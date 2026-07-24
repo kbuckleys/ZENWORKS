@@ -350,6 +350,7 @@ local function rofi_dmenu(entries, opts)
             get_playback()
             if current_track then view_actions(current_track, "track")
             else rofi_message("No track playing") end
+            return nil
         else
             if result == "" then os.exit(0) end
             if by_index then
@@ -734,7 +735,7 @@ get_playback = function()
 end
 
 inv_playback = function()
-    current_track = nil; current_id = nil; is_playing = false; last_playback = 0
+    current_track = nil; current_id = nil; is_playing = false
 end
 
 -- RECENTLY PLAYED
@@ -756,11 +757,6 @@ local function record_recent_play(track)
 end
 
 local function load_recently_played()
-    if #recent_tracks > 0 then return recent_tracks end
-    local data = disk_get(RECENT_CACHE)
-    if type(data) == "table" then
-        recent_tracks = data
-    end
     return recent_tracks
 end
 
@@ -1218,12 +1214,11 @@ local function api_get_lyrics(track_name, artist_name, album_name, duration)
             elseif diff <= 10 then score = score + 2 end
         end
         if score > best_score then
-            best_score = score
             local synced = parse_lrc(entry.syncedLyrics)
-            if synced then best = synced
+            if synced then best = synced; best_score = score
             elseif entry.plainLyrics then
                 local lines = lyrics_to_lines(entry.plainLyrics)
-                if lines then best = {lines=lines} end
+                if lines then best = {lines=lines}; best_score = score end
             end
         end
     end
@@ -1343,7 +1338,9 @@ view_browse = function(entries, items, mesg, ctx, ctx_type, ctx_id)
                         if r and r:match("2..") then
                             disk_bust(ALBUM_CACHE)
                             rofi_message("Removed from library")
-                            table.remove(entries, idx); table.remove(items, idx); goto br_next
+                            table.remove(entries, idx); table.remove(items, idx)
+                            if #items == 0 then return end
+                            goto br_next
                         else rofi_message("Failed to remove") end
                     end
                     do_open = false
@@ -1398,7 +1395,7 @@ browse_album = function(album_id, mesg)
     local te = {}
     for i, t in ipairs(ad.tracks) do te[i] = string.format("%2d. %s", i, display_track(t, true)) end
     view_browse(te, ad.tracks, mesg, "album", "album", album_id)
-    if seek_pending then session_pop() end
+    session_pop()
     return true
 end
 
@@ -1747,7 +1744,7 @@ view_lyrics = function(item)
             break
         end
     end
-    if seek_pending or jump_to_track_pending then session_pop() end
+    session_pop()
 end
 
 -- VIEW: ADD TO PLAYLIST
@@ -1771,7 +1768,7 @@ view_add_pl = function(track_id)
 
     local idx = rofi_dmenu(names, {prompt="Add to Playlist", mesg="Select a playlist", custom=false, by_index=true, use_menu=true})
     if not idx then
-        if seek_pending or jump_to_track_pending then session_pop() end
+        session_pop()
         return
     end
 
@@ -1860,7 +1857,7 @@ local function view_playlists()
                         disk_bust(MASS_DIR .. "/playlist_tracks_" .. pl.id .. ".json"); mem_bust("playlist_tracks_" .. pl.id)
                         rofi_message("Deleted")
                         table.remove(entries, idx); table.remove(pls, idx - 1)
-                        session_pop(); session_pop()
+                        session_clear()
                         break
                     else rofi_message("Failed to delete") end
                 end
@@ -2099,13 +2096,16 @@ view_seek = function(item)
         if not si then break end
         local sign, secs = si:match("^([%+%-])(%d+)s$")
         if sign then
-            os.execute("playerctl position " .. sign .. secs .. " 2>/dev/null")
+            local cur = get_playerctl_position()
+            local delta = sign == "+" and tonumber(secs) or -tonumber(secs)
+            local target = math.max(0, math.floor(cur + delta + 0.5))
+            os.execute("playerctl position " .. target .. " 2>/dev/null")
         else
             local m, s = si:match("^(%d+):(%d+)$")
             if m and s then os.execute("playerctl position " .. (tonumber(m) * 60 + tonumber(s)) .. " 2>/dev/null") end
         end
     end
-    if seek_pending or jump_to_track_pending then session_pop() end
+    session_pop()
 end
 
 local function view_playback()
@@ -2508,7 +2508,7 @@ local function daemon_mode()
         if title and title ~= "" and title ~= last_title then
             daemon_notify(title, artist, art_url, track_id)
             last_title = title
-            if track_id then
+            if track_id and #track_id > 0 then
                 os.execute("nohup lua " .. shell_quote(DIR .. "/spotirofi.lua")
                     .. " --prefetch-lyrics " .. shell_quote(track_id)
                     .. " " .. shell_quote(title)
