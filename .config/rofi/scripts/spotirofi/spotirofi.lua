@@ -22,13 +22,6 @@ local LIKED_IDS    = CACHE .. "/liked_ids.json"
 local VOLUME_FILE  = CACHE .. "/volume.json"
 local RECENT_CACHE = CACHE .. "/recently_played.json"
 
-local THEME      = DIR .. "/main.rasi"
-local THEME_MENU = DIR .. "/menu.rasi"
-local THEME_LYR  = DIR .. "/lyrics.rasi"
-local THEME_MSG  = DIR .. "/message.rasi"
-local THEME_SUB  = DIR .. "/sub.rasi"
-local THEME_BINDS = DIR .. "/binds.rasi"
-
 local MAX_RESULTS = 20
 local CACHE_TTL  = 43200
 local SPOTIFY_ID  = "d420a117a32841c2b3474932e49fb54b"
@@ -88,6 +81,22 @@ local function read_file(p)
     local d = f:read("*a"); f:close()
     return d
 end
+
+local THEME, THEME_MENU, THEME_LYR, THEME_MSG, THEME_SUB, THEME_BINDS = (function()
+    local function resolve(src)
+        local content = read_file(src)
+        if not content then return src end
+        local resolved = content:gsub('@import "ZENON"', '@import "' .. DIR .. '/style/ZENON"')
+        if resolved == content then return src end
+        local tmp = os.tmpname() .. ".rasi"
+        local f = io.open(tmp, "w")
+        if f then f:write(resolved); f:close(); return tmp end
+        return src
+    end
+    local d = DIR .. "/style"
+    return resolve(d.."/main.rasi"), resolve(d.."/menu.rasi"), resolve(d.."/lyrics.rasi"),
+           resolve(d.."/message.rasi"), resolve(d.."/sub.rasi"), resolve(d.."/binds.rasi")
+end)()
 
 local function write_file(p, d)
     local t = p .. ".tmp"
@@ -284,7 +293,7 @@ local function rofi_dmenu(entries, opts)
 
     while true do
         if seek_pending or jump_to_track_pending then return nil end
-        local args = {"rofi","-dmenu","-theme",theme,"-p",prompt,"-i",
+        local args = {"rofi","-dmenu","-config",DIR.."/style/config.rasi","-theme",theme,"-p",prompt,"-i",
                       "-kb-custom-1","Alt+BackSpace","-kb-custom-2","Alt+space",
                       "-kb-custom-3","Alt+slash","-kb-custom-4","Alt+Return",
                       "-kb-custom-5","Alt+KP_Enter",
@@ -365,7 +374,7 @@ end
 
 rofi_message = function(msg, theme)
     local tf = os.tmpname()
-    os.execute("rofi -e " .. shell_quote(msg) .. " -theme " .. shell_quote(theme or THEME_MSG) .. " -markup 2>/dev/null; printf '\\n__EXIT__%d__' $? >> " .. shell_quote(tf))
+    os.execute("rofi -e " .. shell_quote(msg) .. " -config " .. shell_quote(DIR.."/style/config.rasi") .. " -theme " .. shell_quote(theme or THEME_MSG) .. " -markup 2>/dev/null; printf '\\n__EXIT__%d__' $? >> " .. shell_quote(tf))
     local raw = read_file(tf)
     os.remove(tf)
     local ec = tonumber((raw or ""):match("__EXIT__(%d+)__")) or 1
@@ -377,7 +386,7 @@ local function rofi_input(prompt, preset)
     local out_tf = os.tmpname()
     local f = io.open(in_tf, "w")
     if f then f:write(preset or ""); f:close() end
-    os.execute("rofi -dmenu -p " .. shell_quote(prompt)
+    os.execute("rofi -dmenu -config " .. shell_quote(DIR.."/style/config.rasi") .. " -p " .. shell_quote(prompt)
         .. " -theme " .. shell_quote(THEME_MENU)
         .. " < " .. shell_quote(in_tf)
         .. " > " .. shell_quote(out_tf) .. " 2>/dev/null")
@@ -1415,7 +1424,7 @@ view_art = function(item)
         ef:write("\0icon\x1f" .. art_path .. "\n")
         ef:close()
     end
-    os.execute("rofi -dmenu -theme " .. shell_quote(DIR .. "/art.rasi")
+    os.execute("rofi -dmenu -config " .. shell_quote(DIR.."/style/config.rasi") .. " -theme " .. shell_quote(DIR .. "/style/art.rasi")
         .. " -mesg " .. shell_quote(mesg)
         .. " -markup-rows -no-custom"
         .. " < " .. shell_quote(entry_tf)
@@ -1434,9 +1443,24 @@ view_actions = function(item, ctx, ctx_type, ctx_id, all_items, cidx, entries)
     local is_liked = liked[item.id]
     local in_pl    = ctx_type == "playlist" and ctx_id
 
+    local art_url = item.album and item.album.images and #item.album.images > 0
+        and item.album.images[1].url or nil
+    local art_path = ensure_art(art_url) or ""
+    local tmp_theme = os.tmpname() .. ".rasi"
+    local tf = io.open(tmp_theme, "w")
+    if tf then
+        local tmpl = read_file(DIR .. "/style/action.rasi") or ""
+        tmpl = tmpl:gsub('@import "ZENON"', '@import "' .. DIR .. '/style/ZENON"')
+        tf:write(string.format(tmpl, art_path))
+        tf:close()
+    end
+    local action_theme = tmp_theme
+
     local play_label = item.id == current_id and (is_playing and "Pause" or "Resume") or "Play"
+    local seek_active = item.id == current_id
+    local seek_label = seek_active and "Seek" or '<span color="#6a707f">Seek</span>'
     local actions = {play_label}
-    if item.id == current_id then actions[#actions+1] = "Seek" end
+    actions[#actions+1] = seek_label
     actions[#actions+1] = "Add to Queue"
     local like_idx = #actions + 1
     actions[#actions+1] = is_liked and "Unlike" or "Like"
@@ -1450,9 +1474,12 @@ view_actions = function(item, ctx, ctx_type, ctx_id, all_items, cidx, entries)
     actions[#actions+1] = "Album Art"
 
     while true do
-        local sel = rofi_dmenu(actions, {prompt="Action", mesg=track_mesg(item), sel=0, custom=false, theme=THEME_SUB})
+        actions[2] = item.id == current_id and "Seek" or '<span color="#6a707f">Seek</span>'
+        local sel = rofi_dmenu(actions,
+            {prompt="Action", mesg=track_mesg(item), sel=0, custom=false, theme=action_theme, markup=true})
         if not sel then
             if seek_pending or jump_to_track_pending then session_pop() end
+            if tmp_theme then os.remove(tmp_theme) end
             return
         end
 
@@ -1467,7 +1494,6 @@ view_actions = function(item, ctx, ctx_type, ctx_id, all_items, cidx, entries)
             is_playing = true
             last_playback = 0
             actions[1] = "Pause"
-            if actions[2] ~= "Seek" then table.insert(actions, 2, "Seek"); like_idx = like_idx + 1 end
         elseif sel == "Pause" then
             os.execute("playerctl pause 2>/dev/null")
             is_playing = false
@@ -1477,7 +1503,7 @@ view_actions = function(item, ctx, ctx_type, ctx_id, all_items, cidx, entries)
             if do_like(item, sel == "Unlike") then
                 is_liked = not is_liked
                 actions[like_idx] = is_liked and "Unlike" or "Like"
-                if not is_liked then session_pop(); return true end
+                if not is_liked then if tmp_theme then os.remove(tmp_theme) end; session_pop(); return true end
             end
         elseif sel == "Go to Album" then
             local album = item.album
@@ -1498,6 +1524,7 @@ view_actions = function(item, ctx, ctx_type, ctx_id, all_items, cidx, entries)
                         table.remove(entries, cidx)
                         table.remove(all_items, cidx)
                     end
+                    if tmp_theme then os.remove(tmp_theme) end
                     session_pop(); return
                 end
             end
@@ -2117,9 +2144,9 @@ local function view_playback()
         items[#items+1] = "Previous Track"
         items[#items+1] = is_shuffle and "Shuffle: On" or "Shuffle: Off"
         items[#items+1] = repeat_state=="off" and "Repeat: Off" or (repeat_state=="track" and "Repeat: Track" or "Repeat: Context")
-        if current_track then items[#items+1] = "Seek" end
+        items[#items+1] = current_track and "Seek" or '<span color="#6a707f">Seek</span>'
         local mesg = current_track and track_mesg(current_track) or "No track playing"
-        local si = rofi_dmenu(items, {prompt="Playback", mesg=mesg, custom=false, use_menu=true, theme=THEME_SUB})
+        local si = rofi_dmenu(items, {prompt="Playback", mesg=mesg, custom=false, use_menu=true, theme=THEME_SUB, markup=true})
         if not si then break end
         if si == "Pause" then
             local r = os.execute("playerctl pause 2>/dev/null")
@@ -2163,7 +2190,7 @@ local function view_system()
                    "Restart Daemons",
                    "Kill Daemons"}
     while true do
-        local sel = rofi_dmenu(items, {prompt="System", mesg="Current bitrate: " .. cur_br .. " kbps", custom=false, use_menu=true, theme=THEME_SUB, markup=true})
+        local sel = rofi_dmenu(items, {prompt="System", custom=false, use_menu=true, theme=THEME_SUB, markup=true})
         if not sel then break end
         local clean = sel:gsub("<[^>]+>", "")
         if clean == "Keybinds" then
@@ -2228,14 +2255,18 @@ local function replay_session()
         local v = s.view
 
         if v == "action" and s.track_id then
-            if current_track and s.track_id == current_track.id then
+            if current_track then
                 view_actions(current_track, "track")
             else
                 view_actions({id=s.track_id, name=s.track_name or "", artists=s.track_artists or {},
                     album=s.track_album or {}, duration_ms=s.track_duration_ms or 0}, "track")
             end
         elseif v == "lyrics" and s.track_id then
-            view_lyrics({id=s.track_id, name=s.track_name or "", artists=s.track_artists or {}})
+            if current_track then
+                view_lyrics(current_track)
+            else
+                view_lyrics({id=s.track_id, name=s.track_name or "", artists=s.track_artists or {}})
+            end
         elseif v == "album" and s.album_id then
             local ad = api_get_album(s.album_id)
             if ad and ad.tracks and #ad.tracks > 0 then
@@ -2293,11 +2324,13 @@ local function replay_session()
                 end
             end
         elseif v == "recommendations" and s.track_id then
-            local tracks = api_get_recommendations(s.track_id)
+            local rec_id = current_track and current_track.id or s.track_id
+            local rec_name = current_track and current_track.name or s.track_name
+            local tracks = api_get_recommendations(rec_id)
             if tracks then
                 local te = {}
                 for i, t in ipairs(tracks) do te[i] = string.format("%2d. %s", i, display_track(t)) end
-                view_browse(te, tracks, "More Like " .. (s.track_name or ""), "recommendations", nil, nil)
+                view_browse(te, tracks, "More Like " .. (rec_name or ""), "recommendations", nil, nil)
             end
         elseif v == "categories"          then view_categories()
         elseif v == "playlists"           then view_playlists()
