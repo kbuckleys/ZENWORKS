@@ -1086,49 +1086,52 @@ end
 
 -- QUEUE
 
-local queue_tracks = nil
-local queue_idx    = 0
+local queue_tracks  = nil
+local queue_idx     = 0
+local queue_context = nil
 
 local function load_queue()
     local raw = read_file(P.queue)
     if not raw then return end
     local d = safe_decode(raw)
     if d then
-        queue_tracks = d.tracks
-        queue_idx    = d.idx or 0
+        queue_tracks  = d.tracks
+        queue_idx     = d.idx or 0
+        queue_context = d.context or nil
     end
 end
 
-local function save_queue(items, idx)
+local function save_queue(items, idx, context_uri)
     local tids = {}
     for _, t in ipairs(items or {}) do
         if type(t) == "table" and t.id then tids[#tids+1] = t.id end
     end
-    queue_tracks = tids
-    queue_idx    = idx
-    write_file(P.queue, json.encode({tracks=tids, idx=idx}))
+    queue_tracks  = tids
+    queue_idx     = idx
+    queue_context = context_uri
+    write_file(P.queue, json.encode({tracks=tids, idx=idx, context=context_uri}))
 end
 
 local function flush_queue()
     if not queue_tracks then return end
-    write_file(P.queue, json.encode({tracks=queue_tracks, idx=queue_idx}))
+    write_file(P.queue, json.encode({tracks=queue_tracks, idx=queue_idx, context=queue_context}))
 end
 
 -- ACTIONS
 
 local function do_play(item, ctx, ctx_type, ctx_id, all_items, idx)
-    if all_items and idx then save_queue(all_items, idx) end
-    local token = get_token()
-    if not token then return end
-    local device_id = get_spotifyd_device()
-    local dparam = device_id and "?device_id=" .. device_id or ""
-
     local context_uri
     if ctx_type and ctx_id then context_uri = "spotify:" .. ctx_type .. ":" .. ctx_id
     elseif ctx == "discover-weekly" then context_uri = "spotify:playlist:" .. P.weekly
     elseif ctx == "release-radar"   then context_uri = "spotify:playlist:" .. P.radar
     elseif ctx == "new-music-friday" then context_uri = "spotify:playlist:" .. P.friday
     end
+
+    if all_items and idx then save_queue(all_items, idx, context_uri) end
+    local token = get_token()
+    if not token then return end
+    local device_id = get_spotifyd_device()
+    local dparam = device_id and "?device_id=" .. device_id or ""
 
     local body
     if context_uri then
@@ -1246,6 +1249,36 @@ local function do_playback_cmd(cmd)
     local r = shell(string.format("curl -s --max-time 3 -o /dev/null -w '%%{http_code}' -X POST 'https://api.spotify.com/v1/me/player/%s' -H %s -H 'Content-Length: 0'", cmd, shell_quote("Authorization: Bearer " .. token)))
     if r and r:match("2..") then mem_bust("queue") end
     return r
+end
+
+local function recover_playback(direction)
+    if not queue_tracks or #queue_tracks == 0 then return false end
+    local new_idx = queue_idx + direction
+    if new_idx < 1 then new_idx = 1 end
+    if new_idx > #queue_tracks then new_idx = #queue_tracks end
+    if new_idx == queue_idx then return false end
+    local token = get_token()
+    if not token then return false end
+    local device_id = get_spotifyd_device()
+    local dparam = device_id and "?device_id=" .. device_id or ""
+    local body
+    if queue_context then
+        body = json.encode({context_uri=queue_context, offset={position=new_idx-1}})
+    else
+        local uris = {}
+        for i = new_idx, math.min(#queue_tracks, new_idx + 49) do
+            uris[#uris+1] = "spotify:track:" .. queue_tracks[i]
+        end
+        if #uris > 0 then body = json.encode({uris=uris, offset={position=0}}) end
+    end
+    if not body then return false end
+    local r = shell(string.format("curl -s --max-time 3 -o /dev/null -w '%%{http_code}' -X PUT 'https://api.spotify.com/v1/me/player/play%s' -H %s -H 'Content-Type: application/json' -d %s", dparam, shell_quote("Authorization: Bearer " .. token), shell_quote(body)))
+    if r and r:match("2..") then
+        queue_idx = new_idx
+        last_playback = 0; get_playback()
+        return true
+    end
+    return false
 end
 
 -- API HELPERS
@@ -2390,10 +2423,12 @@ local function view_playback()
             if r == true or r == 0 then is_playing = true else rofi_message("Failed to resume") end
         elseif si == "Next Track" then
             local r = do_playback_cmd("next")
-            if r and r:match("2..") then last_playback = 0; get_playback() else rofi_message("Failed to skip") end
+            if r and r:match("2..") then last_playback = 0; get_playback()
+            elseif not recover_playback(1) then rofi_message("Failed to skip") end
         elseif si == "Previous Track" then
             local r = do_playback_cmd("previous")
-            if r and r:match("2..") then last_playback = 0; get_playback() else rofi_message("Failed to go back") end
+            if r and r:match("2..") then last_playback = 0; get_playback()
+            elseif not recover_playback(-1) then rofi_message("Failed to go back") end
         elseif si:find("^Shuffle") then
             local token = get_token()
             if token then
