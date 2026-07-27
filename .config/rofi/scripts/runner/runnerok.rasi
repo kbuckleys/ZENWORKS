@@ -49,7 +49,7 @@ element-text.selected.normal {
 }
 
 message {
-    background-color: #20242a;
+    background-color: #16191d;
     padding: 2px 8px 2px 8px;
     expand: true;
 }
