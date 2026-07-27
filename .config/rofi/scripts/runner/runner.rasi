@@ -6,6 +6,10 @@
 
 @import "ZENON"
 
+* {
+    selected-normal-background: #20242a;
+}
+
 window {
     location: south;
     anchor: south;
@@ -24,13 +28,13 @@ hbox {
 
 inputbar {
     children: [ textbox-prompt-colon, entry ];
-    padding: 4px 8px;
+    padding: 2px 12px 2px 12px;
     spacing: 4px;
     width: 15%;
 }
 
 textbox-prompt-colon {
-    str: "";
+    str: " ";
     color: #fab387;
     expand: false;
 }
@@ -50,12 +54,10 @@ listview {
 element {
     padding: 2px 12px 2px 12px;
 }
-
 element-text {
     highlight: bold #e0d8a4;
     text-color: #fab387;
 }
-
-element-text selected {
-    background-color: transparent;
+element-text.selected.normal {
+    background-color: #20242a;
 }

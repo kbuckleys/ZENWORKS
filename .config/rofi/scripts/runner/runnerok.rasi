@@ -6,6 +6,10 @@
 
 @import "ZENON"
 
+* {
+    selected-normal-background: #fab387;
+}
+
 window {
     location: south;
     anchor: south;
@@ -19,31 +23,17 @@ mainbox {
 
 hbox {
     orientation: horizontal;
-    children: [ message, inputbar, listview ];
-}
-
-inputbar {
-    children: [ prompt ];
-    padding: 4px 8px;
-    spacing: 4px;
-}
-
-prompt {
-    text-color: #e0d8a4;
-    expand: true;
+    children: [ message, listview ];
 }
 
 textbox {
-    text-color: #000000;
+    text-color: #fab387;
     horizontal-align: 0.5;
     font: "0xProto Nerd Font Bold 12";
 }
 
-entry { enabled: false; }
-
 listview {
     layout: horizontal;
-    lines: 50;
     fixed-height: true;
     scrollbar: false;
 }
@@ -51,25 +41,16 @@ listview {
 element {
     padding: 2px 12px 2px 12px;
 }
-
 element-text {
-    highlight: bold #e0d8a4;
     text-color: #fab387;
 }
-
-element-text selected {
-    background-color: transparent;
+element-text.selected.normal {
+    background-color: #fab387;
+    text-color: #000000;
 }
 
 message {
-    enabled: true;
-    background-color: #fab387;
-    padding: 4px 8px;
+    background-color: #20242a;
+    padding: 2px 8px 2px 8px;
     expand: true;
-}
-
-message textbox {
-    text-color: #000000;
-    font: "0xProto Nerd Font 12";
-    horizontal-align: 0;
 }
