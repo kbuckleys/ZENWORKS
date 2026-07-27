@@ -1,0 +1,46 @@
+/**
+* ┌─┐┌─┐┌┐┌┬ ┬┌─┐┬─┐┬┌─┌─┐
+* ┌─┘├┤ │││││││ │├┬┘├┴┐└─┐
+* └─┘└─┘┘└┘└┴┘└─┘┴└─┴ ┴└─┘
+* https://github.com/kbuckleys/ */
+
+@import "ZENON"
+
+configuration {
+    kb-remove-to-sol: "BackSpace";
+    kb-remove-char-back: "";
+}
+
+window {
+    location: south;
+    anchor: south;
+    width: 100%;
+    children: [ inputbar, hbox ];
+}
+
+hbox {
+    orientation: horizontal;
+    children: [ listview ];
+}
+
+inputbar {
+    enabled: false;
+}
+
+listview {
+    layout: horizontal;
+    lines: 50;
+    fixed-height: true;
+    scrollbar: false;
+}
+
+element {
+    padding: 4px 12px 4px 12px;
+}
+element-text {
+    highlight: none;
+}
+element-text selected {
+    background-color: transparent;
+    text-color: #9bbfbf;
+}

@@ -1,0 +1,75 @@
+/**
+* ┌─┐┌─┐┌┐┌┬ ┬┌─┐┬─┐┬┌─┌─┐
+* ┌─┘├┤ │││││││ │├┬┘├┴┐└─┐
+* └─┘└─┘┘└┘└┴┘└─┘┴└─┴ ┴└─┘
+* https://github.com/kbuckleys/ */
+
+@import "ZENON"
+
+window {
+    location: south;
+    anchor: south;
+    width: 100%;
+    children: [ mainbox ];
+}
+
+mainbox {
+    children: [ hbox ];
+}
+
+hbox {
+    orientation: horizontal;
+    children: [ message, inputbar, listview ];
+}
+
+inputbar {
+    children: [ prompt ];
+    padding: 4px 8px;
+    spacing: 4px;
+}
+
+prompt {
+    text-color: #e0d8a4;
+    expand: true;
+}
+
+textbox {
+    text-color: #000000;
+    horizontal-align: 0.5;
+    font: "0xProto Nerd Font Bold 12";
+}
+
+entry { enabled: false; }
+
+listview {
+    layout: horizontal;
+    lines: 50;
+    fixed-height: true;
+    scrollbar: false;
+}
+
+element {
+    padding: 2px 12px 2px 12px;
+}
+
+element-text {
+    highlight: bold #e0d8a4;
+    text-color: #fab387;
+}
+
+element-text selected {
+    background-color: transparent;
+}
+
+message {
+    enabled: true;
+    background-color: #fab387;
+    padding: 4px 8px;
+    expand: true;
+}
+
+message textbox {
+    text-color: #000000;
+    font: "0xProto Nerd Font 12";
+    horizontal-align: 0;
+}

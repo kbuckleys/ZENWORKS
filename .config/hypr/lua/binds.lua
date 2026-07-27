@@ -35,7 +35,7 @@ hl.bind("SUPER + V", hl.dsp.exec_cmd('rofi-rbw --selector-args="-theme rbw"'))
 hl.bind("SUPER + K", hl.dsp.exec_cmd("~/.config/rofi/scripts/runner/runner.lua"))
 hl.bind("SUPER + SHIFT + K", hl.dsp.exec_cmd("~/.config/rofi/scripts/hitman/hitman.lua"))
 hl.bind("SUPER + D", hl.dsp.exec_cmd("~/.config/rofi/scripts/dictionary/dict.lua"))
-hl.bind("SUPER + SPACE", hl.dsp.exec_cmd("rofi -show drun"))
+hl.bind("SUPER + SPACE", hl.dsp.exec_cmd("~/.config/rofi/scripts/runner/runner.lua"))
 
 -- WORKSPACES
 hl.bind("SUPER + GRAVE", hl.dsp.workspace.toggle_special("special"))
