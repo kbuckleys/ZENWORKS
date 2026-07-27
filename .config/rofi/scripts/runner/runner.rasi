@@ -7,7 +7,7 @@
 @import "ZENON"
 
 * {
-    selected-normal-background: #20242a;
+    selected-normal-background: #fab387;
 }
 
 window {
@@ -55,9 +55,9 @@ element {
     padding: 2px 12px 2px 12px;
 }
 element-text {
-    highlight: bold #e0d8a4;
+    highlight: bold;
     text-color: #fab387;
 }
-element-text.selected.normal {
-    background-color: #20242a;
+element-text.selected {
+    text-color: #000000;
 }

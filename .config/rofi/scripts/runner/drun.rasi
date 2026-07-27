@@ -41,6 +41,5 @@ element-text {
     highlight: none;
 }
 element-text selected {
-    background-color: transparent;
     text-color: #9bbfbf;
 }
