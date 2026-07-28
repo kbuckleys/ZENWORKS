@@ -12,7 +12,8 @@ local CONFIG = DIR .. "/config.rasi"
 local RUNNER_THEME = DIR .. "/runner.rasi"
 local MODE_THEME = DIR .. "/runnerok.rasi"
 local HIST = HOME .. "/.cache/rofi-run-history"
-local HIST_MAX = 100
+local HIST_MAX = 200
+local FREQ = HOME .. "/.cache/rofi-run-freq"
 
 local ICON_T = string.char(0xEE, 0xAA, 0x85)
 local ICON_P = string.char(0xF3, 0xB0, 0x98, 0x94)
@@ -151,6 +152,34 @@ local function write_history(lines)
     f:close()
 end
 
+local function read_freq()
+    local data = {}
+    local f = io.open(FREQ, "r")
+    if not f then return data end
+    for line in f:lines() do
+        local name, count = line:match("^(.-)=(%d+)$")
+        if name and name ~= "" then data[name] = tonumber(count) end
+    end
+    f:close()
+    return data
+end
+
+local function write_freq(data)
+    local f = io.open(FREQ, "w")
+    if not f then return end
+    for name, count in pairs(data) do
+        f:write(name, "=", tostring(count), "\n")
+    end
+    f:close()
+end
+
+local function bump_freq(name)
+    if not name or name == "" then return end
+    local data = read_freq()
+    data[name] = (data[name] or 0) + 1
+    write_freq(data)
+end
+
 local function add_history(entry, mode)
     local hist = read_history()
     local formatted = (mode == "Terminal" and ICON_T or ICON_P) .. "  " .. entry
@@ -177,6 +206,7 @@ end
 local function get_combined_entries()
     local apps = get_apps()
     local hist = read_history()
+    local freq = read_freq()
 
     local app_names = {}
     for _, app in ipairs(apps) do
@@ -199,11 +229,21 @@ local function get_combined_entries()
         entries[#entries + 1] = entry
     end
 
+    table.sort(entries, function(a, b)
+        local key_a = a:find("<span", 1, true) and strip_hidden(a) or strip_prefix(a)
+        local key_b = b:find("<span", 1, true) and strip_hidden(b) or strip_prefix(b)
+        local count_a = freq[key_a] or 0
+        local count_b = freq[key_b] or 0
+        if count_a ~= count_b then return count_a > count_b end
+        return a < b
+    end)
+
     return entries
 end
 
 local function run_terminal(cmd)
     add_history(cmd, "Terminal")
+    bump_freq(cmd)
     os.execute(string.format(
         "setsid kitty -1 --detach --hold --title runner %s -i -c %s >/dev/null 2>&1",
         SHELL, shell_quote(cmd)))
@@ -211,6 +251,7 @@ end
 
 local function run_process(cmd)
     add_history(cmd, "Process")
+    bump_freq(cmd)
     os.execute(string.format(
         "setsid %s -i -c %s >/dev/null 2>&1 &",
         SHELL, shell_quote(cmd)))
@@ -246,6 +287,7 @@ local function run()
         local app = find_app(display)
 
         if app then
+            bump_freq(display)
             os.execute(string.format("gtk-launch %s >/dev/null 2>&1 &", shell_quote(app.desktop)))
             break
         elseif starts_with(raw, ICON_T) then
