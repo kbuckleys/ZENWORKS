@@ -16,11 +16,9 @@ window {
     width: 100%;
     children: [ mainbox ];
 }
-
 mainbox {
     children: [ hbox ];
 }
-
 hbox {
     orientation: horizontal;
     children: [ inputbar, listview ];
@@ -32,23 +30,17 @@ inputbar {
     spacing: 4px;
     width: 15%;
 }
-
 textbox-prompt-colon {
     str: " ";
     color: #fab387;
-    expand: false;
 }
-
 entry {
-    text-color: #e0d8a4;
-    placeholder: "";
+    text-color: #fab387;
 }
 
 listview {
     layout: horizontal;
     lines: 50;
-    fixed-height: true;
-    scrollbar: false;
 }
 
 element {
@@ -57,7 +49,6 @@ element {
 element-text {
     highlight: bold;
     text-color: #fab387;
-    orientation: horizontal;
 }
 element-text.selected {
     text-color: #000000;
