@@ -1,5 +1,10 @@
 #!/usr/bin/lua
 
+-- ┌─┐┌─┐┌┐┌┬ ┬┌─┐┬─┐┬┌─┌─┐
+-- ┌─┘├┤ │││││││ │├┬┘├┴┐└─┐
+-- └─┘└─┘┘└┘└┴┘└─┘┴└─┴ ┴└─┘
+-- https://github.com/kbuckleys/
+
 local HOME = os.getenv("HOME")
 local DIR = HOME .. "/.config/rofi/scripts/runner"
 local SHELL = os.getenv("SHELL") or "/bin/bash"
@@ -228,8 +233,10 @@ local function run()
         if #entries == 0 then break end
         local raw, code = rofi_dmenu(entries, RUNNER_THEME, "Run", runner_args)
 
-        if code == 10 and raw and (starts_with(raw, ICON_T) or starts_with(raw, ICON_P)) then
-            delete_from_history(raw)
+        if code == 10 then
+            if raw and (starts_with(raw, ICON_T) or starts_with(raw, ICON_P)) then
+                delete_from_history(raw)
+            end
             goto continue
         end
 
