@@ -57,6 +57,7 @@ element {
 element-text {
     highlight: bold;
     text-color: #fab387;
+    orientation: horizontal;
 }
 element-text.selected {
     text-color: #000000;
