@@ -4,7 +4,7 @@
 </picture>
 
 <h3><p align="center">
-My dotfile repo for all to use, and for my own convenience
+A zen Arch-based ecosystem
 </p></h3>
 
 ---
