@@ -4,7 +4,7 @@ run = "tab_switch 1 --relative"
 desc = "Next tab"
 
 [[mgr.prepend_keymap]]
-on = [ "<C-BackTab>" ]
+on = [ "<C-S-Tab>" ]
 run = "tab_switch -1 --relative"
 desc = "Previous tab"
 
