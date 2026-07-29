@@ -12,7 +12,7 @@ A zen Arch-based ecosystem
 # Dependencies
 Everything I use is condensed [here](/pkglst)
 
-# Theme Elements
+**Theme Elements**
 - [YAMS](https://www.pling.com/p/2303161/)
 - [Kripton GTK theme](https://www.gnome-look.org/s/Gnome/p/1365372/) (standard-buttons)
 - [GoogleDot-Black](https://www.gnome-look.org/p/1638261)
