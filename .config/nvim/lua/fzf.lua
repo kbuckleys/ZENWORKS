@@ -72,7 +72,7 @@ function M.open()
     return
   end
 
-  for _, exe in ipairs({ "fzf", "find" }) do
+  for _, exe in ipairs({ "fzf", "fd" }) do
     if vim.fn.executable(exe) ~= 1 then
       vim.notify(("fzf.lua: required executable '%s' not found"):format(exe), vim.log.levels.ERROR)
       return
@@ -81,7 +81,7 @@ function M.open()
   local has_bat = vim.fn.executable("bat") == 1
 
   local tmpfile = vim.fn.tempname()
-  local root = "~"
+  local root = vim.fn.expand("~")
 
   local geo = win_geometry()
   local buf = vim.api.nvim_create_buf(false, true)
@@ -122,16 +122,7 @@ function M.open()
     or "cat {}"
 
   local cmd = string.format(
-    "find %s "
-      .. "-path /proc -prune -o "
-      .. "-path /sys -prune -o "
-      .. "-path /dev -prune -o "
-      .. "-path /run -prune -o "
-      .. "-path /snap -prune -o "
-      .. "-name .git -prune -o "
-      .. "-name node_modules -prune -o "
-      .. "-name .cache -prune -o "
-      .. "-type f -print 2>/dev/null | "
+    "fd . %s --type f --exclude .cache --exclude node_modules --hidden --follow 2>/dev/null | "
       .. "FZF_DEFAULT_OPTS=\"--color=%s\" fzf -m "
       .. "--preview '%s' "
       .. "--preview-window=down:60%% > %s",

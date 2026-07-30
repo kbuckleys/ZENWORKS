@@ -199,4 +199,4 @@ vim.api.nvim_create_autocmd("ColorScheme", {
   pattern = "*",
   callback = apply_terminal_syntax
 })
-apply_terminal_syntax()   
+apply_terminal_syntax()

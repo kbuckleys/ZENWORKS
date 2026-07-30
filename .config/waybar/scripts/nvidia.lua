@@ -177,7 +177,14 @@ local function main()
     local gpu_text = colorize(gpu_util, MID_UTIL, WARN_UTIL)
     local temp_text = colorize(gpu_temp, MID_TEMP, WARN_TEMP)
 
-    local text = " GPU " .. gpu_text .. "%  VRAM " .. vram_str .. "  " .. temp_text .. "°"
+    local gpu_title = "GPU"
+    if gpu_util >= WARN_UTIL then
+        gpu_title = "<span foreground='" .. COLOR_WARN .. "'>GPU</span>"
+    elseif gpu_util >= MID_UTIL then
+        gpu_title = "<span foreground='" .. COLOR_MID .. "'>GPU</span>"
+    end
+
+    local text = " " .. gpu_title .. " " .. gpu_text .. "%  VRAM " .. vram_str .. "  " .. temp_text .. "°"
     local tooltip = string.format("<b>%s</b>\n\nUtilization: %d%%\nTemperature: %d°C\nVRAM: %s\nPower: ",
         gpu_name, gpu_util, gpu_temp, vram_str)
     if has_power then
