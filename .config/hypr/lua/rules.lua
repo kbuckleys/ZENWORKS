@@ -16,8 +16,8 @@ hl.window_rule({ match = { class = "swayimg" }, float = true })
 hl.window_rule({ match = { class = "mpv" }, float = true, })
 
 -- BORDERS
-hl.window_rule({ match = { fullscreen = true }, border_color = "rgba(250, 179, 135, 0.6)"})
-hl.window_rule({ match = { float = true }, border_color = "rgba(182, 224, 164, 0.6)"})
+hl.window_rule({ match = { fullscreen = true }, border_color = "#fab38799"})
+hl.window_rule({ match = { float = true }, border_color = "#b6e0a499"})
 
 -- SPECIAL WORKSPACE
 hl.workspace_rule({ workspace = "special:special", gaps_out = 30 })
