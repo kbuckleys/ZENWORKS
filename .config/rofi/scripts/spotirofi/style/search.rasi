@@ -9,33 +9,32 @@
 window {
     location: south;
     anchor: south;
-    width: 700px;
+    width: 1000px;
 }
 
 mainbox {
-    children: [ message, listview ];
+    children: [ inputbar, message, listview ];
 }
 
-textbox {
-    text-color: #b6e0a4;
-    horizontal-align: 0.5;
-    font: "0xProto Nerd Font Bold 12";
+inputbar {
+    enabled: true;
+    children: [textbox-prompt-colon, entry];
+    padding: 4px 8px;
+    spacing: 4px;
 }
 
 listview {
     fixed-columns: false;
     fixed-height: false;
     scrollbar: false;
-    columns: 1;
-    lines: 11;
+    columns: 2;
+    lines: 14;
 }
 
 element {
     padding: 2px 8px;
 }
 element-text {
-    font: "0xProto Nerd Font 12";
-    horizontal-align: 0.5;
     highlight: bold #b6e0a4;
 }
 element-text selected {
@@ -51,4 +50,12 @@ textbox {
     text-color: #b6e0a4;
     horizontal-align: 0.5;
     font: "0xProto Nerd Font Bold 12";
+}
+textbox-prompt-colon {
+    str: "";
+    color: #b6e0a4;
+    padding: 0px 8px 0px 2px;
+}
+entry {
+    text-color: #b6e0a4;
 }
