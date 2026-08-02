@@ -1,0 +1,69 @@
+# ┌─┐┌─┐┌┐┌┬ ┬┌─┐┬─┐┬┌─┌─┐
+# ┌─┘├┤ │││││││ │├┬┘├┴┐└─┐
+# └─┘└─┘┘└┘└┴┘└─┘┴└─┴ ┴└─┘
+# https://github.com/kbuckleys/
+
+[global]
+    font = "0xProto Nerd Font Propo 11"
+    width = (400, 800)
+    height = (0, 200)
+    origin = bottom-center
+    offset = (0, 20)
+    scale = 0
+    notification_limit = 5
+    progress_bar = true
+    indicate_hidden = true
+    transparency = 0
+    separator_height = 2
+    padding = 2
+    horizontal_padding = 2
+    text_icon_padding = 16
+    frame_width = 1
+    gap_size = -1
+    separator_color = frame
+    sort = true
+    idle_threshold = 0
+    layer = overlay
+    force_xwayland = false
+    markup = full
+    format = "<b>%s</b>\n%b"
+    alignment = center
+    vertical_alignment = center
+    show_age_threshold = 60
+    word_wrap = true
+    ellipsize = middle
+    ignore_newline = false
+    stack_duplicates = true
+    hide_duplicate_count = false
+    show_indicators = true
+    icon_position = left
+    min_icon_size = 32
+    max_icon_size = 96
+    icon_path = /usr/share/icons/Adwaita/16x16/status/:/usr/share/icons/Adwaita/16x16/devices/
+    sticky_history = false
+    history_length = 20
+    browser = /usr/bin/xdg-open
+    always_run_script = true
+    title = dunst
+    class = dunst
+    corner_radius = 0
+    background = "#dfdfdd"
+    foreground = "#000000"
+    frame_color = "#20242a"
+    highlight = "#20242a"
+    timeout = 5s
+
+[urgency_low]
+    background = "#b6e0a4"
+    foreground = "#000000"
+    timeout = 4s
+
+[urgency_normal]
+    background = "#dfdfdd"
+    foreground = "#000000"
+    timeout = 4s
+
+[urgency_critical]
+    background = "#fab387"
+    foreground = "#000000"
+    timeout = 0
