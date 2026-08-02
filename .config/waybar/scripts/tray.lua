@@ -29,7 +29,7 @@ end
 local count = result and result:match('^v%s+as%s+(%d+)')
 
 if count and tonumber(count) > 0 then
-  print('{"text":"   ", "class":"visible"}')
+  print('{"text":"  ", "class":"visible"}')
 else
   print('{"text":"", "class":"hidden"}')
 end
