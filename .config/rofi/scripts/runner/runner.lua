@@ -42,6 +42,25 @@ local function strip_hidden(s)
     return s
 end
 
+local function escape_markup(s)
+    return (s or ""):gsub("&", "&amp;"):gsub("<", "&lt;"):gsub(">", "&gt;")
+end
+
+local function unescape_markup(s)
+    return (s or ""):gsub("&lt;", "<"):gsub("&gt;", ">"):gsub("&amp;", "&")
+end
+
+local function escape_history_entry(entry)
+    local _, e = entry:find("  ", 1, true)
+    if e then return entry:sub(1, e) .. escape_markup(entry:sub(e + 1)) end
+    return escape_markup(entry)
+end
+
+local function entry_key(e)
+    if e:find("<span", 1, true) then return unescape_markup(strip_hidden(e)) end
+    return unescape_markup(strip_prefix(e))
+end
+
 if os.getenv("ROFI_SOCKET") then
     local parts = {}
     for i = 1, #arg do
@@ -81,11 +100,18 @@ end
 local function parse_desktop(path)
     local f = io.open(path, "r")
     if not f then return nil end
-    local name, exec, nodisplay = nil, nil, false
+    local name, exec, nodisplay, in_entry = nil, nil, false, false
     for line in f:lines() do
-        if line:match("^Name=") then name = line:match("^Name=(.+)$")
-        elseif line:match("^Exec=") then exec = line:match("^Exec=(.+)$")
-        elseif line:match("^NoDisplay=true") then nodisplay = true end
+        local group = line:match("^%[([^%]]+)%]")
+        if group then
+            in_entry = (group == "Desktop Entry")
+        elseif in_entry and line:match("^Name=") then
+            name = line:match("^Name=(.+)$")
+        elseif in_entry and line:match("^Exec=") then
+            exec = line:match("^Exec=(.+)$")
+        elseif in_entry and line:match("^NoDisplay=true") then
+            nodisplay = true
+        end
     end
     f:close()
     if nodisplay or not name or not exec then return nil end
@@ -223,17 +249,15 @@ local function get_combined_entries()
 
     local entries = {}
     for _, app in ipairs(apps) do
-        entries[#entries + 1] = app.name .. '<span size="1">  ' .. app.exec .. '</span>'
+        entries[#entries + 1] = escape_markup(app.name) .. '<span size="1">  ' .. escape_markup(app.exec) .. '</span>'
     end
     for _, entry in ipairs(filtered_hist) do
-        entries[#entries + 1] = entry
+        entries[#entries + 1] = escape_history_entry(entry)
     end
 
     table.sort(entries, function(a, b)
-        local key_a = a:find("<span", 1, true) and strip_hidden(a) or strip_prefix(a)
-        local key_b = b:find("<span", 1, true) and strip_hidden(b) or strip_prefix(b)
-        local count_a = freq[key_a] or 0
-        local count_b = freq[key_b] or 0
+        local count_a = freq[entry_key(a)] or 0
+        local count_b = freq[entry_key(b)] or 0
         if count_a ~= count_b then return count_a > count_b end
         return a < b
     end)
@@ -262,7 +286,7 @@ local function mode_picker(cmd)
         ICON_T .. "  Terminal",
         ICON_P .. "  Process",
         string.char(0xEE, 0xB8, 0xA3) .. "  Back",
-    }, MODE_THEME, "", "-selected-row 0 -mesg " .. shell_quote(cmd))
+    }, MODE_THEME, "", "-selected-row 0 -mesg " .. shell_quote(escape_markup(cmd)))
     if not result then return "Back" end
     return strip_prefix(result)
 end
@@ -276,7 +300,7 @@ local function run()
 
         if code == 10 then
             if raw and (starts_with(raw, ICON_T) or starts_with(raw, ICON_P)) then
-                delete_from_history(raw)
+                delete_from_history(unescape_markup(raw))
             end
             goto continue
         end
@@ -284,26 +308,28 @@ local function run()
         if not raw or raw == "" then break end
 
         local display = raw:find("<span", 1, true) and strip_hidden(raw) or strip_prefix(raw)
-        local app = find_app(display)
+        local is_entry = raw:find("<span", 1, true) or starts_with(raw, ICON_T) or starts_with(raw, ICON_P)
+        local real = is_entry and unescape_markup(display) or display
+        local app = find_app(real)
 
         if app then
-            bump_freq(display)
+            bump_freq(real)
             os.execute(string.format("gtk-launch %s >/dev/null 2>&1 &", shell_quote(app.desktop)))
             break
         elseif starts_with(raw, ICON_T) then
-            run_terminal(display)
+            run_terminal(real)
             break
         elseif starts_with(raw, ICON_P) then
-            run_process(display)
+            run_process(real)
             break
         end
 
-        local action = mode_picker(display)
+        local action = mode_picker(real)
         if action == "Terminal" then
-            run_terminal(display)
+            run_terminal(real)
             break
         elseif action == "Process" then
-            run_process(display)
+            run_process(real)
             break
         end
 
