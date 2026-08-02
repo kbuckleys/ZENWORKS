@@ -21,7 +21,7 @@ hl.env("XCURSOR_SIZE", "6")
 hl.config({
 	misc = {
 		allow_session_lock_restore = true,
-		font_family = "0xProto Nerd Font",
+		font_family = "0xProto Nerd Font Propo",
 		disable_splash_rendering = true,
 		initial_workspace_tracking = 0,
 		close_special_on_empty = true,

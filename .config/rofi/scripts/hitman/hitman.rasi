@@ -30,10 +30,10 @@ inputbar {
 textbox {
     text-color: #9bbfbf;
     horizontal-align: 0.5;
-    font: "0xProto Nerd Font 12";
+    font: "0xProto Nerd Font Propo 12";
 }
 textbox-prompt-colon {
-    str: " ";
+    str: "";
     color: #e78284;
 }
 entry {
