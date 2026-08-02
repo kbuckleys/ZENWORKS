@@ -132,21 +132,22 @@ rules = [
 	{ mime = "vfs/{absent,stale}", fg = "#a0a09b" },
 
 	# Special file
-  { mime = "inode/empty", fg = "#a0a09b" },
+    { mime = "inode/empty", fg = "#a0a09b" },
 
-  # Orphan (broken) symlinks first
-  { url = "*", is = "orphan", fg = "#e78284" },
+    # Orphan (broken) symlinks first
+    { url = "*", is = "orphan", fg = "#e78284" },
 
-  # Valid symlinks last (won't override orphans)
-  { url = "*", is = "link", fg = "#c8a4e0" },
+    # Valid symlinks last (won't override orphans)
+    { url = "*", is = "link", fg = "#c8a4e0" },
 	{ url = "*", is = "exec", fg = "#fab387" },
 
 	# Dummy file
 	{ url = "*", is = "dummy", bg = "#fab387", fg = "#000000" },
 	{ url = "*/", is = "dummy", bg = "#fab387", fg = "#000000" },
 
-	# Fallback
-	{ url = "*/", fg = "#9bbfbf" },
+    # Fallback
+    { url = "*/", fg = "#9bbfbf" },
+    { url = "*", fg = "#dfdfdd" },
 ]
 
 [icon]
