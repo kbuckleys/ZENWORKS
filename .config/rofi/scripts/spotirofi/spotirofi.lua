@@ -45,7 +45,7 @@ local CACHE_TTL_LONG = 86400
 local PROGRESS_BAR_W = 20
 local ICON_PREFIX = {
     tracks    = "\u{F0387} ",
-    albums    = "\u{F0025} ",
+    albums    = "\u{F405} ",
     artists   = "\u{F415} ",
     playlists = "\u{F0411} ",
 }
@@ -406,7 +406,7 @@ local function status_mesg()
     elseif repeat_state == "context" then r = "\u{F0456}"
     else r = '<span foreground="' .. DIM .. '">\u{F0457}</span>' end
     local s = is_shuffle and "\u{F074}" or '<span foreground="' .. DIM .. '">\u{F049D}</span>'
-    return r .. "\u{2002}\u{2002}" .. s
+    return r .. " " .. s
 end
 
 toggle_repeat = function()
@@ -1233,8 +1233,8 @@ end
 
 display_track = function(item, hide_artist, hide_liked)
     local an = hide_artist and "" or artist_names(item)
-    local p  = item.id == current_id and (is_playing and "\u{f04b}  " or "\u{f04c}  ") or ""
-    local l  = (not hide_liked) and item.id and liked[item.id] and "\u{f05d}  " or ""
+    local p  = item.id == current_id and (is_playing and "\u{f04b} " or "\u{f04c} ") or ""
+    local l  = (not hide_liked) and item.id and liked[item.id] and "\u{f05d} " or ""
     local e  = item.explicit and "\u{f071} " or ""
     local txt = p .. l .. e .. (item.name or "Unknown") .. (hide_artist and "" or SEP .. an)
     if item.id == current_id then txt = "<span foreground=\"#b6e0a4\">" .. txt .. "</span>" end
@@ -1250,7 +1250,7 @@ local function display_artist(item)
 end
 
 local function display_playlist(item)
-    local prefix = (item.owner and item.owner.id == "spotify") and "\u{f1bc}  " or ""
+    local prefix = (item.owner and item.owner.id == "spotify") and "\u{f1bc} " or ""
     return prefix .. (item.name or "Unknown")
 end
 
@@ -1327,14 +1327,14 @@ function Util.has_lyrics(id)
 end
 
 local function track_mesg(item)
-    local p = item.id == current_id and (is_playing and "\u{f04b}  " or "\u{f04c}  ") or ""
-    local l = item.id and liked[item.id] and " \u{f05d} " or ""
-    local e = item.explicit and "\u{f071} " or ""
+    local p = item.id == current_id and (is_playing and "\u{f04b} " or "\u{f04c} ") or ""
+    local l = item.id and liked[item.id] and " \u{f05d}" or ""
+    local e = item.explicit and " \u{f071}" or ""
     local s = ""
     if Util.has_lyrics(item.id) then
-        s = Util.has_synced_lyrics(item.id) and "\u{F0188}" or "\u{F0189}"
+        s = Util.has_synced_lyrics(item.id) and " \u{F0188}" or " \u{F0189}"
     end
-    return p .. (item.name or "") .. SEP .. artist_names(item) .. " " .. l .. e .. s
+    return p .. " " .. (item.name or "") .. SEP .. artist_names(item) .. " " .. l .. e .. s
 end
 
 local function progress_bar(pct)
@@ -3001,7 +3001,7 @@ local function view_system()
             for _, v in ipairs({96, 160, 320}) do
                 if v == cur_br then
                     table.insert(br_opts, "<span foreground=\"#b6e0a4\">"
-                        .. "\u{f00c}  " .. v .. " kbps" .. (v == 160 and " (default)" or "") .. "</span>")
+                        .. "\u{f00c} " .. v .. " kbps" .. (v == 160 and " (default)" or "") .. "</span>")
                 else
                     local label = v .. " kbps"
                     if v == 160 then label = label .. " (default)" end
