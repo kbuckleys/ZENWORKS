@@ -10,6 +10,7 @@
     origin = bottom-center
     offset = (0, 20)
     scale = 0
+    follow = mouse
     notification_limit = 5
     progress_bar = true
     indicate_hidden = true
@@ -41,7 +42,7 @@
     max_icon_size = 96
     icon_path = /usr/share/icons/Adwaita/16x16/status/:/usr/share/icons/Adwaita/16x16/devices/
     sticky_history = false
-    history_length = 20
+    history_length = 0
     browser = /usr/bin/xdg-open
     always_run_script = true
     title = dunst
