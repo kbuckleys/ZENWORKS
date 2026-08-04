@@ -29,7 +29,7 @@ hbox {
 textbox {
     text-color: #fab387;
     horizontal-align: 0.5;
-    font: "JetBrainsMono Nerd Font Bold 12";
+    font: "JetBrainsMono Nerd Font Propo Bold 12";
 }
 
 listview {

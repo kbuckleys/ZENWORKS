@@ -24,7 +24,7 @@ textbox {
     text-color: #e78284;
     background-color: #000000;
     horizontal-align: 0.5;
-    font: "JetBrainsMono Nerd Font Bold 12";
+    font: "JetBrainsMono Nerd Font Propo Bold 12";
 }
 
 listview {
@@ -41,7 +41,7 @@ element {
 element-text {
     text-color: #000000;
     horizontal-align: 0.5;
-    font: "JetBrainsMono Nerd Font Bold 12";
+    font: "JetBrainsMono Nerd Font Propo Bold 12";
 }
 element-text.selected.normal {
     text-color: #e78284;

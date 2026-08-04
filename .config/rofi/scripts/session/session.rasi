@@ -39,7 +39,7 @@ element-text {
     color: #000000;
     highlight: none;
     horizontal-align: 0.5;
-    font: "JetBrainsMono Nerd Font Bold 12";
+    font: "JetBrainsMono Nerd Font Propo Bold 12";
 }
 element selected.normal {
     background-color: #000000;
