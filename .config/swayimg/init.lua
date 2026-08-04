@@ -17,7 +17,7 @@ swayimg.imagelist.enable_recursive(false) -- recursive directory reading
 swayimg.imagelist.enable_adjacent(true) -- add adjacent files from same dir
 
 -- Text overlay configuration
-swayimg.text.set_font("0xProto Nerd Font") -- font name
+swayimg.text.set_font("JetBrainsMono Nerd Font") -- font name
 swayimg.text.set_size(15) -- font size in pixels
 --swayimg.text.set_spacing(0) -- line spacing
 swayimg.text.set_padding(0) -- padding from window edge
