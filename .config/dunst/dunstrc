@@ -4,7 +4,7 @@
 # https://github.com/kbuckleys/
 
 [global]
-    font = "JetBrainsMono Nerd Font SemiBold 12"
+    font = "JetBrainsMono Nerd Font Propo SemiBold 12"
     width = (400, 800)
     height = (0, 200)
     origin = bottom-center
