@@ -7,8 +7,6 @@
 @import "ZENON"
 
 window {
-    location: south;
-    anchor: south;
     width: 700px;
     children: [ wrap, listview-split ];
 }
@@ -45,11 +43,11 @@ element-text {
 }
 
 message {
-    background-color: #20242a;
-    padding: 5px;
+    background-color: #16191d;
+    padding: 5px 5px 5px 5px;
 }
 textbox {
     text-color: #b6e0a4;
     horizontal-align: 0.5;
-    font: "0xProto Nerd Font Propo Bold 12";
+    font: "0xProto Nerd Font Propo, DejaVu Sans Bold 12";
 }

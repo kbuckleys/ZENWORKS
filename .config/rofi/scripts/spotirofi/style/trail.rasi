@@ -6,45 +6,30 @@
 
 @import "ZENON"
 
-configuration {
-    show-icons: true;
-}
-
 window {
-    location: center;
-    anchor: center;
-    width: 1004px;
+    width: 700px;
 }
 
 mainbox {
-    children: [ message, listview ];
-}
-
-inputbar {
-    enabled: false;
+    children: [ listview ];
 }
 
 listview {
-    columns: 1;
-    lines: 1;
+    fixed-columns: false;
+    fixed-height: false;
     scrollbar: false;
+    columns: 1;
+    lines: 10;
 }
 
-element-icon {
-    size: 1000px;
-    expand: false;
+element {
+    padding: 2px 2px 2px 2px;
 }
 element-text {
-    enabled: false;
-}
-
-message {
-    background-color: #16191d;
-    margin: 0px 0px -2px 0px;
-    padding: 5px 5px 5px 5px;
-}
-textbox {
-    text-color: #b6e0a4;
+    font: "0xProto Nerd Font Propo, DejaVu Sans 12";
     horizontal-align: 0.5;
+}
+element-text selected {
+    text-color: #b6e0a4;
     font: "0xProto Nerd Font Propo, DejaVu Sans Bold 12";
 }

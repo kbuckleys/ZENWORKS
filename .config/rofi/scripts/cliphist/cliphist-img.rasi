@@ -4,20 +4,26 @@
 * └─┘└─┘┘└┘└┴┘└─┘┴└─┴ ┴└─┘
 * https://github.com/kbuckleys/ */
 
-@import "ZENON"
+@theme "ZENON"
+
+* {
+    selected-normal-background: none;
+}
 
 configuration {
+    kb-remove-to-sol: "BackSpace";
+    kb-remove-char-back: "";
     show-icons: true;
 }
 
 window {
-    location: center;
-    anchor: center;
-    width: 1004px;
+    width: 80%;
+    location: south;
+    anchor: south;
 }
 
 mainbox {
-    children: [ message, listview ];
+    children: [ inputbar, message, listview ];
 }
 
 inputbar {
@@ -25,26 +31,38 @@ inputbar {
 }
 
 listview {
-    columns: 1;
-    lines: 1;
+    fixed-columns: true;
+    fixed-height: false;
+    columns: 8;
+    lines: 3;
+    flow: horizontal;
     scrollbar: false;
 }
 
-element-icon {
-    size: 1000px;
-    expand: false;
+element {
+    orientation: vertical;
+    children: [ element-icon ];
+    padding: 2px;
+    border: 0px;
 }
 element-text {
     enabled: false;
 }
+element selected {
+    border: 1px;
+    border-color: #eebebe;
+    background-color: none;
+}
+element-icon {
+    size: 200px;
+}
 
 message {
     background-color: #16191d;
-    margin: 0px 0px -2px 0px;
     padding: 5px 5px 5px 5px;
 }
 textbox {
-    text-color: #b6e0a4;
+    text-color: #eebebe;
     horizontal-align: 0.5;
     font: "0xProto Nerd Font Propo, DejaVu Sans Bold 12";
 }

@@ -6,32 +6,55 @@
 
 @import "ZENON"
 
+configuration {
+    kb-remove-to-sol: "BackSpace";
+    kb-remove-char-back: "";
+    show-icons: true;
+}
+
 window {
-    width: 700px;
+    width: 1000px;
 }
 
 mainbox {
-    children: [ message, listview ];
+    children: [ inputbar, message, listview ];
+}
+
+inputbar {
+    enabled: false;
 }
 
 listview {
-    fixed-columns: false;
+    fixed-columns: true;
     fixed-height: false;
+    columns: 5;
+    lines: 3;
+    flow: horizontal;
     scrollbar: false;
-    columns: 1;
-    lines: 11;
 }
 
 element {
-    padding: 2px 8px;
+    orientation: vertical;
+    children: [ element-icon, element-text ];
+    spacing: 4px;
+    padding: 4px;
+}
+element selected {
+    border: 1px;
+    border-color: #b6e0a4;
+}
+element-icon {
+    size: 150px;
+    horizontal-align: 0.5;
 }
 element-text {
-    font: "0xProto Nerd Font 12";
     horizontal-align: 0.5;
+    font: "0xProto Nerd Font Propo, DejaVu Sans Bold 11";
+    text-color: #DFDFDD;
     highlight: bold #b6e0a4;
 }
 element-text selected {
-    background-color: transparent;
+    text-color: #DFDFDD;
 }
 
 message {
