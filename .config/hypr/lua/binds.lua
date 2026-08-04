@@ -27,7 +27,7 @@ hl.bind("SUPER + B", hl.dsp.exec_cmd(web))
 -- ROFI
 hl.bind("SUPER + ESCAPE", hl.dsp.exec_cmd('rofi -show power-menu -modi "power-menu:~/.config/rofi/scripts/session/session.lua" -theme ~/.config/rofi/scripts/session/session.rasi'))
 hl.bind("SUPER + SHIFT + C", hl.dsp.exec_cmd("rofi -show calc -modi calc -no-show-match -no-sort -calc-command \"echo '{result}' | cliphist store\" -theme ~/.config/rofi/calc.rasi"))
-hl.bind("SUPER + C", hl.dsp.exec_cmd("cliphist list | rofi -i -dmenu -theme ~/.config/rofi/cliphist.rasi | cliphist decode | wl-copy"))
+hl.bind("SUPER + C", hl.dsp.exec_cmd("~/.config/rofi/scripts/cliphist/cliphist.lua"))
 hl.bind("SUPER + S", hl.dsp.exec_cmd("rofi -i -show recursivebrowser -disable-history -theme ~/.config/rofi/rootsearch.rasi"))
 hl.bind("SUPER + J", hl.dsp.exec_cmd('rofimoji -a type copy --selector-args="-theme ~/.config/rofi/rofimoji.rasi"'))
 hl.bind("SUPER + M", hl.dsp.exec_cmd("~/.config/rofi/scripts/spotirofi/spotirofi.lua"))

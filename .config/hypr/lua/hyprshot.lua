@@ -19,7 +19,9 @@ local function region()
     local script = [[
 mkdir -p "]] .. dir .. [["
 file="]] .. dir .. [[/$(date +'%Y-%m-%d-%H%M%S')_region.png"
-grim -g "$(slurp -d)" "$file" && wl-copy < "$file" && notify-send -i "$file" "Screenshot saved" "Saved to $file and copied to clipboard"
+geometry=$(slurp -d)
+sleep 0.15
+grim -g "$geometry" "$file" && wl-copy < "$file" && notify-send -i "$file" "Screenshot saved" "Saved to $file and copied to clipboard"
 ]]
     hl.exec_cmd("bash -c '" .. script:gsub("'", "'\"'\"'") .. "'")
 end
