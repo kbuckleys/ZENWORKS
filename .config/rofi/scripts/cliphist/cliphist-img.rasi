@@ -13,7 +13,6 @@
 configuration {
     kb-remove-to-sol: "BackSpace";
     kb-remove-char-back: "";
-    show-icons: true;
 }
 
 window {
@@ -49,8 +48,9 @@ element-text {
     enabled: false;
 }
 element selected {
-    border: 1px;
-    border-color: #eebebe;
+    border: 2px;
+    border-radius: 2px;
+    border-color: #6a707f;
     background-color: none;
 }
 element-icon {
