@@ -30,7 +30,7 @@ inputbar {
 textbox {
     text-color: #000000;
     horizontal-align: 0.5;
-    font: "0xProto Nerd Font Propo Bold 12";
+    font: "JetBrainsMono Nerd Font Bold 12";
 }
 textbox-prompt-colon {
     str: " ";
