@@ -87,6 +87,9 @@ export FZF_DEFAULT_OPTS='
 alias hypr='start-hyprland'
 alias ls='eza -G --icons'
 alias lsx='lsix'
+alias hypr='start-hyprland'
+alias ls='eza -G --icons'
+alias icat='kitten icat'
 
 # Shell integrations
 eval "$(zoxide init --cmd cd zsh)"
