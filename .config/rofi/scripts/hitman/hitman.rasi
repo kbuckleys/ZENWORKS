@@ -37,6 +37,7 @@ textbox-prompt-colon {
     color: #e78284;
 }
 entry {
+    font: "JetBrainsMono Nerd Font Propo Medium 13";
     text-color: #eebebe;
 }
 

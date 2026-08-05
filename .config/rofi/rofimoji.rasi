@@ -37,6 +37,7 @@ element {
     padding: 2px 8px 2px 8px;
 }
 element-text {
+    font: "JetBrainsMono Nerd Font Propo Medium 13";
     highlight: bold #e0d8a4;
 }
 element-text selected {

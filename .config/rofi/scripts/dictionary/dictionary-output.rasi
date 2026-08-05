@@ -20,7 +20,7 @@ textbox {
     text-color: #9bbfbf;
     horizontal-align: 0.5;
     font: "JetBrainsMono Nerd Font Propo Bold 12";
-    padding: 0px 0px 6px 0px;
+    padding: 5px 5px 5px 5px;
 }
 listview {
     padding: 12px 0px 12px 0px;
@@ -29,6 +29,7 @@ listview {
 }
 
 element-text {
+    font: "JetBrainsMono Nerd Font Propo Medium 13";
     horizontal-align: 0.5;
     text-color: #dfdfdd;
     padding: 2px 0px;

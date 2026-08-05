@@ -38,7 +38,7 @@ element {
 }
 element-text {
     highlight: bold #eebebe;
-    font: "JetBrainsMono Nerd Font Propo SemiBold 13";
+    font: "JetBrainsMono Nerd Font Propo Medium 13";
 }
 element-text selected {
     background-color: transparent;
