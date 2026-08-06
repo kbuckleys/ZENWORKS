@@ -31,8 +31,9 @@ inputbar {
     width: 15%;
 }
 textbox-prompt-colon {
-    str: " ";
+    padding: 2px 0px 2px 0px;
     color: #fab387;
+    str: " ";
 }
 entry {
     text-color: #fab387;

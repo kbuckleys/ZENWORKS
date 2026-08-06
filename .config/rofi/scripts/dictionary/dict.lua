@@ -11,6 +11,8 @@ local ROFI_THEME_RESULTS = HOME .. "/.config/rofi/scripts/dictionary/dictionary-
 local MAX_LINE_LENGTH = 80
 local MAX_DEFS_PER_POS = 2
 local MAX_LINES = 20
+local HISTORY_FILE = HOME .. "/.cache/dict-history"
+local MAX_HISTORY = 100
 
 local COLOR_HEAD = "#9bbfbf"
 local COLOR_PHON = "#9bbfbf"
@@ -18,6 +20,7 @@ local COLOR_POS = "#6a707f"
 local COLOR_EX = "#eebebe"
 local COLOR_SYN = "#9bbfbf"
 local COLOR_ERROR = "#e78284"
+local ICON_HEAD = "\u{f405}"
 
 -- JSON parsing
 local json = require("cjson")
@@ -67,6 +70,41 @@ end
 -- Shell-escape a string (single-quote it)
 local function shell_quote(s)
     return "'" .. s:gsub("'", "'\\''") .. "'"
+end
+
+-- Load history entries (most recent first), one word per line
+local function load_history()
+    local content = read_file(HISTORY_FILE)
+    local list = {}
+    for line in content:gmatch("[^\n]+") do
+        list[#list + 1] = line
+    end
+    return list
+end
+
+-- Save history entries, truncated to MAX_HISTORY
+local function save_history(list)
+    shell("mkdir -p " .. shell_quote(HOME .. "/.cache"))
+    local lines = {}
+    for i = 1, math.min(#list, MAX_HISTORY) do
+        lines[#lines + 1] = list[i]
+    end
+    local content = #lines > 0 and (table.concat(lines, "\n") .. "\n") or ""
+    write_file(HISTORY_FILE, content)
+end
+
+-- Add a word to the front of history, de-duplicating case-insensitively
+local function add_to_history(word)
+    local list = load_history()
+    local lower = word:lower()
+    local filtered = {}
+    for _, w in ipairs(list) do
+        if w:lower() ~= lower then
+            filtered[#filtered + 1] = w
+        end
+    end
+    table.insert(filtered, 1, word)
+    save_history(filtered)
 end
 
 -- HTML entity decoding
@@ -266,7 +304,8 @@ local function format_output(rows, phonetic, synonyms)
             local content = row:sub(tab_pos + 1)
 
             if typ == "head" then
-                message = "<b><span foreground=\"" .. COLOR_HEAD .. "\">" .. content .. "</span></b>"
+                message = "<span foreground=\"" .. COLOR_HEAD .. "\">" .. ICON_HEAD .. "</span>  " ..
+                    "<b><span foreground=\"" .. COLOR_HEAD .. "\">" .. content .. "</span></b>"
                 if phonetic ~= "" then
                     message = message .. "  <span foreground=\"" .. COLOR_PHON .. "\">" .. phonetic .. "</span>"
                 end
@@ -354,10 +393,16 @@ end
 
 -- Main loop
 while true do
+    local history = load_history()
+    local hist_file = os.tmpname()
+    write_file(hist_file, #history > 0 and (table.concat(history, "\n") .. "\n") or "")
+
+    local input_mesg = "<span foreground=\"" .. COLOR_HEAD .. "\">" .. ICON_HEAD .. "</span>"
     local word = shell(string.format(
-        'rofi -dmenu -wayland-layer top -theme %s -p "Define"',
-        shell_quote(ROFI_THEME_INPUT)
+        'cat %s | rofi -dmenu -wayland-layer top -theme %s -p "Define" -mesg %s',
+        hist_file, shell_quote(ROFI_THEME_INPUT), shell_quote(input_mesg)
     ))
+    remove_file(hist_file)
     if not word or word == "" then break end
     word = word:gsub("%s+$", ""):gsub("^%s+", "")
     if word == "" then break end
@@ -408,6 +453,9 @@ while true do
         local phonetic = parse_phonetic(phon_response)
         local synonyms = parse_synonyms(syn_response)
         local rows = parse_rows(word, def_response, MAX_DEFS_PER_POS)
+        if rows[1] and not rows[1]:match("^error\t") then
+            add_to_history(word)
+        end
         local message, lines = format_output(rows, phonetic, synonyms)
 
         local n_lines = #lines

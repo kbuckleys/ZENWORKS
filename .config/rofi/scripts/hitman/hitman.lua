@@ -82,7 +82,7 @@ local function main()
     else
         confirm_msg = string.format("Kill %d Processes", #pids)
     end
-    local confirm = rofi(confirm_msg .. "\nAbort", string.format(
+    local confirm = rofi(confirm_msg .. "\nABORT", string.format(
         "-dmenu -p 'Confirm' -mesg '%s' -selected-row 0 -theme '%s'",
         confirm_msg, CONFIRM_THEME))
 

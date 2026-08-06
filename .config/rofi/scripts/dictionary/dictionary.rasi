@@ -14,23 +14,49 @@ configuration {
 window {
     location: south;
     anchor: south;
-    width: 500px;
+    width: 400px;
 }
 
 mainbox {
-    children: [inputbar];
+    children: [ message, inputbar, listview ];
+}
+
+listview {
+    fixed-columns: false;
+    fixed-height: false;
+    scrollbar: false;
+    columns: 2;
+    lines: 12;
+}
+
+element {
+    padding: 2px 20px 2px 20px;
+}
+element-text {
+    font: "JetBrainsMono Nerd Font Propo SemiBold 13";
+    horizontal-align: 0.5;
+    highlight: bold #9bbfbf;
+    text-color: #dfdfdd;
+}
+element-text selected {
+    background-color: transparent;
 }
 
 inputbar {
-    children: [textbox-prompt-colon, entry];
-    padding: 4px 8px;
-    spacing: 4px;
-}
-textbox-prompt-colon {
-    color: #e0d8a4;
-    str: " ";
+    children: [ entry ];
 }
 entry {
-    font: "JetBrainsMono Nerd Font Propo Medium 13";
-    color: #e0d8a4;
+    font: "JetBrainsMono Nerd Font Propo SemiBold 14";
+    horizontal-align: 0.5;
+    color: #9bbfbf;
+}
+
+message {
+    background-color: #16191d;
+    padding: 5px 30px 5px 30px;
+}
+textbox {
+    text-color: #9bbfbf;
+    horizontal-align: 0.5;
+    font: "JetBrainsMono Nerd Font Propo SemiBold 14";
 }
