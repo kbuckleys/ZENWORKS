@@ -86,9 +86,6 @@ export FZF_DEFAULT_OPTS='
 # Aliases
 alias hypr='start-hyprland'
 alias ls='eza -G --icons'
-alias lsx='lsix'
-alias hypr='start-hyprland'
-alias ls='eza -G --icons'
 alias icat='kitten icat'
 
 # Shell integrations
