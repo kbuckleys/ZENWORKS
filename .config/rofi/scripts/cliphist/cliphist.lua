@@ -13,8 +13,9 @@ local CACHE = (os.getenv("XDG_CACHE_HOME") or HOME .. "/.cache") .. "/cliphist-r
 local TMP_OPEN = "/tmp/cliphist-open"
 local THUMB = 256
 local PREVIEW_MAX = 120
-local MODE_KEYS = "Alt+space"
-local MODE_HINT = "Toggle mode: alt + space"
+local MODE_KEYS = "Tab"
+local MODE_HINT = "tab: toggle mode ~ delete: remove entry"
+local DELETE_KEYS = "Delete"
 local DEBOUNCE_MS = 750
 local DEBUG = os.getenv("CLIPHIST_DEBUG") == "1"
 local LOG = (os.getenv("XDG_CACHE_HOME") or HOME .. "/.cache") .. "/cliphist-rofi/debug.log"
@@ -75,8 +76,8 @@ local function run_rofi(rows, theme, mesg)
     f:write(input)
     f:close()
     local cmd = string.format(
-        "rofi -dmenu -no-custom -format i -kb-custom-1 %s -theme %s -mesg %s < %s > %s 2>/dev/null",
-        shell_quote(MODE_KEYS), shell_quote(theme), shell_quote(mesg),
+        "rofi -dmenu -i -no-custom -format i -kb-custom-1 %s -kb-custom-2 %s -theme %s -mesg %s < %s > %s 2>/dev/null",
+        shell_quote(MODE_KEYS), shell_quote(DELETE_KEYS), shell_quote(theme), shell_quote(mesg),
         shell_quote(in_tmp), shell_quote(out_tmp))
     local ok, _, code = os.execute(cmd)
     os.remove(in_tmp)
@@ -200,7 +201,9 @@ local function restore_image(id)
 end
 
 local CUSTOM_1 = 10
+local CUSTOM_2 = 11
 local last_toggle = 0
+local last_delete = 0
 
 if not image_mode then
     local _, img_ids = list()
@@ -242,9 +245,7 @@ while true do
         theme = TEXT_THEME
     end
 
-    local mode_label = image_mode and "Images" or "Plain Text"
-    local mesg = "Clipboard History ~ " .. mode_label ..
-        "\n<span color=\"#6a707f\">" .. MODE_HINT .. "</span>"
+    local mesg = MODE_HINT
 
     local idx, ec = run_rofi(rows, theme, mesg)
     log_debug(string.format("mode=%s theme=%s ec=%d idx=%d",
@@ -258,6 +259,18 @@ while true do
             log_debug("toggle -> " .. (image_mode and "img" or "txt"))
         else
             log_debug("toggle debounced")
+        end
+    elseif ec == CUSTOM_2 then
+        local now = now_ms()
+        if now - last_delete >= DEBOUNCE_MS and idx >= 0 then
+            last_delete = now
+            local id = image_mode and img_entries[idx + 1] or text_entries[idx + 1].id
+            os.execute(string.format("printf '%%s' %s | cliphist delete",
+                shell_quote(id)))
+            os.remove(CACHE .. "/" .. id .. ".png")
+            log_debug("deleted id=" .. tostring(id))
+        else
+            log_debug("delete debounced or no selection")
         end
     else
         if idx >= 0 then

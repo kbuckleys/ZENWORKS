@@ -6,10 +6,6 @@
 
 @theme "ZENON"
 
-* {
-    selected-normal-background: #e78284;
-}
-
 window {
     location: south;
     anchor: south;
@@ -42,8 +38,8 @@ element-text {
     font: "JetBrainsMono Nerd Font Propo Bold 16";
 }
 element selected.normal {
-    background-color: #000000;
+    background-color: #eebebe;
 }
 element-text selected {
-    color: #e78284;
+    color: #000000;
 }

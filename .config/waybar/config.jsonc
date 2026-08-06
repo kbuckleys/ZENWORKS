@@ -10,7 +10,7 @@
     "layer": "dock",
     "position": "bottom",
     "exclusive": true,
-    "height": 28,
+    "height": 32,
 
     "modules-left": [
         "custom/update",

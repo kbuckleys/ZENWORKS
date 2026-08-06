@@ -39,6 +39,7 @@ local EXIT = {
     open_url = 12, jump = 13, jump_kp = 14, liked = 15, trail_jump = 16,
     track = 17, seek = 18, art = 19, repeat_toggle = 20, lyrics = 21,
     recent = 22, shuffle_toggle = 23, clear_trail = 24,
+    seek_plus = 25, seek_minus = 26,
 }
 local SEP = " \u{F01D8} "
 local CACHE_TTL_SHORT = 300
@@ -80,11 +81,7 @@ local function trim(s)
 end
 
 local function copy_to_clipboard(text)
-    if os.getenv("WAYLAND_DISPLAY") then
-        os.execute("echo " .. shell_quote(text) .. " | wl-copy 2>/dev/null")
-    else
-        os.execute("echo " .. shell_quote(text) .. " | xclip -selection clipboard 2>/dev/null")
-    end
+    os.execute("echo " .. shell_quote(text) .. " | wl-copy 2>/dev/null")
 end
 
 local function copy_spotify_url(kind, id) copy_to_clipboard("https://open.spotify.com/" .. kind .. "/" .. (id or "")) end
@@ -132,10 +129,7 @@ function Util.get_own_pid()
 end
 
 function Util.get_clipboard()
-    if os.getenv("WAYLAND_DISPLAY") then
-        return trim(shell("wl-paste 2>/dev/null") or "")
-    end
-    return trim(shell("xclip -selection clipboard -o 2>/dev/null") or "")
+    return trim(shell("wl-paste 2>/dev/null") or "")
 end
 
 function Util.markup(t)
@@ -510,6 +504,7 @@ local view_actions, view_artist, view_lyrics, view_add_pl, view_art, view_volume
 local browse_album, view_browse
 local get_playback
 local get_token
+local get_playerctl_position
 local display_track, rofi_message
 local toggle_repeat, toggle_shuffle
 local open_url
@@ -559,7 +554,7 @@ local function rofi_dmenu(entries, opts)
     if main_pending or liked_pending or recent_pending or Util.trail_jump_pending then return nil end
     opts = opts or {}
     local prompt   = opts.prompt or ""
-    local mesg     = opts.mesg
+    local mesg_fn  = opts.mesg
     local markup   = opts.markup
     local by_index = opts.by_index
     local theme    = opts.theme or (opts.thumbs and Util.THEME_THUMBS or (opts.use_menu and THEME_MENU or THEME))
@@ -567,14 +562,17 @@ local function rofi_dmenu(entries, opts)
     local sel      = opts.sel
 
     if seek_pending or jump_to_track_pending then return nil end
+    ::menu_redo::
+    local mesg = type(mesg_fn) == "function" and mesg_fn() or mesg_fn
     local args = {"rofi","-dmenu","-config",P.dir.."/style/config.rasi","-theme",theme,"-p",prompt,"-i",
-                   "-kb-custom-1","Alt+BackSpace"}
+                   "-kb-custom-1","Control+Shift+Delete"}
+    args[#args+1] = "-kb-element-next"; args[#args+1] = ""
     if not opts.no_alt_space then args[#args+1] = "-kb-custom-2"; args[#args+1] = "Alt+space" end
     args[#args+1] = "-kb-custom-3"; args[#args+1] = "Alt+g"
     args[#args+1] = "-kb-custom-4"; args[#args+1] = "Alt+Return"
     args[#args+1] = "-kb-custom-5"; args[#args+1] = "Alt+KP_Enter"
     args[#args+1] = "-kb-custom-6"; args[#args+1] = "Alt+l"
-    args[#args+1] = "-kb-custom-7"; args[#args+1] = "Alt+t"
+    args[#args+1] = "-kb-custom-7"; args[#args+1] = "Tab"
     args[#args+1] = "-kb-custom-8"; args[#args+1] = "Alt+c"
     args[#args+1] = "-kb-custom-9"; args[#args+1] = "Alt+e"
     args[#args+1] = "-kb-custom-10"; args[#args+1] = "Alt+a"
@@ -582,7 +580,10 @@ local function rofi_dmenu(entries, opts)
     args[#args+1] = "-kb-custom-12"; args[#args+1] = "Alt+y"
     args[#args+1] = "-kb-custom-13"; args[#args+1] = "Alt+p"
     args[#args+1] = "-kb-custom-14"; args[#args+1] = "Alt+s"
-    args[#args+1] = "-kb-custom-15"; args[#args+1] = "Alt+k"
+    args[#args+1] = "-kb-custom-15"; args[#args+1] = "Delete"
+    args[#args+1] = "-kb-custom-16"; args[#args+1] = "Alt+equal"
+    args[#args+1] = "-kb-custom-17"; args[#args+1] = "Alt+minus"
+    args[#args+1] = "-kb-remove-char-forward"; args[#args+1] = "Control+d"
     if opts.custom == false then args[#args+1] = "-no-custom" end
     if markup then args[#args+1] = "-markup-rows"; args[#args+1] = "-markup" end
     if by_index then args[#args+1] = "-format"; args[#args+1] = "i" end
@@ -612,6 +613,8 @@ local function rofi_dmenu(entries, opts)
     for _, e in ipairs(entries or {}) do f:write(markup and Util.pango_escape(e) or e, "\n") end
     f:close()
 
+    local bs = Util.bs_launch(theme)
+
     local qa = {}
     for _, a in ipairs(args) do qa[#qa+1] = shell_quote(a) end
     local out_tf = os.tmpname()
@@ -619,6 +622,7 @@ local function rofi_dmenu(entries, opts)
               .. " > " .. shell_quote(out_tf)
               .. " 2>/dev/null; printf '\\n__EXIT__%d__' $? >> " .. shell_quote(out_tf)
     os.execute(cmd)
+    if bs then Util.bs_teardown(bs) end
     local raw = read_file(out_tf)
     os.remove(entry_tf)
     os.remove(out_tf)
@@ -680,6 +684,17 @@ local function rofi_dmenu(entries, opts)
         end)
         if not ok then rofi_message("open_url error: " .. tostring(err)) end
         return nil
+    elseif exit_code == EXIT.seek_plus or exit_code == EXIT.seek_minus then
+        if not current_track then
+            rofi_message("No track playing")
+            return nil
+        end
+        local delta = exit_code == EXIT.seek_plus and 10 or -10
+        local pos = get_playerctl_position()
+        local dur = (current_track.duration_ms or 0) / 1000
+        local target = math.max(0, math.min(dur > 0 and dur or math.huge, math.floor(pos + delta + 0.5)))
+        os.execute("playerctl position " .. target .. " 2>/dev/null")
+        mem_bust("_playerctl_pos")
     else
         if result == "" then
             if exit_code == 0 then return nil end
@@ -692,6 +707,7 @@ local function rofi_dmenu(entries, opts)
         end
         return result
     end
+    goto menu_redo
 end
 
 rofi_message = function(msg, theme)
@@ -2107,6 +2123,45 @@ view_album_details = function(album)
     rofi_message(table.concat(lines, "\n"), THEME_META)
 end
 
+view_track_details = function(item)
+    local d = api_get("tracks/" .. (item.id or ""))
+    if not d then
+        rofi_message("Could not load track details")
+        return
+    end
+    local lines = {}
+    local function row(label, val)
+        local k = 15
+        return string.rep(" ", k - #label)
+            .. Util.markup('<span foreground="#9bbfbf">') .. label .. Util.markup("</span>")
+            .. "  " .. tostring(val)
+    end
+    local add = function(label, val)
+        if val ~= nil and tostring(val) ~= "" then lines[#lines+1] = row(label, val) end
+    end
+    local names = {}
+    for _, ar in ipairs(d.artists or {}) do
+        if ar.name and ar.name ~= "" then names[#names+1] = ar.name end
+    end
+    add("Name", d.name)
+    if #names > 0 then add("Artists", table.concat(names, ", ")) end
+    if d.album and d.album.name then add("Album", d.album.name) end
+    if d.album and d.album.album_type then add("Type", d.album.album_type) end
+    if d.disc_number then add("Disc", d.disc_number) end
+    if d.track_number then add("Track", d.track_number) end
+    if d.duration_ms then
+        add("Duration", string.format("%d:%02d", math.floor(d.duration_ms / 60000),
+            math.floor((d.duration_ms % 60000) / 1000)))
+    end
+    if d.explicit then add("Explicit", "yes") end
+    if d.popularity ~= nil then add("Popularity", tostring(d.popularity)) end
+    if d.external_urls and d.external_urls.spotify then add("URL", d.external_urls.spotify) end
+    if d.external_ids and d.external_ids.isrc then add("ISRC", d.external_ids.isrc) end
+    add("ID", d.id)
+    if #lines == 0 then lines[1] = "No details available" end
+    rofi_message(table.concat(lines, "\n"), THEME_META)
+end
+
 api_get_playlist_tracks = function(playlist_id)
     return cached_fetch("playlist_tracks_" .. playlist_id, P.mass .. "/playlist_tracks_" .. playlist_id .. ".json", 1800, function()
         return Util.paged_fetch("playlists/" .. playlist_id .. "/tracks",
@@ -2607,6 +2662,7 @@ view_actions = function(item, ctx_type, ctx_id, all_items, cidx, entries)
     actions[#actions+1] = "Copy URL"
     actions[#actions+1] = "More Like This"
     actions[#actions+1] = "Albumart"
+    actions[#actions+1] = "Track Details"
 
     local act_key = "action:" .. (item.id or "")
     local pre_sel = 0
@@ -2737,6 +2793,7 @@ view_actions = function(item, ctx_type, ctx_id, all_items, cidx, entries)
                 session_pop()
             end
         elseif sel == "Albumart" then view_art(item)
+        elseif sel == "Track Details" then view_track_details(item)
         elseif sel == "Seek" then
             if item.id == current_id then view_seek(item)
             else rofi_message("Not the current track") end
@@ -3428,9 +3485,8 @@ end
 
 view_seek = function(item)
     session_push({view="seek", track_id=item.id, strack_name=item.name or "", track_duration_ms=item.duration_ms or 0})
-    local seeks = {"+10s", "-10s", "+30s", "-30s", Util.markup('<span foreground="#20242a">────────────────────</span>'), "1:00", "2:00", "0:00"}
+    local seeks = {"+10s", "-10s", "+30s", "-30s", Util.markup('<span foreground="#20242a">────────────────────</span>'), "+1:00", "-1:00", "0:00"}
     local seek_key = "seek:" .. (item.id or "")
-    local disp_pos = get_playerctl_position()
     while true do
         ::seek_next::
         local pre_sel = 0
@@ -3438,7 +3494,7 @@ view_seek = function(item)
         if type(saved) == "string" then
             for i, a in ipairs(seeks) do if Util.strip_markup(a) == Util.strip_markup(saved) then pre_sel = i - 1; break end end
         end
-        local si = rofi_dmenu(seeks, {prompt="Seek", mesg=seek_mesg(item, disp_pos), sel=pre_sel, custom=false, theme=THEME_SUB, markup=true})
+        local si = rofi_dmenu(seeks, {prompt="Seek", mesg=function() return seek_mesg(item) end, sel=pre_sel, custom=false, theme=THEME_SUB, markup=true})
         if not si then
             if consume_pending_toggle() then goto seek_next end
             if seek_pending or jump_to_track_pending then session_pop(); return end
@@ -3446,14 +3502,19 @@ view_seek = function(item)
             break
         end
         do local vp = disk_get(P.view_pos) or {}; vp[seek_key] = si; disk_set(P.view_pos, vp) end
+        local delta
         local sign, secs = si:match("^([%+%-])(%d+)s$")
-        if sign then
-            local delta = sign == "+" and tonumber(secs) or -tonumber(secs)
+        if sign then delta = sign == "+" and tonumber(secs) or -tonumber(secs) end
+        if not delta then
+            local rsign, rm, rs = si:match("^([%+%-])(%d+):(%d+)$")
+            if rsign then delta = (rsign == "+" and 1 or -1) * (tonumber(rm) * 60 + tonumber(rs)) end
+        end
+        if delta then
+            local pos = get_playerctl_position()
             local dur = (item.duration_ms or 0) / 1000
-            local target = math.max(0, math.min(dur > 0 and dur or math.huge, math.floor(disp_pos + delta + 0.5)))
+            local target = math.max(0, math.min(dur > 0 and dur or math.huge, math.floor(pos + delta + 0.5)))
             os.execute("playerctl position " .. target .. " 2>/dev/null")
             mem_bust("_playerctl_pos")
-            disp_pos = target
         else
             local m, s = si:match("^(%d+):(%d+)$")
             if m and s then
@@ -3462,7 +3523,6 @@ view_seek = function(item)
                 target = math.max(0, math.min(dur > 0 and dur or math.huge, target))
                 os.execute("playerctl position " .. target .. " 2>/dev/null")
                 mem_bust("_playerctl_pos")
-                disp_pos = target
             end
         end
     end
@@ -3597,11 +3657,12 @@ local function view_system()
             rofi_message(table.concat({
                 row("Select", "return"),
                 row("Close", "escape"),
-                row("Back one level", "alt + backspace"),
+                row("Clear input / Back one level", "backspace"),
                 row("Jump to current track's action menu", "alt + return"),
                 row("Jump to main menu", "alt + space"),
-                row("Jump to trail step", "alt + t"),
-                row("Clear session trail", "alt + k"),
+                row("Jump to trail step", "tab"),
+                row("Clear session trail", "delete"),
+                row("Seek + / -10s", "alt + = / -"),
                 row("Liked tracks", "alt + l"),
                 row("Recently played", "alt + p"),
                 row("Album art of current track", "alt + a"),
@@ -4393,6 +4454,421 @@ local function run_prefetch_art()
     os.exit(0)
 end
 
+-- ── Backspace monitor ─────────────────────────────────────────────────
+-- Plain Backspace is ambiguous: rofi edits the filter natively, but when
+-- the filter is already empty a Backspace press is swallowed by rofi's
+-- keyboard grab. This daemon-level monitor watches the keyboard at the
+-- evdev layer (Wayland) and, while the filter is known to be empty,
+-- re-injects the internal "back one level" combo (Control+Shift+Delete =
+-- kb-custom-1) through its own uinput virtual keyboard.
+--
+-- Note: the combo deliberately does NOT include Backspace. spbsd injects
+-- on the very Backspace keydown the user is still physically holding, and
+-- compositors dedupe a second press of an already-held keycode, so a
+-- fresh key (Delete) is used instead.
+--
+--   * Util.BS_C_SOURCE / Util.bs_compile  tiny C helper ("spbsd"): passive
+--     evdev reader that forwards every EV_KEY event as "K <code> <val>"
+--     lines on the ev.fifo, and injects the combo through uinput on demand
+--     when told to via the cmd.fifo (Wayland only, no wtype needed).
+--   * Util.bsmon_mode (--bsmon)           background Lua process holding a
+--     shadow of rofi's filter string (per-key word class, "w"/"s") from the
+--     forwarded key stream, so Ctrl+BackSpace word-deletes mirror rofi's
+--     textbox_cursor_dec_word exactly; when a plain Backspace keydown
+--     arrives with the shadow already empty it tells spbsd to inject
+--     Control+Shift+Delete.
+--   * Util.bs_start/bs_launch/bs_teardown lifecycle glue called from
+--     rofi_dmenu around every interactive menu. Spawn is fully async, so
+--     menus open instantly; a BackSpace pressed in the first instant of a
+--     brand-new menu (before spbsd reports READY) may be missed.
+
+Util.BS_C_SOURCE = [=[
+#define _GNU_SOURCE
+#include <signal.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <dirent.h>
+#include <errno.h>
+#include <sys/select.h>
+#include <sys/stat.h>
+#include <linux/input.h>
+#include <linux/uinput.h>
+
+#define MAXDEV 32
+#define NBITS(x) ((((x) - 1) / (8 * sizeof(unsigned long))) + 1)
+#define INJ_NAME "spbsd-inject"
+
+static int devfds[MAXDEV];
+static int ndev = 0;
+static int evfd = -1;
+static int cmdfd = -1;
+static int uifd = -1;
+
+static void on_term(int sig) {
+    (void)sig;
+    _exit(0);
+}
+
+static int has_backspace(int fd) {
+    unsigned long evbits[NBITS(EV_MAX)] = {0};
+    if (ioctl(fd, EVIOCGBIT(0, sizeof(evbits)), evbits) < 0) return 0;
+    if (!(evbits[EV_KEY / (8 * sizeof(unsigned long))]
+          & (1UL << (EV_KEY % (8 * sizeof(unsigned long)))))) return 0;
+    unsigned long keys[NBITS(KEY_MAX)] = {0};
+    if (ioctl(fd, EVIOCGBIT(EV_KEY, sizeof(keys)), keys) < 0) return 0;
+    return (keys[KEY_BACKSPACE / (8 * sizeof(unsigned long))]
+            & (1UL << (KEY_BACKSPACE % (8 * sizeof(unsigned long))))) ? 1 : 0;
+}
+
+/* Skip our own injector device so injected keys never loop back. */
+static int is_own_device(int fd) {
+    char name[256];
+    if (ioctl(fd, EVIOCGNAME(sizeof(name) - 1), name) < 0) return 0;
+    name[sizeof(name) - 1] = 0;
+    return strcmp(name, INJ_NAME) == 0;
+}
+
+static void setup_uinput(void) {
+    uifd = open("/dev/uinput", O_WRONLY | O_NONBLOCK);
+    if (uifd < 0) {
+        fprintf(stderr, "HELPER no uinput\n");
+        return;
+    }
+    struct uinput_setup setup;
+    memset(&setup, 0, sizeof(setup));
+    strncpy(setup.name, INJ_NAME, sizeof(setup.name) - 1);
+    setup.id.bustype = BUS_VIRTUAL;
+    setup.id.vendor = 0x1234;
+    setup.id.product = 0x5678;
+    setup.id.version = 1;
+    ioctl(uifd, UI_SET_EVBIT, EV_KEY);
+    ioctl(uifd, UI_SET_KEYBIT, KEY_DELETE);
+    ioctl(uifd, UI_SET_KEYBIT, KEY_LEFTCTRL);
+    ioctl(uifd, UI_SET_KEYBIT, KEY_RIGHTCTRL);
+    ioctl(uifd, UI_SET_KEYBIT, KEY_LEFTSHIFT);
+    ioctl(uifd, UI_SET_KEYBIT, KEY_RIGHTSHIFT);
+    if (ioctl(uifd, UI_DEV_SETUP, &setup) < 0
+        || ioctl(uifd, UI_DEV_CREATE) < 0) {
+        close(uifd);
+        uifd = -1;
+        return;
+    }
+    usleep(10000); /* let the kernel register /dev/input/eventX */
+    fprintf(stderr, "HELPER uinput ready\n");
+}
+
+static void inject_back(void) {
+    if (uifd < 0) return;
+    struct input_event e[7];
+    int n = 0;
+    memset(&e[n], 0, sizeof(e[0])); e[n].type = EV_KEY; e[n].code = KEY_LEFTCTRL;  e[n].value = 1; n++;
+    memset(&e[n], 0, sizeof(e[0])); e[n].type = EV_KEY; e[n].code = KEY_LEFTSHIFT; e[n].value = 1; n++;
+    memset(&e[n], 0, sizeof(e[0])); e[n].type = EV_KEY; e[n].code = KEY_DELETE;     e[n].value = 1; n++;
+    memset(&e[n], 0, sizeof(e[0])); e[n].type = EV_KEY; e[n].code = KEY_DELETE;     e[n].value = 0; n++;
+    memset(&e[n], 0, sizeof(e[0])); e[n].type = EV_KEY; e[n].code = KEY_LEFTSHIFT; e[n].value = 0; n++;
+    memset(&e[n], 0, sizeof(e[0])); e[n].type = EV_KEY; e[n].code = KEY_LEFTCTRL;  e[n].value = 0; n++;
+    memset(&e[n], 0, sizeof(e[0])); e[n].type = EV_SYN; e[n].code = SYN_REPORT;    e[n].value = 0; n++;
+    if (write(uifd, e, n * sizeof(struct input_event)) < 0)
+        fprintf(stderr, "HELPER inject write failed\n");
+}
+
+static void open_devices(void) {
+    DIR *d = opendir("/dev/input");
+    if (!d) return;
+    struct dirent *e;
+    while ((e = readdir(d)) != NULL) {
+        if (strncmp(e->d_name, "event", 5) != 0) continue;
+        char path[160];
+        snprintf(path, sizeof(path), "/dev/input/%s", e->d_name);
+        int fd = open(path, O_RDONLY | O_NONBLOCK);
+        if (fd < 0) continue;
+        if (!has_backspace(fd) || is_own_device(fd)) { close(fd); continue; }
+        if (ndev < MAXDEV) {
+            devfds[ndev++] = fd;
+            fprintf(stderr, "HELPER open %s\n", path);
+        }
+        else close(fd);
+    }
+    closedir(d);
+}
+
+int main(int argc, char **argv) {
+    if (argc < 3) return 2;
+    const char *evfifo = argv[1];
+    const char *cmdfifo = argv[2];
+    setup_uinput();
+    open_devices();
+    fprintf(stderr, "HELPER devices=%d\n", ndev);
+    evfd = open(evfifo, O_WRONLY);
+    if (evfd < 0) return 3;
+    if (ndev == 0) {
+        dprintf(evfd, "NODEV\n");
+        close(evfd);
+        return 4;
+    }
+    signal(SIGTERM, on_term);
+    signal(SIGINT, on_term);
+    dprintf(evfd, "READY\n");
+    if (uifd < 0) dprintf(evfd, "NOUINPUT\n");
+    cmdfd = open(cmdfifo, O_RDONLY | O_NONBLOCK);
+    int running = 1;
+    while (running) {
+        fd_set rfds;
+        FD_ZERO(&rfds);
+        int maxfd = -1;
+        for (int i = 0; i < ndev; i++) {
+            FD_SET(devfds[i], &rfds);
+            if (devfds[i] > maxfd) maxfd = devfds[i];
+        }
+        if (cmdfd >= 0) {
+            FD_SET(cmdfd, &rfds);
+            if (cmdfd > maxfd) maxfd = cmdfd;
+        }
+        if (maxfd < 0) break;
+        int r = select(maxfd + 1, &rfds, NULL, NULL, NULL);
+        if (r < 0) {
+            if (errno == EINTR) continue;
+            break;
+        }
+        if (cmdfd >= 0 && FD_ISSET(cmdfd, &rfds)) {
+            char buf[64];
+            int n = read(cmdfd, buf, sizeof(buf));
+            for (int i = 0; i < n; i++) {
+                if (buf[i] == '1') inject_back();
+            }
+        }
+        for (int i = 0; i < ndev && running; i++) {
+            if (!FD_ISSET(devfds[i], &rfds)) continue;
+            struct input_event ev;
+            int n = read(devfds[i], &ev, sizeof(ev));
+            if (n == 0 || (n < 0 && errno != EAGAIN && errno != EINTR)) {
+                close(devfds[i]);
+                devfds[i] = devfds[--ndev];
+                i--;
+                continue;
+            }
+            if (n < 0) continue;
+            if (n < (int)sizeof(ev)) continue;
+            if (ev.type != EV_KEY) continue;
+            if (dprintf(evfd, "K %d %d\n", ev.code, ev.value) < 0) {
+                running = 0;
+                break;
+            }
+        }
+    }
+    if (uifd >= 0) {
+        ioctl(uifd, UI_DEV_DESTROY);
+        close(uifd);
+    }
+    if (evfd >= 0) close(evfd);
+    if (cmdfd >= 0) close(cmdfd);
+    for (int i = 0; i < ndev; i++) close(devfds[i]);
+    return 0;
+}
+]=]
+
+function Util.bs_compile()
+    os.execute("mkdir -p " .. shell_quote(P.cache))
+    local bin = P.cache .. "/spbsd"
+    local stamp = P.cache .. "/spbsd.stamp"
+    local function exists(p)
+        local f = io.open(p, "r")
+        if f then f:close(); return true end
+        return false
+    end
+    if (read_file(stamp) or "") ~= tostring(#Util.BS_C_SOURCE) or not exists(bin) then
+        local src = P.cache .. "/spbsd.c"
+        write_file(src, Util.BS_C_SOURCE)
+        os.execute("gcc -O2 -w -o " .. shell_quote(bin) .. " " .. shell_quote(src) .. " 2>/dev/null")
+        os.remove(src)
+        write_file(stamp, tostring(#Util.BS_C_SOURCE))
+    end
+    if exists(bin) then
+        os.execute("chmod +x " .. shell_quote(bin))
+        return bin
+    end
+    return nil
+end
+
+function Util.bs_clear_on_bs(theme)
+    if not theme then return false end
+    local content = read_file(theme) or ""
+    local val = content:match("kb%-remove%-to%-sol%s*:%s*\"([^\"]+)\"")
+    return val ~= nil and val:find("BackSpace") ~= nil
+end
+
+function Util.bs_start(clear_bs)
+    local bin = Util.bs_bin or Util.bs_compile()
+    if not bin then return nil end
+    Util.bs_bin = bin
+    local pid = tostring(Util.get_own_pid() or math.random(100000, 999999))
+    local run = "/tmp/spotirofi_bs_" .. pid .. "_" .. tostring(math.random(10000, 99999))
+    os.execute("mkdir -p " .. shell_quote(run))
+    local evf = run .. "/ev.fifo"
+    local cmdf = run .. "/cmd.fifo"
+    os.execute("mkfifo " .. shell_quote(evf) .. " " .. shell_quote(cmdf) .. " 2>/dev/null")
+    local cmd = string.format("nohup lua %s --bsmon %s %s > %s 2>&1 &",
+        shell_quote(P.dir .. "/spotirofi.lua"),
+        shell_quote(run), clear_bs and "1" or "0",
+        shell_quote(run .. "/bsmon.log"))
+    os.execute(cmd)
+    return { run = run, ev = evf, cmd = cmdf }
+end
+
+function Util.bs_launch(theme)
+    if os.getenv("SPOTIROFI_NO_BS") then return nil end
+    return Util.bs_start(Util.bs_clear_on_bs(theme))
+end
+
+function Util.bs_teardown(bs)
+    if not bs then return end
+    os.execute("pkill -f " .. shell_quote(bs.run) .. " 2>/dev/null")
+    os.execute("rm -rf " .. shell_quote(bs.run))
+end
+
+function Util.bsmon_mode()
+    local run = arg[2]
+    if not run then os.exit(2) end
+    local clear_bs = (arg[3] == "1")
+    io.write(string.format("BSMON started run=%s clear_bs=%s\n", run, clear_bs and "1" or "0"))
+    io.flush()
+    local evf = run .. "/ev.fifo"
+    local cmdf = run .. "/cmd.fifo"
+    os.execute("mkfifo " .. shell_quote(evf) .. " " .. shell_quote(cmdf) .. " 2>/dev/null")
+    local bin = Util.bs_bin or Util.bs_compile()
+    if not bin then os.exit(3) end
+    Util.bs_bin = bin
+    os.execute(shell_quote(bin) .. " " .. shell_quote(evf) .. " " .. shell_quote(cmdf)
+        .. " >> " .. shell_quote(run .. "/helper.log") .. " 2>&1 &")
+    local ev, eerr = io.open(evf, "r")
+    if not ev then os.exit(4) end
+    local cmd = io.open(cmdf, "w")
+    if not cmd then ev:close(); os.exit(5) end
+    local use_wtype = false
+    local injected = false
+    local function inject_back()
+        if injected then return end
+        injected = true
+        io.write("BSMON inject\n"); io.flush()
+        if cmd then
+            cmd:write("1")
+            cmd:flush()
+        end
+        if use_wtype then
+            os.execute("wtype -M ctrl -M shift -k Delete -m ctrl -m shift 2>/dev/null")
+        end
+    end
+    local KEY_LEFTCTRL, KEY_RIGHTCTRL = 29, 97
+    local KEY_LEFTSHIFT, KEY_RIGHTSHIFT = 42, 54
+    local KEY_LEFTALT, KEY_RIGHTALT = 56, 100
+    local printable = {}
+    for i = 2, 13 do printable[i] = true end
+    for i = 16, 27 do printable[i] = true end
+    for i = 30, 41 do printable[i] = true end
+    printable[43] = true
+    printable[86] = true
+    for i = 44, 53 do printable[i] = true end
+    printable[55] = true
+    printable[57] = true
+    for i = 71, 83 do printable[i] = true end
+    printable[98] = true
+    printable[117] = true
+    printable[121] = true
+    local shadow = ""
+    local is_word = {}
+    for i = 2, 11 do is_word[i] = true end
+    for i = 16, 25 do is_word[i] = true end
+    for i = 30, 38 do is_word[i] = true end
+    is_word[40] = true
+    for i = 44, 50 do is_word[i] = true end
+    for i = 71, 73 do is_word[i] = true end
+    for i = 75, 77 do is_word[i] = true end
+    for i = 79, 82 do is_word[i] = true end
+    local function shadow_del_one()
+        shadow = shadow:sub(1, #shadow - 1)
+    end
+    local function shadow_word_back()
+        local n = #shadow
+        while n > 0 and shadow:sub(n, n) ~= "w" do n = n - 1 end
+        while n > 0 and shadow:sub(n, n) == "w" do n = n - 1 end
+        shadow = shadow:sub(1, n)
+    end
+    local lctrl, rctrl, lshift, rshift, lalt, ralt = 0, 0, 0, 0, 0, 0
+    for line in ev:lines() do
+        if line == "NODEV" then
+            io.write("BSMON helper NODEV\n"); io.flush()
+            break
+        elseif line == "READY" then
+            io.write("BSMON helper ready\n"); io.flush()
+        elseif line == "NOUINPUT" then
+            use_wtype = true
+            io.write("BSMON helper no uinput, using wtype\n"); io.flush()
+        elseif line:sub(1, 2) == "K " then
+            local code_s, val_s = line:match("^K (%d+) (%d+)$")
+            if code_s then
+                local code, val = tonumber(code_s), tonumber(val_s)
+                local is_mod = code == KEY_LEFTCTRL or code == KEY_RIGHTCTRL
+                    or code == KEY_LEFTSHIFT or code == KEY_RIGHTSHIFT
+                    or code == KEY_LEFTALT or code == KEY_RIGHTALT
+                if is_mod then
+                    if val == 0 then
+                        if code == KEY_LEFTCTRL then lctrl = 0
+                        elseif code == KEY_RIGHTCTRL then rctrl = 0
+                        elseif code == KEY_LEFTSHIFT then lshift = 0
+                        elseif code == KEY_RIGHTSHIFT then rshift = 0
+                        elseif code == KEY_LEFTALT then lalt = 0
+                        elseif code == KEY_RIGHTALT then ralt = 0 end
+                    elseif val == 1 or val == 2 then
+                        if code == KEY_LEFTCTRL then lctrl = 1
+                        elseif code == KEY_RIGHTCTRL then rctrl = 1
+                        elseif code == KEY_LEFTSHIFT then lshift = 1
+                        elseif code == KEY_RIGHTSHIFT then rshift = 1
+                        elseif code == KEY_LEFTALT then lalt = 1
+                        elseif code == KEY_RIGHTALT then ralt = 1 end
+                    end
+                elseif val == 1 or val == 2 then
+                    local ctrl = (lctrl + rctrl) > 0
+                    local alt = (lalt + ralt) > 0
+                    if ctrl and alt then
+                        if code == 35 then
+                            shadow_word_back()
+                        end
+                    elseif ctrl and not alt then
+                        if code == 17 then
+                            shadow = ""
+                        elseif code == 22 then
+                            if not clear_bs then shadow = "" end
+                        elseif code == 14 then
+                            shadow_word_back()
+                        elseif code == 35 or code == 32 then
+                            if not clear_bs then shadow_del_one() end
+                        elseif code == 47 then
+                            local cb = shell("wl-paste 2>/dev/null")
+                            if cb and cb ~= "" then
+                                shadow = shadow .. string.rep("?", utf8.len(cb) or #cb)
+                            end
+                        end
+                    elseif not alt then
+                        if code == 14 then
+                            local empty = (#shadow == 0)
+                            if clear_bs then shadow = ""
+                            else shadow_del_one() end
+                            if empty then inject_back() end
+                        elseif printable[code] then
+                            shadow = shadow .. (is_word[code] and "w" or "s")
+                        end
+                    end
+                end
+            end
+        end
+    end
+    ev:close()
+    os.exit(0)
+end
+
 if arg and arg[1] == "--daemon" then
     daemon_mode()
 elseif arg and arg[1] == "--recent-watch" then
@@ -4403,6 +4879,8 @@ elseif arg and arg[1] == "--prefetch-track" then
     run_prefetch_track()
 elseif arg and arg[1] == "--prefetch-art" then
     run_prefetch_art()
+elseif arg and arg[1] == "--bsmon" then
+    Util.bsmon_mode()
 elseif arg and arg[1] then
     os.exit(2)
 else

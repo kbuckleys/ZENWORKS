@@ -13,6 +13,9 @@
 configuration {
     kb-remove-to-sol: "BackSpace";
     kb-remove-char-back: "";
+    kb-element-next: "";
+    kb-remove-char-forward: "";
+    show-icons: true;
 }
 
 window {
@@ -22,7 +25,7 @@ window {
 }
 
 mainbox {
-    children: [ inputbar, message, listview ];
+    children: [ inputbar, listview, message ];
 }
 
 inputbar {
@@ -59,10 +62,10 @@ element-icon {
 
 message {
     background-color: #16191d;
-    padding: 5px 5px 5px 5px;
+    padding: 5px 30px 5px 30px;
 }
 textbox {
-    text-color: #eebebe;
+    text-color: #6a707f;
     horizontal-align: 0.5;
     font: "JetBrainsMono Nerd Font Propo Bold 12";
 }

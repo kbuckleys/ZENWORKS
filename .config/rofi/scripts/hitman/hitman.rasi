@@ -27,6 +27,10 @@ inputbar {
     spacing: 4px;
 }
 
+message {
+    background-color: #16191d;
+    padding: 5px 30px 5px 30px;
+}
 textbox {
     text-color: #9bbfbf;
     horizontal-align: 0.5;
@@ -50,7 +54,7 @@ listview {
 }
 
 element {
-    padding: 2px 8px 2px 8px;
+    padding: 2px 20px 2px 20px;
 }
 element-text {
     highlight: bold #eebebe;
@@ -58,9 +62,4 @@ element-text {
 element-text selected {
     background-color: transparent;
     text-color: #e78284;
-}
-
-message {
-    background-color: #20242a;
-    padding: 4px;
 }

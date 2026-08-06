@@ -14,8 +14,7 @@
 }
 
 #waybar {
-    background: #16191d;
-    padding: 0;
+    background: transparent;
 }
 
 #workspaces {
