@@ -9,7 +9,6 @@ A zen Arch-based ecosystem
 
 ---
 
-# Dependencies
 Everything I use is condensed [here](/pkglst)
 
 **Theme Elements**
