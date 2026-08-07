@@ -6,37 +6,45 @@
 -- ZENU Package Manager ~ Part of the ZENWORKS Suite
 -- https://github.com/kbuckleys/
 
-local HOME = os.getenv("HOME")
-local LOGO_PATH = HOME .. "/.config/logo"
+local HOME       = os.getenv("HOME")
+local LOGO_PATH  = HOME .. "/.config/logo"
+local AUR_CACHE  = HOME .. "/.cache/paru/packages.aur"
+local CLONE_DIR  = HOME .. "/.cache/paru/clone"
+local CACHE_DIR  = (os.getenv("XDG_CACHE_HOME") or (HOME .. "/.cache")) .. "/zenu"
+local PACMAN_LOG = "/var/log/pacman.log"
+local PKG_CACHE  = "/var/cache/pacman/pkg"
+local DEBUG      = os.getenv("ZENU_DEBUG") ~= nil
 
-local ICON_INSTALL = "󱞡"
-local ICON_REMOVE  = ""
+-- Passed into the row formatter with -v, so these stay the only definition.
+-- Written as byte escapes rather than literal glyphs: these are Nerd Font
+-- private-use codepoints that editors and copy-paste routinely mangle or
+-- drop, and a silently empty icon shifts every field in the row.
+-- \243\177\158\161 = U+F17A1 (available), \239\128\141 = U+F00D (installed)
+local ICON_AVAIL = "\243\177\158\161"
+local ICON_INST  = "\239\128\141"
 
-local REPO_COLORS = {
-  CORE     = "\027[36m", -- cyan
-  EXTRA    = "\027[32m", -- green
-  MULTILIB = "\027[33m", -- yellow
-  AUR      = "\027[35m", -- magenta
-  LOCAL    = "\027[97m", -- white
-}
-local COLOR_RESET = "\027[0m"
+local FZF_COLOR = "--color=fg+:#dfdfdd,bg+:#20242a,pointer:#e0d8a4,marker:#fab387,hl+:#b6e0a4,hl::#b6e0a4,spinner:#9bbfbf,border:#20242a"
 
-local CACHE = {}
-local function invalidate_cache()
-  CACHE.available_raw  = nil
-  CACHE.installed_raw  = nil
-  CACHE.repo_map       = nil
-  CACHE.available_pkgs = nil
-  CACHE.installed_set  = nil
-  CACHE.installed_pkgs = nil
-end
-local FZF_COLOR   = "--color=fg+:#dfdfdd,bg+:#20242a,pointer:#e0d8a4,marker:#fab387,hl+:#b6e0a4,hl::#b6e0a4,spinner:#9bbfbf,border:#20242a"
+-- Column geometry. The repo tag is right-aligned against the terminal edge
+-- and everything else is derived from the width so the tag stays flush.
+local REPO_W = 8 -- "MULTILIB"; testing repos fold to short tags that also fit
+local SIZE_W = 9
+local MARGIN = 4 -- fzf's pointer + multi-select marker gutter
 
 -- low level helpers
 
+-- os.execute returns true|nil plus an exit code on Lua 5.4+. Go through the
+-- exit code explicitly so the truthiness does not silently invert on 5.1.
 local function sh(cmd)
-  -- fire-and-forget / status only
-  return os.execute(cmd)
+  local ok, _, code = os.execute(cmd)
+  if type(ok) == "number" then return ok == 0 end
+  return ok == true and (code == nil or code == 0)
+end
+
+-- Single-quote for /bin/sh. Package names come from the pacman database, but
+-- they still reach the shell as data, so quote them like data.
+local function shq(s)
+  return "'" .. tostring(s):gsub("'", "'\\''") .. "'"
 end
 
 local function capture(cmd)
@@ -47,6 +55,10 @@ local function capture(cmd)
   return out
 end
 
+local function trim(s)
+  return (s:gsub("^%s+", ""):gsub("%s+$", ""))
+end
+
 local function lines_of(str)
   local t = {}
   for line in str:gmatch("([^\n]*)\n?") do
@@ -55,540 +67,1416 @@ local function lines_of(str)
   return t
 end
 
-local function write_tmp(text)
-  local path = os.tmpname()
-  local f = io.open(path, "w")
+-- Wall clock, not os.clock(): almost all the time here is spent waiting on
+-- pacman, paru and fzf, and os.clock() only counts this process's own CPU,
+-- so it reports ~0 ms for exactly the operations worth measuring.
+-- /proc/uptime avoids spawning `date` just to take a reading.
+local function now_ms()
+  local f = io.open("/proc/uptime", "r")
+  if not f then return nil end
+  local line = f:read("*l") or ""
+  f:close()
+  local up = tonumber(line:match("^(%S+)"))
+  return up and up * 1000 or nil
+end
+
+local function timed(label, fn)
+  if not DEBUG then return fn() end
+  local t0 = now_ms()
+  local a, b = fn()
+  local t1 = now_ms()
+  if t0 and t1 then
+    io.stderr:write(string.format("[zenu] %-28s %6.0f ms\n", label, t1 - t0))
+  end
+  return a, b
+end
+
+-- run directory
+
+-- One private directory per run instead of a scatter of os.tmpname() files.
+-- os.tmpname() is tmpnam(3): a predictable path in a world-writable /tmp, and
+-- the old code leaked one file per view toggle because the views never
+-- returned. mktemp -d is unpredictable, and this all goes away in one rm -rf.
+local RUNDIR = trim(capture("mktemp -d /tmp/zenu.XXXXXXXX 2>/dev/null"))
+if RUNDIR == "" then
+  io.stderr:write("ZENU: could not create a temporary directory\n")
+  os.exit(1)
+end
+
+local function runpath(name)
+  return RUNDIR .. "/" .. name
+end
+
+local function write_file(path, text)
+  local f, err = io.open(path, "w")
+  if not f then
+    io.stderr:write("ZENU: cannot write " .. path .. ": " .. tostring(err) .. "\n")
+    os.exit(1)
+  end
   f:write(text)
   f:close()
   return path
 end
 
--- Run fzf over a list of lines with arbitrary extra args, return the
--- selection (raw string, possibly multi-line for --multi selections).
-local function fzf(items, args)
-  local input = type(items) == "table" and table.concat(items, "\n") or items
-  local tmp = write_tmp(input)
-  local out = capture("fzf " .. args .. " < " .. tmp)
-  os.remove(tmp)
+local function write_script(name, text)
+  local path = write_file(runpath(name), text)
+  sh("chmod +x " .. shq(path))
+  return path
+end
+
+local function read_file(path)
+  local f = io.open(path, "r")
+  if not f then return "" end
+  local out = f:read("*a") or ""
+  f:close()
   return out
 end
 
-local function term_width()
+local function cleanup()
+  if RUNDIR ~= "" and RUNDIR:match("^/tmp/zenu%.") then
+    sh("rm -rf " .. shq(RUNDIR))
+  end
+end
+
+-- cleanup() only runs on a normal exit; a SIGTERM, a closed terminal or a
+-- SIGKILL leaves the directory behind, and plain Lua cannot trap signals.
+-- Each run records its pid, so any earlier directory whose owner is gone
+-- can be collected on the next start. mktemp -d makes these mode 700, so
+-- this only ever touches our own.
+local function sweep_stale()
+  write_file(runpath("pid"), trim(capture("echo $PPID")))
+  sh([[
+    for d in /tmp/zenu.*/; do
+      [ -d "$d" ] || continue
+      p=$(cat "$d/pid" 2>/dev/null)
+      if [ -z "$p" ] || ! kill -0 "$p" 2>/dev/null; then rm -rf "$d"; fi
+    done 2>/dev/null
+  ]])
+end
+
+-- terminal
+
+local function term_size()
   -- tput's own stdout is a pipe here (we're capturing it), not the
   -- terminal, so it can't determine the real size via ioctl and may
   -- silently fall back to a stale default. Query /dev/tty directly
   -- instead, which always refers to the actual controlling terminal.
   local out = capture("stty size < /dev/tty 2>/dev/null")
-  local _, cols = out:match("(%d+)%s+(%d+)")
-  local w = tonumber(cols)
-  return w or 80
+  local rows, cols = out:match("(%d+)%s+(%d+)")
+  local h, w = tonumber(rows), tonumber(cols)
+  -- `or 80` is not enough: a detached or not-yet-sized tty reports "0 0",
+  -- and tonumber("0") is 0, which is truthy in Lua. That collapsed every
+  -- column to the minimum instead of falling back.
+  if not w or w < 40 then w = 80 end
+  if not h or h < 10 then h = 24 end
+  return h, w
 end
 
--- Centers text within a given width, using UTF-8 codepoint count (not
--- byte count) so multi-byte glyphs like the keybind icons don't throw
--- off the math. The 󰇙 separator glyph renders double-width in some
--- terminal fonts, which would otherwise make the text drift right.
+local function term_width()
+  local _, w = term_size()
+  return w
+end
+
+-- Centers header text across the terminal, by codepoint count rather than
+-- byte count.
+--
+-- Two corrections over the previous version, which sat five columns left
+-- of centre:
+--
+--   * No extra allowance for the 󰇙 separator. It is a Nerd Font
+--     private-use codepoint, and terminals render those at one column
+--     (private-use ranges are East_Asian_Width=Ambiguous, which kitty and
+--     friends treat as narrow). The package rows already assume exactly
+--     this for the status icons, and they line up. Counting each
+--     separator as two pushed the text left by half their number.
+--   * fzf indents the header by HEADER_INDENT columns; measured constant
+--     across --multi / --no-input / bare. Subtract it so the text is
+--     centred on the terminal rather than within the indented region.
+local HEADER_INDENT = 2
+
 local function center_text(text, width)
   local len = (utf8 and utf8.len(text)) or #text
-  local _, wide_count = text:gsub("󰇙", "")
-  len = len + wide_count
-  local pad = math.floor((width - len) / 2)
+  local pad = math.floor((width - len) / 2) - HEADER_INDENT
   if pad < 0 then pad = 0 end
   return string.rep(" ", pad) .. text
 end
 
 local function show_logo()
-  local f = io.open(LOGO_PATH, "r")
-  if f then
-    io.write(f:read("*a"), "\n")
-    f:close()
-  end
+  io.write(read_file(LOGO_PATH), "\n")
 end
 
 local function hard_clear()
-  io.write("\027c")
-  sh("stty sane 2>/dev/null")
+  -- \027c is RIS, a full terminal reset that also wipes scrollback and
+  -- resets charset/colors. Clear the screen and scrollback only.
+  io.write("\027[H\027[2J\027[3J")
 end
 
--- sudo keep-alive (mirrors the background `while true; do sudo -n true...`)
+-- Terminals ship with XON/XOFF flow control enabled, which eats C-s (XOFF)
+-- and C-q (XON) before fzf ever sees them -- C-s would appear to freeze the
+-- UI rather than toggle the list. Turn it off for the run and put the
+-- original termios back on the way out.
+local SAVED_TTY = nil
 
-local sudo_handle = nil
-
-local function sudo_start()
-  -- mirrors: if ! sudo -v 2>/dev/null; then if ! sudo -v; then ... fi; fi
-  if not sh("sudo -v 2>/dev/null") then
-    if not sh("sudo -v") then
-      print("Auth failed.")
-      os.exit(1)
-    end
-  end
-  -- Launch a background keep-alive loop and grab its PID (first line it prints).
-  sudo_handle = io.popen([[
-    bash -c '
-      echo $$
-      while true; do
-        sudo -n true 2>/dev/null
-        sleep 60
-        kill -0 $PPID 2>/dev/null || exit
-      done
-    '
-  ]], "r")
+local function tty_setup()
+  SAVED_TTY = trim(capture("stty -g < /dev/tty 2>/dev/null"))
+  sh("stty -ixon < /dev/tty 2>/dev/null")
 end
 
-local function sudo_stop()
-  if sudo_handle then
-    local pid = sudo_handle:read("*l")
-    if pid then sh("kill " .. pid .. " 2>/dev/null") end
-    sudo_handle:close()
-    sudo_handle = nil
+local function tty_restore()
+  if SAVED_TTY and SAVED_TTY ~= "" then
+    sh("stty " .. SAVED_TTY .. " < /dev/tty 2>/dev/null")
+    SAVED_TTY = nil
   end
 end
 
--- Ensure fzf and paru/paru-git are installed
-
-local function fzf_installed()
-  return sh("pacman -Qq fzf >/dev/null 2>&1")
+local function pause(msg)
+  io.write(msg or "\nPress RETURN to continue.")
+  io.read("*l")
 end
 
-local function ensure_fzf()
-  if fzf_installed() then return end
-  sh("sudo pacman -S --noconfirm fzf >/dev/null 2>&1")
+-- dependencies
+
+local DEPS = {
+  { pkg = "fzf",            bin = "fzf",      why = "the interface itself" },
+  { pkg = "expac",          bin = "expac",    why = "package size columns" },
+  { pkg = "pacman-contrib", bin = "paccache", why = "cache maintenance" },
+}
+
+local function have(bin)
+  return sh("command -v " .. shq(bin) .. " >/dev/null 2>&1")
+end
+
+local function ensure_deps()
+  local missing = {}
+  for _, d in ipairs(DEPS) do
+    if not have(d.bin) then missing[#missing + 1] = d end
+  end
+  if #missing == 0 then return end
+
+  local names = {}
+  for _, d in ipairs(missing) do names[#names + 1] = d.pkg end
+
+  hard_clear()
+  show_logo()
+  print("  ZENU needs a few packages that aren't installed yet:")
+  print("")
+  for _, d in ipairs(missing) do
+    print(string.format("    %-16s %s", d.pkg, d.why))
+  end
+  print("")
+  sh("sudo pacman -S --needed --noconfirm " .. table.concat(names, " "))
 end
 
 local function paru_installed()
   return sh("pacman -Qq paru >/dev/null 2>&1") or sh("pacman -Qq paru-git >/dev/null 2>&1")
 end
 
-local function ensure_paru()
-  if paru_installed() then return end
+-- sudo keep-alive
 
+local sudo_pid   = nil
+local sudo_ready = false
+
+-- Held at file scope deliberately, and it must stay that way.
+--
+-- Lua closes io.popen handles from the garbage collector, and closing one
+-- calls pclose(), which waits for the child to exit. The keep-alive child
+-- loops until it is told to stop, so a handle left to fall out of scope
+-- freezes the entire process the moment the collector happens to reach it
+-- -- typically several screens later, looking like the terminal has just
+-- gone blank. Keeping a live reference means it is only ever closed by
+-- sudo_stop, which kills the child first so pclose returns at once.
+local sudo_handle = nil
+
+-- Deferred on purpose: browsing the package list needs no privileges, so
+-- the password prompt only appears when something is actually about to be
+-- installed or removed.
+local function sudo_ensure()
+  if sudo_ready then return true end
+  if not sh("sudo -n true 2>/dev/null") then
+    if not sh("sudo -v") then
+      print("Auth failed.")
+      return false
+    end
+  end
+  sudo_ready = true
+
+  local lua_pid = trim(capture("echo $PPID"))
+  local keepalive = write_script("keepalive.sh", string.format([[
+#!/bin/bash
+echo $$
+while true; do
+  sudo -n true 2>/dev/null
+  sleep 60
+  kill -0 %s 2>/dev/null || exit
+done
+]], lua_pid))
+  sudo_handle = io.popen(keepalive, "r")
+  if sudo_handle then
+    sudo_pid = trim(sudo_handle:read("*l") or "")
+  end
+  return true
+end
+
+local function sudo_stop()
+  if sudo_pid and sudo_pid ~= "" then
+    -- pkill -P first: killing the bash wrapper alone orphans its sleep.
+    sh("pkill -P " .. sudo_pid .. " 2>/dev/null")
+    sh("kill " .. sudo_pid .. " 2>/dev/null")
+    sudo_pid = nil
+  end
+  if sudo_handle then
+    -- Only safe once the child is gone: this pclose()es and would
+    -- otherwise wait forever on the keep-alive loop.
+    sudo_handle:close()
+    sudo_handle = nil
+  end
+end
+
+-- package data
+
+local INSTALLED = nil
+
+local function installed_set()
+  if INSTALLED then return INSTALLED end
+  INSTALLED = {}
+  for _, pkg in ipairs(lines_of(capture("pacman -Qq 2>/dev/null"))) do
+    INSTALLED[pkg] = true
+  end
+  return INSTALLED
+end
+
+local function invalidate()
+  INSTALLED = nil
+end
+
+-- Fresh update check that needs no privileges at all.
+--
+-- The old code ran `paru -Sy` on every entry to the manage view (and again
+-- on every return trip from the update view), which meant a password prompt
+-- before you could even look at the list. `checkupdates` syncs into its own
+-- private database under the user's cache instead of /var/lib/pacman/sync,
+-- so it is just as fresh without root; `paru -Qua` covers the AUR side.
+-- Both are run concurrently since the repo sync dominates the wall time.
+local function fetch_updates()
+  local cmd
+  if have("checkupdates") then
+    cmd = "{ checkupdates & paru -Qua --color=never & wait; } 2>/dev/null | sort -u"
+  else
+    -- Without pacman-contrib the best available is a check against whatever
+    -- the system databases already hold.
+    cmd = "paru -Qu --color=never 2>/dev/null | sort -u"
+  end
+  return lines_of(capture(cmd))
+end
+
+-- An explicit, user-initiated database sync. This is the only thing that
+-- refreshes what the manage view considers "available", and it is offered
+-- from the maintenance view rather than fired implicitly.
+local function sync_repos()
+  if not sudo_ensure() then return false end
+  sh("sudo pacman -Sy")
+  invalidate()
+  return true
+end
+
+-- Replaces `paru --clean`, which ran after every transaction, emptied the
+-- package cache entirely (destroying any ability to downgrade) and still
+-- left pacman's interrupted download-* directories behind.
+local function trim_cache()
+  if not have("paccache") then return end
+  if not sudo_ensure() then return end
+  sh("sudo paccache -rk2 >/dev/null 2>&1")
+end
+
+-- list pipeline
+
+-- Formats every package row in a single gawk pass fed by process
+-- substitution. This replaces `paru -Sl` (923 ms for 133k lines) with
+-- `pacman -Sl` plus paru's own AUR name cache (211 ms + 2 ms), and it
+-- keeps the 16 MB of formatted rows out of the Lua heap entirely.
+--
+-- Emits, whitespace-delimited so fzf can address the fields directly:
+--   1 = icon   2 = package name   3 = size   4 = repo tag
+local LIST_AWK = [==[
+BEGIN {
+  # icon_avail / icon_inst arrive via -v from the Lua side.
+  RESET = "\033[0m"; DIM = "\033[2m"
+
+  # Short tag + color per repo. The old code assumed 8 columns was enough
+  # for the longest tag ("MULTILIB") and used %8s, which pads but never
+  # truncates -- so on a box with the testing repos enabled "CORE-TESTING"
+  # and "EXTRA-TESTING" ran past the field and broke the right alignment.
+  tag["core"]="CORE";               col["core"]="\033[36m"
+  tag["extra"]="EXTRA";             col["extra"]="\033[32m"
+  tag["multilib"]="MULTILIB";       col["multilib"]="\033[33m"
+  tag["core-testing"]="CORE-T";     col["core-testing"]="\033[31m"
+  tag["extra-testing"]="EXTRA-T";   col["extra-testing"]="\033[31m"
+  tag["multilib-testing"]="MLIB-T"; col["multilib-testing"]="\033[31m"
+  tag["aur"]="AUR";                 col["aur"]="\033[35m"
+  tag["local"]="LOCAL";             col["local"]="\033[97m"
+
+  name_fmt = "%-" pkg_w "s"
+  size_fmt = "%" size_w "s"
+  repo_fmt = "%" repo_w "s"
+  pre["avail"] = icon_avail " "
+  pre["inst"]  = icon_inst " "
+  pre["dep"]   = DIM icon_inst " "
+}
+function human(b,   u, i) {
+  if (b == "" || b + 0 <= 0) return "-"
+  split("B K M G T", u, " ")
+  i = 1
+  while (b >= 1024 && i < 5) { b /= 1024; i++ }
+  return sprintf((i == 1 ? "%d%s" : "%.1f%s"), b, u[i])
+}
+function tail(repo, state,   k, t, c) {
+  k = repo SUBSEP state
+  if (k in tailc) return tailc[k]
+  if (repo in tag) { t = tag[repo]; c = col[repo] }
+  else             { t = toupper(substr(repo, 1, repo_w)); c = "\033[37m" }
+  if (state == "dep") c = DIM
+  return tailc[k] = " " c sprintf(repo_fmt, t) RESET
+}
+function row(pkg, repo,   state, sz) {
+  if      (!(pkg in inst)) { state = "avail"; sz = human(dsize[pkg]) }
+  else if (pkg in expl)    { state = "inst";  sz = human(isize[pkg]) }
+  else                     { state = "dep";   sz = human(isize[pkg]) }
+  if (only == "installed" && state == "avail") return
+  # Pad, never truncate: field 2 has to stay the real package name because
+  # that is exactly what gets handed to pacman. The longest name in the
+  # repos and the whole AUR is 66 characters, so at 100 columns or wider
+  # nothing overflows; at 80 columns 35 names out of 133k push the size and
+  # repo columns right, which is a better failure than acting on a clipped
+  # name.
+  print pre[state] sprintf(name_fmt, pkg) sprintf(size_fmt, sz) tail(repo, state)
+}
+ARGIND == 1 { inst[$1]  = 1; next }                   # pacman -Qq
+ARGIND == 2 { expl[$1]  = 1; next }                   # pacman -Qeq
+ARGIND == 3 { isize[$1] = $2; next }                  # expac -Q %n\t%m
+ARGIND == 4 { dsize[$1] = $2; next }                  # expac -S %n\t%k
+ARGIND == 5 {                                         # pacman -Sl
+  split($0, f, " ")
+  if (f[2] in seenrepo) next    # first repo wins, matching pacman's priority
+  seenrepo[f[2]] = 1
+  if (f[2] in inst) seen[f[2]] = 1
+  row(f[2], f[1]); next
+}
+ARGIND == 6 {                                         # paru's AUR name cache
+  if ($1 in seenrepo) next      # a real repo package shadows its AUR twin
+  if ($1 in inst) seen[$1] = 1
+  row($1, "aur"); next
+}
+END {
+  # Installed packages that are in no sync database any more (dropped from
+  # the repos, or installed with -U) would otherwise vanish from the list.
+  for (p in inst) if (!(p in seen)) row(p, "local")
+}
+]==]
+
+-- The generated rows are cached under XDG_CACHE_HOME and keyed on the
+-- mtimes of the pacman databases plus the column width, so repeat launches
+-- skip the work entirely.
+local LIST_SH = [==[
+#!/bin/bash
+# usage: list.sh <pkg_w> <full|installed>
+PKG_W="$1"; MODE="$2"
+cache="$ZENU_CACHE_DIR/rows.$MODE.$PKG_W"
+stampf="$cache.stamp"
+t0="$EPOCHREALTIME"
+dbg() { [ -n "$ZENU_DEBUG" ] || return 0
+        printf '[zenu] %%-28s %%6.0f ms\n' "$1" \
+          "$(echo "$EPOCHREALTIME $t0" | awk '{print ($1-$2)*1000}')" >&2; }
+stamp="$(stat -c %%Y /var/lib/pacman/local /var/lib/pacman/sync "$ZENU_AUR" 2>/dev/null | tr '\n' ' ')"
+stamp="$stamp|$(command -v expac >/dev/null 2>&1 && echo e || echo n)"
+
+if [ -r "$cache" ] && [ -r "$stampf" ] && [ "$(cat "$stampf")" = "$stamp" ]; then
+  cat "$cache"
+  dbg "rows $MODE (cache hit)"
+  exit 0
+fi
+
+mkdir -p "$ZENU_CACHE_DIR"
+AUR="$ZENU_AUR"; [ -r "$AUR" ] || AUR=/dev/null
+
+part="$cache.$$"
+# Every stream is an inline process substitution. Assigning one to a
+# variable first and expanding it later leaves a /dev/fd path whose
+# validity depends on the shell keeping the descriptor open.
+# The expac streams are empty when expac is missing, which just leaves the
+# size column blank; gawk's ARGIND is positional so the file indices below
+# stay correct either way.
+# LC_ALL=C keeps gawk's substr/length byte-based; package names are ASCII
+# and this is measurably faster over 133k rows.
+LC_ALL=C gawk -v pkg_w="$PKG_W" -v size_w=%d -v repo_w=%d -v only="$MODE" \
+  -v icon_avail=%s -v icon_inst=%s -f "$ZENU_AWK" \
+  <(pacman -Qq 2>/dev/null) \
+  <(pacman -Qeq 2>/dev/null) \
+  <(command -v expac >/dev/null 2>&1 && expac -Q '%%n\t%%m' 2>/dev/null) \
+  <(command -v expac >/dev/null 2>&1 && expac -S '%%n\t%%k' 2>/dev/null) \
+  <(pacman -Sl 2>/dev/null) \
+  "$AUR" | tee "$part"
+if [ "${PIPESTATUS[0]}" -eq 0 ]; then
+  mv -f "$part" "$cache" && printf '%%s' "$stamp" > "$stampf"
+  dbg "rows $MODE (rebuilt)"
+else
+  rm -f "$part"
+fi
+]==]
+
+-- Dispatches on what the row actually is instead of always reaching for
+-- `paru -Si`, which costs 250 ms for a repo package and 542 ms over the
+-- network for an AUR one -- on every cursor movement.
+local PREVIEW_SH = [==[
+#!/bin/bash
+# usage: preview.sh <pkg> <repo-tag> [full]
+pkg="$1"; repo="$2"; mode="${3:-quick}"
+pacman -Qi -- "$pkg" 2>/dev/null && exit 0
+case "$repo" in
+  AUR)
+    if [ "$mode" = full ]; then
+      paru -Si -- "$pkg"
+    else
+      printf '\033[35m%s\033[0m\n\nAUR package (not installed).\n' "$pkg"
+      pb="$ZENU_CLONE/$pkg/PKGBUILD"
+      if [ -r "$pb" ]; then
+        printf '\n\033[2m--- cached PKGBUILD ---\033[0m\n'
+        cat "$pb"
+      else
+        printf '\nPress \033[1mC-p\033[0m for full AUR details (queries the network).\n'
+      fi
+    fi
+    ;;
+  LOCAL)
+    printf '\033[97m%s\033[0m\n\nInstalled locally; not in any sync database.\n' "$pkg"
+    ;;
+  *)
+    pacman -Si -- "$pkg" 2>/dev/null || printf 'No information available for %s.\n' "$pkg"
+    ;;
+esac
+]==]
+
+local AWK_PATH, LIST_PATH, PREVIEW_PATH
+
+local function init_scripts()
+  AWK_PATH     = write_file(runpath("list.awk"), LIST_AWK)
+  LIST_PATH    = write_script("list.sh",
+    string.format(LIST_SH, SIZE_W, REPO_W, shq(ICON_AVAIL), shq(ICON_INST)))
+  PREVIEW_PATH = write_script("preview.sh", PREVIEW_SH)
+end
+
+-- Environment for the helper scripts, prefixed onto the commands that fzf
+-- and io.popen run.
+local function env_prefix()
+  return "ZENU_CACHE_DIR=" .. shq(CACHE_DIR)
+    .. " ZENU_AUR=" .. shq(AUR_CACHE)
+    .. " ZENU_AWK=" .. shq(AWK_PATH)
+    .. " ZENU_CLONE=" .. shq(CLONE_DIR)
+    .. (DEBUG and " ZENU_DEBUG=1" or "")
+    .. " "
+end
+
+local function pkg_width(w)
+  -- icon + space + name + size + space + repo tag == usable width
+  local pw = w - MARGIN - 2 - SIZE_W - 1 - REPO_W
+  if pw < 10 then pw = 10 end
+  return pw
+end
+
+local function list_cmd(w, mode)
+  return env_prefix() .. shq(LIST_PATH) .. " " .. pkg_width(w) .. " " .. mode
+end
+
+-- fzf
+
+-- Runs fzf over `input_cmd`'s stdout and returns its selection. fzf drives
+-- the UI on /dev/tty, so its stdout is free to be a pipe we capture -- no
+-- temporary file needed for the list.
+local function fzf_cmd(input_cmd, args)
+  return capture(input_cmd .. " | fzf " .. args .. " 2>/dev/null")
+end
+
+local function fzf_list(items, args)
+  local input = type(items) == "table" and table.concat(items, "\n") or items
+  local path = write_file(runpath("menu.txt"), input)
+  return fzf_cmd("cat " .. shq(path), args)
+end
+
+local MENU_ARGS = table.concat({
+  "--no-input", "--no-scrollbar", "--layout=reverse",
+  "--border=top", "--info=hidden", FZF_COLOR,
+}, " ")
+
+local function menu(items, height)
+  local args = MENU_ARGS .. " --height=" .. (height or (#items + 1))
+  return trim(fzf_list(items, args))
+end
+
+local function header_arg(text, w)
+  return '--header=' .. shq(center_text(text, w))
+end
+
+-- Views. Each returns the name of the next view, or nil to quit, so the
+-- two package views no longer call each other recursively (which grew the
+-- stack and leaked a switch file on every toggle).
+
+local SWITCH = nil
+
+local function read_switch()
+  local v = trim(read_file(SWITCH))
+  write_file(SWITCH, "")
+  return v
+end
+
+-- transaction summaries
+
+local function human_bytes(n)
+  n = tonumber(n) or 0
+  local units = { "B", "K", "M", "G", "T" }
+  local i = 1
+  while n >= 1024 and i < #units do n = n / 1024; i = i + 1 end
+  if i == 1 then return string.format("%d%s", n, units[i]) end
+  return string.format("%.1f%s", n, units[i])
+end
+
+-- Apparent size of a directory tree, for reporting reclaimed space.
+local function dir_bytes(path)
+  return tonumber(trim(capture("du -sb " .. shq(path) .. " 2>/dev/null | cut -f1"))) or 0
+end
+
+-- Wraps a list of package names to the terminal width.
+local function print_names(names, indent, width)
+  local line = ""
+  for _, n in ipairs(names) do
+    if line == "" then
+      line = indent .. n
+    elseif #line + #n + 2 <= width then
+      line = line .. "  " .. n
+    else
+      print(line)
+      line = indent .. n
+    end
+  end
+  if line ~= "" then print(line) end
+end
+
+-- Records the state a transaction will be measured against. Reading the
+-- pacman log's size beforehand lets the summary afterwards report what
+-- pacman *actually* did -- dependencies pulled in, packages orphaned and
+-- removed, AUR builds -- rather than only what was asked for.
+local function txn_mark()
+  return {
+    log  = tonumber(trim(capture("wc -c < " .. shq(PACMAN_LOG) .. " 2>/dev/null"))) or 0,
+    size = tonumber(trim(capture("expac -Q '%m' 2>/dev/null | awk '{s+=$1} END{print s+0}'"))),
+  }
+end
+
+local VERBS = { "upgraded", "installed", "reinstalled", "downgraded", "removed" }
+
+-- Everything appended to the log since the mark, bucketed by verb.
+local function txn_events(mark)
+  local ev, total = {}, 0
+  for _, v in ipairs(VERBS) do ev[v] = {} end
+  local raw = capture(string.format("tail -c +%d %s 2>/dev/null",
+    (mark.log or 0) + 1, shq(PACMAN_LOG)))
+  for _, line in ipairs(lines_of(raw)) do
+    local verb, pkg, ver = line:match("%[ALPM%]%s+(%a+)%s+(%S+)%s+%((.-)%)")
+    if verb and ev[verb] then
+      -- "1.28.5-4 -> 1.28.6-1" for upgrades, a bare version otherwise.
+      local old, new = ver:match("^(%S+)%s*%->%s*(%S+)$")
+      ev[verb][#ev[verb] + 1] = { pkg = pkg, ver = ver, old = old, new = new }
+      total = total + 1
+    end
+  end
+  ev.total = total
+  return ev
+end
+
+local function disk_delta(mark)
+  if not mark.size then return nil end
+  local after = tonumber(trim(capture("expac -Q '%m' 2>/dev/null | awk '{s+=$1} END{print s+0}'")))
+  if not after then return nil end
+  return after - mark.size
+end
+
+local STD_MENU = { "Package Manager", "Check for updates", "Maintenance", "Quit" }
+
+-- The one shared exit menu. Returns a view name rather than nil so callers
+-- can tell "go to maintenance" apart from "quit".
+local function finish_menu()
+  local choice = menu(STD_MENU, #STD_MENU + 1)
+  if choice == "Package Manager" then return "manage" end
+  if choice == "Check for updates" then return "update" end
+  if choice == "Maintenance" then return "maintain" end
+  return "quit"
+end
+
+local SECTION_LABEL = {
+  upgraded = "Upgraded", installed = "Installed", reinstalled = "Reinstalled",
+  downgraded = "Downgraded", removed = "Removed",
+}
+
+-- Renders the summary block and the shared menu, returning the next view.
+--
+-- `extra` is for operations that leave no trace in the pacman log (cache
+-- pruning, clone deletion): a list of {label, value} rows shown instead.
+-- The listing is budgeted against the terminal height so a large upgrade
+-- cannot push the menu off the bottom of the screen.
+local function summary_screen(events, extra, ok)
+  local h, w = term_size()
   hard_clear()
   show_logo()
-  print("  It seems you do not have paru installed. Please select your desired variant to proceed.")
   print("")
-  local choices = { "paru (stable)", "paru-git (recommended)" }
-  local args = "--no-input --layout=reverse --height=4"
-  local selected = fzf(choices, args):gsub("%s+$", "")
 
-  local pkg = "paru"
-  if selected:match("^paru%-git") then
-    pkg = "paru-git"
+  if ok == false then
+    print("  \027[1;31mTransaction failed\027[0m")
+    print("  \027[2mAnything listed below did complete before it stopped.\027[0m")
+    print("")
   end
 
+  print("  \027[1mSummary\027[0m")
   print("")
-  print("Installing " .. pkg .. " ...")
-  local build_dir = "/tmp/" .. pkg .. "-bootstrap"
-  sh("rm -rf " .. build_dir)
-  sh("git clone https://aur.archlinux.org/" .. pkg .. ".git " .. build_dir)
-  sh("cd " .. build_dir .. " && makepkg -si --noconfirm")
-  sh("rm -rf " .. build_dir)
-end
 
-local function sync_repos()
-  sh("paru -Sy && paru --clean")
-  invalidate_cache()
-end
+  -- logo + heading + blanks + menu + margin
+  local budget = h - 14
+  if ok == false then budget = budget - 3 end
+  if budget < 4 then budget = 4 end
+  local used, clipped = 0, 0
 
--- Update Packages
+  local function room(n) return used + n <= budget end
 
-local function build_log_entries()
-  local log_path = "/var/log/pacman.log"
-  local f = io.open(log_path, "r")
-  if not f then return {} end
-
-  local entries = {}
-  for line in f:lines() do
-    if line:find("%[ALPM%] installed") or line:find("%[ALPM%] upgraded") then
-      entries[#entries + 1] = line
-    end
-  end
-  f:close()
-
-  -- Show last 50 entries
-  local start = math.max(1, #entries - 49)
-  local display = {}
-  for i = start, #entries do
-    local e = entries[i]
-    local date, action, pkg, ver = e:match("%[(.-)%]%s*%[ALPM%]%s*(%w+)%s+(.-)%s*%((.-)%)")
-    if date and pkg then
-      local tag = action == "upgraded" and "↑" or "+"
-      display[#display + 1] = date .. "  " .. tag .. "  " .. pkg .. " " .. ver
-    else
-      display[#display + 1] = e
-    end
-  end
-  return display
-end
-
-local function refresh_updates(switch_tmp)
-  sync_repos()
-
-  local raw = capture("paru -Qu --color=never | sort -u")
-  local updates = lines_of(raw)
-
-  hard_clear()
-
-  if #updates == 0 then
-    print("No updates available.")
-    sh("paru --clean")
-    return false
-  end
-
-  -- Recompute layout against the current terminal width so the version
-  -- columns stay flush against the right edge instead of a fixed offset.
-  local VER_W  = 20
-  local GAP    = 3
-  local MARGIN = 4 -- fzf's pointer + multi-select marker gutter (fixed now that --no-scrollbar is set)
-  local W      = term_width()
-  local pkg_w  = W - (VER_W * 2 + GAP + MARGIN)
-  if pkg_w < 10 then pkg_w = 10 end
-  if pkg_w > 99 then pkg_w = 99 end -- Lua's string.format %s width hard-caps at 99
-
-  local row_fmt = "%-" .. pkg_w .. "s%" .. VER_W .. "s" .. string.rep(" ", GAP) .. "%" .. VER_W .. "s"
-
-  local selection_list = {}
-  for _, line in ipairs(updates) do
-    local pkg, old_ver, new_ver = line:match("^(%S+)%s+(%S+)%s+%-%>%s+(%S+)")
-    pkg     = pkg or line
-    old_ver = old_ver or ""
-    new_ver = new_ver or ""
-
-    local pkg_display     = pkg:sub(1, pkg_w)
-    local old_ver_display = old_ver:sub(1, VER_W)
-    local new_ver_display = new_ver:sub(1, VER_W)
-
-    selection_list[#selection_list + 1] =
-      string.format(row_fmt, pkg_display, old_ver_display, new_ver_display)
-  end
-
-  local log_list = build_log_entries()
-
-  local header_text = "TAB Flag  󰇙  C-a Invert  󰇙  C-d Clear  󰇙  C-r History  󰇙  C-u Manage  󰇙  RETURN Sync"
-  local header_centered = center_text(header_text, W)
-
-  local q = "'\\''"
-  local updates_tmp     = write_tmp(table.concat(selection_list, "\n"))
-  local log_tmp         = write_tmp(table.concat(log_list, "\n"))
-  local state_tmp       = write_tmp("updates")
-  -- C-r toggle: read which list is currently shown from state_tmp,
-  -- flip it, and print the newly-selected list for fzf to reload from.
-  local toggle_script = 'state=$(cat "' .. state_tmp .. '"); '
-    .. 'if [ "$state" = "updates" ]; then echo history > "' .. state_tmp .. '"; cat "' .. log_tmp .. '"; '
-    .. 'else echo updates > "' .. state_tmp .. '"; cat "' .. updates_tmp .. '"; fi'
-  local toggle_cmd = "bash -c " .. q .. toggle_script .. q
-
-  local args = table.concat({
-    "--multi", "--no-input", "--no-scrollbar", FZF_COLOR,
-    "--no-input",
-    "--no-scrollbar",
-    "--border=top",
-    "--header-border=line",
-    "--bind 'esc:ignore,ctrl-a:toggle-all,ctrl-d:clear-multi,ctrl-r:reload(" .. toggle_cmd .. "),ctrl-u:execute-silent(echo manage > \"" .. switch_tmp .. "\")+abort'",
-    '--header="' .. header_centered .. '"',
-    "--delimiter ' '",
-    '--preview="paru -Si {1}"',
-    '--preview-window="bottom:50%,noinfo"',
-  }, " ")
-
-  local selected_raw = capture("fzf " .. args .. " < " .. updates_tmp)
-  os.remove(updates_tmp)
-  os.remove(log_tmp)
-  os.remove(state_tmp)
-
-  print("")
-  local installed_any = false
-  if selected_raw ~= "" then
-    local selected = {}
-    for _, line in ipairs(lines_of(selected_raw)) do
-      local pkg = line:match("^(%S+)")
-      if pkg then selected[#selected + 1] = pkg end
-    end
-    if #selected > 0 then
-      sh("paru -S --noconfirm " .. table.concat(selected, " "))
-      invalidate_cache()
-      installed_any = true
-    end
-  end
-
-  print("Cleaning paru cache...")
-  sh("paru --clean")
-  return installed_any
-end
-
--- Forward-declared so update_packages and manage_packages can call
--- each other directly (the C-u toggle between the two views).
-local update_packages
-local manage_packages
-
-local function ensure_cache()
-  if not CACHE.available_raw then
-    CACHE.available_raw = capture("paru -Sl 2>/dev/null")
-    CACHE.repo_map = {}
-    CACHE.available_pkgs = {}
-    for _, line in ipairs(lines_of(CACHE.available_raw)) do
-      local repo, pkg = line:match("^(%S+)%s+(%S+)")
-      if repo and pkg then
-        CACHE.available_pkgs[#CACHE.available_pkgs + 1] = pkg
-        CACHE.repo_map[pkg] = repo:upper()
+  if events then
+    for _, verb in ipairs(VERBS) do
+      local list = events[verb]
+      if list and #list > 0 then
+        print(string.format("    %-11s %4d", SECTION_LABEL[verb], #list))
+        used = used + 1
+        local pad = 0
+        for _, e in ipairs(list) do if #e.pkg > pad then pad = #e.pkg end end
+        if pad > 34 then pad = 34 end
+        io.write("\027[2m")
+        for _, e in ipairs(list) do
+          if room(1) then
+            local ver = e.old and (e.old .. " \u{2192} " .. e.new) or e.ver
+            print(string.format("      %-" .. pad .. "s  %s", e.pkg, ver))
+            used = used + 1
+          else
+            clipped = clipped + 1
+          end
+        end
+        io.write("\027[0m")
       end
     end
   end
-  if not CACHE.installed_raw then
-    CACHE.installed_raw = capture("paru -Qq")
-    CACHE.installed_set = {}
-    CACHE.installed_pkgs = {}
-    for _, pkg in ipairs(lines_of(CACHE.installed_raw)) do
-      CACHE.installed_set[pkg] = true
-      CACHE.installed_pkgs[#CACHE.installed_pkgs + 1] = pkg
+
+  if clipped > 0 then
+    print(string.format("      \027[2m+ %d more\027[0m", clipped))
+  end
+
+  if extra then
+    for _, row in ipairs(extra) do
+      print(string.format("    %-11s %s", row[1], row[2]))
     end
   end
-  return CACHE.repo_map, CACHE.available_pkgs, CACHE.installed_set, CACHE.installed_pkgs
+
+  local nothing = (not extra) and (not events or events.total == 0)
+  if nothing then
+    print("    Nothing changed.")
+  end
+
+  print("")
+  return finish_menu()
 end
 
-update_packages = function()
-  local switch_tmp = write_tmp("")
+-- history
+
+local function history_entries(limit)
+  limit = limit or 50
+  -- Read backwards and stop at `limit`: the old version walked all 16,880
+  -- lines of a 1.3 MB log, kept all 3,383 matches, then threw away all but
+  -- the last 50 -- and did it again on every entry to the view.
+  local raw = capture(string.format(
+    "tac %s 2>/dev/null | grep -m %d -E '\\[ALPM\\] (installed|upgraded)' 2>/dev/null",
+    shq(PACMAN_LOG), limit))
+
+  local out = {}
+  for _, e in ipairs(lines_of(raw)) do
+    local date, action, pkg, ver = e:match("%[(.-)%]%s*%[ALPM%]%s*(%w+)%s+(.-)%s*%((.-)%)")
+    if date and pkg then
+      local tag = action == "upgraded" and "↑" or "+"
+      out[#out + 1] = string.format("%s  %s  %s %s", date, tag, pkg, ver)
+    else
+      out[#out + 1] = e
+    end
+  end
+  return out
+end
+
+-- Reads a history line back into the package name and the version it was
+-- upgraded from, so a bad update can be rolled back to a cached package.
+local function parse_history(line)
+  local pkg, vers = line:match("[↑+]%s+(%S+)%s+(.+)$")
+  if not pkg then return nil end
+  local old = vers:match("^(%S+)%s*->")
+  return pkg, old
+end
+
+-- Returns a view name when a transaction actually ran, nil otherwise so
+-- the caller knows to show a plain Back menu instead of a summary.
+local function downgrade(pkg, old)
+  if not old then
+    print("  That entry is a fresh install, not an upgrade - nothing to roll back to.")
+    return nil
+  end
+  local pattern = string.format("%s/%s-%s-*.pkg.tar.*", PKG_CACHE, pkg, old)
+  local found = lines_of(capture("ls -1 " .. pattern .. " 2>/dev/null | grep -v '\\.sig$'"))
+  if #found == 0 then
+    print(string.format("  No cached package for %s %s in %s.", pkg, old, PKG_CACHE))
+    print("  Newly cached versions are kept from now on (paccache -rk2), so this")
+    print("  will work for future downgrades.")
+    return nil
+  end
+  if not sudo_ensure() then return nil end
+  local mark = txn_mark()
+  local ok = sh("sudo pacman -U " .. shq(found[1]))
+  invalidate()
+  local delta = disk_delta(mark)
+  local extra = delta
+    and { { "Disk", (delta >= 0 and "+" or "-") .. human_bytes(math.abs(delta)) } }
+    or nil
+  return summary_screen(txn_events(mark), extra, ok)
+end
+
+local function history_view()
+  local entries = history_entries(200)
+  if #entries == 0 then
+    hard_clear()
+    print("  No history found.")
+    print("")
+    menu({ "Back" }, 2)
+    return nil
+  end
+  local w = term_width()
+  local args = table.concat({
+    "--no-input", "--no-scrollbar", "--border=top", "--header-border=line",
+    "--info=hidden", "--height=60%", "--reverse", FZF_COLOR,
+    "--bind", shq("esc:abort"),
+    header_arg("RETURN Downgrade  󰇙  ESC Close", w),
+  }, " ")
+  local sel = trim(fzf_list(entries, args))
+  if sel == "" then return nil end
+
+  hard_clear()
+  local pkg, old = parse_history(sel)
+  local next_view
+  if not pkg then
+    print("  Could not read a package name from that entry.")
+  else
+    next_view = downgrade(pkg, old)
+  end
+  if not next_view then
+    print("")
+    menu({ "Back" }, 2)
+  end
+  return next_view
+end
+
+-- update view
+
+local function update_view()
   while true do
     hard_clear()
     show_logo()
     print("")
-    refresh_updates(switch_tmp)
+    -- The repo sync is a real network download, so say so rather than
+    -- leaving a blank screen for ten-odd seconds.
+    io.write("  Checking for updates...")
+    io.flush()
+    local updates = timed("fetch_updates", fetch_updates)
+    hard_clear()
 
-    local sf = io.open(switch_tmp, "r")
-    local switch = (sf and sf:read("*a") or ""):gsub("%s+$", "")
-    if sf then sf:close() end
-    local wf = io.open(switch_tmp, "w")
-    if wf then wf:write(""); wf:close() end
+    if #updates == 0 then
+      show_logo()
+      print("  No updates available.")
+      print("")
+      local choice = menu({ "Re-check for updates", "Package Manager", "Maintenance", "Quit" }, 5)
+      if choice == "Package Manager" then return "manage"
+      elseif choice == "Maintenance" then return "maintain"
+      elseif choice == "Re-check for updates" then -- loop
+      else return nil end
+    else
+      local w = term_width()
+      local VER_W = 20
+      local GAP   = 3
+      local pkg_w = w - (VER_W * 2 + GAP + MARGIN)
+      if pkg_w < 10 then pkg_w = 10 end
 
-    if switch == "manage" then
-      -- C-u was pressed inside the fzf list - jump straight to the
-      -- package manager.
-      os.remove(switch_tmp)
-      manage_packages()
-      return -- safety net; manage_packages() only returns via its own toggle
-    end
+      local rows = {}
+      for _, line in ipairs(updates) do
+        local pkg, oldv, newv = line:match("^(%S+)%s+(%S+)%s+%-%>%s+(%S+)")
+        pkg  = pkg or line
+        oldv = oldv or ""
+        newv = newv or ""
+        rows[#rows + 1] = string.format(
+          "%-" .. pkg_w .. "s%" .. VER_W .. "s" .. string.rep(" ", GAP) .. "%" .. VER_W .. "s",
+          pkg:sub(1, pkg_w), oldv:sub(1, VER_W), newv:sub(1, VER_W))
+      end
 
-    local choice = fzf({
-      "View History",
-      "Re-check for updates",
-      "Return to Package Manager",
-    }, table.concat({
-      "--no-input",
-      "--no-scrollbar",
-      "--layout=reverse",
-      "--height=4",
-      "--border=top",
-      "--info=hidden",
-      FZF_COLOR,
-    }, " ")):gsub("%s+$", "")
+      local header = "TAB Flag  󰇙  C-a Invert  󰇙  C-r History  󰇙  C-u Manage  󰇙  C-t Maintain  󰇙  RETURN Sync"
+      local args = table.concat({
+        "--multi", "--no-input", "--no-scrollbar", FZF_COLOR,
+        "--border=top", "--header-border=line",
+        "--accept-nth", "1",
+        -- Not ctrl-m: the terminal delivers it as carriage return, so
+        -- binding it would shadow RETURN.
+        "--bind", shq("esc:ignore,ctrl-a:toggle-all,ctrl-d:clear-multi"
+          .. ",ctrl-r:execute-silent(echo history > " .. SWITCH .. ")+abort"
+          .. ",ctrl-u:execute-silent(echo manage > " .. SWITCH .. ")+abort"
+          .. ",ctrl-t:execute-silent(echo maintain > " .. SWITCH .. ")+abort"),
+        header_arg(header, w),
+        "--preview", shq("pacman -Si {1} 2>/dev/null || paru -Si {1}"),
+        '--preview-window=bottom:50%,noinfo',
+      }, " ")
 
-    if choice == "Return to Package Manager" then
-      os.remove(switch_tmp)
-      manage_packages()
-      return
-    elseif choice == "View History" then
-      local log_list = build_log_entries()
-      if #log_list == 0 then
-        hard_clear()
-        print("No history found.")
+      local selected = fzf_list(rows, args)
+      local switch = read_switch()
+      if switch == "manage" then return "manage" end
+      if switch == "maintain" then return "maintain" end
+      if switch == "history" then
+        local next_view = history_view()
+        if next_view == "quit" then return nil end
+        if next_view and next_view ~= "update" then return next_view end
+      elseif trim(selected) ~= "" then
+        local pkgs = {}
+        for _, p in ipairs(lines_of(selected)) do
+          p = trim(p)
+          if p ~= "" then pkgs[#pkgs + 1] = shq(p) end
+        end
+        if #pkgs > 0 then
+          if not sudo_ensure() then return nil end
+          hard_clear()
+          local mark = txn_mark()
+          -- checkupdates syncs a private database, so /var/lib/pacman/sync
+          -- is still whatever it was; the real databases have to be synced
+          -- before anything is actually pulled in.
+          local ok
+          if #pkgs == #updates then
+            ok = sh("paru -Syu --noconfirm")
+          else
+            print("\027[33mSelecting a subset is a partial upgrade, which Arch does not")
+            print("support cleanly. Syncing first and installing only what you chose.\027[0m")
+            print("")
+            ok = sh("paru -Sy && paru -S --needed --noconfirm " .. table.concat(pkgs, " "))
+          end
+          invalidate()
+          trim_cache()
+
+          local events = txn_events(mark)
+          local extra = nil
+          local delta = disk_delta(mark)
+          if delta then
+            extra = { { "Disk", (delta >= 0 and "+" or "-") .. human_bytes(math.abs(delta)) } }
+          end
+          local next_view = summary_screen(events, extra, ok)
+          if next_view == "manage" then return "manage"
+          elseif next_view == "maintain" then return "maintain"
+          elseif next_view == "quit" then return nil end
+          -- "update": fall through and re-check
+        end
       else
-        local W = term_width()
-        local header_text = "RETURN Close"
-        local header_centered = center_text(header_text, W)
-        local args = table.concat({
-          "--no-input",
-          "--no-scrollbar",
-          "--border=top",
-          "--header-border=line",
-          "--info=hidden",
-          "--height=60%",
-          "--reverse",
-          FZF_COLOR,
-          '--header="' .. header_centered .. '"',
-        }, " ")
-        fzf(log_list, args)
+        -- ESC with nothing selected: offer a way out rather than looping.
+        local choice = menu({ "Re-check for updates", "Package Manager", "Maintenance", "Quit" }, 5)
+        if choice == "Package Manager" then return "manage"
+        elseif choice == "Maintenance" then return "maintain"
+        elseif choice == "Re-check for updates" then -- loop
+        else return nil end
       end
     end
   end
 end
 
--- Add/Remove Packages
+-- manage view
 
-manage_packages = function()
-  sync_repos()
-  hard_clear()
-  local switch_tmp2 = write_tmp("")
+-- Everything `-Rs` would take out besides the packages you picked.
+-- Returns nil plus pacman's message when the removal is refused (usually
+-- because something still depends on a target) -- worth catching here,
+-- since the transaction itself runs with --noconfirm.
+local function removal_deps(names)
+  local q = {}
+  for _, n in ipairs(names) do q[#q + 1] = shq(n) end
+  local out = capture("pacman -Rs --print --print-format '%n' "
+    .. table.concat(q, " ") .. " 2>&1")
+  if out:match("error:") then return nil, trim(out) end
 
-  while true do
-    local repo_map, available_pkgs, installed_set, installed_pkgs_l = ensure_cache()
+  local target = {}
+  for _, n in ipairs(names) do target[n] = true end
+  local deps = {}
+  for _, p in ipairs(lines_of(out)) do
+    if not target[p] then deps[#deps + 1] = p end
+  end
+  return deps
+end
 
-    -- Right-align a colorized repo tag to the terminal edge, same
-    -- treatment as the version columns in the update view.
-    local REPO_W    = 8 -- fits "MULTILIB" (8 chars), the longest repo tag
-    local GAP       = 1
-    local ICON_PAD  = " " -- padding between icon and package name
-    local ICON_W    = 1 + #ICON_PAD -- icon glyph + its padding
-    local MARGIN    = 4  -- fzf's pointer + multi-select marker gutter
-    local W      = term_width()
-    local pkg_w  = W - MARGIN - REPO_W - GAP - ICON_W
-    if pkg_w < 10 then pkg_w = 10 end
-    if pkg_w > 99 then pkg_w = 99 end -- Lua's string.format %s width hard-caps at 99
+-- Everything that would be pulled in alongside the packages you picked.
+-- `--needed` mirrors the flag the real install uses, so the preview and
+-- the transaction agree. pacman cannot resolve AUR targets, so those come
+-- back separately: only paru knows their dependencies, and working them
+-- out means hitting the network.
+local function install_deps(names)
+  local function resolve(targets)
+    local q = {}
+    for _, n in ipairs(targets) do q[#q + 1] = shq(n) end
+    local out = capture("pacman -S --needed --print --print-format '%n' "
+      .. table.concat(q, " ") .. " 2>&1")
+    if out:match("error:") then return nil end
+    return lines_of(out)
+  end
 
-    local function repo_tag(pkg)
-      local repo  = repo_map[pkg] or "LOCAL"
-      local plain = string.format("%" .. REPO_W .. "s", repo)
-      local color = REPO_COLORS[repo] or "\027[37m"
-      return color .. plain .. COLOR_RESET
-    end
-
-    local function row(icon, pkg)
-      local pkg_display = string.format("%-" .. pkg_w .. "s", pkg:sub(1, pkg_w))
-      return icon .. ICON_PAD .. pkg_display .. string.rep(" ", GAP) .. repo_tag(pkg)
-    end
-
-    local combined = {}
-    local installed_only = {}
-    for _, pkg in ipairs(available_pkgs) do
-      if pkg ~= "" and not installed_set[pkg] then
-        combined[#combined + 1] = row(ICON_INSTALL, pkg)
+  local all, unresolved = resolve(names), {}
+  if not all then
+    -- One bad target fails the whole call, so fall back to per-target.
+    all = {}
+    for _, n in ipairs(names) do
+      local r = resolve({ n })
+      if r then
+        for _, p in ipairs(r) do all[#all + 1] = p end
+      else
+        unresolved[#unresolved + 1] = n
       end
     end
-    for _, pkg in ipairs(installed_pkgs_l) do
-      local r = row(ICON_REMOVE, pkg)
-      combined[#combined + 1] = r
-      installed_only[#installed_only + 1] = r
+  end
+
+  local target, seen, deps = {}, {}, {}
+  for _, n in ipairs(names) do target[n] = true end
+  for _, p in ipairs(all) do
+    if not target[p] and not seen[p] then
+      seen[p] = true
+      deps[#deps + 1] = p
     end
+  end
+  return deps, unresolved
+end
 
-    -- Strip any ANSI codes before parsing so this works whether fzf hands
-    -- {} the colorized or the stripped form of the line.
-    local strip_ansi = 'sed -E "s/\\x1b\\[[0-9;]*m//g"'
-    local inner = 'line="$1"; clean=$(printf %s "$line" | ' .. strip_ansi .. '); '
-      .. 'prefix="${clean%% *}"; rest="${clean#* }"; '
-      .. 'pkg=$(printf %s "$rest" | sed -E "s/[A-Z]+[[:space:]]*$//" | xargs); '
-      .. 'if [[ "$prefix" == "' .. ICON_INSTALL .. '" ]]; then paru -Si "$pkg"; else paru -Qi "$pkg"; fi'
-    local q = "'\\''" -- represents the shell escape sequence '\''
-    local preview_arg = "--preview='bash -c " .. q .. inner .. q .. " -- {}'"
+-- You already picked the packages in the list; this confirms that choice
+-- and nothing more, instead of handing you paru's full dependency dump.
+local function confirm_transaction(ins_n, rem_n)
+  local w = term_width()
+  hard_clear()
+  show_logo()
+  print("")
 
-    local header_text = "TAB Flag  󰇙  C-a Invert  󰇙  C-d Clear  󰇙  C-s Source  󰇙  C-u Update  󰇙  RETURN Sync"
-    local header_centered = center_text(header_text, W)
+  if #ins_n > 0 then
+    print("  \027[32mInstall\027[0m")
+    for _, p in ipairs(ins_n) do print("    " .. p) end
+    local deps, unresolved = install_deps(ins_n)
+    if #deps > 0 then
+      print(string.format("    \027[2mwith %d dependenc%s:\027[0m",
+        #deps, #deps == 1 and "y" or "ies"))
+      io.write("\027[2m")
+      print_names(deps, "      ", w - 2)
+      io.write("\027[0m")
+    end
+    if #unresolved > 0 then
+      print("    \027[2mdependencies for " .. table.concat(unresolved, ", ")
+        .. " are resolved by paru during the build\027[0m")
+    end
+    print("")
+  end
 
-    local full_tmp      = write_tmp(table.concat(combined, "\n"))
-    local installed_tmp = write_tmp(table.concat(installed_only, "\n"))
-    local state_tmp      = write_tmp("full")
-    -- C-s toggle: read which list is currently shown from state_tmp,
-    -- flip it, and print the newly-selected list for fzf to reload from.
-    local toggle_script = 'state=$(cat "' .. state_tmp .. '"); '
-      .. 'if [ "$state" = "full" ]; then echo installed > "' .. state_tmp .. '"; cat "' .. installed_tmp .. '"; '
-      .. 'else echo full > "' .. state_tmp .. '"; cat "' .. full_tmp .. '"; fi'
-    local toggle_cmd = "bash -c " .. q .. toggle_script .. q
+  local blocked = nil
+  if #rem_n > 0 then
+    print("  \027[31mRemove\027[0m")
+    for _, p in ipairs(rem_n) do print("    " .. p) end
+    local deps, err = removal_deps(rem_n)
+    if not deps then
+      blocked = err
+    elseif #deps > 0 then
+      print(string.format("    \027[2mand %d package%s no longer required:\027[0m",
+        #deps, #deps == 1 and "" or "s"))
+      io.write("\027[2m")
+      print_names(deps, "      ", w - 2)
+      io.write("\027[0m")
+    end
+    print("")
+  end
 
+  if blocked then
+    print("  \027[1;31mThis removal cannot proceed:\027[0m")
+    for _, l in ipairs(lines_of(blocked)) do print("    " .. l:gsub("^error:%s*", "")) end
+    print("")
+    menu({ "Back" }, 2)
+    return false
+  end
+
+  return menu({ "Confirm", "Cancel" }, 3) == "Confirm"
+end
+
+local function manage_view()
+  -- Deliberately no sync here. `paru -Sy` needs root, and the whole point
+  -- of deferring sudo is that browsing the list costs nothing. The list is
+  -- built from whatever the local databases already hold; the update view
+  -- is where freshness actually matters.
+  while true do
+    local w = term_width()
+    local full_cmd = list_cmd(w, "full")
+    local inst_cmd = list_cmd(w, "installed")
+
+    local P_ALL  = "\027[38;2;155;191;191m  > \027[0m"
+    local P_INST = "\027[38;2;155;191;191m  installed > \027[0m"
+
+    -- fzf 0.74 can hold the toggle state itself: the transform reads the
+    -- current prompt and emits the actions for the other mode. The old
+    -- version kept the state in a temp file and pre-rendered both lists.
+    -- [==[ ... ]==]: the bash [[ ... ]] test below contains ]] , which
+    -- would close a plain Lua long string early.
+    local toggle = write_script("toggle.sh", string.format([==[
+#!/bin/bash
+if [[ "$FZF_PROMPT" == *installed* ]]; then
+  printf 'change-prompt(%%s)+reload(%%s)' %s %s
+else
+  printf 'change-prompt(%%s)+reload(%%s)' %s %s
+fi
+]==], shq(P_ALL), shq(full_cmd), shq(P_INST), shq(inst_cmd)))
+
+    -- C-p is deliberately not listed: it only applies to AUR rows, and the
+    -- preview pane for those rows advertises it in place.
+    local header = "TAB Flag  󰇙  C-a Invert  󰇙  C-s Installed  󰇙  C-u Update  󰇙  C-t Maintain  󰇙  RETURN Sync"
     local args = table.concat({
-      "--multi", "--ansi", "--nth 2", "--tiebreak=chunk,index", "--no-scrollbar", FZF_COLOR,
-      "--ansi",
-      "--nth 2",
+      "--multi", "--ansi", "--no-scrollbar",
+      "--nth", "2", "--accept-nth", "2",
       "--tiebreak=chunk,index",
-      "--no-scrollbar",
-      "--border=top",
-      "--info=hidden",
-      "--header-border=line",
-      "--bind 'esc:ignore,ctrl-a:toggle-all,ctrl-d:clear-multi,ctrl-s:reload(" .. toggle_cmd .. "),ctrl-u:execute-silent(echo update > \"" .. switch_tmp2 .. "\")+abort'",
-      '--header="' .. header_centered .. '"',
-      '--prompt="\027[38;2;155;191;191m  > \027[0m"',
-      preview_arg,
-      '--preview-window="bottom:50%,noinfo"',
+      "--border=top", "--info=hidden", "--header-border=line",
+      FZF_COLOR,
+      -- transform(...) rather than transform:, which would swallow every
+      -- binding after it. Not ctrl-m either: that is RETURN.
+      "--bind", shq("esc:ignore,ctrl-a:toggle-all,ctrl-d:clear-multi"
+        .. ",ctrl-s:transform(" .. toggle .. ")"
+        .. ",ctrl-p:change-preview(" .. env_prefix() .. PREVIEW_PATH .. " {2} {4} full)"
+        .. ",ctrl-u:execute-silent(echo update > " .. SWITCH .. ")+abort"
+        .. ",ctrl-t:execute-silent(echo maintain > " .. SWITCH .. ")+abort"),
+      header_arg(header, w),
+      "--prompt=" .. shq(P_ALL),
+      "--preview", shq(env_prefix() .. PREVIEW_PATH .. " {2} {4}"),
+      '--preview-window=bottom:50%,noinfo',
     }, " ")
 
-    local selected_raw = capture("fzf " .. args .. " < " .. full_tmp)
-    os.remove(full_tmp)
-    os.remove(installed_tmp)
-    os.remove(state_tmp)
-    local sf2 = io.open(switch_tmp2, "r")
-    local switch2 = (sf2 and sf2:read("*a") or ""):gsub("%s+$", "")
-    if sf2 then sf2:close() end
+    -- Not wrapped in timed(): this call spans the whole interactive fzf
+    -- session, so it would measure how long you looked at the list. The
+    -- list build reports its own timing from inside list.sh.
+    local selected = fzf_cmd(full_cmd, args)
 
-    if switch2 == "update" then
-      -- C-u was pressed inside the fzf list - reset the switch file
-      -- and jump straight to the update view.
-      local rf2 = io.open(switch_tmp2, "w")
-      if rf2 then rf2:write(""); rf2:close() end
-      update_packages()
-      -- falls through: loop back and show the manage view again
-    elseif selected_raw == "" then
-      -- ESC/cancelled with nothing selected - just loop back and show
-      -- the list again; ESC no longer quits the app.
-    else
-      local to_install, to_uninstall = {}, {}
-      for _, raw_line in ipairs(lines_of(selected_raw)) do
-        local line = raw_line:gsub("\027%[[%d;]*m", "")
-        local icon, rest = line:match("^(%S+)%s+(.*)$")
-        local pkg = rest
-        if pkg then
-          pkg = pkg:gsub("%s*%u+%s*$", ""):gsub("%s+$", "")
-        end
-        if icon == ICON_INSTALL then
-          to_install[#to_install + 1] = pkg
-        elseif icon == ICON_REMOVE then
-          to_uninstall[#to_uninstall + 1] = pkg
+    local switch = read_switch()
+    if switch == "update" then return "update" end
+    if switch == "maintain" then return "maintain" end
+
+    if trim(selected) ~= "" then
+      -- fzf hands back field 2 verbatim, so there is no line to unpick and
+      -- no risk of clipping a name; installed state comes from pacman.
+      local inst = installed_set()
+      local ins_n, ins_q, rem_n, rem_q = {}, {}, {}, {}
+      for _, pkg in ipairs(lines_of(selected)) do
+        pkg = trim(pkg)
+        if pkg ~= "" then
+          if inst[pkg] then
+            rem_n[#rem_n + 1] = pkg; rem_q[#rem_q + 1] = shq(pkg)
+          else
+            ins_n[#ins_n + 1] = pkg; ins_q[#ins_q + 1] = shq(pkg)
+          end
         end
       end
 
-      if #to_install > 0 then
-        sh("paru -S " .. table.concat(to_install, " "))
-      end
-      if #to_uninstall > 0 then
-        sh("paru -Rs --noconfirm " .. table.concat(to_uninstall, " "))
-      end
+      if #ins_n > 0 or #rem_n > 0 then
+        if confirm_transaction(ins_n, rem_n) then
+          if not sudo_ensure() then return nil end
+          hard_clear()
+          local mark = txn_mark()
+          -- Confirmation already happened here, so paru is not asked to
+          -- prompt again with its own transaction listing.
+          local ok = true
+          if #ins_q > 0 then
+            ok = sh("paru -S --needed --noconfirm " .. table.concat(ins_q, " ")) and ok
+          end
+          if #rem_q > 0 then
+            ok = sh("paru -Rs --noconfirm " .. table.concat(rem_q, " ")) and ok
+          end
+          invalidate()
+          trim_cache()
 
-      if #to_install > 0 or #to_uninstall > 0 then
-        invalidate_cache()
-        print("Cleaning paru cache...")
-        sh("paru --clean")
-
-        local choice = fzf({
-          "Return to Package Manager",
-          "Check for updates",
-        }, table.concat({
-          "--no-input",
-          "--no-scrollbar",
-          "--layout=reverse",
-          "--height=4",
-          "--border=top",
-          "--info=hidden",
-          FZF_COLOR,
-        }, " ")):gsub("%s+$", "")
-
-        hard_clear()
-
-        if choice == "Check for updates" then
-          update_packages()
+          local events = txn_events(mark)
+          local extra = nil
+          local delta = disk_delta(mark)
+          if delta then
+            extra = { { "Disk", (delta >= 0 and "+" or "-") .. human_bytes(math.abs(delta)) } }
+          end
+          local next_view = summary_screen(events, extra, ok)
+          hard_clear()
+          if next_view == "update" then return "update"
+          elseif next_view == "maintain" then return "maintain"
+          elseif next_view == "quit" then return nil end
+          -- "manage": fall through and show the list again
         end
       end
     end
   end
 end
 
--- Entry point
+-- maintenance view
+
+local function maint_orphans()
+  local orphans = lines_of(capture("pacman -Qtdq 2>/dev/null"))
+  hard_clear()
+  if #orphans == 0 then
+    print("  No orphaned packages.")
+    print("")
+    menu({ "Back" }, 2)
+    return "maintain"
+  end
+  local w = term_width()
+  local args = table.concat({
+    "--multi", "--no-input", "--no-scrollbar", "--border=top",
+    "--header-border=line", "--info=hidden", "--height=60%", "--reverse", FZF_COLOR,
+    "--bind", shq("esc:abort,ctrl-a:toggle-all,ctrl-d:clear-multi"),
+    header_arg("TAB Flag  󰇙  C-a Invert  󰇙  RETURN Remove  󰇙  ESC Back", w),
+    "--preview", shq("pacman -Qi {1}"),
+    '--preview-window=bottom:50%,noinfo',
+  }, " ")
+  local sel = fzf_list(orphans, args)
+  local pkgs = {}
+  for _, p in ipairs(lines_of(sel)) do
+    p = trim(p)
+    if p ~= "" then pkgs[#pkgs + 1] = shq(p) end
+  end
+  if #pkgs == 0 then return "maintain" end
+  if not sudo_ensure() then return "maintain" end
+  hard_clear()
+  local mark = txn_mark()
+  local ok = sh("sudo pacman -Rns " .. table.concat(pkgs, " "))
+  invalidate()
+  local delta = disk_delta(mark)
+  local extra = delta
+    and { { "Disk", (delta >= 0 and "+" or "-") .. human_bytes(math.abs(delta)) } }
+    or nil
+  return summary_screen(txn_events(mark), extra, ok)
+end
+
+local function maint_pacnew()
+  local files = lines_of(capture("pacdiff -o 2>/dev/null"))
+  hard_clear()
+  if #files == 0 then
+    print("  No .pacnew or .pacsave files pending.")
+    print("")
+    menu({ "Back" }, 2)
+    return "maintain"
+  end
+  print("  Pending configuration files:")
+  print("")
+  for _, f in ipairs(files) do print("    " .. f) end
+  print("")
+  local choice = menu({ "Review them now (pacdiff)", "Back" }, 3)
+  if choice == "Review them now (pacdiff)" then
+    if not sudo_ensure() then return "maintain" end
+    hard_clear()
+    sh("sudo -E DIFFPROG=${DIFFPROG:-vimdiff} pacdiff")
+    -- pacdiff edits files rather than packages, so there is nothing in the
+    -- pacman log to summarise; report what is still outstanding instead.
+    local left = lines_of(capture("pacdiff -o 2>/dev/null"))
+    return summary_screen(nil,
+      { { "Reviewed", tostring(#files) },
+        { "Remaining", tostring(#left) } }, true)
+  end
+  return "maintain"
+end
+
+local function maint_pkgcache()
+  hard_clear()
+  local size    = trim(capture("du -sh " .. shq(PKG_CACHE) .. " 2>/dev/null | cut -f1"))
+  local pkgs    = trim(capture("find " .. shq(PKG_CACHE) .. " -maxdepth 1 -name '*.pkg.tar.*' 2>/dev/null | wc -l"))
+  local stale   = trim(capture("find " .. shq(PKG_CACHE) .. " -maxdepth 1 -type d -name 'download-*' 2>/dev/null | wc -l"))
+
+  print("  Package cache: " .. PKG_CACHE)
+  print("")
+  print(string.format("    total size            %s", size))
+  print(string.format("    cached packages       %s", pkgs))
+  print(string.format("    stale download dirs   %s", stale))
+  print("")
+  print("  Stale download-* directories are left behind when a transaction is")
+  print("  interrupted. They are never reused.")
+  print("")
+
+  local choice = menu({
+    "Keep 2 versions per package (paccache -rk2)",
+    "Remove stale download-* directories",
+    "Back",
+  }, 4)
+
+  if choice:match("^Keep 2") then
+    if not sudo_ensure() then return "maintain" end
+    hard_clear()
+    local before = dir_bytes(PKG_CACHE)
+    local ok = sh("sudo paccache -rk2")
+    local after = trim(capture("find " .. shq(PKG_CACHE) .. " -maxdepth 1 -name '*.pkg.tar.*' 2>/dev/null | wc -l"))
+    return summary_screen(nil, {
+      { "Kept", after .. " package files (2 versions each)" },
+      { "Freed", human_bytes(math.max(0, before - dir_bytes(PKG_CACHE))) },
+    }, ok)
+  elseif choice:match("^Remove stale") then
+    if not sudo_ensure() then return "maintain" end
+    hard_clear()
+    local before = dir_bytes(PKG_CACHE)
+    local ok = sh("sudo find " .. shq(PKG_CACHE) .. " -maxdepth 1 -type d -name 'download-*' -exec rm -rf {} +")
+    return summary_screen(nil, {
+      { "Removed", stale .. " stale download directories" },
+      { "Freed", human_bytes(math.max(0, before - dir_bytes(PKG_CACHE))) },
+    }, ok)
+  end
+  return "maintain"
+end
+
+local function maint_clonecache()
+  local raw = capture("du -sb " .. shq(CLONE_DIR) .. "/*/ 2>/dev/null | sort -rn")
+  hard_clear()
+  if trim(raw) == "" then
+    print("  No AUR build clones cached.")
+    print("")
+    menu({ "Back" }, 2)
+    return "maintain"
+  end
+
+  local inst = installed_set()
+  local rows, paths = {}, {}
+  for _, line in ipairs(lines_of(raw)) do
+    local bytes, path = line:match("^(%d+)%s+(.+)$")
+    if bytes then
+      local name = path:gsub("/$", ""):match("([^/]+)$")
+      local mark = inst[name] and "" or " (not installed)"
+      rows[#rows + 1] = string.format("%8s  %s%s", human_bytes(bytes), name, mark)
+      paths[#paths + 1] = path
+    end
+  end
+
+  local w = term_width()
+  local args = table.concat({
+    "--multi", "--no-input", "--no-scrollbar", "--border=top",
+    "--header-border=line", "--info=hidden", "--height=60%", "--reverse", FZF_COLOR,
+    "--bind", shq("esc:abort,ctrl-a:toggle-all,ctrl-d:clear-multi"),
+    "--accept-nth", "2",
+    header_arg("TAB Flag  󰇙  C-a Invert  󰇙  RETURN Delete clone  󰇙  ESC Back", w),
+  }, " ")
+  local sel = fzf_list(rows, args)
+  if trim(sel) == "" then return "maintain" end
+
+  local targets = {}
+  for _, name in ipairs(lines_of(sel)) do
+    name = trim(name)
+    if name ~= "" then targets[#targets + 1] = shq(CLONE_DIR .. "/" .. name) end
+  end
+  if #targets == 0 then return "maintain" end
+
+  hard_clear()
+  print("  Removing " .. #targets .. " build clone(s)...")
+  local before = dir_bytes(CLONE_DIR)
+  local ok = sh("rm -rf " .. table.concat(targets, " "))
+  return summary_screen(nil, {
+    { "Removed", #targets .. " build clone(s)" },
+    { "Freed", human_bytes(math.max(0, before - dir_bytes(CLONE_DIR))) },
+    { "Note", "re-cloned on demand if you rebuild those packages" },
+  }, ok)
+end
+
+local function maintenance_view()
+  while true do
+    hard_clear()
+    show_logo()
+
+    local orphans = trim(capture("pacman -Qtdq 2>/dev/null | wc -l"))
+    local pacnew  = trim(capture("pacdiff -o 2>/dev/null | wc -l"))
+    local cache   = trim(capture("du -sh " .. shq(PKG_CACHE) .. " 2>/dev/null | cut -f1"))
+    local stale   = trim(capture("find " .. shq(PKG_CACHE) .. " -maxdepth 1 -type d -name 'download-*' 2>/dev/null | wc -l"))
+    local clones  = trim(capture("du -sh " .. shq(CLONE_DIR) .. " 2>/dev/null | cut -f1"))
+
+    print("")
+    local synced = trim(capture("stat -c %Y /var/lib/pacman/sync 2>/dev/null"))
+    local age = tonumber(synced) and math.floor((os.time() - tonumber(synced)) / 3600) or nil
+
+    local items = {
+      string.format("Orphaned packages          %s", orphans),
+      string.format("Config files (.pacnew)     %s pending", pacnew),
+      string.format("Package cache              %s, %s stale download dirs", cache, stale),
+      string.format("AUR build clones           %s", clones),
+      string.format("Sync package databases     %s", age and (age .. "h old") or "unknown"),
+      "Package Manager",
+      "Check for updates",
+      "Quit",
+    }
+    local choice = menu(items, #items + 1)
+
+    if choice == "" or choice == "Quit" then return nil
+    elseif choice == "Package Manager" then return "manage"
+    elseif choice == "Check for updates" then return "update"
+    else
+      -- Sub-actions end on the shared menu, so they report where to go
+      -- next; "maintain" means stay on this list.
+      local next_view
+      if     choice:match("^Orphaned")         then next_view = maint_orphans()
+      elseif choice:match("^Config files")     then next_view = maint_pacnew()
+      elseif choice:match("^Package cache")    then next_view = maint_pkgcache()
+      elseif choice:match("^AUR build clones") then next_view = maint_clonecache()
+      elseif choice:match("^Sync package databases") then
+        hard_clear()
+        if sync_repos() then
+          next_view = summary_screen(nil,
+            { { "Synced", "package databases" } }, true)
+        end
+      end
+      if next_view == "quit" then return nil end
+      if next_view and next_view ~= "maintain" then return next_view end
+    end
+  end
+end
+
+-- entry point
+
+local VIEWS = {
+  manage   = manage_view,
+  update   = update_view,
+  maintain = maintenance_view,
+}
 
 local function main()
   show_logo()
-  sudo_start()
-  ensure_fzf()
-  ensure_paru()
+  ensure_deps()
+  if not paru_installed() then
+    hard_clear()
+    show_logo()
+    print("  paru is required and is not installed.")
+    print("  Install it with: sudo pacman -S --needed base-devel git && \\")
+    print("    git clone https://aur.archlinux.org/paru-git.git && cd paru-git && makepkg -si")
+    pause()
+    return
+  end
+  init_scripts()
+  sweep_stale()
+  tty_setup()
+  SWITCH = write_file(runpath("switch"), "")
   hard_clear()
 
   local mode = arg and arg[1]
-  if mode == "update" then
-    -- waybar on-click shortcut - jumps straight into the update view
-    update_packages()
-  else
-    -- No menu anymore - Package Manager is the default landing view,
-    -- reachable directly (no args, or mode == "manage"/"add-remove").
-    manage_packages()
-  end
+  local view = (mode == "update") and "update"
+    or (mode == "maintain" and "maintain")
+    or "manage"
 
+  -- A flat loop instead of the views calling each other: the old toggle
+  -- path recursed without bound and never unwound.
+  while view do
+    local fn = VIEWS[view]
+    if not fn then break end
+    view = fn()
+  end
 end
 
 local ok, err = pcall(main)
 sudo_stop()
+tty_restore()
+cleanup()
 if not ok then
   io.stderr:write("ZENU error: " .. tostring(err) .. "\n")
   print("\027[1;31mZENU crashed - press RETURN to close.\027[0m")

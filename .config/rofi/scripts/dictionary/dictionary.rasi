@@ -14,7 +14,7 @@ configuration {
 window {
     location: south;
     anchor: south;
-    width: 400px;
+    width: 800px;
 }
 
 mainbox {
@@ -25,8 +25,9 @@ listview {
     fixed-columns: false;
     fixed-height: false;
     scrollbar: false;
-    columns: 2;
-    lines: 12;
+    flow: horizontal;
+    columns: 5;
+    lines: 1;
 }
 
 element {
