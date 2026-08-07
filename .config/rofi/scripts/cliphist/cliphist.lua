@@ -15,7 +15,9 @@ local THUMB = 256
 local PREVIEW_MAX = 120
 local MODE_KEYS = "Tab"
 local MODE_HINT = "tab: toggle mode ~ delete: remove entry"
+local IMG_MODE_HINT = "tab: toggle mode ~ shift+return: open ~ delete: remove entry"
 local DELETE_KEYS = "Delete"
+local OPEN_KEYS = "Shift+Return"
 local DEBOUNCE_MS = 750
 local DEBUG = os.getenv("CLIPHIST_DEBUG") == "1"
 local LOG = (os.getenv("XDG_CACHE_HOME") or HOME .. "/.cache") .. "/cliphist-rofi/debug.log"
@@ -76,8 +78,10 @@ local function run_rofi(rows, theme, mesg)
     f:write(input)
     f:close()
     local cmd = string.format(
-        "rofi -dmenu -i -no-custom -format i -kb-custom-1 %s -kb-custom-2 %s -theme %s -mesg %s < %s > %s 2>/dev/null",
-        shell_quote(MODE_KEYS), shell_quote(DELETE_KEYS), shell_quote(theme), shell_quote(mesg),
+        "rofi -dmenu -i -no-custom -format i -kb-accept-alt '' " ..
+        "-kb-custom-1 %s -kb-custom-2 %s -kb-custom-3 %s -theme %s -mesg %s < %s > %s 2>/dev/null",
+        shell_quote(MODE_KEYS), shell_quote(DELETE_KEYS), shell_quote(OPEN_KEYS),
+        shell_quote(theme), shell_quote(mesg),
         shell_quote(in_tmp), shell_quote(out_tmp))
     local ok, _, code = os.execute(cmd)
     os.remove(in_tmp)
@@ -176,8 +180,7 @@ local function restore(id)
     os.remove(tmp)
 end
 
-local function restore_image(id)
-    log_debug("restore_image id=" .. tostring(id))
+local function decode_image(id)
     os.execute("mkdir -p " .. shell_quote(TMP_OPEN))
     os.execute(string.format(
         "find %s -type f -name '*.png' -mmin +30 -delete 2>/dev/null",
@@ -191,17 +194,31 @@ local function restore_image(id)
         ok = f:seek("end") > 0
         f:close()
     end
-    if ok then
+    if ok then return path end
+    log_debug("decode failed or empty; skipped")
+    return nil
+end
+
+local function copy_image(id)
+    log_debug("copy_image id=" .. tostring(id))
+    local path = decode_image(id)
+    if path then
         os.execute(string.format("wl-copy < %s", shell_quote(path)))
+    end
+end
+
+local function open_image(id)
+    log_debug("open_image id=" .. tostring(id))
+    local path = decode_image(id)
+    if path then
         os.execute(string.format("xdg-open %s >/dev/null 2>&1 &",
             shell_quote(path)))
-    else
-        log_debug("decode failed or empty; skipped")
     end
 end
 
 local CUSTOM_1 = 10
 local CUSTOM_2 = 11
+local CUSTOM_3 = 12
 local last_toggle = 0
 local last_delete = 0
 
@@ -245,7 +262,7 @@ while true do
         theme = TEXT_THEME
     end
 
-    local mesg = MODE_HINT
+    local mesg = image_mode and IMG_MODE_HINT or MODE_HINT
 
     local idx, ec = run_rofi(rows, theme, mesg)
     log_debug(string.format("mode=%s theme=%s ec=%d idx=%d",
@@ -272,10 +289,15 @@ while true do
         else
             log_debug("delete debounced or no selection")
         end
+    elseif ec == CUSTOM_3 and image_mode then
+        if idx >= 0 then
+            open_image(img_entries[idx + 1])
+        end
+        break
     else
         if idx >= 0 then
             if image_mode then
-                restore_image(img_entries[idx + 1])
+                copy_image(img_entries[idx + 1])
             else
                 restore(text_entries[idx + 1].id)
             end
