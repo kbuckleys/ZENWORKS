@@ -39,6 +39,9 @@ local function capture(cmd)
 end
 
 local function tmpdir()
+    -- sweep dirs left behind when a previous run was killed mid-pick
+    os.execute("find /tmp -maxdepth 1 -type d -name 'rofi-nerd.*' -mmin +10 " ..
+        "-exec rm -rf {} + 2>/dev/null")
     local out = capture("mktemp -d /tmp/rofi-nerd.XXXXXXXX")
     return out and out:gsub("\n$", "") or nil
 end
@@ -111,6 +114,7 @@ local function build_ok_theme(icon, dir)
 end
 
 local function value_for(icon, format)
+    format = format:lower()
     if format == "icon" then
         return icon.char
     elseif format == "class" then
@@ -145,8 +149,10 @@ local function main()
         local pick = run_rofi(rows, THEME, mesg, selected)
         if not pick then break end
 
-        selected = pick
         local icon = icons[pick + 1]
+        if not icon then break end
+
+        selected = pick
         local theme = build_ok_theme(icon, dir)
         local format = run_rofi(FORMATS, theme, icon.class, 0)
         os.remove(theme)
