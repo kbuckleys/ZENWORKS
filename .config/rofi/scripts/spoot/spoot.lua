@@ -436,6 +436,17 @@ local function safe_decode(s)
     if not s or not s:find("%S") then return nil end
     local ok, data = pcall(json.decode, s)
     if not ok or type(data) ~= "table" then return nil end
+    -- strip_nulls walks the ENTIRE decoded structure just to turn json.null
+    -- into nil: 5.7ms on the 1.4MB liked cache, on top of a 10ms decode. A
+    -- document with no `null` TOKEN in it cannot contain a null value, and our
+    -- own cache files never do -- they are written from already-stripped data.
+    -- The plain (non-pattern) scan costs 0.3ms on that same 1.4MB, so the
+    -- common case gets the walk for free. Same early-out idiom as
+    -- Util.pango_escape and Util.strip_markup.
+    --
+    -- "null" inside a string value is a harmless false positive: it just takes
+    -- the walk it would have taken anyway.
+    if not s:find("null", 1, true) then return data end
     return strip_nulls(data)
 end
 
@@ -2576,11 +2587,23 @@ local function load_queue()
     end
 end
 
+-- `idx` indexes the caller's list; `tids` drops every entry without an .id, so
+-- the two only line up while nothing is dropped. One id-less row (a local file,
+-- an unavailable episode) shifted every position after it, leaving queue_idx
+-- pointing at the wrong track -- which is what recover_playback's
+-- Next/Previous fallback then resumes from. Mapping the index inside the same
+-- filtering pass keeps it on the track the caller actually meant.
 local function save_queue(items, idx, context_uri)
-    local tids = {}
-    for _, t in ipairs(items or {}) do
-        if type(t) == "table" and t.id then tids[#tids+1] = t.id end
+    local tids, new_idx = {}, nil
+    for i, t in ipairs(items or {}) do
+        if type(t) == "table" and t.id then
+            tids[#tids+1] = t.id
+            if i == idx then new_idx = #tids end
+        end
     end
+    -- Falls back to the raw idx when the target row was itself filtered out --
+    -- there is no right answer then, and this matches the old behaviour.
+    idx = new_idx or idx
     queue_tracks  = tids
     queue_idx     = idx
     queue_context = context_uri
@@ -2630,17 +2653,28 @@ local function do_play(item, ctx_type, ctx_id, all_items, idx)
     end
     if body then
         local code = shell(string.format("curl -s --max-time 3 -o /dev/null -w '%%{http_code}' -X PUT %s -H %s -H 'Content-Type: application/json' -d %s", shell_quote("https://api.spotify.com/v1/me/player/play" .. dparam), shell_quote("Authorization: Bearer " .. token), shell_quote(body)))
+        -- Spotify answers 204 on success. This used to return true for ANY
+        -- response -- 403, a curl timeout ("000"), "no active device" -- so a
+        -- play that never happened still moved the caller's ▶ marker onto the
+        -- row and still stamped P.recent_cmd_at, which then muted Util.sync_now
+        -- for 5s and delayed the correction. Costs nothing to check: the request
+        -- is already awaited and `code` was already being read for the 404 test.
+        local ok = code ~= nil and code:match("^2") ~= nil
         -- 404 = "Device not found": the persisted id went stale, so drop it and
-        -- retry once against a freshly resolved device.
-        if code and code:match("404") and device_id then
+        -- retry once against a freshly resolved device. The retry's status is
+        -- what decides the outcome now; it used to be discarded entirely.
+        if not ok and code and code:match("404") and device_id then
             Util.bust_device()
             local fresh = get_spotifyd_device()
             if fresh and fresh ~= device_id then
-                shell(string.format("curl -s --max-time 3 -o /dev/null -w '%%{http_code}' -X PUT %s -H %s -H 'Content-Type: application/json' -d %s", shell_quote("https://api.spotify.com/v1/me/player/play?device_id=" .. fresh), shell_quote("Authorization: Bearer " .. token), shell_quote(body)))
+                local retry = shell(string.format("curl -s --max-time 3 -o /dev/null -w '%%{http_code}' -X PUT %s -H %s -H 'Content-Type: application/json' -d %s", shell_quote("https://api.spotify.com/v1/me/player/play?device_id=" .. fresh), shell_quote("Authorization: Bearer " .. token), shell_quote(body)))
+                ok = retry ~= nil and retry:match("^2") ~= nil
             end
         end
-        P.recent_cmd_at = os.time()
-        return true
+        -- Only on a play that actually started: this suppresses Util.sync_now,
+        -- and after a FAILED play we want that sync to run and show the truth.
+        if ok then P.recent_cmd_at = os.time() end
+        return ok
     end
     return false
 end
@@ -2657,12 +2691,19 @@ local function flush_liked_cache()
     local id_set = {}
     for _, t in ipairs(tracks) do if t.id then id_set[t.id] = true end end
     local new_ids = {}
+    -- Whether this reconciliation actually found work. do_like already ran
+    -- Util.optimistic_like (which mutates this very list and rebuilds the artist
+    -- index) and Util.persist_liked (which wrote both cache files), so in the
+    -- normal case the loop below finds NOTHING out of sync -- and the writes at
+    -- the bottom then re-encoded and rewrote the 1.4MB liked cache a second
+    -- time, ~6ms, for a byte-identical result on every single like/unlike.
+    local changed = false
     for id, v in pairs(liked) do
         if v and not id_set[id] then
             new_ids[#new_ids + 1] = id
         elseif not v and id_set[id] then
             for i = #tracks, 1, -1 do
-                if tracks[i].id == id then table.remove(tracks, i); break end
+                if tracks[i].id == id then table.remove(tracks, i); changed = true; break end
             end
         end
     end
@@ -2683,6 +2724,7 @@ local function flush_liked_cache()
                 if t and t.id then fresh[#fresh+1] = t end
             end
             for i = #fresh, 1, -1 do table.insert(tracks, 1, fresh[i]) end
+            if #fresh > 0 then changed = true end
         end
         if not ok then
             _liked_dirty = true
@@ -2690,6 +2732,11 @@ local function flush_liked_cache()
         end
     end
     _liked_dirty = false
+    -- Nothing was out of sync, so the caches on disk already say exactly this.
+    -- build_liked_artist_index and bust_format_cache are skipped for the same
+    -- reason: Util.optimistic_like and do_like respectively already ran them
+    -- against this same unchanged list.
+    if not changed then return end
     write_file(P.liked, json.encode({fetched_at=os.time(), tracks=tracks}))
     local ids = {}
     for _, t in ipairs(tracks) do if t.id then ids[#ids+1] = t.id end end
@@ -5023,7 +5070,14 @@ local function view_system()
             -- Deliberately keeps P.trails: restarting audio plumbing has
             -- nothing to do with navigation history.
             os.execute("sleep 1")
-            inv_playback()
+            -- Not inv_playback(): that clears current_track but LEAVES the saved
+            -- queue, and get_playback reads "me/player empty" + "we still hold a
+            -- queue" as a spotifyd dropout and forces a PUT /me/player/play. So
+            -- restarting the daemons silently resumed the previous session --
+            -- the same mechanism as the cold-start bug, in a second place.
+            -- Killing the daemons must never leave the last track playing.
+            -- Navigation state is untouched, exactly as the comment above says.
+            Util.clear_last_playback()
             ensure_spotifyd()
             os.execute("sleep 3")
             os.execute("nohup lua " .. shell_quote(P.dir .. "/spoot.lua") .. " --daemon > /tmp/spoot_daemon.log 2>&1 &")
@@ -5315,12 +5369,19 @@ local function check_rate_cooldown()
 end
 
 -- PLAYBACK state only. Runs on a cold start (the MPRIS daemon wasn't alive),
--- where the now-playing caches really are stale. It must NOT touch P.session:
--- where you were in the menus has nothing to do with whether the daemon
--- survived, and clearing it here is what made menu retention look random --
--- it worked while the daemon happened to be up, and silently reset after a
+-- where the now-playing caches really are stale, and from System > Restart
+-- Daemons, which kills the same plumbing on purpose. It must NOT touch
+-- P.session: where you were in the menus has nothing to do with whether the
+-- daemon survived, and clearing it here is what made menu retention look random
+-- -- it worked while the daemon happened to be up, and silently reset after a
 -- reboot, a crash, or Restart/Kill Daemons.
-local function clear_last_playback()
+--
+-- On Util rather than a file local so view_system can reach it: that function
+-- is defined ~400 lines EARLIER, and a local declared here is simply not in
+-- scope there. Same reason as Util.view_album_details and friends -- the chunk
+-- is one function and Lua caps it at 200 locals, so a forward declaration is
+-- not free. Util is a table looked up at call time, so order stops mattering.
+function Util.clear_last_playback()
     os.execute("playerctl pause 2>/dev/null")
     os.remove(P.now); os.remove(P.now_track)
     current_track = nil; current_id = nil; previous_id = nil
@@ -5348,7 +5409,7 @@ local function init_library(cold_start)
     ensure_auth()
     ensure_spotifyd()
     load_queue()
-    if cold_start then clear_last_playback() end
+    if cold_start then Util.clear_last_playback() end
     (function()
         local raw = read_file(P.state)
         if raw then local d = safe_decode(raw)
@@ -5499,12 +5560,24 @@ local function daemon_mode()
     local lock = "/tmp/spoot_daemon.pid"
     local claim = "/tmp/spoot_daemon.lock"
     local mypid = Util.get_own_pid()
+    -- Both takeover paths below SIGTERM the pid they find, so "is this one of
+    -- mine?" has to be answered strictly. Matching "spoot" alone matched any
+    -- process whose command line merely MENTIONS spoot -- a shell, an editor, a
+    -- test harness with the path in argv -- so a recycled pid meant killing
+    -- something unrelated. (Hit for real while testing this file.) A daemon is
+    -- always spawned as `lua <dir>/spoot.lua --daemon`, so requiring the flag
+    -- too costs nothing and is the same test ensure_daemon and
+    -- Util.pidfile_owner_alive already apply. Plain find, not a pattern.
+    local function is_our_daemon(pid)
+        local c = Util.proc_cmdline(pid)
+        return c:find("spoot", 1, true) ~= nil and c:find("--daemon", 1, true) ~= nil
+    end
     local claimed = trim(shell("mkdir " .. claim .. " 2>/dev/null && echo ok") or "") == "ok"
     if not claimed then
         local holder = tonumber((read_file(claim .. "/pid") or ""):match("(%d+)"))
         local holder_alive = holder and holder ~= mypid
             and Util.proc_alive(holder)
-            and Util.proc_cmdline(holder):find("spoot")
+            and is_our_daemon(holder)
         if holder_alive then
             os.execute("kill " .. holder .. " 2>/dev/null; sleep 0.1")
         end
@@ -5515,11 +5588,8 @@ local function daemon_mode()
     if mypid then Util.secure_write(claim .. "/pid", tostring(mypid)) end
     local prev = read_file(lock)
     local prev_pid = prev and tonumber(prev:match("(%d+)"))
-    if prev_pid and prev_pid > 0 and prev_pid ~= mypid then
-        local cmdline = Util.proc_cmdline(prev_pid)
-        if cmdline:find("spoot") then
-            os.execute("kill " .. prev_pid .. " 2>/dev/null; sleep 0.1")
-        end
+    if prev_pid and prev_pid > 0 and prev_pid ~= mypid and is_our_daemon(prev_pid) then
+        os.execute("kill " .. prev_pid .. " 2>/dev/null; sleep 0.1")
     end
     if mypid then Util.secure_write(lock, tostring(mypid)) end
     Util.kill_playerctl_follow()
