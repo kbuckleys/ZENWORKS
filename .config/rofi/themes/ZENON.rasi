@@ -37,6 +37,8 @@
 }
 
 window {
+    location: south;
+    anchor: south;
     background-color: @background;
     padding: 0;
     border: 1px;
@@ -109,6 +111,10 @@ element.alternate.urgent {
 element.alternate.active {
     background-color: @alternate-active-background;
     text-color: @alternate-active-foreground;
+}
+
+icon-current-entry {
+    background-color: #00000000;
 }
 
 scrollbar {

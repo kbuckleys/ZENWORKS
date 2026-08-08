@@ -113,6 +113,10 @@ element.alternate.active {
     text-color: @alternate-active-foreground;
 }
 
+icon-current-entry {
+    background-color: #00000000;
+}
+
 scrollbar {
     handle-color: rgba(155, 191, 191, 0.2);
     handle-width: 8px;
