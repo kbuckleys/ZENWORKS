@@ -5,7 +5,10 @@ Wants=pipewire.service wireplumber.service
 
 [Service]
 Type=oneshot
-ExecStart=%h/.config/corsair/corsair-headset-fix
+# setup.sh symlinks the script here before enabling this unit, so this path
+# holds no matter where the corsair directory itself lives. Don't point it at
+# the directory — that would tie the unit to one install location.
+ExecStart=%h/.local/bin/corsair-headset-fix
 
 [Install]
 WantedBy=default.target
