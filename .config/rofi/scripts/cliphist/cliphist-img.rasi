@@ -1,0 +1,72 @@
+/**
+* ┌─┐┌─┐┌┐┌┬ ┬┌─┐┬─┐┬┌─┌─┐
+* ┌─┘├┤ │││││││ │├┬┘├┴┐└─┐
+* └─┘└─┘┘└┘└┴┘└─┘┴└─┴ ┴└─┘
+* https://github.com/kbuckleys/ */
+
+@theme "ZENON"
+
+* {
+    selected-normal-background: none;
+}
+
+configuration {
+    kb-remove-to-sol: "BackSpace";
+    kb-remove-char-back: "";
+    kb-element-next: "";
+    kb-remove-char-forward: "";
+    show-icons: true;
+}
+
+window {
+    width: 80%;
+    location: south;
+    anchor: south;
+}
+
+mainbox {
+    children: [ inputbar, listview, message ];
+}
+
+inputbar {
+    enabled: false;
+}
+
+listview {
+    padding: 2px 3px 0px 3px;
+    fixed-columns: true;
+    fixed-height: false;
+    columns: 8;
+    lines: 3;
+    flow: horizontal;
+    scrollbar: false;
+}
+
+element {
+    orientation: vertical;
+    children: [ element-icon ];
+    padding: 2px;
+    border: 0px;
+}
+element-text {
+    enabled: false;
+}
+element selected {
+    border: 2px;
+    border-radius: 2px;
+    border-color: #6a707f;
+    background-color: none;
+}
+element-icon {
+    size: 200px;
+}
+
+message {
+    background-color: #16191d;
+    padding: 5px 30px 5px 30px;
+}
+textbox {
+    text-color: #6a707f;
+    horizontal-align: 0.5;
+    font: "JetBrainsMono Nerd Font Propo Bold 12";
+}

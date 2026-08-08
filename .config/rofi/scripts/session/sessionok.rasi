@@ -1,0 +1,51 @@
+/**
+* ┌─┐┌─┐┌┐┌┬ ┬┌─┐┬─┐┬┌─┌─┐
+* ┌─┘├┤ │││││││ │├┬┘├┴┐└─┐
+* └─┘└─┘┘└┘└┴┘└─┘┴└─┴ ┴└─┘
+* https://github.com/kbuckleys/ */
+
+@theme "ZENON"
+
+window {
+    location: south;
+    anchor: south;
+    width: 250px;
+}
+
+mainbox {
+    children: [ message, listview ];
+}
+
+textbox {
+    text-color: #e78284;
+    background-color: #000000;
+    horizontal-align: 0.5;
+    font: "JetBrainsMono Nerd Font Propo Bold 16";
+}
+
+listview {
+    background-color: #e78284;
+    fixed-height: false;
+    scrollbar: false;
+    columns: 2;
+    lines: 1;
+}
+
+element {
+    padding: 2px 8px 2px 8px;
+}
+element-text {
+    text-color: #000000;
+    horizontal-align: 0.5;
+    font: "JetBrainsMono Nerd Font Propo Bold 16";
+}
+element selected.normal {
+    background-color: #eebebe;
+}
+element-text selected {
+    color: #000000;
+}
+
+message {
+    padding: 5px 30px 5px 30px;
+}

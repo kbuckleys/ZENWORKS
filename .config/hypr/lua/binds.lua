@@ -27,16 +27,16 @@ end, { locked = true })
 
 -- ROFI
 hl.bind("SUPER + SHIFT + J",  hl.dsp.exec_cmd("~/.config/rofi/scripts/nerd/nerd.lua"))
-hl.bind("SUPER + SHIFT + C",  hl.dsp.exec_cmd("rofi -show calc -modi calc -no-show-match -no-sort -calc-command \"echo '{result}' | cliphist store\" -theme ~/.config/rofi/calc.rasi"))
-hl.bind("SUPER + ESCAPE",     hl.dsp.exec_cmd('rofi -show power-menu -modi "power-menu:~/.config/rofi/scripts/session/session.lua" -theme ~/.config/rofi/scripts/session/session.rasi'))
+hl.bind("SUPER + SHIFT + C",  hl.dsp.exec_cmd("~/.config/rofi/scripts/calc/calc.lua"))
+hl.bind("SUPER + ESCAPE",     hl.dsp.exec_cmd("~/.config/rofi/scripts/session/session.lua"))
 hl.bind("SUPER + SPACE",      hl.dsp.exec_cmd("~/.config/rofi/scripts/runner/runner.lua"))
 hl.bind("SUPER + C",          hl.dsp.exec_cmd("~/.config/rofi/scripts/cliphist/cliphist.lua"))
-hl.bind("SUPER + S",          hl.dsp.exec_cmd("rofi -i -show recursivebrowser -disable-history -theme ~/.config/rofi/rootsearch.rasi"))
-hl.bind("SUPER + J",          hl.dsp.exec_cmd('rofimoji -a type copy --selector-args="-theme ~/.config/rofi/rofimoji.rasi"'))
+hl.bind("SUPER + S",          hl.dsp.exec_cmd("~/.config/rofi/scripts/rootsearch/rootsearch.lua"))
+hl.bind("SUPER + J",          hl.dsp.exec_cmd("~/.config/rofi/scripts/rofimoji/rofimoji.lua"))
 hl.bind("SUPER + M",          hl.dsp.exec_cmd("~/.config/rofi/scripts/spoot/spoot.lua"))
-hl.bind("SUPER + V",          hl.dsp.exec_cmd('rofi-rbw --selector-args="-theme rbw"'))
+hl.bind("SUPER + V",          hl.dsp.exec_cmd("~/.config/rofi/scripts/rbw/rbw.lua"))
 hl.bind("SUPER + K",          hl.dsp.exec_cmd("~/.config/rofi/scripts/hitman/hitman.lua"))
-hl.bind("SUPER + D",          hl.dsp.exec_cmd("~/.config/rofi/scripts/dictionary/dict.lua"))
+hl.bind("SUPER + D",          hl.dsp.exec_cmd("~/.config/rofi/scripts/dictionary/dictionary.lua"))
 
 -- WORKSPACES
 hl.bind("SUPER + GRAVE",  hl.dsp.workspace.toggle_special("special"))

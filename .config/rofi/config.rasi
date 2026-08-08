@@ -1,0 +1,16 @@
+/**
+* ┌─┐┌─┐┌┐┌┬ ┬┌─┐┬─┐┬┌─┌─┐
+* ┌─┘├┤ │││││││ │├┬┘├┴┐└─┐
+* └─┘└─┘┘└┘└┴┘└─┘┴└─┴ ┴└─┘
+* https://github.com/kbuckleys/ */
+
+@theme "ZENON"
+
+configuration {
+	drun-display-format: "{name}";
+    terminal: "kitty -1";
+    filebrowser {
+        command: "kitty -1 yazi";
+        show-hidden: true;
+    }
+}
