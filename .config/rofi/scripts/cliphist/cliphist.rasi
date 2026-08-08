@@ -28,6 +28,7 @@ inputbar {
 }
 
 listview {
+    padding: 2px 2px 0px 3px;
     fixed-columns: false;
     fixed-height: false;
     scrollbar: false;

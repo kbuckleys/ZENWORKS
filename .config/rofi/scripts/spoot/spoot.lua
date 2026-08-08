@@ -9,7 +9,12 @@
 
 local P = {
     home      = os.getenv("HOME"),
-    dir       = debug.getinfo(1, "S").source:match("^@(.*/)"),
+    -- "./" fallback because the pattern needs a directory separator to match:
+    -- invoked as a bare `lua spoot.lua` from inside this directory, source is
+    -- "@spoot.lua", dir came back nil, and the very first use of it (resolving
+    -- the themes) died on "attempt to concatenate a nil value (field 'dir')".
+    -- rofi always passes an absolute path, so only a hand-run hit this.
+    dir       = debug.getinfo(1, "S").source:match("^@(.*/)") or "./",
     max       = 20,
     ttl       = 43200,
     ttl_lyrics = 7 * 24 * 3600,  -- 1 week
@@ -140,8 +145,11 @@ local function split_status_icons(s)
     return s:sub(1, cut - 1), suffix
 end
 
+-- printf '%s', not echo: echo appends a newline, so every URL copied from here
+-- landed in the clipboard with a trailing \n. parse_spotify_url strips one on
+-- the way back in, but a paste anywhere else carried it.
 local function copy_to_clipboard(text)
-    os.execute("echo " .. shell_quote(text) .. " | wl-copy 2>/dev/null")
+    os.execute("printf '%s' " .. shell_quote(text) .. " | wl-copy 2>/dev/null")
 end
 
 local function copy_spotify_url(kind, id) copy_to_clipboard("https://open.spotify.com/" .. kind .. "/" .. (id or "")) end
@@ -162,11 +170,15 @@ local function parse_spotify_url(url)
     return nil, nil
 end
 
+-- Parenthesised so this returns ONE value, for the same reason Util.strip_markup
+-- is: gsub also hands back a match count, and every call site here happens to be
+-- inside a concatenation -- but the day one of them is a function's last
+-- argument, that count silently becomes an extra argument.
 local function url_encode(s)
-    return s:gsub("([^%w%-%.%_%~])", function(c)
+    return (s:gsub("([^%w%-%.%_%~])", function(c)
         if c == " " then return "+" end
         return string.format("%%%02X", string.byte(c))
-    end)
+    end))
 end
 
 local function read_file(p)
@@ -186,6 +198,63 @@ function Util.get_own_pid()
     local raw = f and f:read("*a")
     if f then f:close() end
     return raw and tonumber(raw:match("^(%d+)"))
+end
+
+-- Pid liveness and argv, read straight out of /proc instead of shelling out to
+-- `kill -0` and `cat`. Eleven sites did the latter and SIX of them run before
+-- the first menu can draw (init_instance_lock, ensure_daemon,
+-- Util.ensure_recent_watch) -- measured at 10.8ms of pure fork+exec, for two
+-- file reads. Util.bsmon_mode already did it this way.
+--
+-- One semantic difference worth naming: /proc/<pid>/stat is world-readable
+-- where `kill -0` answers EPERM across users. Every caller here is checking a
+-- helper WE spawned, and each pairs the check with a cmdline:find("spoot")
+-- test, so the answer is identical.
+--
+-- The ^%d+$ validation is kept from the shell-quoting era: it now guards
+-- against a garbled pid file producing a nonsense path rather than a nonsense
+-- command, but a garbled pid file must still answer "not alive" either way.
+-- Pid 0 is deliberately not special-cased: `kill -0 0` reported it "alive"
+-- because 0 means our whole process GROUP, which was never the question.
+local function pid_str(pid)
+    if type(pid) == "number" then pid = string.format("%d", pid) end
+    if type(pid) ~= "string" or not pid:match("^%d+$") then return nil end
+    return pid
+end
+
+function Util.proc_alive(pid)
+    local p = pid_str(pid)
+    if not p then return false end
+    local f = io.open("/proc/" .. p .. "/stat", "r")
+    if not f then return false end
+    f:close()
+    return true
+end
+
+-- NUL-separated, and returned as-is: every caller only ever :find()s "spoot"
+-- or "--daemon" in it, which works unchanged on the raw bytes.
+function Util.proc_cmdline(pid)
+    local p = pid_str(pid)
+    if not p then return "" end
+    local f = io.open("/proc/" .. p .. "/cmdline", "r")
+    if not f then return "" end
+    local raw = f:read("*a")
+    f:close()
+    return raw or ""
+end
+
+-- "Is the process this pid file names still one of OURS?" -- the whole question
+-- every pid-file guard here is actually asking. The cmdline test is what makes a
+-- recycled pid answer no: without it a stale file whose pid has been reused by
+-- some unrelated long-lived process disables the guarded spawn forever, since
+-- nothing ever rewrites the file. `kill -0` used to paper over the root-owned
+-- case by failing with EPERM; /proc does not, so the test is explicit now.
+function Util.pidfile_owner_alive(path, marker)
+    local pid = trim(read_file(path) or "")
+    if not Util.proc_alive(pid) then return false end
+    local cmd = Util.proc_cmdline(pid)
+    return cmd:find("spoot", 1, true) ~= nil
+        and (not marker or cmd:find(marker, 1, true) ~= nil)
 end
 
 function Util.get_clipboard()
@@ -242,8 +311,18 @@ end
 -- which lands tag-only wrappers on exactly the same result as before.
 function Util.strip_markup(s)
     if not s then return s end
-    s = tostring(s):gsub("\1(.-)\2", "%1")
-    return s:gsub("<[^>]+>", "")
+    s = tostring(s)
+    -- Same early-out, and for the same reason, as Util.pango_escape above:
+    -- row_of runs this twice per row on every selection, and neither gsub can
+    -- match without one of these two bytes -- the first needs \1, the second
+    -- needs '<'. Nearly every row has neither.
+    if not s:find("[\1<]") then return s end
+    s = s:gsub("\1(.-)\2", "%1")
+    -- Parenthesised so this returns ONE value. gsub also hands back a match
+    -- count, and every call site here happens to discard it -- but the day one
+    -- of them is used as a function's last argument, that count silently
+    -- becomes an extra argument.
+    return (s:gsub("<[^>]+>", ""))
 end
 
 local THEME, THEME_MENU, THEME_LYR, THEME_MSG, THEME_SUB, THEME_BINDS, THEME_META, THEME_ART = (function()
@@ -348,9 +427,13 @@ local function strip_nulls(t)
     return t
 end
 
+-- The trim() this used to open with cost 25ms on liked_tracks.json (1.4MB) --
+-- nearly 3x the 9ms decode it was preparing for -- because `^%s*(.-)%s*$` walks
+-- and then COPIES the whole blob. It was only ever an emptiness test: cjson
+-- already skips leading and trailing whitespace itself. Scanning for the first
+-- non-space instead is O(1) in practice and copies nothing.
 local function safe_decode(s)
-    s = trim(s or "")
-    if s == "" then return nil end
+    if not s or not s:find("%S") then return nil end
     local ok, data = pcall(json.decode, s)
     if not ok or type(data) ~= "table" then return nil end
     return strip_nulls(data)
@@ -532,6 +615,16 @@ end
 --
 -- Clearing `unavail` on a positive is what lets a re-fetch heal a stale flag,
 -- since the flag outlives the data it was derived from.
+--
+-- Called from ONE place for anything that came off the API: api_get, right
+-- before it hands the decoded body back. It used to be applied by cached_fetch
+-- plus six hand-written call sites, which meant every source that talked to
+-- api_get DIRECTLY was missed -- search, recommendations, api_get_tracks,
+-- flush_liked_cache's reconciliation and pasted URLs all kept a raw is_playable
+-- and never set `unavail`, so a region-locked track neither dimmed in
+-- display_track nor was refused by do_play. The only callers left are the two in
+-- save_library_cache, whose data is assembled from raw curl by
+-- parallel_fetch_library and so never passes through api_get.
 function Util.mark_availability(o)
     local function walk(t)
         if type(t) ~= "table" then return end
@@ -558,7 +651,6 @@ local function cached_fetch(key, disk_path, ttl, fetch_fn)
     if v ~= nil then
         local empty = type(v) == "table" and next(v) == nil
         if not empty then
-            Util.mark_availability(v)
             mem_set(key, v, ttl)
             if disk_path then disk_set(disk_path, v) end
         end
@@ -679,7 +771,10 @@ function Util.scope(entry, body)
         io.stderr:write("spoot: view '" .. tostring(entry.view)
             .. "' is not in VIEWS -- it cannot be restored on a warm start\n")
     end
-    local depth = #_session_stack
+    -- session_push is what lazily creates the stack, so reading its length first
+    -- has to tolerate it not existing yet. Nothing reaches a scoped view before
+    -- session_load today; this keeps that from being load-bearing.
+    local depth = _session_stack and #_session_stack or 0
     local gen   = Util.session_gen
     session_push(entry)
     local ok, a, b = pcall(body)
@@ -1005,7 +1100,9 @@ local function rofi_dmenu(entries, opts)
     for _, e in ipairs(entries or {}) do f:write(markup and Util.pango_escape(e) or e, "\n") end
     f:close()
 
-    local bs = Util.bs_launch(theme)
+    -- Return value deliberately dropped: the monitor lives for the app's
+    -- lifetime and is torn down in Util.clean_exit, not here.
+    Util.bs_launch(theme)
 
     local qa = {}
     for _, a in ipairs(args) do qa[#qa+1] = shell_quote(a) end
@@ -1450,8 +1547,10 @@ Util._art_batch = function(items)
             local ok = r ~= nil and r.code:match("2..") ~= nil
             if ok then ok = Util._art_valid_file(pd.tmp, r.size) end
             if ok then ok = os.rename(pd.tmp, pd.path) end
-            if not ok then failures[#failures+1] = pd end
-            os.remove(pd.tmp)
+            -- Only on failure: a successful rename already moved the file, so
+            -- the unconditional remove was a wasted syscall per cover -- 60 of
+            -- them on a full sync batch.
+            if not ok then failures[#failures+1] = pd; os.remove(pd.tmp) end
             pd.tmp = nil
         end
         todo = failures
@@ -1469,13 +1568,9 @@ function Util.spawn_art_prefetch(list)
     if not list or #list == 0 then return end
     -- album_thumbs re-derives its pending list from disk on every call, so each
     -- redraw during a download would otherwise spawn a second prefetcher for
-    -- whatever is still missing. Same kill -0 liveness idiom as ensure_daemon.
+    -- whatever is still missing. Same pid-file liveness idiom as ensure_daemon.
     local pidf = "/tmp/spoot_art_prefetch.pid"
-    local prev = trim(read_file(pidf) or "")
-    if prev:match("^%d+$")
-       and trim(shell("kill -0 " .. prev .. " 2>/dev/null && echo alive") or "") == "alive" then
-        return
-    end
+    if Util.pidfile_owner_alive(pidf, "--prefetch-art-batch") then return end
     local lf = os.tmpname()
     local f = io.open(lf, "w")
     if not f then os.remove(lf); return end
@@ -1503,6 +1598,22 @@ local function ensure_art(art_url, subdir, opts)
     return Util.fetch_art(art_url, art_path, opts)
 end
 
+-- The written path is unique per call. It used to be a fixed
+-- /tmp/spoot_theme_<name>.rasi, which broke as soon as a view nested inside
+-- itself -- and both callers can:
+--   * view_actions writes the "action" theme and os.removes it on every exit
+--     path. Alt+Return inside an action menu is EXIT.jump, which opens a NESTED
+--     view_actions; that one overwrote the file with the other track's cover
+--     and then DELETED it on the way out, leaving the still-open outer menu
+--     redrawing (via menu_redo) against a -theme path that no longer existed.
+--   * view_browse writes the "album" theme, so opening an album from inside an
+--     album's own track list left the outer list wearing the inner album's
+--     cover.
+-- A per-call sequence number keeps each invocation's theme to itself. The
+-- startup sweep and Util.clean_exit both glob /tmp/spoot_theme_*.rasi, so these
+-- names are still cleaned up, and view_actions' os.remove now only ever deletes
+-- the file it wrote itself.
+Util._theme_seq = 0
 Util.write_art_theme = function(name, art_path)
     local tmpl = Util._art_theme_tmpls[name]
     if not tmpl then
@@ -1510,7 +1621,8 @@ Util.write_art_theme = function(name, art_path)
         tmpl = raw:gsub('@import "ZENON"', '@import "' .. P.dir .. '/style/ZENON"')
         Util._art_theme_tmpls[name] = tmpl
     end
-    local tmp = "/tmp/spoot_theme_" .. name .. ".rasi"
+    Util._theme_seq = Util._theme_seq + 1
+    local tmp = "/tmp/spoot_theme_" .. name .. "_" .. Util._theme_seq .. ".rasi"
     local rasi = tmpl:gsub("%%s", art_path or "")
     if not art_path or art_path == "" then
         rasi = rasi:gsub("background%-image:%s*url%(\"\",%s*both%);", "")
@@ -1630,7 +1742,7 @@ P.device_ttl = 600
 -- Forget the cached device so the next play re-resolves it. Called when the
 -- daemons are restarted or when Spotify rejects the device we had.
 function Util.bust_device()
-    mem_bust("spotifyd_device"); mem_bust("spotifyd_device_vol")
+    mem_bust("spotifyd_device")
     disk_bust(P.device)
 end
 
@@ -1638,33 +1750,38 @@ end
 -- first play of EVERY launch paid a ~300ms /me/player/devices round trip. Backed
 -- by disk with a TTL it survives launches; bust_device covers the cases where it
 -- could go stale.
+--
+-- The device's supports_volume flag used to be carried alongside the id, in mem
+-- and on disk. Nothing ever read it back: the one gate it fed was removed from
+-- view_volume (see the comment there -- volume goes through playerctl, not the
+-- Spotify device API, so that flag was never the capability being tested).
+-- Reading only saved.id here means a device.json written by an older build,
+-- which still carries `vol`, loads unchanged.
 local function get_spotifyd_device()
     local cached = mem_get("spotifyd_device")
     if cached then return cached end
     local saved = disk_get(P.device, P.device_ttl)
     if type(saved) == "table" and saved.id then
         mem_set("spotifyd_device", saved.id, P.device_ttl)
-        mem_set("spotifyd_device_vol", saved.vol, P.device_ttl)
         return saved.id
     end
     local token = get_token()
     if not token then return nil end
     local d = safe_decode(shell("curl -s --max-time 3 -H " .. shell_quote("Authorization: Bearer " .. token) .. " 'https://api.spotify.com/v1/me/player/devices'"))
     if not d or not d.devices then return nil end
-    local dev_id, dev_supports_vol = nil, false
+    local dev_id = nil
     for _, dev in ipairs(d.devices) do
-        if dev.name and dev.name:lower():find("spoot") then dev_id = dev.id; dev_supports_vol = dev.supports_volume; break end
+        if dev.name and dev.name:lower():find("spoot") then dev_id = dev.id; break end
     end
     if not dev_id then
         for _, dev in ipairs(d.devices) do
-            if dev.is_active then dev_id = dev.id; dev_supports_vol = dev.supports_volume; break end
+            if dev.is_active then dev_id = dev.id; break end
         end
     end
-    if not dev_id and #d.devices > 0 then dev_id = d.devices[1].id; dev_supports_vol = d.devices[1].supports_volume end
+    if not dev_id and #d.devices > 0 then dev_id = d.devices[1].id end
     if dev_id then
         mem_set("spotifyd_device", dev_id, P.device_ttl)
-        mem_set("spotifyd_device_vol", dev_supports_vol, P.device_ttl)
-        disk_set(P.device, {id = dev_id, vol = dev_supports_vol})
+        disk_set(P.device, {id = dev_id})
     end
     return dev_id
 end
@@ -1729,7 +1846,13 @@ local function api_get(path, params, _retry)
         return api_get(path, params, true)
     end
     if status >= 400 then return nil end
-    return safe_decode(body)
+    -- THE availability collapse, for everything that comes off the API. See the
+    -- note above Util.mark_availability for why it lives here rather than at the
+    -- call sites. Also the single place that drops available_markets, so no
+    -- endpoint can smuggle its ~185-entry arrays into a disk cache.
+    local d = safe_decode(body)
+    if d then Util.mark_availability(d) end
+    return d
 end
 
 -- Offset-paginated fetch helper; any failed page returns nil so it is never
@@ -1963,7 +2086,6 @@ local function load_saved_albums()
         offset = offset + 50
     end
     table.sort(items, function(a,b) return (a.name or ""):lower() < (b.name or ""):lower() end)
-    Util.mark_availability(items)
     write_file(P.albums, json.encode({fetched_at=os.time(), items=items}))
     mem_set("saved_albums", items, P.ttl)
     return items, true
@@ -1999,23 +2121,16 @@ end
 
 local function fetch_library_with_fallback()
     local tracks, albums, artists = parallel_fetch_library()
-    local from_cache = {}
-    local failed = {}
-    if not tracks then
-        tracks = load_liked_tracks_full()
-        if tracks then from_cache[#from_cache+1] = "tracks" else failed[#failed+1] = "tracks" end
-    end
+    if not tracks then tracks = load_liked_tracks_full() end
     if not albums then
         local a, ok = load_saved_albums()
         albums = ok and a or nil
-        if albums then from_cache[#from_cache+1] = "albums" else failed[#failed+1] = "albums" end
     end
     if not artists then
         local a, ok = load_followed_artists()
         artists = ok and a or nil
-        if artists then from_cache[#from_cache+1] = "artists" else failed[#failed+1] = "artists" end
     end
-    return tracks, albums, artists, from_cache, failed
+    return tracks, albums, artists
 end
 
 local function build_liked_artist_index(tracks)
@@ -2031,9 +2146,10 @@ local function build_liked_artist_index(tracks)
     end
 end
 
--- These write straight to disk instead of going through cached_fetch, so they
--- need the availability collapse applied here too -- liked_tracks.json alone is
--- 44% available_markets.
+-- The LAST callers of mark_availability outside api_get, and deliberately so:
+-- parallel_fetch_library assembles these from raw curl output, so they are the
+-- one library path the collapse in api_get never sees. Without it
+-- liked_tracks.json goes back to being 44% available_markets.
 local function save_library_cache(tracks, albums, artists)
     if tracks then
         Util.mark_availability(tracks)
@@ -2076,7 +2192,6 @@ local function load_liked_tracks()
         build_liked_artist_index(tracks)
         return tracks
     end
-    Util.mark_availability(tracks)
     write_file(P.liked, json.encode({fetched_at=os.time(), tracks=tracks}))
     local ids = {}
     for _, t in ipairs(tracks) do if t.id then ids[#ids+1] = t.id end end
@@ -2093,13 +2208,12 @@ local inv_playback  -- forward declaration
 get_playback = function()
     if os.time() - last_playback < 5 then return end
     -- me/player takes a market too, so the now-playing item arrives carrying
-    -- is_playable. Converted (and stripped) here rather than left raw, so
-    -- now_track.json never persists the field and anything downstream that reads
-    -- current_track -- record_recent_play included -- sees the same shape every
-    -- other track source produces.
+    -- is_playable; api_get collapses it on the way out, so now_track.json never
+    -- persists the field and anything downstream that reads current_track --
+    -- record_recent_play included -- sees the same shape every other track
+    -- source produces.
     local d = api_get("me/player", Util.with_market())
     last_playback = os.time()
-    if d and d.item then Util.mark_availability(d.item) end
     if not d or not d.item then
         local cool = tonumber((read_file("/tmp/spoot_rate_cooldown") or ""):match("%d+"))
         if cool and os.time() < cool then return end
@@ -2213,11 +2327,9 @@ local function record_recent_play(track)
             table.remove(recent_tracks, i)
         end
     end
-    -- Tracks arrive here straight off me/player, not through cached_fetch, so the
-    -- availability collapse has to be applied by hand. Only the NEW track can
-    -- still be carrying available_markets -- every other entry was collapsed when
-    -- it was inserted -- so this no longer re-walks all 100 on every play.
-    Util.mark_availability(track)
+    -- Every caller feeds this a track that came off me/player through api_get,
+    -- which already applied the availability collapse, so there is nothing to do
+    -- here -- and nothing that would re-walk all 100 entries on every play.
     table.insert(recent_tracks, 1, track)
     while #recent_tracks > 100 do
         table.remove(recent_tracks)
@@ -2322,16 +2434,48 @@ local function get_playerctl_volume()
     return v
 end
 
-function Util.has_synced_lyrics(id)
-    if not id then return false end
+-- ONE decode of lyrics_<id>.json per draw instead of two or three. Util.status_icons
+-- asks has_lyrics and then has_synced_lyrics, and an action menu's rebuild_actions
+-- adds track_has_lyrics on top -- while track_mesg (which calls status_icons) is
+-- the `mesg` FUNCTION handed to the action, playback and main menus, so the whole
+-- lot re-ran on every redraw, each call a full read + json.decode + strip_nulls
+-- walk of the file.
+--
+-- A positive is memoised for the cache's own TTL: lyrics do not un-cache
+-- themselves. A negative is memoised for a few seconds ONLY, because a detached
+-- --prefetch-lyrics may be writing the file right now and this process has no way
+-- to hear about it -- long enough to collapse the several calls one draw makes,
+-- short enough that the glyph appears on the next redraw rather than next launch.
+-- On Util, not a file local: the chunk is at Lua's 200-local ceiling (see the note
+-- above Util's declaration).
+function Util.lyr_state(id)
+    if not id then return nil end
+    local key = "lyrstate:" .. id
+    local st = mem_get(key)
+    if st ~= nil then return st end
     local d = disk_get(P.lyrics .. "/lyrics_" .. id .. ".json")
-    return type(d) == "table" and type(d.times) == "table" and #d.times > 0
+    st = {
+        has    = type(d) == "table" and type(d.lines) == "table" and #d.lines > 0,
+        synced = type(d) == "table" and type(d.times) == "table" and #d.times > 0,
+    }
+    mem_set(key, st, st.has and P.ttl_lyrics or 3)
+    return st
+end
+
+-- Called wherever THIS process learns the file changed, so the memo above never
+-- outlives what it describes.
+function Util.lyr_bust(id)
+    if id then mem_bust("lyrstate:" .. id) end
+end
+
+function Util.has_synced_lyrics(id)
+    local st = Util.lyr_state(id)
+    return st ~= nil and st.synced
 end
 
 function Util.has_lyrics(id)
-    if not id then return false end
-    local d = disk_get(P.lyrics .. "/lyrics_" .. id .. ".json")
-    return type(d) == "table" and type(d.lines) == "table" and #d.lines > 0
+    local st = Util.lyr_state(id)
+    return st ~= nil and st.has
 end
 
 function Util.track_has_lyrics(id)
@@ -2408,8 +2552,20 @@ local function load_queue()
     local d = safe_decode(raw)
     if d then
         if type(d.tracks) == "table" then
+            -- Bare track-ID STRINGS, matching what every writer produces
+            -- (save_queue collapses items to t.id, do_add_queue appends an id,
+            -- flush_queue round-trips that array). This used to keep only
+            -- entries where type(t) == "table", which is the one thing the file
+            -- never contains -- so queue_tracks came back empty from EVERY
+            -- launch, and with it recover_playback's Next/Previous fallback and
+            -- get_playback's recovery path, both of which give up on an empty
+            -- queue. A table with an .id is still accepted and collapsed, so a
+            -- file written by an older build loads instead of being dropped.
             local clean = {}
-            for _, t in ipairs(d.tracks) do if type(t) == "table" then clean[#clean+1] = t end end
+            for _, t in ipairs(d.tracks) do
+                if type(t) == "string" then clean[#clean+1] = t
+                elseif type(t) == "table" and t.id then clean[#clean+1] = t.id end
+            end
             queue_tracks = clean
         else
             queue_tracks = {}
@@ -2583,7 +2739,8 @@ function Util.clean_exit()
     flush_liked_cache()
     if Util._api_hdr then os.remove(Util._api_hdr) end
     os.remove("/tmp/spoot_instance.lock")
-    os.remove(P.cache .. "/action_theme.rasi")
+    -- The glob covers every theme this process resolved or generated, including
+    -- the per-call art themes from Util.write_art_theme.
     os.execute("rm -f /tmp/spoot_theme_*.rasi 2>/dev/null")
     os.exit(0)
 end
@@ -2605,9 +2762,9 @@ local function do_like(item, unlike)
     return true
 end
 
+-- No token fetch here: api_get resolves (and refreshes) its own, and answers nil
+-- when there isn't one, which this already reads as "not following".
 local function api_check_following(artist_id)
-    local token = get_token()
-    if not token then return false end
     local r = api_get("me/following/contains?type=artist&ids=" .. artist_id)
     return r and r[1] == true
 end
@@ -2983,6 +3140,21 @@ function Util.build_pl_index()
     return idx
 end
 
+-- Build_pl_index walks every owned playlist, so it is the most expensive
+-- background job here and exactly one may be in flight. Same pid-file liveness
+-- idiom as Util.spawn_art_prefetch; without it, view_actions (which
+-- calls Util.pl_index once per open) fired a fresh full-library walk on EVERY
+-- action menu opened while the index was cold, and init_library's sibling spawn
+-- could race the first of them.
+function Util.spawn_plindex()
+    if Util.detached then return end
+    local pidf = "/tmp/spoot_plindex.pid"
+    if Util.pidfile_owner_alive(pidf, "--prefetch-plindex") then return end
+    os.execute("nohup lua " .. shell_quote(P.dir .. "/spoot.lua")
+        .. " --prefetch-plindex > /dev/null 2>&1 &"
+        .. " echo $! > " .. shell_quote(pidf))
+end
+
 -- Read-only and non-blocking: view_actions already stalls up to 1.5s on
 -- resolve_lyrics_state, so it must never also wait on a walk of every playlist.
 -- A stale index is served while a rebuild runs in the background.
@@ -2991,10 +3163,7 @@ function Util.pl_index()
     if v ~= nil then return v end
     local fresh = disk_get(P.pl_index, CACHE_TTL_SHORT)
     if fresh then mem_set("pl_index", fresh, CACHE_TTL_SHORT); return fresh end
-    if not Util.detached then
-        os.execute("nohup lua " .. shell_quote(P.dir .. "/spoot.lua")
-            .. " --prefetch-plindex > /dev/null 2>&1 &")
-    end
+    Util.spawn_plindex()
     return disk_get(P.pl_index)  -- no TTL: whatever we last knew beats nothing
 end
 
@@ -3241,10 +3410,13 @@ local function resolve_lyrics_state(item)
         .. " " .. shell_quote((item.album and item.album.name) or "")
         .. " " .. shell_quote(dur)
         .. " > /dev/null 2>&1 &")
-    for _ = 1, 5 do
-        if disk_get(disk, P.ttl_lyrics) ~= nil then return true end
+    -- Backs off instead of five flat 0.3s waits: same 1.5s worst case, but the
+    -- common case (the detached prefetch answers quickly) unblocks the action
+    -- menu in 0.1s rather than 0.3s.
+    for _, wait in ipairs({0.1, 0.2, 0.3, 0.4, 0.5}) do
+        if disk_get(disk, P.ttl_lyrics) ~= nil then Util.lyr_bust(id); return true end
         if disk_get(marker, P.ttl_lyrics) ~= nil then return false end
-        os.execute("sleep 0.3")
+        os.execute("sleep " .. wait)
     end
     return nil
 end
@@ -3264,7 +3436,14 @@ view_browse = function(entries, items, mesg, ctx, ctx_type, ctx_id, no_status)
     local is_playlist_list = (ctx_type == "playlist" and not ctx_id) or ctx == "search-playlist"
     local is_search_all   = ctx == "all"
     local is_search_ctx   = is_search_all or (ctx and ctx:match("^search%-")) or ctx == "track" or ctx == "artist"
-    local hide_single_artist = ctx == "album" or ctx == "liked-by-artist" or ctx == "top-by-artist"
+    -- `or nil` so this matches what the CALLERS passed. format_entries keys its
+    -- memo on tostring() of each flag, and callers that want the default pass
+    -- nil (view_liked_tracks sends `(tracks, nil, true)`, view_recently_played
+    -- just `(tracks)`) -- so handing rebuild a literal `false` here made
+    -- "nil" ~= "false" and the first refresh of every such list rebuilt the
+    -- whole entry array for no reason. browse_album already passes true and is
+    -- unaffected either way.
+    local hide_single_artist = (ctx == "album" or ctx == "liked-by-artist" or ctx == "top-by-artist") or nil
 
     local v_key = ctx .. "|" .. (ctx_type or "") .. "|" .. (ctx_id or "")
     -- Left nil so rofi_dmenu's pos_key restores the remembered row. It is only
@@ -3272,6 +3451,20 @@ view_browse = function(entries, items, mesg, ctx, ctx_type, ctx_id, no_status)
     -- cursor after a selection); an explicit sel always wins over pos_key.
     local pre_sel = nil
     local album_theme = nil
+    -- Util.write_art_theme hands back a UNIQUE path per call (see the note above
+    -- it), so the file it writes belongs to this view alone and has to be
+    -- removed by this view -- exactly as view_actions removes its own. It never
+    -- was, so only Util.clean_exit's glob ever swept them and a long session
+    -- left one /tmp theme behind per album opened.
+    --
+    -- Tied to the BLOCK rather than to any one exit path, because this function
+    -- returns from eight places and breaks out of its loop from more -- the same
+    -- "no exit path can forget the cleanup" guarantee Util.scope gets from its
+    -- pcall. A nested album view has its own unique path and its own guard, so
+    -- the inner one can never delete the theme the outer is still drawing with.
+    local _theme_guard <close> = setmetatable({}, {__close = function()
+        if album_theme then os.remove(album_theme) end
+    end})
     if ctx == "album" then
         local a = items[1] and items[1].album
         local art_url = a and a.images and a.images[1] and a.images[1].url or nil
@@ -3379,7 +3572,11 @@ view_browse = function(entries, items, mesg, ctx, ctx_type, ctx_id, no_status)
                     current_id = item.id
                     is_playing = true
                 end
-                get_playback()
+                -- Deliberately no get_playback() here, matching the is_track
+                -- branch above. Within 5s it self-throttles to a no-op; past
+                -- that it is a ~300ms round trip that can still answer with the
+                -- PREVIOUS track, dragging the marker off the row just picked --
+                -- the race Util.sync_now's P.recent_cmd_at guard exists to stop.
                 rebuild()
                 pre_sel = idx - 1
             elseif st == "albums" then
@@ -3664,12 +3861,18 @@ view_actions = function(item, ctx_type, ctx_id, all_items, cidx, entries)
     local act_key = "action:" .. (item.id or "")
     local pre_sel = Util.pos_row(act_key, akeys)
 
+    -- Hoisted out of the loop: `item` is fixed for the life of this menu, so the
+    -- cover and the theme built from it are the same on every pass. Rebuilding
+    -- them per iteration re-statted the art cache for nothing, and now that
+    -- Util.write_art_theme hands back a unique path it would also leave one
+    -- stray /tmp theme per pass. One file, removed on the way out.
+    local art_url = item.album and item.album.images and #item.album.images > 0
+        and item.album.images[1].url or nil
+    local art_path = ensure_art(Util.art_url(art_url, "1e02")) or ""
+    local tmp_theme = Util.write_art_theme("action", art_path)
+    local action_theme = tmp_theme
+
     while true do
-        local art_url = item.album and item.album.images and #item.album.images > 0
-            and item.album.images[1].url or nil
-        local art_path = ensure_art(Util.art_url(art_url, "1e02")) or ""
-        local tmp_theme = Util.write_art_theme("action", art_path)
-        local action_theme = tmp_theme
         -- Claimed so Shift+Return on "Go to Album" can offer the album's own
         -- action menu (Return there opens the album outright). Every other row
         -- reproduces the default below: a nested action menu for this track.
@@ -3681,14 +3884,12 @@ view_actions = function(item, ctx_type, ctx_id, all_items, cidx, entries)
         local alt = Util.alt_pressed
         Util.alt_pressed = false
         if not sel then
+            -- Both arms of the jump_to_track_pending test that used to be here
+            -- were byte-identical; the flag is read by the caller, not cleared
+            -- here, so it made no difference either way.
             Util.back_pressed = false
-            if jump_to_track_pending then
-                if tmp_theme then os.remove(tmp_theme) end
-                return
-            else
-                if tmp_theme then os.remove(tmp_theme) end
-                return
-            end
+            if tmp_theme then os.remove(tmp_theme) end
+            return
         end
 
         -- rebuild_actions hands rofi pango-wrapped labels for the dimmed Seek and
@@ -4158,6 +4359,9 @@ view_lyrics = function(item)
         if definitive then disk_set(marker, true) end
         return nil
     end)
+    -- cached_fetch may have just written the file this process memoised as
+    -- "no lyrics"; drop that so the glyph shows on the very next draw.
+    Util.lyr_bust(id)
 
     local display_lines, timestamps
     if type(data) == "table" and data.lines then
@@ -4480,10 +4684,9 @@ local function view_your_queue()
         -- Undocumented, but me/player/queue honours market and answers with
         -- is_playable on currently_playing and on every queue entry -- which
         -- matters here because Spotify will happily queue a track it then skips.
-        -- This response is the one track source that does NOT go through
-        -- cached_fetch, so mark_availability has to be called by hand.
+        -- api_get collapses that into `unavail` before we ever see it.
         d = api_get("me/player/queue", Util.with_market())
-        if d then Util.mark_availability(d); mem_set("queue", d, 10) end
+        if d then mem_set("queue", d, 10) end
     end
     if not d then rofi_message("Queue is empty"); return end
     local tracks = {}
@@ -4501,12 +4704,12 @@ end)
 end
 
 view_volume = function()
-    -- No spotifyd_device_vol gate here. It only ever answered when a device
-    -- lookup happened to run earlier in THIS process, so a fresh launch going
-    -- straight to System > Volume skipped it entirely -- and when it did fire it
-    -- blocked a menu that drives volume through playerctl, not the Spotify
-    -- device API, so the device's supports_volume flag was not the capability
-    -- being tested.
+    -- No supports_volume gate here. It only ever answered when a device lookup
+    -- happened to run earlier in THIS process, so a fresh launch going straight
+    -- to System > Volume skipped it entirely -- and when it did fire it blocked
+    -- a menu that drives volume through playerctl, not the Spotify device API,
+    -- so the device's supports_volume flag was not the capability being tested.
+    -- get_spotifyd_device no longer carries the flag at all.
     local disp_vol = get_playerctl_volume()
     Util.scope({view="volume"}, function()
     while true do
@@ -4746,16 +4949,16 @@ local function view_system()
                     .. "  " .. desc
             end
             rofi_message(table.concat({
+                row("redraw / load missing thumbnails", "f5"),
                 row("jump to trail step", "tab"),
                 row("select", "return"),
-                row("action menu (track / album / artist / playlist)", "shift + return"),
-                row("jump to current track's action menu", "alt + return"),
                 row("close", "escape"),
                 row("clear session trail", "delete"),
                 row("clear input / back one level", "backspace"),
-                row("redraw / load missing thumbnails", "f5"),
-                row("jump to main menu", "alt + space"),
                 row("seek + / - 10s", "alt + = / -"),
+                row("jump to main menu", "alt + space"),
+                row("action menu (track / album / artist / playlist)", "shift + return"),
+                row("jump to current track's action menu", "alt + return"),
                 row("seek menu", "alt + e"),
                 row("liked tracks", "alt + l"),
                 row("recently played", "alt + p"),
@@ -4796,7 +4999,7 @@ local function view_system()
             end
         elseif clean == "Refresh Library" then
             os.execute("notify-send -t 5000 --app-name=spoot 'spoot' 'Building Cache' &")
-            local tracks, albums, artists, from_cache, failed = fetch_library_with_fallback()
+            local tracks, albums, artists = fetch_library_with_fallback()
             if tracks then
                 save_library_cache(tracks, albums, artists)
                 populate_liked_ids()
@@ -5051,27 +5254,25 @@ end
 -- MAIN
 
 local function init_instance_lock()
-    os.execute("rm -f /tmp/spoot_code /tmp/spoot_oauth_pid 2>/dev/null")
     local lock = "/tmp/spoot_instance.lock"
     local existing = trim(read_file(lock) or "")
     if existing ~= "" and existing:match("^%d+$") then
-        local alive = trim(shell("kill -0 " .. existing .. " 2>/dev/null && echo alive") or "") == "alive"
-        local cmdline = alive and trim(shell("cat /proc/" .. existing .. "/cmdline 2>/dev/null") or "") or ""
+        local alive = Util.proc_alive(existing)
+        local cmdline = alive and Util.proc_cmdline(existing) or ""
         if alive and cmdline:find("spoot") then os.exit(0) end
     end
+    -- AFTER the liveness check, never before: these two files belong to an
+    -- in-flight OAuth flow, and oauth_get_token polls /tmp/spoot_code for up to
+    -- 120s. Wiping them first meant launching spoot while the first instance was
+    -- still logging in deleted the code file that instance was waiting for, and
+    -- its login hung until the timeout.
+    os.execute("rm -f /tmp/spoot_code /tmp/spoot_oauth_pid 2>/dev/null")
     local pid = Util.get_own_pid()
     if pid then Util.secure_write(lock, tostring(pid)) end
 end
 
 local function ensure_daemon()
-    local daemon_pid = trim(read_file("/tmp/spoot_daemon.pid") or "")
-    local daemon_alive = false
-    if daemon_pid ~= "" and tonumber(daemon_pid) then
-        local cmdline = trim(shell("cat /proc/" .. daemon_pid .. "/cmdline 2>/dev/null") or "")
-        if cmdline:find("spoot") and cmdline:find("--daemon") then
-            daemon_alive = trim(shell("kill -0 " .. daemon_pid .. " 2>/dev/null && echo alive") or "") == "alive"
-        end
-    end
+    local daemon_alive = Util.pidfile_owner_alive("/tmp/spoot_daemon.pid", "--daemon")
     if not daemon_alive then
         os.execute("nohup lua " .. shell_quote(P.dir .. "/spoot.lua") .. " --daemon > /tmp/spoot_daemon.log 2>&1 &")
     end
@@ -5079,14 +5280,7 @@ local function ensure_daemon()
 end
 
 function Util.ensure_recent_watch()
-    local pid = trim(read_file("/tmp/spoot_recent.pid") or "")
-    local alive = false
-    if pid ~= "" and tonumber(pid) then
-        local cmdline = trim(shell("cat /proc/" .. pid .. "/cmdline 2>/dev/null") or "")
-        if cmdline:find("spoot") and cmdline:find("--recent%-watch") then
-            alive = trim(shell("kill -0 " .. pid .. " 2>/dev/null && echo alive") or "") == "alive"
-        end
-    end
+    local alive = Util.pidfile_owner_alive("/tmp/spoot_recent.pid", "--recent-watch")
     if not alive then
         os.execute("nohup lua " .. shell_quote(P.dir .. "/spoot.lua") .. " --recent-watch > /tmp/spoot_recent_watch.log 2>&1 &")
     end
@@ -5131,6 +5325,22 @@ local function clear_last_playback()
     os.remove(P.now); os.remove(P.now_track)
     current_track = nil; current_id = nil; previous_id = nil
     is_playing = false; last_playback = 0
+    -- The saved QUEUE is playback state too, and it is the thing that was
+    -- actually resurrecting the previous session. get_playback reads "me/player
+    -- has nothing" + "we still hold a queue" as "spotifyd dropped out mid-song,
+    -- put it back", and answers with recover_playback(0, true) -- a forced
+    -- PUT /me/player/play. That heuristic is right for a dropout. A cold start
+    -- is not a dropout: the daemons were killed on purpose and the machine is
+    -- meant to be silent, so the first menu to call Util.sync_now started the
+    -- last track playing, and so did every menu reopened after it.
+    --
+    -- Cleared in memory as well as on disk because init_library calls
+    -- load_queue() BEFORE this, so queue_tracks is already populated by now.
+    --
+    -- Navigation state is deliberately NOT touched here -- see the note above
+    -- this function; session.json and trails.json survive a cold start intact.
+    queue_tracks = nil; queue_idx = 0; queue_context = nil
+    os.remove(P.queue)
 end
 
 local function init_library(cold_start)
@@ -5155,16 +5365,20 @@ local function init_library(cold_start)
        or cache_stale(P.liked) or cache_stale(P.albums) or cache_stale(P.artists) then
         os.execute("notify-send -t 5000 --app-name=spoot 'spoot' 'Building Cache' &")
         local tracks, albums, artists = fetch_library_with_fallback()
-        save_library_cache(tracks, albums, artists)
-        os.execute("notify-send -t 3000 --app-name=spoot 'spoot' 'Caching Complete' &")
+        -- Same success test as System > Refresh Library. Reporting "Caching
+        -- Complete" unconditionally announced success even when every one of the
+        -- three fetches had failed and save_library_cache had written nothing.
+        if tracks then
+            save_library_cache(tracks, albums, artists)
+            os.execute("notify-send -t 3000 --app-name=spoot 'spoot' 'Caching Complete' &")
+        else
+            os.execute("notify-send -t 5000 --app-name=spoot 'Spoot' 'Library refresh failed' &")
+        end
     end
     populate_liked_ids()
     -- Warm the playlist membership index out of band. Nothing waits on it: the
     -- action menu serves the last known index and picks up the new one next run.
-    if not disk_get(P.pl_index, CACHE_TTL_SHORT) then
-        os.execute("nohup lua " .. shell_quote(P.dir .. "/spoot.lua")
-            .. " --prefetch-plindex > /dev/null 2>&1 &")
-    end
+    if not disk_get(P.pl_index, CACHE_TTL_SHORT) then Util.spawn_plindex() end
     Util.trail_load()
     session_load()
     replay_session(true)
@@ -5180,6 +5394,16 @@ local function main()
 
     local first_loop = true
     local main_key = "main||"
+    -- Constant, so it is built once rather than rebuilt on every draw. The
+    -- `add(v) if v then ... end` wrapper this replaces guarded twelve string
+    -- literals against being nil.
+    local MAIN_ENTRIES = {
+        "Playback",
+        "Your Queue", "Liked Tracks", "Top Tracks", "Saved Albums",
+        "Followed Artists", "Playlists", "New Releases",
+        "Recently Played", "Categories", "Search",
+        "System",
+    }
     while true do
         flush_liked_cache()
         -- Refresh on the first loop too. Skipping it meant a fresh launch drew
@@ -5202,16 +5426,8 @@ local function main()
         -- new state instead of the header this iteration built.
         local mesg = function() return current_track and track_mesg(current_track) or nil end
 
-        local entries = {}
-        local function add(v) if v then entries[#entries+1] = v end end
-        add("Playback")
-        add("Your Queue"); add("Liked Tracks"); add("Top Tracks"); add("Saved Albums")
-        add("Followed Artists"); add("Playlists"); add("New Releases")
-        add("Recently Played"); add("Categories"); add("Search")
-        add("System")
-
-        local sel = rofi_dmenu(entries, {prompt="Spotify", mesg=mesg, pos_key=main_key, custom=false, markup=true, no_status=not current_track})
-        if sel then sel = sel:gsub("<[^>]+>", "") end
+        local sel = rofi_dmenu(MAIN_ENTRIES, {prompt="Spotify", mesg=mesg, pos_key=main_key, custom=false, markup=true, no_status=not current_track})
+        if sel then sel = Util.strip_markup(sel) end
 
         if main_pending   then main_pending   = false; goto m1 end
         if liked_pending then
@@ -5287,8 +5503,8 @@ local function daemon_mode()
     if not claimed then
         local holder = tonumber((read_file(claim .. "/pid") or ""):match("(%d+)"))
         local holder_alive = holder and holder ~= mypid
-            and trim(shell("kill -0 " .. holder .. " 2>/dev/null && echo alive") or "") == "alive"
-            and (trim(shell("cat /proc/" .. holder .. "/cmdline 2>/dev/null") or "")):find("spoot")
+            and Util.proc_alive(holder)
+            and Util.proc_cmdline(holder):find("spoot")
         if holder_alive then
             os.execute("kill " .. holder .. " 2>/dev/null; sleep 0.1")
         end
@@ -5300,7 +5516,7 @@ local function daemon_mode()
     local prev = read_file(lock)
     local prev_pid = prev and tonumber(prev:match("(%d+)"))
     if prev_pid and prev_pid > 0 and prev_pid ~= mypid then
-        local cmdline = trim(shell("cat /proc/" .. prev_pid .. "/cmdline 2>/dev/null") or "")
+        local cmdline = Util.proc_cmdline(prev_pid)
         if cmdline:find("spoot") then
             os.execute("kill " .. prev_pid .. " 2>/dev/null; sleep 0.1")
         end
@@ -5432,6 +5648,7 @@ function Util.fetch_and_cache_lyrics(id, title, artist, album, duration)
     local result, definitive = api_get_lyrics(title, artist, album, duration)
     if result then
         disk_set(disk, result)
+        Util.lyr_bust(id)
     elseif definitive then
         disk_set(P.lyrics .. "/nolyr_" .. id .. ".json", true)
     end
@@ -5472,7 +5689,6 @@ function Util.run_notify()
         -- of a file fast_now_track reads and decodes on nearly every menu entry.
         track = api_get("tracks/" .. id, Util.with_market())
         if track then
-            Util.mark_availability(track)
             -- `playing` is written here as well; run_prefetch_track omitted it
             -- while get_playback includes it, which left fast_now_track reading
             -- transport state from the daemon's one-shot snapshot instead.
@@ -5506,7 +5722,6 @@ local function run_prefetch_track()
     if not id or not id:match("^[A-Za-z0-9]+$") then os.exit(0) end
     local track = api_get("tracks/" .. id, Util.with_market())
     if track then
-        Util.mark_availability(track)
         write_file(P.now_track, json.encode({
             item = track,
             playing = trim(shell("playerctl status 2>/dev/null")) == "Playing",
@@ -5921,11 +6136,8 @@ function Util.bsmon_mode()
     local function sync_gen()
         local raw = read_file(gen_path)
         if not raw then os.exit(0) end          -- run dir removed: app exited
-        if app_pid ~= "" then                    -- app died without cleaning up
-            local alive = io.open("/proc/" .. app_pid .. "/stat", "r")
-            if not alive then os.exit(0) end
-            alive:close()
-        end
+        -- app died without cleaning up
+        if app_pid ~= "" and not Util.proc_alive(app_pid) then os.exit(0) end
         local g, cb = raw:match("^(%d+)%s+(%d)")
         if g and g ~= cur_gen then
             cur_gen  = g

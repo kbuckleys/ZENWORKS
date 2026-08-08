@@ -34,11 +34,12 @@ listview {
 }
 
 element {
-    padding: 2px 8px 2px 8px;
+    padding: 5px 5px 5px 5px;
 }
 element-text {
     text-color: #e78284;
     horizontal-align: 0.5;
+    font: "JetBrainsMono Nerd Font Propo Bold 13";
 }
 element-text.selected.normal {
     text-color: #000000;
@@ -46,5 +47,5 @@ element-text.selected.normal {
 
 message {
     background-color: #e78284;
-    padding: 10px 30px 10px 30px;
+    padding: 10px 10px 10px 10px;
 }

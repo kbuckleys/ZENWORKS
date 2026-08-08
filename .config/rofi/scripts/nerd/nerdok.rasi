@@ -31,6 +31,7 @@ icon-current-entry {
 listview {
     lines: 3;
     scrollbar: false;
+    padding: 0px 3px 2px 0px;
 }
 
 element {
