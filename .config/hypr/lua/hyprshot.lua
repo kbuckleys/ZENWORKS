@@ -49,6 +49,6 @@ local function window()
 end
 
 -- BINDS
-hl.bind("SUPER + SHIFT + PRINT", region)
-hl.bind("SUPER + PRINT", window)
-hl.bind("PRINT", screen)
+hl.bind("SUPER + SHIFT + PRINT",  region)
+hl.bind("SUPER + PRINT",          window)
+hl.bind("PRINT",                  screen)
