@@ -9,8 +9,26 @@ A zen Arch-based ecosystem
 
 ---
 
-Everything I use is condensed [here](/pkglst)
+<div align="center">
 
-**Theme Elements**
-- [Kripton GTK theme](https://www.gnome-look.org/s/Gnome/p/1365372/) (standard-buttons)
-- [GoogleDot-Black](https://www.gnome-look.org/p/1638261)
+<p>
+  Everything I use is condensed <a href="/pkglst">here</a>.
+</p>
+
+<h3>Theme Elements</h3>
+
+<p>
+  <a href="https://www.gnome-look.org/s/Gnome/p/1365372/">
+    Kripton GTK theme
+  </a>
+  <br>
+  <sub>standard buttons</sub>
+</p>
+
+<p>
+  <a href="https://www.gnome-look.org/p/1638261/">
+    GoogleDot-Black
+  </a>
+</p>
+
+</div>
