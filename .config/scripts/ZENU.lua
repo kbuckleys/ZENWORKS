@@ -659,14 +659,65 @@ local function print_names(names, indent, width)
   if line ~= "" then print(line) end
 end
 
+-- Installed size of every package, keyed by name. Per package rather than one
+-- grand total: a net figure hides the shape of a transaction, and the sizes of
+-- packages that get removed cannot be looked up once they are gone.
+local function pkg_sizes()
+  local t, n = {}, 0
+  for _, line in ipairs(lines_of(capture("expac -Q '%n %m' 2>/dev/null"))) do
+    local name, sz = line:match("^(%S+)%s+(%d+)$")
+    if name then t[name] = tonumber(sz); n = n + 1 end
+  end
+  if n == 0 then return nil end -- expac missing or failed; not an empty system
+  return t
+end
+
+-- What a sync transaction would cost, in bytes: what gets downloaded, what the
+-- new versions occupy, and what the versions they replace hand back. Sizes come
+-- from the sync databases, so AUR targets are absent by construction -- nothing
+-- knows their size until they are built -- and get counted as `unknown` so the
+-- caller can say the estimate is a floor rather than quietly understating it.
+local function sync_cost(names, installed)
+  local cost = { download = 0, add = 0, replace = 0, unknown = #names }
+  if #names == 0 then return cost end
+
+  local q = {}
+  for _, n in ipairs(names) do q[#q + 1] = shq(n) end
+  local raw = capture("expac -S '%n %m %k' " .. table.concat(q, " ") .. " 2>/dev/null")
+  for _, line in ipairs(lines_of(raw)) do
+    local name, size, dl = line:match("^(%S+)%s+(%d+)%s+(%d+)$")
+    if name then
+      cost.add = cost.add + tonumber(size)
+      cost.download = cost.download + tonumber(dl)
+      -- Already present means this is a replacement, not an addition: only
+      -- the difference between the two versions actually lands on disk.
+      cost.replace = cost.replace + (installed[name] or 0)
+      cost.unknown = cost.unknown - 1
+    end
+  end
+  return cost
+end
+
+-- What removing `names` hands back. Anything not in the local database is
+-- already gone, so it contributes nothing rather than being an error.
+local function remove_cost(names, installed)
+  local total = 0
+  for _, n in ipairs(names) do total = total + (installed[n] or 0) end
+  return total
+end
+
+local function signed_bytes(n)
+  return (n >= 0 and "+" or "-") .. human_bytes(math.abs(n))
+end
+
 -- Records the state a transaction will be measured against. Reading the
 -- pacman log's size beforehand lets the summary afterwards report what
 -- pacman *actually* did -- dependencies pulled in, packages orphaned and
 -- removed, AUR builds -- rather than only what was asked for.
 local function txn_mark()
   return {
-    log  = tonumber(trim(capture("wc -c < " .. shq(PACMAN_LOG) .. " 2>/dev/null"))) or 0,
-    size = tonumber(trim(capture("expac -Q '%m' 2>/dev/null | awk '{s+=$1} END{print s+0}'"))),
+    log   = tonumber(trim(capture("wc -c < " .. shq(PACMAN_LOG) .. " 2>/dev/null"))) or 0,
+    sizes = pkg_sizes(),
   }
 end
 
@@ -691,11 +742,45 @@ local function txn_events(mark)
   return ev
 end
 
+-- Bytes gained and bytes given back since the mark, counted per package so the
+-- two sides stay visible. An upgrade contributes to whichever side it landed
+-- on; without the split, a big install and a big removal in one transaction
+-- cancel out and the summary reports a misleading "nothing much happened".
 local function disk_delta(mark)
-  if not mark.size then return nil end
-  local after = tonumber(trim(capture("expac -Q '%m' 2>/dev/null | awk '{s+=$1} END{print s+0}'")))
+  local before = mark.sizes
+  if not before then return nil end
+  local after = pkg_sizes()
   if not after then return nil end
-  return after - mark.size
+
+  local added, removed = 0, 0
+  for name, sz in pairs(after) do
+    local d = sz - (before[name] or 0) -- new packages, and upgrades that grew
+    if d > 0 then added = added + d end
+  end
+  for name, sz in pairs(before) do
+    local d = (after[name] or 0) - sz -- gone packages, and upgrades that shrank
+    if d < 0 then removed = removed - d end
+  end
+  return added, removed
+end
+
+-- The Disk row shared by every transaction summary, or nil when nothing moved.
+-- Both sides are shown only when both are non-zero: a plain install would
+-- otherwise carry a "-0B" that means nothing.
+local function disk_rows(mark)
+  local added, removed = disk_delta(mark)
+  if not added or (added == 0 and removed == 0) then return nil end
+
+  local value
+  if added > 0 and removed > 0 then
+    value = string.format("+%s  -%s  \027[2mnet %s\027[0m",
+      human_bytes(added), human_bytes(removed), signed_bytes(added - removed))
+  elseif added > 0 then
+    value = "+" .. human_bytes(added)
+  else
+    value = "-" .. human_bytes(removed)
+  end
+  return { { "Disk", value } }
 end
 
 local STD_MENU = { "Package Manager", "Check for updates", "Maintenance", "Quit" }
@@ -839,11 +924,7 @@ local function downgrade(pkg, old)
   local mark = txn_mark()
   local ok = sh("sudo pacman -U " .. shq(found[1]))
   invalidate()
-  local delta = disk_delta(mark)
-  local extra = delta
-    and { { "Disk", (delta >= 0 and "+" or "-") .. human_bytes(math.abs(delta)) } }
-    or nil
-  return summary_screen(txn_events(mark), extra, ok)
+  return summary_screen(txn_events(mark), disk_rows(mark), ok)
 end
 
 local function history_view()
@@ -970,13 +1051,7 @@ local function update_view()
           invalidate()
           trim_cache()
 
-          local events = txn_events(mark)
-          local extra = nil
-          local delta = disk_delta(mark)
-          if delta then
-            extra = { { "Disk", (delta >= 0 and "+" or "-") .. human_bytes(math.abs(delta)) } }
-          end
-          local next_view = summary_screen(events, extra, ok)
+          local next_view = summary_screen(txn_events(mark), disk_rows(mark), ok)
           if next_view == "manage" then return "manage"
           elseif next_view == "maintain" then return "maintain"
           elseif next_view == "quit" then return nil end
@@ -1064,6 +1139,12 @@ local function confirm_transaction(ins_n, rem_n)
   show_logo()
   print("")
 
+  -- One local-database read for both halves of the screen: the install side
+  -- needs it to tell an upgrade from an addition, the removal side to price
+  -- what it is about to delete.
+  local installed = pkg_sizes() or {}
+  local gain, free, partial = 0, 0, false
+
   if #ins_n > 0 then
     print("  \027[32mInstall\027[0m")
     for _, p in ipairs(ins_n) do print("    " .. p) end
@@ -1079,6 +1160,28 @@ local function confirm_transaction(ins_n, rem_n)
       print("    \027[2mdependencies for " .. table.concat(unresolved, ", ")
         .. " are resolved by paru during the build\027[0m")
     end
+
+    local targets = {}
+    for _, p in ipairs(ins_n) do targets[#targets + 1] = p end
+    for _, p in ipairs(deps) do targets[#targets + 1] = p end
+    local cost = sync_cost(targets, installed)
+    gain = cost.add - cost.replace
+    partial = cost.unknown > 0
+    if cost.add > 0 then
+      -- Only worth separating "Install" from "Disk" when some of the targets
+      -- replace versions already on disk; otherwise the two are the same number.
+      local line = string.format("    \027[2mDownload\027[0m %s   \027[2mDisk\027[0m %s",
+        human_bytes(cost.download), signed_bytes(gain))
+      if cost.replace > 0 then
+        line = line .. string.format("   \027[2m(%s new, %s replaced)\027[0m",
+          human_bytes(cost.add), human_bytes(cost.replace))
+      end
+      print(line)
+    end
+    if partial then
+      print(string.format("    \027[2m%d AUR package%s not counted -- size is unknown until built\027[0m",
+        cost.unknown, cost.unknown == 1 and "" or "s"))
+    end
     print("")
   end
 
@@ -1089,13 +1192,30 @@ local function confirm_transaction(ins_n, rem_n)
     local deps, err = removal_deps(rem_n)
     if not deps then
       blocked = err
-    elseif #deps > 0 then
-      print(string.format("    \027[2mand %d package%s no longer required:\027[0m",
-        #deps, #deps == 1 and "" or "s"))
-      io.write("\027[2m")
-      print_names(deps, "      ", w - 2)
-      io.write("\027[0m")
+    else
+      if #deps > 0 then
+        print(string.format("    \027[2mand %d package%s no longer required:\027[0m",
+          #deps, #deps == 1 and "" or "s"))
+        io.write("\027[2m")
+        print_names(deps, "      ", w - 2)
+        io.write("\027[0m")
+      end
+      local all = {}
+      for _, p in ipairs(rem_n) do all[#all + 1] = p end
+      for _, p in ipairs(deps) do all[#all + 1] = p end
+      free = remove_cost(all, installed)
+      if free > 0 then
+        print(string.format("    \027[2mDisk\027[0m %s", signed_bytes(-free)))
+      end
     end
+    print("")
+  end
+
+  -- Only when both halves are non-empty: with one half the section line above
+  -- is already the total, and repeating it just adds a line to read.
+  if gain ~= 0 and free > 0 then
+    print(string.format("  \027[1mNet\027[0m %s%s", signed_bytes(gain - free),
+      partial and "  \027[2m(excluding AUR builds)\027[0m" or ""))
     print("")
   end
 
@@ -1201,13 +1321,7 @@ fi
           invalidate()
           trim_cache()
 
-          local events = txn_events(mark)
-          local extra = nil
-          local delta = disk_delta(mark)
-          if delta then
-            extra = { { "Disk", (delta >= 0 and "+" or "-") .. human_bytes(math.abs(delta)) } }
-          end
-          local next_view = summary_screen(events, extra, ok)
+          local next_view = summary_screen(txn_events(mark), disk_rows(mark), ok)
           hard_clear()
           if next_view == "update" then return "update"
           elseif next_view == "maintain" then return "maintain"
@@ -1251,11 +1365,7 @@ local function maint_orphans()
   local mark = txn_mark()
   local ok = sh("sudo pacman -Rns " .. table.concat(pkgs, " "))
   invalidate()
-  local delta = disk_delta(mark)
-  local extra = delta
-    and { { "Disk", (delta >= 0 and "+" or "-") .. human_bytes(math.abs(delta)) } }
-    or nil
-  return summary_screen(txn_events(mark), extra, ok)
+  return summary_screen(txn_events(mark), disk_rows(mark), ok)
 end
 
 local function maint_pacnew()
