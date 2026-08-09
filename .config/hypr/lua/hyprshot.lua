@@ -18,7 +18,7 @@ case "${1}" in
     ;;
   region)
     file="]] .. dir .. [[/$(date +'%Y-%m-%d-%H%M%S')_region.png"
-    geometry=$(slurp)
+geometry=$(slurp -d)
     [ -n "$geometry" ] || exit 0
     grim -g "$geometry" "$file"
     ;;

@@ -36,6 +36,7 @@ hl.config({
 
 	input = {
 		accel_profile = "flat",
+        focus_on_close = 2,
 		sensitivity = -0.6,
 		repeat_delay = 200,
 		repeat_rate = 35,
@@ -60,6 +61,7 @@ hl.config({
     scrolling = {
         column_width = 0.95,
         focus_fit_method = 0,
+        wrap_focus = true,
     },
 	master = {
 		orientation = "center",
