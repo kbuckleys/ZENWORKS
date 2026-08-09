@@ -208,6 +208,8 @@ dirs = [
 	{ name = "spoot", text = " " },
 	{ name = "spicetify", text = " " },
 	{ name = "spotify-player", text = " " },
+	{ name = "claude", text = " " },
+	{ name = ".claude", text = " " },
 	{ name = "vim", text = " " },
 	{ name = "nvim", text = " " },
 	{ name = "neovim", text = " " },
