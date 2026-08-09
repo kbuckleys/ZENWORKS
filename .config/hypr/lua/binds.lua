@@ -97,16 +97,26 @@ hl.bind("SUPER + ALT + DOWN",   hl.dsp.window.swap({ direction = "d" }), { descr
 hl.bind("SUPER + ALT + LEFT",   hl.dsp.window.swap({ direction = "l" }), { description = "Swap window to the left" })
 hl.bind("SUPER + ALT + UP",     hl.dsp.window.swap({ direction = "u" }), { description = "Swap window up" })
 
--- Cycle & Z-Order
+-- Window Switching
 hl.bind("SUPER + TAB", function()
     hl.dispatch(hl.dsp.window.cycle_next())
     hl.dispatch(hl.dsp.window.bring_to_top())
 end)
 
 hl.bind("SUPER + SHIFT + TAB", function()
-    hl.dispatch(hl.dsp.window.cycle_next({ next = false }))
-    hl.dispatch(hl.dsp.window.bring_to_top())
-end)   
+    local ws = hl.get_active_workspace()
+    if not ws then return end
+
+    hl.dispatch(hl.dsp.window.alter_zorder({ mode = "bottom" }))
+
+    local top
+    for _, win in ipairs(hl.get_windows({ workspace = ws, mapped = true })) do
+        if not win.hidden then top = win end
+    end
+    if top then
+        hl.dispatch(hl.dsp.focus({ window = top }))
+    end
+end)
 
 -- GROUPING
 hl.bind("SUPER + SHIFT + G",  hl.dsp.group.toggle())

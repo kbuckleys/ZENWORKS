@@ -5,7 +5,7 @@
 
 hl.bind("SUPER + L",          hl.dsp.window.swap({ next = true }))
 hl.bind("SUPER + SHIFT + L",  function ()
-    local layouts = { "scrolling", "dwindle", "master" }
+    local layouts = { "master", "dwindle", "scrolling" }
     local workspace = hl.get_active_workspace()
 	if hl.get_active_special_workspace() then
 		workspace = hl.get_active_special_workspace()

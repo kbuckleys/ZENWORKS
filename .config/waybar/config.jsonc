@@ -184,6 +184,6 @@
         },
         "exec-if": "which waybar-updates",
         "exec": "waybar-updates -d -n -c 3600",
-        "on-click": "kitty -1 -T ZENU lua ~/.config/scripts/ZENU.lua update"
+        "on-click": "kitty -1 -T ZENU ~/.config/scripts/ZENU.lua update"
     }
 }

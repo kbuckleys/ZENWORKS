@@ -1,4 +1,4 @@
-#!/usr/bin/lua
+#!/usr/bin/env lua
 
 (function()
 
@@ -32,23 +32,33 @@ local P = {
         return (d:gsub("/+$", "")) .. "/"
     end)(),
     tmp       = os.getenv("TMPDIR") or "/tmp",
-    -- Results per single-category search, fetched AND displayed. 50 is the hard
-    -- ceiling: verified against the live API, where limit=51 answers 400.
+    -- Results per TYPE in the one search there is, fetched AND displayed. 50 is
+    -- the hard ceiling: verified against the live API, where limit=51 answers
+    -- 400. /search takes a single `limit` covering every type in `type=`, so
+    -- this is one number by the endpoint's own design and the request limit and
+    -- the display cap cannot drift -- an invariant the split search could never
+    -- have, since it had two of these to keep in step. It costs bytes: 229 KB
+    -- per uncached search against 23.5 KB when the combined list showed 5 of
+    -- each. Still exactly one round trip, and a round trip is ~530 ms TTFB here.
     max       = 50,
-    -- Results per category in a COMBINED search -- the request limit and the
-    -- display cap, deliberately the same number so the two cannot drift. It was
-    -- briefly 10 against a display of 5 for "headroom", which protected against
-    -- nothing: nothing between api_search and format_search_results discards
-    -- items, and 8 varied queries returned zero nulls for strip_nulls to
-    -- compact away. It only cost bytes -- 23.5 KB per search at 5, 45.8 at 10,
-    -- against 229 KB if this used P.max for all four types.
-    max_all   = 5,
     -- Top tracks are paged past the 50-per-request ceiling to here. A multiple
     -- of 50 so the cap lands on a page boundary; the account reports 1578
     -- available, so this needs a stop, and past ~100 a "top" list stops meaning
     -- much. Two requests, and cached_fetch holds the result for an hour.
     top_max   = 100,
-    ttl       = 43200,
+    -- How long Liked Tracks, Saved Albums and Followed Artists are trusted
+    -- without asking. It was twelve hours, and twelve hours was never a claim
+    -- about how often a library changes -- it was how rarely you could stand to
+    -- be blocked, because expiry meant init_library re-paging the whole library
+    -- before the menu could open. Expiry now costs three sub-kilobyte probes in
+    -- a detached process (Util.REVALIDATORS.library), so the number can say what
+    -- it means: check about every fifteen minutes.
+    ttl       = 900,
+    -- The backstop on those probes. total-plus-head cannot see an add that
+    -- cancels a remove, and me/following is ordered by name so a new follow need
+    -- not move its head, so past this the re-page happens regardless of what the
+    -- fingerprint says. This is the number that used to be P.ttl.
+    ttl_lib_max = 43200,
     ttl_lyrics = 7 * 24 * 3600,  -- 1 week
     spotify   = "d420a117a32841c2b3474932e49fb54b",
 }
@@ -59,8 +69,15 @@ P.token      = P.cache .. "/token.json"
 P.liked      = P.cache .. "/liked_tracks.json"
 P.albums     = P.cache .. "/saved_albums.json"
 P.artists    = P.cache .. "/followed_artists.json"
+-- What the three files above looked like from Spotify's side last time we asked:
+-- one head fingerprint each, plus when the last full re-page ran. Kept apart
+-- from the caches themselves so confirming freshness never rewrites megabytes.
+P.lib_fp     = P.cache .. "/library_fp.json"
 P.session    = P.cache .. "/session.json"
 P.trails     = P.cache .. "/trails.json"
+-- Menus you CLOSED, as opposed to the trail's record of where you still are.
+-- See Util.menu_hist_add.
+P.menu_hist  = P.cache .. "/menu_history.json"
 P.view_pos   = P.cache .. "/view_pos.json"
 P.queue      = P.cache .. "/playback_queue.json"
 P.art        = P.cache .. "/art"
@@ -74,6 +91,39 @@ P.now_track  = P.cache .. "/now_track.json"
 P.device     = P.cache .. "/device.json"
 P.pl_index   = P.cache .. "/playlist_index.json"
 P.search_hist = P.cache .. "/search_history.json"
+-- One line per thumbnail grid draw. A tile cannot change while its rofi window
+-- is open -- rofi is handed the entries once, at exec, and scrolls inside its own
+-- process -- so a grid that came up with holes cannot be examined after the fact
+-- by looking at it. This is how a bad draw gets explained without reproducing
+-- it. See Util.thumb_log and --thumb-report.
+P.thumb_log  = P.cache .. "/thumb.log"
+-- Bytes, not lines, so the cap costs a seek on a handle already open rather than
+-- a read of the whole file per draw. ~130 bytes a line, so roughly 3000 draws.
+P.thumb_log_max = 400 * 1024
+-- playlist_id -> the art hash currently cached at art/playlists/<id>.jpg. What
+-- makes a cover self-evicting: a playlist whose art changed reports a different
+-- hash, so the file is refetched over the top of the old one. No TTL, and no
+-- orphans possible, because the path never varies with the art.
+-- One entry per kind of object whose artwork is cached BY ID rather than by art
+-- hash. `field` is where that kind keeps its image array -- categories say
+-- `icons`, everyone else says `images`. Playlists additionally have a `highres`
+-- subdirectory; categories are served at a single 274px size so they have none.
+P.art_kinds = {
+    playlist = {dir = P.art .. "/playlists",  index = P.cache .. "/playlist_art.json",
+                field = "images", highres = P.art .. "/playlists/highres"},
+    category = {dir = P.art .. "/categories", index = P.cache .. "/category_art.json",
+                field = "icons"},
+    -- Curations tiles are keyed by ROW, not by any Spotify object: each one
+    -- borrows the artwork of the first thing on the shelf behind it, and the
+    -- shelf's contents rotate constantly. Filing them under the row's own name
+    -- means the tile is replaced when that first item changes, exactly as a
+    -- playlist cover is replaced when its art changes.
+    curation = {dir = P.art .. "/curations", index = P.cache .. "/curation_art.json",
+                field = "images"},
+}
+-- Images shipped with the themes. Named once here so the layout is not
+-- repeated at each use, same as every other path in this table.
+P.assets     = P.dir .. "/style/assets"
 local EXIT = {
     back = 10, main = 11,
     open_url = 12, jump = 13, quit = 14, liked = 15, trail_jump = 16,
@@ -219,6 +269,46 @@ end
 -- Grouped into one table (rather than separate top-level locals) since the
 -- whole script body is a single function and Lua caps it at 200 locals.
 local Util = {}
+
+-- The shape of style/thumbs.rasi's grid. rofi_dmenu sizes the window from these,
+-- and THUMB_SYNC above is several screens of their product -- so change the
+-- theme's `columns`/`lines` and change these with it, or the window will be the
+-- wrong height for what the theme lays out.
+Util.THUMB_COLS = 5
+Util.THUMB_ROWS = 3
+
+-- Passed as rofi's -threads for thumbnail grids only, where the icons are.
+--
+-- A MITIGATION for a rofi bug, not a fix, and it is worth being exact about what
+-- is known. rofi's icon fetcher pushes onto the one global GThreadPool that
+-- -threads sizes (source/view.c: g_thread_pool_new_full(..., config.threads,
+-- FALSE, ...), with 0 resolving to MIN(nproc, 128) -- six on this machine). In
+-- source/rofi-icon-fetcher.c, `query_started = TRUE` is set BEFORE
+-- g_thread_pool_push and the push error is discarded, and a failed load sets
+-- query_done without ever clearing query_started -- so an icon that fails once
+-- is blank for the life of that window and nothing ever asks again. That is the
+-- black-tile bug, and the retry belongs upstream.
+--
+-- Measured while it was reproducing, same 50-cover grid opened at row 37: the
+-- default six threads gave 6 blank tiles, two gave 10, one gave 11. A clean
+-- dose-response DOWNWARD. Upward was never measured under failing conditions --
+-- every clean run at 4, 8, 12, 16 and 64 came after the failure burst had
+-- already stopped, as did fourteen clean runs of the plain default. So this is
+-- an extrapolation of a real trend, and it earns its place only because the pool
+-- is non-exclusive: idle threads are reclaimed, so asking for more costs nothing
+-- when nothing needs them.
+Util.THUMB_THREADS = 16
+
+-- Refreshes that cached_fetch asked for while the menu they belong to was
+-- already drawing from the expired copy. A fetcher cannot be handed to another
+-- process, so the NAME of one is: this table is the whole vocabulary of the
+-- `revalidate` option, and a second consumer costs a row here rather than a CLI
+-- mode of its own. See Util.spawn_revalidate.
+--
+-- Declared here, not beside those functions: the entries are registered next to
+-- the fetchers they name, thousands of lines earlier than the code that reads
+-- them, and a later `= {}` would silently wipe every registration.
+Util.REVALIDATORS = {}
 Util._art_theme_tmpls = {}
 
 -- One definition of "the request worked". Nineteen call sites spelled this
@@ -405,6 +495,7 @@ local THEME, THEME_MENU, THEME_LYR, THEME_MSG, THEME_SUB, THEME_BINDS, THEME_MET
         -- Skip the shared /tmp theme files so background processes can't wipe
         -- the resolved themes the interactive app is already using.
         Util.THEME_THUMBS = P.dir .. "/style/thumbs.rasi"
+        Util.THEME_TRAIL  = P.dir .. "/style/trail.rasi"
         return P.dir .. "/style/main.rasi", P.dir .. "/style/menu.rasi", P.dir .. "/style/lyrics.rasi",
                P.dir .. "/style/message.rasi", P.dir .. "/style/sub.rasi", P.dir .. "/style/binds.rasi",
                P.dir .. "/style/meta.rasi", P.dir .. "/style/art.rasi"
@@ -424,12 +515,15 @@ local THEME, THEME_MENU, THEME_LYR, THEME_MSG, THEME_SUB, THEME_BINDS, THEME_MET
     end
     local d = P.dir .. "/style"
     P.THEME_SEARCH = resolve(d.."/search.rasi","search")
-    -- The combined search's RESULTS list, as opposed to search.rasi which is its
-    -- input box. Its rows are a mix of tracks, albums, artists and playlists, so
-    -- it gets a two-column layout of its own rather than the generic menu.
-    Util.THEME_SEARCHALL = resolve(d.."/searchall.rasi","searchall")
-    Util.THEME_TRAIL = resolve(d.."/trail.rasi","trail")
+    -- The search's RESULTS list, as opposed to search.rasi which is its input
+    -- box. Its rows are a mix of tracks, albums, artists and playlists, so it
+    -- gets a two-column layout of its own rather than the generic menu.
+    Util.THEME_RESULTS = resolve(d.."/searchall.rasi","searchall")
     Util.THEME_THUMBS = resolve(d.."/thumbs.rasi","thumbs")
+    -- Trail Steps and Trail History share one file. It starts life as a copy of
+    -- sub.rasi, so they look exactly as they did; having their own means they can
+    -- be styled apart from every other sub-menu without touching those.
+    Util.THEME_TRAIL = resolve(d.."/trail.rasi","trail")
     return resolve(d.."/main.rasi","main"), resolve(d.."/menu.rasi","menu"), resolve(d.."/lyrics.rasi","lyrics"),
            resolve(d.."/message.rasi","message"), resolve(d.."/sub.rasi","sub"), resolve(d.."/binds.rasi","binds"),
            resolve(d.."/meta.rasi","meta"), resolve(d.."/art.rasi","art")
@@ -454,7 +548,7 @@ local function ensure_cache()
     -- traverse in to reach them. One fork per process instead of per file.
     -- -m sets the mode at creation, so there is no window where it is 0755.
     os.execute("mkdir -p " .. shell_quote(P.cache) .. " " .. shell_quote(P.lyrics)
-        .. " " .. shell_quote(P.mass) .. " " .. shell_quote(P.art) .. " " .. shell_quote(P.art .. "/highres")
+        .. " " .. shell_quote(P.mass) .. " " .. shell_quote(P.art) .. " " .. shell_quote(P.art .. "/highres") .. Util.art_kind_dirs()
         .. "; mkdir -p -m 700 " .. shell_quote(Util.scratch_dir()))
 
     -- The housekeeping sweeps below are throttled to once an hour by the mtime of
@@ -646,19 +740,65 @@ end
 local function mem_set(key, value, ttl)
     _mem[key] = {value = value, expire = ttl and (os.time() + ttl)}
 end
-local function mem_bust(key) _mem[key] = nil end
-local function disk_get(path, ttl)
+-- A key ending in ":" busts that whole FAMILY of memos rather than one entry --
+-- every search run this process, say, whose keys carry a variable tail.
+local function mem_bust(key)
+    if key:sub(-1) ~= ":" then _mem[key] = nil; return end
+    for k in pairs(_mem) do
+        if k:sub(1, #key) == key then _mem[k] = nil end
+    end
+end
+-- `tag` is a validity TOKEN, and it outranks the TTL: when the caller knows
+-- something that changes exactly when the data does -- a playlist's snapshot_id
+-- -- age stops being evidence of anything. A matching tag serves the file however
+-- old it is, and a differing one refetches however fresh. The TTL stays as the
+-- fallback for callers that have no such token.
+local function disk_get(path, ttl, tag)
     local raw = read_file(path)
     if not raw then return nil end
     local d = safe_decode(raw)
     if not d or type(d) ~= "table" or type(d.fetched_at) ~= "number" then return nil end
+    -- `items`/`tracks` are the envelope the three library loaders wrote before
+    -- they moved onto this function. Same timestamp field, different payload key,
+    -- so reading both means the switch costs no refetch of a 663-track cache.
+    local payload = d.data
+    if payload == nil then payload = d.items end
+    if payload == nil then payload = d.tracks end
+    if payload == nil then return nil end
+    if tag ~= nil then
+        if d.tag == tag then return payload end
+        -- A tag was offered and the file carries a different one (or none, having
+        -- been written before tags existed): it cannot be trusted past its TTL.
+        if d.tag ~= nil then return nil end
+    end
     if ttl and os.time() - d.fetched_at >= ttl then return nil end
-    return d.data
+    return payload
 end
-local function disk_set(path, data)
-    write_file(path, json.encode({data=data, fetched_at=os.time()}))
+local function disk_set(path, data, tag)
+    write_file(path, json.encode({data=data, fetched_at=os.time(), tag=tag}))
 end
 local function disk_bust(path) os.remove(path) end
+
+-- "This copy is still current" without rewriting the copy. Used by the library
+-- revalidator, which asks Spotify whether anything changed for about a kilobyte
+-- and, when the answer is no, has to make a several-megabyte cache read as fresh
+-- again -- decoding and re-encoding it to move one integer would cost more than
+-- the request that established it did not need moving.
+--
+-- The literal `"fetched_at":<digits>` occurs exactly once in an envelope: JSON
+-- escaping means a track or playlist NAMED that appears as \"fetched_at\":, so
+-- the pattern cannot match inside the payload. Anything other than exactly one
+-- hit is treated as a failure rather than guessed at, and the caller falls back
+-- to a real refresh.
+function Util.cache_touch(path)
+    local raw = read_file(path)
+    if not raw then return false end
+    local out, n = raw:gsub('"fetched_at":%s*%d+', '"fetched_at":' .. os.time(), 1)
+    if n ~= 1 then return false end
+    -- write_file answers os.rename's nil-on-failure, not false, so this is a
+    -- truthiness test rather than a comparison.
+    return not not write_file(path, out)
+end
 
 -- view_pos (cursor memory) is read on essentially every menu draw and rewritten
 -- on every selection -- 11KB / 261 keys, decoded and re-encoded each time. One
@@ -708,12 +848,17 @@ end
 
 -- SEARCH HISTORY
 --
--- Past queries, one list per search category ("search:all", "search:track", …),
--- most recent first. Same in-process-copy-plus-write-through shape as Util.pos_*
--- above, and for the same reason: it is read on every draw of a search menu and
--- rewritten on every accepted query, and the file is small enough that a full
--- re-encode per write is free.
+-- Past queries under P.hist_key, most recent first. Same
+-- in-process-copy-plus-write-through shape as Util.pos_* above, and for the same
+-- reason: it is read on every draw of the search box and rewritten on every
+-- accepted query, and the file is small enough that a full re-encode per write
+-- is free. Still keyed rather than a bare list because the file already held a
+-- table of lists, and Util.hist_migrate has to be able to read the old keys.
 P.hist_max = 50
+P.hist_key = "search"
+-- The keys the split search wrote, newest-intent first.
+P.hist_legacy = {"search:all", "search:track", "search:album", "search:artist",
+                 "search:playlist"}
 function Util.hist_all()
     if not Util._hist then Util._hist = disk_get(P.search_hist) or {} end
     return Util._hist
@@ -752,6 +897,40 @@ function Util.hist_remove(key, q)
     if #l == 0 then all[key] = nil end
     disk_set(P.search_hist, all)
     return true
+end
+
+-- Folds the five per-category lists the split search left behind into the one
+-- list there is now. Round-robin -- head of each in turn -- because the entries
+-- carry no timestamps: taking one from each list keeps the most recent query of
+-- every old category near the top, where concatenating would have buried four
+-- categories under whichever list happened to be longest.
+--
+-- Self-erasing: it deletes the legacy keys as it consumes them, so every call
+-- after the first is five table lookups that find nothing.
+function Util.hist_migrate()
+    local all = Util.hist_all()
+    local lists, most = {}, 0
+    for _, k in ipairs(P.hist_legacy) do
+        local l = all[k]
+        if type(l) == "table" and #l > 0 then
+            lists[#lists+1] = l
+            if #l > most then most = #l end
+        end
+        all[k] = nil
+    end
+    if most == 0 then return end
+    local merged = type(all[P.hist_key]) == "table" and all[P.hist_key] or {}
+    local seen = {}
+    for _, q in ipairs(merged) do seen[q] = true end
+    for i = 1, most do
+        for _, l in ipairs(lists) do
+            local q = l[i]
+            if q and not seen[q] then seen[q] = true; merged[#merged+1] = q end
+        end
+    end
+    while #merged > P.hist_max do table.remove(merged) end
+    all[P.hist_key] = merged
+    disk_set(P.search_hist, all)
 end
 
 local function bust_my_playlists()
@@ -859,20 +1038,65 @@ function Util.mark_availability(o)
     return o
 end
 
-local function cached_fetch(key, disk_path, ttl, fetch_fn)
+-- `opts` (all optional):
+--   tag         validity token, see disk_get -- a match serves the file at any age
+--   stale_ok    a failed fetch answers with the EXPIRED disk copy rather than nil
+--   revalidate  name of a Util.REVALIDATORS entry: an expired copy is served
+--               IMMEDIATELY and refreshed in a detached process, so the menu
+--               never waits on the network to draw
+-- All three live here rather than at any one call site because every list in the
+-- file already comes through this function, so each applies everywhere at once.
+local function cached_fetch(key, disk_path, ttl, fetch_fn, opts)
+    opts = opts or {}
+    -- Util.revalidating is the detached refresh itself, and the exact mirror of
+    -- Util.cache_only below: it must ignore every cache and go to the network,
+    -- since re-reading the copy it was spawned to replace would make it a no-op.
+    if Util.revalidating then
+        local fresh = fetch_fn()
+        if fresh ~= nil and not (type(fresh) == "table" and next(fresh) == nil) then
+            mem_set(key, fresh, ttl)
+            if disk_path then disk_set(disk_path, fresh, opts.tag) end
+        end
+        return fresh
+    end
     local v = mem_get(key)
     if v ~= nil then return v end
     if disk_path then
-        v = disk_get(disk_path, ttl)
+        v = disk_get(disk_path, ttl, opts.tag)
         if v ~= nil then mem_set(key, v, ttl); return v end
-    end
-    v = fetch_fn()
-    if v ~= nil then
-        local empty = type(v) == "table" and next(v) == nil
-        if not empty then
-            mem_set(key, v, ttl)
-            if disk_path then disk_set(disk_path, v) end
+        -- Expired, but present. Waiting ~450ms for a list that has barely changed
+        -- is the whole complaint this answers: hand back what we have and let a
+        -- detached process fetch the truth for the NEXT open. Anything changed
+        -- inside spoot busts this cache outright and never reaches here, so the
+        -- staleness window only covers edits made on another device.
+        if opts.revalidate then
+            v = disk_get(disk_path)
+            if v ~= nil then
+                mem_set(key, v, ttl)
+                Util.spawn_revalidate(opts.revalidate, opts.revalidate_arg)
+                return v
+            end
         end
+    end
+    -- Util.cache_only asks for whatever is already cached and nothing more: the
+    -- caller is decorating a menu, not opening one, and must not pay for a fetch.
+    if not Util.cache_only then
+        v = fetch_fn()
+        if v ~= nil then
+            local empty = type(v) == "table" and next(v) == nil
+            if not empty then
+                mem_set(key, v, ttl)
+                if disk_path then disk_set(disk_path, v, opts.tag) end
+            end
+        end
+    end
+    -- Nothing came back. A list the user is looking at is better served by what we
+    -- knew an hour ago than by "no results", so re-read the file with no TTL. Also
+    -- taken under cache_only, where there was no fetch to fail: stale is all there
+    -- is, and it beats nothing for free.
+    if v == nil and (opts.stale_ok or Util.cache_only) and disk_path then
+        v = disk_get(disk_path)
+        if v ~= nil then mem_set(key, v, ttl) end
     end
     return v
 end
@@ -885,9 +1109,9 @@ local function populate_liked_ids()
         for _, id in ipairs(ids) do liked[id] = true end
         return
     end
-    local c = safe_decode(read_file(P.liked))
-    if c and c.tracks then
-        for _, t in ipairs(c.tracks) do
+    local tracks = disk_get(P.liked)
+    if type(tracks) == "table" then
+        for _, t in ipairs(tracks) do
             if t.id then liked[t.id] = true end
         end
     end
@@ -925,6 +1149,76 @@ function Util.trail_save()
     write_file(P.trails, json.encode({trails=Util.trail_history}))
 end
 Util.trail_history = Util.trail_history or {}
+
+-- ── Closed-menu history ───────────────────────────────────────────────
+-- The trail says where you still are; this says where you have BEEN and left.
+-- Util.scope pops a menu on the way out and nothing used to remember it, so
+-- getting back to something you closed meant walking the path again by hand.
+--
+-- Same in-process-copy-plus-write-through shape as Util.pos_* and Util.hist_*
+-- above, and for the same reason: read on every trail draw, rewritten whenever a
+-- menu closes, and small enough that a full re-encode per write is free.
+--
+-- Only the STACK is stored, never a rendered label -- exactly the rule the
+-- breadcrumb follows, so a later change to how a step is named reaches old
+-- entries too instead of leaving them frozen in an old style.
+P.menu_hist_max = 100
+
+function Util.menu_hist_all()
+    if not Util._mhist then Util._mhist = disk_get(P.menu_hist) or {} end
+    return Util._mhist
+end
+
+function Util.menu_hist_save()
+    disk_set(P.menu_hist, Util.menu_hist_all())
+end
+
+-- True when `a` names the same path as `b`, or a shorter one leading to it. The
+-- comparison is on view identity plus the ids that distinguish two menus of the
+-- same kind, not on the whole entry: a stack entry also carries display names
+-- that can change (a renamed playlist) without it being a different menu.
+function Util.stack_prefix(a, b)
+    if not (a and b) or #a > #b then return false end
+    for i = 1, #a do
+        local x, y = a[i], b[i]
+        if type(x) ~= "table" or type(y) ~= "table" then return false end
+        if x.view ~= y.view then return false end
+        for _, k in ipairs({"track_id", "album_id", "artist_id", "playlist_id",
+                            "category_id", "query", "category", "genre"}) do
+            if x[k] ~= y[k] then return false end
+        end
+    end
+    return true
+end
+
+-- Records a menu that just closed. Called from Util.scope's normal unwind only.
+--
+-- Two things are deliberately NOT recorded:
+--   * a track's action menu, which is a detail of the list underneath it and
+--     would otherwise crowd out real destinations;
+--   * a path that is a prefix of the entry we just wrote. Backing out of
+--     Artist > Albums > Album > Track unwinds four scopes; without this the
+--     history would hold four rows all describing the one excursion, when what
+--     you left was the deepest of them.
+function Util.menu_hist_add(path)
+    if not path or #path == 0 then return end
+    local leaf = path[#path]
+    if type(leaf) ~= "table" or not leaf.view then return end
+    if leaf.view == "action" then return end
+    local all = Util.menu_hist_all()
+    if all[1] and Util.stack_prefix(path, all[1].stack) then return end
+    -- Somewhere we already know: move it up rather than keeping two rows for it.
+    for i = #all, 1, -1 do
+        local e = all[i]
+        if type(e) == "table" and type(e.stack) == "table"
+           and #e.stack == #path and Util.stack_prefix(path, e.stack) then
+            table.remove(all, i)
+        end
+    end
+    table.insert(all, 1, {stack = path, ts = os.time()})
+    while #all > P.menu_hist_max do table.remove(all) end
+    Util.menu_hist_save()
+end
 
 local function session_load()
     local d = safe_decode(read_file(P.session))
@@ -1015,6 +1309,18 @@ function Util.scope(entry, body)
     -- rethrow below then carries it up to the crash handler at the bottom.
     local ok, a, b = xpcall(body, Util.traceback)
     if Util.session_gen == gen then
+        -- This menu closed normally, so it is a place you have been and left:
+        -- record the path to it before the stack forgets. Inside the generation
+        -- test on purpose -- a trail jump or a warm start REPLACES the stack, and
+        -- nothing was closed in that case. Copied, because what stays behind must
+        -- not alias entries the live stack goes on mutating.
+        if ok then
+            local path = {}
+            for i = 1, math.min(depth + 1, #_session_stack) do path[i] = _session_stack[i] end
+            if #path == depth + 1 then
+                Util.menu_hist_add(json.decode(json.encode(path)))
+            end
+        end
         while #_session_stack > depth do table.remove(_session_stack) end
         session_save()
     end
@@ -1110,7 +1416,7 @@ end
 -- the whole crumb is otherwise one flat #6a707f, arrows included.
 --
 -- One definition shared by the two places a trail is drawn: the breadcrumb in
--- every menu's mesg, and the rows of the Jump to Trail Step menu. The literal
+-- every menu's mesg, and the rows of the Trail Steps menu. The literal
 -- ">" stays OUTSIDE the Util.markup blobs so pango_escape still turns it into
 -- &gt;; only the tags are protected from escaping.
 function Util.crumb_arrow(s)
@@ -1151,6 +1457,7 @@ local jump_to_track_pending = false
 local recent_pending = false
 local view_actions, view_artist, view_lyrics, view_add_pl, view_art, view_volume
 local view_seek
+local view_new_releases
 local browse_album, view_browse
 local get_playback
 local get_token
@@ -1198,6 +1505,7 @@ end
 local function rofi_dmenu(entries, opts)
     Util.back_pressed = false
     Util.alt_pressed = false
+    Util.tab_pressed = false
     if main_pending or liked_pending or recent_pending or Util.trail_jump_pending then return nil end
     opts = opts or {}
     local prompt   = opts.prompt or ""
@@ -1294,7 +1602,19 @@ local function rofi_dmenu(entries, opts)
         local first = nl and mesg:sub(1, nl - 1) or mesg
         local rest  = nl and mesg:sub(nl) or ""
         local body, icons = split_status_icons(first)
-        mesg = truncate_text(body, MESG_NAME_MAX_CHARS) .. icons .. rest
+        -- Measure what will actually be DRAWN. The budget is a width estimate at
+        -- ~10px per character, and markup occupies no width -- but it was being
+        -- counted, so the shuffle/repeat spans alone spent 38 of the 49 and a
+        -- 16-character track title came out as "Xtal…". A blind cut was unsafe
+        -- besides: it could slice a <span …> in half and hand rofi broken pango.
+        -- Fits: left exactly as built, markup and all. Too long: the cut is made
+        -- on the plain text, because slicing a <span …> in half would hand rofi
+        -- broken pango.
+        local plain = Util.strip_markup(body)
+        if (utf8.len(plain) or 0) > MESG_NAME_MAX_CHARS then
+            body = truncate_text(plain, MESG_NAME_MAX_CHARS)
+        end
+        mesg = body .. icons .. rest
     end
     local args = {"rofi","-dmenu","-config",P.dir.."/style/config.rasi","-theme",theme,"-p",prompt,"-i",
                    "-kb-custom-1","Control+Shift+Delete"}
@@ -1346,21 +1666,39 @@ local function rofi_dmenu(entries, opts)
     if by_index then args[#args+1] = "-format"; args[#args+1] = "i" end
     if eh then args[#args+1] = "-eh"; args[#args+1] = tostring(eh) end
     if opts.thumbs then
+        -- Util.THUMB_COLS is style/thumbs.rasi's `columns` -- the grid is sized
+        -- from it, so the two must agree. thumbs_cols overrides BOTH: a caller
+        -- with a handful of tiles (Curations, 7) gets a tidier shape than the
+        -- 5-wide default without a second theme file existing to drift from this
+        -- one. The row cap is the theme's `lines`.
+        local cols = tonumber(opts.thumbs_cols) or Util.THUMB_COLS
         local n = #(entries or {})
-        local rows = math.ceil(n / 5)
-        if rows > 3 then rows = 3 end
+        local rows = math.ceil(n / cols)
+        if rows > Util.THUMB_ROWS then rows = Util.THUMB_ROWS end
         if rows < 1 then rows = 1 end
         args[#args+1] = "-l"; args[#args+1] = tostring(rows)
+        -- Grids only: \0icon rows come from Util.album_thumbs and nowhere else,
+        -- so a text list has no icons to lose and no reason to carry this.
+        args[#args+1] = "-threads"; args[#args+1] = tostring(Util.THUMB_THREADS)
+        if cols ~= Util.THUMB_COLS then
+            args[#args+1] = "-theme-str"
+            args[#args+1] = "listview { columns: " .. cols .. "; }"
+        end
     end
     if sel and sel > 0 then args[#args+1] = "-selected-row"; args[#args+1] = tostring(sel) end
     if not opts.no_status and not opts.thumbs then
         local status = status_mesg()
         if status then mesg = mesg and (status .. "  " .. mesg) or status end
     end
-    local crumb = breadcrumb(opts.crumb)
-    if crumb then
-        if markup then crumb = Util.markup('<span foreground="#6a707f">') .. crumb .. Util.markup('</span>') end
-        mesg = (mesg and (mesg .. "\n") or "") .. crumb
+    -- The trail menus are the one place this is suppressed: they ARE the trail,
+    -- so printing it above them says nothing, and the line is better spent on
+    -- what Tab does from where you are standing.
+    if not opts.no_crumb then
+        local crumb = breadcrumb(opts.crumb)
+        if crumb then
+            if markup then crumb = Util.markup('<span foreground="#6a707f">') .. crumb .. Util.markup('</span>') end
+            mesg = (mesg and (mesg .. "\n") or "") .. crumb
+        end
     end
     if mesg then args[#args+1] = "-mesg"; args[#args+1] = Util.pango_escape(mesg) end
 
@@ -1423,6 +1761,11 @@ local function rofi_dmenu(entries, opts)
         end
         liked_pending = true; return nil end
     if exit_code == EXIT.trail_jump then
+        -- Opt-in, like alt_select above: the trail menu handles Tab itself to
+        -- switch modes, so it must not bubble up and close the very menu that
+        -- wants to react to it. A flag rather than a callback, matching
+        -- Util.alt_pressed; the caller reads it immediately.
+        if opts.tab_select then Util.tab_pressed = true; return nil end
         Util.trail_jump_stack = _session_stack and json.decode(json.encode(_session_stack)) or {}
         Util.trail_jump_pending = true
         return nil
@@ -1732,6 +2075,20 @@ Util.art_url = function(art_url, seed)
     return (art_url:gsub("(i%.scdn%.co/image/ab67616d0000)[0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]", "%1" .. s))
 end
 
+-- The high-resolution rendition of a PLAYLIST cover. The last byte of the prefix
+-- is a size code: ab67706f00000002 is 300x300 and …03 is 640x640, verified
+-- against six playlists including editorial and featured ones.
+--
+-- Anchored to that exact prefix on purpose. Every playlist reachable from this
+-- account has an uploaded cover sharing it, so an auto-generated mosaic using a
+-- different prefix is untested -- and rewriting a prefix we do not recognise
+-- would turn a working 300px cover into a 404. Anything unmatched is returned
+-- untouched and simply stays at the size Spotify gave.
+Util.art_url_hi = function(art_url)
+    if not art_url or #art_url == 0 then return art_url end
+    return (art_url:gsub("(i%.scdn%.co/image/ab67706f000000)0[0-9a-fA-F]", "%103"))
+end
+
 Util._rand_suffix = function()
     local u = io.open("/dev/urandom", "rb")
     if u then
@@ -1751,23 +2108,77 @@ Util._art_content_length = function(hdr_path)
     return tonumber(h:match("[Cc]ontent%-[Ll]ength:%s*(%d+)"))
 end
 
+-- Is this file something rofi can actually draw, and did all of it arrive?
+--
+-- This used to accept JPEG and nothing else, which was wrong about what Spotify
+-- serves: 2 of the 50 category icons are PNG, and roughly a tenth of playlist
+-- search results are WebP (user-uploaded covers on image-cdn-*.spotifycdn.com).
+-- Every one of those was downloaded, rejected, and queued again on the NEXT
+-- draw, so Categories and playlist search each paid ~3 s per open, reopen and
+-- back -- forever, since the file could never be accepted. rofi renders all
+-- three formats (gdk-pixbuf identifies images by content, not by extension),
+-- so the files are stored exactly as they arrive under their existing .jpg
+-- path and the suffix is cosmetic.
+--
+-- Still a real check, not a rubber stamp: each format is verified end-to-end so
+-- a truncated download is caught, which is the reason this function exists.
 Util._art_valid_file = function(path, content_length)
     local fh = io.open(path, "rb")
     if not fh then return false end
-    local head = fh:read(3)
+    local head = fh:read(12) or ""
     local st = fh:seek("end")
-    local tail = nil
-    if st and st >= 2 then
-        fh:seek("end", -2)
-        tail = fh:read(2)
+    local function tail_bytes(n)
+        if not st or st < n then return nil end
+        fh:seek("end", -n)
+        return fh:read(n)
+    end
+    local ok = false
+    if not st or st <= 0 or (content_length and st ~= content_length) then
+        ok = false
+    elseif head:byte(1) == 0xFF and head:byte(2) == 0xD8 and head:byte(3) == 0xFF then
+        local t = tail_bytes(2)
+        ok = t ~= nil and t:byte(1) == 0xFF and t:byte(2) == 0xD9
+    elseif head:sub(1, 8) == "\137PNG\r\n\26\n" then
+        -- IEND, with its CRC -- the last 8 bytes of every well-formed PNG.
+        ok = tail_bytes(8) == "IEND\174\66\96\130"
+    elseif head:sub(1, 4) == "RIFF" and head:sub(9, 12) == "WEBP" then
+        -- The RIFF size field counts everything after itself, so it is a
+        -- length check on the whole file -- stricter than any trailer sniff.
+        local b1, b2, b3, b4 = head:byte(5, 8)
+        ok = b1 and (b1 + b2 * 256 + b3 * 65536 + b4 * 16777216) == st - 8
     end
     fh:close()
-    if not st or st <= 0 then return false end
-    if content_length and st ~= content_length then return false end
-    if not head or #head < 3 then return false end
-    if head:byte(1) ~= 0xFF or head:byte(2) ~= 0xD8 or head:byte(3) ~= 0xFF then return false end
-    if not tail or #tail < 2 then return false end
-    return tail:byte(1) == 0xFF and tail:byte(2) == 0xD9
+    return ok
+end
+
+-- The part of an art URL that identifies the IMAGE, so a replaced cover is
+-- detectable. Album art is i.scdn.co/image/<hex> with no extension; category
+-- icons are t.scdn.co/images/<hex>.jpeg, and the extension is what used to
+-- defeat this -- an anchored [%w_%-]+$ cannot cross the dot, so every category
+-- resolved to no hash at all and none of them ever cached. Query strings are
+-- dropped too: they are cache-busting noise, not identity.
+Util.art_hash = function(url)
+    if not url or #url == 0 then return nil end
+    local last = url:match("([^/?#]+)[?#]") or url:match("([^/?#]+)$")
+    if not last then return nil end
+    return (last:gsub("%.%w+$", ""):gsub("[^%w_%-]", ""))
+end
+
+-- Is another attempt at this fetch worth anything? A body that arrived intact
+-- but is not a renderable image will not become one on the second try, and a
+-- 404 will not either -- retrying those only bought the sleep between passes,
+-- which is what made a single dead cover cost ~2 s on EVERY draw of a list.
+-- Only genuinely transient conditions come back.
+--
+-- code == nil means curl reported nothing for this url at all: connection
+-- refused, DNS, or timeout. `truncated` is a size mismatch against the
+-- Content-Length, i.e. the transfer was cut short.
+Util.art_retry_worthwhile = function(code, truncated)
+    if code == nil then return true end          -- never reached the server
+    if truncated then return true end            -- arrived short
+    local n = tonumber(code)
+    if not n then return false end
+    return n == 408 or n == 429 or n >= 500      -- server said "later"
 end
 
 Util.fetch_art = function(url, art_path, opts)
@@ -1778,15 +2189,25 @@ Util.fetch_art = function(url, art_path, opts)
     for attempt = 1, attempts do
         local tmp = art_path .. ".tmp" .. Util._rand_suffix()
         local hdr = tmp .. ".hdr"
-        local cmd = string.format("curl -sf --connect-timeout %d --max-time %d -D %s -o %s %s 2>/dev/null",
+        -- -w carries the status back so a hopeless fetch can be told apart from
+        -- an unlucky one; -f still suppresses the error body.
+        local cmd = string.format("curl -sf --connect-timeout %d --max-time %d -D %s -o %s %s -w '%%{http_code}' 2>/dev/null",
             connect_timeout, timeout, shell_quote(hdr), shell_quote(tmp), shell_quote(url))
-        shell(cmd)
+        local code = (shell(cmd) or ""):match("%d%d%d")
         local cl = Util._art_content_length(hdr)
         os.remove(hdr)
         if Util._art_valid_file(tmp, cl) then
             if os.rename(tmp, art_path) then return art_path end
         end
+        -- Truncation is the one failure the size tells us about; anything else
+        -- that arrived is a body we simply cannot draw.
+        local truncated = false
+        if cl then
+            local fh = io.open(tmp, "rb")
+            if fh then truncated = fh:seek("end") ~= cl; fh:close() end
+        end
         os.remove(tmp)
+        if not Util.art_retry_worthwhile(code, truncated) then return nil end
         if attempt < attempts then os.execute("sleep 1") end
     end
     return nil
@@ -1831,19 +2252,38 @@ Util._art_batch = function(items)
         for code, size, path in report:gmatch("(%d+) (%d+) ([^\n]+)") do
             got[path] = {code = code, size = tonumber(size)}
         end
-        local failures = {}
+        -- Split, rather than retrying everything that did not land: a cover
+        -- that came down whole but is not a drawable image is hopeless, and
+        -- carrying it into the next pass bought nothing but the sleep below.
+        local retry = {}
         for _, pd in ipairs(todo) do
             local r = got[pd.tmp]
             local ok = r ~= nil and Util.is2xx(r.code)
             if ok then ok = Util._art_valid_file(pd.tmp, r.size) end
             if ok then ok = os.rename(pd.tmp, pd.path) end
+            pd.ok = ok or nil
             -- Only on failure: a successful rename already moved the file, so
             -- the unconditional remove was a wasted syscall per cover -- 60 of
             -- them on a full sync batch.
-            if not ok then failures[#failures+1] = pd; os.remove(pd.tmp) end
+            if not ok then
+                -- r.size is what curl actually wrote. It can only disagree with
+                -- the transfer curl reported as complete if the transfer was
+                -- cut short, which is the one retryable kind of bad body.
+                local truncated = false
+                if r and Util.is2xx(r.code) then
+                    local fh = io.open(pd.tmp, "rb")
+                    if fh then truncated = fh:seek("end") ~= r.size; fh:close() end
+                end
+                if Util.art_retry_worthwhile(r and r.code, truncated) then
+                    retry[#retry+1] = pd
+                else
+                    pd.dead = true   -- so the caller can stop asking for it
+                end
+                os.remove(pd.tmp)
+            end
             pd.tmp = nil
         end
-        todo = failures
+        todo = retry
         if #todo > 0 and pass < 3 then os.execute("sleep 1") end
     end
 end
@@ -1854,19 +2294,60 @@ end
 -- same status + byte-count + JPEG validation and atomic rename as the sync path;
 -- a prefetch killed mid-flight can then never leave a truncated file sitting at
 -- a final art path, where every later run would trust it.
-function Util.spawn_art_prefetch(list)
-    if not list or #list == 0 then return end
-    -- album_thumbs re-derives its pending list from disk on every call, so each
-    -- redraw during a download would otherwise spawn a second prefetcher for
-    -- whatever is still missing. Same pid-file liveness idiom as ensure_daemon.
+-- Covers per spool file. A CHUNK SIZE, not a limit on how much of a grid gets
+-- fetched: the worker drains every file in the spool, so a 1496-album
+-- discography becomes seven of these and all of it lands. Chunked rather than
+-- handed over whole so the index is committed seven times instead of once, and a
+-- worker killed part-way through leaves its finished chunks recorded.
+Util.PREFETCH_MAX = 240
+Util.art_spool_dir = function() return P.tmp .. "/spoot_art_spool" end
+
+-- Hands the tail of a thumbnail grid to a detached copy of ourselves so the menu
+-- can draw now and the rest of the covers are warm by the next visit. Routed
+-- through spoot.lua rather than a backgrounded bare curl so the tail gets the
+-- same status + byte-count + JPEG validation and atomic rename as the sync path;
+-- a prefetch killed mid-flight can then never leave a truncated file sitting at
+-- a final art path, where every later run would trust it.
+--
+-- SPOOLED, not handed to one process. This used to return outright when a worker
+-- was already alive, which threw the whole tail away -- and a grid you are
+-- sitting in produces no next draw to re-queue from, so those tiles stayed
+-- placeholders until you pressed F5. A worker lives ~3s per chunk, so any grid
+-- opened just after another one lost its covers, which is precisely the "it
+-- works sometimes" this is meant to end. Now the work is always written down;
+-- the pidfile only decides whether a NEW worker is needed to drain it.
+--
+-- Answers the tail_action recorded in the thumbnail log.
+function Util.spawn_art_prefetch(list, kind)
+    if not list or #list == 0 then return "empty" end
+    local dir = Util.art_spool_dir()
+    os.execute("mkdir -p " .. shell_quote(dir))
+    local n = 0
+    for i = 1, #list, Util.PREFETCH_MAX do
+        -- Zero-padded so a plain lexicographic sort is oldest-first, and written
+        -- under a dot-prefixed name that is renamed into place, so a worker
+        -- scanning the directory can never pick up a half-written chunk.
+        local name = string.format("%012d_%s_%06d", os.time(), Util._rand_suffix(), i)
+        local tmp, final = dir .. "/." .. name, dir .. "/" .. name
+        local f = io.open(tmp, "w")
+        if not f then break end
+        -- kind/key/hash ride along for id-keyed artwork. Without them this
+        -- process wrote the files but nothing recorded them in the index, and
+        -- the staleness check for those kinds is the INDEX, not the file -- so
+        -- every cover past THUMB_SYNC was re-fetched on every draw, forever.
+        for j = i, math.min(i + Util.PREFETCH_MAX - 1, #list) do
+            local pd = list[j]
+            f:write(pd.url, "\t", pd.path, "\t", kind or "", "\t",
+                    pd.art_key or "", "\t", pd.hash or "", "\n")
+        end
+        f:close()
+        if os.rename(tmp, final) then n = n + 1 else os.remove(tmp) end
+    end
+    if n == 0 then return "spoolfail" end
     local pidf = P.tmp .. "/spoot_art_prefetch.pid"
-    if Util.pidfile_owner_alive(pidf, "--prefetch-art-batch") then return end
-    local lf = Util.tmpfile("prefetch")
-    local f = io.open(lf, "w")
-    if not f then os.remove(lf); return end
-    for _, pd in ipairs(list) do f:write(pd.url, "\t", pd.path, "\n") end
-    f:close()
-    Util.spawn_self({"--prefetch-art-batch", lf}, nil, pidf)
+    if Util.pidfile_owner_alive(pidf, "--prefetch-art-batch") then return "spooled" end
+    Util.spawn_self({"--prefetch-art-batch"}, nil, pidf)
+    return "spawned"
 end
 
 -- `opts` is forwarded to Util.fetch_art, whose defaults (3 attempts, 5s connect,
@@ -1891,6 +2372,148 @@ local function ensure_art(art_url, subdir, opts)
     if Util._art_valid_file(art_path) then return art_path end
     os.remove(art_path)
     return Util.fetch_art(art_url, art_path, opts)
+end
+
+-- ASSETS shipped with the themes, for rows that will never have real artwork.
+-- 300x300 like Spotify's covers, so they scale identically in the 150px grid.
+Util.ART_NONE     = P.assets .. "/noart.png"     -- album with no cover
+Util.ART_PLAYLIST = P.assets .. "/playlist.png"  -- playlist with no cover
+Util.ART_NEW      = P.assets .. "/new.png"       -- the Create New Playlist tile
+-- Discover by Genre: a picker over genre NAMES, so there is no object whose
+-- cover could stand for it. It is the only permanently artless tile in the file,
+-- which is why it gets artwork of its own rather than the "no cover" mark.
+Util.ART_GENERIC  = P.assets .. "/generic.jpg"
+
+-- Playlist covers are cached ONE FILE PER PLAYLIST, keyed by playlist id rather
+-- than by art hash. Spotify regenerates these constantly -- weekly editorial
+-- refreshes, mosaics rebuilding as tracks change -- and a hash-named file would
+-- leave the superseded cover behind every time. Here the path never varies, so
+-- refetching overwrites: the eviction and the replacement are the same
+-- operation, and an orphan cannot exist. No TTL is involved; the index below is
+-- what detects a change.
+--
+-- Returns the path to use as the row's icon, always non-nil: the shipped
+-- placeholder when the playlist has no cover.
+-- Directory list for ensure_cache's single mkdir, so every kind's cache exists
+-- without a fork per draw.
+function Util.art_kind_dirs()
+    local out = ""
+    for _, k in pairs(P.art_kinds) do
+        out = out .. " " .. shell_quote(k.dir)
+        if k.highres then out = out .. " " .. shell_quote(k.highres) end
+    end
+    return out
+end
+
+function Util.art_index(kind)
+    Util._art_idx = Util._art_idx or {}
+    if not Util._art_idx[kind] then
+        Util._art_idx[kind] = disk_get(P.art_kinds[kind].index) or {}
+    end
+    return Util._art_idx[kind]
+end
+
+-- Forces the next Util.art_index to re-read from disk. The detached prefetcher
+-- records ITS covers in another process, so a copy loaded at startup goes stale
+-- the moment one is spawned -- and a stale copy reports cached artwork as
+-- missing, which spends a draw's whole synchronous budget re-downloading files
+-- that are already on disk and leaves everything past it wearing a placeholder.
+function Util.art_index_drop(kind)
+    if Util._art_idx then Util._art_idx[kind] = nil end
+end
+
+-- The ONE writer. Every write used to be `disk_set(cfg.index, idx)` from a copy
+-- this process read at some earlier point, which is a whole-file overwrite: a
+-- prefetcher's entries, written in between, were silently erased and its covers
+-- re-fetched forever after. Re-reading and merging here means the last writer
+-- adds to the file instead of replacing it.
+--
+-- `updates` maps key -> hash string, or key -> false to delete.
+function Util.art_index_put(kind, updates)
+    local cfg = P.art_kinds[kind]
+    if not cfg then return end
+    local idx = disk_get(cfg.index) or {}
+    for k, v in pairs(updates) do
+        if v == false then idx[k] = nil else idx[k] = v end
+    end
+    disk_set(cfg.index, idx)
+    Util._art_idx = Util._art_idx or {}
+    Util._art_idx[kind] = idx
+end
+
+-- Artwork cached BY ID rather than by art hash, for objects whose image Spotify
+-- replaces in place: playlists (weekly editorial refreshes, mosaics rebuilding
+-- as tracks change) and categories. A hash-named file would strand the old cover
+-- every time. Here the path never varies, so refetching overwrites -- eviction
+-- and replacement are one operation and an orphan cannot exist. No TTL; the
+-- index of id -> art hash is what detects a change.
+--
+-- `hi` asks for the high-resolution rendition, cached in the kind's own
+-- subdirectory. Returns a path to use, always non-nil; the caller supplies the
+-- placeholder for "this object has no artwork".
+-- How long a piece of artwork we could not fetch stays written off. Long enough
+-- that a dead cover costs nothing across a session; short enough that a CDN
+-- having a bad afternoon heals by itself.
+-- On Util, not a local: the chunk body is one function at Lua's 200-local cap.
+Util.ART_FAIL_TTL = 6 * 3600
+
+-- An index entry is either the art hash we successfully cached (a string, as it
+-- always was) or a record of a fetch that failed (a table). Old index files hold
+-- only strings, so they load unchanged.
+function Util.art_failed(entry, hash)
+    return type(entry) == "table" and entry.f == hash
+        and (os.time() - (entry.t or 0)) < Util.ART_FAIL_TTL
+end
+
+function Util.keyed_art(kind, item, fetch, hi, fallback)
+    local cfg = P.art_kinds[kind]
+    if not (cfg and item and item.id) then return fallback end
+    local dir  = (hi and cfg.highres) or cfg.dir
+    local idx  = Util.art_index(kind)
+    local key  = hi and (item.id .. ":hi") or item.id
+    local path = dir .. "/" .. item.id .. ".jpg"
+    local imgs = item[cfg.field] or {}
+    local url  = imgs[1] and imgs[1].url
+    local hash = Util.art_hash(url)
+
+    if not hash then
+        -- Artwork removed upstream: drop ours rather than serving a stale one.
+        if idx[key] then
+            os.remove(path)
+            Util.art_index_put(kind, {[key] = false})
+        end
+        return fallback
+    end
+    if hi then url = Util.art_url_hi(url) end
+    if idx[key] == hash and Util._art_valid_file(path) then return path end
+    -- Already tried this exact artwork and it would not come down. Answering
+    -- with the placeholder is the whole point: the alternative is re-requesting
+    -- it on every redraw of the list, which is what made a single dead cover
+    -- cost seconds per menu.
+    if Util.art_failed(idx[key], hash) then return fallback end
+    if not fetch then return path, url, hash, key end  -- caller batches the fetch
+    ensure_cache()   -- also creates every kind's dir
+    local got = Util.fetch_art(url, path, not hi and Util.ART_DECOR or nil)
+    Util.art_index_put(kind, {[key] = got and hash or {f = hash, t = os.time()}})
+    return got and path or fallback
+end
+
+-- Records artwork the batch fetcher just wrote, so the index agrees with disk.
+function Util.art_commit(kind, list)
+    if not list or #list == 0 then return end
+    local up, dirty = {}, false
+    for _, e in ipairs(list) do
+        if e.art_key and e.hash then
+            if Util._art_valid_file(e.path) then
+                up[e.art_key] = e.hash; dirty = true
+            elseif e.dead then
+                -- _art_batch gave up on this one for good. Recording that is
+                -- what keeps the next draw from asking again.
+                up[e.art_key] = {f = e.hash, t = os.time()}; dirty = true
+            end
+        end
+    end
+    if dirty then Util.art_index_put(kind, up) end
 end
 
 -- Budget for art that is only a menu backdrop: try once, give up quickly. A miss
@@ -1930,6 +2553,58 @@ Util.write_art_theme = function(name, art_path)
     return tmp
 end
 
+-- Wall clock, at 10ms resolution, without a fork. os.clock measures CPU, which
+-- is exactly the wrong thing here -- a draw that spent 900ms waiting on the CDN
+-- burns almost none of it, and that is the number worth recording. os.time only
+-- has whole seconds. /proc/uptime has neither problem and costs one read.
+function Util.mono()
+    local f = io.open("/proc/uptime", "r")
+    if not f then return nil end
+    local s = f:read(32) or ""
+    f:close()
+    return tonumber(s:match("^([%d%.]+)"))
+end
+
+-- THUMBNAIL DRAW LOG
+--
+-- One line per grid draw, because a grid cannot be examined after the fact: rofi
+-- is handed its entries once, at exec, and scrolls inside its own process, so a
+-- tile that came up as a placeholder stays one for the life of that window no
+-- matter what lands on disk a moment later. What a draw DECIDED is therefore the
+-- only evidence there is, and it has to be recorded as the draw happens.
+--
+-- Fields, in order (see Util.thumb_report, which is the reader):
+--   ts kind view items cursor cached missing sync_try sync_ok sync_fail
+--   tail tail_action placeholders invalid ms
+Util.THUMB_FIELDS = {"ts", "kind", "view", "items", "cursor", "cached", "missing",
+                     "sync_try", "sync_ok", "sync_fail", "tail", "tail_action",
+                     "placeholders", "invalid", "ms"}
+
+function Util.thumb_log(rec)
+    local out = {}
+    for i, k in ipairs(Util.THUMB_FIELDS) do
+        local v = rec[k]
+        if v == nil then v = "-" end
+        -- Tabs are the separator and a view key is arbitrary text.
+        out[i] = tostring(v):gsub("[\t\n]", " ")
+    end
+    local f = io.open(P.thumb_log, "a")
+    if not f then return end
+    f:write(table.concat(out, "\t"), "\n")
+    local size = f:seek("end")
+    f:close()
+    if not size or size <= P.thumb_log_max then return end
+    -- Halve it rather than trimming one line per draw: the rewrite then happens
+    -- once every few thousand draws instead of on every one past the cap.
+    local raw = read_file(P.thumb_log)
+    if not raw then return end
+    local lines = {}
+    for line in raw:gmatch("[^\n]+") do lines[#lines+1] = line end
+    local keep = {}
+    for i = math.floor(#lines / 2) + 1, #lines do keep[#keep+1] = lines[i] end
+    write_file(P.thumb_log, table.concat(keep, "\n") .. "\n")
+end
+
 -- Album-list thumbnails, reusing the shared 300px art cache (seed "1e02").
 -- Fetches the first THUMB_SYNC missing covers, detaches the rest, then appends
 -- "\0icon\x1f<path>" to every row with a path.
@@ -1938,86 +2613,209 @@ end
 --   * not fetched yet -- path emitted anyway so rofi loads it on scroll.
 --   * fetch failed    -- stays in `missing` until a stat finds it, and that set
 --     is re-statted every call, so the next redraw retries.
---   * no artwork      -- pointed at style/noart.png rather than left iconless.
+--   * no artwork      -- pointed at style/assets/noart.png rather than left iconless.
 --
 -- url -> path is memoised per list: this reruns on every redraw, and re-deriving
 -- it cost 1500 gsubs + 1500 stats per keypress on a large discography. Only
 -- covers still MISSING are re-statted, which preserves the retry above.
 Util._thumb_memo = nil
-Util.album_thumbs = function(entries, items)
+-- Resolves ONE item to the icon path it should show, plus the url/hash needed if
+-- that file still has to be fetched. This is the ONLY thing that differs between
+-- an album grid and a playlist grid -- the memo, the re-stat of missing covers,
+-- the sync/prefetch split and the \0icon decoration below are all shared, which
+-- is why this is a parameter rather than a second copy of the whole function.
+local function thumb_resolve(it, kind)
+    -- Kinds whose artwork Spotify replaces in place are cached by id; the rest
+    -- are cached by art hash, below.
+    if P.art_kinds[kind] then
+        -- A row that is not a playlist at all: view_playlists puts "Create New
+        -- Playlist" above the real ones, so without a sentinel entries and items
+        -- sit one apart and every tile shows its neighbour's cover.
+        if it.__new then return Util.ART_NEW end
+        -- A row may name its own stand-in: the Curations genre tile has no
+        -- object behind it and would otherwise wear the "no cover" mark, which
+        -- reads as a failure rather than as what it is.
+        local fb = it.art_fallback
+                or (kind == "playlist" and Util.ART_PLAYLIST or Util.ART_NONE)
+        local path, url, hash, key = Util.keyed_art(kind, it, false, false, fb)
+        if not url then return path end       -- already cached, or has no artwork
+        return path, url, hash, key
+    end
+    local imgs = it.images or (it.album and it.album.images) or {}
+    local url = imgs[1] and imgs[1].url
+    if url and #url > 0 then
+        url = Util.art_url(url, "1e02")
+        local hash = Util.art_hash(url)
+        if hash and #hash > 0 then return P.art .. "/" .. hash .. ".jpg", url end
+    end
+    -- No usable art URL. Deliberately returns no url, so the caller does not mark
+    -- it missing: there is nothing to fetch, and the placeholder ships with the
+    -- themes so it is always present and costs no network.
+    return Util.ART_NONE
+end
+
+-- `focus` is the row the menu is about to open on (0-based, same convention as
+-- rofi_dmenu's `sel`). Covers are fetched outwards from there rather than from
+-- the top of the list, because those are the ones rofi is about to render -- see
+-- the ordering below. `view` only names the draw in the log.
+Util.album_thumbs = function(entries, items, kind, focus, view)
     items = items or {}
+    kind = kind or "album"
     local n = #items
+    local t_start = Util.mono()
+    -- The prefetcher records ITS covers from another process, so a copy of the
+    -- index read earlier in this one is stale the moment a worker has run --
+    -- and a stale index reports cached artwork as missing, which is how a draw
+    -- spends its whole synchronous budget re-downloading files that are already
+    -- on disk. Re-read per draw: 51 KB / 676 entries decodes in well under the
+    -- millisecond a draw of this size already costs.
+    if P.art_kinds[kind] then Util.art_index_drop(kind) end
     -- Keyed on identity AND shape: Saved Albums' "Remove from Library" mutates
     -- this very table in place, and a memo keyed on identity alone would then
-    -- hand every row below the removal the previous row's cover.
+    -- hand every row below the removal the previous row's cover. `kind` is in the
+    -- key too, so an album grid and a playlist grid cannot share a memo.
     local memo = Util._thumb_memo
-    if not (memo and memo.items == items and memo.n == n
+    if not (memo and memo.items == items and memo.n == n and memo.kind == kind
             and memo.first == items[1] and memo.last == items[n]) then
-        memo = {items = items, n = n, first = items[1], last = items[n],
-                paths = {}, urls = {}, missing = {}}
+        memo = {items = items, n = n, kind = kind, first = items[1], last = items[n],
+                paths = {}, urls = {}, hashes = {}, ids = {}, missing = {}}
         for i, it in ipairs(items) do
-            local imgs = it.images or (it.album and it.album.images) or {}
-            local url = imgs[1] and imgs[1].url
-            local hash
-            if url and #url > 0 then
-                url = Util.art_url(url, "1e02")
-                hash = url:match("/image/([%w]+)") or url:match("/([%w_%-]+)$")
-            end
-            if hash then
-                memo.paths[i] = P.art .. "/" .. hash .. ".jpg"
-                memo.urls[i]  = url
+            local path, url, hash, pid = thumb_resolve(it, kind)
+            memo.paths[i] = path
+            if url then
+                memo.urls[i]   = url
+                memo.hashes[i] = hash
+                memo.ids[i]    = pid
                 -- Kept as an ASCENDING array, not a set: the stat pass below
-                -- feeds THUMB_SYNC in this order, and the covers that must be
-                -- fetched before the menu draws are the ones at the top of the
-                -- list. A pairs() walk would hand it 60 covers at random.
+                -- walks it in order and the reordering that follows needs a
+                -- stable sequence to work from. A pairs() walk would hand it
+                -- 60 covers at random.
                 memo.missing[#memo.missing + 1] = i
-            else
-                -- No usable art URL: deliberately NOT marked missing, there is
-                -- nothing to fetch. The placeholder ships with the themes, so it
-                -- is always present and costs no network.
-                memo.paths[i] = P.dir .. "/style/noart.png"
             end
         end
         Util._thumb_memo = memo
     end
     local paths = memo.paths
     local pending, still = {}, {}
+    local invalid = 0
     for _, i in ipairs(memo.missing) do
         local p = paths[i]
-        local fh = io.open(p, "r")
-        local ok = false
-        if fh then
-            local sz = fh:seek("end")
-            fh:close()
-            ok = sz and sz > 0
+        local ok
+        if P.art_kinds[kind] then
+            -- Existence proves NOTHING here. These files are named by object id,
+            -- so artwork Spotify has since replaced still sits at exactly the
+            -- path we would write to -- statting it would report "present" and
+            -- the new art would never be fetched, defeating the whole point. The
+            -- index is the authority: current only if it agrees with the hash the
+            -- API just reported. This also lets a row drop out of `missing` once
+            -- Util.art_commit records it.
+            ok = Util._art_valid_file(p) and Util.art_index(kind)[memo.ids[i]] == memo.hashes[i]
+        else
+            -- Album paths are named by art hash, so a changed cover is a
+            -- different path and existence really does mean up to date -- but
+            -- only for a file that is actually an image. This used to accept any
+            -- non-empty file, which is the one failure F5 could never repair: a
+            -- truncated or half-written cover read as cached, its real path went
+            -- to rofi, the decode failed, and because spoot believed that cover
+            -- was fine it was never re-fetched. Validating it here puts it back
+            -- in `pending` instead, where the next draw replaces it.
+            ok = Util._art_valid_file(p)
+            if not ok then
+                local fh = io.open(p, "r")
+                if fh then
+                    local sz = fh:seek("end")
+                    fh:close()
+                    -- Present, non-empty, and not a drawable image: the exact
+                    -- case above, counted so the log can name it.
+                    if sz and sz > 0 then invalid = invalid + 1 end
+                end
+            end
         end
         if not ok then
             still[#still+1] = i
-            pending[#pending+1] = { url = memo.urls[i], path = p }
+            -- art_key/hash ride along only for id-keyed grids; _art_batch
+            -- ignores them, and they are what lets the index be updated once the
+            -- file actually lands (see Util.art_commit below).
+            pending[#pending+1] = { url = memo.urls[i], path = p, row = i,
+                                    art_key = memo.ids[i], hash = memo.hashes[i] }
         end
     end
     memo.missing = still
+    -- Every row that has no file right now. rofi must not be pointed at any of
+    -- these (see the decoration loop). Rows fetched successfully just below drop
+    -- out of it.
+    local blank = {}
+    for _, pd in ipairs(pending) do blank[pd.row] = true end
+    local sync_try, sync_ok, tail_n, tail_action = 0, 0, 0, "none"
     if #pending > 0 then
         ensure_cache()
+        -- Fetch OUTWARDS FROM THE CURSOR, not from row 1. `pending` is in row
+        -- order, so the synchronous head used to be rows 1-60 no matter where the
+        -- menu was about to open -- and a grid reopened at row 300, which pos_key
+        -- restores routinely, therefore left every visible tile to the background
+        -- prefetch. Forward first because that is the direction people scroll,
+        -- then upwards, nearest row first in both directions. Same number of
+        -- covers, the ones actually about to be drawn.
+        local at = math.max(0, math.min(tonumber(focus) or 0, n - 1)) + 1
+        local ordered, above = {}, {}
+        for _, pd in ipairs(pending) do
+            if pd.row >= at then ordered[#ordered+1] = pd else above[#above+1] = pd end
+        end
+        for j = #above, 1, -1 do ordered[#ordered+1] = above[j] end
         local head, tail = {}, {}
-        for i, pd in ipairs(pending) do
+        for i, pd in ipairs(ordered) do
             if i <= THUMB_SYNC then head[#head+1] = pd else tail[#tail+1] = pd end
         end
         Util._art_batch(head)
-        if #tail > 0 then Util.spawn_art_prefetch(tail) end
+        -- Only the synchronous half can be committed here; the detached prefetch
+        -- writes its files in another process, so those covers are recorded the
+        -- next time this list is drawn and the stat above finds them present.
+        if P.art_kinds[kind] then Util.art_commit(kind, head) end
+        sync_try, tail_n = #head, #tail
+        for _, pd in ipairs(head) do
+            if pd.ok then blank[pd.row] = nil; sync_ok = sync_ok + 1 end
+        end
+        if #tail > 0 then tail_action = Util.spawn_art_prefetch(tail, kind) end
     end
-    -- Emitted even when the file is missing, deliberately: rofi queries an icon
-    -- only when it first RENDERS the row (of 200 rows with icons, it opened 3),
-    -- so a row below the fold resolves when scrolled to, by which time the
-    -- prefetch has usually written it. An on-screen row whose file is still
-    -- missing is the case this cannot help -- rofi caches that miss for the life
-    -- of the menu. F5 redraws to pick those up.
+    -- NEVER name a file that is not on disk yet. rofi's icon fetcher caches by
+    -- path with no eviction, no invalidation and no retry anywhere in it: one
+    -- failed load stores a null surface against that path and every later render
+    -- of the row returns it, so the tile stays blank for the life of the window.
+    -- Proven directly -- a tile whose file appeared one second after the menu
+    -- opened was still empty two seconds later. That is the whole bug, including
+    -- the case where the artwork IS cached: skimming fast reaches rows the
+    -- prefetch has not written, rofi writes those paths off, and the covers that
+    -- land a moment later are never looked at again. Only a NEW rofi has a clean
+    -- icon cache, which is why refreshing was the only thing that worked.
+    --
+    -- So a row without a file yet gets the placeholder, which always exists and
+    -- always loads. The tile is then a deliberate render rather than a hole, and
+    -- nothing is poisoned: the next draw upgrades it to the real cover.
+    local ph = kind == "playlist" and Util.ART_PLAYLIST or Util.ART_NONE
+    local placeholders = 0
     for i, e in ipairs(entries or {}) do
         local p = paths[i]
-        if p and not e:find("\0icon", 1, true) then
-            entries[i] = e .. "\0icon\x1f" .. p
+        if p then
+            if blank[i] then p = ph; placeholders = placeholders + 1 end
+            -- Replace rather than skip. The old guard froze the FIRST path onto
+            -- the entry forever, which with placeholders in play would strand a
+            -- row on one permanently -- the redraw could never promote it.
+            -- \0icon is the only field appended to a row, and always last.
+            local cut = e:find("\0", 1, true)
+            entries[i] = (cut and e:sub(1, cut - 1) or e) .. "\0icon\x1f" .. p
         end
     end
+    -- What this draw decided, while it is still knowable. See Util.thumb_log.
+    local t_end = Util.mono()
+    Util.thumb_log({
+        ts = os.time(), kind = kind, view = view or "-", items = n,
+        cursor = tonumber(focus) or 0,
+        cached = n - #pending, missing = #pending,
+        sync_try = sync_try, sync_ok = sync_ok, sync_fail = sync_try - sync_ok,
+        tail = tail_n, tail_action = tail_action,
+        placeholders = placeholders, invalid = invalid,
+        ms = (t_start and t_end) and math.floor((t_end - t_start) * 1000 + 0.5) or "-",
+    })
 end
 
 -- SPOTIFYD MANAGEMENT
@@ -2334,60 +3132,64 @@ local function parallel_fetch_library()
     if ok then return r1, r2, r3 else return nil, nil, nil end
 end
 
+-- The three library loaders below used to carry a copy each of the same memo,
+-- disk envelope, TTL test and serve-the-old-list-if-the-network-failed fallback.
+-- That last behaviour is now cached_fetch's `stale_ok`, so it applies to every
+-- list in the file rather than to these three, and they are left holding only
+-- what actually differs: how their endpoint pages.
+--
+-- The second return value means "this is CURRENT", which is what
+-- fetch_library_with_fallback needs before it rewrites the cache: true from the
+-- memo, from a fresh file, or from a fetch that worked -- false only when a
+-- failed fetch fell back to an expired copy. Util.lib_sorted names the one
+-- ordering both the album and the artist list use.
+--
+-- On Util, not a local: the chunk body is one function at Lua's 200-local cap.
+function Util.lib_sorted(t)
+    table.sort(t, function(a,b) return (a.name or ""):lower() < (b.name or ""):lower() end)
+    return t
+end
+
 local function load_saved_albums()
-    local cached = mem_get("saved_albums")
-    if cached then return cached, true end
-    local c = safe_decode(read_file(P.albums))
-    if c and c.items and type(c.items) == "table" then
-        if type(c.fetched_at) ~= "number" or os.time() - c.fetched_at < P.ttl then
-            mem_set("saved_albums", c.items, P.ttl)
-            return c.items, true
+    local tried, fresh = false, false
+    local items = cached_fetch("saved_albums", P.albums, P.ttl, function()
+        tried = true
+        local out, offset = {}, 0
+        while true do
+            local d = api_get("me/albums", Util.with_market("limit=50&offset=" .. offset))
+            if not d or not d.items then return nil end
+            if #d.items == 0 then break end
+            for _, e in ipairs(d.items) do
+                if e.album then out[#out+1] = e.album end
+            end
+            if #d.items < 50 then break end
+            offset = offset + 50
         end
-    end
-    local items = {}
-    local offset = 0
-    while true do
-        local d = api_get("me/albums", Util.with_market("limit=50&offset=" .. offset))
-        if not d or not d.items then return (c and c.items) or {}, false end
-        if #d.items == 0 then break end
-        for _, e in ipairs(d.items) do
-            if e.album then items[#items+1] = e.album end
-        end
-        if #d.items < 50 then break end
-        offset = offset + 50
-    end
-    table.sort(items, function(a,b) return (a.name or ""):lower() < (b.name or ""):lower() end)
-    write_file(P.albums, json.encode({fetched_at=os.time(), items=items}))
-    mem_set("saved_albums", items, P.ttl)
-    return items, true
+        fresh = true
+        return Util.lib_sorted(out)
+    end, {stale_ok = true, revalidate = "library"})
+    return items or {}, items ~= nil and (fresh or not tried)
 end
 
 local function load_followed_artists()
-    local cached = mem_get("followed_artists")
-    if cached then return cached, true end
-    local c = safe_decode(read_file(P.artists))
-    if c and c.items and type(c.items) == "table" then
-        if type(c.fetched_at) ~= "number" or os.time() - c.fetched_at < P.ttl then
-            mem_set("followed_artists", c.items, P.ttl)
-            return c.items, true
+    local tried, fresh = false, false
+    local items = cached_fetch("followed_artists", P.artists, P.ttl, function()
+        tried = true
+        local out, after = {}, nil
+        while true do
+            local p = "type=artist&limit=50"
+            if after then p = p .. "&after=" .. after end
+            local d = api_get("me/following", p)
+            if not d or not d.artists or not d.artists.items then return nil end
+            if #d.artists.items == 0 then break end
+            for _, a in ipairs(d.artists.items) do out[#out+1] = a end
+            if not d.artists.next then break end
+            after = d.artists.cursors and d.artists.cursors.after
         end
-    end
-    local items = {}
-    local after = nil
-    while true do
-        local p = "type=artist&limit=50"
-        if after then p = p .. "&after=" .. after end
-        local d = api_get("me/following", p)
-        if not d or not d.artists or not d.artists.items then return (c and c.items) or {}, false end
-        if #d.artists.items == 0 then break end
-        for _, a in ipairs(d.artists.items) do items[#items+1] = a end
-        if not d.artists.next then break end
-        after = d.artists.cursors and d.artists.cursors.after
-    end
-    table.sort(items, function(a,b) return (a.name or ""):lower() < (b.name or ""):lower() end)
-    write_file(P.artists, json.encode({fetched_at=os.time(), items=items}))
-    mem_set("followed_artists", items, P.ttl)
-    return items, true
+        fresh = true
+        return Util.lib_sorted(out)
+    end, {stale_ok = true, revalidate = "library"})
+    return items or {}, items ~= nil and (fresh or not tried)
 end
 
 local function fetch_library_with_fallback()
@@ -2426,50 +3228,111 @@ local function save_library_cache(tracks, albums, artists)
         Util.mark_availability(tracks)
         mem_set("liked_tracks", tracks, P.ttl)
         build_liked_artist_index(tracks)
-        write_file(P.liked, json.encode({fetched_at=os.time(), tracks=tracks}))
-        local ids = {}
-        for _, t in ipairs(tracks) do if t.id then ids[#ids+1] = t.id end end
-        write_file(P.liked_ids, json.encode(ids))
+        Util.persist_liked(tracks)
     end
     if albums then
         Util.mark_availability(albums)
         mem_set("saved_albums", albums, P.ttl)
-        write_file(P.albums, json.encode({fetched_at=os.time(), items=albums}))
+        disk_set(P.albums, albums)
     end
     if artists then
         mem_set("followed_artists", artists, P.ttl)
-        write_file(P.artists, json.encode({fetched_at=os.time(), items=artists}))
+        disk_set(P.artists, artists)
     end
 end
 
 local function load_liked_tracks()
-    local cached = mem_get("liked_tracks")
-    if cached then
-        if not liked_by_artist_id then build_liked_artist_index(cached) end
-        return cached
+    local fresh = false
+    local tracks = cached_fetch("liked_tracks", P.liked, P.ttl, function()
+        local t = load_liked_tracks_full()
+        if not t then return nil end
+        -- cached_fetch writes the track file itself; only the derived id list is
+        -- this function's to keep in step.
+        Util.write_liked_ids(t)
+        fresh = true
+        return t
+    end, {stale_ok = true, revalidate = "library"}) or {}
+    -- The artist index is per-process, so it has to exist before the first return
+    -- of a run -- and be rebuilt when the list underneath it just changed.
+    if fresh or not liked_by_artist_id then build_liked_artist_index(tracks) end
+    return tracks
+end
+
+-- LIBRARY FRESHNESS
+--
+-- The library is the one cache where "has this changed?" is enormously cheaper
+-- than "give it to me again": three ~1 KB requests against the ~35 pages
+-- parallel_fetch_library walks for a 1578-track library. Each list's head -- its
+-- total, plus the newest entry's id and date -- is the fingerprint. Asking is so
+-- cheap that P.ttl can be minutes instead of half a day, which is the whole
+-- point: staleness is now bounded by how often you open spoot, not by a number
+-- picked to keep you from being blocked.
+--
+-- Answers nil when the probe itself failed, which is NOT the same as "unchanged"
+-- and must never be stored: an offline probe would otherwise write a fingerprint
+-- that matches nothing and force a re-page on the next run.
+function Util.lib_probe(kind)
+    if kind == "artists" then
+        local d = api_get("me/following", "type=artist&limit=1")
+        local a = d and d.artists
+        if not a then return nil end
+        local first = a.items and a.items[1]
+        return (a.total or -1) .. ":" .. ((first and first.id) or "")
     end
-    local c = safe_decode(read_file(P.liked))
-    if c and c.tracks and type(c.tracks) == "table" then
-        if type(c.fetched_at) ~= "number" or os.time() - c.fetched_at < P.ttl then
-            mem_set("liked_tracks", c.tracks, P.ttl)
-            build_liked_artist_index(c.tracks)
-            return c.tracks
+    local d = api_get(kind == "liked" and "me/tracks" or "me/albums", "limit=1")
+    if not d or not d.items then return nil end
+    local e = d.items[1]
+    local obj = e and (e.track or e.album)
+    return (d.total or -1) .. ":" .. ((obj and obj.id) or "") .. ":" .. ((e and e.added_at) or "")
+end
+
+-- Records what the library looked like at the moment it was fully re-paged, so
+-- the next probe has something to compare against. Every path that rebuilds all
+-- three caches calls this -- the revalidator below, the cold build in
+-- init_library, System > Refresh Library -- because a full refresh that left no
+-- fingerprint would be re-paged again by the very next background check.
+--
+-- `fp` is the probe result the caller already has, if any; the revalidator does,
+-- the other two do not and pay three small requests here. An incomplete probe
+-- writes nothing: no record means one wasted re-page later, a wrong record means
+-- edits that never show up.
+function Util.lib_fp_write(fp)
+    fp = fp or {}
+    for _, kind in ipairs({"liked", "albums", "artists"}) do
+        if not fp[kind] then fp[kind] = Util.lib_probe(kind) end
+        if not fp[kind] then return end
+    end
+    fp.full_at = os.time()
+    disk_set(P.lib_fp, fp)
+end
+
+Util.REVALIDATORS.library = function()
+    local fp = disk_get(P.lib_fp) or {}
+    local now = {}
+    for _, kind in ipairs({"liked", "albums", "artists"}) do
+        local v = Util.lib_probe(kind)
+        -- One failed probe and the whole run stands down. Refreshing on partial
+        -- information would either re-page a library that never moved or, worse,
+        -- record a fingerprint for a list we did not actually check.
+        if not v then return end
+        now[kind] = v
+    end
+    local changed = now.liked ~= fp.liked or now.albums ~= fp.albums
+                 or now.artists ~= fp.artists
+                 or os.time() - (tonumber(fp.full_at) or 0) >= P.ttl_lib_max
+    if not changed then
+        -- Nothing moved: make the three caches read as current without rewriting
+        -- them. A touch that cannot be made (an envelope this cannot parse) is
+        -- treated as a reason to do the real work rather than to guess.
+        if Util.cache_touch(P.liked) and Util.cache_touch(P.albums)
+           and Util.cache_touch(P.artists) then
+            return
         end
     end
-    local tracks = load_liked_tracks_full()
-    if not tracks then
-        tracks = (c and c.tracks and type(c.tracks) == "table") and c.tracks or {}
-        mem_set("liked_tracks", tracks, P.ttl)
-        build_liked_artist_index(tracks)
-        return tracks
-    end
-    write_file(P.liked, json.encode({fetched_at=os.time(), tracks=tracks}))
-    local ids = {}
-    for _, t in ipairs(tracks) do if t.id then ids[#ids+1] = t.id end end
-    write_file(P.liked_ids, json.encode(ids))
-    mem_set("liked_tracks", tracks, P.ttl)
-    build_liked_artist_index(tracks)
-    return tracks
+    local tracks, albums, artists = fetch_library_with_fallback()
+    if not tracks then return end
+    save_library_cache(tracks, albums, artists)
+    Util.lib_fp_write(now)
 end
 
 -- PLAYBACK STATE
@@ -2631,9 +3494,46 @@ display_track = function(item, hide_artist, hide_liked, hide_single_artist)
     return txt
 end
 
+-- A one-track album is a single, and selecting it plays that track rather than
+-- opening a list of one (see Util.open_album). The row says so two ways:
+--
+--   * \u{F069F} in #fab387, ALWAYS -- a fixed colour independent of playback, so
+--     "this plays straight away" is legible at a glance in any list.
+--   * the ▶/⏸ marker and the green row of display_track while its track is the
+--     one playing. `total_tracks` comes with every album object and the album id
+--     is on the playing track, so neither costs a fetch.
 local function display_album(item, show_artist)
-    if not show_artist and #(item.artists or {}) <= 1 then return item.name or "Unknown" end
-    return (item.name or "Unknown") .. album_suffix(item)
+    local body = (not show_artist and #(item.artists or {}) <= 1)
+        and (item.name or "Unknown")
+        or ((item.name or "Unknown") .. album_suffix(item))
+    if item.total_tracks ~= 1 then return body end
+    local playing = current_track and current_track.album
+                    and current_track.album.id == item.id and item.id ~= nil
+    -- Single glyph FIRST, transport marker after it: the glyph is what the row
+    -- is, the marker is what it is doing, and a fixed leading column reads
+    -- better than one that shifts right whenever playback starts.
+    local mark = playing and (is_playing and "\u{f04b} " or "\u{f04c} ") or ""
+    body = Util.markup('<span foreground="#fab387">') .. "\u{F069F}"
+           .. Util.markup("</span>") .. " " .. mark .. body
+    if playing then
+        body = Util.markup('<span foreground="#b6e0a4">') .. body .. Util.markup("</span>")
+    end
+    return body
+end
+
+-- The album row builder, in one place. Four call sites had a copy of this loop,
+-- and with singles now carrying live playback state the rows have to be
+-- REBUILDABLE -- a marker that only appears on the next open is no marker.
+-- `numbered` matches format_entries' "%2d. " prefix, which the search result
+-- lists use and the standalone album lists do not. Rebuilding a search list
+-- without it would silently strip the numbering off every row.
+function Util.album_entries(items, show_artist, numbered)
+    local out = {}
+    for i, a in ipairs(items or {}) do
+        local row = display_album(a, show_artist ~= false)
+        out[i] = numbered and string.format("%2d. %s", i, row) or row
+    end
+    return out
 end
 
 local function display_artist(item)
@@ -2979,15 +3879,52 @@ local function do_play(item, ctx_type, ctx_id, all_items, idx)
     return false
 end
 
+-- Resume or pause what is already loaded, and keep our idea of the transport in
+-- step with it. Six copies of these three lines existed; the memo bust is the
+-- one that was easy to forget, and forgetting it leaves every ▶ marker drawn for
+-- the next second showing the state we just left.
+-- Returns whether playerctl accepted it, so a caller that wants to report the
+-- failure can (view_playback does) without repeating the call. The flag moves
+-- only on success: claiming paused after a pause that never happened leaves the
+-- marker lying until the next sync corrects it.
+function Util.transport(playing)
+    local r = os.execute("playerctl " .. (playing and "play" or "pause") .. " 2>/dev/null")
+    Util.playerctl_bust()
+    local ok = r == true or r == 0
+    if ok then is_playing = playing end
+    return ok
+end
+
+-- What pressing Return on a playable row means, in one place: the row that is
+-- already playing toggles, any other row starts. Four lists spelled this out
+-- identically, and a one-track album -- which IS a track row, just drawn as an
+-- album -- needs the same rule rather than a fifth copy of it.
+--
+-- current_track is adopted only when the request actually went out: do_play
+-- refuses an unavailable track and answers false with no token, and claiming it
+-- playing anyway moved the marker to a row that never started.
+function Util.play_or_toggle(item, ctx_type, ctx_id, all_items, idx)
+    if not item then return false end
+    if item.id and item.id == current_id then
+        Util.transport(not is_playing)
+        return true
+    end
+    if do_play(item, ctx_type, ctx_id, all_items, idx) then
+        current_track = item
+        current_id = item.id
+        is_playing = true
+        return true
+    end
+    return false
+end
+
 local _liked_dirty = false
 
 local function flush_liked_cache()
     if not _liked_dirty then return end
     local tracks = mem_get("liked_tracks")
-    if not tracks then
-        local c = safe_decode(read_file(P.liked))
-        tracks = (c and c.tracks and type(c.tracks) == "table") and c.tracks or {}
-    end
+    if type(tracks) ~= "table" then tracks = disk_get(P.liked) end
+    if type(tracks) ~= "table" then tracks = {} end
     local id_set = {}
     for _, t in ipairs(tracks) do if t.id then id_set[t.id] = true end end
     local new_ids = {}
@@ -3037,29 +3974,30 @@ local function flush_liked_cache()
     -- reason: Util.optimistic_like and do_like respectively already ran them
     -- against this same unchanged list.
     if not changed then return end
-    write_file(P.liked, json.encode({fetched_at=os.time(), tracks=tracks}))
-    local ids = {}
-    for _, t in ipairs(tracks) do if t.id then ids[#ids+1] = t.id end end
-    write_file(P.liked_ids, json.encode(ids))
+    Util.persist_liked(tracks)
     build_liked_artist_index(tracks)
     bust_format_cache()
 end
 
+-- The flat id list every display helper reads for its heart glyph. Derived from
+-- the track cache rather than maintained alongside it, so the two cannot drift.
+function Util.write_liked_ids(tracks)
+    local ids = {}
+    for _, t in ipairs(tracks or {}) do if t.id then ids[#ids+1] = t.id end end
+    write_file(P.liked_ids, json.encode(ids))
+end
+
 function Util.persist_liked(tracks)
     tracks = tracks or {}
-    write_file(P.liked, json.encode({fetched_at=os.time(), tracks=tracks}))
-    local ids = {}
-    for _, t in ipairs(tracks) do if t.id then ids[#ids+1] = t.id end end
-    write_file(P.liked_ids, json.encode(ids))
+    disk_set(P.liked, tracks)
+    Util.write_liked_ids(tracks)
 end
 
 function Util.optimistic_like(item, unlike)
     if not (item and item.id) then return nil end
     local tracks = mem_get("liked_tracks")
-    if not tracks then
-        local c = safe_decode(read_file(P.liked))
-        tracks = (c and c.tracks and type(c.tracks) == "table") and c.tracks or {}
-    end
+    if type(tracks) ~= "table" then tracks = disk_get(P.liked) end
+    if type(tracks) ~= "table" then tracks = {} end
     if unlike then
         for i = #tracks, 1, -1 do
             if tracks[i].id == item.id then table.remove(tracks, i) end
@@ -3198,10 +4136,7 @@ end
 function Util.album_is_saved(album_id)
     if not album_id then return false end
     local items = mem_get("saved_albums")
-    if not items then
-        local c = safe_decode(read_file(P.albums))
-        items = c and c.items
-    end
+    if not items then items = disk_get(P.albums) end
     if type(items) == "table" then
         for _, a in ipairs(items) do if a.id == album_id then return true end end
         return false
@@ -3278,7 +4213,7 @@ local function album_action_menu(album)
 end
 
 local function playlist_action_menu(pl)
-    local acts = {"Open Playlist", "Save Playlist", "Copy URL"}
+    local acts = {"Open Playlist", "Save Playlist", "Playlist Art", "Copy URL"}
     local pl_ac_key = "pl-ac:" .. (pl.id or "")
     local pre_sel = 0
     local saved = Util.pos_get(pl_ac_key)
@@ -3290,7 +4225,9 @@ local function playlist_action_menu(pl)
     if action then
         Util.pos_put(pl_ac_key, action)
     end
-    if action == "Save Playlist" then
+    if action == "Playlist Art" then
+        view_art(pl)
+    elseif action == "Save Playlist" then
         rofi_message(do_save_playlist(pl.id) and "Playlist saved" or "Failed to save playlist")
     elseif action == "Copy URL" then
         copy_spotify_url("playlist", pl.id)
@@ -3399,7 +4336,7 @@ local function api_get_album(album_id)
             end
         end
         return d
-    end)
+    end, {revalidate = "album", revalidate_arg = album_id})
 end
 
 -- The aligned label/value sheet behind Album and Track Details, which carried
@@ -3481,7 +4418,16 @@ Util.view_track_details = function(item)
     s.show()
 end
 
-api_get_playlist_tracks = function(playlist_id)
+-- `snapshot` is the playlist's snapshot_id, which Spotify changes exactly when
+-- its contents change. Handed to cached_fetch as the validity tag, it replaces
+-- guessing with knowing: a playlist you have opened before is a disk read for as
+-- long as it genuinely has not moved, and refetches the moment it has -- including
+-- edits made on your phone, which no TTL could catch any sooner than its expiry.
+--
+-- The old 1800s TTL survives as the fallback for callers with no token, and is
+-- why this was slow: every one of these files expires mid-session, so reopening a
+-- 739-track playlist meant eight sequential pages before the menu could draw.
+api_get_playlist_tracks = function(playlist_id, snapshot)
     return cached_fetch("playlist_tracks_" .. playlist_id, P.mass .. "/playlist_tracks_" .. playlist_id .. ".json", 1800, function()
         return Util.paged_fetch("playlists/" .. playlist_id .. "/tracks",
             -- `explicit` has to be in the mask: this is the only track source in
@@ -3499,45 +4445,131 @@ api_get_playlist_tracks = function(playlist_id)
                 end
                 return nil
             end)
-    end)
+    end, {tag = snapshot})
 end
 
--- `limit` is per TYPE, which is why the caller sets it rather than this always
--- using P.max: a combined search asks for four types at once but
--- format_search_results shows only 5 of each, so P.max there would pull 229 KB
--- to render 20 rows (measured; 46 KB at a limit of 10). Single-category searches
--- display everything they fetch and pass P.max.
-local function api_search(query, stype, limit)
-    limit = limit or P.max
-    local mem_key = "search:" .. query .. ":" .. stype .. ":" .. limit
-    local cached = mem_get(mem_key)
-    if cached then return cached end
-    local d = api_get("search", Util.with_market("q=" .. url_encode(query) .. "&type=" .. stype .. "&limit=" .. limit))
-    if d then
-        for _, k in ipairs({"tracks","albums","artists","playlists"}) do
-            if d[k] and d[k].items then d[k] = d[k].items end
+-- Everything that changes a playlist's tracks has to drop both copies of them,
+-- and the pair was written out at three call sites. One name so a fourth
+-- mutation cannot forget half of it.
+function Util.bust_playlist_tracks(playlist_id)
+    if not playlist_id then return end
+    disk_bust(P.mass .. "/playlist_tracks_" .. playlist_id .. ".json")
+    mem_bust("playlist_tracks_" .. playlist_id)
+    disk_bust(Util.playlist_meta_path(playlist_id))
+    mem_bust("playlist_meta_" .. playlist_id)
+end
+
+function Util.playlist_meta_path(id) return P.mass .. "/playlist_meta_" .. id .. ".json" end
+
+-- ONE owner of "what does playlist X look like right now" -- its name, cover,
+-- owner, size, and above all its snapshot_id, which is what decides whether the
+-- cached tracks are still current.
+--
+-- This exists as a CACHE rather than as fields on the session stack, and the
+-- difference matters: a stack entry is a record of where you were and never
+-- changes, so a snapshot kept there would go on validating the same tracks
+-- forever. An editorial playlist -- Discover Weekly, daylist, Release Radar --
+-- would then be frozen at whatever it held the day the session was written.
+-- A cache has a TTL and a background refresh, so the snapshot self-corrects.
+function Util.playlist_meta(id)
+    if not id or #id == 0 then return nil end
+    return cached_fetch("playlist_meta_" .. id, Util.playlist_meta_path(id), CACHE_TTL_MED,
+        function()
+            return api_get("playlists/" .. id,
+                "fields=id,name,images,owner,snapshot_id,tracks(total)")
+        end, {revalidate = "playlist_meta", revalidate_arg = id})
+end
+
+-- Records what a list already told us, so replaying into this playlist never has
+-- to ask. The list it came from is itself refreshed on its own schedule, so this
+-- is as current as that list was.
+function Util.playlist_meta_seed(pl)
+    if not (pl and pl.id and pl.snapshot_id) then return end
+    disk_set(Util.playlist_meta_path(pl.id), {
+        id = pl.id, name = pl.name, images = pl.images, owner = pl.owner,
+        snapshot_id = pl.snapshot_id,
+        tracks = pl.tracks and {total = tonumber(pl.tracks.total)} or nil,
+    })
+    mem_set("playlist_meta_" .. pl.id, nil, 0)
+end
+
+-- Refreshes the snapshot FIRST, then lets it decide whether the tracks need
+-- re-paging: with Util.revalidating cleared, api_get_playlist_tracks goes back to
+-- its ordinary tag check, so an unchanged playlist costs one small request and a
+-- changed one is fully rebuilt. Blanket-refetching instead would re-page 739
+-- tracks every hour to learn nothing.
+Util.REVALIDATORS.playlist_meta = function(id)
+    if not id or #id == 0 then return end
+    local m = Util.playlist_meta(id)
+    Util.revalidating = false
+    if m and m.snapshot_id then api_get_playlist_tracks(id, m.snapshot_id) end
+end
+
+-- Searches are cached to DISK, not just memory. A warm start is a new process
+-- with an empty memo, so replaying onto a search result refetched every time --
+-- measured at 695 ms single-category and 511 ms combined, which is the whole of
+-- that delay. It is network, so memory alone cannot fix it: the memo does not
+-- survive the restart that IS the warm start.
+--
+-- Lifetime is the daemons' -- both kill paths call Util.drop_search_cache -- with
+-- CACHE_TTL_LONG as a backstop, because daemons can run for weeks and the
+-- catalogue does move. The trade is deliberate: repeating a search inside that
+-- window answers from disk instead of requerying.
+function Util.search_cache_path(key)
+    -- Queries are arbitrary user text, so the filename is a sanitised prefix for
+    -- legibility plus a djb2 hash of the WHOLE key. A collision then needs both
+    -- to match, rather than just 32 bits.
+    local h = 5381
+    for i = 1, #key do h = (h * 33 + key:byte(i)) % 0x100000000 end
+    local tag = key:gsub("[^%w]", "_"):sub(1, 32)
+    return P.mass .. "/search_" .. tag .. "_" .. string.format("%08x", h) .. ".json"
+end
+
+function Util.drop_search_cache()
+    mem_bust("search:")
+    os.execute("rm -f " .. shell_quote(P.mass) .. "/search_*.json 2>/dev/null")
+end
+
+-- One search, one shape: all four types in one request, P.max of each. Neither
+-- the type list nor the limit is a parameter any more -- there is no second
+-- caller to vary them, and both belonged to the type picker that is gone.
+local function api_search(query)
+    local stype, limit = "track,album,artist,playlist", P.max
+    local key = "search:" .. query .. ":" .. stype .. ":" .. limit
+    return cached_fetch(key, Util.search_cache_path(key), CACHE_TTL_LONG, function()
+        local d = api_get("search", Util.with_market("q=" .. url_encode(query) .. "&type=" .. stype .. "&limit=" .. limit))
+        if d then
+            for _, k in ipairs({"tracks","albums","artists","playlists"}) do
+                if d[k] and d[k].items then d[k] = d[k].items end
+            end
         end
-        mem_set(mem_key, d, 30)
-    end
-    return d
+        return d
+    end)
 end
 
 local function api_get_me()
     return cached_fetch("me_profile", P.cache .. "/me_profile.json", CACHE_TTL_MED, function()
         return api_get("me")
-    end)
+    end, {revalidate = "me_profile"})
 end
 -- Util.market() needs this, and it is declared far above where this local
 -- exists. Published rather than duplicated so there stays one profile fetch.
 Util.api_get_me = api_get_me
 
+-- Five minutes is shorter than the gap between two ordinary uses of spoot, so
+-- this expired before nearly every open and the Playlists menu paid a ~340ms
+-- round trip before it could draw. `revalidate` keeps the TTL honest while
+-- refusing to make the menu wait for it: the expired list draws now and the
+-- refresh lands behind it. Every change made INSIDE spoot calls
+-- bust_my_playlists, which removes the file outright, so those are never stale.
 local function api_get_my_playlists()
     return cached_fetch("my_playlists", P.cache .. "/my_playlists.json", CACHE_TTL_SHORT, function()
         return Util.paged_fetch("me/playlists",
             function(o) return "limit=50&offset=" .. o end,
             function(d, items) return #items == 0 or not d.next end)
-    end)
+    end, {revalidate = "my_playlists"})
 end
+Util.REVALIDATORS.my_playlists = function() return api_get_my_playlists() end
 
 -- PLAYLIST MEMBERSHIP INDEX
 --
@@ -3594,6 +4626,32 @@ function Util.spawn_plindex()
     Util.spawn_self({"--prefetch-plindex"}, nil, pidf)
 end
 
+function Util.spawn_revalidate(name, arg2)
+    if Util.detached or Util.revalidating then return end
+    if not name or not Util.REVALIDATORS[name] then return end
+    -- One per name, not one per open: a menu redraws freely, and without this
+    -- guard every draw during a slow refresh would start another refresh. Same
+    -- pid-file liveness idiom as spawn_art_prefetch and spawn_plindex.
+    local pidf = P.tmp .. "/spoot_reval_" .. name:gsub("[^%w_]", "") .. ".pid"
+    if Util.pidfile_owner_alive(pidf, "--revalidate") then return end
+    local args = {"--revalidate", name}
+    if arg2 then args[#args+1] = tostring(arg2) end
+    Util.spawn_self(args, nil, pidf)
+end
+
+function Util.run_revalidate()
+    Util.detached = true
+    local fn = Util.REVALIDATORS[arg[2] or ""]
+    if not fn then os.exit(0) end
+    ensure_cache()
+    -- Set for the whole call: everything it reaches goes through cached_fetch,
+    -- and every one of those reads has to be skipped, not just the outermost.
+    Util.revalidating = true
+    pcall(fn, arg[3])
+    Util.revalidating = false
+    os.exit(0)
+end
+
 -- Read-only and non-blocking: view_actions already stalls up to 1.5s on
 -- resolve_lyrics_state, so it must never also wait on a walk of every playlist.
 -- A stale index is served while a rebuild runs in the background.
@@ -3644,8 +4702,7 @@ function Util.do_remove_from_playlist(playlist_id, track_id)
     local url = "https://api.spotify.com/v1/playlists/" .. playlist_id .. "/tracks"
     local r = Util.api_write("DELETE", url, token, {body=body})
     if not Util.is2xx(r) then return false end
-    disk_bust(P.mass .. "/playlist_tracks_" .. playlist_id .. ".json")
-    mem_bust("playlist_tracks_" .. playlist_id)
+    Util.bust_playlist_tracks(playlist_id)
     Util.pl_index_patch(playlist_id, track_id, false)
     return true
 end
@@ -3655,19 +4712,19 @@ local function api_get_artist_albums(artist_id)
         return Util.paged_fetch("artists/" .. artist_id .. "/albums",
             function(o) return "limit=50&offset=" .. o .. "&include_groups=album,single,compilation" end,
             function(d, items) return #items == 0 or not d.next end)
-    end)
+    end, {revalidate = "artist_albums", revalidate_arg = artist_id})
 end
 
 local function api_get_artist_top_tracks(artist_id)
     return cached_fetch("artist_top_" .. artist_id, P.mass .. "/artist_top_" .. artist_id .. ".json", CACHE_TTL_MED, function()
         return api_get("artists/" .. artist_id .. "/top-tracks", Util.with_market())
-    end)
+    end, {revalidate = "artist_top", revalidate_arg = artist_id})
 end
 
 local function api_get_artist_related(artist_id)
     return cached_fetch("artist_related_" .. artist_id, P.mass .. "/artist_related_" .. artist_id .. ".json", CACHE_TTL_LONG, function()
         return api_get("artists/" .. artist_id .. "/related-artists")
-    end)
+    end, {revalidate = "artist_related", revalidate_arg = artist_id})
 end
 
 local function api_get_tracks(ids)
@@ -3680,9 +4737,49 @@ local function api_get_tracks(ids)
     return map
 end
 
-local function api_get_recommendations(track_id)
-    if not track_id then return nil end
-    local d = api_get("recommendations", Util.with_market("seed_tracks=" .. track_id .. "&limit=50"))
+-- Same shape as api_get_top_tracks above, deliberately: the per-range
+-- cached_fetch, the paged walk, and the medium -> long -> short fall-through
+-- with the same "return nil, never {}" rule that makes the fall-through work.
+-- That last part is load-bearing here too -- short_term really is empty on a
+-- listening history this app has only recently started seeing.
+function Util.api_get_top_artists()
+    for _, rng in ipairs({"medium_term","long_term","short_term"}) do
+        local artists = cached_fetch("top_artists_" .. rng, P.cache .. "/top_artists_" .. rng .. ".json", CACHE_TTL_MED, function()
+            local got = 0
+            local all = Util.paged_fetch("me/top/artists",
+                function(o) return "limit=50&offset=" .. o .. "&time_range=" .. rng end,
+                function(d, items)
+                    got = got + #items
+                    return #items == 0 or not d.next or got >= P.top_max
+                end)
+            if not all or #all == 0 then return nil end
+            return all
+        end, {revalidate = "top_artists"})
+        if artists then return artists end
+    end
+end
+
+-- The exact call view_followed_artists makes, so artist rows, Shift+Return
+-- actions and the artist hub all behave identically here.
+function Util.view_top_artists()
+    local ar = Util.api_get_top_artists()
+    if not ar or #ar == 0 then rofi_message("No top artists"); return end
+    Util.scope({view="top-artists"}, function()
+        local entries = {}
+        for i, a in ipairs(ar) do entries[i] = display_artist(a) end
+        view_browse(entries, ar, "Top Artists" .. SEP .. #ar .. " artists", "artist-list", nil, nil, true)
+    end)
+end
+
+-- `seed` is the whole seed_* parameter, so a genre shelf and a "More Like" both
+-- come through here rather than growing a second copy of the stub repair below.
+--
+-- Note for later: /recommendations is deprecated for new applications and works
+-- only because this client ID predates that. Two features now depend on it, so
+-- if Spotify withdraws it for old clients as well, both go at once.
+local function api_get_recommendations(seed)
+    if not seed or #seed == 0 then return nil end
+    local d = api_get("recommendations", Util.with_market(seed .. "&limit=50"))
     if not d or not d.tracks or #d.tracks == 0 then return nil end
     local stubs = {}
     for i, t in pairs(d.tracks) do
@@ -3708,14 +4805,62 @@ local function api_get_categories()
     return cached_fetch("categories", P.cache .. "/categories.json", CACHE_TTL_LONG, function()
         local d = api_get("browse/categories", "limit=50")
         if d and d.categories and d.categories.items then return d.categories.items end
-    end)
+    end, {revalidate = "categories"})
 end
+
+-- At most this many name-less rows are resolved per shelf. One request each --
+-- there is no batch endpoint for playlists -- so it is bounded rather than
+-- unlimited, and it happens inside the cached_fetch below so the finished list
+-- is what lands on disk. A shelf therefore pays it once per TTL, not per draw.
+-- On Util, not a local: the chunk body is one function at Lua's 200-local cap.
+Util.CATEGORY_BACKFILL_MAX = 20
 
 local function api_get_category_playlists(cat_id)
     return cached_fetch("category_playlists_" .. cat_id, P.mass .. "/category_playlists_" .. cat_id .. ".json", CACHE_TTL_MED, function()
-        local d = api_get("browse/categories/" .. cat_id .. "/playlists", "limit=50")
-        if d and d.playlists and d.playlists.items then return d.playlists.items end
-    end)
+        -- locale, or names arrive in the account's market language: the Charts
+        -- shelf comes back as "أنجح الأغاني - مصر" rather than "Top Songs -
+        -- Egypt". Every other string spoot draws is English and the themes use a
+        -- Latin mono face, so the menu should match.
+        local d = api_get("browse/categories/" .. cat_id .. "/playlists", "limit=50&locale=en_US")
+        if not (d and d.playlists and d.playlists.items) then return nil end
+        local out, thin = {}, {}
+        for _, pl in ipairs(d.playlists.items) do
+            -- No id is nothing we can open. A missing NAME is different: the
+            -- Made For You shelf returns 15 such rows and they are real
+            -- playlists -- one of them is Classical Mix, 50 tracks with artwork
+            -- -- the listing just omits the name. They used to draw as
+            -- "Unknown", so resolve them rather than dropping them.
+            if pl and pl.id then
+                out[#out+1] = pl
+                if (not pl.name or #pl.name == 0) and #thin < Util.CATEGORY_BACKFILL_MAX then
+                    thin[#thin+1] = pl
+                end
+            end
+        end
+        for _, pl in ipairs(thin) do
+            local full = api_get("playlists/" .. pl.id, "fields=name,owner,images,tracks(total)")
+            if full and full.name and #full.name > 0 then
+                pl.name   = full.name
+                pl.owner  = pl.owner  or full.owner
+                pl.images = (pl.images and #pl.images > 0) and pl.images or full.images
+                pl.tracks = pl.tracks or full.tracks
+            end
+        end
+        -- A handful are nameless UPSTREAM -- a direct fetch answers "" too -- so
+        -- after trying, drop what still cannot be labelled rather than drawing an
+        -- "Unknown" row nobody can act on.
+        local keep = {}
+        for _, pl in ipairs(out) do
+            if pl.name and #pl.name > 0 then keep[#keep+1] = pl end
+        end
+        if #keep == 0 then return nil end
+        return keep
+    end, {revalidate = "category_playlists", revalidate_arg = cat_id})
+end
+-- A category shelf costs up to 21 requests to rebuild (the name backfill), which
+-- is exactly why its expiry must not land on a menu that is trying to draw.
+Util.REVALIDATORS.category_playlists = function(cat_id)
+    if cat_id and #cat_id > 0 then return api_get_category_playlists(cat_id) end
 end
 
 local function api_get_top_tracks()
@@ -3737,16 +4882,62 @@ local function api_get_top_tracks()
             -- empty result, which would look like success and stop the walk.
             if not all or #all == 0 then return nil end
             return all
-        end)
+        end, {revalidate = "top_tracks"})
         if tracks then return tracks end
     end
+end
+
+-- Spotify's editorial shelf. Answers a `message` headline ("Popular Playlists")
+-- alongside the list, which is worth showing since it is the only label the
+-- shelf has.
+--
+-- On the Nov 2024 deprecation list: it works for this client only because the
+-- id predates the cutoff, the same grandfathering that keeps More Like This and
+-- Related Artists alive. Every caller must tolerate nil.
+local function api_get_featured_playlists()
+    return cached_fetch("featured_playlists", P.cache .. "/featured_playlists.json", CACHE_TTL_MED, function()
+        local d = api_get("browse/featured-playlists", "limit=50")
+        local it = d and d.playlists and d.playlists.items
+        if not (it and #it > 0) then return nil end
+        -- Carried alongside the items so the view can title itself.
+        return {message = d.message, items = it}
+    end, {revalidate = "featured_playlists"})
 end
 
 local function api_get_new_releases()
     return cached_fetch("new_releases", P.cache .. "/new_releases.json", CACHE_TTL_LONG, function()
         local d = api_get("browse/new-releases", "limit=50")
         if d and d.albums and d.albums.items and #d.albums.items > 0 then return d.albums.items end
-    end)
+    end, {revalidate = "new_releases"})
+end
+
+-- The plain revalidators: every one of them is "call the fetcher again", so they
+-- are one table rather than eleven hand-written assignments that could only ever
+-- differ by typo. Placed here because this is the first point at which all of
+-- them exist; genre_seeds lives several thousand lines further down and is
+-- reached through Util at call time, which is why it alone needs a wrapper.
+--
+-- Not here, and each for its own reason stated at its definition:
+--   playlist_meta / my_playlists / category_playlists -- registered at their
+--     sites because they do more than re-call one function.
+--   library -- probes before it re-pages.
+--   playlist_tracks -- snapshot_id makes a stale copy WRONG, not merely old, so
+--     blocking on it is correct.
+--   search / lyrics -- keyed on arbitrary text, with nothing to refresh into.
+for name, fn in pairs({
+    album             = api_get_album,
+    artist_albums     = api_get_artist_albums,
+    artist_top        = api_get_artist_top_tracks,
+    artist_related    = api_get_artist_related,
+    top_artists       = Util.api_get_top_artists,
+    top_tracks        = api_get_top_tracks,
+    categories        = api_get_categories,
+    featured_playlists = api_get_featured_playlists,
+    new_releases      = api_get_new_releases,
+    me_profile        = api_get_me,
+    genre_seeds       = function() return Util.api_get_genre_seeds() end,
+}) do
+    Util.REVALIDATORS[name] = fn
 end
 
 local function lyrics_to_lines(plain)
@@ -3866,19 +5057,22 @@ end
 
 -- VIEW: BROWSE
 
-view_browse = function(entries, items, mesg, ctx, ctx_type, ctx_id, no_status)
+view_browse = function(entries, items, mesg, ctx, ctx_type, ctx_id, no_status, art_path)
     local is_track = ctx == "liked" or ctx == "top-tracks"
                   or ctx == "your-queue"
                   or ctx == "liked-by-artist" or ctx == "top-by-artist"
-                  or ctx == "track" or ctx == "recommendations"
-                  or ctx == "recently-played"
+                  or ctx == "recommendations"
+                  or ctx == "recently-played" or ctx == "genre"
                   or (ctx_type and ctx_id)
-    local is_album_list   = ctx == "album-list" or (ctx_type == "album" and not ctx_id) or ctx == "album" or ctx == "search-album"
-    local is_album_grid   = ctx == "album-list" or (ctx_type == "album" and not ctx_id) or ctx == "search-album"
-    local is_artist_list  = ctx == "artist-list" or ctx == "artist"
-    local is_playlist_list = (ctx_type == "playlist" and not ctx_id) or ctx == "search-playlist"
-    local is_search_all   = ctx == "all"
-    local is_search_ctx   = is_search_all or (ctx and ctx:match("^search%-")) or ctx == "track" or ctx == "artist"
+    local is_album_list   = ctx == "album-list" or (ctx_type == "album" and not ctx_id) or ctx == "album"
+    local is_album_grid   = ctx == "album-list" or (ctx_type == "album" and not ctx_id)
+    local is_artist_list  = ctx == "artist-list"
+    local is_playlist_list = (ctx_type == "playlist" and not ctx_id)
+    -- The search's one results list, mixing all four types. "track", "artist",
+    -- "search-album" and "search-playlist" used to arrive here too, one per
+    -- single-category search; every one of them died with the type picker, and
+    -- no caller passes them now.
+    local is_search       = ctx == "search"
     -- `or nil` to match what the CALLERS passed. format_entries keys its memo on
     -- tostring() of each flag, and callers wanting the default pass nil -- so a
     -- literal `false` here made "nil" ~= "false", and the first refresh of every
@@ -3899,22 +5093,30 @@ view_browse = function(entries, items, mesg, ctx, ctx_type, ctx_id, no_status)
     local _theme_guard <close> = setmetatable({}, {__close = function()
         if album_theme then os.remove(album_theme) end
     end})
-    if ctx == "album" then
+    if art_path then
+        -- A cover the CALLER resolved -- a playlist's own artwork. Same
+        -- album.rasi backdrop, but the image must not come from items[1], which
+        -- for a playlist is merely its first track and has nothing to do with
+        -- the playlist. Passing "" is meaningful: write_art_theme strips the
+        -- background-image line, so an artless list still gets the layout.
+        album_theme = Util.write_art_theme("album", art_path)
+    elseif ctx == "album" then
         local a = items[1] and items[1].album
         local art_url = a and a.images and a.images[1] and a.images[1].url or nil
-        -- Backdrop only: never make opening an album wait on the CDN.
-        local art_path = art_url and ensure_art(Util.art_url(art_url, "1e02"), nil, Util.ART_DECOR) or ""
-        album_theme = Util.write_art_theme("album", art_path)
+        -- Backdrop only: never make opening an album wait on the CDN. Named
+        -- `cover` rather than art_path so it cannot shadow the parameter above.
+        local cover = art_url and ensure_art(Util.art_url(art_url, "1e02"), nil, Util.ART_DECOR) or ""
+        album_theme = Util.write_art_theme("album", cover)
     end
     -- The theme this list actually draws with. Deliberately NOT folded into
     -- album_theme: that is a per-call file this view owns and the <close> guard
-    -- above deletes it, whereas THEME_SEARCHALL is resolved once at startup and
+    -- above deletes it, whereas THEME_RESULTS is resolved once at startup and
     -- shared for the app's lifetime -- assigning it there would delete it out
-    -- from under every later combined search.
+    -- from under every later search.
     --
     -- nil for everything else, which lets rofi_dmenu fall back to its usual
     -- use_menu/thumbs selection.
-    local view_theme = album_theme or (is_search_all and Util.THEME_SEARCHALL) or nil
+    local view_theme = album_theme or (is_search and Util.THEME_RESULTS) or nil
     -- Regenerates rows carrying live state (▶ marker, liked heart). Handed to
     -- rofi_dmenu as `refresh` so a redraw from inside -- a track played or liked
     -- in a hotkey-opened action menu -- shows the new state. Album, artist and
@@ -3925,11 +5127,22 @@ view_browse = function(entries, items, mesg, ctx, ctx_type, ctx_id, no_status)
     local function rebuild()
         if is_track then
             entries = format_entries(items, nil, hide_liked, hide_single_artist)
-        elseif is_search_all then
+        elseif is_search then
             entries = {}
             for i, it in ipairs(items) do entries[i] = Util.format_mixed_item(it, i) end
+        elseif is_album_list and not is_track then
+            -- Album rows carry live state now too: a single played from this
+            -- list has to take the ▶ marker without the list being reopened.
+            -- Guarded on `not is_track` because an album's TRACK list is
+            -- is_album_list as well, and its rows are handled above.
+            entries = Util.album_entries(items, true)
         end
-        if is_album_grid then Util.album_thumbs(entries, items) end
+        -- The row the menu is about to open on, resolved the same way
+        -- rofi_dmenu resolves it, so the covers fetched before the draw are the
+        -- ones about to be rendered.
+        local at = pre_sel or Util.pos_get(v_key)
+        if is_album_grid then Util.album_thumbs(entries, items, nil, at, v_key)
+        elseif is_playlist_list then Util.album_thumbs(entries, items, "playlist", at, v_key) end
         return entries
     end
     while true do
@@ -3939,8 +5152,8 @@ view_browse = function(entries, items, mesg, ctx, ctx_type, ctx_id, no_status)
         -- Album/artist/playlist rows open content on Return and actions on
         -- Shift+Return, so those lists claim the key. An album's TRACK list is
         -- is_album_list too, but is_track wins the dispatch and keeps the default.
-        local idx = rofi_dmenu(entries, {prompt=ctx or "Browse", mesg=mesg, custom=false, by_index=true, markup=(is_track or is_search_all or is_playlist_list or is_artist_list or is_album_list), theme=view_theme, use_menu=true, sel=pre_sel, pos_key=v_key, no_status=no_status or is_search_ctx, thumbs=is_album_grid, items=items, entries=entries, ctx_type=ctx_type, ctx_id=ctx_id, refresh=rebuild,
-            alt_select=((is_album_list and not is_track) or is_artist_list or is_playlist_list or is_search_all) or nil})
+        local idx = rofi_dmenu(entries, {prompt=ctx or "Browse", mesg=mesg, custom=false, by_index=true, markup=(is_track or is_search or is_playlist_list or is_artist_list or is_album_list), theme=view_theme, use_menu=true, sel=pre_sel, pos_key=v_key, no_status=no_status or is_search, thumbs=is_album_grid or is_playlist_list, items=items, entries=entries, ctx_type=ctx_type, ctx_id=ctx_id, refresh=rebuild,
+            alt_select=((is_album_list and not is_track) or is_artist_list or is_playlist_list or is_search) or nil})
         -- Read before anything else: the next rofi_dmenu call clears the flag.
         local alt = Util.alt_pressed
         Util.alt_pressed = false
@@ -3959,28 +5172,10 @@ view_browse = function(entries, items, mesg, ctx, ctx_type, ctx_id, no_status)
             local item = items[idx]
 
         if is_track then
-            if item.id == current_id then
-                if is_playing then
-                    os.execute("playerctl pause 2>/dev/null")
-                    Util.playerctl_bust()
-                    is_playing = false
-                else
-                    os.execute("playerctl play 2>/dev/null")
-                    Util.playerctl_bust()
-                    is_playing = true
-                end
-            elseif do_play(item, ctx_type, ctx_id, items, idx) then
-                -- Only on a request that actually went out: do_play refuses an
-                -- unavailable track (and answers false with no token), and
-                -- claiming it playing anyway moved the marker to a row that
-                -- never started.
-                current_track = item
-                current_id = item.id
-                is_playing = true
-            end
+            Util.play_or_toggle(item, ctx_type, ctx_id, items, idx)
             rebuild()
             pre_sel = idx - 1
-        elseif is_search_all then
+        elseif is_search then
             local st = item._stype
             if st == "tracks" and alt then
                 -- This list claims Shift+Return for its album and playlist rows,
@@ -4000,21 +5195,7 @@ view_browse = function(entries, items, mesg, ctx, ctx_type, ctx_id, no_status)
                         if it == item then tcidx = #tctx end
                     end
                 end
-                if item.id == current_id then
-                    if is_playing then
-                        os.execute("playerctl pause 2>/dev/null")
-                        Util.playerctl_bust()
-                        is_playing = false
-                    else
-                        os.execute("playerctl play 2>/dev/null")
-                        Util.playerctl_bust()
-                        is_playing = true
-                    end
-                elseif do_play(item, ctx_type, ctx_id, tctx, tcidx) then
-                    current_track = item
-                    current_id = item.id
-                    is_playing = true
-                end
+                Util.play_or_toggle(item, ctx_type, ctx_id, tctx, tcidx)
                 -- Deliberately no get_playback() here, matching the is_track
                 -- branch above. Within 5s it self-throttles to a no-op; past
                 -- that it is a ~300ms round trip that can still answer with the
@@ -4024,9 +5205,14 @@ view_browse = function(entries, items, mesg, ctx, ctx_type, ctx_id, no_status)
                 pre_sel = idx - 1
             elseif st == "albums" then
                 if not alt or album_action_menu(item) then
-                    -- browse_album reports its own failure now.
-                    browse_album(item.id, (item.name or "Unknown") .. album_suffix(item))
+                    -- browse_album reports its own failure now. `alt` is true only
+                    -- when the action menu ran, i.e. "Open Album" was asked for
+                    -- by name -- which must open even a single.
+                    Util.open_album(item, alt)
                     if jump_to_track_pending then return end
+                    -- A single played rather than opened; this list mixes types,
+                    -- so its rebuild is what puts the marker on the album row.
+                    rebuild()
                 end
             elseif st == "artists" then
                 Util.open_artist(item, alt)
@@ -4048,6 +5234,10 @@ view_browse = function(entries, items, mesg, ctx, ctx_type, ctx_id, no_status)
             -- below -- which is why it stays inline here rather than moving into
             -- the shared album_action_menu).
             local do_open = not alt
+            -- Set by either action list's "Open Album" row. Kept apart from
+            -- do_open because the two mean different things: plain Return on a
+            -- single plays it, asking for the album by name opens it.
+            local from_menu = false
             if alt and ctx == "album-list" then
                 local acts = {"Open Album", "Remove from Library", "Albumart", "Copy URL", "Album Details"}
                 if (item.artists or {})[1] then table.insert(acts, 2, "Go to Artist") end
@@ -4057,15 +5247,14 @@ view_browse = function(entries, items, mesg, ctx, ctx_type, ctx_id, no_status)
                 local act_alt = Util.alt_pressed
                 Util.alt_pressed = false
                 if action == "Open Album" then
-                    do_open = true
+                    do_open = true; from_menu = true
                 elseif action == "Remove from Library" then
                     -- Shares Util.do_remove_album with the album action menu;
                     -- only the row-pruning below is specific to this list.
                     if Util.do_remove_album(item.id) then
                         rofi_message("Removed from library")
                         table.remove(items, idx)
-                        entries = {}
-                        for i, a in ipairs(items) do entries[i] = display_album(a, true) end
+                        entries = Util.album_entries(items)
                         mesg = "Saved Albums" .. SEP .. #items .. " albums"
                         if #items == 0 then return end
                         goto br_next
@@ -4086,11 +5275,15 @@ view_browse = function(entries, items, mesg, ctx, ctx_type, ctx_id, no_status)
                 end
             elseif alt then
                 do_open = album_action_menu(item)
+                from_menu = do_open
             end
             if do_open then
                 -- browse_album reports its own failure now.
-                browse_album(item.id, (item.name or "Unknown") .. album_suffix(item))
+                Util.open_album(item, from_menu)
                 if jump_to_track_pending then return end
+                -- Util.open_album may have PLAYED this row rather than opened it
+                -- (a single), so the marker has to be re-derived before the redraw.
+                rebuild()
             end
             pre_sel = idx - 1
         elseif is_artist_list then
@@ -4135,16 +5328,63 @@ browse_album = function(album_id, mesg)
 end)
 end
 
+-- What a SELECTED album row does, as opposed to what browse_album does. A single
+-- -- one track -- plays that track instead of opening a list of one, which is the
+-- whole point of marking singles in display_album.
+--
+-- Deliberately NOT folded into browse_album: that function is what
+-- reg("album", …) replays on a warm start and what a pasted album URL opens, and
+-- neither may start music on its own. Only a deliberate selection comes here.
+--
+-- The mesg every caller used to build by hand lives here now too, which is what
+-- kept six copies of the same concatenation in step.
+-- `want_browse` is set by the callers that came through an action menu's "Open
+-- Album" row. Asking for the album by name means the album, even when it holds
+-- one track -- otherwise that row played the single and the one way to actually
+-- SEE a single's album did not exist.
+function Util.open_album(al, want_browse)
+    if not (al and al.id) then return false end
+    if al.total_tracks == 1 and not want_browse then
+        local ad = api_get_album(al.id)
+        -- api_get_album filters to what our market will actually serve, so an
+        -- album that says one track can still arrive with none, or (a
+        -- mislabelled compilation) with several. Anything but exactly one falls
+        -- through to the ordinary view rather than guessing which track you meant.
+        if ad and ad.tracks and #ad.tracks == 1 then
+            -- The same call a track row makes, so a single behaves exactly like
+            -- one: play it if it is not the current track, otherwise pause or
+            -- resume. Pressing Return twice used to restart it from the top.
+            Util.play_or_toggle(ad.tracks[1], "album", al.id, ad.tracks, 1)
+            return true
+        end
+    end
+    return browse_album(al.id, (al.name or "Unknown") .. album_suffix(al))
+end
+
 -- VIEW: ALBUM ART
 
+-- Tracks and albums carry their art on `item.album.images`; a playlist carries
+-- its own on `item.images`, and it is the PLAYLIST's cover that must show, not
+-- the first track's. `item.owner` marks that case: a playlist has no artists, so
+-- it captions itself with who made it.
 view_art = function(item)
-    if not item or not item.album or not item.album.images or #item.album.images == 0 then
+    local imgs = item and ((item.album and item.album.images) or item.images)
+    if not (imgs and imgs[1] and imgs[1].url) then
         rofi_message("No album art available"); return
     end
-    local art_url = item.album.images[1].url
-    local art_path = ensure_art(Util.art_url(art_url), "highres")
+    local art_path
+    if item.owner then
+        -- Cached by id under the playlist kind, not by art hash: an editorial
+        -- cover is replaced in place, and a hash-named file would strand the old
+        -- one on every weekly refresh.
+        art_path = Util.keyed_art("playlist", item, true, true, nil)
+    else
+        art_path = ensure_art(Util.art_url(imgs[1].url), "highres")
+    end
     if not art_path then rofi_message("No album art available"); return end
-    local mesg = Util.pango_escape((item.name or "Unknown") .. SEP .. artist_names(item))
+    local by = item.owner and (item.owner.display_name or item.owner.id or "Spotify")
+        or artist_names(item)
+    local mesg = Util.pango_escape((item.name or "Unknown") .. SEP .. by)
     local entry_tf = Util.tmpfile("art.in")
     local ef = io.open(entry_tf, "w")
     if ef then
@@ -4363,6 +5603,9 @@ view_actions = function(item, ctx_type, ctx_id, all_items, cidx, entries)
                         if tmp_theme then os.remove(tmp_theme) end
                         return
                     end
+                    -- browse_album, NOT Util.open_album: "Go to Album" is a
+                    -- request to SEE the album, so a one-track one must still
+                    -- open rather than start playing.
                     browse_album(album.id, (album.name or "Unknown") .. album_suffix(album))
                 end
             elseif key == "Go to Artist" then
@@ -4376,9 +5619,7 @@ view_actions = function(item, ctx_type, ctx_id, all_items, cidx, entries)
                 return
             end
         elseif key == "Resume" then
-            os.execute("playerctl play 2>/dev/null")
-            Util.playerctl_bust()
-            is_playing = true
+            Util.transport(true)
         elseif key == "Play" then
             if do_play(item, ctx_type, ctx_id, all_items, cidx) then
                 current_track = item
@@ -4386,9 +5627,7 @@ view_actions = function(item, ctx_type, ctx_id, all_items, cidx, entries)
                 is_playing = true
             end
         elseif key == "Pause" then
-            os.execute("playerctl pause 2>/dev/null")
-            Util.playerctl_bust()
-            is_playing = false
+            Util.transport(false)
         elseif key == "Add to Queue" then do_add_queue(item.id)
         elseif key == "Like" or key == "Unlike" then
             if do_like(item, key == "Unlike") then
@@ -4411,6 +5650,8 @@ view_actions = function(item, ctx_type, ctx_id, all_items, cidx, entries)
                 return
             end
             if album and album.id then
+                -- Same as the Shift+Return branch above: this row means "show me
+                -- the album", never "play it".
                 browse_album(album.id, (album.name or "Unknown") .. album_suffix(album))
             end
         elseif key == "Go to Artist" then
@@ -4478,8 +5719,7 @@ end
 local function fetch_artist_albums(artist_id, artist_name)
     local items = api_get_artist_albums(artist_id)
     if not items or #items == 0 then return nil end
-    local ae = {}
-    for i, a in ipairs(items) do ae[i] = display_album(a) end
+    local ae = Util.album_entries(items, false)
     return items, ae, (artist_name or "") .. SEP .. #items .. " albums"
 end
 
@@ -4515,41 +5755,26 @@ local function fetch_category_playlists(category_id, category_name)
     return pls, pe, (category_name or "") .. SEP .. #pls .. " playlists"
 end
 
-local function format_search_results(results, category, query)
-    if category == "all" then
-        local items = {}
-        for _, rk in ipairs({"tracks","albums","artists","playlists"}) do
-            local ci = results[rk]
-            if ci and type(ci) == "table" then
-                -- P.max_all, not a literal 5: this is the same number
-                -- Util.open_search_results sends as the API limit, so the list
-                -- displays exactly what was fetched however it is retuned.
-                for i = 1, math.min(#ci, P.max_all) do ci[i]._stype = rk; items[#items+1] = ci[i] end
-            end
+-- Everything the one request returned, in type order, each row stamped with the
+-- `_stype` view_browse dispatches on. No cap of its own: api_search asks for
+-- P.max per type and this shows P.max per type, so a number here could only ever
+-- hide results that were already paid for. The flat "no more than P.max rows in
+-- total" cap this used to carry was exactly that mistake -- harmless while a
+-- combined search fetched 20 items, but it would now throw away three types.
+local function format_search_results(results, query)
+    local items = {}
+    for _, rk in ipairs({"tracks","albums","artists","playlists"}) do
+        local ci = results[rk]
+        if ci and type(ci) == "table" then
+            for i = 1, #ci do ci[i]._stype = rk; items[#items+1] = ci[i] end
         end
-        if #items == 0 then return nil end
-        local n = math.min(#items, P.max); local entries = {}
-        for i = 1, n do
-            entries[#entries+1] = Util.format_mixed_item(items[i], i)
-        end
-        return items, entries, n .. " results for " .. query, "all", nil
-    else
-        local key = category .. "s"
-        local items = results[key]
-        if not items or type(items) ~= "table" or #items == 0 then return nil end
-        local n = math.min(#items, P.max); local entries = {}
-        for i = 1, n do
-            local body
-            if category == "track" then body = display_track(items[i])
-            elseif category == "artist" then body = display_artist(items[i])
-            elseif category == "album" then body = display_album(items[i], true)
-            else body = display_playlist(items[i]) end
-            entries[#entries+1] = string.format("%2d. %s", i, body)
-        end
-        local sctx = (category == "album" or category == "playlist") and "search-" .. category or category
-        return items, entries, n .. " " .. key .. " for " .. query, sctx,
-               (category == "album" and "album" or category == "playlist" and "playlist" or nil)
     end
+    if #items == 0 then return nil end
+    local entries = {}
+    for i = 1, #items do
+        entries[i] = Util.format_mixed_item(items[i], i)
+    end
+    return items, entries, #items .. " results for " .. query
 end
 
 -- Opening a view is ONE function, shared by the live menu and replay_session.
@@ -4561,12 +5786,31 @@ end
 
 function Util.open_playlist(pl)
     if not pl or not pl.id then return false end
-    local tracks = api_get_playlist_tracks(pl.id)
+    -- snapshot_id rides on every playlist object every list here hands us -- your
+    -- own, category shelves, Featured, search results -- so the common path never
+    -- has to guess whether its cached tracks are current.
+    local tracks = api_get_playlist_tracks(pl.id, pl.snapshot_id)
     if not tracks then rofi_message("Failed to load playlist"); return false end
     if #tracks == 0 then rofi_message("Playlist is empty"); return false end
+    -- A playlist WITH a cover gets the album.rasi backdrop showing its own art;
+    -- one without falls through to menu.rasi, which needs no code -- view_browse
+    -- leaves the theme nil and rofi_dmenu's use_menu fallback picks it.
+    --
+    -- fetch=true because this is a single cover for the view we are opening, not
+    -- a grid: there is no batch to defer to. Util.ART_DECOR bounds the wait.
+    -- The shipped placeholder is for GRID rows; as a full-bleed backdrop it
+    -- would just be a giant glyph, so an artless playlist passes nothing -- which
+    -- is what the nil fallback here means.
+    local cover = (pl.images and pl.images[1] and pl.images[1].url)
+        and Util.keyed_art("playlist", pl, true, false, nil) or nil
+    -- Hand what this list knew to the metadata cache, so reopening this playlist
+    -- after a restart is a disk read rather than the ~450ms request that used to
+    -- be ~95% of a warm start.
+    Util.playlist_meta_seed(pl)
     Util.scope({view="playlist", playlist_id=pl.id, playlist_name=pl.name or "Playlist"}, function()
         local te = format_entries(tracks)
-        view_browse(te, tracks, display_playlist(pl) .. SEP .. #tracks .. " tracks", "playlist", "playlist", pl.id)
+        view_browse(te, tracks, display_playlist(pl) .. SEP .. #tracks .. " tracks", "playlist", "playlist", pl.id,
+                    nil, cover)
     end)
     return true
 end
@@ -4575,26 +5819,28 @@ end
 -- resync its rows. Replay passes nil: there is no list behind it to update.
 function Util.open_playlist_actions(pl, on_change)
     if not pl or not pl.id then return end
+    Util.playlist_meta_seed(pl)
     Util.scope({view="playlist-actions", playlist_id=pl.id, playlist_name=pl.name or "Playlist"}, function()
         -- Opening an empty playlist only ever yields "Playlist is empty", so say
         -- it on the row instead. Dimmed in place, not dropped: a vanishing row
         -- shifts every index below it, and pos_key remembers the cursor by index.
         -- Only user playlists can be empty; editorial ones always carry tracks.
-        -- The replay entry point passes only {id, name}, so fall back to the
-        -- cached playlist list for the count.
+        -- A replay that could not restore the count falls back to the cached
+        -- playlist list for it.
         local total = pl.tracks and tonumber(pl.tracks.total)
         if not total then
             for _, p in ipairs(api_get_my_playlists() or {}) do
                 if p.id == pl.id then
                     total = p.tracks and tonumber(p.tracks.total)
-                    pl.owner = pl.owner or p.owner
+                    pl.owner  = pl.owner  or p.owner
+                    pl.images = pl.images or p.images   -- Playlist Art needs these on replay
                     break
                 end
             end
         end
         local is_empty = total == 0 and not (pl.owner and pl.owner.id == "spotify")
         local acts = {is_empty and Util.markup('<span color="#6a707f">Playlist is empty</span>')
-                      or "Open Playlist", "Rename Playlist", "Delete Playlist", "Copy URL"}
+                      or "Open Playlist", "Rename Playlist", "Delete Playlist", "Playlist Art", "Copy URL"}
         while true do
             local asel = rofi_dmenu(acts, {prompt=display_playlist(pl), mesg=display_playlist(pl), custom=false,
                 use_menu=true, theme=THEME_SUB, no_status=true, markup=true, pos_key="playlist-ac:" .. (pl.id or "")})
@@ -4603,6 +5849,8 @@ function Util.open_playlist_actions(pl, on_change)
             if asel == "Open Playlist" then
                 Util.open_playlist(pl)
                 if jump_to_track_pending then return end
+            elseif asel == "Playlist Art" then
+                view_art(pl)
             elseif asel == "Rename Playlist" then
                 if not token then rofi_message("No auth")
                 else
@@ -4626,7 +5874,7 @@ function Util.open_playlist_actions(pl, on_change)
                         local r = Util.api_write("DELETE", url, token)
                         if Util.is2xx(r) then
                             bust_my_playlists()
-                            disk_bust(P.mass .. "/playlist_tracks_" .. pl.id .. ".json"); mem_bust("playlist_tracks_" .. pl.id)
+                            Util.bust_playlist_tracks(pl.id)
                             rofi_message("Deleted Playlist: " .. (pl.name or ""))
                             if on_change then on_change("delete", pl) end
                             return
@@ -4641,8 +5889,44 @@ function Util.open_playlist_actions(pl, on_change)
     end)
 end
 
+function Util.api_get_genre_seeds()
+    return cached_fetch("genre_seeds", P.cache .. "/genre_seeds.json", CACHE_TTL_LONG, function()
+        local d = api_get("recommendations/available-genre-seeds")
+        if d and d.genres and #d.genres > 0 then return d.genres end
+    end, {revalidate = "genre_seeds"})
+end
+
+-- Split out so the picker and a warm start replaying straight into a genre both
+-- land in the same place.
+function Util.open_genre_tracks(genre)
+    if not genre then return false end
+    local tracks = api_get_recommendations("seed_genres=" .. url_encode(genre))
+    if not tracks then rofi_message("No tracks for " .. genre); return false end
+    Util.scope({view="genre-tracks", genre=genre}, function()
+        local te = format_entries(tracks)
+        view_browse(te, tracks, "Genre" .. SEP .. genre .. SEP .. #tracks .. " tracks", "genre", nil, nil)
+    end)
+    return true
+end
+
+function Util.view_discover_genre()
+    local genres = Util.api_get_genre_seeds()
+    if not genres or #genres == 0 then rofi_message("No genres available"); return end
+    Util.scope({view="discover-genre"}, function()
+        local gk = "discover-genre||"
+        while true do
+            local idx = rofi_dmenu(genres, {prompt="Genre", mesg="Discover by Genre" .. SEP .. #genres .. " genres",
+                custom=false, by_index=true, use_menu=true, no_status=true, markup=true, pos_key=gk})
+            if not idx then return end
+            if idx >= 1 and idx <= #genres then Util.open_genre_tracks(genres[idx]) end
+            if jump_to_track_pending then return end
+        end
+    end)
+end
+
 function Util.open_recommendations(track_id, track_name)
-    local tracks = api_get_recommendations(track_id)
+    if not track_id then rofi_message("No recommendations found"); return false end
+    local tracks = api_get_recommendations("seed_tracks=" .. track_id)
     if not tracks then rofi_message("No recommendations found"); return false end
     Util.scope({view="recommendations", track_id=track_id, recs_track_name=track_name or ""}, function()
         local te = format_entries(tracks)
@@ -4651,17 +5935,30 @@ function Util.open_recommendations(track_id, track_name)
     return true
 end
 
-function Util.open_search_results(category, query)
-    category = category or "all"
-    local stype = category == "all" and "track,album,artist,playlist" or category
-    -- A combined search shows 5 per category (see format_search_results), so it
-    -- asks for a little headroom rather than P.max of each of four types.
-    local results = api_search(query, stype, category == "all" and P.max_all or P.max)
+function Util.open_search_results(query)
+    local results = api_search(query)
     if not results then rofi_message("No results"); return false end
-    Util.scope({view="search-results", category=category, query=query}, function()
-        local items, entries, mesg, sctx, sctx_id = format_search_results(results, category, query)
+    Util.scope({view="search-results", query=query}, function()
+        local items, entries, mesg = format_search_results(results, query)
         if not items then return end
-        view_browse(entries, items, mesg, sctx, sctx_id, nil)
+        view_browse(entries, items, mesg, "search", nil, nil)
+    end)
+    return true
+end
+
+function Util.open_featured_playlists()
+    local d = api_get_featured_playlists()
+    local pls = d and d.items
+    -- A deprecated endpoint answering nil is an ordinary outcome here, not an
+    -- error worth crashing over.
+    if not (pls and #pls > 0) then rofi_message("No featured playlists"); return false end
+    local pe = {}
+    for i, pl in ipairs(pls) do pe[i] = display_playlist(pl) end
+    Util.scope({view="featured"}, function()
+        -- ctx="playlist" so it inherits the thumbnail grid and the
+        -- art-aware open behaviour every other playlist list has.
+        view_browse(pe, pls, (d.message or "Featured") .. SEP .. #pls .. " playlists",
+                    "playlist", "playlist", nil, true)
     end)
     return true
 end
@@ -4688,20 +5985,24 @@ function Util.browse_artist_albums(artist_id, artist_name)
         if not items then rofi_message("No albums found"); return end
         local pk = "artist-albums:" .. (artist_id or "")
         while true do
-            Util.album_thumbs(ae, items)
+            -- Same reason as view_new_releases: a discography is mostly singles,
+            -- and playing one from here has to move the marker without a reopen.
+            ae = Util.album_entries(items, false)
+            Util.album_thumbs(ae, items, nil, Util.pos_get(pk), pk)
             local aidx = rofi_dmenu(ae, {prompt=artist_name or "", mesg=mesg, custom=false, by_index=true,
                                          use_menu=true, no_status=true, markup=true, thumbs=true, pos_key=pk,
                                          alt_select=true,
                                          -- So F5 re-runs album_thumbs; view_browse gets this
                                          -- via its own `rebuild`.
-                                         refresh=function() Util.album_thumbs(ae, items); return ae end})
+                                         refresh=function() Util.album_thumbs(ae, items, nil, Util.pos_get(pk), pk); return ae end})
             local alt = Util.alt_pressed
             Util.alt_pressed = false
             if not aidx then return end
             if aidx >= 1 and aidx <= #items then
                 local al = items[aidx]
                 if not alt or album_action_menu(al) then
-                    browse_album(al.id, (al.name or "Unknown") .. album_suffix(al))
+                    -- `alt` marks the "Open Album" row: never play, always open.
+                    Util.open_album(al, alt)
                     if jump_to_track_pending then return end
                 end
             end
@@ -4999,7 +6300,7 @@ view_add_pl = function(track_id, track_name)
     local add_url = "https://api.spotify.com/v1/playlists/" .. target_id .. "/tracks"
     local r = Util.api_write("POST", add_url, token, {body=body})
     if Util.is2xx(r) then
-        disk_bust(P.mass .. "/playlist_tracks_" .. target_id .. ".json"); mem_bust("playlist_tracks_" .. target_id)
+        Util.bust_playlist_tracks(target_id)
         -- Patch the membership index now rather than waiting for a rebuild, so
         -- Remove from Playlist offers this playlist immediately.
         Util.pl_index_patch(target_id, track_id, true, target_name)
@@ -5015,11 +6316,31 @@ local function view_playlists()
     local token = get_token()
     if not token then rofi_message("No auth"); return end
     local pls = api_get_my_playlists() or {}
-    local entries = {"Create New Playlist"}
-    for _, p in ipairs(pls) do entries[#entries+1] = display_playlist(p) end
+    local entries, thumb_items
+    -- Rebuilt together, always, by this one function. `thumb_items` is parallel
+    -- to `entries` INCLUDING its first row: Util.album_thumbs pairs entries[i]
+    -- with items[i], so a placeholder has to stand in for "Create New Playlist"
+    -- or every tile shows the previous row's cover. The sentinel resolves to the
+    -- create glyph, which is what blends that row into the grid.
+    --
+    -- One builder rather than three inline rebuilds because create, rename and
+    -- delete each mutate this list, and any of them forgetting the second array
+    -- silently shifts every icon by one.
+    local function rebuild_rows()
+        entries = {"Create New Playlist"}
+        thumb_items = {{__new = true}}
+        for _, p in ipairs(pls) do
+            entries[#entries+1] = display_playlist(p)
+            thumb_items[#thumb_items+1] = p
+        end
+    end
+    rebuild_rows()
 
     while true do
-        local idx = rofi_dmenu(entries, {prompt="Playlists", mesg="Playlists" .. SEP .. #pls, custom=false, by_index=true, use_menu=true, no_status=true, markup=true, pos_key="playlists||", alt_select=true})
+        Util.album_thumbs(entries, thumb_items, "playlist", Util.pos_get("playlists||"), "playlists||")
+        local idx = rofi_dmenu(entries, {prompt="Playlists", mesg="Playlists" .. SEP .. #pls, custom=false, by_index=true, use_menu=true, no_status=true, markup=true, pos_key="playlists||", alt_select=true,
+            thumbs=true,
+            refresh=function() Util.album_thumbs(entries, thumb_items, "playlist", Util.pos_get("playlists||"), "playlists||"); return entries end})
         local alt = Util.alt_pressed
         Util.alt_pressed = false
         if not idx then return end
@@ -5031,7 +6352,7 @@ local function view_playlists()
                 local url = "https://api.spotify.com/v1/users/" .. me.id .. "/playlists"
                 local r = Util.api_write("POST", url, token, {body={name=pl_name}, raw=true})
                 local cr = safe_decode(r)
-                if cr then pls[#pls+1] = cr; entries[#entries+1] = display_playlist(cr); bust_my_playlists()
+                if cr then pls[#pls+1] = cr; rebuild_rows(); bust_my_playlists()
                 else rofi_message("Failed to create") end
             end
         elseif idx >= 2 and idx - 1 <= #pls then
@@ -5040,12 +6361,11 @@ local function view_playlists()
                 Util.open_playlist_actions(pl, function(what)
                     if what == "rename" then
                         table.sort(pls, function(a,b) return (a.name or ""):lower() < (b.name or ""):lower() end)
-                        entries = {"Create New Playlist"}
-                        for _, p in ipairs(pls) do entries[#entries+1] = display_playlist(p) end
+                        rebuild_rows()
                     elseif what == "delete" then
                         local del_idx = nil
                         for i, p in ipairs(pls) do if p.id == pl.id then del_idx = i; break end end
-                        if del_idx then table.remove(entries, del_idx + 1); table.remove(pls, del_idx) end
+                        if del_idx then table.remove(pls, del_idx); rebuild_rows() end
                     end
                 end)
             else
@@ -5060,19 +6380,17 @@ end
 
 -- VIEW: SEARCH
 
-local function view_search(category)
-    Util.scope({view="search", category=category}, function()
-    -- One history list per category, so Search Tracks and Search Albums do not
-    -- pollute each other.
-    local hkey = "search:" .. category
+local function view_search()
+    Util.scope({view="search"}, function()
+    local hkey = P.hist_key
+    Util.hist_migrate()
     while true do
-        local key = category == "all" and "all" or category .. "s"
         -- Past queries are offered as rows. `custom` stays enabled (the default),
         -- so typing a new query still works exactly as before -- the history is
         -- a suggestion list, not a menu you are confined to.
         local hist = Util.hist_get(hkey)
-        local query = rofi_dmenu(hist, {prompt="Search " .. category:sub(1,1):upper() .. category:sub(2),
-            mesg="Search " .. key, use_menu=true, theme=P.THEME_SEARCH, no_status=true, markup=true,
+        local query = rofi_dmenu(hist, {prompt="Search",
+            mesg="Search", use_menu=true, theme=P.THEME_SEARCH, no_status=true, markup=true,
             hist_key=hkey, refresh=function() return Util.hist_get(hkey) end})
         if not query then break end
         -- rofi echoes a SELECTED row back pango-escaped (markup is on), so a
@@ -5083,7 +6401,7 @@ local function view_search(category)
             if Util.pango_escape(h) == query then query = h; break end
         end
         Util.hist_add(hkey, query)
-        if not Util.open_search_results(category, query) then break end
+        if not Util.open_search_results(query) then break end
         if jump_to_track_pending then break end
     end
     end)
@@ -5099,7 +6417,12 @@ local function view_categories()
     for _, c in ipairs(cats) do ce[#ce+1] = c.name end
 
     while true do
-        local idx = rofi_dmenu(ce, {prompt="Categories", mesg="Categories" .. SEP .. #cats, custom=false, by_index=true, use_menu=true, no_status=true, markup=true, pos_key="categories||"})
+        -- Icons are cached by category id, like playlist covers: Spotify replaces
+        -- a category's icon in place rather than serving a new URL.
+        Util.album_thumbs(ce, cats, "category", Util.pos_get("categories||"), "categories||")
+        local idx = rofi_dmenu(ce, {prompt="Categories", mesg="Categories" .. SEP .. #cats, custom=false, by_index=true, use_menu=true, no_status=true, markup=true, pos_key="categories||",
+            thumbs=true,
+            refresh=function() Util.album_thumbs(ce, cats, "category", Util.pos_get("categories||"), "categories||"); return ce end})
         if not idx then return end
         if idx < 1 or idx > #cats then goto cat_loop end
         local cat = cats[idx]
@@ -5135,8 +6458,7 @@ local function view_saved_albums()
     local al = load_saved_albums()
     if #al == 0 then rofi_message("No saved albums"); return end
     Util.scope({view="saved-albums"}, function()
-    local entries = {}
-    for i, a in ipairs(al) do entries[i] = display_album(a, true) end
+    local entries = Util.album_entries(al)
     view_browse(entries, al, "Saved Albums" .. SEP .. #al .. " albums", "album-list", "album", nil, true)
     if jump_to_track_pending then return end
 end)
@@ -5153,18 +6475,149 @@ local function view_followed_artists()
 end)
 end
 
-local function view_new_releases()
+-- Spotify's own shelves plus the personalised ones, gathered under a single Main
+-- row so none has to take a top-level slot of its own. Same stable-key cursor
+-- treatment as the other sub.rasi menus (see Util.pos_row).
+-- Browse category ids. These are global Spotify constants -- the same id serves
+-- every account and market -- so naming them here is safer than resolving by
+-- label, which arrives localised.
+Util.PICK_CATEGORIES = {
+    made_for_you = "0JQ5DAt0tbjZptfcdMSKl3",
+    discover     = "0JQ5DAtOnAEpjOgUKwXyxj",
+    charts       = "0JQ5DAudkNjCgYMM0TZXDw",
+}
+
+-- The Discover shelf holds exactly one playlist, the personalised Discover
+-- Weekly, so the row opens straight into its tracks instead of into a list of
+-- one. If it ever holds more, fall through to the ordinary category view rather
+-- than picking an arbitrary first row.
+function Util.open_discover_weekly()
+    local pls = api_get_category_playlists(Util.PICK_CATEGORIES.discover)
+    if pls and #pls == 1 and pls[1] and pls[1].id then
+        return Util.open_playlist(pls[1])
+    end
+    return Util.open_category_playlists(Util.PICK_CATEGORIES.discover, "Discover Weekly")
+end
+
+-- One row per shelf: its label, the key its cursor position is remembered by,
+-- and where its TILE ARTWORK comes from. `art` returns the object whose cover
+-- stands for the shelf -- almost always the first thing on it -- reusing the
+-- fetcher the row itself opens with, so a warm shelf costs nothing extra.
+--
+-- Every `art` call happens under Util.cache_only (see below), so none of these
+-- may assume its fetcher will actually go out to the network.
+Util.CURATION_TILES = {
+    {key = "madeforyou",     label = "Made For You",
+     art = function() return (api_get_category_playlists(Util.PICK_CATEGORIES.made_for_you) or {})[1] end},
+    {key = "discoverweekly", label = "Discover Weekly",
+     art = function() return (api_get_category_playlists(Util.PICK_CATEGORIES.discover) or {})[1] end},
+    {key = "topartists",     label = "Top Artists",
+     art = function() return (Util.api_get_top_artists() or {})[1] end},
+    {key = "featured",       label = "Featured Playlists",
+     art = function() local d = api_get_featured_playlists(); return d and d.items and d.items[1] end},
+    {key = "newreleases",    label = "New Releases",
+     art = function() return (api_get_new_releases() or {})[1] end},
+    {key = "charts",         label = "Charts",
+     art = function() return (api_get_category_playlists(Util.PICK_CATEGORIES.charts) or {})[1] end},
+    -- Discover by Genre is a picker over 126 genre names, not a shelf of
+    -- objects, so there is nothing whose cover could stand for it -- the one
+    -- permanently artless row, and the only user of Util.ART_GENERIC.
+    {key = "genre",          label = "Discover by Genre", fallback = Util.ART_GENERIC},
+}
+
+-- Resolves the seven tiles to pseudo-items Util.keyed_art can file by ROW key.
+--
+-- Runs entirely under Util.cache_only: reading seven shelves for real would cost
+-- half a dozen requests before the menu could draw, which is the exact cost this
+-- whole change exists to remove. A shelf we have never opened simply yields no
+-- object, its tile gets the placeholder, and the second return value tells the
+-- caller to warm it in the background.
+function Util.curation_tiles()
+    local was = Util.cache_only
+    Util.cache_only = true
+    local tiles, cold = {}, false
+    for i, t in ipairs(Util.CURATION_TILES) do
+        local src = nil
+        if t.art then
+            -- Guarded: these run against half-populated caches by design, and one
+            -- shelf's bad day must not take the whole menu down.
+            local ok, v = pcall(t.art)
+            src = ok and v or nil
+            if not src then cold = true end
+        end
+        tiles[i] = {id = t.key, images = src and src.images or nil,
+                    art_fallback = t.fallback}
+    end
+    Util.cache_only = was
+    return tiles, cold
+end
+
+Util.view_curations = function()
+    -- keys, not row indexes, are what the cursor is remembered by -- so this
+    -- list can be reordered without moving anyone's cursor.
+    local items, keys = {}, {}
+    for i, t in ipairs(Util.CURATION_TILES) do items[i] = t.label; keys[i] = t.key end
+    -- "spotify-picks" is a persisted identifier, not a label: it names this view
+    -- in session.json and its cursor in view_pos.json. It stays put while the
+    -- display name changes, the same separation the `keys` array above gives the
+    -- rows themselves.
+    Util.scope({view="spotify-picks"}, function()
+    local pk = "spotify-picks:"
+    local pre_sel = Util.pos_row(pk, keys)
+    local tiles, cold = Util.curation_tiles()
+    -- One warmer per open, and only when something was actually missing. It
+    -- fetches the cold shelves and their covers, so the NEXT open is complete --
+    -- this one stays as fast as it was when the menu was plain text.
+    if cold then Util.spawn_curation_warm() end
+    -- by_index, like every other thumbnail grid here: album_thumbs appends a
+    -- \0icon field to each row, so matching rofi's echo back against the row TEXT
+    -- is exactly the comparison that suffix would break.
+    local entries = {}
+    while true do
+        for i, label in ipairs(items) do entries[i] = label end
+        Util.album_thumbs(entries, tiles, "curation", pre_sel, "curations||")
+        local idx = rofi_dmenu(entries, {prompt="Curations", mesg="Curations",
+            custom=false, by_index=true, no_status=true, markup=true, sel=pre_sel,
+            thumbs=true, thumbs_cols=4,
+            refresh=function() Util.album_thumbs(entries, tiles, "curation", pre_sel, "curations||"); return entries end})
+        if not idx then return end
+        if idx < 1 or idx > #items then goto cur_next end
+        pre_sel = idx - 1
+        Util.pos_put(pk, keys[idx])
+        local sel = items[idx]
+        if sel == "Featured Playlists" then Util.open_featured_playlists()
+        elseif sel == "New Releases" then view_new_releases()
+        elseif sel == "Made For You" then
+            Util.open_category_playlists(Util.PICK_CATEGORIES.made_for_you, "Made For You")
+        elseif sel == "Discover Weekly" then Util.open_discover_weekly()
+        elseif sel == "Charts" then
+            Util.open_category_playlists(Util.PICK_CATEGORIES.charts, "Charts")
+        elseif sel == "Top Artists" then Util.view_top_artists()
+        elseif sel == "Discover by Genre" then Util.view_discover_genre() end
+        if jump_to_track_pending then return end
+        -- Whatever we just visited may have filled a shelf that was cold when
+        -- this menu opened, so re-resolve before drawing again.
+        tiles = Util.curation_tiles()
+        ::cur_next::
+    end
+    end)
+end
+
+view_new_releases = function()
     local albums = api_get_new_releases() or {}
     if #albums == 0 then rofi_message("No new releases"); return end
     Util.scope({view="new-releases"}, function()
-    local entries = {}
-    for i, a in ipairs(albums) do entries[i] = display_album(a, true) end
+    local entries
     local v_key = "new-releases||"
     local pre_sel = nil
     while true do
-        Util.album_thumbs(entries, albums)
+        -- Rebuilt per pass, not once: a single played from this grid takes the ▶
+        -- marker, and this loop is what redraws after it. album_thumbs re-applies
+        -- its \0icon suffixes from the memo, so the tiles cost nothing.
+        entries = Util.album_entries(albums)
+        Util.album_thumbs(entries, albums, nil, pre_sel or Util.pos_get(v_key), v_key)
         local idx = rofi_dmenu(entries, {prompt="New Releases", mesg="New Releases" .. SEP .. #albums .. " albums", custom=false, by_index=true, use_menu=true, no_status=true, sel=pre_sel, pos_key=v_key, markup=true, thumbs=true, alt_select=true,
-            refresh=function() Util.album_thumbs(entries, albums); return entries end})
+            refresh=function() Util.album_thumbs(entries, albums, nil, pre_sel or Util.pos_get(v_key), v_key); return entries end})
         local alt = Util.alt_pressed
         Util.alt_pressed = false
         if not idx then return end
@@ -5172,7 +6625,8 @@ local function view_new_releases()
             pre_sel = idx - 1
             local al = albums[idx]
             if not alt or album_action_menu(al) then
-                browse_album(al.id, (al.name or "Unknown") .. album_suffix(al))
+                -- `alt` marks the "Open Album" row: never play, always open.
+                Util.open_album(al, alt)
                 if jump_to_track_pending then return end
             end
         end
@@ -5374,13 +6828,9 @@ local function view_playback()
             end
         end
         if si == "Pause" then
-            local r = os.execute("playerctl pause 2>/dev/null")
-            Util.playerctl_bust()
-            if r == true or r == 0 then is_playing = false else rofi_message("Failed to pause") end
+            if not Util.transport(false) then rofi_message("Failed to pause") end
         elseif si == "Resume" then
-            local r = os.execute("playerctl play 2>/dev/null")
-            Util.playerctl_bust()
-            if r == true or r == 0 then is_playing = true else rofi_message("Failed to resume") end
+            if not Util.transport(true) then rofi_message("Failed to resume") end
         elseif si == "Next Track" then
             local prev_id = current_id
             local r = do_playback_cmd("next")
@@ -5428,6 +6878,8 @@ function Util.restart_daemons()
     Util.kill_recent_watch()
     Util.kill_playerctl_follow()
     Util.bust_device()
+    -- Search results are cached until the daemons go, so this is where they go.
+    Util.drop_search_cache()
     -- Deliberately keeps P.trails: restarting audio plumbing has
     -- nothing to do with navigation history.
     os.execute("sleep 1")
@@ -5531,7 +6983,7 @@ local function view_system()
             end
             rofi_message(table.concat({
                 row("redraw / load missing thumbnails", "f5"),
-                row("jump to trail step", "tab"),
+                row("trail steps / trail history", "tab"),
                 row("select", "return"),
                 row("close", "escape"),
                 row("dlete search history entry", "delete"),
@@ -5568,6 +7020,7 @@ local function view_system()
             local tracks, albums, artists = fetch_library_with_fallback()
             if tracks then
                 save_library_cache(tracks, albums, artists)
+                Util.lib_fp_write()
                 populate_liked_ids()
                 os.execute("notify-send -t 3000 --app-name=spoot 'spoot' 'Caching Complete' &")
             else
@@ -5588,6 +7041,7 @@ local function view_system()
             os.execute("pkill -f 'spoot.*--daemon' 2>/dev/null")
             Util.kill_recent_watch()
             Util.kill_playerctl_follow()
+            Util.drop_search_cache()
             -- Session AND trail: this row is a shutdown, and clean_exit's
             -- os.exit means no scope unwinds to rewrite session.json -- so the
             -- stack was left naming THIS menu, and the next launch replayed
@@ -5652,18 +7106,28 @@ reg("album", "Album", function(s)
 end)
 reg("playlist", "Playlist", function(s)
     if not s.playlist_id then return end
-    Util.open_playlist(api_get("playlists/" .. s.playlist_id)
+    -- Util.playlist_meta answers from disk, so the whole replay is a disk read --
+    -- and unlike a snapshot frozen into the stack entry, it carries a TTL and
+    -- refreshes itself behind the menu, so an editorial playlist that Spotify
+    -- has rebuilt since is noticed rather than served forever.
+    Util.open_playlist(Util.playlist_meta(s.playlist_id)
         or {id=s.playlist_id, name=s.playlist_name or "Playlist"})
 end)
 reg("playlist-actions", "Playlist", function(s)
     if not s.playlist_id then return end
-    Util.open_playlist_actions({id=s.playlist_id, name=s.playlist_name or "Playlist"})
+    -- Same cache: the {id, name} stub is what makes open_playlist_actions walk
+    -- the whole playlist list to recover owner/images/total.
+    Util.open_playlist_actions(Util.playlist_meta(s.playlist_id)
+        or {id=s.playlist_id, name=s.playlist_name or "Playlist"})
 end)
 reg("recommendations", "More Like", function(s)
     if s.track_id then Util.open_recommendations(s.track_id, s.recs_track_name) end
 end, true)
+-- s.category is read by neither of these any more. Entries written by the split
+-- search still carry it and still replay: the query is all that was ever needed
+-- to rebuild the results, and the search box has nothing left to parameterise.
 reg("search-results", "Search", function(s)
-    if s.query then Util.open_search_results(s.category, s.query) end
+    if s.query then Util.open_search_results(s.query) end
 end)
 reg("category-playlists", "Category", function(s)
     if s.category_id then Util.open_category_playlists(s.category_id, s.category_name) end
@@ -5686,9 +7150,7 @@ end)
 reg("related", "Related", function(s)
     if s.artist_id then Util.browse_related_artists(s.artist_id, s.artist_name) end
 end)
-reg("search", "Search", function(s)
-    if s.category then view_search(s.category) end
-end)
+reg("search", "Search", function() view_search() end)
 reg("liked",            "Liked Tracks",     function() view_liked_tracks() end)
 reg("top-tracks",       "Top Tracks",       function() view_top_tracks() end)
 reg("your-queue",       "Your Queue",       function() view_your_queue() end)
@@ -5696,6 +7158,13 @@ reg("recently-played",  "Recently Played",  function() view_recently_played() en
 reg("saved-albums",     "Saved Albums",     function() view_saved_albums() end)
 reg("followed-artists", "Followed Artists", function() view_followed_artists() end)
 reg("new-releases",     "New Releases",     function() view_new_releases() end)
+reg("spotify-picks",    "Curations",        function() Util.view_curations() end)
+reg("top-artists",      "Top Artists",      function() Util.view_top_artists() end)
+reg("discover-genre",   "Genre",            function() Util.view_discover_genre() end)
+reg("genre-tracks", "Genre", function(s)
+    if s.genre then Util.open_genre_tracks(s.genre) end
+end)
+reg("featured",         "Featured",         function() Util.open_featured_playlists() end)
 reg("categories",       "Categories",       function() view_categories() end)
 reg("playlists",        "Playlists",        function() view_playlists() end)
 reg("volume",           "Volume",           function() view_volume() end)
@@ -5741,6 +7210,42 @@ function Util.restore_trail()
     return false
 end
 
+-- Mode 2, Trail History: menus you closed that the trail no longer offers.
+--
+-- Rows are rendered from Util.parts_from_stack, the same function the breadcrumb
+-- and mode 1 use, so a step can never be named one way here and another there.
+-- The destination reads first and its context recedes behind it; rofi filters on
+-- the whole line, so typing either one finds the row.
+function Util.menu_hist_rows(live)
+    local rows, entries = {}, {}
+    local function reachable(path)
+        if Util.stack_prefix(path, live) then return true end
+        for _, t in ipairs(Util.trail_history) do
+            if type(t) == "table" and type(t.stack) == "table"
+               and Util.stack_prefix(path, t.stack) then return true end
+        end
+        return false
+    end
+    for _, e in ipairs(Util.menu_hist_all()) do
+        if type(e) == "table" and type(e.stack) == "table" and #e.stack > 0
+           and not reachable(e.stack) then
+            local parts = Util.parts_from_stack(e.stack)
+            local leaf = table.remove(parts)
+            -- parts is now {"Main", …}; "Main" alone is not context worth
+            -- printing, so a top-level menu is simply its own name.
+            table.remove(parts, 1)
+            local row = leaf
+            if #parts > 0 then
+                row = row .. Util.markup('<span foreground="#6a707f">') .. "  \u{F01D8}  "
+                    .. table.concat(parts, " > ") .. Util.markup("</span>")
+            end
+            rows[#rows+1] = row
+            entries[#entries+1] = e
+        end
+    end
+    return rows, entries
+end
+
 function Util.view_trail_jump(stack)
     local SEP = "  \u{F17B7}  "
     local opts = {}
@@ -5781,27 +7286,105 @@ function Util.view_trail_jump(stack)
         if type(t) == "table" and type(t.stack) == "table" then add_trail(t.stack) end
     end
     add_trail(stack, true)
-    if #opts <= 1 then
+    -- Two modes, Tab cycling between them: the trail you are on, and the menus
+    -- you closed and left behind. tab_select is what keeps Tab here instead of
+    -- letting it bubble up and close this menu, the same opt-in shape
+    -- alt_select uses for Shift+Return.
+    --
+    -- The two are INDEPENDENT, and that matters most right after you clear the
+    -- session: alt delete (and the System entry) empty the trail but not the
+    -- record of what you closed -- which is exactly what you want to reach at
+    -- that moment. So "You left no trail" is only the right answer when there is
+    -- nothing in EITHER, and an empty trail with a history opens straight into
+    -- the history rather than dead-ending on a message.
+    local have_trail = #opts > 1
+    local mode = have_trail and "trail" or "history"
+    if not have_trail and #(Util.menu_hist_rows(stack)) == 0 then
         rofi_message("You left no trail")
-    else
-        local labels = {}
-        for i, o in ipairs(opts) do labels[i] = o.label end
-        local idx = rofi_dmenu(labels, {prompt="Jump to Trail Step", custom=false, by_index=true, use_menu=true, theme=Util.THEME_TRAIL, markup=true, no_status=true, no_alt_space=true, sel=#labels - 1})
-        if idx and idx >= 1 and idx <= #opts then
-            local o = opts[idx]
-            local target = {}
-            for i = 1, o.depth do target[i] = o.stack[i] end
-            if o.stack ~= stack then
-                for i = #Util.trail_history, 1, -1 do
-                    if Util.trail_history[i] and Util.trail_history[i].stack == o.stack then
-                        table.remove(Util.trail_history, i)
-                        break
-                    end
-                end
-                Util.trail_save()
-            end
-            Util.session_set(target)
+        replay_session()
+        return
+    end
+    while true do
+        local labels, chosen
+        if mode == "trail" then
+            labels = {}
+            for i, o in ipairs(opts) do labels[i] = o.label end
+        else
+            labels, chosen = Util.menu_hist_rows(stack)
         end
+        do
+            -- These two menus are the only ones that suppress the breadcrumb:
+            -- they already show the trail as their rows, so repeating it above
+            -- them is noise. The line says what Tab does from here instead --
+            -- which is the one binding you cannot discover by looking.
+            -- Named before the draw so the hint can promise only what Tab will
+            -- actually do: with one side empty there is nowhere to switch to,
+            -- and the line says so rather than advertising a dead key.
+            -- An if, not an and/or chain: "trail" with an empty history makes the
+            -- middle term nil, and `a and nil or b` then falls through to b --
+            -- which would advertise a switch back to the mode you are already in.
+            local other
+            if mode == "trail" then
+                if #(Util.menu_hist_rows(stack)) > 0 then other = "history" end
+            elseif have_trail then
+                other = "trail"
+            end
+            -- All one dimmed grey, the same #6a707f the breadcrumb uses for a
+            -- trail step. This line is a footnote about a key, not content: it
+            -- should sit behind the rows, not compete with them.
+            -- Names the menu Tab goes TO, so the line reads as the pair of
+            -- titles rather than as prose describing them. With one side empty
+            -- there is nowhere to switch to, and it says that instead of
+            -- advertising a dead key.
+            local hint = Util.markup('<span foreground="#6a707f">') .. "tab  "
+                .. (other == "history" and "trail history"
+                 or other == "trail" and "trail steps"
+                 or (mode == "trail" and "nothing closed yet" or "no trail to go back to"))
+                .. Util.markup("</span>")
+            -- One string for the prompt and the heading so the two cannot drift.
+            -- These menus hide the inputbar, so the prompt is never drawn and the
+            -- message bar is the only place the mode can name itself -- which it
+            -- has to, since Tab silently swaps the rows underneath you. Left
+            -- unstyled so it takes the theme's message colour and reads as a
+            -- heading over the dimmed keybind line below it. Only the FIRST mesg
+            -- line is ever truncated (see rofi_dmenu), and this one is short, so
+            -- the hint underneath always survives intact.
+            local title = mode == "trail" and "Trail Steps" or "Trail History"
+            local idx = rofi_dmenu(labels, {prompt = title,
+                mesg = title .. "\n" .. hint,
+                custom=false, by_index=true, use_menu=true, markup=true, no_status=true,
+                theme=Util.THEME_TRAIL,
+                no_alt_space=true, tab_select=true, no_crumb=true,
+                sel = mode == "trail" and (#labels - 1) or 0})
+            if Util.tab_pressed then
+                Util.tab_pressed = false
+                if other then mode = other end
+                goto tj_next
+            end
+            if not idx then break end
+            if mode == "history" then
+                local e = chosen[idx]
+                if e then Util.session_set(json.decode(json.encode(e.stack))) end
+                break
+            end
+            if idx >= 1 and idx <= #opts then
+                local o = opts[idx]
+                local target = {}
+                for i = 1, o.depth do target[i] = o.stack[i] end
+                if o.stack ~= stack then
+                    for i = #Util.trail_history, 1, -1 do
+                        if Util.trail_history[i] and Util.trail_history[i].stack == o.stack then
+                            table.remove(Util.trail_history, i)
+                            break
+                        end
+                    end
+                    Util.trail_save()
+                end
+                Util.session_set(target)
+            end
+            break
+        end
+        ::tj_next::
     end
     -- Whether the user jumped or backed out, the view functions that unwound
     -- while Tab propagated up already popped _session_stack out from under
@@ -5887,8 +7470,7 @@ end
 -- is one function and Lua caps it at 200 locals, so a forward declaration is
 -- not free. Util is a table looked up at call time, so order stops mattering.
 function Util.clear_last_playback()
-    os.execute("playerctl pause 2>/dev/null")
-    Util.playerctl_bust()
+    Util.transport(false)
     os.remove(P.now); os.remove(P.now_track)
     current_track = nil; current_id = nil; previous_id = nil
     is_playing = false; last_playback = 0
@@ -5918,11 +7500,18 @@ local function init_library(cold_start)
             end
         end
     end)()
-    -- Missing and stale were two branches with byte-identical bodies. cache_stale
-    -- is still only reached when all three files exist, so a missing cache never
-    -- pays for its tail reads.
-    if not (cache_exists(P.liked) and cache_exists(P.albums) and cache_exists(P.artists))
-       or cache_stale(P.liked) or cache_stale(P.albums) or cache_stale(P.artists) then
+    -- Two cases that used to share one blocking body, and should not have.
+    --
+    -- MISSING is a genuine cold build: there is nothing to show, so there is
+    -- nothing to do but wait, and the notification is telling you why you are
+    -- waiting.
+    --
+    -- STALE means we have the whole library, merely at some age. Paying ~35
+    -- requests before the menu could open was the entire complaint against the
+    -- twelve-hour TTL -- and the twelve hours only existed to make this rare.
+    -- Hand it to the revalidator, which finds out for three small requests
+    -- whether any of it was worth re-fetching, and open the menu now.
+    if not (cache_exists(P.liked) and cache_exists(P.albums) and cache_exists(P.artists)) then
         os.execute("notify-send -t 5000 --app-name=spoot 'spoot' 'Building Cache' &")
         local tracks, albums, artists = fetch_library_with_fallback()
         -- Same success test as System > Refresh Library. Reporting "Caching
@@ -5930,10 +7519,13 @@ local function init_library(cold_start)
         -- three fetches had failed and save_library_cache had written nothing.
         if tracks then
             save_library_cache(tracks, albums, artists)
+            Util.lib_fp_write()
             os.execute("notify-send -t 3000 --app-name=spoot 'spoot' 'Caching Complete' &")
         else
             os.execute("notify-send -t 5000 --app-name=spoot 'Spoot' 'Library refresh failed' &")
         end
+    elseif cache_stale(P.liked) or cache_stale(P.albums) or cache_stale(P.artists) then
+        Util.spawn_revalidate("library")
     end
     populate_liked_ids()
     -- Warm the playlist membership index out of band. Nothing waits on it: the
@@ -5960,8 +7552,8 @@ local function main()
     local MAIN_ENTRIES = {
         "Playback",
         "Your Queue", "Liked Tracks", "Top Tracks", "Saved Albums",
-        "Followed Artists", "Playlists", "New Releases",
-        "Recently Played", "Categories", "Search",
+        "Followed Artists", "Playlists", "Recently Played",
+        "Categories", "Curations", "Search",
         "System",
     }
     while true do
@@ -6028,15 +7620,7 @@ local function main()
         end
         if not sel then goto m1 end
 
-        if      sel == "Search" then
-            local tp = {"All","Tracks","Albums","Artists","Playlists"}
-            local p  = {"all","track","album","artist","playlist"}
-            local st_key = "search-type:"
-            local si = rofi_dmenu(tp, {prompt="Search", mesg="Search", custom=false, by_index=true, use_menu=true, theme=THEME_SUB, no_status=true, pos_key=st_key, crumb="Search", markup=true})
-            if si and si >= 1 and si <= #tp then
-                local cat = p[si]:lower()
-                view_search(cat)
-            end
+        if      sel == "Search" then view_search()
         elseif  sel == "Liked Tracks"     then view_liked_tracks()
         elseif  sel == "Saved Albums"     then view_saved_albums()
         elseif  sel == "Followed Artists" then view_followed_artists()
@@ -6044,7 +7628,7 @@ local function main()
         elseif  sel == "Categories"       then view_categories()
         elseif  sel == "Your Queue"       then view_your_queue()
         elseif  sel == "Top Tracks"       then view_top_tracks()
-        elseif  sel == "New Releases"     then view_new_releases()
+        elseif  sel == "Curations"        then Util.view_curations()
         elseif  sel == "Recently Played"  then view_recently_played()
         elseif  sel == "Playback"          then view_playback()
         elseif  sel == "System"        then view_system()
@@ -6296,21 +7880,195 @@ function Util.run_prefetch_plindex()
     os.exit(0)
 end
 
--- The tail of a thumbnail grid, handed over by Util.spawn_art_prefetch as a
--- url<TAB>path list. Consumed and removed immediately so a crash here cannot
--- leave the file behind.
+-- Grid tails, spooled by Util.spawn_art_prefetch as url<TAB>path<TAB>kind<TAB>
+-- key<TAB>hash chunks. DRAINS the spool rather than handling one hand-off: while
+-- this runs, every other grid opened keeps writing chunks into the same
+-- directory, and the whole point of the spool is that none of them are lost.
+-- Each chunk is consumed and removed before it is fetched, so a crash cannot
+-- leave one to be retried forever, and the index is committed per chunk so a
+-- worker killed mid-drain still recorded everything it finished.
 function Util.run_prefetch_art_batch()
     Util.detached = true
-    local lf = arg[2]
-    if not lf or #lf == 0 then os.exit(0) end
-    local raw = read_file(lf)
-    os.remove(lf)
-    if not raw then os.exit(0) end
-    local list = {}
-    for url, path in raw:gmatch("([^\t\n]+)\t([^\t\n]+)") do
-        list[#list+1] = {url = url, path = path}
+    local dir = Util.art_spool_dir()
+    -- arg[2] is the pre-spool calling convention -- a single batch file passed by
+    -- path. Still honoured so a worker spawned by the previous build, or one
+    -- already in flight across an upgrade, finishes its work instead of dropping
+    -- it on the floor.
+    local first = arg[2]
+    if first and #first == 0 then first = nil end
+    -- Bounded so a spool that somehow refills forever cannot make this immortal;
+    -- whatever is left is picked up by the next draw's worker.
+    for _ = 1, 200 do
+        local lf = first
+        first = nil
+        if not lf then
+            local names = {}
+            local p = io.popen("ls -1 " .. shell_quote(dir) .. " 2>/dev/null")
+            if p then
+                for line in p:lines() do
+                    -- Dot-prefixed names are chunks still being written.
+                    if line:sub(1, 1) ~= "." then names[#names+1] = line end
+                end
+                p:close()
+            end
+            if #names == 0 then break end
+            table.sort(names)
+            lf = dir .. "/" .. names[1]
+        end
+        local raw = read_file(lf)
+        os.remove(lf)
+        local list, kind = {}, nil
+        for line in (raw or ""):gmatch("[^\n]+") do
+            -- Trailing fields are empty for hash-named artwork, which needs no index.
+            local url, path, k, art_key, hash = line:match("^([^\t]*)\t([^\t]*)\t([^\t]*)\t([^\t]*)\t([^\t]*)$")
+            if url and #url > 0 and #path > 0 then
+                list[#list+1] = {url = url, path = path,
+                                 art_key = #art_key > 0 and art_key or nil,
+                                 hash = #hash > 0 and hash or nil}
+                if #k > 0 then kind = k end
+            end
+        end
+        if #list > 0 then
+            ensure_cache()
+            Util._art_batch(list)
+            -- Same bookkeeping the synchronous half does, so these covers count
+            -- as cached on the next draw instead of being fetched again.
+            if kind and P.art_kinds[kind] then Util.art_commit(kind, list) end
+        end
     end
-    if #list > 0 then ensure_cache(); Util._art_batch(list) end
+    os.exit(0)
+end
+
+-- Reads P.thumb_log back. A grid cannot be inspected after it is closed, so this
+-- is the only account of why a draw came up with holes: it names the reason
+-- rather than printing the numbers and leaving them to be interpreted.
+--
+-- `spoot.lua --thumb-report [n]` -- the last n draws that had placeholders
+-- (default 20), worst first, then a per-view tally.
+function Util.thumb_report()
+    Util.detached = true
+    local raw = read_file(P.thumb_log)
+    if not raw then print("no thumbnail log yet: " .. P.thumb_log); os.exit(0) end
+    local rows = {}
+    for line in raw:gmatch("[^\n]+") do
+        -- Split on tabs by hand. gmatch("[^\t]*") is the obvious spelling and is
+        -- wrong: a pattern that can match the empty string yields one between
+        -- every pair of fields, which slides every column one place along.
+        local r, i, pos = {}, 1, 1
+        while true do
+            local s, e = line:find("\t", pos, true)
+            local fld = line:sub(pos, (s or 0) - 1)
+            if not s then fld = line:sub(pos) end
+            local k = Util.THUMB_FIELDS[i]
+            if k then r[k] = fld end
+            i = i + 1
+            if not s then break end
+            pos = e + 1
+        end
+        if r.kind then
+            for _, k in ipairs({"items","cursor","cached","missing","sync_try","sync_ok",
+                                "sync_fail","tail","placeholders","invalid","ms"}) do
+                r[k] = tonumber(r[k]) or 0
+            end
+            rows[#rows+1] = r
+        end
+    end
+    -- Ranked by how much of the grid was wrong, not by how many tiles: 12 holes
+    -- in 20 is the report worth reading, 12 in 1400 is a scroll away from normal.
+    local bad = {}
+    for _, r in ipairs(rows) do
+        if r.placeholders > 0 then
+            r.share = r.placeholders / math.max(r.items, 1)
+            bad[#bad+1] = r
+        end
+    end
+    table.sort(bad, function(a, b) return a.share > b.share end)
+    local want = tonumber(arg[2]) or 20
+    print(string.format("%d draws logged, %d with placeholders", #rows, #bad))
+    print("")
+    for i = 1, math.min(#bad, want) do
+        local r = bad[i]
+        -- In the order they'd have to be ruled out. Only the first that applies
+        -- is printed: a draw whose tail was dropped has not got a second problem,
+        -- it has that one.
+        local why
+        if r.invalid > 0 then
+            why = r.invalid .. " cached file(s) not a decodable image -- refetched now, "
+                .. "used to be a permanently dead tile"
+        elseif r.tail_action == "spoolfail" then
+            why = "tail of " .. r.tail .. " could not be spooled (is " .. P.tmp .. " writable?)"
+        elseif r.sync_fail > 0 then
+            why = r.sync_fail .. " of " .. r.sync_try .. " synchronous fetches failed"
+        elseif r.tail > 0 then
+            why = "grid larger than the " .. r.sync_try .. "-cover synchronous budget; "
+                .. r.tail .. " left to the background (" .. r.tail_action .. ")"
+        else
+            why = "covers were simply not cached yet"
+        end
+        print(string.format("%s  %s  %s", os.date("%Y-%m-%d %H:%M:%S", tonumber(r.ts) or 0),
+            r.kind, r.view))
+        print(string.format("    %d/%d tiles placeholder  (cached %d, missing %d, sync %d/%d, tail %d %s, %dms)",
+            r.placeholders, r.items, r.cached, r.missing, r.sync_ok, r.sync_try,
+            r.tail, r.tail_action, r.ms))
+        print("    " .. why)
+    end
+    print("")
+    print("per view:")
+    local per, order = {}, {}
+    for _, r in ipairs(rows) do
+        local k = r.kind .. "  " .. r.view
+        if not per[k] then per[k] = {draws = 0, clean = 0, ph = 0, inval = 0, tail = 0}; order[#order+1] = k end
+        local a = per[k]
+        a.draws = a.draws + 1
+        if r.placeholders == 0 then a.clean = a.clean + 1 end
+        a.ph = a.ph + r.placeholders
+        a.inval = a.inval + r.invalid
+        a.tail = a.tail + r.tail
+    end
+    table.sort(order)
+    for _, k in ipairs(order) do
+        local a = per[k]
+        print(string.format("  %-46s %3d draws, %3d clean, %5d placeholders, %d invalid, %d backgrounded",
+            k:sub(1, 46), a.draws, a.clean, a.ph, a.inval, a.tail))
+    end
+    os.exit(0)
+end
+
+-- Fills in whatever Curations could not draw. Util.curation_tiles reads the
+-- shelves cache-only so the menu never waits on them; this is the other half --
+-- it reads them FOR real, which populates each shelf's ordinary cache, and then
+-- fetches the covers those shelves point at. Nothing here is Curations-specific
+-- beyond the tile list: the shelf caches it warms are the same ones the rows
+-- open with, so the first visit to any of them is faster too.
+function Util.spawn_curation_warm()
+    local pidf = P.tmp .. "/spoot_curation_warm.pid"
+    if Util.pidfile_owner_alive(pidf, "--warm-curations") then return end
+    Util.spawn_self({"--warm-curations"}, nil, pidf)
+end
+
+function Util.run_curation_warm()
+    Util.detached = true
+    ensure_cache()
+    local list = {}
+    for _, t in ipairs(Util.CURATION_TILES) do
+        if t.art then
+            local ok, src = pcall(t.art)
+            local imgs = ok and src and src.images
+            if imgs and imgs[1] and imgs[1].url then
+                -- fetch=false so this goes through _art_batch with everything
+                -- else, rather than one blocking download per shelf.
+                local path, url, hash, key = Util.keyed_art("curation",
+                    {id = t.key, images = imgs}, false, false, nil)
+                if url then
+                    list[#list+1] = {url = url, path = path, art_key = key, hash = hash}
+                end
+            end
+        end
+    end
+    if #list > 0 then
+        Util._art_batch(list)
+        Util.art_commit("curation", list)
+    end
     os.exit(0)
 end
 
@@ -6815,8 +8573,14 @@ elseif arg and arg[1] == "--prefetch-track" then
     run_prefetch_track()
 elseif arg and arg[1] == "--prefetch-art-batch" then
     Util.run_prefetch_art_batch()
+elseif arg and arg[1] == "--thumb-report" then
+    Util.thumb_report()
 elseif arg and arg[1] == "--prefetch-plindex" then
     Util.run_prefetch_plindex()
+elseif arg and arg[1] == "--warm-curations" then
+    Util.run_curation_warm()
+elseif arg and arg[1] == "--revalidate" then
+    Util.run_revalidate()
 elseif arg and arg[1] == "--notify" then
     Util.run_notify()
 elseif arg and arg[1] == "--bsmon" then

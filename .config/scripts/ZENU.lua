@@ -1,4 +1,4 @@
-#!/usr/bin/lua
+#!/usr/bin/env lua
 
 -- ┌─┐┌─┐┌┐┌┬ ┬┌─┐┬─┐┬┌─┌─┐
 -- ┌─┘├┤ │││││││ │├┬┘├┴┐└─┐
@@ -302,7 +302,7 @@ local function sudo_ensure()
 
   local lua_pid = trim(capture("echo $PPID"))
   local keepalive = write_script("keepalive.sh", string.format([[
-#!/bin/bash
+#!/usr/bin/env bash
 echo $$
 while true; do
   sudo -n true 2>/dev/null
@@ -477,7 +477,7 @@ END {
 -- mtimes of the pacman databases plus the column width, so repeat launches
 -- skip the work entirely.
 local LIST_SH = [==[
-#!/bin/bash
+#!/usr/bin/env bash
 # usage: list.sh <pkg_w> <full|installed>
 PKG_W="$1"; MODE="$2"
 cache="$ZENU_CACHE_DIR/rows.$MODE.$PKG_W"
@@ -527,7 +527,7 @@ fi
 -- `paru -Si`, which costs 250 ms for a repo package and 542 ms over the
 -- network for an AUR one -- on every cursor movement.
 local PREVIEW_SH = [==[
-#!/bin/bash
+#!/usr/bin/env bash
 # usage: preview.sh <pkg> <repo-tag> [full]
 pkg="$1"; repo="$2"; mode="${3:-quick}"
 pacman -Qi -- "$pkg" 2>/dev/null && exit 0
@@ -1249,7 +1249,7 @@ local function manage_view()
     -- [==[ ... ]==]: the bash [[ ... ]] test below contains ]] , which
     -- would close a plain Lua long string early.
     local toggle = write_script("toggle.sh", string.format([==[
-#!/bin/bash
+#!/usr/bin/env bash
 if [[ "$FZF_PROMPT" == *installed* ]]; then
   printf 'change-prompt(%%s)+reload(%%s)' %s %s
 else

@@ -1,4 +1,4 @@
-#!/usr/bin/lua
+#!/usr/bin/env lua
 
 -- ┌─┐┌─┐┌┐┌┬ ┬┌─┐┬─┐┬┌─┌─┐
 -- ┌─┘├┤ │││││││ │├┬┘├┴┐└─┐
@@ -37,7 +37,7 @@ local COLOR_EX = "#eebebe"
 local COLOR_SYN = "#9bbfbf"
 local COLOR_ERROR = "#e78284"
 local ICON_HEAD = "\u{f405}"
-local ICON_AUDIO = "\u{efcf}"
+local ICON_AUDIO = "\u{f07c5}"
 local ICON_CORRECTED = "\u{f040}"
 -- Separator between keybinds in the hint row (nf-md-dots_vertical)
 local HINT_SEPARATOR = "\u{f01d9}"
