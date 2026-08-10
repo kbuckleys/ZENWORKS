@@ -1,17 +1,22 @@
 /**
-* ┌─┐┌─┐┌┐┌┬ ┬┌─┐┬─┐┬┌─┌─┐
-* ┌─┘├┤ │││││││ │├┬┘├┴┐└─┐
-* └─┘└─┘┘└┘└┴┘└─┘┴└─┴ ┴└─┘
-* https://github.com/kbuckleys/ */
+ * ┌─┐┌─┐┌┐┌┬ ┬┌─┐┬─┐┬┌─┌─┐
+ * ┌─┘├┤ │││││││ │├┬┘├┴┐└─┐
+ * └─┘└─┘┘└┘└┴┘└─┘┴└─┘┴└─┴ ┴└─┘
+ * https://github.com/kbuckleys/
+ *
+ * The root grid, and only the root grid. Starts life as a byte-for-byte copy of
+ * thumbs.rasi so nothing moves on the first draw; having its own file means the
+ * five top-level tiles can be styled apart from every other thumbnail grid
+ * (Collections, Podcasts, the album and playlist grids) without touching those.
+ * Same precedent as pods.rasi, which forked meta.rasi for the same reason.
+ *
+ * The root menu still passes `thumbs=true`, so it keeps the grid's row count,
+ * icon thread pool and status-line suppression -- only the theme differs. */
 
 @import "ZENON"
 
 * {
     selected-normal-background: none;
-}
-configuration {
-    kb-remove-to-sol: "BackSpace";
-    kb-remove-char-back: "";
 }
 
 window {
@@ -19,11 +24,7 @@ window {
 }
 
 mainbox {
-    children: [ inputbar, message, listview ];
-}
-
-inputbar {
-    enabled: false;
+    children: [ message, listview ];
 }
 
 listview {
@@ -64,7 +65,7 @@ message {
 /* Propo, not the mono face: in mono a Nerd Font glyph is squeezed to a single
  * fixed cell with almost no side bearing, so the one space Util.status_icons
  * emits before each of liked/explicit/lyrics reads as tighter here than in
- * every other theme. This was the only rule in style/ naming a non-Propo face. */
+ * every other theme. */
 textbox {
     text-color: #b6e0a4;
     horizontal-align: 0.5;
