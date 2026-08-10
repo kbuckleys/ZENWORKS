@@ -18,14 +18,16 @@ case "${1}" in
     ;;
   region)
     file="]] .. dir .. [[/$(date +'%Y-%m-%d-%H%M%S')_region.png"
-geometry=$(slurp -d)
+    geometry=$(slurp -d)
     [ -n "$geometry" ] || exit 0
     grim -g "$geometry" "$file"
     ;;
   window)
     file="]] .. dir .. [[/$(date +'%Y-%m-%d-%H%M%S')_window.png"
     geometry=$(hyprctl -j activewindow | jq -r '"\(.at[0]),\(.at[1]) \(.size[0])x\(.size[1])"')
-    [ -n "$geometry" ] || exit 1
+    # jq prints the literal "null,null nullxnull" when nothing is focused, which
+    # is non-empty and would sail past a -n test straight into a grim parse error
+    [ "$geometry" != "null,null nullxnull" ] || exit 1
     grim -g "$geometry" "$file"
     ;;
 esac

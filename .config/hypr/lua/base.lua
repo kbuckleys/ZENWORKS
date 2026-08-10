@@ -63,10 +63,6 @@ hl.config({
         focus_fit_method = 0,
         wrap_focus = true,
     },
-	master = {
-		orientation = "center",
-	},
-
 	decoration = {
 		dim_special = 0.8,
 		blur = {
