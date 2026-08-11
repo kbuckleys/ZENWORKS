@@ -37,7 +37,7 @@ log=$(mktemp)
 # -D (continuous capture) is REQUIRED: with the default damage-based capture a
 # static screen delivers too few frames, and a race in wf-recorder's audio/video
 # sync drops them all, leaving an audio-only file.
-args=(-D -c h264_nvenc -p preset=p7 -p tune=hq -p rgb_mode=yuv444 -p rc=vbr -p cq=20 -p b:v=0)
+args=(-D -r 60 -c h264_nvenc -p preset=p7 -p tune=hq -p rc=vbr -p cq=20 -p b:v=0)
 
 # An empty --audio= aborts inside libpulse and leaves a truncated file behind,
 # so only ask for audio once a monitor source is actually known to exist
