@@ -43,6 +43,7 @@ hl.config({
 	},
 
 	general = {
+        layout = "scrolling",
 		col = {
 			inactive_border = "#9bbfbf4d",
 			active_border = "#9bbfbfcc",
@@ -69,7 +70,12 @@ hl.config({
             enabled = false
 		},
 		shadow = {
-			enabled = false
+            range = 200,
+            render_power = 1,
+            offset = { 0, 20 },
+            scale = 0.9,
+            color = "rgba(0,0,0,0.6)",
+            color_inactive = "rgba(0,0,0,0.4)",
 		},
 	},
 
