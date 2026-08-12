@@ -59,7 +59,7 @@ local function main()
     local mesg = string.format("%d Processes ~ Uptime: %s\nshift + return: multi-select  \u{F01D9}  return: confirm", #lines, uptime_str)
 
     local selection = rofi(formatted, string.format(
-        "-dmenu -multi-select -i -p 'Kill Process' -mesg '%s' -theme '%s'",
+        "-dmenu -multi-select -i -markup-rows -ballot-selected-str '<span foreground=\"#e78284\">\u{F09FC}</span> ' -ballot-unselected-str '' -p 'Kill Process' -mesg '%s' -theme '%s'",
         mesg, THEME))
 
     if not selection or selection == "" then

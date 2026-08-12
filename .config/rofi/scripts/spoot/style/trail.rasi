@@ -48,7 +48,7 @@ message {
     padding: 5px 30px 5px 30px;
 }
 textbox {
-    text-color: #dfdfdd;
+    text-color: #a2a8bc;
     horizontal-align: 0.5;
     font: "JetBrainsMono Nerd Font Propo Bold 12";
 }
