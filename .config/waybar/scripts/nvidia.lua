@@ -15,6 +15,7 @@ local MID_UTIL = tonumber(os.getenv("NVIDIA_MID_UTIL")) or 50
 
 local COLOR_WARN = "#e78284"
 local COLOR_MID = "#e0d8a4"
+local COLOR_TITLE = "#7a8292"
 
 local function trim(s)
     return s:match("^%s*(.-)%s*$")
@@ -177,7 +178,7 @@ local function main()
     local gpu_text = colorize(gpu_util, MID_UTIL, WARN_UTIL)
     local temp_text = colorize(gpu_temp, MID_TEMP, WARN_TEMP)
 
-    local gpu_title = "GPU"
+    local gpu_title = "<span foreground='" .. COLOR_TITLE .. "'>GPU</span>"
     if gpu_util >= WARN_UTIL then
         gpu_title = "<span foreground='" .. COLOR_WARN .. "'>GPU</span>"
     elseif gpu_util >= MID_UTIL then

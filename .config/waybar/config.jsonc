@@ -79,9 +79,9 @@
     },
 
     "cpu": {
-        "format": " CPU  {usage}% ",
-        "format-mid": "CPU  {usage}% ",
-        "format-high": "CPU  {usage}% ",
+        "format": " <span foreground='#7a8292'>CPU</span>  {usage}% ",
+        "format-mid": " <span foreground='#7a8292'>CPU</span>  {usage}% ",
+        "format-high": " <span foreground='#7a8292'>CPU</span>  {usage}% ",
         "on-click": "kitty -1 -T sysmon btop",
         "tooltip": true,
         "interval": 1,
@@ -102,7 +102,7 @@
     },
 
     "memory": {
-        "format": " RAM {used:0.1f} / {swapUsed:0.1f}",
+        "format": " <span foreground='#7a8292'>RAM</span> {used:0.1f} / {swapUsed:0.1f}",
         "tooltip": true,
         "tooltip-format": "RAM Total: {total:0.1f}GiB\nRAM Used: {used:0.1f}GiB\nRAM Available: {avail:0.1f}GiB\n\nSWAP Total: {swapTotal:0.1f}GiB\nSWAP Used: {swapUsed:0.1f}GiB\nSWAP Available: {swapAvail:0.1f}GiB",
         "interval": 1
