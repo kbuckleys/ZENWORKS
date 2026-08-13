@@ -17,8 +17,8 @@ swayimg.imagelist.enable_recursive(false) -- recursive directory reading
 swayimg.imagelist.enable_adjacent(true) -- add adjacent files from same dir
 
 -- Text overlay configuration
-swayimg.text.set_font("JetBrainsMono Nerd Font Propo") -- font name
-swayimg.text.set_size(15) -- font size in pixels
+swayimg.text.set_font("JetBrainsMono Nerd Font") -- font name
+swayimg.text.set_size(16) -- font size in pixels
 --swayimg.text.set_spacing(0) -- line spacing
 swayimg.text.set_padding(0) -- padding from window edge
 swayimg.text.set_foreground(0xffdfdfdd) -- foreground text color
@@ -31,8 +31,8 @@ swayimg.text.set_status_timeout(3) -- status message hide timeout
 swayimg.viewer.set_default_scale("optimal") -- default image scale
 swayimg.viewer.set_default_position("center") -- default image position
 swayimg.viewer.set_drag_button("MouseLeft") -- mouse button to drag image
-swayimg.viewer.set_window_background(0xff000000) -- window background color
-swayimg.viewer.set_image_chessboard(20, 0xff333333, 0xff4c4c4c) -- chessboard
+swayimg.viewer.set_window_background(0x80000000) -- window background color (50% alpha)
+swayimg.viewer.set_image_background(0x80000000) -- transparent image background (50% alpha, matches window)
 swayimg.viewer.enable_centering(true) -- enable automatic centering
 swayimg.viewer.enable_loop(true) -- enable image list loop mode
 swayimg.viewer.limit_preload(1) -- number of images to preload
