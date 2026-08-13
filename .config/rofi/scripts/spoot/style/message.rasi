@@ -16,6 +16,7 @@ mainbox {
 
 textbox {
     font: "JetBrainsMono Nerd Font Propo Bold 12";
+    padding: 10px 30px 10px 30px;
     background-color: #fab387;
     text-color: #000000;
 }
