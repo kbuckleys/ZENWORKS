@@ -6,7 +6,6 @@
 hl.window_rule({ match = { class = "mpv" },                               float = true, })
 hl.window_rule({ match = { class = "swayimg" },                           float = true })
 hl.window_rule({ match = { class = "xdg-desktop-portal-gtk" },            float = true, size = { 1000, 1000 }})
-hl.window_rule({ match = { class = "re.fossplant.songrec" },              float = true, size = { 800, 1100 }})
 hl.window_rule({ match = { class = "kitty", title = "termfilechooser" },  float = true, size = {1000, 450}})
 hl.window_rule({ match = { class = "kitty", title = "runner" },           float = true, size = {1000, 1000}})
 hl.window_rule({ match = { class = "steam", title = "Steam Settings" },   float = true})
@@ -16,10 +15,14 @@ hl.window_rule({ match = { class = "kitty",title = "Wiremix" },           float 
 hl.window_rule({ match = { class = "kitty",title = "ZENU" },              float = true, size = { 1000, 1100 }})
 
 -- BORDERS
-hl.window_rule({ match = { fullscreen = true },  border_color = "#fab38799"})
-hl.window_rule({ match = { float = true },       border_color = "#b6e0a499"})
+hl.window_rule({ match = { fullscreen = true },  border_color = "#fab38799", border_size = 2 })
+hl.window_rule({ match = { float = true },       border_color = "#b6e0a499", border_size = 2 })
 
--- SHADOWS (only floating)
+-- ROUNDING
+hl.window_rule({ match = { fullscreen = true },  rounding = 5 })
+hl.window_rule({ match = { float = true },       rounding = 5 })
+
+-- SHADOWS - FLOATS ONLY
 hl.window_rule({ match = { float = false }, no_shadow = true })
 
 -- LAYERS
