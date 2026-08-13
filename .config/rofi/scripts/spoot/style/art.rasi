@@ -14,7 +14,7 @@ window {
     border-radius: 5px 5px 5px 5px;
     location: center;
     anchor: center;
-    width: 1004px;
+    width: 1000px;
 }
 
 mainbox {
@@ -28,6 +28,7 @@ inputbar {
 listview {
     lines: 1;
     columns: 1;
+    padding: 0;
 }
 
 element {
