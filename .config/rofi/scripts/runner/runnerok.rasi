@@ -48,4 +48,5 @@ element-text.selected.normal {
 message {
     padding: 2px 8px 2px 8px;
     expand: true;
+    border: 0;
 }

@@ -41,4 +41,5 @@ element-text.selected.normal {
 message {
     background-color: #e78284;
     padding: 10px 10px 10px 10px;
+    border: 0;
 }

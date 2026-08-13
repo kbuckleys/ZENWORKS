@@ -47,3 +47,8 @@ element-text {
     horizontal-align: 0.5;
     highlight: none;
 }
+
+message {
+    border-color: rgb(69, 80, 92, 0.3);
+    border: 1px 0px 1px 0px;
+}

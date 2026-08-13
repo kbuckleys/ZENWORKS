@@ -51,3 +51,8 @@ textbox {
     text-color: #6a707f;
     font: "JetBrainsMono Nerd Font Propo Bold 12";
 }
+
+message {
+    border-color: rgb(69, 80, 92, 0.3);
+    border: 1px 0px 0px 0px;
+}
