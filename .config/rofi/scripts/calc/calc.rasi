@@ -28,7 +28,7 @@ inputbar {
 }
 
 textbox {
-    text-color: #000000;
+    text-color: #9fcbfc;
     horizontal-align: 0.5;
     font: "JetBrainsMono Nerd Font Propo Bold 12";
 }
@@ -58,5 +58,4 @@ element-text {
 message {
     padding: 2px 8px 2px 8px;
     background-color: rgb(40, 47, 54, 0.4);
-    color: #000000;
 }
