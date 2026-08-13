@@ -7,8 +7,7 @@
 @theme "ZENON"
 
 window {
-    location: south;
-    anchor: south;
+    border-radius: 0px;
     width: 250px;
 }
 
@@ -22,8 +21,6 @@ inputbar, element-icon {
 
 listview {
     background-color: #e78284;
-    fixed-height: false;
-    scrollbar: false;
     columns: 6;
     lines: 1;
 }
@@ -41,6 +38,5 @@ element selected.normal {
     background-color: #eebebe;
 }
 element-text selected {
-    background-color: transparent;
     color: #000000;
 }

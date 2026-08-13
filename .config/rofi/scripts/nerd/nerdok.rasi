@@ -7,8 +7,6 @@
 @import "ZENON"
 
 window {
-    location: south;
-    anchor: south;
     width: 500px;
     children: [ wrap, listview-split ];
 }
@@ -30,27 +28,14 @@ icon-current-entry {
 
 listview {
     lines: 3;
-    scrollbar: false;
-    padding: 0px 3px 2px 0px;
 }
 
-element {
-    padding: 2px 20px 2px 20px;
-}
 element-text {
     font: "JetBrainsMono Nerd Font Propo SemiBold 13";
     horizontal-align: 0.5;
 }
-element-text selected {
-    background-color: transparent;
-}
 
-message {
-    background-color: rgb(40, 47, 54, 0.4);
-    padding: 5px 30px 5px 30px;
-}
 textbox {
     text-color: #dfdfdd;
-    horizontal-align: 0.5;
     font: "JetBrainsMono Nerd Font Propo SemiBold 13";
 }

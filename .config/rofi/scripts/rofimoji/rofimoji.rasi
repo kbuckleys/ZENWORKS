@@ -12,8 +12,6 @@ configuration {
 }
 
 window {
-    location: south;
-    anchor: south;
     width: 80%;
 }
 
@@ -26,20 +24,11 @@ inputbar {
 }
 
 listview {
-    fixed-columns: false;
-    fixed-height: false;
-    scrollbar: false;
     columns: 3;
     lines: 8;
 }
 
-element {
-    padding: 2px 8px 2px 8px;
-}
 element-text {
     font: "JetBrainsMono Nerd Font Propo Medium 13";
     highlight: bold #e0d8a4;
-}
-element-text selected {
-    background-color: transparent;
 }

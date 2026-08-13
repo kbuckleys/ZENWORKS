@@ -20,8 +20,6 @@ configuration {
 }
 
 window {
-    location: south;
-    anchor: south;
     width: 80%;
 }
 
@@ -34,11 +32,7 @@ inputbar {
 }
 
 listview {
-    padding: 2px 3px 0px 3px;
-    fixed-columns: true;
-    fixed-height: false;
     dynamic: true;
-    scrollbar: false;
     columns: 16;
     lines: 4;
     flow: horizontal;
@@ -47,8 +41,6 @@ listview {
 element {
     orientation: vertical;
     children: [ element-icon ];
-    padding: 2px;
-    border: 0px;
 }
 element-text {
     enabled: false;
@@ -57,7 +49,6 @@ element selected {
     border: 2px;
     border-radius: 2px;
     border-color: #6a707f;
-    background-color: transparent;
 }
 element-icon {
     size: 64px;
@@ -66,12 +57,7 @@ element-icon {
     vertical-align: 0.5;
 }
 
-message {
-    background-color: rgb(40, 47, 54, 0.4);
-    padding: 5px 30px 5px 30px;
-}
 textbox {
     text-color: #6a707f;
-    horizontal-align: 0.5;
     font: "JetBrainsMono Nerd Font Propo Bold 12";
 }

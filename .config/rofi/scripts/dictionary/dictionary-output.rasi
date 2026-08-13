@@ -7,8 +7,6 @@
 @theme "ZENON"
 
 window {
-    location: south;
-    anchor: south;
     width: 1000px;
 }
 
@@ -18,15 +16,12 @@ mainbox {
 
 listview {
     padding: 12px 0px 12px 0px;
-    fixed-height: false;
-    scrollbar: false;
 }
 
 element-text {
     font: "JetBrainsMono Nerd Font Propo Medium 13";
     horizontal-align: 0.5;
     text-color: #dfdfdd;
-    padding: 2px 0px;
 }
 element.selected.normal {
     background-color: transparent;
@@ -35,12 +30,7 @@ element.selected.alternate {
     background-color: transparent;
 }
 
-message {
-    background-color: rgb(40, 47, 54, 0.4);
-    padding: 5px 30px 5px 30px;
-}
 textbox {
     text-color: #9bbfbf;
-    horizontal-align: 0.5;
     font: "JetBrainsMono Nerd Font Propo SemiBold 14";
 }

@@ -11,10 +11,9 @@
 }
 
 window {
-    location: south;
-    anchor: south;
     width: 100%;
     children: [ mainbox ];
+    border-radius: 0px;
 }
 mainbox {
     children: [ hbox ];
@@ -41,17 +40,12 @@ entry {
 
 listview {
     layout: horizontal;
-    lines: 50;
 }
 
-element {
-    padding: 2px 12px 2px 12px;
-}
 element-text {
     highlight: bold;
     text-color: #fab387;
 }
 element-text.selected {
-    background-color: transparent;
     text-color: #000000;
 }

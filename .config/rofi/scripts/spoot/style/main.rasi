@@ -19,11 +19,7 @@ mainbox {
 }
 
 listview {
-    padding: 0px 3px 2px 3px;
-    fixed-columns: true;
-    fixed-height: true;
     flow: horizontal;
-    scrollbar: false;
     columns: 5;
     lines: 3;
 }
@@ -48,12 +44,7 @@ element-text {
     font: "JetBrainsMono Nerd Font Propo SemiBold 11";
 }
 
-message {
-    background-color: rgb(40, 47, 54, 0.4);
-    padding: 5px 30px 5px 30px;
-}
 textbox {
     text-color: #b6e0a4;
-    horizontal-align: 0.5;
     font: "JetBrainsMono Nerd Font Propo Bold 12";
 }

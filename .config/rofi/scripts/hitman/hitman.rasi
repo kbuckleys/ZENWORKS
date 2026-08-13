@@ -12,8 +12,6 @@ configuration {
 }
 
 window {
-    location: south;
-    anchor: south;
     width: 1000px;
 }
 
@@ -27,13 +25,8 @@ inputbar {
     spacing: 4px;
 }
 
-message {
-    background-color: rgb(40, 47, 54, 0.4);
-    padding: 5px 30px 5px 30px;
-}
 textbox {
     text-color: #9bbfbf;
-    horizontal-align: 0.5;
     font: "JetBrainsMono Nerd Font Propo Bold 12";
 }
 textbox-prompt-colon {
@@ -48,21 +41,13 @@ entry {
 }
 
 listview {
-    padding: 0px 3px 0px 3px;
-    fixed-columns: false;
-    fixed-height: false;
-    scrollbar: false;
     columns: 2;
     lines: 12;
 }
 
-element {
-    padding: 2px 20px 2px 20px;
-}
 element-text {
     highlight: bold #eebebe;
 }
 element-text selected {
-    background-color: transparent;
     text-color: #e78284;
 }

@@ -7,8 +7,6 @@
 @theme "ZENON"
 
 window {
-    location: south;
-    anchor: south;
     width: 100%;
 }
 
@@ -32,20 +30,11 @@ entry {
 }
 
 listview {
-    fixed-columns: false;
-    fixed-height: false;
-    scrollbar: false;
     columns: 3;
     lines: 12;
 }
 
-element {
-    padding: 2px 8px 2px 8px;
-}
 element-text {
     font: "JetBrainsMono Nerd Font Propo SemiBold 13";
     highlight: bold #c8a4e0;
-}
-element-text selected {
-    background-color: transparent;
 }

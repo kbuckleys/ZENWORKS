@@ -39,7 +39,7 @@ window {
     location: south;
     anchor: south;
     background-color: @background;
-    padding: 0;
+    border-radius: 10px 10px 0px 0px;
     border: 1px;
 }
 
@@ -50,30 +50,25 @@ mainbox {
 
 message {
     background-color: rgb(40, 47, 54, 0.4);
-    border-color: @separatorcolor;
-    border: 0px;
-    padding: 0px;
+    padding: 5px 30px 5px 30px;
 }
 
 textbox {
-    text-color: @foreground;
+    horizontal-align: 0.5;
 }
 
 listview {
-    border-color: @separatorcolor;
-    scrollbar: true;
-    fixed-height: 0;
-    spacing: 2px;
     padding: 0px;
-    border: 0px;
+    fixed-columns: false;
+    fixed-height: false;
+    scrollbar: false;
 }
 
 element {
-    padding: 1px;
-    border: 0;
+    padding: 2px 20px 2px 20px;
 }
 element-text {
-    background-color: inherit;
+    background-color: transparent;
     text-color: inherit;
 }
 element.normal.normal {

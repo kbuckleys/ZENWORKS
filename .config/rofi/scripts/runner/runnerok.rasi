@@ -38,9 +38,6 @@ listview {
     scrollbar: false;
 }
 
-element {
-    padding: 2px 12px 2px 12px;
-}
 element-text {
     text-color: #fab387;
 }
@@ -50,7 +47,6 @@ element-text.selected.normal {
 }
 
 message {
-    background-color: rgb(40, 47, 54, 0.4);
     padding: 2px 8px 2px 8px;
     expand: true;
 }

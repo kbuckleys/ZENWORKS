@@ -11,8 +11,6 @@
 }
 
 window {
-    location: south;
-    anchor: south;
     width: 1000px;
 }
 
@@ -27,15 +25,10 @@ textbox {
 }
 
 listview {
-    fixed-height: false;
-    scrollbar: false;
     columns: 2;
     lines: 1;
 }
 
-element {
-    padding: 5px 5px 5px 5px;
-}
 element-text {
     text-color: #e78284;
     horizontal-align: 0.5;
@@ -46,6 +39,6 @@ element-text.selected.normal {
 }
 
 message {
-    background-color: rgb(40, 47, 54, 0.4);
+    background-color: #e78284;
     padding: 10px 10px 10px 10px;
 }
