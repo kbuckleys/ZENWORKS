@@ -51,6 +51,7 @@ element {
     padding: 2px 8px 2px 8px;
 }
 element-text {
+    background-color: transparent;
     highlight: none;
 }
 

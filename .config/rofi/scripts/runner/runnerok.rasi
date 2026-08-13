@@ -45,6 +45,7 @@ element-text {
     text-color: #fab387;
 }
 element-text.selected.normal {
+    background-color: transparent;
     text-color: #000000;
 }
 

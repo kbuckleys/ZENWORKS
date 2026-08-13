@@ -55,14 +55,14 @@ element selected {
     border: 2px;
     border-radius: 2px;
     border-color: #6a707f;
-    background-color: none;
+    background-color: transparent;
 }
 element-icon {
     size: 200px;
 }
 
 message {
-    background-color: #16191d;
+    background-color: rgb(22, 25, 29, 0.8);
     padding: 5px 30px 5px 30px;
 }
 textbox {

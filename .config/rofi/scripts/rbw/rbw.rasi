@@ -21,9 +21,14 @@ inputbar {
     enabled: false;
 }
 
-#textbox {
-    padding: 4px 8px 4px 8px;
-    color: #fab387;
+message {
+    background-color: rgb(22, 25, 29, 0.8);
+    padding: 5px 30px 5px 30px;
+}
+textbox {
+    text-color: #fab387;
+    horizontal-align: 0.5;
+    font: "JetBrainsMono Nerd Font Propo SemiBold 12";
 }
 
 listview {

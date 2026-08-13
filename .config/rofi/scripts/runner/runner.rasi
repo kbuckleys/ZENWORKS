@@ -52,5 +52,6 @@ element-text {
     text-color: #fab387;
 }
 element-text.selected {
+    background-color: transparent;
     text-color: #000000;
 }

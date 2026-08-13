@@ -41,5 +41,6 @@ element selected.normal {
     background-color: #eebebe;
 }
 element-text selected {
+    background-color: transparent;
     color: #000000;
 }
