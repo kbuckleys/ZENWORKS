@@ -3,8 +3,9 @@
 -- └─┘└─┘┘└┘└┴┘└─┘┴└─┴ ┴└─┘
 -- https://github.com/kbuckleys/
 
--- Workspace 1 always defaults to dwindle
+-- Workspace 1 and Special always default to dwindle
 hl.workspace_rule({ workspace = "1", layout = "dwindle" })
+hl.workspace_rule({ workspace = "special:special", layout = "dwindle" })
 
 hl.bind("SUPER + L",          hl.dsp.window.swap({ next = true }))
 hl.bind("SUPER + SHIFT + L",  function ()

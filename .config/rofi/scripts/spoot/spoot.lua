@@ -4355,7 +4355,7 @@ local function do_play(item, ctx_type, ctx_id, all_items, idx)
     -- queue behind. `unavail` comes only from is_playable (see
     -- Util.mark_availability), so this can never fire on a guess.
     if item and item.unavail then
-        rofi_message("Selection is unavailable to your account's region")
+        rofi_message("Selection is unavailable in your account's region")
         return false
     end
     local context_uri

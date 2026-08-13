@@ -66,7 +66,9 @@ hl.config({
 	decoration = {
 		dim_special = 0.8,
 		blur = {
-            enabled = false
+            size = 4,
+            passes = 2,
+            special = true,
 		},
 		shadow = {
             range = 200,

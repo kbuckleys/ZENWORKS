@@ -11,6 +11,7 @@
 }
 
 configuration {
+    fixed-num-lines: false;
     kb-remove-to-sol: "BackSpace";
     kb-remove-char-back: "";
     kb-element-next: "";
@@ -34,18 +35,20 @@ inputbar {
 
 listview {
     padding: 2px 3px 0px 3px;
-    fixed-columns: false;
+    fixed-columns: true;
     fixed-height: false;
+    dynamic: true;
     scrollbar: false;
     columns: 16;
     lines: 4;
+    flow: horizontal;
 }
 
 element {
-    padding: 10px 10px 10px 10px;
     orientation: vertical;
-    horizontal-align: 0.5;
-    vertical-align: 0.5;
+    children: [ element-icon ];
+    padding: 2px;
+    border: 0px;
 }
 element-text {
     enabled: false;
@@ -59,6 +62,8 @@ element selected {
 element-icon {
     size: 64px;
     padding: 0px 0px 0px 0px;
+    horizontal-align: 0.5;
+    vertical-align: 0.5;
 }
 
 message {

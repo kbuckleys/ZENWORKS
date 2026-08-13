@@ -56,7 +56,7 @@ local function run_rofi(rows, theme, mesg, selected)
     f:write(table.concat(rows, "\n") .. "\n")
     f:close()
     os.execute(string.format(
-        "rofi -dmenu -i -no-custom -format i -selected-row %d -theme %s -mesg %s < %s > %s 2>/dev/null",
+        "rofi -dmenu -i -no-custom -no-config -no-fixed-num-lines -format i -selected-row %d -theme %s -mesg %s < %s > %s 2>/dev/null",
         selected or 0, shell_quote(theme), shell_quote(mesg),
         shell_quote(in_tmp), shell_quote(out_tmp)))
     os.remove(in_tmp)
