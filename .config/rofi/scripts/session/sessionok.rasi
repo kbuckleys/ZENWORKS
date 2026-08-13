@@ -18,7 +18,6 @@ mainbox {
 
 textbox {
     text-color: #e78284;
-    background-color: #000000;
     horizontal-align: 0.5;
     font: "JetBrainsMono Nerd Font Propo Bold 16";
 }
@@ -41,9 +40,6 @@ element-text {
 }
 element selected.normal {
     background-color: #eebebe;
-}
-element-text selected {
-    color: #000000;
 }
 
 message {

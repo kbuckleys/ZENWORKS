@@ -20,12 +20,12 @@
     selected-normal-foreground: #DFDFDD;
     selected-active-foreground: #0B0E0E;
     selected-urgent-foreground: #0B0E0E;
-    selected-normal-background: #16191d;
+    selected-normal-background: rgb(193, 220, 255, 0.1);
     active-background: @background;
     normal-foreground: @foreground;
     normal-background: #00000000;
     lightfg: @normal-background;
-    background: rgba(0, 0, 0, 1);
+    background: rgba(0, 0, 0, 0.8);
     separatorcolor: @foreground;
     urgent-background: #e78284;
     urgent-foreground: #e78284;
@@ -33,7 +33,6 @@
     lightbg: #DFDFDD;
     blue: #9BBFBF;
     red: #e78284;
-    spacing: 2;
 }
 
 window {

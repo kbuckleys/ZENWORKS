@@ -69,6 +69,7 @@ hl.config({
             size = 4,
             passes = 2,
             special = true,
+            popups = true,
 		},
 		shadow = {
             range = 200,

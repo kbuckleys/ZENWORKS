@@ -54,7 +54,7 @@ element-text {
 }
 
 message {
-    background-color: none;
+    background-color: rgb(22, 25, 29, 0.8);
     padding: 0px 30px 30px 30px;
 }
 textbox {
