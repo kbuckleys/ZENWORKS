@@ -64,6 +64,7 @@ hl.config({
 		preserve_split = true,
 	},
 	decoration = {
+		dim_special = 0.8,
         rounding = 5,
 		blur = {
             passes = 2,
