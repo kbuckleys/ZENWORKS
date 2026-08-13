@@ -20,7 +20,7 @@
     selected-normal-foreground: #DFDFDD;
     selected-active-foreground: #0B0E0E;
     selected-urgent-foreground: #0B0E0E;
-    selected-normal-background: rgb(193, 220, 255, 0.1);
+    selected-normal-background: rgb(69, 80, 92, 0.3);
     active-background: @background;
     normal-foreground: @foreground;
     normal-background: #00000000;
@@ -49,6 +49,7 @@ mainbox {
 }
 
 message {
+    background-color: rgb(40, 47, 54, 0.4);
     border-color: @separatorcolor;
     border: 0px;
     padding: 0px;

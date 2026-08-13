@@ -50,7 +50,7 @@ element-text.selected.normal {
 }
 
 message {
-    background-color: rgba(163, 169, 189, 0.1);
+    background-color: rgb(40, 47, 54, 0.4);
     padding: 2px 8px 2px 8px;
     expand: true;
 }

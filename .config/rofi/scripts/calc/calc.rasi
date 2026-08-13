@@ -57,6 +57,6 @@ element-text {
 
 message {
     padding: 2px 8px 2px 8px;
-    background-color: #9fcbfc;
+    background-color: rgb(40, 47, 54, 0.4);
     color: #000000;
 }

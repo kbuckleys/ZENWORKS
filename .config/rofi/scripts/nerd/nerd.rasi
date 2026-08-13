@@ -67,7 +67,7 @@ element-icon {
 }
 
 message {
-    background-color: rgb(22, 25, 29, 0.8);
+    background-color: rgb(40, 47, 54, 0.4);
     padding: 5px 30px 5px 30px;
 }
 textbox {
