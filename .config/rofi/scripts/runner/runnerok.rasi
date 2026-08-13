@@ -11,9 +11,8 @@
 }
 
 window {
-    location: south;
-    anchor: south;
     width: 100%;
+    border-radius: 0;
     children: [ mainbox ];
 }
 

@@ -58,7 +58,6 @@ textbox {
 }
 
 listview {
-    padding: 0px;
     fixed-columns: false;
     fixed-height: false;
     scrollbar: false;

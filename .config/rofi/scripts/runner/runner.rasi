@@ -12,8 +12,8 @@
 
 window {
     width: 100%;
+    border-radius: 0;
     children: [ mainbox ];
-    border-radius: 0px;
 }
 mainbox {
     children: [ hbox ];
@@ -27,7 +27,7 @@ inputbar {
     children: [ textbox-prompt-colon, entry ];
     padding: 2px 12px 2px 12px;
     spacing: 4px;
-    width: 15%;
+    width: 20%;
 }
 textbox-prompt-colon {
     padding: 2px 0px 2px 0px;
