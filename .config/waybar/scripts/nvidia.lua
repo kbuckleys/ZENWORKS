@@ -15,7 +15,7 @@ local MID_UTIL = tonumber(os.getenv("NVIDIA_MID_UTIL")) or 50
 
 local COLOR_WARN = "#e78284"
 local COLOR_MID = "#e0d8a4"
-local COLOR_TITLE = "#7a8292"
+local COLOR_TITLE = "#a2a8bc"
 
 local function trim(s)
     return s:match("^%s*(.-)%s*$")
