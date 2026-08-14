@@ -1,0 +1,49 @@
+/**
+* ┌─┐┌─┐┌┐┌┬ ┬┌─┐┬─┐┬┌─┌─┐
+* ┌─┘├┤ │││││││ │├┬┘├┴┐└─┐
+* └─┘└─┘┘└┘└┴┘└─┘┴└─┴ ┴└─┘
+* https://github.com/kbuckleys/ */
+
+@theme "ZENON"
+
+configuration {
+    kb-remove-char-back: "BackSpace";
+    kb-remove-to-sol: "";
+}
+
+window {
+    width: 800px;
+}
+
+mainbox {
+    children: [ message, inputbar, listview ];
+}
+
+inputbar {
+    enabled: false;
+}
+
+listview {
+    padding: 4px 0px 4px 0px;
+}
+
+element-text {
+    font: "JetBrainsMono Nerd Font Propo SemiBold 13";
+    highlight: bold #9bbfbf;
+    text-color: #dfdfdd;
+    horizontal-align: 0.5;
+}
+
+inputbar {
+    children: [ entry ];
+}
+entry {
+    font: "JetBrainsMono Nerd Font Propo SemiBold 14";
+    horizontal-align: 0.5;
+    color: #9bbfbf;
+}
+
+textbox {
+    text-color: #9bbfbf;
+    font: "JetBrainsMono Nerd Font Propo SemiBold 14";
+}

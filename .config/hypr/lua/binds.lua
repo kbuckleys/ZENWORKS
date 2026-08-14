@@ -38,6 +38,7 @@ hl.bind("SUPER + SHIFT + M",  hl.dsp.exec_cmd("~/.config/rofi/scripts/spoot/spoo
 hl.bind("SUPER + V",          hl.dsp.exec_cmd("~/.config/rofi/scripts/rbw/rbw.lua"))
 hl.bind("SUPER + K",          hl.dsp.exec_cmd("~/.config/rofi/scripts/hitman/hitman.lua"))
 hl.bind("SUPER + D",          hl.dsp.exec_cmd("~/.config/rofi/scripts/dictionary/dictionary.lua"))
+hl.bind("SUPER + SHIFT + D",  hl.dsp.exec_cmd("~/.config/rofi/scripts/translate/translate.lua"))
 
 -- WORKSPACES
 hl.bind("SUPER + GRAVE",  hl.dsp.workspace.toggle_special("special"))
