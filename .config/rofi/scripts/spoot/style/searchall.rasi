@@ -6,6 +6,11 @@
 
 @import "ZENON"
 
+configuration {
+    kb-remove-to-sol: "BackSpace";
+    kb-remove-char-back: "";
+}
+
 window {
     width: 1000px;
 }
@@ -20,7 +25,7 @@ inputbar {
 
 listview {
     columns: 2;
-    lines: 10;
+    lines: 14;
 }
 
 element-text {

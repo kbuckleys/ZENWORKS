@@ -20,6 +20,7 @@ inputbar, element-icon {
 }
 
 listview {
+    padding: 0px 0px 0px 0px;
     background-color: #e78284;
     columns: 6;
     lines: 1;

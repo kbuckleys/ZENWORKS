@@ -24,6 +24,7 @@ textbox {
 
 listview {
     background-color: #e78284;
+    padding: 0px 0px 0px 0px;
     fixed-height: false;
     scrollbar: false;
     columns: 2;
