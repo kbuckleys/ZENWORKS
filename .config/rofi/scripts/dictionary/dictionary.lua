@@ -15,7 +15,7 @@ elseif DIR:sub(1, 1) ~= "/" then DIR = (os.getenv("PWD") or ".") .. "/" .. DIR e
 local ROFI_THEME_INPUT = DIR .. "/dictionary.rasi"
 local ROFI_THEME_SELECT = DIR .. "/select.rasi"
 local ROFI_THEME_RESULTS = DIR .. "/dictionary-output.rasi"
-local MAX_LINE_LENGTH = 80
+local MAX_LINE_LENGTH = 96
 local MAX_DEFS_PER_POS = 2
 local MAX_LINES = 20
 local MAX_SYNONYMS = 6
@@ -32,11 +32,8 @@ local USER_AGENT = "rofi-dict/1.0 (https://github.com/kbuckleys/)"
 
 local COLOR_HEAD = "#9bbfbf"
 local COLOR_KEY = "#a2a8bc"
-local COLOR_PHON = "#9bbfbf"
 local COLOR_POS = "#6a707f"
-local COLOR_LABEL = "#6a707f"
 local COLOR_EX = "#eebebe"
-local COLOR_SYN = "#9bbfbf"
 local COLOR_ERROR = "#e78284"
 local ICON_HEAD = "\u{f405}"
 local ICON_AUDIO = "\u{f07c5}"
@@ -167,19 +164,54 @@ local function has_content(s)
     return s:match("[%w]") ~= nil
 end
 
--- Simple word wrap
+-- Length/substring that count UTF-8 characters and degrade to bytes on any
+-- invalid input, so a mid-sequence cut can never corrupt a character. Matches
+-- translate.lua's helpers so both scripts wrap text identically.
+local function ulen(s)
+    local ok, n = pcall(utf8.len, s)
+    return (ok and n) or #s
+end
+
+local function usub(s, i, j)
+    local ok, n = pcall(utf8.len, s)
+    if not ok or not n then return s:sub(i, j) end
+    if i < 0 then i = n + i + 1 end
+    if j == nil then j = n elseif j < 0 then j = n + j + 1 end
+    if i < 1 then i = 1 end
+    if j > n then j = n end
+    if i > j then return "" end
+    local start = utf8.offset(s, i)
+    if not start then return "" end
+    local stop = utf8.offset(s, j + 1)
+    if not stop then return s:sub(start) end
+    return s:sub(start, stop - 1)
+end
+
+-- Simple word wrap, UTF-8 char-aware so multi-byte characters are never split.
+-- An unbroken run (URL, long word) is cut at the limit without dropping a char.
 local function wrap(text, width)
     local lines = {}
     for raw_line in text:gmatch("[^\n]+") do
         local line = raw_line
-        while #line > width do
-            local break_at = width
-            local space = line:sub(1, width):match(".*()%s")
-            if space and space > 1 then
-                break_at = space
+        local ok, len = pcall(utf8.len, line)
+        if not ok or not len then len = #line end
+        while len > width do
+            local break_at, found = width, false
+            for i = width, 2, -1 do
+                if usub(line, i, i):match("%s") then
+                    break_at, found = i, true
+                    break
+                end
             end
-            lines[#lines + 1] = line:sub(1, break_at - 1)
-            line = line:sub(break_at + 1)
+            if found then
+                lines[#lines + 1] = usub(line, 1, break_at - 1)
+                line = usub(line, break_at + 1)
+            else
+                lines[#lines + 1] = usub(line, 1, width)
+                line = usub(line, width + 1)
+            end
+            local ok2, l2 = pcall(utf8.len, line)
+            len = (ok2 and l2) or #line
         end
         lines[#lines + 1] = line
     end
@@ -269,10 +301,11 @@ local function render_template(inner)
     local name = template_name(parts)
     local pos = positional_args(parts)
 
-    -- Templates that stand in for a word: keep the display form
+    -- Templates that stand in for a word: show the target, not a trailing gloss
+    -- ({{l|en|word|gloss}} links the word; the gloss is only disambiguation).
     if name == "w" or name == "l" or name == "m" or name == "ll"
         or name == "link" or name == "mention" or name == "glossary" then
-        return pos[#pos] or ""
+        return pos[1] or ""
     end
     -- Non-gloss definitions and glosses: keep the prose
     if name == "n-g" or name == "ngd" or name == "non-gloss"
@@ -707,12 +740,12 @@ local function build_message(word, entry, suggested)
     local msg = "<span foreground=\"" .. COLOR_HEAD .. "\">" .. ICON_HEAD .. "</span>  " ..
         "<b><span foreground=\"" .. COLOR_HEAD .. "\">" .. escape_markup(word) .. "</span></b>"
     if entry.ipa and entry.ipa ~= "" then
-        msg = msg .. "  <span foreground=\"" .. COLOR_PHON .. "\">" ..
+        msg = msg .. "  <span foreground=\"" .. COLOR_HEAD .. "\">" ..
             escape_markup(entry.ipa) .. "</span>"
     end
     if entry.audio and PLAYER then
         local tag = entry.audio.code and (" " .. entry.audio.code) or ""
-        msg = msg .. "  <span foreground=\"" .. COLOR_PHON .. "\">" ..
+        msg = msg .. "  <span foreground=\"" .. COLOR_HEAD .. "\">" ..
             ICON_AUDIO .. escape_markup(tag) .. "</span>"
     end
     if suggested then
@@ -756,7 +789,7 @@ local function build_lines(entry)
                     if i == 1 and label then
                         local elab = escape_markup(label)
                         if esc:sub(1, #elab) == elab then
-                            esc = "<span foreground=\"" .. COLOR_LABEL .. "\"><i>" ..
+                            esc = "<span foreground=\"" .. COLOR_POS .. "\"><i>" ..
                                 elab .. "</i></span>" .. esc:sub(#elab + 1)
                         end
                     end
@@ -776,7 +809,7 @@ local function build_lines(entry)
 
     if #entry.synonyms > 0 then
         add_blank()
-        lines[#lines + 1] = "<span foreground=\"" .. COLOR_SYN .. "\"><b>Synonyms:</b> " ..
+        lines[#lines + 1] = "<span foreground=\"" .. COLOR_HEAD .. "\"><b>Synonyms:</b> " ..
             escape_markup(table.concat(entry.synonyms, ", ")) .. "</span>"
     end
 
@@ -799,7 +832,6 @@ local function run_rofi(args, input_file)
     local out = read_file(outfile)
     remove_file(outfile)
 
-    if type(ok) == "number" then code = ok end
     return code or 0, trim(out)
 end
 

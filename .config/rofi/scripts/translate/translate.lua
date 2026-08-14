@@ -19,10 +19,11 @@ local HISTORY_MAX = 20
 local ROFI_THEME_INPUT = DIR .. "/translate.rasi"
 local ROFI_THEME_SELECT = DIR .. "/select.rasi"
 local ROFI_THEME_RESULTS = DIR .. "/translate-output.rasi"
-local MAX_LINE_LENGTH = 80
+local MAX_LINE_LENGTH = 96
 local MAX_LINES = 20
 local MAX_SOURCE_LEN = 120
-local TTS_MAX_CHARS = 180
+local TTS_CHUNK_MAX = 190
+local TTS_REQUEST_GAP = 0.25
 
 -- Wikimedia-style UA; Google's endpoints are unauthenticated but a bare curl
 -- UA is a common throttle trigger
@@ -100,8 +101,8 @@ local LANGS = {
 -- Google returns that don't appear verbatim in the list above.
 local SOURCE_NAMES = {}
 for _, l in ipairs(LANGS) do SOURCE_NAMES[l[1]] = l[2] end
-SOURCE_NAMES["iw"] = SOURCE_NAMES["iw"] or "עברית"
-SOURCE_NAMES["jw"] = SOURCE_NAMES["jw"] or "Jawa"
+SOURCE_NAMES["iw"] = "עברית"
+SOURCE_NAMES["jw"] = "Jawa"
 
 local function source_name(code)
     return SOURCE_NAMES[code] or (code and code:upper() or "")
@@ -155,6 +156,29 @@ local function trim(s)
     return (s:gsub("^%s+", ""):gsub("%s+$", ""))
 end
 
+-- Length/substring that count UTF-8 characters and degrade to bytes on any
+-- invalid input, so a mid-sequence cut can never crash the script. Lua 5.5's
+-- utf8 library has no sub, so one is built from utf8.offset.
+local function ulen(s)
+    local ok, n = pcall(utf8.len, s)
+    return (ok and n) or #s
+end
+
+local function usub(s, i, j)
+    local ok, n = pcall(utf8.len, s)
+    if not ok or not n then return s:sub(i, j) end
+    if i < 0 then i = n + i + 1 end
+    if j == nil then j = n elseif j < 0 then j = n + j + 1 end
+    if i < 1 then i = 1 end
+    if j > n then j = n end
+    if i > j then return "" end
+    local start = utf8.offset(s, i)
+    if not start then return "" end
+    local stop = utf8.offset(s, j + 1)
+    if not stop then return s:sub(start) end
+    return s:sub(start, stop - 1)
+end
+
 -- Escape for rofi markup
 local function escape_markup(s)
     s = s:gsub("&", "&amp;")
@@ -170,28 +194,50 @@ local function has_content(s)
     return s:match("%S") ~= nil
 end
 
--- Simple word wrap
+-- Simple word wrap. Operates on UTF-8 characters, not bytes, so a multi-byte
+-- char is never split across lines.
 local function wrap(text, width)
     local lines = {}
     for raw_line in text:gmatch("[^\n]+") do
         local line = raw_line
-        while #line > width do
-            local break_at = width
-            local space = line:sub(1, width):match(".*()%s")
-            if space and space > 1 then
-                break_at = space
+        local ok, len = pcall(utf8.len, line)
+        if not ok or not len then len = #line end
+        while len > width do
+            local break_at, found = width, false
+            for i = width, 2, -1 do
+                if usub(line, i, i):match("%s") then
+                    break_at, found = i, true
+                    break
+                end
             end
-            lines[#lines + 1] = line:sub(1, break_at - 1)
-            line = line:sub(break_at + 1)
+            if found then
+                -- Cut after the last space in the window, dropping that space.
+                lines[#lines + 1] = usub(line, 1, break_at - 1)
+                line = usub(line, break_at + 1)
+            else
+                -- Unbroken run (URL, long word): cut exactly at the limit so
+                -- no character is dropped.
+                lines[#lines + 1] = usub(line, 1, width)
+                line = usub(line, width + 1)
+            end
+            local ok2, l2 = pcall(utf8.len, line)
+            len = (ok2 and l2) or #line
         end
         lines[#lines + 1] = line
     end
     return lines
 end
 
+-- Truncate by UTF-8 characters (not bytes) so a multi-byte char is never cut
+-- mid-sequence, which would leave invalid UTF-8 that rofi mangles.
 local function truncate(text, max)
-    if #text <= max then return text end
-    return text:sub(1, max) .. "…"
+    local ok, n = pcall(utf8.len, text)
+    if not ok or not n then
+        if #text <= max then return text end
+        return text:sub(1, max) .. "…"
+    end
+    if n <= max then return text end
+    return usub(text, 1, max) .. "…"
 end
 
 --------------------------------------------------------------------------------
@@ -234,24 +280,84 @@ local function file_size(path)
     return size
 end
 
--- Start the download while the user is still reading the translation, so
--- Return doesn't stall on the network. Downloads to a .part file and renames,
--- so a half-written file is never played. Returns the temp path.
+-- Split text into chunks Google's TTS will accept (a single request rejects
+-- text over ~200 chars). Breaks at sentence boundaries where possible so the
+-- speech stays natural, then packs sentences into chunks of at most
+-- TTS_CHUNK_MAX chars, hard-splitting any sentence that alone exceeds it.
+local function split_tts(text)
+    local chunks, sentences = {}, {}
+    for seg in text:gmatch("[^%.\n?。．！？]*[%.\n?。．！？]?") do
+        local piece = seg:gsub("^%s+", "")
+        if piece:match("%S") then sentences[#sentences + 1] = piece end
+    end
+
+    local cur = ""
+    local function flush()
+        if cur:match("%S") then chunks[#chunks + 1] = cur end
+        cur = ""
+    end
+
+    for _, s in ipairs(sentences) do
+        local slen = ulen(s)
+        local clen = ulen(cur)
+        if clen > 0 and clen + slen > TTS_CHUNK_MAX then
+            flush()
+        end
+        if slen <= TTS_CHUNK_MAX then
+            cur = cur .. s
+        else
+            local rest = s
+            while ulen(rest) > TTS_CHUNK_MAX do
+                chunks[#chunks + 1] = usub(rest, 1, TTS_CHUNK_MAX)
+                rest = usub(rest, TTS_CHUNK_MAX + 1)
+            end
+            cur = rest
+        end
+    end
+    flush()
+    return chunks
+end
+
+-- Start the downloads while the user is still reading the translation, so
+-- Return doesn't stall on the network. The whole paragraph is split into
+-- sentence-aligned chunks; each is fetched with its own total/idx, then the
+-- pieces are concatenated into a single file (all pieces share the encoder's
+-- bitrate, so a plain cat is a valid MP3 stream). Returns the final path.
 local function prefetch_audio(text, code)
     if not PLAYER or not text or text == "" then return nil end
 
-    local audio = text:sub(1, TTS_MAX_CHARS)
+    local chunks = split_tts(text)
+    if #chunks == 0 then return nil end
+
     local path = os.tmpname()
     local part = path .. ".part"
-    local url = "https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl="
-        .. urlencode(code) .. "&total=1&idx=0&textlen=" .. #audio
-        .. "&q=" .. urlencode(audio)
+    local n = #chunks
+
+    local cmds, pieces = {}, {}
+    for i, chunk in ipairs(chunks) do
+        local url = "https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl="
+            .. urlencode(code) .. "&total=" .. n .. "&idx=" .. (i - 1)
+            .. "&textlen=" .. #chunk .. "&q=" .. urlencode(chunk)
+        local piece = path .. "." .. (i - 1)
+        cmds[#cmds + 1] = string.format("curl -sL --max-time 12 -A %s %s -o %s",
+            shell_quote(USER_AGENT), shell_quote(url), shell_quote(piece))
+        pieces[#pieces + 1] = shell_quote(piece)
+    end
+
+    -- Fetch every chunk, then assemble; pieces are cleaned up either way.
+    local sep = " && sleep " .. TTS_REQUEST_GAP .. " && "
     os.execute(string.format(
-        "( curl -sL --max-time 12 -A %s %s -o %s && mv -f %s %s ) >/dev/null 2>&1 &",
-        shell_quote(USER_AGENT), shell_quote(url),
-        shell_quote(part), shell_quote(part), shell_quote(path)))
+        "( %s; if [ $? -eq 0 ]; then cat %s > %s && mv -f %s %s; fi; rm -f %s ) >/dev/null 2>&1 &",
+        table.concat(cmds, sep),
+        table.concat(pieces, " "),
+        shell_quote(part), shell_quote(part), shell_quote(path),
+        table.concat(pieces, " ")))
     return path
 end
+
+-- Paths we've started playing, recorded whenever play_audio launches a clip.
+-- Declared before play_audio so it's a real local (not a nil global).
+local PLAYED_PATHS = {}
 
 -- Fire and forget. The player is detached so rofi can be back on screen
 -- immediately rather than waiting out the clip.
@@ -259,13 +365,14 @@ local function play_audio(path)
     if not PLAYER or not path then return false end
 
     -- Normally already done; only waits if Return came fast
-    for _ = 1, 20 do
+    for _ = 1, 80 do
         if file_size(path) > 0 then break end
         os.execute("sleep 0.1")
     end
     if file_size(path) == 0 then return false end
 
     os.execute("setsid " .. PLAYER .. " " .. shell_quote(path) .. " >/dev/null 2>&1 &")
+    PLAYED_PATHS[path] = true
     return true
 end
 
@@ -322,18 +429,19 @@ for _, c in ipairs({
     "yo","zu","iw","jw",
 }) do KNOWN_CODES[c] = true end
 
-local function translate_url(text, code, source)
-    local sl = source and KNOWN_CODES[source] and source or "auto"
-    return "https://translate.googleapis.com/translate_a/single?client=gtx&sl="
-        .. sl .. "&tl=" .. urlencode(code) .. "&dt=t&dt=rm&q=" .. urlencode(text)
-end
+local TRANSLATE_ENDPOINT = "https://translate.googleapis.com/translate_a/single"
 
 -- Fetch and parse a translation. Returns { translation, roman, source }, or
--- nil + an error kind ("network" / "empty").
+-- nil + an error kind ("network" / "empty"). Uses a POST body so long inputs
+-- aren't constrained by Google's ~15KB URL length limit.
 local function do_translate(text, code, source)
-    local url = translate_url(text, code, source)
-    local body = shell(string.format("curl -s --max-time 12 -A %s %s",
-        shell_quote(USER_AGENT), shell_quote(url)))
+    local sl = source and KNOWN_CODES[source] and source or "auto"
+    local body = shell(string.format(
+        "curl -s --max-time 12 -A %s --data-urlencode %s -d %s %s",
+        shell_quote(USER_AGENT),
+        shell_quote("q=" .. text),
+        shell_quote("client=gtx&sl=" .. sl .. "&tl=" .. urlencode(code) .. "&dt=t&dt=rm"),
+        shell_quote(TRANSLATE_ENDPOINT)))
     if not body or body == "" then return nil, "network" end
 
     local ok, data = pcall(json.decode, body)
@@ -382,10 +490,20 @@ local function build_message(text, lang, t, audio_enabled, swapped)
     local msg = "<span foreground=\"" .. COLOR_HEAD .. "\">" .. ICON_TRANSLATE .. "</span>  " ..
         "<b><span foreground=\"" .. COLOR_HEAD .. "\">" ..
         escape_markup(head) .. "</span></b>"
-    msg = msg .. "\n<span foreground=\"" .. COLOR_POS .. "\">" .. escape_markup(lang.name) .. "</span>"
-    if t.source then
+
+    if swapped then
+        -- Swapped: we're viewing the source text, so the "target" is the source language
+        local src_name = t.source and source_name(t.source) or "auto"
+        msg = msg .. "\n<span foreground=\"" .. COLOR_POS .. "\">" .. escape_markup(src_name) .. "</span>"
         msg = msg .. " <span foreground=\"" .. COLOR_POS .. "\">→ from " ..
-            escape_markup(source_name(t.source)) .. "</span>"
+            escape_markup(lang.name) .. "</span>"
+    else
+        -- Normal: viewing translation, target is lang, source is t.source
+        msg = msg .. "\n<span foreground=\"" .. COLOR_POS .. "\">" .. escape_markup(lang.name) .. "</span>"
+        if t.source then
+            msg = msg .. " <span foreground=\"" .. COLOR_POS .. "\">→ from " ..
+                escape_markup(source_name(t.source)) .. "</span>"
+        end
     end
 
     local keys = {}
@@ -433,7 +551,6 @@ local function run_rofi(args, input_file)
     local out = read_file(outfile)
     remove_file(outfile)
 
-    if type(ok) == "number" then code = ok end
     return code or 0, trim(out)
 end
 
@@ -613,12 +730,13 @@ local function delete_history(code, text)
     save_history(out)
 end
 
--- One-line row for a history entry: "text → translation (lang)"
+-- One-line row for a history entry: "text → translation (lang)". Shown without
+-- -markup-rows, so no markup escaping (that would print "&amp;" literally).
 local function history_row(e)
     local lang = source_name(e.code)
-    local t = escape_markup(truncate((e.text or ""):gsub("\n", " "), 45))
-    local trans = escape_markup(truncate((e.translation or ""):gsub("\n", " "), 45))
-    return t .. "  →  " .. trans .. "  (" .. escape_markup(lang) .. ")"
+    local t = truncate((e.text or ""):gsub("\n", " "), 45)
+    local trans = truncate((e.translation or ""):gsub("\n", " "), 45)
+    return t .. "  →  " .. trans .. "  (" .. lang .. ")"
 end
 
 -- Pick a saved translation. Delete removes the highlighted entry and refreshes.
@@ -697,10 +815,15 @@ if arg[1] == "--debug" then
     print("### player: " .. tostring(PLAYER) .. " ###")
     print("### clip: " .. tostring(CLIP) .. " ###")
 
-    local url = translate_url(text, code, source)
-    print("### url: " .. url .. " ###")
-    local body = shell(string.format("curl -s --max-time 12 -A %s %s",
-        shell_quote(USER_AGENT), shell_quote(url)))
+    local sl = source and KNOWN_CODES[source] and source or "auto"
+    print("### endpoint: " .. TRANSLATE_ENDPOINT .. " ###")
+    print("### sl: " .. sl .. " tl: " .. code .. " (POST, q= text) ###")
+    local body = shell(string.format(
+        "curl -s --max-time 12 -A %s --data-urlencode %s -d %s %s",
+        shell_quote(USER_AGENT),
+        shell_quote("q=" .. text),
+        shell_quote("client=gtx&sl=" .. sl .. "&tl=" .. urlencode(code) .. "&dt=t&dt=rm"),
+        shell_quote(TRANSLATE_ENDPOINT)))
     print("### body: " .. tostring(body) .. " ###")
 
     local t, err = do_translate(text, code, source)
@@ -724,11 +847,10 @@ end
 -- Main loop
 --------------------------------------------------------------------------------
 
--- Player process for the most recent audio clip, so it can be stopped on exit.
-local LAST_AUDIO = nil
-local function cleanup_audio()
-    if PLAYER and LAST_AUDIO then
-        os.execute("pkill -f " .. shell_quote(LAST_AUDIO) .. " >/dev/null 2>&1")
+-- Stop every clip we started (they run detached in their own sessions).
+local function stop_audio()
+    for p in pairs(PLAYED_PATHS) do
+        os.execute("pkill -f " .. shell_quote(p) .. " >/dev/null 2>&1")
     end
 end
 
@@ -762,7 +884,6 @@ local function translate_and_show(text, lang, source)
                 audio_path = prefetch_audio(shown_text, shown_code)
                 if audio_path then
                     audio_paths[#audio_paths + 1] = audio_path
-                    LAST_AUDIO = audio_path
                 end
             end
             local message = build_message(text, lang, t, audio_enabled, swapped)
@@ -784,6 +905,9 @@ local function translate_and_show(text, lang, source)
                 if code == 1 then quit = true end
             end
         until not again
+
+        -- Left the results for this text (back / escape / re-pick): silence it.
+        stop_audio()
 
         if code == 10 and not quit then
             local new_lang = pick_language()
@@ -835,4 +959,4 @@ while true do
     end
 end
 
-cleanup_audio()
+stop_audio()

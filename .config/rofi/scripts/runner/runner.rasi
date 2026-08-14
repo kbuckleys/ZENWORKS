@@ -28,16 +28,19 @@ inputbar {
     width: 20%;
 }
 textbox-prompt-colon {
-    padding: 6px 0px 6px 10px;
+    padding: 2px 0px 2px 10px;
     color: #fab387;
     str: " ";
 }
 entry {
     text-color: #fab387;
+    padding: 2px 0px 2px 0px;
+    font: "JetBrainsMono Nerd Font Propo Bold 13";
 }
 
 listview {
     layout: horizontal;
+    padding: 0px 6px 0px 6px;
 }
 
 element-text {
