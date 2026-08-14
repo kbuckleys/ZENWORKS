@@ -56,7 +56,9 @@ local function main()
     local uptime_str = uptime_handle and uptime_handle:read("*a"):gsub("^up ", ""):gsub("\n$", "") or "unknown uptime"
     if uptime_handle then uptime_handle:close() end
 
-    local mesg = string.format("%d Processes ~ Uptime: %s\nshift + return: multi-select  \u{F01D9}  return: confirm", #lines, uptime_str)
+    local mesg = string.format(
+        "%d Processes ~ Uptime: %s\n<b><span foreground=\"#a2a8bc\">shift return</span></b> <span foreground=\"#6a707f\">multi-select</span>    <b><span foreground=\"#a2a8bc\">return</span></b> <span foreground=\"#6a707f\">confirm</span>",
+        #lines, uptime_str)
 
     local selection = rofi(formatted, string.format(
         "-dmenu -multi-select -i -markup-rows -ballot-selected-str '<span foreground=\"#e78284\">\u{F09FC}</span> ' -ballot-unselected-str '' -p 'Kill Process' -mesg '%s' -theme '%s'",

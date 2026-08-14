@@ -145,7 +145,7 @@ local function main()
         rows[i] = icon.class .. "\0icon\x1f" .. icon.svg
     end
     local mesg = string.format(
-        "%d Icons  \u{F01D9}  return: pick format  \u{F01D9}  esc: quit", #icons)
+        "%d Icons    \u{F01D9}    <b><span foreground=\"#a2a8bc\">return</span></b> <span foreground=\"#6a707f\">pick format</span>    <b><span foreground=\"#a2a8bc\">esc</span></b> <span foreground=\"#6a707f\">quit</span>", #icons)
 
     local selected = 0
     while true do

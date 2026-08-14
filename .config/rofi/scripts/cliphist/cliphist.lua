@@ -18,8 +18,8 @@ local TMP_OPEN = (os.getenv("TMPDIR") or "/tmp") .. "/cliphist-open"
 local THUMB = 256
 local PREVIEW_MAX = 120
 local MODE_KEYS = "Tab"
-local MODE_HINT = "tab: toggle mode ~ delete: remove entry"
-local IMG_MODE_HINT = "tab: toggle mode ~ shift+return: open ~ delete: remove entry"
+local MODE_HINT = "<b><span foreground=\"#a2a8bc\">tab</span></b> <span foreground=\"#6a707f\">toggle mode</span>    <b><span foreground=\"#a2a8bc\">delete</span></b> <span foreground=\"#6a707f\">remove entry</span>"
+local IMG_MODE_HINT = "<b><span foreground=\"#a2a8bc\">tab</span></b> <span foreground=\"#6a707f\">toggle mode</span>    <b><span foreground=\"#a2a8bc\">shift return</span></b> <span foreground=\"#6a707f\">open</span>    <b><span foreground=\"#a2a8bc\">delete</span></b> <span foreground=\"#6a707f\">remove entry</span>"
 local DELETE_KEYS = "Delete"
 local OPEN_KEYS = "Shift+Return"
 local DEBOUNCE_MS = 750

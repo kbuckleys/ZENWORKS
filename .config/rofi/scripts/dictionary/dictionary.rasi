@@ -16,13 +16,7 @@ window {
 }
 
 mainbox {
-    children: [ message, inputbar, listview ];
-}
-
-listview {
-    flow: horizontal;
-    columns: 5;
-    lines: 1;
+    children: [ message, inputbar ];
 }
 
 element-text {

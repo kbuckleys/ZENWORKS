@@ -16,7 +16,7 @@ window {
 }
 
 mainbox {
-    children: [ message, inputbar, listview ];
+    children: [ message, inputbar ];
 }
 
 listview {

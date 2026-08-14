@@ -29,14 +29,13 @@ local TTS_MAX_CHARS = 180
 local USER_AGENT = "rofi-translate/1.0 (https://github.com/kbuckleys/)"
 
 local COLOR_HEAD = "#9bbfbf"
+local COLOR_KEY = "#a2a8bc"
 local COLOR_POS = "#6a707f"
 local COLOR_EX = "#eebebe"
 local COLOR_BODY = "#dfdfdd"
 local COLOR_ERROR = "#e78284"
 local ICON_TRANSLATE = "\u{f05ca}"
-local ICON_STAR = "\u{f04fe}"
--- Separator between keybinds in the hint row (nf-md-dots_vertical)
-local HINT_SEPARATOR = "\u{f01d9}"
+local ICON_STAR = "\u{f02da}"
 
 -- JSON parsing
 local json = require("cjson")
@@ -365,20 +364,24 @@ end
 -- Rendering
 --------------------------------------------------------------------------------
 
--- A dim "key: action <sep> key: action" row for the bottom of the message bar
+-- A small "key action <sep> key action" row for the bottom of the message bar.
+-- Keys are bold COLOR_KEY; descriptions are the dim COLOR_POS.
 local function hint_row(bindings)
     local parts = {}
     for _, b in ipairs(bindings) do
-        parts[#parts + 1] = "<b>" .. escape_markup(b[1]) .. "</b>: " .. escape_markup(b[2])
+        parts[#parts + 1] = "<b><span foreground=\"" .. COLOR_KEY .. "\">" ..
+            escape_markup(b[1]) .. "</span></b> <span foreground=\"" .. COLOR_POS .. "\">" ..
+            escape_markup(b[2]) .. "</span>"
     end
-    return "<span foreground=\"" .. COLOR_POS .. "\" size=\"small\">" ..
-        table.concat(parts, "   " .. HINT_SEPARATOR .. "   ") .. "</span>"
+    return "<span size=\"small\">" ..
+        table.concat(parts, "    ") .. "</span>"
 end
 
-local function build_message(text, lang, t, audio_enabled)
+local function build_message(text, lang, t, audio_enabled, swapped)
+    local head = swapped and truncate(t.translation, MAX_SOURCE_LEN) or truncate(text, MAX_SOURCE_LEN)
     local msg = "<span foreground=\"" .. COLOR_HEAD .. "\">" .. ICON_TRANSLATE .. "</span>  " ..
         "<b><span foreground=\"" .. COLOR_HEAD .. "\">" ..
-        escape_markup(truncate(text, MAX_SOURCE_LEN)) .. "</span></b>"
+        escape_markup(head) .. "</span></b>"
     msg = msg .. "\n<span foreground=\"" .. COLOR_POS .. "\">" .. escape_markup(lang.name) .. "</span>"
     if t.source then
         msg = msg .. " <span foreground=\"" .. COLOR_POS .. "\">→ from " ..
@@ -386,7 +389,9 @@ local function build_message(text, lang, t, audio_enabled)
     end
 
     local keys = {}
-    keys[#keys + 1] = audio_enabled and { "return", "copy & speak" } or { "return", "copy" }
+    keys[#keys + 1] = { "c", "copy" }
+    keys[#keys + 1] = { "s", "swap" }
+    if audio_enabled then keys[#keys + 1] = { "return", "speak" } end
     keys[#keys + 1] = { "tab", "other language" }
     keys[#keys + 1] = { "backspace", "back" }
     keys[#keys + 1] = { "esc", "close" }
@@ -394,18 +399,18 @@ local function build_message(text, lang, t, audio_enabled)
     return msg .. "\n" .. hint_row(keys)
 end
 
-local function build_lines(t)
+local function build_lines(text, roman)
     local lines = {}
 
-    for _, wline in ipairs(wrap(t.translation, MAX_LINE_LENGTH)) do
+    for _, wline in ipairs(wrap(text, MAX_LINE_LENGTH)) do
         lines[#lines + 1] = "<b><span foreground=\"" .. COLOR_BODY .. "\">" ..
             escape_markup(wline) .. "</span></b>"
     end
 
-    if t.roman and t.roman ~= "" then
+    if roman and roman ~= "" then
         lines[#lines + 1] = ""
         lines[#lines + 1] = "<span foreground=\"" .. COLOR_POS .. "\"><i>Pronunciation</i></span>"
-        for _, wline in ipairs(wrap(t.roman, MAX_LINE_LENGTH)) do
+        for _, wline in ipairs(wrap(roman, MAX_LINE_LENGTH)) do
             lines[#lines + 1] = "<span foreground=\"" .. COLOR_EX .. "\"><i>" ..
                 escape_markup(wline) .. "</i></span>"
         end
@@ -433,19 +438,22 @@ local function run_rofi(args, input_file)
 end
 
 -- Show a results screen. Returns rofi's exit code:
---   0  Return      copy to clipboard, speak the translation
+--   0  Return      play the audio again
+--   13 c           copy the shown text to the clipboard
 --   10 Tab         pick another target language for the same text
 --   11 BackSpace   back to the text prompt
+--   12 s          swap output between target and source text
 --   1  Escape      close
-local function show_results(lines, message, audio_enabled)
+local function show_results(lines, message)
     local tmpfile = os.tmpname()
     write_file(tmpfile, #lines > 0 and (table.concat(lines, "\n") .. "\n") or "\n")
 
     -- BackSpace ships bound to kb-remove-char-back and Tab to kb-element-next;
-    -- leaving either in place makes it a double binding and rofi rejects it.
+    -- leaving either in place makes a double binding and rofi rejects it.
     -- Nothing is typed on this screen, so dropping the editing/navigation keys
-    -- costs nothing.
-    local binds = ' -kb-remove-char-back "" -kb-element-next "" -kb-custom-1 "Tab" -kb-custom-2 "BackSpace"'
+    -- costs nothing. A bare "s" is unbound by default and used to swap views.
+    local binds = ' -kb-remove-char-back "" -kb-element-next ""' ..
+        ' -kb-custom-1 "Tab" -kb-custom-2 "BackSpace" -kb-custom-3 "s" -kb-custom-4 "c"'
 
     local n_lines = math.max(1, math.min(#lines, MAX_LINES))
     local args = string.format(
@@ -470,7 +478,7 @@ end
 
 local function show_error(text)
     local msg = "<span foreground=\"" .. COLOR_ERROR .. "\">" .. escape_markup(text) .. "</span>"
-    return show_results({ msg }, "", false)
+    return show_results({ msg }, "")
 end
 
 --------------------------------------------------------------------------------
@@ -533,13 +541,13 @@ local function prompt_for_text()
         '-dmenu -wayland-layer top -theme %s -no-sort -p "Text" -mesg %s',
         shell_quote(ROFI_THEME_INPUT), shell_quote(mesg))
 
-    local code, out = run_rofi(args, empty)
+    local code, raw = run_rofi(args, empty)
     remove_file(empty)
 
     if code ~= 0 then return nil end
-    if not has_content(out) then return HISTORY_MARKER end
+    if not has_content(raw) then return HISTORY_MARKER end
 
-    local out = trim(out)
+    local out = trim(raw)
     local scode, rest = out:match("^(%S+)%s*:%s*(%S.*)$")
     if scode and KNOWN_CODES[scode] and has_content(rest) then
         return { text = rest, source = scode }
@@ -707,7 +715,7 @@ if arg[1] == "--debug" then
 
     print("### rendered ###")
     print(build_message(text, { code = code, name = source_name(code) }, t, PLAYER ~= nil))
-    for _, l in ipairs(build_lines(t)) do print(l) end
+    for _, l in ipairs(build_lines(t.translation, t.roman)) do print(l) end
 
     os.exit(0)
 end
@@ -737,26 +745,40 @@ local function translate_and_show(text, lang, source)
     bump_usage(lang.code)
     local audio_enabled = PLAYER ~= nil
 
-    -- Results phase for this text. Return copies and speaks, then reopens so it
-    -- can be done again; Tab re-picks the target language for the same text;
-    -- Backspace returns to the text prompt; Escape closes.
+    -- Results phase for this text. c copies and reopens so it can be done
+    -- again; Return replays the audio; Tab re-picks the target language
+    -- for the same text; Alt+Tab swaps between the translation and the source
+    -- text; Backspace returns to the text prompt; Escape closes.
     local quit, keep = false, true
+    local swapped = false
     local audio_paths = {}
     while keep and not quit do
-        local audio_path = audio_enabled and prefetch_audio(t.translation, lang.code) or nil
-        if audio_path then audio_paths[#audio_paths + 1] = audio_path end
-        LAST_AUDIO = audio_path
-        local message = build_message(text, lang, t, audio_enabled)
-        local lines = build_lines(t)
-
         local again, code
         repeat
-            code = show_results(lines, message, audio_enabled)
+            local shown_text = swapped and text or t.translation
+            local shown_code = swapped and t.source or lang.code
+            local audio_path
+            if audio_enabled and shown_code then
+                audio_path = prefetch_audio(shown_text, shown_code)
+                if audio_path then
+                    audio_paths[#audio_paths + 1] = audio_path
+                    LAST_AUDIO = audio_path
+                end
+            end
+            local message = build_message(text, lang, t, audio_enabled, swapped)
+            local lines = swapped and build_lines(text) or build_lines(t.translation, t.roman)
+
+            code = show_results(lines, message)
             if code == 0 then
-                copy_clip(t.translation)
                 again = audio_path ~= nil and play_audio(audio_path)
+            elseif code == 13 then
+                copy_clip(shown_text)
+                again = true
             elseif code == 10 then
                 again = false
+            elseif code == 12 then
+                swapped = not swapped
+                again = true
             else
                 again = false
                 if code == 1 then quit = true end
@@ -776,6 +798,7 @@ local function translate_and_show(text, lang, source)
                     keep = true
                 else
                     lang, t = new_lang, t2
+                    swapped = false
                     add_history(lang.code, source, text, t.translation)
                     bump_usage(lang.code)
                 end

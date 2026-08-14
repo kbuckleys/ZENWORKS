@@ -13,6 +13,7 @@ if DIR == "." then DIR = os.getenv("PWD") or "."
 elseif DIR:sub(1, 1) ~= "/" then DIR = (os.getenv("PWD") or ".") .. "/" .. DIR end
 
 local ROFI_THEME_INPUT = DIR .. "/dictionary.rasi"
+local ROFI_THEME_SELECT = DIR .. "/select.rasi"
 local ROFI_THEME_RESULTS = DIR .. "/dictionary-output.rasi"
 local MAX_LINE_LENGTH = 80
 local MAX_DEFS_PER_POS = 2
@@ -30,6 +31,7 @@ local ACCENT_PREFERENCE = { "US", "UK", "AU" }
 local USER_AGENT = "rofi-dict/1.0 (https://github.com/kbuckleys/)"
 
 local COLOR_HEAD = "#9bbfbf"
+local COLOR_KEY = "#a2a8bc"
 local COLOR_PHON = "#9bbfbf"
 local COLOR_POS = "#6a707f"
 local COLOR_LABEL = "#6a707f"
@@ -39,8 +41,6 @@ local COLOR_ERROR = "#e78284"
 local ICON_HEAD = "\u{f405}"
 local ICON_AUDIO = "\u{f07c5}"
 local ICON_CORRECTED = "\u{f040}"
--- Separator between keybinds in the hint row (nf-md-dots_vertical)
-local HINT_SEPARATOR = "\u{f01d9}"
 
 -- JSON parsing
 local json = require("cjson")
@@ -687,16 +687,19 @@ end
 -- Rendering
 --------------------------------------------------------------------------------
 
--- A dim "key: action <sep> key: action" row for the bottom of the message bar.
--- Key names are spelled out rather than drawn as symbol glyphs, which are not
--- all guaranteed to exist in the configured Nerd Font.
+-- A small "key action <sep> key action" row for the bottom of the message bar.
+-- Keys are bold COLOR_KEY; descriptions are the dim COLOR_POS. Key names are
+-- spelled out rather than drawn as symbol glyphs, which are not all guaranteed
+-- to exist in the configured Nerd Font.
 local function hint_row(bindings)
     local parts = {}
     for _, b in ipairs(bindings) do
-        parts[#parts + 1] = "<b>" .. b[1] .. "</b>: " .. b[2]
+        parts[#parts + 1] = "<b><span foreground=\"" .. COLOR_KEY .. "\">" ..
+            b[1] .. "</span></b> <span foreground=\"" .. COLOR_POS .. "\">" ..
+            b[2] .. "</span>"
     end
-    return "<span foreground=\"" .. COLOR_POS .. "\" size=\"small\">" ..
-        table.concat(parts, "   " .. HINT_SEPARATOR .. "   ") .. "</span>"
+    return "<span size=\"small\">" ..
+        table.concat(parts, "    ") .. "</span>"
 end
 
 -- Build the header shown above the definition list
@@ -897,48 +900,111 @@ end
 -- Main loop
 --------------------------------------------------------------------------------
 
--- Show the input prompt. Delete forgets the highlighted history entry and
--- reopens, so several can be pruned in a row without leaving the prompt.
--- Returns the word to look up, or nil to quit.
+-- Marker returned by prompt_for_word() when the user confirms an empty box,
+-- meaning "show the lookup history" instead of quitting.
+local HISTORY_MARKER = { history = true }
+
+-- Show the input prompt. An empty confirmation opens the lookup history
+-- instead of quitting. Returns the word to look up, the history marker, or
+-- nil to quit.
 local function prompt_for_word()
+    local empty = os.tmpname()
+    write_file(empty, "")
+
+    local mesg = "<span foreground=\"" .. COLOR_HEAD .. "\">" .. ICON_HEAD .. "</span>" ..
+        "\n" .. hint_row({ { "return", "define / history" }, { "esc", "quit" } })
+    local args = string.format(
+        '-dmenu -wayland-layer top -theme %s -p "Define" -mesg %s -no-sort',
+        shell_quote(ROFI_THEME_INPUT), shell_quote(mesg))
+
+    local code, out = run_rofi(args, empty)
+    remove_file(empty)
+
+    if code ~= 0 then return nil end
+    out = trim(out)
+    if out == "" then return HISTORY_MARKER end
+    return out
+end
+
+-- Pick a word from the lookup history. Delete removes the highlighted entry
+-- and refreshes. Returns the word to re-look up, or nil to go back.
+local function show_history()
     while true do
         local history = load_history()
+        if #history == 0 then return nil end
+
         local hist_file = os.tmpname()
-        write_file(hist_file, #history > 0 and (table.concat(history, "\n") .. "\n") or "")
+        write_file(hist_file, table.concat(history, "\n") .. "\n")
 
-        local keys = { { "return", "define" } }
-        if #history > 0 then
-            keys[#keys + 1] = { "delete", "forget entry" }
-        end
-        keys[#keys + 1] = { "esc", "quit" }
-
-        local mesg = "<span foreground=\"" .. COLOR_HEAD .. "\">" .. ICON_HEAD .. "</span>" ..
-            "\n" .. hint_row(keys)
-
-        -- Delete ships as part of kb-remove-char-forward ("Delete,Control+d");
-        -- narrowing it to Control+d keeps forward-delete while freeing Delete
+        -- Delete is bound by default to both kb-delete-entry and
+        -- kb-remove-char-forward; leaving either in place makes a double binding
+        -- and rofi rejects it. Rebind to a custom key so we can persist.
+        local binds = ' -kb-delete-entry "" -kb-remove-char-forward "" -kb-custom-1 "Delete"'
+        local mesg = hint_row({
+            { "return", "re-look up" }, { "delete", "remove" }, { "esc", "back" }
+        })
         local args = string.format(
-            '-dmenu -wayland-layer top -theme %s -p "Define" -mesg %s' ..
-            ' -kb-remove-char-forward "Control+d" -kb-custom-3 "Delete"',
-            shell_quote(ROFI_THEME_INPUT), shell_quote(mesg))
+            '-dmenu -i -no-custom -wayland-layer top -theme %s -no-sort -p "History" -mesg %s%s',
+            shell_quote(ROFI_THEME_SELECT), shell_quote(mesg), binds)
 
         local code, out = run_rofi(args, hist_file)
         remove_file(hist_file)
 
-        if code == 12 then
-            -- Only forget entries that are actually in history, so pressing
-            -- Delete over typed-but-unsaved text does nothing
-            for _, h in ipairs(history) do
-                if h:lower() == out:lower() then
-                    remove_from_history(out)
+        if code == 0 then
+            for i, h in ipairs(history) do
+                if out == h then return h end
+            end
+            return nil
+        elseif code == 10 then
+            for i, h in ipairs(history) do
+                if out == h then
+                    remove_from_history(h)
                     break
                 end
             end
-        elseif code == 0 and out ~= "" then
-            return out
         else
             return nil
         end
+    end
+end
+
+-- Resolve `word` and show its definition, with pronunciation. Records the
+-- resolved title in history and keeps the results screen replayable.
+local function lookup(word)
+    local entry, title, suggested, err = resolve(word)
+
+    if err == "network" then
+        show_error("Network error — couldn't reach Wiktionary")
+        return
+    elseif not entry then
+        show_error("No definitions found for \"" .. word .. "\". Check spelling?")
+        return
+    end
+
+    add_to_history(title)
+
+    local message = build_message(title, entry, suggested)
+    local lines = build_lines(entry)
+    local audio_enabled = (entry.audio ~= nil) and (PLAYER ~= nil)
+
+    -- Download now, while the definition is still being read, so Space
+    -- doesn't wait on the network
+    local audio_path = audio_enabled and prefetch_audio(entry.audio.file) or nil
+
+    -- rofi always exits on a keybinding, so playing means: hand the clip to
+    -- a detached player and reopen immediately. Playback overlaps the
+    -- restored menu instead of the menu waiting for the clip to end.
+    -- Backspace and Escape fall through to the input prompt.
+    local replay
+    repeat
+        local code = show_results(lines, message, audio_enabled)
+        replay = (code == 0 or code == 10) and audio_path ~= nil
+        if replay then play_audio(audio_path) end
+    until not replay
+
+    if audio_path then
+        remove_file(audio_path)
+        remove_file(audio_path .. ".part")
     end
 end
 
@@ -946,37 +1012,9 @@ while true do
     local word = prompt_for_word()
     if not word then break end
 
-    local entry, title, suggested, err = resolve(word)
-
-    if err == "network" then
-        show_error("Network error — couldn't reach Wiktionary")
-    elseif not entry then
-        show_error("No definitions found for \"" .. word .. "\". Check spelling?")
-    else
-        add_to_history(title)
-
-        local message = build_message(title, entry, suggested)
-        local lines = build_lines(entry)
-        local audio_enabled = (entry.audio ~= nil) and (PLAYER ~= nil)
-
-        -- Download now, while the definition is still being read, so Space
-        -- doesn't wait on the network
-        local audio_path = audio_enabled and prefetch_audio(entry.audio.file) or nil
-
-        -- rofi always exits on a keybinding, so playing means: hand the clip to
-        -- a detached player and reopen immediately. Playback overlaps the
-        -- restored menu instead of the menu waiting for the clip to end.
-        -- Backspace and Escape fall through to the input prompt.
-        local replay
-        repeat
-            local code = show_results(lines, message, audio_enabled)
-            replay = (code == 0 or code == 10) and audio_path ~= nil
-            if replay then play_audio(audio_path) end
-        until not replay
-
-        if audio_path then
-            remove_file(audio_path)
-            remove_file(audio_path .. ".part")
-        end
+    if word.history then
+        -- Empty box: offer saved words instead of quitting.
+        word = show_history()
     end
+    if word then lookup(word) end
 end
