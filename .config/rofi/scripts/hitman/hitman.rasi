@@ -21,17 +21,16 @@ mainbox {
 
 inputbar {
     children: [textbox-prompt-colon, entry];
-    padding: 4px 8px;
-    spacing: 4px;
+    border-color: rgba(155, 191, 191, 0.2);
+    border: 0px 0px 1px 0px;
 }
 
 textbox {
-    text-color: #9bbfbf;
+    text-color: #dfdfdd;
     font: "JetBrainsMono Nerd Font Propo Bold 12";
 }
 textbox-prompt-colon {
     font: "JetBrainsMono Nerd Font Propo Medium 13";
-    padding: 2px 4px 2px 10px;
     color: #e78284;
     str: "";
 }
@@ -53,6 +52,6 @@ element-text selected {
 }
 
 message {
-    border-color: rgb(69, 80, 92, 0.3);
     border: 1px 0px 0px 0px;
+    margin: -2px 0px 0px 0px;
 }

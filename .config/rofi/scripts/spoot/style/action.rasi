@@ -21,6 +21,7 @@ listview-split {
     children: [ icon-current-entry, listview ];
 }
 listview {
+    padding: 0px 3px 2px 1px;
     lines: 13;
 }
 

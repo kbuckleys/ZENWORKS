@@ -23,10 +23,6 @@ inputbar {
     enabled: false;
 }
 
-listview {
-    padding: 4px 0px 4px 0px;
-}
-
 element-text {
     font: "JetBrainsMono Nerd Font Propo SemiBold 13";
     horizontal-align: 0.5;
@@ -34,10 +30,10 @@ element-text {
     text-color: #dfdfdd;
 }
 
-message {
-    margin: 0px 0px -6px 0px;
-}
 textbox {
     text-color: #9bbfbf;
     font: "JetBrainsMono Nerd Font Propo SemiBold 14";
+}
+message {
+    padding: 7px 30px 2px 30px;
 }

@@ -44,14 +44,15 @@ window {
 }
 
 mainbox {
-    border: 0px solid;
-    padding: 0;
+    border: 0px;
+    padding: 0px 0px 0px 0px;
 }
 
 message {
     background-color: rgb(40, 47, 54, 0.4);
     border-color: rgb(69, 80, 92, 0.3);
     padding: 5px 30px 5px 30px;
+    margin: 0px 0px 0px 0px;
     border: 0px 0px 1px 0px;
 }
 
@@ -60,6 +61,7 @@ textbox {
 }
 
 listview {
+    padding: 0px 3px 2px 3px;
     fixed-columns: false;
     fixed-height: false;
     scrollbar: false;
@@ -141,14 +143,14 @@ prompt {
 }
 textbox-prompt-colon {
     text-color: @normal-foreground;
-    margin: 0px 0.3em 0em 0em;
+    padding: 6px 10px 6px 20px;
     expand: false;
-    str: ":";
+    str: "";
 }
 inputbar {
     children: [ prompt,textbox-prompt-colon,entry,case-indicator ];
     text-color: @normal-foreground;
-    padding: 1px;
+    padding: 0px 0px 0px 0px;
     spacing: 0;
 }
 
@@ -159,5 +161,5 @@ case-indicator {
 
 entry {
     text-color: @normal-foreground;
-    spacing: 0;
+    padding: 6px 6px 6px 6px;
 }

@@ -26,6 +26,7 @@ mainbox {
 }
 
 listview {
+    padding: 3px 3px 3px 3px;
     flow: horizontal;
     columns: 8;
     lines: 3;
@@ -40,7 +41,7 @@ element-text {
 }
 element selected {
     border: 2px;
-    border-radius: 2px;
+    border-radius: 5px;
     border-color: #6a707f;
 }
 element-icon {
@@ -53,6 +54,6 @@ textbox {
 }
 
 message {
-    border-color: rgb(69, 80, 92, 0.3);
     border: 1px 0px 0px 0px;
+    margin: -1px 0px 0px 0px;
 }

@@ -25,12 +25,10 @@ hbox {
 
 inputbar {
     children: [ textbox-prompt-colon, entry ];
-    padding: 2px 12px 2px 12px;
-    spacing: 4px;
     width: 20%;
 }
 textbox-prompt-colon {
-    padding: 2px 0px 2px 0px;
+    padding: 6px 0px 6px 10px;
     color: #fab387;
     str: " ";
 }

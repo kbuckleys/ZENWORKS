@@ -20,14 +20,13 @@ listview-split {
     orientation: horizontal;
     children: [ icon-current-entry, listview ];
 }
+listview {
+    lines: 3;
+}
 
 icon-current-entry {
     background-image: url("%s", both);
     size: 80px;
-}
-
-listview {
-    lines: 3;
 }
 
 element-text {

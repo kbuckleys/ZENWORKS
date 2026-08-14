@@ -19,10 +19,6 @@ mainbox {
     children: [ message, inputbar ];
 }
 
-listview {
-    padding: 4px 0px 4px 0px;
-}
-
 element-text {
     font: "JetBrainsMono Nerd Font Propo SemiBold 13";
     highlight: bold #9bbfbf;

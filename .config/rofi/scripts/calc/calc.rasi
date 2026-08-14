@@ -21,8 +21,6 @@ mainbox {
 
 inputbar {
     children: [textbox-prompt-colon, entry];
-    padding: 4px 8px;
-    spacing: 4px;
 }
 
 textbox {
@@ -49,6 +47,5 @@ element-text {
 }
 
 message {
-    border-color: rgb(69, 80, 92, 0.3);
     border: 1px 0px 1px 0px;
 }

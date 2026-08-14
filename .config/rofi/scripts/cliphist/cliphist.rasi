@@ -26,6 +26,7 @@ inputbar {
 }
 
 listview {
+    padding: 3px 4px 0px 3px;
     columns: 3;
     lines: 12;
 }
@@ -41,6 +42,5 @@ textbox {
 }
 
 message {
-    border-color: rgb(69, 80, 92, 0.3);
     border: 1px 0px 0px 0px;
 }
