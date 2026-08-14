@@ -891,6 +891,7 @@ local function translate_and_show(text, lang, source)
 
             code = show_results(lines, message)
             if code == 0 then
+                stop_audio()
                 again = audio_path ~= nil and play_audio(audio_path)
             elseif code == 13 then
                 copy_clip(shown_text)
