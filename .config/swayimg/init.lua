@@ -4,40 +4,40 @@
 -- https://github.com/kbuckleys/
 
 -- General config
-swayimg.set_mode("viewer") -- mode at startup
-swayimg.enable_antialiasing(true) -- anti-aliasing
-swayimg.enable_decoration(false) -- window title/buttons/borders
-swayimg.enable_overlay(false) -- window overlay mode
-swayimg.set_dnd_button("MouseRight") -- drag-and-drop mouse button
+swayimg.mode = "viewer" -- mode at startup
+swayimg.antialiasing = true -- anti-aliasing
+swayimg.decoration = false -- window title/buttons/borders
+swayimg.overlay = false -- window overlay mode
+swayimg.dnd_button = "MouseRight" -- drag-and-drop mouse button
 
 -- Image list configuration
-swayimg.imagelist.set_order("numeric") -- list order
-swayimg.imagelist.enable_reverse(false) -- reverse order
-swayimg.imagelist.enable_recursive(false) -- recursive directory reading
-swayimg.imagelist.enable_adjacent(true) -- add adjacent files from same dir
+swayimg.imagelist.order = "numeric" -- list order
+swayimg.imagelist.reverse = false -- reverse order
+swayimg.imagelist.recursive = false -- recursive directory reading
+swayimg.imagelist.adjacent = true -- add adjacent files from same dir
 
 -- Text overlay configuration
-swayimg.text.set_font("JetBrainsMono Nerd Font") -- font name
-swayimg.text.set_size(16) -- font size in pixels
---swayimg.text.set_spacing(0) -- line spacing
-swayimg.text.set_padding(0) -- padding from window edge
-swayimg.text.set_foreground(0xffdfdfdd) -- foreground text color
-swayimg.text.set_background(0x00000000) -- text background color
-swayimg.text.set_shadow(0x000000) -- text shadow color
-swayimg.text.set_timeout(5) -- layer hide timeout
-swayimg.text.set_status_timeout(3) -- status message hide timeout
+swayimg.text.font = "JetBrainsMono Nerd Font" -- font name
+swayimg.text.size = 16 -- font size in pixels
+--swayimg.text.spacing = 0 -- line spacing
+swayimg.text.padding = 0 -- padding from window edge
+swayimg.text.color = 0xffdfdfdd -- foreground text color
+swayimg.text.background = 0x00000000 -- text background color
+swayimg.text.shadow = 0x000000 -- text shadow color
+swayimg.text.timeout = 5 -- layer hide timeout
+swayimg.text.status_timeout = 3 -- status message hide timeout
 
 -- Image viewer mode
-swayimg.viewer.set_default_scale("optimal") -- default image scale
-swayimg.viewer.set_default_position("center") -- default image position
-swayimg.viewer.set_drag_button("MouseLeft") -- mouse button to drag image
+swayimg.viewer.default_scale = "optimal" -- default image scale
+swayimg.viewer.default_position = "center" -- default image position
+swayimg.viewer.drag_button = "MouseLeft" -- mouse button to drag image
 swayimg.viewer.set_window_background(0x80000000) -- window background color (50% alpha)
 swayimg.viewer.set_image_background(0x80000000) -- transparent image background (50% alpha, matches window)
-swayimg.viewer.enable_centering(true) -- enable automatic centering
-swayimg.viewer.enable_loop(true) -- enable image list loop mode
-swayimg.viewer.limit_preload(1) -- number of images to preload
---swayimg.viewer.limit_history(1) -- number of the history cache
-swayimg.viewer.set_mark_color(0xff808080) -- mark icon color
+swayimg.viewer.autocenter = true -- enable automatic centering
+swayimg.viewer.loop = true -- enable image list loop mode
+swayimg.viewer.preload = 1 -- number of images to preload
+--swayimg.viewer.history = 1 -- number of the history cache
+swayimg.viewer.mark_color = 0xff808080 -- mark icon color
 swayimg.viewer.set_text("topleft", { -- top left text block scheme
 	"File: {name}",
 	"Format: {format}",
@@ -70,31 +70,31 @@ end)
 -- bind mouse vertical scroll button with pressed Ctrl to zoom in the image at mouse pointer coordinates
 swayimg.viewer.on_mouse("Ctrl-ScrollUp", function()
 	local pos = swayimg.get_mouse_pos()
-	local scale = swayimg.viewer.get_scale()
+	local scale = swayimg.viewer.scale
 	scale = scale + scale / 10
 	swayimg.viewer.set_abs_scale(scale, pos.x, pos.y)
 end)
 
 -- Slide show mode, same config as for viewer mode with the following defaults:
-swayimg.slideshow.set_timeout(5) -- timeout to switch image
-swayimg.slideshow.set_default_scale("fit") -- default image scale
+swayimg.slideshow.timeout = 5 -- timeout to switch image
+swayimg.slideshow.default_scale = "fit" -- default image scale
 swayimg.slideshow.set_window_background("auto") -- window background mode
---swayimg.slideshow.limit_history(0) -- number of the history cache
+--swayimg.slideshow.history = 0 -- number of the history cache
 swayimg.slideshow.set_text("topleft", { "{name}" }) -- top left text block scheme
 
 -- Gallery mode
-swayimg.gallery.set_aspect("fill") -- thumbnail aspect ratio
-swayimg.gallery.set_thumb_size(200) -- thumbnail size in pixels
-swayimg.gallery.set_padding_size(10) -- padding between thumbnails
-swayimg.gallery.set_border_size(2) -- border size for selected thumbnail
-swayimg.gallery.set_border_color(0xffb6e0a4) -- border color for selected thumbnail
-swayimg.gallery.set_selected_scale(1.0) -- scale for selected thumbnail
-swayimg.gallery.set_selected_color(0xff20242a) -- background color for selected thumbnail
-swayimg.gallery.set_unselected_color(0xff202020) -- background color for unselected thumbnail
-swayimg.gallery.set_window_color(0xff000000) -- window background color
-swayimg.gallery.limit_cache(100) -- number of thumbnails stored in memory
-swayimg.gallery.enable_preload(false) -- preloading invisible thumbnails
-swayimg.gallery.enable_pstore(false) -- enable persistent storage for thumbnails
+swayimg.gallery.aspect = "fill" -- thumbnail aspect ratio
+swayimg.gallery.thumb_size = 200 -- thumbnail size in pixels
+swayimg.gallery.padding_size = 10 -- padding between thumbnails
+swayimg.gallery.border_size = 2 -- border size for selected thumbnail
+swayimg.gallery.border_color = 0xffb6e0a4 -- border color for selected thumbnail
+swayimg.gallery.selected_scale = 1.0 -- scale for selected thumbnail
+swayimg.gallery.selected_color = 0xff20242a -- background color for selected thumbnail
+swayimg.gallery.unselected_color = 0xff202020 -- background color for unselected thumbnail
+swayimg.gallery.window_color = 0xff000000 -- window background color
+swayimg.gallery.cache = 100 -- number of thumbnails stored in memory
+swayimg.gallery.preload = false -- preloading invisible thumbnails
+swayimg.gallery.pstore = false -- enable persistent storage for thumbnails
 swayimg.gallery.set_text("topleft", { -- top left text block scheme
 	"File: {name}",
 })
@@ -106,16 +106,16 @@ swayimg.gallery.set_text("topright", { -- top right text block scheme
 
 -- bind Enter key to open image in viewer
 swayimg.gallery.on_key("Return", function()
-	swayimg.set_mode("viewer")
+	swayimg.mode = "viewer"
 end)
 -- bind the left arrow key to select thumbnail on the left side
 swayimg.gallery.on_key("Left", function()
-	swayimg.gallery.switch_image("left")
+	swayimg.gallery.select("left")
 end)
 
 -- force set scale mode on window resize (useful for tiling compositors)
 swayimg.on_window_resize(function()
-	if swayimg.get_mode() == "viewer" then
+	if swayimg.mode == "viewer" then
 		swayimg.viewer.set_fix_scale("optimal")
 	end
 end)
@@ -124,13 +124,13 @@ end)
 swayimg.slideshow.on_key("Delete", function()
 	local image = swayimg.slideshow.get_image()
 	os.remove(image.path)
-	swayimg.text.set_status("File " .. image.path .. " removed")
+	swayimg.text.status = "File " .. image.path .. " removed"
 end)
 
 -- set a custom window title in gallery mode
 swayimg.gallery.on_image_change(function()
 	local image = swayimg.gallery.get_image()
-	swayimg.set_title("Gallery: " .. image.path)
+	swayimg.title = "Gallery: " .. image.path
 end)
 
 -- print paths to all marked files by pressing Ctrl-p in gallery mode
