@@ -24,13 +24,13 @@ inputbar {
 }
 
 textbox {
-    text-color: #9fcbfc;
-    horizontal-align: 0.5;
     font: "JetBrainsMono Nerd Font Propo Bold 12";
+    horizontal-align: 0.5;
+    text-color: #9fcbfc;
 }
 textbox-prompt-colon {
-    str: " ";
     color: #9fcbfc;
+    str: " ";
 }
 entry {
     color: #9fcbfc;

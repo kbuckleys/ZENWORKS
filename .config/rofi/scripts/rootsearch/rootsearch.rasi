@@ -7,7 +7,7 @@
 @theme "ZENON"
 
 window {
-    width: 100%;
+    width: 80%;
 }
 
 mainbox {
@@ -16,11 +16,8 @@ mainbox {
 
 inputbar {
     children: [textbox-prompt-colon, entry];
-    padding: 4px 8px;
-    spacing: 4px;
 }
 textbox-prompt-colon {
-    padding: 2px 0px 2px 4px;
     color: #c8a4e0;
     str: " ";
 }
