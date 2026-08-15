@@ -38,7 +38,7 @@ textbox-prompt-colon {
     str: "";
 }
 entry {
-    font: "JetBrainsMono Nerd Font Propo SemiBold 14";
+    font: "JetBrainsMono Nerd Font Propo SemiBold 13";
     text-color: #b6e0a4;
 }
 message {

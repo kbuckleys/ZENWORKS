@@ -149,21 +149,39 @@ P.thumb_log_max = 400 * 1024
 -- orphans possible, because the path never varies with the art.
 -- One entry per kind of object whose artwork is cached BY ID rather than by art
 -- hash. `field` is where that kind keeps its image array -- categories say
--- `icons`, everyone else says `images`. Playlists additionally have a `highres`
--- subdirectory; categories are served at a single 274px size so they have none.
--- A kind with more than one rendition also gets a `size` function, deciding
--- which one a fetch asks for. It is NOT written here -- see the assignments
--- below Util.art_url_artist for why this table cannot hold one.
+-- `icons`, everyone else says `images`.
+--
+-- `code` is the rendition the DEFAULT tier fetches, and `tiers` the ones a
+-- caller can ask for by name, each with its own directory. Naming the directory
+-- and the size code together is the point: the tier decides both, so a file can
+-- never end up somewhere that disagrees with what is in it. `full` marks a tier
+-- the user ASKED to see, which is what buys it the full retry budget -- every
+-- other tier is a decoration and gets Util.ART_DECOR.
+--
+-- Categories are served at a single 274px size, so they declare neither.
+--
+-- The `reseed` that turns a code into a url is NOT written here -- see the
+-- assignments below Util.art_url_artist for why this table cannot hold one.
 P.art_kinds = {
+    -- Playlists. 300 for the grid at 150px a tile, 640 for the track list's
+    -- 364px backdrop, and 1280 -- the largest there is -- for the full-screen
+    -- viewer. See Util.art_url_pl for the codes.
     playlist = {dir = P.art .. "/playlists",  index = P.cache .. "/playlist_art.json",
-                field = "images", highres = P.art .. "/playlists/highres"},
+                field = "images", code = "02",
+                tiers = {
+                    med = {dir = P.art .. "/playlists/med-res",  code = "03"},
+                    hi  = {dir = P.art .. "/playlists/high-res", code = "04", full = true},
+                }},
     -- Artists. Id-keyed like playlists because Spotify replaces an artist
     -- picture in place, so a hash-named file would strand the old one on every
     -- change. 320x320 for the grid, which thumbs.rasi draws at 150px, and
     -- 640x640 -- the largest an artist has -- for the Artist Impression viewer.
     -- See Util.art_url_artist for why those two codes and no others.
     artist   = {dir = P.art .. "/artists", index = P.cache .. "/artist_art.json",
-                field = "images", highres = P.art .. "/artists/highres"},
+                field = "images", code = "5174",
+                tiers = {
+                    hi = {dir = P.art .. "/artists/high-res", code = "e5eb", full = true},
+                }},
     category = {dir = P.art .. "/categories", index = P.cache .. "/category_art.json",
                 field = "icons"},
     -- Collections tiles are keyed by ROW, not by any Spotify object: each one
@@ -211,7 +229,7 @@ P.art_subdirs = {
     -- removable on its own.
     ["albums/med-res"] = P.art .. "/albums/med-res",
     -- The largest rendition, for the full-screen art viewer only (view_art).
-    ["albums/highres"] = P.art .. "/albums/highres",
+    ["albums/high-res"] = P.art .. "/albums/high-res",
 }
 -- The two "is this in my library" endpoints that share a URL grammar: an ?ids=
 -- collection you PUT to save and DELETE to remove, and a /contains sibling that
@@ -2505,18 +2523,24 @@ Util.art_url = function(art_url, seed)
     return (art_url:gsub("(i%.scdn%.co/image/ab67616d0000)[0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]", "%1" .. s))
 end
 
--- The high-resolution rendition of a PLAYLIST cover. The last byte of the prefix
--- is a size code: ab67706f00000002 is 300x300 and …03 is 640x640, verified
--- against six playlists including editorial and featured ones.
+-- The rendition of a PLAYLIST cover. The last byte of the prefix is a size code,
+-- and there are FOUR, not the two this said before it was swept properly: 01 is
+-- 64x64, 02 is 300x300 -- what the API hands back as images[1] -- 03 is 640x640
+-- and 04 is 1280x1280. 05 and 06 do not exist, so 04 is as large as a playlist
+-- gets. Confirmed against every playlist on this account.
 --
--- Anchored to that exact prefix on purpose. Every playlist reachable from this
--- account has an uploaded cover sharing it, so an auto-generated mosaic using a
--- different prefix is untested -- and rewriting a prefix we do not recognise
--- would turn a working 300px cover into a 404. Anything unmatched is returned
--- untouched and simply stays at the size Spotify gave.
-Util.art_url_hi = function(art_url)
+-- The old comment claimed 03 was the top, which is why the full-screen viewer
+-- spent its life upscaling 640 into a 1000px window.
+--
+-- Anchored to that exact prefix on purpose, and it matches barely half of what
+-- is cached: ab67706c personalised covers (one size only), album-art URLs, and
+-- Spotify's `default`/`region_*` placeholders all wear something else. Rewriting
+-- a prefix we do not recognise would turn a working cover into a 404, so
+-- anything unmatched is returned untouched and stays at the size Spotify gave --
+-- which means its tiers hold the same bytes, and that is the correct outcome.
+Util.art_url_pl = function(art_url, code)
     if not art_url or #art_url == 0 then return art_url end
-    return (art_url:gsub("(i%.scdn%.co/image/ab67706f000000)0[0-9a-fA-F]", "%103"))
+    return (art_url:gsub("(i%.scdn%.co/image/ab67706f000000)0[0-9a-fA-F]", "%1" .. code))
 end
 
 -- The rendition of an ARTIST picture. Spotify serves exactly three and no more:
@@ -2526,7 +2550,7 @@ end
 -- use: there is no 2000px artist rendition the way ab67616d000082c1 is one, so
 -- 640 is as large as an artist gets.
 --
--- Anchored to the artist prefix for the same reason Util.art_url_hi is anchored
+-- Anchored to the artist prefix for the same reason Util.art_url_pl is anchored
 -- to the playlist one. About one artist in seven still wears a legacy bare-hash
 -- upload at some odd size, or (for a couple) an album cover, and rewriting a
 -- prefix we do not recognise would turn a working picture into a 404. Anything
@@ -2537,23 +2561,18 @@ Util.art_url_artist = function(art_url, code)
                          "%1" .. code))
 end
 
--- Which rendition Util.keyed_art asks for, per kind. It used to call
--- Util.art_url_hi outright -- PLAYLIST knowledge inside a function serving six
--- kinds, with nowhere for a kind that sizes its pictures differently to say so.
+-- How a kind turns one of its size codes into a url. The codes themselves are
+-- data on the kind (see P.art_kinds); this is the one thing about a rendition
+-- that has to be a function, because each prefix has its own shape.
 --
--- Attached HERE and not in the P.art_kinds literal, which is where they belong
--- and where they were first written. That table is built with the other cache
--- paths at the top of the file, ~230 lines before `local Util` exists, so a
--- closure written there compiles `Util` as a GLOBAL read -- nil at call time.
--- It took the artist grid down on its first draw with "attempt to index a nil
--- value (global 'Util')", and would have done the same to any playlist high-res
--- fetch. Down here `Util` is the local, captured as an upvalue.
-P.art_kinds.playlist.size = function(url, hi)
-    return hi and Util.art_url_hi(url) or url
-end
-P.art_kinds.artist.size = function(url, hi)
-    return Util.art_url_artist(url, hi and "e5eb" or "5174")
-end
+-- Attached HERE and not in the P.art_kinds literal, which is where they belong.
+-- That table is built with the other cache paths at the top of the file, ~230
+-- lines before `local Util` exists, so anything written there that names `Util`
+-- compiles as a GLOBAL read -- nil at call time. It took the artist grid down on
+-- its first draw with "attempt to index a nil value (global 'Util')". Down here
+-- `Util` is the local, captured as an upvalue.
+P.art_kinds.playlist.reseed = Util.art_url_pl
+P.art_kinds.artist.reseed   = Util.art_url_artist
 
 Util._rand_suffix = function()
     local u = io.open("/dev/urandom", "rb")
@@ -2617,17 +2636,42 @@ Util._art_valid_file = function(path, content_length)
     return ok
 end
 
+-- The one string hash in the file. Used for art identity below and for the
+-- P.mass filenames of caches keyed by arbitrary text; see Util.mass_path.
+function Util.djb2(s)
+    local h = 5381
+    for i = 1, #s do h = (h * 33 + s:byte(i)) % 0x100000000 end
+    return h
+end
+
 -- The part of an art URL that identifies the IMAGE, so a replaced cover is
 -- detectable. Album art is i.scdn.co/image/<hex> with no extension; category
 -- icons are t.scdn.co/images/<hex>.jpeg, and the extension is what used to
 -- defeat this -- an anchored [%w_%-]+$ cannot cross the dot, so every category
 -- resolved to no hash at all and none of them ever cached. Query strings are
 -- dropped too: they are cache-busting noise, not identity.
+--
+-- The last path segment is only an identity on the CONTENT-ADDRESSED CDNs.
+-- Spotify's generated covers live elsewhere behind descriptive paths -- a mix
+-- ends .../img/repeat/or/en, a seed mix .../Relaxing%20Classical/en/default, a
+-- chart .../region_eg_default.jpg -- so 61 playlists on this account hashed to
+-- "default" and 32 to "en". Since this value is what Util.keyed_art compares to
+-- decide a cover went stale, those covers could never be SEEN to change: they
+-- froze at whatever landed first, and mixes and charts are exactly the ones
+-- Spotify regenerates most.
 Util.art_hash = function(url)
     if not url or #url == 0 then return nil end
     local last = url:match("([^/?#]+)[?#]") or url:match("([^/?#]+)$")
     if not last then return nil end
-    return (last:gsub("%.%w+$", ""):gsub("[^%w_%-]", ""))
+    local tok = (last:gsub("%.%w+$", ""):gsub("[^%w_%-]", ""))
+    -- A long hex tail IS the identity, and returning it untouched is
+    -- load-bearing twice over: it leaves 94% of already-cached tokens
+    -- byte-identical, and this value also NAMES the file in the flat album pool
+    -- (see thumb_resolve), so changing it there would orphan every cover in it.
+    if #tok >= 32 and tok:match("^%x+$") then return tok end
+    -- Everything else: the whole url is the identity. Prefixed so a hashed token
+    -- is never mistaken for a real asset id when reading an index by eye.
+    return "u" .. string.format("%08x", Util.djb2(url))
 end
 
 -- Is another attempt at this fetch worth anything? A body that arrived intact
@@ -2827,6 +2871,13 @@ end
 -- the defaults.
 local function ensure_art(art_url, subdir, opts)
     if not art_url or #art_url == 0 then return nil end
+    -- Its OWN extractor, not Util.art_hash, and the two can disagree: for a
+    -- generated cover on pickasso.spotifycdn.com this answers the id after
+    -- /image/ while art_hash answers the whole url hashed. Latent rather than
+    -- live -- every url that reaches BOTH is i.scdn.co/image/<hex>, checked
+    -- against all 825 show and episode covers on disk with 0 disagreements.
+    -- Left alone deliberately: this value names the file in the flat album pool,
+    -- so unifying them would orphan every cover in it to fix nothing.
     local hash = art_url:match("/image/([%w]+)") or art_url:match("/([%w_%-]+)$")
     if not hash then return nil end
     ensure_cache()
@@ -2889,13 +2940,15 @@ Util.ART_CATEGORIES = P.assets .. "/categories.png"
 -- Returns the path to use as the row's icon, always non-nil: the shipped
 -- placeholder when the playlist has no cover.
 -- Directory list for ensure_cache's single mkdir, so every art directory exists
--- without a fork per draw: each kind's own cache (plus playlists' highres) and
--- every rendition subdirectory of the flat pool.
+-- without a fork per draw: each kind's own cache and every rendition it keeps
+-- beside it, plus every rendition subdirectory of the flat pool.
 function Util.art_dirs()
     local out = ""
     for _, k in pairs(P.art_kinds) do
         out = out .. " " .. shell_quote(k.dir)
-        if k.highres then out = out .. " " .. shell_quote(k.highres) end
+        if k.tiers then
+            for _, t in pairs(k.tiers) do out = out .. " " .. shell_quote(t.dir) end
+        end
     end
     for _, d in pairs(P.art_subdirs) do
         out = out .. " " .. shell_quote(d)
@@ -2963,12 +3016,19 @@ function Util.art_failed(entry, hash)
         and (os.time() - (entry.t or 0)) < Util.ART_FAIL_TTL
 end
 
-function Util.keyed_art(kind, item, fetch, hi, fallback)
+-- `tier` names one of the kind's extra renditions -- nil for its default, "med",
+-- "hi". It was a boolean while two sizes were all any kind had; playlists have
+-- three, and a boolean cannot say which. An undeclared tier reads as the default
+-- rather than erroring, the way a kind with no renditions at all already did.
+function Util.keyed_art(kind, item, fetch, tier, fallback)
     local cfg = P.art_kinds[kind]
     if not (cfg and item and item.id) then return fallback end
-    local dir  = (hi and cfg.highres) or cfg.dir
+    local t    = tier and cfg.tiers and cfg.tiers[tier] or nil
+    local dir  = (t and t.dir) or cfg.dir
     local idx  = Util.art_index(kind)
-    local key  = hi and (item.id .. ":hi") or item.id
+    -- Unchanged for "hi", so the <id>:hi entries already in playlist_art.json and
+    -- artist_art.json still resolve to the files they were written for.
+    local key  = t and (item.id .. ":" .. tier) or item.id
     local path = dir .. "/" .. item.id .. ".jpg"
     local imgs = item[cfg.field] or {}
     local url  = imgs[1] and imgs[1].url
@@ -2998,8 +3058,12 @@ function Util.keyed_art(kind, item, fetch, hi, fallback)
         end
         return fallback
     end
-    -- The kind owns which rendition it wants; see the `size` note on P.art_kinds.
-    if cfg.size then url = cfg.size(url, hi) end
+    -- The tier picks the rendition, the kind knows how to ask for it. Note the
+    -- hash above is taken from the RAW url, so it identifies the artwork rather
+    -- than the size -- which is what lets every tier of one cover share a single
+    -- staleness token.
+    local code = (t and t.code) or cfg.code
+    if code and cfg.reseed then url = cfg.reseed(url, code) end
     if idx[key] == hash and Util._art_valid_file(path) then return path end
     -- Already tried this exact artwork and it would not come down. Answering
     -- with the placeholder is the whole point: the alternative is re-requesting
@@ -3008,7 +3072,12 @@ function Util.keyed_art(kind, item, fetch, hi, fallback)
     if Util.art_failed(idx[key], hash) then return fallback end
     if not fetch then return path, url, hash, key end  -- caller batches the fetch
     ensure_cache()   -- also creates every kind's dir
-    local got = Util.fetch_art(url, path, not hi and Util.ART_DECOR or nil)
+    -- Only a tier marked `full` is one the user asked to look at; everything
+    -- else here is a grid tile or a backdrop, and a miss on those costs nothing
+    -- visible. The old test was `not hi`, which read "is this the default tier"
+    -- -- so the moment a decorative tier that was not the default existed, it
+    -- would have inherited the full retry budget and frozen the view.
+    local got = Util.fetch_art(url, path, (t and t.full) and nil or Util.ART_DECOR)
     Util.art_index_put(kind, {[key] = got and hash or {f = hash, t = os.time()}})
     return got and path or fallback
 end
@@ -3152,7 +3221,7 @@ local function thumb_resolve(it, kind)
         -- reads as a failure rather than as what it is.
         local fb = it.art_fallback
                 or (kind == "playlist" and Util.ART_PLAYLIST or Util.ART_NONE)
-        local path, url, hash, key = Util.keyed_art(kind, it, false, false, fb)
+        local path, url, hash, key = Util.keyed_art(kind, it, false, nil, fb)
         if not url then return path end       -- already cached, or has no artwork
         return path, url, hash, key
     end
@@ -4542,6 +4611,46 @@ local function flush_queue()
     write_file(P.queue, json.encode({tracks=queue_tracks, idx=queue_idx, context=queue_context}))
 end
 
+-- How many track URIs one play request carries. Spotify documents no maximum for
+-- the `uris` array, so this is the size that has always worked here rather than a
+-- limit anyone published -- which is exactly why it belongs in one named place
+-- instead of being spelled `+ 49` at two call sites that never referenced each
+-- other.
+--
+-- On Util rather than a local: the chunk body is one function at Lua's 200-local
+-- cap, the same reason Util.ART_FAIL_TTL lives there.
+Util.PLAY_URIS_MAX = 50
+
+-- The slice of a CONTEXTLESS list to hand Spotify, and where the played row sits
+-- inside it. Returns (uris, position).
+--
+-- Only three of the places you can start playback from have a context to play
+-- through -- an album, a playlist, the single-album shortcut. Everything else,
+-- from Liked Tracks to a genre shelf, has to send a bare `uris` array, and the
+-- moment that array runs out Spotify autoplays whatever it likes. That is
+-- playback wandering off the list you were looking at.
+--
+-- Both callers used to build the array as `idx .. idx+49`: everything BEFORE the
+-- row was thrown away, so a 50-track genre shelf played from row 30 sent 21 URIs
+-- and strayed 21 tracks later. A list that fits in one request is now sent
+-- WHOLE, with the offset pointing at the row -- which covers every genre shelf,
+-- More Like This and search page outright.
+--
+-- A longer list still starts at the row. Forward coverage is what decides how
+-- long playback stays put, so spending it on tracks behind the cursor would buy
+-- nothing: recover_playback re-issues its own window on every skip, which is
+-- what makes Previous work without them.
+function Util.play_window(uris_all, idx)
+    local n = #uris_all
+    local first = (n <= Util.PLAY_URIS_MAX) and 1 or idx
+    local uris, pos = {}, 0
+    for i = first, math.min(n, first + Util.PLAY_URIS_MAX - 1) do
+        uris[#uris+1] = uris_all[i]
+        if i == idx then pos = #uris - 1 end
+    end
+    return uris, pos
+end
+
 -- ACTIONS
 
 -- Returns whether a play request actually went out, so callers stop patching the
@@ -4588,12 +4697,14 @@ local function do_play(item, ctx_type, ctx_id, all_items, idx)
         -- would start the correct track but strand it with no context.
         b = {context_uri=context_uri, offset={uri=Util.item_uri(item)}}
     elseif all_items and idx then
-        local uris = {}
-        for i = idx, math.min(#all_items, idx + 49) do
-            local u = all_items[i] and Util.item_uri(all_items[i])
-            if u then uris[#uris+1] = u end
-        end
-        if #uris > 0 then b = {uris=uris, offset={position=0}} end
+        -- queue_tracks, not all_items: save_queue above has just built it, and
+        -- the idx it handed back indexes THAT array -- the filtered one, with
+        -- id-less rows dropped. Reading all_items with a filtered index was off
+        -- by one row for every id-less row above the one played. It also spares
+        -- a second Util.item_uri pass over the whole list, since save_queue
+        -- already did exactly that.
+        local uris, pos = Util.play_window(queue_tracks, idx)
+        if #uris > 0 then b = {uris=uris, offset={position=pos}} end
     elseif item and item.id then
         -- Guarded: an item with no id used to raise a concat error here rather
         -- than failing gracefully. `b` stays nil and the caller returns false.
@@ -4860,9 +4971,31 @@ local function do_like(item, unlike)
     return true
 end
 
+-- Answers from the cached shelf before the network, exactly as Util.lib_has does
+-- for albums and shows. view_artist calls this on the way in, so every open of
+-- every artist hub used to pay a me/following/contains round trip for something
+-- load_followed_artists already knew.
+--
+-- Read under Util.cache_only, the way Util.shelf_tiles reads its shelves: this
+-- must never turn one small request into a paginated crawl of the whole followed
+-- list, so a shelf that is not on disk falls through to the ask below instead.
+--
+-- Same trade Util.lib_has states: a follow made on another device reads stale
+-- until the shelf refreshes, and acting on the row corrects it either way --
+-- do_follow_artist splices the shelf as it writes.
+--
 -- No token fetch here: api_get resolves (and refreshes) its own, and answers nil
 -- when there isn't one, which this already reads as "not following".
 local function api_check_following(artist_id)
+    if not artist_id then return false end
+    local was = Util.cache_only
+    Util.cache_only = true
+    local items = load_followed_artists()
+    Util.cache_only = was
+    if type(items) == "table" and #items > 0 then
+        for _, a in ipairs(items) do if a.id == artist_id then return true end end
+        return false
+    end
     local r = api_get("me/following/contains?type=artist&ids=" .. artist_id)
     return r and r[1] == true
 end
@@ -5116,11 +5249,8 @@ recover_playback = function(direction, force)
         -- shuffle is active, so this path is only reliable when shuffle is off.
         body = json.encode({context_uri=queue_context, offset={position=new_idx-1}})
     else
-        local uris = {}
-        for i = new_idx, math.min(#queue_tracks, new_idx + 49) do
-            uris[#uris+1] = queue_tracks[i]
-        end
-        if #uris > 0 then body = json.encode({uris=uris, offset={position=0}}) end
+        local uris, pos = Util.play_window(queue_tracks, new_idx)
+        if #uris > 0 then body = json.encode({uris=uris, offset={position=pos}}) end
     end
     if not body then return false end
     local r = Util.api_write("PUT", "https://api.spotify.com/v1/me/player/play" .. dparam,
@@ -5305,7 +5435,7 @@ function Util.merge_resume_points(show_id, eps)
             end
             if not next(map) then return nil end
             return map
-        end)
+        end, {revalidate = "show_resume", revalidate_arg = show_id})
     if type(fresh) ~= "table" then return eps end
     for _, e in ipairs(eps) do
         if e.id and fresh[e.id] then e.resume_point = fresh[e.id] end
@@ -5315,6 +5445,17 @@ end
 
 Util.REVALIDATORS.show = function(show_id)
     if show_id and #show_id > 0 then return Util.api_get_show(show_id) end
+end
+
+-- A 300s TTL with no revalidate meant nearly every RE-open of a podcast blocked
+-- on a fresh page of 50 episodes, for a progress number. Serving the last one
+-- and refreshing behind the menu is the whole point of the short TTL.
+Util.REVALIDATORS.show_resume = function(show_id)
+    if not (show_id and #show_id > 0) then return end
+    -- Reached through merge_resume_points because the fetch lives inside it;
+    -- the episode list it is handed is a throwaway, only there to satisfy the
+    -- signature -- what matters is the cached_fetch it performs on the way.
+    Util.merge_resume_points(show_id, {{id = ""}})
 end
 
 -- The aligned label/value sheet behind Album and Track Details, which carried
@@ -5374,8 +5515,24 @@ Util.view_album_details = function(album)
     s.show()
 end
 
+-- Cached like every other per-id lookup here (see api_get_album). A track's
+-- metadata does not change, so a day is generous rather than risky, and opening
+-- the same sheet twice stopped costing two round trips.
+-- On Util, not a local: the chunk body is at Lua's 200-local cap, so a
+-- file-scope `local function` here does not compile.
+Util.api_get_track_detail = function(id)
+    if not id or #id == 0 then return nil end
+    return cached_fetch("track_detail_" .. id, P.mass .. "/track_detail_" .. id .. ".json",
+        CACHE_TTL_LONG, function()
+            return api_get("tracks/" .. id, Util.with_market())
+        end, {revalidate = "track_detail", revalidate_arg = id})
+end
+Util.REVALIDATORS.track_detail = function(id)
+    if id and #id > 0 then return Util.api_get_track_detail(id) end
+end
+
 Util.view_track_details = function(item)
-    local d = api_get("tracks/" .. (item.id or ""), Util.with_market())
+    local d = Util.api_get_track_detail(item.id)
     if not d then
         rofi_message("Could not load track details")
         return
@@ -5420,8 +5577,22 @@ Util.view_show_details = function(show)
     s.show()
 end
 
+-- Same treatment as api_get_track_detail above, and for the same reason: the
+-- sheet is a read of fixed metadata, so it belongs on disk rather than on the
+-- wire every time it is opened.
+Util.api_get_episode_detail = function(id)
+    if not id or #id == 0 then return nil end
+    return cached_fetch("episode_detail_" .. id, P.mass .. "/episode_detail_" .. id .. ".json",
+        CACHE_TTL_LONG, function()
+            return api_get("episodes/" .. id, Util.with_market())
+        end, {revalidate = "episode_detail", revalidate_arg = id})
+end
+Util.REVALIDATORS.episode_detail = function(id)
+    if id and #id > 0 then return Util.api_get_episode_detail(id) end
+end
+
 Util.view_episode_details = function(item)
-    local d = api_get("episodes/" .. (item.id or ""), Util.with_market())
+    local d = Util.api_get_episode_detail(item.id)
     if not d then
         rofi_message("Could not load episode details")
         return
@@ -5543,15 +5714,21 @@ end
 -- CACHE_TTL_LONG as a backstop, because daemons can run for weeks and the
 -- catalogue does move. The trade is deliberate: repeating a search inside that
 -- window answers from disk instead of requerying.
-function Util.search_cache_path(key)
-    -- Queries are arbitrary user text, so the filename is a sanitised prefix for
-    -- legibility plus a djb2 hash of the WHOLE key. A collision then needs both
-    -- to match, rather than just 32 bits.
-    local h = 5381
-    for i = 1, #key do h = (h * 33 + key:byte(i)) % 0x100000000 end
+-- A P.mass filename for a cache keyed by ARBITRARY TEXT rather than by an id --
+-- a query, a recommendation seed. A sanitised prefix for legibility plus a djb2
+-- hash of the WHOLE key, so a collision needs both to match rather than just 32
+-- bits.
+--
+-- `prefix` is what keeps two such caches apart on disk, and it is load-bearing:
+-- Util.drop_search_cache globs search_*.json on the way out, so anything meant
+-- to survive an exit has to be filed under a name of its own.
+function Util.mass_path(prefix, key)
     local tag = key:gsub("[^%w]", "_"):sub(1, 32)
-    return P.mass .. "/search_" .. tag .. "_" .. string.format("%08x", h) .. ".json"
+    return P.mass .. "/" .. prefix .. "_" .. tag .. "_"
+        .. string.format("%08x", Util.djb2(key)) .. ".json"
 end
+
+function Util.search_cache_path(key) return Util.mass_path("search", key) end
 
 function Util.drop_search_cache()
     mem_bust("search:")
@@ -5969,28 +6146,58 @@ end
 -- Note for later: /recommendations is deprecated for new applications and works
 -- only because this client ID predates that. Two features now depend on it, so
 -- if Spotify withdraws it for old clients as well, both go at once.
+-- Cached like every other menu loader, which it was not: this was the ONE
+-- menu-opening loader in the file that went straight to api_get, so More Like
+-- This and every genre shelf paid ~0.75s on every open -- first visit, reopen in
+-- the same session, and again on each warm-start replay through
+-- reg("genre-tracks") / reg("recommendations"). Two round trips whenever the
+-- response comes back with stubs, since the repair below is serial.
+--
+-- The TTL is an hour rather than a day because /recommendations is the one
+-- endpoint here that does not answer the same thing twice: two calls a second
+-- apart with the same seed shared 4 tracks out of 50. So the cache decides how
+-- often the list turns over, not just how fast it opens. An hour of the same
+-- picks is the trade -- and `revalidate` means the wait is never paid again
+-- anyway, since an expired copy draws immediately while a detached process
+-- fetches the next one.
+--
+-- Keeping the list still also fixes something that was never a "slowness" bug:
+-- reopening used to hand back 50 different tracks, so the remembered cursor
+-- landed on an unrelated row every time.
+--
+-- The stub repair stays INSIDE the fetch, so it only costs a request on a real
+-- miss.
 local function api_get_recommendations(seed)
     if not seed or #seed == 0 then return nil end
-    local d = api_get("recommendations", Util.with_market(seed .. "&limit=50"))
-    if not d or not d.tracks or #d.tracks == 0 then return nil end
-    local stubs = {}
-    for i, t in pairs(d.tracks) do
-        if t and (not t.name or #t.name == 0 or not t.artists or #t.artists == 0) then
-            stubs[#stubs+1] = i
+    return cached_fetch("recs_" .. seed, Util.mass_path("recs", seed), CACHE_TTL_MED, function()
+        local d = api_get("recommendations", Util.with_market(seed .. "&limit=50"))
+        if not d or not d.tracks or #d.tracks == 0 then return nil end
+        local stubs = {}
+        for i, t in pairs(d.tracks) do
+            if t and (not t.name or #t.name == 0 or not t.artists or #t.artists == 0) then
+                stubs[#stubs+1] = i
+            end
         end
-    end
-    if #stubs > 0 then
-        local ids, sidx = {}, {}
-        for _, i in ipairs(stubs) do
-            local id = d.tracks[i].id
-            if id then sidx[id] = i; ids[#ids+1] = id end
+        if #stubs > 0 then
+            local ids, sidx = {}, {}
+            for _, i in ipairs(stubs) do
+                local id = d.tracks[i].id
+                if id then sidx[id] = i; ids[#ids+1] = id end
+            end
+            if #ids > 0 then
+                local map = api_get_tracks(ids)
+                for id, i in pairs(sidx) do if map[id] then d.tracks[i] = map[id] end end
+            end
         end
-        if #ids > 0 then
-            local map = api_get_tracks(ids)
-            for id, i in pairs(sidx) do if map[id] then d.tracks[i] = map[id] end end
-        end
-    end
-    return d.tracks
+        return d.tracks
+    end, {stale_ok = true, revalidate = "recommendations", revalidate_arg = seed})
+end
+
+-- Parameterised like category_playlists and show_latest: the seed is the whole
+-- seed_* parameter, and Util.spawn_self shell-quotes it, so the `=` and any %xx
+-- from url_encode survive the trip to the detached process intact.
+Util.REVALIDATORS.recommendations = function(seed)
+    if seed and #seed > 0 then return api_get_recommendations(seed) end
 end
 
 local function api_get_categories()
@@ -6116,6 +6323,15 @@ end
 --   playlist_tracks -- snapshot_id makes a stale copy WRONG, not merely old, so
 --     blocking on it is correct.
 --   search / lyrics -- keyed on arbitrary text, with nothing to refresh into.
+--   recommendations / show_resume -- registered at their sites, like the three
+--     above, because they take a parameter.
+--
+-- And the loaders that are deliberately not cached AT ALL, named here so the
+-- next reader can see they were weighed rather than missed: the queue and
+-- me/player are live transport state, and a cached one is simply a wrong one;
+-- Util.lib_probe exists to ask whether a cache is stale; open_url and
+-- listen_lookup are one-shot resolvers rather than menus; api_get_tracks only
+-- ever runs inside another loader's fetch.
 for name, fn in pairs({
     album             = api_get_album,
     artist_albums     = api_get_artist_albums,
@@ -6716,15 +6932,15 @@ view_art = function(item)
         -- Cached by id under the playlist kind, not by art hash: an editorial
         -- cover is replaced in place, and a hash-named file would strand the old
         -- one on every weekly refresh.
-        art_path = Util.keyed_art("playlist", item, true, true, nil)
+        art_path = Util.keyed_art("playlist", item, true, "hi", nil)
     elseif is_artist then
         -- Id-keyed for the same reason, and `hi` for the 640x640 rendition --
         -- the largest an artist has. Not the branch below: Util.art_url reseeds
         -- the ALBUM prefix, which an artist URL does not match, so this would
-        -- land in the flat highres pool at whatever size it happened to arrive.
-        art_path = Util.keyed_art("artist", item, true, true, nil)
+        -- land in the albums high-res pool at whatever size it happened to arrive.
+        art_path = Util.keyed_art("artist", item, true, "hi", nil)
     else
-        art_path = ensure_art(Util.art_url(imgs[1].url), "albums/highres")
+        art_path = ensure_art(Util.art_url(imgs[1].url), "albums/high-res")
     end
     if not art_path then rofi_message("No " .. noun .. " available"); return end
     -- Util.subtitle, not artist_names: it answers the show for an episode and
@@ -7309,7 +7525,7 @@ function Util.open_playlist(pl)
     -- would just be a giant glyph, so an artless playlist passes nothing -- which
     -- is what the nil fallback here means.
     local cover = (pl.images and pl.images[1] and pl.images[1].url)
-        and Util.keyed_art("playlist", pl, true, false, nil) or nil
+        and Util.keyed_art("playlist", pl, true, "med", nil) or nil
     -- Hand what this list knew to the metadata cache, so reopening this playlist
     -- after a restart is a disk read rather than the ~450ms request that used to
     -- be ~95% of a warm start.
@@ -10462,7 +10678,7 @@ function Util.run_shelf_warm()
                 -- fetch=false so this goes through _art_batch with everything
                 -- else, rather than one blocking download per shelf.
                 local path, url, hash, key = Util.keyed_art(kind,
-                    {id = t.key, images = imgs}, false, false, nil)
+                    {id = t.key, images = imgs}, false, nil, nil)
                 if url then
                     list[#list+1] = {url = url, path = path, art_key = key, hash = hash}
                 end

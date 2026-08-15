@@ -1,0 +1,15 @@
+/**
+* ┌─┐┌─┐┌┐┌┬ ┬┌─┐┬─┐┬┌─┌─┐
+* ┌─┘├┤ │││││││ │├┬┘├┴┐└─┐
+* └─┘└─┘┘└┘└┴┘└─┘┴└─┴ ┴└─┘
+* https://github.com/kbuckleys/
+* Independent config, bypasses rofi's globals */
+
+configuration {
+    recursivebrowser {
+        filter-regex: "(.*cache.*|.*\\.o)";
+        cancel-returns-1: true;
+        command: "sh -c 'echo \"$1\" > /tmp/rofi-fatman-opened; xdg-open \"$1\"' _";
+        directory: "/";
+    }
+}
