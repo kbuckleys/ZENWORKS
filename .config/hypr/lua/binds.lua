@@ -30,7 +30,7 @@ hl.bind("SUPER + ESCAPE",     hl.dsp.exec_cmd("~/.config/rofi/scripts/session/se
 hl.bind("SUPER + SPACE",      hl.dsp.exec_cmd("~/.config/rofi/scripts/runner/runner.lua"))
 hl.bind("SUPER + C",          hl.dsp.exec_cmd("~/.config/rofi/scripts/cliphist/cliphist.lua"))
 hl.bind("SUPER + SHIFT + C",  hl.dsp.exec_cmd("~/.config/rofi/scripts/calc/calc.lua"))
-hl.bind("SUPER + S",          hl.dsp.exec_cmd("~/.config/rofi/scripts/rootsearch/rootsearch.lua"))
+hl.bind("SUPER + S",          hl.dsp.exec_cmd("~/.config/rofi/scripts/fatman/fatman.lua"))
 hl.bind("SUPER + J",          hl.dsp.exec_cmd("~/.config/rofi/scripts/rofimoji/rofimoji.lua"))
 hl.bind("SUPER + SHIFT + J",  hl.dsp.exec_cmd("~/.config/rofi/scripts/nerd/nerd.lua"))
 hl.bind("SUPER + M",          hl.dsp.exec_cmd("~/.config/rofi/scripts/spoot/spoot.lua"))

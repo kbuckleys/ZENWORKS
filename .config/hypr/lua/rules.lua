@@ -22,7 +22,7 @@ hl.window_rule({ match = { float = true },       border_color = "#b6e0a499", bor
 hl.window_rule({ match = { float = false }, no_shadow = true })
 
 -- LAYERS
-hl.layer_rule({ match = { namespace = "rofi" }, blur = true, ignore_alpha = 0.5 })
+hl.layer_rule({ match = { namespace = ".*" }, blur = true, ignore_alpha = 0.5 })
 
 -- SPECIAL WORKSPACE
 hl.workspace_rule({ workspace = "special:special", gaps_out = 30 })
