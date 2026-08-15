@@ -13,7 +13,7 @@ window {
 /* spacing is per-box, so zeroing it to close the message/binds seam would also
  * tighten the two gaps below; those are handed back as margins. */
 mainbox {
-    children: [message, textbox-binds, inputbar, listview];
+    children: [ message, textbox-binds, inputbar, listview ];
     spacing: 0;
 }
 
@@ -41,6 +41,8 @@ textbox-binds {
 
 inputbar {
     children: [textbox-prompt-colon, entry];
+    border: 0px 0px 1px 0px;
+    margin: 0px 0px -2px 0px;
 }
 textbox-prompt-colon {
     color: #fab387;

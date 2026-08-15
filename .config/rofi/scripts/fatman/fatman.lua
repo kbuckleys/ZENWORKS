@@ -758,7 +758,13 @@ local function run_native_search()
     return "tab"
 end
 
-bs_start()
+-- The search view is the entry point; Tab from there drops into the file
+-- manager loop below. run_native_search() leaves the backspace monitor running,
+-- so the loop does not need its own bs_start().
+if run_native_search() ~= "tab" then
+    bs_stop()
+    os.exit(0)
+end
 
 while true do
     bs_bump()
