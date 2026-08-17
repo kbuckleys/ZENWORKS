@@ -25,6 +25,10 @@ hl.bind("SUPER + SHIFT + H", function()
     hl.exec_cmd("hyprlock")
 end, { locked = true })
 
+-- spoot
+hl.bind("SUPER + M",          hl.dsp.exec_cmd("~/Projects/spoot/bin/spoot"))
+hl.bind("SUPER + SHIFT + M",  hl.dsp.exec_cmd("~/Projects/spoot/bin/spoot --listen"))
+
 -- ROFI
 hl.bind("SUPER + ESCAPE",     hl.dsp.exec_cmd("~/.config/rofi/scripts/session/session.lua"))
 hl.bind("SUPER + SPACE",      hl.dsp.exec_cmd("~/.config/rofi/scripts/runner/runner.lua"))
@@ -33,8 +37,6 @@ hl.bind("SUPER + SHIFT + C",  hl.dsp.exec_cmd("~/.config/rofi/scripts/calc/calc.
 hl.bind("SUPER + S",          hl.dsp.exec_cmd("~/.config/rofi/scripts/fatman/fatman.lua"))
 hl.bind("SUPER + J",          hl.dsp.exec_cmd("~/.config/rofi/scripts/rofimoji/rofimoji.lua"))
 hl.bind("SUPER + SHIFT + J",  hl.dsp.exec_cmd("~/.config/rofi/scripts/nerd/nerd.lua"))
-hl.bind("SUPER + M",          hl.dsp.exec_cmd("~/.config/rofi/scripts/spoot/spoot.lua"))
-hl.bind("SUPER + SHIFT + M",  hl.dsp.exec_cmd("~/.config/rofi/scripts/spoot/spoot.lua --listen"))
 hl.bind("SUPER + V",          hl.dsp.exec_cmd("~/.config/rofi/scripts/rbw/rbw.lua"))
 hl.bind("SUPER + K",          hl.dsp.exec_cmd("~/.config/rofi/scripts/hitman/hitman.lua"))
 hl.bind("SUPER + D",          hl.dsp.exec_cmd("~/.config/rofi/scripts/dictionary/dictionary.lua"))
