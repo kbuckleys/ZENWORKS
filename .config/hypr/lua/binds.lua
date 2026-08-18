@@ -15,8 +15,6 @@ hl.bind("SUPER + RETURN",          hl.dsp.exec_cmd(term))
 hl.bind("SUPER + P",               hl.dsp.exec_cmd(term .. " -T ZENU ~/.config/scripts/ZENU.lua"))
 hl.bind("SUPER + SHIFT + P",       hl.dsp.exec_cmd(term .. " -T ZENU ~/.config/scripts/ZENU.lua update"))
 hl.bind("SUPER + CONTROL + P",     hl.dsp.exec_cmd("hyprpicker -a"))
-hl.bind("SUPER + Y",               hl.dsp.exec_cmd("killall -SIGUSR1 waybar"))
-hl.bind("SUPER + SHIFT + Y",       hl.dsp.exec_cmd("killall waybar && waybar"))
 hl.bind("SUPER + E",               hl.dsp.exec_cmd(fman))
 hl.bind("SUPER + B",               hl.dsp.exec_cmd(web))
 
