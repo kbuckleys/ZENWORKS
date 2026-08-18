@@ -13,10 +13,11 @@ import "statusbar"
 ShellRoot {
   id: root
 
-  property var hdmiScreen: (function() {
+  property var statusScreen: (function() {
+    const target = Quickshell.env("QS_STATUS_SCREEN") || "HDMI-A-1";
     const screens = Quickshell.screens;
     for (let i = 0; i < screens.length; ++i) {
-      if (screens[i].name === "HDMI-A-1") return screens[i];
+      if (screens[i].name === target) return screens[i];
     }
     return screens.length ? screens[0] : null;
   })()
@@ -25,7 +26,7 @@ ShellRoot {
     id: bar
     anchors { left: true; right: true; bottom: true }
     implicitHeight: 32
-    screen: root.hdmiScreen
+    screen: root.statusScreen
     exclusionMode: ExclusionMode.Auto
     color: "transparent"
 
