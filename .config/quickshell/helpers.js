@@ -1,0 +1,51 @@
+function home() {
+  try { return Quickshell.env("HOME"); } catch (e) { return "/home/buck"; }
+}
+
+function collapse(s) {
+  return (s ?? "").replace(/ {2,}/g, " ");
+}
+
+function pangoToStyled(s) {
+  if (!s) return "";
+  return s
+    .replace(/<span\b[^>]*\bforeground=(["'])([^"']+)\1[^>]*>/g, '<font color="$2">')
+    .replace(/<span\b[^>]*>/g, "")
+    .replace(/<\/span\s*>/g, "</font>");
+}
+
+function apply(s) {
+  return collapse(pangoToStyled(s));
+}
+
+function tooltip(s) {
+  return (s ?? "")
+    .replace(/<span\b[^>]*\bforeground=(["'])([^"']+)\1[^>]*>/g, '<font color="$2">')
+    .replace(/<span\b[^>]*>/g, "")
+    .replace(/<\/span\s*>/g, "</font>")
+    .replace(/\n/g, "<br/>");
+}
+
+function pad(n) {
+  n = Math.trunc(n);
+  return n < 10 ? "0" + n : String(n);
+}
+
+function powFormat(val) {
+  const units = ["", "k", "M", "G", "T", "P"];
+  let fraction = Math.max(0, val);
+  let pow = 0;
+  while (pow + 1 < units.length && fraction / 1000 >= 1) {
+    fraction /= 1000;
+    ++pow;
+  }
+  return fraction.toFixed(1) + units[pow] + "B/s";
+}
+
+function giB(kb) {
+  return Math.round(kb / 10485.76) / 100;
+}
+
+function format1f(v) {
+  return v.toFixed(1);
+}
