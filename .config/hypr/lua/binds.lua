@@ -5,7 +5,7 @@
 
 -- DEFAULTS
 local term = "kitty -1"
-local web = "helium-browser"
+local web = "firefox"
 local fman = term .. " yazi"
 
 -- MISC
@@ -23,22 +23,22 @@ hl.bind("SUPER + SHIFT + H", function()
     hl.exec_cmd("hyprlock")
 end, { locked = true })
 
--- spoot
-hl.bind("SUPER + M",          hl.dsp.exec_cmd("~/Projects/spoot/bin/spoot"))
-hl.bind("SUPER + SHIFT + M",  hl.dsp.exec_cmd("~/Projects/spoot/bin/spoot --listen"))
-
--- ROFI
-hl.bind("SUPER + ESCAPE",     hl.dsp.exec_cmd("~/.config/rofi/scripts/session/session.lua"))
-hl.bind("SUPER + SPACE",      hl.dsp.exec_cmd("~/.config/rofi/scripts/runner/runner.lua"))
-hl.bind("SUPER + C",          hl.dsp.exec_cmd("~/.config/rofi/scripts/cliphist/cliphist.lua"))
+-- QS
+hl.bind("SUPER + ESCAPE",     hl.dsp.exec_cmd("qs ipc call Session toggle"))
+hl.bind("SUPER + SPACE",      hl.dsp.exec_cmd("qs ipc call Runner toggle"))
+hl.bind("SUPER + C",          hl.dsp.exec_cmd("qs ipc call Cliphist toggle"))
 hl.bind("SUPER + SHIFT + C",  hl.dsp.exec_cmd("~/.config/rofi/scripts/calc/calc.lua"))
-hl.bind("SUPER + S",          hl.dsp.exec_cmd("~/.config/rofi/scripts/fatman/fatman.lua"))
+hl.bind("SUPER + S",          hl.dsp.exec_cmd("qs ipc call Scout toggle"))
 hl.bind("SUPER + J",          hl.dsp.exec_cmd("~/.config/rofi/scripts/rofimoji/rofimoji.lua"))
 hl.bind("SUPER + SHIFT + J",  hl.dsp.exec_cmd("~/.config/rofi/scripts/nerd/nerd.lua"))
 hl.bind("SUPER + V",          hl.dsp.exec_cmd("~/.config/rofi/scripts/rbw/rbw.lua"))
 hl.bind("SUPER + K",          hl.dsp.exec_cmd("~/.config/rofi/scripts/hitman/hitman.lua"))
 hl.bind("SUPER + D",          hl.dsp.exec_cmd("~/.config/rofi/scripts/dictionary/dictionary.lua"))
 hl.bind("SUPER + SHIFT + D",  hl.dsp.exec_cmd("~/.config/rofi/scripts/translate/translate.lua"))
+
+-- spoot
+hl.bind("SUPER + M",          hl.dsp.exec_cmd("~/Projects/spoot/bin/spoot"))
+hl.bind("SUPER + SHIFT + M",  hl.dsp.exec_cmd("~/Projects/spoot/bin/spoot --listen"))
 
 -- WORKSPACES
 hl.bind("SUPER + GRAVE",  hl.dsp.workspace.toggle_special("special"))
