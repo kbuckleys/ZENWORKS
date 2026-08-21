@@ -1,0 +1,344 @@
+/*
+┌─┐┌─┐┌┐┌┬ ┬┌─┐┬─┐┬┌─┌─┐
+┌─┘├┤ │││││││ │├┬┘├┴┐└─┐
+└─┘└─┘┘└┘└┴┘└─┘┴└─┴ ┴└─┘
+https://github.com/kbuckleys/ */
+
+/* -------------------------------------------------------------------------
+   Menu colors
+   ------------------------------------------------------------------------- */
+
+@-moz-document url-prefix("chrome://browser/content/browser.xhtml") {
+  :root {
+    --menu-text-color: #dfdfdd !important;
+    --menu-accent-color: #20242a !important;
+  }
+
+  /* Menu text */
+  menupopup menu,
+  menupopup menuitem,
+  panel menu,
+  panel menuitem,
+  menupopup .menu-text,
+  menupopup .menu-iconic-text {
+    color: #dfdfdd !important;
+  }
+
+  /* One highlight color for hovered/selected items - matches at any depth
+     so iconic entries wrapped in containers (e.g. #context-navigation)
+     get the same highlight bar as text-only entries */
+  menupopup :is(menu, menuitem):hover,
+  menupopup :is(menu, menuitem)[_moz-menuactive="true"],
+  panel :is(menu, menuitem):hover,
+  panel :is(menu, menuitem)[_moz-menuactive="true"] {
+    color: #dfdfdd !important;
+    background: #20242a !important;
+    border: 0 !important;
+    box-shadow: none !important;
+  }
+}
+
+/* -------------------------------------------------------------------------
+   Toolbar controls
+   ------------------------------------------------------------------------- */
+
+/* Hide Back and Forward buttons */
+#back-button,
+#forward-button {
+    display: none !important;
+}
+
+/* Put the hamburger / application menu at the left of the navigation bar */
+#nav-bar {
+    display: flex !important;
+}
+
+#PanelUI-button {
+    order: -1 !important;
+}
+
+/* -------------------------------------------------------------------------
+   Tab controls
+   ------------------------------------------------------------------------- */
+
+/* Hide tab close buttons */
+.tab-close-button {
+    display: none !important;
+}
+
+/* Hide the New Tab button and the tab overflow button */
+#tabs-newtab-button,
+.tabs-newtab-button,
+#new-tab-button,
+#alltabs-button,
+.tabbrowser-arrowscrollbox-periphery {
+    display: none !important;
+}
+
+/* Hide site favicons, while retaining the icon stack for other state icons */
+#tabbrowser-tabs .tab-icon-image {
+    display: none !important;
+}
+
+/* Remove space reserved for the hidden favicon */
+#tabbrowser-tabs .tab-icon-stack {
+    width: 0 !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+/* -------------------------------------------------------------------------
+   Make tabs span the whole width of the tab bar
+   ------------------------------------------------------------------------- */
+
+/* Tabs already share the bar's width equally (flex: 100 100); they are only
+   capped by this variable. Raising it lets them fill the whole bar while all
+   of Firefox's native open/close animation and sizing logic keeps working.
+   Do NOT override max-width/min-width/flex on .tabbrowser-tab directly -
+   that breaks the max-width transitions Firefox uses to detect tab
+   open/close completion and leaves phantom gaps behind. */
+#tabbrowser-tabs[orient="horizontal"] {
+    --tab-max-width: 100% !important;
+}
+
+/* Remove tab bar side padding/margins and the window-drag spacer after
+   the last tab (the blank area on the far right) */
+#TabsToolbar,
+#tabbrowser-tabs {
+    padding-inline: 0 !important;
+    margin-inline: 0 !important;
+}
+
+.titlebar-spacer[type="pre-tabs"],
+.titlebar-spacer[type="post-tabs"] {
+    display: none !important;
+}
+
+/* Remove inner spacing around the tab background */
+#tabbrowser-tabs .tabbrowser-tab .tab-stack {
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+/* -------------------------------------------------------------------------
+   Center tab labels in Firefox Nova
+   ------------------------------------------------------------------------- */
+
+#tabbrowser-tabs .tabbrowser-tab {
+    position: relative !important;
+}
+
+#tabbrowser-tabs .tabbrowser-tab .tab-content {
+    position: static !important;
+}
+
+#tabbrowser-tabs .tabbrowser-tab .tab-label,
+#tabbrowser-tabs .tabbrowser-tab .tab-text {
+    display: block !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    text-align: center !important;
+}
+
+/* -------------------------------------------------------------------------
+   Hide the tab bar when exactly one tab is open
+   ------------------------------------------------------------------------- */
+
+#tabbrowser-tabs .tabbrowser-tab:only-of-type,
+#tabbrowser-tabs .tabbrowser-tab:only-of-type
+    + #tabbrowser-arrowscrollbox-periphery,
+#tabbrowser-tabs .tabbrowser-tab:only-of-type
+    + #tabs-newtab-button {
+    visibility: collapse !important;
+}
+
+#tabbrowser-tabs,
+#tabbrowser-arrowscrollbox,
+#TabsToolbar {
+    min-height: 0 !important;
+}
+
+/* -------------------------------------------------------------------------
+   Square corners throughout Firefox's browser UI
+   ------------------------------------------------------------------------- */
+
+:root {
+    --tab-border-radius: 0px !important;
+    --toolbarbutton-border-radius: 0px !important;
+    --arrowpanel-border-radius: 0px !important;
+    --border-radius-small: 0px !important;
+    --border-radius-medium: 0px !important;
+}
+
+#navigator-toolbox *,
+#nav-bar *,
+#TabsToolbar *,
+#PersonalToolbar *,
+#urlbar,
+#urlbar-background,
+#searchbar,
+.panel-arrowcontent,
+.panel-subview-body,
+menupopup,
+toolbarbutton,
+.urlbarView-row,
+.tab-background {
+    border-radius: 0 !important;
+}
+
+/* -------------------------------------------------------------------------
+   Compact tabs
+   ------------------------------------------------------------------------- */
+
+:root {
+    --tab-min-height: 30px !important;
+    /* No vertical margins around tabs -> no dead space in the tab bar */
+    --tab-margin-block: 0px !important;
+    /* Strip hugs its content */
+    --tabstrip-min-height: var(--tab-min-height) !important;
+}
+
+/* Clamp the tab bar to exactly one tab height and drop any vertical
+   padding on the toolbar / its item wrapper */
+#TabsToolbar {
+    height: var(--tab-min-height) !important;
+    max-height: var(--tab-min-height) !important;
+}
+
+#TabsToolbar,
+#TabsToolbar .toolbar-items,
+#tabbrowser-arrowscrollbox::part(scrollbox) {
+    padding-block: 0 !important;
+    margin-block: 0 !important;
+}
+
+/* Remove separator/shadow between nav bar and tab bar */
+:root {
+    --tabs-navbar-separator-style: none !important;
+    --tabs-navbar-shadow-size: 0px !important;
+}
+
+#nav-bar {
+    border-bottom: 0 !important;
+    box-shadow: none !important;
+    margin-bottom: 0 !important;
+    padding-bottom: 0 !important;
+}
+
+#TabsToolbar {
+    padding-top: 0 !important;
+    margin-top: 0 !important;
+}
+
+/* -------------------------------------------------------------------------
+   Disable tab hover highlight
+   ------------------------------------------------------------------------- */
+
+#tabbrowser-tabs .tabbrowser-tab:hover > .tab-stack > .tab-background:not([selected], [multiselected]) {
+    background-color: transparent !important;
+    outline-color: transparent !important;
+    box-shadow: none !important;
+}
+
+/* -------------------------------------------------------------------------
+   UI font: JetBrains Mono
+   ------------------------------------------------------------------------- */
+
+* {
+    font-family: "JetBrainsMono Nerd Font Mono", "JetBrainsMono Nerd Font",
+        "JetBrains Mono", monospace !important;
+}
+
+/* -------------------------------------------------------------------------
+   Tab label weights: medium for unselected, bold for active
+   ------------------------------------------------------------------------- */
+
+#tabbrowser-tabs .tabbrowser-tab .tab-label {
+    font-weight: 500 !important;
+}
+
+#tabbrowser-tabs .tabbrowser-tab[selected] .tab-label,
+#tabbrowser-tabs .tabbrowser-tab[selected] .tab-label-container {
+    font-weight: bold !important;
+}
+
+/* -------------------------------------------------------------------------
+   Auto-hide nav bar when more than one tab is open
+   ------------------------------------------------------------------------- */
+
+/* The urlbar promotes itself to its own compositor layer
+   (will-change: translate); that layer can leave a stale unclickable copy
+   behind when the toolbar is clipped/faded. Force it back into normal
+   painting so it disappears with the rest of the nav bar. */
+#nav-bar .urlbar {
+    will-change: auto !important;
+}
+
+/* Collapsed = >1 tab AND not hovering toolbox AND nothing focused inside
+   AND none of its own menus/panels currently open.
+   The hidden styles live in the keyframes; the 0s-duration animation with
+   a 200ms delay keeps everything visible during the grace period and applies
+   them all at once, fully synced. */
+@keyframes uc-navbar-collapse {
+    to {
+        position: relative;
+        min-height: 0;
+        max-height: 0;
+        padding-block: 0;
+        border: 0;
+        overflow: hidden;
+        opacity: 0;
+        pointer-events: none;
+    }
+}
+
+#navigator-toolbox:not(:hover)
+    #nav-bar:not(:focus-within):not(:has([open])) {
+    animation: uc-navbar-collapse 0s linear 200ms forwards !important;
+}
+
+/* While collapsed, neutralize every rendering mode the urlbar can escape
+   with - using opacity, NOT display:none:
+   - :popover-open -> expanded urlbar lives in the top layer, which ignores
+     ancestor clipping/opacity entirely (this is the "ghost")
+   - [breakout] -> absolutely positioned breakout copy
+   display:none would make the urlbar unfocusable, which breaks the
+   automatic focus a new tab gives the urlbar; opacity keeps it focusable
+   so :focus-within can kick in and reveal it. */
+#navigator-toolbox:not(:hover)
+    #nav-bar:not(:focus-within):not(:has([open]))
+    .urlbar:popover-open,
+#navigator-toolbox:not(:hover)
+    #nav-bar:not(:focus-within):not(:has([open]))
+    .urlbar[breakout] {
+    opacity: 0 !important;
+    pointer-events: none !important;
+    transition:
+        opacity 0s linear 200ms,
+        pointer-events 0s linear 200ms !important;
+}
+
+/* Revealed (hover or focus) = pushes page content down. Instant - cancels
+   the grace period above when it's still running. */
+#navigator-toolbox:hover
+    #nav-bar,
+#navigator-toolbox:not(:hover)
+    #nav-bar:focus-within,
+/* Keep it up while one of its menus/panels is open (XUL sets open="true"
+   on the anchoring button/menu, urlbar gets [open] while results show) */
+#navigator-toolbox
+    #nav-bar:has([open]) {
+    min-height: 0 !important;
+    max-height: none !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+    animation: none !important;
+    transition:
+        max-height 0s linear 0s,
+        opacity 0s linear 0s,
+        padding-block 0s linear 0s,
+        pointer-events 0s linear 0s !important;
+}
