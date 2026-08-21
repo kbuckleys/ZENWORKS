@@ -121,6 +121,25 @@ https://github.com/kbuckleys/ */
     padding: 0 !important;
 }
 
+/* Separator glyph between tabs - centered exactly on the boundary line */
+#tabbrowser-tabs .tabbrowser-tab:not(:first-child)::after {
+    content: "\e621";
+    position: absolute;
+    top: 50%;
+    left: 0;
+    translate: -50% -50%;
+    font-size: var(--tab-min-height);
+    line-height: 1;
+    opacity: 0.4;
+    pointer-events: none;
+}
+
+/* Let the half of the separator that extends past the tab's edge render
+   (tabs use overflow: clip; without extra margin the outer half is cut) */
+#tabbrowser-tabs .tabbrowser-tab {
+    overflow-clip-margin: calc(var(--tab-min-height) / 2 + 4px) !important;
+}
+
 /* -------------------------------------------------------------------------
    Center tab labels in Firefox Nova
    ------------------------------------------------------------------------- */
