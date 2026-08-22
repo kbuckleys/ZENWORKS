@@ -60,7 +60,7 @@ if [ "$vendor" = "0x10de" ]; then
   [ -n "$fan" ] && [ "$fan" -gt 0 ] && tooltip="$tooltip\nFan: ${fan}%"
   [ -n "$pciegen" ] && tooltip="$tooltip\nPCIe: ${pciegen} ${pciewidth}"
 
-  text=" <span foreground='#a2a8bc'>GPU</span> ${util}% ${temp}° "
+  text=" <span foreground='#9bbfbf'>GPU</span> ${util}% ${temp}° "
 
 elif [ "$vendor" = "0x1002" ] || [ "$vendor" = "0x8086" ]; then
 
@@ -104,9 +104,9 @@ elif [ "$vendor" = "0x1002" ] || [ "$vendor" = "0x8086" ]; then
   [ -n "$pdraw" ] && tooltip="$tooltip\nPower: ${pdraw}W"
 
   if [ -n "$temp" ] && [ "$temp" -gt 0 ]; then
-    text=" <span foreground='#a2a8bc'>GPU</span> ${util}% ${temp}° "
+    text=" <span foreground='#9bbfbf'>GPU</span> ${util}% ${temp}° "
   else
-    text=" <span foreground='#a2a8bc'>GPU</span> ${util}% "
+    text=" <span foreground='#9bbfbf'>GPU</span> ${util}% "
   fi
 
 else

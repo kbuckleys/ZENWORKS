@@ -404,16 +404,26 @@ function onThumbsDone() {
         width: parent.width
         height: parent.height - msgBar.height
 
-        Text {
-          id: emptyLabel
-          anchors.centerIn: parent
-          text: "No clipboard entries"
-          color: popup.hintColor
-          font.family: "JetBrainsMono Nerd Font Propo"
-          font.weight: 600
-          font.pixelSize: 13
-          visible: popup.shown && !popup.hasText && !popup.hasImg
-        }
+          Text {
+            id: emptyLabel
+            anchors.centerIn: parent
+            text: "No clipboard entries"
+            color: popup.hintColor
+            font.family: "JetBrainsMono Nerd Font Propo"
+            font.weight: 600
+            font.pixelSize: 13
+            visible: popup.shown && !popup.hasText && !popup.hasImg
+          }
+
+          Text {
+            anchors.centerIn: parent
+            text: "No matches found"
+            color: popup.hintColor
+            font.family: "JetBrainsMono Nerd Font Propo"
+            font.weight: 600
+            font.pixelSize: 15
+            visible: popup.shown && popup.mode === "text" && popup.rows.length === 0 && popup.hasText
+          }
 
         Item {
           id: textPane

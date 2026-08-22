@@ -33,10 +33,11 @@ Item {
     rightPadding: 4
 
     BarText {
-      text: root.connected
-          ? "󱞡 " + root.downText + " ~ " + root.upText + " 󱞿 "
+      src: root.connected
+          ? " <span foreground='#9bbfbf'>󱞡</span> " + root.downText + " <span foreground='#9bbfbf'>~</span> " + root.upText + " <span foreground='#9bbfbf'>󱞿</span> "
           : "󰱟 "
-      color: root.connected ? "#dfdfdd" : "#e78284"
+      styled: true
+      textColor: root.connected ? "#dfdfdd" : "#e78284"
     }
   }
 

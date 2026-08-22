@@ -399,11 +399,11 @@ PanelWindow {
           Text {
             id: emptyLabel
             anchors.centerIn: parent
-            text: "No files found"
+            text: "No matches found"
             color: popup.hintColor
             font.family: "JetBrainsMono Nerd Font Propo"
             font.weight: 600
-            font.pixelSize: 13
+            font.pixelSize: 15
             visible: popup.shown && popup.rows.length === 0
           }
 

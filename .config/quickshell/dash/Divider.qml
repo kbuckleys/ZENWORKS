@@ -8,18 +8,20 @@ import "."
 
 Item {
   id: root
-  implicitWidth: row.implicitWidth
+  implicitWidth: 9
   implicitHeight: 32
 
-  Row {
-    id: row
-    anchors.verticalCenter: parent.verticalCenter
-    leftPadding: 8
-    rightPadding: 8
-
-    BarText {
-      text: "󰇙"
-      color: "#dfdfdd"
+  Column {
+    anchors.centerIn: parent
+    spacing: 3
+    Repeater {
+      model: 6
+      Rectangle {
+        width: 1
+        height: 2
+        radius: 1
+        color: "#6a707f"
+      }
     }
   }
 }

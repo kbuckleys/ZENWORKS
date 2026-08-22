@@ -483,12 +483,12 @@ PanelWindow {
               ? "failed to fetch icons from nerdfonts.com"
               : popup.appMode === "nerd" && popup.nerdLoading
                 ? "fetching icons…"
-                : "nothing found"
+                : "No matches found"
             color: popup.nerdFailed && popup.appMode === "nerd"
               ? popup.errColor : popup.dimColor
             font.family: "JetBrainsMono Nerd Font Propo"
             font.weight: 600
-            font.pixelSize: 14
+            font.pixelSize: 15
           }
 
           GridView {

@@ -33,11 +33,8 @@ PanelWindow {
 
   readonly property real targetX: {
     if (!barWin || !anchorItem) return 0;
-    const p = barWin.contentItem.mapFromItem(
-        anchorItem,
-        anchorItem.width / 2 - popup.implicitWidth / 2,
-        0);
-    return p.x;
+    const p = anchorItem.mapToItem(barWin.contentItem, anchorItem.width / 2, 0);
+    return p.x - popup.implicitWidth / 2;
   }
 
   margins.left: !barWin || !popup.screen ? 0 :

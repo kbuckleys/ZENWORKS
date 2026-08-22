@@ -44,6 +44,7 @@ PanelWindow {
 
   // dictionary state
   property string dictQuery: ""
+  property string query: ""
   property bool dictLoading: false
   property int lookupSeq: 0
   property var dictResult: null
@@ -565,20 +566,40 @@ PanelWindow {
   // -------------------------------------------------------- history --
 
   function historyModel() {
-    if (popup.appMode === "dict") return popup.dictHist;
-    return popup.transHist.map((e) => Lexicon.transHistoryRow(e));
+    if (popup.view !== "history") {
+      // outside history return display strings so histList delegate (text: modelData)
+      // never receives a QVariantMap -> QML warnings. Length still reflects
+      // underlying history size.
+      if (popup.appMode === "dict") return popup.dictHist.slice();
+      return popup.transHist.map((e) => Lexicon.transHistoryRow(e));
+    }
+    const q = (popup.query || "").toLowerCase();
+    if (popup.appMode === "dict") {
+      if (!q) return popup.dictHist.filter((w) => typeof w === "string");
+      return popup.dictHist.filter((w) =>
+        typeof w === "string" && w.toLowerCase().indexOf(q) >= 0);
+    }
+    const rows = popup.transHist.map((e) => Lexicon.transHistoryRow(e));
+    if (!q) return rows;
+    return rows.filter((s) => s.toLowerCase().indexOf(q) >= 0);
   }
 
   function deleteSelected() {
     if (popup.view !== "history") return;
     if (popup.appMode === "dict") {
-      if (popup.sel >= popup.dictHist.length) return;
-      popup.dictHist = Lexicon.removeDictHistory(popup.dictHist, popup.dictHist[popup.sel]);
+      const filtered = popup.historyModel();
+      if (popup.sel >= filtered.length) return;
+      const word = filtered[popup.sel];
+      popup.dictHist = Lexicon.removeDictHistory(popup.dictHist, word);
       popup.writeFile(Lexicon.dictHistoryPath(),
         Lexicon.serializeDictHistory(popup.dictHist));
     } else {
-      if (popup.sel >= popup.transHist.length) return;
-      const e = popup.transHist[popup.sel];
+      const q = (popup.query || "").toLowerCase();
+      const filtered = q === ""
+        ? popup.transHist.slice()
+        : popup.transHist.filter((e) => Lexicon.transHistoryRow(e).toLowerCase().indexOf(q) >= 0);
+      if (popup.sel >= filtered.length) return;
+      const e = filtered[popup.sel];
       popup.transHist = Lexicon.removeTransHistory(popup.transHist, e.code, e.text);
       popup.writeFile(Lexicon.transHistoryPath(),
         Lexicon.serializeTransHistory(popup.transHist));
@@ -588,11 +609,16 @@ PanelWindow {
 
   function activateHistory() {
     if (popup.appMode === "dict") {
-      if (popup.sel >= popup.dictHist.length) return;
-      popup.startLookup(popup.dictHist[popup.sel]);
+      const filtered = popup.historyModel();
+      if (popup.sel >= filtered.length) return;
+      popup.startLookup(filtered[popup.sel]);
     } else {
-      if (popup.sel >= popup.transHist.length) return;
-      popup.retranslateHistory(popup.transHist[popup.sel]);
+      const q = (popup.query || "").toLowerCase();
+      const filtered = q === ""
+        ? popup.transHist.slice()
+        : popup.transHist.filter((e) => Lexicon.transHistoryRow(e).toLowerCase().indexOf(q) >= 0);
+      if (popup.sel >= filtered.length) return;
+      popup.retranslateHistory(filtered[popup.sel]);
     }
   }
 
@@ -622,6 +648,7 @@ PanelWindow {
       if (popup.appMode === "dict") {
         const q = wordInput.text.trim();
         if (q === "") {
+          popup.query = "";
           popup.view = "history";
           popup.sel = 0;
           popup.clampSel();
@@ -632,6 +659,7 @@ PanelWindow {
       } else {
         const t = popup.transText.trim();
         if (!Lexicon.hasContent(t)) {
+          popup.query = "";
           popup.view = "history";
           popup.sel = 0;
           popup.clampSel();
@@ -647,6 +675,7 @@ PanelWindow {
     } else {
       // dict results: Return opens the look-up history
       popup.stopAudio();
+      popup.query = "";
       popup.view = "history";
       popup.sel = 0;
       popup.clampSel();
@@ -657,6 +686,7 @@ PanelWindow {
   function goBack() {
     popup.stopAudio();
     // leaving an output screen starts a fresh query
+    popup.query = "";
     popup.dictQuery = "";
     wordInput.text = "";
     popup.dictResult = null;
@@ -763,6 +793,7 @@ PanelWindow {
               id: wordInput
               anchors.fill: parent
               horizontalAlignment: TextInput.AlignHCenter
+              onTextChanged: popup.query = text
               verticalAlignment: TextInput.AlignVCenter
               color: popup.headColor
               selectionColor: popup.headColor
@@ -872,9 +903,15 @@ PanelWindow {
               }
               Keys.priority: Keys.BeforeItem
               Keys.onPressed: (event) => {
-                if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter)) {
                   event.accepted = true;
                   popup.translateReturnKey(event.modifiers & Qt.ShiftModifier);
+                  return;
+                }
+                if (event.key === Qt.Key_Backspace &&
+                    popup.view === "history" && !tArea.text) {
+                  event.accepted = true;
+                  popup.goBack();
                 }
               }
               Keys.onTabPressed: (event) => {
@@ -1358,6 +1395,7 @@ PanelWindow {
         if (popup.view === "input" && popup.appMode === "trans") {
           // shift picks the output language, plain speaks it
           if (!Lexicon.hasContent(popup.transText)) {
+            popup.query = "";
             popup.view = "history";
             popup.sel = 0;
             popup.clampSel();
@@ -1390,7 +1428,14 @@ PanelWindow {
       } else if (event.key === Qt.Key_Backspace &&
                  (popup.view === "results" || popup.view === "history")) {
         event.accepted = true;
-        popup.goBack();
+        if (popup.view === "history" && popup.query.length > 0) {
+          const chars = Array.from(popup.query);
+          chars.pop();
+          popup.query = chars.join("");
+          popup.clampSel();
+        } else {
+          popup.goBack();
+        }
       } else if (event.key === Qt.Key_Delete && popup.view === "history") {
         event.accepted = true;
         popup.deleteSelected();
@@ -1408,6 +1453,16 @@ PanelWindow {
                  (popup.view === "picker" || popup.view === "history")) {
         event.accepted = true;
         popup.moveSel(8);
+      } else if (popup.view === "history" && event.text && event.text.length > 0 &&
+                 !(event.modifiers & Qt.ControlModifier) &&
+                 !(event.modifiers & Qt.AltModifier) &&
+                 !(event.modifiers & Qt.MetaModifier) &&
+                 event.key !== Qt.Key_Escape && event.key !== Qt.Key_Return &&
+                 event.key !== Qt.Key_Enter && event.key !== Qt.Key_Tab &&
+                 event.key !== Qt.Key_Backspace && event.key !== Qt.Key_Delete) {
+        event.accepted = true;
+        popup.query += event.text;
+        popup.clampSel();
       }
     }
   }

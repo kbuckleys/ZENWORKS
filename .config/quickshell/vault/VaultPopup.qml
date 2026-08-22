@@ -541,6 +541,20 @@ PanelWindow {
             }
           }
 
+          Item {
+            width: parent.width
+            height: popup.filtered.length === 0 ? 40 : 0
+            Text {
+              anchors.centerIn: parent
+              visible: popup.filtered.length === 0
+              text: "No matches found"
+              color: popup.dimColor
+              font.family: "JetBrainsMono Nerd Font Propo"
+              font.weight: 600
+              font.pixelSize: 15
+            }
+          }
+
           GridView {
             id: list
             width: parent.width
@@ -571,6 +585,7 @@ PanelWindow {
                 anchors.right: parent.right
                 anchors.rightMargin: 8
                 text: {
+                  if (!entry) return "";
                   const pref = entry.folder
                     ? "<span style=\"color:" + popup.dimColor + ";\">" +
                       Vault.escapeHtml(entry.folder) + "  ›  </span>" : "";
@@ -924,13 +939,14 @@ PanelWindow {
   // -------------------------------------------------------- helpers --
 
   function listHeight() {
+    if (popup.filtered.length === 0) return 0;
     const needed = Math.ceil(popup.filtered.length / popup.effCols);
     return Math.max(1, Math.min(needed, popup.visibleRows)) * popup.cellH;
   }
 
   function calcHeight() {
     if (popup.mode === "list")
-      return (popup.query.length > 0 ? 50 : 0) + popup.listHeight() + 58;
+      return (popup.query.length > 0 ? 50 : 0) + (popup.filtered.length === 0 ? 40 : popup.listHeight()) + 58;
     if (popup.mode === "actions")
       return 2 + 56 + 2 + 48 + 26;
     if (popup.mode === "error")

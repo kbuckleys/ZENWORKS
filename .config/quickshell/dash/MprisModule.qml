@@ -24,7 +24,8 @@ Item {
   Row {
     id: row
     anchors.verticalCenter: parent.verticalCenter
-    leftPadding: 18
+    leftPadding: root.visible ? 4 : 0
+    rightPadding: root.visible ? 4 : 0
 
     BarText {
       id: label
@@ -34,6 +35,13 @@ Item {
       }
       color: "#9bbfbf"
     }
+  }
+
+  property bool hovered: mouse.containsMouse
+  property string mprisTooltipText: {
+    if (!root.player) return "";
+    const parts = [root.title, root.artist, root.album].filter((s) => s && s !== "");
+    return parts.join("\n");
   }
 
   MouseArea {
@@ -58,16 +66,6 @@ Item {
         else Quickshell.execDetached(["playerctl", "play-pause"]);
       }
     }
-  }
-
-  Tooltip {
-    anchorItem: root
-    text: {
-      if (!root.player) return "";
-      const parts = [root.title, root.artist, root.album].filter((s) => s && s !== "");
-      return parts.join("\n");
-    }
-    show: mouse.containsMouse && root.player !== null
   }
 
   Timer {

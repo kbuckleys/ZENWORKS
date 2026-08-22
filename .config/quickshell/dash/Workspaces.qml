@@ -39,6 +39,31 @@ Item {
     anchors.verticalCenter: parent.verticalCenter
     leftPadding: 4
 
+    Item {
+      id: special
+      visible: root.specialWorkspace !== null
+      width: specialLabel.implicitWidth + 14
+      height: 32
+
+      BarText {
+        id: specialLabel
+        anchors.centerIn: parent
+        text: "\uF2D2 "
+        color: root.specialFocused ? "#e78284" : "#9bbfbf"
+      }
+
+      MouseArea {
+        anchors.fill: parent
+        cursorShape: Qt.PointingHandCursor
+        onClicked: {
+          var sp = root.specialWorkspace !== null
+              ? root.specialWorkspace.name.replace(/^special:/, "")
+              : root.specialName;
+          Hyprland.dispatch('hl.dsp.workspace.toggle_special("' + sp + '")');
+        }
+      }
+    }
+
     Repeater {
       model: Hyprland.workspaces
 
@@ -67,37 +92,6 @@ Item {
           onClicked: {
             Hyprland.dispatch('hl.dsp.focus({ workspace = "' + modelData.name + '" })');
           }
-        }
-      }
-    }
-
-    Item {
-      width: 8
-      height: 32
-      visible: root.specialWorkspace !== null
-    }
-
-    Item {
-      id: special
-      visible: root.specialWorkspace !== null
-      width: label.implicitWidth + 14
-      height: 32
-
-      BarText {
-        id: label
-        anchors.centerIn: parent
-        text: " "
-        color: root.specialFocused ? "#e78284" : "#eebebe"
-      }
-
-      MouseArea {
-        anchors.fill: parent
-        cursorShape: Qt.PointingHandCursor
-        onClicked: {
-          var sp = root.specialWorkspace !== null
-              ? root.specialWorkspace.name.replace(/^special:/, "")
-              : root.specialName;
-          Hyprland.dispatch('hl.dsp.workspace.toggle_special("' + sp + '")');
         }
       }
     }

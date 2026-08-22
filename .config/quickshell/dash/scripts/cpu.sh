@@ -80,7 +80,7 @@ tooltip="$tooltip\n\nUsage: ${total_usage}%\n\nPer Core:"
 tooltip="$tooltip\n$cores"
 tooltip="$(printf '%b' "$tooltip")"
 
-text=" <span foreground='#a2a8bc'>CPU</span>  ${total_usage}% "
+text=" <span foreground='#9bbfbf'>CPU</span>  ${total_usage}% "
 
 jq -nc --argjson usage "$total_usage" --arg text "$text" --arg tooltip "$tooltip" \
   '{usage: $usage, text: $text, tooltip: $tooltip}'

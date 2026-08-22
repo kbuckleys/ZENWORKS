@@ -26,7 +26,7 @@ Item {
     rightPadding: 4
 
     BarText {
-      src: " <span foreground='#a2a8bc'>RAM</span> " + Helpers.format1f(root.used)
+      src: " <span foreground='#9bbfbf'>RAM</span> " + Helpers.format1f(root.used)
       styled: true
       color: "#dfdfdd"
     }

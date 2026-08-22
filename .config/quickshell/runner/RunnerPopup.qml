@@ -525,27 +525,28 @@ property var statusbar: null
         }
       }
 
-      Keys.onEscapePressed: {
+      Keys.onEscapePressed: (event) => {
+        event.accepted = true;
         if (popup.mode === "picker") popup.backToSearch();
         else popup.closeRunner();
       }
-      Keys.onReturnPressed: {
+      Keys.onReturnPressed: (event) => {
         event.accepted = true;
         popup.confirm();
       }
-      Keys.onTabPressed: {
+      Keys.onTabPressed: (event) => {
         event.accepted = true;
         popup.autocomplete();
       }
-      Keys.onBacktabPressed: {
+      Keys.onBacktabPressed: (event) => {
         event.accepted = true;
         popup.moveSel(-1);
       }
-      Keys.onLeftPressed: popup.moveSel(-1)
-      Keys.onRightPressed: popup.moveSel(1)
-      Keys.onUpPressed: popup.moveSel(-1)
-      Keys.onDownPressed: popup.moveSel(1)
-      Keys.onPressed: {
+      Keys.onLeftPressed: (event) => popup.moveSel(-1)
+      Keys.onRightPressed: (event) => popup.moveSel(1)
+      Keys.onUpPressed: (event) => popup.moveSel(-1)
+      Keys.onDownPressed: (event) => popup.moveSel(1)
+      Keys.onPressed: (event) => {
         if (event.key === Qt.Key_Delete) {
           event.accepted = true;
           popup.deleteSelected();
