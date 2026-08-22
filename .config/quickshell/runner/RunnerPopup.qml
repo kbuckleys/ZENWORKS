@@ -527,8 +527,13 @@ property var statusbar: null
 
       Keys.onEscapePressed: (event) => {
         event.accepted = true;
-        if (popup.mode === "picker") popup.backToSearch();
-        else popup.closeRunner();
+        if (popup.mode === "picker") {
+          popup.backToSearch();
+        } else if (input.text !== "") {
+          input.text = "";
+        } else {
+          popup.closeRunner();
+        }
       }
       Keys.onReturnPressed: (event) => {
         event.accepted = true;
@@ -547,7 +552,10 @@ property var statusbar: null
       Keys.onUpPressed: (event) => popup.moveSel(-1)
       Keys.onDownPressed: (event) => popup.moveSel(1)
       Keys.onPressed: (event) => {
-        if (event.key === Qt.Key_Delete) {
+        if ((event.key === Qt.Key_C) && (event.modifiers & Qt.AltModifier)) {
+          event.accepted = true;
+          input.text = "";
+        } else if (event.key === Qt.Key_Delete) {
           event.accepted = true;
           popup.deleteSelected();
         } else if (event.key === Qt.Key_Return && (event.modifiers & Qt.AltModifier)) {

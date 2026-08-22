@@ -14,13 +14,20 @@ function escapeHtml(s) {
 // Red multi-select ballot (JetBrainsMono Nerd Font, U+F09FC)
 const BALLOT = "\uDB82\uDDFC";
 
-// ps -eo pid=,user=,pcpu=,pmem=,args= --sort=-pcpu
+function formatMemKb(kb) {
+  const v = parseInt(kb, 10);
+  if (isNaN(v)) return kb;
+  if (v >= 1048576) return (v / 1048576).toFixed(1) + "G";
+  return Math.round(v / 1024) + "M";
+}
+
+// ps -eo pid=,user=,pcpu=,rss=,args= --sort=-pcpu (rss in KiB)
 function parseProcesses(text) {
   const rows = [];
   for (const line of String(text).split("\n")) {
     const m = line.match(/^\s*(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(.*)$/);
     if (m && m[1] && m[5] !== "") {
-      rows.push({ pid: m[1], user: m[2], cpu: m[3], mem: m[4], args: m[5] });
+      rows.push({ pid: m[1], user: m[2], cpu: m[3], mem: formatMemKb(m[4]), args: m[5] });
     }
   }
   return rows;
@@ -30,7 +37,7 @@ function parseProcesses(text) {
 function display(r) {
   return r.pid.padStart(6) + " " + r.user.padEnd(9) +
     (r.cpu + "%").padStart(6) + " " +
-    (r.mem + "%").padStart(5) + "  " + r.args;
+    r.mem.padStart(5) + "  " + r.args;
 }
 
 function filterRows(rows, query) {

@@ -1381,6 +1381,12 @@ PanelWindow {
         popup.syncFocus();
       } else if (popup.view === "history" || popup.view === "results") {
         popup.goBack();
+      } else if (popup.view === "input" && popup.appMode === "dict" && wordInput.text !== "") {
+        wordInput.text = "";
+      } else if (popup.view === "input" && popup.appMode === "trans" && tArea.text !== "") {
+        tArea.text = "";
+        popup.transText = "";
+        popup.live = null;
       } else {
         popup.closePopup();
       }
@@ -1411,6 +1417,10 @@ PanelWindow {
         } else {
           popup.handleReturn();
         }
+      } else if (event.key === Qt.Key_C && (event.modifiers & Qt.AltModifier) &&
+          popup.view === "input" && popup.appMode === "dict") {
+        event.accepted = true;
+        wordInput.text = "";
       } else if (event.key === Qt.Key_C && (event.modifiers & Qt.AltModifier) &&
           popup.view === "input" && popup.appMode === "trans") {
         event.accepted = true;

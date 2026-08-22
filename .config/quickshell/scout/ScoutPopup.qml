@@ -530,7 +530,11 @@ PanelWindow {
 
       Keys.onEscapePressed: (event) => {
         event.accepted = true;
-        popup.closePopup();
+        if (searchInput.text !== "") {
+          searchInput.text = "";
+        } else {
+          popup.closePopup();
+        }
       }
       Keys.onReturnPressed: (event) => {
         event.accepted = true
@@ -555,7 +559,9 @@ PanelWindow {
           popup.goEnd()
         } else if ((event.modifiers & Qt.AltModifier) && event.key === Qt.Key_C) {
           event.accepted = true
-          if (popup.rows.length > 0) {
+          if (searchInput.text !== "") {
+            searchInput.text = "";
+          } else if (popup.rows.length > 0) {
             const path = popup.rows[popup.sel].path
             Quickshell.execDetached(["sh", "-c", "printf '%s' " + Scout.shellQuote(path) + " | wl-copy 2>/dev/null"])
             popup.flashSrc = path

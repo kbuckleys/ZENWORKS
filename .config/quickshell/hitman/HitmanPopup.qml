@@ -119,7 +119,7 @@ PanelWindow {
     const row = popup.filtered[popup.sel];
     popup.pinnedPid = row ? row.pid : "";
     psProc.command = ["sh", "-c",
-      "ps -eo pid=,user=,pcpu=,pmem=,args= --sort=-pcpu"];
+      "ps -eo pid=,user=,pcpu=,rss=,args= --sort=-pcpu"];
     psProc.running = true;
   }
 
@@ -389,15 +389,21 @@ PanelWindow {
       focus: true
       Keys.onEscapePressed: (event) => {
         event.accepted = true;
-        if (popup.mode === "list") popup.closePopup();
-        else popup.goBack();
+        if (popup.mode === "list" && Object.keys(popup.selected).length > 0) {
+          popup.selected = {};
+        } else if (popup.mode === "list") {
+          popup.closePopup();
+        } else {
+          popup.goBack();
+        }
       }
 
       Keys.onPressed: (event) => {
         if (popup.mode === "list") {
           if (event.key === Qt.Key_C && (event.modifiers & Qt.AltModifier)) {
             event.accepted = true;
-            popup.selected = {};
+            if (filterInput.text !== "") filterInput.clear();
+            else popup.selected = {};
           } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
             event.accepted = true;
             if (event.modifiers & Qt.ShiftModifier) popup.toggleBallot();
@@ -499,13 +505,6 @@ PanelWindow {
                   cursorVisible: activeFocus
                   cursorDelegate: Item {}
                   clip: true
-                  Keys.priority: Keys.BeforeItem
-                  Keys.onPressed: (event) => {
-                    if (event.key === Qt.Key_Backspace) {
-                      event.accepted = true;
-                      filterInput.clear();
-                    }
-                  }
                   Keys.forwardTo: bgRoot
 
                   Rectangle {
@@ -580,7 +579,7 @@ PanelWindow {
                 width: parent.width * 0.075; height: 26
                 verticalAlignment: Text.AlignVCenter
                 horizontalAlignment: Text.AlignRight
-                text: "MEM"
+                text: "RAM"
                 color: popup.dimColor
                 font.family: "JetBrainsMono Nerd Font"
                 font.pixelSize: 12
@@ -691,7 +690,7 @@ PanelWindow {
                 DataCell {
                   width: parent.width * 0.075
                   horizontalAlignment: Text.AlignRight
-                  text: Hitman.highlight(modelData.mem + "%", popup.query)
+                  text: Hitman.highlight(modelData.mem, popup.query)
                   color: index === popup.sel ? popup.errColor : popup.fgColor
                 }
                 DataCell {

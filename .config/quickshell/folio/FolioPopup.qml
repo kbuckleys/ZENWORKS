@@ -599,7 +599,12 @@ function onThumbsDone() {
 
     Keys.onEscapePressed: (event) => {
       event.accepted = true;
-      popup.closePopup();
+      if (filter.text !== "") {
+        filter.text = "";
+        popup.query = "";
+      } else {
+        popup.closePopup();
+      }
     }
 
     Keys.onReturnPressed: (event) => {
@@ -624,13 +629,20 @@ function onThumbsDone() {
     Keys.onDownPressed: (event) => { event.accepted = true; popup.moveVert(1); }
 
     Keys.onPressed: (event) => {
-      if (event.key === Qt.Key_Delete) {
+      if ((event.key === Qt.Key_C) && (event.modifiers & Qt.AltModifier)) {
+        event.accepted = true;
+        filter.text = "";
+        popup.query = "";
+      } else if (event.key === Qt.Key_Delete) {
         event.accepted = true;
         popup.deleteSelected();
       } else if (event.key === Qt.Key_Backspace) {
         event.accepted = true;
-        popup.query = "";
-        filter.text = "";
+        if (filter.text.length > 0) {
+          const chars = Array.from(filter.text);
+          chars.pop();
+          filter.text = chars.join("");
+        }
       } else if (event.key === Qt.Key_Home) {
         event.accepted = true;
         popup.goHome();

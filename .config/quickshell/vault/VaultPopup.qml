@@ -861,7 +861,9 @@ PanelWindow {
 
   Keys.onEscapePressed: (event) => {
     event.accepted = true;
-    if (popup.mode === "list") popup.closePopup();
+    if (popup.mode === "list" && filterInput.text !== "") {
+      filterInput.text = "";
+    } else if (popup.mode === "list") popup.closePopup();
     else if (popup.mode === "error") popup.openActions();
     else popup.goBack();
   }
@@ -878,6 +880,11 @@ PanelWindow {
         event.accepted = true;
         popup.closePopup();
         popup.detach("rbw lock");
+        return;
+      }
+      if ((event.key === Qt.Key_C) && (event.modifiers & Qt.AltModifier)) {
+        event.accepted = true;
+        filterInput.text = "";
         return;
       }
       if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {

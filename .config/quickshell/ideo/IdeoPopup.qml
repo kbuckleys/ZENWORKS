@@ -428,12 +428,10 @@ PanelWindow {
 
                 Keys.priority: Keys.BeforeItem
                 Keys.onPressed: (event) => {
-                  if (event.key === Qt.Key_Backspace) {
+                  if (event.key === Qt.Key_Backspace && popup.formatMode) {
                     event.accepted = true;
-                    if (popup.formatMode) {
-                      popup.formatMode = false;
-                      popup.syncFocus();
-                    } else filterInput.clear();
+                    popup.formatMode = false;
+                    popup.syncFocus();
                   } else if (event.key === Qt.Key_Tab) {
                     event.accepted = true;
                     popup.toggleMode();
@@ -627,12 +625,19 @@ PanelWindow {
       if (popup.formatMode) {
         popup.formatMode = false;
         popup.syncFocus();
+      } else if (filterInput.text !== "") {
+        filterInput.text = "";
       } else {
         popup.closePopup();
       }
     }
 
     Keys.onPressed: (event) => {
+      if ((event.key === Qt.Key_C) && (event.modifiers & Qt.AltModifier)) {
+        event.accepted = true;
+        filterInput.text = "";
+        return;
+      }
       if (event.key === Qt.Key_Tab) {
         event.accepted = true;
         popup.toggleMode();

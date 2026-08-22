@@ -285,7 +285,12 @@ PanelWindow {
 
       Keys.onEscapePressed: (event) => {
         event.accepted = true;
-        popup.closePopup();
+        if (filterInput.text !== "") {
+          filterInput.clear();
+          popup.query = "";
+        } else {
+          popup.closePopup();
+        }
       }
 
       Keys.onPressed: (event) => {
