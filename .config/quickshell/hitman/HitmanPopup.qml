@@ -455,8 +455,7 @@ PanelWindow {
           Item {
             id: inputBar
             width: parent.width
-            height: popup.query.length > 0 ? 50 : 0
-            Behavior on height { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
+            height: 50
             clip: true
 
             Rectangle {
@@ -533,6 +532,7 @@ PanelWindow {
                     popup.query = filterInput.text;
                     popup.sel = 0;
                     popup.applyFilter();
+
                   }
                 }
               }
@@ -607,6 +607,21 @@ PanelWindow {
           }
 
           // process grid
+          Item {
+            width: parent.width
+            height: popup.filtered.length === 0 ? 40 : 0
+
+            Text {
+              anchors.centerIn: parent
+              visible: popup.filtered.length === 0
+              text: "No matches found"
+              color: popup.dimColor
+              font.family: "JetBrainsMono Nerd Font Propo"
+              font.weight: 600
+              font.pixelSize: 15
+            }
+          }
+
           GridView {
             id: grid
             width: parent.width
@@ -867,13 +882,14 @@ PanelWindow {
   // -------------------------------------------------------- helpers --
 
   function gridHeight() {
+    if (popup.filtered.length === 0) return 0;
     const needed = Math.ceil(popup.filtered.length / popup.cols);
     return Math.max(1, Math.min(needed, popup.visibleRows)) * popup.cellH;
   }
 
   function calcHeight() {
     if (popup.mode === "list")
-      return (popup.query.length > 0 ? 50 : 0) + 26 + popup.gridHeight() + 58;
+      return 50 + 26 + (popup.filtered.length === 0 ? 40 : popup.gridHeight()) + 58;
     if (popup.mode === "confirm")
       return 52 + 42;
     return 122;
