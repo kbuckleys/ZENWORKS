@@ -15,3 +15,5 @@ MprisModule 1.0 MprisModule.qml
 PulseAudioModule 1.0 PulseAudioModule.qml
 ClockModule 1.0 ClockModule.qml
 StatusModule 1.0 StatusModule.qml
+Sparkline 1.0 Sparkline.qml
+NotificationModule 1.0 NotificationModule.qml

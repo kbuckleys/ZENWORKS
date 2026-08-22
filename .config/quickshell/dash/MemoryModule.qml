@@ -18,6 +18,15 @@ Item {
   property real swapTotal: 0
   property real swapFree: 0
   property string tooltipText: ""
+  property var history: []
+  property int usage: 0
+
+  function pushHistory(v) {
+    const h = root.history.slice();
+    h.push(Math.max(0, Math.min(100, v)));
+    if (h.length > 30) h.shift();
+    root.history = h;
+  }
 
   Row {
     id: row
@@ -45,6 +54,17 @@ Item {
     anchorItem: root
     text: root.tooltipText
     show: mouse.containsMouse && root.total > 0
+    history: root.history
+    historyLineColor: {
+      if (root.usage >= 90) return "#e78284";
+      if (root.usage >= 50) return "#e0d8a4";
+      return "#9bbfbf";
+    }
+    historyFillColor: {
+      if (root.usage >= 90) return "#e78284";
+      if (root.usage >= 50) return "#e0d8a4";
+      return "#9bbfbf";
+    }
   }
 
   Timer {
@@ -80,6 +100,9 @@ Item {
           "SWAP Total: " + Helpers.format1f(Helpers.giB(root.swapTotal)) + "GiB\n" +
           "SWAP Used: " + Helpers.format1f(root.swapUsed) + "GiB\n" +
           "SWAP Available: " + Helpers.format1f(Helpers.giB(root.swapFree)) + "GiB";
+      const pct = root.total > 0 ? Math.round((root.total - root.avail) / root.total * 100) : 0;
+      root.usage = pct;
+      root.pushHistory(pct);
     }
   }
 }

@@ -31,7 +31,7 @@ Item {
       id: label
       text: {
         if (!root.player) return "";
-        return root.player.isPlaying ? "" : "";
+        return root.player.isPlaying ? "\uF04B" : "\uF04C";
       }
       color: "#9bbfbf"
     }

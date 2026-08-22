@@ -21,7 +21,7 @@ if [ -z "$card" ]; then
 fi
 
 if [ -z "$card" ]; then
-  printf '{"text":"","tooltip":""}\n'
+  printf '{"util":0,"text":"","tooltip":""}\n'
   exit 0
 fi
 
@@ -30,7 +30,7 @@ vendor="$(cat "$card/device/vendor" 2>/dev/null)"
 if [ "$vendor" = "0x10de" ]; then
 
   if ! command -v nvidia-smi >/dev/null 2>&1; then
-    printf '{"text":"","tooltip":""}\n'
+    printf '{"util":0,"text":"","tooltip":""}\n'
     exit 0
   fi
 
@@ -110,10 +110,10 @@ elif [ "$vendor" = "0x1002" ] || [ "$vendor" = "0x8086" ]; then
   fi
 
 else
-  printf '{"text":"","tooltip":""}\n'
+  printf '{"util":0,"text":"","tooltip":""}\n'
   exit 0
 fi
 
 tooltip="$(printf '%b' "$tooltip")"
 
-jq -nc --arg text "$text" --arg tooltip "$tooltip" '{text: $text, tooltip: $tooltip}'
+jq -nc --argjson util "${util:-0}" --arg text "$text" --arg tooltip "$tooltip" '{util: $util, text: $text, tooltip: $tooltip}'

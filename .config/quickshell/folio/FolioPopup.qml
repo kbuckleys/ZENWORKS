@@ -597,7 +597,10 @@ function onThumbsDone() {
       }
     }
 
-    Keys.onEscapePressed: popup.closePopup()
+    Keys.onEscapePressed: (event) => {
+      event.accepted = true;
+      popup.closePopup();
+    }
 
     Keys.onReturnPressed: (event) => {
       event.accepted = true;
