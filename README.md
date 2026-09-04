@@ -8,3 +8,7 @@ A zen Arch-based ecosystem in Quickshell
 </p></h3>
 
 ---
+
+Dependencies
+-
+```jetbrains-mono-nerd``` ```ttf-dseg``` ```rsync```
