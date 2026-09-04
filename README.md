@@ -11,4 +11,4 @@ A zen Arch-based ecosystem in Quickshell
 
 Dependencies
 -
-```jetbrains-mono-nerd``` ```ttf-dseg``` ```rsync```
+```jetbrains-mono-nerd``` ```ttf-dseg``` ```rsync``` ```git```
