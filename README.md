@@ -11,6 +11,6 @@ A zen Arch-based ecosystem in Quickshell
 
 Dependencies
 -
-```jetbrains-mono-nerd``` ```ttf-dseg``` ```rsync``` ```git``` ```unicode-emoji``` ```rbw``` ```libqalculate```
+```quickshell``` ```jetbrains-mono-nerd``` ```ttf-dseg``` ```rsync``` ```git``` ```unicode-emoji``` ```rbw``` ```libqalculate```
 
-Remember to chmod the script files in ```/quickshell/scripts/```
+Remember to make the script files in ```/quickshell/scripts/``` executable
