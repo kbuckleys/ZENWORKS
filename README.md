@@ -11,6 +11,6 @@ A zen Arch-based ecosystem in Quickshell
 
 Dependencies
 -
-```quickshell``` ```jetbrains-mono-nerd``` ```ttf-dseg``` ```rsync``` ```git``` ```unicode-emoji``` ```rbw``` ```libqalculate```
+```quickshell``` ```jetbrains-mono-nerd``` ```ttf-dseg``` ```rsync``` ```git``` ```unicode-emoji``` ```rbw``` ```libqalculate``` ```bat``` ```poppler``` ```p7zip``` ```libarchive``` ```ripgrep``` ```fzf``` ```wl-clipboard``` ```cliphist``` ```grim``` ```playerctl``` ```libpulse``` ```bandwhich``` ```solaar``` ```waybar-updates```
 
 Remember to make the script files in ```/quickshell/scripts/``` executable
