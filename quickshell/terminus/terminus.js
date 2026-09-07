@@ -132,10 +132,23 @@ function basename(p) {
 // The path as a row of pieces, each carrying the path it leads to, so the
 // crumb bar is a set of jump targets rather than a label. Built here because
 // it is string work, and the window should only have to render it.
-function crumbs(path) {
-  const out = [{ label: "/", path: "/" }];
-  let at = "";
-  for (const part of String(path).split("/")) {
+// A PATH UNDER HOME IS WRITTEN FROM HOME. Nobody thinks of their downloads as
+// the third thing down the filesystem, and "/ home / buck" spent two of the
+// bar's steps — a good quarter of it on a shallow path — restating something
+// every step after it already implies. `~` is what they would have typed.
+//
+// Only when home is a REAL prefix and not merely a string one: /home/buckley
+// begins with /home/buck and is not inside it, which is what the trailing
+// slash in the test is for. The crumb still carries the full path, so clicking
+// it goes home rather than to a directory called "~".
+function crumbs(path, home) {
+  const p = String(path);
+  const h = String(home || "");
+  const under = h !== "" && (p === h || p.indexOf(h + "/") === 0);
+  const out = under ? [{ label: "~", path: h }]
+                    : [{ label: "/", path: "/" }];
+  let at = under ? h : "";
+  for (const part of (under ? p.slice(h.length) : p).split("/")) {
     if (part === "") continue;
     at += "/" + part;
     out.push({ label: part, path: at });
@@ -1147,6 +1160,27 @@ function conflictCommand(names, destDir) {
     "[ -e " + d + "/" + Strings.shellQuote(n) + " ] && printf '%s\\036' "
     + Strings.shellQuote(n));
   return tests.join("; ") + "; true";
+}
+
+// Whether the archive about to be written is already there, and what it would
+// be called if the one that is there is kept. Both answers in one scan, for
+// the reason conflictCommand exists: the archivers overwrite without a word.
+//
+// The extension is passed in rather than worked out, because an archive's is
+// not the part after the last dot — trimming ".tar.zst" by that rule gives
+// "name.tar (1).zst", which names the copy after a file type it is not.
+function archiveTargetCommand(destDir, name, ext) {
+  const d = Strings.shellQuote(destDir);
+  const n = Strings.shellQuote(name);
+  const e = Strings.shellQuote(ext);
+  // Silent when the name is free, so an ordinary archive costs one stat and
+  // asks nothing.
+  return "[ -e " + d + "/" + n + " ] || exit 0\n"
+    + "n=" + n + "; e=" + e + "; stem=${n%\"$e\"}\n"
+    + "[ -n \"$stem\" ] || stem=$n\n"
+    + "i=1\n"
+    + "while [ -e " + d + "/\"$stem ($i)$e\" ]; do i=$((i+1)); done\n"
+    + "printf '%s\\036%s\\036' \"$n\" \"$stem ($i)$e\"\n";
 }
 
 function parseConflicts(text) {

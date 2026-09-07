@@ -800,12 +800,25 @@ PanelWindow {
                 id: rowDrag
                 target: null
                 onActiveChanged: {
-                  if (active) {
-                    // region first, so the surface is already transparent by
-                    // the time the drag is offered
-                    popup.dragging = true
+                  if (!active) return
+                  // region first, so the surface is already transparent by
+                  // the time the drag is offered
+                  popup.dragging = true
+                  // WHAT YOU ARE CARRYING, drawn beside the cursor. Without it
+                  // a drag out of here was an invisible one: the popup gets out
+                  // of the way the moment the gesture starts, so between
+                  // picking a result up and dropping it there was nothing on
+                  // screen saying which result it was. terminus has said so
+                  // since it learned to drag, and this is the same card.
+                  //
+                  // The picture is made BEFORE the drag is offered, because
+                  // Drag.imageSource is read when Drag.active turns true and
+                  // grabToImage answers a frame later — set them the other way
+                  // round and every drag carries the previous one's picture.
+                  popup.dragPicture(row, function(url) {
+                    row.Drag.imageSource = url
                     row.Drag.active = true
-                  }
+                  })
                 }
               }
 
@@ -905,6 +918,79 @@ PanelWindow {
           }
         }
       }
+    }
+  }
+
+  // ── what a drag is carrying ───────────────────────────────────────────
+  // Off screen and never seen directly: it exists to be photographed. The
+  // labels are filled in, the picture is taken, and the drag carries the
+  // photograph.
+  property string dragLabel: ""
+  property string dragGlyph: ""
+  property color dragInk: Zenon.white
+  // The grab result is HELD, not discarded. It owns the image the compositor
+  // is still reading from; let it go and the drag can end up carrying nothing.
+  property var dragGrab: null
+
+  function dragPicture(row, then) {
+    const p = String(row.modelData.path || "")
+    const bare = row.modelData.isDir ? p.replace(/\/+$/, "") : p
+    const cut = bare.lastIndexOf("/")
+    // The NAME, not the path. A drag card is read at a glance beside a moving
+    // cursor, and the rest of the path is what the row behind it is already
+    // showing.
+    popup.dragLabel = cut < 0 ? bare : bare.slice(cut + 1)
+    popup.dragGlyph = row.glyph
+    popup.dragInk = row.modelData.isDir ? popup.dirColor : popup.fgColor
+    // A failed grab is not a reason to refuse the drag; it just goes without
+    // a picture, which is what it did before there was one.
+    if (!dragCard.grabToImage(function(res) { popup.dragGrab = res; then(res.url) }))
+      then("")
+  }
+
+  Item {
+    id: dragCard
+    opacity: 0
+    z: -100
+    x: -4000
+    height: 38
+
+    // SIZED FROM THE TEXT rather than from a laid-out row, and anchored rather
+    // than positioned, because grabToImage reads the width in the same tick the
+    // labels are filled in — a Row would not have set its own width yet, and
+    // the first drag of every session would carry a card cut to a few pixels.
+    readonly property real pad: 12
+    width: dragCard.pad * 2 + dragCardGlyph.implicitWidth
+      + (popup.dragGlyph !== "" ? 8 : 0) + dragCardLabel.implicitWidth
+
+    Rectangle {
+      anchors.fill: parent
+      radius: 6
+      color: Zenon.layerBg
+      border.width: 1
+      border.color: Zenon.cyan
+    }
+
+    Text {
+      id: dragCardGlyph
+      anchors.left: parent.left
+      anchors.leftMargin: dragCard.pad
+      anchors.verticalCenter: parent.verticalCenter
+      text: popup.dragGlyph
+      color: popup.dragInk
+      font.family: "JetBrainsMono Nerd Font"
+      font.pixelSize: 16
+    }
+
+    Text {
+      id: dragCardLabel
+      anchors.left: dragCardGlyph.right
+      anchors.leftMargin: popup.dragGlyph !== "" ? 8 : 0
+      anchors.verticalCenter: parent.verticalCenter
+      text: popup.dragLabel
+      color: Zenon.white
+      font.family: "JetBrainsMono Nerd Font Propo"
+      font.pixelSize: 15
     }
   }
 

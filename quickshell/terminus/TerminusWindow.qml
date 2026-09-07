@@ -459,6 +459,15 @@ FloatingWindow {
   // count, so resizing the window keeps the proportion you chose instead of
   // pinning one pane to a width and giving every new pixel to the other.
   property real paneFrac: 0.5
+  // Eased when the divider is SENT somewhere — a keyed step, the double-click
+  // back to even — and never while it is under the pointer. A behaviour left
+  // running through a drag puts the split a frame behind the mouse, which
+  // reads as the window resisting you rather than as smoothness. Exactly the
+  // rule the sidebar's own Behavior follows; see `side`.
+  Behavior on paneFrac {
+    enabled: !splitGrip.pressed
+    NumberAnimation { duration: Zenon.normal; easing.type: Zenon.ease }
+  }
   readonly property real paneMinFrac: 0.15
   readonly property real paneMaxFrac: 0.85
 
@@ -1193,6 +1202,13 @@ FloatingWindow {
       // a keystroke that changed nothing about what was in it — the flicker,
       // and the same one the pane exchange had.
       rows: root.rows,
+      // WHERE IT WAS SCROLLED TO, which is not the same as which row the
+      // cursor was on. A tab remembered `sel` and nothing else, and the view
+      // used to keep its offset across the switch by accident — the origin
+      // drifted instead of resetting, which is exactly the bug the rewind in
+      // syncView fixes. With the rewind honest about resetting, the offset has
+      // to be carried deliberately or every switch lands you at the top.
+      scroll: root.keepScroll(),
       // and the bytes they were parsed from, so the refresh that follows a
       // switch can recognise an unchanged directory and leave the model alone.
       // Restoring the rows without this only moved the flicker later: the
@@ -1245,6 +1261,14 @@ FloatingWindow {
       root.viewMode = t.view;
       root.applyDepth--;
     }
+    // AFTER the model has been rebuilt, which is why it is deferred: handing
+    // back the rows above runs syncView, and syncView rewinds the views to the
+    // top on a wholesale change so their origin cannot drift. That rewind is
+    // what keeps the listing from arriving with a band of nothing above it —
+    // and it is also what would leave you at the top of every tab you step
+    // back into. So the rewind puts the ORIGIN back and this puts YOU back,
+    // in that order.
+    if (t.scroll) Qt.callLater(root.restoreScroll, t.scroll);
     // The directory is still re-read, but the rows it had are already on
     // screen while that happens, so nothing blinks.
     root.refresh(true);
@@ -1331,6 +1355,9 @@ FloatingWindow {
     const t = root.tabState();
     t.cwd = (path && path !== "") ? path : Paths.home();
     t.sel = 0;
+    // and at the top of it. The state was copied off the tab you are standing
+    // in, so without this a new tab opens scrolled to wherever that one was.
+    t.scroll = null;
     t.dual = false;
     t.otherCwd = "";
     t.otherSel = 0;
@@ -1351,16 +1378,41 @@ FloatingWindow {
     root.newTab(path);
   }
 
-  function closeTab() {
+  // Close a tab BY INDEX, which is NOT "step into it and then close the one
+  // you are in". Middle click did it that second way — switchTab followed by
+  // closeTab — and it was wrong twice over. It paid for a full load of a tab
+  // that was about to be thrown away; and switchTab rewrites `tabs`, which is
+  // the strip Repeater's model, so replacing it destroyed the delegate whose
+  // click handler was still running. Everything after that line was
+  // unreachable — it threw "root is not defined" rather than running — so the
+  // close simply never happened and the gesture read as "select".
+  function closeTabAt(i) {
     if (root.tabs.length < 2) return;   // the last tab is just the window
+    if (i < 0 || i >= root.tabs.length) return;
+    // The tab you are STANDING IN lives in the window rather than in the
+    // array, so its record is written back before anything is removed.
+    // Without this, closing a background tab rolled the current one back to
+    // whatever it looked like the last time you left it.
     const next = root.tabs.slice();
-    next.splice(root.tab, 1);
-    const land = Math.min(root.tab, next.length - 1);
+    next[root.tab] = root.tabState();
+    next.splice(i, 1);
+    if (i === root.tab) {
+      // The one you are in: land on its neighbour, which is what `w` means.
+      const land = Math.min(i, next.length - 1);
+      root.tabs = next;
+      root.tab = -1;          // force the load even when the index is the same
+      root.tab = land;
+      root.loadTab(next[land]);
+      return;
+    }
+    // ANY OTHER TAB IS ONLY A RECORD. Drop it and stay exactly where you are:
+    // nothing about the window changes except which index the current tab
+    // sits at, so there is no directory to re-read and nothing to load.
+    if (i < root.tab) root.tab = root.tab - 1;
     root.tabs = next;
-    root.tab = -1;          // force switchTab to do the load
-    root.tab = land;
-    root.loadTab(next[land]);
   }
+
+  function closeTab() { root.closeTabAt(root.tab); }
 
   // ── zoom ────────────────────────────────────────────────────────────────
   // One number, applied to the sizes that carry information — row height, the
@@ -2418,6 +2470,8 @@ FloatingWindow {
     for (let i = 0; i < n; ++i)
       if (m.get(i).path === next[i].path) ++same;
     if (m.count === 0 || same < n * 0.5) {
+      // BEFORE the clear, never after — see rewindViews.
+      root.rewindViews();
       m.clear();
       for (let i = 0; i < next.length; ++i) m.append({ path: next[i].path });
       return;
@@ -2438,6 +2492,44 @@ FloatingWindow {
       else m.insert(i, { path: p });
     }
     while (m.count > next.length) m.remove(m.count - 1);
+  }
+
+  // A VIEW KEEPS ITS OWN ORIGIN, and that origin has to be put back by hand
+  // whenever the listing is replaced wholesale underneath a scrolled view.
+  //
+  // Qt holds the row that was at the top in place across a model change — it
+  // shifts `originY` to compensate rather than moving `contentY`, which is
+  // what makes a refresh of the SAME directory sit still. Replace the listing
+  // with a shorter one and there is no such row to hold: the origin is shifted
+  // to a place that does not exist and stays there. It reads as a huge empty
+  // band above the first row, with contentY sitting innocently at 0 and the
+  // scroll rail parked at the top, because by the view's own arithmetic it IS
+  // at the top — the top has simply moved a thousand pixels off the model.
+  //
+  // Opening a directory in a new tab from a list you had scrolled down was the
+  // way in: the new tab arrives with its own, usually shorter, listing, and
+  // stepping back to the tab of origin compounded the drift rather than
+  // clearing it.
+  //
+  // positionViewAtBeginning and NOT forceLayout: a relayout re-runs the
+  // arithmetic that produced the bad origin and faithfully reproduces it.
+  // Only positioning says where the top actually is.
+  //
+  // And BEFORE the model is torn down rather than after. Rewinding afterwards
+  // repairs the origin that has already drifted, which leaves the listing you
+  // have just arrived in wearing the gap and only tidies it on the way out.
+  // Rewound first, the view is at the top when the rows are replaced, so there
+  // is no scrolled state for Qt to try to preserve and the origin never moves
+  // at all — measured clean at every step rather than only at the last one.
+  //
+  // Called from the wholesale branch of syncView alone. That branch is the one
+  // that means "a different directory, or a re-sort" — where the scroll was
+  // always meant to reset. The incremental walk, which is a refresh of the
+  // listing you are standing in, must keep your place and is left alone.
+  function rewindViews() {
+    list.positionViewAtBeginning();
+    midList.positionViewAtBeginning();
+    grid.positionViewAtBeginning();
   }
 
   // FUNCTIONS, not bindings. As properties these recomputed whenever `marked`
@@ -2915,11 +3007,19 @@ FloatingWindow {
     //
     // Only when there is somewhere to scroll TO: a preview that fits would
     // otherwise swallow the wheel and leave the listing beside it stuck.
+    // WHICHEVER PREVIEW IS ON SCREEN, not only the text one. The pane shows a
+    // file's contents OR an archive's tree, and the wheel was offered to the
+    // first and never the second — so spinning it over a long archive listing
+    // scrolled the middle column instead and the tree sat there unread.
     if (root.viewMode === "columns"
-        && textScroll.visible
-        && textScroll.contentHeight > textScroll.height
-        && bx - root.activePaneX >= previewPane.x)
-      return textScroll;
+        && bx - root.activePaneX >= previewPane.x) {
+      if (textScroll.visible
+          && textScroll.contentHeight > textScroll.height)
+        return textScroll;
+      if (archiveList.visible
+          && archiveList.contentHeight > archiveList.height)
+        return archiveList;
+    }
     return root.viewMode === "grid" ? grid
          : (root.viewMode === "columns" ? midList : list);
   }
@@ -2981,7 +3081,7 @@ FloatingWindow {
   // Built when the path changes, not when a crumb is drawn. The delegate asked
   // crumbs() for its own length, so rendering n crumbs cost n+1 walks of the
   // path on every repaint.
-  readonly property var crumbList: Terminus.crumbs(root.cwd)
+  readonly property var crumbList: Terminus.crumbs(root.cwd, Paths.home())
 
   // How many are ticked, without building the list of them. The status line
   // wants a number, and markedRows scans the whole view to produce an array —
@@ -3887,18 +3987,71 @@ FloatingWindow {
     [".7z",      "7z — 7-Zip"]
   ]
 
+  // What is being archived and what it will be called, held while the answer
+  // to "is that name taken" comes back. Null at every other moment.
+  property var archivePending: null
+
+  // THE NAME IS NOT ASKED FOR ANY MORE.
+  //
+  // It was a prompt with the answer already typed into it, and the answer was
+  // accepted as-is nearly every time — a dialog charging a keystroke for the
+  // privilege of agreeing with it. The suggestion IS the name now: a directory
+  // archives under its own name, and a handful of loose files archive under
+  // the name of the directory they were sitting in, which is the only name
+  // they have in common.
+  //
+  // What made the prompt worth its keystroke was the chance to notice you were
+  // about to write over an archive that was already there. That question has
+  // not gone away — it is just only asked when it is a real question, and it
+  // is asked in the words a paste already uses.
   function beginArchive(ext) {
     const rows = root.acting();
     if (rows.length === 0) return;
-    const suggested = (rows.length === 1 ? Terminus.stem(rows[0].name)
-                                         : Terminus.basename(root.cwd))
-      + (ext && ext !== "" ? ext : ".tar.zst");
-    prompt.ask("Archive to", suggested, (name) => {
-      if (name === "") return;
-      root.startJob("archive", rows.map((r) => r.path),
-                    Terminus.joinPath(root.cwd, name), "");
-      root.marked = {};
-    });
+    const e = (ext && ext !== "") ? ext : ".tar.zst";
+    const name = (rows.length === 1 ? Terminus.stem(rows[0].name)
+                                    : Terminus.basename(root.cwd)) + e;
+    root.archivePending = { paths: rows.map((r) => r.path), name: name };
+    archiveClashProc.command = ["sh", "-c",
+      Terminus.archiveTargetCommand(root.cwd, name, e)];
+    archiveClashProc.running = true;
+  }
+
+  // Nothing is written until that answer is in — bsdtar and 7z overwrite in
+  // silence, exactly as cp and mv do, so the scan is the whole difference
+  // between archiving and losing the archive that was already there.
+  Process {
+    id: archiveClashProc
+    stdout: StdioCollector {
+      id: archiveClashOut
+      waitForEnd: true
+      onStreamFinished: {
+        const a = root.archivePending;
+        if (!a) return;
+        // Empty means the name is free. Otherwise: the name that is taken,
+        // and the first one that is not.
+        const answer = Terminus.parseConflicts(archiveClashOut.text);
+        if (answer.length < 2) { root.commitArchive(a.name); return; }
+        // The paste's own three answers, minus the one that would be a second
+        // Cancel: SKIP and CANCEL are the same act when there is a single
+        // thing to skip, and two buttons that do nothing is not a choice.
+        // Overwrite wears the alarm colour here for the reason it does there.
+        confirm.askMany(
+          "Archive over " + answer[0] + "?",
+          "keep both \u2192 " + answer[1],
+          [{ label: "Overwrite", ink: Zenon.red,
+             act: () => root.commitArchive(answer[0]) },
+           { label: "Keep both", ink: Zenon.green,
+             act: () => root.commitArchive(answer[1]) }]);
+      }
+    }
+  }
+
+  function commitArchive(name) {
+    const a = root.archivePending;
+    if (!a) return;
+    root.archivePending = null;
+    root.startJob("archive", a.paths, Terminus.joinPath(root.cwd, name), "");
+    root.marked = {};
   }
 
   // ── links ───────────────────────────────────────────────────────────────
@@ -4246,8 +4399,26 @@ FloatingWindow {
           || appPick.open) return;
 
       if (help.open) {
+        // EVERY KEY IS SWALLOWED HERE, AND ONLY ESCAPE CLOSES.
+        //
+        // This used to close on any key at all, on the reasoning that you
+        // opened the keymap because you wanted a key and pressing one meant
+        // you had found it. But a BARE MODIFIER is a key event in its own
+        // right, with no text and nothing for the search field to consume —
+        // so reaching for alt or ctrl to read what they do dismissed the list
+        // that was telling you. Shift on the way to an upper-case letter did
+        // it too, which made the field impossible to type a capital into.
+        //
+        // The panel is something you READ, not a prompt you answer, and it
+        // should leave when you say so rather than when your hand moves. The
+        // listing behind it must still get nothing while it is up, so every
+        // key is accepted whether or not it means anything.
+        //
+        // Escape ordinarily never reaches here: helpField has the focus and
+        // backs out one step at a time — text first, then the panel. This is
+        // the same answer for the case where it does not.
         event.accepted = true;
-        help.open = false;
+        if (event.key === Qt.Key_Escape) help.open = false;
         return;
       }
       if (menu.open) {
@@ -4342,6 +4513,46 @@ FloatingWindow {
         else if (root.query !== "") { filterField.text = ""; root.query = ""; }
         else if (root.visualOn) root.endVisual();
         else if (Object.keys(root.marked).length > 0) root.marked = {};
+        return;
+      }
+
+      // ── the two dividers, from the keyboard ─────────────────────────
+      // Alt walks the split, alt+shift walks the sidebar's edge — one hand
+      // shape for both lines, and the ARROW POINTS THE WAY THE LINE TRAVELS
+      // rather than at whichever pane grows. Which pane grows depends on which
+      // side of the divider you are asking about; the divider itself only ever
+      // goes left or right, so that is what the key says.
+      //
+      // BEFORE the movement block below, which takes a bare Left and Right and
+      // never looks at the modifiers — so with alt held they meant "up a
+      // directory" and "open the file", neither of which is a thing to do by
+      // accident while reaching for a resize.
+      //
+      // Both consume the key even when there is nothing to resize. A binding
+      // that quietly turns into a different verb whenever the sidebar happens
+      // to be closed is worse than one that does nothing.
+      if ((event.modifiers & Qt.AltModifier)
+          && (event.key === Qt.Key_Left || event.key === Qt.Key_Right)) {
+        event.accepted = true;
+        const grow = event.key === Qt.Key_Right ? 1 : -1;
+        if (event.modifiers & Qt.ShiftModifier) {
+          // PIXELS, because that is what the sidebar is measured in — it is a
+          // column of fixed things rather than a share of the window, which is
+          // the whole reason sidebarWidth is not a fraction. Clamped to the
+          // same bounds the grip drags between, and onSidebarWidthChanged
+          // writes it to disk without being asked.
+          if (root.sidebar)
+            root.sidebarWidth = Math.max(root.sidebarMin,
+              Math.min(root.sidebarMax, root.sidebarWidth + grow * 20));
+        } else if (root.dual) {
+          // A FRACTION, because the split is one — see paneFrac. Stepping in
+          // pixels would drift the proportion every time the window resized,
+          // which is the thing paneFrac exists to prevent. 2% lands where you
+          // meant without making the trip across the pane a drum roll.
+          root.paneFrac = Math.max(root.paneMinFrac,
+            Math.min(root.paneMaxFrac, root.paneFrac + grow * 0.02));
+          viewSave.restart();
+        }
         return;
       }
 
@@ -4508,6 +4719,11 @@ FloatingWindow {
       case "u":  event.accepted = true; root.undo(); break;
       case "z":  event.accepted = true; root.measureDirs(); break;
       case "\\": event.accepted = true; root.toggleDual(); break;
+      // The SAME KEY WITH SHIFT, because it is the same gesture about the
+      // other vertical division of the window: `\` splits the body in two,
+      // `|` puts the places column back beside it. onSidebarChanged writes
+      // the new state to disk without being asked.
+      case "|":  event.accepted = true; root.sidebar = !root.sidebar; break;
       case "o":  event.accepted = true; root.stepOver(); break;
       case "q":
         event.accepted = true;
@@ -4771,9 +4987,18 @@ FloatingWindow {
                   // rule the listing's rows follow
                   if (tabMouse.dragging) return;
                   if (m.button === Qt.MiddleButton) {
-                    root.switchTab(tabCell.index);
-                    root.closeTab();
-                  } else root.switchTab(tabCell.index);
+                    // DEFERRED, because this handler is about to lose the
+                    // ground it is standing on: closing a tab replaces
+                    // `root.tabs`, which is this Repeater's model, so the
+                    // delegate running this very line is destroyed inside the
+                    // call and everything after it throws instead of running.
+                    // Handing root an index and letting it do the work in its
+                    // own scope — which nothing here can tear down — is the
+                    // whole of the fix.
+                    Qt.callLater(root.closeTabAt, tabCell.index);
+                    return;
+                  }
+                  root.switchTab(tabCell.index);
                 }
               }
             }
@@ -4789,16 +5014,36 @@ FloatingWindow {
         height: root.headH
         color: Zenon.headBg
 
+        // ── THE INSIDE OF THE BAR, WHICH IS NOT THE WHOLE OF IT ──────
+        // The last pixel of this strip is the hairline along its bottom edge.
+        // Everything on the bar used to be centred across the whole 34,
+        // hairline included, and then nudged a pixel DOWN to compensate — the
+        // note on crumbStatus says "up by the separator's own pixel", which is
+        // what was meant and the opposite of what +1 does. Between the two,
+        // every label on this bar sat a pixel and a half low.
+        //
+        // So the inside is named once, here, and everything is placed against
+        // it: one answer to "where is the middle", and a divider that stands
+        // the full height now starts on the bar's top edge and stops exactly
+        // where the hairline starts instead of running under it.
+        Item {
+          id: crumbInner
+          anchors.top: parent.top
+          anchors.left: parent.left
+          anchors.right: parent.right
+          anchors.bottom: parent.bottom
+          anchors.bottomMargin: 1
+        }
+
         // the sidebar's switch, where the path begins — it is about what is to
         // the LEFT of the path, so it sits to the left of it
         Item {
           id: sideToggle
           anchors.left: parent.left
           anchors.leftMargin: 8
-          anchors.verticalCenter: parent.verticalCenter
-          anchors.verticalCenterOffset: 1
+          anchors.verticalCenter: crumbInner.verticalCenter
           width: 34
-          height: parent.height
+          height: crumbInner.height
 
           Text {
             anchors.centerIn: parent
@@ -4820,15 +5065,105 @@ FloatingWindow {
           }
         }
 
-        Row {
+        // ── the trail, as something that SCROLLS rather than gets cut ──
+        // A path deeper than the bar is wide used to simply run off the
+        // right-hand edge, and what went over the edge was the LAST step —
+        // the directory you are actually standing in, and the one part of the
+        // trail you cannot work out from the rest.
+        Flickable {
+          id: crumbFlick
           anchors.left: sideToggle.right
           anchors.leftMargin: 4
           anchors.right: filterInline.left
           anchors.rightMargin: 12
-          anchors.verticalCenter: parent.verticalCenter
-          anchors.verticalCenterOffset: 1
-          spacing: 0
+          anchors.verticalCenter: crumbInner.verticalCenter
+          height: crumbInner.height
           clip: true
+          contentWidth: crumbTrail.width
+          contentHeight: crumbFlick.height
+          flickableDirection: Flickable.HorizontalFlick
+          boundsBehavior: Flickable.StopAtBounds
+
+          // ── the trail does not END at the edge, it FADES there ────────
+          // An ellipsis is a character: it has to be read, recognised as not
+          // being part of any directory's name, and then discounted. A fade
+          // says "there is more this way" without asking for a word.
+          //
+          // AN OPACITY MASK, not a wash of colour over the top. The obvious
+          // trick — a rectangle ramping from the bar's own colour to
+          // transparent — cannot work here, and it took a screenshot to see
+          // why: headBg is #66282f36, four tenths opaque, so painting it over
+          // the crumbs veils them by four tenths and stops. What is actually
+          // behind this bar is the wallpaper, and there is no colour this
+          // window can paint that matches that. So the pixels lose their own
+          // alpha towards the edge instead, and it reads the same whatever
+          // happens to be behind them.
+          //
+          // The layer is only enabled while there is something to fade: an
+          // always-on layer would put the bar through an offscreen texture for
+          // the whole session to buy an effect that only appears when the path
+          // outgrows the bar.
+          layer.enabled: crumbFlick.maxX > 0
+          layer.effect: MultiEffect {
+            maskEnabled: true
+            maskSource: crumbMask
+            // The threshold is where the mask's alpha starts cutting and the
+            // spread is how softly it does it. Both default to zero, which
+            // means "cut nothing" — the mask was being read correctly and
+            // changing precisely nothing. Half and full is the soft-edge
+            // recipe: the ramp in the mask becomes a ramp in the alpha.
+            maskThresholdMin: 0.5
+            maskSpreadAtMin: 1.0
+          }
+
+          readonly property bool overLeft: crumbFlick.contentX > 1
+          readonly property bool overRight: crumbFlick.contentX < crumbFlick.maxX - 1
+          // 64px of ramp, as a fraction, and never more than a third of the
+          // bar — on a narrow pane a fixed 36 would be most of the trail.
+          readonly property real fadeAt: crumbFlick.width > 0
+            ? Math.min(0.33, 64 / crumbFlick.width) : 0
+
+          // The WHEEL drives this; a drag does not. Every crumb is a click
+          // target, and a Flickable that takes drags turns a slightly unsteady
+          // click into a scroll instead of a step up the tree.
+          interactive: false
+
+          readonly property real maxX: Math.max(0, contentWidth - width)
+          // A CHUNK, not a step. One crumb a notch means spinning the wheel
+          // six times to get back to the root of a deep path, which is not
+          // scrolling, it is winding. Most of the bar per notch covers the
+          // trail in a couple of strokes and still leaves enough of the old
+          // view on screen to keep your bearings.
+          readonly property real chunk: Math.max(120, crumbFlick.width * 0.6)
+
+          // PINNED TO THE END, so the step that falls off is the one nearest
+          // the root — the part you can most afford to lose sight of, and the
+          // part the wheel is there to bring back.
+          function pinEnd() {
+            crumbAnim.stop();
+            crumbFlick.contentX = crumbFlick.maxX;
+          }
+          // The trail is rebuilt whenever the path changes, so this fires then
+          // and not while you are reading it: scrolling back and standing
+          // still does not yank you forward again.
+          onContentWidthChanged: Qt.callLater(crumbFlick.pinEnd)
+          onWidthChanged: Qt.callLater(crumbFlick.pinEnd)
+
+          // Consecutive notches accumulate from where the animation is GOING,
+          // for the reason wheelScroll spells out over the listing.
+          function wheelBy(delta) {
+            const from = crumbAnim.running ? crumbAnim.to : crumbFlick.contentX;
+            const to = Math.max(0, Math.min(crumbFlick.maxX, from + delta));
+            if (to === crumbFlick.contentX && !crumbAnim.running) return;
+            crumbAnim.stop();
+            crumbAnim.to = to;
+            crumbAnim.start();
+          }
+
+        Row {
+          id: crumbTrail
+          height: crumbFlick.height
+          spacing: 0
 
           Repeater {
             model: root.crumbList
@@ -4837,6 +5172,16 @@ FloatingWindow {
               id: crumbRow
               required property var modelData
               required property int index
+
+              // FULL HEIGHT, and that is what levels the trail with the rest of
+              // the bar. A Row lays its children out along x and leaves y alone,
+              // so a delegate that sized itself to its label sat at the very top
+              // of the strip with every other thing on the bar centred beside it
+              // — measured at five pixels of air above the crumbs and eighteen
+              // below. Standing the delegate the full height of the bar gives
+              // the labels inside it a parent worth centring against, and it is
+              // what lets the separator below be a rule rather than a character.
+              height: crumbFlick.height
 
               // A step slides in from the left as you go deeper and fades as
               // you come back up. The path is the one thing in this window
@@ -4854,13 +5199,29 @@ FloatingWindow {
                                   duration: Zenon.normal; easing.type: Easing.OutCubic }
               }
 
+              // ── the separator ────────────────────────────────────────
+              // A plain slash, which is what a path is written with. It was a
+              // chevron, then a hairline, then a leaned rule cut to the bar's
+              // exact height — and the leaned one was the wrong kind of exact:
+              // a rule has ends, and ends have to be reasoned about every time
+              // the bar's height or its border changes. A character has none of
+              // that. It sits on the same baseline as the names either side of
+              // it and moves with them.
+              //
+              // msgBorder, the hairline colour, so the separator stays chrome
+              // and does not compete with the steps it is separating.
               Text {
                 anchors.verticalCenter: parent.verticalCenter
-                visible: index > 1
-                text: " › "
-                color: Zenon.muted
+                // NONE AFTER THE FILESYSTEM ROOT, which is already a slash —
+                // "/" then "home" reads as "/home" and a separator between
+                // them would double it. Everything else gets one, `~`
+                // included, which is why this asks what came BEFORE rather
+                // than counting from the start.
+                visible: index > 0 && root.crumbList[index - 1].path !== "/"
+                text: " / "
+                color: Zenon.msgBorder
                 font.family: "JetBrainsMono Nerd Font Propo"
-                font.pixelSize: 14
+                font.pixelSize: 15
               }
 
               Text {
@@ -4923,6 +5284,69 @@ FloatingWindow {
             }
           }
         }
+        }
+
+        // The ramp the trail is cut with: opaque through the middle, falling to
+        // nothing at whichever end still has trail beyond it, so the fade
+        // appears on the side there is more to see and only there.
+        //
+        // A REAL CHILD OF THE BAR, and that is the whole trick. Written inline
+        // as the value of maskSource it never renders: a ShaderEffectSource
+        // that is only referenced from a property is not in the scene, so its
+        // texture comes back empty — and an empty mask does not mean "no mask",
+        // it means every pixel has zero alpha, which took the entire trail with
+        // it. hideSource keeps the gradient itself off the bar while it goes on
+        // being rendered into the texture, which is exactly what it is for.
+        Rectangle {
+          id: crumbRamp
+          width: Math.max(1, crumbFlick.width)
+          height: Math.max(1, crumbFlick.height)
+          gradient: Gradient {
+            orientation: Gradient.Horizontal
+            GradientStop { position: 0.0
+              color: crumbFlick.overLeft ? "#00000000" : "#ff000000" }
+            GradientStop { position: crumbFlick.fadeAt; color: "#ff000000" }
+            GradientStop { position: 1.0 - crumbFlick.fadeAt; color: "#ff000000" }
+            GradientStop { position: 1.0
+              color: crumbFlick.overRight ? "#00000000" : "#ff000000" }
+          }
+        }
+
+        ShaderEffectSource {
+          id: crumbMask
+          width: crumbRamp.width
+          height: crumbRamp.height
+          sourceItem: crumbRamp
+          hideSource: true
+          visible: false
+        }
+
+        NumberAnimation {
+          id: crumbAnim
+          target: crumbFlick
+          property: "contentX"
+          duration: 130
+          easing.type: Easing.OutCubic
+        }
+
+        // A MouseArea and NoButton, for both reasons the body's wheel overlay
+        // gives: a WheelHandler is never offered these events, and a handler
+        // that cannot take a press cannot come between a crumb and its click.
+        MouseArea {
+          anchors.fill: crumbFlick
+          acceptedButtons: Qt.NoButton
+          onWheel: (w) => {
+            if (crumbFlick.maxX <= 0) { w.accepted = false; return; }
+            // A horizontal wheel, or a trackpad's sideways swipe, says the
+            // same thing as a vertical one here — there is only one axis to
+            // travel — so either is taken and whichever moved is used.
+            const d = w.angleDelta.y !== 0 ? w.angleDelta.y : w.angleDelta.x;
+            const notches = d / 120;
+            if (notches === 0) { w.accepted = false; return; }
+            w.accepted = true;
+            crumbFlick.wheelBy(-notches * crumbFlick.chunk);
+          }
+        }
 
 
         // ── the filter, inline ──────────────────────────────────────
@@ -4935,8 +5359,7 @@ FloatingWindow {
           id: filterInline
           anchors.right: crumbStatus.left
           anchors.rightMargin: root.query !== "" || filterField.activeFocus ? 14 : 0
-          anchors.verticalCenter: parent.verticalCenter
-          anchors.verticalCenterOffset: 1
+          anchors.verticalCenter: crumbInner.verticalCenter
           spacing: 6
           visible: root.query !== "" || filterField.activeFocus
 
@@ -4999,10 +5422,9 @@ FloatingWindow {
           id: prefsToggle
           anchors.right: parent.right
           anchors.rightMargin: 8
-          anchors.verticalCenter: parent.verticalCenter
-          anchors.verticalCenterOffset: 1
+          anchors.verticalCenter: crumbInner.verticalCenter
           width: 30
-          height: parent.height
+          height: crumbInner.height
 
           Text {
             anchors.centerIn: parent
@@ -5041,8 +5463,7 @@ FloatingWindow {
           id: jobsToggle
           anchors.right: prefsToggle.left
           anchors.rightMargin: 2
-          anchors.verticalCenter: parent.verticalCenter
-          anchors.verticalCenterOffset: 1
+          anchors.verticalCenter: crumbInner.verticalCenter
           readonly property bool live: jobsModel.count > 0
           // ONE COLOUR, READ BY EVERYTHING. The glyph, the count, the glow and
           // the burst all wear it, so "something went wrong" is a single fact
@@ -5052,7 +5473,7 @@ FloatingWindow {
           readonly property color tone: root.jobFaults > 0 ? Zenon.red : Zenon.cyan
           width: jobsToggle.live ? 32 : 0
           visible: width > 0.5
-          height: parent.height
+          height: crumbInner.height
           // Grows and collapses rather than appearing: it sits between the
           // status chip and the hamburger, and a button that pops into
           // existence shoves everything to its left across in one frame.
@@ -5227,8 +5648,7 @@ FloatingWindow {
           anchors.rightMargin: 10
           // up by the separator's own pixel: it is the bar's bottom EDGE, not
           // part of the inside, and centring across it sat everything low
-          anchors.verticalCenter: parent.verticalCenter
-          anchors.verticalCenterOffset: 1
+          anchors.verticalCenter: crumbInner.verticalCenter
           spacing: 14
 
           // ── the status, as a chip ──────────────────────────────────
@@ -5788,7 +6208,18 @@ FloatingWindow {
           // at all — see the note above, which is why the gate is here.
           model: root.viewMode === "list" ? viewModel : null
           boundsBehavior: Flickable.StopAtBounds
-          reuseItems: true
+          // RECYCLING IS TURNED OFF WITH THE MODEL, not left running across it.
+          // A view whose model goes null releases its delegates into the reuse
+          // pool, and the pool survives the detach. Coming back, it hands those
+          // items out again WITHOUT re-injecting the model's roles — so a recycled
+          // delegate kept the `path` it was holding before the view was hidden,
+          // rowFor() found nothing under it, and it drew as an empty row while
+          // `index` stayed correct enough to click. Switching views a few times was
+          // all it took, and the grid showed it worst: blank tiles you could still
+          // select, at random, since which pooled items come back is chance.
+          // Binding reuseItems to the model's own gate drains the pool the moment
+          // the model is detached, so nothing stale is left to be handed out.
+          reuseItems: root.viewMode === "list"
 
           delegate: EntryRow {
             // The model carries identity; the row comes from viewIndex. A file
@@ -5833,7 +6264,8 @@ FloatingWindow {
             // recycled, like the grid's tiles: the model is replaced whenever
             // the directory is re-read, and rebuilding every row for that is
             // the redraw you can see
-            reuseItems: true
+            // drained with the model — see the note on the list, above
+            reuseItems: root.viewMode === "columns"
             boundsBehavior: Flickable.StopAtBounds
 
             delegate: EntryRow {
@@ -5860,7 +6292,8 @@ FloatingWindow {
             height: parent.height
             clip: true
             model: root.viewMode === "columns" ? viewModel : null
-            reuseItems: true
+            // drained with the model — see the note on the list, above
+            reuseItems: root.viewMode === "columns"
             boundsBehavior: Flickable.StopAtBounds
 
             delegate: EntryRow {
@@ -5909,7 +6342,8 @@ FloatingWindow {
               // binding here meant every archive quietly instantiated a
               // column of rows against the wrong shape of data.
               model: root.previewKind === "dir" ? root.previewRows : []
-              reuseItems: true
+              // drained with the model — see the note on the list, above
+              reuseItems: root.previewKind === "dir"
               boundsBehavior: Flickable.StopAtBounds
               interactive: false
 
@@ -6220,15 +6654,15 @@ FloatingWindow {
               id: archiveList
               anchors.fill: parent
               anchors.margins: 16
-              // A touch tighter at the top than at the sides: the bar above is a hard
-              // edge and the pane's own left divider is not, so an equal 16 read as
-              // more air above than beside.
-              anchors.topMargin: 12
+              // level with the text preview beside it — see the note there
+              anchors.topMargin: 0
+              anchors.bottomMargin: 0
               visible: root.previewKind === "archive"
               model: root.previewKind === "archive" ? root.previewRows : []
               clip: true
               interactive: true
-              reuseItems: true
+              // drained with the model — see the note on the list, above
+              reuseItems: root.previewKind === "archive"
               boundsBehavior: Flickable.StopAtBounds
               onVisibleChanged: if (!visible) contentY = 0;
 
@@ -6314,10 +6748,15 @@ FloatingWindow {
               id: textScroll
               anchors.fill: parent
               anchors.margins: 16
-              // A touch tighter at the top than at the sides: the bar above is a hard
-              // edge and the pane's own left divider is not, so an equal 16 read as
-              // more air above than beside.
-              anchors.topMargin: 12
+              // NO VERTICAL PADDING AT ALL. The sides need it — the pane's own
+              // divider is a hairline and text run up against it reads as
+              // spilling out of the column. The top and bottom do not: the bar
+              // above is a hard edge that already separates them, and the three
+              // columns beside this one start their first row flush with it.
+              // Inset, the preview began a line and a half lower than the
+              // listing it is a preview OF, which reads as the pane sagging.
+              anchors.topMargin: 0
+              anchors.bottomMargin: 0
               visible: root.previewKind === "text"
               clip: true
               interactive: true
@@ -6416,7 +6855,8 @@ FloatingWindow {
           // Recycled, like the list's rows. A tile holds an Image, and
           // building a fresh one per tile while scrolling a folder of pictures
           // is the most expensive thing this window does.
-          reuseItems: true
+          // drained with the model — see the note on the list, above
+          reuseItems: root.viewMode === "grid"
           // A target width rather than a fixed one: the cells divide the pane
           // exactly, so there is never a ragged strip of dead space down the
           // right-hand edge, and they land near enough to the target that a
@@ -6598,7 +7038,8 @@ FloatingWindow {
             clip: true
             visible: root.otherViewMode === "list"
             model: root.dual && root.otherViewMode === "list" ? root.otherRows : []
-            reuseItems: true
+            // drained with the model — see the note on the list, above
+            reuseItems: root.dual && root.otherViewMode === "list"
             boundsBehavior: Flickable.StopAtBounds
 
             delegate: EntryRow {
@@ -6638,7 +7079,8 @@ FloatingWindow {
             clip: true
             visible: root.otherViewMode === "grid"
             model: root.dual && root.otherViewMode === "grid" ? root.otherRows : []
-            reuseItems: true
+            // drained with the model — see the note on the list, above
+            reuseItems: root.dual && root.otherViewMode === "grid"
             boundsBehavior: Flickable.StopAtBounds
 
             // its own zoom, the active grid's arithmetic
@@ -7690,8 +8132,9 @@ FloatingWindow {
     // ── the keymap, on F1 ─────────────────────────────────────────────
     // The hint strip is gone. A permanent one row of keys could only ever show
     // a fraction of them and cost a strip of the window for the privilege;
-    // yazi puts the whole list behind a key, and so does this. Any key closes
-    // it, because the reason it is open is that you wanted one.
+    // yazi puts the whole list behind a key, and so does this. ESCAPE closes
+    // it, and nothing else does — it is a page you read while you work out
+    // which key you wanted, so it has to survive you pressing keys.
     Rectangle {
       id: help
       anchors.fill: parent
@@ -7797,6 +8240,9 @@ FloatingWindow {
                   ["[  ]", "previous / next"]]],
         ["panes", [["\\", "second pane on / off"],
                    ["tab  o", "step into the other side"],
+                   ["alt \u2190 \u2192", "resize the split"],
+                   ["|", "sidebar on / off"],
+                   ["alt shift \u2190 \u2192", "resize the sidebar"],
                    ["f5", "copy to the other side"],
                    ["f6", "move to the other side"],
                    [root.mouseKey(1), "step into the other side"]]],
@@ -7879,9 +8325,9 @@ FloatingWindow {
           // had done nothing at all rather than something wrong.
           //
           // They scroll it instead. Escape is untouched and still backs out one
-          // step at a time; every other key still falls through and closes.
+          // step at a time; everything else is swallowed by the window's own
+          // handler without acting — see the note on `help.open` there.
           Keys.onPressed: (e) => {
-            if (e.key === Qt.Key_F1) { e.accepted = true; help.open = false; return; }
             const page = Math.max(60, helpScroll.height - 40);
             const step = (e.key === Qt.Key_Up) ? -30
                        : (e.key === Qt.Key_Down) ? 30
@@ -9536,6 +9982,8 @@ FloatingWindow {
           out.push({ label: "Open shell here", key: ";", act: () => root.openShell() });
           out.push({ label: root.dual ? "Close second pane" : "Second pane",
                      key: "\\", act: () => root.toggleDual() });
+          out.push({ label: root.sidebar ? "Hide sidebar" : "Sidebar",
+                     key: "|", act: () => { root.sidebar = !root.sidebar; } });
           // Braced. Both of these are about the SECOND PANE and both were
           // meant to be behind `root.dual` — but only the first was, so a
           // one-pane window offered to swap sides with a pane that was not
@@ -11866,8 +12314,21 @@ FloatingWindow {
           asynchronous: true
           // Decode at the size drawn, not at a fixed 320: below that it
           // was decoding more than it showed, above it, less.
-          sourceSize.width: Math.max(320, Math.round(thumbBox.width))
-          sourceSize.height: Math.max(320, Math.round(thumbBox.height))
+          //
+          // ROUNDED UP TO A STEP, because the decode size is half of the
+          // cache key and the two panes are NEVER the same width. The split
+          // gives the left half floor(body * frac) and the right half what is
+          // left after the divider — one pixel apart — so above the 320 floor
+          // the same file was asked for at 376 and at 375. Qt treats those as
+          // two different images: it decoded both, held both, and every step
+          // across the divider was a guaranteed miss on the one it needed.
+          //
+          // A step of 64 puts both panes, and every zoom inside the step, on
+          // ONE key. It only ever rounds UP, so nothing is decoded smaller
+          // than it is drawn and no tile loses resolution — it just stops
+          // asking for a resolution nobody can tell apart from its neighbour.
+          sourceSize.width: Math.max(320, Math.ceil(thumbBox.width / 64) * 64)
+          sourceSize.height: Math.max(320, Math.ceil(thumbBox.height / 64) * 64)
         }
       }
 
