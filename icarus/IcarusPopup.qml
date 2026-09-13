@@ -124,15 +124,26 @@ Item {
   // Both are about this shell, so they are a menu about this shell. Neither
   // confirms: one opens a panel, and the other is over in a second with
   // nothing lost.
-  property var shellEntries: [
+  // Backgrounds come first: it is the lightest thing here, it opens a panel
+  // and changes nothing on its own, and it used to sit out on the root menu
+  // among the PLACES — which is a list of things to open, not a list of
+  // things to change. Still behind its own setting, which is why this is
+  // built rather than written out.
+  property var shellEntries: {
+    const out = [];
+    if (Oracle.menuShowBackground)
+      out.push({ id: "background", text: "Set background", icon: "\uF03E",
+                 cmd: "qs ipc call Picasso toggle" });
+    out.push(
     { id: "settings", text: "Settings", icon: "\uF013",
       cmd: "qs ipc call Oracle toggle" },
     // `qs kill` before `qs -d`, in that order, in a shell that has already
     // been detached — so the replacement is never a child of the instance it
     // replaces.
     { id: "restart", text: "Restart Shell", icon: "\uF01E",
-      cmd: "qs kill; sleep 0.4; qs -d" }
-  ]
+      cmd: "qs kill; sleep 0.4; qs -d" });
+    return out;
+  }
 
   property var sessionEntries: [
     { id: "lockscreen", text: "Lock",  icon: "\uF023", cmd: "sleep 0.35 && qs ipc call Cerberus lock", confirm: false },
@@ -169,8 +180,9 @@ Item {
   // column instead reads as a ransom note. Nothing is wrong with any
   // individual glyph; the problem is only ever the mixture.
   //
-  // centred model for root: files, recent, apps, home, trash, background,
-  // then this shell and the session it is running in.
+  // centred model for root: files, recent, apps, home, trash, then this
+  // shell — which is where backgrounds live now — and the session it is
+  // running in.
   //
   // BUILT rather than written out, because three of these rows are switches in
   // oracle now. A literal list with `enabled: false` on a switched-off row
@@ -219,11 +231,6 @@ Item {
                     ? "Trash (" + root.trashCount + ")" : "Trash",
                   icon: "\uF014", hasChildren: false, kind: "trash",
                   isSeparator: false, enabled: root.trashCount > 0 });
-    // Right-click-the-desktop's oldest entry. It opens picasso, which is the
-    // thing that owns backgrounds — icarus only has to know who to ask.
-    if (Oracle.menuShowBackground)
-      rows.push({ text: "Set background", icon: "\uF03E", hasChildren: false,
-                  kind: "background", isSeparator: false, enabled: true });
     sep();
     // This shell, and then the session it is running in. In that order,
     // because the two lists behind them climb in severity and reloading a bar
@@ -352,7 +359,7 @@ Item {
     } else if (m.kind === "recent") {
       root.stopBranches("recent");
       root.armBranch("recent");
-    } else if (m.kind === "terminus" || m.kind === "background") {
+    }    else if (m.kind === "terminus") {
       root.stopBranches("");
       root.childMenu = "";
     }
@@ -369,11 +376,7 @@ Item {
     else if (m.kind === "session") root.childMenu = "session";
     else if (m.kind === "shell")  root.childMenu = "shell";
     else if (m.kind === "recent") root.childMenu = "recent";
-    else if (m.kind === "background") {
-      // picasso owns backgrounds; icarus only knows who to ask
-      root.execCmd("qs ipc call Picasso toggle");
-      root.closeAll();
-    } else if (m.kind === "terminus") {
+    else if (m.kind === "terminus") {
       // where the menu was opened, which is the directory the desktop is
       // showing rather than a blind fallback to home
       root.openInTerminus(root.cwd);
@@ -768,7 +771,6 @@ Item {
     }
   }
 
-
   // ── apps submenu ────────────────────────────────────────────────
   PanelWindow {
     // OVERLAY, like every other popup this shell puts up. These eight set no
@@ -892,23 +894,14 @@ Item {
                   anchors.leftMargin: 12
                   anchors.rightMargin: 10
 
-                  Text {
-                    id: appIcon
-                    anchors.verticalCenter: parent.verticalCenter
-                    width: 16
-                    height: 16
-                    text: "\uF108"
-                    color: Zenon.white
-                    font.family: Zenon.face
-                    font.pixelSize: 15
-                    verticalAlignment: Text.AlignVCenter
-                    horizontalAlignment: Text.AlignHCenter
-                  }
-
+                  // NO GLYPH. Every row here carried the same one — a generic
+                  // \uF108 standing in for an icon this menu does not look
+                  // up — so it was a column of identical marks saying nothing
+                  // about the thing beside it. A list of names is a list of
+                  // names.
                   Text {
                     id: appLabel
-                    anchors.left: appIcon.right
-                    anchors.leftMargin: 8
+                    anchors.left: parent.left
                     anchors.right: parent.right
                     anchors.rightMargin: 8
                     anchors.verticalCenter: parent.verticalCenter

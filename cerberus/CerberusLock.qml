@@ -1052,31 +1052,18 @@ Scope {
           anchors.bottomMargin: root.clockBottom
           spacing: 16
 
-        Item {
-          anchors.verticalCenter: parent.verticalCenter
-          width: Math.max(lockGhost.implicitWidth, lockTime.implicitWidth)
-          height: lockTime.implicitHeight
-
+          // UPTIME FIRST, THEN THE CLOCK — the order the other lock layout
+          // has always used, over on the right when a track is playing. The
+          // two were mirror images of each other for no reason anyone chose.
           Text {
-            id: lockGhost
-            anchors.centerIn: parent
-            text: "88:88"
-            color: root.ghostFg
-            font.family: Zenon.clockFamily
-            font.weight: Font.Bold
-            font.pointSize: root.clockSize
-          }
-
-          Text {
-            id: lockTime
-            anchors.centerIn: parent
-            text: Qt.formatDateTime(clock.date, "HH:mm")
+            anchors.verticalCenter: parent.verticalCenter
+            visible: root.uptimeText !== ""
+            text: root.uptimeText
             color: root.clockFg
             font.family: Zenon.clockFamily
             font.weight: Font.Bold
             font.pointSize: root.clockSize
           }
-        }
 
           // THE CLOCK'S OWN FACE, not a footnote beside it. Two readings of
           // the same kind — how long, and when — so they are set the same way
@@ -1096,14 +1083,30 @@ Scope {
             font.pixelSize: root.sepSize
           }
 
-          Text {
+          Item {
             anchors.verticalCenter: parent.verticalCenter
-            visible: root.uptimeText !== ""
-            text: root.uptimeText
-            color: root.clockFg
-            font.family: Zenon.clockFamily
-            font.weight: Font.Bold
-            font.pointSize: root.clockSize
+            width: Math.max(lockGhost.implicitWidth, lockTime.implicitWidth)
+            height: lockTime.implicitHeight
+
+            Text {
+              id: lockGhost
+              anchors.centerIn: parent
+              text: "88:88"
+              color: root.ghostFg
+              font.family: Zenon.clockFamily
+              font.weight: Font.Bold
+              font.pointSize: root.clockSize
+            }
+
+            Text {
+              id: lockTime
+              anchors.centerIn: parent
+              text: Qt.formatDateTime(clock.date, "HH:mm")
+              color: root.clockFg
+              font.family: Zenon.clockFamily
+              font.weight: Font.Bold
+              font.pointSize: root.clockSize
+            }
           }
         }
 

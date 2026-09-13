@@ -34,15 +34,9 @@ PanelWindow {
   property real morphFade: 1
   property real showFactor: 0
   property bool collapsing: false
-  readonly property real morphScaleX: (popup.morphMode && popup.statusbar && panel.width > 0)
-    ? popup.statusbar.width / panel.width : 1
-  readonly property real morphScaleY: (popup.morphMode && popup.statusbar && panel.height > 0)
-    ? popup.statusbar.height / panel.height : 1
-  readonly property real panelX: popup.morphMode ? popup.morphScaleX
-    : (popup.collapsing ? 0.985 + 0.015 * popup.showFactor
+  readonly property real panelX: (popup.collapsing ? 0.985 + 0.015 * popup.showFactor
                         : 0.94 + 0.06 * popup.showFactor)
-  readonly property real panelY: popup.morphMode ? popup.morphScaleY
-    : (popup.collapsing ? 0.82 + 0.18 * popup.showFactor
+  readonly property real panelY: (popup.collapsing ? 0.82 + 0.18 * popup.showFactor
                         : 0.90 + 0.10 * popup.showFactor)
   // Math.min, not morphFade alone. Handing the pill straight to another
   // layer leaves morphFade pinned at 1 — the pill never un-morphs, so there

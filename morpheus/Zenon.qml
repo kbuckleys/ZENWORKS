@@ -257,18 +257,10 @@ QtObject {
   // the edge, so the full 88px pad would be clipped. Grow 4 blur
   // 24 drop 6 alpha 0.60 keeps the same soft, present read but
   // stays inside the overlay window and shows on a dark desktop.
-  // Capped ink, uncapped size — the same bargain the menu shadow strikes, and
-  // for the same reason: hyprland decides blur from alpha and cannot tell a
-  // shadow from a ground. Panels get away with a dark shadow today only
-  // because panelOpacity defaults to 0.80 and blurs alongside it; take that
-  // under 0.5 and a 0.60 shadow would ring the panel exactly the way the menu
-  // shadow used to. GROW carries the weight the ink gives up — a blurred rect
-  // is only half covered at its own edge, so the first pixels are where a
-  // shadow is actually read.
   readonly property color shadowInk:  Qt.rgba(0, 0, 0, Oracle.shadowStrength)
-  readonly property int   shadowGrow: 12
-  readonly property int   shadowBlur: 28
-  readonly property int   shadowDrop: 8
+  readonly property int   shadowGrow: 4
+  readonly property int   shadowBlur: 24
+  readonly property int   shadowDrop: 6
   readonly property int   shadowPad: shadowGrow + shadowBlur + shadowDrop
 
   // ── the shadow a MENU's BORDER casts ──
@@ -329,6 +321,7 @@ QtObject {
   // the time far more evenly, so each frame carries a similar distance and
   // the move lands instead of settling.
   readonly property int travelEase: Easing.OutCubic
+
 
   // ── the arrival ──────────────────────────────────────────────────────
   // Moved to Arrival.qml. When the session's first animation plays is a

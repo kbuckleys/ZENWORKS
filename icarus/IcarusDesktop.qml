@@ -16,6 +16,19 @@ Variants {
   // reference to the popup that should be opened
   property var popup: null
 
+  // ── WHICH MONITOR THE POINTER IS ACTUALLY ON ──────────────────────────
+  // Hyprland's focusedMonitor follows the focused WINDOW. Over the desktop
+  // there is no window to focus, so it goes on naming wherever you last had
+  // one — and a panel opened from here spawned on the other screen until you
+  // clicked something to move window focus. That is the "sometimes it opens
+  // on the wrong monitor" this desktop is in the best position to answer:
+  // it already has a surface on every output and already takes input on all
+  // of them, so it knows where the pointer is without asking anyone.
+  //
+  // Null whenever the pointer is over a window instead, where focusedMonitor
+  // is right by definition and should be left to answer.
+  property var pointerScreen: null
+
   PanelWindow {
     id: surface
     required property var modelData
@@ -33,6 +46,14 @@ Variants {
     Item {
       id: catcher
       anchors.fill: parent
+
+      HoverHandler {
+        id: overDesktop
+        onHoveredChanged: {
+          if (overDesktop.hovered) root.pointerScreen = surface.modelData;
+          else if (root.pointerScreen === surface.modelData) root.pointerScreen = null;
+        }
+      }
 
       MouseArea {
         id: mouse
