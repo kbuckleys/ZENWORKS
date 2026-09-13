@@ -875,6 +875,27 @@ function findCommand(dir, query) {
 // first 2000 rg found rather than the first 2000 alphabetically; that is the
 // price of being able to stop it, and a search that broad is being narrowed
 // again anyway.
+// DIRECTORIES ONLY, for the send-to sheet's filter. A file is never an answer
+// to "where should this go", so unlike findCommand there is no second pass and
+// nothing to interleave — which also halves the walk.
+//
+// Bounded three ways, because this runs against a whole home directory while
+// somebody is still typing: a depth cap, a result cap, and one process at a
+// time (the caller kills the last before starting the next). fd is walking
+// directory entries, not reading files — the 79-second warning on grepCommand
+// below is about ripgrep opening everything it finds, which this never does.
+//
+// `--nth -2` for the same reason findCommand gives: fd ends a directory with a
+// slash, so its last field is empty and every entry would score zero. The
+// caller strips that slash back off.
+function dirFindCommand(dirs, query) {
+  const q = Strings.shellQuote(String(query).trim());
+  const where = dirs.map((d) => Strings.shellQuote(d)).join(" ");
+  return "fd -t d -H --no-ignore --color=never --max-depth 8 . " + where
+    + " 2>/dev/null | fzf --filter " + q + " -d / --nth -2 2>/dev/null"
+    + " | head -n 120 | tr '\\n' '\\0'";
+}
+
 function grepCommand(dir, query) {
   return "rg --files-with-matches --smart-case --null --color=never --hidden"
     + " -g " + Strings.shellQuote("!.local")

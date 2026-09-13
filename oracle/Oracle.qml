@@ -140,7 +140,7 @@ Singleton {
   // numbers: a layer sits near an edge and a shadow loud enough to lift it off
   // the desktop reads as a black halo, while a menu floats over a window and
   // the same number reads as no shadow at all.
-  property real shadowStrength: 0.48
+  property real shadowStrength: 0.60
   // A menu's own ground. Opaque by default and deliberately so: a menu sits
   // ON what is behind it, and at the panels' alpha the wallpaper reads
   // straight through the rows.
@@ -425,10 +425,9 @@ Singleton {
     { key: "menuOpacity", section: "look", alias: "transparency translucency see-through menu background", label: "Menu opacity", type: "real",
       min: 0.3, max: 1, step: 0.05,
       help: "The ground under the rows of every menu that opens on the DESKTOP — icarus', the tray's, picasso's, and the dropdowns in here. Alpha over black, so lower is more transparent, and hyprland frosts the wallpaper behind it. Terminus' right-click menu is solid whatever this says: it opens inside a window, so what is behind it is terminus' own rows, and nothing the compositor does can frost those." },
-    { key: "shadowStrength", section: "look", label: "Shadow", type: "real",
-      alias: "elevation depth lift drop shadow menu panel",
-      min: 0, max: 0.48, step: 0.01,
-      help: "How dark every shadow on this desktop is — panels, menus, terminus' dialogs, all of them. Alpha over black, and it stops at 0.48 deliberately: hyprland will not blur under a pixel below 0.5, so a shadow above that line is the one part of a surface the compositor blurs behind, which reads as a frosted ring around anything too transparent to be blurred itself. Under the line a shadow is free at any size — which is why this is capped and the spread is not." },
+    { key: "shadowStrength", section: "look", label: "Panel shadow", type: "real",
+      min: 0, max: 1, step: 0.05,
+      help: "How far a layer lifts off the desktop. A layer sits near an edge, so too much of this reads as a black halo." },
     { key: "motionScale", section: "motion", label: "Animation speed", type: "real",
       min: 0, max: 2.5, step: 0.05, unit: "x",
       help: "Multiplies every duration in the shell. Zero means no animation at all." },

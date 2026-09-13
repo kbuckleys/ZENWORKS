@@ -110,6 +110,27 @@ ShellRoot {
     return screens.length ? screens[0] : null;
   }
 
+  // ── MOVING THE PILL TO ANOTHER OUTPUT ─────────────────────────────────
+  // A layer-shell surface belongs to the output it was created on and cannot
+  // be handed to another one. Rebinding `screen` takes it off the old output
+  // without putting it on the new: the pill simply vanished when Monitor was
+  // changed in settings, and only a shell restart brought it back.
+  //
+  // So it is taken down and put back up. One frame down is enough for the
+  // compositor to destroy the surface and let quickshell build a fresh one
+  // against the screen the binding now names.
+  onStatusScreenChanged: {
+    if (!root.statusScreen) return;
+    bar.visible = false;
+    barReattach.restart();
+  }
+
+  Timer {
+    id: barReattach
+    interval: 1
+    onTriggered: bar.visible = true
+  }
+
   property string activeLayer: ""
   property bool layerOpen: activeLayer !== ""
 
@@ -201,6 +222,23 @@ ShellRoot {
   // stand-in for the pill's own visual progress. Both halves of every
   // crossfade read this one scalar, which is what keeps them from drifting.
   property real morphFactor: root.pillMorphed ? 1 : 0
+  // travelEase, not ease. A morph is the pill TRAVELLING into a panel's
+  // shape and it is watched the whole way; Zenon.ease is quintic, the curve
+  // for something appearing, which puts seven tenths of the change in the
+  // first fifth of the time and crawls through the rest.
+  //
+  // The crossfade below is keyed off this number, which is what made it read
+  // as slow rather than merely soft: layerFade opens at 0.55, and quintic is
+  // past 0.55 almost at once — so the layer stood there finished while the
+  // geometry spent the remaining four fifths of the animation creeping the
+  // last few percent. Cubic spends the time evenly, so the schedule below
+  // means what it says.
+  // THE SAME ANIMATION A DETACHED LAYER PLAYS. Not a curve chosen to feel
+  // like it — literally the same duration and the same easing that every
+  // popup's own showFactor uses when it opens on a monitor the pill is not
+  // on. A morph is that arrival with the pill's rect as its starting shape;
+  // anything else here makes it a second, different animation that happens
+  // to be about the same thing.
   Behavior on morphFactor { NumberAnimation { duration: Zenon.slow; easing.type: Zenon.ease } }
   // The crossfade schedule, defined once here rather than re-derived in each
   // layer: the pill's own row has finished clearing by 0.45 and a layer only
@@ -211,6 +249,15 @@ ShellRoot {
   // monitor awareness: layers spawn on the focused monitor; they only
   // morph out of the pill when that monitor is the pill's own
   readonly property var focusedScreen: {
+    // THE POINTER FIRST, WHEN IT IS OVER THE DESKTOP. Hyprland's focused
+    // monitor follows the focused WINDOW, and over bare desktop there is no
+    // window to follow — so it keeps naming the screen your last window was
+    // on, and a panel opened from the desktop menu spawned there instead of
+    // under your cursor. icarusDesktop has a surface on every output and
+    // knows where the pointer is; when it says nothing the pointer is over a
+    // window, and then the focused monitor is right by definition.
+    if (icarusDesktop && icarusDesktop.pointerScreen)
+      return icarusDesktop.pointerScreen;
     const m = Hyprland.focusedMonitor;
     if (!m || !m.name) return statusScreen;
     const screens = Quickshell.screens;
@@ -557,8 +604,19 @@ ShellRoot {
       margins.right: bar.sideMargin
       margins.bottom: Zenon.padScreen
       margins.top: Zenon.padScreen
-      Behavior on margins.left { NumberAnimation { duration: Zenon.slow; easing.type: Zenon.ease } }
-      Behavior on margins.right { NumberAnimation { duration: Zenon.slow; easing.type: Zenon.ease } }
+      // travelEase on all four of these: they ARE the morph, as far as the
+      // eye is concerned — the pill sliding out to a panel's margins and
+      // growing to its height. Quintic put seven tenths of that change in the
+      // first fifth of the time and crawled through the rest, so the shape
+      // arrived nearly right and then spent the remaining four fifths
+      // settling the last few pixels. A DETACHED layer has no pill geometry
+      // to animate at all, which is why it read as quicker on the same 170ms.
+      // NO ANIMATION ON THE PILL'S OWN GEOMETRY. The layer draws its own
+      // opaque ground now, so the pill behind it is not visible while one is
+      // open — and animating a shape nobody can see cost a 13x resize every
+      // frame and put a second motion under the layer's own. It snaps, out of
+      // sight, and what you watch is the layer: the same entrance and the same
+      // exit it plays detached.
       Behavior on margins.bottom { NumberAnimation { duration: Zenon.slow; easing.type: Zenon.ease } }
 
     // The pill's own first frame. QQuickWindow.frameSwapped fires once the
@@ -594,7 +652,6 @@ ShellRoot {
       transform: Translate {
         y: (Zenon.barTop ? -1 : 1) * (1 - root.barIntro) * 22
       }
-      Behavior on height { NumberAnimation { duration: Zenon.slow; easing.type: Zenon.ease } }
 
       // The now-playing takeover. Drawn at pill level and not inside the
       // module, for two reasons: it has to reach past the bar's own right

@@ -638,6 +638,25 @@ FloatingWindow {
   // A click in the half the keyboard is not in: land on the row, then come
   // over. Both halves are real panes, so this is the whole of what makes
   // them interchangeable rather than one of them being second class.
+  // THE SAME RULE, FOR A CLICK THAT LANDS ON NOTHING.
+  //
+  // focusPane below is a click on a ROW in the other half: take the row, then
+  // come over. Empty space had no equivalent, and the empty-space overlay is
+  // one item across the whole body with no idea which half the pointer is in
+  // — so clicking the background of the inactive half cleared the ACTIVE
+  // pane's marks and opened the paste menu for the ACTIVE pane's directory,
+  // from a click made in the other one. Nothing moved, which read as the mouse
+  // being unable to choose a pane at all: only rows could, and only by being
+  // rows.
+  //
+  // No `sel` here — clicking empty space is not choosing a row, so the cursor
+  // stays where that half left it.
+  function comeOverAt(bx) {
+    const v = root.viewUnder(bx);
+    if (!v || !v.pane || v.pane.active) return;
+    if (root.dual && v.pane.side !== root.paneSide) root.stepOver();
+  }
+
   function focusPane(pane, i) {
     if (!pane) return;
     pane.sel = i;
@@ -664,6 +683,22 @@ FloatingWindow {
   // other, and the visible result is that the contents stay exactly where they
   // are while the focus crosses over. Which is what Tab is expected to do.
   property int paneSide: 0
+  // AN INVARIANT, NOT A TIDY-UP. With one pane, side 0 is the only half drawn
+  // — PaneList and PaneGrid are both `dual || side === 0` — so a paneSide of 1
+  // while unsplit names a half that does not exist.
+  //
+  // It happens: toggleDual puts the window back to one pane and leaves this
+  // wherever the keyboard was. `act` guards against it (`dual && paneSide === 1`)
+  // and so does everything reached through `act`, but anything reading the
+  // number directly is looking at a lie. It already cost list and grid their
+  // mouse once, through actList — which picked the list for paneSide rather
+  // than the list belonging to the active pane, and so answered with an empty,
+  // undrawn view.
+  //
+  // Enforced where the state changes rather than at each of the four places
+  // that unsplit. loadTab writes `dual` before `paneSide`, so a tab that was
+  // saved split still restores its side.
+  onDualChanged: if (!root.dual) root.paneSide = 0
 
   // WHAT EACH SIDE IS SHOWING is the pane's own business now. paneViews and
   // paneZooms were two arrays indexed by side, kept in step by hand at every
@@ -2454,6 +2489,17 @@ FloatingWindow {
   readonly property string pdfStem: Terminus.terminusCacheDir() + "/preview"
   property int previewStamp: 0
   property var previewRows: []
+  // AN ARCHIVE'S TREE IS NOT A LISTING'S ROWS, and they used to share this
+  // property. A tree entry has a glyph, an ink and a depth; it has no `path`,
+  // so nothing that expects an entry can read one — and everything that reads
+  // the preview had to ask `previewKind` first and remember to. The file
+  // already carries the scar: an invisible ListView "quietly instantiated a
+  // column of rows against the wrong shape of data".
+  //
+  // Two properties, so the question cannot be forgotten. Each is emptied when
+  // the other is filled — see settlePreview, which is the one place both are
+  // written.
+  property var previewTree: []
 
   property string previewText: ""
 
@@ -2535,6 +2581,8 @@ FloatingWindow {
   // Every slide now ends with exactly one refresh; refreshPreview returns
   // immediately when the pane is already showing the right row, so asking
   // when the answer is already in costs nothing.
+
+
   function resumePreview() {
     if (millerAnim.running) return;
     // BELT AND BRACES on the fade. millerStep drops the columns to nothing
@@ -2543,16 +2591,19 @@ FloatingWindow {
     // — the worst failure this transition could have. Every slide ends here.
     miller.opacity = 1;
     root.previewWanted = false;
-    // This refresh is the one that follows a slide, so whatever it settles is
-    // an ARRIVAL and gets the longer ease.
-    root.previewArriving = true;
+    // AND THE ONE REQUEST THE SLIDE WAS HOLDING BACK. Unconditional, because
+    // the paths that ask BEFORE stepping and the step that leaves `sel` at 0
+    // both end a slide with nothing outstanding — and then the row under the
+    // cursor never gets previewed at all. A directory with a single file in
+    // it has no second row to move to and would never show one.
+    //
+    // refreshPreview returns immediately when the pane is already showing the
+    // right row, so asking when the answer is in costs nothing.
     root.refreshPreview();
-    // Nothing settled synchronously — a cold directory answers later, and the
-    // flag has to survive until it does.
   }
 
   function refreshPreview() {
-    if (millerAnim.running) { root.previewWanted = true; return; }
+    if (millerAnim.running || root.stepping) { root.previewWanted = true; return; }
     peekAim.restart();
     const r = root.currentRow();
     // The rows under this cursor are the ones being left — see `arriving`.
@@ -2692,7 +2743,8 @@ FloatingWindow {
             e.ink = e.more ? Zenon.muted : root.inkOf(e);
             e.glyph = e.more ? "" : Icons.glyphFor(e);
           }
-          root.previewRows = rows;
+          root.previewTree = rows;
+          root.previewRows = [];
           root.previewShown = cur.path;
           // an unreadable or empty archive is still not text
           if (rows.length === 0) root.previewKind = "binary";
@@ -2826,16 +2878,22 @@ FloatingWindow {
       previewFade.stop();
       previewPane.opacity = 0;
       previewFade.restart();
-      // consumed by the fade that just started; the next one is a cursor move
-      // unless another arrival says otherwise
-      root.previewArriving = false;
     }
     previewProc.running = false;
     root.previewFor = "";
     previewDelay.stop();
     root.previewShown = path || "";
     root.previewKind = kind;
-    root.previewRows = rows || [];
+    // ROUTED BY KIND, and the other one emptied. A cached archive comes back
+    // through here exactly as a cached directory does, so this is where the
+    // two shapes have to be told apart or they never are.
+    if (kind === "archive") {
+      root.previewTree = rows || [];
+      root.previewRows = [];
+    } else {
+      root.previewRows = rows || [];
+      root.previewTree = [];
+    }
     root.previewText = text || "";
   }
 
@@ -3322,25 +3380,21 @@ FloatingWindow {
     easing.type: Zenon.travelEase
   }
 
-  // The preview pane's own arrival, at ONE OF TWO SPEEDS.
+  // The preview pane's own arrival.
   //
-  // The pane changes subject in two quite different situations and they want
-  // opposite things. ARRIVING is stepping into a directory: the columns have
-  // just travelled, the pane fills once they stop, and it is the only thing
-  // moving on that frame — it wants a real ease, or it reads as a pop however
-  // short the fade is. BROWSING is the cursor walking down a list, several
-  // rows a second, where the same ease would smear one row's preview into the
-  // next and make the cursor feel unresponsive.
+  // This had two speeds once — a longer one for arriving in a directory, a
+  // short one for walking the cursor down it. The long one was covering a pop
+  // that came from the column being EMPTIED mid-navigation, and that stopped
+  // happening when syncPreviewRows learnt to leave a hidden column alone. A
+  // fade tuned to hide a bug should not outlive the bug.
   //
-  // Render thread either way, so a directory heavy enough to be worth easing
-  // in is not the thing that makes its own easing stutter.
-  property bool previewArriving: false
-
+  // Render thread, so a directory heavy enough to be worth easing in is not
+  // the thing that makes its own easing stutter.
   OpacityAnimator {
     id: previewFade
     target: previewPane
     to: 1
-    duration: root.previewArriving ? Zenon.slow : Zenon.fast
+    duration: Zenon.fast
     easing.type: Zenon.travelEase
   }
 
@@ -3390,6 +3444,31 @@ FloatingWindow {
   readonly property var prevCol: root.millerOrder[2] === 0 ? colA
     : (root.millerOrder[2] === 1 ? colB : colC)
 
+  // True from the moment a step is taken until the slide it starts has
+  // finished. The travel is queued a tick late now (see millerStep), so
+  // millerAnim.running is briefly false during a step it is about to run —
+  // and everything that defers work "while the columns move" has to keep
+  // deferring across that gap or it will fire in it.
+  property bool stepping: false
+
+  // A QUARTER of the pane, not a third. Distance is the other half of how
+  // tight a move feels: the same duration over less ground reads as
+  // controlled, and over more ground as a swing. Far enough to still say
+  // which way the tree went.
+  function startTravel(down) {
+    millerAnim.stop();
+    millerFade.stop();
+    miller.x = (down ? 1 : -1) * Math.round(millerBox.width * root.millerTravel);
+    miller.opacity = root.millerDim;
+    millerAnim.start();
+    millerFade.start();
+    // The animator is running now, so millerAnim.running does the guarding
+    // from here. This flag only ever covered the tick between the step and
+    // this call — clearing it anywhere later would deadlock resumePreview,
+    // which is the one thing that ends a slide.
+    root.stepping = false;
+  }
+
   function millerStep(from, to) {
     if (root.viewMode !== "columns" || from === "" || from === to) return;
     const down = to.indexOf(from === "/" ? "/" : from + "/") === 0;
@@ -3430,16 +3509,21 @@ FloatingWindow {
       root.previewShown = from;
     }
 
-    millerAnim.stop();
-    millerFade.stop();
-    // A QUARTER of the pane, not a third. Distance is the other half of how
-    // tight a move feels: the same duration over less ground reads as
-    // controlled, and over more ground as a swing. Far enough to still say
-    // which way the tree went.
-    miller.x = (down ? 1 : -1) * Math.round(millerBox.width * root.millerTravel);
-    miller.opacity = root.millerDim;
-    millerAnim.start();
-    millerFade.start();
+    // ── THE SLIDE STARTS WITH THE COLUMNS, NOT AHEAD OF THEM ────────────
+    // Setting the offset here put the travel on the frame BEFORE the columns
+    // had taken their new seats. Caught on a capture: one frame showed the
+    // OLD arrangement — parent, current and preview exactly as they were —
+    // displaced bodily by a quarter of a pane, and the next frame snapped
+    // into the new arrangement at a different offset. The whole tree leaping
+    // sideways and back is the flicker that replaced the stale-rows one.
+    //
+    // Queued BEHIND the columns' own sync, which is a callLater queued a
+    // moment ago by the rotation above, so the seats, the rows and the offset
+    // all land on the same frame. By function reference rather than a closure
+    // so that two quick steps coalesce to one travel, in the direction of the
+    // second.
+    root.stepping = true;
+    Qt.callLater(root.startTravel, down);
   }
 
   // WHERE THE CURSOR WAS ASKED TO GO once the rows are actually in.
@@ -3822,31 +3906,50 @@ FloatingWindow {
   //
   // Coordinates are the body's; each view converts to its own content space.
   function rowUnder(bx, by) {
-    // The second pane has its own rows and its own cursor, and neither belongs
-    // to the active listing. Returning 0 rather than -1 says "over something",
-    // which is what turns the empty-space overlay off and lets the click reach
-    // the row underneath.
+    // ASKED OF THE VIEW UNDER THE POINTER — found by its own geometry, not
+    // worked out from which pane is active or what mode that pane is in.
+    //
+    // Two goes at this were wrong in the same way the actList note above
+    // describes. It used to return 0 ("over something") for the whole passive
+    // half, so the empty-space overlay switched off and the click fell through
+    // to the row underneath — right over that half's ROWS, wrong over its
+    // empty space, where there is no row to fall through to and the click
+    // simply vanished. Answering per side fixed that and broke more: it picked
+    // the other half's view by root.viewMode, which is the ACTIVE pane's mode,
+    // so with one half in list and the other in grid it questioned a view that
+    // is not drawn, heard -1 everywhere, and the overlay ate every click in
+    // that half instead.
+    //
+    // The views know where they are and whether they are on. Asking them is
+    // the only form of this that cannot go stale.
+    const v = root.viewUnder(bx);
+    if (v) return v.indexAt(bx - v.x + v.contentX, by - v.y + v.contentY);
+
+    // Not over a list or a grid. The only other thing holding rows is miller,
+    // and miller only ever opens on the active half.
+    if (root.viewMode !== "columns") return 0;
     if (root.dual && (bx < root.activePaneX
                       || bx > root.activePaneX + root.activePaneW)) return 0;
-    // Measured from the ACTIVE PANE's left edge, not the body's. The three
-    // views are placed at activePaneX now, and indexAt asks in the view's own
-    // coordinates — with the active pane on the right-hand half, the unshifted
-    // x landed a whole pane's width to the left of where the pointer was.
     const x = bx - root.activePaneX;
-    // and from its top, which is under this half's headings when it has them
     const y = by - bodyBox.topH;
-    if (root.viewMode === "list")
-      return root.actList.indexAt(x + root.actList.contentX,
-                                  y + root.actList.contentY);
-    if (root.viewMode === "grid")
-      return root.actGrid.indexAt(x + root.actGrid.contentX,
-                                  y + root.actGrid.contentY);
-    // Miller columns: only the middle pane is the listing. The parent pane and
-    // the preview beside it own their own clicks, so anything outside the
-    // middle column reports "occupied" and the press is passed straight on.
     if (x < root.midCol.x || x > root.midCol.x + root.midCol.width) return 0;
     return root.midCol.view.indexAt(x - root.midCol.x + root.midCol.view.contentX,
                            y + root.midCol.view.contentY);
+  }
+
+  // Whichever of the four views the pointer is inside, or null.
+  //
+  // `on` is the same gate the views draw themselves by — one pane's list and
+  // grid are never both on — so this needs to know nothing about sides, modes
+  // or which half has the keyboard. Written as a function because it reads
+  // geometry that moves; every caller is an event handler, not a binding.
+  function viewUnder(bx) {
+    const vs = [listA, listB, gridA, gridB];
+    for (let i = 0; i < vs.length; i++) {
+      const v = vs[i];
+      if (v.on && bx >= v.x && bx < v.x + v.width) return v;
+    }
+    return null;
   }
   // true for the whole of a row being dragged out, so the overlays that watch
   // hoverRow do not wake up when the pointer leaves the row it picked up
@@ -3864,6 +3967,7 @@ FloatingWindow {
   //
   // Handlers cannot be shielded, only switched off — so they read this.
   readonly property bool modal: props.open || perms.open || confirm.open
+    || sendTo.open
     || prompt.open || pathBar.open || bulk.open || prefs.open || help.open
     || appPick.open
 
@@ -4582,13 +4686,21 @@ FloatingWindow {
     const next = Object.assign({}, base);
     let lo = -1, hi = -1;
 
+    // MEASURED FROM THE ACTIVE PANE, not from the body. band.x1/x2 are body
+    // coordinates — zoneL is activePaneX — and a grid is placed at the pane's
+    // own left edge. On the left half activePaneX is 0 and the two agree; on
+    // the RIGHT half every column index came out a pane's width too far along,
+    // past the end of the row, and the band selected nothing at all.
+    const bx1 = x1 - root.activePaneX;
+    const bx2 = x2 - root.activePaneX;
+
     if (root.viewMode === "grid") {
       const g = root.actGrid;
       const cols = Math.max(1, Math.floor(g.width / g.cellWidth));
       const r1 = Math.floor((y1 + g.contentY) / g.cellHeight);
       const r2 = Math.floor((y2 + g.contentY) / g.cellHeight);
-      const c1 = Math.floor(x1 / g.cellWidth);
-      const c2 = Math.floor(x2 / g.cellWidth);
+      const c1 = Math.floor(bx1 / g.cellWidth);
+      const c2 = Math.floor(bx2 / g.cellWidth);
       for (let r = Math.max(0, r1); r <= r2; ++r) {
         for (let c = Math.max(0, c1); c <= Math.min(cols - 1, c2); ++c) {
           const i = r * cols + c;
@@ -4605,9 +4717,10 @@ FloatingWindow {
     // a drag started over the parent or the preview is not a selection of
     // anything in the middle one and must not act like it.
     if (root.viewMode === "columns") {
+      // Same correction: these widths are inside the pane, the band's x is not.
       const left = root.parCol.width + 1;
       const right = left + root.midCol.width;
-      if (x2 < left || x1 > right) { root.act.marked = next; return; }
+      if (bx2 < left || bx1 > right) { root.act.marked = next; return; }
     }
     lo = Math.floor((y1 + view.contentY) / root.rowH);
     hi = Math.floor((y2 + view.contentY) / root.rowH);
@@ -5443,7 +5556,7 @@ FloatingWindow {
       // long as one is up — see its own note. Nothing here may act while a
       // question is on screen.
       if (confirm.open || prompt.open || perms.open || props.open
-          || appPick.open) return;
+          || appPick.open || sendTo.open) return;
 
       if (help.open) {
         // EVERY KEY IS SWALLOWED HERE, AND ONLY ESCAPE CLOSES.
@@ -6140,6 +6253,15 @@ FloatingWindow {
         height: root.headH
         color: Zenon.headBg
 
+        // HOW MUCH OF THE BAR'S OWN CONTENT IS SHOWING. The send-to header is
+        // drawn on this bar (see sendToBarHead) and the two cannot share the
+        // room, so everything that belongs to the path steps aside while the
+        // sheet is up and comes back as it leaves. One number, because these
+        // are half a dozen siblings rather than one container — crumbInner is
+        // a geometry helper with nothing inside it, which is what made the
+        // first attempt at this fade nothing at all.
+        readonly property real chromeInk: 1 - sendToCard.opacity
+
         // ── THE INSIDE OF THE BAR, WHICH IS NOT THE WHOLE OF IT ──────
         // The last pixel of this strip is the hairline along its bottom edge.
         // Everything on the bar used to be centred across the whole 34,
@@ -6165,6 +6287,7 @@ FloatingWindow {
         // the LEFT of the path, so it sits to the left of it
         Item {
           id: sideToggle
+          opacity: crumbBar.chromeInk
           anchors.left: parent.left
           anchors.leftMargin: 8
           anchors.verticalCenter: crumbInner.verticalCenter
@@ -6198,6 +6321,7 @@ FloatingWindow {
         // trail you cannot work out from the rest.
         Flickable {
           id: crumbFlick
+          opacity: crumbBar.chromeInk
           anchors.left: sideToggle.right
           // Clear of the toggle rather than touching it. The glyph is a
           // control and the trail is text; at 4px the first step read as a
@@ -6425,6 +6549,7 @@ FloatingWindow {
         // being rendered into the texture, which is exactly what it is for.
         Rectangle {
           id: crumbRamp
+          opacity: crumbBar.chromeInk
           width: Math.max(1, crumbFlick.width)
           height: Math.max(1, crumbFlick.height)
           gradient: Gradient {
@@ -6736,6 +6861,7 @@ FloatingWindow {
         // working than the place those keys are finally written down.
         Item {
           id: prefsToggle
+          opacity: crumbBar.chromeInk
           anchors.right: parent.right
           anchors.rightMargin: 8
           anchors.verticalCenter: crumbInner.verticalCenter
@@ -6777,6 +6903,7 @@ FloatingWindow {
         // already where you look to find out what the window is doing.
         Item {
           id: jobsToggle
+          opacity: crumbBar.chromeInk
           anchors.right: prefsToggle.left
           anchors.rightMargin: 2
           anchors.verticalCenter: crumbInner.verticalCenter
@@ -6960,6 +7087,7 @@ FloatingWindow {
         // and whatever the last action had to say live here now.
         Row {
           id: crumbStatus
+          opacity: crumbBar.chromeInk
           anchors.right: jobsToggle.left
           anchors.rightMargin: 10
           // up by the separator's own pixel: it is the bar's bottom EDGE, not
@@ -7184,10 +7312,135 @@ FloatingWindow {
           }
         }
 
+        // ── WHAT THE SHEET IS DOING, SAID ON THE BAR ─────────────────
+        // The send-to header lives HERE rather than inside the sheet, and
+        // that is the whole of why it looks right: inside the sheet, anything
+        // see-through reveals the file list, because the file list is what is
+        // behind it. On the bar it sits over the window's own background with
+        // the compositor's blur behind that, so its translucency shows what
+        // the bar's translucency shows.
+        //
+        // The breadcrumb steps aside while it is up — you are choosing a
+        // destination, not reading where you already are — and the two cross
+        // fade on the sheet's own opacity, so the bar changes its mind at
+        // exactly the speed the sheet arrives.
+        //
+        // Read as a sentence: this thing → that place. The verb and the arrow
+        // are punctuation and stay muted; the nouns carry the colour.
+        Row {
+          id: sendToBarHead
+          anchors.centerIn: crumbInner
+          spacing: 6
+          opacity: sendToCard.opacity
+          visible: sendToBarHead.opacity > 0.01
+
+          Text {
+            anchors.verticalCenter: parent.verticalCenter
+            text: sendTo.op === "move" ? "\uDB80\uDD90" : "\uDB80\uDD8F"
+            // crumbInk, the ink the step you are standing on uses. The header
+            // takes the bar's place while it is up, so its punctuation is the
+            // bar's punctuation — muted put it a shade below the chrome it had
+            // replaced.
+            color: root.crumbInk
+            font.family: Zenon.face
+            font.pixelSize: 15
+          }
+
+          // Air after the verb, so the glyph reads as a label on the line
+          // rather than as the first character of the filename.
+          Item { width: 6; height: 1 }
+
+          Text {
+            anchors.verticalCenter: parent.verticalCenter
+            text: sendTo.icon || ""
+            color: sendTo.iconInk
+            font.family: Zenon.face
+            font.pixelSize: 15
+          }
+
+          Text {
+            anchors.verticalCenter: parent.verticalCenter
+            width: Math.min(implicitWidth, 240)
+            elide: Text.ElideMiddle
+            text: (sendTo.paths.length === 1 ? sendTo.names[0]
+                : sendTo.paths.length + " items") || ""
+            color: sendTo.iconInk
+            font.family: Zenon.face
+            font.pixelSize: 15
+          }
+
+          Item { width: 6; height: 1 }
+
+          Text {
+            anchors.verticalCenter: parent.verticalCenter
+            visible: !!sendTo.current
+            text: "\uDB85\uDFB7"
+            color: root.crumbInk
+            font.family: Zenon.face
+            font.pixelSize: 15
+          }
+
+          Item { width: 6; height: 1 }
+
+          Text {
+            anchors.verticalCenter: parent.verticalCenter
+            visible: !!sendTo.current
+            text: (sendTo.current
+              ? Icons.glyphFor({ name: sendTo.current.name, isDir: true }) : "") || ""
+            color: sendTo.blocked ? Zenon.muted : Zenon.cyan
+            font.family: Zenon.face
+            font.pixelSize: 15
+          }
+
+          Text {
+            anchors.verticalCenter: parent.verticalCenter
+            visible: !!sendTo.current
+            width: Math.min(implicitWidth, 260)
+            elide: Text.ElideMiddle
+            text: (sendTo.current ? sendTo.current.name : "") || ""
+            color: sendTo.blocked ? Zenon.muted : Zenon.cyan
+            font.family: Zenon.face
+            font.pixelSize: 15
+          }
+        }
+
+        // What you have typed, on the bar with the rest of it.
+        Text {
+          id: sendToQuery
+          anchors.right: crumbInner.right
+          anchors.rightMargin: 12
+          anchors.verticalCenter: crumbInner.verticalCenter
+          opacity: sendToCard.opacity
+          visible: sendTo.query !== "" && sendToQuery.opacity > 0.01
+          text: sendTo.query
+          color: Zenon.sand
+          font.family: Zenon.face
+          font.pixelSize: 15
+        }
+
+        // ── THE BAR'S BOTTOM EDGE, WITH A GAP WHERE THE SHEET HANGS ──
+        // Two segments rather than one line with something drawn over it.
+        // Covering was the first attempt and it could not work: headBg is
+        // translucent, so a patch in the bar's own colour tinted the hairline
+        // instead of hiding it. A rule with a hole in it has nothing to show
+        // through.
+        //
+        // The sheet is spliced INTO the chrome, not hung under it — the bar's
+        // edge stops where the sheet begins and picks up again on the far
+        // side, so the two are one piece with a tongue coming out of it.
         Rectangle {
           anchors.bottom: parent.bottom
           anchors.left: parent.left
+          width: sendTo.splicing ? sendTo.spliceX : parent.width
+          height: 1
+          color: Zenon.msgBorder
+        }
+
+        Rectangle {
+          anchors.bottom: parent.bottom
           anchors.right: parent.right
+          width: sendTo.splicing
+            ? Math.max(0, parent.width - sendTo.spliceX - sendTo.spliceW) : 0
           height: 1
           color: Zenon.msgBorder
         }
@@ -7504,8 +7757,8 @@ FloatingWindow {
               id: colA
               slot: root.millerOrder[0] === 0 ? 0
                   : (root.millerOrder[1] === 0 ? 1 : 2)
-              x: miller.slotX(colA.slot)
-              width: miller.slotW(colA.slot)
+              x: miller.slotX(colA.drawnSlot)
+              width: miller.slotW(colA.drawnSlot)
               height: parent.height
               // By SLOT, never by instance: rotating changes what this column
               // is about, and the binding follows it there.
@@ -7518,8 +7771,8 @@ FloatingWindow {
               id: colB
               slot: root.millerOrder[0] === 1 ? 0
                   : (root.millerOrder[1] === 1 ? 1 : 2)
-              x: miller.slotX(colB.slot)
-              width: miller.slotW(colB.slot)
+              x: miller.slotX(colB.drawnSlot)
+              width: miller.slotW(colB.drawnSlot)
               height: parent.height
               // By SLOT, never by instance: rotating changes what this column
               // is about, and the binding follows it there.
@@ -7532,8 +7785,8 @@ FloatingWindow {
               id: colC
               slot: root.millerOrder[0] === 2 ? 0
                   : (root.millerOrder[1] === 2 ? 1 : 2)
-              x: miller.slotX(colC.slot)
-              width: miller.slotW(colC.slot)
+              x: miller.slotX(colC.drawnSlot)
+              width: miller.slotW(colC.drawnSlot)
               height: parent.height
               // By SLOT, never by instance: rotating changes what this column
               // is about, and the binding follows it there.
@@ -7886,7 +8139,7 @@ FloatingWindow {
                 anchors.topMargin: 0
                 anchors.bottomMargin: 0
                 visible: root.previewKind === "archive"
-                model: root.previewKind === "archive" ? root.previewRows : []
+                model: root.previewKind === "archive" ? root.previewTree : []
                 clip: true
                 interactive: true
                 // drained with the model — see the note on the list, above
@@ -8513,16 +8766,42 @@ FloatingWindow {
         //
         // It asks the view's own indexAt rather than reading hoverRow, for the
         // reason rowUnder exists.
+        //
+        // AND IT ASKS ONLY WHEN THE ANSWER COULD HAVE CHANGED. This fires on
+        // every motion event — on a 180Hz panel that is a hit test against a
+        // view, per frame, for a boolean that changes when you cross a row
+        // boundary and at no other time. The last point is remembered and a
+        // move of less than a pixel in both axes is not worth asking about.
         HoverHandler {
           id: emptyWatch
-          onPointChanged: {
+          property real lastX: -1
+          property real lastY: -1
+          //
+          // The throttle remembers an answer, so anything else that could
+          // change it has to say so. A pane switch is the one: the pointer has
+          // not moved, but which half is active has, and in column view that
+          // decides whether it is over anything at all.
+          readonly property int activeSide: root.act.side
+          onActiveSideChanged: {
+            emptyWatch.lastX = -1;
+            emptyWatch.lastY = -1;
+            if (emptyWatch.hovered) emptyWatch.settle();
+          }
+
+          function settle() {
             const px = emptyWatch.point.position.x;
-            root.overEmpty = root.rowUnder(px, emptyWatch.point.position.y) < 0;
+            const py = emptyWatch.point.position.y;
+            if (Math.abs(px - emptyWatch.lastX) < 1
+             && Math.abs(py - emptyWatch.lastY) < 1) return;
+            emptyWatch.lastX = px;
+            emptyWatch.lastY = py;
+            root.overEmpty = root.rowUnder(px, py) < 0;
             // The rubber band cannot ask where the pointer is — a DragHandler
             // has a position only once it is already dragging — so the hover
             // that is watching anyway answers for it.
             root.overBandZone = px >= band.zoneL && px <= band.zoneR;
           }
+          onPointChanged: emptyWatch.settle()
         }
 
         // A click on nothing: right opens the menu, left means "none of them".
@@ -8546,6 +8825,9 @@ FloatingWindow {
           enabled: root.overEmpty
           acceptedButtons: Qt.LeftButton | Qt.RightButton
           onClicked: (m) => {
+            // FIRST, so both of the lines below are about the half that was
+            // clicked rather than the half that had the keyboard.
+            root.comeOverAt(m.x);
             if (m.button === Qt.RightButton) { menu.openHere(bodyBox, m); return; }
             if (Object.keys(root.marked).length > 0) root.act.marked = {};
             content.forceActiveFocus();
@@ -9612,7 +9894,14 @@ FloatingWindow {
             Math.max(1, Math.min(3, Math.floor(helpGrid.width / 560)))
           readonly property int perCol:
             Math.max(1, Math.ceil(help.shownRows.length / helpGrid.cols))
-          columns: helpGrid.cols
+          // ROWS ONLY, never both. Setting `columns` as well meant two
+          // bindings describing one layout, and on a width change they
+          // disagreed for a frame: Qt took the new `columns` with the old
+          // `rows` and warned "78 visible items, rows*columns 39" — a keymap
+          // laid out wrong for a frame, and a line in the log every time the
+          // window was resized. Filling top to bottom, `rows` is the only one
+          // Grid needs; it derives the columns, and perCol is defined as the
+          // height that yields exactly `cols` of them.
           rows: helpGrid.perCol
           flow: Grid.TopToBottom
 
@@ -10524,7 +10813,7 @@ FloatingWindow {
       anchors.fill: parent
       z: 20
       readonly property bool anyOpen:
-        confirm.open || perms.open || props.open || prefs.open
+        confirm.open || perms.open || props.open || prefs.open || sendTo.open
       enabled: dialogKeys.anyOpen
 
       onAnyOpenChanged: {
@@ -10549,6 +10838,39 @@ FloatingWindow {
 
       Keys.onPressed: (event) => {
         event.accepted = true;
+
+        // Before confirm, because choosing a destination can raise the
+        // overwrite question on top of this one and the answer belongs to
+        // whichever card is in front.
+        if (sendTo.open && !confirm.open) {
+          // Escape backs out of the filter before it backs out of the sheet:
+          // a narrowed tree is a state you can be in by accident, and losing
+          // the whole picker for it would be losing the branches you opened
+          // to get there.
+          if (event.key === Qt.Key_Escape) {
+            if (sendTo.query !== "") { sendTo.query = ""; return; }
+            sendTo.dismiss(); return;
+          }
+          if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+            sendTo.choose(); return;
+          }
+          if (event.key === Qt.Key_Down) { sendTo.step(1); return; }
+          if (event.key === Qt.Key_Up) { sendTo.step(-1); return; }
+          if (event.key === Qt.Key_Right) { sendTo.expandCurrent(); return; }
+          if (event.key === Qt.Key_Left) { sendTo.outward(); return; }
+          if (event.key === Qt.Key_Backspace) {
+            sendTo.query = sendTo.query.slice(0, -1); return;
+          }
+          // EVERYTHING ELSE PRINTABLE NARROWS THE TREE. Arrows and the four
+          // keys above are the whole of the navigation, deliberately — see
+          // the note on `query`.
+          if (event.key !== Qt.Key_Tab && event.text
+              && event.text.length === 1 && event.text >= " ") {
+            sendTo.query += event.text;
+            return;
+          }
+          return;
+        }
 
         if (confirm.open) {
           if (event.key === Qt.Key_Escape) { confirm.dismiss(); return; }
@@ -11310,6 +11632,11 @@ FloatingWindow {
           // The path is another thing you can take from the row, so it belongs
           // with the two above rather than down among the dialogs.
           { label: "Copy path", key: "c c", act: () => root.copyPath() });
+        // The other half of cut-and-paste, for when you know where it is
+        // going and do not want to go there first — see sendTo.
+        out.push(
+          { label: "Copy to" + many + "…", act: () => sendTo.ask("copy") },
+          { label: "Move to" + many + "…", act: () => sendTo.ask("move") });
         out.push({ sep: true });
         if (root.pending)
           out.push({ label: "Paste here", key: "p", act: () => root.paste() });
@@ -12909,6 +13236,738 @@ FloatingWindow {
       }
     }
 
+    // ── SEND TO: copy or move without going there ─────────────────────────
+    // "Copy to…" and "Move to…" on the row menu. The point is not having to
+    // navigate to the destination first — pick it out of a tree and the
+    // transfer starts from where you are standing.
+    //
+    // IT DOES NO FILE WORK OF ITS OWN, and that is the whole design. pasteDest
+    // already exists for the one gesture that pastes somewhere other than the
+    // cwd, so this sets the same property and calls the same paste(). Conflict
+    // resolution, the undo record a move leaves, the job queue, the status
+    // line and the refresh of the destination all behave exactly as they do
+    // for an ordinary paste, because they ARE the ordinary paste.
+    Rectangle {
+      id: sendTo
+      anchors.fill: parent
+      z: 11
+      // NO DIM. A sheet is a picker, not a warning — and the listing behind
+      // it is what the choice is ABOUT, so darkening it hid the thing you
+      // were looking at to decide. The card has the menus' shadow to sit
+      // against the window on, which is separation enough.
+      //
+      // The overlay stays, because it is what catches every click that misses
+      // the card — see the MouseArea below. It simply paints nothing now.
+      color: "transparent"
+      opacity: 1
+      // Held up by the sheet rather than by a fade of its own: with nothing
+      // to dim there is nothing here to animate, and the card's own fade is
+      // what says when the sheet has gone.
+      visible: sendTo.open || sendToCard.opacity > 0.01
+
+      // WHAT THE BAR ASKS THE SHEET. Read from crumbBar's two rule segments
+      // so its bottom edge can open a gap exactly where this hangs from it.
+      readonly property bool splicing: sendToCard.opacity > 0.01
+      readonly property real spliceX: sendToCard.x
+      readonly property real spliceW: sendToCard.width
+
+      property bool open: false
+      property string op: "copy"
+      // CAPTURED WHEN THE MENU ENTRY IS CHOSEN, not read back when you pick a
+      // destination. commitPaste clears the marks, and a picker that asked
+      // "which rows?" afterwards would answer with none of them.
+      property var paths: []
+      property var names: []
+      // WHAT IS MOVING, AS THE LISTING DRAWS IT. Taken from the enriched rows
+      // at the moment they are captured — the same glyph and the same ink the
+      // file wears on its own line — so the header names the thing in the
+      // vocabulary you were just reading it in. Several at once have no single
+      // icon, so they get Material's file-multiple (U+F12F7).
+      property string icon: ""
+      property color iconInk: Zenon.white
+      // The tree, flattened: every row on screen in order, each carrying the
+      // depth it is drawn at. Children are spliced in under their parent and
+      // spliced out again when it closes.
+      property var nodes: []
+      property int sel: 0
+      // The one directory being read. One at a time: a tree you are walking
+      // fast would otherwise have four reads in flight for branches you have
+      // already left, and the answers arrive in whatever order they finish.
+      property string loadFor: ""
+
+      readonly property string verb: sendTo.op === "copy" ? "Copy" : "Move"
+      // ── WHAT CANNOT BE A DESTINATION ─────────────────────────────────
+      // A directory cannot go inside itself, or inside anything it contains.
+      // Pasting could always be asked to do it too, but you had to walk into
+      // the folder first and nobody does that by accident — here the child is
+      // sitting on screen one keystroke below its own parent, and rsync will
+      // copy a folder into its own subdirectory for as long as the disk holds
+      // out. Refused at the point of choosing rather than filtered out of the
+      // tree: a branch you cannot land on is still a branch you walk THROUGH.
+      //
+      // Written out rather than calling bans() so the binding actually
+      // depends on what it reads — a binding does not re-evaluate on a
+      // function call, which this file has paid for more than once.
+      readonly property bool blocked: {
+        const n = sendTo.current;
+        if (!n) return true;
+        for (let i = 0; i < sendTo.paths.length; i++) {
+          const p = sendTo.paths[i];
+          if (n.path === p || n.path.indexOf(p + "/") === 0) return true;
+        }
+        return false;
+      }
+
+      function bans(path) {
+        for (let i = 0; i < sendTo.paths.length; i++) {
+          const p = sendTo.paths[i];
+          if (path === p || path.indexOf(p + "/") === 0) return true;
+        }
+        return false;
+      }
+
+      // ── TYPE AND IT NARROWS ──────────────────────────────────────────
+      // No field, no prompt, no slash to start it: the sheet has the keyboard
+      // and there is nothing else in it a letter could mean, so a letter
+      // filters. Which is exactly why the vim keys are not bound in here —
+      // `j` and `l` are letters first in a box you can type into, and a
+      // picker that sometimes moved and sometimes typed would be neither.
+      // Arrows move; everything printable filters.
+      property string query: ""
+      onQueryChanged: {
+        sendTo.sel = 0;
+        sendTo.hits = [];
+        // One letter matches most of a filesystem, so the crawl waits for a
+        // second one; the local sift runs from the first keystroke either way.
+        if (sendTo.query.length >= 2) sendToCrawl.restart();
+        else { sendToCrawl.stop(); sendToFind.running = false; sendTo.crawling = false; }
+      }
+
+      // ── AND IT LOOKS PAST WHAT IS OPEN ───────────────────────────────
+      // The sift above can only answer about branches you have already
+      // expanded, which makes the filter a way of re-reading the tree rather
+      // than a way of finding somewhere. So typing also sends out one search
+      // for directories under the places that are worth searching, and what
+      // comes back is listed underneath the local matches as flat rows.
+      //
+      // FLAT, DELIBERATELY. A hit six levels down would otherwise need its
+      // whole ancestry synthesised into the tree to be drawn in place, and
+      // the result is harder to read than the path itself: the answer to
+      // "where?" is the path, so the row is the path.
+      property var hits: []
+      property bool crawling: false
+
+      // Home, and wherever you are if that is somewhere else. Not the root
+      // and not the mounts: those are in the tree to be walked into on
+      // purpose, and crawling them to answer a keystroke is a walk of the
+      // whole machine for an answer nobody asked this way.
+      function crawlRoots() {
+        const out = [Paths.home()];
+        const c = root.cwd;
+        if (c && c.indexOf(Paths.home()) !== 0) out.push(c);
+        return out;
+      }
+
+      function pretty(p) {
+        const h = Paths.home();
+        if (p === h) return "~";
+        return p.indexOf(h + "/") === 0 ? "~" + p.slice(h.length) : p;
+      }
+
+      Timer {
+        id: sendToCrawl
+        interval: 220
+        onTriggered: {
+          if (!sendTo.open || sendTo.query.length < 2) return;
+          sendTo.crawling = true;
+          sendToFind.running = false;
+          sendToFind.command = ["sh", "-c",
+            Terminus.dirFindCommand(sendTo.crawlRoots(), sendTo.query)];
+          sendToFind.running = true;
+        }
+      }
+
+      Process {
+        id: sendToFind
+        stdout: StdioCollector {
+          id: sendToFound
+          waitForEnd: true
+          onStreamFinished: {
+            sendTo.crawling = false;
+            if (!sendTo.open) return;
+            const out = [];
+            const parts = sendToFound.text.split("\u0000");
+            for (let i = 0; i < parts.length; i++) {
+              // fd ends a directory with a slash — see dirFindCommand.
+              let p = parts[i];
+              if (p.length > 1 && p.charAt(p.length - 1) === "/")
+                p = p.slice(0, -1);
+              if (p !== "") out.push(p);
+            }
+            sendTo.hits = out;
+          }
+        }
+      }
+
+      // WHAT IS ON SCREEN, which is the whole tree until you type. A match
+      // keeps its ANCESTORS too — a hit six levels down with its parents
+      // stripped out is a name with no answer to "where?", and the depth
+      // indents would be measuring nothing.
+      //
+      // Only over what has been loaded. Nothing is crawled to satisfy a
+      // filter: the tree is what you have opened, and typing sifts it.
+      readonly property var shown: {
+        const q = sendTo.query.toLowerCase();
+        if (q === "") return sendTo.nodes;
+        const n = sendTo.nodes;
+        const keep = [];
+        for (let i = 0; i < n.length; i++)
+          keep.push(n[i].name.toLowerCase().indexOf(q) >= 0);
+        // Backwards, so a kept row can mark the parents above it and those
+        // parents are themselves passed over later in the same sweep.
+        for (let i = n.length - 1; i >= 0; i--) {
+          if (!keep[i]) continue;
+          let d = n[i].depth;
+          for (let j = i - 1; j >= 0 && d > 0; j--) {
+            if (n[j].depth < d) { keep[j] = true; d = n[j].depth; }
+          }
+        }
+        const out = [];
+        const have = ({});
+        for (let i = 0; i < n.length; i++)
+          if (keep[i]) { out.push(n[i]); have[n[i].path] = true; }
+        // Then whatever the crawl found that the tree has not already shown.
+        for (let i = 0; i < sendTo.hits.length; i++) {
+          const p = sendTo.hits[i];
+          if (have[p] === true) continue;
+          have[p] = true;
+          out.push({ path: p, name: sendTo.pretty(p), depth: 0, hit: true,
+                     open: false, loaded: false, kids: null });
+        }
+        return out;
+      }
+
+      // The cursor indexes what is VISIBLE, not the tree — so filtering does
+      // not leave it pointing at a row that has been sifted out. Everything
+      // that acts on a row goes back to the tree through its path.
+      readonly property var current:
+        (sendTo.sel >= 0 && sendTo.sel < sendTo.shown.length)
+          ? sendTo.shown[sendTo.sel] : null
+
+      function nodeIndex(path) {
+        for (let i = 0; i < sendTo.nodes.length; i++)
+          if (sendTo.nodes[i].path === path) return i;
+        return -1;
+      }
+
+      function ask(op) {
+        const rows = root.acting();
+        if (rows.length === 0) return;
+        sendTo.op = op;
+        sendTo.paths = rows.map((r) => r.path);
+        sendTo.names = rows.map((r) => r.name);
+        if (rows.length === 1) {
+          sendTo.icon = rows[0].glyph !== undefined ? rows[0].glyph : "";
+          sendTo.iconInk = rows[0].ink !== undefined ? rows[0].ink : Zenon.white;
+        } else {
+          sendTo.icon = "\uDB84\uDEF7";
+          sendTo.iconInk = Zenon.white;
+        }
+        sendTo.nodes = sendTo.roots();
+        sendTo.query = "";
+        sendTo.hits = [];
+        sendTo.sel = 0;
+        sendTo.loadFor = "";
+        sendTo.open = true;
+      }
+
+      function dismiss() {
+        // Stopped, so the ScriptAction at the end of it never runs: leaving
+        // the sheet is a decision not to send, and a flash still in flight
+        // would have sent anyway a tenth of a second later.
+        sendToFlash.stop();
+        sendTo.flashInk = 0;
+        sendTo.flashAt = -1;
+        sendTo.pendingDest = "";
+        sendTo.open = false;
+        sendTo.nodes = [];
+        sendTo.query = "";
+        sendTo.hits = [];
+        sendToCrawl.stop();
+        sendToFind.running = false;
+        sendTo.crawling = false;
+        sendTo.loadFor = "";
+      }
+
+      // WHERE A TREE CAN START. The places you already told terminus you care
+      // about — bookmarks and disks — plus home, the root, and the other
+      // pane's directory, which is the destination often enough to be worth a
+      // row of its own. Deduplicated, because a bookmarked home is one place
+      // and two entries for it would be two answers to the same question.
+      function roots() {
+        const out = [];
+        const seen = ({});
+        function add(p, label) {
+          if (!p || p === "" || seen[p] === true) return;
+          seen[p] = true;
+          out.push({ path: p,
+                     name: label !== undefined && label !== ""
+                       ? label : Terminus.basename(p),
+                     depth: 0, open: false, loaded: false, kids: null });
+        }
+        // WHAT YOU CHOSE, PLUS THE TWO WAYS IN. Home, the other pane when
+        // there is one, your bookmarks, and the root.
+        //
+        // Not the current directory: you are already in it, its subfolders
+        // are one keystroke away in the tree and one letter away in the
+        // filter, and as a root it only ever restated the window behind it.
+        // Not the mounted disks either — /boot and the partition under /home
+        // were two more rows saying the same thing the root already says, and
+        // the useful part of a disk is a folder ON it, which the filter finds
+        // without a shortcut of its own.
+        add(Paths.home(), "Home");
+        if (root.dual && root.pas) add(root.pas.cwd);
+        for (let i = 0; i < root.bookmarks.length; i++) add(root.bookmarks[i]);
+        add("/", "/");
+        return out;
+      }
+
+      // Children are kept on the node once read, so closing a branch and
+      // opening it again is free. A directory that changed under you is the
+      // price, and it is the same price the preview cache pays.
+      function expand(i) {
+        const n = sendTo.nodes[i];
+        if (!n || n.open) return;
+        if (n.kids !== null) { sendTo.insert(i, n.kids); return; }
+        if (sendTo.loadFor !== "") return;
+        sendTo.loadFor = n.path;
+        sendToProc.running = false;
+        sendToProc.command = ["sh", "-c", Terminus.peekCommand(n.path)];
+        sendToProc.running = true;
+      }
+
+      function insert(i, kids) {
+        const n = sendTo.nodes[i];
+        if (!n) return;
+        const made = [];
+        for (let k = 0; k < kids.length; k++)
+          made.push({ path: kids[k].path, name: kids[k].name,
+                      depth: n.depth + 1, open: false, loaded: false, kids: null });
+        const a = sendTo.nodes.slice();
+        a[i] = { path: n.path, name: n.name, depth: n.depth,
+                 open: true, loaded: true, kids: kids };
+        sendTo.nodes = a.slice(0, i + 1).concat(made, a.slice(i + 1));
+      }
+
+      function collapse(i) {
+        const n = sendTo.nodes[i];
+        if (!n || !n.open) return;
+        const a = sendTo.nodes.slice();
+        let j = i + 1;
+        while (j < a.length && a[j].depth > n.depth) j++;
+        a[i] = { path: n.path, name: n.name, depth: n.depth,
+                 open: false, loaded: n.loaded, kids: n.kids };
+        sendTo.nodes = a.slice(0, i + 1).concat(a.slice(j));
+      }
+
+      function toggle(i) {
+        const n = sendTo.nodes[i];
+        if (!n) return;
+        if (n.open) sendTo.collapse(i); else sendTo.expand(i);
+      }
+
+      // The three the keyboard and the mouse actually call: they are handed a
+      // row that is on screen and find it in the tree themselves.
+      function expandCurrent() {
+        const n = sendTo.current;
+        if (n) sendTo.expand(sendTo.nodeIndex(n.path));
+      }
+
+      function toggleShown(i) {
+        const n = sendTo.shown[i];
+        if (n) sendTo.toggle(sendTo.nodeIndex(n.path));
+      }
+
+      function clamp() {
+        sendTo.sel = Math.max(0,
+          Math.min(sendTo.sel, sendTo.shown.length - 1));
+      }
+
+      // Left on an open branch closes it; left on a closed one goes out to
+      // the branch it is in. The same thing `h` does in the listing.
+      function outward() {
+        const n = sendTo.current;
+        if (!n) return;
+        if (n.open) {
+          sendTo.collapse(sendTo.nodeIndex(n.path));
+          sendTo.clamp();
+          return;
+        }
+        // Walked over what is VISIBLE: with a filter on, the parent two rows
+        // up in the tree may not be on screen, and the one that is, is the
+        // one the indent is drawn against.
+        for (let i = sendTo.sel - 1; i >= 0; i--)
+          if (sendTo.shown[i].depth < n.depth) { sendTo.sel = i; return; }
+      }
+
+      function step(d) {
+        if (sendTo.shown.length === 0) return;
+        sendTo.sel = Math.max(0,
+          Math.min(sendTo.shown.length - 1, sendTo.sel + d));
+      }
+
+      // ── THE ROW FLASHES, THEN THE SHEET GOES, THEN IT HAPPENS ────────
+      // The same three beats a menu row gives when you click it, and the same
+      // numbers — 60ms up, 130ms down, cyan at 0.55 — because it is the same
+      // gesture: you have picked a thing and the card is answering before it
+      // acts. Return used to send with the sheet vanishing on the keystroke,
+      // which leaves you unsure which row you were on at the moment it went.
+      property int flashAt: -1
+      property real flashInk: 0
+      property string pendingDest: ""
+
+      SequentialAnimation {
+        id: sendToFlash
+        NumberAnimation { target: sendTo; property: "flashInk"; to: 1;
+                          duration: 60; easing.type: Easing.OutQuad }
+        NumberAnimation { target: sendTo; property: "flashInk"; to: 0;
+                          duration: 130; easing.type: Easing.InQuad }
+        ScriptAction { script: sendTo.commit() }
+      }
+
+      function choose() {
+        const n = sendTo.current;
+        if (!n || sendToFlash.running) return;
+        if (sendTo.blocked) {
+          root.warn(n.path === sendTo.paths[0]
+            ? "that is where it already is"
+            : "cannot put a folder inside itself");
+          return;
+        }
+        // Held on the sheet rather than read back at the end: the flash is
+        // long enough for a second keystroke to move the cursor, and the
+        // destination is the one that was lit up.
+        sendTo.pendingDest = n.path;
+        sendTo.flashAt = sendTo.sel;
+        sendToFlash.restart();
+      }
+
+      function commit() {
+        const dest = sendTo.pendingDest;
+        sendTo.pendingDest = "";
+        sendTo.flashAt = -1;
+        if (dest === "") return;
+        sendTo.open = false;
+        root.setPending({ op: sendTo.op, paths: sendTo.paths,
+                          names: sendTo.names });
+        root.pasteDest = dest;
+        root.paste();
+        sendTo.nodes = [];
+      }
+
+      Process {
+        id: sendToProc
+        stdout: StdioCollector {
+          id: sendToOut
+          waitForEnd: true
+          onStreamFinished: {
+            const p = sendTo.loadFor;
+            sendTo.loadFor = "";
+            if (p === "" || !sendTo.open) return;
+            // Found by PATH, not by the index that asked: the tree can have
+            // been collapsed or rebuilt while the read was out.
+            let at = -1;
+            for (let i = 0; i < sendTo.nodes.length; i++)
+              if (sendTo.nodes[i].path === p) { at = i; break; }
+            if (at < 0) return;
+            // Directories only — this is a destination picker, and the same
+            // parse the listing and the preview use, so hidden folders and
+            // the sort order match what the window is already showing.
+            const all = root.rowsFromListing(sendToOut.text, p);
+            const dirs = [];
+            for (let i = 0; i < all.length; i++)
+              if (all[i].isDir) dirs.push(all[i]);
+            sendTo.insert(at, dirs);
+          }
+        }
+      }
+
+      // Clicking off cancels, the way the other cards behave. Under the card,
+      // which is declared after it and so takes its own clicks first.
+      MouseArea {
+        anchors.fill: parent
+        onClicked: sendTo.dismiss()
+      }
+
+      // ── IT COMES OUT FROM UNDER THE BAR ──────────────────────────────
+      // A sheet, the way macOS drops one: it belongs to this window, it hangs
+      // off the chrome, and the way in and the way out are the same movement
+      // reversed. A card that simply appeared in the corner said nothing
+      // about where it came from or what it is attached to.
+      //
+      // The well is everything BELOW the chrome and it clips, so the sheet is
+      // genuinely hidden behind the bar rather than fading out on top of it.
+      // The band is the tab strip plus the path bar — chrome is a Column, so
+      // those two heights are exactly where the body begins.
+      Item {
+        id: sendToWell
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: parent.top
+        anchors.topMargin: tabStrip.height + crumbBar.height
+        anchors.bottom: parent.bottom
+        clip: true
+
+      // The one every menu on this desktop wears. A sibling, never a child —
+      // the card clips, and a card that clips clips its own shadow away.
+      // Inside the well, so the part that would fall across the bar is cut
+      // off with it: a sheet hanging from the chrome does not cast upwards.
+      MenuShadow {
+        panel: sendToCard
+        cornerRadius: Zenon.dialogRadius
+        opacity: sendToCard.opacity
+      }
+
+      Rectangle {
+        id: sendToCard
+        anchors.horizontalCenter: parent.horizontalCenter
+        width: Math.min(560, parent.width - 80)
+        // Grown to what it holds, capped at the well. A picker sized for the
+        // deepest tree you might open is mostly empty space when all it has
+        // is six bookmarks; one that grows as you open branches is the same
+        // gesture continuing. Animated, or the sheet would jump every time a
+        // branch loaded.
+        // ADDED UP FROM THE PARTS RATHER THAN WRITTEN AS A NUMBER. A guessed
+        // constant was seven pixels short and sliced the last row with the
+        // bottom rule, on a sheet that had room for it — which reads as a
+        // scroll that is not there. This one cannot drift when a font size
+        // or a margin changes, because it is made of them.
+        //
+        // dialogRadius is in it because the card's top is that far above the
+        // clip — see the note on `y`. Those pixels are cut away, so the sheet
+        // has to be that much taller to hold the same contents.
+        // No header any more — it is drawn on the bar, see sendToBarHead — so
+        // the sheet is a list, a rule and a footer.
+        readonly property real chromeH:
+          Zenon.dialogRadius + 12 + sendToFoot.height + 14
+        readonly property int rowH: 30
+        // WHAT IS VISIBLE, not what is loaded. Bound to the tree instead, a
+        // sheet that had been opened out stayed at full height when a filter
+        // cut it to three rows, and the answer sat in the top inch of a lot
+        // of empty card.
+        height: Math.min(sendToWell.height - 40,
+          sendToCard.chromeH
+            + Math.max(2, sendTo.shown.length) * sendToCard.rowH)
+        Behavior on height {
+          NumberAnimation { duration: Zenon.fast; easing.type: Zenon.travelEase }
+        }
+
+        // AT REST ITS TOP SITS ABOVE THE CLIP by exactly the corner radius,
+        // so the rounded top corners are cut away and the sheet reads as
+        // hanging FROM the bar rather than floating below it. Rounded at the
+        // bottom, square at the top — which is the shape of the thing being
+        // imitated.
+        y: sendTo.open ? -Zenon.dialogRadius : -sendToCard.height - 2
+        // A SHEET IS SLOWER THAN A MENU. It is a bigger object and it travels
+        // further, so the shared durations — sized for a card that appears
+        // where the pointer already is — read as a snap here rather than as a
+        // slide. Taken as a multiple of the token rather than written as a
+        // number, so turning the desktop's motion down still turns this down.
+        readonly property int slideIn: Math.round(Zenon.slow * 2.0)
+        readonly property int slideOut: Math.round(Zenon.slow * 1.3)
+
+        // Down on a curve that settles, up on one that accelerates away: a
+        // sheet arrives and is dismissed, it does not do the same thing twice.
+        Behavior on y {
+          NumberAnimation {
+            duration: sendTo.open ? sendToCard.slideIn : sendToCard.slideOut
+            easing.type: sendTo.open ? Easing.OutCubic : Easing.InCubic
+          }
+        }
+
+        // AND IT FADES AS IT TRAVELS. The well clips, so a sheet that only
+        // slid would be a hard edge crossing the listing; fading the same
+        // distance makes it arrive rather than pass by. Same two durations as
+        // the slide, so the two halves of one movement cannot drift apart.
+        opacity: sendTo.open ? 1 : 0
+        Behavior on opacity {
+          NumberAnimation {
+            duration: sendTo.open ? sendToCard.slideIn : sendToCard.slideOut
+            easing.type: sendTo.open ? Easing.OutCubic : Easing.InCubic
+          }
+        }
+
+        color: Zenon.black
+        border.color: Zenon.surfaceBorder
+        border.width: 1
+        radius: Zenon.dialogRadius
+        clip: true
+
+        // Hairlines, the same ink the menu separates with. The list scrolls
+        // under both of them, so a row cut in half at the bottom reads as
+        // more to come rather than as a row drawn wrong.
+        Rectangle {
+          anchors.bottom: sendToFoot.top
+          anchors.bottomMargin: 10
+          anchors.left: parent.left
+          anchors.right: parent.right
+          height: 1
+          color: Zenon.menuSepInk
+        }
+
+        ListView {
+          id: sendToList
+          anchors.top: parent.top
+          anchors.left: parent.left
+          anchors.right: parent.right
+          anchors.bottom: sendToFoot.top
+          // THE CORNER RADIUS, which is how far the card's top sits above the
+          // clip — see the note on `y`. Below that the first row is flush
+          // with the bar's own bottom edge, which is where the sheet begins
+          // as far as the eye is concerned.
+          anchors.topMargin: Zenon.dialogRadius
+          anchors.bottomMargin: 12
+          clip: true
+          model: sendTo.shown
+          boundsBehavior: Flickable.StopAtBounds
+          currentIndex: sendTo.sel
+          highlightMoveDuration: 0
+          // Keeps the cursor on screen without the view chasing it: the same
+          // Contain the listing uses.
+          onCurrentIndexChanged: sendToList.positionViewAtIndex(
+            sendToList.currentIndex, ListView.Contain)
+
+          delegate: Item {
+            id: sendToRow
+            required property var modelData
+            required property int index
+            width: sendToList.width
+            height: sendToCard.rowH
+
+            readonly property bool on: sendToRow.index === sendTo.sel
+            readonly property bool banned: sendTo.bans(sendToRow.modelData.path)
+            readonly property real indent: 10 + sendToRow.modelData.depth * 14
+
+            Rectangle {
+              anchors.fill: parent
+              color: sendToRow.on ? Zenon.headBg : "transparent"
+            }
+
+            // The twisty. Its own click target, so a click on the NAME picks
+            // the directory and a click here opens it — one row, two verbs,
+            // and no guessing which one a single click meant.
+            Text {
+              id: sendToTwist
+              x: sendToRow.indent
+              width: 14
+              anchors.verticalCenter: parent.verticalCenter
+              // A crawl result is a leaf here: it is somewhere to send to, not
+              // a branch, and it has no place in the tree to open into.
+              visible: sendToRow.modelData.hit !== true
+              text: sendToRow.modelData.open ? "" : ""
+              color: Zenon.muted
+              font.family: Zenon.face
+              font.pixelSize: 13
+            }
+
+            Text {
+              id: sendToGlyph
+              x: sendToRow.indent + 18
+              anchors.verticalCenter: parent.verticalCenter
+              text: Icons.glyphFor({ name: sendToRow.modelData.name, isDir: true })
+              // CYAN, WHICH IS WHAT inkOf GIVES A DIRECTORY. Every row in
+              // this tree is one, so the whole list wears the colour the
+              // listing wears — the glyph and the name together, the way a
+              // row is inked everywhere else in the window. The cursor is the
+              // highlight behind it, not a different colour on top of it.
+              color: sendToRow.banned ? Zenon.muted : Zenon.cyan
+              font.family: Zenon.face
+              font.pixelSize: 15
+            }
+
+            Text {
+              x: sendToRow.indent + 40
+              // Room kept for the bookmark mark, whether or not this row has
+              // one: a name that elided differently depending on a mark at
+              // the far end would make the column look ragged.
+              width: parent.width - x - 34
+              anchors.verticalCenter: parent.verticalCenter
+              text: sendToRow.modelData.name
+              elide: Text.ElideRight
+              color: sendToRow.banned ? Zenon.muted : Zenon.cyan
+              font.family: Zenon.face
+              font.pixelSize: 15
+            }
+
+            // THE SAME MARK A ROW IN THE LISTING WEARS, in the same place and
+            // the same sand — see entryBookmark. A bookmark keeps its own
+            // directory glyph on the left, because what it is and the fact
+            // that you kept it are two different things and the row has room
+            // to say both. Asked of the path rather than stored on the node,
+            // so a bookmarked folder deep inside the tree is marked too and
+            // not only the ones that opened it.
+            Text {
+              anchors.right: parent.right
+              anchors.rightMargin: 12
+              anchors.verticalCenter: parent.verticalCenter
+              visible: root.isBookmarked(sendToRow.modelData.path)
+              text: "\uF02E"
+              color: Zenon.sand
+              font.family: Zenon.face
+              font.pixelSize: 14
+            }
+
+            Rectangle {
+              anchors.fill: parent
+              z: 3
+              visible: sendToRow.index === sendTo.flashAt && sendTo.flashInk > 0
+              color: Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b,
+                             0.55 * sendTo.flashInk)
+            }
+
+            MouseArea {
+              anchors.fill: parent
+              acceptedButtons: Qt.LeftButton
+              enabled: !sendToFlash.running
+              onClicked: (m) => {
+                sendTo.sel = sendToRow.index;
+                if (m.x < sendToRow.indent + 16) sendTo.toggleShown(sendToRow.index);
+              }
+              onDoubleClicked: sendTo.choose()
+            }
+          }
+        }
+
+        Column {
+          id: sendToFoot
+          anchors.bottom: parent.bottom
+          anchors.left: parent.left
+          anchors.right: parent.right
+          anchors.margins: 14
+          spacing: 4
+
+          // NO PATH ROW. It was here because a tree shows you a leaf and the
+          // question is about the whole path — but a crawl result IS its
+          // path, so under a filter the line restated the row above it, and
+          // the filter is how most destinations get found.
+          Text {
+            width: parent.width
+            text: sendTo.blocked && sendTo.current
+              ? "cannot go there"
+              : sendTo.crawling ? "searching…"
+              : "type to filter    ↑↓ move    → open    ↵ send    esc"
+            horizontalAlignment: Text.AlignHCenter
+            color: Zenon.muted
+            font.family: Zenon.face
+            font.pixelSize: 13
+          }
+        }
+      }
+      }
+
+    }
+
+
     // ── the one-line prompt ───────────────────────────────────────────
     // Rename and new-folder both want a name and nothing else, so they share
     // one card rather than growing two nearly identical ones.
@@ -13723,11 +14782,19 @@ FloatingWindow {
       dim: !!root.cutSet[path]
       live: plist.act
       passive: !plist.act
-      actionable: plist.act
+      // Not `plist.act`: by the time EntryRow asks, the click above has
+      // already brought this pane over, so the menu is about a row in the
+      // active listing either way.
+      actionable: true
       showMeta: plist.width >= root.metaMinWidth
       onChosen: (right, shift, ctrl) => {
-        if (plist.act) root.clickRow(index, right, shift, ctrl);
-        else root.focusPane(plist.pane, index);
+        // A click in the half the keyboard is not in comes over FIRST and
+        // then does what it came to do. Stopping at the hand-over meant a
+        // right click over there only ever switched panes — you had to click
+        // once to arrive and again to ask, and the first click looked like it
+        // had done nothing but move the focus.
+        if (!plist.act) root.focusPane(plist.pane, index);
+        root.clickRow(index, right, shift, ctrl);
       }
       onOpened: {
         if (plist.act) plist.pane.sel = index;
@@ -13788,7 +14855,8 @@ FloatingWindow {
       passive: !pgrid.act
       tileZoom: pgrid.zoom
       onChosen: (right, shift, ctrl, mx, my) => {
-        if (!pgrid.act) { root.focusPane(pgrid.pane, index); return; }
+        // Come over, then act — see the list's note.
+        if (!pgrid.act) root.focusPane(pgrid.pane, index);
         root.clickRow(index, right, shift, ctrl);
         if (right) root.openMenuAt(tileItem, { x: mx, y: my });
       }
@@ -14251,7 +15319,62 @@ FloatingWindow {
     // below follows it without ever being cleared.
     property var rows: []
 
-    readonly property bool isLive: col.slot === 1
+    // ── THE PREVIEW COLUMN ARRIVES, IT DOES NOT APPEAR ──────────────────
+    // MEASURED, off a 60fps capture of a step in and a step out:
+    //
+    //   out  7.3 → 7.4 → 9.8 → 11.7 → 11.85   eased in over three frames
+    //   in   7.8 → 7.6 → 7.5 → 7.4 → 7.3 → 13.66   one frame, full strength
+    //
+    // Walking out, the preview is the listing you just left — it is in hand,
+    // settlePreview runs, and previewPane's fade covers it. Walking in, it is
+    // a cold read that comes back through previewOut and never touches
+    // settlePreview, so the column sat empty for a tenth of a second and then
+    // cut in at full strength on a still frame. That single frame is the
+    // flicker in the third column on the way in.
+    //
+    // DRIVEN FROM sync(), not from the preview pipeline. Rows reach this
+    // column by several routes — a cache hit, a cold read, a rotation — and
+    // hanging the fade off any one of them misses the others. sync() is the
+    // only place colModel can change, whoever asked for it.
+    property real ink: 1
+    opacity: col.ink
+
+    NumberAnimation {
+      id: inkFade
+      target: col
+      property: "ink"
+      to: 1
+      duration: Zenon.fast
+      easing.type: Zenon.travelEase
+    }
+
+    // ── THE SLOT THIS COLUMN IS DRAWN IN ────────────────────────────────
+    // Not always the slot it IS. `slot` moves the instant millerOrder
+    // rotates; the model behind it does not, because onRowsChanged defers
+    // sync to the end of the tick — and has to, since at the moment of the
+    // rotation the sources for the new slots still describe the old position.
+    //
+    // Geometry bound to `slot` therefore moved a frame ahead of its own
+    // contents. CAUGHT ON A 60fps CAPTURE of a step into ~/.config/btop: for
+    // exactly one frame the column that had been the parent was drawn in the
+    // preview seat, shifted by the travel offset, still holding the whole of
+    // ~ — .cache, .cargo, .claude — at full brightness down the right-hand
+    // edge. One frame at 60Hz, three at 180. That is the flash of a directory
+    // in the third column on the way in.
+    //
+    // So the geometry waits for the model rather than racing it: sync() moves
+    // this at the end of its own call, and the seat and the rows in it change
+    // on the same frame. Everything the eye or the mouse can tell apart reads
+    // this — position, width, which column is live, which row is current.
+    // `rows` is the exception and must stay on `slot`: it is what drives sync.
+    property int drawnSlot: -1
+    Component.onCompleted: col.drawnSlot = col.slot
+    // Queued here as well as on rows, so a rotation into a slot whose source
+    // is the array this column already holds still catches up — callLater
+    // coalesces the two into the single sync it would have done anyway.
+    onSlotChanged: Qt.callLater(col.sync)
+
+    readonly property bool isLive: col.drawnSlot === 1
     readonly property alias view: colView
 
     // path -> row, rebuilt with the model. The delegate holds a path so that
@@ -14279,6 +15402,7 @@ FloatingWindow {
 
     function sync() {
       const next = col.rows || [];
+      const wasEmpty = colModel.count === 0;
       const ix = ({});
       for (let i = 0; i < next.length; ++i)
         if (next[i]) ix["k:" + next[i].path] = next[i];
@@ -14290,6 +15414,23 @@ FloatingWindow {
         if (m.get(i).path !== next[i].path) m.set(i, { path: next[i].path });
       for (let i = keep; i < next.length; ++i) m.append({ path: next[i].path });
       if (m.count > next.length) m.remove(next.length, m.count - next.length);
+
+      // LAST, with the rows above and in the same call. This is the line that
+      // keeps a column's seat and its contents on the same frame.
+      col.drawnSlot = col.slot;
+
+      // Rows landing in an empty PREVIEW column are an arrival and ease in.
+      // Anywhere else is full strength: the parent and the middle are where
+      // you already are, and a column caught mid-fade by the next step must
+      // not carry a part-opacity into its new seat.
+      if (col.slot === 2 && wasEmpty && next.length > 0) {
+        inkFade.stop();
+        col.ink = 0;
+        inkFade.start();
+      } else if (col.slot !== 2) {
+        inkFade.stop();
+        col.ink = 1;
+      }
     }
 
     ListModel { id: colModel }
@@ -14313,9 +15454,18 @@ FloatingWindow {
 
         width: col.width
         entry: colRow.row
-        current: col.slot === 0 ? (colRow.index === root.parentIndex)
+        current: col.drawnSlot === 0 ? (colRow.index === root.parentIndex)
                : (col.isLive ? (colRow.index === root.sel) : false)
         live: col.isLive
+        // ONLY THE LIVE COLUMN OPENS A MENU. EntryRow opens one itself on a
+        // right click when `actionable`, and that menu acts on
+        // root.currentRow() — never on a hit test. The live column gets away
+        // with it because its rows call clickRow() first, which moves the
+        // cursor to the row you clicked; the other two navigate instead, so
+        // the cursor never moves and the menu came up about whatever was
+        // under it in the middle column. Right-clicking a parent directory
+        // offered you actions on a completely different file.
+        actionable: col.isLive
         dim: col.isLive && !!root.cutSet[colRow.path]
         ticked: col.isLive && !!root.marked[colRow.path]
         // No metadata this narrow, where the name says everything there is
@@ -14330,18 +15480,18 @@ FloatingWindow {
           // you can see should get you there. Slot 2 enters the previewed
           // directory rather than the row clicked, so a click there can never
           // act on the wrong file.
-          if (col.slot === 0) { if (colRow.row && colRow.row.isDir) root.goTo(colRow.path); return; }
+          if (col.drawnSlot === 0) { if (colRow.row && colRow.row.isDir) root.goTo(colRow.path); return; }
           const r = root.currentRow();
           if (r && r.isDir) root.goTo(r.path);
         }
         onOpened: {
           if (col.isLive) { root.act.sel = colRow.index; root.activate(); return; }
-          if (col.slot === 0) { if (colRow.row && colRow.row.isDir) root.goTo(colRow.path); return; }
+          if (col.drawnSlot === 0) { if (colRow.row && colRow.row.isDir) root.goTo(colRow.path); return; }
           const r = root.currentRow();
           if (r && r.isDir) root.goTo(r.path);
         }
         onTabbed: {
-          if (col.slot === 2) {
+          if (col.drawnSlot === 2) {
             const r = root.currentRow();
             if (r && r.isDir) root.openInNewTab(r.path);
             return;

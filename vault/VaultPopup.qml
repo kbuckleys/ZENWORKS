@@ -26,19 +26,9 @@ PanelWindow {
   property real morphFade: 1
   property real showFactor: 0
   property bool collapsing: false
-  // Morphed, the panel IS the pill: derive the scale from the pill's own live
-  // animated size so the two are locked frame-for-frame, instead of each
-  // running its own entrance animation against the other. Standalone there is
-  // no pill to carry the motion, so the scale-up entrance stays.
-  readonly property real morphScaleX: (popup.morphMode && popup.statusbar && panel.width > 0)
-    ? popup.statusbar.width / panel.width : 1
-  readonly property real morphScaleY: (popup.morphMode && popup.statusbar && panel.height > 0)
-    ? popup.statusbar.height / panel.height : 1
-  readonly property real panelX: popup.morphMode ? popup.morphScaleX
-    : (popup.collapsing ? 0.985 + 0.015 * popup.showFactor
+  readonly property real panelX: (popup.collapsing ? 0.985 + 0.015 * popup.showFactor
                         : 0.94 + 0.06 * popup.showFactor)
-  readonly property real panelY: popup.morphMode ? popup.morphScaleY
-    : (popup.collapsing ? 0.82 + 0.18 * popup.showFactor
+  readonly property real panelY: (popup.collapsing ? 0.82 + 0.18 * popup.showFactor
                         : 0.90 + 0.10 * popup.showFactor)
   // Morphed, the handover is timed off the PILL's progress, not this popup's
   // own showFactor: showFactor is OutCubic and front-loaded, so it crossed the
@@ -631,13 +621,13 @@ PanelWindow {
       // than the panel and any layout measured against the panel's size fell
       // one row or one column short. This hands the content its full box back.
       anchors.margins: -bgRoot.border.width
-      color: popup.morphMode ? "transparent" : popup.bgColor
+      color: popup.bgColor
       radius: Zenon.pillRadius
       topLeftRadius: Zenon.pillRadius
       topRightRadius: Zenon.pillRadius
       bottomLeftRadius: Zenon.pillRadius
       bottomRightRadius: Zenon.pillRadius
-      border.color: popup.morphMode ? "transparent" : popup.borderColor
+      border.color: popup.borderColor
       border.width: 1
       focus: true
 
