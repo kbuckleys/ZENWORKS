@@ -134,6 +134,11 @@ Item {
     if (Oracle.menuShowBackground)
       out.push({ id: "background", text: "Set background", icon: "\uF03E",
                  cmd: "qs ipc call Picasso toggle" });
+    // A note is made from here because here is where you are when you want
+    // one: the desktop, with nothing else open. It needs no panel of its own
+    // — the note IS the panel.
+    out.push({ id: "note", text: "New note", icon: "\uF24A",
+               cmd: "qs ipc call Clio add" });
     out.push(
     { id: "settings", text: "Settings", icon: "\uF013",
       cmd: "qs ipc call Oracle toggle" },
@@ -232,11 +237,25 @@ Item {
                   icon: "\uF014", hasChildren: false, kind: "trash",
                   isSeparator: false, enabled: root.trashCount > 0 });
     sep();
-    // This shell, and then the session it is running in. In that order,
-    // because the two lists behind them climb in severity and reloading a bar
-    // is the bottom of that scale.
-    rows.push({ text: "Shell", icon: "\uF120", hasChildren: true,
-                kind: "shell", isSeparator: false, enabled: true });
+    // ── THE SHELL'S OWN ENTRIES, ON THE MENU ITSELF ────────────────────
+    // They were behind a "Shell" row that opened a card with four things in
+    // it. A submenu earns its place by holding more than fits or more than
+    // you want to read at once; this held a note, a background, the settings
+    // and a restart — four leaves behind one door, each one a click further
+    // away than it needed to be.
+    //
+    // Built from the same shellEntries the card was built from, so what is
+    // offered and what it does are still written down once.
+    for (let i = 0; i < root.shellEntries.length; ++i) {
+      const e = root.shellEntries[i];
+      rows.push({ text: e.text, icon: e.icon, hasChildren: false,
+                  kind: "shellcmd", cmd: e.cmd,
+                  isSeparator: false, enabled: true });
+    }
+    // A RULE OF ITS OWN. Everything above is about this desktop and this
+    // shell; below is ending the session the whole lot is running in, and
+    // the two do not belong in one run of rows.
+    sep();
     rows.push({ text: "Session", icon: "\uF2C0", hasChildren: true,
                 kind: "session", isSeparator: false, enabled: true });
     return rows;
@@ -341,7 +360,7 @@ Item {
   // not a row you are browsing past.
   function rowEntered(m) {
     if (!m) return;
-    if (m.kind === "trash") {
+    if (m.kind === "trash" || m.kind === "shellcmd") {
       root.stopBranches("");
       if (root.childMenu !== "trash") root.childMenu = "";
     } else if (m.kind === "apps") {
@@ -371,6 +390,11 @@ Item {
   function rowChosen(m) {
     if (!m) return;
     if (m.kind === "trash") { root.openTrash(); return; }
+    if (m.kind === "shellcmd") {
+      root.execCmd(m.cmd);
+      root.closeAll();
+      return;
+    }
     if (m.kind === "apps")        root.childMenu = "apps";
     else if (m.kind === "file")   root.childMenu = "file";
     else if (m.kind === "session") root.childMenu = "session";

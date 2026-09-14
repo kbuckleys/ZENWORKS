@@ -45,21 +45,76 @@ Item {
   }
   visible: osd.implicitHeight > 0.5
 
-  // The first value is the state of the machine, not news about it.
-  property bool primed: false
+  // ── THE FIRST VALUE IS THE STATE OF THE MACHINE, NOT NEWS ──────────────
+  // Suppressing it by counting signals did not work, and could not: `ready`,
+  // `level` and `muted` are three separate bindings off one audio object, so
+  // when the sink appears `levelChanged` can arrive while `ready` is still
+  // false. That bump returned at the readiness check WITHOUT priming, and the
+  // flag was still down when the first real change came — which is the change
+  // that got eaten instead. It also failed the other way: a sink whose volume
+  // happens to match the null-state defaults emits nothing at all at startup,
+  // so nothing primed and the same thing happened.
+  //
+  // So the guard is the VALUE rather than the count. What was on screen when
+  // the sink was first understood is remembered, and a bump that does not
+  // differ from it is not news no matter how many signals carried it.
+  // AND THE VALUE ALONE IS NOT ENOUGH EITHER. PwObjectTracker only starts
+  // streaming a sink's properties once it is being tracked, so the real
+  // volume can arrive a moment AFTER `ready` — priming on readiness records
+  // the placeholder, and the true value then reads as a change. Which is the
+  // OSD that greets a cold start.
+  //
+  // So readiness opens a settling window instead of arming anything. Whatever
+  // pipewire says during it is the state of the machine; the first thing
+  // after it is news. Re-armed from scratch if the sink goes away and comes
+  // back, because that is a cold start for this purpose too.
+  property bool armed: false
+  property real seenLevel: 0
+  property bool seenMuted: false
+
+  function prime() {
+    if (!Volume.ready) return;
+    osd.seenLevel = Volume.level;
+    osd.seenMuted = Volume.muted;
+  }
+
+  Timer {
+    id: settle
+    interval: 1500
+    onTriggered: {
+      osd.prime();
+      osd.armed = true;
+    }
+  }
 
   Connections {
     target: Volume
-    function onLevelChanged() { osd.bump(); }
-    function onMutedChanged() { osd.bump(); }
+    function onReadyChanged() {
+      osd.armed = false;
+      if (Volume.ready) settle.restart();
+      else settle.stop();
+    }
+    // INSIDE THE WINDOW IT IS STATE, AFTER IT, NEWS. Recording and comparing
+    // are the two halves of the same fact and only one of them can be true of
+    // any given signal — doing both would record the value and then find it
+    // unchanged, which is an OSD that never fires at all.
+    function onLevelChanged() { osd.armed ? osd.bump() : osd.prime(); }
+    function onMutedChanged() { osd.armed ? osd.bump() : osd.prime(); }
   }
 
+  // Belt as well as braces: a signal that carries no change is not news even
+  // once the window has closed, and pipewire does emit those.
   function bump() {
-    if (!Volume.ready) return;
-    if (!osd.primed) { osd.primed = true; return; }
+    if (!Volume.ready || !osd.armed) return;
+    if (Volume.level === osd.seenLevel && Volume.muted === osd.seenMuted)
+      return;
+    osd.seenLevel = Volume.level;
+    osd.seenMuted = Volume.muted;
     osd.active = true;
     hold.restart();
   }
+
+  Component.onCompleted: if (Volume.ready) settle.restart()
 
   Timer {
     id: hold
@@ -127,32 +182,44 @@ Item {
       height: 28
       spacing: 10
 
+      // THE SPEAKER, AND THE MUTE. Both literals were empty — lost when
+      // howler was rebuilt — so this drew nothing at all and the only thing
+      // saying "muted" was the word at the far end. Written as escapes rather
+      // than as the characters themselves, which is how they went missing.
       Text {
         anchors.verticalCenter: parent.verticalCenter
-        text: Volume.muted ? "" : ""
+        text: Volume.muted ? "\uF466" : "\uF028"
         color: Volume.muted ? Zenon.red : Zenon.green
         font.family: Zenon.face
         font.weight: Font.Bold
         font.pixelSize: 18
       }
 
+      // ONE OR THE OTHER, never both — the rule the bar's own meter follows,
+      // written down in PulseAudioModule. Muted is not a quiet volume, it is
+      // the absence of one, so the glyph says so and the gauge goes away
+      // rather than standing beside it drawn empty and red.
       Meter {
         anchors.verticalCenter: parent.verticalCenter
+        visible: !Volume.muted
         vertical: false
         segCount: 14
         thickness: 9
         segLength: 6
         segGap: 2
-        value: Volume.muted ? 0 : Volume.level
-        accent: Volume.muted ? Zenon.red : Zenon.green
+        value: Volume.level
+        accent: Zenon.green
       }
 
+      // And the figure goes with it: "muted" was the word doing the glyph's
+      // job, which is why there was no glyph to see.
       Text {
         anchors.verticalCenter: parent.verticalCenter
+        visible: !Volume.muted
         width: 52
         horizontalAlignment: Text.AlignRight
-        text: Volume.muted ? "muted" : Volume.percent + "%"
-        color: Volume.muted ? Zenon.red : Zenon.white
+        text: Volume.percent + "%"
+        color: Zenon.white
         font.family: Zenon.face
         font.weight: Font.Bold
         font.pixelSize: 17

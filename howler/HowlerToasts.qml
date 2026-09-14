@@ -524,6 +524,14 @@ PanelWindow {
                 // setting, rather than a number buried here.
                 wrapMode: toast.multiline ? Text.NoWrap : Text.WordWrap
                 visible: text !== ""
+                // HIDDEN BY OPACITY, NEVER BY `visible`. The transport hangs
+                // off the bottom of this column, so taking a line OUT of the
+                // column moved the bottom up — the buttons followed it and
+                // landed across the track title instead, which is worse than
+                // what they were covering. Made transparent, the line still
+                // occupies its row, the column keeps its height, and the
+                // buttons sit exactly where the artist's name was.
+                opacity: transport.visible && toast.marks === "" ? 0 : 1
                 text: toast.bodyText
                 textFormat: Howler.markup ? Text.StyledText : Text.PlainText
                 color: toast.titleless ? Howler.titleInk : Howler.bodyInk
@@ -533,16 +541,22 @@ PanelWindow {
                   ? Howler.fontSize : Howler.fontSize - 2
               }
 
-              // ── ONE LINE, TWO JOBS ───────────────────────────────────────
-              // The marks and the transport occupy the SAME row: hovering swaps
-              // what is drawn there and never what is laid out, so the title
-              // does not lift a few pixels every time the pointer crosses the
-              // toast.
+              // ── A ROW ONLY WHEN THERE IS SOMETHING IN IT ─────────────────
+              // This used to stand its full height whenever the toast had
+              // transport actions, so that hovering could swap the marks for
+              // the buttons without the title lifting. A track with no marks
+              // — no heart, no lyrics, no explicit — therefore carried a
+              // blank line for the whole of its life to reserve room for
+              // something that only appears under the pointer.
+              //
+              // So the row is the MARKS, and nothing else. The transport is
+              // drawn over the bottom of the text instead of inside this,
+              // which costs it no height at all — and the title still does
+              // not move, because nothing is being laid out either way.
               Item {
                 id: marksRow
                 width: parent.width
-                height: (toast.marks !== "" || toast.transportActs.length > 0)
-                  ? marksText.implicitHeight : 0
+                height: toast.marks !== "" ? marksText.implicitHeight : 0
                 visible: height > 0
 
                 Text {
@@ -557,51 +571,57 @@ PanelWindow {
                   font.pixelSize: Howler.fontSize - 2
                 }
 
-                Row {
-                  id: transport
-                  anchors.centerIn: parent
-                  visible: toast.transportActs.length > 0 && toastHov.hovered
-                  spacing: 18
+              }
+            }
 
-                  Repeater {
-                    model: toast.transportActs
+            Row {
+              id: transport
+              // OVER THE LAST LINE, not in a row of its own — see the
+              // note on marksRow. Anchored to the text column's bottom
+              // edge, which is the marks when there are marks and the
+              // artist's name when there are not.
+              anchors.horizontalCenter: text.horizontalCenter
+              anchors.bottom: text.bottom
+              visible: toast.transportActs.length > 0 && toastHov.hovered
+              spacing: 18
 
-                    delegate: Text {
-                      required property var modelData
-                      // The label the sender gave it, turned into the glyph the
-                      // bar uses for the same verb — its own text is "Previous",
-                      // which is a word where a row of three needs a shape.
-                      readonly property string verb:
-                        String(modelData.identifier || "").split(":").pop()
-                      text: verb === "prev" ? "\uF04A"
-                          : verb === "next" ? "\uF04E"
-                          : (NowPlaying.playing ? "\uF04C" : "\uF04B")
-                      color: btnHov.hovered ? Howler.titleInk : Howler.bodyInk
-                      font.family: Zenon.face
-                      font.pixelSize: Howler.fontSize
-                      // A MouseArea, not a TapHandler: a handler lets the
-                      // press through to the card's own tap and pressing
-                      // Previous would have opened spoot as well as skipping
-                      // back. A MouseArea consumes it.
-                      HoverHandler { id: btnHov }
-                      MouseArea {
-                        anchors.fill: parent
-                        anchors.margins: -6
-                        // THE ACTION SAYS WHICH BUTTONS EXIST; it does not get
-                        // to say what they do. Invoking one activates it over
-                        // the bus, and the spec has the server close a
-                        // notification that is not `resident` the moment an
-                        // action is activated — so skipping a track took the
-                        // toast with it. `resident` is the sender's to set and
-                        // read-only here, so the press goes where the bar's own
-                        // transport sends it instead, and the toast stays up
-                        // to show the track it just moved to.
-                        onClicked: {
-                          if (parent.verb === "prev") NowPlaying.previous();
-                          else if (parent.verb === "next") NowPlaying.next();
-                          else NowPlaying.toggle();
-                        }
-                      }
+              Repeater {
+                model: toast.transportActs
+
+                delegate: Text {
+                  required property var modelData
+                  // The label the sender gave it, turned into the glyph the
+                  // bar uses for the same verb — its own text is "Previous",
+                  // which is a word where a row of three needs a shape.
+                  readonly property string verb:
+                    String(modelData.identifier || "").split(":").pop()
+                  text: verb === "prev" ? "\uF04A"
+                      : verb === "next" ? "\uF04E"
+                      : (NowPlaying.playing ? "\uF04C" : "\uF04B")
+                  color: btnHov.hovered ? Howler.titleInk : Howler.bodyInk
+                  font.family: Zenon.face
+                  font.pixelSize: Howler.fontSize
+                  // A MouseArea, not a TapHandler: a handler lets the
+                  // press through to the card's own tap and pressing
+                  // Previous would have opened spoot as well as skipping
+                  // back. A MouseArea consumes it.
+                  HoverHandler { id: btnHov }
+                  MouseArea {
+                    anchors.fill: parent
+                    anchors.margins: -6
+                    // THE ACTION SAYS WHICH BUTTONS EXIST; it does not get
+                    // to say what they do. Invoking one activates it over
+                    // the bus, and the spec has the server close a
+                    // notification that is not `resident` the moment an
+                    // action is activated — so skipping a track took the
+                    // toast with it. `resident` is the sender's to set and
+                    // read-only here, so the press goes where the bar's own
+                    // transport sends it instead, and the toast stays up
+                    // to show the track it just moved to.
+                    onClicked: {
+                      if (parent.verb === "prev") NowPlaying.previous();
+                      else if (parent.verb === "next") NowPlaying.next();
+                      else NowPlaying.toggle();
                     }
                   }
                 }

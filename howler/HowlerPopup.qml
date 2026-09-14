@@ -213,19 +213,68 @@ PanelWindow {
           font.pixelSize: 16
         }
 
-        Text {
-          id: clearBtn
+        // ── WHAT THE BAR HOLDS ON THE RIGHT ──────────────────────────
+        // A Row rather than two things anchored to the same edge: `clear`
+        // comes and goes with the list, and anything anchored beside it
+        // would have to know that. A Row skips what is not there and closes
+        // the gap itself.
+        Row {
           anchors.right: parent.right
           anchors.rightMargin: 16
           anchors.verticalCenter: parent.verticalCenter
-          visible: popup.rows.length > 0
-          text: "clear"
-          color: clearHov.hovered ? Zenon.red : Zenon.muted
-          font.family: Zenon.face
-          font.pixelSize: 13
-          HoverHandler { id: clearHov }
-          TapHandler {
-            onTapped: { Howler.dismissAll(); Howler.clearHistory(); }
+          spacing: 12
+
+          // ── TRACK MUSIC, OR DO NOT ─────────────────────────────────
+          // It was a chip in the filter row reading "music tracked" /
+          // "music ignored" — a sentence, sitting among the app filters as
+          // though it were one of them. It is not a filter: the filters say
+          // which of these notifications to show, and this says whether a
+          // whole kind of them is ever kept at all. So it belongs on the
+          // bar with `clear`, which is the other thing here that changes
+          // what the list IS rather than what of it you are looking at.
+          //
+          // A GLYPH RATHER THAN A SENTENCE, lit when it is on — the same way
+          // the bar's own mute reads, and it says it in a quarter the width.
+          Rectangle {
+            id: musicBtn
+            anchors.verticalCenter: parent.verticalCenter
+            width: 30
+            height: 22
+            radius: 11
+            color: Howler.trackMusic
+              ? Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b, 0.18)
+              : (musicHov.hovered ? Qt.rgba(1, 1, 1, 0.08) : "transparent")
+            border.width: 1
+            border.color: Howler.trackMusic ? Zenon.cyan : Zenon.surface
+            Behavior on color { ColorAnimation { duration: Zenon.fast } }
+            Behavior on border.color { ColorAnimation { duration: Zenon.fast } }
+
+            Text {
+              anchors.centerIn: parent
+              text: "\uF001"
+              color: Howler.trackMusic ? Zenon.cyan
+                : (musicHov.hovered ? Zenon.white : Zenon.keyInk)
+              font.family: Zenon.face
+              font.pixelSize: 12
+              Behavior on color { ColorAnimation { duration: Zenon.fast } }
+            }
+
+            HoverHandler { id: musicHov }
+            TapHandler { onTapped: Howler.toggleMusicTracking() }
+          }
+
+          Text {
+            id: clearBtn
+            anchors.verticalCenter: parent.verticalCenter
+            visible: popup.rows.length > 0
+            text: "clear"
+            color: clearHov.hovered ? Zenon.red : Zenon.muted
+            font.family: Zenon.face
+            font.pixelSize: 13
+            HoverHandler { id: clearHov }
+            TapHandler {
+              onTapped: { Howler.dismissAll(); Howler.clearHistory(); }
+            }
           }
         }
 
@@ -294,8 +343,13 @@ PanelWindow {
         anchors.right: parent.right
         anchors.leftMargin: 16
         anchors.rightMargin: 16
-        anchors.topMargin: 10
-        height: 24
+        // COLLAPSED WHEN EMPTY. The music toggle used to be in here, so the
+        // row always had something in it; with only app filters left, a
+        // history from one application has nothing to put here and a 24px
+        // strip of nothing above the list is not a filter bar.
+        anchors.topMargin: chips.height > 0 ? 10 : 0
+        height: chipRow.width > 0 ? 24 : 0
+        visible: chips.height > 0
         contentWidth: chipRow.width
         clip: true
         boundsBehavior: Flickable.StopAtBounds
@@ -303,12 +357,6 @@ PanelWindow {
         Row {
           id: chipRow
           spacing: 8
-
-          Chip {
-            label: Howler.trackMusic ? "music tracked" : "music ignored"
-            on: Howler.trackMusic
-            onPicked: Howler.toggleMusicTracking()
-          }
 
           Chip {
             visible: popup.appFilter !== ""
