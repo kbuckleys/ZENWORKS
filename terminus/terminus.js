@@ -178,7 +178,9 @@ function whereOf(path, base) {
 // Directories first, always, whatever the sort is. Not a preference: a size
 // sort that interleaves folders among files makes the folders unfindable, and
 // every file manager worth using has settled on the same rule.
-function sortEntries(rows, key, desc) {
+// `dirsFirst` defaults to true when it is not passed, so every caller that
+// has not been told about it keeps the order it always had.
+function sortEntries(rows, key, desc, dirsFirst, natural) {
   const dir = desc ? -1 : 1;
   const n = rows.length;
 
@@ -205,10 +207,12 @@ function sortEntries(rows, key, desc) {
     const nm = displaySound_(r);
     dec[i] = {
       r: r,
-      // Directories first, always — EXCEPT in the usage view, where that rule
-      // is the one thing you do not want: a 4GB file below every empty folder
-      // answers the opposite of the question being asked.
-      d: usage ? 0 : (r.isDir ? 0 : 1),
+      // Directories first — EXCEPT in the usage view, where that rule is the
+      // one thing you do not want: a 4GB file below every empty folder
+      // answers the opposite of the question being asked. And except when
+      // you have said otherwise, in which case a folder sorts by its name
+      // like everything else.
+      d: (usage || dirsFirst === false) ? 0 : (r.isDir ? 0 : 1),
       nm: nm,
       num: usage ? (r.du !== undefined && r.du !== null ? r.du : r.size)
          : (key === "size" ? r.size : (key === "time" ? r.mtime : 0)),
@@ -218,7 +222,24 @@ function sortEntries(rows, key, desc) {
     };
   }
 
-  const byName = (a, b) => a.nm < b.nm ? -1 : (a.nm > b.nm ? 1 : 0);
+  // ── NAMES WITH NUMBERS IN THEM ────────────────────────────────────────
+  // A plain string compare reads "file10" as less than "file2", because it
+  // compares the "1" against the "2" and stops. Every numbered set anybody
+  // owns — screenshots, episodes, renders — therefore came out shuffled:
+  //   file10.txt  file2.txt  IMG_10.jpg  IMG_9.jpg  track1  track20  track3
+  //
+  // localeCompare with numeric ordering reads the digits as a number, which
+  // is what a person does:
+  //   file2.txt  file10.txt  IMG_9.jpg  IMG_10.jpg  track1  track3  track20
+  //
+  // It is the slower of the two and that is why it is a switch rather than
+  // the only way: the names are already lowercased and cached (see
+  // displaySound_), so a plain compare is a pointer comparison most of the
+  // time, and a directory of four thousand files is a lot of comparisons.
+  const byName = natural
+    ? (a, b) => a.nm.localeCompare(b.nm, undefined,
+                                   { numeric: true, sensitivity: "base" })
+    : (a, b) => a.nm < b.nm ? -1 : (a.nm > b.nm ? 1 : 0);
   let cmp;
   if (key === "size" || key === "time" || usage)
     cmp = (a, b) => (a.num - b.num) * dir || byName(a, b);
@@ -1020,10 +1041,38 @@ function parseDirSizes(text) {
 
 // A shell where you are standing. The same xdg-terminal-exec shape the bar's
 // own click actions use.
-function shellCommand(dir) {
-  return "xdg-terminal-exec --title=terminus-shell -e sh -c "
-    + Strings.shellQuote("cd " + Strings.shellQuote(dir) + " && exec $SHELL")
-    + " >/dev/null 2>&1 &";
+// ── OPENING A SHELL WHERE YOU ARE STANDING ───────────────────────────────
+// `xdg-terminal-exec` is the freedesktop way to ask "whatever terminal this
+// user prefers": it reads ~/.config/xdg-terminals.list and falls back to
+// guessing. It is the right default and it is not always right — not
+// installed, or a stale list, and "open shell here" fails SILENTLY, with
+// nothing the window can say about it.
+//
+// So `term` overrides it, and takes two shapes on purpose:
+//
+//   ""            the default above, untouched
+//   "kitty"       a terminal to run, given `-e sh -c ...` — which kitty,
+//                 foot, alacritty, wezterm and xterm all accept
+//   "... %d ..."  a whole command line, with %d standing for the directory,
+//                 already quoted
+//
+// The second covers everyone who just wants a different terminal; the third
+// is there because terminals disagree about every flag except -e, and a
+// setting that only took a binary would be a setting that broke on the first
+// one that wanted its title spelled differently.
+function shellCommand(dir, term) {
+  const t = String(term || "").trim();
+  const quoted = Strings.shellQuote(dir);
+  const inner = Strings.shellQuote("cd " + quoted + " && exec $SHELL");
+
+  if (t === "") {
+    return "xdg-terminal-exec --title=terminus-shell -e sh -c "
+      + inner + " >/dev/null 2>&1 &";
+  }
+  if (t.indexOf("%d") >= 0) {
+    return t.split("%d").join(quoted) + " >/dev/null 2>&1 &";
+  }
+  return t + " -e sh -c " + inner + " >/dev/null 2>&1 &";
 }
 
 // yazi's `a`: a trailing slash means a directory, anything else a file.

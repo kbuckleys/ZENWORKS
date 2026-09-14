@@ -451,7 +451,10 @@ FloatingWindow {
   // and a map that only ever grows would be an unbounded write on every save.
   property var dirViews: ({})
   property var dirViewOrder: []
-  readonly property int dirViewCap: 300
+  // How many directories keep their remembered view. Not readonly any more:
+  // three hundred was a number nobody could see, let alone choose, sitting
+  // next to a button offering to forget all of them.
+  property int dirViewCap: 300
 
   // ...and whether to do it at all.
   //
@@ -462,6 +465,31 @@ FloatingWindow {
   // turning it off stops it being written and stops it being applied, so
   // turning it back on returns the memory rather than starting again.
   property bool perDirView: true
+
+  // ── THUMBNAILS IN THE GRID ─────────────────────────────────────────────
+  // The grid decoded every picture it could see, always. That is what the
+  // grid is FOR on a folder of photographs, and it is what makes it unusable
+  // on a network mount or four thousand raws — so it is a switch. Off, a tile
+  // is its glyph, which is what a tile with nothing decoded yet already is.
+  // ── FOLDERS AT THE TOP, OR NOT ─────────────────────────────────────────
+  // The listing pinned every directory above every file, in every view but
+  // disk usage. It is a reasonable default and it is not everybody's: sorted
+  // by date, a folder touched last year sitting above this morning's download
+  // is the sort refusing to answer the question asked of it.
+  property bool dirsFirst: true
+
+  // See Terminus.sortEntries: "file2" before "file10", which a plain string
+  // compare gets backwards.
+  property bool naturalSort: true
+
+  property bool thumbsOn: true
+
+  // ── AND THE PREVIEW PANE ───────────────────────────────────────────────
+  // The third column's media half: the picture, the film's frame, the PDF,
+  // the archive's tree. Off, the column still lists a directory you point
+  // at — that is navigation, not preview — but nothing is decoded, stat'd or
+  // read for a FILE you are merely passing over, which is most of them.
+  property bool previewOn: true
 
   // Guards the round trip, and it is a DEPTH rather than a flag.
   //
@@ -509,6 +537,18 @@ FloatingWindow {
   // What is on screen is left alone. Forgetting how this folder liked to be
   // read is not a reason to rearrange it while you are looking at it — the
   // next visit is when the difference should show.
+  // Brought down to the cap when the cap comes down. Without this, moving the
+  // slider left recorded a smaller number and kept every entry already over
+  // it — the setting would only bite on the next directory visited.
+  function trimDirViews() {
+    const m = root.dirViews;
+    const o = root.dirViewOrder.slice();
+    while (o.length > root.dirViewCap) delete m[o.shift()];
+    root.dirViews = m;
+    root.dirViewOrder = o;
+    viewSave.restart();
+  }
+
   function forgetDirViews() {
     root.dirViews = ({});
     root.dirViewOrder = [];
@@ -2214,6 +2254,15 @@ FloatingWindow {
         zoom: root.zoom,
         sidebar: root.sidebar,
         sidebarWidth: root.sidebarWidth,
+        thumbsOn: root.thumbsOn,
+        dirsFirst: root.dirsFirst,
+        naturalSort: root.naturalSort,
+        alwaysTabs: root.alwaysTabs,
+        colHeadsOn: root.colHeadsOn,
+        confirmTrash: root.confirmTrash,
+        termCmd: root.termCmd,
+        previewOn: root.previewOn,
+        dirViewCap: root.dirViewCap,
         thumbZoom: root.thumbZoom,
         sortKey: root.sortKey,
         sortDesc: root.sortDesc,
@@ -2266,6 +2315,16 @@ FloatingWindow {
     if (typeof s.sortDesc === "boolean") root.sortDesc = s.sortDesc;
     if (typeof s.showHidden === "boolean") root.showHidden = s.showHidden;
     if (typeof s.perDirView === "boolean") root.perDirView = s.perDirView;
+    if (typeof s.thumbsOn === "boolean") root.thumbsOn = s.thumbsOn;
+    if (typeof s.dirsFirst === "boolean") root.dirsFirst = s.dirsFirst;
+    if (typeof s.naturalSort === "boolean") root.naturalSort = s.naturalSort;
+    if (typeof s.alwaysTabs === "boolean") root.alwaysTabs = s.alwaysTabs;
+    if (typeof s.colHeadsOn === "boolean") root.colHeadsOn = s.colHeadsOn;
+    if (typeof s.confirmTrash === "boolean") root.confirmTrash = s.confirmTrash;
+    if (typeof s.termCmd === "string") root.termCmd = s.termCmd;
+    if (typeof s.previewOn === "boolean") root.previewOn = s.previewOn;
+    if (typeof s.dirViewCap === "number" && s.dirViewCap > 0)
+      root.dirViewCap = Math.round(s.dirViewCap);
     if (typeof s.lastSaveDir === "string" && root.mgr
         && root.mgr.lastSaveDir === "") root.mgr.lastSaveDir = s.lastSaveDir;
     if (typeof s.sessionReplay === "boolean") root.sessionReplay = s.sessionReplay;
@@ -2419,7 +2478,7 @@ FloatingWindow {
     return root.enrich(Terminus.sortEntries(
       Terminus.filterEntries(Terminus.parseListing(text, dir), "",
                              root.showHidden),
-      root.sortKey, root.sortDesc));
+      root.sortKey, root.sortDesc, root.dirsFirst, root.naturalSort));
   }
 
 
@@ -2854,6 +2913,11 @@ FloatingWindow {
       root.beginPeek(r.path, Terminus.peekCommand(r.path));
       return;
     }
+    // NOTHING IS READ FOR A FILE WHEN THE PREVIEW IS OFF. Stopped here
+    // rather than at the pane that draws it: what costs is the stat, the
+    // thumbnail and the decode this dispatcher sets in motion, not the
+    // rectangle at the end of it.
+    if (!root.previewOn) { root.previewKind = "none"; return; }
     if (Terminus.isImage(r.name)) { root.previewKind = "image"; return; }
     if (Terminus.isVideo(r.name)) {
       root.previewKind = "video";
@@ -4056,6 +4120,9 @@ FloatingWindow {
     if (appPick.open)
       return appPick.paths.length > 1 ? "(multiple files)"
         : Terminus.basename(appPick.path);
+    // The one sheet that is about the WINDOW rather than about a file, so it
+    // is the one whose title is a word.
+    if (prefs.open) return "Settings";
     return "";
   }
 
@@ -4124,7 +4191,8 @@ FloatingWindow {
   // the speed the sheet does.
   readonly property real sheetHeadOn: Math.max(
     confirmSheet.cardInk, propsSheet.cardInk, permsSheet.cardInk,
-    bulkSheet.cardInk, promptSheet.cardInk, appSheet.cardInk)
+    bulkSheet.cardInk, promptSheet.cardInk, appSheet.cardInk,
+    prefsSheet.cardInk)
 
   // ── WHICHEVER SHEET IS ON THE BAR ──────────────────────────────────────
   // Picked by how far along its arrival is rather than by `open`, because a
@@ -4133,7 +4201,7 @@ FloatingWindow {
   // it. Only one is ever up, so the strongest is the one.
   readonly property var liveSheet: {
     const all = [confirmSheet, propsSheet, permsSheet,
-                 bulkSheet, promptSheet, appSheet];
+                 bulkSheet, promptSheet, appSheet, prefsSheet];
     let best = null;
     for (let i = 0; i < all.length; i++)
       if (all[i] && (best === null || all[i].cardInk > best.cardInk))
@@ -4166,7 +4234,7 @@ FloatingWindow {
   // asking it would have held the window soft for the whole session.
   readonly property real cardSoft: Math.max(
     help.opacity, confirm.opacity, props.opacity, perms.opacity,
-    bulk.opacity, prompt.opacity, appPick.opacity, prefs.opacity,
+    bulk.opacity, prompt.opacity, appPick.opacity, prefsSheet.cardInk,
     sendToCard.opacity)
 
   readonly property bool modal: props.open || perms.open || confirm.open
@@ -4765,18 +4833,41 @@ FloatingWindow {
     root.act.marked = {};
   }
 
+  // ── ASKING ABOUT THE TRASH ─────────────────────────────────────────────
+  // Only this one is optional. Trash is recoverable — the undo record below
+  // is what recovers it — so being asked every time is a keystroke spent on a
+  // decision that can be unmade. deleteForever() has no such switch and never
+  // will: that is the difference between the two verbs.
+  property bool confirmTrash: true
+
+  // The strip comes and goes with the second tab, so the body jumps by its
+  // height the moment one is opened and again when it is closed. On, it is
+  // simply always there.
+  property bool alwaysTabs: false
+
+  // The sort strip over a single-pane list. Twenty-two pixels, and sorting is
+  // reachable from this panel and from the `,` keys either way.
+  property bool colHeadsOn: true
+
   function trash() {
     const rows = root.acting();
     if (rows.length === 0) return;
+    if (!root.confirmTrash) { root.doTrash(rows); return; }
     confirm.ask(
       "Trash " + rows.length + (rows.length === 1 ? " item" : " items") + "?",
-      rows.map((r) => r.name).join("   "), "Trash", () => {
-        const paths = rows.map((r) => r.path);
-        root.run(Terminus.trashCommand(paths));
-        // recorded by where they CAME FROM: that is what undo can look up
-        root.pushUndo({ kind: "trash", paths: paths });
-        root.act.marked = {};
-      });
+      rows.map((r) => r.name).join("   "), "Trash",
+      () => root.doTrash(rows));
+  }
+
+  // The doing, apart from the asking, so both routes run exactly the same
+  // thing — including the undo record, which is the whole reason the ask can
+  // be skipped at all.
+  function doTrash(rows) {
+    const paths = rows.map((r) => r.path);
+    root.run(Terminus.trashCommand(paths));
+    // recorded by where they CAME FROM: that is what undo can look up
+    root.pushUndo({ kind: "trash", paths: paths });
+    root.act.marked = {};
   }
 
   // ── renaming ────────────────────────────────────────────────────────────
@@ -5562,7 +5653,13 @@ FloatingWindow {
     root.status = note;
   }
 
-  function openShell() { root.run(Terminus.shellCommand(root.cwd)); }
+  // Empty means xdg-terminal-exec, which is what it always did — see
+  // Terminus.shellCommand for the two shapes a value can take.
+  property string termCmd: ""
+
+  function openShell() {
+    root.run(Terminus.shellCommand(root.cwd, root.termCmd));
+  }
 
   // yazi's `a`. One prompt for both, because the only difference is whether
   // the name ends in a slash — which is how yazi says it too.
@@ -6214,7 +6311,7 @@ FloatingWindow {
         width: parent.width
         // the path bar's height, so the two strips stack as one band of chrome
         // rather than two of slightly different depths
-        height: root.tabs.length > 1 ? root.headH : 0
+        height: (root.alwaysTabs || root.tabs.length > 1) ? root.headH : 0
         visible: height > 0
         clip: true
         // The path bar's own colour. Leaving the strip transparent removed the
@@ -7747,7 +7844,8 @@ FloatingWindow {
         // only one height for both. A grid beside a list would have had a
         // 22px band of nothing over the grid, which is what it looked like:
         // a sort bar placeholder.
-        height: root.viewMode === "list" && !root.dual ? 22 : 0
+        height: root.colHeadsOn && root.viewMode === "list" && !root.dual
+          ? 22 : 0
         visible: height > 0
         clip: true
         // TWO grounds, because this strip spans two things.
@@ -11375,24 +11473,20 @@ FloatingWindow {
       id: prefs
       anchors.fill: parent
       z: 14
-      visible: prefs.shade > 0.01
-      opacity: prefs.shade
-
-      property real shade: 0
-      Behavior on shade {
-        NumberAnimation { duration: Zenon.menuFade; easing.type: Easing.OutCubic }
-      }
-      onOpenChanged: prefs.shade = prefs.open ? 1 : 0
+      // THE SHEET'S OWN ARRIVAL DECIDES THIS. It used to carry a `shade` that
+      // faded the whole overlay on the menu's timing — which would now cut
+      // the sheet off partway out, because a sheet leaves more slowly than a
+      // menu card ever did. The sheet fades and slides itself; this only has
+      // to still be there while it does.
+      visible: prefsSheet.cardInk > 0.01
 
       property bool open: false
-      // where the card's TOP RIGHT corner goes, in this item's coordinates
-      property real px: 0
-      property real py: 0
 
+      // The corner it used to hang from. A sheet hangs from the bar instead,
+      // so the item is no longer measured against — but the hamburger still
+      // calls this, and a caller should not have to change because the thing
+      // it opens changed shape.
       function openFrom(item) {
-        const p = item.mapToItem(prefs, item.width, item.height);
-        prefs.px = p.x;
-        prefs.py = p.y + 6;
         prefs.open = true;
       }
       function toggleFrom(item) {
@@ -11404,35 +11498,26 @@ FloatingWindow {
         onClicked: { prefs.open = false; content.forceActiveFocus(); }
       }
 
-      // The same shadow the menu carries, which is icarus' shadow — and it
-      // rides the card's own arrival, so it grows out of the corner with it.
-      MenuShadow {
-        panel: prefsCard
-        cornerRadius: 8
-        transformOrigin: Item.TopRight
-        scale: prefsCard.scale
-      }
-
-      Rectangle {
-        id: prefsCard
-        // Rounded, for the reason the menu card's position is: the corner it
-        // hangs from is measured off a bar that sits on a fractional pixel,
-        // and an item on a half pixel renders its text through a filter.
-        x: Math.round(Math.max(4,
-             Math.min(prefs.px - prefsCard.width, prefs.width - prefsCard.width - 4)))
-        y: Math.round(Math.max(4,
-             Math.min(prefs.py, prefs.height - prefsCard.height - 4)))
-        // 292, not 272: the sort strip carries five buttons while the
-        // disk-usage mode is on, and "usage" does not fit in a fifth of the
-        // old width.
-        width: 292
-        height: prefsCol.implicitHeight
-        color: Zenon.black
-        border.color: Zenon.surfaceBorder
-        border.width: 1
-        radius: 8
-        transformOrigin: Item.TopRight
-        scale: 0.96 + 0.04 * prefs.shade
+      // ── A SHEET, LIKE EVERY OTHER CARD IN THIS WINDOW ────────────────
+      // It hung off the hamburger as a menu card, 292 pixels of settings in
+      // one tall strip, positioned by arithmetic against the corner it came
+      // out of and clamped to the window so it did not fall off the bottom.
+      // It is a panel of settings, not a menu of verbs — and the sheet gives
+      // it the width to be laid out rather than listed.
+      //
+      // The arrival, the title on the bar, the gap it opens in the bar's own
+      // edge and the blur behind it all come with the shape.
+      Sheet {
+        id: prefsSheet
+        shown: prefs.open
+        fromTop: tabStrip.height + crumbBar.height
+        // 700, not 620: the two columns each hold a slider with a label and a
+        // readout, and a PrefText whose field is whatever is left after its
+        // label — the narrower the sheet, the less of a terminal command you
+        // can see at once. The well caps it against the window either way, so
+        // this is a ceiling rather than a width.
+        cardW: 700
+        cardH: prefsCol.implicitHeight
 
         // The card eats its own clicks. Without this, the gaps between rows
         // fall through to the catcher behind and dismiss the panel you were
@@ -11445,145 +11530,239 @@ FloatingWindow {
           topPadding: 4
           bottomPadding: 10
 
-          SideHead { label: "VIEW"; first: true }
+          // ── TWO COLUMNS, BECAUSE THERE IS ROOM FOR TWO ──────────────
+          // As a menu card hanging off the hamburger this was 292 pixels
+          // wide and thirteen rows tall — a strip you scrolled your eye
+          // down. A sheet is as wide as the window lets it be, so the
+          // sections sit beside each other and the whole of it is one
+          // glance. Split by SECTION rather than by row count: a heading
+          // and the switches under it are one thing and do not get to be
+          // in two places.
+          Row {
+            width: parent.width
+            spacing: 26
 
-          // The three views as three buttons rather than as `v` pressed until
-          // the right one comes round. While the window is split, columns is
-          // not in the ring — six columns of listing in half a window each —
-          // so it is shown refusing rather than quietly doing nothing.
-          PrefSeg {
-            options: ["columns", "list", "grid"]
-            current: root.viewMode
-            allowed: root.viewRing
-            onChose: (v) => root.setView(v)
-          }
+            Column {
+              width: (parent.width - parent.spacing) / 2
 
-          // The two zooms are deliberately independent — the grid scales its
-          // pictures and everything else scales its text — so the row says
-          // which one it is holding rather than reading "zoom" and meaning
-          // something different in each view.
-          PrefSlider {
-            label: root.viewMode === "grid" ? "Thumbnails" : "Text size"
-            value: root.activeZoom
-            from: root.zoomMin
-            to: root.zoomMax
-            neutral: 1.0
-            // the same notch ctrl+wheel over the listing uses, and the same
-            // one ctrl+plus steps by
-            wheelStep: 0.1
-            readout: Math.round(root.activeZoom * 100) + "%"
-            onMoved: (v) => root.setZoom(v)
-          }
+            SideHead { label: "VIEW"; first: true }
 
-          SideHead { label: "SORT" }
-
-          // The column headings do this too, by clicking them — but only in
-          // list view, and the grid and columns had no way to reach the order
-          // at all except by learning `,` sequences.
-          //
-          // USAGE joins the ring only while the disk-usage mode is on, which
-          // is the only time it means anything. Without it, turning the mode
-          // on left all four buttons unlit and the panel looking broken.
-          PrefSeg {
-            options: root.usage
-              ? ["name", "kind", "size", "time", "usage"]
-              : ["name", "kind", "size", "time"]
-            current: root.sortKey
-            onChose: (v) => {
-              // a second press on the key already in force turns it round,
-              // exactly as clicking the heading twice does
-              if (root.sortKey === v) root.sortDesc = !root.sortDesc;
-              else { root.sortKey = v; root.sortDesc = false; }
+            // The three views as three buttons rather than as `v` pressed until
+            // the right one comes round. While the window is split, columns is
+            // not in the ring — six columns of listing in half a window each —
+            // so it is shown refusing rather than quietly doing nothing.
+            PrefSeg {
+              options: ["columns", "list", "grid"]
+              current: root.viewMode
+              allowed: root.viewRing
+              onChose: (v) => root.setView(v)
             }
-          }
 
-          PrefRow {
-            label: "Descending"
-            on: root.sortDesc
-            onToggled: root.sortDesc = !root.sortDesc
-          }
-
-          SideHead { label: "LISTING" }
-
-          PrefRow {
-            label: "Hidden files"
-            hint: "."
-            on: root.showHidden
-            onToggled: root.showHidden = !root.showHidden
-          }
-
-          PrefRow {
-            label: "Disk usage"
-            hint: ", u"
-            on: root.usage
-            onToggled: root.toggleUsage()
-          }
-
-          PrefRow {
-            label: "Git status"
-            hint: ", g"
-            on: root.git
-            onToggled: root.toggleGit()
-          }
-
-          // ACTION, not a switch. PrefRow draws a toggle because every other
-          // row in this panel is one; this is a thing you DO once, so it wears
-          // its verb where the switch would be and nothing is left lit
-          // afterwards to suggest a state.
-          PrefAction {
-            label: "Reset remembered views"
-            verb: root.dirViewOrder.length > 0
-              ? root.dirViewOrder.length + " kept" : "none"
-            enabled: root.dirViewOrder.length > 0
-            onTriggered: root.forgetDirViews()
-          }
-
-          PrefRow {
-            label: "Remember per directory"
-            on: root.perDirView
-            onToggled: {
-              root.perDirView = !root.perDirView;
-              // Recorded on the way ON, so the folder you are standing in is
-              // remembered from here rather than from the next one you walk
-              // into — and applied at once, so turning it back on returns the
-              // view this folder had rather than waiting for you to leave.
-              if (root.perDirView) { root.rememberView(); root.applyDirView(); }
-              viewSave.restart();
+            // The two zooms are deliberately independent — the grid scales its
+            // pictures and everything else scales its text — so the row says
+            // which one it is holding rather than reading "zoom" and meaning
+            // something different in each view.
+            // The grid's own switch, named for what it turns off rather than for
+            // the view it belongs to — there is nowhere else thumbnails are drawn.
+            PrefRow {
+              label: "Thumbnails"
+              on: root.thumbsOn
+              onToggled: root.thumbsOn = !root.thumbsOn
             }
-          }
 
-          SideHead { label: "WINDOW" }
-
-          PrefRow {
-            label: "Sidebar"
-            on: root.sidebar
-            onToggled: root.sidebar = !root.sidebar
-          }
-
-          PrefRow {
-            label: "Restore session"
-            on: root.sessionReplay
-            onToggled: {
-              root.sessionReplay = !root.sessionReplay;
-              viewSave.restart();
+            PrefRow {
+              label: "Preview pane"
+              on: root.previewOn
+              onToggled: root.previewOn = !root.previewOn
             }
-          }
 
-          PrefRow {
-            label: "Split view"
-            hint: "\\"
-            on: root.dual
-            onToggled: root.toggleDual()
-          }
+            PrefSlider {
+              label: root.viewMode === "grid" ? "Thumbnails" : "Text size"
+              value: root.activeZoom
+              from: root.zoomMin
+              to: root.zoomMax
+              neutral: 1.0
+              // the same notch ctrl+wheel over the listing uses, and the same
+              // one ctrl+plus steps by
+              wheelStep: 0.1
+              readout: Math.round(root.activeZoom * 100) + "%"
+              onMoved: (v) => root.setZoom(v)
+            }
 
-          PrefSlider {
-            label: "Opacity"
-            value: root.winAlpha
-            from: root.winAlphaMin
-            to: 1.0
-            neutral: 1.0
-            readout: Math.round(root.winAlpha * 100) + "%"
-            onMoved: (v) => root.setAlpha(v)
+            SideHead { label: "LISTING" }
+
+            PrefRow {
+              label: "Hidden files"
+              hint: "."
+              on: root.showHidden
+              onToggled: root.showHidden = !root.showHidden
+            }
+
+            PrefRow {
+              label: "Disk usage"
+              hint: ", u"
+              on: root.usage
+              onToggled: root.toggleUsage()
+            }
+
+            PrefRow {
+              label: "Confirm trash"
+              on: root.confirmTrash
+              onToggled: root.confirmTrash = !root.confirmTrash
+            }
+
+            PrefRow {
+              label: "Git status"
+              hint: ", g"
+              on: root.git
+              onToggled: root.toggleGit()
+            }
+
+            // ACTION, not a switch. PrefRow draws a toggle because every other
+            // row in this panel is one; this is a thing you DO once, so it wears
+            // its verb where the switch would be and nothing is left lit
+            // afterwards to suggest a state.
+            PrefAction {
+              label: "Reset remembered views"
+              verb: root.dirViewOrder.length > 0
+                ? root.dirViewOrder.length + " kept" : "none"
+              enabled: root.dirViewOrder.length > 0
+              onTriggered: root.forgetDirViews()
+            }
+
+            // Beside the button that forgets them, because it is the same
+            // fact said as a number: how many are kept at all.
+            PrefSlider {
+              label: "Remember"
+              value: root.dirViewCap
+              from: 50
+              to: 1000
+              readout: root.dirViewCap + " dirs"
+              onMoved: (v) => {
+                root.dirViewCap = Math.round(v);
+                root.trimDirViews();
+              }
+            }
+
+            PrefRow {
+              label: "Remember per directory"
+              on: root.perDirView
+              onToggled: {
+                root.perDirView = !root.perDirView;
+                // Recorded on the way ON, so the folder you are standing in is
+                // remembered from here rather than from the next one you walk
+                // into — and applied at once, so turning it back on returns the
+                // view this folder had rather than waiting for you to leave.
+                if (root.perDirView) { root.rememberView(); root.applyDirView(); }
+                viewSave.restart();
+              }
+            }
+
+            }
+
+            Column {
+              width: (parent.width - parent.spacing) / 2
+
+            SideHead { label: "SORT"; first: true }
+
+            // The column headings do this too, by clicking them — but only in
+            // list view, and the grid and columns had no way to reach the order
+            // at all except by learning `,` sequences.
+            //
+            // USAGE joins the ring only while the disk-usage mode is on, which
+            // is the only time it means anything. Without it, turning the mode
+            // on left all four buttons unlit and the panel looking broken.
+            PrefSeg {
+              options: root.usage
+                ? ["name", "kind", "size", "time", "usage"]
+                : ["name", "kind", "size", "time"]
+              current: root.sortKey
+              onChose: (v) => {
+                // a second press on the key already in force turns it round,
+                // exactly as clicking the heading twice does
+                if (root.sortKey === v) root.sortDesc = !root.sortDesc;
+                else { root.sortKey = v; root.sortDesc = false; }
+              }
+            }
+
+            PrefRow {
+              label: "Natural order"
+              on: root.naturalSort
+              onToggled: root.naturalSort = !root.naturalSort
+            }
+
+            PrefRow {
+              label: "Folders first"
+              on: root.dirsFirst
+              // No re-sort to ask for: the pane's `view` reads this, so
+              // both halves rearrange themselves — see the note on Pane.raw.
+              onToggled: root.dirsFirst = !root.dirsFirst
+            }
+
+            PrefRow {
+              label: "Descending"
+              on: root.sortDesc
+              onToggled: root.sortDesc = !root.sortDesc
+            }
+
+            SideHead { label: "WINDOW" }
+
+            PrefRow {
+              label: "Sidebar"
+              on: root.sidebar
+              onToggled: root.sidebar = !root.sidebar
+            }
+
+            PrefRow {
+              label: "Always show tabs"
+              on: root.alwaysTabs
+              onToggled: root.alwaysTabs = !root.alwaysTabs
+            }
+
+            PrefRow {
+              label: "Column headers"
+              on: root.colHeadsOn
+              onToggled: root.colHeadsOn = !root.colHeadsOn
+            }
+
+            PrefRow {
+              label: "Restore session"
+              on: root.sessionReplay
+              onToggled: {
+                root.sessionReplay = !root.sessionReplay;
+                viewSave.restart();
+              }
+            }
+
+            PrefRow {
+              label: "Split view"
+              hint: "\\"
+              on: root.dual
+              onToggled: root.toggleDual()
+            }
+
+            // Empty is the default and says so: xdg-terminal-exec is what
+            // runs when nothing is typed here.
+            PrefText {
+              label: "Terminal"
+              value: root.termCmd
+              ghost: "xdg-terminal-exec"
+              onCommitted: (v) => {
+                root.termCmd = v.trim();
+                viewSave.restart();
+              }
+            }
+
+            PrefSlider {
+              label: "Opacity"
+              value: root.winAlpha
+              from: root.winAlphaMin
+              to: 1.0
+              neutral: 1.0
+              readout: Math.round(root.winAlpha * 100) + "%"
+              onMoved: (v) => root.setAlpha(v)
+            }
+            }
           }
         }
       }
@@ -15105,7 +15284,8 @@ FloatingWindow {
           r.du = r.isDir ? m[r.path] : r.size;
         }
       }
-      return Terminus.sortEntries(kept, root.sortKey, root.sortDesc);
+      return Terminus.sortEntries(kept, root.sortKey, root.sortDesc,
+                                  root.dirsFirst, root.naturalSort);
     }
 
     readonly property var view: Terminus.filterQuery(pane.sorted, pane.query)
@@ -15551,6 +15731,9 @@ FloatingWindow {
             // draw in the instant between a row leaving and the view being
             // told — guarded here rather than left to throw.
             if (!tile.entry) return "";
+            // Switched off, a tile shows the glyph it shows before anything
+            // has decoded — see root.thumbsOn.
+            if (!root.thumbsOn) return "";
             const pic = Terminus.isImage(tile.entry.name);
             // a video's frame and an audio file's cover are both
             // CACHE-ONLY: there is no original to fall back to
@@ -17283,6 +17466,98 @@ FloatingWindow {
       font.family: Zenon.face
       font.pixelSize: 13
       Behavior on color { ColorAnimation { duration: Zenon.fast } }
+    }
+  }
+
+  // ── A LINE YOU TYPE INTO, ON THE SETTINGS PANEL ────────────────────────
+  // The panel had switches, segments, sliders and one action — every control
+  // it needed while every setting was a choice between things the window
+  // already knew about. A terminal command is not: it is a string only you
+  // know, so it needs somewhere to put one.
+  //
+  // Committed on Return or on losing the field, never per keystroke: half a
+  // command is not a command, and writing one to disk on every letter would
+  // persist a dozen broken ones on the way to a good one.
+  component PrefText: Item {
+    id: ptext
+    property string label: ""
+    property string value: ""
+    property string ghost: ""
+    signal committed(string v)
+
+    width: parent ? parent.width : 0
+    height: 34
+
+    Rectangle {
+      anchors.fill: parent
+      color: ptextHov.hovered || ptextIn.activeFocus
+        ? Zenon.headBg : "transparent"
+    }
+    HoverHandler { id: ptextHov }
+
+    Text {
+      id: ptextLabel
+      anchors.left: parent.left
+      anchors.leftMargin: 14
+      anchors.verticalCenter: parent.verticalCenter
+      width: 116
+      text: ptext.label
+      elide: Text.ElideRight
+      color: Zenon.white
+      font.family: Zenon.face
+      font.pixelSize: 13
+    }
+
+    Rectangle {
+      anchors.left: ptextLabel.right
+      anchors.leftMargin: 6
+      anchors.right: parent.right
+      anchors.rightMargin: 14
+      anchors.verticalCenter: parent.verticalCenter
+      height: 24
+      radius: 4
+      color: Qt.rgba(Zenon.white.r, Zenon.white.g, Zenon.white.b, 0.05)
+      border.width: 1
+      border.color: ptextIn.activeFocus ? Zenon.cyan : Zenon.msgBorder
+      Behavior on border.color { ColorAnimation { duration: Zenon.fast } }
+
+      MouseArea {
+        anchors.fill: parent
+        cursorShape: Qt.IBeamCursor
+        onClicked: ptextIn.forceActiveFocus()
+      }
+
+      Text {
+        anchors.fill: parent
+        anchors.leftMargin: 8
+        verticalAlignment: Text.AlignVCenter
+        visible: ptextIn.text === "" && !ptextIn.activeFocus
+        text: ptext.ghost
+        color: Zenon.muted
+        font.family: Zenon.face
+        font.pixelSize: 12
+      }
+
+      TextInput {
+        id: ptextIn
+        anchors.fill: parent
+        anchors.leftMargin: 8
+        anchors.rightMargin: 8
+        verticalAlignment: Text.AlignVCenter
+        text: ptext.value
+        color: Zenon.white
+        selectionColor: Zenon.selBg
+        selectedTextColor: Zenon.white
+        font.family: Zenon.face
+        font.pixelSize: 12
+        clip: true
+        onEditingFinished: ptext.committed(ptextIn.text)
+        Keys.onEscapePressed: (e) => {
+          e.accepted = true;
+          ptextIn.text = ptext.value;
+          content.forceActiveFocus();
+        }
+      }
     }
   }
 
