@@ -93,6 +93,35 @@ PanelWindow {
   readonly property color msgBorder: Zenon.msgBorder
   readonly property color fgColor: Zenon.white
   readonly property color hintColor: Zenon.muted
+
+  // ── THE KEYS, DRAWN AS KEYS ──────────────────────────────────────────
+  // The hints were rich text with the key in bold and its word after it in
+  // grey, and the colours were hex literals inside artemis.js — the palette
+  // said twice. A chip says "this is a key you press" the way the rest of
+  // this desktop says it, and takes its ink from Zenon like everything else.
+  //
+  // The recipe is terminus' KeyChip, which is an inline component of that
+  // file and so cannot be imported.
+  component KeyCap: Rectangle {
+    id: cap
+    property string label: ""
+    implicitWidth: capText.implicitWidth + 13
+    implicitHeight: 19
+    radius: 5
+    color: Qt.rgba(Zenon.keyInk.r, Zenon.keyInk.g, Zenon.keyInk.b, 0.10)
+    border.width: 1
+    border.color: Qt.rgba(Zenon.keyInk.r, Zenon.keyInk.g, Zenon.keyInk.b, 0.30)
+    visible: cap.label !== ""
+
+    Text {
+      id: capText
+      anchors.centerIn: parent
+      text: cap.label
+      color: Zenon.keyInk
+      font.family: Zenon.face
+      font.pixelSize: 11
+    }
+  }
   readonly property color dirColor: Zenon.blue
 
   // shell.qml reads this for the morphed pill's width; it used to be the
@@ -849,7 +878,7 @@ PanelWindow {
           id: msgBar
           width: parent.width
           height: popup.msgH
-          color: popup.msgColor
+          color: Zenon.hintBg
           Rectangle {
             anchors.top: parent.top
             anchors.left: parent.left
@@ -859,18 +888,30 @@ PanelWindow {
           }
           Row {
             anchors.centerIn: parent
-            spacing: 32
+            // Tighter than the old 32, because a chip already draws its own
+            // boundary — the space was doing that job.
+            spacing: 14
+
             Repeater {
               model: Artemis.hintText(popup.dirsOnly)
-              Text {
+
+              delegate: Row {
+                id: hintPair
                 required property var modelData
-                text: modelData
-                color: popup.hintColor
-                textFormat: Text.RichText
-                font.family: Zenon.face
-                font.weight: 600
-                font.pixelSize: 14
-                verticalAlignment: Text.AlignVCenter
+                spacing: 5
+
+                KeyCap {
+                  anchors.verticalCenter: parent.verticalCenter
+                  label: hintPair.modelData[0]
+                }
+
+                Text {
+                  anchors.verticalCenter: parent.verticalCenter
+                  text: hintPair.modelData[1]
+                  color: popup.hintColor
+                  font.family: Zenon.face
+                  font.pixelSize: 13
+                }
               }
             }
           }

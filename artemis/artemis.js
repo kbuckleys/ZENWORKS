@@ -206,12 +206,14 @@ function openCommand(path, isDir) {
   return "gio open " + Strings.shellQuote(path) + " >/dev/null 2>&1 &";
 }
 
+// PAIRS, NOT MARKUP. It used to hand back finished rich text with the colours
+// written in as hex — the palette living in a second place, and a hint that
+// could only ever be drawn one way. The popup draws these as chips now; what
+// belongs here is which key and what it does.
 function hintText(dirsOnly) {
-  const key = (k) => "<b><span style=\"color:#a2a8bc;\">" + k + "</span></b>";
-  const lbl = (t) => "<span style=\"color:#6a707f;\">" + t + "</span>";
   return [
-    key("return") + " " + lbl("open"),
-    key("alt c") + " " + lbl("copy path"),
-    key("alt d") + " " + lbl(dirsOnly ? "all results" : "directories only")
+    ["return", "open"],
+    ["alt c", "copy path"],
+    ["alt d", dirsOnly ? "all results" : "directories only"]
   ];
 }

@@ -41,7 +41,7 @@ Item {
   // have finished.
   implicitHeight: osd.active ? card.implicitHeight : 0
   Behavior on implicitHeight {
-    NumberAnimation { duration: Zenon.fast; easing.type: Zenon.ease }
+    NumberAnimation { duration: Howler.closeMs; easing.type: Zenon.ease }
   }
   visible: osd.implicitHeight > 0.5
 
@@ -83,14 +83,17 @@ Item {
 
     // A TOAST'S SKIN. Same ground, same border, same corners, same
     // transparency — it shares their stack, so it is one of them.
-    color: Zenon.panelBgDeep
-    border.color: Zenon.surface
+    // THE TOAST'S OWN SKIN, which is the point of the OSD looking like
+    // one — so it follows the same two settings rather than keeping a
+    // copy of what they used to say.
+    color: Howler.bg
+    border.color: Howler.borderInk
     border.width: Howler.borderSize
     radius: Howler.radius * 2
 
     opacity: osd.active ? 1 : 0
     Behavior on opacity {
-      NumberAnimation { duration: Zenon.fast; easing.type: Zenon.ease }
+      NumberAnimation { duration: Howler.closeMs; easing.type: Zenon.ease }
     }
 
     // COPIED FROM morpheus/NowPlayingPanel's volume row, verbatim — the
@@ -105,10 +108,10 @@ Item {
       x: osd.active ? 0 : osd.slideX
       y: osd.active ? 0 : osd.slideY
       Behavior on x {
-        NumberAnimation { duration: Zenon.normal; easing.type: Zenon.travelEase }
+        NumberAnimation { duration: Howler.openMs; easing.type: Zenon.travelEase }
       }
       Behavior on y {
-        NumberAnimation { duration: Zenon.normal; easing.type: Zenon.travelEase }
+        NumberAnimation { duration: Howler.openMs; easing.type: Zenon.travelEase }
       }
     }
 

@@ -95,23 +95,87 @@ PanelWindow {
   readonly property bool wide: popup.view === "results"
   readonly property int maxBodyH: 520
 
+  // ── THE KEYS, DRAWN AS KEYS ──────────────────────────────────────────
+  // They were a run of rich text with the key set in bold and the word after
+  // it in grey — which asks the reader to work out where one hint ends and
+  // the next begins from weight alone. A chip says "this is a key you press"
+  // the way the rest of this desktop says it, and a chip with its word beside
+  // it is one object rather than two runs that happen to be adjacent.
+  //
+  // The recipe is terminus' KeyChip, which is an inline component of that
+  // file and so cannot be imported. Two definitions of one small shape, and
+  // the alternative was a shared component that nine other popups would then
+  // be half-using.
+  component KeyCap: Rectangle {
+    id: cap
+    property string label: ""
+    implicitWidth: capText.implicitWidth + 13
+    implicitHeight: 19
+    radius: 5
+    color: Qt.rgba(Zenon.keyInk.r, Zenon.keyInk.g, Zenon.keyInk.b, 0.10)
+    border.width: 1
+    border.color: Qt.rgba(Zenon.keyInk.r, Zenon.keyInk.g, Zenon.keyInk.b, 0.30)
+    visible: cap.label !== ""
+
+    Text {
+      id: capText
+      anchors.centerIn: parent
+      text: cap.label
+      color: Zenon.keyInk
+      font.family: Zenon.face
+      font.pixelSize: 11
+    }
+  }
+
   component HintBar: Item {
     id: hintBarRoot
     height: 30
     property var rows: popup.hints()
+
+    // The same strip ideo, zeus and folio stand theirs on. These used to sit
+    // inside a header that had its own ground; anchored to the bottom they
+    // had none, and a row of keys floating on the panel reads as content.
+    Rectangle {
+      anchors.fill: parent
+      color: Zenon.hintBg
+
+      // And the hairline along its top edge, which is what the other three
+      // already draw — the strip is translucent, so without a line the body
+      // above it simply gets darker rather than ending.
+      Rectangle {
+        anchors.top: parent.top
+        anchors.left: parent.left
+        anchors.right: parent.right
+        height: 1
+        color: Zenon.msgBorder
+      }
+    }
+
     Row {
       anchors.centerIn: parent
-      spacing: 22
+      // Tighter between the pairs than the old 22, because a chip already
+      // draws its own boundary — the space was doing that job before.
+      spacing: 14
       Repeater {
         model: hintBarRoot.rows
-        Text {
+
+        delegate: Row {
+          id: hintPair
           required property var modelData
-          text: "<b><span style=\"color:" + popup.keyColor + ";\">" +
-            Strings.escapeHtml(modelData[0]) + "</span></b> <span style=\"color:" +
-            popup.dimColor + ";\">" + Strings.escapeHtml(modelData[1]) + "</span>"
-          textFormat: Text.RichText
-          font.family: Zenon.face
-          font.pixelSize: 15
+          spacing: 5
+
+          KeyCap {
+            anchors.verticalCenter: parent.verticalCenter
+            label: hintPair.modelData[0]
+          }
+
+          Text {
+            anchors.verticalCenter: parent.verticalCenter
+            text: hintPair.modelData[1]
+            color: popup.dimColor
+            font.family: Zenon.face
+            font.pixelSize: 13
+          }
         }
       }
     }
@@ -847,7 +911,6 @@ PanelWindow {
             }
           }
 
-          HintBar { width: parent.width }
 
           Item {
             width: parent.width
@@ -892,6 +955,19 @@ PanelWindow {
             }
           }
         }
+
+        // ── THE HINTS, ALONG THE BOTTOM ──────────────────────────────
+        // They sat directly under the title, between you and the thing you
+        // opened this for. A hint is what you read when you do not know what
+        // to do next, which is not the first thing on the panel — so it goes
+        // where a footer goes, and the body starts at the top where it
+        // belongs. Anchored rather than laid out: what is above it is already
+        // sized so this 30 is exactly what is left over.
+        HintBar {
+          anchors.left: parent.left
+          anchors.right: parent.right
+          anchors.bottom: parent.bottom
+        }
       }
 
       // ------------------------------------------------- trans input --
@@ -922,7 +998,6 @@ PanelWindow {
             }
           }
 
-          HintBar { width: parent.width }
 
           Item {
             width: parent.width
@@ -1076,6 +1151,19 @@ PanelWindow {
             }
           }
         }
+
+        // ── THE HINTS, ALONG THE BOTTOM ──────────────────────────────
+        // They sat directly under the title, between you and the thing you
+        // opened this for. A hint is what you read when you do not know what
+        // to do next, which is not the first thing on the panel — so it goes
+        // where a footer goes, and the body starts at the top where it
+        // belongs. Anchored rather than laid out: what is above it is already
+        // sized so this 30 is exactly what is left over.
+        HintBar {
+          anchors.left: parent.left
+          anchors.right: parent.right
+          anchors.bottom: parent.bottom
+        }
       }
 
       // -------------------------------------------------- dict results --
@@ -1094,7 +1182,11 @@ PanelWindow {
 
           Rectangle {
             width: parent.width
-            height: 74
+            // The hint bar used to stand in here under the title; it is
+            // anchored to the bottom of the view now, so the header gives
+            // back the 30 it was holding for it and the panel's own height
+            // is unchanged.
+            height: 44
             color: popup.msgColor
 
             Rectangle {
@@ -1182,7 +1274,6 @@ PanelWindow {
                 }
               }
 
-              HintBar { width: parent.width }
             }
           }
 
@@ -1248,6 +1339,19 @@ PanelWindow {
             }
           }
         }
+
+        // ── THE HINTS, ALONG THE BOTTOM ──────────────────────────────
+        // They sat directly under the title, between you and the thing you
+        // opened this for. A hint is what you read when you do not know what
+        // to do next, which is not the first thing on the panel — so it goes
+        // where a footer goes, and the body starts at the top where it
+        // belongs. Anchored rather than laid out: what is above it is already
+        // sized so this 30 is exactly what is left over.
+        HintBar {
+          anchors.left: parent.left
+          anchors.right: parent.right
+          anchors.bottom: parent.bottom
+        }
       }
 
       // ------------------------------------------------------- picker --
@@ -1266,7 +1370,11 @@ PanelWindow {
 
           Rectangle {
             width: parent.width
-            height: 72
+            // The hint bar used to stand in here under the title; it is
+            // anchored to the bottom of the view now, so the header gives
+            // back the 30 it was holding for it and the panel's own height
+            // is unchanged.
+            height: 42
             color: popup.msgColor
 
             Rectangle {
@@ -1296,7 +1404,6 @@ PanelWindow {
                 }
               }
 
-              HintBar { width: parent.width }
             }
           }
 
@@ -1340,6 +1447,19 @@ PanelWindow {
             }
           }
         }
+
+        // ── THE HINTS, ALONG THE BOTTOM ──────────────────────────────
+        // They sat directly under the title, between you and the thing you
+        // opened this for. A hint is what you read when you do not know what
+        // to do next, which is not the first thing on the panel — so it goes
+        // where a footer goes, and the body starts at the top where it
+        // belongs. Anchored rather than laid out: what is above it is already
+        // sized so this 30 is exactly what is left over.
+        HintBar {
+          anchors.left: parent.left
+          anchors.right: parent.right
+          anchors.bottom: parent.bottom
+        }
       }
 
       // ------------------------------------------------------- history --
@@ -1358,7 +1478,11 @@ PanelWindow {
 
           Rectangle {
             width: parent.width
-            height: 72
+            // The hint bar used to stand in here under the title; it is
+            // anchored to the bottom of the view now, so the header gives
+            // back the 30 it was holding for it and the panel's own height
+            // is unchanged.
+            height: 42
             color: popup.msgColor
 
             Rectangle {
@@ -1388,7 +1512,6 @@ PanelWindow {
                 }
               }
 
-              HintBar { width: parent.width }
             }
           }
 
@@ -1432,6 +1555,19 @@ PanelWindow {
               }
             }
           }
+        }
+
+        // ── THE HINTS, ALONG THE BOTTOM ──────────────────────────────
+        // They sat directly under the title, between you and the thing you
+        // opened this for. A hint is what you read when you do not know what
+        // to do next, which is not the first thing on the panel — so it goes
+        // where a footer goes, and the body starts at the top where it
+        // belongs. Anchored rather than laid out: what is above it is already
+        // sized so this 30 is exactly what is left over.
+        HintBar {
+          anchors.left: parent.left
+          anchors.right: parent.right
+          anchors.bottom: parent.bottom
         }
       }
 

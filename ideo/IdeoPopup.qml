@@ -336,23 +336,65 @@ PanelWindow {
             ["tab", "emoji"]];
   }
 
+  // ── THE KEYS, DRAWN AS KEYS ──────────────────────────────────────────
+  // They were a run of rich text with the key in bold and the word after it
+  // in grey — which asks the reader to find where one hint ends and the next
+  // begins from weight alone. A chip says "this is a key you press" the way
+  // the rest of this desktop says it, and a chip with its word beside it is
+  // one object rather than two runs that happen to be adjacent.
+  //
+  // The recipe is terminus' KeyChip, which is an inline component of that
+  // file and so cannot be imported.
+  component KeyCap: Rectangle {
+    id: cap
+    property string label: ""
+    implicitWidth: capText.implicitWidth + 13
+    implicitHeight: 19
+    radius: 5
+    color: Qt.rgba(Zenon.keyInk.r, Zenon.keyInk.g, Zenon.keyInk.b, 0.10)
+    border.width: 1
+    border.color: Qt.rgba(Zenon.keyInk.r, Zenon.keyInk.g, Zenon.keyInk.b, 0.30)
+    visible: cap.label !== ""
+
+    Text {
+      id: capText
+      anchors.centerIn: parent
+      text: cap.label
+      color: Zenon.keyInk
+      font.family: Zenon.face
+      font.pixelSize: 11
+    }
+  }
+
   component HintBar: Item {
     id: hintBarRoot
     height: 26
     property var rows: popup.hints()
     Row {
       anchors.centerIn: parent
-      spacing: 20
+      // Tighter between the pairs than before, because a chip already draws
+      // its own boundary — the space was doing that job.
+      spacing: 14
       Repeater {
         model: hintBarRoot.rows
-        Text {
+
+        delegate: Row {
+          id: hintPair
           required property var modelData
-          text: "<b><span style=\"color:" + popup.keyColor + ";\">" +
-            Strings.escapeHtml(modelData[0]) + "</span></b> <b><span style=\"color:" +
-            popup.dimColor + ";\">" + Strings.escapeHtml(modelData[1]) + "</span></b>"
-          textFormat: Text.RichText
-          font.family: Zenon.face
-          font.pixelSize: 13
+          spacing: 5
+
+          KeyCap {
+            anchors.verticalCenter: parent.verticalCenter
+            label: hintPair.modelData[0]
+          }
+
+          Text {
+            anchors.verticalCenter: parent.verticalCenter
+            text: hintPair.modelData[1]
+            color: popup.dimColor
+            font.family: Zenon.face
+            font.pixelSize: 13
+          }
         }
       }
     }
@@ -595,7 +637,7 @@ PanelWindow {
         Rectangle {
           width: parent.width
           height: popup.formatMode ? 26 : 54
-          color: Zenon.headBg
+          color: Zenon.hintBg
 
           Rectangle {
             anchors.top: parent.top

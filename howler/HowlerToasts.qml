@@ -62,9 +62,13 @@ PanelWindow {
   // hangs from — down from the top, up from the bottom. Nothing ever travels
   // across the screen to reach its place.
   readonly property bool sideways: toasts.side !== "center"
-  readonly property real slideX: toasts.side === "right" ? 64
-                               : toasts.side === "left" ? -64 : 0
-  readonly property real slideY: toasts.sideways ? 0 : (toasts.atTop ? -36 : 36)
+  // HOW FAR IS ORACLE'S, which way is still the corner's. `fade` and `scale`
+  // set the distance to zero rather than being special-cased here — a style
+  // that does not travel is a travel of nothing.
+  readonly property real slideX: toasts.side === "right" ? Howler.slideBy
+                               : toasts.side === "left" ? -Howler.slideBy : 0
+  readonly property real slideY: toasts.sideways ? 0
+    : (toasts.atTop ? -Howler.slideByV : Howler.slideByV)
 
   readonly property real stackW: Math.min(Howler.maxWidth,
     Howler.width + Howler.iconSize + Howler.padding * 4 + Howler.borderSize * 2)
@@ -122,14 +126,14 @@ PanelWindow {
       // broken rather than as motion.
       remove: Transition {
         NumberAnimation { property: "opacity"; to: 0
-                          duration: Zenon.fast; easing.type: Easing.InQuad }
+                          duration: Howler.closeMs; easing.type: Easing.InQuad }
       }
 
       // The gap closing is the part that was missing — without it the stack
       // teleports every time the oldest one goes.
       displaced: Transition {
         NumberAnimation { properties: "x,y"
-                          duration: Zenon.normal; easing.type: Zenon.travelEase }
+                          duration: Howler.openMs; easing.type: Zenon.travelEase }
       }
 
       // AN ITEM, WITH THE CARD INSIDE IT. The card clips — its content has
@@ -258,7 +262,7 @@ PanelWindow {
         // whose width is this very binding.
         readonly property int lane: Howler.hPadding + Howler.borderSize * 2
           + (toast.hasIcon
-             ? Howler.iconPadding + Howler.iconSize + Howler.padding
+             ? Howler.iconPadding + Howler.iconSize + Howler.hPadding
              : Howler.hPadding)
         // THE DELEGATE IS THE LANE, and the card is centred in it. Setting
         // the delegate's own `x` looked right and did nothing: a vertical
@@ -268,9 +272,28 @@ PanelWindow {
         // for. What the view does not touch is what a child of the delegate
         // does, so the centring moved one level in.
         width: toasts.stackW
-        readonly property int cardW:
-          Math.min(Howler.maxWidth, toast.lane + Math.max(Howler.width,
-            toast.multiline ? Math.ceil(bodyMetrics.implicitWidth) + 2 : 0))
+        // ── AS WIDE AS WHAT IS IN IT ─────────────────────────────────
+        // The content was only measured for a LIST; everything else took the
+        // nominal width whether it needed it or not, so a four-word
+        // notification got the same 450px card as a package manifest and
+        // spent most of it on nothing. Both lines are measured now — a
+        // summary can easily be the longer of the two — and the card is the
+        // wider of them plus its gutters.
+        //
+        // `lane` is those gutters, which is what keeps this honest: fitting
+        // the content cannot eat the padding, because the padding is added
+        // to the content rather than taken out of the card.
+        //
+        // The floor is oracle's minimum width and the ceiling its maximum. A
+        // body longer than the ceiling is not elided, it wraps — bodyMetrics
+        // asks how wide ONE line would be, the card refuses to be that wide,
+        // and the real Text wraps into the room it got.
+        readonly property int cardW: {
+          const need = Math.ceil(Math.max(bodyMetrics.implicitWidth,
+                                          titleMetrics.implicitWidth)) + 2;
+          return Math.min(Howler.maxWidth,
+            toast.lane + Math.max(Howler.width, need));
+        }
         // MEASURED FROM THE CONTENT, never from `inner`. inner fills this
         // rectangle, so asking it how tall it wants to be while it is sized
         // by the answer is a loop — and a ListView resolves that loop to a
@@ -284,6 +307,18 @@ PanelWindow {
         // NEVER DRAWN, only asked how wide it wants to be. Anchored to
         // nothing and given no width, so its implicitWidth is the text's
         // natural width and not a reading of the card it is sizing.
+        // The summary measured the same way, and it has to be: a short body
+        // under a long title was fitted to the body and elided the title.
+        Text {
+          id: titleMetrics
+          visible: false
+          text: toast.titleless ? "" : (toast.modelData.summary || "")
+          wrapMode: Text.NoWrap
+          font.family: Zenon.face
+          font.weight: Font.Bold
+          font.pixelSize: Howler.fontSize
+        }
+
         Text {
           id: bodyMetrics
           visible: false
@@ -301,11 +336,25 @@ PanelWindow {
         // something different for every corner; a Translate is relative by
         // construction and says exactly what it does.
         opacity: 0
-        transform: Translate {
-          id: slide
-          x: toasts.slideX
-          y: toasts.slideY
-        }
+        // TWO TRANSFORMS, and only ever one of them doing anything. `scale`
+        // holds at 1 unless the style asks for it, and `slide` at 0 unless
+        // the style travels — so the arrival below animates both without
+        // having to know which style is on, and a style change mid-flight
+        // cannot leave a toast stranded off its own coordinates.
+        transform: [
+          Translate {
+            id: slide
+            x: toasts.slideX
+            y: toasts.slideY
+          },
+          Scale {
+            id: grow
+            origin.x: toast.width / 2
+            origin.y: toast.height / 2
+            xScale: Howler.growFrom
+            yScale: Howler.growFrom
+          }
+        ]
         Component.onCompleted: {
           toast.player = toast.modelData
             ? Howler.playerFor(toast.modelData) : "";
@@ -315,11 +364,13 @@ PanelWindow {
         ParallelAnimation {
           id: arrive
           NumberAnimation { target: toast; property: "opacity"; to: 1
-                            duration: Zenon.normal; easing.type: Zenon.ease }
+                            duration: Howler.openMs; easing.type: Zenon.ease }
           NumberAnimation { target: slide; property: "x"; to: 0
-                            duration: Zenon.normal; easing.type: Zenon.travelEase }
+                            duration: Howler.openMs; easing.type: Zenon.travelEase }
           NumberAnimation { target: slide; property: "y"; to: 0
-                            duration: Zenon.normal; easing.type: Zenon.travelEase }
+                            duration: Howler.openMs; easing.type: Zenon.travelEase }
+          NumberAnimation { target: grow; properties: "xScale,yScale"; to: 1
+                            duration: Howler.openMs; easing.type: Zenon.travelEase }
         }
 
         // mako's per-urgency timeouts, straight out of oracle. Zero means it
@@ -355,11 +406,14 @@ PanelWindow {
         ParallelAnimation {
           id: leave
           NumberAnimation { target: toast; property: "opacity"; to: 0
-                            duration: Zenon.fast; easing.type: Easing.InQuad }
+                            duration: Howler.closeMs; easing.type: Easing.InQuad }
           NumberAnimation { target: slide; property: "x"; to: toasts.slideX
-                            duration: Zenon.fast; easing.type: Easing.InQuad }
+                            duration: Howler.closeMs; easing.type: Easing.InQuad }
           NumberAnimation { target: slide; property: "y"; to: toasts.slideY
-                            duration: Zenon.fast; easing.type: Easing.InQuad }
+                            duration: Howler.closeMs; easing.type: Easing.InQuad }
+          NumberAnimation { target: grow; properties: "xScale,yScale"
+                            to: Howler.growFrom
+                            duration: Howler.closeMs; easing.type: Easing.InQuad }
           onFinished: if (toast.modelData) toast.modelData.expire()
         }
 
@@ -370,12 +424,12 @@ PanelWindow {
         MenuShadow {
           panel: card
           cornerRadius: Howler.radius
-          ink: Zenon.red
+          ink: Howler.accent
           reach: Howler.glowReach
           softness: Howler.glowReach
           grow: Howler.borderSize * 2
           drop: 0
-          visible: toast.critical
+          visible: toast.critical && Howler.glowOn && Howler.glowReach > 0
         }
 
         ClippingRectangle {
@@ -384,8 +438,8 @@ PanelWindow {
           width: toast.cardW
           height: parent.height
           radius: Howler.radius
-          color: Zenon.panelBgDeep
-          border.color: toast.critical ? Zenon.red : Zenon.surface
+          color: Howler.bg
+          border.color: toast.critical ? Howler.accent : Howler.borderInk
           border.width: Howler.borderSize
 
           HoverHandler { id: toastHov }
@@ -433,8 +487,13 @@ PanelWindow {
             Column {
               id: text
               anchors.left: iconBox.right
+              // THE SAME AIR THE BORDER GIVES IT. The text keeps hPadding
+              // between itself and the card's edge; the picture is an edge
+              // too, and a tighter gap there left the words looking stuck to
+              // the artwork. One number for both sides of the text, whichever
+              // kind of edge happens to be on the left.
               anchors.leftMargin: iconBox.visible
-                ? Howler.padding : inner.textInset
+                ? Howler.hPadding : inner.textInset
               anchors.right: parent.right
               anchors.rightMargin: inner.textInset
               anchors.verticalCenter: parent.verticalCenter
@@ -446,8 +505,7 @@ PanelWindow {
                 elide: Text.ElideRight
                 visible: !toast.titleless
                 text: toast.modelData.summary || ""
-                color: toast.modelData.urgency === NotificationUrgency.Critical
-                  ? Zenon.red : Zenon.white
+                color: toast.critical ? Howler.accent : Howler.titleInk
                 font.family: Zenon.face
                 font.weight: Font.Bold
                 font.pixelSize: Howler.fontSize
@@ -468,7 +526,7 @@ PanelWindow {
                 visible: text !== ""
                 text: toast.bodyText
                 textFormat: Howler.markup ? Text.StyledText : Text.PlainText
-                color: toast.titleless ? Zenon.white : Zenon.muted
+                color: toast.titleless ? Howler.titleInk : Howler.bodyInk
                 font.family: Zenon.face
                 font.weight: toast.titleless ? Font.Bold : Font.Normal
                 font.pixelSize: toast.titleless
@@ -494,7 +552,7 @@ PanelWindow {
                   visible: !transport.visible
                   text: toast.marks
                   textFormat: Howler.markup ? Text.StyledText : Text.PlainText
-                  color: Zenon.muted
+                  color: Howler.bodyInk
                   font.family: Zenon.face
                   font.pixelSize: Howler.fontSize - 2
                 }
@@ -518,7 +576,7 @@ PanelWindow {
                       text: verb === "prev" ? "\uF04A"
                           : verb === "next" ? "\uF04E"
                           : (NowPlaying.playing ? "\uF04C" : "\uF04B")
-                      color: btnHov.hovered ? Zenon.white : Zenon.muted
+                      color: btnHov.hovered ? Howler.titleInk : Howler.bodyInk
                       font.family: Zenon.face
                       font.pixelSize: Howler.fontSize
                       // A MouseArea, not a TapHandler: a handler lets the

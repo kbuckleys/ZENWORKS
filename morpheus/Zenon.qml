@@ -154,6 +154,13 @@ QtObject {
     return menuScaleFrom + (1 - menuScaleFrom) * shade;
   }
   readonly property color headBg:    "#66282f36"
+
+  // ── THE STRIP A HINT BAR STANDS ON ────────────────────────────────────
+  // Black rather than headBg's blue-grey, and thinner than it: a row of keys
+  // is the quietest thing on a panel and headBg gave it the same weight as a
+  // title bar. Named here rather than written out in each popup — four of
+  // them wear this and they were four copies of one answer.
+  readonly property color hintBg: Qt.rgba(0, 0, 0, 0.35)
   readonly property color msgBorder: "#4d45505c"
   readonly property color selBg:     "#4d45505c"
   readonly property color keyInk:    "#a2a8bc"

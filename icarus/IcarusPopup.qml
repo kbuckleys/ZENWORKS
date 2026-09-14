@@ -220,7 +220,7 @@ Item {
       rows.push({ text: "Apps", icon: "\uF009", hasChildren: true,
                   kind: "apps", isSeparator: false, enabled: true });
     if (Oracle.menuShowHome)
-      rows.push({ text: "Home", icon: "\uF015", hasChildren: true,
+      rows.push({ text: "Home", icon: "\uF46D", hasChildren: true,
                   kind: "file", isSeparator: false, enabled: true });
     // Muted when there is nothing in it — an empty trash is still worth
     // SEEING, so you know where it is and that it is empty, but there is
@@ -237,7 +237,7 @@ Item {
     // is the bottom of that scale.
     rows.push({ text: "Shell", icon: "\uF120", hasChildren: true,
                 kind: "shell", isSeparator: false, enabled: true });
-    rows.push({ text: "Session", icon: "\uF007", hasChildren: true,
+    rows.push({ text: "Session", icon: "\uF2C0", hasChildren: true,
                 kind: "session", isSeparator: false, enabled: true });
     return rows;
   }

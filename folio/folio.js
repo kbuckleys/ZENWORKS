@@ -103,12 +103,14 @@ function openCommand(id, dir) {
       " ] && xdg-open " + Strings.shellQuote(file) + " >/dev/null 2>&1 &";
 }
 
+// PAIRS, NOT MARKUP. It used to hand back finished rich text with the colours
+// written into it as hex — which meant the palette lived in two places, and a
+// hint could only ever be drawn one way. The popup draws these as chips now;
+// what belongs here is which key and what it does.
 function hintText(mode) {
-  const key = (k) => "<b><span style=\"color:#a2a8bc;\">" + k + "</span></b>";
-  const lbl = (t) => "<span style=\"color:#6a707f;\">" + t + "</span>";
-  const tab = key("tab") + " " + lbl("toggle mode");
-  const del = key("delete") + " " + lbl("remove entry");
-  const open = key("shift return") + " " + lbl("open image");
+  const tab = ["tab", "toggle mode"];
+  const del = ["delete", "remove entry"];
+  const open = ["shift return", "open image"];
   if (mode === "image") return [tab, open, del];
   return [tab, del];
 }

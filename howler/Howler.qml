@@ -26,6 +26,7 @@ import Quickshell.Io
 import Quickshell.Services.Mpris
 import Quickshell.Services.Notifications
 import "../oracle"
+import "../morpheus"
 import "howler.js" as Wolf
 
 Singleton {
@@ -57,10 +58,59 @@ Singleton {
   // AND THE PICTURE GETS HALF. Text needs air around it to stay off a
   // border; a picture has its own edge and only wants to be inside one.
   readonly property int iconPadding:  Math.round(Oracle.notifPadding / 2)
-  // How far a critical toast's light carries past its border. Not an oracle
-  // row: it is not a taste, it is how much room the one urgency that shouts
-  // gets to shout in.
-  readonly property int glowReach:    28
+  readonly property int glowReach:    Oracle.notifGlowReach
+  readonly property bool glowOn:      Oracle.notifGlow
+
+  // ── A NAME OUT OF ORACLE, A COLOUR OUT OF ZENON ────────────────────────
+  // Oracle offers the palette by name because it cannot import Zenon; this is
+  // the other half of that. An unknown name falls back to white rather than
+  // to nothing — a toast drawn in "transparent" would be a notification you
+  // could not read, which is a worse answer than the wrong colour.
+  function ink(name) {
+    switch (String(name)) {
+      case "white":   return Zenon.white;
+      case "muted":   return Zenon.muted;
+      case "surface": return Zenon.surface;
+      case "red":     return Zenon.red;
+      case "green":   return Zenon.green;
+      case "yellow":  return Zenon.yellow;
+      case "blue":    return Zenon.blue;
+      case "magenta": return Zenon.magenta;
+      case "cyan":    return Zenon.cyan;
+      case "pink":    return Zenon.pink;
+      case "sand":    return Zenon.sand;
+    }
+    return Zenon.white;
+  }
+
+  readonly property color accent:    Howler.ink(Oracle.notifAccent)
+  readonly property color borderInk: Howler.ink(Oracle.notifBorderInk)
+  readonly property color titleInk:  Howler.ink(Oracle.notifTitleInk)
+  readonly property color bodyInk:   Howler.ink(Oracle.notifBodyInk)
+  // Black at the chosen strength, which is what panelBgDeep was at a fixed
+  // 0.70. Its own knob because a toast sits over whatever happens to be on
+  // screen, which is not the job a panel has.
+  readonly property color bg: Qt.rgba(0, 0, 0, Oracle.notifBgOpacity)
+
+  // ── AND HOW IT ARRIVES ─────────────────────────────────────────────────
+  // Zenon's own durations, scaled. Multiplied rather than replaced so the
+  // shell's one motion setting still reaches the toasts — turn the desktop's
+  // motion down and these come down with it.
+  readonly property string animStyle: Oracle.notifAnimStyle
+  readonly property int openMs:
+    Math.max(1, Math.round(Zenon.normal * Oracle.notifAnimSpeed))
+  readonly property int closeMs:
+    Math.max(1, Math.round(Zenon.fast * Oracle.notifAnimSpeed))
+  // Only a slide travels. The vertical throw keeps the proportion the two
+  // were first tuned at — 36 against 64 — so one number moves both.
+  readonly property real slideBy:
+    Oracle.notifAnimStyle === "slide" ? Oracle.notifSlide : 0
+  readonly property real slideByV:
+    Math.round(Howler.slideBy * 0.5625)
+  // Where `scale` starts from. Far enough under one to read as growth,
+  // near enough that the text is never illegibly small on the way in.
+  readonly property real growFrom:
+    Oracle.notifAnimStyle === "scale" ? 0.88 : 1.0
   readonly property int margin:       Oracle.notifSpacing
   readonly property int borderSize:   Oracle.notifBorderSize
   readonly property int fontSize:     Oracle.notifFontSize
