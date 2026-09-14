@@ -4008,6 +4008,167 @@ FloatingWindow {
   // following the cursor over the top of the panel.
   //
   // Handlers cannot be shielded, only switched off — so they read this.
+  // ── HOW SOFT THE WINDOW GOES BEHIND A CARD ─────────────────────────────
+  // The keymap already did this and it was the right idea in the wrong number
+  // of places: a card standing on a flat wash of black has no depth behind it,
+  // and dimming hides the thing you are deciding about instead of setting it
+  // back. So every card that takes the window over softens it, and by its OWN
+  // fade — the strongest one wins, so two cards overlapping never double the
+  // blur or flicker as one of them leaves.
+  //
+  // sendTo is deliberately NOT here. A picker is about the listing behind it;
+  // blurring that would hide the thing the choice is being made against, which
+  // is the same reason it has no scrim. Nor pathBar, which is a dropdown off
+  // the chrome rather than a card over the window.
+  // WHAT IS LEFT OF THE SCRIM. It was 0.55 on six cards, written out six
+  // times, and at that strength it was doing the whole job of setting the
+  // window back — which is why the listing behind a dialog read as gone
+  // rather than as behind. With the blur carrying the separation this only
+  // has to take the contrast out of what is already soft.
+  readonly property color cardScrim: Qt.rgba(0, 0, 0, 0.32)
+
+  // ── WHAT THE OPEN SHEET IS ABOUT, SAID ON THE BAR ──────────────────────
+  // Every one of these cards opened with a coloured caption band across its
+  // own top — the same idea the send picker had before its header moved to
+  // the chrome. A sheet hangs FROM the bar, so the bar is where it says what
+  // it is: the band comes off the card, the breadcrumb steps aside, and the
+  // sheet is left as the thing it actually is rather than a titled box.
+  //
+  // THE THING, NOT THE WORD, everywhere it can be. "Properties" tells you
+  // what you already know; the filename is the one fact the card is about.
+  readonly property string sheetTitle: {
+    if (confirm.open) return confirm.heading;
+    if (prompt.open) return prompt.heading;
+    if (props.open)
+      return props.many ? props.rows.length + " items"
+        : (props.rows[0] ? props.rows[0].name : "Properties");
+    if (perms.open)
+      return perms.paths.length === 1
+        ? Terminus.basename(perms.paths[0])
+        : perms.paths.length + " items";
+    if (bulk.open)
+      return root.bulkNames.length === 1 ? "Rename 1 item"
+        : "Rename " + root.bulkNames.length + " items";
+    // THE FILE, not its type. The card led with the mime — "Open text/plain
+    // with" — on the reasoning that the choice outlives this one file, and
+    // what that actually put on the bar was a string with a slash in it where
+    // a filename was expected.
+    if (appPick.open)
+      return appPick.paths.length > 1 ? "(multiple files)"
+        : Terminus.basename(appPick.path);
+    return "";
+  }
+
+  // A glyph ahead of the title, for the sheets that want one. Empty is the
+  // answer for most of them: a card about a file says so by naming it, and
+  // a picture beside the name would be saying it twice.
+  //
+  // Properties and permissions are the exception, and only for a single item.
+  // The name in the bar is the whole of what those two cards are about, and
+  // the glyph is how the row beside it was already being read — so the header
+  // shows the file the way the listing showed it. Several at once have no one
+  // glyph, and the title says "6 items" rather than a name.
+  readonly property string sheetGlyph: {
+    // The question's own mark — see confirm.verbGlyph, which keys it off the
+    // same word verbInk keys the colour off.
+    if (confirm.open)
+      return confirm.choices.length > 0
+        ? confirm.verbGlyph(confirm.choices[0].label) : "";
+    // The file's own glyph when there is one file. The generic mark is for
+    // the case that has no file to show — several of them at once.
+    if (appPick.open)
+      return appPick.icon !== "" ? appPick.icon : "\uEC65";
+    if (props.open && !props.many && props.rows[0])
+      return props.rows[0].glyph !== undefined ? props.rows[0].glyph : "";
+    if (perms.open && perms.paths.length === 1) return perms.icon;
+    // A VERB, not a file. Rename is always about several — one name is the
+    // in-place edit — so there is no row's glyph to show and this says what
+    // the card does instead.
+    if (bulk.open) return "\uEC61";
+    return "";
+  }
+
+  // PUNCTUATION IS NOT THE SUBJECT. Where the glyph is the row's own it wears
+  // the row's ink with the name — but rename's is a verb standing in for a
+  // row that does not exist, so it takes crumbInk, the ink the step you are
+  // standing on uses. The send header's verb and arrow are inked the same way
+  // and for the same reason.
+  readonly property color sheetGlyphInk:
+    bulk.open ? root.crumbInk : root.sheetTitleInk
+
+
+
+  // ── THE HEADER IS INKED LIKE THE ROW IT IS ABOUT ───────────────────────
+  // Glyph and name together, the way a row is inked everywhere else in this
+  // window: a directory cyan, an archive yellow, a broken link red. The bar
+  // was titling everything cyan, which made a card about a tarball look like
+  // a card about a folder.
+  //
+  // Only where there IS one row. Several at once have no colour of their own
+  // — the title says "6 items", which is not a file and is not inked like one.
+  //
+  // The confirm card is the exception it always was: its band wore the
+  // PRIMARY choice's colour so the card read as dangerous exactly when what
+  // it offered was, and that survives the move to the bar.
+  readonly property color sheetTitleInk: {
+    if (confirm.open)
+      return confirm.choices.length > 0 ? confirm.choices[0].ink : Zenon.sand;
+    if (appPick.open && appPick.icon !== "") return appPick.iconInk;
+    if (props.open && !props.many && props.rows[0])
+      return root.inkFor(props.rows[0]);
+    if (perms.open && perms.paths.length === 1) return perms.iconInk;
+    return Zenon.cyan;
+  }
+
+  // Ramped by the sheets' own arrival, so the bar changes its mind at exactly
+  // the speed the sheet does.
+  readonly property real sheetHeadOn: Math.max(
+    confirmSheet.cardInk, propsSheet.cardInk, permsSheet.cardInk,
+    bulkSheet.cardInk, promptSheet.cardInk, appSheet.cardInk)
+
+  // ── WHICHEVER SHEET IS ON THE BAR ──────────────────────────────────────
+  // Picked by how far along its arrival is rather than by `open`, because a
+  // sheet on its way out has already stopped being open and is still hanging
+  // there — the bar has to keep its gap for as long as there is something in
+  // it. Only one is ever up, so the strongest is the one.
+  readonly property var liveSheet: {
+    const all = [confirmSheet, propsSheet, permsSheet,
+                 bulkSheet, promptSheet, appSheet];
+    let best = null;
+    for (let i = 0; i < all.length; i++)
+      if (all[i] && (best === null || all[i].cardInk > best.cardInk))
+        best = all[i];
+    return (best !== null && best.cardInk > 0.01) ? best : null;
+  }
+
+  // ── AND WHERE THE BAR OPENS FOR IT ─────────────────────────────────────
+  // The send picker had this to itself, as three properties on the picker.
+  // They are the window's now, answered by the picker or by whichever dialog
+  // sheet is up, so the bar splices for all of them through one rule instead
+  // of the dialogs hanging under an unbroken hairline while the picker alone
+  // got a gap.
+  readonly property bool splicing:
+    sendTo.splicing || root.liveSheet !== null
+  readonly property real spliceX: root.liveSheet !== null
+    ? root.liveSheet.drawnX : sendTo.spliceX
+  readonly property real spliceW: root.liveSheet !== null
+    ? root.liveSheet.drawnW : sendTo.spliceW
+
+  // ONE ANSWER TO "IS A SHEET UP", and everything the bar does about it reads
+  // this. The strip goes black, the breadcrumb stands down and the sheet's own
+  // title fades in — three effects of one fact, which were three expressions
+  // naming the picker and the dialogs separately until they disagreed.
+  readonly property real sheetInk:
+    Math.max(sendToCard.opacity, root.sheetHeadOn)
+
+  // sendTo is read off its CARD, not off its overlay. The picker's overlay is
+  // always fully opaque — it is a click catcher that paints nothing — so
+  // asking it would have held the window soft for the whole session.
+  readonly property real cardSoft: Math.max(
+    help.opacity, confirm.opacity, props.opacity, perms.opacity,
+    bulk.opacity, prompt.opacity, appPick.opacity, prefs.opacity,
+    sendToCard.opacity)
+
   readonly property bool modal: props.open || perms.open || confirm.open
     || sendTo.open
     || prompt.open || pathBar.open || bulk.open || prefs.open || help.open
@@ -5369,7 +5530,14 @@ FloatingWindow {
   // you got here.
   function beginOpenWith(path) {
     if (!path) return;
-    appPick.ask(path, root.openWithMime);
+    // THE SELECTION, with the pointer's row as the fallback — which is what
+    // acting() means everywhere else in this window. The row the menu opened
+    // on leads, so the type that gets adopted is the one that was asked about.
+    const rows = root.acting();
+    const out = [path];
+    for (let i = 0; i < rows.length; ++i)
+      if (rows[i].path !== path && !rows[i].isDir) out.push(rows[i].path);
+    appPick.ask(out, root.openWithMime);
   }
 
   function selectAll() {
@@ -6038,23 +6206,6 @@ FloatingWindow {
       id: chrome
       anchors.fill: parent
 
-      // Softened while the keymap is up — zeus' confirm card does the same
-      // thing to its views, for the same reason: the list behind a reference
-      // you are reading should recede rather than compete with it. An opaque
-      // black panel hid it instead, which loses the sense of where you are.
-      //
-      // Only while it is on screen. A layer left enabled would put the whole
-      // window through an offscreen texture for the entire session to buy a
-      // blur that shows for a couple of seconds.
-      layer.enabled: help.opacity > 0.01
-      layer.effect: MultiEffect {
-        blurEnabled: true
-        blurMax: 40
-        // ramped by the overlay's own fade, so it goes soft as the keymap
-        // arrives instead of snapping out of focus underneath it
-        blur: help.opacity
-      }
-
       // ── tabs ──────────────────────────────────────────────────────
       // Hidden while there is one, because a single tab is just the window and
       // a strip saying so is a strip of nothing.
@@ -6342,8 +6493,7 @@ FloatingWindow {
         // the strip goes solid for as long as the sheet is, and comes back
         // with it. Tinted rather than switched, off the sheet's own opacity,
         // so it darkens at exactly the rate the sheet arrives.
-        color: Qt.tint(Zenon.headBg,
-          Qt.rgba(0, 0, 0, sendToCard.opacity))
+        color: Qt.tint(Zenon.headBg, Qt.rgba(0, 0, 0, root.sheetInk))
 
         // HOW MUCH OF THE BAR'S OWN CONTENT IS SHOWING. The send-to header is
         // drawn on this bar (see sendToBarHead) and the two cannot share the
@@ -6352,7 +6502,7 @@ FloatingWindow {
         // are half a dozen siblings rather than one container — crumbInner is
         // a geometry helper with nothing inside it, which is what made the
         // first attempt at this fade nothing at all.
-        readonly property real chromeInk: 1 - sendToCard.opacity
+        readonly property real chromeInk: 1 - root.sheetInk
 
         // AND THE PATH'S OWN SHARE OF IT. The trail stands down for the
         // send-to header like the rest of the chrome, and ALSO for the search
@@ -7434,6 +7584,38 @@ FloatingWindow {
         //
         // Read as a sentence: this thing → that place. The verb and the arrow
         // are punctuation and stay muted; the nouns carry the colour.
+        // THE DIALOG SHEETS' HEADER, in the same place and for the same
+        // reason as the send picker's below. One Text rather than a row of
+        // parts: these cards are about one thing and its name is the whole
+        // of what there is to say.
+        Row {
+          id: sheetBarHead
+          anchors.centerIn: crumbInner
+          spacing: 7
+          opacity: root.sheetHeadOn
+          visible: sheetBarHead.opacity > 0.01
+
+          Text {
+            anchors.verticalCenter: parent.verticalCenter
+            visible: root.sheetGlyph !== ""
+            text: root.sheetGlyph
+            color: root.sheetGlyphInk
+            font.family: Zenon.face
+            font.pixelSize: 15
+          }
+
+          Text {
+            anchors.verticalCenter: parent.verticalCenter
+            width: Math.min(implicitWidth, crumbInner.width - 160)
+            elide: Text.ElideMiddle
+            text: root.sheetTitle
+            color: root.sheetTitleInk
+            font.family: Zenon.face
+            font.weight: Font.Bold
+            font.pixelSize: 15
+          }
+        }
+
         Row {
           id: sendToBarHead
           anchors.centerIn: crumbInner
@@ -7537,7 +7719,7 @@ FloatingWindow {
         Rectangle {
           anchors.bottom: parent.bottom
           anchors.left: parent.left
-          width: sendTo.splicing ? sendTo.spliceX : parent.width
+          width: root.splicing ? root.spliceX : parent.width
           height: 1
           color: Zenon.msgBorder
         }
@@ -7545,8 +7727,8 @@ FloatingWindow {
         Rectangle {
           anchors.bottom: parent.bottom
           anchors.right: parent.right
-          width: sendTo.splicing
-            ? Math.max(0, parent.width - sendTo.spliceX - sendTo.spliceW) : 0
+          width: root.splicing
+            ? Math.max(0, parent.width - root.spliceX - root.spliceW) : 0
           height: 1
           color: Zenon.msgBorder
         }
@@ -7610,6 +7792,31 @@ FloatingWindow {
         width: parent.width
         height: parent.height - tabStrip.height - crumbBar.height
           - colHeads.height - portalBar.height
+
+        // ── SOFTENED BEHIND ANY CARD THAT TAKES THE WINDOW OVER ──────
+        // zeus' confirm card does the same thing to its views, for the same
+        // reason: what you are deciding about should recede rather than
+        // compete, and it should still be THERE. An opaque black panel hid it
+        // instead, which loses the sense of where you are.
+        //
+        // ON THE BODY, NOT ON THE CHROME. The blur was on the whole Column,
+        // which took the bar with it — and the bar is where every sheet now
+        // writes its title. A soft title over a soft path is a window with
+        // nothing in focus at all. So the rule is simply: chrome stays sharp,
+        // content recedes. The tab strip, the path bar and the sort strip are
+        // chrome; the sidebar, the panes and the preview are what this holds.
+        //
+        // Only while a card is on screen. A layer left enabled would put the
+        // body through an offscreen texture for the entire session to buy a
+        // blur that shows for a couple of seconds.
+        layer.enabled: root.cardSoft > 0.01
+        layer.effect: MultiEffect {
+          blurEnabled: true
+          blurMax: 40
+          // ramped by the card's own fade, so the body goes soft as the card
+          // arrives instead of snapping out of focus underneath it
+          blur: root.cardSoft
+        }
 
         Rectangle {
           id: side
@@ -9174,8 +9381,8 @@ FloatingWindow {
       z: 13
       visible: opacity > 0.01
       opacity: props.open ? 1 : 0
-      color: Qt.rgba(0, 0, 0, 0.55)
-      Behavior on opacity { NumberAnimation { duration: Zenon.normal; easing.type: Zenon.ease } }
+      color: root.cardScrim
+      Behavior on opacity { NumberAnimation { duration: props.open ? propsSheet.slideIn : propsSheet.slideOut; easing.type: Zenon.ease } }
 
       property bool open: false
       property var rows: []
@@ -9309,55 +9516,22 @@ FloatingWindow {
       // shadow, and now this window's too. A card is a card: one of
       // them wearing a shadow of its own was two answers to the same
       // question.
-      MenuShadow { panel: propsCard; cornerRadius: Zenon.dialogRadius }
-
-      ClippingRectangle {
-        id: propsCard
-        anchors.centerIn: parent
-        width: Math.min(560, parent.width - 80)
-        height: propsCol.implicitHeight
-        color: Zenon.black
-        border.color: Zenon.surfaceBorder
-        border.width: 1
-        radius: Zenon.dialogRadius
-        transform: Translate { y: (1 - props.opacity) * 10 }
-
-        // the card keeps its own clicks — see InputShield
-        InputShield {}
+      Sheet {
+        id: propsSheet
+        shown: props.open
+        fromTop: tabStrip.height + crumbBar.height
+        cardW: 560
+        cardH: propsCol.implicitHeight
 
         Column {
           id: propsCol
           width: parent.width
 
-          // THE THING, not the word. A card that says "Properties" is telling
-          // you what you already know — you opened it — while the one fact it
-          // is about, which file this is, was buried in the first row of the
-          // table underneath. The name goes in the bar and the row comes out.
-          //
-          // And the bar is thinner for it: 34px of cyan under a 17px word was
-          // a banner, and this is a caption.
-          Rectangle {
-            width: parent.width
-            height: 26
-            color: Zenon.cyan
-            Text {
-              anchors.fill: parent
-              anchors.leftMargin: 14
-              anchors.rightMargin: 14
-              horizontalAlignment: Text.AlignHCenter
-              verticalAlignment: Text.AlignVCenter
-              text: props.many ? props.rows.length + " items"
-                : (props.rows[0] ? props.rows[0].name : "Properties")
-              // the middle of a long name is the part you can spare
-              elide: Text.ElideMiddle
-              color: Zenon.black
-              font.family: Zenon.face
-              font.weight: Font.Bold
-              font.pixelSize: 14
-            }
-          }
-
-          Item { width: 1; height: 8 }
+          // The caption band stood here. It is drawn on the bar now — see
+          // sheetBarHead — because a sheet says what it is where it hangs from.
+          // Its own air stays: the sheet adds none, so a card whose first row
+          // does not carry any has to say so.
+          Item { width: 1; height: 10 }
 
           // picture on the left, facts on the right
           Item {
@@ -11860,8 +12034,11 @@ FloatingWindow {
         // asked you to choose between renaming the row under the cursor and
         // renaming the nine you had ticked — which is not a choice anybody
         // wants to make on a menu, and the first answer is almost never it.
+        // JUST "Rename", with the count saying how many. "Bulk rename (9)"
+        // named a mechanism; the row above it already says Rename for one,
+        // and the only thing that changes with nine is the number.
         if (n > 1)
-          out.push({ label: "Bulk rename" + many, key: "r",
+          out.push({ label: "Rename" + many, key: "r",
                      act: () => root.beginBulkRename() });
         else
           out.push({ label: "Rename", key: "r", act: () => root.beginRename() });
@@ -12328,8 +12505,8 @@ FloatingWindow {
       z: 15
       visible: opacity > 0.01
       opacity: bulk.open ? 1 : 0
-      color: Qt.rgba(0, 0, 0, 0.55)
-      Behavior on opacity { NumberAnimation { duration: Zenon.normal; easing.type: Zenon.ease } }
+      color: root.cardScrim
+      Behavior on opacity { NumberAnimation { duration: bulk.open ? bulkSheet.slideIn : bulkSheet.slideOut; easing.type: Zenon.ease } }
 
       property bool open: false
       // Which row has the keyboard. A delegate cannot be told to take focus
@@ -12400,16 +12577,18 @@ FloatingWindow {
         repeat: true
         property int tries: 0
         onTriggered: {
-          if (!bulk.open || bulkKeys.activeFocus || bulkClaim.tries++ > 12) {
+          if (!bulk.open || findField.focused || bulkClaim.tries++ > 12) {
             bulkClaim.stop();
             return;
           }
           bulkKeys.forceActiveFocus();
-          // and the first row within it, which is where you would start
-          // typing. The delegate may well have existed already — the model is
-          // just a count, so re-opening on the same number of files reuses the
-          // rows and their Component.onCompleted never runs again.
-          bulk.focusRow(0);
+          // AND THE FIND FIELD WITHIN IT. It used to be the first name row,
+          // on the reasoning that a row is where you would start typing —
+          // but the card's own verb is the pattern at the top, and landing in
+          // row one meant reaching for the mouse or tabbing backwards to use
+          // it. Editing a single name by hand is what the in-place rename is
+          // for; this card is open because the pattern is what you wanted.
+          findField.claim();
         }
       }
 
@@ -12431,46 +12610,19 @@ FloatingWindow {
           if (e.key === Qt.Key_Escape) bulk.dismiss();
         }
 
-        MenuShadow { panel: bulkCard; cornerRadius: Zenon.dialogRadius }
-
-        ClippingRectangle {
-          id: bulkCard
-          anchors.centerIn: parent
-          width: Math.min(760, parent.width - 80)
-          height: Math.min(parent.height - 100, bulkCol.implicitHeight)
-          color: Zenon.black
-          border.color: Zenon.surfaceBorder
-          border.width: 1
-          radius: Zenon.dialogRadius
-          transform: Translate { y: (1 - bulk.opacity) * 10 }
-
-          // the card eats its own clicks, so the scrim behind it does not
-          InputShield {}
+        Sheet {
+          id: bulkSheet
+          shown: bulk.open
+          fromTop: tabStrip.height + crumbBar.height
+          cardW: 760
+          cardH: bulkCol.implicitHeight
 
           Column {
             id: bulkCol
             width: parent.width
 
-            // The thing, not the word — the same bar the properties and
-            // permissions cards wear.
-            Rectangle {
-              width: parent.width
-              height: 26
-              color: Zenon.cyan
-              Text {
-                anchors.fill: parent
-                anchors.leftMargin: 14
-                anchors.rightMargin: 14
-                horizontalAlignment: Text.AlignHCenter
-                verticalAlignment: Text.AlignVCenter
-                text: root.bulkNames.length === 1 ? "Rename 1 item"
-                  : "Rename " + root.bulkNames.length + " items"
-                color: Zenon.black
-                font.family: Zenon.face
-                font.weight: Font.Bold
-                font.pixelSize: 14
-              }
-            }
+            // The caption band stood here. It is drawn on the bar now — see
+            // sheetBarHead — because a sheet says what it is where it hangs from.
 
             // ── the pattern ───────────────────────────────────────
             // Return in either field applies it. A BUTTON rather than a live
@@ -12871,12 +13023,19 @@ FloatingWindow {
       z: 12
       visible: opacity > 0.01
       opacity: perms.open ? 1 : 0
-      color: Qt.rgba(0, 0, 0, 0.55)
-      Behavior on opacity { NumberAnimation { duration: Zenon.normal; easing.type: Zenon.ease } }
+      color: root.cardScrim
+      Behavior on opacity { NumberAnimation { duration: perms.open ? permsSheet.slideIn : permsSheet.slideOut; easing.type: Zenon.ease } }
 
       property bool open: false
       property int mode: 0
       property var paths: []
+      // WHAT IT LOOKED LIKE IN THE LISTING, captured with the paths rather
+      // than looked up afterwards — the card maps rows down to paths and the
+      // glyph would be gone by the time the bar asked for it. Only meaningful
+      // for one item; a mixed set has no single glyph, the same way it has no
+      // single mode.
+      property string icon: ""
+      property color iconInk: Zenon.cyan
       // Which of the nine boxes the keyboard is on, read across then down:
       // owner r w x, group r w x, other r w x — the order chmod writes them
       // and the order they are drawn in. The dialog was mouse-only.
@@ -12889,6 +13048,9 @@ FloatingWindow {
         const rows = root.acting();
         if (rows.length === 0) return;
         perms.paths = rows.map((r) => r.path);
+        perms.icon = rows.length === 1 && rows[0].glyph !== undefined
+          ? rows[0].glyph : "";
+        perms.iconInk = rows.length === 1 ? root.inkFor(rows[0]) : Zenon.cyan;
         // the cursor's mode is the starting point even for a multi-select:
         // there is no single answer for a mixed set, and picking one of them
         // is more honest than showing zero
@@ -12911,28 +13073,19 @@ FloatingWindow {
       // shadow, and now this window's too. A card is a card: one of
       // them wearing a shadow of its own was two answers to the same
       // question.
-      MenuShadow { panel: permsCard; cornerRadius: Zenon.dialogRadius }
-
-      ClippingRectangle {
-        id: permsCard
-        anchors.centerIn: parent
+      Sheet {
+        id: permsSheet
+        shown: perms.open
+        fromTop: tabStrip.height + crumbBar.height
         // Sized to the grid it holds: 78 label + 3x62 boxes + 40 for the
         // row's octal digit is 304, and 40 either side of that is the margin
         // everything else in the card lines up to.
-        width: 384
+        cardW: 384
         // Sized to what is in it, like every other dialog here. It was a fixed
         // 208 that happened to fit the type it had; enlarging the type left a
         // band of empty card under the buttons, and the next change to its
         // contents would have done the same thing again.
-        height: permsCol.implicitHeight
-        color: Zenon.black
-        border.color: Zenon.surfaceBorder
-        border.width: 1
-        radius: Zenon.dialogRadius
-        transform: Translate { y: (1 - perms.opacity) * 10 }
-
-        // the card keeps its own clicks — see InputShield
-        InputShield {}
+        cardH: permsCol.implicitHeight
 
         Column {
           id: permsCol
@@ -12947,34 +13100,10 @@ FloatingWindow {
           readonly property int cellW: 62
           readonly property int octW: 40
 
-          // WHAT IT IS BEING APPLIED TO, in the bar itself.
-          //
-          // The card used to open with the word "Permissions" across a 38px
-          // band and the filename repeated in muted grey on its own line
-          // underneath — a title saying nothing and a subtitle saying the one
-          // thing worth saying. One line, and the band is a caption rather
-          // than a banner. The properties card is built the same way.
-          Rectangle {
-            width: parent.width
-            height: 26
-            color: Zenon.cyan
-            Text {
-              anchors.fill: parent
-              anchors.leftMargin: 14
-              anchors.rightMargin: 14
-              horizontalAlignment: Text.AlignHCenter
-              verticalAlignment: Text.AlignVCenter
-              text: perms.paths.length === 1
-                ? Terminus.basename(perms.paths[0])
-                : perms.paths.length + " items"
-              elide: Text.ElideMiddle
-              color: Zenon.black
-              font.family: Zenon.face
-              font.weight: Font.Bold
-              font.pixelSize: 14
-            }
-          }
-
+          // The caption band stood here. It is drawn on the bar now — see
+          // sheetBarHead — because a sheet says what it is where it hangs from.
+          // The rhythm's own gap stays: the sheet adds no air, so the first
+          // row has to bring it like every other row does.
           Item { width: 1; height: permsCol.gap }
 
           // The answer in both spellings on one line — the octal you would
@@ -13224,8 +13353,8 @@ FloatingWindow {
       z: 10
       visible: opacity > 0.01
       opacity: confirm.open ? 1 : 0
-      color: Qt.rgba(0, 0, 0, 0.55)
-      Behavior on opacity { NumberAnimation { duration: Zenon.normal; easing.type: Zenon.ease } }
+      color: root.cardScrim
+      Behavior on opacity { NumberAnimation { duration: confirm.open ? confirmSheet.slideIn : confirmSheet.slideOut; easing.type: Zenon.ease } }
 
       property bool open: false
       property string heading: ""
@@ -13245,6 +13374,17 @@ FloatingWindow {
         if (verb === "Delete") return Zenon.red;
         if (verb === "Trash") return Zenon.yellow;
         return Zenon.sand;
+      }
+
+      // AND ITS MARK, off the same word, so the two cannot come to disagree
+      // about which question is being asked. A bin for the one that can be
+      // undone and a cross for the one that cannot — the same split verbInk
+      // already draws in yellow and red, and it inks this too. Every other
+      // question gets none: a picture makes none of them clearer.
+      function verbGlyph(verb) {
+        if (verb === "Delete") return "\uF00D";
+        if (verb === "Trash") return "\uF014";
+        return "";
       }
 
       // The two-button case, which is most of them, in the shape every existing
@@ -13296,46 +13436,21 @@ FloatingWindow {
       // shadow, and now this window's too. A card is a card: one of
       // them wearing a shadow of its own was two answers to the same
       // question.
-      MenuShadow { panel: confirmCard; cornerRadius: Zenon.dialogRadius }
-
-      ClippingRectangle {
-        id: confirmCard
-        anchors.centerIn: parent
+      Sheet {
+        id: confirmSheet
+        shown: confirm.open
+        fromTop: tabStrip.height + crumbBar.height
         // wider once there are more than two answers, so "Keep both" is not
         // squeezed into a column narrower than its own label
-        width: Math.min(confirm.choices.length > 2 ? 700 : 560, parent.width - 60)
-        height: confirmCol.implicitHeight
-        color: Zenon.black
-        border.color: Zenon.surfaceBorder
-        border.width: 1
-        radius: Zenon.dialogRadius
-        transform: Translate { y: (1 - confirm.opacity) * 10 }
-
-        // the card keeps its own clicks — see InputShield
-        InputShield {}
+        cardW: confirm.choices.length > 2 ? 700 : 560
+        cardH: confirmCol.implicitHeight
 
         Column {
           id: confirmCol
           width: parent.width
 
-          // The header wears the PRIMARY choice's colour — the first one, the
-          // one Enter takes — so the card reads as dangerous exactly when the
-          // thing it is offering to do is.
-          Rectangle {
-            width: parent.width
-            height: 34
-            color: confirm.choices.length > 0
-              ? confirm.choices[0].ink : Zenon.sand
-
-            Text {
-              anchors.centerIn: parent
-              text: confirm.heading
-              color: Zenon.black
-              font.family: Zenon.face
-              font.weight: Font.Bold
-              font.pixelSize: 18
-            }
-          }
+          // The caption band stood here. It is drawn on the bar now — see
+          // sheetBarHead — because a sheet says what it is where it hangs from.
 
           Item {
             width: parent.width
@@ -14269,11 +14384,19 @@ FloatingWindow {
           // there while the crawl is out rather than taking the line over: a
           // query that disappeared for a tenth of a second every time you
           // stopped typing would be the one thing you wanted to read.
+          // ── THE KEYS ARE DRAWN AS KEYS ────────────────────────────
+          // They were one run of text with the glyphs spaced into it, which
+          // made this the only list of keys in the window not wearing the
+          // chip every other one wears — the context menu and F1 are both
+          // KeyChip, and this is the third list. Spelt out as chip-and-word
+          // pairs so a key and what it does stay together.
           Row {
             anchors.horizontalCenter: parent.horizontalCenter
-            spacing: 0
+            spacing: 12
 
             Text {
+              anchors.verticalCenter: parent.verticalCenter
+              rightPadding: 2
               text: sendTo.blocked && sendTo.current ? "cannot go there"
                   : (sendTo.query !== "" ? sendTo.query : "type to filter")
               color: sendTo.query !== "" && !sendTo.blocked
@@ -14282,18 +14405,50 @@ FloatingWindow {
               font.pixelSize: 13
             }
 
+            // While the crawl is out this takes the KEYS' place and not the
+            // query's: a query that disappeared for a tenth of a second every
+            // time you stopped typing would be the one thing you wanted to
+            // read.
             Text {
-              visible: !(sendTo.blocked && sendTo.current)
-              // The verb changes with the op, and `go` has a second one.
-              // Kept to the same shape so the line does not reflow as the
-              // crawl comes and goes.
-              text: sendTo.crawling ? "    searching…"
-                  : (sendTo.op === "go"
-                     ? "    ↑↓ move    → open    ↵ go    ⇧↵ new tab    esc"
-                     : "    ↑↓ move    → open    ↵ send    esc")
+              anchors.verticalCenter: parent.verticalCenter
+              visible: sendTo.crawling && !(sendTo.blocked && sendTo.current)
+              text: "searching\u2026"
               color: Zenon.muted
               font.family: Zenon.face
               font.pixelSize: 13
+            }
+
+            Repeater {
+              model: {
+                if (sendTo.crawling) return [];
+                if (sendTo.blocked && sendTo.current) return [];
+                const out = [["\u2191\u2193", "move"], ["\u2192", "open"]];
+                // The verb is the op's own, and `go` has a second one.
+                out.push(["\u21b5", sendTo.op === "go" ? "go" : "send"]);
+                if (sendTo.op === "go") out.push(["\u21e7\u21b5", "new tab"]);
+                out.push(["esc", "close"]);
+                return out;
+              }
+
+              delegate: Row {
+                id: hintPair
+                required property var modelData
+                spacing: 5
+
+                KeyChip {
+                  anchors.verticalCenter: parent.verticalCenter
+                  label: hintPair.modelData[0]
+                  fontSize: 11
+                }
+
+                Text {
+                  anchors.verticalCenter: parent.verticalCenter
+                  text: hintPair.modelData[1]
+                  color: Zenon.muted
+                  font.family: Zenon.face
+                  font.pixelSize: 13
+                }
+              }
             }
           }
         }
@@ -14312,8 +14467,8 @@ FloatingWindow {
       z: 11
       visible: opacity > 0.01
       opacity: prompt.open ? 1 : 0
-      color: Qt.rgba(0, 0, 0, 0.55)
-      Behavior on opacity { NumberAnimation { duration: Zenon.normal; easing.type: Zenon.ease } }
+      color: root.cardScrim
+      Behavior on opacity { NumberAnimation { duration: prompt.open ? promptSheet.slideIn : promptSheet.slideOut; easing.type: Zenon.ease } }
 
       property bool open: false
       property string heading: ""
@@ -14391,42 +14546,21 @@ FloatingWindow {
       // shadow, and now this window's too. A card is a card: one of
       // them wearing a shadow of its own was two answers to the same
       // question.
-      MenuShadow { panel: promptCard; cornerRadius: Zenon.dialogRadius }
-
-      ClippingRectangle {
-        id: promptCard
-        anchors.centerIn: parent
-        width: Math.min(460, parent.width - 60)
+      Sheet {
+        id: promptSheet
+        shown: prompt.open
+        fromTop: tabStrip.height + crumbBar.height
+        cardW: 460
         // As tall as it needs: the error line appears and disappears under the
         // field, and a fixed 104 clipped it off the bottom when it did.
-        height: promptCol.implicitHeight
-        color: Zenon.black
-        border.color: Zenon.surfaceBorder
-        border.width: 1
-        radius: Zenon.dialogRadius
-        transform: Translate { y: (1 - prompt.opacity) * 10 }
-
-        // the card keeps its own clicks — see InputShield
-        InputShield {}
+        cardH: promptCol.implicitHeight
 
         Column {
           id: promptCol
           width: parent.width
 
-          Rectangle {
-            width: parent.width
-            height: 34
-            color: Zenon.cyan
-
-            Text {
-              anchors.centerIn: parent
-              text: prompt.heading
-              color: Zenon.black
-              font.family: Zenon.face
-              font.weight: Font.Bold
-              font.pixelSize: 18
-            }
-          }
+          // The caption band stood here. It is drawn on the bar now — see
+          // sheetBarHead — because a sheet says what it is where it hangs from.
 
           // BARE, the way the path bar and the application picker are. It was
           // a filled, bordered box inside a card that is already a filled,
@@ -14524,14 +14658,26 @@ FloatingWindow {
       z: 16
       visible: opacity > 0.01
       opacity: appPick.open ? 1 : 0
-      color: Qt.rgba(0, 0, 0, 0.55)
-      Behavior on opacity { NumberAnimation { duration: Zenon.normal; easing.type: Zenon.ease } }
+      color: root.cardScrim
+      Behavior on opacity { NumberAnimation { duration: appPick.open ? appSheet.slideIn : appSheet.slideOut; easing.type: Zenon.ease } }
 
       property bool open: false
       // what is being opened, and what it IS — the second is what gets the
       // association, and it can be empty for a file xdg-mime could not name
       property string path: ""
+      // EVERYTHING IT WILL OPEN. The card took one path — the row under the
+      // pointer — and opened that alone with three files selected, which is
+      // the one entry on the menu that did not act on the selection the way
+      // copy, move and rename all do. `path` stays the first of them, because
+      // the type being adopted has to be one type and that is the one xdg-mime
+      // was asked about.
+      property var paths: []
       property string mime: ""
+      // As permissions does: what the row looked like in the listing, kept
+      // beside the paths. Only for one file — several at once have no single
+      // glyph, and the title says so.
+      property string icon: ""
+      property color iconInk: Zenon.white
       property int pick: 0
 
       // Snapshotted when the card opens rather than read live. It is a few
@@ -14540,10 +14686,44 @@ FloatingWindow {
       // it per keystroke is work that answers the same thing every time.
       property var installed: []
 
-      readonly property var hits: Terminus.filterApps(appPick.installed, appField.text)
+      // ── TYPE AND IT NARROWS ─────────────────────────────────────────
+      // No field, the way the send picker has none: the card has the keyboard
+      // and there is nothing else in it a letter could mean, so a letter
+      // filters. A box drawn around that only said "this takes typing", which
+      // the caret and the footer say without spending a row on it.
+      property string query: ""
 
-      // as pathBar: whatever the field did not take stops here
-      Keys.onPressed: (event) => { event.accepted = true; }
+      readonly property var hits:
+        Terminus.filterApps(appPick.installed, appPick.query)
+
+      // Back to the top on every keystroke: the ranking has changed underneath
+      // the cursor, so where it was means nothing.
+      onQueryChanged: {
+        appPick.pick = 0;
+        appList.positionViewAtBeginning();
+      }
+
+      Keys.onPressed: (event) => {
+        event.accepted = true;
+        if (event.key === Qt.Key_Escape) {
+          // Escape clears the filter before it closes the card: a narrowed
+          // list is a state you can be in by accident.
+          if (appPick.query !== "") { appPick.query = ""; return; }
+          appPick.dismiss(); return;
+        }
+        if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+          appPick.accept(); return;
+        }
+        if (event.key === Qt.Key_Down) { appPick.step(1); return; }
+        if (event.key === Qt.Key_Up) { appPick.step(-1); return; }
+        if (event.key === Qt.Key_Backspace) {
+          appPick.query = appPick.query.slice(0, -1); return;
+        }
+        if (event.key !== Qt.Key_Tab && event.text
+            && event.text.length === 1 && event.text >= " ") {
+          appPick.query += event.text;
+        }
+      }
 
       function snapshot() {
         const vals = DesktopEntries.applications.values;
@@ -14569,12 +14749,18 @@ FloatingWindow {
         return out;
       }
 
-      function ask(path, mime) {
-        appPick.path = path;
+      function ask(paths, mime) {
+        const list = (paths && paths.length !== undefined)
+          ? paths : [String(paths || "")];
+        appPick.paths = list;
+        appPick.path = list.length > 0 ? list[0] : "";
         appPick.mime = mime;
+        const lead = list.length === 1 ? root.rowFor(list[0]) : null;
+        appPick.icon = lead && lead.glyph !== undefined ? lead.glyph : "";
+        appPick.iconInk = lead ? root.inkFor(lead) : Zenon.white;
         appPick.installed = appPick.snapshot();
         appPick.pick = 0;
-        appField.text = "";
+        appPick.query = "";
         appPick.open = true;
         // the same retry the prompt needs, and for the same reason: the card
         // is still invisible on the frame that opens it, and an invisible item
@@ -14590,8 +14776,10 @@ FloatingWindow {
         property int tries: 0
         onTriggered: {
           if (!appPick.open || appClaim.tries++ > 20) { appClaim.stop(); return; }
-          if (appField.activeFocus) { appClaim.stop(); return; }
-          appField.forceActiveFocus();
+          // THE CARD ITSELF, now that there is no field in it to hold the
+          // keyboard — and it is the card that reads the keys.
+          if (appPick.activeFocus) { appClaim.stop(); return; }
+          appPick.forceActiveFocus();
         }
       }
 
@@ -14614,12 +14802,19 @@ FloatingWindow {
       // about what the next right-click will show.
       function choose(app) {
         const mime = appPick.mime;
-        const path = appPick.path;
+        const paths = appPick.paths.slice();
+        const n = paths.length;
         appPick.dismiss();
-        root.run(Terminus.adoptAppCommand(app.id, mime, path));
+        // The type is adopted ONCE, on the row the menu opened on, and the
+        // rest are launched. Registering per file would be the same statement
+        // made three times.
+        root.run(Terminus.adoptAppCommand(app.id, mime, paths[0]));
+        for (let i = 1; i < n; ++i)
+          root.run(Terminus.openWithCommand(app.id, paths[i]));
         root.status = mime !== ""
           ? mime + " now opens with " + app.name
-          : "opened with " + app.name;
+          : (n > 1 ? n + " opened with " + app.name
+                   : "opened with " + app.name);
         // the scan behind the menu is stale the moment that lands
         root.openWithApps = [];
         root.appsScanned = false;
@@ -14642,119 +14837,27 @@ FloatingWindow {
       // shadow, and now this window's too. A card is a card: one of
       // them wearing a shadow of its own was two answers to the same
       // question.
-      MenuShadow { panel: appCard; cornerRadius: Zenon.dialogRadius }
-
-      ClippingRectangle {
-        id: appCard
-        anchors.horizontalCenter: parent.horizontalCenter
-        anchors.top: parent.top
-        anchors.topMargin: 80
-        width: Math.min(560, parent.width - 80)
+      Sheet {
+        id: appSheet
+        shown: appPick.open
+        fromTop: tabStrip.height + crumbBar.height
+        cardW: 560
         // As tall as it needs and no taller: a filter over four hundred
         // entries usually leaves three, and a card that stayed full height
         // around them would be mostly empty box.
-        height: appCol.implicitHeight
-        color: Zenon.black
-        border.color: Zenon.surfaceBorder
-        border.width: 1
-        radius: Zenon.dialogRadius
-        transform: Translate { y: (1 - appPick.opacity) * 10 }
-
-        // the card keeps its own clicks — see InputShield
-        InputShield {}
+        cardH: appCol.implicitHeight
 
         Column {
           id: appCol
           width: parent.width
 
-          Rectangle {
-            width: parent.width
-            height: 34
-            color: Zenon.cyan
+          // The caption band stood here. It is drawn on the bar now — see
+          // sheetBarHead — because a sheet says what it is where it hangs from.
 
-            Text {
-              anchors.fill: parent
-              anchors.leftMargin: 14
-              anchors.rightMargin: 14
-              horizontalAlignment: Text.AlignHCenter
-              verticalAlignment: Text.AlignVCenter
-              elide: Text.ElideMiddle
-              // The TYPE, not the file name. What you are about to decide
-              // outlives this file, and a heading naming the file would be
-              // describing the smaller half of what happens.
-              text: appPick.mime !== "" ? "Open " + appPick.mime + " with"
-                                        : "Open " + Terminus.basename(appPick.path) + " with"
-              color: Zenon.black
-              font.family: Zenon.face
-              font.weight: Font.Bold
-              font.pixelSize: 18
-            }
-          }
-
-          // BARE, the way the path bar's field is. It was a filled, bordered
-          // box inside a card that is already a filled, bordered box — two
-          // frames around one line of text, and the inner one had no edge to
-          // define that the card was not defining already. What says "this
-          // takes typing" is the caret and the colour of the text, not a
-          // rectangle drawn around them.
-          Item {
-            width: parent.width
-            height: 46
-
-            TextInput {
-              id: appField
-              anchors.left: parent.left
-              anchors.leftMargin: 14
-              anchors.right: parent.right
-              anchors.rightMargin: 14
-              anchors.verticalCenter: parent.verticalCenter
-              color: Zenon.cyan
-              selectionColor: Zenon.selBg
-              selectedTextColor: Zenon.white
-              font.family: Zenon.face
-              font.pixelSize: 18
-              clip: true
-              // back to the top on every keystroke: the ranking has changed
-              // underneath the cursor, so where it was means nothing
-              onTextChanged: {
-                appPick.pick = 0;
-                appList.positionViewAtBeginning();
-              }
-
-              // The same breathing caret the search bar, the path bar and the
-              // keymap's search all use. A cursorDelegate REPLACES the
-              // built-in one, so there is exactly one and it is this; a hard
-              // blink in a field that is already asking for your attention
-              // reads as a fault.
-              cursorDelegate: Rectangle {
-                width: 2
-                color: Zenon.cyan
-                SequentialAnimation on opacity {
-                  running: appField.activeFocus
-                  loops: Animation.Infinite
-                  NumberAnimation { to: 0.2; duration: 620; easing.type: Easing.InOutQuad }
-                  NumberAnimation { to: 1.0; duration: 620; easing.type: Easing.InOutQuad }
-                }
-              }
-
-              Text {
-                anchors.verticalCenter: parent.verticalCenter
-                visible: appField.text === ""
-                text: "type to filter"
-                color: Zenon.muted
-                font.family: appField.font.family
-                font.pixelSize: appField.font.pixelSize
-              }
-
-              Keys.onPressed: (e) => {
-                if (e.key === Qt.Key_Down) { e.accepted = true; appPick.step(1); return; }
-                if (e.key === Qt.Key_Up) { e.accepted = true; appPick.step(-1); return; }
-              }
-              Keys.onReturnPressed: (e) => { e.accepted = true; appPick.accept(); }
-              Keys.onEnterPressed: (e) => { e.accepted = true; appPick.accept(); }
-              Keys.onEscapePressed: (e) => { e.accepted = true; appPick.dismiss(); }
-            }
-          }
+          // NO FIELD. Typing filters — see the key handler — the way it
+          // does in the send picker, so the card opens straight onto the list
+          // it is asking you to choose from instead of onto a box.
+          Item { width: 1; height: 12 }
 
           Rectangle {
             width: parent.width
@@ -14866,9 +14969,61 @@ FloatingWindow {
             }
           }
 
-          // The card's own bottom padding, which the rule and the hint bar
-          // were standing in for.
-          Item { width: 1; height: 8 }
+          Rectangle {
+            width: parent.width
+            height: 1
+            color: Zenon.msgBorder
+          }
+
+          // ── THE HINT IS THE FIELD ────────────────────────────────────
+          // The send picker's footer, verbatim in shape: what you typed on
+          // the left where the instruction was, and the keys as chips on the
+          // right. "type to filter" is something you need told once, and the
+          // moment you follow it the same line shows what you typed — so the
+          // card gets a filter without carrying a box for one.
+          Item {
+            width: parent.width
+            height: 34
+
+            Row {
+              anchors.centerIn: parent
+              spacing: 12
+
+              Text {
+                anchors.verticalCenter: parent.verticalCenter
+                rightPadding: 2
+                text: appPick.query !== "" ? appPick.query : "type to filter"
+                color: appPick.query !== "" ? Zenon.sand : Zenon.muted
+                font.family: Zenon.face
+                font.pixelSize: 13
+              }
+
+              Repeater {
+                model: [["\u2191\u2193", "move"], ["\u21b5", "open"],
+                        ["esc", "close"]]
+
+                delegate: Row {
+                  id: appHintPair
+                  required property var modelData
+                  spacing: 5
+
+                  KeyChip {
+                    anchors.verticalCenter: parent.verticalCenter
+                    label: appHintPair.modelData[0]
+                    fontSize: 11
+                  }
+
+                  Text {
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: appHintPair.modelData[1]
+                    color: Zenon.muted
+                    font.family: Zenon.face
+                    font.pixelSize: 13
+                  }
+                }
+              }
+            }
+          }
         }
       }
     }
@@ -17245,6 +17400,190 @@ FloatingWindow {
   // One shape for both. A chip says "this is a thing you type" without having
   // to be loud about it, which is what lets the ink come back up to something
   // legible: it is the outline doing the separating now, not the dimness.
+  // ── A SHEET, WHICH IS WHAT EVERY CARD IN THIS WINDOW IS NOW ────────────
+  // The send picker proved the shape and the rest of the dialogs were still
+  // cards appearing in the middle of the screen from nowhere. A sheet says
+  // where it came from: it hangs off the chrome, it is clipped by a well that
+  // starts below the bar, and the way in is the way out reversed.
+  //
+  // Everything specific to one dialog is passed in — how wide, how tall, and
+  // whether it is up. Everything that makes it a sheet lives here once, so
+  // six dialogs cannot drift into six slightly different sheets.
+  //
+  // `fromTop` IS PASSED IN rather than read off the chrome. An inline
+  // component does not see the ids of the file it is declared in, and the
+  // band above the well is the tab strip plus the path bar — which only the
+  // caller can measure.
+  component Sheet: Item {
+    id: sheet
+    anchors.fill: parent
+
+    property bool shown: false
+    property real fromTop: 0
+    // What the CONTENT wants. The corner radius is added on top, because the
+    // card's top sits that far above the clip and those pixels are cut away.
+    property real cardW: 560
+    property real cardH: 200
+    default property alias body: sheetBody.data
+
+    // A SHEET IS SLOWER THAN A MENU. It is a bigger object and it travels
+    // further, so the shared durations — sized for a card that appears where
+    // the pointer already is — read as a snap here. Multiples of the token,
+    // so turning the desktop's motion down turns these down too.
+    //
+    // On the sheet's root rather than on the card, because the scrim and the
+    // blur behind it have to move at the same speed: a window that went soft
+    // before the sheet had left the bar was two events where there is one.
+    readonly property int slideIn: Math.round(Zenon.slow * 2.0)
+    readonly property int slideOut: Math.round(Zenon.slow * 1.3)
+
+    // HOW FAR ALONG THE ARRIVAL IS, for anything outside the sheet that has
+    // to move with it — the bar's own header, and the blur behind. Read off
+    // the card rather than the overlay, which never fades.
+    readonly property real cardInk: sheetCard.opacity
+
+    // WHERE IT MEETS THE BAR. The well spans the window, so the card's own x
+    // is already the window's — which is what the bar needs to open a gap in
+    // its bottom edge exactly this wide, exactly here.
+    readonly property real drawnX: sheetCard.x
+    readonly property real drawnW: sheetCard.width
+
+    // WHAT IS NOT CONTENT: the corner radius, which is cut away above the
+    // clip, and nothing else.
+    //
+    // NO AIR OF ITS OWN, and that is the whole of the rule. Every card's
+    // first row already carries its own — a field centred in a 46px row
+    // leaves 11 above it, a line of text with a 12px margin leaves 12 — which
+    // is what put the air under the caption band when there was one. Adding
+    // more here does not replace that, it stacks on it: measured at 23px of
+    // nothing between the bar and the first field of the rename card, which
+    // is this 12 plus that 11.
+    readonly property real cut: Zenon.dialogRadius
+
+    // The well is everything BELOW the chrome and it clips, so the sheet is
+    // genuinely hidden behind the bar rather than fading out on top of it.
+    Item {
+      id: well
+      anchors.left: parent.left
+      anchors.right: parent.right
+      anchors.top: parent.top
+      anchors.topMargin: sheet.fromTop
+      anchors.bottom: parent.bottom
+      clip: true
+
+      // Inside the well, so the part that would fall across the bar is cut
+      // off with it: a sheet hanging from the chrome does not cast upwards.
+      MenuShadow {
+        panel: sheetCard
+        cornerRadius: Zenon.dialogRadius
+        opacity: sheetCard.opacity
+      }
+
+      ClippingRectangle {
+        id: sheetCard
+        anchors.horizontalCenter: parent.horizontalCenter
+        width: Math.min(sheet.cardW, well.width - 40)
+        height: Math.min(sheet.cardH + sheet.cut, well.height - 40)
+        Behavior on width {
+          NumberAnimation { duration: Zenon.fast; easing.type: Zenon.travelEase }
+        }
+        Behavior on height {
+          NumberAnimation { duration: Zenon.fast; easing.type: Zenon.travelEase }
+        }
+
+        // AT REST ITS TOP SITS ABOVE THE CLIP by exactly the corner radius,
+        // so the rounded top corners are cut away and the sheet reads as
+        // hanging FROM the bar rather than floating below it. Rounded at the
+        // bottom, square at the top.
+        y: sheet.shown ? -Zenon.dialogRadius : -sheetCard.height - 2
+
+        // Down on a curve that settles, up on one that accelerates away: a
+        // sheet arrives and is dismissed, it does not do the same thing twice.
+        Behavior on y {
+          NumberAnimation {
+            duration: sheet.shown ? sheet.slideIn : sheet.slideOut
+            easing.type: sheet.shown ? Easing.OutCubic : Easing.InCubic
+          }
+        }
+        opacity: sheet.shown ? 1 : 0
+        Behavior on opacity {
+          NumberAnimation {
+            duration: sheet.shown ? sheet.slideIn : sheet.slideOut
+            easing.type: sheet.shown ? Easing.OutCubic : Easing.InCubic
+          }
+        }
+
+        color: Zenon.black
+        border.color: Zenon.surfaceBorder
+        border.width: 1
+        radius: Zenon.dialogRadius
+
+        // The card keeps its own clicks, so a press on its empty space does
+        // not fall through to the scrim behind and dismiss what you are
+        // filling in.
+        InputShield {}
+
+        // Below the cut. Everything a caller puts in the sheet lands here, so
+        // no caller has to know that the top of the card is not the top of
+        // the sheet.
+        Item {
+          id: sheetBody
+          anchors.fill: parent
+          anchors.topMargin: sheet.cut
+        }
+      }
+    }
+  }
+
+  // ── HOW A CARD ARRIVES, AND LEAVES THE SAME WAY ────────────────────────
+  // Seven cards carried `Translate { y: (1 - card.opacity) * 10 }`, which is
+  // not an animation but a side effect of one: the travel was a FUNCTION of
+  // the fade, so the two could never have different curves, different
+  // durations, or different shapes, and ten pixels of drift welded to an
+  // opacity ramp is what "static" looks like.
+  //
+  // Driven by `shown` instead, so the motion is its own animation with its
+  // own easing — travelEase, the curve the columns and the sheet move on,
+  // rather than the fade's. And ASYMMETRIC: arriving takes the full normal,
+  // leaving takes fast, which is the rule the send sheet already follows. The
+  // duration binding is read when the animation starts, by which time `shown`
+  // is already the value being animated TO, so one expression gives both.
+  component CardRise: Translate {
+    required property bool shown
+    y: shown ? 0 : 14
+    Behavior on y {
+      NumberAnimation {
+        duration: shown ? Zenon.normal : Zenon.fast
+        easing.type: Zenon.travelEase
+      }
+    }
+  }
+
+  // The other half. A card that grows the last few percent into place reads
+  // as arriving; one that only slides reads as being moved.
+  component CardGrow: Scale {
+    required property bool shown
+    // The card being scaled, so the growth happens about its middle. Not
+    // `parent` — a Transform has no parent to ask.
+    property Item card: null
+    origin.x: card ? card.width / 2 : 0
+    origin.y: card ? card.height / 2 : 0
+    xScale: shown ? 1 : 0.96
+    yScale: shown ? 1 : 0.96
+    Behavior on xScale {
+      NumberAnimation {
+        duration: shown ? Zenon.normal : Zenon.fast
+        easing.type: Zenon.travelEase
+      }
+    }
+    Behavior on yScale {
+      NumberAnimation {
+        duration: shown ? Zenon.normal : Zenon.fast
+        easing.type: Zenon.travelEase
+      }
+    }
+  }
+
   component KeyChip: Rectangle {
     id: chip
     property string label: ""
@@ -17313,6 +17652,12 @@ FloatingWindow {
     signal backTabbed()
 
     function claim() { fldIn.forceActiveFocus(); fldIn.selectAll(); }
+
+    // WHETHER IT ACTUALLY HAS THE KEYBOARD. The retry that opens the card has
+    // to ask the field, not the scope around it: activeFocus propagates up a
+    // FocusScope, so a scope that got focus while the claim inside it was
+    // dropped looks exactly like success from the outside.
+    readonly property alias focused: fldIn.activeFocus
 
     height: 26
     radius: 4

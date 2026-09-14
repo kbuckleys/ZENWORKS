@@ -172,7 +172,11 @@ Singleton {
   // against a twelve-pixel inset fills the card's height the way mako's
   // max-icon-size does.
   property int notifIconSize: 96
-  property int notifWidth: 400
+  // A FLOOR, NOT A WIDTH. The card measures its own text and takes what it
+  // needs; this is only how narrow it is allowed to get, so a two-word
+  // notification still reads as a panel. Four hundred made it the width of
+  // everything instead, which is the opposite of fitting.
+  property int notifWidth: 200
   property int notifMaxWidth: 800
   // how far the stack floats above the pill
   property int notifLift: 20
@@ -198,6 +202,58 @@ Singleton {
   // mako: markup=1 — whether an application's <b> and <i> are honoured or
   // shown as the characters they are
   property bool notifMarkup: true
+
+  // ── THE PALETTE, OFFERED AS CHOICES ───────────────────────────────────
+  // Names only. Oracle cannot import Zenon — Zenon imports Oracle — and does
+  // not need to: what a row offers is a list of names, and the component
+  // drawing the thing is what turns a name into a colour. Shared, so every
+  // "which colour" row anywhere in this file offers the same set in the same
+  // order rather than each listing the palette again.
+  readonly property var inkOptions: [
+    { value: "white",   label: "White" },
+    { value: "muted",   label: "Muted" },
+    { value: "surface", label: "Surface" },
+    { value: "red",     label: "Red" },
+    { value: "green",   label: "Green" },
+    { value: "yellow",  label: "Yellow" },
+    { value: "blue",    label: "Blue" },
+    { value: "magenta", label: "Magenta" },
+    { value: "cyan",    label: "Cyan" },
+    { value: "pink",    label: "Pink" },
+    { value: "sand",    label: "Sand" }
+  ]
+
+  // ── what a toast is made of ───────────────────────────────────────────
+  // NAMED OUT OF THE PALETTE, not written as hex. Every one of these is a
+  // zenon colour, so a toast cannot be set to something the rest of the
+  // desktop has never heard of, and changing the palette moves the toasts
+  // with it. It also means no new kind of control: these are enums, and
+  // oracle already draws enums.
+  property string notifAccent: "red"
+  property string notifBorderInk: "surface"
+  property string notifTitleInk: "white"
+  property string notifBodyInk: "muted"
+  // The card's own black. Its own setting rather than the shell's panel
+  // opacity: a toast sits over whatever happens to be on screen and has to
+  // stay readable against it, which is not the same job a panel has.
+  property real notifBgOpacity: 0.70
+
+  // ── and how it arrives ────────────────────────────────────────────────
+  // `slide` is what it has always done: in from the edge it is pinned to.
+  // `fade` stays put. `scale` grows from just under full size, which reads
+  // as the toast being placed rather than thrown.
+  property string notifAnimStyle: "slide"
+  // How far a sliding toast travels. The vertical throw is shorter than the
+  // sideways one by the ratio the two were first tuned at (36 against 64),
+  // so one number moves both and keeps the proportion.
+  property int notifSlide: 64
+  // Against the shell's own motion setting rather than instead of it: 1.0 is
+  // whatever zenon says normal is, so turning the desktop's motion down
+  // still reaches the toasts.
+  property real notifAnimSpeed: 1.0
+  // A critical toast casts its accent past its border.
+  property bool notifGlow: true
+  property int notifGlowReach: 28
   // A per-toast ceiling, not a height: a short notification stays short.
   property int notifMaxHeight: 400
   // WHICH CORNER, not which end. mako's `anchor` had both axes and so does
@@ -491,6 +547,34 @@ Singleton {
       min: 0, max: 40, step: 1, unit: "px" },
     { key: "notifMarkup", section: "notify", label: "Honour markup", type: "bool",
       help: "Whether an application's bold and italic are rendered, or shown as the characters they are." },
+
+    { key: "notifBgOpacity", section: "notify", alias: "toast colour color transparency translucent opacity howler", label: "Background", type: "real",
+      min: 0.0, max: 1.0, step: 0.05,
+      help: "How solid the card is over whatever is behind it." },
+    { key: "notifBorderInk", section: "notify", label: "Border colour", type: "enum",
+      options: root.inkOptions },
+    { key: "notifTitleInk", section: "notify", label: "Title colour", type: "enum",
+      options: root.inkOptions },
+    { key: "notifBodyInk", section: "notify", label: "Body colour", type: "enum",
+      options: root.inkOptions },
+    { key: "notifAccent", section: "notify", alias: "toast colour color critical urgent accent glow howler", label: "Critical colour", type: "enum",
+      options: root.inkOptions,
+      help: "The ink a critical notification wears — its border, its title, and the light it casts." },
+    { key: "notifGlow", section: "notify", label: "Critical glows", type: "bool",
+      help: "Whether a critical toast casts its colour past its border." },
+    { key: "notifGlowReach", section: "notify", label: "Glow reach", type: "int",
+      min: 0, max: 64, step: 2, unit: "px" },
+
+    { key: "notifAnimStyle", section: "notify", alias: "toast animation motion slide fade scale howler", label: "Arrival", type: "enum",
+      options: [ { value: "slide", label: "Slide" },
+                 { value: "fade",  label: "Fade" },
+                 { value: "scale", label: "Scale" } ],
+      help: "Slide comes in from the edge the stack is pinned to. Fade stays put. Scale grows into place." },
+    { key: "notifSlide", section: "notify", label: "Slide distance", type: "int",
+      min: 0, max: 200, step: 4, unit: "px" },
+    { key: "notifAnimSpeed", section: "notify", label: "Animation speed", type: "real",
+      min: 0.25, max: 3.0, step: 0.05, unit: "\u00d7",
+      help: "Against the shell's own motion setting, so turning that down still reaches the toasts." },
     { key: "notifPosition", section: "notify", label: "Position", type: "enum",
       // drawn as a six-cell grid with the chosen corner lit — see the
       // EnumControl, which renders `pictogram` specs itself
