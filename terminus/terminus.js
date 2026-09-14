@@ -909,11 +909,18 @@ function findCommand(dir, query) {
 // `--nth -2` for the reason findCommand gives: fd ends a directory with a
 // slash, so its last field is empty and every entry would score zero. The
 // caller strips that slash back off.
+// MATCHED AGAINST THE WHOLE PATH, not against the folder's own name. It used
+// to pass `-d / --nth -2`, which pins fzf to the second-to-last slash-delimited
+// field — the basename, since fd ends a directory with a slash. That made the
+// obvious narrowing impossible: "config buck" could never find ~/.config,
+// because "buck" is in the path and never in the name. Off the leash, fzf's
+// space-separated terms AND together across the entire path, which is what
+// everyone already means by typing a second word.
 function dirFindCommand(query) {
   const q = Strings.shellQuote(String(query).trim());
   return "fd -t d -H --no-ignore --color=never --max-depth 10"
     + " -E /proc -E /sys -E /dev -E /run . / 2>/dev/null"
-    + " | fzf --filter " + q + " -d / --nth -2 2>/dev/null"
+    + " | fzf --filter " + q + " 2>/dev/null"
     + " | head -n 120 | tr '\\n' '\\0'";
 }
 

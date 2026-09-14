@@ -1510,6 +1510,27 @@ FloatingWindow {
   // between tabs does not re-list a directory that was already listed —
   // refreshOther catches anything that changed while it was away.
   function loadTab(t) {
+    // ── NOTHING IN HERE IS A PREFERENCE ──────────────────────────────────
+    // Loading a tab is terminus rearranging itself, which is exactly what
+    // applyDepth exists to say — and it was only being said around the one
+    // line that sets the view. The lines above it were not covered, and they
+    // are the ones that did the damage: paneViews puts the OLD tab's view on
+    // the pane, and the cwd is changed a moment later, so for that moment the
+    // window is standing in the new directory wearing the old directory's
+    // view. rememberView is unguarded there, and wrote it down.
+    //
+    // Every new tab therefore recorded its own destination as whatever you
+    // happened to be looking at, one step before correcting the view on
+    // screen — under a guard, so the correction was never recorded. Opening a
+    // tab at home from the grid set home to grid and left it that way, which
+    // is the inheritance that survived fixing newTab: the tab was asking the
+    // right question and being handed an answer it had just spoiled itself.
+    //
+    // Raised for the whole function, which is also what makes the comment
+    // below true: the tab's own view wins, so the destination's own record
+    // must not be applied on the way in either. No early returns, so the
+    // release at the end always runs.
+    root.applyDepth++;
     if (root.renaming) root.endRename(false);
     root.dual = t.dual === true;
     root.pas.cwd = typeof t.otherCwd === "string" ? t.otherCwd : "";
@@ -1558,6 +1579,7 @@ FloatingWindow {
     // screen while that happens, so nothing blinks.
     root.refresh(true);
     root.refreshOther();
+    root.applyDepth--;
   }
 
   function tabList() {
@@ -1640,6 +1662,26 @@ FloatingWindow {
     const t = root.tabState();
     t.cwd = (path && path !== "") ? path : Paths.home();
     t.sel = 0;
+    // ── A NEW TAB DOES NOT INHERIT THE VIEW ──────────────────────────────
+    // The state is copied off the tab you are standing in, and the view came
+    // with it: opening a tab from a pictures folder in the grid put home in
+    // the grid too, and kept it there. Nothing was wrong with home's own
+    // record — loadTab raises applyDepth, which is what stops applyDirView
+    // from asking, so the answer was never read rather than being wrong.
+    //
+    // Asked here instead, where the destination is already known. How a
+    // folder wants to be read is a fact about that folder, so a tab opening
+    // onto it starts the way that folder was left, and a folder with no
+    // record starts in the plainest view the current layout has rather than
+    // in whatever the last one happened to be showing.
+    //
+    // Only while the memory is on: switched off there is no other source of
+    // truth, and inheriting is then the only thing left to do.
+    if (root.perDirView) {
+      const v = root.dirViews[t.cwd];
+      t.view = (v && root.viewRing.indexOf(v.view) >= 0)
+        ? v.view : root.viewRing[0];
+    }
     // and at the top of it. The state was copied off the tab you are standing
     // in, so without this a new tab opens scrolled to wherever that one was.
     t.scroll = null;
@@ -5497,7 +5539,12 @@ FloatingWindow {
         ["t", "trash",     () => root.goTo(Paths.home() + "/.local/share/Trash/files")],
         ["m", "media",     () => root.goTo("/run/media")],
         ["/", "root",      () => root.goTo("/")],
-        [" ", "go to", () => pathBar.begin()]
+        // THE SAME SHEET THAT SENDS, ASKED TO GO INSTEAD. Picking a place
+        // out of a tree you can filter is the same act whether something is
+        // travelling with you or not, and it was already built — so this is
+        // the picker with its destination handed to goTo rather than to
+        // paste, not a second picker that happens to look like it.
+        [" ", "go to", () => sendTo.ask("go")]
       ],
       c: [
         ["c", "copy path",     () => { const r = root.currentRow();
@@ -6179,6 +6226,25 @@ FloatingWindow {
                 property real grabDx: 0
                 property bool dragging: false
 
+                // ── THE STRIP, HELD RATHER THAN LOOKED UP ────────────────
+                // A press outlives its delegate: on a config reload the tab
+                // is torn down with the button still held, and the release
+                // and the cancel are both delivered to what is left of it. By
+                // then `tabStrip` cannot be named — a QML id resolves through
+                // the component's context and not through JS scope, so once
+                // that context is gone the name does not evaluate to null, it
+                // fails to evaluate at all. Which is why guarding it did not
+                // work: `!tabStrip` threw the error it was testing for, and
+                // `typeof tabStrip` threw it too. typeof only forgives a name
+                // JS itself has never heard of, and this one is not that.
+                //
+                // So the reference is taken ONCE, while the context is
+                // certainly alive, and read as a plain property afterwards.
+                // Reading a property of a half-dead object is allowed; naming
+                // a dead id is not.
+                property var strip: null
+                Component.onCompleted: tabMouse.strip = tabStrip
+
                 // MEASURED IN THE STRIP, never in the tab. `m.x` is relative to
                 // this MouseArea, and this MouseArea moves with the tab while
                 // the tab follows the pointer — reading the pointer off a thing
@@ -6223,15 +6289,21 @@ FloatingWindow {
                 onReleased: {
                   const was = tabMouse.dragging;
                   tabMouse.dragging = false;
-                  if (was) root.moveTab(tabStrip.dragFrom, tabStrip.dragTo);
-                  tabStrip.endDrag();
+                  // Through the held reference — see `strip` above. A drag
+                  // that died with its component has nothing left to put back.
+                  const st = tabMouse.strip;
+                  if (!st) return;
+                  if (was) root.moveTab(st.dragFrom, st.dragTo);
+                  st.endDrag();
                 }
 
                 // A grab taken away mid-drag puts everything back rather than
                 // committing a move nobody finished asking for.
                 onCanceled: {
                   tabMouse.dragging = false;
-                  tabStrip.endDrag();
+                  // Through the held reference like the release above: a
+                  // cancel is exactly what a torn-down delegate delivers.
+                  if (tabMouse.strip) tabMouse.strip.endDrag();
                 }
 
                 onClicked: (m) => {
@@ -6264,7 +6336,14 @@ FloatingWindow {
         id: crumbBar
         width: parent.width
         height: root.headH
-        color: Zenon.headBg
+        // BLACK WHILE THE SHEET IS UP. The send-to header is drawn on this
+        // same strip, and the bar's translucent grey let the column behind it
+        // read straight through a header that is answering a question — so
+        // the strip goes solid for as long as the sheet is, and comes back
+        // with it. Tinted rather than switched, off the sheet's own opacity,
+        // so it darkens at exactly the rate the sheet arrives.
+        color: Qt.tint(Zenon.headBg,
+          Qt.rgba(0, 0, 0, sendToCard.opacity))
 
         // HOW MUCH OF THE BAR'S OWN CONTENT IS SHOWING. The send-to header is
         // drawn on this bar (see sendToBarHead) and the two cannot share the
@@ -7364,6 +7443,7 @@ FloatingWindow {
 
           Text {
             anchors.verticalCenter: parent.verticalCenter
+            visible: sendTo.sending
             text: sendTo.op === "move" ? "\uDB80\uDD90" : "\uDB80\uDD8F"
             // crumbInk, the ink the step you are standing on uses. The header
             // takes the bar's place while it is up, so its punctuation is the
@@ -7376,11 +7456,17 @@ FloatingWindow {
 
           // Air after the verb, so the glyph reads as a label on the line
           // rather than as the first character of the filename.
-          Item { width: 6; height: 1 }
+          // A Row skips an invisible child entirely, so the spacers go with
+          // the nouns they were spacing and `go` reads as arrow, air, place.
+          Item { width: 6; height: 1; visible: sendTo.sending }
 
           Text {
             anchors.verticalCenter: parent.verticalCenter
             text: sendTo.icon || ""
+            // The Row's own 6 is the gap between PHRASES; a glyph and the
+            // name it labels are one phrase and were reading as two things
+            // jammed together.
+            rightPadding: 3
             color: sendTo.iconInk
             font.family: Zenon.face
             font.pixelSize: 15
@@ -7388,10 +7474,13 @@ FloatingWindow {
 
           Text {
             anchors.verticalCenter: parent.verticalCenter
-            width: Math.min(implicitWidth, 240)
+            // COUNTED OFF `names`, not off `paths`. They are the same length
+            // for a copy and a move, and for `go` the subject is a name with
+            // no path behind it — read from the path list it said "0 items".
+            width: Math.min(implicitWidth, 300)
             elide: Text.ElideMiddle
-            text: (sendTo.paths.length === 1 ? sendTo.names[0]
-                : sendTo.paths.length + " items") || ""
+            text: (sendTo.names.length === 1 ? sendTo.names[0]
+                : sendTo.names.length + " items") || ""
             color: sendTo.iconInk
             font.family: Zenon.face
             font.pixelSize: 15
@@ -7402,7 +7491,10 @@ FloatingWindow {
           Text {
             anchors.verticalCenter: parent.verticalCenter
             visible: !!sendTo.current
-            text: "\uDB85\uDFB7"
+            // A DIFFERENT ARROW FOR A DIFFERENT SENTENCE. Copy and move are
+            // putting a thing somewhere, and the heavy arrow reads as
+            // delivery; `go` is you travelling, so it gets the plain one.
+            text: sendTo.op === "go" ? "\uF061" : "\uDB85\uDFB7"
             color: root.crumbInk
             font.family: Zenon.face
             font.pixelSize: 15
@@ -7413,8 +7505,8 @@ FloatingWindow {
           Text {
             anchors.verticalCenter: parent.verticalCenter
             visible: !!sendTo.current
-            text: (sendTo.current
-              ? Icons.glyphFor({ name: sendTo.current.name, isDir: true }) : "") || ""
+            text: sendTo.glyphOf(sendTo.current) || ""
+            rightPadding: 3
             color: sendTo.blocked ? Zenon.muted : Zenon.cyan
             font.family: Zenon.face
             font.pixelSize: 15
@@ -7572,7 +7664,22 @@ FloatingWindow {
                   required property var modelData
                   width: sideCol.width
                   label: Terminus.basename(modelData)
-                  glyph: "\uF02E"
+                  // THE GLYPH THE FOLDER WEARS EVERYWHERE ELSE. Every row
+                  // here used to be the same bookmark tag, which said "this
+                  // is a bookmark" — a thing the panel it is sitting in had
+                  // already said — and threw away the one piece of
+                  // information the icon could have carried. Downloads,
+                  // .config and a git checkout are told apart at a glance in
+                  // the listing and in the send sheet; this is the third
+                  // place they are drawn and it is the same table.
+                  //
+                  // Home by its own name rather than by the user's: the
+                  // basename of ~ is "buck", which no rule claims, while the
+                  // sheet's roots already label it "Home" for exactly this.
+                  glyph: Icons.glyphFor({
+                    name: modelData === Paths.home()
+                      ? "home" : Terminus.basename(modelData),
+                    isDir: true })
                   active: modelData === root.cwd
                   showRemove: true
                   onChosen: root.goTo(modelData)
@@ -7750,11 +7857,38 @@ FloatingWindow {
             width: parent.width
             height: parent.height
 
-            readonly property real w0: Math.round(miller.width * 0.24)
-            readonly property real w1: Math.round(miller.width * 0.34)
-            readonly property real w2: miller.width - miller.w0 - miller.w1 - 2
+            // ── TWO COLUMNS WHILE A FIND IS UP ────────────────────────
+            // Results are not a directory — they come from all over the tree
+            // — so the parent column has nothing true to say about them. It
+            // was drawing the parent of the folder the search STARTED in,
+            // which is a quarter of the pane spent on an answer to a question
+            // nobody asked. With it gone the results and the preview split
+            // the pane, which is what miller columns are for: the list, and
+            // what the cursor is on.
+            //
+            // A find only. A grep already puts its own second column to work
+            // — see showMeta — and its results are lines inside files rather
+            // than places, so that layout is the one it wants.
+            readonly property bool flat: root.searchMode === "find"
+
+            readonly property real w0: miller.flat
+              ? 0 : Math.round(miller.width * 0.24)
+            // THE FREED QUARTER GOES TO THE RESULTS, all of it. The preview
+            // keeps the 0.42 it has in the three-column layout — it is
+            // showing one file and never wanted more — so the list takes the
+            // parent column's room on top of its own and ends up the wider of
+            // the two. Which is the right way round: a result is a PATH, and
+            // a path is long.
+            readonly property real w1: Math.round(
+              miller.width * (miller.flat ? 0.58 : 0.34))
+            // One seam instead of two when the parent is gone.
+            readonly property int seams: miller.flat ? 1 : 2
+            readonly property real w2:
+              miller.width - miller.w0 - miller.w1 - miller.seams
+
             function slotX(sl) { return sl === 0 ? 0
-              : (sl === 1 ? miller.w0 + 1 : miller.w0 + miller.w1 + 2); }
+              : (sl === 1 ? (miller.flat ? 0 : miller.w0 + 1)
+                          : miller.w0 + miller.w1 + miller.seams); }
             function slotW(sl) { return sl === 0 ? miller.w0
               : (sl === 1 ? miller.w1 : miller.w2); }
             // Where the columns ARE, which is home except for the moment
@@ -7813,10 +7947,12 @@ FloatingWindow {
             // column stops, not something a column owns.
             Rectangle {
               x: miller.w0; width: 1; height: parent.height
+              visible: !miller.flat
               color: Zenon.msgBorder
             }
             Rectangle {
-              x: miller.w0 + miller.w1 + 1; width: 1; height: parent.height
+              x: miller.w0 + miller.w1 + miller.seams - 1
+              width: 1; height: parent.height
               color: Zenon.msgBorder
             }
 
@@ -10867,7 +11003,11 @@ FloatingWindow {
             sendTo.dismiss(); return;
           }
           if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-            sendTo.choose(); return;
+            // SHIFT GOES THERE WITHOUT LEAVING HERE — the same shift the
+            // listing's own open honours, and only for `go`: a copy has
+            // nowhere to arrive that a tab could show.
+            sendTo.choose((event.modifiers & Qt.ShiftModifier) !== 0);
+            return;
           }
           if (event.key === Qt.Key_Down) { sendTo.step(1); return; }
           if (event.key === Qt.Key_Up) { sendTo.step(-1); return; }
@@ -13305,7 +13445,10 @@ FloatingWindow {
         let w = 0;
         const rows = sendTo.shown;
         for (let i = 0; i < rows.length; i++) {
-          const t = 10 + rows[i].depth * 14 + 40
+          // 18 to the glyph column, 22 across it, 8 to the name — the
+          // delegate's own layout, which is why it is spelled out rather than
+          // rounded to one number.
+          const t = 10 + rows[i].depth * 14 + 18 + 22 + 8
                   + sendToFm.advanceWidth(rows[i].name) + 34;
           if (t > w) w = t;
         }
@@ -13342,7 +13485,13 @@ FloatingWindow {
       // already left, and the answers arrive in whatever order they finish.
       property string loadFor: ""
 
-      readonly property string verb: sendTo.op === "copy" ? "Copy" : "Move"
+      // WHETHER THERE IS A VERB TO NAME. Copy and move have to say which
+      // they are; `go` has nothing to disambiguate, so it drops the leading
+      // glyph and lets the sentence start with the place you are leaving.
+      readonly property bool sending: sendTo.op !== "go"
+
+      readonly property string verb: sendTo.op === "go" ? "Go to"
+        : sendTo.op === "copy" ? "Copy" : "Move"
       // ── WHAT CANNOT BE A DESTINATION ─────────────────────────────────
       // A directory cannot go inside itself, or inside anything it contains.
       // Pasting could always be asked to do it too, but you had to walk into
@@ -13381,12 +13530,31 @@ FloatingWindow {
       // picker that sometimes moved and sometimes typed would be neither.
       // Arrows move; everything printable filters.
       property string query: ""
+
+      // ── A SPACE IS AND ─────────────────────────────────────────────
+      // Typing narrows; typing a second word narrows what the first one
+      // left. "config" finds every config directory on the disk, and
+      // "config buck" keeps the ones under /home/buck — which is how you
+      // actually arrive at a destination: you remember the name first and
+      // where it lives second.
+      //
+      // Held as a property rather than split inside the sift, because a
+      // binding tracks the properties it READS and this file has paid more
+      // than once for dependencies hidden behind a function call.
+      readonly property var terms: {
+        const out = [];
+        const parts = sendTo.query.toLowerCase().split(/\s+/);
+        for (let i = 0; i < parts.length; i++)
+          if (parts[i] !== "") out.push(parts[i]);
+        return out;
+      }
+
       onQueryChanged: {
         sendTo.sel = 0;
         sendTo.hits = [];
         // One letter matches most of a filesystem, so the crawl waits for a
         // second one; the local sift runs from the first keystroke either way.
-        if (sendTo.query.length >= 2) sendToCrawl.restart();
+        if (sendTo.terms.join("").length >= 2) sendToCrawl.restart();
         else { sendToCrawl.stop(); sendToFind.running = false; sendTo.crawling = false; }
       }
 
@@ -13403,6 +13571,24 @@ FloatingWindow {
       // "where?" is the path, so the row is the path.
       property var hits: []
       property bool crawling: false
+
+      // ── THE GLYPH A NODE WEARS ───────────────────────────────────────
+      // OFF THE PATH, NEVER OFF THE NAME. A row found by the crawl is drawn
+      // as its path — "~/.config/quickshell" is the answer to "where?", which
+      // a bare basename is not — and that name went to the icon table, which
+      // has no rule for a whole path and handed back the plain folder. So
+      // every hit in both sheets was a generic folder while the identical
+      // directory two rows up in the tree wore its own glyph.
+      //
+      // Home by its own name rather than by the user's: the basename of ~ is
+      // "buck", which no rule claims, and the tree's root row for it is
+      // labelled "Home" for the same reason.
+      function glyphOf(n) {
+        if (!n) return "";
+        return Icons.glyphFor({
+          name: n.path === Paths.home() ? "home" : Terminus.basename(n.path),
+          isDir: true });
+      }
 
       function pretty(p) {
         const h = Paths.home();
@@ -13453,12 +13639,20 @@ FloatingWindow {
       // Only over what has been loaded — the crawl below is what looks
       // further than the branches you have opened.
       readonly property var shown: {
-        const q = sendTo.query.toLowerCase();
-        if (q === "") return sendTo.nodes;
+        const t = sendTo.terms;
+        if (t.length === 0) return sendTo.nodes;
         const n = sendTo.nodes;
         const keep = [];
-        for (let i = 0; i < n.length; i++)
-          keep.push(n[i].name.toLowerCase().indexOf(q) >= 0);
+        // AGAINST THE PATH, for the same reason the crawl is — a word like
+        // "buck" is never in the folder's own name, it is in where the
+        // folder lives. Inlined rather than called: see the note on `terms`.
+        for (let i = 0; i < n.length; i++) {
+          const hay = n[i].path.toLowerCase();
+          let all = true;
+          for (let k = 0; k < t.length; k++)
+            if (hay.indexOf(t[k]) < 0) { all = false; break; }
+          keep.push(all);
+        }
         // Backwards, so a kept row can mark the parents above it and those
         // parents are themselves passed over later in the same sweep.
         for (let i = n.length - 1; i >= 0; i--) {
@@ -13497,17 +13691,34 @@ FloatingWindow {
       }
 
       function ask(op) {
-        const rows = root.acting();
-        if (rows.length === 0) return;
         sendTo.op = op;
-        sendTo.paths = rows.map((r) => r.path);
-        sendTo.names = rows.map((r) => r.name);
-        if (rows.length === 1) {
-          sendTo.icon = rows[0].glyph !== undefined ? rows[0].glyph : "";
-          sendTo.iconInk = rows[0].ink !== undefined ? rows[0].ink : Zenon.white;
+        if (op === "go") {
+          // PATHS STAYS EMPTY, and that is not an oversight — it is what
+          // makes `blocked` answer false for every row, since nothing can be
+          // put inside itself when nothing is being put. The header's subject
+          // is filled in from `names` alone, which is why it reads that and
+          // not the path list.
+          sendTo.paths = [];
+          // WHERE YOU ARE STANDING, said in the same slot the cargo uses. The
+          // header is a sentence — this → that — and the half a journey needs
+          // is the half you are leaving. Without it the sheet named a
+          // destination with nothing to be a destination FROM.
+          sendTo.names = [sendTo.pretty(root.cwd)];
+          sendTo.icon = Icons.glyphFor({ name: Terminus.basename(root.cwd),
+                                         isDir: true });
+          sendTo.iconInk = Zenon.cyan;
         } else {
-          sendTo.icon = "\uDB84\uDEF7";
-          sendTo.iconInk = Zenon.white;
+          const rows = root.acting();
+          if (rows.length === 0) return;
+          sendTo.paths = rows.map((r) => r.path);
+          sendTo.names = rows.map((r) => r.name);
+          if (rows.length === 1) {
+            sendTo.icon = rows[0].glyph !== undefined ? rows[0].glyph : "";
+            sendTo.iconInk = rows[0].ink !== undefined ? rows[0].ink : Zenon.white;
+          } else {
+            sendTo.icon = "\uDB84\uDEF7";
+            sendTo.iconInk = Zenon.white;
+          }
         }
         sendTo.nodes = sendTo.roots();
         sendTo.query = "";
@@ -13525,6 +13736,7 @@ FloatingWindow {
         sendTo.flashInk = 0;
         sendTo.flashAt = -1;
         sendTo.pendingDest = "";
+        sendTo.pendingTab = false;
         sendTo.open = false;
         sendTo.nodes = [];
         sendTo.query = "";
@@ -13671,9 +13883,15 @@ FloatingWindow {
         ScriptAction { script: sendTo.commit() }
       }
 
-      function choose() {
+      // Held beside pendingDest and for the same reason: the flash is long
+      // enough for a second keystroke, and what was asked for is what was
+      // asked for at the moment the key went down.
+      property bool pendingTab: false
+
+      function choose(inTab) {
         const n = sendTo.current;
         if (!n || sendToFlash.running) return;
+        sendTo.pendingTab = (inTab === true) && sendTo.op === "go";
         if (sendTo.blocked) {
           root.warn(n.path === sendTo.paths[0]
             ? "that is where it already is"
@@ -13694,6 +13912,14 @@ FloatingWindow {
         sendTo.flashAt = -1;
         if (dest === "") return;
         sendTo.open = false;
+        if (sendTo.op === "go") {
+          const tab = sendTo.pendingTab;
+          sendTo.pendingTab = false;
+          sendTo.nodes = [];
+          if (tab) root.openInNewTab(dest);
+          else root.goTo(dest);
+          return;
+        }
         root.setPending({ op: sendTo.op, paths: sendTo.paths,
                           names: sendTo.names });
         root.pasteDest = dest;
@@ -13927,8 +14153,17 @@ FloatingWindow {
             Text {
               id: sendToGlyph
               x: sendToRow.indent + 18
+              // A FIXED COLUMN, not the glyph's own width — the same fix the
+              // listing's glyphs got, for the same reason. The nerd font is
+              // proportional, so a wide icon ended further right than a
+              // narrow one and ran into a name that was pinned at a constant
+              // x: some rows had a gap, some had none, and the wide ones
+              // touched. A column of constant width puts every icon on one
+              // centre line and starts every name at the same place.
+              width: 22
+              horizontalAlignment: Text.AlignHCenter
               anchors.verticalCenter: parent.verticalCenter
-              text: Icons.glyphFor({ name: sendToRow.modelData.name, isDir: true })
+              text: sendTo.glyphOf(sendToRow.modelData)
               // CYAN, WHICH IS WHAT inkOf GIVES A DIRECTORY. Every row in
               // this tree is one, so the whole list wears the colour the
               // listing wears — the glyph and the name together, the way a
@@ -13940,11 +14175,16 @@ FloatingWindow {
             }
 
             Text {
-              x: sendToRow.indent + 40
+              // OFF THE COLUMN'S EDGE, not off a number that has to be kept
+              // equal to it. The listing puts 12 between its 24-wide column
+              // and the name; this tree is a size down, so it is 8 against 22.
+              anchors.left: sendToGlyph.right
+              anchors.leftMargin: 8
               // Room kept for the bookmark mark, whether or not this row has
               // one: a name that elided differently depending on a mark at
               // the far end would make the column look ragged.
-              width: parent.width - x - 34
+              anchors.right: parent.right
+              anchors.rightMargin: 34
               anchors.verticalCenter: parent.verticalCenter
               text: sendToRow.modelData.name
               elide: Text.ElideRight
@@ -14044,8 +14284,13 @@ FloatingWindow {
 
             Text {
               visible: !(sendTo.blocked && sendTo.current)
+              // The verb changes with the op, and `go` has a second one.
+              // Kept to the same shape so the line does not reflow as the
+              // crawl comes and goes.
               text: sendTo.crawling ? "    searching…"
-                  : "    ↑↓ move    → open    ↵ send    esc"
+                  : (sendTo.op === "go"
+                     ? "    ↑↓ move    → open    ↵ go    ⇧↵ new tab    esc"
+                     : "    ↑↓ move    → open    ↵ send    esc")
               color: Zenon.muted
               font.family: Zenon.face
               font.pixelSize: 13
@@ -17315,4 +17560,3 @@ FloatingWindow {
 
 
 }
-
