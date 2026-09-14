@@ -59,21 +59,169 @@ Singleton {
   property var cpuTemp: null      // °C
   property var cpuLoad: null      // 1-minute load average
 
+  // ── THE CPU, READ RATHER THAN SHELLED OUT FOR ─────────────────────────
+  // cpu.sh ran once a second and forked about eight times doing it: bash,
+  // two mktemps, two greps of /proc/stat either side of an internal
+  // `sleep 0.3`, an awk over both, then — every single tick, for facts that
+  // cannot change while the machine is on — a grep of /proc/cpuinfo, TWO
+  // lscpus and an nproc.
+  //
+  // All of it is in files this process can open. /proc/stat gives the usage
+  // and the per-core breakdown, /proc/loadavg the load and the process count,
+  // /proc/cpuinfo the model and the core counts, and cpufreq the frequency.
+  //
+  // AND THE SAMPLING WINDOW IS THE TICK. The script slept 0.3s to have two
+  // readings to subtract; this keeps the previous one, so the window is the
+  // whole second between ticks — a longer baseline and a truer number, for
+  // no sleep at all.
+  //
+  // The script is left in scripts/ untouched. Nothing calls it now.
+  FileView { id: statFile; path: "/proc/stat"; blockLoading: true; printErrors: false }
+  FileView { id: loadFile; path: "/proc/loadavg"; blockLoading: true; printErrors: false }
+  FileView { id: cpuinfoFile; path: "/proc/cpuinfo"; blockLoading: true; printErrors: false }
+
+  // The reading the last tick took, to subtract this one from.
+  property var cpuPrev: null
+  // Read once: a processor does not change model or core count mid-session.
+  property string cpuName: ""
+  property int cpuCores: 0
+  property int cpuThreads: 0
+  // Found once, because the hwmon index is fixed for the life of the boot.
+  property string cpuTempPath: ""
+
+  FileView {
+    id: cpuTempFile
+    path: root.cpuTempPath
+    blockLoading: true
+    printErrors: false
+  }
+
   Process {
+    id: cpuTempFind
+    command: ["sh", "-c",
+      "find /sys/devices/platform/coretemp.0/hwmon -name temp1_input 2>/dev/null | head -n1"]
+    stdout: StdioCollector {
+      id: cpuTempOut
+      waitForEnd: true
+      onStreamFinished: root.cpuTempPath = String(cpuTempOut.text).trim()
+    }
+  }
+
+  // One FileView per thread, the same files cpu.sh averaged over.
+  Instantiator {
+    id: freqFiles
+    model: root.cpuThreads
+    delegate: FileView {
+      required property int index
+      path: "/sys/devices/system/cpu/cpu" + index + "/cpufreq/scaling_cur_freq"
+      blockLoading: true
+      printErrors: false
+    }
+  }
+
+  function readCpuStatic() {
+    cpuinfoFile.reload();
+    const t = String(cpuinfoFile.text());
+    const nm = t.match(/^model name\s*:\s*(.+)$/m);
+    root.cpuName = nm ? nm[1].trim() : "";
+    const th = t.match(/^processor\s*:/gm);
+    root.cpuThreads = th ? th.length : 0;
+    const co = t.match(/^cpu cores\s*:\s*(\d+)$/m);
+    root.cpuCores = co ? parseInt(co[1], 10) : root.cpuThreads;
+  }
+
+  // The totals and the idle time of every line in /proc/stat that names a cpu.
+  function cpuSample() {
+    statFile.reload();
+    const out = ({});
+    const lines = String(statFile.text()).split("\n");
+    for (let i = 0; i < lines.length; i++) {
+      const m = lines[i].match(/^(cpu[0-9]*)\s+(.*)$/);
+      if (!m) continue;
+      const n = m[2].trim().split(/\s+/).map(Number);
+      let tot = 0;
+      for (let k = 0; k < n.length; k++) tot += n[k];
+      // idle + iowait, the two columns cpu.sh counted as not-working
+      out[m[1]] = { t: tot, i: (n[3] || 0) + (n[4] || 0) };
+    }
+    return out;
+  }
+
+  function cpuPct(now, prev, key) {
+    if (!prev || !prev[key] || !now[key]) return 0;
+    const dt = now[key].t - prev[key].t;
+    const di = now[key].i - prev[key].i;
+    return dt > 0 ? Math.round(100 * (dt - di) / dt) : 0;
+  }
+
+  function pollCpu() {
+    const now = root.cpuSample();
+    const prev = root.cpuPrev;
+    root.cpuPrev = now;
+    // The first tick has nothing to subtract from and is not a reading.
+    if (!prev) return;
+
+    const usage = root.cpuPct(now, prev, "cpu");
+
+    let freq = null;
+    let sum = 0;
+    let seen = 0;
+    for (let i = 0; i < freqFiles.count; i++) {
+      const f = freqFiles.objectAt(i);
+      if (!f) continue;
+      f.reload();
+      const v = parseInt(String(f.text()).trim(), 10);
+      if (!isNaN(v)) { sum += v; seen++; }
+    }
+    if (seen > 0) freq = Math.round(sum / seen / 1000);
+
+    let temp = null;
+    if (root.cpuTempPath !== "") {
+      cpuTempFile.reload();
+      const v = parseInt(String(cpuTempFile.text()).trim(), 10);
+      if (!isNaN(v)) temp = Math.round(v / 1000);
+    }
+
+    loadFile.reload();
+    const la = String(loadFile.text()).trim().split(/\s+/);
+    const load = la.length > 0 ? parseFloat(la[0]) : null;
+
+    // ── THE TOOLTIP, SAID THE WAY THE SCRIPT SAID IT ────────────────────
+    // Same lines, same order, same wording — this is the one part of the
+    // change anybody can see, so it is the one part that must not differ.
+    let tip = "CPU: " + root.cpuName
+      + "\nCores: " + (root.cpuCores || "?") + " cores / "
+      + (root.cpuThreads || "?") + " threads";
+    if (freq !== null)
+      tip += "\nFrequency: " + (freq / 1000).toFixed(2) + " GHz";
+    if (temp !== null) tip += "\nTemperature: " + temp + "\u00b0C";
+    if (la.length >= 3)
+      tip += "\nLoad Average: " + la[0] + " " + la[1] + " " + la[2];
+    if (la.length >= 4) tip += "\nRunning: " + la[3];
+    tip += "\n\nUsage: " + usage + "%\n\nPer Core:";
+    const keys = [];
+    for (const k in now) if (k !== "cpu") keys.push(k);
+    keys.sort((a, b) => parseInt(a.slice(3), 10) - parseInt(b.slice(3), 10));
+    for (let i = 0; i < keys.length; i++)
+      tip += "\n  " + keys[i].slice(3) + " " + root.cpuPct(now, prev, keys[i]) + "%";
+
+    root.cpuUsage = usage;
+    root.cpuTip = tip;
+    root.cpuFreq = freq;
+    root.cpuTemp = temp;
+    root.cpuLoad = isNaN(load) ? null : load;
+    root.cpuHistory = root.push(root.cpuHistory, usage);
+  }
+
+  // Stands in for the Process the tick used to start, so the tick below is
+  // unchanged and does not have to know which pollers are processes.
+  QtObject {
     id: cpuProc
-    command: [Helpers.script("cpu.sh")]
-    stdout: SplitParser {
-      onRead: (line) => {
-        try {
-          const o = JSON.parse(line);
-          root.cpuUsage = o.usage ?? 0;
-          root.cpuTip = o.tooltip ?? "";
-          root.cpuFreq = o.freq ?? null;
-          root.cpuTemp = o.temp ?? null;
-          root.cpuLoad = o.load ?? null;
-          root.cpuHistory = root.push(root.cpuHistory, o.usage ?? 0);
-        } catch (e) {}
-      }
+    property bool running: false
+    onRunningChanged: {
+      if (!cpuProc.running) return;
+      root.pollCpu();
+      cpuProc.running = false;
     }
   }
 
@@ -116,11 +264,32 @@ Singleton {
   readonly property real memUsed: Helpers.giB(root.memTotal - root.memAvail)
   readonly property real swapUsed: Helpers.giB(root.swapTotal - root.swapFree)
 
-  Process {
+  // ── READ, NOT SPAWNED ─────────────────────────────────────────────────
+  // This was `cat /proc/meminfo` — a fork, an exec and a pipe, once a second,
+  // for the whole life of the session, to read a file this process can open
+  // itself. FileView reads /proc directly: measured, the same 1671 bytes and
+  // fresh values on every reload.
+  //
+  // The parser is untouched. It wants lines and it still gets lines; only the
+  // thing handing them over has changed.
+  FileView {
+    id: memFile
+    path: "/proc/meminfo"
+    blockLoading: true
+    printErrors: false
+  }
+
+  // Kept so the tick below can go on saying `if (!running)` about all four
+  // pollers without knowing which of them are processes any more.
+  QtObject {
     id: memProc
-    command: ["cat", "/proc/meminfo"]
-    stdout: SplitParser {
-      onRead: (line) => root.parseMem(line)
+    property bool running: false
+    onRunningChanged: {
+      if (!memProc.running) return;
+      memFile.reload();
+      const lines = String(memFile.text()).split("\n");
+      for (let i = 0; i < lines.length; i++) root.parseMem(lines[i]);
+      memProc.running = false;
     }
   }
 
@@ -164,35 +333,127 @@ Singleton {
   readonly property string diskReadText: Helpers.powFormat(root.diskRead)
   readonly property string diskWriteText: Helpers.powFormat(root.diskWrite)
 
+  // ── THE DISK, SPLIT BY HOW OFTEN IT CHANGES ───────────────────────────
+  // disk.sh was the most expensive poller in the shell: 358ms of bash every
+  // second — two walks of /sys/block either side of an internal `sleep 0.3`,
+  // several awks, a df and a jq. It was alive for a third of every second.
+  //
+  // Throughput is read here, the same way the CPU is: the previous sample is
+  // kept and the window is the tick, so there is no sleep and no process.
+  //
+  // CAPACITY IS A DIFFERENT QUESTION and gets a different rate. How full the
+  // root filesystem is moves in minutes, not in tenths of a second, and there
+  // is no /proc for it — statvfs is what df is for. So it keeps its process
+  // and runs every thirty seconds instead of every one.
+  property var diskDevs: []
+  property var diskPrev: null
+
   Process {
-    id: diskProc
-    command: [Helpers.script("disk.sh")]
-    stdout: SplitParser {
-      onRead: (line) => {
-        try {
-          const o = JSON.parse(line);
-          root.diskRead = o.read ?? 0;
-          root.diskWrite = o.write ?? 0;
-          root.diskUsedPct = o.used ?? 0;
-          root.diskTotal = o.total ?? 0;
-          root.diskUsedBytes = o.usedBytes ?? 0;
-          root.diskTip = o.tooltip ?? "";
-          // Scaled the same way the network's throughput is, and against the
-          // same kind of learned ceiling: an NVMe and a spinning disk are two
-          // orders of magnitude apart and no fixed full-scale figure is right
-          // for both.
-          root.diskReadCeil = Math.max(root.diskRead, root.minDiskCeil,
-            root.diskReadCeil * root.slowDecay);
-          root.diskWriteCeil = Math.max(root.diskWrite, root.minDiskCeil,
-            root.diskWriteCeil * root.slowDecay);
-          root.diskReadHistory = root.push(root.diskReadHistory,
-            root.logLevel(root.diskRead, root.diskReadCeil));
-          root.diskWriteHistory = root.push(root.diskWriteHistory,
-            root.logLevel(root.diskWrite, root.diskWriteCeil));
-        } catch (e) {}
+    id: diskFind
+    command: ["sh", "-c",
+      "for d in /sys/block/*; do n=${d##*/}; case $n in loop*|zram*|ram*|dm-*|md*) continue;; esac; [ -r \"$d/stat\" ] && echo $n; done"]
+    stdout: StdioCollector {
+      id: diskFindOut
+      waitForEnd: true
+      onStreamFinished: {
+        const out = [];
+        const ls = String(diskFindOut.text).trim().split("\n");
+        for (let i = 0; i < ls.length; i++)
+          if (ls[i].trim() !== "") out.push(ls[i].trim());
+        root.diskDevs = out;
       }
     }
   }
+
+  Instantiator {
+    id: diskFiles
+    model: root.diskDevs
+    delegate: FileView {
+      required property var modelData
+      path: "/sys/block/" + modelData + "/stat"
+      blockLoading: true
+      printErrors: false
+    }
+  }
+
+  function pollDisk() {
+    let r = 0;
+    let w = 0;
+    for (let i = 0; i < diskFiles.count; i++) {
+      const f = diskFiles.objectAt(i);
+      if (!f) continue;
+      f.reload();
+      const n = String(f.text()).trim().split(/\s+/);
+      if (n.length < 8) continue;
+      // field 3 is sectors read and field 7 sectors written, and a sector is
+      // 512 bytes whatever the drive's own block size is — the kernel reports
+      // these in 512-byte units by definition.
+      r += parseInt(n[2], 10) || 0;
+      w += parseInt(n[6], 10) || 0;
+    }
+    const now = Date.now();
+    const prev = root.diskPrev;
+    root.diskPrev = { r: r, w: w, time: now };
+    if (!prev) return;
+    const dt = (now - prev.time) / 1000;
+    if (dt <= 0) return;
+    root.diskRead = Math.max(0, (r - prev.r) * 512 / dt);
+    root.diskWrite = Math.max(0, (w - prev.w) * 512 / dt);
+    root.diskReadCeil = Math.max(root.diskRead, root.minDiskCeil,
+      root.diskReadCeil * root.slowDecay);
+    root.diskWriteCeil = Math.max(root.diskWrite, root.minDiskCeil,
+      root.diskWriteCeil * root.slowDecay);
+    root.diskReadHistory = root.push(root.diskReadHistory,
+      root.logLevel(root.diskRead, root.diskReadCeil));
+    root.diskWriteHistory = root.push(root.diskWriteHistory,
+      root.logLevel(root.diskWrite, root.diskWriteCeil));
+  }
+
+  Timer {
+    interval: 30000
+    repeat: true
+    running: true
+    triggeredOnStart: true
+    onTriggered: if (!diskCapProc.running) diskCapProc.running = true
+  }
+
+  Process {
+    id: diskCapProc
+    command: ["df", "-P", "-B1", "/"]
+    stdout: StdioCollector {
+      id: diskCapOut
+      waitForEnd: true
+      onStreamFinished: {
+        const ls = String(diskCapOut.text).trim().split("\n");
+        if (ls.length < 2) return;
+        const f = ls[1].trim().split(/\s+/);
+        if (f.length < 5) return;
+        const total = parseInt(f[1], 10) || 0;
+        const used = parseInt(f[2], 10) || 0;
+        const avail = parseInt(f[3], 10) || 0;
+        const pct = parseInt(String(f[4]).replace("%", ""), 10) || 0;
+        root.diskTotal = total;
+        root.diskUsedBytes = used;
+        root.diskUsedPct = pct;
+        const gib = (b) => (b / 1073741824).toFixed(1);
+        root.diskTip = "Disk: / \u2014 " + gib(used) + " GiB used of "
+          + gib(total) + " GiB\nFree: " + gib(avail) + " GiB ("
+          + pct + "% used)";
+      }
+    }
+  }
+
+  // Stands in for the Process the tick used to start.
+  QtObject {
+    id: diskProc
+    property bool running: false
+    onRunningChanged: {
+      if (!diskProc.running) return;
+      root.pollDisk();
+      diskProc.running = false;
+    }
+  }
+
 
   readonly property real minDiskCeil: 32 * 1024 * 1024
   // per 1s sample — about a three minute half-life, same feel as the network's
@@ -282,15 +543,29 @@ Singleton {
     }
   }
 
-  // The one poller that is a long-running loop rather than a one-shot: at 4Hz
-  // the cost of spawning a shell per sample is more than the sample.
-  Process {
-    id: netDevProc
-    command: ["sh", "-c",
-      "while true; do cat /proc/net/dev; echo __END__; sleep 0.25; done"]
+  // ── FOUR TIMES A SECOND, WITHOUT A PROCESS ────────────────────────────
+  // This was a shell held open for the life of the session running
+  // `cat /proc/net/dev; sleep 0.25` forever — a fork and an exec every 250ms,
+  // eight processes a second, to read a 450-byte file. The comment above it
+  // argued that a loop was cheaper than spawning a shell per sample, which
+  // was true and beside the point: nothing has to be spawned at all.
+  //
+  // The sample rate and the parser are unchanged.
+  FileView {
+    id: netDevFile
+    path: "/proc/net/dev"
+    blockLoading: true
+    printErrors: false
+  }
+
+  Timer {
+    interval: 250
+    repeat: true
     running: true
-    stdout: SplitParser {
-      onRead: (line) => root.netDevLine(line)
+    onTriggered: {
+      netDevFile.reload();
+      root.netDevLines = String(netDevFile.text()).split("\n");
+      root.finalizeNetSample();
     }
   }
 
@@ -352,10 +627,19 @@ Singleton {
     running: true
     onTriggered: {
       if (!cpuProc.running) cpuProc.running = true;
-      if (!gpuProc.running) gpuProc.running = true;
       if (!memProc.running) memProc.running = true;
       if (!diskProc.running) diskProc.running = true;
     }
+  }
+
+  // ON ITS OWN CLOCK. The other three read files; this one spawns a process
+  // that talks to the driver, and it is the only poller left that does.
+  Timer {
+    interval: Oracle.sysmonGpuInterval
+    repeat: true
+    running: true
+    triggeredOnStart: true
+    onTriggered: if (!gpuProc.running) gpuProc.running = true
   }
 
   // the interface and address change far more rarely than the throughput does
@@ -369,6 +653,9 @@ Singleton {
   }
 
   Component.onCompleted: {
+    root.readCpuStatic();
+    cpuTempFind.running = true;
+    diskFind.running = true;
     cpuProc.running = true;
     gpuProc.running = true;
     memProc.running = true;

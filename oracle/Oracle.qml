@@ -337,6 +337,12 @@ Singleton {
   // samples, so this is the rate for both.
   property int sysmonInterval: 1000
   property int sysmonNetInterval: 3000
+  // ── THE GPU GETS ITS OWN RATE ──────────────────────────────────────────
+  // On an nvidia card the reading costs a whole nvidia-smi — 25-50ms of CPU,
+  // most of it initialising NVML again — which at the shared one-second rate
+  // was the single most expensive thing the bar did. Utilisation and
+  // temperature do not move fast enough to be worth that every second.
+  property int sysmonGpuInterval: 2000
   // how many samples the graphs keep. Two minutes at 1Hz.
   property int sysmonSpan: 120
   property int updateCheckMins: 60
@@ -662,6 +668,9 @@ Singleton {
     { key: "sysmonInterval", section: "system", label: "Sample rate", type: "int",
       min: 250, max: 5000, step: 250, unit: "ms",
       help: "How often CPU, GPU, memory and disk are read. The bar's meters and zeus' graphs share these samples." },
+    { key: "sysmonGpuInterval", section: "system", alias: "gpu nvidia poll rate sample", label: "GPU sample rate", type: "int",
+      min: 500, max: 10000, step: 250, unit: "ms",
+      help: "How often the GPU is asked. On nvidia each reading costs a full nvidia-smi, so this is deliberately slower than the rest." },
     { key: "sysmonNetInterval", section: "system", label: "Interface check", type: "int",
       min: 1000, max: 30000, step: 500, unit: "ms",
       help: "How often the network interface and address are re-read. Throughput is sampled at the rate above." },
