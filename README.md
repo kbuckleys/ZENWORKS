@@ -19,3 +19,21 @@ Notes
 - bandwhich needs a capability grant to read traffic without root: ```scripts/bandwhich-grant.sh``` does this via ```pkexec```
 - ```xdg-open``` means the suite inherits whatever handlers your system has. Those are not listed here and cannot be enumerated from the code
 - Remember to make the script files in ```/quickshell/scripts/``` executable
+
+Endpoints
+-
+| Component | Endpoint |
+| --- | --- |
+| Session Manager | qs ipc call Erebus toggle |
+| App Launcher / Shell Command | qs ipc call Cynosure toggle |
+| File Manager | qs ipc call Terminus spawn |
+| Clipboard Manager | qs ipc call Folio toggle |
+| Calculator | qs ipc call Metis toggle |
+| Recursive Search | qs ipc call Artemis toggle |
+| Emoji Search | qs ipc call Ideo emoji |
+| Glyph Search | qs ipc call Ideo nerd |
+| Bitwarden Vault | qs ipc call Calypso toggle |
+| System Monitor | qs ipc call Zeus toggle |
+| Dictionary | qs ipc call Lexi toggle |
+| Translator | qs ipc call Lexi translate |
+| Background Browser | qs ipc call Picasso toggle |
