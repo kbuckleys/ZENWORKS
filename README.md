@@ -11,7 +11,7 @@ A zen Arch-based ecosystem in Quickshell
 
 Dependencies
 -
-```quickshell``` ```qt6-declarative``` ```hyprland ttf-jetbrains-mono-nerd``` ```coreutils``` ```util-linux``` ```pciutils``` ```glib2``` ```systemd``` ```pam``` ```polkit``` ```libcap``` ```ripgrep``` ```fd``` ```bat``` ```imagemagick``` ```ffmpeg``` ```poppler``` ```libarchive``` ```7zip``` ```zip``` ```git``` ```udisks2``` ```wl-clipboard``` ```xdg-utils``` ```xdg-terminal-exec``` ```libnotify``` ```jq``` ```curl``` ```libpulse``` ```pamixer``` ```pipewire``` ```playerctl``` ```cliphist``` ```grim``` ```libqalculate``` ```rbw``` ```bandwhich``` ```qt6-imageformats``` ```kimageformats```
+```quickshell``` ```qt6-declarative``` ```hyprland``` ```ttf-jetbrains-mono-nerd``` ```coreutils``` ```util-linux``` ```pciutils``` ```glib2``` ```systemd``` ```pam``` ```polkit``` ```libcap``` ```ripgrep``` ```fd``` ```bat``` ```imagemagick``` ```ffmpeg``` ```poppler``` ```libarchive``` ```7zip``` ```zip``` ```git``` ```udisks2``` ```wl-clipboard``` ```xdg-utils``` ```xdg-terminal-exec``` ```libnotify``` ```jq``` ```curl``` ```libpulse``` ```pamixer``` ```pipewire``` ```playerctl``` ```cliphist``` ```grim``` ```libqalculate``` ```rbw``` ```bandwhich``` ```qt6-imageformats``` ```kimageformats```
 
 Notes
 -
