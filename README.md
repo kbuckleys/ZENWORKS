@@ -11,37 +11,11 @@ A zen Arch-based ecosystem in Quickshell
 
 Dependencies
 -
-- quickshell
-- ttf-jetbrains-mono-nerd
-- ttf-dseg
-- unicode-emoji
-- fd
-- fzf
-- ripgrep
-- bat
-- rsync
-- git
-- python
-- imagemagick
-- ffmpeg
-- poppler
-- p7zip
-- inotify-tools
-- udisks2
-- wl-clipboard
-- cliphist
-- wtype
-- grim
-- xdg-terminal-exec
-- playerctl
-- libpulse
-- libnotify
-- mpv
-- mpg123
-- libqalculate
-- rbw
-- bandwhich
-- solaar
-- waybar-updates
+```quickshell``` ```qt6-declarative``` ```hyprland ttf-jetbrains-mono-nerd``` ```coreutils``` ```util-linux``` ```pciutils``` ```glib2``` ```systemd``` ```pam``` ```polkit``` ```libcap``` ```ripgrep``` ```fd``` ```bat``` ```imagemagick``` ```ffmpeg``` ```poppler``` ```libarchive``` ```7zip``` ```zip``` ```git``` ```udisks2``` ```wl-clipboard``` ```xdg-utils``` ```xdg-terminal-exec``` ```libnotify``` ```jq``` ```curl``` ```libpulse``` ```pamixer``` ```pipewire``` ```playerctl``` ```cliphist``` ```grim``` ```libqalculate``` ```rbw``` ```bandwhich``` ```qt6-imageformats``` ```kimageformats```
 
-Remember to make the script files in ```/quickshell/scripts/``` executable
+Notes
+-
+- Qt reads its image-format plugin list ONCE PER PROCESS. After installing ```qt6-imageformats``` or ```kimageformats``` you must restart quickshell; a config reload is not enough
+- bandwhich needs a capability grant to read traffic without root: ```scripts/bandwhich-grant.sh``` does this via ```pkexec```
+- ```xdg-open``` means the suite inherits whatever handlers your system has. Those are not listed here and cannot be enumerated from the code
+- Remember to make the script files in ```/quickshell/scripts/``` executable
