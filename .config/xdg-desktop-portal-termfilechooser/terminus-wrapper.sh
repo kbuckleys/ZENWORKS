@@ -65,17 +65,35 @@ fi
 # a marker that nothing was ever going to write — holding the asking
 # application's file dialog open forever, so the next attempt to open one
 # appeared to do nothing at all. `picking=false` is a dialog that is gone.
+# THE MARKER IS CHECKED BEFORE THE VERDICT, AND AGAIN AFTER IT.
+#
+# The answer is written asynchronously: terminus stops "picking" and the marker
+# lands a few milliseconds later. This loop used to test the marker only in the
+# `while` condition — so after the sleep it asked terminus for its status FIRST,
+# saw picking=false, and cancelled a save that had just been confirmed. Both
+# things become true in the same instant, and the status check was tested first,
+# so it won almost every time: the portal log read 124 cancellations against 2
+# successes, and every one of those handed the application response code 2 —
+# not "the user cancelled" but "the dialog broke" — which is what made firefox
+# fall back to downloading into its own last-used folder on its own.
+#
+# So: look for the marker immediately after waking, and look once more after a
+# grace period before ever declaring a cancel.
 while [ ! -e "$out.done" ]; do
     sleep 0.1
+    [ -e "$out.done" ] && break
     if ! st=$(qs ipc call Terminus status 2>/dev/null); then
         say "terminus went away mid-pick; cancelling"
-        rm -f "$out.done"
         exit 0
     fi
     case "$st" in
         *picking=false*)
+            # A dialog that is gone has usually just answered. Give the write
+            # time to land rather than racing it, and never delete the marker —
+            # it is somebody else's in-flight answer.
+            sleep 0.3
+            [ -e "$out.done" ] && break
             say "picker closed without answering; cancelling"
-            rm -f "$out.done"
             exit 0
             ;;
     esac
