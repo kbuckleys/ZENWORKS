@@ -561,7 +561,14 @@ PanelWindow {
 
                 Text {
                   id: marksText
-                  anchors.fill: parent
+                  // LEFT AND RIGHT ONLY. `anchors.fill` took the height from
+                  // the row, and the row takes its height from this item's
+                  // implicitHeight — which Qt reports as a binding loop even
+                  // though the number settles, because the dependency really
+                  // is circular. Anchored across, the Text is its own
+                  // implicit height and the row simply matches it.
+                  anchors.left: parent.left
+                  anchors.right: parent.right
                   horizontalAlignment: Howler.textAlign
                   visible: !transport.visible
                   text: toast.marks

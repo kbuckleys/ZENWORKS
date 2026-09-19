@@ -451,6 +451,7 @@ Variants {
 
             // ── AND THE NOTE ITSELF ──────────────────────────────────
             Flickable {
+              id: bodyScroll
               anchors.top: head.bottom
               anchors.left: parent.left
               anchors.right: parent.right
@@ -480,7 +481,27 @@ Variants {
                 selectionColor: Qt.rgba(1, 1, 1, 0.25)
                 selectedTextColor: Zenon.white
                 font.family: Zenon.face
-                font.pixelSize: slot.note ? slot.note.size : 14
+                font.pixelSize: slot.note ? slot.note.size : Scribe.SIZES[1]
+
+                // A cursorDelegate REPLACES the built-in one, so there is
+                // exactly one caret and this decides how it behaves. It
+                // breathes, the way every other field on this desktop does —
+                // a hard on/off blink is the one thing here that still looked
+                // like a default.
+                cursorDelegate: Rectangle {
+                  width: 2
+                  color: Zenon.cyan
+                  SequentialAnimation on opacity {
+                    running: body.activeFocus
+                    loops: Animation.Infinite
+                    NumberAnimation {
+                      to: 0.2; duration: 620; easing.type: Easing.InOutQuad
+                    }
+                    NumberAnimation {
+                      to: 1.0; duration: 620; easing.type: Easing.InOutQuad
+                    }
+                  }
+                }
 
                 // Stored as the body's contents rather than as Qt's whole
                 // HTML document — see Scribe.fragment — and as nothing at
@@ -511,6 +532,18 @@ Variants {
                   wall.forceActiveFocus();
                 }
               }
+            }
+
+            // A SIBLING OF THE FLICKABLE, NEVER A CHILD OF IT. Inside, it
+            // becomes part of the scrolling content: it travels up with the
+            // text and its anchors resolve against the content item, whose
+            // height is the whole document — so the "thumb" was as long as
+            // the note and the whole thing read as one grey bar.
+            Scrollbar {
+              flick: bodyScroll
+              anchors.right: bodyScroll.right
+              anchors.top: bodyScroll.top
+              anchors.bottom: bodyScroll.bottom
             }
 
             // The placeholder, which is not the TextEdit's own: a rich-text

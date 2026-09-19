@@ -17,7 +17,22 @@ PanelWindow {
 
   WlrLayershell.layer: WlrLayer.Overlay
 
+  // Explicitly the whole surface when idle and explicitly nothing while
+  // dragging, rather than leaning on what an unset mask means — getting that
+  // backwards leaves the popup permanently click-through. closeArea already
+  // fills the window, so it IS the full-surface region.
+  mask: Region { item: popup.dragging ? null : closeArea }
+
   property bool shown: false
+  // ── DRAGGING ONE OF THESE SOMEWHERE ELSE ──────────────────────────────
+  // Artemis' arrangement, wholesale, because the problem is identical: a
+  // layer-shell popup that must let go of the pointer and of its own focus
+  // grab for as long as a drag is in flight, without cancelling the drag.
+  //
+  // Wayland's drag grab is separate from the surface input region, so
+  // dropping the region mid-drag does not cancel anything — it only decides
+  // who the drop resolves to, which has to be the application underneath.
+  property bool dragging: false
   property bool morphMode: false
   // 0..1, driven by shell.qml, which owns the crossfade schedule: 0 until the
   // pill's own row has finished clearing, then rising to 1 as the pill
@@ -27,10 +42,23 @@ PanelWindow {
   property real showFactor: 0
 
   property bool collapsing: false
-  readonly property real panelX: (popup.collapsing ? 0.985 + 0.015 * popup.showFactor
-                        : 0.94 + 0.06 * popup.showFactor)
-  readonly property real panelY: (popup.collapsing ? 0.82 + 0.18 * popup.showFactor
-                        : 0.90 + 0.10 * popup.showFactor)
+  // ── NO SCALE WHEN MORPHED, AND THAT IS THE POINT ────────────────────
+  // This briefly followed contentFade so the panel would grow as it faded,
+  // the way a detached one does. It looked wrong, and the capture showed
+  // why: detached, the panel is arriving out of nothing and 0.94 -> 1.0
+  // reads as arrival. Morphed, the container is ALREADY THERE — it is the
+  // pill — so the same scale is not an entrance, it is the text being
+  // stretched horizontally in place. Measured across the morph: the
+  // content spread outward over seven frames.
+  //
+  // So a morph is a straight crossfade inside a shape that is already
+  // right, and the scale belongs to the case that has something to scale
+  // from.
+  readonly property real growth: popup.showFactor
+  readonly property real panelX: (popup.collapsing ? 0.985 + 0.015 * popup.growth
+                        : 0.94 + 0.06 * popup.growth)
+  readonly property real panelY: (popup.collapsing ? 0.82 + 0.18 * popup.growth
+                        : 0.90 + 0.10 * popup.growth)
   // Morphed, the handover is timed off the PILL's progress, not this popup's
   // own showFactor: showFactor is OutCubic and front-loaded, so it crossed the
   // threshold ~25ms in and this layer's content faded up on top of a morpheus
@@ -150,7 +178,10 @@ PanelWindow {
   HyprlandFocusGrab {
     id: grab
     windows: [ popup ]
-    active: popup.shown
+    // Not while dragging: the pointer is over another application by design
+    // at that point, and closing here would destroy the row the drag is
+    // sourced from, mid-gesture.
+    active: popup.shown && !popup.dragging
     onCleared: {
       popup.log("grab cleared");
       popup.closePopup();
@@ -401,6 +432,102 @@ function onThumbsDone() {
     });
   }
 
+  // ── WHAT YOU ARE CARRYING, DRAWN BESIDE THE CURSOR ────────────────────
+  // Without it a drag out of here is an invisible one: the popup gets out of
+  // the way the moment the gesture starts, so between picking an entry up and
+  // dropping it there is nothing on screen saying which entry it was.
+  //
+  // Sized from the text and anchored rather than laid out, because
+  // grabToImage reads the width in the same tick the labels are filled in — a
+  // Row would not have set its own width yet and the first drag of a session
+  // would carry a card a few pixels wide.
+  property string dragLabel: ""
+  property string dragGlyph: ""
+  property color dragInk: Zenon.cyan
+  property var dragGrab: null
+
+  Item {
+    id: dragCard
+    opacity: 0
+    z: -100
+    x: -4000
+    height: 38
+
+    readonly property real pad: 12
+    width: dragCard.pad * 2 + dragCardGlyph.implicitWidth
+      + (popup.dragGlyph !== "" ? 8 : 0) + dragCardLabel.implicitWidth
+
+    Rectangle {
+      anchors.fill: parent
+      radius: 6
+      color: Zenon.layerBg
+      border.width: 1
+      border.color: Zenon.cyan
+    }
+
+    Text {
+      id: dragCardGlyph
+      anchors.left: parent.left
+      anchors.leftMargin: dragCard.pad
+      anchors.verticalCenter: parent.verticalCenter
+      text: popup.dragGlyph
+      color: popup.dragInk
+      font.family: Zenon.faceFixed
+      font.pixelSize: 16
+    }
+
+    Text {
+      id: dragCardLabel
+      anchors.left: dragCardGlyph.right
+      anchors.leftMargin: popup.dragGlyph !== "" ? 8 : 0
+      anchors.verticalCenter: parent.verticalCenter
+      text: popup.dragLabel
+      color: Zenon.white
+      font.family: Zenon.face
+      font.pixelSize: 15
+    }
+  }
+
+  // The picture is made BEFORE the drag is offered: Drag.imageSource is read
+  // when Drag.active turns true and grabToImage answers a frame later, so
+  // setting them the other way round makes every drag carry the previous
+  // one's picture.
+  function dragPicture(label, glyph, ink, then) {
+    popup.dragLabel = label;
+    popup.dragGlyph = glyph;
+    popup.dragInk = ink;
+    // A failed grab is not a reason to refuse the drag; it simply goes
+    // without a picture.
+    if (!dragCard.grabToImage(function(res) {
+          popup.dragGrab = res; then(res.url);
+        }))
+      then("");
+  }
+
+  // The original behind a thumbnail, written out so it can be handed over —
+  // see Folio.dragFileCommand. Asynchronous, like the grab above, so the
+  // drag is offered from the callback rather than before it.
+  property var dragThen: null
+  Process {
+    id: dragProc
+    stdout: StdioCollector {
+      id: dragOut
+      waitForEnd: true
+      onStreamFinished: {
+        const f = String(dragOut.text || "").trim();
+        const then = popup.dragThen;
+        popup.dragThen = null;
+        if (then) then(f);
+      }
+    }
+  }
+
+  function dragDecode(id, then) {
+    popup.dragThen = then;
+    dragProc.command = ["sh", "-c", Folio.dragFileCommand(id, Folio.openDir())];
+    dragProc.running = true;
+  }
+
   MouseArea {
     id: closeArea
     anchors.fill: parent
@@ -520,10 +647,47 @@ function onThumbsDone() {
             highlightMoveDuration: 120
 
             delegate: Item {
+              id: textRow
               required property var modelData
               required property int index
               width: textGrid.cellWidth
               height: textGrid.cellHeight
+
+              // The WHOLE entry, not the preview the cell shows — the preview
+              // is trimmed and marked up for reading in a narrow cell, and
+              // what the other application wants is what was copied.
+              //
+              // Drag.active is never bound: a binding starts the drag the
+              // instant the handler activates, which is a frame before
+              // grabToImage can answer, so the card would always be empty.
+              Drag.active: false
+              Drag.source: textRow
+              Drag.keys: ["text/plain"]
+              Drag.mimeData: ({ "text/plain": String(textRow.modelData.content || "") })
+              Drag.supportedActions: Qt.CopyAction
+              Drag.dragType: Drag.Automatic
+              Drag.hotSpot.x: 0
+              Drag.hotSpot.y: 0
+              Drag.onDragFinished: function(dropAction) {
+                textRow.Drag.active = false;
+                popup.dragging = false;
+                if (dropAction === Qt.CopyAction) popup.closePopup();
+              }
+
+              DragHandler {
+                target: null
+                onActiveChanged: {
+                  if (!active) return;
+                  // region first, so the surface is already transparent by
+                  // the time the drag is offered
+                  popup.dragging = true;
+                  popup.dragPicture(Folio.plain(textRow.modelData.preview),
+                                    "\uF0F6", Zenon.cyan, function(url) {
+                    textRow.Drag.imageSource = url;
+                    textRow.Drag.active = true;
+                  });
+                }
+              }
 
               Rectangle {
                 anchors.fill: parent
@@ -549,12 +713,30 @@ function onThumbsDone() {
 
               MouseArea {
                 anchors.fill: parent
-                onClicked: {
+                // ONE CLICK PICKS, TWO COMMIT. A single click used to paste
+                // and close, which cannot coexist with dragging an entry out
+                // — every drag begins with a press on the thing being
+                // dragged, and the release that ends it read as a click. It
+                // also made the most destructive gesture here the cheapest
+                // one: a mis-click pasted into whatever had focus.
+                onClicked: popup.sel = index
+                onDoubleClicked: {
                   popup.sel = index;
                   popup.confirm();
                 }
               }
             }
+          }
+
+          // A SIBLING OF THE VIEW, never a child of it — inside, it becomes
+          // part of the scrolling content: it travels with the cells and its
+          // anchors resolve against the content item, which is as tall as the
+          // whole list. It hides itself when everything fits.
+          Scrollbar {
+            flick: textGrid
+            anchors.right: textGrid.right
+            anchors.top: textGrid.top
+            anchors.bottom: textGrid.bottom
           }
         }
 
@@ -578,10 +760,49 @@ function onThumbsDone() {
             highlightMoveDuration: 120
 
             delegate: Item {
+              id: imgRow
               required property var modelData
               required property int index
               width: imgGrid.cellWidth
               height: imgGrid.cellHeight
+
+              // A FILE, and the real one rather than the thumbnail this cell
+              // is drawing — see Folio.dragFileCommand. The mime data cannot
+              // be written until that file exists, so unlike the text rows
+              // above it is filled in from the decode's callback.
+              Drag.active: false
+              Drag.source: imgRow
+              Drag.keys: ["text/uri-list"]
+              Drag.supportedActions: Qt.CopyAction
+              Drag.dragType: Drag.Automatic
+              Drag.hotSpot.x: width / 2
+              Drag.hotSpot.y: height / 2
+              Drag.onDragFinished: function(dropAction) {
+                imgRow.Drag.active = false;
+                popup.dragging = false;
+                if (dropAction === Qt.CopyAction) popup.closePopup();
+              }
+
+              DragHandler {
+                target: null
+                onActiveChanged: {
+                  if (!active) return;
+                  popup.dragging = true;
+                  popup.dragDecode(imgRow.modelData.id, function(file) {
+                    // Nothing decoded means nothing to carry: let go of the
+                    // surface again rather than offering an empty drag.
+                    if (file === "") { popup.dragging = false; return; }
+                    imgRow.Drag.mimeData = {
+                      "text/uri-list": "file://" + encodeURI(file) + "\r\n"
+                    };
+                    popup.dragPicture(Folio.baseName(file), "\uF03E",
+                                      Zenon.cyan, function(url) {
+                      imgRow.Drag.imageSource = url;
+                      imgRow.Drag.active = true;
+                    });
+                  });
+                }
+              }
 
               Rectangle {
                 anchors.fill: parent
@@ -606,12 +827,30 @@ function onThumbsDone() {
 
               MouseArea {
                 anchors.fill: parent
-                onClicked: {
+                // ONE CLICK PICKS, TWO COMMIT. A single click used to paste
+                // and close, which cannot coexist with dragging an entry out
+                // — every drag begins with a press on the thing being
+                // dragged, and the release that ends it read as a click. It
+                // also made the most destructive gesture here the cheapest
+                // one: a mis-click pasted into whatever had focus.
+                onClicked: popup.sel = index
+                onDoubleClicked: {
                   popup.sel = index;
                   popup.confirm();
                 }
               }
             }
+          }
+
+          // A SIBLING OF THE VIEW, never a child of it — inside, it becomes
+          // part of the scrolling content: it travels with the cells and its
+          // anchors resolve against the content item, which is as tall as the
+          // whole list. It hides itself when everything fits.
+          Scrollbar {
+            flick: imgGrid
+            anchors.right: imgGrid.right
+            anchors.top: imgGrid.top
+            anchors.bottom: imgGrid.bottom
           }
         }
       }
@@ -664,6 +903,21 @@ function onThumbsDone() {
 
     TextInput {
       id: filter
+
+      // A cursorDelegate REPLACES the built-in one, so there is exactly
+      // one caret and this decides how it behaves. It breathes, the way
+      // every other field on this desktop does — a hard on/off blink
+      // was the last thing here still wearing Qt's default.
+      cursorDelegate: Rectangle {
+        width: 2
+        color: Zenon.cyan
+        SequentialAnimation on opacity {
+          running: filter.activeFocus
+          loops: Animation.Infinite
+          NumberAnimation { to: 0.2; duration: 620; easing.type: Easing.InOutQuad }
+          NumberAnimation { to: 1.0; duration: 620; easing.type: Easing.InOutQuad }
+        }
+      }
       width: 1
       height: 1
       x: -1

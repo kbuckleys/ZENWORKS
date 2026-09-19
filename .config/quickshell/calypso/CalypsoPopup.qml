@@ -26,10 +26,23 @@ PanelWindow {
   property real morphFade: 1
   property real showFactor: 0
   property bool collapsing: false
-  readonly property real panelX: (popup.collapsing ? 0.985 + 0.015 * popup.showFactor
-                        : 0.94 + 0.06 * popup.showFactor)
-  readonly property real panelY: (popup.collapsing ? 0.82 + 0.18 * popup.showFactor
-                        : 0.90 + 0.10 * popup.showFactor)
+  // ── NO SCALE WHEN MORPHED, AND THAT IS THE POINT ────────────────────
+  // This briefly followed contentFade so the panel would grow as it faded,
+  // the way a detached one does. It looked wrong, and the capture showed
+  // why: detached, the panel is arriving out of nothing and 0.94 -> 1.0
+  // reads as arrival. Morphed, the container is ALREADY THERE — it is the
+  // pill — so the same scale is not an entrance, it is the text being
+  // stretched horizontally in place. Measured across the morph: the
+  // content spread outward over seven frames.
+  //
+  // So a morph is a straight crossfade inside a shape that is already
+  // right, and the scale belongs to the case that has something to scale
+  // from.
+  readonly property real growth: popup.showFactor
+  readonly property real panelX: (popup.collapsing ? 0.985 + 0.015 * popup.growth
+                        : 0.94 + 0.06 * popup.growth)
+  readonly property real panelY: (popup.collapsing ? 0.82 + 0.18 * popup.growth
+                        : 0.90 + 0.10 * popup.growth)
   // Morphed, the handover is timed off the PILL's progress, not this popup's
   // own showFactor: showFactor is OutCubic and front-loaded, so it crossed the
   // threshold ~25ms in and this layer's content faded up on top of a morpheus

@@ -95,6 +95,45 @@ function deleteCommand(id, dir) {
       Strings.shellQuote(dir + "/" + id + ".png");
 }
 
+// The preview is rich text — it is drawn with Text.RichText so a match can be
+// marked — and a drag card is a plain label. Tags stripped and entities put
+// back, then trimmed to something that reads at a glance beside a moving
+// cursor rather than a paragraph trailing off the screen.
+function plain(s) {
+  var t = String(s || "").replace(/<[^>]*>/g, "");
+  t = t.replace(/&lt;/g, "<").replace(/&gt;/g, ">")
+       .replace(/&quot;/g, '"').replace(/&#39;/g, "'")
+       .replace(/&amp;/g, "&");
+  t = t.replace(/\s+/g, " ").trim();
+  return t.length > 48 ? t.slice(0, 47) + "\u2026" : t;
+}
+
+// The file's own name, for the same card.
+function baseName(p) {
+  var s = String(p || "");
+  var cut = s.lastIndexOf("/");
+  return cut < 0 ? s : s.slice(cut + 1);
+}
+
+// THE FULL IMAGE, WRITTEN OUT SO IT CAN BE DRAGGED SOMEWHERE.
+//
+// The grid draws thumbnails — small PNGs this module renders for itself — and
+// handing one of those to another application would be giving it a downscaled
+// copy of what it asked for. cliphist still holds the original, so a drag
+// decodes it the same way opening one does, and prints where it landed.
+//
+// Same directory and the same half-hour sweep as openCommand: a dragged image
+// is a file somebody else now owns a copy of, and leaving ours behind forever
+// would make a cache out of every drag.
+function dragFileCommand(id, dir) {
+  const file = dir + "/" + id + ".png";
+  return "mkdir -p " + Strings.shellQuote(dir) + "; find " + Strings.shellQuote(dir) +
+      " -type f -name '*.png' -mmin +30 -delete 2>/dev/null; printf '%s' " +
+      Strings.shellQuote(id) + " | cliphist decode > " + Strings.shellQuote(file) +
+      "; [ -s " + Strings.shellQuote(file) + " ] && printf '%s' " +
+      Strings.shellQuote(file);
+}
+
 function openCommand(id, dir) {
   const file = dir + "/" + id + ".png";
   return "mkdir -p " + Strings.shellQuote(dir) + "; find " + Strings.shellQuote(dir) +

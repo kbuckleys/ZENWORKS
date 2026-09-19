@@ -16,7 +16,26 @@ var HUES = ["sand", "yellow", "green", "cyan", "blue", "magenta", "pink"];
 
 // The sizes a note's text can be, smallest first. A stepper rather than a
 // number: there is no note that wants 15px in particular.
-var SIZES = [12, 14, 17, 21];
+//
+// Each step went up by 2 — the old set started small enough that the smallest
+// was hard to read at arm's length on a 1440p panel.
+var SIZES = [14, 16, 19, 23];
+
+// The step a new note starts on, named rather than written as a number in
+// three places. Second from the smallest, which is where 14 used to sit.
+var DEFAULT_SIZE = SIZES[1];
+
+// A NOTE WRITTEN BEFORE THE SIZES MOVED still says 12, 17 or 21, none of
+// which are steps any more — and an unrecognised size falls back to the
+// default, which would have quietly re-sized most of the wall on first load.
+// Every old step maps onto a new one by the same 2 the whole set moved, so
+// the note keeps the size it was written at rather than the number.
+function migrateSize(v) {
+  var n = Number(v);
+  if (SIZES.indexOf(n) >= 0) return n;
+  if (SIZES.indexOf(n + 2) >= 0) return n + 2;
+  return DEFAULT_SIZE;
+}
 
 var MIN_W = 180;
 var MIN_H = 140;
@@ -41,7 +60,7 @@ function blank(id, x, y, hue) {
     y: Math.round(Number(y) || 0),
     w: 260,
     h: 220,
-    size: 14,
+    size: DEFAULT_SIZE,
     // WHICH ONE IS IN FRONT, as a number rather than as a position in the
     // list. Raising by reordering would renumber every note's index, and the
     // board addresses a note BY index — so the one you clicked would hand its
@@ -60,7 +79,7 @@ function sane(n, id) {
     y: Math.round(clamp(n.y, -MAX_H, 100000)),
     w: Math.round(clamp(n.w, MIN_W, MAX_W)),
     h: Math.round(clamp(n.h, MIN_H, MAX_H)),
-    size: SIZES.indexOf(Number(n.size)) >= 0 ? Number(n.size) : 14,
+    size: migrateSize(n.size),
     z: Math.round(Number(n.z) || 0)
   };
 }

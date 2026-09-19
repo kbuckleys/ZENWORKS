@@ -139,16 +139,24 @@ Item {
     // — the note IS the panel.
     out.push({ id: "note", text: "New note", icon: "\uF24A",
                cmd: "qs ipc call Clio add" });
-    out.push(
+    return out;
+  }
+
+  // ── AND THE TWO THAT ARE ABOUT THE SHELL ITSELF ───────────────────────
+  // Set background and New note act on the desktop in front of you, so they
+  // stay out on the root menu where a click reaches them. These two act on
+  // the shell drawing that desktop — one opens its settings, the other
+  // throws it away and starts it again — and that is a different subject
+  // and a heavier one. Behind a door, where a mis-click cannot reach them.
+  readonly property var shellOnlyEntries: [
     { id: "settings", text: "Settings", icon: "\uF013",
       cmd: "qs ipc call Oracle toggle" },
     // `qs kill` before `qs -d`, in that order, in a shell that has already
     // been detached — so the replacement is never a child of the instance it
     // replaces.
     { id: "restart", text: "Restart Shell", icon: "\uF01E",
-      cmd: "qs kill; sleep 0.4; qs -d" });
-    return out;
-  }
+      cmd: "qs kill; sleep 0.4; qs -d" }
+  ]
 
   property var sessionEntries: [
     { id: "lockscreen", text: "Lock",  icon: "\uF023", cmd: "sleep 0.35 && qs ipc call Cerberus lock", confirm: false },
@@ -252,10 +260,14 @@ Item {
                   kind: "shellcmd", cmd: e.cmd,
                   isSeparator: false, enabled: true });
     }
-    // A RULE OF ITS OWN. Everything above is about this desktop and this
-    // shell; below is ending the session the whole lot is running in, and
-    // the two do not belong in one run of rows.
+    // A RULE OF ITS OWN. Everything above acts on this desktop — open a
+    // thing, set a background, write a note. Below are the two subjects that
+    // are about the machinery instead: the shell drawing the desktop, and
+    // the session the whole lot runs in.
     sep();
+    // The shell's own pair, behind their own door — see shellOnlyEntries.
+    rows.push({ text: "Shell", icon: "\uF120", hasChildren: true,
+                kind: "shell", isSeparator: false, enabled: true });
     rows.push({ text: "Session", icon: "\uF2C0", hasChildren: true,
                 kind: "session", isSeparator: false, enabled: true });
     return rows;
@@ -401,9 +413,8 @@ Item {
     else if (m.kind === "shell")  root.childMenu = "shell";
     else if (m.kind === "recent") root.childMenu = "recent";
     else if (m.kind === "terminus") {
-      // where the menu was opened, which is the directory the desktop is
-      // showing rather than a blind fallback to home
-      root.openInTerminus(root.cwd);
+      // Reveal, not navigate — see revealTerminus.
+      root.revealTerminus();
       root.closeAll();
     }
   }
@@ -448,6 +459,23 @@ Item {
   // for a file manager while looking at one means you want another, not that
   // one navigated out from under you. `windows` reports each window's state,
   // so the shell picks between the two verbs.
+  // ── WHAT SUPER+E DOES, AND NOTHING ELSE ──────────────────────────────
+  // The Files entry used to hand Terminus the desktop's current directory.
+  // That is a destination, so the window always arrived somewhere instead
+  // of coming back where you left it — and openInTerminus spawns a second
+  // window when one is already up, so "Files" kept making new ones.
+  //
+  // SUPER+E sends no path at all, and the manager treats that as a reveal
+  // rather than a navigation: a hidden window is still where it was. This
+  // is the same call, so the two entry points cannot drift.
+  //
+  // openInTerminus below keeps taking a path, because its other callers —
+  // the trash, and a directory you picked out of the browser — are asking
+  // for somewhere specific.
+  function revealTerminus() {
+    root.execCmd("qs ipc call Terminus spawn ''");
+  }
+
   function openInTerminus(where) {
     const q = Strings.shellQuote(where);
     root.execCmd(
@@ -1161,9 +1189,14 @@ Item {
                     height: 16
                     visible: (modelData.isDir || false) && !modelData.isParent
                     text: "\uF054"
-                    color: Zenon.muted
+                    // White, like the label it belongs to. Muted put it a
+                    // shade below the row it is part of, which read as though
+                    // the arrow were disabled rather than as punctuation.
+                    color: Zenon.white
                     font.family: Zenon.face
-                    font.pixelSize: 15
+                    // The label beside it is 16. An arrow a point smaller sat
+                    // slightly below the line of the text it belongs to.
+                    font.pixelSize: 16
                     verticalAlignment: Text.AlignVCenter
                     horizontalAlignment: Text.AlignHCenter
                   }
@@ -1278,7 +1311,7 @@ Item {
   CardMenu {
     id: shellMenu
     screen: root.screen
-    model: root.shellEntries
+    model: root.shellOnlyEntries
     cardWidth: 200
     open: root.shown && root.childMenu === "shell"
 
@@ -1295,7 +1328,7 @@ Item {
                     + Zenon.menuShadowPad)
 
     onChosen: index => {
-      const e = root.shellEntries[index];
+      const e = root.shellOnlyEntries[index];
       if (!e) return;
       root.execCmd(e.cmd);
       root.closeAll();
