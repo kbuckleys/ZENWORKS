@@ -30,12 +30,17 @@ import QtQuick.Window
 import Quickshell
 import Quickshell.Io
 import Quickshell.Widgets
+import Quickshell.Wayland
+import Quickshell.Hyprland
 import QtQuick.Effects
+import QtMultimedia
 import "../morpheus"
 import "../picasso"
 import "terminus.js" as Terminus
 import "../morpheus/icons.js" as Icons
 import "../morpheus/thumbs.js" as Thumbs
+import "tags.js" as Tags
+import "collections.js" as Coll
 
 FloatingWindow {
   id: root
@@ -107,8 +112,9 @@ FloatingWindow {
             : root.viewMode === "columns" ? root.midCol.view : root.actList;
     const it = v ? v.itemAtIndex(root.sel) : null;
     // From the row's bottom-left, so the card drops out of the row the way a
-    // menu drops out of the thing it belongs to. menuCard clamps itself inside
-    // the window, so a row near the bottom pulls it back up on its own.
+    // menu drops out of the thing it belongs to. A row near the bottom needs
+    // no special handling here: the card is on a popup surface now, and the
+    // compositor flips it above the pointer when there is no room below.
     if (it) menu.openAt(it, { x: 0, y: it.height });
     // A row the view still has not built — it can refuse even after
     // positionSel if the listing changed underneath. The menu is about the
@@ -508,8 +514,32 @@ FloatingWindow {
   readonly property bool applyingDirView: root.applyDepth > 0
 
   function rememberView() {
+    // ── A RESULTS PAGE IS NOT A DIRECTORY ──────────────────────────────
+    // cwd is still wherever you were standing when you opened a collection
+    // or a tag, so every one of these writes was landing on THAT folder's
+    // remembered view. Switching a collection to grid quietly rearranged
+    // the directory you had left, and you found out the next time you
+    // walked into it.
+    //
+    // A collection keeps its own instead — it is a list you made, and how
+    // you want it read is a fact about it. A tag page and a plain search
+    // keep nothing: there is no record to hang it on, and guessing at one
+    // is how this went wrong in the first place.
+    if (root.searchMode !== "") {
+      if (root.applyingDirView || root.applyDepth > 0) return;
+      if (root.searchMode === "collection" && root.collOpenId >= 0)
+        root.rememberCollectionView();
+      else if (root.searchMode === "tag")
+        root.rememberTagView();
+      // find and grep keep nothing: a search is typed once and gone, and
+      // there is no record to hang a preference on.
+      return;
+    }
     if (!root.perDirView) return;
-    if (root.applyingDirView || root.cwd === "" || root.picking) return;
+    // isPicker as well as picking — a dialog must not teach this machine how
+    // any directory wants to be sorted. See isPicker for why both.
+    if (root.applyingDirView || root.cwd === ""
+        || root.picking || root.isPicker) return;
     const m = root.dirViews;
     const o = root.dirViewOrder.slice();
     if (m[root.cwd] === undefined) o.push(root.cwd);
@@ -1349,7 +1379,41 @@ FloatingWindow {
         root.thumbOrder = o;
       }
     }
-    onExited: root.thumbJobs = []
+    // ── AND THE NEXT BATCH, IF THERE IS ONE ──────────────────────────
+    // See thumbBatch for why a directory of pictures arrives in pieces.
+    onExited: {
+      root.thumbJobs = [];
+      if (root.thumbQueue.length > 0) Qt.callLater(root.runThumbBatch);
+    }
+  }
+
+  // ── HOW MANY PATHS FIT IN ONE COMMAND ────────────────────────────────
+  // The whole job list is interpolated into a single `sh -c` argument, and
+  // Linux caps one argument at MAX_ARG_STRLEN — 128KB. A wallpapers folder
+  // went over it: the command came to 178KB and the kernel refused to exec
+  // it, which Qt reports as "Process failed to start, likely because the
+  // binary could not be found". Nothing was missing; the argument was too
+  // long. Every thumbnail in that directory silently failed and the grid
+  // sat on its glyphs.
+  //
+  // This is the same trap statArgv carries a note about, met from the other
+  // side — there the fix was to stop using a shell string at all, and here
+  // the shell is doing real work, so the list is cut into pieces instead.
+  // 150 paths is comfortably inside the cap even for very long ones, and it
+  // has a second benefit: the thumbnails appear in waves rather than all at
+  // the end of one long run.
+  readonly property int thumbBatch: 150
+  property var thumbQueue: []
+
+  function runThumbBatch() {
+    if (thumbProc.running) { thumbRetry.restart(); return; }
+    const q = root.thumbQueue;
+    if (q.length === 0) return;
+    const batch = q.slice(0, root.thumbBatch);
+    root.thumbQueue = q.slice(root.thumbBatch);
+    root.thumbJobs = batch;
+    thumbProc.command = ["sh", "-c", Thumbs.generate(batch)];
+    thumbProc.running = true;
   }
 
   function makeThumbs() {
@@ -1378,9 +1442,10 @@ FloatingWindow {
       jobs.push({ src: r.path, kind: kind });
     }
     if (jobs.length === 0) return;
-    root.thumbJobs = jobs;
-    thumbProc.command = ["sh", "-c", Thumbs.generate(jobs)];
-    thumbProc.running = true;
+    // Queued rather than run: the list may be longer than one command can
+    // carry — see thumbBatch.
+    root.thumbQueue = jobs;
+    root.runThumbBatch();
   }
 
   // ── searching ───────────────────────────────────────────────────────────
@@ -1412,11 +1477,24 @@ FloatingWindow {
 
   Process {
     id: statProc
+    // Which paths this run was asked about, so a reply can be compared
+    // against the question. Only the tag pages read it.
+    property var askedFor: []
     stdout: StdioCollector {
       id: statOut
       waitForEnd: true
       onStreamFinished: {
-        root.act.raw = root.enrich(Terminus.parseStat(statOut.text));
+        const rows = root.enrich(Terminus.parseStat(statOut.text));
+        // THE INDEX LEARNS FROM ITS OWN MISSES. A tagged file deleted or
+        // moved by something that is not terminus leaves an entry behind,
+        // and that entry is not harmless: it inflates the sidebar's count
+        // and it is a row that cannot be opened. `find` has just told us
+        // which of the paths we asked about still exist, so the ones it
+        // did not answer for are gone — and this is the one moment we know
+        // that for certain without going and looking.
+        if (root.searchMode === "tag" || root.searchMode === "collection")
+          root.pruneTagIndex(statProc.askedFor, rows);
+        root.act.raw = rows;
         root.act.sel = 0;
         root.status = root.rows.length + " matches";
         Qt.callLater(root.positionSel);
@@ -1438,6 +1516,8 @@ FloatingWindow {
       const r = root.currentRow();
       root.searchBackCwd = root.cwd;
       root.searchBackSel = r ? r.path : "";
+      root.searchBackView = { view: root.viewMode, zoom: root.zoom,
+                              thumbZoom: root.act.zoom };
     }
     root.searchMode = mode;
     root.searchQuery = query;
@@ -1449,18 +1529,331 @@ FloatingWindow {
     searchProc.running = true;
   }
 
+  // ── collections ───────────────────────────────────────────────────
+  // A saved QUESTION — see collections.js. What lives here is the list of
+  // and the machinery to run one; the compiler is over there.
+  property var collections: []
+
+  FileView {
+    id: collFile
+    path: Quickshell.statePath("terminus-collections.json")
+    blockLoading: true
+    printErrors: false
+    watchChanges: true
+    onFileChanged: collFile.reload()
+    onTextChanged: root.loadCollections()
+  }
+
+  // What the file said last time we looked. Compared BEFORE anything is
+  // assigned, because assigning `collections` rebuilds every sidebar row
+  // under it — and the rows are where the cursor lives.
+  property string collRaw: ""
+
+  function loadCollections() {
+    const txt = String(collFile.text() || "");
+    // ── A WRITE THAT CHANGES NOTHING IS NOT NEWS ──────────────────────
+    // Every save comes back round through onTextChanged, and reassigning
+    // the array from it rebuilt the whole Repeater. Opening one
+    // collection did that TWENTY times, measured — each rebuild destroyed
+    // the row holding the sidebar cursor and built a new one, so the
+    // highlight flickered off and only settled a second or two later.
+    // That is what "clicking it does not highlight it" was.
+    if (txt === root.collRaw) return;
+    root.collRaw = txt;
+    try {
+      const o = JSON.parse(txt || "[]");
+      root.collections = Array.isArray(o) ? o : [];
+    } catch (e) {
+      root.collections = [];
+    }
+  }
+
+  // Same re-read-before-write discipline the bookmarks and the tags use,
+  // and for the same reason: a second window may have added one.
+  function editCollections(mutate) {
+    collFile.reload();
+    collFile.waitForJob();
+    let list;
+    try {
+      const o = JSON.parse(String(collFile.text() || "") || "[]");
+      list = Array.isArray(o) ? o : [];
+    } catch (e) { list = []; }
+    mutate(list);
+    root.collections = list;
+    collFile.setText(JSON.stringify(list));
+  }
+
+  // Written straight onto the record rather than into a side table: a
+  // collection is already a thing with a name and rules saved on disk, and
+  // how it is read belongs with them.
+  // ── THE VIEW, AND ONLY THE VIEW ───────────────────────────────────────
+  // Zoom used to be stored here too, and it could not be: the grid's zoom
+  // is fitted to the pane, so applying a stored value produces a slightly
+  // DIFFERENT actual value, which then reads as a change worth saving.
+  // Measured converging one write at a time — 1.15026, 1.15227, 1.15392,
+  // 1.15524 — and every one of those writes reloaded the file and rebuilt
+  // every sidebar row underneath it, which is why the cursor took a second
+  // to land on the row you had just clicked.
+  //
+  // A collection is a place with a shape, not a magnification. The pane's
+  // zoom belongs to the pane and the directory records already keep it.
+  function rememberCollectionView() {
+    const f = root.collById(root.collOpenId);
+    if (!f || f.view === root.viewMode) return;
+    root.editCollections((list) => {
+      for (let i = 0; i < list.length; ++i)
+        if (list[i].id === root.collOpenId) { list[i].view = root.viewMode; return; }
+    });
+  }
+
+  // As a collection does — see rememberCollectionView. A tag page is a
+  // listing you return to, and how you want it read is a fact about the
+  // tag rather than about wherever you happened to be standing when you
+  // opened it.
+  function rememberTagView() {
+    const name = root.openTagName;
+    if (name === "") return;
+    const cur = root.tagViews[name];
+    if (cur && cur.view === root.viewMode) return;
+    root.editTags((st) => {
+      if (!st.views) st.views = ({});
+      st.views[name] = { view: root.viewMode };
+    });
+  }
+
+  // ── A TAG PAGE IS ITS OWN PLACE ───────────────────────────────────────
+  // ALWAYS applied, never skipped. Returning early when a tag had no
+  // stored view left the pane in whatever the last directory was using,
+  // which is the opposite of what a separate place means: opening a tag
+  // from a folder in grid gave you a grid, from a folder in columns gave
+  // you columns, and the tag itself never had a view of its own at all.
+  //
+  // With nothing recorded it takes the default and WRITES IT, so from then
+  // on the tag has an opinion of its own that nothing else can move.
+  function applyTagView(name) {
+    const v = root.tagViews[name];
+    const want = (v && v.view && root.viewRing.indexOf(v.view) >= 0)
+      ? v.view : Tags.DEFAULT_VIEW;
+    root.applyDepth++;
+    root.act.viewMode = want;
+    Qt.callLater(() => { root.applyDepth = Math.max(0, root.applyDepth - 1); });
+    if (!v) root.editTags((st) => {
+      if (!st.views) st.views = ({});
+      st.views[name] = { view: want };
+    });
+  }
+
+  // ── AND SO IS A COLLECTION ────────────────────────────────────────────
+  // Same rule as applyTagView, same reason: a view is applied every time,
+  // whether or not one was stored, because "no opinion yet" must not mean
+  // "use the last directory's". A collection that has never been arranged
+  // takes the default and records it.
+  function applyCollectionView(f) {
+    if (!f) return;
+    const want = (f.view && root.viewRing.indexOf(f.view) >= 0)
+      ? f.view : Coll.DEFAULT_VIEW;
+    // Under the same guard the directory views use, so applying one does
+    // not immediately read as a change worth remembering.
+    root.applyDepth++;
+    root.act.viewMode = want;
+    Qt.callLater(() => { root.applyDepth = Math.max(0, root.applyDepth - 1); });
+    if (!f.view) root.editCollections((list) => {
+      for (let i = 0; i < list.length; ++i)
+        if (list[i].id === f.id) { list[i].view = want; return; }
+    });
+  }
+
+  function collById(id) {
+    for (let i = 0; i < root.collections.length; ++i)
+      if (root.collections[i].id === id) return root.collections[i];
+    return null;
+  }
+
+  function saveCollection(folder) {
+    root.editCollections((list) => {
+      for (let i = 0; i < list.length; ++i)
+        if (list[i].id === folder.id) { list[i] = folder; return; }
+      list.push(folder);
+    });
+  }
+
+  function dropCollection(id) {
+    root.editCollections((list) => {
+      for (let i = list.length - 1; i >= 0; --i)
+        if (list[i].id === id) list.splice(i, 1);
+    });
+  }
+
+  // ── running one ───────────────────────────────────────────────────────
+  // setsid, so the whole pipeline gets a process group of its own and
+  // cancelling it takes fd, rg and xargs down together. Signalling the
+  // Process alone would reach the shell and leave rg running over a home
+  // directory, which is the one query here expensive enough to matter.
+  Process {
+    id: collProc
+    property var folder: null
+    stdout: StdioCollector {
+      id: collOut
+      waitForEnd: true
+      onStreamFinished: {
+        const f = collProc.folder;
+        if (!f) return;
+        let paths = String(collOut.text || "").split("\u0000")
+          .filter((p) => p !== "");
+        paths = Coll.applyTags(f, paths, root.tagMarks);
+        root.finishCollection(paths);
+      }
+    }
+  }
+
+  function finishCollection(paths) {
+    if (paths.length === 0) {
+      root.act.raw = [];
+      root.status = "nothing matches";
+      return;
+    }
+    statProc.askedFor = paths;
+    statProc.command = Terminus.statArgv(paths);
+    statProc.running = true;
+  }
+
+  // ── var, NOT int, AND THAT IS NOT A STYLE CHOICE ──────────────────────
+  // A collection's id comes from Date.now(), which is thirteen digits.
+  // QML's `int` is 32-bit, so 1789823955681 was silently truncated to
+  // -1177406751 on the way into this property — and collById then matched
+  // nothing at all.
+  //
+  // Everything downstream failed quietly because of it: the view a
+  // collection was set to was never saved (rememberCollectionView looks
+  // the collection up by this id and gave up), and the sidebar row never
+  // lit, because `collOpenId === modelData.id` compared a truncated number
+  // with a whole one. Both looked like separate bugs in the view code.
+  property var collOpenId: -1
+
+  function openCollection(id) {
+    const f = root.collById(id);
+    if (!f) return;
+    if (root.searchMode === "") {
+      const r = root.currentRow();
+      root.searchBackCwd = root.cwd;
+      root.searchBackSel = r ? r.path : "";
+      root.searchBackView = { view: root.viewMode, zoom: root.zoom,
+                              thumbZoom: root.act.zoom };
+    }
+    root.searchMode = "collection";
+    root.searchQuery = f.name;
+    root.collOpenId = id;
+    root.act.raw = [];
+    root.applyCollectionView(f);
+
+    // A folder that asks only about tags is answered from the index, with
+    // no process at all — the same shortcut openTag takes.
+    if (Coll.tagsOnly(f)) {
+      root.status = "\u2026";
+      root.finishCollection(Coll.applyTags(f, Coll.allTagged(root.tagMarks),
+                                       root.tagMarks));
+      return;
+    }
+
+    const cmd = Coll.command(f, Paths.home());
+    if (cmd === "") { root.status = "no rules yet"; return; }
+    root.status = "searching\u2026";
+    collProc.folder = f;
+    collProc.running = false;
+    collProc.command = ["setsid", "sh", "-c", cmd];
+    collProc.running = true;
+  }
+
+  // Escape while one is still running. A content query over a large tree is
+  // seconds of rg, and a page you have already decided against must not go
+  // on costing.
+  function cancelCollection() {
+    if (!collProc.running) return;
+    const pid = collProc.processId;
+    if (pid > 0)
+      Quickshell.execDetached(["sh", "-c", "kill -TERM -" + pid + " 2>/dev/null"]);
+    collProc.running = false;
+    collProc.folder = null;
+  }
+
+  // ── A TAG, BROWSED ────────────────────────────────────────────────────
+  // A fourth searchMode rather than a view of its own, because that is
+  // exactly what it is: a set of paths from all over the tree, shown with
+  // the WHERE column, not sorted, and left alone by the directory watcher.
+  // Everything that already knows how to be a result page knows how to be
+  // this one.
+  //
+  // And it needs no process. `find` and `rg` have to go and look; the index
+  // already holds the answer, so this goes straight to the stat stage the
+  // other two reach after their search has come back.
+  function openTag(name) {
+    if (name === "") return;
+    if (root.searchMode === "") {
+      const r = root.currentRow();
+      root.searchBackCwd = root.cwd;
+      root.searchBackSel = r ? r.path : "";
+      root.searchBackView = { view: root.viewMode, zoom: root.zoom,
+                              thumbZoom: root.act.zoom };
+    }
+    root.searchMode = "tag";
+    root.searchQuery = name;
+    root.act.raw = [];
+    root.applyTagView(name);
+    const paths = Tags.pathsWith(root.tagMarks, name);
+    if (paths.length === 0) {
+      root.status = "nothing tagged " + name;
+      return;
+    }
+    root.status = "\u2026";
+    statProc.askedFor = paths;
+    statProc.command = Terminus.statArgv(paths);
+    statProc.running = true;
+  }
+
+  // Which tag is being browsed, for the sidebar to light its own row with.
+  readonly property string openTagName:
+    root.searchMode === "tag" ? root.searchQuery : ""
+
   property string searchBackCwd: ""
   property string searchBackSel: ""
+  // ── AND HOW THE PANE WAS ARRANGED BEFORE THE RESULTS ─────────────────
+  // A collection and a tag each carry their own view now, and applying one
+  // changes the PANE — which is the same pane the directory underneath was
+  // being read in. Leaving the results left the pane in the collection's
+  // arrangement, so a folder you had in columns came back as a grid, and
+  // the next thing that wrote a directory record wrote that down.
+  //
+  // So the arrangement is put back with the cwd and the cursor, which are
+  // the other two things a results page borrows and has to return.
+  property var searchBackView: null
 
   function clearSearch() {
     if (root.searchMode === "") return;
+    // A collection may still be out there running rg. Leaving the page is
+    // exactly when it stops being worth anything.
+    root.cancelCollection();
+    root.collOpenId = -1;
     root.searchMode = "";
     root.searchQuery = "";
     const backCwd = root.searchBackCwd;
     const backSel = root.searchBackSel;
+    const backView = root.searchBackView;
     root.searchBackCwd = "";
     root.searchBackSel = "";
+    root.searchBackView = null;
     if (backSel !== "") root.wantSel = backSel;
+    // Under applyDepth, so putting the pane back the way it was is not
+    // itself read as a change worth remembering against the directory.
+    if (backView) {
+      root.applyDepth++;
+      if (backView.view && root.viewRing.indexOf(backView.view) >= 0)
+        root.act.viewMode = backView.view;
+      const z = Number(backView.zoom);
+      if (!isNaN(z) && z > 0) root.zoom = root.zoomClamp(z);
+      const tz = Number(backView.thumbZoom);
+      if (!isNaN(tz) && tz > 0) root.act.zoom = root.zoomClamp(tz);
+      Qt.callLater(() => { root.applyDepth = Math.max(0, root.applyDepth - 1); });
+    }
     // THE STALE-LISTING GUARD HAS TO BE STOOD DOWN FIRST.
     //
     // Results replace `root.rows` without touching `lastListing`, so after a
@@ -2002,6 +2395,282 @@ FloatingWindow {
     else root.toggleBookmark();
   }
 
+  // ── tags ────────────────────────────────────────────────────────────────
+  // The truth is on the FILE — `user.xdg.tags`, see tags.js for why. What
+  // lives here is a cache of it, because the truth is expensive to ask:
+  // sweeping $HOME for tagged files takes 1.57s over 432,933 of them.
+  // Once in the background is fine, behind every click on a sidebar tag is
+  // not, so the answer is kept.
+  //
+  // Two halves, and only one of them is derived. `index` is a cache and can
+  // always be rebuilt from disk. `defs` cannot: it is the colour and the
+  // ORDER a tag was given, which exist nowhere on the filesystem, and a tag
+  // that has been made but not yet put on anything exists only here.
+  property var tagDefs: []          // [{ name, ink }]
+  property var tagMarks: ({})       // path -> [name], the delegates' lookup
+
+  FileView {
+    id: tagFile
+    path: Quickshell.statePath("terminus-tags.json")
+    blockLoading: true
+    printErrors: false
+    // Same reason bookmarkFile watches: a second terminus window writing a
+    // tag should show up here without a restart. And the same two-signal
+    // dance — reload() only QUEUES the read, textChanged is where the bytes
+    // actually land. See the long note on bookmarkFile.
+    watchChanges: true
+    onFileChanged: tagFile.reload()
+    onTextChanged: root.loadTags()
+  }
+
+  function tagState() {
+    try {
+      const o = JSON.parse(String(tagFile.text() || "") || "{}");
+      return {
+        defs: Array.isArray(o.defs) ? o.defs : [],
+        index: (o.index && typeof o.index === "object") ? o.index : ({}),
+        // How each tag's page likes to be read, by tag name. A collection
+        // keeps this on its own record; a tag has no record, so it lives
+        // here beside the definitions.
+        views: (o.views && typeof o.views === "object") ? o.views : ({})
+      };
+    } catch (e) {
+      // A corrupt file is not a reason to lose the session. The index
+      // rebuilds from disk anyway, and defs is the only real casualty.
+      return { defs: [], index: ({}), views: ({}) };
+    }
+  }
+
+  property var tagViews: ({})
+
+  property string tagRaw: ""
+
+  function loadTags() {
+    // As loadCollections does, and for the same reason: tagMarks feeds
+    // every row's dots and tagViews feeds the sidebar.
+    const txt = String(tagFile.text() || "");
+    if (txt === root.tagRaw) return;
+    root.tagRaw = txt;
+    const st = root.tagState();
+    root.tagDefs = st.defs;
+    root.tagMarks = st.index;
+    root.tagViews = st.views;
+  }
+
+  // Every write goes through here and re-reads first, for the reason
+  // editBookmarks does: the file is shared by every terminus window, so
+  // "what I think it holds" is not what it holds. reload() queues, and
+  // waitForJob() is what actually blocks until the bytes have landed.
+  function editTags(mutate) {
+    tagFile.reload();
+    tagFile.waitForJob();
+    const st = root.tagState();
+    mutate(st);
+    // In memory first, so the listing repaints on this frame; the write
+    // comes back round through onTextChanged and re-derives the same thing.
+    root.tagDefs = st.defs;
+    root.tagMarks = st.index;
+    root.tagViews = st.views;
+    tagFile.setText(JSON.stringify(st));
+  }
+
+  // A STORED COLOUR FIRST, then the seven that come with one, then a
+  // fallback. The middle step is what lets "red" be red without anything
+  // having been written to the state file — and the last is not a default
+  // so much as a refusal to draw nothing: a tag another program wrote, or
+  // one whose definition was lost, is still on the file and still has to
+  // be visible.
+  function tagInk(name) {
+    for (let i = 0; i < root.tagDefs.length; ++i)
+      if (root.tagDefs[i].name === name)
+        return Zenon[root.tagDefs[i].ink] || Zenon.cyan;
+    const preset = Tags.presetInk(name);
+    if (preset !== "") return Zenon[preset] || Zenon.cyan;
+    return Zenon.cyan;
+  }
+
+  function tagsFor(path) { return root.tagMarks[path] || []; }
+
+  // Drops index entries for paths that were asked about and did not come
+  // back. Only ever called with a list we have just stat'd, so "missing"
+  // means missing rather than "not looked at".
+  //
+  // A collection's paths come from fd and are real by construction, so the
+  // only ones this can remove are tag entries whose file has gone.
+  function pruneTagIndex(asked, rows) {
+    if (!asked || asked.length === 0) return;
+    const alive = ({});
+    for (let i = 0; i < rows.length; ++i) alive[rows[i].path] = true;
+    const gone = [];
+    for (let j = 0; j < asked.length; ++j)
+      if (!alive[asked[j]] && root.tagMarks[asked[j]]) gone.push(asked[j]);
+    if (gone.length === 0) return;
+    root.editTags((st) => {
+      for (let k = 0; k < gone.length; ++k) delete st.index[gone[k]];
+    });
+  }
+
+  // What the sidebar lists: every tag that is on at least one file, by name,
+  // with how many carry it. Sorted rather than kept in definition order —
+  // the sidebar is somewhere you look a tag UP, and the list is as long as
+  // the number of tags in use rather than a handful you arranged by hand.
+  readonly property var sideTags: {
+    const counts = Tags.tally(root.tagMarks);
+    const names = Object.keys(counts).sort();
+    const out = [];
+    for (let i = 0; i < names.length; ++i)
+      out.push({ name: names[i], count: counts[names[i]],
+                 ink: root.tagInk(names[i]) });
+    return out;
+  }
+
+  // Named on the window so ipc can reach it: the sheet's own id is not
+  // visible from the manager, which is where the handler has to live.
+  function openTagPicker() { tagPick.ask(); }
+  // `page` picks the tab: 0 properties, 1 permissions.
+  function openProperties(page) {
+    props.ask();
+    if (page === 1 && props.tabs.length > 1) props.tab = 1;
+  }
+  function openCollectionEditor(id) { collEdit.ask(id === undefined ? -1 : id); }
+
+  // ── writing a tag to the disk ─────────────────────────────────────────
+  // The attribute FIRST, the index after, and the index only for the files
+  // the write actually reported success for. An index that records a tag the
+  // file does not carry is worse than no index: it puts the file in the
+  // sidebar listing, where clicking it finds nothing.
+  Process {
+    id: tagWriteProc
+    property var pending: []
+    stderr: StdioCollector {
+      id: tagWriteErr
+      waitForEnd: true
+      onStreamFinished: {
+        const e = String(tagWriteErr.text || "").trim();
+        if (e !== "") root.warn(e.split("\n")[0]);
+      }
+    }
+    onExited: (code) => {
+      if (code !== 0) { root.warn("could not tag"); return; }
+      const pairs = tagWriteProc.pending;
+      root.editTags((st) => {
+        for (let i = 0; i < pairs.length; ++i) {
+          const e = pairs[i];
+          if (e.names.length === 0) delete st.index[e.path];
+          else st.index[e.path] = e.names;
+        }
+      });
+      tagWriteProc.pending = [];
+      root.refresh();
+    }
+  }
+
+  function applyTagPairs(pairs) {
+    if (!pairs || pairs.length === 0) return;
+    tagWriteProc.pending = pairs;
+    tagWriteProc.command = ["sh", "-c", Tags.writeManyCommand(pairs)];
+    tagWriteProc.running = true;
+  }
+
+  // One gesture both ways, across a whole selection — see Tags.toggleAcross
+  // for why a mixed selection adds rather than flipping each row.
+  function toggleTagFor(paths, name) {
+    if (!paths || paths.length === 0) return;
+    const r = Tags.toggleAcross(root.tagMarks, paths, name);
+    root.applyTagPairs(r.pairs);
+    root.status = (r.added ? "tagged " : "untagged ")
+      + paths.length + (paths.length === 1 ? " item" : " items");
+  }
+
+  // What every verb acts on: the marked set, or the row under the cursor.
+  // acting() hands back ROWS, which is what the other verbs want; this one
+  // only needs where they are.
+  function toggleTagHere(name) {
+    root.toggleTagFor(root.acting().map((r) => r.path), name);
+  }
+
+  function defineTag(name, ink) {
+    const clean = Tags.normalise([name]);
+    if (clean.length === 0) return;
+    root.editTags((st) => {
+      for (let i = 0; i < st.defs.length; ++i)
+        if (st.defs[i].name === clean[0]) { st.defs[i].ink = ink; return; }
+      st.defs.push({ name: clean[0], ink: ink });
+    });
+  }
+
+  // Forgets the DEFINITION, and takes the tag off every file that carries it
+  // — a tag dropped from the sidebar that left itself on forty files would
+  // come back the next time the index was rebuilt.
+  // Renaming writes every file that carries it — there is no central
+  // record to edit — and then moves the definition so the colour follows.
+  function renameTag(from, to) {
+    const pairs = Tags.renamePairs(root.tagMarks, from, to);
+    const want = Tags.normalise([to])[0] || "";
+    if (want === "" || want === from) return;
+    root.editTags((st) => {
+      // The view follows the name, or the page you had arranged comes back
+      // arranged differently for no reason you could point at.
+      if (st.views && st.views[from] !== undefined) {
+        if (st.views[want] === undefined) st.views[want] = st.views[from];
+        delete st.views[from];
+      }
+      let moved = false;
+      for (let i = 0; i < st.defs.length; ++i) {
+        if (st.defs[i].name !== from) continue;
+        // Straight onto the new name unless something already answers to
+        // it, in which case the existing definition wins — the colour you
+        // can see beside the tag you typed is the one you meant.
+        const taken = st.defs.some((d) => d.name === want);
+        if (taken) st.defs.splice(i, 1);
+        else st.defs[i].name = want;
+        moved = true;
+        break;
+      }
+      if (!moved && !st.defs.some((d) => d.name === want)) return;
+    });
+    if (pairs.length === 0) { root.status = "renamed " + from; return; }
+    root.applyTagPairs(pairs);
+    root.status = "renamed " + from + " \u2192 " + want;
+  }
+
+  function dropTag(name) {
+    const paths = Tags.pathsWith(root.tagMarks, name);
+    const pairs = paths.map((p) => ({
+      path: p,
+      names: (root.tagMarks[p] || []).filter((t) => t !== name)
+    }));
+    root.editTags((st) => {
+      st.defs = st.defs.filter((d) => d.name !== name);
+      if (st.views) delete st.views[name];
+    });
+    root.applyTagPairs(pairs);
+  }
+
+  // ── rebuilding the cache from the disk ────────────────────────────────
+  // The whole point of the index is that this does NOT run often. It is the
+  // repair, for when something outside terminus has been moving tagged files
+  // around, not part of startup.
+  Process {
+    id: tagScanProc
+    stdout: StdioCollector {
+      id: tagScanOut
+      waitForEnd: true
+      onStreamFinished: {
+        const found = Tags.parseTagDump(tagScanOut.text);
+        root.editTags((st) => { st.index = found; });
+        root.status = "indexed " + Object.keys(found).length + " tagged";
+      }
+    }
+  }
+
+  function rebuildTagIndex(where) {
+    root.status = "indexing tags\u2026";
+    tagScanProc.command =
+      ["sh", "-c", Tags.scanTagsCommand(where || Paths.home())];
+    tagScanProc.running = true;
+  }
+
   // ── taking the keyboard ─────────────────────────────────────────────────
   // forceActiveFocus() on the frame `visible` is set does nothing: the surface
   // has not been mapped yet, so there is no window for the focus to be active
@@ -2057,6 +2726,21 @@ FloatingWindow {
   property var portal: null   // { multiple, directory, save, out }
   readonly property bool picking: root.portal !== null
 
+  // ── A DIALOG FOR ITS WHOLE LIFE, not just while a request is open ───────
+  //
+  // `picking` answers "is there a request in front of me", and it goes false
+  // the instant one is answered — while the window itself lives on for a
+  // moment afterwards. Every guard written against it therefore has a hole on
+  // the way out, and the preference write is debounced by 400ms, which is
+  // exactly long enough to fall through it: a sort chosen inside a save dialog
+  // was written to the shared preferences after the dialog had stopped
+  // picking, and the next thing the main window loaded was the dialog's idea
+  // of how to sort.
+  //
+  // winId is -1 from the moment a picker is constructed and never changes, so
+  // this is true for as long as the object exists.
+  readonly property bool isPicker: root.winId === -1
+
   // WHERE YOU LAST SAVED SOMETHING.
   //
   // A save request arrives with a directory the ASKING PROGRAM chose, which is
@@ -2072,6 +2756,27 @@ FloatingWindow {
   // manager — see lastSaveDir there — because a dialog does not outlive its
   // own answer. This is only the door to the preferences file.
   function persistPrefs() { viewSave.restart(); }
+
+  // ── THE FILE YOU HAVE NOT SAVED YET ─────────────────────────────────────
+  //
+  // Firefox and friends write the file BEFORE they ask where to put it: by the
+  // time the dialog is up, the suggested name already exists at the suggested
+  // path, with real bytes in it. So a save dialog opened on a directory showed
+  // the thing you were in the middle of naming as an item already sitting
+  // there — 461 bytes, "modified just now" — and offered to overwrite it.
+  //
+  // Nothing in this window or in the portal wrapper creates that file; both
+  // were checked, and a picker opened by hand against an empty directory
+  // leaves it empty. It is the asking application's, and it is not ours to
+  // delete. It is ours not to LIST: the dialog is about a file that does not
+  // exist yet, and saying otherwise is the dialog contradicting itself.
+  //
+  // Matched on the full path the request named, not on the name in the field,
+  // so renaming in the field does not un-hide it and an unrelated file that
+  // happens to share the name elsewhere is untouched.
+  readonly property string portalGhost:
+    (root.portal && root.portal.save && root.portal.suggested)
+      ? root.portal.suggested : ""
 
   readonly property string portalTitle: {
     if (!root.portal) return "";
@@ -2168,6 +2873,7 @@ FloatingWindow {
 
   function portalAnswer(paths) {
     if (!root.portal) return;
+    const saving = root.portal.save;
     // Recorded on the way out rather than on every step, so cancelling a
     // dialog does not teach it anything.
     if (root.portal.save && paths.length > 0 && root.mgr)
@@ -2175,7 +2881,9 @@ FloatingWindow {
     const out = root.portal.out;
     root.portal = null;
     if (root.mgr) {
-      root.mgr.answerPortal(out, paths);
+      // `saving` captured before portal was cleared — see answerPortal for
+      // why a save has to bring its file into existence.
+      root.mgr.answerPortal(out, paths, saving);
       // a dedicated dialog is done existing, not merely hidden
       if (root.mgr.pickerWin === root) { root.mgr.retirePicker(); return; }
     }
@@ -2286,7 +2994,7 @@ FloatingWindow {
       // A PICKER is not a preference. pick() forces columns so the dialog is
       // always laid out the way a dialog should be, and letting that overwrite
       // the view you actually chose would mean every save dialog reset it.
-      if (root.picking) return;
+      if (root.picking || root.isPicker) return;
       // The OPEN TABS travel with the view preferences, because they are the
       // same question: how was this window set up when I left it. Only window 0
       // restores them — a spare window you opened with N is a scratch view, and
@@ -2435,6 +3143,26 @@ FloatingWindow {
   property var pendingTabs: []
   property int pendingTabIndex: 0
 
+  // ── WHERE THIS WINDOW WAS ASKED TO OPEN ───────────────────────────────
+  // Set by the manager when a window is built FOR a destination, which is
+  // now the ordinary case: nothing is created at startup any more, so
+  // `Terminus open ~/Pictures` builds the window and tells it where to go.
+  //
+  // It has to be a property rather than a goTo from outside, because the
+  // session restore below finishes ASYNCHRONOUSLY — it shells out to check
+  // which stored directories still exist — and lands a second or so after
+  // the window was made. Navigating from the manager therefore worked and
+  // was then undone, which looked exactly like the request being ignored.
+  property string bootPath: ""
+
+  function takeBoot() {
+    if (root.bootPath === "") return false;
+    const p = root.bootPath;
+    root.bootPath = "";
+    root.enter(p);
+    return true;
+  }
+
   Process {
     id: tabCheckProc
     stdout: StdioCollector {
@@ -2447,11 +3175,15 @@ FloatingWindow {
         }
         const kept = root.pendingTabs.filter((t) => alive[t.cwd]);
         root.pendingTabs = [];
-        if (kept.length === 0) return;
+        if (kept.length === 0) { root.takeBoot(); return; }
         root.tabs = kept;
         root.tab = Math.max(0, Math.min(kept.length - 1, root.pendingTabIndex));
         const t = kept[root.tab];
         root.act.sel = t.sel || 0;
+        // The restored tab, unless this window was built to go somewhere —
+        // then the tabs are kept as they are and the destination wins, which
+        // is what asking for one means.
+        if (root.takeBoot()) return;
         // enter() rather than goTo(): this is where the window already is as
         // far as history is concerned, not somewhere it navigated to.
         root.enter(t.cwd);
@@ -2523,7 +3255,7 @@ FloatingWindow {
   function rowsFromListing(text, dir) {
     return root.enrich(Terminus.sortEntries(
       Terminus.filterEntries(Terminus.parseListing(text, dir), "",
-                             root.showHidden),
+                             root.showHidden, root.portalGhost),
       root.sortKey, root.sortDesc, root.dirsFirst, root.naturalSort));
   }
 
@@ -2619,8 +3351,16 @@ FloatingWindow {
   function cachePreview(path, entry) {
     const c = Object.assign({}, root.previewCache);
     const o = root.previewOrder.slice();
+    // ONLY IF IT IS NEW, the rule cacheInfo and the thumbnail cache both
+    // follow and this one did not. Re-previewing a file you have already
+    // seen pushed its path a second time, so the order list filled with
+    // duplicates and the eviction below started shifting off names that
+    // were still live — the cache held 24 slots and fewer and fewer
+    // distinct files, which is why walking back over the same folder kept
+    // paying for previews it had already made.
+    const fresh = c[path] === undefined;
     c[path] = entry;
-    o.push(path);
+    if (fresh) o.push(path);
     while (o.length > 24) delete c[o.shift()];
     root.previewCache = c;
     root.previewOrder = o;
@@ -2705,12 +3445,12 @@ FloatingWindow {
     // rather than this writing the same pair down a second time.
     ["move", [["j / k  ↓ ↑", "down / up"],
               ["←  backspace", "parent"], ["→", "enter a directory"],
-              ["↵", "open"], ["i", "quick look"],
+              ["↵", "open"], ["space", "quick look"],
               ["g g", "top"], ["G", "bottom"],
               ["ctrl u / d", "half page"], ["ctrl b / f", "page"],
               [root.mouseKey(4) + " / " + root.mouseKey(5),
                "back / forward"]]],
-    ["select", [["space", "toggle and move on"],
+    ["select", [["shift space", "toggle and move on"],
                 ["v", "visual select"],
                 ["ctrl a", "select all"],
                 ["ctrl r", "invert selection"],
@@ -2736,7 +3476,7 @@ FloatingWindow {
     ["copy", [["c c", "full path"], ["c d", "directory"],
               ["c f", "filename"], ["c n", "name without extension"]]],
     ["tabs", [["t", "new"], ["w", "close"], ["1 - 9", "switch"],
-              ["shift return", "open a directory in a new tab"],
+              ["shift return", "open a directory in a new tab", false],
               [root.mouseKey(3), "open a directory in a new tab"],
               ["[  ]", "previous / next"]]],
     ["panes", [["\\", "second pane on / off"],
@@ -2749,6 +3489,17 @@ FloatingWindow {
                [root.mouseKey(1), "step into the other side"]]],
     ["marks", [["b a", "bookmark this directory"],
                ["b b", "bookmark the item under the cursor"]]],
+    ["tags", [["c t", "tag the selection"],
+              ["\u21b5", "put the tag on / take it off"],
+              ["type", "filter, or name a new tag"],
+              ["ctrl \u21b5", "rename the highlighted tag to what is typed"],
+              ["del", "forget a tag everywhere"],
+              ["menu", "the seven colours, on the row's own menu"]]],
+    ["collections", [["c s", "new collection"],
+                     ["click", "open one from the sidebar"],
+                     ["right click", "edit one from the sidebar"],
+                     ["middle click", "remove one from the sidebar"],
+                     ["esc", "leave it and go back"]]],
     ["dialogs", [["esc", "close"], ["return", "accept"],
                  ["\u2190 \u2192 \u2191 \u2193", "move (permissions)"],
                  ["space", "toggle a bit"],
@@ -2807,10 +3558,10 @@ FloatingWindow {
     }
     const one = [
       ["open",              "\u21b5", () => root.activate()],
-      ["open with",         "",        () => root.beginOpenWith(
+      ["open with",         "\udb81\ude36 \u21b5", () => root.beginOpenWith(
                                               root.currentRow()
                                                 ? root.currentRow().path : "")],
-      ["quick look",        "i",       () => root.quickLook()],
+      ["quick look",        "space",   () => root.quickLook()],
       // BOTH KEYS ON THE VERB, not a verb keyed `h` and a keymap row saying
       // `h / l  ← →` beside it. They were the same two things listed twice —
       // once as something you could run and once as something to read — and
@@ -2835,7 +3586,17 @@ FloatingWindow {
       // empty chip while the keymap wrote the key down separately, so neither
       // half said the whole thing.
       ["properties",        "alt \u21b5",  () => props.ask()],
-      ["permissions",       "c m",     () => perms.ask()],
+      ["permissions",       "c m",     () => root.openProperties(1)],
+      ["disks",             "M",       () => disks.ask()],
+      ["tags",              "c t",     () => tagPick.ask()],
+      ["new collection",  "c s",     () => collEdit.ask(-1)],
+      // Editing one is only offered while you are looking at it, which is
+      // also the only time you know which one you mean.
+      ["edit collection", "",        () => {
+        if (root.collOpenId >= 0) collEdit.ask(root.collOpenId);
+        else root.warn("open a collection first");
+      }],
+      ["reindex tags",      "",        () => root.rebuildTagIndex()],
       ["new tab",           "t",       () => root.newTab()],
       ["close tab",         "ctrl c",  () => root.closeTab()],
       ["split view",        "\\",      () => root.toggleDual()],
@@ -2888,8 +3649,16 @@ FloatingWindow {
       // strings happening to agree.
       const modal = name === "dialogs" || name === "menu";
       for (let i = 0; i < rows.length; i++) {
+        // THIRD, a row may say it claims NOTHING, with `false` in that slot.
+        // One key can mean two things depending on what is under the cursor:
+        // shift+return opens a DIRECTORY in a new tab and hands a FILE to the
+        // open-with sheet. The verb is the file half. This row is the
+        // directory half, and matching on the key alone let it swallow the
+        // verb — which took the verb out of the palette's runnable half and
+        // left "open with" listed with no key beside it.
         const claim = rows[i].length > 2 ? rows[i][2] : rows[i][0];
-        const v = (modal && rows[i].length <= 2) ? undefined : byKey[claim];
+        const v = (claim === false || (modal && rows[i].length <= 2))
+          ? undefined : byKey[claim];
         if (v !== undefined) v.used = true;
         // THE KEYMAP'S WORDING IS WHAT IS SHOWN, THE VERB'S IS STILL FOUND.
         // The two tables name the same thing differently on purpose: the
@@ -2917,6 +3686,22 @@ FloatingWindow {
     // A STABLE PARTITION, not a sort: inside each half the groups keep their
     // order, so the keymap still reads as move, then select, then act — it is
     // the same page with the verbs lifted to the top of it.
+    // ── AND THE COLLECTIONS, BY NAME ─────────────────────────────────
+    // A collection is a verb you made: "open the PNGs" is exactly the sort
+    // of thing this list is for, and reaching them only through the
+    // sidebar meant the one window that has no sidebar open could not get
+    // at them at all. Named rather than keyed — there is no key to give
+    // out, and the palette is how a thing without one is reached.
+    for (let i = 0; i < root.collections.length; i++) {
+      const c = root.collections[i];
+      if (!c || !c.name) continue;
+      out.push({ section: "collections", label: c.name, key: "",
+                 alias: Coll.describe(c),
+                 act: (function (id) {
+                   return function () { root.openCollection(id); };
+                 })(c.id) });
+    }
+
     const runs = [];
     const refs = [];
     for (let i = 0; i < out.length; i++)
@@ -2938,6 +3723,22 @@ FloatingWindow {
   function quickLook() {
     const r = root.currentRow();
     if (!r || r.isDir) return;
+    root.lookFetch();
+    root.looking = true;
+  }
+
+  // ── WHAT THE ROW NEEDS, MADE ON DEMAND ───────────────────────────────
+  // Split out of quickLook and called again on every step, because the arrows
+  // walk the listing underneath and each file that arrives may need something
+  // nobody has made yet. Run once on the way in, flicking from a picture to
+  // the PDF beside it showed the apology for a page that had never been
+  // rendered — see look.onRowChanged.
+  //
+  // Every branch asks first whether the thing it makes is already there, so
+  // calling this on a row that needs nothing costs a handful of lookups.
+  function lookFetch() {
+    const r = root.currentRow();
+    if (!r || r.isDir) return;
     // A film whose frame has not been pulled yet: ask for it now. This is the
     // one moment somebody is actually looking, so it is the one moment worth
     // making them wait a beat for.
@@ -2950,7 +3751,43 @@ FloatingWindow {
       thumbProc.command = ["sh", "-c", Thumbs.generate(root.thumbJobs)];
       thumbProc.running = true;
     }
-    root.looking = true;
+    // A PDF HAS NO THUMBNAIL — it has a rendered page, and only the preview
+    // pane was ever rendering one. Opened from a list or a grid there was
+    // nothing at pdfStem for this file, so quick look said there was nothing
+    // to show. Same one-off as the film above.
+    if (Terminus.isPdf(r.name) && !pdfProc.running && root.pdfFor !== r.path) {
+      root.pdfFor = r.path;
+      pdfProc.command = ["sh", "-c", Terminus.pdfCommand(r.path, root.pdfStem)];
+      pdfProc.running = true;
+    }
+
+    // ── AND THE TEXT OF A FILE, WHICH IN A LIST NOTHING HAS READ ──────
+    // loadPreview stops at its first line when the view is not columns:
+    // there is no pane to fill, so reading files to fill it would be work
+    // for nothing. Quick look is the exception — it IS the pane, asked for
+    // one file at a time — and opened from a list or a grid it drew "no
+    // preview available" across every text file in the window.
+    //
+    // The same one-off the film and the page above make, through the funnel
+    // the pane itself uses: beginPeek names the row it is for, and the
+    // collector caches the answer under that path, so the pane and the next
+    // look at this file both get it for nothing.
+    //
+    // By elimination rather than by a list of extensions, exactly as the tail
+    // of loadPreview decides it: everything that is not one of the kinds
+    // above is read as text and found to be binary or not by its bytes.
+    if (!Terminus.isImage(r.name) && !Terminus.isVideo(r.name)
+        && !Terminus.isAudio(r.name) && !Terminus.isFont(r.name)
+        && !Terminus.isPdf(r.name) && !Terminus.isArchive(r.name)
+        && r.path !== root.previewShown && r.path !== root.previewFor) {
+      const hit = root.previewCache[r.path];
+      if (hit !== undefined)
+        root.settlePreview(hit.kind, hit.rows, hit.text, r.path);
+      else {
+        root.previewKind = "text";
+        root.beginPeek(r.path, Terminus.batCommand(r.path));
+      }
+    }
   }
 
   property string previewKind: "none"   // none | dir | image | video | audio | font | pdf | text | archive | binary
@@ -2961,6 +3798,11 @@ FloatingWindow {
   // Beside the thumbnails, not loose in the cache root: everything terminus
   // renders is one directory, so clearing it is one rm.
   readonly property string pdfStem: Terminus.terminusCacheDir() + "/preview"
+  // WHOSE PAGE IS CURRENTLY AT pdfStem. One file is reused for every PDF, so
+  // the path alone cannot say whether what is sitting there belongs to the row
+  // being asked about — quick look would happily show the last document opened
+  // in the preview pane. Written wherever a render is started.
+  property string pdfFor: ""
   property int previewStamp: 0
   property var previewRows: []
   // AN ARCHIVE'S TREE IS NOT A LISTING'S ROWS, and they used to share this
@@ -3232,7 +4074,12 @@ FloatingWindow {
         } else {
           root.previewKind = "text";
           root.previewShown = cur.path;
-          const rich = Terminus.ansiToRich(t);
+          // AN EMPTY FILE HAS NO TEXT, and ansiToRich does not agree: handed
+          // "" it returns the <pre> wrapper it wraps everything in, which is
+          // a non-empty string that renders as nothing. Everything asking
+          // "is there a document here" — the footer, the rule above it —
+          // was being told yes by a wrapper around no content.
+          const rich = String(t).trim() === "" ? "" : Terminus.ansiToRich(t);
           root.previewText = rich;
           if (cur) root.cachePreview(cur.path, { kind: "text", text: rich });
         }
@@ -3327,6 +4174,7 @@ FloatingWindow {
     }
     if (Terminus.isPdf(r.name)) {
       root.previewKind = "pdf";
+      root.pdfFor = r.path;
       pdfProc.command = ["sh", "-c", Terminus.pdfCommand(r.path, root.pdfStem)];
       pdfProc.running = true;
       return;
@@ -3407,6 +4255,12 @@ FloatingWindow {
     root.infoOrder = o;
   }
 
+  // The kind is settled asynchronously — the pane reads the file before it
+  // knows it is text — so a probe skipped because previewKind was still
+  // "none" has to be asked for again once it is not.
+  onPreviewKindChanged: if (root.previewKind === "text" && !root.previewInfo)
+    infoDelay.restart()
+
   Timer {
     id: infoDelay
     // longer than the preview's 55ms: this is the one probe with no cheap
@@ -3428,7 +4282,11 @@ FloatingWindow {
           ? Terminus.parseVideoInfo(infoOut.text)
           : (root.previewInfoKind === "audio"
             ? Terminus.parseAudioInfo(infoOut.text)
-            : Terminus.parseImageInfo(infoOut.text));
+            : (root.previewInfoKind === "text"
+              ? Terminus.parseTextInfo(infoOut.text)
+              : (root.previewInfoKind === "pdf"
+                ? Terminus.parsePdfInfo(infoOut.text)
+                : Terminus.parseImageInfo(infoOut.text))));
         // Cached even when the cursor has moved on: the work is already done,
         // and walking back up the list should not pay for it twice.
         //
@@ -3449,7 +4307,14 @@ FloatingWindow {
     if (!r || r.isDir) return;
     const kind = Terminus.isVideo(r.name) ? "video"
       : (Terminus.isAudio(r.name) ? "audio"
-        : (Terminus.isImage(r.name) ? "image" : ""));
+        : (Terminus.isImage(r.name) ? "image"
+          // OR whatever the pane actually decided. A great many text files
+          // have no extension to recognise — .zshrc, a Makefile, a script —
+          // and those are exactly the ones previewKind gets right by looking
+          // at the bytes. The name is only the fast path.
+          : (Terminus.isPdf(r.name) ? "pdf"
+            : ((Terminus.isText(r.name) || root.previewKind === "text")
+              ? "text" : ""))));
     if (kind === "") return;
     const hit = root.infoCache[r.path];
     if (hit !== undefined) { root.previewInfo = hit; return; }
@@ -3458,7 +4323,9 @@ FloatingWindow {
     infoProc.command = ["sh", "-c",
       kind === "video" ? Terminus.videoInfoCommand(r.path)
         : (kind === "audio" ? Terminus.audioInfoCommand(r.path)
-          : Terminus.imageInfoCommand(r.path))];
+          : (kind === "text" ? Terminus.textInfoCommand(r.path)
+            : (kind === "pdf" ? Terminus.pdfInfoCommand(r.path)
+              : Terminus.imageInfoCommand(r.path))))];
     infoProc.running = true;
   }
 
@@ -3467,7 +4334,12 @@ FloatingWindow {
     onExited: (code) => {
       // the stamp is what makes Qt reload a file it has already cached under
       // this exact name
-      if (code === 0 && root.previewKind === "pdf") root.previewStamp++;
+      // NOT gated on previewKind any more. Quick look renders pages in list
+      // and grid views, where the preview pane has computed nothing and the
+      // kind is "none" — so the guard threw away the stamp for exactly the
+      // renders it had asked for, and the page never appeared.
+      if (code === 0) root.previewStamp++;
+      else root.pdfFor = "";
     }
   }
 
@@ -3635,6 +4507,11 @@ FloatingWindow {
     // what that listing turns into, so reading them afterwards would show one
     // arrangement and then rearrange it in front of you
     root.loadViewPrefs();
+    // Nothing to wait for when there is no session to replay: the
+    // destination applies now rather than after a restore that will not
+    // happen. When there IS one, restoreTabs has already been set going by
+    // loadViewPrefs and its completion calls takeBoot instead.
+    if (!root.sessionReplay || root.winId !== 0) root.takeBoot();
     root.refresh(true);
   }
 
@@ -4176,6 +5053,28 @@ FloatingWindow {
   // and one for a row that has just been created, so it can announce itself
   property int madePulse: 0
 
+  // ── AND ONE FOR COMING BACK FROM A WORKSPACE THAT WAS NOT THIS ONE ──
+  //
+  // The cursor bars travel on XAnimator/YAnimator, which run on the RENDER
+  // thread — and the render thread stops when the compositor stops asking this
+  // window for frames, which is exactly what switching away to another
+  // workspace does. A travel in flight at that moment is cut off where it
+  // stood. Coming back does not finish it: the binding behind the bar never
+  // changed value, so nothing re-writes it, and the bar sits BETWEEN two rows
+  // until the cursor is moved again. Measured off a 60fps capture of column
+  // view — rows are 28px, and the bar came back at y=55 against a row at 62 and
+  // stayed there for the remaining 170 frames.
+  //
+  // Qt is never told any of this happened: neither `visible`,
+  // `backingWindowVisible` nor `Window.active` moves across a workspace
+  // switch — probed, all three. Hyprland is the only one who knows, and the
+  // rest of this shell already asks it.
+  property int thawPulse: 0
+  Connections {
+    target: Hyprland
+    function onFocusedWorkspaceChanged() { root.thawPulse++; }
+  }
+
   function activate() {
     const r = root.currentRow();
     if (!r) return;
@@ -4510,10 +5409,6 @@ FloatingWindow {
     if (props.open)
       return props.many ? props.rows.length + " items"
         : (props.rows[0] ? props.rows[0].name : "Properties");
-    if (perms.open)
-      return perms.paths.length === 1
-        ? Terminus.basename(perms.paths[0])
-        : perms.paths.length + " items";
     if (bulk.open)
       return root.bulkNames.length === 1 ? "Rename 1 item"
         : "Rename " + root.bulkNames.length + " items";
@@ -4529,6 +5424,15 @@ FloatingWindow {
     if (prefs.open) return "Settings";
     if (cmdPalette.open) return "Commands";
     if (marks.open) return "Bookmarks";
+    if (disks.open) return "Disks";
+    // Named for what it is ABOUT, not for the verb: the card is open over a
+    // selection and how many is the thing you want confirmed before you tag
+    // them. The footer says it too, and the bar is where the eye already is.
+    if (tagPick.open)
+      return tagPick.targets.length === 1
+        ? "Tag 1 item" : "Tag " + tagPick.targets.length + " items";
+    if (collEdit.open)
+      return collEdit.making ? "New Collection" : "Collection";
     return "";
   }
 
@@ -4553,7 +5457,6 @@ FloatingWindow {
       return appPick.icon !== "" ? appPick.icon : "\uEC65";
     if (props.open && !props.many && props.rows[0])
       return props.rows[0].glyph !== undefined ? props.rows[0].glyph : "";
-    if (perms.open && perms.paths.length === 1) return perms.icon;
     // A VERB, not a file. Rename is always about several — one name is the
     // in-place edit — so there is no row's glyph to show and this says what
     // the card does instead.
@@ -4561,6 +5464,11 @@ FloatingWindow {
     // The mark itself, the one the listing and the sidebar put beside a
     // bookmarked row — so the sheet is labelled with the thing it holds.
     if (marks.open) return "\uF02E";
+    // nf-fa-tag, the same mark the sidebar will list them under
+    if (tagPick.open) return "\uF02B";
+    if (collEdit.open) return "\uEC78";
+    // the same disk mark the sidebar and the rows use
+    if (disks.open) return "\uF1C0";
     return "";
   }
 
@@ -4592,21 +5500,27 @@ FloatingWindow {
     if (appPick.open && appPick.icon !== "") return appPick.iconInk;
     if (props.open && !props.many && props.rows[0])
       return root.inkFor(props.rows[0]);
-    if (perms.open && perms.paths.length === 1) return perms.iconInk;
     // SAND, which is what a bookmark is inked everywhere else in this window:
     // the ribbon on a listing row, the one in the sidebar, the one in the go
     // sheet. Cyan is the ink of a place you are going; this card is about the
     // marks themselves, so it wears their colour.
     if (marks.open) return Zenon.sand;
+    // The colour of the tag the cursor is on, so the bar's mark IS the tag
+    // being chosen rather than a generic one above a list of colours.
+    if (tagPick.open) {
+      const n = tagPick.chosen();
+      if (n !== "") return root.tagInk(n);
+    }
     return Zenon.cyan;
   }
 
   // Ramped by the sheets' own arrival, so the bar changes its mind at exactly
   // the speed the sheet does.
   readonly property real sheetHeadOn: Math.max(
-    confirmSheet.cardInk, propsSheet.cardInk, permsSheet.cardInk,
+    confirmSheet.cardInk, propsSheet.cardInk,
     bulkSheet.cardInk, promptSheet.cardInk, appSheet.cardInk,
-    prefsSheet.cardInk, paletteSheet.cardInk, marksSheet.cardInk)
+    prefsSheet.cardInk, paletteSheet.cardInk, marksSheet.cardInk,
+    disksSheet.cardInk, tagSheet.cardInk, collSheet.cardInk)
 
   // ── WHICHEVER SHEET IS ON THE BAR ──────────────────────────────────────
   // Picked by how far along its arrival is rather than by `open`, because a
@@ -4614,9 +5528,10 @@ FloatingWindow {
   // there — the bar has to keep its gap for as long as there is something in
   // it. Only one is ever up, so the strongest is the one.
   readonly property var liveSheet: {
-    const all = [confirmSheet, propsSheet, permsSheet,
+    const all = [confirmSheet, propsSheet,
                  bulkSheet, promptSheet, appSheet, prefsSheet,
-                 paletteSheet, marksSheet];
+                 paletteSheet, marksSheet, disksSheet, tagSheet,
+                 collSheet];
     let best = null;
     for (let i = 0; i < all.length; i++)
       if (all[i] && (best === null || all[i].cardInk > best.cardInk))
@@ -4661,12 +5576,14 @@ FloatingWindow {
   // always fully opaque — it is a click catcher that paints nothing — so
   // asking it would have held the window soft for the whole session.
   readonly property real cardSoft: Math.max(
-    confirm.opacity, props.opacity, perms.opacity,
+    confirm.opacity, props.opacity,
     bulk.opacity, prompt.opacity, appPick.opacity, prefsSheet.cardInk,
-    paletteSheet.cardInk, marksSheet.cardInk, sendToCard.opacity)
+    paletteSheet.cardInk, marksSheet.cardInk, disksSheet.cardInk,
+    tagSheet.cardInk, collSheet.cardInk, sendToCard.opacity)
 
   readonly property bool modal: root.looking || cmdPalette.open || marks.open
-    || props.open || perms.open || confirm.open
+    || disks.open || tagPick.open || collEdit.open
+    || props.open || confirm.open
     || sendTo.open
     || prompt.open || bulk.open || prefs.open
     || appPick.open
@@ -4998,6 +5915,20 @@ FloatingWindow {
   // rather than a search, because the glyph's colour is a binding and a
   // binding cannot walk a ListModel and notice when it changes.
   property int jobFaults: 0
+  // Rows that finished WELL and are still sitting in the drawer. A job that
+  // worked used to delete its own row, which emptied the model, which closed
+  // the drawer — so the one moment you wanted to see confirmed was the one
+  // moment the drawer took itself away. It stays now, marked done, and this
+  // is what turns the glyph green.
+  property int jobDone: 0
+  // Bumped when one ends WELL, read by the green burst the same way
+  // jobStarted and jobFaulted are read by theirs.
+  property int jobFinished: 0
+  // How many are RUNNING, as opposed to how many rows there are. Those were
+  // the same number while a finished job removed itself and they are not any
+  // more: the breathing pulse has to stop when the work stops, not when the
+  // drawer is finally cleared.
+  property int jobsLive: 0
   // Whether the pointer is on the drawer's glyph, and whether it is on the
   // card. Two items, one question — the drawer stays open while the pointer
   // is over EITHER, which is what lets you move from the button to the list
@@ -5103,8 +6034,16 @@ FloatingWindow {
       root.jobFaulted = root.jobFaulted + 1;
       jobFaultLinger.restart();
     } else {
-      jobsModel.remove(i);
+      // KEPT, exactly like a failure is kept, and for the same reason turned
+      // the other way up: the drawer closing on success is the news arriving
+      // and leaving in the same frame. Marked done, held until read, and
+      // cleared by clearEndedJobs with everything else that has stopped.
+      jobsModel.set(i, { state: "done", pct: 100 });
+      root.jobDone = root.jobDone + 1;
+      root.jobFinished = root.jobFinished + 1;
+      jobFaultLinger.restart();
     }
+    root.jobsLive = Math.max(0, root.jobsLive - 1);
     delete root.jobMeta[id];
 
     // Not here and now: the stderr collector's stream may still be closing,
@@ -5154,6 +6093,7 @@ FloatingWindow {
     const id = ++root.jobSeq;
     const proc = jobRunner.createObject(root, { jobId: id });
     if (!proc) { root.warn("could not start"); return; }
+    root.jobsLive = root.jobsLive + 1;
 
     // setsid, so the job gets a process group of its own and CANCELLING it can
     // take the whole tree down. Signalling the Process itself would only reach
@@ -5212,14 +6152,15 @@ FloatingWindow {
     root.status = "cancelled";
   }
 
-  // The rows for jobs that ended badly, dropped. Called when the drawer has
-  // been opened and closed again — you have read it — and by the timer below
-  // for the case where you never looked.
-  function clearJobFaults() {
-    if (root.jobFaults === 0) return;
+  // Every row that has STOPPED, dropped — badly or well. Called when the
+  // drawer has been opened and closed again — you have read it — and by the
+  // timer below for the case where you never looked.
+  function clearEndedJobs() {
+    if (root.jobFaults === 0 && root.jobDone === 0) return;
     for (let i = jobsModel.count - 1; i >= 0; --i)
       if (jobsModel.get(i).state !== "running") jobsModel.remove(i);
     root.jobFaults = 0;
+    root.jobDone = 0;
     jobFaultLinger.stop();
   }
 
@@ -5228,7 +6169,7 @@ FloatingWindow {
   Timer {
     id: jobFaultLinger
     interval: 12000
-    onTriggered: root.clearJobFaults()
+    onTriggered: root.clearEndedJobs()
   }
 
   function cancelAllJobs() {
@@ -5964,6 +6905,44 @@ FloatingWindow {
   property bool bulkRegex: false
   property bool bulkStemOnly: true
 
+  // ── the three modes ─────────────────────────────────────────────────────
+  // Finder's split, and it is the right one: replace EDITS a name, add
+  // DECORATES it, format REPLACES it outright. Those are three different
+  // intentions about the old name — keep most of it, keep all of it, keep
+  // none of it — and they were previously spread across one field pair and
+  // six chips, where "add a prefix" was a find/replace with an empty find
+  // that did nothing, and numbering was a verb you could not aim.
+  //
+  // One at a time, chosen from the dropdown left of the first field, so the
+  // row below only ever shows the controls the chosen mode actually has.
+  property string bulkMode: "replace"     // replace | add | format
+  // The one open dropdown, held as a REFERENCE rather than a name: opening a
+  // second while the first is up would leave two lists over each other, and
+  // a null here is also how a click anywhere else puts the open one away.
+  property var bulkOpenDrop: null
+  property string bulkAddWhere: "after"   // before | after
+  property string bulkFmtKind: "index"    // index | counter | date
+  property string bulkFmtWhere: "after"   // before | after
+  property string bulkFmtStart: "1"
+
+  function applyBulkAdd(text, where) {
+    if (text === "") return;
+    root.pushBulkHistory();
+    // From the ORIGINAL names, like replace and unlike the verbs: adding the
+    // same prefix twice should mean the same as adding it once.
+    root.bulkEdits = Terminus.bulkAddText(root.bulkNames, text, where,
+                                          root.bulkStemOnly);
+  }
+
+  function applyBulkFormat(fmt) {
+    if (fmt === "" && root.bulkFmtKind !== "date") return;
+    root.pushBulkHistory();
+    root.bulkEdits = Terminus.bulkFormat(root.bulkNames, fmt,
+                                         root.bulkFmtKind, root.bulkFmtWhere,
+                                         root.bulkFmtStart, " ",
+                                         root.bulkStemOnly);
+  }
+
   function applyBulkReplace(find, repl) {
     if (find === "") return;
     root.pushBulkHistory();
@@ -6051,6 +7030,11 @@ FloatingWindow {
   // answer to "nothing opens this" is to register something against the TYPE,
   // and by then the file that raised the question is beside the point.
   property string openWithMime: ""
+  // WHICH of them actually opens it. The registered list answers "what could
+  // open this"; a default is a different claim and the properties card shows
+  // it as one — buck's jpegs were defaulting to an Avahi SSH browser, which
+  // the old list could show as one row among three but never as the answer.
+  property string openWithDefault: ""
 
   Process {
     id: appsProc
@@ -6060,6 +7044,7 @@ FloatingWindow {
       onStreamFinished: {
         root.openWithApps = Terminus.parseApps(appsOut.text);
         root.openWithMime = Terminus.parseAppsMime(appsOut.text);
+        root.openWithDefault = Terminus.parseAppsDefault(appsOut.text);
         root.appsScanned = true;
       }
     }
@@ -6068,6 +7053,7 @@ FloatingWindow {
   function findApps(path) {
     root.openWithApps = [];
     root.openWithMime = "";
+    root.openWithDefault = "";
     root.appsScanned = false;
     // A directory, or a scan already in flight: either way nothing further is
     // coming, so the answer is in — there is nothing to open this with.
@@ -6078,6 +7064,38 @@ FloatingWindow {
 
   function openWith(id, path) {
     root.run(Terminus.openWithCommand(id, path));
+  }
+
+  // ── CHANGING WHAT OPENS A TYPE ──────────────────────────────────────────
+  // Both of these edit the association database rather than this file, so both
+  // ask the scan again afterwards: the card is showing the old answer the
+  // moment the command lands, and there is nothing else to tell it otherwise.
+  //
+  // `rescanApps` re-reads for the row the card is about, which is the row the
+  // question was asked of — not the cursor, which may have moved on.
+  property string appsPath: ""
+  function rescanApps() {
+    if (root.appsPath !== "") root.findApps(root.appsPath);
+  }
+  function setDefaultApp(id) {
+    if (!id || root.openWithMime === "") return;
+    root.run(Terminus.setDefaultAppCommand(id, root.openWithMime));
+    root.status = "default set";
+    rescanTick.restart();
+  }
+  function removeApp(id) {
+    if (!id || root.openWithMime === "") return;
+    root.run(Terminus.removeAppCommand(id, root.openWithMime));
+    root.status = "handler removed";
+    rescanTick.restart();
+  }
+  // A beat, because `run` is a process and the scan that follows reads what
+  // that process writes. Asking immediately raced it and showed the list the
+  // command had just changed.
+  Timer {
+    id: rescanTick
+    interval: 220
+    onTriggered: root.rescanApps()
   }
 
   // ── and choosing one by hand ────────────────────────────────────────────
@@ -6093,6 +7111,16 @@ FloatingWindow {
     const out = [path];
     for (let i = 0; i < rows.length; ++i)
       if (rows[i].path !== path && !rows[i].isDir) out.push(rows[i].path);
+    // THE SCAN IS STARTED HERE TOO. It used to be the menu's job alone, so
+    // reaching this card by its key — shift+return on a file — opened it with
+    // no idea what already handles the type: no "opens with" list at the top,
+    // and nothing to remove. The card reads the answer live, so it filling in
+    // a moment later is fine.
+    //
+    // appsPath doubles as what rescanApps re-reads, so a handler removed from
+    // inside the card refreshes the card.
+    root.appsPath = path;
+    root.findApps(path);
     appPick.ask(out, root.openWithMime);
   }
 
@@ -6147,7 +7175,16 @@ FloatingWindow {
   function beginMkdir() { root.startCreate("dir"); }
 
   function startCreate(kind) {
-    if (root.picking) return;
+    // A DIALOG IS A PLACE TO PUT THINGS, NOT JUST TO FIND THEM. This refused
+    // outright in picker mode, which meant a save dialog could not make the
+    // folder you wanted to save into — you cancelled, opened a file manager,
+    // made the directory, and started the save again.
+    //
+    // BOTH kinds are allowed, not just the directory that was actually asked
+    // for: `a` is the prefix of the `a /` that makes a directory, so refusing
+    // the file half refuses the sequence before it can reach its second key,
+    // and the directory could still not be made. An empty file someone asked
+    // for twice over is their business.
     // Finish whatever name is being typed rather than refusing: `a` twice in
     // a row is a reasonable thing to do, and the first one silently doing
     // nothing is not a reasonable answer to it.
@@ -6182,7 +7219,10 @@ FloatingWindow {
 
 
   // ── chrome ──────────────────────────────────────────────────────────────
-  readonly property int rowH: Math.round(28 * root.zoom)
+  // 26, not 28. Two pixels off every row — the list and the miller columns
+  // both measure themselves from this, so a screenful gains rows and the
+  // vertical rhythm tightens without the text itself moving.
+  readonly property int rowH: Math.round(26 * root.zoom)
 
   // WHEN THE CURSOR IS AN OUTLINE RATHER THAN A BAR, asked by the SelectBar
   // over each list. EntryRow decides this per row as `cursorOnly`; the bar is
@@ -6300,7 +7340,9 @@ FloatingWindow {
                                        if (r) root.copyText(r.name, "filename copied"); }],
         ["n", "copy name",     () => { const r = root.currentRow();
                                        if (r) root.copyText(Terminus.stem(r.name), "name copied"); }],
-        ["m", "permissions",   () => perms.ask()],
+        ["m", "permissions",   () => root.openProperties(1)],
+        ["t", "tags",          () => tagPick.ask()],
+        ["s", "collection",  () => collEdit.ask(-1)],
         ["a", "archive",       () => root.beginArchive("")]
       ],
       b: [
@@ -6363,7 +7405,7 @@ FloatingWindow {
       // Dialogs are handled by dialogKeys, which takes the keyboard for as
       // long as one is up — see its own note. Nothing here may act while a
       // question is on screen.
-      if (confirm.open || prompt.open || perms.open || props.open
+      if (confirm.open || prompt.open || props.open
           || appPick.open || sendTo.open) return;
 
       // ── AND WHILE A NAME IS BEING TYPED IN THE LISTING ────────────
@@ -6751,12 +7793,25 @@ FloatingWindow {
 
       // ── everything else, by character so shift is a different key ───
       switch (event.text) {
-      case " ":  event.accepted = true; root.toggleMark(); root.moveSel(1); break;
+      // SPACE LOOKS, SHIFT+SPACE SELECTS.
+      //
+      // Shift does not change what space TYPES, so these cannot be two cases
+      // the way `g` and `G` are — the modifier has to be read here. The
+      // control and alt guard above lets shift through for exactly this.
+      case " ":
+        event.accepted = true;
+        if (event.modifiers & Qt.ShiftModifier) {
+          root.toggleMark(); root.moveSel(1);
+        } else {
+          root.quickLook();
+        }
+        break;
       case "y":  event.accepted = true; content.seq("y"); break;
       case "x":  event.accepted = true; content.seq("x"); break;
       case "p":  event.accepted = true; root.paste(); break;
       case "d":  event.accepted = true; root.trash(); break;
       case "D":  event.accepted = true; root.deleteForever(); break;
+      case "M":  event.accepted = true; disks.ask(); break;
       case "a":  event.accepted = true; root.beginCreate(); break;
       // ONE KEY, and it does what the selection says. `r` on a row opens that
       // row's name; `r` on nine rows opens the card that renames nine. Having
@@ -6786,7 +7841,7 @@ FloatingWindow {
       // `|` puts the places column back beside it. onSidebarChanged writes
       // the new state to disk without being asked.
       case "|":  event.accepted = true; root.sidebar = !root.sidebar; break;
-      case "i":  event.accepted = true; root.quickLook(); break;
+
       case "o":  event.accepted = true; root.stepOver(); break;
       case "q":
         event.accepted = true;
@@ -7386,17 +8441,39 @@ FloatingWindow {
             width: visible ? chipText.implicitWidth + 18 : 0
             height: 21
             radius: 5
-            color: Qt.rgba(Zenon.sand.r, Zenon.sand.g, Zenon.sand.b, 0.10)
+            // ── THE COLOUR OF THE THING, NOT OF "A SEARCH" ──────────
+            // Sand was right while every chip was a search. A tag has a
+            // colour of its own — it is most of what a tag IS — and a
+            // collection has one too, so the chip wears it and matches
+            // the row in the sidebar it came from. A find or a grep has
+            // no colour to borrow and keeps the sand.
+            readonly property color ink: {
+              if (root.searchMode === "tag") return root.tagInk(root.searchQuery);
+              if (root.searchMode === "collection") {
+                const f = root.collById(root.collOpenId);
+                if (f && f.ink) return Zenon[f.ink] || Zenon.cyan;
+                return Zenon.cyan;
+              }
+              return Zenon.sand;
+            }
+            color: Qt.rgba(searchChip.ink.r, searchChip.ink.g,
+                           searchChip.ink.b, 0.10)
             border.width: 1
-            border.color: Qt.rgba(Zenon.sand.r, Zenon.sand.g, Zenon.sand.b, 0.32)
+            border.color: Qt.rgba(searchChip.ink.r, searchChip.ink.g,
+                                  searchChip.ink.b, 0.32)
 
             Text {
               id: chipText
               anchors.centerIn: parent
-              // the magnifier the search bar uses, so the two read as the same
-              // thing seen twice rather than two different features
-              text: "\uF002  " + root.searchQuery
-              color: Zenon.sand
+              // THE MARK OF THE THING IT IS SHOWING. A magnifier was right
+              // while every chip was a search; a tag page and a collection
+              // are not searches, and labelling them with one made the
+              // sidebar and the chip disagree about what you were looking
+              // at. Each wears what it is listed under.
+              text: (root.searchMode === "tag" ? "\uF02B"
+                     : root.searchMode === "collection" ? "\uEC78"
+                     : "\uF002") + "  " + root.searchQuery
+              color: searchChip.ink
               font.family: Zenon.face
               font.pixelSize: 13
             }
@@ -7784,7 +8861,13 @@ FloatingWindow {
           // about the drawer rather than four things that have to be kept in
           // step. Red is reserved for exactly this — the same rule the confirm
           // card's verbInk follows.
-          readonly property color tone: root.jobFaults > 0 ? Zenon.red : Zenon.cyan
+          // Bad news first — a failure alongside a success is still a
+          // failure to go and look at. Then green, but only once nothing is
+          // RUNNING: green while a second job is still going would be
+          // reporting the batch finished when half of it has not.
+          readonly property color tone: root.jobFaults > 0 ? Zenon.red
+            : (root.jobsLive === 0 && root.jobDone > 0 ? Zenon.green
+                                                       : Zenon.cyan)
           width: jobsToggle.live ? 32 : 0
           visible: width > 0.5
           height: crumbInner.height
@@ -7900,10 +8983,25 @@ FloatingWindow {
                               duration: 320; easing.type: Easing.InQuad }
           }
 
+          // FINISHING IS NEWS TOO. It bursts like a start and a fault do,
+          // and then it STAYS — settling to a floor instead of fading out,
+          // because the green is the receipt and a receipt that dims itself
+          // after half a second is one you had to be watching for.
+          SequentialAnimation {
+            id: jobsDoneBurst
+            NumberAnimation { target: jobsToggle; property: "glow"; to: 1.0;
+                              duration: 130; easing.type: Easing.OutQuad }
+            NumberAnimation { target: jobsToggle; property: "glow"; to: 0.55;
+                              duration: 420; easing.type: Easing.InQuad }
+          }
+
           SequentialAnimation {
             id: jobsGlowPulse
-            running: jobsToggle.live && !jobsGlowBurst.running
-                     && !jobsFaultBurst.running
+            // jobsLive, not live: rows outlive the work now, and a drawer
+            // sitting there green is finished — breathing at you is what
+            // something still running does.
+            running: root.jobsLive > 0 && !jobsGlowBurst.running
+                     && !jobsFaultBurst.running && !jobsDoneBurst.running
             loops: Animation.Infinite
             NumberAnimation { target: jobsToggle; property: "glow"
                               to: root.jobFaults > 0 ? 0.95 : 0.78
@@ -7936,6 +9034,14 @@ FloatingWindow {
             function onJobFaultedChanged() {
               jobsGlowOut.stop();
               jobsFaultBurst.restart();
+            }
+            // Only when the LAST one lands. Each job in a batch finishing
+            // would otherwise re-burst the glyph while the rest are still
+            // going, which reads as "done" three times before it is.
+            function onJobFinishedChanged() {
+              if (root.jobsLive > 0) return;
+              jobsGlowOut.stop();
+              jobsDoneBurst.restart();
             }
           }
 
@@ -8162,7 +9268,9 @@ FloatingWindow {
           Text {
             anchors.verticalCenter: parent.verticalCenter
             visible: root.searchMode !== ""
-            text: root.searchMode === "grep" ? "grep" : "find"
+            text: root.searchMode === "grep" ? "grep"
+              : (root.searchMode === "tag" ? "tag"
+                 : (root.searchMode === "collection" ? "collection" : "find"))
             color: Zenon.sand
             font.family: Zenon.face
             font.pixelSize: 14
@@ -8547,10 +9655,28 @@ FloatingWindow {
               // Whatever colHeads is not supplying, this does.
               Item {
                 width: 1
-                height: Math.max(0, 22 - colHeads.height)
+                // Trimmed from 22. It exists to make up whatever colHeads is
+                // not supplying, not to hold the list down the panel — and
+                // with the heading's own 24 on top of it the first label sat
+                // most of an inch below the breadcrumb.
+                height: Math.max(0, 10 - colHeads.height)
               }
 
-              SideHead { label: "BOOKMARKS"; first: true }
+              // ── EMPTY SECTIONS ARE NOT SECTIONS ───────────────────
+              // A heading over nothing is a promise the panel does not
+              // keep. The other three already hid themselves; bookmarks
+              // never did, so a fresh profile opened on the word
+              // BOOKMARKS and a gap.
+              //
+              // `first` is whichever one is actually showing, not whichever
+              // is written first — the leading heading wants no room above
+              // it, and that is a different heading depending on what you
+              // have.
+              SideHead {
+                label: "BOOKMARKS"
+                visible: root.bookmarks.length > 0
+                first: true
+              }
 
               Repeater {
                 model: root.bookmarks
@@ -8590,7 +9716,84 @@ FloatingWindow {
                 height: root.bookmarks.length === 0 ? 0 : 8
               }
 
-              SideHead { label: "DISKS"; visible: root.disks.length > 0 }
+              // ── TAGS ──────────────────────────────────────────────
+              // Only the ones that are actually ON something. A tag that
+              // has been made but not yet used is real — it is in the
+              // picker, with its colour — but a sidebar entry that lists
+              // nothing is a place you can go to find an empty room, and
+              // the count beside each row is the promise this keeps.
+              SideHead {
+                label: "TAGS"
+                visible: root.sideTags.length > 0
+                first: root.bookmarks.length === 0
+              }
+
+              Repeater {
+                model: root.sideTags
+
+                delegate: SideRow {
+                  required property var modelData
+                  width: sideCol.width
+                  // No drag reorder: bookmarks carry an order that lives in
+                  // their file, and tags are sorted by name. slot -1 is how
+                  // SideRow is told it is not reorderable.
+                  slot: -1
+                  label: modelData.name
+                  detail: String(modelData.count)
+                  glyph: "\uF02B"
+                  ink: modelData.ink
+                  active: root.openTagName === modelData.name
+                  onChosen: root.openTag(modelData.name)
+                }
+              }
+
+              Item {
+                width: 1
+                height: root.sideTags.length === 0 ? 0 : 8
+              }
+
+              // ── SMART FOLDERS ─────────────────────────────────────
+              // Listed whether or not they currently match anything: unlike
+              // a tag, a collection exists because you wrote it, and one
+              // that happens to be empty today is still the question you
+              // asked. Hiding it would make "no results" look like "no
+              // folder".
+              SideHead {
+                label: "COLLECTIONS"
+                visible: root.collections.length > 0
+                first: root.bookmarks.length === 0 && root.sideTags.length === 0
+              }
+
+              Repeater {
+                model: root.collections
+
+                delegate: SideRow {
+                  required property var modelData
+                  width: sideCol.width
+                  slot: -1
+                  label: modelData.name
+                  glyph: "\uEC78"
+                  ink: Zenon[modelData.ink] || Zenon.cyan
+                  active: root.collOpenId === modelData.id
+                  showRemove: true
+                  editable: true
+                  onChosen: root.openCollection(modelData.id)
+                  onRemoved: root.dropCollection(modelData.id)
+                  onEdited: collEdit.ask(modelData.id)
+                }
+              }
+
+              Item {
+                width: 1
+                height: root.collections.length === 0 ? 0 : 8
+              }
+
+              SideHead {
+                label: "DISKS"
+                visible: root.disks.length > 0
+                first: root.bookmarks.length === 0 && root.sideTags.length === 0
+                       && root.collections.length === 0
+              }
 
               Repeater {
                 model: root.disks
@@ -8736,12 +9939,19 @@ FloatingWindow {
           index: paneL.sel
           rowH: root.rowH
           on: listA.on && !root.cursorOutline(paneL)
+          // NOT WHILE EXTENDING A SELECTION. Holding a direction in visual
+          // mode steps the cursor a row at a time as fast as the key repeats,
+          // and an eased bar spends every one of those steps still catching
+          // up with the last — it trails the block it is supposed to be
+          // drawing the end of. It snaps while the selection grows.
+          animate: !root.visualOn
         }
         SelectBar {
           view: listB
           index: paneR.sel
           rowH: root.rowH
           on: listB.on && !root.cursorOutline(paneR)
+          animate: !root.visualOn
         }
 
         // ── columns ─────────────────────────────────────────────────
@@ -8789,6 +9999,15 @@ FloatingWindow {
             // A find only. A grep already puts its own second column to work
             // — see showMeta — and its results are lines inside files rather
             // than places, so that layout is the one it wants.
+            //
+            // AND NOT A TAG OR A COLLECTION, which this briefly did on the
+            // reasoning that they are results too. They are not: a find is
+            // typed, looked at and left, so borrowing the pane's shape for
+            // the duration costs nothing. A collection is a PLACE you keep
+            // and come back to — it has a view of its own now — and forcing
+            // the two-column shape on top of that meant the view it
+            // remembered never showed. Two columns is for the thing you are
+            // passing through, not the thing you live in.
             readonly property bool flat: root.searchMode === "find"
 
             readonly property real w0: miller.flat
@@ -8943,6 +10162,12 @@ FloatingWindow {
                 // more air above than beside.
                 anchors.topMargin: 12
                 spacing: 10
+                // NOT text. A picture's name belongs above it, because the
+                // picture is the thing and the name labels it. A document is
+                // read from its first line down, so anything above that line
+                // is in the way — text carries its name at the FOOT instead,
+                // with the counts, where the two read as one footer. See the
+                // facts column.
                 visible: root.previewKind === "image" || root.previewKind === "video"
                   || root.previewKind === "audio"
 
@@ -8964,9 +10189,28 @@ FloatingWindow {
                   // decoded source, and never from paintedWidth/paintedHeight —
                   // the painted size follows the item's own, which is this
                   // rectangle's, and reading it here would be a binding loop.
-                  readonly property real ar:
-                    shot.implicitWidth > 0 && shot.implicitHeight > 0
-                      ? shot.implicitWidth / shot.implicitHeight : 1
+                  // LATCHED WHEN THE PICTURE LANDS, not bound to it.
+                  //
+                  // The value never circled — sourceSize is fixed, so the
+                  // implicit size is the decoded size and nothing to do with
+                  // this item. The DEPENDENCY did: height reads
+                  // shot.implicitHeight, and shot fills this item, so Qt saw
+                  // height depending on a child that depends on height and
+                  // called it a loop. It is right to: a graph that circles
+                  // is re-evaluated until it happens to settle, which is
+                  // work done on every layout pass for an answer that only
+                  // changes when a new file is shown.
+                  property real ar: 1
+                  function takeAspect() {
+                    if (shot.implicitWidth > 0 && shot.implicitHeight > 0)
+                      mediaClip.ar = shot.implicitWidth / shot.implicitHeight;
+                  }
+                  Connections {
+                    target: shot
+                    function onStatusChanged() {
+                      if (shot.status === Image.Ready) mediaClip.takeAspect();
+                    }
+                  }
                   width: Math.max(1, Math.min(media.boxW, media.boxH * mediaClip.ar))
                   height: Math.max(1, Math.min(media.boxH, media.boxW / mediaClip.ar))
 
@@ -9007,108 +10251,191 @@ FloatingWindow {
                   }
                 }
 
-                Text {
-                  width: parent.width
-                  horizontalAlignment: Text.AlignHCenter
-                  text: {
-                    const r = root.currentRow();
-                    return r ? r.name : "";
-                  }
-                  elide: Text.ElideMiddle
-                  color: Zenon.white
+                // NO NAME, AND NO RULE. The column beside this one has the
+                // row selected and named already, so every preview repeating
+                // it was the pane telling you the one thing you could already
+                // see — and with the name gone the rule under it was dividing
+                // a picture from its own caption, which needs no dividing.
+                //
+                // Text keeps a rule: there it separates a document you are
+                // reading from the footer under it. See the facts column.
+
+
+
+              }
+
+              // ── THE FACTS, WHICH ARE NOT ALWAYS AT THE TOP ────────────
+              // For a picture or a film they belong under the frame, where
+              // they read as its caption. For TEXT there is no frame — the
+              // document itself fills the pane — and a block of counts above
+              // it pushes the first line of the file down out of the way of
+              // the thing you opened the preview to read. So they sit at the
+              // foot of the pane there, the way a status line does.
+              //
+              // One Repeater either way: only the anchoring differs, and an
+              // anchor set to undefined is how QML is told to forget one.
+              Column {
+                id: facts
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.leftMargin: 20
+                anchors.rightMargin: 16
+
+                // Measured rather than guessed, so a label added later
+                // cannot quietly overflow the way "longest line" did.
+                readonly property real labelW: factsMetric.width + 6
+                TextMetrics {
+                  id: factsMetric
                   font.family: Zenon.face
-                  font.weight: Font.Bold
-                  font.pixelSize: 17
+                  font.pixelSize: 16
+                  text: "longest line"
                 }
 
+                // PLACED, NOT ANCHORED EITHER WAY ROUND.
+                //
+                // This was a pair of ternaries handing `undefined` to whichever
+                // anchor was not wanted. QML does not reliably drop an anchor
+                // that way — both stayed live, top won, and the footer rendered
+                // at the TOP of the pane with the document crushed into the one
+                // line above it. One `y` cannot contradict itself.
+                // A FOOTER NEEDS SOMETHING TO BE THE FOOT OF. An empty
+                // file is still previewKind "text", so the counts were
+                // pinned to the bottom of the pane behind a rule with
+                // nothing above it — a separator separating the metadata
+                // from a blank. With no document the counts ARE the
+                // content, so they sit where it would have been.
+                readonly property bool atFoot:
+                  (root.previewKind === "text" && root.previewText !== "")
+                  || root.previewKind === "pdf"
+                y: facts.atFoot
+                  ? Math.max(0, parent.height - facts.height - 12)
+                  : media.y + media.height + 10
+                visible: media.visible || root.previewKind === "text"
+                  || root.previewKind === "pdf"
+                spacing: 3
+
+                // Only for text, where this column is a footer under the
+                // document rather than a caption under a picture — a picture
+                // already has the rule that media draws above these rows.
                 Rectangle {
                   width: parent.width
                   height: 1
                   color: Zenon.msgBorder
+                  visible: facts.atFoot
                 }
 
-                Column {
-                  width: parent.width
-                  spacing: 3
+                Item {
+                  width: 1
+                  height: 7
+                  visible: facts.atFoot
+                }
 
-                  Repeater {
-                    // Every property this reads is named here on purpose: a
-                    // binding re-evaluates when a PROPERTY it touched changes,
-                    // and currentRow() is a function call, which is not one.
-                    // Without `sel` and `view` in the expression the panel kept
-                    // the first file's size and date for the whole folder.
-                    model: {
-                      const kind = root.previewKind;
-                      const info = root.previewInfo;
-                      const at = root.sel;
-                      const all = root.view;
-                      if (kind !== "image" && kind !== "video" && kind !== "audio")
-                        return [];
-                      const r = root.currentRow();
-                      if (!r) return [];
-                      const out = [];
-                      const dot = "  \u00b7  ";
-                      const add = (k, v) => { if (v) out.push([k, v]); };
-                      if (info && info.dims) out.push(["dimensions", info.dims]);
-                      if (kind === "video" && info) {
-                        add("duration", info.duration);
-                        add("codec", info.codec
-                          + (info.container ? dot + info.container : ""));
-                        add("frame rate", info.fps);
-                        add("bitrate", info.bitrate);
-                      } else if (kind === "audio" && info) {
-                        // the tags first: on a track they are the answer, and
-                        // the codec is the footnote
-                        add("title", info.title);
-                        add("artist", info.artist);
-                        add("album", info.album
-                          + (info.date ? dot + info.date : ""));
-                        add("track", info.track);
-                        add("duration", info.duration);
-                        add("codec", info.codec
-                          + (info.container ? dot + info.container : ""));
-                        add("audio", [info.rate, info.channels]
-                          .filter((x) => !!x).join(dot));
-                        add("bitrate", info.bitrate);
-                      } else if (info) {
-                        add("format", info.format);
-                        add("colour", [info.depth, info.colorspace]
-                          .filter((x) => !!x).join(dot));
-                      }
-                      out.push(["size", Terminus.formatSize(r.size)]);
-                      out.push(["modified", Terminus.formatTime(r.mtime)]);
-                      return out;
+                // NO NAME HERE. The column beside this one already has the
+                // row selected and named; repeating it over its own preview
+                // was the pane telling you something you were looking at.
+
+
+                Repeater {
+                  // Every property this reads is named here on purpose: a
+                  // binding re-evaluates when a PROPERTY it touched changes,
+                  // and currentRow() is a function call, which is not one.
+                  // Without `sel` and `view` in the expression the panel kept
+                  // the first file's size and date for the whole folder.
+                  model: {
+                    const kind = root.previewKind;
+                    const info = root.previewInfo;
+                    const at = root.sel;
+                    const all = root.view;
+                    if (kind !== "image" && kind !== "video"
+                        && kind !== "audio" && kind !== "text"
+                        && kind !== "pdf")
+                      return [];
+                    const r = root.currentRow();
+                    if (!r) return [];
+                    const out = [];
+                    const dot = "  \u00b7  ";
+                    const add = (k, v) => { if (v) out.push([k, v]); };
+                    if (info && info.dims) out.push(["dimensions", info.dims]);
+                    if (kind === "video" && info) {
+                      add("duration", info.duration);
+                      add("codec", info.codec
+                        + (info.container ? dot + info.container : ""));
+                      add("frame rate", info.fps);
+                      add("bitrate", info.bitrate);
+                    } else if (kind === "audio" && info) {
+                      // the tags first: on a track they are the answer, and
+                      // the codec is the footnote
+                      add("title", info.title);
+                      add("artist", info.artist);
+                      add("album", info.album
+                        + (info.date ? dot + info.date : ""));
+                      add("track", info.track);
+                      add("duration", info.duration);
+                      add("codec", info.codec
+                        + (info.container ? dot + info.container : ""));
+                      add("audio", [info.rate, info.channels]
+                        .filter((x) => !!x).join(dot));
+                      add("bitrate", info.bitrate);
+                    } else if (kind === "pdf" && info) {
+                      // What the document says about itself first, where it
+                      // says anything — a great many PDFs carry neither a
+                      // title nor an author.
+                      add("title", info.title);
+                      add("author", info.author);
+                      add("pages", info.pages);
+                      add("page size", info.pageSize);
+                      add("pdf", info.version
+                        + (info.encrypted ? dot + "encrypted" : ""));
+                    } else if (kind === "text" && info) {
+                      // Length, then shape, then the one that explains a
+                      // page of mojibake when you meet one.
+                      add("lines", info.lines);
+                      add("words", info.words + dot
+                          + info.chars + " characters");
+                      add("longest line", info.longest);
+                      add("encoding", info.encoding);
+                    } else if (info) {
+                      add("format", info.format);
+                      add("colour", [info.depth, info.colorspace]
+                        .filter((x) => !!x).join(dot));
+                    }
+                    out.push(["size", Terminus.formatSize(r.size)]);
+                    out.push(["modified", Terminus.formatTime(r.mtime)]);
+                    return out;
+                  }
+
+                  delegate: Row {
+                    required property var modelData
+                    width: media.width
+                    height: 24
+                    spacing: 10
+
+                    Text {
+                      // WIDE ENOUGH FOR THE LONGEST LABEL THERE ACTUALLY IS,
+                      // which is "longest line" and not "frame rate" — the
+                      // text rows were added after this number was chosen.
+                      // Right-aligned text that does not fit its box spills
+                      // out of the LEFT of it, so the label was not merely
+                      // cramped, it was hanging off the edge of the pane.
+                      width: facts.labelW
+                      height: parent.height
+                      horizontalAlignment: Text.AlignRight
+                      verticalAlignment: Text.AlignVCenter
+                      text: modelData[0]
+                      color: Zenon.muted
+                      font.family: Zenon.face
+                      font.pixelSize: 16
                     }
 
-                    delegate: Row {
-                      required property var modelData
-                      width: media.width
-                      height: 24
-                      spacing: 10
-
-                      Text {
-                        // wide enough for "frame rate", the longest label any of
-                        // these rows carries, at this size
-                        width: 102
-                        height: parent.height
-                        horizontalAlignment: Text.AlignRight
-                        verticalAlignment: Text.AlignVCenter
-                        text: modelData[0]
-                        color: Zenon.muted
-                        font.family: Zenon.face
-                        font.pixelSize: 16
-                      }
-
-                      Text {
-                        width: media.width - 112
-                        height: parent.height
-                        verticalAlignment: Text.AlignVCenter
-                        text: modelData[1]
-                        elide: Text.ElideRight
-                        color: Zenon.white
-                        font.family: Zenon.face
-                        font.pixelSize: 16
-                      }
+                    Text {
+                      width: media.width - facts.labelW - 10
+                      height: parent.height
+                      verticalAlignment: Text.AlignVCenter
+                      text: modelData[1]
+                      elide: Text.ElideRight
+                      color: Zenon.white
+                      font.family: Zenon.face
+                      font.pixelSize: 16
                     }
                   }
                 }
@@ -9297,22 +10624,45 @@ FloatingWindow {
               // beside it is the same one every other view here uses.
               Flickable {
                 id: textScroll
-                anchors.fill: parent
-                anchors.margins: 16
-                // NO VERTICAL PADDING AT ALL. The sides need it — the pane's own
-                // divider is a hairline and text run up against it reads as
-                // spilling out of the column. The top and bottom do not: the bar
-                // above is a hard edge that already separates them, and the three
-                // columns beside this one start their first row flush with it.
-                // Inset, the preview began a line and a half lower than the
-                // listing it is a preview OF, which reads as the pane sagging.
-                anchors.topMargin: 0
-                anchors.bottomMargin: 0
+                // BELOW THE HEADER RATHER THAN BEHIND IT. This used to fill
+                // the pane, which was right while text was the one kind with
+                // no facts above it — see media.visible.
+                anchors.top: media.visible ? media.bottom : parent.top
+                // NONE when there is no header above it: the bar over the
+                // pane is already a hard edge, and the three columns beside
+                // this one start their first row flush with it.
+                anchors.topMargin: media.visible ? 10 : 0
+
+                anchors.left: parent.left
+                anchors.right: parent.right
+                // Stops above the facts when they are at the foot of the
+                // pane, which is where text puts them — see the note on the
+                // facts column.
+                anchors.bottom: root.previewKind === "text" && facts.visible
+                  ? facts.top : parent.bottom
+                anchors.bottomMargin: root.previewKind === "text" && facts.visible
+                  ? 10 : 0
+                anchors.leftMargin: 16
+                anchors.rightMargin: 16
+                // NO PADDING AT THE BOTTOM, and none at the top either when
+                // there is no header above — the sides need it, because the
+                // pane's divider is a hairline and text run up against it
+                // reads as spilling out of the column, but the bar above is a
+                // hard edge that already separates them and the three columns
+                // beside this one start their first row flush with it. Inset,
+                // the preview began a line and a half lower than the listing
+                // it is a preview OF, which reads as the pane sagging. The top
+                // margin is set above, since it now depends on the header
+                // and on where the facts sit.
                 visible: root.previewKind === "text"
                 clip: true
                 interactive: true
                 boundsBehavior: Flickable.StopAtBounds
-                contentWidth: Math.max(width, previewBody.implicitWidth)
+                // WRAPPED, so the width is the pane's and there is nothing
+                // to scroll sideways to. A preview is for reading what is in
+                // a file, and a line that runs off the right edge of a narrow
+                // pane cannot be read without dragging it back and forth.
+                contentWidth: width
                 contentHeight: previewBody.implicitHeight
                 // back to the top whenever the pane is showing something else
                 onVisibleChanged: if (!visible) contentY = 0;
@@ -9326,7 +10676,10 @@ FloatingWindow {
                   // highlighting, and markdown comes through the same path
                   textFormat: Text.RichText
                   color: Zenon.white
-                  wrapMode: Text.NoWrap
+                  // AnywhereIfNeeded rather than plain Wrap: source lines and
+                  // long paths have no spaces to break at, and a word wider
+                  // than the pane would otherwise still overhang it.
+                  wrapMode: Text.WrapAtWordBoundaryOrAnywhere
                   font.family: Zenon.faceMono
                   font.pixelSize: Math.round(17 * root.zoom)
                 }
@@ -9347,12 +10700,14 @@ FloatingWindow {
               ScrollRail {
                 target: textScroll
                 on: textScroll.visible
-                // Placed against the PANE, not against textScroll — the
-                // flickable is inset 16px so that its text does not run into
-                // the edges, and hanging the rail off that put it 18px in from
-                // the pane while every other rail here sits 2px from its view.
-                anchors.top: previewPane.top
-                anchors.topMargin: 2
+                // Its RIGHT edge is placed against the pane, not against
+                // textScroll — the flickable is inset 16px so that its text
+                // does not run into the edges, and hanging the rail off that
+                // put it 18px in from the pane while every other rail here
+                // sits 2px from its view. Its top follows the text, which no
+                // longer starts at the top of the pane.
+                anchors.top: textScroll.top
+                anchors.topMargin: 0
                 anchors.bottom: previewPane.bottom
                 anchors.bottomMargin: 2
                 anchors.right: previewPane.right
@@ -9360,12 +10715,20 @@ FloatingWindow {
               }
 
               Image {
-                anchors.fill: parent
-                anchors.margins: 16
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.top: parent.top
+                anchors.leftMargin: 16
+                anchors.rightMargin: 16
                 // A touch tighter at the top than at the sides: the bar above is a hard
                 // edge and the pane's own left divider is not, so an equal 16 read as
                 // more air above than beside.
                 anchors.topMargin: 12
+                // Stops above the facts, which sit at the foot for a document
+                // the same way they do for text — it used to fill the pane and
+                // draw straight over them.
+                anchors.bottom: facts.visible ? facts.top : parent.bottom
+                anchors.bottomMargin: facts.visible ? 10 : 16
                 visible: root.previewKind === "pdf"
                 source: root.previewKind === "pdf" && root.previewStamp > 0
                   ? "file://" + root.pdfStem + ".png?v=" + root.previewStamp : ""
@@ -9404,11 +10767,14 @@ FloatingWindow {
           view: gridA
           index: paneL.sel
           on: gridA.on && !root.cursorOutline(paneL)
+          // As the lists do — see the note on listA's bar.
+          animate: !root.visualOn
         }
         SelectCell {
           view: gridB
           index: paneR.sel
           on: gridB.on && !root.cursorOutline(paneR)
+          animate: !root.visualOn
         }
 
         // One rail per view that scrolls, each riding its own flickable —
@@ -10070,6 +11436,22 @@ FloatingWindow {
 
           TextInput {
             id: saveField
+
+            // A cursorDelegate REPLACES the built-in one, so there is
+            // exactly one caret and this decides how it behaves. It
+            // breathes, the way every other field on this desktop does
+            // — a hard on/off blink was the last thing here still
+            // wearing Qt's default.
+            cursorDelegate: Rectangle {
+              width: 2
+              color: Zenon.cyan
+              SequentialAnimation on opacity {
+                running: saveField.activeFocus
+                loops: Animation.Infinite
+                NumberAnimation { to: 0.2; duration: 620; easing.type: Easing.InOutQuad }
+                NumberAnimation { to: 1.0; duration: 620; easing.type: Easing.InOutQuad }
+              }
+            }
             anchors.fill: parent
             anchors.leftMargin: 10
             anchors.rightMargin: 10
@@ -10244,10 +11626,22 @@ FloatingWindow {
 
       function show(sel) {
         props.rows = sel;
+        // The card carries an "open with" row for a single file, and the scan
+        // that fills it used to be started only by the menu — so reaching
+        // properties by its key showed an empty one.
+        root.appsPath = (sel.length === 1 && !sel[0].isDir) ? sel[0].path : "";
+        root.findApps(root.appsPath);
         props.owner = "";
         props.walked = -1;
         props.files = -1;
         props.dirs = -1;
+        // The cursor row's mode, as the permissions card used: a mixed set
+        // has no single answer and picking one is more honest than zero.
+        props.permMode = (sel[0] && sel[0].mode) || 0;
+        props.permWas = props.permMode;
+        props.permCursor = 0;
+        // Always opens on properties, whichever page you left it on.
+        props.tab = 0;
         props.open = true;
         // only when there is a directory in the set: for plain files the size
         // is already known and du would be a process for nothing
@@ -10312,6 +11706,7 @@ FloatingWindow {
       }
 
       InputShield {
+        keepTop: tabStrip.height + crumbBar.height
         onClicked: { props.open = false; content.forceActiveFocus(); }
       }
 
@@ -10330,6 +11725,91 @@ FloatingWindow {
         id: propFm
         font.family: Zenon.face
         font.pixelSize: 16
+      }
+
+      // The NAME of whatever currently opens this type, not its desktop id: the
+      // id is what the association database deals in, the name is what you
+      // recognise. Falls back to the id when the scan found no entry for it,
+      // which is what a stale association looks like.
+      readonly property string openWithLabel: {
+        if (!root.appsScanned) return "\u2026";
+        const id = root.openWithDefault;
+        if (id === "") return "nothing";
+        for (const a of root.openWithApps) if (a.id === id) return a.name;
+        return id;
+      }
+
+      // ONE LIST. Choosing a row makes that handler the default; the cross at
+      // the end of a row takes the handler away. Both verbs live on the row
+      // they are about, which is why there is no longer a "Remove" submenu —
+      // that was the same names listed twice, doing different things depending
+      // on which copy you had walked into.
+      function openWithMenu(item) {
+        const apps = root.openWithApps;
+        const out = [];
+        for (let i = 0; i < apps.length; ++i) {
+          const id = apps[i].id;
+          out.push({ label: apps[i].name,
+                     key: id === root.openWithDefault ? "default" : "",
+                     act: () => root.setDefaultApp(id),
+                     strike: () => root.removeApp(id) });
+        }
+        if (out.length > 0) out.push({ sep: true });
+        out.push({ label: "Add another\u2026",
+                   act: () => root.beginOpenWith(root.appsPath) });
+        menu.openCustom(item, { x: 0, y: item.height }, out, false);
+      }
+
+      // ── THE MODE, WHICH THIS CARD NOW OWNS ────────────────────────
+      // permMode is what the grid is showing and permWas is what the file
+      // actually has; the Apply button is the difference between them.
+      // Nothing is written until it is pressed — properties is a card you
+      // open to LOOK at something, and a chmod that happened because you
+      // clicked a box while reading would be the one surprise it must not
+      // spring.
+      // ── TWO PAGES, ONE CARD ───────────────────────────────────────
+      // Permissions used to be a sheet of its own, which meant two cards
+      // about one file and no way between them without closing one and
+      // reaching for a different key. They are one card now, and
+      // properties is still what opens: reading is the common act and
+      // changing the mode is the rare one, so the rare one is a tab away
+      // rather than in the way.
+      property int tab: 0
+      readonly property var tabs: props.many
+        ? ["Properties"] : ["Properties", "Permissions"]
+
+      property int permMode: 0
+      property int permWas: 0
+      property int permCursor: 0
+      readonly property int permCursorBit:
+        [4, 2, 1][props.permCursor % 3] << (6 - Math.floor(props.permCursor / 3) * 3)
+      readonly property bool permDirty:
+        (props.permMode & 511) !== (props.permWas & 511)
+      readonly property var permPaths: props.rows.map((r) => r.path)
+
+      function togglePermBit() {
+        props.permMode = props.permMode ^ props.permCursorBit;
+      }
+
+      function applyPerms() {
+        if (!props.permDirty) return;
+        root.run(Terminus.chmodCommand(props.permPaths, props.permMode));
+        props.permWas = props.permMode;
+        root.status = "permissions set";
+      }
+
+      // Every tag on the selection, once each. One file's own list, or the
+      // union across several — sorted, so the order does not jump about as
+      // the selection changes.
+      readonly property var tagNames: {
+        const seen = ({});
+        const out = [];
+        for (let i = 0; i < props.rows.length; ++i) {
+          const names = root.tagMarks[props.rows[i].path] || [];
+          for (let j = 0; j < names.length; ++j)
+            if (!seen[names[j]]) { seen[names[j]] = true; out.push(names[j]); }
+        }
+        return out.sort();
       }
 
       readonly property var facts: {
@@ -10359,8 +11839,7 @@ FloatingWindow {
                       : Terminus.formatSize(r.size) + "  ·  " + r.size + " bytes"],
                     ["modified", Terminus.formatTime(r.mtime)],
                     ["owner", props.owner === "" ? "…" : props.owner],
-                    ["permissions", ("000" + (r.mode & 511).toString(8)).slice(-3)
-                      + "  " + Terminus.modeString(r.mode)]
+                    // no "permissions" row: the grid below IS that row now
                   ].concat(
                     // What is inside it, for a directory — the natural companion
                     // to the size two rows up, and the one thing this card could
@@ -10372,6 +11851,7 @@ FloatingWindow {
                           + props.imageInfo.depth + "  \u00b7  "
                           + props.imageInfo.colorspace]]
                       : [],
+                    r.isDir ? [] : [["open with", props.openWithLabel]],
                     r.isDir ? []
                       : [["sha256", props.checksum === "" ? "click to compute"
                           : props.checksum]]);
@@ -10421,9 +11901,58 @@ FloatingWindow {
           // does not carry any has to say so.
           Item { width: 1; height: 10 }
 
+          // A mixed selection has no single mode to edit, so it gets no tab
+          // to edit one with — the strip simply is not there.
+          Item {
+            width: parent.width
+            height: props.tabs.length > 1 ? 34 : 0
+            visible: props.tabs.length > 1
+
+            Row {
+              anchors.centerIn: parent
+              spacing: 6
+
+              Repeater {
+                model: props.tabs
+                delegate: Rectangle {
+                  id: propTab
+                  required property var modelData
+                  required property int index
+                  readonly property bool on: props.tab === propTab.index
+                  width: propTabText.implicitWidth + 26
+                  height: 26
+                  radius: 5
+                  color: propTab.on
+                    ? Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b, 0.16)
+                    : (propTabHov.hovered ? Zenon.headBg : "transparent")
+                  border.width: 1
+                  border.color: propTab.on ? Zenon.cyan : Zenon.msgBorder
+                  Behavior on color { ColorAnimation { duration: Zenon.fast } }
+                  Behavior on border.color { ColorAnimation { duration: Zenon.fast } }
+
+                  Text {
+                    id: propTabText
+                    anchors.centerIn: parent
+                    text: propTab.modelData
+                    color: propTab.on ? Zenon.cyan : Zenon.white
+                    font.family: Zenon.face
+                    font.pixelSize: 14
+                  }
+
+                  HoverHandler { id: propTabHov }
+                  MouseArea {
+                    anchors.fill: parent
+                    onClicked: props.tab = propTab.index
+                  }
+                }
+              }
+            }
+          }
+
           // picture on the left, facts on the right
           Item {
             id: propBody
+            visible: props.tab === 0
             width: parent.width
             height: Math.max(props.many ? 0 : propShotBox.height + 4,
                              propFacts.implicitHeight)
@@ -10559,6 +12088,65 @@ FloatingWindow {
               anchors.right: parent.right
               anchors.verticalCenter: parent.verticalCenter
 
+            // ── TAGS, WHICH ARE NOT A STRING ─────────────────────────
+            // A row of its own rather than an entry in `facts`, because
+            // every fact there is a label and a piece of text and a tag is
+            // a label and a COLOUR. Flattening them to "red · work" would
+            // hand back exactly what the colour was carrying.
+            //
+            // Absent, not empty, for an untagged file: a card that says
+            // "tags —" about most files is a row of nothing on most cards.
+            // For several files at once it is the union, with a count, since
+            // "which tags are in this selection" is the answerable question.
+            Row {
+              width: propFacts.width
+              height: 28
+              leftPadding: 18
+              rightPadding: 18
+              spacing: 12
+              visible: props.tagNames.length > 0
+
+              Text {
+                width: 118
+                height: parent.height
+                horizontalAlignment: Text.AlignRight
+                verticalAlignment: Text.AlignVCenter
+                text: "tags"
+                color: Zenon.muted
+                font.family: Zenon.face
+                font.pixelSize: 16
+              }
+
+              Row {
+                height: parent.height
+                spacing: 12
+
+                Repeater {
+                  model: props.tagNames
+                  delegate: Row {
+                    required property var modelData
+                    height: 28
+                    spacing: 5
+
+                    Text {
+                      anchors.verticalCenter: parent.verticalCenter
+                      text: "\uF02B"
+                      color: root.tagInk(modelData)
+                      font.family: Zenon.face
+                      font.pixelSize: 15
+                    }
+                    Text {
+                      anchors.verticalCenter: parent.verticalCenter
+                      text: modelData
+                      color: Zenon.white
+                      font.family: Zenon.face
+                      font.pixelSize: 16
+                    }
+                  }
+                }
+              }
+            }
+
             Repeater {
               model: props.facts
 
@@ -10592,25 +12180,312 @@ FloatingWindow {
                   // until it has an answer.
                   readonly property bool askable:
                     modelData[0] === "sha256" && props.checksum === ""
-                  color: propValue.askable
+                  // The other row you can act on. Same treatment, so "this one
+                  // does something" is one idea in this card rather than two.
+                  readonly property bool pickable:
+                    modelData[0] === "open with" && root.appsScanned
+                  color: (propValue.askable || propValue.pickable)
                     ? (sumHov.hovered ? Zenon.cyan : Zenon.keyInk) : Zenon.white
                   font.family: Zenon.face
                   font.pixelSize: 16
 
-                  HoverHandler { id: sumHov; enabled: propValue.askable }
+                  HoverHandler {
+                    id: sumHov
+                    enabled: propValue.askable || propValue.pickable
+                  }
 
                   MouseArea {
                     anchors.fill: parent
-                    enabled: propValue.askable
-                    onClicked: props.computeChecksum()
+                    enabled: propValue.askable || propValue.pickable
+                    onClicked: {
+                      if (propValue.pickable) props.openWithMenu(propValue);
+                      else props.computeChecksum();
+                    }
                   }
                 }
               }
             }
 
+            // ── PERMISSIONS, WHICH USED TO BE A CARD OF ITS OWN ───────
+            // Properties already listed the mode as a line of text you
+            // could read and not change, and a second sheet existed to
+            // change it. Two cards about one file, and the one you opened
+            // first was always the wrong one.
+            //
+            // The grid is the same grid, moved: same nine boxes, same
+            // presets, same keyboard. What it lost is a card, a scrim, a
+            // shadow and five registrations — and what it gained is being
+            // in the place you were already looking when you wondered.
+
+
             }
           }
 
+          Item { width: 1; height: 6 }
+
+          Column {
+            id: permGrid
+            width: parent.width
+            readonly property int gap: 12
+            readonly property int labelW: 78
+            readonly property int cellW: 62
+            readonly property int octW: 40
+            // The tab AND something to show one for: a mixed selection has
+            // no tab to reach this page with, so it can never be on it.
+            visible: props.tab === 1 && props.rows.length > 0 && !props.many
+
+
+          // ONE RHYTHM. Everything below the title is 12px apart and the grid
+          // is centred rather than left-padded — it used to start 40px in and
+          // end 146px short of the right edge, which is what made the card
+          // look like it was leaning.
+
+          // The caption band stood here. It is drawn on the bar now — see
+          // sheetBarHead — because a sheet says what it is where it hangs from.
+          // The rhythm's own gap stays: the sheet adds no air, so the first
+          // row has to bring it like every other row does.
+          Item { width: 1; height: permGrid.gap }
+
+          // The answer in both spellings on one line — the octal you would
+          // type at chmod and the rwx string ls prints. They are the same
+          // number said twice, so they belong side by side rather than stacked.
+          Row {
+            anchors.horizontalCenter: parent.horizontalCenter
+            spacing: 16
+
+            Text {
+              anchors.verticalCenter: parent.verticalCenter
+              text: ("000" + (props.permMode & 511).toString(8)).slice(-3)
+              color: Zenon.cyan
+              font.family: Zenon.faceMono
+              font.weight: Font.Bold
+              font.pixelSize: 30
+            }
+
+            Rectangle {
+              anchors.verticalCenter: parent.verticalCenter
+              width: 1
+              height: 24
+              color: Zenon.msgBorder
+            }
+
+            Text {
+              anchors.verticalCenter: parent.verticalCenter
+              text: Terminus.modeString(props.permMode)
+              color: Zenon.sand
+              font.family: Zenon.faceMono
+              font.weight: Font.Bold
+              font.pixelSize: 21
+            }
+          }
+
+          Item { width: 1; height: permGrid.gap }
+
+          // The four modes anyone actually types. A permissions dialog whose
+          // quickest route to 755 is nine clicks is a dialog that has not
+          // finished the job.
+          Row {
+            anchors.horizontalCenter: parent.horizontalCenter
+            spacing: 8
+
+            Repeater {
+              model: [
+                ["644", 420], ["755", 493], ["600", 384], ["700", 448]
+              ]
+
+              delegate: Rectangle {
+                required property var modelData
+                readonly property bool on: (props.permMode & 511) === modelData[1]
+                width: 62
+                height: 24
+                radius: 4
+                color: on ? Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b, 0.20)
+                  : (presetHov.hovered ? Zenon.hoverTint : "transparent")
+                border.width: 1
+                border.color: on ? Zenon.cyan : Zenon.msgBorder
+                Behavior on color {
+                  ColorAnimation { duration: Zenon.fast; easing.type: Zenon.ease }
+                }
+
+                Text {
+                  anchors.centerIn: parent
+                  text: modelData[0]
+                  color: parent.on ? Zenon.cyan : Zenon.muted
+                  font.family: Zenon.faceMono
+                  font.pixelSize: 14
+                }
+
+                HoverHandler { id: presetHov }
+                MouseArea {
+                  anchors.fill: parent
+                  // the high bits — setuid and friends — are left alone: this
+                  // is a shortcut for the nine, not a reset of the whole mode
+                  onClicked: props.permMode = (props.permMode & ~511) | modelData[1]
+                }
+              }
+            }
+          }
+
+          Item { width: 1; height: permGrid.gap + 2 }
+
+          Rectangle {
+            height: 1
+            color: Zenon.msgBorder
+          }
+
+          Item { width: 1; height: permGrid.gap }
+
+          // A GRID with its columns named, rather than three unlabelled rows
+          // of three: r, w and x are not obvious from the boxes alone, and the
+          // heading costs one row of small type.
+          Row {
+            anchors.horizontalCenter: parent.horizontalCenter
+            height: 18
+
+            Item { width: permGrid.labelW; height: 1 }
+            Repeater {
+              model: ["read", "write", "exec"]
+              delegate: Text {
+                required property var modelData
+                width: permGrid.cellW
+                height: 18
+                horizontalAlignment: Text.AlignHCenter
+                verticalAlignment: Text.AlignVCenter
+                text: modelData
+                color: Zenon.msgBorder
+                font.family: Zenon.face
+                font.pixelSize: 12
+              }
+            }
+            Item { width: permGrid.octW; height: 1 }
+          }
+
+          // three rows of three, in the order chmod writes them
+          Repeater {
+            model: [["owner", 6], ["group", 3], ["other", 0]]
+
+            delegate: Row {
+              id: permRow
+              required property var modelData
+              required property int index
+              readonly property int shift: modelData[1]
+              anchors.horizontalCenter: parent.horizontalCenter
+              height: 34
+
+              Text {
+                width: permGrid.labelW
+                height: parent.height
+                verticalAlignment: Text.AlignVCenter
+                text: modelData[0]
+                color: Zenon.white
+                font.family: Zenon.face
+                font.pixelSize: 16
+              }
+
+              Repeater {
+                model: [["r", 4], ["w", 2], ["x", 1]]
+
+                delegate: Item {
+                  required property var modelData
+                  required property int index
+                  width: permGrid.cellW
+                  height: parent.height
+
+                  readonly property int bit: modelData[1] << permRow.shift
+                  readonly property bool on: (props.permMode & bit) !== 0
+                  readonly property bool here:
+                    props.permCursor === permRow.index * 3 + index
+
+                  Rectangle {
+                    anchors.centerIn: parent
+                    width: 50
+                    height: 26
+                    radius: 4
+                    color: parent.on
+                      ? Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b, 0.20)
+                      : (bitHov.hovered ? Zenon.hoverTint : "transparent")
+                    border.width: parent.here ? 2 : 1
+                    border.color: parent.here ? Zenon.sand
+                      : (parent.on ? Zenon.cyan : Zenon.msgBorder)
+                    Behavior on color {
+                      ColorAnimation { duration: Zenon.fast; easing.type: Zenon.ease }
+                    }
+
+                    Text {
+                      anchors.centerIn: parent
+                      text: modelData[0]
+                      color: parent.parent.on ? Zenon.cyan : Zenon.muted
+                      font.family: Zenon.faceMono
+                      font.weight: Font.Bold
+                      font.pixelSize: 16
+                    }
+                  }
+
+                  HoverHandler { id: bitHov }
+                  MouseArea {
+                    anchors.fill: parent
+                    onClicked: {
+                      props.permCursor = permRow.index * 3 + parent.index;
+                      props.permMode = props.permMode ^ parent.bit;
+                    }
+                  }
+                }
+              }
+
+              // This row's own octal digit, so the three boxes and the number
+              // at the top are visibly the same statement.
+              Text {
+                width: permGrid.octW
+                height: parent.height
+                horizontalAlignment: Text.AlignHCenter
+                verticalAlignment: Text.AlignVCenter
+                text: String((props.permMode >> permRow.shift) & 7)
+                color: Zenon.muted
+                font.family: Zenon.faceMono
+                font.pixelSize: 15
+              }
+            }
+          }
+
+          Item { width: 1; height: permGrid.gap + 2 }
+
+          Rectangle {
+            height: 1
+            color: Zenon.msgBorder
+          }
+
+          // ── ONLY WHEN THERE IS SOMETHING TO COMMIT ──────────────
+          // The permissions CARD had Cancel and Apply because it was a
+          // dialog: it existed to ask a question and had to be answered.
+          // Properties is not — you open it to read, and most of the time
+          // you will never touch a box. So the row is absent until the
+          // grid differs from the file, and "Cancel" became "Revert",
+          // which is what it now means: put the boxes back, stay here.
+          Item {
+            width: parent.width
+            height: props.permDirty ? 54 : 8
+            visible: true
+
+            Row {
+              anchors.centerIn: parent
+              spacing: 12
+              visible: props.permDirty
+
+              DialogButton {
+                label: "Revert"
+                ink: Zenon.muted
+                onClicked: props.permMode = props.permWas
+              }
+
+              DialogButton {
+                label: "Apply"
+                ink: Zenon.cyan
+                primary: true
+                onClicked: props.applyPerms()
+              }
+            }
+          }
+          }
           Item { width: 1; height: 10 }
 
           Rectangle {
@@ -10861,7 +12736,7 @@ FloatingWindow {
           // You opened it and moved away, so you have read whatever went
           // wrong: the red goes with the pointer rather than sitting there
           // until a timer decides you are done.
-          root.clearJobFaults();
+          root.clearEndedJobs();
         }
       }
 
@@ -11018,9 +12893,16 @@ FloatingWindow {
                 anchors.right: jobRowStop.left
                 anchors.rightMargin: 8
                 anchors.verticalCenter: jobRowLabel.verticalCenter
-                text: jobRow.ended ? ""
+                // An ended row said nothing at all, which was right while
+                // the only rows that could end were bad ones and the state
+                // word beside them carried the news. A row that WORKED is
+                // now the drawer's whole point, and a blank where the
+                // percentage was is not a receipt.
+                text: jobRow.model.state === "done" ? "done"
+                  : jobRow.ended ? ""
                   : (jobRow.model.cancelled ? "stopping" : jobRow.model.pct + "%")
-                color: jobRow.model.cancelled ? Zenon.muted : Zenon.cyan
+                color: jobRow.model.state === "done" ? Zenon.green
+                  : jobRow.model.cancelled ? Zenon.muted : Zenon.cyan
                 font.family: Zenon.face
                 font.weight: Font.Bold
                 font.pixelSize: 14
@@ -11063,7 +12945,10 @@ FloatingWindow {
                 }
               }
 
-              Rectangle {
+              // A METER, NOT A BAR. The same instrument the zoom control
+              // and the audio quick look already are, so a proportion in this
+              // window is read the same way wherever it turns up.
+              Meter {
                 id: jobBar
                 anchors.left: parent.left
                 anchors.right: parent.right
@@ -11071,61 +12956,56 @@ FloatingWindow {
                 anchors.leftMargin: 12
                 anchors.rightMargin: 12
                 anchors.bottomMargin: 9
-                height: 6
-                radius: 3
-                clip: true
-                color: Zenon.trough(Zenon.cyan)
+                vertical: false
+                thickness: 6
+                segLength: 6
+                segGap: 3
+                // Every segment counts. A dead zone is for a control you set
+                // by hand and nudge off its floor; this is a readout.
+                deadZone: 0
+                // From the PARENT's width, not this item's own. segCount
+                // feeds implicitWidth inside Meter, so measuring `width`
+                // here would be a size that depends on itself.
+                segCount: Math.max(10, Math.floor((parent.width - 24) / 9))
 
                 // NOT EVERY JOB CAN SAY HOW FAR ALONG IT IS.
                 //
                 // The percentage is counted out of entries, and an archive of
                 // ONE file has exactly one entry: it sits at 0 for the whole
-                // run and then jumps to 100 as it exits. An empty trough for
-                // twenty seconds is indistinguishable from a bar that does not
+                // run and then jumps to 100 as it exits. An empty meter for
+                // twenty seconds is indistinguishable from one that does not
                 // work — which is what it was taken for.
                 //
-                // So a job with nothing to report says so by MOVING: a sweep
-                // across the trough, which is what every progress bar that
-                // cannot count does. The moment a real percentage arrives the
-                // sweep stops and the fill takes over.
+                // So a job with nothing to report says so by MOVING: the fill
+                // sweeps the segments end to end, which is what every
+                // progress readout that cannot count does. The moment a real
+                // percentage arrives the sweep stops and the count takes over.
                 readonly property bool counting: jobRow.ended
                   || jobRow.model.pct > 0 || jobRow.model.entries > 1
                   || jobRow.model.index > 0
 
-                Rectangle {
-                  id: jobSweep
-                  height: parent.height
-                  width: parent.width * 0.32
-                  radius: 3
-                  visible: !jobBar.counting && !jobRow.model.cancelled
-                  color: Zenon.cyan
-                  opacity: 0.55
-                  XAnimator on x {
-                    running: jobSweep.visible
-                    loops: Animation.Infinite
-                    from: -jobSweep.width
-                    to: jobBar.width
-                    duration: 1150
-                    easing.type: Easing.InOutQuad
-                  }
+                property real chase: 0
+                NumberAnimation on chase {
+                  running: !jobBar.counting && !jobRow.model.cancelled
+                  loops: Animation.Infinite
+                  from: 0; to: 1
+                  duration: 1150
+                  easing.type: Easing.InOutQuad
                 }
 
-                Rectangle {
-                  anchors.left: parent.left
-                  anchors.top: parent.top
-                  anchors.bottom: parent.bottom
-                  visible: jobBar.counting || jobRow.model.cancelled
-                  width: parent.width * (jobRow.model.pct / 100)
-                  radius: 3
-                  color: jobRow.model.state === "failed" ? Zenon.red
-                    : (jobRow.ended || jobRow.model.cancelled ? Zenon.muted
-                                                              : Zenon.cyan)
-                  // The row is edited in place rather than rebuilt — see the
-                  // note on jobsModel — which is what lets this animate at
-                  // all.
-                  Behavior on width {
-                    NumberAnimation { duration: 300; easing.type: Zenon.ease }
-                  }
+                value: jobBar.counting || jobRow.model.cancelled
+                  ? jobRow.model.pct / 100 : jobBar.chase
+                accent: jobRow.model.state === "failed" ? Zenon.red
+                  : jobRow.model.state === "done" ? Zenon.green
+                  : (jobRow.ended || jobRow.model.cancelled ? Zenon.muted
+                                                            : Zenon.cyan)
+                // The row is edited in place rather than rebuilt — see the
+                // note on jobsModel — which is what lets this animate at all.
+                // Off while sweeping: the chase is already an animation, and
+                // easing it a second time turns it to soup.
+                Behavior on value {
+                  enabled: jobBar.counting
+                  NumberAnimation { duration: 300; easing.type: Zenon.ease }
                 }
               }
             }
@@ -11149,14 +13029,48 @@ FloatingWindow {
     // the way the window's focusClaim does, and hands it back on the way out.
     //
     // prompt is excluded: it holds a TextInput that takes focus for itself and
-    // needs the letters.
+    // needs the letters. The collection editor is excluded for the same
+    // reason and it is a sharper case — it holds SEVERAL, plus a tab ring
+    // walking between them, and this claim was pulling focus back out from
+    // under whichever one the ring had just handed it to.
+    // ── WHERE EVERY DROPDOWN'S LIST IS DRAWN ──────────────────────────
+    // At WINDOW scope, not inside the sheet that owns the dropdown, and
+    // that is the whole point of it.
+    //
+    // A sheet is as tall as its own content. A new collection has one rule,
+    // so its card is about 165px — and a list of seven options is 210. It
+    // did not matter whether the list hung down or flipped up or clamped
+    // itself politely: there was never room inside that card, and there
+    // never will be for a card that has just been opened. Measured against
+    // the WINDOW there is always room.
+    //
+    // Empty until a list moves in, and an Item with no MouseArea of its own
+    // takes no events while it is.
+    Item {
+      id: dropLayer
+      anchors.fill: parent
+      // Over the sheets, which sit at 13–15. Under nothing that matters:
+      // menus and quick look are separate surfaces entirely.
+      z: 30
+
+      // Clicking anywhere else puts the open list away, which is what a
+      // menu does. Declared FIRST, so the lists that arrive here at runtime
+      // sit above it and keep their rows.
+      MouseArea {
+        anchors.fill: parent
+        enabled: root.bulkOpenDrop !== null
+        onClicked: root.bulkOpenDrop = null
+      }
+    }
+
     Item {
       id: dialogKeys
       anchors.fill: parent
       z: 20
       readonly property bool anyOpen:
-        confirm.open || perms.open || props.open || prefs.open || sendTo.open
-        || cmdPalette.open || marks.open || root.looking
+        confirm.open || props.open || prefs.open || sendTo.open
+        || cmdPalette.open || marks.open || disks.open || tagPick.open
+        || root.looking
       enabled: dialogKeys.anyOpen
 
       onAnyOpenChanged: {
@@ -11187,6 +13101,26 @@ FloatingWindow {
         // whichever card is in front.
         // Before confirm for the same reason the palette is: a sheet that can
         // raise another question belongs to whichever card is in front.
+        // No filter here, so every letter is free — and `m` is the verb the
+        // rows are about, which is why it can be a bare letter when the
+        // bookmarks sheet beside it has to spend ctrl and delete.
+        if (disks.open && !confirm.open) {
+          if (event.key === Qt.Key_Escape) { disks.dismiss(); return; }
+          if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+            disks.enter(); return;
+          }
+          if (event.key === Qt.Key_Down || event.text === "j") {
+            disks.step(1); return;
+          }
+          if (event.key === Qt.Key_Up || event.text === "k") {
+            disks.step(-1); return;
+          }
+          if (event.text === "m" || event.text === "M") {
+            disks.toggle(); return;
+          }
+          return;
+        }
+
         if (marks.open && !confirm.open) {
           // Escape backs out one step at a time, the palette's rule: the
           // filter first, then the sheet.
@@ -11228,6 +13162,43 @@ FloatingWindow {
           return;
         }
 
+        if (tagPick.open && !confirm.open) {
+          // The filter first, then the sheet — the palette's rule, which
+          // every sheet with a filter in it follows.
+          if (event.key === Qt.Key_Escape) {
+            if (tagPick.query !== "") { tagPick.query = ""; return; }
+            tagPick.dismiss(); return;
+          }
+          // Return TAGS and leaves the card up. Shift-Return is the one that
+          // is finished — tagging comes in runs, but a single tag should not
+          // cost an Escape as well.
+          if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+            // Ctrl renames the highlighted tag to what is typed, rather
+            // than putting it on the selection.
+            if ((event.modifiers & Qt.ControlModifier) !== 0) {
+              tagPick.rename();
+              return;
+            }
+            tagPick.apply();
+            if ((event.modifiers & Qt.ShiftModifier) !== 0) tagPick.dismiss();
+            return;
+          }
+          if (event.key === Qt.Key_Down) { tagPick.step(1); return; }
+          if (event.key === Qt.Key_Up) { tagPick.step(-1); return; }
+          // DELETE, not a letter, for the reason the marks sheet gives: every
+          // letter belongs to the filter, and `x` in the middle of typing a
+          // tag name must not take a tag off forty files.
+          if (event.key === Qt.Key_Delete) { tagPick.drop(); return; }
+          if (event.key === Qt.Key_Backspace) {
+            tagPick.query = tagPick.query.slice(0, -1); return;
+          }
+          if (event.key !== Qt.Key_Tab && event.text
+              && event.text.length === 1 && event.text >= " ") {
+            tagPick.query += event.text;
+          }
+          return;
+        }
+
         if (cmdPalette.open && !confirm.open) {
           if (event.key === Qt.Key_Escape) {
             if (cmdPalette.query !== "") { cmdPalette.query = ""; return; }
@@ -11253,11 +13224,14 @@ FloatingWindow {
         // underneath so a folder of photographs can be flicked through
         // without closing and reopening on each one.
         if (root.looking && !confirm.open) {
-          // ESCAPE AND i LEAVE. Return does NOT any more: it is the key that
+          // ESCAPE AND SPACE LEAVE. The key that opens it closes it, which
+          // is now space rather than `i`. Return does NOT: it is the key that
           // means "do the thing", and over a file being looked at the thing is
           // to open it — which is the one verb this overlay existed to save
           // you from needing, and then could not do.
-          if (event.key === Qt.Key_Escape || event.text === "i") {
+          if (event.key === Qt.Key_Escape
+              || (event.key === Qt.Key_Space
+                  && !(event.modifiers & Qt.ShiftModifier))) {
             root.looking = false;
             return;
           }
@@ -11271,12 +13245,23 @@ FloatingWindow {
             root.activate();
             return;
           }
+          // PLAY / PAUSE. Not space — that closes the overlay now — and not
+          // Return, which opens the file in whatever owns it. `p` is free
+          // here: paste means nothing over a single file being looked at.
+          if (event.text === "p" && look.playable) {
+            if (lookPlayer.playbackState === MediaPlayer.PlayingState)
+              lookPlayer.pause();
+            else lookPlayer.play();
+            return;
+          }
           if (event.text === "d") { root.trash(); return; }
           if (event.text === "y") { content.seq("y"); return; }
           if (event.text === "r") {
             root.looking = false; root.beginRename(); return;
           }
-          if (event.key === Qt.Key_Space) {
+          // the shifted one still marks, as it does in the listing behind
+          if (event.key === Qt.Key_Space
+              && (event.modifiers & Qt.ShiftModifier)) {
             root.toggleMark(); root.moveSel(1); return;
           }
           // ── TWO AXES, TWO JOBS ──────────────────────────────────────
@@ -11375,7 +13360,6 @@ FloatingWindow {
 
         if (event.key === Qt.Key_Escape) {
           props.open = false;
-          perms.open = false;
           prefs.open = false;
           content.forceActiveFocus();
           return;
@@ -11405,26 +13389,34 @@ FloatingWindow {
           return;
         }
 
-        if (perms.open) {
+        // ── THE PERMISSIONS PAGE HAS ITS OWN KEYS ──────────────────
+        // The same nine-box keyboard the permissions sheet had, now
+        // reached through the card's second tab. Left/right/up/down walk
+        // the grid, space flips a bit, Return writes it.
+        if (props.tab === 1) {
           if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-            perms.apply();
+            props.applyPerms();
           } else if (event.key === Qt.Key_Left) {
-            perms.cursor = (perms.cursor + 8) % 9;
-          } else if (event.key === Qt.Key_Right || event.key === Qt.Key_Tab) {
-            perms.cursor = (perms.cursor + 1) % 9;
+            props.permCursor = (props.permCursor + 8) % 9;
+          } else if (event.key === Qt.Key_Right) {
+            props.permCursor = (props.permCursor + 1) % 9;
           } else if (event.key === Qt.Key_Up) {
-            perms.cursor = (perms.cursor + 6) % 9;
+            props.permCursor = (props.permCursor + 6) % 9;
           } else if (event.key === Qt.Key_Down) {
-            perms.cursor = (perms.cursor + 3) % 9;
+            props.permCursor = (props.permCursor + 3) % 9;
           } else if (event.key === Qt.Key_Space) {
-            perms.toggleCursor();
+            props.togglePermBit();
+          } else if (event.key === Qt.Key_Tab) {
+            props.tab = 0;
           }
           return;
         }
 
-        // properties: Return closes it, and the one thing in it you can ask
-        // for is the checksum
-        if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+        // properties: Tab changes page, Return closes it, and the one
+        // thing in it you can ask for is the checksum
+        if (event.key === Qt.Key_Tab) {
+          if (props.tabs.length > 1) props.tab = 1;
+        } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
           props.open = false;
           content.forceActiveFocus();
         } else if (event.key === Qt.Key_S) {
@@ -11581,6 +13573,7 @@ FloatingWindow {
       }
 
       InputShield {
+        keepTop: tabStrip.height + crumbBar.height
         onClicked: { prefs.open = false; content.forceActiveFocus(); }
       }
 
@@ -11610,6 +13603,31 @@ FloatingWindow {
         // reaching into.
         InputShield {}
 
+        // ── IT SCROLLS WHEN THE WINDOW IS TOO SHORT FOR IT ──────────────
+        // Every other sheet already caps itself and scrolls what will not fit:
+        // the palette and the pickers count rows against a page, the previews
+        // flick. This one asked for its full height and got whatever the well
+        // would give it, so in a short window the bottom of the panel — the
+        // terminal command, the session switches — was simply cut off with no
+        // way to reach it.
+        //
+        // The card still ASKS for its natural height; the Sheet still caps that
+        // against the window. What changed is what happens when the cap bites.
+        Flickable {
+          id: prefsScroll
+          anchors.fill: parent
+          clip: true
+          contentWidth: width
+          contentHeight: prefsCol.implicitHeight
+          boundsBehavior: Flickable.StopAtBounds
+          // Nothing to flick when it all fits, so a short panel does not drift
+          // under the hand on a stray wheel notch.
+          interactive: prefsScroll.contentHeight > prefsScroll.height
+
+        // INSIDE THE SCROLLER, so it travels with the rows it is marking.
+        // Left outside it the bar mapped its position through the content
+        // item while sitting in the body, which agrees only while the panel
+        // is scrolled to the top.
         // ── THE SELECTION, AS ONE BAR THAT MOVES ──────────────────────
         // The list sheets get theirs beside a view; this panel is two Columns
         // and has no view, so it carries its own. DECLARED BEFORE THE ROWS so
@@ -11908,6 +13926,7 @@ FloatingWindow {
             }
           }
         }
+        }
       }
     }
 
@@ -11915,905 +13934,1234 @@ FloatingWindow {
     // What you can do to the thing under the pointer. Everything here has a
     // key as well; this is the half of the interface for the hand that is
     // already on the mouse.
-    Item {
-      id: menu
+    // ── CLICKS THAT LAND NOWHERE NEAR THE CARD ───────────────────────────
+    // The menu's own catcher went with it onto its surface, and that surface
+    // is only as big as the card plus the room its shadow needs. A click
+    // further out than that lands on this window instead, where nothing was
+    // listening any more — so the menu sat there until it was answered. This
+    // is the other half of the same catcher.
+    MouseArea {
       anchors.fill: parent
-      z: 9
-      // Kept alive through the fade OUT, which is the whole reason a menu
-      // needs an opacity rather than just a visible: a card that vanishes on
-      // the frame you click it never shows you which row you clicked.
+      z: 8
+      visible: menu.open
+      enabled: menu.open
+      acceptedButtons: Qt.AllButtons
+      onClicked: menu.close()
+    }
+
+    // ── THE SURFACE THE RIGHT-CLICK MENU LIVES ON ────────────────────────
+    // An xdg-popup, which is the one kind of surface a Wayland client may put
+    // OUTSIDE its own window. That is the whole reason it exists here: the
+    // menu used to be an item inside the window, clamped to it, so a card
+    // taller than a short terminus was simply cut off at the bottom edge.
+    //
+    // The compositor places it, and it is the only party that can: a client is
+    // never told where its own window sits on screen, so nothing in here could
+    // work out whether the card was about to run off the display. `anchor`
+    // hands it the pointer in WINDOW coordinates, which a popup is allowed to
+    // be positioned by, and PopupAdjustment.All lets it flip and slide the
+    // card back on screen by itself.
+    //
+    // The surface is exactly the card — see the note on `pad` below for why it
+    // carries nothing around it.
+    PopupWindow {
+      id: menuPop
       visible: menu.shade > 0.01
-      opacity: menu.shade
+      color: "transparent"
 
-      // 0 closed, 1 open. Everything about the card's arrival — its opacity,
-      // its scale, the shade behind it — is a function of this one number, so
-      // there is one animation to tune rather than four to keep in step.
-      property real shade: 0
-      Behavior on shade {
-        NumberAnimation { duration: Zenon.menuFade; easing.type: Easing.OutCubic }
-      }
-      onOpenChanged: menu.shade = menu.open ? 1 : 0
-      // Once the card is actually gone, and not before. Guarded on `open` as
-      // well as on the shade so that a menu reopened mid-fade keeps the list
-      // it was just given.
-      onShadeChanged: if (!menu.open && menu.shade <= 0.01) {
-        menu.customItems = null;
-        menu.centered = false;
-      }
-
-      property bool open: false
-      property real mx: 0
-      property real my: 0
-
-      readonly property var target: root.currentRow()
-      readonly property bool isImage:
-        !!menu.target && !menu.target.isDir && Terminus.isImage(menu.target.name)
-
-      // on a row: everything applies to it
-      function openAt(item, mouse) {
-        const p = item.mapToItem(menu, mouse.x, mouse.y);
-        menu.mx = p.x;
-        menu.my = p.y;
-        menu.here = false;
-        // Said outright rather than left to the last close(), which may still
-        // be fading and no longer clears these on the way out.
-        menu.customItems = null;
-        menu.centered = false;
-        menu.subAt = -1;
-        menu.subSel = -1;
-        menu.open = true;
-        // after `open`, so `items` has been rebuilt for this target
-        menu.at = menu.step(menu.items, -1, 1);
-        // asked now rather than on every selection change: it is a process,
-        // and almost every right-click is not about opening with something
-        const t = menu.target;
-        root.findApps(t && !t.isDir ? t.path : "");
-      }
-
-      // on empty space: only the things that are about the DIRECTORY, because
-      // there is no row under the pointer to be about
-      function openHere(item, mouse) {
-        const p = item.mapToItem(menu, mouse.x, mouse.y);
-        menu.mx = p.x;
-        menu.my = p.y;
-        menu.here = true;
-        // Said outright rather than left to the last close(), which may still
-        // be fading and no longer clears these on the way out.
-        menu.customItems = null;
-        menu.centered = false;
-        menu.subAt = -1;
-        menu.subSel = -1;
-        menu.open = true;
-        menu.at = menu.step(menu.items, -1, 1);
-      }
-
-      property bool here: false
-
-      // The sort options, as the submenu the `,` sequence already spells out.
-      // One list feeding both would be ideal; these are three lines and the
-      // sequence table's entries carry hint text this menu has no room for.
-      // One row per format, described rather than just named: ".tar.zst" is
-      // not self-explanatory to anyone who has not met zstd.
-      readonly property var formatItems: {
-        const out = [];
-        for (const f of root.archiveFormats) {
-          const ext = f[0];
-          out.push({ label: ext, hint: f[1],
-                     act: () => root.beginArchive(ext) });
-        }
-        return out;
-      }
-
-      readonly property var sortItems: [
-        { label: "Name", act: () => root.setSort("name") },
-        { label: "Size", act: () => root.setSort("size") },
-        { label: "Modified", act: () => root.setSort("time") },
-        { label: "Kind", act: () => root.setSort("kind") },
-        { sep: true },
-        // A mode rather than an order, which is why it says what it will do
-        // rather than naming a column.
-        { label: root.usage ? "Leave disk usage" : "Disk usage",
-          key: ", u", act: () => root.toggleUsage() },
-        { label: root.git ? "Leave git status" : "Git status",
-          key: ", g", act: () => root.toggleGit() },
-        { sep: true },
-        { label: root.sortDesc ? "Ascending" : "Descending",
-          act: () => root.sortDesc = !root.sortDesc }
-      ]
-
-      // Filled by the process findApps starts when the menu opens. Empty until
-      // it answers, which is why it says so rather than showing nothing.
-      // Only entries that can actually be launched. It used to fall back to a
-      // "(no applications)" row, which is a submenu whose one item is an
-      // apology — you opened a card, walked into a second card, and were told
-      // there was nothing there. The parent row says it instead, by being dim.
-      readonly property var appItems: {
-        const t = menu.target;
-        if (!t) return [];
-        const apps = root.openWithApps;
-        const out = [];
-        for (let i = 0; i < apps.length; ++i) {
-          // the ID, captured per iteration. Not the scanned file: that is the
-          // first one found, which may be a stale user override — see
-          // openWithCommand. An entry the scan could not locate at all still
-          // has nothing to run.
-          const id = apps[i].id;
-          if (!id || !apps[i].file) continue;
-          out.push({ label: apps[i].name, act: () => root.openWith(id, t.path) });
-        }
-        return out;
-      }
-
-      // The submenu itself: what already handles this file, and then a way out
-      // of that list.
+      // ── NO ROOM FOR A SHADOW, AND THE SHADOW IS GONE WITH IT ──────────
+      // A shadow needs translucent pixels around the card, and on a popup
+      // surface those cost twice over:
       //
-      // A type CAN have a handler and still not have the one you want — a
-      // .conf that opens in the wrong editor, an image that opens in a viewer
-      // when you meant to edit it — and the picker was only reachable from a
-      // file nothing claimed at all. So the same card hangs off the bottom of
-      // the populated submenu, behind a rule: everything above it is one
-      // click, this one opens something.
-      readonly property var appMenu: {
-        const t = menu.target;
-        if (!t) return [];
-        const out = menu.appItems.slice();
-        if (out.length > 0) out.push({ sep: true });
-        out.push({ label: "Choose Program",
-                   act: () => root.beginOpenWith(t.path) });
-        return out;
+      //   hyprland blurs them. decoration:blur:popups is on and
+      //   popups_ignorealpha is 0.2, so the falloff sat above the threshold and
+      //   the backdrop was blurred THROUGH the shadow — a pale halo where a
+      //   dark one belonged. It was never a problem before because the menu was
+      //   an item inside the window, and only became a surface of its own
+      //   today.
+      //
+      //   and the compositor fits the SURFACE, not the card. 80px of padding
+      //   on every side made the thing being placed 160px taller than the menu
+      //   anyone can see, so a right click near the bottom of the window had
+      //   the whole card shoved up the screen to make room for padding.
+      //
+      // So the surface is exactly the card. The card is opaque, carries its own
+      // border and sits over a backdrop hyprland is already blurring, which is
+      // the separation the shadow was drawn for.
+      // ── ROOM FOR A SHADOW, AND ONLY AS MUCH AS IT NEEDS ───────────────
+      // A surface is a hard edge, so a shadow has to be paid for in padding.
+      // The catch is that the compositor fits the SURFACE, not the card, so
+      // every pixel of padding is a pixel the card can be shoved by when it
+      // opens near the edge of a screen.
+      //
+      // menuShadowPad is 80, which is right for a card inside a window and far
+      // too much to pay here — it moved menus by 160px. This is a third of it:
+      // a shadow you can see, and an error small enough that a menu still
+      // arrives where the pointer is. MenuShadow.reach is set to match, so
+      // nothing is drawn outside the room reserved for it.
+      readonly property int pad: 36
+      // ── THIS SURFACE NEVER CHANGES SIZE WHILE IT IS OPEN ──────────────
+      // It used to grow to hold the submenu, and that fed back on itself: a
+      // card opened near the right of the screen has no room for the extra
+      // width, so the compositor slid the whole surface left to fit — which
+      // dragged the card out from under the pointer, unhovered the row, closed
+      // the submenu, shrank the surface and slid it back. Measured off a 60fps
+      // capture: the submenu appeared for exactly one frame at a time, over and
+      // over.
+      //
+      // The submenu has its own surface now, so this one is the card and
+      // nothing else, and the card stays where it was put.
+      implicitWidth: Math.ceil(2 * menuPop.pad + menuCard.width)
+      implicitHeight: Math.ceil(2 * menuPop.pad + menuCard.height)
+
+      anchor {
+        window: root
+        // the CARD lands on the pointer, so the surface starts a shadow
+        // further up and to the left of it
+        rect.x: Math.round(menu.mx) - menuPop.pad
+        rect.y: Math.round(menu.my) - menuPop.pad
+        rect.width: 1
+        rect.height: 1
+        // Flip and slide, but never Resize: a menu that fits by having rows
+        // cut off its bottom is not fitting.
+        adjustment: PopupAdjustment.Flip | PopupAdjustment.Slide
       }
 
-      // which item's submenu is showing, or -1
-      property int subAt: -1
-
-      // ── as wide as its longest entry ────────────────────────────────
-      // 240 was a guess, and the entries that outgrew it were elided — so the
-      // menu hid the ends of exactly the labels that needed the room, and
-      // "Paste as hard link" or a long "Open with" name became a shrug. The
-      // card measures its own contents instead, with the same fonts the rows
-      // draw with and the same paddings they are laid out by. Still bounded:
-      // a menu the width of the window would be its own problem.
-      FontMetrics {
-        id: menuLabelFm
-        font.family: Zenon.face
-        font.pixelSize: 16
-      }
-      FontMetrics {
-        id: menuKeyFm
-        font.family: Zenon.face
-        font.pixelSize: 12
-      }
-
-      function rowWidth(it, labelFm, keyFm) {
-        if (it.sep) return 0;
-        // 12 in from the left, then the label, then the gap before the key —
-        // the same 22 the row is laid out with, or the card measures itself
-        // narrower than it draws and the labels elide again.
-        let w = 12 + Math.ceil(labelFm.advanceWidth(String(it.label || ""))) + 22;
-        // the chip's own text plus the padding KeyChip adds around it
-        if (it.key) w += Math.ceil(keyFm.advanceWidth(String(it.key))) + 14;
-        // the chevron needs more room on the right than a plain row does
-        w += it.sub ? 26 : 12;
-        // AND A COUPLE OF PIXELS OF SLACK. advanceWidth is the sum of the
-        // glyph advances; Text lays the same string out with shaping and its
-        // own rounding and comes out a little wider, which is the difference
-        // between a label that fits and "Propertie…".
-        return w + 6;
-      }
-
-      readonly property real cardWidth: {
-        let w = 0;
-        for (const it of menu.items)
-          w = Math.max(w, menu.rowWidth(it, menuLabelFm, menuKeyFm));
-        return Math.round(Math.max(200, Math.min(460, w)));
-      }
-
-      // ── the keyboard's place in the card ────────────────────────────
-      // The menu was mouse-only: every key but Escape was dropped while it was
-      // up, so the Menu key could open a card you then had to reach for the
-      // mouse to use. `at` is the cursor in the parent card and `subSel` the
-      // one in the submenu, with -1 meaning "the keyboard is not in there".
-      property int at: -1
-      property int subSel: -1
-
-      // The next selectable row in a direction, wrapping, skipping separators
-      // — a separator is a line, not a place you can be. Returns -1 for a list
-      // with nothing selectable in it at all.
-      function step(list, from, dir) {
-        const n = list ? list.length : 0;
-        if (n === 0) return -1;
-        let i = from;
-        for (let k = 0; k < n; ++k) {
-          i = (i + dir + n) % n;
-          if (!list[i].sep) return i;
-        }
-        return -1;
-      }
-
-      readonly property var subItems: {
-        if (menu.subAt < 0) return [];
-        const it = menu.items[menu.subAt];
-        return (it && it.sub) ? it.sub : [];
-      }
-
-      // THE ACTION IS READ BEFORE THE MENU CLOSES, for the reason spelled out
-      // on the rows themselves: close() empties the Repeater's model, an
-      // emptied Repeater destroys its delegates, and modelData goes with them.
-      function run(act) {
-        menu.close();
-        if (act) act();
-      }
-
-      function activateAt() {
-        const it = menu.items[menu.at];
-        if (!it || it.sep) return;
-        // a parent row opens its children rather than doing anything
-        if (it.sub) { menu.subAt = menu.at; menu.subSel = menu.step(it.sub, -1, 1); return; }
-        menu.run(it.act);
-      }
-
-      function activateSub() {
-        const it = menu.subItems[menu.subSel];
-        if (!it || it.sep) return;
-        menu.run(it.act);
-      }
-
-      // Down and up, in whichever card the keyboard is actually in.
-      function move(dir) {
-        if (menu.subSel >= 0) menu.subSel = menu.step(menu.subItems, menu.subSel, dir);
-        else menu.at = menu.step(menu.items, menu.at, dir);
-      }
-
-      function close() {
-        menu.open = false;
-        // customItems is NOT cleared here, and that is the whole fix for the
-        // flash: the card is deliberately kept alive through its fade out, so
-        // clearing the handed-in list on the closing frame let `items` fall
-        // back to the row menu — and the last thing you saw of the drop menu
-        // was the full context menu wearing its shape for 150ms. It is
-        // cleared when the fade has finished instead, below.
-        menu.subAt = -1;
-        menu.at = -1;
-        menu.subSel = -1;
-        content.forceActiveFocus();
-      }
-
-      // anything that misses the card puts it away
-      MouseArea {
+      Item {
+        id: menu
         anchors.fill: parent
-        acceptedButtons: Qt.AllButtons
-        onClicked: menu.close()
-      }
+        z: 9
+        // Kept alive through the fade OUT, which is the whole reason a menu
+        // needs an opacity rather than just a visible: a card that vanishes on
+        // the frame you click it never shows you which row you clicked.
+        visible: menu.shade > 0.01
+        opacity: menu.shade
 
-      // ── a list handed in from outside ───────────────────────────────
-      // For the questions that are about a PLACE rather than about a row:
-      // what to do with something just dropped. Answering those in a dialog
-      // put the choice in the middle of the screen, a long way from the
-      // pointer that had just arrived somewhere specific — so the menu takes
-      // an explicit list and opens where the drop happened.
-      property var customItems: null
-      // Centred entries, for the handed-in menus only. A row menu is a column
-      // of verbs you read down the left edge, and it has keys along the right
-      // to line up against; the drop menu is three short answers to one
-      // question with nothing in the right-hand column, and left-aligning
-      // those leaves them hanging off the side of a card sized for them.
-      property bool centered: false
-
-      function openCustom(item, mouse, list) {
-        const p = item.mapToItem(menu, mouse.x, mouse.y);
-        menu.mx = p.x;
-        menu.my = p.y;
-        menu.here = false;
-        menu.subAt = -1;
-        menu.subSel = -1;
-        menu.customItems = list;
-        menu.centered = true;
-        menu.open = true;
-        menu.at = menu.step(menu.items, -1, 1);
-      }
-
-      readonly property var items: {
-        if (menu.customItems) return menu.customItems;
-        if (menu.here) {
-          const out = [];
-          if (root.pending) {
-            out.push({ label: "Paste here", key: "p", act: () => root.paste() });
-            out.push({ label: "Paste as symlink", act: () => root.pasteLink(true) });
-            out.push({ label: "Paste as hard link", act: () => root.pasteLink(false) });
-            out.push({ sep: true });
-          }
-          out.push({ label: "New directory", key: "a /", act: () => root.beginMkdir() });
-          out.push({ label: "New file", key: "a", act: () => root.beginCreate() });
-          out.push({ sep: true });
-          out.push({ label: "Sort by", key: ",", sub: menu.sortItems });
-          if (root.undoStack.length > 0)
-            out.push({ label: root.undoLabel, key: "u", act: () => root.undo() });
-          out.push({ sep: true });
-          out.push({ label: root.isBookmarked(root.cwd)
-              ? "Remove bookmark" : "Bookmark this directory",
-            key: "b a",
-            act: () => root.toggleBookmark() });
-          if (root.inTrash)
-            out.push({ label: "Empty the trash", danger: true,
-                       act: () => root.emptyTrash() });
-          out.push({ label: "Open shell here", key: ";", act: () => root.openShell() });
-          out.push({ label: root.dual ? "Close second pane" : "Second pane",
-                     key: "\\", act: () => root.toggleDual() });
-          out.push({ label: root.sidebar ? "Hide sidebar" : "Sidebar",
-                     key: "|", act: () => { root.sidebar = !root.sidebar; } });
-          // Braced. Both of these are about the SECOND PANE and both were
-          // meant to be behind `root.dual` — but only the first was, so a
-          // one-pane window offered to swap sides with a pane that was not
-          // there. The indentation had said what was intended all along.
-          if (root.dual) {
-            out.push({ label: "Step into other pane", key: "tab", act: () => root.stepOver() });
-            out.push({ label: "Swap sides", act: () => root.swapSides() });
-          }
-          out.push({ label: "Select all", key: "ctrl a", act: () => root.selectAll() });
-          out.push({ sep: true });
-          // THIS directory, not whatever the cursor is resting on. Last, where
-          // every other file manager puts it.
-          out.push({ label: "Properties",
-                     act: () => props.askPath(root.cwd) });
-          return out;
-        }
-        const t = menu.target;
-        if (!t) return [];
-        // the cheap counter, so labels stay right without depending on the
-        // whole selection array
-        const n = root.markedCount > 0 ? root.markedCount : 1;
-        const many = n > 1 ? " (" + n + ")" : "";
-        const out = [
-          { label: t.isDir ? "Open directory" : "Open", key: "return", act: () => root.activate() }
-        ];
-        // Directly under Open, because it is the other way to open this — and
-        // only for a directory, which is the only thing with a listing to give
-        // a tab. The same gesture is on the middle mouse button.
-        if (t.isDir)
-          out.push({ label: "Open in new tab", key: "shift return",
-                     act: () => root.openInNewTab(t.path) });
-        // Opening is one kind of thing and moving is another; the rule below
-        // holds them apart. Cut first: the pair is ordered by how much of a
-        // commitment it is, and the one that takes the file away is the one
-        // you want to have to read past to reach.
-        out.push({ sep: true });
-        out.push(
-          { label: "Cut" + many, key: "x x", act: () => root.yank("move") },
-          { label: "Copy" + many, key: "y y", act: () => root.yank("copy") },
-          // The path is another thing you can take from the row, so it belongs
-          // with the two above rather than down among the dialogs.
-          { label: "Copy path", key: "c c", act: () => root.copyPath() });
-        // The other half of cut-and-paste, for when you know where it is
-        // going and do not want to go there first — see sendTo.
-        out.push(
-          { label: "Copy to" + many + "…", key: "y s",
-            act: () => sendTo.ask("copy") },
-          { label: "Move to" + many + "…", key: "x s",
-            act: () => sendTo.ask("move") },
-          { label: "Duplicate" + many, key: "y d",
-            act: () => root.duplicate() });
-        out.push({ sep: true });
-        if (root.pending)
-          out.push({ label: "Paste here", key: "p", act: () => root.paste() });
-        if (root.pending) {
-          out.push({ label: "Paste as symlink", act: () => root.pasteLink(true) });
-          out.push({ label: "Paste as hard link", act: () => root.pasteLink(false) });
-          // Closing the block rather than opening one: the paste entries are
-          // about what is on the clipboard, everything under them is about the
-          // row, and with nothing between them the menu grew by three rows in
-          // the middle and read as one long list of unrelated verbs.
-          out.push({ sep: true });
-        }
-        // Only where it can do something: an Extract on a text file and a
-        // Restore outside the trash are entries that exist to be greyed out.
-        if (t.isDir)
-          out.push({ label: "Calculate size" + many, key: "z",
-                     act: () => root.measureDirs() });
-        if (root.dual && root.otherCwd !== "" && root.otherCwd !== root.cwd) {
-          out.push({ label: "Copy to other pane" + many, key: "f5",
-                     act: () => root.sendToOther("copy") });
-          out.push({ label: "Move to other pane" + many, key: "f6",
-                     act: () => root.sendToOther("move") });
-        }
-        if (Terminus.isArchive(t.name) && !t.isDir)
-          out.push({ label: "Extract here" + many, act: () => root.extractSelected() });
-        out.push({ label: "Archive" + many, key: "c a", sub: menu.formatItems });
-        if (root.inTrash) {
-          out.push({ label: "Restore" + many, act: () => root.restoreSelected() });
-          out.push({ label: "Empty the trash", danger: true,
-                     act: () => root.emptyTrash() });
-        }
-        if (!t.isDir) {
-          // A submenu when something already handles this type, and a CARD
-          // when nothing does.
-          //
-          // The old fallback was a submenu holding one row that said "(no
-          // applications)" — you opened a card, walked right into a second
-          // card, and were told there was nothing in it. Worse, it was a dead
-          // end: the answer to "nothing opens this" is to pick something, and
-          // the menu had nowhere to do that from.
-          //
-          // So the entry becomes an action instead, and the card it opens
-          // lists everything installed. What you choose is REGISTERED for the
-          // type on its way to running it, which is what turns this row back
-          // into a submenu the next time you open it — see adoptAppCommand.
-          // The same card is reachable from the bottom of the populated
-          // submenu, because "it has a handler" and "it has the one you want"
-          // are not the same claim — see appMenu.
-          //
-          // Only once the scan has actually answered. While it is still out
-          // there is no news yet, and flipping the row from one shape to the
-          // other under the pointer would be inventing some.
-          if (menu.appItems.length === 0 && root.appsScanned)
-            out.push({ label: "Open with",
-                       act: () => root.beginOpenWith(t.path) });
-          else
-            out.push({ label: "Open with", sub: menu.appMenu });
-          // Beside the two verbs that open things, because it is the one that
-          // opens nothing — see root.quickLook.
-          out.push({ label: "Quick look", key: "i",
-                     act: () => root.quickLook() });
-        }
-        out.push({ label: "Sort by", key: ",", sub: menu.sortItems });
-        // Renaming sits under the sort, not up among cut and copy: those act
-        // on the row and hand you straight back to it, and this one opens a
-        // field and waits. It is the first of the verbs that ask a question.
-        // Whichever one the selection means, and only that one. Offering both
-        // asked you to choose between renaming the row under the cursor and
-        // renaming the nine you had ticked — which is not a choice anybody
-        // wants to make on a menu, and the first answer is almost never it.
-        // JUST "Rename", with the count saying how many. "Bulk rename (9)"
-        // named a mechanism; the row above it already says Rename for one,
-        // and the only thing that changes with nine is the number.
-        if (n > 1)
-          out.push({ label: "Rename" + many, key: "r",
-                     act: () => root.beginBulkRename() });
-        else
-          out.push({ label: "Rename", key: "r", act: () => root.beginRename() });
-        if (t.isDir)
-          out.push({ label: root.isBookmarked(t.path)
-              ? "Remove bookmark" : "Bookmark",
-            key: "b b",
-            act: () => root.toggleBookmarkFor(t.path) });
-        // The two that open a card of their own, together at the bottom behind
-        // a rule — everything above acts on the row and returns you to it.
-        out.push({ sep: true });
-        out.push({ label: "Permissions", key: "c m", act: () => perms.ask() });
-        out.push({ label: "Properties", key: "alt return", act: () => props.ask() });
-        if (menu.isImage) {
-          out.push({ sep: true });
-          out.push({ label: "Set as background",
-                     act: () => root.setWallpaper(null) });
-          const screens = Quickshell.screens;
-          if (screens.length > 1) {
-            for (let i = 0; i < screens.length; ++i) {
-              const nm = screens[i].name;
-              out.push({ label: "Background on " + nm,
-                         act: () => root.setWallpaper(nm) });
-            }
-          }
-        }
-        out.push({ sep: true });
-        out.push({ label: "Trash" + many, key: "d", danger: true, act: () => root.trash() });
-        return out;
-      }
-
-      // icarus' shadow, worn here. The menu this window opens and the menu
-      // the desktop opens are the same gesture, and the one that cast a
-      // different shadow read as a different piece of software.
-      //
-      // It rides the card's own arrival — same scale, same origin — so it
-      // grows out of the pointer with it rather than sitting at full size
-      // under a card that is still unfolding.
-      MenuShadow {
-        panel: menuCard
-        cornerRadius: Zenon.menuRadius
-        transformOrigin: Item.TopLeft
-        scale: menuCard.scale
-      }
-
-      ClippingRectangle {
-        id: menuCard
-        // Grows out of the pointer rather than appearing at full size. The
-        // origin is the corner the pointer is at, so the card unfolds FROM the
-        // click instead of expanding around its own middle.
-        transformOrigin: Item.TopLeft
-        scale: Zenon.menuScale(menu.shade)
-
-        // kept inside the window: a menu opened near the right edge that
-        // hangs off it is a menu with items you cannot reach
-        // Rounded. The position comes from a pointer, which lands on
-        // fractions of a pixel, and an item on a half pixel renders its text
-        // through a filter — which is what "blurry" was.
-        x: Math.round(Math.max(4, Math.min(menu.mx, menu.width - width - 4)))
-        y: Math.round(Math.max(4, Math.min(menu.my, menu.height - height - 4)))
-        width: menu.cardWidth
-        // EXACTLY the column, which already carries 4px of padding at each
-        // end. The extra 8 here was a second bottom padding — the column sits
-        // at the card's top, so every pixel of it landed underneath the last
-        // row and nowhere else.
-        height: menuCol.implicitHeight
-        // Solid. A backdrop blur here was fighting the card rather than
-        // helping it: ShaderEffectSource copies the rectangle behind the card,
-        // and a menu that opens over three columns of text ends up smearing
-        // three different backgrounds under one small surface. Opaque black is
-        // what a menu wants — it is meant to sit ON the window, not in it.
-        color: Zenon.menuBgSolid
-        border.color: Zenon.surfaceBorder
-        border.width: 1
-        radius: Zenon.menuRadius
-        // and the parent gives up the side the child is standing on
-        topLeftRadius: subCard.visible && !subCard.onRight ? 0 : Zenon.menuRadius
-        bottomLeftRadius: subCard.visible && !subCard.onRight ? 0 : Zenon.menuRadius
-        topRightRadius: subCard.visible && subCard.onRight ? 0 : Zenon.menuRadius
-        bottomRightRadius: subCard.visible && subCard.onRight ? 0 : Zenon.menuRadius
-
-        Column {
-          id: menuCol
-          width: parent.width
-          topPadding: Zenon.menuCardPad
-          bottomPadding: Zenon.menuCardPad
-
-          Repeater {
-            model: menu.items
-
-            delegate: Item {
-              id: menuRow
-              required property var modelData
-              width: menuCol.width
-              height: modelData.sep ? Zenon.menuSepHeight : Zenon.menuRowHeight
-
-              Rectangle {
-                anchors.verticalCenter: parent.verticalCenter
-                anchors.left: parent.left
-                anchors.right: parent.right
-                anchors.margins: 8
-                height: 1
-                visible: !!modelData.sep
-                color: Zenon.msgBorder
-              }
-
-              required property int index
-
-              Rectangle {
-                anchors.fill: parent
-                visible: !modelData.sep
-                // icarus' menu highlight, worn here too — the two are the same
-                // gesture on the same desktop, and a context menu that lit its
-                // rows a different colour from the desktop menu read as a
-                // different piece of software.
-                // The keyboard's row counts as highlighted only while the
-                // keyboard is in THIS card — with a submenu open the cursor
-                // has moved into it and the parent row keeps its subAt tint
-                color: itemHov.hovered || menu.subAt === index
-                       || (menu.subSel < 0 && menu.at === index)
-                  ? Zenon.headBg : "transparent"
-              }
-              HoverHandler {
-                id: itemHov
-                enabled: !modelData.sep
-                // Hovering a row with children opens them and hovering one
-                // without closes whatever was open — so moving down the card
-                // never leaves an orphaned second card beside an unrelated row.
-                onHoveredChanged: if (hovered) {
-                  menu.subAt = modelData.sub ? index : -1;
-                  // so a keystroke after a hover carries on from the row under
-                  // the pointer rather than from wherever the keyboard was
-                  menu.at = index;
-                  menu.subSel = -1;
-                }
-              }
-
-              // BOUNDED ON THE RIGHT by whatever is over there, which is what
-              // it was missing: a left-anchored Text with no right edge is as
-              // wide as its string, so "Open in new tab" simply drew straight
-              // through the "middle click" beside it and the two were printed
-              // on top of each other. Now it stops short and elides.
-              Text {
-                id: menuLabel
-                anchors.left: parent.left
-                anchors.leftMargin: 12
-                anchors.right: menuKey.visible ? menuKey.left
-                             : (menuChev.visible ? menuChev.left : parent.right)
-                // The label and its key are two different statements — what
-                // this does, and what performs it — and at 10px they read as
-                // one run of text with a box at the end of it. Centred, the
-                // gap has to match the left inset or the middle is not the
-                // middle.
-                anchors.rightMargin: menu.centered ? 12 : 22
-                horizontalAlignment: menu.centered ? Text.AlignHCenter
-                                                   : Text.AlignLeft
-                anchors.verticalCenter: parent.verticalCenter
-                elide: Text.ElideRight
-                visible: !modelData.sep
-                text: modelData.label || ""
-                color: modelData.danger ? Zenon.red : Zenon.white
-                font.family: Zenon.face
-                font.pixelSize: 16
-              }
-
-              // The key that does the same thing, so the menu teaches the
-              // keyboard rather than competing with it. A footnote to the
-              // entry, not a second label — but it was drawn in msgBorder,
-              // which is a BORDER colour carrying 30% alpha, so it came out
-              // barely there. keyInk is the palette's name for exactly this:
-              // dimmer than the label, still meant to be read.
-              KeyChip {
-                id: menuKey
-                anchors.right: menuChev.visible ? menuChev.left : parent.right
-                anchors.rightMargin: modelData.sub ? 8 : 12
-                anchors.verticalCenter: parent.verticalCenter
-                visible: !modelData.sep && !!modelData.key
-                label: modelData.key || ""
-              }
-
-              // the chevron that says there is more to the right
-              Text {
-                id: menuChev
-                anchors.right: parent.right
-                anchors.rightMargin: 10
-                anchors.verticalCenter: parent.verticalCenter
-                visible: !!modelData.sub
-                text: "\uf105"   // nf-fa-angle_right
-                color: Zenon.muted
-                font.family: Zenon.faceMono
-                font.pixelSize: 15
-              }
-
-              // The row FLASHES, then the card closes, then the thing happens.
-              //
-              // A menu that disappears on mouse-down leaves you unsure which
-              // row you hit — and for the destructive entries that is a bad
-              // moment to be unsure in. The delay is long enough to see and
-              // short enough that it is not a wait.
-              property real chosen: 0
-              SequentialAnimation {
-                id: chosenAnim
-                NumberAnimation { target: menuRow; property: "chosen"; to: 1;
-                                  duration: 60; easing.type: Easing.OutQuad }
-                NumberAnimation { target: menuRow; property: "chosen"; to: 0;
-                                  duration: 130; easing.type: Easing.InQuad }
-                ScriptAction {
-                  script: {
-                    const act = menuRow.pending;
-                    menuRow.pending = null;
-                    menu.close();
-                    if (act) act();
-                  }
-                }
-              }
-              property var pending: null
-
-              Rectangle {
-                anchors.fill: parent
-                visible: menuRow.chosen > 0
-                color: Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b,
-                               0.55 * menuRow.chosen)
-              }
-
-              MouseArea {
-                anchors.fill: parent
-                enabled: !modelData.sep && !chosenAnim.running
-              // No hand cursor. This is a file manager, not a page of links:
-              // a row you can click is the normal state of everything here, so
-              // pointing at one is not news and the pointer should not change
-              // to say so.
-                onClicked: {
-                  // a parent row opens its children rather than doing anything
-                  if (modelData.sub) { menu.subAt = index; return; }
-                  menuRow.pending = modelData.act;
-                  chosenAnim.restart();
-                }
-              }
-            }
-          }
-        }
-      }
-
-      // ── the submenu ───────────────────────────────────────────────
-      // A second card beside the first, for the entries that are a CHOICE
-      // rather than an action — how to sort, which application to open with.
-      // Those would each be four or five more rows on a menu that is already
-      // long, and they are all answers to one question, which is what a
-      // submenu is for.
-      //
-      // Its y is computed from the rows above it rather than measured off the
-      // delegate: the rows are a fixed 30 and separators 7, so the arithmetic
-      // is exact and nothing has to be mapped between items.
-      MenuShadow {
-        panel: subCard
-        cornerRadius: Zenon.menuRadius
-        visible: subCard.visible
-        opacity: subCard.shade
-        transformOrigin: Item.TopLeft
-        scale: subCard.scale
-      }
-
-      ClippingRectangle {
-        id: subCard
-        // The same arrival the card it hangs off has, and every other menu on
-        // this desktop. It used to simply appear, which next to a parent that
-        // unfolds read as two different pieces of software.
-        readonly property bool wanted: menu.subAt >= 0 && subCard.items.length > 0
+        // 0 closed, 1 open. Everything about the card's arrival — its opacity,
+        // its scale, the shade behind it — is a function of this one number, so
+        // there is one animation to tune rather than four to keep in step.
         property real shade: 0
-        onWantedChanged: subCard.shade = subCard.wanted ? 1 : 0
         Behavior on shade {
           NumberAnimation { duration: Zenon.menuFade; easing.type: Easing.OutCubic }
         }
-        visible: subCard.wanted || subCard.shade > 0.01
-        transformOrigin: Item.TopLeft
-        scale: Zenon.menuScale(subCard.shade)
-        opacity: subCard.shade
-
-        readonly property var items: menu.subItems
-
-        readonly property real rowTop: {
-          let y = Zenon.menuCardPad;   // menuCol's top padding
-          for (let i = 0; i < menu.subAt && i < menu.items.length; ++i) {
-            y += menu.items[i].sep ? Zenon.menuSepHeight : Zenon.menuRowHeight;
-          }
-          return y;
+        onOpenChanged: menu.shade = menu.open ? 1 : 0
+        // Once the card is actually gone, and not before. Guarded on `open` as
+        // well as on the shade so that a menu reopened mid-fade keeps the list
+        // it was just given.
+        onShadeChanged: if (!menu.open && menu.shade <= 0.01) {
+          menu.customItems = null;
+          menu.centered = false;
         }
 
-        // the same measurement, plus the description column those rows carry
-        width: {
+        property bool open: false
+        property real mx: 0
+        property real my: 0
+
+        readonly property var target: root.currentRow()
+        readonly property bool isImage:
+          !!menu.target && !menu.target.isDir && Terminus.isImage(menu.target.name)
+
+        // on a row: everything applies to it
+        function openAt(item, mouse) {
+          const p = item.mapToItem(null, mouse.x, mouse.y);
+          menu.mx = p.x;
+          menu.my = p.y;
+          menu.here = false;
+          // Said outright rather than left to the last close(), which may still
+          // be fading and no longer clears these on the way out.
+          menu.customItems = null;
+          menu.centered = false;
+          menu.subAt = -1;
+          menu.subSel = -1;
+          menu.open = true;
+          // after `open`, so `items` has been rebuilt for this target
+          menu.at = menu.step(menu.items, -1, 1);
+          // asked now rather than on every selection change: it is a process,
+          // and almost every right-click is not about opening with something
+          const t = menu.target;
+          root.findApps(t && !t.isDir ? t.path : "");
+        }
+
+        // on empty space: only the things that are about the DIRECTORY, because
+        // there is no row under the pointer to be about
+        function openHere(item, mouse) {
+          const p = item.mapToItem(null, mouse.x, mouse.y);
+          menu.mx = p.x;
+          menu.my = p.y;
+          menu.here = true;
+          // Said outright rather than left to the last close(), which may still
+          // be fading and no longer clears these on the way out.
+          menu.customItems = null;
+          menu.centered = false;
+          menu.subAt = -1;
+          menu.subSel = -1;
+          menu.open = true;
+          menu.at = menu.step(menu.items, -1, 1);
+        }
+
+        property bool here: false
+
+        // The sort options, as the submenu the `,` sequence already spells out.
+        // One list feeding both would be ideal; these are three lines and the
+        // sequence table's entries carry hint text this menu has no room for.
+        // One row per format, described rather than just named: ".tar.zst" is
+        // not self-explanatory to anyone who has not met zstd.
+        readonly property var formatItems: {
+          const out = [];
+          for (const f of root.archiveFormats) {
+            const ext = f[0];
+            out.push({ label: ext, hint: f[1],
+                       act: () => root.beginArchive(ext) });
+          }
+          return out;
+        }
+
+        readonly property var sortItems: [
+          { label: "Name", act: () => root.setSort("name") },
+          { label: "Size", act: () => root.setSort("size") },
+          { label: "Modified", act: () => root.setSort("time") },
+          { label: "Kind", act: () => root.setSort("kind") },
+          { sep: true },
+          // A mode rather than an order, which is why it says what it will do
+          // rather than naming a column.
+          { label: root.usage ? "Leave disk usage" : "Disk usage",
+            key: ", u", act: () => root.toggleUsage() },
+          { label: root.git ? "Leave git status" : "Git status",
+            key: ", g", act: () => root.toggleGit() },
+          { sep: true },
+          { label: root.sortDesc ? "Ascending" : "Descending",
+            act: () => root.sortDesc = !root.sortDesc }
+        ]
+
+        // Filled by the process findApps starts when the menu opens. Empty until
+        // it answers, which is why it says so rather than showing nothing.
+        // Only entries that can actually be launched. It used to fall back to a
+        // "(no applications)" row, which is a submenu whose one item is an
+        // apology — you opened a card, walked into a second card, and were told
+        // there was nothing there. The parent row says it instead, by being dim.
+        readonly property var appItems: {
+          const t = menu.target;
+          if (!t) return [];
+          const apps = root.openWithApps;
+          const out = [];
+          for (let i = 0; i < apps.length; ++i) {
+            // the ID, captured per iteration. Not the scanned file: that is the
+            // first one found, which may be a stale user override — see
+            // openWithCommand. An entry the scan could not locate at all still
+            // has nothing to run.
+            const id = apps[i].id;
+            if (!id || !apps[i].file) continue;
+            out.push({ label: apps[i].name, act: () => root.openWith(id, t.path) });
+          }
+          return out;
+        }
+
+        // The submenu itself: what already handles this file, and then a way out
+        // of that list.
+        //
+        // A type CAN have a handler and still not have the one you want — a
+        // .conf that opens in the wrong editor, an image that opens in a viewer
+        // when you meant to edit it — and the picker was only reachable from a
+        // file nothing claimed at all. So the same card hangs off the bottom of
+        // the populated submenu, behind a rule: everything above it is one
+        // click, this one opens something.
+        readonly property var appMenu: {
+          const t = menu.target;
+          if (!t) return [];
+          const out = menu.appItems.slice();
+          if (out.length > 0) out.push({ sep: true });
+          out.push({ label: "Choose Program",
+                     act: () => root.beginOpenWith(t.path) });
+          return out;
+        }
+
+        // which item's submenu is showing, or -1
+        property int subAt: -1
+
+        // ── as wide as its longest entry ────────────────────────────────
+        // 240 was a guess, and the entries that outgrew it were elided — so the
+        // menu hid the ends of exactly the labels that needed the room, and
+        // "Paste as hard link" or a long "Open with" name became a shrug. The
+        // card measures its own contents instead, with the same fonts the rows
+        // draw with and the same paddings they are laid out by. Still bounded:
+        // a menu the width of the window would be its own problem.
+        FontMetrics {
+          id: menuLabelFm
+          font.family: Zenon.face
+          font.pixelSize: 16
+        }
+        FontMetrics {
+          id: menuKeyFm
+          font.family: Zenon.face
+          font.pixelSize: 12
+        }
+
+        function rowWidth(it, labelFm, keyFm) {
+          if (it.sep) return 0;
+          // 12 in from the left, then the label, then the gap before the key —
+          // the same 22 the row is laid out with, or the card measures itself
+          // narrower than it draws and the labels elide again.
+          let w = 12 + Math.ceil(labelFm.advanceWidth(String(it.label || ""))) + 22;
+          // the chip's own text plus the padding KeyChip adds around it
+          if (it.key) w += Math.ceil(keyFm.advanceWidth(String(it.key))) + 14;
+          // the chevron needs more room on the right than a plain row does
+          w += it.sub ? 26 : 12;
+          // AND A COUPLE OF PIXELS OF SLACK. advanceWidth is the sum of the
+          // glyph advances; Text lays the same string out with shaping and its
+          // own rounding and comes out a little wider, which is the difference
+          // between a label that fits and "Propertie…".
+          return w + 6;
+        }
+
+        readonly property real cardWidth: {
           let w = 0;
-          for (const it of subCard.items) {
+          for (const it of menu.items)
+            w = Math.max(w, menu.rowWidth(it, menuLabelFm, menuKeyFm));
+          return Math.round(Math.max(200, Math.min(460, w)));
+        }
+
+        // ── the keyboard's place in the card ────────────────────────────
+        // The menu was mouse-only: every key but Escape was dropped while it was
+        // up, so the Menu key could open a card you then had to reach for the
+        // mouse to use. `at` is the cursor in the parent card and `subSel` the
+        // one in the submenu, with -1 meaning "the keyboard is not in there".
+        property int at: -1
+        property int subSel: -1
+
+        // The next selectable row in a direction, wrapping, skipping separators
+        // — a separator is a line, not a place you can be. Returns -1 for a list
+        // with nothing selectable in it at all.
+        function step(list, from, dir) {
+          const n = list ? list.length : 0;
+          if (n === 0) return -1;
+          let i = from;
+          for (let k = 0; k < n; ++k) {
+            i = (i + dir + n) % n;
+            // The swatch strip is skipped for the same reason a separator
+            // is: there is no single thing on it to land on. c t opens the
+            // full picker, which is the keyboard's way in.
+            if (!list[i].sep && !list[i].swatch) return i;
+          }
+          return -1;
+        }
+
+        // ── THE SUBMENU'S STATE LIVES OUT HERE, NOT ON THE CARD ──────────
+        // subPop's visibility and size cannot be read off subCard, because
+        // subCard IS subPop's content: a window that is not visible has not
+        // built its contentItem, so subCard does not exist to be asked, and the
+        // popup could never become visible in the first place. It opened
+        // exactly never.
+        //
+        // So everything the surface needs to know is computed here, from the
+        // items alone, and is true whether or not anything has been built yet.
+        readonly property bool subWanted:
+          menu.subAt >= 0 && menu.subItems.length > 0
+        property real subShade: 0
+        onSubWantedChanged: menu.subShade = menu.subWanted ? 1 : 0
+        Behavior on subShade {
+          NumberAnimation { duration: Zenon.menuFade; easing.type: Easing.OutCubic }
+        }
+
+        // the widest row it holds, plus the description column those rows carry
+        readonly property real subCardW: {
+          let w = 0;
+          for (const it of menu.subItems) {
             let x = menu.rowWidth(it, menuLabelFm, menuKeyFm);
             if (it.hint) x += 16 + menuKeyFm.advanceWidth(String(it.hint));
             w = Math.max(w, x);
           }
           return Math.round(Math.max(200, Math.min(460, w)));
         }
-        height: subCol.implicitHeight
-        // Flipped to the left of the parent card when there is no room on the
-        // right, for the same reason the parent card is clamped to the window.
-        // Asked ONCE, as a property, because the corners below have to agree
-        // with the placement — a card that squares the wrong edge is worse
-        // than one that squares neither.
-        readonly property bool onRight:
-          menuCard.x + menuCard.width + subCard.width < menu.width - 4
 
-        // Flush against the parent, with the gap taken out. The two cards are
-        // one surface with a rule down it, the way icarus' menus read, and two
-        // pixels of window showing between them is what stopped them being it.
-        x: Math.round(subCard.onRight
-          ? menuCard.x + menuCard.width
-          : Math.max(4, menuCard.x - subCard.width))
-        y: Math.round(Math.max(4,
-          Math.min(menuCard.y + subCard.rowTop, menu.height - height - 4)))
-        color: Zenon.menuBgSolid
-        border.color: Zenon.surfaceBorder
-        border.width: 1
-        radius: Zenon.menuRadius
-        // Square where it meets the parent, round everywhere else.
-        topLeftRadius: subCard.onRight ? 0 : Zenon.menuRadius
-        bottomLeftRadius: subCard.onRight ? 0 : Zenon.menuRadius
-        topRightRadius: subCard.onRight ? Zenon.menuRadius : 0
-        bottomRightRadius: subCard.onRight ? Zenon.menuRadius : 0
+        // what subCol will come to: its rows, and the padding it puts above and
+        // below them
+        readonly property real subCardH: {
+          let h = 2 * Zenon.menuCardPad;
+          for (const it of menu.subItems)
+            h += it.sep ? Zenon.menuSepHeight : Zenon.menuRowHeight;
+          return h;
+        }
 
-        Column {
-          id: subCol
-          width: parent.width
-          topPadding: Zenon.menuCardPad
-          bottomPadding: Zenon.menuCardPad
+        // how far down the parent card the row it hangs off sits
+        readonly property real subRowTop: {
+          let y = Zenon.menuCardPad;
+          for (let i = 0; i < menu.subAt && i < menu.items.length; ++i)
+            y += menu.items[i].sep ? Zenon.menuSepHeight : Zenon.menuRowHeight;
+          return y;
+        }
 
-          Repeater {
-            model: subCard.items
+        readonly property var subItems: {
+          if (menu.subAt < 0) return [];
+          const it = menu.items[menu.subAt];
+          return (it && it.sub) ? it.sub : [];
+        }
 
-            delegate: Item {
-              id: subRow
-              required property var modelData
-              // needed by the keyboard cursor's highlight below; the parent
-              // card's rows have always declared it
-              required property int index
-              width: subCol.width
-              height: modelData.sep ? Zenon.menuSepHeight : Zenon.menuRowHeight
+        // THE ACTION IS READ BEFORE THE MENU CLOSES, for the reason spelled out
+        // on the rows themselves: close() empties the Repeater's model, an
+        // emptied Repeater destroys its delegates, and modelData goes with them.
+        function run(act) {
+          menu.close();
+          if (act) act();
+        }
 
-              // The action is READ BEFORE THE MENU CLOSES, and that ordering is
-              // the whole reason these rows do anything at all.
-              //
-              // close() sets subAt back to -1, which makes subCard.items answer
-              // with an empty list, which empties this Repeater's model — and an
-              // emptied Repeater destroys its delegates. `modelData` belongs to
-              // the delegate, so calling modelData.act() after close() is a call
-              // on something that no longer exists. Every entry under Archive,
-              // Open with and Sort by was silently dead for exactly that reason.
-              //
-              // Holding it in `pending` also buys the same flash the parent
-              // card's rows get, so a choice in a submenu confirms itself the
-              // same way a choice in the menu does.
-              property real chosen: 0
-              property var pending: null
-              SequentialAnimation {
-                id: subChosenAnim
-                NumberAnimation { target: subRow; property: "chosen"; to: 1;
-                                  duration: 60; easing.type: Easing.OutQuad }
-                NumberAnimation { target: subRow; property: "chosen"; to: 0;
-                                  duration: 130; easing.type: Easing.InQuad }
-                ScriptAction {
-                  script: {
-                    const act = subRow.pending;
-                    subRow.pending = null;
-                    menu.close();
-                    if (act) act();
+        function activateAt() {
+          const it = menu.items[menu.at];
+          if (!it || it.sep) return;
+          // a parent row opens its children rather than doing anything
+          if (it.sub) { menu.subAt = menu.at; menu.subSel = menu.step(it.sub, -1, 1); return; }
+          menu.run(it.act);
+        }
+
+        function activateSub() {
+          const it = menu.subItems[menu.subSel];
+          if (!it || it.sep) return;
+          menu.run(it.act);
+        }
+
+        // Down and up, in whichever card the keyboard is actually in.
+        function move(dir) {
+          if (menu.subSel >= 0) menu.subSel = menu.step(menu.subItems, menu.subSel, dir);
+          else menu.at = menu.step(menu.items, menu.at, dir);
+        }
+
+        function close() {
+          menu.open = false;
+          // customItems is NOT cleared here, and that is the whole fix for the
+          // flash: the card is deliberately kept alive through its fade out, so
+          // clearing the handed-in list on the closing frame let `items` fall
+          // back to the row menu — and the last thing you saw of the drop menu
+          // was the full context menu wearing its shape for 150ms. It is
+          // cleared when the fade has finished instead, below.
+          menu.subAt = -1;
+          menu.at = -1;
+          menu.subSel = -1;
+          content.forceActiveFocus();
+        }
+
+        // anything that misses the card puts it away
+        MouseArea {
+          anchors.fill: parent
+          acceptedButtons: Qt.AllButtons
+          onClicked: menu.close()
+        }
+
+        // ── a list handed in from outside ───────────────────────────────
+        // For the questions that are about a PLACE rather than about a row:
+        // what to do with something just dropped. Answering those in a dialog
+        // put the choice in the middle of the screen, a long way from the
+        // pointer that had just arrived somewhere specific — so the menu takes
+        // an explicit list and opens where the drop happened.
+        property var customItems: null
+        // Centred entries, for the handed-in menus only. A row menu is a column
+        // of verbs you read down the left edge, and it has keys along the right
+        // to line up against; the drop menu is three short answers to one
+        // question with nothing in the right-hand column, and left-aligning
+        // those leaves them hanging off the side of a card sized for them.
+        property bool centered: false
+
+        // `center` is optional and defaults to the drop menu's behaviour, which
+        // is what every earlier caller wanted. A list with a submenu in it
+        // wants the other one: centred labels leave the parent row's arrow
+        // floating away from the text it belongs to.
+        function openCustom(item, mouse, list, center) {
+          const p = item.mapToItem(null, mouse.x, mouse.y);
+          menu.mx = p.x;
+          menu.my = p.y;
+          menu.here = false;
+          menu.subAt = -1;
+          menu.subSel = -1;
+          menu.customItems = list;
+          menu.centered = center === undefined ? true : !!center;
+          menu.open = true;
+          menu.at = menu.step(menu.items, -1, 1);
+        }
+
+        readonly property var items: {
+          if (menu.customItems) return menu.customItems;
+          if (menu.here) {
+            const out = [];
+            if (root.pending) {
+              out.push({ label: "Paste here", key: "p", act: () => root.paste() });
+              out.push({ label: "Paste as symlink", act: () => root.pasteLink(true) });
+              out.push({ label: "Paste as hard link", act: () => root.pasteLink(false) });
+              out.push({ sep: true });
+            }
+            out.push({ label: "New directory", key: "a /", act: () => root.beginMkdir() });
+            out.push({ label: "New file", key: "a", act: () => root.beginCreate() });
+            out.push({ sep: true });
+            out.push({ label: "Sort by", key: ",", sub: menu.sortItems });
+            if (root.undoStack.length > 0)
+              out.push({ label: root.undoLabel, key: "u", act: () => root.undo() });
+            out.push({ sep: true });
+            out.push({ label: root.isBookmarked(root.cwd)
+                ? "Remove bookmark" : "Bookmark this directory",
+              key: "b a",
+              act: () => root.toggleBookmark() });
+            if (root.inTrash)
+              out.push({ label: "Empty the trash", danger: true,
+                         act: () => root.emptyTrash() });
+            out.push({ label: "Open shell here", key: ";", act: () => root.openShell() });
+            out.push({ label: root.dual ? "Close second pane" : "Second pane",
+                       key: "\\", act: () => root.toggleDual() });
+            out.push({ label: root.sidebar ? "Hide sidebar" : "Sidebar",
+                       key: "|", act: () => { root.sidebar = !root.sidebar; } });
+            // Braced. Both of these are about the SECOND PANE and both were
+            // meant to be behind `root.dual` — but only the first was, so a
+            // one-pane window offered to swap sides with a pane that was not
+            // there. The indentation had said what was intended all along.
+            if (root.dual) {
+              out.push({ label: "Step into other pane", key: "tab", act: () => root.stepOver() });
+              out.push({ label: "Swap sides", act: () => root.swapSides() });
+            }
+            out.push({ label: "Select all", key: "ctrl a", act: () => root.selectAll() });
+            out.push({ sep: true });
+            // THIS directory, not whatever the cursor is resting on. Last, where
+            // every other file manager puts it.
+            out.push({ label: "Properties",
+                       act: () => props.askPath(root.cwd) });
+            return out;
+          }
+          const t = menu.target;
+          if (!t) return [];
+          // the cheap counter, so labels stay right without depending on the
+          // whole selection array
+          const n = root.markedCount > 0 ? root.markedCount : 1;
+          const many = n > 1 ? " (" + n + ")" : "";
+          const out = [
+            { label: t.isDir ? "Open directory" : "Open", key: "return", act: () => root.activate() }
+          ];
+          // Directly under Open, because it is the other way to open this — and
+          // only for a directory, which is the only thing with a listing to give
+          // a tab. The same gesture is on the middle mouse button.
+          if (t.isDir)
+            out.push({ label: "Open in new tab", key: "shift return",
+                       act: () => root.openInNewTab(t.path) });
+          // Opening is one kind of thing and moving is another; the rule below
+          // holds them apart. Cut first: the pair is ordered by how much of a
+          // commitment it is, and the one that takes the file away is the one
+          // you want to have to read past to reach.
+          out.push({ sep: true });
+          out.push(
+            { label: "Cut" + many, key: "x x", act: () => root.yank("move") },
+            { label: "Copy" + many, key: "y y", act: () => root.yank("copy") },
+            // The path is another thing you can take from the row, so it belongs
+            // with the two above rather than down among the dialogs.
+            { label: "Copy path", key: "c c", act: () => root.copyPath() });
+          // The other half of cut-and-paste, for when you know where it is
+          // going and do not want to go there first — see sendTo.
+          out.push(
+            { label: "Copy to" + many + "…", key: "y s",
+              act: () => sendTo.ask("copy") },
+            { label: "Move to" + many + "…", key: "x s",
+              act: () => sendTo.ask("move") },
+            { label: "Duplicate" + many, key: "y d",
+              act: () => root.duplicate() });
+          out.push({ sep: true });
+          if (root.pending)
+            out.push({ label: "Paste here", key: "p", act: () => root.paste() });
+          if (root.pending) {
+            out.push({ label: "Paste as symlink", act: () => root.pasteLink(true) });
+            out.push({ label: "Paste as hard link", act: () => root.pasteLink(false) });
+            // Closing the block rather than opening one: the paste entries are
+            // about what is on the clipboard, everything under them is about the
+            // row, and with nothing between them the menu grew by three rows in
+            // the middle and read as one long list of unrelated verbs.
+            out.push({ sep: true });
+          }
+          // Only where it can do something: an Extract on a text file and a
+          // Restore outside the trash are entries that exist to be greyed out.
+          if (t.isDir)
+            out.push({ label: "Calculate size" + many, key: "z",
+                       act: () => root.measureDirs() });
+          if (root.dual && root.otherCwd !== "" && root.otherCwd !== root.cwd) {
+            out.push({ label: "Copy to other pane" + many, key: "f5",
+                       act: () => root.sendToOther("copy") });
+            out.push({ label: "Move to other pane" + many, key: "f6",
+                       act: () => root.sendToOther("move") });
+          }
+          if (Terminus.isArchive(t.name) && !t.isDir)
+            out.push({ label: "Extract here" + many, act: () => root.extractSelected() });
+          out.push({ label: "Archive" + many, key: "c a", sub: menu.formatItems });
+          if (root.inTrash) {
+            out.push({ label: "Restore" + many, act: () => root.restoreSelected() });
+            out.push({ label: "Empty the trash", danger: true,
+                       act: () => root.emptyTrash() });
+          }
+          if (!t.isDir) {
+            // A submenu when something already handles this type, and a CARD
+            // when nothing does.
+            //
+            // The old fallback was a submenu holding one row that said "(no
+            // applications)" — you opened a card, walked right into a second
+            // card, and were told there was nothing in it. Worse, it was a dead
+            // end: the answer to "nothing opens this" is to pick something, and
+            // the menu had nowhere to do that from.
+            //
+            // So the entry becomes an action instead, and the card it opens
+            // lists everything installed. What you choose is REGISTERED for the
+            // type on its way to running it, which is what turns this row back
+            // into a submenu the next time you open it — see adoptAppCommand.
+            // The same card is reachable from the bottom of the populated
+            // submenu, because "it has a handler" and "it has the one you want"
+            // are not the same claim — see appMenu.
+            //
+            // Only once the scan has actually answered. While it is still out
+            // there is no news yet, and flipping the row from one shape to the
+            // other under the pointer would be inventing some.
+            if (menu.appItems.length === 0 && root.appsScanned)
+              out.push({ label: "Open with",
+                         act: () => root.beginOpenWith(t.path) });
+            else
+              out.push({ label: "Open with", sub: menu.appMenu });
+            // Beside the two verbs that open things, because it is the one that
+            // opens nothing — see root.quickLook.
+            out.push({ label: "Quick look", key: "space",
+                       act: () => root.quickLook() });
+          }
+          out.push({ label: "Sort by", key: ",", sub: menu.sortItems });
+          // Renaming sits under the sort, not up among cut and copy: those act
+          // on the row and hand you straight back to it, and this one opens a
+          // field and waits. It is the first of the verbs that ask a question.
+          // Whichever one the selection means, and only that one. Offering both
+          // asked you to choose between renaming the row under the cursor and
+          // renaming the nine you had ticked — which is not a choice anybody
+          // wants to make on a menu, and the first answer is almost never it.
+          // JUST "Rename", with the count saying how many. "Bulk rename (9)"
+          // named a mechanism; the row above it already says Rename for one,
+          // and the only thing that changes with nine is the number.
+          if (n > 1)
+            out.push({ label: "Rename" + many, key: "r",
+                       act: () => root.beginBulkRename() });
+          else
+            out.push({ label: "Rename", key: "r", act: () => root.beginRename() });
+          if (t.isDir)
+            out.push({ label: root.isBookmarked(t.path)
+                ? "Remove bookmark" : "Bookmark",
+              key: "b b",
+              act: () => root.toggleBookmarkFor(t.path) });
+          // The two that open a card of their own, together at the bottom behind
+          // a rule — everything above acts on the row and returns you to it.
+          out.push({ sep: true });
+          // ── THE TAGS THEMSELVES, NOT A DOOR TO THEM ──────────────
+          // A row saying "Tags" that opens a card is two gestures for the
+          // commonest one there is. Finder puts the colours in the menu
+          // and so does this: one click, one tag, menu closed.
+          //
+          // The seven that come with a colour only — an arbitrary tag has
+          // no swatch to show and the picker is where those live, which
+          // the row underneath still reaches.
+          out.push({ swatch: true });
+          out.push({ label: "More tags" + many, key: "c t",
+                     act: () => tagPick.ask() });
+          // No Permissions row. It is a tab inside Properties now, and two
+          // menu entries opening the same card one tab apart is the menu
+          // being longer to say the same thing. c m still goes straight to
+          // that tab for anyone who reaches for it.
+          out.push({ label: "Properties", key: "alt return", act: () => props.ask() });
+          if (menu.isImage) {
+            out.push({ sep: true });
+            out.push({ label: "Set as background",
+                       act: () => root.setWallpaper(null) });
+            const screens = Quickshell.screens;
+            if (screens.length > 1) {
+              for (let i = 0; i < screens.length; ++i) {
+                const nm = screens[i].name;
+                out.push({ label: "Background on " + nm,
+                           act: () => root.setWallpaper(nm) });
+              }
+            }
+          }
+          out.push({ sep: true });
+          out.push({ label: "Trash" + many, key: "d", danger: true, act: () => root.trash() });
+          return out;
+        }
+
+        // icarus' shadow, worn here. The menu this window opens and the menu
+        // the desktop opens are the same gesture, and the one that cast a
+        // different shadow read as a different piece of software.
+        //
+        // It rides the card's own arrival — same scale, same origin — so it
+        // grows out of the pointer with it rather than sitting at full size
+        // under a card that is still unfolding.
+        // Back, now that the surface leaves room — see menuPop.pad. Same
+        // component icarus and the tray wear, so the three menus on this
+        // desktop cast one shadow rather than three opinions about one.
+        MenuShadow {
+          panel: menuCard
+          // ── THE FALLOFF HAS TO FIT THE ROOM, or it is not a falloff ─────
+          // The defaults are sized for menuShadowPad: 20 spread + 50 blur +
+          // 10 offset, 80 in total. Given 36px of surface to live in, the
+          // gradient was simply cut off partway down — a hard-edged dark
+          // rectangle around the card rather than a shadow fading out.
+          //
+          // Scaled to the padding instead, so the three add up to exactly the
+          // room available and the last of the blur lands on the last pixel
+          // of it. Change `pad` and the shadow follows.
+          reach: menuPop.pad
+          grow: Math.round(menuPop.pad * 0.20)
+          softness: Math.round(menuPop.pad * 0.62)
+          drop: Math.round(menuPop.pad * 0.18)
+          cornerRadius: Zenon.menuRadius
+          transformOrigin: Item.TopLeft
+          scale: menuCard.scale
+        }
+
+        ClippingRectangle {
+          id: menuCard
+          // Grows out of the pointer rather than appearing at full size. The
+          // origin is the corner the pointer is at, so the card unfolds FROM the
+          // click instead of expanding around its own middle.
+          transformOrigin: Item.TopLeft
+          scale: Zenon.menuScale(menu.shade)
+
+          // kept inside the window: a menu opened near the right edge that
+          // hangs off it is a menu with items you cannot reach
+          // Rounded. The position comes from a pointer, which lands on
+          // fractions of a pixel, and an item on a half pixel renders its text
+          // through a filter — which is what "blurry" was.
+          // THE POINTER NO LONGER COMES INTO THIS. The card is pinned at the
+          // shadow's inset inside its own surface, and that surface is placed at
+          // the pointer by the compositor — which is also the only thing that
+          // knows where the screen ends. Clamping here as well would be a second
+          // opinion about a question already answered, in the wrong coordinates.
+          x: menuPop.pad
+          y: menuPop.pad
+          width: menu.cardWidth
+          // EXACTLY the column, which already carries 4px of padding at each
+          // end. The extra 8 here was a second bottom padding — the column sits
+          // at the card's top, so every pixel of it landed underneath the last
+          // row and nowhere else.
+          height: menuCol.implicitHeight
+          // Solid. A backdrop blur here was fighting the card rather than
+          // helping it: ShaderEffectSource copies the rectangle behind the card,
+          // and a menu that opens over three columns of text ends up smearing
+          // three different backgrounds under one small surface. Opaque black is
+          // what a menu wants — it is meant to sit ON the window, not in it.
+          color: Zenon.menuBgSolid
+          border.color: Zenon.surfaceBorder
+          border.width: 1
+          // ROUND ON EVERY CORNER. The two cards used to square off the edge
+          // where they met, because they met — they were one surface with a
+          // rule down it. They are two surfaces since the submenu got its own,
+          // each casting its own shadow into the gap, and a squared edge with a
+          // shadow beside it reads as a card with a corner missing.
+          radius: Zenon.menuRadius
+
+          Column {
+            id: menuCol
+            width: parent.width
+            topPadding: Zenon.menuCardPad
+            bottomPadding: Zenon.menuCardPad
+
+            Repeater {
+              model: menu.items
+
+              delegate: Item {
+                id: menuRow
+                required property var modelData
+                width: menuCol.width
+                height: modelData.sep ? Zenon.menuSepHeight
+                  : (modelData.swatch ? Math.round(Zenon.menuRowHeight * 1.15)
+                                      : Zenon.menuRowHeight)
+
+                Rectangle {
+                  anchors.verticalCenter: parent.verticalCenter
+                  anchors.left: parent.left
+                  anchors.right: parent.right
+                  anchors.margins: 8
+                  height: 1
+                  visible: !!modelData.sep
+                  color: Zenon.msgBorder
+                }
+
+                required property int index
+
+                // ── THE SEVEN, IN A LINE ──────────────────────────────
+                // Each toggles across the whole selection by the same rule
+                // every other verb here follows — see Tags.toggleAcross for
+                // why a mixed selection fills in rather than flipping.
+                //
+                // The ring is the state: a tag already on everything
+                // selected wears one, and clicking it takes it off. It is
+                // the only way to show a toggle on a thing whose whole job
+                // is to be a colour, and it is what Finder does.
+                Row {
+                  // Above the row's own MouseArea, which fills the whole row
+                  // and is declared after this — the same reason menuX
+                  // carries a z. Disabling that one over a swatch row is
+                  // what actually frees the clicks; this makes the stacking
+                  // say so too rather than depending on it.
+                  z: 2
+                  anchors.centerIn: parent
+                  visible: !!modelData.swatch
+                  spacing: Math.round(Zenon.menuRowHeight * 0.30)
+
+                  Repeater {
+                    model: !!menuRow.modelData.swatch ? Tags.PRESETS : []
+
+                    delegate: Item {
+                      id: swatch
+                      required property var modelData
+                      readonly property real d:
+                        Math.round(Zenon.menuRowHeight * 0.82)
+                      width: swatch.d
+                      height: swatch.d
+
+                      // Whether EVERY selected row already carries it, which
+                      // is what decides which way a click goes.
+                      readonly property bool on: {
+                        const rows = root.acting();
+                        if (rows.length === 0) return false;
+                        for (let i = 0; i < rows.length; ++i)
+                          if (!Tags.hasTag(root.tagMarks[rows[i].path],
+                                           swatch.modelData.name)) return false;
+                        return true;
+                      }
+
+                      Rectangle {
+                        anchors.fill: parent
+                        radius: width / 2
+                        color: swatchHov.hovered
+                          ? Qt.rgba(1, 1, 1, 0.10) : "transparent"
+                        border.width: swatch.on ? 2 : 0
+                        border.color: Zenon[swatch.modelData.ink] || Zenon.cyan
+                      }
+
+                      Text {
+                        anchors.centerIn: parent
+                        text: "\uF02B"
+                        color: Zenon[swatch.modelData.ink] || Zenon.cyan
+                        font.family: Zenon.face
+                        font.pixelSize: Math.round(Zenon.menuRowHeight * 0.50)
+                      }
+
+                      HoverHandler { id: swatchHov }
+                      MouseArea {
+                        anchors.fill: parent
+                        onClicked: {
+                          root.toggleTagHere(swatch.modelData.name);
+                          menu.open = false;
+                        }
+                      }
+                    }
                   }
                 }
-              }
 
-              Rectangle {
-                anchors.verticalCenter: parent.verticalCenter
-                anchors.left: parent.left
-                anchors.right: parent.right
-                anchors.margins: 8
-                height: 1
-                visible: !!modelData.sep
-                color: Zenon.msgBorder
-              }
+                Rectangle {
+                  anchors.fill: parent
+                  visible: !modelData.sep && !modelData.swatch
+                  // icarus' menu highlight, worn here too — the two are the same
+                  // gesture on the same desktop, and a context menu that lit its
+                  // rows a different colour from the desktop menu read as a
+                  // different piece of software.
+                  // The keyboard's row counts as highlighted only while the
+                  // keyboard is in THIS card — with a submenu open the cursor
+                  // has moved into it and the parent row keeps its subAt tint
+                  color: itemHov.hovered || menu.subAt === index
+                         || (menu.subSel < 0 && menu.at === index)
+                    ? Zenon.headBg : "transparent"
+                }
+                HoverHandler {
+                  id: itemHov
+                  enabled: !modelData.sep && !modelData.swatch
+                  // Hovering a row with children opens them and hovering one
+                  // without closes whatever was open — so moving down the card
+                  // never leaves an orphaned second card beside an unrelated row.
+                  onHoveredChanged: if (hovered) {
+                    menu.subAt = modelData.sub ? index : -1;
+                    // so a keystroke after a hover carries on from the row under
+                    // the pointer rather than from wherever the keyboard was
+                    menu.at = index;
+                    menu.subSel = -1;
+                  }
+                }
 
-              Rectangle {
-                anchors.fill: parent
-                visible: !modelData.sep
-                // the same highlight the parent card wears, from icarus
-                color: subHov.hovered || menu.subSel === subRow.index
-                  ? Zenon.headBg : "transparent"
-              }
-              HoverHandler { id: subHov; enabled: !modelData.sep }
+                // BOUNDED ON THE RIGHT by whatever is over there, which is what
+                // it was missing: a left-anchored Text with no right edge is as
+                // wide as its string, so "Open in new tab" simply drew straight
+                // through the "middle click" beside it and the two were printed
+                // on top of each other. Now it stops short and elides.
+                Text {
+                  id: menuLabel
+                  anchors.left: parent.left
+                  anchors.leftMargin: 12
+                  anchors.right: menuKey.visible ? menuKey.left
+                               : (menuChev.visible ? menuChev.left
+                                 : (menuX.visible ? menuX.left : parent.right))
+                  // The label and its key are two different statements — what
+                  // this does, and what performs it — and at 10px they read as
+                  // one run of text with a box at the end of it. Centred, the
+                  // gap has to match the left inset or the middle is not the
+                  // middle.
+                  anchors.rightMargin: menu.centered ? 12 : 22
+                  horizontalAlignment: menu.centered ? Text.AlignHCenter
+                                                     : Text.AlignLeft
+                  anchors.verticalCenter: parent.verticalCenter
+                  elide: Text.ElideRight
+                  visible: !modelData.sep && !modelData.swatch
+                  text: modelData.label || ""
+                  color: modelData.danger ? Zenon.red : Zenon.white
+                  font.family: Zenon.face
+                  font.pixelSize: 16
+                }
 
-              Text {
-                id: subLabel
-                anchors.left: parent.left
-                anchors.leftMargin: 12
-                anchors.verticalCenter: parent.verticalCenter
-                visible: !modelData.sep
-                text: modelData.label || ""
-                color: Zenon.white
-                font.family: Zenon.face
-                font.pixelSize: 16
-              }
+                // The key that does the same thing, so the menu teaches the
+                // keyboard rather than competing with it. A footnote to the
+                // entry, not a second label — but it was drawn in msgBorder,
+                // which is a BORDER colour carrying 30% alpha, so it came out
+                // barely there. keyInk is the palette's name for exactly this:
+                // dimmer than the label, still meant to be read.
+                KeyChip {
+                  id: menuKey
+                  anchors.right: menuChev.visible ? menuChev.left
+                               : (menuX.visible ? menuX.left : parent.right)
+                  anchors.rightMargin: modelData.sub ? 8 : 12
+                  anchors.verticalCenter: parent.verticalCenter
+                  visible: !modelData.sep && !modelData.swatch && !!modelData.key
+                  label: modelData.key || ""
+                }
 
-              // what the format actually is, for the rows that carry one
-              Text {
-                anchors.left: subLabel.right
-                anchors.leftMargin: 12
-                anchors.right: parent.right
-                anchors.rightMargin: 10
-                anchors.verticalCenter: parent.verticalCenter
-                visible: !!modelData.hint
-                text: modelData.hint || ""
-                elide: Text.ElideRight
-                horizontalAlignment: Text.AlignRight
-                color: Zenon.muted
-                font.family: Zenon.face
-                font.pixelSize: 13
-              }
+                // ── A ROW THAT CAN BE TAKEN AWAY SAYS SO ON ITSELF ────
+                // An entry carrying `strike` gets a cross at its right edge
+                // that removes the thing the row names, while the row itself
+                // still does what it says. It replaced a "Remove" submenu: one
+                // list of handlers where you either choose one or cross one
+                // out is a smaller idea than two lists of the same names that
+                // do different things depending on which you walked into.
+                //
+                // Above the row's own MouseArea — that one fills the whole row
+                // and is declared after this, so without a z it would take
+                // every click including the ones aimed here.
+                Text {
+                  id: menuX
+                  z: 2
+                  anchors.right: parent.right
+                  anchors.rightMargin: 10
+                  anchors.verticalCenter: parent.verticalCenter
+                  visible: !modelData.sep && !modelData.swatch && !!modelData.strike
+                  text: "\uf00d"   // nf-fa-times
+                  color: strikeHov.hovered ? Zenon.red : Zenon.muted
+                  font.family: Zenon.faceMono
+                  font.pixelSize: 14
 
-              Rectangle {
-                anchors.fill: parent
-                visible: subRow.chosen > 0
-                color: Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b,
-                               0.55 * subRow.chosen)
-              }
+                  HoverHandler { id: strikeHov }
+                  MouseArea {
+                    anchors.fill: parent
+                    // a target you can hit without aiming — the glyph is 14px
+                    anchors.margins: -7
+                    enabled: !chosenAnim.running
+                    onClicked: {
+                      menuRow.pending = modelData.strike;
+                      chosenAnim.restart();
+                    }
+                  }
+                }
 
-              MouseArea {
-                anchors.fill: parent
-                enabled: !modelData.sep && !subChosenAnim.running
-              // No hand cursor. This is a file manager, not a page of links:
-              // a row you can click is the normal state of everything here, so
-              // pointing at one is not news and the pointer should not change
-              // to say so.
-                onClicked: {
-                  if (!modelData.act) return;
-                  subRow.pending = modelData.act;
-                  subChosenAnim.restart();
+                // the chevron that says there is more to the right
+                Text {
+                  id: menuChev
+                  anchors.right: menuX.visible ? menuX.left : parent.right
+                  anchors.rightMargin: 10
+                  anchors.verticalCenter: parent.verticalCenter
+                  visible: !!modelData.sub
+                  text: "\uf105"   // nf-fa-angle_right
+                  // See CardMenu's tail: a chevron is punctuation on the
+                  // label, not a dimmed thing of its own.
+                  color: Zenon.white
+                  font.family: Zenon.faceMono
+                  // matching menuLabel, which is 16
+                  font.pixelSize: 16
+                }
+
+                // The row FLASHES, then the card closes, then the thing happens.
+                //
+                // A menu that disappears on mouse-down leaves you unsure which
+                // row you hit — and for the destructive entries that is a bad
+                // moment to be unsure in. The delay is long enough to see and
+                // short enough that it is not a wait.
+                property real chosen: 0
+                SequentialAnimation {
+                  id: chosenAnim
+                  NumberAnimation { target: menuRow; property: "chosen"; to: 1;
+                                    duration: 60; easing.type: Easing.OutQuad }
+                  NumberAnimation { target: menuRow; property: "chosen"; to: 0;
+                                    duration: 130; easing.type: Easing.InQuad }
+                  ScriptAction {
+                    script: {
+                      const act = menuRow.pending;
+                      menuRow.pending = null;
+                      menu.close();
+                      if (act) act();
+                    }
+                  }
+                }
+                property var pending: null
+
+                Rectangle {
+                  anchors.fill: parent
+                  visible: menuRow.chosen > 0
+                  color: Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b,
+                                 0.55 * menuRow.chosen)
+                }
+
+                MouseArea {
+                  anchors.fill: parent
+                  // AND NOT OVER THE SWATCH STRIP. This one fills the whole
+                  // row and is declared after it, so it was taking every
+                  // click meant for a colour — the strip drew correctly and
+                  // could not be used.
+                  enabled: !modelData.sep && !modelData.swatch
+                           && !chosenAnim.running
+                // No hand cursor. This is a file manager, not a page of links:
+                // a row you can click is the normal state of everything here, so
+                // pointing at one is not news and the pointer should not change
+                // to say so.
+                  onClicked: {
+                    // a parent row opens its children rather than doing anything
+                    if (modelData.sub) { menu.subAt = index; return; }
+                    menuRow.pending = modelData.act;
+                    chosenAnim.restart();
+                  }
                 }
               }
             }
           }
         }
+
+        // ── the submenu ───────────────────────────────────────────────
+        // A second card beside the first, for the entries that are a CHOICE
+        // rather than an action — how to sort, which application to open with.
+        // Those would each be four or five more rows on a menu that is already
+        // long, and they are all answers to one question, which is what a
+        // submenu is for.
+        //
+        // Its y is computed from the rows above it rather than measured off the
+        // delegate: the rows are a fixed 30 and separators 7, so the arithmetic
+        // is exact and nothing has to be mapped between items.
+      // ── AND THE SUBMENU GETS ITS OWN ───────────────────────────────────
+      // A popup may parent a popup, which is how real menus are built and the
+      // reason they do not have the bug this one had: the parent card is a
+      // fixed surface, and only THIS one is moved around by the compositor to
+      // stay on screen. Nothing the submenu does can shift the card under the
+      // pointer any more.
+      //
+      // Anchored to the card's right edge at the parent row, growing right and
+      // down. The rect is the card's full width rather than a point so that
+      // FlipX mirrors the submenu to the card's LEFT when there is no room —
+      // from a point it would mirror about the right edge and land on top of
+      // the card it belongs to.
+      PopupWindow {
+        id: subPop
+        visible: menu.subWanted || menu.subShade > 0.01
+        color: "transparent"
+        readonly property int pad: menuPop.pad
+        implicitWidth: Math.ceil(menu.subCardW + 2 * subPop.pad)
+        implicitHeight: Math.ceil(menu.subCardH + 2 * subPop.pad)
+        anchor {
+          window: menuPop
+          // Both shifted back by this surface's own inset, so the CARD lands
+          // flush against the parent card rather than a shadow's width away
+          // from it — the anchor places the surface, and the card sits `pad`
+          // inside it.
+          rect.x: menuCard.x - subPop.pad
+          rect.y: menuCard.y + menu.subRowTop - subPop.pad
+          rect.width: menuCard.width
+          rect.height: 1
+          edges: Edges.Right | Edges.Top
+          gravity: Edges.Right | Edges.Bottom
+          adjustment: PopupAdjustment.FlipX | PopupAdjustment.SlideY
+        }
+
+          MenuShadow {
+            panel: subCard
+            // the same proportions as the parent card's — see the note there
+            reach: subPop.pad
+            grow: Math.round(subPop.pad * 0.20)
+            softness: Math.round(subPop.pad * 0.62)
+            drop: Math.round(subPop.pad * 0.18)
+            cornerRadius: Zenon.menuRadius
+            visible: subCard.visible
+            opacity: subCard.shade
+            transformOrigin: Item.TopLeft
+            scale: subCard.scale
+          }
+
+          ClippingRectangle {
+            id: subCard
+            // The same arrival the card it hangs off has, and every other menu on
+            // this desktop. It used to simply appear, which next to a parent that
+            // unfolds read as two different pieces of software.
+            // See menu.subWanted — the state is out there now, and this card
+            // wears it. It fills its surface, so it has no visibility of its
+            // own to work out; the surface is mapped only while it is wanted.
+            readonly property bool wanted: menu.subWanted
+            readonly property real shade: menu.subShade
+            transformOrigin: Item.TopLeft
+            scale: Zenon.menuScale(subCard.shade)
+            opacity: subCard.shade
+
+            readonly property var items: menu.subItems
+
+            readonly property real rowTop: menu.subRowTop
+
+            // Both measured on menu, so the surface can size itself before this
+            // card exists — see the note there.
+            width: menu.subCardW
+            height: menu.subCardH
+            // Flipped to the left of the parent card when there is no room on the
+            // right, for the same reason the parent card is clamped to the window.
+            // Asked ONCE, as a property, because the corners below have to agree
+            // with the placement — a card that squares the wrong edge is worse
+            // than one that squares neither.
+            // ALWAYS the right, now that the surface grows to hold it: the old
+            // test asked whether the card plus the submenu still fit inside the
+            // WINDOW, and the window has stopped being the boundary. The surface
+            // is made wide enough for both, and if that puts it off the edge of
+            // the screen the compositor slides the whole thing back — one answer,
+            // from the only party that can see the screen.
+            readonly property bool onRight: true
+
+            // Flush against the parent, with the gap taken out. The two cards are
+            // one surface with a rule down it, the way icarus' menus read, and two
+            // pixels of window showing between them is what stopped them being it.
+            x: subPop.pad
+            // No clamp against menu.height: the surface's height is computed FROM
+            // this, so reading it back here is a binding loop. The surface is made
+            // tall enough instead.
+            y: subPop.pad
+            color: Zenon.menuBgSolid
+            border.color: Zenon.surfaceBorder
+            border.width: 1
+            radius: Zenon.menuRadius
+            // Square where it meets the parent, round everywhere else.
+            // See the parent card: two surfaces, so both are fully rounded.
+
+            Column {
+              id: subCol
+              width: parent.width
+              topPadding: Zenon.menuCardPad
+              bottomPadding: Zenon.menuCardPad
+
+              Repeater {
+                model: subCard.items
+
+                delegate: Item {
+                  id: subRow
+                  required property var modelData
+                  // needed by the keyboard cursor's highlight below; the parent
+                  // card's rows have always declared it
+                  required property int index
+                  width: subCol.width
+                  height: modelData.sep ? Zenon.menuSepHeight : Zenon.menuRowHeight
+
+                  // The action is READ BEFORE THE MENU CLOSES, and that ordering is
+                  // the whole reason these rows do anything at all.
+                  //
+                  // close() sets subAt back to -1, which makes subCard.items answer
+                  // with an empty list, which empties this Repeater's model — and an
+                  // emptied Repeater destroys its delegates. `modelData` belongs to
+                  // the delegate, so calling modelData.act() after close() is a call
+                  // on something that no longer exists. Every entry under Archive,
+                  // Open with and Sort by was silently dead for exactly that reason.
+                  //
+                  // Holding it in `pending` also buys the same flash the parent
+                  // card's rows get, so a choice in a submenu confirms itself the
+                  // same way a choice in the menu does.
+                  property real chosen: 0
+                  property var pending: null
+                  SequentialAnimation {
+                    id: subChosenAnim
+                    NumberAnimation { target: subRow; property: "chosen"; to: 1;
+                                      duration: 60; easing.type: Easing.OutQuad }
+                    NumberAnimation { target: subRow; property: "chosen"; to: 0;
+                                      duration: 130; easing.type: Easing.InQuad }
+                    ScriptAction {
+                      script: {
+                        const act = subRow.pending;
+                        subRow.pending = null;
+                        menu.close();
+                        if (act) act();
+                      }
+                    }
+                  }
+
+                  Rectangle {
+                    anchors.verticalCenter: parent.verticalCenter
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.margins: 8
+                    height: 1
+                    visible: !!modelData.sep
+                    color: Zenon.msgBorder
+                  }
+
+                  Rectangle {
+                    anchors.fill: parent
+                    visible: !modelData.sep
+                    // the same highlight the parent card wears, from icarus
+                    color: subHov.hovered || menu.subSel === subRow.index
+                      ? Zenon.headBg : "transparent"
+                  }
+                  HoverHandler { id: subHov; enabled: !modelData.sep }
+
+                  Text {
+                    id: subLabel
+                    anchors.left: parent.left
+                    anchors.leftMargin: 12
+                    anchors.verticalCenter: parent.verticalCenter
+                    visible: !modelData.sep
+                    text: modelData.label || ""
+                    color: Zenon.white
+                    font.family: Zenon.face
+                    font.pixelSize: 16
+                  }
+
+                  // what the format actually is, for the rows that carry one
+                  Text {
+                    anchors.left: subLabel.right
+                    anchors.leftMargin: 12
+                    anchors.right: parent.right
+                    anchors.rightMargin: 10
+                    anchors.verticalCenter: parent.verticalCenter
+                    visible: !!modelData.hint
+                    text: modelData.hint || ""
+                    elide: Text.ElideRight
+                    horizontalAlignment: Text.AlignRight
+                    color: Zenon.muted
+                    font.family: Zenon.face
+                    font.pixelSize: 13
+                  }
+
+                  Rectangle {
+                    anchors.fill: parent
+                    visible: subRow.chosen > 0
+                    color: Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b,
+                                   0.55 * subRow.chosen)
+                  }
+
+                  MouseArea {
+                    anchors.fill: parent
+                    enabled: !modelData.sep && !subChosenAnim.running
+                  // No hand cursor. This is a file manager, not a page of links:
+                  // a row you can click is the normal state of everything here, so
+                  // pointing at one is not news and the pointer should not change
+                  // to say so.
+                    onClicked: {
+                      if (!modelData.act) return;
+                      subRow.pending = modelData.act;
+                      subChosenAnim.restart();
+                    }
+                  }
+                }
+              }
+            }
+          }
       }
 
+
+      }
     }
+
 
     // ── bulk rename ───────────────────────────────────────────────────
     // Forty names, edited where the forty files are.
@@ -12857,12 +15205,57 @@ FloatingWindow {
       // find. One ring rather than two halves that cannot reach each other,
       // which is what the pattern fields and the rows were before.
       function tabFromRow(i) {
+        // Wraps to the PICKER, which is the top of the ring now that the
+        // card opens on it.
         if (i < root.bulkNames.length - 1) bulk.focusRow(i + 1);
-        else findField.claim();
+        else modeDrop.claim();
       }
       function backTabFromRow(i) {
+        // replField, before this: the second of the two REPLACE fields, and
+        // the only mode that has it. Backing out of row one in add or format
+        // reached for a control that was not on screen.
         if (i > 0) bulk.focusRow(i - 1);
-        else replField.claim();
+        else bulk.tailField().claim();
+      }
+
+      // ── THE WHOLE ROW OF CONTROLS, IN ORDER ───────────────────────
+      // Every control the showing mode has, not just its text fields. The
+      // secondary pickers — before/after, Index/Counter/Date, the start
+      // number — were reachable by pointer only, which made the card half
+      // keyboard-driven: Tab walked straight past the thing you were about
+      // to set.
+      //
+      // Per mode, because only one mode's controls are on screen at a time
+      // and a hidden control cannot take focus — tabbing into one reads as
+      // Tab doing nothing at all.
+      function ring() {
+        if (root.bulkMode === "add")
+          return [modeDrop, addField, addWhere];
+        if (root.bulkMode === "format")
+          return root.bulkFmtKind === "date"
+            ? [modeDrop, fmtKind, fmtField, fmtWhere]
+            : [modeDrop, fmtKind, fmtField, fmtWhere, fmtStart];
+        return [modeDrop, findField, replField];
+      }
+
+      function focusFrom(cur, dir) {
+        const r = bulk.ring();
+        let i = -1;
+        for (let k = 0; k < r.length; ++k) if (r[k] === cur) { i = k; break; }
+        if (i < 0) { r[0].claim(); return; }
+        const next = i + dir;
+        // Off either end is into the ROWS, which are the other half of this
+        // card's ring — tabFromRow brings it back round.
+        if (next >= r.length) { bulk.focusRow(0); return; }
+        if (next < 0) { bulk.focusRow(root.bulkNames.length - 1); return; }
+        r[next].claim();
+      }
+
+      // The last control before the rows — read off the ring rather than
+      // named, so adding a control to a mode does not need saying twice.
+      function tailField() {
+        const r = bulk.ring();
+        return r[r.length - 1];
       }
 
       // What is wrong with each proposed name, from the same function the
@@ -12886,13 +15279,39 @@ FloatingWindow {
         content.forceActiveFocus();
       }
 
+      // WHICHEVER MODE IS SHOWING. The three modes' fields all still exist
+      // while their mode is hidden — visible: false does not destroy an item
+      // — so every focus claim here has to ask which one is actually on
+      // screen rather than reaching for the find field it used to be.
+      function leadField() {
+        if (root.bulkMode === "add") return addField;
+        if (root.bulkMode === "format") return fmtField;
+        return findField;
+      }
+
       onOpenChanged: {
+        // Whatever was hanging open when the card went away does not come
+        // back with it.
+        root.bulkOpenDrop = null;
         if (!bulk.open) return;
         bulk.at = 0;
         findField.text = "";
         replField.text = "";
+        addField.text = "";
+        fmtField.text = "";
         bulkClaim.tries = 0;
         bulkClaim.restart();
+      }
+
+      // Switching mode moves the caret with it. The field you are looking at
+      // having the keyboard is the whole reason the card claims focus at all.
+      Connections {
+        target: root
+        function onBulkModeChanged() {
+          if (!bulk.open) return;
+          bulkClaim.tries = 0;
+          bulkClaim.restart();
+        }
       }
 
       // ASK UNTIL IT HAS IT. The card is animating in from opacity 0 when the
@@ -12905,7 +15324,8 @@ FloatingWindow {
         repeat: true
         property int tries: 0
         onTriggered: {
-          if (!bulk.open || findField.focused || bulkClaim.tries++ > 12) {
+          if (!bulk.open || modeDrop.focused
+              || bulkClaim.tries++ > 12) {
             bulkClaim.stop();
             return;
           }
@@ -12916,11 +15336,11 @@ FloatingWindow {
           // row one meant reaching for the mouse or tabbing backwards to use
           // it. Editing a single name by hand is what the in-place rename is
           // for; this card is open because the pattern is what you wanted.
-          findField.claim();
+          modeDrop.claim();
         }
       }
 
-      InputShield { onClicked: bulk.dismiss() }
+      InputShield { keepTop: tabStrip.height + crumbBar.height; onClicked: bulk.dismiss() }
 
       // Escape from anywhere in the card, including from inside a field that
       // has not handled it — so there is always one key that gets you out.
@@ -12961,59 +15381,204 @@ FloatingWindow {
               id: patRow
               width: parent.width
               height: 46
-              // Anchored rather than laid out in a Row: the button sizes
-              // itself to its own label, so the two fields are whatever is
-              // left over after it — and a Row would have to be told that
-              // number twice.
-              readonly property real cell:
-                Math.max(60, (patRow.width - 72 - replBtn.width) / 2)
+              // Lifted as a WHOLE while any of its dropdowns is open. Giving
+              // the list its own z is not enough: z only orders an item among
+              // its siblings, and the list's siblings are inside patRow while
+              // the things it has to cover are the rows below patRow.
+              z: (modeDrop.expanded || addWhere.expanded || fmtKind.expanded
+                  || fmtWhere.expanded) ? 60 : 0
 
-              BulkField {
-                id: findField
+              // Every mode's controls live between the dropdown and the
+              // button, so the row keeps one shape whichever mode is showing
+              // and the button never moves when you switch.
+              readonly property real innerL: 16 + modeDrop.width + 8
+              readonly property real innerR: patRow.width - 16 - applyBtn.width - 8
+              readonly property real innerW: Math.max(80, patRow.innerR - patRow.innerL)
+
+              BulkDrop {
+                id: modeDrop
+                overlay: dropLayer
                 anchors.left: parent.left
                 anchors.leftMargin: 16
                 anchors.verticalCenter: parent.verticalCenter
-                width: patRow.cell
-                ghost: "find"
-                onAccepted: root.applyBulkReplace(findField.text, replField.text)
-                onTabbed: replField.claim()
-                onBackTabbed: bulk.focusRow(root.bulkNames.length - 1)
+                options: [["replace", "Replace Text"],
+                          ["add",     "Add Text"],
+                          ["format",  "Format"]]
+                value: root.bulkMode
+                onPicked: (v) => root.bulkMode = v
+                // Forward into whichever mode is now showing, back to the
+                // last row — the picker is the top of the ring.
+                onTabbed: bulk.focusFrom(modeDrop, 1)
+                onBackTabbed: bulk.focusFrom(modeDrop, -1)
               }
 
-              Text {
-                id: patArrow
-                anchors.left: findField.right
-                anchors.leftMargin: 8
-                anchors.verticalCenter: parent.verticalCenter
-                width: 14
-                horizontalAlignment: Text.AlignHCenter
-                text: "\u2192"
-                color: Zenon.muted
-                font.family: Zenon.face
-                font.pixelSize: 15
+              // ── replace text ─────────────────────────────────────
+              // Return in either field applies it. A BUTTON rather than a
+              // live binding: the replace runs from the original names, so
+              // making it live would wipe a hand edit every time the caret
+              // moved through the pattern.
+              Item {
+                visible: root.bulkMode === "replace"
+                x: patRow.innerL
+                width: patRow.innerW
+                height: parent.height
+                readonly property real cell: Math.max(50, (width - 22) / 2)
+
+                BulkField {
+                  id: findField
+                  anchors.left: parent.left
+                  anchors.verticalCenter: parent.verticalCenter
+                  width: parent.cell
+                  ghost: "find"
+                  onAccepted: root.applyBulkReplace(findField.text, replField.text)
+                  onTabbed: bulk.focusFrom(findField, 1)
+                  onBackTabbed: bulk.focusFrom(findField, -1)
+                }
+
+                Text {
+                  id: patArrow
+                  anchors.left: findField.right
+                  anchors.leftMargin: 8
+                  anchors.verticalCenter: parent.verticalCenter
+                  width: 14
+                  horizontalAlignment: Text.AlignHCenter
+                  text: "\u2192"
+                  color: Zenon.muted
+                  font.family: Zenon.face
+                  font.pixelSize: 15
+                }
+
+                BulkField {
+                  id: replField
+                  anchors.left: patArrow.right
+                  anchors.leftMargin: 8
+                  anchors.verticalCenter: parent.verticalCenter
+                  width: parent.cell
+                  ghost: "replace with"
+                  onAccepted: root.applyBulkReplace(findField.text, replField.text)
+                  onTabbed: bulk.focusFrom(replField, 1)
+                  onBackTabbed: bulk.focusFrom(replField, -1)
+                }
               }
 
-              BulkField {
-                id: replField
-                anchors.left: patArrow.right
-                anchors.leftMargin: 8
-                anchors.verticalCenter: parent.verticalCenter
-                width: patRow.cell
-                ghost: "replace with"
-                onAccepted: root.applyBulkReplace(findField.text, replField.text)
-                onTabbed: bulk.focusRow(0)
-                onBackTabbed: findField.claim()
+              // ── add text ─────────────────────────────────────────
+              Item {
+                visible: root.bulkMode === "add"
+                x: patRow.innerL
+                width: patRow.innerW
+                height: parent.height
+
+                BulkField {
+                  id: addField
+                  anchors.left: parent.left
+                  anchors.verticalCenter: parent.verticalCenter
+                  width: Math.max(60, parent.width - addWhere.width - 8)
+                  ghost: "text to add"
+                  onAccepted: root.applyBulkAdd(addField.text, root.bulkAddWhere)
+                  onTabbed: bulk.focusFrom(addField, 1)
+                  onBackTabbed: bulk.focusFrom(addField, -1)
+                }
+
+                BulkDrop {
+                  id: addWhere
+                overlay: dropLayer
+                  anchors.right: parent.right
+                  anchors.verticalCenter: parent.verticalCenter
+                  options: [["before", "before name"], ["after", "after name"]]
+                  value: root.bulkAddWhere
+                  onPicked: (v) => root.bulkAddWhere = v
+                  onTabbed: bulk.focusFrom(addWhere, 1)
+                  onBackTabbed: bulk.focusFrom(addWhere, -1)
+                }
+              }
+
+              // ── format ───────────────────────────────────────────
+              // The one mode that DISCARDS the old name, which is why it
+              // asks for the most: what the new name is, what distinguishes
+              // the rows, which end that goes on, and where counting starts.
+              Item {
+                visible: root.bulkMode === "format"
+                x: patRow.innerL
+                width: patRow.innerW
+                height: parent.height
+
+                BulkDrop {
+                  id: fmtKind
+                overlay: dropLayer
+                  anchors.left: parent.left
+                  anchors.verticalCenter: parent.verticalCenter
+                  options: [["index",   "Name and Index"],
+                            ["counter", "Name and Counter"],
+                            ["date",    "Name and Date"]]
+                  value: root.bulkFmtKind
+                  onPicked: (v) => root.bulkFmtKind = v
+                  onTabbed: bulk.focusFrom(fmtKind, 1)
+                  onBackTabbed: bulk.focusFrom(fmtKind, -1)
+                }
+
+                BulkField {
+                  id: fmtField
+                  anchors.left: fmtKind.right
+                  anchors.leftMargin: 8
+                  anchors.verticalCenter: parent.verticalCenter
+                  width: Math.max(50, parent.width - fmtKind.width
+                          - fmtWhere.width - (fmtStart.visible ? fmtStart.width + 8 : 0)
+                          - 24)
+                  ghost: "custom format"
+                  onAccepted: root.applyBulkFormat(fmtField.text)
+                  onTabbed: bulk.focusFrom(fmtField, 1)
+                  onBackTabbed: bulk.focusFrom(fmtField, -1)
+                }
+
+                BulkDrop {
+                  id: fmtWhere
+                overlay: dropLayer
+                  anchors.right: fmtStart.visible ? fmtStart.left : parent.right
+                  anchors.rightMargin: fmtStart.visible ? 8 : 0
+                  anchors.verticalCenter: parent.verticalCenter
+                  options: [["before", "before name"], ["after", "after name"]]
+                  value: root.bulkFmtWhere
+                  onPicked: (v) => root.bulkFmtWhere = v
+                  onTabbed: bulk.focusFrom(fmtWhere, 1)
+                  onBackTabbed: bulk.focusFrom(fmtWhere, -1)
+                }
+
+                BulkField {
+                  id: fmtStart
+                  anchors.right: parent.right
+                  anchors.verticalCenter: parent.verticalCenter
+                  width: 58
+                  // A date has nothing to count from.
+                  visible: root.bulkFmtKind !== "date"
+                  ghost: "start"
+                  // NOT bound to bulkFmtStart, written to it: a two-way
+                  // binding on a field you are typing in fights the caret.
+                  onTextChanged: root.bulkFmtStart = fmtStart.text
+                  onAccepted: root.applyBulkFormat(fmtField.text)
+                  onTabbed: bulk.focusFrom(fmtStart, 1)
+                  onBackTabbed: bulk.focusFrom(fmtStart, -1)
+                }
               }
 
               DialogButton {
-                id: replBtn
+                id: applyBtn
                 anchors.right: parent.right
                 anchors.rightMargin: 16
                 anchors.verticalCenter: parent.verticalCenter
-                label: "Replace"
+                label: root.bulkMode === "replace" ? "Replace"
+                  : root.bulkMode === "add" ? "Add" : "Format"
                 ink: Zenon.cyan
-                ready: findField.text !== ""
-                onClicked: root.applyBulkReplace(findField.text, replField.text)
+                ready: root.bulkMode === "replace" ? findField.text !== ""
+                  : root.bulkMode === "add" ? addField.text !== ""
+                  : (fmtField.text !== "" || root.bulkFmtKind === "date")
+                onClicked: {
+                  if (root.bulkMode === "replace")
+                    root.applyBulkReplace(findField.text, replField.text);
+                  else if (root.bulkMode === "add")
+                    root.applyBulkAdd(addField.text, root.bulkAddWhere);
+                  else
+                    root.applyBulkFormat(fmtField.text);
+                }
               }
             }
 
@@ -13207,6 +15772,23 @@ FloatingWindow {
 
                   TextInput {
                     id: toName
+
+                    // A cursorDelegate REPLACES the built-in one, so
+                    // there is exactly one caret and this decides how
+                    // it behaves. It breathes, the way every other
+                    // field on this desktop does — a hard on/off blink
+                    // was the last thing here still wearing Qt's
+                    // default.
+                    cursorDelegate: Rectangle {
+                      width: 2
+                      color: Zenon.cyan
+                      SequentialAnimation on opacity {
+                        running: toName.activeFocus
+                        loops: Animation.Infinite
+                        NumberAnimation { to: 0.2; duration: 620; easing.type: Easing.InOutQuad }
+                        NumberAnimation { to: 1.0; duration: 620; easing.type: Easing.InOutQuad }
+                      }
+                    }
                     x: wasName.x + wasName.width + 12
                     width: parent.width - x - 14 - (issueText.visible ? issueText.width + 10 : 0)
                     height: parent.height
@@ -13351,335 +15933,6 @@ FloatingWindow {
       }
     }
 
-    // ── permissions ───────────────────────────────────────────────────
-    // Nine bits, shown as the grid they are. The octal and the rwxrwxrwx
-    // string are both on screen because those are the two forms every other
-    // tool speaks, and reading one off the other in your head is exactly the
-    // step that gets a mode wrong.
-    Rectangle {
-      id: perms
-      anchors.fill: parent
-      z: 12
-      visible: opacity > 0.01
-      opacity: perms.open ? 1 : 0
-      color: root.cardScrim
-      Behavior on opacity { NumberAnimation { duration: perms.open ? permsSheet.slideIn : permsSheet.slideOut; easing.type: Zenon.ease } }
-
-      property bool open: false
-      property int mode: 0
-      property var paths: []
-      // WHAT IT LOOKED LIKE IN THE LISTING, captured with the paths rather
-      // than looked up afterwards — the card maps rows down to paths and the
-      // glyph would be gone by the time the bar asked for it. Only meaningful
-      // for one item; a mixed set has no single glyph, the same way it has no
-      // single mode.
-      property string icon: ""
-      property color iconInk: Zenon.cyan
-      // Which of the nine boxes the keyboard is on, read across then down:
-      // owner r w x, group r w x, other r w x — the order chmod writes them
-      // and the order they are drawn in. The dialog was mouse-only.
-      property int cursor: 0
-      readonly property int cursorBit:
-        [4, 2, 1][perms.cursor % 3] << (6 - Math.floor(perms.cursor / 3) * 3)
-      function toggleCursor() { perms.mode = perms.mode ^ perms.cursorBit; }
-
-      function ask() {
-        const rows = root.acting();
-        if (rows.length === 0) return;
-        perms.paths = rows.map((r) => r.path);
-        perms.icon = rows.length === 1 && rows[0].glyph !== undefined
-          ? rows[0].glyph : "";
-        perms.iconInk = rows.length === 1 ? root.inkFor(rows[0]) : Zenon.cyan;
-        // the cursor's mode is the starting point even for a multi-select:
-        // there is no single answer for a mixed set, and picking one of them
-        // is more honest than showing zero
-        perms.mode = rows[0].mode || 0;
-        perms.cursor = 0;
-        perms.open = true;
-      }
-
-      function apply() {
-        root.run(Terminus.chmodCommand(perms.paths, perms.mode));
-        perms.open = false;
-        content.forceActiveFocus();
-      }
-
-      InputShield {
-        onClicked: { perms.open = false; content.forceActiveFocus(); }
-      }
-
-      // The panel shadow every card on this desktop casts — icarus'
-      // shadow, and now this window's too. A card is a card: one of
-      // them wearing a shadow of its own was two answers to the same
-      // question.
-      Sheet {
-        id: permsSheet
-        shown: perms.open
-        fromTop: tabStrip.height + crumbBar.height
-        // Sized to the grid it holds: 78 label + 3x62 boxes + 40 for the
-        // row's octal digit is 304, and 40 either side of that is the margin
-        // everything else in the card lines up to.
-        cardW: 384
-        // Sized to what is in it, like every other dialog here. It was a fixed
-        // 208 that happened to fit the type it had; enlarging the type left a
-        // band of empty card under the buttons, and the next change to its
-        // contents would have done the same thing again.
-        cardH: permsCol.implicitHeight
-
-        Column {
-          id: permsCol
-          width: parent.width
-
-          // ONE RHYTHM. Everything below the title is 12px apart and the grid
-          // is centred rather than left-padded — it used to start 40px in and
-          // end 146px short of the right edge, which is what made the card
-          // look like it was leaning.
-          readonly property int gap: 12
-          readonly property int labelW: 78
-          readonly property int cellW: 62
-          readonly property int octW: 40
-
-          // The caption band stood here. It is drawn on the bar now — see
-          // sheetBarHead — because a sheet says what it is where it hangs from.
-          // The rhythm's own gap stays: the sheet adds no air, so the first
-          // row has to bring it like every other row does.
-          Item { width: 1; height: permsCol.gap }
-
-          // The answer in both spellings on one line — the octal you would
-          // type at chmod and the rwx string ls prints. They are the same
-          // number said twice, so they belong side by side rather than stacked.
-          Row {
-            anchors.horizontalCenter: parent.horizontalCenter
-            spacing: 16
-
-            Text {
-              anchors.verticalCenter: parent.verticalCenter
-              text: ("000" + (perms.mode & 511).toString(8)).slice(-3)
-              color: Zenon.cyan
-              font.family: Zenon.faceMono
-              font.weight: Font.Bold
-              font.pixelSize: 30
-            }
-
-            Rectangle {
-              anchors.verticalCenter: parent.verticalCenter
-              width: 1
-              height: 24
-              color: Zenon.msgBorder
-            }
-
-            Text {
-              anchors.verticalCenter: parent.verticalCenter
-              text: Terminus.modeString(perms.mode)
-              color: Zenon.sand
-              font.family: Zenon.faceMono
-              font.weight: Font.Bold
-              font.pixelSize: 21
-            }
-          }
-
-          Item { width: 1; height: permsCol.gap }
-
-          // The four modes anyone actually types. A permissions dialog whose
-          // quickest route to 755 is nine clicks is a dialog that has not
-          // finished the job.
-          Row {
-            anchors.horizontalCenter: parent.horizontalCenter
-            spacing: 8
-
-            Repeater {
-              model: [
-                ["644", 420], ["755", 493], ["600", 384], ["700", 448]
-              ]
-
-              delegate: Rectangle {
-                required property var modelData
-                readonly property bool on: (perms.mode & 511) === modelData[1]
-                width: 62
-                height: 24
-                radius: 4
-                color: on ? Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b, 0.20)
-                  : (presetHov.hovered ? Zenon.hoverTint : "transparent")
-                border.width: 1
-                border.color: on ? Zenon.cyan : Zenon.msgBorder
-                Behavior on color {
-                  ColorAnimation { duration: Zenon.fast; easing.type: Zenon.ease }
-                }
-
-                Text {
-                  anchors.centerIn: parent
-                  text: modelData[0]
-                  color: parent.on ? Zenon.cyan : Zenon.muted
-                  font.family: Zenon.faceMono
-                  font.pixelSize: 14
-                }
-
-                HoverHandler { id: presetHov }
-                MouseArea {
-                  anchors.fill: parent
-                  // the high bits — setuid and friends — are left alone: this
-                  // is a shortcut for the nine, not a reset of the whole mode
-                  onClicked: perms.mode = (perms.mode & ~511) | modelData[1]
-                }
-              }
-            }
-          }
-
-          Item { width: 1; height: permsCol.gap + 2 }
-
-          Rectangle {
-            width: parent.width
-            height: 1
-            color: Zenon.msgBorder
-          }
-
-          Item { width: 1; height: permsCol.gap }
-
-          // A GRID with its columns named, rather than three unlabelled rows
-          // of three: r, w and x are not obvious from the boxes alone, and the
-          // heading costs one row of small type.
-          Row {
-            anchors.horizontalCenter: parent.horizontalCenter
-            height: 18
-
-            Item { width: permsCol.labelW; height: 1 }
-            Repeater {
-              model: ["read", "write", "exec"]
-              delegate: Text {
-                required property var modelData
-                width: permsCol.cellW
-                height: 18
-                horizontalAlignment: Text.AlignHCenter
-                verticalAlignment: Text.AlignVCenter
-                text: modelData
-                color: Zenon.msgBorder
-                font.family: Zenon.face
-                font.pixelSize: 12
-              }
-            }
-            Item { width: permsCol.octW; height: 1 }
-          }
-
-          // three rows of three, in the order chmod writes them
-          Repeater {
-            model: [["owner", 6], ["group", 3], ["other", 0]]
-
-            delegate: Row {
-              id: permRow
-              required property var modelData
-              required property int index
-              readonly property int shift: modelData[1]
-              anchors.horizontalCenter: parent.horizontalCenter
-              height: 34
-
-              Text {
-                width: permsCol.labelW
-                height: parent.height
-                verticalAlignment: Text.AlignVCenter
-                text: modelData[0]
-                color: Zenon.white
-                font.family: Zenon.face
-                font.pixelSize: 16
-              }
-
-              Repeater {
-                model: [["r", 4], ["w", 2], ["x", 1]]
-
-                delegate: Item {
-                  required property var modelData
-                  required property int index
-                  width: permsCol.cellW
-                  height: parent.height
-
-                  readonly property int bit: modelData[1] << permRow.shift
-                  readonly property bool on: (perms.mode & bit) !== 0
-                  readonly property bool here:
-                    perms.cursor === permRow.index * 3 + index
-
-                  Rectangle {
-                    anchors.centerIn: parent
-                    width: 50
-                    height: 26
-                    radius: 4
-                    color: parent.on
-                      ? Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b, 0.20)
-                      : (bitHov.hovered ? Zenon.hoverTint : "transparent")
-                    border.width: parent.here ? 2 : 1
-                    border.color: parent.here ? Zenon.sand
-                      : (parent.on ? Zenon.cyan : Zenon.msgBorder)
-                    Behavior on color {
-                      ColorAnimation { duration: Zenon.fast; easing.type: Zenon.ease }
-                    }
-
-                    Text {
-                      anchors.centerIn: parent
-                      text: modelData[0]
-                      color: parent.parent.on ? Zenon.cyan : Zenon.muted
-                      font.family: Zenon.faceMono
-                      font.weight: Font.Bold
-                      font.pixelSize: 16
-                    }
-                  }
-
-                  HoverHandler { id: bitHov }
-                  MouseArea {
-                    anchors.fill: parent
-                    onClicked: {
-                      perms.cursor = permRow.index * 3 + parent.index;
-                      perms.mode = perms.mode ^ parent.bit;
-                    }
-                  }
-                }
-              }
-
-              // This row's own octal digit, so the three boxes and the number
-              // at the top are visibly the same statement.
-              Text {
-                width: permsCol.octW
-                height: parent.height
-                horizontalAlignment: Text.AlignHCenter
-                verticalAlignment: Text.AlignVCenter
-                text: String((perms.mode >> permRow.shift) & 7)
-                color: Zenon.muted
-                font.family: Zenon.faceMono
-                font.pixelSize: 15
-              }
-            }
-          }
-
-          Item { width: 1; height: permsCol.gap + 2 }
-
-          Rectangle {
-            width: parent.width
-            height: 1
-            color: Zenon.msgBorder
-          }
-
-          Item {
-            width: parent.width
-            height: 54
-
-            Row {
-              anchors.centerIn: parent
-              spacing: 12
-
-              DialogButton {
-                label: "Cancel"
-                ink: Zenon.muted
-                onClicked: { perms.open = false; content.forceActiveFocus(); }
-              }
-
-              DialogButton {
-                label: "Apply"
-                ink: Zenon.cyan
-                primary: true
-                onClicked: perms.apply()
-              }
-            }
-          }
-        }
-      }
-    }
 
     // ── the confirmation ──────────────────────────────────────────────
     // Everything that overwrites or deletes comes through here. Same shape as
@@ -13768,7 +16021,7 @@ FloatingWindow {
         content.forceActiveFocus();
       }
 
-      InputShield { onClicked: confirm.dismiss() }
+      InputShield { keepTop: tabStrip.height + crumbBar.height; onClicked: confirm.dismiss() }
 
 
       // The panel shadow every card on this desktop casts — icarus'
@@ -13977,7 +16230,7 @@ FloatingWindow {
         if (c && c.act) c.act();
       }
 
-      InputShield { onClicked: cmdPalette.dismiss() }
+      InputShield { keepTop: tabStrip.height + crumbBar.height; onClicked: cmdPalette.dismiss() }
 
       Sheet {
         id: paletteSheet
@@ -14173,7 +16426,1174 @@ FloatingWindow {
     // root it has. This answers "which bookmark?" and nothing else.
     //
     // The palette's shape, because it is the palette's problem — a short list
+    // ── EVERY DISK, MOUNTED OR NOT ──────────────────────────────────────
+    // The sidebar has shown these for a while, but only while it is open and
+    // only as a strip down the edge — too narrow for the numbers that matter
+    // when you are deciding where something will fit. This is the same list
+    // with room to read it, reachable without the sidebar being up at all.
+    //
+    // It reads root.disks, which the four-second lsblk poll already fills for
+    // the sidebar, so the sheet costs no process of its own and a stick
+    // plugged in while it is open appears in it.
+    Rectangle {
+      id: disks
+      anchors.fill: parent
+      z: 13
+      visible: opacity > 0.01
+      opacity: disks.open ? 1 : 0
+      color: root.cardScrim
+      Behavior on opacity {
+        NumberAnimation {
+          duration: disks.open ? disksSheet.slideIn : disksSheet.slideOut
+          easing.type: Zenon.ease
+        }
+      }
+
+      property bool open: false
+      property int sel: 0
+
+      // Mounted first, then the rest — the ones you can go to are the ones you
+      // are usually here for, and an unmounted disk is a button rather than a
+      // place. Within each half lsblk's own order is kept, which follows the
+      // hardware rather than the alphabet and puts partitions of one device
+      // together.
+      readonly property var rows: {
+        const on = [], off = [];
+        for (const d of root.disks) (d.mount !== "" ? on : off).push(d);
+        return on.concat(off);
+      }
+
+      readonly property var cur: disks.rows[disks.sel] || null
+
+      function ask() {
+        disks.sel = 0;
+        disks.open = true;
+      }
+
+      function dismiss() {
+        disks.open = false;
+        content.forceActiveFocus();
+      }
+
+      function step(d) {
+        const n = disks.rows.length;
+        if (n === 0) return;
+        disks.sel = (disks.sel + d + n) % n;
+        disksList.positionViewAtIndex(disks.sel, ListView.Contain);
+      }
+
+      // RETURN IS "TAKE ME THERE", which for something not yet mounted means
+      // mounting it first — the same thing the sidebar's rows do, so the two
+      // cannot answer the same gesture differently. The card stays open on a
+      // mount, because the disk is not somewhere to go until it has one.
+      function enter() {
+        const d = disks.cur;
+        if (!d) return;
+        if (d.mount !== "") { disks.dismiss(); root.goTo(d.mount); return; }
+        root.mountDisk(d);
+      }
+
+      // And `m` is the other half of it: the verb on its own, so a mounted
+      // disk can be ejected from here without going to it first.
+      function toggle() {
+        const d = disks.cur;
+        if (!d) return;
+        if (Terminus.isSystemMount(d.mount)) {
+          root.warn("the system is standing on " + d.mount);
+          return;
+        }
+        root.mountDisk(d);
+      }
+
+      InputShield { keepTop: tabStrip.height + crumbBar.height; onClicked: disks.dismiss() }
+
+      Sheet {
+        id: disksSheet
+        shown: disks.open
+        fromTop: tabStrip.height + crumbBar.height
+        cardW: 820
+        readonly property int rowH: 38
+        readonly property int pageRows: 12
+        cardH: 12 + Math.max(1, Math.min(disksSheet.pageRows,
+                                         disks.rows.length))
+                    * disksSheet.rowH + disksFoot.height
+
+        SelectBar {
+          view: disksList
+          index: disks.sel
+          rowH: disksSheet.rowH
+          on: disks.rows.length > 0
+        }
+
+        ListView {
+          id: disksList
+          anchors.top: parent.top
+          anchors.topMargin: 6
+          anchors.left: parent.left
+          anchors.right: parent.right
+          anchors.bottom: disksFoot.top
+          clip: true
+          model: disks.rows
+          boundsBehavior: Flickable.StopAtBounds
+
+          delegate: Item {
+            id: diskRow
+            required property var modelData
+            required property int index
+            width: disksList.width
+            height: disksSheet.rowH
+
+            readonly property bool mounted: modelData.mount !== ""
+            readonly property real used:
+              Terminus.usedFraction(modelData.avail, modelData.fsSize)
+
+            // ── MOUNTED SAYS SO DOWN THE EDGE ─────────────────────────
+            // The same 3px cyan bar the sidebar puts against the row you are
+            // standing in. Saying it with the glyph's colour alone made two
+            // states of one mark, which is a difference you have to know to
+            // look for; a bar is either there or it is not.
+            Rectangle {
+              anchors.left: parent.left
+              anchors.verticalCenter: parent.verticalCenter
+              width: 3
+              height: parent.height - 12
+              radius: 1
+              color: Zenon.cyan
+              visible: diskRow.mounted
+            }
+
+            Text {
+              id: diskGlyph
+              anchors.left: parent.left
+              anchors.leftMargin: 16
+              anchors.verticalCenter: parent.verticalCenter
+              text: diskRow.modelData.removable ? "\uF0A0" : "\uF1C0"
+              color: diskRow.mounted ? Zenon.cyan : Zenon.muted
+              font.family: Zenon.faceMono
+              font.pixelSize: 16
+            }
+
+            Text {
+              id: diskName
+              anchors.left: diskGlyph.right
+              anchors.leftMargin: 12
+              anchors.verticalCenter: parent.verticalCenter
+              width: 210
+              elide: Text.ElideRight
+              text: diskRow.modelData.name !== ""
+                ? diskRow.modelData.name
+                : Terminus.basename(diskRow.modelData.path)
+              color: Zenon.white
+              font.family: Zenon.face
+              font.pixelSize: 16
+            }
+
+            // WHERE IT IS, which is the whole question for a disk. Unmounted
+            // says so in words rather than leaving the column blank — blank
+            // reads as "not loaded yet".
+            Text {
+              id: diskWhere
+              anchors.left: diskName.right
+              anchors.leftMargin: 12
+              anchors.right: diskFree.left
+              anchors.rightMargin: 12
+              anchors.verticalCenter: parent.verticalCenter
+              elide: Text.ElideMiddle
+              text: diskRow.mounted ? diskRow.modelData.mount : "not mounted"
+              color: diskRow.mounted ? Zenon.keyInk : Zenon.muted
+              font.family: Zenon.faceMono
+              font.pixelSize: 14
+            }
+
+            // Free space once it is mounted, capacity before — the same pair
+            // the sidebar shows, and for the same reason: "412G free" is what
+            // you want before copying, and the capacity is all there is to say
+            // about a disk you cannot see inside yet.
+            Text {
+              id: diskFree
+              anchors.right: diskUse.visible ? diskUse.left : diskFs.left
+              anchors.rightMargin: 14
+              anchors.verticalCenter: parent.verticalCenter
+              text: diskRow.mounted && diskRow.modelData.avail !== ""
+                ? diskRow.modelData.avail + " free"
+                : diskRow.modelData.size
+              color: Zenon.white
+              font.family: Zenon.faceMono
+              font.pixelSize: 14
+            }
+
+            // HOW FULL IT IS, which only a mounted disk knows — lsblk can
+            // report a size for an unmounted one but never a free figure, so
+            // the meter's absence is itself part of the answer.
+            Meter {
+              id: diskUse
+              anchors.right: diskFs.left
+              anchors.rightMargin: 12
+              anchors.verticalCenter: parent.verticalCenter
+              visible: diskRow.mounted && diskRow.used >= 0
+              vertical: false
+              value: diskRow.used
+              accent: diskRow.used > 0.9 ? Zenon.red : Zenon.cyan
+              thickness: 5
+              segLength: 4
+              segGap: 2
+              segCount: 12
+              deadZone: 0
+            }
+
+            Text {
+              id: diskFs
+              anchors.right: parent.right
+              anchors.rightMargin: 16
+              anchors.verticalCenter: parent.verticalCenter
+              width: 62
+              horizontalAlignment: Text.AlignRight
+              text: diskRow.modelData.fstype
+              color: Zenon.muted
+              font.family: Zenon.faceMono
+              font.pixelSize: 12
+            }
+
+            MouseArea {
+              anchors.fill: parent
+              onClicked: { disks.sel = diskRow.index; disks.enter(); }
+            }
+          }
+        }
+
+        Rectangle {
+          anchors.bottom: disksFoot.top
+          anchors.left: parent.left
+          anchors.right: parent.right
+          height: 1
+          color: Zenon.msgBorder
+        }
+
+        Item {
+          id: disksFoot
+          anchors.bottom: parent.bottom
+          anchors.left: parent.left
+          anchors.right: parent.right
+          height: 34
+
+          Row {
+            anchors.centerIn: parent
+            spacing: 12
+
+            Text {
+              anchors.verticalCenter: parent.verticalCenter
+              rightPadding: 2
+              text: disks.rows.length === 0 ? "no disks" : ""
+              visible: disks.rows.length === 0
+              color: Zenon.muted
+              font.family: Zenon.face
+              font.pixelSize: 14
+            }
+
+            Repeater {
+              model: [["\u2191\u2193", "move"], ["\u21b5", "go"],
+                      ["m", "mount / eject"], ["esc", "close"]]
+
+              delegate: Row {
+                id: dfPair
+                required property var modelData
+                spacing: 5
+
+                KeyChip {
+                  anchors.verticalCenter: parent.verticalCenter
+                  label: dfPair.modelData[0]
+                  fontSize: 11
+                }
+                Text {
+                  anchors.verticalCenter: parent.verticalCenter
+                  text: dfPair.modelData[1]
+                  color: Zenon.muted
+                  font.family: Zenon.face
+                  font.pixelSize: 13
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
     // you filter with the keyboard and commit with return.
+    // ── the collection editor ───────────────────────────────────────
+    // Edits a DEEP COPY and writes it only on save. A card that mutated the
+    // stored folder as you typed would have no cancel — and the rules are
+    // the sort of thing you take apart to see what happens.
+    Rectangle {
+      id: collEdit
+      anchors.fill: parent
+      z: 13
+      visible: opacity > 0.01
+      opacity: collEdit.open ? 1 : 0
+      color: root.cardScrim
+      Behavior on opacity {
+        NumberAnimation {
+          duration: collEdit.open ? collSheet.slideIn : collSheet.slideOut
+          easing.type: Zenon.ease
+        }
+      }
+
+      property bool open: false
+      property var draft: null
+      property bool making: false
+
+      // ── SLIGHTLY LARGER TYPE THAN THE RENAME CARD ─────────────────
+      // That card is a table: forty rows of filenames, where small type is
+      // what lets you see them all at once. This one is four controls you
+      // read and type into, and it was borrowing the table's size. One
+      // number, so the fields, the pickers and the sentence cannot drift
+      // apart from each other.
+      readonly property int textSize: 16
+
+      // ── WHY A ListModel AND NOT THE DRAFT'S OWN ARRAY ─────────────
+      // The same reason jobsModel is one, and it bit in the same way. A
+      // `property var` holding an array has to be REPLACED to be seen
+      // changing, so a Repeater over it rebuilds every delegate on every
+      // edit — and these delegates seed themselves from their row on
+      // creation and write back on every keystroke. Rebuild, seed, write,
+      // rebuild: a binding loop, and Qt said so.
+      //
+      // A ListModel is edited in PLACE. setProperty touches one role and
+      // the delegate already on screen keeps its cursor, its focus and its
+      // text.
+      ListModel { id: ruleModel }
+
+      // Bumped on every edit, because a binding cannot watch a ListModel's
+      // CONTENTS — only its count. The sentence below and the Save button
+      // both have to re-read when a value changes, and this is what tells
+      // them to. Same trick jobFaults uses.
+      property int ruleRev: 0
+
+      // The draft as it stands, rebuilt from the model on demand rather
+      // than kept in step with it. Called by the sentence, by `ready`, and
+      // by commit — never stored, so there is only ever one truth.
+      function draftNow() {
+        if (!collEdit.draft) return null;
+        const d = {
+          id: collEdit.draft.id,
+          name: collName.text,
+          ink: collEdit.draft.ink || "cyan",
+          root: collRoot.text,
+          rules: []
+        };
+        for (let i = 0; i < ruleModel.count; ++i) {
+          const r = ruleModel.get(i);
+          d.rules.push({ kind: r.kind, op: r.op, value: r.value });
+        }
+        return d;
+      }
+
+      function ask(id) {
+        const existing = id >= 0 ? root.collById(id) : null;
+        collEdit.making = existing === null;
+        // JSON round trip rather than a shallow copy: the rules are objects
+        // inside an array, and a shallow copy would hand the card the very
+        // objects it is supposed to be editing a copy of.
+        collEdit.draft = existing
+          ? JSON.parse(JSON.stringify(existing))
+          : Coll.blank(Date.now());
+        if (collEdit.making && collEdit.draft.root === "")
+          collEdit.draft.root = root.cwd;
+        // PUSHED IN, not bound. These two write BACK to the draft on every
+        // keystroke, so binding their text to the draft as well would be a
+        // loop — the field sets the draft, the draft sets the field. The
+        // draft is the record and the fields are seeded from it once, which
+        // is the same shape the rule rows use.
+        collName.text = String(collEdit.draft.name || "");
+        collRoot.text = String(collEdit.draft.root || "");
+        ruleModel.clear();
+        const rs = collEdit.draft.rules || [];
+        for (let i = 0; i < rs.length; ++i)
+          ruleModel.append({ kind: rs[i].kind, op: rs[i].op,
+                             value: String(rs[i].value || "") });
+        if (ruleModel.count === 0) {
+          const n = Coll.newRule("name");
+          ruleModel.append({ kind: n.kind, op: n.op, value: n.value });
+        }
+        collEdit.ruleRev = collEdit.ruleRev + 1;
+        collEdit.open = true;
+        collClaim.tries = 0;
+        collClaim.restart();
+      }
+
+      // ASK UNTIL IT HAS IT, the same retry every other card here carries:
+      // the sheet is animating in from opacity 0 when the first request goes
+      // out, and forceActiveFocus() on an item the scene has not placed yet
+      // is silently dropped.
+      Timer {
+        id: collClaim
+        interval: 40
+        repeat: true
+        property int tries: 0
+        onTriggered: {
+          if (!collEdit.open || collName.focused || collClaim.tries++ > 12) {
+            collClaim.stop();
+            return;
+          }
+          collKeys.forceActiveFocus();
+          collName.claim();
+        }
+      }
+
+      function dismiss() {
+        collEdit.open = false;
+        collEdit.draft = null;
+        content.forceActiveFocus();
+      }
+
+      function setRule(i, field, value) {
+        if (i < 0 || i >= ruleModel.count) return;
+        if (ruleModel.get(i)[field] === value) return;
+        ruleModel.setProperty(i, field, String(value));
+        // The op belongs to the kind, so changing the kind has to pick a
+        // legal op — "larger" survives a switch to Name otherwise and
+        // compiles to nothing.
+        if (field === "kind") {
+          const ops = Coll.opsFor(value);
+          ruleModel.setProperty(i, "op", ops.length > 0 ? ops[0] : "");
+          ruleModel.setProperty(i, "value", "");
+        }
+        collEdit.ruleRev = collEdit.ruleRev + 1;
+      }
+
+      function addRule() {
+        const n = Coll.newRule("name");
+        ruleModel.append({ kind: n.kind, op: n.op, value: n.value });
+        collEdit.ruleRev = collEdit.ruleRev + 1;
+      }
+
+      function dropRule(i) {
+        if (i < 0 || i >= ruleModel.count) return;
+        ruleModel.remove(i);
+        // Never none: an empty card gives you nothing to type into and no
+        // way to get a row back.
+        if (ruleModel.count === 0) {
+          const n = Coll.newRule("name");
+          ruleModel.append({ kind: n.kind, op: n.op, value: n.value });
+        }
+        collEdit.ruleRev = collEdit.ruleRev + 1;
+      }
+
+      // ruleRev and nameRev are READ here so the binding re-runs when they
+      // change — a ListModel's contents are invisible to the dependency
+      // tracker, and without touching them this would evaluate once.
+      readonly property bool ready: {
+        collEdit.ruleRev;
+        collEdit.nameRev;
+        const d = collEdit.draftNow();
+        if (!d || String(d.name).trim() === "") return false;
+        return Coll.command(d, Paths.home()) !== "" || Coll.tagsOnly(d);
+      }
+
+      readonly property string sentence: {
+        collEdit.ruleRev;
+        const d = collEdit.draftNow();
+        return d ? Coll.describe(d) : "";
+      }
+
+      // The two text fields are not in the model, so they need their own.
+      property int nameRev: 0
+
+      // ── THE TAB RING ──────────────────────────────────────────────
+      // Built by ASKING the Repeater what it made, not by keeping a list in
+      // step with it by hand: rules are added and removed while the card is
+      // open, and a hand-kept list is one `addRule` away from pointing at a
+      // control that no longer exists.
+      //
+      // Each rule contributes three stops — what it asks about, how, and
+      // what for — and the value stop is whichever of the two controls that
+      // rule actually shows.
+      function ring() {
+        const out = [collName, collRoot];
+        for (let i = 0; i < ruleRepeater.count; ++i) {
+          const row = ruleRepeater.itemAt(i);
+          if (!row) continue;
+          if (row.kindCtl) out.push(row.kindCtl);
+          if (row.opCtl) out.push(row.opCtl);
+          if (row.valCtl) out.push(row.valCtl);
+        }
+        return out;
+      }
+
+      function focusFrom(cur, dir) {
+        const r = collEdit.ring();
+        if (r.length === 0) return;
+        let i = -1;
+        for (let k = 0; k < r.length; ++k) if (r[k] === cur) { i = k; break; }
+        // Not found means the caller is gone — its row was just removed —
+        // and the top of the ring is the honest place to land.
+        if (i < 0) { r[0].claim(); return; }
+        const next = r[(i + dir + r.length) % r.length];
+        if (next && next.claim) next.claim();
+      }
+
+      function commit() {
+        if (!collEdit.ready) return;
+        const d = collEdit.draftNow();
+        d.name = String(d.name).trim();
+        root.saveCollection(d);
+        const id = d.id;
+        collEdit.dismiss();
+        root.openCollection(id);
+      }
+
+      InputShield {
+        keepTop: tabStrip.height + crumbBar.height
+        onClicked: collEdit.dismiss()
+      }
+
+      FocusScope {
+        id: collKeys
+        anchors.fill: parent
+        Keys.onPressed: (e) => {
+          if (e.key !== Qt.Key_Escape) return;
+          e.accepted = true;
+          // ONE STEP AT A TIME, the rule every card with something open
+          // inside it follows. An open dropdown is the innermost thing, so
+          // it goes first — Escape used to take the whole card away from
+          // under a menu the pointer was still in.
+          if (root.bulkOpenDrop !== null) { root.bulkOpenDrop = null; return; }
+          collEdit.dismiss();
+        }
+
+        Sheet {
+          id: collSheet
+          shown: collEdit.open
+          fromTop: tabStrip.height + crumbBar.height
+          cardW: 820
+          cardH: collCol.implicitHeight
+
+          Column {
+            id: collCol
+            width: parent.width
+
+            // ── what it is called, and where it looks ──────────────
+            Item {
+              width: parent.width
+              height: 46
+
+              BulkField {
+
+                textSize: collEdit.textSize
+                id: collName
+                anchors.left: parent.left
+                anchors.leftMargin: 16
+                anchors.verticalCenter: parent.verticalCenter
+                width: (parent.width - 44) * 0.38
+                ghost: "name"
+                onTextChanged: collEdit.nameRev = collEdit.nameRev + 1
+                onTabbed: collEdit.focusFrom(collName, 1)
+                onBackTabbed: collEdit.focusFrom(collName, -1)
+                onAccepted: collEdit.commit()
+              }
+
+              BulkField {
+
+                textSize: collEdit.textSize
+                id: collRoot
+                anchors.left: collName.right
+                anchors.leftMargin: 12
+                anchors.right: parent.right
+                anchors.rightMargin: 16
+                anchors.verticalCenter: parent.verticalCenter
+                ghost: "where to look"
+                onTextChanged: collEdit.nameRev = collEdit.nameRev + 1
+                onTabbed: collEdit.focusFrom(collRoot, 1)
+                onBackTabbed: collEdit.focusFrom(collRoot, -1)
+                onAccepted: collEdit.commit()
+              }
+            }
+
+            Rectangle {
+              width: parent.width
+              height: 1
+              color: Zenon.msgBorder
+            }
+
+            // ── the rules ─────────────────────────────────────────
+            Repeater {
+              id: ruleRepeater
+              model: ruleModel
+
+              delegate: Item {
+                id: ruleRow
+                required property string kind
+                required property string op
+                required property string value
+                required property int index
+
+                // What this row offers the ring. The value stop is whichever
+                // control the row is actually showing — a hidden one cannot
+                // take focus, and tabbing into it would look like Tab being
+                // swallowed.
+                readonly property var kindCtl: kindDrop
+                readonly property var opCtl: opDrop
+                readonly property var valCtl:
+                  ruleRow.kind === "kind" ? valueDrop : valueField
+                width: collCol.width
+                height: 44
+                // Lifted while one of its own dropdowns is open, for the
+                // reason patRow is — z orders an item among its SIBLINGS,
+                // and the rows below are this row's siblings.
+                z: (kindDrop.expanded || opDrop.expanded) ? 60 : 0
+
+                BulkDrop {
+
+                  textSize: collEdit.textSize
+                  id: kindDrop
+                  overlay: dropLayer
+                  anchors.left: parent.left
+                  anchors.leftMargin: 16
+                  anchors.verticalCenter: parent.verticalCenter
+                  options: {
+                    const out = [];
+                    for (let i = 0; i < Coll.KINDS.length; ++i)
+                      out.push([Coll.KINDS[i].kind, Coll.KINDS[i].label]);
+                    return out;
+                  }
+                  value: ruleRow.kind
+                  onPicked: (v) => collEdit.setRule(ruleRow.index, "kind", v)
+                  onTabbed: collEdit.focusFrom(kindDrop, 1)
+                  onBackTabbed: collEdit.focusFrom(kindDrop, -1)
+                }
+
+                BulkDrop {
+
+                  textSize: collEdit.textSize
+                  id: opDrop
+                  overlay: dropLayer
+                  anchors.left: kindDrop.right
+                  anchors.leftMargin: 8
+                  anchors.verticalCenter: parent.verticalCenter
+                  options: {
+                    const ops = Coll.opsFor(ruleRow.kind);
+                    const out = [];
+                    for (let i = 0; i < ops.length; ++i) out.push([ops[i], ops[i]]);
+                    return out;
+                  }
+                  value: ruleRow.op
+                  onPicked: (v) => collEdit.setRule(ruleRow.index, "op", v)
+                  onTabbed: collEdit.focusFrom(opDrop, 1)
+                  onBackTabbed: collEdit.focusFrom(opDrop, -1)
+                }
+
+                // The Kind row picks from a list; everything else is typed.
+                // Two controls in one slot rather than a third column that
+                // is empty five rows out of six.
+                BulkDrop {
+                  textSize: collEdit.textSize
+                  id: valueDrop
+                  overlay: dropLayer
+                  visible: ruleRow.kind === "kind"
+                  anchors.left: opDrop.right
+                  anchors.leftMargin: 8
+                  anchors.verticalCenter: parent.verticalCenter
+                  options: {
+                    const out = [["", "\u2014"]];
+                    for (let i = 0; i < Coll.FILE_KINDS.length; ++i)
+                      out.push([Coll.FILE_KINDS[i].name,
+                                Coll.FILE_KINDS[i].name]);
+                    return out;
+                  }
+                  value: ruleRow.value
+                  onPicked: (v) => collEdit.setRule(ruleRow.index, "value", v)
+                  onTabbed: collEdit.focusFrom(valueDrop, 1)
+                  onBackTabbed: collEdit.focusFrom(valueDrop, -1)
+                }
+
+                BulkField {
+
+                  textSize: collEdit.textSize
+                  id: valueField
+                  visible: ruleRow.kind !== "kind"
+                  anchors.left: opDrop.right
+                  anchors.leftMargin: 8
+                  anchors.right: ruleDrop.left
+                  anchors.rightMargin: 10
+                  anchors.verticalCenter: parent.verticalCenter
+                  ghost: {
+                    const k = ruleRow.kind;
+                    if (k === "size") return "10m";
+                    if (k === "date") return "7d";
+                    if (k === "tag") return "a tag name";
+                    if (k === "content") return "text to find inside";
+                    return "text";
+                  }
+                  // Written back on every keystroke rather than on accept:
+                  // the Save button is bound to whether the draft asks
+                  // anything, and it would stay dead until you pressed
+                  // Return in a field you had already filled in.
+                  onTextChanged: collEdit.setRule(ruleRow.index, "value",
+                                                   valueField.text)
+                  onTabbed: collEdit.focusFrom(valueField, 1)
+                  onBackTabbed: collEdit.focusFrom(valueField, -1)
+                  onAccepted: collEdit.commit()
+                  // Seeded once. The row is edited in place now, so this
+                  // runs when the row is CREATED and never again — which is
+                  // what stops the seed and the write-back chasing each
+                  // other.
+                  Component.onCompleted: valueField.text = ruleRow.value
+                }
+
+                Text {
+                  id: ruleDrop
+                  anchors.right: parent.right
+                  anchors.rightMargin: 16
+                  anchors.verticalCenter: parent.verticalCenter
+                  text: "\uEA76"
+                  color: ruleDropHov.hovered ? Zenon.red : Zenon.muted
+                  font.family: Zenon.face
+                  font.pixelSize: 14
+
+                  HoverHandler { id: ruleDropHov }
+                  MouseArea {
+                    anchors.fill: parent
+                    anchors.margins: -6
+                    onClicked: collEdit.dropRule(ruleRow.index)
+                  }
+                }
+              }
+            }
+
+            Rectangle {
+              width: parent.width
+              height: 1
+              color: Zenon.msgBorder
+            }
+
+            // ── what it would ask, in words ───────────────────────
+            // The compiled sentence, shown back. A rule that compiles to
+            // nothing — a size of "abc", a date of "soon" — is otherwise
+            // invisible until the folder returns the wrong thing.
+            Item {
+              width: parent.width
+              height: 40
+
+              Text {
+                anchors.left: parent.left
+                anchors.leftMargin: 16
+                anchors.right: collActions.left
+                anchors.rightMargin: 12
+                anchors.verticalCenter: parent.verticalCenter
+                elide: Text.ElideRight
+                text: collEdit.sentence === "" ? "no rules yet"
+                                                : collEdit.sentence
+                color: collEdit.ready ? Zenon.muted : Zenon.red
+                font.family: Zenon.face
+                font.pixelSize: collEdit.textSize - 2
+              }
+
+              Row {
+                id: collActions
+                anchors.right: parent.right
+                anchors.rightMargin: 16
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: 8
+
+                BulkVerb {
+                  label: "+ rule"
+                  onClicked: collEdit.addRule()
+                }
+                BulkVerb {
+                  label: "delete"
+                  dim: collEdit.making
+                  onClicked: {
+                    if (collEdit.making) return;
+                    root.dropCollection(collEdit.draft.id);
+                    collEdit.dismiss();
+                  }
+                }
+                DialogButton {
+                  label: collEdit.making ? "Create" : "Save"
+                  ink: Zenon.cyan
+                  ready: collEdit.ready
+                  onClicked: collEdit.commit()
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // ── tags ──────────────────────────────────────────────────────────
+    // A PICKER THAT HAPPENS TO MANAGE, which is the other way round from the
+    // bookmarks sheet beside it. The common act is "put a tag on these
+    // files", so that is what a bare Return does and that is why the card
+    // stays open afterwards: tagging comes in runs, and a card that closed
+    // on each would make three tags three trips.
+    //
+    // The list is the UNION of three things — the seven that come with a
+    // colour, whatever has been made by hand, and whatever is actually on a
+    // file. The third is not redundant: a tag written by another program, or
+    // one whose definition was lost, is on the disk and has to be reachable.
+    Rectangle {
+      id: tagPick
+      anchors.fill: parent
+      z: 13
+      visible: opacity > 0.01
+      opacity: tagPick.open ? 1 : 0
+      color: root.cardScrim
+      Behavior on opacity {
+        NumberAnimation {
+          duration: tagPick.open ? tagSheet.slideIn : tagSheet.slideOut
+          easing.type: Zenon.ease
+        }
+      }
+
+      property bool open: false
+      property int sel: 0
+      property string query: ""
+
+      // WHAT IT WILL TAG, captured on the way in rather than read live.
+      // acting() answers about the cursor, and the footer has to be able to
+      // say "3 items" for the whole time the card is up — including after a
+      // toggle has refreshed the listing underneath it.
+      property var targets: []
+
+      readonly property var counts: Tags.tally(root.tagMarks)
+
+      readonly property var all: {
+        const seen = ({});
+        const out = [];
+        const add = (name) => {
+          if (name === "" || seen[name]) return;
+          seen[name] = true;
+          let on = tagPick.targets.length > 0;
+          let some = false;
+          for (let i = 0; i < tagPick.targets.length; ++i) {
+            if (Tags.hasTag(root.tagMarks[tagPick.targets[i]], name)) some = true;
+            else on = false;
+          }
+          out.push({
+            name: name,
+            ink: root.tagInk(name),
+            count: tagPick.counts[name] || 0,
+            // Three states, not two. A selection where SOME of the files
+            // carry the tag is the case a checkbox cannot say, and it is
+            // exactly the case where Return does something non-obvious —
+            // see Tags.toggleAcross.
+            on: on,
+            partly: some && !on
+          });
+        };
+        for (let i = 0; i < Tags.PRESETS.length; ++i) add(Tags.PRESETS[i].name);
+        for (let j = 0; j < root.tagDefs.length; ++j) add(root.tagDefs[j].name);
+        const tallied = Object.keys(tagPick.counts).sort();
+        for (let k = 0; k < tallied.length; ++k) add(tallied[k]);
+        return out;
+      }
+
+      // Ranked by the same scorer the file filter and the palette use.
+      readonly property var rows: {
+        const q = tagPick.query.trim().toLowerCase();
+        const all = tagPick.all;
+        if (q === "") return all;
+        const hit = [];
+        for (let i = 0; i < all.length; i++) {
+          const sc = Terminus.fuzzyScore(all[i].name.toLowerCase(), q);
+          if (sc >= 0) hit.push({ c: all[i], sc: sc, i: i });
+        }
+        hit.sort((a, b) => (b.sc - a.sc) || (a.i - b.i));
+        const out = [];
+        for (let i = 0; i < hit.length; i++) out.push(hit[i].c);
+        return out;
+      }
+
+      // A NAME THAT DOES NOT EXIST YET IS AN OFFER, not an error. Typing a
+      // new word and pressing Return should make that tag and put it on the
+      // selection in one gesture — anything else means a separate "new tag"
+      // verb for something the filter field has already been told.
+      readonly property string fresh: {
+        const q = Tags.normalise([tagPick.query])[0] || "";
+        if (q === "") return "";
+        for (let i = 0; i < tagPick.all.length; ++i)
+          if (tagPick.all[i].name === q) return "";
+        return q;
+      }
+
+      onQueryChanged: tagPick.sel = 0
+
+      function ask() {
+        tagPick.query = "";
+        tagPick.sel = 0;
+        tagPick.targets = root.acting().map((r) => r.path);
+        tagPick.open = true;
+      }
+
+      function dismiss() {
+        tagPick.open = false;
+        content.forceActiveFocus();
+      }
+
+      function step(d) {
+        const n = tagPick.rows.length + (tagPick.fresh !== "" ? 1 : 0);
+        if (n === 0) return;
+        tagPick.sel = (tagPick.sel + d + n) % n;
+        tagList.positionViewAtIndex(
+          Math.max(0, tagPick.sel - (tagPick.fresh !== "" ? 1 : 0)),
+          ListView.Contain);
+      }
+
+      // Index 0 is the offer when there is one, so everything below shifts.
+      readonly property int offset: tagPick.fresh !== "" ? 1 : 0
+
+      function chosen() {
+        if (tagPick.offset === 1 && tagPick.sel === 0) return tagPick.fresh;
+        const r = tagPick.rows[tagPick.sel - tagPick.offset];
+        return r ? r.name : "";
+      }
+
+      function apply() {
+        const name = tagPick.chosen();
+        if (name === "") return;
+        if (tagPick.targets.length === 0) { root.warn("nothing to tag"); return; }
+        // A brand new name is DEFINED as well as applied, so it keeps its
+        // place in the list after the filter is cleared.
+        if (name === tagPick.fresh) {
+          root.defineTag(name, "cyan");
+          tagPick.query = "";
+        }
+        root.toggleTagFor(tagPick.targets, name);
+      }
+
+      // The filter field doubles as the name field, as it already does for
+      // making one: highlight a tag, type what it should be called, and
+      // ctrl+Return moves it — every file that carries it included. No new
+      // widget for a thing the card can already take dictation for.
+      function rename() {
+        const name = tagPick.chosen();
+        const to = tagPick.query.trim();
+        if (name === "" || name === tagPick.fresh || to === "") return;
+        if (to === name) return;
+        root.renameTag(name, to);
+        tagPick.query = "";
+      }
+
+      // Forgets it everywhere — see root.dropTag for why a definition cannot
+      // be dropped on its own.
+      function drop() {
+        const name = tagPick.chosen();
+        if (name === "" || name === tagPick.fresh) return;
+        root.dropTag(name);
+        tagPick.sel = Math.max(0, tagPick.sel - 1);
+      }
+
+      InputShield { keepTop: tabStrip.height + crumbBar.height; onClicked: tagPick.dismiss() }
+
+      Sheet {
+        id: tagSheet
+        shown: tagPick.open
+        fromTop: tabStrip.height + crumbBar.height
+        cardW: 720
+        readonly property int rowH: 32
+        readonly property int pageRows: 12
+        cardH: 12 + Math.max(1, Math.min(tagSheet.pageRows,
+                                         tagPick.rows.length + tagPick.offset))
+                    * tagSheet.rowH + tagFoot.height
+
+        SelectBar {
+          view: tagList
+          index: Math.max(0, tagPick.sel - tagPick.offset)
+          rowH: tagSheet.rowH
+          on: tagPick.rows.length > 0 && tagPick.sel >= tagPick.offset
+        }
+
+        // The offer, above the list rather than in it: it is not one of the
+        // tags, it is the thing that would make one.
+        Item {
+          id: tagNew
+          anchors.top: parent.top
+          anchors.topMargin: 6
+          anchors.left: parent.left
+          anchors.right: parent.right
+          height: tagPick.fresh !== "" ? tagSheet.rowH : 0
+          visible: tagPick.fresh !== ""
+
+          Rectangle {
+            anchors.fill: parent
+            anchors.leftMargin: 8
+            anchors.rightMargin: 8
+            radius: 5
+            color: tagPick.sel === 0
+              ? Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b, 0.16)
+              : "transparent"
+          }
+
+          Text {
+            x: 16
+            width: 22
+            horizontalAlignment: Text.AlignHCenter
+            anchors.verticalCenter: parent.verticalCenter
+            text: "\uF067"
+            color: Zenon.cyan
+            font.family: Zenon.face
+            font.pixelSize: 14
+          }
+
+          Text {
+            anchors.left: parent.left
+            anchors.leftMargin: 46
+            anchors.verticalCenter: parent.verticalCenter
+            text: "make \u201c" + tagPick.fresh + "\u201d"
+            color: Zenon.white
+            font.family: Zenon.face
+            font.pixelSize: 17
+          }
+
+          MouseArea {
+            anchors.fill: parent
+            onClicked: { tagPick.sel = 0; tagPick.apply(); }
+          }
+        }
+
+        ListView {
+          id: tagList
+          anchors.top: tagNew.bottom
+          anchors.topMargin: 6
+          anchors.left: parent.left
+          anchors.right: parent.right
+          anchors.bottom: tagFoot.top
+          anchors.bottomMargin: 6
+          clip: true
+          model: tagPick.rows
+          currentIndex: Math.max(0, tagPick.sel - tagPick.offset)
+          boundsBehavior: Flickable.StopAtBounds
+
+          delegate: Item {
+            id: tagRow
+            required property var modelData
+            required property int index
+            width: tagList.width
+            height: tagSheet.rowH
+
+            MouseArea {
+              anchors.fill: parent
+              acceptedButtons: Qt.LeftButton | Qt.MiddleButton
+              onClicked: (m) => {
+                tagPick.sel = tagRow.index + tagPick.offset;
+                if (m.button === Qt.MiddleButton) tagPick.drop();
+                else tagPick.apply();
+              }
+            }
+
+            // The colour IS the glyph. A tag has no icon of its own and a
+            // generic one on every row would be a column of identical
+            // shapes where the one distinguishing mark already lives.
+            Text {
+              id: tagDot
+              x: 16
+              width: 22
+              horizontalAlignment: Text.AlignHCenter
+              anchors.verticalCenter: parent.verticalCenter
+              text: "\uF02B"
+              color: tagRow.modelData.ink
+              font.family: Zenon.face
+              font.pixelSize: 15
+            }
+
+            Text {
+              anchors.left: tagDot.right
+              anchors.leftMargin: 14
+              anchors.right: tagState.left
+              anchors.rightMargin: 12
+              anchors.verticalCenter: parent.verticalCenter
+              text: tagRow.modelData.name
+              elide: Text.ElideRight
+              color: Zenon.white
+              font.family: Zenon.face
+              font.pixelSize: 17
+            }
+
+            // Whether the SELECTION carries it, then how many files do.
+            // Two different questions and the first one is why the card is
+            // open, so it is the one that gets a mark rather than a number.
+            Text {
+              id: tagState
+              anchors.right: tagCount.left
+              anchors.rightMargin: 10
+              anchors.verticalCenter: parent.verticalCenter
+              text: tagRow.modelData.on ? "\uF00C"
+                : (tagRow.modelData.partly ? "\uF068" : "")
+              color: tagRow.modelData.on ? Zenon.cyan : Zenon.muted
+              font.family: Zenon.face
+              font.pixelSize: 13
+            }
+
+            Text {
+              id: tagCount
+              anchors.right: parent.right
+              anchors.rightMargin: 16
+              anchors.verticalCenter: parent.verticalCenter
+              text: tagRow.modelData.count > 0
+                ? String(tagRow.modelData.count) : ""
+              color: Zenon.muted
+              font.family: Zenon.face
+              font.pixelSize: 13
+            }
+          }
+        }
+
+        Rectangle {
+          anchors.bottom: tagFoot.top
+          anchors.left: parent.left
+          anchors.right: parent.right
+          height: 1
+          color: Zenon.msgBorder
+        }
+
+        Item {
+          id: tagFoot
+          anchors.bottom: parent.bottom
+          anchors.left: parent.left
+          anchors.right: parent.right
+          height: 34
+
+          Row {
+            anchors.centerIn: parent
+            spacing: 12
+
+            Text {
+              anchors.verticalCenter: parent.verticalCenter
+              rightPadding: 2
+              text: tagPick.query !== "" ? tagPick.query
+                : (tagPick.targets.length === 1 ? "1 item"
+                   : tagPick.targets.length + " items")
+              color: tagPick.query !== "" ? Zenon.sand : Zenon.muted
+              font.family: Zenon.face
+              font.pixelSize: 14
+            }
+
+            Repeater {
+              // The keys that are actually bound. `x` was advertised here
+              // while Delete was what the router listened for — a hint bar
+              // is documentation and documentation that lies is worse than
+              // none.
+              model: [["\u21b5", "tag"], ["\u21e7\u21b5", "tag & close"],
+                      ["\u2303\u21b5", "rename"], ["\u2191\u2193", "move"],
+                      ["del", "forget"], ["esc", "close"]]
+              delegate: Row {
+                required property var modelData
+                spacing: 5
+                KeyChip { label: modelData[0] }
+                Text {
+                  anchors.verticalCenter: parent.verticalCenter
+                  text: modelData[1]
+                  color: Zenon.muted
+                  font.family: Zenon.face
+                  font.pixelSize: 13
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
     Rectangle {
       id: marks
       anchors.fill: parent
@@ -14330,7 +17750,7 @@ FloatingWindow {
         else root.goTo(path);
       }
 
-      InputShield { onClicked: marks.dismiss() }
+      InputShield { keepTop: tabStrip.height + crumbBar.height; onClicked: marks.dismiss() }
 
       Sheet {
         id: marksSheet
@@ -14561,393 +17981,6 @@ FloatingWindow {
     // starts nothing and asks for nothing: previewKind, previewText and the
     // cached frame are all standing answers about the row under the cursor by
     // the time this opens.
-    Rectangle {
-      id: look
-      anchors.fill: parent
-      z: 15
-      visible: look.opacity > 0.01
-      opacity: root.looking ? 1 : 0
-      // Darker than a card's scrim. This is the one overlay whose whole job
-      // is the thing in the middle of it, so everything else gets out of the
-      // way rather than merely standing back.
-      color: Qt.rgba(0, 0, 0, 0.82)
-      // Asymmetric, the rule every card in this window follows: arriving takes
-      // the full normal, leaving takes the fast. One duration for both made
-      // opening and dismissing the same event played twice.
-      Behavior on opacity {
-        NumberAnimation {
-          duration: root.looking ? Zenon.normal : Zenon.fast
-          easing.type: Zenon.ease
-        }
-      }
-
-      readonly property var row: root.currentRow()
-
-      // The caption bar's height, named on the OVERLAY rather than on the bar:
-      // the picture's height subtracts it and the panel's height adds it, and
-      // the bar is anchored inside the panel, so asking the bar itself puts
-      // the panel's own geometry in the middle of both sums.
-      readonly property real capH: 34
-
-      // ── HOW BIG THE PICTURE IS, ASKED OF SOMETHING THAT IS NOT DRAWN ──
-      // PreserveAspectFit keeps an Image's IMPLICIT size in step with its
-      // explicit one — set a width and the implicit height follows it. So
-      // asking the picture that is being drawn how big it naturally is, in
-      // order to decide how big to draw it, is a circle, and Qt says so.
-      //
-      // This one is never sized, so its implicit size is the decoded size and
-      // nothing else. Same source and same sourceSize as the real one, which
-      // means Qt serves both out of one decode — it costs a QML item, not a
-      // second copy of the picture.
-      Image {
-        id: lookNat
-        visible: false
-        asynchronous: true
-        sourceSize.width: Math.round(look.width * 0.9)
-        sourceSize.height: Math.round(look.height * 0.86)
-        source: look.src
-      }
-
-      // Capped at 1, because a small picture blown up to fill the window is
-      // not a preview of it.
-      readonly property real fitScale: {
-        const iw = lookNat.implicitWidth;
-        const ih = lookNat.implicitHeight;
-        if (iw <= 0 || ih <= 0) return 0;
-        return Math.min(1, look.width * 0.9 / iw,
-                        (look.height * 0.86 - look.capH) / ih);
-      }
-      readonly property real shotW:
-        Math.round(lookNat.implicitWidth * look.fitScale)
-      readonly property real shotH:
-        Math.round(lookNat.implicitHeight * look.fitScale)
-
-      // ── THE SHAPE IT HAD WHILE THE NEXT ONE IS DECODING ───────────────
-      // Stepping to the next picture clears the old one instantly and the new
-      // one arrives a frame or two later. In between, shotW is 0, the panel
-      // has nothing to be the size of, and it fell back to the size of a card
-      // with no picture in it — so every step went small, then big. With the
-      // resize eased that was a shrink and a grow; without it, a flash. Either
-      // way it reads as the panel closing and reopening, which is the one
-      // thing it is not doing.
-      //
-      // So the last good size is kept and worn through the gap. The panel
-      // changes size once, when there is something to change it for.
-      property real heldW: 0
-      property real heldH: 0
-      function holdSize() {
-        if (look.shotW > 0 && look.shotH > 0) {
-          look.heldW = look.shotW;
-          look.heldH = look.shotH;
-        }
-      }
-      onShotWChanged: look.holdSize()
-      onShotHChanged: look.holdSize()
-
-      // ── READING THE THING, RATHER THAN LEAVING IT ─────────────────────
-      // Three lines a press, which is what a wheel notch moves and what the
-      // hand expects from an arrow key in a document. Clamped at both ends so
-      // holding a key at the bottom of a file does not wind contentY off into
-      // space and leave the view blank on the way back.
-      //
-      // Silently nothing when there is no text pane: over a picture there is
-      // nothing to scroll, and a key that quietly does nothing is better than
-      // one that does something else instead.
-      readonly property int scrollStep: 3 * 14 + 12
-
-      // Whether there is anything to scroll — a short file fits and its keys
-      // would do nothing, so the bar does not offer them.
-      readonly property bool scrollable: lookScroll.visible
-        && lookScroll.contentHeight > lookScroll.height
-
-      function scrollBy(n) {
-        if (!lookScroll.visible) return;
-        const max = Math.max(0, lookScroll.contentHeight - lookScroll.height);
-        lookScroll.contentY = Math.max(0,
-          Math.min(max, lookScroll.contentY + n * look.scrollStep));
-      }
-
-      // The row WANTS a picture and has not got one yet — as against a text
-      // file, which never will and should collapse to its own size at once.
-      readonly property bool pending: look.src !== ""
-        && lookShot.status !== Image.Ready && lookShot.status !== Image.Error
-
-      // ── ASKED OF THE FILE, NOT OF THE PREVIEW PANE ───────────────────
-      // This read root.previewKind, which is the miller column's state — and
-      // the miller column only exists in the columns view. In a list or a
-      // grid nothing had computed it, so previewKind was "none" and every
-      // picture opened as "nothing to show for this one".
-      //
-      // The row itself always knows, in every view, by the same functions the
-      // grid's tiles use.
-      readonly property bool pic:
-        look.row ? Terminus.isImage(look.row.name) : false
-      readonly property bool framed: look.row
-        && (Terminus.isVideo(look.row.name) || Terminus.isAudio(look.row.name))
-
-      // The file itself for a picture; the cached frame for a film or a cover,
-      // which is the only image either of those has.
-      readonly property string src: {
-        const r = look.row;
-        if (!r) return "";
-        if (look.pic) return "file://" + r.path;
-        if (look.framed)
-          return root.thumbFile[r.path] ? "file://" + root.thumbFile[r.path] : "";
-        return "";
-      }
-
-      InputShield { onClicked: root.looking = false }
-
-      // ── THE PREVIEW AND ITS NAME, AS ONE PANEL ───────────────────────
-      // The name used to float against the scrim along the bottom of the
-      // WINDOW, which on a picture half the window tall left it stranded an
-      // inch under the thing it was naming. A caption belongs to what it
-      // captions, so it is a bar across the bottom of the panel now and the
-      // panel is whatever there is to show — a picture, or the text preview.
-      //
-      // THE FRAME IS SIZED TO THE CONTENT, not the content to the frame.
-      // lookShot takes its bounds from the window and the panel then takes the
-      // picture's PAINTED size, which is the only number that knows where the
-      // picture actually ends after PreserveAspectFit has had it. The other
-      // way round is a binding loop: the painted size is what the frame would
-      // be asking for.
-      ClippingRectangle {
-        id: lookFrame
-        anchors.centerIn: parent
-        color: Zenon.black
-        border.color: Zenon.surfaceBorder
-        border.width: 1
-        radius: Zenon.dialogRadius
-
-        readonly property real textW: Math.min(900, look.width * 0.8)
-
-        // NOTHING TO READ IS NOT A SHORT DOCUMENT. With no preview text the
-        // column is empty and the card collapsed onto its own caption bar —
-        // a sentence saying there is nothing to show needs somewhere to be
-        // shown, so the card keeps a fixed, modest height for that case.
-        readonly property real emptyH: 120
-
-        // Held through the decode — see look.heldW — so a step between two
-        // pictures is one change of size rather than a collapse and a recovery.
-        readonly property bool holding: look.pending && look.heldW > 0
-
-        width: lookShot.visible ? look.shotW
-          : (lookFrame.holding ? look.heldW : lookFrame.textW)
-        height: look.capH + (lookShot.visible ? look.shotH
-          : (lookFrame.holding ? look.heldH
-             : (root.previewText !== ""
-                ? Math.min(lookCol.implicitHeight + 32, look.height * 0.8)
-                : lookFrame.emptyH)))
-
-        // ── NO EASING ON THE SIZE ─────────────────────────────────────
-        // The panel used to ease between sizes, on the reasoning that stepping
-        // files should be one panel changing shape rather than two panels.
-        // With the size now HELD across the decode there is nothing to ease:
-        // the change happens once, when the new picture is already in hand,
-        // and easing it only delays the picture you asked for.
-        //
-        // Which leaves this overlay animating on exactly two events — opening
-        // and closing. Everything in between is instant, which is what a
-        // viewer you flick through should be.
-
-        // THE ARRIVAL EVERY OTHER CARD HAS AND THIS ONE DID NOT. It appeared
-        // at full size the instant the scrim began to fade, which reads as a
-        // cut rather than as something being opened. CardRise and CardGrow are
-        // the shared pair — rise and grow on travelEase, asymmetric in and
-        // out — so quick look opens the way the menus and the cards do.
-        transform: [
-          CardGrow { shown: root.looking; card: lookFrame },
-          CardRise { shown: root.looking }
-        ]
-
-        Image {
-          id: lookShot
-          // PLACED, NOT ANCHORED. The panel is sized to this picture, so a
-          // horizontalCenter anchor is a loop: the picture's x would come from
-          // the panel's width and the panel's width comes from the picture.
-          // The panel IS the picture's size, so the corner is 0, 0 — and the
-          // border draws over the edge, which is what a frame is.
-          x: 0
-          y: 0
-          // Ninety per cent of the window, less the caption bar, which is
-          // part of the panel now and has to fit in the same room. The
-          // arithmetic is look.fitScale; this is the result of it, which is
-          // already aspect-correct and therefore exactly what is drawn.
-          width: look.shotW
-          height: look.shotH
-          fillMode: Image.PreserveAspectFit
-          asynchronous: true
-          visible: look.src !== "" && look.shotW > 0
-            && lookShot.status === Image.Ready
-          // Decoded at the size it is drawn, which for this is most of a
-          // monitor — the grid's 480px cache would be a blur at that size.
-          sourceSize.width: Math.round(look.width * 0.9)
-          sourceSize.height: Math.round(look.height * 0.86)
-          source: look.src
-        }
-
-        // Everything that is not a picture: the text preview the pane already
-        // read, or the name and the reason there is nothing to show.
-        Flickable {
-          id: lookScroll
-          anchors.top: parent.top
-          anchors.left: parent.left
-          anchors.right: parent.right
-          anchors.bottom: lookCap.top
-          anchors.margins: 16
-          visible: !lookShot.visible && root.previewText !== ""
-          clip: true
-          contentWidth: width
-          contentHeight: lookCol.implicitHeight
-          boundsBehavior: Flickable.StopAtBounds
-
-          Column {
-            id: lookCol
-            width: parent.width
-            spacing: 10
-
-            Text {
-              width: parent.width
-              text: root.previewText
-              textFormat: Text.RichText
-              wrapMode: Text.Wrap
-              color: Zenon.white
-              font.family: Zenon.faceMono
-              font.pixelSize: 14
-            }
-          }
-        }
-
-        // ── AND WHEN THERE IS NOTHING ───────────────────────────────
-        // Its own item rather than a third state of the text above: that one
-        // is a document — left-aligned, monospaced, scrollable, starting at
-        // the top because that is where a file starts. This is a SENTENCE
-        // ABOUT the file, and it belongs in the middle of the space it is
-        // explaining rather than in the corner of it.
-        //
-        // Yellow, the ink this window gives a thing that can be acted on and
-        // an answer that is not a failure: the file is fine, terminus simply
-        // has no way to show it. Muted read as though something had gone
-        // wrong and been swallowed.
-        Text {
-          anchors.top: parent.top
-          anchors.left: parent.left
-          anchors.right: parent.right
-          anchors.bottom: lookCap.top
-          // NOT WHILE ONE IS ON ITS WAY. "no preview available" is an answer
-          // about the file, and during a decode there is no answer yet.
-          visible: !lookShot.visible && !look.pending
-                   && root.previewText === ""
-          horizontalAlignment: Text.AlignHCenter
-          verticalAlignment: Text.AlignVCenter
-          text: "no preview available"
-          color: Zenon.yellow
-          font.family: Zenon.face
-          font.pixelSize: 15
-        }
-
-        // ── THE NAME, AS A BAR RATHER THAN A CAPTION ─────────────────
-        // headBg over the panel's black, which is the same pairing the path
-        // bar has with the window: a strip that is part of the surface and a
-        // shade off it, rather than a separate thing laid on top.
-        Rectangle {
-          id: lookCap
-          anchors.left: parent.left
-          anchors.right: parent.right
-          anchors.bottom: parent.bottom
-          height: look.capH
-          color: Zenon.headBg
-
-          // The seam every strip in this window uses. Without it the bar and
-          // a dark picture above it ran together into one shape.
-          Rectangle {
-            anchors.top: parent.top
-            anchors.left: parent.left
-            anchors.right: parent.right
-            height: 1
-            color: Zenon.msgBorder
-          }
-
-          // ── THE NAME LEFT, THE KEYS RIGHT ─────────────────────────
-          // Centred, the name moved every time you stepped to a file with a
-          // longer one — a title that shifts under the eye on every keypress,
-          // in the one place you are pressing a key repeatedly. Pinned left it
-          // starts in the same spot whatever it says, and the room it is not
-          // using is where the keys go.
-          Text {
-            id: lookName
-            anchors.left: parent.left
-            anchors.leftMargin: 14
-            anchors.right: lookKeys.left
-            anchors.rightMargin: 14
-            anchors.verticalCenter: parent.verticalCenter
-            elide: Text.ElideMiddle
-            text: look.row ? look.row.name : ""
-            color: Zenon.white
-            font.family: Zenon.face
-            font.weight: Font.Bold
-            font.pixelSize: 15
-          }
-
-          // WHAT MOVES YOU, said on the bar rather than left to be discovered.
-          // Quick look has no footer of its own — the caption bar IS the
-          // chrome — so the hint lives beside the name it is about.
-          Row {
-            id: lookKeys
-            anchors.right: parent.right
-            anchors.rightMargin: 14
-            anchors.verticalCenter: parent.verticalCenter
-            spacing: 5
-
-            KeyChip {
-              anchors.verticalCenter: parent.verticalCenter
-              label: "h / l"
-              fontSize: 11
-            }
-            KeyChip {
-              anchors.verticalCenter: parent.verticalCenter
-              label: "\u2190 / \u2192"
-              fontSize: 11
-            }
-            Text {
-              anchors.verticalCenter: parent.verticalCenter
-              leftPadding: 3
-              rightPadding: 8
-              text: "prev / next"
-              color: Zenon.muted
-              font.family: Zenon.face
-              font.pixelSize: 12
-            }
-
-            // ── AND THE OTHER AXIS, ONLY WHEN IT HAS ONE ────────────────
-            // Shown for a document that is taller than its pane and nowhere
-            // else: over a picture there is nothing to scroll, and a hint for
-            // a key that does nothing is worse than no hint.
-            KeyChip {
-              anchors.verticalCenter: parent.verticalCenter
-              visible: look.scrollable
-              label: "j / k"
-              fontSize: 11
-            }
-            KeyChip {
-              anchors.verticalCenter: parent.verticalCenter
-              visible: look.scrollable
-              label: "\u2191 / \u2193"
-              fontSize: 11
-            }
-            Text {
-              anchors.verticalCenter: parent.verticalCenter
-              visible: look.scrollable
-              leftPadding: 3
-              text: "scroll"
-              color: Zenon.muted
-              font.family: Zenon.face
-              font.pixelSize: 12
-            }
-          }
-        }
-      }
-    }
 
     // ── SEND TO: copy or move without going there ─────────────────────────
     // "Copy to…" and "Move to…" on the row menu. The point is not having to
@@ -15605,8 +18638,10 @@ FloatingWindow {
         // where the pointer already is — read as a snap here rather than as a
         // slide. Taken as a multiple of the token rather than written as a
         // number, so turning the desktop's motion down still turns this down.
+        // The same pair the Sheet component uses, and for the same reason —
+        // see the note there on why leaving is much faster than arriving.
         readonly property int slideIn: Math.round(Zenon.slow * 2.0)
-        readonly property int slideOut: Math.round(Zenon.slow * 1.3)
+        readonly property int slideOut: Math.round(Zenon.slow * 0.75)
 
         // Down on a curve that settles, up on one that accelerates away: a
         // sheet arrives and is dismissed, it does not do the same thing twice.
@@ -15977,7 +19012,7 @@ FloatingWindow {
         content.forceActiveFocus();
       }
 
-      InputShield { onClicked: prompt.dismiss() }
+      InputShield { keepTop: tabStrip.height + crumbBar.height; onClicked: prompt.dismiss() }
 
       // The panel shadow every card on this desktop casts — icarus'
       // shadow, and now this window's too. A card is a card: one of
@@ -16133,6 +19168,21 @@ FloatingWindow {
       readonly property var hits:
         Terminus.filterApps(appPick.installed, appPick.query)
 
+      // ── ONE CURSOR OVER TWO LISTS ───────────────────────────────────
+      // The card shows the handlers this type already has above the several
+      // hundred applications it could have, and `pick` walks both as though
+      // they were one column: 0 .. handlerCount-1 is the summary at the top,
+      // everything after it indexes `hits`. Otherwise the arrows could only
+      // ever reach the lower half and the rows at the top were pointer-only.
+      //
+      // handlerCount follows the section's own visibility — it collapses to 0
+      // the moment a filter is typed, which is also when the section is hidden,
+      // so the cursor never points at a row that is not on screen.
+      readonly property int handlerCount:
+        appPick.query === "" ? root.openWithApps.length : 0
+      readonly property bool onHandler: appPick.pick < appPick.handlerCount
+      readonly property int hitIndex: appPick.pick - appPick.handlerCount
+
       // Back to the top on every keystroke: the ranking has changed underneath
       // the cursor, so where it was means nothing.
       onQueryChanged: {
@@ -16153,6 +19203,12 @@ FloatingWindow {
         }
         if (event.key === Qt.Key_Down) { appPick.step(1); return; }
         if (event.key === Qt.Key_Up) { appPick.step(-1); return; }
+        // Delete takes a handler away, which is the key this window already
+        // means "remove" by everywhere else. It acts on the row under the
+        // cursor in the list below rather than on the summary at the top: the
+        // summary has no cursor, and every handler appears in the list anyway
+        // — so "firefox", Delete, done, without reaching for the pointer.
+        if (event.key === Qt.Key_Delete) { appPick.strike(); return; }
         if (event.key === Qt.Key_Backspace) {
           appPick.query = appPick.query.slice(0, -1); return;
         }
@@ -16160,6 +19216,26 @@ FloatingWindow {
             && event.text.length === 1 && event.text >= " ") {
           appPick.query += event.text;
         }
+      }
+
+      // Only a registered handler can be removed; anything else in this list
+      // is simply an application that has never claimed the type, and saying
+      // so is better than a key that silently does nothing.
+      function strike() {
+        if (appPick.onHandler) {
+          const h = root.openWithApps[appPick.pick];
+          if (h) root.removeApp(h.id);
+          return;
+        }
+        const a = appPick.hits[appPick.hitIndex];
+        if (!a) return;
+        let handled = false;
+        for (const h of root.openWithApps) if (h.id === a.id) handled = true;
+        if (!handled) {
+          root.status = (a.name || a.id) + " does not handle this type";
+          return;
+        }
+        root.removeApp(a.id);
       }
 
       function snapshot() {
@@ -16221,14 +19297,22 @@ FloatingWindow {
       }
 
       function step(d) {
-        const n = appPick.hits.length;
+        const n = appPick.handlerCount + appPick.hits.length;
         if (n === 0) return;
         appPick.pick = (appPick.pick + d + n) % n;
-        appList.positionViewAtIndex(appPick.pick, ListView.Contain);
+        if (!appPick.onHandler)
+          appList.positionViewAtIndex(appPick.hitIndex, ListView.Contain);
       }
 
       function accept() {
-        const a = appPick.hits[appPick.pick];
+        // A handler is already registered, so choosing one is simply opening
+        // with it — the same thing the row below would do, minus the adopting.
+        if (appPick.onHandler) {
+          const h = root.openWithApps[appPick.pick];
+          if (h) appPick.choose(h);
+          return;
+        }
+        const a = appPick.hits[appPick.hitIndex];
         if (!a) return;
         appPick.choose(a);
       }
@@ -16242,7 +19326,10 @@ FloatingWindow {
       RowFlash { id: appFlash; onDone: () => appPick.launch() }
 
       function choose(app) {
-        if (!appFlash.fire(appPick.pick)) return;
+        // The flash lives on the lower list's rows; from the summary above it
+        // there is nothing to flash, so the launch goes straight through.
+        if (appPick.onHandler) { appPick.pendingApp = app; appPick.launch(); return; }
+        if (!appFlash.fire(appPick.hitIndex)) return;
         appPick.pendingApp = app;
       }
 
@@ -16254,7 +19341,10 @@ FloatingWindow {
       }
 
       function run(app) {
-        const mime = appPick.mime;
+        // The card is often opened before the scan that names the type has
+        // answered, so the snapshot taken at `ask` can be empty while the live
+        // one is right. Prefer whichever actually says something.
+        const mime = appPick.mime !== "" ? appPick.mime : root.openWithMime;
         const paths = appPick.paths.slice();
         const n = paths.length;
         appPick.dismiss();
@@ -16288,7 +19378,7 @@ FloatingWindow {
       // of it would be an empty box. It is replaced wholesale by the next
       // ask(), which is the only place its contents can be stale.
 
-      InputShield { onClicked: appPick.dismiss() }
+      InputShield { keepTop: tabStrip.height + crumbBar.height; onClicked: appPick.dismiss() }
 
       // The panel shadow every card on this desktop casts — icarus'
       // shadow, and now this window's too. A card is a card: one of
@@ -16311,10 +19401,112 @@ FloatingWindow {
           // The caption band stood here. It is drawn on the bar now — see
           // sheetBarHead — because a sheet says what it is where it hangs from.
 
+          // ── WHAT ALREADY OPENS IT ─────────────────────────────────
+          // This card asks "choose a program" and used to ask it without ever
+          // saying which programs already claim the type — so the one thing
+          // you might want to do about a wrong handler, take it away, could
+          // only be reached from the properties card.
+          //
+          // Hidden the moment you start typing: past that point the card is a
+          // search result and a second list above it is in the way.
+          Column {
+            width: parent.width
+            visible: root.openWithApps.length > 0 && appPick.query === ""
+
+            Item { width: 1; height: 10 }
+
+            Text {
+              x: 14
+              text: "opens with"
+              color: Zenon.muted
+              font.family: Zenon.face
+              font.pixelSize: 12
+            }
+
+            Item { width: 1; height: 4 }
+
+            Repeater {
+              model: root.openWithApps
+              delegate: Item {
+                id: handlerRow
+                required property var modelData
+                required property int index
+                width: appCol.width
+                height: 30
+
+                readonly property bool isDefault:
+                  modelData.id === root.openWithDefault
+
+                readonly property bool target:
+                  appPick.onHandler && appPick.pick === handlerRow.index
+
+                Rectangle {
+                  anchors.fill: parent
+                  color: handlerRow.target ? Zenon.selBg
+                       : (handlerHov.hovered ? Zenon.headBg : "transparent")
+                }
+                HoverHandler { id: handlerHov }
+
+                Text {
+                  anchors.left: parent.left
+                  anchors.leftMargin: 14
+                  anchors.right: handlerDef.visible ? handlerDef.left
+                                                    : handlerX.left
+                  anchors.rightMargin: 10
+                  anchors.verticalCenter: parent.verticalCenter
+                  elide: Text.ElideRight
+                  text: handlerRow.modelData.name || handlerRow.modelData.id
+                  color: Zenon.white
+                  font.family: Zenon.face
+                  font.pixelSize: 14
+                }
+
+                KeyChip {
+                  id: handlerDef
+                  anchors.right: handlerX.left
+                  anchors.rightMargin: 8
+                  anchors.verticalCenter: parent.verticalCenter
+                  visible: handlerRow.isDefault
+                  label: "default"
+                }
+
+                Text {
+                  id: handlerX
+                  anchors.right: parent.right
+                  anchors.rightMargin: 12
+                  anchors.verticalCenter: parent.verticalCenter
+                  text: "\uf00d"   // nf-fa-times, as the row menu uses
+                  color: handlerXHov.hovered ? Zenon.red : Zenon.muted
+                  font.family: Zenon.faceMono
+                  font.pixelSize: 14
+
+                  HoverHandler { id: handlerXHov }
+                  MouseArea {
+                    anchors.fill: parent
+                    anchors.margins: -7
+                    onClicked: root.removeApp(handlerRow.modelData.id)
+                  }
+                }
+              }
+            }
+
+            // NO RULE OF ITS OWN. The list below already draws one above
+            // itself, and two lines with a gap between them read as an empty
+            // row rather than as a division.
+          }
+
           // NO FIELD. Typing filters — see the key handler — the way it
           // does in the send picker, so the card opens straight onto the list
           // it is asking you to choose from instead of onto a box.
-          Item { width: 1; height: 12 }
+          //
+          // This is the card's TOP padding, above the rule the list draws for
+          // itself. With the handlers listed above it, it stops being padding
+          // and becomes a gap between them and that rule — so it collapses
+          // whenever they are showing.
+          Item {
+            width: 1
+            height: appPick.handlerCount > 0 ? 0 : 12
+          }
 
           Rectangle {
             width: parent.width
@@ -16324,9 +19516,10 @@ FloatingWindow {
 
           SelectBar {
             view: appList
-            index: appPick.pick
+            index: appPick.hitIndex
             rowH: 30
-            on: appPick.hits.length > 0
+            // dark while the cursor is up in the summary — see handlerCount
+            on: !appPick.onHandler && appPick.hits.length > 0
           }
 
           ListView {
@@ -16347,46 +19540,43 @@ FloatingWindow {
               width: appList.width
               height: 30
 
-              readonly property bool target: index === appPick.pick
+              readonly property bool target:
+                !appPick.onHandler && index === appPick.hitIndex
 
-              // No fill: the card carries one bar and slides it. Hover keeps
-              // its own tint, because the pointer moves the cursor here — see
-              // the HoverHandler below.
-              Rectangle {
-                anchors.fill: parent
-                color: !appRow.target && appHov.hovered
-                  ? Zenon.hoverTint : "transparent"
+              // Which of these several hundred already claim the type. The
+              // name carries it rather than a chip: the right-hand column is
+              // the id, and a badge between the two would crowd a row that is
+              // mostly name already.
+              readonly property bool handler: {
+                for (const h of root.openWithApps)
+                  if (h.id === appRow.modelData.id) return true;
+                return false;
               }
 
+              // NO HOVER, AND NO TINT — the rule every other sheet follows.
+              // The pointer used to move the cursor here, which is a second
+              // thing driving the selection while the arrows are driving it
+              // too: reach for the mouse on the way to something else and the
+              // row you had picked was gone. A click still picks, because a
+              // click is a decision.
               FlashOver { flash: appFlash; index: appRow.index }
-              // Hovering moves the cursor, so Return after a hover takes what
-              // is under the pointer rather than what the arrows last left
-              // behind — the context menu's rows do the same.
-              HoverHandler {
-                id: appHov
-                onHoveredChanged: if (hovered) appPick.pick = appRow.index
-              }
 
-              Text {
-                anchors.left: parent.left
-                anchors.leftMargin: 22
-                anchors.verticalCenter: parent.verticalCenter
-                visible: appRow.target
-                text: "\u276F"
-                color: Zenon.cyan
-                font.family: Zenon.face
-                font.pixelSize: 13
-              }
+              // The caret that used to sit here is gone, and the column it
+              // reserved with it. The cursor is already a filled bar across
+              // the whole row — an arrow pointing at it as well was the same
+              // fact stated twice, and it cost every row 29px of indent to
+              // say it.
 
               Text {
                 id: appName
                 anchors.left: parent.left
-                anchors.leftMargin: 43
+                anchors.leftMargin: 14
                 anchors.verticalCenter: parent.verticalCenter
-                width: Math.min(implicitWidth, appRow.width - 43 - 14)
+                width: Math.min(implicitWidth, appRow.width - 14 - 14)
                 text: modelData.name
                 elide: Text.ElideRight
-                color: appRow.target ? Zenon.white : Zenon.keyInk
+                color: appRow.handler ? Zenon.cyan
+                     : (appRow.target ? Zenon.white : Zenon.keyInk)
                 font.family: Zenon.face
                 font.pixelSize: 16
               }
@@ -16469,7 +19659,7 @@ FloatingWindow {
 
               Repeater {
                 model: [["\u2191\u2193", "move"], ["\u21b5", "open"],
-                        ["esc", "close"]]
+                        ["del", "remove"], ["esc", "close"]]
 
                 delegate: Row {
                   id: appHintPair
@@ -16583,7 +19773,8 @@ FloatingWindow {
     // it is a full pass over the directory for a keystroke that changed
     // nothing, and on four thousand rows that is felt.
     readonly property var sorted: {
-      const kept = Terminus.filterEntries(pane.raw, "", root.showHidden);
+      const kept = Terminus.filterEntries(pane.raw, "", root.showHidden,
+                                          root.portalGhost);
       if (root.searchMode !== "") return kept;
       if (root.usage) {
         const m = root.dirSizes;
@@ -16949,6 +20140,15 @@ FloatingWindow {
       tile.current
         && (tile.passive || (!tile.ticked && root.markedCount > 0))
 
+    // As the list's rows do — see EntryRow.tagList.
+    readonly property var tagList: {
+      if (!tile.entry) return [];
+      const all = root.tagMarks[tile.entry.path];
+      if (!all || all.length === 0) return [];
+      return all.length > 4 ? all.slice(0, 4) : all;
+    }
+
+
     // A cyan flare on the tile that was just opened.
     //
     // Opening from a grid gives no feedback of its own — the window that comes
@@ -16958,7 +20158,15 @@ FloatingWindow {
     property real glow: 0
     Connections {
       target: root
-      function onOpenPulseChanged() { if (tile.current && !tile.passive) flare.restart(); }
+      // Files only, the same rule the list rows follow. Opening a DIRECTORY
+      // replaces the whole grid — the tile that flared is gone on the next
+      // frame, so the flare fires into a view that no longer exists and reads
+      // as the new directory flashing at you. A file leaves the grid standing,
+      // which is the case the flare was for.
+      function onOpenPulseChanged() {
+        if (tile.current && !tile.passive
+            && tile.entry && !tile.entry.isDir) flare.restart();
+      }
     }
     SequentialAnimation {
       id: flare
@@ -17033,10 +20241,32 @@ FloatingWindow {
       // ClippingRectangle rather than `clip: true`: an item's clip is
       // a rectangle, always, and never follows a radius.
       //
-      // The aspect ratio is taken from the Image's IMPLICIT size, the
-      // decoded source, and NOT from paintedWidth/paintedHeight. The
-      // painted size is derived from the item's own size, which is now
-      // this rectangle's — reading it here would be a binding loop.
+      // The aspect ratio comes from a sizer image that is never drawn —
+      // see thumbNat just below, and the note on it for why neither the
+      // painted size NOR the drawn image's implicit size can be read here.
+      // ── HOW BIG IT NATURALLY IS, ASKED OF SOMETHING NEVER DRAWN ──────
+      // The comment below used to say the implicit size was safe because it
+      // is not the painted size. It is not safe: `thumb` fills thumbClip, and
+      // under PreserveAspectFit an Image's IMPLICIT size is kept in step with
+      // its explicit one — so thumbClip sized itself from a number that was
+      // derived from thumbClip. Qt said so on every load:
+      //
+      //     Binding loop detected for property "width"
+      //
+      // This one is never sized, never drawn and never anchored to anything,
+      // so its implicit size is the decoded size and nothing else. Same source
+      // and same sourceSize as the real one, which means Qt serves both out of
+      // a single decode — it costs a QML item, not a second copy of the
+      // picture. The same trick quick look uses; see lookNat.
+      Image {
+        id: thumbNat
+        visible: false
+        asynchronous: true
+        source: thumb.source
+        sourceSize.width: thumb.sourceSize.width
+        sourceSize.height: thumb.sourceSize.height
+      }
+
       ClippingRectangle {
         id: thumbClip
         anchors.centerIn: parent
@@ -17045,8 +20275,8 @@ FloatingWindow {
         radius: 5
 
         readonly property real ar:
-          thumb.implicitWidth > 0 && thumb.implicitHeight > 0
-            ? thumb.implicitWidth / thumb.implicitHeight : 1
+          thumbNat.implicitWidth > 0 && thumbNat.implicitHeight > 0
+            ? thumbNat.implicitWidth / thumbNat.implicitHeight : 1
         width: Math.max(1, Math.min(thumbBox.width,
           thumbBox.height * thumbClip.ar))
         height: Math.max(1, Math.min(thumbBox.height,
@@ -17126,6 +20356,39 @@ FloatingWindow {
         color: root.inkFor(tile.entry)
         font.family: Zenon.face
         font.pixelSize: Math.round(40 * tile.tileZoom)
+      }
+
+      // ── the tags, in the picture's corner ──────────────────────
+      // ON the thumbnail rather than beside the name, which is where a
+      // grid has the room — and the one place that works over a
+      // photograph as well as over a glyph. Each dot carries a dark
+      // ring for exactly that reason: a pale tag on a pale picture is
+      // not a mark, and the ring costs nothing over a glyph.
+      Row {
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        anchors.margins: Math.round(5 * tile.tileZoom)
+        spacing: Math.max(4, Math.round(6 * tile.tileZoom))
+        visible: tile.tagList.length > 0
+        opacity: tile.dim ? 0.45 : 1
+        z: 3
+
+        Repeater {
+          model: tile.tagList
+          // As the rows do — and with a shadow rather than the dot's ring,
+          // because a glyph has no outline to put a border on and a pale
+          // tag over a pale photograph still has to be legible.
+          delegate: Text {
+            required property var modelData
+            anchors.verticalCenter: parent.verticalCenter
+            text: "\uF02B"
+            color: root.tagInk(modelData)
+            font.family: Zenon.face
+            font.pixelSize: Math.round(13 * tile.tileZoom)
+            style: Text.Outline
+            styleColor: Qt.rgba(0, 0, 0, 0.6)
+          }
+        }
       }
     }
 
@@ -17471,7 +20734,7 @@ FloatingWindow {
       // where you came from — it changes because the columns rotated, not
       // because anything travelled — and during the rotation itself the live
       // one is being handed a new directory, so neither should ease.
-      animate: col.isLive && !millerAnim.running
+      animate: col.isLive && !millerAnim.running && !root.visualOn
     }
 
     ListView {
@@ -17659,6 +20922,22 @@ FloatingWindow {
       entryRow.current
         && (entryRow.passive || (!entryRow.ticked && root.markedCount > 0))
 
+    // THE ROW'S TAGS, CAPPED. A map lookup by path, exactly as the git
+    // gutter does it — no field on the row object, because the note above
+    // enrich records what happens when a 4000-row directory pays for one
+    // computation per row before first paint.
+    //
+    // Four dots. Past that they stop being countable at a glance and start
+    // eating the name, which is the one thing on the row that cannot be
+    // given up. The rest are still on the file and still in the sheet.
+    readonly property var tagList: {
+      if (!entryRow.entry) return [];
+      const all = root.tagMarks[entryRow.entry.path];
+      if (!all || all.length === 0) return [];
+      return all.length > 4 ? all.slice(0, 4) : all;
+    }
+
+
     // A light passing across the bar as the row is OPENED — Return, or a
     // double click. The same acknowledgement the grid's tiles have always
     // flared with, so a directory opened from a list and the same directory
@@ -17676,10 +20955,23 @@ FloatingWindow {
     // scroll and every return to a tab.
     Connections {
       target: root
+      // ── A LIGHT ACROSS THE ROW THAT WAS OPENED, ON FILES ONLY ───────
+      // The distinction is what makes it worth having. Opening a DIRECTORY
+      // replaces the entire listing, which is the loudest acknowledgement this
+      // window can give and needs no help; opening a FILE hands off to another
+      // application, and if that takes a moment there is nothing on screen to
+      // say the keypress landed. This says it, on the row it landed on.
+      //
+      // It was removed wholesale once for playing over every open, directories
+      // included, which is exactly the half that did not need it.
+      function onOpenPulseChanged() {
+        if (entryRow.live && entryRow.current
+            && entryRow.entry && !entryRow.entry.isDir) rowSweep.restart();
+      }
+
       // A fuller flash for a row that has just been MADE, so `a` shows you
       // where the new thing went before you have typed a character of its
-      // name. That is the only pulse this row answers now — see the note on
-      // the sweep that used to sit beside it.
+      // name.
       function onMadePulseChanged() {
         if (entryRow.live && entryRow.current) rowBorn.restart();
       }
@@ -17715,16 +21007,32 @@ FloatingWindow {
                        0.30 * entryRow.bornGlow)
       }
 
-      // NO SWEEP. A cyan band used to travel across the row when it was
-      // opened — 340ms of light passing over the highlight — as an
-      // acknowledgement that Return had landed. It is not needed: opening a
-      // directory replaces the entire listing, which is the loudest
-      // acknowledgement this window can give, and on a file the status line
-      // says so. What was left was a flourish playing over the one bar the eye
-      // is locked to, every single time.
-      //
-      // The born flash stays: that answers a question the window cannot
-      // otherwise answer — where did the thing I just made go.
+      // The sweep itself — see the Connections above for when it runs.
+      Rectangle {
+        id: rowSweepBar
+        width: parent.width * 0.45
+        height: parent.height
+        visible: rowSweep.running
+        gradient: Gradient {
+          orientation: Gradient.Horizontal
+          GradientStop { position: 0.0; color: "transparent" }
+          GradientStop {
+            position: 0.5
+            color: Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b, 0.30)
+          }
+          GradientStop { position: 1.0; color: "transparent" }
+        }
+      }
+
+      NumberAnimation {
+        id: rowSweep
+        target: rowSweepBar
+        property: "x"
+        from: -rowSweepBar.width
+        to: rowSweepBar.parent ? rowSweepBar.parent.width : 0
+        duration: 340
+        easing.type: Easing.OutCubic
+      }
 
       // the outline that replaces the fill
       border.width: entryRow.cursorOnly ? 1 : 0
@@ -17814,13 +21122,26 @@ FloatingWindow {
       radius: 4
     }
 
+    // THE CURSOR'S BAR, AND ONLY WHILE THERE IS A SELECTION TO READ.
+    //
+    // Two marks, two jobs: the tint above says WHICH ROWS ARE CHECKED and is
+    // painted on every one of them, and this says WHERE THE CURSOR IS among
+    // them. That second job only exists once the tint is on more than one
+    // row — with nothing checked the cursor is already the SelectBar sliding
+    // behind the row, and a second mark for it is a mark that answers a
+    // question nobody asked.
     Rectangle {
       anchors.left: parent.left
       anchors.verticalCenter: parent.verticalCenter
       width: 3
       height: parent.height - 8
       radius: 2
-      visible: entryRow.ticked
+      // NO FADE. The bar is only ever on screen while a selection is, so
+      // "animate except during multi-select" and "never animate" are the
+      // same rule — and eased, it spent every step of a held direction key
+      // fading out of the row the cursor had already left.
+      visible: entryRow.current
+               && (root.markedCount > 0 || root.visualOn)
       color: Zenon.cyan
     }
 
@@ -17902,11 +21223,48 @@ FloatingWindow {
           font.pixelSize: Math.round(13 * root.zoom)
         }
 
+        // ── the tags, beside the name ────────────────────────────
+        // Dots rather than words, and on the RIGHT, which is where Finder
+        // puts them and where this row already keeps its bookmark: a tag is
+        // a property OF the file, read after you have read which file it is.
+        // Words would cost the name its room on every tagged row; a colour
+        // is the whole of what a tag says at a glance, and the sheet has
+        // the names.
+        Row {
+          id: entryTags
+          anchors.right: entryBookmark.visible ? entryBookmark.left : parent.right
+          anchors.rightMargin: entryBookmark.visible ? 7 : 12
+          anchors.verticalCenter: parent.verticalCenter
+          // Room between them. At three pixels two tags read as one wide
+          // mark rather than as two, which is the one thing the row has to
+          // get right — the count is half of what a glance takes from here.
+          spacing: Math.max(4, Math.round(7 * root.zoom))
+          visible: entryRow.tagList.length > 0
+          opacity: entryRow.dim ? 0.65 : 1
+
+          Repeater {
+            model: entryRow.tagList
+            // THE SIDEBAR'S OWN MARK. A dot said "tagged, in this colour"
+            // and a label glyph says the same thing while also matching
+            // what the row is listed under — one shape for one idea, in
+            // the three places tags appear.
+            delegate: Text {
+              required property var modelData
+              anchors.verticalCenter: parent.verticalCenter
+              text: "\uF02B"
+              color: root.tagInk(modelData)
+              font.family: Zenon.face
+              font.pixelSize: Math.round(12 * root.zoom)
+            }
+          }
+        }
+
         Text {
           id: entryName
           anchors.left: entryGlyph.right
           anchors.leftMargin: 12
-          anchors.right: entryBookmark.visible ? entryBookmark.left : parent.right
+          anchors.right: entryTags.visible ? entryTags.left
+            : (entryBookmark.visible ? entryBookmark.left : parent.right)
           anchors.rightMargin: 12
           anchors.verticalCenter: parent.verticalCenter
           visible: !entryRow.editing
@@ -17963,6 +21321,22 @@ FloatingWindow {
 
           TextInput {
           id: entryEdit
+
+          // A cursorDelegate REPLACES the built-in one, so there is
+          // exactly one caret and this decides how it behaves. It
+          // breathes, the way every other field on this desktop does —
+          // a hard on/off blink was the last thing here still wearing
+          // Qt's default.
+          cursorDelegate: Rectangle {
+            width: 2
+            color: Zenon.cyan
+            SequentialAnimation on opacity {
+              running: entryEdit.activeFocus
+              loops: Animation.Infinite
+              NumberAnimation { to: 0.2; duration: 620; easing.type: Easing.InOutQuad }
+              NumberAnimation { to: 1.0; duration: 620; easing.type: Easing.InOutQuad }
+            }
+          }
           anchors.fill: parent
           verticalAlignment: Text.AlignVCenter
           color: Zenon.white
@@ -18322,18 +21696,45 @@ FloatingWindow {
       y: -(cell.view ? cell.view.contentY : 0)
 
       Rectangle {
+        id: box
         readonly property real cw: cell.view ? cell.view.cellWidth : 0
         readonly property real ch: cell.view ? cell.view.cellHeight : 0
 
-        x: (cell.index % cell.cols) * cw + 4
-        y: Math.floor(cell.index / cell.cols) * ch + 4
+        readonly property real slotX: (cell.index % cell.cols) * box.cw + 4
+        readonly property real slotY:
+          Math.floor(cell.index / cell.cols) * box.ch + 4
+
+        x: box.slotX
+        y: box.slotY
         Behavior on x {
+          id: slideX
           enabled: cell.animate && root.cursorSlide
           XAnimator { duration: Zenon.fast; easing.type: Zenon.travelEase }
         }
         Behavior on y {
+          id: slideY
           enabled: cell.animate && root.cursorSlide
           YAnimator { duration: Zenon.fast; easing.type: Zenon.travelEase }
+        }
+
+        // See root.thawPulse — the same stranding, on two axes here.
+        Connections {
+          target: root
+          function onThawPulseChanged() { box.reseat(); }
+        }
+        function reseat() {
+          if (Math.abs(box.x - box.slotX) < 0.5
+              && Math.abs(box.y - box.slotY) < 0.5) return;
+          slideX.enabled = false;
+          slideY.enabled = false;
+          box.x = Qt.binding(function() { return box.slotX; });
+          box.y = Qt.binding(function() { return box.slotY; });
+          slideX.enabled = Qt.binding(function() {
+            return cell.animate && root.cursorSlide;
+          });
+          slideY.enabled = Qt.binding(function() {
+            return cell.animate && root.cursorSlide;
+          });
         }
 
         width: Math.max(0, cw - 8)
@@ -18412,17 +21813,35 @@ FloatingWindow {
       y: -(bar.view ? bar.view.contentY : 0)
 
       Rectangle {
+        id: slot
         width: parent.width
         height: bar.rowH
         y: bar.index * bar.rowH
         // The caller's own `animate` AND the setting: a column that must not
         // ease during a rotation still must not, whatever the switch says.
         Behavior on y {
+          id: slide
           enabled: bar.animate && root.cursorSlide
           YAnimator { duration: Zenon.fast; easing.type: Zenon.travelEase }
         }
         color: Zenon.selBg
         visible: bar.on && bar.filled
+
+        // See root.thawPulse. Re-stated rather than nudged: the binding is put
+        // back with the easing off for that one assignment, so the bar lands on
+        // the row instead of travelling to it from wherever it was stranded.
+        Connections {
+          target: root
+          function onThawPulseChanged() { slot.reseat(); }
+        }
+        function reseat() {
+          if (Math.abs(slot.y - bar.index * bar.rowH) < 0.5) return;
+          slide.enabled = false;
+          slot.y = Qt.binding(function() { return bar.index * bar.rowH; });
+          slide.enabled = Qt.binding(function() {
+            return bar.animate && root.cursorSlide;
+          });
+        }
       }
     }
   }
@@ -18544,7 +21963,12 @@ FloatingWindow {
     // instead — which is the usual answer and the better one, but it only
     // works if there is enough of it. 44 above, against the 34 that was mostly
     // taken up by the line.
-    height: visible ? (sideHead.first ? 24 : 44) : 0
+    // 20, not 14. The label sits on this item's BOTTOM edge with a 7px
+    // margin, so anything under about 18 pushes it out of the top of the
+    // item and the Flickable clips it — the leading heading came out with
+    // its top half sliced off. The room that was actually excessive was
+    // the spacer above, which is where it was taken from.
+    height: visible ? (sideHead.first ? 20 : 44) : 0
 
     Text {
       id: sideHeadText
@@ -18596,6 +22020,15 @@ FloatingWindow {
     property string label: ""
     property string detail: ""
     property string glyph: ""
+    // A COLOUR OF ITS OWN, when the row has one to give. Bookmarks and disks
+    // do not — their glyph says what KIND of thing the row is and the muted
+    // grey is right for that — but a tag's colour IS the tag, and a row that
+    // drew it grey was throwing away the one thing that tells two of them
+    // apart at a glance. Unset means the old behaviour, unchanged.
+    property color ink: "transparent"
+    // Whether right-clicking this row means anything. Off for bookmarks and
+    // disks, which are places rather than definitions.
+    property bool editable: false
     property bool active: false
     property bool mounted: false
     property bool showMount: false
@@ -18610,6 +22043,7 @@ FloatingWindow {
     signal chosen()
     signal removed()
     signal toggledMount()
+    signal edited()
 
     // ── CARRYING ONE UP OR DOWN THE LIST ────────────────────────────────
     // Its place among the bookmarks, or -1 for a row that is not one — the
@@ -18655,8 +22089,30 @@ FloatingWindow {
     // rows are of two heights in two Repeaters under a Column, so there is no
     // index the bar could count with; the one row that knows it is the one is
     // the row itself.
-    onActiveChanged: if (sideRow.active) root.sideAt = sideRow
+    // AND IT HAS TO LET GO AGAIN. This only ever CLAIMED the cursor, never
+    // released it, so the bar stayed on whatever was last active — walk out
+    // of a collection into an ordinary directory and it sat there marking a
+    // collection you were no longer in. It went unnoticed while bookmarks
+    // were the only rows that lit, because navigating between them moved it
+    // along; a collection you leave for somewhere unlisted has nothing to
+    // hand it to.
+    onActiveChanged: {
+      if (sideRow.active) root.sideAt = sideRow;
+      else if (root.sideAt === sideRow) root.sideAt = null;
+    }
     Component.onCompleted: if (sideRow.active) root.sideAt = sideRow
+
+    // AND IT HAS TO LET GO WHEN IT IS DESTROYED, which is not the same
+    // event as going inactive and is the one that actually bit.
+    //
+    // Opening a collection rewrites the collections list — it records the
+    // view it opened with — so the Repeater rebuilds every row underneath
+    // it. The row holding the cursor was destroyed with sideAt still
+    // pointing at it, and reading `.visible` off a destroyed QObject
+    // THROWS rather than returning undefined: the bar's own visible
+    // binding died with it, so the cursor vanished from a sidebar whose
+    // row was perfectly, correctly active.
+    Component.onDestruction: if (root.sideAt === sideRow) root.sideAt = null
 
     // The active row gets a bar rather than only a fill — the same mark the
     // listing puts on a selected file, so "this is the one" reads the same way
@@ -18749,11 +22205,20 @@ FloatingWindow {
       // BELOW the drag handler, which claims the press first once it decides
       // the pointer is travelling. A click that never travelled still lands
       // here, so tapping a bookmark goes there as it always did.
-      acceptedButtons: Qt.LeftButton | Qt.MiddleButton
+      acceptedButtons: Qt.LeftButton | Qt.MiddleButton | Qt.RightButton
       onClicked: (m) => {
         if (sideRow.dragging) return;
-        if (m.button === Qt.MiddleButton) sideRow.removed();
-        else sideRow.chosen();
+        if (m.button === Qt.MiddleButton) { sideRow.removed(); return; }
+        // Right click OPENS it for editing, where the row has an editor to
+        // open — a collection is the only kind of sidebar row that is a
+        // thing you wrote rather than a place that exists. Rows without one
+        // fall through to being chosen, so the button is never dead.
+        if (m.button === Qt.RightButton) {
+          if (sideRow.editable) { sideRow.edited(); return; }
+          sideRow.chosen();
+          return;
+        }
+        sideRow.chosen();
       }
     }
 
@@ -18768,7 +22233,12 @@ FloatingWindow {
       width: 20
       horizontalAlignment: Text.AlignHCenter
       text: sideRow.glyph
-      color: sideRow.active ? Zenon.cyan : Zenon.muted
+      // The row's own colour wins even while active: the cyan is there to
+      // say "this is where you are", and the label beside it already says
+      // that. Taking a tag's colour away to repeat it would lose more than
+      // it tells.
+      color: sideRow.ink.a > 0 ? sideRow.ink
+        : (sideRow.active ? Zenon.cyan : Zenon.muted)
       font.family: Zenon.face
       font.pixelSize: 15
     }
@@ -18792,7 +22262,15 @@ FloatingWindow {
       anchors.verticalCenterOffset: sideRow.used >= 0 ? -11 : 0
       text: sideRow.label
       elide: Text.ElideMiddle
-      color: sideRow.active ? Zenon.white : Zenon.keyInk
+      // THE TITLE SAYS IT TOO, not just the bar beside it. White against
+      // keyInk is a difference you have to go looking for on a row whose
+      // glyph is already carrying a colour of its own — so the active row
+      // takes that colour for its name as well, and the one you are
+      // looking at is the one that is lit.
+      color: sideRow.active
+        ? (sideRow.ink.a > 0 ? sideRow.ink : Zenon.white)
+        : Zenon.keyInk
+      font.weight: sideRow.active ? Font.DemiBold : Font.Normal
       font.family: Zenon.face
       font.pixelSize: 15
     }
@@ -19136,6 +22614,296 @@ FloatingWindow {
   // on afterwards. A verb says what will happen, and a count beside it says
   // how much there is to happen to, which is also how you know whether the row
   // is worth pressing at all.
+  // A CHOICE on the batch-rename card, shown as the answer with the rest put
+  // away. A dropdown and not another row of chips: these options are
+  // EXCLUSIVE and each one hides the others' controls, so a shape that shows
+  // one answer is telling the truth where six lit-or-unlit chips would be
+  // claiming they could all be on at once.
+  component BulkDrop: Item {
+    id: drop
+    // [[value, label], ...] rather than two parallel lists, so a row cannot
+    // go out of step with its own label.
+    property var options: []
+    property string value: ""
+    property bool expanded: false
+    signal picked(string v)
+
+    // WHERE THE LIST ACTUALLY LIVES. A list hanging under a 28px chip is
+    // entirely outside its own parent's bounds, and Qt Quick will RENDER a
+    // child out there while refusing to hit-test it — so the menu drew
+    // perfectly and not one row in it could be clicked. Reparented into a
+    // layer that spans the card, where every row sits inside its parent and
+    // the mouse can find it.
+    property Item overlay: null
+    property real listX: 0
+    property real listY: 0
+    property real listH: 0
+
+    // THE SAME CONTRACT A FIELD OFFERS. The card owns the tab ring and hands
+    // focus round it by calling claim() and asking focused — a control that
+    // cannot answer those is one the keyboard has to skip, and the mode
+    // picker is the first thing in the row.
+    readonly property bool focused: drop.activeFocus
+    signal tabbed()
+    signal backTabbed()
+    function claim() { drop.forceActiveFocus(); }
+
+    // Which row the KEYBOARD is on, as opposed to which one is chosen.
+    // Only meaningful while open, and reset to the chosen row each time it
+    // opens so arrowing starts from where you already are.
+    property int cursor: 0
+    function indexOfValue() {
+      for (let i = 0; i < drop.options.length; ++i)
+        if (drop.options[i][0] === drop.value) return i;
+      return 0;
+    }
+    function choose(i) {
+      if (i < 0 || i >= drop.options.length) return;
+      drop.expanded = false;
+      drop.picked(drop.options[i][0]);
+    }
+
+    Keys.onPressed: (e) => {
+      // Tab LEAVES, and closes on the way out: a list left hanging over the
+      // card while the caret is three controls away is a menu nobody owns.
+      if (e.key === Qt.Key_Tab) {
+        e.accepted = true; drop.expanded = false; drop.tabbed(); return;
+      }
+      if (e.key === Qt.Key_Backtab) {
+        e.accepted = true; drop.expanded = false; drop.backTabbed(); return;
+      }
+      // Escape closes the LIST if one is open, and is left alone otherwise
+      // so it still reaches the card and shuts that.
+      if (e.key === Qt.Key_Escape) {
+        if (!drop.expanded) return;
+        e.accepted = true; drop.expanded = false; return;
+      }
+      if (e.key === Qt.Key_Return || e.key === Qt.Key_Enter
+          || e.key === Qt.Key_Space) {
+        e.accepted = true;
+        if (drop.expanded) drop.choose(drop.cursor);
+        else { drop.cursor = drop.indexOfValue(); drop.expanded = true; }
+        return;
+      }
+      if (e.key === Qt.Key_Down || e.key === Qt.Key_Up) {
+        e.accepted = true;
+        const step = e.key === Qt.Key_Down ? 1 : -1;
+        if (!drop.expanded) {
+          // Closed, an arrow OPENS it rather than silently changing the
+          // value underneath you — the same thing every other list in this
+          // window does with a first keypress.
+          drop.cursor = drop.indexOfValue();
+          drop.expanded = true;
+          return;
+        }
+        drop.cursor = Math.max(0, Math.min(drop.options.length - 1,
+                                           drop.cursor + step));
+        return;
+      }
+    }
+
+    // Recomputed when it opens, not bound: mapToItem is a function call and
+    // a binding around one does not re-run when the geometry under it moves.
+    // A dropdown does not move while it is open, so once is enough.
+    // ── WHERE IT FITS, NOT JUST WHERE IT BELONGS ───────────────────────
+    // A card sized by its own content is often shorter than a list of nine
+    // options, and a list that simply hung downwards from the last rule ran
+    // off the bottom of the card and was cut in half by the clip. So the
+    // space is measured and the list goes wherever there is more of it —
+    // and when neither side has enough, it takes what there is and scrolls.
+    function reposition() {
+      const rowH = Zenon.menuRowHeight;
+      const want = drop.options.length * rowH + 8;
+      if (!drop.overlay) {
+        drop.listX = 0;
+        drop.listY = drop.height + 4;
+        drop.listH = want;
+        return;
+      }
+      const pt = drop.mapToItem(drop.overlay, 0, 0);
+      const below = drop.overlay.height - (pt.y + drop.height) - 6;
+      const above = pt.y - 6;
+      drop.listX = pt.x;
+      // Downwards by preference — that is where a menu is looked for — and
+      // upwards only when down genuinely has less room.
+      if (want <= below || below >= above) {
+        drop.listH = Math.min(want, Math.max(rowH + 8, below));
+        drop.listY = pt.y + drop.height + 4;
+      } else {
+        drop.listH = Math.min(want, Math.max(rowH + 8, above));
+        drop.listY = pt.y - drop.listH - 4;
+      }
+    }
+
+    onExpandedChanged: {
+      if (drop.expanded) { drop.reposition(); root.bulkOpenDrop = drop; }
+      else if (root.bulkOpenDrop === drop) root.bulkOpenDrop = null;
+    }
+
+    Connections {
+      target: root
+      function onBulkOpenDropChanged() {
+        if (root.bulkOpenDrop !== drop) drop.expanded = false;
+      }
+    }
+
+    readonly property string label: {
+      for (let i = 0; i < drop.options.length; ++i)
+        if (drop.options[i][0] === drop.value) return drop.options[i][1];
+      return "";
+    }
+    // Sized to the WIDEST option, not to the current one: a control that
+    // changes width when you change its value shoves the field beside it.
+    //
+    // Measured in a FUNCTION and stored, not computed in the binding —
+    // measuring means writing to the TextMetrics, and writing to something
+    // a binding is reading is how a binding loop starts.
+    property real widest: 0
+    function remeasure() {
+      let w = 0;
+      for (let i = 0; i < drop.options.length; ++i) {
+        dropMetric.text = drop.options[i][1];
+        w = Math.max(w, dropMetric.width);
+      }
+      drop.widest = w;
+    }
+    onOptionsChanged: drop.remeasure()
+    Component.onCompleted: drop.remeasure()
+
+    implicitWidth: drop.widest + 34
+    // Grows with the text it carries, so a card that wants larger type
+    // does not end up with larger words in a chip sized for smaller ones.
+    property int textSize: 13
+    implicitHeight: Math.max(28, drop.textSize + 15)
+
+    TextMetrics {
+      id: dropMetric
+      font.family: Zenon.face
+      font.pixelSize: drop.textSize
+    }
+
+    Rectangle {
+      id: dropChip
+      anchors.fill: parent
+      radius: 5
+      color: drop.expanded || dropHov.hovered ? Zenon.headBg
+        : Qt.rgba(Zenon.white.r, Zenon.white.g, Zenon.white.b, 0.05)
+      border.width: 1
+      border.color: drop.expanded || drop.activeFocus ? Zenon.cyan
+                                                      : Zenon.msgBorder
+      Behavior on color { ColorAnimation { duration: Zenon.fast } }
+      Behavior on border.color { ColorAnimation { duration: Zenon.fast } }
+
+      Text {
+        anchors.left: parent.left
+        anchors.leftMargin: 9
+        anchors.verticalCenter: parent.verticalCenter
+        text: drop.label
+        color: Zenon.white
+        font.family: Zenon.face
+        font.pixelSize: drop.textSize
+      }
+      Text {
+        anchors.right: parent.right
+        anchors.rightMargin: 9
+        anchors.verticalCenter: parent.verticalCenter
+        // Down, not right: it opens downwards, and the arrow on a menu row
+        // that opens sideways is the one glyph this must not borrow.
+        text: "\uF078"
+        color: Zenon.white
+        font.family: Zenon.faceMono
+        font.pixelSize: drop.textSize - 2
+      }
+    }
+    HoverHandler { id: dropHov }
+    MouseArea {
+      anchors.fill: parent
+      onClicked: {
+        drop.claim();
+        if (!drop.expanded) drop.cursor = drop.indexOfValue();
+        drop.expanded = !drop.expanded;
+      }
+    }
+
+    // The list. Parented to the drop and drawn with a z of its own, which
+    // is why patRow lifts its whole self while one is open — see there.
+    Rectangle {
+      id: dropList
+      visible: drop.expanded
+      parent: drop.overlay ? drop.overlay : drop
+      x: drop.listX
+      y: drop.listY
+      // FROM THE MEASUREMENT, not from the Column inside it. dropCol is
+      // anchored to this rectangle, and its rows size to dropCol — so asking
+      // dropCol how wide it wants to be is asking a child how wide its own
+      // parent should be. That is a polish loop, and a polish loop does not
+      // warn and carry on: layout never settles and the whole window comes
+      // up blank.
+      width: Math.max(drop.width, drop.widest + 24)
+      height: drop.listH
+      // THE SAME SURFACE THIS WINDOW'S OTHER MENUS ARE. panelBg is
+      // rgba(0,0,0,panelOpacity) — a colour built for a layer surface with
+      // the compositor's blur behind it. There is no blur behind anything
+      // inside a window, so it was simply see-through, and the verb chips
+      // underneath read straight through the list.
+      radius: Zenon.menuRadius
+      color: Zenon.menuBgSolid
+      border.width: 1
+      border.color: Zenon.surfaceBorder
+      z: 100
+
+      ListView {
+        id: dropView
+        anchors.fill: parent
+        anchors.topMargin: 4
+        anchors.bottomMargin: 4
+        clip: true
+        model: drop.options
+        // Follows the keyboard, so arrowing past the bottom of a clamped
+        // list scrolls rather than moving a cursor nobody can see.
+        currentIndex: drop.cursor
+        onCurrentIndexChanged: dropView.positionViewAtIndex(
+          dropView.currentIndex, ListView.Contain)
+        boundsBehavior: Flickable.StopAtBounds
+
+        delegate: Rectangle {
+          id: dropRow
+          required property var modelData
+          required property int index
+          width: dropView.width
+          height: Zenon.menuRowHeight
+          // Either pointer: the keyboard's row and the mouse's row light
+          // the same way, because they are the same thing said twice.
+          color: rowHov.hovered || drop.cursor === dropRow.index
+            ? Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b, 0.16)
+            : "transparent"
+
+          Text {
+            anchors.left: parent.left
+            anchors.leftMargin: 12
+            anchors.right: parent.right
+            anchors.rightMargin: 10
+            anchors.verticalCenter: parent.verticalCenter
+            elide: Text.ElideRight
+            text: dropRow.modelData[1]
+            // The chosen one keeps the cyan a state is owed; the rest are
+            // plain white, the same as every other pickable label here.
+            color: dropRow.modelData[0] === drop.value ? Zenon.cyan
+                                                       : Zenon.white
+            font.family: Zenon.face
+            font.pixelSize: drop.textSize
+          }
+
+          HoverHandler { id: rowHov }
+          MouseArea {
+            anchors.fill: parent
+            onClicked: drop.choose(dropRow.index)
+          }
+        }
+      }
+    }
+  }
+
   // A verb on the batch-rename card. Chip-shaped, like every other small
   // pressable thing in this window, and able to stay LIT — the two on the
   // right are switches and the rest are one-shot actions, but a user should
@@ -19314,6 +23082,22 @@ FloatingWindow {
 
       TextInput {
         id: ptextIn
+
+        // A cursorDelegate REPLACES the built-in one, so there is
+        // exactly one caret and this decides how it behaves. It
+        // breathes, the way every other field on this desktop does — a
+        // hard on/off blink was the last thing here still wearing Qt's
+        // default.
+        cursorDelegate: Rectangle {
+          width: 2
+          color: Zenon.cyan
+          SequentialAnimation on opacity {
+            running: ptextIn.activeFocus
+            loops: Animation.Infinite
+            NumberAnimation { to: 0.2; duration: 620; easing.type: Easing.InOutQuad }
+            NumberAnimation { to: 1.0; duration: 620; easing.type: Easing.InOutQuad }
+          }
+        }
         anchors.fill: parent
         anchors.leftMargin: 8
         anchors.rightMargin: 8
@@ -19511,8 +23295,15 @@ FloatingWindow {
     // On the sheet's root rather than on the card, because the scrim and the
     // blur behind it have to move at the same speed: a window that went soft
     // before the sheet had left the bar was two events where there is one.
+    //
+    // LEAVING IS FASTER THAN ARRIVING, and by more than it was. A sheet
+    // arriving is the event — it is worth the travel, and 2.0 is what makes it
+    // read as one object moving rather than a card appearing. Dismissing one
+    // is not an event, it is getting out of the way, and 1.3 left you watching
+    // it go. Same asymmetry every card in this window follows, just further
+    // apart: 340ms in, 128ms out.
     readonly property int slideIn: Math.round(Zenon.slow * 2.0)
-    readonly property int slideOut: Math.round(Zenon.slow * 1.3)
+    readonly property int slideOut: Math.round(Zenon.slow * 0.75)
 
     // HOW FAR ALONG THE ARRIVAL IS, for anything outside the sheet that has
     // to move with it — the bar's own header, and the blur behind. Read off
@@ -19724,20 +23515,52 @@ FloatingWindow {
   // overshoot is unreachable from here anyway, because the wheel is taken by
   // that overlay and never reaches the flick engine.
 
-  component InputShield: MouseArea {
+  component InputShield: Item {
+    id: shield
     anchors.fill: parent
-    acceptedButtons: Qt.AllButtons
-    // claimed as well, so nothing behind lights up under the pointer
-    hoverEnabled: true
-    WheelHandler {
-      // every device, and nothing passed on
-      onWheel: (e) => { e.accepted = true; }
+
+    // HOW MUCH OF THE TOP IS THE SHEET'S OWN HEAD. A sheet morphs the tab
+    // strip and the path bar into its header, so those pixels READ as the
+    // card's title while sitting outside the card — and a shield that
+    // dismissed on any click dismissed when you clicked the sheet's own
+    // title. Clicks up there are still swallowed; they just do not count as
+    // clicking away. Left at 0 for anything that is not a sheet.
+    property real keepTop: 0
+    signal clicked()
+
+    // Swallows EVERYTHING, the head band included: the point of the shield
+    // is that nothing behind a modal reacts, and that is as true of the
+    // header as it is of the listing.
+    MouseArea {
+      anchors.fill: parent
+      acceptedButtons: Qt.AllButtons
+      // claimed as well, so nothing behind lights up under the pointer
+      hoverEnabled: true
+      WheelHandler {
+        // every device, and nothing passed on
+        onWheel: (e) => { e.accepted = true; }
+      }
+    }
+
+    // CLICKING AWAY, which is only ever the part below the chrome. Declared
+    // second so it takes the clicks in its own band off the swallower above.
+    MouseArea {
+      anchors.left: parent.left
+      anchors.right: parent.right
+      anchors.bottom: parent.bottom
+      anchors.top: parent.top
+      anchors.topMargin: shield.keepTop
+      acceptedButtons: Qt.AllButtons
+      onClicked: shield.clicked()
     }
   }
 
   component BulkField: Rectangle {
     id: fld
     property string ghost: ""
+    // As BulkDrop has one — the two sit side by side in a row and have to
+    // agree about how big the type is.
+    property int textSize: 14
     property alias text: fldIn.text
     signal accepted()
     // Where Tab goes from here. The card owns the ring — a field should not
@@ -19753,7 +23576,7 @@ FloatingWindow {
     // dropped looks exactly like success from the outside.
     readonly property alias focused: fldIn.activeFocus
 
-    height: 26
+    height: Math.max(26, fld.textSize + 12)
     radius: 4
     color: Qt.rgba(Zenon.white.r, Zenon.white.g, Zenon.white.b, 0.05)
     border.width: 1
@@ -19777,11 +23600,26 @@ FloatingWindow {
       text: fld.ghost
       color: Zenon.muted
       font.family: Zenon.face
-      font.pixelSize: 14
+      font.pixelSize: fld.textSize
     }
 
     TextInput {
       id: fldIn
+
+      // A cursorDelegate REPLACES the built-in one, so there is exactly
+      // one caret and this decides how it behaves. It breathes, the way
+      // every other field on this desktop does — a hard on/off blink
+      // was the last thing here still wearing Qt's default.
+      cursorDelegate: Rectangle {
+        width: 2
+        color: Zenon.cyan
+        SequentialAnimation on opacity {
+          running: fldIn.activeFocus
+          loops: Animation.Infinite
+          NumberAnimation { to: 0.2; duration: 620; easing.type: Easing.InOutQuad }
+          NumberAnimation { to: 1.0; duration: 620; easing.type: Easing.InOutQuad }
+        }
+      }
       anchors.fill: parent
       anchors.leftMargin: 8
       anchors.rightMargin: 8
@@ -19790,7 +23628,7 @@ FloatingWindow {
       selectionColor: Zenon.selBg
       selectedTextColor: Zenon.white
       font.family: Zenon.face
-      font.pixelSize: 14
+      font.pixelSize: fld.textSize
       clip: true
       // Before the specific handlers below, which is where Tab has to be
       // caught: a TextInput otherwise hands it to the scene's own focus chain,
@@ -19997,5 +23835,705 @@ FloatingWindow {
     }
   }
 
+
+  // ── THE SURFACE QUICK LOOK LIVES ON ──────────────────────────────────
+  // Not a child of the window. terminus is an xdg-toplevel, so anything
+  // inside it is clipped to whatever height the compositor gave the window —
+  // and a preview that has to fit inside a short window is not a preview.
+  //
+  // So the overlay gets its own layer-shell surface, the size of the monitor
+  // the window happens to be on. Two properties make that safe:
+  //
+  //   keyboardFocus None  — the layer never asks for the keyboard, so focus
+  //     stays on the toplevel underneath and Escape / h / l / j / k go on
+  //     being handled by the window's own Keys handler, unmoved.
+  //   exclusionMode Ignore — it is a modal overlay for a few seconds, not
+  //     furniture. Reserving space would shove every tiled window aside.
+  //
+  // It is mapped only while the overlay is on screen, opacity included, so
+  // the closing fade finishes before the surface goes away.
+  PanelWindow {
+    id: lookLayer
+    visible: root.looking || look.opacity > 0.01
+    screen: root.screen
+    color: "transparent"
+    exclusionMode: ExclusionMode.Ignore
+    WlrLayershell.layer: WlrLayer.Overlay
+    WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
+    WlrLayershell.namespace: "terminus-quicklook"
+    anchors { top: true; bottom: true; left: true; right: true }
+
+    Rectangle {
+      id: look
+      anchors.fill: parent
+      z: 15
+      visible: look.opacity > 0.01
+      opacity: root.looking ? 1 : 0
+      // NO SCRIM AT ALL, and that is also what stops the blur.
+      //
+      // This surface is a layer now, and rules.lua blurs every layer namespace
+      // with `ignore_alpha = 0.5` — so a 0.82 black wash was above the
+      // threshold and hyprland blurred the desktop through it. Transparent is
+      // below it, so the dim and the blur leave together and the picture sits
+      // on the desktop rather than on a darkened copy of it.
+      color: "transparent"
+      // Asymmetric, the rule every card in this window follows: arriving takes
+      // the full normal, leaving takes the fast. One duration for both made
+      // opening and dismissing the same event played twice.
+      Behavior on opacity {
+        NumberAnimation {
+          duration: root.looking ? Zenon.normal : Zenon.fast
+          easing.type: Zenon.ease
+        }
+      }
+
+      readonly property var row: root.currentRow()
+
+      // THE STEP IS A NEW FILE, AND IT MAY NEED SOMETHING MADE. h and l move
+      // the cursor in the listing underneath, so this is where a step lands —
+      // there is no other signal for it. lookFetch is idempotent, and this
+      // binding re-evaluates for reasons that are not steps, so a row that
+      // already has everything falls straight through.
+      onRowChanged: if (root.looking) root.lookFetch()
+
+      // A READ IS IN FLIGHT FOR THIS ROW. The apology below is an answer
+      // about the file, and while bat is still running there is no answer
+      // yet — without this, every text file opened from a list said there
+      // was nothing to show for the fifty milliseconds before its text
+      // arrived. The picture side has said the same thing all along; this is
+      // look.pending for the other half.
+      readonly property bool reading:
+        !!look.row && root.previewFor === look.row.path
+
+      // The caption bar's height, named on the OVERLAY rather than on the bar:
+      // the picture's height subtracts it and the panel's height adds it, and
+      // the bar is anchored inside the panel, so asking the bar itself puts
+      // the panel's own geometry in the middle of both sums.
+      readonly property real capH: 34
+
+      // ── HOW BIG THE PICTURE IS, ASKED OF SOMETHING THAT IS NOT DRAWN ──
+      // PreserveAspectFit keeps an Image's IMPLICIT size in step with its
+      // explicit one — set a width and the implicit height follows it. So
+      // asking the picture that is being drawn how big it naturally is, in
+      // order to decide how big to draw it, is a circle, and Qt says so.
+      //
+      // This one is never sized, so its implicit size is the decoded size and
+      // nothing else. Same source and same sourceSize as the real one, which
+      // means Qt serves both out of one decode — it costs a QML item, not a
+      // second copy of the picture.
+      Image {
+        id: lookNat
+        visible: false
+        asynchronous: true
+        sourceSize.width: Math.round(look.width * 0.8)
+        sourceSize.height: Math.round(look.height * 0.86)
+        source: look.src
+      }
+
+      // Capped at 1, because a small picture blown up to fill the window is
+      // not a preview of it.
+      readonly property real fitScale: {
+        const iw = lookNat.implicitWidth;
+        const ih = lookNat.implicitHeight;
+        if (iw <= 0 || ih <= 0) return 0;
+        // ── A FILM MAY BE SCALED UP; A PICTURE MAY NOT ────────────────
+        // The cap exists because a small picture blown up to fill the panel
+        // is not a preview of it — you would be looking at its pixels.
+        //
+        // For a film the number being measured is not the film, it is the
+        // CACHED FRAME pulled out of it, which is a few hundred pixels wide
+        // whatever the source is. Capping against that sized the panel to the
+        // thumbnail and played a 4K video inside a 480px box. The thumbnail
+        // is only being asked for the aspect ratio here; VideoOutput draws
+        // the real frames at whatever size it is given.
+        const cap = look.vid ? Infinity : 1;
+        return Math.min(cap, look.width * 0.8 / iw,
+                        (look.height * 0.86 - look.capH) / ih);
+      }
+      readonly property real shotW:
+        Math.round(lookNat.implicitWidth * look.fitScale)
+      readonly property real shotH:
+        Math.round(lookNat.implicitHeight * look.fitScale)
+
+      // ── THE SHAPE IT HAD WHILE THE NEXT ONE IS DECODING ───────────────
+      // Stepping to the next picture clears the old one instantly and the new
+      // one arrives a frame or two later. In between, shotW is 0, the panel
+      // has nothing to be the size of, and it fell back to the size of a card
+      // with no picture in it — so every step went small, then big. With the
+      // resize eased that was a shrink and a grow; without it, a flash. Either
+      // way it reads as the panel closing and reopening, which is the one
+      // thing it is not doing.
+      //
+      // So the last good size is kept and worn through the gap. The panel
+      // changes size once, when there is something to change it for.
+      property real heldW: 0
+      property real heldH: 0
+      function holdSize() {
+        if (look.shotW > 0 && look.shotH > 0) {
+          look.heldW = look.shotW;
+          look.heldH = look.shotH;
+        }
+      }
+      onShotWChanged: look.holdSize()
+      onShotHChanged: look.holdSize()
+
+      // ── READING THE THING, RATHER THAN LEAVING IT ─────────────────────
+      // Three lines a press, which is what a wheel notch moves and what the
+      // hand expects from an arrow key in a document. Clamped at both ends so
+      // holding a key at the bottom of a file does not wind contentY off into
+      // space and leave the view blank on the way back.
+      //
+      // Silently nothing when there is no text pane: over a picture there is
+      // nothing to scroll, and a key that quietly does nothing is better than
+      // one that does something else instead.
+      readonly property int scrollStep: 3 * 14 + 12
+
+      // Whether there is anything to scroll — a short file fits and its keys
+      // would do nothing, so the bar does not offer them.
+      readonly property bool scrollable: lookScroll.visible
+        && lookScroll.contentHeight > lookScroll.height
+
+      function scrollBy(n) {
+        if (!lookScroll.visible) return;
+        const max = Math.max(0, lookScroll.contentHeight - lookScroll.height);
+        lookScroll.contentY = Math.max(0,
+          Math.min(max, lookScroll.contentY + n * look.scrollStep));
+      }
+
+      // The row WANTS a picture and has not got one yet — as against a text
+      // file, which never will and should collapse to its own size at once.
+      readonly property bool pending: look.src !== ""
+        && lookShot.status !== Image.Ready && lookShot.status !== Image.Error
+
+      // ── ASKED OF THE FILE, NOT OF THE PREVIEW PANE ───────────────────
+      // This read root.previewKind, which is the miller column's state — and
+      // the miller column only exists in the columns view. In a list or a
+      // grid nothing had computed it, so previewKind was "none" and every
+      // picture opened as "nothing to show for this one".
+      //
+      // The row itself always knows, in every view, by the same functions the
+      // grid's tiles use.
+      readonly property bool pic:
+        look.row ? Terminus.isImage(look.row.name) : false
+      readonly property bool framed: look.row
+        && (Terminus.isVideo(look.row.name) || Terminus.isAudio(look.row.name))
+      // A rendered page rather than a cached frame, so it is its own case.
+      readonly property bool doc:
+        look.row ? Terminus.isPdf(look.row.name) : false
+
+      // ── WHAT PLAYS, AND ONLY HERE ───────────────────────────────────
+      // The preview PANE keeps its still frame on purpose: it follows the
+      // cursor, and starting a decoder on every row you arrow past is a lot
+      // of work for a folder you are walking through. Quick look is asked
+      // for, one file at a time, which is exactly when playing is wanted.
+      readonly property bool vid:
+        look.row ? Terminus.isVideo(look.row.name) : false
+      readonly property bool playable: look.row
+        && (look.vid || Terminus.isAudio(look.row.name))
+
+      // The file itself for a picture; the cached frame for a film or a cover,
+      // which is the only image either of those has.
+      readonly property string src: {
+        const r = look.row;
+        if (!r) return "";
+        if (look.pic) return "file://" + r.path;
+        if (look.framed)
+          return root.thumbFile[r.path] ? "file://" + root.thumbFile[r.path] : "";
+        // Only once the page at pdfStem is known to be THIS document's — see
+        // root.pdfFor. The stamp is what makes Qt re-read a name it has
+        // already cached.
+        if (look.doc)
+          return (root.pdfFor === r.path && root.previewStamp > 0)
+            ? "file://" + root.pdfStem + ".png?v=" + root.previewStamp : "";
+        return "";
+      }
+
+      // Source and lifetime are one expression: it empties when the overlay
+      // closes or the cursor steps to something that does not play, and an
+      // empty source is a stopped player. Nothing has to remember to stop it.
+      MediaPlayer {
+        id: lookPlayer
+        audioOutput: AudioOutput { id: lookAudio }
+        videoOutput: lookVideo
+        source: (root.looking && look.playable && look.row)
+          ? "file://" + look.row.path : ""
+        // Autoplay, the way every other quick look does: you opened it to see
+        // the thing, not to be asked whether you meant it.
+        onSourceChanged: if (lookPlayer.source != "") lookPlayer.play()
+      }
+
+      InputShield { onClicked: root.looking = false }
+
+      // ── THE PREVIEW AND ITS NAME, AS ONE PANEL ───────────────────────
+      // The name used to float against the scrim along the bottom of the
+      // WINDOW, which on a picture half the window tall left it stranded an
+      // inch under the thing it was naming. A caption belongs to what it
+      // captions, so it is a bar across the bottom of the panel now and the
+      // panel is whatever there is to show — a picture, or the text preview.
+      //
+      // THE FRAME IS SIZED TO THE CONTENT, not the content to the frame.
+      // lookShot takes its bounds from the window and the panel then takes the
+      // picture's PAINTED size, which is the only number that knows where the
+      // picture actually ends after PreserveAspectFit has had it. The other
+      // way round is a binding loop: the painted size is what the frame would
+      // be asking for.
+      // ── THE SAME SHADOW THE MENU CASTS ──────────────────────────────
+      // Full strength here, unlike the menu's. That one lives on a popup
+      // sized to its card, so every pixel of shadow has to be paid for in
+      // padding the compositor then counts when placing it — which is why its
+      // reach is a third of the usual. This card sits in the middle of a
+      // surface the size of the monitor, so the room is already there and the
+      // defaults apply.
+      //
+      // It reads as a shadow rather than a haze because this is a LAYER, and
+      // rules.lua ignores alpha below 0.5 on layers — the same reason icarus'
+      // menus have always looked right. See the note on popups_ignorealpha.
+      MenuShadow {
+        panel: lookFrame
+        cornerRadius: Zenon.dialogRadius
+        opacity: look.opacity
+      }
+
+      ClippingRectangle {
+        id: lookFrame
+        anchors.centerIn: parent
+        // ── A GROUND, NOT A BACKING BOARD ────────────────────────────
+        // Solid black, a PNG with an alpha channel was shown mounted on it:
+        // the transparent parts of the picture were not transparent, they
+        // were black, and there is no way to tell that apart from a picture
+        // that really is black. A viewer has to be able to answer "does this
+        // image have a background" and this one could not.
+        //
+        // Quick look is a LAYER — see the namespace above — and rules.lua
+        // blurs every layer namespace whose alpha clears ignore_alpha 0.5.
+        // So a ground above that floor costs nothing to blur: the compositor
+        // is already doing it for the bar and every popup.
+        //
+        // LIGHTER THAN A LAYER'S OWN GROUND, and that is the point rather
+        // than an oversight. layerBg is 0.80, which over this desktop lets
+        // through about seven values out of 255 — a distinction no eye is
+        // going to make against black. The popups are at 0.80 because they
+        // are things you READ; this is a thing you LOOK THROUGH, and it has
+        // to be see-through enough to be worth the name.
+        //
+        // Against blurFloor rather than as a bare 0.60, so it can never
+        // silently fall under hyprland's threshold — the one failure that
+        // would turn the soft ground into a hard rectangle of sharp desktop.
+        color: Qt.rgba(0, 0, 0, Math.max(Zenon.blurFloor, 0.60))
+        border.color: Zenon.surfaceBorder
+        border.width: 1
+        radius: Zenon.dialogRadius
+
+        readonly property real textW: Math.min(900, look.width * 0.8)
+
+        // NOTHING TO READ IS NOT A SHORT DOCUMENT. With no preview text the
+        // column is empty and the card collapsed onto its own caption bar —
+        // a sentence saying there is nothing to show needs somewhere to be
+        // shown, so the card keeps a fixed, modest height for that case.
+        // Taller for a track, which puts a player in this space rather than
+        // one line of type — see the column below the "no preview" text.
+        readonly property real emptyH:
+          (look.playable && !look.vid) ? 186 : 120
+
+        // Held through the decode — see look.heldW — so a step between two
+        // pictures is one change of size rather than a collapse and a recovery.
+        readonly property bool holding: look.pending && look.heldW > 0
+
+        // ── STEPPING BETWEEN PICTURES IS A MOVE, NOT A CUT ─────────────
+        // The panel shrink-wraps whatever it is showing, so every picture of
+        // a different size snapped it to a new shape. Held through the decode
+        // (see heldW) that is one snap per image rather than two — but
+        // arrowing through a folder is still a run of hard jumps at irregular
+        // intervals, which is what reads as chop.
+        //
+        // Eased, the panel travels between the two shapes instead. The decode
+        // has already finished by the time this runs — shotW only changes
+        // once the image has been read — so the ease is not competing with it
+        // for the GUI thread, which is the usual reason an eased resize
+        // stutters.
+        //
+        // Not on the FIRST one: heldW is 0 until a picture has landed, so
+        // opening quick look sizes the panel outright and only the steps
+        // after it travel. Without that, every open would grow from nothing.
+        Behavior on width {
+          enabled: look.heldW > 0
+          NumberAnimation { duration: Zenon.fast; easing.type: Zenon.travelEase }
+        }
+        Behavior on height {
+          enabled: look.heldH > 0
+          NumberAnimation { duration: Zenon.fast; easing.type: Zenon.travelEase }
+        }
+        width: lookShot.visible ? look.shotW
+          : (lookFrame.holding ? look.heldW : lookFrame.textW)
+        height: look.capH + (lookShot.visible ? look.shotH
+          : (lookFrame.holding ? look.heldH
+             : (root.previewText !== ""
+                ? Math.min(lookCol.implicitHeight + 32, look.height * 0.8)
+                : lookFrame.emptyH)))
+
+        // ── NO EASING ON THE SIZE ─────────────────────────────────────
+        // The panel used to ease between sizes, on the reasoning that stepping
+        // files should be one panel changing shape rather than two panels.
+        // With the size now HELD across the decode there is nothing to ease:
+        // the change happens once, when the new picture is already in hand,
+        // and easing it only delays the picture you asked for.
+        //
+        // Which leaves this overlay animating on exactly two events — opening
+        // and closing. Everything in between is instant, which is what a
+        // viewer you flick through should be.
+
+        // THE ARRIVAL EVERY OTHER CARD HAS AND THIS ONE DID NOT. It appeared
+        // at full size the instant the scrim began to fade, which reads as a
+        // cut rather than as something being opened. CardRise and CardGrow are
+        // the shared pair — rise and grow on travelEase, asymmetric in and
+        // out — so quick look opens the way the menus and the cards do.
+        transform: [
+          CardGrow { shown: root.looking; card: lookFrame },
+          CardRise { shown: root.looking }
+        ]
+
+        Image {
+          id: lookShot
+          // PLACED, NOT ANCHORED. The panel is sized to this picture, so a
+          // horizontalCenter anchor is a loop: the picture's x would come from
+          // the panel's width and the panel's width comes from the picture.
+          // The panel IS the picture's size, so the corner is 0, 0 — and the
+          // border draws over the edge, which is what a frame is.
+          x: 0
+          y: 0
+          // Ninety per cent of the window, less the caption bar, which is
+          // part of the panel now and has to fit in the same room. The
+          // arithmetic is look.fitScale; this is the result of it, which is
+          // already aspect-correct and therefore exactly what is drawn.
+          width: look.shotW
+          height: look.shotH
+          fillMode: Image.PreserveAspectFit
+          asynchronous: true
+          visible: look.src !== "" && look.shotW > 0
+            && lookShot.status === Image.Ready
+          // Decoded at the size it is drawn, which for this is most of a
+          // monitor — the grid's 480px cache would be a blur at that size.
+          sourceSize.width: Math.round(look.width * 0.8)
+          sourceSize.height: Math.round(look.height * 0.86)
+          source: look.src
+        }
+
+        // ── THE FILM ITSELF, OVER THE FRAME PULLED OUT OF IT ─────────────
+        // Exactly the still's box, so the panel's size is still worked out
+        // from the thumbnail and nothing here feeds back into it — see the
+        // note on lookShot about why that box is placed rather than anchored.
+        // The still stays underneath and shows through until the first frame
+        // is decoded, so opening a film does not flash an empty rectangle.
+        VideoOutput {
+          id: lookVideo
+          x: 0
+          y: 0
+          width: look.shotW
+          height: look.shotH
+          fillMode: VideoOutput.PreserveAspectFit
+          visible: look.vid && lookPlayer.hasVideo
+        }
+
+        // ── HOW FAR THROUGH, FOR THE ONE THAT SHOWS NOTHING MOVING ──────
+        // A film says where it is by playing; a track shows a cover that does
+        // not change, so without this there is no way to tell a paused one
+        // from a playing one, or to see that it is nearly over.
+        //
+        // Across the foot of the picture rather than under it: the panel is
+        // sized to the cover, and a bar below would either stretch the panel
+        // or hang outside it.
+        Rectangle {
+          // ACROSS THE CARD, not across the artwork. Sized to the picture
+          // it was invisible for every track that has no cover — which is
+          // most of them — because there was no picture to be the width of.
+          // The card is always there, and the bar belongs to the file rather
+          // than to its art anyway.
+          // Over the artwork, where there IS artwork. A track with no cover
+          // gets the player below instead, which has room for a bigger one.
+          visible: look.playable && !look.vid && lookPlayer.duration > 0
+                   && lookShot.visible
+          anchors.left: parent.left
+          anchors.right: parent.right
+          anchors.bottom: parent.bottom
+          anchors.bottomMargin: look.capH
+          height: 10
+          color: "transparent"
+
+          Meter {
+            anchors.centerIn: parent
+            vertical: false
+            value: lookPlayer.duration > 0
+              ? lookPlayer.position / lookPlayer.duration : 0
+            accent: Zenon.cyan
+            thickness: 4
+            segLength: 5
+            segGap: 3
+            deadZone: 0
+            segCount: Math.max(8, Math.floor((parent.width - 24) / 8))
+          }
+        }
+
+        // Everything that is not a picture: the text preview the pane already
+        // read, or the name and the reason there is nothing to show.
+        Flickable {
+          id: lookScroll
+          anchors.top: parent.top
+          anchors.left: parent.left
+          anchors.right: parent.right
+          anchors.bottom: lookCap.top
+          anchors.margins: 16
+          visible: !lookShot.visible && root.previewText !== ""
+          clip: true
+          contentWidth: width
+          contentHeight: lookCol.implicitHeight
+          boundsBehavior: Flickable.StopAtBounds
+
+          Column {
+            id: lookCol
+            width: parent.width
+            spacing: 10
+
+            Text {
+              width: parent.width
+              text: root.previewText
+              textFormat: Text.RichText
+              // The same two as the preview column — see previewBody. This is
+              // the same text, bigger; it should not also be set differently.
+              wrapMode: Text.WrapAtWordBoundaryOrAnywhere
+              color: Zenon.white
+              font.family: Zenon.faceMono
+              font.pixelSize: Math.round(17 * root.zoom)
+            }
+          }
+        }
+
+        // A TEXT FILE IS THE ONE THING HERE YOU SCROLL. Pictures fit the panel
+        // by construction, so this is the only view in the overlay with more
+        // in it than is on screen — and it had no way of saying so, or of
+        // saying how far down you were.
+        //
+        // Against the CARD rather than the flickable, the way the preview
+        // pane's rail is: lookScroll is inset 16px so its text clears the
+        // edges, and a rail hung off that would sit 18px in from the card.
+        ScrollRail {
+          target: lookScroll
+          on: lookScroll.visible
+          // Against the CARD only. Neither the flickable nor the caption
+          // bar is a sibling of this — both sit a level deeper — and Qt
+          // refuses an anchor that crosses that. The caption's height is
+          // named on the overlay (look.capH) precisely so sums like this one
+          // do not have to reach into the bar to ask it.
+          anchors.top: parent.top
+          anchors.topMargin: 2
+          anchors.bottom: parent.bottom
+          anchors.bottomMargin: look.capH + 2
+          anchors.right: parent.right
+          anchors.rightMargin: 2
+        }
+
+        // ── AND WHEN THERE IS NOTHING ───────────────────────────────
+        // Its own item rather than a third state of the text above: that one
+        // is a document — left-aligned, monospaced, scrollable, starting at
+        // the top because that is where a file starts. This is a SENTENCE
+        // ABOUT the file, and it belongs in the middle of the space it is
+        // explaining rather than in the corner of it.
+        //
+        // Yellow, the ink this window gives a thing that can be acted on and
+        // an answer that is not a failure: the file is fine, terminus simply
+        // has no way to show it. Muted read as though something had gone
+        // wrong and been swallowed.
+        Text {
+          anchors.top: parent.top
+          anchors.left: parent.left
+          anchors.right: parent.right
+          anchors.bottom: lookCap.top
+          // NOT WHILE ONE IS ON ITS WAY. "no preview available" is an answer
+          // about the file, and during a decode there is no answer yet.
+          // And not for something that PLAYS. A track with no cover art is
+          // not a file terminus cannot show you — it is one there is nothing
+          // to look AT in, which is a different sentence. The player below
+          // says that better by simply being the thing.
+          visible: !lookShot.visible && !look.pending && !look.reading
+                   && root.previewText === "" && !look.playable
+          horizontalAlignment: Text.AlignHCenter
+          verticalAlignment: Text.AlignVCenter
+          text: "no preview available"
+          color: Zenon.yellow
+          font.family: Zenon.face
+          font.pixelSize: 15
+        }
+
+        // ── A TRACK WITH NO COVER IS STILL SOMETHING TO LOOK AT ─────────
+        // It was a mostly empty card with "no preview available" in small red
+        // type across the middle of it. There is nothing to preview, true —
+        // but there is plenty to SHOW: what is playing, how far through it is
+        // and how much is left. That fills the space the apology sat in.
+        Column {
+          anchors.centerIn: parent
+          anchors.verticalCenterOffset: -look.capH / 2
+          width: parent.width - 48
+          spacing: 14
+          visible: look.playable && !look.vid && !lookShot.visible
+                   && !look.pending
+
+          Text {
+            anchors.horizontalCenter: parent.horizontalCenter
+            // THE ROW'S OWN GLYPH, not a codepoint written out here. The
+            // listing already worked out what this file looks like — and a
+            // hand-written escape is exactly how the first attempt at this
+            // ended up drawing a lorry.
+            text: look.row ? look.row.glyph : ""
+            color: look.row ? root.inkFor(look.row) : Zenon.cyan
+            font.family: Zenon.faceMono
+            font.pixelSize: 44
+          }
+
+          Text {
+            anchors.horizontalCenter: parent.horizontalCenter
+            text: lookPlayer.duration > 0
+              ? Terminus.formatClock(lookPlayer.position)
+                + "   /   " + Terminus.formatClock(lookPlayer.duration)
+              : "\u2026"
+            color: Zenon.white
+            font.family: Zenon.faceMono
+            font.pixelSize: 20
+          }
+
+          Meter {
+            anchors.horizontalCenter: parent.horizontalCenter
+            vertical: false
+            value: lookPlayer.duration > 0
+              ? lookPlayer.position / lookPlayer.duration : 0
+            accent: Zenon.cyan
+            thickness: 6
+            segLength: 6
+            segGap: 3
+            deadZone: 0
+            segCount: Math.max(10, Math.floor(parent.width / 9))
+          }
+        }
+
+        // ── THE NAME, AS A BAR RATHER THAN A CAPTION ─────────────────
+        // headBg over the panel's black, which is the same pairing the path
+        // bar has with the window: a strip that is part of the surface and a
+        // shade off it, rather than a separate thing laid on top.
+        Rectangle {
+          id: lookCap
+          anchors.left: parent.left
+          anchors.right: parent.right
+          anchors.bottom: parent.bottom
+          height: look.capH
+          color: Zenon.headBg
+
+          // The seam every strip in this window uses. Without it the bar and
+          // a dark picture above it ran together into one shape.
+          Rectangle {
+            anchors.top: parent.top
+            anchors.left: parent.left
+            anchors.right: parent.right
+            height: 1
+            color: Zenon.msgBorder
+          }
+
+          // ── THE NAME LEFT, THE KEYS RIGHT ─────────────────────────
+          // Centred, the name moved every time you stepped to a file with a
+          // longer one — a title that shifts under the eye on every keypress,
+          // in the one place you are pressing a key repeatedly. Pinned left it
+          // starts in the same spot whatever it says, and the room it is not
+          // using is where the keys go.
+          Text {
+            id: lookName
+            anchors.left: parent.left
+            anchors.leftMargin: 14
+            anchors.right: lookKeys.left
+            anchors.rightMargin: 14
+            anchors.verticalCenter: parent.verticalCenter
+            elide: Text.ElideMiddle
+            text: look.row ? look.row.name : ""
+            color: Zenon.white
+            font.family: Zenon.face
+            font.weight: Font.Bold
+            font.pixelSize: 15
+          }
+
+          // WHAT MOVES YOU, said on the bar rather than left to be discovered.
+          // Quick look has no footer of its own — the caption bar IS the
+          // chrome — so the hint lives beside the name it is about.
+          Row {
+            id: lookKeys
+            anchors.right: parent.right
+            anchors.rightMargin: 14
+            anchors.verticalCenter: parent.verticalCenter
+            spacing: 5
+
+            // How far in, for the things that have a "far in". Only while
+            // something is actually loaded — a duration of 0 is a file that
+            // has not been opened yet, not a zero-length one.
+            Text {
+              anchors.verticalCenter: parent.verticalCenter
+              visible: look.playable && lookPlayer.duration > 0
+              text: Terminus.formatClock(lookPlayer.position)
+                + " / " + Terminus.formatClock(lookPlayer.duration)
+              color: Zenon.muted
+              font.family: Zenon.faceMono
+              font.pixelSize: 11
+            }
+            KeyChip {
+              anchors.verticalCenter: parent.verticalCenter
+              visible: look.playable
+              label: lookPlayer.playbackState === MediaPlayer.PlayingState
+                ? "p pause" : "p play"
+              fontSize: 11
+            }
+            KeyChip {
+              anchors.verticalCenter: parent.verticalCenter
+              label: "h / l"
+              fontSize: 11
+            }
+            KeyChip {
+              anchors.verticalCenter: parent.verticalCenter
+              label: "\u2190 / \u2192"
+              fontSize: 11
+            }
+            Text {
+              anchors.verticalCenter: parent.verticalCenter
+              leftPadding: 3
+              rightPadding: 8
+              text: "prev / next"
+              color: Zenon.muted
+              font.family: Zenon.face
+              font.pixelSize: 12
+            }
+
+            // ── AND THE OTHER AXIS, ONLY WHEN IT HAS ONE ────────────────
+            // Shown for a document that is taller than its pane and nowhere
+            // else: over a picture there is nothing to scroll, and a hint for
+            // a key that does nothing is worse than no hint.
+            KeyChip {
+              anchors.verticalCenter: parent.verticalCenter
+              visible: look.scrollable
+              label: "j / k"
+              fontSize: 11
+            }
+            KeyChip {
+              anchors.verticalCenter: parent.verticalCenter
+              visible: look.scrollable
+              label: "\u2191 / \u2193"
+              fontSize: 11
+            }
+            Text {
+              anchors.verticalCenter: parent.verticalCenter
+              visible: look.scrollable
+              leftPadding: 3
+              text: "scroll"
+              color: Zenon.muted
+              font.family: Zenon.face
+              font.pixelSize: 12
+            }
+          }
+        }
+      }
+    }
+  }
 
 }

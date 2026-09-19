@@ -350,17 +350,70 @@ function displaySound_(r) {
   return r.hay;
 }
 
-function filterEntries(rows, query, showHidden) {
+// `hidePath` drops exactly one entry by its full path. It exists for the save
+// dialog: see portalGhost in TerminusWindow — the application asking for the
+// dialog has usually already written the file it is about to ask you where to
+// put, so the thing you are naming is sitting in the listing behind the name
+// field, looking like something that was already there.
+function filterEntries(rows, query, showHidden, hidePath) {
   const q = String(query || "").toLowerCase();
+  const hide = String(hidePath || "");
   // The common call is (rows, "", true) — every listing, both panes, on every
   // sort change. Handing back the same array rather than a copy of it is the
   // difference between allocating four thousand-element arrays for nothing and
   // not.
-  if (q === "" && showHidden) return rows;
+  if (q === "" && showHidden && hide === "") return rows;
   return rows.filter((r) => {
+    if (hide !== "" && r.path === hide) return false;
     if (!showHidden && r.isHidden) return false;
     return q === "" || displaySound_(r).indexOf(q) >= 0;
   });
+}
+
+// ── what a PDF is, beside the page it renders ───────────────────────────
+// pdfinfo prints "Key: value" lines; only a handful are worth a row. Title
+// and author are the document's own idea of itself and are often absent or
+// wrong, so they come first only when they are there at all.
+function pdfInfoCommand(path) {
+  return "pdfinfo -- " + Strings.shellQuote(path) + " 2>/dev/null";
+}
+
+function parsePdfInfo(text) {
+  const out = {};
+  const lines = String(text || "").split("\n");
+  if (lines.length === 0) return null;
+  for (const line of lines) {
+    const c = line.indexOf(":");
+    if (c < 0) continue;
+    out[line.slice(0, c).trim().toLowerCase()] = line.slice(c + 1).trim();
+  }
+  if (out["pages"] === undefined && out["page size"] === undefined) return null;
+  // "612 x 792 pts (letter)" — the name in the brackets is the useful half,
+  // and the numbers are points, which nobody thinks in.
+  let size = out["page size"] || "";
+  const named = size.match(/\(([^)]+)\)/);
+  if (named) size = named[1];
+  return {
+    pages: out["pages"] || "",
+    pageSize: size,
+    version: out["pdf version"] || "",
+    title: out["title"] || "",
+    author: out["author"] || "",
+    // "no", or "yes (print:yes …)" — only the first word matters here
+    encrypted: (out["encrypted"] || "").indexOf("yes") === 0 ? "yes" : ""
+  };
+}
+
+// Milliseconds as a clock, for the one place that counts in them. Hours only
+// when there are any — "0:03:07" for a three-minute track is a film's format
+// worn by something that is not one.
+function formatClock(ms) {
+  const t = Math.max(0, Math.floor(Number(ms) / 1000));
+  const h = Math.floor(t / 3600);
+  const m = Math.floor((t % 3600) / 60);
+  const sec = t % 60;
+  const pad = (n) => (n < 10 ? "0" + n : String(n));
+  return h > 0 ? h + ":" + pad(m) + ":" + pad(sec) : m + ":" + pad(sec);
 }
 
 // ── how it reads ──────────────────────────────────────────────────────────
@@ -594,7 +647,7 @@ function batCommand(path) {
   // that is paid for three times: bat highlights it, ansiToRich turns it into
   // markup, and Qt lays that markup out as rich text. That last one is the
   // expensive part and it is proportional to what it is given.
-  return "bat --color=always --theme=ansi --style=plain --paging=never"
+  return "exec bat --color=always --theme=ansi --style=plain --paging=never"
     + " --line-range=1:90 -- "
     + Strings.shellQuote(path) + " 2>/dev/null";
 }
@@ -802,7 +855,12 @@ function ansiToRich(text) {
   while (open > 0) { out += "</span>"; open--; }
   // <pre>, because Qt's rich text collapses newlines and runs of spaces like
   // any other HTML — without it the whole file rendered as a single line.
-  return "<pre>" + out + "</pre>";
+  // pre-wrap, not plain pre. <pre> keeps the newlines and the runs of spaces,
+  // which is the whole reason it is here — but it also refuses to break a long
+  // line, and Text.wrapMode cannot overrule a tag. So a source file ran off
+  // the right edge of the preview pane with no way to read the rest of it.
+  // pre-wrap keeps everything pre keeps and wraps what overflows.
+  return "<pre style=\"white-space: pre-wrap;\">" + out + "</pre>";
 }
 
 
@@ -1206,6 +1264,24 @@ const CLASH = { overwrite: "overwrite", skip: "skip", keep: "keep" };
 // A dotfile has no extension to preserve: ${n%.*} on ".bashrc" leaves an empty
 // stem and an extension of ".bashrc", which would produce " (1).bashrc". A
 // directory has no extension either, whatever a dot in its name suggests.
+// TAGS HAVE TO SURVIVE A COPY, and -a does not carry them: it is
+// -rlptgoD, and extended attributes are -X, which is not in that list. A
+// file copied with rsync as it stood arrived untagged.
+//
+// PROBED, NOT ASSUMED. Handed -X, rsync fails per file on a destination
+// that cannot hold an attribute and exits 23 — so a perfectly good copy to
+// an exFAT stick would have reported itself as a failed transfer, and
+// terminus mounts those sticks itself, so that is the ordinary case and not
+// an exotic one. One temp file in the destination answers the question
+// before rsync is asked it; an unquoted $xf expands to nothing at all when
+// the answer is no.
+const XATTR_PROBE =
+  "xf=\n" +
+  "xprobe=$(mktemp \"$XDEST/.terminus-xattr.XXXXXX\" 2>/dev/null) && {\n" +
+  "  setfattr -n user.xdg.tags -v probe -- \"$xprobe\" 2>/dev/null && xf=-X\n" +
+  "  rm -f -- \"$xprobe\"\n" +
+  "}\n";
+
 const FREE_NAME =
   "terminus_free() {\n" +
   "  d=$1; n=$2; s=$3\n" +
@@ -1230,14 +1306,17 @@ function transferCommand(paths, destDir, move, clash) {
   const mode = clash || CLASH.overwrite;
   const quoted = paths.map((p) => Strings.shellQuote(p));
   const dest = Strings.shellQuote(destDir);
-  const flags = "-a --info=progress2 --no-inc-recursive"
+  // $xf is set by XATTR_PROBE below, and is either -X or empty.
+  const flags = "-a $xf --info=progress2 --no-inc-recursive"
     + (move ? " --remove-source-files" : "");
+
+  const prologue = "XDEST=" + dest + "\n" + XATTR_PROBE;
 
   let cmd;
   if (mode === CLASH.keep) {
     // One rsync per item, because rsync renames only when it is given a single
     // source and a full target path — there is no per-file rename for a batch.
-    cmd = FREE_NAME
+    cmd = prologue + FREE_NAME
       + "i=0\n"
       + "for p in " + quoted.join(" ") + "; do\n"
       + "  i=$((i+1))\n"
@@ -1254,7 +1333,7 @@ function transferCommand(paths, destDir, move, clash) {
     // that promised "the incoming copy wins" silently did nothing at all.
     // Verified — two 4-byte files with equal mtimes, and the destination kept
     // its own contents. An explicit overwrite has to actually write.
-    cmd = "rsync " + flags
+    cmd = prologue + "rsync " + flags
       + (mode === CLASH.skip ? " --ignore-existing" : " --ignore-times")
       + " -- " + quoted.join(" ") + " " + Strings.shellQuote(destDir + "/")
       // EXIT ON FAILURE, so the sweep below cannot answer for it. Without
@@ -1395,13 +1474,66 @@ function clipboardPasteCommand(destDir) {
 // end up with a file called "800px-Foo.jpg?v=3". -J prefers the name the
 // server states and -O falls back to the URL's own, and the whole thing lands
 // in a free name rather than over anything already there.
+// A PAGE IS NOT A PICTURE, and a 200 does not mean you got the file.
+//
+// This is why an image dragged out of a browser could land "corrupted": a lot
+// of sites refuse hotlinked images not with an error but with an HTML page —
+// a login wall, a "hotlinking not allowed" notice, an interstitial — served
+// as 200 OK. curl -f only rejects HTTP failure codes, so the body was written
+// out under the picture's own name and something.jpg on disk was markup. The
+// file was never damaged in transit; it was never the picture.
+//
+// Three things, in order:
+//   a Referer and a browser User-Agent, because that is the difference
+//     between being served the image and being served the notice;
+//   the type CHECKED after the fact, because no header can be trusted to
+//     have told the truth;
+//   and the extension CORRECTED from what actually arrived, so a picture
+//     saved from a URL with no extension is not left unopenable.
 function fetchUrlCommand(url, destDir, fallback) {
   const d = Strings.shellQuote(destDir);
+  const u = Strings.shellQuote(url);
+  // scheme://host/ — enough of a Referer to satisfy a same-origin check
+  const origin = String(url).replace(/^([a-z]+:\/\/[^\/]+).*$/i, '$1') + '/';
   return FREE_NAME
     + 'f=$(terminus_free ' + d + ' ' + Strings.shellQuote(fallback) + ' "")\n'
-    + 'curl -fsSL --max-time 120 -o ' + d + '/"$f" -- '
-    + Strings.shellQuote(url) + ' || { rm -f -- ' + d + '/"$f"; exit 1; }\n'
-    + '[ -s ' + d + '/"$f" ] || { rm -f -- ' + d + '/"$f"; exit 1; }\n';
+    + 'curl -fsSL --max-time 120 '
+    + '-A ' + Strings.shellQuote(
+        'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 '
+        + '(KHTML, like Gecko) Chrome/124.0 Safari/537.36') + ' '
+    + '-e ' + Strings.shellQuote(origin) + ' '
+    + '-o ' + d + '/"$f" -- ' + u
+    + ' || { rm -f -- ' + d + '/"$f"; exit 1; }\n'
+    + '[ -s ' + d + '/"$f" ] || { rm -f -- ' + d + '/"$f"; exit 1; }\n'
+    // What came back, according to the bytes rather than to the server.
+    + 'm=$(file -b --mime-type -- ' + d + '/"$f" 2>/dev/null)\n'
+    + 'case "$m" in\n'
+    + '  text/html|text/xml|application/xhtml*)\n'
+    // Kept out of the directory rather than left looking like a broken
+    // picture: the drop failed, and a file that cannot be opened is a worse
+    // answer than no file.
+    + '    rm -f -- ' + d + '/"$f"; exit 1 ;;\n'
+    + 'esac\n'
+    // The name is a guess off the end of a URL; the type is not a guess. If
+    // they disagree, and the URL gave nothing usable, take the real one.
+    + 'case "$f" in\n'
+    + '  *.*) ;;\n'
+    + '  *)\n'
+    + '    ext=""\n'
+    + '    case "$m" in\n'
+    + '      image/jpeg) ext=.jpg ;;\n'
+    + '      image/png) ext=.png ;;\n'
+    + '      image/gif) ext=.gif ;;\n'
+    + '      image/webp) ext=.webp ;;\n'
+    + '      image/avif) ext=.avif ;;\n'
+    + '      image/svg+xml) ext=.svg ;;\n'
+    + '      video/mp4) ext=.mp4 ;;\n'
+    + '      video/webm) ext=.webm ;;\n'
+    + '      application/pdf) ext=.pdf ;;\n'
+    + '    esac\n'
+    + '    [ -n "$ext" ] && mv -n -- ' + d + '/"$f" ' + d + '/"$f$ext"\n'
+    + '  ;;\n'
+    + 'esac\n';
 }
 
 // What to call a thing fetched from a URL when nothing better is known.
@@ -1697,6 +1829,75 @@ function bulkNumber(names, start, pad, where, sep, stemOnly) {
   });
 }
 
+// ── add text ────────────────────────────────────────────────────────────
+// The second of Finder's three modes, and the one find/replace cannot do at
+// all: there is no pattern to FIND when what you want is the same word in
+// front of every name. Literal always — a prefix is not an expression, and
+// honouring the regex switch here would only mean "\d" silently going in as
+// two characters some of the time.
+function bulkAddText(names, text, where, stemOnly) {
+  const t = String(text === undefined ? "" : text);
+  if (t === "") return names.slice();
+  return mapPart(names, stemOnly, (s) => where === "before" ? t + s : s + t);
+}
+
+// Today, as the name a file sorts by. ISO order rather than anything local:
+// a dated batch is nearly always one you are about to sort by name, and only
+// this order makes those two the same thing.
+function formatStamp() {
+  const d = new Date();
+  const p = (n) => (n < 10 ? "0" : "") + n;
+  return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate());
+}
+
+// ── format ──────────────────────────────────────────────────────────────
+// A name built from scratch rather than edited: every row becomes the same
+// custom text plus whatever tells them apart. The old name is DISCARDED,
+// which is the whole difference between this and the other two modes and the
+// reason it is worth its own mode rather than another verb.
+//
+// Index and counter differ only in padding, and they are still kept apart —
+// for the same reason Finder keeps them apart. "1, 2, 3" and "00001, 00002"
+// are two different intentions and picking between them by typing a pad
+// width is a worse question than picking between two words.
+function bulkFormat(names, fmt, kind, where, start, sep, stemOnly) {
+  const base = String(fmt === undefined ? "" : fmt);
+  // A date needs no custom text to be a complete name; an index alone would
+  // rename every file to a bare number, which is a thing you do by accident
+  // and not on purpose.
+  if (base === "" && kind !== "date") return names.slice();
+  const from = parseInt(start, 10);
+  const first = isNaN(from) ? 1 : from;
+  const stamp = formatStamp();
+  const s = sep === undefined ? " " : String(sep);
+  // Padded to the width of the LAST index, so 1..10 is 01..10 throughout
+  // rather than 1..9 then 10 — the same rule bulkNumber follows.
+  const width = String(first + names.length - 1).length;
+  return names.map((name, i) => {
+    let tail;
+    // DATE, AND THEN AN INDEX IF IT HAS TO. Every file in one batch gets the
+    // same date, so a date alone renames forty files to one name — which
+    // bulkIssues correctly refuses, leaving a mode that can never apply. The
+    // index is what makes the date a name rather than a collision, and it is
+    // left off entirely when there is only one file to rename.
+    if (kind === "date") {
+      tail = names.length > 1 ? stamp + s + String(first + i) : stamp;
+    }
+    else if (kind === "counter") {
+      let n = String(first + i);
+      while (n.length < 5) n = "0" + n;
+      tail = n;
+    } else {
+      let n = String(first + i);
+      while (n.length < width) n = "0" + n;
+      tail = n;
+    }
+    const built = base === "" ? tail
+      : (where === "before" ? tail + s + base : base + s + tail);
+    return stemOnly ? built + splitExt(name)[1] : built;
+  });
+}
+
 function bulkIssues(oldNames, newNames) {
   const out = [];
   const seen = Object.create(null);
@@ -1778,6 +1979,11 @@ function appsCommand(path) {
     // One field where every other record has three, which is exactly how
     // parseApps tells it apart from an application.
     + "printf '%s\\036' \"$m\"; "
+    // AND THE DEFAULT, as a second one-field record. The registered list below
+    // is every application that claims the type; which of them actually opens
+    // it on a double click is a different question, and gio prints that answer
+    // on a line the `^\t` filter deliberately drops.
+    + "printf '%s\\036' \"$(xdg-mime query default \"$m\" 2>/dev/null)\"; "
     + "gio mime \"$m\" 2>/dev/null | sed -n 's/^\\t//p' | awk '!seen[$0]++' | "
     + "while read -r id; do "
     // the shared XDG search path — see morpheus/Desktop.qml. This used to be
@@ -1802,6 +2008,26 @@ function parseAppsMime(text) {
   // one field is the type; three is an application, from output written before
   // the type was led with
   return f.length === 1 ? f[0].trim() : "";
+}
+
+// The desktop id that currently opens this type, or "" if nothing does. The
+// second record, for the same reason the type is the first: asking a second
+// process for something a running one already knows is a process wasted.
+function parseAppsDefault(text) {
+  const recs = String(text || "").split(RECORD);
+  if (recs.length < 2) return "";
+  const f = recs[1].split(FIELD);
+  return f.length === 1 ? f[0].trim() : "";
+}
+
+// Making one of them THE one, without launching it — the half of
+// adoptAppCommand that is about the type rather than about this file. Same
+// `gio mime` for the same reason: it writes [Added Associations] as well as
+// the default, and the scan can only see what is registered.
+function setDefaultAppCommand(desktopId, mime) {
+  const id = Desktop.fileName(desktopId);
+  if (String(mime || "") === "" || String(id || "") === "") return "true";
+  return "gio mime " + Strings.shellQuote(mime) + " " + Strings.shellQuote(id);
 }
 
 function parseApps(text) {
@@ -1866,6 +2092,84 @@ function adoptAppCommand(desktopId, mime, path) {
     : "gio mime " + Strings.shellQuote(mime) + " "
       + Strings.shellQuote(Desktop.fileName(desktopId)) + " >/dev/null 2>&1\n";
   return reg + Desktop.launchCommand(desktopId, path);
+}
+
+// ── and UNCHOOSING one ──────────────────────────────────────────────────
+//
+// There is no `gio mime` for this. gio can set a default and it can add an
+// association, but it has no verb for "this application should stop claiming
+// this type" — so the association file is edited directly, which is what the
+// rest of the desktop does here.
+//
+// Three edits, per the freedesktop spec, and the third is the one that makes
+// it stick: dropping the id from [Added Associations] and [Default
+// Applications] only undoes what was added HERE, and the system-wide entry
+// underneath would put the application straight back in the list. Naming it
+// under [Removed Associations] is how a user says no to something they never
+// added in the first place.
+//
+// Written through a temp file and moved into place, so an interrupted write
+// cannot leave half a mimeapps.list behind — this is the file every
+// application on the desktop consults to find out what opens what, and a
+// truncated one breaks all of them rather than just this window.
+function removeAppCommand(desktopId, mime) {
+  const id = Desktop.fileName(desktopId);
+  if (String(mime || "") === "" || String(id || "") === "") return "true";
+  return "f=\"${XDG_CONFIG_HOME:-$HOME/.config}/mimeapps.list\"; "
+    + "mkdir -p \"$(dirname \"$f\")\" || exit 1; "
+    + "[ -e \"$f\" ] || : > \"$f\"; "
+    // An immutable or read-only mimeapps.list is somebody else's deliberate
+    // configuration — the same judgement adoptAppCommand makes about it.
+    + "[ -w \"$f\" ] || exit 1; "
+    + "t=$(mktemp \"$f.XXXXXX\") || exit 1; "
+    + "awk -v MIME=" + Strings.shellQuote(mime) + " -v ID=" + Strings.shellQuote(id) + " '"
+    + "# Remove one desktop id as a handler for one mime type, per the freedesktop\n"
+    + "# mimeapps.list spec: drop it from [Added Associations] and [Default\n"
+    + "# Applications], and record it under [Removed Associations] so that a system\n"
+    + "# default does not simply come back.\n"
+    + "function strip(list,   n, i, p, out) {\n"
+    + "  n = split(list, p, \";\"); out = \"\";\n"
+    + "  for (i = 1; i <= n; i++)\n"
+    + "    if (p[i] != \"\" && p[i] != ID) out = out p[i] \";\";\n"
+    + "  return out;\n"
+    + "}\n"
+    + "/^[ \\t]*\\[/ {\n"
+    + "  sec = $0; gsub(/^[ \\t]+|[ \\t]+$/, \"\", sec);\n"
+    + "  if (!(sec in seen)) { seen[sec] = 1; order[++nsec] = sec }\n"
+    + "  cur = sec; next;\n"
+    + "}\n"
+    + "{\n"
+    + "  key = $0; sub(/=.*/, \"\", key); gsub(/^[ \\t]+|[ \\t]+$/, \"\", key);\n"
+    + "  if (cur == \"\" ) { pre[++npre] = $0; next }\n"
+    + "  if (key == MIME) {\n"
+    + "    val = $0; sub(/^[^=]*=/, \"\", val);\n"
+    + "    if (cur == \"[Added Associations]\" || cur == \"[Default Applications]\") {\n"
+    + "      val = strip(val);\n"
+    + "      if (val == \"\") next;                       # key is now empty: drop it\n"
+    + "      body[cur] = body[cur] MIME \"=\" val \"\\n\"; next;\n"
+    + "    }\n"
+    + "    if (cur == \"[Removed Associations]\") {\n"
+    + "      val = strip(val) ID \";\";                   # no duplicate, then append\n"
+    + "      body[cur] = body[cur] MIME \"=\" val \"\\n\"; done = 1; next;\n"
+    + "    }\n"
+    + "  }\n"
+    + "  body[cur] = body[cur] $0 \"\\n\";\n"
+    + "}\n"
+    + "END {\n"
+    + "  if (!done) {\n"
+    + "    if (!(\"[Removed Associations]\" in seen)) order[++nsec] = \"[Removed Associations]\";\n"
+    + "    body[\"[Removed Associations]\"] = body[\"[Removed Associations]\"] MIME \"=\" ID \";\\n\";\n"
+    + "  }\n"
+    + "  for (i = 1; i <= npre; i++) print pre[i];\n"
+    + "  for (i = 1; i <= nsec; i++) {\n"
+    + "    b = body[order[i]];\n"
+    + "    sub(/\\n+$/, \"\", b);                         # no run of blank lines where a section ends\n"
+    + "    if (i > 1 || npre > 0) print \"\";\n"
+    + "    print order[i];\n"
+    + "    if (b != \"\") print b;\n"
+    + "  }\n"
+    + "}\n"
+    + "' \"$f\" > \"$t\" && mv \"$t\" \"$f\" || { rm -f \"$t\"; exit 1; }";
 }
 
 // ── the list you choose from ────────────────────────────────────────────
@@ -2164,6 +2468,38 @@ function parseImageInfo(text) {
     format: f[2],
     depth: f[3],
     colorspace: f[4]
+  };
+}
+
+// ── what a text file IS, as opposed to what it says ─────────────────────
+//
+// Every other kind in the preview pane carries a line of facts above the
+// thing itself — a picture its dimensions, a film its codec — and text alone
+// showed the document and nothing about it. These are the questions worth
+// asking of one: how long is it, how wide does it run, and what encoding is
+// it in, which is the one that matters when it renders as mojibake.
+//
+// wc and file, both cheap, in one process. `wc -L` is the longest line, which
+// is what says whether a file will wrap in a narrow pane.
+function textInfoCommand(path) {
+  const q = Strings.shellQuote(path);
+  return "wc -l -w -c -L < " + q + " 2>/dev/null | tr -s ' ' '\\037'; "
+    + "printf '\\036'; "
+    + "file -b --mime-encoding -- " + q + " 2>/dev/null";
+}
+
+function parseTextInfo(text) {
+  const parts = String(text || "").split(RECORD);
+  const nums = String(parts[0] || "").trim().split(FIELD)
+    .map((x) => x.trim()).filter((x) => x !== "");
+  if (nums.length < 4) return null;
+  const n = (x) => Number(x) || 0;
+  return {
+    lines: n(nums[0]).toLocaleString(),
+    words: n(nums[1]).toLocaleString(),
+    chars: n(nums[2]).toLocaleString(),
+    longest: n(nums[3]).toLocaleString(),
+    encoding: String(parts[1] || "").trim()
   };
 }
 

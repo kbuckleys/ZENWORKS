@@ -253,7 +253,58 @@ ShellRoot {
   // on. A morph is that arrival with the pill's rect as its starting shape;
   // anything else here makes it a second, different animation that happens
   // to be about the same thing.
-  Behavior on morphFactor { NumberAnimation { duration: Zenon.slow; easing.type: Zenon.ease } }
+  // LINEAR, and not because linear feels nice. morphFactor drives NOTHING
+  // but the crossfade below -- the pill's own geometry snaps now (see the
+  // margins block), so the curve that was chosen to match the pill
+  // travelling is shaping a pure opacity schedule it no longer has anything
+  // to do with.
+  //
+  // Composing a front-loaded curve with a clamped schedule crushes the first
+  // half. Quintic reaches 0.45 at 11% of 170ms = 19ms, so pillRowFade ran
+  // 1.00 -> 0.10 -> 0.00: ONE intermediate frame at 60Hz, three at 180Hz.
+  // The morpheus row did not fade out, it cut out, and that is the whole of
+  // why a morph looked nothing like a detached open.
+  //
+  // Linear spends the 170ms evenly, so each half of the crossfade gets its
+  // own 76ms: 4 intermediate frames at 60Hz and 13 at 180Hz on the way out,
+  // and the layer's fade-in lands on 6/16 -- which is what a DETACHED layer's
+  // showFactor measures at (5/16). Same duration, same felt rate, finally.
+  // ── AND LONG ENOUGH FOR BOTH HALVES TO BE SEEN ────────────────────────
+  // The schedule below spends 45% of this on clearing the pill and 45% on
+  // bringing the layer up, so at Zenon.slow each half got 76ms — under five
+  // frames. Both halves read as cuts however the curve is shaped, because
+  // there is not enough time in them to read as anything else.
+  //
+  // Doubled, each half gets ~153ms, which is what a DETACHED layer's own
+  // entrance takes. That is the whole claim this animation makes — that a
+  // morph is the same arrival with the pill's rect as its starting shape —
+  // and it could not be true while the morph ran in half the time.
+  //
+  // The Sheet component already reaches for the same multiple, for the same
+  // reason: a big object that travels is watched the whole way.
+  // ── ONE DURATION FOR THE WHOLE MORPH ─────────────────────────────────
+  // The pill's geometry and this crossfade have to be the same length or
+  // they are two events: the shape finished growing at 170ms while the
+  // layer had not begun appearing until 187ms, so you watched a panel
+  // arrive and THEN fill in.
+  //
+  // Zenon.slow, not a multiple of it. This was doubled while the pill's
+  // geometry still snapped — with no travel to watch, the crossfade was
+  // the whole animation and needed the room. Now that the shape actually
+  // moves, the motion carries it and the extra time only reads as drag.
+  // Same duration as every other animation on this desktop, which is the
+  // point: a morph should not announce itself as a special event.
+  // Zenon.brisk. The morph is the one animation you sit through before you
+  // can use what you asked for, so it is the one that should be quickest —
+  // every other easing on this desktop is decorating something already on
+  // screen. `fast` was still a beat longer than that argument allows, so
+  // the scale grew a rung below it rather than this reaching past the scale
+  // for a bare number: Oracle's multiplier has to keep reaching the morph or
+  // the pill and the layer it becomes ease at different rates.
+  readonly property int morphMs: Zenon.brisk
+  Behavior on morphFactor {
+    NumberAnimation { duration: root.morphMs; easing.type: Easing.Linear }
+  }
   // The crossfade schedule, defined once here rather than re-derived in each
   // layer: the pill's own row has finished clearing by 0.45 and a layer only
   // starts appearing at 0.55, so the two can never be on screen together.
@@ -616,6 +667,12 @@ ShellRoot {
         ((bar.screen ? bar.screen.width : 1920) - root.currentBarWidth) / 2)
       margins.left: bar.sideMargin
       margins.right: bar.sideMargin
+      Behavior on margins.left {
+        NumberAnimation { duration: root.morphMs; easing.type: Zenon.travelEase }
+      }
+      Behavior on margins.right {
+        NumberAnimation { duration: root.morphMs; easing.type: Zenon.travelEase }
+      }
       margins.bottom: Zenon.padScreen
       margins.top: Zenon.padScreen
       // travelEase on all four of these: they ARE the morph, as far as the
@@ -625,13 +682,25 @@ ShellRoot {
       // arrived nearly right and then spent the remaining four fifths
       // settling the last few pixels. A DETACHED layer has no pill geometry
       // to animate at all, which is why it read as quicker on the same 170ms.
-      // NO ANIMATION ON THE PILL'S OWN GEOMETRY. The layer draws its own
-      // opaque ground now, so the pill behind it is not visible while one is
-      // open — and animating a shape nobody can see cost a 13x resize every
-      // frame and put a second motion under the layer's own. It snaps, out of
-      // sight, and what you watch is the layer: the same entrance and the same
-      // exit it plays detached.
-      Behavior on margins.bottom { NumberAnimation { duration: Zenon.slow; easing.type: Zenon.ease } }
+      // ── THE PILL'S GEOMETRY ANIMATES AGAIN, AND IT HAD TO ──────────
+      // It was snapped, on the reasoning that the layer draws its own
+      // opaque ground so nobody can see the pill move, and that animating
+      // it cost a 13x resize every frame. The first half was true and the
+      // second no longer is — re-measured over repeated morphs on a 100ms
+      // heartbeat: median 100ms, p90 110ms, one 256ms blip. No storm.
+      //
+      // And snapping it broke two things that were not obvious from here.
+      // The morph became a shape appearing at full size with a crossfade
+      // inside it, which is the "rough" — there is no travel to watch, so
+      // it reads as a cut however the contents are eased. And cynosure
+      // stopped easing while morphed: it follows the pill's live width by
+      // construction and deliberately does not run its own Behavior on top
+      // of it, because the pill "eases toward the same target". Once the
+      // pill stopped easing, nothing did, and filtering went jerky.
+      //
+      // travelEase, not ease: this is a thing crossing a distance and
+      // watched the whole way — see the note on morphFactor.
+      Behavior on margins.bottom { NumberAnimation { duration: root.morphMs; easing.type: Zenon.travelEase } }
 
     // The pill's own first frame. QQuickWindow.frameSwapped fires once the
     // window has actually handed a buffer over, which is the earliest moment
@@ -653,6 +722,10 @@ ShellRoot {
       id: bg
       width: parent.width
       height: root.pillMorphed ? root.barHeightExpanded : root.barHeightCollapsed
+      // Both axes, or the pill grows sideways and jumps vertically.
+      Behavior on height {
+        NumberAnimation { duration: root.morphMs; easing.type: Zenon.travelEase }
+      }
       color: Zenon.panelBg
       border.color: Zenon.surfaceBorder
       border.width: 1

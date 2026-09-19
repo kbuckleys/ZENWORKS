@@ -321,6 +321,12 @@ QtObject {
   // the pill it is morphing out of is the one way this shell can look broken
   // rather than merely different. At a scale of 0 they are all zero, which Qt
   // reads as "no animation": every Behavior in here then lands on frame one.
+  // BELOW `fast`, for the one thing you WAIT ON. Everything on this scale
+  // decorates something already on screen, so `fast` is as quick as decoration
+  // needs to be. The morph is the exception: it stands between asking for a
+  // panel and being able to use it, and the right length for that is the
+  // shortest one that still reads as a move rather than a cut.
+  readonly property int brisk:  Math.round(75 * Oracle.motionScale)
   readonly property int fast:   Math.round(110 * Oracle.motionScale)
   readonly property int normal: Math.round(140 * Oracle.motionScale)
   readonly property int slow:   Math.round(170 * Oracle.motionScale)

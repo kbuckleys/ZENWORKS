@@ -353,9 +353,19 @@ PanelWindow {
               height: 16
               text: (row.modelData.hasChildren || false) ? ""
                 : ((row.modelData.mark || false) ? "" : "")
-              color: (row.modelData.mark || false) ? Zenon.cyan : Zenon.muted
+              // Three answers, not two. A TICK is a state and keeps its
+              // cyan; a CHEVRON is punctuation belonging to the label beside
+              // it and takes the label's own white. Muted was lumping the
+              // chevron in with "nothing here", which is what made it look
+              // like a disabled row.
+              color: (row.modelData.mark || false) ? Zenon.cyan
+                : ((row.modelData.hasChildren || false) ? Zenon.white
+                  : Zenon.muted)
               font.family: Zenon.face
-              font.pixelSize: (row.modelData.mark || false) ? 13 : 15
+              // The chevron matches the label it punctuates, which is 16.
+              // The tick stays smaller: it is a state sitting in the margin,
+              // not part of the sentence.
+              font.pixelSize: (row.modelData.mark || false) ? 13 : 16
               verticalAlignment: Text.AlignVCenter
               horizontalAlignment: Text.AlignHCenter
             }
