@@ -229,7 +229,18 @@ FloatingWindow {
   // How far one level of the list's tree is indented, and the room a
   // disclosure triangle takes. Scaled with the zoom like every other
   // measurement in a row.
-  readonly property int treeStep: Math.round(14 * root.zoom)
+  //
+  // THE STEP IS NOT THE MARKER'S WIDTH. They were both 14, which read as
+  // barely an indent at all once the guide lines went in — a level looked
+  // like a nudge rather than a rank. The two are separate measurements and
+  // only the step wants doubling: the marker is still a 14px glyph.
+  //
+  // Everything in the guides is expressed against these, so nothing else
+  // moves. A column's line sits at k * treeStep + treeArrowW / 2, which is
+  // the middle of where a marker at that depth would be, and the arm is
+  // whatever is left of the step — so widening the step lengthens the arms
+  // and leaves the corners, the markers and the icons where they belong.
+  readonly property int treeStep: Math.round(28 * root.zoom)
   readonly property int treeArrowW: Math.round(14 * root.zoom)
 
   // ONE MOMENT FOR THE WHOLE LISTING. The date bands are worked out against
@@ -1059,7 +1070,6 @@ FloatingWindow {
   // which is a pane that goes blank the moment you step out of it.
   readonly property string otherViewMode:
     root.pas.viewMode === "grid" ? "grid" : "list"
-  readonly property real otherThumbZoom: root.pas.zoom > 0 ? root.pas.zoom : 1.0
 
   // Where the divider sits, as a FRACTION of the body rather than a pixel
   // count, so resizing the window keeps the proportion you chose instead of
@@ -1276,6 +1286,41 @@ FloatingWindow {
   readonly property real sidebarMax: 420
 
   property var disks: []
+
+  // ── ONE MARK IN THE SIDEBAR, AND THE MOST SPECIFIC ONE ────────────────
+  // Three rows claimed to be where you are at once: the bookmark for the
+  // directory, and EVERY disk whose mount is a prefix of it — with / and
+  // /home both mounted that is two disks for any path under home. Each drew
+  // its own bar, and the single travelling cursor went to whichever claimed
+  // last. Leaving a collection flips them all back at the same moment, and
+  // the last one is the bottom disk: the cursor went all the way to the
+  // bottom of the sidebar.
+  //
+  // Answered once, here, so the rows only compare against it. A bookmark
+  // for the exact directory beats a disk that merely contains it, and the
+  // longest mount beats a shorter one — /home is a better answer than / for
+  // /home/buck.
+  //
+  // A PREFIX IS NOT A PATH: "/home" is a prefix of the string "/homework"
+  // and has nothing to do with it, so the test is the whole component.
+  function under(path, mount) {
+    if (mount === "" || path === "") return false;
+    if (mount === "/") return path.charAt(0) === "/";
+    return path === mount || path.indexOf(mount + "/") === 0;
+  }
+
+  readonly property string sideDisk: {
+    if (root.searchMode !== "") return "";
+    for (let i = 0; i < root.bookmarks.length; ++i)
+      if (root.bookmarks[i] === root.cwd) return "";
+    let best = "";
+    for (let j = 0; j < root.disks.length; ++j) {
+      const m = String(root.disks[j].mount || "");
+      if (!root.under(root.cwd, m)) continue;
+      if (m.length > best.length) best = m;
+    }
+    return best;
+  }
   property string diskKey: ""
   // false until the first poll has landed, so the machine's own disks are not
   // mistaken for something you just plugged in
@@ -1557,6 +1602,16 @@ FloatingWindow {
   // Without this the retry below would ask about it forever.
   property var duTried: ({})
 
+  // Opening a branch puts directories on screen without re-listing cwd, so
+  // nothing else would come back to measure them. Debounced for the reason
+  // the empty-directory probe is: expanding changes the rows twice in quick
+  // succession, and du is a walk of the whole subtree.
+  Timer {
+    id: usageDelay
+    interval: 150
+    onTriggered: root.measureAll()
+  }
+
   function measureAll() {
     if (!root.usage) return;
     // Busy is not the same as done. This used to just give up, and since the
@@ -1568,7 +1623,15 @@ FloatingWindow {
     if (duProc.running) return;
     const tried = root.duTried;
     const sizes = root.dirSizes;
-    const todo = root.rows.filter((r) => r.isDir
+    // ── EVERY DIRECTORY DRAWN, NOT ONLY THE TOP LEVEL ───────────────
+    // This asked about root.rows, which is the listing — so a directory
+    // spliced into the tree by opening a branch was never handed to du at
+    // all. Its bar stayed an empty track for ever, which the delegate
+    // draws to mean "asked, no answer yet" and here meant "never asked":
+    // usage had nothing to do with the child rows. `view` is what is on
+    // screen, which is also what usageMax is already measured against, so
+    // the bars and the yardstick now come from the same set of rows.
+    const todo = root.view.filter((r) => r.isDir
       && sizes[r.path] === undefined && tried[r.path] !== true);
     if (todo.length === 0) { root.status = ""; return; }
     const next = Object.assign({}, tried);
@@ -1803,6 +1866,26 @@ FloatingWindow {
         root.applyPendingRealm();
         root.act.raw = rows;
         root.act.sel = 0;
+        // ── UNLESS SOMETHING ASKED FOR A ROW ────────────────────────
+        // sel = 0 is right when a results page has just OPENED: the rows
+        // are a set you have not seen and the first is as good as any. It
+        // is wrong when the same page is re-run because something on it
+        // was created, renamed or deleted — that is not an arrival, and
+        // being thrown back to the top of a hundred rows after every
+        // action is its own kind of broken. reCollect arms the aim with
+        // the row you were standing on.
+        //
+        // ONE ATTEMPT, then disarmed either way: the row may have been
+        // the very thing that was just deleted, and an aim left armed
+        // would be taken by whatever listing arrived next.
+        if (root.wantSel !== "") {
+          const landed = root.landWanted();
+          root.wantSel = "";
+          if (!landed && root.reAt >= 0)
+            root.act.sel = Math.max(0,
+              Math.min(root.reAt, root.act.view.length - 1));
+        }
+        root.reAt = -1;
         // ── THE CURSOR LANDS, IT DOES NOT TRAVEL ────────────────────
         // The rows under it are now a completely different set, so the
         // bar easing from wherever it was is easing between two places
@@ -1812,6 +1895,24 @@ FloatingWindow {
         // thawPulse is the existing way to say "re-seat without
         // travelling"; see its own note.
         root.thawPulse++;
+        // ── AND THE BRANCHES, WHICH THE QUERY DOES NOT COVER ────────
+        // The rows above are the TOP LEVEL. A row spliced in by opening a
+        // folder came from that folder's own listing and nothing re-read
+        // it, so deleting a file inside an expanded branch of a collection
+        // left it on screen — while the folder above it correctly worked
+        // out it was now empty and dropped its marker. Two halves of one
+        // row set disagreeing, and re-opening the page did not help
+        // because only the half that comes from the query was replaced.
+        //
+        // A directory listing has the watcher for this. A collection has
+        // none — it is a snapshot of a question — so the moment its rows
+        // land is the moment to refresh the other half too.
+        //
+        // HERE rather than in reCollect, so that OPENING a page repairs
+        // branches left stale by an earlier visit as well; by this line
+        // the tree is the new page's, so liveBranches names its branches
+        // and not the ones we have just navigated away from.
+        if (root.act.treed) root.rereadBranches(root.act.liveBranches());
         root.status = root.rows.length + " matches";
         Qt.callLater(root.positionSel);
       }
@@ -2061,8 +2162,22 @@ FloatingWindow {
       onStreamFinished: {
         const f = collProc.folder;
         if (!f) return;
+        // ── fd MARKS A DIRECTORY WITH A TRAILING SLASH ────────
+        // Every other path in this window is bare, and a row carrying
+        // "…/nest probe/" is a different string from the same directory
+        // named anywhere else. It compared equal to nothing: joinPath made
+        // "…/nest probe//new file", so a file created inside a folder in a
+        // collection could never be found again — the cursor did not land
+        // on it and its name never opened for editing. Nothing else
+        // noticed, because within a collection the slashed form was used
+        // consistently on both sides of every comparison.
+        //
+        // Stripped here, where fd's output stops being fd's output, rather
+        // than at each of the places that would otherwise have to know.
         let paths = String(collOut.text || "").split("\u0000")
-          .filter((p) => p !== "");
+          .filter((p) => p !== "")
+          .map((p) => (p.length > 1 && p.charAt(p.length - 1) === "/")
+            ? p.slice(0, -1) : p);
         paths = Coll.applyTags(f, paths, root.tagMarks);
         root.finishCollection(paths);
       }
@@ -2076,6 +2191,10 @@ FloatingWindow {
       root.applyPendingRealm();
       root.act.raw = [];
       root.act.sel = 0;
+      // This return skips statProc, which is where a re-ask's aim is
+      // spent — see reCollect. Nothing to land on, so let them go.
+      root.wantSel = "";
+      root.reAt = -1;
       root.status = "nothing matches";
       return;
     }
@@ -2096,6 +2215,17 @@ FloatingWindow {
   // lit, because `collOpenId === modelData.id` compared a truncated number
   // with a whole one. Both looked like separate bugs in the view code.
   property var collOpenId: -1
+
+  // ── OPENING ONE IS A JOURNEY; ARRIVING BACK AT ONE IS NOT ───────────
+  // The same split goTo and enter already have. Everything a person
+  // reaches for goes through here so the collection lands in history;
+  // back() and forward() call openCollection directly, through travelTo,
+  // because a step along the trail must not append to it.
+  function goToCollection(id) {
+    if (!root.collById(id)) return;
+    root.pushTrail("c:" + id);
+    root.openCollection(id);
+  }
 
   function openCollection(id) {
     const f = root.collById(id);
@@ -2124,6 +2254,77 @@ FloatingWindow {
     const cmd = Coll.command(f, Paths.home());
     if (cmd === "") { root.status = "no rules yet"; return; }
     root.status = "searching\u2026";
+    collProc.folder = f;
+    collProc.running = false;
+    collProc.command = ["setsid", "sh", "-c", cmd];
+    collProc.running = true;
+  }
+
+  // ── A COLLECTION IS A QUESTION, AND AN ACTION CHANGES THE ANSWER ──────
+  // refresh() re-lists cwd and returns immediately on a results page — "results
+  // are not a directory" — which was true when nothing on one could be acted
+  // on. It is not true now: a collection is a tree, things are created,
+  // renamed and deleted in it, and none of that showed. The row for a file
+  // you had just deleted sat there until you left the page and came back,
+  // which is exactly the complaint the directory listing used to draw.
+  //
+  // RE-ASKED, NOT PATCHED. Re-running the query is the only answer that is
+  // right for all of it: a delete removes a row, a rename replaces one, and
+  // a create ADDS one that no amount of re-statting the paths we already
+  // have could discover. Measured at 10ms for Recents over this home
+  // directory, which is cheaper than reasoning about which rows to mend.
+  //
+  // NOT openCollection, which is the gesture rather than the query: that one
+  // records where to return to on Escape, announces itself in the status
+  // line and puts the cursor on the first row. A refresh must do none of
+  // those — see the landing in statProc.
+  // Where the cursor was when a collection was re-asked, as a fallback for
+  // when the row it was on has gone. -1 means "not a refresh".
+  property int reAt: -1
+
+  Timer {
+    id: collSettle
+    // The same coalescing the directory watcher uses, and for the same
+    // reason: one paste is a burst of completions.
+    interval: 250
+    onTriggered: root.reCollect()
+  }
+
+  function reCollect() {
+    // collOpenId is -1 when nothing is open, never "" — the mode is the
+    // real test and the only one needed.
+    if (root.searchMode !== "collection") return;
+    const f = root.collById(root.collOpenId);
+    if (!f) return;
+    // ── ARMED ONLY ONCE THE RE-ASK IS CERTAIN ───────────────────────
+    // These two are consumed where the rows land, and a run that never
+    // reaches that point leaves them set: wantSel in particular is the
+    // armed aim the NEXT listing will take, so a collection that failed to
+    // re-ask put the cursor on some unrelated row in the next directory
+    // opened. Worked out first, armed after the last way out.
+    const tagOnly = Coll.tagsOnly(f);
+    const cmd = tagOnly ? "" : Coll.command(f, Paths.home());
+    if (!tagOnly && cmd === "") return;
+    // The row you were on, by path — the indices are about to move.
+    // AND by index, because the commonest reason to re-ask is that the row
+    // you were standing on has just been deleted: there is no path to come
+    // back to, and dumping the cursor at the top of a hundred results is
+    // the thing this whole function exists to avoid. Whatever slid into
+    // that index is the right answer, which is what a directory listing
+    // does too.
+    //
+    // AN AIM ALREADY SET WINS. commitRename points at the NEW name before
+    // the command runs, and overwriting that with "where the cursor is"
+    // landed a rename back on the index the old name had rather than on
+    // the row it had just become.
+    const r = root.currentRow();
+    if (root.wantSel === "") root.wantSel = r ? r.path : "";
+    root.reAt = root.act.sel;
+    if (tagOnly) {
+      root.finishCollection(Coll.applyTags(f, Coll.allTagged(root.tagMarks),
+                                           root.tagMarks));
+      return;
+    }
     collProc.folder = f;
     collProc.running = false;
     collProc.command = ["setsid", "sh", "-c", cmd];
@@ -2200,6 +2401,17 @@ FloatingWindow {
 
   function clearSearch() {
     if (root.searchMode === "") return;
+    // ── LEAVING ONE IS A STEP BACK, NOT A NEW PLACE ───────────────────
+    // The entry below a collection in the trail is the directory this is
+    // about to restore, so walking off the end of it is exactly one step
+    // back. Without this the trail still pointed at the collection you had
+    // just left and the first Back was spent going nowhere.
+    const tp = root.act;
+    if (root.searchMode === "collection" && tp.trailAt > 0
+        && tp.trail[tp.trailAt] === ("c:" + root.collOpenId)) {
+      root.markTrailSel();
+      tp.trailAt -= 1;
+    }
     // A collection may still be out there running rg. Leaving the page is
     // exactly when it stops being worth anything.
     root.cancelCollection();
@@ -2731,6 +2943,33 @@ FloatingWindow {
   // window because the row being dragged and the row drawing the drop line are
   // two different rows and neither can see the other.
   // The sidebar row the listing is currently standing in, published by the
+  // ── THE CURSOR TRAVELS ONLY WHEN IT CHANGES ROWS ────────────────────
+  // Its y comes from mapToItem, which moves for two quite different
+  // reasons: the cursor moving to another row, and the sidebar's own
+  // layout shifting under it. Easing was applied to both, and the second
+  // one is not travel — it is the rows jumping while the bar walks to
+  // where one of them used to be.
+  //
+  // They jump often. The column's top spacer is max(0, 10 - colHeads),
+  // so the whole sidebar moves ten pixels whenever the listing's heading
+  // strip appears or disappears with the view mode — and a bookmark that
+  // opens a directory remembered in another view does exactly that. The
+  // bar was then chasing a moving target: measured off Buck's capture it
+  // ended up twenty-one pixels below the row it was going to, further
+  // than the two rows are apart, with the active row's own cyan bar
+  // already in place. Two rows marked, in two different ways.
+  //
+  // Armed by the row that CLAIMS the cursor, before the assignment, so
+  // the binding is already allowed to ease by the time it re-evaluates.
+  // Everything else snaps, which is what a layout shift should do.
+  property bool sideSlide: false
+  function armSideSlide() { root.sideSlide = true; sideSlideOff.restart(); }
+  Timer {
+    id: sideSlideOff
+    interval: Zenon.fast + 40
+    onTriggered: root.sideSlide = false
+  }
+
   // row itself — see SideRow. Held here because the bar that marks it is a
   // sibling of the Column the rows are in and cannot see inside it.
   property var sideAt: null
@@ -2833,16 +3072,34 @@ FloatingWindow {
         // How each tag's page likes to be read, by tag name. A collection
         // keeps this on its own record; a tag has no record, so it lives
         // here beside the definitions.
-        views: (o.views && typeof o.views === "object") ? o.views : ({})
+        views: (o.views && typeof o.views === "object") ? o.views : ({}),
+        // ── WHAT BECAME OF EACH OF THE SEVEN ─────────────────────────
+        // Presets are offered whether or not anything uses them, which
+        // made renaming one impossible to SEE: the files moved, the
+        // definition moved, and the old name sat in the list exactly
+        // where it had been, with the new one added underneath. A rename
+        // that leaves both names on screen is a create, whatever it did
+        // underneath.
+        //
+        // preset name -> what it is called now, or "" if it was
+        // forgotten. The NAME rather than a bare "hidden" flag, because
+        // the slot is the other half of reading as a rename: the row has
+        // to change its wording where it stands, not vanish from the
+        // fourth line and reappear at the bottom.
+        gone: (o.gone && typeof o.gone === "object" && !Array.isArray(o.gone))
+          ? o.gone : ({})
       };
     } catch (e) {
       // A corrupt file is not a reason to lose the session. The index
       // rebuilds from disk anyway, and defs is the only real casualty.
-      return { defs: [], index: ({}), views: ({}) };
+      return { defs: [], index: ({}), views: ({}), gone: ({}) };
     }
   }
 
   property var tagViews: ({})
+
+  // What became of each preset that is no longer itself — see tagState.
+  property var tagGone: ({})
 
   property string tagRaw: ""
 
@@ -2856,6 +3113,7 @@ FloatingWindow {
     root.tagDefs = st.defs;
     root.tagMarks = st.index;
     root.tagViews = st.views;
+    root.tagGone = st.gone;
   }
 
   // Every write goes through here and re-reads first, for the reason
@@ -2872,7 +3130,22 @@ FloatingWindow {
     root.tagDefs = st.defs;
     root.tagMarks = st.index;
     root.tagViews = st.views;
+    root.tagGone = st.gone;
     tagFile.setText(JSON.stringify(st));
+  }
+
+  // ── IS THIS ONE OF THE SEVEN, WHATEVER IT IS CALLED NOW ─────────────
+  // Answers with the PRESET whose place this name holds, or "" when the
+  // name is the user's own. A renamed preset is still one of the seven:
+  // `crimson` is where `red` lives now, and the lineup is fixed even when
+  // its wording is not. Used to keep a default from being removed.
+  function presetSlot(name) {
+    if (name === "") return "";
+    if (Tags.presetInk(name) !== "" && root.tagGone[name] === undefined)
+      return name;
+    for (const k in root.tagGone)
+      if (root.tagGone[k] === name) return k;
+    return "";
   }
 
   // A STORED COLOUR FIRST, then the seven that come with one, then a
@@ -2898,6 +3171,48 @@ FloatingWindow {
   //
   // A collection's paths come from fd and are real by construction, so the
   // only ones this can remove are tag entries whose file has gone.
+  // ── A TAG IS KEYED BY PATH, AND A PATH CAN STOP EXISTING ────────────
+  // Nothing in the delete, trash or rename paths ever touched the index, and
+  // the one thing that prunes it — pruneTagIndex — can only drop a path a
+  // stat run ASKED about. A file deleted out of a collection is gone from
+  // that query's answer, so it is never asked about again and never pruned:
+  // the sidebar goes on counting it, and "green 2" points at one file.
+  //
+  // A RESTART DOES NOT FIX IT either, though it looks as though it might:
+  // loadTags re-reads the JSON and believes it. Only the palette's "reindex
+  // tags" repairs it, by walking the disk.
+  //
+  // Both halves are cheap and exact at the moment the verb runs: it knows
+  // which paths are about to stop existing, and which are about to become a
+  // different path.
+  function forgetTags(paths) {
+    if (!paths || paths.length === 0) return;
+    const hit = paths.filter((p) => root.tagMarks[p] !== undefined);
+    // editTags reloads the shared file and waits for the write; not worth
+    // paying for the overwhelmingly common case of untagged files.
+    if (hit.length === 0) return;
+    root.editTags((st) => {
+      for (let i = 0; i < hit.length; ++i) delete st.index[hit[i]];
+    });
+  }
+
+  // `pairs` is [[from, to], …]. The tag travels with the file: the xattr
+  // moved with it on disk, so leaving the index behind would be the index
+  // disagreeing with the truth it is a cache of.
+  function moveTags(pairs) {
+    if (!pairs || pairs.length === 0) return;
+    const hit = pairs.filter((q) => root.tagMarks[q[0]] !== undefined);
+    if (hit.length === 0) return;
+    root.editTags((st) => {
+      for (let i = 0; i < hit.length; ++i) {
+        const v = st.index[hit[i][0]];
+        if (v === undefined) continue;
+        delete st.index[hit[i][0]];
+        st.index[hit[i][1]] = v;
+      }
+    });
+  }
+
   function pruneTagIndex(asked, rows) {
     if (!asked || asked.length === 0) return;
     const alive = ({});
@@ -2931,7 +3246,7 @@ FloatingWindow {
   // `page` picks the tab: 0 properties, 1 permissions.
   function openProperties(page) {
     props.ask();
-    if (page === 1 && props.tabs.length > 1) props.tab = 1;
+    if (page === 1 && props.hasPerms) props.tab = 1;
   }
   function openCollectionEditor(id) { collEdit.ask(id === undefined ? -1 : id); }
 
@@ -2943,6 +3258,8 @@ FloatingWindow {
   Process {
     id: tagWriteProc
     property var pending: []
+    // A preset name being put back into use — see applyTagPairs.
+    property string homing: ""
     stderr: StdioCollector {
       id: tagWriteErr
       waitForEnd: true
@@ -2954,20 +3271,33 @@ FloatingWindow {
     onExited: (code) => {
       if (code !== 0) { root.warn("could not tag"); return; }
       const pairs = tagWriteProc.pending;
+      const back = tagWriteProc.homing;
       root.editTags((st) => {
         for (let i = 0; i < pairs.length; ++i) {
           const e = pairs[i];
           if (e.names.length === 0) delete st.index[e.path];
           else st.index[e.path] = e.names;
         }
+        // ── USING ONE OF THE SEVEN AGAIN BRINGS IT HOME ─────────────
+        // A retired preset comes back into the list on its own the
+        // moment a file carries it, because the list is built from the
+        // tally as well as from the presets. It would come back at the
+        // BOTTOM though, as a tag that merely shares a name with one of
+        // the seven, and the row it used to occupy would stay missing.
+        if (back !== "" && st.gone && st.gone[back] !== undefined)
+          delete st.gone[back];
       });
+      tagWriteProc.homing = "";
       tagWriteProc.pending = [];
       root.refresh();
     }
   }
 
-  function applyTagPairs(pairs) {
+  // `homing` names a tag that is being PUT ON something, so that one of
+  // the seven can take its own place back — see the write's onExited.
+  function applyTagPairs(pairs, homing) {
     if (!pairs || pairs.length === 0) return;
+    tagWriteProc.homing = homing || "";
     tagWriteProc.pending = pairs;
     tagWriteProc.command = ["sh", "-c", Tags.writeManyCommand(pairs)];
     tagWriteProc.running = true;
@@ -2978,7 +3308,7 @@ FloatingWindow {
   function toggleTagFor(paths, name) {
     if (!paths || paths.length === 0) return;
     const r = Tags.toggleAcross(root.tagMarks, paths, name);
-    root.applyTagPairs(r.pairs);
+    root.applyTagPairs(r.pairs, r.added ? name : "");
     root.status = (r.added ? "tagged " : "untagged ")
       + paths.length + (paths.length === 1 ? " item" : " items");
   }
@@ -3013,7 +3343,13 @@ FloatingWindow {
   function renameTag(from, to) {
     const pairs = Tags.renamePairs(root.tagMarks, from, to);
     const want = Tags.normalise([to])[0] || "";
-    if (want === "" || want === from) return;
+    if (from === "" || want === "" || want === from) return;
+    // Carried onto the new name below, so a preset keeps its colour.
+    // The NAME of the Zenon colour, not the colour: that is what a
+    // definition stores and what tagInk resolves on the way out. Handing
+    // it the resolved value made the lookup miss and every renamed preset
+    // came out in the default cyan.
+    const ink = Tags.presetInk(from) || "cyan";
     root.editTags((st) => {
       // The view follows the name, or the page you had arranged comes back
       // arranged differently for no reason you could point at.
@@ -3033,14 +3369,54 @@ FloatingWindow {
         moved = true;
         break;
       }
-      if (!moved && !st.defs.some((d) => d.name === want)) return;
+      // `from` had no definition of its own — a preset that files are
+      // carrying — and those files are about to answer to `want`. Define
+      // the new name with the colour they were wearing, or it arrives
+      // with no ink and the row goes grey.
+      if (!moved && !st.defs.some((d) => d.name === want))
+        st.defs.push({ name: want, ink: ink });
+
+      // ── AND THE ROW ITSELF CHANGES ITS NAME ──────────────────────
+      // A definition was moved or removed above, so a tag of one's own
+      // has already followed. A PRESET is not in the list because of a
+      // definition — it is in the list because it is one of the seven —
+      // so unless its slot is told what it is called now, the old name
+      // stays put and the new one arrives as an extra row.
+      if (!st.gone || Array.isArray(st.gone) || typeof st.gone !== "object")
+        st.gone = ({});
+      if (Tags.presetInk(from) !== "") st.gone[from] = want;
+      // `from` may itself be what a preset was renamed to two renames
+      // ago; the slot follows the chain rather than stopping at the
+      // first name it was given.
+      for (const k in st.gone)
+        if (st.gone[k] === from) st.gone[k] = want;
+      // And renaming something ONTO a preset's name brings it home.
+      if (st.gone[want] !== undefined) delete st.gone[want];
+
+      // A DEFINITION THAT ONLY RESTATES A PRESET IS NOT ONE. Coming home
+      // leaves the travelling definition behind under the preset's own
+      // name and its own colour, which records nothing — tagInk falls
+      // through to exactly that answer with no definition at all. A
+      // preset deliberately redefined in a DIFFERENT colour is a real
+      // definition and stays.
+      st.defs = st.defs.filter((d) => Tags.presetInk(d.name) !== d.ink);
     });
-    if (pairs.length === 0) { root.status = "renamed " + from; return; }
-    root.applyTagPairs(pairs);
+    if (pairs.length > 0) root.applyTagPairs(pairs);
     root.status = "renamed " + from + " \u2192 " + want;
   }
 
   function dropTag(name) {
+    // ── THE LINEUP IS FIXED ───────────────────────────────────────────
+    // The seven can be renamed — that is a change of wording, and the
+    // slot stays. Removing one is a change to the lineup itself, and the
+    // lineup is not the user's to shorten: the colours are what a tag
+    // picker offers on a machine where nothing has been tagged yet, and
+    // a picker that can be emptied has nothing to offer. Caught here as
+    // well as in the sheet so no other caller can get round it.
+    if (root.presetSlot(name) !== "") {
+      root.warn(name + " is a default tag");
+      return;
+    }
     const paths = Tags.pathsWith(root.tagMarks, name);
     const pairs = paths.map((p) => ({
       path: p,
@@ -3472,7 +3848,7 @@ FloatingWindow {
         // you built to look at something is part of "where I was", so it
         // travels with the tabs rather than with the look of the window,
         // and it is restored only when session replay is on.
-        paneOpen: [paneL.openList(), paneR.openList()],
+        paneOpen: [paneL.dirOpenList(), paneR.dirOpenList()],
         paneZooms: [paneL.zoom, paneR.zoom],
         paneFrac: root.paneFrac,
         dirViews: root.dirViews
@@ -3738,8 +4114,53 @@ FloatingWindow {
   // Whether the horizontal keys belong to the tree rather than to history.
   // One question, asked in the key handler and by the hint bar, so the two
   // can never disagree about what h does.
+  // ── WHICH PAGES A TREE CAN EXIST IN ───────────────────────────────────
+  // A directory listing, always. And a COLLECTION, which is new: its rows
+  // are paths from all over, so they cannot be INDENTED by how deep they
+  // happen to live — that was Recents putting lua files three levels in
+  // under nothing, and the reason the whole tree was switched off here —
+  // but a folder in the results is still a folder, and opening it in place
+  // to see what is in it is the same gesture it is anywhere else. Depth
+  // comes from the walk now rather than from the path, which is what makes
+  // the difference; see the pane's `flat`.
+  //
+  // NOT find or grep. Those pages are a question you asked, and splicing
+  // a directory's whole contents into a list of matches answers a
+  // different one.
+  // ── WHICH SET OF OPEN BRANCHES IS SHOWING ───────────────────────────
+  // A collection is its own list, so the folders opened in it are its own
+  // too. They were ONE map per pane, shared by every realm that pane had
+  // ever shown: collapsing Documents in home collapsed it in Recents and
+  // the other way about, because both were asking the same map about the
+  // same path.
+  //
+  // Keyed by realm, and a collection's key is its id — two collections do
+  // not share either. find, grep and a tag page all answer "d": none of
+  // them draws a tree (see treeRealm), so they have nothing to keep and
+  // must not disturb what the directory listing has.
+  // ── WHERE YOU ARE, AS SOMETHING HISTORY CAN HOLD ────────────────────
+  // The trail stored paths, and a collection is not one — so opening one
+  // put nothing in history and leaving it dropped it entirely. Back went
+  // to whatever you were doing before, as though the collection had never
+  // been a place. It is a place: it has a name, a row in the sidebar and
+  // its own remembered view.
+  //
+  // A directory is its path and a collection is "c:" and its id, which is
+  // a number for one you made and a string for the built-in — both survive
+  // the round trip, see travelTo. find, grep and tag pages answer with the
+  // cwd they are covering, so they are not recorded separately; they are
+  // typed once and gone, and Escape is their way out.
+  readonly property string here:
+    root.searchMode === "collection" ? ("c:" + root.collOpenId) : root.cwd
+
+  readonly property string realmKey:
+    root.searchMode === "collection" ? ("c:" + root.collOpenId) : "d"
+
+  readonly property bool treeRealm:
+    root.searchMode === "" || root.searchMode === "collection"
+
   readonly property bool treeKeys:
-    root.viewMode === "list" && root.searchMode === ""
+    root.viewMode === "list" && root.treeRealm
 
   // ── ONE KEY, FOUR OUTCOMES ────────────────────────────────────────────
   // Finder's model exactly. Going right: a closed folder opens, an open one
@@ -4065,8 +4486,8 @@ FloatingWindow {
     ["tags", [["c t", "tag the selection"],
               ["\u21b5", "put the tag on / take it off"],
               ["type", "filter, or name a new tag"],
-              ["ctrl \u21b5", "rename the highlighted tag to what is typed"],
-              ["del", "forget a tag everywhere"],
+              ["alt r", "rename the highlighted tag, in the row"],
+              ["del", "remove a tag everywhere"],
               ["menu", "the seven colours, on the row's own menu"]]],
     ["collections", [["c s", "new collection"],
                      ["click", "open one from the sidebar"],
@@ -4282,7 +4703,7 @@ FloatingWindow {
       out.push({ section: "collections", label: c.name, key: "",
                  alias: Coll.describe(c),
                  act: (function (id) {
-                   return function () { root.openCollection(id); };
+                   return function () { root.goToCollection(id); };
                  })(c.id) });
     }
 
@@ -5404,8 +5825,6 @@ FloatingWindow {
     : (root.millerOrder[0] === 1 ? colB : colC)
   readonly property var midCol: root.millerOrder[1] === 0 ? colA
     : (root.millerOrder[1] === 1 ? colB : colC)
-  readonly property var prevCol: root.millerOrder[2] === 0 ? colA
-    : (root.millerOrder[2] === 1 ? colB : colC)
 
   // True from the moment a step is taken until the slide it starts has
   // finished. The travel is queued a tick late now (see millerStep), so
@@ -5531,7 +5950,23 @@ FloatingWindow {
   }
 
   function goTo(path) {
-    if (path === root.cwd) return;
+    // ── A RESULTS PAGE IS NOT THE DIRECTORY UNDERNEATH IT ─────────────
+    // cwd stays wherever you were when the page was opened: a collection
+    // or a search is drawn OVER the listing, not instead of it. So this
+    // early return was asking about cwd while the question was about the
+    // screen, and the bookmark for the directory you opened the
+    // collection from did nothing at all until you pressed Escape — which
+    // is the usual case, because you open Recents from somewhere and that
+    // somewhere is the bookmark that stops working.
+    //
+    // Asking for the directory a results page is covering means "put it
+    // away", which is what Escape means — and clearSearch is what knows
+    // how, with the cursor, the view mode and the zoom it restores. A
+    // plain re-entry would drop all three.
+    if (path === root.cwd) {
+      if (root.searchMode !== "") root.clearSearch();
+      return;
+    }
     root.pushTrail(path);
     root.enter(path);
   }
@@ -5547,10 +5982,13 @@ FloatingWindow {
   // What the cursor is on, remembered against the directory being left.
   function markTrailSel() {
     const p = root.act;
-    if (p.cwd === "") return;
+    // Keyed by the PLACE — see root.here — so a collection remembers the
+    // row you were on in it, the way a directory always has.
+    const ref = root.here;
+    if (ref === "") return;
     const r = root.currentRow();
     const m = p.trailSel;
-    m[p.cwd] = r ? r.path : "";
+    m[ref] = r ? r.path : "";
     p.trailSel = m;
   }
 
@@ -5558,7 +5996,7 @@ FloatingWindow {
     const p = root.act;
     root.markTrailSel();
     const t = p.trailAt < 0 ? [] : p.trail.slice(0, p.trailAt + 1);
-    if (t.length === 0 && p.cwd !== "") t.push(p.cwd);
+    if (t.length === 0 && root.here !== "") t.push(root.here);
     if (t.length > 0 && t[t.length - 1] === path) return;
     t.push(path);
     // A wall you cannot see the end of is a leak. Two hundred is more places
@@ -5577,15 +6015,33 @@ FloatingWindow {
   // a shifted letter you press deliberately. They are h, l and the arrows now,
   // which is the pair a hand reaches for by reflex, and a key that does
   // nothing and says nothing reads as a key that is not bound.
+  // The one place that knows how to arrive at a trail entry, whichever
+  // kind it is. enter() for a directory, the collection itself otherwise —
+  // and NOT goToCollection, for the reason back() gives about enter:
+  // walking the trail is not a new place to record.
+  function travelTo(ref) {
+    if (String(ref).indexOf("c:") !== 0) { root.enter(ref); return; }
+    // ── THE ID SURVIVES THE ROUND TRIP, WHICHEVER KIND IT IS ────────
+    // A collection you made is keyed by Date.now(), a number; the built-in
+    // by the string "builtin:recents". Both become text in the trail, and
+    // collById compares with ===, so handing back the wrong type finds
+    // nothing. Asking collById which form it knows is exact — guessing
+    // from isNaN would turn a string id that happens to be digits into a
+    // number and lose it.
+    const id = String(ref).slice(2);
+    root.openCollection(root.collById(id) !== null ? id : Number(id));
+  }
+
   function back() {
     if (!root.canBack) { root.warn("nothing to go back to"); return; }
     const p = root.act;
     root.markTrailSel();
     p.trailAt -= 1;
     root.aimAt(p.trail[p.trailAt]);
-    // enter, not goTo: walking the trail is not a new place to record, and
-    // recording it would make forward unreachable the moment you used back.
-    root.enter(p.trail[p.trailAt]);
+    // travelTo, not goTo: walking the trail is not a new place to record,
+    // and recording it would make forward unreachable the moment you used
+    // back.
+    root.travelTo(p.trail[p.trailAt]);
   }
 
   function forward() {
@@ -5594,7 +6050,7 @@ FloatingWindow {
     root.markTrailSel();
     p.trailAt += 1;
     root.aimAt(p.trail[p.trailAt]);
-    root.enter(p.trail[p.trailAt]);
+    root.travelTo(p.trail[p.trailAt]);
   }
 
   // Armed BEFORE the move, because landWanted runs against the rows as they
@@ -5679,6 +6135,12 @@ FloatingWindow {
   readonly property var lastListing: root.act.lastListing
 
   function goUp() {
+    // ── A RESULTS PAGE HAS NO PARENT ──────────────────────────────────
+    // cwd is whatever the page is covering, so "up" from a collection went
+    // to the parent of a directory that is not on screen — an arbitrary
+    // jump with no relation to anything you could see. Its rows come from
+    // all over; the only honest meaning of outwards is out of the page.
+    if (root.searchMode !== "") { root.clearSearch(); return; }
     const from = root.cwd;
     if (from === "/") return;
     root.wantSel = from;
@@ -5787,6 +6249,9 @@ FloatingWindow {
       root.previewOrder = [];
       if (root.viewMode === "columns") root.refreshPreview();
       root.refresh();
+      // refresh() declines on a results page; a collection has its own —
+      // see reCollect.
+      if (root.searchMode === "collection") collSettle.restart();
       root.drain();
     }
   }
@@ -6767,6 +7232,8 @@ FloatingWindow {
     if (code === 0 && root.status !== "") root.status = "";
     root.act.marked = {};
     root.refresh();
+    // A transfer lands on a collection the same way a command does.
+    if (root.searchMode === "collection") collSettle.restart();
     // the second pane is very often the destination, and a destination that
     // does not show what just arrived in it is the whole point missed
     root.refreshOther();
@@ -6920,6 +7387,7 @@ FloatingWindow {
           Terminus.joinPath(root.destDir, Terminus.basename(p.paths[i]))]);
       }
       root.pushUndo({ kind: "move", pairs: pairs });
+      root.moveTags(pairs);
     }
     root.startJob(p.op, p.paths, root.destDir, clash);
     // spent: the next paste is a paste into where you are standing again
@@ -6974,6 +7442,10 @@ FloatingWindow {
   function doTrash(rows) {
     const paths = rows.map((r) => r.path);
     root.run(Terminus.trashCommand(paths));
+    // The xattr goes to the trash with the file, so a restore still knows
+    // what it was tagged; it is the INDEX that must stop counting it while
+    // it is not in your tree. Reindex after a restore to get it back.
+    root.forgetTags(paths);
     // recorded by where they CAME FROM: that is what undo can look up
     root.pushUndo({ kind: "trash", paths: paths });
     root.act.marked = {};
@@ -7077,6 +7549,7 @@ FloatingWindow {
       return;
     }
     root.run(Terminus.renameCommand(entry.path, want));
+    root.moveTags([[entry.path, to]]);
     if (wasFresh) root.unreserve(fresh);
     root.pushUndo({ kind: "rename", from: entry.path, to: to });
     // land on it under its new name rather than wherever the old one sorted
@@ -8256,7 +8729,9 @@ FloatingWindow {
       "This does not go to the trash.  "
         + rows.map((r) => r.name).join("   "),
       "Delete", () => {
-        root.run(Terminus.deleteCommand(rows.map((r) => r.path)));
+        const doomed = rows.map((r) => r.path);
+        root.run(Terminus.deleteCommand(doomed));
+        root.forgetTags(doomed);
         root.act.marked = {};
       });
   }
@@ -10656,7 +11131,23 @@ FloatingWindow {
         Rectangle {
           id: side
           width: root.sidebar ? root.sidebarWidth : 0
-          height: parent.height
+          // ── IT REACHES UP THROUGH THE HEADING STRIP ──────────────
+          // colHeads is a full-width band above this row, and bodyRow's
+          // height is what is left after it — so in LIST view, the one
+          // view that has columns to name, the whole sidebar was pushed
+          // 22px down and the strip sat over it as an empty placeholder.
+          // It was painted in the sidebar's own tone to hide that, which
+          // made it invisible rather than absent: BOOKMARKS still started
+          // lower in a list than in a grid, and every row under it moved
+          // whenever the view changed.
+          //
+          // The strip names the LISTING's columns and belongs over the
+          // listing. Rather than restructure the stack for it, the sidebar
+          // simply grows back up through it — it is declared after
+          // colHeads, so it paints over it, and bodyRow does not clip.
+          // The reservation the listing needs is untouched.
+          y: -colHeads.height
+          height: parent.height + colHeads.height
           visible: width > 0
           clip: true
           color: root.sidebarBg
@@ -10715,7 +11206,7 @@ FloatingWindow {
               // is 46, and easing fourteen pixels of height is a stretch
               // rather than a movement.
               Behavior on y {
-                enabled: root.cursorSlide
+                enabled: root.cursorSlide && root.sideSlide
                 NumberAnimation {
                   duration: Zenon.fast; easing.type: Zenon.travelEase
                 }
@@ -10726,19 +11217,15 @@ FloatingWindow {
               id: sideCol
               width: side.width - 1
 
-              // The sidebar's top moves between views, and this makes up the
-              // difference. colHeads spans the full width, so in LIST view its
-              // 22px strip sits above the sidebar and gives the first heading
-              // its breathing room; in grid and columns that strip collapses to
-              // nothing and the heading ended up jammed against the breadcrumb.
-              // Whatever colHeads is not supplying, this does.
+              // The gap under the breadcrumb, and it is the SAME in every
+              // view now. It used to make up whatever colHeads was not
+              // supplying, because that strip pushed the sidebar down in
+              // list view and not in the others — see the note on `side`,
+              // which no longer lets it. A constant, so nothing in the
+              // sidebar moves when the view changes.
               Item {
                 width: 1
-                // Trimmed from 22. It exists to make up whatever colHeads is
-                // not supplying, not to hold the list down the panel — and
-                // with the heading's own 24 on top of it the first label sat
-                // most of an inch below the breadcrumb.
-                height: Math.max(0, 10 - colHeads.height)
+                height: 10
               }
 
               // ── EMPTY SECTIONS ARE NOT SECTIONS ───────────────────
@@ -10782,7 +11269,20 @@ FloatingWindow {
                     name: modelData === Paths.home()
                       ? "home" : Terminus.basename(modelData),
                     isDir: true })
-                  active: modelData === root.cwd
+                  // ── ONLY WHEN THE DIRECTORY IS WHAT IS SHOWN ────
+                  // cwd does not change when a collection or a search is
+                  // opened — the page is drawn OVER the listing — so this
+                  // stayed lit the whole time you were somewhere else, and
+                  // the collection's own row lit beside it.
+                  //
+                  // Worse than cosmetic: the cursor bar is CLAIMED on the
+                  // change, so a row that never went inactive cannot take
+                  // it back when the collection releases it. Open Recents
+                  // from home, come back to home, and the bar marked
+                  // nothing at all — which is what Buck's capture shows.
+                  // Guarded, the flip back to true is a change, and the
+                  // change is the claim.
+                  active: root.searchMode === "" && modelData === root.cwd
                   showRemove: true
                   onChosen: root.goTo(modelData)
                   // middle click removes it, the same gesture the tabs use
@@ -10855,12 +11355,25 @@ FloatingWindow {
                   label: modelData.name
                   glyph: "\uEC78"
                   ink: Zenon[modelData.ink] || Zenon.cyan
-                  active: root.collOpenId === modelData.id
+                  // ── LIT ONLY WHILE A COLLECTION IS WHAT IS SHOWN ──
+                  // collOpenId is a stored value: written when a collection
+                  // opens and cleared only by Escape back to a directory.
+                  // Opening a TAG from a collection writes neither, so the
+                  // collection's row stayed lit underneath the tag's — two
+                  // sidebar entries both claiming to be the page you are on.
+                  //
+                  // Guarded on the mode, which is how openTagName has always
+                  // done it: that one is derived from searchMode and so
+                  // cannot go stale. This makes the pair symmetrical instead
+                  // of clearing collOpenId from each new realm and hoping
+                  // none is ever added without the line.
+                  active: root.searchMode === "collection"
+                    && root.collOpenId === modelData.id
                   // A built-in has no record to delete or rules to edit.
                   // Offering either would be two buttons that can only fail.
                   showRemove: !modelData.builtin
                   editable: !modelData.builtin
-                  onChosen: root.openCollection(modelData.id)
+                  onChosen: root.goToCollection(modelData.id)
                   onRemoved: root.dropCollection(modelData.id)
                   onEdited: collEdit.ask(modelData.id)
                 }
@@ -10892,7 +11405,10 @@ FloatingWindow {
                     ? modelData.avail + " free" : modelData.size
                   used: Terminus.usedFraction(modelData.avail, modelData.fsSize)
                   glyph: modelData.removable ? "\uF0A0" : "\uF1C0"
-                  active: modelData.mount !== "" && root.cwd.indexOf(modelData.mount) === 0
+                  // At most one disk, and only when no bookmark is a
+                  // better answer — see root.sideDisk.
+                  active: modelData.mount !== ""
+                    && modelData.mount === root.sideDisk
                   // a mounted disk is a place; an unmounted one is a button
                   mounted: modelData.mount !== ""
                   // no eject on the mounts the system is standing on
@@ -12325,6 +12841,11 @@ FloatingWindow {
           // change it has to say so. A pane switch is the one: the pointer has
           // not moved, but which half is active has, and in column view that
           // decides whether it is over anything at all.
+          //
+          // READ BY NOTHING, ON PURPOSE. It exists so that the handler
+          // below has something to fire on — a property whose only job is
+          // its own change signal. It reads as dead to anything counting
+          // references, because the handler's name does not contain it.
           readonly property int activeSide: root.act.side
           onActiveSideChanged: {
             emptyWatch.lastX = -1;
@@ -12862,9 +13383,13 @@ FloatingWindow {
       // properties is still what opens: reading is the common act and
       // changing the mode is the rare one, so the rare one is a tab away
       // rather than in the way.
+      // 0 is properties, 1 is permissions. Not a tab index any more — the
+      // strip is gone — but still the page the card is showing.
       property int tab: 0
-      readonly property var tabs: props.many
-        ? ["Properties"] : ["Properties", "Permissions"]
+      // Whether there is a second page at all. A mixed selection has no
+      // single mode to edit, so it has no permissions row to open and no
+      // page to open onto.
+      readonly property bool hasPerms: !props.many
 
       property int permMode: 0
       property int permWas: 0
@@ -12927,7 +13452,14 @@ FloatingWindow {
                       : Terminus.formatSize(r.size) + "  ·  " + r.size + " bytes"],
                     ["modified", Terminus.formatTime(r.mtime)],
                     ["owner", props.owner === "" ? "…" : props.owner],
-                    // no "permissions" row: the grid below IS that row now
+                    // ── AND THE WAY TO THE GRID ──────────────────────
+                    // It reads as a fact and acts as a door. Both
+                    // spellings, the same pair the grid itself shows, so
+                    // the page you arrive at is recognisably the row you
+                    // clicked rather than a different subject.
+                    ["permissions",
+                      ("000" + (props.permMode & 511).toString(8)).slice(-3)
+                      + "  \u00b7  " + Terminus.modeString(props.permMode)]
                   ].concat(
                     // What is inside it, for a directory — the natural companion
                     // to the size two rows up, and the one thing this card could
@@ -12989,53 +13521,15 @@ FloatingWindow {
           // does not carry any has to say so.
           Item { width: 1; height: 10 }
 
-          // A mixed selection has no single mode to edit, so it gets no tab
-          // to edit one with — the strip simply is not there.
-          Item {
-            width: parent.width
-            height: props.tabs.length > 1 ? 34 : 0
-            visible: props.tabs.length > 1
-
-            Row {
-              anchors.centerIn: parent
-              spacing: 6
-
-              Repeater {
-                model: props.tabs
-                delegate: Rectangle {
-                  id: propTab
-                  required property var modelData
-                  required property int index
-                  readonly property bool on: props.tab === propTab.index
-                  width: propTabText.implicitWidth + 26
-                  height: 26
-                  radius: 5
-                  color: propTab.on
-                    ? Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b, 0.16)
-                    : (propTabHov.hovered ? Zenon.headBg : "transparent")
-                  border.width: 1
-                  border.color: propTab.on ? Zenon.cyan : Zenon.msgBorder
-                  Behavior on color { ColorAnimation { duration: Zenon.fast } }
-                  Behavior on border.color { ColorAnimation { duration: Zenon.fast } }
-
-                  Text {
-                    id: propTabText
-                    anchors.centerIn: parent
-                    text: propTab.modelData
-                    color: propTab.on ? Zenon.cyan : Zenon.white
-                    font.family: Zenon.face
-                    font.pixelSize: 14
-                  }
-
-                  HoverHandler { id: propTabHov }
-                  MouseArea {
-                    anchors.fill: parent
-                    onClicked: props.tab = propTab.index
-                  }
-                }
-              }
-            }
-          }
+          // ── NO TAB STRIP ───────────────────────────────────────
+          // There were two pills here, Properties and Permissions, which
+          // is a lot of chrome for a card with one subject and a second
+          // page that most openings never want. The permissions row in
+          // the facts below is the way through now: it reads as a fact
+          // and acts as a door, so the card opens on what you came for
+          // and the rare thing is one click away rather than always in
+          // view. Escape on that page comes back here; see the key
+          // handler.
 
           // picture on the left, facts on the right
           Item {
@@ -13272,21 +13766,28 @@ FloatingWindow {
                   // does something" is one idea in this card rather than two.
                   readonly property bool pickable:
                     modelData[0] === "open with" && root.appsScanned
-                  color: (propValue.askable || propValue.pickable)
+                  // The third. A mixed selection has no single mode, so it
+                  // has no row to open and nothing to open it onto.
+                  readonly property bool opensPerms:
+                    modelData[0] === "permissions" && !props.many
+                  readonly property bool acts: propValue.askable
+                    || propValue.pickable || propValue.opensPerms
+                  color: propValue.acts
                     ? (sumHov.hovered ? Zenon.cyan : Zenon.keyInk) : Zenon.white
                   font.family: Zenon.face
                   font.pixelSize: 16
 
                   HoverHandler {
                     id: sumHov
-                    enabled: propValue.askable || propValue.pickable
+                    enabled: propValue.acts
                   }
 
                   MouseArea {
                     anchors.fill: parent
-                    enabled: propValue.askable || propValue.pickable
+                    enabled: propValue.acts
                     onClicked: {
-                      if (propValue.pickable) props.openWithMenu(propValue);
+                      if (propValue.opensPerms) props.tab = 1;
+                      else if (propValue.pickable) props.openWithMenu(propValue);
                       else props.computeChecksum();
                     }
                   }
@@ -13586,12 +14087,33 @@ FloatingWindow {
             width: parent.width
             height: 46
 
-            DialogButton {
+            Row {
               anchors.centerIn: parent
-              label: "Close"
-              ink: Zenon.cyan
-              primary: true
-              onClicked: { props.open = false; content.forceActiveFocus(); }
+              spacing: 8
+
+              // ── OUT OF THE PAGE, NOT OUT OF THE CARD ─────────────
+              // The permissions page is reached by clicking a row in
+              // properties, and once the tab strip went it had no visible
+              // way back — Escape and Tab both do it and neither is
+              // written anywhere. Beside Close because the two are the
+              // same kind of answer at different depths: one leaves the
+              // page, the other leaves the card.
+              //
+              // A positioner skips an invisible child, so on the
+              // properties page Close is centred exactly as it was.
+              DialogButton {
+                visible: props.tab === 1
+                label: "Back"
+                ink: Zenon.muted
+                onClicked: props.tab = 0
+              }
+
+              DialogButton {
+                label: "Close"
+                ink: Zenon.cyan
+                primary: true
+                onClicked: { props.open = false; content.forceActiveFocus(); }
+              }
             }
           }
         }
@@ -14253,6 +14775,32 @@ FloatingWindow {
         if (tagPick.open && !confirm.open) {
           // The filter first, then the sheet — the palette's rule, which
           // every sheet with a filter in it follows.
+          // ── WHILE A NAME IS BEING TYPED, IT TAKES EVERYTHING ──────
+          // Before the filter, before Escape-clears-the-query, before the
+          // letter keys: the row is an editor and an editor owns its keys.
+          if (tagPick.renaming !== "") {
+            if (event.key === Qt.Key_Escape) { tagPick.cancelRename(); return; }
+            if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+              tagPick.commitRename(); return;
+            }
+            if (event.key === Qt.Key_Backspace) {
+              tagPick.renameText = tagPick.renameText.slice(0, -1); return;
+            }
+            if (event.text && event.text.length === 1 && event.text >= " ")
+              tagPick.renameText += event.text;
+            return;
+          }
+
+          // ── ALT R, AND BEFORE THE LETTER KEYS ─────────────────────
+          // Every bare letter belongs to the filter, so the modifier has
+          // to be tested first: `event.text` is still "r" with Alt held,
+          // and the printable branch below would otherwise swallow it and
+          // type an r into the filter instead.
+          if ((event.modifiers & Qt.AltModifier) !== 0
+              && event.key === Qt.Key_R) {
+            tagPick.beginRename(); return;
+          }
+
           if (event.key === Qt.Key_Escape) {
             if (tagPick.query !== "") { tagPick.query = ""; return; }
             tagPick.dismiss(); return;
@@ -14261,12 +14809,6 @@ FloatingWindow {
           // is finished — tagging comes in runs, but a single tag should not
           // cost an Escape as well.
           if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-            // Ctrl renames the highlighted tag to what is typed, rather
-            // than putting it on the selection.
-            if ((event.modifiers & Qt.ControlModifier) !== 0) {
-              tagPick.rename();
-              return;
-            }
             tagPick.apply();
             if ((event.modifiers & Qt.ShiftModifier) !== 0) tagPick.dismiss();
             return;
@@ -14501,7 +15043,13 @@ FloatingWindow {
             props.permCursor = (props.permCursor + 3) % 9;
           } else if (event.key === Qt.Key_Space) {
             props.togglePermBit();
-          } else if (event.key === Qt.Key_Tab) {
+          } else if (event.key === Qt.Key_Tab
+                     || event.key === Qt.Key_Escape) {
+            // BACK, NOT SHUT. With the tab strip gone this is the way
+            // out of the second page, and it is the one Escape already
+            // means everywhere else in this window: unwind what you are
+            // in the middle of and stop there. A second Escape, now on
+            // the properties page, closes the card as it always did.
             props.tab = 0;
           }
           return;
@@ -14510,7 +15058,7 @@ FloatingWindow {
         // properties: Tab changes page, Return closes it, and the one
         // thing in it you can ask for is the checksum
         if (event.key === Qt.Key_Tab) {
-          if (props.tabs.length > 1) props.tab = 1;
+          if (props.hasPerms) props.tab = 1;
         } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
           props.open = false;
           content.forceActiveFocus();
@@ -16433,16 +16981,6 @@ FloatingWindow {
         content.forceActiveFocus();
       }
 
-      // WHICHEVER MODE IS SHOWING. The three modes' fields all still exist
-      // while their mode is hidden — visible: false does not destroy an item
-      // — so every focus claim here has to ask which one is actually on
-      // screen rather than reaching for the find field it used to be.
-      function leadField() {
-        if (root.bulkMode === "add") return addField;
-        if (root.bulkMode === "format") return fmtField;
-        return findField;
-      }
-
       onOpenChanged: {
         // Whatever was hanging open when the card went away does not come
         // back with it.
@@ -18092,7 +18630,7 @@ FloatingWindow {
         root.saveCollection(d);
         const id = d.id;
         collEdit.dismiss();
-        root.openCollection(id);
+        root.goToCollection(id);
       }
 
       InputShield {
@@ -18435,7 +18973,15 @@ FloatingWindow {
             partly: some && !on
           });
         };
-        for (let i = 0; i < Tags.PRESETS.length; ++i) add(Tags.PRESETS[i].name);
+        // Each of the seven in its place, under whatever it is called
+        // now. Always seven rows: a default can be renamed but not
+        // removed, so a slot never empties. Typing one of the original
+        // names onto a file brings that name home — see the tag write.
+        for (let i = 0; i < Tags.PRESETS.length; ++i) {
+          const n = Tags.PRESETS[i].name;
+          const now = root.tagGone[n];
+          add(now === undefined ? n : now);
+        }
         for (let j = 0; j < root.tagDefs.length; ++j) add(root.tagDefs[j].name);
         const tallied = Object.keys(tagPick.counts).sort();
         for (let k = 0; k < tallied.length; ++k) add(tallied[k]);
@@ -18515,24 +19061,89 @@ FloatingWindow {
         root.toggleTagFor(tagPick.targets, name);
       }
 
-      // The filter field doubles as the name field, as it already does for
-      // making one: highlight a tag, type what it should be called, and
-      // ctrl+Return moves it — every file that carries it included. No new
-      // widget for a thing the card can already take dictation for.
-      function rename() {
-        const name = tagPick.chosen();
-        const to = tagPick.query.trim();
-        if (name === "" || name === tagPick.fresh || to === "") return;
-        if (to === name) return;
-        root.renameTag(name, to);
+      // ── RENAMING IS ITS OWN MODE, ON THE ROW ──────────────────────
+      // The filter field used to double as the name field: highlight a
+      // tag, type the new name, ctrl+Return. It could not work, and the
+      // reason is structural rather than a slip — typing the new name
+      // RE-FILTERS the list by fuzzy-matching it, so the tag being renamed
+      // drops out of `rows` and the "make a new tag" offer takes index 0.
+      // chosen() then answers with that offer and rename() refuses. It
+      // only ever went through if the new name happened to fuzzy-match the
+      // old one and you arrowed back onto it.
+      //
+      // One field cannot be both "which tag" and "what to call it". The
+      // filter stays a filter; renaming borrows the ROW, the way the
+      // listing renames a file in place, and keys go to the name while it
+      // is up. Nothing is dictated into two places at once.
+      property string renaming: ""
+      property string renameText: ""
+
+      // ── A REFUSAL HAS TO LAND WHERE THE EYE IS ────────────────────
+      // root.warn writes the status chip at the foot of the WINDOW, which
+      // during a sheet is behind the scrim and a long way from the row
+      // being argued about. Said in the footer instead, in place of the
+      // hints, and gone again shortly after.
+      property string gripe: ""
+
+      function gripeAbout(t) { tagPick.gripe = t; gripeGo.restart(); }
+
+      Timer { id: gripeGo; interval: 2400; onTriggered: tagPick.gripe = ""; }
+
+      onOpenChanged: if (!tagPick.open) tagPick.gripe = "";
+
+      function beginRename() {
+        let name = tagPick.chosen();
+        // ── THE OFFER IS NOT A TAG, BUT IT IS WHERE THE CURSOR SITS ──
+        // Typing to FIND a tag puts the "make a new one" offer at the top
+        // of the list, and the highlight defaults to it. Refusing there
+        // and saying nothing is what made renaming look like it CREATED
+        // tags: the keystrokes went to the filter instead, and the Return
+        // that was meant to commit the new name made a tag out of it.
+        //
+        // So it falls to the first real row and MOVES the highlight onto
+        // it, rather than renaming something the cursor was not on: what
+        // is about to change is the row you can see turn into a field.
+        if (name === "" || name === tagPick.fresh) {
+          if (tagPick.rows.length === 0) {
+            tagPick.gripeAbout("no tag to rename");
+            return;
+          }
+          tagPick.sel = tagPick.offset;
+          name = tagPick.rows[0].name;
+        }
+
+        tagPick.renaming = name;
+        tagPick.renameText = name;
+      }
+
+      function commitRename() {
+        const from = tagPick.renaming;
+        const to = tagPick.renameText.trim();
+        tagPick.renaming = "";
+        tagPick.renameText = "";
+        if (from === "" || to === "" || to === from) return;
+        root.renameTag(from, to);
+        // The filter was very likely how the tag was found, and the new
+        // name has no reason to match it — leaving it on would hide the
+        // thing that was just renamed.
         tagPick.query = "";
       }
 
-      // Forgets it everywhere — see root.dropTag for why a definition cannot
-      // be dropped on its own.
+      function cancelRename() {
+        tagPick.renaming = "";
+        tagPick.renameText = "";
+      }
+
+      // Takes it off everywhere — see root.dropTag for why a definition
+      // cannot be dropped on its own, and why one of the seven cannot be
+      // dropped at all.
       function drop() {
         const name = tagPick.chosen();
         if (name === "" || name === tagPick.fresh) return;
+        if (root.presetSlot(name) !== "") {
+          tagPick.gripeAbout(name + " is a default tag");
+          return;
+        }
         root.dropTag(name);
         tagPick.sel = Math.max(0, tagPick.sel - 1);
       }
@@ -18650,17 +19261,33 @@ FloatingWindow {
               font.pixelSize: 15
             }
 
+            // The row IS the name field while this one is being renamed —
+            // see tagPick.renaming. Cyan and a caret, so which row is
+            // taking the typing is never in question.
+            readonly property bool editing: tagPick.renaming !== ""
+              && tagPick.renaming === tagRow.modelData.name
+
             Text {
+              id: tagName
               anchors.left: tagDot.right
               anchors.leftMargin: 14
               anchors.right: tagState.left
               anchors.rightMargin: 12
               anchors.verticalCenter: parent.verticalCenter
-              text: tagRow.modelData.name
+              text: tagRow.editing ? tagPick.renameText : tagRow.modelData.name
               elide: Text.ElideRight
-              color: Zenon.white
+              color: tagRow.editing ? Zenon.cyan : Zenon.white
               font.family: Zenon.face
               font.pixelSize: 17
+            }
+
+            Rectangle {
+              visible: tagRow.editing
+              x: tagName.x + Math.min(tagName.contentWidth + 2, tagName.width)
+              anchors.verticalCenter: parent.verticalCenter
+              width: 1
+              height: 19
+              color: Zenon.cyan
             }
 
             // Whether the SELECTION carries it, then how many files do.
@@ -18707,9 +19334,19 @@ FloatingWindow {
           anchors.right: parent.right
           height: 34
 
+          Text {
+            anchors.centerIn: parent
+            visible: tagPick.gripe !== ""
+            text: tagPick.gripe
+            color: Zenon.red
+            font.family: Zenon.face
+            font.pixelSize: 14
+          }
+
           Row {
             anchors.centerIn: parent
             spacing: 12
+            visible: tagPick.gripe === ""
 
             Text {
               anchors.verticalCenter: parent.verticalCenter
@@ -18728,8 +19365,8 @@ FloatingWindow {
               // is documentation and documentation that lies is worse than
               // none.
               model: [["\u21b5", "tag"], ["\u21e7\u21b5", "tag & close"],
-                      ["\u2303\u21b5", "rename"], ["\u2191\u2193", "move"],
-                      ["del", "forget"], ["esc", "close"]]
+                      ["alt r", "rename"], ["\u2191\u2193", "move"],
+                      ["del", "remove"], ["esc", "close"]]
               delegate: Row {
                 required property var modelData
                 spacing: 5
@@ -20967,7 +21604,7 @@ FloatingWindow {
     // note on `tree`. Asked in three places and it must be the same
     // question in all of them.
     readonly property bool treed:
-      pane.viewMode === "list" && root.searchMode === ""
+      pane.viewMode === "list" && root.treeRealm
 
     function isOpen(path) { return pane.openDirs["k:" + String(path)] === true; }
 
@@ -20984,6 +21621,38 @@ FloatingWindow {
       const out = [];
       for (const k in pane.openDirs) out.push(k.slice(2));
       return out.slice(-pane.openCap);
+    }
+
+    // The open branches of every realm this pane has shown. Only the one
+    // on screen lives in openDirs; the rest wait here — see root.realmKey.
+    property var openSets: ({})
+    property string realmWas: "d"
+
+    // A named property, not a bare child: Pane is a QtObject and has no
+    // default property to put one in — the same shape Elastic uses for its
+    // timers.
+    readonly property Connections _realm: Connections {
+      target: root
+      function onRealmKeyChanged() {
+        // Put the outgoing realm's away before the incoming one's is laid
+        // out, so a pane that has never shown this realm starts closed
+        // rather than inheriting whatever was last on screen.
+        const store = Object.assign({}, pane.openSets);
+        store[pane.realmWas] = pane.openList();
+        pane.openSets = store;
+        pane.realmWas = root.realmKey;
+        pane.setOpenList(store[root.realmKey] || []);
+        // Rows may already be up — onRawChanged has been and gone — so the
+        // branches this set names need asking for now.
+        pane.primeOpen();
+      }
+    }
+
+    // What the SESSION remembers, which is the directory listing's tree and
+    // not whichever collection happened to be open when it was written.
+    function dirOpenList() {
+      return root.realmKey === "d" ? pane.openList()
+                                   : (pane.openSets["d"] || []);
     }
 
     function setOpenList(list) {
@@ -21068,7 +21737,16 @@ FloatingWindow {
       // The watch list is the open branches plus cwd — see root.watch.
       // Also the moment to try the branches again after a fallback.
       if (pane.active) { root.watchBare = false; root.watch(); }
-      if (want && !pane.kids["k:" + path]) pane.readKids(path);
+      // ── AND IT IS READ AGAIN, NOT REMEMBERED ─────────────────
+      // A closed branch is not in the watch list, so anything that
+      // happened inside it while it was shut went unseen: reopening drew
+      // the rows it held when you closed it. This only read a branch with
+      // NO rows cached, which after the first open is never true.
+      //
+      // Forced rather than dropped-and-refilled, for the reason
+      // rereadBranches gives: the rows it has stay up until the new ones
+      // arrive, so opening a branch you have seen before does not blink.
+      if (want) pane.readKids(path, true);
       if (land >= 0) { pane.sel = land; root.positionSel(); }
     }
 
@@ -21150,10 +21828,11 @@ FloatingWindow {
             const m = Object.assign({}, pane.kids);
             const fresh = Terminus.parseListing(kidOut.text, dir);
             m["k:" + dir] = fresh;
-            // Anything this branch used to hold and no longer does takes
-            // its own remembered branch with it — see dropGone.
-            pane.dropGone(m, dir, fresh);
             pane.kids = m;
+            // Anything this branch used to hold and no longer does takes
+            // its own remembered branch with it — see dropGone. One call:
+            // forgetVanished covers kids as well as openDirs and dirEmpty,
+            // so pruning `m` first was the same walk done twice.
             pane.forgetVanished(dir, fresh);
             // What just landed may itself hold branches that were open
             // when the session ended — see primeOpen.
@@ -21245,12 +21924,19 @@ FloatingWindow {
       }
     }
 
-    // A branch you have closed and reopened should show what is there NOW.
-    // Cheap: the read is one find over one directory.
-    function forgetKids(path) {
-      const m = Object.assign({}, pane.kids);
-      delete m["k:" + String(path)];
-      pane.kids = m;
+    // ── THE BRANCHES ACTUALLY ON SCREEN ──────────────────────────────
+    // Not openDirs, which deliberately keeps every folder ever opened so
+    // that walking back into one finds it as you left it — handing that
+    // whole set to a re-read would spawn a find per folder you have
+    // touched all session. The flattened rows are the ones being drawn,
+    // and they are the only ones whose staleness anybody can see.
+    function liveBranches() {
+      const out = [];
+      if (!pane.treed) return out;
+      const v = pane.tree;
+      for (let i = 0; i < v.length; ++i)
+        if (v[i].isDir && pane.isOpen(v[i].path)) out.push(v[i].path);
+      return out;
     }
 
     // ── THE FLATTEN, ROWS AND GUIDES IN ONE WALK ─────────────────────
@@ -21273,24 +21959,43 @@ FloatingWindow {
     readonly property var flat: {
       const base = pane.sorted;
       // A branch only means anything in the list. Columns view is already a
-      // tree by construction, a grid has nothing to indent, and a results
-      // page is not a directory to open anything inside of.
-      if (!pane.treed) return { rows: base, guide: null };
+      // tree by construction, a grid has nothing to indent, and find and
+      // grep are questions rather than directories — see root.treeRealm.
+      if (!pane.treed) return { rows: base, guide: null, depth: null };
       let any = false;
       for (const k in pane.openDirs) { any = true; break; }
-      if (!any) return { rows: base, guide: null };
+      if (!any) return { rows: base, guide: null, depth: null };
 
       const out = [];
+      const lvl = [];
       const g = ({});
+      // ── DEPTH COMES FROM HERE, NOT FROM THE PATH ─────────────────
+      // depthOf used to count separators between the row and cwd, which is
+      // the right answer only when every row IS in cwd. A collection's
+      // rows come from all over, so that reading indented every result by
+      // how deep it happened to live on disk. The walk knows the real
+      // answer — how many branches it opened to get here — and it is the
+      // same number in a directory listing, so there is one rule now
+      // rather than two.
+      const dp = ({});
+      // Paths reached by opening a branch, as opposed to being in the
+      // listing to begin with. Only a collection can have both.
+      const under = ({});
+
       const walk = (rows, d, anc) => {
         const n = rows.length;
         for (let i = 0; i < n; ++i) {
           const r = rows[i];
           const mine = (i === n - 1) ? anc : (anc | (1 << d));
           out.push(r);
+          lvl.push(d);
           // Top-level rows have no column to the left of them to be joined
           // to, so a flat listing is drawn exactly as it was.
-          if (d > 0) g["k:" + r.path] = mine;
+          if (d > 0) {
+            g["k:" + r.path] = mine;
+            dp["k:" + r.path] = d;
+            under["k:" + r.path] = true;
+          }
           if (d >= 8) continue;          // a guard, not a feature
           if (!r.isDir || !pane.isOpen(r.path)) continue;
           const raw = pane.kids["k:" + r.path];
@@ -21303,7 +22008,25 @@ FloatingWindow {
         }
       };
       walk(base, 0, 0);
-      return { rows: out, guide: g };
+
+      // ── A PATH CAN BE IN THE LIST TWICE ──────────────────────────
+      // Only in a collection, and it is not a corner case: Recents can
+      // easily hold both ~/.config and ~/.config/quickshell. Open the
+      // first and the second is drawn under it AND still sitting at the
+      // top level, the same file in two places, each with its own idea of
+      // how deep it is.
+      //
+      // The nested one wins, because it is the one carrying context. A
+      // directory listing cannot produce this — its rows are all siblings
+      // in cwd and everything spliced in is strictly deeper — so the pass
+      // is skipped there rather than run to find nothing.
+      if (root.searchMode === "")
+        return { rows: out, guide: g, depth: dp };
+      const once = [];
+      for (let i = 0; i < out.length; ++i)
+        if (!(lvl[i] === 0 && under["k:" + out[i].path] === true))
+          once.push(out[i]);
+      return { rows: once, guide: g, depth: dp };
     }
 
     readonly property var tree: pane.flat.rows
@@ -21317,27 +22040,27 @@ FloatingWindow {
       return m === undefined ? -1 : m;
     }
 
-    // HOW DEEP A ROW SITS, worked out from the path rather than stamped on
-    // the row during the flatten. A row object is shared with the caches
-    // and with the other pane, so writing a depth onto it would be one
-    // listing's layout leaking into another's; the path already carries the
-    // answer exactly.
+    // HOW DEEP A ROW SITS. Read off the flatten, which counted the
+    // branches it opened to get there, rather than measured off the path.
+    //
+    // It used to count separators between the row and cwd. That is the
+    // right answer only when every row IS in cwd, and it is why a tree was
+    // switched off in a collection entirely: those rows come from all over,
+    // so Recents indented every result by how deep it happened to live on
+    // disk — lua files under .config/hypr/lua sat three levels in, under
+    // nothing. The walk's own count is right on both kinds of page.
+    //
+    // A SIDE TABLE, not a field on the row. The objection to stamping it
+    // has not changed: a row object is shared with the caches and with the
+    // other pane, and one listing's layout must not leak into another's.
+    // Absent means top level, which is also the answer for every row when
+    // nothing is expanded.
     function depthOf(path) {
-      // ── NOT IN A RESULTS PAGE ──────────────────────────────────────
-      // This measures a path against the directory being listed, which
-      // is the right answer only when every row IS in that directory.
-      // A collection's rows come from all over the tree, so Recents
-      // indented every result by how deep it happened to live — lua
-      // files under .config/hypr/lua sat three levels in, under nothing.
       if (!pane.treed) return 0;
-      const c = pane.cwd;
-      const p = String(path || "");
-      if (c === "" || p.indexOf(c) !== 0) return 0;
-      // "/" is its own parent: everything under it is already one deeper.
-      const rest = p.slice(c === "/" ? 1 : c.length + 1);
-      let n = 0;
-      for (let i = 0; i < rest.length; ++i) if (rest.charCodeAt(i) === 47) ++n;
-      return n;
+      const m = pane.flat.depth;
+      if (!m) return 0;
+      const d = m["k:" + String(path)];
+      return d === undefined ? 0 : d;
     }
 
     readonly property var view: Terminus.filterQuery(pane.tree, pane.query)
@@ -21437,6 +22160,8 @@ FloatingWindow {
       // rows on screen, so it is asked again when they change — debounced,
       // because expanding a branch changes them twice in quick succession.
       if (pane.active) emptyDelay.restart();
+      // And which of them still need measuring — see usageDelay.
+      if (pane.active && root.usage) usageDelay.restart();
       // The rows under the cursor are new ones, so what the preview is OF has
       // changed even when the cursor itself has not moved.
       if (pane.active && pane.viewMode === "columns") root.refreshPreview();
@@ -21683,7 +22408,7 @@ FloatingWindow {
       depth: plist.pane.depthOf(cell.path)
       guide: plist.pane.guideOf(cell.path)
       inTree: plist.pane.treed
-      branch: !!cell.row && cell.row.isDir && root.searchMode === ""
+      branch: !!cell.row && cell.row.isDir && root.treeRealm
       expanded: plist.pane.isOpen(cell.path)
       hollow: root.dirEmpty[cell.path] === true
       onToggled: {
@@ -21887,9 +22612,9 @@ FloatingWindow {
       }
     }
 
+    // The same pair as a row, and the same fix — see EntryRow.cursorOnly.
     readonly property bool cursorOnly:
-      tile.current
-        && (tile.passive || (!tile.ticked && root.markedCount > 0))
+      tile.current && (tile.passive || root.markedCount > 0)
 
     // As the list's rows do — see EntryRow.tagList.
     readonly property var tagList: {
@@ -21935,7 +22660,7 @@ FloatingWindow {
       // between tiles. The tick stays, because a tick is a property of the
       // FILE rather than of where the cursor happens to be — and the border
       // below stays too, because a tile has always carried one.
-      color: tile.ticked && !tile.cursorOnly
+      color: tile.ticked
         ? Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b, 0.10)
         : "transparent"
       // ── THE OUTLINE MOVED TO THE CURSOR ITSELF ────────────────
@@ -21953,7 +22678,9 @@ FloatingWindow {
       // under the cursor.
       border.width: (tile.current && tile.cursorOnly) || tile.glow > 0
         ? 1 + tile.glow * 2 : 0
-      border.color: tile.glow > 0 ? Zenon.cyan : Zenon.msgBorder
+      // As a row's — see EntryRow's border.
+      border.color: (tile.glow > 0 || !tile.passive)
+        ? Zenon.cyan : Zenon.msgBorder
 
       // the flare itself, over the tile's own fill
       Rectangle {
@@ -22106,7 +22833,7 @@ FloatingWindow {
         text: tile.entry ? tile.entry.glyph : ""
         color: root.inkFor(tile.entry)
         font.family: Zenon.face
-        font.pixelSize: Math.round(40 * tile.tileZoom)
+        font.pixelSize: Math.round(64 * tile.tileZoom)
       }
 
       // ── the tags, in the picture's corner ──────────────────────
@@ -22188,7 +22915,7 @@ FloatingWindow {
       // zooming in to inspect an image blew its name up to a headline.
       // The 62px the tile reserves for this text is a constant too, so
       // two lines always fit at every zoom.
-      font.pixelSize: 16
+      font.pixelSize: 14
     }
 
     // ── renaming, on the tile ───────────────────────────────────────
@@ -22222,7 +22949,9 @@ FloatingWindow {
       selectedTextColor: Zenon.white
       font.family: Zenon.face
       font.weight: Font.Bold
-      font.pixelSize: 16
+      // Whatever tileName is: a name that changed size the moment you
+      // started renaming it would be jumping under the cursor.
+      font.pixelSize: 14
       clip: true
 
       cursorDelegate: Rectangle {
@@ -22703,9 +23432,20 @@ FloatingWindow {
     // was reported as.
     property bool passive: false
 
+    // ── TICKED AND THE CURSOR ARE TWO FACTS, NOT A CHOICE ─────────
+    // This carried `!ticked`, on the reading that a ticked row is already
+    // marked out and does not need the outline too. It does: the tick is
+    // what every OTHER ticked row is wearing. With things selected the
+    // SelectBar stands down, so a cursor sitting on one of them had the
+    // bar off and the outline suppressed, and the row was indistinguishable
+    // from its neighbours — select all and the cursor is simply not there.
+    // (A 3px tick survives in the left gutter, outside the row, which is
+    // not something anybody finds.)
+    //
+    // So the two are drawn independently now: the fill says "selected" and
+    // the outline says "and you are standing here".
     readonly property bool cursorOnly:
-      entryRow.current
-        && (entryRow.passive || (!entryRow.ticked && root.markedCount > 0))
+      entryRow.current && (entryRow.passive || root.markedCount > 0)
 
     // THE ROW'S TAGS, CAPPED. A map lookup by path, exactly as the git
     // gutter does it — no field on the row object, because the note above
@@ -22781,7 +23521,7 @@ FloatingWindow {
       // rectangle that slides between rows; a fill here is a mark that can
       // only blink. What is left is the tick, which is a property of the ROW
       // rather than of where the cursor happens to be, so it stays with it.
-      color: entryRow.ticked && !entryRow.cursorOnly
+      color: entryRow.ticked
         ? Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b, 0.10)
         : "transparent"
 
@@ -22819,9 +23559,14 @@ FloatingWindow {
         easing.type: Easing.OutCubic
       }
 
-      // the outline that replaces the fill
+      // ── THE OUTLINE THAT REPLACES THE BAR ────────────────────
+      // In the window's own cyan on the pane you are keying, because
+      // that is what the SelectBar it stands in for is drawn in, and a
+      // muted grey over a cyan-tinted tick read as one more row
+      // separator. On the PASSIVE pane it stays muted on purpose: that
+      // cursor is a memory of where you were, not where you are.
       border.width: entryRow.cursorOnly ? 1 : 0
-      border.color: Zenon.msgBorder
+      border.color: entryRow.passive ? Zenon.msgBorder : Zenon.cyan
     }
 
     // Still tracked, for the drag box: whether the pointer is ON a row is what
@@ -22907,29 +23652,16 @@ FloatingWindow {
       radius: 4
     }
 
-    // THE CURSOR'S BAR, AND ONLY WHILE THERE IS A SELECTION TO READ.
+    // NO SEPARATE CURSOR TICK IN THE GUTTER. A 3px bar used to sit here to
+    // say where the cursor was among checked rows, because the row itself
+    // could not: its outline was suppressed whenever the cursor landed on a
+    // row that was itself checked, which left the tick as the only mark and
+    // a 3px mark outside the row is not one anybody finds. The outline is
+    // drawn in every one of those states now — see cursorOnly — so the
+    // gutter bar was the same answer given twice, and the quieter of the two.
     //
-    // Two marks, two jobs: the tint above says WHICH ROWS ARE CHECKED and is
-    // painted on every one of them, and this says WHERE THE CURSOR IS among
-    // them. That second job only exists once the tint is on more than one
-    // row — with nothing checked the cursor is already the SelectBar sliding
-    // behind the row, and a second mark for it is a mark that answers a
-    // question nobody asked.
-    Rectangle {
-      anchors.left: parent.left
-      anchors.verticalCenter: parent.verticalCenter
-      width: 3
-      height: parent.height - 8
-      radius: 2
-      // NO FADE. The bar is only ever on screen while a selection is, so
-      // "animate except during multi-select" and "never animate" are the
-      // same rule — and eased, it spent every step of a held direction key
-      // fading out of the row the cursor had already left.
-      visible: entryRow.current
-               && (root.markedCount > 0 || root.visualOn)
-      color: Zenon.cyan
-    }
-
+    // Every case is still covered: nothing checked and the pane active is
+    // the SelectBar; anything checked, or the passive pane, is the outline.
 
     Row {
       anchors.fill: parent
@@ -23090,19 +23822,16 @@ FloatingWindow {
 
           Item {
             id: entryChev
-            // ── EVERY SUB DIRECTORY, EMPTY OR NOT ─────────────────
-            // A directory known to hold nothing is still drawn inside the
-            // tree. It was hidden while this was a disclosure triangle,
-            // because a triangle promises something to disclose — but a
-            // node marker promises only that this is a folder, and a
-            // nested folder with no marker at all reads as a file sitting
-            // at the end of the line. At the TOP level there is no line to
-            // read it against, so an empty folder there stays bare.
+            // Hidden for a directory KNOWN to be empty — see root.dirEmpty
+            // — at every depth. It was briefly shown on nested ones, on the
+            // theory that a folder with no marker reads as a file; it does
+            // not, because the guide line already says where it sits and
+            // the folder glyph already says what it is. A marker that
+            // discloses nothing is the thing worth removing.
             //
             // The strip keeps its width either way, so a name never moves
             // when the answer arrives.
-            visible: entryRow.branch
-              && (entryRow.depth > 0 || !entryRow.hollow)
+            visible: entryRow.branch && !entryRow.hollow
             anchors.right: parent.right
             anchors.verticalCenter: parent.verticalCenter
             width: root.treeArrowW
@@ -23121,41 +23850,22 @@ FloatingWindow {
             // chart. F111 is F10C's own filled twin, so the two share
             // their metrics and the marker cannot shift when it opens.
             //
-            // ── AND IT FILLS IN RATHER THAN SWITCHING ────────────
-            // The triangle this replaced TURNED, which was an animation;
-            // two glyphs swapped outright is not, and losing it made
-            // opening a branch feel like a hard cut. Both are drawn and
-            // crossfaded, so the ring reads as filling from the middle.
-            //
-            // A BINDING, never assigned, which is what makes this safe
-            // under reuseItems: a recycled delegate re-evaluates it and
-            // cannot strand a half-faded opacity the way the old add
-            // transition did — see the note on arrival animations below.
-            // Worst case a recycled row crossfades once while it is being
-            // scrolled into place, at Zenon.fast.
-            Repeater {
-              model: 2
-              delegate: Text {
-                required property int index
-                readonly property bool lit: (index === 1) === entryRow.expanded
-                anchors.centerIn: parent
-                width: root.treeArrowW
-                horizontalAlignment: Text.AlignHCenter
-                text: index === 1 ? "\uf111" : "\uf10c"
-                // ONE COLOUR. The fill is the state; brightening it as
-                // well said the same thing twice and made an open
-                // branch's marker compete with the name beside it.
-                color: Zenon.muted
-                opacity: lit ? 1 : 0
-                Behavior on opacity {
-                  NumberAnimation {
-                    duration: Zenon.fast
-                    easing.type: Zenon.ease
-                  }
-                }
-                font.family: Zenon.faceMono
-                font.pixelSize: Math.round(14 * root.zoom)
-              }
+            // NO CROSSFADE BETWEEN THEM, tried and dropped: at fourteen
+            // pixels the two rings differ by a few pixels of fill and
+            // fading one into the other is motion nobody can see. The
+            // turn the triangle used to do was worth animating because
+            // it swept a whole glyph; this does not.
+            Text {
+              anchors.centerIn: parent
+              width: root.treeArrowW
+              horizontalAlignment: Text.AlignHCenter
+              text: entryRow.expanded ? "\uf111" : "\uf10c"
+              // ONE COLOUR. The fill is the state; brightening it as well
+              // said the same thing twice and made an open branch's
+              // marker compete with the name beside it.
+              color: Zenon.muted
+              font.family: Zenon.faceMono
+              font.pixelSize: Math.round(14 * root.zoom)
             }
           }
 
@@ -24119,7 +24829,7 @@ FloatingWindow {
     // along; a collection you leave for somewhere unlisted has nothing to
     // hand it to.
     onActiveChanged: {
-      if (sideRow.active) root.sideAt = sideRow;
+      if (sideRow.active) { root.armSideSlide(); root.sideAt = sideRow; }
       else if (root.sideAt === sideRow) root.sideAt = null;
     }
     Component.onCompleted: if (sideRow.active) root.sideAt = sideRow
@@ -26986,6 +27696,40 @@ FloatingWindow {
           text: "no preview available"
           color: Zenon.yellow
           font.family: Zenon.face
+          font.pixelSize: 15
+        }
+
+        // ── AND AN EMPTY DIRECTORY SAYS SO ─────────────────────────────
+        // A directory with nothing in it drew nothing at all: its listing
+        // has no rows, and "no preview available" is suppressed for
+        // folders because the listing IS the preview. The card came up
+        // blank, which reads as still loading rather than as an answer.
+        //
+        // ANSWERED, not merely absent, and that is the whole of the
+        // condition. previewShown is the path the preview currently on
+        // screen is ABOUT, so this waits until the reply is about THIS
+        // folder — dirRows is empty during the fetch too, and saying
+        // "empty" then would be the same wrong sentence one beat early.
+        //
+        // Muted rather than the yellow above: that one is an answer about
+        // what terminus cannot do, and this is a fact about the directory.
+        Text {
+          anchors.top: parent.top
+          anchors.left: parent.left
+          anchors.right: parent.right
+          anchors.bottom: lookCap.top
+          visible: look.folder && !look.reading && !!look.row
+                   && root.previewShown === look.row.path
+                   && look.dirRows.length === 0
+          horizontalAlignment: Text.AlignHCenter
+          verticalAlignment: Text.AlignVCenter
+          // The same word, ink and weight the LISTING uses for an empty
+          // directory — see the "Empty" label over the rows. One answer
+          // said one way, wherever you happen to be looking at it from.
+          text: "Empty"
+          color: Zenon.muted
+          font.family: Zenon.face
+          font.weight: Font.Bold
           font.pixelSize: 15
         }
 

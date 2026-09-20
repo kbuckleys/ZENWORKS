@@ -2784,18 +2784,6 @@ function expandPath(text, home, cwd) {
 // hit like "dwn" for Downloads has no prefix to agree on, and spelling one out
 // would suggest something that does not exist. Tab takes the whole candidate
 // in that case; see the path bar.
-function completePrefix(hits, frag) {
-  if (!hits || hits.length === 0) return "";
-  const f = String(frag || "");
-  const lf = f.toLowerCase();
-  if (hits[0].toLowerCase().indexOf(lf) !== 0) return "";
-  const pre = [];
-  for (const h of hits) {
-    if (h.toLowerCase().indexOf(lf) === 0) pre.push(h);
-  }
-  return commonPrefix(pre);
-}
-
 // How far every candidate agrees, so Tab can fill in the part that is not yet
 // a choice — the shell behaviour: two directories sharing six letters means
 // Tab types those six and stops rather than picking one for you.

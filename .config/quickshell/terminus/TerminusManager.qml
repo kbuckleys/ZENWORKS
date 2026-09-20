@@ -444,7 +444,7 @@ Scope {
         for (let i = 0; i < all.length; ++i) {
           if (all[i].name.toLowerCase() === name.toLowerCase()) {
             w.shown = true;
-            w.openCollection(all[i].id);
+            w.goToCollection(all[i].id);
             return "ok";
           }
         }

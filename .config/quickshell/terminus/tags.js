@@ -72,13 +72,7 @@ var DEFAULT_VIEW = "list";
 //
 // --absolute-names because getfattr strips the leading slash otherwise, and
 // a path-keyed map with no leading slash matches nothing we look up.
-function readTagsCommand(paths) {
-  if (!paths || paths.length === 0) return "true";
-  var quoted = paths.map(function (p) { return Strings.shellQuote(p); });
-  return "getfattr --absolute-names -n " + ATTR
-    + " -- " + quoted.join(" ") + " 2>/dev/null || true";
-}
-
+//
 // The whole tree in one pass, which is how the index is built. -h so a
 // symlink is asked about ITSELF rather than about what it points at: tagging
 // a link and tagging its target are two different acts, and following here
