@@ -334,6 +334,50 @@ function extensionOf(name) {
   return n.slice(cut + 1).toLowerCase();
 }
 
+// ── WHEN THE EXTENSION IS NOT IN THE TABLE ───────────────────────────────
+// A KIND is a coarser question than an extension and it has an answer for
+// everything: terminus already decides that .crw is an image on its way to
+// deciding whether to thumbnail it, and once that is known the picture glyph
+// is right whether or not anyone has written a line for .crw.
+//
+// Which matters because EXTS is a list of extensions somebody thought of, and
+// the list of image formats is not. Forty-one of the ones terminus recognises
+// had no line here — the camera raws, the HEIF family, the old raster formats
+// — and every one of them drew the SAME blank page as a file type nothing has
+// ever heard of, sitting in a folder beside a .cr2 that drew a picture.
+//
+// EACH ENTRY IS READ OUT OF THE TABLE RATHER THAN WRITTEN TWICE. There is
+// exactly one image glyph, one video glyph and so on — verified across the
+// tables, not assumed — so the fallback for a kind can simply BE the glyph its
+// commonest member already uses, and cannot drift away from it later.
+//
+// Archives are the one kind with two glyphs: zip and 7z carry a box of their
+// own and everything else the general one, which is the one to fall back to.
+// Documents and text are not uniform either, for the same sort of reason, and
+// take the generic member of each.
+//
+// No entry for "file" or "other". A thing with no kind is exactly what the
+// plain page is for, and giving it one would be inventing a claim.
+const KIND = {
+  image:    EXTS["png"],
+  video:    EXTS["mp4"],
+  audio:    EXTS["mp3"],
+  archive:  EXTS["tar"],
+  document: EXTS["docx"],
+  text:     EXTS["txt"],
+  font:     EXTS["ttf"]
+};
+
+function kindGlyph(kind) {
+  const g = KIND[kind];
+  return g === undefined ? "" : g;
+}
+
+// Whether glyphFor fell all the way through — i.e. whether the caller has
+// anything to gain by asking kindGlyph. Asked rather than compared against a
+// literal, so the plain page can be changed in one place.
+function isPlain(glyph) { return glyph === CONDS["!dir"]; }
+
 // The glyph for one entry, or "" when nothing claims it — which the caller
 // draws as the plain page CONDS["!dir"] carries.
 function glyphFor(entry) {

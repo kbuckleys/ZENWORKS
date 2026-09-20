@@ -93,22 +93,46 @@ CardMenu {
   // A submenu hangs off its own row of the card above it; the root menu opens
   // UPWARD out of the bar, which is what it has under it. CardMenu clamps
   // either one into the screen, and flips a submenu that will not fit.
-  // The pill's own top edge, which is what the menu has to clear. srcPos.y is
-  // the ICON's top, and an icon is centred in the pill — so opening upward
-  // from there buried the menu's bottom edge inside the bar instead of
-  // standing it on top of it.
-  readonly property real barTop: {
+  // ── THE PILL'S EDGES, WHICH ARE NOT THE WINDOW'S ──────────────────────
+  // What the menu has to clear is the PILL. srcPos.y is the ICON's top, and
+  // an icon is centred in the pill — so opening upward from there buried the
+  // menu's bottom edge inside the bar instead of standing it on top of it.
+  //
+  // It read the WINDOW's top edge instead, which was right only while the
+  // bar was a surface the size of the pill. It is a full-output surface now
+  // — see the note on the bar's exclusiveZone, and the rule about never
+  // resizing a layer surface — so the window's top edge is the SCREEN's top
+  // edge, the menu was placed at 0 minus its own height, and the clamp put
+  // it against the top of the screen. That is the whole bug.
+  //
+  // bg.y, published by the bar as pillY, is where the pill actually is, and
+  // it already knows which edge the bar lives on. Added to the window's
+  // origin rather than used bare, so this stays correct if the surface ever
+  // stops being the whole output.
+  readonly property real pillTop: {
     if (!root.srcWin || !root.screen) return 0;
-    return Zenon.winOrigin(root.srcWin, root.screen).y;
+    const o = Zenon.winOrigin(root.srcWin, root.screen);
+    const py = root.srcWin.pillY === undefined ? 0 : root.srcWin.pillY;
+    return o.y + py;
   }
+
+  readonly property real pillBottom:
+    root.pillTop + ((root.srcWin && root.srcWin.pillHeight) || 0)
 
   at: root.isSubMenu
     ? Qt.point(root.parentMenu.cardX + root.parentMenu.cardWidth,
                root.parentMenu.cardY + root.parentMenu.rowY(root.parentRow))
-    // Left edge on the ICON it came from, bottom edge on the PILL it stands
+    // Left edge on the ICON it came from, near edge on the PILL it stands
     // on. Anything else and the menu belongs to the bar rather than to the
     // thing you clicked.
-    : Qt.point(root.srcPos.x, root.barTop - root.contentH)
+    //
+    // WHICH WAY IT OPENS FOLLOWS THE BAR. Upward out of a bottom bar, and
+    // downward out of a top one — the same single boolean every other layer
+    // reads, because a menu still opening upward from a bar at the top would
+    // be opening into the screen edge.
+    : Qt.point(root.srcPos.x,
+        Zenon.barTop ? root.pillBottom : root.pillTop - root.contentH)
+
 
   hinged: root.isSubMenu
   flipFrom: root.isSubMenu

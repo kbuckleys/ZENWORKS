@@ -36,6 +36,16 @@ function dir() {
 // fallback to an 8MB original, so the larger number is the cheaper mistake.
 const SIZE = 480;
 
+// ── AND ONE SIZE UP, FOR WHEN SOMEBODY IS LOOKING PROPERLY ──────────────
+// The preview pane follows the cursor, so what it shows has to be cheap —
+// 480 is that. Quick look is ASKED for, one file at a time, which is the
+// moment a soft picture stops being acceptable.
+//
+// It is only ever wanted for a file Qt cannot open itself: an ordinary png
+// is handed to Qt directly at whatever size the pane wants, and rendering a
+// second copy of it here would be work for nothing.
+const BIG = 1600;
+
 // path | size | mtime, hashed. Size and mtime together are what makes replacing
 // a picture with a different one of the same name a different cache entry —
 // which is what lets both sides leave Qt's image cache on, since a changed file
@@ -70,23 +80,28 @@ function keyScript() {
 // seek — writes nothing and is not reported, which is how the caller knows to
 // keep showing its glyph rather than pointing an Image at a path that was never
 // written.
-function generate(jobs) {
+// `big` asks for the BIG size under a name of its own, so the two live in
+// the cache side by side: the pane keeps showing its cheap copy while quick
+// look renders the better one, and neither invalidates the other.
+function generate(jobs, big) {
   if (!jobs || jobs.length === 0) return "";
   const d = Strings.shellQuote(dir());
+  const px = big ? BIG : SIZE;
+  const tail = big ? "@big" : "";
   const args = jobs.map((j) => j.kind + " " + Strings.shellQuote(j.src)).join("\n");
   return "mkdir -p " + d + "; printf '%s\n' " + Strings.shellQuote(args)
     + " | xargs -P 4 -L 1 sh -c '"
     + keyScript()
-    + 'out=' + d + '/$key.png; '
+    + 'out=' + d + '/$key' + tail + '.png; '
     + 'if [ ! -s "$out" ]; then '
     + 'if [ "$0" = v ]; then '
     + 'ffmpeg -nostdin -loglevel quiet -ss 1 -i "$1" -frames:v 1 '
-    + '-vf scale=' + SIZE + ':-1 -y "$out"; '
+    + '-vf scale=' + px + ':-1 -y "$out"; '
     + 'elif [ "$0" = a ]; then '
     + 'ffmpeg -nostdin -loglevel quiet -i "$1" -an -frames:v 1 '
-    + '-vf scale=' + SIZE + ':-1 -y "$out"; '
+    + '-vf scale=' + px + ':-1 -y "$out"; '
     + 'else '
-    + 'magick "$1"[0] -auto-orient -thumbnail ' + SIZE + 'x' + SIZE + ' -strip "$out"; '
+    + 'magick "$1"[0] -auto-orient -thumbnail ' + px + 'x' + px + ' -strip "$out"; '
     + 'fi; fi; '
     + 'test -s "$out" && printf "%s\t%s\n" "$1" "$out"'
     + "' 2>/dev/null";
