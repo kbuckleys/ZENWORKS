@@ -29,6 +29,8 @@
 // way to tell a lone \037 from a stray space.
 const FIELD = "\u001f";
 const RECORD = "\u001e";
+// One level down from RECORD, for a record that carries more than a name.
+const UNIT = "\u001f";
 
 // The one -printf format, shared by the listing and by the search results, so
 // the two cannot drift into producing rows of different shapes. Kept as the
@@ -1311,6 +1313,32 @@ function freeName(rows, base) {
   return base + " " + Date.now();
 }
 
+// Like freeName, but it keeps the extension where a reader expects it:
+// "report.pdf" becomes "report (1).pdf" rather than "report.pdf 2". The
+// bracketed form is the one Keep both already writes on a paste, so a name
+// made here and a name made there are the same shape.
+//
+// Last dot, which is the ordinary rule and the one the rename field itself
+// works by. An archive's ".tar.zst" is the known exception — see
+// archiveTargetCommand, which is handed its extension for exactly that
+// reason — and is not what this is for.
+function freeNameKeeping(rows, name) {
+  const taken = {};
+  for (let i = 0; i < rows.length; ++i) taken[rows[i].name] = true;
+  if (!taken[name]) return name;
+  const dot = name.lastIndexOf(".");
+  // A LEADING dot is the whole name of a hidden file, not an extension:
+  // ".zshrc" must not become " (1).zshrc".
+  const cut = dot > 0 ? dot : name.length;
+  const stem = name.slice(0, cut);
+  const ext = name.slice(cut);
+  for (let i = 1; i < 1000; ++i) {
+    const n = stem + " (" + i + ")" + ext;
+    if (!taken[n]) return n;
+  }
+  return stem + " " + Date.now() + ext;
+}
+
 function createCommand(dir, name) {
   const target = joinPath(dir, name.replace(/\/+$/, ""));
   if (/\/$/.test(name)) return "mkdir -p -- " + Strings.shellQuote(target);
@@ -1357,10 +1385,34 @@ function mkdirCommand(dir, name) {
   return "mkdir -p -- " + Strings.shellQuote(joinPath(dir, name));
 }
 
+// Make the folder and move the selection into it, in that order and in one
+// shell — see gatherIntoFolder for why it cannot be two commands. `&&` so
+// nothing is moved if the directory could not be made, and -- before the
+// paths because a file called -r is still a file.
+function gatherCommand(dir, name, paths) {
+  const dest = Strings.shellQuote(joinPath(dir, name));
+  return "mkdir -p -- " + dest + " && mv -- "
+    + paths.map(function (p) { return Strings.shellQuote(p); }).join(" ")
+    + " " + dest + "/";
+}
+
 // -T so a rename onto an existing DIRECTORY fails loudly instead of quietly
 // moving the source inside it, which is mv's default and is never what a
 // rename meant.
+//
+// AND A GUARD IN FRONT OF IT, because -T does not help with a FILE: mv
+// replaces one without a word, and a rename is not a request to destroy
+// anything. The caller asks first from the listing it already has — see
+// commitRename — and this is what catches the gap between that listing and
+// the disk. renameOverCommand is the answer to the question, and the only
+// way to get the overwrite.
 function renameCommand(path, newName) {
+  const dst = Strings.shellQuote(joinPath(dirname(path), newName));
+  return "[ -e " + dst + " ] && { echo 'already exists' >&2; exit 1; }; "
+    + renameOverCommand(path, newName);
+}
+
+function renameOverCommand(path, newName) {
   return "mv -T -- " + Strings.shellQuote(path) + " "
     + Strings.shellQuote(joinPath(dirname(path), newName));
 }
@@ -1682,9 +1734,18 @@ function urlFallbackName(url) {
 
 function conflictCommand(names, destDir) {
   const d = Strings.shellQuote(destDir);
-  const tests = names.map((n) =>
-    "[ -e " + d + "/" + Strings.shellQuote(n) + " ] && printf '%s\\036' "
-    + Strings.shellQuote(n));
+  // ── AND WHETHER IT IS A DIRECTORY ───────────────────────────────────
+  // Because the answer to a clash is not the same word for both. rsync
+  // -a MERGES a directory into one of the same name — the destination's
+  // other contents are left exactly where they were, verified with two
+  // trees and a file only the destination had — so "Overwrite" is what
+  // happens to a file and never what happens to a folder. The scan says
+  // which it is, and the card can then use the word that is true.
+  const tests = names.map((n) => {
+    const q = Strings.shellQuote(n);
+    return "[ -e " + d + "/" + q + " ] && printf '%s\\037%s\\036' " + q
+      + " \"$([ -d " + d + "/" + q + " ] && echo d || echo f)\"";
+  });
   return tests.join("; ") + "; true";
 }
 
@@ -1711,6 +1772,18 @@ function archiveTargetCommand(destDir, name, ext) {
 
 function parseConflicts(text) {
   return String(text || "").split(RECORD).filter((s) => s !== "");
+}
+
+// conflictCommand's own reader: [{ name, isDir }]. Separate from
+// parseConflicts, which reads archiveTargetCommand's two bare fields and
+// must go on seeing plain strings.
+function parseClashes(text) {
+  return String(text || "").split(RECORD)
+    .filter(function (s) { return s !== ""; })
+    .map(function (s) {
+      const bits = s.split(UNIT);
+      return { name: bits[0], isDir: bits[1] === "d" };
+    });
 }
 
 // chmod, from nine booleans. Octal because that is what chmod takes and what

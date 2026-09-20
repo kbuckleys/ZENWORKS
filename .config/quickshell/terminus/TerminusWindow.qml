@@ -251,6 +251,11 @@ FloatingWindow {
   property real nowSec: Math.floor(Date.now() / 1000)
   property bool sortDesc: false
   readonly property int sel: root.act.sel
+
+  // Whether the menu on screen is the one the hamburger opened, so the
+  // button can light up while its own card is up and not while a row's is.
+  property bool burgerOn: false
+
   // path -> true. A map rather than a list so a row can ask about itself in
   // constant time while the list is being drawn.
   readonly property var marked: root.act.marked
@@ -4463,7 +4468,8 @@ FloatingWindow {
               [", !", "reverse"],
               ["V", "view: columns · list · grid"], ["+ / -", "zoom"],
               ["ctrl 0", "reset zoom"]]],
-    ["go", [["g space", "go to\u2026 (tab completes)"],
+    ["go", [["g r", "the directory a row actually lives in"],
+            ["g space", "go to\u2026 (tab completes)"],
             ["g h", "home"], ["g c", "config"], ["g d", "downloads"],
             ["g D", "documents"], ["g p", "pictures"], ["g v", "videos"],
             ["g t", "trash"], ["g m", "media"], ["g /", "root"]]],
@@ -4579,6 +4585,7 @@ FloatingWindow {
       ["collapse all",      "",        () => root.collapseAll()],
       ["paste",             "p",       () => root.paste()],
       ["new file or folder", "a",      () => root.beginCreate()],
+      ["new directory with selection", "c g", () => root.gatherIntoFolder()],
       ["trash",             "d",       () => root.trash()],
       ["delete for good",   "D",       () => root.deleteForever()],
       ["undo",              "u",       () => root.undo()],
@@ -4601,6 +4608,7 @@ FloatingWindow {
         if (root.collOpenId >= 0) collEdit.ask(root.collOpenId);
         else root.warn("open a collection first");
       }],
+      ["go to containing directory", "g r", () => root.reveal()],
       ["reindex tags",      "",        () => root.rebuildTagIndex()],
       ["new tab",           "t",       () => root.newTab()],
       ["close tab",         "ctrl c",  () => root.closeTab()],
@@ -5120,7 +5128,7 @@ FloatingWindow {
           const rows = Terminus.archiveTree(t);
           for (const e of rows) {
             e.ink = e.more ? Zenon.muted : root.inkOf(e);
-            e.glyph = e.more ? "" : Icons.glyphFor(e);
+            e.glyph = e.more ? "" : root.glyphOf(e);
           }
           root.previewTree = rows;
           root.previewRows = [];
@@ -5502,10 +5510,33 @@ FloatingWindow {
     return Zenon.white;
   }
 
+  // ── THE GLYPH, WITH THE KIND BEHIND IT ────────────────────────────────
+  // Icons.glyphFor answers from a table of extensions somebody wrote down,
+  // and the set of image formats is not a set anybody finishes writing down:
+  // forty-one of the ones this window already calls images had no line in it
+  // and drew the plain page — the same mark a file type nothing recognises
+  // gets, beside a .cr2 drawing a picture.
+  //
+  // So when the table has nothing, the KIND answers instead. This window has
+  // already worked the kind out for the sort and the colour, and it is the
+  // one place that knows it — Icons is shared with artemis and has no
+  // opinion about what counts as an image.
+  //
+  // Fonts are asked for separately because kindOf folds them into
+  // "document": right for sorting, where a .ttf belongs among the things you
+  // open rather than the things you play, and wrong here, where they have a
+  // glyph of their own.
+  function glyphOf(r) {
+    const g = Icons.glyphFor(r);
+    if (!Icons.isPlain(g)) return g;
+    const kind = Terminus.isFont(r.name) ? "font" : Terminus.kindOf(r.name);
+    return Icons.kindGlyph(kind) || g;
+  }
+
   function enrich(rows) {
     for (const r of rows) {
       r.ink = root.inkOf(r);
-      r.glyph = Icons.glyphFor(r);
+      r.glyph = root.glyphOf(r);
       // The metadata cells USED to be computed here as well — kind, the
       // relative time and the size string. They are not any more; see kindOf
       // below. ink and glyph stay, because every view draws those for every
@@ -5971,6 +6002,38 @@ FloatingWindow {
     root.enter(path);
   }
 
+  // ── WHERE IT ACTUALLY LIVES ─────────────────────────────────────────────
+  // Finder's ⌘R, and this window needs it more than Finder does. A tag
+  // page, a collection, Recents, a find and a grep are all lists of files
+  // drawn from everywhere at once — that is the point of them — and the
+  // WHERE column tells you the directory as a fact you cannot act on. This
+  // is the verb that acts on it: go to that directory, with the cursor on
+  // the file you were looking at.
+  //
+  // Useful in a plain listing too, on a row inside an expanded branch: the
+  // tree shows a file three levels down without ever having gone there.
+  function reveal() {
+    const r = root.currentRow();
+    if (!r) { root.warn("nothing to reveal"); return; }
+    const dir = Terminus.dirname(r.path);
+    if (dir === "" || dir === r.path) {
+      root.warn("no enclosing directory");
+      return;
+    }
+    // ORDER MATTERS. A results page is drawn over a directory, and putting
+    // it away restores the cursor it was opened from — wantSel and all —
+    // so an aim taken before this one would be the one that got thrown
+    // away. Same reason goTo has to ask clearSearch rather than re-enter.
+    if (root.searchMode !== "") root.clearSearch();
+    root.wantSel = r.path;
+    // Already standing in it — which is the expanded-branch case, and the
+    // case where a results page was covering its own directory. Nothing to
+    // travel to, so the aim is taken here; if the listing is not up yet it
+    // stays armed and the next one takes it.
+    if (dir === root.cwd) { root.landWanted(); return; }
+    root.goTo(dir);
+  }
+
   // ── THE HISTORY, WRITTEN HERE AND NOWHERE ELSE ─────────────────────────
   // goTo is every navigation you asked for; enter is the move itself. The
   // split was already here — enter's own note says it is "what back and
@@ -6340,7 +6403,12 @@ FloatingWindow {
   //
   // With the zoom, like every other measurement on a row.
   readonly property int colKindW: Math.round(100 * root.zoom)
-  readonly property int colTimeW: Math.round(94 * root.zoom)
+  // 112, not 94. The times used to be right-aligned and flush with the
+  // window, so the column only had to be as wide as the longest one —
+  // "2026-07-05" at 13px is about 78 of the 94. Left-aligned, that same 94
+  // puts the far end of a full date within a couple of pixels of the edge
+  // of the window, and the extra width is what becomes the air after it.
+  readonly property int colTimeW: Math.round(112 * root.zoom)
 
   function colWidths(inner, f) {
     const kind = f.kind > 0 ? root.colKindW : 0;
@@ -6969,7 +7037,7 @@ FloatingWindow {
       id: conflictOut
       waitForEnd: true
       onStreamFinished: {
-        const clash = Terminus.parseConflicts(conflictOut.text);
+        const clash = Terminus.parseClashes(conflictOut.text);
         // The mode is a plain string, not Terminus.CLASH.overwrite: a QML .js
         // import does not reliably expose top-level `const` bindings on its
         // namespace, and nothing else in this window reads one that way. The
@@ -6980,11 +7048,26 @@ FloatingWindow {
         // usually mean, but it wears the alarm colour so a blind Enter is at
         // least an informed one. "Keep both" renames the incoming copy; "Skip"
         // keeps what is already there and takes the rest of the selection.
+        // ── THE WORD HAS TO BE THE ONE THAT HAPPENS ──────────────────
+        // rsync -a merges a directory into one of the same name: the
+        // files the destination has and the source does not are left
+        // alone, and only the ones that collide are written. So when
+        // every clash is a folder, nothing is overwritten in the sense
+        // the word means to anyone reading it, and the button said the
+        // most alarming untrue thing on the card. Same action, and it
+        // was always the safe one — now it says so.
+        const n = clash.length;
+        const folders = clash.every((c) => c.isDir);
+        const what = folders ? (n === 1 ? " directory" : " directories")
+                             : (n === 1 ? " item" : " items");
         confirm.askMany(
-          (root.pending.op === "copy" ? "Copy" : "Move") + " over "
-            + clash.length + (clash.length === 1 ? " item" : " items") + "?",
-          clash.join("   "),
-          [{ label: "Overwrite", ink: Zenon.red,
+          folders
+            ? "Merge into " + n + what + "?"
+            : (root.pending.op === "copy" ? "Copy" : "Move")
+              + " over " + n + what + "?",
+          clash.map((c) => c.name).join("   "),
+          [{ label: folders ? "Merge" : "Overwrite",
+             ink: folders ? Zenon.cyan : Zenon.red,
              act: () => root.commitPaste("overwrite") },
            { label: "Keep both", ink: Zenon.green,
              act: () => root.commitPaste("keep") },
@@ -7487,13 +7570,25 @@ FloatingWindow {
   // `cancelled` is Escape rather than Return, and for something that was
   // created a moment ago that means "I did not want this after all" — so it
   // goes away again. Anything older is left exactly as it was.
+  // ── WHETHER THE FRESH THING IS EMPTY ────────────────────────────────
+  // Cancelling the name of something just created UNDOES the creation, and
+  // for a directory that is a recursive delete. That is exactly right for
+  // `a`, which makes an empty folder and nothing else — and catastrophic
+  // for the gather verb, whose folder arrives with the selection already
+  // inside it. Escape there deleted the files it had just tidied away,
+  // with no trash and no undo. Measured, on two fixtures, before this
+  // flag existed.
+  property bool freshHolds: false
+
   function endRename(cancelled) {
     if (!root.renaming) return;
     root.renaming = false;
     root.renamePath = "";
     const fresh = root.freshPath;
+    const holds = root.freshHolds;
     root.freshPath = "";
-    if (cancelled === true && fresh !== "") {
+    root.freshHolds = false;
+    if (cancelled === true && fresh !== "" && !holds) {
       root.run(Terminus.deleteCommand([fresh]));
       // The name is free again the moment the file goes — see unreserve.
       root.unreserve(fresh);
@@ -7548,10 +7643,46 @@ FloatingWindow {
       root.wantSel = to;
       return;
     }
-    root.run(Terminus.renameCommand(entry.path, want));
-    root.moveTags([[entry.path, to]]);
+    // ── AND IF THAT NAME IS ALREADY TAKEN ───────────────────────────
+    // mv replaces an existing file without a word, so typing the name of
+    // something that is already there quietly destroyed it — including
+    // straight after `a`, where naming the new file after one you already
+    // had was an easy thing to do by accident. The same three answers a
+    // paste gets, because it is the same question.
+    const near = root.rowsIn(Terminus.dirname(entry.path));
+    const from = entry.path;
+    if (near.some((r) => r.name === want && r.path !== from)) {
+      confirm.askMany(
+        "\u201c" + want + "\u201d already exists",
+        // The directory's own name, not its path: the path is the width of
+        // the card and the only part of it that is news is the last piece.
+        "in " + (Terminus.basename(Terminus.dirname(from)) || "/"),
+        // No Cancel of ours — askMany puts one on every card it draws, and
+        // two of them side by side is a card that looks like it is asking
+        // something it is not.
+        [{ label: "Replace", ink: Zenon.red,
+           act: () => root.applyRename(from, want, wasFresh, fresh, true) },
+         { label: "Keep both", ink: Zenon.green,
+           act: () => root.applyRename(from,
+                        Terminus.freeNameKeeping(near, want),
+                        wasFresh, fresh, false) }]);
+      return;
+    }
+    root.applyRename(from, want, wasFresh, fresh, false);
+  }
+
+  // The doing, apart from the asking — so the answer to a clash runs
+  // exactly what an unclashing rename runs, down to the undo record.
+  function applyRename(from, want, wasFresh, fresh, over) {
+    const to = Terminus.joinPath(Terminus.dirname(from), want);
+    root.run(over ? Terminus.renameOverCommand(from, want)
+                  : Terminus.renameCommand(from, want));
+    root.moveTags([[from, to]]);
     if (wasFresh) root.unreserve(fresh);
-    root.pushUndo({ kind: "rename", from: entry.path, to: to });
+    // Replace leaves nothing to put back for the file that was written
+    // over — the record is about the one that moved, which is all a
+    // rename ever moves.
+    root.pushUndo({ kind: "rename", from: from, to: to });
     // land on it under its new name rather than wherever the old one sorted
     root.wantSel = to;
   }
@@ -8674,7 +8805,13 @@ FloatingWindow {
   }
 
   // The half of startCreate that needs to know what the directory holds.
-  function makeIn(kind, where) {
+  // ── RESERVING A NAME, APART FROM MAKING THE THING ───────────────────
+  // Split out of makeIn because the gather verb below needs every word of
+  // it — the free name, the aim that opens the rename field, the justMade
+  // entry that stops two of them picking the same name, and the branch
+  // re-read — and needs to run a DIFFERENT command with the result. The
+  // one thing it does not do is decide what to run; that is the caller's.
+  function reserveName(stem, where) {
     // ── A NAME ASKED FOR IS AS TAKEN AS A NAME ON DISK ────────────────
     // freeName reads the rows, and the rows are up to a watch settle
     // behind — a quarter of a second. Two `a`s inside that window both
@@ -8693,10 +8830,10 @@ FloatingWindow {
       if (Terminus.dirname(p) === where)
         near.push({ name: Terminus.basename(p) });
     }
-    const name = Terminus.freeName(near,
-      kind === "dir" ? "new directory" : "new file");
+    const name = Terminus.freeName(near, stem);
     const path = Terminus.joinPath(where, name);
     root.freshPath = path;
+    root.freshHolds = false;
     root.wantSel = path;
     // Capped: an entry is normally dropped the moment the row turns up
     // in a listing, but a create that FAILS — no permission, a full
@@ -8714,8 +8851,55 @@ FloatingWindow {
     // case with no other event to fall back on. Named here and re-read
     // when the command lands.
     root.madeIn = where;
+    return name;
+  }
+
+  function makeIn(kind, where) {
+    const name = root.reserveName(
+      kind === "dir" ? "new directory" : "new file", where);
     root.run(kind === "dir" ? Terminus.mkdirCommand(where, name)
                             : Terminus.createCommand(where, name));
+  }
+
+  // ── FINDER'S NEW FOLDER WITH SELECTION ──────────────────────────────────
+  // Tick nine things, one gesture: the folder is made, the nine are moved
+  // into it, and the cursor lands on it with the name open for typing —
+  // which is the whole of it, because a folder made this way is always
+  // about to be called something.
+  //
+  // ONE COMMAND, not a create followed by a move. root.run is asynchronous
+  // and the move would have to be fired from the create's completion, which
+  // is a callback this window does not have and a race it does not need:
+  // mkdir and mv in one shell, with && between them, cannot move anything
+  // into a directory that was not made.
+  function gatherIntoFolder() {
+    const rows = root.acting();
+    if (rows.length === 0) { root.warn("nothing to gather"); return; }
+    const where = root.cwd;
+    // The rows have to be in the directory the folder is being made in, or
+    // the move is a move ACROSS directories wearing a tidy-up's clothes.
+    // Everything acting() can hand back on a plain listing already is —
+    // a results page is the case that is not, and there is no one
+    // directory to gather into there.
+    if (root.searchMode !== "") {
+      root.warn("not on a results page");
+      return;
+    }
+    const paths = rows.map((r) => r.path);
+    const name = root.reserveName("new directory", where);
+    // NOT disposable: see freshHolds. The selection is in there.
+    root.freshHolds = true;
+    const dest = Terminus.joinPath(where, name);
+    // Recorded so u puts them back. The folder itself is left behind
+    // empty, which is what undoing a MOVE means — the folder was never
+    // the thing that moved.
+    root.pushUndo({ kind: "move",
+      pairs: paths.map((x) =>
+        [x, Terminus.joinPath(dest, Terminus.basename(x))]) });
+    root.moveTags(paths.map((x) =>
+      [x, Terminus.joinPath(dest, Terminus.basename(x))]));
+    root.run(Terminus.gatherCommand(where, name, paths));
+    root.spendMarks();
   }
 
   // yazi's `D`. Not the trash, and worded so the card cannot be mistaken for
@@ -8844,6 +9028,7 @@ FloatingWindow {
         ["v", "videos",    () => root.goTo(Paths.home() + "/Videos")],
         ["t", "trash",     () => root.goTo(Paths.home() + "/.local/share/Trash/files")],
         ["b", "bookmarks", () => marks.ask()],
+        ["r", "containing dir", () => root.reveal()],
         ["m", "media",     () => root.goTo("/run/media")],
         ["/", "root",      () => root.goTo("/")],
         // THE SAME SHEET THAT SENDS, ASKED TO GO INSTEAD. Picking a place
@@ -8865,7 +9050,8 @@ FloatingWindow {
         ["m", "permissions",   () => root.openProperties(1)],
         ["t", "tags",          () => tagPick.ask()],
         ["s", "collection",  () => collEdit.ask(-1)],
-        ["a", "archive",       () => root.beginArchive("")]
+        ["a", "archive",       () => root.beginArchive("")],
+        ["g", "directory with these", () => root.gatherIntoFolder()]
       ],
       b: [
         ["a", "bookmark here",   () => root.toggleBookmark()],
@@ -10375,7 +10561,7 @@ FloatingWindow {
             // nf-fa-bars, as an escape — a literal nerd glyph does not survive
             // the trip through a shell heredoc, and arrives as nothing at all.
             text: "\uF0C9"
-            color: prefs.open ? Zenon.cyan
+            color: (prefs.open || root.burgerOn) ? Zenon.cyan
               : (prefsHov.hovered ? Zenon.white : Zenon.muted)
             font.family: Zenon.face
             font.pixelSize: 16
@@ -10384,7 +10570,25 @@ FloatingWindow {
           HoverHandler { id: prefsHov }
           MouseArea {
             anchors.fill: parent
-            onClicked: prefs.toggleFrom(prefsToggle)
+            // ── THE WINDOW'S MENU, NOT A SECOND KEY FOR ONE SHEET ─────
+            // This opened the settings panel outright. A hamburger in the
+            // corner of a window is the place everything without a home
+            // goes, and spending it on one sheet — which the palette also
+            // opens, and which is mostly a written-down copy of keys that
+            // already work — left the most reachable control in the window
+            // doing the least. Settings is in the menu now, as a row.
+            //
+            // From the button's bottom edge, the way the row menu drops out
+            // of its row. It is at the right edge of the window, so the
+            // card has nowhere to go but left: the popup surface slides to
+            // fit, which is what Slide is for.
+            onClicked: {
+              if (menu.open) { menu.close(); return; }
+              root.burgerOn = true;
+              menu.openCustom(prefsToggle,
+                              { x: prefsToggle.width, y: prefsToggle.height },
+                              menu.windowItems, false, true);
+            }
           }
         }
 
@@ -11223,9 +11427,14 @@ FloatingWindow {
               // list view and not in the others — see the note on `side`,
               // which no longer lets it. A constant, so nothing in the
               // sidebar moves when the view changes.
+              //
+              // 4, not 10. The leading heading carries its own airIn above
+              // the word now, so this spacer is no longer the whole of the
+              // gap under the bar — it was being paid twice and the first
+              // category sat noticeably lower than the rules under it.
               Item {
                 width: 1
-                height: 10
+                height: 4
               }
 
               // ── EMPTY SECTIONS ARE NOT SECTIONS ───────────────────
@@ -12988,6 +13197,7 @@ FloatingWindow {
           font.pixelSize: 15
         }
         }
+
       }
 
 
@@ -15183,17 +15393,11 @@ FloatingWindow {
 
       property bool open: false
 
-      // The corner it used to hang from. A sheet hangs from the bar instead,
-      // so the item is no longer measured against — but the hamburger still
-      // calls this, and a caller should not have to change because the thing
-      // it opens changed shape.
-      function openFrom(item) {
-        prefs.open = true;
-      }
-      function toggleFrom(item) {
-        if (prefs.open) { prefs.open = false; content.forceActiveFocus(); }
-        else prefs.openFrom(item);
-      }
+      // openFrom/toggleFrom stood here. They existed so the hamburger
+      // could open this sheet without knowing what shape it was, and the
+      // hamburger opens the window menu now — Settings is a row in it,
+      // which sets `open` directly, the same way the palette always has.
+      // Nothing was left calling either one.
 
       // ── ON THE PROPERTY, NOT IN THE OPENER ──────────────────────────
       // openFrom is the hamburger's way in and it is not the only one: the
@@ -15678,8 +15882,23 @@ FloatingWindow {
         // further up and to the left of it
         rect.x: Math.round(menu.mx) - menuPop.pad
         rect.y: Math.round(menu.my) - menuPop.pad
-        rect.width: 1
-        rect.height: 1
+        // ── THE PADDING HAS TO BE PAID BACK ON A FLIP ─────────────────
+        // A 1x1 rect here is a point, and a point has the same top and
+        // bottom — so a flip put the SURFACE's bottom edge on it. The card
+        // sits `pad` inside that edge, and the rect had already been moved
+        // `pad` up to make room for the shadow, so a menu that opened
+        // upwards came to rest 2 * pad above the pointer: measured off a
+        // 60fps capture at 73px, the cursor tip at y=1050 and the card's
+        // bottom border at y=976. Downwards it was exact, which is what
+        // made it read as the bottom rows having menus of their own.
+        //
+        // A rect the size of the padding box instead. The compositor
+        // anchors to its top-left going down and to its bottom-right
+        // coming back, so the shadow's room is subtracted on the way out
+        // and added again on the way back, and the card's leading edge
+        // lands on the pointer whichever way it went.
+        rect.width: 2 * menuPop.pad
+        rect.height: 2 * menuPop.pad
         // Flip and slide, but never Resize: a menu that fits by having rows
         // cut off its bottom is not fitting.
         adjustment: PopupAdjustment.Flip | PopupAdjustment.Slide
@@ -15781,6 +16000,52 @@ FloatingWindow {
           { label: "png",  hint: "lossless",     act: () => root.convertLook("png") },
           { label: "jpg",  hint: "small",        act: () => root.convertLook("jpg") },
           { label: "webp", hint: "smaller",      act: () => root.convertLook("webp") }
+        ]
+
+        readonly property var viewItems: [
+          { label: "List",    key: "V", act: () => root.setView("list") },
+          { label: "Grid",    act: () => root.setView("grid") },
+          { label: "Columns", act: () => root.setView("columns") }
+        ]
+
+        // ── THE WINDOW'S OWN MENU ─────────────────────────────────────
+        // What the hamburger opens. It used to open the settings panel and
+        // nothing else, which made it a second key for one sheet sitting in
+        // the most reachable corner of the window.
+        //
+        // Deliberately NOT the empty-space menu: right-clicking the listing
+        // already gives you that, and it is about the DIRECTORY — paste,
+        // new file, bookmark this one, its properties. This is about the
+        // WINDOW, and it is the only home for a set of things that until
+        // now lived exclusively in the palette and in keys you had to know
+        // already. Settings is still here; it is an item rather than the
+        // whole menu.
+        readonly property var windowItems: [
+          { label: "View", sub: menu.viewItems },
+          { label: "Sort by", key: ",", sub: menu.sortItems },
+          { sep: true },
+          // Hidden files only. Disk usage, git status and the group
+          // headings are all in the Sort submenu already — they are ways
+          // of READING the listing, which is what that menu is — and a
+          // toggle you can reach from two rows of the same card is a
+          // toggle that looks like two different settings.
+          { label: root.showHidden ? "Hide hidden files" : "Hidden files",
+            key: ".", act: () => { root.showHidden = !root.showHidden; } },
+          { sep: true },
+          { label: "New tab", key: "t", act: () => root.newTab() },
+          { label: "Close tab", key: "ctrl c", act: () => root.closeTab() },
+          { label: root.dual ? "Close second pane" : "Split view",
+            key: "\\", act: () => root.toggleDual() },
+          { label: root.sidebar ? "Hide sidebar" : "Sidebar",
+            key: "|", act: () => { root.sidebar = !root.sidebar; } },
+          { sep: true },
+          { label: "Bookmarks", key: "g b", act: () => marks.ask() },
+          { label: "Tags", key: "c t", act: () => tagPick.ask() },
+          { label: "New collection", key: "c s", act: () => collEdit.ask(-1) },
+          { label: "Reindex tags", act: () => root.rebuildTagIndex() },
+          { sep: true },
+          { label: "Settings", act: () => { prefs.open = true; } },
+          { label: "Keys & commands", key: "F1", act: () => cmdPalette.ask() }
         ]
 
         readonly property var sortItems: [
@@ -16012,6 +16277,8 @@ FloatingWindow {
           menu.subAt = -1;
           menu.at = -1;
           menu.subSel = -1;
+          // Whatever opened it, it is shut — see the hamburger.
+          root.burgerOn = false;
           content.forceActiveFocus();
         }
 
@@ -16040,14 +16307,25 @@ FloatingWindow {
         // is what every earlier caller wanted. A list with a submenu in it
         // wants the other one: centred labels leave the parent row's arrow
         // floating away from the text it belongs to.
-        function openCustom(item, mouse, list, center) {
+        // `right` hangs the card's RIGHT edge on the point instead of its
+        // left. A menu dropped from a button in the corner of the window
+        // has nowhere to go: opening rightward, it reaches past the window
+        // onto the desktop, and the compositor is happy to leave it there
+        // because a popup surface is not clipped by its parent. Nothing is
+        // lost, and it still reads as a card that missed.
+        //
+        // cardWidth is asked for AFTER customItems is set, because it is
+        // measured off menu.items and items is customItems once there is
+        // one — read a moment earlier and it sizes the menu that is not
+        // being opened.
+        function openCustom(item, mouse, list, center, right) {
           const p = item.mapToItem(null, mouse.x, mouse.y);
-          menu.mx = p.x;
-          menu.my = p.y;
           menu.here = false;
           menu.subAt = -1;
           menu.subSel = -1;
           menu.customItems = list;
+          menu.mx = right === true ? p.x - menu.cardWidth : p.x;
+          menu.my = p.y;
           menu.centered = center === undefined ? true : !!center;
           menu.open = true;
           menu.at = menu.step(menu.items, -1, 1);
@@ -16121,6 +16399,18 @@ FloatingWindow {
                          ? "Collapse" : "Expand in place",
                        key: root.act.isOpen(t.path) ? "h" : "l",
                        act: () => root.act.toggleOpen(t.path) });
+          // ── AND THE WAY OUT OF A LIST THAT IS NOT A DIRECTORY ───────
+          // Under the ways to open it, which is where Finder puts its own.
+          // Only when it would go somewhere: on a plain listing every row
+          // already lives in the directory you are standing in, and an
+          // entry that cannot move is an entry to read past. A results
+          // page always qualifies, and so does a row inside an expanded
+          // branch — the tree shows you a file three levels down without
+          // ever having gone there.
+          if (root.searchMode !== ""
+              || Terminus.dirname(t.path) !== root.cwd)
+            out.push({ label: "Go to containing directory", key: "g r",
+                       act: () => root.reveal() });
           // Opening is one kind of thing and moving is another; the rule below
           // holds them apart. Cut first: the pair is ordered by how much of a
           // commitment it is, and the one that takes the file away is the one
@@ -16141,6 +16431,11 @@ FloatingWindow {
               act: () => sendTo.ask("move") },
             { label: "Duplicate" + many, key: "y d",
               act: () => root.duplicate() },
+            // Among the verbs that make a new thing out of the selection
+            // rather than among the ones that move it: nothing leaves this
+            // directory, it just gains a level.
+            { label: "New directory with selection" + many, key: "c g",
+              act: () => root.gatherIntoFolder() },
             { label: "Make symlink" + many, key: "y l",
               act: () => root.linkHere() });
           out.push({ sep: true });
@@ -16203,11 +16498,19 @@ FloatingWindow {
                          act: () => root.beginOpenWith(t.path) });
             else
               out.push({ label: "Open with", sub: menu.appMenu });
-            // Beside the two verbs that open things, because it is the one that
-            // opens nothing — see root.quickLook.
-            out.push({ label: "Quick look", key: "space",
-                       act: () => root.quickLook() });
           }
+          // Beside the two verbs that open things, because it is the one that
+          // opens nothing — see root.quickLook.
+          //
+          // OUTSIDE the !isDir block, which is where it used to sit. It was
+          // grouped with "Open with" because both are about opening a file,
+          // but a directory has a quick look too — it lists what is inside,
+          // and says "Empty" when there is nothing — so the one view that
+          // works on everything was the one verb the menu only offered on
+          // half of it. The key was bound for directories the whole time,
+          // which made the omission a menu that disagreed with the keyboard.
+          out.push({ label: "Quick look", key: "space",
+                     act: () => root.quickLook() });
           out.push({ label: "Sort by", key: ",", sub: menu.sortItems });
           // Renaming sits under the sort, not up among cut and copy: those act
           // on the row and hand you straight back to it, and this one opens a
@@ -24176,6 +24479,12 @@ FloatingWindow {
         width: entryRow.cols.kind
         height: parent.height
         visible: entryRow.showMeta && entryRow.frac.kind > 0
+        // Right, so the kinds stack against the size column rather than
+        // ragging out from the name's edge. The padding keeps them off
+        // it — the sizes beside them are right-aligned too, and two
+        // right-aligned columns touching read as one.
+        horizontalAlignment: Text.AlignRight
+        rightPadding: Math.round(14 * root.zoom)
         verticalAlignment: Text.AlignVCenter
         text: entryRow.entry ? root.kindOf(entryRow.entry) : ""
         elide: Text.ElideRight
@@ -24259,7 +24568,10 @@ FloatingWindow {
         width: entryRow.cols.time
         height: parent.height
         visible: entryRow.showMeta && entryRow.frac.time > 0
-        horizontalAlignment: Text.AlignRight
+        // Left. It is the last column, so right-aligning it pinned the
+        // times to the window's edge with the ragged side facing in.
+        horizontalAlignment: Text.AlignLeft
+        leftPadding: Math.round(14 * root.zoom)
         verticalAlignment: Text.AlignVCenter
         text: entryRow.entry ? root.whenOf(entryRow.entry) : ""
         color: Zenon.muted
@@ -24686,32 +24998,114 @@ FloatingWindow {
   component SideHead: Item {
     id: sideHead
     property string label: ""
-    // The room above a heading separates it from the group BEFORE it, so the
-    // first one does not want any — it would just be a gap under the
-    // breadcrumb with nothing on the other side of it to separate from.
+    // ── A RULE EACH SIDE, EXCEPT OVER THE FIRST ONE ───────────────────
+    // The heading is fenced: one rule closing the group above it, one
+    // opening its own. The topmost heading takes only the lower rule,
+    // because the bar it hangs under already draws the line above it and
+    // two of them a few pixels apart is a seam that looks like a mistake.
+    //
+    // WHICH ONE IS TOPMOST IS NOT FIXED. A group with nothing in it is not
+    // drawn — no bookmarks, no BOOKMARKS — so `first` is passed down the
+    // four of them as a cascade of emptiness tests at the call sites: Tags
+    // is first when there are no bookmarks, Collections when there are
+    // neither, and Collections is always drawn, which is why Disks never
+    // has to ask.
     property bool first: false
+
+    readonly property int rule: 1
+    // Over the top rule, and it belongs to the group that just ended.
+    readonly property int airAbove: 13
+    // Between a rule and the word, on both sides, so the heading sits in
+    // the middle of its own fence rather than against one side of it.
+    readonly property int airIn: 7
+
+    // ── THE ROW MEETS THE RULE, NOT THE GLYPH ────────────────────────
+    // An earlier turn at this pushed the lower rule down into the first
+    // row's top air so it sat hard against the glyph. It did close that
+    // gap and it put the rule THROUGH the cursor: the fill starts at the
+    // top of the row, eight pixels above where the line had been moved
+    // to, so selecting the first bookmark drew a line across it.
+    //
+    // The rule is the head's last pixel and the row begins on the next
+    // one, which is what makes the cursor's top edge and the rule a
+    // single seam. The air between that seam and the glyph belongs to the
+    // row — it is what centres a 15px glyph in 32px — and is not the
+    // heading's to take.
+
     width: parent ? parent.width : 0
-    // MORE ROOM, NOW THAT THERE IS NO RULE. Space is what separates the groups
-    // instead — which is the usual answer and the better one, but it only
-    // works if there is enough of it. 44 above, against the 34 that was mostly
-    // taken up by the line.
-    // 20, not 14. The label sits on this item's BOTTOM edge with a 7px
-    // margin, so anything under about 18 pushes it out of the top of the
-    // item and the Flickable clips it — the leading heading came out with
-    // its top half sliced off. The room that was actually excessive was
-    // the spacer above, which is where it was taken from.
-    height: visible ? (sideHead.first ? 20 : 44) : 0
+    // Measured off the parts rather than given as a number, so changing
+    // the type size or either gap cannot leave the rules in the wrong
+    // place — which is what a hand-tuned height got wrong twice before.
+    // ROUNDED, because the text's implicit height is fractional and a
+    // fractional height puts the lower rule across two pixel rows — half
+    // of it under the cursor, which is exactly the seam this is for.
+    height: visible
+      ? Math.round((sideHead.first ? 0 : sideHead.airAbove + sideHead.rule)
+        + sideHead.airIn + sideHeadText.height + sideHead.airIn + sideHead.rule)
+      : 0
+
+    // Above the rows, because the lower rule is drawn over the first one's
+    // top air — and that row draws a fill when it is the active one, which
+    // is declared after this and would otherwise paint straight over the
+    // line. BOOKMARKS lost its rule exactly that way whenever the bookmark
+    // under it was the place you were standing.
+    z: 1
+
+    // Closing the group above. Absent on the first, which has none.
+    // Edge to edge: inset, they read as underlines belonging to the word
+    // rather than as the panel's own divisions.
+    Rectangle {
+      visible: !sideHead.first
+      width: sideHead.width
+      y: sideHead.airAbove
+      height: sideHead.rule
+      color: Zenon.msgBorder
+    }
+
+    // And opening this one, on the item's last pixel — so the first row,
+    // and the cursor that fills it, begin on the very next one.
+    Rectangle {
+      width: sideHead.width
+      y: sideHead.height - sideHead.rule
+      height: sideHead.rule
+      color: Zenon.msgBorder
+    }
 
     Text {
       id: sideHeadText
-      // 26, which is where a row's LABEL starts: the glyph column is 20 wide
-      // from 12, and this puts the heading on the same left edge as the names
-      // under it instead of on the icons' edge.
-      anchors.left: parent.left
-      anchors.leftMargin: 26
-      anchors.bottom: parent.bottom
-      anchors.bottomMargin: 7
+      // 12, the panel's own left edge — where the GLYPH column starts, not
+      // where the names do. A heading that is a title belongs at the edge
+      // of the thing it is titling, with the rows indented under it by
+      // their icons; indenting the title as well leaves the column with
+      // nothing at its margin and the whole panel drifting right.
+      // ── ON THE ICONS, NOT ON THE COLUMN THEY SIT IN ───────────────
+      // 15 rather than 12. The glyph column starts at 12 and is 20 wide
+      // with the glyph CENTRED in it, so no icon's ink actually begins at
+      // 12 — measured off the rendered rows, the home, folder and disk
+      // glyphs all start at 15 or 16. Aligning to the column is the tidy
+      // answer on paper and visibly wrong on screen: the heading hangs a
+      // few pixels left of everything it names.
+      //
+      // The cost of the optical answer is that it is tied to this type
+      // size; a much larger glyph would start further in and want a
+      // different number.
+      //
+      // The rules stay at 12. A separator that begins where the text does
+      // leaves a notch at the panel's edge and stops being a separator.
+      x: 15
+      y: (sideHead.first ? 0 : sideHead.airAbove + sideHead.rule)
+         + sideHead.airIn
       text: sideHead.label
+      // ── A TITLE, NOT A FILING LABEL ─────────────────────────────────
+      // It was 11px grey caps with 1.8 of letter-spacing, which is the
+      // shape of a label on a drawer — small, shouted, and needing an
+      // ornament beside it to be worth looking at at all. Two ornaments
+      // were tried and both read as arbitrary, which was the wrong
+      // problem: the text itself was the quiet part.
+      //
+      // 13px sentence case in the accent ink instead. Letter-spacing goes
+      // with it — it exists to open up capitals and does nothing but
+      // loosen a word that is already legible.
       // ── A MARK BEFORE IT, NOT A RULE AFTER IT ──────────────────────────
       // The heading was a word with a hairline running off it to the right
       // edge — "BOOKMARKS ————", the group's own underscore. That is a divider
@@ -24725,23 +25119,21 @@ FloatingWindow {
       // stands in, so the headings and the rows share one left edge and the
       // label starts where a row's label starts. It marks the group in the one
       // place the eye is already travelling down.
-      color: Zenon.keyInk
+      // The ink the breadcrumb gives the step you are standing on. Cyan
+      // is this window's "chosen" colour — it marks the active pane, the
+      // cursor and the current row — and spending it on four headings
+      // that are never chosen and never change made the sidebar compete
+      // with the one thing in it that IS selected.
+      color: root.crumbInk
       font.family: Zenon.face
       font.weight: Font.Bold
-      font.pixelSize: 11
-      font.letterSpacing: 1.8
+      font.pixelSize: 13
+      // Back with the capitals, and for them: tracking is what stops a run
+      // of caps reading as one shape. It went when the headings stopped
+      // being capitals and returns with them.
+      font.letterSpacing: 1.2
     }
 
-    Rectangle {
-      anchors.right: sideHeadText.left
-      anchors.rightMargin: 9
-      anchors.verticalCenter: sideHeadText.verticalCenter
-      width: 3
-      height: 11
-      radius: 1.5
-      color: Zenon.cyan
-      opacity: 0.85
-    }
   }
 
   // One row of the sidebar: a bookmark or a disk. The disk half adds the mount
@@ -24846,18 +25238,10 @@ FloatingWindow {
     // row was perfectly, correctly active.
     Component.onDestruction: if (root.sideAt === sideRow) root.sideAt = null
 
-    // The active row gets a bar rather than only a fill — the same mark the
-    // listing puts on a selected file, so "this is the one" reads the same way
-    // in both halves of the window.
-    Rectangle {
-      anchors.left: parent.left
-      anchors.verticalCenter: parent.verticalCenter
-      width: 3
-      height: parent.height - 10
-      radius: 2
-      visible: sideRow.active
-      color: Zenon.cyan
-    }
+    // A cyan bar down the left of the active row stood here, mirroring the
+    // mark the listing puts on a selected file. The fill says it already,
+    // and now that the fill starts exactly on the heading's rule the bar
+    // was a second, shorter, differently-aligned edge inside it.
     HoverHandler { id: sideHover }
 
     // ── WHERE IT WOULD LAND ─────────────────────────────────────────────
@@ -26502,6 +26886,7 @@ FloatingWindow {
         visible: headBar.meta
         label: "KIND"
         sortKey: "kind"
+        rightAlign: true
       }
       ColHead {
         width: headBar.meta ? headBar.cols.size : 0
@@ -26518,9 +26903,7 @@ FloatingWindow {
         visible: headBar.meta
         label: "MODIFIED"
         sortKey: "time"
-        rightAlign: true
-        // flush, like the times below it
-        padRight: 0
+        // Left, like the times below it.
       }
     }
 
@@ -27941,5 +28324,6 @@ FloatingWindow {
       }
     }
   }
+
 
 }
