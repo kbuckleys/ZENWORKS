@@ -1683,6 +1683,43 @@ FloatingWindow {
   // what came back. See morpheus/thumbs.js.
   property var thumbFile: ({})
   property var thumbJobs: []
+
+  // ── PICTURES QT CANNOT OPEN ─────────────────────────────────────────────
+  // A quarter of what this window calls an image is a format Qt has a
+  // decoder for; the rest — raws, HEIF, jxl, psd — are handed to the same
+  // ImageMagick that already renders the grid's thumbnails, and the render
+  // is shown in place of the file. See Terminus.qtBlind.
+  //
+  // THAT LIST IS A SEED, NOT THE TRUTH. Qt sniffs content as well as names
+  // and its plugins differ per machine, so the list cannot be right by
+  // construction — and does not have to be. An Image that fails writes its
+  // extension down here, and every later file of that kind takes the
+  // rendered path from the start. One wasted decode per format, once.
+  property var blindExt: ({})
+
+  function noteBlind(name) {
+    const n = String(name);
+    const cut = n.lastIndexOf(".");
+    if (cut <= 0) return;
+    const e = n.slice(cut + 1).toLowerCase();
+    if (root.blindExt[e]) return;
+    const next = Object.assign({}, root.blindExt);
+    next[e] = true;
+    root.blindExt = next;
+  }
+
+  // Whether this file has to go the long way round.
+  function needsRender(r) {
+    return !!r && !r.isDir && Terminus.isImage(r.name)
+      && (Terminus.qtBlind(r.name) || root.blindExt[Terminus.extOf(r.name)] === true);
+  }
+
+  // ── AND THE BETTER COPY, FOR QUICK LOOK ONLY ────────────────────────────
+  // The preview pane follows the cursor and takes the cheap 480; quick look
+  // is asked for, one file at a time, and gets 1600. Its own map and its own
+  // process, so a big render cannot make the pane's batch wait.
+  property var bigFile: ({})
+  property string bigWant: ""
   // Insertion order, so the map can be bounded. Without it this grew by one
   // entry for every image, video and track the window ever showed and never
   // gave one back — the same shape of leak the navigation history had, and the
@@ -1760,6 +1797,34 @@ FloatingWindow {
     root.thumbJobs = batch;
     thumbProc.command = ["sh", "-c", Thumbs.generate(batch)];
     thumbProc.running = true;
+  }
+
+  // Quick look's own renderer. Separate from thumbProc so a 1600px raw
+  // cannot hold up the grid's batch behind it.
+  Process {
+    id: bigProc
+    stdout: StdioCollector {
+      id: bigOut
+      waitForEnd: true
+      onStreamFinished: {
+        const made = Thumbs.parseMade(bigOut.text);
+        const c = Object.assign({}, root.bigFile);
+        for (const k in made) c[k] = made[k];
+        root.bigFile = c;
+      }
+    }
+  }
+
+  // Asked for when quick look opens on something Qt cannot read. The pane's
+  // small copy is already on screen by then, so this only ever replaces a
+  // soft picture with a sharp one.
+  function wantBig(r) {
+    if (!root.needsRender(r)) return;
+    if (root.bigFile[r.path] || bigProc.running) return;
+    root.bigWant = r.path;
+    bigProc.command = ["sh", "-c",
+      Thumbs.generate([{ src: r.path, kind: "i" }], true)];
+    bigProc.running = true;
   }
 
   function makeThumbs() {
@@ -3861,6 +3926,39 @@ FloatingWindow {
     }
   }
 
+  // ── THE RESTORED BRANCHES, CHECKED AGAINST THE DISK ───────────────────
+  // See Terminus.livingDirsCommand for why a list off disk cannot be
+  // trusted the way a session's own can: it is a guess about directories
+  // that may have been deleted at any point since, it is capped so the dead
+  // ones evict the living, and a dead branch under the restored directory
+  // goes to inotifywait, which exits on it and takes the watch with it.
+  //
+  // One process, once, at startup. The lists are usually short and the
+  // answer replaces them wholesale.
+  Process {
+    id: sieveProc
+    stdout: StdioCollector {
+      id: sieveOut
+      waitForEnd: true
+      onStreamFinished: {
+        const live = Terminus.parseLivingDirs(sieveOut.text, 2);
+        // Only shrink. If the sieve came back with more than it was given —
+        // it cannot, but a failed process returning nothing would read as
+        // "everything is gone" — the branches stay as they were.
+        if (sieveOut.text === "" ) return;
+        paneL.setOpenList(live[0]);
+        paneR.setOpenList(live[1]);
+      }
+    }
+  }
+
+  function sieveOpen(lists) {
+    const any = (lists[0] && lists[0].length) || (lists[1] && lists[1].length);
+    if (!any) return;
+    sieveProc.command = ["sh", "-c", Terminus.livingDirsCommand(lists)];
+    sieveProc.running = true;
+  }
+
   function loadViewPrefs() {
     const raw = String(viewFile.text() || "").trim();
     if (raw === "") return;
@@ -3937,9 +4035,15 @@ FloatingWindow {
     // on an error.
     if (typeof s.otherCwd === "string") root.pas.cwd = s.otherCwd;
     if (s.paneSide === 1) root.paneSide = 1;
+    // ── AND ONLY THE ONES STILL THERE ────────────────────────────────
+    // Set straight away, so the tree is right on the first paint for the
+    // overwhelming majority of entries that do exist, and then sieved by
+    // the answer below. Waiting for a process before showing any branch at
+    // all would make every restored session open flat and then jump.
     if (root.sessionReplay && s.paneOpen && s.paneOpen.length === 2) {
       paneL.setOpenList(s.paneOpen[0]);
       paneR.setOpenList(s.paneOpen[1]);
+      root.sieveOpen([s.paneOpen[0], s.paneOpen[1]]);
     }
     if (s.paneViews && s.paneViews.length === 2) {
       paneL.viewMode = s.paneViews[0];
@@ -4778,15 +4882,26 @@ FloatingWindow {
       root.beginPeek(r.path, Terminus.peekCommand(r.path));
       return;
     }
+    // THE SHARP COPY, and this is the one place that wants one. The pane
+    // takes whatever the grid made at 480; here somebody has asked to look
+    // at this file in particular, which is exactly when soft stops being
+    // good enough. Called per row, so walking a folder of raws with space
+    // held renders each as it arrives.
+    root.wantBig(r);
     // A film whose frame has not been pulled yet: ask for it now. This is the
     // one moment somebody is actually looking, so it is the one moment worth
     // making them wait a beat for.
+    // A picture Qt cannot open needs the same one-off: the grid builds these
+    // for every row it shows, but a LIST never calls makeThumbs, so in a list
+    // the preview pane would have nothing to point at.
     if (!root.thumbFile[r.path] && !thumbProc.running
-        && (Terminus.isVideo(r.name) || Terminus.isAudio(r.name))) {
+        && (Terminus.isVideo(r.name) || Terminus.isAudio(r.name)
+            || root.needsRender(r))) {
       // The same one-off the preview pane makes for a film it has not seen —
       // see the note beside previewKind = "video".
       root.thumbJobs = [{ src: r.path,
-                          kind: Terminus.isVideo(r.name) ? "v" : "a" }];
+                          kind: Terminus.isVideo(r.name) ? "v"
+                              : (Terminus.isAudio(r.name) ? "a" : "i") }];
       thumbProc.command = ["sh", "-c", Thumbs.generate(root.thumbJobs)];
       thumbProc.running = true;
     }
@@ -12045,7 +12160,25 @@ FloatingWindow {
                           ? "file://" + root.thumbFile[r.path] : "";
                       }
                       if (root.previewKind !== "image") return "";
-                      return Terminus.isImage(r.name) ? "file://" + r.path : "";
+                      if (!Terminus.isImage(r.name)) return "";
+                      // A raw or a HEIC is not something Qt can open, so the
+                      // pane shows the rendered copy — the same cache a
+                      // film's frame comes from, for the same reason.
+                      if (root.needsRender(r)) {
+                        return root.thumbFile[r.path]
+                          ? "file://" + root.thumbFile[r.path] : "";
+                      }
+                      return "file://" + r.path;
+                    }
+                    // ── AND IF QT STILL CANNOT READ IT ──────────
+                    // The blind list is a seed; this is what makes it
+                    // complete. One failure per format, then every file of
+                    // that kind takes the rendered path from the start.
+                    onStatusChanged: {
+                      if (status !== Image.Error) return;
+                      const rr = root.currentRow();
+                      if (rr && !rr.isDir && Terminus.isImage(rr.name))
+                        root.noteBlind(rr.name);
                     }
                     fillMode: Image.PreserveAspectFit
                     asynchronous: true
@@ -27286,6 +27419,30 @@ FloatingWindow {
       readonly property bool reading:
         !!look.row && root.previewFor === look.row.path
 
+      // ── HOW WIDE THE CONTENTS WANT TO BE ───────────────────
+      // Measured, not guessed, and measured once per folder rather than
+      // once per row: the longest name by CHARACTER COUNT, then that one
+      // string laid out for its real width. The rows themselves cannot
+      // be asked — the list virtualises them, so the long one is very
+      // often not built.
+      readonly property string dirWidest: {
+        let best = "";
+        for (let i = 0; i < look.dirRows.length; ++i) {
+          const nm = look.dirRows[i].name || "";
+          if (nm.length > best.length) best = nm;
+        }
+        return best;
+      }
+      TextMetrics {
+        id: lookDirName
+        font.family: Zenon.face
+        font.pixelSize: Math.round(15 * root.zoom)
+        text: look.dirWidest
+      }
+      // One cell of the contents: the glyph column, its gap, the name.
+      readonly property real dirCellW:
+        Math.round(22 * root.zoom) + 6 + Math.ceil(lookDirName.width)
+
       // The caption bar's height, named on the OVERLAY rather than on the bar:
       // the picture's height subtracts it and the panel's height adds it, and
       // the bar is anchored inside the panel, so asking the bar itself puts
@@ -27309,6 +27466,17 @@ FloatingWindow {
         sourceSize.width: Math.round(look.width * 0.8)
         sourceSize.height: Math.round(look.height * 0.86)
         source: look.src
+        // The same lesson the preview pane learns — see root.noteBlind.
+        // Taken here as well because quick look can be the first thing to
+        // meet a format, opened straight onto a file from a search.
+        onStatusChanged: {
+          if (status !== Image.Error) return;
+          const rr = look.row;
+          if (rr && !rr.isDir && Terminus.isImage(rr.name)) {
+            root.noteBlind(rr.name);
+            root.wantBig(rr);
+          }
+        }
       }
 
       // Capped at 1, because a small picture blown up to fill the window is
@@ -27430,7 +27598,99 @@ FloatingWindow {
       // treeRows. previewRows belongs to the pane and the pane keeps
       // recomputing it.
       property var dirRows: []
-      readonly property bool listing: look.folder && look.dirRows.length > 0
+      // ANY folder, including one holding nothing. It used to mean "has
+      // rows to show", because an empty folder's card was the word
+      // Empty and 120px was plenty for it. Now the card is the FACTS,
+      // which an empty folder has as many of as a full one — gated on
+      // the row count it fell through to emptyH and cut them in half.
+      readonly property bool listing: look.folder
+
+      // ── A FOLDER IS TWO THINGS AT ONCE ────────────────────────────
+      // What it CONTAINS and what it IS. The preview used to answer only
+      // the first, as one long column — which is the same answer the
+      // listing behind it already gives, and says nothing about the
+      // folder itself. Split: the left half is the folder, the right
+      // half is its contents.
+      //
+      // The facts are the ones that cost nothing. A directory's own
+      // `size` is its inode's, not its contents', and the real number is
+      // a du away — that is what the properties sheet's Calculate size
+      // is for, and it is not worth a process behind a keypress that is
+      // meant to be instant.
+      // ── SEVEN ROWS, ACROSS EXACTLY THE FACTS ────────────────
+      // The pitch is not a number, it is a division: the height the
+      // facts take, in seven. At a fixed 22px the contents overran the
+      // facts beside them — nine rows against four pairs, the first
+      // starting above "items" and the ninth clipped by the caption —
+      // so the two halves read as two unrelated lists that happened to
+      // share a card. Divided, they start and finish together.
+      readonly property real dirRowH: look.dirBodyH / look.dirFit
+
+      // Two columns once one would not fit, never more: past two, the
+      // names are too narrow to read and the thing stops being a preview
+      // and becomes a listing with a scrollbar.
+      // ── THE FACTS SET THE HEIGHT; THE CONTENTS FIT INTO IT ────────
+      // Not the other way round. Sized to its contents the card was a
+      // listing with a scrollbar — forty rows tall for a folder of forty
+      // things, and a different height for every folder you stepped
+      // through. The left half is the same size whatever the folder is,
+      // so it is what the card should measure, and the contents get two
+      // columns and a scroll to live inside it.
+      //
+      // The facts' INK, which is what the contents line up against —
+      // not the column's height, which carries 10px of padding below
+      // the last fact that no fact is drawn in.
+      //
+      // No floor any more. The floor existed to keep the card as tall
+      // as it was when the glyph sat in this column, and a card that
+      // measures its own contents has no business being kept at the
+      // size of something it no longer holds.
+      readonly property real dirBodyH:
+        Math.min(lookDirSide.implicitHeight - Math.round(10 * root.zoom),
+                 look.height * 0.8 - 32)
+
+      // Seven. Not "as many as fit" — that is what made the count vary
+      // with the length of a path, and made the last one a sliver.
+      readonly property int dirFit: 7
+
+      // A second column only when one will not hold everything. Never a
+      // third: past two the names are too narrow to read.
+      readonly property int dirCols:
+        look.dirRows.length > look.dirFit ? 2 : 1
+
+      // Down the first column, then the second — the order `ls` uses and
+      // the order a person scanning for a name expects. Row-major would
+      // put neighbours side by side and break the alphabet.
+      readonly property var dirPairs: {
+        const n = look.dirRows.length;
+        if (n === 0) return [];
+        const per = Math.ceil(n / look.dirCols);
+        const out = [];
+        for (let i = 0; i < per; ++i)
+          out.push({ a: look.dirRows[i],
+                     b: look.dirCols > 1 ? (look.dirRows[i + per] || null) : null });
+        return out;
+      }
+
+      readonly property var dirFacts: {
+        const r = look.row;
+        if (!r || !look.folder) return [];
+        const n = look.dirRows.length;
+        return [
+          // ANSWERED, not merely absent. dirRows still holds the LAST
+          // folder's listing while this one is being read, so "empty" is
+          // only true once the reply on screen is about this path — the
+          // guard the old centred "Empty" label carried before the facts
+          // took the sentence over.
+          ["items", (look.reading || root.previewShown !== r.path) ? "\u2026"
+            : (n === 0 ? "empty" : n + (n === 1 ? " item" : " items"))],
+          ["location", Terminus.dirname(r.path)],
+          ["modified", root.whenOf(r)],
+          ["permissions",
+            ("000" + (r.mode & 511).toString(8)).slice(-3)
+            + "  \u00b7  " + Terminus.modeString(r.mode)]
+        ];
+      }
       function syncDir() {
         if (look.folder && root.previewKind === "dir"
             && root.previewRows.length > 0)
@@ -27487,9 +27747,19 @@ FloatingWindow {
         // The stamp only changes when a rotation has happened — see
         // root.imgStamp — so an ordinary step between pictures still hits
         // Qt's cache as before.
-        if (look.pic)
+        if (look.pic) {
+          // Rendered, for the formats Qt has no decoder for. The big copy
+          // when it has landed and the pane's small one until then, so
+          // opening quick look shows something immediately and sharpens.
+          if (root.needsRender(r)) {
+            const big = root.bigFile[r.path];
+            if (big) return "file://" + big;
+            return root.thumbFile[r.path]
+              ? "file://" + root.thumbFile[r.path] : "";
+          }
           return "file://" + r.path
             + (root.imgStamp > 0 ? "?v=" + root.imgStamp : "");
+        }
         if (look.framed)
           return root.thumbFile[r.path] ? "file://" + root.thumbFile[r.path] : "";
         // Only once the page at pdfStem is known to be THIS document's — see
@@ -27579,6 +27849,44 @@ FloatingWindow {
 
         readonly property real textW: Math.min(900, look.width * 0.8)
 
+        // ── A FOLDER'S CARD IS THE SIZE OF WHAT IS ON IT ──────────
+        // A picture's card is the picture. A folder's was the full
+        // reading width whether it held forty things or nothing at all,
+        // which left an empty folder's four facts adrift in the middle
+        // of a 900px slab. Split, the contents want that width and earn
+        // it. Unsplit, the card is the facts plus their margins.
+        readonly property real dirW: {
+          // No contents half: the card is the facts and their margins.
+          if (!lookDirPane.split)
+            return Math.max(lookDirSide.implicitWidth + 32, lookFrame.barW);
+          // With one: the facts' half, the rule, and as many name
+          // columns as there are — a folder holding one thing is not
+          // 900px of anything. The reading width is the ceiling, for
+          // the folder whose names run off the end of it.
+          const cols = look.dirCols;
+          const half = cols * look.dirCellW + (cols > 1 ? 12 : 0) + 10;
+          return Math.max(
+            Math.min(lookDirPane.leftW + 1 + 32 + half, lookFrame.textW),
+            lookFrame.barW);
+        }
+
+        // The floor under that: what the CAPTION needs to say the name
+        // and show its keys. The facts can be narrower than the bar
+        // below them; the bar cannot be narrower than itself.
+        //
+        // Every term is an implicitWidth — a natural, unwrapped, unelided
+        // text width — so none of them is read back off the card's own
+        // width, which is what this is computing.
+        readonly property real barW:
+          Math.ceil(
+            14 + lookGlyph.implicitWidth + 8
+            + Math.min(lookName.implicitWidth, Math.round(220 * root.zoom))
+            + 14 + lookKeys.implicitWidth + 14)
+          // Slack. Summed exactly, the name gets exactly its own width
+          // and Qt elides on the fractional pixel — a card sized to fit
+          // "Documents" showed "Doc…nts".
+          + 4
+
         // NOTHING TO READ IS NOT A SHORT DOCUMENT. With no preview text the
         // column is empty and the card collapsed onto its own caption bar —
         // a sentence saying there is nothing to show needs somewhere to be
@@ -27623,12 +27931,14 @@ FloatingWindow {
           Math.min(root.previewTree.length * Math.round(21 * root.zoom) + 32,
                    look.height * 0.8)
         readonly property real faceH: Math.round(300 * root.zoom)
-        readonly property real dirH:
-          Math.min(look.dirRows.length * Math.round(22 * root.zoom) + 32,
-                   look.height * 0.8)
+        // The facts column decides it — see look.dirBodyH. One height
+        // for every folder, so stepping through them does not make the
+        // card breathe.
+        readonly property real dirH: look.dirBodyH + 32
 
         width: lookShot.visible ? look.shotW
-          : (lookFrame.holding ? look.heldW : lookFrame.textW)
+          : (lookFrame.holding ? look.heldW
+             : (look.listing ? lookFrame.dirW : lookFrame.textW))
         height: look.capH + (lookShot.visible ? look.shotH
           : (lookFrame.holding ? look.heldH
              : (look.listing ? lookFrame.dirH
@@ -27908,62 +28218,226 @@ FloatingWindow {
         // folder previews as a small copy of itself rather than as a
         // summary of facts about it. Sorted and enriched already — this
         // is the pane's own `previewRows`, latched.
-        ListView {
-          id: lookDir
+        // ── WHAT A FOLDER IS, BESIDE WHAT IT HOLDS ──────────────────
+        // Left: the folder itself — its glyph at size, and the facts that
+        // cost nothing to know. Right: what is in it, in one column or
+        // two. A rule between them, because two panels sharing an edge
+        // with no line read as one panel with a gap in it.
+        Item {
+          id: lookDirPane
           anchors.top: parent.top
           anchors.left: parent.left
           anchors.right: parent.right
           anchors.bottom: lookCap.top
-          anchors.margins: 16
           visible: look.folder
-          model: look.dirRows
-          clip: true
-          boundsBehavior: Flickable.DragAndOvershootBounds
-          boundsMovement: Flickable.FollowBoundsBehavior
-          reuseItems: look.folder
 
-          ElasticScroll { view: lookDir; step: root.wheelStep }
+          // NO MARGINS ON THE PANE — they are on the two halves. A
+          // separator that stops 16px short of the card's edges reads as
+          // a line drawn on the panel; one that runs the full height
+          // reads as the edge between two halves, which is what it is.
+          // THE FACTS DECIDE IT, up to the fraction of the reading width
+          // that used to decide it outright. Taken from the pane's own
+          // width instead, the facts' cap would come from the card and
+          // the card's width would come from the facts.
+          readonly property real leftW:
+            Math.min(lookDirSide.implicitWidth + 32,
+                     Math.round(lookFrame.textW * 0.38))
+          // An empty folder is its facts and nothing else: no contents
+          // half, so no rule, and the facts get the whole width.
+          readonly property bool split: look.dirRows.length > 0
 
-          delegate: Item {
-            required property var modelData
-            width: lookDir.width
-            height: Math.round(22 * root.zoom)
+          // ── the folder ────────────────────────────────────────────
+          Column {
+            id: lookDirSide
+            // ── THE BOX IS CENTRED; THE LINES ARE NOT ─────────────
+            // Pinned to the top-left of a half taller and wider than it
+            // is, the facts read as having fallen into a corner of the
+            // card rather than as being placed in it. So the column is
+            // sized to the facts and centred on both axes — and every
+            // line inside it still starts at its left edge, because a
+            // centred RAG-BOTH label column is not a properties list,
+            // it is a poem.
+            anchors.verticalCenter: parent.verticalCenter
+            // The INK centred, not the box. Every fact carries 10px of
+            // padding BELOW it, including the last one, so a box centred
+            // by its own height hangs half that gap high.
+            anchors.verticalCenterOffset: Math.round(5 * root.zoom)
+            x: Math.round((lookDirSide.room - lookDirSide.width) / 2)
+            spacing: 0
 
-            Text {
-              id: lookDirGlyph
-              anchors.left: parent.left
-              anchors.verticalCenter: parent.verticalCenter
-              width: Math.round(22 * root.zoom)
-              horizontalAlignment: Text.AlignHCenter
-              text: modelData.glyph || ""
-              color: modelData.ink || Zenon.white
-              font.family: Zenon.faceMono
-              font.pixelSize: Math.round(15 * root.zoom)
-            }
+            // The half it is centred in — which is the whole pane when
+            // an empty folder leaves no contents half to sit beside.
+            // Read off the PANE, because centring cannot feed a width.
+            readonly property real room:
+              lookDirPane.split ? lookDirPane.leftW : lookDirPane.width
+            // What it may not grow past. Read off the READING WIDTH,
+            // because this one does feed a width — see lookFrame.dirW.
+            readonly property real capW:
+              (lookDirPane.split ? Math.round(lookFrame.textW * 0.38)
+                                 : lookFrame.textW) - 32
 
-            Text {
-              anchors.left: lookDirGlyph.right
-              anchors.leftMargin: 6
-              anchors.right: parent.right
-              anchors.verticalCenter: parent.verticalCenter
-              text: modelData.name || ""
-              elide: Text.ElideRight
-              color: modelData.ink || Zenon.white
-              font.family: Zenon.face
-              font.pixelSize: Math.round(15 * root.zoom)
+            // No glyph here. It is the same glyph the caption bar shows
+            // beside the name, and drawn twice on one small card it read
+            // as two different things being named.
+            Repeater {
+              model: look.dirFacts
+              delegate: Column {
+                required property var modelData
+                spacing: 1
+                bottomPadding: Math.round(10 * root.zoom)
+
+                Text {
+                  text: modelData[0]
+                  color: Zenon.keyInk
+                  font.family: Zenon.face
+                  font.pixelSize: Math.round(11 * root.zoom)
+                  font.weight: Font.Bold
+                  font.letterSpacing: 1.2
+                }
+                Text {
+                  // As wide as it wants, up to the half. A Text's
+                  // implicitWidth is its UNWRAPPED width, so capping the
+                  // width with it is safe — the wrap and the cap cannot
+                  // chase each other round a loop.
+                  width: Math.min(implicitWidth, lookDirSide.capW)
+                  text: modelData[1]
+                  color: Zenon.white
+                  font.family: Zenon.face
+                  font.pixelSize: Math.round(14 * root.zoom)
+                  // ElideRight, and not the middle elide the name bars
+                  // use: a middle elide has no meaning once the text
+                  // WRAPS, and Qt answers it by cutting the last line
+                  // off with no ellipsis at all. A deep path came out
+                  // ending in "scrat" as though that were the folder.
+                  elide: Text.ElideRight
+                  maximumLineCount: 2
+                  wrapMode: Text.WrapAnywhere
+                }
+              }
             }
           }
-        }
 
-        ScrollRail {
-          target: lookDir
-          on: lookDir.visible
-          anchors.top: parent.top
-          anchors.topMargin: 2
-          anchors.bottom: parent.bottom
-          anchors.bottomMargin: look.capH + 2
-          anchors.right: parent.right
-          anchors.rightMargin: 2
+          Rectangle {
+            id: lookDirRule
+            x: lookDirPane.leftW
+            width: 1
+            anchors.top: parent.top
+            anchors.bottom: parent.bottom
+            visible: lookDirPane.split
+            color: Zenon.msgBorder
+          }
+
+          // ── and what is in it ─────────────────────────────────────
+          ListView {
+            id: lookDir
+            anchors.top: parent.top
+            anchors.topMargin: 16
+            anchors.left: lookDirRule.right
+            anchors.leftMargin: 16
+            anchors.right: parent.right
+            anchors.rightMargin: 16
+            anchors.bottom: parent.bottom
+            anchors.bottomMargin: 16
+            visible: lookDirPane.split
+            model: look.dirPairs
+            clip: true
+            boundsBehavior: Flickable.DragAndOvershootBounds
+            boundsMovement: Flickable.FollowBoundsBehavior
+            reuseItems: look.folder
+
+            ElasticScroll { view: lookDir; step: root.wheelStep }
+
+            delegate: Item {
+              id: dirPairRow
+              required property var modelData
+              width: lookDir.width
+              height: look.dirRowH
+
+              readonly property real colW:
+                look.dirCols > 1 ? (dirPairRow.width - 12) / 2 : dirPairRow.width
+
+              // One cell, twice. The b half is empty on the last row of an
+              // odd listing, which is why it is drawn from a null-guarded
+              // entry rather than from a second Repeater over a shorter
+              // model.
+              Item {
+                x: 0
+                width: dirPairRow.colW
+                height: parent.height
+                visible: !!dirPairRow.modelData.a
+
+                Text {
+                  id: dirCellGlyphA
+                  anchors.left: parent.left
+                  anchors.verticalCenter: parent.verticalCenter
+                  width: Math.round(22 * root.zoom)
+                  horizontalAlignment: Text.AlignHCenter
+                  text: dirPairRow.modelData.a ? (dirPairRow.modelData.a.glyph || "") : ""
+                  color: dirPairRow.modelData.a
+                    ? (dirPairRow.modelData.a.ink || Zenon.white) : Zenon.white
+                  font.family: Zenon.faceMono
+                  font.pixelSize: Math.round(15 * root.zoom)
+                }
+                Text {
+                  anchors.left: dirCellGlyphA.right
+                  anchors.leftMargin: 6
+                  anchors.right: parent.right
+                  anchors.verticalCenter: parent.verticalCenter
+                  text: dirPairRow.modelData.a ? (dirPairRow.modelData.a.name || "") : ""
+                  elide: Text.ElideRight
+                  color: dirPairRow.modelData.a
+                    ? (dirPairRow.modelData.a.ink || Zenon.white) : Zenon.white
+                  font.family: Zenon.face
+                  font.pixelSize: Math.round(15 * root.zoom)
+                }
+              }
+
+              Item {
+                x: dirPairRow.colW + 12
+                width: dirPairRow.colW
+                height: parent.height
+                visible: !!dirPairRow.modelData.b
+
+                Text {
+                  id: dirCellGlyphB
+                  anchors.left: parent.left
+                  anchors.verticalCenter: parent.verticalCenter
+                  width: Math.round(22 * root.zoom)
+                  horizontalAlignment: Text.AlignHCenter
+                  text: dirPairRow.modelData.b ? (dirPairRow.modelData.b.glyph || "") : ""
+                  color: dirPairRow.modelData.b
+                    ? (dirPairRow.modelData.b.ink || Zenon.white) : Zenon.white
+                  font.family: Zenon.faceMono
+                  font.pixelSize: Math.round(15 * root.zoom)
+                }
+                Text {
+                  anchors.left: dirCellGlyphB.right
+                  anchors.leftMargin: 6
+                  anchors.right: parent.right
+                  anchors.verticalCenter: parent.verticalCenter
+                  text: dirPairRow.modelData.b ? (dirPairRow.modelData.b.name || "") : ""
+                  elide: Text.ElideRight
+                  color: dirPairRow.modelData.b
+                    ? (dirPairRow.modelData.b.ink || Zenon.white) : Zenon.white
+                  font.family: Zenon.face
+                  font.pixelSize: Math.round(15 * root.zoom)
+                }
+              }
+            }
+          }
+
+          // ON the contents half. A ScrollRail anchors to its target, and
+          // an anchor may only name a parent or a sibling — this one sat
+          // outside the pane naming a grandchild of it, which Qt drops,
+          // leaving the bar sized 0 and invisible however far the list
+          // overflowed.
+          ScrollRail {
+            target: lookDir
+            on: lookDirPane.visible && lookDirPane.split
+            anchors.top: lookDir.top
+            anchors.bottom: lookDir.bottom
+            anchors.right: lookDir.right
+          }
         }
 
         // ── AND WHAT A TYPEFACE LOOKS LIKE ──────────────────────────
@@ -28096,25 +28570,6 @@ FloatingWindow {
         //
         // Muted rather than the yellow above: that one is an answer about
         // what terminus cannot do, and this is a fact about the directory.
-        Text {
-          anchors.top: parent.top
-          anchors.left: parent.left
-          anchors.right: parent.right
-          anchors.bottom: lookCap.top
-          visible: look.folder && !look.reading && !!look.row
-                   && root.previewShown === look.row.path
-                   && look.dirRows.length === 0
-          horizontalAlignment: Text.AlignHCenter
-          verticalAlignment: Text.AlignVCenter
-          // The same word, ink and weight the LISTING uses for an empty
-          // directory — see the "Empty" label over the rows. One answer
-          // said one way, wherever you happen to be looking at it from.
-          text: "Empty"
-          color: Zenon.muted
-          font.family: Zenon.face
-          font.weight: Font.Bold
-          font.pixelSize: 15
-        }
 
         // ── A TRACK WITH NO COVER IS STILL SOMETHING TO LOOK AT ─────────
         // It was a mostly empty card with "no preview available" in small red
@@ -28194,10 +28649,28 @@ FloatingWindow {
           // in the one place you are pressing a key repeatedly. Pinned left it
           // starts in the same spot whatever it says, and the room it is not
           // using is where the keys go.
+          // The row's own glyph, in the row's own ink. Shown for every
+          // kind and not only for folders: conditioned on the kind it
+          // would shift the name sideways as you step through a listing,
+          // which is the one thing the bar is pinned left to avoid.
           Text {
-            id: lookName
+            id: lookGlyph
             anchors.left: parent.left
             anchors.leftMargin: 14
+            anchors.verticalCenter: parent.verticalCenter
+            text: look.row ? (look.row.glyph || "") : ""
+            color: look.row ? (look.row.ink || Zenon.white) : Zenon.white
+            font.family: Zenon.faceMono
+            // Larger than the name beside it. A nerd glyph set at the
+            // text size reads smaller than the text does — it is drawn
+            // inside the cell rather than filling it.
+            font.pixelSize: 19
+          }
+
+          Text {
+            id: lookName
+            anchors.left: lookGlyph.right
+            anchors.leftMargin: 8
             anchors.right: lookKeys.left
             anchors.rightMargin: 14
             anchors.verticalCenter: parent.verticalCenter

@@ -135,22 +135,42 @@ module.exports = {
       + decls.map((n) => "try{globalThis." + n + "=" + n + "}catch(e){}").join(";"),
       tctx);
 
+    // ── EVERY RECOGNISED EXTENSION RESOLVES TO SOMETHING ──────────────
+    // It used to demand a line in EXTS for each one, which is a stricter
+    // thing than the window needs and a list nobody finishes: forty-one
+    // image formats failed it, all of them obscure, and adding forty-one
+    // lines pointing at the one image glyph would have left the forty-
+    // second to fail the same way.
+    //
+    // What actually matters is that a file terminus has a KIND for never
+    // draws the mark of a file it has never heard of. So the check is the
+    // resolution the window performs — the table first, the kind behind
+    // it — and it now covers the fallback as well as the table.
+    const resolve = (ext) => {
+      const g = T.glyphFor({ name: "x." + ext });
+      if (!T.isPlain(g)) return g;
+      const kind = tctx.isFont("x." + ext) ? "font" : tctx.kindOf("x." + ext);
+      return T.kindGlyph(kind) || g;
+    };
     const gap = (tableName) => {
       const tbl = tctx[tableName] || {};
-      return Object.keys(tbl)
-        .filter((e) => tbl[e] && T.EXTS[e] === undefined);
+      return Object.keys(tbl).filter((e) => tbl[e] && T.isPlain(resolve(e)));
     };
     for (const name of ["ARCHIVE_EXTS", "IMAGE_EXTS", "VIDEO_EXTS",
                         "AUDIO_EXTS", "FONT_EXTS", "TEXT_EXTS"]) {
-      const miss = gap(name);
-      t.eq("every extension in " + name + " has a glyph", miss, []);
+      t.eq("every extension in " + name + " draws as its kind", gap(name), []);
     }
     // and the same for the kinds the listing colours rows by
     const cats = tctx.CAT_EXTS || {};
     for (const k of Object.keys(cats)) {
       const miss = Object.keys(cats[k])
-        .filter((e) => cats[k][e] && T.EXTS[e] === undefined);
-      t.eq("every " + k + " extension has a glyph", miss, []);
+        .filter((e) => cats[k][e] && T.isPlain(resolve(e)));
+      t.eq("every " + k + " extension draws as its kind", miss, []);
     }
+    // And the fallback table itself: a kind terminus can return with no
+    // glyph behind it is the hole this was all about, one level up.
+    for (const k of ["image", "video", "audio", "archive", "document",
+                     "text", "font"])
+      t.ok("the " + k + " kind has a fallback glyph", T.kindGlyph(k) !== "");
   }
 };

@@ -761,6 +761,48 @@ function isVideo(name) {
   return VIDEO_EXTS[n.slice(cut + 1).toLowerCase()] === 1;
 }
 
+// ── WHAT QT CANNOT OPEN, WHATEVER IT IS CALLED ──────────────────────────
+// isImage answers "is this a picture", which is the right question for the
+// glyph, the colour, the sort and the kind column. It is the wrong question
+// for "can I point an Image at it": this Qt has decoders for about a quarter
+// of the formats in IMAGE_EXTS, and the rest — every camera raw, the whole
+// HEIF family, jxl, psd, xcf — fail on decode. A folder of phone photos
+// previewed as nothing at all and wrote two warnings per file doing it.
+//
+// The answer is a thumbnail rendered by ImageMagick, which reads 51 of the
+// 68 Qt cannot. This is the list that says which files to send that way
+// rather than handing them to Qt first.
+//
+// DELIBERATELY NOT AUTHORITATIVE. Qt also sniffs content, so an extension
+// list can only ever approximate it, and the plugins present differ per
+// machine. Being wrong here costs nothing in either direction: a format
+// wrongly listed gets a thumbnail it did not need, and one wrongly missing
+// is caught when the Image fails and the caller remembers the extension —
+// see root.blindExt. It is an optimisation with a safety net under it, not
+// a source of truth, which is why it may be edited freely.
+var QT_BLIND_EXTS = {
+  // camera raw, every one of them
+  arw: 1, cr2: 1, cr3: 1, crw: 1, dcr: 1, dng: 1, erf: 1, kdc: 1, mef: 1,
+  mos: 1, mrw: 1, nef: 1, nrw: 1, orf: 1, pef: 1, raf: 1, raw: 1, rw2: 1,
+  sr2: 1, srf: 1, srw: 1, x3f: 1,
+  // the HEIF family and its neighbours
+  avif: 1, avifs: 1, heif: 1, heic: 1, hif: 1, avci: 1, hej2: 1, jxl: 1,
+  jxr: 1, hdp: 1, wdp: 1,
+  // editor and exchange formats
+  psd: 1, psb: 1, xcf: 1, kra: 1, krz: 1, ora: 1, exr: 1, hdr: 1, dds: 1,
+  // the old raster zoo
+  pcx: 1, ras: 1, sun: 1, sct: 1, tim: 1, pic: 1, pxr: 1, ff: 1, qoi: 1,
+  pfm: 1, phm: 1, iff: 1, ilbm: 1, lbm: 1, rgb: 1, rgba: 1, bw: 1, sgi: 1,
+  ani: 1, eps: 1, epsf: 1, epsi: 1
+};
+
+function qtBlind(name) {
+  var n = String(name);
+  var cut = n.lastIndexOf(".");
+  if (cut <= 0) return false;
+  return QT_BLIND_EXTS[n.slice(cut + 1).toLowerCase()] === 1;
+}
+
 function isImage(name) {
   const n = String(name);
   const cut = n.lastIndexOf(".");
@@ -1730,6 +1772,52 @@ function urlFallbackName(url) {
   try { n = decodeURIComponent(n); } catch (e) { /* leave it as it came */ }
   n = n.replace(/[\/\0]/g, "");
   return n === "" ? "download" : n;
+}
+
+// ── THE OPEN BRANCHES THAT ARE STILL THERE ──────────────────────────────
+// openDirs is deliberately never pruned — walking out of a folder and back
+// in should find it as you left it — and that is right for a session. It is
+// wrong for a list restored from DISK, where every entry is a guess about a
+// directory that may have been deleted months ago. Measured on this machine
+// before it was: 59 of 70 remembered branches pointed at nothing.
+//
+// Two costs, and the second is the sharp one. The list is capped, so ghosts
+// occupy slots and evict branches that do exist, and the feature quietly
+// stops working. And openBranches hands every branch UNDER the current
+// directory to inotifywait, filtered by prefix rather than by existence —
+// inotifywait exits at once on a path that is not there, taking the watch on
+// the directory down with it and leaving a listing that silently stops
+// refreshing. In a session forgetVanished clears those out; a restored list
+// has never been through it.
+//
+// find with -maxdepth 0, which is the one-shot way to ask "which of these
+// exist" — the missing ones go to stderr and the survivors come back in one
+// pass, NUL separated because a path may hold anything but NUL.
+function livingDirsCommand(lists) {
+  const parts = [];
+  for (var i = 0; i < lists.length; ++i) {
+    var l = lists[i] || [];
+    // find with no paths is an error, not an empty answer.
+    if (l.length > 0)
+      parts.push("find "
+        + l.map(function (p) { return Strings.shellQuote(p); }).join(" ")
+        // `|| true`, because find exits nonzero for having been ASKED about a
+        // path that is gone — which is the ordinary case here and not a
+        // failure. The survivors are already on stdout by then.
+        + " -maxdepth 0 -type d -print0 2>/dev/null || true");
+    else parts.push("true");
+  }
+  return parts.join("; printf '\\036'; ");
+}
+
+function parseLivingDirs(text, n) {
+  var out = [];
+  var chunks = String(text || "").split(RECORD);
+  for (var i = 0; i < n; ++i) {
+    var c = chunks[i] === undefined ? "" : chunks[i];
+    out.push(c.split("\u0000").filter(function (p) { return p !== ""; }));
+  }
+  return out;
 }
 
 function conflictCommand(names, destDir) {

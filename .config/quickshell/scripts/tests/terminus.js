@@ -169,6 +169,113 @@ module.exports = {
     t.has("move refuses to descend into a directory", T.renameCommand("/d/x", "/d/y"), "mv -T");
     t.has("chmod takes the octal", T.chmodCommand(["/d/x"], 0o755), "755");
 
+    // ── THE RESTORED BRANCHES, SIEVED ─────────────────────────────────────
+    // A list of open branches off disk is a list of guesses. It is capped,
+    // so ghosts evict the living, and a ghost under the restored directory
+    // is handed to inotifywait, which exits on it and takes the watch down.
+    const sieve = T.livingDirsCommand([["/a b", "/c"], ["/d"]]);
+    t.has("each path is quoted", sieve, "'/a b'");
+    t.has("it asks about the paths themselves", sieve, "-maxdepth 0 -type d");
+    t.has("NUL separated, because a path may hold anything else",
+      sieve, "-print0");
+    // find exits nonzero for having been ASKED about a path that is gone,
+    // which is the ordinary case here and not a failure.
+    t.has("a missing path is not an error", sieve, "|| true");
+    t.eq("the two lists are kept apart",
+      sieve.split("printf '\\036'").length, 2);
+    // find with no paths is an error rather than an empty answer.
+    t.has("an empty list asks nothing", T.livingDirsCommand([[], ["/d"]]), "true;");
+    t.ok("and does not invoke find for it",
+      T.livingDirsCommand([[], []]).indexOf("find") < 0);
+
+    t.eq("the survivors come back per list",
+      T.parseLivingDirs("/a\u0000/b\u0000\u001e/c\u0000", 2),
+      [["/a", "/b"], ["/c"]]);
+    t.eq("an empty half is an empty list",
+      T.parseLivingDirs("\u001e/c\u0000", 2), [[], ["/c"]]);
+    t.eq("nothing at all is two empty lists",
+      T.parseLivingDirs("", 2), [[], []]);
+    t.eq("and a missing half does not become undefined",
+      T.parseLivingDirs("/a\u0000", 2), [["/a"], []]);
+
+    // ── WHAT QT CANNOT OPEN ───────────────────────────────────────────────
+    // Every one of these is an image by every other measure — the glyph, the
+    // colour, the sort — and none of them can be handed to an Image element.
+    // They go to ImageMagick instead; see root.needsRender.
+    for (const e of ["cr2", "nef", "arw", "dng", "heic", "avif", "jxl",
+                     "psd", "xcf", "exr", "pcx"]) {
+      t.ok("a ." + e + " is an image", T.isImage("photo." + e));
+      t.ok("...that Qt cannot open", T.qtBlind("photo." + e));
+    }
+    // And the ones it can are not sent the long way round for nothing.
+    for (const e of ["png", "jpg", "jpeg", "gif", "webp", "bmp", "svg",
+                     "tiff", "ico"]) {
+      t.ok("a ." + e + " is an image", T.isImage("photo." + e));
+      t.ok("...and Qt opens it itself", !T.qtBlind("photo." + e));
+    }
+    t.ok("case does not matter", T.qtBlind("PHOTO.CR2"));
+    t.ok("a file with no extension is not blind", !T.qtBlind("noextension"));
+    t.ok("and nor is something that is not an image at all",
+      !T.qtBlind("notes.txt"));
+
+    // ── A RENAME MUST NOT REPLACE ANYTHING ────────────────────────────────
+    // -T stops mv moving the source INSIDE a directory of the target's name,
+    // which is mv's default and never what a rename meant. It does nothing
+    // about a FILE, which mv replaces without a word — so the guard is the
+    // other half, and the only route to an overwrite is the explicit one the
+    // card's Replace answer takes.
+    t.has("a rename checks the target first",
+      T.renameCommand("/d/x", "y"), "[ -e '/d/y' ]");
+    t.has("and says so rather than doing it",
+      T.renameCommand("/d/x", "y"), "exit 1");
+    t.ok("the deliberate overwrite has no guard",
+      T.renameOverCommand("/d/x", "y").indexOf("[ -e") < 0);
+    t.has("but is still -T", T.renameOverCommand("/d/x", "y"), "mv -T");
+
+    // ── KEEP BOTH, WITH THE EXTENSION WHERE A READER EXPECTS IT ───────────
+    const near = [{ name: "report.pdf" }, { name: "report (1).pdf" },
+                  { name: ".zshrc" }, { name: "notes" }];
+    t.eq("a free name is left alone", T.freeNameKeeping(near, "free.txt"),
+      "free.txt");
+    t.eq("a taken one is numbered before its extension",
+      T.freeNameKeeping(near, "report.pdf"), "report (2).pdf");
+    t.eq("a name with no extension is numbered at the end",
+      T.freeNameKeeping(near, "notes"), "notes (1)");
+    // A LEADING dot is the whole name of a hidden file, not an extension:
+    // ".zshrc" must not become " (1).zshrc".
+    t.eq("a hidden file keeps its dot at the front",
+      T.freeNameKeeping(near, ".zshrc"), ".zshrc (1)");
+
+    // ── WHAT IS ALREADY THERE, AND WHETHER IT IS A DIRECTORY ──────────────
+    // Both, because the answer to a clash is not the same word for each:
+    // rsync MERGES a directory of the same name and replaces a file.
+    const clash = T.conflictCommand(["a b.txt"], "/d");
+    t.has("the name is quoted", clash, "'a b.txt'");
+    t.has("and the destination too", clash, "'/d'");
+    t.has("it asks whether the thing is a directory", clash, "-d ");
+    t.has("and never fails for finding nothing", clash, "; true");
+    t.eq("a scan that found nothing parses to nothing",
+      T.parseClashes(""), []);
+    t.eq("a file comes back as one",
+      T.parseClashes("a.txt\u001ff\u001e"), [{ name: "a.txt", isDir: false }]);
+    t.eq("and a directory says so",
+      T.parseClashes("Photos\u001fd\u001e"), [{ name: "Photos", isDir: true }]);
+    t.eq("two of them come back in order",
+      T.parseClashes("Photos\u001fd\u001ea.txt\u001ff\u001e")
+        .map((c) => c.name), ["Photos", "a.txt"]);
+
+    // ── NEW DIRECTORY WITH SELECTION ──────────────────────────────────────
+    // One command, not a create followed by a move: && is what makes it
+    // impossible to move anything into a directory that was not made.
+    const gather = T.gatherCommand("/d", "new directory", ["/d/a b.txt"]);
+    t.ok("the directory is made first", gather.indexOf("mkdir -p --") === 0);
+    t.has("and nothing moves unless it was", gather, "&& mv --");
+    t.has("the new name is quoted", gather, "'/d/new directory'");
+    t.has("and so is a source with a space in it", gather, "'/d/a b.txt'");
+    // -- before the paths, because a file called -r is still a file.
+    t.eq("mv is told where its options end",
+      gather.split("mv ")[1].indexOf("-- "), 0);
+
     // ── modeString ────────────────────────────────────────────────────────
     t.eq("a 755 file reads rwxr-xr-x", T.modeString(0o755), "rwxr-xr-x");
     t.eq("a 644 file reads rw-r--r--", T.modeString(0o644), "rw-r--r--");

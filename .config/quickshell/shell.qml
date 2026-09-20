@@ -804,6 +804,13 @@ ShellRoot {
       // surface it now floats in.
       readonly property real pillWidth: bg.width
       readonly property real pillHeight: bg.height
+      // AND WHERE IT IS, which size alone cannot say. The surface is the
+      // whole output, so a layer asking "where does the bar end" off the
+      // WINDOW gets the screen's edge and not the pill's — which is how the
+      // tray menu came to open at the top of the screen rather than out of
+      // the icon that was clicked. bg.y already knows which edge the bar is
+      // on; this is it, published.
+      readonly property real pillY: bg.y
       // travelEase on all four of these: they ARE the morph, as far as the
       // eye is concerned — the pill sliding out to a panel's margins and
       // growing to its height. Quintic put seven tenths of that change in the
