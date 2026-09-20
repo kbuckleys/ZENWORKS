@@ -38,16 +38,31 @@ MouseArea {
   // after the opening brace, with no need to find the matching close or to
   // guess the nesting of whatever the view is sitting in.
   //
-  // A child of a Flickable is parented to its contentItem, so `parent` is
-  // the whole scrolled content and anchoring to it would make this drift
-  // off with the rows. contentX and contentY are exactly where the
-  // viewport currently sits inside that content, so tracking them keeps
-  // this over the visible part and nowhere else.
+  // A child of a plain Flickable is parented to its contentItem, so
+  // `parent` is the whole scrolled content: it travels with the rows, and
+  // cancelling that with contentX/contentY is what keeps this over the
+  // visible part.
   //
+  // ── BUT ONLY IF THAT IS WHERE WE LANDED ───────────────────────────────
+  // A child declared inside a LIST VIEW is parented to the view itself,
+  // not to its contentItem — measured, not assumed: with the view's own
+  // screen y fixed at 144, this item's climbed 166 → 549 as contentY grew.
+  // It was already in viewport coordinates, and the offset pushed it DOWN
+  // out of the viewport by exactly the distance scrolled.
+  //
+  // The effect is a scroll that dies the further you go: the overlay slides
+  // off the pointer, the wheel stops landing on it, and what is left is the
+  // view's own handling. It needs enough content to push the overlay past
+  // the pointer before it shows, which is why it looked like a property of
+  // tall previews — archives first, then any long folder.
+  //
+  // So the offset is applied only when we are genuinely in the content.
   // A caller that would rather lay it over the view as a SIBLING sets
   // anchors instead, and these bindings are simply replaced.
-  x: shell.view ? shell.view.contentX : 0
-  y: shell.view ? shell.view.contentY : 0
+  readonly property bool inContent:
+    !!shell.view && shell.parent === shell.view.contentItem
+  x: shell.inContent ? shell.view.contentX : 0
+  y: shell.inContent ? shell.view.contentY : 0
   width: shell.view ? shell.view.width : 0
   height: shell.view ? shell.view.height : 0
 
