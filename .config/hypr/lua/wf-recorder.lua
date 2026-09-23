@@ -4,9 +4,12 @@
 -- https://github.com/kbuckleys/
 
 local function record(mode)
-	local output_dir = os.getenv("HOME") .. "/Videos/Captures"
+	-- The videos directory from user-dirs.dirs; see hyprshot.lua for the
+	-- $HOME fallback.
 	local script = [[
-output_dir="]] .. output_dir .. [["
+vids=$(xdg-user-dir VIDEOS 2>/dev/null || true)
+{ [ -n "$vids" ] && [ "$vids" != "$HOME" ]; } || vids="$HOME/Videos"
+output_dir="$vids/Captures"
 mkdir -p "$output_dir"
 
 if pgrep -x wf-recorder >/dev/null; then

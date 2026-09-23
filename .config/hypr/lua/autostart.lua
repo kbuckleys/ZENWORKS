@@ -10,7 +10,9 @@ hl.on("hyprland.start", function()
     --
     -- Through the shell's launcher, which decides the GPU and allocator
     -- environment for whatever machine this is — see scripts/launch.sh.
-    hl.exec_cmd(os.getenv("HOME") .. "/.config/quickshell/scripts/launch.sh -n")
+    local xdg = os.getenv("XDG_CONFIG_HOME")
+    local config = (xdg and xdg ~= "") and xdg or (os.getenv("HOME") .. "/.config")
+    hl.exec_cmd(config .. "/quickshell/scripts/launch.sh -n")
     hl.exec_cmd("wl-clip-persist --clipboard regular")
     hl.exec_cmd("dbus-update-activation-environment --all")
     hl.exec_cmd("systemctl --user import-environment")

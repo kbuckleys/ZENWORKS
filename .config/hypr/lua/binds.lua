@@ -29,7 +29,7 @@ hl.bind("SUPER + SHIFT + B",  hl.dsp.exec_cmd("qs ipc call Picasso toggle"))
 hl.bind("SUPER + P",          hl.dsp.exec_cmd("qs ipc call Ceres toggleWindow packages"))
 hl.bind("SUPER + SHIFT + P",  hl.dsp.exec_cmd("qs ipc call Ceres toggleWindow updates"))
 
--- spoot
+-- spoot: a personal project outside this repo; drop these two if you do not have it
 hl.bind("SUPER + M",          hl.dsp.exec_cmd("~/Projects/spoot/bin/spoot"))
 hl.bind("SUPER + SHIFT + M",  hl.dsp.exec_cmd("~/Projects/spoot/bin/spoot --listen"))
 

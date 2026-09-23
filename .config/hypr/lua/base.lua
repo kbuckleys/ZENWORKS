@@ -4,6 +4,9 @@
 -- https://github.com/kbuckleys/
 
 -- MONITORS
+-- Any output without a rule of its own (another machine, a projector) gets
+-- its preferred mode rather than being left unconfigured.
+hl.monitor({ output = "",          mode = "preferred",      position = "auto", scale = "auto", })
 hl.monitor({ output = "DP-1",      mode = "2560x1440@180",  position = "auto", })
 hl.monitor({ output = "HDMI-A-1",  mode = "1920x1080@100",  position = "auto", transform = 3, })
 
