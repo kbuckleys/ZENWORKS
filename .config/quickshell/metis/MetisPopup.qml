@@ -203,7 +203,10 @@ PanelWindow {
     openAnim.restart();
     popup.syncFocus();
 
-    popup.detach("qalc --exrates >/dev/null 2>&1");
+    // At most twice a day: the ECB publishes once, and fetching on every
+    // open was a network round trip each time the calculator appeared.
+    popup.detach("f=\"${QALCULATE_USER_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/qalculate}/eurofxref-daily.xml\"; "
+      + "[ -n \"$(find \"$f\" -mmin -720 2>/dev/null)\" ] || qalc --exrates >/dev/null 2>&1");
   }
 
   function closePopup() {
