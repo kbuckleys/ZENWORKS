@@ -18,7 +18,6 @@ Notes
 - Qt reads its image-format plugin list ONCE PER PROCESS. After installing ```qt6-imageformats``` or ```kimageformats``` you must restart quickshell; a config reload is not enough
 - bandwhich needs a capability grant to read traffic without root: ```scripts/bandwhich-grant.sh``` does this via ```pkexec```
 - ```xdg-open``` means the suite inherits whatever handlers your system has. Those are not listed here and cannot be enumerated from the code
-- Remember to make the script files in ```/quickshell/scripts/``` executable
 
 Endpoints
 -
