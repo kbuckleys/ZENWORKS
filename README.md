@@ -37,3 +37,5 @@ Endpoints
 | Dictionary | qs ipc call Lexi toggle |
 | Translator | qs ipc call Lexi translate |
 | Background Browser | qs ipc call Picasso toggle |
+| Package Manager | qs ipc call Ceres toggleWindow packages |
+| Package Manager - Updates | qs ipc call Ceres toggleWindow updates |
