@@ -267,16 +267,49 @@ PanelWindow {
     popup.syncFocus();
   }
 
+  // Each fetch is an assignment whose status is rbw's own, so it chains
+  // with && and a failed lookup stops before anything is typed or copied.
   function rbwFetch(kind, entry) {
     const id = Strings.shellQuote(entry.id);
     if (kind === "user")
-      return "u=$(rbw get --field user " + id + "); ";
+      return "u=$(rbw get --field user " + id + ")";
     if (kind === "pass")
-      return "p=$(rbw get " + id + "); ";
+      return "p=$(rbw get " + id + ")";
     if (kind === "totp")
-      return "t=$(rbw code " + id + "); ";
+      return "t=$(rbw code " + id + ")";
     return "";
   }
+
+  // Through wtype's stdin, never its argv: argv is readable in /proc by
+  // anything running as you, and a secret that began with "-" would have
+  // been parsed as an option.
+  function typeVar(v) {
+    return "printf '%s' \"$" + v + "\" | wtype -";
+  }
+
+  // `wl-paste --watch cliphist store` keeps everything copied, so a secret
+  // has to be kept out of the history, not just cleared from the clipboard
+  // afterwards. wl-copy --sensitive marks the offer so the watcher reports
+  // CLIPBOARD_STATE=sensitive and cliphist skips it; wl-clipboard releases
+  // up to 2.2.1 lack the flag, so there the entry is taken back out of
+  // cliphist once stored, and only if the newest entry is this secret.
+  // A shell function, so the secret is passed without an exec and never
+  // reaches any process's argv. Clears the clipboard after 30s if it still
+  // holds the secret.
+  readonly property string copySecretFn:
+    "copy_secret() { "
+    + "if wl-copy --help 2>&1 | grep -q -- --sensitive; then "
+    + "printf '%s' \"$1\" | wl-copy --sensitive >/dev/null 2>&1 || return 1; "
+    + "else "
+    + "printf '%s' \"$1\" | wl-copy >/dev/null 2>&1 || return 1; "
+    + "if command -v cliphist >/dev/null 2>&1; then "
+    + "sleep 0.5; l=$(cliphist list 2>/dev/null | head -n1); "
+    + "if [ -n \"$l\" ] && [ \"$(printf '%s\\n' \"$l\" | cliphist decode 2>/dev/null)\" = \"$1\" ]; then "
+    + "printf '%s\\n' \"$l\" | cliphist delete >/dev/null 2>&1; fi; fi; "
+    + "fi; "
+    + "sleep 30; "
+    + "if [ \"$(wl-paste 2>/dev/null)\" = \"$1\" ]; then wl-copy --clear >/dev/null 2>&1; fi; "
+    + "return 0; }; "
 
   function execute(kind) {
     const entry = popup.activeEntry;
@@ -286,46 +319,22 @@ PanelWindow {
 
     // consume pipelines: rbw output flows through pipes only — secrets
     // never appear in argv, env, files, or logs
+    const fail = " || echo CALYPSO_ACTION_FAILED";
+    const fetchVar = { user: "u", pass: "p", totp: "t" };
+    let script = "";
     if (kind === "both") {
-      actionProc.command = ["bash", "-c",
-        "{ " + rbwFetch("user", entry) + "} && { " + rbwFetch("pass", entry) + "}" +
-        " && sleep 0.3 && wtype \"$u\" -k Tab \"$p\""];
-    } else if (kind === "user") {
-      actionProc.command = ["bash", "-c",
-        rbwFetch("user", entry) + "sleep 0.3 && wtype \"$u\"" +
-        " || echo CALYPSO_ACTION_FAILED"];
-    } else if (kind === "pass") {
-      actionProc.command = ["bash", "-c",
-        rbwFetch("pass", entry) + "sleep 0.3 && wtype \"$p\"" +
-        " || echo CALYPSO_ACTION_FAILED"];
-    } else if (kind === "totp") {
-      actionProc.command = ["bash", "-c",
-        rbwFetch("totp", entry) + "sleep 0.3 && wtype \"$t\"" +
-        " || echo CALYPSO_ACTION_FAILED"];
-    } else if (kind === "copypass") {
-      actionProc.command = ["bash", "-c",
-        rbwFetch("pass", entry) +
-        "printf '%s' \"$p\" | wl-copy >/dev/null 2>&1" +
-        " && sleep 30" +
-        " && if [ \"$(wl-paste)\" = \"$p\" ]; then printf '' | wl-copy >/dev/null 2>&1; fi" +
-        " || echo CALYPSO_ACTION_FAILED"];
-    } else if (kind === "copyuser") {
-      actionProc.command = ["bash", "-c",
-        rbwFetch("user", entry) +
-        "printf '%s' \"$u\" | wl-copy >/dev/null 2>&1" +
-        " && sleep 30" +
-        " && if [ \"$(wl-paste)\" = \"$u\" ]; then printf '' | wl-copy >/dev/null 2>&1; fi" +
-        " || echo CALYPSO_ACTION_FAILED"];
-    } else if (kind === "copytotp") {
-      actionProc.command = ["bash", "-c",
-        rbwFetch("totp", entry) +
-        "printf '%s' \"$t\" | wl-copy >/dev/null 2>&1" +
-        " && sleep 30" +
-        " && if [ \"$(wl-paste)\" = \"$t\" ]; then printf '' | wl-copy >/dev/null 2>&1; fi" +
-        " || echo CALYPSO_ACTION_FAILED"];
+      script = rbwFetch("user", entry) + " && " + rbwFetch("pass", entry)
+        + " && sleep 0.3 && " + typeVar("u") + " && wtype -k Tab && " + typeVar("p");
+    } else if (kind === "user" || kind === "pass" || kind === "totp") {
+      script = rbwFetch(kind, entry) + " && sleep 0.3 && " + typeVar(fetchVar[kind]);
+    } else if (kind === "copyuser" || kind === "copypass" || kind === "copytotp") {
+      const k = kind.slice(4);
+      script = popup.copySecretFn + rbwFetch(k, entry)
+        + " && copy_secret \"$" + fetchVar[k] + "\"";
     } else {
       return;
     }
+    actionProc.command = ["bash", "-c", script + fail];
 
     // gate everything behind the agent's lock state
     checkLock("action");
