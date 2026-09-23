@@ -24,7 +24,6 @@ Endpoints
 -
 | Component | Endpoint |
 | --- | --- |
-| Session Manager | qs ipc call Erebus toggle |
 | App Launcher / Shell Command | qs ipc call Cynosure toggle |
 | File Manager | qs ipc call Terminus spawn |
 | Clipboard Manager | qs ipc call Folio toggle |
