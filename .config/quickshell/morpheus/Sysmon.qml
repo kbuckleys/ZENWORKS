@@ -98,8 +98,12 @@ Singleton {
 
   Process {
     id: cpuTempFind
+    // By driver name, so AMD answers as well as Intel: coretemp's temp1 is
+    // the package, k10temp's Tctl, zenpower's Tdie.
     command: ["sh", "-c",
-      "find /sys/devices/platform/coretemp.0/hwmon -name temp1_input 2>/dev/null | head -n1"]
+      "for h in /sys/class/hwmon/hwmon*; do case \"$(cat \"$h/name\" 2>/dev/null)\" in "
+      + "coretemp|k10temp|zenpower) [ -r \"$h/temp1_input\" ] && { echo \"$h/temp1_input\"; exit 0; } ;; "
+      + "esac; done"]
     stdout: StdioCollector {
       id: cpuTempOut
       waitForEnd: true
