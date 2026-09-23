@@ -37,7 +37,6 @@ import QtQuick.Effects
 import QtMultimedia
 import "../morpheus"
 import "../picasso"
-import "."
 import "terminus.js" as Terminus
 import "../morpheus/icons.js" as Icons
 import "../morpheus/thumbs.js" as Thumbs
@@ -81,8 +80,8 @@ FloatingWindow {
   // tiles are written at document scope, so the same gesture worked there and
   // the two halves disagreed for no visible reason.
   //
-  // The bookmark sidebar had the identical bug against the bookmark file
-  // (now TerminusBookmarks), which is what made removed bookmarks come back. One wrapper per id that a
+  // The bookmark sidebar had the identical bug against `bookmarkFile`, which
+  // is what made removed bookmarks come back. One wrapper per id that a
   // delegate needs, and the trap is closed.
   function openMenuAt(item, mouse) { menu.openAt(item, mouse); }
 
@@ -3586,13 +3585,74 @@ FloatingWindow {
   }
 
   // ── bookmarks ───────────────────────────────────────────────────────────
-  // One list for every window: the file, its watch and the re-read-before-
-  // write rule live in TerminusBookmarks. These names stay so the rest of
-  // this file reads bookmarks the way it always has.
-  readonly property var bookmarks: TerminusBookmarks.list
-  function loadBookmarks() { TerminusBookmarks.load(); }
-  function isBookmarked(path) { return TerminusBookmarks.has(path); }
-  function editBookmarks(mutate) { TerminusBookmarks.edit(mutate); }
+  // Kept in the shell's own state directory, not next to the config: it is
+  // something you accumulate by using terminus, not something you write by hand.
+  property var bookmarks: []
+
+  FileView {
+    id: bookmarkFile
+    path: Quickshell.statePath("terminus-bookmarks")
+    blockLoading: true
+    printErrors: false
+    // FileView can watch its own file, which is the one kind of watching
+    // quickshell does offer — so a bookmark added in another terminus window,
+    // or edited by hand, shows up here without a restart.
+    watchChanges: true
+
+    // TWO SIGNALS, AND THEY ARE NOT THE SAME EVENT. This took three goes.
+    //
+    // `fileChanged` says the file on disk is no longer what we hold. It
+    // refreshes nothing by itself, so it has to ask — and `reload()` only
+    // QUEUES the read. text() immediately afterwards still answers with the
+    // copy we already had, which is what defeated every previous attempt
+    // here: a "we are writing" flag that got stuck and swallowed other
+    // windows' changes, and then a comparison against the text we last wrote
+    // which compared the OLD content against the NEW and concluded it was
+    // somebody else's news — so it re-derived the list from the stale bytes
+    // and put back the bookmark you had just removed, about a second after
+    // you removed it. That was the "not instant".
+    //
+    // `textChanged` is where the new bytes actually arrive. By then the
+    // question "what does the file say" has an answer, and it does not matter
+    // who wrote it: our own write lands here too and simply re-derives the
+    // array the sidebar is already showing. There is no state left to get
+    // stuck, and nothing to compare.
+    onFileChanged: bookmarkFile.reload()
+    onTextChanged: root.loadBookmarks()
+  }
+
+  function loadBookmarks() {
+    const raw = String(bookmarkFile.text() || "").split("\n")
+      .map((l) => l.trim()).filter((l) => l !== "");
+    root.bookmarks = raw;
+  }
+
+  function isBookmarked(path) { return root.bookmarks.indexOf(path) >= 0; }
+
+  // Every change goes through here, and it re-reads before it writes.
+  //
+  // The list is shared by every terminus window, so "what I think it is" is not
+  // good enough to base a write on — the copy in hand can be stale, and a
+  // read-modify-write on a stale copy silently reverts whatever another window
+  // did. Re-reading immediately before mutating makes the last write win on
+  // the CURRENT list rather than on an old one.
+  function editBookmarks(mutate) {
+    // Re-read before mutating, FOR REAL. reload() queues the read and
+    // waitForJob() is what blocks until it has landed — without it, the
+    // "modify the CURRENT list rather than an old one" this function exists
+    // for was operating on exactly the old one it was trying to avoid.
+    // Blocking is already the deal here: blockLoading is on, and this is one
+    // short line-per-path file.
+    bookmarkFile.reload();
+    bookmarkFile.waitForJob();
+    root.loadBookmarks();
+    const next = root.bookmarks.slice();
+    mutate(next);
+    // In memory first, so the sidebar changes on this frame. The write comes
+    // back round through onTextChanged and re-derives the same array.
+    root.bookmarks = next;
+    bookmarkFile.setText(next.join("\n") + "\n");
+  }
 
   // One key, both directions: bookmarking the folder you are in and removing
   // it again are the same gesture, and a separate "unbookmark" would need you
@@ -3724,10 +3784,10 @@ FloatingWindow {
     path: Quickshell.statePath("terminus-tags.json")
     blockLoading: true
     printErrors: false
-    // Same reason the bookmark file is watched: a second terminus window writing a
+    // Same reason bookmarkFile watches: a second terminus window writing a
     // tag should show up here without a restart. And the same two-signal
     // dance — reload() only QUEUES the read, textChanged is where the bytes
-    // actually land. See the long note in TerminusBookmarks.
+    // actually land. See the long note on bookmarkFile.
     watchChanges: true
     onFileChanged: tagFile.reload()
     onTextChanged: root.loadTags()
