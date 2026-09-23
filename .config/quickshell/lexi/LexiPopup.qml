@@ -594,9 +594,14 @@ PanelWindow {
   function drainWrite() {
     if (popup.writeQueue.length === 0 || writeProc.running) return;
     const job = popup.writeQueue.shift();
-    writeProc.command = ["sh", "-c",
-      "printf '%s' " + Strings.shellQuote(job.content) + " > " + Strings.shellQuote(job.path)];
+    // Through stdin, not argv. A cache rewritten as one `printf '%s' <all of
+    // it>` argument fails with E2BIG once it passes 128 KiB (a single argv
+    // string's limit), and nothing is written. Closing stdin ends `cat`.
+    writeProc.command = ["sh", "-c", "cat > \"$1\"", "lexi-write", job.path];
+    writeProc.stdinEnabled = true;
     writeProc.running = true;
+    writeProc.write(job.content);
+    writeProc.stdinEnabled = false;
   }
 
   function detach(script) {
