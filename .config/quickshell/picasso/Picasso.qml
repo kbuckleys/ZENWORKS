@@ -43,29 +43,9 @@ Singleton {
     return d === "" ? root.defaultDir : d;
   }
 
-  // XDG_PICTURES_DIR, from the file xdg-user-dirs actually writes it to. The
-  // environment variable is checked first by Paths.pictures(), for the
-  // sessions that do export it, and the spec's default is the floor under
-  // both.
-  property string picturesDir: Paths.pictures()
-
-  FileView {
-    id: userDirs
-    path: Paths.userDirsFile()
-    blockLoading: true
-    printErrors: false
-    onLoaded: root.readUserDirs()
-  }
-
-  // The file is shell syntax — `XDG_PICTURES_DIR="$HOME/Pictures"` — so $HOME
-  // is expanded by hand rather than by starting a shell to read four lines.
-  function readUserDirs() {
-    const m = String(userDirs.text() || "")
-      .match(/^\s*XDG_PICTURES_DIR\s*=\s*"([^"]*)"/m);
-    if (!m) return;
-    const v = m[1].replace(/\$HOME/g, Paths.home()).replace(/\/+$/, "");
-    if (v !== "") root.picturesDir = v;
-  }
+  // XDG_PICTURES_DIR, from the file xdg-user-dirs actually writes it to —
+  // see morpheus/UserDirs.
+  readonly property string picturesDir: UserDirs.pictures
 
   // Where the thumbnails live and how big they are is morpheus/thumbs.js'
   // business, not picasso's — see scan(), which builds both from Thumbs so a
@@ -343,8 +323,6 @@ Singleton {
   onDirChanged: rescanDebounce.restart()
 
   Component.onCompleted: {
-    // before the scan, because it decides which directory is scanned
-    root.readUserDirs();
     // parseState reads the old bare-map file as well as the current one, so
     // an install that predates per-monitor fit loads with its wallpapers
     // intact and no fits set — which is exactly what it had.

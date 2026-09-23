@@ -30,6 +30,7 @@ singleton Arrival 1.0 Arrival.qml
 Glow 1.0 Glow.qml
 singleton Strings 1.0 Strings.qml
 singleton Paths 1.0 Paths.qml
+singleton UserDirs 1.0 UserDirs.qml
 singleton Desktop 1.0 Desktop.qml
 MenuShadow 1.0 MenuShadow.qml
 Scrollbar 1.0 Scrollbar.qml
