@@ -17,43 +17,8 @@ import Quickshell.Widgets
 import "../morpheus"
 import "picasso.js" as Art
 
-PanelWindow {
+LayerPopup {
   id: popup
-
-  WlrLayershell.layer: WlrLayer.Overlay
-
-  property bool shown: false
-  property bool morphMode: false
-  property real morphFade: 1
-  property real showFactor: 0
-  property bool collapsing: false
-  // ── NO SCALE WHEN MORPHED, AND THAT IS THE POINT ────────────────────
-  // This briefly followed contentFade so the panel would grow as it faded,
-  // the way a detached one does. It looked wrong, and the capture showed
-  // why: detached, the panel is arriving out of nothing and 0.94 -> 1.0
-  // reads as arrival. Morphed, the container is ALREADY THERE — it is the
-  // pill — so the same scale is not an entrance, it is the text being
-  // stretched horizontally in place. Measured across the morph: the
-  // content spread outward over seven frames.
-  //
-  // So a morph is a straight crossfade inside a shape that is already
-  // right, and the scale belongs to the case that has something to scale
-  // from.
-  readonly property real growth: popup.showFactor
-  readonly property real panelX: (popup.collapsing ? 0.985 + 0.015 * popup.growth
-                        : 0.94 + 0.06 * popup.growth)
-  readonly property real panelY: (popup.collapsing ? 0.82 + 0.18 * popup.growth
-                        : 0.90 + 0.10 * popup.growth)
-  // Math.min, not morphFade alone. Handing the pill straight to another
-  // layer leaves morphFade pinned at 1 — the pill never un-morphs, so there
-  // is nothing to ease it down — and this layer stayed fully opaque until its
-  // window simply blinked out. Its own closeAnim is already easing
-  // showFactor to 0, so taking the lower of the two fades it out on the way
-  // between layers while leaving the normal open schedule untouched.
-  readonly property real contentFade: popup.morphMode
-    ? Math.min(popup.morphFade, popup.showFactor) : popup.showFactor
-
-  property var statusbar: null
 
   readonly property color bgColor: Zenon.layerBg
   readonly property color msgColor: Zenon.headBg
@@ -265,24 +230,7 @@ PanelWindow {
     }
   }
 
-  visible: popup.showFactor > 0.01
-  color: "transparent"
-  anchors { left: true; right: true; top: true; bottom: true }
   focusable: true
-  exclusionMode: ExclusionMode.Ignore
-
-  NumberAnimation {
-    id: openAnim
-    target: popup; property: "showFactor"
-    to: 1; duration: Zenon.slow; easing.type: Zenon.ease
-  }
-
-  NumberAnimation {
-    id: closeAnim
-    target: popup; property: "showFactor"
-    to: 0; duration: Zenon.slow; easing.type: Zenon.ease
-    onFinished: popup.shown = false
-  }
 
   // ONE GRAB OVER ALL THREE SURFACES. A card is its own layer-shell window,
   // so a grab that listed only the panel would treat the card as "somewhere
@@ -345,16 +293,13 @@ PanelWindow {
     popup.closeMenu();
     popup.menuPath = "";
     Picasso.scan();
-    closeAnim.stop();
-    popup.showFactor = 0;
-    openAnim.restart();
+    popup.playOpen();
     popup.syncFocus();
   }
 
   function closePopup() {
     popup.collapsing = true;
-    openAnim.stop();
-    closeAnim.restart();
+    popup.playClose();
   }
 
   function toggle() {

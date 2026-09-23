@@ -29,29 +29,10 @@ import "."
 import "../oracle"
 import "ceres.js" as Cer
 
-PanelWindow {
+LayerPopup {
   id: popup
-  WlrLayershell.layer: WlrLayer.Overlay
 
-  property bool shown: false
-  property bool morphMode: false
-  property real morphFade: 1
-  property real showFactor: 0
-  property bool collapsing: false
-  property var statusbar: null
-  readonly property real growth: popup.showFactor
-  readonly property real panelX: (popup.collapsing ? 0.985 + 0.015 * popup.growth
-                        : 0.94 + 0.06 * popup.growth)
-  readonly property real panelY: (popup.collapsing ? 0.82 + 0.18 * popup.growth
-                        : 0.90 + 0.10 * popup.growth)
-  readonly property real contentFade: popup.morphMode
-    ? Math.min(popup.morphFade, popup.showFactor) : popup.showFactor
-
-  visible: popup.showFactor > 0.01
-  color: "transparent"
-  anchors { left: true; right: true; top: true; bottom: true }
   focusable: true
-  exclusionMode: ExclusionMode.Ignore
 
   // ── which face ──────────────────────────────────────────────────────────
   // Asking for the password is this panel's state; everything after it is
@@ -108,17 +89,6 @@ PanelWindow {
   readonly property int panelWidth: 720
 
   // ── opening ─────────────────────────────────────────────────────────────
-  NumberAnimation {
-    id: openAnim
-    target: popup; property: "showFactor"
-    to: 1; duration: Zenon.slow; easing.type: Zenon.ease
-  }
-  NumberAnimation {
-    id: closeAnim
-    target: popup; property: "showFactor"
-    to: 0; duration: Zenon.slow; easing.type: Zenon.ease
-    onFinished: popup.shown = false
-  }
 
   HyprlandFocusGrab {
     windows: [ popup ]
@@ -129,7 +99,7 @@ PanelWindow {
   function openPopup() {
     popup.shown = true;
     popup.collapsing = false;
-    openAnim.restart();
+    popup.playOpen();
     keys.forceActiveFocus();
   }
 
@@ -143,8 +113,7 @@ PanelWindow {
     // A result that has been seen is done with; a run in progress is not.
     if (Ceres.txState === "done" || Ceres.txState === "authfail") Ceres.txClear();
     popup.collapsing = true;
-    openAnim.stop();
-    closeAnim.restart();
+    popup.playClose();
   }
 
   function toggle() {

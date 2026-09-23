@@ -42,6 +42,7 @@ Working 1.0 Working.qml
 DialogButton 1.0 DialogButton.qml
 ScrollRail 1.0 ScrollRail.qml
 Sheet 1.0 Sheet.qml
+LayerPopup 1.0 LayerPopup.qml
 InputShield 1.0 InputShield.qml
 KeyCap 1.0 KeyCap.qml
 HintRow 1.0 HintRow.qml
