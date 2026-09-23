@@ -531,45 +531,31 @@ ShellRoot {
   // dynamic pill width, max 1000, each layer retains own width
   property int morpheusContentWidth: barLayout ? barLayout.implicitWidth + 24 : 800
   property int barWidthCollapsed: Zenon.layerWidth(morpheusContentWidth)
+  // The layers the pill can wear, under the names activeLayer uses.
+  readonly property var layers: ({
+    cynosure: cynosure, folio: folio, artemis: artemis, lexi: lexi,
+    zeus: zeus, ideo: ideo, calypso: calypso, metis: metis,
+    howler: howler, ceres: ceres, picasso: picasso, chronos: chronos
+  })
+  // The few that are not sized by their content.
+  readonly property var fixedLayerWidth: ({ zeus: 1000, picasso: 1000, howler: 800 })
+
+  // Every width goes through Zenon.layerWidth, and so does each layer's OWN
+  // panel — the same call with the same argument, which is what stops the
+  // pill and the layer inside it from disagreeing about how wide 1000
+  // currently means. See Zenon.layerMax.
   property int barWidthExpanded: {
     if (!layerOpen) return barWidthCollapsed;
-    try {
-      // follow cynosure's shrink-wrapped width exactly rather than freezing
-      // the pill at the collapsed morpheus width; the 8px floor is only a guard
-      // against a degenerate zero-width pill, never visible padding
-      // Every width here goes through Zenon.layerWidth, and so does the
-      // layer's OWN panel — the two are the same call with the same argument,
-      // which is what stops the pill and the layer inside it from disagreeing
-      // about how wide 1000 currently means. See Zenon.layerMax.
-      if (activeLayer === "cynosure" && cynosure && cynosure.contentWidth)
-        return Zenon.layerWidth(Math.max(8, cynosure.contentWidth))
-      // folio shrink-wraps its longest entry the way cynosure shrink-wraps
-      // its rows, so the pill has to ask it rather than assume the maximum
-      if (activeLayer === "folio" && folio && folio.panelWidth)
-        return Zenon.layerWidth(folio.panelWidth)
-      if (activeLayer === "artemis") return Zenon.layerWidth(artemis.panelWidth)
-      // lexi is prose in three of its views and a list of short strings in
-      // the other two, and only it knows which one is up
-      if (activeLayer === "lexi" && lexi && lexi.panelWidth)
-        return Zenon.layerWidth(lexi.panelWidth)
-      if (activeLayer === "zeus") return Zenon.layerWidth(1000)
-      // ideo is a whole number of emoji cells wide, and how many of those
-      // there are depends on how many survived the filter
-      if (activeLayer === "ideo" && ideo && ideo.panelWidth)
-        return Zenon.layerWidth(ideo.panelWidth)
-      // both fit themselves now — see panelWidth in each
-      if (activeLayer === "calypso" && calypso && calypso.panelWidth)
-        return Zenon.layerWidth(calypso.panelWidth)
-      if (activeLayer === "metis" && metis && metis.panelWidth)
-        return Zenon.layerWidth(metis.panelWidth)
-      if (activeLayer === "howler") return Zenon.layerWidth(800)
-      if (activeLayer === "ceres" && ceres) return Zenon.layerWidth(ceres.panelWidth)
-      if (activeLayer === "picasso") return Zenon.layerWidth(1000)
-      // chronos is sized by its calendar grid, not stretched to the usual max
-      if (activeLayer === "chronos" && chronos && chronos.panelWidth)
-        return Zenon.layerWidth(chronos.panelWidth)
-    } catch (e) {}
-    return Zenon.layerWidth(1000)
+    const l = root.layers[activeLayer];
+    const fixed = root.fixedLayerWidth[activeLayer];
+    if (fixed) return Zenon.layerWidth(fixed);
+    // cynosure shrink-wraps its rows and the pill follows it exactly; the 8px
+    // floor only guards against a degenerate zero-width pill
+    if (activeLayer === "cynosure" && l && l.contentWidth)
+      return Zenon.layerWidth(Math.max(8, l.contentWidth));
+    // the rest fit themselves — see panelWidth in each
+    if (l && l.panelWidth) return Zenon.layerWidth(l.panelWidth);
+    return Zenon.layerWidth(1000);
   }
   property int currentBarWidth: pillMorphed ? barWidthExpanded : barWidthCollapsed
 
@@ -592,19 +578,11 @@ ShellRoot {
   property int barHeightCollapsed: Zenon.slot
   property int barHeightExpanded: {
     if (!layerOpen) return barHeightCollapsed;
+    // cynosure is one row, exactly one slot; the rest measure themselves
+    if (activeLayer === "cynosure") return Zenon.slot;
+    const l = root.layers[activeLayer];
     try {
-      if (activeLayer === "cynosure") return Zenon.slot
-      if (activeLayer === "folio" && folio && folio.calcHeight) return folio.calcHeight()
-      if (activeLayer === "artemis" && artemis && artemis.calcHeight) return artemis.calcHeight()
-      if (activeLayer === "lexi" && lexi && lexi.calcHeight) return lexi.calcHeight()
-      if (activeLayer === "zeus" && zeus && zeus.calcHeight) return zeus.calcHeight()
-      if (activeLayer === "ideo" && ideo && ideo.calcHeight) return ideo.calcHeight()
-      if (activeLayer === "calypso" && calypso && calypso.calcHeight) return calypso.calcHeight()
-      if (activeLayer === "metis" && metis && metis.calcHeight) return metis.calcHeight()
-      if (activeLayer === "howler" && howler && howler.calcHeight) return howler.calcHeight()
-      if (activeLayer === "ceres" && ceres && ceres.calcHeight) return ceres.calcHeight()
-      if (activeLayer === "picasso" && picasso && picasso.calcHeight) return picasso.calcHeight()
-      if (activeLayer === "chronos" && chronos && chronos.calcHeight) return chronos.calcHeight()
+      if (l && l.calcHeight) return l.calcHeight();
     } catch (e) {}
     return 320
   }
@@ -658,96 +636,24 @@ ShellRoot {
     function hideLayer() { root.endMorph(root.activeLayer !== "" ? root.activeLayer : root.morphSource); }
   }
 
-  // watch popups' shown to sync activeLayer (when they toggle via their own ipc)
-  Connections { target: cynosure; function onShownChanged() { if (cynosure.shown) root.beginMorph("cynosure"); else root.endMorph("cynosure"); } }
-  Connections {
-    target: folio
-    function onShownChanged() { if (folio.shown) root.beginMorph("folio"); else root.endMorph("folio"); }
-    // start collapsing the pill the moment the close BEGINS. Waiting for
-    // `shown` means waiting for the whole close animation to finish first,
-    // which left the pill sitting there expanded and empty afterwards.
-    function onCollapsingChanged() { if (folio.collapsing) root.endMorph("folio"); }
+  // Each layer reports opening, and the moment its close BEGINS
+  // (`collapsing`), and the pill follows. Waiting for `shown` to drop instead
+  // means waiting out the whole close animation, which left the pill sitting
+  // there expanded and empty. cynosure has no close animation and so no
+  // `collapsing`.
+  Component.onCompleted: {
+    for (const name in root.layers) {
+      const l = root.layers[name];
+      l.shownChanged.connect(() => l.shown ? root.beginMorph(name) : root.endMorph(name));
+      if (l.collapsingChanged)
+        l.collapsingChanged.connect(() => { if (l.collapsing) root.endMorph(name); });
+    }
   }
-  Connections {
-    target: artemis
-    function onShownChanged() { if (artemis.shown) root.beginMorph("artemis"); else root.endMorph("artemis"); }
-    // start collapsing the pill the moment the close BEGINS. Waiting for
-    // `shown` means waiting for the whole close animation to finish first,
-    // which left the pill sitting there expanded and empty afterwards.
-    function onCollapsingChanged() { if (artemis.collapsing) root.endMorph("artemis"); }
-  }
-  Connections {
-    target: picasso
-    function onShownChanged() { if (picasso.shown) root.beginMorph("picasso"); else root.endMorph("picasso"); }
-    // start collapsing the pill the moment the close BEGINS. Waiting for
-    // `shown` means waiting for the whole close animation to finish first,
-    // which left the pill sitting there expanded and empty afterwards.
-    function onCollapsingChanged() { if (picasso.collapsing) root.endMorph("picasso"); }
-  }
-
-  Connections {
-    target: chronos
-    function onShownChanged() { if (chronos.shown) root.beginMorph("chronos"); else root.endMorph("chronos"); }
-    // start collapsing the pill the moment the close BEGINS. Waiting for
-    // `shown` means waiting for the whole close animation to finish first,
-    // which left the pill sitting there expanded and empty afterwards.
-    function onCollapsingChanged() { if (chronos.collapsing) root.endMorph("chronos"); }
-  }
-  Connections {
-    target: ceres
-    function onShownChanged() { if (ceres.shown) root.beginMorph("ceres"); else root.endMorph("ceres"); }
-    function onCollapsingChanged() { if (ceres.collapsing) root.endMorph("ceres"); }
-  }
-  Connections {
-    target: howler
-    function onShownChanged() { if (howler.shown) root.beginMorph("howler"); else root.endMorph("howler"); }
-    // start collapsing the pill the moment the close BEGINS. Waiting for
-    // `shown` means waiting for the whole close animation to finish first,
-    // which left the pill sitting there expanded and empty afterwards.
-    function onCollapsingChanged() { if (howler.collapsing) root.endMorph("howler"); }
-  }
-  Connections {
-    target: lexi
-    function onShownChanged() { if (lexi.shown) root.beginMorph("lexi"); else root.endMorph("lexi"); }
-    // start collapsing the pill the moment the close BEGINS. Waiting for
-    // `shown` means waiting for the whole close animation to finish first,
-    // which left the pill sitting there expanded and empty afterwards.
-    function onCollapsingChanged() { if (lexi.collapsing) root.endMorph("lexi"); }
-  }
+  // Dragged off, zeus hands the pill straight back: the bar returns to being
+  // a bar while the panel carries on somewhere else on the screen.
   Connections {
     target: zeus
-    function onShownChanged() { if (zeus.shown) root.beginMorph("zeus"); else root.endMorph("zeus"); }
-    // start collapsing the pill the moment the close BEGINS. Waiting for
-    // `shown` means waiting for the whole close animation to finish first,
-    // which left the pill sitting there expanded and empty afterwards.
-    function onCollapsingChanged() { if (zeus.collapsing) root.endMorph("zeus"); }
-    // Dragged off, it hands the pill straight back: the bar returns to being a
-    // bar while the panel carries on somewhere else on the screen.
     function onPinnedChanged() { if (zeus.pinned) root.endMorph("zeus"); }
-  }
-  Connections {
-    target: ideo
-    function onShownChanged() { if (ideo.shown) root.beginMorph("ideo"); else root.endMorph("ideo"); }
-    // start collapsing the pill the moment the close BEGINS. Waiting for
-    // `shown` means waiting for the whole close animation to finish first,
-    // which left the pill sitting there expanded and empty afterwards.
-    function onCollapsingChanged() { if (ideo.collapsing) root.endMorph("ideo"); }
-  }
-  Connections {
-    target: calypso
-    function onShownChanged() { if (calypso.shown) root.beginMorph("calypso"); else root.endMorph("calypso"); }
-    // start collapsing the pill the moment the close BEGINS. Waiting for
-    // `shown` means waiting for the whole close animation to finish first,
-    // which left the pill sitting there expanded and empty afterwards.
-    function onCollapsingChanged() { if (calypso.collapsing) root.endMorph("calypso"); }
-  }
-  Connections {
-    target: metis
-    function onShownChanged() { if (metis.shown) root.beginMorph("metis"); else root.endMorph("metis"); }
-    // start collapsing the pill the moment the close BEGINS. Waiting for
-    // `shown` means waiting for the whole close animation to finish first,
-    // which left the pill sitting there expanded and empty afterwards.
-    function onCollapsingChanged() { if (metis.collapsing) root.endMorph("metis"); }
   }
 
   PanelWindow {
