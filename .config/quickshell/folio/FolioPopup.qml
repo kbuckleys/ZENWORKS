@@ -259,7 +259,6 @@ PanelWindow {
     // sourced from, mid-gesture.
     active: popup.shown && !popup.dragging
     onCleared: {
-      popup.log("grab cleared");
       popup.closePopup();
     }
   }
@@ -290,17 +289,6 @@ PanelWindow {
     onExited: popup.onActionDone()
   }
 
-  Process {
-    id: logProc
-  }
-
-  function log(msg) {
-    logProc.command = ["sh", "-c",
-      "printf '%s\\n' " + Strings.shellQuote(Qt.formatTime(new Date(), "hh:mm:ss") + " " + msg) +
-      " >> /tmp/folio_state.txt"];
-    logProc.running = true;
-  }
-
   function openPopup() {
     popup.shown = true;
     popup.collapsing = false;
@@ -314,14 +302,12 @@ PanelWindow {
     closeAnim.stop();
     popup.showFactor = 0;
     openAnim.restart();
-    popup.log("open");
   }
 
   function closePopup() {
     popup.collapsing = true;
     openAnim.stop();
     closeAnim.restart();
-    popup.log("close");
   }
 
   function toggle() {
@@ -388,7 +374,6 @@ function onThumbsDone() {
   }
 
   function onActionDone() {
-    popup.log("action=" + popup.lastAction);
     if (popup.lastAction === "delete") popup.reload();
     else popup.closePopup();
     popup.lastAction = "";
@@ -420,7 +405,6 @@ function onThumbsDone() {
   function toggleMode() {
     const target = popup.mode === "image" ? "text" : "image";
     const avail = target === "text" ? popup.hasText : popup.hasImg;
-    popup.log("toggle target=" + target + " avail=" + avail);
     if (!avail || popup.mode === target) return;
     popup.mode = target;
     popup.query = "";
