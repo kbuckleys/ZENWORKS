@@ -54,8 +54,12 @@ hl.config({
 
 	general = {
         layout = "scrolling",
+		-- The quickshell suite's one border (Zenon.border: #45505c at 30%, 1px),
+		-- the same whether focused or not. Kept in step with Zenon by hand, as
+		-- `rounding` is with Zenon.windowRadius.
+		border_size = 1,
 		col = {
-			inactive_border = "#45505C26",
+			inactive_border = "#45505C4D",
 			active_border = "#45505C4D",
 		},
 		gaps_out = 4,
