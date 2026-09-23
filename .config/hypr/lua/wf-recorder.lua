@@ -36,7 +36,8 @@ filename="$output_dir/$(date +'%Y-%m-%d-%H%M%S')-$monitor.mp4"
 log=$(mktemp)
 
 # h264_nvenc dropped the old named presets, so preset=lossless is rejected by
-# ffmpeg and the encoder never opens. Lossless is now preset p7 + tune lossless.
+# ffmpeg and the encoder never opens. These args are high-quality VBR (p7,
+# tune hq, cq 20), not lossless; that would be preset p7 + tune lossless.
 # -D (continuous capture) is REQUIRED: with the default damage-based capture a
 # static screen delivers too few frames, and a race in wf-recorder's audio/video
 # sync drops them all, leaving an audio-only file.
