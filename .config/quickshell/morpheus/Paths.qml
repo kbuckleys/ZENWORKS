@@ -36,6 +36,12 @@ QtObject {
     return Quickshell.env("TMPDIR") || "/tmp";
   }
 
+  // Private to this user and cleared at logout; for scratch files that should
+  // not sit under a guessable name in a shared /tmp.
+  function runtimeDir() {
+    return Quickshell.env("XDG_RUNTIME_DIR") || Paths.tmpDir();
+  }
+
   // Where applications, the trash and other shared data live.
   function dataDir() {
     return Quickshell.env("XDG_DATA_HOME") || Paths.home() + "/.local/share";

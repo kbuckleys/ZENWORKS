@@ -43,6 +43,7 @@ function makeContext() {
     home: () => ENV.HOME,
     cacheDir: () => ENV.XDG_CACHE_HOME || Paths.home() + "/.cache",
     tmpDir: () => ENV.TMPDIR || "/tmp",
+    runtimeDir: () => ENV.XDG_RUNTIME_DIR || Paths.tmpDir(),
     dataDir: () => ENV.XDG_DATA_HOME || Paths.home() + "/.local/share",
     configDir: () => ENV.XDG_CONFIG_HOME || Paths.home() + "/.config"
   };

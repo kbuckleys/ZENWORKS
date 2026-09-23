@@ -964,7 +964,7 @@ PanelWindow {
     return rows;
   }
 
-  property string dictAudioPath: "/tmp/qslexicon-dict.audio"
+  readonly property string dictAudioPath: Paths.runtimeDir() + "/qslexicon-dict.audio"
 
   function prefetchDictAudio(file) {
     const url = Lexicon.WIKT_AUDIO_BASE + encodeURIComponent(file);

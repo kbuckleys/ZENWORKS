@@ -18,7 +18,10 @@
 import json, subprocess, sys
 
 names = json.load(open(sys.argv[1])); names.pop("METADATA", None)
-font = sys.argv[2] if len(sys.argv) > 2 else "/usr/share/fonts/TTF/JetBrainsMonoNerdFont-Regular.ttf"
+# Default to wherever fontconfig finds the Nerd Font, not one distro's path.
+font = sys.argv[2] if len(sys.argv) > 2 else subprocess.run(
+    ["fc-match", "-f", "%{file}", "JetBrainsMono Nerd Font"],
+    capture_output=True, text=True, check=True).stdout.strip()
 charset = subprocess.run(["fc-query", "--format=%{charset}", font],
                          capture_output=True, text=True, check=True).stdout
 

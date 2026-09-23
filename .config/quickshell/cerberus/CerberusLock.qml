@@ -238,8 +238,7 @@ Scope {
   // So the dozen lines that matter go somewhere that survives the reboot you
   // had to perform to get out of it. Only the sleep edges and the lock's own
   // lifecycle, never anything typed.
-  readonly property string trail:
-    (Quickshell.env("HOME") || "/tmp") + "/.cache/cerberus.log"
+  readonly property string trail: Paths.cacheDir() + "/cerberus.log"
 
   // How many keys the lock has been handed since it went up. The one number
   // that separates "the lock is deaf" from "the password is wrong", and it

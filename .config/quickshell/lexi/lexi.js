@@ -217,7 +217,7 @@ function ttsScript(prefix, text, code, playerCmd) {
   const chunks = ttsChunks(text);
   if (chunks.length === 0) return null;
   const n = chunks.length;
-  const path = "/tmp/" + prefix + ".mp3";
+  const path = Paths.runtimeDir() + "/" + prefix + ".mp3";
 
   const cmds = [];
   const pieces = [];

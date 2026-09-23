@@ -15,6 +15,7 @@
 # have passed happily while the shipping widget stayed broken.
 set -e
 cd "$(dirname "$0")"
-RUNNER=/usr/lib/qt6/bin/qmltestrunner
+RUNNER=$(command -v qmltestrunner6 qmltestrunner 2>/dev/null | head -n1)
+[ -n "$RUNNER" ] || RUNNER=/usr/lib/qt6/bin/qmltestrunner
 [ -x "$RUNNER" ] || { echo "qmltestrunner not found (qt6-declarative)"; exit 1; }
 QT_QPA_PLATFORM=offscreen "$RUNNER" -input . "$@"
