@@ -100,6 +100,10 @@ end
 
 local function setTargetZoom(value)
 	value = math.min(MAX_ZOOM, math.max(MIN_ZOOM, value))
+	-- Stepping in and back out by the same count does not divide back to an
+	-- exact 1.0 (twenty steps leaves 1.0000000000000007), and anything above
+	-- MIN_ZOOM keeps the shader and whole-monitor damage on. Land it.
+	if value - MIN_ZOOM < 1e-6 then value = MIN_ZOOM end
 	if value == target then return end
 	target = value
 	hl.config({ cursor = { zoom_factor = value } })
