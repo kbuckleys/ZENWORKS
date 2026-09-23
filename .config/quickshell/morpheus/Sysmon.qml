@@ -8,8 +8,8 @@
 // It used to be four copies of the same shape: each bar module ran its own
 // Timer, its own Process and its own thirty-sample pushHistory. That was
 // tolerable while the bar was the only reader. Zeus wants the same five
-// readings as graphs, and a second set of pollers would have meant cpu.sh
-// running twice a second for two views that then disagreed about what the last
+// readings as graphs, and a second set of pollers would have meant sampling
+// everything twice for two views that then disagreed about what the last
 // minute looked like.
 //
 // So the polling and the history live here, and the modules and zeus are both
@@ -60,22 +60,15 @@ Singleton {
   property var cpuLoad: null      // 1-minute load average
 
   // ── THE CPU, READ RATHER THAN SHELLED OUT FOR ─────────────────────────
-  // cpu.sh ran once a second and forked about eight times doing it: bash,
-  // two mktemps, two greps of /proc/stat either side of an internal
-  // `sleep 0.3`, an awk over both, then — every single tick, for facts that
-  // cannot change while the machine is on — a grep of /proc/cpuinfo, TWO
-  // lscpus and an nproc.
+  // Everything is in files this process can open, so nothing is spawned:
+  // /proc/stat gives the usage and the per-core breakdown, /proc/loadavg the
+  // load and the process count, /proc/cpuinfo the model and the core counts
+  // (read once — they cannot change while the machine is on), and cpufreq
+  // the frequency.
   //
-  // All of it is in files this process can open. /proc/stat gives the usage
-  // and the per-core breakdown, /proc/loadavg the load and the process count,
-  // /proc/cpuinfo the model and the core counts, and cpufreq the frequency.
-  //
-  // AND THE SAMPLING WINDOW IS THE TICK. The script slept 0.3s to have two
-  // readings to subtract; this keeps the previous one, so the window is the
-  // whole second between ticks — a longer baseline and a truer number, for
-  // no sleep at all.
-  //
-  // The script is left in scripts/ untouched. Nothing calls it now.
+  // THE SAMPLING WINDOW IS THE TICK. The previous reading is kept and
+  // subtracted, so the window is the whole interval between ticks — no
+  // sleep inside a sample to get two readings.
   FileView { id: statFile; path: "/proc/stat"; blockLoading: true; printErrors: false }
   FileView { id: loadFile; path: "/proc/loadavg"; blockLoading: true; printErrors: false }
   FileView { id: cpuinfoFile; path: "/proc/cpuinfo"; blockLoading: true; printErrors: false }
@@ -111,7 +104,7 @@ Singleton {
     }
   }
 
-  // One FileView per thread, the same files cpu.sh averaged over.
+  // One FileView per thread; the frequency shown is their average.
   Instantiator {
     id: freqFiles
     model: root.cpuThreads
@@ -145,7 +138,7 @@ Singleton {
       const n = m[2].trim().split(/\s+/).map(Number);
       let tot = 0;
       for (let k = 0; k < n.length; k++) tot += n[k];
-      // idle + iowait, the two columns cpu.sh counted as not-working
+      // idle + iowait: the columns that count as not working
       out[m[1]] = { t: tot, i: (n[3] || 0) + (n[4] || 0) };
     }
     return out;
@@ -338,12 +331,9 @@ Singleton {
   readonly property string diskWriteText: Helpers.powFormat(root.diskWrite)
 
   // ── THE DISK, SPLIT BY HOW OFTEN IT CHANGES ───────────────────────────
-  // disk.sh was the most expensive poller in the shell: 358ms of bash every
-  // second — two walks of /sys/block either side of an internal `sleep 0.3`,
-  // several awks, a df and a jq. It was alive for a third of every second.
-  //
-  // Throughput is read here, the same way the CPU is: the previous sample is
-  // kept and the window is the tick, so there is no sleep and no process.
+  // Throughput is read here, the same way the CPU is: the previous sample of
+  // /sys/block/*/stat is kept and the window is the tick, so there is no
+  // sleep and no process.
   //
   // CAPACITY IS A DIFFERENT QUESTION and gets a different rate. How full the
   // root filesystem is moves in minutes, not in tenths of a second, and there
