@@ -35,8 +35,10 @@ PanelWindow {
   // the bar, for the pill's live size and position while morphed
   property var statusbar: null
 
-  // Emitted once a close has finished and `shown` has gone false.
-  signal closed()
+  // Emitted once a close has finished and `shown` has gone false. Not
+  // `closed`: every quickshell window already has that signal, for the
+  // window itself being closed, and QML will not let it be redeclared.
+  signal closeFinished()
 
   // ── NO SCALE WHEN MORPHED, AND THAT IS THE POINT ────────────────────
   // Detached, the panel is arriving out of nothing and 0.94 -> 1.0 reads as
@@ -79,7 +81,7 @@ PanelWindow {
     to: 0; duration: Zenon.slow; easing.type: Zenon.ease
     onFinished: {
       layer.shown = false;
-      layer.closed();
+      layer.closeFinished();
     }
   }
 

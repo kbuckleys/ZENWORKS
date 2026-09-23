@@ -652,7 +652,7 @@ LayerPopup {
   Region { id: panelRegion; x: panel.x; y: panel.y; width: panel.width; height: panel.height }
   mask: popup.pinned ? panelRegion : null
 
-  onClosed: {
+  onCloseFinished: {
     // A pin lasts as long as the panel does. Next time it opens it is a menu
     // again, on the pill, on whichever monitor you are looking at then.
     popup.pinned = false;
