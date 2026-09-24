@@ -3669,6 +3669,56 @@ FloatingWindow {
     root.status = removed ? "bookmark removed" : "bookmarked";
   }
 
+  // ── BOOKMARKING BY DRAG ─────────────────────────────────────────────
+  // Anything dragged onto the sidebar can be offered as a bookmark; only
+  // folders become one. Whether a dropped path IS a folder is asked of the
+  // disk, because a drag from another application says nothing about it —
+  // and asked in argv, so no file name is ever read by a shell.
+  function localPaths(urls) {
+    const out = [];
+    for (const u of urls || []) {
+      const t = String(u);
+      if (t.indexOf("file://") === 0) out.push(decodeURIComponent(t.slice(7)));
+    }
+    return out;
+  }
+
+  function bookmarkDropped(urls) {
+    const paths = root.localPaths(urls).filter((p) => root.bookmarks.indexOf(p) < 0);
+    if (paths.length === 0) {
+      if (root.localPaths(urls).length > 0) root.status = "already bookmarked";
+      return;
+    }
+    if (bookmarkProbe.running) return;
+    bookmarkProbe.asked = paths.length;
+    bookmarkProbe.command = ["sh", "-c",
+      "for p; do [ -d \"$p\" ] && printf '%s\\n' \"$p\"; done; exit 0",
+      "terminus-bookmark"].concat(paths);
+    bookmarkProbe.running = true;
+  }
+
+  Process {
+    id: bookmarkProbe
+    property int asked: 0
+    stdout: StdioCollector {
+      id: bookmarkProbeOut
+      onStreamFinished: {
+        const dirs = String(bookmarkProbeOut.text).split("\n").filter((l) => l !== "");
+        const skipped = bookmarkProbe.asked - dirs.length;
+        if (dirs.length === 0) {
+          root.status = "only folders can be bookmarked";
+          return;
+        }
+        root.editBookmarks((list) => {
+          for (const d of dirs) if (list.indexOf(d) < 0) list.push(d);
+        });
+        root.status = (dirs.length === 1 ? "bookmarked" : "bookmarked " + dirs.length)
+          + (skipped > 0 ? " · " + skipped + (skipped === 1 ? " file" : " files")
+             + " skipped" : "");
+      }
+    }
+  }
+
   // Which bookmark is being carried and where it would land, held on the
   // window because the row being dragged and the row drawing the drop line are
   // two different rows and neither can see the other.
@@ -9125,7 +9175,10 @@ FloatingWindow {
     return out;
   }
 
-  function dropUris(urls, action, dest, atItem, atX, atY) {
+  // `extra` is optional: menu entries offered beside Move and Copy — the
+  // sidebar adds "Add to bookmarks" when what is dropped could become one.
+  function dropUris(urls, action, dest, atItem, atX, atY, extra) {
+    const more = extra || [];
     const into = (dest && dest !== "") ? dest : root.cwd;
     const paths = [];
     // THINGS DROPPED IN FROM OUTSIDE THE MACHINE. An image dragged off a web
@@ -9155,7 +9208,7 @@ FloatingWindow {
       paths.push(path);
     }
     if (remote.length > 0) root.fetchInto(remote, into);
-    if (paths.length === 0) return;
+    if (paths.length === 0 && more.length === 0) return;
     const names = paths.map((p) => Terminus.basename(p));
     const drop = (op) => {
       root.setPending({ op: op, paths: paths, names: names });
@@ -9177,7 +9230,9 @@ FloatingWindow {
     const moving = action === Qt.MoveAction;
     const moveHere = { label: "Move here", act: () => drop("move") };
     const copyHere = { label: "Copy here", act: () => drop("copy") };
-    const order = moving ? [moveHere, copyHere] : [copyHere, moveHere];
+    const order = paths.length === 0 ? []
+      : (moving ? [moveHere, copyHere] : [copyHere, moveHere]);
+    for (const m of more) order.push(m);
     order.push({ sep: true });
     // Abort is spelled out rather than left to Escape: a menu that appeared
     // under your hand should be dismissable by the same hand.
@@ -12608,6 +12663,38 @@ FloatingWindow {
               ? Zenon.cyan : Zenon.border
           }
 
+          // ── DROPPED ON THE SIDEBAR, NOT ON A FOLDER IN IT ─────────
+          // means "keep this here": the folders that were carried become
+          // bookmarks, at the end of the list. Declared BEFORE the rows'
+          // scroller, so a bookmark or a disk — which takes drops of its own
+          // — is still what a drop onto it means; this answers everywhere
+          // else, headings and empty space included.
+          DropArea {
+            id: sideDrop
+            anchors.fill: parent
+            onDropped: (d) => root.bookmarkDropped(root.urlsFrom(d))
+          }
+
+          // lit like a pane about to take a drop, and saying what it will do
+          Rectangle {
+            anchors.fill: parent
+            anchors.rightMargin: 1
+            visible: sideDrop.containsDrag
+            color: Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b, 0.07)
+            border.width: 1
+            border.color: Zenon.border
+
+            Text {
+              anchors.horizontalCenter: parent.horizontalCenter
+              anchors.bottom: parent.bottom
+              anchors.bottomMargin: 14
+              text: "drop to bookmark"
+              color: Zenon.muted
+              font.family: Zenon.face
+              font.pixelSize: 13
+            }
+          }
+
           Flickable {
             anchors.fill: parent
             anchors.rightMargin: 1
@@ -12730,6 +12817,7 @@ FloatingWindow {
                   // change is the claim.
                   active: root.searchMode === "" && modelData === root.cwd
                   showRemove: true
+                  dropPath: modelData
                   onChosen: root.goTo(modelData)
                   // middle click removes it, the same gesture the tabs use
                   onRemoved: root.removeBookmark(modelData)
@@ -12859,6 +12947,8 @@ FloatingWindow {
                   mounted: modelData.mount !== ""
                   // no eject on the mounts the system is standing on
                   showMount: !Terminus.isSystemMount(modelData.mount)
+                  // a place to drop into only while it is mounted
+                  dropPath: modelData.mount
                   onChosen: {
                     if (modelData.mount !== "") root.goTo(modelData.mount);
                     else root.mountDisk(modelData);
@@ -26775,6 +26865,40 @@ FloatingWindow {
     // and now that the fill starts exactly on the heading's rule the bar
     // was a second, shorter, differently-aligned edge inside it.
     HoverHandler { id: sideHover }
+
+    // ── A FOLDER YOU CAN DROP ONTO ──────────────────────────────────────
+    // The directory this row stands for, when it stands for one: a bookmark,
+    // a mounted disk. Dropping onto it asks the same Move / Copy question a
+    // folder in the listing asks, and offers to bookmark what was carried
+    // when that is something that could become a bookmark. Tags and
+    // collections are not places, so they have none, and a drop on them
+    // falls through to the sidebar's own "bookmark this".
+    property string dropPath: ""
+
+    DropArea {
+      id: rowDrop
+      anchors.fill: parent
+      enabled: sideRow.dropPath !== ""
+      onDropped: (d) => {
+        const urls = root.urlsFrom(d);
+        const fresh = root.localPaths(urls).filter((p) => root.bookmarks.indexOf(p) < 0);
+        root.dropUris(urls, d.proposedAction, sideRow.dropPath, sideRow, d.x, d.y,
+          fresh.length === 0 ? []
+            : [{ label: "Add to bookmarks", act: () => root.bookmarkDropped(urls) }]);
+      }
+    }
+
+    // lit like a folder in the listing that a drop is about to go into
+    Rectangle {
+      anchors.fill: parent
+      anchors.leftMargin: 4
+      anchors.rightMargin: 4
+      visible: rowDrop.containsDrag
+      color: Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b, 0.12)
+      border.width: 1
+      border.color: Zenon.border
+      radius: 4
+    }
 
     // ── WHERE IT WOULD LAND ─────────────────────────────────────────────
     // An INSERTION POINT, 0..n, not a row index: there are n rows and n+1
