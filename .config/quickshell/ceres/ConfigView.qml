@@ -61,14 +61,14 @@ Item {
   // ── the review ──────────────────────────────────────────────────────────
   // The draft is written as you, then diffed and parsed — see the window's
   // sheet for what is shown of it.
-  readonly property string draft: Paths.home() + "/.cache/ceres/pacman.conf.new"
+  readonly property string draft: Paths.cacheDir() + "/ceres/pacman.conf.new"
   property var review: null
   property bool reviewing: false
   function askReview() {
     if (view.changes === 0 || view.reviewing) return;
     view.review = null;
     view.reviewing = true;
-    draftProc.command = ["sh", "-c", "mkdir -p " + Cer.q(Paths.home() + "/.cache/ceres")
+    draftProc.command = ["sh", "-c", "mkdir -p " + Cer.q(Paths.cacheDir() + "/ceres")
       + " && printf '%s' " + Cer.q(Pac.text(view.cur)) + " > " + Cer.q(view.draft)
       + " && " + Pac.reviewCommand(view.draft)];
     draftProc.running = true;
