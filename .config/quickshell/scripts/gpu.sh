@@ -9,6 +9,46 @@ trim() { printf '%s' "$1" | sed -E 's/^[[:space:]]+|[[:space:]]+$//g'; }
 int() { local v="$(trim "$(n "$1")")"; case "$v" in ""|*[!0-9]*) echo -n "" ;; *) echo -n "$v" ;; esac; }
 watt() { local v="$(trim "$(n "$1")")"; [ -z "$v" ] && { echo -n ""; return; }; awk -v x="$v" 'BEGIN { printf "%d", x }' 2>/dev/null; }
 
+# ── INTEL'S LOAD, FROM HOW LONG IT WAS IDLE ─────────────────────────────
+# i915 and xe publish no busy figure an unprivileged process can read
+# (intel_gpu_top needs perf access), but both publish, world-readable, how
+# many milliseconds each GT has spent in its idle state: i915's
+# gt/gtN/rc6_residency_ms (power/rc6_residency_ms on older kernels), xe's
+# device/tileN/gtN/gtidle/idle_residency_ms. Busy is the share of the time
+# since the previous sample that was NOT spent idle, so the previous sample
+# is kept in the runtime dir; the first call after a restart has nothing to
+# compare against and answers nothing (n/a) for that one sample. The busiest
+# GT is the answer, so a video decode on a media GT counts as well.
+intel_busy() {
+  local card="$1" files f cur prev state
+  # RC6 switched off means the idle counter never moves, which would read as
+  # a permanent 100% — no answer is better than that one
+  [ "$(cat "$card/power/rc6_enable" 2>/dev/null)" = "0" ] && return 0
+  files=$(ls "$card"/device/tile*/gt*/gtidle/idle_residency_ms \
+             "$card"/gt/gt*/rc6_residency_ms 2>/dev/null)
+  [ -n "$files" ] || files=$(ls "$card"/power/rc6_residency_ms 2>/dev/null)
+  [ -n "$files" ] || return 0
+  cur="$(date +%s%3N)"
+  for f in $files; do cur="$cur $(int "$(cat "$f" 2>/dev/null)")"; done
+  state="${XDG_RUNTIME_DIR:-/tmp}/zenworks-gpu-idle-${card##*/}"
+  prev="$(cat "$state" 2>/dev/null)"
+  printf '%s\n' "$cur" > "$state" 2>/dev/null
+  [ -n "$prev" ] || return 0
+  awk -v a="$prev" -v b="$cur" 'BEGIN {
+    n = split(a, p, " "); m = split(b, c, " ")
+    if (n != m || n < 2) exit
+    dt = c[1] - p[1]; if (dt <= 0) exit
+    best = -1
+    for (i = 2; i <= n; i++) {
+      if (p[i] == "" || c[i] == "") continue
+      di = c[i] - p[i]; if (di < 0) continue      # a counter that wrapped
+      u = 100 * (1 - di / dt); if (u < 0) u = 0; if (u > 100) u = 100
+      if (u > best) best = u
+    }
+    if (best >= 0) printf "%d", best + 0.5
+  }'
+}
+
 # Which card to report on. The one whose load can actually be read comes
 # first: NVIDIA through nvidia-smi, then anything exposing gpu_busy_percent
 # (amdgpu). Only then the card driving the display — on a hybrid laptop that
@@ -79,11 +119,11 @@ elif [ "$vendor" = "0x1002" ] || [ "$vendor" = "0x8086" ]; then
   device="$card/device"
   [ "$vendor" = "0x1002" ] && vname="AMD" || vname="Intel"
 
-  # gpu_busy_percent is amdgpu's. Intel's i915 and xe drivers publish no load
-  # figure an unprivileged process can read (intel_gpu_top needs perf access),
-  # so there the load is UNKNOWN, reported as null, and shown as n/a rather
-  # than as a meter sitting at a confident 0%.
+  # gpu_busy_percent is amdgpu's. Intel's is worked out from idle time — see
+  # intel_busy — and when neither answers the load is UNKNOWN, reported as
+  # null and shown as n/a rather than as a meter sitting at a confident 0%.
   util="$(int "$(cat "$device/gpu_busy_percent" 2>/dev/null)")"
+  [ -z "$util" ] && [ "$vendor" = "0x8086" ] && util="$(intel_busy "$card")"
 
   hwmon="$(ls "$device/hwmon/" 2>/dev/null | head -n1)"
   if [ -n "$hwmon" ]; then
@@ -116,7 +156,7 @@ elif [ "$vendor" = "0x1002" ] || [ "$vendor" = "0x8086" ]; then
   if [ -n "$util" ]; then
     tooltip="GPU: $name\nVendor: $vname\nUtilization: ${util}%"
   else
-    tooltip="GPU: $name\nVendor: $vname\nUtilization: n/a ($vname exposes no load without root)"
+    tooltip="GPU: $name\nVendor: $vname\nUtilization: n/a"
   fi
   [ -n "$temp" ] && [ "$temp" -gt 0 ] && tooltip="$tooltip\nTemperature: ${temp}°C"
   [ -n "$memtotal" ] && tooltip="$tooltip\nVRAM Used: ${memused} MiB / ${memtotal} MiB"

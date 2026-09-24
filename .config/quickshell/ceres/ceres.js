@@ -545,7 +545,7 @@ function signed(n) {
 // when this package has never been built here.
 function reviewCommand(name) {
   const p = q(name);
-  return "c=\"$HOME/.cache/paru/clone\"/" + p + "\n"
+  return "c=\"${XDG_CACHE_HOME:-$HOME/.cache}/paru/clone\"/" + p + "\n"
     + "new=$(paru -Gp -- " + p + " 2>/dev/null)\n"
     + "if [ -z \"$new\" ]; then echo '@@none'; exit 0; fi\n"
     + "if [ -f \"$c/PKGBUILD\" ]; then\n"

@@ -471,7 +471,7 @@ FloatingWindow {
     win.plan = null;
     win.planning = true;
     win.overlay = "confirm";
-    undoProc.command = ["sh", "-c", Cer.undoCommand(Paths.home() + "/.cache/paru/clone")];
+    undoProc.command = ["sh", "-c", Cer.undoCommand(Paths.cacheDir() + "/paru/clone")];
     undoProc.running = true;
   }
   function txBusyGuard() { return Ceres.txBusy; }
@@ -762,7 +762,7 @@ FloatingWindow {
       + (win.maint.stale ? 1 : 0)
 
   function loadMaint() {
-    maintProc.command = ["sh", "-c", Cer.maintCommand(Paths.home() + "/.cache/paru/clone")];
+    maintProc.command = ["sh", "-c", Cer.maintCommand(Paths.cacheDir() + "/paru/clone")];
     maintProc.running = true;
   }
   Process {
@@ -953,10 +953,10 @@ FloatingWindow {
 
   // The new list is written as you, then put in place as root — the old one
   // kept beside it as .ceres-bak — through the one password path.
-  readonly property string mirrorDraft: Paths.home() + "/.cache/ceres/mirrorlist.new"
+  readonly property string mirrorDraft: Paths.cacheDir() + "/ceres/mirrorlist.new"
   function useRanked() {
     if (!win.ranked || win.ranked.ranked.length === 0) return;
-    draftProc.command = ["sh", "-c", "mkdir -p " + Cer.q(Paths.home() + "/.cache/ceres") + " && printf '%s' "
+    draftProc.command = ["sh", "-c", "mkdir -p " + Cer.q(Paths.cacheDir() + "/ceres") + " && printf '%s' "
       + Cer.q(Cer.mirrorlistText(win.ranked.ranked, Qt.formatDate(new Date(), "yyyy-MM-dd")))
       + " > " + Cer.q(win.mirrorDraft)];
     draftProc.running = true;
@@ -1024,7 +1024,7 @@ FloatingWindow {
     if (!m) return;
     const gone = m.clones.filter(c => all || !c.installed).map(c => c.name);
     if (gone.length === 0) return;
-    cloneProc.command = ["rm", "-rf", "--"].concat(gone.map(n => Paths.home() + "/.cache/paru/clone/" + n));
+    cloneProc.command = ["rm", "-rf", "--"].concat(gone.map(n => Paths.cacheDir() + "/paru/clone/" + n));
     cloneProc.running = true;
   }
   Process {

@@ -12,6 +12,12 @@
 // authenticated login, so it gives a physical attacker nothing they did not
 // already have, and it is the difference between a bad night and a lost
 // session if PAM ever breaks under you.
+//
+// It is not only reachable from a VT: ANY process running as you in this
+// session can make the same call and unlock without a password. That is a
+// deliberate trust, not an oversight — code running as you already owns the
+// session in every way that matters — but it means this lock guards against
+// the person at the keyboard, not against your own processes.
 
 import QtQuick
 import QtQuick.Window
@@ -305,6 +311,12 @@ Scope {
   readonly property bool capsOn: CapsLock.on
 
   function engage() {
+    // Once per lock. lockDelay engages without the screenshot when grim is
+    // slow, and grim finishing afterwards must not engage again: that reset
+    // keysSeen mid-lock and wrote a second "lock:engage" into the trail.
+    // The surface's own flag, read directly, as lock() does — so a lock the
+    // compositor dropped can still be engaged again.
+    if (sessionLock.locked) return;
     sessionLock.locked = true;
     root.locked = true;
     root.covering = true;

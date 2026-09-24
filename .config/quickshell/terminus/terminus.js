@@ -1222,11 +1222,52 @@ function findCommand(dir, query) {
     + " ; } | head -n 500 | tr '\\n' '\\0'";
 }
 
-// Sorted, because rg's is a PARALLEL walk and the order it finishes in is not
-// an order at all — the same query twice ran the same files past you in two
-// different arrangements. There is no relevance to preserve here the way there
-// is for a name search: every one of these files contains what you asked for,
-// so the useful order is the one you can predict.
+// DIRECTORIES ONLY, for the send-to sheet's filter, and the WHOLE MACHINE.
+// A file is never an answer to "where should this go", so unlike findCommand
+// there is no second pass and nothing to interleave — which also halves the
+// walk and is most of what pays for the scope.
+//
+// MEASURED BEFORE IT WAS WIDENED, warm cache, this machine:
+//
+//   ~ depth 8                9,989 dirs    ~30ms      (what this used to be)
+//   / depth 8  no excludes  35,602 dirs   ~100ms
+//   / depth 8  excludes     15,049 dirs    ~55ms
+//   / depth 10 excludes     20,883 dirs    ~85ms      (this)
+//   / unlimited excludes    66,455 dirs   ~215ms
+//
+// DEPTH 10, NOT 8, AND THAT IS NOT A ROUND-UP. Depth is counted from the
+// search root, so `/` at 8 reaches only six levels into a home directory —
+// LESS of the place you actually send things than the old home-only scope
+// covered. Ten from / is eight from ~, which is where it started.
+//
+// NOT UNLIMITED: three times the time for, on the query this was measured
+// with, exactly the same hits. Everything past ten levels was deeper noise.
+//
+// THE PSEUDO-FILESYSTEMS ARE CUT OUT or the rest does not matter: /proc,
+// /sys, /dev and /run more than DOUBLE the walk and cannot contain a
+// destination. fd's --one-file-system cannot do this job here, because /home
+// is its own partition and would go with them.
+//
+// The cap cannot save any of this, and it is worth knowing why: `fzf
+// --filter` reads all of stdin before it emits a line, so `head` never closes
+// the pipe early. Cost scales with how many directories exist, not with how
+// many match.
+//
+// MATCHED AGAINST THE WHOLE PATH, not against the folder's own name. It used
+// to pass `-d / --nth -2`, which pins fzf to the second-to-last slash-delimited
+// field — the basename, since fd ends a directory with a slash. That made the
+// obvious narrowing impossible: "config buck" could never find ~/.config,
+// because "buck" is in the path and never in the name. Off the leash, fzf's
+// space-separated terms AND together across the entire path, which is what
+// everyone already means by typing a second word.
+function dirFindCommand(query) {
+  const q = Strings.shellQuote(String(query).trim());
+  return "fd -t d -H --no-ignore --color=never --max-depth 10"
+    + " -E /proc -E /sys -E /dev -E /run . / 2>/dev/null"
+    + " | fzf --filter " + q + " 2>/dev/null"
+    + " | head -n 120 | tr '\\n' '\\0'";
+}
+
 // TWO THINGS MADE THIS TAKE A MINUTE AND A HALF, and they compounded.
 //
 // `--no-ignore` AND `--hidden` together switch off every filter ripgrep has:
@@ -1280,55 +1321,6 @@ function findCommand(dir, query) {
 // first 2000 rg found rather than the first 2000 alphabetically; that is the
 // price of being able to stop it, and a search that broad is being narrowed
 // again anyway.
-// DIRECTORIES ONLY, for the send-to sheet's filter, and the WHOLE MACHINE.
-// A file is never an answer to "where should this go", so unlike findCommand
-// there is no second pass and nothing to interleave — which also halves the
-// walk and is most of what pays for the scope.
-//
-// MEASURED BEFORE IT WAS WIDENED, warm cache, this machine:
-//
-//   ~ depth 8                9,989 dirs    ~30ms      (what this used to be)
-//   / depth 8  no excludes  35,602 dirs   ~100ms
-//   / depth 8  excludes     15,049 dirs    ~55ms
-//   / depth 10 excludes     20,883 dirs    ~85ms      (this)
-//   / unlimited excludes    66,455 dirs   ~215ms
-//
-// DEPTH 10, NOT 8, AND THAT IS NOT A ROUND-UP. Depth is counted from the
-// search root, so `/` at 8 reaches only six levels into a home directory —
-// LESS of the place you actually send things than the old home-only scope
-// covered. Ten from / is eight from ~, which is where it started.
-//
-// NOT UNLIMITED: three times the time for, on the query this was measured
-// with, exactly the same hits. Everything past ten levels was deeper noise.
-//
-// THE PSEUDO-FILESYSTEMS ARE CUT OUT or the rest does not matter: /proc,
-// /sys, /dev and /run more than DOUBLE the walk and cannot contain a
-// destination. fd's --one-file-system cannot do this job here, because /home
-// is its own partition and would go with them.
-//
-// The cap cannot save any of this, and it is worth knowing why: `fzf
-// --filter` reads all of stdin before it emits a line, so `head` never closes
-// the pipe early. Cost scales with how many directories exist, not with how
-// many match.
-//
-// `--nth -2` for the reason findCommand gives: fd ends a directory with a
-// slash, so its last field is empty and every entry would score zero. The
-// caller strips that slash back off.
-// MATCHED AGAINST THE WHOLE PATH, not against the folder's own name. It used
-// to pass `-d / --nth -2`, which pins fzf to the second-to-last slash-delimited
-// field — the basename, since fd ends a directory with a slash. That made the
-// obvious narrowing impossible: "config buck" could never find ~/.config,
-// because "buck" is in the path and never in the name. Off the leash, fzf's
-// space-separated terms AND together across the entire path, which is what
-// everyone already means by typing a second word.
-function dirFindCommand(query) {
-  const q = Strings.shellQuote(String(query).trim());
-  return "fd -t d -H --no-ignore --color=never --max-depth 10"
-    + " -E /proc -E /sys -E /dev -E /run . / 2>/dev/null"
-    + " | fzf --filter " + q + " 2>/dev/null"
-    + " | head -n 120 | tr '\\n' '\\0'";
-}
-
 function grepCommand(dir, query) {
   return "rg --files-with-matches --smart-case --null --color=never --hidden"
     + " -g " + Strings.shellQuote("!.local")
