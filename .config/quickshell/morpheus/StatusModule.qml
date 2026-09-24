@@ -92,22 +92,15 @@ Collapsible {
     show: mouse.containsMouse && root.active
   }
 
-  Timer {
-    id: poll
-    interval: 2000
-    // Switched off in oracle there is nothing to report, and this is a
-    // subprocess every two seconds for the rest of the session — the one
-    // module switch that is worth more than the pixels it saves.
-    running: Oracle.showStatus
-    repeat: true
-    onTriggered: {
-      if (!proc.running) proc.running = true;
-    }
-  }
-
+  // One long-lived `status.sh watch`, which prints a line only when the answer
+  // changes — see the script for how it listens. It replaced running the
+  // one-shot every two seconds for the whole session.
+  //
+  // Started and stopped by hand rather than bound: quickshell writes `running`
+  // false when the process exits, which would break a binding for good.
   Process {
     id: proc
-    command: [Helpers.script("status.sh")]
+    command: [Helpers.script("status.sh"), "watch"]
     stdout: SplitParser {
       onRead: (line) => {
         try {
@@ -118,7 +111,33 @@ Collapsible {
         } catch (e) {}
       }
     }
+    // It never ends on its own while wanted, so an exit means it fell over.
+    onExited: if (Oracle.showStatus) respawn.restart()
   }
 
-  Component.onCompleted: proc.running = true
+  Timer {
+    id: respawn
+    interval: 2000
+    onTriggered: if (Oracle.showStatus && !proc.running) proc.running = true
+  }
+
+  // Switched off in oracle there is nothing to report, and nothing to run.
+  function sync() {
+    if (Oracle.showStatus) {
+      if (!proc.running) proc.running = true;
+    } else {
+      respawn.stop();
+      proc.running = false;
+      root.micActive = false;
+      root.screenActive = false;
+      root.recording = false;
+    }
+  }
+
+  Connections {
+    target: Oracle
+    function onShowStatusChanged() { root.sync(); }
+  }
+
+  Component.onCompleted: root.sync()
 }

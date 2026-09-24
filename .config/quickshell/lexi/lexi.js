@@ -217,7 +217,7 @@ function ttsScript(prefix, text, code, playerCmd) {
   const chunks = ttsChunks(text);
   if (chunks.length === 0) return null;
   const n = chunks.length;
-  const path = "/tmp/" + prefix + ".mp3";
+  const path = Paths.runtimeDir() + "/" + prefix + ".mp3";
 
   const cmds = [];
   const pieces = [];
@@ -1021,10 +1021,10 @@ function stripTags(s) {
 //
 // One JSON object per line, newest first — the same shape the two
 // history files already use, so nothing new has to be taught to read it.
-// The whole file is rewritten on every write (printf '%s' through the
-// shell, like everything else here), which is why the cap is a count
-// rather than "everything, forever": 150 entries is a few hundred
-// kilobytes of argv at the very worst.
+// The whole file is rewritten on every write (piped to `cat` over stdin,
+// so its size is not bounded by argv), which is why the cap is a count
+// rather than "everything, forever": a rewrite per look-up has to stay
+// cheap.
 function dictCachePath() { return Paths.cacheDir() + "/dict-cache"; }
 function transCachePath() { return Paths.cacheDir() + "/translate-cache"; }
 

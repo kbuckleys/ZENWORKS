@@ -19,6 +19,7 @@ Item {
   readonly property int temp: Sysmon.gpuTemp
   readonly property string tooltipText: Sysmon.gpuTip
   readonly property int usage: Sysmon.gpuUsage
+  readonly property bool usageKnown: Sysmon.gpuUsageKnown
   readonly property var history: Sysmon.gpuHistory
   readonly property color accent: Sysmon.gpuInk
 
@@ -35,8 +36,17 @@ Item {
 
     Meter {
       anchors.verticalCenter: parent.verticalCenter
+      visible: root.usageKnown
       value: root.usage / 100
       accent: root.accent
+    }
+    // A GPU that cannot report its load (Intel) says so, rather than showing
+    // an empty meter that reads as an idle one.
+    BarText {
+      anchors.verticalCenter: parent.verticalCenter
+      visible: !root.usageKnown
+      src: "n/a"
+      textColor: Zenon.muted
     }
   }
 

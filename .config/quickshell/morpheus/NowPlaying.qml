@@ -114,8 +114,31 @@ Singleton {
     root.artUrl = p ? p.trackArtUrl : "";
   }
 
+  // Rescanned when something about a player changes, not on a clock: which
+  // one is playing and what it is playing are both announced. callLater folds
+  // the handful of signals one track change sends into a single scan.
+  function rescan() { Qt.callLater(root.scan); }
+
+  Instantiator {
+    model: Mpris.players
+    delegate: Connections {
+      required property var modelData
+      target: modelData
+      function onPlaybackStateChanged() { root.rescan(); }
+      function onIsPlayingChanged() { root.rescan(); }
+      function onTrackTitleChanged() { root.rescan(); }
+      function onTrackArtistChanged() { root.rescan(); }
+      function onTrackAlbumChanged() { root.rescan(); }
+      function onTrackArtUrlChanged() { root.rescan(); }
+    }
+    onObjectAdded: root.rescan()
+    onObjectRemoved: root.rescan()
+  }
+
+  // A safety net for a player that changes without saying so; it was the
+  // only mechanism when it ran every second.
   Timer {
-    interval: 1000
+    interval: 10000
     running: true
     repeat: true
     onTriggered: root.scan()

@@ -4,6 +4,9 @@
 -- https://github.com/kbuckleys/
 
 -- MONITORS
+-- Any output without a rule of its own (another machine, a projector) gets
+-- its preferred mode rather than being left unconfigured.
+hl.monitor({ output = "",          mode = "preferred",      position = "auto", scale = "auto", })
 hl.monitor({ output = "DP-1",      mode = "2560x1440@180",  position = "auto", })
 hl.monitor({ output = "HDMI-A-1",  mode = "1920x1080@100",  position = "auto", transform = 3, })
 
@@ -51,8 +54,12 @@ hl.config({
 
 	general = {
         layout = "scrolling",
+		-- The quickshell suite's one border (Zenon.border: #45505c at 30%, 1px),
+		-- the same whether focused or not. Kept in step with Zenon by hand, as
+		-- `rounding` is with Zenon.windowRadius.
+		border_size = 1,
 		col = {
-			inactive_border = "#45505C26",
+			inactive_border = "#45505C4D",
 			active_border = "#45505C4D",
 		},
 		gaps_out = 4,

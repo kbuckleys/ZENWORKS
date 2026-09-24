@@ -29,7 +29,7 @@ hl.bind("SUPER + SHIFT + B",  hl.dsp.exec_cmd("qs ipc call Picasso toggle"))
 hl.bind("SUPER + P",          hl.dsp.exec_cmd("qs ipc call Ceres toggleWindow packages"))
 hl.bind("SUPER + SHIFT + P",  hl.dsp.exec_cmd("qs ipc call Ceres toggleWindow updates"))
 
--- spoot
+-- spoot: a personal project outside this repo; drop these two if you do not have it
 hl.bind("SUPER + M",          hl.dsp.exec_cmd("~/Projects/spoot/bin/spoot"))
 hl.bind("SUPER + SHIFT + M",  hl.dsp.exec_cmd("~/Projects/spoot/bin/spoot --listen"))
 
@@ -125,10 +125,11 @@ hl.bind("SUPER + SHIFT + ALT + DOWN",   hl.dsp.window.move({ into_group = "d" })
 hl.bind("SUPER + SHIFT + ALT + LEFT",   hl.dsp.window.move({ into_group = "l" }))
 hl.bind("SUPER + SHIFT + ALT + UP",     hl.dsp.window.move({ into_group = "u" }))
 
-hl.bind("SUPER + SHIFT + CONTROL + RIGHT",  hl.dsp.window.move({ out_of_group = true }))
-hl.bind("SUPER + SHIFT + CONTROL + DOWN",   hl.dsp.window.move({ out_of_group = true }))
-hl.bind("SUPER + SHIFT + CONTROL + LEFT",   hl.dsp.window.move({ out_of_group = true }))
-hl.bind("SUPER + SHIFT + CONTROL + UP",     hl.dsp.window.move({ out_of_group = true }))
+-- SUPER + SHIFT + CONTROL + arrows is smart-move.lua's snap-to-edge
+hl.bind("SUPER + CONTROL + ALT + RIGHT",  hl.dsp.window.move({ out_of_group = true }))
+hl.bind("SUPER + CONTROL + ALT + DOWN",   hl.dsp.window.move({ out_of_group = true }))
+hl.bind("SUPER + CONTROL + ALT + LEFT",   hl.dsp.window.move({ out_of_group = true }))
+hl.bind("SUPER + CONTROL + ALT + UP",     hl.dsp.window.move({ out_of_group = true }))
 
 -- AUDIO
 hl.bind("SUPER + EQUAL",  hl.dsp.exec_cmd("pamixer -i 1"), { repeating = true })

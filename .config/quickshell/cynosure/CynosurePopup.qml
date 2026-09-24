@@ -238,10 +238,15 @@ property var statusbar: null
   function drainWrite() {
     if (popup.writeQueue.length === 0 || writeProc.running) return;
     const job = popup.writeQueue.shift();
+    // Through stdin, not argv. A cache rewritten as one `printf '%s' <all of
+    // it>` argument fails with E2BIG once it passes 128 KiB (a single argv
+    // string's limit), and nothing is written. Closing stdin ends `cat`.
     const op = job.append ? ">>" : ">";
-    writeProc.command = ["sh", "-c",
-      "printf '%s' " + Strings.shellQuote(job.content) + " " + op + " " + Strings.shellQuote(job.path)];
+    writeProc.command = ["sh", "-c", "cat " + op + " \"$1\"", "cynosure-write", job.path];
+    writeProc.stdinEnabled = true;
     writeProc.running = true;
+    writeProc.write(job.content);
+    writeProc.stdinEnabled = false;
   }
 
   function writeHistory() {

@@ -44,6 +44,8 @@ QtObject {
   // behind, so it reads as a hairline of the desktop itself.
   // The colour is spoot's highlight bar (its Theme.selectedBg, #45505c) —
   // Buck's call, replacing the cyan it started as — at 30%.
+  // Hyprland's window borders (hypr/lua/base.lua) are this same value, copied
+  // by hand: change one, change the other.
   readonly property color border: Qt.rgba(69 / 255, 80 / 255, 92 / 255, 0.3)
 
   readonly property color white:   "#dfdfdd"

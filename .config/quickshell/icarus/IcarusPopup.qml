@@ -28,8 +28,7 @@ Item {
 
   // ── the trash ─────────────────────────────────────────────────────────
   // XDG's trash, wherever XDG_DATA_HOME points — not a path written out here.
-  readonly property string trashDir:
-    (Quickshell.env("XDG_DATA_HOME") || (Quickshell.env("HOME") + "/.local/share")) + "/Trash"
+  readonly property string trashDir: Paths.dataDir() + "/Trash"
   property int trashCount: 0
   // Emptying is not undoable, so it takes two clicks: the row arms first and
   // says so. The confirm submenu this menu already has is wired to the session

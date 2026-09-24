@@ -2,7 +2,9 @@
 // ┌─┘├┤ │││││││ │├┬┘├┴┐└─┐
 // └─┘└─┘┘└┘└┴┘└─┘┴└─┴ ┴└─┘
 // https://github.com/kbuckleys/
-// MORPH PILL BAR - dynamic width max 1000, slide, all layers morph, reserves space
+//
+// The shell's root: the bar (a pill that morphs into whichever layer is open
+// on its monitor), and every layer, daemon and window under it.
 
 import QtQuick
 import QtQuick.Layouts
@@ -114,23 +116,11 @@ ShellRoot {
   // follow your eyes to the other screen.
   OraclePopup { id: oracle; liveScreen: root.focusedScreen; screen: oracle.homeScreen ? oracle.homeScreen : root.focusedScreen }
 
-  // Which monitor the pill lives on. A BINDING now, not a function called
-  // once: the name is a setting, and the point of it being a setting is that
-  // it can change while the shell is running. Written out as an IIFE it was
-  // evaluated at load and never again, so oracle could set it and nothing
-  // would move until a restart.
-  //
-  // Oracle first, then the environment variable that used to be the only
-  // answer, then whatever screen there is — the same order, with one door
-  // added in front.
+  // Which monitor the pill lives on: oracle's setting, then QS_STATUS_SCREEN,
+  // then the first screen — never a monitor name written into the source. A
+  // binding, so changing the setting moves the pill without a restart.
   readonly property var statusScreen: {
     const screens = Quickshell.screens;
-    // Oracle, then the environment variable that used to be the only answer,
-    // and then nothing — NOT a monitor name written into the source. The old
-    // fallback was "HDMI-A-1", which is one desk's output: on any machine
-    // without it the loop below matched nothing and fell through to the first
-    // screen anyway, so the name was doing no work except to look like a
-    // decision somebody had made for you.
     const target = Oracle.barMonitor !== "" ? Oracle.barMonitor
       : Quickshell.env("QS_STATUS_SCREEN");
     if (target) {
@@ -247,112 +237,28 @@ ShellRoot {
   // without each importing Zenon directly (and so a future 12:8 is one line).
   property real pillRadius: Zenon.pillRadius
 
-  // 0 = the pill is wearing morpheus, 1 = it is fully wearing the layer.
-  // Same duration and easing as every other pill Behavior, so it is an exact
-  // stand-in for the pill's own visual progress. Both halves of every
-  // crossfade read this one scalar, which is what keeps them from drifting.
+  // 0 = the pill is wearing morpheus, 1 = it is fully wearing the layer, as a
+  // plain linear clock over the morph. Only two things read it: the morpheus
+  // row's small slide, and morphProgress below when there is no change of
+  // shape to measure instead.
   property real morphFactor: root.pillMorphed ? 1 : 0
-  // travelEase, not ease. A morph is the pill TRAVELLING into a panel's
-  // shape and it is watched the whole way; Zenon.ease is quintic, the curve
-  // for something appearing, which puts seven tenths of the change in the
-  // first fifth of the time and crawls through the rest.
-  //
-  // The crossfade below is keyed off this number, which is what made it read
-  // as slow rather than merely soft: layerFade opens at 0.55, and quintic is
-  // past 0.55 almost at once — so the layer stood there finished while the
-  // geometry spent the remaining four fifths of the animation creeping the
-  // last few percent. Cubic spends the time evenly, so the schedule below
-  // means what it says.
-  // THE SAME ANIMATION A DETACHED LAYER PLAYS. Not a curve chosen to feel
-  // like it — literally the same duration and the same easing that every
-  // popup's own showFactor uses when it opens on a monitor the pill is not
-  // on. A morph is that arrival with the pill's rect as its starting shape;
-  // anything else here makes it a second, different animation that happens
-  // to be about the same thing.
-  // LINEAR, and not because linear feels nice. morphFactor drives NOTHING
-  // but the crossfade below -- the pill's own geometry snaps now (see the
-  // margins block), so the curve that was chosen to match the pill
-  // travelling is shaping a pure opacity schedule it no longer has anything
-  // to do with.
-  //
-  // Composing a front-loaded curve with a clamped schedule crushes the first
-  // half. Quintic reaches 0.45 at 11% of 170ms = 19ms, so pillRowFade ran
-  // 1.00 -> 0.10 -> 0.00: ONE intermediate frame at 60Hz, three at 180Hz.
-  // The morpheus row did not fade out, it cut out, and that is the whole of
-  // why a morph looked nothing like a detached open.
-  //
-  // Linear spends the 170ms evenly, so each half of the crossfade gets its
-  // own 76ms: 4 intermediate frames at 60Hz and 13 at 180Hz on the way out,
-  // and the layer's fade-in lands on 6/16 -- which is what a DETACHED layer's
-  // showFactor measures at (5/16). Same duration, same felt rate, finally.
-  // ── AND LONG ENOUGH FOR BOTH HALVES TO BE SEEN ────────────────────────
-  // The schedule below spends 45% of this on clearing the pill and 45% on
-  // bringing the layer up, so at Zenon.slow each half got 76ms — under five
-  // frames. Both halves read as cuts however the curve is shaped, because
-  // there is not enough time in them to read as anything else.
-  //
-  // Doubled, each half gets ~153ms, which is what a DETACHED layer's own
-  // entrance takes. That is the whole claim this animation makes — that a
-  // morph is the same arrival with the pill's rect as its starting shape —
-  // and it could not be true while the morph ran in half the time.
-  //
-  // The Sheet component already reaches for the same multiple, for the same
-  // reason: a big object that travels is watched the whole way.
-  // ── ONE DURATION FOR THE WHOLE MORPH ─────────────────────────────────
-  // The pill's geometry and this crossfade have to be the same length or
-  // they are two events: the shape finished growing at 170ms while the
-  // layer had not begun appearing until 187ms, so you watched a panel
-  // arrive and THEN fill in.
-  //
-  // Zenon.slow, not a multiple of it. This was doubled while the pill's
-  // geometry still snapped — with no travel to watch, the crossfade was
-  // the whole animation and needed the room. Now that the shape actually
-  // moves, the motion carries it and the extra time only reads as drag.
-  // Same duration as every other animation on this desktop, which is the
-  // point: a morph should not announce itself as a special event.
-  // Zenon.brisk. The morph is the one animation you sit through before you
-  // can use what you asked for, so it is the one that should be quickest —
-  // every other easing on this desktop is decorating something already on
-  // screen. `fast` was still a beat longer than that argument allows, so
-  // the scale grew a rung below it rather than this reaching past the scale
-  // for a bare number: Oracle's multiplier has to keep reaching the morph or
-  // the pill and the layer it becomes ease at different rates.
+  // ONE DURATION FOR THE WHOLE MORPH: the pill's width and height Behaviors
+  // use it too, so the shape and the crossfade are one event rather than a
+  // panel arriving and THEN filling in. Zenon.brisk because the morph is the
+  // one animation you sit through before you can use what you asked for, so
+  // it should be the quickest; kept on Zenon's scale so oracle's speed
+  // multiplier reaches it like every other animation.
   readonly property int morphMs: Zenon.brisk
   Behavior on morphFactor {
     NumberAnimation { duration: root.morphMs; easing.type: Easing.Linear }
   }
-  // The crossfade schedule, defined once here rather than re-derived in each
-  // layer: the pill's own row has finished clearing by 0.45 and a layer only
-  // starts appearing at 0.55, so the two can never be on screen together.
-  // Both halves are handed the finished number, so they cannot drift apart.
-  //
-  // ── 30 / 70, WHICH IS MATERIAL'S SPLIT AND NOT A GUESS ─────────────
-  // It was 45 out and 45 in with a DEAD ZONE between them: from 0.45 to
-  // 0.55 the pill was carrying nothing at all. Ten per cent of the morph
-  // spent showing an empty box is not a transition between two things, it
-  // is a blink, and no curve fixes a hole.
-  //
-  // Material's container transform spends the first 30% clearing the
-  // outgoing content and the remaining 70% bringing the incoming content
-  // up, with the two ABUTTING rather than separated. The asymmetry is the
-  // point: what you are leaving should get out of the way quickly, and
-  // what you asked for should have room to arrive.
-  //
-  // ── MEASURED OFF THE PILL, NOT OFF A CLOCK ───────────────────────────
-  // These keyed off morphFactor, which is a LINEAR timer, while the pill's
-  // shape ran a front-loaded curve over the same duration. Two different
-  // curves on one event: one frame into a collapse the shape had travelled
-  // 62% of the way while the timer said 10%, so the layer's text was still
-  // at 86% opacity over a pill that had already shrunk past it — text
-  // hanging in mid-air off both rounded ends. That is the "stretching".
-  //
-  // morphFactor's own comment said it drives nothing but this crossfade, so
-  // linear was safe. That stopped being true the moment the geometry got a
-  // curve of its own, and nothing connected the two facts.
-  //
-  // So the crossfade is now a function of where the pill ACTUALLY IS. The
-  // two cannot drift, whatever curve or duration the shape is given, because
-  // they are no longer two things.
+  // ── THE CROSSFADE IS MEASURED OFF THE PILL, NOT OFF A CLOCK ──────────
+  // The pill's shape eases on its own curve (Zenon.morphBezier), so a fade
+  // keyed to a timer drifts from it: one frame into a collapse the shape had
+  // travelled 62% of the way while a linear timer said 10%, leaving the
+  // layer's text hanging off both rounded ends. So progress is where the
+  // pill's width actually is between its two sizes, and the fade cannot
+  // drift from the shape whatever curve or duration the shape is given.
   readonly property real morphProgress: {
     const a = root.barWidthCollapsed;
     const b = root.morphW;
@@ -365,11 +271,10 @@ ShellRoot {
     return Math.max(0, Math.min(1, (bar.pillWidth - a) / (b - a)));
   }
 
-  // MORPHEUS NEVER SPILLS, so its half keeps the generous window: its row
-  // is built to the collapsed pill's width, so a growing pill is always
-  // bigger than it and a shrinking one arrives at exactly its size. It
-  // clears over the first 30% opening and arrives over the last 70%
-  // closing, which is Material's split and costs nothing here.
+  // The morpheus row clears over the first 30% of an opening and returns over
+  // the last 70% of a closing: Material's container-transform split, the two
+  // halves abutting with no empty-box gap between them. Its row is built to
+  // the collapsed pill's width, so it never spills past a growing pill.
   readonly property real pillRowFade: root.pillMorphed
     ? 1 - Math.min(1, root.morphProgress / 0.30)
     : Math.max(0, Math.min(1, (0.70 - root.morphProgress) / 0.70))
@@ -497,12 +402,12 @@ ShellRoot {
     onTriggered: root.startBarIntro()
   }
 
-    // replay wallpaper zoom + pill slide on unlock — the pill/wallpaper
-   // sit at 0 while the lock is up (so no static frame shows through
-   // the fade), then animate 0→1 once on unlock. No 1→0 reset on
-   // unlock itself — that was the static-then-animate double.
-    property double _lastUnlock: 0
-    function parkIntro() {
+  // Replay the wallpaper zoom and pill slide on unlock. The pill and
+  // wallpaper sit at 0 while the lock is up (so no static frame shows through
+  // the fade), then animate 0→1 once on unlock. No 1→0 reset on unlock
+  // itself — that was the static-then-animate double.
+  property double _lastUnlock: 0
+  function parkIntro() {
     barIntroTimer.stop();
     root._barIntroInstant = true;
     root.barIntro = 0;
@@ -528,48 +433,34 @@ ShellRoot {
     }
   }
 
-  // dynamic pill width, max 1000, each layer retains own width
+  // The collapsed pill shrink-wraps the morpheus row.
   property int morpheusContentWidth: barLayout ? barLayout.implicitWidth + 24 : 800
   property int barWidthCollapsed: Zenon.layerWidth(morpheusContentWidth)
+  // The layers the pill can wear, under the names activeLayer uses.
+  readonly property var layers: ({
+    cynosure: cynosure, folio: folio, artemis: artemis, lexi: lexi,
+    zeus: zeus, ideo: ideo, calypso: calypso, metis: metis,
+    howler: howler, ceres: ceres, picasso: picasso, chronos: chronos
+  })
+  // The few that are not sized by their content.
+  readonly property var fixedLayerWidth: ({ zeus: 1000, picasso: 1000, howler: 800 })
+
+  // Every width goes through Zenon.layerWidth, and so does each layer's OWN
+  // panel — the same call with the same argument, which is what stops the
+  // pill and the layer inside it from disagreeing about how wide 1000
+  // currently means. See Zenon.layerMax.
   property int barWidthExpanded: {
     if (!layerOpen) return barWidthCollapsed;
-    try {
-      // follow cynosure's shrink-wrapped width exactly rather than freezing
-      // the pill at the collapsed morpheus width; the 8px floor is only a guard
-      // against a degenerate zero-width pill, never visible padding
-      // Every width here goes through Zenon.layerWidth, and so does the
-      // layer's OWN panel — the two are the same call with the same argument,
-      // which is what stops the pill and the layer inside it from disagreeing
-      // about how wide 1000 currently means. See Zenon.layerMax.
-      if (activeLayer === "cynosure" && cynosure && cynosure.contentWidth)
-        return Zenon.layerWidth(Math.max(8, cynosure.contentWidth))
-      // folio shrink-wraps its longest entry the way cynosure shrink-wraps
-      // its rows, so the pill has to ask it rather than assume the maximum
-      if (activeLayer === "folio" && folio && folio.panelWidth)
-        return Zenon.layerWidth(folio.panelWidth)
-      if (activeLayer === "artemis") return Zenon.layerWidth(artemis.panelWidth)
-      // lexi is prose in three of its views and a list of short strings in
-      // the other two, and only it knows which one is up
-      if (activeLayer === "lexi" && lexi && lexi.panelWidth)
-        return Zenon.layerWidth(lexi.panelWidth)
-      if (activeLayer === "zeus") return Zenon.layerWidth(1000)
-      // ideo is a whole number of emoji cells wide, and how many of those
-      // there are depends on how many survived the filter
-      if (activeLayer === "ideo" && ideo && ideo.panelWidth)
-        return Zenon.layerWidth(ideo.panelWidth)
-      // both fit themselves now — see panelWidth in each
-      if (activeLayer === "calypso" && calypso && calypso.panelWidth)
-        return Zenon.layerWidth(calypso.panelWidth)
-      if (activeLayer === "metis" && metis && metis.panelWidth)
-        return Zenon.layerWidth(metis.panelWidth)
-      if (activeLayer === "howler") return Zenon.layerWidth(800)
-      if (activeLayer === "ceres" && ceres) return Zenon.layerWidth(ceres.panelWidth)
-      if (activeLayer === "picasso") return Zenon.layerWidth(1000)
-      // chronos is sized by its calendar grid, not stretched to the usual max
-      if (activeLayer === "chronos" && chronos && chronos.panelWidth)
-        return Zenon.layerWidth(chronos.panelWidth)
-    } catch (e) {}
-    return Zenon.layerWidth(1000)
+    const l = root.layers[activeLayer];
+    const fixed = root.fixedLayerWidth[activeLayer];
+    if (fixed) return Zenon.layerWidth(fixed);
+    // cynosure shrink-wraps its rows and the pill follows it exactly; the 8px
+    // floor only guards against a degenerate zero-width pill
+    if (activeLayer === "cynosure" && l && l.contentWidth)
+      return Zenon.layerWidth(Math.max(8, l.contentWidth));
+    // the rest fit themselves — see panelWidth in each
+    if (l && l.panelWidth) return Zenon.layerWidth(l.panelWidth);
+    return Zenon.layerWidth(1000);
   }
   property int currentBarWidth: pillMorphed ? barWidthExpanded : barWidthCollapsed
 
@@ -592,21 +483,13 @@ ShellRoot {
   property int barHeightCollapsed: Zenon.slot
   property int barHeightExpanded: {
     if (!layerOpen) return barHeightCollapsed;
+    // cynosure is one row, exactly one slot; the rest measure themselves
+    if (activeLayer === "cynosure") return Zenon.slot;
+    const l = root.layers[activeLayer];
     try {
-      if (activeLayer === "cynosure") return Zenon.slot
-      if (activeLayer === "folio" && folio && folio.calcHeight) return folio.calcHeight()
-      if (activeLayer === "artemis" && artemis && artemis.calcHeight) return artemis.calcHeight()
-      if (activeLayer === "lexi" && lexi && lexi.calcHeight) return lexi.calcHeight()
-      if (activeLayer === "zeus" && zeus && zeus.calcHeight) return zeus.calcHeight()
-      if (activeLayer === "ideo" && ideo && ideo.calcHeight) return ideo.calcHeight()
-      if (activeLayer === "calypso" && calypso && calypso.calcHeight) return calypso.calcHeight()
-      if (activeLayer === "metis" && metis && metis.calcHeight) return metis.calcHeight()
-      if (activeLayer === "howler" && howler && howler.calcHeight) return howler.calcHeight()
-      if (activeLayer === "ceres" && ceres && ceres.calcHeight) return ceres.calcHeight()
-      if (activeLayer === "picasso" && picasso && picasso.calcHeight) return picasso.calcHeight()
-      if (activeLayer === "chronos" && chronos && chronos.calcHeight) return chronos.calcHeight()
+      if (l && l.calcHeight) return l.calcHeight();
     } catch (e) {}
-    return 320
+    return 320;
   }
 
   // ── WHAT THE PILL IS CARRYING ─────────────────────────────────────────
@@ -658,96 +541,24 @@ ShellRoot {
     function hideLayer() { root.endMorph(root.activeLayer !== "" ? root.activeLayer : root.morphSource); }
   }
 
-  // watch popups' shown to sync activeLayer (when they toggle via their own ipc)
-  Connections { target: cynosure; function onShownChanged() { if (cynosure.shown) root.beginMorph("cynosure"); else root.endMorph("cynosure"); } }
-  Connections {
-    target: folio
-    function onShownChanged() { if (folio.shown) root.beginMorph("folio"); else root.endMorph("folio"); }
-    // start collapsing the pill the moment the close BEGINS. Waiting for
-    // `shown` means waiting for the whole close animation to finish first,
-    // which left the pill sitting there expanded and empty afterwards.
-    function onCollapsingChanged() { if (folio.collapsing) root.endMorph("folio"); }
+  // Each layer reports opening, and the moment its close BEGINS
+  // (`collapsing`), and the pill follows. Waiting for `shown` to drop instead
+  // means waiting out the whole close animation, which left the pill sitting
+  // there expanded and empty. cynosure has no close animation and so no
+  // `collapsing`.
+  Component.onCompleted: {
+    for (const name in root.layers) {
+      const l = root.layers[name];
+      l.shownChanged.connect(() => l.shown ? root.beginMorph(name) : root.endMorph(name));
+      if (l.collapsingChanged)
+        l.collapsingChanged.connect(() => { if (l.collapsing) root.endMorph(name); });
+    }
   }
-  Connections {
-    target: artemis
-    function onShownChanged() { if (artemis.shown) root.beginMorph("artemis"); else root.endMorph("artemis"); }
-    // start collapsing the pill the moment the close BEGINS. Waiting for
-    // `shown` means waiting for the whole close animation to finish first,
-    // which left the pill sitting there expanded and empty afterwards.
-    function onCollapsingChanged() { if (artemis.collapsing) root.endMorph("artemis"); }
-  }
-  Connections {
-    target: picasso
-    function onShownChanged() { if (picasso.shown) root.beginMorph("picasso"); else root.endMorph("picasso"); }
-    // start collapsing the pill the moment the close BEGINS. Waiting for
-    // `shown` means waiting for the whole close animation to finish first,
-    // which left the pill sitting there expanded and empty afterwards.
-    function onCollapsingChanged() { if (picasso.collapsing) root.endMorph("picasso"); }
-  }
-
-  Connections {
-    target: chronos
-    function onShownChanged() { if (chronos.shown) root.beginMorph("chronos"); else root.endMorph("chronos"); }
-    // start collapsing the pill the moment the close BEGINS. Waiting for
-    // `shown` means waiting for the whole close animation to finish first,
-    // which left the pill sitting there expanded and empty afterwards.
-    function onCollapsingChanged() { if (chronos.collapsing) root.endMorph("chronos"); }
-  }
-  Connections {
-    target: ceres
-    function onShownChanged() { if (ceres.shown) root.beginMorph("ceres"); else root.endMorph("ceres"); }
-    function onCollapsingChanged() { if (ceres.collapsing) root.endMorph("ceres"); }
-  }
-  Connections {
-    target: howler
-    function onShownChanged() { if (howler.shown) root.beginMorph("howler"); else root.endMorph("howler"); }
-    // start collapsing the pill the moment the close BEGINS. Waiting for
-    // `shown` means waiting for the whole close animation to finish first,
-    // which left the pill sitting there expanded and empty afterwards.
-    function onCollapsingChanged() { if (howler.collapsing) root.endMorph("howler"); }
-  }
-  Connections {
-    target: lexi
-    function onShownChanged() { if (lexi.shown) root.beginMorph("lexi"); else root.endMorph("lexi"); }
-    // start collapsing the pill the moment the close BEGINS. Waiting for
-    // `shown` means waiting for the whole close animation to finish first,
-    // which left the pill sitting there expanded and empty afterwards.
-    function onCollapsingChanged() { if (lexi.collapsing) root.endMorph("lexi"); }
-  }
+  // Dragged off, zeus hands the pill straight back: the bar returns to being
+  // a bar while the panel carries on somewhere else on the screen.
   Connections {
     target: zeus
-    function onShownChanged() { if (zeus.shown) root.beginMorph("zeus"); else root.endMorph("zeus"); }
-    // start collapsing the pill the moment the close BEGINS. Waiting for
-    // `shown` means waiting for the whole close animation to finish first,
-    // which left the pill sitting there expanded and empty afterwards.
-    function onCollapsingChanged() { if (zeus.collapsing) root.endMorph("zeus"); }
-    // Dragged off, it hands the pill straight back: the bar returns to being a
-    // bar while the panel carries on somewhere else on the screen.
     function onPinnedChanged() { if (zeus.pinned) root.endMorph("zeus"); }
-  }
-  Connections {
-    target: ideo
-    function onShownChanged() { if (ideo.shown) root.beginMorph("ideo"); else root.endMorph("ideo"); }
-    // start collapsing the pill the moment the close BEGINS. Waiting for
-    // `shown` means waiting for the whole close animation to finish first,
-    // which left the pill sitting there expanded and empty afterwards.
-    function onCollapsingChanged() { if (ideo.collapsing) root.endMorph("ideo"); }
-  }
-  Connections {
-    target: calypso
-    function onShownChanged() { if (calypso.shown) root.beginMorph("calypso"); else root.endMorph("calypso"); }
-    // start collapsing the pill the moment the close BEGINS. Waiting for
-    // `shown` means waiting for the whole close animation to finish first,
-    // which left the pill sitting there expanded and empty afterwards.
-    function onCollapsingChanged() { if (calypso.collapsing) root.endMorph("calypso"); }
-  }
-  Connections {
-    target: metis
-    function onShownChanged() { if (metis.shown) root.beginMorph("metis"); else root.endMorph("metis"); }
-    // start collapsing the pill the moment the close BEGINS. Waiting for
-    // `shown` means waiting for the whole close animation to finish first,
-    // which left the pill sitting there expanded and empty afterwards.
-    function onCollapsingChanged() { if (metis.collapsing) root.endMorph("metis"); }
   }
 
   PanelWindow {
@@ -818,15 +629,10 @@ ShellRoot {
       // the bottom half of the pill took clicks after every launch. The
       // plain rectangle has no transform in it to go stale.
       mask: Region { x: bg.x; y: bg.y; width: bg.width; height: bg.height }
-      // The reserved strip never changes size. Auto followed the pill's live
-      // height, and Ignore released the reservation altogether while morphed
-      // — either way every tiled window on this monitor resized the moment a
-      // layer opened. Pinned to the collapsed pill instead, so the desktop
-      // underneath stays exactly where it is whatever the pill is doing.
-      // Ignore releases the reservation altogether, so the pill floats over
-      // tiled windows instead of pushing them up. Still pinned to the
-      // COLLAPSED height when it is on: see above — following the live height
-      // resized every window on the monitor each time a layer opened.
+      // Reserving space is a setting; off, the pill floats over tiled
+      // windows. On, the reservation is pinned to the COLLAPSED pill (see
+      // exclusiveZone) — following its live height resized every tiled window
+      // on the monitor each time a layer opened.
       exclusionMode: Oracle.barReserveSpace
         ? ExclusionMode.Normal : ExclusionMode.Ignore
       // The pill's own height, the gap it keeps under itself, and then
@@ -837,9 +643,8 @@ ShellRoot {
       exclusiveZone: root.barHeightCollapsed + Zenon.padScreen
         + Oracle.barWindowGap
       color: "transparent"
-      // No margins. The surface is the whole output; where the pill sits
-      // inside it is bg's own x and y, which is scene graph and costs the
-      // compositor nothing.
+      // No margins: the surface is the whole output, and where the pill sits
+      // inside it is bg's own x and y.
       // What the pill measures, published on the window so a layer drawing
       // itself at the pill's size can ask for the pill rather than for the
       // surface it now floats in.
@@ -852,35 +657,10 @@ ShellRoot {
       // the icon that was clicked. bg.y already knows which edge the bar is
       // on; this is it, published.
       readonly property real pillY: bg.y
-      // travelEase on all four of these: they ARE the morph, as far as the
-      // eye is concerned — the pill sliding out to a panel's margins and
-      // growing to its height. Quintic put seven tenths of that change in the
-      // first fifth of the time and crawled through the rest, so the shape
-      // arrived nearly right and then spent the remaining four fifths
-      // settling the last few pixels. A DETACHED layer has no pill geometry
-      // to animate at all, which is why it read as quicker on the same 170ms.
-      // ── THE PILL'S GEOMETRY ANIMATES AGAIN, AND IT HAD TO ──────────
-      // It was snapped, on the reasoning that the layer draws its own
-      // opaque ground so nobody can see the pill move, and that animating
-      // it cost a 13x resize every frame. The first half was true and the
-      // second no longer is — re-measured over repeated morphs on a 100ms
-      // heartbeat: median 100ms, p90 110ms, one 256ms blip. No storm.
-      //
-      // And snapping it broke two things that were not obvious from here.
-      // The morph became a shape appearing at full size with a crossfade
-      // inside it, which is the "rough" — there is no travel to watch, so
-      // it reads as a cut however the contents are eased. And cynosure
-      // stopped easing while morphed: it follows the pill's live width by
-      // construction and deliberately does not run its own Behavior on top
-      // of it, because the pill "eases toward the same target". Once the
-      // pill stopped easing, nothing did, and filtering went jerky.
-      //
-      // travelEase, not ease: this is a thing crossing a distance and
-      // watched the whole way — see the note on morphFactor.
-      // No Behavior on margins.bottom either, and for the same reason as
-      // the side margins: it is the SURFACE's offset, not the pill's. It is
-      // a constant now in any case — the pill grows upward inside a surface
-      // whose bottom edge never moves.
+      // The pill's geometry animates on bg (its width and height Behaviors),
+      // not here. It has to animate: snapped, a morph reads as a cut, and
+      // cynosure, which follows the pill's live width rather than easing on
+      // its own, goes jerky while you filter.
 
     // The pill's own first frame. QQuickWindow.frameSwapped fires once the
     // window has actually handed a buffer over, which is the earliest moment
@@ -1251,15 +1031,9 @@ ShellRoot {
           StatusModule { id: statusMod; implicitHeight: Zenon.slot }
         }
       }
-
-      // layer content area kept empty – actual layer UI lives in its own
-      // PanelWindow (now transparent when morphMode) positioned over this bg,
-      // so the bar's bg appears to morph into the layer.
-      Item {
-        id: layerContent
-        anchors.fill: parent
-        visible: false
-      }
+      // No layer content lives in here: each layer is its own PanelWindow,
+      // transparent in morphMode and positioned over this bg, so the pill
+      // appears to become the layer.
     }
   }
 }

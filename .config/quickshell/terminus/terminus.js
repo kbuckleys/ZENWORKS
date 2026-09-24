@@ -2065,7 +2065,8 @@ function nameError(name) {
 // .trashinfo beside it holding the path it came from. Reading that directly is
 // more robust than depending on a daemon, and it is the same file every other
 // trash implementation on the system writes.
-function trashRoot() { return Paths.home() + "/.local/share/Trash"; }
+// XDG_DATA_HOME's trash, which is where gio puts things.
+function trashRoot() { return Paths.dataDir() + "/Trash"; }
 function trashFilesDir() { return trashRoot() + "/files"; }
 function isTrashDir(dir) { return String(dir) === trashFilesDir(); }
 

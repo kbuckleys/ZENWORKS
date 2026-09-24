@@ -35,7 +35,7 @@ ROWS="$CACHE/rows.tsv"
 # refreshed every three days; paru's is only a fallback for when the AUR
 # cannot be reached.
 AUR="$CACHE/aur-names"
-PARU_AUR="$HOME/.cache/paru/packages.aur"
+PARU_AUR="${XDG_CACHE_HOME:-$HOME/.cache}/paru/packages.aur"
 
 aur_list() {
   mkdir -p "$CACHE"

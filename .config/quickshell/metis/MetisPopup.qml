@@ -11,50 +11,8 @@ import Quickshell.Hyprland
 import Quickshell.Wayland
 import "../morpheus"
 
-PanelWindow {
+LayerPopup {
   id: popup
-
-  WlrLayershell.layer: WlrLayer.Overlay
-
-  property bool shown: false
-  property bool morphMode: false
-  // 0..1, driven by shell.qml, which owns the crossfade schedule: 0 until the
-  // pill's own row has finished clearing, then rising to 1 as the pill
-  // finishes taking this layer's shape
-  property real morphFade: 1
-  property real showFactor: 0
-  property bool collapsing: false
-  // ── NO SCALE WHEN MORPHED, AND THAT IS THE POINT ────────────────────
-  // This briefly followed contentFade so the panel would grow as it faded,
-  // the way a detached one does. It looked wrong, and the capture showed
-  // why: detached, the panel is arriving out of nothing and 0.94 -> 1.0
-  // reads as arrival. Morphed, the container is ALREADY THERE — it is the
-  // pill — so the same scale is not an entrance, it is the text being
-  // stretched horizontally in place. Measured across the morph: the
-  // content spread outward over seven frames.
-  //
-  // So a morph is a straight crossfade inside a shape that is already
-  // right, and the scale belongs to the case that has something to scale
-  // from.
-  readonly property real growth: popup.showFactor
-  readonly property real panelX: (popup.collapsing ? 0.985 + 0.015 * popup.growth
-                        : 0.94 + 0.06 * popup.growth)
-  readonly property real panelY: (popup.collapsing ? 0.82 + 0.18 * popup.growth
-                        : 0.90 + 0.10 * popup.growth)
-  // Morphed, the handover is timed off the PILL's progress, not this popup's
-  // own showFactor: showFactor is OutCubic and front-loaded, so it crossed the
-  // threshold ~25ms in and this layer's content faded up on top of a morpheus
-  // row that was still 80% opaque.
-  // Math.min, not morphFade alone. Handing the pill straight to another
-  // layer leaves morphFade pinned at 1 — the pill never un-morphs, so there
-  // is nothing to ease it down — and this layer stayed fully opaque until its
-  // window simply blinked out. Its own closeAnim is already easing
-  // showFactor to 0, so taking the lower of the two fades it out on the way
-  // between layers while leaving the normal open schedule untouched.
-  readonly property real contentFade: popup.morphMode
-    ? Math.min(popup.morphFade, popup.showFactor) : popup.showFactor
-
-  property var statusbar: null
 
   readonly property color bgColor: Zenon.layerBg
   readonly property color fgColor: Zenon.white
@@ -120,25 +78,7 @@ PanelWindow {
     }
   }
 
-  visible: popup.showFactor > 0.01
-  color: "transparent"
-
-  anchors { left: true; right: true; top: true; bottom: true }
   focusable: true
-  exclusionMode: ExclusionMode.Ignore
-
-  NumberAnimation {
-    id: openAnim
-    target: popup; property: "showFactor"
-    to: 1; duration: Zenon.slow; easing.type: Zenon.ease
-  }
-
-  NumberAnimation {
-    id: closeAnim
-    target: popup; property: "showFactor"
-    to: 0; duration: Zenon.slow; easing.type: Zenon.ease
-    onFinished: popup.shown = false
-  }
 
   HyprlandFocusGrab {
     id: grab
@@ -198,18 +138,18 @@ PanelWindow {
 
     focusRetry.counter = 0;
     focusRetry.restart();
-    closeAnim.stop();
-    popup.showFactor = 0;
-    openAnim.restart();
+    popup.playOpen();
     popup.syncFocus();
 
-    popup.detach("qalc --exrates >/dev/null 2>&1");
+    // At most twice a day: the ECB publishes once, and fetching on every
+    // open was a network round trip each time the calculator appeared.
+    popup.detach("f=\"${QALCULATE_USER_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/qalculate}/eurofxref-daily.xml\"; "
+      + "[ -n \"$(find \"$f\" -mmin -720 2>/dev/null)\" ] || qalc --exrates >/dev/null 2>&1");
   }
 
   function closePopup() {
     popup.collapsing = true;
-    openAnim.stop();
-    closeAnim.restart();
+    popup.playClose();
   }
 
   function toggle() {

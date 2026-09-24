@@ -13,50 +13,8 @@ import "calypso.js" as Calypso
 import "../morpheus/helpers.js" as Helpers
 import "../morpheus"
 
-PanelWindow {
+LayerPopup {
   id: popup
-
-  WlrLayershell.layer: WlrLayer.Overlay
-
-  property bool shown: false
-  property bool morphMode: false
-  // 0..1, driven by shell.qml, which owns the crossfade schedule: 0 until the
-  // pill's own row has finished clearing, then rising to 1 as the pill
-  // finishes taking this layer's shape
-  property real morphFade: 1
-  property real showFactor: 0
-  property bool collapsing: false
-  // ── NO SCALE WHEN MORPHED, AND THAT IS THE POINT ────────────────────
-  // This briefly followed contentFade so the panel would grow as it faded,
-  // the way a detached one does. It looked wrong, and the capture showed
-  // why: detached, the panel is arriving out of nothing and 0.94 -> 1.0
-  // reads as arrival. Morphed, the container is ALREADY THERE — it is the
-  // pill — so the same scale is not an entrance, it is the text being
-  // stretched horizontally in place. Measured across the morph: the
-  // content spread outward over seven frames.
-  //
-  // So a morph is a straight crossfade inside a shape that is already
-  // right, and the scale belongs to the case that has something to scale
-  // from.
-  readonly property real growth: popup.showFactor
-  readonly property real panelX: (popup.collapsing ? 0.985 + 0.015 * popup.growth
-                        : 0.94 + 0.06 * popup.growth)
-  readonly property real panelY: (popup.collapsing ? 0.82 + 0.18 * popup.growth
-                        : 0.90 + 0.10 * popup.growth)
-  // Morphed, the handover is timed off the PILL's progress, not this popup's
-  // own showFactor: showFactor is OutCubic and front-loaded, so it crossed the
-  // threshold ~25ms in and this layer's content faded up on top of a morpheus
-  // row that was still 80% opaque.
-  // Math.min, not morphFade alone. Handing the pill straight to another
-  // layer leaves morphFade pinned at 1 — the pill never un-morphs, so there
-  // is nothing to ease it down — and this layer stayed fully opaque until its
-  // window simply blinked out. Its own closeAnim is already easing
-  // showFactor to 0, so taking the lower of the two fades it out on the way
-  // between layers while leaving the normal open schedule untouched.
-  readonly property real contentFade: popup.morphMode
-    ? Math.min(popup.morphFade, popup.showFactor) : popup.showFactor
-
-  property var statusbar: null
 
   readonly property color bgColor: Zenon.layerBg
   readonly property color fgColor: Zenon.white
@@ -132,25 +90,7 @@ PanelWindow {
   readonly property int visibleRows: 7
   readonly property int cellH: 34
 
-  visible: popup.showFactor > 0.01
-  color: "transparent"
-
-  anchors { left: true; right: true; top: true; bottom: true }
   focusable: true
-  exclusionMode: ExclusionMode.Ignore
-
-  NumberAnimation {
-    id: openAnim
-    target: popup; property: "showFactor"
-    to: 1; duration: Zenon.slow; easing.type: Zenon.ease
-  }
-
-  NumberAnimation {
-    id: closeAnim
-    target: popup; property: "showFactor"
-    to: 0; duration: Zenon.slow; easing.type: Zenon.ease
-    onFinished: popup.shown = false
-  }
 
   HyprlandFocusGrab {
     id: grab
@@ -267,16 +207,49 @@ PanelWindow {
     popup.syncFocus();
   }
 
+  // Each fetch is an assignment whose status is rbw's own, so it chains
+  // with && and a failed lookup stops before anything is typed or copied.
   function rbwFetch(kind, entry) {
     const id = Strings.shellQuote(entry.id);
     if (kind === "user")
-      return "u=$(rbw get --field user " + id + "); ";
+      return "u=$(rbw get --field user " + id + ")";
     if (kind === "pass")
-      return "p=$(rbw get " + id + "); ";
+      return "p=$(rbw get " + id + ")";
     if (kind === "totp")
-      return "t=$(rbw code " + id + "); ";
+      return "t=$(rbw code " + id + ")";
     return "";
   }
+
+  // Through wtype's stdin, never its argv: argv is readable in /proc by
+  // anything running as you, and a secret that began with "-" would have
+  // been parsed as an option.
+  function typeVar(v) {
+    return "printf '%s' \"$" + v + "\" | wtype -";
+  }
+
+  // `wl-paste --watch cliphist store` keeps everything copied, so a secret
+  // has to be kept out of the history, not just cleared from the clipboard
+  // afterwards. wl-copy --sensitive marks the offer so the watcher reports
+  // CLIPBOARD_STATE=sensitive and cliphist skips it; wl-clipboard releases
+  // up to 2.2.1 lack the flag, so there the entry is taken back out of
+  // cliphist once stored, and only if the newest entry is this secret.
+  // A shell function, so the secret is passed without an exec and never
+  // reaches any process's argv. Clears the clipboard after 30s if it still
+  // holds the secret.
+  readonly property string copySecretFn:
+    "copy_secret() { "
+    + "if wl-copy --help 2>&1 | grep -q -- --sensitive; then "
+    + "printf '%s' \"$1\" | wl-copy --sensitive >/dev/null 2>&1 || return 1; "
+    + "else "
+    + "printf '%s' \"$1\" | wl-copy >/dev/null 2>&1 || return 1; "
+    + "if command -v cliphist >/dev/null 2>&1; then "
+    + "sleep 0.5; l=$(cliphist list 2>/dev/null | head -n1); "
+    + "if [ -n \"$l\" ] && [ \"$(printf '%s\\n' \"$l\" | cliphist decode 2>/dev/null)\" = \"$1\" ]; then "
+    + "printf '%s\\n' \"$l\" | cliphist delete >/dev/null 2>&1; fi; fi; "
+    + "fi; "
+    + "sleep 30; "
+    + "if [ \"$(wl-paste 2>/dev/null)\" = \"$1\" ]; then wl-copy --clear >/dev/null 2>&1; fi; "
+    + "return 0; }; "
 
   function execute(kind) {
     const entry = popup.activeEntry;
@@ -286,46 +259,22 @@ PanelWindow {
 
     // consume pipelines: rbw output flows through pipes only — secrets
     // never appear in argv, env, files, or logs
+    const fail = " || echo CALYPSO_ACTION_FAILED";
+    const fetchVar = { user: "u", pass: "p", totp: "t" };
+    let script = "";
     if (kind === "both") {
-      actionProc.command = ["bash", "-c",
-        "{ " + rbwFetch("user", entry) + "} && { " + rbwFetch("pass", entry) + "}" +
-        " && sleep 0.3 && wtype \"$u\" -k Tab \"$p\""];
-    } else if (kind === "user") {
-      actionProc.command = ["bash", "-c",
-        rbwFetch("user", entry) + "sleep 0.3 && wtype \"$u\"" +
-        " || echo CALYPSO_ACTION_FAILED"];
-    } else if (kind === "pass") {
-      actionProc.command = ["bash", "-c",
-        rbwFetch("pass", entry) + "sleep 0.3 && wtype \"$p\"" +
-        " || echo CALYPSO_ACTION_FAILED"];
-    } else if (kind === "totp") {
-      actionProc.command = ["bash", "-c",
-        rbwFetch("totp", entry) + "sleep 0.3 && wtype \"$t\"" +
-        " || echo CALYPSO_ACTION_FAILED"];
-    } else if (kind === "copypass") {
-      actionProc.command = ["bash", "-c",
-        rbwFetch("pass", entry) +
-        "printf '%s' \"$p\" | wl-copy >/dev/null 2>&1" +
-        " && sleep 30" +
-        " && if [ \"$(wl-paste)\" = \"$p\" ]; then printf '' | wl-copy >/dev/null 2>&1; fi" +
-        " || echo CALYPSO_ACTION_FAILED"];
-    } else if (kind === "copyuser") {
-      actionProc.command = ["bash", "-c",
-        rbwFetch("user", entry) +
-        "printf '%s' \"$u\" | wl-copy >/dev/null 2>&1" +
-        " && sleep 30" +
-        " && if [ \"$(wl-paste)\" = \"$u\" ]; then printf '' | wl-copy >/dev/null 2>&1; fi" +
-        " || echo CALYPSO_ACTION_FAILED"];
-    } else if (kind === "copytotp") {
-      actionProc.command = ["bash", "-c",
-        rbwFetch("totp", entry) +
-        "printf '%s' \"$t\" | wl-copy >/dev/null 2>&1" +
-        " && sleep 30" +
-        " && if [ \"$(wl-paste)\" = \"$t\" ]; then printf '' | wl-copy >/dev/null 2>&1; fi" +
-        " || echo CALYPSO_ACTION_FAILED"];
+      script = rbwFetch("user", entry) + " && " + rbwFetch("pass", entry)
+        + " && sleep 0.3 && " + typeVar("u") + " && wtype -k Tab && " + typeVar("p");
+    } else if (kind === "user" || kind === "pass" || kind === "totp") {
+      script = rbwFetch(kind, entry) + " && sleep 0.3 && " + typeVar(fetchVar[kind]);
+    } else if (kind === "copyuser" || kind === "copypass" || kind === "copytotp") {
+      const k = kind.slice(4);
+      script = popup.copySecretFn + rbwFetch(k, entry)
+        + " && copy_secret \"$" + fetchVar[k] + "\"";
     } else {
       return;
     }
+    actionProc.command = ["bash", "-c", script + fail];
 
     // gate everything behind the agent's lock state
     checkLock("action");
@@ -496,16 +445,13 @@ PanelWindow {
 
     focusRetry.counter = 0;
     focusRetry.restart();
-    closeAnim.stop();
-    popup.showFactor = 0;
-    openAnim.restart();
+    popup.playOpen();
     popup.syncFocus();
   }
 
   function closePopup() {
     popup.collapsing = true;
-    openAnim.stop();
-    closeAnim.restart();
+    popup.playClose();
   }
 
   function toggle() {

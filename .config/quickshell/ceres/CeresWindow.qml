@@ -83,6 +83,16 @@ FloatingWindow {
     ["maintenance", win.maint && win.maintCount > 0 ? "Maintenance  " + win.maintCount : "Maintenance"],
     ["settings", configView.changes > 0 ? "Settings  " + configView.changes : "Settings"]
   ]
+  // The label column of a list of [label, value, ...] fact rows (the cache's
+  // and the mirrors'): as wide as the longest label, never narrower than the
+  // 250 the rows used to be fixed at, so short lists keep their alignment.
+  FontMetrics { id: mfFact; font.family: Zenon.face; font.pixelSize: 16 }
+  function factLabelWidth(facts) {
+    let w = 250;
+    for (const f of facts || []) w = Math.max(w, Math.ceil(mfFact.advanceWidth(String(f[0]))));
+    return w;
+  }
+
   function showTab(t) {
     win.tab = t;
     if (t === "packages" && win.found.length === 0) win.search();
@@ -1991,17 +2001,21 @@ FloatingWindow {
             anchors.top: mdBtns.bottom
             anchors.topMargin: 16
             spacing: 8
+            readonly property var facts: !mdetail.m || !mdetail.m.keep ? [] : [
+              ["Versions beyond the newest " + win.keepVersions, mdetail.m.keep],
+              ["Files of uninstalled packages", mdetail.m.uninst],
+              ["Stale downloads", { n: mdetail.m.stale, size: "" }]
+            ]
+            // Wide enough for the longest label: a fixed 250 let "Files of
+            // uninstalled packages" run under its own value.
+            readonly property real labelW: win.factLabelWidth(cacheFacts.facts)
             Repeater {
-              model: !mdetail.m || !mdetail.m.keep ? [] : [
-                ["Versions beyond the newest " + win.keepVersions, mdetail.m.keep],
-                ["Files of uninstalled packages", mdetail.m.uninst],
-                ["Stale downloads", { n: mdetail.m.stale, size: "" }]
-              ]
+              model: cacheFacts.facts
               delegate: Row {
                 required property var modelData
                 spacing: 12
                 Text {
-                  width: 250
+                  width: cacheFacts.labelW
                   text: modelData[0]
                   color: Zenon.keyInk
                   font.family: Zenon.face
@@ -2028,8 +2042,7 @@ FloatingWindow {
             anchors.topMargin: visible ? 16 : 0
             height: visible ? implicitHeight : 0
             spacing: 8
-            Repeater {
-              model: !win.mirrors ? [] : (() => {
+            readonly property var facts: !win.mirrors ? [] : (() => {
                 const h = win.mirrors;
                 const first = h.servers.length ? h.servers[0].status : null;
                 return [
@@ -2042,11 +2055,14 @@ FloatingWindow {
                   ["List written", Cer.age(Date.now() - h.modified), Date.now() - h.modified > 90 * 86400000]
                 ];
               })()
+            readonly property real labelW: win.factLabelWidth(mirrorFacts.facts)
+            Repeater {
+              model: mirrorFacts.facts
               delegate: Row {
                 required property var modelData
                 spacing: 12
                 Text {
-                  width: 250
+                  width: mirrorFacts.labelW
                   text: modelData[0]
                   color: Zenon.keyInk
                   font.family: Zenon.face
