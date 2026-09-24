@@ -11670,21 +11670,7 @@ FloatingWindow {
             // cursors is one too many, and the drawn one was in the wrong place
             // the moment you moved the caret into the middle of a word — it
             // measures the whole string, not the position.
-            //
-            // A cursorDelegate REPLACES the built-in one, so there is exactly
-            // one and the field itself decides where it goes. It breathes rather
-            // than blinking: a hard on/off in a bar that is already asking for
-            // your attention reads as a fault.
-            cursorDelegate: Rectangle {
-              width: 2
-              color: Zenon.cyan
-              SequentialAnimation on opacity {
-                running: searchField.activeFocus
-                loops: Animation.Infinite
-                NumberAnimation { to: 0.2; duration: 620; easing.type: Easing.InOutQuad }
-                NumberAnimation { to: 1.0; duration: 620; easing.type: Easing.InOutQuad }
-              }
-            }
+            cursorDelegate: Caret { field: searchField }
           }
 
           Text {
@@ -11790,16 +11776,7 @@ FloatingWindow {
             // where the keyboard is — and the field's OWN, for the reason the
             // search bar's carries: a second one drawn at contentWidth is in
             // the wrong place as soon as the caret is not at the end.
-            cursorDelegate: Rectangle {
-              width: 2
-              color: Zenon.cyan
-              SequentialAnimation on opacity {
-                running: filterField.activeFocus
-                loops: Animation.Infinite
-                NumberAnimation { to: 0.2; duration: 620; easing.type: Easing.InOutQuad }
-                NumberAnimation { to: 1.0; duration: 620; easing.type: Easing.InOutQuad }
-              }
-            }
+            cursorDelegate: Caret { field: filterField }
           }
         }
 
@@ -14588,21 +14565,7 @@ FloatingWindow {
           TextInput {
             id: saveField
 
-            // A cursorDelegate REPLACES the built-in one, so there is
-            // exactly one caret and this decides how it behaves. It
-            // breathes, the way every other field on this desktop does
-            // — a hard on/off blink was the last thing here still
-            // wearing Qt's default.
-            cursorDelegate: Rectangle {
-              width: 2
-              color: Zenon.cyan
-              SequentialAnimation on opacity {
-                running: saveField.activeFocus
-                loops: Animation.Infinite
-                NumberAnimation { to: 0.2; duration: 620; easing.type: Easing.InOutQuad }
-                NumberAnimation { to: 1.0; duration: 620; easing.type: Easing.InOutQuad }
-              }
-            }
+            cursorDelegate: Caret { field: saveField }
             anchors.fill: parent
             anchors.leftMargin: 10
             anchors.rightMargin: saveWhere.width + 20
@@ -19165,22 +19128,7 @@ FloatingWindow {
                   TextInput {
                     id: toName
 
-                    // A cursorDelegate REPLACES the built-in one, so
-                    // there is exactly one caret and this decides how
-                    // it behaves. It breathes, the way every other
-                    // field on this desktop does — a hard on/off blink
-                    // was the last thing here still wearing Qt's
-                    // default.
-                    cursorDelegate: Rectangle {
-                      width: 2
-                      color: Zenon.cyan
-                      SequentialAnimation on opacity {
-                        running: toName.activeFocus
-                        loops: Animation.Infinite
-                        NumberAnimation { to: 0.2; duration: 620; easing.type: Easing.InOutQuad }
-                        NumberAnimation { to: 1.0; duration: 620; easing.type: Easing.InOutQuad }
-                      }
-                    }
+                    cursorDelegate: Caret { field: toName }
                     x: wasName.x + wasName.width + 12
                     width: parent.width - x - 14 - (issueText.visible ? issueText.width + 10 : 0)
                     height: parent.height
@@ -22562,21 +22510,8 @@ FloatingWindow {
               font.pixelSize: 18
               clip: true
 
-              // The same breathing caret the search bar, the path bar, the
-              // keymap search and the picker all wear. A cursorDelegate
-              // REPLACES the built-in one, so there is exactly one and it is
-              // this; a hard blink in a field that is already asking for your
-              // attention reads as a fault.
-              cursorDelegate: Rectangle {
-                width: 2
-                color: prompt.error !== "" ? Zenon.red : Zenon.cyan
-                SequentialAnimation on opacity {
-                  running: promptField.activeFocus
-                  loops: Animation.Infinite
-                  NumberAnimation { to: 0.2; duration: 620; easing.type: Easing.InOutQuad }
-                  NumberAnimation { to: 1.0; duration: 620; easing.type: Easing.InOutQuad }
-                }
-              }
+              // the shared caret, red while the prompt has an error
+              cursorDelegate: Caret { field: promptField; color: prompt.error !== "" ? Zenon.red : Zenon.cyan }
 
               Keys.onReturnPressed: (e) => { e.accepted = true; prompt.accept(); }
               Keys.onEscapePressed: (e) => { e.accepted = true; prompt.dismiss(); }
@@ -24925,16 +24860,7 @@ FloatingWindow {
       font.pixelSize: 14
       clip: true
 
-      cursorDelegate: Rectangle {
-        width: 2
-        color: Zenon.cyan
-        SequentialAnimation on opacity {
-          running: tileEdit.activeFocus
-          loops: Animation.Infinite
-          NumberAnimation { to: 0.2; duration: 620; easing.type: Easing.InOutQuad }
-          NumberAnimation { to: 1.0; duration: 620; easing.type: Easing.InOutQuad }
-        }
-      }
+      cursorDelegate: Caret { field: tileEdit }
 
       property bool hadFocus: false
 
@@ -26060,21 +25986,7 @@ FloatingWindow {
           TextInput {
           id: entryEdit
 
-          // A cursorDelegate REPLACES the built-in one, so there is
-          // exactly one caret and this decides how it behaves. It
-          // breathes, the way every other field on this desktop does —
-          // a hard on/off blink was the last thing here still wearing
-          // Qt's default.
-          cursorDelegate: Rectangle {
-            width: 2
-            color: Zenon.cyan
-            SequentialAnimation on opacity {
-              running: entryEdit.activeFocus
-              loops: Animation.Infinite
-              NumberAnimation { to: 0.2; duration: 620; easing.type: Easing.InOutQuad }
-              NumberAnimation { to: 1.0; duration: 620; easing.type: Easing.InOutQuad }
-            }
-          }
+          cursorDelegate: Caret { field: entryEdit }
           anchors.fill: parent
           verticalAlignment: Text.AlignVCenter
           color: Zenon.white
@@ -27819,21 +27731,7 @@ FloatingWindow {
       TextInput {
         id: ptextIn
 
-        // A cursorDelegate REPLACES the built-in one, so there is
-        // exactly one caret and this decides how it behaves. It
-        // breathes, the way every other field on this desktop does — a
-        // hard on/off blink was the last thing here still wearing Qt's
-        // default.
-        cursorDelegate: Rectangle {
-          width: 2
-          color: Zenon.cyan
-          SequentialAnimation on opacity {
-            running: ptextIn.activeFocus
-            loops: Animation.Infinite
-            NumberAnimation { to: 0.2; duration: 620; easing.type: Easing.InOutQuad }
-            NumberAnimation { to: 1.0; duration: 620; easing.type: Easing.InOutQuad }
-          }
-        }
+        cursorDelegate: Caret { field: ptextIn }
         anchors.fill: parent
         anchors.leftMargin: 8
         anchors.rightMargin: 8
@@ -28121,20 +28019,7 @@ FloatingWindow {
     TextInput {
       id: fldIn
 
-      // A cursorDelegate REPLACES the built-in one, so there is exactly
-      // one caret and this decides how it behaves. It breathes, the way
-      // every other field on this desktop does — a hard on/off blink
-      // was the last thing here still wearing Qt's default.
-      cursorDelegate: Rectangle {
-        width: 2
-        color: Zenon.cyan
-        SequentialAnimation on opacity {
-          running: fldIn.activeFocus
-          loops: Animation.Infinite
-          NumberAnimation { to: 0.2; duration: 620; easing.type: Easing.InOutQuad }
-          NumberAnimation { to: 1.0; duration: 620; easing.type: Easing.InOutQuad }
-        }
-      }
+      cursorDelegate: Caret { field: fldIn }
       anchors.fill: parent
       anchors.leftMargin: 8
       anchors.rightMargin: 8

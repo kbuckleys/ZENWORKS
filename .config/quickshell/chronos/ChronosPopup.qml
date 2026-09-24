@@ -1188,21 +1188,7 @@ LayerPopup {
                 TextInput {
                   id: nameInput
 
-                  // A cursorDelegate REPLACES the built-in one, so
-                  // there is exactly one caret and this decides how it
-                  // behaves. It breathes, the way every other field on
-                  // this desktop does — a hard on/off blink was the
-                  // last thing here still wearing Qt's default.
-                  cursorDelegate: Rectangle {
-                    width: 2
-                    color: Zenon.cyan
-                    SequentialAnimation on opacity {
-                      running: nameInput.activeFocus
-                      loops: Animation.Infinite
-                      NumberAnimation { to: 0.2; duration: 620; easing.type: Easing.InOutQuad }
-                      NumberAnimation { to: 1.0; duration: 620; easing.type: Easing.InOutQuad }
-                    }
-                  }
+                  cursorDelegate: Caret { field: nameInput }
                   anchors.fill: parent
                   anchors.leftMargin: 12
                   anchors.rightMargin: 12

@@ -489,30 +489,7 @@ Variants {
                 font.family: Zenon.face
                 font.pixelSize: slot.note ? slot.note.size : Scribe.SIZES[1]
 
-                // A cursorDelegate REPLACES the built-in one, so there is
-                // exactly one caret and this decides how it behaves. It
-                // breathes, the way every other field on this desktop does —
-                // a hard on/off blink is the one thing here that still looked
-                // like a default.
-                cursorDelegate: Rectangle {
-                  width: 2
-                  color: Zenon.cyan
-                  // Only while the note is being edited. The animation below
-                  // stops on focus loss but the delegate does not go away, so
-                  // a note you had typed in kept a caret frozen at whatever
-                  // opacity the breath had reached.
-                  visible: body.activeFocus
-                  SequentialAnimation on opacity {
-                    running: body.activeFocus
-                    loops: Animation.Infinite
-                    NumberAnimation {
-                      to: 0.2; duration: 620; easing.type: Easing.InOutQuad
-                    }
-                    NumberAnimation {
-                      to: 1.0; duration: 620; easing.type: Easing.InOutQuad
-                    }
-                  }
-                }
+                cursorDelegate: Caret { field: body }
 
                 // Stored as the body's contents rather than as Qt's whole
                 // HTML document — see Scribe.fragment — and as nothing at
