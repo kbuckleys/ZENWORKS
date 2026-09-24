@@ -501,9 +501,21 @@ property var statusbar: null
     let first = -1;
     let last = -1;
     let best = 0;
+    let built = 0;
     for (let i = 0; i < popup.filtered.length; ++i) {
       const it = list.itemAtIndex(i);
-      if (!it) break;                    // beyond what the view has realised
+      // ── AN UNBUILT ROW IS OFF ONE END OR THE OTHER ──────────────────
+      // This used to stop at the first row the view had not realised, on
+      // the reading that it was past the far end. It can just as well be
+      // BEFORE the near one: wrap to the end of a long list (Up from the
+      // first row) and the view scrolls so far that it lets the first rows
+      // go. The walk then stopped at row 0, found nothing, and fell back to
+      // "nothing fits" — every row painted, a sliced one on the left, and
+      // the last row square in the pill's right corner. Before the run
+      // starts, an unbuilt row is scrolled off the left: skip it. After, it
+      // is past the right: stop.
+      if (!it) { if (first >= 0) break; continue; }
+      built++;
       const left = it.x - c;
       const right = left + it.width;
       if (right <= 0.5) continue;        // scrolled off to the left
@@ -514,10 +526,23 @@ property var statusbar: null
       best = right;
     }
     if (first >= 0) {
+      popup.fitRetries = 0;
       popup.fitFirst = first;
       popup.fitLast = last;
       return best;
     }
+    // ── NOT MEASURED YET IS NOT "NOTHING FITS" ──────────────────────────
+    // Asked the instant a filter swaps the model, the view has not built the
+    // new rows yet and there is nothing to measure. That used to land in the
+    // fallback below — fitLast -1, every row shown, the pill as wide as the
+    // content — so the last row sat flush in the pill's right corner with no
+    // row claiming it, and its highlight went square across the rounding.
+    // Nothing re-asked unless the content width moved again. So when not one
+    // row is built yet, ask again a frame later, a bounded number of times.
+    if (built === 0 && popup.filtered.length > 0 && popup.fitRetries < 12) {
+      popup.fitRetries++;
+      fitRetry.restart();
+    } else popup.fitRetries = 0;
     // Nothing fits whole: a single row wider than the entire strip. It is
     // shown clipped rather than collapsing the pill to nothing — moveSel
     // already keeps it selected. It does own the left corner, but the strip
@@ -532,6 +557,13 @@ property var statusbar: null
     interval: 0
     onTriggered: popup.fittedListW = popup.measureFit()
   }
+  // see measureFit — a re-ask for a model whose rows are not built yet
+  property int fitRetries: 0
+  Timer {
+    id: fitRetry
+    interval: 16
+    onTriggered: popup.fittedListW = popup.measureFit()
+  }
 
   Connections {
     target: list
@@ -539,6 +571,9 @@ property var statusbar: null
     // is the earliest point measureFit() can see real geometry
     function onContentWidthChanged() { fitTimer.restart(); }
     function onContentXChanged() { fitTimer.restart(); }
+    // a filter that changes WHICH rows without changing their total width
+    // moves neither of the above
+    function onCountChanged() { fitTimer.restart(); }
   }
   onListCapChanged: fitTimer.restart()
 

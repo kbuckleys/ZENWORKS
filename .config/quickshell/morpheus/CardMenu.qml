@@ -429,7 +429,13 @@ PanelWindow {
             acceptedButtons: Qt.LeftButton | Qt.RightButton
             enabled: row.on && !flash.running
             onEntered: root.hovered(row.index)
-            onExited: root.unhovered(row.index)
+            // ONLY A POINTER THAT LEFT. Disabling a hovered MouseArea makes
+            // Qt report an exit too — and the flash disables this one for its
+            // whole length. So confirming an armed row ("Empty Trash", second
+            // click) reported the pointer as gone, the owner disarmed it, and
+            // the flash then ended in `chosen` on a row that was no longer
+            // armed: it armed again instead of acting, every time.
+            onExited: if (hover.enabled) root.unhovered(row.index)
             // A row that ASKS does not flash. The flash is the reply to an
             // action, and a row that opens a question has not done anything
             // yet — the question is the reply. Everything else flashes, and

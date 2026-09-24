@@ -1529,26 +1529,85 @@ FloatingWindow {
       Rule { anchors.bottom: parent.bottom; anchors.left: parent.left; anchors.right: parent.right }
     }
 
-    // The notes Ceres keeps about its own answer — stale, restart owed.
-    Column {
+    // ── THE MESSAGE BAR ──────────────────────────────────────────────
+    // The notes Ceres keeps about its own answer — a failed check, a reboot
+    // or a re-login owed, news unread. None of them is an update, and they
+    // hold whether there are updates or not, so they sit in a bar of their
+    // own above the list rather than as loose red lines that read like part
+    // of it. Each row wears its own level; the bar wears the worst of them.
+    // An Item around the bar so the margins count toward the height the body
+    // is anchored under, and the whole thing takes no room when there is
+    // nothing to say.
+    Item {
       id: notes
       anchors.top: head.bottom
       anchors.left: parent.left
       anchors.right: parent.right
-      anchors.leftMargin: 16
       visible: win.tab === "updates" && win.page === "browse"
-      height: visible && Ceres.notes.length ? Ceres.notes.length * 24 + 8 : 0
-      topPadding: 4
-      Repeater {
-        model: Ceres.notes
-        delegate: Text {
-          required property string modelData
-          height: 24
-          verticalAlignment: Text.AlignVCenter
-          text: modelData
-          color: Zenon.red
-          font.family: Zenon.face
-          font.pixelSize: 16
+               && Ceres.noteItems.length > 0
+      height: visible ? noteBar.height + 20 : 0
+
+      function inkOf(level) {
+        return level === "bad" ? Zenon.red : level === "warn" ? Zenon.yellow : Zenon.blue;
+      }
+      function glyphOf(level) {
+        return level === "bad" ? "\uF06A" : level === "warn" ? "\uF071" : "\uF05A";
+      }
+      readonly property color worst: {
+        const items = Ceres.noteItems;
+        if (items.some(n => n.level === "bad")) return Zenon.red;
+        if (items.some(n => n.level === "warn")) return Zenon.yellow;
+        return Zenon.blue;
+      }
+
+      Rectangle {
+        id: noteBar
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: parent.top
+        anchors.margins: 12
+        anchors.topMargin: 10
+        height: noteCol.implicitHeight + 16
+        radius: Zenon.windowRadius
+        color: Qt.rgba(notes.worst.r, notes.worst.g, notes.worst.b, 0.10)
+        border.width: 1
+        border.color: Qt.rgba(notes.worst.r, notes.worst.g, notes.worst.b, 0.45)
+
+        Column {
+          id: noteCol
+          anchors.left: parent.left
+          anchors.right: parent.right
+          anchors.verticalCenter: parent.verticalCenter
+          anchors.leftMargin: 12
+          anchors.rightMargin: 12
+          spacing: 4
+          Repeater {
+            model: Ceres.noteItems
+            delegate: Row {
+              required property var modelData
+              width: noteCol.width
+              height: 24
+              spacing: 10
+              Text {
+                width: 18
+                anchors.verticalCenter: parent.verticalCenter
+                horizontalAlignment: Text.AlignHCenter
+                text: notes.glyphOf(modelData.level)
+                color: notes.inkOf(modelData.level)
+                font.family: Zenon.face
+                font.pixelSize: 15
+              }
+              Text {
+                width: parent.width - 28
+                anchors.verticalCenter: parent.verticalCenter
+                elide: Text.ElideRight
+                text: modelData.text
+                color: Zenon.white
+                font.family: Zenon.face
+                font.pixelSize: 16
+              }
+            }
+          }
         }
       }
     }
@@ -2634,7 +2693,13 @@ FloatingWindow {
           font.weight: Font.Bold
           font.pixelSize: 16
         }
-        ListView {
+        // A Flickable over a Column, not a ListView. The lines wrap, so
+        // their heights differ, and a ListView only ESTIMATES the rows it has
+        // not built yet — correcting originY and contentHeight as it builds
+        // them. The elastic scroll animates against those bounds, so every
+        // correction nudged the text mid-scroll: the jitter. A PKGBUILD is a
+        // few hundred lines at most; laid out whole, the bounds are exact.
+        Flickable {
           id: reviewList
           ScrollRail {
             target: reviewList
@@ -2651,16 +2716,25 @@ FloatingWindow {
           anchors.bottom: parent.bottom
           clip: true
           boundsBehavior: Flickable.StopAtBounds
-          model: win.review ? win.review.lines : []
-          delegate: Text {
-            required property var modelData
+          contentHeight: reviewLines.implicitHeight
+          // a new review starts at its top, as the ListView's model reset did
+          Connections { target: win; function onReviewChanged() { reviewList.contentY = 0; } }
+          Column {
+            id: reviewLines
             width: reviewList.width - 14
-            wrapMode: Text.WrapAnywhere
-            text: modelData.text
-            color: modelData.ink === "add" ? Zenon.green : modelData.ink === "del" ? Zenon.red
-              : modelData.ink === "hunk" ? Zenon.cyan : Zenon.keyInk
-            font.family: "monospace"
-            font.pixelSize: 15
+            Repeater {
+              model: win.review ? win.review.lines : []
+              delegate: Text {
+                required property var modelData
+                width: reviewLines.width
+                wrapMode: Text.WrapAnywhere
+                text: modelData.text
+                color: modelData.ink === "add" ? Zenon.green : modelData.ink === "del" ? Zenon.red
+                  : modelData.ink === "hunk" ? Zenon.cyan : Zenon.keyInk
+                font.family: "monospace"
+                font.pixelSize: 15
+              }
+            }
           }
         }
       }

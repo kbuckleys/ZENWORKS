@@ -136,6 +136,21 @@ Item {
     return set === 0 ? "all at defaults" : set + " of " + all.length + " set";
   }
 
+  // Narrow: labels go on their own line above what they label, which then has
+  // the whole width — a fixed label column left the controls too little and
+  // they wrapped mid-choice.
+  readonly property bool narrow: rows.width < 560
+
+  // Which repository cards are open, BY NAME: every edit rebuilds the list of
+  // cards, and a card holding this itself was closed again by the very edit
+  // it was opened for.
+  property var openRepos: ({})
+  function toggleRepo(name) {
+    const o = Object.assign({}, view.openRepos);
+    if (o[name]) delete o[name]; else o[name] = true;
+    view.openRepos = o;
+  }
+
   // The SigLevel everything starts from: [options]' own, or pacman's.
   readonly property var sigBase: Pac.parseSig(view.opt("SigLevel").value)
 
@@ -384,6 +399,67 @@ Item {
     TapHandler { onTapped: chip.picked() }
   }
 
+  // ONE CHOICE, drawn as one bar: the options joined, the chosen one filled.
+  // Separate chips for two different choices read as one list of five, and
+  // wrapping could split a choice across two lines; a bar wraps whole.
+  // `options` is [[value, label], …]; `dim` is the inherited look.
+  component Segmented: Rectangle {
+    id: seg
+    property var options: []
+    property string value: ""
+    property bool dim: false
+    signal picked(string value)
+    width: segRow.implicitWidth + 4
+    height: 32
+    radius: Zenon.windowRadius
+    color: "transparent"
+    border.width: 1
+    border.color: Zenon.border
+    Row {
+      id: segRow
+      anchors.centerIn: parent
+      Repeater {
+        model: seg.options
+        delegate: Item {
+          id: part
+          required property var modelData
+          required property int index
+          readonly property bool lit: seg.value === part.modelData[0]
+          width: partText.implicitWidth + 18
+          height: 28
+          // between two unchosen options only: the fill is its own edge
+          Rectangle {
+            visible: part.index > 0 && !part.lit
+              && seg.value !== seg.options[part.index - 1][0]
+            anchors.left: parent.left
+            anchors.verticalCenter: parent.verticalCenter
+            width: 1
+            height: 16
+            color: Zenon.border
+          }
+          Rectangle {
+            anchors.fill: parent
+            visible: part.lit
+            radius: Zenon.windowRadius - 1
+            color: seg.dim ? Zenon.headBg
+              : Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b, 0.2)
+            border.width: seg.dim ? 0 : 1
+            border.color: Zenon.cyan
+          }
+          Text {
+            id: partText
+            anchors.centerIn: parent
+            text: part.modelData[1]
+            color: part.lit ? (seg.dim ? Zenon.keyInk : Zenon.cyan) : Zenon.muted
+            font.family: Zenon.face
+            font.pixelSize: 15
+          }
+          TapHandler { onTapped: seg.picked(part.modelData[0]) }
+        }
+      }
+    }
+  }
+
   // A line of text, committed on return or when it lets go; Esc puts it back.
   // Empty means unset — the placeholder says what that is.
   component Field: Rectangle {
@@ -447,48 +523,47 @@ Item {
     signal edited(string value)
     readonly property var sig: Pac.parseSig(se.value, se.base)
     readonly property bool inherited: se.value === ""
-    spacing: 8
+    spacing: 10
     Repeater {
       model: [["pkg", "Packages"], ["db", "Databases"]]
+      // The label beside its bars while they fit, above them when not; and
+      // the bars in a Flow of their own, so the second one wraps under the
+      // first rather than back under the label.
       delegate: Flow {
         id: sr
         required property var modelData
+        readonly property bool inline: se.avail >= 350
         width: se.avail
-        spacing: 6
+        spacing: 8
         Text {
-          width: 110
-          height: 28
+          width: sr.inline ? 88 : se.avail
+          height: sr.inline ? 32 : 22
           verticalAlignment: Text.AlignVCenter
           text: sr.modelData[1]
           color: Zenon.keyInk
           font.family: Zenon.face
           font.pixelSize: 15
         }
-        Repeater {
-          model: ["Never", "Optional", "Required"]
-          delegate: Chip {
-            required property string modelData
-            label: modelData
-            lit: se.sig[sr.modelData[0]].check === modelData
+        Flow {
+          width: sr.inline ? se.avail - 96 : se.avail
+          spacing: 8
+          Segmented {
+            options: [["Never", "Never"], ["Optional", "Optional"], ["Required", "Required"]]
+            value: se.sig[sr.modelData[0]].check
             dim: se.inherited
-            onPicked: {
+            onPicked: (v) => {
               const s = JSON.parse(JSON.stringify(se.sig));
-              s[sr.modelData[0]].check = modelData;
+              s[sr.modelData[0]].check = v;
               se.edited(Pac.formatSig(s));
             }
           }
-        }
-        Item { width: 10; height: 1 }
-        Repeater {
-          model: [["TrustedOnly", "trusted only"], ["TrustAll", "trust all"]]
-          delegate: Chip {
-            required property var modelData
-            label: modelData[1]
-            lit: se.sig[sr.modelData[0]].trust === modelData[0]
+          Segmented {
+            options: [["TrustedOnly", "Trusted only"], ["TrustAll", "Trust all"]]
+            value: se.sig[sr.modelData[0]].trust
             dim: se.inherited
-            onPicked: {
+            onPicked: (v) => {
               const s = JSON.parse(JSON.stringify(se.sig));
-              s[sr.modelData[0]].trust = modelData[0];
+              s[sr.modelData[0]].trust = v;
               se.edited(Pac.formatSig(s));
             }
           }
@@ -645,11 +720,48 @@ Item {
   }
 
   // ── one repository ──────────────────────────────────────────────────────
+  // Closed, a card is its header and one line of what it is set to, so the
+  // order of the list — which is what this page is about — fits on screen.
+  // The name opens it.
+  function repoSummary(r) {
+    const from = r.Include.length > 0
+      ? r.Include.map((f) => f.replace(/^.*\//, "")).join(", ")
+      : r.Server.length > 0
+        ? r.Server.length + (r.Server.length === 1 ? " server" : " servers")
+        : "no servers";
+    const sig = r.SigLevel === "" ? "signatures as [options]" : "signatures " + r.SigLevel;
+    const use = r.Usage === "" || /\bAll\b/.test(r.Usage) ? "all uses" : r.Usage;
+    return from + "  ·  " + sig + "  ·  " + use;
+  }
+
+  // A label and what it labels: side by side, or stacked when narrow.
+  component Labeled: Flow {
+    id: lab
+    property string label: ""
+    default property alias content: slot.data
+    spacing: 10
+    Text {
+      width: view.narrow ? lab.width : 130
+      height: view.narrow ? 22 : 32
+      verticalAlignment: Text.AlignVCenter
+      text: lab.label
+      color: Zenon.keyInk
+      font.family: Zenon.face
+      font.pixelSize: 15
+    }
+    Item {
+      id: slot
+      width: view.narrow ? lab.width : lab.width - 140
+      height: childrenRect.height
+    }
+  }
+
   component RepoCard: Rectangle {
     id: card
     property var repo: null
     property int at: 0
     readonly property bool changed: view.repoDirty(card.repo, card.at)
+    readonly property bool open: card.repo.enabled && !!view.openRepos[card.repo.name]
     height: rcol.implicitHeight + 20
     radius: Zenon.windowRadius
     color: "transparent"
@@ -666,38 +778,70 @@ Item {
       anchors.margins: 10
       anchors.leftMargin: 14
       anchors.rightMargin: 14
-      spacing: 10
+      spacing: 8
 
       Item {
         width: parent.width
-        height: 30
-        Row {
+        height: 32
+        Check {
+          id: onBox
           anchors.left: parent.left
           anchors.verticalCenter: parent.verticalCenter
-          spacing: 10
-          Check {
+          lit: card.repo.enabled
+          onToggled: view.cur = Pac.setRepoEnabled(view.cur, card.repo.name, !card.repo.enabled)
+        }
+        // the chevron, the name and its badge: the part that opens the card
+        Item {
+          anchors.left: onBox.right
+          anchors.leftMargin: 10
+          anchors.right: moves.left
+          anchors.rightMargin: 8
+          anchors.verticalCenter: parent.verticalCenter
+          height: parent.height
+          Row {
+            id: titleRow
             anchors.verticalCenter: parent.verticalCenter
-            lit: card.repo.enabled
-            onToggled: view.cur = Pac.setRepoEnabled(view.cur, card.repo.name, !card.repo.enabled)
+            width: parent.width
+            spacing: 10
+            Text {
+              anchors.verticalCenter: parent.verticalCenter
+              visible: card.repo.enabled
+              text: card.open ? "" : ""
+              color: Zenon.muted
+              font.family: Zenon.face
+              font.pixelSize: 12
+            }
+            Text {
+              id: repoName
+              anchors.verticalCenter: parent.verticalCenter
+              width: Math.min(implicitWidth, titleRow.width - 22)
+              elide: Text.ElideRight
+              text: (card.at + 1) + ".  [" + card.repo.name + "]"
+              color: card.repo.enabled ? Zenon.white : Zenon.muted
+              font.family: Zenon.face
+              font.weight: Font.Bold
+              font.pixelSize: 17
+            }
+            Text {
+              anchors.verticalCenter: parent.verticalCenter
+              // what is left after the name: it gives way before the name does
+              width: Math.max(0, Math.min(implicitWidth, titleRow.width - repoName.width - 44))
+              visible: width > 30
+              elide: Text.ElideRight
+              text: !card.repo.official ? "third party"
+                : /testing|unstable/.test(card.repo.name) ? "pre-release" : "Arch"
+              color: !card.repo.official ? Zenon.magenta : /testing|unstable/.test(card.repo.name) ? Zenon.yellow : Zenon.muted
+              font.family: Zenon.face
+              font.pixelSize: 14
+            }
           }
-          Text {
-            anchors.verticalCenter: parent.verticalCenter
-            text: (card.at + 1) + ".  [" + card.repo.name + "]"
-            color: card.repo.enabled ? Zenon.white : Zenon.muted
-            font.family: Zenon.face
-            font.weight: Font.Bold
-            font.pixelSize: 17
-          }
-          Text {
-            anchors.verticalCenter: parent.verticalCenter
-            text: !card.repo.official ? "third party"
-              : /testing|unstable/.test(card.repo.name) ? "pre-release" : "Arch"
-            color: !card.repo.official ? Zenon.magenta : /testing|unstable/.test(card.repo.name) ? Zenon.yellow : Zenon.muted
-            font.family: Zenon.face
-            font.pixelSize: 14
+          TapHandler {
+            enabled: card.repo.enabled
+            onTapped: { view.toggleRepo(card.repo.name); view.released(); }
           }
         }
         Row {
+          id: moves
           anchors.right: parent.right
           anchors.verticalCenter: parent.verticalCenter
           spacing: 6
@@ -719,86 +863,96 @@ Item {
         }
       }
 
+      // closed: what it is set to, in one line
+      Text {
+        visible: card.repo.enabled && !card.open
+        width: parent.width
+        leftPadding: 28
+        elide: Text.ElideRight
+        text: view.repoSummary(card.repo)
+        color: Zenon.muted
+        font.family: Zenon.face
+        font.pixelSize: 14
+        TapHandler { onTapped: { view.toggleRepo(card.repo.name); view.released(); } }
+      }
+
       // A switched-off repository is only its header: its settings are
       // commented out, and switching it on brings them back as they were.
       Column {
-        visible: card.repo.enabled
+        visible: card.open
         width: parent.width
-        spacing: 10
+        topPadding: 4
+        spacing: 12
         Repeater {
           model: [["Include", "Servers from", "a mirrorlist file, e.g. /etc/pacman.d/mirrorlist"],
                   ["Server", "Servers", "URLs, space-separated — $repo and $arch are filled in"],
                   ["CacheServer", "Cache servers", "tried first for packages, never for databases"]]
-          delegate: Row {
+          delegate: Labeled {
             id: kr
             required property var modelData
-            spacing: 10
-            Text {
-              width: 130
-              anchors.verticalCenter: parent.verticalCenter
-              text: kr.modelData[1]
-              color: Zenon.keyInk
-              font.family: Zenon.face
-              font.pixelSize: 15
-            }
+            width: rcol.width
+            label: kr.modelData[1]
             Field {
-              width: rcol.width - 140
+              width: parent.width
               value: card.repo[kr.modelData[0]].join(" ")
               placeholder: kr.modelData[2]
               onCommitted: (t) => card.set(kr.modelData[0], t)
             }
           }
         }
-        Row {
-          spacing: 10
-          Text {
-            width: 130
-            text: "Signatures"
-            color: Zenon.keyInk
-            font.family: Zenon.face
-            font.pixelSize: 15
-          }
+        Labeled {
+          width: rcol.width
+          label: "Signatures"
           Column {
-            spacing: 6
+            width: parent.width
+            spacing: 8
             SigEditor {
-              avail: rcol.width - 140
+              avail: parent.width
               value: card.repo.SigLevel
               base: view.sigBase
               onEdited: (v) => card.set("SigLevel", v)
             }
-            Text {
-              text: card.repo.SigLevel === "" ? "as [options]" : "own · "
-                + "<u>use [options]'</u>"
-              textFormat: Text.StyledText
-              color: card.repo.SigLevel === "" ? Zenon.muted : Zenon.cyan
-              font.family: Zenon.face
-              font.pixelSize: 14
-              TapHandler { enabled: card.repo.SigLevel !== ""; onTapped: card.set("SigLevel", "") }
+            // where these come from, and the way back to it
+            Row {
+              spacing: 8
+              Text {
+                text: card.repo.SigLevel === "" ? "inherited from [options]" : "this repository's own"
+                color: Zenon.muted
+                font.family: Zenon.face
+                font.pixelSize: 14
+              }
+              Text {
+                visible: card.repo.SigLevel !== ""
+                text: "use [options]"
+                color: Zenon.cyan
+                font.family: Zenon.face
+                font.pixelSize: 14
+                font.underline: true
+                TapHandler { onTapped: card.set("SigLevel", "") }
+              }
             }
           }
         }
-        Row {
-          spacing: 10
-          Text {
-            width: 130
-            anchors.verticalCenter: parent.verticalCenter
-            text: "Used for"
-            color: Zenon.keyInk
-            font.family: Zenon.face
-            font.pixelSize: 15
-          }
-          Repeater {
-            // All, or unset, is every one; switching one off writes the rest
-            model: Pac.USAGE
-            delegate: Check {
-              required property string modelData
-              readonly property var words: card.repo.Usage === "" || /\bAll\b/.test(card.repo.Usage)
-                ? Pac.USAGE : card.repo.Usage.split(/\s+/)
-              label: modelData
-              lit: words.indexOf(modelData) >= 0
-              onToggled: {
-                const w = Pac.USAGE.filter(u => u === modelData ? !lit : words.indexOf(u) >= 0);
-                card.set("Usage", w.length === Pac.USAGE.length ? "" : w.length === 0 ? "Sync" : w.join(" "));
+        Labeled {
+          width: rcol.width
+          label: "Used for"
+          Flow {
+            width: parent.width
+            spacing: 16
+            Repeater {
+              // All, or unset, is every one; switching one off writes the rest
+              model: Pac.USAGE
+              delegate: Check {
+                required property string modelData
+                readonly property var words: card.repo.Usage === "" || /\bAll\b/.test(card.repo.Usage)
+                  ? Pac.USAGE : card.repo.Usage.split(/\s+/)
+                height: 32
+                label: modelData
+                lit: words.indexOf(modelData) >= 0
+                onToggled: {
+                  const w = Pac.USAGE.filter(u => u === modelData ? !lit : words.indexOf(u) >= 0);
+                  card.set("Usage", w.length === Pac.USAGE.length ? "" : w.length === 0 ? "Sync" : w.join(" "));
+                }
               }
             }
           }
@@ -852,17 +1006,17 @@ Item {
         font.family: Zenon.face
         font.pixelSize: 15
       }
-      Row {
+      Labeled {
         visible: add.open
-        spacing: 10
-        Text { width: 130; anchors.verticalCenter: parent.verticalCenter; text: "Name"; color: Zenon.keyInk; font.family: Zenon.face; font.pixelSize: 15 }
-        Field { width: acol.width - 140; value: add.name; placeholder: "as the repository calls itself"; onCommitted: (t) => add.name = t }
+        width: acol.width
+        label: "Name"
+        Field { width: parent.width; value: add.name; placeholder: "as the repository calls itself"; onCommitted: (t) => add.name = t }
       }
-      Row {
+      Labeled {
         visible: add.open
-        spacing: 10
-        Text { width: 130; anchors.verticalCenter: parent.verticalCenter; text: "Servers"; color: Zenon.keyInk; font.family: Zenon.face; font.pixelSize: 15 }
-        Field { width: acol.width - 140; value: add.servers; placeholder: "https://…/$repo/os/$arch"; onCommitted: (t) => add.servers = t }
+        width: acol.width
+        label: "Servers"
+        Field { width: parent.width; value: add.servers; placeholder: "https://…/$repo/os/$arch"; onCommitted: (t) => add.servers = t }
       }
       Text {
         visible: add.open && add.problem !== ""

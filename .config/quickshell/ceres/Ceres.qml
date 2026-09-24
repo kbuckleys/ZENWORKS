@@ -214,27 +214,35 @@ Singleton {
 
   // ── on the bar ──────────────────────────────────────────────────────────
   // The lines above the lists: what is wrong with the answer, if anything.
-  readonly property var notes: {
+  //
+  // Each carries how much it matters — "bad" stops things working, "warn" is
+  // owed but can wait, "info" is only worth knowing — so the window's message
+  // bar can say so with more than one shade of red. `notes` is the same lines
+  // as plain text, for the tooltip and the panel.
+  readonly property var noteItems: {
     const out = [];
     // Short: they head a tooltip whose other lines are "name old → new".
-    if (root.setupNeeded)
-      out.push("Setup needed: " + Cer.nameList(root.deps.missing.map(m => m.pkg), 2));
-    if (root.restartNeeded) out.push("Reboot needed: kernel upgraded");
-    if (root.staleApps.length)
-      out.push("Restart " + Cer.nameList(root.staleApps.map(g => g.name), 2));
-    if (root.staleServices.length)
-      out.push(root.staleServices.length + (root.staleServices.length === 1 ? " service needs" : " services need")
-        + " a re-login");
-    if (root.unreadNews.length)
-      out.push(root.unreadNews.length + " unread Arch news" + (root.unreadNews.length === 1 ? " item" : " items"));
     if (root.failures > 0) {
       const why = root.error !== "" ? root.error : "check failed";
-      out.push(root.lastOk > 0
+      out.push({ level: "bad", text: root.lastOk > 0
         ? "Checked " + Cer.age(root.now - root.lastOk) + " — " + why
-        : "Not checked yet — " + why);
+        : "Not checked yet — " + why });
     }
+    if (root.setupNeeded)
+      out.push({ level: "bad",
+        text: "Setup needed: " + Cer.nameList(root.deps.missing.map(m => m.pkg), 2) });
+    if (root.restartNeeded) out.push({ level: "warn", text: "Reboot needed: kernel upgraded" });
+    if (root.staleApps.length)
+      out.push({ level: "warn", text: "Restart " + Cer.nameList(root.staleApps.map(g => g.name), 2) });
+    if (root.staleServices.length)
+      out.push({ level: "warn", text: root.staleServices.length
+        + (root.staleServices.length === 1 ? " service needs" : " services need") + " a re-login" });
+    if (root.unreadNews.length)
+      out.push({ level: "info", text: root.unreadNews.length + " unread Arch news"
+        + (root.unreadNews.length === 1 ? " item" : " items") });
     return out;
   }
+  readonly property var notes: root.noteItems.map(n => n.text)
 
   readonly property var ink: ({
     muted: "#6b7089", arrow: "#fab387", repo: "#7aa2f7", aur: "#c099ff",

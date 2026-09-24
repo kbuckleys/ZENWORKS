@@ -616,6 +616,9 @@ const APPS = {
   "wine": "\uEF17", "winecfg": "\uEF17", "wine64": "\uEF17",
   "spicetify": "\uF1BC",
   "cliphist": "\uED7B",
+  // desktop id com.anthropic.Claude, command claude-desktop; `claude` is
+  // also the CLI, which is the same logo
+  "claude": "\uEC82", "claude-desktop": "\uEC82", "claude-code": "\uEC82",
   "nextcloud": "\uF0C2", "nextcloud-client": "\uF0C2",
   "electron": "\uDB84\uDC24",
   // ── this shell's own ──
