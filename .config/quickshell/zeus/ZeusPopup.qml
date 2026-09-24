@@ -456,7 +456,7 @@ LayerPopup {
   // unit beside them in the text face
   function statValue(key) {
     if (key === "cpu") return String(Sysmon.cpuUsage);
-    if (key === "gpu") return Sysmon.gpuPresent ? String(Sysmon.gpuUsage) : "--";
+    if (key === "gpu") return Sysmon.gpuPresent && Sysmon.gpuUsageKnown ? String(Sysmon.gpuUsage) : "--";
     if (key === "ram") return String(Sysmon.memUsage);
     if (key === "net") return Helpers.splitRate(Sysmon.netDownText).num;
     return Helpers.splitRate(Sysmon.diskReadText).num;

@@ -9,16 +9,29 @@ trim() { printf '%s' "$1" | sed -E 's/^[[:space:]]+|[[:space:]]+$//g'; }
 int() { local v="$(trim "$(n "$1")")"; case "$v" in ""|*[!0-9]*) echo -n "" ;; *) echo -n "$v" ;; esac; }
 watt() { local v="$(trim "$(n "$1")")"; [ -z "$v" ] && { echo -n ""; return; }; awk -v x="$v" 'BEGIN { printf "%d", x }' 2>/dev/null; }
 
-card=""
+# Which card to report on. The one whose load can actually be read comes
+# first: NVIDIA through nvidia-smi, then anything exposing gpu_busy_percent
+# (amdgpu). Only then the card driving the display — on a hybrid laptop that
+# is usually the Intel iGPU, which cannot say how busy it is (see below).
+# cardN-<connector> entries are outputs, not cards, and are skipped.
+cards=()
 for d in /sys/class/drm/card*; do
-  [ -e "$d/device/vendor" ] || continue
-  if [ "$(cat "$d/device/boot_vga" 2>/dev/null)" = "1" ]; then card="$d"; break; fi
+  case "${d##*/}" in *-*) continue ;; esac
+  [ -e "$d/device/vendor" ] && cards+=("$d")
 done
-if [ -z "$card" ]; then
-  for d in /sys/class/drm/card*; do
-    [ -e "$d/device/vendor" ] && { card="$d"; break; }
+card=""
+if command -v nvidia-smi >/dev/null 2>&1; then
+  for d in "${cards[@]}"; do
+    [ "$(cat "$d/device/vendor")" = "0x10de" ] && { card="$d"; break; }
   done
 fi
+[ -z "$card" ] && for d in "${cards[@]}"; do
+  [ -r "$d/device/gpu_busy_percent" ] && { card="$d"; break; }
+done
+[ -z "$card" ] && for d in "${cards[@]}"; do
+  [ "$(cat "$d/device/boot_vga" 2>/dev/null)" = "1" ] && { card="$d"; break; }
+done
+[ -z "$card" ] && [ ${#cards[@]} -gt 0 ] && card="${cards[0]}"
 
 if [ -z "$card" ]; then
   printf '{"present":false,"util":0,"temp":0,"tooltip":""}\n'
@@ -66,8 +79,11 @@ elif [ "$vendor" = "0x1002" ] || [ "$vendor" = "0x8086" ]; then
   device="$card/device"
   [ "$vendor" = "0x1002" ] && vname="AMD" || vname="Intel"
 
-  util="$(cat "$device/gpu_busy_percent" 2>/dev/null | tr -d ' ')"
-  util=${util:-0}
+  # gpu_busy_percent is amdgpu's. Intel's i915 and xe drivers publish no load
+  # figure an unprivileged process can read (intel_gpu_top needs perf access),
+  # so there the load is UNKNOWN, reported as null, and shown as n/a rather
+  # than as a meter sitting at a confident 0%.
+  util="$(int "$(cat "$device/gpu_busy_percent" 2>/dev/null)")"
 
   hwmon="$(ls "$device/hwmon/" 2>/dev/null | head -n1)"
   if [ -n "$hwmon" ]; then
@@ -97,7 +113,11 @@ elif [ "$vendor" = "0x1002" ] || [ "$vendor" = "0x8086" ]; then
   name="$(lspci -s "$slot" 2>/dev/null | sed -E 's/^[0-9a-fA-F:.]+ [^:]+: //; s/ \[[0-9a-fA-F]{4}:[0-9a-fA-F]{4}\]//; s/ \(rev [0-9a-fA-F]+\)$//' | tr -s ' ')"
   [ -z "$name" ] && name="$vname GPU"
 
-  tooltip="GPU: $name\nVendor: $vname\nUtilization: ${util}%"
+  if [ -n "$util" ]; then
+    tooltip="GPU: $name\nVendor: $vname\nUtilization: ${util}%"
+  else
+    tooltip="GPU: $name\nVendor: $vname\nUtilization: n/a ($vname exposes no load without root)"
+  fi
   [ -n "$temp" ] && [ "$temp" -gt 0 ] && tooltip="$tooltip\nTemperature: ${temp}°C"
   [ -n "$memtotal" ] && tooltip="$tooltip\nVRAM Used: ${memused} MiB / ${memtotal} MiB"
   [ -n "$pdraw" ] && tooltip="$tooltip\nPower: ${pdraw}W"
@@ -111,5 +131,7 @@ tooltip="$(printf '%b' "$tooltip")"
 
 # No `text` field: the label and the meter are built in GpuModule.qml, so the
 # palette lives in Zenon alone rather than being restated as hex in here.
-jq -nc --argjson util "${util:-0}" --argjson temp "${temp:-0}" --arg tooltip "$tooltip" \
-  '{present: true, util: $util, temp: $temp, tooltip: $tooltip}'
+# util is null when the driver cannot say (Intel); a number otherwise.
+jq -nc --arg util "${util:-}" --argjson temp "${temp:-0}" --arg tooltip "$tooltip" \
+  '{present: true, util: (if $util == "" then null else ($util | tonumber) end),
+    temp: $temp, tooltip: $tooltip}'

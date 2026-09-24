@@ -227,6 +227,9 @@ Singleton {
   // a fact about the machine, not about the text: the bar's module hides on it
   property bool gpuPresent: false
   property int gpuUsage: 0
+  // false when the driver has no load figure to give (Intel): the meter then
+  // says n/a instead of sitting at a 0% nobody measured
+  property bool gpuUsageKnown: false
   property int gpuTemp: 0
   property string gpuTip: ""
   property var gpuHistory: []
@@ -239,10 +242,12 @@ Singleton {
         try {
           const o = JSON.parse(line);
           root.gpuPresent = o.present ?? false;
-          root.gpuUsage = o.util ?? 0;
+          const known = typeof o.util === "number";
+          root.gpuUsageKnown = known;
+          root.gpuUsage = known ? o.util : 0;
           root.gpuTemp = o.temp ?? 0;
           root.gpuTip = o.tooltip ?? "";
-          root.gpuHistory = root.push(root.gpuHistory, o.util ?? 0);
+          if (known) root.gpuHistory = root.push(root.gpuHistory, o.util);
         } catch (e) {}
       }
     }
