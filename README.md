@@ -22,7 +22,7 @@ Notes
 - Qt reads its image-format plugin list ONCE PER PROCESS. After installing ```qt6-imageformats``` or ```kimageformats``` you must restart quickshell; a config reload is not enough
 - bandwhich needs a capability grant to read traffic without root: ```scripts/bandwhich-grant.sh``` does this via ```pkexec```
 - Ceres installs ```paru``` itself on first use if it is missing, so it is not listed above
-- Settings that belong to one machine (named monitors, cursor theme, NVIDIA tuning, personal binds) live in ```hypr/lua/machine.lua```, which is not committed. Copy ```hypr/lua/machine.example.lua``` to ```hypr/lua/machine.lua``` and edit it; without it every monitor gets its preferred mode
+- ```SUPER + M``` / ```SUPER + SHIFT + M``` in ```binds.lua``` run a personal project (```~/Projects/spoot```) that is not part of this repo
 - ```xdg-open``` means the suite inherits whatever handlers your system has. Those are not listed here and cannot be enumerated from the code
 
 Endpoints

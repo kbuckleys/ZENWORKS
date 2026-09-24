@@ -4,13 +4,23 @@
 -- https://github.com/kbuckleys/
 
 -- MONITORS
--- Every output gets its preferred mode. Named monitors, and anything else
--- that belongs to one machine (cursor theme, GPU tuning), go in
--- lua/machine.lua — see lua/machine.example.lua.
+-- Any output without a rule of its own (another machine, a projector) gets
+-- its preferred mode rather than being left unconfigured.
 hl.monitor({ output = "",          mode = "preferred",      position = "auto", scale = "auto", })
+hl.monitor({ output = "DP-1",      mode = "2560x1440@180",  position = "auto", })
+hl.monitor({ output = "HDMI-A-1",  mode = "1920x1080@100",  position = "auto", transform = 3, })
 
 -- ENV
+-- Nvidia cache limit set to 20 GB
+hl.env("__GL_SHADER_DISK_CACHE_SIZE", "21474836480")
+hl.env("__GL_SHADER_DISK_CACHE_SKIP_CLEANUP", "1")
 hl.env("QSG_RENDER_LOOP", "threaded")
+
+-- CURSOR
+hl.env("HYPRCURSOR_THEME", "cz-Viator-Black-Hourglass")
+hl.env("XCURSOR_THEME", "cz-Viator-Black-Hourglass")
+hl.env("HYPRCURSOR_SIZE", "6")
+hl.env("XCURSOR_SIZE", "6")
 
 hl.config({
 	render = {
