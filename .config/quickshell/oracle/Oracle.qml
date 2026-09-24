@@ -1052,8 +1052,12 @@ Singleton {
       // line icarus' session menu uses.
       // Through the launcher, so the new shell gets the GPU and allocator
       // environment for this machine — see scripts/launch.sh.
+      // Quoted: a config path with a space in it would otherwise split. By
+      // hand, as Strings.shellQuote does it — morpheus reads this singleton,
+      // so importing morpheus here would be a cycle.
+      const dir = "'" + String(Quickshell.shellDir).replace(/'/g, "'\\''") + "'";
       Quickshell.execDetached(["sh", "-c", "qs kill; sleep 0.4; "
-        + Quickshell.shellDir + "/scripts/launch.sh -d"]);
+        + dir + "/scripts/launch.sh -d"]);
       return;
     }
   }

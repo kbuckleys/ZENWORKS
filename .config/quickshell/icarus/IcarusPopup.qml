@@ -162,7 +162,7 @@ Item {
     // and the same state files under by-shell/<hash>.
     { id: "restart", text: "Restart Shell", icon: "\uF01E",
       // through the launcher — see scripts/launch.sh
-      cmd: "qs kill; sleep 0.4; " + Quickshell.shellDir + "/scripts/launch.sh -n -d" }
+      cmd: "qs kill; sleep 0.4; " + Strings.shellQuote(Quickshell.shellDir) + "/scripts/launch.sh -n -d" }
   ]
 
   property var sessionEntries: [
