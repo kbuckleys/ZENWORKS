@@ -1,0 +1,2 @@
+# this machine's own settings; see lua/machine.example.lua
+lua/machine.lua
