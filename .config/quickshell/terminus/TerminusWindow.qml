@@ -296,6 +296,27 @@ FloatingWindow {
       for (let i = 0; i < p.paths.length; ++i) m[p.paths[i]] = true;
     return m;
   }
+  // ── A CUT PASTED SOMEWHERE ELSE ───────────────────────────────────────
+  // Nautilus moves a Terminus cut itself, and nothing tells Terminus: the
+  // rows went, but the cut stayed pending, and a `p` here would have tried to
+  // move files that are no longer anywhere it knew. So when a fresh listing
+  // of the folder the cut came from holds none of its items, the cut has
+  // been taken — dropped, and the clipboard's copy of it marked spent (see
+  // spentClip). Only when ALL of them are gone: one missing item is a file
+  // deleted, not a paste.
+  function cutTaken(dir, rows) {
+    const p = root.pending;
+    if (!p || p.op !== "move" || !root.mgr) return;
+    const here = p.paths.filter((x) => Terminus.dirname(x) === dir);
+    if (here.length === 0) return;
+    const present = {};
+    for (let i = 0; i < rows.length; ++i) present[rows[i].path] = true;
+    if (here.some((x) => present[x])) return;
+    root.mgr.spentClip = p.paths.slice();
+    // not setPending: that spends the marks, and nothing was done here
+    root.mgr.clipboard = null;
+  }
+
   // ── AN ACTION SPENDS THE SELECTION ────────────────────────────────────
   // Marks are a sentence being built — these three, then a verb — and the
   // verb finishes the sentence. Left ticked afterwards they were silently
@@ -416,21 +437,26 @@ FloatingWindow {
     // deleted out of an expanded folder stayed on screen. Only cwd
     // updated, which is precisely the shape of the report.
     //
-    // Counted rather than timed: a deliberate stop produces one exit and
-    // consumes one credit, so a process that falls over on its own still
-    // finds the count at zero and still falls back. A window — "ignore
+    // FLAGGED, not counted. It was a count — one credit per stop — and a
+    // count assumes one exit per stop, which is wrong: two restarts before
+    // the old process has finished dying are two stops of the SAME process
+    // and one exit. The spare credit then swallowed the next real death,
+    // the watch stayed down, and changes stopped showing until navigating
+    // started a new one — the "sometimes it doesn't update". A flag says
+    // "the next exit is ours", however many times we asked, so a process
+    // that falls over on its own still finds it clear and still falls back. A window — "ignore
     // an exit within 500ms of a restart" — would have swallowed the case
     // this guard exists for, which is inotifywait exiting AT ONCE on a
     // path that has gone.
     onExited: (code) => {
-      if (root.watchKilled > 0) { root.watchKilled--; return; }
+      if (root.watchStopping) { root.watchStopping = false; return; }
       root.watchDied();
     }
   }
 
   property bool watchBare: false
   // Deliberate stops whose exit has not been seen yet — see onExited.
-  property int watchKilled: 0
+  property bool watchStopping: false
 
   function watchDied() {
     if (!root.shown || root.cwd === "" || root.searchMode !== "") return;
@@ -630,8 +656,9 @@ FloatingWindow {
   function watch() {
     // One credit per stop that will actually produce an exit — see the
     // note on watchProc.onExited.
-    if (watchProc.running) root.watchKilled++;
+    if (watchProc.running) root.watchStopping = true;
     watchProc.running = false;
+    root.watchArmed = "";
     // nothing to watch while hidden, and nothing to watch while showing search
     // results, which are not a directory
     if (!root.shown || root.cwd === "" || root.searchMode !== "") return;
@@ -645,11 +672,46 @@ FloatingWindow {
     // ONE inotifywait over all of them rather than a process per branch.
     // It takes a list, the handler already coalesces the burst, and
     // openBranches names only the ones actually on screen.
+    const dirs = root.watching();
+    root.watchArmed = dirs.join("\n");
     watchProc.command = ["inotifywait", "-m", "-q",
       "-e", "create", "-e", "delete", "-e", "moved_to", "-e", "moved_from",
       "-e", "close_write", "-e", "attrib", "--"]
-      .concat(root.watching());
+      .concat(dirs);
     watchProc.running = true;
+  }
+
+  // ── THE WATCH FOLLOWS THE ROWS, NOT JUST THE GESTURES ─────────────────
+  // watching() is read off the rows on screen, and watch() was only asked
+  // at the moments something was DONE — arriving, showing, a triangle
+  // clicked. Arriving is exactly when the rows are not there yet: a
+  // directory whose folders were left expanded comes back with its
+  // branches read in a moment AFTER cwd changes, so the watch was armed on
+  // cwd alone and stayed that way. Every delete inside an expanded folder
+  // then went unseen — the job's own refresh re-reads cwd and never the
+  // branches, which are the watcher's to catch — until a triangle was
+  // clicked or you left and came back. Which is "random" only in the sense
+  // that it depended on whether you had re-entered the directory since
+  // last expanding something in it.
+  //
+  // So whenever the rows change, what SHOULD be watched is compared with
+  // what WAS armed, and the watch is re-aimed when they differ. Debounced:
+  // a directory with several remembered branches fills in one read at a
+  // time, and each re-aim is a kill and a spawn.
+  property string watchArmed: ""
+  property string otherWatchArmed: ""
+
+  Timer {
+    id: watchAim
+    interval: 150
+    onTriggered: {
+      if (root.shown && root.cwd !== "" && root.searchMode === ""
+          && root.watching().join("\n") !== root.watchArmed)
+        root.watch();
+      if (root.shown && root.dual && root.otherCwd !== ""
+          && root.otherWatching().join("\n") !== root.otherWatchArmed)
+        root.watchOther();
+    }
   }
 
   // ── THE OTHER HALF IS WATCHED TOO ─────────────────────────────────────
@@ -668,13 +730,14 @@ FloatingWindow {
       onRead: (line) => { root.noteOtherHit(line); otherSettle.restart(); }
     }
     onExited: (code) => {
-      if (root.otherWatchKilled > 0) { root.otherWatchKilled--; return; }
+      // see watchStopping
+      if (root.otherWatchStopping) { root.otherWatchStopping = false; return; }
       if (root.otherWatchBare) return;
       root.otherWatchBare = true;
       otherRetry.restart();
     }
   }
-  property int otherWatchKilled: 0
+  property bool otherWatchStopping: false
   property bool otherWatchBare: false
   property var otherHits: ({})
 
@@ -692,13 +755,16 @@ FloatingWindow {
   }
 
   function watchOther() {
-    if (otherWatchProc.running) root.otherWatchKilled++;
+    if (otherWatchProc.running) root.otherWatchStopping = true;
     otherWatchProc.running = false;
+    root.otherWatchArmed = "";
     if (!root.shown || !root.dual || root.otherCwd === "") return;
+    const dirs = root.otherWatching();
+    root.otherWatchArmed = dirs.join("\n");
     otherWatchProc.command = ["inotifywait", "-m", "-q",
       "-e", "create", "-e", "delete", "-e", "moved_to", "-e", "moved_from",
       "-e", "close_write", "-e", "attrib", "--"]
-      .concat(root.otherWatching());
+      .concat(dirs);
     otherWatchProc.running = true;
   }
 
@@ -784,6 +850,10 @@ FloatingWindow {
     // before anything else: how this directory was left is part of arriving
     // in it, and applying it after the listing has drawn is a visible flip
     root.applyDirView();
+    // A new directory is a new set of branches: the fallback to cwd alone
+    // was about the old set, and left set it kept every later directory's
+    // expanded folders unwatched until the window was hidden and shown.
+    root.watchBare = false;
     root.watch();
     archSweep.restart();
     // one handler per signal: remembering the open tabs lives here too
@@ -1242,6 +1312,7 @@ FloatingWindow {
     // path that is not there, which is the whole test. Guarded against home
     // itself so a failure there cannot loop.
     onExited: (code) => {
+      if (root.otherAgain) { Qt.callLater(root.refreshOther); return; }
       if (code === 0 || root.otherCwd === Paths.home()) return;
       root.pas.cwd = Paths.home();
       root.pas.sel = 0;
@@ -1256,6 +1327,7 @@ FloatingWindow {
         // `raw` each time rebuilt rows that had not changed.
         // The pane's own record, the one the active half's refresh keeps,
         // so it stays true across a step over and a swap.
+        if (root.otherFor !== root.otherCwd) { Qt.callLater(root.refreshOther); return; }
         if (otherOut.text === root.pas.lastListing) return;
         root.pas.lastListing = otherOut.text;
         // ENRICHED HERE, where the other half's listing is parsed. It used
@@ -1446,8 +1518,16 @@ FloatingWindow {
     root.warmShown = dir;
   }
 
+  // Queued behind one in flight exactly as the active listing is — see
+  // startListing.
+  property bool otherAgain: false
+  property string otherFor: ""
+
   function refreshOther() {
     if (!root.dual || root.otherCwd === "") return;
+    if (otherProc.running) { root.otherAgain = true; return; }
+    root.otherAgain = false;
+    root.otherFor = root.otherCwd;
     otherProc.command = ["sh", "-c", Terminus.listCommand(root.otherCwd)];
     otherProc.running = true;
   }
@@ -1481,14 +1561,59 @@ FloatingWindow {
   // new implicitWidth. `splitGrew` is what was added, and it is remembered
   // with the window's size: close a split window and it reopens wide, so an
   // unsplit after that must still know how much was ours to give back.
+  //
+  // ── ONE SPLIT'S WORTH OF ROOM, HOWEVER MANY SPLITS ────────────────────
+  // The split is per TAB and the window is shared by all of them, so the
+  // room is the window's, not a tab's: it is taken when the FIRST split
+  // anywhere opens and handed back when the LAST one closes. Asked per
+  // toggle, splitting a second tab widened the window again, and unsplitting
+  // it gave back room the first tab was still standing in.
+  //
+  // And a window already carrying the room (splitGrew > 0) never takes it
+  // twice — reopened wide from a session, say.
+  //
+  // ── THE ANSWER IS FOR THE QUESTION THAT WAS ASKED ─────────────────────
+  // The resize waits on hyprctl, and `\ \` is quicker than that. The unsplit
+  // found nothing to give back (splitGrew was only set when the answer
+  // landed), then the split's answer landed anyway, widened a window that
+  // was no longer split, and recorded nothing — so the room was never given
+  // back, and every quick toggle ratcheted the window wider until it hit the
+  // edges. So each request says what it was for (`fitFor`), an answer for a
+  // state we have since left is dropped, and one request resizes at most
+  // once (`fitPending`), however many times its process reports.
   property int splitGrew: 0
   property int splitWant: 0
+  property bool fitFor: false
+  property bool fitPending: false
+
+  // Whether any tab OTHER than the one on screen is split. The one on screen
+  // lives in the window rather than in its record — see closeTabAt.
+  function otherTabSplit() {
+    for (let i = 0; i < root.tabs.length; ++i)
+      if (i !== root.tab && root.tabs[i] && root.tabs[i].dual === true) return true;
+    return false;
+  }
 
   function fitSplit(on) {
+    if (root.otherTabSplit()) { root.fitPending = false; return; }
     // Asked before `dual` changes, while bodyBox is still one pane wide.
-    if (on) root.splitWant = root.width + Math.round(bodyBox.width);
-    else if (root.splitGrew > 0) root.splitWant = root.width - root.splitGrew;
-    else return;
+    if (on) {
+      if (root.splitGrew > 0) { root.fitPending = false; return; }
+      root.splitWant = root.width + Math.round(bodyBox.width);
+    } else if (root.splitGrew > 0) root.splitWant = root.width - root.splitGrew;
+    else { root.fitPending = false; return; }
+    root.fitFor = on;
+    root.fitPending = true;
+    fitProc.running = false;
+    fitProc.running = true;
+  }
+
+  // A tab closed: if it held the last split, the room goes back with it.
+  function fitAfterTabs() {
+    if (root.dual || root.otherTabSplit() || root.splitGrew <= 0) return;
+    root.splitWant = root.width - root.splitGrew;
+    root.fitFor = false;
+    root.fitPending = true;
     fitProc.running = false;
     fitProc.running = true;
   }
@@ -1499,13 +1624,17 @@ FloatingWindow {
     stdout: StdioCollector {
       id: fitOut
       onStreamFinished: {
-        const grow = root.dual;
+        if (!root.fitPending) return;
+        // asked for a state we have since toggled out of — see fitFor
+        if (root.fitFor !== (root.dual || root.otherTabSplit())) { root.fitPending = false; return; }
+        const grow = root.fitFor;
         const parts = fitOut.text.split("@@mons");
         let win = null, mons = null;
         try { win = JSON.parse(parts[0]); mons = JSON.parse(parts[1]); } catch (e) { return; }
         // The window the key was pressed in is the focused one; anything
         // else answering here is not ours to resize.
         if (!win || win.class !== "org.quickshell" || win.title !== root.title) return;
+        root.fitPending = false;
         const room = Terminus.splitRoom(win, mons, root.splitWant, 16, 560);
         if (room) Terminus.splitRoomDispatches(win.address, room).forEach((d) => Hyprland.dispatch(d));
         root.splitGrew = grow && room ? room.dw : 0;
@@ -1628,7 +1757,7 @@ FloatingWindow {
     root.setPending({ op: op, paths: rows.map((r) => r.path),
                       names: rows.map((r) => r.name) });
     root.pasteDest = root.otherCwd;
-    root.paste();
+    root.pastePending();
   }
 
   // Where a paste LANDS. Normally where you are standing; the other pane's
@@ -2016,8 +2145,8 @@ FloatingWindow {
     root.duTried = next;
     root.status = "measuring " + todo.length
       + (todo.length === 1 ? " directory\u2026" : " directories\u2026");
-    duProc.command = ["sh", "-c",
-      Terminus.dirSizeCommand(todo.map((r) => r.path))];
+    duProc.command = Terminus.shArgv(
+      Terminus.dirSizeCommand(todo.map((r) => r.path)));
     duProc.running = true;
   }
 
@@ -2027,8 +2156,8 @@ FloatingWindow {
     if (duProc.running) { root.status = "still measuring\u2026"; return; }
     root.status = "measuring " + (dirs.length === 1 ? dirs[0].name
       : dirs.length + " directories") + "\u2026";
-    duProc.command = ["sh", "-c",
-      Terminus.dirSizeCommand(dirs.map((r) => r.path))];
+    duProc.command = Terminus.shArgv(
+      Terminus.dirSizeCommand(dirs.map((r) => r.path)));
     duProc.running = true;
   }
 
@@ -2495,6 +2624,10 @@ FloatingWindow {
           root.applyPendingRealm();
           root.act.raw = [];
           root.status = "no matches";
+          // a re-ask that found nothing: its aim must not be taken by
+          // whatever listing arrives next
+          root.wantSel = "";
+          root.reAt = -1;
           return;
         }
         statProc.command = Terminus.statArgv(paths);
@@ -2947,7 +3080,24 @@ FloatingWindow {
     // The same coalescing the directory watcher uses, and for the same
     // reason: one paste is a burst of completions.
     interval: 250
-    onTriggered: root.reCollect()
+    onTriggered: root.reSearch()
+  }
+
+  // ── EVERY RESULTS PAGE, RE-ASKED AFTER AN ACTION ────────────────────
+  // Only a collection used to be: a find, a grep or a tag page kept showing
+  // a file you had just deleted, renamed or moved, until you searched
+  // again. Same landing as reCollect's — the row you were on, by path, or
+  // by index when that row is the one that went.
+  function reSearch() {
+    const mode = root.searchMode;
+    if (mode === "collection") { root.reCollect(); return; }
+    if (mode !== "find" && mode !== "grep" && mode !== "tag") return;
+    const r = root.currentRow();
+    // an aim already set wins — see reCollect
+    if (root.wantSel === "") root.wantSel = r ? r.path : "";
+    root.reAt = root.act.sel;
+    if (mode === "tag") root.openTag(root.openTagName);
+    else root.search(mode, root.searchQuery);
   }
 
   function reCollect() {
@@ -3034,6 +3184,8 @@ FloatingWindow {
       root.act.raw = [];
       root.act.sel = 0;
       root.status = "nothing tagged " + name;
+      root.wantSel = "";
+      root.reAt = -1;
       return;
     }
     root.status = "\u2026";
@@ -3488,6 +3640,7 @@ FloatingWindow {
       root.tab = -1;          // force the load even when the index is the same
       root.tab = land;
       root.loadTab(next[land]);
+      root.fitAfterTabs();
       return;
     }
     // ANY OTHER TAB IS ONLY A RECORD. Drop it and stay exactly where you are:
@@ -3495,6 +3648,7 @@ FloatingWindow {
     // sits at, so there is no directory to re-read and nothing to load.
     if (i < root.tab) root.tab = root.tab - 1;
     root.tabs = next;
+    root.fitAfterTabs();
   }
 
   function closeTab() { root.closeTabAt(root.tab); }
@@ -5209,7 +5363,7 @@ FloatingWindow {
       if (at + 1 < v.length
           && String(v[at + 1].path).indexOf(r.path + "/") === 0) {
         pane.sel = at + 1;
-        root.anchor = pane.sel;
+        root.setAnchor(pane.sel);
         root.positionSel();
       }
       return;
@@ -5989,6 +6143,8 @@ FloatingWindow {
   // behind a timer that exists to avoid spawning things was the one delay with
   // nothing behind it — walking back up a list is now instant.
   onSelChanged: {
+    // The shift-range starts wherever the cursor was last put — see anchorPath.
+    if (!root.holdAnchor) root.setAnchor(root.act.sel);
     // Before the early return below: the range follows the cursor in every
     // view, not only the one that draws a preview.
     if (root.visualOn) root.extendVisual();
@@ -6712,10 +6868,15 @@ FloatingWindow {
   // ── reading the directory ───────────────────────────────────────────────
   Process {
     id: listProc
+    // see startListing
+    onExited: if (root.listAgain) Qt.callLater(root.startListing)
     stdout: StdioCollector {
       id: listOut
       waitForEnd: true
       onStreamFinished: {
+        // read for a directory we have since left — the one queued behind it
+        // is for this one
+        if (root.listFor !== root.cwd) { Qt.callLater(root.startListing); return; }
         // Byte-identical output means nothing in this directory changed, so
         // there is nothing to redraw. inotify fires close_write and attrib for
         // files whose presence, size and mtime are all unchanged, and
@@ -6740,6 +6901,7 @@ FloatingWindow {
         // and wrong answer, and everything watching the cursor believed it.
         root.arriving = true;
         root.act.raw = root.enrich(Terminus.parseListing(listOut.text, root.cwd));
+        root.cutTaken(root.cwd, root.act.raw);
         // The listing also says which of this directory's remembered
         // branches are no longer here — see dropGone.
         root.act.forgetVanished(root.cwd, root.act.raw);
@@ -6803,6 +6965,29 @@ FloatingWindow {
     }
   }
 
+  // ── A LISTING ASKED FOR WHILE ONE IS OUT IS QUEUED, NOT DROPPED ──────
+  // `running = true` on a Process that is already running does nothing — it
+  // does not restart it, and it does not pick up the new command. So a
+  // refresh that landed while the previous `find` was still out simply
+  // vanished: a job finishes and re-reads, inotify fires for the same change
+  // a moment later, and if that `find` had started before the last write hit
+  // the disk the screen kept its answer until you left and came back. It
+  // depended on timing alone, which is why it could not be made to happen.
+  //
+  // So a request made mid-flight is remembered and run as soon as the one in
+  // flight exits, and a listing read for a directory we are no longer in is
+  // thrown away rather than drawn under the new cwd.
+  property bool listAgain: false
+  property string listFor: ""
+
+  function startListing() {
+    if (listProc.running) { root.listAgain = true; return; }
+    root.listAgain = false;
+    root.listFor = root.cwd;
+    listProc.command = ["sh", "-c", Terminus.listCommand(root.cwd)];
+    listProc.running = true;
+  }
+
   // `full` means the DIRECTORY changed. A plain refresh — after an action, or
   // when inotify says something moved in the current directory — re-reads only
   // the current listing.
@@ -6814,8 +6999,7 @@ FloatingWindow {
   // question about one of them. That was the redraw in the split view.
   function refresh(full) {
     if (root.searchMode !== "") return;   // results are not a directory
-    listProc.command = ["sh", "-c", Terminus.listCommand(root.cwd)];
-    listProc.running = true;
+    root.startListing();
     // Together with the listing, so the marks arrive with the rows they are
     // about — and again after every job, because this is the one view in the
     // window that a `git commit` in another terminal can make wrong.
@@ -7079,7 +7263,7 @@ FloatingWindow {
     if (at < 0) return false;
     root.wantSel = "";
     root.act.sel = at;
-    root.anchor = at;
+    root.setAnchor(at);
     // Something just made: land on it, flash it, and open the name for
     // editing — the second half of `a`, once the row it is about exists.
     if (want === root.freshPath) {
@@ -7497,6 +7681,18 @@ FloatingWindow {
 
   Process {
     id: actProc
+    // A PROCESS THAT NEVER STARTED says so only by not running. Quickshell
+    // emits exited for a process that ran, and for one execve refused
+    // (sh missing, E2BIG, ENOMEM) it emits nothing but runningChanged — so
+    // the queue waited on an exit that was never coming and every action
+    // after it sat there. exited always lands before running drops, so
+    // "stopped without having exited" is exactly the failed start.
+    property bool sawExit: false
+    onRunningChanged: {
+      if (actProc.running || actProc.sawExit) return;
+      root.warn("could not start that");
+      root.drain();
+    }
     stderr: StdioCollector {
       id: actErr
       waitForEnd: true
@@ -7506,6 +7702,7 @@ FloatingWindow {
       }
     }
     onExited: (code) => {
+      actProc.sawExit = true;
       if (code === 0 && root.status !== "") root.status = "";
       // Whatever was just made inside a branch is on disk now — see
       // root.madeIn. Cleared either way, so a failed create does not
@@ -7515,6 +7712,14 @@ FloatingWindow {
         root.madeIn = "";
         if (code === 0 && dir !== root.cwd) root.rereadBranches([dir]);
       }
+      // ── AND EVERY OPEN BRANCH, NOT ONLY CWD ─────────────────────────
+      // refresh() below re-reads the directory itself. A delete, move or
+      // rename INSIDE an expanded folder was left to the watcher to notice,
+      // so any time the watcher was not covering that folder — see watchAim
+      // for how that happened — what terminus had just done itself never
+      // showed. A job is ours; we know it changed something, so we look.
+      // Unchanged branches come back byte-identical and cost nothing.
+      root.rereadBranches(root.openBranches());
       // emptying or restoring changes what the trash holds
       if (root.inTrash && !trashSizeProc.running) trashSizeProc.running = true;
       // A PEEK IS A PHOTOGRAPH and something has just changed the scene. The
@@ -7529,7 +7734,7 @@ FloatingWindow {
       root.refresh();
       // refresh() declines on a results page; a collection has its own —
       // see reCollect.
-      if (root.searchMode === "collection") collSettle.restart();
+      if (root.searchMode !== "") collSettle.restart();
       root.drain();
     }
   }
@@ -7542,15 +7747,47 @@ FloatingWindow {
 
   function drain() {
     if (root.queue.length === 0 || actProc.running) return;
-    actProc.command = ["sh", "-c", root.queue.shift()];
+    // a plain script, or a { script, args } from terminus.js that carries its
+    // paths as arguments — see shArgv there
+    const next = root.queue.shift();
+    actProc.command = typeof next === "string" ? ["sh", "-c", next]
+      : Terminus.shArgv(next);
+    actProc.sawExit = false;
     actProc.running = true;
   }
 
   // ── selection ───────────────────────────────────────────────────────────
-  // Where a shift-range starts. Moved by a plain click and by nothing else,
-  // so shift-clicking twice extends from the same place both times rather
-  // than walking the anchor along behind you.
-  property int anchor: 0
+  // Where a shift-range starts: the row the cursor was last put on by
+  // anything OTHER than a shift-click — a plain click, a ctrl-click, the
+  // arrow keys, a landing. Shift-click alone leaves it where it is, so
+  // shift-clicking twice extends from the same place both times rather than
+  // walking the anchor along behind you.
+  //
+  // A PATH, NOT AN INDEX, and not moved by plain clicks alone. It was an
+  // index only a plain click set, so a range started from wherever you last
+  // clicked rather than from the row you had arrowed or ctrl-clicked onto —
+  // from row 0 in a directory you had not clicked in yet, and from a
+  // different row altogether once a branch opened above it and pushed every
+  // index down. The row the range began on was simply not in it. Read back
+  // through anchorIndex(), which falls back to the cursor when the row is not
+  // in this listing.
+  property string anchorPath: ""
+  // raised while a shift-click moves the cursor, so onSelChanged leaves the
+  // anchor behind — see clickRow
+  property bool holdAnchor: false
+
+  function setAnchor(i) {
+    const r = root.act.view[i];
+    root.anchorPath = r ? String(r.path) : "";
+  }
+
+  function anchorIndex() {
+    const v = root.act.view;
+    if (root.anchorPath !== "")
+      for (let i = 0; i < v.length; ++i)
+        if (v[i].path === root.anchorPath) return i;
+    return root.act.sel;
+  }
 
   // True while the pointer is over a row or a tile. The drag box asks this
   // rather than guessing from coordinates: "was the cursor actually on top of
@@ -8054,14 +8291,45 @@ FloatingWindow {
   //
   // Right-click is deliberately none of them: you right-click a selection to
   // act on it, so clearing it first would make the menu act on one file.
+  //
+  // A PLAIN CLICK SELECTS WITHOUT TICKING — the row is only "selected"
+  // because acting() falls back to the cursor while nothing is marked. So the
+  // first ctrl-click after it has to tick that row too, or the selection you
+  // were adding to quietly becomes just the new row and the first one has to
+  // be clicked again. Only a row a plain click landed on, remembered by path:
+  // the cursor sitting on row 0 after entering a directory was never chosen.
+  property string clickedPath: ""
+
   function clickRow(i, right, shift, ctrl) {
     root.saveAimed = true;
-    if (shift) { root.markRange(root.anchor, i); root.act.sel = i; }
-    else if (ctrl) { root.markAt(i); root.act.sel = i; }
+    if (shift) {
+      const from = root.anchorIndex();
+      root.markRange(from, i);
+      root.holdAnchor = true;
+      root.act.sel = i;
+      root.holdAnchor = false;
+    }
+    else if (ctrl) {
+      const cur = root.currentRow();
+      const r = root.view[i];
+      if (root.markedCount === 0 && cur && r && cur.path === root.clickedPath
+          && cur.path !== r.path) {
+        const next = Object.assign({}, root.act.marked);
+        next[cur.path] = true;
+        next[r.path] = true;
+        root.act.marked = next;
+      } else {
+        root.markAt(i);
+      }
+      root.act.sel = i;
+      root.setAnchor(i);   // sel may not have changed, so onSelChanged may not fire
+    }
     else {
       if (!right) root.act.marked = {};
       root.act.sel = i;
-      root.anchor = i;
+      root.setAnchor(i);
+      const r = root.view[i];
+      root.clickedPath = r ? String(r.path) : "";
     }
     content.forceActiveFocus();
   }
@@ -8180,8 +8448,8 @@ FloatingWindow {
     // queue: that queue refreshes the listing and clears the status line when
     // it drains, and putting a clipboard write through it would make `y` blink
     // the directory and wipe the message it had just set.
-    clipCopyProc.command = ["sh", "-c",
-      Terminus.clipboardCopyCommand(rows.map((r) => r.path))];
+    clipCopyProc.command = Terminus.shArgv(
+      Terminus.clipboardCopyCommand(rows.map((r) => r.path), op === "move"));
     clipCopyProc.running = true;
     root.status = rows.length + (op === "copy" ? " to copy" : " to move");
   }
@@ -8189,10 +8457,22 @@ FloatingWindow {
   Process { id: clipCopyProc }
 
   // ── what the SYSTEM clipboard is holding ────────────────────────────────
-  // Consulted only when terminus has nothing of its own pending, so an
-  // operation started here always wins over whatever else has been copied
-  // since — the internal list knows the difference between a copy and a move
-  // and a clipboard mostly does not.
+  // Asked on EVERY paste, because the clipboard is the one record of what was
+  // copied last. The internal list used to win whenever it was set, and a `y`
+  // leaves it set all session — so files copied in Nautilus afterwards could
+  // never be pasted here; `p` kept producing the old yank. Now:
+  //
+  //   the same files the internal list holds  our own yank, still current:
+  //                                           the internal list, which knows
+  //                                           a cut from a copy
+  //   other files                             copied since, elsewhere: they win
+  //   an image                                already written by the script
+  //   nothing a file manager can use          the internal list if there is
+  //                                           one, else nothing to paste
+  //
+  // And a move already made is not made again: after `x` and `p` the list is
+  // spent but the clipboard still names the paths it moved away from, so
+  // those read as nothing — see spentClip.
   Process {
     id: clipProc
     stdout: StdioCollector {
@@ -8231,21 +8511,28 @@ FloatingWindow {
             try { pth = decodeURIComponent(pth); } catch (e) { /* as it came */ }
             paths.push(pth);
           }
-          if (paths.length === 0) {
-            root.pasteDest = "";
-            root.warn("nothing to paste");
-            return;
-          }
-          root.setPending({ op: op, paths: paths,
-                            names: paths.map((x) => Terminus.basename(x)) });
-          // Straight back through the ordinary path, conflict scan and all.
-          root.paste();
+          if (root.pasteFrom(kind, paths, op)) return;
+        } else if (root.pasteFrom(kind, [], "copy")) {
           return;
         }
         root.pasteDest = "";
         root.warn("nothing to paste");
       }
     }
+  }
+
+  // False when there is nothing to paste; see Terminus.pasteSource.
+  function pasteFrom(kind, paths, op) {
+    const src = Terminus.pasteSource(kind, paths,
+      root.pending ? root.pending.paths : null,
+      root.mgr ? root.mgr.spentClip : []);
+    if (src === "none") return false;
+    if (src === "clip")
+      root.setPending({ op: op, paths: paths,
+                        names: paths.map((x) => Terminus.basename(x)) });
+    // Straight on through the ordinary path, conflict scan and all.
+    root.pastePending();
+    return true;
   }
 
   // Nothing is written until the answer to "what is already there" comes back.
@@ -8297,26 +8584,55 @@ FloatingWindow {
     }
   }
 
+  // ── DECIDED ONCE, AT THE GESTURE ──────────────────────────────────────
+  // destDir is read again after the conflict scan comes back, and a scan is
+  // a process: leave it reading the cursor live and moving the cursor while
+  // it ran would check one directory for clashes and write into another.
+  // Latched into pasteDest, which every other deliberate destination already
+  // uses and which commitPaste clears.
+
+  // `p`: whatever was copied LAST, here or anywhere — the clipboard decides,
+  // see clipProc.
   function paste() {
-    // ── DECIDED ONCE, AT THE GESTURE ──────────────────────────────────
-    // destDir is read again after the conflict scan comes back, and a
-    // scan is a process: leave it reading the cursor live and moving the
-    // cursor while it ran would check one directory for clashes and write
-    // into another. Latched into pasteDest, which every other deliberate
-    // destination already uses and which commitPaste clears.
+    if (root.pasteDest === "") root.pasteDest = root.cursorDir();
+    clipProc.command = ["sh", "-c",
+      Terminus.clipboardPasteCommand(root.destDir)];
+    clipProc.running = true;
+  }
+
+  // THIS list — a drop, a send-to, the other pane — which the clipboard has
+  // nothing to say about.
+  function pastePending() {
     if (root.pasteDest === "") root.pasteDest = root.cursorDir();
     if (!root.pending || root.pending.paths.length === 0) {
-      // Nothing of ours. Ask the system what it has — files copied in another
-      // file manager, or an image that only exists on the clipboard.
-      clipProc.command = ["sh", "-c",
-        Terminus.clipboardPasteCommand(root.destDir)];
-      clipProc.running = true;
+      root.pasteDest = "";
+      root.warn("nothing to paste");
       return;
     }
-    conflictProc.command = ["sh", "-c",
-      Terminus.conflictCommand(root.pending.names, root.destDir)];
+    // ── NOTHING IS MOVED ONTO ITSELF ──────────────────────────────────
+    // A cut pasted back where it came from met itself in the clash scan,
+    // and Merge or Overwrite ran rsync --remove-source-files with the source
+    // and the destination the same item: rsync had nothing to copy, then
+    // removed the "source" — the only copy. The folder was simply gone.
+    // Those are left where they are; there is nothing to move. And nothing,
+    // copy or move, goes into itself or into something it contains.
+    const dest = root.destDir;
+    const op = root.pending.op;
+    const take = root.pending.paths.filter((p) =>
+      p !== dest && dest.indexOf(p + "/") !== 0
+      && !(op === "move" && Terminus.dirname(p) === dest));
+    if (take.length === 0) {
+      root.pasteDest = "";
+      root.warn(op === "move" ? "already here" : "cannot paste a folder into itself");
+      return;
+    }
+    root.pasteOnly = take.length === root.pending.paths.length ? null : take;
+    conflictProc.command = Terminus.shArgv(Terminus.conflictCommand(
+      take.map((p) => Terminus.basename(p)), dest));
     conflictProc.running = true;
   }
+  // this paste's share of the pending list, when some of it stayed put
+  property var pasteOnly: null
 
   // ── transfers in flight, all of them at once ────────────────────────────
   //
@@ -8396,6 +8712,12 @@ FloatingWindow {
     Process {
       id: proc
       property int jobId: -1
+      // the same failed start as actProc's, and here it would leave a job
+      // row running forever and this Process alive — see sawExit there
+      property bool sawExit: false
+      onRunningChanged: {
+        if (!proc.running && !proc.sawExit) root.jobExited(proc.jobId, -1);
+      }
 
       // rsync writes its progress to stdout and rewrites the line with \r, so
       // this is a stream of one growing line rather than a sequence of them.
@@ -8411,7 +8733,10 @@ FloatingWindow {
           if (e !== "") root.warn(e.split("\n")[0]);
         }
       }
-      onExited: (code) => root.jobExited(proc.jobId, code)
+      onExited: (code) => {
+        proc.sawExit = true;
+        root.jobExited(proc.jobId, code);
+      }
     }
   }
 
@@ -8536,7 +8861,7 @@ FloatingWindow {
     root.act.marked = {};
     root.refresh();
     // A transfer lands on a collection the same way a command does.
-    if (root.searchMode === "collection") collSettle.restart();
+    if (root.searchMode !== "") collSettle.restart();
     // the second pane is very often the destination, and a destination that
     // does not show what just arrived in it is the whole point missed
     root.refreshOther();
@@ -8557,10 +8882,11 @@ FloatingWindow {
     // same cancel as a transfer does: it is the same question — something is
     // working, how far along is it — and a second set of machinery to answer
     // it would only be a second set to keep in step.
-    proc.command = ["setsid", "sh", "-c",
+    proc.command = ["setsid"].concat(Terminus.shArgv(
       op === "archive" ? Terminus.archiveJobCommand(paths, dest)
-        : op === "extract" ? Terminus.extractJobCommand(paths[0], dest)
-        : Terminus.transferCommand(paths, dest, op === "move", clash)];
+        : op === "extract"
+          ? { script: Terminus.extractJobCommand(paths[0], dest), args: [] }
+        : Terminus.transferCommand(paths, dest, op === "move", clash)));
 
     const names = paths.map((p) => Terminus.basename(p));
     root.jobMeta[id] = { proc: proc, names: names,
@@ -8680,23 +9006,36 @@ FloatingWindow {
   function commitPaste(clash) {
     const p = root.pending;
     if (!p) return;
+    const dest = root.destDir;
+    // what pastePending let through — and the same guard again here, since
+    // not every caller comes by way of it: rsync must never be handed an
+    // item as its own destination with --remove-source-files
+    const paths = (root.pasteOnly || p.paths).filter((x) =>
+      x !== dest && dest.indexOf(x + "/") !== 0
+      && !(p.op === "move" && Terminus.dirname(x) === dest));
+    root.pasteOnly = null;
+    if (paths.length === 0) { root.pasteDest = ""; return; }
     // A move is recorded as where each item was and where it is about to be,
     // so undo can put it back precisely. A copy is not recorded at all — see
     // the undo stack's own note.
     if (p.op === "move") {
       const pairs = [];
-      for (let i = 0; i < p.paths.length; ++i) {
-        pairs.push([p.paths[i],
-          Terminus.joinPath(root.destDir, Terminus.basename(p.paths[i]))]);
+      for (let i = 0; i < paths.length; ++i) {
+        pairs.push([paths[i],
+          Terminus.joinPath(dest, Terminus.basename(paths[i]))]);
       }
       root.pushUndo({ kind: "move", pairs: pairs });
       root.moveTags(pairs);
     }
-    root.startJob(p.op, p.paths, root.destDir, clash);
+    root.startJob(p.op, paths, dest, clash);
     // spent: the next paste is a paste into where you are standing again
     root.pasteDest = "";
-    // a move is spent once it lands; a copy can be pasted again elsewhere
-    if (p.op === "move") root.setPending(null);
+    // a move is spent once it lands; a copy can be pasted again elsewhere.
+    // The clipboard still names what moved, so that is remembered too.
+    if (p.op === "move") {
+      if (root.mgr) root.mgr.spentClip = p.paths.slice();
+      root.setPending(null);
+    }
     root.act.marked = {};
   }
 
@@ -9213,7 +9552,7 @@ FloatingWindow {
     const drop = (op) => {
       root.setPending({ op: op, paths: paths, names: names });
       root.pasteDest = into === root.cwd ? "" : into;
-      root.paste();
+      root.pastePending();
     };
     // ASKED WHERE IT WAS DROPPED, not in the middle of the screen.
     //
@@ -14481,6 +14820,17 @@ FloatingWindow {
           // entitled to — including the one that becomes a drag out of terminus.
           enabled: root.overEmpty
           acceptedButtons: Qt.LeftButton | Qt.RightButton
+          // ── ASKED AGAIN AT THE PRESS ──────────────────────────────────
+          // overEmpty is worked out when the POINTER moves, and rows move
+          // under a still pointer — a listing landing, a scroll, a file
+          // arriving. Then it is stale, this sits over a row, and the click
+          // meant for the row lands here: a ctrl-click that marked nothing,
+          // and a second click (after the hand had moved a pixel) that did.
+          // A row under the press now hands the press on to it.
+          onPressed: (m) => {
+            root.overEmpty = root.rowUnder(m.x, m.y) < 0;
+            if (!root.overEmpty) m.accepted = false;
+          }
           onClicked: (m) => {
             // FIRST, so both of the lines below are about the half that was
             // clicked rather than the half that had the keyboard.
@@ -14851,11 +15201,11 @@ FloatingWindow {
         // only when there is a directory in the set: for plain files the size
         // is already known and du would be a process for nothing
         if (sel.some((r) => r.isDir)) {
-          sizeProc.command = ["sh", "-c",
-            Terminus.sizeCommand(sel.map((r) => r.path))];
+          sizeProc.command = Terminus.shArgv(
+            Terminus.sizeCommand(sel.map((r) => r.path)));
           sizeProc.running = true;
-          countProc.command = ["sh", "-c",
-            Terminus.countCommand(sel.map((r) => r.path))];
+          countProc.command = Terminus.shArgv(
+            Terminus.countCommand(sel.map((r) => r.path)));
           countProc.running = true;
         }
         ownerProc.command = ["sh", "-c",
@@ -17767,12 +18117,15 @@ FloatingWindow {
           if (menu.customItems) return menu.customItems;
           if (menu.here) {
             const out = [];
+            // Always offered: `p` pastes what was copied last ANYWHERE, and
+            // whether the clipboard holds files is only known by asking it.
+            // The links are made from Terminus's own list, so they need one.
+            out.push({ label: "Paste here", key: "p", act: () => root.paste() });
             if (root.pending) {
-              out.push({ label: "Paste here", key: "p", act: () => root.paste() });
               out.push({ label: "Paste as symlink", act: () => root.pasteLink(true) });
               out.push({ label: "Paste as hard link", act: () => root.pasteLink(false) });
-              out.push({ sep: true });
             }
+            out.push({ sep: true });
             out.push({ label: "New directory", key: "a /", act: () => root.beginMkdir() });
             out.push({ label: "New file", key: "a", act: () => root.beginCreate() });
             out.push({ sep: true });
@@ -17871,17 +18224,17 @@ FloatingWindow {
             { label: "Make symlink" + many, key: "y l",
               act: () => root.linkHere() });
           out.push({ sep: true });
-          if (root.pending)
-            out.push({ label: "Paste here", key: "p", act: () => root.paste() });
+          // always — see the empty-space menu
+          out.push({ label: "Paste here", key: "p", act: () => root.paste() });
           if (root.pending) {
             out.push({ label: "Paste as symlink", act: () => root.pasteLink(true) });
             out.push({ label: "Paste as hard link", act: () => root.pasteLink(false) });
-            // Closing the block rather than opening one: the paste entries are
-            // about what is on the clipboard, everything under them is about the
-            // row, and with nothing between them the menu grew by three rows in
-            // the middle and read as one long list of unrelated verbs.
-            out.push({ sep: true });
           }
+          // Closing the block rather than opening one: the paste entries are
+          // about what is on the clipboard, everything under them is about the
+          // row, and with nothing between them the menu grew by three rows in
+          // the middle and read as one long list of unrelated verbs.
+          out.push({ sep: true });
           // Only where it can do something: an Extract on a text file and a
           // Restore outside the trash are entries that exist to be greyed out.
           if (t.isDir)
@@ -22027,7 +22380,7 @@ FloatingWindow {
         root.setPending({ op: sendTo.op, paths: sendTo.paths,
                           names: sendTo.names });
         root.pasteDest = dest;
-        root.paste();
+        root.pastePending();
         sendTo.nodes = [];
       }
 
@@ -23354,6 +23707,9 @@ FloatingWindow {
     // rearranges the branches too rather than leaving them as they were
     // when they were opened.
     property var kids: ({})
+    // The raw text each branch was last parsed from — see kidOut. Mutated in
+    // place: nothing binds to it.
+    property var kidText: ({})
 
     // Whether this pane's listing is one a tree can exist in — see the
     // note on `tree`. Asked in three places and it must be the same
@@ -23686,15 +24042,24 @@ FloatingWindow {
             // Raw, unsorted — the flatten sorts, so a branch follows the
             // order the listing is in rather than the order it was opened
             // in. Replaced wholesale so `tree` sees a new object.
-            const m = Object.assign({}, pane.kids);
-            const fresh = Terminus.parseListing(kidOut.text, dir);
-            m["k:" + dir] = fresh;
-            pane.kids = m;
-            // Anything this branch used to hold and no longer does takes
-            // its own remembered branch with it — see dropGone. One call:
-            // forgetVanished covers kids as well as openDirs and dirEmpty,
-            // so pruning `m` first was the same walk done twice.
-            pane.forgetVanished(dir, fresh);
+            // THE SAME BYTES ARE THE SAME ROWS, as for the listing itself:
+            // a job re-reads every open branch when it lands (see actProc),
+            // and handing back an unchanged branch as a new object would
+            // re-flatten the whole tree for nothing.
+            const same = pane.kids["k:" + dir] !== undefined
+              && pane.kidText["k:" + dir] === kidOut.text;
+            pane.kidText["k:" + dir] = kidOut.text;
+            if (!same) {
+              const m = Object.assign({}, pane.kids);
+              const fresh = Terminus.parseListing(kidOut.text, dir);
+              m["k:" + dir] = fresh;
+              pane.kids = m;
+              // Anything this branch used to hold and no longer does takes
+              // its own remembered branch with it — see dropGone. One call:
+              // forgetVanished covers kids as well as openDirs and dirEmpty,
+              // so pruning `m` first was the same walk done twice.
+              pane.forgetVanished(dir, fresh);
+            }
             // What just landed may itself hold branches that were open
             // when the session ended — see primeOpen.
             pane.primeOpen();
@@ -24047,6 +24412,8 @@ FloatingWindow {
       // rows on screen, so it is asked again when they change — debounced,
       // because expanding a branch changes them twice in quick succession.
       if (pane.active) emptyDelay.restart();
+      // and so is which of them are being watched — see watchAim
+      watchAim.restart();
       // And which of them still need measuring — see usageDelay.
       if (pane.active && root.usage) usageDelay.restart();
       // The rows under the cursor are new ones, so what the preview is OF has

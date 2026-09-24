@@ -46,6 +46,9 @@ Scope {
   // between them at all — the only route was a drag, and dragging out of a
   // quickshell surface does not currently work.
   property var clipboard: null
+  // The paths the last paste MOVED: the system clipboard still names them,
+  // and a second `p` must not try to move what is already gone.
+  property var spentClip: []
 
   // ── THE WINDOW IS NOT COMPILED AT STARTUP ─────────────────────────────
   // An inline `Component { TerminusWindow {} }` names the type at file
@@ -229,9 +232,17 @@ Scope {
 
   Component.onCompleted: mgr.loadTree()
 
+  // Capped, newest kept: every folder ever measured used to stay for the
+  // session, copied whole on each update and into each new window. A fresh
+  // measurement moves to the back, so what goes first is the stalest.
+  readonly property int sizesCap: 5000
   property var sharedSizes: ({})
   function noteSizes(got) {
-    mgr.sharedSizes = Object.assign({}, mgr.sharedSizes, got);
+    const next = Object.assign({}, mgr.sharedSizes);
+    for (const k in got) { delete next[k]; next[k] = got[k]; }
+    const keys = Object.keys(next);
+    for (let i = 0; i < keys.length - mgr.sizesCap; ++i) delete next[keys[i]];
+    mgr.sharedSizes = next;
   }
 
   // ── ONE SPARE, KEPT; THE REST LET GO ───────────────────────────────────

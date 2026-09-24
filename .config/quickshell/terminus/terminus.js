@@ -1376,15 +1376,29 @@ function parseStat(text) {
 // Symlinks count as files rather than being followed: a link is a thing in the
 // directory, and following it would count another directory's contents into
 // this one's total and could walk in a circle doing it.
+// ── A SELECTION TRAVELS AS ARGUMENTS, NOT AS SCRIPT TEXT ─────────────────
+// Every command over a list of paths is { script, args }: the script names
+// the list as "$@" and the paths go to sh as argv, one argument each — see
+// shArgv. Spliced into the script they were all ONE argument, and Linux caps
+// a single argument at MAX_ARG_STRLEN, 128KB. On a folder of photos that was
+// a paste of ~670 files (the clash check repeats every name), a move of
+// ~1300 or a trash of ~2600: execve refused with E2BIG, quickshell reported
+// the process as never started, and the operation did nothing at all — a
+// paste silently dropped, a job that never finished. As separate arguments
+// the bound is ARG_MAX, the whole argv (~2MB): tens of thousands of paths.
+// statArgv made the same move for the same reason; this is the rest of them.
+function withArgs(script, args) { return { script: script, args: args || [] }; }
+
+// The argv to run one: $0 is a name for ps, and the paths start at $1.
+function shArgv(cmd) { return ["sh", "-c", cmd.script, "terminus"].concat(cmd.args); }
+
 function countCommand(paths) {
-  const q = paths.map((p) => Strings.shellQuote(p)).join(" ");
-  return "find " + q + " -mindepth 1 \\( -type f -o -type l \\) 2>/dev/null | wc -l; "
-    + "find " + q + " -mindepth 1 -type d 2>/dev/null | wc -l";
+  return withArgs("find \"$@\" -mindepth 1 \\( -type f -o -type l \\) 2>/dev/null | wc -l; "
+    + "find \"$@\" -mindepth 1 -type d 2>/dev/null | wc -l", paths);
 }
 
 function sizeCommand(paths) {
-  return "du -sbc -- " + paths.map((p) => Strings.shellQuote(p)).join(" ")
-    + " 2>/dev/null | tail -1 | cut -f1";
+  return withArgs("du -sbc -- \"$@\" 2>/dev/null | tail -1 | cut -f1", paths);
 }
 
 // ── WHAT THE PROPERTIES SHEET KNOWS ABOUT A FOLDER, IN ONE PROCESS ───────
@@ -1402,10 +1416,12 @@ function sizeCommand(paths) {
 // after the cursor has moved on is complete and correct — for the folder
 // you left. The tag is how the answer says which question it is answering.
 function folderFactsCommand(path, tag) {
+  // One path, so it rides in the script itself: `set --` makes it "$@" for
+  // the size and count scripts, which are written for a list.
   const q = Strings.shellQuote(path);
-  return "stat -c '%U:%G' -- " + q + " 2>/dev/null || echo; "
-    + sizeCommand([path]) + "; "
-    + countCommand([path]) + "; "
+  return "set -- " + q + "; stat -c '%U:%G' -- \"$1\" 2>/dev/null || echo; "
+    + sizeCommand([]).script + "; "
+    + countCommand([]).script + "; "
     + "echo end " + Strings.shellQuote(String(tag === undefined ? "" : tag));
 }
 
@@ -1431,8 +1447,7 @@ function parseFolderFacts(text) {
 // "bytes<TAB>path", and paths can contain anything except a tab or a newline,
 // so the first tab is the only split that is safe.
 function dirSizeCommand(paths) {
-  return "du -sb -- " + paths.map((p) => Strings.shellQuote(p)).join(" ")
-    + " 2>/dev/null";
+  return withArgs("du -sb -- \"$@\" 2>/dev/null", paths);
 }
 
 function parseDirSizes(text) {
@@ -1538,7 +1553,7 @@ function createCommand(dir, name) {
 // purpose: one of these is recoverable and the other is not, and they should
 // not be reachable by the same key or built by the same function.
 function deleteCommand(paths) {
-  return "rm -rf -- " + paths.map((p) => Strings.shellQuote(p)).join(" ");
+  return withArgs("rm -rf -- \"$@\"", paths);
 }
 
 // gio open, NOT xdg-open, and the difference is TERMINAL APPLICATIONS.
@@ -1678,7 +1693,6 @@ const ITEM_MARK = "@@TERMINUS-ITEM@@";
 
 function transferCommand(paths, destDir, move, clash) {
   const mode = clash || CLASH.overwrite;
-  const quoted = paths.map((p) => Strings.shellQuote(p));
   const dest = Strings.shellQuote(destDir);
   // $xf is set by XATTR_PROBE below, and is either -X or empty.
   const flags = "-a $xf --info=progress2 --no-inc-recursive"
@@ -1692,7 +1706,7 @@ function transferCommand(paths, destDir, move, clash) {
     // source and a full target path — there is no per-file rename for a batch.
     cmd = prologue + FREE_NAME
       + "i=0\n"
-      + "for p in " + quoted.join(" ") + "; do\n"
+      + "for p; do\n"
       + "  i=$((i+1))\n"
       + "  printf '" + ITEM_MARK + "%s\\r' \"$i\"\n"
       + "  t=$(terminus_free " + dest + " \"$(basename -- \"$p\")\" \"$p\")\n"
@@ -1709,7 +1723,7 @@ function transferCommand(paths, destDir, move, clash) {
     // its own contents. An explicit overwrite has to actually write.
     cmd = prologue + "rsync " + flags
       + (mode === CLASH.skip ? " --ignore-existing" : " --ignore-times")
-      + " -- " + quoted.join(" ") + " " + Strings.shellQuote(destDir + "/")
+      + " -- \"$@\" " + Strings.shellQuote(destDir + "/")
       // EXIT ON FAILURE, so the sweep below cannot answer for it. Without
       // this, a transfer that failed and a sweep that succeeded added up to a
       // job that reported success — the keep-both branch has always had its
@@ -1731,11 +1745,10 @@ function transferCommand(paths, destDir, move, clash) {
   // about directories that turn out not to be empty, and everything that can
   // genuinely fail has already exited above.
   if (move) {
-    cmd += "find " + quoted.join(" ")
-      + " -depth -type d -empty -delete 2>/dev/null\n"
+    cmd += "find \"$@\" -depth -type d -empty -delete 2>/dev/null\n"
       + "exit 0\n";
   }
-  return cmd;
+  return withArgs(cmd, paths);
 }
 
 // rsync rewrites its progress line with a carriage return, so the stream is
@@ -1767,7 +1780,7 @@ function parseItem(line) {
 // supported" rather than pretending. A hand-rolled version gets the happy path
 // right and loses the file on every other one.
 function trashCommand(paths) {
-  return "gio trash -- " + paths.map((p) => Strings.shellQuote(p)).join(" ");
+  return withArgs("gio trash -- \"$@\"", paths);
 }
 
 // What is already there, asked BEFORE anything is written. cp and mv overwrite
@@ -1784,19 +1797,55 @@ function trashCommand(paths) {
 //
 // The internal list is KEPT, because it carries the copy/move distinction and
 // the exact paths, and because rsync with progress is better than anything a
-// clipboard can express. The system clipboard is written alongside it and read
-// when the internal one is empty, so the two never disagree about an operation
-// terminus itself started.
+// clipboard can express. The system clipboard is written alongside it, and a
+// paste asks the clipboard FIRST: while it still lists exactly what the
+// internal list holds, the internal list is used — it knows a cut from a
+// copy — and once something else has been copied anywhere, that wins. See
+// samePaths.
 //
-// text/uri-list, because it is the one type nearly everything understands for
-// "here are some files". wl-copy offers a single type per invocation, so this
-// is a choice: GTK file managers also speak x-special/gnome-copied-files,
-// which carries copy-versus-cut, and picking it would trade every other
-// application for that one distinction.
-function clipboardCopyCommand(paths) {
-  const uris = paths.map((p) => "file://" + encodeURI(p)).join("\r\n");
-  return "printf '%s' " + Strings.shellQuote(uris)
-    + " | wl-copy -t text/uri-list >/dev/null 2>&1";
+// Whether two lists name the same files, in any order — how a paste tells
+// terminus's own yank, still on the clipboard, from something copied since.
+function samePaths(a, b) {
+  if (!a || !b || a.length !== b.length) return false;
+  const seen = {};
+  for (const p of a) seen[p] = true;
+  for (const p of b) if (!seen[p]) return false;
+  return true;
+}
+
+// What a paste does with what the clipboard said (see clipboardPasteCommand):
+//   "own"      the clipboard still holds our list: use it, cut or copy as made
+//   "clip"     other files, copied since: they are the paste
+//   "pending"  nothing a file manager can use there: our list, if we have one
+//   "none"     nothing at all
+// A clipboard naming exactly what the last paste moved is spent, and reads as
+// nothing: those paths are gone.
+function pasteSource(kind, clipPaths, pendingPaths, spentPaths) {
+  const files = (kind === "gnome" || kind === "uris") && clipPaths.length > 0
+    && !samePaths(clipPaths, spentPaths);
+  if (files) return pendingPaths && samePaths(clipPaths, pendingPaths) ? "own" : "clip";
+  if (kind !== "fail" && pendingPaths && pendingPaths.length > 0) return "pending";
+  return "none";
+}
+
+// A COPY is text/uri-list, because it is the one type nearly everything
+// understands for "here are some files". wl-copy offers a single type per
+// invocation, so the type is a choice.
+//
+// A CUT is x-special/gnome-copied-files, led by the word "cut", because a
+// uri-list cannot say cut at all: Nautilus pasted a Terminus cut as a copy
+// and the originals stayed behind, still dimmed here as cut. GTK file
+// managers (Nautilus, Thunar, Nemo, Caja) read this format and MOVE; an
+// application that knows only uri-list cannot paste a cut, which is the
+// honest answer — it could only have copied it.
+function clipboardCopyCommand(paths, cut) {
+  const uris = paths.map((p) => "file://" + encodeURI(p));
+  if (cut) {
+    return withArgs("{ printf 'cut'; for u; do printf '\\n%s' \"$u\"; done; }"
+      + " | wl-copy -t x-special/gnome-copied-files >/dev/null 2>&1", uris);
+  }
+  return withArgs("{ printf '%s' \"$1\"; shift; for u; do printf '\\r\\n%s' \"$u\"; done; }"
+    + " | wl-copy -t text/uri-list >/dev/null 2>&1", uris);
 }
 
 // What the clipboard is holding, decided IN ONE ROUND TRIP.
@@ -1975,12 +2024,8 @@ function conflictCommand(names, destDir) {
   // trees and a file only the destination had — so "Overwrite" is what
   // happens to a file and never what happens to a folder. The scan says
   // which it is, and the card can then use the word that is true.
-  const tests = names.map((n) => {
-    const q = Strings.shellQuote(n);
-    return "[ -e " + d + "/" + q + " ] && printf '%s\\037%s\\036' " + q
-      + " \"$([ -d " + d + "/" + q + " ] && echo d || echo f)\"";
-  });
-  return tests.join("; ") + "; true";
+  return withArgs("d=" + d + "; for n; do [ -e \"$d/$n\" ] && printf '%s\\037%s\\036' \"$n\""
+    + " \"$([ -d \"$d/$n\" ] && echo d || echo f)\"; done; true", names);
 }
 
 // Whether the archive about to be written is already there, and what it would
@@ -3348,17 +3393,22 @@ function archiveScript(prefix, countCmd, tool, entryPat, fromStdout) {
 }
 
 function archiveJobCommand(paths, archivePath) {
-  const names = paths.map((p) => Strings.shellQuote(basename(p))).join(" ");
+  const names = paths.map((p) => basename(p));
   const ar = Strings.shellQuote(archivePath);
   const sevenZ = /\.7z$/i.test(archivePath);
   const prefix = "cd " + Strings.shellQuote(dirname(paths[0])) + " || exit 1\n";
+  // The names are relative, so a file called "-rf" reached find as an
+  // option: it refused the whole list and the progress total was 0. find has
+  // no `--` for its starting points; handed over on stdin, as ./name, they
+  // are only ever paths. The tools themselves take the names as they are.
+  const each = "printf './%s\\0' \"$@\" | find -files0-from -";
   if (sevenZ) {
     // 7z counts files only: it has no entry of its own for a directory
-    return archiveScript(prefix, "find " + names + " -type f 2>/dev/null | wc -l",
-      "7z a -bb1 -bd -- " + ar + " " + names, "'+ '*", true);
+    return withArgs(archiveScript(prefix, each + " -type f 2>/dev/null | wc -l",
+      "7z a -bb1 -bd -- " + ar + " \"$@\"", "'+ '*", true), names);
   }
-  return archiveScript(prefix, "find " + names + " 2>/dev/null | wc -l",
-    "bsdtar -a -cvf " + ar + " -- " + names, "'a '*", false);
+  return withArgs(archiveScript(prefix, each + " 2>/dev/null | wc -l",
+    "bsdtar -a -cvf " + ar + " -- \"$@\"", "'a '*", false), names);
 }
 
 // One archive at a time, so the count means something, and into a directory of

@@ -165,7 +165,7 @@ module.exports = {
     t.before("directories are searched before files", find, "--nth -2", "--nth -1");
     t.has("the query reaches fzf", find, "conf");
 
-    t.has("delete is recursive and forced", T.deleteCommand(["/d/x"]), "rm -rf");
+    t.has("delete is recursive and forced", T.deleteCommand(["/d/x"]).script, "rm -rf");
     t.has("move refuses to descend into a directory", T.renameCommand("/d/x", "/d/y"), "mv -T");
     t.has("chmod takes the octal", T.chmodCommand(["/d/x"], 0o755), "755");
 
@@ -249,9 +249,11 @@ module.exports = {
     // ── WHAT IS ALREADY THERE, AND WHETHER IT IS A DIRECTORY ──────────────
     // Both, because the answer to a clash is not the same word for each:
     // rsync MERGES a directory of the same name and replaces a file.
-    const clash = T.conflictCommand(["a b.txt"], "/d");
-    t.has("the name is quoted", clash, "'a b.txt'");
-    t.has("and the destination too", clash, "'/d'");
+    const clashCmd = T.conflictCommand(["a b.txt"], "/d");
+    const clash = clashCmd.script;
+    t.eq("the name travels as an argument, not as script text",
+      clashCmd.args, ["a b.txt"]);
+    t.has("the destination is quoted", clash, "'/d'");
     t.has("it asks whether the thing is a directory", clash, "-d ");
     t.has("and never fails for finding nothing", clash, "; true");
     t.eq("a scan that found nothing parses to nothing",
@@ -302,8 +304,42 @@ module.exports = {
     t.eq("no common prefix", T.commonPrefix(["ab", "cd"]), "");
     t.eq("nothing to complete", T.commonPrefix([]), "");
 
+    // ── WHAT `p` PASTES: whatever was copied last, anywhere ──────────────
+    t.ok("the same files in another order are the same", T.samePaths(["/a", "/b"], ["/b", "/a"]));
+    t.ok("one more is not", !T.samePaths(["/a"], ["/a", "/b"]));
+    t.ok("nor is a different one", !T.samePaths(["/a", "/b"], ["/a", "/c"]));
+    t.ok("nor is nothing", !T.samePaths(["/a"], null));
+    // our own yank comes back through the reader's decoding intact, or it
+    // would never be recognised and a cut would paste as a copy
+    const uriNames = ["/d/a b.jpg", "/d/100%.txt", "/d/#1.txt", "/d/caf\u00e9", "/d/it's"];
+    const back = uriNames.map((p) => decodeURIComponent(("file://" + encodeURI(p)).slice(7)));
+    t.ok("encoded and decoded, the same paths", T.samePaths(back, uriNames));
+
+    const mine = ["/d/a", "/d/b"];
+    t.eq("our yank still on the clipboard: ours, which knows a cut",
+      T.pasteSource("uris", ["/d/b", "/d/a"], mine, []), "own");
+    t.eq("files copied since, in Nautilus: those",
+      T.pasteSource("uris", ["/n/x"], mine, []), "clip");
+    t.eq("and in GNOME's own format too",
+      T.pasteSource("gnome", ["/n/x"], mine, []), "clip");
+    t.eq("with nothing of ours, the clipboard's",
+      T.pasteSource("uris", ["/n/x"], null, []), "clip");
+    t.eq("text on the clipboard: ours",
+      T.pasteSource("none", [], mine, []), "pending");
+    t.eq("an empty uri-list: ours",
+      T.pasteSource("uris", [], mine, []), "pending");
+    t.eq("nothing anywhere", T.pasteSource("none", [], null, []), "none");
+    t.eq("a list of our own that is empty is nothing", T.pasteSource("none", [], [], []), "none");
+    t.eq("a move already made is not made again",
+      T.pasteSource("uris", mine, null, mine), "none");
+    t.eq("an image that could not be written is not a cue to paste something else",
+      T.pasteSource("fail", [], mine, []), "none");
+
     // ── archives, and the count that drives the progress bar ──────────────
-    const cz = T.archiveJobCommand(["/d/src"], "/d/out.tar.zst");
+    const czCmd = T.archiveJobCommand(["/d/src"], "/d/out.tar.zst");
+    const cz = czCmd.script;
+    t.eq("the archive takes names relative to their folder, as arguments",
+      czCmd.args, ["src"]);
     t.has("bsdtar picks the format out of the name", cz, "bsdtar -a -cvf");
     t.has("verbose, because the entries ARE the progress", cz, "-cvf");
     t.has("the total is counted before the work starts", cz, "wc -l");
@@ -312,7 +348,7 @@ module.exports = {
     // bsdtar announces entries on stderr, so the pipe has to carry stderr
     t.has("stderr is what gets counted for bsdtar", cz, "2>&1 >/dev/null");
 
-    const c7 = T.archiveJobCommand(["/d/src"], "/d/out.7z");
+    const c7 = T.archiveJobCommand(["/d/src"], "/d/out.7z").script;
     t.has("7z is driven by 7z", c7, "7z a -bb1");
     t.has("7z counts files, having no entry for a directory", c7, "-type f");
     // its entry lines come on stdout, and its stderr must stay untouched so a
@@ -774,5 +810,104 @@ module.exports = {
     const dd = T.splitRoomDispatches("0xab", { dw: 10 });
     t.ok("resized, then centred", dd[0].indexOf("resize") >= 0 && dd[1].indexOf("center") >= 0);
     t.ok("the window is named by address", dd[1].indexOf('window = "address:0xab"') >= 0);
+
+    // ── A BIG SELECTION, THROUGH A REAL SHELL ─────────────────────────────
+    // Every builder over a list of paths, run the way the window runs it —
+    // shArgv, into sh — on 5000 paths long enough that the old form (the
+    // list spliced into the script) would have been one argument past
+    // MAX_ARG_STRLEN, and execve would have refused it with E2BIG. The tools
+    // that would touch the desktop or the network (gio, wl-copy, rsync,
+    // bsdtar) are stubs on PATH that write down what they were given.
+    {
+      const fs = require("fs"), os = require("os"), path = require("path");
+      const { spawnSync } = require("child_process");
+      const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "terminus-argv-"));
+      try {
+        const bin = path.join(tmp, "bin");
+        fs.mkdirSync(bin);
+        const log = path.join(tmp, "log");
+        const stub = (name, body) => {
+          fs.writeFileSync(path.join(bin, name), "#!/bin/sh\n" + body + "\n", { mode: 0o755 });
+        };
+        // each argument NUL-terminated, since one of the names has a newline
+        stub("gio", "printf '%s\\0' \"$@\" > \"$TLOG\"");
+        stub("rsync", "printf '%s\\0' \"$@\" > \"$TLOG\"");
+        stub("bsdtar", "printf '%s\\0' \"$@\" > \"$TLOG\"; for a; do echo \"a $a\" >&2; done");
+        stub("wl-copy", "cat > \"$TLOG\"");
+        const env = Object.assign({}, process.env,
+          { PATH: bin + ":" + process.env.PATH, TLOG: log });
+        const run = (argv) => spawnSync(argv[0], argv.slice(1), { encoding: "utf8", env: env });
+        const started = (name, r) => t.ok(name + " (" + (r.error ? r.error.code : "exit " + r.status) + ")",
+          !r.error && r.status === 0);
+        const logged = () => fs.readFileSync(log, "utf8");
+
+        const src = path.join(tmp, "Pictures", "Camera");
+        const dest = path.join(tmp, "dest dir");
+        fs.mkdirSync(src, { recursive: true });
+        fs.mkdirSync(dest);
+        const N = 5000;
+        const names = [];
+        for (let i = 0; i < N; i++) {
+          const n = "IMG_20240101_" + String(i).padStart(6, "0") + " it's a photo.jpg";
+          names.push(n);
+          fs.writeFileSync(path.join(src, n), "0123456789");
+        }
+        // and the names a quoting mistake would break on
+        const odd = ["-rf", "new\nline", "$(touch pwned)", "back\\slash"];
+        for (const n of odd) { names.push(n); fs.writeFileSync(path.join(src, n), "0123456789"); }
+        const paths = names.map((n) => path.join(src, n));
+        const spliced = paths.map((p) => "'" + p.replace(/'/g, "'\\''") + "'").join(" ");
+        t.ok("the test is worth running: spliced, the list is past 128KB",
+          spliced.length > 131072);
+
+        const cl = run(T.shArgv(T.conflictCommand(names.slice(0, N / 2), src)));
+        started("the clash check starts", cl);
+        t.eq("and finds every clash", T.parseClashes(cl.stdout).length, N / 2);
+
+        const du = run(T.shArgv(T.sizeCommand(paths)));
+        started("the size starts", du);
+        t.eq("and adds every file", Number(du.stdout.trim()), 10 * paths.length);
+
+        const ds = run(T.shArgv(T.dirSizeCommand(paths)));
+        started("the per-item size starts", ds);
+        t.eq("one line for each", (ds.stdout.match(/\t/g) || []).length, paths.length);
+
+        fs.mkdirSync(path.join(src, "sub"));
+        fs.writeFileSync(path.join(src, "sub", "a"), "");
+        const ct = run(T.shArgv(T.countCommand(paths.concat([path.join(src, "sub")]))));
+        started("the count starts", ct);
+        t.eq("and counts what is inside the folders", ct.stdout.trim().split("\n"), ["1", "0"]);
+
+        const tr = run(T.shArgv(T.trashCommand(paths)));
+        started("trash starts", tr);
+        t.eq("and gio is handed every path, intact", logged(), ["trash", "--"].concat(paths).join("\0") + "\0");
+
+        const cp = run(T.shArgv(T.clipboardCopyCommand(paths)));
+        started("the clipboard copy starts", cp);
+        t.eq("and offers every URI, joined exactly as before",
+          logged(), paths.map((p) => "file://" + encodeURI(p)).join("\r\n"));
+
+        const mv = run(T.shArgv(T.transferCommand(paths, dest, true, "overwrite")));
+        started("a move starts", mv);
+        const rs = logged().split("\0");
+        t.eq("rsync gets every path, then the destination",
+          rs.slice(rs.indexOf("--") + 1, -1), paths.concat([dest + "/"]));
+
+        const ar = run(["setsid"].concat(T.shArgv(T.archiveJobCommand(paths, path.join(tmp, "out.tar.zst")))));
+        started("an archive starts", ar);
+        // one more than there are names: "new\nline" is two lines to wc
+        t.has("find counts every name for the total, \"-rf\" included",
+          ar.stdout, "T" + (paths.length + 1) + "\r");
+        t.has("and bsdtar is handed every one", ar.stdout, "P" + (paths.length + 4) + "\r");
+
+        t.ok("no name was ever run as a command", !fs.existsSync("pwned") && !fs.existsSync(path.join(src, "pwned")));
+
+        const rm = run(T.shArgv(T.deleteCommand(paths)));
+        started("delete starts", rm);
+        t.eq("and removes every one", fs.readdirSync(src), ["sub"]);
+      } finally {
+        fs.rmSync(tmp, { recursive: true, force: true });
+      }
+    }
   }
 };
