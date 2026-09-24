@@ -305,6 +305,12 @@ Scope {
   readonly property bool capsOn: CapsLock.on
 
   function engage() {
+    // Once per lock. lockDelay engages without the screenshot when grim is
+    // slow, and grim finishing afterwards must not engage again: that reset
+    // keysSeen mid-lock and wrote a second "lock:engage" into the trail.
+    // The surface's own flag, read directly, as lock() does — so a lock the
+    // compositor dropped can still be engaged again.
+    if (sessionLock.locked) return;
     sessionLock.locked = true;
     root.locked = true;
     root.covering = true;
