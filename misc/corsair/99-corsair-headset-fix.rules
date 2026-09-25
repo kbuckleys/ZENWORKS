@@ -1,0 +1,14 @@
+# ┌─┐┌─┐┌┐┌┬ ┬┌─┐┬─┐┬┌─┌─┐
+# ┌─┘├┤ │││││││ │├┬┘├┴┐└─┐
+# └─┘└─┘┘└┘└┴┘└─┘┴└─┴ ┴└─┘
+# https://github.com/kbuckleys/
+# corsair-headset-fix — re-apply when the adapter is (re)plugged
+#
+# 'sound' is not tagged by systemd's own rules, so TAG+="systemd" is required for
+# the device to get a .device unit at all. SYSTEMD_USER_WANTS then propagates the
+# start job to every running user manager (needs systemd >= 248).
+#
+# The 99- prefix orders this after 90-alsa-restore.rules, which runs
+# `alsactl restore` synchronously on this same controlC* add event.
+
+ACTION=="add", SUBSYSTEM=="sound", KERNEL=="controlC*", ATTRS{idVendor}=="1b1c", ATTRS{idProduct}=="0a53", TAG+="systemd", ENV{SYSTEMD_USER_WANTS}+="corsair-headset-fix.service"

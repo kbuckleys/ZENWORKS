@@ -1,0 +1,65 @@
+#!/bin/sh
+
+# ┌─┐┌─┐┌┐┌┬ ┬┌─┐┬─┐┬┌─┌─┐
+# ┌─┘├┤ │││││││ │├┬┘├┴┐└─┐
+# └─┘└─┘┘└┘└┴┘└─┘┴└─┴ ┴└─┘
+# https://github.com/kbuckleys/
+# corsair-headset-fix
+
+set -e
+
+find_card() {
+  for c in /proc/asound/card*; do
+    [ -d "$c" ] || continue
+    grep -q "1b1c:0a53" "$c/usbid" 2>/dev/null && { echo "${c##*card}"; return 0; }
+  done
+  return 1
+}
+
+# Retry up to 5s for WirePlumber to enumerate the card
+for i in $(seq 1 10); do
+  CARD=$(find_card) && break
+  sleep 0.5
+done
+[ -n "$CARD" ] || exit 0
+
+# Resolve the PipeWire card name and its active profile in one pass.
+# In `pactl list cards`, "Active Profile:" always follows the Properties block
+# that carries alsa.card, so a single scan gets both.
+#
+# Do NOT compare an awk variable that may be unset against $CARD: an
+# uninitialised awk var compares equal to numeric 0, so the match would fire on
+# line 1 whenever the headset is ALSA card 0. Only compare inside the rule that
+# actually matched.
+for i in $(seq 1 10); do
+  CARD_INFO=$(pactl list cards 2>/dev/null | awk -v card="$CARD" '
+    /^Card #/         { name = ""; hit = 0 }
+    /^\tName: /       { name = $2 }
+    /alsa\.card = "/  { gsub(/"/, "", $3); if ($3 == card) hit = 1 }
+    hit && /Active Profile: / { print name; print $NF; exit }
+  ')
+  [ -n "$CARD_INFO" ] && break
+  sleep 0.5
+done
+[ -n "$CARD_INFO" ] || exit 0
+
+CARD_NAME=$(echo "$CARD_INFO" | sed -n 1p)
+ACTIVE=$(echo "$CARD_INFO" | sed -n 2p)
+[ -n "$CARD_NAME" ] || exit 0
+
+# 1) Switch to Analog Stereo Duplex if currently using digital output
+if [ -n "$ACTIVE" ] && echo "$ACTIVE" | grep -q "iec958"; then
+  pactl set-card-profile "$CARD_NAME" output:analog-stereo+input:analog-stereo 2>/dev/null || true
+  sleep 1
+fi
+
+# NOTE: 'Headset Playback Volume' (index 0, 0…+16 dB) is deliberately not set here.
+# PipeWire's ACP owns it — the sink reports Base Volume 54% / -16.00 dB, i.e. that
+# +16 dB is the top half of the normal volume slider. Anything written here is
+# reclaimed on the next volume change. Set the sink to 100% instead.
+
+# 2) Max out the second hardware output stage (index 1: -50 dB → +5 dB)
+amixer -c "$CARD" cset name='Headset Playback Volume',index=1 55,55 >/dev/null \
+  || echo "corsair-headset-fix: could not set output gain" >&2
+
+echo "Corsair VOID ELITE: analog profile + output stage at +5 dB"
