@@ -1,0 +1,534 @@
+# ┌─┐┌─┐┌┐┌┬ ┬┌─┐┬─┐┬┌─┌─┐
+# ┌─┘├┤ │││││││ │├┬┘├┴┐└─┐
+# └─┘└─┘┘└┘└┴┘└─┘┴└─┴ ┴└─┘
+# https://github.com/kbuckleys/
+
+[app]
+overall = {}
+
+[mgr]
+cwd = { fg = "#9bbfbf" }
+find_keyword = { bold = true, underline = true }
+find_position = { bg = "#010101", bold = true }
+marker_selected = { bg = "#e0d8a4" }
+marker_copied = { bg = "#b6e0a4" }
+marker_marked = { bg = "#c8a4e0" }
+marker_cut = { bg = "#e78284" }
+count_copied = { fg = "#000000", bg = "#b6e0a4" }
+count_cut = { fg = "#000000", bg = "#e78284" }
+count_selected = { fg = "#000000", bg = "#e0d8a4" }
+
+[tabs]
+active = { bg = "#9bbfbf", fg = "#000000" }
+inactive = { bg = "#010101", fg = "#9bbfbf" }
+sep_inner = { open = "", close = "" }
+sep_outer = { open = "", close = "" }
+
+[mode]
+normal_main = { fg = "#9bbfbf", bold = true }
+normal_alt = { fg = "#9bbfbf" }
+select_main = { fg = "#c8a4e0", bold = true }
+select_alt = { fg = "#c8a4e0" }
+unset_main = { fg = "#e0d8a4", bold = true }
+unset_alt = { fg = "#e0d8a4" }
+
+[indicator]
+parent  = { reversed = true, bold = true }
+current = { reversed = true, bold = true }
+preview = { underline = false }
+padding = { open = "█", close = "█" }
+
+[status]
+overall = { fg = "#000000" }
+sep_left = { open = "", close = "" }
+sep_right = { open = "", close = "" }
+
+# Permissions
+perm_sep = { fg = "#6a707f" }
+perm_type = { fg = "#b6e0a4" }
+perm_read = { fg = "#e0d8a4" }
+perm_write = { fg = "#e78284" }
+perm_exec = { fg = "#9bbfbf" }
+
+# Progress
+progress_normal = { fg = "#fab387", bg = "#20242a" }
+progress_error = { fg = "#e78284", bg = "#20242a" }
+
+[which]
+border = { fg = "#20242a" }
+cols = 3
+mask = { bg = "#20242a" }
+cand = { fg = "#fab387" }
+rest = { fg = "#20242a" }
+desc = { fg = "#dfdfdd" }
+separator = "   "
+separator_style = { fg = "#6a707f" }
+
+[confirm]
+border = { fg = "#e78284" }
+title = { fg = "#e78284", bold = true }
+list = { fg = "#eebebe" }
+btn_yes = { fg = "#eebebe" }
+btn_no = { fg = "#eebebe" }
+btn_labels = [ "[Y]ES", "[N]O" ]
+
+[spot]
+border = { fg = "#9bbfbf" }
+title = { fg = "#9bbfbf", bold = true }
+tbl_col = { fg = "#9bbfbf" }
+tbl_cell = { fg = "#9bbfbf", bg = "#20242a" }
+
+[notify]
+title_info = { fg = "#b6e0a4" }
+title_warn = { fg = "#e0d8a4" }
+title_error = { fg = "#e78284" }
+icon_info = " "
+icon_warn = " "
+icon_error = " "
+
+[pick]
+border = { fg = "#9bbfbf" }
+active = { fg = "#c8a4e0", bold = true }
+inactive = {}
+
+[input]
+border = { fg = "#fab387" }
+title = { bold = true }
+value = { fg = "#fab387" }
+selected = { reversed = true }
+
+[cmp]
+border = { fg = "#fab387" }
+active = { fg = "#000000", bg = "#fab387" }
+inactive = { fg = "#fab387" }
+
+[tasks]
+border = { fg = "#fab387" }
+title = { bold = true }
+hovered = { fg = "#dfdfdd", bg = "#20242a" }
+
+[help]
+on = {}
+run = {}
+desc = {}
+hovered = { fg = "#dfdfdd", bg = "#20242a" }
+footer = { fg = "#fab387", bg = "#20242a" }
+
+[filetype]
+rules = [
+	# Image
+	{ mime = "image/*", fg = "#b6e0a4" },
+
+	# Media
+	{ mime = "{audio,video}/*", fg = "#e0d8a4" },
+
+	# Archive
+	{ mime = "application/{zip,rar,7z*,tar,gzip,xz,zstd,bzip*,lzma,compress,archive,cpio,arj,xar,ms-cab*}", fg = "#fab387" },
+
+	# Document
+	{ mime = "application/{pdf,doc,rtf}", fg = "#9bbfbf" },
+
+	# Virtual file system
+	{ mime = "vfs/{absent,stale}", fg = "#a0a09b" },
+
+	# Special file
+    { mime = "inode/empty", fg = "#a0a09b" },
+
+    # Orphan (broken) symlinks first
+    { url = "*", is = "orphan", fg = "#e78284" },
+
+    # Valid symlinks last (won't override orphans)
+    { url = "*", is = "link", fg = "#c8a4e0" },
+	{ url = "*", is = "exec", fg = "#fab387" },
+
+	# Dummy file
+	{ url = "*", is = "dummy", bg = "#fab387", fg = "#000000" },
+	{ url = "*/", is = "dummy", bg = "#fab387", fg = "#000000" },
+
+    # Fallback
+    { url = "*/", fg = "#9bbfbf" },
+    { url = "*", fg = "#dfdfdd" },
+]
+
+[icon]
+conds = [
+	{ if = "orphan", text = " " },
+	{ if = "link", text = " " },
+	{ if = "block", text = " " },
+	{ if = "char", text = " " },
+	{ if = "fifo", text = " " },
+	{ if = "sock", text = " " },
+	{ if = "sticky", text = " " },
+	{ if = "dummy", text = " " },
+	{ if = "dir", text = " " },
+	{ if = "exec", text = " " },
+	{ if = "!dir", text = " " },
+]
+files = [
+    { name = "config", text = " " },
+    { name = "license", text = "󰿃 " },
+    { name = "readme", text = " " },
+    { name = "readme.md", text = " " },
+    { name = "makefile", text = " " },
+	{ name = ".gitignore", text = " " },
+	{ name = ".gitattributes", text = " " },
+	{ name = ".bash_history", text = "󱆃 " },
+	{ name = ".bashrc", text = "󱆃 " },
+    { name = "hypr.conf", text = " " },
+    { name = "hyprland.lua", text = " " },
+    { name = "hyprland.conf", text = " " },
+    { name = "hypridle.conf", text = " " },
+    { name = "hyprlock.conf", text = " " },
+    { name = "hyprpaper.conf", text = " " },
+    { name = "hyprsunset.conf", text = " " },
+    { name = "hyprtoolkit.conf", text = " " },
+    { name = "hyprlauncher.conf", text = " " },
+    { name = "hyprqt6engine.conf", text = " " },
+]
+dirs = [
+	{ name = "mnt", text = " " },
+	{ name = "projects", text = "󰲃 " },
+	{ name = "lua", text = " " },
+	{ name = "boot", text = " " },
+	{ name = "run", text = " " },
+	{ name = "usr", text = " " },
+	{ name = "root", text = " " },
+	{ name = "gtk-3.0", text = " " },
+	{ name = "gtk-4.0", text = " " },
+	{ name = "gtk-5.0", text = " " },
+    { name = "home", text = " " },
+    { name = "captures", text = "󰹑 " },
+    { name = "screenshots", text = "󰹑 " },
+    { name = "arch", text = "󰣇 " },
+    { name = "paru", text = "󰣇 " },
+    { name = "yay", text = "󰣇 " },
+	{ name = "hypr", text = " " },
+	{ name = "hyprland", text = " " },
+	{ name = "spotify", text = " " },
+	{ name = "spotifyd", text = " " },
+	{ name = "spoot", text = " " },
+	{ name = "spicetify", text = " " },
+	{ name = "spotify-player", text = " " },
+	{ name = "claude", text = " " },
+	{ name = ".claude", text = " " },
+	{ name = "vim", text = " " },
+	{ name = "nvim", text = " " },
+	{ name = "neovim", text = " " },
+	{ name = "mpv", text = " " },
+	{ name = "foot", text = "󰽒 " },
+	{ name = "fish", text = " " },
+	{ name = "electron", text = "󱀤 " },
+	{ name = "discord", text = " " },
+	{ name = "pulse", text = " " },
+	{ name = ".git", text = "󰊢 " },
+	{ name = "git", text = "󰊢 " },
+	{ name = ".npm", text = " " },
+    { name = ".steam", text = " " },
+    { name = ".cache", text = " " },
+    { name = ".local", text = " " },
+    { name = ".cargo", text = "󱣘 " },
+    { name = ".github", text = " " },
+    { name = ".config", text = " " },
+    { name = "cliphist", text = " " },
+    { name = "mozilla", text = " " },
+    { name = ".mozilla", text = " " },
+    { name = "zen", text = "󰺕 " },
+    { name = ".zen", text = "󰺕 " },
+    { name = "scripts", text = "󰑷 " },
+	{ name = "desktop", text = " " },
+	{ name = "development", text = " " },
+	{ name = "documents", text = " " },
+	{ name = "downloads", text = "󰃘 " },
+	{ name = "library", text = " " },
+	{ name = "games", text = " " },
+	{ name = "movies", text = " " },
+	{ name = "music", text = " " },
+	{ name = "pictures", text = " " },
+	{ name = "torrents", text = " " },
+	{ name = "bittorrents", text = " " },
+	{ name = "django", text = " " },
+	{ name = "ruby", text = " " },
+	{ name = "spring boot", text = " " },
+	{ name = "laravel", text = " " },
+	{ name = "flask", text = " " },
+	{ name = "rust", text = " " },
+	{ name = "fast", text = "  " },
+	{ name = "phoenix", text = " " },
+	{ name = "nest", text = " " },
+    { name = "go", text = "󰟓 " },
+    { name = ".go", text = "󰟓 " },
+    { name = "elixir", text = " " },
+	{ name = "public", text = " " },
+	{ name = "videos", text = " " },
+	{ name = "fonts", text = " " },
+	{ name = "memes", text = " " },
+	{ name = "wine", text = " " },
+	{ name = ".wine", text = " " }
+]
+exts = [
+    { name = "sh", text = "󰑷 " },
+    { name = "md", text = " " },
+    { name = "txt", text = " " },
+    { name = "doc", text = " " },
+    { name = "docx", text = " " },
+    { name = "odt", text = " " },
+    { name = "wpd", text = " " },
+    { name = "pdf", text = " " },
+    { name = "exe", text = " " },
+    { name = "dll", text = " " },
+    { name = "nix", text = "󱄅 " },
+
+    # Archive formats
+    { name = "z", text = " " },
+    { name = "zip", text = " " },
+    { name = "deb", text = " " },
+    { name = "pkg", text = " " },
+    { name = "rpm", text = " " },
+    { name = "gz", text = " " },
+    { name = "tar", text = " " },
+    { name = "rar", text = " " },
+    { name = "7z", text = " " },
+    { name = "gzip", text = " " },
+    { name = "xz", text = " " },
+    { name = "zstd", text = " " },
+    { name = "bzip", text = " " },
+    { name = "lzma", text = " " },
+    { name = "lzma", text = " " },
+    { name = "compress", text = " " },
+    { name = "archive", text = " " },
+    { name = "cpio", text = " " },
+    { name = "arj", text = " " },
+    { name = "xar", text = " " },
+    { name = "cab", text = "󰪶 " },
+
+    # Storage
+    { name = "bin", text = " " },
+    { name = "dmg", text = " " },
+    { name = "iso", text = " " },
+    { name = "toast", text = " " },
+    { name = "img", text = " " },
+    { name = "vcd", text = " " },
+
+    # Closed Captions
+    { name = "srt", text = " " },
+    { name = "vtt", text = " " },
+    { name = "ass", text = " " },
+    { name = "ssa", text = " " },
+    { name = "sub", text = " " },
+    { name = "idx", text = " " },
+
+    # Video formats
+    { name = "mp4", text = " " },
+    { name = "m4p", text = " " },
+    { name = "m4v", text = " " },
+    { name = "mkv", text = " " },
+    { name = "webm", text = " " },
+    { name = "3g2", text = " " },
+    { name = "3gp", text = " " },
+    { name = "avi", text = " " },
+    { name = "flv", text = " " },
+    { name = "f4v", text = " " },
+    { name = "f4p", text = " " },
+    { name = "f4a", text = " " },
+    { name = "f4b", text = " " },
+    { name = "h264", text = " " },
+    { name = "m4v", text = " " },
+    { name = "mov", text = " " },
+    { name = "mpg", text = " " },
+    { name = "mp2", text = " " },
+    { name = "mpeg", text = " " },
+    { name = "mpe", text = " " },
+    { name = "mpv", text = " " },
+    { name = "m2v", text = " " },
+    { name = "m4v", text = " " },
+    { name = "rm", text = " " },
+    { name = "rmvb", text = " " },
+    { name = "swf", text = " " },
+    { name = "vob", text = " " },
+    { name = "wmv", text = " " },
+    { name = "ogv", text = " " },
+    { name = "drc", text = " " },
+    { name = "gifv", text = " " },
+    { name = "mng", text = " " },
+    { name = "mts", text = " " },
+    { name = "m2ts", text = " " },
+    { name = "ts", text = " " },
+    { name = "qt", text = " " },
+    { name = "yuv", text = " " },
+    { name = "viv", text = " " },
+    { name = "asf", text = " " },
+    { name = "amv", text = " " },
+    { name = "svi", text = " " },
+    { name = "mxf", text = " " },
+    { name = "roq", text = " " },
+    { name = "nsv", text = " " },
+
+    # Audio formats
+    { name = "3gp", text = "󰎅 " },
+    { name = "aa", text = "󰎅 " },
+    { name = "aac", text = "󰎅 " },
+    { name = "aax", text = "󰎅 " },
+    { name = "act", text = "󰎅 " },
+    { name = "aiff", text = "󰎅 " },
+    { name = "alac", text = "󰎅 " },
+    { name = "amr", text = "󰎅 " },
+    { name = "ape", text = "󰎅 " },
+    { name = "au", text = "󰎅 " },
+    { name = "awb", text = "󰎅 " },
+    { name = "dss", text = "󰎅 " },
+    { name = "dvf", text = "󰎅 " },
+    { name = "flac", text = "󰎅 " },
+    { name = "gsm", text = "󰎅 " },
+    { name = "iklax", text = "󰎅 " },
+    { name = "ivs", text = "󰎅 " },
+    { name = "m4a", text = "󰎅 " },
+    { name = "m4b", text = "󰎅 " },
+    { name = "m4p", text = "󰎅 " },
+    { name = "mmf", text = "󰎅 " },
+    { name = "movpkg", text = "󰎅 " },
+    { name = "mp1", text = "󰎅 " },
+    { name = "mp2", text = "󰎅 " },
+    { name = "mp3", text = "󰎅 " },
+    { name = "mpc", text = "󰎅 " },
+    { name = "msv", text = "󰎅 " },
+    { name = "nmf", text = "󰎅 " },
+    { name = "ogg", text = "󰎅 " },
+    { name = "oga", text = "󰎅 " },
+    { name = "mogg", text = "󰎅 " },
+    { name = "opus", text = "󰎅 " },
+    { name = "ra", text = "󰎅 " },
+    { name = "rm", text = "󰎅 " },
+    { name = "rf64", text = "󰎅 " },
+    { name = "sln", text = "󰎅 " },
+    { name = "tta", text = "󰎅 " },
+    { name = "voc", text = "󰎅 " },
+    { name = "vox", text = "󰎅 " },
+    { name = "wma", text = "󰎅 " },
+    { name = "wav", text = "󰎅 " },
+    { name = "wv", text = "󰎅 " },
+    { name = "8svx", text = "󰎅 " },
+    { name = "cda", text = "󰎅 " },
+
+    # Image formats
+    { name = "ai", text = " " },
+    { name = "ps", text = " " },
+    { name = "psd", text = " " },
+    { name = "tif", text = " " },
+    { name = "tiff", text = " " },
+    { name = "bmp", text = " " },
+    { name = "ico", text = " " },
+    { name = "webp", text = " " },
+    { name = "png", text = " " },
+    { name = "apng", text = " " },
+    { name = "jpg", text = " " },
+    { name = "jpeg", text = " " },
+    { name = "jp2", text = " " },
+    { name = "j2k", text = " " },
+    { name = "jpf", text = " " },
+    { name = "jpm", text = " " },
+    { name = "jpq2", text = " " },
+    { name = "j2c", text = " " },
+    { name = "jpc", text = " " },
+    { name = "jpx", text = " " },
+    { name = "jfif", text = " " },
+    { name = "pjpeg", text = " " },
+    { name = "pjp", text = " " },
+    { name = "mj2", text = " " },
+    { name = "gif", text = " " },
+    { name = "svg", text = " " },
+    { name = "avif", text = " " },
+    { name = "ico", text = " " },
+    { name = "cur", text = " " },
+
+    # Programming & Configs
+    { name = "apk", text = "󰓷 " },
+    { name = "c", text = " " },
+    { name = "class", text = " " },
+    { name = "cpp", text = " " },
+    { name = "cs", text = " " },
+    { name = "h", text = " " },
+    { name = "jar", text = " " },
+    { name = "java", text = " " },
+    { name = "swift", text = " " },
+    { name = "vb", text = " " },
+    { name = "toml", text = " " },
+    { name = "yaml", text = " " },
+    { name = "lua", text = " " },
+    { name = "luac", text = " " },
+    { name = "json", text = " " },
+    { name = "jsonc", text = " " },
+    { name = "cfg", text = " " },
+    { name = "conf", text = " " },
+    { name = "rasi", text = " " },
+    { name = "ini", text = " " },
+    { name = "fish", text = " " },
+    { name = "xml", text = "󰗀 " },
+    { name = "vim", text = " " },
+    { name = "swp", text = " " },
+    { name = "asp", text = " " },
+    { name = "aspx", text = " " },
+    { name = "cfm", text = " " },
+    { name = "cgi", text = " " },
+    { name = "pl", text = " " },
+    { name = "go", text = "󰟓 " },
+    { name = "css", text = " " },
+    { name = "htm", text = " " },
+    { name = "html", text = " " },
+    { name = "xhtml", text = " " },
+    { name = "js", text = " " },
+    { name = "jsp", text = " " },
+    { name = "part", text = " " },
+    { name = "php", text = " " },
+    { name = "py", text = "󰌠 " },
+    { name = "rss", text = " " },
+    { name = "list", text = " " },
+    { name = "desktop", text = " " },
+    { name = "rs", text = "󱘗 " },
+    { name = "rlib", text = "󱘗 " },
+    { name = "rmeta", text = "󱘗 " },
+    { name = "ex", text = " " },
+    { name = "exs", text = " " },
+    { name = "eex", text = " " },
+    { name = "heex", text = " " },
+    { name = "rb", text = " " },
+    { name = "rake", text = " " },
+
+    # Email
+    { name = "email", text = "󰇮 " },
+    { name = "eml", text = "󰇮 " },
+    { name = "emlx", text = "󰇮 " },
+    { name = "msg", text = "󰇮 " },
+    { name = "oft", text = "󰇮 " },
+    { name = "ost", text = "󰇮 " },
+    { name = "pst", text = "󰇮 " },
+    { name = "vcf", text = "󰇮 " },
+    
+    # Fonts
+    { name = "fnt", text = " " },
+    { name = "fon", text = " " },
+    { name = "otf", text = " " },
+    { name = "ttf", text = " " },
+    
+    # Slide formats
+    { name = "key", text = "󰐩 " },
+    { name = "odp", text = "󰐩 " },
+    { name = "pps", text = "󰐩 " },
+    { name = "ppt", text = "󰐩 " },
+    { name = "pptx", text = "󰐩 " },
+    
+    # Misc
+    { name = "theme", text = "󰔎 " },
+    { name = "manifest", text = " " },
+    { name = "torrent", text = " " },
+    { name = "dpkg", text = "󱧘 " },
+    { name = "ods", text = " " },
+    { name = "db", text = " " },
+    { name = "sqlite", text = " " },
+    { name = "xls", text = " " },
+    { name = "xlsm", text = " " },
+    { name = "xlsx", text = " " },
+    { name = "csv", text = " " },
+    { name = "log", text = " " },
+    { name = "sav", text = " " },
+    { name = "rc", text = " " }
+]

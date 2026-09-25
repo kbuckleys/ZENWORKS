@@ -1,0 +1,200 @@
+/**
+ * ┌─┐┌─┐┌┐┌┬ ┬┌─┐┬─┐┬┌─┌─┐
+ * ┌─┘├┤ │││││││ │├┬┘├┴┐└─┐
+ * └─┘└─┘┘└┘└┴┘└─┘┴└─┴ ┴└─┘
+ * https://github.com/kbuckleys/ */
+
+{
+  "$schema": "https://github.com/fastfetch-cli/fastfetch/raw/dev/doc/json_schema.json",
+  "logo": {
+    "source": "~/.config/logo",
+    "type": "file",
+    "position": "top",
+    "padding": {
+      "top": 1
+    }
+  },
+  "display": {
+    "separator": " ",
+    "percent": {
+      "type": 3,
+      "green": 40,
+      "yellow": 75
+    },
+    "bar": {
+      "char": {
+        "elapsed": "■",
+        "total": "─"
+      },
+      "border": {
+        "left": "",
+        "right": ""
+      },
+      "width": 10
+    },
+    "size": {
+      "ndigits": 0
+    },
+    "key": {
+      "width": 20,
+      "paddingLeft": 2
+    }
+  },
+  "modules": [
+    {
+      "type": "title",
+      "key": "  ",
+      "keyColor": "bright_magenta"
+    },
+    "break",
+    {
+      "type": "os",
+      "key": "   OS",
+      "keyColor": "bright_yellow"
+    },
+    {
+      "type": "kernel",
+      "key": "   Kernel",
+      "keyColor": "bright_yellow"
+    },
+    {
+      "type": "packages",
+      "key": "󰏖   Packages",
+      "keyColor": "bright_yellow"
+    },
+    {
+      "type": "shell",
+      "key": "   Shell",
+      "keyColor": "bright_yellow"
+    },
+    {
+      "type": "uptime",
+      "key": "󰅐   Uptime",
+      "keyColor": "bright_yellow"
+    },
+    {
+      "type": "processes",
+      "key": "󰔟   Processes",
+      "keyColor": "bright_yellow"
+    },
+    {
+      "type": "datetime",
+      "key": "   Date",
+      "keyColor": "bright_yellow",
+      "format": "{day-in-month} {month-name-short} {year}  {hour-pretty}:{minute-pretty}"
+    },
+    "break",
+    {
+      "type": "wm",
+      "key": "   WM",
+      "keyColor": "bright_blue"
+    },
+    {
+      "type": "lm",
+      "key": "󰧨   Login",
+      "keyColor": "bright_blue"
+    },
+    {
+      "type": "theme",
+      "key": "󰉼   Theme",
+      "keyColor": "bright_blue"
+    },
+    {
+      "type": "icons",
+      "key": "󰀻   Icons",
+      "keyColor": "bright_blue"
+    },
+    {
+      "type": "font",
+      "key": "   Font",
+      "keyColor": "bright_blue"
+    },
+    {
+      "type": "terminal",
+      "key": "   Terminal",
+      "keyColor": "bright_blue"
+    },
+    "break",
+    {
+      "type": "host",
+      "key": "   Host",
+      "keyColor": "bright_green"
+    },
+    {
+      "type": "cpu",
+      "key": "   CPU",
+      "keyColor": "bright_green",
+      "showPeCoreCount": true
+    },
+    {
+      "type": "gpu",
+      "key": "󰍛   GPU",
+      "keyColor": "bright_green"
+    },
+    {
+      "type": "display",
+      "key": "󰍹   Display",
+      "keyColor": "bright_green"
+    },
+    {
+      "type":       "disk",
+      "key": "   Disk",
+      "keyColor": "bright_green",
+      "format": "{mount-from}  {size-percentage-bar}  {size-used} / {size-total} ({size-percentage})",
+      "percent": {
+        "type": 3
+      }
+    },
+    {
+      "type": "memory",
+      "key": "   Memory",
+      "keyColor": "bright_green",
+      "percent": {
+        "type": 3
+      }
+    },
+    {
+      "type": "swap",
+      "key": "󰓡   Swap",
+      "keyColor": "bright_green",
+      "percent": {
+        "type": 3
+      }
+    },
+    "break",
+    {
+      "type": "localip",
+      "key": "󰈁   Local IP",
+      "keyColor": "bright_cyan",
+      "showIpv6": false,
+      "showLoop": false,
+      "showMac": false
+    },
+    {
+      "type": "sound",
+      "key": "󰗅   Sound",
+      "keyColor": "bright_cyan"
+    },
+    {
+      "type": "player",
+      "key": "󰥠   Player",
+      "keyColor": "bright_cyan"
+    },
+    {
+      "type": "media",
+      "key": "󰝚   Media",
+      "keyColor": "bright_cyan"
+    },
+    "break",
+    "break",
+    {
+      "type": "colors",
+      "symbol": "block",
+      "paddingLeft": 2,
+      "block": {
+        "width": 3
+      }
+    },
+    "break"
+  ]
+}

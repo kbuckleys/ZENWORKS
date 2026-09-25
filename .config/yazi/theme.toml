@@ -1,0 +1,10 @@
+[flavor]
+# Both slots point at ZENON: some terminals report a light colour scheme
+# even on a black background, and an empty slot falls back to yazi's
+# built-in theme.
+dark = "ZENON"
+light = "ZENON"
+
+[mgr]
+border_symbol = " "
+border_style = { fg = "reset" }
