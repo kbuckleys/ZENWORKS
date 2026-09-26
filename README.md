@@ -14,7 +14,7 @@ Installation
 ```
 git clone https://github.com/kbuckleys/ZENWORKS/
 cd ZENWORKS
-bash install.sh
+bash install
 ```
 
 Endpoints
