@@ -138,7 +138,6 @@ hl.bind("SUPER + CONTROL + ALT + UP",     hl.dsp.window.move({ out_of_group = tr
 -- AUDIO
 hl.bind("SUPER + EQUAL",  hl.dsp.exec_cmd("pamixer -i 1"), { repeating = true })
 hl.bind("SUPER + MINUS",  hl.dsp.exec_cmd("pamixer -d 1"), { repeating = true })
-hl.bind("SUPER + 9",      hl.dsp.exec_cmd(term .. " -T Wiremix wiremix"))
 hl.bind("SUPER + 0",      hl.dsp.exec_cmd("pamixer -t"))
 
 hl.bind("SUPER + SHIFT + EQUAL",  hl.dsp.exec_cmd("playerctl next"))
