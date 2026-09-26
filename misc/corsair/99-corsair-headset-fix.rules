@@ -8,7 +8,9 @@
 # the device to get a .device unit at all. SYSTEMD_USER_WANTS then propagates the
 # start job to every running user manager (needs systemd >= 248).
 #
-# The 99- prefix orders this after 90-alsa-restore.rules, which runs
-# `alsactl restore` synchronously on this same controlC* add event.
+# The 99- prefix orders this after 90-alsa-restore.rules, but nothing depends on
+# that: this rule only QUEUES a user-service start, which runs asynchronously
+# and waits for WirePlumber to enumerate the card itself. By then the udev
+# event — and alsactl restore with it — is long finished.
 
 ACTION=="add", SUBSYSTEM=="sound", KERNEL=="controlC*", ATTRS{idVendor}=="1b1c", ATTRS{idProduct}=="0a53", TAG+="systemd", ENV{SYSTEMD_USER_WANTS}+="corsair-headset-fix.service"

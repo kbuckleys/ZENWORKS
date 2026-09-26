@@ -32,6 +32,18 @@ mkdir -p "$HOME/.config/systemd/user"
 ln -sf "$DIR/corsair-headset-fix.service" "$HOME/.config/systemd/user/corsair-headset-fix.service"
 echo "  → ~/.config/systemd/user/corsair-headset-fix.service"
 
+# Symlink the WirePlumber node rules (crackling fix). Read only when
+# WirePlumber starts, so restart it when the link is new or changed.
+WP="$HOME/.config/wireplumber/wireplumber.conf.d/51-corsair-headset-fix.conf"
+mkdir -p "$(dirname "$WP")"
+if [ "$(readlink "$WP")" != "$DIR/corsair-headset-fix.wireplumber.conf" ]; then
+  ln -sf "$DIR/corsair-headset-fix.wireplumber.conf" "$WP"
+  systemctl --user restart wireplumber pipewire pipewire-pulse 2>/dev/null || true
+  echo "  → $WP (audio stack restarted)"
+else
+  echo "  → $WP (already linked)"
+fi
+
 # Enable and start the service
 systemctl --user daemon-reload
 systemctl --user enable --now corsair-headset-fix.service

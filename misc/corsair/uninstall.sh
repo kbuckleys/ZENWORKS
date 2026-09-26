@@ -13,10 +13,17 @@ set -e
 systemctl --user disable --now corsair-headset-fix.service 2>/dev/null || true
 echo "  → service disabled & stopped"
 
+# Noted before the loop removes it: whether the WirePlumber rules are ours and
+# live, which decides whether the audio stack needs a restart below.
+WP="$HOME/.config/wireplumber/wireplumber.conf.d/51-corsair-headset-fix.conf"
+WP_LINKED=0
+[ -L "$WP" ] && WP_LINKED=1
+
 # Only ever remove our own symlinks. If someone replaced one with a real file,
 # it isn't ours to delete.
 for link in "$HOME/.local/bin/corsair-headset-fix" \
-            "$HOME/.config/systemd/user/corsair-headset-fix.service"; do
+            "$HOME/.config/systemd/user/corsair-headset-fix.service" \
+            "$WP"; do
   if [ -L "$link" ]; then
     rm -f "$link"
     echo "  → removed $link"
@@ -26,6 +33,14 @@ for link in "$HOME/.local/bin/corsair-headset-fix" \
 done
 
 systemctl --user daemon-reload
+
+# WirePlumber read the node rules when it started and keeps them until it
+# restarts, so removing the link alone changes nothing yet. Only restart when
+# the link was actually ours and is now gone — a brief audio dropout.
+if [ "$WP_LINKED" = 1 ]; then
+  systemctl --user restart wireplumber pipewire pipewire-pulse 2>/dev/null || true
+  echo "  → audio stack restarted (WirePlumber rules dropped)"
+fi
 
 # Remove the root-owned files. Skipped entirely when neither exists, so an
 # already-clean system doesn't ask for a password.
