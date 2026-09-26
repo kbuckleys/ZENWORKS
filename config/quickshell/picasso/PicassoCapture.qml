@@ -119,47 +119,32 @@ Scope {
   //
   // WITH THE POINTER OUT OF THE PICTURE. This machine draws its cursor in
   // software, into the frame itself, so grim cannot leave it out — every
-  // window shot had the arrow sitting in it. For the moment of the capture
-  // a transparent surface covers the monitor with the pointer hidden over
-  // it (see `hider`), and the capture waits a beat for that to land.
+  // window shot had the arrow sitting in it. So hyprland stops drawing it
+  // (Picasso.cursorCmd) for the length of the capture, and the capture waits
+  // a frame or two for that to land — long enough, too, for the region
+  // overlay to have left the screen.
+  // It always comes back: after grim, whether grim worked or not; on a
+  // signal, through the trap; and grim gets ten seconds, so a hung capture
+  // cannot keep it hidden.
   function run(cmd, file) {
     shotProc.file = file;
-    shotProc.command = ["sh", "-c", cmd];
-    hider.screen = cap.focusedScreen();
-    hider.visible = true;
-    hideLater.restart();
-  }
-
-  Timer {
-    id: hideLater
-    interval: 140
-    onTriggered: shotProc.running = true
+    shotProc.command = ["sh", "-c",
+      "trap " + cap.sh(Picasso.cursorCmd(true)) + " EXIT; trap 'exit 130' INT TERM HUP; "
+      + Picasso.cursorCmd(false) + "; sleep 0.1; timeout 10 sh -c " + cap.sh(cmd)];
+    shotProc.running = true;
   }
 
   Process {
     id: shotProc
     property string file: ""
     onExited: (code) => {
-      hider.visible = false;
       cap.busy = false;
       if (code === 0) cap.announce(shotProc.file);
     }
   }
 
-  PanelWindow {
-    id: hider
-    visible: false
-    color: "transparent"
-    WlrLayershell.layer: WlrLayer.Overlay
-    WlrLayershell.namespace: "picasso-hider"
-    exclusionMode: ExclusionMode.Ignore
-    anchors { top: true; bottom: true; left: true; right: true }
-    MouseArea {
-      anchors.fill: parent
-      hoverEnabled: true
-      cursorShape: Qt.BlankCursor
-    }
-  }
+  // a shell that died with the pointer hidden gives it back when it starts
+  Component.onCompleted: Picasso.showCursor(true)
 
   // Clipboard, and the toast. -w and a default action, the way ceres' update
   // toast does it: howler invokes `default` on a left click and notify-send

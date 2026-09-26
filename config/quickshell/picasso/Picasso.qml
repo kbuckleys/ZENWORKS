@@ -82,6 +82,15 @@ Singleton {
   // folder hyprshot.lua used, found the same way.
   readonly property string shotDir: root.picturesDir + "/Screenshots"
 
+  // THE POINTER, kept out of the picture. Cursors are drawn in software here
+  // (zoom.lua), into the frame itself, so no capture can leave one out —
+  // hyprland is told to stop drawing it for the moment of the capture
+  // instead. Through eval: the lua config refuses `hyprctl keyword`.
+  function cursorCmd(visible) {
+    return "hyprctl -q eval 'hl.config({ cursor = { invisible = " + (visible ? "false" : "true") + " } })'";
+  }
+  function showCursor(visible) { Quickshell.execDetached(["sh", "-c", root.cursorCmd(visible)]); }
+
   function shoot(mode) { root.shotRequested(mode || "region"); }
   function pick() { root.pickRequested(); }
   function annotate(path) { if (path && path !== "") root.annotateRequested(path); }

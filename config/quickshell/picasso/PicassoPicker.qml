@@ -47,7 +47,13 @@ Scope {
   // a hover only arrives on the first MOVE, and until then the loupe had
   // nowhere to be.
   property point startAt: Qt.point(-1, -1)
-  onActiveChanged: if (picker.active) { picker.startAt = Qt.point(-1, -1); cursorProc.running = true; }
+  // The pointer is hidden by hyprland for as long as the picker is up (it is
+  // a blank cursor over the picker anyway), so the frame it copies has no
+  // arrow in it — see Picasso.cursorCmd.
+  onActiveChanged: {
+    Picasso.showCursor(!picker.active);
+    if (picker.active) { picker.startAt = Qt.point(-1, -1); cursorProc.running = true; }
+  }
 
   Process {
     id: cursorProc
@@ -157,9 +163,10 @@ Scope {
       // `reader`.
       // NOT TAKEN AT ONCE. The pointer is drawn into the frame on this
       // machine — a software cursor, so asking the capture to leave it out
-      // (paintCursor) cannot — and it is only hidden once this surface is up
-      // under it. So the capture waits a beat for the pointer to be gone;
-      // taken straight away, the loupe magnified the arrow.
+      // (paintCursor) cannot — and hyprland only stops drawing it once the
+      // picker has asked (onActiveChanged). So the capture waits a beat for
+      // the pointer to be gone; taken straight away, the loupe magnified
+      // the arrow.
       property bool armed: false
       Timer {
         interval: 140
