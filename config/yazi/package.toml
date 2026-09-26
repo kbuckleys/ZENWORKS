@@ -1,0 +1,22 @@
+[[plugin.deps]]
+use = "yazi-rs/plugins:mount"
+rev = "c591a36"
+hash = "b95f898e6dc60b52edbc415952e14395"
+
+[[plugin.deps]]
+use = "yazi-rs/plugins:chmod"
+rev = "c591a36"
+hash = "87472b05a8c420100f6a2b9cde1e7746"
+
+[[plugin.deps]]
+use = "WhoSowSee/whoosh"
+rev = "43f3202"
+hash = "da14dfe482886e756150ae4f5c2bb23"
+
+[[plugin.deps]]
+use = "KKV9/compress"
+rev = "80e5268"
+hash = "868db729374b97871bc30b96d0e9061f"
+
+[flavor]
+deps = []
