@@ -752,6 +752,14 @@ FloatingWindow {
     TapHandler { enabled: !vrow.current; onTapped: win.installCached(vrow.v) }
   }
 
+  // Scrolls a Flickable just enough to show the span [top, top + h) — a
+  // sidebar following its selection.
+  function keepInView(f, top, h) {
+    if (top < f.contentY) f.contentY = Math.max(0, top - 8);
+    else if (top + h > f.contentY + f.height)
+      f.contentY = Math.min(Math.max(0, f.contentHeight - f.height), top + h + 8 - f.height);
+  }
+
   // ── Maintenance ────────────────────────────────────────────────────────
   property var maint: null
   property int msel: 0
@@ -1795,75 +1803,96 @@ FloatingWindow {
           color: Zenon.border
         }
 
-        Column {
+        // Scrolls: the cache and the archive together outgrow a short window.
+        Flickable {
+          id: hdetail
+          ScrollRail {
+            target: hdetail
+            parent: hdetail
+            anchors.right: parent.right
+            anchors.top: parent.top
+            anchors.bottom: parent.bottom
+          }
           anchors.left: hdiv.right
           anchors.right: parent.right
           anchors.top: parent.top
+          anchors.bottom: parent.bottom
           anchors.margins: 16
-          spacing: 8
+          clip: true
+          contentHeight: hdetailCol.implicitHeight
+          boundsBehavior: Flickable.StopAtBounds
           visible: !!win.hevent
+          ElasticScroll { view: hdetail }
+          // a new package starts at its top
+          Connections { target: win; function onHselChanged() { hdetail.contentY = 0; } }
 
-          Text {
-            text: win.hevent ? win.hevent.name : ""
-            color: Zenon.white
-            font.family: Zenon.face
-            font.weight: Font.Bold
-            font.pixelSize: 24
-          }
-          Text {
-            textFormat: Text.StyledText
-            text: !win.hevent ? "" : (win.installedNow !== ""
-              ? "<font color='" + Zenon.muted + "'>installed now</font>  " + Cer.esc(win.installedNow)
-              : "<font color='" + Zenon.muted + "'>not installed</font>")
-            color: Zenon.white
-            font.family: Zenon.face
-            font.pixelSize: 17
-            bottomPadding: 8
-          }
-          Text {
-            text: win.cached.length ? "In the package cache" : "Nothing of it in the package cache"
-            color: Zenon.muted
-            font.family: Zenon.face
-            font.weight: Font.Bold
-            font.pixelSize: 15
-          }
-          // every cached version, the way back and any other
-          Repeater {
-            model: win.cached
-            delegate: VersionRow { required property var modelData; v: modelData }
-          }
-          // and beyond the cache, the archive: the ten newest it has
-          Text {
-            visible: win.archived.length > 0
-            topPadding: 10
-            text: "From the Arch archive"
-            color: Zenon.muted
-            font.family: Zenon.face
-            font.weight: Font.Bold
-            font.pixelSize: 15
-          }
-          Repeater {
-            model: win.archived.slice(0, 10)
-            delegate: VersionRow { required property var modelData; v: modelData }
-          }
-          Text {
-            visible: win.archived.length > 10
-            text: "+ " + (win.archived.length - 10) + " older in the archive"
-            color: Zenon.muted
-            font.family: Zenon.face
-            font.pixelSize: 15
-          }
-          // what going back does not do
-          Text {
-            visible: win.cached.length > 0 || win.archived.length > 0
-            width: parent.width
-            wrapMode: Text.Wrap
-            topPadding: 10
-            text: "A version installed from here stays until the next full upgrade replaces it. "
-              + "To hold it, add the package to IgnorePkg in /etc/pacman.conf."
-            color: Zenon.muted
-            font.family: Zenon.face
-            font.pixelSize: 15
+          Column {
+            id: hdetailCol
+            width: hdetail.width - 14
+            spacing: 8
+
+            Text {
+              text: win.hevent ? win.hevent.name : ""
+              color: Zenon.white
+              font.family: Zenon.face
+              font.weight: Font.Bold
+              font.pixelSize: 24
+            }
+            Text {
+              textFormat: Text.StyledText
+              text: !win.hevent ? "" : (win.installedNow !== ""
+                ? "<font color='" + Zenon.muted + "'>installed now</font>  " + Cer.esc(win.installedNow)
+                : "<font color='" + Zenon.muted + "'>not installed</font>")
+              color: Zenon.white
+              font.family: Zenon.face
+              font.pixelSize: 17
+              bottomPadding: 8
+            }
+            Text {
+              text: win.cached.length ? "In the package cache" : "Nothing of it in the package cache"
+              color: Zenon.muted
+              font.family: Zenon.face
+              font.weight: Font.Bold
+              font.pixelSize: 15
+            }
+            // every cached version, the way back and any other
+            Repeater {
+              model: win.cached
+              delegate: VersionRow { required property var modelData; v: modelData }
+            }
+            // and beyond the cache, the archive: the ten newest it has
+            Text {
+              visible: win.archived.length > 0
+              topPadding: 10
+              text: "From the Arch archive"
+              color: Zenon.muted
+              font.family: Zenon.face
+              font.weight: Font.Bold
+              font.pixelSize: 15
+            }
+            Repeater {
+              model: win.archived.slice(0, 10)
+              delegate: VersionRow { required property var modelData; v: modelData }
+            }
+            Text {
+              visible: win.archived.length > 10
+              text: "+ " + (win.archived.length - 10) + " older in the archive"
+              color: Zenon.muted
+              font.family: Zenon.face
+              font.pixelSize: 15
+            }
+            // what going back does not do
+            Text {
+              visible: win.cached.length > 0 || win.archived.length > 0
+              width: parent.width
+              wrapMode: Text.Wrap
+              topPadding: 10
+              text: "A version installed from here stays until the next full upgrade replaces it. "
+                + "To hold it, add the package to IgnorePkg in /etc/pacman.conf."
+              color: Zenon.muted
+              font.family: Zenon.face
+              font.pixelSize: 15
+            }
           }
         }
       }
@@ -1896,59 +1925,83 @@ FloatingWindow {
             w = Math.max(w, mfTitle.advanceWidth(it.title), mfSum.advanceWidth(win.maintSummary(it.key)));
           return Math.max(180, Math.ceil(w) + 26 + 16);
         }
-        Column {
-          id: maintList
+        // Scrolls when the window is shorter than the list, and follows the
+        // selection there from the keys.
+        Flickable {
+          id: maintSide
+          ScrollRail {
+            target: maintSide
+            parent: maintSide
+            anchors.right: parent.right
+            anchors.top: parent.top
+            anchors.bottom: parent.bottom
+          }
           anchors.left: parent.left
           anchors.top: parent.top
-          anchors.margins: 8
-          width: maintView.sideW
-          spacing: 4
-          Repeater {
-            model: win.maintItems
-            delegate: Rectangle {
-              id: mrow
-              required property var modelData
-              required property int index
-              width: maintList.width
-              height: 56
-              radius: Zenon.windowRadius
-              color: mrow.index === win.msel ? Zenon.headBg : "transparent"
-              border.width: mrow.index === win.msel ? 1 : 0
-              border.color: Zenon.border
-              Rectangle {
-                visible: win.maintWants(mrow.modelData.key)
-                anchors.left: parent.left
-                anchors.leftMargin: 12
-                anchors.verticalCenter: parent.verticalCenter
-                width: 6; height: 6; radius: 3
-                color: Zenon.yellow
-              }
-              Column {
-                anchors.left: parent.left
-                anchors.leftMargin: 26
-                anchors.right: parent.right
-                anchors.rightMargin: 12
-                anchors.verticalCenter: parent.verticalCenter
-                spacing: 2
-                Text {
-                  text: mrow.modelData.title
-                  color: Zenon.white
-                  font.family: Zenon.face
-                  font.weight: Font.Bold
-                  font.pixelSize: 17
+          anchors.bottom: parent.bottom
+          width: maintView.sideW + 16
+          clip: true
+          contentHeight: maintList.implicitHeight + 16
+          boundsBehavior: Flickable.StopAtBounds
+          ElasticScroll { view: maintSide }
+          Connections {
+            target: win
+            function onMselChanged() { win.keepInView(maintSide, 8 + win.msel * 60, 56); }
+          }
+
+          Column {
+            id: maintList
+            x: 8
+            y: 8
+            width: maintView.sideW
+            spacing: 4
+            Repeater {
+              model: win.maintItems
+              delegate: Rectangle {
+                id: mrow
+                required property var modelData
+                required property int index
+                width: maintList.width
+                height: 56
+                radius: Zenon.windowRadius
+                color: mrow.index === win.msel ? Zenon.headBg : "transparent"
+                border.width: mrow.index === win.msel ? 1 : 0
+                border.color: Zenon.border
+                Rectangle {
+                  visible: win.maintWants(mrow.modelData.key)
+                  anchors.left: parent.left
+                  anchors.leftMargin: 12
+                  anchors.verticalCenter: parent.verticalCenter
+                  width: 6; height: 6; radius: 3
+                  color: Zenon.yellow
                 }
-                Text {
-                  // held to the column: the pane beside it is not its to write on
-                  width: parent.width
-                  elide: Text.ElideRight
-                  visible: text !== ""
-                  text: win.maintSummary(mrow.modelData.key)
-                  color: win.maintWants(mrow.modelData.key) ? Zenon.yellow : Zenon.muted
-                  font.family: Zenon.face
-                  font.pixelSize: 15
+                Column {
+                  anchors.left: parent.left
+                  anchors.leftMargin: 26
+                  anchors.right: parent.right
+                  anchors.rightMargin: 12
+                  anchors.verticalCenter: parent.verticalCenter
+                  spacing: 2
+                  Text {
+                    text: mrow.modelData.title
+                    color: Zenon.white
+                    font.family: Zenon.face
+                    font.weight: Font.Bold
+                    font.pixelSize: 17
+                  }
+                  Text {
+                    // held to the column: the pane beside it is not its to write on
+                    width: parent.width
+                    elide: Text.ElideRight
+                    visible: text !== ""
+                    text: win.maintSummary(mrow.modelData.key)
+                    color: win.maintWants(mrow.modelData.key) ? Zenon.yellow : Zenon.muted
+                    font.family: Zenon.face
+                    font.pixelSize: 15
+                  }
                 }
+                TapHandler { onTapped: { win.msel = mrow.index; keys.forceActiveFocus(); } }
               }
-              TapHandler { onTapped: { win.msel = mrow.index; keys.forceActiveFocus(); } }
             }
           }
         }

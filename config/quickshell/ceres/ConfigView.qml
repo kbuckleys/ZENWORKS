@@ -178,57 +178,86 @@ Item {
       w = Math.max(w, fmTitle.advanceWidth(g.title), fmSum.advanceWidth(view.groupSummary(g.id)));
     return Math.max(180, Math.ceil(w) + 26 + 16);
   }
-  Column {
-    id: groupList
+  // Scrolls when the window is shorter than the list, and follows the
+  // selection there from the keys.
+  Flickable {
+    id: side
+    ScrollRail {
+      target: side
+      parent: side
+      anchors.right: parent.right
+      anchors.top: parent.top
+      anchors.bottom: parent.bottom
+    }
     anchors.left: parent.left
     anchors.top: parent.top
-    anchors.margins: 8
-    width: view.sideW
-    spacing: 4
-    Repeater {
-      model: Pac.GROUPS
-      delegate: Rectangle {
-        id: grow
-        required property var modelData
-        required property int index
-        width: groupList.width
-        height: 56
-        radius: Zenon.windowRadius
-        color: grow.index === view.gsel ? Zenon.headBg : "transparent"
-        border.width: grow.index === view.gsel ? 1 : 0
-        border.color: Zenon.border
-        Rectangle {
-          visible: view.groupDirty(grow.modelData.id)
-          anchors.left: parent.left
-          anchors.leftMargin: 12
-          anchors.verticalCenter: parent.verticalCenter
-          width: 6; height: 6; radius: 3
-          color: Zenon.yellow
-        }
-        Column {
-          anchors.left: parent.left
-          anchors.leftMargin: 26
-          anchors.right: parent.right
-          anchors.rightMargin: 12
-          anchors.verticalCenter: parent.verticalCenter
-          spacing: 2
-          Text {
-            text: grow.modelData.title
-            color: Zenon.white
-            font.family: Zenon.face
-            font.weight: Font.Bold
-            font.pixelSize: 17
+    anchors.bottom: parent.bottom
+    width: view.sideW + 16
+    clip: true
+    contentHeight: groupList.implicitHeight + 16
+    boundsBehavior: Flickable.StopAtBounds
+    ElasticScroll { view: side }
+    Connections {
+      target: view
+      function onGselChanged() {
+        const top = 8 + view.gsel * 60, h = 56;
+        if (top < side.contentY) side.contentY = Math.max(0, top - 8);
+        else if (top + h > side.contentY + side.height)
+          side.contentY = Math.min(Math.max(0, side.contentHeight - side.height), top + h + 8 - side.height);
+      }
+    }
+
+    Column {
+      id: groupList
+      x: 8
+      y: 8
+      width: view.sideW
+      spacing: 4
+      Repeater {
+        model: Pac.GROUPS
+        delegate: Rectangle {
+          id: grow
+          required property var modelData
+          required property int index
+          width: groupList.width
+          height: 56
+          radius: Zenon.windowRadius
+          color: grow.index === view.gsel ? Zenon.headBg : "transparent"
+          border.width: grow.index === view.gsel ? 1 : 0
+          border.color: Zenon.border
+          Rectangle {
+            visible: view.groupDirty(grow.modelData.id)
+            anchors.left: parent.left
+            anchors.leftMargin: 12
+            anchors.verticalCenter: parent.verticalCenter
+            width: 6; height: 6; radius: 3
+            color: Zenon.yellow
           }
-          Text {
-            width: parent.width
-            elide: Text.ElideRight
-            text: view.groupSummary(grow.modelData.id)
-            color: Zenon.muted
-            font.family: Zenon.face
-            font.pixelSize: 15
+          Column {
+            anchors.left: parent.left
+            anchors.leftMargin: 26
+            anchors.right: parent.right
+            anchors.rightMargin: 12
+            anchors.verticalCenter: parent.verticalCenter
+            spacing: 2
+            Text {
+              text: grow.modelData.title
+              color: Zenon.white
+              font.family: Zenon.face
+              font.weight: Font.Bold
+              font.pixelSize: 17
+            }
+            Text {
+              width: parent.width
+              elide: Text.ElideRight
+              text: view.groupSummary(grow.modelData.id)
+              color: Zenon.muted
+              font.family: Zenon.face
+              font.pixelSize: 15
+            }
           }
+          TapHandler { onTapped: { view.gsel = grow.index; view.released(); } }
         }
-        TapHandler { onTapped: { view.gsel = grow.index; view.released(); } }
       }
     }
   }
