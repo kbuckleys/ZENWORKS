@@ -711,7 +711,103 @@ FloatingWindow {
       if (root.shown && root.dual && root.otherCwd !== ""
           && root.otherWatching().join("\n") !== root.otherWatchArmed)
         root.watchOther();
+      root.watchShut();
     }
+  }
+
+  // ── AND THE FOLDERS THAT ARE SHUT ─────────────────────────────────────
+  // watchProc covers cwd and the open branches, which is everything whose
+  // ROWS are on screen. One thing on screen is about a folder's inside
+  // without showing it: the chevron, which says whether a shut folder
+  // holds anything. A file landing in an empty shut folder is an event for
+  // that folder and none at all for its parent, so nothing noticed, and
+  // the folder stayed chevron-less until something made terminus look.
+  //
+  // So every shut folder row in the list gets a watch of its own, in a
+  // SEPARATE inotifywait from watchProc:
+  //   - only arrivals and departures, the only events that can change
+  //     whether a folder is empty — not the close_write and attrib churn
+  //   - an event never re-reads a listing; it asks probeEmpty again, and
+  //     at most once a second (shutGate), because a shut .cache or a
+  //     download in progress will fire all day
+  //   - its failure costs nothing but chevrons, which is exactly how it
+  //     was before it existed
+  //
+  // Only in the list, the one view with chevrons, only for the active
+  // half, which is the one probeEmpty asks about, and capped: a results
+  // page can name folders from anywhere.
+  readonly property int shutCap: 2000
+  property string shutArmed: ""
+
+  function shutWatching() {
+    const pane = root.act;
+    if (!root.shown || !pane || !pane.treed) return [];
+    const out = [];
+    const v = pane.view;
+    for (let i = 0; i < v.length && out.length < root.shutCap; ++i)
+      if (v[i].isDir && !pane.isOpen(v[i].path)) out.push(v[i].path);
+    return out;
+  }
+
+  // Re-aimed from watchAim with the other two, and asked when showing,
+  // hiding, switching half or leaving the list — see shutKey.
+  function watchShut() {
+    const dirs = root.shutWatching();
+    const key = dirs.join("\n");
+    if (key === root.shutArmed && (key === "" || shutWatchProc.running)) return;
+    root.shutArmed = key;
+    shutWatchProc.running = false;
+    if (dirs.length === 0) return;
+    // ONE UNWATCHABLE PATH KILLS inotifywait OUTRIGHT, and `/` alone has
+    // two (/root, /lost+found). So the list is sieved first — gone,
+    // unreadable and untraversable folders are dropped — and the shell
+    // then execs into inotifywait, so stopping the Process stops the
+    // watcher rather than orphaning it behind a pipe.
+    shutWatchProc.command = ["sh", "-c",
+      'n=$#; while [ "$n" -gt 0 ]; do d=$1; shift; n=$((n-1)); '
+      + 'if [ -d "$d" ] && [ -r "$d" ] && [ -x "$d" ]; then set -- "$@" "$d"; fi; done; '
+      + '[ "$#" -gt 0 ] || exit 0; '
+      + 'exec inotifywait -m -q -e create -e delete -e moved_to -e moved_from -- "$@"',
+      "sh"].concat(dirs);
+    shutWatchProc.running = true;
+  }
+
+  // Whatever changes WHICH folders there are to watch without the rows
+  // changing — rows changing already goes through watchAim.
+  readonly property string shutKey: (root.shown && root.act && root.act.treed)
+    ? String(root.paneSide) : ""
+  onShutKeyChanged: watchAim.restart()
+
+  Process {
+    id: shutWatchProc
+    stdout: SplitParser {
+      splitMarker: "\n"
+      onRead: (line) => root.shutHit()
+    }
+    // Died — a folder went between the sieve and the watch, most likely.
+    // Forgotten, so the next re-aim starts it again rather than deciding
+    // it is already armed. Not when a re-aim has already started the next
+    // one: that one IS armed, and the old one's exit is only arriving late.
+    onExited: (code) => { if (!shutWatchProc.running) root.shutArmed = ""; }
+  }
+
+  // Leading edge, then no more than once per interval: the first event is
+  // answered straight away, a stream of them once a second.
+  Timer {
+    id: shutGate
+    interval: 1000
+    property bool again: false
+    onTriggered: if (shutGate.again) {
+      shutGate.again = false;
+      emptyDelay.restart();
+      shutGate.start();
+    }
+  }
+
+  function shutHit() {
+    if (shutGate.running) { shutGate.again = true; return; }
+    emptyDelay.restart();
+    shutGate.start();
   }
 
   // ── THE OTHER HALF IS WATCHED TOO ─────────────────────────────────────
@@ -823,6 +919,15 @@ FloatingWindow {
   }
 
   onCwdChanged: {
+    // The ghost trail follows you down and stays when you come back up —
+    // see crumbDeep.
+    {
+      const c = root.cwd;
+      const d = root.crumbDeep;
+      const above = d !== "" && d !== c
+        && d.indexOf(c === "/" ? "/" : c + "/") === 0;
+      if (!above) root.crumbDeep = c;
+    }
     // The anchor is a row INDEX, and the rows are about to be different ones.
     root.endVisual();
     // and a save aimed at a row here is not aimed at anything there
@@ -874,6 +979,7 @@ FloatingWindow {
     if (root.shown) { root.watchBare = false; root.otherWatchBare = false; }
     root.watch();
     root.watchOther();
+    root.watchShut();
     // ── WHAT HAPPENED WHILE NOBODY WAS WATCHING ─────────────────────────
     // The watcher stops when the window hides, and that is exactly when
     // other programs write: you are in the browser when the download lands,
@@ -8413,8 +8519,59 @@ FloatingWindow {
   // path on every repaint.
   // Through archMounts, so inside an archive the crumbs spell the archive's
   // path rather than a hashed one in /run — see Terminus.archiveCrumbs.
-  readonly property var crumbList:
-    Terminus.archiveCrumbs(root.cwd, Paths.home(), root.archMounts)
+  // ── A DRAG OVER THE BREADCRUMBS ─────────────────────────────────────
+  // The step under a drag, or "". Held for springMs it is gone to — but not
+  // the step you are already in, and never one the drag is carrying (the
+  // same rule springCheck keeps for folder rows). Safe mid-drag for the
+  // reason opening a folder on hold is: the drag lives on dragProxy.
+  property string crumbDropPath: ""
+
+  // `arm` is false when the trail moved rather than the pointer — see
+  // crumbDrop.rehover.
+  function crumbHover(path, arm) {
+    // the same step again changes nothing — unless the pointer has now
+    // moved over a step the trail put there, which arms its hold
+    if (path === root.crumbDropPath && (arm !== true || crumbSpring.running)) return;
+    root.crumbDropPath = path;
+    const ok = arm === true && path !== "" && path !== root.cwd
+      && !root.dragPaths.some((p) => path === p || path.indexOf(p + "/") === 0);
+    if (ok) crumbSpring.restart(); else crumbSpring.stop();
+  }
+
+  Timer {
+    id: crumbSpring
+    interval: root.springMs
+    onTriggered: {
+      const dir = root.crumbDropPath;
+      if (dir === "" || dir === root.cwd) return;
+      root.goTo(dir);
+      // the trail is about to be rebuilt under the pointer; the next move
+      // over it says which step is there now
+      root.crumbDropPath = "";
+    }
+  }
+
+  // ── THE WAY BACK DOWN ───────────────────────────────────────────────
+  // The deepest directory on the line you are walking. Going up — a crumb,
+  // `h`, a drag held on a step — leaves it where it was, and the steps
+  // between here and there stay on the trail, dimmed, to be clicked,
+  // dropped on or held on to go back down. Going anywhere OFF that line
+  // (a sibling, a bookmark) starts a new one. The way Nautilus does it.
+  property string crumbDeep: ""
+
+  readonly property var crumbList: {
+    const here = Terminus.archiveCrumbs(root.cwd, Paths.home(), root.archMounts);
+    const deep = root.crumbDeep;
+    if (deep === "" || deep === root.cwd || here.length === 0) return here;
+    const all = Terminus.archiveCrumbs(deep, Paths.home(), root.archMounts);
+    // the two trails have to agree up to here, or the tail is not a way
+    // down from HERE — an archive mount can make them disagree
+    if (all.length <= here.length
+        || String(all[here.length - 1].path) !== String(here[here.length - 1].path))
+      return here;
+    return here.concat(all.slice(here.length).map((c) =>
+      ({ label: c.label, path: c.path, ghost: true })));
+  }
 
   // How many are ticked, without building the list of them. The status line
   // wants a number, and markedRows scans the whole view to produce an array —
@@ -9029,6 +9186,16 @@ FloatingWindow {
     if (code === 0 && root.status !== "") root.status = "";
     root.act.marked = {};
     root.refresh();
+    // ── AND THE BRANCHES, AND WHICH FOLDERS ARE EMPTY ─────────────────
+    // What actProc's exit already does for a command, and a transfer is no
+    // less ours. refresh() re-reads cwd alone, so a copy dropped into a
+    // folder inside an open branch never showed; and a folder that was
+    // empty kept dirEmpty — no chevron — because nothing asked again. The
+    // watcher cannot cover that: a file landing in Documents/test is an
+    // event for test, which is not watched while it is shut, and none at
+    // all for Documents.
+    root.rereadBranches(root.openBranches());
+    emptyDelay.restart();
     // A transfer lands on a collection the same way a command does.
     if (root.searchMode !== "") collSettle.restart();
     // the second pane is very often the destination, and a destination that
@@ -9550,6 +9717,26 @@ FloatingWindow {
       then("");
   }
 
+  // The paths the drag in flight is carrying, so opening on hold can refuse
+  // to go into one of them — see springCheck. Empty when nothing is dragged.
+  property var dragPaths: []
+
+  // Starts a drag of `entry` (or the marked set) from a row or tile. (hx, hy)
+  // is where the pointer sits on the picture.
+  function beginDrag(entry, hx, hy) {
+    root.draggingRow = true;
+    dragProxy.uris = root.dragUris(entry);
+    root.dragPaths = root.dragRows(entry).filter((r) => !!r).map((r) => r.path);
+    dragProxy.Drag.hotSpot = Qt.point(hx, hy);
+    // The picture first, then the drag: Drag.imageSource has to be set
+    // before active goes true, or the platform has already taken the
+    // gesture and started carrying nothing.
+    root.dragPicture(entry, (url) => {
+      dragProxy.Drag.imageSource = url;
+      dragProxy.Drag.active = true;
+    });
+  }
+
   // The rows a drag is actually about: the marked set when there is one, and
   // otherwise the row under the pointer. Exactly the rule dragUris always
   // used — written once now, because the picture and the payload have to
@@ -9589,11 +9776,12 @@ FloatingWindow {
   // would have to know that and would break the day it moves. indexAt wants
   // CONTENT coordinates, which is what contentX/contentY add back.
   function dropDirAt(x, y) {
+    root.dropViaFile = false;
     const other = root.dual && (x < root.activePaneX
                              || x > root.activePaneX + root.activePaneW);
     if (other) {
       return root.dropRowAt(root.otherViewMode === "grid" ? root.gridOf(root.pas.side) : root.listOf(root.pas.side),
-                            root.otherRows, x, y);
+                            root.otherRows, x, y, root.pas);
     }
     // MILLER HAS THREE LISTINGS ON SCREEN and the drop belongs to whichever
     // one the pointer is over. This used to ask `list`, which is not the view
@@ -9620,7 +9808,7 @@ FloatingWindow {
       return "";
     }
     return root.dropRowAt(root.viewMode === "grid" ? root.actGrid : root.actList,
-                          root.view, x, y);
+                          root.view, x, y, root.act);
   }
 
   // ── WHILE A DRAG IS HELD OVER THE LISTING ─────────────────────────────
@@ -9636,32 +9824,32 @@ FloatingWindow {
   //                going while the pointer is still. The wheel cannot do it:
   //                while a drag is in flight the compositor holds the pointer.
   //
-  //   OPEN ON HOLD a drag held over a folder for springMs goes into it — but
-  //                NEVER IN THE PANE THE DRAG CAME FROM. The dragged row is
-  //                the drag's source, and re-listing its pane would destroy
-  //                it mid-drag. So it opens in the other half of a split, or
-  //                anywhere for a drag from another window or application.
+  //   OPEN ON HOLD a drag held over a folder for springMs goes into it, in
+  //                whichever pane it is over — including the one the drag
+  //                came from, which is safe because the drag lives on
+  //                dragProxy and not on a row the re-listing destroys. Never
+  //                into something being dragged: that is a drop dropUris
+  //                refuses anyway. In the LIST a hold only opens the
+  //                folder's branch, never goes in; the branches a drag
+  //                opened are shut when it leaves or lands.
   readonly property int dragEdge: 56
-  readonly property int springMs: 700
+  readonly property int springMs: 1000
 
   property var assistView: null
   property real assistSpeed: 0
   property point assistAt: Qt.point(0, 0)
-  // The half a drag from THIS window began in — read off where it first
-  // entered the listing, which for a row picked up here is the row itself.
-  // -1 until known, and forgotten when the drag ends.
-  property int assistFrom: -1
   property string springDir: ""
   property int springSide: 0
-
-  onDraggingRowChanged: if (!root.draggingRow) root.assistFrom = -1
+  // true when dropDir was read off a FILE inside an open branch rather than
+  // off a folder row — a place to drop, but not something to open on hold:
+  // it is already open, and the next hold would walk into it.
+  property bool dropViaFile: false
+  // The branches this drag opened on hold, as { pane, dir }, so they can be
+  // shut again once it is over — see springShut.
+  property var springOpened: []
 
   function assistSideAt(x) {
     return !root.dual ? root.paneSide : (x >= root.paneX(1) ? 1 : 0);
-  }
-
-  function dragAssistEnter(x, y) {
-    if (root.draggingRow && root.assistFrom < 0) root.assistFrom = root.assistSideAt(x);
   }
 
   // The view under a point in dropHint's space, and the part of it that is
@@ -9713,11 +9901,16 @@ FloatingWindow {
     return Math.max(1750, pitch * 30);
   }
 
-  function dragAssistStop() {
+  function dragAssistStop(hold) {
     root.assistSpeed = 0;
     root.assistView = null;
     springTimer.stop();
     root.springDir = "";
+    root.dropViaFile = false;
+    if (hold === true) {
+      root.springHeld = root.springHeld.concat(root.springOpened);
+      root.springOpened = [];
+    } else root.springShut();
   }
 
   Timer {
@@ -9749,8 +9942,9 @@ FloatingWindow {
 
   function springCheck() {
     const side = root.assistSideAt(root.assistAt.x);
-    const ok = root.dropDir !== ""
-      && (!root.draggingRow || (root.dual && root.assistFrom >= 0 && side !== root.assistFrom));
+    const d = root.dropDir;
+    const ok = d !== "" && !root.dropViaFile
+      && !root.dragPaths.some((p) => d === p || d.indexOf(p + "/") === 0);
     if (!ok) { springTimer.stop(); root.springDir = ""; return; }
     if (root.dropDir === root.springDir && springTimer.running) return;
     root.springDir = root.dropDir;
@@ -9765,10 +9959,64 @@ FloatingWindow {
       const dir = root.springDir;
       if (dir === "" || root.dropDir !== dir) return;
       root.springDir = "";
+      // IN THE LIST A HOLD ONLY EVER OPENS THE BRANCH — it never goes in.
+      // The list already shows a folder's contents in place, so walking
+      // into one is not what you are asking for; there is no second stage.
+      // An open folder, or an empty one with nothing to disclose, stays as
+      // it is, and so does which pane is active.
+      //
+      // The chevron's own path, scroll hold and all, because it is the one
+      // that already keeps the rows under the pointer where they were and
+      // the cursor on its file — see root.scrollHold.
+      const pane = !root.dual || root.springSide === root.paneSide
+        ? root.act : root.pas;
+      if (pane.treed) {
+        if (pane.isOpen(dir) || root.dirEmpty[dir] === true) return;
+        if (root.dual) root.activatePane(root.springSide);
+        root.scrollHold = root.keepScroll();
+        scrollHoldExpiry.restart();
+        pane.setOpen(dir, true);
+        root.springOpened = root.springOpened.concat([{ pane: pane, dir: dir }]);
+        return;
+      }
       if (root.dual) root.activatePane(root.springSide);
       root.goTo(dir);
       root.dropDir = "";
     }
+  }
+
+  // Shuts what the drag opened, the way Finder does, and nothing else: a
+  // branch that was open before the drag stays open. From the DROP AREA's
+  // end of things, not the drag's — a drag from another window or
+  // application ends over there, and this window only sees it leave or
+  // land.
+  //
+  // A DROP HOLDS THEM OPEN instead (springHeld): while the copy-or-move
+  // question is up, and for springGrace after Copy or Move is chosen, so
+  // what landed is seen landing before the branch folds away. A separate
+  // list from springOpened, so a new drag started meanwhile keeps its own
+  // branches and the grace running out does not shut them under it.
+  property var springHeld: []
+
+  Timer {
+    id: springGrace
+    interval: 1000
+    onTriggered: root.springShut(root.springHeld)
+  }
+
+  function springShut(list) {
+    const held = list !== undefined;
+    const opened = held ? list : root.springOpened;
+    if (opened.length === 0) return;
+    if (held) root.springHeld = []; else root.springOpened = [];
+    root.scrollHold = root.keepScroll();
+    scrollHoldExpiry.restart();
+    for (let i = opened.length - 1; i >= 0; --i) {
+      const o = opened[i];
+      if (o.pane.isOpen(o.dir)) o.pane.setOpen(o.dir, false);
+    }
+    // a collapse lands nothing, so nothing else would put the view back
+    if (root.scrollHold) root.settleScroll();
   }
 
   // The row under the pointer in one particular view, or "" for none of it.
@@ -9777,16 +10025,31 @@ FloatingWindow {
   // nested a level deeper than the first pane's, and arithmetic written here
   // would have to know that and would break the day it moves. indexAt wants
   // CONTENT coordinates, which is what contentX/contentY add back.
-  function dropRowAt(v, rows, x, y) {
+  function dropRowAt(v, rows, x, y, pane) {
     if (!v || !v.visible || !rows) return "";
     const p = v.mapFromItem(dropHint, x, y);
     if (p.x < 0 || p.y < 0 || p.x > v.width || p.y > v.height) return "";
     const i = v.indexAt(p.x + v.contentX, p.y + v.contentY);
     if (i < 0 || i >= rows.length) return "";
     const r = rows[i];
-    // only a directory can be dropped INTO; anything else means the folder
-    // it is sitting in, which is what the empty space already means
-    return (r && r.isDir) ? r.path : "";
+    if (!r) return "";
+    if (r.isDir) return r.path;
+    // Anything else means the folder it is sitting in. At the top of the
+    // listing that is the pane's own directory, which is what the empty
+    // space already means — but a file INSIDE AN OPEN BRANCH is sitting in
+    // that branch, and dropping on it has to put things there. Opening a
+    // folder on hold (springTimer) is what makes those rows appear under a
+    // drag; landing the drop in cwd instead would be the wrong place with
+    // the right folder in plain view. Depth, not the path, says which: a
+    // collection's top-level rows live all over the disk.
+    if (pane && pane.treed && pane.depthOf(r.path) > 0) {
+      const owner = Terminus.dirname(r.path);
+      if (owner !== "") {
+        root.dropViaFile = true;
+        return owner;
+      }
+    }
+    return "";
   }
 
   // One curl per URL, through the ordinary action queue so they arrive in the
@@ -9872,6 +10135,8 @@ FloatingWindow {
       root.setPending({ op: op, paths: paths, names: names });
       root.pasteDest = into === root.cwd ? "" : into;
       root.pastePending();
+      // the branches a drag opened stay a moment longer — see springGrace
+      springGrace.restart();
     };
     // ASKED WHERE IT WAS DROPPED, not in the middle of the screen.
     //
@@ -9909,6 +10174,7 @@ FloatingWindow {
     // xdg-activation request from a client is ignored — as it should be, or
     // any program could pull itself in front of what you were doing.
     dropAsk.show(order);
+    return true;
   }
 
   // ── undo ────────────────────────────────────────────────────────────────
@@ -12047,6 +12313,16 @@ FloatingWindow {
           function pinEnd() {
             crumbAnim.stop();
             crumbFlick.contentX = crumbFlick.maxX;
+            // With a way back down on the end, the end is not where you are.
+            // Where you are wins: never scrolled off the left.
+            for (let i = 0; i < crumbTrail.children.length; ++i) {
+              const c = crumbTrail.children[i];
+              if (c.modelData && c.modelData.path === root.cwd) {
+                if (c.x < crumbFlick.contentX)
+                  crumbFlick.contentX = Math.max(0, c.x - 8);
+                break;
+              }
+            }
           }
           // The trail is rebuilt whenever the path changes, so this fires then
           // and not while you are reading it: scrolling back and standing
@@ -12118,6 +12394,7 @@ FloatingWindow {
                 // included, which is why this asks what came BEFORE rather
                 // than counting from the start.
                 visible: index > 0 && root.crumbList[index - 1].path !== "/"
+                opacity: modelData.ghost === true ? 0.45 : 1
                 text: " / "
                 color: Zenon.border
                 font.family: Zenon.face
@@ -12133,11 +12410,33 @@ FloatingWindow {
                 // you READ, and lighting a segment up as the cursor crosses it
                 // makes the whole bar twitch on the way to somewhere else.
                 // They are still clickable — see below.
-                color: index === root.crumbList.length - 1
+                // Where you are is the step whose path IS cwd, not the last
+                // one: past it the trail goes on as the way back down.
+                color: root.crumbDropPath === modelData.path ? Zenon.cyan
+                  : modelData.path === root.cwd
                   ? root.crumbInk : Zenon.muted
+                // the way back down — see crumbDeep. Lit fully while a drag
+                // is over it, so the target reads as a target.
+                opacity: modelData.ghost === true
+                  && root.crumbDropPath !== modelData.path ? 0.45 : 1
                 font.family: Zenon.face
                 font.weight: Font.Medium
                 font.pixelSize: 15
+
+                // the step a drag is over, lit like a folder about to take
+                // one — see crumbDrop. Behind the label, not beside it: in a
+                // Row a sibling would take up room in the trail.
+                Rectangle {
+                  z: -1
+                  anchors.fill: parent
+                  anchors.leftMargin: -4
+                  anchors.rightMargin: -4
+                  anchors.topMargin: -2
+                  anchors.bottomMargin: -2
+                  radius: 4
+                  visible: root.crumbDropPath === modelData.path
+                  color: Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b, 0.12)
+                }
 
                 MouseArea {
                   anchors.fill: parent
@@ -12275,6 +12574,64 @@ FloatingWindow {
             if (notches === 0) { w.accepted = false; return; }
             w.accepted = true;
             crumbFlick.wheelBy(-notches * crumbFlick.chunk);
+          }
+        }
+
+        // ── DROPPED ON A STEP OF THE PATH ─────────────────────────────
+        // A crumb is a directory like any folder row, so a drop on one asks
+        // the same Move / Copy question, and a drag held over one for
+        // springMs goes there (crumbSpring).
+        //
+        // ONE DropArea over the whole trail, not one per crumb, for the
+        // reason dropHint is one over the whole body: going somewhere
+        // rebuilds the trail — every step, see crumbRow — and a DropArea
+        // inside a step would be destroyed with the drag still over it.
+        // This one outlives every path, and asks which step is under the
+        // pointer instead.
+        DropArea {
+          id: crumbDrop
+          anchors.fill: crumbFlick
+          enabled: crumbFlick.visible
+          // The step under a point in this item's space, or "" for none:
+          // a crumb row and its separator both count as that step, the
+          // search chip and the space past the end as nothing.
+          function pathAt(x, y) {
+            const p = crumbTrail.mapFromItem(crumbDrop, x, y);
+            const c = crumbTrail.childAt(p.x, p.y);
+            return (c && c.modelData && c.modelData.path) ? String(c.modelData.path) : "";
+          }
+          // ── THE TRAIL MOVES UNDER A STILL POINTER TOO ──────────────
+          // A window resize, the trail re-pinning to its end, the wheel, or
+          // the trail being rebuilt after a hold went somewhere: the step
+          // under the pointer changes and no drag event says so. So the
+          // last point is kept and asked again — to put the light on the
+          // right step, not to start a hold: only a pointer that actually
+          // moves arms one, or a hold would go up the path a step a second
+          // on its own.
+          property real atX: 0
+          property real atY: 0
+          function rehover() {
+            if (crumbDrop.containsDrag)
+              root.crumbHover(crumbDrop.pathAt(crumbDrop.atX, crumbDrop.atY), false);
+          }
+          Connections {
+            target: crumbFlick
+            function onWidthChanged() { Qt.callLater(crumbDrop.rehover); }
+            function onContentXChanged() { crumbDrop.rehover(); }
+            function onContentWidthChanged() { Qt.callLater(crumbDrop.rehover); }
+          }
+          onPositionChanged: (d) => {
+            crumbDrop.atX = d.x;
+            crumbDrop.atY = d.y;
+            root.crumbHover(crumbDrop.pathAt(d.x, d.y), true);
+          }
+          onExited: root.crumbHover("", false)
+          onDropped: (d) => {
+            const into = crumbDrop.pathAt(d.x, d.y);
+            root.crumbHover("", false);
+            if (into === "") return;
+            root.dropUris(root.urlsFrom(d), d.proposedAction, into,
+                          crumbDrop, d.x, d.y);
           }
         }
 
@@ -14963,18 +15320,38 @@ FloatingWindow {
               : (d.x >= root.paneX(1) ? 1 : 0);
             root.dragAssistMove(d.x, d.y);
           }
-          onEntered: (d) => root.dragAssistEnter(d.x, d.y)
           onExited: { root.dropDir = ""; root.dragAssistStop(); }
+          // A RESIZE MOVES THE ROWS under a pointer that has not moved — a
+          // grid reflows its tiles, a split's halves change width — and no
+          // drag event follows to say what is under it now. Asked again from
+          // the last point the drag reported, a turn later so the views have
+          // laid themselves out. The same re-reading assistTick does when an
+          // edge scroll moves the rows.
+          function reaim() {
+            if (!dropHint.containsDrag) return;
+            const x = root.assistAt.x, y = root.assistAt.y;
+            root.dropDir = root.dropDirAt(x, y);
+            root.dropSide = !root.dual ? 0 : (x >= root.paneX(1) ? 1 : 0);
+            root.springCheck();
+          }
+          onWidthChanged: Qt.callLater(dropHint.reaim)
+          onHeightChanged: Qt.callLater(dropHint.reaim)
 
           onDropped: (d) => {
-            root.dragAssistStop();
+            // The branches the drag opened are NOT shut here: the drop
+            // question is about to ask about a row in one of them, and
+            // folding it away under the menu loses the very thing you are
+            // answering about. Held until the menu is answered — see
+            // springHeld.
+            root.dragAssistStop(true);
             const side = !root.dual ? root.paneSide
               : (d.x >= root.paneX(1) ? 1 : 0);
             const pane = side === root.paneSide ? root.cwd : root.otherCwd;
             const into = root.dropDir !== "" ? root.dropDir : pane;
             root.dropDir = "";
-            root.dropUris(root.urlsFrom(d), d.proposedAction, into,
-                          dropHint, d.x, d.y);
+            if (!root.dropUris(root.urlsFrom(d), d.proposedAction, into,
+                               dropHint, d.x, d.y))
+              root.springShut(root.springHeld);
           }
         }
 
@@ -17477,6 +17854,42 @@ FloatingWindow {
         } else if (event.key === Qt.Key_S) {
           props.computeChecksum();
         }
+      }
+    }
+
+    // ── what a drag out of this window IS ─────────────────────────────
+    // One item for every drag a row or tile starts, rather than an attached
+    // Drag group on each delegate. A delegate dies whenever its listing is
+    // rebuilt, and opening a folder on hold (springTimer) rebuilds the
+    // listing the drag came from — which took the drag, and the only thing
+    // that ever cleared draggingRow, down with it. So opening on hold used to
+    // be refused in the source pane. This lives as long as the window does,
+    // and the rows only say WHEN (their DragHandlers, via root.beginDrag).
+    //
+    // Artemis' shape otherwise, which drags into other applications
+    // successfully: `Drag.source` and `Drag.keys` both set, or startDrag()
+    // returns false with no warning and nothing anywhere accepts the drag.
+    //
+    // CopyAction only, like artemis. A move offered over the wayland data-device
+    // means the source has to delete the file when the target says it took it,
+    // and nothing here implements that half — so offering it would be a
+    // promise terminus cannot keep. Moving between terminus windows is `x` then `p`.
+    Item {
+      id: dragProxy
+      x: -4000
+      width: 1
+      height: 1
+      property string uris: ""
+      Drag.active: false
+      Drag.source: dragProxy
+      Drag.keys: ["text/uri-list"]
+      Drag.mimeData: ({ "text/uri-list": dragProxy.uris })
+      Drag.supportedActions: Qt.CopyAction
+      Drag.dragType: Drag.Automatic
+      Drag.onDragFinished: (dropAction) => {
+        dragProxy.Drag.active = false;
+        root.draggingRow = false;
+        root.dragPaths = [];
       }
     }
 
@@ -25961,23 +26374,9 @@ FloatingWindow {
       && tile.entry.isDir && root.dropDir === tile.entry.path
 
     // ── dragging this tile out ──────────────────────────────────────
-    // The same shape as EntryRow's, and for the same reasons written there:
-    // the attached Drag group belongs on the DELEGATE, and a DragHandler with
-    // no target decides WHEN while the group decides WHAT. The grid had none
-    // of this, so nothing in it could be dragged anywhere at all.
-    Drag.active: false
-    Drag.source: tile
-    Drag.keys: ["text/uri-list"]
-    Drag.mimeData: ({ "text/uri-list": tile.entry ? root.dragUris(tile.entry) : "" })
-    Drag.supportedActions: Qt.CopyAction
-    Drag.dragType: Drag.Automatic
-    Drag.hotSpot.x: tile.width / 2
-    Drag.hotSpot.y: tile.height / 2
-    Drag.onDragFinished: (dropAction) => {
-      tile.Drag.active = false;
-      root.draggingRow = false;
-    }
-
+    // The same shape as EntryRow's: a DragHandler with no target decides
+    // WHEN, and root.beginDrag hands the drag itself to dragProxy, which
+    // outlives the tile — see there.
     DragHandler {
       id: tileDrag
       target: null
@@ -25985,11 +26384,7 @@ FloatingWindow {
                && !root.railHover && !root.railDragging
       onActiveChanged: {
         if (!tileDrag.active) return;
-        root.draggingRow = true;
-        root.dragPicture(tile.entry, (url) => {
-          tile.Drag.imageSource = url;
-          tile.Drag.active = true;
-        });
+        root.beginDrag(tile.entry, tile.width / 2, tile.height / 2);
       }
     }
 
@@ -26793,31 +27188,11 @@ FloatingWindow {
 
 
     // ── dragging this row out ───────────────────────────────────────
-    // Copied from artemis, which drags into other applications successfully;
-    // terminus' own version did not, and the differences were all here.
-    //
-    // The attached Drag group is on the DELEGATE, not on a child Item that
-    // fills it — terminus had it on a child, and a child that merely fills its
-    // parent is not the same thing to Qt's drag machinery. `Drag.source` and
-    // `Drag.keys` were both missing entirely, and startDrag() returned false
-    // with no warning: the drag began and nothing anywhere would accept it.
-    //
-    // CopyAction only, like artemis. A move offered over the wayland data-device
-    // means the source has to delete the file when the target says it took it,
-    // and nothing here implements that half — so offering it would be a
-    // promise terminus cannot keep. Moving between terminus windows is `x` then `p`.
-    Drag.active: false
-    Drag.source: entryRow
-    Drag.keys: ["text/uri-list"]
-    Drag.mimeData: ({ "text/uri-list": entryRow.entry ? root.dragUris(entryRow.entry) : "" })
-    Drag.supportedActions: Qt.CopyAction
-    Drag.dragType: Drag.Automatic
-    Drag.hotSpot.x: 16
-    Drag.hotSpot.y: entryRow.height / 2
-    Drag.onDragFinished: (dropAction) => {
-      entryRow.Drag.active = false;
-      root.draggingRow = false;
-    }
+    // The drag itself is NOT on this row any more — it is on root's
+    // dragProxy, which root.beginDrag (called from rowDrag below) fills in.
+    // A row is a delegate and dies whenever its listing is rebuilt, which
+    // is exactly what opening a folder on hold does to the pane the drag
+    // came from. See dragProxy for the rest.
 
     // Resolved once per delegate. It was inkFor(entry) in two bindings — the
     // glyph's colour and the name's — and a function call in a binding cannot
@@ -27005,7 +27380,7 @@ FloatingWindow {
 
     // The gesture that starts a drag. Artemis' shape: a DragHandler with no
     // target, which sets Drag.active imperatively once it activates — the
-    // handler decides WHEN, the attached group above decides WHAT.
+    // handler decides WHEN, root.dragProxy decides WHAT.
     DragHandler {
       id: rowDrag
       target: null
@@ -27013,14 +27388,7 @@ FloatingWindow {
                && !root.railHover && !root.railDragging
       onActiveChanged: {
         if (!rowDrag.active) return;
-        root.draggingRow = true;
-        // The picture first, then the drag: Drag.imageSource has to be set
-        // before active goes true, or the platform has already taken the
-        // gesture and started carrying nothing.
-        root.dragPicture(entryRow.entry, (url) => {
-          entryRow.Drag.imageSource = url;
-          entryRow.Drag.active = true;
-        });
+        root.beginDrag(entryRow.entry, 16, entryRow.height / 2);
       }
     }
 
@@ -29894,6 +30262,11 @@ FloatingWindow {
 
     function dismiss() {
       dropAsk.open = false;
+      // Abort, Escape or a click away: nothing landed, so the branches the
+      // drag opened go now. A turn later, because a chosen row's act runs
+      // just AFTER this — see dropFlash — and Copy or Move starts
+      // springGrace instead.
+      Qt.callLater(() => { if (!springGrace.running) root.springShut(root.springHeld); });
       // The rows stay until the next show: the card fades out, and emptying
       // them under it would collapse it mid-fade.
       // The listing gets the keyboard back, the way every sheet here ends.
