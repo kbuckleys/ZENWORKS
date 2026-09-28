@@ -22,8 +22,7 @@ DATA="${XDG_DATA_HOME:-$HOME/.local/share}"
 STAMP="$(date +%Y%m%d-%H%M%S)"
 
 CONFIGS=(
-  btop fastfetch hypr kitty nvim quickshell swayimg
-  xdg-desktop-portal xdg-desktop-portal-termfilechooser yazi
+  btop fastfetch hypr kitty nvim quickshell xdg-desktop-portal xdg-desktop-portal-termfilechooser yazi
 )
 DOTFILES=(.zshrc .p10k.zsh)
 
@@ -38,7 +37,7 @@ PACKAGES=(
   # audio & media
   pipewire pipewire-pulse wireplumber libpulse alsa-utils pamixer playerctl
   gst-plugins-good gst-plugins-bad gst-plugins-ugly
-  ffmpeg mpv swayimg imagemagick perl-image-exiftool poppler
+  ffmpeg mpv imagemagick perl-image-exiftool poppler
   # wayland utilities
   wl-clipboard wl-clip-persist cliphist grim slurp wf-recorder wtype libnotify
   # files, archives & mounts
