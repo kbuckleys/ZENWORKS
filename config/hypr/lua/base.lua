@@ -52,7 +52,7 @@ hl.config({
 			inactive_border = "#45505C4D",
 			active_border = "#45505CCC",
 		},
-		gaps_out = 4,
+		gaps_out = 0,
 		gaps_in = -2,
 		snap = {
 			enabled = true,
