@@ -46,7 +46,7 @@ PACKAGES=(
   # terminal & shell
   kitty zsh zoxide neovim git curl btop fastfetch
   # system & packages
-  pacman-contrib expac gawk bandwhich iotop check solaar glib2 gtk3
+  pacman-contrib expac gawk bandwhich iotop check solaar glib2 gtk3 nodejs
   # fonts
   noto-fonts noto-fonts-cjk noto-fonts-extra noto-fonts-emoji
   ttf-jetbrains-mono-nerd ttf-dseg unicode-emoji
