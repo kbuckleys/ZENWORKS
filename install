@@ -22,7 +22,7 @@ DATA="${XDG_DATA_HOME:-$HOME/.local/share}"
 STAMP="$(date +%Y%m%d-%H%M%S)"
 
 CONFIGS=(
-  btop fastfetch hypr kitty nvim quickshell xdg-desktop-portal xdg-desktop-portal-termfilechooser
+  fastfetch hypr kitty nvim quickshell xdg-desktop-portal xdg-desktop-portal-termfilechooser
 )
 DOTFILES=(.zshrc .p10k.zsh)
 
@@ -44,7 +44,7 @@ PACKAGES=(
   fd fzf ripgrep bat jq file attr inotify-tools rsync
   7zip zip unzip unrar libarchive ratarmount fuse3 ntfs-3g udisks2
   # terminal & shell
-  kitty zsh zoxide neovim git curl btop fastfetch
+  kitty zsh zoxide neovim git curl fastfetch
   # system & packages
   pacman-contrib expac gawk bandwhich iotop check solaar glib2 gtk3 nodejs
   # fonts
