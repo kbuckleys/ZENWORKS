@@ -8,10 +8,6 @@ if [[ -r "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh" ]]
   source "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh"
 fi
 
-if [[ -f "/opt/homebrew/bin/brew" ]]; then
-  eval "$(/opt/homebrew/bin/brew shellenv)"
-fi
-
 # Set the directory where zinit and plugins will be stored
 ZINIT_HOME="${XDG_DATA_HOME:-${HOME}/.local/share}/zinit/zinit.git"
 
@@ -46,14 +42,10 @@ ZVM_INSERT_MODE_CURSOR=$ZVM_CURSOR_BLINKING_BEAM
 ZVM_NORMAL_MODE_CURSOR=$ZVM_CURSOR_BLINKING_BLOCK
 
 # Add in snippets
-zinit snippet OMZP::command-not-found
 zinit snippet OMZP::archlinux
 zinit snippet OMZL::git.zsh
-zinit snippet OMZP::kubectl
-zinit snippet OMZP::kubectx
 zinit snippet OMZP::sudo
 zinit snippet OMZP::git
-zinit snippet OMZP::aws
 
 # 1. Load completions system (MUST be before cdreplay)
 autoload -Uz compinit && compinit
