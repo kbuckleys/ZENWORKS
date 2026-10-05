@@ -29,6 +29,8 @@ if pgrep -x wf-recorder >/dev/null; then
   rm -f "$output_dir/.active-recording"
   exit 0
 fi
+# "stop" with nothing recording does nothing — never starts one
+[ "${1}" = stop ] && exit 0
 
 monitor=$(hyprctl monitors -j | jq -r '.[] | select(.focused) | .name' | head -n1)
 [ -n "$monitor" ] || { notify-send "󱠑 No monitor"; exit 1; }
@@ -126,6 +128,10 @@ exit 1
 ]]
 	hl.exec_cmd("bash -c '" .. script:gsub("'", "'\"'\"'") .. "' -- " .. mode)
 end
+
+-- The bar's recording dot stops a recording through this, so it says the
+-- same "Recording Stopped" the binds do: `hyprctl repl 'ZenRecord("stop")'`.
+ZenRecord = record
 
 -- BINDS
 hl.bind("SUPER + R",            function() record("full") end)
