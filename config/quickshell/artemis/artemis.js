@@ -199,35 +199,101 @@ function fitPath(p, avail) {
   return str.slice(0, avail - base.length - 2) + "\u2026/" + base;
 }
 
-function highlightedPreview(text, query) {
-  const terms = (query || "").trim().toLowerCase().split(/\s+/).filter(Boolean);
-  if (terms.length === 0) return Strings.escapeHtml(text);
-  const lower = text.toLowerCase();
-  const ranges = [];
-  for (const q of terms) {
-    let idx = 0;
-    while (true) {
-      const p = lower.indexOf(q, idx);
-      if (p < 0) break;
-      ranges.push([p, p + q.length]);
-      idx = p + q.length;
+// ── WHICH LETTERS FZF MATCHED ────────────────────────────────────────────
+// fzf --filter ranks fuzzily and says nothing about where it matched, and the
+// highlight used to look for each term as a contiguous substring — so `apq`,
+// which fzf finds as ArtemisPopup.qml, lit nothing, and a correct result
+// looked like a wrong one. This answers the same question fzf did, near
+// enough to show: a term that occurs whole is lit whole, otherwise its letters
+// are found in order.
+//
+// FROM THE RIGHT, both times. On a path the filename is what a query is
+// usually aimed at, and fzf's boundary bonuses land there too; scanning from
+// the end and then tightening forward picks the letters in the name over the
+// same letters in a directory three levels up.
+//
+// fzf's extended syntax is read as far as it changes what is lit: `!term`
+// matches nothing to show, `'term` is exact, `^`/`$` anchor, `a|b` is the
+// first alternative that hits. Smart case is ignored — the highlight is
+// case-blind either way.
+function termPositions_(lower, term) {
+  if (term === "" || term.charAt(0) === "!") return [];
+  let t = term;
+  let exact = false, head = false, tail = false;
+  if (t.charAt(0) === "'") { exact = true; t = t.slice(1); }
+  if (t.charAt(0) === "^") { head = true; t = t.slice(1); }
+  if (t.length > 1 && t.charAt(t.length - 1) === "$") { tail = true; t = t.slice(0, -1); }
+  if (t === "") return [];
+  const span = (at) => {
+    const out = [];
+    for (let i = 0; i < t.length; ++i) out.push(at + i);
+    return out;
+  };
+  if (head) return lower.indexOf(t) === 0 ? span(0) : [];
+  if (tail) {
+    const at = lower.length - t.length;
+    return at >= 0 && lower.slice(at) === t ? span(at) : [];
+  }
+  const whole = lower.lastIndexOf(t);
+  if (whole >= 0) return span(whole);
+  if (exact) return [];
+  // rightmost start that still fits the whole term…
+  let j = t.length - 1, start = -1;
+  for (let i = lower.length - 1; i >= 0; --i) {
+    if (lower.charAt(i) === t.charAt(j) && --j < 0) { start = i; break; }
+  }
+  if (start < 0) return [];
+  // …then the earliest letters after it, so the lit run is as tight as it gets
+  const out = [];
+  for (let i = start, k = 0; i < lower.length && k < t.length; ++i)
+    if (lower.charAt(i) === t.charAt(k)) { out.push(i); ++k; }
+  return out;
+}
+
+function matchPositions(text, query) {
+  const lower = String(text).toLowerCase();
+  const terms = String(query || "").trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const lit = {};
+  for (const term of terms) {
+    const alts = term.split("|").filter(Boolean);
+    for (const alt of alts) {
+      const hit = termPositions_(lower, alt);
+      if (hit.length === 0) continue;
+      for (const i of hit) lit[i] = true;
+      break;
     }
   }
-  if (ranges.length === 0) return Strings.escapeHtml(text);
-  ranges.sort((a,b)=> a[0]-b[0]);
-  const merged = [];
-  for (const r of ranges) {
-    if (merged.length === 0 || r[0] > merged[merged.length-1][1]) merged.push(r);
-    else merged[merged.length-1][1] = Math.max(merged[merged.length-1][1], r[1]);
-  }
+  return lit;
+}
+
+// Rich text for one row. `opts` is optional, and plato's picker passes none:
+//   match — the ink of a matched letter (default magenta, Zenon's #c8a4e0)
+//   dim   — if set, the ink of the parent path, so the NAME is what stands
+//           out down the column and the directories recede behind it
+//
+// Runs of the same kind go out as one span, so a 90-character path is a
+// handful of spans rather than ninety.
+function highlightedPreview(text, query, opts) {
+  const s = String(text);
+  const o = opts || {};
+  const match = o.match || "#c8a4e0";
+  const lit = matchPositions(s, query);
+  // where the name starts: after the last slash that is not the trailing one
+  // a directory carries
+  const cut = o.dim ? s.replace(/\/+$/, "").lastIndexOf("/") + 1 : 0;
+  const kind = (i) => lit[i] ? "m" : i < cut ? "d" : "";
   let out = "";
-  let pos = 0;
-  for (const r of merged) {
-    if (r[0] > pos) out += Strings.escapeHtml(text.slice(pos, r[0]));
-    out += "<span style=\"color:#c8a4e0;font-weight:700;\">" + Strings.escapeHtml(text.slice(r[0], r[1])) + "</span>";
-    pos = r[1];
+  let i = 0;
+  while (i < s.length) {
+    const k = kind(i);
+    let e = i + 1;
+    while (e < s.length && kind(e) === k) ++e;
+    const chunk = Strings.escapeHtml(s.slice(i, e));
+    if (k === "m") out += "<span style=\"color:" + match + ";font-weight:700;\">" + chunk + "</span>";
+    else if (k === "d") out += "<span style=\"color:" + o.dim + ";\">" + chunk + "</span>";
+    else out += chunk;
+    i = e;
   }
-  if (pos < text.length) out += Strings.escapeHtml(text.slice(pos));
   return out;
 }
 

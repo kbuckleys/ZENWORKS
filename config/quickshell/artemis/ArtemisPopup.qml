@@ -55,8 +55,46 @@ LayerPopup {
   property string highlightQuery: ""
 
   property var freq: ({})
-  property string flashSrc: ""
-  property int flashSeq: 0
+
+  // What runs on the tail of the row flash — see rowFlash.
+  property var flashAct: null
+
+  // ── RESULTS ARRIVE, THEY DO NOT FLICKER ──────────────────────────────
+  // Every answer bumps arriveSeq, and a row near the top whose path CHANGED
+  // with it rises in (see the delegate's arrive()). A row that is the same
+  // file it was a keystroke ago stays perfectly still, so typing one more
+  // letter that keeps the top of the list does not shimmer the whole panel.
+  // arriveAt fences it to the moment of arrival: rows that come into view
+  // later, by scrolling, are not arriving.
+  property int arriveSeq: 0
+  property double arriveAt: 0
+
+  // The busiest row in the frecency map, so a row's heat pip can say how
+  // hot it is relative to the rest rather than in raw opens.
+  readonly property int freqMax: {
+    let m = 0;
+    for (const k in popup.freq) if (popup.freq[k] > m) m = popup.freq[k];
+    return m;
+  }
+
+  // ── BUSY, BUT ONLY WHEN IT IS WORTH SAYING ───────────────────────────
+  // A search is ~7ms and a walk ~19ms; dots that came up for that long on
+  // every keystroke would be a flicker, not a message. They are shown once
+  // the wait has outlasted busyDelay, which in practice means a cold cache.
+  readonly property bool working: popup.searching || popup.indexing
+  property bool busy: false
+  onWorkingChanged: {
+    if (popup.working) busyDelay.restart()
+    else { busyDelay.stop(); popup.busy = false }
+  }
+  Timer { id: busyDelay; interval: 150; onTriggered: popup.busy = popup.working }
+
+  // NOTHING MATCHED — asked of the query the rows ANSWER (highlightQuery),
+  // not the one being typed, so the mark does not blink on between a
+  // keystroke and its results.
+  readonly property bool showNoMatch:
+    popup.rows.length === 0 && popup.highlightQuery.trim() !== ""
+  readonly property int emptyH: 128
 
   readonly property color bgColor: Zenon.layerBg
   readonly property color msgColor: Zenon.headBg
@@ -132,7 +170,10 @@ LayerPopup {
   readonly property int textColsUsed: 1
   readonly property int textRowsNeeded: Math.min(Math.max(1, Math.ceil(popup.rows.length / popup.textColsUsed)), popup.textRows)
   readonly property real textCellHeight: popup.textCellH
-  readonly property real bodyH: popup.textRowsNeeded * popup.textCellHeight + popup.msgH + (popup.query.length > 0 ? 36 : 0)
+  readonly property int inputH: popup.query.length > 0 ? 36 : 0
+  readonly property real bodyH: (popup.showNoMatch ? popup.emptyH
+      : popup.textRowsNeeded * popup.textCellHeight)
+    + popup.msgH + popup.inputH
 
   TextMetrics {
     id: textMetrics
@@ -298,6 +339,8 @@ LayerPopup {
     // A drag that ends without onDragFinished would otherwise leave this
     // surface permanently input-transparent, i.e. unusable.
     popup.dragging = false
+    rowFlash.cancel()
+    popup.flashAct = null
     popup.collapsing = true
     popup.playClose();
   }
@@ -365,6 +408,8 @@ LayerPopup {
   function setRows(rows) {
     popup.rows = rows
     popup.highlightQuery = popup.query
+    popup.arriveAt = Date.now()
+    popup.arriveSeq++
     popup.clampSel()
   }
 
@@ -409,9 +454,38 @@ LayerPopup {
     popup.saveState()
   }
 
-  function confirm() {
-    if (popup.rows.length === 0) return
-    const row = popup.rows[popup.sel]
+  // ── A ROW LIGHTS UP BEFORE IT ACTS ───────────────────────────────────
+  // terminus' RowFlash, as every sheet in the suite wears it: return used to
+  // collapse the finder on the keystroke, so you never saw which row it took.
+  // The row is captured NOW, not read at the tail — the flash is long enough
+  // for an arrow key to land in, and what was opened is what was chosen.
+  function flashThen(index, act) {
+    // an open already on its way out is not interrupted by another
+    if (rowFlash.running && popup.flashAct) return
+    rowFlash.cancel()
+    popup.flashAct = act
+    rowFlash.fire(index)
+  }
+
+  RowFlash {
+    id: rowFlash
+    onDone: () => {
+      const f = popup.flashAct
+      popup.flashAct = null
+      if (f) f()
+    }
+  }
+
+  // The ROW is held, not its index: a search can land inside the flash and
+  // put a different file at that index.
+  function choose(index) {
+    if (index < 0 || index >= popup.rows.length) return
+    const row = popup.rows[index]
+    popup.flashThen(index, () => popup.confirm(row))
+  }
+
+  function confirm(row) {
+    if (!row) return
     popup.freq = Artemis.bumpFreq(popup.freq, row.path)
     popup.saveState()
     if (row.isDir) {
@@ -591,10 +665,6 @@ LayerPopup {
       anchors.margins: -bg.border.width
       color: popup.bgColor
       radius: Zenon.pillRadius
-      topLeftRadius: Zenon.pillRadius
-      topRightRadius: Zenon.pillRadius
-      bottomLeftRadius: Zenon.pillRadius
-      bottomRightRadius: Zenon.pillRadius
       border.color: Zenon.border
       border.width: 1
 
@@ -623,27 +693,35 @@ LayerPopup {
         Rectangle {
           id: inputBar
           width: parent.width
-          height: searchInput.text.length > 0 ? 36 : 0
+          // Off the same property as bodyH, and on the panel's own clock
+          // (Zenon.slow): the line and the panel grow together, so the list
+          // under them rides down with the edge instead of being shoved a row
+          // and then caught up with.
+          height: popup.inputH
           visible: height > 0.5
           clip: true
           color: "transparent"
-          Behavior on height { NumberAnimation { duration: Zenon.normal; easing.type: Zenon.ease } }
+          Behavior on height { NumberAnimation { duration: Zenon.slow; easing.type: Zenon.ease } }
 
           Row {
             anchors.fill: parent
             anchors.leftMargin: 10
             spacing: 0
+            // fades in as it unfolds, rather than being uncovered by the clip
+            opacity: inputBar.height / 36
+            Behavior on opacity { NumberAnimation { duration: Zenon.fast } }
 
             Text {
               id: promptText
               width: 30
               height: parent.height
-              opacity: popup.searching ? 0.45 : 1
-              Behavior on opacity { NumberAnimation { duration: Zenon.fast } }
-              text: ""
-              visible: searchInput.text.length > 0
-              color: Zenon.magenta
-              font.family: Zenon.face
+              // The lens, or — while alt d narrows to directories — the
+              // folder, in the folders' own blue: the mode is said where you
+              // are looking, not only in the hint strip.
+              text: popup.dirsOnly ? Icons.glyphFor({ name: "", isDir: true }) : "\uf002"
+              color: popup.dirsOnly ? popup.dirColor : Zenon.magenta
+              Behavior on color { ColorAnimation { duration: Zenon.fast } }
+              font.family: popup.dirsOnly ? Zenon.faceMono : Zenon.face
               font.weight: Font.Bold
               font.pixelSize: 18
               verticalAlignment: Text.AlignVCenter
@@ -651,18 +729,19 @@ LayerPopup {
 
             TextInput {
               id: searchInput
-              width: parent.width - promptText.width
+              width: parent.width - promptText.width - busyDots.width - 16
               height: parent.height
               color: Zenon.magenta
               selectionColor: Zenon.magenta
-              selectedTextColor: "#000000"
+              selectedTextColor: Zenon.black
               font.family: Zenon.face
               font.weight: Font.Bold
               font.pixelSize: 18
               verticalAlignment: Text.AlignVCenter
               focus: true
-              cursorVisible: false
-              cursorDelegate: Item {}
+              // the shell's one caret, in the field's own ink — it follows
+              // the arrow keys, where the old pulse was pinned to the end
+              cursorDelegate: Caret { field: searchInput; color: Zenon.magenta }
               clip: true
               Keys.forwardTo: bg
               onTextChanged: {
@@ -673,26 +752,17 @@ LayerPopup {
                 if (popup.query.trim() === "") popup.refresh()
                 else searchDebounce.restart()
               }
-
-              Rectangle {
-                id: pulseCursor
-                anchors.left: parent.left
-                anchors.leftMargin: Math.min(searchInput.contentWidth, searchInput.width - pulseCursor.width)
-                anchors.verticalCenter: searchInput.verticalCenter
-                width: 3
-                height: 20
-                radius: 1
-                color: Zenon.magenta
-                opacity: 0.25
-                visible: searchInput.text.length > 0
-                SequentialAnimation on opacity {
-                  running: searchInput.activeFocus && searchInput.text.length > 0
-                  loops: Animation.Infinite
-                  NumberAnimation { to: 1; duration: 550; easing.type: Easing.InOutSine }
-                  NumberAnimation { to: 0.25; duration: 550; easing.type: Easing.InOutSine }
-                }
-              }
             }
+          }
+
+          // out and not back yet — see popup.busy for why it waits first
+          Working {
+            id: busyDots
+            anchors.right: parent.right
+            anchors.rightMargin: 16
+            anchors.verticalCenter: parent.verticalCenter
+            running: popup.busy && popup.rows.length > 0
+            ink: Zenon.magenta
           }
         }
 
@@ -701,19 +771,34 @@ LayerPopup {
           width: parent.width
           height: parent.height - inputBar.height - msgBar.height
 
-          Text {
-            id: emptyLabel
+          // ── WHEN THERE ARE NO ROWS ─────────────────────────────────────
+          // Three different answers, and a line of grey text was all three.
+          // Nothing matched is terminus' mark — the same lens over the same
+          // word — and the body grows to hold it (see emptyH). Still out is
+          // the shell's dots. Nothing typed and nothing yet opened is the
+          // one place a word is still the right thing.
+          EmptyMark {
             anchors.centerIn: parent
-            // There was no loading state at all: a first open sat on
-            // "No matches found" until the walk came back.
-            text: popup.indexing && popup.rows.length === 0 ? "building index\u2026"
-              : popup.query.trim() === "" ? "type to search"
-              : "No matches found"
+            filtered: true
+            visible: popup.shown && popup.showNoMatch
+          }
+
+          Working {
+            anchors.centerIn: parent
+            running: popup.shown && popup.rows.length === 0 && !popup.showNoMatch
+              && popup.working
+            dot: 6
+          }
+
+          Text {
+            anchors.centerIn: parent
+            text: "type to search"
             color: popup.hintColor
             font.family: Zenon.face
             font.weight: 600
             font.pixelSize: 15
-            visible: popup.shown && popup.rows.length === 0
+            visible: popup.shown && popup.rows.length === 0 && !popup.showNoMatch
+              && !popup.working
           }
 
           GridView {
@@ -741,10 +826,40 @@ LayerPopup {
             cellWidth: fileGrid.width
             cellHeight: popup.textCellHeight
             model: popup.rows
-            highlightMoveDuration: 120
-            // Each row carries a Rectangle, a RichText, a clipped Item, a
-            // 4-stop Gradient, a ParallelAnimation, a Connections and a
-            // MouseArea. Handing the view a fresh array used to destroy and
+            // ── THE CARET, AND NOTHING ELSE ────────────────────────────────
+            // One selection for the whole list, sliding between rows rather
+            // than jumping — a fill per delegate could only ever blink from
+            // one to the next. selBg is the suite's selection ground; the
+            // magenta edge ties it to the field you are typing into.
+            //
+            // A row used to tint under the pointer as well, which said "this
+            // is the one" about a row that was not — the selection is moved
+            // with the keys here and a single click only moves the caret, so a
+            // second highlight following the mouse was a second answer to the
+            // only question this list asks.
+            //
+            // A child of the view lands in its contentItem, so this scrolls
+            // with the rows; z 0 is under the delegates' 1.
+            Rectangle {
+              id: selMark
+              z: 0
+              width: fileGrid.cellWidth
+              height: fileGrid.cellHeight
+              y: Math.floor(popup.sel / popup.textColsUsed) * fileGrid.cellHeight
+              visible: popup.rows.length > 0
+              color: Zenon.selBg
+              Behavior on y { NumberAnimation { duration: Zenon.fast; easing.type: Zenon.ease } }
+              Rectangle {
+                anchors.left: parent.left
+                anchors.verticalCenter: parent.verticalCenter
+                width: 2
+                height: parent.height - 12
+                radius: 1
+                color: popup.dirsOnly ? popup.dirColor : Zenon.magenta
+              }
+            }
+            // Each row carries a RichText, a glyph, a flash, an animation, a
+            // Connections and a MouseArea. Handing the view a fresh array used to destroy and
             // rebuild every one of them on every search — the same trap
             // Tooltip.qml and ZeusPopup.qml both already carry a scar from.
             reuseItems: true
@@ -784,17 +899,6 @@ LayerPopup {
                 if (dropAction === Qt.CopyAction) popup.closePopup()
               }
 
-              // THE CARET, AND NOTHING ELSE. A row used to tint under the
-              // pointer as well, which said "this is the one" about a row
-              // that was not — the selection is moved with the keys here and
-              // a single click only moves the caret, so a second highlight
-              // following the mouse was a second answer to the only question
-              // this list asks.
-              Rectangle {
-                anchors.fill: parent
-                color: row.index === popup.sel ? Zenon.border : "transparent"
-              }
-
               // The same glyph terminus draws for the same file, from the
               // same table — see morpheus/icons.js. A result list over the
               // tree and a listing of the tree are two views of one thing,
@@ -815,87 +919,123 @@ LayerPopup {
                                         isDir: row.modelData.isDir })
               }
 
-              Text {
-                id: rowGlyph
-                anchors.left: parent.left
-                anchors.leftMargin: 16
+              // ── HOW OFTEN YOU OPEN IT ──────────────────────────────────
+              // Before anything is typed the list IS the frecency ranking,
+              // and nothing on it said so — it read as an arbitrary handful.
+              // A pip in the gutter, as bright as the file is hot relative to
+              // the hottest; gone the moment you type, when the order is
+              // fzf's and the count is beside the point.
+              Rectangle {
+                readonly property int hits: popup.freq[row.modelData.path] || 0
+                visible: popup.highlightQuery === "" && hits > 0 && popup.freqMax > 0
+                x: 7
                 anchors.verticalCenter: parent.verticalCenter
-                width: 26
-                horizontalAlignment: Text.AlignHCenter
-                text: row.glyph
-                color: modelData.isDir ? popup.dirColor : popup.fgColor
-                // MONO for the glyph and proportional for the path beside it:
-                // the icons are drawn on a fixed advance, and in the
-                // proportional face they come out at different widths, so the
-                // paths would not line up down the column.
-                font.family: Zenon.faceMono
-                // A touch larger than the path beside it. These are pictures,
-                // not letters: at the text's own size they read as smudges in
-                // the margin rather than as marks you can tell apart at a
-                // glance, which is the whole job.
-                font.pixelSize: 22
+                width: 4
+                height: 4
+                radius: 2
+                color: Zenon.magenta
+                opacity: 0.2 + 0.8 * hits / Math.max(1, popup.freqMax)
               }
 
-              Text {
-                anchors.fill: parent
-                anchors.leftMargin: 16 + 26 + 10
-                anchors.rightMargin: 16
-                text: {
-                  // THE TARGET WIDTH, not the live one. The panel follows the
-                  // pill while it morphs, so measuring against the view would
-                  // re-fit and re-mark-up every row on every frame of the
-                  // animation for an answer only correct at the end of it.
-                  const avail = Math.max(1, Math.floor(
-                    (popup.panelTarget - 32 - 36) / textMetrics.advanceWidth))
-                  return Artemis.highlightedPreview(
-                    Artemis.fitPath(modelData.preview, avail), popup.highlightQuery)
-                }
-                color: modelData.isDir ? popup.dirColor : popup.fgColor
-                textFormat: Text.RichText
-                font.family: Zenon.face
-                font.weight: 600
-                font.pixelSize: 16
-                clip: true
-                // No `elide` here: RichText is measured after the markup is
-                // parsed, so eliding fights the manual fit above and the
-                // manual one always won anyway.
-                wrapMode: Text.NoWrap
-                horizontalAlignment: Text.AlignLeft
-                verticalAlignment: Text.AlignVCenter
-              }
-
+              // The row's face — glyph and path — as one piece, so it can
+              // rise in on arrival without the selection or the flash moving.
               Item {
+                id: face
                 anchors.fill: parent
-                clip: true
-                visible: swoop.opacity > 0
-                Rectangle {
-                  id: swoop
-                  width: parent.width
-                  height: parent.height
-                  opacity: 0
-                  gradient: Gradient {
-                    orientation: Gradient.Horizontal
-                    GradientStop { position: 0.0; color: Qt.rgba(200/255, 164/255, 224/255, 0) }
-                    GradientStop { position: 0.55; color: Qt.rgba(200/255, 164/255, 224/255, 0.55) }
-                    GradientStop { position: 0.78; color: Qt.rgba(223/255, 221/255, 221/255, 0.75) }
-                    GradientStop { position: 1.0; color: Qt.rgba(223/255, 221/255, 221/255, 0) }
-                  }
-                  ParallelAnimation {
-                    id: swoopAnim
-                    NumberAnimation { target: swoop; property: "x"; from: -swoop.width; to: swoop.width; duration: 440; easing.type: Easing.OutCubic }
-                    SequentialAnimation {
-                      NumberAnimation { target: swoop; property: "opacity"; from: 0; to: 1; duration: 90 }
-                      NumberAnimation { target: swoop; property: "opacity"; to: 0; duration: 350; easing.type: Easing.InCubic }
-                    }
-                  }
+                transform: Translate { id: lift }
+
+                Text {
+                  id: rowGlyph
+                  anchors.left: parent.left
+                  anchors.leftMargin: 16
+                  anchors.verticalCenter: parent.verticalCenter
+                  width: 26
+                  horizontalAlignment: Text.AlignHCenter
+                  text: row.glyph
+                  color: modelData.isDir ? popup.dirColor : popup.fgColor
+                  // MONO for the glyph and proportional for the path beside it:
+                  // the icons are drawn on a fixed advance, and in the
+                  // proportional face they come out at different widths, so the
+                  // paths would not line up down the column.
+                  font.family: Zenon.faceMono
+                  // A touch larger than the path beside it. These are pictures,
+                  // not letters: at the text's own size they read as smudges in
+                  // the margin rather than as marks you can tell apart at a
+                  // glance, which is the whole job.
+                  font.pixelSize: 22
                 }
-                Connections {
-                  target: popup
-                  function onFlashSeqChanged() {
-                    if (popup.flashSrc === modelData.path) swoopAnim.restart()
+
+                Text {
+                  anchors.fill: parent
+                  anchors.leftMargin: 16 + 26 + 10
+                  anchors.rightMargin: 16
+                  text: {
+                    // THE TARGET WIDTH, not the live one. The panel follows the
+                    // pill while it morphs, so measuring against the view would
+                    // re-fit and re-mark-up every row on every frame of the
+                    // animation for an answer only correct at the end of it.
+                    const avail = Math.max(1, Math.floor(
+                      (popup.panelTarget - 32 - 36) / textMetrics.advanceWidth))
+                    // the parent path recedes, so the NAME is what reads down
+                  // the column; matched letters are lit in either part
+                  return Artemis.highlightedPreview(
+                      Artemis.fitPath(modelData.preview, avail), popup.highlightQuery,
+                      { match: String(Zenon.magenta), dim: String(popup.hintColor) })
                   }
+                  color: modelData.isDir ? popup.dirColor : popup.fgColor
+                  textFormat: Text.RichText
+                  font.family: Zenon.face
+                  font.weight: 600
+                  font.pixelSize: 16
+                  clip: true
+                  // No `elide` here: RichText is measured after the markup is
+                  // parsed, so eliding fights the manual fit above and the
+                  // manual one always won anyway.
+                  wrapMode: Text.NoWrap
+                  horizontalAlignment: Text.AlignLeft
+                  verticalAlignment: Text.AlignVCenter
                 }
               }
+
+              // ── ARRIVING ───────────────────────────────────────────────
+              // A row near the top that is showing a DIFFERENT file than it
+              // was rises in, staggered down the list. The same file stays
+              // still. Called from the answer (arriveSeq) and from the view
+              // handing this delegate out (created or reused), because which
+              // of those happens first depends on whether the row existed.
+              property string lastPath: ""
+              property int seenSeq: -1
+              function arrive() {
+                const p = String(row.modelData.path || "")
+                const fresh = row.seenSeq !== popup.arriveSeq
+                  && Date.now() - popup.arriveAt < 200
+                  && row.index < 10 && p !== row.lastPath
+                row.seenSeq = popup.arriveSeq
+                row.lastPath = p
+                if (fresh) arriveAnim.restart()
+                else if (!arriveAnim.running) { face.opacity = 1; lift.y = 0 }
+              }
+              Component.onCompleted: row.arrive()
+              GridView.onReused: row.arrive()
+              Connections {
+                target: popup
+                function onArriveSeqChanged() { row.arrive() }
+              }
+              SequentialAnimation {
+                id: arriveAnim
+                PropertyAction { target: face; property: "opacity"; value: 0 }
+                PropertyAction { target: lift; property: "y"; value: 5 }
+                PauseAnimation { duration: row.index * 14 }
+                ParallelAnimation {
+                  NumberAnimation { target: face; property: "opacity"; to: 1
+                                    duration: Zenon.fast; easing.type: Zenon.ease }
+                  NumberAnimation { target: lift; property: "y"; to: 0
+                                    duration: Zenon.fast; easing.type: Zenon.ease }
+                }
+              }
+
+              // lit before it acts — see popup.flashThen
+              FlashOver { flash: rowFlash; index: row.index }
 
               DragHandler {
                 id: rowDrag
@@ -932,7 +1072,7 @@ LayerPopup {
                 onClicked: popup.sel = row.index
                 onDoubleClicked: {
                   popup.sel = row.index
-                  popup.confirm()
+                  popup.choose(row.index)
                 }
               }
             }
@@ -951,35 +1091,11 @@ LayerPopup {
             height: 1
             color: Zenon.border
           }
-          Row {
+          // the suite's hint strip — morpheus/HintRow, as every layer has it
+          HintRow {
             id: hintRow
             anchors.centerIn: parent
-            // Tighter than the old 32, because a chip already draws its own
-            // boundary — the space was doing that job.
-            spacing: 14
-
-            Repeater {
-              model: Artemis.hintText(popup.dirsOnly)
-
-              delegate: Row {
-                id: hintPair
-                required property var modelData
-                spacing: 5
-
-                KeyCap {
-                  anchors.verticalCenter: parent.verticalCenter
-                  label: hintPair.modelData[0]
-                }
-
-                Text {
-                  anchors.verticalCenter: parent.verticalCenter
-                  text: hintPair.modelData[1]
-                  color: popup.hintColor
-                  font.family: Zenon.face
-                  font.pixelSize: 13
-                }
-              }
-            }
+            rows: Artemis.hintText(popup.dirsOnly)
           }
         }
       }
@@ -994,7 +1110,7 @@ LayerPopup {
       }
       Keys.onReturnPressed: (event) => {
         event.accepted = true
-        popup.confirm()
+        popup.choose(popup.sel)
       }
       Keys.onLeftPressed: (event) => { event.accepted = true; popup.moveHoriz(-1) }
       Keys.onRightPressed: (event) => { event.accepted = true; popup.moveHoriz(1) }
@@ -1026,8 +1142,8 @@ LayerPopup {
           if (popup.rows.length > 0) {
             const path = popup.rows[popup.sel].path
             Quickshell.execDetached(["sh", "-c", "printf '%s' " + Strings.shellQuote(path) + " | wl-copy 2>/dev/null"])
-            popup.flashSrc = path
-            popup.flashSeq++
+            // the suite's flash, with nothing on its tail — the copy is done
+            popup.flashThen(popup.sel, null)
           }
         }
       }

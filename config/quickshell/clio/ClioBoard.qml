@@ -59,7 +59,15 @@ Variants {
     color: "transparent"
     exclusionMode: ExclusionMode.Ignore
     anchors { left: true; right: true; top: true; bottom: true }
-    visible: Clio.shown && Clio.count > 0
+    // ROWS, not notes: the last note deleted still has a row while it plays
+    // its exit, and a board put away under it would cut that short. And kept
+    // up while the wall fades out, for the same reason.
+    visible: (Clio.shown || wall.opacity > 0.01) && Clio.rows.count > 0
+
+    // The head's height, and where it meets its note: a pixel INTO it, so
+    // the head's edge and the note's lie on one line, the seam between them.
+    readonly property int headH: 30
+    readonly property int headGap: -1
 
     // Which note has the keyboard, "" for none. Board-local: the notes are
     // shared between screens, the keyboard is not.
@@ -86,10 +94,19 @@ Variants {
       delegate: Region {
         required property string key
         readonly property var n: Clio.noteFor(key)
+        // Nothing for a note on its way out, or for a wall fading away: what
+        // is leaving is drawn, not touched, and the desktop under it is the
+        // desktop again from the moment it was asked for.
+        readonly property bool live: !!n && Clio.shown && !Clio.isLeaving(key)
+        // And the head, which floats off the note while it is edited — over
+        // its top edge, or under its bottom one when the top has no room.
+        readonly property bool headed: live && board.editing === key
+        readonly property real reach: board.headH + board.headGap
+        readonly property bool below: !!n && n.y - board.originY < reach
         x: n ? Math.round(n.x - board.originX) : 0
-        y: n ? Math.round(n.y - board.originY) : 0
-        width: n ? n.w : 0
-        height: n ? n.h : 0
+        y: n ? Math.round(n.y - board.originY - (headed && !below ? reach : 0)) : 0
+        width: live ? n.w : 0
+        height: live ? n.h + (headed ? reach : 0) : 0
       }
     }
 
@@ -178,15 +195,112 @@ Variants {
       }
     }
 
+    // ── SNAPPING ───────────────────────────────────────────────────────
+    // A wall dragged together by hand is a wall a few pixels out everywhere.
+    // So an edge that comes within SNAP of another note's edge — level with
+    // it, or a GAP's width beside it — or of a screen's edge less a gutter,
+    // goes the rest of the way, and a guide is drawn along what it met.
+    //
+    // FROM THE RAW POSITION EVERY TIME. The drags compute where the pointer
+    // alone would put the note, and that is what is snapped, so pulling
+    // past the threshold lets go: nothing is remembered between frames.
+    //
+    // Everything in the layout's global space, as a note's position is; the
+    // guides are drawn only on the board doing the dragging.
+    readonly property int snapReach: 8
+    readonly property int snapGap: 12
+    readonly property int snapGutter: 16
+    property var guides: []
+
+    // A move snaps whichever edge is nearer; a resize only the far ones,
+    // right and bottom, which are the edges the corner moves.
+    function snap(id, x, y, w, h, resizing) {
+      const xs = [], ys = [];          // [target, from, to] along the other axis
+      for (let i = 0; i < Clio.notes.length; i++) {
+        const o = Clio.notes[i];
+        if (o.id === id) continue;
+        const spanY = [Math.min(y, o.y), Math.max(y + h, o.y + o.h)];
+        const spanX = [Math.min(x, o.x), Math.max(x + w, o.x + o.w)];
+        // level with its edges, and a gap clear of them
+        xs.push([o.x, spanY], [o.x + o.w, spanY],
+                [o.x + o.w + board.snapGap, spanY, o.x + o.w],
+                [o.x - board.snapGap, spanY, o.x]);
+        ys.push([o.y, spanX], [o.y + o.h, spanX],
+                [o.y + o.h + board.snapGap, spanX, o.y + o.h],
+                [o.y - board.snapGap, spanX, o.y]);
+      }
+      const ss = Quickshell.screens;
+      for (let i = 0; i < ss.length; i++) {
+        const s = ss[i], g = board.snapGutter;
+        xs.push([s.x + g, [s.y, s.y + s.height]], [s.x + s.width - g, [s.y, s.y + s.height]]);
+        ys.push([s.y + g, [s.x, s.x + s.width]], [s.y + s.height - g, [s.x, s.x + s.width]]);
+      }
+
+      // The nearest target for either of this note's edges along one axis.
+      // A gap target lines up with an edge from the far side, so it is
+      // matched only against the opposite edge of this note.
+      function best(lo, size, targets, onlyFar) {
+        let hit = null;
+        for (let i = 0; i < targets.length; i++) {
+          const t = targets[i], gap = t.length > 2;
+          const edges = onlyFar ? [[lo + size, 1]] : [[lo, 0], [lo + size, 1]];
+          for (let e = 0; e < edges.length; e++) {
+            // a gap past the right of another note meets this note's LEFT
+            if (gap && ((t[0] > t[2]) !== (edges[e][1] === 0))) continue;
+            const d = t[0] - edges[e][0];
+            if (Math.abs(d) <= board.snapReach && (!hit || Math.abs(d) < Math.abs(hit.d)))
+              hit = { d: d, at: gap ? t[2] : t[0], span: t[1] };
+          }
+        }
+        return hit;
+      }
+
+      const hx = best(x, w, xs, resizing), hy = best(y, h, ys, resizing);
+      const out = { x: x, y: y, w: w, h: h };
+      if (hx) { if (resizing) out.w += hx.d; else out.x += hx.d; }
+      if (hy) { if (resizing) out.h += hy.d; else out.y += hy.d; }
+
+      // Drawn where the edges met, across both notes. A gap snap draws the
+      // other note's edge — that is the line this note is keeping clear of.
+      const lines = [];
+      if (hx) lines.push({ x: hx.at, y: Math.min(hx.span[0], out.y),
+                           w: 1, h: Math.max(hx.span[1], out.y + out.h) - Math.min(hx.span[0], out.y) });
+      if (hy) lines.push({ x: Math.min(hy.span[0], out.x), y: hy.at,
+                           w: Math.max(hy.span[1], out.x + out.w) - Math.min(hy.span[0], out.x), h: 1 });
+      board.guides = lines;
+      return out;
+    }
+
     Item {
       id: wall
       anchors.fill: parent
+
+      // PUT AWAY AS A FADE. Hiding the wall used to be the board vanishing;
+      // now the wall goes out and the board follows it (see `visible`).
+      opacity: Clio.shown ? 1 : 0
+      Behavior on opacity {
+        NumberAnimation { duration: Zenon.normal; easing.type: Zenon.ease }
+      }
 
       // above every note, whatever its z has climbed to
       InputShield {
         z: 1e9
         visible: board.menuSlot !== null
         onClicked: board.closeMenu()
+      }
+
+      // The guides, over every note and under the shield.
+      Repeater {
+        model: board.guides
+        delegate: Rectangle {
+          required property var modelData
+          z: 1e8
+          x: Math.round(modelData.x - board.originX)
+          y: Math.round(modelData.y - board.originY)
+          width: Math.max(1, modelData.w)
+          height: Math.max(1, modelData.h)
+          color: Qt.rgba(Zenon.white.r, Zenon.white.g, Zenon.white.b, 0.55)
+        }
       }
 
 
@@ -203,11 +317,31 @@ Variants {
 
           readonly property var note: Clio.noteFor(slot.key)
           readonly property string noteId: slot.key
-          readonly property color hue:
+          // Not readonly, so it can be animated: a note changing colour
+          // passes through the colours between rather than jumping, and the
+          // ground, the edge and the head all follow it, being made of it.
+          property color hue:
             slot.note ? Clio.ink(slot.note.hue) : Zenon.sand
+          Behavior on hue { ColorAnimation { duration: Zenon.normal; easing.type: Zenon.ease } }
           // The body, or the typeface picker standing in for it: choosing a
           // face is still being on the note, so the head stays out.
           readonly property bool active: body.activeFocus || slot.pickFocus
+          readonly property bool leaving: Clio.isLeaving(slot.key)
+          // Being carried, as distinct from being pressed: set by the drags
+          // once the pointer has really moved, so a click does not bob.
+          property bool lifted: false
+          // In the air, one way or the other: what the deep shadow means.
+          readonly property bool raised: slot.active || slot.lifted
+
+          // A deleted note's keyboard is given up before it fades, not left
+          // to be lost when its row goes — a focus that dies with its item
+          // never says so, and the board's grab would stay up holding it.
+          onLeavingChanged: if (slot.leaving && (body.activeFocus || slot.pickFocus)) {
+            body.focus = false;
+            slot.picking = false;
+            board.editing = "";
+            wall.forceActiveFocus();
+          }
 
           // BOUND, not owned. A gesture writes the note on every frame and
           // this follows — which is how the copy of this note on the next
@@ -259,6 +393,12 @@ Variants {
             if (!body.activeFocus && !slot.pickFocus && board.editing === slot.noteId)
               board.editing = "";
           }
+          // Put down: the end of every gesture, released or taken away.
+          function drop() {
+            slot.busy = false;
+            slot.lifted = false;
+            board.guides = [];
+          }
           function closeFaces(face) {
             if (face !== undefined && slot.note) Clio.set(slot.noteId, "face", face);
             slot.picking = false;
@@ -307,13 +447,17 @@ Variants {
 
 
           // ARRIVING. Once, when the note is made — which now happens only
-          // when a note is genuinely made.
-          opacity: 0
-          scale: 0.94
-          Component.onCompleted: {
-            slot.opacity = 1;
-            slot.scale = 1;
-          }
+          // when a note is genuinely made. And LEAVING, the same played
+          // backwards: Clio holds the row until it has (see Clio.leaving).
+          //
+          // Lifted a touch while carried, with the deeper shadow below: the
+          // note is off the wall and in your hand.
+          property bool arrived: false
+          readonly property bool here: slot.arrived && !slot.leaving
+          enabled: !slot.leaving
+          opacity: slot.here ? 1 : 0
+          scale: (slot.here ? 1 : 0.94) * (slot.lifted ? 1.015 : 1)
+          Component.onCompleted: slot.arrived = true
           Behavior on opacity {
             NumberAnimation { duration: Zenon.normal; easing.type: Zenon.ease }
           }
@@ -324,16 +468,33 @@ Variants {
           // The shadow every card on this desktop casts. A sibling of the
           // card and never a child: the card clips, and a card that clips
           // clips its own shadow away.
+          // ── THE SHAPE THE SHADOW FALLS FROM ──────────────────────────
+          // The card, and the head with it while the head is up: one shape,
+          // so one shadow — the head's own fell across the note beneath it.
+          // Grown at the head's pace, so the shadow opens with it.
+          Item {
+            id: hull
+            // not readonly: a readonly property cannot carry a Behavior
+            property real reach: slot.active ? board.headH + board.headGap : 0
+            x: 0
+            width: slot.width
+            y: head.below ? 0 : -hull.reach
+            height: slot.height + hull.reach
+            Behavior on reach {
+              NumberAnimation { duration: Zenon.fast; easing.type: Zenon.ease }
+            }
+          }
+
           MenuShadow {
-            panel: card
+            panel: hull
             cornerRadius: card.radius
-            ink: slot.active ? Zenon.menuShadowInk
+            ink: slot.raised ? Zenon.menuShadowInk
               : Qt.rgba(Zenon.menuShadowInk.r, Zenon.menuShadowInk.g,
                         Zenon.menuShadowInk.b, Zenon.menuShadowInk.a * 0.45)
-            softness: slot.active
+            softness: slot.raised
               ? Zenon.menuShadowBlur : Zenon.menuShadowBlur * 0.45
-            grow: slot.active ? Zenon.menuShadowGrow : 0
-            drop: slot.active
+            grow: slot.raised ? Zenon.menuShadowGrow : 0
+            drop: slot.raised
               ? Zenon.menuShadowDrop : Zenon.menuShadowDrop * 0.4
             Behavior on softness {
               NumberAnimation { duration: Zenon.fast; easing.type: Zenon.ease }
@@ -348,253 +509,24 @@ Variants {
             id: card
             anchors.fill: parent
             radius: 8
-            color: slot.note ? Clio.wash(slot.note.hue) : "transparent"
+            // squared on the side the head joins, while it is there
+            readonly property real joined: slot.active ? 0 : card.radius
+            topLeftRadius: head.below ? card.radius : card.joined
+            topRightRadius: head.below ? card.radius : card.joined
+            bottomLeftRadius: head.below ? card.joined : card.radius
+            bottomRightRadius: head.below ? card.joined : card.radius
+            color: slot.note ? Clio.washOf(slot.hue) : "transparent"
             border.width: 1
             // The note's own colour, not the shared rule: the edge is part of
-            // which note this is.
-            border.color: Qt.rgba(slot.hue.r, slot.hue.g, slot.hue.b, 0.55)
+            // which note this is. Brighter under the pointer, which is the
+            // only thing an idle note says about being something you can
+            // pick up — the edge is already its colour, so it is the edge
+            // that answers.
+            border.color: Qt.rgba(slot.hue.r, slot.hue.g, slot.hue.b,
+              noteHov.hovered && !slot.active ? 0.85 : 0.55)
+            Behavior on border.color { ColorAnimation { duration: Zenon.fast } }
 
             HoverHandler { id: noteHov }
-
-            // ── THE HEAD IS THE HANDLE ───────────────────────────────
-            // The whole note is not draggable, because the whole note but
-            // this strip is a text field — a drag starting in the body is a
-            // selection, and guessing which was meant is how an editor loses
-            // a sentence.
-            Rectangle {
-              id: head
-              anchors.top: parent.top
-              anchors.left: parent.left
-              anchors.right: parent.right
-              height: slot.active ? 32 : 0
-              visible: head.height > 0.5
-              clip: true
-              color: Qt.rgba(slot.hue.r, slot.hue.g, slot.hue.b, 0.22)
-              Behavior on height {
-                NumberAnimation { duration: Zenon.fast; easing.type: Zenon.ease }
-              }
-
-              MouseArea {
-                id: drag
-                anchors.fill: parent
-                property real grabX: 0
-                property real grabY: 0
-
-                onPressed: (m) => {
-                  drag.grabX = m.x;
-                  drag.grabY = m.y;
-                  // Keeps the note active while it is being dragged: the head
-                  // is shown by the body having focus, and a press on the
-                  // head is not a press on the body.
-                  slot.busy = true;
-                  body.forceActiveFocus();
-                  Clio.raise(slot.noteId);
-                }
-                onPositionChanged: (m) => {
-                  if (!drag.pressed) return;
-                  Clio.place(slot.noteId,
-                    slot.note.x + (m.x - drag.grabX),
-                    slot.note.y + (m.y - drag.grabY),
-                    slot.note.w, slot.note.h);
-                }
-                // Recorded on release rather than per frame: the position is
-                // not news until the gesture is over, and a file rewritten
-                // sixty times a second to record one drag is sixty writes
-                // for one fact.
-                onReleased: slot.busy = false
-              }
-
-              // ── WHAT THE HEAD HOLDS ──────────────────────────────
-              // Only while you are on the note. A wall of stickies covered
-              // in buttons is a control panel; the buttons are for when you
-              // have reached for one.
-              readonly property bool armed: slot.active
-
-              // ── WHAT FITS, IN THE ORDER IT IS MISSED LEAST ───────
-              // A note can be dragged down to 180px and the bar cannot: at
-              // full strength it needs about three hundred. So it gives way
-              // instead of piling up — the swatches go first, then the size
-              // stepper, and the close never does. Measured against what the
-              // rows actually want rather than against thresholds written
-              // out here, so changing a glyph cannot put the numbers wrong.
-              readonly property real freeForSwatches:
-                head.width - fmtRow.width - close.width - 34
-              readonly property bool roomForSwatches:
-                head.freeForSwatches >= swatchRow.implicitWidth
-              readonly property bool roomForSize:
-                head.width - close.width - 34 >= fmtRow.implicitWidth
-
-              Row {
-                id: fmtRow
-                anchors.left: parent.left
-                anchors.leftMargin: 6
-                anchors.verticalCenter: parent.verticalCenter
-                spacing: 2
-                opacity: head.armed ? 1 : 0
-                visible: opacity > 0.01
-                Behavior on opacity {
-                  NumberAnimation { duration: Zenon.fast; easing.type: Zenon.ease }
-                }
-
-                // Bold, italic and underline, applied to the SELECTION when
-                // there is one and to the whole note when there is not —
-                // which is what pressing bold with nothing selected means.
-                Repeater {
-                  model: [["\uF032", "b"], ["\uF033", "i"], ["\uF0CD", "u"]]
-
-                  delegate: Rectangle {
-                    id: fmt
-                    required property var modelData
-                    width: 26
-                    height: 22
-                    radius: 4
-                    color: fmtHov.hovered
-                      ? Qt.rgba(1, 1, 1, 0.16) : "transparent"
-
-                    HoverHandler { id: fmtHov }
-
-                    Text {
-                      anchors.centerIn: parent
-                      text: fmt.modelData[0]
-                      color: Zenon.white
-                      font.family: Zenon.face
-                      font.pixelSize: 14
-                    }
-
-                    MouseArea {
-                      anchors.fill: parent
-                      onClicked: card.mark(fmt.modelData[1])
-                    }
-                  }
-                }
-
-                // ── AND HOW BIG IT IS, AND IN WHAT ─────────────────
-                // The face's mark, then down and up either side of it. The
-                // mark is the one control here that is about the TYPE rather
-                // than the size, and pressing it says so: it opens the
-                // typeface list in the note's place. Tinted in the note's hue
-                // while the note is set in something other than the shell's
-                // own face.
-                //
-                // Each end dims when there is nowhere further to go, so the
-                // control says it has run out rather than silently ignoring
-                // you — see Scribe.stepSize, which clamps rather than wraps.
-                Item { width: 5; height: 1; visible: head.roomForSize }
-
-                // MINUS, THE MARK, PLUS — read as a sentence, with the thing
-                // being changed in the middle and the two directions either
-                // side of it. One Repeater rather than a button, a label and
-                // another button: the middle entry is the one with nowhere to
-                // step, which is what makes it the label.
-                Repeater {
-                  model: [["\uF068", -1], ["\uE659", 0], ["\uF067", 1]]
-
-                  delegate: Rectangle {
-                    id: step
-                    required property var modelData
-                    readonly property bool isMark: step.modelData[1] === 0
-                    visible: head.roomForSize
-                    readonly property bool canGo: !step.isMark && slot.note
-                      && Scribe.stepSize(slot.note.size, step.modelData[1])
-                         !== slot.note.size
-                    width: 26
-                    height: 22
-                    radius: 4
-                    color: stepHov.hovered && (step.isMark || step.canGo)
-                      ? Qt.rgba(1, 1, 1, 0.16) : "transparent"
-
-                    HoverHandler { id: stepHov }
-
-                    Text {
-                      anchors.centerIn: parent
-                      text: step.modelData[0]
-                      color: step.isMark && slot.note && slot.note.face
-                        ? slot.hue : Zenon.white
-                      opacity: step.isMark ? 1 : (step.canGo ? 1 : 0.3)
-                      font.family: Zenon.face
-                      font.pixelSize: step.isMark ? 14 : 12
-                    }
-
-                    MouseArea {
-                      anchors.fill: parent
-                      enabled: step.isMark || step.canGo
-                      onClicked: {
-                        if (step.isMark) slot.openFaces();
-                        else Clio.set(slot.noteId, "size",
-                          Scribe.stepSize(slot.note.size, step.modelData[1]));
-                      }
-                    }
-                  }
-                }
-              }
-
-              // The colours, as the note's own hue repeated in every other.
-              Row {
-                id: swatchRow
-                anchors.right: close.left
-                anchors.rightMargin: 14
-                anchors.verticalCenter: parent.verticalCenter
-                spacing: 5
-                opacity: head.armed ? 1 : 0
-                visible: opacity > 0.01 && head.roomForSwatches
-                Behavior on opacity {
-                  NumberAnimation { duration: Zenon.fast; easing.type: Zenon.ease }
-                }
-
-                Repeater {
-                  model: Scribe.HUES
-
-                  delegate: Rectangle {
-                    id: swatch
-                    required property var modelData
-                    width: 13
-                    height: 13
-                    radius: 6.5
-                    color: Clio.ink(swatch.modelData)
-                    // The one it wears is ringed rather than missing from the
-                    // row: a gap would move every other swatch each time you
-                    // changed colour.
-                    border.width: slot.note
-                      && slot.note.hue === swatch.modelData ? 2 : 0
-                    border.color: Zenon.border
-                    opacity: swatchHov.hovered || (slot.note
-                      && slot.note.hue === swatch.modelData) ? 1 : 0.55
-
-                    HoverHandler { id: swatchHov }
-
-                    MouseArea {
-                      anchors.fill: parent
-                      onClicked: Clio.set(slot.noteId, "hue", swatch.modelData)
-                    }
-                  }
-                }
-              }
-
-              Text {
-                id: close
-                anchors.right: parent.right
-                anchors.rightMargin: 8
-                anchors.verticalCenter: parent.verticalCenter
-                text: "\uF00D"
-                // Red for the press, not the hover: passing over it on the way
-                // to a swatch is not a threat to the note.
-                color: closeMa.pressed ? Zenon.red : Zenon.white
-                opacity: head.armed ? 1 : 0
-                visible: opacity > 0.01
-                font.family: Zenon.face
-                font.pixelSize: 15
-                Behavior on opacity {
-                  NumberAnimation { duration: Zenon.fast; easing.type: Zenon.ease }
-                }
-
-                MouseArea {
-                  id: closeMa
-                  anchors.fill: parent
-                  anchors.margins: -4
-                  onClicked: Clio.remove(slot.noteId)
-                }
-              }
-            }
 
             // ── AND THE NOTE ITSELF ──────────────────────────────────
             Flickable {
@@ -604,7 +536,7 @@ Variants {
               // the whole shell — see morpheus/Elastic.qml. Inside the view
               // rather than over it: it pins itself to the viewport.
               ElasticScroll { view: bodyScroll }
-              anchors.top: head.bottom
+              anchors.top: parent.top
               anchors.left: parent.left
               anchors.right: parent.right
               anchors.bottom: parent.bottom
@@ -705,6 +637,35 @@ Variants {
               }
             }
 
+            // ── WHERE THE TEXT RUNS ON ──────────────────────────────
+            // A long note was cut off by a hard edge mid-line. Now the last
+            // few pixels melt into the note's ground, and only while there
+            // is more past them — at the end of the text the edge is clean.
+            // The first edge does the same once the text has been scrolled.
+            Rectangle {
+              visible: bodyScroll.visible && bodyScroll.contentY > 1
+              anchors.top: bodyScroll.top
+              anchors.left: bodyScroll.left
+              anchors.right: bodyScroll.right
+              height: 14
+              gradient: Gradient {
+                GradientStop { position: 0; color: card.color }
+                GradientStop { position: 1; color: Qt.rgba(card.color.r, card.color.g, card.color.b, 0) }
+              }
+            }
+            Rectangle {
+              visible: bodyScroll.visible
+                && bodyScroll.contentY + bodyScroll.height < bodyScroll.contentHeight - 1
+              anchors.bottom: bodyScroll.bottom
+              anchors.left: bodyScroll.left
+              anchors.right: bodyScroll.right
+              height: 22
+              gradient: Gradient {
+                GradientStop { position: 0; color: Qt.rgba(card.color.r, card.color.g, card.color.b, 0) }
+                GradientStop { position: 1; color: card.color }
+              }
+            }
+
             // A SIBLING OF THE FLICKABLE, NEVER A CHILD OF IT. Inside, it
             // becomes part of the scrolling content: it travels up with the
             // text and its anchors resolve against the content item, whose
@@ -725,7 +686,7 @@ Variants {
             Item {
               id: faces
               visible: slot.picking
-              anchors.top: head.bottom
+              anchors.top: parent.top
               anchors.left: parent.left
               anchors.right: parent.right
               anchors.bottom: parent.bottom
@@ -839,7 +800,7 @@ Variants {
             // edit has no ghost, and an empty note that says nothing at all
             // looks broken rather than blank.
             Text {
-              anchors.top: head.bottom
+              anchors.top: parent.top
               anchors.left: parent.left
               anchors.topMargin: 10
               anchors.leftMargin: 10
@@ -881,15 +842,18 @@ Variants {
                     && Math.abs(m.x - grabX) < 5 && Math.abs(m.y - grabY) < 5)
                   return;
                 moved = true;
-                Clio.place(slot.noteId,
+                slot.lifted = true;
+                const s = board.snap(slot.noteId,
                   slot.note.x + (m.x - grabX),
                   slot.note.y + (m.y - grabY),
-                  slot.note.w, slot.note.h);
+                  slot.note.w, slot.note.h, false);
+                Clio.place(slot.noteId, s.x, s.y, s.w, s.h);
               }
               onReleased: {
-                slot.busy = false;
+                slot.drop();
                 if (!moved) body.forceActiveFocus();
               }
+              onCanceled: slot.drop()
             }
 
             // ── THE CORNER YOU PULL ──────────────────────────────────
@@ -926,13 +890,18 @@ Variants {
               onPositionChanged: (m) => {
                 if (!pressed) return;
                 const p = mapToItem(wall, m.x, m.y);
-                Clio.place(slot.noteId, slot.note.x, slot.note.y,
+                const s = board.snap(slot.noteId, slot.note.x, slot.note.y,
                   Scribe.clamp(grabW + (p.x - grabX),
                                Scribe.MIN_W, Scribe.MAX_W),
                   Scribe.clamp(grabH + (p.y - grabY),
-                               Scribe.MIN_H, Scribe.MAX_H));
+                               Scribe.MIN_H, Scribe.MAX_H), true);
+                // clamped again: a snap can carry an edge past the limits
+                Clio.place(slot.noteId, slot.note.x, slot.note.y,
+                  Scribe.clamp(s.w, Scribe.MIN_W, Scribe.MAX_W),
+                  Scribe.clamp(s.h, Scribe.MIN_H, Scribe.MAX_H));
               }
-              onReleased: slot.busy = false
+              onReleased: slot.drop()
+              onCanceled: slot.drop()
 
               Text {
                 anchors.centerIn: parent
@@ -995,6 +964,330 @@ Variants {
               // words — bold then italic is one thought, not two selections.
               if (had) body.select(a, body.selectionEnd);
               body.forceActiveFocus();
+            }
+          }
+
+          // ── THE HEAD IS THE HANDLE ───────────────────────────────
+          // The whole note is not draggable, because the whole note but
+          // this strip is a text field — a drag starting in the body is a
+          // selection, and guessing which was meant is how an editor loses
+          // a sentence.
+          //
+          // GROWN ONTO THE NOTE, NOT INSIDE IT. It used to grow inside the
+          // card from nothing, and the text, anchored under it, dropped its
+          // whole height every time a note was clicked into; keeping its room
+          // instead left every idle note with an empty band across its top.
+          // So it is outside the card, joined to it: on its top edge — or its
+          // bottom one when there is no room above on this screen — with the
+          // card's corners on that side squared while it is there, so the
+          // two read as one shape with a rule across it. One shadow under
+          // both (see `hull`). The board's input region grows to take it in
+          // while the note is being edited (see the Instantiator up top).
+          //
+          // A sibling of the card for the same reason the shadow is: the
+          // card clips.
+          Rectangle {
+            id: head
+            readonly property bool below: !!slot.note
+              && slot.note.y - board.originY < head.height + board.headGap
+            x: 0
+            width: slot.width
+            height: board.headH
+            y: head.below ? slot.height + board.headGap : -head.height - board.headGap
+            radius: card.radius
+            // square where it meets the note
+            topLeftRadius: head.below ? 0 : card.radius
+            topRightRadius: head.below ? 0 : card.radius
+            bottomLeftRadius: head.below ? card.radius : 0
+            bottomRightRadius: head.below ? card.radius : 0
+            clip: true
+            color: Clio.washOf(slot.hue)
+            border.width: 1
+            border.color: Qt.rgba(slot.hue.r, slot.hue.g, slot.hue.b, 0.55)
+            opacity: slot.active ? 1 : 0
+            visible: head.opacity > 0.01
+            Behavior on opacity {
+              NumberAnimation { duration: Zenon.fast; easing.type: Zenon.ease }
+            }
+
+            // the tint the head always wore, over the note's own ground
+            Rectangle {
+              anchors.fill: parent
+              anchors.margins: 1
+              topLeftRadius: Math.max(0, head.topLeftRadius - 1)
+              topRightRadius: Math.max(0, head.topRightRadius - 1)
+              bottomLeftRadius: Math.max(0, head.bottomLeftRadius - 1)
+              bottomRightRadius: Math.max(0, head.bottomRightRadius - 1)
+              color: Qt.rgba(slot.hue.r, slot.hue.g, slot.hue.b, 0.22)
+            }
+
+            MouseArea {
+              id: drag
+              anchors.fill: parent
+              // idle, the whole card is the handle (normal mode, in the card)
+              enabled: slot.active
+              property real grabX: 0
+              property real grabY: 0
+
+              onPressed: (m) => {
+                drag.grabX = m.x;
+                drag.grabY = m.y;
+                // Keeps the note active while it is being dragged: the head
+                // is shown by the body having focus, and a press on the
+                // head is not a press on the body.
+                slot.busy = true;
+                body.forceActiveFocus();
+                Clio.raise(slot.noteId);
+              }
+              onPositionChanged: (m) => {
+                if (!drag.pressed) return;
+                slot.lifted = true;
+                const s = board.snap(slot.noteId,
+                  slot.note.x + (m.x - drag.grabX),
+                  slot.note.y + (m.y - drag.grabY),
+                  slot.note.w, slot.note.h, false);
+                Clio.place(slot.noteId, s.x, s.y, s.w, s.h);
+              }
+              // Recorded on release rather than per frame: the position is
+              // not news until the gesture is over, and a file rewritten
+              // sixty times a second to record one drag is sixty writes
+              // for one fact.
+              onReleased: slot.drop()
+              onCanceled: slot.drop()
+            }
+
+            // ── WHAT THE HEAD HOLDS ──────────────────────────────
+            // Only while you are on the note. A wall of stickies covered
+            // in buttons is a control panel; the buttons are for when you
+            // have reached for one.
+            readonly property bool armed: slot.active
+
+            // ── WHAT FITS, IN THE ORDER IT IS MISSED LEAST ───────
+            // A note can be dragged down to 180px and the bar cannot: at
+            // full strength it needs about three hundred. So it gives way
+            // instead of piling up — the swatches go first, then the size
+            // stepper, and the close never does. Measured against what the
+            // rows actually want rather than against thresholds written
+            // out here, so changing a glyph cannot put the numbers wrong.
+            readonly property real freeForSwatches:
+              head.width - fmtRow.width - close.width - 34
+            readonly property bool roomForSwatches:
+              head.freeForSwatches >= swatchRow.implicitWidth
+            readonly property bool roomForSize:
+              head.width - close.width - 34 >= fmtRow.implicitWidth
+
+            Row {
+              id: fmtRow
+              anchors.left: parent.left
+              anchors.leftMargin: 6
+              anchors.verticalCenter: parent.verticalCenter
+              spacing: 2
+              opacity: head.armed ? 1 : 0
+              visible: opacity > 0.01
+              Behavior on opacity {
+                NumberAnimation { duration: Zenon.fast; easing.type: Zenon.ease }
+              }
+
+              // Bold, italic and underline, applied to the SELECTION when
+              // there is one and to the whole note when there is not —
+              // which is what pressing bold with nothing selected means.
+              Repeater {
+                model: [["\uF032", "b"], ["\uF033", "i"], ["\uF0CD", "u"]]
+
+                delegate: Rectangle {
+                  id: fmt
+                  required property var modelData
+                  width: 26
+                  height: 22
+                  radius: 4
+                  color: fmtHov.hovered
+                    ? Qt.rgba(1, 1, 1, 0.16) : "transparent"
+
+                  HoverHandler { id: fmtHov }
+
+                  Text {
+                    anchors.centerIn: parent
+                    text: fmt.modelData[0]
+                    color: Zenon.white
+                    font.family: Zenon.face
+                    font.pixelSize: 14
+                  }
+
+                  MouseArea {
+                    anchors.fill: parent
+                    onClicked: card.mark(fmt.modelData[1])
+                  }
+                }
+              }
+
+              // ── AND HOW BIG IT IS, AND IN WHAT ─────────────────
+              // The face's mark, then down and up either side of it. The
+              // mark is the one control here that is about the TYPE rather
+              // than the size, and pressing it says so: it opens the
+              // typeface list in the note's place. Tinted in the note's hue
+              // while the note is set in something other than the shell's
+              // own face.
+              //
+              // Each end dims when there is nowhere further to go, so the
+              // control says it has run out rather than silently ignoring
+              // you — see Scribe.stepSize, which clamps rather than wraps.
+              Item { width: 5; height: 1; visible: head.roomForSize }
+
+              // MINUS, THE MARK, PLUS — read as a sentence, with the thing
+              // being changed in the middle and the two directions either
+              // side of it. One Repeater rather than a button, a label and
+              // another button: the middle entry is the one with nowhere to
+              // step, which is what makes it the label.
+              Repeater {
+                model: [["\uF068", -1], ["\uE659", 0], ["\uF067", 1]]
+
+                delegate: Rectangle {
+                  id: step
+                  required property var modelData
+                  readonly property bool isMark: step.modelData[1] === 0
+                  visible: head.roomForSize
+                  readonly property bool canGo: !step.isMark && slot.note
+                    && Scribe.stepSize(slot.note.size, step.modelData[1])
+                       !== slot.note.size
+                  width: 26
+                  height: 22
+                  radius: 4
+                  color: stepHov.hovered && (step.isMark || step.canGo)
+                    ? Qt.rgba(1, 1, 1, 0.16) : "transparent"
+
+                  HoverHandler { id: stepHov }
+
+                  // ── A NUDGE WHEN IT TOOK ───────────────────────────
+                  // The text resizing is the answer, but on a long note
+                  // it can be off the part you are looking at. So the
+                  // button that matches the step pops — ctrl+= and
+                  // ctrl+- included, which reach it from the keyboard.
+                  readonly property int size: slot.note ? slot.note.size : 0
+                  // a value, not a binding: a binding could catch up
+                  // before the handler below had compared against it
+                  property int was: 0
+                  Component.onCompleted: step.was = step.size
+                  onSizeChanged: {
+                    if (!step.isMark && step.was > 0 && step.size > 0
+                        && (step.size > step.was) === (step.modelData[1] > 0))
+                      pop.restart();
+                    step.was = step.size;
+                  }
+
+                  Text {
+                    id: stepGlyph
+                    anchors.centerIn: parent
+                    text: step.modelData[0]
+                    color: step.isMark && slot.note && slot.note.face
+                      ? slot.hue : Zenon.white
+                    opacity: step.isMark ? 1 : (step.canGo ? 1 : 0.3)
+                    font.family: Zenon.face
+                    font.pixelSize: step.isMark ? 14 : 12
+
+                    SequentialAnimation on scale {
+                      id: pop
+                      running: false
+                      NumberAnimation { to: 1.35; duration: Zenon.fast * 0.6; easing.type: Easing.OutCubic }
+                      NumberAnimation { to: 1; duration: Zenon.normal; easing.type: Zenon.ease }
+                    }
+                  }
+
+                  MouseArea {
+                    anchors.fill: parent
+                    enabled: step.isMark || step.canGo
+                    onClicked: {
+                      if (step.isMark) slot.openFaces();
+                      else Clio.set(slot.noteId, "size",
+                        Scribe.stepSize(slot.note.size, step.modelData[1]));
+                    }
+                  }
+                }
+              }
+            }
+
+            // The colours, as the note's own hue repeated in every other.
+            Row {
+              id: swatchRow
+              anchors.right: close.left
+              anchors.rightMargin: 14
+              anchors.verticalCenter: parent.verticalCenter
+              spacing: 7
+              opacity: head.armed ? 1 : 0
+              visible: opacity > 0.01 && head.roomForSwatches
+              Behavior on opacity {
+                NumberAnimation { duration: Zenon.fast; easing.type: Zenon.ease }
+              }
+
+              Repeater {
+                model: Scribe.HUES
+
+                delegate: Rectangle {
+                  id: swatch
+                  required property var modelData
+                  width: 13
+                  height: 13
+                  radius: 6.5
+                  color: Clio.ink(swatch.modelData)
+                  readonly property bool worn: !!slot.note
+                    && slot.note.hue === swatch.modelData
+                  opacity: swatchHov.hovered || swatch.worn ? 1 : 0.55
+                  scale: swatchHov.hovered ? 1.15 : 1
+                  Behavior on scale {
+                    NumberAnimation { duration: Zenon.fast; easing.type: Zenon.ease }
+                  }
+
+                  HoverHandler { id: swatchHov }
+
+                  // The one it wears is ringed rather than missing from the
+                  // row: a gap would move every other swatch each time you
+                  // changed colour. A ring around the dot, not a border
+                  // eating into it — at 13px a border left a speck of the
+                  // colour it was meant to be pointing out.
+                  Rectangle {
+                    anchors.centerIn: parent
+                    width: 19
+                    height: 19
+                    radius: 9.5
+                    color: "transparent"
+                    border.width: 1.5
+                    border.color: Zenon.white
+                    opacity: swatch.worn ? 0.9 : 0
+                    Behavior on opacity {
+                      NumberAnimation { duration: Zenon.fast; easing.type: Zenon.ease }
+                    }
+                  }
+
+                  MouseArea {
+                    anchors.fill: parent
+                    onClicked: Clio.set(slot.noteId, "hue", swatch.modelData)
+                  }
+                }
+              }
+            }
+
+            Text {
+              id: close
+              anchors.right: parent.right
+              anchors.rightMargin: 8
+              anchors.verticalCenter: parent.verticalCenter
+              text: "\uF00D"
+              // Red for the press, not the hover: passing over it on the way
+              // to a swatch is not a threat to the note.
+              color: closeMa.pressed ? Zenon.red : Zenon.white
+              opacity: head.armed ? 1 : 0
+              visible: opacity > 0.01
+              font.family: Zenon.face
+              font.pixelSize: 15
+              Behavior on opacity {
+                NumberAnimation { duration: Zenon.fast; easing.type: Zenon.ease }
+              }
+
+              MouseArea {
+                id: closeMa
+                anchors.fill: parent
+                anchors.margins: -4
+                onClicked: Clio.remove(slot.noteId)
+              }
             }
           }
         }

@@ -63,7 +63,32 @@ Singleton {
 
   function noteFor(id) {
     const i = root.indexOf(id);
-    return i < 0 ? null : root.notes[i];
+    if (i >= 0) return root.notes[i];
+    // a note on its way out is still drawn, as it was, until it has gone
+    const g = root.leaving[id];
+    return g ? g : null;
+  }
+
+  // ── LEAVING ────────────────────────────────────────────────────────────
+  // A note arrived with a fade and a settle, and went in a blink: its row was
+  // removed and its delegate destroyed in the same breath. So a removal is
+  // two steps now. The note leaves `notes` at once — it is gone as far as the
+  // file, the count and every verb here are concerned — but its ROW stays,
+  // with the note as it last was held here, for as long as the board takes
+  // to play the arrival backwards. Then the row goes.
+  property var leaving: ({})
+
+  function isLeaving(id) { return root.leaving[id] !== undefined; }
+
+  Timer {
+    id: departTimer
+    // the board's exit is Zenon.normal; a beat more so it lands first
+    interval: Zenon.normal + 40
+    onTriggered: {
+      for (let i = keyModel.count - 1; i >= 0; i--)
+        if (root.leaving[keyModel.get(i).key] !== undefined) keyModel.remove(i);
+      root.leaving = ({});
+    }
   }
 
   // ── THE PALETTE, BY NAME ───────────────────────────────────────────────
@@ -85,8 +110,10 @@ Singleton {
   // The note's own ground: its hue laid over black, faint enough that white
   // text reads on it. A sticky note is identified by its colour from across
   // the room, not read through it.
-  function wash(hue) {
-    const c = root.ink(hue);
+  function wash(hue) { return root.washOf(root.ink(hue)); }
+  // The same, from a colour already resolved — the board animates the ink
+  // itself when a note changes hue, and washes whatever it has reached.
+  function washOf(c) {
     return Qt.rgba(c.r * 0.35, c.g * 0.35, c.b * 0.35, 0.90);
   }
 
@@ -180,16 +207,22 @@ Singleton {
   }
 
   function remove(id) {
-    const out = [];
-    for (let i = 0; i < root.notes.length; i++)
-      if (root.notes[i].id !== id) out.push(root.notes[i]);
-    root.notes = out;
-    // The one row, not the whole list: every other note keeps its delegate
-    // and everything that delegate was holding.
-    for (let i = 0; i < keyModel.count; i++) {
-      if (keyModel.get(i).key === id) { keyModel.remove(i); break; }
-    }
+    const i = root.indexOf(id);
+    if (i < 0) return;
+    root.depart([root.notes[i]]);
+    root.notes = root.notes.filter((n) => n.id !== id);
     root.save();
+  }
+
+  // Into `leaving`, and the clock started on their rows — see LEAVING. The
+  // one row, not the whole list: every other note keeps its delegate and
+  // everything that delegate was holding.
+  function depart(gone) {
+    const l = ({});
+    for (const k in root.leaving) l[k] = root.leaving[k];
+    for (let i = 0; i < gone.length; i++) l[gone[i].id] = gone[i];
+    root.leaving = l;
+    departTimer.restart();
   }
 
   // ── CHANGING ONE ───────────────────────────────────────────────────────
@@ -249,8 +282,8 @@ Singleton {
   }
 
   function clear() {
+    root.depart(root.notes);
     root.notes = [];
-    keyModel.clear();
     root.save();
   }
 
