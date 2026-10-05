@@ -838,10 +838,16 @@ LayerPopup {
             // second highlight following the mouse was a second answer to the
             // only question this list asks.
             //
-            // A child of the view lands in its contentItem, so this scrolls
-            // with the rows; z 0 is under the delegates' 1.
+            // PARENTED BY HAND. A child declared inside a GridView lands on
+            // the view itself, NOT its contentItem (measured — see the note in
+            // morpheus/ElasticScroll), so the mark sat still in viewport
+            // coordinates while the rows scrolled: once the caret passed the
+            // last visible row it sank out of the bottom and every row after
+            // it went unmarked. In the contentItem it scrolls with the rows;
+            // z 0 is under the delegates' 1.
             Rectangle {
               id: selMark
+              parent: fileGrid.contentItem
               z: 0
               width: fileGrid.cellWidth
               height: fileGrid.cellHeight
