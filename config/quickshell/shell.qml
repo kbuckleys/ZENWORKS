@@ -40,8 +40,9 @@ ShellRoot {
   // keep popups for logic, but UI will be morphed via bar
   // the notification daemon's on-screen half. Not a morph layer: toasts
   // arrive on their own schedule rather than being opened, so they stack
-  // above the pill instead of becoming it.
-  HowlerToasts { statusbar: bar; screen: root.focusedScreen }
+  // above the pill instead of becoming it. Spawns on the focused output and
+  // stays there while anything is showing — see HowlerToasts.followScreen.
+  HowlerToasts { statusbar: bar; followScreen: root.focusedScreen }
   // the wallpaper, on its own background layer per monitor
   PicassoDaemon { }
   // screenshots, the color picker, and the image viewer — which annotation

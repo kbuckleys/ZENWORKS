@@ -28,6 +28,25 @@ PanelWindow {
 
   property var statusbar: null
 
+  // ── WHICH OUTPUT ────────────────────────────────────────────────────
+  // SPAWNS WHERE YOU ARE, THEN STAYS. `followScreen` is the shell's idea of
+  // where the pointer is; the window takes it only while there is nothing on
+  // it. Once a toast or the OSD is showing, the stack is pinned — a card that
+  // hopped monitors after the pointer is a card you never get to click — and
+  // it is let go once the last one has finished fading, not when the model
+  // empties, or the closing fade would play out on the other screen.
+  property var followScreen: null
+  readonly property bool busy: stack.count > 0 || osd.implicitHeight > 0.5
+  function refollow() {
+    if (!toasts.busy && !settle.running && toasts.followScreen
+        && toasts.screen !== toasts.followScreen)
+      toasts.screen = toasts.followScreen;
+  }
+  onFollowScreenChanged: toasts.refollow()
+  onBusyChanged: if (!toasts.busy) settle.restart()
+  Timer { id: settle; interval: Howler.closeMs + 50; onTriggered: toasts.refollow() }
+  Component.onCompleted: toasts.refollow()
+
   color: "transparent"
   focusable: false
   exclusionMode: ExclusionMode.Ignore
