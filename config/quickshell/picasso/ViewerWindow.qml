@@ -3,11 +3,11 @@
 // └─┘└─┘┘└┘└┴┘└─┘┴└─┴ ┴└─┘
 // https://github.com/kbuckleys/
 //
-// THE VIEWER'S WINDOW. One picture large, the rest of its folder in a strip
-// underneath; or the whole folder as a gallery. Three modes:
+// THE VIEWER'S WINDOW. One picture large, the rest of its directory in a strip
+// underneath; or the whole directory as a gallery. Three modes:
 //
 //   view       the picture, zoomed and panned; the strip; the edit panel
-//   gallery    every picture in the folder as a grid
+//   gallery    every picture in the directory as a grid
 //   annotate   Annotator, over the whole window — marks drawn on the picture
 //
 // NOTHING OF ITS OWN WHERE PICASSO ALREADY HAS IT. The edit is a picasso.js
@@ -15,7 +15,7 @@
 // wallpaper wears, set with the same LookEditor — plus a turn, a mirror and
 // a crop. Saving grabs a Scene at the picture's own size, so the file is
 // what the preview showed. "Set as background" is the picker's own card,
-// opened on this picture with the edit staged. The folder listing, the image
+// opened on this picture with the edit staged. The directory listing, the image
 // test, the sort, the trash and the formatting are terminus.js'; the
 // thumbnails are morpheus/thumbs.js' shared pool.
 //
@@ -44,7 +44,7 @@
 //   f fullscreen — the picture alone on black, no bars; f or esc back
 //   ctrl held: the loupe — the part under the pointer, closer (ctrl+wheel)
 //   W the monitors' outlines — what each would show of it as a background
-//   ' places — the pictures folders, terminus' bookmarks, the ones of late
+//   ' places — the pictures directories, terminus' bookmarks, the ones of late
 //   a video plays: p pauses, , . five seconds back and on, m mutes
 //   o show in terminus   d (or delete) to the trash, u brings it back
 //   D (or shift+delete) deletes for good — it asks first, and there is no undo
@@ -56,11 +56,11 @@
 // The gallery: space or x marks (ctrl+click, shift+click, ctrl+a too, or a
 // box dragged out from anywhere off the thumbnails, as terminus' is) and
 // right click is the picture's menu — or the marked pictures', or the
-// folder's. Delete, F2, t, * and ctrl+c act on the marked pictures when
+// directory's. Delete, F2, t, * and ctrl+c act on the marked pictures when
 // there are any. Pictures drag out of the gallery, and up out of the strip,
 // as files.
 //
-// The folder is watched (terminus' watch): a picture landing in it, renamed
+// The directory is watched (terminus' watch): a picture landing in it, renamed
 // or deleted elsewhere, is in the listing without asking.
 //
 // The gallery can be in the order the pictures were TAKEN (the camera's
@@ -97,7 +97,7 @@ FloatingWindow {
   property var mgr: null
   property var fileManager: null
   // An annotation window on its own — opened from a screenshot's toast or a
-  // file manager's Annotate: the one picture, no folder, and closed when the
+  // file manager's Annotate: the one picture, no directory, and closed when the
   // marks are done. See PicassoViewer.open.
   property bool solo: false
 
@@ -110,22 +110,22 @@ FloatingWindow {
 
   // ── what is shown ──────────────────────────────────────────────────────
   // Rows are terminus.js listing rows: { name, path, size, mtime, … }.
-  // `allRows` is the folder; `rows` is what the filter leaves of it — and
+  // `allRows` is the directory; `rows` is what the filter leaves of it — and
   // everything else (stepping, the strip, the gallery) is about `rows`.
   property var allRows: []
   property var rows: []
   property int index: -1
-  // The folders beside the pictures, for the gallery — led by the way up.
-  // ~/Pictures on its own holds nothing BUT folders (Screenshots,
+  // The directories beside the pictures, for the gallery — led by the way up.
+  // ~/Pictures on its own holds nothing BUT directories (Screenshots,
   // Wallpapers), and a gallery that could not go into them would open on
-  // an empty page. Not in a gallery of picked files: those have no folder.
-  property var folders: []
+  // an empty page. Not in a gallery of picked files: those have no directory.
+  property var directories: []
   // Laid out for the grid (viewer.js galleryLayout): a section — a date, a
   // burst, a group of alike pictures — starts a fresh line, padded to it
   // with empty cells, its heading a chip on its first picture. A folded
   // burst shows only its first.
   readonly property int gcols: Math.max(1, Math.round(grid.width / 190))
-  readonly property var layout: V.galleryLayout(win.folders, win.rows, win.gcols, win.sectionAt, win.hiddenRows)
+  readonly property var layout: V.galleryLayout(win.directories, win.rows, win.gcols, win.sectionAt, win.hiddenRows)
   readonly property var galleryItems: win.layout.items
   readonly property var rowIndex: {
     const o = {};
@@ -157,7 +157,7 @@ FloatingWindow {
     const at = win.itemOfPath(win.path);
     if (at >= 0 && at !== win.gidx) win.gidx = at;
   }
-  // the gallery's cursor, over folders and pictures both; on a picture it
+  // the gallery's cursor, over directories and pictures both; on a picture it
   // is the picture shown
   property int gidx: 0
   property string dir: ""
@@ -383,11 +383,11 @@ FloatingWindow {
   function say(t, ms) { win.note = t; noteClear.interval = ms || 3000; noteClear.restart(); }
 
   // ── loading ───────────────────────────────────────────────────────────
-  // One path: its folder, opened at it (or a folder, opened at its first
+  // One path: its directory, opened at it (or a directory, opened at its first
   // picture). Several: just those, in the order given.
   function load(list, mode) {
     win.leave(() => {
-      win.forgetFolder();
+      win.forgetDirectory();
       win.picked = list.length > 1 || win.solo ? list.slice() : [];
       win.want = list[0];
       win.startMode = mode || "view";
@@ -401,9 +401,9 @@ FloatingWindow {
 
   // ── back and forward, as terminus has them ──────────────────────────
   // The top bar's back arrow, and mouse 4 / mouse 5. Back from a picture is
-  // its gallery; back in a gallery is the folder you were in before — or,
+  // its gallery; back in a gallery is the directory you were in before — or,
   // with none, the one above. Forward retraces it, a picture included.
-  // `history` holds folders left; `ahead` holds { dir } or { view: path }.
+  // `history` holds directories left; `ahead` holds { dir } or { view: path }.
   property var history: []
   property var ahead: []
   readonly property string upDir: win.picked.length === 0 && win.dir !== "" && win.dir !== "/"
@@ -411,7 +411,7 @@ FloatingWindow {
   readonly property bool canBack: win.mode === "map"
     || (win.mode === "view" ? !win.solo && win.galleryItems.length > 0
         : win.mode === "gallery" && (win.history.length > 0 || win.upDir !== ""))
-  function goUp() { if (win.upDir !== "") win.openFolder(win.upDir); }
+  function goUp() { if (win.upDir !== "") win.openDirectory(win.upDir); }
   function navBack() {
     if (win.mode === "map") { win.mode = win.mapFrom !== "" ? win.mapFrom : "gallery"; return; }
     if (win.mode === "view") {
@@ -426,7 +426,7 @@ FloatingWindow {
     if (to === "") return;
     if (h.length > 0) win.history = h.slice(0, -1);
     if (win.dir !== "") win.ahead = win.ahead.concat([{ dir: win.dir }]);
-    win.openFolder(to, true);
+    win.openDirectory(to, true);
   }
   function navForward() {
     const a = win.ahead;
@@ -443,18 +443,18 @@ FloatingWindow {
     if (win.mode !== "gallery") return;
     win.ahead = a.slice(0, -1);
     if (win.dir !== "") win.history = win.history.concat([win.dir]);
-    win.openFolder(e.dir, true);
+    win.openDirectory(e.dir, true);
   }
 
-  // Into a folder, from the gallery — or up out of one, landing on it.
-  function openFolder(path, keepHistory) {
+  // Into a directory, from the gallery — or up out of one, landing on it.
+  function openDirectory(path, keepHistory) {
     // a step of your own starts a new way forward, as a browser's does
     if (!keepHistory) {
       if (win.picked.length === 0 && win.dir !== "") win.history = win.history.concat([win.dir]);
       win.ahead = [];
     }
     win.leave(() => {
-      win.forgetFolder();
+      win.forgetDirectory();
       win.cameFrom = win.dir;
       win.picked = [];
       win.want = path;
@@ -462,12 +462,12 @@ FloatingWindow {
       win.list();
     });
   }
-  // What the gallery's cursor is on, acted on: a folder is gone into, a
+  // What the gallery's cursor is on, acted on: a directory is gone into, a
   // picture is looked at.
   function galleryOpen(i) {
     const it = win.galleryItems[i];
     if (!it || it.isFill) return;
-    if (it.isDir) { win.openFolder(it.path); return; }
+    if (it.isDir) { win.openDirectory(it.path); return; }
     const ri = win.rowOfItem(i);
     // a folded burst opens out first; its pictures are then each a cell
     const b = win.burstAt[ri];
@@ -663,9 +663,9 @@ FloatingWindow {
     win.say(Object.keys(next).length + " marked  \u00b7  delete sends them to the trash, u brings them back", 8000);
   }
 
-  // What belonged to the folder being left: its marks, its filter, the
+  // What belonged to the directory being left: its marks, its filter, the
   // picture it was being compared with.
-  function forgetFolder() {
+  function forgetDirectory() {
     win.marks = ({});
     win.filterText = "";
     win.filterOpen = false;
@@ -678,7 +678,7 @@ FloatingWindow {
     win.listArgs();
     listProc.running = true;
   }
-  // The same listing again, quietly — the folder changed under the window
+  // The same listing again, quietly — the directory changed under the window
   // (see the watch). The picture shown stays shown, and nothing is reset.
   function refresh() {
     if (win.want === "" || listProc.running) { win.refreshAgain = listProc.running; return; }
@@ -692,9 +692,9 @@ FloatingWindow {
       listProc.dirOf = "";
       listProc.command = Terminus.statArgv(win.picked);
     } else {
-      // A picture opens its folder; anything else asked for is taken to BE
-      // the folder — the launcher only ever hands over pictures, and a
-      // folder is what `picasso-view ~/Pictures` means.
+      // A picture opens its directory; anything else asked for is taken to BE
+      // the directory — the launcher only ever hands over pictures, and a
+      // directory is what `picasso-view ~/Pictures` means.
       const b = Terminus.basename(win.want);
       const d = Terminus.isImage(b) || Terminus.isVideo(b) ? Terminus.dirname(win.want) : win.want;
       listProc.dirOf = d;
@@ -728,31 +728,31 @@ FloatingWindow {
         win.allRows = rows;
         win.readTags();
         if (win.wantsTimes) win.needMeta(() => win.resort());
-        // a refresh: the same folder, read again — only what changed moves
+        // a refresh: the same directory, read again — only what changed moves
         if (listProc.refresh) {
           listProc.refresh = false;
-          if (win.sigOf(dirs) !== win.sigOf(win.folders)) win.folders = dirs;
+          if (win.sigOf(dirs) !== win.sigOf(win.directories)) win.directories = dirs;
           win.setRows(win.filtered(rows));
           return;
         }
-        win.folders = dirs;
+        win.directories = dirs;
         win.dir = d !== "" ? d : (rows.length > 0 ? Terminus.dirname(rows[0].path) : "");
         rows = win.filtered(rows);
         win.rows = rows;
         const at = V.indexOfPath(rows, win.want);
         win.go(at >= 0 ? at : 0, true);
-        // A folder asked for opens as the gallery — so does one with no
-        // pictures of its own, which has only its folders to show.
-        const folderAsked = at < 0 && win.want === d;
+        // A directory asked for opens as the gallery — so does one with no
+        // pictures of its own, which has only its directories to show.
+        const directoryAsked = at < 0 && win.want === d;
         // "show": a slideshow of what was asked for — the menus' Slideshow
-        // of these, of this folder
+        // of these, of this directory
         const show = win.startMode === "show" && rows.length > 0;
         win.mode = show ? "view"
           : rows.length > 0 && win.startMode === "annotate" ? "annotate"
-          : (win.startMode === "gallery" || folderAsked || rows.length === 0) ? "gallery"
+          : (win.startMode === "gallery" || directoryAsked || rows.length === 0) ? "gallery"
           : (win.mode === "annotate" ? "view" : win.mode);
         if (show) win.playing = true;
-        // the gallery's cursor: on the folder just come up out of, or on
+        // the gallery's cursor: on the directory just come up out of, or on
         // the picture being shown
         const came = V.indexOfPath(dirs, win.cameFrom);
         const atPic = win.itemOfPath(win.path);
@@ -902,7 +902,7 @@ FloatingWindow {
 
   // ── thumbnails, from the shared pool ──────────────────────────────────
   // Asked for by the tiles that are actually made — the strip and the grid
-  // only build what is near the view — and batched, so scrolling a folder
+  // only build what is near the view — and batched, so scrolling a directory
   // of two thousand photos renders the ones on screen, not all of them.
   property var thumbs: ({})
   property var thumbQueue: []
@@ -939,8 +939,8 @@ FloatingWindow {
     onRunningChanged: if (!running) Qt.callLater(win.runThumbs)
   }
 
-  // ── the folder, watched ───────────────────────────────────────────────
-  // terminus' watch (Terminus.watchArgv) on the folder shown. A screenshot
+  // ── the directory, watched ───────────────────────────────────────────────
+  // terminus' watch (Terminus.watchArgv) on the directory shown. A screenshot
   // landing, a picture renamed or deleted elsewhere, tags written — the
   // listing is read again, quietly, and the picture shown stays shown. A
   // file written over has its thumbnail dropped, and is shown afresh if it
@@ -991,7 +991,7 @@ FloatingWindow {
   // ── the neighbours, read ahead ────────────────────────────────────────
   // The picture shown and the ones either side, decoded in the background
   // into Qt's pixmap cache and HELD there: the stage asks for the same url
-  // at the same size and finds it waiting, so stepping through a folder of
+  // at the same size and finds it waiting, so stepping through a directory of
   // big photos does not blank and fade on every step. Held, because Qt
   // keeps an unreferenced picture only while it is under 2 MB — a slot let
   // go of is a decode thrown away. Three slots, kept where they are as the
@@ -1036,7 +1036,7 @@ FloatingWindow {
   // takes the file out; anywhere else it draws the marking box
   property int hoverThumb: -1
   readonly property int markCount: Object.keys(win.marks).length
-  // in the folder's order, not the order they were marked in
+  // in the directory's order, not the order they were marked in
   function markedPaths() {
     return win.allRows.filter((r) => win.marks[r.path]).map((r) => r.path);
   }
@@ -1063,7 +1063,7 @@ FloatingWindow {
   }
   // What an action is about: the marked pictures, when there are some and
   // `p` is among them (or nothing in particular was named) — else `p`, and
-  // nothing at all when that is nothing (the gallery's cursor on a folder).
+  // nothing at all when that is nothing (the gallery's cursor on a directory).
   function targets(p) {
     const m = win.markedPaths();
     if (m.length > 0 && (!p || win.marks[p])) return m;
@@ -1073,11 +1073,11 @@ FloatingWindow {
 
   // ── tags ──────────────────────────────────────────────────────────────
   // terminus' (tags.js): user.xdg.tags on the files themselves, so a picture
-  // starred here is starred in terminus' tag pages too. Read for the folder
+  // starred here is starred in terminus' tag pages too. Read for the directory
   // after every listing; written back as they change. "favourite" is the
   // star — V.FAVOURITE.
   property var tags: ({})
-  // .xmp files in the folder ({ path: true }), and what the ones beside the
+  // .xmp files in the directory ({ path: true }), and what the ones beside the
   // pictures say ({ picture: { names, rating } }) — see tags.js' sidecars
   property var sidecars: ({})
   property var sideInfo: ({})
@@ -1304,7 +1304,7 @@ FloatingWindow {
     win.run(["qs", "ipc", "call", "Terminus", "open", win.dir]);
   }
   // The files themselves onto the clipboard, as terminus copies them — to
-  // paste into a folder, a chat, a mail.
+  // paste into a directory, a chat, a mail.
   function copyFiles(ps) {
     if (ps.length === 0) return;
     win.run(Terminus.shArgv(Terminus.clipboardCopyCommand(ps, false)));
@@ -1400,7 +1400,7 @@ FloatingWindow {
       win.list();
     });
   }
-  // Paths gone from the folder — trashed, moved away — out of the rows.
+  // Paths gone from the directory — trashed, moved away — out of the rows.
   function dropRows(ps) {
     const gone = {};
     for (const q of ps) gone[q] = true;
@@ -1475,7 +1475,7 @@ FloatingWindow {
   }
 
   // ── somewhere else ────────────────────────────────────────────────────
-  // terminus' folder picker, then terminus' copy — rsync, keeping both when
+  // terminus' directory picker, then terminus' copy — rsync, keeping both when
   // a name is taken ("name (1).jpg"), never writing over anything.
   function sendTo(ps, move) {
     if (ps.length === 0) return;
@@ -1556,7 +1556,7 @@ FloatingWindow {
   // ctrl+v: whatever it holds, looked at. Files copied anywhere open as a
   // picked set; a picture with no file (a screenshot, a browser's copy) is
   // written to the runtime directory and opened from there, for Save New
-  // to keep — nothing lands in a folder of yours unasked.
+  // to keep — nothing lands in a directory of yours unasked.
   function pasteLook() {
     const stem = Paths.runtimeDir() + "/picasso-view/clipboard-" + Date.now();
     win.capture(["sh", "-c", V.clipboardLookCommand(stem), "sh", stem], (text) => {
@@ -1567,7 +1567,7 @@ FloatingWindow {
       if (got.kind === "image") win.say("from the clipboard — ctrl+shift+s keeps it", 6000);
     });
   }
-  // The gallery's Paste: into the folder shown, as terminus pastes — files
+  // The gallery's Paste: into the directory shown, as terminus pastes — files
   // copied in beside each other, a picture written as "Pasted image.png".
   function pasteHere() {
     if (win.dir === "" || win.picked.length > 0) return;
@@ -1639,7 +1639,7 @@ FloatingWindow {
 
   // ── for sending ───────────────────────────────────────────────────────
   // terminus' export: small, stripped, a format for the web — beside each
-  // one ("-web"), or into a folder terminus' picker is asked for.
+  // one ("-web"), or into a directory terminus' picker is asked for.
   function exportFor(ps, preset, ask) {
     ps = ps.filter((p) => !Terminus.isVideo(Terminus.basename(p)));
     if (ps.length === 0) return;
@@ -1682,8 +1682,8 @@ FloatingWindow {
   }
 
   // ── places ────────────────────────────────────────────────────────────
-  // Where to go from here: the pictures folders, terminus' bookmarks (its
-  // own file, read as it is now), and the folders last looked at.
+  // Where to go from here: the pictures directories, terminus' bookmarks (its
+  // own file, read as it is now), and the directories last looked at.
   FileView {
     id: bookmarkFile
     path: Quickshell.statePath("terminus-bookmarks")
@@ -1768,7 +1768,7 @@ FloatingWindow {
   // ── background ────────────────────────────────────────────────────────
   // Through the picker's own card. A crop cannot travel as a look, so a
   // cropped edit is rendered to a scratch png and the card opens on that —
-  // written into the wallpaper folder only if the card is APPLIED (see
+  // written into the wallpaper directory only if the card is APPLIED (see
   // PicassoPopup.focusAdopt); closed, the render is thrown away and nothing
   // was saved anywhere.
   function toBackground() {
@@ -1966,7 +1966,7 @@ FloatingWindow {
         return;
       }
       // the picture spoken about: the one shown, or the gallery's cursor's
-      // (nothing, when that is on a folder)
+      // (nothing, when that is on a directory)
       const cur = gallery ? win.cursorPath() : win.path;
       e.accepted = true;
       if (ctrl && k === Qt.Key_C) {
@@ -1993,7 +1993,7 @@ FloatingWindow {
         else if (win.filterText !== "") win.setFilter("");
         else if (win.infoShown) win.infoShown = false;
         else if (win.panelShown) win.panelShown = false;
-        // a picture goes back to the gallery it was opened from — its folder,
+        // a picture goes back to the gallery it was opened from — its directory,
         // or the picked pictures; the gallery is the last stop, and closes
         else if (!gallery && !win.solo && win.galleryItems.length > 0) win.mode = "gallery";
         else win.close();
@@ -2033,7 +2033,7 @@ FloatingWindow {
         else if (k === Qt.Key_Backspace) win.goUp();
         else if (k === Qt.Key_G && win.rows.length > 0) win.mode = "view";
         else if (k === Qt.Key_S && win.rows.length > 0) { win.playing = true; win.mode = "view"; }
-        // marked, and on to the next, for going down a folder picking
+        // marked, and on to the next, for going down a directory picking
         else if (k === Qt.Key_Space) { if (cur !== "") win.toggleMark(cur); win.gallerySeek(1); }
         else e.accepted = false;
       }
@@ -2143,7 +2143,7 @@ FloatingWindow {
     if (win.mode !== "annotate") Qt.callLater(() => keys.forceActiveFocus());
     if (win.mode === "view") Qt.callLater(() => win.refit(false));
     if (win.mode === "gallery") {
-      // back from a picture, the cursor is on it — unless it was left on a folder
+      // back from a picture, the cursor is on it — unless it was left on a directory
       const on = win.galleryItems[win.gidx];
       if (win.index >= 0 && (!on || !on.isDir)) { const at = win.itemOfPath(win.path); if (at >= 0) win.gidx = at; }
       Qt.callLater(() => grid.positionViewAtIndex(win.gidx, GridView.Contain));
@@ -2212,14 +2212,14 @@ FloatingWindow {
       active: win.picShows && win.picTop < bar.height
     }
 
-    // back to the gallery this picture is from — its folder, or the picked
+    // back to the gallery this picture is from — its directory, or the picked
     // pictures it was opened among
     Tool {
       id: backBtn
       anchors.left: parent.left
       anchors.leftMargin: 12
       anchors.verticalCenter: parent.verticalCenter
-      // in the gallery: the folder before, or the one above (the gallery
+      // in the gallery: the directory before, or the one above (the gallery
       // keeps no ".." cell of its own any more)
       visible: win.mode === "view" ? !win.solo && win.galleryItems.length > 0
         : win.mode === "gallery" && win.canBack
@@ -2242,7 +2242,7 @@ FloatingWindow {
       spacing: 1
       Text {
         width: parent.width
-        // in the gallery, the bar is about the folder; otherwise the picture
+        // in the gallery, the bar is about the directory; otherwise the picture
         text: win.mode === "map" ? "Where they were taken"
           : win.mode === "gallery"
           ? (win.picked.length > 0 ? "Picked pictures" : (Terminus.basename(win.dir) || "/"))
@@ -2377,12 +2377,12 @@ FloatingWindow {
     }
   }
 
-  // "~/Pictures/Wallpapers · 7 folders · 31 pictures"
+  // "~/Pictures/Wallpapers · 7 directories · 31 pictures"
   readonly property string where: {
     const out = [];
     if (win.picked.length === 0 && win.dir !== "") out.push(win.dir.replace(Paths.home(), "~"));
-    const nf = win.folders.filter((f) => !f.isUp).length;
-    if (nf > 0) out.push(nf + (nf === 1 ? " folder" : " folders"));
+    const nf = win.directories.filter((f) => !f.isUp).length;
+    if (nf > 0) out.push(nf + (nf === 1 ? " directory" : " directories"));
     out.push(win.rows.length + (win.rows.length === 1 ? " picture" : " pictures"));
     if (win.markCount > 0) out.push(win.markCount + " marked  \u00b7  right click for what to do with them");
     return out.join("  \u00b7  ");
@@ -3170,11 +3170,11 @@ FloatingWindow {
   }
 
   // ── the gallery ───────────────────────────────────────────────────────
-  // Terminus' grid, as the folder would look there: cells that divide the
+  // Terminus' grid, as the directory would look there: cells that divide the
   // width exactly at about 190px, each picture whole and rounded at its own
   // shape (not cropped to a square), its name under it in two lines at
   // most, and terminus' own cursor — SelectCell — sliding between them.
-  // Folders are their glyph in terminus' folder ink. The rail is terminus'.
+  // Directories are their glyph in terminus' directory ink. The rail is terminus'.
   Item {
     id: galleryPane
     anchors.top: bar.bottom
@@ -3217,19 +3217,19 @@ FloatingWindow {
         required property int index
         width: grid.cellWidth
         height: grid.cellHeight
-        readonly property bool folder: !!cell.modelData.isDir
+        readonly property bool directory: !!cell.modelData.isDir
         // an empty cell, ending a line before a section
         readonly property bool fill: !!cell.modelData.isFill
         readonly property bool here: cell.index === win.gidx
-        readonly property bool marked: !cell.folder && !cell.fill && !!win.marks[cell.modelData.path]
-        readonly property var tagged: cell.folder || cell.fill ? [] : (win.tags[cell.modelData.path] || [])
+        readonly property bool marked: !cell.directory && !cell.fill && !!win.marks[cell.modelData.path]
+        readonly property var tagged: cell.directory || cell.fill ? [] : (win.tags[cell.modelData.path] || [])
         readonly property var chip: win.layout.chips[cell.index] || null
-        readonly property int ri: cell.folder || cell.fill ? -1 : (win.rowIndex[cell.modelData.path] ?? -1)
+        readonly property int ri: cell.directory || cell.fill ? -1 : (win.rowIndex[cell.modelData.path] ?? -1)
         readonly property var burst: cell.ri >= 0 ? (win.burstAt[cell.ri] || null) : null
         readonly property bool best: !!win.dupes && !cell.fill && !!win.dupes.keep[cell.modelData.path]
         enabled: !cell.fill
         z: cell.chip ? 2 : 0
-        Component.onCompleted: if (!cell.folder && !cell.fill) win.wantThumb(cell.modelData.path)
+        Component.onCompleted: if (!cell.directory && !cell.fill) win.wantThumb(cell.modelData.path)
 
         // out of the window, as a file — see win.dragOut
         Drag.active: false
@@ -3239,7 +3239,7 @@ FloatingWindow {
         DragHandler {
           target: null
           // from the picture itself; off it, a drag is the box (see gband)
-          enabled: active || (!cell.folder && !cell.fill && win.hoverThumb === cell.index)
+          enabled: active || (!cell.directory && !cell.fill && win.hoverThumb === cell.index)
           onActiveChanged: if (active) win.dragOut(cell, cell.modelData.path)
         }
 
@@ -3251,10 +3251,10 @@ FloatingWindow {
           width: parent.width - 24
           height: parent.height - 68
 
-          // a folder is its glyph, the way terminus draws one
+          // a directory is its glyph, the way terminus draws one
           Text {
             anchors.centerIn: parent
-            visible: cell.folder
+            visible: cell.directory
             text: cell.modelData.isUp ? "" : ""
             color: Zenon.cyan
             font.family: Zenon.face
@@ -3268,20 +3268,20 @@ FloatingWindow {
                 else if (win.hoverThumb === cell.index) win.hoverThumb = -1;
               }
             }
-            visible: !cell.folder && !cell.fill && pic.measured
+            visible: !cell.directory && !cell.fill && pic.measured
             anchors.centerIn: parent
             width: Math.max(1, Math.min(thumbBox.width, thumbBox.height * pic.ratio))
             height: Math.max(1, Math.min(thumbBox.height, thumbBox.width / pic.ratio))
             radius: Zenon.windowRadius
             color: "transparent"
-            measure: !cell.folder && !cell.fill
-            path: cell.folder || cell.fill ? "" : cell.modelData.path
+            measure: !cell.directory && !cell.fill
+            path: cell.directory || cell.fill ? "" : cell.modelData.path
             thumb: win.thumbs[cell.modelData.path] ?? ""
             wait: !(cell.modelData.path in win.thumbs)
             spinner: false
           }
           Text {
-            visible: !cell.folder && pic.visible && Terminus.isVideo(cell.modelData.name || "")
+            visible: !cell.directory && pic.visible && Terminus.isVideo(cell.modelData.name || "")
             anchors.centerIn: pic
             text: "\uf144"
             color: Zenon.white
@@ -3355,7 +3355,7 @@ FloatingWindow {
           horizontalAlignment: Text.AlignHCenter
           visible: !cell.fill
           text: cell.modelData.isUp ? "Up to " + (Terminus.basename(cell.modelData.path) || "/") : (cell.modelData.name || "")
-          color: cell.folder ? Zenon.cyan : Zenon.white
+          color: cell.directory ? Zenon.cyan : Zenon.white
           font.family: Zenon.face
           font.weight: cell.here ? Font.Bold : Font.Medium
           font.pixelSize: 14
@@ -3454,8 +3454,8 @@ FloatingWindow {
           // ctrl marks one, shift marks the run from the cursor
           onClicked: (m) => {
             keys.forceActiveFocus();
-            if (!cell.folder && (m.modifiers & Qt.ControlModifier)) win.toggleMark(cell.modelData.path);
-            else if (!cell.folder && (m.modifiers & Qt.ShiftModifier)) win.markRange(win.gidx, cell.index);
+            if (!cell.directory && (m.modifiers & Qt.ControlModifier)) win.toggleMark(cell.modelData.path);
+            else if (!cell.directory && (m.modifiers & Qt.ShiftModifier)) win.markRange(win.gidx, cell.index);
             win.gallerySel(cell.index);
           }
           onDoubleClicked: win.galleryOpen(cell.index)
@@ -3598,7 +3598,7 @@ FloatingWindow {
     }
 
     // Right click, anywhere over the grid: the tile's menu — or the marked
-    // pictures', the folder's, or (between tiles) the gallery's own.
+    // pictures', the directory's, or (between tiles) the gallery's own.
     MouseArea {
       anchors.fill: grid
       acceptedButtons: Qt.RightButton
@@ -3622,7 +3622,7 @@ FloatingWindow {
   }
 
   // ── the strip ─────────────────────────────────────────────────────────
-  // The folder under the picture. Its own wheel: over the strip, the wheel
+  // The directory under the picture. Its own wheel: over the strip, the wheel
   // scrolls it, and the picture is left where it is.
   Rectangle {
     id: strip
@@ -3664,7 +3664,7 @@ FloatingWindow {
       leftMargin: 10
       rightMargin: 10
       // tiles a little way out of view are kept, so stepping through the
-      // folder does not rebuild — and re-decode — each one it scrolls to
+      // directory does not rebuild — and re-decode — each one it scrolls to
       cacheBuffer: 1600
 
       delegate: Item {
@@ -4194,7 +4194,7 @@ FloatingWindow {
             if (!win.row) return [];
             const out = [
               { k: "Name", v: win.row.name },
-              { k: "Folder", v: win.dir.replace(Paths.home(), "~") },
+              { k: "Directory", v: win.dir.replace(Paths.home(), "~") },
               { k: "Size", v: win.nw > 0 ? Math.round(win.nw) + " × " + Math.round(win.nh) : "" },
               { k: "File", v: Terminus.formatSize(win.row.size) + "  ·  " + Terminus.extOf(win.row.name).toUpperCase() },
               { k: "Modified", v: new Date(win.row.mtime * 1000).toLocaleString(Qt.locale(), "yyyy-MM-dd HH:mm") }
@@ -4325,7 +4325,7 @@ FloatingWindow {
       guard: (file, write) => win.keepCopies([file], write)
       // On its own — the screenshot's toast — Back is into the viewer too:
       // the window stops being a lone annotation and opens the picture's
-      // folder at it (or at the copy the marks were saved to).
+      // directory at it (or at the copy the marks were saved to).
       onFinished: {
         if (!win.solo) { win.mode = "view"; return; }
         const at = win.soloFile !== "" ? win.soloFile : win.path;
@@ -4365,12 +4365,12 @@ FloatingWindow {
     menu.at = at;
     menu.open = true;
   }
-  // A gallery tile's menu: a folder's, the marked pictures' (when it is one
+  // A gallery tile's menu: a directory's, the marked pictures' (when it is one
   // of several marked), or the picture's own; between tiles, the gallery's.
   function galleryMenu(i, at) {
     const it = i >= 0 ? win.galleryItems[i] : null;
     if (!it || it.isFill) { win.showMenu(at, "gallery", ""); return; }
-    if (it.isDir) { win.showMenu(at, "folder", it.path); return; }
+    if (it.isDir) { win.showMenu(at, "directory", it.path); return; }
     if (win.markCount > 1 && win.marks[it.path]) { win.showMenu(at, "marked", it.path); return; }
     win.gallerySel(i);
     win.showMenu(at, "cell", it.path);
@@ -4399,7 +4399,7 @@ FloatingWindow {
   // terminus' conversion, and terminus' targets. The picture as it is on
   // disk goes through its convertCommand — a new file beside it, never over
   // it. An edit or a selection is rendered first (the same grab a save
-  // makes) and that render converted into the folder under a free name, so
+  // makes) and that render converted into the directory under a free name, so
   // what is converted is what is on screen.
   function convertTo(ext) {
     if (win.path === "" || !win.stillOnly()) return;
@@ -4453,7 +4453,7 @@ FloatingWindow {
     const pick = menu.pixel;
     const tools = win.mgr ? win.mgr.tools : {};
     const exportRows = () => V.EXPORTS.map((x, i) => ({ text: x.t, icon: "\uf1d8", act: "export", preset: i }))
-      .concat([{ isSeparator: true }, { text: "Into a folder…  \u00b7  2048 px WebP", icon: "\uf07c", act: "exportTo", asks: true }]);
+      .concat([{ isSeparator: true }, { text: "Into a directory…  \u00b7  2048 px WebP", icon: "\uf07c", act: "exportTo", asks: true }]);
 
     switch (kind) {
     case "selection":
@@ -4535,7 +4535,7 @@ FloatingWindow {
         { text: "Fullscreen", icon: "\uf065", act: "full", hint: "f" },
         { text: "The strip", icon: "\uf00a", act: "strip", hint: "alt+j  alt+k", mark: win.stripShown },
         { text: "Monitor outlines", icon: "\uf108", act: "monitors", hint: "W", mark: stage.monitorsShown },
-        { text: "Map of the folder", icon: "\uf279", act: "map", enabled: win.rows.length > 0 },
+        { text: "Map of the directory", icon: "\uf279", act: "map", enabled: win.rows.length > 0 },
         { text: "Info", icon: "\uf129", act: "info", hint: "i", mark: win.infoShown }
       ]);
 
@@ -4603,11 +4603,11 @@ FloatingWindow {
         { text: "Delete " + ps.length + " permanently…", icon: "\uf00d", act: "deleteP", hint: "D", asks: true }
       ]);
 
-    case "folder":
+    case "directory":
       return [
-        { text: "Open", icon: "\uf07c", act: "openFolder", hint: "enter" },
-        { text: "Slideshow of it", icon: "\uf04b", act: "showFolder" },
-        { text: "Show in terminus", icon: "\uf07c", act: "revealFolder" },
+        { text: "Open", icon: "\uf07c", act: "openDirectory", hint: "enter" },
+        { text: "Slideshow of it", icon: "\uf04b", act: "showDirectory" },
+        { text: "Show in terminus", icon: "\uf07c", act: "revealDirectory" },
         { text: "Copy path", icon: "\uf0c1", act: "copyPathP" }
       ];
 
@@ -4618,7 +4618,7 @@ FloatingWindow {
         { text: "Stop showing alike pictures", icon: "\uf00d", act: "dupes", hint: "esc" },
         sep
       ] : []).concat([
-        { text: "Paste into this folder", icon: "\uf0ea", act: "paste", enabled: win.picked.length === 0 && win.dir !== "" },
+        { text: "Paste into this directory", icon: "\uf0ea", act: "paste", enabled: win.picked.length === 0 && win.dir !== "" },
         { text: "Look at the clipboard", icon: "\uf03e", act: "pasteLook", hint: "ctrl+v" },
         sep,
         { text: "Mark all", icon: "\uf00c", act: "markAll", hint: "ctrl+a", enabled: win.rows.length > 0 }
@@ -4736,9 +4736,9 @@ FloatingWindow {
       break;
     case "viewMarked": win.load(ps, "view"); break;
     case "showMarked": win.load(ps, "show"); break;
-    case "openFolder": win.openFolder(p); break;
-    case "showFolder": win.load([p], "show"); break;
-    case "revealFolder": win.run(["qs", "ipc", "call", "Terminus", "open", p]); break;
+    case "openDirectory": win.openDirectory(p); break;
+    case "showDirectory": win.load([p], "show"); break;
+    case "revealDirectory": win.run(["qs", "ipc", "call", "Terminus", "open", p]); break;
     case "reveal": win.reveal(); break;
     case "trash": if (win.path !== "") win.trash([win.path]); break;
     case "trashP": win.trash(ps); break;
@@ -4761,7 +4761,7 @@ FloatingWindow {
                                    { edge: 2048, ext: "webp", q: 85 }, true); break;
     case "sheet": win.contactSheet(ps); break;
     case "sheetAll": win.contactSheet(win.markCount > 0 ? win.markedPaths() : win.rows.map((r) => r.path)); break;
-    case "go": win.openFolder(row.dir); break;
+    case "go": win.openDirectory(row.dir); break;
     case "xmp": if (win.mgr) { win.mgr.setXmp(!win.mgr.xmpSidecars); win.say(win.mgr.xmpSidecars
       ? "tags and stars are written to an .xmp beside each picture too" : "tags stay on the files only (an .xmp already there is still kept up)"); } break;
     case "bursts": if (win.mgr) win.mgr.setBursts(!win.mgr.groupBursts); break;

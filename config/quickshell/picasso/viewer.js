@@ -5,7 +5,7 @@
 //
 // THE VIEWER'S PURE HALF — zoom and pan, the crop's geometry, and what the
 // launcher hands over. Nothing here touches Quickshell or a process, which
-// is what lets oracle/tests check it. The folder listing, the image test and
+// is what lets oracle/tests check it. The directory listing, the image test and
 // the sort are terminus.js'; the look is picasso.js'.
 
 // ── what was asked for ────────────────────────────────────────────────────
@@ -384,7 +384,7 @@ function clipboardLookCommand(stem) {
 // That answer — or terminus' clipboardPasteCommand's — as { kind, paths }.
 // uri-list lines are file:// URLs, percent-encoded, CRLF or LF; anything not
 // a local file is dropped (GNOME's list leads with "copy" or "cut", which
-// goes the same way). "wrote" is terminus' picture written into a folder,
+// goes the same way). "wrote" is terminus' picture written into a directory,
 // and its path is the name it was given there.
 function parseClipboardLook(text) {
   const s = String(text || "");
@@ -521,7 +521,7 @@ function parseHashes(text) {
 }
 
 // ── when, and where ───────────────────────────────────────────────────────
-// exiftool -j -n of a folder's pictures: when each was taken (to the
+// exiftool -j -n of a directory's pictures: when each was taken (to the
 // hundredth, for bursts) and where. Seconds since the epoch in local time,
 // as the camera wrote it; NaN for a file that does not say.
 function exifTime(s, sub) {
@@ -561,8 +561,8 @@ function takenOf(row, meta) {
 }
 
 // ── the gallery's sections ───────────────────────────────────────────────
-// Day by day for a folder that spans a couple of months at most, month by
-// month past that — a phone's camera folder by day is a thousand headings.
+// Day by day for a directory that spans a couple of months at most, month by
+// month past that — a phone's camera directory by day is a thousand headings.
 function sectionScale(times) {
   let lo = Infinity, hi = -Infinity;
   for (const t of times) if (t > 0) { lo = Math.min(lo, t); hi = Math.max(hi, t); }
@@ -601,18 +601,18 @@ function bursts(times, gap) {
   return out;
 }
 
-// The gallery's items, laid out for a grid `cols` wide: the folders, then
+// The gallery's items, laid out for a grid `cols` wide: the directories, then
 // the pictures — a section starting a fresh line of the grid, padded to it
 // with empty cells ({ isFill }), and its heading carried on its first cell
 // rather than taking a line of its own (see chips). `sectionAt` is { row
 // index: { text, kind, key, … } }; `hidden` the row indices a folded burst
 // keeps out of sight.
 // Returns { items, chips: { item index: section }, at: { path: item index } }.
-function galleryLayout(folders, rows, cols, sectionAt, hidden) {
+function galleryLayout(directories, rows, cols, sectionAt, hidden) {
   const items = [], chips = {}, at = {};
   const c = Math.max(1, cols || 1);
   const breakLine = () => { while (items.length % c !== 0) items.push({ isFill: true }); };
-  for (const f of folders || []) items.push(f);
+  for (const f of directories || []) items.push(f);
   const any = sectionAt && Object.keys(sectionAt).length > 0;
   if (any && items.length > 0) breakLine();
   for (let i = 0; i < (rows || []).length; ++i) {
@@ -625,7 +625,7 @@ function galleryLayout(folders, rows, cols, sectionAt, hidden) {
   return { items: items, chips: chips, at: at };
 }
 
-// What the cursor can rest on: a folder or a picture, not a filler.
+// What the cursor can rest on: a directory or a picture, not a filler.
 function selectable(it) { return !!it && !it.isFill; }
 
 // The cursor moved by `d` items from `i` — a step across a line passes
@@ -750,7 +750,7 @@ function backupName(dir, path, stamp) {
   return dir + "/" + stamp + "-" + base;
 }
 function backupCommand() {
-  // $1 the folder, then pairs of picture and copy
+  // $1 the directory, then pairs of picture and copy
   return 'mkdir -p "$1" || exit 1; shift\n'
     + 'while [ $# -ge 2 ]; do cp -p -- "$1" "$2" || exit 1; shift 2; done\n';
 }
@@ -802,7 +802,7 @@ function monitorCuts(w, h, screens) {
 }
 
 // ── somewhere to go ───────────────────────────────────────────────────────
-// Folders worth jumping to: the last ones looked at here, newest first, at
+// Directories worth jumping to: the last ones looked at here, newest first, at
 // most `max`, and the one now shown not counted twice.
 function noteRecent(list, dir, max) {
   if (!dir) return (list || []).slice();

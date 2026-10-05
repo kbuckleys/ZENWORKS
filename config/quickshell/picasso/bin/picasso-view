@@ -4,11 +4,11 @@
 # └─┘└─┘┘└┘└┴┘└─┘┴└─┴ ┴└─┘
 # https://github.com/kbuckleys/
 #
-# picasso-view [picture|folder…]   open pictures in picasso's viewer, from a
+# picasso-view [picture|directory…]   open pictures in picasso's viewer, from a
 #                                   terminal, a keybind, or picasso-view.desktop
 #                                   (which is how terminus and artemis get here).
 #
-# One picture opens its folder, at that picture; a folder opens as its
+# One picture opens its directory, at that picture; a directory opens as its
 # gallery; several pictures are a gallery of just those; none is the gallery
 # of ~/Pictures (wherever XDG has put it). Paths are made
 # absolute HERE, because the shell answering the ipc call has no idea which
@@ -16,7 +16,7 @@
 # a selection arrives as a selection rather than as a window per file.
 
 # With nothing named — the launcher's entry, or a bare keybind — the viewer
-# opens on XDG's pictures folder, which the shell knows and this does not.
+# opens on XDG's pictures directory, which the shell knows and this does not.
 [ $# -eq 0 ] && exec qs ipc call Picasso view "" >/dev/null
 paths=""
 for f in "$@"; do

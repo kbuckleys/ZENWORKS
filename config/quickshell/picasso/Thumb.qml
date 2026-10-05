@@ -12,7 +12,7 @@
 //           NONE ("-") for a picture that will never have one (transparency)
 //   wait    true while a thumbnail is still being made: the tile shows the
 //           spinner rather than decoding the original in the meantime, which
-//           for a folder of 24-megapixel photos is the difference between a
+//           for a directory of 24-megapixel photos is the difference between a
 //           gallery that fills in and one that stalls
 
 import QtQuick
@@ -32,7 +32,7 @@ ClippingRectangle {
   // strip and gallery fill in quietly, terminus' way: nothing, then the fade
   property bool spinner: true
   // the fade in as it decodes — off in the viewer's strip, where stepping
-  // through a folder made every tile scrolled into view develop again
+  // through a directory made every tile scrolled into view develop again
   property bool fade: true
 
   // its own shape, width over height — for a caller that sizes the box to
@@ -74,7 +74,7 @@ ClippingRectangle {
     // popping in. IN ONLY: a source change or a recycled tile must not show
     // the last picture dissolving over the next, and a thumbnail already in
     // Qt's cache is Ready on the frame the tile is made, which a Behavior
-    // does not animate — so a warmed folder still appears at once. Same rule
+    // does not animate — so a warmed directory still appears at once. Same rule
     // and numbers as terminus' thumbClip.
     opacity: img.status === Image.Ready ? 1 : 0
     Behavior on opacity {

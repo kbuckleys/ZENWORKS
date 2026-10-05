@@ -33,7 +33,7 @@ Scope {
   id: mgr
 
   // terminus, handed in by shell.qml, for Save New's dialog and "show in
-  // folder"
+  // directory"
   property var fileManager: null
 
   // ── ITS .desktop ENTRY ─────────────────────────────────────────────
@@ -69,21 +69,21 @@ Scope {
 
   // ── THE ORDER, AND THE SLIDESHOW'S PACE ────────────────────────────
   // One for every window and every mode — the gallery, the picture and its
-  // strip are the same folder in the same order — and kept across restarts:
+  // strip are the same directory in the same order — and kept across restarts:
   // "Newest" chosen once stays chosen, and so do a slideshow's seconds and
   // its shuffle. A window reads them and writes them back through setSort
   // and setSlides.
   property string sortKey: "name"
   property int slideSecs: 4
   property bool shuffle: false
-  // the strip of the folder under a picture — up and down, or its handle
+  // the strip of the directory under a picture — up and down, or its handle
   property bool stripShown: true
   // runs of pictures taken moments apart, folded into one tile in the gallery
   property bool groupBursts: false
   // tags and the star written to an .xmp beside each picture too, for
   // darktable, digiKam, Lightroom — see tags.js' sidecars
   property bool xmpSidecars: false
-  // the folders last looked at, newest first — the Places menu
+  // the directories last looked at, newest first — the Places menu
   property var recent: []
   FileView {
     id: stateFile
@@ -214,7 +214,7 @@ Scope {
 
   function open(paths, mode) {
     // Opened on its own — from the launcher, with nothing handed over — it
-    // opens on the pictures folder XDG names, as a gallery of it.
+    // opens on the pictures directory XDG names, as a gallery of it.
     let list = V.parsePaths(paths);
     if (list.length === 0) {
       if (mode === "annotate" || Picasso.picturesDir === "") return;

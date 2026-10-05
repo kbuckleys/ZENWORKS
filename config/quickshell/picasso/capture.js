@@ -9,7 +9,7 @@
 
 // ── the screenshot ────────────────────────────────────────────────────────
 
-// "2026-09-26-134642" — the same stamp hyprshot.lua wrote, so the folder
+// "2026-09-26-134642" — the same stamp hyprshot.lua wrote, so the directory
 // keeps sorting the way it always has.
 function stamp(d) {
   const p = (n) => (n < 10 ? "0" : "") + n;

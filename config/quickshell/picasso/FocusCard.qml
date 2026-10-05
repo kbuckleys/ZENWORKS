@@ -180,7 +180,7 @@ Item {
   // THE PICKER STAYS OPEN; the card goes. See PicassoPopup.closeFocus.
   //
   // A scratch picture (the viewer's selection — see PicassoPopup.focusAdopt)
-  // is written into its folder first, under a free name, and that file is
+  // is written into its directory first, under a free name, and that file is
   // what is set: the scratch png lives in the runtime directory and would be
   // gone at the next boot.
   function apply() {

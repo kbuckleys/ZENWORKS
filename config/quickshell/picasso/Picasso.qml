@@ -26,7 +26,7 @@ Singleton {
   // specification's own default and xdg-user-dirs is free to have moved it —
   // to Bilder, to Images, onto another disk — and a shell that assumed the
   // English name would find nothing on such a machine and report an empty
-  // folder as though the folder were empty.
+  // directory as though the directory were empty.
   //
   // The one piece that is genuinely this shell's own convention is the
   // "Wallpapers" leaf, and it is only a DEFAULT: oracle stores nothing until
@@ -79,7 +79,7 @@ Singleton {
   signal annotateRequested(string path)
   // ── THE VIEWER ───────────────────────────────────────────────────────
   // Every picture on the machine, not only the wallpapers: PicassoViewer
-  // opens a window on it with its folder as the gallery. Annotation is one of
+  // opens a window on it with its directory as the gallery. Annotation is one of
   // the viewer's modes now, so annotateRequested lands there too.
   //
   // `paths` is one path, or several joined by newlines — several is a
@@ -94,7 +94,7 @@ Singleton {
   signal setterRequested(string path, var look, var adopt)
 
   // Where screenshots land: XDG's pictures directory, then Screenshots — the
-  // folder hyprshot.lua used, found the same way.
+  // directory hyprshot.lua used, found the same way.
   readonly property string shotDir: root.picturesDir + "/Screenshots"
 
   // THE POINTER, kept out of the picture. Cursors are drawn in software here
@@ -109,7 +109,7 @@ Singleton {
   function shoot(mode) { root.shotRequested(mode || "region"); }
   function pick() { root.pickRequested(); }
   function annotate(path) { if (path && path !== "") root.annotateRequested(path); }
-  // "" is the viewer opened on its own: the pictures folder, as a gallery
+  // "" is the viewer opened on its own: the pictures directory, as a gallery
   function view(paths) { root.viewRequested(paths || ""); }
   function setAsWallpaper(path, look, adopt) {
     if (path && path !== "") root.setterRequested(path, look || ({}), adopt || null);
@@ -453,7 +453,7 @@ Singleton {
   // never the same URL, so a decode failure can never be cached against it.
   function scan() {
     // one at a time, and a rescan asked for meanwhile — a file dropped into
-    // the folder, the popup opened — runs when this one ends rather than
+    // the directory, the popup opened — runs when this one ends rather than
     // being a no-op restart that left the new file out until the next open
     if (scanProc.running) { scanProc.again = true; return; }
     root.scanning = true;

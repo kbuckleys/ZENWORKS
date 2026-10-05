@@ -7,7 +7,7 @@
 // Annotate (a), and from everything that used to open a window of its own
 // for this: a screenshot's toast, terminus' and folio's Annotate. Those all
 // still say Picasso.annotate(path); the viewer answers it by opening on that
-// picture, in this mode, with the picture's folder around it.
+// picture, in this mode, with the picture's directory around it.
 //
 // Everything is drawn onto a canvas at the picture's OWN resolution: the
 // picture first, then each mark in order. The window shows that canvas
@@ -17,8 +17,8 @@
 //
 //   Save       over the picture it opened
 //   Save New   a new file, through terminus' own save dialog — opened in
-//              the picture's own folder with a name already in it, so Return
-//              takes the default and anywhere else is a walk through folders
+//              the picture's own directory with a name already in it, so Return
+//              takes the default and anywhere else is a walk through directories
 //   Copy       the annotated picture to the clipboard
 //
 // Tools on keys as well as buttons: p pen, h highlighter, l line, a arrow,

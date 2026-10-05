@@ -19,7 +19,7 @@ QtObject {
   readonly property int menuSepHeight: 7
   readonly property int menuCardPad: 4
   readonly property int menuIconGap: 12
-  readonly property int menuMaxHeight: menuRowHeight * 18 + menuCardPad * 2
+  readonly property int menuMaxHeight: menuRowHeight * 22 +menuCardPad * 2
   readonly property int menuShadowGrow: 4
   readonly property int menuShadowBlur: 24
   readonly property int menuShadowDrop: 6

@@ -13,7 +13,7 @@ function label(path) {
 
 // The path with the wallpaper root stripped off, e.g. "ether/pack_21/eveWS".
 // This is what the filter matches: the scan is recursive, and typing a
-// folder's name is the only way to narrow to one pack without a tree view.
+// directory's name is the only way to narrow to one pack without a tree view.
 function rel(path, dir) {
   const p = String(path || "");
   const d = String(dir || "");

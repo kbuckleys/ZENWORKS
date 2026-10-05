@@ -48,7 +48,7 @@ LayerPopup {
 
   // ── what the grid shows ──────────────────────────────────────────────
   // Two kinds of background, two tabs in the strip: pictures from the
-  // wallpaper folder, and plain colours. A colour is assigned exactly like a
+  // wallpaper directory, and plain colours. A colour is assigned exactly like a
   // picture (see picasso.js isColor), so everything past choosing one — the
   // card, the monitors, the tick on what is in use — is the same machinery.
   property string view: "backgrounds"
@@ -292,7 +292,7 @@ LayerPopup {
     function stop(): string { Picasso.stopSlideshow(); return "stopped"; }
     function annotate(path: string): string { Picasso.annotate(path); return path; }
     // the viewer: one path, or several separated by newlines; "" for the
-    // pictures folder
+    // pictures directory
     function view(paths: string): string { Picasso.view(paths); return paths; }
     function status(): string {
       return "dir=" + Picasso.dir + " files=" + Picasso.files.length
@@ -365,14 +365,14 @@ LayerPopup {
   }
 
   // FROM OUTSIDE THE PICKER — the viewer's "Set as background". The picture
-  // need not be in the wallpaper folder: the card only needs a path, and
+  // need not be in the wallpaper directory: the card only needs a path, and
   // one that is not in the grid simply has nothing to browse to either side.
   // The viewer's look arrives staged, so what was dialled there is what the
   // card shows and what Apply sets.
   //
   // A SCRATCH PICTURE, KEPT ONLY IF IT IS USED. The viewer's selection is
   // rendered to a png in the runtime directory and handed over with `adopt`
-  // ({ dir, name }): Apply writes it into that folder under a free name and
+  // ({ dir, name }): Apply writes it into that directory under a free name and
   // sets that (FocusCard.apply); the card closed any other way deletes it,
   // and nothing was saved.
   property var focusAdopt: null
