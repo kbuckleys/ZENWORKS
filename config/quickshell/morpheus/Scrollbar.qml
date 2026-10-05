@@ -17,7 +17,9 @@
 //
 // How it looks: a 4px thumb at the right edge, 6px under the pointer, its
 // track appearing only then; drawn only when there is somewhere for the
-// thumb to go.
+// thumb to go. With Oracle's "Autohide scrollbars" (on by default) the whole
+// bar fades out once the list has been still for a moment, and comes back on
+// a scroll, a flick, or the pointer arriving on it.
 //
 // What differs by where it is used, as settings rather than as designs:
 //
@@ -115,6 +117,31 @@ Item {
   // along its strip or it is not a scrollbar
   z: 9
   visible: root.on && root.scrollable
+
+  // ── AUTOHIDE ───────────────────────────────────────────────────────────
+  // Faded rather than made invisible: an invisible bar has no MouseArea, and
+  // the pointer arriving on the strip is one of the things that brings it
+  // back. `wake` is the moment after the last movement it lingers for.
+  readonly property bool awake: !Zenon.scrollAutohide || wake.running
+    || ma.containsMouse || ma.pressed || ma.dragging
+    || (root.flick !== null && root.flick.moving)
+  onPosChanged: if (Zenon.scrollAutohide) wake.restart()
+  Timer { id: wake; interval: 900 }
+  // In at once, with no ramp at all — the bar is there on the frame the
+  // scroll starts — and out slowly, so it settles away rather than blinking
+  // off. Driven by hand rather than by a Behavior whose duration follows
+  // `awake`: that binding and the opacity's change on the same flip race,
+  // and the fade-out often ran at the fade-in's pace and read as a snap.
+  opacity: 0
+  Component.onCompleted: root.opacity = root.awake ? 1 : 0
+  onAwakeChanged: {
+    fade.stop();
+    if (root.awake) { root.opacity = 1; return; }
+    fade.to = 0;
+    fade.duration = Zenon.slow * 3;
+    fade.start();
+  }
+  NumberAnimation { id: fade; target: root; property: "opacity"; easing.type: Easing.InOutQuad }
 
   // the painted column's centre, against the right edge (the bottom one, on
   // its side)

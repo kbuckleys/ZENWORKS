@@ -428,6 +428,10 @@ QtObject {
   readonly property int slow:   Math.round(170 * Oracle.motionScale)
   readonly property int ease:   Easing.OutQuint
 
+  // whether morpheus/Scrollbar fades out between scrolls — read here so the
+  // scrollbar's own test stub can stand in for it without importing oracle
+  readonly property bool scrollAutohide: Oracle.scrollbarAutohide
+
   // THE CURVE FOR SOMETHING THAT TRAVELS, as opposed to something that
   // appears. `ease` above is quintic, which is right for a panel arriving:
   // it is over almost at once and the tail is not really seen.
