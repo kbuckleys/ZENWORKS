@@ -934,7 +934,13 @@ Item {
       horizontalAlignment: Text.AlignRight
       rightPadding: Math.round(14 * host.zoom)
       verticalAlignment: Text.AlignVCenter
-      text: entryRow.entry ? host.kindOf(entryRow.entry) : ""
+      // EXCEPT A FOLDER'S. "directory" thirty rows running was the loudest
+      // thing in the column and told you nothing the glyph and the sort had
+      // not: folders come first and wear a folder. Left blank, the column
+      // speaks only where the answer varies. Here and not in host.kindOf,
+      // whose word the sort and the info sheet still want.
+      text: (entryRow.entry && !entryRow.entry.isDir)
+        ? host.kindOf(entryRow.entry) : ""
       elide: Text.ElideRight
       color: Zenon.muted
       opacity: entryRow.dim ? 0.65 : 1
@@ -947,7 +953,9 @@ Item {
     // The bar itself lives in UsageBar.qml, shared with the disks down the
     // sidebar — the same measurement drawn the same way in both halves of
     // the window. What is decided here is only what this column measures
-    // against, and how far along it this row sits.
+    // against, and how far along it this row sits. A share too narrow to reach
+    // the figure, and an edge mark that would cut through it, are UsageBar's
+    // to leave undrawn, not this cell's.
     Item {
       id: sizeCell
       width: entryRow.cols.size
@@ -969,8 +977,20 @@ Item {
       // there — so they need no third answer.
       readonly property real ceiling:
         entryRow.live ? host.usageMax : host.otherUsageMax
-      readonly property real frac: (sizeCell.on && sizeCell.ceiling > 0)
-        ? sizeCell.bytes / sizeCell.ceiling : 0
+      //
+      // ON A LOG SCALE, from a kibibyte up to the ceiling. Linear, one big
+      // folder flattened everything else: in home, .local at 742 GiB left
+      // every other bar under 3% — thirty-eight empty tracks and one full
+      // one, which is a column that answers only "which is biggest". Sizes on
+      // a disk span nine orders of magnitude, so length is given to the
+      // ORDER and the figure written on the bar keeps the exact amount. A
+      // kibibyte is the floor because below it nothing is worth a length.
+      readonly property real frac: {
+        if (!sizeCell.on || sizeCell.ceiling <= 0 || sizeCell.bytes <= 0) return 0;
+        const lo = Math.log(1024);
+        const top = Math.log(Math.max(sizeCell.ceiling, 2048)) - lo;
+        return Math.max(0, Math.log(Math.max(sizeCell.bytes, 1)) - lo) / top;
+      }
       // The row the mode was opened to find. Warmer, so "which is the big
       // one" is answered before any bar has been compared to any other.
       readonly property bool biggest: sizeCell.on && sizeCell.ceiling > 0

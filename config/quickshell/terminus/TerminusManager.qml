@@ -803,7 +803,11 @@ Scope {
           + " dual=" + w.dual
           + " other=" + w.otherCwd + "@" + w.otherSel
           + " side=" + w.paneSide + " split=" + w.paneFrac.toFixed(3)
-          + " views=" + JSON.stringify([w.paneL.viewMode, w.paneR.viewMode])
+          // paneL and paneR are ids, which nothing outside the window can
+          // reach — reading them threw and took the whole report with it.
+          // act/pas are public; which is the left one follows from paneSide.
+          + " views=" + JSON.stringify((w.dual && w.paneSide === 1)
+              ? [w.pas.viewMode, w.act.viewMode] : [w.act.viewMode, w.pas.viewMode])
           + " renaming=" + w.renaming
           + " marked=" + w.markedCount
           + " view=" + w.viewMode

@@ -655,9 +655,16 @@ function formatTime(epoch) {
   if (age < 3600) return Math.floor(age / 60) + "m ago";
   if (age < 86400) return Math.floor(age / 3600) + "h ago";
   if (age < 2592000) return Math.floor(age / 86400) + "d ago";
+  // "Jul 5", not "2026-07-05". The ISO form was ten characters against the
+  // relative times' five or six, so the column came out ragged the moment a
+  // listing held both — which is every listing old enough to need a date.
+  // The year only when it is not this one, the way ls does it. English month
+  // names — the group headings' own, cut to three — rather than the locale's,
+  // so the width is one the column can count on.
   const d = new Date(t * 1000);
-  const pad = (n) => String(n).padStart(2, "0");
-  return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+  const day = MONTHS[d.getMonth()].slice(0, 3) + " " + d.getDate();
+  return d.getFullYear() === new Date().getFullYear()
+    ? day : day + " " + d.getFullYear();
 }
 
 // What the selection adds up to, for the status strip. A directory is never

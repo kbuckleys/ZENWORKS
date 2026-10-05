@@ -45,8 +45,14 @@ Item {
   property real barRadius: 4
   property int fontSize: 14
   property int fontWeight: Font.Medium
-
   readonly property real span: Math.max(0, Math.min(1, bar.frac))
+  // Does the fill's edge land on the written figure? A couple of pixels
+  // either side counts, so the mark never grazes the first or last glyph.
+  readonly property bool overText: {
+    const edge = bar.fromRight ? bar.width - fill.width : fill.width;
+    const right = bar.width - bar.labelPad;
+    return edge > right - figure.contentWidth - 3 && edge < right + 3;
+  }
 
   Rectangle {
     id: track
@@ -67,7 +73,15 @@ Item {
     // No artificial minimum. A floor of a few pixels made 6 B and 0 B look
     // like the same measurement with a rendering fault, and the figure inside
     // already says which is which — so a share too small to draw is not drawn.
-    width: (bar.pending || bar.span <= 0) ? 0 : Math.round(bar.span * bar.width)
+    //
+    // The same goes for a share that would end inside the label's padding.
+    // Growing from the right, 1% of the column is two pixels standing in the
+    // gap just past the last digit, where it read as a typed pipe — "8.4
+    // GiB|" on every row that was small next to the biggest. Only a fill that
+    // reaches the figure is a length anyone can see.
+    readonly property real want: Math.round(bar.span * bar.width)
+    width: (bar.pending || bar.span <= 0
+            || (bar.fromRight && fill.want < bar.labelPad)) ? 0 : fill.want
 
     // Lit along the top edge. A flat block at this height reads as a slab; the
     // sheen is what makes it read as a bar. Two stops, so no gradient library.
@@ -100,7 +114,16 @@ Item {
       anchors.left: bar.fromRight ? parent.left : undefined
       anchors.right: bar.fromRight ? undefined : parent.right
       width: 1
-      visible: bar.span > 0.01 && bar.span < 0.995
+      // fill.width too: a fill held at zero still anchors this to its edge,
+      // which is the track's own end, and it stood there alone
+      //
+      // AND NOT THROUGH THE FIGURE. Once the listing went to a log scale most
+      // bars end somewhere in their own number, and a bright line there cut
+      // a glyph clean in two — "Ki|B", "2.|3". The soft edge of the fill
+      // alone passes under the digits without breaking them; the mark comes
+      // back wherever it lands in clear track.
+      visible: bar.span > 0.01 && bar.span < 0.995 && fill.width > 0
+        && !bar.overText
       color: Qt.rgba(bar.accent.r, bar.accent.g, bar.accent.b, 0.55)
     }
 
@@ -111,6 +134,7 @@ Item {
 
   // Declared last so it draws over the band.
   Text {
+    id: figure
     anchors.fill: parent
     horizontalAlignment: Text.AlignRight
     verticalAlignment: Text.AlignVCenter

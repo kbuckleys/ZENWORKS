@@ -4132,6 +4132,8 @@ FloatingWindow {
   function closeTabAt(i) {
     if (root.tabs.length < 2) return;   // the last tab is just the window
     if (i < 0 || i >= root.tabs.length) return;
+    // the strip shrinks this one out and closes the rest up over it
+    tabStrip.noteClose(i);
     // The tab you are STANDING IN lives in the window rather than in the
     // array, so its record is written back before anything is removed.
     // Without this, closing a background tab rolled the current one back to
@@ -8835,7 +8837,10 @@ FloatingWindow {
   // and for the same reason.
   readonly property color sheetGlyphInk:
     confirm.open ? (confirm.choices.length > 0 ? confirm.choices[0].ink : Zenon.sand)
-    : bulk.open ? root.crumbInk : root.sheetTitleInk
+    : bulk.open ? root.crumbInk
+    // The tag under the cursor, on the mark only — see sheetTitleInk.
+    : (tagPick.open && tagPick.chosen() !== "") ? root.tagInk(tagPick.chosen())
+    : root.sheetTitleInk
 
 
 
@@ -8863,12 +8868,11 @@ FloatingWindow {
     // sheet. Cyan is the ink of a place you are going; this card is about the
     // marks themselves, so it wears their colour.
     if (marks.open) return Zenon.sand;
-    // The colour of the tag the cursor is on, so the bar's mark IS the tag
-    // being chosen rather than a generic one above a list of colours.
-    if (tagPick.open) {
-      const n = tagPick.chosen();
-      if (n !== "") return root.tagInk(n);
-    }
+    // The colour of the tag the cursor is on goes on the MARK, so the bar's
+    // tag IS the tag being chosen — and the words stay white, the way the
+    // confirmation writes its question: "Tag 1 item" is not a tag, and in
+    // red it read as a warning.
+    if (tagPick.open) return Zenon.white;
     return Zenon.cyan;
   }
 
@@ -8948,6 +8952,10 @@ FloatingWindow {
   onSheetTitleChanged: if (root.sheetTitle !== "") root.latchBar()
   onSheetGlyphChanged: if (root.sheetTitle !== "") root.latchBar()
   onSheetTitleInkChanged: if (root.sheetTitle !== "") root.latchBar()
+  // ITS OWN HANDLER. Latching only on the title's change read the glyph's
+  // ink before that binding had caught up, so the mark kept the colour of
+  // the tag the cursor had just LEFT — or cyan, from when the sheet opened.
+  onSheetGlyphInkChanged: if (root.sheetTitle !== "") root.latchBar()
   Connections {
     target: sendTo
     function onOpenChanged() { if (sendTo.open) root.latchBar(); }
@@ -12448,6 +12456,25 @@ FloatingWindow {
           function onTabsChanged() { tabStrip.endDrag(); }
         }
 
+        // ── A TAB CLOSED SHRINKS OUT, AND THE REST CLOSE UP ─────────
+        // As plato's strip (plato/editor/TabBar.qml). The model is a plain
+        // array and a close rebuilds every cell at its new place, so
+        // closeTabAt says first which tab is going (noteClose): the cells
+        // made again start where they were and slide over, already there
+        // rather than fading in afresh, and the closed one leaves a ghost
+        // in its slot that narrows to nothing beneath them.
+        property int closedAt: -1
+        property real closedCellW: 0
+        function noteClose(i) {
+          if (root.tabs.length < 3 && !root.alwaysTabs) return;
+          tabStrip.closedAt = i;
+          tabStrip.closedCellW = tabStrip.width / Math.max(1, root.tabs.length);
+          ghosts.append({ gx: i * tabStrip.closedCellW, gw: tabStrip.closedCellW,
+            name: Terminus.basename(root.shownPath(i === root.tab ? root.cwd : root.tabs[i].cwd)) });
+          Qt.callLater(() => { tabStrip.closedAt = -1; });
+        }
+        ListModel { id: ghosts }
+
         // The strip spans the window and the tabs divide it, the way a browser
         // does it: a tab's position stops moving every time a directory with a
         // longer name is opened in one of them.
@@ -12458,6 +12485,39 @@ FloatingWindow {
         Item {
           anchors.fill: parent
           anchors.bottomMargin: 1
+
+          Repeater {
+            model: ghosts
+            delegate: Item {
+              id: ghost
+              required property int index
+              required property real gx
+              required property real gw
+              required property string name
+              x: ghost.gx
+              width: ghost.gw
+              height: parent.height
+              clip: true
+              z: -1
+              Text {
+                anchors.centerIn: parent
+                width: Math.max(0, ghost.gw - 16)
+                horizontalAlignment: Text.AlignHCenter
+                elide: Text.ElideMiddle
+                text: ghost.name
+                color: Zenon.muted
+                font.family: Zenon.face
+                font.pixelSize: Math.round(16 * root.zoom)
+              }
+              ParallelAnimation {
+                running: true
+                onFinished: ghosts.remove(ghost.index)
+                NumberAnimation { target: ghost; property: "opacity"; from: 1; to: 0; duration: Zenon.normal; easing.type: Easing.OutCubic }
+                NumberAnimation { target: ghost; property: "width"; to: 0; duration: Zenon.normal; easing.type: Zenon.travelEase }
+                NumberAnimation { target: ghost; property: "x"; to: ghost.gx + ghost.gw / 2; duration: Zenon.normal; easing.type: Zenon.travelEase }
+              }
+            }
+          }
 
           Repeater {
             model: root.tabs
@@ -12483,22 +12543,41 @@ FloatingWindow {
                   ? tabCell.index + 1 : tabCell.index;
               }
 
-              x: tabCell.lifted ? tabStrip.dragX : tabCell.slot * tabCell.width
+              // from where it was before a close rebuilt the strip
+              property real shiftX: 0
+              property real shiftW: 0
+              x: tabCell.lifted ? tabStrip.dragX
+                : tabCell.slot * (tabStrip.width / Math.max(1, root.tabs.length)) + tabCell.shiftX
               // the carried one rides over the rest
               z: tabCell.lifted ? 2 : 0
               // The slide. Switched off for the tab under the pointer: that one
               // is following a finger, and an animation between the finger and
               // the tab is lag with a curve on it.
               Behavior on x {
-                enabled: !tabCell.lifted
+                enabled: !tabCell.lifted && !closeUp.running
                 NumberAnimation { duration: Zenon.normal; easing.type: Easing.OutCubic }
+              }
+              ParallelAnimation {
+                id: closeUp
+                NumberAnimation { target: tabCell; property: "shiftX"; to: 0; duration: Zenon.normal; easing.type: Zenon.travelEase }
+                NumberAnimation { target: tabCell; property: "shiftW"; to: 0; duration: Zenon.normal; easing.type: Zenon.travelEase }
               }
 
               // A new tab grows into place rather than appearing, and the
               // active one lifts a little — the strip is the one part of the
               // chrome that changes while you are looking straight at it.
               opacity: 0
-              Component.onCompleted: tabIn.start()
+              Component.onCompleted: {
+                const c = tabStrip.closedAt;
+                if (c < 0) { tabIn.start(); return; }
+                // a survivor of a close: there already, sliding from its old place
+                tabCell.opacity = 1;
+                const was = tabCell.index >= c ? tabCell.index + 1 : tabCell.index;
+                const w = tabStrip.width / Math.max(1, root.tabs.length);
+                tabCell.shiftX = was * tabStrip.closedCellW - tabCell.index * w;
+                tabCell.shiftW = tabStrip.closedCellW - w;
+                closeUp.start();
+              }
               NumberAnimation {
                 id: tabIn
                 target: tabCell
@@ -12510,7 +12589,7 @@ FloatingWindow {
               Behavior on color {
                 ColorAnimation { duration: Zenon.fast; easing.type: Zenon.ease }
               }
-              width: tabStrip.width / Math.max(1, root.tabs.length)
+              width: tabStrip.width / Math.max(1, root.tabs.length) + tabCell.shiftW
               height: parent.height
               // The active tab paints nothing — it is the strip, which is the
               // bar — so it runs into the path bar with no seam at all. The
@@ -12545,7 +12624,8 @@ FloatingWindow {
               Text {
                 id: tabLabel
                 anchors.centerIn: parent
-                width: parent.width - 16
+                // room either side for the close button, while it shows
+                width: parent.width - 16 - (closeX.visible ? 2 * (closeX.width + 8) : 0)
                 horizontalAlignment: Text.AlignHCenter
                 elide: Text.ElideMiddle
                 text: Terminus.basename(root.shownPath(here ? root.cwd : modelData.cwd))
@@ -12559,11 +12639,46 @@ FloatingWindow {
                 font.pixelSize: Math.round(16 * root.zoom)
               }
 
+              // ── CLOSE, UNDER THE POINTER ───────────────────────────
+              // A × at the tab's right end while the pointer is on it, as
+              // plato's tabs have; a middle click still closes too.
+              Text {
+                id: closeX
+                anchors.right: parent.right
+                anchors.rightMargin: 8
+                anchors.verticalCenter: parent.verticalCenter
+                opacity: tabHov.hovered && !tabMouse.dragging && tabCell.width > 70 && !root.modal ? 1 : 0
+                Behavior on opacity { NumberAnimation { duration: Zenon.fast } }
+                visible: opacity > 0
+                text: "\u{F0156}"
+                font.family: Zenon.faceMono
+                font.pixelSize: Math.round(16 * root.zoom)
+                color: tabMouse.overClose ? Zenon.white : Zenon.muted
+                Behavior on color { ColorAnimation { duration: Zenon.fast } }
+                Rectangle {
+                  anchors.centerIn: parent
+                  width: parent.height + 2
+                  height: width
+                  radius: 4
+                  z: -1
+                  color: Qt.rgba(1, 1, 1, tabMouse.overClose ? 0.08 : 0)
+                }
+              }
+
               HoverHandler { id: tabHov }
               MouseArea {
                 id: tabMouse
                 anchors.fill: parent
                 acceptedButtons: Qt.LeftButton | Qt.MiddleButton
+                hoverEnabled: true
+                // the pointer is on the close button
+                property bool overClose: false
+                onContainsMouseChanged: if (!tabMouse.containsMouse) tabMouse.overClose = false
+                function onClose(m) {
+                  if (!closeX.visible) return false;
+                  const p = tabMouse.mapToItem(closeX, m.x, m.y);
+                  return p.x >= -4 && p.x <= closeX.width + 4 && p.y >= -4 && p.y <= closeX.height + 4;
+                }
 
                 // How far into the tab you took hold of it, so the tab does not
                 // jump its own width the moment the drag begins.
@@ -12605,6 +12720,7 @@ FloatingWindow {
                 }
 
                 onPositionChanged: (m) => {
+                  tabMouse.overClose = tabMouse.onClose(m);
                   if (!tabMouse.pressed || root.tabs.length < 2 || root.modal) return;
                   const at = tabMouse.stripX(m);
                   if (!tabMouse.dragging) {
@@ -12654,7 +12770,7 @@ FloatingWindow {
                   // a gesture that became a drag is not also a click — the same
                   // rule the listing's rows follow
                   if (tabMouse.dragging) return;
-                  if (m.button === Qt.MiddleButton) {
+                  if (m.button === Qt.MiddleButton || tabMouse.onClose(m)) {
                     // DEFERRED, because this handler is about to lose the
                     // ground it is standing on: closing a tab replaces
                     // `root.tabs`, which is this Repeater's model, so the
@@ -15236,14 +15352,9 @@ FloatingWindow {
           // The same word at the same size as the active pane's — see the
           // note there. Two panes saying the same thing two different ways
           // reads as two different states.
-          Text {
+          EmptyMark {
             anchors.centerIn: parent
             visible: root.dual && root.otherRows.length === 0
-            text: "Empty"
-            color: Zenon.muted
-            font.family: Zenon.face
-            font.weight: Font.Bold
-            font.pixelSize: 15
           }
         }
 
@@ -15608,7 +15719,7 @@ FloatingWindow {
         // It travels with the columns too: miller.x is the step animation, so
         // the label slides in with the column it belongs to rather than
         // sitting still while that column moves out from under it.
-        Text {
+        EmptyMark {
           id: emptyLabel
           x: root.viewMode === "columns"
             // NOT miller.x. That is written by an XAnimator on the render
@@ -15675,11 +15786,7 @@ FloatingWindow {
               easing.type: Zenon.travelEase
             }
           }
-          text: root.query !== "" ? "No matches" : "Empty"
-          color: Zenon.muted
-          font.family: Zenon.face
-          font.weight: Font.Bold
-          font.pixelSize: 15
+          filtered: root.query !== ""
         }
         }
 
@@ -16222,8 +16329,11 @@ FloatingWindow {
           return 18 + 118 + 12 + w + 18;
         }
 
+        // The picture's own 18px inset counts too. Left out, the card came up
+        // eighteen pixels narrower than its widest fact, and ElideMiddle took
+        // them out of the middle: "0 files  · …directories" on every folder.
         cardW: Math.max(420, Math.min(760,
-          propShotBox.width + (props.many ? 0 : 10) + propsSheet.factsW))
+          (props.many ? 0 : 18 + propShotBox.width + 10) + propsSheet.factsW))
         cardH: propsCol.implicitHeight
 
         Column {
@@ -21460,6 +21570,7 @@ FloatingWindow {
                 anchors.rightMargin: 16
                 anchors.verticalCenter: parent.verticalCenter
                 ghost: "where to look"
+                elide: Text.ElideLeft
                 onTextChanged: collEdit.nameRev = collEdit.nameRev + 1
                 onTabbed: collEdit.focusFrom(collRoot, 1)
                 onBackTabbed: collEdit.focusFrom(collRoot, -1)
@@ -22003,7 +22114,9 @@ FloatingWindow {
         glyphInk: root.sheetGlyphInk
         shown: tagPick.open
         fromTop: tabStrip.height + crumbBar.height
-        cardW: 720
+        // As wide as the key hints along its foot need, which is the widest
+        // thing in it — a fixed 720 left seven short names in a wide card.
+        cardW: Math.max(460, tagHints.implicitWidth + 48)
         readonly property int rowH: 32
         readonly property int pageRows: 12
         cardH: 12 + Math.max(1, Math.min(tagSheet.pageRows,
@@ -22125,7 +22238,8 @@ FloatingWindow {
               anchors.left: tagDot.right
               anchors.leftMargin: 14
               anchors.right: tagState.left
-              anchors.rightMargin: 12
+              // room for the count that follows the name
+              anchors.rightMargin: 12 + tagCount.implicitWidth + 10
               anchors.verticalCenter: parent.verticalCenter
               text: tagRow.editing ? tagPick.renameText : tagRow.modelData.name
               elide: Text.ElideRight
@@ -22148,8 +22262,8 @@ FloatingWindow {
             // open, so it is the one that gets a mark rather than a number.
             Text {
               id: tagState
-              anchors.right: tagCount.left
-              anchors.rightMargin: 10
+              anchors.right: parent.right
+              anchors.rightMargin: 16
               anchors.verticalCenter: parent.verticalCenter
               text: tagRow.modelData.on ? "\uF00C"
                 : (tagRow.modelData.partly ? "\uF068" : "")
@@ -22158,11 +22272,15 @@ FloatingWindow {
               font.pixelSize: 13
             }
 
+            // BESIDE THE NAME, not at the card's far edge. Out there a lone
+            // "1" sat half a card away from the tag it counted, and read as
+            // belonging to nothing. Hidden while the row is being renamed,
+            // when the name under it is moving.
             Text {
               id: tagCount
-              anchors.right: parent.right
-              anchors.rightMargin: 16
+              x: tagName.x + Math.min(tagName.contentWidth, tagName.width) + 10
               anchors.verticalCenter: parent.verticalCenter
+              visible: !tagRow.editing
               text: tagRow.modelData.count > 0
                 ? String(tagRow.modelData.count) : ""
               color: Zenon.muted
@@ -22197,6 +22315,7 @@ FloatingWindow {
           }
 
           Row {
+            id: tagHints
             anchors.centerIn: parent
             spacing: 12
             visible: tagPick.gripe === ""
@@ -25136,6 +25255,9 @@ FloatingWindow {
       required property string path
       required property int index
       held: pgrid.held
+      riseView: pgrid
+      riseIndex: index
+      GridView.onReused: tileItem.riseReset()
       readonly property var row: pgrid.pane.rowFor(path)
       width: pgrid.cellWidth
       height: pgrid.cellHeight
@@ -25171,9 +25293,22 @@ FloatingWindow {
     property bool waited: false
     readonly property bool thumbLoading: thumb.source != "" && thumb.status === Image.Loading
     onThumbLoadingChanged: if (tile.thumbLoading && tile.held) tile.waited = true
+    // ── AND THE SCREENFUL GOES IN TURN ─────────────────────────────────
+    // Held, the whole tile waits out of sight; let go, the tiles come up
+    // one after another from the top (TileRise, picasso's gallery's too)
+    // rather than all on one frame.
+    property var riseView: null
+    property int riseIndex: -1
+    TileRise { id: rise }
+    Component.onCompleted: if (tile.held) rise.hide()
+    // a tile taken from the pool after the release must not stay hidden
+    function riseReset() { if (!tile.held) rise.show(); }
     onHeldChanged: {
-      if (tile.held) { if (tile.thumbLoading) tile.waited = true; }
-      else tile.waited = false;
+      if (tile.held) { if (tile.thumbLoading) tile.waited = true; rise.hide(); }
+      else {
+        tile.waited = false;
+        if (tile.riseView) rise.start(tile.riseView, tile.riseIndex); else rise.show();
+      }
     }
     // Resolved once per tile rather than three times inside the label's own
     // binding — see the note there. "" whenever the mode is off, so a grid
@@ -25270,9 +25405,9 @@ FloatingWindow {
       // between tiles. The tick stays, because a tick is a property of the
       // FILE rather than of where the cursor happens to be — and the border
       // below stays too, because a tile has always carried one.
-      color: tile.ticked
-        ? Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b, 0.10)
-        : "transparent"
+      // A tick is marked on the picture itself now (MarkRing, in thumbBox),
+      // not washed over the whole cell.
+      color: "transparent"
       // ── THE OUTLINE MOVED TO THE CURSOR ITSELF ────────────────
       // The sliding bar is BEHIND the tiles, which is right for a
       // glyph — it shows around it — and useless under a photograph,
@@ -25317,6 +25452,9 @@ FloatingWindow {
       anchors.topMargin: 12
       anchors.horizontalCenter: parent.horizontalCenter
       width: parent.width - 24
+      // ticked, the picture steps back a little inside its ring (MarkRing)
+      scale: tile.ticked ? 0.9 : 1
+      Behavior on scale { NumberAnimation { duration: Zenon.slow; easing.type: Easing.OutBack; easing.overshoot: 1.6 } }
       // 68, not 62. The reserve has to hold the 8px gap, two lines of
       // label and the 4px the highlight is inset by — and the label
       // went from 15px to 16px, which is exactly enough for a name
@@ -25502,9 +25640,24 @@ FloatingWindow {
       // in — see thumbClip. The glyph is for a tile with no picture to
       // show: not an image, thumbnails off, a video the batch has not
       // reached yet, or a file Qt could not read.
+      //
+      // A FOLDER WITH PICTURES IN IT IS DRAWN AS THEM — see FolderCover. One
+      // with none, or with thumbnails off, keeps the glyph.
+      FolderCover {
+        id: tileCover
+        anchors.fill: parent
+        live: root.thumbsOn && !!tile.entry && tile.entry.isDir
+        path: tile.entry && tile.entry.isDir ? tile.entry.path : ""
+        stamp: tile.entry ? (tile.entry.mtime || 0) : 0
+        glyph: tile.entry ? tile.entry.glyph : ""
+        ink: root.inkFor(tile.entry)
+        dim: tile.dim ? 0.45 : 1
+      }
+
       Text {
         anchors.centerIn: parent
-        visible: thumb.source == "" || thumb.status === Image.Error
+        visible: (thumb.source == "" || thumb.status === Image.Error)
+          && !tileCover.shown
         opacity: tile.dim ? 0.45 : 1
         text: tile.entry ? tile.entry.glyph : ""
         color: root.inkFor(tile.entry)
@@ -25512,41 +25665,27 @@ FloatingWindow {
         font.pixelSize: Math.round(64 * tile.tileZoom)
       }
 
-      // ── the tags, in the picture's corner ──────────────────────
-      // ON the thumbnail rather than beside the name, which is where a
-      // grid has the room — and the one place that works over a
-      // photograph as well as over a glyph. Each dot carries a dark
-      // ring for exactly that reason: a pale tag on a pale picture is
-      // not a mark, and the ring costs nothing over a glyph.
-      Row {
-        anchors.right: parent.right
-        anchors.bottom: parent.bottom
-        anchors.margins: Math.round(5 * tile.tileZoom)
-        spacing: Math.max(4, Math.round(6 * tile.tileZoom))
-        visible: tile.tagList.length > 0
-        opacity: tile.dim ? 0.45 : 1
-        z: 3
-
-        Repeater {
-          model: tile.tagList
-          // As the rows do — and with a shadow rather than the dot's ring,
-          // because a glyph has no outline to put a border on and a pale
-          // tag over a pale photograph still has to be legible.
-          delegate: Text {
-            required property var modelData
-            anchors.verticalCenter: parent.verticalCenter
-            text: "\uF02B"
-            color: root.tagInk(modelData)
-            font.family: Zenon.face
-            font.pixelSize: Math.round(13 * tile.tileZoom)
-            style: Text.Outline
-            styleColor: Qt.rgba(0, 0, 0, 0.6)
-          }
-        }
+      // Ticked: round the picture when there is one, else round a square
+      // about the glyph or the folder's cover.
+      MarkRing {
+        readonly property bool pic: thumbClip.visible
+        readonly property real sq: Math.min(thumbBox.width, thumbBox.height)
+        x: pic ? thumbClip.x : (thumbBox.width - sq) / 2
+        y: pic ? thumbClip.y : (thumbBox.height - sq) / 2
+        width: pic ? thumbClip.width : sq
+        height: pic ? thumbClip.height : sq
+        on: tile.ticked
       }
+
+      // THE TAGS ARE NOT HERE ANY MORE — they ride in the name's lead, beside
+      // the bookmark. Anchored to this box's corner they hung off the TILE's
+      // corner, which a glyph or a portrait picture is nowhere near, and a
+      // tag sat out in the air fifty pixels from the thing it marked.
     }
 
-    Text {
+    // TileName, not Text: see TileName.qml for why a long name needs
+    // shortening done by hand to keep its extension and its ellipsis.
+    TileName {
       anchors.top: thumbBox.bottom
       anchors.topMargin: 8
       anchors.left: parent.left
@@ -25562,13 +25701,12 @@ FloatingWindow {
       // of the same string, coloured with StyledText. The name is escaped
       // because it is now markup: an ampersand in a filename would otherwise
       // eat the rest of the label.
-      textFormat: Text.StyledText
       // The git mark leads, because it is about the file rather than about
       // your relationship to it, and because a row of tiles reads left to
       // right. Same inline treatment as the bookmark below and for the same
       // reason: a badge in the corner of the thumbnail sits over the picture
       // and a long way from the thing it qualifies.
-      text: (tile.gitState !== ""
+      lead: (tile.gitState !== ""
               ? "<font color=\"" + Zenon.hex(root.gitInk(tile.gitState)) + "\">"
                 + Terminus.gitMark(tile.gitState) + "</font>&#160;&#160;" : "")
             + (tile.entry && root.isBookmarked(tile.entry.path)
@@ -25576,14 +25714,16 @@ FloatingWindow {
               // collapses a run of ordinary ones to a single space, so the gap
               // asked for was never the gap drawn.
               ? "<font color=\"" + Zenon.hex(Zenon.sand) + "\">\uF02E</font>&#160;&#160;" : "")
-            + Strings.escapeHtml(tile.entry ? tile.entry.name : "")
-            // the same mark a list row carries — a link was the one thing the
-            // grid could not tell apart from the file it points at
-            + (tile.entry && tile.entry.isLink ? "&#160;\u2192" : "")
+            // Tags last, nearest the name, one coloured mark each — the
+            // list's tag column, said inline for the same reason as above.
+            + tile.tagList.map((t) => "<font color=\"" + Zenon.hex(root.tagInk(t))
+                + "\">\uF02B</font>&#160;").join("")
+            + (tile.tagList.length > 0 ? "&#160;" : "")
+      name: tile.entry ? tile.entry.name : ""
+      // the same mark a list row carries — a link was the one thing the
+      // grid could not tell apart from the file it points at
+      trail: tile.entry && tile.entry.isLink ? "&#160;\u2192" : ""
       opacity: tile.dim ? 0.5 : 1
-      elide: Text.ElideMiddle
-      maximumLineCount: 2
-      wrapMode: Text.Wrap
       color: root.nameInkFor(tile.entry)
       font.family: Zenon.face
       font.weight: tile.current ? Font.Bold : Font.Medium
@@ -25959,6 +26099,79 @@ FloatingWindow {
             return;
           }
           if (colRow.row && colRow.row.isDir) root.openInNewTab(colRow.path);
+        }
+      }
+    }
+
+    // ── THE FOLDER, AT THE FOOT OF ITS PREVIEW ─────────────────────────
+    // A previewed folder was a third copy of a list: parent, current, and
+    // this. Its cover and what it holds now sit at the bottom of the column,
+    // so the preview says something the two columns beside it cannot.
+    //
+    // AT THE FOOT, not over the rows. A header above them would push the
+    // rows down, and on a step into the folder this column slides into the
+    // middle and becomes the listing — the header would have to go and every
+    // row would jump up under the cursor. Down here nothing moves: it shows
+    // only while the rows leave it room, and fades as the column leaves the
+    // preview slot.
+    Item {
+      id: colFoot
+      readonly property var dir: col.drawnSlot === 2 && root.previewKind === "dir"
+        ? root.currentRow() : null
+      // what the rows leave below them
+      readonly property bool room: colView.contentHeight + colFoot.implicitH + 24
+        <= col.height
+      readonly property real implicitH: colCover.height + 10 + colSum.height
+      anchors.left: parent.left
+      anchors.right: parent.right
+      anchors.bottom: parent.bottom
+      anchors.margins: 16
+      height: colFoot.implicitH
+      opacity: (!!colFoot.dir && colFoot.room && (colCover.shown || colSum.text !== ""))
+        ? 1 : 0
+      visible: colFoot.opacity > 0.01
+      Behavior on opacity {
+        NumberAnimation { duration: Zenon.fast; easing.type: Zenon.travelEase }
+      }
+
+      FolderCover {
+        id: colCover
+        anchors.top: parent.top
+        anchors.horizontalCenter: parent.horizontalCenter
+        width: parent.width
+        height: colCover.shown ? Math.round(Math.min(parent.width / 1.5, 160)) : 0
+        live: root.thumbsOn && !!colFoot.dir
+        path: colFoot.dir ? colFoot.dir.path : ""
+        stamp: colFoot.dir ? (colFoot.dir.mtime || 0) : 0
+        glyph: colFoot.dir ? colFoot.dir.glyph : ""
+        ink: root.inkFor(colFoot.dir)
+      }
+
+      // What it holds, counted from the rows already shown above, and its
+      // size once du has been round — never a guess at it.
+      Text {
+        id: colSum
+        anchors.top: colCover.bottom
+        anchors.topMargin: colCover.shown ? 10 : 0
+        anchors.left: parent.left
+        anchors.right: parent.right
+        horizontalAlignment: Text.AlignHCenter
+        elide: Text.ElideRight
+        color: Zenon.muted
+        font.family: Zenon.face
+        font.pixelSize: Math.round(13 * root.zoom)
+        text: {
+          if (!colFoot.dir) return "";
+          const rows = col.rows || [];
+          let files = 0, dirs = 0;
+          for (let i = 0; i < rows.length; ++i)
+            if (rows[i]) { if (rows[i].isDir) ++dirs; else ++files; }
+          const parts = [];
+          if (files > 0) parts.push(files + (files === 1 ? " file" : " files"));
+          if (dirs > 0) parts.push(dirs + (dirs === 1 ? " folder" : " folders"));
+          const walked = root.dirSizes[colFoot.dir.path];
+          if (walked !== undefined) parts.push(Terminus.formatSize(walked));
+          return parts.join("  \u00b7  ");
         }
       }
     }

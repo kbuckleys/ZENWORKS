@@ -17,6 +17,9 @@ Rectangle {
   // agree about how big the type is.
   property int textSize: 14
   property alias text: fldIn.text
+  // Which end gives way when the text is wider than the field and the field
+  // is not being typed in. A path keeps its tail, so a path field says Left.
+  property int elide: Text.ElideRight
   signal accepted()
   // Where Tab goes from here. The card owns the ring — a field should not
   // know what is next to it.
@@ -58,8 +61,28 @@ Rectangle {
     font.pixelSize: fld.textSize
   }
 
+  // ── AT REST, A LONG VALUE IS SHORTENED, NOT CUT ───────────────────
+  // A TextInput wider than itself scrolls to its caret and clips wherever
+  // that leaves it — the search sheet's "~/.config/quickshell/terminus"
+  // came out as "’.config/…", the last sliver of the slash reading as a
+  // stray apostrophe. Unfocused and overflowing, the field shows this
+  // elided copy instead; a click hands it back to the input, which shows
+  // the whole thing for editing.
+  readonly property bool overflows: fldIn.contentWidth > fldIn.width
+  Text {
+    anchors.fill: fldIn
+    verticalAlignment: Text.AlignVCenter
+    visible: fld.overflows && !fldIn.activeFocus
+    text: fldIn.text
+    elide: fld.elide
+    color: Zenon.white
+    font.family: Zenon.face
+    font.pixelSize: fld.textSize
+  }
+
   TextInput {
     id: fldIn
+    opacity: fld.overflows && !fldIn.activeFocus ? 0 : 1
 
     cursorDelegate: Caret { field: fldIn }
     anchors.fill: parent
