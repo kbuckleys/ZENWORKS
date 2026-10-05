@@ -7397,7 +7397,8 @@ FloatingWindow {
   function nameInkOf(e) { return Terminus.nameInkOf(e); }
 
   // Text previews in plato's colours, when plato is part of this shell — see
-  // previewCommand in terminus.js
+  // previewCommand in terminus.js. Markdown comes out rendered, as plato
+  // draws it (headings, tables, boxes; plato's markdown settings apply).
   readonly property string platoRender: Quickshell.shellDir + "/plato/nvim/render.lua"
 
   // shared with every other row of files — see terminus.js

@@ -1286,6 +1286,17 @@ function ansiToRich(text, family) {
         k++;
       } else if (c === 1) {
         out += "<span style=\"font-weight:700;\">"; open++; k++;
+      } else if (c === 3) {
+        out += "<span style=\"font-style:italic;\">"; open++; k++;
+      } else if (c === 4) {
+        out += "<span style=\"text-decoration:underline;\">"; open++; k++;
+      } else if (c === 9) {
+        out += "<span style=\"text-decoration:line-through;\">"; open++; k++;
+      } else if (c === 48 && codes[k+1] === 2) {
+        // a background: plato's rendered markdown (inline code, code panels)
+        out += "<span style=\"background-color:rgb(" + (codes[k+2]|0) + ","
+          + (codes[k+3]|0) + "," + (codes[k+4]|0) + ");\">";
+        open++; k += 5;
       } else if (c === 38 && codes[k+1] === 2) {
         out += "<span style=\"color:rgb(" + (codes[k+2]|0) + ","
           + (codes[k+3]|0) + "," + (codes[k+4]|0) + ");\">";
