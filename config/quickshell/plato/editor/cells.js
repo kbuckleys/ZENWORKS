@@ -55,7 +55,7 @@ function width(ch) {
 function slice(text, c0, len) {
   let cell = 0, out = "";
   const c1 = c0 + len;
-  for (const ch of text) {
+  for (const ch of chars(text)) {
     if (cell >= c1) break;
     if (cell >= c0) out += ch;
     cell += width(ch);
@@ -66,6 +66,14 @@ function slice(text, c0, len) {
 // how many cells `text` takes
 function count(text) {
   let n = 0;
-  for (const ch of text) n += width(ch);
+  for (const ch of chars(text)) n += width(ch);
   return n;
+}
+
+// A row's text as its characters — code points, as nvim counts them. Not
+// Array.from: in this engine it splits a character past U+FFFF (a Nerd Font
+// icon, most emoji) into its two UTF-16 halves, and every span after one on
+// the row came out a character short.
+function chars(t) {
+  return String(t || "").match(/[\uD800-\uDBFF][\uDC00-\uDFFF]|[\s\S]/g) || [];
 }

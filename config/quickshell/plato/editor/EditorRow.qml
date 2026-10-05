@@ -24,6 +24,8 @@
 import QtQuick
 import QtQuick.Shapes
 import "../../morpheus"
+import "../../morpheus/icons.js" as Icons
+import "cells.js" as Cells
 
 Item {
   id: row
@@ -134,6 +136,202 @@ Item {
     opacity: number.rel === 0 ? 1 : Math.max(0.5, 1 - number.rel * 0.04)
   }
 
+  // ── rendered markdown's blocks (view.lua's `md`) ───────────────────
+  // Drawn under the text: a heading's band, fading out to the right with an
+  // accent at its start; a code block's framed panel and its language in
+  // the corner; a quote's bars, a callout tinted in its colour; a table's
+  // frame, its header lit and its rows striped; a rule that fades at both
+  // ends. A block that spans rows is one shape: each row draws its slice of
+  // a taller rounded rectangle, and only the block's first and last rows
+  // show its corners.
+  readonly property var md: row.info.md || null
+  readonly property var mdQ: row.md && row.md.q ? row.md.q : null
+  readonly property var mdT: row.md && row.md.tb ? row.md.tb : null
+  function headInk(n) {
+    return [Zenon.magenta, Zenon.blue, Zenon.cyan, Zenon.green, Zenon.yellow, Zenon.pink][Math.max(0, Math.min(5, n - 1))];
+  }
+  function calloutInk(k) {
+    return k === "note" ? Zenon.blue : k === "tip" ? Zenon.green : k === "important" ? Zenon.magenta
+      : k === "warning" ? Zenon.yellow : k === "caution" ? Zenon.red : Zenon.muted;
+  }
+  function has(e, c) { return !!e && e.indexOf(c) >= 0; }
+  // the glyph for a code block's language: the file tree's, for a file of it
+  function langGlyph(lang) {
+    const l = String(lang || "").toLowerCase();
+    const ext = ({ python: "py", javascript: "js", typescript: "ts", rust: "rs", bash: "sh",
+      shell: "sh", zsh: "sh", console: "sh", markdown: "md", yaml: "yml", ruby: "rb",
+      golang: "go", "c++": "cpp", csharp: "cs", kotlin: "kt", haskell: "hs",
+      "front matter": "yml" })[l] || l;
+    return ext ? Icons.glyphFor({ name: "x." + ext }) : "";
+  }
+
+  // a heading
+  Item {
+    id: headBand
+    visible: row.md !== null && row.md.k === "h"
+    readonly property color ink: visible ? row.headInk(row.md.n) : "transparent"
+    readonly property real strength: visible ? [0.24, 0.18, 0.13, 0.1, 0.08, 0.07][Math.min(5, row.md.n - 1)] : 0
+    x: row.textX - row.cellW * 0.6
+    width: Math.max(0, row.width - x - row.cellW * 0.5)
+    height: row.cellH
+    Rectangle {
+      anchors.fill: parent
+      radius: 4
+      gradient: Gradient {
+        orientation: Gradient.Horizontal
+        GradientStop { position: 0; color: Qt.rgba(headBand.ink.r, headBand.ink.g, headBand.ink.b, headBand.strength) }
+        GradientStop { position: 0.75; color: Qt.rgba(headBand.ink.r, headBand.ink.g, headBand.ink.b, 0) }
+      }
+    }
+    Rectangle {
+      x: 0
+      y: 3
+      width: 3
+      height: parent.height - 6
+      radius: 1.5
+      color: parent.ink
+    }
+  }
+
+  // a code block, or front matter
+  Item {
+    id: codePanel
+    visible: row.md !== null && row.md.k === "c"
+    readonly property bool atTop: visible && row.has(row.md.e, "t")
+    readonly property bool atBottom: visible && row.has(row.md.e, "b")
+    x: row.textX + (visible ? row.md.x : 0) * row.cellW - row.cellW * 0.6
+    width: Math.max(0, row.width - x - row.cellW * 0.5)
+    height: row.cellH
+    clip: true
+    Rectangle {
+      y: codePanel.atTop ? 1 : -8
+      width: parent.width
+      height: parent.height + (codePanel.atTop ? -1 : 8) + (codePanel.atBottom ? -1 : 8)
+      radius: 6
+      color: Qt.rgba(1, 1, 1, 0.04)
+      border.width: 1
+      border.color: Zenon.border
+    }
+    // the language, quiet, in the panel's top right corner
+    Row {
+      visible: codePanel.visible && !!row.md.lang
+      anchors.right: parent.right
+      anchors.rightMargin: row.cellW
+      anchors.verticalCenter: parent.verticalCenter
+      spacing: Math.round(row.cellW * 0.5)
+      Text {
+        readonly property string g: parent.visible ? row.langGlyph(row.md.lang) : ""
+        visible: g !== ""
+        text: g
+        font.family: row.face.family
+        font.pixelSize: Math.round(row.face.pixelSize * 0.85)
+        color: Zenon.muted
+        anchors.verticalCenter: parent.verticalCenter
+      }
+      Text {
+        text: parent.visible ? row.md.lang : ""
+        font.family: row.face.family
+        font.pixelSize: Math.round(row.face.pixelSize * 0.8)
+        color: Zenon.muted
+        anchors.verticalCenter: parent.verticalCenter
+      }
+    }
+  }
+
+  // a quote: a callout's tint, then its bars
+  Item {
+    id: callout
+    visible: row.mdQ !== null && !!row.mdQ.k && row.mdQ.b.length > 0
+    readonly property color ink: visible ? row.calloutInk(row.mdQ.k) : "transparent"
+    readonly property bool atTop: visible && row.has(row.mdQ.e, "t")
+    readonly property bool atBottom: visible && row.has(row.mdQ.e, "b")
+    x: visible ? row.textX + row.mdQ.b[0] * row.cellW : 0
+    width: Math.max(0, row.width - x - row.cellW * 0.5)
+    height: row.cellH
+    clip: true
+    Rectangle {
+      y: callout.atTop ? 1 : -8
+      width: parent.width
+      height: parent.height + (callout.atTop ? -1 : 8) + (callout.atBottom ? -1 : 8)
+      radius: 6
+      color: Qt.rgba(callout.ink.r, callout.ink.g, callout.ink.b, 0.08)
+    }
+  }
+  Repeater {
+    model: row.mdQ ? row.mdQ.b : []
+    Rectangle {
+      required property var modelData
+      required property int index
+      readonly property bool atTop: row.has(row.mdQ.e, "t")
+      readonly property bool atBottom: row.has(row.mdQ.e, "b")
+      readonly property color ink: index === 0 && row.mdQ.k ? row.calloutInk(row.mdQ.k) : Zenon.muted
+      x: Math.round(row.textX + modelData * row.cellW + row.cellW * 0.3)
+      y: atTop ? 3 : 0
+      width: 3
+      height: row.cellH - (atTop ? 3 : 0) - (atBottom ? 3 : 0)
+      radius: (atTop || atBottom) ? 1.5 : 0
+      color: ink
+      opacity: index === 0 && row.mdQ.k ? 1 : 0.7
+    }
+  }
+
+  // a table: its frame, the header lit, every other row striped
+  Item {
+    id: tableFrame
+    visible: row.mdT !== null
+    readonly property bool atTop: visible && row.has(row.mdT.e, "t")
+    readonly property bool atBottom: visible && row.has(row.mdT.e, "b")
+    x: visible ? row.textX + (row.mdT.x + 0.5) * row.cellW : 0
+    width: visible ? Math.max(0, (row.mdT.w - 1) * row.cellW + 1) : 0
+    height: row.cellH
+    clip: true
+    Rectangle {
+      y: tableFrame.atTop ? 0 : -8
+      width: parent.width
+      height: parent.height + (tableFrame.atTop ? 0 : 8) + (tableFrame.atBottom ? 0 : 8)
+      radius: 6
+      color: !tableFrame.visible ? "transparent" : row.mdT.h ? Qt.rgba(1, 1, 1, 0.07)
+        : row.mdT.z ? Qt.rgba(1, 1, 1, 0.035) : Qt.rgba(1, 1, 1, 0.012)
+      border.width: 1
+      border.color: "#454b57"
+    }
+    // the columns' rules, one line down the whole table
+    Repeater {
+      model: tableFrame.visible ? row.mdT.c : []
+      Rectangle {
+        required property var modelData
+        x: Math.round((modelData - row.mdT.x - 0.5) * row.cellW)
+        width: 1
+        height: row.cellH
+        color: "#454b57"
+      }
+    }
+    // the rule under the header (its --- row is hidden), or across that
+    // row when the cursor shows it as written
+    Rectangle {
+      visible: tableFrame.visible && (!!row.mdT.d || !!row.mdT.u)
+      y: row.mdT && row.mdT.u ? row.cellH - 1 : Math.round(row.cellH / 2)
+      width: parent.width
+      height: 1
+      color: "#5a6170"
+    }
+  }
+
+  // a rule, fading in and out
+  Rectangle {
+    visible: row.md !== null && row.md.k === "hr"
+    x: row.textX
+    width: Math.max(0, row.width - row.textX - row.cellW)
+    y: Math.round(row.cellH / 2)
+    height: 1
+    gradient: Gradient {
+      orientation: Gradient.Horizontal
+      GradientStop { position: 0; color: Qt.rgba(Zenon.muted.r, Zenon.muted.g, Zenon.muted.b, 0) }
+      GradientStop { position: 0.5; color: Zenon.muted }
+      GradientStop { position: 1; color: Qt.rgba(Zenon.muted.r, Zenon.muted.g, Zenon.muted.b, 0) }
+    }
+  }
+
   // ── backgrounds ────────────────────────────────────────────────────
   // only the spans that have one: most rows have none, and a Repeater over
   // nothing costs nothing when the row changes
@@ -234,7 +432,7 @@ Item {
   readonly property string markup: {
     const d = row.info;
     const styles = row.ed.styles;
-    const chars = Array.from(d.t);
+    const chars = Cells.chars(d.t);
     let out = "";
     let pos = 0;
     for (let k = 0; k < d.s.length; ++k) {
@@ -259,13 +457,21 @@ Item {
   // Not clipped, so a glyph taller than its cell — box drawing reaches from
   // the very top of the line to the very bottom — meets the row above and
   // the row below rather than stopping short of them. The window clips.
+  //
+  // A RENDERED H1 OR H2 IS SET LARGER, a little past its row — headings sit
+  // between blank lines. Not the cursor's line: written out, it is on the
+  // grid the cursor moves on.
+  readonly property real textScale: row.md && row.md.k === "h" && !row.md.raw && row.info.k === 0
+    ? (row.md.n === 1 ? 1.25 : row.md.n === 2 ? 1.12 : 1) : 1
   Text {
     x: row.textX
     width: row.width - row.textX
     height: row.cellH
     verticalAlignment: Text.AlignVCenter
     textFormat: Text.StyledText
-    font: row.face
+    font.family: row.face.family
+    font.weight: row.face.weight
+    font.pixelSize: Math.round(row.face.pixelSize * row.textScale)
     color: row.ed.normalFg
     text: row.markup
   }

@@ -46,6 +46,35 @@ function M.apply()
   for i, c in ipairs({ p.blue, p.magenta, p.yellow, p.cyan, p.green, p.bright_red }) do
     set("PlatoRainbow" .. i, { fg = c })
   end
+  -- rendered markdown (markdown.lua); EditorRow's heading bands take the
+  -- same colours, a level each
+  for i, c in ipairs({ p.magenta, p.blue, p.cyan, p.green, p.yellow, p.bright_red }) do
+    set("PlatoMdH" .. i, { fg = c, bold = true })
+  end
+  -- a bullet's colour by how deep its list is
+  for i, c in ipairs({ p.blue, p.magenta, p.cyan, p.green }) do
+    set("PlatoMdBullet" .. i, { fg = c })
+  end
+  set("PlatoMdQuoteText", { fg = "#a2a8b5", italic = true })
+  set("PlatoMdCalloutText", { fg = p.white })
+  set("PlatoMdComment", { fg = p.bright_black, italic = true })
+  set("PlatoMdTodo", { fg = p.bright_black })
+  set("PlatoMdCheck", { fg = p.green })
+  set("PlatoMdDone", { fg = p.bright_black, strikethrough = true })
+  set("PlatoMdBold", { bold = true })
+  set("PlatoMdItalic", { italic = true })
+  set("PlatoMdStrike", { fg = p.bright_black, strikethrough = true })
+  set("PlatoMdCode", { fg = p.bright_red, bg = p.lblack })
+  set("PlatoMdLink", { fg = p.blue, underline = true, sp = p.blue })
+  set("PlatoMdFence", { fg = p.bright_black, italic = true })
+  set("PlatoMdTable", { fg = "#454b57" })
+  set("PlatoMdTableHead", { fg = p.white, bold = true })
+  set("PlatoMdQuote", { fg = p.bright_black })
+  set("PlatoMdNote", { fg = p.blue, bold = true })
+  set("PlatoMdTip", { fg = p.green, bold = true })
+  set("PlatoMdImportant", { fg = p.magenta, bold = true })
+  set("PlatoMdWarning", { fg = p.yellow, bold = true })
+  set("PlatoMdCaution", { fg = p.red, bold = true })
   -- spelling (spell.lua): a curl under the word, as a diagnostic's
   set("SpellBad", { undercurl = true, sp = p.red })
   set("SpellCap", { undercurl = true, sp = p.yellow })

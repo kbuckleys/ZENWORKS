@@ -44,6 +44,7 @@ Item {
   // long lines wrapped at the width rather than cut off by it
   property bool wrap: false
 
+  // (markdown comes out rendered, as the editor draws it)
   readonly property string platoRender: Quickshell.shellDir + "/plato/nvim/render.lua"
   readonly property string kind: fp._kind
   // what the text or picture takes, for a card that sizes itself to it

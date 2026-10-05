@@ -210,6 +210,20 @@ end
 -- a click, in window cells. nvim_input_mouse does the rest natively: a
 -- click places the cursor, a drag makes a visual selection.
 function methods.mouse(p)
+  -- rendered markdown (markdown.lua): its rows hide and widen text, so a
+  -- plain left click there is placed here, by what the row shows
+  if p.button == "left" and p.action == "press" and (p.mods or "") == "" then
+    local w, l, b = view.clickAt(p.row, p.col)
+    if w then
+      vim.schedule(function()
+        if not api.nvim_win_is_valid(w) then return end
+        api.nvim_set_current_win(w)
+        pcall(api.nvim_win_set_cursor, w, { l + 1, b })
+        view.schedule()
+      end)
+      return true
+    end
+  end
   api.nvim_input_mouse(p.button, p.action, p.mods or "", 0, p.row, p.col)
   return true
 end

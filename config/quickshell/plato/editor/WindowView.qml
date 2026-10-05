@@ -178,7 +178,7 @@ Item {
     return r.n + "\u0001" + r.k + "\u0001" + r.t + "\u0001" + JSON.stringify(r.s)
       + "\u0001" + JSON.stringify(r.g || 0) + "\u0001" + r.f + "\u0001" + (r.v || "")
       + "\u0001" + (r.ig ? Array.from(r.ig).join(",") : "")
-      + "\u0001" + JSON.stringify([r.m || 0, r.sl || 0, r.vt || 0, r.fc || 0]);
+      + "\u0001" + JSON.stringify([r.m || 0, r.sl || 0, r.vt || 0, r.fc || 0, r.md || 0]);
   }
   function place() {
     const rows = win.ed.rowsOf(win.w.id);

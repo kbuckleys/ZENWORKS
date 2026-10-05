@@ -28,6 +28,9 @@
 --   vt a diagnostic at the line's end: { from, to, kind, cut } cells, kind
 --      "e" "w" "i" "h", cut when the window's edge took the rest of it
 --   fc a closed fold's pill: { from, len } cells of its "⋯ N lines"
+--   md rendered markdown's block (markdown.lua): { k = "h", n } a heading,
+--      { k = "c", x, e } a code block from cell x ("t" top, "b" bottom),
+--      { k = "hr" } a rule
 -- Style numbers are defined in the frame's `styles` the first time they are
 -- used — see hl.lua.
 --
@@ -41,6 +44,35 @@ local M = {}
 
 local pending = false
 local emit = nil
+-- window → { rows = screen row → { l, chars, c0, len }, r0, c0, h, w }:
+-- rendered markdown's rows and where the window's text is on nvim's grid
+M.clicks = {}
+
+-- A cell of nvim's grid (0-based row and column) as the window, line and
+-- byte it shows, where rendered markdown drew that row otherwise than it is
+-- written — or nil, where nvim's own mapping is right. Plain Lua only: it is
+-- asked from a fast callback.
+function M.clickAt(row, col)
+  for win, c in pairs(M.clicks) do
+    if row >= c.r0 and row < c.r0 + c.h and col >= c.c0 and col < c.c0 + c.w then
+      local l, b = M.clickIn(c.rows[row - c.r0], col - c.c0)
+      if l then return win, l, b end
+      return nil
+    end
+  end
+  return nil
+end
+
+-- one row's cell → its line and byte (past the text: the last byte)
+function M.clickIn(m, col)
+  if not m then return nil end
+  local cell = m.c0 + col
+  local byte = m.len
+  for _, ch in ipairs(m.chars) do
+    if cell < ch[3] + math.max(1, ch[4]) then byte = ch[1]; break end
+  end
+  return m.l, math.max(0, math.min(byte, math.max(0, m.len - 1)))
+end
 local hlns = api.nvim_create_namespace("plato.view")
 
 -- ── layout: bytes to cells ─────────────────────────────────────────────
@@ -55,17 +87,23 @@ local function layout(s, ts, from, limit, conceal)
   local i, n = 1, #s
   local ci = 1
   while i <= n and col < stop do
-    -- concealed bytes: one replacement cell, or nothing at all
+    -- concealed bytes: shown as something else, or not at all. The
+    -- something else is a cell, as nvim's conceal has it, or several:
+    -- rendered markdown pads a table's columns on its pipes
     if conceal then
       while conceal[ci] and conceal[ci][2] <= i - 1 do ci = ci + 1 end
       local c = conceal[ci]
       if c and c[1] <= i - 1 then
         if c[3] then
+          local w = c[3]:find("[\128-\255]") and vim.fn.strdisplaywidth(c[3]) or #c[3]
           if col >= from then
             out[#out + 1] = c[3]
-            chars[#chars + 1] = { i - 1, math.min(c[2], n), col - from, 1 }
+            chars[#chars + 1] = { i - 1, math.min(c[2], n), col - from, w }
+          elseif col + w > from then
+            out[#out + 1] = string.rep(" ", col + w - from)
+            chars[#chars + 1] = { i - 1, math.min(c[2], n), col - from, w }
           end
-          col = col + 1
+          col = col + w
         end
         i = math.min(c[2], n) + 1
         ci = ci + 1
@@ -392,6 +430,58 @@ local function charSpans(piece, list)
   return list
 end
 
+-- Conceal ranges in byte order, overlaps resolved: of two that start
+-- together the longer wins, and a later one is trimmed behind an earlier.
+function M.mergeConceal(list)
+  table.sort(list, function(x, y)
+    if x[1] ~= y[1] then return x[1] < y[1] end
+    return x[2] > y[2]
+  end)
+  local merged = { list[1] }
+  for k = 2, #list do
+    local p, c = merged[#merged], list[k]
+    if c[1] >= p[2] then merged[#merged + 1] = c
+    elseif c[2] > p[2] then merged[#merged + 1] = { p[2], c[2], c[3] } end
+  end
+  return merged
+end
+
+-- Rendered markdown's drawing for one row (markdown.lua's blk, q, tb), in
+-- the row's cells: positions moved by the view's sideways scroll, and a
+-- block's edges only on the row that has them — the first piece of a
+-- wrapped line its top, the last its bottom.
+local function mdRow(mdl, k, pieces, shift, raw)
+  if not (mdl.blk or mdl.q or mdl.tb) then return nil end
+  local function edges(e)
+    if not e then return nil end
+    local out = (k == 0 and e:find("t") and "t" or "") .. (k == pieces - 1 and e:find("b") and "b" or "")
+    return out ~= "" and out or nil
+  end
+  -- the cursor's line, shown as written: drawn on the grid like any other
+  local r = { raw = raw or nil }
+  local b = mdl.blk
+  if b then
+    r.k, r.n = b.k, b.n
+    if b.k == "c" then
+      r.x, r.e = math.max(0, b.x - shift), edges(b.e)
+      if k == 0 then r.lang = b.lang end
+    end
+  end
+  if mdl.q then
+    local bars = {}
+    for _, c in ipairs(mdl.q.b) do if c - shift >= 0 then bars[#bars + 1] = c - shift end end
+    r.q = { b = bars, k = mdl.q.k, e = edges(mdl.q.e) }
+  end
+  if mdl.tb then
+    local t = mdl.tb
+    local rules = {}
+    for _, c in ipairs(t.c or {}) do rules[#rules + 1] = c - shift end
+    r.tb = { x = t.x - shift, w = t.w, c = rules, h = t.h, d = t.d, z = t.z, e = edges(t.e),
+      u = t.u }
+  end
+  return r
+end
+
 -- ── one window, as rows ─────────────────────────────────────────────────
 -- Any window: the editor's, or a float — a hover, a signature, completion's
 -- documentation. Run inside nvim_win_call, so every "current window" question
@@ -428,6 +518,9 @@ local function build(win, isCurrent, mode, margin)
   -- rainbow brackets (brackets.lua): a colour a level
   local rainbow = not large and plain and vim.g.plato_rainbow ~= false
   local brackets = require("plato.brackets")
+  -- markdown drawn as what it means (markdown.lua), in an editor's window
+  local mdm = require("plato.markdown")
+  local md = plain and mdm.active(buf)
 
   local top = vim.fn.line("w0") - 1
   local bot
@@ -441,7 +534,7 @@ local function build(win, isCurrent, mode, margin)
       else l = l + 1 end
       rows = rows + 1
     end
-    bot = math.min(last - 1, top + height + skipped + (cl > 0 and height or 0))
+    bot = math.min(last - 1, top + height + skipped + ((cl > 0 or md) and height or 0))
   end
 
   -- the highlight ranges reach the rows past the edges too (see `margin`)
@@ -449,6 +542,8 @@ local function build(win, isCurrent, mode, margin)
   local hlBot = math.min(last - 1, bot + margin * 2)
   local tsPaints, tsConceal, tsHidden = hl.treesitter(buf, hlTop, hlBot)
   local deco, signs, virt, xConceal = extmarks(buf, hlTop, hlBot)
+  local mdLines = md and mdm.compute(buf, hlTop, hlBot) or {}
+  local mdRaw = md and mdm.rawLine()
   local found = searchMatches(buf, top, bot, isCurrent and view.lnum - 1 or -1, view.col)
   local sel = isCurrent and selection(mode) or {}
   -- the bracket at the cursor and its partner, both on screen: l0 → { bytes }
@@ -468,6 +563,18 @@ local function build(win, isCurrent, mode, margin)
   local hit = nil
 
   local function concealFor(l)
+    if md then
+      -- the cursor's line as written, so it never sits on a hidden star
+      if mdRaw and isCurrent and l == view.lnum - 1 then return nil end
+      local list = {}
+      for _, src in ipairs({ mdLines[l] and mdLines[l].cc or {}, xConceal[l] or {} }) do
+        for _, c in ipairs(src) do
+          list[#list + 1] = { c[1], c[2] == -1 and math.huge or c[2], c[3] ~= "" and c[3] or nil }
+        end
+      end
+      if #list == 0 then return nil end
+      return M.mergeConceal(list)
+    end
     if cl == 0 then return nil end
     if isCurrent and l == view.lnum - 1 then
       local cc = vim.wo[win].concealcursor
@@ -483,15 +590,7 @@ local function build(win, isCurrent, mode, margin)
       end
     end
     if #list == 0 then return nil end
-    table.sort(list, function(x, y) return x[1] < y[1] end)
-    -- overlapping ranges: the first wins, the rest are trimmed behind it
-    local merged = { list[1] }
-    for k = 2, #list do
-      local p, c = merged[#merged], list[k]
-      if c[1] >= p[2] then merged[#merged + 1] = c
-      elseif c[2] > p[2] then merged[#merged + 1] = { p[2], c[2], c[3] } end
-    end
-    return merged
+    return M.mergeConceal(list)
   end
 
   -- ── INDENT GUIDES ────────────────────────────────────────────────────
@@ -522,6 +621,9 @@ local function build(win, isCurrent, mode, margin)
   end
 
   local rows = {}
+  -- rendered markdown: which bytes each window row's cells are, for a
+  -- click (bridge.mouse) — nvim maps a screen cell by the text as written
+  local clicks = md and {} or nil
   -- git's marks for this buffer (git.lua): a bar down the gutter's edge
   local vcs = require("plato.git").marks(buf)
   -- the cursor's cell, and which character of its row's text that is: the
@@ -547,7 +649,8 @@ local function build(win, isCurrent, mode, margin)
     if l >= last then
       if not live then break end
       rows[#rows + 1] = { n = 0, k = 0, t = "", s = {}, f = false }
-    elseif cl > 0 and tsHidden and tsHidden[l] and not (isCurrent and l == view.lnum - 1) then
+    elseif ((cl > 0 and tsHidden and tsHidden[l]) or (md and mdLines[l] and mdLines[l].hide))
+        and not (isCurrent and l == view.lnum - 1) then
       -- a whole line concealed (conceal_lines): not a row at all
       l = l + 1
       goto nextline
@@ -602,7 +705,9 @@ local function build(win, isCurrent, mode, margin)
         -- from skipcol on the top line, but never more than the screen holds
         local from = wrap and ((live and l == top) and view.skipcol or 0) or view.leftcol
         local limit = wrap and width * (height - #rows) or width
-        local text, chars, lineCells = layout(line, ts, from, limit, concealFor(l))
+        local hid = concealFor(l)
+        local concealed = hid ~= nil
+        local text, chars, lineCells = layout(line, ts, from, limit, hid)
         local ncells = cellWidth(text)
 
         local base, dl, ol = {}, {}, {}
@@ -615,9 +720,13 @@ local function build(win, isCurrent, mode, margin)
           local runs = hl.syntax(buf, l, line, chars)
           for _, r in ipairs(runs or {}) do paint(base, chars, ncells, r[1], r[2], r[3]) end
         end
+        local mdl = mdLines[l]
+        if mdl and not subLit then
+          for _, p in ipairs(mdl.paint) do paint(base, chars, ncells, p[1], p[2], p[3]) end
+        end
         -- rainbow brackets, over the syntax's own colour — but not a bracket
         -- the syntax says is in a string or a comment
-        if rainbow and not subLit and line:find("[%(%)%[%]{}]") then
+        if rainbow and not md and not subLit and line:find("[%(%)%[%]{}]") then
           for _, rb in ipairs(brackets.rainbow(buf, l, line)) do
             local k = seek(chars, rb[1])
             local ch = chars[k]
@@ -778,6 +887,11 @@ local function build(win, isCurrent, mode, margin)
           if hitCells and hitCells[1] >= c0 and hitCells[1] < math.max(c1, c0 + 1) then
             hit = { row = #rows, col = hitCells[1] - c0, len = hitCells[2] - hitCells[1] }
           end
+          -- every row, once markdown has hidden a line: below it, nvim's
+          -- own rows and the drawn ones no longer match
+          if clicks and live then
+            clicks[#rows] = { l = l, chars = chars, c0 = c0, len = #line }
+          end
           rows[#rows + 1] = {
             n = l + 1, k = k, t = piece, f = false,
             s = charSpans(piece, spans(base, dl, ol, c0, c1)),
@@ -785,6 +899,7 @@ local function build(win, isCurrent, mode, margin)
             v = vcs and vcs[l + 1] or nil,
             ig = (guides and k == 0 and not (wrap and from > 0)) and guideCols(l + 1, wrap and 0 or from) or nil,
             m = m, sl = slc, vt = vt,
+            md = mdl and mdRow(mdl, k, pieces, wrap and 0 or from, mdRaw and live and isCurrent and l == view.lnum - 1) or nil,
           }
         end
       end
@@ -796,6 +911,14 @@ local function build(win, isCurrent, mode, margin)
   end
 
   run(top, height, rows, true)
+  -- kept as plain data: the click arrives in a fast callback (bridge.lua),
+  -- where nvim cannot be asked where a window is
+  if clicks then
+    local pos = api.nvim_win_get_position(win)
+    M.clicks[win] = { rows = clicks, r0 = pos[1], c0 = pos[2] + textoff, h = height, w = width }
+  else
+    M.clicks[win] = nil
+  end
 
   -- ── PAST THE EDGES ─────────────────────────────────────────────────────
   -- `margin` rows above the window and below it, drawn by plato just
@@ -868,7 +991,8 @@ local function signature(row)
   return row.n .. "\1" .. row.k .. "\1" .. row.t .. "\1" .. tostring(row.f)
     .. "\1" .. vim.json.encode(row.s) .. "\1" .. vim.json.encode(row.g or false)
     .. "\1" .. (row.v or "") .. "\1" .. (row.ig and table.concat(row.ig, ",") or "")
-    .. "\1" .. vim.json.encode({ row.m or false, row.sl or false, row.vt or false, row.fc or false })
+    .. "\1" .. vim.json.encode({ row.m or false, row.sl or false, row.vt or false, row.fc or false,
+      row.md or false })
 end
 
 -- ── the editor window ───────────────────────────────────────────────────
@@ -1107,6 +1231,9 @@ function M.frame(full)
   end
   for w in pairs(sentWins) do
     if not seen[w] then sentWins[w] = nil end
+  end
+  for w in pairs(M.clicks) do
+    if not seen[w] then M.clicks[w] = nil end
   end
 
   if full then

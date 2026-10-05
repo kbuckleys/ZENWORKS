@@ -67,6 +67,7 @@ function M.options(p)
   if p.minimapRows ~= nil then require("plato.minimap").setRows(p.minimapRows) end
   if p.indentGuides ~= nil then vim.g.plato_guides = p.indentGuides end
   if p.rainbowBrackets ~= nil then vim.g.plato_rainbow = p.rainbowBrackets end
+  if type(p.markdown) == "table" then vim.g.plato_md = p.markdown end
   if p.largeFileMB ~= nil then vim.g.plato_large_mb = p.largeFileMB end
   -- TYPEWRITER (zen only, PlatoWindow decides): the cursor's line held in
   -- the middle — a scrolloff no window is tall enough to satisfy. Off, every

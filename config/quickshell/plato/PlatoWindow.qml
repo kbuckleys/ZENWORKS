@@ -104,6 +104,10 @@ FloatingWindow {
       zen: win.zen, minimap: s.minimap,
       typewriter: win.zen && s.typewriter, indentGuides: s.indentGuides,
       largeFileMB: s.largeFileMB, rainbowBrackets: s.rainbowBrackets,
+      markdown: {
+        render: s.mdRender, rawLine: s.mdRawLine, headings: s.mdHeadings, inline: s.mdInline,
+        lists: s.mdLists, code: s.mdCode, tables: s.mdTables, quotes: s.mdQuotes, rules: s.mdRules,
+      },
     });
   }
 

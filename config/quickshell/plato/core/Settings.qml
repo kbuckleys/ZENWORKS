@@ -58,6 +58,17 @@ QtObject {
   property bool dimInactive: true
   property bool rainbowBrackets: true
 
+  // ── markdown, drawn as what it means (nvim/lua/plato/markdown.lua) ──
+  property bool mdRender: true
+  property bool mdRawLine: true
+  property bool mdHeadings: true
+  property bool mdInline: true
+  property bool mdLists: true
+  property bool mdCode: true
+  property bool mdTables: true
+  property bool mdQuotes: true
+  property bool mdRules: true
+
   // ── editing: nvim's options, sent to every engine ─────────────────
   property bool wrap: true
   property bool relativeNumbers: true
@@ -98,6 +109,7 @@ QtObject {
     { id: "text",    label: "Text",          icon: "\u{F0284}" },
     { id: "editing", label: "Editing",       icon: "\u{F03EB}" },
     { id: "motion",  label: "Cursor & motion", icon: "\u{F0B5B}" },
+    { id: "markdown", label: "Markdown",     icon: "\u{F0354}" },
     { id: "git",     label: "Git",           icon: "\u{F02A2}" },
     { id: "tree",    label: "File tree",     icon: "\u{F0645}" },
     { id: "notify",  label: "Notifications", icon: "\u{F009A}" },
@@ -190,6 +202,25 @@ QtObject {
     { key: "zenWidth", section: "motion", label: "Zen mode text width", type: "int",
       min: 60, max: 200, step: 4, unit: "",
       help: "How many characters wide zen mode's centred column is (Space z)." },
+
+    { key: "mdRender", section: "markdown", label: "Render markdown", type: "bool",
+      help: "Markdown files are drawn as what they mean: headings on bands, no stars round bold, tables ruled and lined up, code on a panel, boxes to tick. The file itself is untouched. Space v shows one file as written." },
+    { key: "mdRawLine", section: "markdown", label: "Cursor's line as written", type: "bool",
+      help: "The line the cursor is on shows every #, * and | it really has, so you never edit a character you cannot see." },
+    { key: "mdHeadings", section: "markdown", label: "Headings", type: "bool",
+      help: "# and ## become an icon, and the heading sits on a band in its level's colour." },
+    { key: "mdInline", section: "markdown", label: "Bold, italic, code and links", type: "bool",
+      help: "The stars, backticks and brackets are hidden; links show their text alone." },
+    { key: "mdLists", section: "markdown", label: "Bullets and checkboxes", type: "bool",
+      help: "- becomes a bullet, - [ ] a box to tick (Space x ticks it), and done items are struck through." },
+    { key: "mdCode", section: "markdown", label: "Code blocks", type: "bool",
+      help: "Fenced and indented code sits on a panel, its ``` fences hidden." },
+    { key: "mdTables", section: "markdown", label: "Tables", type: "bool",
+      help: "Pipes become rules and the columns line up, aligned as the --- row asks." },
+    { key: "mdQuotes", section: "markdown", label: "Quotes and callouts", type: "bool",
+      help: "> becomes a bar; > [!NOTE], [!TIP], [!WARNING] and the rest get their icon and colour." },
+    { key: "mdRules", section: "markdown", label: "Horizontal rules", type: "bool",
+      help: "--- on a line of its own is drawn as a line across." },
 
     { key: "gitGutter", section: "git", label: "Changes in the gutter", type: "bool",
       help: "A bar down the gutter's edge where lines were added (green) or changed (yellow) since the last commit, and a red wedge where some were deleted. Also on the scrollbar." },

@@ -519,7 +519,7 @@ Item {
   // characters, so the bytes are walked back into them
   function charsBefore(text, bytes) {
     let b = 0, i = 0;
-    const cs = Array.from(text);
+    const cs = String(text).match(/[\uD800-\uDBFF][\uDC00-\uDFFF]|[\s\S]/g) || [];
     while (i < cs.length && b < bytes) {
       const c = cs[i].codePointAt(0);
       b += c < 0x80 ? 1 : c < 0x800 ? 2 : c < 0x10000 ? 3 : 4;

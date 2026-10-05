@@ -18,6 +18,7 @@ import QtQuick
 import Quickshell
 import "../../morpheus"
 import "keys.js" as KeyMap
+import "cells.js" as Cells
 import "../../morpheus/scrollfeel.js" as Feel
 
 Item {
@@ -308,7 +309,7 @@ Item {
           if (!w) return "";
           const r = view.ed.rowsOf(w.id)[view.ed.cursorRow];
           if (!r) return "";
-          return Array.from(r.t)[view.ed.cursorChar] || "";
+          return Cells.chars(r.t)[view.ed.cursorChar] || "";
         }
       }
     }
@@ -364,7 +365,7 @@ Item {
         if (r < w.row || r >= w.row + w.height || c < w.col + w.textoff || c >= w.col + w.width) continue;
         const row = view.ed.rowsOf(w.id)[r - w.row];
         if (!row || !row.t) return;
-        const chars = Array.from(row.t);
+        const chars = Cells.chars(row.t);
         const at = c - w.col - w.textoff;
         if (at >= chars.length) return;
         const stop = /[\s"'`()<>\[\]{},;|=]/;
