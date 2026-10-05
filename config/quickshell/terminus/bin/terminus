@@ -1,0 +1,23 @@
+#!/bin/sh
+# ┌─┐┌─┐┌┐┌┬ ┬┌─┐┬─┐┬┌─┌─┐
+# ┌─┘├┤ │││││││ │├┬┘├┴┐└─┐
+# └─┘└─┘┘└┘└┴┘└─┘┴└─┴ ┴└─┘
+# https://github.com/kbuckleys/
+#
+# terminus [directory|file]   open terminus there, from a terminal, a keybind,
+#                             or terminus.desktop — which is how another
+#                             application's "show in folder" gets here, once
+#                             oracle's Default Apps has made it the file manager.
+#
+# A directory opens as itself; a file opens its directory; nothing opens home.
+# Made absolute HERE, because the shell answering the ipc call has no idea
+# which directory this was run from. A file:// url, which some applications
+# hand a file manager whatever its Exec asks for, is turned back into a path.
+[ $# -eq 0 ] && exec qs ipc call Terminus spawn "" >/dev/null
+p=$1
+case $p in
+  file://*) p=$(printf '%s' "${p#file://}" | sed 's/%\([0-9A-Fa-f][0-9A-Fa-f]\)/\\x\1/g' | xargs -0 printf '%b') ;;
+esac
+p=$(realpath -m -- "$p")
+[ -d "$p" ] || p=$(dirname -- "$p")
+exec qs ipc call Terminus spawn "$p" >/dev/null
