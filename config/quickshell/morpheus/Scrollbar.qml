@@ -105,6 +105,9 @@ Item {
     root.overflow > 0 ? Math.max(0, Math.min(1, root.pos / root.overflow)) : 0
   readonly property real thumbY: Math.round(root.travel * root.progress)
   readonly property bool dragging: ma.dragging
+  // the hand is on the bar, from the press itself (a click on the bare
+  // track moves the list before `dragging` is set)
+  readonly property bool held: ma.pressed
 
   width: root.horizontal ? implicitWidth : root.thickness + root.grabPad
   height: root.horizontal ? root.thickness + root.grabPad : implicitHeight
