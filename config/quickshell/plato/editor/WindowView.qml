@@ -645,8 +645,12 @@ Item {
       return Math.max(win.height, s.lines * win.cellH);
     }
     property bool syncing: false
+    // ONLY THE HAND SCROLLS NVIM. Lines deleted at the end (Vjjjc on the
+    // last lines) shrink contentHeight, and the Flickable pulls contentY
+    // back in bounds on its own: sent on as a drag, that scrolled nvim up,
+    // and scrolloff dragged the cursor up off the line it had just made.
     onContentYChanged: {
-      if (proxy.syncing) return;
+      if (proxy.syncing || !rail.held) return;
       dragTo.line = Math.round(proxy.contentY / win.cellH) + 1;
       // start, NOT restart: restarting on every move put the send off for
       // as long as the hand kept moving, and the text only followed once
