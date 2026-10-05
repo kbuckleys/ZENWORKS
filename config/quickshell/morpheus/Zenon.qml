@@ -116,10 +116,12 @@ QtObject {
   readonly property int menuRowHeight: Oracle.menuRowHeight
   readonly property int menuSepHeight: 7
   readonly property int menuCardPad:   4    // the column's inset in the card
-  // THE TALLEST A CARD GETS: eighteen rows, and past that it scrolls (CardBody).
+  // THE TALLEST A CARD GETS: twenty-two rows, and past that it scrolls (CardBody).
   // A menu as tall as the screen — xkb's ninety-nine keyboard layouts — is
-  // not a menu but a wall, and its far end was out of reach.
-  readonly property int menuMaxHeight: menuRowHeight * 18 + menuCardPad * 2
+  // not a menu but a wall, and its far end was out of reach. Eighteen was
+  // too few: picasso's picture menu is eighteen rows and five separators,
+  // and scrolled for its last row.
+  readonly property int menuMaxHeight: menuRowHeight * 22 + menuCardPad * 2
   // The air between a row's icon and its label. The icon sits in a 16px box
   // and most Font Awesome glyphs do not fill it, so the gap reads narrower
   // than the number suggests — 8 had the two touching on the wider marks.
