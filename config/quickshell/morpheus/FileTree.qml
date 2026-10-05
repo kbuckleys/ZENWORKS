@@ -624,8 +624,12 @@ FocusScope {
       const r = tree.flat[tree.sel];
       const k = event.key, t = event.text;
       event.accepted = true;
-      if (k === Qt.Key_Down || t === "j") tree.sel = Math.min(n - 1, tree.sel + 1);
-      else if (k === Qt.Key_Up || t === "k") tree.sel = Math.max(0, tree.sel - 1);
+      // AT AN END, ONE MORE WRAPS ROUND to the other — on a fresh press
+      // only: a held key stops at the end rather than racing round and round
+      if (k === Qt.Key_Down || t === "j")
+        tree.sel = tree.sel >= n - 1 && !event.isAutoRepeat ? 0 : Math.min(n - 1, tree.sel + 1);
+      else if (k === Qt.Key_Up || t === "k")
+        tree.sel = tree.sel <= 0 && !event.isAutoRepeat ? Math.max(0, n - 1) : Math.max(0, tree.sel - 1);
       else if (k === Qt.Key_Return || k === Qt.Key_Enter || t === "o") tree.activate(tree.sel);
       else if (k === Qt.Key_Right || t === "l") {
         if (r && r.e.isDir) { if (!tree.isOpen(r.e.path)) tree.setOpen(r.e.path, true); else tree.sel = Math.min(n - 1, tree.sel + 1); }

@@ -187,7 +187,8 @@ Item {
                   anchors.fill: parent
                   visible: icon.glyph !== ""
                   text: icon.glyph
-                  color: row.ink
+                  // a row may tint its glyph (`iconInk`): a colour's swatch
+                  color: row.modelData.iconInk && row.on ? row.modelData.iconInk : row.ink
                   font.family: Zenon.face
                   font.pixelSize: 15
                   verticalAlignment: Text.AlignVCenter

@@ -44,6 +44,9 @@ QtObject {
 
   readonly property color white:   "#dfdfdd"
   readonly property color muted:   "#6a707f"   // bright_black
+  // muted, lifted: labels that must read on a frosted panel (picasso's look
+  // controls) — muted itself sank into the frost
+  readonly property color soft:    "#a2a8b5"
 
   // accents
   readonly property color red:     "#e78284"
