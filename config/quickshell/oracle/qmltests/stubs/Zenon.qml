@@ -7,6 +7,10 @@ QtObject {
   readonly property color border: Qt.rgba(0.271, 0.314, 0.361, 0.3)
   readonly property int fast: 110
   readonly property int ease: Easing.OutQuint
+  property bool scrollAutohide: true
+  readonly property int slow: 170
+  readonly property int normal: 140
+  readonly property int brisk: 75
   readonly property int elastic: 420
   // the menu card's, for CardBody (values as morpheus/Zenon has them)
   readonly property color white: "#dfdfdd"

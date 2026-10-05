@@ -147,6 +147,10 @@ Singleton {
   // surface, and hyprland frosts what is behind those. Zenon holds it
   // above the blur floor whatever this says.
   property real menuOpacity: 0.60
+  // Every scrollbar in the shell (morpheus/Scrollbar) fades out once the
+  // list stops moving, and comes back on a scroll or under the pointer. Off,
+  // the thumb is always faintly there, as it used to be.
+  property bool scrollbarAutohide: true
 
   // ── motion ────────────────────────────────────────────────────────────
   // One multiplier over Zenon's three durations, so the whole shell speeds up
@@ -587,6 +591,8 @@ Singleton {
     { key: "shadowStrength", section: "look", label: "Panel shadow", type: "real",
       min: 0, max: 1, step: 0.05,
       help: "How far a layer lifts off the desktop. A layer sits near an edge, so too much of this reads as a black halo." },
+    { key: "scrollbarAutohide", section: "look", alias: "scrollbar scroll bar hide overlay thumb", label: "Autohide scrollbars", type: "bool",
+      help: "Every scrollbar in the shell fades away once the list stops moving, and comes back when you scroll or put the pointer on it. Off, the thumb is always there." },
     { key: "motionScale", section: "motion", label: "Animation speed", type: "real",
       min: 0, max: 2.5, step: 0.05, unit: "x",
       help: "Multiplies every duration in the shell. Zero means no animation at all." },

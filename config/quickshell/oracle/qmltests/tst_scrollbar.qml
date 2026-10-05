@@ -124,5 +124,26 @@ Item {
       console.log("   wheelStep 150 -> contentY", Math.round(list.contentY));
       bar.wheelStep = 0;
     }
+
+    // Autohide: shown on a scroll, faded once the list has been still, and
+    // back under the pointer. Off, always there.
+    function test_autohide() {
+      mouseMove(root, 10, 10);
+      tryVerify(() => bar.opacity === 0, 3000, "asleep to begin with");
+      list.contentY = 40;
+      verify(bar.awake, "a scroll wakes it");
+      compare(bar.opacity, 1, "and it is there at once, no fade in");
+      tryVerify(() => !bar.awake, 3000, "still, it goes to sleep");
+      verify(bar.opacity > 0.5, "and fades rather than snapping off");
+      tryVerify(() => bar.opacity > 0 && bar.opacity < 1, 300, "partway through the fade");
+      tryVerify(() => bar.opacity === 0, 1000, "then is gone");
+      const p = bar.mapToItem(root, bar.width - 6, bar.height / 2);
+      mouseMove(root, p.x, p.y);
+      tryVerify(() => bar.awake, 500, "the pointer brings it back");
+      mouseMove(root, 10, 10);
+      Zenon.scrollAutohide = false;
+      tryVerify(() => bar.opacity === 1, 1000, "off, it stays");
+      Zenon.scrollAutohide = true;
+    }
   }
 }
