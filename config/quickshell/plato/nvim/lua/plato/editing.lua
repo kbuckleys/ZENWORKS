@@ -66,6 +66,7 @@ function M.options(p)
   if p.minimap ~= nil then vim.g.plato_minimap = p.minimap end
   if p.minimapRows ~= nil then require("plato.minimap").setRows(p.minimapRows) end
   if p.indentGuides ~= nil then vim.g.plato_guides = p.indentGuides end
+  if p.rainbowBrackets ~= nil then vim.g.plato_rainbow = p.rainbowBrackets end
   if p.largeFileMB ~= nil then vim.g.plato_large_mb = p.largeFileMB end
   -- TYPEWRITER (zen only, PlatoWindow decides): the cursor's line held in
   -- the middle — a scrolloff no window is tall enough to satisfy. Off, every
@@ -166,12 +167,14 @@ end
 -- and format-on-save both come here.
 function M.format(buf)
   buf = buf or api.nvim_get_current_buf()
+  local before = api.nvim_buf_get_lines(buf, 0, -1, false)
   local okc, conform = pcall(require, "conform")
   if okc then
     pcall(conform.format, { bufnr = buf, timeout_ms = 1500, lsp_format = "fallback" })
   elseif #vim.lsp.get_clients({ bufnr = buf, method = "textDocument/formatting" }) > 0 then
     pcall(vim.lsp.buf.format, { bufnr = buf, timeout_ms = 1500 })
   end
+  M.flashChanged(buf, before)
 end
 local function onSave()
   -- a file in a directory that is not there yet (a new note, a capture
@@ -207,10 +210,10 @@ end
 -- are where the text was, and the window still has its old rows when plato
 -- gets this, a frame ahead of the one without them. That is what lets the
 -- delete's ghost be drawn from the text that is about to go.
-local function cells(win, regtype)
+local function cells(win, regtype, s, t)
   local e = vim.v.event
-  local s = api.nvim_buf_get_mark(0, "[")
-  local t = api.nvim_buf_get_mark(0, "]")
+  s = s or api.nvim_buf_get_mark(0, "[")
+  t = t or api.nvim_buf_get_mark(0, "]")
   if s[1] == 0 or t[1] == 0 then return {} end
   local info = vim.fn.getwininfo(win)[1]
   local textL = info.wincol - 1 + info.textoff
@@ -276,6 +279,7 @@ function M.putYank(i)
   local y = M.ring[i]
   if not y then return false end
   local linewise = y.regtype == "V"
+  M.notePut()
   api.nvim_put(y.lines, linewise and "l" or (y.regtype:sub(1, 1) == "\22" and "b" or "c"), true, true)
   -- the chosen one goes back to the top, and into the unnamed register
   table.remove(M.ring, i)
@@ -311,6 +315,65 @@ local function flashes()
       end
     end,
   })
+end
+
+-- ── EDITS ARRIVING, SEEN ───────────────────────────────────────────────
+-- A paste (p, P, gp, ]p, the yank history) and a format light up what they
+-- brought in, a green wash that ebbs as a yank's yellow does: text you did
+-- not type appearing should be seen to appear. A put is told apart from
+-- other changes by the key that started it (on_key: p or P in normal or
+-- visual mode, not after f t r m, where p is a character); a format by
+-- comparing the buffer before and after it.
+local putPending = false
+local lastKey = ""
+function M.notePut() putPending = true end
+local function puts()
+  vim.on_key(function(key, typed)
+    local k = (typed and typed ~= "") and typed or key
+    local m = api.nvim_get_mode().mode
+    if (k == "p" or k == "P") and (m == "n" or m == "v" or m == "V" or m == "\22")
+        and not lastKey:match("^[fFtTrm]$") then
+      putPending = true
+    elseif k ~= "g" and k ~= "]" and k ~= "[" and not k:match("^%d$") and k ~= '"' then
+      -- only the keys of the same command keep it pending
+      if not lastKey:match('^"$') then putPending = false end
+    end
+    lastKey = k
+  end, api.nvim_create_namespace("plato.puts"))
+end
+local function sendArrive(win, list)
+  if #list > 0 then send({ event = "flash", kind = "arrive", cells = list }) end
+end
+-- after a put: '[ and '] hold what it brought
+function M.flashPut()
+  putPending = false
+  if vim.g.plato_flash == false then return end
+  local win = api.nvim_get_current_win()
+  if api.nvim_win_get_config(win).relative ~= "" then return end
+  local rt = vim.fn.getregtype(vim.v.register)
+  local ok, list = pcall(cells, win, rt:sub(1, 1) == "V" and "V" or "v")
+  if ok then sendArrive(win, list) end
+end
+-- the lines a change rewrote, from the buffer as it was: each hunk vim.diff
+-- finds, flashed as whole lines
+function M.flashChanged(buf, before)
+  if vim.g.plato_flash == false then return end
+  local win = api.nvim_get_current_win()
+  if api.nvim_win_get_buf(win) ~= buf or api.nvim_win_get_config(win).relative ~= "" then return end
+  local after = api.nvim_buf_get_lines(buf, 0, -1, false)
+  local diff = vim.text and vim.text.diff or vim.diff
+  local ok, hunks = pcall(diff, table.concat(before, "\n") .. "\n", table.concat(after, "\n") .. "\n",
+    { result_type = "indices" })
+  if not ok then return end
+  local list = {}
+  for _, h in ipairs(hunks) do
+    local s, n = h[3], h[4]
+    if n > 0 then
+      local okc, part = pcall(cells, win, "V", { s, 0 }, { s + n - 1, 0 })
+      if okc then for _, c in ipairs(part) do list[#list + 1] = c end end
+    end
+  end
+  sendArrive(win, list)
 end
 
 -- ── UNDO AND REDO, SEEN ────────────────────────────────────────────────
@@ -352,6 +415,7 @@ local function undos()
       if cur < s.cur then kind = "undo"
       elseif cur > s.cur and cur <= s.max then kind = "redo" end
       s.cur, s.max = cur, math.max(s.max, cur)
+      if not kind and putPending then M.flashPut(); return end
       if not kind or vim.g.plato_flash == false then return end
       local win = api.nvim_get_current_win()
       if api.nvim_win_get_config(win).relative ~= "" then return end
@@ -396,6 +460,7 @@ function M.setup(sendFn)
   saveAsOnWrite()
   onSave()
   flashes()
+  puts()
   undos()
 end
 

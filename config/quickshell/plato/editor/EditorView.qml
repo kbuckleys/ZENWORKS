@@ -37,6 +37,7 @@ Item {
   property bool animateLayout: true
   property bool gitGutter: true
   property bool jumpTrail: true
+  property bool dimInactive: true
   // where the windows lay their frost (under the bars), and the bars it
   // goes under — see WindowView's ScrollEdges; null for none
   property Item edgeHost: null
@@ -113,6 +114,7 @@ Item {
       liveW: view.width - view.mapW
       gitGutter: view.gitGutter
       jumpTrail: view.jumpTrail
+      dimInactive: view.dimInactive
       // the frost under the tabs and the status line — see WindowView
       edgeHost: view.edgeHost
       topBar: view.topBar
@@ -260,12 +262,20 @@ Item {
       border.color: Zenon.muted
     }
 
+    // A NEW MODE MORPHS THE CARET: the block narrows to insert's bar, the
+    // bar widens back, and replace's underline settles from the block —
+    // briskly, so it reads as the same cursor changing rather than a swap.
+    // Clipped, so the block's letter never spills out of a bar.
     Rectangle {
       id: caret
       visible: view.activeFocus
+      clip: true
       y: view.shape === "underline" ? view.cellH - 2 : 0
       width: view.shape === "bar" ? 2 : view.cellW
       height: view.shape === "underline" ? 2 : view.cellH
+      Behavior on width { NumberAnimation { duration: Zenon.brisk; easing.type: Zenon.travelEase } }
+      Behavior on height { NumberAnimation { duration: Zenon.brisk; easing.type: Zenon.travelEase } }
+      Behavior on y { NumberAnimation { duration: Zenon.brisk; easing.type: Zenon.travelEase } }
       color: view.textInk
       Behavior on color { ColorAnimation { duration: Zenon.brisk } }
       opacity: 1

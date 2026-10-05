@@ -13,10 +13,14 @@
 // list of every monospaced family installed, each name set in its own face.
 // Every change applies at once, in every window.
 //
-// Keys: j/k or ↑/↓ move, h/l or ←/→ change the value (a switch flips, a
-// number steps, a choice cycles), Enter or Space flips a switch or opens the
-// typeface list, r puts the setting back to its default, Esc closes (or
-// leaves the typeface list).
+// TYPING FILTERS: every letter goes into a query (read back in the footer)
+// and only the settings whose name or section match it stay, under their
+// section's heading. Esc clears the query first and closes the sheet once
+// it is empty. So the keys are the arrows: ↑/↓ (or ctrl j/k) move, ←/→
+// change the value (a switch flips, a number steps, a choice cycles),
+// ctrl ←/→ jump across the columns, Enter (or Space, with nothing typed)
+// flips a switch or opens the typeface list, ctrl r puts the setting back
+// to its default.
 
 import QtQuick
 import Quickshell
@@ -30,6 +34,8 @@ PlatoSheet {
 
   property var settings: null
   required property font face
+  // the window, for the colour dropdown's card (a popup of its own)
+  property var window: null
 
   signal closed()
 
@@ -37,28 +43,50 @@ PlatoSheet {
   function open() {
     sheet.picking = false;
     sheet.editing = "";
+    query.text = "";
     sheet.sel = Math.max(0, sheet.firstRow());
     sheet.shown = true;
-    keys.forceActiveFocus();
+    query.forceActiveFocus();
+  }
+  // Esc: out of the typeface list or a text being typed, then the query
+  // cleared, and only then the sheet closed
+  function back() {
+    if (drop.open) { drop.open = false; return; }
+    if (!sheet.picking && sheet.editing === "" && query.text !== "") { query.text = ""; return; }
+    sheet.close();
   }
   function close() {
-    if (sheet.picking) { sheet.picking = false; keys.forceActiveFocus(); return; }
+    drop.open = false;
+    if (sheet.picking) { sheet.picking = false; query.forceActiveFocus(); return; }
     if (sheet.editing !== "") { sheet.endEdit(false); return; }
     sheet.shown = false;
     sheet.closed();
   }
 
   // ── the rows: a header per section, then its settings ───────────────
-  readonly property var rows: {
+  // Filtered by the query: a setting stays when every word typed is in its
+  // name or its section's; a section with none left loses its heading too.
+  function rowsFor(q) {
     const s = sheet.settings;
     if (!s) return [];
+    const words = q.toLowerCase().split(/\s+/).filter((w) => w !== "");
     const out = [];
     for (const sec of s.sections) {
+      const mine = s.specs.filter((sp) => {
+        if (sp.section !== sec.id) return false;
+        const hay = (sp.label + " " + sec.label).toLowerCase();
+        return words.every((w) => hay.indexOf(w) >= 0);
+      });
+      if (mine.length === 0) continue;
       out.push({ header: true, label: sec.label, icon: sec.icon });
-      for (const sp of s.specs) if (sp.section === sec.id) out.push({ header: false, spec: sp });
+      for (const sp of mine) out.push({ header: false, spec: sp });
     }
     return out;
   }
+  readonly property var rows: sheet.rowsFor(query.text)
+  // the whole list, whose taller column is what one column may hold
+  readonly property var allRows: sheet.rowsFor("")
+  onRowsChanged: sheet.sel = Math.max(0, sheet.firstRow())
   property int sel: 0
   function firstRow() { return sheet.rows.findIndex((r) => !r.header); }
   function step(dir) {
@@ -86,12 +114,13 @@ PlatoSheet {
   function endEdit(keep) {
     if (keep && sheet.editing !== "") sheet.settings.set(sheet.editing, textField.text.trim());
     sheet.editing = "";
-    keys.forceActiveFocus();
+    query.forceActiveFocus();
   }
   function activate(spec) {
     if (!spec || !sheet.settings) return;
     if (spec.type === "text" && !spec.pick) { sheet.editText(spec); return; }
     if (spec.pick === "font") sheet.openFonts();
+    else if (spec.pick === "color") sheet.openDrop(spec);
     else if (spec.type === "bool") sheet.settings.nudge(spec.key, 1);
     else sheet.settings.nudge(spec.key, 1);
   }
@@ -99,11 +128,10 @@ PlatoSheet {
   // ── the sheet ──────────────────────────────────────────────────────
   // TWO COLUMNS: the sections split where the rows come out most even, the
   // first half down the left and the rest down the right. The keys still
-  // walk every setting in order (j/k), and H / L jump across.
+  // walk every setting in order (↑/↓), and ctrl ←/→ jump across.
   readonly property real roomH: Math.max(300, sheet.height - sheet.fromTop - sheet.footH - 40)
   readonly property int helpH: 52
-  readonly property int split: {
-    const r = sheet.rows;
+  function splitOf(r) {
     let best = r.length, gap = r.length;
     for (let i = 1; i < r.length; ++i) {
       if (!r[i].header) continue;
@@ -112,17 +140,29 @@ PlatoSheet {
     }
     return best;
   }
-  readonly property int tallest: Math.max(sheet.split, sheet.rows.length - sheet.split)
-  cardW: Math.min(1160, Math.max(700, sheet.width - 60))
-  cardH: Math.min(sheet.roomH, sheet.tallest * sheet.rowH + 14 + sheet.helpH)
+  // THE CARD FITS WHAT IS LEFT. Filtered down to what one column of the
+  // full sheet would hold, it is one column, half as wide; and it is only
+  // as tall as its taller column (room for the "no match" line at least).
+  // The sheet eases between sizes (morpheus Sheet).
+  readonly property int allSplit: sheet.splitOf(sheet.allRows)
+  readonly property bool twoCols: sheet.rows.length > Math.max(sheet.allSplit, sheet.allRows.length - sheet.allSplit)
+  readonly property int split: sheet.twoCols ? sheet.splitOf(sheet.rows) : sheet.rows.length
+  // (two rows' room when nothing matches, for the line that says so)
+  readonly property int tallest: sheet.rows.length === 0 ? 2
+    : Math.max(sheet.split, sheet.rows.length - sheet.split)
+  readonly property real wideW: Math.min(1160, Math.max(700, sheet.width - 60))
+  cardW: sheet.twoCols || sheet.picking ? sheet.wideW : Math.max(560, Math.round(sheet.wideW / 2))
+  cardH: Math.min(sheet.roomH, (sheet.picking ? Math.max(sheet.tallest, 23) : sheet.tallest) * sheet.rowH + 14 + sheet.helpH)
   footText: sheet.picking ? (fontQuery.text === "" ? "type to filter" : fontQuery.text)
-    : "plato settings"
-  footInk: sheet.picking ? Zenon.white : Zenon.muted
-  hints: sheet.picking ? [["↑↓", "move"], ["↵", "use"], ["esc", "back"]]
-    : [["↑↓", "move"], ["←→", "change"], ["H L", "column"], ["r", "default"], ["esc", "close"]]
+    : query.text === "" ? "type to filter settings" : query.text
+  footInk: (sheet.picking ? fontQuery.text : query.text) !== "" ? Zenon.white : Zenon.muted
+  hints: sheet.picking || drop.open ? [["↑↓", "move"], ["↵", "use"], ["esc", "back"]]
+    : [["↑↓", "move"], ["←→", "change"]].concat(sheet.twoCols ? [["ctrl ←→", "column"]] : [])
+      .concat([["ctrl r", "default"], ["esc", query.text !== "" ? "clear" : "close"]])
 
   // across: the row at the same height in the other column
   function across(dir) {
+    if (!sheet.twoCols) return;
     const inLeft = sheet.sel < sheet.split;
     if ((dir > 0) !== inLeft) return;
     const at = inLeft ? sheet.sel : sheet.sel - sheet.split;
@@ -160,13 +200,13 @@ PlatoSheet {
         spacing: 9
         Text {
           font.family: Zenon.faceMono
-          font.pixelSize: 14
+          font.pixelSize: 15
           color: Zenon.blue
           text: row.modelData.icon || ""
         }
         Text {
           font.family: Zenon.face
-          font.pixelSize: 13
+          font.pixelSize: 14
           font.weight: Font.DemiBold
           font.letterSpacing: 1.1
           color: Zenon.blue
@@ -191,14 +231,14 @@ PlatoSheet {
         width: parent.width - 36 - 250
         elide: Text.ElideRight
         font.family: Zenon.face
-        font.pixelSize: 15
+        font.pixelSize: 16
         color: row.gi === sheet.sel ? Zenon.white : "#c8ccd6"
         text: row.spec ? row.spec.label : ""
       }
       MouseArea {
         anchors.fill: parent
         enabled: !row.modelData.header
-        onClicked: { sheet.sel = row.gi; keys.forceActiveFocus(); }
+        onClicked: { sheet.sel = row.gi; query.forceActiveFocus(); }
       }
 
       // ── the control ──────────────────────────────────────────────────
@@ -209,6 +249,7 @@ PlatoSheet {
         active: row.spec !== null
         sourceComponent: !row.spec ? null
           : row.spec.pick === "font" ? fontChip
+          : row.spec.pick === "color" ? colorChip
           : row.spec.type === "bool" ? switchControl
           : row.spec.type === "int" || row.spec.type === "real" ? trackControl
           : chipControl
@@ -239,12 +280,12 @@ PlatoSheet {
 
     delegate: settingRow
     anchors.left: parent.left
-    width: parent.width / 2 - 0.5
+    width: sheet.twoCols ? parent.width / 2 - 0.5 : parent.width
     property int from: 0
     property int to: sheet.split
   }
   Rectangle {
-    visible: !sheet.picking
+    visible: !sheet.picking && sheet.twoCols
     x: parent.width / 2
     anchors.top: parent.top
     anchors.topMargin: 10
@@ -257,7 +298,7 @@ PlatoSheet {
     id: list2
     // the slice of the rows this column shows
     readonly property bool mine: sheet.sel >= list2.from && sheet.sel < list2.to
-    visible: !sheet.picking
+    visible: !sheet.picking && sheet.twoCols
     anchors.top: parent.top
     anchors.topMargin: 6
     anchors.bottom: helpRule.top
@@ -301,7 +342,7 @@ PlatoSheet {
     maximumLineCount: 2
     elide: Text.ElideRight
     font.family: Zenon.face
-    font.pixelSize: 13
+    font.pixelSize: 14
     color: Zenon.muted
     text: sheet.editing !== "" ? "" : sheet.cur ? (sheet.cur.help || "") : ""
   }
@@ -323,7 +364,7 @@ PlatoSheet {
       anchors.rightMargin: 10
       verticalAlignment: TextInput.AlignVCenter
       font.family: Zenon.faceFixed
-      font.pixelSize: 14
+      font.pixelSize: 15
       color: Zenon.white
       selectionColor: Qt.rgba(Zenon.magenta.r, Zenon.magenta.g, Zenon.magenta.b, 0.5)
       cursorDelegate: Caret { field: textField }
@@ -412,7 +453,7 @@ PlatoSheet {
       horizontalAlignment: Text.AlignRight
       font.family: Zenon.face
       font.weight: Font.Medium
-      font.pixelSize: 15
+      font.pixelSize: 16
       color: Zenon.white
       text: sl.spec ? Ora.display(sl.spec, sl.value) : ""
     }
@@ -453,7 +494,7 @@ PlatoSheet {
       anchors.leftMargin: 9
       anchors.verticalCenter: parent.verticalCenter
       font.family: Zenon.faceMono
-      font.pixelSize: 12
+      font.pixelSize: 13
       color: Zenon.muted
       text: "\u{F0141}"
     }
@@ -467,7 +508,7 @@ PlatoSheet {
       elide: Text.ElideRight
       font.family: chip.family
       font.weight: Font.Medium
-      font.pixelSize: 14
+      font.pixelSize: 15
       color: Zenon.white
       text: chip.shown
     }
@@ -476,7 +517,7 @@ PlatoSheet {
       anchors.rightMargin: 9
       anchors.verticalCenter: parent.verticalCenter
       font.family: Zenon.faceMono
-      font.pixelSize: 12
+      font.pixelSize: 13
       color: Zenon.muted
       text: "\u{F0142}"
     }
@@ -505,6 +546,108 @@ PlatoSheet {
     }
   }
 
+  // ── A COLOUR: a swatch, and a dropdown of them ────────────────────
+  // The choice shown as itself — a dot in the colour and its name — and
+  // Enter, Space or a click opens the choices as the shell's menu card
+  // (morpheus CardPopup) under the chip, each with its swatch and a tick on
+  // the one in use. ↑/↓ move in it, Enter takes one, Esc puts it away;
+  // ←/→ on the row still step through them without it.
+  property var chips: ({})
+  Component {
+    id: colorChip
+    Rectangle {
+      id: cc
+      readonly property var spec: parent ? parent.spec : null
+      readonly property var value: parent ? parent.value : null
+      readonly property color ink: { const c = Zenon[String(cc.value)]; return c !== undefined ? c : Zenon.white; }
+      width: 190
+      height: 26
+      radius: 4
+      color: Qt.rgba(1, 1, 1, 0.06)
+      border.width: 1
+      border.color: drop.open && drop.spec === cc.spec ? Zenon.cyan : Zenon.border
+      Component.onCompleted: if (cc.spec) sheet.chips[cc.spec.key] = cc
+      Component.onDestruction: if (cc.spec && sheet.chips[cc.spec.key] === cc) delete sheet.chips[cc.spec.key]
+      Rectangle {
+        id: dot
+        anchors.left: parent.left
+        anchors.leftMargin: 10
+        anchors.verticalCenter: parent.verticalCenter
+        width: 12
+        height: 12
+        radius: 6
+        color: cc.ink
+        border.width: 1
+        border.color: Qt.rgba(0, 0, 0, 0.4)
+        Behavior on color { ColorAnimation { duration: Zenon.fast } }
+      }
+      Text {
+        anchors.left: dot.right
+        anchors.leftMargin: 9
+        anchors.right: chev.left
+        anchors.verticalCenter: parent.verticalCenter
+        elide: Text.ElideRight
+        font.family: Zenon.face
+        font.weight: Font.Medium
+        font.pixelSize: 15
+        color: Zenon.white
+        text: cc.spec ? Ora.display(cc.spec, cc.value) : ""
+      }
+      Text {
+        id: chev
+        anchors.right: parent.right
+        anchors.rightMargin: 9
+        anchors.verticalCenter: parent.verticalCenter
+        font.family: Zenon.faceMono
+        font.pixelSize: 13
+        color: Zenon.muted
+        text: "\u{F0140}"
+      }
+      MouseArea {
+        anchors.fill: parent
+        onClicked: { sheet.sel = parent.parent ? parent.parent.rowIndex : sheet.sel; sheet.openDrop(cc.spec); }
+      }
+    }
+  }
+  property int dropSel: 0
+  function openDrop(spec) {
+    const chip = sheet.chips[spec.key];
+    if (!chip || !sheet.window) return;
+    const p = chip.mapToItem(sheet.window.contentItem, 0, chip.height + 4);
+    drop.spec = spec;
+    drop.at = Qt.point(p.x, p.y);
+    sheet.dropSel = Math.max(0, spec.options.findIndex((o) => o.value === sheet.settings.get(spec.key)));
+    drop.open = true;
+  }
+  function takeDrop(i) {
+    const o = drop.spec ? drop.spec.options[i] : null;
+    if (o) sheet.settings.set(drop.spec.key, o.value);
+    drop.open = false;
+  }
+  CardPopup {
+    id: drop
+    property var spec: null
+    window: sheet.window
+    cardWidth: 190
+    activeIndex: sheet.dropSel
+    model: {
+      if (!drop.spec) return [];
+      sheet.settings ? sheet.settings.revision : 0;
+      const now = sheet.settings ? sheet.settings.get(drop.spec.key) : "";
+      return drop.spec.options.map((o) => ({ text: o.label, icon: "\u25CF",
+        iconInk: Zenon[o.value], mark: o.value === now }));
+    }
+    onChosen: (i) => sheet.takeDrop(i)
+    onHovered: (i) => sheet.dropSel = i
+  }
+  // a click anywhere else in the sheet puts the dropdown away
+  MouseArea {
+    anchors.fill: parent
+    visible: drop.open
+    z: 50
+    onClicked: drop.open = false
+  }
+
   // ── the typeface list ──────────────────────────────────────────────
   // Every family fontconfig calls monospaced (spacing 100) or dual-width
   // (90, as many Nerd Fonts' Mono cuts are), each set in itself, filtered
@@ -528,7 +671,7 @@ PlatoSheet {
     const f = sheet.shownFamilies[sheet.fontSel];
     if (f) sheet.settings.set("fontFamily", f);
     sheet.picking = false;
-    keys.forceActiveFocus();
+    query.forceActiveFocus();
   }
   Process {
     id: famProc
@@ -555,7 +698,7 @@ PlatoSheet {
     Keys.onPressed: (event) => {
       const n = sheet.shownFamilies.length;
       const ctrl = (event.modifiers & Qt.ControlModifier) !== 0;
-      if (event.key === Qt.Key_Escape) { sheet.close(); event.accepted = true; }
+      if (event.key === Qt.Key_Escape) { sheet.back(); event.accepted = true; }
       else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) { sheet.useFont(); event.accepted = true; }
       else if (event.key === Qt.Key_Down || (ctrl && (event.key === Qt.Key_N || event.key === Qt.Key_J))) {
         if (n) sheet.fontSel = (sheet.fontSel + 1) % n; event.accepted = true;
@@ -588,7 +731,7 @@ PlatoSheet {
         width: parent.width - 140
         elide: Text.ElideRight
         font.family: fam.modelData
-        font.pixelSize: 16
+        font.pixelSize: 17
         color: fam.modelData === (sheet.settings ? sheet.settings.fontFamily : "") ? Zenon.cyan : Zenon.white
         text: fam.modelData
       }
@@ -597,7 +740,7 @@ PlatoSheet {
         anchors.rightMargin: 20
         anchors.verticalCenter: parent.verticalCenter
         font.family: fam.modelData
-        font.pixelSize: 15
+        font.pixelSize: 16
         color: Zenon.muted
         text: "{ 0O il1 => }"
       }
@@ -608,32 +751,55 @@ PlatoSheet {
     }
   }
   ScrollRail {
-    target: sheet.picking ? fonts : list2
+    target: sheet.picking ? fonts : sheet.twoCols ? list2 : list
     anchors.right: parent.right
     anchors.rightMargin: 2
     anchors.top: parent.top
     anchors.bottom: sheet.picking ? parent.bottom : helpRule.top
   }
 
-  // ── keys ───────────────────────────────────────────────────────────
-  Item {
-    id: keys
-    focus: sheet.shown && !sheet.picking
+  // ── keys, and the query ────────────────────────────────────────────
+  // typed into, never seen: the footer reads it back. What is not a letter
+  // for the query is caught here first.
+  TextInput {
+    id: query
+    width: 0
+    height: 0
+    opacity: 0
+    focus: sheet.shown && !sheet.picking && sheet.editing === ""
     Keys.onPressed: (event) => {
+      const k = event.key;
+      const ctrl = (event.modifiers & Qt.ControlModifier) !== 0;
       event.accepted = true;
-      const k = event.key, t = event.text;
-      if (k === Qt.Key_Escape || t === "q") sheet.close();
-      else if (k === Qt.Key_Down || t === "j" || (k === Qt.Key_Tab && !(event.modifiers & Qt.ShiftModifier))) sheet.step(1);
-      else if (k === Qt.Key_Up || t === "k" || k === Qt.Key_Backtab) sheet.step(-1);
-      else if (t === "H") sheet.across(-1);
-      else if (t === "L") sheet.across(1);
-      else if (t === "g") sheet.sel = sheet.firstRow();
-      else if (t === "G") { sheet.sel = sheet.rows.length - 1; if (sheet.rows[sheet.sel].header) sheet.step(-1); }
-      else if (k === Qt.Key_Right || t === "l") sheet.nudge(sheet.cur, 1);
-      else if (k === Qt.Key_Left || t === "h") sheet.nudge(sheet.cur, -1);
-      else if (k === Qt.Key_Return || k === Qt.Key_Enter || k === Qt.Key_Space) sheet.activate(sheet.cur);
-      else if (t === "r" && sheet.cur) sheet.settings.reset(sheet.cur.key);
+      if (drop.open) {
+        const n = drop.spec ? drop.spec.options.length : 0;
+        if (k === Qt.Key_Escape) drop.open = false;
+        else if (n && (k === Qt.Key_Down || (ctrl && (k === Qt.Key_J || k === Qt.Key_N)))) sheet.dropSel = (sheet.dropSel + 1) % n;
+        else if (n && (k === Qt.Key_Up || (ctrl && (k === Qt.Key_K || k === Qt.Key_P)))) sheet.dropSel = (sheet.dropSel - 1 + n) % n;
+        else if (k === Qt.Key_Return || k === Qt.Key_Enter || k === Qt.Key_Space) sheet.takeDrop(sheet.dropSel);
+        return;
+      }
+      if (k === Qt.Key_Escape) sheet.back();
+      else if (k === Qt.Key_Down || (k === Qt.Key_Tab && !(event.modifiers & Qt.ShiftModifier))
+               || (ctrl && (k === Qt.Key_J || k === Qt.Key_N))) sheet.step(1);
+      else if (k === Qt.Key_Up || k === Qt.Key_Backtab || (ctrl && (k === Qt.Key_K || k === Qt.Key_P))) sheet.step(-1);
+      else if (ctrl && k === Qt.Key_Left) sheet.across(-1);
+      else if (ctrl && k === Qt.Key_Right) sheet.across(1);
+      else if (ctrl && k === Qt.Key_R) { if (sheet.cur) sheet.settings.reset(sheet.cur.key); }
+      else if (k === Qt.Key_Right) sheet.nudge(sheet.cur, 1);
+      else if (k === Qt.Key_Left) sheet.nudge(sheet.cur, -1);
+      else if (k === Qt.Key_Return || k === Qt.Key_Enter
+               || (k === Qt.Key_Space && query.text === "")) sheet.activate(sheet.cur);
       else event.accepted = false;
     }
+  }
+  Text {
+    visible: !sheet.picking && sheet.rows.length === 0
+    anchors.centerIn: parent
+    anchors.verticalCenterOffset: -sheet.helpH / 2
+    font.family: Zenon.face
+    font.pixelSize: 16
+    color: Zenon.muted
+    text: "No setting matches “" + query.text + "”"
   }
 }

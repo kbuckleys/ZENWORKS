@@ -37,6 +37,8 @@ QtObject {
   property int fontSize: 14
   property string fontFamily: "JetBrainsMono Nerd Font"
   property string fontWeight: "semibold"
+  // the cursor's line number, in one of zenon's colours
+  property string lineNumberInk: "white"
 
   // ── the cursor and motion ──────────────────────────────────────────
   property bool cursorBreathes: true
@@ -53,6 +55,8 @@ QtObject {
   property bool typewriter: false
   property bool indentGuides: true
   property bool jumpTrail: true
+  property bool dimInactive: true
+  property bool rainbowBrackets: true
 
   // ── editing: nvim's options, sent to every engine ─────────────────
   property bool wrap: true
@@ -111,6 +115,17 @@ QtObject {
                  { value: "semibold", label: "SemiBold" },
                  { value: "bold",     label: "Bold" } ],
       help: "How heavy the text is drawn. Bold syntax stays a step heavier." },
+    { key: "lineNumberInk", section: "text", label: "Current line number colour", type: "enum", pick: "color",
+      options: [ { value: "white",   label: "White" },
+                 { value: "yellow",  label: "Peach" },
+                 { value: "sand",    label: "Sand" },
+                 { value: "pink",    label: "Pink" },
+                 { value: "red",     label: "Red" },
+                 { value: "magenta", label: "Magenta" },
+                 { value: "blue",    label: "Blue" },
+                 { value: "cyan",    label: "Cyan" },
+                 { value: "green",   label: "Green" } ],
+      help: "The colour of the number beside the line the cursor is on." },
 
     { key: "wrap", section: "editing", label: "Wrap long lines", type: "bool",
       help: "Off, a long line runs off the right and the view follows the cursor sideways." },
@@ -166,6 +181,10 @@ QtObject {
       help: "A line down each level of indentation, drawn as the file tree draws its own; the block the cursor is in is drawn brighter." },
     { key: "jumpTrail", section: "motion", label: "Jump trail", type: "bool",
       help: "A jump of more than a few lines (gg, G, a search, go to definition) leaves a brief streak from where the cursor was." },
+    { key: "dimInactive", section: "motion", label: "Dim the splits you are not in", type: "bool",
+      help: "With the window split, the text of every split but the one you are typing in is drawn fainter." },
+    { key: "rainbowBrackets", section: "motion", label: "Rainbow brackets", type: "bool",
+      help: "Brackets coloured by how deeply they are nested, a colour a level. Brackets in strings and comments keep their own colour." },
     { key: "typewriter", section: "motion", label: "Typewriter scrolling in zen", type: "bool",
       help: "In zen mode the cursor's line stays in the middle of the window and the text moves past it." },
     { key: "zenWidth", section: "motion", label: "Zen mode text width", type: "int",

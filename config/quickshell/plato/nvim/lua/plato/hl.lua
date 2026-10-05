@@ -60,6 +60,9 @@ function M.attrs(group)
     c = (h.undercurl or h.underdouble or h.underdotted or h.underdashed) or nil,
     -- a link (MultiCursorVisual → Visual) washes as what it links to
     a = h.bg and (M.wash[group] or M.wash[name]) or nil,
+    -- the selection: drawn by the window as one rounded shape over all its
+    -- rows (WindowView), not a strip per span
+    v = (group == "Visual" or name == "Visual") or nil,
   }
   if h.bg and not a.a then
     local link = api.nvim_get_hl(0, { name = name, link = true }).link
@@ -97,7 +100,7 @@ function M.style(base, deco, over)
     return 0
   end
   local look = {}
-  for _, k in ipairs({ "fg", "bg", "sp", "b", "i", "s", "u", "c", "a" }) do
+  for _, k in ipairs({ "fg", "bg", "sp", "b", "i", "s", "u", "c", "a", "v" }) do
     look[#look + 1] = tostring(s[k])
   end
   look = table.concat(look, "\1")
@@ -146,6 +149,8 @@ function M.ui()
     cursorlinenr = a("CursorLineNr").fg,
     folded = a("Folded").fg,
     nontext = a("NonText").fg,
+    visual = a("Visual").bg,
+    visualAlpha = M.wash.Visual,
   }
 end
 

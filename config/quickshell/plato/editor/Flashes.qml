@@ -17,6 +17,9 @@
 //            struck through it, and it fades — a whole line folding shut as
 //            it goes, a few characters lifting away.
 //
+//   arrive   what a paste or a format brought in: a green wash, as a
+//            yank's yellow, ebbing away
+//
 //   undo     A REWIND: a cyan wash sweeps back across what the undo changed,
 //   redo     right to left, with a bright edge leading it, and fades; a redo
 //            sweeps the other way. Each covers the line's text, not the
@@ -82,7 +85,7 @@ Item {
     const del = ev.kind === "delete";
     for (const c of cells) {
       live.append({
-        uid: ++root._uid, del: del, linewise: ev.linewise === true,
+        uid: ++root._uid, del: del, linewise: ev.linewise === true, arrive: ev.kind === "arrive",
         gx: c.col * root.cellW, gy: c.row * root.cellH + root.lagAt(c.row),
         gw: c.len * root.cellW, ghost: del ? root.textAt(c.row, c.col, c.len) : "",
       });
@@ -104,6 +107,7 @@ Item {
       required property int uid
       required property bool del
       required property bool linewise
+      required property bool arrive
       required property real gx
       required property real gy
       required property real gw
@@ -123,7 +127,8 @@ Item {
         anchors.topMargin: -1
         anchors.bottomMargin: -1
         radius: 3
-        color: Qt.rgba(Zenon.yellow.r, Zenon.yellow.g, Zenon.yellow.b, 0.38)
+        readonly property color ink: fx.arrive ? Zenon.green : Zenon.yellow
+        color: Qt.rgba(ink.r, ink.g, ink.b, fx.arrive ? 0.30 : 0.38)
       }
 
       // ── delete ──────────────────────────────────────────────────────

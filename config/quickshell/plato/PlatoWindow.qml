@@ -77,7 +77,15 @@ FloatingWindow {
   // a notification, rather than losing it.
   onClosed: win.finish(true)
 
-  EditorState { id: st }
+  EditorState {
+    id: st
+    // the settings' "Current line number colour", one of zenon's
+    numberHere: {
+      const k = win.settings ? win.settings.lineNumberInk : "white";
+      const ink = Zenon[k];
+      return ink !== undefined ? ink : Zenon.white;
+    }
+  }
 
   // ── the settings that are nvim's to apply ──────────────────────────
   // core/Settings.qml's editing settings, all sent when nvim is first
@@ -95,7 +103,7 @@ FloatingWindow {
       gitBlame: s.gitBlame, stickyScroll: s.stickyScroll, reopenTabs: s.reopenTabs,
       zen: win.zen, minimap: s.minimap,
       typewriter: win.zen && s.typewriter, indentGuides: s.indentGuides,
-      largeFileMB: s.largeFileMB,
+      largeFileMB: s.largeFileMB, rainbowBrackets: s.rainbowBrackets,
     });
   }
 
@@ -547,6 +555,7 @@ FloatingWindow {
     animateLayout: win.settings ? win.settings.animateLayout : true
     gitGutter: win.settings ? win.settings.gitGutter : true
     jumpTrail: win.settings ? win.settings.jumpTrail : true
+    dimInactive: win.settings ? win.settings.dimInactive : true
     minimap: (win.settings ? win.settings.minimap : true) && !win.zen && st.status.large !== true
     onMinimapRows: (n) => nvim.options({ minimapRows: n })
     // nvim is told the editor's new size once the tree has finished moving,
@@ -955,6 +964,7 @@ FloatingWindow {
     // terminus' sheets hang from the chrome: here, the tab strip
     fromTop: tabs.height
     settings: win.settings
+    window: win
     face.family: Zenon.faceFixed
     face.pixelSize: win.chromeSize
     onClosed: editor.forceActiveFocus()

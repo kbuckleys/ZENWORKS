@@ -40,6 +40,12 @@ function M.apply()
   set("CursorLineNr", { fg = p.yellow })
   set("Folded", { fg = p.bright_black, italic = true })
   set("NonText", { fg = p.bright_black })
+  -- a closed fold's count of lines, in the pill after its first line
+  set("PlatoFoldChip", { fg = p.bright_black })
+  -- rainbow brackets (brackets.lua), a colour a level, round and round
+  for i, c in ipairs({ p.blue, p.magenta, p.yellow, p.cyan, p.green, p.bright_red }) do
+    set("PlatoRainbow" .. i, { fg = c })
+  end
   -- spelling (spell.lua): a curl under the word, as a diagnostic's
   set("SpellBad", { undercurl = true, sp = p.red })
   set("SpellCap", { undercurl = true, sp = p.yellow })

@@ -69,6 +69,8 @@ Item {
   property bool gitGutter: true
   // "Jump trail": a jump of a few lines or more leaves a streak behind it
   property bool jumpTrail: true
+  // the settings' "Dim the splits you are not in"
+  property bool dimInactive: true
 
   // modelData is the window's id; where it is and how big comes from the
   // layout, so a resize moves this item rather than replacing it
@@ -175,7 +177,8 @@ Item {
   function sigOf(r) {
     return r.n + "\u0001" + r.k + "\u0001" + r.t + "\u0001" + JSON.stringify(r.s)
       + "\u0001" + JSON.stringify(r.g || 0) + "\u0001" + r.f + "\u0001" + (r.v || "")
-      + "\u0001" + (r.ig ? Array.from(r.ig).join(",") : "");
+      + "\u0001" + (r.ig ? Array.from(r.ig).join(",") : "")
+      + "\u0001" + JSON.stringify([r.m || 0, r.sl || 0, r.vt || 0, r.fc || 0]);
   }
   function place() {
     const rows = win.ed.rowsOf(win.w.id);
@@ -300,6 +303,14 @@ Item {
     for (let i = 0; i < edges.below.length; ++i) edgeAt(edges.below[i], h + i);
 
     win.curOrd = ords[win.ed.cursorOf(win.w.id).row] || 0;
+    // the selection's rows, for the one shape drawn over them
+    const parts = [];
+    for (let i = 0; i < h; ++i) {
+      const sl = rows[i].sl;
+      if (sl) parts.push([i, sl[0], sl[1]]);
+    }
+    const key = JSON.stringify(parts);
+    if (key !== selection.key) { selection.key = key; selection.parts = parts; }
     content.seatBar(shift !== 0);
     win.noteJump(rows, shift);
   }
@@ -380,6 +391,10 @@ Item {
     width: win.width
     height: win.height
     y: win.lag + win.bandY
+    // THE SPLITS YOU ARE NOT IN STEP BACK, so where the keys go reads at a
+    // glance; the current line's bar alone said it before
+    opacity: win.dimInactive && !win.w.current && win.ed.winIds.length > 1 ? 0.55 : 1
+    Behavior on opacity { NumberAnimation { duration: Zenon.normal; easing.type: Zenon.ease } }
 
     // The current line: terminus' cursor bar, over every row of it when it
     // wraps. Only in the window the cursor is in.
@@ -461,6 +476,63 @@ Item {
       on: win.w.current && !win.ed.cmdlineShown && !win.ed.inFloat
     }
 
+    // ── THE SELECTION, AS ONE SHAPE ──────────────────────────────────
+    // Every row of it joined into one outline with rounded corners —
+    // outside corners round out, the steps between rows round in — rather
+    // than a square strip a row. view.lua sends each row's part (`sl`);
+    // place() gathers them. Under the text, as the wash always was. A
+    // selection that was not there a moment ago fades in.
+    Selection {
+      id: selection
+      cellW: win.cellW
+      cellH: win.cellH
+      textX: win.w.textoff * win.cellW
+      ink: Qt.rgba(win.ed.visualInk.r, win.ed.visualInk.g, win.ed.visualInk.b, win.ed.visualAlpha)
+    }
+
+    // ── A SEARCH JUMP, FOUND ─────────────────────────────────────────
+    // n, N, *, # or a confirmed / land the cursor on a match: an outline
+    // closes in on it from a little way out and fades, so the eye finds
+    // where the jump went (view.lua's pulse).
+    Rectangle {
+      id: pulse
+      z: 3
+      visible: false
+      property real gx: 0
+      property real gy: 0
+      property real gw: 0
+      property real grow: 0
+      x: pulse.gx - pulse.grow
+      y: pulse.gy - pulse.grow
+      width: pulse.gw + pulse.grow * 2
+      height: win.cellH + pulse.grow * 2
+      radius: 4 + pulse.grow / 2
+      color: "transparent"
+      border.width: 2
+      border.color: Zenon.sand
+      Connections {
+        target: win.ed
+        function onPulsed(hit) {
+          if (hit.win !== win.w.id) return;
+          pulse.gx = (win.w.textoff + hit.col) * win.cellW - 1;
+          pulse.gy = hit.row * win.cellH;
+          pulse.gw = Math.max(1, hit.len) * win.cellW + 2;
+          pulseRun.restart();
+        }
+      }
+      SequentialAnimation {
+        id: pulseRun
+        PropertyAction { target: pulse; property: "visible"; value: true }
+        ParallelAnimation {
+          NumberAnimation { target: pulse; property: "grow"; from: 7; to: 0; duration: 180; easing.type: Easing.OutCubic }
+          NumberAnimation { target: pulse; property: "opacity"; from: 0; to: 1; duration: 120; easing.type: Easing.OutQuad }
+        }
+        PauseAnimation { duration: 260 }
+        NumberAnimation { target: pulse; property: "opacity"; to: 0; duration: 420; easing.type: Easing.InOutQuad }
+        PropertyAction { target: pulse; property: "visible"; value: false }
+      }
+    }
+
     Repeater {
       id: pool
       model: Math.max(1, win.w.height) * 3
@@ -493,6 +565,9 @@ Item {
         curOrd: win.curOrd
         relative: { win.ed.frame; return win.ed.scrollOf(win.w.id).rnu; }
         gitGutter: win.gitGutter
+        // the window draws the selection whole (Selection above)
+        ownSelection: false
+        eofMark: true
         // the cursor's block: its guide drawn brighter, in this window only
         scope: win.w.current ? win.ed.scope : null
         // zen mode: only the cursor's paragraph at full strength
@@ -681,12 +756,24 @@ Item {
       }
     }
     Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Zenon.border }
+    // THE SHADOW DEEPENS AS THE TEXT GOES UNDER: faint while the block's
+    // opener has only just reached the top, full once a few lines of it
+    // have scrolled beneath the pinned lines
+    readonly property real depth: {
+      win.ed.frame;
+      if (sticky.lines.length === 0) return 0;
+      const top = win.ed.scrollOf(win.w.id).top;
+      const lastN = sticky.lines[sticky.lines.length - 1].n;
+      return Math.max(0.3, Math.min(1, (top - lastN) / 4));
+    }
+    property real shade: sticky.depth
+    Behavior on shade { NumberAnimation { duration: Zenon.normal; easing.type: Zenon.ease } }
     Rectangle {
       anchors.top: parent.bottom
       width: parent.width
-      height: 8
+      height: 6 + 6 * sticky.shade
       gradient: Gradient {
-        GradientStop { position: 0; color: Qt.rgba(0, 0, 0, 0.35) }
+        GradientStop { position: 0; color: Qt.rgba(0, 0, 0, 0.5 * sticky.shade) }
         GradientStop { position: 1; color: "transparent" }
       }
     }

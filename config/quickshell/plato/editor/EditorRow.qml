@@ -53,6 +53,11 @@ Item {
   // arriving: 0 → 1 as a row a fold uncovered fades in (WindowView)
   property real enter: 1
   // the dimming eases on its own, so a fade-in is not eased a second time
+  // the selection: drawn here as a rounded strip of this row's own (a
+  // float's rows), unless the window draws one shape over all its rows
+  property bool ownSelection: true
+  // a row past the file's end shows a dim ~, as vim's do (a window's rows)
+  property bool eofMark: false
   property real dimLevel: row.dimmed ? 0.3 : 1
   Behavior on dimLevel { NumberAnimation { duration: Zenon.normal; easing.type: Zenon.ease } }
   opacity: row.dimLevel * row.enter
@@ -119,9 +124,14 @@ Item {
     height: row.cellH
     horizontalAlignment: Text.AlignRight
     verticalAlignment: Text.AlignVCenter
-    font: row.face
+    font.family: row.face.family
+    font.pixelSize: row.face.pixelSize
+    font.weight: number.rel === 0 ? Font.Bold : row.face.weight
     textFormat: Text.PlainText
-    color: number.rel === 0 ? row.ed.cursorLineNrFg : row.ed.lineNrFg
+    color: number.rel === 0 ? row.ed.numberHere : row.ed.lineNrFg
+    // QUIETER FURTHER OUT: the numbers near the cursor are the ones a
+    // count is read off; the rest step back, to half strength
+    opacity: number.rel === 0 ? 1 : Math.max(0.5, 1 - number.rel * 0.04)
   }
 
   // ── backgrounds ────────────────────────────────────────────────────
@@ -134,7 +144,7 @@ Item {
     for (let k = 0; k < sp.length; ++k) {
       const st = row.ed.styles[sp[k][2]];
       // a selection or a match is a wash over the text (hl.lua's `wash`)
-      if (st && st.bg) {
+      if (st && st.bg && !(st.v && !row.ownSelection)) {
         const c = Qt.color(st.bg);
         out.push({ x: sp[k][0], w: sp[k][1], c: st.a ? Qt.rgba(c.r, c.g, c.b, st.a) : c });
       }
@@ -148,8 +158,51 @@ Item {
       x: row.textX + modelData.x * row.cellW
       width: modelData.w * row.cellW
       height: row.cellH
+      radius: 3
       color: modelData.c
     }
+  }
+
+  // ── a diagnostic's pill, and a fold's ──────────────────────────────
+  // The message at a line's end sits in a soft pill of its severity's
+  // colour, half a cell of air either side; one the window's edge cut short
+  // ends in "…" (view.lua) and its pill runs into the edge. A closed
+  // fold's "⋯ N lines" is a quiet pill of its own.
+  readonly property var vt: row.info.vt ? Array.from(row.info.vt) : null
+  function sevInk(k) {
+    return k === "e" ? Zenon.red : k === "w" ? Zenon.yellow : k === "i" ? Zenon.blue : Zenon.cyan;
+  }
+  Rectangle {
+    visible: row.vt !== null
+    readonly property color ink: row.vt ? row.sevInk(row.vt[2]) : "transparent"
+    x: row.vt ? row.textX + (row.vt[0] - 0.5) * row.cellW : 0
+    width: row.vt ? (row.vt[1] - row.vt[0] + (row.vt[3] ? 0.5 : 1)) * row.cellW : 0
+    y: 1
+    height: row.cellH - 2
+    radius: height / 2
+    color: Qt.rgba(ink.r, ink.g, ink.b, 0.13)
+  }
+  readonly property var fc: row.info.fc ? Array.from(row.info.fc) : null
+  Rectangle {
+    visible: row.fc !== null
+    x: row.fc ? row.textX + (row.fc[0] - 0.75) * row.cellW : 0
+    width: row.fc ? (row.fc[1] + 1.5) * row.cellW : 0
+    y: 2
+    height: row.cellH - 4
+    radius: height / 2
+    color: Qt.rgba(1, 1, 1, 0.05)
+    border.width: 1
+    border.color: Zenon.border
+  }
+  // a float's selection, one strip a row (a window draws its own shape)
+  readonly property var sl: row.ownSelection && row.info.sl ? Array.from(row.info.sl) : null
+  Rectangle {
+    visible: row.sl !== null
+    x: row.sl ? row.textX + row.sl[0] * row.cellW : 0
+    width: row.sl ? (row.sl[1] - row.sl[0]) * row.cellW : 0
+    height: row.cellH
+    radius: 3
+    color: Qt.rgba(row.ed.visualInk.r, row.ed.visualInk.g, row.ed.visualInk.b, row.ed.visualAlpha)
   }
 
   // ── INDENT GUIDES, AS THE FILE TREE DRAWS ITS OWN ──────────────────
@@ -215,6 +268,36 @@ Item {
     font: row.face
     color: row.ed.normalFg
     text: row.markup
+  }
+
+  // past the end of the file: a dim ~ where the text would start
+  Text {
+    visible: row.eofMark && row.info.n === 0
+    x: row.textX
+    height: row.cellH
+    verticalAlignment: Text.AlignVCenter
+    textFormat: Text.PlainText
+    font: row.face
+    color: row.ed.lineNrFg
+    opacity: 0.35
+    text: "~"
+  }
+
+  // ── the bracket at the cursor, and its partner ─────────────────────
+  // outlined in the cursor's cyan, as the jump trail's ghost is
+  readonly property var pairCells: row.info.m ? Array.from(row.info.m) : []
+  Repeater {
+    model: row.pairCells
+    Rectangle {
+      required property var modelData
+      x: row.textX + modelData * row.cellW
+      width: row.cellW
+      height: row.cellH
+      radius: 2
+      color: Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b, 0.12)
+      border.width: 1
+      border.color: Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b, 0.8)
+    }
   }
 
   // ── underlines ─────────────────────────────────────────────────────

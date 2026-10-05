@@ -17,6 +17,9 @@
 
 local here = vim.fs.dirname(debug.getinfo(1, "S").source:sub(2))
 vim.opt.runtimepath:prepend(here)
+-- nvim's matchparen marks the pair with window matches, which no frame
+-- reads; plato outlines the pair itself (brackets.lua), so it only cost time
+vim.g.loaded_matchparen = 1
 
 -- ── the screen is plato's ──────────────────────────────────────────────
 -- nvim's window IS plato's viewport: one window, filling the whole grid,

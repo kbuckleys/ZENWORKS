@@ -22,6 +22,12 @@
 --   t  the text as drawn          s  its colours: { {col, len, style}, ... }
 --   g  the sign in the gutter     f  a closed fold
 --   ig the indent guides: the cells, from the text's left, a guide runs down
+--   m  the bracket at the cursor and its partner: the cells to outline
+--   sl the selection on this row: { from, to } cells (plato draws one
+--      rounded shape over every row of it)
+--   vt a diagnostic at the line's end: { from, to, kind, cut } cells, kind
+--      "e" "w" "i" "h", cut when the window's edge took the rest of it
+--   fc a closed fold's pill: { from, len } cells of its "⋯ N lines"
 -- Style numbers are defined in the frame's `styles` the first time they are
 -- used — see hl.lua.
 --
@@ -418,6 +424,10 @@ local function build(win, isCurrent, mode, margin)
   if sw <= 0 then sw = ts end
   local spell = not large and vim.wo[win].spell
   local prose = spell and require("plato.spell").prose(buf)
+  local plain = vim.bo[buf].buftype == "" and api.nvim_win_get_config(win).relative == ""
+  -- rainbow brackets (brackets.lua): a colour a level
+  local rainbow = not large and plain and vim.g.plato_rainbow ~= false
+  local brackets = require("plato.brackets")
 
   local top = vim.fn.line("w0") - 1
   local bot
@@ -441,6 +451,21 @@ local function build(win, isCurrent, mode, margin)
   local deco, signs, virt, xConceal = extmarks(buf, hlTop, hlBot)
   local found = searchMatches(buf, top, bot, isCurrent and view.lnum - 1 or -1, view.col)
   local sel = isCurrent and selection(mode) or {}
+  -- the bracket at the cursor and its partner, both on screen: l0 → { bytes }
+  local pairAt = {}
+  if isCurrent and not large and not mode:find("^c") then
+    local m1 = mode:sub(1, 1)
+    local ok, pr = pcall(brackets.pair, buf, view.lnum - 1, view.col,
+      m1 == "i" or m1 == "R", top, bot)
+    if ok and pr then
+      for _, b in ipairs(pr) do
+        pairAt[b[1]] = pairAt[b[1]] or {}
+        table.insert(pairAt[b[1]], b[2])
+      end
+    end
+  end
+  -- the search match the cursor sits on, in this window's cells
+  local hit = nil
 
   local function concealFor(l)
     if cl == 0 then return nil end
@@ -529,13 +554,34 @@ local function build(win, isCurrent, mode, margin)
     else
       local fold = vim.fn.foldclosed(l + 1)
       if fold ~= -1 then
-        local text = vim.fn.foldtextresult(l + 1)
-        local t = layout(text, ts, 0, width)
-        if live and view.lnum - 1 >= l and view.lnum <= vim.fn.foldclosedend(l + 1) then
+        -- A CLOSED FOLD IS ITS FIRST LINE, in its own colours, and a pill
+        -- after it saying how many lines are folded under it — not
+        -- foldtext's dashes across the row.
+        local fe = vim.fn.foldclosedend(l + 1)
+        local chip = "\u{22EF} " .. (fe - l) .. " lines"
+        local chipW = cellWidth(chip)
+        local first = (api.nvim_buf_get_lines(buf, l, l + 1, false)[1] or ""):gsub("%s+$", "")
+        local t, fchars = layout(first, ts, wrap and 0 or view.leftcol, math.max(0, width - chipW - 3))
+        local fbase = {}
+        local nc = cellWidth(t)
+        if tsPaints then
+          for _, p in ipairs(tsPaints[l] or {}) do paint(fbase, fchars, nc, p[1], p[2], p[3]) end
+        else
+          for _, r in ipairs(hl.syntax(buf, l, first, fchars) or {}) do paint(fbase, fchars, nc, r[1], r[2], r[3]) end
+        end
+        local fc = nil
+        if width - nc >= chipW + 3 then
+          local at = nc + 2
+          t = t .. string.rep(" ", at - nc) .. chip
+          for c = at, at + chipW - 1 do fbase[c] = "PlatoFoldChip" end
+          fc = { at, chipW }
+          nc = at + chipW
+        end
+        if live and view.lnum - 1 >= l and view.lnum <= fe then
           cursorRow, cursorCol, cursorChar = #rows, 0, 0
         end
         rows[#rows + 1] = { n = l + 1, k = 0, t = t, f = true,
-          s = { { 0, cellWidth(t), hl.style("Folded") } }, g = nil }
+          s = charSpans(t, spans(fbase, {}, {}, 0, nc)), g = nil, fc = fc }
         -- foldclosedend is 1-based: as a 0-based index it is the fold's
         -- last line, and the loop's own step moves past it
         l = vim.fn.foldclosedend(l + 1) - 1
@@ -569,6 +615,20 @@ local function build(win, isCurrent, mode, margin)
           local runs = hl.syntax(buf, l, line, chars)
           for _, r in ipairs(runs or {}) do paint(base, chars, ncells, r[1], r[2], r[3]) end
         end
+        -- rainbow brackets, over the syntax's own colour — but not a bracket
+        -- the syntax says is in a string or a comment
+        if rainbow and not subLit and line:find("[%(%)%[%]{}]") then
+          for _, rb in ipairs(brackets.rainbow(buf, l, line)) do
+            local k = seek(chars, rb[1])
+            local ch = chars[k]
+            if ch and ch[1] == rb[1] then
+              local g = (base[math.max(0, ch[3])] or ""):lower()
+              if not (g:find("comment") or g:find("string")) then
+                paint(base, chars, ncells, rb[1], rb[1] + 1, "PlatoRainbow" .. (rb[2] % 6 + 1))
+              end
+            end
+          end
+        end
         for _, p in ipairs(deco[l] or {}) do paint(dl, chars, ncells, p[1], p[2], p[3]) end
         if not large then
           for _, p in ipairs(colorCodes(line, qml)) do paint(dl, chars, ncells, p[1], p[2], p[3]) end
@@ -593,8 +653,18 @@ local function build(win, isCurrent, mode, margin)
             end
           end
         end
+        local hitCells = nil
         if not subLit then
-          for _, p in ipairs(found[l] or {}) do paint(ol, chars, ncells, p[1], p[2], p[3]) end
+          for _, p in ipairs(found[l] or {}) do
+            paint(ol, chars, ncells, p[1], p[2], p[3])
+            if live and p[3] == "CurSearch" then
+              local k0 = seek(chars, p[1])
+              local k1 = seek(chars, math.max(p[1] + 1, p[2])) - 1
+              if chars[k0] and chars[k1] then
+                hitCells = { chars[k0][3], chars[k1][3] + chars[k1][4] }
+              end
+            end
+          end
         end
         local sl = sel[l]
         if sl then
@@ -617,6 +687,7 @@ local function build(win, isCurrent, mode, margin)
         -- but never eol text; a diagnostic that reached the next row made the
         -- file look a line longer than it is.
         local v = virt[l]
+        local pill = nil
         if v and (lineCells - from) < limit then
           local rowEnd = wrap
             and math.max(1, math.ceil(math.max(ncells, 1) / width)) * width
@@ -628,11 +699,28 @@ local function build(win, isCurrent, mode, margin)
             for _, chunk in ipairs(v) do
               local s, g = chunk[1], chunk[2]
               if type(g) == "table" then g = g[#g] end
-              local w = math.min(cellWidth(s), rowEnd - ncells)
-              if w <= 0 then break end
+              local full = cellWidth(s)
+              local w = math.min(full, rowEnd - ncells)
+              if w <= 0 then pill = pill and { pill[1], pill[2], pill[3], true }; break end
+              -- a diagnostic sits in a pill of its severity's colour
+              local sev = type(g) == "string" and g:match("^DiagnosticVirtualText(%a+)")
+              if sev then
+                local lead = #(s:match("^%s*"))
+                if lead < w then
+                  local kind = ({ Error = "e", Warn = "w", Info = "i", Hint = "h" })[sev] or "h"
+                  if pill then pill[2] = ncells + w
+                  else pill = { ncells + lead, ncells + w, kind, false } end
+                end
+              end
               text = text .. cellSlice(s, 0, w)
               for c = ncells, ncells + w - 1 do base[c] = g end
               ncells = ncells + w
+              if w < full then
+                -- cut by the edge: its last cell says so
+                if pill then pill[4] = true end
+                text = cellSlice(text, 0, ncells - 1) .. "\u{2026}"
+                break
+              end
             end
           end
         end
@@ -664,12 +752,39 @@ local function build(win, isCurrent, mode, margin)
             end
           end
           local sign = (k == 0) and signs[l] or nil
+          -- the outlined pair, the selection, a diagnostic's pill and the
+          -- search hit: each in this piece's own cells
+          local m = nil
+          for _, pb in ipairs(pairAt[l] or {}) do
+            local pk = seek(chars, pb)
+            local pc = chars[pk]
+            if pc and pc[1] == pb and pc[3] >= c0 and pc[3] < c1 then
+              m = m or {}
+              m[#m + 1] = pc[3] - c0
+            end
+          end
+          local slc = nil
+          if sl then
+            local a, z
+            for c = c0, math.max(c0, c1) - 1 do
+              if ol[c] == "Visual" then a = a or c; z = c end
+            end
+            if a then slc = { a - c0, z + 1 - c0 } end
+          end
+          local vt = nil
+          if pill and pill[1] < c1 and pill[2] > c0 then
+            vt = { math.max(pill[1], c0) - c0, math.min(pill[2], c1) - c0, pill[3], pill[4] }
+          end
+          if hitCells and hitCells[1] >= c0 and hitCells[1] < math.max(c1, c0 + 1) then
+            hit = { row = #rows, col = hitCells[1] - c0, len = hitCells[2] - hitCells[1] }
+          end
           rows[#rows + 1] = {
             n = l + 1, k = k, t = piece, f = false,
             s = charSpans(piece, spans(base, dl, ol, c0, c1)),
             g = sign and { sign[1], sign[2] and hl.style(sign[2]) or 0 } or nil,
             v = vcs and vcs[l + 1] or nil,
             ig = (guides and k == 0 and not (wrap and from > 0)) and guideCols(l + 1, wrap and 0 or from) or nil,
+            m = m, sl = slc, vt = vt,
           }
         end
       end
@@ -744,7 +859,7 @@ local function build(win, isCurrent, mode, margin)
   return {
     rows = rows, above = above, below = below,
     height = height, width = width, buf = buf, view = view,
-    wrap = wrap, last = last, textoff = textoff, scope = scope,
+    wrap = wrap, last = last, textoff = textoff, scope = scope, hit = hit,
     cursor = { row = cursorRow, col = math.max(0, cursorCol), ch = math.max(0, cursorChar) },
   }
 end
@@ -753,6 +868,7 @@ local function signature(row)
   return row.n .. "\1" .. row.k .. "\1" .. row.t .. "\1" .. tostring(row.f)
     .. "\1" .. vim.json.encode(row.s) .. "\1" .. vim.json.encode(row.g or false)
     .. "\1" .. (row.v or "") .. "\1" .. (row.ig and table.concat(row.ig, ",") or "")
+    .. "\1" .. vim.json.encode({ row.m or false, row.sl or false, row.vt or false, row.fc or false })
 end
 
 -- ── the editor window ───────────────────────────────────────────────────
@@ -1051,6 +1167,17 @@ function M.frame(full)
     end
   end
 
+  -- A SEARCH JUMP (n, N, *, #, or / and ? confirmed) lands on a match:
+  -- plato pulses an outline round it, so the eye finds where it went
+  local pulse = vim.NIL
+  if M._searchJump and M._searchJump > 0 then
+    if b.hit then
+      pulse = { row = b.hit.row, col = b.hit.col, len = b.hit.len, win = ed }
+      M._searchJump = 0
+    else
+      M._searchJump = M._searchJump - 1
+    end
+  end
   local marks = scrollMarks(buf)
   -- the minimap's lines go on their own, a moment later (minimap.lua)
   pcall(require("plato.minimap").poke, ed, buf)
@@ -1090,6 +1217,7 @@ function M.frame(full)
       return okn and n or 1
     end)(),
     para = para,
+    pulse = pulse,
     marks = marks or vim.NIL,
     cmdline = cmdline,
     search = search,
@@ -1136,10 +1264,11 @@ local function attach(buf)
   api.nvim_buf_attach(buf, false, {
     on_lines = function(_, b, _, first)
       hl.invalidateFrom(b, first)
+      require("plato.brackets").invalidate(b, first)
       M.schedule()
     end,
-    on_detach = function(_, b) attached[b] = nil; hl.forget(b) end,
-    on_reload = function(_, b) hl.forget(b); M.schedule(true) end,
+    on_detach = function(_, b) attached[b] = nil; hl.forget(b); require("plato.brackets").forget(b) end,
+    on_reload = function(_, b) hl.forget(b); require("plato.brackets").forget(b); M.schedule(true) end,
   })
 end
 
@@ -1184,7 +1313,20 @@ function M.setup(send)
   -- until something else moved. on_key sees the key before it runs; the
   -- scheduled frame is built after, and is coalesced and diffed like any
   -- other, so a key that changed nothing costs one comparison.
-  vim.on_key(function() M.schedule() end, api.nvim_create_namespace("plato.keys"))
+  vim.on_key(function(key, typed)
+    local k = (typed and typed ~= "") and typed or key
+    if (k == "n" or k == "N" or k == "*" or k == "#") and api.nvim_get_mode().mode == "n" then
+      M._searchJump = 3
+    end
+    M.schedule()
+  end, api.nvim_create_namespace("plato.keys"))
+  api.nvim_create_autocmd("CmdlineLeave", {
+    group = group,
+    callback = function()
+      local t = vim.fn.getcmdtype()
+      if (t == "/" or t == "?") and not vim.v.event.abort then M._searchJump = 3 end
+    end,
+  })
   attach(api.nvim_get_current_buf())
 end
 

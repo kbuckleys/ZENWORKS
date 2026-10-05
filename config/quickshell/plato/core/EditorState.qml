@@ -77,6 +77,12 @@ QtObject {
   property color cursorLineBg: "#20242a"
   property color lineNrFg: "#6a707f"
   property color cursorLineNrFg: "#fab387"
+  // the colour the cursor's line number is drawn in: the settings' choice
+  // (PlatoWindow), nvim's CursorLineNr when nothing sets it
+  property color numberHere: state.cursorLineNrFg
+  // the selection's colour, and how strongly it washes over the text
+  property color visualInk: "#c8a4e0"
+  property real visualAlpha: 0.32
 
   // ── floats and the completion menu ─────────────────────────────────
   // nvim's floating windows — hover, signature help, completion's docs —
@@ -177,6 +183,9 @@ QtObject {
   // the indent guide of the block the cursor is in: { col, first, last },
   // or null (view.lua's scope)
   property var scope: null
+  // a search jump landed on a match: { row, col, len, win } in that
+  // window's cells, for one frame — WindowView pulses an outline round it
+  signal pulsed(var hit)
   // how many cursors (multicursor.nvim): more than one shows in the status bar
   property int cursors: 1
 
@@ -250,6 +259,8 @@ QtObject {
     if (ui.cursorline) state.cursorLineBg = ui.cursorline;
     if (ui.linenr) state.lineNrFg = ui.linenr;
     if (ui.cursorlinenr) state.cursorLineNrFg = ui.cursorlinenr;
+    if (ui.visual) state.visualInk = ui.visual;
+    if (ui.visualAlpha) state.visualAlpha = ui.visualAlpha;
     state.stylesReset();
   }
 
@@ -350,6 +361,7 @@ QtObject {
     if (ev.cmdline) state.applyCmdline(Object.assign({ shown: true }, ev.cmdline));
     else if (state.cmdlineShown && !String(ev.mode).startsWith("c")) state.cmdlineShown = false;
     state.frame++;
+    if (ev.pulse) state.pulsed(ev.pulse);
   }
 
   function applyPum(ev) {

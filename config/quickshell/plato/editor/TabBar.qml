@@ -77,9 +77,74 @@ Rectangle {
     function onTabOrderChanged() { tabStrip.endDrag(); }
   }
 
+  // ── A TAB CLOSED SHRINKS OUT, AND THE REST CLOSE UP ───────────────
+  // The strip's model is a plain list, so a change rebuilds every cell at
+  // its new place. What the strip looked like before is kept here (ids in
+  // order, one cell's width, each tab's name), so a cell made again can
+  // start where it was and slide to where it is, and a tab that is gone
+  // leaves a ghost in its slot that narrows to nothing as the others move
+  // over it. Recorded a moment after each change, once the cells exist.
+  property var prevIds: []
+  property real prevCellW: 0
+  property var prevNames: ({})
+  function record() {
+    tabStrip.prevIds = tabStrip.tabs.map((b) => b.id);
+    tabStrip.prevCellW = tabStrip.width / Math.max(1, tabStrip.tabs.length);
+    const names = {};
+    for (const b of tabStrip.tabs) names[b.id] = b.name;
+    tabStrip.prevNames = names;
+  }
+  onTabsChanged: {
+    if (tabStrip.animate && tabStrip.tabs.length > 1) {
+      const live = tabStrip.tabs.map((b) => b.id);
+      for (let i = 0; i < tabStrip.prevIds.length; ++i) {
+        const id = tabStrip.prevIds[i];
+        if (live.indexOf(id) < 0)
+          ghosts.append({ gx: i * tabStrip.prevCellW, gw: tabStrip.prevCellW,
+                          name: tabStrip.prevNames[id] || "" });
+      }
+    }
+    Qt.callLater(tabStrip.record);
+  }
+  onWidthChanged: tabStrip.prevCellW = tabStrip.width / Math.max(1, tabStrip.tabs.length)
+  ListModel { id: ghosts }
+
   Item {
     anchors.fill: parent
     anchors.bottomMargin: 1
+
+    Repeater {
+      model: ghosts
+      delegate: Item {
+        id: ghost
+        required property int index
+        required property real gx
+        required property real gw
+        required property string name
+        x: ghost.gx
+        width: ghost.gw
+        height: parent.height
+        clip: true
+        z: -1
+        Text {
+          anchors.centerIn: parent
+          width: Math.min(implicitWidth, ghost.gw - 16)
+          elide: Text.ElideMiddle
+          textFormat: Text.PlainText
+          text: ghost.name
+          color: Zenon.muted
+          font.family: Zenon.face
+          font.pixelSize: tabStrip.face.pixelSize
+        }
+        ParallelAnimation {
+          running: true
+          onFinished: ghosts.remove(ghost.index)
+          NumberAnimation { target: ghost; property: "opacity"; from: 1; to: 0; duration: Zenon.normal; easing.type: Easing.OutCubic }
+          NumberAnimation { target: ghost; property: "width"; to: 0; duration: Zenon.normal; easing.type: Zenon.travelEase }
+          NumberAnimation { target: ghost; property: "x"; to: ghost.gx + ghost.gw / 2; duration: Zenon.normal; easing.type: Zenon.travelEase }
+        }
+      }
+    }
 
     Repeater {
       model: tabStrip.tabs
@@ -100,11 +165,19 @@ Rectangle {
             ? tabCell.index + 1 : tabCell.index;
         }
 
-        x: tabCell.lifted ? tabStrip.dragX : tabCell.slot * tabCell.width
+        // from where it was before the strip was rebuilt (see prevIds)
+        property real shiftX: 0
+        property real shiftW: 0
+        x: tabCell.lifted ? tabStrip.dragX : tabCell.slot * (tabStrip.width / Math.max(1, tabStrip.tabs.length)) + tabCell.shiftX
         z: tabCell.lifted ? 2 : 0
         Behavior on x {
-          enabled: !tabCell.lifted
+          enabled: !tabCell.lifted && !closeUp.running
           NumberAnimation { duration: Zenon.normal; easing.type: Easing.OutCubic }
+        }
+        ParallelAnimation {
+          id: closeUp
+          NumberAnimation { target: tabCell; property: "shiftX"; to: 0; duration: Zenon.normal; easing.type: Zenon.travelEase }
+          NumberAnimation { target: tabCell; property: "shiftW"; to: 0; duration: Zenon.normal; easing.type: Zenon.travelEase }
         }
 
         // ONLY A NEW TAB ARRIVES. The strip's model is a plain list, so any
@@ -121,6 +194,15 @@ Rectangle {
           tabStrip.seen[id] = true;
           if (fresh && tabStrip.animate) { tabCell.scale = 0.6; tabIn.start(); }
           else tabCell.opacity = 1;
+          // a tab already drawn, rebuilt somewhere else: slide from there
+          const was = tabStrip.prevIds.indexOf(id);
+          if (!fresh && was >= 0 && tabStrip.animate && tabStrip.prevCellW > 0) {
+            const w = tabStrip.width / Math.max(1, tabStrip.tabs.length);
+            tabCell.shiftX = was * tabStrip.prevCellW - tabCell.index * w;
+            tabCell.shiftW = tabStrip.prevCellW - w;
+            if (Math.abs(tabCell.shiftX) > 0.5 || Math.abs(tabCell.shiftW) > 0.5) closeUp.start();
+            else { tabCell.shiftX = 0; tabCell.shiftW = 0; }
+          }
         }
         ParallelAnimation {
           id: tabIn
@@ -130,7 +212,7 @@ Rectangle {
         Behavior on color {
           ColorAnimation { duration: Zenon.fast; easing.type: Zenon.ease }
         }
-        width: tabStrip.width / Math.max(1, tabStrip.tabs.length)
+        width: tabStrip.width / Math.max(1, tabStrip.tabs.length) + tabCell.shiftW
         height: parent.height
         color: tabCell.lifted ? Zenon.headBg
           : (tabCell.here ? "transparent" : Qt.rgba(0, 0, 0, 0.28))
@@ -160,7 +242,9 @@ Rectangle {
           }
           Text {
             id: tabLabel
+            // room either side for the close button, while it shows
             width: Math.min(implicitWidth, tabCell.width - 16 - (dot.visible ? dot.width + 6 : 0)
+              - (closeX.visible ? 2 * (closeX.width + 8) : 0)
               - (pinNo.visible ? pinNo.width + 6 : 0))
             elide: Text.ElideMiddle
             textFormat: Text.PlainText
@@ -170,9 +254,13 @@ Rectangle {
             font.pixelSize: tabStrip.face.pixelSize
           }
           // unsaved: terminus' tabs have nothing to say this, an editor's must
+          // (faded, not hidden, under the pointer: the close button takes
+          // over its meaning, and the name does not shift)
           Text {
             id: dot
             visible: tabCell.modelData.modified
+            opacity: tabMouse.containsMouse ? 0 : 1
+            Behavior on opacity { NumberAnimation { duration: Zenon.fast } }
             // unsaved: the same glyph as the status line's
             text: "\uEA73"
             font.family: Zenon.faceMono
@@ -182,12 +270,47 @@ Rectangle {
           }
         }
 
+        // ── CLOSE, UNDER THE POINTER ─────────────────────────────────
+        // A × at the tab's right end while the pointer is on it (a middle
+        // click still closes too). Closing a tab with unsaved changes is
+        // refused by nvim, as ever.
+        Text {
+          id: closeX
+          anchors.right: parent.right
+          anchors.rightMargin: 8
+          anchors.verticalCenter: parent.verticalCenter
+          opacity: tabMouse.containsMouse && !tabMouse.dragging && tabCell.width > 70 ? 1 : 0
+          Behavior on opacity { NumberAnimation { duration: Zenon.fast } }
+          visible: opacity > 0
+          text: "\u{F0156}"
+          font.family: Zenon.faceMono
+          font.pixelSize: tabStrip.face.pixelSize
+          color: tabMouse.overClose ? (tabCell.modelData.modified ? Zenon.pink : Zenon.white) : Zenon.muted
+          Behavior on color { ColorAnimation { duration: Zenon.fast } }
+          Rectangle {
+            anchors.centerIn: parent
+            width: parent.height + 2
+            height: width
+            radius: 4
+            z: -1
+            color: Qt.rgba(1, 1, 1, tabMouse.overClose ? 0.08 : 0)
+          }
+        }
+
         MouseArea {
           id: tabMouse
+          // the pointer is on the close button
+          property bool overClose: false
+          function onClose(m) {
+            if (!closeX.visible) return false;
+            const p = tabMouse.mapToItem(closeX, m.x, m.y);
+            return p.x >= -4 && p.x <= closeX.width + 4 && p.y >= -4 && p.y <= closeX.height + 4;
+          }
           anchors.fill: parent
           acceptedButtons: Qt.LeftButton | Qt.MiddleButton
           hoverEnabled: true
           onContainsMouseChanged: {
+            if (!tabMouse.containsMouse) tabMouse.overClose = false;
             const t = tabStrip.tips;
             if (!t) return;
             if (tabMouse.containsMouse && !tabMouse.pressed)
@@ -210,6 +333,7 @@ Rectangle {
             tabMouse.dragging = false;
           }
           onPositionChanged: (m) => {
+            tabMouse.overClose = tabMouse.onClose(m);
             if (!tabMouse.pressed || tabStrip.tabs.length < 2) return;
             const at = tabMouse.stripX(m);
             if (!tabMouse.dragging) {
@@ -240,7 +364,8 @@ Rectangle {
             if (tabMouse.dragging) return;
             const id = tabCell.modelData.id;
             // deferred: closing replaces the model this delegate belongs to
-            if (m.button === Qt.MiddleButton) Qt.callLater(() => tabStrip.client.bufClose(id, false));
+            if (m.button === Qt.MiddleButton || tabMouse.onClose(m))
+              Qt.callLater(() => tabStrip.client.bufClose(id, false));
             else tabStrip.client.bufShow(id);
           }
         }
