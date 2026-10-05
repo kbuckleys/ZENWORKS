@@ -72,10 +72,12 @@
 
 import QtQuick
 import QtQuick.Window
+import QtQuick.Effects
 import QtMultimedia
 import Quickshell
 import Quickshell.Io
 import Quickshell.Hyprland
+import Quickshell.Widgets
 import "../morpheus"
 import "../terminus"
 import "../oracle"
@@ -308,6 +310,7 @@ FloatingWindow {
   }
   function zoomTo(z, px, py, ms) {
     if (win.tw <= 0) return;
+    win.sayZoom();
     const f = win.fitZ();
     // back down to the fit is back to fitted: it follows the window again
     if (z <= f * 1.001) { win.fitted = true; win.refit(ms > 0); return; }
@@ -735,6 +738,9 @@ FloatingWindow {
           win.setRows(win.filtered(rows));
           return;
         }
+        // the tiles made for it now come up one after another (see `cell`)
+        win.staggering = true;
+        staggerOff.restart();
         win.directories = dirs;
         win.dir = d !== "" ? d : (rows.length > 0 ? Terminus.dirname(rows[0].path) : "");
         rows = win.filtered(rows);
@@ -848,6 +854,15 @@ FloatingWindow {
         ? Object.assign({ z: win.vz }, V.centreOf({ z: win.vz, x: win.vx, y: win.vy },
                                                   win.tw, win.th, stage.width, stage.height))
         : null;
+      // a step seen: the last picture slides off, this one comes in after it
+      const d = to > win.index ? 1 : -1;
+      const seen = win.mode === "view" && win.index >= 0 && !win.flyingIn;
+      win.ghost = seen && win.loaded && !win.isVid && win.straighten === 0
+        && win.look.rotate === 0 && !win.look.mirror
+        ? { url: win.stageUrl, x: pic.x, y: pic.y, w: pic.width, h: pic.height, d: d } : null;
+      win.enterDir = seen ? d : 0;
+      enterAnim.stop();
+      win.enterK = 0;
       win.resetEdit();
       win.fallback = "";
       win.gifPaused = false;
@@ -858,6 +873,7 @@ FloatingWindow {
       win.refit(false);
       win.pendingView = keep;
       Qt.callLater(win.applyPending);
+      Qt.callLater(win.enter);
       win.rehold();
       if (win.infoShown) win.askExif();
     };
@@ -865,6 +881,8 @@ FloatingWindow {
   }
   function step(d) {
     if (win.rows.length === 0) return;
+    // past either end, a person stepping is told so by the picture itself
+    if (!win.playing && (win.index + d < 0 || win.index + d >= win.rows.length)) { win.bump(d); return; }
     // the slideshow goes round — shuffled, picasso.js' pick, as the
     // wallpaper's slideshow picks; a person stepping stops at the ends
     if (win.playing && win.shuffle && d > 0 && win.rows.length > 2) {
@@ -873,6 +891,134 @@ FloatingWindow {
     } else if (win.playing) win.go((win.index + d + win.rows.length) % win.rows.length);
     else win.go(win.index + d);
   }
+
+  // ── a step, seen ──────────────────────────────────────────────────────
+  // The picture left slides a little the way it went and fades (`ghost`, a
+  // second Image of the same url, so Qt's cache answers it at once); the
+  // next comes in from the other side as it is decoded (`enterK`, 0 → 1).
+  // Opened from the gallery it flies out of its tile instead (`flyIn`).
+  readonly property int stepMs: Math.round(130 * Oracle.motionScale)
+  readonly property int flyMs: Math.round(140 * Oracle.motionScale)
+  property var ghost: null
+  property int enterDir: 0
+  property real enterK: 1
+  // how far the picture is pushed off its place: the step's slide, or the
+  // bump at either end of the folder
+  property real bumpX: 0
+  // A step is a SLIDE, no fade: the next picture comes in from the side it
+  // lies on, the last one goes out the other way, both whole — and only once
+  // the next is decoded, so the last stays in place meanwhile, never a gap.
+  readonly property int slideMs: Math.round(200 * Oracle.motionScale)
+  readonly property real slideX: (1 - win.enterK) * win.enterDir * stage.width + win.bumpX
+  NumberAnimation { id: enterAnim; target: win; property: "enterK"; to: 1
+                    duration: win.enterDir !== 0 ? win.slideMs : win.stepMs; easing.type: Easing.OutCubic
+                    onFinished: win.ghost = null }
+  function enter() {
+    if (win.loaded && !win.flyingIn && win.enterK < 1) enterAnim.restart();
+  }
+  // stepped past the first or the last: pulled that way, and back
+  property int bumpDir: 0
+  function bump(d) {
+    if (win.mode !== "view") return;
+    win.bumpDir = d;
+    bumpAnim.restart();
+    win.say(d > 0 ? "the last picture" : "the first picture", 1200);
+  }
+  SequentialAnimation {
+    id: bumpAnim
+    NumberAnimation { target: win; property: "bumpX"; to: -win.bumpDir * 28
+                      duration: Math.round(90 * Oracle.motionScale); easing.type: Easing.OutCubic }
+    NumberAnimation { target: win; property: "bumpX"; to: 0
+                      duration: Math.round(320 * Oracle.motionScale); easing.type: Easing.OutBack; easing.overshoot: 2.2 }
+  }
+
+  // a directory just listed: its first tiles rise in turn
+  property bool staggering: false
+  Timer { id: staggerOff; interval: 500; onTriggered: win.staggering = false }
+
+  // ── from a tile, and back into it ────────────────────────────────────
+  // Between the gallery and a picture, the picture flies: out of its tile
+  // to where it will be shown, and back into its tile on the way out. The
+  // flyer is a copy laid over everything for the flight; the real picture
+  // (or its tile) takes over where it lands.
+  property bool flyingIn: false
+  // the tile hidden while the picture flies back into it
+  property string flyTarget: ""
+  property string lastMode: "view"
+  function thumbUrl(p) {
+    const t = win.thumbs[p];
+    return t && t !== "-" ? "file://" + t : "";
+  }
+  // where a picture of this shape will be shown, fitted, in the stage
+  function guessRect(ratio) {
+    const rw = stage.width - 2 * win.margin, rh = stage.height - 2 * win.margin;
+    if (!(ratio > 0) || rw <= 0 || rh <= 0) return null;
+    const w = rw / rh > ratio ? rh * ratio : rw, h = w / ratio;
+    return { x: win.margin + (rw - w) / 2, y: win.margin + (rh - h) / 2, w: w, h: h };
+  }
+  function flyIn() {
+    const cell = grid.itemAtIndex(win.itemOfPath(win.path));
+    const th = cell ? cell.thumbItem : null;
+    if (!th || !th.visible || !th.measured || win.isVid) return;
+    const url = win.thumbUrl(win.path);
+    if (url === "") return;
+    const r = win.loaded ? { x: pic.x, y: pic.y, w: pic.width, h: pic.height } : win.guessRect(th.ratio);
+    if (!r) return;
+    const from = th.mapToItem(flyLayer, 0, 0, th.width, th.height);
+    const to = stage.mapToItem(flyLayer, r.x, r.y);
+    win.flyingIn = true;
+    win.enterDir = 0;
+    galleryOut.restart();
+    flyLayer.launch(url, false, from, Qt.rect(to.x, to.y, r.w, r.h), th.radius, win.picRadius);
+  }
+  function flyOut() {
+    const gi = win.itemOfPath(win.path);
+    if (gi < 0 || !win.loaded || win.isVid) return;
+    grid.positionViewAtIndex(gi, GridView.Contain);
+    grid.forceLayout();
+    const cell = grid.itemAtIndex(gi);
+    const th = cell ? cell.thumbItem : null;
+    if (!th || !th.measured) return;
+    // a zoomed picture leaves from where it would sit fitted
+    const r = win.fitted ? { x: pic.x, y: pic.y, w: pic.width, h: pic.height } : win.guessRect(win.tw / win.th);
+    if (!r) return;
+    const sharp = win.fallback === "" && win.straighten === 0 && win.look.rotate === 0 && !win.look.mirror;
+    const url = sharp ? win.stageUrl : win.thumbUrl(win.path);
+    if (url === "") return;
+    const from = stage.mapToItem(flyLayer, r.x, r.y);
+    const to = th.mapToItem(flyLayer, 0, 0, th.width, th.height);
+    win.flyTarget = win.path;
+    flyLayer.launch(url, true, Qt.rect(from.x, from.y, r.w, r.h), to, win.picRadius, th.radius);
+    galleryOut.stop();
+    galleryFade.restart();
+  }
+  function landed(back) {
+    if (back) { win.flyTarget = ""; return; }
+    // The picture (or its stand-in) is put down at full strength under the
+    // flyer, and only the flyer fades: two halves fading across each other
+    // let the dark window through, and the picture dipped as it landed.
+    enterAnim.stop();
+    win.enterK = 1;
+    win.flyingIn = false;
+  }
+
+  // ── the zoom, shown ───────────────────────────────────────────────────
+  // The bar's percentage counts to its new value as the picture glides, and
+  // a zoom asked for is said once more, large, over the picture.
+  property real shownZoom: win.vz * 100
+  Behavior on shownZoom { NumberAnimation { duration: Zenon.slow; easing.type: Easing.OutCubic } }
+  property bool zoomSaid: false
+  Timer { id: zoomSaidOff; interval: 750; onTriggered: win.zoomSaid = false }
+  function sayZoom() {
+    if (win.mode !== "view" || !win.loaded) return;
+    win.zoomSaid = true;
+    zoomSaidOff.restart();
+  }
+
+  // the fitted picture's corners, rounded while there is room round it
+  readonly property real picRadius: win.chrome ? 10 : 0
+  // a picture that may have see-through parts sits on a checkerboard
+  readonly property bool mayAlpha: /\.(png|webp|gif|apng|svgz?|avif|tiff?|ico|jxl|qoi|tga)$/i.test(win.path)
 
   // ── the zoom, locked ──────────────────────────────────────────────────
   // The place go() took from the last picture, put on this one once it is
@@ -885,7 +1031,7 @@ FloatingWindow {
     win.fitted = false;
     win.setView(V.viewAt(p.z, p.fx, p.fy, win.tw, win.th, stage.width, stage.height), 0);
   }
-  onLoadedChanged: if (win.loaded) Qt.callLater(win.applyPending)
+  onLoadedChanged: if (win.loaded) { Qt.callLater(win.applyPending); Qt.callLater(win.enter); }
   onZoomLockChanged: win.say(win.zoomLock ? "zoom locked — the next picture opens at this size and place"
                                           : "zoom unlocked")
 
@@ -2058,11 +2204,11 @@ FloatingWindow {
       else if (k === Qt.Key_Down || k === Qt.Key_J) win.panKey(k, 0, -1, e.isAutoRepeat);
       else if (k === Qt.Key_Plus || k === Qt.Key_Equal) win.zoomTo(V.stepZoom(win.vz, 1), undefined, undefined, Zenon.normal);
       else if (k === Qt.Key_Minus) win.zoomTo(V.stepZoom(win.vz, -1), undefined, undefined, Zenon.normal);
-      else if (k === Qt.Key_0) { win.fitted = true; win.refit(true); }
+      else if (k === Qt.Key_0) { win.fitted = true; win.refit(true); win.sayZoom(); }
       else if (k === Qt.Key_1) win.zoomTo(1, undefined, undefined, Zenon.normal);
       // the picture at its own size — and again, back to the fit
       else if ((k === Qt.Key_Return || k === Qt.Key_Enter) && !win.isVid) {
-        if (!win.fitted && Math.abs(win.vz - 1) < 0.001) { win.fitted = true; win.refit(true); }
+        if (!win.fitted && Math.abs(win.vz - 1) < 0.001) { win.fitted = true; win.refit(true); win.sayZoom(); }
         else win.zoomTo(1, undefined, undefined, Zenon.normal);
       }
       else if (k === Qt.Key_2) win.zoomTo(2, undefined, undefined, Zenon.normal);
@@ -2139,6 +2285,10 @@ FloatingWindow {
     win.mode = "annotate";
   }
   onModeChanged: {
+    const was = win.lastMode;
+    win.lastMode = win.mode;
+    if (was === "gallery" && win.mode === "view") win.flyIn();
+    else if (was === "view" && win.mode === "gallery") win.flyOut();
     if (win.mode !== "view" && win.full) win.full = false;
     if (win.mode !== "annotate") Qt.callLater(() => keys.forceActiveFocus());
     if (win.mode === "view") Qt.callLater(() => win.refit(false));
@@ -2395,7 +2545,7 @@ FloatingWindow {
     if (win.nw > 0) out.push(Math.round(win.nw) + "×" + Math.round(win.nh));
     out.push(Terminus.formatSize(win.row.size));
     out.push(Terminus.formatTime(win.row.mtime));
-    if (win.mode === "view" && win.loaded) out.push(Math.round(win.vz * 100) + "%" + (win.zoomLock ? " locked" : ""));
+    if (win.mode === "view" && win.loaded) out.push(Math.round(win.shownZoom) + "%" + (win.zoomLock ? " locked" : ""));
     if (win.isVid && win.vid) out.push(V.clock(win.vid.position) + " / " + V.clock(win.vid.duration) + (win.muted ? "  muted" : ""));
     const a = win.animated ? win.img : null;
     if (a && a.frameCount > 1)
@@ -2435,6 +2585,69 @@ FloatingWindow {
     onWidthChanged: win.refit(false)
     onHeightChanged: win.refit(false)
 
+    // ── what lies under the picture ─────────────────────────────────────
+    // Fitted, it lifts off the window on a soft shadow; zoomed, it IS the
+    // window, and the shadow goes.
+    RectangularShadow {
+      x: pic.x; y: pic.y + 6
+      width: pic.width; height: pic.height
+      radius: win.picRadius
+      blur: 32
+      color: "#a6000000"
+      transform: Translate { x: win.slideX }
+      opacity: win.fitted && win.chrome ? pic.opacity : 0
+      visible: opacity > 0.01
+      Behavior on opacity { NumberAnimation { duration: Zenon.normal; easing.type: Easing.OutCubic } }
+    }
+
+    // The tile's thumbnail, blurred, where the picture will be, while the
+    // picture itself decodes — so a large photo comes up soft and sharpens,
+    // rather than out of nothing.
+    Item {
+      id: standIn
+      readonly property string url: win.mode === "view" && !win.isVid ? win.thumbUrl(win.path) : ""
+      readonly property var r: standImg.status === Image.Ready
+        ? win.guessRect(standImg.implicitWidth / standImg.implicitHeight) : null
+      x: r ? r.x : 0; y: r ? r.y : 0
+      width: r ? r.w : 0; height: r ? r.h : 0
+      opacity: r && !win.loaded && !win.flyingIn ? 1 : 0
+      visible: opacity > 0.01
+      // in at once (a flyer is fading over it), out over the picture
+      Behavior on opacity { enabled: standIn.opacity >= 1; NumberAnimation { duration: win.stepMs; easing.type: Easing.OutCubic } }
+      Image {
+        id: standImg
+        anchors.fill: parent
+        visible: false
+        source: standIn.url
+        asynchronous: true
+        cache: true
+      }
+      MultiEffect {
+        anchors.fill: parent
+        source: standImg
+        blurEnabled: true
+        blur: 0.7
+        blurMax: 32
+        brightness: -0.04
+      }
+    }
+
+    // the picture stepped away from, sliding off as the next slides in
+    Image {
+      id: ghostImg
+      x: win.ghost ? win.ghost.x - win.enterK * win.ghost.d * stage.width : 0
+      y: win.ghost ? win.ghost.y : 0
+      width: win.ghost ? win.ghost.w : 0
+      height: win.ghost ? win.ghost.h : 0
+      visible: !!win.ghost
+      source: win.ghost ? win.ghost.url : ""
+      fillMode: Image.Stretch
+      autoTransform: true
+      asynchronous: false
+      cache: true
+      mipmap: true
+    }
+
     // The picture, drawn at the size it is shown rather than scaled from its
     // own: the Scene's effect layer is then only ever as big as the stage.
     Item {
@@ -2449,10 +2662,33 @@ FloatingWindow {
       Behavior on height { enabled: win.glide > 0; NumberAnimation { duration: win.glide; easing.type: Zenon.ease } }
       // In only, as terminus' tiles and Thumb do: nothing while it decodes,
       // then the fade — and no ghost of the last picture on the way out.
-      opacity: win.loaded ? 1 : 0
-      Behavior on opacity {
-        enabled: pic.opacity < 1
-        NumberAnimation { duration: Zenon.normal; easing.type: Easing.OutCubic }
+      // The fade is enterK's, which a step also slides in by (slideX).
+      // A step shows the next picture at full strength the moment it is
+      // decoded — only its short slide is animated — so stepping never waits
+      // on a fade; a picture arrived at any other way fades in.
+      opacity: win.loaded && !win.flyingIn ? (win.enterDir !== 0 ? 1 : win.enterK) : 0
+      transform: Translate { x: win.slideX }
+
+      // Rounded while fitted. A mask is a layer as big as the picture, so
+      // only while that is no bigger than the stage — never zoomed in.
+      layer.enabled: win.picRadius > 0 && win.fitted && win.loaded
+      layer.smooth: true
+      layer.effect: MultiEffect {
+        maskEnabled: true
+        maskSource: picMask
+        maskThresholdMin: 0.5
+        maskSpreadAtMin: 1.0
+      }
+
+      // see-through parts on a checkerboard, as every editor shows them
+      Image {
+        anchors.fill: parent
+        visible: win.mayAlpha && win.loaded && !win.isVid
+        fillMode: Image.Tile
+        smooth: false
+        source: "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16'>"
+          + "<rect width='16' height='16' fill='%2326262b'/><rect width='8' height='8' fill='%23323238'/>"
+          + "<rect x='8' y='8' width='8' height='8' fill='%23323238'/></svg>"
       }
 
       Scene {
@@ -2481,6 +2717,40 @@ FloatingWindow {
         anchors.fill: parent
         active: win.isVid && win.path !== ""
         sourceComponent: vidComp
+      }
+    }
+    Item {
+      id: picMask
+      width: pic.width
+      height: pic.height
+      visible: false
+      layer.enabled: true
+      Rectangle { anchors.fill: parent; radius: win.picRadius; color: "#000000" }
+    }
+
+    // the zoom asked for, said large over the picture for a moment
+    Rectangle {
+      anchors.horizontalCenter: parent.horizontalCenter
+      anchors.top: parent.top
+      anchors.topMargin: 18
+      z: 6
+      width: zoomSaidText.implicitWidth + 28
+      height: 34
+      radius: 17
+      color: "#cc000000"
+      border.width: 1
+      border.color: Zenon.border
+      opacity: win.zoomSaid ? 1 : 0
+      visible: opacity > 0.01
+      Behavior on opacity { NumberAnimation { duration: win.zoomSaid ? Zenon.fast : 380; easing.type: Easing.OutCubic } }
+      Text {
+        id: zoomSaidText
+        anchors.centerIn: parent
+        text: (win.fitted ? "fit  ·  " : "") + Math.round(win.shownZoom) + "%"
+        color: Zenon.white
+        font.family: Zenon.face
+        font.weight: 600
+        font.pixelSize: 16
       }
     }
 
@@ -2611,7 +2881,7 @@ FloatingWindow {
         if (m.button !== Qt.LeftButton || !win.loaded || win.isVid || (m.modifiers & Qt.ShiftModifier)) return;
         if (win.fitted) {
           if (stage.overPic(Qt.point(m.x, m.y))) win.zoomTo(Math.max(1, win.fitZ() * 2), m.x, m.y, Zenon.normal);
-        } else { win.fitted = true; win.refit(true); }
+        } else { win.fitted = true; win.refit(true); win.sayZoom(); }
       }
     }
 
@@ -3181,7 +3451,7 @@ FloatingWindow {
     anchors.left: parent.left
     anchors.right: parent.right
     anchors.bottom: parent.bottom
-    visible: win.mode === "gallery"
+    visible: win.mode === "gallery" || galleryOut.running
 
     // pictures scrolled off the top carry on under the bar, frosted — see
     // morpheus/ScrollEdge. Up in the bar's space, and under it: the bar is
@@ -3229,7 +3499,15 @@ FloatingWindow {
         readonly property bool best: !!win.dupes && !cell.fill && !!win.dupes.keep[cell.modelData.path]
         enabled: !cell.fill
         z: cell.chip ? 2 : 0
-        Component.onCompleted: if (!cell.directory && !cell.fill) win.wantThumb(cell.modelData.path)
+        // the picture, for a flight into it or out of it (flyIn/flyOut)
+        readonly property alias thumbItem: pic
+        Component.onCompleted: {
+          if (!cell.directory && !cell.fill) win.wantThumb(cell.modelData.path);
+          // a fresh directory comes up a tile after a tile, top to bottom —
+          // terminus' TileRise, which its grid does on arriving too
+          if (win.staggering) { rise.hide(); rise.start(grid, cell.index); }
+        }
+        TileRise { id: rise }
 
         // out of the window, as a file — see win.dragOut
         Drag.active: false
@@ -3250,11 +3528,26 @@ FloatingWindow {
           anchors.horizontalCenter: parent.horizontalCenter
           width: parent.width - 24
           height: parent.height - 68
+          // marked, the picture steps back a little inside its ring
+          scale: cell.marked ? 0.9 : 1
+          Behavior on scale { NumberAnimation { duration: win.stepMs; easing.type: Easing.OutBack; easing.overshoot: 1.6 } }
 
-          // a directory is its glyph, the way terminus draws one
+          // a directory with pictures in it is drawn as them, as terminus'
+          // grid draws one — see terminus/FolderCover.qml
+          FolderCover {
+            id: dirCover
+            anchors.fill: parent
+            live: cell.directory && !cell.modelData.isUp
+            path: cell.directory && !cell.modelData.isUp ? cell.modelData.path : ""
+            stamp: cell.modelData.mtime || 0
+            glyph: dirGlyph.text
+            ink: Zenon.cyan
+          }
+          // otherwise its glyph, the way terminus draws one
           Text {
+            id: dirGlyph
             anchors.centerIn: parent
-            visible: cell.directory
+            visible: cell.directory && !dirCover.shown
             text: cell.modelData.isUp ? "" : ""
             color: Zenon.cyan
             font.family: Zenon.face
@@ -3269,6 +3562,8 @@ FloatingWindow {
               }
             }
             visible: !cell.directory && !cell.fill && pic.measured
+            // a picture flying back in lands here; until it does, it is the flyer
+            opacity: win.flyTarget !== "" && win.flyTarget === cell.modelData.path ? 0 : 1
             anchors.centerIn: parent
             width: Math.max(1, Math.min(thumbBox.width, thumbBox.height * pic.ratio))
             height: Math.max(1, Math.min(thumbBox.height, thumbBox.width / pic.ratio))
@@ -3290,31 +3585,9 @@ FloatingWindow {
             font.family: Zenon.face
             font.pixelSize: 30
           }
-          // marked: washed and outlined in the cursor's ink, a tick at its corner
-          Rectangle {
-            visible: cell.marked && pic.visible
-            anchors.fill: pic
-            radius: Zenon.windowRadius
-            color: Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b, 0.16)
-            border.width: 2
-            border.color: Zenon.cyan
-          }
-          Rectangle {
-            visible: cell.marked && pic.visible
-            x: pic.x + pic.width - width + 6
-            y: pic.y - 6
-            width: 22
-            height: 22
-            radius: 11
-            color: Zenon.cyan
-            Text {
-              anchors.centerIn: parent
-              text: "\uf00c"
-              color: Zenon.black
-              font.family: Zenon.face
-              font.pixelSize: 12
-            }
-          }
+          // marked: terminus' MarkRing — a ring a little out from the picture,
+          // which has stepped back inside it (thumbBox.scale), and a tick
+          MarkRing { anchors.fill: pic; on: cell.marked && pic.visible }
           // the star, and the tags that come with a colour, along its foot
           Row {
             x: pic.x + 6
@@ -3346,7 +3619,9 @@ FloatingWindow {
             }
           }
         }
-        Text {
+        // terminus' TileName: ElideMiddle does nothing on a wrapped label, so a
+        // long name was cut off with no ellipsis and no extension
+        TileName {
           anchors.top: thumbBox.bottom
           anchors.topMargin: 8
           anchors.left: parent.left
@@ -3354,14 +3629,11 @@ FloatingWindow {
           anchors.margins: 8
           horizontalAlignment: Text.AlignHCenter
           visible: !cell.fill
-          text: cell.modelData.isUp ? "Up to " + (Terminus.basename(cell.modelData.path) || "/") : (cell.modelData.name || "")
+          name: cell.modelData.isUp ? "Up to " + (Terminus.basename(cell.modelData.path) || "/") : (cell.modelData.name || "")
           color: cell.directory ? Zenon.cyan : Zenon.white
           font.family: Zenon.face
           font.weight: cell.here ? Font.Bold : Font.Medium
           font.pixelSize: 14
-          elide: Text.ElideMiddle
-          maximumLineCount: 2
-          wrapMode: Text.Wrap
         }
         // a folded burst: how many are under it — Enter or a click on this opens it
         Rectangle {
@@ -3464,6 +3736,76 @@ FloatingWindow {
     }
 
     SelectCell { view: grid; index: win.gidx; on: win.mode === "gallery" }
+
+    // ── the section scrolled into, held at the top ──────────────────────
+    // Its own chip has gone up under the bar; this one stays, until the
+    // next section's chip comes up and pushes it off.
+    Item {
+      id: pinned
+      x: grid.x
+      width: grid.width
+      height: 24
+      z: 3
+      readonly property var starts: Object.keys(win.layout.chips).map(Number)
+        .filter((i) => win.layout.chips[i] && win.layout.chips[i].text !== "")
+        .sort((a, b) => a - b)
+      readonly property real scrolled: grid.contentY - grid.originY
+      readonly property real ch: grid.cellHeight
+      function rowY(i) { return Math.floor(i / win.gcols) * pinned.ch; }
+      readonly property int cur: {
+        let c = -1;
+        for (const i of pinned.starts) { if (pinned.rowY(i) < pinned.scrolled - 0.5) c = i; else break; }
+        return c;
+      }
+      readonly property int after: {
+        for (const i of pinned.starts) if (i > pinned.cur) return i;
+        return -1;
+      }
+      readonly property var chip: pinned.cur >= 0 ? win.layout.chips[pinned.cur] : null
+      y: pinned.after >= 0 ? Math.min(1, pinned.rowY(pinned.after) - pinned.scrolled + 1 - 28) : 1
+      visible: !!pinned.chip && win.mode === "gallery"
+      RectangularShadow {
+        anchors.fill: pinChip
+        radius: pinChip.radius
+        blur: 12
+        color: "#80000000"
+      }
+      Rectangle {
+        id: pinChip
+        x: 10
+        width: pinRow.implicitWidth + 18
+        height: 22
+        radius: 11
+        color: Zenon.headBg
+        border.width: 1
+        border.color: pinned.chip && pinned.chip.kind === "dupe" ? Zenon.sand : Zenon.border
+        Row {
+          id: pinRow
+          anchors.centerIn: parent
+          spacing: 8
+          Text {
+            text: pinned.chip ? pinned.chip.text : ""
+            color: pinned.chip && pinned.chip.kind === "dupe" ? Zenon.sand : Zenon.white
+            font.family: Zenon.face
+            font.weight: 600
+            font.pixelSize: 12
+          }
+          Text {
+            visible: text !== ""
+            text: pinned.chip ? (pinned.chip.sub || "") : ""
+            color: Zenon.muted
+            font.family: Zenon.face
+            font.pixelSize: 12
+          }
+        }
+        // a click goes back up to where the section begins
+        MouseArea {
+          anchors.fill: parent
+          cursorShape: Qt.PointingHandCursor
+          onClicked: { keys.forceActiveFocus(); grid.positionViewAtIndex(pinned.cur, GridView.Beginning); }
+        }
+      }
+    }
 
     // ── the drag box ────────────────────────────────────────────────────
     // As terminus' (its `band`): a DragHandler over the grid, which only
@@ -3619,6 +3961,78 @@ FloatingWindow {
       anchors.bottom: grid.bottom
       anchors.bottomMargin: 2
     }
+  }
+
+  // ── the flight, between a tile and the stage ──────────────────────────
+  // See flyIn/flyOut. Over the stage and the gallery, under the bar.
+  Item {
+    id: flyLayer
+    anchors.fill: parent
+    z: 3.5
+    property bool back: false
+    function launch(url, back, from, to, r0, r1) {
+      flyAnim.stop();
+      flyFade.stop();
+      flyLayer.back = back;
+      flyer.opacity = 1;
+      flyImg.source = url;
+      flyX.from = from.x; flyX.to = to.x;
+      flyY.from = from.y; flyY.to = to.y;
+      flyW.from = from.width; flyW.to = to.width;
+      flyH.from = from.height; flyH.to = to.height;
+      flyR.from = r0; flyR.to = r1;
+      flyer.visible = true;
+      flyAnim.restart();
+    }
+    ClippingRectangle {
+      id: flyer
+      visible: false
+      color: "transparent"
+      Image {
+        id: flyImg
+        anchors.fill: parent
+        fillMode: Image.Stretch
+        autoTransform: true
+        asynchronous: false
+        cache: true
+        mipmap: true
+      }
+    }
+    ParallelAnimation {
+      id: flyAnim
+      NumberAnimation { id: flyX; target: flyer; property: "x"; duration: win.flyMs; easing.type: Easing.OutCubic }
+      NumberAnimation { id: flyY; target: flyer; property: "y"; duration: win.flyMs; easing.type: Easing.OutCubic }
+      NumberAnimation { id: flyW; target: flyer; property: "width"; duration: win.flyMs; easing.type: Easing.OutCubic }
+      NumberAnimation { id: flyH; target: flyer; property: "height"; duration: win.flyMs; easing.type: Easing.OutCubic }
+      NumberAnimation { id: flyR; target: flyer; property: "radius"; duration: win.flyMs; easing.type: Easing.OutCubic }
+      onFinished: {
+        win.landed(flyLayer.back);
+        // into its tile it simply becomes the tile; onto the stage it hands
+        // over to the picture (or its stand-in) under a short fade
+        if (flyLayer.back) { flyer.visible = false; flyImg.source = ""; }
+        else flyFade.restart();
+      }
+    }
+    NumberAnimation {
+      id: flyFade
+      target: flyer; property: "opacity"; to: 0
+      duration: win.stepMs; easing.type: Easing.OutCubic
+      onFinished: { flyer.visible = false; flyImg.source = ""; }
+    }
+  }
+  // the gallery goes down under a picture flying out of it, rather than
+  // leaving the window dark for a frame
+  NumberAnimation {
+    id: galleryOut
+    target: galleryPane; property: "opacity"; from: 1; to: 0
+    duration: win.flyMs; easing.type: Easing.OutCubic
+    onFinished: galleryPane.opacity = 1
+  }
+  // the gallery comes up under a picture flying back into it
+  NumberAnimation {
+    id: galleryFade
+    target: galleryPane; property: "opacity"; from: 0; to: 1
+    duration: win.flyMs; easing.type: Easing.OutCubic
   }
 
   // ── the strip ─────────────────────────────────────────────────────────
@@ -3816,6 +4230,14 @@ FloatingWindow {
       readonly property bool shown: navTab.side
         ? win.mode === "view" && navTab.live && (hoverWatch.hovered || navTab.hot) && !win.cropping
         : strip.can && !win.cropping
+      // Prev and next come up as the pointer nears their side, not anywhere
+      // over the picture: full within 80px of the edge, gone past 240.
+      readonly property real near: {
+        if (!navTab.side || navTab.hot) return 1;
+        const px = hoverWatch.point.position.x;
+        const dist = navTab.edge === "left" ? px : stage.width - px;
+        return Math.max(0, Math.min(1, 1 - (dist - 80) / 160));
+      }
       readonly property string glyph: navTab.edge === "left" ? "\uf104"
         : navTab.edge === "right" ? "\uf105"
         : (win.stripShown ? "\uf107" : "\uf106")
@@ -3842,9 +4264,19 @@ FloatingWindow {
         : navTab.base
       border.width: 1
       border.color: Zenon.border
-      opacity: navTab.shown ? 1 : 0
+      opacity: navTab.shown ? navTab.near : 0
       visible: opacity > 0.01
       Behavior on opacity { NumberAnimation { duration: Zenon.fast; easing.type: Zenon.ease } }
+      // a click leans it the way it goes, and it springs back
+      transform: Translate { id: navNudge }
+      SequentialAnimation {
+        id: navNudgeAnim
+        NumberAnimation { target: navNudge; property: navTab.side ? "x" : "y"
+                          to: navTab.side ? navTab.modelData.d * 6 : (win.stripShown ? 4 : -4)
+                          duration: Math.round(70 * Oracle.motionScale); easing.type: Easing.OutCubic }
+        NumberAnimation { target: navNudge; property: navTab.side ? "x" : "y"; to: 0
+                          duration: Math.round(260 * Oracle.motionScale); easing.type: Easing.OutBack; easing.overshoot: 2 }
+      }
       // no line along the edge it grows out of
       Rectangle {
         color: navTab.color
@@ -3878,6 +4310,7 @@ FloatingWindow {
         }
         onClicked: {
           keys.forceActiveFocus();
+          navNudgeAnim.restart();
           if (navTab.side) win.step(navTab.modelData.d);
           else win.toggleStrip();
         }
@@ -3954,7 +4387,7 @@ FloatingWindow {
               anchors.right: parent.right
               visible: win.crop !== null
               text: "Clear"
-              color: clearMa.containsMouse ? Zenon.cyan : Zenon.muted
+              color: clearMa.containsMouse ? Zenon.cyan : Zenon.soft
               font.family: Zenon.face
               font.weight: 600
               font.pixelSize: 13
@@ -3996,7 +4429,7 @@ FloatingWindow {
             width: parent.width
             visible: win.cropping
             text: "drag the box or its edges, or draw a new one · esc when done"
-            color: Zenon.muted
+            color: Zenon.soft
             font.family: Zenon.face
             font.pixelSize: 12
             wrapMode: Text.WordWrap
@@ -4028,7 +4461,7 @@ FloatingWindow {
                   Text {
                     anchors.horizontalCenter: parent.horizontalCenter
                     text: modelData.hint
-                    color: Zenon.muted
+                    color: Zenon.soft
                     font.family: Zenon.face
                     font.pixelSize: 11
                   }
@@ -4040,7 +4473,7 @@ FloatingWindow {
             width: parent.width
             text: win.edited ? "a new file beside it, with the edit" + (win.crop ? " and the crop" : "")
                              : "a new file beside it — the original stays"
-            color: Zenon.muted
+            color: Zenon.soft
             font.family: Zenon.face
             font.pixelSize: 12
             wrapMode: Text.WordWrap

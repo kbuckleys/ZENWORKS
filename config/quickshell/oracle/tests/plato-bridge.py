@@ -757,6 +757,67 @@ try:
     check("and normal mode's v is inclusive again afterwards", b8.text()[0] == "ello rld foosecond line", b8.text())
     b8.send("quit"); b8.proc.wait(timeout=5)
 
+    # ── 2026-10-05 polish: pairs, rainbow, folds, pills, selection, pulse, puts
+    b9 = Bridge(tmp, "polish")
+    pdoc = os.path.join(tmp, "polish.js")
+    open(pdoc, "w").write("function f(a) {\n  if (a) { return [a, (a)]; }\n  return \"(x\";\n}\nlet a = 1;\nlet b = 2;\nlet c = 3;\nvalue value\n")
+    b9.send("resize", rows=14, cols=60); b9.send("open", path=pdoc); b9.settle(0.4)
+    def cellOf(row, ch, nth=0):
+        t = b9.rows[row]["t"]; i = -1
+        for _ in range(nth + 1): i = t.index(ch, i + 1)
+        return i
+    # the bracket under the cursor and its partner are both outlined
+    b9.keys("g"); b9.keys("g"); b9.keys("f"); b9.keys("{")
+    check("pair: the brace under the cursor is outlined", cellOf(0, "{") in (b9.rows[0].get("m") or []), b9.rows[0].get("m"))
+    check("pair: and its partner three lines down", b9.rows[3].get("m") == [0], b9.rows[3].get("m"))
+    b9.keys("0")
+    check("pair: none off a bracket", not b9.rows[0].get("m") and not b9.rows[3].get("m"), (b9.rows[0].get("m"), b9.rows[3].get("m")))
+    # rainbow: a level deeper is another colour; a bracket in a string is not one
+    outer = b9.style_at(0, cellOf(0, "{")).get("fg")
+    inner = b9.style_at(1, cellOf(1, "(")).get("fg")
+    check("rainbow: nested brackets differ in colour", outer and inner and outer != inner, (outer, inner))
+    check("rainbow: a bracket in a string keeps the string's colour",
+          b9.style_at(2, cellOf(2, "(")).get("fg") == b9.style_at(2, cellOf(2, "x")).get("fg"))
+    b9.send("options", rainbowBrackets=False); b9.settle()
+    check("rainbow: off, a bracket is punctuation again", b9.style_at(1, cellOf(1, "(")).get("fg") != inner)
+    b9.send("options", rainbowBrackets=True); b9.settle()
+    # a closed fold is its first line and a pill counting the lines
+    b9.keys("5"); b9.keys("G"); b9.keys("z"); b9.keys("f"); b9.keys("j")
+    fr = next(r for r in b9.rows if r and r["f"])
+    check("fold: its first line, then the count", fr["t"].startswith("let a = 1;") and fr["t"].endswith("2 lines"), fr["t"])
+    check("fold: the pill's cells", fr.get("fc") and fr["t"][fr["fc"][0]:].startswith("\u22ef"), fr.get("fc"))
+    b9.keys("z"); b9.keys("o")
+    # a diagnostic at the line's end is a pill of its severity
+    b9.send("cmd", cmd='lua vim.diagnostic.set(vim.api.nvim_create_namespace("t"), 0, {{lnum=4,col=0,message="short",severity=2},{lnum=5,col=0,message=string.rep("long ",20),severity=1}})')
+    b9.settle(0.3)
+    vt = b9.rows[4].get("vt")
+    check("pill: a warning's", vt and vt[2] == "w" and "short" in b9.rows[4]["t"][vt[0]:vt[1]] and not vt[3], vt)
+    vt = b9.rows[5].get("vt")
+    check("pill: one cut by the edge says so, and ends in an ellipsis",
+          vt and vt[2] == "e" and vt[3] and b9.rows[5]["t"].endswith("\u2026"), (vt, b9.rows[5]["t"]))
+    # the selection's part of each row, for one shape
+    b9.keys("g"); b9.keys("g"); b9.keys("w"); b9.keys("v"); b9.keys("j")
+    check("selection: a part on each row", b9.rows[0].get("sl") and b9.rows[1].get("sl") and not b9.rows[2].get("sl"),
+          [b9.rows[i].get("sl") for i in range(3)])
+    check("selection: from the cursor's start to the line's end", b9.rows[0]["sl"][0] == 9, b9.rows[0].get("sl"))
+    b9.keys("<Esc>")
+    # a search jump pulses; a plain motion onto a match does not
+    b9.keys("/value<CR>")
+    pulses = [f.get("pulse") for f in b9.frames[-6:] if f.get("pulse")]
+    check("pulse: a confirmed search", pulses and pulses[-1]["len"] == 5, pulses)
+    b9.frames.clear(); b9.keys("n")
+    check("pulse: n", any(f.get("pulse") for f in b9.frames), [f.get("pulse") for f in b9.frames])
+    b9.frames.clear(); b9.keys("0")
+    check("pulse: not a plain motion", not any(f.get("pulse") for f in b9.frames))
+    # a paste lights what it brought; a plain edit does not
+    b9.keys("g"); b9.keys("g"); b9.keys("y"); b9.keys("y"); b9.events.clear()
+    b9.keys("p")
+    ar = [e for e in b9.events if e.get("event") == "flash" and e.get("kind") == "arrive"]
+    check("arrive: p flashes the line it put", len(ar) == 1 and ar[0]["cells"][0]["row"] == 1, ar)
+    b9.events.clear(); b9.keys("x")
+    check("arrive: x does not", not [e for e in b9.events if e.get("kind") == "arrive"])
+    b9.send("quit"); b9.proc.wait(timeout=5)
+
     # two new buffers rescued in the same second are two files, not one
     rdir = os.path.join(STATE, "rescue")
     before = len(os.listdir(rdir)) if os.path.isdir(rdir) else 0
@@ -768,7 +829,7 @@ try:
     check("two untitled buffers rescued side by side", after - before == 2, (before, after))
 
 finally:
-    for p in ("b", "b2", "b3", "b4", "b5", "b6", "b7"):
+    for p in ("b", "b2", "b3", "b4", "b5", "b6", "b7", "b8", "b9"):
         br = globals().get(p)
         if br and br.proc.poll() is None: br.proc.kill()
     shutil.rmtree(tmp, ignore_errors=True)

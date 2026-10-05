@@ -43,5 +43,27 @@ module.exports = {
     t.eq("not anything under an excluded name",
       A.covers("/home/test", "/home/test/.local/share/thing"), false);
     t.eq("nor under node_modules", A.covers("/home/test", "/home/test/p/node_modules/q"), false);
+
+    // ── what a row lights ─────────────────────────────────────────────────
+    const lit = (text, q) => Object.keys(A.matchPositions(text, q)).map(Number).sort((a, b) => a - b);
+    t.eq("a whole term is lit whole, the occurrence in the name",
+      lit("foo/foo.qml", "foo"), [4, 5, 6]);
+    t.eq("a fuzzy term lights the letters fzf found",
+      lit("a/ArtemisPopup.qml", "apq"), [2, 9, 15]);
+    t.eq("fuzzy prefers the name over the same letters up the tree",
+      lit("abc/x/abc", "ac"), [6, 8]);
+    t.eq("a negated term lights nothing", lit("foo", "!foo"), []);
+    t.eq("an exact term that is not there lights nothing", lit("f/o/o", "'foo"), []);
+    t.eq("an anchored head", lit("foofoo", "^foo"), [0, 1, 2]);
+    t.eq("an anchored tail", lit("x.qml", "qml$"), [2, 3, 4]);
+    t.eq("the first alternative that hits", lit("bar", "zzz|ba"), [0, 1]);
+    t.eq("no query, no spans", A.highlightedPreview("a<b", ""), "a&lt;b");
+    t.eq("dim takes the parent path, not the name",
+      A.highlightedPreview("d/n", "", { dim: "#111" }), "<span style=\"color:#111;\">d/</span>n");
+    t.eq("a directory's trailing slash is part of its name",
+      A.highlightedPreview("d/e/", "", { dim: "#111" }), "<span style=\"color:#111;\">d/</span>e/");
+    t.eq("a match is lit in its own ink, inside the dimmed part too",
+      A.highlightedPreview("ab/c", "a", { dim: "#111", match: "#222" }),
+      "<span style=\"color:#222;font-weight:700;\">a</span><span style=\"color:#111;\">b/</span>c");
   },
 };

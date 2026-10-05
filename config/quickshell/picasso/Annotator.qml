@@ -22,8 +22,9 @@
 //   Copy       the annotated picture to the clipboard
 //
 // Tools on keys as well as buttons: p pen, h highlighter, l line, a arrow,
-// r rectangle, e ellipse, t text, n numbered marker, x pixelate. Shift
-// holds a line to 45° and a box to a square. ctrl+z / ctrl+shift+z undo and
+// r rectangle, e ellipse, t text, n numbered marker, x pixelate, s spotlight,
+// c crop; o rounds the corners of a rectangle or a spotlight.
+// Shift holds a line to 45° and a box to a square. ctrl+z / ctrl+shift+z undo and
 // redo, ctrl+s save, ctrl+shift+s save new, ctrl+c copy, esc back to the
 // viewer — asking first when there are marks nobody saved.
 
@@ -31,6 +32,7 @@ import QtQuick
 import Quickshell
 import "../morpheus"
 import "capture.js" as Cap
+import "viewer.js" as V
 
 Item {
   id: ann
@@ -60,6 +62,10 @@ Item {
   property string tool: "arrow"
   property color ink: Zenon.red
   property int size: 1       // 0 small, 1 medium, 2 large
+  // rectangles and spotlights with rounded corners (o)
+  property bool rounded: false
+  // where the pointer is over the picture, for the tool's preview under it
+  property point hoverAt: Qt.point(0, 0)
 
   readonly property var tools: [
     ["pen",       "", "p", "Pen"],
@@ -70,7 +76,9 @@ Item {
     ["ellipse",   "", "e", "Ellipse"],
     ["text",      "", "t", "Text"],
     ["number",    "", "n", "Numbered marker"],
-    ["pixelate",  "", "x", "Pixelate"]
+    ["pixelate",  "", "x", "Pixelate"],
+    ["spot",      "\uf0eb", "s", "Spotlight"],
+    ["crop",      "\uf125", "c", "Crop"]
   ]
   readonly property var inks: [Zenon.red, Zenon.yellow, Zenon.green, Zenon.cyan,
                                Zenon.blue, Zenon.magenta, "#ffffff", "#000000"]
@@ -80,6 +88,47 @@ Item {
   readonly property real unit: Math.max(1, paper.width / 1600)
   readonly property real stroke: [3, 6, 12][ann.size] * ann.unit
   readonly property real textPx: [22, 34, 52][ann.size] * ann.unit
+
+  // ── the crop ─────────────────────────────────────────────────────
+  // A crop is a mark like any other — {kind: "crop", r} in the picture's
+  // pixels, r null for the whole picture — so undo and redo take it back
+  // like a stroke. The last one is the crop. Marks stay in the whole
+  // picture's coordinates; only what is shown and saved is cut down to it.
+  readonly property var whole: ({ x: 0, y: 0, w: paper.width, h: paper.height })
+  readonly property var crop: {
+    for (let i = ann.marks.length - 1; i >= 0; --i)
+      if (ann.marks[i].kind === "crop") return ann.marks[i].r;
+    return null;
+  }
+  readonly property bool cropping: ann.tool === "crop"
+  // the box being set up while the crop tool is in the hand
+  property var draft: null
+  // what is on screen and in the file: all of it while cropping, so the
+  // box can grow back out
+  readonly property var shown: ann.cropping || !ann.crop ? ann.whole : ann.crop
+  // the tool to go back to when the crop is done with
+  property string back: "arrow"
+  property string was: "arrow"
+  onToolChanged: {
+    ann.glide = true; glideOff.restart();
+    if (ann.tool === "crop") ann.draft = ann.crop;
+    else if (ann.was === "crop") ann.applyCrop();
+    if (ann.tool !== "crop") ann.back = ann.tool;
+    ann.was = ann.tool;
+  }
+  function sameRect(a, b) {
+    if (!a || !b) return !a && !b;
+    return a.x === b.x && a.y === b.y && a.w === b.w && a.h === b.h;
+  }
+  function applyCrop() {
+    let r = ann.draft;
+    if (r && r.x === 0 && r.y === 0 && r.w === paper.width && r.h === paper.height) r = null;
+    if (!ann.sameRect(r, ann.crop)) ann.commit({ kind: "crop", r: r });
+  }
+  function cancelCrop() { ann.draft = ann.crop; ann.tool = ann.back; }
+  // the frame slides to a new crop, but not while the window is resized
+  property bool glide: false
+  Timer { id: glideOff; interval: Zenon.slow + 60; onTriggered: ann.glide = false }
 
   function commit(m) {
     const next = ann.marks.slice();
@@ -94,7 +143,12 @@ Item {
     const m = ann.marks.slice(), u = ann.undone.slice();
     u.push(m.pop());
     ann.marks = m; ann.undone = u; ann.dirty = true;
+    ann.afterStep();
+  }
+  function afterStep() {
     ann.renumber();
+    ann.glide = true; glideOff.restart();
+    if (ann.cropping) ann.draft = ann.crop;
     done.requestPaint();
   }
   function redo() {
@@ -102,8 +156,7 @@ Item {
     const m = ann.marks.slice(), u = ann.undone.slice();
     m.push(u.pop());
     ann.marks = m; ann.undone = u; ann.dirty = true;
-    ann.renumber();
-    done.requestPaint();
+    ann.afterStep();
   }
   function renumber() {
     let n = 1;
@@ -123,7 +176,14 @@ Item {
     if (ann.guard && file === ann.path) { ann.guard(file, () => ann.write_(file)); return true; }
     return ann.write_(file);
   }
+  // A crop set up and not applied yet is applied by saving; the canvas
+  // then repaints at its new size, and only that is written.
+  function whenPainted(fn) {
+    if (ann.cropping) ann.tool = ann.back;
+    if (done.stale) done.after = fn; else fn();
+  }
   function write_(file) {
+    if (ann.cropping || done.stale) { ann.whenPainted(() => ann.write_(file)); return true; }
     if (!done.save(file)) { ann.say("could not save to " + file); return false; }
     ann.dirty = false;
     ann.saved(file);
@@ -131,6 +191,7 @@ Item {
     return true;
   }
   function copy() {
+    if (ann.cropping || done.stale) { ann.whenPainted(() => ann.copy()); return; }
     // Straight into the runtime directory, which always exists. A
     // subdirectory was made by a detached mkdir that had not run yet when
     // save() did, so the first Copy of every session failed.
@@ -171,6 +232,12 @@ Item {
     ctx.lineWidth = m.w;
     const nx = Math.min(m.x1, m.x2), ny = Math.min(m.y1, m.y2);
     const nw = Math.abs(m.x2 - m.x1), nh = Math.abs(m.y2 - m.y1);
+    // a soft shadow under the drawn marks, so they lift off a busy picture
+    if (["pen", "line", "arrow", "rect", "ellipse", "number"].indexOf(m.kind) >= 0) {
+      ctx.shadowColor = "rgba(0,0,0,0.45)";
+      ctx.shadowBlur = Math.max(4 * ann.unit, (m.w || m.r / 4) * 1.4);
+      ctx.shadowOffsetY = Math.max(1, (m.w || m.r / 4) * 0.35);
+    }
     switch (m.kind) {
     case "highlight":
       ctx.globalAlpha = 0.35;
@@ -209,7 +276,22 @@ Item {
       break;
     }
     case "rect":
-      ctx.strokeRect(nx, ny, nw, nh);
+      if (m.round > 0) {
+        const rr = Math.min(m.round, nw / 2, nh / 2);
+        ctx.beginPath();
+        ctx.roundedRect(nx, ny, nw, nh, rr, rr);
+        ctx.stroke();
+      } else ctx.strokeRect(nx, ny, nw, nh);
+      break;
+    case "spot":
+      // in the hand: its hole, outlined; committed, all of them go at once
+      // (drawSpots), so two never darken each other's hole
+      ann.drawSpots(ctx, [m]);
+      ctx.lineWidth = 2 * ann.unit;
+      ctx.strokeStyle = "rgba(255,255,255,0.8)";
+      ctx.setLineDash([6 * ann.unit, 4 * ann.unit]);
+      ann.spotPath(ctx, m);
+      ctx.stroke();
       break;
     case "ellipse":
       ctx.beginPath();
@@ -259,12 +341,45 @@ Item {
     ctx.restore();
   }
 
+  // ── the spotlight ────────────────────────────────────────────────
+  // Everything but the boxes, dimmed: one even-odd fill of the whole
+  // picture with every box cut out of it, drawn where the first one falls
+  // among the marks — marks before it are dimmed with the picture, marks
+  // after it stand out.
+  function spotPath(ctx, m) {
+    const nx = Math.min(m.x1, m.x2), ny = Math.min(m.y1, m.y2);
+    const nw = Math.abs(m.x2 - m.x1), nh = Math.abs(m.y2 - m.y1);
+    ctx.beginPath();
+    if (m.round > 0) {
+      const rr = Math.min(m.round, nw / 2, nh / 2);
+      ctx.roundedRect(nx, ny, nw, nh, rr, rr);
+    } else ctx.rect(nx, ny, nw, nh);
+  }
+  // Each box clips itself out in turn — clips intersect — so what is
+  // left to dim is outside all of them, and boxes that overlap stay lit.
+  function drawSpots(ctx, spots) {
+    ctx.save();
+    ctx.fillRule = Qt.OddEvenFill;
+    for (const m of spots) {
+      ann.spotPath(ctx, m);
+      ctx.rect(0, 0, paper.width, paper.height);
+      ctx.clip();
+    }
+    ctx.fillStyle = "rgba(0,0,0,0.55)";
+    ctx.fillRect(0, 0, paper.width, paper.height);
+    ctx.restore();
+  }
+
   // The blocks a pixelate mark paints, read off what is drawn now.
   function pixelCells(x, y, w, h) {
+    const s = ann.shown;
+    const x2 = Math.min(x + w, s.x + s.w), y2 = Math.min(y + h, s.y + s.h);
+    x = Math.max(x, s.x); y = Math.max(y, s.y); w = x2 - x; h = y2 - y;
     x = Math.round(x); y = Math.round(y); w = Math.round(w); h = Math.round(h);
     if (w < 2 || h < 2) return [];
     const b = Math.max(8, Math.round(Math.min(paper.width, paper.height) / 90));
-    const d = done.getContext("2d").getImageData(x, y, w, h).data;
+    // the canvas holds only what is shown — the crop — from its corner
+    const d = done.getContext("2d").getImageData(x - done.x, y - done.y, w, h).data;
     const out = [];
     for (let by = 0; by < h; by += b) {
       for (let bx = 0; bx < w; bx += b) {
@@ -299,9 +414,16 @@ Item {
       if (ctrl && e.key === Qt.Key_Y) { ann.redo(); return; }
       if (ctrl && e.key === Qt.Key_S) { shift ? ann.saveNew() : ann.saveTo(ann.path); return; }
       if (ctrl && e.key === Qt.Key_C) { ann.copy(); return; }
+      if (ann.cropping) {
+        if (e.key === Qt.Key_Escape) { ann.cancelCrop(); return; }
+        if (e.key === Qt.Key_Return || e.key === Qt.Key_Enter) { ann.tool = ann.back; return; }
+        if (e.key === Qt.Key_Backspace || e.key === Qt.Key_Delete) { ann.draft = null; return; }
+        if (e.text === "c") { ann.tool = ann.back; return; }
+      }
       if (e.key === Qt.Key_Escape) { ann.close(); return; }
       if (e.key === Qt.Key_BracketLeft) { ann.size = Math.max(0, ann.size - 1); return; }
       if (e.key === Qt.Key_BracketRight) { ann.size = Math.min(2, ann.size + 1); return; }
+      if (e.text === "o") { ann.rounded = !ann.rounded; return; }
       for (const t of ann.tools) if (e.text === t[2]) { ann.tool = t[0]; return; }
       const n = parseInt(e.text, 10);
       if (n >= 1 && n <= ann.inks.length) { ann.ink = ann.inks[n - 1]; return; }
@@ -398,7 +520,7 @@ Item {
               id: toolMa
               anchors.fill: parent
               hoverEnabled: true
-              onClicked: ann.tool = modelData[0]
+              onClicked: ann.tool = on && modelData[0] === "crop" ? ann.back : modelData[0]
               onContainsMouseChanged: containsMouse ? tips.show(toolBtn, modelData[3], modelData[2])
                                                     : tips.hide(toolBtn)
             }
@@ -463,6 +585,32 @@ Item {
                 : tips.hide(parent)
             }
           }
+        }
+      }
+
+      // corners, rounded or square, for a rectangle or a spotlight
+      Rectangle {
+        id: roundBtn
+        anchors.verticalCenter: parent.verticalCenter
+        width: 30; height: 30; radius: Zenon.windowRadius
+        color: ann.rounded ? Qt.rgba(1, 1, 1, 0.10) : (roundMa.containsMouse ? Qt.rgba(1, 1, 1, 0.06) : "transparent")
+        Rectangle {
+          anchors.centerIn: parent
+          width: 14; height: 11
+          radius: ann.rounded ? 4 : 0
+          color: "transparent"
+          border.width: 1.5
+          border.color: ann.rounded ? Zenon.white : Zenon.muted
+          Behavior on radius { NumberAnimation { duration: Zenon.fast } }
+        }
+        MouseArea {
+          id: roundMa
+          anchors.fill: parent
+          hoverEnabled: true
+          onClicked: ann.rounded = !ann.rounded
+          onContainsMouseChanged: containsMouse
+            ? tips.show(roundBtn, ann.rounded ? "Square corners" : "Rounded corners", "o")
+            : tips.hide(roundBtn)
         }
       }
 
@@ -587,15 +735,20 @@ Item {
       id: paper
       width: source.implicitWidth
       height: source.implicitHeight
-      readonly property real fit: width > 0
-        ? Math.min(2, (view.width - 48) / width, (view.height - 48) / height) : 1
+      // fitted to what is shown — the crop, once there is one
+      readonly property var f: ann.shown
+      readonly property real fit: f.w > 0
+        ? Math.min(2, (view.width - 48) / f.w, (view.height - 48) / f.h) : 1
       transformOrigin: Item.TopLeft
       scale: paper.fit
-      x: Math.round((view.width - width * fit) / 2)
-      y: Math.round((view.height - height * fit) / 2)
+      x: Math.round((view.width - f.w * fit) / 2 - f.x * fit)
+      y: Math.round((view.height - f.h * fit) / 2 - f.y * fit)
+      Behavior on scale { enabled: ann.glide; NumberAnimation { duration: Zenon.slow; easing.type: Easing.OutCubic } }
+      Behavior on x { enabled: ann.glide; NumberAnimation { duration: Zenon.slow; easing.type: Easing.OutCubic } }
+      Behavior on y { enabled: ann.glide; NumberAnimation { duration: Zenon.slow; easing.type: Easing.OutCubic } }
 
       Rectangle {
-        anchors.fill: parent
+        x: paper.f.x; y: paper.f.y; width: paper.f.w; height: paper.f.h
         anchors.margins: -1 / paper.fit
         color: "transparent"
         border.width: 1 / paper.fit
@@ -603,46 +756,122 @@ Item {
       }
 
       // Everything committed, the picture underneath — and what is saved.
+      // Only what is shown, from its corner: cropped, the canvas IS the crop.
       Canvas {
         id: done
-        anchors.fill: parent
+        x: paper.f.x; y: paper.f.y; width: paper.f.w; height: paper.f.h
         renderTarget: Canvas.Image
         renderStrategy: Canvas.Immediate
         property bool loaded: false
+        // a new size not painted yet — saving waits for it (whenPainted)
+        property bool stale: false
+        property var after: null
+        readonly property var at: paper.f
+        onAtChanged: { done.stale = true; requestPaint(); }
         Component.onCompleted: loadImage(source.source)
         onImageLoaded: { done.loaded = true; requestPaint(); }
         onPaint: {
           const ctx = getContext("2d");
+          ctx.save();
           ctx.clearRect(0, 0, width, height);
-          if (done.loaded) ctx.drawImage(source.source, 0, 0, width, height);
-          for (const m of ann.marks) ann.drawMark(ctx, m);
+          ctx.translate(-done.x, -done.y);
+          if (done.loaded) ctx.drawImage(source.source, 0, 0, paper.width, paper.height);
+          let spotted = false;
+          for (const m of ann.marks) {
+            if (m.kind !== "spot") { ann.drawMark(ctx, m); continue; }
+            if (spotted) continue;
+            spotted = true;
+            ann.drawSpots(ctx, ann.marks.filter((k) => k.kind === "spot"));
+          }
+          ctx.restore();
+        }
+        onPainted: {
+          done.stale = false;
+          const f = done.after;
+          done.after = null;
+          if (f) f();
         }
       }
 
       // The mark in the hand, on its own layer so drawing it does not
       // repaint the picture every move.
-      Canvas {
-        id: liveInk
-        anchors.fill: parent
-        renderStrategy: Canvas.Immediate
-        onPaint: {
-          const ctx = getContext("2d");
-          ctx.clearRect(0, 0, width, height);
-          if (ann.live) ann.drawMark(ctx, ann.live);
+      // cut to the crop too, so a stroke run past it is seen to stop there
+      Item {
+        x: paper.f.x; y: paper.f.y; width: paper.f.w; height: paper.f.h
+        clip: true
+        Canvas {
+          id: liveInk
+          x: -parent.x; y: -parent.y
+          width: paper.width; height: paper.height
+          renderStrategy: Canvas.Immediate
+          onPaint: {
+            const ctx = getContext("2d");
+            ctx.clearRect(0, 0, width, height);
+            if (ann.live) ann.drawMark(ctx, ann.live);
+          }
+        }
+      }
+
+      // ── the tool, under the pointer ──────────────────────────────────
+      // The brush as a ring its own size and ink (a highlighter's band
+      // filled, as it will lay down); the next numbered marker, faint,
+      // where a click will put it. In the picture's pixels, like the marks.
+      Item {
+        id: brush
+        readonly property bool stroked: ["pen", "highlight", "line", "arrow", "rect", "ellipse"].indexOf(ann.tool) >= 0
+        visible: drawMa.containsMouse && !ann.cropping && (brush.stroked || ann.tool === "number")
+        x: ann.hoverAt.x
+        y: ann.hoverAt.y
+        // never smaller than a few screen pixels, to be seen at all
+        readonly property real d: Math.max(ann.tool === "highlight" ? ann.stroke * 3.5 : ann.stroke, 8 / paper.fit)
+        Rectangle {
+          visible: brush.stroked
+          x: -width / 2; y: -height / 2
+          width: brush.d + 2 / paper.fit; height: width; radius: width / 2
+          color: "transparent"
+          border.width: 1 / paper.fit
+          border.color: Qt.rgba(0, 0, 0, 0.5)
+        }
+        Rectangle {
+          visible: brush.stroked
+          x: -width / 2; y: -height / 2
+          width: brush.d; height: width; radius: width / 2
+          color: ann.tool === "highlight" ? Qt.rgba(ann.ink.r, ann.ink.g, ann.ink.b, 0.35) : "transparent"
+          border.width: 1.5 / paper.fit
+          border.color: ann.ink
+        }
+        Rectangle {
+          visible: ann.tool === "number" && !drawMa.pressed
+          readonly property real r: ann.textPx * 0.7
+          x: -r; y: -r
+          width: r * 2; height: r * 2; radius: r
+          color: ann.ink
+          opacity: 0.45
+          Text {
+            anchors.centerIn: parent
+            text: ann.nextNumber
+            color: Cap.inkOn(ann.rgbOf(ann.ink)[0], ann.rgbOf(ann.ink)[1], ann.rgbOf(ann.ink)[2])
+            font.family: Zenon.face
+            font.weight: Font.Bold
+            font.pixelSize: parent.r * 1.1
+          }
         }
       }
 
       MouseArea {
+        id: drawMa
         anchors.fill: parent
-        enabled: !textEdit.visible
-        cursorShape: ann.tool === "text" ? Qt.IBeamCursor : Qt.CrossCursor
+        enabled: !textEdit.visible && !ann.cropping
+        hoverEnabled: true
+        cursorShape: ann.tool === "text" ? Qt.IBeamCursor
+          : brush.stroked || ann.tool === "number" ? Qt.BlankCursor : Qt.CrossCursor
         property real sx: 0
         property real sy: 0
 
         function constrain(m, x, y) {
           if (!(m.modifiers & Qt.ShiftModifier)) return [x, y];
           const dx = x - sx, dy = y - sy;
-          if (ann.tool === "rect" || ann.tool === "ellipse" || ann.tool === "pixelate") {
+          if (ann.tool === "rect" || ann.tool === "ellipse" || ann.tool === "pixelate" || ann.tool === "spot") {
             const s = Math.max(Math.abs(dx), Math.abs(dy));
             return [sx + Math.sign(dx || 1) * s, sy + Math.sign(dy || 1) * s];
           }
@@ -670,10 +899,12 @@ Item {
             return;
           }
           ann.live = { kind: ann.tool, ink: c, w: ann.stroke,
+                       round: ann.rounded ? Math.max(10 * ann.unit, ann.stroke * 3) : 0,
                        x1: m.x, y1: m.y, x2: m.x, y2: m.y, pts: [m.x, m.y] };
           liveInk.requestPaint();
         }
         onPositionChanged: (m) => {
+          ann.hoverAt = Qt.point(m.x, m.y);
           if (!ann.live) return;
           const l = ann.live;
           if (l.kind === "pen" || l.kind === "highlight") {
@@ -734,6 +965,156 @@ Item {
                    && !(e.modifiers & Qt.ShiftModifier)) { e.accepted = true; textEdit.finish(true); }
         }
         onActiveFocusChanged: if (!activeFocus && visible) textEdit.finish(true)
+      }
+    }
+
+    // ── the crop box, while the crop tool is in the hand ──────────────
+    // The viewer's own: the rest darkened, thirds, a body that moves and
+    // grips that resize. Shift keeps it square. Return or another tool
+    // applies it, esc puts it back, ⌫ lets go of it.
+    Item {
+      id: cropLayer
+      x: paper.x; y: paper.y
+      width: paper.width * paper.fit; height: paper.height * paper.fit
+      visible: ann.cropping
+      readonly property real k: paper.fit
+      readonly property var r: ann.draft || ann.whole
+      readonly property real tw: paper.width
+      readonly property real th: paper.height
+      function square(r, edge, m) {
+        return (m.modifiers & Qt.ShiftModifier) ? V.fitAspect(r, edge, 1, tw, th) : r;
+      }
+
+      Rectangle { x: 0; y: 0; width: parent.width; height: cropLayer.r.y * cropLayer.k; color: "#99000000" }
+      Rectangle { x: 0; y: (cropLayer.r.y + cropLayer.r.h) * cropLayer.k; width: parent.width
+                  height: parent.height - y; color: "#99000000" }
+      Rectangle { x: 0; y: cropLayer.r.y * cropLayer.k; width: cropLayer.r.x * cropLayer.k
+                  height: cropLayer.r.h * cropLayer.k; color: "#99000000" }
+      Rectangle { x: (cropLayer.r.x + cropLayer.r.w) * cropLayer.k; y: cropLayer.r.y * cropLayer.k
+                  width: parent.width - x; height: cropLayer.r.h * cropLayer.k; color: "#99000000" }
+
+      // a fresh box, dragged out anywhere
+      MouseArea {
+        anchors.fill: parent
+        cursorShape: Qt.CrossCursor
+        property real ax: 0
+        property real ay: 0
+        onPressed: (m) => { keys.forceActiveFocus(); ax = m.x / cropLayer.k; ay = m.y / cropLayer.k; }
+        onPositionChanged: (m) => {
+          const cx = m.x / cropLayer.k, cy = m.y / cropLayer.k;
+          const r = cropLayer.square(Cap.rectOf(ax, ay, cx, cy, cropLayer.tw, cropLayer.th),
+                                     (cx < ax ? "l" : "r") + (cy < ay ? "t" : "b"), m);
+          if (r.w >= 4 && r.h >= 4) ann.draft = r;
+        }
+      }
+
+      Rectangle {
+        id: cropBox
+        x: cropLayer.r.x * cropLayer.k
+        y: cropLayer.r.y * cropLayer.k
+        width: cropLayer.r.w * cropLayer.k
+        height: cropLayer.r.h * cropLayer.k
+        color: "transparent"
+        border.width: 1
+        border.color: Zenon.cyan
+
+        Repeater {
+          model: 2
+          Rectangle { required property int index; x: cropBox.width * (index + 1) / 3; width: 1
+                      height: cropBox.height; color: Qt.rgba(1, 1, 1, 0.25) }
+        }
+        Repeater {
+          model: 2
+          Rectangle { required property int index; y: cropBox.height * (index + 1) / 3; height: 1
+                      width: cropBox.width; color: Qt.rgba(1, 1, 1, 0.25) }
+        }
+
+        Repeater {
+          model: ["move", "tl", "t", "tr", "l", "r", "bl", "b", "br"]
+          delegate: MouseArea {
+            id: grip
+            required property string modelData
+            readonly property bool body: grip.modelData === "move"
+            readonly property real gx: grip.modelData.indexOf("l") >= 0 ? 0
+              : grip.modelData.indexOf("r") >= 0 ? cropBox.width : cropBox.width / 2
+            readonly property real gy: grip.modelData.indexOf("t") >= 0 ? 0
+              : grip.modelData.indexOf("b") >= 0 ? cropBox.height : cropBox.height / 2
+            x: grip.body ? 0 : grip.gx - 9
+            y: grip.body ? 0 : grip.gy - 9
+            width: grip.body ? cropBox.width : 18
+            height: grip.body ? cropBox.height : 18
+            z: grip.body ? 0 : 1
+            cursorShape: grip.body ? Qt.SizeAllCursor
+              : (grip.modelData === "tl" || grip.modelData === "br") ? Qt.SizeFDiagCursor
+              : (grip.modelData === "tr" || grip.modelData === "bl") ? Qt.SizeBDiagCursor
+              : (grip.modelData === "l" || grip.modelData === "r") ? Qt.SizeHorCursor : Qt.SizeVerCursor
+            property var r0: null
+            property point p0
+            onPressed: (m) => {
+              keys.forceActiveFocus();
+              grip.r0 = cropLayer.r;
+              grip.p0 = grip.mapToItem(cropLayer, m.x, m.y);
+            }
+            onPositionChanged: (m) => {
+              if (!grip.r0) return;
+              const p = grip.mapToItem(cropLayer, m.x, m.y);
+              const dx = (p.x - grip.p0.x) / cropLayer.k, dy = (p.y - grip.p0.y) / cropLayer.k;
+              if (grip.body) { ann.draft = Cap.moveRect(grip.r0, dx, dy, cropLayer.tw, cropLayer.th); return; }
+              const r = cropLayer.square(Cap.resizeRect(grip.r0, grip.modelData, dx, dy,
+                                                        cropLayer.tw, cropLayer.th), grip.modelData, m);
+              if (r.w >= 4 && r.h >= 4) ann.draft = r;
+            }
+            onReleased: grip.r0 = null
+            // a double click on the box applies it
+            onDoubleClicked: if (grip.body) ann.tool = ann.back
+            Rectangle {
+              visible: !grip.body
+              anchors.centerIn: parent
+              width: 10; height: 10; radius: 2
+              color: Zenon.cyan
+              border.width: 1
+              border.color: "#000000"
+            }
+          }
+        }
+      }
+
+      // the size it will be saved at
+      Rectangle {
+        x: cropBox.x + 6
+        y: Math.max(6, cropBox.y - height - 6)
+        width: cropSize.implicitWidth + 12
+        height: 22
+        radius: 4
+        color: "#cc000000"
+        Text {
+          id: cropSize
+          anchors.centerIn: parent
+          text: Math.round(cropLayer.r.w) + " × " + Math.round(cropLayer.r.h)
+          color: Zenon.white
+          font.family: Zenon.face
+          font.pixelSize: 12
+        }
+      }
+    }
+
+    // what the keys do, while cropping
+    Rectangle {
+      anchors.horizontalCenter: parent.horizontalCenter
+      anchors.bottom: parent.bottom
+      anchors.bottomMargin: 12
+      visible: ann.cropping
+      width: cropHint.implicitWidth + 20
+      height: 26
+      radius: 13
+      color: "#cc000000"
+      Text {
+        id: cropHint
+        anchors.centerIn: parent
+        text: "return apply  ·  esc cancel  ·  ⌫ whole picture  ·  shift square"
+        color: Zenon.muted
+        font.family: Zenon.face
+        font.pixelSize: 12
       }
     }
   }

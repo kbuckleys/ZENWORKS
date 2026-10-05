@@ -7,7 +7,7 @@
 // filmstrip. The cached thumbnail from morpheus/thumbs.js when there is one,
 // the original when there is not, decoded at the size of the box either way.
 //
-//   path    the picture
+//   path    the picture (its own file)
 //   thumb   its cached thumbnail, "" while there is none yet, or thumbs.js'
 //           NONE ("-") for a picture that will never have one (transparency)
 //   wait    true while a thumbnail is still being made: the tile shows the

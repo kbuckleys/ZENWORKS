@@ -122,7 +122,7 @@ Item {
     Text {
       visible: ed.showBackdrop && ed.look.backdrop === "color"
       text: "click Colour again to choose it"
-      color: Zenon.muted
+      color: Zenon.soft
       font.family: Zenon.face
       font.pixelSize: 13
     }
@@ -251,7 +251,7 @@ Item {
 
     Text {
       text: "Reset look"
-      color: resetMa.containsMouse || ed.kbRow === "reset" ? Zenon.cyan : Zenon.muted
+      color: resetMa.containsMouse || ed.kbRow === "reset" ? Zenon.cyan : Zenon.soft
       font.family: Zenon.face
       font.weight: 600
       font.pixelSize: 14

@@ -23,7 +23,7 @@ Rectangle {
   signal hit()
   readonly property bool lit: seg.chosen || segMa.containsMouse || seg.current
   readonly property color ink: seg.chosen ? Zenon.cyan
-    : (segMa.containsMouse || seg.current ? Zenon.white : Zenon.muted)
+    : (segMa.containsMouse || seg.current ? Zenon.white : Zenon.soft)
   height: 34
   radius: 5
   opacity: seg.live ? 1 : 0.4
