@@ -44,7 +44,7 @@ PACKAGES=(
   wl-clipboard wl-clip-persist cliphist grim slurp wf-recorder wtype libnotify
   # files, archives & mounts
   fd fzf ripgrep bat jq file attr inotify-tools rsync
-  7zip zip unzip unrar libarchive ratarmount fuse3 ntfs-3g udisks2
+  7zip zip unzip unrar libarchive ratarmount fuse3 ntfs-3g ntfsprogs udisks2
   # terminal & shell
   kitty zsh zoxide neovim git curl fastfetch
   # system & packages
