@@ -53,6 +53,7 @@ PACKAGES=(
   # fonts
   noto-fonts noto-fonts-cjk noto-fonts-extra noto-fonts-emoji
   ttf-jetbrains-mono-nerd ttf-dseg unicode-emoji
+  otf-san-francisco otf-san-francisco-mono
 )
 
 # ── output ──────────────────────────────────────────────────────────────────
