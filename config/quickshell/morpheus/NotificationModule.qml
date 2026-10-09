@@ -10,6 +10,8 @@
 import QtQuick
 import "../oracle"
 import "."
+// qualified, for HeldRing alone
+import "../terminus" as Term
 
 Collapsible {
   id: root
@@ -47,6 +49,14 @@ Collapsible {
       Behavior on width { NumberAnimation { duration: 150; easing.type: Easing.OutQuad } }
       height: Zenon.slot
       anchors.verticalCenter: parent.verticalCenter
+
+      // outlined while its menu is open (terminus/HeldRing.qml)
+      Term.HeldRing {
+        anchors.fill: parent
+        anchors.topMargin: 3
+        anchors.bottomMargin: 3
+        on: menu.open
+      }
 
       BarText {
         id: iconGlyph

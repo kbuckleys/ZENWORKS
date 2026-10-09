@@ -315,7 +315,18 @@ FocusScope {
     tree.openDirs = o;
     watcher.restartSoon();
   }
-  onCurrentPathChanged: tree.reveal(tree.currentPath)
+  onCurrentPathChanged: { tree.opening = ""; tree.reveal(tree.currentPath); }
+
+  // ── THE FILE ON ITS WAY TO THE EDITOR ──────────────────────────────
+  // Opening a file hands the keyboard to the editor, which turns the bar
+  // from the keyboard's row to the editor's file — and for the moment
+  // before the caller's currentPath catches up, that was still the OLD
+  // file: a double click flicked the bar back to it and over again
+  // (user, 2026-10-09). So the bar reads the file being opened until
+  // currentPath arrives, or a beat passes and it never will.
+  property string opening: ""
+  readonly property string shownPath: tree.opening !== "" ? tree.opening : tree.currentPath
+  Timer { id: openingDone; interval: 1500; onTriggered: tree.opening = "" }
 
   // ── the keyboard's place in it ─────────────────────────────────────
   property int sel: 0
@@ -349,13 +360,22 @@ FocusScope {
     Qt.callLater(() => list.positionViewAtIndex(i, ListView.Contain));
     if (tree._followFocus) list.forceActiveFocus();
   }
-  function selPath() { const r = tree.flat[tree.sel]; return r ? r.e.path : ""; }
-  function activate(i) {
+  // The row the verbs act on: the cursor's, or for the length of one verb
+  // chosen from a held row's menu, that row (heldBox — a plain field, so
+  // setting it notifies nothing and the bar never moves; user, 2026-10-09).
+  readonly property var heldBox: ({ i: -1 })
+  function actAt() { return tree.heldBox.i >= 0 ? tree.heldBox.i : tree.sel; }
+  function selPath() { const r = tree.flat[tree.actAt()]; return r ? r.e.path : ""; }
+  // keep: leave the cursor where it is (Open from a held row's menu)
+  function activate(i, keep) {
     const r = tree.flat[i];
     if (!r) return;
-    tree.sel = i;
+    if (!keep) tree.sel = i;
     if (r.e.isDir) tree.toggle(r.e.path);
-    else tree.fileActivated(r.e.path);
+    else {
+      if (r.e.path !== tree.currentPath) { tree.opening = r.e.path; openingDone.restart(); }
+      tree.fileActivated(r.e.path);
+    }
   }
 
   // ── editing the tree ───────────────────────────────────────────────
@@ -386,7 +406,7 @@ FocusScope {
   // `directory`: what is typed names a directory, with or without its slash
   property bool editDirectory: false
   function beginNew(directory) {
-    const r = tree.flat[tree.sel];
+    const r = tree.flat[tree.actAt()];
     tree.editDir = !r ? tree.rootPath : (r.e.isDir && tree.isOpen(r.e.path)) ? r.e.path
       : r.e.path.slice(0, r.e.path.lastIndexOf("/"));
     tree.editDirectory = directory === true;
@@ -409,7 +429,7 @@ FocusScope {
   // Renaming is the row's own — terminus' EntryRow edits its name in place
   // and asks its host to commit or give up (see `host` below).
   function beginRename() {
-    const r = tree.flat[tree.sel];
+    const r = tree.flat[tree.actAt()];
     if (!r) return;
     treeHost.renamePath = r.e.path;
     treeHost.renaming = true;
@@ -522,7 +542,13 @@ FocusScope {
       list.forceActiveFocus();
     }
 
+    // The row a menu is open about, which EntryRow outlines with terminus'
+    // HeldRing (it reads host.sideMenuAt, terminus' name for it). Only while
+    // the card is up, however it closes.
+    property var menuItem: null
+    readonly property var sideMenuAt: menu.open ? treeHost.menuItem : null
     function openMenuAt(item, m) {
+      treeHost.menuItem = item;
       tree.openMenu(item.mapToItem(null, m.x, m.y));
     }
   }
@@ -659,6 +685,8 @@ FocusScope {
       // the menu key: the row's menu, hung under the row
       else if (k === Qt.Key_Menu || (k === Qt.Key_F10 && (event.modifiers & Qt.ShiftModifier))) {
         const at = list.itemAtIndex(tree.sel);
+        treeHost.menuItem = at;
+        tree.heldAt = -1;
         tree.openMenu(at ? at.mapToItem(null, 24, at.height) : list.mapToItem(null, 24, 0));
       }
       else if ((t === "q" || (tree.hideKey !== "" && t === tree.hideKey)) && tree.hideable)
@@ -677,12 +705,14 @@ FocusScope {
     // The menu takes the keys while it is up (menuKeys), and the bar must
     // not leave the row the menu is about for the editor's file meanwhile —
     // a right click slid it to the open file, often at the bottom.
-    readonly property bool held: (list.focus || menu.open) && tree.focus
+    // While the menu is up the bar keeps the mode it had when it opened
+    // (menuHadKeys): the menu taking the keys must not move it either.
+    readonly property bool held: menu.open ? tree.menuHadKeys : (list.focus && tree.focus)
     SelectBar {
       view: list
-      index: list.held ? tree.sel : tree.flat.findIndex((r) => r.e.path === tree.currentPath)
+      index: list.held ? tree.sel : tree.flat.findIndex((r) => r.e.path === tree.shownPath)
       rowH: treeHost.rowH
-      on: list.held || tree.flat.some((r) => r.e.path === tree.currentPath)
+      on: list.held || tree.flat.some((r) => r.e.path === tree.shownPath)
     }
 
     delegate: EntryRow {
@@ -702,13 +732,18 @@ FocusScope {
       // the cursor is the keyboard's row while the tree has the keyboard, and
       // otherwise the file the editor is showing
       current: list.held ? row.index === tree.sel
-        : row.modelData.e.path === tree.currentPath
+        : row.modelData.e.path === tree.shownPath
       live: list.held
       // never the outlined, passive cursor: the bar above is always the
       // cursor here, focused or not
       passive: false
       onToggled: { tree.sel = row.index; tree.toggle(row.modelData.e.path); }
       onChosen: (right, shift, ctrl) => {
+        // A right click holds the row for its menu and leaves the cursor
+        // AND the keyboard be (user, 2026-10-09) — see heldAt. Taking the
+        // focus here flipped the bar from the editor's file to tree.sel,
+        // wherever that had last been left.
+        if (right) { tree.heldAt = row.index; return; }
         list.forceActiveFocus();
         tree.sel = row.index;
       }
@@ -810,7 +845,7 @@ FocusScope {
   property bool props: false
   signal propsWanted(string path)
   function menuItems() {
-    const r = tree.flat[tree.sel];
+    const r = tree.flat[tree.heldAt >= 0 ? tree.heldAt : tree.sel];
     const e = r ? r.e : null;
     const p = e ? e.path : tree.rootPath;
     const isDir = e ? e.isDir : true;
@@ -823,7 +858,7 @@ FocusScope {
       .map((x) => x.isSeparator ? x : Object.assign({}, x, { run: () => x.run(p, isDir) }));
     const out = [
       { text: !isDir ? "Open" : tree.isOpen(p) ? "Close directory" : "Open directory",
-        icon: isDir ? "\u{F0770}" : "\u{F0214}", hint: "↵", run: () => tree.activate(tree.sel) },
+        icon: isDir ? "\u{F0770}" : "\u{F0214}", hint: "↵", run: () => tree.activate(tree.actAt(), true) },
     ].concat(extra).concat([
       { isSeparator: true },
       { text: "New file…", icon: "\u{F0415}", hint: "a", run: () => tree.beginNew(false) },
@@ -833,9 +868,9 @@ FocusScope {
       { text: "Rename…", icon: "\u{F0CB5}", hint: "R", enabled: !!e, run: () => tree.beginRename() },
       { text: "Move to trash", icon: "\u{F0A7A}", hint: "d", enabled: !!e, run: () => tree.trashSel() },
       { isSeparator: true },
-      { text: "Copy path", icon: "\u{F0C78}", hint: "y", run: sh(Terminus.copyPathCommand(p)) },
-      { text: "Copy relative path", icon: "\u{F0C78}", enabled: rel !== p, run: sh(Terminus.copyPathCommand(rel)) },
-      { text: "Copy name", icon: "\u{F0C78}", run: sh(Terminus.copyPathCommand(p.slice(p.lastIndexOf("/") + 1))) },
+      { text: "Copy path", icon: "\u{F506}", hint: "y", run: sh(Terminus.copyPathCommand(p)) },
+      { text: "Copy relative path", icon: "\u{F506}", enabled: rel !== p, run: sh(Terminus.copyPathCommand(rel)) },
+      { text: "Copy name", icon: "\u{F506}", run: sh(Terminus.copyPathCommand(p.slice(p.lastIndexOf("/") + 1))) },
       { isSeparator: true },
     ]);
     if (tree.props) out.push(
@@ -856,7 +891,7 @@ FocusScope {
   }
   // a copy beside it, named as terminus' Keep both names one: "a (1).txt"
   function duplicateSel() {
-    const r = tree.flat[tree.sel];
+    const r = tree.flat[tree.actAt()];
     if (!r) return;
     const p = r.e.path;
     const dir = p.slice(0, p.lastIndexOf("/"));
@@ -866,18 +901,38 @@ FocusScope {
   }
 
   property var menuRows: []
+  // The row a right click asked about while the cursor stays put; its menu
+  // is about it (menuItems), and only a verb chosen brings the cursor over,
+  // since the verbs act on tree.sel. -1 for the keyboard's menu.
+  property int heldAt: -1
+  // Whether the tree had the keyboard as the menu opened, and what did if
+  // it did not: the menu borrows the keys and hands them back to whoever
+  // had them, so a right click from the editor leaves you in the editor.
+  property bool menuHadKeys: false
+  property Item _focusBack: null
+  function noteFocus() {
+    if (menu.open) return;
+    tree.menuHadKeys = list.focus && tree.focus;
+    tree._focusBack = tree.menuHadKeys ? null : tree.Window.activeFocusItem;
+  }
   function openMenu(at) {
+    tree.noteFocus();
     tree.menuRows = tree.menuItems();
     menu.at = at;
     menu.open = true;
     menuKeys.forceActiveFocus();
   }
   function closeMenu() {
+    tree.heldAt = -1;
     if (!menu.open) return;
     menu.open = false;
     const back = tree._menuBack;
     tree._menuBack = null;
-    if (back) back(); else list.forceActiveFocus();
+    const was = tree._focusBack;
+    tree._focusBack = null;
+    if (back) back();
+    else if (was) was.forceActiveFocus();
+    else list.forceActiveFocus();
   }
   // Someone else's rows on the tree's menu — a properties card's "open
   // with" list ({ label, key?, act, sep? }) — and where the keys go after.
@@ -885,7 +940,9 @@ FocusScope {
   function openRows(at, rows, back) {
     tree.menuRows = (rows || []).map((r) => r.sep ? { isSeparator: true }
       : { text: r.label, hint: r.key || "", run: r.act });
+    tree.noteFocus();
     tree._menuBack = back || null;
+    tree.heldAt = -1;
     menu.at = at;
     menu.open = true;
     menuKeys.forceActiveFocus();
@@ -913,8 +970,13 @@ FocusScope {
       : { text: it.text, icon: it.icon, hint: it.hint || "", enabled: it.enabled !== false })
     onChosen: (i) => {
       const it = tree.menuRows[i];
+      const h = tree.heldAt;
       tree.closeMenu();
-      if (it && it.run && it.enabled !== false) it.run();
+      // the verb acts on the held row; the cursor stays (heldBox)
+      if (it && it.run && it.enabled !== false) {
+        tree.heldBox.i = h >= 0 && h < tree.flat.length ? h : -1;
+        try { it.run(); } finally { tree.heldBox.i = -1; }
+      }
     }
   }
 }

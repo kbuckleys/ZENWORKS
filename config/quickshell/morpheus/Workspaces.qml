@@ -9,6 +9,8 @@ import Quickshell.Hyprland
 import Quickshell.Services.SystemTray
 import "../oracle"
 import "."
+// qualified, for HeldRing alone
+import "../terminus" as Term
 
 Item {
   id: root
@@ -283,6 +285,14 @@ Item {
           width: Zenon.textSize
           height: Zenon.textSize
           anchors.verticalCenter: parent.verticalCenter
+
+          // the icon whose menu is open, outlined (terminus/HeldRing.qml),
+          // as everything a right click asks about is across the suite
+          Term.HeldRing {
+            anchors.fill: parent
+            anchors.margins: -4
+            on: trayMenu.open
+          }
 
           Image {
             id: trayIcon
