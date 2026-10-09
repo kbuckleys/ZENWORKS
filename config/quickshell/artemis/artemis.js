@@ -1,0 +1,324 @@
+// ┌─┐┌─┐┌┐┌┬ ┬┌─┐┬─┐┬┌─┌─┐
+// ┌─┘├┤ │││││││ │├┬┘├┴┐└─┐
+// └─┘└─┘┘└┘└┴┘└─┘┴└─┴ ┴└─┘
+// https://github.com/kbuckleys/
+
+function basename(p) {
+  const s = String(p).replace(/\/$/, "");
+  const parts = s.split("/");
+  return parts[parts.length - 1] || p;
+}
+
+// ── the index ────────────────────────────────────────────────────────────
+//
+// WHAT THIS USED TO DO, because the difference is the whole point: every
+// debounced keystroke ran `fd -t f -H . $HOME | fzf --filter …` from scratch.
+// Measured here, that is 518,413 files and ~240ms of eight saturated cores,
+// per keystroke, to search a set that had not changed since the last one.
+//
+// It is now indexed once and searched many times. Two changes make that work:
+//
+// 1. EXCLUDES INSTEAD OF DROPPING -H. Of those 518k, 355,700 were in
+//    .local/share (Steam, flatpak), 49,600 .rustup, 31,045 .config/discord,
+//    22,925 .cargo. Dropping -H altogether cuts it to 396 files and makes
+//    ~/.config unsearchable, which is where the interesting dotfiles live.
+//    Excluding the caches instead — including the generic Electron cache
+//    directory names, which is most of it — gives ~4k entries built in 19ms,
+//    and nothing a person would ever look for is lost.
+// 2. THE INDEX IS NEVER READ INTO QML. Only fzf opens it. The engine only
+//    ever sees the <=500 lines that came back, so a 3.6MB index costs no
+//    QML memory at all.
+function excludes() {
+  return [
+    // package and toolchain stores
+    ".cache", ".local/share", ".cargo", ".rustup", ".git", "node_modules",
+    ".npm", ".var", ".steam", ".gradle", ".venv", "__pycache__", ".nv",
+    // browser profiles — .mozilla and .config/mozilla are different paths
+    "mozilla", ".mozilla", ".thumbnails",
+    // Every Electron app buries tens of thousands of files under these exact
+    // names. Excluding the NAMES rather than discord/helium/... by hand means
+    // the next such app is already handled.
+    "Cache", "Cache_Data", "Code Cache", "GPUCache", "DawnCache",
+    "ComputeCache", "Service Worker", "CacheStorage", "blob_storage",
+    "IndexedDB", "Crashpad", "file-history"
+  ].map((d) => "-E " + Strings.shellQuote(d)).join(" ");
+}
+
+// Directories are indexed too, and carry a trailing slash so a result can say
+// what it is without anyone having to stat it back.
+//
+// Written to a temp and moved into place: a rename is atomic, so a search that
+// lands mid-rebuild reads the whole old index rather than half of a new one.
+function indexCommand(root, indexPath) {
+  const r = Strings.shellQuote(root);
+  const out = Strings.shellQuote(indexPath);
+  const tmp = Strings.shellQuote(indexPath + ".new");
+  const ex = excludes();
+  // fd already terminates a directory with "/", which is what marks it in
+  // the index — directories are listed first so they win ties in a browse.
+  return "{ fd -t d -H " + ex + " . " + r + " 2>/dev/null ; " +
+         "fd -t f -H " + ex + " . " + r + " 2>/dev/null ; } > " + tmp +
+         " && mv -f " + tmp + " " + out;
+}
+
+// What a search reads from the index: all of it, its directories, or — for
+// plato's Ctrl-P — only the FILES under one directory, written relative to it.
+//
+// THE SCOPE IS WHY PLATO HAS NO FINDER OF ITS OWN. A project is a directory
+// the index already covers, so searching it is the same ranking over a slice
+// of the same file: one awk pass (prefix match, directories dropped, prefix
+// cut off so fzf ranks what you would type rather than /home/…), in the same
+// few milliseconds. `scope` is an absolute directory without a trailing slash.
+function source_(indexPath, dirsOnly, scope) {
+  const idx = Strings.shellQuote(indexPath);
+  // "files" as a scope: the whole index, its files only — plato's finder,
+  // which searches everything artemis does but opens files, not directories
+  if (scope === "files") return "grep -v '/$' " + idx + " 2>/dev/null";
+  if (scope) {
+    return "awk -v r=" + Strings.shellQuote(scope + "/") +
+      " 'index($0, r) == 1 && substr($0, length($0)) != \"/\"" +
+      " { print substr($0, length(r) + 1) }' " + idx + " 2>/dev/null";
+  }
+  return dirsOnly ? "grep '/$' " + idx + " 2>/dev/null" : "cat " + idx + " 2>/dev/null";
+}
+
+// The per-keystroke half, and all it does now is rank. ~7ms against the
+// cached index, versus ~400ms for the traversal it replaces.
+function filterCommand(indexPath, query, dirsOnly, scope) {
+  return source_(indexPath, dirsOnly, scope) + " | fzf --filter " +
+    Strings.shellQuote(String(query).trim()) + " 2>/dev/null | head -n 500";
+}
+
+// The listing shown before anything is typed, restricted to directories when
+// that toggle is on, or to a scope's files as above.
+function browseCommand(indexPath, dirsOnly, scope) {
+  return source_(indexPath, dirsOnly, scope) + " | head -n 200";
+}
+
+// Whether `dir` is inside what an index of `root` covers: under it, and not
+// under anything excludes() leaves out. A directory that is not — a project
+// outside $HOME, or in ~/.local/share — gets an index of its own, built by the
+// same indexCommand.
+function covers(root, dir) {
+  const r = String(root).replace(/\/$/, "");
+  const d = String(dir).replace(/\/$/, "");
+  if (d !== r && d.indexOf(r + "/") !== 0) return false;
+  // matched as whole path segments — ".local/share" is two of them, and
+  // "Cache" must not catch "Caches"
+  const rel = d.slice(r.length) + "/";
+  const skipped = excluded_();
+  for (let i = 0; i < skipped.length; ++i)
+    if (rel.indexOf("/" + skipped[i] + "/") >= 0) return false;
+  return true;
+}
+
+// the excluded names, as excludes() has them — one list, read two ways
+function excluded_() {
+  const out = [];
+  const re = /-E '([^']*)'/g;
+  const s = excludes();
+  let m;
+  while ((m = re.exec(s)) !== null) out.push(m[1]);
+  return out;
+}
+
+function parseResults(text) {
+  if (!text) return [];
+  const out = [];
+  for (const line of String(text).split("\n")) {
+    const p = line.trim();
+    if (p === "") continue;
+    // `displayText` used to be set here on every one of up to 500 objects and
+    // read by nothing at all.
+    out.push({ path: p, preview: p, isDir: p.charAt(p.length - 1) === "/" });
+  }
+  return out;
+}
+
+// ── frecency ─────────────────────────────────────────────────────────────
+//
+// What the panel shows before you type. It used to be
+// `fd --max-results 200 | sort`, which bails after the first 200 hits in
+// nondeterministic parallel traversal order — so it opened on 200 essentially
+// random files, usually whatever cache directory fd's threads reached first.
+// Ranking what you actually open is the same trick cynosure.js already plays
+// with its rofi-run-freq file.
+function bumpFreq(freq, path) {
+  const next = {};
+  for (const k in freq) next[k] = freq[k];
+  next[path] = (next[path] || 0) + 1;
+  return next;
+}
+
+function freqRanked(freq, limit) {
+  const keys = [];
+  for (const k in freq) keys.push(k);
+  keys.sort((a, b) => {
+    const d = (freq[b] || 0) - (freq[a] || 0);
+    return d !== 0 ? d : (a < b ? -1 : a > b ? 1 : 0);
+  });
+  return keys.slice(0, limit).map((p) => ({
+    path: p, preview: p, isDir: p.charAt(p.length - 1) === "/"
+  }));
+}
+
+// A path that has been opened before but has since been deleted should not
+// keep a seat in the opening view forever — and it did, because nothing ever
+// called this. The frequency map is what ranks the list you see before you
+// type anything, so a deleted download stayed at the top of it for good.
+//
+// `alive` is checked through a Set rather than indexOf: the map holds a few
+// hundred keys and the list it is checked against is every path that answered,
+// which is a scan per key otherwise.
+function pruneFreq(freq, alive) {
+  const live = new Set(alive);
+  const next = {};
+  for (const k in freq) if (live.has(k)) next[k] = freq[k];
+  return next;
+}
+
+// Which of these still exist. One process for the whole map rather than a stat
+// per key, and \036-separated because a path may contain anything else.
+function aliveCommand(paths) {
+  if (paths.length === 0) return "";
+  return "for p in " + paths.map((p) => Strings.shellQuote(p)).join(" ")
+    + "; do [ -e \"$p\" ] && printf '%s\\036' \"$p\"; done";
+}
+
+// ── rendering ────────────────────────────────────────────────────────────
+
+// Fit a path to the row, losing the MIDDLE rather than the tail. The old
+// version sliced the end off, which on a file finder throws away the filename
+// — the one part you were looking for.
+function fitPath(p, avail) {
+  const str = String(p);
+  if (str.length <= avail || avail < 4) return str;
+  const dir = str.charAt(str.length - 1) === "/";
+  const base = basename(str) + (dir ? "/" : "");
+  if (base.length + 2 >= avail) return "\u2026" + base.slice(base.length - (avail - 1));
+  return str.slice(0, avail - base.length - 2) + "\u2026/" + base;
+}
+
+// ── WHICH LETTERS FZF MATCHED ────────────────────────────────────────────
+// fzf --filter ranks fuzzily and says nothing about where it matched, and the
+// highlight used to look for each term as a contiguous substring — so `apq`,
+// which fzf finds as ArtemisPopup.qml, lit nothing, and a correct result
+// looked like a wrong one. This answers the same question fzf did, near
+// enough to show: a term that occurs whole is lit whole, otherwise its letters
+// are found in order.
+//
+// FROM THE RIGHT, both times. On a path the filename is what a query is
+// usually aimed at, and fzf's boundary bonuses land there too; scanning from
+// the end and then tightening forward picks the letters in the name over the
+// same letters in a directory three levels up.
+//
+// fzf's extended syntax is read as far as it changes what is lit: `!term`
+// matches nothing to show, `'term` is exact, `^`/`$` anchor, `a|b` is the
+// first alternative that hits. Smart case is ignored — the highlight is
+// case-blind either way.
+function termPositions_(lower, term) {
+  if (term === "" || term.charAt(0) === "!") return [];
+  let t = term;
+  let exact = false, head = false, tail = false;
+  if (t.charAt(0) === "'") { exact = true; t = t.slice(1); }
+  if (t.charAt(0) === "^") { head = true; t = t.slice(1); }
+  if (t.length > 1 && t.charAt(t.length - 1) === "$") { tail = true; t = t.slice(0, -1); }
+  if (t === "") return [];
+  const span = (at) => {
+    const out = [];
+    for (let i = 0; i < t.length; ++i) out.push(at + i);
+    return out;
+  };
+  if (head) return lower.indexOf(t) === 0 ? span(0) : [];
+  if (tail) {
+    const at = lower.length - t.length;
+    return at >= 0 && lower.slice(at) === t ? span(at) : [];
+  }
+  const whole = lower.lastIndexOf(t);
+  if (whole >= 0) return span(whole);
+  if (exact) return [];
+  // rightmost start that still fits the whole term…
+  let j = t.length - 1, start = -1;
+  for (let i = lower.length - 1; i >= 0; --i) {
+    if (lower.charAt(i) === t.charAt(j) && --j < 0) { start = i; break; }
+  }
+  if (start < 0) return [];
+  // …then the earliest letters after it, so the lit run is as tight as it gets
+  const out = [];
+  for (let i = start, k = 0; i < lower.length && k < t.length; ++i)
+    if (lower.charAt(i) === t.charAt(k)) { out.push(i); ++k; }
+  return out;
+}
+
+function matchPositions(text, query) {
+  const lower = String(text).toLowerCase();
+  const terms = String(query || "").trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const lit = {};
+  for (const term of terms) {
+    const alts = term.split("|").filter(Boolean);
+    for (const alt of alts) {
+      const hit = termPositions_(lower, alt);
+      if (hit.length === 0) continue;
+      for (const i of hit) lit[i] = true;
+      break;
+    }
+  }
+  return lit;
+}
+
+// Rich text for one row. `opts` is optional, and plato's picker passes none:
+//   match — the ink of a matched letter (default magenta, Zenon's #c8a4e0)
+//   dim   — if set, the ink of the parent path, so the NAME is what stands
+//           out down the column and the directories recede behind it
+//
+// Runs of the same kind go out as one span, so a 90-character path is a
+// handful of spans rather than ninety.
+function highlightedPreview(text, query, opts) {
+  const s = String(text);
+  const o = opts || {};
+  const match = o.match || "#c8a4e0";
+  const lit = matchPositions(s, query);
+  // where the name starts: after the last slash that is not the trailing one
+  // a directory carries
+  const cut = o.dim ? s.replace(/\/+$/, "").lastIndexOf("/") + 1 : 0;
+  const kind = (i) => lit[i] ? "m" : i < cut ? "d" : "";
+  let out = "";
+  let i = 0;
+  while (i < s.length) {
+    const k = kind(i);
+    let e = i + 1;
+    while (e < s.length && kind(e) === k) ++e;
+    const chunk = Strings.escapeHtml(s.slice(i, e));
+    if (k === "m") out += "<span style=\"color:" + match + ";font-weight:700;\">" + chunk + "</span>";
+    else if (k === "d") out += "<span style=\"color:" + o.dim + ";\">" + chunk + "</span>";
+    else out += chunk;
+    i = e;
+  }
+  return out;
+}
+
+// A directory goes to terminus. A FILE does not come through here: it is opened
+// by terminus.js' openOrAskCommand, which is what terminus itself opens with,
+// so the two agree on what a file opens with — and on what to do when nothing
+// does, which is to ask (see ArtemisPopup's open-with card).
+//
+// It used to open yazi in a terminal, because xdg-open on a directory hands it
+// to a graphical file manager and there was not one worth handing it to. There
+// is now, it is part of this shell, and reaching it over ipc means no terminal
+// is spawned to hold it and no second process to wait on.
+function openDirCommand(path) {
+  return "qs ipc call Terminus open " + Strings.shellQuote(path)
+    + " >/dev/null 2>&1 &";
+}
+
+// PAIRS, NOT MARKUP. It used to hand back finished rich text with the colours
+// written in as hex — the palette living in a second place, and a hint that
+// could only ever be drawn one way. The popup draws these as chips now; what
+// belongs here is which key and what it does.
+function hintText(dirsOnly) {
+  return [
+    ["return", "open"],
+    ["alt c", "copy path"],
+    ["alt d", dirsOnly ? "all results" : "directories only"]
+  ];
+}
