@@ -25,7 +25,7 @@
 # opaque page; on light glass a pale accent washes out, so any accent under
 # 3:1 against ground is darkened just to 3:1 — and the script says which.
 # Every theme is also checked for ink, keyInk, soft and muted contrast.
-import json, os, sys
+import json, math, os, sys
 
 OUT = os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "themes")
 
@@ -60,7 +60,7 @@ THEMES = {
  "zenon-light": dict(name="Zenon Light", mode="light",
    ground="#f3f3f1", card="#e9eaec", surface="#dcdfe4", ink="#1d2025", soft="#474d58", keyInk="#3a3f4b",
    muted="#666c7a", dim="#b9c3c3", border="#9aa3ad",
-   red="#c4474e", orange="#c25f22", yellow="#8f7a1c", green="#4a8538", cyan="#337b7b",
+   red="#c4474e", orange="#c25f22", yellow="#8f7a1c", sand="#8f7a1c", green="#4a8538", cyan="#337b7b",
    blue="#2f6fbe", magenta="#8550b6", pink="#bc5f72"),
  # ── Catppuccin ──
  "catppuccin-frappe": dict(name="Catppuccin Frappé", mode="dark",
@@ -236,6 +236,60 @@ THEMES = {
 
 ADJUSTED = []
 
+# ── OKLCH, for sand ─────────────────────────────────────────────────────
+def _lin(v):
+    v /= 255
+    return v / 12.92 if v <= 0.04045 else ((v + 0.055) / 1.055) ** 2.4
+
+def _gam(v):
+    v = v * 12.92 if v <= 0.0031308 else 1.055 * v ** (1 / 2.4) - 0.055
+    return v * 255
+
+def to_oklch(h):
+    r, g, b = (_lin(v) for v in h2rgb(h))
+    l = (0.4122214708*r + 0.5363325363*g + 0.0514459929*b) ** (1/3)
+    m = (0.2119034982*r + 0.6806995451*g + 0.1073969566*b) ** (1/3)
+    s = (0.0883024619*r + 0.2817188376*g + 0.6299787005*b) ** (1/3)
+    L = 0.2104542553*l + 0.7936177850*m - 0.0040720468*s
+    A = 1.9779984951*l - 2.4285922050*m + 0.4505937099*s
+    B = 0.0259040371*l + 0.7827717662*m - 0.8086757660*s
+    return L, math.hypot(A, B), math.degrees(math.atan2(B, A)) % 360
+
+def from_oklch(L, C, H):
+    # chroma given up until the colour is on screen, never the lightness
+    while True:
+        A, B = C * math.cos(math.radians(H)), C * math.sin(math.radians(H))
+        l = (L + 0.3963377774*A + 0.2158037573*B) ** 3
+        m = (L - 0.1055613458*A - 0.0638541728*B) ** 3
+        s = (L - 0.0894841775*A - 1.2914855480*B) ** 3
+        rgb = (4.0767416621*l - 3.3077115913*m + 0.2309699292*s,
+               -1.2684380046*l + 2.6097574011*m - 0.3413193965*s,
+               -0.0041960863*l - 0.7034186147*m + 1.7076147010*s)
+        if all(-1e-4 <= v <= 1.0001 for v in rgb) or C <= 0:
+            return rgb2h(tuple(_gam(min(1, max(0, v))) for v in rgb))
+        C -= 0.002
+
+# SAND IS ZENON'S PALE STRAW, NOT THE THEME'S GOLD. Zenon's is #e0d8a4 —
+# oklch .88 / .068 / 100: light, barely coloured, leaning green of yellow.
+# Handed a palette's own yellow (chroma .11–.16, hue 70–90) it came out as
+# mustard on every theme but Zenon (user, 2026-10-09: "ugly"), and in the
+# themes whose yellow IS their orange (Rosé Pine, Dayfox) it was the
+# `yellow` slot twice. So it keeps only the theme's hue, pulled halfway to
+# Zenon's, at Zenon's restraint: dark, Zenon's lightness (no brighter than
+# a step past the theme's own ink); light, Zenon Light's (#8f7a1c, .58 /
+# .11), walked darker only as far as legible() would.
+def sand_of(p, light):
+    _, _, h = to_oklch(p["yellow"])
+    hue = h + (100 - h) * 0.5
+    if light:
+        out = from_oklch(0.60, 0.10, hue)
+        while contrast(out, p["ground"]) < 3.0:
+            L, C, H = to_oklch(out)
+            out = from_oklch(L - 0.01, C, H)
+        return out
+    ink_l = to_oklch(p["ink"])[0]
+    return from_oklch(min(0.87, ink_l + 0.04), 0.07, hue)
+
 def legible(stem, key, h, ground, need=3.0):
     # Light palettes are drawn for an opaque page; on light glass a pale
     # accent washes out. Darken only as far as `need`, never further.
@@ -263,7 +317,7 @@ def build(p, stem=""):
         "ground": p["ground"], "surface": p["surface"], "card": p["card"],
         "ink": p["ink"], "muted": p["muted"], "soft": soft, "keyInk": key,
         "red": p["red"], "green": p["green"], "yellow": p["orange"], "blue": p["blue"],
-        "magenta": p["magenta"], "cyan": p["cyan"], "pink": pink, "sand": p["yellow"],
+        "magenta": p["magenta"], "cyan": p["cyan"], "pink": pink, "sand": p.get("sand") or sand_of(p, light),
         "dim": p["dim"],
         "sparkFill": a(0.2, p["cyan"]),
         "border": a(0.4 if light else 0.3, p["border"]),
