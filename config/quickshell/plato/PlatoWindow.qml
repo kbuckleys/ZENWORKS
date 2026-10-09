@@ -484,7 +484,9 @@ FloatingWindow {
     id: groundBelow
     z: -1
     x: tabs.x
-    y: tabs.height
+    // not under the sticky lines' bar, which wears the active tab's glass
+    // (see WindowView's sticky): laid twice, it came out darker
+    y: tabs.height + stickyHost.band
     width: parent.width - x
     height: parent.height - y
     color: Zenon.layerBg
@@ -661,6 +663,9 @@ FloatingWindow {
     mapEdgeOut: win.editorInset + win.zenMargin
     topBar: tabs
     bottomBar: status
+    stickyHost: win.zen ? null : stickyHost
+    stickyTop: tabs.height
+    stickyLeft: tabs.x
     fileDir: win.ctx.here()
     fontSize: win.fontSize
     fontFamily: win.mgr ? win.mgr.fontFamily : Zenon.faceFixed
@@ -680,6 +685,23 @@ FloatingWindow {
   }
   // one resize when zen's column has settled, not one a frame
   Timer { id: zenSlide; interval: Zenon.normal * 2 + 20 }
+
+  // the sticky lines' layer: over the editor, so their bar runs the whole
+  // width under the tab strip (see WindowView's sticky)
+  Item {
+    id: stickyHost
+    anchors.fill: parent
+    // how deep the bar on show is: it lays the window's ground itself, and
+    // groundBelow stops above it. Read off what is in here (a window's bar
+    // is reparented in), not handed over by the bar, so no order of windows
+    // coming and going can leave the ground laid twice.
+    readonly property real band: {
+      let h = 0;
+      for (const c of stickyHost.children)
+        if (c.visible && c.height > h) h = c.height;
+      return h;
+    }
+  }
 
   // ── what nvim says: cards in the editor's lower right corner ───────
   Toasts {
@@ -1082,6 +1104,7 @@ FloatingWindow {
     ctx: win.ctx
     finder: win.mgr ? win.mgr.finder : null
     codeFamily: win.mgr ? win.mgr.fontFamily : Zenon.faceFixed
+    codeWeight: win.mgr ? win.mgr.fontWeight : Font.DemiBold
     history: win.mgr
     face.family: Zenon.faceFixed
     face.pixelSize: win.chromeSize

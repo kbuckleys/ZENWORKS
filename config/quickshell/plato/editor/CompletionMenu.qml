@@ -82,6 +82,7 @@ Item {
     id: pathCard
     file: menu.shownItem && menu.shownItem.path ? menu.shownItem.path : ""
     codeFamily: menu.face.family
+    codeWeight: menu.face.weight
     pixelSize: Math.max(11, menu.face.pixelSize - 2)
     maxW: Math.min(620, Math.max(280, menu.areaW * 0.45))
     maxH: Math.min(420, Math.max(160, menu.areaH * 0.6))

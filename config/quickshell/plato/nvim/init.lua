@@ -121,6 +121,8 @@ vim.api.nvim_create_autocmd("BufReadPost", {
 
 -- ── colours ────────────────────────────────────────────────────────────
 require("plato.theme").apply()
+-- filetypes nvim has none for, which hl.lua colours itself (*.log)
+require("plato.hl").filetypes()
 
 -- ── treesitter ─────────────────────────────────────────────────────────
 -- nvim bundles a handful of parsers (lua, c, vim, markdown, …); the queries

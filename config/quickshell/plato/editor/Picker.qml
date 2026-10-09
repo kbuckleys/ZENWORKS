@@ -83,6 +83,7 @@ PlatoSheet {
   property var finder: null
   // the editor's face, for the preview
   property string codeFamily: Zenon.faceFixed
+  property int codeWeight: Font.DemiBold
   // what the palette has been used for: PlatoManager's used() / usageScore()
   property var history: null
 
@@ -868,6 +869,7 @@ PlatoSheet {
     from: picker.previewLine > 0 ? Math.max(1, picker.previewLine - 6) : 1
     hit: picker.previewLine > 0 ? picker.previewLine - preview.from : -1
     codeFamily: picker.codeFamily
+    codeWeight: picker.codeWeight
     pixelSize: picker.face.pixelSize
     imageMargin: 14
     message: preview.kind === "binary" ? "binary file — nothing to show"

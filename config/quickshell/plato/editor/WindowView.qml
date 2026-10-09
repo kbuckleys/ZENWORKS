@@ -1009,21 +1009,74 @@ Item {
   // (see nvim/lua/plato/sticky.lua), in the window the cursor is in. A
   // click goes to that line. A hairline and a soft shadow under them say
   // the text runs on beneath.
+  //
+  // A BAR ACROSS THE WINDOW, HUNG FROM THE TAB STRIP (user, 2026-10-09: no
+  // floating strip inset from the edges and off the tabs). A window that
+  // touches the strip lays them in the plato window's stickyHost, from the
+  // strip's bottom (stickyTop), from its left (stickyLeft) to the window's right edge, the editor's
+  // inset counted in so each line still sits over its own row; the ground
+  // is frost over the editor (stickySource). A split lower down keeps them
+  // inside itself, frosting its own rows.
+  property Item stickyHost: null
+  property real stickyTop: 0
+  property real stickyLeft: 0
+  property Item stickySource: null
   Item {
     id: sticky
     readonly property var lines: win.w.current ? win.ed.context : []
+    readonly property bool hung: !!win.stickyHost && win.w.row === 0
+    parent: sticky.hung ? win.stickyHost : win
     visible: sticky.lines.length > 0
-    width: win.width - 10
-    height: sticky.lines.length * win.cellH
+    // where this window is in the host (the editor moves without it knowing)
+    readonly property point at: {
+      void [win.x, win.y, win.width, win.height, win.edgeTrack, win.stickyTop, win.stickyLeft];
+      return sticky.hung ? win.mapToItem(win.stickyHost, 0, 0) : Qt.point(0, 0);
+    }
+    x: sticky.hung ? win.stickyLeft : 0
+    y: sticky.hung ? win.stickyTop : 0
+    // the gap above the first row, which the bar fills down from the strip
+    readonly property real lead: sticky.hung ? Math.max(0, sticky.at.y - win.stickyTop) : 0
+    // the rows' left, in the bar
+    readonly property real rowX: sticky.at.x - sticky.x
+    width: sticky.hung ? win.stickyHost.width - win.stickyLeft : win.width
+    height: sticky.lead + sticky.lines.length * win.cellH
     z: 5
-    Rectangle { anchors.fill: parent; color: Zenon.layerBg }
+    // THE ACTIVE TAB'S GLASS, LAYER FOR LAYER (user, 2026-10-09): the
+    // strip's thin glass, then the window's ground over it at tabOver, so
+    // the two come to the window's own alpha exactly as the tab above does.
+    // The plato window leaves its ground out under the bar (stickyHost.band)
+    // so nothing doubles it. Hung in a lower split there is no tab to
+    // match, and the window's ground is under it: the layer's colour only.
+    Rectangle {
+      anchors.fill: parent
+      visible: sticky.hung
+      color: Zenon.alpha(Zenon.tabAwayInk, Zenon.tabAway(Zenon.layerBg.a))
+    }
+    Rectangle {
+      anchors.fill: parent
+      color: sticky.hung ? Zenon.alpha(Zenon.layerBg, Zenon.tabOver(Zenon.layerBg.a)) : Zenon.layerBg
+    }
+    // and the text running on beneath, frosted on that glass: one light
+    // pass, no floor, no scrim, no dimming. Stacked (gain 2) the syntax
+    // colours spread into a grey veil and the bar read darker than the tab
+    // (user's capture, 2026-10-09).
+    Frost {
+      anchors.fill: parent
+      source: sticky.hung ? win.stickySource : content
+      scrim: 0
+      brightness: 0
+      saturation: 0
+      opacity: 0.6
+    }
     Column {
+      x: sticky.rowX
+      y: sticky.lead
       Repeater {
         model: sticky.lines
         Item {
           id: ctxRow
           required property var modelData
-          width: sticky.width
+          width: win.width
           height: win.cellH
           Text {
             width: win.w.textoff * win.cellW - win.cellW * 2
@@ -1052,12 +1105,17 @@ Item {
               }
             }
           }
-          MouseArea {
-            anchors.fill: parent
-            cursorShape: Qt.PointingHandCursor
-            onClicked: win.client.cmd(String(ctxRow.modelData.n))
-          }
         }
+      }
+    }
+    // a click anywhere on a line's band goes to it, the inset included
+    MouseArea {
+      anchors.fill: parent
+      cursorShape: Qt.PointingHandCursor
+      onClicked: (m) => {
+        const i = Math.floor((m.y - sticky.lead) / win.cellH);
+        const l = sticky.lines[Math.max(0, Math.min(sticky.lines.length - 1, i))];
+        if (l) win.client.cmd(String(l.n));
       }
     }
     Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Zenon.border }

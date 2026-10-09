@@ -16,6 +16,7 @@
 
 import QtQuick
 import Quickshell
+import Quickshell.Io
 import "../../morpheus"
 import "keys.js" as KeyMap
 import "cells.js" as Cells
@@ -44,6 +45,12 @@ Item {
   property Item edgeHost: null
   property Item topBar: null
   property Item bottomBar: null
+  // where the sticky lines hang, window-wide, from the bottom of the tab
+  // strip (y = stickyTop in it, from x = stickyLeft) — see WindowView's
+  // sticky; null keeps them inside the window
+  property Item stickyHost: null
+  property real stickyTop: 0
+  property real stickyLeft: 0
 
   // ── the cell ───────────────────────────────────────────────────────
   FontMetrics {
@@ -131,6 +138,10 @@ Item {
       topBar: view.topBar
       bottomBar: view.bottomBar
       edgeTrack: [view.x, view.y, view.width, view.height]
+      stickyHost: view.stickyHost
+      stickyTop: view.stickyTop
+      stickyLeft: view.stickyLeft
+      stickySource: view
     }
   }
   // a window's scrollbar thumb is being dragged
@@ -495,42 +506,106 @@ Item {
     property real px: 0
     property real py: 0
     codeFamily: fm.font.family
+    codeWeight: fm.font.weight
     pixelSize: Math.max(11, fm.font.pixelSize - 2)
     maxW: Math.min(620, Math.max(280, view.width * 0.5))
     maxH: Math.min(420, Math.max(160, view.height * 0.6))
     hint: peek.kind === "image" ? "gf opens it in Picasso" : ""
-    function hide() { hoverWait.stop(); peek.file = ""; }
+    function hide() { hoverWait.stop(); resolve.running = false; peek.file = ""; peek.spanR = -1; peek.under = ""; }
+    // the word on show, in the editor's cells: the card goes the moment the
+    // pointer leaves it (it once compared each move with the one before, so
+    // a slow drift away never added up to "moved off" and the card stuck)
+    property int spanR: -1
+    property int spanA: 0
+    property int spanB: 0
+    // the word the pointer is over now ("" none), and what it reads as
+    property string under: ""
+    property var found: null
+    // ── THE SAME WORD, THE SAME ANSWER ────────────────────────────────
+    // The wait restarts only when the pointer reaches ANOTHER word. It used
+    // to restart on every move until a card was up, so a hand that never
+    // quite stopped (a mouse rarely does) never saw one, and the same path
+    // answered one time and not the next.
     function hover(x, y) {
-      // moved off what it is showing: gone; still: look again
-      if (peek.file !== "" && (Math.abs(x - peek.px) > view.cellW * 3 || Math.abs(y - peek.py) > view.cellH)) peek.file = "";
       peek.px = x;
       peek.py = y;
-      hoverWait.restart();
+      const f = peek.wordAt(x, y);
+      const key = f ? f.r + ":" + f.a : "";
+      if (key === peek.under) return;
+      peek.under = key;
+      peek.found = f;
+      resolve.running = false;
+      if (peek.file !== "") { peek.file = ""; peek.spanR = -1; }
+      if (f) hoverWait.restart(); else hoverWait.stop();
     }
-    // the word under the pointer, if it reads as a path
-    function look() {
-      const r = Math.floor(peek.py / view.cellH), c = Math.floor(peek.px / view.cellW);
+    // the path under the pointer, if any: { r, a, b, word, strict } in the
+    // editor's cells. A WRAPPED LINE IS READ WHOLE: a path cut across two
+    // rows was two half paths, each naming nothing (or the wrong file), so
+    // the same path answered or not by where the window happened to wrap
+    // it. The pieces of the line are joined, and the span is the part of
+    // the word on the pointer's row.
+    function wordAt(x, y) {
+      const r = Math.floor(y / view.cellH), c = Math.floor(x / view.cellW);
       const ws = view.ed.wins;
       for (let i = 0; i < ws.length; ++i) {
         const w = ws[i];
         if (r < w.row || r >= w.row + w.height || c < w.col + w.textoff || c >= w.col + w.width) continue;
-        const row = view.ed.rowsOf(w.id)[r - w.row];
-        if (!row || !row.t) return;
-        const chars = Cells.chars(row.t);
-        const at = c - w.col - w.textoff;
-        if (at >= chars.length) return;
-        const stop = /[\s"'`()<>\[\]{},;|=]/;
-        let a = at, b = at;
-        while (a > 0 && !stop.test(chars[a - 1])) a--;
-        while (b < chars.length && !stop.test(chars[b])) b++;
-        let word = chars.slice(a, b).join("").replace(/^file:\/\//, "").replace(/[.:]+$/, "");
-        // a slash or a dot to be a path at all; not a URL, not a comment's //
-        if (word.length < 2 || !/[\/.]/.test(word) || word.indexOf("://") >= 0 || /^\/+$/.test(word)) return;
-        const home = Quickshell.env("HOME");
-        if (word === "~" || word.startsWith("~/")) word = home + word.slice(1);
-        else if (!word.startsWith("/")) word = (view.fileDir || home) + "/" + word.replace(/^\.\//, "");
-        peek.file = word.replace(/\/+$/, "") || "/";
+        const rows = view.ed.rowsOf(w.id);
+        const at = r - w.row;
+        const row = rows[at];
+        if (!row || !row.t || !row.n) return null;
+        let first = at, last = at;
+        while (first > 0 && rows[first].k > 0 && rows[first - 1] && rows[first - 1].n === row.n) first--;
+        while (rows[last + 1] && rows[last + 1].n === row.n && rows[last + 1].k > 0) last++;
+        let text = "", off = 0;
+        for (let k = first; k <= last; ++k) {
+          if (k === at) off = Cells.count(text);
+          text += rows[k].t || "";
+        }
+        const cc = off + c - w.col - w.textoff;
+        const it = Cells.words(text).find((it) => cc >= it.a && cc < it.b);
+        if (!it) return null;
+        const strict = Cells.pathOf(it.w, false) !== "";
+        const word = Cells.pathOf(it.w, true);
+        if (word === "") return null;
+        const base = w.col + w.textoff - off;
+        return { r: r, a: Math.max(w.col + w.textoff, base + it.a), b: Math.min(w.col + w.width, base + it.b),
+                 word: word, strict: strict };
+      }
+      return null;
+    }
+    // where it is: "~" is home; a relative path is looked for beside the
+    // file, then from its project's top (git's), then from home — the first
+    // that exists, as a note in ~/todo names a file under a project.
+    function look() {
+      const f = peek.found;
+      if (!f) return;
+      const word = f.word;
+      const home = Quickshell.env("HOME");
+      peek.spanR = f.r;
+      peek.spanA = f.a;
+      peek.spanB = f.b;
+      peek.always = f.strict;
+      if (word === "~" || word.startsWith("~/") || word.startsWith("/")) {
+        const p = word.startsWith("~") ? home + word.slice(1) : word;
+        peek.file = p.replace(/\/+$/, "") || "/";
         return;
+      }
+      resolve.forKey = peek.under;
+      resolve.command = ["sh", "-c",
+        "w=$1; d=$2; for b in \"$d\" \"$(git -C \"$d\" rev-parse --show-toplevel 2>/dev/null)\" \"$HOME\"; do "
+        + "[ -n \"$b\" ] && [ -e \"$b/$w\" ] && { printf '%s' \"$b/$w\"; exit; }; done; printf '%s' \"$d/$w\"",
+        "sh", word.replace(/^\.\//, ""), view.fileDir || home];
+      resolve.running = true;
+    }
+    Process {
+      id: resolve
+      property string forKey: ""
+      stdout: StdioCollector {
+        onStreamFinished: {
+          if (resolve.forKey !== peek.under || text === "") return;
+          peek.file = text.replace(/\/+$/, "") || "/";
+        }
       }
     }
     Timer { id: hoverWait; interval: 450; onTriggered: peek.look() }
@@ -789,7 +864,12 @@ Item {
     // AN ARROW OVER THE SCROLLBAR. This area lies over every window's rail
     // (which only gets the press it lets through), so its I-beam showed on
     // the bar too — and stayed while the thumb was dragged.
-    cursorShape: overRail || overFold || view.railHeld ? Qt.ArrowCursor : Qt.IBeamCursor
+    //
+    // AND AN ARROW UNLESS THERE IS TYPING TO DO (user, 2026-10-09): the
+    // I-beam promises text goes where it points, which only insert and
+    // replace keep; in normal mode a click moves a block, it places nothing.
+    cursorShape: overRail || overFold || view.railHeld || !typing ? Qt.ArrowCursor : Qt.IBeamCursor
+    readonly property bool typing: view.ed.modeName === "insert" || view.ed.modeName === "replace"
     property bool overRail: false
     // over a fold's ring or a closed fold's pill: things to click, not text
     // to place a caret in, so the pointer is the arrow (user, 2026-10-09)
@@ -911,6 +991,8 @@ Item {
       held = "";
     }
     onWheel: (wheel) => {
+      // the text moves out from under a peeked path
+      peek.hide();
       // Ctrl and the wheel: zoom, as everywhere else
       if (wheel.modifiers & Qt.ControlModifier) {
         if (wheel.angleDelta.y !== 0) view.zoomRequested(wheel.angleDelta.y > 0 ? 1 : -1);

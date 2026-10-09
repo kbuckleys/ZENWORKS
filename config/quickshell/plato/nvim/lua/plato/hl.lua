@@ -225,6 +225,9 @@ end
 local synCache = {}   -- buf → lnum(0-based) → { text, runs }
 local synCount = {}   -- buf → how many lines synCache holds for it
 local synName = {}    -- synID → its translated group's name
+-- the line-local highlighters' answers (lineLocal, below), per text
+local lineCache = {}   -- buf → { [0] = the highlighter, [text] = runs }
+local lineCount = {}
 -- KEPT SMALL. Every line ever scrolled past was kept, and an edit walks the
 -- whole cache to drop what is below it: a long file read top to bottom made
 -- every keystroke a walk of thousands. Past this many, a buffer's cache is
@@ -241,11 +244,255 @@ function M.invalidateFrom(buf, first)
   synCount[buf] = n
 end
 
-function M.forget(buf) synCache[buf] = nil; synCount[buf] = nil end
+function M.forget(buf) synCache[buf] = nil; synCount[buf] = nil; lineCache[buf] = nil end
+
+-- ── base: line-local Lua highlighters ──────────────────────────────────
+-- Formats bat colours and nvim has no grammar for (or one too slow for a
+-- big file): csv/tsv columns and logs. Each looks at one line alone — no
+-- regex engine, no syncing — so it also colours a file too big for syntax
+-- (large.lua turns that off; terminus hands bat anything past 4 MB, and the
+-- two must agree). The colours are bat's under --theme=ansi, so the editor,
+-- plato's previews and bat's say the same thing.
+
+-- csv and tsv: a column at a time, bat's cycle of five (PlatoCol1-5,
+-- theme.lua), a quoted field as a string (its "" escapes cyan), the
+-- delimiters plain
+local function columns(text, d)
+  local runs, i, col, n = {}, 1, 0, #text
+  while i <= n + 1 do
+    local b0 = i - 1
+    local j, quoted = i, text:sub(i, i) == '"'
+    local esc = {}
+    if quoted then
+      j = i + 1
+      while j <= n do
+        local c = text:sub(j, j)
+        if c == '"' then
+          if text:sub(j + 1, j + 1) == '"' then esc[#esc + 1] = j; j = j + 2 else j = j + 1; break end
+        else j = j + 1 end
+      end
+      -- what follows the closing quote, up to the delimiter, is the field's
+      j = text:find(d, j, true) or n + 1
+    else
+      j = text:find(d, i, true) or n + 1
+    end
+    if j - 1 > b0 then
+      local g = quoted and "PlatoColQuoted" or ("PlatoCol" .. (col % 5 + 1))
+      -- a quoted field's "" (an escaped quote) in the escape's cyan, as bat's
+      local from = b0
+      for _, x in ipairs(esc) do
+        if x - 1 > from then runs[#runs + 1] = { from, x - 1, g } end
+        runs[#runs + 1] = { x - 1, x + 1, "PlatoColEscape" }
+        from = x + 1
+      end
+      runs[#runs + 1] = { from, j - 1, g }
+    end
+    col = col + 1
+    i = j + 1
+  end
+  return runs
+end
+
+-- a log, as bat's `log` syntax: dates and times, numbers (a word's own
+-- digits are not one — v1, 10ms, 1e10), hex, an address's groups, a quoted
+-- string (bat lets an unclosed one run on to the end of the file; this
+-- stops at the line's end), key= with its key. Levels stay plain, as bat
+-- leaves them.
+local function isWord(c) return c ~= "" and c:match("[%w_]") ~= nil end
+local function logRuns(s)
+  local runs, n, i = {}, #s, 1
+  local function put(a, b, g) runs[#runs + 1] = { a - 1, b, g } end
+  while i <= n do
+    local c = s:sub(i, i)
+    local prev = i > 1 and s:sub(i - 1, i - 1) or ""
+    local done = false
+    -- a URL: plain, all of it (bat's too), so its ?x=1 is no key
+    if isWord(c) and not isWord(prev) then
+      local _, ue = s:find("^%a[%w+.-]*://[^%s\"'<>]*", i)
+      if ue then i = ue + 1; done = true end
+    end
+    -- a quoted string
+    -- (a double-quoted one's backslash escapes, \n \" \\, in the key's colour,
+    -- as bat's; a single-quoted one has none)
+    if (c == '"' or c == "'") and not isWord(prev) then
+      local e, esc = i + 1, {}
+      while e <= n do
+        local ch = s:sub(e, e)
+        if ch == "\\" and c == '"' and e < n then esc[#esc + 1] = e; e = e + 2
+        elseif ch == c then break
+        else e = e + 1 end
+      end
+      -- unclosed: to the line's end, as bat has it (bat runs on into the
+      -- lines after; one line is as far as this goes)
+      do
+        local from = i
+        for _, x in ipairs(esc) do
+          if x > from then put(from, x - 1, "PlatoLogString") end
+          put(x, x + 1, "PlatoLogKey")
+          from = x + 2
+        end
+        put(from, math.min(e, n), "PlatoLogString")
+        i = e + 1; done = true
+      end
+    end
+    -- key=, the key's colour whatever it is made of (2358734848=true)
+    if not done and isWord(c) and not isWord(prev) then
+      local _, e = s:find("^[%w_]+", i)
+      if s:sub(e + 1, e + 1) == "=" then
+        put(i, e, "PlatoLogKey"); put(e + 1, e + 1, "PlatoLogSep"); i = e + 2; done = true
+      end
+    end
+    if not done and not isWord(prev) then
+      -- 2026-10-09, then T and a time
+      local d1, d2 = s:find("^%d%d%d%d%-%d%d%-%d%d", i)
+      if not d1 then d1, d2 = s:find("^%d%d%d%d/%d%d/%d%d", i) end
+      local after = d1 and s:sub(d2 + 1, d2 + 1) or ""
+      if d1 and (after == "T" or not isWord(after)) then
+        put(d1, d2, "PlatoLogNumber")
+        i = d2 + 1
+        if s:sub(i, i) == "T" and s:find("^%d%d:%d%d:%d%d", i + 1) then put(i, i, "PlatoLogSep"); i = i + 1 end
+        done = true
+      end
+    end
+    if not done and (not isWord(prev) or s:sub(i - 1, i - 1) == "T") then
+      -- 03:57:51: a time, whole
+      local t1, t2 = s:find("^%d%d:%d%d:%d%d", i)
+      -- with its milliseconds, unless a zone letter follows (.123Z stays
+      -- plain); microseconds are a number of their own, as bat has them
+      local f2 = t1 and select(2, s:find("^%.%d%d?%d?", t2 + 1))
+      if f2 and not isWord(s:sub(f2 + 1, f2 + 1)) then t2 = f2 end
+      if t1 and not s:sub(t2 + 1, t2 + 1):match("[%w_:]") then
+        put(t1, t2, "PlatoLogNumber"); i = t2 + 1; done = true
+      end
+    end
+    if not done and not isWord(prev) then
+      -- 0xDEADBEEF: the 0x and its digits
+      local h1, h2 = s:find("^0[xX]%x+", i)
+      if h1 and not isWord(s:sub(h2 + 1, h2 + 1)) then
+        put(h1, h1 + 1, "PlatoLogNumber"); put(h1 + 2, h2, "PlatoLogNumber"); i = h2 + 1; done = true
+      end
+    end
+    if not done and not isWord(prev) then
+      -- an address of hex groups and colons (a MAC, IPv6): each group
+      local a1, a2 = s:find("^[%x:]+", i)
+      if a1 and not isWord(s:sub(a2 + 1, a2 + 1)) then
+        local tok = s:sub(a1, a2)
+        local _, colons = tok:gsub(":", "")
+        local short = true
+        for g in tok:gmatch("%x+") do if #g > 4 then short = false end end
+        if colons >= 2 and short and tok:find("%x") and not tok:find(":::") then
+          local at = a1
+          while at <= a2 do
+            local _, ge = s:find("^%x+", at)
+            if ge and ge <= a2 then put(at, ge, "PlatoLogNumber"); at = ge + 1 else at = at + 1 end
+          end
+          i = a2 + 1; done = true
+        end
+      end
+    end
+    if not done and c:match("%d") and not isWord(prev) then
+      -- an IPv4 address: four numbers, the dots plain
+      local p1, p2 = s:find("^%d+%.%d+%.%d+%.%d+", i)
+      local octets = p1 ~= nil
+      if p1 then
+        for o in s:sub(p1, p2):gmatch("%d+") do if #o > 3 or tonumber(o) > 255 then octets = false end end
+      end
+      if octets and not isWord(s:sub(p2 + 1, p2 + 1)) then
+        local at = p1
+        while at <= p2 do
+          local _, ge = s:find("^%d+", at)
+          if ge then put(at, ge, "PlatoLogNumber"); at = ge + 2 else at = at + 1 end
+        end
+        i = p2 + 1; done = true
+      end
+    end
+    if not done and c:match("%d") and not isWord(prev) then
+      -- a number, with its decimal part (2.1.280 is 2.1, then 280)
+      local _, j = s:find("^%d+", i)
+      local f1, f2 = s:find("^%.%d+", j + 1)
+      if f1 and not isWord(s:sub(f2 + 1, f2 + 1)) then
+        put(i, f2, "PlatoLogNumber"); i = f2 + 1; done = true
+      elseif not isWord(s:sub(j + 1, j + 1)) then
+        put(i, j, "PlatoLogNumber"); i = j + 1; done = true
+      end
+    end
+    if not done and isWord(c) then
+      -- a word: key= takes the key's colour; otherwise skipped whole, so
+      -- its digits are never a number
+      local _, e = s:find("^[%w_]+", i)
+      if s:sub(e + 1, e + 1) == "=" then
+        put(i, e, "PlatoLogKey"); put(e + 1, e + 1, "PlatoLogSep"); i = e + 2
+      else
+        i = e + 1
+      end
+      done = true
+    end
+    if not done then i = i + 1 end
+  end
+  return runs
+end
+
+-- /etc/hosts, as bat's "Hosts File": the address, then its names, then a
+-- comment (nvim calls the file `conf` and colours the comment only)
+local function hostsRuns(s)
+  local runs = {}
+  local hash = s:find("#", 1, true)
+  local body = hash and s:sub(1, hash - 1) or s
+  local k = 0
+  for a, w, e in body:gmatch("()(%S+)()") do
+    runs[#runs + 1] = { a - 1, e - 1, k == 0 and "PlatoHostAddr" or "PlatoHostName" }
+    k = k + 1
+  end
+  if hash then runs[#runs + 1] = { hash - 1, -1, "Comment" } end
+  return runs
+end
+
+local function isLog(buf)
+  local ft = vim.bo[buf].filetype
+  if ft == "log" then return true end
+  if ft ~= "" and ft ~= "text" then return false end
+  local name = vim.api.nvim_buf_get_name(buf)
+  return name:match("%.log$") ~= nil or name:match("%.log%.%d+$") ~= nil
+    or name:match("^/var/log/") ~= nil
+end
+
+local function csv(t) return columns(t, ",") end
+local function tsv(t) return columns(t, "\t") end
+
+-- bat's line-local formats, and plato's for them; nil for any other
+function M.lineLocal(buf, text)
+  local ft = vim.bo[buf].filetype
+  local f
+  if ft == "csv" then f = csv
+  elseif ft == "tsv" then f = tsv
+  elseif isLog(buf) then f = logRuns
+  elseif vim.api.nvim_buf_get_name(buf) == "/etc/hosts" then f = hostsRuns
+  else return nil end
+  local c = lineCache[buf]
+  if not c or c[0] ~= f or (lineCount[buf] or 0) > 2000 then
+    c = { [0] = f }; lineCache[buf] = c; lineCount[buf] = 0
+  end
+  local hit = c[text]
+  if hit then return hit end
+  hit = f(text)
+  c[text] = hit
+  lineCount[buf] = lineCount[buf] + 1
+  return hit
+end
+
+-- the filetype for what nvim has none for (init.lua, before any file loads)
+function M.filetypes()
+  vim.filetype.add({
+    extension = { log = "log" },
+    pattern = { [".*%.log%.%d+"] = "log", ["/var/log/.*"] = "log" },
+  })
+end
 
 -- `chars` is the layout's list of { b0, b1, ... } for the part of the line
 -- that is on screen: only those characters are asked about.
 function M.syntax(buf, lnum, text, chars)
+  local own = M.lineLocal(buf, text)
+  if own then return own end
   if vim.bo[buf].syntax == "" then return nil end
   local c = synCache[buf]
   if not c or (synCount[buf] or 0) > SYN_MAX then

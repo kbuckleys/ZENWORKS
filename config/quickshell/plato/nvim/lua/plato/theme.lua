@@ -89,6 +89,20 @@ function M.apply()
   for i, c in ipairs({ p.blue, p.magenta, p.yellow, p.cyan, p.green, p.bright_red }) do
     set("PlatoRainbow" .. i, { fg = c })
   end
+  -- csv and tsv columns (hl.columns), bat's cycle under --theme=ansi
+  for i, c in ipairs({ p.cyan, p.cyan, p.yellow, p.magenta, p.green }) do
+    set("PlatoCol" .. i, { fg = c })
+  end
+  set("PlatoColQuoted", { fg = p.green })
+  set("PlatoColEscape", { fg = p.cyan })
+  -- logs (hl.lineLocal), bat's colours for them
+  set("PlatoLogNumber", { fg = p.yellow })
+  set("PlatoLogSep", { fg = p.magenta })
+  set("PlatoLogString", { fg = p.green })
+  set("PlatoLogKey", { fg = p.cyan })
+  -- /etc/hosts (hl.lineLocal)
+  set("PlatoHostAddr", { fg = p.yellow })
+  set("PlatoHostName", { fg = p.green })
   -- rendered markdown (markdown.lua); EditorRow's heading bands take the
   -- same colours, a level each
   for i, c in ipairs({ p.magenta, p.blue, p.cyan, p.green, p.yellow, p.bright_red }) do

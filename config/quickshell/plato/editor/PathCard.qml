@@ -19,6 +19,7 @@ Item {
 
   property string file: ""
   property string codeFamily: Zenon.faceFixed
+  property int codeWeight: Font.DemiBold
   property int pixelSize: 14
   property real maxW: 560
   property real maxH: 340
@@ -26,8 +27,20 @@ Item {
   property string hint: ""
 
   readonly property string kind: fp.kind
-  readonly property bool ready: card.file !== ""
-    && (fp.kind === "text" || fp.kind === "dir" || (fp.kind === "image" && fp.imageReady))
+  // ── A PILL ALWAYS ANSWERS ─────────────────────────────────────────
+  // A path the text draws as a pill promises a look at its file, so with
+  // `always` a path to nothing, an empty file, a binary or a picture that
+  // will not decode still brings up the card: the path, and "no preview"
+  // (user: "this must remain consistent", then the one plain wording).
+  property bool always: false
+  readonly property string note: {
+    if (!card.always || card.file === "" || fp.want !== fp._key) return "";
+    const none = fp.kind === "missing" || fp.kind === "empty" || fp.kind === "binary"
+      || (fp.kind === "image" && fp.imageFailed);
+    return none ? "no preview" : "";
+  }
+  readonly property bool ready: card.file !== "" && (card.note !== ""
+    || fp.kind === "text" || fp.kind === "dir" || (fp.kind === "image" && fp.imageReady))
   visible: card.ready
 
   readonly property int pad: 6
@@ -36,9 +49,11 @@ Item {
   // a picture at its own shape, as large as the room lets it be
   readonly property real fit: fp.kind !== "image" || fp.contentW <= 0 ? 1
     : Math.min(1, (card.maxW - card.pad * 2) / fp.contentW, card.roomH / fp.contentH)
-  readonly property real bodyW: fp.kind === "image" ? Math.round(fp.contentW * card.fit)
+  readonly property real bodyW: card.note !== "" ? Math.min(card.maxW - card.pad * 2, Math.max(220, caption.implicitWidth + 16))
+    : fp.kind === "image" ? Math.round(fp.contentW * card.fit)
     : Math.min(card.maxW - card.pad * 2, Math.max(220, fp.contentW))
-  readonly property real bodyH: fp.kind === "image" ? Math.round(fp.contentH * card.fit)
+  readonly property real bodyH: card.note !== "" ? 0
+    : fp.kind === "image" ? Math.round(fp.contentH * card.fit)
     : Math.min(card.roomH, fp.contentH)
   width: card.bodyW + card.pad * 2
   height: card.bodyH + card.captionH + card.pad * 2
@@ -65,6 +80,7 @@ Item {
       delay: 0
       wrap: true
       codeFamily: card.codeFamily
+      codeWeight: card.codeWeight
       pixelSize: card.pixelSize
     }
   }
@@ -77,10 +93,10 @@ Item {
     textFormat: Text.PlainText
     font.family: Zenon.face
     font.weight: Zenon.weight
-    font.pixelSize: 11
+    font.pixelSize: 13
     color: Zenon.muted
     readonly property string home: Quickshell.env("HOME")
     text: (card.file.startsWith(caption.home + "/") ? "~" + card.file.slice(caption.home.length) : card.file)
-      + (card.hint !== "" ? "  ·  " + card.hint : "")
+      + (card.note !== "" ? "  ·  " + card.note : card.hint !== "" ? "  ·  " + card.hint : "")
   }
 }

@@ -30,6 +30,8 @@ Item {
   property int from: 1
   property int hit: -1
   property string codeFamily: Zenon.faceFixed
+  // the editor's weight too: a preview reads as the file will in plato
+  property int codeWeight: Font.DemiBold
   property int pixelSize: 16
   // drawn centred when not empty: the host's word for what is (not) here
   property string message: ""
@@ -53,6 +55,7 @@ Item {
   readonly property real contentH: fp._kind === "image" ? pic.implicitHeight
     : fp._kind === "" ? 0 : textBox.contentHeight + 20
   readonly property bool imageReady: pic.status === Image.Ready
+  readonly property bool imageFailed: pic.status === Image.Error
 
   property string _key: ""
   property string _kind: ""
@@ -93,13 +96,22 @@ Item {
       fp.show(key, "image", "");
       return;
     }
-    // what it is first — a directory, a file, nothing — on a line of its own
+    // what it is first — a directory, a file, nothing — on a line of its own.
+    // A FILE IS A REGULAR ONE: a pipe or a device has no end, and a preview
+    // of ~/.steam/steam.pipe sat blocked on it for good (2026-10-09); they
+    // count as nothing here (and terminus.js previewCommand holds the same
+    // line for terminus' own pane)
     const p = "\"$1\"";
     proc.running = false;
     proc.forKey = key;
+    // each run says which it is on its first line: a run stopped for the
+    // next file still finishes its stream, and its cut-off output (of some
+    // other file) was once read as this one's — cached as "binary" on a
+    // cold start, when nvim is slow enough for the picker to move on
+    proc.run += 1;
     proc.command = ["sh", "-c",
-      "if [ -d " + p + " ]; then echo D; exec ls -1Ap --group-directories-first -- " + p + " 2>/dev/null | head -n 200; "
-      + "elif [ -e " + p + " ]; then echo F; " + Terminus.previewCommand(fp.file, fp.platoRender, fp.from, Zenon.nvimTheme()) + "; "
+      "echo " + proc.run + "; if [ -d " + p + " ]; then echo D; exec ls -1Ap --group-directories-first -- " + p + " 2>/dev/null | head -n 200; "
+      + "elif [ -f " + p + " ]; then echo F; " + Terminus.previewCommand(fp.file, fp.platoRender, fp.from, Zenon.nvimTheme()) + "; "
       + "else echo M; fi", "sh", fp.file];
     proc.running = true;
   }
@@ -122,19 +134,26 @@ Item {
   Process {
     id: proc
     property string forKey: ""
+    property int run: 0
     stdout: StdioCollector {
       id: out
       onStreamFinished: {
         const key = proc.forKey;
         if (key !== fp.want) return;
-        const t = String(out.text);
+        let t = String(out.text);
+        const nl = t.indexOf("\n");
+        if (nl < 0 || t.slice(0, nl) !== String(proc.run)) return;
+        t = t.slice(nl + 1);
         const cut = t.indexOf("\n");
         const what = cut < 0 ? t : t.slice(0, cut);
         const body = cut < 0 ? "" : t.slice(cut + 1);
         let kind, rich = "";
         if (what === "D") { rich = fp.listing(body); kind = rich === "" ? "empty" : "dir"; }
         else if (what === "F") {
-          kind = Terminus.looksBinary(body) ? "binary" : body.trim() === "" ? "empty" : "text";
+          // (an empty file through plato's renderer is still a colour reset,
+          // ESC[0m, and came out a blank card: escapes are not content)
+          kind = Terminus.looksBinary(body) ? "binary"
+            : body.replace(/\x1b\[[0-9;]*m/g, "").trim() === "" ? "empty" : "text";
           if (kind === "text") rich = Terminus.ansiToRich(body, fp.codeFamily);
         } else kind = "missing";
         const c = Object.assign({}, fp._cache);
@@ -206,6 +225,7 @@ Item {
     textFormat: TextEdit.RichText
     wrapMode: fp.wrap ? TextEdit.Wrap : TextEdit.NoWrap
     font.family: fp.codeFamily
+    font.weight: fp.codeWeight
     font.pixelSize: fp.pixelSize
     color: Zenon.white
     text: visible ? fp._rich : ""

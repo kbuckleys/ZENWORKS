@@ -77,3 +77,53 @@ function count(text) {
 function chars(t) {
   return String(t || "").match(/[\uD800-\uDBFF][\uDC00-\uDFFF]|[\s\S]/g) || [];
 }
+
+// ── paths in a row ────────────────────────────────────────────────────
+// The words of laid-out text, split where a path cannot go on, each with
+// the cells it covers: [{ w, a, b }], cells [a, b). EditorView's hover peek
+// and EditorRow's path pills read the same words, so what is lit is what
+// the pointer shows.
+const stop = /[\s"'`()<>\[\]{},;|=]/;
+function words(text) {
+  const out = [];
+  let cell = 0, w = "", a = 0;
+  for (const ch of chars(text)) {
+    if (stop.test(ch)) {
+      if (w !== "") out.push({ w: w, a: a, b: cell });
+      w = "";
+    } else {
+      if (w === "") a = cell;
+      w += ch;
+    }
+    cell += width(ch);
+  }
+  if (w !== "") out.push({ w: w, a: a, b: cell });
+  return out;
+}
+// a word as a path: what the peek looks up (`loose`: any slash or dot, a
+// bare "notes.md" too), or — not loose — what is plainly one, for the
+// pills: rooted (/, ~/, ./, ../, file://) or a slashed name ending in an
+// extension. Never a URL, never a comment's //. Trailing . : are prose,
+// and a trailing :line or :line:col (an error's, grep's) is a place in the
+// file, not its name.
+const tail = /(:\d+){0,2}[.:]*$/;
+function pathOf(word, loose) {
+  let p = String(word).replace(/^file:\/\//, "").replace(tail, "");
+  if (p.length < 2 || p.indexOf("://") >= 0 || /^\/+$/.test(p) || p.indexOf("//") >= 0) return "";
+  if (loose) return /[\/.]/.test(p) ? p : "";
+  if (/^(~|\.{1,2})?\/[\w.@+-]/.test(p) || p === "~") return p;
+  if (/^[\w.@+-]+(\/[\w.@+-]+)+\.[A-Za-z0-9]{1,8}$/.test(p)) return p;
+  return "";
+}
+// the plain paths of a row, as cell spans [{ a, b }] (the trailing prose
+// trimmed off the span too)
+function paths(text) {
+  const out = [];
+  for (const it of words(text)) {
+    const p = pathOf(it.w, false);
+    if (p === "") continue;
+    const cut = it.w.length - it.w.replace(tail, "").length;
+    out.push({ a: it.a, b: it.b - cut });
+  }
+  return out;
+}

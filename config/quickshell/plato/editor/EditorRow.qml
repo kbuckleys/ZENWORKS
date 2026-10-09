@@ -366,6 +366,27 @@ Item {
     }
   }
 
+  // ── paths, in a pill ───────────────────────────────────────────────
+  // what plainly reads as a path (Cells.paths: rooted, or a slashed name
+  // with an extension) sits on a chip — the shell's chip (metis', KeyCap):
+  // a soft fill, a one-pixel outline, rounded — the words the pointer can
+  // rest on for a look at the file
+  readonly property var pathSpans: row.info.t ? Cells.paths(row.info.t) : []
+  Repeater {
+    model: row.pathSpans
+    Rectangle {
+      required property var modelData
+      x: row.textX + modelData.a * row.cellW - 3
+      width: (modelData.b - modelData.a) * row.cellW + 6
+      y: 1
+      height: row.cellH - 2
+      radius: 5
+      color: Qt.rgba(Zenon.blue.r, Zenon.blue.g, Zenon.blue.b, 0.10)
+      border.width: 1
+      border.color: Qt.rgba(Zenon.blue.r, Zenon.blue.g, Zenon.blue.b, 0.40)
+    }
+  }
+
   // ── a diagnostic's pill, and a fold's ──────────────────────────────
   // The message at a line's end sits in a soft pill of its severity's
   // colour, half a cell of air either side; one the window's edge cut short
