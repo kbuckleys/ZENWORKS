@@ -152,7 +152,10 @@ PopupWindow {
     // Once the card is actually gone, and not before. Guarded on `open` as
     // well as on the shade so that a menu reopened mid-fade keeps the list
     // it was just given.
+    // heldRow too: the card keeps its rows through the fade, and a fade
+    // that fell back to the cursor's row would change them under you.
     onShadeChanged: if (!menu.open && menu.shade <= 0.01) {
+      if (term) term.heldRow = null;
       menu.customItems = null;
       menu.centered = false;
     }
@@ -168,7 +171,9 @@ PopupWindow {
     // arrowing through a directory (qmlprofiler, 2026-10-09). Opening sets
     // `open` before it reads anything, so the card is built once, for the
     // row it opens on, and follows the cursor while it is up or fading.
-    readonly property var target: menu.open || menu.shade > 0.01 ? term.currentRow() : null
+    // The right-clicked row while one is held (term.heldRow), else the cursor's.
+    readonly property var target: menu.open || menu.shade > 0.01
+      ? (term.heldRow || term.currentRow()) : null
     readonly property bool isImage:
       !!menu.target && !menu.target.isDir && Terminus.isImage(menu.target.name)
 
@@ -184,7 +189,9 @@ PopupWindow {
       menu.centered = false;
       menu.subAt = -1;
       menu.subSel = -1;
-      term.sideMenuAt = null;
+      // the row it is about, outlined while it is up (HeldRing, in
+      // EntryRow and Tile) — as a disk row is; cleared on close
+      term.sideMenuAt = item;
       menu.open = true;
       // after `open`, so `items` has been rebuilt for this target
       menu.at = menu.step(menu.items, -1, 1);
@@ -201,6 +208,7 @@ PopupWindow {
       menu.mx = p.x;
       menu.my = p.y;
       menu.here = true;
+      term.heldRow = null;
       // Said outright rather than left to the last close(), which may still
       // be fading and no longer clears these on the way out.
       menu.customItems = null;
@@ -510,8 +518,26 @@ PopupWindow {
     // on the rows themselves: close() empties the Repeater's model, an
     // emptied Repeater destroys its delegates, and modelData goes with them.
     function run(act) {
+      // A verb chosen about a held row acts THERE, and the cursor stays
+      // where it is (user, 2026-10-09): for this one call currentRow() and
+      // acting() answer with the held row (term.heldBox, see Listing).
+      const h = menu.customItems ? null : term.heldRow;
       menu.close();
-      if (act) act();
+      if (!act) return;
+      term.heldBox.row = h;
+      try { act(); } finally { term.heldBox.row = null; }
+    }
+
+    // Brings the cursor to a row by path — for Open on a held directory,
+    // which leaves for it (and, in the grid, comes back to activate later).
+    function cursorTo(path) {
+      const v = term.view;
+      for (let i = 0; i < v.length; ++i) {
+        if (v[i].path !== path) continue;
+        term.act.sel = i;
+        term.setAnchor(i);
+        return;
+      }
     }
 
     function activateAt() {
@@ -590,6 +616,7 @@ PopupWindow {
       const p = item.mapToItem(null, mouse.x, mouse.y);
       // a menu of someone else's replaces the disk's; diskMenu sets it after
       term.sideMenuAt = null;
+      term.heldRow = null;
       menu.here = false;
       menu.subAt = -1;
       menu.subSel = -1;
@@ -653,10 +680,18 @@ PopupWindow {
       if (!t) return [];
       // the cheap counter, so labels stay right without depending on the
       // whole selection array
-      const n = term.markedCount > 0 ? term.markedCount : 1;
+      // a held row outside the marks is acted on alone (Listing.acting)
+      const n = term.heldRow && !term.marked[term.heldRow.path] ? 1
+        : term.markedCount > 0 ? term.markedCount : 1;
       const many = n > 1 ? " (" + n + ")" : "";
       const out = [
-        { label: t.isDir ? "Open directory" : "Open", key: "return", act: () => term.activate() }
+        { label: t.isDir ? "Open directory" : "Open", key: "return", act: () => {
+          // a directory is gone INTO, and the grid re-enters activate after
+          // its hold, reading the cursor — so the cursor goes with it
+          const r = term.currentRow();
+          if (r && r.isDir && term.heldBox.row) menu.cursorTo(r.path);
+          term.activate();
+        } }
       ];
       // Directly under Open, because it is the other way to open this — and
       // only for a directory, which is the only thing with a listing to give
@@ -789,7 +824,13 @@ PopupWindow {
       // half of it. The key was bound for directories the whole time,
       // which made the omission a menu that disagreed with the keyboard.
       out.push({ label: "Quick look", key: "space",
-                 act: () => term.quickLook() });
+                 act: () => {
+                   // quick look walks the listing from the cursor, so the
+                   // cursor goes to the held row first
+                   const r = term.currentRow();
+                   if (r && term.heldBox.row) menu.cursorTo(r.path);
+                   term.quickLook();
+                 } });
       out.push({ label: "Sort by", key: ",", sub: menu.sortItems });
       // Renaming sits under the sort, not up among cut and copy: those act
       // on the row and hand you straight back to it, and this one opens a
@@ -1184,8 +1225,8 @@ PopupWindow {
                 script: {
                   const act = menuRow.pending;
                   menuRow.pending = null;
-                  menu.close();
-                  if (act) act();
+                  // through run(), which brings the cursor to a held row first
+                  menu.run(act);
                 }
               }
             }
@@ -1390,8 +1431,8 @@ PopupWindow {
                   script: {
                     const act = subRow.pending;
                     subRow.pending = null;
-                    menu.close();
-                    if (act) act();
+                    // through run(), which brings the cursor to a held row first
+                    menu.run(act);
                   }
                 }
               }

@@ -482,7 +482,9 @@ Rectangle {
     anchors.left: parent.left
     anchors.bottom: parent.bottom
     width: term.sidebarWidth - 1
-    height: 41
+    // while picking, the portal bar's height, so the two seams run as one
+    // line across the window (user, 2026-10-09)
+    height: term.picking ? term.chromeRef.portalBar.height : 41
     opacity: sideFlick.opacity
     color: term.sidebarBg   // the body, as the sidebar is
     Rectangle { width: parent.width; height: 1; color: Zenon.border }
@@ -496,7 +498,7 @@ Rectangle {
     }
     SideRow { term: side.term
       id: trashRow
-      y: 5
+      y: Math.round((sideFoot.height - height) / 2)
       width: parent.width
       slot: -1
       label: "Trash"

@@ -110,8 +110,13 @@ Item {
       term.act.sel = i;
       term.setAnchor(i);   // sel may not have changed, so onSelChanged may not fire
     }
+    // A plain right click leaves the cursor be: it holds the row for the
+    // menu instead (term.heldRow, HeldRing). Marks are kept, as before.
+    else if (right) {
+      term.heldRow = term.view[i] || null;
+    }
     else {
-      if (!right) term.act.marked = {};
+      term.act.marked = {};
       term.act.sel = i;
       term.setAnchor(i);
       const r = term.view[i];

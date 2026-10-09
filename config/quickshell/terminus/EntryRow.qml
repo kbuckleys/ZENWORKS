@@ -417,6 +417,13 @@ Item {
     }
   }
 
+  // The row a menu is open about (HeldRing.qml), as a disk row is.
+  HeldRing {
+    anchors.fill: parent
+    z: 5
+    on: !!host && host.sideMenuAt === entryRow
+  }
+
   // Lit while a drag is over this directory, so a drop says where it is
   // going before you let go of it.
   Rectangle {

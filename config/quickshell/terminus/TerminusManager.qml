@@ -967,6 +967,16 @@ Scope {
           const clean = suggested.replace(/_+$/, "");
           if (clean !== suggested && /[^.]\.[^./]+$/.test(clean))
             suggested = clean;
+          // ── NOR IS THE BROWSER'S " (1)" ──────────────────────────────
+          // Firefox and Chromium number a name themselves when it is taken
+          // in THEIR idea of the directory ("clip (1).jpg", portal.log
+          // 2026-10-09), which hid the clash from the dialog — and the dialog
+          // opens somewhere else anyway (lastSaveDir). So the plain name is
+          // offered: a clash shows (saveClash) and numbering it is one click
+          // on the field's own button (saveNumbered in the window).
+          const plain = suggested.replace(/ ?\(\d+\)(?=\.[^./ ]+$|$)/, "");
+          if (plain !== suggested && plain !== "" && !plain.startsWith("."))
+            suggested = plain;
         }
 
         let w = mgr.picker();

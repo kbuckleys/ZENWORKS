@@ -2503,8 +2503,14 @@ Column {
             // Only for text, where this column is a footer under the
             // document rather than a caption under a picture — a picture
             // already has the rule that media draws above these rows.
+            // Edge to edge of the pane, not of the rows: the rows are inset
+            // to read as text, but a rule inset with them read as a stray
+            // underline rather than the seam between document and footer.
+            // A Column places only y, so x is free to step out of it.
             Rectangle {
-              width: parent.width
+              x: -facts.anchors.leftMargin
+              width: parent.width + facts.anchors.leftMargin
+                + facts.anchors.rightMargin
               height: 1
               color: Zenon.border
               visible: facts.atFoot
@@ -2928,10 +2934,11 @@ Column {
     PaneGrid { term: chrome.term; id: gridA; pane: term.paneLRef }
     PaneGrid { term: chrome.term; id: gridB; pane: term.paneRRef }
 
-    // a soft shade from the bar onto whichever list or grid is scrolled
-    // (TopShade.qml; the columns carry their own, see MillerColumn)
+    // a soft shade from the bar onto whichever grid is scrolled
+    // (TopShade.qml). Not on the lists or the columns (user, 2026-10-09):
+    // over the frosted bar it read as a drop shadow under a row strip.
     Repeater {
-      model: [listA, listB, gridA, gridB]
+      model: [gridA, gridB]
       delegate: TopShade {
         required property var modelData
         view: modelData
@@ -3616,7 +3623,8 @@ Column {
   Rectangle {
     id: portalBar
     width: parent.width
-    height: term.picking ? 60 : 0
+    // 46, down from 60 (user, 2026-10-09): a strip, not a panel
+    height: term.picking ? 46 : 0
     visible: height > 0
     clip: true
     // FROSTED AND DARKER, no gradient (the user's call — the cyan washed up
@@ -3651,22 +3659,15 @@ Column {
       anchors.verticalCenter: parent.verticalCenter
       spacing: 12
 
-      Rectangle {
+      // the bare mark: the tinted, ringed square it sat in was a halo the
+      // strip did not need (user, 2026-10-09)
+      Text {
         anchors.verticalCenter: parent.verticalCenter
-        width: 34
-        height: 34
-        radius: 8
-        color: Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b, 0.14)
-        border.width: 1
-        border.color: Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b, 0.35)
-        Text {
-          anchors.centerIn: parent
-          text: portalBar.mark
-          color: Zenon.cyan
-          font.family: Zenon.face
-          font.weight: Zenon.weight
-          font.pixelSize: Zenon.px(16)
-        }
+        text: portalBar.mark
+        color: Zenon.cyan
+        font.family: Zenon.face
+        font.weight: Zenon.weight
+        font.pixelSize: Zenon.px(16)
       }
 
       Column {
@@ -3690,10 +3691,13 @@ Column {
       anchors.right: portalButtons.left
       anchors.rightMargin: 14
       anchors.verticalCenter: parent.verticalCenter
-      height: 34
+      height: 30
       radius: 8
       visible: !!term.portal && term.portal.save
-      color: Zenon.selBg
+      // A CLASH LIGHTS THE FIELD — its ring and a wash of the same yellow
+      // the button turns — so "this name is taken" is said where the name is.
+      color: term.saveClash ? Zenon.alpha(Zenon.yellow, 0.10) : Zenon.selBg
+      Behavior on color { ColorAnimation { duration: Zenon.fast } }
       border.width: 1
       border.color: Terminus.nameError(saveField.text) === ""
         ? (term.saveClash ? Zenon.yellow : Zenon.border) : Zenon.red
@@ -3753,6 +3757,47 @@ Column {
         }
       }
 
+      // ── AND A WAY OUT OF IT ─────────────────────────────────────
+      // A small chip inside the field while the name is taken: the first
+      // free " (n)" before the extension (term.saveNumbered). Replacing
+      // stays the button's; keeping both is this.
+      Rectangle {
+        id: saveNumber
+        anchors.right: saveWhere.left
+        anchors.rightMargin: 6
+        anchors.verticalCenter: parent.verticalCenter
+        height: 22
+        width: term.saveClash ? saveNumberText.implicitWidth + 14 : 0
+        visible: width > 0.5
+        radius: 5
+        clip: true
+        color: Zenon.alpha(Zenon.yellow, saveNumberMa.pressed ? 0.34
+          : saveNumberMa.containsMouse ? 0.24 : 0.14)
+        Behavior on width { NumberAnimation { duration: Zenon.fast; easing.type: Zenon.ease } }
+        Text {
+          id: saveNumberText
+          anchors.centerIn: parent
+          // the number it would add, read off the name it would make
+          text: {
+            if (!term.saveClash) return "";
+            const m = /\((\d+)\)(\.[^.]*)?$/.exec(
+              Terminus.freeNameKeeping(term.saveRows(), saveField.text));
+            return "+ (" + (m ? m[1] : "1") + ")";
+          }
+          color: Zenon.yellow
+          font.family: Zenon.face
+          font.weight: Font.Bold
+          font.pixelSize: Zenon.px(12)
+        }
+        MouseArea {
+          id: saveNumberMa
+          anchors.fill: parent
+          hoverEnabled: true
+          cursorShape: Qt.PointingHandCursor
+          onClicked: term.saveNumbered()
+        }
+      }
+
       TextInput {
         id: saveField
 
@@ -3760,6 +3805,7 @@ Column {
         anchors.fill: parent
         anchors.leftMargin: saveGlyph.implicitWidth + 20
         anchors.rightMargin: saveWhere.width + 14
+          + (saveNumber.visible ? saveNumber.width + 6 : 0)
         verticalAlignment: TextInput.AlignVCenter
         color: Zenon.white
         selectionColor: Zenon.cyan

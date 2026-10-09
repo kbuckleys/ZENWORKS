@@ -639,6 +639,15 @@ Item {
     }
   }
 
+  // The tile a menu is open about (HeldRing.qml), as a disk row is.
+  HeldRing {
+    anchors.fill: parent
+    anchors.margins: 4
+    z: 5
+    radius: 6
+    on: !!tile.term && tile.term.sideMenuAt === tile
+  }
+
   // Lit while a drag is over this directory — the grid's answer to the same
   // question the list row answers with its own outline.
   Rectangle {

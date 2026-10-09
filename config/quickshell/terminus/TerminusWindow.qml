@@ -99,6 +99,8 @@ FloatingWindow {
   // the cursor is scrolled into view first and the placing waits a tick — the
   // same shape as positionSel's other callers.
   function openMenuAtCursor() {
+    // the keyboard's menu is about the cursor, never a row still held
+    root.heldRow = null;
     // An empty directory has no row to ask about, so ask about the directory
     // instead: the row branch of the menu returns nothing without a target,
     // and an empty card is worse than the one that has something in it.
@@ -1875,6 +1877,18 @@ FloatingWindow {
   // a right-clicked disk is plain to see without the bar leaving where you
   // are. Set by diskMenu, cleared by the menu itself as it closes.
   property var sideMenuAt: null
+  // THE ROW A RIGHT CLICK ASKED ABOUT, in the listing. A right click is an
+  // alt mode (user, 2026-10-09): the cursor stays where it was, the row is
+  // outlined (HeldRing), and the menu is about it. Only a verb CHOSEN from
+  // the menu brings the cursor over, since the verbs act on the cursor —
+  // see RowMenu.run. Cleared as the menu closes.
+  property var heldRow: null
+  // The held row as the VERBS see it, only for the length of one chosen
+  // verb (RowMenu.run): currentRow() and acting() answer with it, so the
+  // verb acts there and the cursor never moves (user, 2026-10-09). A field
+  // on a plain object, not a property, so setting and clearing it notifies
+  // nothing — the preview and the bar never hear of it.
+  readonly property var heldBox: ({ row: null })
 
   property int markDragFrom: -1
   property int markDragTo: -1
@@ -2094,11 +2108,28 @@ FloatingWindow {
     const target = Terminus.joinPath(root.saveDir, n);
     // the application's own placeholder is not a file you would be replacing
     if (target === root.portalGhost) return false;
-    const rows = root.saveDir === root.cwd
-      ? root.rows : (root.act.kids["k:" + root.saveDir] || []);
+    const rows = root.saveRows();
     for (let i = 0; i < rows.length; ++i)
       if (rows[i].path === target) return true;
     return false;
+  }
+
+  // What is already where the save would land, less the application's own
+  // placeholder (see portalGhost), which is not a name anybody is using.
+  function saveRows() {
+    const rows = root.saveDir === root.cwd
+      ? root.rows : (root.act.kids["k:" + root.saveDir] || []);
+    return rows.filter((r) => r.path !== root.portalGhost);
+  }
+
+  // The clash's way out, short of replacing: the field's name with the first
+  // free " (n)" before its extension — the shape Keep both writes on a paste.
+  // The small button inside the name field while saveClash holds.
+  function saveNumbered() {
+    const f = chrome.saveField;
+    f.text = Terminus.freeNameKeeping(root.saveRows(), f.text);
+    f.forceActiveFocus();
+    f.cursorPosition = f.text.length;
   }
 
   readonly property string portalTitle: {

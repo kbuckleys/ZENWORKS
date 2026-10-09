@@ -141,7 +141,10 @@ Item {
     // rename ever moves.
     term.pushUndo({ kind: "rename", from: from, to: to });
     // land on it under its new name rather than wherever the old one sorted
-    term.wantSel = to;
+    // — when it was the cursor's. Renamed from a held row's menu, the
+    // cursor stays on its own file, wherever the new name sorts it.
+    const cur = term.currentRow();
+    term.wantSel = !cur || cur.path === from ? to : cur.path;
   }
   // wl-copy, the same way folio puts a clip back on the clipboard
   function copyPath() {

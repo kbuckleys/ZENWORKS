@@ -279,18 +279,12 @@ Item {
   // Outlined while its menu is open, so which disk the menu is about is
   // seen at a glance. Not the cursor: the bar stays where you are, and a
   // right click is a question about a row, not a step onto it.
-  property real held: term.sideMenuAt === sideRow ? 1 : 0
-  Behavior on held { NumberAnimation { duration: Zenon.fast; easing.type: Easing.OutCubic } }
-  Rectangle {
+  // The shared HeldRing.qml, which every menu in the suite now wears.
+  HeldRing {
     anchors.fill: parent
     anchors.leftMargin: 4
     anchors.rightMargin: 4
-    visible: sideRow.held > 0.01 && sideRow.swell <= 0.01
-    opacity: sideRow.held
-    color: Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b, 0.08)
-    border.width: 1
-    border.color: Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b, 0.6)
-    radius: 4
+    on: term.sideMenuAt === sideRow && sideRow.swell <= 0.01
   }
 
   // ── WHERE IT WOULD LAND ─────────────────────────────────────────────

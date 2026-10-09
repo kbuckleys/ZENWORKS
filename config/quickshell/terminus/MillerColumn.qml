@@ -188,8 +188,8 @@ Item {
 
   ListModel { id: colModel }
 
-  // the bar's shade on this column once it is scrolled (TopShade.qml)
-  TopShade { view: colView; width: col.width }
+  // No TopShade here (user, 2026-10-09): under the frosted bar it read as
+  // a drop shadow. The grid keeps its own.
 
   // The listing's bar, in the columns too. `current` here is not one number
   // — the leftmost column marks where you came FROM and the live one marks

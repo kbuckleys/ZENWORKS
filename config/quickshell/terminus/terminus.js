@@ -986,11 +986,15 @@ function isImage(name) {
 // null for Zenon. A preview is its own nvim, so it hears about the theme
 // here or not at all (Buck caught terminus' pane still in Zenon's syntax).
 function previewCommand(path, platoRender, from, theme) {
-  if (!platoRender) return batCommand(path, from);
   const p = Strings.shellQuote(path);
+  if (!platoRender) return "[ -f " + p + " ] && " + batCommand(path, from);
   const r = Strings.shellQuote(platoRender);
   const at = Math.max(1, Math.floor(Number(from) || 1));
-  return "if [ -f " + r + " ] && [ \"$(stat -c %s -- " + p + " 2>/dev/null || echo 0)\" -lt 4000000 ]; then "
+  // ONLY A REGULAR FILE: a pipe or a device never ends, and an nvim left
+  // to preview ~/.steam/steam.pipe sat blocked in open() for twelve hours,
+  // deaf to SIGTERM (2026-10-09). Anything else previews as nothing.
+  return "if [ ! -f " + p + " ]; then :; "
+    + "elif [ -f " + r + " ] && [ \"$(stat -c %s -- " + p + " 2>/dev/null || echo 0)\" -lt 4000000 ]; then "
     + (at > 1 ? "PLATO_RENDER_FROM=" + at + " " : "")
     + (theme ? "PLATO_THEME=" + Strings.shellQuote(JSON.stringify(theme)) + " " : "")
     + "NVIM_APPNAME=quickshell/plato/nvim exec nvim --headless -i NONE -n --clean"

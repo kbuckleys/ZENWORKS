@@ -202,6 +202,10 @@ Item {
   // nothing is. The same rule zeus' kill list uses, and the reason you can
   // rename a file without marking it first.
   function acting() {
+    // a verb chosen from a held row's menu (RowMenu.run): that row, or the
+    // marks if it is one of them
+    const h = term.heldBox.row;
+    if (h) return term.marked[h.path] ? term.markedRows() : [h];
     const m = term.markedRows();
     if (m.length > 0) return m;
     const r = term.view[term.sel];
@@ -218,7 +222,7 @@ Item {
   //
   // That is the list that flashes in the last column. Reading the pane
   // directly cannot be a frame behind it.
-  function currentRow() { return term.act.view[term.act.sel] || null; }
+  function currentRow() { return term.heldBox.row || term.act.view[term.act.sel] || null; }
   // The colour and the glyph are worked out ONCE PER LISTING and stored on the
   // row, not asked for every time a delegate is drawn.
   //
