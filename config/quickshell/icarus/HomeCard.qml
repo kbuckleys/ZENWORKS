@@ -22,6 +22,9 @@ import Quickshell.Widgets
 import Quickshell.Io
 import "../morpheus"
 import "../oracle"
+// qualified: only HeldRing is wanted, and an unqualified import would let
+// terminus' file names shadow this directory's own
+import "../terminus" as Term
 import "icarus.js" as Icarus
 import "../morpheus/icons.js" as Icons
 
@@ -545,8 +548,9 @@ PanelWindow {
                 readonly property bool pickable: card.selectable(entry.index)
                 readonly property bool lit: entry.pickable
                   && ((card.owner.selLevel === card.level && card.owner.selIndex === entry.index)
-                      || card.openIndex === entry.index
-                      || card.owner.isCtxRow(card.level, entry.index))
+                      || card.openIndex === entry.index)
+                // the right-clicked entry is NOT lit: it wears the HeldRing
+                // below and nothing else (user, 2026-10-09)
                 readonly property bool branch: card.isBranch(entry.index)
 
                 function fire(act) { entryFlash.fire(act); }
@@ -674,6 +678,12 @@ PanelWindow {
                 }
 
                 ChosenFlash { id: entryFlash }
+
+                // the entry a menu is open about, outlined (HeldRing.qml)
+                Term.HeldRing {
+                  anchors.fill: parent
+                  on: !entry.isSep && card.owner.isCtxRow(card.level, entry.index)
+                }
 
                 MouseArea {
                   id: hover

@@ -1216,7 +1216,9 @@ Scope {
                 width: parent.width
                 visible: NowPlaying.album !== ""
                 text: NowPlaying.album
-                color: Zenon.muted
+                // Muted read too faint over a light lock (user, 2026-10-09):
+                // there it is a step past the artist's ink, not the full grey.
+                color: Zenon.light ? Zenon.mix(Zenon.ink, Zenon.muted, 0.6) : Zenon.muted
                 font.family: root.fontFamily
                 font.pixelSize: Zenon.px(14)
                 elide: Text.ElideRight

@@ -548,6 +548,16 @@ Variants {
             Behavior on ink { ColorAnimation { duration: Zenon.fast } }
           }
 
+          // The note a menu is open about (terminus/HeldRing.qml), as
+          // everywhere a right click asks something. A step out from the
+          // card and hollow: the note's own wash is its colour.
+          HeldRing {
+            anchors.fill: parent
+            anchors.margins: -4
+            radius: card.radius + 4
+            on: board.menuSlot === slot
+          }
+
           ClippingRectangle {
             id: card
             anchors.fill: parent
