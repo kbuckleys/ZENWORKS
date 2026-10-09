@@ -26,8 +26,12 @@ module.exports = {
   module: "terminus/terminus.js",
   cases: (T, t) => {
     // ── previews in plato's colours ───────────────────────────────────────
-    t.eq("no plato renderer: bat, as before",
-      T.previewCommand("/x/a.js", ""), T.batCommand("/x/a.js"));
+    t.eq("no plato renderer: bat, as before, for a regular file only",
+      T.previewCommand("/x/a.js", ""), "[ -f '/x/a.js' ] && " + T.batCommand("/x/a.js"));
+    // a pipe never ends: an nvim previewing ~/.steam/steam.pipe sat blocked
+    // in open() for twelve hours (2026-10-09)
+    t.eq("with a renderer, anything but a regular file previews as nothing",
+      T.previewCommand("/x/a.js", "/q/r.lua").startsWith("if [ ! -f '/x/a.js' ]; then :; elif "), true);
     const platoPc = T.previewCommand("/x/a.js", "/q/plato/nvim/render.lua");
     t.eq("with one: plato's renderer, through plato's own nvim",
       /NVIM_APPNAME=quickshell\/plato\/nvim exec nvim --headless -i NONE -n --clean/.test(platoPc), true);

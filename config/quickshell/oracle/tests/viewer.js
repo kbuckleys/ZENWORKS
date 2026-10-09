@@ -41,6 +41,12 @@ module.exports = {
 
     t.eq("a square out of a wide picture", V.centredCrop(400, 200, 1), { x: 100, y: 0, w: 200, h: 200 });
     t.eq("free is the whole", V.centredCrop(400, 200, 0), { x: 0, y: 0, w: 400, h: 200 });
+    t.eq("letterbox trimmed", V.parseTrim("462 232 400x200+31+16", 460, 230), { x: 30, y: 15, w: 400, h: 200 });
+    t.eq("trim scaled to a stand-in", V.parseTrim("462 232 400x200+31+16", 230, 115), { x: 15, y: 8, w: 200, h: 100 });
+    t.eq("no border, nothing to trim", V.parseTrim("102 102 100x100+1+1", 100, 100), { none: true });
+    t.eq("all black is no picture", V.parseTrim("102 102 0x0+102+102", 100, 100), null);
+    t.eq("garbage", V.parseTrim("", 100, 100), null);
+    t.eq("trim turns as the stage", V.trimCommand(90, true).indexOf("-flop -rotate 90 -bordercolor") > 0, true);
     t.eq("dragging the right side drags the height, from the middle",
       V.fitAspect({ x: 0, y: 50, w: 200, h: 100 }, "r", 1, 1000, 1000), { x: 0, y: 0, w: 200, h: 200 });
     // bottom-right held at (400, 200); the square it wants would pass the top

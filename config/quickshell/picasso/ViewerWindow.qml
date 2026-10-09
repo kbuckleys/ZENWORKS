@@ -30,7 +30,7 @@
 //   + - 0 1 2   zoom in, out, fit, actual size, double     a double click too
 //   return   actual size, or back to the fit when it is there
 //   z lock the zoom — the next picture opens at the same size and place
-//   g gallery   e edit   c crop   r R turn   m mirror   a annotate
+//   g gallery   e edit   c crop   C trim black borders   r R turn   m mirror   a annotate
 //   \ held: the picture without its edit
 //   v compare — beside the next picture, or the two marked; shift+← →
 //     walks the other half, tab swaps them
@@ -2371,7 +2371,7 @@ FloatingWindow {
       else if (k === Qt.Key_Z) win.zoomLock = !win.zoomLock;
       else if (k === Qt.Key_G) win.mode = "gallery";
       else if (k === Qt.Key_E) { if (win.stillOnly()) win.panelShown = !win.panelShown; }
-      else if (k === Qt.Key_C) win.cropTool();
+      else if (k === Qt.Key_C) { if (shift) win.trimBorders(); else win.cropTool(); }
       else if (k === Qt.Key_R) { win.panelShown = true; win.turn(shift ? -90 : 90); }
       else if (k === Qt.Key_M) {
         if (win.isVid) { win.muted = !win.muted; win.say(win.muted ? "muted" : "sound on"); }
@@ -3818,6 +3818,17 @@ FloatingWindow {
         }
         TileRise { id: rise }
 
+        // the tile a menu is open about — terminus' HeldRing, as its grid
+        // wears it (marked: the clicked one, which the menu is anchored to)
+        HeldRing {
+          anchors.fill: parent
+          anchors.margins: 4
+          z: 5
+          radius: 6
+          on: menu.open && !cell.fill && menu.subject === cell.modelData.path
+            && (menu.kind === "cell" || menu.kind === "directory" || menu.kind === "marked")
+        }
+
         // from where this path's tile was before the reorder — see tilePos
         // (terminus/Glide, as terminus' views glide)
         Glide { id: glide; limit: grid.height }
@@ -4811,6 +4822,12 @@ FloatingWindow {
               }
             }
           }
+          Seg {
+            width: parent.width
+            height: 30
+            label: "\uf065  Trim black borders"
+            onHit: win.trimBorders()
+          }
           Slide {
             width: parent.width
             label: "Straighten"
@@ -5211,7 +5228,9 @@ FloatingWindow {
     if (!it || it.isFill) { win.showMenu(at, "gallery", ""); return; }
     if (it.isDir) { win.showMenu(at, "directory", it.path); return; }
     if (win.markCount > 1 && win.marks[it.path]) { win.showMenu(at, "marked", it.path); return; }
-    win.gallerySel(i);
+    // The cursor stays where it was (user, 2026-10-09): the tile is held —
+    // HeldRing — and the verbs act on its path (menu.pick).
+    menu.heldAt = i;
     win.showMenu(at, "cell", it.path);
   }
 
@@ -5269,6 +5288,29 @@ FloatingWindow {
     win.startCrop(win.crop ? win.cropRatio : "free");
   }
 
+  // The black strips round it — a letterbox, a scan's edge — found by
+  // ImageMagick (viewer.js trimCommand) and set up as a free crop, in the
+  // crop tool, to be nudged and saved like any other; nothing is written.
+  function trimBorders() {
+    if (!win.stillOnly() || !win.loaded) return;
+    const file = win.fallback !== "" ? win.fallback : win.path;
+    const at = win.path, w = win.tw, h = win.th;
+    win.capture(["sh", "-c", V.trimCommand(win.look.rotate, win.look.mirror) + " 2>/dev/null", "sh", file], (out) => {
+      if (win.path !== at) return;
+      const r = V.parseTrim(out, w, h);
+      if (!r) { win.say("could not find the picture's edges"); return; }
+      if (r.none) { win.say("no black borders to trim"); return; }
+      win.panelShown = true;
+      win.cropRatio = "free";
+      win.cropStaged = true;
+      win.crop = r;
+      win.cropping = true;
+      win.fitted = true;
+      win.refit(true);
+      win.say("black borders trimmed  \u00b7  " + r.w + " \u00d7 " + r.h + "  \u00b7  ctrl+s saves");
+    });
+  }
+
   // The rows of each card. A branch carries its rows as `children`, and
   // CardPopup opens them beside it on hover — see its BRANCHES.
   function menuRows(kind, p) {
@@ -5320,6 +5362,7 @@ FloatingWindow {
         { text: "Edit", icon: "\uf1de", act: "edit", hint: "e" }
       ].concat(editIn).concat([
         { text: "Crop…", icon: "\uf125", act: "crop", hint: "c" },
+        { text: "Trim black borders", icon: "\uf065", act: "trim", hint: "C" },
         { text: "Turn right", icon: "\uf01e", act: "turn", hint: "r" },
         { text: "Set as background", icon: "\uf108", act: "background", hint: "w" },
         sep
@@ -5552,6 +5595,7 @@ FloatingWindow {
     case "edit": win.panelShown = true; break;
     case "editIn": win.editIn(); break;
     case "crop": win.cropTool(); break;
+    case "trim": win.trimBorders(); break;
     case "turn": win.panelShown = true; win.turn(90); break;
     case "star": win.toggleStar(p); break;
     case "tags": win.editTags(p); break;
@@ -5629,6 +5673,8 @@ FloatingWindow {
     property var pixel: null
     // rows a card hands up as they are (PropsCard's open-with list)
     property var custom: []
+    // the gallery tile a "cell" menu is about, while the cursor is elsewhere
+    property int heldAt: -1
     fit: true
     model: win.menuRows(menu.kind, menu.subject)
     onChosen: (i) => menu.pick(menu.model[i])
@@ -5636,6 +5682,13 @@ FloatingWindow {
     function pick(row) {
       if (!row || row.isSeparator || row.enabled === false) return;
       menu.open = false;
+      // A verb about a held tile acts on menu.subject and the cursor stays
+      // (user, 2026-10-09) — except Open, which opens the cursor's tile
+      // (galleryOpen(gidx)) and leaves the gallery anyway.
+      if (row.act === "open" && menu.kind === "cell" && menu.heldAt >= 0
+          && (win.galleryItems[menu.heldAt] || {}).path === menu.subject)
+        win.gallerySel(menu.heldAt);
+      menu.heldAt = -1;
       win.act(row, menu.subject);
     }
   }

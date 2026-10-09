@@ -1041,6 +1041,35 @@ try:
     frost_case("split", plain, ["gg", "<C-w>s", "10<C-e>", "<C-w>j", "G", "<C-w>k", "gg"])
     b13.send("quit"); b13.proc.wait(timeout=5)
 
+    # ── bat's formats, coloured as bat colours them (hl.lineLocal) ───────
+    # csv/tsv columns in bat's cycle of five, a log's dates/numbers/keys —
+    # and a tsv too big for syntax (large.lua) still gets its columns
+    b14 = Bridge(tmp, "formats")
+    b14.send("resize", rows=10, cols=120)
+    def inks(path):
+        b14.send("cmd", cmd="silent! %bwipeout!"); b14.settle()
+        b14.send("open", path=path); b14.settle(0.4)
+        r = b14.rows[0] or {}
+        return [(sp[0], (b14.styles.get(sp[2]) or {}).get("fg")) for sp in r.get("s") or []]
+    YEL, CYA, MAG, GRN = "#fab387", "#9bbfbf", "#c8a4e0", "#b6e0a4"
+    big = os.path.join(tmp, "big.tsv")
+    with open(big, "w") as fh:
+        row = "alpha\tbeta\tgamma\tdelta\tepsilon\tzeta\n"
+        fh.write(row * (6 * 1024 * 1024 // len(row) + 1))
+    got = [ink for _, ink in inks(big)]
+    check("large tsv: bat's column cycle", got[:6] == [CYA, CYA, YEL, MAG, GRN, CYA], got)
+    csvp = os.path.join(tmp, "q.csv")
+    with open(csvp, "w") as fh: fh.write('"a ""b"" c",2\n')
+    got = [ink for _, ink in inks(csvp)]
+    check("csv: quoted field green, its \"\" cyan", got[:3] == [GRN, CYA, GRN], got)
+    logp = os.path.join(tmp, "app.log")
+    with open(logp, "w") as fh: fh.write("2026-10-09T10:11:12 [info] id=42 v1.2 'q'\n")
+    got = inks(logp)
+    # (the brackets of [info] are the editor's rainbow, over the log's own)
+    want = [(0, YEL), (10, MAG), (11, YEL), (27, CYA), (29, MAG), (30, YEL), (36, YEL), (38, GRN)]
+    check("log: dates, T, keys, numbers, strings", [g for g in got if g[0] not in (20, 25)] == want, got)
+    b14.send("quit"); b14.proc.wait(timeout=5)
+
     # an engine that cannot listen (a socket it may not make) goes at once,
     # rather than idling forever where no window can reach it
     longsock = "/proc/plato-test/no.sock"
@@ -1063,7 +1092,7 @@ try:
     check("two untitled buffers rescued side by side", after - before == 2, (before, after))
 
 finally:
-    for p in ("b", "b2", "b3", "b4", "b5", "b6", "b7", "b8", "b9", "b10", "b11", "b12", "b13"):
+    for p in ("b", "b2", "b3", "b4", "b5", "b6", "b7", "b8", "b9", "b10", "b11", "b12", "b13", "b14"):
         br = globals().get(p)
         if br and br.proc.poll() is None: br.proc.kill()
     shutil.rmtree(tmp, ignore_errors=True)

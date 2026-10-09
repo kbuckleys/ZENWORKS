@@ -202,6 +202,40 @@ function ratioName(w, h) {
   return Math.round(w) / g + ":" + Math.round(h) / g;
 }
 
+// ── black borders ─────────────────────────────────────────────────────────
+// The strips a film frame, a screenshot of a video or a scan carries round
+// the picture. ImageMagick's trim keys on the corner colour, so the picture
+// is first given a one-pixel black border of its own: then only black (to
+// within `fuzz`) is trimmed, never a white sky. It is turned and mirrored
+// the way the stage is — mirror first, then turn, as Scene does — so the
+// box comes back in the SAVED picture's pixels, where the crop lives.
+// Prints "W H WxH+X+Y" of the bordered picture; see parseTrim.
+function trimCommand(rotate, mirror, fuzz) {
+  return 'magick -- "$1[0]" -auto-orient' + (mirror ? " -flop" : "")
+    + (rotate ? " -rotate " + rotate : "")
+    + " -bordercolor black -border 1 -fuzz " + (fuzz || 8) + '% -format "%w %h %@" info:';
+}
+
+// trimCommand's line -> the crop { x, y, w, h } in a `w`×`h` picture (what
+// the stage shows, which can be a smaller stand-in than the file), or
+// { none: true } when there is nothing to trim, or null when it is all black
+// or could not be read.
+function parseTrim(text, w, h) {
+  const m = /^(\d+) (\d+) (\d+)x(\d+)\+(-?\d+)\+(-?\d+)/.exec(String(text || "").trim());
+  if (!m || !(w > 0) || !(h > 0)) return null;
+  const bw = +m[1] - 2, bh = +m[2] - 2;
+  if (!(bw > 0) || !(bh > 0) || +m[3] === 0 || +m[4] === 0) return null;
+  const kx = w / bw, ky = h / bh;
+  const x0 = Math.max(0, +m[5] - 1), y0 = Math.max(0, +m[6] - 1);
+  const x1 = Math.min(bw, +m[5] - 1 + +m[3]), y1 = Math.min(bh, +m[6] - 1 + +m[4]);
+  if (x1 - x0 < 4 || y1 - y0 < 4) return null;
+  const r = { x: Math.round(x0 * kx), y: Math.round(y0 * ky),
+              w: Math.round((x1 - x0) * kx), h: Math.round((y1 - y0) * ky) };
+  // a pixel or two is JPEG fringe, not a border
+  if (r.x <= 1 && r.y <= 1 && r.w >= w - 2 && r.h >= h - 2) return { none: true };
+  return r;
+}
+
 // ── straightening ─────────────────────────────────────────────────────────
 // A fine turn of a few degrees, which a horizon wants and a quarter turn
 // cannot give. The picture is turned about its middle and grown just enough
