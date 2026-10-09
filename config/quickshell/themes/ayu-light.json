@@ -1,0 +1,29 @@
+{
+  "name": "Ayu Light",
+  "mode": "light",
+  "colors": {
+    "ground": "#fcfcfc",
+    "surface": "#e7eaed",
+    "card": "#f3f4f5",
+    "ink": "#5c6166",
+    "muted": "#8a9199",
+    "soft": "#6e747a",
+    "keyInk": "#686d73",
+    "red": "#e66c6c",
+    "green": "#769e00",
+    "yellow": "#d77935",
+    "blue": "#3798dd",
+    "magenta": "#a37acc",
+    "cyan": "#499bb6",
+    "pink": "#af686a",
+    "sand": "#bd8839",
+    "dim": "#d8dce0",
+    "sparkFill": "#33499bb6",
+    "border": "#66c9ced3",
+    "headBg": "#66e7eaed",
+    "selBg": "#4cd8dce0",
+    "onAccent": "#fcfcfc",
+    "wash": "#000000",
+    "shadow": "#000000"
+  }
+}

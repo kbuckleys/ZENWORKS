@@ -1,0 +1,29 @@
+{
+  "name": "Kanagawa Lotus",
+  "mode": "light",
+  "colors": {
+    "ground": "#f2ecbc",
+    "surface": "#e7dba0",
+    "card": "#e5ddb0",
+    "ink": "#545464",
+    "muted": "#8a8980",
+    "soft": "#716e61",
+    "keyInk": "#62616b",
+    "red": "#c84053",
+    "green": "#6f894e",
+    "yellow": "#cc6d00",
+    "blue": "#4d699b",
+    "magenta": "#624c83",
+    "cyan": "#4e8ca2",
+    "pink": "#b35b79",
+    "sand": "#77713f",
+    "dim": "#d5cea3",
+    "sparkFill": "#334e8ca2",
+    "border": "#66c7bf8f",
+    "headBg": "#66e7dba0",
+    "selBg": "#4cd5cea3",
+    "onAccent": "#f2ecbc",
+    "wash": "#000000",
+    "shadow": "#000000"
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "name": "One Dark",
+  "mode": "dark",
+  "colors": {
+    "ground": "#21252b",
+    "surface": "#3e4451",
+    "card": "#282c34",
+    "ink": "#abb2bf",
+    "muted": "#7f848e",
+    "soft": "#99a0ab",
+    "keyInk": "#a0a6b3",
+    "red": "#e06c75",
+    "green": "#98c379",
+    "yellow": "#d19a66",
+    "blue": "#61afef",
+    "magenta": "#c678dd",
+    "cyan": "#56b6c2",
+    "pink": "#cb8893",
+    "sand": "#e5c07b",
+    "dim": "#4b5263",
+    "sparkFill": "#3356b6c2",
+    "border": "#4c4b5263",
+    "headBg": "#663e4451",
+    "selBg": "#4c4b5263",
+    "onAccent": "#21252b"
+  }
+}

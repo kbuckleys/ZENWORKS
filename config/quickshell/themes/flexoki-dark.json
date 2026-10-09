@@ -1,0 +1,27 @@
+{
+  "name": "Flexoki Dark",
+  "mode": "dark",
+  "colors": {
+    "ground": "#100f0f",
+    "surface": "#282726",
+    "card": "#1c1b1a",
+    "ink": "#cecdc3",
+    "muted": "#6f6e69",
+    "soft": "#878580",
+    "keyInk": "#b6b5ac",
+    "red": "#d14d41",
+    "green": "#879a39",
+    "yellow": "#da702c",
+    "blue": "#4385be",
+    "magenta": "#8b7ec8",
+    "cyan": "#3aa99f",
+    "pink": "#ce5d97",
+    "sand": "#d0a215",
+    "dim": "#403e3c",
+    "sparkFill": "#333aa99f",
+    "border": "#4c403e3c",
+    "headBg": "#66282726",
+    "selBg": "#4c403e3c",
+    "onAccent": "#100f0f"
+  }
+}

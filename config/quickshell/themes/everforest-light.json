@@ -1,0 +1,29 @@
+{
+  "name": "Everforest Light",
+  "mode": "light",
+  "colors": {
+    "ground": "#fdf6e3",
+    "surface": "#e6e2cc",
+    "card": "#f4f0d9",
+    "ink": "#5c6a72",
+    "muted": "#939f91",
+    "soft": "#829181",
+    "keyInk": "#6a777a",
+    "red": "#f85552",
+    "green": "#859701",
+    "yellow": "#dc7022",
+    "blue": "#3a94c5",
+    "magenta": "#d665b3",
+    "cyan": "#33a077",
+    "pink": "#ba5d5f",
+    "sand": "#b78300",
+    "dim": "#bdc3af",
+    "sparkFill": "#3333a077",
+    "border": "#66bdc3af",
+    "headBg": "#66e6e2cc",
+    "selBg": "#4cbdc3af",
+    "onAccent": "#fdf6e3",
+    "wash": "#000000",
+    "shadow": "#000000"
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "name": "Kanagawa Dragon",
+  "mode": "dark",
+  "colors": {
+    "ground": "#0d0c0c",
+    "surface": "#282727",
+    "card": "#181616",
+    "ink": "#c5c9c5",
+    "muted": "#7a8382",
+    "soft": "#a6a69c",
+    "keyInk": "#b2b8b4",
+    "red": "#c4746e",
+    "green": "#87a987",
+    "yellow": "#b6927b",
+    "blue": "#8ba4b0",
+    "magenta": "#8992a7",
+    "cyan": "#8ea4a2",
+    "pink": "#a292a3",
+    "sand": "#c4b28a",
+    "dim": "#393836",
+    "sparkFill": "#338ea4a2",
+    "border": "#4c625e5a",
+    "headBg": "#66282727",
+    "selBg": "#4c393836",
+    "onAccent": "#0d0c0c"
+  }
+}

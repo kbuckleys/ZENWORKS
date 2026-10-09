@@ -1,0 +1,27 @@
+{
+  "name": "Kanagawa Wave",
+  "mode": "dark",
+  "colors": {
+    "ground": "#16161d",
+    "surface": "#2a2a37",
+    "card": "#1f1f28",
+    "ink": "#dcd7ba",
+    "muted": "#727169",
+    "soft": "#c8c093",
+    "keyInk": "#c2bea6",
+    "red": "#e46876",
+    "green": "#98bb6c",
+    "yellow": "#ffa066",
+    "blue": "#7e9cd8",
+    "magenta": "#957fb8",
+    "cyan": "#7aa89f",
+    "pink": "#d27e99",
+    "sand": "#e6c384",
+    "dim": "#363646",
+    "sparkFill": "#337aa89f",
+    "border": "#4c54546d",
+    "headBg": "#662a2a37",
+    "selBg": "#4c363646",
+    "onAccent": "#16161d"
+  }
+}

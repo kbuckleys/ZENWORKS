@@ -1,0 +1,27 @@
+{
+  "name": "Solarized Dark",
+  "mode": "dark",
+  "colors": {
+    "ground": "#002b36",
+    "surface": "#073642",
+    "card": "#04313c",
+    "ink": "#93a1a1",
+    "muted": "#586e75",
+    "soft": "#839496",
+    "keyInk": "#839496",
+    "red": "#dc322f",
+    "green": "#859900",
+    "yellow": "#cb4b16",
+    "blue": "#268bd2",
+    "magenta": "#6c71c4",
+    "cyan": "#2aa198",
+    "pink": "#d33682",
+    "sand": "#b58900",
+    "dim": "#0e4552",
+    "sparkFill": "#332aa198",
+    "border": "#4c2a5561",
+    "headBg": "#66073642",
+    "selBg": "#4c0e4552",
+    "onAccent": "#002b36"
+  }
+}

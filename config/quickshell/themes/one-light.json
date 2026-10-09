@@ -1,0 +1,29 @@
+{
+  "name": "One Light",
+  "mode": "light",
+  "colors": {
+    "ground": "#fafafa",
+    "surface": "#e5e5e6",
+    "card": "#f0f0f1",
+    "ink": "#383a42",
+    "muted": "#8e8f96",
+    "soft": "#5a5c64",
+    "keyInk": "#4e4f57",
+    "red": "#e45649",
+    "green": "#50a14f",
+    "yellow": "#986801",
+    "blue": "#4078f2",
+    "magenta": "#a626a4",
+    "cyan": "#0184bc",
+    "pink": "#9f4b46",
+    "sand": "#c18401",
+    "dim": "#d3d3d5",
+    "sparkFill": "#330184bc",
+    "border": "#66c3c3c6",
+    "headBg": "#66e5e5e6",
+    "selBg": "#4cd3d3d5",
+    "onAccent": "#fafafa",
+    "wash": "#000000",
+    "shadow": "#000000"
+  }
+}

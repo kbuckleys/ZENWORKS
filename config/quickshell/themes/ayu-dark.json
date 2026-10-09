@@ -1,0 +1,27 @@
+{
+  "name": "Ayu Dark",
+  "mode": "dark",
+  "colors": {
+    "ground": "#0b0e14",
+    "surface": "#131721",
+    "card": "#0f131a",
+    "ink": "#bfbdb6",
+    "muted": "#626a73",
+    "soft": "#9a9c9b",
+    "keyInk": "#a8a8a5",
+    "red": "#f07178",
+    "green": "#aad94c",
+    "yellow": "#ff8f40",
+    "blue": "#59c2ff",
+    "magenta": "#d2a6ff",
+    "cyan": "#39bae6",
+    "pink": "#dc8f91",
+    "sand": "#e6b450",
+    "dim": "#273747",
+    "sparkFill": "#3339bae6",
+    "border": "#4c2d3640",
+    "headBg": "#66131721",
+    "selBg": "#4c273747",
+    "onAccent": "#0b0e14"
+  }
+}

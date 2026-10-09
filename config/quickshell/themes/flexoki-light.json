@@ -1,0 +1,29 @@
+{
+  "name": "Flexoki Light",
+  "mode": "light",
+  "colors": {
+    "ground": "#fffcf0",
+    "surface": "#e6e4d9",
+    "card": "#f2f0e5",
+    "ink": "#100f0f",
+    "muted": "#878580",
+    "soft": "#6f6e69",
+    "keyInk": "#2e2c2b",
+    "red": "#af3029",
+    "green": "#66800b",
+    "yellow": "#bc5215",
+    "blue": "#205ea6",
+    "magenta": "#5e409d",
+    "cyan": "#24837b",
+    "pink": "#a02f6f",
+    "sand": "#ad8301",
+    "dim": "#cecdc3",
+    "sparkFill": "#3324837b",
+    "border": "#66b7b5ac",
+    "headBg": "#66e6e4d9",
+    "selBg": "#4ccecdc3",
+    "onAccent": "#fffcf0",
+    "wash": "#000000",
+    "shadow": "#000000"
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "name": "Nightfox",
+  "mode": "dark",
+  "colors": {
+    "ground": "#131a24",
+    "surface": "#212e3f",
+    "card": "#192330",
+    "ink": "#cdcecf",
+    "muted": "#738091",
+    "soft": "#aeafb0",
+    "keyInk": "#b6bac0",
+    "red": "#c94f6d",
+    "green": "#81b29a",
+    "yellow": "#f4a261",
+    "blue": "#719cd6",
+    "magenta": "#9d79d6",
+    "cyan": "#63cdcf",
+    "pink": "#d67ad2",
+    "sand": "#dbc074",
+    "dim": "#29394f",
+    "sparkFill": "#3363cdcf",
+    "border": "#4c39506d",
+    "headBg": "#66212e3f",
+    "selBg": "#4c29394f",
+    "onAccent": "#131a24"
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "name": "Monokai Pro",
+  "mode": "dark",
+  "colors": {
+    "ground": "#221f22",
+    "surface": "#403e41",
+    "card": "#2d2a2e",
+    "ink": "#fcfcfa",
+    "muted": "#939293",
+    "soft": "#c1c0c0",
+    "keyInk": "#c1c0c0",
+    "red": "#ff6188",
+    "green": "#a9dc76",
+    "yellow": "#fc9867",
+    "blue": "#78dce8",
+    "magenta": "#ab9df2",
+    "cyan": "#78dce8",
+    "pink": "#fe9fb6",
+    "sand": "#ffd866",
+    "dim": "#5b595c",
+    "sparkFill": "#3378dce8",
+    "border": "#4c5b595c",
+    "headBg": "#66403e41",
+    "selBg": "#4c5b595c",
+    "onAccent": "#221f22"
+  }
+}

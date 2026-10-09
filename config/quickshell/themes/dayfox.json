@@ -1,0 +1,29 @@
+{
+  "name": "Dayfox",
+  "mode": "light",
+  "colors": {
+    "ground": "#f6f2ee",
+    "surface": "#e4dcd4",
+    "card": "#ede7e1",
+    "ink": "#3d2b5a",
+    "muted": "#837a72",
+    "soft": "#643f61",
+    "keyInk": "#4e3f60",
+    "red": "#a5222f",
+    "green": "#396847",
+    "yellow": "#ac5402",
+    "blue": "#2848a9",
+    "magenta": "#6e33ce",
+    "cyan": "#287980",
+    "pink": "#a440b5",
+    "sand": "#ac5402",
+    "dim": "#d3c7bb",
+    "sparkFill": "#33287980",
+    "border": "#66aab0ad",
+    "headBg": "#66e4dcd4",
+    "selBg": "#4cd3c7bb",
+    "onAccent": "#f6f2ee",
+    "wash": "#000000",
+    "shadow": "#000000"
+  }
+}
