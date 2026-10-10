@@ -49,7 +49,9 @@ import "alexandria.js" as A
 FloatingWindow {
   id: win
   title: "alexandria"
-  color: Zenon.layerBg
+  // CLEAR, the ground laid in the stage around the sidebar, which wears an
+  // inactive tab's thinner glass (user, 2026-10-10, as terminus and plato)
+  color: Zenon.alpha(Zenon.layerBg, 0)
   implicitWidth: 1320
   implicitHeight: 860
   minimumSize: Qt.size(820, 520)
@@ -666,15 +668,33 @@ FloatingWindow {
     layer.enabled: removeSheet.cardInk > 0.01
     layer.effect: MultiEffect { blurEnabled: true; blurMax: 40; blur: removeSheet.cardInk; autoPaddingEnabled: false }
 
+    // the window's ground, everywhere but the sidebar
+    Rectangle {
+      z: -1
+      x: side.width
+      width: parent.width - x
+      height: side.height
+      color: Zenon.layerBg
+    }
+    Rectangle {
+      z: -1
+      y: side.height
+      width: parent.width
+      height: parent.height - y
+      color: Zenon.layerBg
+    }
+
     // ── the shelves and the families ─────────────────────────────────────
     Item {
       id: side
+      // THE WINDOW'S WHOLE HEIGHT: the foot starts beside it rather than
+      // under it (user, 2026-10-10 — as delphi's)
       anchors.left: parent.left
       anchors.top: parent.top
-      anchors.bottom: foot.top
+      anchors.bottom: parent.bottom
       width: Math.round(Math.min(360, Math.max(260, win.width * 0.24)))
 
-      Rectangle { anchors.fill: parent; color: Zenon.floor(0.18) }
+      Rectangle { anchors.fill: parent; color: Zenon.alpha(Zenon.tabAwayInk, Zenon.tabAway(Zenon.layerBg.a)) }
       Rectangle { anchors.right: parent.right; width: 1; height: parent.height; color: Zenon.border }
 
       // the search
@@ -741,54 +761,18 @@ FloatingWindow {
         spacing: 1
         Repeater {
           model: win.shelves
-          delegate: Rectangle {
+          // terminus/ShelfRow — the shelves' row, shared with delphi's pages
+          delegate: ShelfRow {
             id: shelfRow
             required property var modelData
-            readonly property bool here: win.shelf === shelfRow.modelData.id
             width: shelfCol.width
-            height: 30
-            radius: Zenon.windowRadius
-            color: shelfRow.here ? win.hiFill : shelfMa.containsMouse ? Zenon.wash(0.06) : Zenon.alpha(Zenon.cyan, 0)
-            Behavior on color { ColorAnimation { duration: Zenon.fast } }
-            Text {
-              id: shelfGlyph
-              anchors.left: parent.left
-              anchors.leftMargin: 10
-              anchors.verticalCenter: parent.verticalCenter
-              width: 20
-              text: shelfRow.modelData.glyph
-              color: shelfRow.here ? Zenon.cyan : Zenon.muted
-              font.family: Zenon.glyphFace
-              font.pixelSize: Zenon.px(14)
-            }
-            Text {
-              anchors.left: shelfGlyph.right
-              anchors.leftMargin: 8
-              anchors.verticalCenter: parent.verticalCenter
-              text: shelfRow.modelData.label
-              color: shelfRow.here ? Zenon.ink : Zenon.soft
-              font.family: Zenon.face
-              font.weight: Zenon.weight
-              font.pixelSize: Zenon.px(14)
-            }
-            Text {
-              anchors.right: parent.right
-              anchors.rightMargin: 10
-              anchors.verticalCenter: parent.verticalCenter
-              text: shelfRow.modelData.id === "opened" ? win.loose.length
-                : A.shelfCount(win.mgr ? win.mgr.families : [], shelfRow.modelData.id, win.mgr ? win.mgr.favs : {})
-              color: Zenon.muted
-              font.family: Zenon.face
-              font.weight: Zenon.weight
-              font.features: { "tnum": 1 }
-              font.pixelSize: Zenon.px(12)
-            }
-            MouseArea {
-              id: shelfMa
-              anchors.fill: parent
-              hoverEnabled: true
-              onClicked: { win.setShelf(shelfRow.modelData.id); win.refocus(); }
-            }
+            glyph: shelfRow.modelData.glyph
+            label: shelfRow.modelData.label
+            here: win.shelf === shelfRow.modelData.id
+            fill: win.hiFill
+            count: String(shelfRow.modelData.id === "opened" ? win.loose.length
+              : A.shelfCount(win.mgr ? win.mgr.families : [], shelfRow.modelData.id, win.mgr ? win.mgr.favs : {}))
+            onClicked: { win.setShelf(shelfRow.modelData.id); win.refocus(); }
           }
         }
       }
@@ -1973,7 +1957,9 @@ FloatingWindow {
     }
 
     Repeater {
-      model: [famList, specFlick, infoFlick, glyphGrid, groupList]
+      // (not the families: the sidebar runs to the window's bottom, past
+      // the foot, so its rows have no foot to go under)
+      model: [specFlick, infoFlick, glyphGrid, groupList]
       delegate: ScrollEdge {
         required property var modelData
         view: modelData
@@ -1981,7 +1967,6 @@ FloatingWindow {
         follow: true
         bar: foot
         visible: modelData.visible && glyphPage.visible === (modelData === glyphGrid || modelData === groupList)
-          || modelData === famList
       }
     }
 
@@ -1989,7 +1974,7 @@ FloatingWindow {
     Item {
       id: foot
       anchors.bottom: parent.bottom
-      anchors.left: parent.left
+      anchors.left: side.right
       anchors.right: parent.right
       height: 50
       Rectangle { anchors.fill: parent; color: Zenon.hintFrostBg }

@@ -64,6 +64,7 @@ Item {
     : 18 + head.height
       + (cb.hasDetail ? 8 + detailText.height : 0)
       + (cb.items.length > 0 ? 12 + list.height : 0)
+      + (extraCol.visible ? 14 + extraCol.implicitHeight : 0)
       + 20 + 32 + 14
   // HEADLESS, AS WIDE AS ITS ONE ROW: the line and the answers side by side
   // with room between, so the holder can size the card to say it unclipped.
@@ -205,6 +206,25 @@ Item {
         font.pixelSize: Zenon.px(13)
       }
     }
+  }
+
+  // ── WHAT THE ANSWER NEEDS TYPED ─────────────────────────────────────
+  // Anything put inside a ConfirmBody lands here: under the line and the
+  // files, above the answers, as wide as the card's text. Delphi's questions
+  // that want something typed (a branch name, a URL, a password git asked
+  // for) are this card with their fields in it, so they ask the way every
+  // other confirmation does. Nothing inside, it takes no room.
+  default property alias extra: extraCol.data
+  Column {
+    id: extraCol
+    // shown when something in it shows: a holder may keep a list there that
+    // is empty for most of its questions
+    visible: !cb.headless && extraCol.implicitHeight > 0
+    x: 18
+    y: (cb.items.length > 0 ? list.y + list.height
+      : cb.hasDetail ? detailText.y + detailText.height : head.y + head.height) + 14
+    width: cb.width - 36
+    spacing: 10
   }
 
   Row {

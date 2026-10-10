@@ -39,6 +39,7 @@ Item {
   id: sideRow
   property string label: ""
   property string detail: ""
+  property color detailInk: Zenon.muted
   property string glyph: ""
   // A COLOUR OF ITS OWN, when the row has one to give. Bookmarks and disks
   // do not — their glyph says what KIND of thing the row is and the muted
@@ -446,7 +447,7 @@ Item {
     // reading beside a bar plus another on it would be the same number twice.
     visible: sideRow.detail !== "" && sideRow.used < 0
     text: sideRow.detail
-    color: Zenon.muted
+    color: sideRow.detailInk
     font.family: Zenon.face
     font.weight: Zenon.weight
     font.pixelSize: Zenon.px(13)

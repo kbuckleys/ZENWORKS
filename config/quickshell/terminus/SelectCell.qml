@@ -39,6 +39,8 @@ Item {
   property int index: 0
   property bool on: true
   property bool animate: true
+  // how tall the cursor's content is, from the cell's top; -1 for the cell
+  property real fitH: -1
   readonly property bool slides: !cell.host || cell.host.cursorSlide !== false
 
   readonly property int cols: (cell.view && cell.view.cellWidth > 0)
@@ -135,7 +137,14 @@ Item {
       }
 
       width: Math.max(0, cw - 8)
-      height: Math.max(0, ch - 8)
+      // FITTED TO WHAT IS IN THE CELL when the caller says how tall that is
+      // (fitH): a one-line name left the bottom of the cell an empty band
+      // inside the cursor (user, 2026-10-10). The whole cell otherwise.
+      height: cell.fitH > 0 ? Math.min(Math.max(0, ch - 8), cell.fitH) : Math.max(0, ch - 8)
+      Behavior on height {
+        enabled: cell.animate && cell.slides
+        NumberAnimation { duration: Zenon.fast; easing.type: Zenon.travelEase }
+      }
       radius: 6
       color: Zenon.border
       // See the note on Tile's border: over a thumbnail the fill is

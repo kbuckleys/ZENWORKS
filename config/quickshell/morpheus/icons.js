@@ -635,7 +635,9 @@ const APPS = {
   // U+F06D3
   "plato": "\uDB81\uDED3",
   // U+F031, the font book
-  "alexandria": "\uF031"
+  "alexandria": "\uF031",
+  // U+F419, the git client
+  "delphi": "\uF419"
 };
 
 // The glyph for a launcher entry, or "" when nothing claims it. `names` is

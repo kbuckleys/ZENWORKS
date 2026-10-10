@@ -34,6 +34,7 @@ import "oracle"
 import "ceres"
 import "plato"
 import "alexandria"
+import "delphi"
 
 ShellRoot {
   id: root
@@ -86,14 +87,18 @@ ShellRoot {
   // The file manager. NOT in the morph ring and not in the height switch
   // below: it is a real xdg-toplevel, so hyprland owns its size and position
   // the way it owns a terminal's, and the pill has nothing to do with it.
-  TerminusManager { id: terminus; fontBook: alexandria }
+  TerminusManager { id: terminus; fontBook: alexandria; gitClient: delphi }
   // The editor. Also a real window, but unlike terminus it is not built at
   // startup and nothing of it stays once its last window closes: until the
   // first `qs ipc call Plato open`, this is an ipc handler and nothing else.
   // Handed terminus for its open/save dialogs and artemis as its file finder.
-  PlatoManager { id: plato; fileManager: terminus; finder: artemis }
+  PlatoManager { id: plato; fileManager: terminus; finder: artemis; gitClient: delphi }
   // The font book — and oracle's font picker. Built on first use, like plato.
   AlexandriaManager { id: alexandria; fileManager: terminus }
+  // The git client — and git for the rest of the shell (terminus' Open in
+  // Delphi; one backend, one way of asking for a password). Built on first
+  // use; its backend runs only while something is using it.
+  DelphiManager { id: delphi; fileManager: terminus; editor: plato }
   // a click on the bare desktop is a click away from terminus' menus
   Connections {
     target: icarusDesktop

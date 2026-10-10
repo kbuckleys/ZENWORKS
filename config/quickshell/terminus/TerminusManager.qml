@@ -68,6 +68,8 @@ Scope {
   // alexandria's manager, handed in by shell.qml: a font file's Install in
   // the row menu goes through its queue (no window of its own needed)
   property var fontBook: null
+  // delphi's manager, handed in by shell.qml: Open in Delphi, in a repository
+  property var gitClient: null
 
   // The yank buffer, held here rather than in a window, so the windows
   // acknowledge each other: copy in one, paste in another. It was per-window
@@ -562,12 +564,14 @@ Scope {
   //
   // `multiple` lets the answer be every file marked, not just the first —
   // alexandria's Open a font, which installs a batch.
-  function choose(directory, start, reply, saveName, multiple) {
+  // `mixed`: files and directories alike, any number (delphi's upload)
+  function choose(directory, start, reply, saveName, multiple, mixed) {
     const w = mgr.picker();
     if (!w || w.picking) return false;
     const saving = typeof saveName === "string" && saveName !== "";
     w.portal = {
-      multiple: !!multiple && !directory && !saving,
+      multiple: (!!multiple || !!mixed) && !directory && !saving,
+      mixed: !!mixed && !directory && !saving,
       directory: !!directory && !saving,
       save: saving,
       suggested: "",

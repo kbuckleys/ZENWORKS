@@ -66,6 +66,13 @@ Item {
   readonly property string gitState: (term.git && tile.entry)
     ? (term.gitMarks[tile.entry.path] || "") : ""
   property bool current: false
+  // the line under the name: size, count, date… by the pane's sort — see
+  // term.tileDetail
+  property string detail: ""
+  // how far down the tile its content reaches, with the same air below
+  // as the picture has above — the grid's cursor fits to this
+  readonly property real usedH: (tileDetail.visible ? tileDetail.y + tileDetail.height
+    : tileName.y + tileName.height) + 8
   property bool ticked: false
   property bool passive: false
   // A pending CUT, faded to say so — the same signal EntryRow gives a row.
@@ -215,7 +222,8 @@ Item {
     // label and the 4px the highlight is inset by — and the label
     // went from 15px to 16px, which is exactly enough for a name
     // long enough to wrap to overrun the bottom of its own tile.
-    height: parent.height - 68
+    // And 18 more for the second line under the name (`detail`), 2026-10-10.
+    height: parent.height - 86
 
     // Rounded corners, and they belong to the PICTURE rather than
     // to the box holding it. The image is letterboxed inside
@@ -533,6 +541,29 @@ Item {
     // The 62px the tile reserves for this text is a constant too, so
     // two lines always fit at every zoom.
     font.pixelSize: Zenon.px(14)
+  }
+
+  // ── THE SECOND LINE ─────────────────────────────────────────────
+  // Smaller and muted under the name, the list's own columns said once:
+  // what the pane is sorted by, or the size / the count by default.
+  Text {
+    id: tileDetail
+    anchors.top: tileName.bottom
+    anchors.topMargin: 1
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.margins: 8
+    horizontalAlignment: Text.AlignHCenter
+    elide: Text.ElideRight
+    visible: !tile.editing && tile.detail !== ""
+    text: tile.detail
+    opacity: tile.dim ? 0.5 : 1
+    color: Zenon.muted
+    font.family: Zenon.face
+    font.weight: Zenon.weight
+    font.features: { "tnum": 1 }
+    // a constant, as the name's is — see tileName
+    font.pixelSize: Zenon.px(12)
   }
 
   // ── renaming, on the tile ───────────────────────────────────────

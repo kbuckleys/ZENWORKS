@@ -290,15 +290,18 @@ PopupWindow {
       { label: "Keys & commands", key: "F1", act: () => cmdPalette.ask() }
     ]
 
+    // the order in force wears its direction where a key would sit — the
+    // toolbar's sort button opens this list, and has to say what is on
+    function sortMark(k) { return term.sortKey === k ? (term.sortDesc ? "\u2193" : "\u2191") : ""; }
     readonly property var sortItems: [
-      { label: "Name", act: () => term.setSort("name") },
-      { label: "Size", act: () => term.setSort("size") },
-      { label: "Modified", act: () => term.setSort("time") },
-      { label: "Kind", act: () => term.setSort("kind") },
+      { label: "Name", key: menu.sortMark("name"), act: () => term.setSort("name") },
+      { label: "Size", key: menu.sortMark("size"), act: () => term.setSort("size") },
+      { label: "Modified", key: menu.sortMark("time"), act: () => term.setSort("time") },
+      { label: "Kind", key: menu.sortMark("kind"), act: () => term.setSort("kind") },
       // Same gate the sort ring in the settings panel uses: an order
       // that cannot tell any two rows apart is a row that does nothing.
       ...(term.anyTagged
-          ? [{ label: "Tag", key: ", t", act: () => term.setSort("tag") }]
+          ? [{ label: "Tag", key: menu.sortMark("tag") || ", t", act: () => term.setSort("tag") }]
           : []),
       { sep: true },
       // Not an order — a way of reading whichever order is in force.
@@ -573,6 +576,7 @@ PopupWindow {
       menu.subSel = -1;
       // Whatever opened it, it is shut — see the hamburger.
       term.burgerOn = false;
+      term.sortMenuOn = false;
       term.contentRef.forceActiveFocus();
     }
 
@@ -656,6 +660,10 @@ PopupWindow {
           out.push({ label: "Empty the trash", danger: true,
                      act: () => term.emptyTrash() });
         out.push({ label: "Open shell here", key: ";", act: () => term.openShell() });
+        // in a repository: the git client on it (delphi, handed in by
+        // shell.qml — see TerminusManager.gitClient)
+        if (term.gitRoot !== "" && term.mgr && term.mgr.gitClient)
+          out.push({ label: "Open in Delphi", act: () => term.openInDelphi(term.cwd) });
         out.push({ label: term.dual ? "Close second pane" : "Second pane",
                    key: "\\", act: () => term.toggleDual() });
         out.push({ label: term.sidebar ? "Hide sidebar" : "Sidebar",
@@ -699,6 +707,9 @@ PopupWindow {
       if (t.isDir)
         out.push({ label: "Open in new tab", key: "shift return",
                    act: () => term.openInNewTab(t.path) });
+      // a directory in a repository (or one itself): the git client on it
+      if (t.isDir && term.gitRoot !== "" && term.mgr && term.mgr.gitClient)
+        out.push({ label: "Open in Delphi", act: () => term.openInDelphi(t.path) });
       // The third way into a directory, and the one that does not leave
       // where you are. Only in the list: see pane.tree for why the
       // other views have no branches.
@@ -890,6 +901,7 @@ PopupWindow {
                    act: () => term.rotateLook(90) });
         out.push({ label: "Convert to" + many, sub: menu.convertItems });
         out.push({ sep: true });
+        // across every monitor, as one picture — see setWallpaper
         out.push({ label: "Set as background",
                    act: () => term.setWallpaper(null) });
         const screens = Quickshell.screens;
@@ -1081,6 +1093,16 @@ PopupWindow {
 
             Rectangle {
               anchors.fill: parent
+              // INSIDE THE BORDER: the band spans the card but stops short of
+              // its 1px edge, and the first and last rows round their outer
+              // corners to the card's curve, inset (user, 2026-10-10 — as
+              // morpheus/CardBody, every other menu)
+              anchors.leftMargin: 1
+              anchors.rightMargin: 1
+              topLeftRadius: index === 0 ? Math.max(0, Zenon.menuRadius - Zenon.menuCardPad) : 0
+              topRightRadius: topLeftRadius
+              bottomLeftRadius: index === menu.items.length - 1 ? Math.max(0, Zenon.menuRadius - Zenon.menuCardPad) : 0
+              bottomRightRadius: bottomLeftRadius
               visible: !modelData.sep && !modelData.swatch
               // icarus' menu highlight, worn here too — the two are the same
               // gesture on the same desktop, and a context menu that lit its
@@ -1452,6 +1474,13 @@ PopupWindow {
 
               Rectangle {
                 anchors.fill: parent
+                // inside the border, as the parent card's band
+                anchors.leftMargin: 1
+                anchors.rightMargin: 1
+                topLeftRadius: subRow.index === 0 ? Math.max(0, Zenon.menuRadius - Zenon.menuCardPad) : 0
+                topRightRadius: topLeftRadius
+                bottomLeftRadius: subRow.index === subCard.items.length - 1 ? Math.max(0, Zenon.menuRadius - Zenon.menuCardPad) : 0
+                bottomRightRadius: bottomLeftRadius
                 visible: !modelData.sep && !modelData.off
                 // the same highlight the parent card wears, from icarus
                 color: subHov.hovered || menu.subSel === subRow.index

@@ -159,7 +159,13 @@ Item {
   function setWallpaper(screenName) {
     const r = term.currentRow();
     if (!r || r.isDir || !Terminus.isImage(r.name)) return;
-    if (screenName) Picasso.setFor(screenName, r.path);
+    if (screenName) { Picasso.setFor(screenName, r.path); term.status = "background set"; return; }
+    // ACROSS EVERY MONITOR, as one picture (user, 2026-10-10): picasso's
+    // span, each monitor showing the slice that falls where it sits. One
+    // monitor is just the background, as before.
+    const names = [];
+    for (let i = 0; i < Quickshell.screens.length; ++i) names.push(Quickshell.screens[i].name);
+    if (names.length > 1) Picasso.setSpan(r.path, names);
     else Picasso.setAll(r.path);
     term.status = "background set";
   }

@@ -506,7 +506,11 @@ Rectangle {
       ink: term.inTrash && term.searchMode === "" ? Zenon.cyan : "transparent"
       detail: term.trashCount === 0 ? "empty"
         : term.trashCount + (term.trashSize !== "" ? " · " + term.trashSize : "")
+      // orange (Zenon's yellow) while there is something in it
+      detailInk: term.trashCount > 0 ? Zenon.yellow : Zenon.muted
       trashDrop: true
+      hasMenu: true
+      onMenuAsked: (x, y) => term.trashMenu(trashRow, x, y)
       onChosen: term.goTo(Terminus.trashFilesDir())
       onTabbed: term.openInNewTab(Terminus.trashFilesDir())
     }

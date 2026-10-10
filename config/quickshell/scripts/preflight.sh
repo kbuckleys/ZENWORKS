@@ -11,6 +11,8 @@
 #   1. the JS tests (oracle/test.js) — the pure halves, the colour budget,
 #      the type-name clashes
 #   2. the QML tests (oracle/qmltests) — clicks, drags, scrollbars
+#      and delphi's backend (oracle/tests/delphi-core.py), against
+#      throwaway repositories
 #   3. EVERY .qml compiled. The shell builds most windows lazily, so a file
 #      that no longer compiles stays silent until the day it is opened —
 #      plato was broken that way on 2026-10-08 and nothing said so.
@@ -33,6 +35,10 @@ node "$root/oracle/test.js" >/dev/null 2>&1 || fail=1
 
 echo "── QML tests"
 "$root/oracle/qmltests/run.sh" 2>&1 | grep -E 'Totals|FAIL' || fail=1
+
+echo "── delphi core"
+out=$(python3 "$root/oracle/tests/delphi-core.py" 2>&1) || fail=1
+printf '%s\n' "$out" | grep -vE '^  ok ' || true
 
 echo "── compiling every .qml"
 tmp=$(mktemp -d)

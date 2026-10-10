@@ -15,6 +15,7 @@
 // events to `key()`, which is the one place typing is understood.
 
 import QtQuick
+import Quickshell
 import "../morpheus"
 import "."
 
@@ -46,6 +47,14 @@ Item {
       field.submitted(p);
       return true;
     }
+    // PASTED, not typed: a token from a password manager, or a long
+    // passphrase. Its first line only — a copied line often brings its
+    // newline along, and a password never holds one.
+    if (event.matches(StandardKey.Paste)) {
+      const t = String(Quickshell.clipboardText || "").split(/\r?\n/)[0];
+      if (t !== "") { field.failed = false; field.pw += t; }
+      return true;
+    }
     if (k === Qt.Key_Backspace) {
       // Array.from: a codepoint past the BMP is two UTF-16 units
       const c = Array.from(field.pw); c.pop(); field.pw = c.join("");
@@ -68,11 +77,21 @@ Item {
     return false;
   }
 
-  // Asked when a password is asked for: caps may already be on.
+  // Asked when a password is asked for: caps may already be on. The holder
+  // says who asks — ceres hands its singleton (`authSource: Ceres`), and its
+  // authRequested reads the key; delphi, whose questions come from git and
+  // ssh, calls asked() as its card opens. Not named here, so a holder outside
+  // ceres does not start ceres just by showing the field.
+  property var authSource: null
+  function asked() { CapsLock.read(); }
   Connections {
-    target: Ceres
+    target: field.authSource
+    ignoreUnknownSignals: true
     function onAuthRequested() { CapsLock.read(); }
   }
+  // what it says while empty: sudo's password by default; delphi's cards
+  // ask for a token, a key's passphrase, a host's password
+  property string prompt: "input your password"
 
   Item {
     id: entry
@@ -140,7 +159,7 @@ Item {
           id: fieldMsg
           anchors.verticalCenter: parent.verticalCenter
           visible: field.pw.length === 0
-          text: field.failed ? "wrong password" : "input your password"
+          text: field.failed ? "wrong password" : field.prompt
           color: field.failed ? Zenon.red : Zenon.muted
           font.family: Zenon.face
           font.weight: Zenon.weight

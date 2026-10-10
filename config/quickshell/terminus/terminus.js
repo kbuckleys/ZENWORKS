@@ -1105,7 +1105,10 @@ function isAudio(name) {
 // Only the formats Qt's FontLoader actually opens are listed — woff and woff2
 // are web wrappers it does not read, and offering a preview that silently
 // falls back to the default font would be worse than showing none.
-const FONT_EXTS = { ttf: 1, otf: 1, ttc: 1, pfb: 1 };
+// The same set alexandria opens (alexandria.js FONT_FILE): Qt's FontLoader
+// reads every one of them, web fonts included — a .woff2 alexandria showed
+// had no preview here (user, 2026-10-10).
+const FONT_EXTS = { ttf: 1, otf: 1, ttc: 1, otc: 1, pfb: 1, pfa: 1, woff: 1, woff2: 1 };
 
 function isFont(name) {
   return !!FONT_EXTS[extOf(name)];

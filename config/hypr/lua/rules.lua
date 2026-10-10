@@ -3,6 +3,7 @@
 -- └─┘└─┘┘└┘└┴┘└─┘┴└─┴ ┴└─┘
 -- https://github.com/kbuckleys/
 
+hl.window_rule({ match = { class = "org.quickshell", title = "delphi" },            float = true })
 hl.window_rule({ match = { class = "org.quickshell", title = "ceres" },             float = true })
 hl.window_rule({ match = { class = "org.quickshell", title = "oracle" },            float = true })
 hl.window_rule({ match = { class = "org.quickshell", title = "terminus" },          float = true })

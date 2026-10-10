@@ -571,6 +571,14 @@ PanelWindow {
 
                 Rectangle {
                   anchors.fill: parent
+                  // across the card to just inside its border, as every
+                  // menu's band (CardBody); the last row rounds into the
+                  // card's free corner
+                  anchors.leftMargin: 1 - Zenon.menuCardPad
+                  anchors.rightMargin: 1 - Zenon.menuCardPad
+                  readonly property real inner: entry.index === rowRepeater.count - 1 ? Math.max(0, Zenon.menuRadius - Zenon.menuCardPad) : 0
+                  bottomLeftRadius: bg.againstLeft ? 0 : inner
+                  bottomRightRadius: bg.againstLeft ? inner : 0
                   color: entry.lit ? Zenon.border : "transparent"
                 }
 

@@ -449,4 +449,30 @@ Item {
     if (term.isPicker) pickerSave.restart();
     else viewSave.restart();
   }
+
+  // ── A STEP OF THE PATH, ON RIGHT CLICK (user, 2026-10-10) ─────────────
+  // Every step was a place to click and nothing else. Its menu: going
+  // there (here, in a tab, or anywhere through the go-to sheet), copying
+  // where it is — this step, or the whole trail it is part of — and the
+  // things you do to a directory you are not standing in yet.
+  function crumbMenu(item, x, y, path, name) {
+    const full = term.cwd;
+    const out = [
+      { label: "Open", act: () => term.goTo(path) },
+      { label: "Open in new tab", act: () => term.newTab(path) },
+      { label: "Go to\u2026", key: "g space", act: () => term.sendToRef.ask("go") },
+      { sep: true },
+      { label: "Copy path", act: () => term.copyText(path, "copied " + path) }
+    ];
+    if (full !== path)
+      out.push({ label: "Copy full path", act: () => term.copyText(full, "copied " + full) });
+    out.push({ label: "Copy name", act: () => term.copyText(name, "copied " + name) });
+    out.push({ sep: true });
+    out.push({ label: term.isBookmarked(path) ? "Remove bookmark" : "Bookmark",
+               act: () => term.toggleBookmarkFor(path) });
+    out.push({ label: "Open a shell here",
+               act: () => term.run(Terminus.shellCommand(path, term.termCmd)) });
+    term.menuPopRef.menu.openCustom(item, { x: x, y: y }, out, false);
+    term.sideMenuAt = item;
+  }
 }

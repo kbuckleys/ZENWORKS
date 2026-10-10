@@ -36,6 +36,8 @@ Scope {
   property var fileManager: null
   // artemis, handed in by shell.qml: Ctrl-P is its index, scoped to a project
   property var finder: null
+  // delphi's manager, handed in by shell.qml: the status bar's branch opens it
+  property var gitClient: null
 
   // ── ITS .desktop ENTRY ─────────────────────────────────────────────
   // Not shipped as a file: written into ~/.local/share/applications on

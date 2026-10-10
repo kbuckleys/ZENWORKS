@@ -473,12 +473,14 @@ FloatingWindow {
   }
 
   // ── THE GROUND, less the tab strip (see the window's colour) ──────
+  // the tree's: an inactive tab's thinner glass, not the window's (user,
+  // 2026-10-10, as terminus' sidebar and alexandria's)
   Rectangle {
     id: groundLeft
     z: -1
     width: tabs.x
     height: parent.height
-    color: Zenon.layerBg
+    color: tabs.awayGlass
   }
   Rectangle {
     id: groundBelow
@@ -1066,7 +1068,14 @@ FloatingWindow {
     pluginUpdates: win.mgr && win.mgr.plugins ? win.mgr.plugins.count : 0
     onPluginsClicked: pluginPanel.open("updates")
     onDiagnosticsClicked: picker.open("diags")
-    onGitClicked: nvim.cmd("Git")
+    // the branch: delphi on this file's repository, when the shell has it
+    // (PlatoManager.gitClient); fugitive's status otherwise
+    onGitClicked: {
+      const g = win.mgr ? win.mgr.gitClient : null;
+      const f = String(st.file || "").replace(/^~/, Quickshell.env("HOME"));
+      if (g && f !== "") g.show(f, "changes");
+      else nvim.cmd("Git");
+    }
     onLspClicked: win.ctx.lspMenu()
     onFormatClicked: win.ctx.formatMenu()
     treeShown: win.treeShown

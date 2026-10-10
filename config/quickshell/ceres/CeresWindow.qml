@@ -3441,6 +3441,7 @@ FloatingWindow {
 
       PasswordField {
         grow: 2
+        authSource: Ceres
         id: field
         anchors.left: parent.left
         anchors.right: parent.right

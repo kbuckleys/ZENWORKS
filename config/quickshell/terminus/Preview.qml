@@ -521,6 +521,7 @@ Item {
     const hit = r ? term.previewCache[r.path] : undefined;
     if (hit !== undefined) {
       term.settlePreview(hit.kind, hit.rows, hit.text, r.path);
+      if (hit.kind === "dir") preview.verifyPeek(r.path);
       return;
     }
     // an image needs no process either: the pane points Qt at the file
@@ -540,6 +541,7 @@ Item {
         const rows = term.rowsFromListing(seen, r.path);
         term.settlePreview("dir", rows, "", r.path);
         term.cachePreview(r.path, { kind: "dir", rows: rows });
+        preview.verifyPeek(r.path);
         return;
       }
     }
@@ -572,6 +574,9 @@ Item {
         if (!cur || cur.path !== term.previewFor) return;
         term.previewFor = "";
         if (term.previewKind === "dir") {
+          // a re-check (verifyPeek) that found the same bytes on screen:
+          // nothing to rebuild
+          if (term.previewShown === cur.path && term.listingText[cur.path] === t) return;
           // the same output listing it would produce — see listingText
           term.rememberListing(cur.path, t);
           const rows = cur ? term.rowsFromListing(t, cur.path) : [];
@@ -645,6 +650,7 @@ Item {
     const hit = term.previewCache[r.path];
     if (hit !== undefined) {
       term.settlePreview(hit.kind, hit.rows, hit.text, r.path);
+      if (hit.kind === "dir") preview.verifyPeek(r.path);
       return;
     }
     // and a directory whose bytes are remembered needs none of the three
@@ -656,6 +662,7 @@ Item {
         const rows = term.rowsFromListing(seen, r.path);
         term.settlePreview("dir", rows, "", r.path);
         term.cachePreview(r.path, { kind: "dir", rows: rows });
+        preview.verifyPeek(r.path);
         return;
       }
     }
@@ -711,6 +718,17 @@ Item {
   // The old run is stopped first: the collector gathers until the stream ends,
   // and two runs feeding one collector is how half of one listing arrives
   // stapled to half of another.
+  // ── A REMEMBERED DIRECTORY IS ASKED AGAIN, QUIETLY ─────────────────
+  // The cache and the remembered bytes are drawn at once, then confirmed by
+  // a peek that swaps the rows only when it lands — the parent column's
+  // rule (seedParent, then startParent). Without it a directory that
+  // changed while nothing watched it (the watch follows the cursor) showed
+  // what it held last time, for as long as you looked.
+  function verifyPeek(path) {
+    if (term.viewMode !== "columns" || !path) return;
+    term.previewKind = "dir";
+    preview.beginPeek(path, Terminus.peekCommand(path));
+  }
   function beginPeek(path, command) {
     previewProc.running = false;
     term.previewFor = path;

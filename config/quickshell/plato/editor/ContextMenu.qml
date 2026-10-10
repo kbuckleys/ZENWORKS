@@ -17,14 +17,14 @@
 // the things you would otherwise type, with the keys beside them so it
 // teaches them too.
 //
-// PUT AWAY by a click anywhere outside it (morpheus' InputShield over the
-// whole window, so the click is not also a click in the text) or by Esc —
-// the card is its own surface and never has the keyboard, so the keys are
-// caught here while it is up, and any other key closes it too.
+// PUT AWAY by a click anywhere outside it or by Esc — terminus/PopMenu, the
+// window menu every window shares, holds the shield and the keys.
 
 import QtQuick
 import Quickshell
 import "../../morpheus"
+// qualified: plato/editor has its own Selection, and so does terminus
+import "../../terminus" as Term
 import "actions.js" as Actions
 
 Item {
@@ -86,48 +86,21 @@ Item {
       run: () => { if (menu.ctx) menu.ctx.revealInTree(); } },
   ]
 
-  property var items: []
   // the menu went away, chosen from or not: the keyboard goes back
   signal closed()
 
+  // The card, its shield and its keys are terminus/PopMenu — the window
+  // menu every window shares (delphi's lists too). This file is the items.
   function open(x, y) {
-    menu.items = menu.visual ? menu.selectionItems : menu.cursorItems;
-    card.at = menu.mapToItem(null, x, y);
-    card.open = true;
-    catcher.forceActiveFocus();
+    pop.open(x, y, menu.visual ? menu.selectionItems : menu.cursorItems);
   }
-  function close() {
-    if (!card.open) return;
-    card.open = false;
-    menu.closed();
-  }
+  function close() { pop.close(); }
 
-  InputShield {
-    parent: menu.window ? menu.window.contentItem : menu
+  Term.PopMenu {
+    id: pop
     anchors.fill: parent
-    visible: card.open
-    z: 1000
-    onClicked: menu.close()
-  }
-  Item {
-    id: catcher
-    Keys.onPressed: (event) => {
-      event.accepted = true;
-      menu.close();
-    }
-  }
-
-  CardPopup {
-    id: card
     window: menu.window
-    fit: true
     cardWidth: 240
-    model: menu.items.map((it) => it.isSeparator ? { isSeparator: true }
-      : { text: it.text, icon: it.icon, hint: it.mark || "", enabled: it.enabled !== false })
-    onChosen: (i) => {
-      menu.close();
-      const it = menu.items[i];
-      if (it && it.run && it.enabled !== false) it.run();
-    }
+    onClosed: menu.closed()
   }
 }

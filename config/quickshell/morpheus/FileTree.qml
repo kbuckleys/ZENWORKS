@@ -26,6 +26,13 @@
 //
 // Plato's sidebar is the first user. Terminus could become the second.
 //
+// OR A TREE OF GIVEN PATHS, not read from disk: `given` a list of
+// { path: "dir/name", size, … } relative to rootPath (which then only names
+// the top). Every directory is made from the paths and shown open; nothing
+// is read, watched or edited, and there is no menu. `noteOf(entry)` →
+// { text, ink } writes a word at a row's right end, in `noteWidth`.
+// Delphi's upload breakdown: where each file lands in the repository.
+//
 // Keys, when it has focus: j/k or ↑/↓ move, l/→/Enter open (a directory: into
 // it), h/← close or go to the parent, a new file (end in / for a directory),
 // A a new directory, r reveal the file being shown, R or F2 rename, d trash, y copy the path, . hidden files,
@@ -81,6 +88,14 @@ FocusScope {
   // so a project's tree comes back as you left it, in any window)
   property var memory: null
 
+  // a tree of given paths instead of the disk (see the top); null: the disk
+  // (asked as `given !== null` wherever it is acted on: a binding of its
+  // own lagged behind givenChanged, and the paths were never planted)
+  property var given: null
+  property var noteOf: null
+  property int noteWidth: 0
+  onGivenChanged: if (tree.given !== null) tree.reset()
+
   signal fileActivated(string path)
   // Esc: the caller decides where focus goes back to
   signal dismissed()
@@ -125,6 +140,7 @@ FocusScope {
   // ── reading directories: one `find` at a time, in the order asked ──────
   property var queue: []
   function readKids(p) {
+    if (tree.given !== null) return;
     if (tree.queue.indexOf(p) < 0) tree.queue = tree.queue.concat([p]);
     tree.pump();
   }
@@ -142,6 +158,9 @@ FocusScope {
     stdout: StdioCollector {
       id: listed
       onStreamFinished: {
+        // a listing begun before the tree was handed its paths (the root
+        // came first) must not land on the planted tree
+        if (tree.given !== null) return;
         const rows = Terminus.enrich(Terminus.sortEntries(
           Terminus.parseListing(listed.text, lister.dir), "name", false, true, true, ({})), Icons);
         const k = Object.assign({}, tree.kids);
@@ -180,7 +199,7 @@ FocusScope {
 
   // ── git ────────────────────────────────────────────────────────────
   function readGit() {
-    if (tree.rootPath === "" || gitProc.running) return;
+    if (tree.given !== null || tree.rootPath === "" || gitProc.running) return;
     gitProc.command = ["sh", "-c", Terminus.gitCommand(tree.rootPath)];
     gitProc.running = true;
   }
@@ -232,7 +251,7 @@ FocusScope {
       const dirs = [tree.rootPath];
       for (const k in tree.openDirs) if (tree.kids[k] !== undefined) dirs.push(k.slice(2));
       watcher.running = false;
-      if (tree.rootPath === "") return;
+      if (tree.rootPath === "" || tree.given !== null) return;
       // on the next tick: stopped and started in one, a Process may not
       // notice it was ever stopped, and keeps watching the old set
       Qt.callLater(() => {
@@ -264,6 +283,7 @@ FocusScope {
     tree._restoring = false;
   }
   function _reset() {
+    if (tree.given !== null) { tree.plant(); return; }
     tree.kids = ({});
     tree.revealed = ({});
     tree.openDirs = ({});
@@ -282,6 +302,42 @@ FocusScope {
     tree.reveal(tree.currentPath);
     rewatch.restart();
   }
+  // The given paths as the tree: their directories made, every one open,
+  // each level in terminus' order with terminus' glyphs, as a listing is.
+  function plant() {
+    const root = tree.rootPath;
+    tree.queue = [];
+    const kids = ({}), open = ({}), made = ({});
+    const put = (dir, e) => { (kids["k:" + dir] = kids["k:" + dir] || []).push(e); };
+    kids["k:" + root] = [];
+    for (const g of tree.given || []) {
+      const parts = String(g.path || "").split("/").filter((x) => x !== "");
+      if (parts.length === 0) continue;
+      let dir = root;
+      for (let i = 0; i < parts.length - 1; ++i) {
+        const p = dir + "/" + parts[i];
+        if (!made[p]) {
+          made[p] = true;
+          open["k:" + p] = true;
+          put(dir, { name: parts[i], path: p, isDir: true, isLink: false, broken: false, isExec: false,
+                     mode: 0, isHidden: parts[i].charAt(0) === ".", size: 0, mtime: 0 });
+        }
+        dir = p;
+      }
+      const name = parts[parts.length - 1];
+      put(dir, Object.assign({ isLink: false, broken: false, isExec: false, mode: 0, mtime: 0 }, g,
+                             { name: name, path: dir + "/" + name, isDir: false,
+                               isHidden: name.charAt(0) === ".", size: Math.max(0, g.size || 0) }));
+    }
+    for (const k in kids)
+      kids[k] = Terminus.enrich(Terminus.sortEntries(kids[k], "name", false, true, true, ({})), Icons);
+    tree.revealed = ({});
+    tree.git = ({});
+    tree.kids = kids;
+    tree.openDirs = open;
+    tree.sel = 0;
+  }
+
   // Refresh everything read so far — after a save, say, when git has news.
   function refresh() {
     tree.readKids(tree.rootPath);
@@ -505,7 +561,7 @@ FocusScope {
     readonly property var colPlain: ({ name: 1, where: 0, kind: 0, size: 0, time: 0 })
     readonly property var colFound: treeHost.colPlain
     readonly property var colFoundNarrow: treeHost.colPlain
-    function colWidths(inner, f) { return { name: inner, where: 0, kind: 0, size: 0, time: 0 }; }
+    function colWidths(inner, f) { return { name: inner - tree.noteWidth, where: 0, kind: 0, size: 0, time: 0 }; }
     readonly property var dirSizes: ({})
     readonly property bool usage: false
     readonly property real usageMax: 0
@@ -673,6 +729,8 @@ FocusScope {
       }
       else if (t === "g") tree.sel = 0;
       else if (t === "G") tree.sel = Math.max(0, n - 1);
+      // a tree of given paths only moves, opens and closes
+      else if (tree.given !== null && k !== Qt.Key_Escape) event.accepted = false;
       else if (t === "a") tree.beginNew(false);
       else if (t === "A") tree.beginNew(true);
       else if (t === "c") tree.collapseAll();
@@ -749,6 +807,24 @@ FocusScope {
       }
       // double click, as in terminus: a file opens, a directory opens or closes
       onOpened: tree.activate(row.index)
+      // the holder's word at the right end (given paths: new, replaces)
+      Text {
+        visible: !!tree.noteOf
+        readonly property var note: tree.noteOf ? tree.noteOf(row.modelData.e) : null
+        anchors.right: parent.right
+        anchors.rightMargin: 12
+        anchors.verticalCenter: parent.verticalCenter
+        width: tree.noteWidth - 12
+        horizontalAlignment: Text.AlignRight
+        elide: Text.ElideLeft
+        text: note ? note.text : ""
+        color: note && note.ink ? note.ink : Zenon.muted
+        textFormat: Text.StyledText
+        font.family: Zenon.face
+        font.weight: Zenon.weight
+        font.features: { "tnum": 1 }
+        font.pixelSize: tree.fontSize - 2
+      }
     }
   }
 
@@ -916,6 +992,7 @@ FocusScope {
     tree._focusBack = tree.menuHadKeys ? null : tree.Window.activeFocusItem;
   }
   function openMenu(at) {
+    if (tree.given !== null) return;
     tree.noteFocus();
     tree.menuRows = tree.menuItems();
     menu.at = at;

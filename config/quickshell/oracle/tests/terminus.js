@@ -25,6 +25,10 @@ function listing(...recs) { return recs.join("") + ""; }
 module.exports = {
   module: "terminus/terminus.js",
   cases: (T, t) => {
+    // ── fonts: the set alexandria opens ───────────────────────────────────
+    ["a.ttf", "a.OTF", "a.ttc", "a.otc", "a.pfb", "a.pfa", "a.woff", "a.woff2"].forEach((n) =>
+      t.ok("a font: " + n, T.isFont(n)));
+    t.ok("not a font: a.fnt.txt", !T.isFont("a.fnt.txt"));
     // ── previews in plato's colours ───────────────────────────────────────
     t.eq("no plato renderer: bat, as before, for a regular file only",
       T.previewCommand("/x/a.js", ""), "[ -f '/x/a.js' ] && " + T.batCommand("/x/a.js"));

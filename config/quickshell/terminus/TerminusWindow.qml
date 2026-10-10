@@ -141,6 +141,12 @@ FloatingWindow {
   // (0.4 went to a dark slab over a dark background, the label lost in it).
   // A dark theme tints it navy as well — see Zenon.tabAway/tabAwayInk.
   readonly property real tabAwayAlpha: Zenon.tabAway(root.winAlpha)
+  // ── HOW MUCH OF A SCROLLED VIEW SHOWS THROUGH THE BARS, BY MODE ──────
+  // Rows of names frost to a quiet texture; a grid of pictures frosts to
+  // bright blocks of colour that shout through the bar (user, 2026-10-10:
+  // list and columns are right, the grid wants toning down).
+  readonly property real frostRows: 0.75
+  readonly property real frostGrid: 0.4
   minimumSize: Qt.size(560, 320)
   // An explicit size, because nothing else supplies one. Every item inside is
   // anchored to its parent, so no implicit size propagates up from the content
@@ -284,6 +290,8 @@ FloatingWindow {
   // Whether the menu on screen is the one the hamburger opened, so the
   // button can light up while its own card is up and not while a row's is.
   property bool burgerOn: false
+  // and the bar's sort button, the same way
+  property bool sortMenuOn: false
 
   // path -> true. A map rather than a list so a row can ask about itself in
   // constant time while the list is being drawn.
@@ -1187,6 +1195,8 @@ FloatingWindow {
   function confirmErase(heading, detail, items, onYes) { return sideMarks.confirmErase(heading, detail, items, onYes); }
 
   function diskMenu(item, x, y, d) { return sideMarks.diskMenu(item, x, y, d); }
+  function trashMenu(item, x, y) { return sideMarks.trashMenu(item, x, y); }
+  function crumbMenu(item, x, y, path, name) { return opening.crumbMenu(item, x, y, path, name); }
 
   // ── how big a directory really is ──────────────────────────────────────────
   // the functions of this section (git, usage, directory sizes) live in
@@ -1512,6 +1522,7 @@ FloatingWindow {
   function search(mode, query) { return searching.search(mode, query); }
 
   function searchKey() { return searching.searchKey(); }
+  function takeSearch(s) { return tabs.takeSearch(s); }
   function runSearch() { return searching.runSearch(); }
 
   // ── collections ───────────────────────────────────────────────────
@@ -2136,6 +2147,7 @@ FloatingWindow {
     if (!root.portal) return "";
     if (root.portal.save) return "Save as";
     if (root.portal.directory) return "Choose a directory";
+    if (root.portal.mixed) return "Choose files and directories";
     return root.portal.multiple ? "Choose files" : "Choose a file";
   }
 
@@ -2156,11 +2168,21 @@ FloatingWindow {
       if (c && c.isDir) return [c.path];
       return [root.cwd];
     }
+    // files and directories alike: whatever is marked, or the cursor's row
+    if (root.portal.mixed) return root.acting().map((r) => r.path);
     const files = root.acting().filter((r) => !r.isDir);
     if (files.length === 0) return [];
     return root.portal.multiple ? files.map((r) => r.path) : [files[0].path];
   }
 
+
+  // which of the chosen are directories, for their chips' glyphs
+  readonly property var portalDirSet: {
+    const out = {};
+    if (root.portal && root.portal.mixed)
+      for (const r of root.acting()) if (r.isDir) out[r.path] = true;
+    return out;
+  }
 
   function portalAnswer(paths) { return portal.portalAnswer(paths); }
 
@@ -2578,7 +2600,7 @@ FloatingWindow {
             ["shift return", "go to\u2026 landing in a new tab", false],
             ["g h", "home"], ["g c", "config"], ["g d", "downloads"],
             ["g D", "documents"], ["g p", "pictures"], ["g v", "videos"],
-            ["g t", "trash"], ["g m", "media"], ["g /", "root"]]],
+            ["g t", "the trash"], ["g m", "media"], ["g /", "root"]]],
     ["copy", [["c c", "full path"], ["c d", "directory"],
               ["c f", "filename"], ["c n", "name without extension"]]],
     ["tabs", [["t", "new"], ["w", "close"], ["1 - 9", "switch"],
@@ -2615,10 +2637,9 @@ FloatingWindow {
               ["\u2014", "archive · open with"],
               ["\u2014", "bulk rename · links · restore"],
               ["\u2014", "sort, as a submenu"]]],
+    // (the mouse's back / forward is under move, once)
     ["window", [["q", "close"],
-                ["esc", "clear filter / selection"],
-                [root.mouseKey(4) + " / " + root.mouseKey(5),
-                 "back / forward"]]],
+                ["esc", "clear filter / selection"]]],
     // THE LIST DESCRIBING ITSELF, which is not as odd as it looks: it is the
     // keymap, and the keys that drive it are keys. They were the one set that
     // was only ever printed along its own footer, where a hint strip is read
@@ -2791,10 +2812,28 @@ FloatingWindow {
                    act: v !== undefined ? v.act : null });
       }
     }
-    for (let i = 0; i < verbs.length; i++)
-      if (!verbs[i].used)
-        out.push({ section: "more", label: verbs[i].label,
-                   key: verbs[i].key, alias: "", act: verbs[i].act });
+    // ── NOT THE SAME VERB TWICE ──────────────────────────────────────
+    // A verb can be in both tables — `c s` is a sequence AND "new
+    // collection" in the list above — and the keymap row claims only the
+    // first, so the other came back here: "new collection" listed twice
+    // (user, 2026-10-10). A leftover whose name is already on the page,
+    // as a row or as the verb a row runs, is that same verb.
+    const named = ({});
+    // Only rows that RUN something: a reference row of the same name would
+    // otherwise hide the one entry that does it.
+    for (let i = 0; i < out.length; i++) {
+      if (!out[i].act) continue;
+      named[String(out[i].label).toLowerCase()] = true;
+      if (out[i].alias) named[String(out[i].alias).toLowerCase()] = true;
+    }
+    for (let i = 0; i < verbs.length; i++) {
+      if (verbs[i].used) continue;
+      const n = String(verbs[i].label).toLowerCase();
+      if (named[n]) continue;
+      named[n] = true;
+      out.push({ section: "more", label: verbs[i].label,
+                 key: verbs[i].key, alias: "", act: verbs[i].act });
+    }
 
     // ── THE ONES THAT DO SOMETHING FIRST ──────────────────────────────
     // Two kinds of row live in this list and they are different in kind: a
@@ -3025,6 +3064,7 @@ FloatingWindow {
 
 
   function loadPreview() { return preview.loadPreview(); }
+  function verifyPeek(path) { return preview.verifyPeek(path); }
 
   function beginPeek(path, command) { return preview.beginPeek(path, command); }
 
@@ -3126,6 +3166,27 @@ FloatingWindow {
   function whenOf(e) { return listing.whenOf(e); }
 
   function sizeTextOf(e) { return listing.sizeTextOf(e); }
+
+  // ── THE GRID'S SECOND LINE, UNDER A NAME (user, 2026-10-10) ─────────────
+  // What the tile's pane is sorted by, said under each name: the date by
+  // modified, the kind by kind, the tags by tag — and otherwise (name, size)
+  // a file's size and a directory's count (dirCounts). The usage mode's
+  // measured size wins for a directory, as in the list's size column.
+  DirCounts { id: dirCounts; term: root }
+  function tileDetail(e, key) {
+    if (!e) return "";
+    if (key === "time") return root.whenOf(e);
+    if (key === "kind") return e.isDir ? "directory" : root.kindOf(e);
+    if (key === "tag") {
+      const ts = root.tagsFor(e.path);
+      if (ts.length > 0) return ts.join(", ");
+    }
+    if (e.isDir) {
+      const walked = root.usage ? root.dirSizes[e.path] : undefined;
+      return walked !== undefined ? Terminus.formatSize(walked) : dirCounts.countText(e);
+    }
+    return root.sizeTextOf(e);
+  }
 
   Component.onCompleted: {
     // A FloatingWindow is visible by default, and `shown` starts false, so a
@@ -3651,7 +3712,10 @@ FloatingWindow {
   // and the window behind is simply set back: the whole of it, chrome
   // included, darkened under the card's overlay. Strong enough to do the
   // job on its own, since there is no blur left to share it.
-  readonly property color cardScrim: Zenon.darken(0.55)
+  // NOT DARKENED EITHER now (user, 2026-10-10): the card's glass and
+  // shadow set it apart, and the window behind stays as it was. Kept as a
+  // colour, clear, so every overlay that wears it still catches its clicks.
+  readonly property color cardScrim: Zenon.alpha(Zenon.ground, 0)
 
   // ── WHAT THE OPEN SHEET IS ABOUT, SAID ON THE BAR ──────────────────────
   // Every one of these cards opened with a coloured caption band across its
@@ -4280,6 +4344,13 @@ FloatingWindow {
       else root.warn("could not install " + what);
     }, files.length === 1 ? "Installing\u2026" : "Installing " + files.length + " fonts\u2026");
     root.act.marked = {};
+  }
+
+  // The row menu's Open in Delphi: the git client on the repository a
+  // directory is in (delphi finds it — any subdirectory will do).
+  function openInDelphi(path) {
+    const d = root.mgr ? root.mgr.gitClient : null;
+    if (d) d.show(path || root.cwd, "");
   }
 
   function applyBand(x1, y1, x2, y2, base) { return renameDrag.applyBand(x1, y1, x2, y2, base); }
@@ -5408,11 +5479,13 @@ FloatingWindow {
     }
 
     // ── THE GROUND, less the tab strip (see the window's colour) ──────
+    // The sidebar's is an inactive tab's thinner glass (user, 2026-10-10;
+    // plato's tree and alexandria's sidebar wear it too).
     Rectangle {
       z: -1
       width: side.width
       height: parent.height
-      color: root.ground(root.winAlpha)
+      color: Zenon.alpha(Zenon.tabAwayInk, root.tabAwayAlpha)
     }
     Rectangle {
       z: -1
@@ -5421,6 +5494,36 @@ FloatingWindow {
       width: parent.width - side.width
       height: parent.height - y
       color: root.ground(root.winAlpha)
+    }
+
+    // ── THE TABS' GLASS, under the frost like the bar's ground ────────
+    // Each tab used to paint its own glass in Chrome, which is OVER the
+    // ScrollEdges: the active tab hid the rows scrolled up under it while
+    // the path bar beside it showed them (user's frost.png, 2026-10-10).
+    // Laid here instead, it is the same stack as the bar — ground, then the
+    // frosted rows, then the scrim — so the active tab and the bar are one
+    // surface. The inactive glass spans the strip; the active tab adds what
+    // makes it the window's (Zenon.tabOver), following its cell.
+    Item {
+      id: tabGlass
+      z: -1
+      x: side.width
+      width: chrome.tabStrip.width
+      height: chrome.tabStrip.height
+      visible: chrome.tabStrip.visible
+      Rectangle {
+        anchors.fill: parent
+        color: Zenon.alpha(Zenon.tabAwayInk, root.tabAwayAlpha)
+      }
+      Rectangle {
+        readonly property Item cell: chrome.tabStrip.hereCell
+        visible: !!cell
+        x: cell ? cell.x : 0
+        width: cell ? cell.width : 0
+        height: parent.height
+        opacity: cell ? cell.opacity : 0
+        color: root.ground(Zenon.tabOver(root.winAlpha))
+      }
     }
 
     // side, in its own file — see terminus/Sidebar.qml
@@ -5465,8 +5568,12 @@ FloatingWindow {
       model: [chrome.listA, chrome.listB, chrome.gridA, chrome.gridB]
       delegate: ScrollEdge {
         required property var modelData
+        required property int index
         view: modelData
         visible: modelData.on
+        // a grid's pictures frost far louder than rows of text — see
+        // frostGrid
+        strength: index >= 2 ? root.frostGrid : root.frostRows
         scrim: 0   // laid once, full width — see topScrim
         x: side.width + chrome.bodyRow.x + chrome.bodyBox.x + modelData.x
         // from the window's top, under the tab strip too: the tabs frost
@@ -5683,6 +5790,8 @@ FloatingWindow {
         PropsCard {
           id: card
           width: parent.width
+          // the card's height, so its facts can scroll (PropsCard.propsView)
+          height: parent.height
           host: root
           onOpened: props.open = true
           onClosed: { props.open = false; content.forceActiveFocus(); }

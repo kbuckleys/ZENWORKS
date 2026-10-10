@@ -85,7 +85,8 @@ GridView {
   readonly property int targetCell: Math.round(190 * pgrid.zoom)
   cellWidth: Math.floor(pgrid.width
     / Math.max(1, Math.round(pgrid.width / pgrid.targetCell)))
-  cellHeight: Math.round(168 * pgrid.zoom)
+  // and 18 for the line under each name (Tile.detail)
+  cellHeight: Math.round(168 * pgrid.zoom) + 18
 
   // ── THE MOMENT THE LISTING GETS SHORTER ──────────────────
   // and not a frame later. positionSel is too early — it runs before
@@ -133,6 +134,8 @@ GridView {
   // whose picture was already up is not held; one that arrives after the
   // release (scrolled to, or slow) fades in on its own as before.
   property bool held: false
+  // how tall the current tile's content is — see Tile.usedH
+  property real curFit: -1
   property int heldFor: 0
   Connections {
     target: pgrid.pane
@@ -194,9 +197,13 @@ GridView {
     NumberAnimation { id: tileFade; target: tileItem; property: "opacity"; to: 1; duration: 260; easing.type: Easing.OutCubic }
     onPathChanged: tileItem.glideCheck()
     onIndexChanged: tileItem.glideCheck()
-    Component.onCompleted: tileItem.glideCheck()
+    Component.onCompleted: { tileItem.glideCheck(); if (tileItem.current) pgrid.curFit = tileItem.usedH; }
     entry: row
     current: index === pgrid.pane.sel
+    // the cursor's fit, reported by whichever tile has it (SelectCell.fitH)
+    onCurrentChanged: if (current) pgrid.curFit = tileItem.usedH
+    onUsedHChanged: if (current) pgrid.curFit = tileItem.usedH
+    detail: term.tileDetail(row, pgrid.pane.sortKey)
     dim: !!term.cutSet[path]
     ticked: pgrid.act && !!pgrid.pane.marked[path]
     live: pgrid.act

@@ -1550,7 +1550,12 @@ Item {
 
                 Rectangle {
                   anchors.fill: parent
-                  radius: 0
+                  // across the card to just inside its border (the column is
+                  // inset by menuCardPad), as every menu's band — CardBody
+                  anchors.leftMargin: 1 - Zenon.menuCardPad
+                  anchors.rightMargin: 1 - Zenon.menuCardPad
+                  topRightRadius: appEntry.index === 0 ? Math.max(0, Zenon.menuRadius - Zenon.menuCardPad) : 0
+                  bottomRightRadius: appEntry.index === appsRepeater.count - 1 ? Math.max(0, Zenon.menuRadius - Zenon.menuCardPad) : 0
                   color: appHover.containsMouse ? Zenon.border : "transparent"
                 }
 
@@ -1840,7 +1845,11 @@ Item {
           height: Zenon.menuRowHeight
           Rectangle {
             anchors.fill: parent
-            radius: 0
+            // across the card to just inside its border, as every menu's band
+            anchors.leftMargin: 1 - Zenon.menuCardPad
+            anchors.rightMargin: 1 - Zenon.menuCardPad
+            topRightRadius: Math.max(0, Zenon.menuRadius - Zenon.menuCardPad)
+            bottomRightRadius: Math.max(0, Zenon.menuRadius - Zenon.menuCardPad)
             color: confirmHover.containsMouse ? Zenon.border : "transparent"
           }
           Text {

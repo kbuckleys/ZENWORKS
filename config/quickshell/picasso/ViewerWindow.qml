@@ -5823,6 +5823,8 @@ FloatingWindow {
       PropsCard {
         id: propsCard
         width: parent.width
+        // the card's height, so its facts can scroll (PropsCard.propsView)
+        height: parent.height
         host: propsHost
         onOpened: propsBox.open = true
         onClosed: propsBox.open = false

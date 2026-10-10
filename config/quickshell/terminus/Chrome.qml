@@ -141,13 +141,14 @@ Column {
       function onTabsChanged() { Qt.callLater(() => { tabStrip.seenCount = term.tabs.length; }); }
     }
     Component.onCompleted: tabStrip.seenCount = term.tabs.length
-    // THE INACTIVE GLASS, under every tab: a cell paints only what it adds
-    // to it (see Zenon.tabOver), so nothing rebuilt or mid-fade can leave
-    // the strip without a ground — there is no window ground under it.
-    Rectangle {
-      anchors.fill: parent
-      color: Zenon.alpha(Zenon.tabAwayInk, term.tabAwayAlpha)
-    }
+    // THE TABS' GLASS IS LAID BY THE WINDOW, UNDER THE FROST (2026-10-10):
+    // painted here it lay OVER the rows scrolled up under the strip, so the
+    // active tab (at the window's alpha) hid them while the bar beside it,
+    // whose ground is under them, showed them — user's frost.png. The
+    // window's tabGlass mirrors the strip below its ScrollEdges; the cells
+    // here paint nothing unless carried. `hereCell` is where it reads the
+    // active tab from.
+    property Item hereCell: null
     property real closedCellW: 0
     function noteClose(i) {
       if (term.tabs.length < 3 && !term.alwaysTabs) return;
@@ -272,6 +273,7 @@ Column {
           required property var modelData
           required property int index
           readonly property bool here: index === term.tab
+          onHereChanged: if (here) tabStrip.hereCell = tabCell
           readonly property bool lifted: tabStrip.dragFrom === tabCell.index
             && tabStrip.dragFrom < term.tabs.length
 
@@ -313,6 +315,7 @@ Column {
           // chrome that changes while you are looking straight at it.
           opacity: 0
           Component.onCompleted: {
+            if (tabCell.here) tabStrip.hereCell = tabCell;
             const c = tabStrip.closedAt;
             if (c < 0) {
               const grew = term.tabs.length > tabStrip.seenCount;
@@ -368,8 +371,8 @@ Column {
           // lays no ground under the strip, so the active tab wears the
           // window's and an inactive one a much thinner one — the desktop
           // shows through it, and the difference reads at a glance.
-          color: here || tabCell.lifted ? term.ground(Zenon.tabOver(term.winAlpha))
-            : Zenon.alpha(Zenon.tabAwayInk, 0)
+          // (the glass itself is the window's tabGlass, under the frost)
+          color: Zenon.alpha(Zenon.tabAwayInk, 0)
           Rectangle {
             anchors.fill: parent
             visible: tabCell.lifted
@@ -867,9 +870,26 @@ Column {
               color: Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b, 0.12)
             }
 
+            // the step a menu is open on (term.sideMenuAt, set by crumbMenu)
+            HeldRing {
+              anchors.fill: parent
+              anchors.leftMargin: -5
+              anchors.rightMargin: -5
+              anchors.topMargin: -3
+              anchors.bottomMargin: -3
+              on: term.sideMenuAt === crumbLabel
+            }
+            // left goes there, middle opens it in a tab (as a sidebar row
+            // does), right is its menu — see term.crumbMenu
             MouseArea {
               anchors.fill: parent
-              onClicked: term.goTo(modelData.path)
+              acceptedButtons: Qt.LeftButton | Qt.MiddleButton | Qt.RightButton
+              onClicked: (m) => {
+                if (m.button === Qt.RightButton)
+                  term.crumbMenu(crumbLabel, m.x, m.y, modelData.path, modelData.label);
+                else if (m.button === Qt.MiddleButton) term.openInNewTab(modelData.path);
+                else term.goTo(modelData.path);
+              }
             }
           }
         }
@@ -1205,6 +1225,44 @@ Column {
       }
     }
 
+    // ── the order, beside the split (user, 2026-10-10) ────────────
+    // The sort submenu the row menu and `,` already spell out, from the
+    // bar: lit while it is open, and while the listing is in any order but
+    // name ascending, so a reordered window says so.
+    Item {
+      id: sortToggle
+      opacity: crumbBar.chromeInk
+      enabled: crumbBar.chromeLive
+      anchors.right: splitToggle.left
+      anchors.verticalCenter: crumbInner.verticalCenter
+      width: 30
+      height: crumbInner.height
+
+      Text {
+        anchors.centerIn: parent
+        // nf-fa-sort (U+F0DC), as an escape (see the hamburger's note)
+        text: "\uF0DC"
+        color: term.sortMenuOn || term.sortKey !== "name" || term.sortDesc ? Zenon.cyan
+          : (sortHov.hovered ? Zenon.white : Zenon.muted)
+        font.family: Zenon.face
+        font.weight: Zenon.weight
+        font.pixelSize: Zenon.px(15)
+        Behavior on color { ColorAnimation { duration: Zenon.fast } }
+      }
+
+      HoverHandler { id: sortHov }
+      MouseArea {
+        anchors.fill: parent
+        onClicked: {
+          const m = term.menuPopRef.menu;
+          if (m.open) { m.close(); return; }
+          term.sortMenuOn = true;
+          m.openCustom(sortToggle, { x: sortToggle.width, y: sortToggle.height },
+                       m.sortItems, false, true);
+        }
+      }
+    }
+
     // ── what is running, in a drawer ──────────────────────────────
     // A browser's downloads button, and for the same reason: work that
     // takes time is not the thing you are doing, it is a thing that is
@@ -1224,7 +1282,7 @@ Column {
       id: jobsToggle
       opacity: crumbBar.chromeInk
       enabled: crumbBar.chromeLive
-      anchors.right: splitToggle.left
+      anchors.right: sortToggle.left
       anchors.rightMargin: 2
       anchors.verticalCenter: crumbInner.verticalCenter
       readonly property bool live: Jobs.model.count > 0
@@ -1793,7 +1851,10 @@ Column {
             elide: Text.ElideMiddle
             text: (term.sendToRef.names.length === 1 ? term.sendToRef.names[0]
                 : term.sendToRef.names.length + " items") || ""
-            color: term.sendToRef.iconInk
+            // plain ink, as a row's name is (terminus.js nameKeyOf): the
+            // kind is the glyph's to say, and a name in its glyph's colour
+            // read as one coloured smear (user's colors.png, 2026-10-10)
+            color: Zenon.white
             font.family: Zenon.face
             font.weight: Zenon.weight
             font.pixelSize: Zenon.px(15)
@@ -1833,7 +1894,8 @@ Column {
             width: Math.min(implicitWidth, 260)
             elide: Text.ElideMiddle
             text: (term.sendToRef.current ? term.sendToRef.current.name : "") || ""
-            color: term.sendToRef.blocked ? Zenon.muted : Zenon.cyan
+            // and the place's name the same — its glyph carries the colour
+            color: term.sendToRef.blocked ? Zenon.muted : Zenon.white
             font.family: Zenon.face
             font.weight: Zenon.weight
             font.pixelSize: Zenon.px(15)
@@ -2934,20 +2996,9 @@ Column {
     PaneGrid { term: chrome.term; id: gridA; pane: term.paneLRef }
     PaneGrid { term: chrome.term; id: gridB; pane: term.paneRRef }
 
-    // a soft shade from the bar onto whichever grid is scrolled
-    // (TopShade.qml). Not on the lists or the columns (user, 2026-10-09):
-    // over the frosted bar it read as a drop shadow under a row strip.
-    Repeater {
-      model: [gridA, gridB]
-      delegate: TopShade {
-        required property var modelData
-        view: modelData
-        on: modelData.on
-        x: modelData.x
-        y: modelData.y
-        width: modelData.width
-      }
-    }
+    // No TopShade on the grids either (user, 2026-10-10), as on the lists
+    // and columns since 2026-10-09: under the frosted bar it read as a drop
+    // shadow. The bar's frost (ScrollEdge) is what says the view scrolled.
 
     // The listing's cursor, on the grid's two axes. Stands down for the
     // same case the lists do: with things ticked, or on the half the
@@ -2956,6 +3007,8 @@ Column {
       host: term
       view: gridA
       index: term.paneLRef.sel
+      // to the tile's own content (its box starts 4px into the cell)
+      fitH: gridA.curFit > 0 ? gridA.curFit - 4 : -1
       on: gridA.on && !term.cursorOutline(term.paneLRef)
       // As the lists do — see the note on listA's bar.
       animate: !term.visualOn
@@ -2964,6 +3017,8 @@ Column {
       host: term
       view: gridB
       index: term.paneRRef.sel
+      // to the tile's own content (its box starts 4px into the cell)
+      fitH: gridB.curFit > 0 ? gridB.curFit - 4 : -1
       on: gridB.on && !term.cursorOutline(term.paneRRef)
       animate: !term.visualOn
     }
@@ -3610,6 +3665,38 @@ Column {
       }
       filtered: term.query !== ""
     }
+
+    // ── AND OVER THE PREVIEW OF AN EMPTY DIRECTORY (user, 2026-10-10) ──
+    // The third column showed nothing at all for one, which read as a
+    // preview that had not loaded. Only once the peek has answered for
+    // the row under the cursor (previewShown, nothing in flight), at the
+    // column's resting place, eased in like the label above.
+    EmptyMark {
+      id: previewEmpty
+      x: millerBox.x + miller.slotX(2) + (miller.slotW(2) - width) / 2
+      y: (parent.height - height) / 2
+      readonly property var row: term.currentRow()
+      readonly property bool wanted: term.viewMode === "columns" && millerBox.visible
+        && term.previewKind === "dir" && term.previewFor === ""
+        && !!row && row.isDir && term.previewShown === row.path
+        && (term.previewRows || []).length === 0
+        && !term.millerAnimRef.running && !term.arriving
+      opacity: 0
+      visible: previewEmpty.opacity > 0.01
+      states: State {
+        name: "shown"
+        when: previewEmpty.wanted
+        PropertyChanges { previewEmpty.opacity: 1 }
+      }
+      transitions: Transition {
+        to: "shown"
+        NumberAnimation {
+          property: "opacity"
+          duration: Zenon.fast
+          easing.type: Zenon.travelEase
+        }
+      }
+    }
     }
 
   }
@@ -3884,7 +3971,7 @@ Column {
               anchors.verticalCenter: parent.verticalCenter
               spacing: 6
               Text {
-                text: Icons.glyphFor({ name: pick.name, isDir: !!term.portal && term.portal.directory })
+                text: Icons.glyphFor({ name: pick.name, isDir: !!term.portal && (term.portal.directory || term.portalDirSet[String(pick.modelData)] === true) })
                 color: Zenon.cyan
                 font.family: Zenon.face
                 font.weight: Zenon.weight

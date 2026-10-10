@@ -4,7 +4,7 @@
 // https://github.com/kbuckleys/
 //
 // EMPTY MARK — what a listing with nothing in it says: a large, faint glyph
-// over the word.
+// over the word — the lens over "No matches"; "Empty" is the word alone.
 //
 // The word alone, small in the middle of a whole pane, read as something that
 // had failed to load rather than as an answer. The glyph gives the page a
@@ -22,12 +22,18 @@ Column {
 
   // The search's answer rather than the directory's.
   property bool filtered: false
+  // A word of the holder's own in place of "Empty" — delphi's "No changes",
+  // "Nothing stashed" — the same mark, saying what is empty.
+  property string word: ""
 
   spacing: 10
 
+  // ONLY "No matches" keeps its glyph now: an empty directory says so in
+  // the word alone (user, 2026-10-10).
   Text {
+    visible: mark.filtered
     anchors.horizontalCenter: parent.horizontalCenter
-    // nf-fa-folder_open_o, nf-fa-search
+    // nf-fa-search
     text: mark.filtered ? "" : ""
     color: Zenon.muted
     opacity: 0.35
@@ -38,7 +44,7 @@ Column {
 
   Text {
     anchors.horizontalCenter: parent.horizontalCenter
-    text: mark.filtered ? "No matches" : "Empty"
+    text: mark.word !== "" ? mark.word : mark.filtered ? "No matches" : "Empty"
     color: Zenon.muted
     font.family: Zenon.face
     font.weight: Font.Bold

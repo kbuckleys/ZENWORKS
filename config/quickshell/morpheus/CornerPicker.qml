@@ -216,6 +216,12 @@ PopupWindow {
 
       Rectangle {
         anchors.fill: parent
+        // across the card to just inside its border, as every menu's band
+        // (CardBody); the card's last row, so it rounds into its corners
+        anchors.leftMargin: 1 - Zenon.menuCardPad
+        anchors.rightMargin: 1 - Zenon.menuCardPad
+        bottomLeftRadius: Math.max(0, Zenon.menuRadius - Zenon.menuCardPad)
+        bottomRightRadius: Math.max(0, Zenon.menuRadius - Zenon.menuCardPad)
         color: autoMa.containsMouse ? Zenon.border : "transparent"
       }
 

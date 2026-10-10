@@ -212,11 +212,28 @@ Rectangle {
       }
     }
 
-    Column {
+    // ── THE FACTS SCROLL, THE GAUGE AND THE BUTTONS STAY ──────────────
+    // A short window caps the card (Sheet's well) and the facts ran under
+    // the footer, the last of them drawn through its hint (user's
+    // properties.png, 2026-10-10). Between the two now, in a view of
+    // their own that scrolls once they do not fit.
+    Flickable {
+      id: factsView
       anchors.top: diskInfoHead.bottom
       anchors.topMargin: 8
       anchors.left: parent.left
       anchors.right: parent.right
+      anchors.bottom: diskInfoFoot.top
+      clip: true
+      contentWidth: width
+      contentHeight: factsCol.height + 8
+      interactive: contentHeight > height
+      boundsBehavior: Flickable.DragAndOvershootBounds
+      boundsMovement: Flickable.FollowBoundsBehavior
+      ElasticScroll { view: factsView; step: term.wheelStep }
+    Column {
+      id: factsCol
+      width: factsView.width
 
       Repeater {
         model: diskInfo.facts
@@ -258,6 +275,13 @@ Rectangle {
           }
         }
       }
+    }
+    }
+    Scrollbar {
+      flick: factsView
+      anchors.right: factsView.right
+      anchors.top: factsView.top
+      anchors.bottom: factsView.bottom
     }
 
     Item {

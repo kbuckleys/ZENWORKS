@@ -121,10 +121,18 @@ Item {
     // on the shell's one feel (morpheus Elastic). Not dragged: a press on a
     // row is a choice, and a menu that scrolled under it would be a menu
     // that picked the wrong row. A card that fits does not move at all.
+    // EDGE TO EDGE ACROSS, PADDED DOWN. The rows run the card's whole width,
+    // just inside its 1px border, so the highlight is a band across the menu
+    // rather than a pill floating in it (user, 2026-10-10); the padding is
+    // top and bottom only, and the labels keep their place by their own
+    // margins below.
     Flickable {
       id: flick
       anchors.fill: parent
-      anchors.margins: Zenon.menuCardPad
+      anchors.leftMargin: 1
+      anchors.rightMargin: 1
+      anchors.topMargin: Zenon.menuCardPad
+      anchors.bottomMargin: Zenon.menuCardPad
       contentWidth: width
       contentHeight: col.height
       interactive: false
@@ -145,7 +153,7 @@ Item {
             id: row
             required property var modelData
             required property int index
-            width: bg.width - 8
+            width: flick.width
             height: root.rowHeight(row.modelData)
 
             readonly property bool sep: row.modelData.isSeparator || false
@@ -164,9 +172,21 @@ Item {
             readonly property bool lit: row.on
               && (hover.containsMouse || row.index === root.activeIndex)
 
+            // The first and last rows sit against the card's round corners
+            // (menuCardPad below the top edge, 1px in from the side), so
+            // their band is rounded to the same curve, inset — square, its
+            // corner would cross the border. A square card corner (a
+            // hinged submenu) gets a square band.
+            readonly property bool first: row.index === 0
+            readonly property bool last: row.index === root.model.length - 1
+            readonly property real inner: Math.max(0, bg.radius - Zenon.menuCardPad)
             Rectangle {
               anchors.fill: parent
               color: row.lit ? Zenon.border : "transparent"
+              topLeftRadius: row.first && bg.topLeftRadius > 0 ? row.inner : 0
+              topRightRadius: row.first && bg.topRightRadius > 0 ? row.inner : 0
+              bottomLeftRadius: row.last && bg.bottomLeftRadius > 0 ? row.inner : 0
+              bottomRightRadius: row.last && bg.bottomRightRadius > 0 ? row.inner : 0
             }
 
             Rectangle {
@@ -174,10 +194,7 @@ Item {
               anchors.left: parent.left
               anchors.right: parent.right
               // EDGE TO EDGE — a separator in a menu spans the whole card, as
-              // every menu's does. The row sits inside the card's padding, so
-              // it reaches back out by exactly that much.
-              anchors.leftMargin: -Zenon.menuCardPad
-              anchors.rightMargin: -Zenon.menuCardPad
+              // every menu's does; the row already runs border to border.
               height: 1
               color: Zenon.border
               visible: row.sep
@@ -185,8 +202,9 @@ Item {
 
             Item {
               anchors.fill: parent
-              anchors.leftMargin: 12
-              anchors.rightMargin: 10
+              // where they were when the column was inset by menuCardPad
+              anchors.leftMargin: 12 + Zenon.menuCardPad - 1
+              anchors.rightMargin: 10 + Zenon.menuCardPad - 1
               visible: !row.sep
 
               // A row's mark is EITHER a glyph or an image, never both. Most of

@@ -54,7 +54,7 @@ Item {
     id: watchProc
     stdout: SplitParser {
       splitMarker: "\n"
-      onRead: (line) => { term.noteWatchHit(line); watchSettle.restart(); }
+      onRead: (line) => { term.noteWatchHit(line); dirWatch.nudge(watchSettle); }
     }
     // ── A DEAD WATCH IS INVISIBLE, WHICH IS WHY IT IS GUARDED ────────
     // inotifywait exits the moment ONE of its paths is gone. Watching
@@ -134,12 +134,34 @@ Item {
     if (best === "") return;
     term.watchHits[best] = true;
   }
+  // ── COALESCED, BUT NEVER FOR EVER ────────────────────────────────────
+  // Each event restarted its settle timer, so a directory written more often
+  // than every 250 ms — a download, a cache, a build — pushed the re-read
+  // back on every line and it never came: the listing (or the column
+  // previewing it) sat on what it held before the burst until the writing
+  // stopped. Measured headlessly (2026-10-10): a file created every 200 ms
+  // left the preview 40 files behind for 8 seconds. A burst is now answered
+  // at least once every `settleCap`, and once more when it ends.
+  readonly property int settleCap: 1000
+  function nudge(t) {
+    const now = Date.now();
+    if (!t.running) t.since = now;
+    if (now - t.since >= dirWatch.settleCap) {
+      t.stop();
+      t.since = now;
+      t.triggered();
+      return;
+    }
+    t.restart();
+  }
+
   // Coalesced. A single `cp` of a large file emits create, then a stream of
   // close_write/attrib events; re-reading the directory for each one would be
   // a find per event. One re-read once the noise stops is the same answer for
   // a fraction of the work.
   Timer {
     id: watchSettle
+    property real since: 0   // the first event of this burst — see nudge
     interval: 250
     onTriggered: {
       if (term.searchMode !== "") return;
@@ -198,7 +220,7 @@ Item {
     id: peekWatchProc
     stdout: SplitParser {
       splitMarker: "\n"
-      onRead: (line) => peekSettle.restart()
+      onRead: (line) => dirWatch.nudge(peekSettle)
     }
   }
   Timer {
@@ -213,6 +235,7 @@ Item {
   // reason: one `cp` is a stream of events and one re-read answers all of it.
   Timer {
     id: peekSettle
+    property real since: 0   // the first event of this burst — see nudge
     interval: 250
     onTriggered: term.repeek()
   }
@@ -236,7 +259,11 @@ Item {
     // The one case where the pane must be redrawn with the same row in it:
     // the directory it is showing has changed underneath. Saying so is what
     // gets it past the guard in loadPreview.
-    if (r && r.path === d) { term.previewShown = ""; term.loadPreview(); }
+    // RE-READ IN PLACE: the rows it shows stay until the new ones land.
+    // Clearing first (previewShown = "" → loadPreview empties the pane)
+    // blanked the column at every change, so a directory written to all
+    // the time — much of ~/.cache — kept flashing empty (2026-10-10).
+    if (r && r.path === d) term.verifyPeek(d);
   }
   function forgetListing(dir) {
     if (term.previewCache[dir] !== undefined) {
@@ -359,7 +386,7 @@ Item {
     id: otherWatchProc
     stdout: SplitParser {
       splitMarker: "\n"
-      onRead: (line) => { term.noteOtherHit(line); otherSettle.restart(); }
+      onRead: (line) => { term.noteOtherHit(line); dirWatch.nudge(otherSettle); }
     }
     onExited: (code) => {
       // see watchStopping
@@ -402,6 +429,7 @@ Item {
   }
   Timer {
     id: otherSettle
+    property real since: 0   // the first event of this burst — see nudge
     interval: 250
     onTriggered: {
       const hits = term.otherHits;

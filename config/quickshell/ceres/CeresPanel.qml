@@ -429,6 +429,7 @@ LayerPopup {
         // ── auth ────────────────────────────────────────────────────
         PasswordField {
           id: field
+          authSource: Ceres
           visible: popup.face === "auth"
           anchors.fill: parent
           purpose: Ceres.nextLabel

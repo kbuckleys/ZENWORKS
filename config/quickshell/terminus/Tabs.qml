@@ -95,8 +95,30 @@ Item {
       // And each half's, now that the halves keep their own.
       paneSorts: [[term.paneLRef.sortKey, term.paneLRef.sortDesc], [term.paneRRef.sortKey, term.paneRRef.sortDesc]],
       otherView: term.pas.viewMode,
-      view: term.viewMode
+      view: term.viewMode,
+      // ── A SEARCH BELONGS TO ITS TAB ───────────────────────────────────
+      // It was the window's: closing a tab mid-search left its chip on
+      // whichever tab you landed in, and escape then "went back" to the
+      // closed tab's directory (user, 2026-10-10). The rows above are the
+      // results while one is up, so this is all it takes to bring it back.
+      search: term.searchMode === "" ? null : {
+        mode: term.searchMode, query: term.searchQuery, coll: term.collOpenId,
+        backCwd: term.searchBackCwd, backSel: term.searchBackSel,
+        backView: term.searchBackView
+      }
     };
+  }
+  // Stand the window's search down without re-listing anything (loadTab is
+  // about to hand over the rows), then wear the tab's own, if it had one.
+  function takeSearch(s) {
+    if (term.searchMode !== "") term.cancelCollection();
+    term.pendingRealm = null;
+    term.collOpenId = s ? s.coll : -1;
+    term.searchMode = s ? s.mode : "";
+    term.searchQuery = s ? s.query : "";
+    term.searchBackCwd = s ? s.backCwd : "";
+    term.searchBackSel = s ? s.backSel : "";
+    term.searchBackView = s ? s.backView : null;
   }
   // Put a saved tab back on screen. `otherRaw` travels with it so stepping
   // between tabs does not re-list a directory that was already listed —
@@ -168,6 +190,9 @@ Item {
     // before the cwd, so its handler measures against this tab's trail
     term.act.crumbDeep = typeof t.crumbDeep === "string" ? t.crumbDeep : "";
     term.act.cwd = t.cwd;
+    // after the cwd (whose handlers ask whether this is a result page),
+    // before the rows and the refresh (which a result page skips)
+    term.takeSearch(t.search || null);
     term.act.query = "";
     term.chromeRef.filterField.text = "";
     term.act.marked = {};
@@ -179,7 +204,14 @@ Item {
       term.act.lastListing = (t.listing === undefined) ? null : t.listing;
     } else {
       term.act.lastListing = null;
+      // a result page that had not answered yet: nothing of this tab's to
+      // show, so not the last tab's rows either — ask again
+      if (t.search) {
+        term.act.raw = [];
+        if (t.search.mode === "find" || t.search.mode === "grep") term.runSearch();
+      }
     }
+    if (t.search) term.status = term.act.raw.length + " matches";
     // The tab's own view, not the destination directory's: arriving in a tab
     // is arriving back where you were, and a tab that rearranged itself on the
     // way in would not be the window you left.
@@ -285,6 +317,8 @@ Item {
     t.trailAt = -1;
     t.trailSel = ({});
     t.crumbDeep = "";
+    // nor searched for anything
+    t.search = null;
     // ── A NEW TAB DOES NOT INHERIT THE VIEW ──────────────────────────────
     // The state is copied off the tab you are standing in, and the view came
     // with it: opening a tab from a pictures directory in the grid put home in

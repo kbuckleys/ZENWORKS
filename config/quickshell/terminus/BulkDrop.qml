@@ -272,6 +272,9 @@ Item {
       anchors.fill: parent
       anchors.topMargin: 4
       anchors.bottomMargin: 4
+      // inside the 1px border, as every menu's band (user, 2026-10-10)
+      anchors.leftMargin: 1
+      anchors.rightMargin: 1
       clip: true
       model: drop.options
       // Follows the keyboard, so arrowing past the bottom of a clamped
@@ -294,6 +297,11 @@ Item {
         color: rowHov.hovered || drop.cursor === dropRow.index
           ? Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b, 0.16)
           : "transparent"
+        // the first and last rounded into the list's corners, inset
+        topLeftRadius: dropRow.index === 0 ? Math.max(0, Zenon.menuRadius - 4) : 0
+        topRightRadius: topLeftRadius
+        bottomLeftRadius: dropRow.index === drop.options.length - 1 ? Math.max(0, Zenon.menuRadius - 4) : 0
+        bottomRightRadius: bottomLeftRadius
 
         Text {
           anchors.left: parent.left

@@ -39,7 +39,7 @@ Item {
   signal closed()
   signal menuWanted(Item item, var rows)
 
-  implicitHeight: propsCol.implicitHeight
+  implicitHeight: propsCol.implicitHeight + propsFoot.implicitHeight
 
   // ── AS WIDE AS WHAT IT IS SAYING ──────────────────────────────────────
   // The widest fact measured (FontMetrics.advanceWidth, which a binding can
@@ -350,643 +350,676 @@ Item {
   }
 
 
-  Column {
-    id: propsCol
-    width: parent.width
+  // ── THE FACTS SCROLL, CLOSE STAYS ─────────────────────────────────────
+  // The host caps the card at its window (Sheet's well), and in a short
+  // window the facts ran on under the buttons — the card never learned to
+  // scroll (user's properties.png, 2026-10-10). The buttons are pinned to
+  // the foot now and everything above them scrolls once it does not fit.
+  // The host hands the card its height (`height: parent.height`).
+  Flickable {
+    id: propsView
+    anchors.top: parent.top
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.bottom: propsFoot.top
+    clip: true
+    contentWidth: width
+    contentHeight: propsCol.implicitHeight
+    interactive: contentHeight > height + 0.5
+    boundsBehavior: Flickable.DragAndOvershootBounds
+    boundsMovement: Flickable.FollowBoundsBehavior
+    ElasticScroll { view: propsView }
 
-    // The caption band stood here. It is the floating card's own
-    // header now — see Sheet.floating, which draws the title and glyph.
-    // Its own air stays: the sheet adds none, so a card whose first row
-    // does not carry any has to say so.
-    Item { width: 1; height: 10 }
-
-    // ── NO TAB STRIP ───────────────────────────────────────
-    // There were two pills here, Properties and Permissions, which
-    // is a lot of chrome for a card with one subject and a second
-    // page that most openings never want. The permissions row in
-    // the facts below is the way through now: it reads as a fact
-    // and acts as a door, so the card opens on what you came for
-    // and the rare thing is one click away rather than always in
-    // view. Escape on that page comes back here; see the key
-    // handler.
-
-    // picture on the left, facts on the right
-    Item {
-      id: propBody
-      visible: props.tab === 0
+    Column {
+      id: propsCol
       width: parent.width
-      height: Math.max(props.many ? 0 : propShotBox.height + 4,
-                       propFacts.implicitHeight)
 
-      // What it LOOKS like, beside what it is.
-      //
-      // A picture or a video shows itself; a font shows its own A; anything
-      // else shows the glyph the listing gives it, which is at least the
-      // mark you picked the row out by. A multi-selection shows nothing at
-      // all — there is no single thing to be a picture of, and the first
-      // item's thumbnail standing in for eleven files would be a small lie
-      // at the top of a panel of facts.
-      //
-      // Down the LEFT rather than across the top: the rows beside it are a
-      // label column and a value column, and a picture over them pushed
-      // every fact half a panel further down for no reason. On the left it
-      // sits in the margin the labels already leave.
-        Item {
-          id: propShotBox
-          anchors.left: parent.left
-          anchors.leftMargin: 18
-          anchors.verticalCenter: parent.verticalCenter
+      // The caption band stood here. It is the floating card's own
+      // header now — see Sheet.floating, which draws the title and glyph.
+      // Its own air stays: the sheet adds none, so a card whose first row
+      // does not carry any has to say so.
+      Item { width: 1; height: 10 }
 
-          // ── A PICTURE IS NOT A GLYPH, AND NEED NOT BE ITS SIZE ──
-          // Both stand here, so both were 96 — the size a 56px glyph
-          // wants to sit in with air around it, and a photograph shown at
-          // 88 on its long edge is a stamp. They answer different
-          // questions: the glyph is a MARK, the one you picked the row
-          // out by, and only has to be recognisable; the thumbnail is the
-          // thing itself, and this is the one panel where you look AT it.
-          //
-          // AS TALL AS THE FACTS BESIDE IT, which is the one measurement
-          // in this panel that means anything — the picture and the
-          // column of figures are the two halves of the answer, so they
-          // are the same height and the panel is a rectangle rather than
-          // a picture with a column hanging off it.
-          //
-          // Safe to measure against: propFacts' rows are a fixed 28 each,
-          // so its implicitHeight is a row count and does not depend on
-          // the width this box leaves it. Bound the other way round it
-          // would be a loop.
-          readonly property int glyphBox: 96
-          readonly property real shotH: Math.max(88,
-            propFacts.implicitHeight)
-          // A ceiling for panoramas: 2560x1080 as tall as the facts
-          // would still be half the card wide and crowd the figures.
-          readonly property real maxW: 320
+      // ── NO TAB STRIP ───────────────────────────────────────
+      // There were two pills here, Properties and Permissions, which
+      // is a lot of chrome for a card with one subject and a second
+      // page that most openings never want. The permissions row in
+      // the facts below is the way through now: it reads as a fact
+      // and acts as a door, so the card opens on what you came for
+      // and the rare thing is one click away rather than always in
+      // view. Escape on that page comes back here; see the key
+      // handler.
 
-          // The box IS the picture, so the facts start right beside it
-          // whatever shape it turned out to be.
-          width: props.many ? 0
-            : (propShotClip.visible ? propShotClip.width
-                                    : propShotBox.glyphBox)
-          height: propShotClip.visible ? propShotClip.height
-                                       : propShotBox.glyphBox
-          visible: !props.many
+      // picture on the left, facts on the right
+      Item {
+        id: propBody
+        visible: props.tab === 0
+        width: parent.width
+        height: Math.max(props.many ? 0 : propShotBox.height + 4,
+                         propFacts.implicitHeight)
 
-        ClippingRectangle {
-          id: propShotClip
-          anchors.centerIn: parent
-          visible: propShot.status === Image.Ready
-          color: "transparent"
-          radius: Zenon.windowRadius
+        // What it LOOKS like, beside what it is.
+        //
+        // A picture or a video shows itself; a font shows its own A; anything
+        // else shows the glyph the listing gives it, which is at least the
+        // mark you picked the row out by. A multi-selection shows nothing at
+        // all — there is no single thing to be a picture of, and the first
+        // item's thumbnail standing in for eleven files would be a small lie
+        // at the top of a panel of facts.
+        //
+        // Down the LEFT rather than across the top: the rows beside it are a
+        // label column and a value column, and a picture over them pushed
+        // every fact half a panel further down for no reason. On the left it
+        // sits in the margin the labels already leave.
+          Item {
+            id: propShotBox
+            anchors.left: parent.left
+            anchors.leftMargin: 18
+            anchors.verticalCenter: parent.verticalCenter
 
-          // sized from the decoded source, never from paintedWidth — the
-          // note over the preview pane's thumbClip has the reason
-          readonly property real ar:
-            propShot.implicitWidth > 0 && propShot.implicitHeight > 0
-              ? propShot.implicitWidth / propShot.implicitHeight : 1
-          // The facts' height, unless that would make it wider than
-          // the ceiling — then the width decides and the height follows.
-          readonly property real fitH: Math.min(propShotBox.shotH,
-            propShotBox.maxW / Math.max(0.01, propShotClip.ar))
-          width: Math.max(1, propShotClip.fitH * propShotClip.ar)
-          height: Math.max(1, propShotClip.fitH)
-
-          Image {
-            id: propShot
-            anchors.fill: parent
-            // NOT CLEARED ON CLOSE. It used to empty the moment the
-            // card was told to go, so the picture became the glyph on
-            // the first frame of the fade and the card re-laid itself
-            // out — narrower, recentred — while it was leaving.
+            // ── A PICTURE IS NOT A GLYPH, AND NEED NOT BE ITS SIZE ──
+            // Both stand here, so both were 96 — the size a 56px glyph
+            // wants to sit in with air around it, and a photograph shown at
+            // 88 on its long edge is a stamp. They answer different
+            // questions: the glyph is a MARK, the one you picked the row
+            // out by, and only has to be recognisable; the thumbnail is the
+            // thing itself, and this is the one panel where you look AT it.
             //
-            // THE POOL'S COPY FIRST, even for a picture Qt can open:
-            // a 480px JPEG decodes in a few milliseconds, so it is
-            // decoded on the spot and the card ARRIVES with its
-            // picture. An original is a decode of unknown size, so it
-            // stays asynchronous — and the card opens on the glyph and
-            // swaps — only when the pool has nothing yet.
-            readonly property string pooledFile: {
-              if (props.many) return "";
-              const r = props.rows[0];
-              if (!r || r.isDir || props.host.thumbKind(r) === "") return "";
-              return props.host.thumbFile[r.path] || "";
+            // AS TALL AS THE FACTS BESIDE IT, which is the one measurement
+            // in this panel that means anything — the picture and the
+            // column of figures are the two halves of the answer, so they
+            // are the same height and the panel is a rectangle rather than
+            // a picture with a column hanging off it.
+            //
+            // Safe to measure against: propFacts' rows are a fixed 28 each,
+            // so its implicitHeight is a row count and does not depend on
+            // the width this box leaves it. Bound the other way round it
+            // would be a loop.
+            readonly property int glyphBox: 96
+            readonly property real shotH: Math.max(88,
+              propFacts.implicitHeight)
+            // A ceiling for panoramas: 2560x1080 as tall as the facts
+            // would still be half the card wide and crowd the figures.
+            readonly property real maxW: 320
+
+            // The box IS the picture, so the facts start right beside it
+            // whatever shape it turned out to be.
+            width: props.many ? 0
+              : (propShotClip.visible ? propShotClip.width
+                                      : propShotBox.glyphBox)
+            height: propShotClip.visible ? propShotClip.height
+                                         : propShotBox.glyphBox
+            visible: !props.many
+
+          ClippingRectangle {
+            id: propShotClip
+            anchors.centerIn: parent
+            visible: propShot.status === Image.Ready
+            color: "transparent"
+            radius: Zenon.windowRadius
+
+            // sized from the decoded source, never from paintedWidth — the
+            // note over the preview pane's thumbClip has the reason
+            readonly property real ar:
+              propShot.implicitWidth > 0 && propShot.implicitHeight > 0
+                ? propShot.implicitWidth / propShot.implicitHeight : 1
+            // The facts' height, unless that would make it wider than
+            // the ceiling — then the width decides and the height follows.
+            readonly property real fitH: Math.min(propShotBox.shotH,
+              propShotBox.maxW / Math.max(0.01, propShotClip.ar))
+            width: Math.max(1, propShotClip.fitH * propShotClip.ar)
+            height: Math.max(1, propShotClip.fitH)
+
+            Image {
+              id: propShot
+              anchors.fill: parent
+              // NOT CLEARED ON CLOSE. It used to empty the moment the
+              // card was told to go, so the picture became the glyph on
+              // the first frame of the fade and the card re-laid itself
+              // out — narrower, recentred — while it was leaving.
+              //
+              // THE POOL'S COPY FIRST, even for a picture Qt can open:
+              // a 480px JPEG decodes in a few milliseconds, so it is
+              // decoded on the spot and the card ARRIVES with its
+              // picture. An original is a decode of unknown size, so it
+              // stays asynchronous — and the card opens on the glyph and
+              // swaps — only when the pool has nothing yet.
+              readonly property string pooledFile: {
+                if (props.many) return "";
+                const r = props.rows[0];
+                if (!r || r.isDir || props.host.thumbKind(r) === "") return "";
+                return props.host.thumbFile[r.path] || "";
+              }
+              source: {
+                if (props.many) return "";
+                const r = props.rows[0];
+                if (!r || r.isDir) return "";
+                if (propShot.pooledFile !== "") return "file://" + propShot.pooledFile;
+                return props.host.thumbKind(r) === "i" ? Strings.fileUrl(r.path) : "";
+              }
+              fillMode: Image.PreserveAspectFit
+              asynchronous: propShot.pooledFile === ""
+              // Decoded at twice the drawn size, so the panel is sharp on
+              // a scaled display and has something to work with if the box
+              // grows again.
+              sourceSize.width: 384
+              sourceSize.height: 384
             }
+          }
+
+          FontLoader {
+            id: propFace
             source: {
               if (props.many) return "";
               const r = props.rows[0];
-              if (!r || r.isDir) return "";
-              if (propShot.pooledFile !== "") return "file://" + propShot.pooledFile;
-              return props.host.thumbKind(r) === "i" ? Strings.fileUrl(r.path) : "";
-            }
-            fillMode: Image.PreserveAspectFit
-            asynchronous: propShot.pooledFile === ""
-            // Decoded at twice the drawn size, so the panel is sharp on
-            // a scaled display and has something to work with if the box
-            // grows again.
-            sourceSize.width: 384
-            sourceSize.height: 384
-          }
-        }
-
-        FontLoader {
-          id: propFace
-          source: {
-            if (props.many) return "";
-            const r = props.rows[0];
-            return r && !r.isDir && Terminus.isFont(r.name) ? Strings.fileUrl(r.path) : "";
-          }
-        }
-
-        Text {
-          anchors.centerIn: parent
-          visible: !propShotClip.visible
-          readonly property bool specimen: propFace.status === FontLoader.Ready
-          text: {
-            const r = props.rows[0];
-            if (!r) return "";
-            return specimen ? "Ag" : r.glyph;
-          }
-          color: {
-            const r = props.rows[0];
-            return r ? props.host.inkFor(r) : Zenon.muted;
-          }
-          font.family: specimen ? propFace.font.family
-            : Zenon.face
-          font.pixelSize: Zenon.px(56)
-        }
-    }
-
-
-      Column {
-        id: propFacts
-        anchors.left: props.many ? parent.left : propShotBox.right
-        anchors.leftMargin: props.many ? 0 : 10
-        anchors.right: parent.right
-        anchors.verticalCenter: parent.verticalCenter
-
-      // ── TAGS, WHICH ARE NOT A STRING ─────────────────────────
-      // A row of its own rather than an entry in `facts`, because
-      // every fact there is a label and a piece of text and a tag is
-      // a label and a COLOUR. Flattening them to "red · work" would
-      // hand back exactly what the colour was carrying.
-      //
-      // Absent, not empty, for an untagged file: a card that says
-      // "tags —" about most files is a row of nothing on most cards.
-      // For several files at once it is the union, with a count, since
-      // "which tags are in this selection" is the answerable question.
-      Row {
-        width: propFacts.width
-        height: 28
-        leftPadding: 18
-        rightPadding: 18
-        spacing: 12
-        visible: props.tagNames.length > 0
-
-        Text {
-          width: 118
-          height: parent.height
-          horizontalAlignment: Text.AlignRight
-          verticalAlignment: Text.AlignVCenter
-          text: "tags"
-          color: Zenon.muted
-          font.family: Zenon.face
-          font.weight: Zenon.weight
-          font.pixelSize: Zenon.px(16)
-        }
-
-        Row {
-          height: parent.height
-          spacing: 12
-
-          Repeater {
-            model: props.tagNames
-            delegate: Row {
-              required property var modelData
-              height: 28
-              spacing: 5
-
-              Text {
-                anchors.verticalCenter: parent.verticalCenter
-                text: "\uF02B"
-                color: props.host.tagInk(modelData)
-                font.family: Zenon.face
-                font.weight: Zenon.weight
-                font.pixelSize: Zenon.px(15)
-              }
-              Text {
-                anchors.verticalCenter: parent.verticalCenter
-                text: modelData
-                color: Zenon.white
-                font.family: Zenon.face
-                font.weight: Zenon.weight
-                font.pixelSize: Zenon.px(16)
-              }
+              return r && !r.isDir && Terminus.isFont(r.name) ? Strings.fileUrl(r.path) : "";
             }
           }
-        }
+
+          Text {
+            anchors.centerIn: parent
+            visible: !propShotClip.visible
+            readonly property bool specimen: propFace.status === FontLoader.Ready
+            text: {
+              const r = props.rows[0];
+              if (!r) return "";
+              return specimen ? "Ag" : r.glyph;
+            }
+            color: {
+              const r = props.rows[0];
+              return r ? props.host.inkFor(r) : Zenon.muted;
+            }
+            font.family: specimen ? propFace.font.family
+              : Zenon.face
+            font.pixelSize: Zenon.px(56)
+          }
       }
 
-      Repeater {
-        model: props.facts
 
-        delegate: Row {
-          required property var modelData
+        Column {
+          id: propFacts
+          anchors.left: props.many ? parent.left : propShotBox.right
+          anchors.leftMargin: props.many ? 0 : 10
+          anchors.right: parent.right
+          anchors.verticalCenter: parent.verticalCenter
+
+        // ── TAGS, WHICH ARE NOT A STRING ─────────────────────────
+        // A row of its own rather than an entry in `facts`, because
+        // every fact there is a label and a piece of text and a tag is
+        // a label and a COLOUR. Flattening them to "red · work" would
+        // hand back exactly what the colour was carrying.
+        //
+        // Absent, not empty, for an untagged file: a card that says
+        // "tags —" about most files is a row of nothing on most cards.
+        // For several files at once it is the union, with a count, since
+        // "which tags are in this selection" is the answerable question.
+        Row {
           width: propFacts.width
           height: 28
           leftPadding: 18
           rightPadding: 18
           spacing: 12
+          visible: props.tagNames.length > 0
 
           Text {
             width: 118
             height: parent.height
             horizontalAlignment: Text.AlignRight
             verticalAlignment: Text.AlignVCenter
-            text: modelData[0]
+            text: "tags"
             color: Zenon.muted
             font.family: Zenon.face
             font.weight: Zenon.weight
             font.pixelSize: Zenon.px(16)
           }
 
-          Text {
-            id: propValue
-            width: propFacts.width - 118 - 48
+          Row {
             height: parent.height
-            verticalAlignment: Text.AlignVCenter
-            text: modelData[1]
-            elide: Text.ElideMiddle
-            // The one row you can act on says so by looking like a link
-            // until it has an answer.
-            readonly property bool askable:
-              modelData[0] === "sha256" && props.checksum === ""
-            // The other row you can act on. Same treatment, so "this one
-            // does something" is one idea in this card rather than two.
-            readonly property bool pickable:
-              modelData[0] === "open with" && props.host.appsScanned
-            // The third. A mixed selection has no single mode, so it
-            // has no row to open and nothing to open it onto.
-            readonly property bool opensPerms:
-              modelData[0] === "permissions" && !props.many
-            readonly property bool acts: propValue.askable
-              || propValue.pickable || propValue.opensPerms
-            color: propValue.acts
-              ? (sumHov.hovered ? Zenon.cyan : Zenon.keyInk) : Zenon.white
-            font.family: Zenon.face
-            font.weight: Zenon.weight
-            font.pixelSize: Zenon.px(16)
+            spacing: 12
 
-            HoverHandler {
-              id: sumHov
-              enabled: propValue.acts
-            }
+            Repeater {
+              model: props.tagNames
+              delegate: Row {
+                required property var modelData
+                height: 28
+                spacing: 5
 
-            MouseArea {
-              anchors.fill: parent
-              enabled: propValue.acts
-              onClicked: {
-                if (propValue.opensPerms) props.tab = 1;
-                else if (propValue.pickable) props.openWithMenu(propValue);
-                else props.computeChecksum();
+                Text {
+                  anchors.verticalCenter: parent.verticalCenter
+                  text: "\uF02B"
+                  color: props.host.tagInk(modelData)
+                  font.family: Zenon.face
+                  font.weight: Zenon.weight
+                  font.pixelSize: Zenon.px(15)
+                }
+                Text {
+                  anchors.verticalCenter: parent.verticalCenter
+                  text: modelData
+                  color: Zenon.white
+                  font.family: Zenon.face
+                  font.weight: Zenon.weight
+                  font.pixelSize: Zenon.px(16)
+                }
               }
             }
           }
-        }
-      }
-
-      // ── PERMISSIONS, WHICH USED TO BE A CARD OF ITS OWN ───────
-      // Properties already listed the mode as a line of text you
-      // could read and not change, and a second sheet existed to
-      // change it. Two cards about one file, and the one you opened
-      // first was always the wrong one.
-      //
-      // The grid is the same grid, moved: same nine boxes, same
-      // presets, same keyboard. What it lost is a card, a scrim, a
-      // shadow and five registrations — and what it gained is being
-      // in the place you were already looking when you wondered.
-
-
-      }
-    }
-
-    Item { width: 1; height: 6 }
-
-    Column {
-      id: permGrid
-      width: parent.width
-      readonly property int gap: 12
-      readonly property int labelW: 78
-      readonly property int cellW: 62
-      readonly property int octW: 40
-      // The tab AND something to show one for: a mixed selection has
-      // no tab to reach this page with, so it can never be on it.
-      visible: props.tab === 1 && props.rows.length > 0 && !props.many
-
-
-    // ONE RHYTHM. Everything below the title is 12px apart and the grid
-    // is centred rather than left-padded — it used to start 40px in and
-    // end 146px short of the right edge, which is what made the card
-    // look like it was leaning.
-
-    // The caption band stood here. It is the floating card's own
-    // header now — see Sheet.floating, which draws the title and glyph.
-    // The rhythm's own gap stays: the sheet adds no air, so the first
-    // row has to bring it like every other row does.
-    Item { width: 1; height: permGrid.gap }
-
-    // The answer in both spellings on one line — the octal you would
-    // type at chmod and the rwx string ls prints. They are the same
-    // number said twice, so they belong side by side rather than stacked.
-    Row {
-      anchors.horizontalCenter: parent.horizontalCenter
-      spacing: 16
-
-      // ── AND YOU CAN TYPE IT ─────────────────────────────────
-      // Clicking nine boxes to say "750" is the long way round when
-      // the number is already in your head. The octal is a field:
-      // three digits (or the nine rwx letters) and the grid below
-      // follows as you type; Return or a click away hands the keys
-      // back to the sheet, Escape puts the number back as it was.
-      Item {
-        anchors.verticalCenter: parent.verticalCenter
-        width: permOctal.contentWidth + 4
-        height: permOctal.contentHeight
-        readonly property string shown: ("000" + (props.permMode & 511).toString(8)).slice(-3)
-
-        TextInput {
-          id: permOctal
-          anchors.centerIn: parent
-          width: Math.max(contentWidth, 10)
-          text: parent.shown
-          maximumLength: 9
-          color: Zenon.cyan
-          selectionColor: Zenon.selBg
-          selectedTextColor: Zenon.white
-          font.family: Zenon.faceMono
-          font.weight: Font.Bold
-          font.pixelSize: Zenon.px(30)
-          cursorDelegate: Caret { field: permOctal }
-          selectByMouse: true
-          // valid as you go: octal digits, or the rwx spelling
-          readonly property int parsed: Terminus.parseModeText(permOctal.text)
-          onTextEdited: if (permOctal.parsed >= 0)
-            props.permMode = (props.permMode & ~511) | permOctal.parsed
-          onActiveFocusChanged: {
-            if (permOctal.activeFocus) { permOctal.selectAll(); return; }
-            permOctal.text = Qt.binding(() => permOctal.parent.shown);
-          }
-          onAccepted: dialogKeys.forceActiveFocus()
-          Keys.onEscapePressed: {
-            props.permMode = props.permWas;
-            dialogKeys.forceActiveFocus();
-          }
-        }
-        // the field's own line, so it reads as something to click
-        Rectangle {
-          anchors.top: permOctal.bottom
-          anchors.horizontalCenter: permOctal.horizontalCenter
-          width: permOctal.width + 6
-          height: 1
-          color: permOctal.activeFocus
-            ? (permOctal.parsed >= 0 ? Zenon.cyan : Zenon.red)
-            : (permOctalMa.containsMouse ? Zenon.border : "transparent")
-        }
-        MouseArea {
-          id: permOctalMa
-          anchors.fill: parent
-          hoverEnabled: true
-          cursorShape: Qt.IBeamCursor
-          acceptedButtons: Qt.NoButton
-        }
-      }
-
-      Rectangle {
-        anchors.verticalCenter: parent.verticalCenter
-        width: 1
-        height: 24
-        color: Zenon.border
-      }
-
-      Text {
-        anchors.verticalCenter: parent.verticalCenter
-        text: Terminus.modeString(props.permMode)
-        color: Zenon.sand
-        font.family: Zenon.faceMono
-        font.weight: Font.Bold
-        font.pixelSize: Zenon.px(21)
-      }
-    }
-
-    Item { width: 1; height: permGrid.gap }
-
-    // The four modes anyone actually types. A permissions dialog whose
-    // quickest route to 755 is nine clicks is a dialog that has not
-    // finished the job.
-    Row {
-      anchors.horizontalCenter: parent.horizontalCenter
-      spacing: 8
-
-      Repeater {
-        model: [
-          ["644", 420], ["755", 493], ["600", 384], ["700", 448]
-        ]
-
-        delegate: Rectangle {
-          required property var modelData
-          readonly property bool on: (props.permMode & 511) === modelData[1]
-          width: 62
-          height: 24
-          radius: 4
-          color: on ? Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b, 0.20)
-            : (presetHov.hovered ? Zenon.border : "transparent")
-          border.width: 1
-          border.color: Zenon.border
-          Behavior on color {
-            ColorAnimation { duration: Zenon.fast; easing.type: Zenon.ease }
-          }
-
-          Text {
-            anchors.centerIn: parent
-            text: modelData[0]
-            color: parent.on ? Zenon.cyan : Zenon.muted
-            font.family: Zenon.faceMono
-            font.weight: Zenon.weight
-            font.pixelSize: Zenon.px(14)
-          }
-
-          HoverHandler { id: presetHov }
-          MouseArea {
-            anchors.fill: parent
-            // the high bits — setuid and friends — are left alone: this
-            // is a shortcut for the nine, not a reset of the whole mode
-            onClicked: props.permMode = (props.permMode & ~511) | modelData[1]
-          }
-        }
-      }
-    }
-
-    Item { width: 1; height: permGrid.gap + 2 }
-
-    Rectangle {
-      height: 1
-      color: Zenon.border
-    }
-
-    Item { width: 1; height: permGrid.gap }
-
-    // A GRID with its columns named, rather than three unlabelled rows
-    // of three: r, w and x are not obvious from the boxes alone, and the
-    // heading costs one row of small type.
-    Row {
-      anchors.horizontalCenter: parent.horizontalCenter
-      height: 18
-
-      Item { width: permGrid.labelW; height: 1 }
-      Repeater {
-        model: ["read", "write", "exec"]
-        delegate: Text {
-          required property var modelData
-          width: permGrid.cellW
-          height: 18
-          horizontalAlignment: Text.AlignHCenter
-          verticalAlignment: Text.AlignVCenter
-          text: modelData
-          color: Zenon.border
-          font.family: Zenon.face
-          font.weight: Zenon.weight
-          font.pixelSize: Zenon.px(12)
-        }
-      }
-      Item { width: permGrid.octW; height: 1 }
-    }
-
-    // three rows of three, in the order chmod writes them
-    Repeater {
-      model: [["owner", 6], ["group", 3], ["other", 0]]
-
-      delegate: Row {
-        id: permRow
-        required property var modelData
-        required property int index
-        readonly property int shift: modelData[1]
-        anchors.horizontalCenter: parent.horizontalCenter
-        height: 34
-
-        Text {
-          width: permGrid.labelW
-          height: parent.height
-          verticalAlignment: Text.AlignVCenter
-          text: modelData[0]
-          color: Zenon.white
-          font.family: Zenon.face
-          font.weight: Zenon.weight
-          font.pixelSize: Zenon.px(16)
         }
 
         Repeater {
-          model: [["r", 4], ["w", 2], ["x", 1]]
+          model: props.facts
 
-          delegate: Item {
+          delegate: Row {
             required property var modelData
-            required property int index
-            width: permGrid.cellW
-            height: parent.height
+            width: propFacts.width
+            height: 28
+            leftPadding: 18
+            rightPadding: 18
+            spacing: 12
 
-            readonly property int bit: modelData[1] << permRow.shift
-            readonly property bool on: (props.permMode & bit) !== 0
-            readonly property bool here:
-              props.permCursor === permRow.index * 3 + index
-
-            Rectangle {
-              anchors.centerIn: parent
-              width: 50
-              height: 26
-              radius: 4
-              color: parent.on
-                ? Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b, 0.20)
-                : (bitHov.hovered ? Zenon.border : "transparent")
-              border.width: 1
-              border.color: Zenon.border
-              Behavior on color {
-                ColorAnimation { duration: Zenon.fast; easing.type: Zenon.ease }
-              }
-
-              Text {
-                anchors.centerIn: parent
-                text: modelData[0]
-                color: parent.parent.on ? Zenon.cyan : Zenon.muted
-                font.family: Zenon.faceMono
-                font.weight: Font.Bold
-                font.pixelSize: Zenon.px(16)
-              }
+            Text {
+              width: 118
+              height: parent.height
+              horizontalAlignment: Text.AlignRight
+              verticalAlignment: Text.AlignVCenter
+              text: modelData[0]
+              color: Zenon.muted
+              font.family: Zenon.face
+              font.weight: Zenon.weight
+              font.pixelSize: Zenon.px(16)
             }
 
-            HoverHandler { id: bitHov }
-            MouseArea {
-              anchors.fill: parent
-              onClicked: {
-                props.permCursor = permRow.index * 3 + parent.index;
-                props.permMode = props.permMode ^ parent.bit;
+            Text {
+              id: propValue
+              width: propFacts.width - 118 - 48
+              height: parent.height
+              verticalAlignment: Text.AlignVCenter
+              text: modelData[1]
+              elide: Text.ElideMiddle
+              // The one row you can act on says so by looking like a link
+              // until it has an answer.
+              readonly property bool askable:
+                modelData[0] === "sha256" && props.checksum === ""
+              // The other row you can act on. Same treatment, so "this one
+              // does something" is one idea in this card rather than two.
+              readonly property bool pickable:
+                modelData[0] === "open with" && props.host.appsScanned
+              // The third. A mixed selection has no single mode, so it
+              // has no row to open and nothing to open it onto.
+              readonly property bool opensPerms:
+                modelData[0] === "permissions" && !props.many
+              readonly property bool acts: propValue.askable
+                || propValue.pickable || propValue.opensPerms
+              color: propValue.acts
+                ? (sumHov.hovered ? Zenon.cyan : Zenon.keyInk) : Zenon.white
+              font.family: Zenon.face
+              font.weight: Zenon.weight
+              font.pixelSize: Zenon.px(16)
+
+              HoverHandler {
+                id: sumHov
+                enabled: propValue.acts
+              }
+
+              MouseArea {
+                anchors.fill: parent
+                enabled: propValue.acts
+                onClicked: {
+                  if (propValue.opensPerms) props.tab = 1;
+                  else if (propValue.pickable) props.openWithMenu(propValue);
+                  else props.computeChecksum();
+                }
               }
             }
           }
         }
 
-        // This row's own octal digit, so the three boxes and the number
-        // at the top are visibly the same statement.
-        Text {
-          width: permGrid.octW
-          height: parent.height
-          horizontalAlignment: Text.AlignHCenter
-          verticalAlignment: Text.AlignVCenter
-          text: String((props.permMode >> permRow.shift) & 7)
-          color: Zenon.muted
-          font.family: Zenon.faceMono
-          font.weight: Zenon.weight
-          font.pixelSize: Zenon.px(15)
+        // ── PERMISSIONS, WHICH USED TO BE A CARD OF ITS OWN ───────
+        // Properties already listed the mode as a line of text you
+        // could read and not change, and a second sheet existed to
+        // change it. Two cards about one file, and the one you opened
+        // first was always the wrong one.
+        //
+        // The grid is the same grid, moved: same nine boxes, same
+        // presets, same keyboard. What it lost is a card, a scrim, a
+        // shadow and five registrations — and what it gained is being
+        // in the place you were already looking when you wondered.
+
+
         }
       }
-    }
 
-    Item { width: 1; height: permGrid.gap + 2 }
+      Item { width: 1; height: 6 }
 
-    Rectangle {
-      height: 1
-      color: Zenon.border
-    }
+      Column {
+        id: permGrid
+        width: parent.width
+        readonly property int gap: 12
+        readonly property int labelW: 78
+        readonly property int cellW: 62
+        readonly property int octW: 40
+        // The tab AND something to show one for: a mixed selection has
+        // no tab to reach this page with, so it can never be on it.
+        visible: props.tab === 1 && props.rows.length > 0 && !props.many
 
-    // ── ONLY WHEN THERE IS SOMETHING TO COMMIT ──────────────
-    // The permissions CARD had Cancel and Apply because it was a
-    // dialog: it existed to ask a question and had to be answered.
-    // Properties is not — you open it to read, and most of the time
-    // you will never touch a box. So the row is absent until the
-    // grid differs from the file, and "Cancel" became "Revert",
-    // which is what it now means: put the boxes back, stay here.
-    Item {
-      width: parent.width
-      height: props.permDirty ? 54 : 8
-      visible: true
 
+      // ONE RHYTHM. Everything below the title is 12px apart and the grid
+      // is centred rather than left-padded — it used to start 40px in and
+      // end 146px short of the right edge, which is what made the card
+      // look like it was leaning.
+
+      // The caption band stood here. It is the floating card's own
+      // header now — see Sheet.floating, which draws the title and glyph.
+      // The rhythm's own gap stays: the sheet adds no air, so the first
+      // row has to bring it like every other row does.
+      Item { width: 1; height: permGrid.gap }
+
+      // The answer in both spellings on one line — the octal you would
+      // type at chmod and the rwx string ls prints. They are the same
+      // number said twice, so they belong side by side rather than stacked.
       Row {
-        anchors.centerIn: parent
-        spacing: 12
-        visible: props.permDirty
+        anchors.horizontalCenter: parent.horizontalCenter
+        spacing: 16
 
-        DialogButton {
-          label: "Revert"
-          ink: Zenon.muted
-          onClicked: props.permMode = props.permWas
+        // ── AND YOU CAN TYPE IT ─────────────────────────────────
+        // Clicking nine boxes to say "750" is the long way round when
+        // the number is already in your head. The octal is a field:
+        // three digits (or the nine rwx letters) and the grid below
+        // follows as you type; Return or a click away hands the keys
+        // back to the sheet, Escape puts the number back as it was.
+        Item {
+          anchors.verticalCenter: parent.verticalCenter
+          width: permOctal.contentWidth + 4
+          height: permOctal.contentHeight
+          readonly property string shown: ("000" + (props.permMode & 511).toString(8)).slice(-3)
+
+          TextInput {
+            id: permOctal
+            anchors.centerIn: parent
+            width: Math.max(contentWidth, 10)
+            text: parent.shown
+            maximumLength: 9
+            color: Zenon.cyan
+            selectionColor: Zenon.selBg
+            selectedTextColor: Zenon.white
+            font.family: Zenon.faceMono
+            font.weight: Font.Bold
+            font.pixelSize: Zenon.px(30)
+            cursorDelegate: Caret { field: permOctal }
+            selectByMouse: true
+            // valid as you go: octal digits, or the rwx spelling
+            readonly property int parsed: Terminus.parseModeText(permOctal.text)
+            onTextEdited: if (permOctal.parsed >= 0)
+              props.permMode = (props.permMode & ~511) | permOctal.parsed
+            onActiveFocusChanged: {
+              if (permOctal.activeFocus) { permOctal.selectAll(); return; }
+              permOctal.text = Qt.binding(() => permOctal.parent.shown);
+            }
+            onAccepted: dialogKeys.forceActiveFocus()
+            Keys.onEscapePressed: {
+              props.permMode = props.permWas;
+              dialogKeys.forceActiveFocus();
+            }
+          }
+          // the field's own line, so it reads as something to click
+          Rectangle {
+            anchors.top: permOctal.bottom
+            anchors.horizontalCenter: permOctal.horizontalCenter
+            width: permOctal.width + 6
+            height: 1
+            color: permOctal.activeFocus
+              ? (permOctal.parsed >= 0 ? Zenon.cyan : Zenon.red)
+              : (permOctalMa.containsMouse ? Zenon.border : "transparent")
+          }
+          MouseArea {
+            id: permOctalMa
+            anchors.fill: parent
+            hoverEnabled: true
+            cursorShape: Qt.IBeamCursor
+            acceptedButtons: Qt.NoButton
+          }
         }
 
-        DialogButton {
-          label: "Apply"
-          ink: Zenon.cyan
-          primary: true
-          onClicked: props.applyPerms()
+        Rectangle {
+          anchors.verticalCenter: parent.verticalCenter
+          width: 1
+          height: 24
+          color: Zenon.border
+        }
+
+        Text {
+          anchors.verticalCenter: parent.verticalCenter
+          text: Terminus.modeString(props.permMode)
+          color: Zenon.sand
+          font.family: Zenon.faceMono
+          font.weight: Font.Bold
+          font.pixelSize: Zenon.px(21)
         }
       }
+
+      Item { width: 1; height: permGrid.gap }
+
+      // The four modes anyone actually types. A permissions dialog whose
+      // quickest route to 755 is nine clicks is a dialog that has not
+      // finished the job.
+      Row {
+        anchors.horizontalCenter: parent.horizontalCenter
+        spacing: 8
+
+        Repeater {
+          model: [
+            ["644", 420], ["755", 493], ["600", 384], ["700", 448]
+          ]
+
+          delegate: Rectangle {
+            required property var modelData
+            readonly property bool on: (props.permMode & 511) === modelData[1]
+            width: 62
+            height: 24
+            radius: 4
+            color: on ? Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b, 0.20)
+              : (presetHov.hovered ? Zenon.border : "transparent")
+            border.width: 1
+            border.color: Zenon.border
+            Behavior on color {
+              ColorAnimation { duration: Zenon.fast; easing.type: Zenon.ease }
+            }
+
+            Text {
+              anchors.centerIn: parent
+              text: modelData[0]
+              color: parent.on ? Zenon.cyan : Zenon.muted
+              font.family: Zenon.faceMono
+              font.weight: Zenon.weight
+              font.pixelSize: Zenon.px(14)
+            }
+
+            HoverHandler { id: presetHov }
+            MouseArea {
+              anchors.fill: parent
+              // the high bits — setuid and friends — are left alone: this
+              // is a shortcut for the nine, not a reset of the whole mode
+              onClicked: props.permMode = (props.permMode & ~511) | modelData[1]
+            }
+          }
+        }
+      }
+
+      Item { width: 1; height: permGrid.gap + 2 }
+
+      Rectangle {
+        height: 1
+        color: Zenon.border
+      }
+
+      Item { width: 1; height: permGrid.gap }
+
+      // A GRID with its columns named, rather than three unlabelled rows
+      // of three: r, w and x are not obvious from the boxes alone, and the
+      // heading costs one row of small type.
+      Row {
+        anchors.horizontalCenter: parent.horizontalCenter
+        height: 18
+
+        Item { width: permGrid.labelW; height: 1 }
+        Repeater {
+          model: ["read", "write", "exec"]
+          delegate: Text {
+            required property var modelData
+            width: permGrid.cellW
+            height: 18
+            horizontalAlignment: Text.AlignHCenter
+            verticalAlignment: Text.AlignVCenter
+            text: modelData
+            color: Zenon.border
+            font.family: Zenon.face
+            font.weight: Zenon.weight
+            font.pixelSize: Zenon.px(12)
+          }
+        }
+        Item { width: permGrid.octW; height: 1 }
+      }
+
+      // three rows of three, in the order chmod writes them
+      Repeater {
+        model: [["owner", 6], ["group", 3], ["other", 0]]
+
+        delegate: Row {
+          id: permRow
+          required property var modelData
+          required property int index
+          readonly property int shift: modelData[1]
+          anchors.horizontalCenter: parent.horizontalCenter
+          height: 34
+
+          Text {
+            width: permGrid.labelW
+            height: parent.height
+            verticalAlignment: Text.AlignVCenter
+            text: modelData[0]
+            color: Zenon.white
+            font.family: Zenon.face
+            font.weight: Zenon.weight
+            font.pixelSize: Zenon.px(16)
+          }
+
+          Repeater {
+            model: [["r", 4], ["w", 2], ["x", 1]]
+
+            delegate: Item {
+              required property var modelData
+              required property int index
+              width: permGrid.cellW
+              height: parent.height
+
+              readonly property int bit: modelData[1] << permRow.shift
+              readonly property bool on: (props.permMode & bit) !== 0
+              readonly property bool here:
+                props.permCursor === permRow.index * 3 + index
+
+              Rectangle {
+                anchors.centerIn: parent
+                width: 50
+                height: 26
+                radius: 4
+                color: parent.on
+                  ? Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b, 0.20)
+                  : (bitHov.hovered ? Zenon.border : "transparent")
+                border.width: 1
+                border.color: Zenon.border
+                Behavior on color {
+                  ColorAnimation { duration: Zenon.fast; easing.type: Zenon.ease }
+                }
+
+                Text {
+                  anchors.centerIn: parent
+                  text: modelData[0]
+                  color: parent.parent.on ? Zenon.cyan : Zenon.muted
+                  font.family: Zenon.faceMono
+                  font.weight: Font.Bold
+                  font.pixelSize: Zenon.px(16)
+                }
+              }
+
+              HoverHandler { id: bitHov }
+              MouseArea {
+                anchors.fill: parent
+                onClicked: {
+                  props.permCursor = permRow.index * 3 + parent.index;
+                  props.permMode = props.permMode ^ parent.bit;
+                }
+              }
+            }
+          }
+
+          // This row's own octal digit, so the three boxes and the number
+          // at the top are visibly the same statement.
+          Text {
+            width: permGrid.octW
+            height: parent.height
+            horizontalAlignment: Text.AlignHCenter
+            verticalAlignment: Text.AlignVCenter
+            text: String((props.permMode >> permRow.shift) & 7)
+            color: Zenon.muted
+            font.family: Zenon.faceMono
+            font.weight: Zenon.weight
+            font.pixelSize: Zenon.px(15)
+          }
+        }
+      }
+
+      Item { width: 1; height: permGrid.gap + 2 }
+
+      Rectangle {
+        height: 1
+        color: Zenon.border
+      }
+
+      // ── ONLY WHEN THERE IS SOMETHING TO COMMIT ──────────────
+      // The permissions CARD had Cancel and Apply because it was a
+      // dialog: it existed to ask a question and had to be answered.
+      // Properties is not — you open it to read, and most of the time
+      // you will never touch a box. So the row is absent until the
+      // grid differs from the file, and "Cancel" became "Revert",
+      // which is what it now means: put the boxes back, stay here.
+      Item {
+        width: parent.width
+        height: props.permDirty ? 54 : 8
+        visible: true
+
+        Row {
+          anchors.centerIn: parent
+          spacing: 12
+          visible: props.permDirty
+
+          DialogButton {
+            label: "Revert"
+            ink: Zenon.muted
+            onClicked: props.permMode = props.permWas
+          }
+
+          DialogButton {
+            label: "Apply"
+            ink: Zenon.cyan
+            primary: true
+            onClicked: props.applyPerms()
+          }
+        }
+      }
+      }
+      Item { width: 1; height: 10 }
     }
-    }
-    Item { width: 1; height: 10 }
+  }
+  Scrollbar {
+    flick: propsView
+    anchors.right: propsView.right
+    anchors.top: propsView.top
+    anchors.bottom: propsView.bottom
+  }
+
+  Column {
+    id: propsFoot
+    anchors.bottom: parent.bottom
+    width: parent.width
 
     Rectangle {
       width: parent.width

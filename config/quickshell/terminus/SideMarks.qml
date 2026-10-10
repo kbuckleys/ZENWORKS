@@ -302,6 +302,25 @@ Item {
     term.confirmRef.askMany(heading, detail,
       [{ label: "Format", ink: Zenon.red, act: onYes }], items);
   }
+  // ── THE TRASH'S OWN MENU (user, 2026-10-10) ─────────────────────────
+  // It had none: right click did what a left click does. Opening it,
+  // and emptying it — the one thing you go to a trash's row to do — which
+  // asks first (emptyTrash), as `D` in it does.
+  function trashMenu(item, x, y) {
+    const dir = Terminus.trashFilesDir();
+    const out = [
+      { label: "Open", act: () => term.goTo(dir) },
+      { label: "Open in new tab", act: () => term.newTab(dir) },
+      { sep: true },
+      { label: "Copy path", act: () => term.copyText(dir, "copied " + dir) }
+    ];
+    if (term.trashCount > 0) {
+      out.push({ sep: true });
+      out.push({ label: "Empty trash\u2026", act: () => term.emptyTrash() });
+    }
+    term.menuPopRef.menu.openCustom(item, { x: x, y: y }, out, false);
+    term.sideMenuAt = item;
+  }
   function diskMenu(item, x, y, d) {
     if (!d) return;
     const on = d.mount !== "";
