@@ -48,6 +48,7 @@ PACKAGES=(
   exfatprogs dosfstools btrfs-progs xfsprogs f2fs-tools
   # terminal & shell
   kitty zsh zoxide neovim git curl fastfetch stow
+  openssh glab github-cli 
   # system & packages
   pacman-contrib expac gawk bandwhich iotop solaar glib2 gtk3 nodejs
   # fonts
