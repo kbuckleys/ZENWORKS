@@ -294,7 +294,7 @@ WRITES = {"stage", "stageAll", "unstage", "unstageAll", "discard", "clean",
           "stashPush", "stashApply", "stashDrop", "stashBranch",
           "worktreeAdd", "worktreeRemove", "worktreePrune", "merge",
           "cherryPick", "revert", "rebase", "rebaseInteractive", "sequence",
-          "reset", "take", "markResolved", "pullCheckout", "connect"}
+          "reset", "take", "markResolved", "pullCheckout", "connect", "bringBack"}
 
 # Request op → Repo method, where the names differ.
 ALIAS = {"files": "files_in", "refs": "refs", "lastMessage": "last_message"}

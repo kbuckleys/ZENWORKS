@@ -320,6 +320,42 @@ function messageNote(msg) {
   return { ok: true, text: String(n), ink: "muted" };
 }
 
+// A message for a commit left without one, from what is staged: what was
+// done to which files — "Add README.md and LICENSE", "Update install,
+// remove LICENSE", "Update a.qml, b.js and 12 more". A verb per kind of
+// change, the most files first; the whole kept under 72 characters.
+// staged: [{ path, kind }].
+function autoMessage(staged) {
+  var verbs = { added: "add", modified: "update", typechange: "update", deleted: "remove",
+                renamed: "rename", copied: "copy" };
+  var order = ["update", "add", "remove", "rename", "copy"];
+  var by = {};
+  for (var i = 0; i < (staged || []).length; i++) {
+    var v = verbs[staged[i].kind] || "update";
+    (by[v] = by[v] || []).push(baseName(staged[i].path));
+  }
+  var groups = order.filter(function (v) { return by[v]; })
+    .sort(function (a, b) { return by[b].length - by[a].length; });
+  if (groups.length === 0) return "";
+  function names(list, room) {
+    var shown = list.slice(0, room);
+    var more = list.length - shown.length;
+    if (more > 0) return shown.join(", ") + " and " + more + " more";
+    if (shown.length === 1) return shown[0];
+    return shown.slice(0, -1).join(", ") + " and " + shown[shown.length - 1];
+  }
+  // as many names as fit: three for one kind of change, fewer for more
+  for (var room = groups.length === 1 ? 3 : 2; room >= 0; room--) {
+    var parts = groups.map(function (v) {
+      return room === 0 ? v + " " + by[v].length + (by[v].length === 1 ? " file" : " files") : v + " " + names(by[v], room);
+    });
+    var msg = parts.join(", ");
+    msg = msg.charAt(0).toUpperCase() + msg.slice(1);
+    if (msg.length <= 72 || room === 0) return msg;
+  }
+  return "";
+}
+
 // ── REMOTES ─────────────────────────────────────────────────────────────
 // A remote's URL → {host, full, web}: github.com/owner/name from any of
 // https://github.com/o/n(.git), git@github.com:o/n(.git), ssh://git@…/o/n.

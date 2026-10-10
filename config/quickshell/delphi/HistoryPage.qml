@@ -32,10 +32,16 @@ Item {
   readonly property string subtitle: pg.planning ? "onto " + D.short(plan.base) + "  ·  drag or alt ↑↓ to reorder"
     : pg.commits.length + (pg.ended ? "" : "+") + " commits" + (pg.query !== "" ? " matching “" + pg.query + "”" : "")
   readonly property var hints: pg.planning ? plan.hints
-    : pg.area === "files" ? [["↑↓", "files"], ["shift ↑↓", "diff"], ["e", "edit"], ["tab", "commits"]]
+    : pg.area === "files" ? [["↑↓", "files"], ["shift ↑↓", "diff"], ["e", "edit"]]
+        .concat(pg.shownFiles[pg.fileSel] && pg.shownFiles[pg.fileSel].status === "D" ? [["r", "bring back"]] : []).concat([["tab", "commits"]])
     : [["↑↓", "commits"], ["tab", "files"], ["/", "search"], ["c", "copy id"], ["b", "branch here"],
        ["p", "cherry-pick"], ["i", "rework from here"], ["menu", "more"]]
-  readonly property var buttons: pg.planning ? plan.buttons : []
+  // what the chosen commit removed: each can be brought back from it
+  readonly property var removed: pg.shownFiles.filter((f) => f.status === "D")
+  readonly property var buttons: pg.planning ? plan.buttons : [
+    { label: pg.removed.length === 1 ? "Bring back " + D.baseName(pg.removed[0].path) : "Bring back " + pg.removed.length + " removed",
+      visible: pg.removed.length > 0, run: () => pg.bringBack(pg.removed) },
+  ]
 
   function takeFocus() {
     if (pg.planning) plan.takeFocus();
@@ -106,6 +112,12 @@ Item {
   // ── THE COMMIT ─────────────────────────────────────────────────────────
   property var message: null
   property var files: []
+  // the files as filtered (the field above them; / in the files): every
+  // key, the selection and Bring back act on these
+  property string fileQuery: ""
+  readonly property var shownFiles: pg.fileQuery === "" ? pg.files
+    : pg.files.filter((f) => (f.path + " " + (f.from || "")).toLowerCase().indexOf(pg.fileQuery.toLowerCase()) >= 0)
+  onFileQueryChanged: { pg.fileSel = 0; pg.loadFileDiff(); }
   property int fileSel: 0
   property var diffFiles: []
   property string area: "commits"
@@ -123,24 +135,41 @@ Item {
     });
   }
   function loadFileDiff() {
-    const c = pg.commit, f = pg.files[pg.fileSel];
+    const c = pg.commit, f = pg.shownFiles[pg.fileSel];
     if (!c || !f) { pg.diffFiles = []; return; }
     const sha = c.sha, path = f.path;
     pg.win.mgr.call("show", pg.win.root, { rev: sha, path: path, budget: 6000 }, (ok, res) => { if (!pg) return;
-      if (ok && pg.commit && pg.commit.sha === sha && pg.files[pg.fileSel] && pg.files[pg.fileSel].path === path) {
+      if (ok && pg.commit && pg.commit.sha === sha && pg.shownFiles[pg.fileSel] && pg.shownFiles[pg.fileSel].path === path) {
         pg.diffFiles = res.files;
         diff.toFirst();
       }
     });
   }
   function moveFile(d) {
-    if (pg.files.length === 0) return;
-    pg.fileSel = Math.max(0, Math.min(pg.files.length - 1, pg.fileSel + d));
+    if (pg.shownFiles.length === 0) return;
+    pg.fileSel = Math.max(0, Math.min(pg.shownFiles.length - 1, pg.fileSel + d));
     fileList.positionViewAtIndex(pg.fileSel, ListView.Contain);
     pg.loadFileDiff();
   }
 
   // ── WHAT CAN BE DONE FROM A COMMIT ─────────────────────────────────────
+  // BRING BACK what it removed: as each was just before it, on disk and
+  // staged — to commit and push, and it is back (user, 2026-10-11: LICENSE
+  // and README.md went with a "Stage all" of a folder that lacked them).
+  function bringBack(fs) {
+    const c = pg.commit;
+    if (!c || !fs || fs.length === 0) return;
+    const names = fs.map((f) => D.baseName(f.path));
+    pg.win.confirm({ question: "Bring back " + (fs.length === 1 ? names[0] : fs.length + " files") + "?", glyph: "", ink: Zenon.cyan,
+      detail: "As " + (fs.length === 1 ? "it was" : "they were") + " just before " + D.short(c.sha) + " “" + D.subjectOf(c.subject) + "”. "
+        + (fs.length === 1 ? "It is" : "They are") + " put back and staged: commit and push to have " + (fs.length === 1 ? "it" : "them") + " on the remote again.",
+      items: fs.slice(0, 8).map((f) => f.path).concat(fs.length > 8 ? ["… and " + (fs.length - 8) + " more"] : []),
+      verb: "Bring back",
+      then: () => pg.win.act("bringBack", { sha: c.sha, paths: fs.map((f) => f.path) }, {
+        said: "Brought back " + (fs.length === 1 ? names[0] : fs.length + " files") + " — staged, ready to commit",
+        then: () => pg.win.setPage("changes") }) });
+  }
+
   function branchHere(c) {
     pg.win.ask({ title: "A branch at " + D.short(c.sha), glyph: "",
       detail: c.subject, fields: [{ key: "name", label: "Name", hint: "feature/what-it-is" }],
@@ -203,7 +232,7 @@ Item {
     if (pg.planning) return plan.key(e);
     const k = e.key, ctrl = e.modifiers & Qt.ControlModifier, shift = e.modifiers & Qt.ShiftModifier;
     if (ctrl) return false;
-    if (k === Qt.Key_Slash) { search.claim(); return true; }
+    if (k === Qt.Key_Slash) { if (pg.area === "files") fileFilter.claim(); else search.claim(); return true; }
     if (k === Qt.Key_Tab || k === Qt.Key_Backtab) { pg.area = pg.area === "files" ? "commits" : "files"; return true; }
     if (pg.area === "files") {
       if (shift && (k === Qt.Key_Up || k === Qt.Key_Down)) { diff.move(k === Qt.Key_Up ? -1 : 1, false); return true; }
@@ -211,7 +240,8 @@ Item {
       if (k === Qt.Key_Down || k === Qt.Key_J) { pg.moveFile(1); return true; }
       if (k === Qt.Key_PageUp) { diff.page(-1); return true; }
       if (k === Qt.Key_PageDown) { diff.page(1); return true; }
-      if (k === Qt.Key_E && pg.files[pg.fileSel]) { pg.win.edit(pg.win.abs(pg.files[pg.fileSel].path)); return true; }
+      if (k === Qt.Key_E && pg.shownFiles[pg.fileSel]) { pg.win.edit(pg.win.abs(pg.shownFiles[pg.fileSel].path)); return true; }
+      if (k === Qt.Key_R && pg.shownFiles[pg.fileSel] && pg.shownFiles[pg.fileSel].status === "D") { pg.bringBack([pg.shownFiles[pg.fileSel]]); return true; }
       if (k === Qt.Key_Escape) { pg.area = "commits"; return true; }
       return false;
     }
@@ -459,10 +489,26 @@ Item {
     }
     Rectangle { id: headRule; y: headCol.y + headCol.height + 12; width: parent.width; height: 1; color: Zenon.border; visible: !!pg.commit }
 
-    // its files
+    // its files, filtered by what is typed here
+    BulkField {
+      id: fileFilter
+      visible: pg.files.length > 1
+      anchors.top: headRule.bottom
+      anchors.left: parent.left
+      anchors.right: parent.right
+      anchors.margins: 10
+      height: visible ? 30 : 0
+      textSize: Zenon.px(14)
+      ghost: "  Filter " + pg.files.length + " files  ( / )"
+      onTextChanged: pg.fileQuery = fileFilter.text.trim()
+      onAccepted: { pg.area = "files"; pg.win.focusKeys(); }
+      Keys.onEscapePressed: { fileFilter.text = ""; pg.area = "files"; pg.win.focusKeys(); }
+      Keys.onDownPressed: { pg.area = "files"; pg.win.focusKeys(); }
+    }
     ListView {
       id: fileList
-      anchors.top: headRule.bottom
+      anchors.top: fileFilter.visible ? fileFilter.bottom : headRule.bottom
+      anchors.topMargin: fileFilter.visible ? 4 : 0
       anchors.left: parent.left
       anchors.right: parent.right
       height: Math.min(contentHeight + 8, Math.round(right.height * 0.3))
@@ -470,7 +516,7 @@ Item {
       topMargin: 4
       bottomMargin: 4
       boundsBehavior: Flickable.StopAtBounds
-      model: pg.files
+      model: pg.shownFiles
       readonly property int rowH: Math.round(Zenon.px(14) * 2)
       SelectBar { view: fileList; host: pg.win; index: pg.fileSel; rowH: fileList.rowH; color: pg.area === "files" ? pg.win.hiFill : Zenon.wash(0.05) }
       delegate: Item {
@@ -498,7 +544,8 @@ Item {
           anchors.verticalCenter: parent.verticalCenter
           elide: Text.ElideMiddle
           text: (frow.modelData.from ? frow.modelData.from + "  →  " : "") + frow.modelData.path
-          color: frow.index === pg.fileSel ? Zenon.ink : Zenon.soft
+          color: frow.modelData.status === "D" ? Zenon.muted : frow.index === pg.fileSel ? Zenon.ink : Zenon.soft
+          font.strikeout: frow.modelData.status === "D"
           font.family: Zenon.face
           font.weight: Zenon.weight
           font.pixelSize: Zenon.px(14)
@@ -509,7 +556,8 @@ Item {
           anchors.rightMargin: 18
           anchors.verticalCenter: parent.verticalCenter
           textFormat: Text.StyledText
-          text: frow.modelData.added === null ? "binary"
+          text: frow.modelData.status === "D" ? "<font color=\"" + Zenon.hex(Zenon.red) + "\">removed</font>"
+            : frow.modelData.added === null ? "binary"
             : "<font color=\"" + Zenon.hex(Zenon.green) + "\">+" + frow.modelData.added + "</font>  "
               + "<font color=\"" + Zenon.hex(Zenon.red) + "\">−" + frow.modelData.deleted + "</font>"
           color: Zenon.muted
@@ -525,6 +573,9 @@ Item {
         }
       }
     }
+    // the wheel and the bar, as every list has them
+    ElasticScroll { anchors.fill: fileList; view: fileList }
+    Scrollbar { flick: fileList; anchors.right: fileList.right; anchors.top: fileList.top; anchors.bottom: fileList.bottom }
     Rectangle { id: filesRule; anchors.top: fileList.bottom; width: parent.width; height: 1; color: Zenon.border; visible: pg.files.length > 0 }
 
     DiffView {

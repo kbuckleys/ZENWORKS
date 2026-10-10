@@ -15,6 +15,7 @@
 // discards everything under it.
 //
 //   the list   ↑↓ rows · space stage / unstage · d discard · e edit in plato
+//              / filter by path (esc clears) ·
 //              ctrl click mark · shift click / shift ↑↓ mark a range — then
 //              space, d act on every one marked · esc clears the marks
 //              ← → close / open a directory (→ on a file: the diff)
@@ -38,6 +39,29 @@ Item {
   id: pg
   property var win: null
 
+  // ── the filter ─────────────────────────────────────────────────────────
+  // What is typed in the field over the list (/): only the changes whose
+  // path has it are shown, in their tree; a section's Stage all becomes
+  // "Stage these" and takes only those.
+  property string query: ""
+  readonly property var shownSt: {
+    const st = pg.win ? pg.win.st : null;
+    const q = pg.query.toLowerCase();
+    if (!st || q === "") return st;
+    const has = (e) => (String(e.path) + " " + (e.from || "")).toLowerCase().indexOf(q) >= 0;
+    return Object.assign({}, st, { staged: st.staged.filter(has), unstaged: st.unstaged.filter(has),
+                                   untracked: st.untracked.filter(has), conflicts: st.conflicts.filter(has) });
+  }
+  function stageShown(sec) {
+    const st = pg.shownSt;
+    if (!st) return;
+    const paths = sec === "staged" ? st.staged.map((e) => e.path)
+      : st.unstaged.map((e) => e.path).concat(st.untracked.map((e) => e.path));
+    if (paths.length === 0) return;
+    pg.win.act(sec === "staged" ? "unstage" : "stage", { paths: paths },
+               { said: (sec === "staged" ? "Unstaged " : "Staged ") + paths.length + " matching “" + pg.query + "”" });
+  }
+
   // directories put away, by D.treeRows' key
   property var closed: ({})
   // the tree's rows, each file and directory also as the entry terminus'
@@ -45,7 +69,7 @@ Item {
   // worst state beneath it. Each section is its own little tree, rooted at
   // "/<section>", so a file both staged and not is two entries.
   readonly property var rows: {
-    const rs = D.treeRows(D.sections(pg.win ? pg.win.st : null), pg.closed);
+    const rs = D.treeRows(D.sections(pg.shownSt), pg.closed);
     for (const r of rs) {
       if (r.head) continue;
       if (r.isDir) r.state = r.states.reduce((a, b) => Terminus.gitWorse(a, b), "");
@@ -95,7 +119,7 @@ Item {
     ? [["space", (pg.file.area === "staged" ? "unstage " : "stage ") + pg.file.count], ["← →", "close / open"],
        ["d", "discard"], ["a", "stage all"], ["c", "message"]]
     : [["space", pg.file && pg.file.area === "staged" ? "unstage" : "stage"], ["a", "stage all"],
-       ["d", "discard"], ["e", "edit"], ["tab", "diff"], ["c", "message"]]
+       ["d", "discard"], ["e", "edit"], ["tab", "diff"], ["c", "message"], ["/", "filter"]]
   readonly property var lead: pg.chosenRows()[0] || null
   readonly property var buttons: [
     { label: pg.markedCount > 0 ? "Discard " + pg.markedCount : "Discard", ink: Zenon.red,
@@ -105,6 +129,7 @@ Item {
   ]
 
   function takeFocus() {
+    if (changeFilter.focused) return;
     if (pg.area === "message") msgWell.claim();
     else if (pg.win) pg.win.focusKeys();
   }
@@ -306,7 +331,12 @@ Item {
   // ── committing ─────────────────────────────────────────────────────────
   property bool amend: false
   readonly property var note: D.messageNote(msgWell.text)
-  readonly property bool canCommit: pg.note.ok && (pg.stagedCount > 0 || pg.amend)
+  // left empty, the message is written from what is staged (D.autoMessage
+  // — "Add README.md and LICENSE"): git wants one, and a blank title reads
+  // as nothing in a history (user, 2026-10-11: "do i really need one?")
+  readonly property string autoMsg: pg.win && pg.win.st ? D.autoMessage(pg.win.st.staged) : ""
+  readonly property bool typed: msgWell.text.trim() !== ""
+  readonly property bool canCommit: (pg.note.ok || (!pg.typed && !pg.amend && pg.autoMsg !== "")) && (pg.stagedCount > 0 || pg.amend)
     && !!pg.win && !!pg.win.st && pg.win.st.conflicts.length === 0
   onAmendChanged: {
     if (pg.amend && msgWell.text.trim() === "") {
@@ -321,11 +351,11 @@ Item {
     }
     const id = pg.win.info && pg.win.info.identity;
     if (id && (id.name === "" || id.email === "")) { pg.win.askIdentity(() => pg.commit()); return; }
-    const text = msgWell.text;
+    const text = pg.typed ? msgWell.text : pg.autoMsg;
     const amending = pg.amend;
     pg.win.act("commit", { message: text, amend: amending }, {
       label: "Committing",
-      said: amending ? "Amended" : "Committed",
+      said: amending ? "Amended" : pg.typed ? "Committed" : "Committed — “" + text + "”",
       then: () => { msgWell.text = ""; pg.win.draft = ""; pg.amend = false; pg.area = "list"; pg.takeFocus(); } });
   }
 
@@ -359,6 +389,8 @@ Item {
       return true;
     }
     if (k === Qt.Key_Escape && pg.markedCount > 0) { pg.clearMarks(); return true; }
+    if (k === Qt.Key_Slash) { changeFilter.claim(); return true; }
+    if (k === Qt.Key_Escape && pg.query !== "") { changeFilter.text = ""; return true; }
     if (k === Qt.Key_Up || k === Qt.Key_K) { pg.anchor = -1; pg.step(-1); return true; }
     if (k === Qt.Key_Down || k === Qt.Key_J) { pg.anchor = -1; pg.step(1); return true; }
     if (k === Qt.Key_Home) { pg.moveTo(D.nextFile(pg.rows, -1, 1)); return true; }
@@ -397,11 +429,26 @@ Item {
     anchors.bottom: parent.bottom
     width: Math.round(Math.min(440, Math.max(320, pg.width * 0.32)))
 
+    BulkField {
+      id: changeFilter
+      anchors.left: parent.left
+      anchors.right: parent.right
+      anchors.top: parent.top
+      anchors.margins: 10
+      height: 30
+      textSize: Zenon.px(14)
+      ghost: "  Filter changes  ( / )"
+      onTextChanged: pg.query = changeFilter.text.trim()
+      onAccepted: { pg.area = "list"; pg.win.focusKeys(); }
+      Keys.onEscapePressed: { changeFilter.text = ""; pg.win.focusKeys(); }
+      Keys.onDownPressed: pg.win.focusKeys()
+    }
     ListView {
       id: list
       anchors.left: parent.left
       anchors.right: parent.right
-      anchors.top: parent.top
+      anchors.top: changeFilter.bottom
+      anchors.topMargin: 2
       anchors.bottom: box.top
       clip: true
       topMargin: 6
@@ -449,7 +496,8 @@ Item {
             anchors.rightMargin: 16
             anchors.verticalCenter: parent.verticalCenter
             anchors.verticalCenterOffset: 3
-            text: frow.r.id === "staged" ? "Unstage all" : "Stage all"
+            text: pg.query !== "" ? (frow.r.id === "staged" ? "Unstage these" : "Stage these")
+              : frow.r.id === "staged" ? "Unstage all" : "Stage all"
             color: headMa.containsMouse ? Zenon.cyan : Zenon.muted
             font.family: Zenon.face
             font.weight: Zenon.weight
@@ -459,7 +507,7 @@ Item {
               anchors.fill: parent
               anchors.margins: -6
               hoverEnabled: true
-              onClicked: frow.r.id === "staged" ? pg.unstageAll() : pg.stageAll()
+              onClicked: pg.query !== "" ? pg.stageShown(frow.r.id) : frow.r.id === "staged" ? pg.unstageAll() : pg.stageAll()
             }
           }
         }
@@ -522,7 +570,8 @@ Item {
       EmptyMark {
         anchors.centerIn: parent
         visible: !!pg.win && !!pg.win.st && pg.rows.every((r) => r.head)
-        word: "Nothing to commit"
+        filtered: pg.query !== ""
+        word: pg.query !== "" ? "" : "Nothing to commit"
       }
     }
     ElasticScroll { anchors.fill: list; view: list }
@@ -543,8 +592,8 @@ Item {
         y: 12
         width: parent.width - 24
         height: 112
-        ghost: pg.stagedCount > 0 ? "What these " + (pg.stagedCount === 1 ? "changes do" : pg.stagedCount + " files' changes do")
-          + " — a short first line, then more after a blank line" : "Stage something to commit, then say what it does"
+        ghost: pg.stagedCount > 0 ? "Left empty, it says “" + pg.autoMsg + "” — or say what it does: a short first line, then more after a blank line"
+          : "Stage something to commit, then say what it does"
         // the subject's length, as it is typed: 50 is the habit, 72 the wall
         note: pg.note.text
         noteInk: Zenon[pg.note.ink]

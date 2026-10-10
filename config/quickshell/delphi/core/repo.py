@@ -356,7 +356,32 @@ class Repo:
             else:
                 e["path"] = path
             res.append(e)
+        # what happened to each: A added, M modified, D deleted, R renamed —
+        # a file a commit removed is one that can be brought back from it
+        st = self.git.run(["show", "--format=", "-z", "--name-status",
+                           "--find-renames", "--diff-merges=first-parent", sha],
+                          cancel=cancel, lock=False).split("\0")
+        how, i = {}, 0
+        while i < len(st):
+            code = st[i].strip(); i += 1
+            if not code:
+                continue
+            if code[0] in "RC":
+                how[st[i + 1]] = code[0]; i += 2
+            else:
+                how[st[i]] = code[0]; i += 1
+        for e in res:
+            e["status"] = how.get(e["path"], "M")
         return res
+
+    def bring_back(self, sha, paths, cancel=None):
+        """Files a commit removed (or changed), back as they were just before
+        it — in the working tree and staged, to commit. From the commit's
+        first parent; a first commit has none, so nothing to bring back."""
+        if self.git.code(["rev-parse", "-q", "--verify", f"{sha}^"]) != 0:
+            raise GitError(["checkout"], 1, "the first commit removed nothing — there is nothing before it")
+        self.git.run(["checkout", f"{sha}^", "--"] + list(paths), cancel=cancel)
+        return {"paths": list(paths)}
 
     def blame(self, path, rev=None, cancel=None):
         a = ["blame", "--porcelain", "-w"]

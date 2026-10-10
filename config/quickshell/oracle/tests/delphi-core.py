@@ -596,6 +596,20 @@ def connect_adopts_existing_history():
     eq(R.Repo(fresh()).connect(empty, branch="main").get("empty"), True, "empty remote")
 
 
+@test
+def bring_back_what_a_commit_removed():
+    d = fresh({"LICENSE": "mit\n", "README.md": "hi\n", "keep": "k\n"})
+    sh(d, "rm", "-q", "LICENSE", "README.md")
+    write(d, "keep", "k2\n")
+    sh(d, "commit", "-qam", "tidy")
+    r = R.Repo(d)
+    sha = sh(d, "rev-parse", "HEAD").strip()
+    eq({f["path"]: f["status"] for f in r.files_in(sha)}, {"LICENSE": "D", "README.md": "D", "keep": "M"}, "status")
+    r.bring_back(sha, ["LICENSE", "README.md"])
+    eq(read(d, "LICENSE"), "mit\n", "back on disk")
+    eq(sorted(e["path"] for e in r.status()["staged"]), ["LICENSE", "README.md"], "and staged")
+
+
 def continuous(rows):
     """Every line leaving a row's bottom arrives at the next row's top, in
     the same column and colour — and nothing else arrives."""

@@ -114,6 +114,14 @@ module.exports = {
     t.eq("error empty", D.errorText(""), "It did not work");
     t.eq("remember", D.remember([{ root: "/a" }, { root: "/b" }], "/b", "b", 5, 20).map((r) => r.root), ["/b", "/a"]);
     t.eq("tilde", D.tilde("/home/x/src", "/home/x"), "~/src");
+    const M = (xs) => D.autoMessage(xs.map(([p, k]) => ({ path: p, kind: k })));
+    t.eq("auto: one", M([["dir/README.md", "added"]]), "Add README.md");
+    t.eq("auto: two added", M([["README.md", "added"], ["LICENSE", "added"]]), "Add README.md and LICENSE");
+    t.eq("auto: mixed", M([["install", "modified"], ["LICENSE", "deleted"]]), "Update install, remove LICENSE");
+    t.eq("auto: many", M(["a.qml", "b.js", "c.js", "d.js", "e.js"].map((p) => [p, "modified"])), "Update a.qml, b.js, c.js and 2 more");
+    t.eq("auto: counts when long", M(Array.from({ length: 40 }, (_, i) => ["a-rather-long-file-name-" + i + ".qml", i % 2 ? "added" : "modified"])),
+      "Update 20 files, add 20 files");
+    t.eq("auto: nothing", M([]), "");
 
     const TST = { branch: { head: "main" }, staged: [{ path: "x/y/z/deep.txt", kind: "modified" }],
       unstaged: [{ path: "a/b.qml", kind: "modified" }, { path: "a/c/d.js", kind: "modified" }, { path: "top.md", kind: "modified" }],
