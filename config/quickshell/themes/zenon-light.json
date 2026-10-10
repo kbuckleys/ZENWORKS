@@ -1,0 +1,29 @@
+{
+  "name": "Zenon Light",
+  "mode": "light",
+  "colors": {
+    "ground": "#f3f3f1",
+    "surface": "#dcdfe4",
+    "card": "#e9eaec",
+    "ink": "#1d2025",
+    "muted": "#666c7a",
+    "soft": "#474d58",
+    "keyInk": "#3a3f4b",
+    "red": "#c4474e",
+    "green": "#4a8538",
+    "yellow": "#c25f22",
+    "blue": "#2f6fbe",
+    "magenta": "#8550b6",
+    "cyan": "#337b7b",
+    "pink": "#bc5f72",
+    "sand": "#8f7a1c",
+    "dim": "#b9c3c3",
+    "sparkFill": "#33337b7b",
+    "border": "#669aa3ad",
+    "headBg": "#66dcdfe4",
+    "selBg": "#4cb9c3c3",
+    "onAccent": "#f3f3f1",
+    "wash": "#000000",
+    "shadow": "#000000"
+  }
+}

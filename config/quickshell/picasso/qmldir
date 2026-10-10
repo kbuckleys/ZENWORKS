@@ -1,0 +1,19 @@
+singleton Picasso 1.0 Picasso.qml
+PicassoDaemon 1.0 PicassoDaemon.qml
+PicassoPopup 1.0 PicassoPopup.qml
+PicassoCapture 1.0 PicassoCapture.qml
+PicassoPicker 1.0 PicassoPicker.qml
+PicassoViewer 1.0 PicassoViewer.qml
+ViewerWindow 1.0 ViewerWindow.qml
+Annotator 1.0 Annotator.qml
+Scene 1.0 Scene.qml
+FocusCard 1.0 FocusCard.qml
+ColorPicker 1.0 ColorPicker.qml
+Vignette 1.0 Vignette.qml
+Ring 1.0 Ring.qml
+Head 1.0 Head.qml
+Seg 1.0 Seg.qml
+Slide 1.0 Slide.qml
+Switch 1.0 Switch.qml
+LookEditor 1.0 LookEditor.qml
+Thumb 1.0 Thumb.qml

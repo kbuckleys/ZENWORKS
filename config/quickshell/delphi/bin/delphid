@@ -1,0 +1,29 @@
+#!/usr/bin/env python3
+# ┌─┐┌─┐┌┐┌┬ ┬┌─┐┬─┐┬┌─┌─┐
+# ┌─┘├┤ │││││││ │├┬┘├┴┐└─┐
+# └─┘└─┘┘└┘└┴┘└─┘┴└─┴ ┴└─┘
+# https://github.com/kbuckleys/
+#
+# delphid — delphi's backend. JSON lines on stdin/stdout; see core/server.py.
+# Runs without quickshell: `delphid` in a terminal and typed requests work.
+
+import os
+import stat
+import sys
+
+here = os.path.dirname(os.path.realpath(__file__))
+sys.path.insert(0, os.path.join(os.path.dirname(here), "core"))
+
+# A web upload of the package drops exec bits; git runs the askpass helper by
+# path and would fail with "permission denied" on every question.
+ask = os.path.join(here, "delphi-askpass")
+try:
+    m = os.stat(ask).st_mode
+    if not m & stat.S_IXUSR:
+        os.chmod(ask, m | stat.S_IXUSR)
+except OSError:
+    pass
+
+import server  # noqa: E402
+
+server.main()

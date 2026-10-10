@@ -1,0 +1,22 @@
+#!/bin/sh
+# ┌─┐┌─┐┌┐┌┬ ┬┌─┐┬─┐┬┌─┌─┐
+# ┌─┘├┤ │││││││ │├┬┘├┴┐└─┐
+# └─┘└─┘┘└┘└┴┘└─┘┴└─┴ ┴└─┘
+# https://github.com/kbuckleys/
+#
+# alexandria [font file…]   the font book, from a terminal, a keybind, or
+#                           alexandria.desktop (how terminus and artemis open
+#                           a font). Files are a look at them, with Install;
+#                           none is the library.
+#
+# Paths are made absolute HERE — the shell answering has no idea which
+# directory this ran in — and sent in ONE call, newline-separated.
+[ $# -eq 0 ] && exec qs ipc call Alexandria open "" >/dev/null
+paths=""
+for f in "$@"; do
+  case $f in file://*) f=$(printf '%s' "${f#file://}" | sed 's/%\([0-9A-Fa-f][0-9A-Fa-f]\)/\\x\1/g' | xargs -0 printf '%b');; esac
+  p=$(realpath -m -- "$f")
+  paths="${paths:+$paths
+}$p"
+done
+exec qs ipc call Alexandria open "$paths" >/dev/null

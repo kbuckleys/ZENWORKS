@@ -1,0 +1,9 @@
+singleton Ceres 1.0 Ceres.qml
+CeresPanel 1.0 CeresPanel.qml
+CeresManager 1.0 CeresManager.qml
+PasswordField 1.0 PasswordField.qml
+TxView 1.0 TxView.qml
+ChangeRow 1.0 ChangeRow.qml
+NewsView 1.0 NewsView.qml
+SetupView 1.0 SetupView.qml
+ConfigView 1.0 ConfigView.qml

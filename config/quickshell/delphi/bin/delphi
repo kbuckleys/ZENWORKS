@@ -1,0 +1,24 @@
+#!/bin/sh
+# ┌─┐┌─┐┌┐┌┬ ┬┌─┐┬─┐┬┌─┌─┐
+# ┌─┘├┤ │││││││ │├┬┘├┴┐└─┐
+# └─┘└─┘┘└┘└┴┘└─┘┴└─┴ ┴└─┘
+# https://github.com/kbuckleys/
+#
+# delphi [path]   the git client, from a terminal, a keybind, or delphi.desktop
+#                 (which DelphiManager writes on startup). A path is the
+#                 repository it is in — any file or directory inside one, a
+#                 worktree, a bare repository's directory; none is the last
+#                 repository opened, or the list of them.
+#
+# The path is made absolute HERE: the shell answering the ipc call has no
+# idea which directory this was run from. With no path, a terminal's own
+# directory is meant when it is inside a repository — `delphi` typed in one
+# opens that one.
+
+p="${1:-}"
+case $p in file://*) p=$(printf '%s' "${p#file://}" | sed 's/%\([0-9A-Fa-f][0-9A-Fa-f]\)/\\x\1/g' | xargs -0 printf '%b');; esac
+if [ -z "$p" ] && [ -t 1 ] && git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  p=.
+fi
+[ -n "$p" ] && p=$(realpath -m -- "$p")
+exec qs ipc call Delphi open "$p" >/dev/null

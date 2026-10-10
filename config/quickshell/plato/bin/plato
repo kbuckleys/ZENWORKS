@@ -1,0 +1,67 @@
+#!/bin/sh
+# ┌─┐┌─┐┌┐┌┬ ┬┌─┐┬─┐┬┌─┌─┐
+# ┌─┘├┤ │││││││ │├┬┘├┴┐└─┐
+# └─┘└─┘┘└┘└┴┘└─┘┴└─┴ ┴└─┘
+# https://github.com/kbuckleys/
+#
+# plato [-w] [file…]   open files in plato, from a terminal, a keybind, or
+#                      plato.desktop, which PlatoManager writes on startup (and
+#                      is how terminus and artemis get here).
+#
+# Paths are made absolute HERE, because the shell that answers the ipc call
+# has no idea which directory this was run from. Several files go into the
+# same window, one after another.
+#
+# -w, --wait: do not return until every file named is closed again — its tab,
+# or its window. That is plato as $EDITOR: git, sudoedit and crontab read the
+# file back the moment the editor exits, so it must not exit first. hyprland
+# sets EDITOR to `plato --wait` (hypr/lua/base.lua).
+
+wait=0
+case "$1" in
+  -w|--wait) wait=1; shift ;;
+esac
+[ "$1" = "--" ] && shift
+
+if [ $# -eq 0 ]; then
+  exec qs ipc call Plato open ""
+fi
+for f in "$@"; do
+  qs ipc call Plato open "$(realpath -m -- "$f")" >/dev/null
+done
+[ "$wait" -eq 1 ] || exit 0
+
+held() { qs ipc call Plato holds "$1" 2>/dev/null; }
+
+for f in "$@"; do
+  p=$(realpath -m -- "$f")
+  # First for it to be open: the window may still be being made, and nvim
+  # still loading it. Thirty seconds and it is not coming.
+  n=0
+  until [ "$(held "$p")" = yes ]; do
+    n=$((n + 1))
+    if [ "$n" -gt 150 ]; then
+      echo "plato: $f did not open" >&2
+      exit 1
+    fi
+    sleep 0.2
+  done
+  # Then for it to close. No answer at all is the shell reloading (a few
+  # seconds) or gone, and its windows with it: ten seconds of that and the
+  # edit is over, unfinished.
+  gone=0
+  while :; do
+    case "$(held "$p")" in
+      no) break ;;
+      yes|pending) gone=0 ;;
+      *)
+        gone=$((gone + 1))
+        if [ "$gone" -gt 33 ]; then
+          echo "plato: the shell went away while $f was open" >&2
+          exit 1
+        fi
+        ;;
+    esac
+    sleep 0.3
+  done
+done

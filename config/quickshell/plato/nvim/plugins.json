@@ -1,0 +1,32 @@
+{
+  "plugins": [
+    {
+      "src": "https://github.com/tpope/vim-fugitive",
+      "enabled": true
+    },
+    {
+      "src": "https://github.com/jake-stewart/multicursor.nvim",
+      "enabled": true
+    },
+    {
+      "src": "https://github.com/stevearc/conform.nvim",
+      "enabled": true
+    },
+    {
+      "src": "https://github.com/mfussenegger/nvim-lint",
+      "enabled": true
+    },
+    {
+      "src": "https://github.com/NMAC427/guess-indent.nvim",
+      "enabled": true
+    },
+    {
+      "src": "https://github.com/b0o/SchemaStore.nvim",
+      "enabled": true
+    },
+    {
+      "src": "https://github.com/folke/lazydev.nvim",
+      "enabled": true
+    }
+  ]
+}
