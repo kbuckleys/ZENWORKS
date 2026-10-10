@@ -47,7 +47,7 @@ PACKAGES=(
   7zip zip unzip unrar libarchive ratarmount fuse3 ntfs-3g ntfsprogs udisks2
   exfatprogs dosfstools btrfs-progs xfsprogs f2fs-tools
   # terminal & shell
-  kitty zsh zoxide neovim git curl fastfetch
+  kitty zsh zoxide neovim git curl fastfetch stow
   # system & packages
   pacman-contrib expac gawk bandwhich iotop solaar glib2 gtk3 nodejs
   # fonts
