@@ -266,6 +266,10 @@ FloatingWindow {
         } else win.fail("Push did not work", null, err);
       } });
   }
+  // where each page's seams were dragged to (terminus/SeamGrip), by name —
+  // kept while the window is open
+  property var splits: ({})
+  function setSplit(key, v) { const o = Object.assign({}, win.splits); o[key] = v; win.splits = o; }
   // Publish pressed with no remote: the GitHub page asks how, once it can
   property bool wantPublish: false
   function forcePush() {

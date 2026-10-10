@@ -47,7 +47,9 @@ for d in fastfetch hypr kitty quickshell xdg-desktop-portal xdg-desktop-portal-t
         kitty) set -- --exclude=/theme.conf ;;
         xdg-desktop-portal-termfilechooser) set -- --exclude=/config ;;
         # themes saved here (Follow Background's Save) are this machine's
-        quickshell) set -- --exclude=/themes/custom-*.json --exclude=/themes/wallpaper-*.json ;;
+        # …and Python's caches, made by running delphi's backend here
+        quickshell) set -- --exclude=/themes/custom-*.json --exclude=/themes/wallpaper-*.json \
+                           --exclude=__pycache__ --exclude=*.pyc ;;
     esac
     mkdir -p "$pkg/config/$d"
     if [ -n "$dry" ]; then

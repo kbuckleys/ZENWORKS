@@ -427,7 +427,7 @@ Item {
     anchors.left: parent.left
     anchors.top: parent.top
     anchors.bottom: parent.bottom
-    width: Math.round(Math.min(440, Math.max(320, pg.width * 0.32)))
+    width: pg.win && pg.win.splits.changes ? pg.win.splits.changes : Math.round(Math.min(440, Math.max(320, pg.width * 0.32)))
 
     BulkField {
       id: changeFilter
@@ -704,5 +704,15 @@ Item {
       DialogButton { label: "Edit in plato"; ink: Zenon.cyan; onClicked: pg.edit() }
       DialogButton { label: "Mark resolved"; ink: Zenon.green; primary: true; onClicked: pg.resolve("done") }
     }
+  }
+  // the seam between the files and the diff: dragged, it stays
+  SeamGrip {
+    frame: pg
+    at: left.width
+    line: false
+    min: 260
+    max: pg.width - 360
+    onMoved: (p) => pg.win.setSplit("changes", p)
+    onReset: pg.win.setSplit("changes", 0)
   }
 }

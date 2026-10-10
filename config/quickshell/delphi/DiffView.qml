@@ -108,7 +108,12 @@ Item {
   function richOf(r) {
     const esc = (t) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
       .replace(/\t/g, "    ").replace(/ /g, "&nbsp;");
-    const bg = Zenon.hex(Zenon.alpha(r.t === "+" ? Zenon.green : Zenon.red, 0.32));
+    // the word's tint MIXED into the ground, not laid over it: rich text
+    // takes a solid colour (Zenon.hex drops alpha), and the 0.32 meant as a
+    // wash came out full-strength red and green, the text unreadable on it
+    // in either mode (user, 2026-10-11). Mixed, it is a wash in dark and in
+    // light alike, the line's own ink reading on top.
+    const bg = Zenon.hex(Zenon.mix(Zenon.ground, r.t === "+" ? Zenon.green : Zenon.red, Zenon.light ? 0.22 : 0.3));
     let out = "", at = 0;
     for (const sp of r.spans) {
       out += esc(r.text.slice(at, sp[0]));

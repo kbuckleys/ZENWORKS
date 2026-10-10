@@ -273,7 +273,7 @@ Item {
     anchors.left: parent.left
     anchors.top: parent.top
     anchors.bottom: parent.bottom
-    width: Math.round(pg.width * 0.56)
+    width: pg.win && pg.win.splits.history ? pg.win.splits.history : Math.round(pg.width * 0.56)
 
     BulkField {
       id: search
@@ -511,7 +511,8 @@ Item {
       anchors.topMargin: fileFilter.visible ? 4 : 0
       anchors.left: parent.left
       anchors.right: parent.right
-      height: Math.min(contentHeight + 8, Math.round(right.height * 0.3))
+      height: pg.win && pg.win.splits.historyFiles ? Math.min(contentHeight + 8, pg.win.splits.historyFiles)
+        : Math.min(contentHeight + 8, Math.round(right.height * 0.3))
       clip: true
       topMargin: 4
       bottomMargin: 4
@@ -605,5 +606,16 @@ Item {
     window: pg.win
     cardWidth: 260
     onClosed: pg.win.focusKeys()
+  }
+  // the seams: commits | the commit, and its files | their diff
+  SeamGrip {
+    visible: !pg.planning
+    frame: pg
+    at: left.width
+    line: false
+    min: 320
+    max: pg.width - 360
+    onMoved: (p) => pg.win.setSplit("history", p)
+    onReset: pg.win.setSplit("history", 0)
   }
 }
