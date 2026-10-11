@@ -34,7 +34,7 @@ PACKAGES=(
   xdg-utils xdg-terminal-exec
   # shell (quickshell & qt)
   quickshell qt6-declarative qt6-imageformats qt6-multimedia qt6-multimedia-ffmpeg
-  kimageformats libqalculate rbw
+  kimageformats libqalculate
   # audio & media
   pipewire pipewire-pulse wireplumber libpulse alsa-utils pamixer playerctl
   gst-plugins-good gst-plugins-bad gst-plugins-ugly
