@@ -94,6 +94,41 @@ Scope {
   // where each dotfiles repository's packages go, by its root — chosen on
   // the Dotfiles page when it is not the .stowrc's or home
   property var stowTargets: ({})
+  // ── CI: WHAT THE FORGES' CHECKS SAY OF A COMMIT ────────────────────
+  // One answer per forge, repository and commit, shared by History, the
+  // pull requests and the push chip: { state, runs, at }. A finished one
+  // is kept; one still running is asked again after 15 s, "none" after a
+  // minute (a push's checks take a moment to start).
+  property var ci: ({})
+  property var _ciAsking: ({})
+  function ciKey(forge, full, sha) { return forge + "|" + full + "|" + sha; }
+  function ciOf(forge, full, sha) { return mgr.ci[mgr.ciKey(forge, full, sha)] || null; }
+  function ciAsk(forge, full, shas) {
+    const f = D.FORGES[forge];
+    if (!f || !full || !shas || shas.length === 0) return;
+    const now = Date.now();
+    const want = shas.filter((sha) => {
+      const k = mgr.ciKey(forge, full, sha);
+      if (mgr._ciAsking[k]) return false;
+      const c = mgr.ci[k];
+      return !c || (c.state === "pending" && now - c.at > 15000) || (c.state === "none" && now - c.at > 60000);
+    }).slice(0, 40);
+    if (want.length === 0) return;
+    const asking = Object.assign({}, mgr._ciAsking);
+    for (const sha of want) asking[mgr.ciKey(forge, full, sha)] = true;
+    mgr._ciAsking = asking;
+    mgr.call(f.id + "ChecksMany", null, { full: full, shas: want }, (ok, res) => {
+      const a = Object.assign({}, mgr._ciAsking), o = Object.assign({}, mgr.ci);
+      for (const sha of want) {
+        const k = mgr.ciKey(forge, full, sha);
+        delete a[k];
+        if (ok && res[sha]) o[k] = Object.assign({ at: Date.now() }, res[sha]);
+      }
+      mgr._ciAsking = a;
+      if (ok) mgr.ci = o;
+    });
+  }
+
   // where Push sends a repository's branch, by its root: the remotes ticked
   // in the head's push menu (none ticked: its upstream, as git would)
   property var pushTo: ({})
@@ -480,6 +515,17 @@ Scope {
   // (plato's right-click, terminus' row menu).
   function history(file) {
     mgr.withWindow((w) => { w.historyFile = file; w.openRepo(file); w.setPage("history"); });
+  }
+
+  // Who wrote each line of a file, as it is now: History narrowed to it,
+  // its blame in place of the diff, at the line asked about (plato).
+  function blame(file, line) {
+    mgr.withWindow((w) => {
+      w.historyFile = file;
+      w.openRepo(file);
+      w.setPage("history");
+      w.blameWanted = { file: file, line: line || 0 };
+    });
   }
 
   IpcHandler {

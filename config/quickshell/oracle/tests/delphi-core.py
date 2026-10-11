@@ -914,6 +914,68 @@ def ignore_and_untrack_keep_the_files():
 
 
 @test
+def ci_checks_read_from_each_forge():
+    import github, gitlab, forgejo, rest
+    eq(rest.ci_sum([]), "none")
+    eq(rest.ci_sum([{"state": "success"}, {"state": "pending"}]), "pending")
+    eq(rest.ci_sum([{"state": "pending"}, {"state": "failure"}]), "failure")
+    eq(rest.ci_sum([{"state": "neutral"}]), "neutral")
+    def gh(method, path, body=None, **kw):
+        if "check-runs" in path:
+            return {"check_runs": [{"name": "build", "status": "completed", "conclusion": "success", "html_url": "u1"},
+                                   {"name": "test", "status": "in_progress", "conclusion": None, "html_url": "u2"}]}
+        return {"statuses": [{"context": "ci/old", "state": "success", "target_url": "u3"}]}
+    def gl(method, path, body=None, **kw):
+        return [{"id": 1, "name": "test", "stage": "test", "status": "failed", "target_url": "a"},
+                {"id": 2, "name": "test", "stage": "test", "status": "success", "target_url": "b"},
+                {"id": 3, "name": "lint", "stage": "test", "status": "failed", "allow_failure": True}]
+    def fj(method, path, body=None, **kw):
+        return {"statuses": [{"context": "actions / build", "status": "failure", "target_url": "f"}]}
+    saved = (github.call, gitlab.call, forgejo.call, github.token, gitlab.token, forgejo.token)
+    github.call, gitlab.call, forgejo.call = gh, gl, fj
+    github.token = gitlab.token = forgejo.token = lambda: ("t", "x")
+    try:
+        r = github.checks("me/x", "abc")
+        eq((r["state"], [x["name"] for x in r["runs"]]), ("pending", ["build", "test", "ci/old"]))
+        r = gitlab.checks("me/x", "abc")
+        eq(r["state"], "success", "the retried job stands, an allowed failure does not fail it")
+        eq(len(r["runs"]), 2)
+        eq(forgejo.checks("me/x", "abc")["state"], "failure")
+        many = github.checks_many("me/x", ["a", "b", "c"])
+        eq(sorted(many), ["a", "b", "c"])
+    finally:
+        github.call, gitlab.call, forgejo.call, github.token, gitlab.token, forgejo.token = saved
+
+
+@test
+def signing_with_an_ssh_key():
+    # the throwaway HOME's own git config and ~/.ssh: never the user's
+    import signing
+    eq(signing.HOME, TMP, "a throwaway home")
+    st = signing.status()
+    eq((st["on"], st["format"]), (False, "openpgp"))
+    if not st["keygen"]:
+        try:
+            signing.setup(create=True)
+            raise AssertionError("set up without ssh-keygen")
+        except R.GitError:
+            pass
+        return
+    res = signing.setup(create=True, email="me@example.org")
+    eq(res["created"], True)
+    st = signing.status()
+    eq((st["on"], st["format"], st["keyThere"]), (True, "ssh", True))
+    with open(signing.SIGNERS) as f:
+        eq(f.read().startswith('me@example.org namespaces="git" ssh-ed25519 '), True)
+    d = fresh({"a": "1\n"})
+    sh(d, "config", "user.email", "me@example.org"); sh(d, "config", "user.name", "Me")
+    write(d, "a", "2\n"); sh(d, "commit", "-qam", "signed")
+    eq(R.Repo(d).message("HEAD")["signature"], "G", "git checks it Good against the allowed signers")
+    signing.off()
+    eq(signing.status()["on"], False)
+
+
+@test
 def graph_octopus_and_criss_cross():
     L = Lanes()
     # A merges B C D (octopus); B and C share parent E; D's parent F; E, F → G

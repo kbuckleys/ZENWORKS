@@ -378,3 +378,32 @@ def create_release(full, tag, target, name, body="", draft=False, prerelease=Fal
     return _rel(call("POST", f"/repos/{full}/releases",
                      {"tag_name": tag, "target_commitish": target, "name": name or tag,
                       "body": body, "draft": bool(draft), "prerelease": bool(prerelease)}))
+
+
+# ── CI ────────────────────────────────────────────────────────────────────
+# Forgejo Actions (and Woodpecker, and anything else) report as commit
+# statuses: the combined status lists each.
+def checks(full, sha):
+    tok, _ = token()
+    cs = call("GET", f"/repos/{full}/commits/{sha}/status", tok=tok, anon=not tok)
+    runs = [{"name": s.get("context") or "", "state": rest.ci_word(s.get("status") or s.get("state")),
+             "url": s.get("target_url") or "", "started": s.get("created_at"),
+             "finished": s.get("updated_at")} for s in (cs or {}).get("statuses") or []]
+    return {"sha": sha, "state": rest.ci_sum(runs), "runs": runs}
+
+
+def checks_many(full, shas):
+    return rest.ci_many(checks, full, shas)
+
+
+# ── A KEY THAT SIGNS ──────────────────────────────────────────────────────
+# Forgejo checks an SSH signature against the keys on the account (and asks
+# for the key to be verified once, on the web — said back if so).
+def add_signing_key(key, title="delphi"):
+    try:
+        r = call("POST", "/user/keys", {"title": title, "key": key})
+    except ForgeError as e:
+        if e.status == 422 and ("exist" in str(e).lower() or "used" in str(e).lower()):
+            return {"added": False, "already": True}
+        raise
+    return {"added": True, "id": r.get("id"), "verify": f"https://{HOST}/user/settings/keys"}

@@ -425,7 +425,9 @@ def _row(r, pull):
         head, base = r.get("head") or {}, r.get("base") or {}
         e.update(draft=bool(r.get("draft")), merged=bool(r.get("merged_at")),
                  branch=head.get("ref"), base=base.get("ref"),
-                 headRepo=(head.get("repo") or {}).get("full_name"))
+                 headRepo=(head.get("repo") or {}).get("full_name"),
+                 # its newest commit: what its checks are of (CI)
+                 sha=head.get("sha") or "")
         if e["merged"]:
             e["state"] = "merged"
     return e
@@ -558,3 +560,45 @@ def create_release(full, tag, target, name, body="", draft=False, prerelease=Fal
     return _rel(call("POST", f"/repos/{full}/releases",
                      {"tag_name": tag, "target_commitish": target, "name": name or tag,
                       "body": body, "draft": bool(draft), "prerelease": bool(prerelease)}))
+
+
+# ── CI ────────────────────────────────────────────────────────────────────
+# A commit's checks: the check runs (GitHub Actions and every app that
+# reports that way) and the older commit statuses, as one list (rest.ci_*).
+def checks(full, sha):
+    tok, _ = token()
+    runs = []
+    cr = call("GET", f"/repos/{full}/commits/{sha}/check-runs?per_page=100", tok=tok)
+    for r in cr.get("check_runs") or []:
+        st = r.get("conclusion") if r.get("status") == "completed" else r.get("status")
+        runs.append({"name": r.get("name") or "", "state": rest.ci_word(st),
+                     "url": r.get("html_url") or r.get("details_url") or "",
+                     "started": r.get("started_at"), "finished": r.get("completed_at")})
+    cs = call("GET", f"/repos/{full}/commits/{sha}/status", tok=tok)
+    for s in cs.get("statuses") or []:
+        runs.append({"name": s.get("context") or "", "state": rest.ci_word(s.get("state")),
+                     "url": s.get("target_url") or "", "started": s.get("created_at"),
+                     "finished": s.get("updated_at")})
+    return {"sha": sha, "state": rest.ci_sum(runs), "runs": runs}
+
+
+def checks_many(full, shas):
+    return rest.ci_many(checks, full, shas)
+
+
+# ── A KEY THAT SIGNS ──────────────────────────────────────────────────────
+# Registered as a SIGNING key (not one to log in with): commits signed with
+# it show as Verified. The token needs the admin:ssh_signing_key scope —
+# gh's default sign-in does not ask for it, and GitHub's refusal says so.
+def add_signing_key(key, title="delphi"):
+    try:
+        r = call("POST", "/user/ssh_signing_keys", {"title": title, "key": key})
+    except ForgeError as e:
+        if e.status == 422 and "already" in str(e).lower():
+            return {"added": False, "already": True}
+        if e.status in (403, 404):
+            raise ForgeError("GitHub refused: the sign-in needs the admin:ssh_signing_key permission — run "
+                             "`gh auth refresh -s admin:ssh_signing_key`, or add the key at github.com → Settings → "
+                             "SSH and GPG keys → New SSH key (type: Signing Key)", e.status)
+        raise
+    return {"added": True, "id": r.get("id")}

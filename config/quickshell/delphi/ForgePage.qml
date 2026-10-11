@@ -115,6 +115,11 @@ Item {
       const keep = pg.wanted >= 0 ? pg.wanted : pg.row ? pg.row.number : -1;
       pg.wanted = -1;
       pg.allRows = rs;
+      // the pull requests' checks, where the forge says which commit each is at
+      if (pg.pulls) {
+        const shas = rs.filter((r) => !!r.sha && r.state === "open").map((r) => r.sha);
+        if (shas.length > 0) pg.win.mgr.ciAsk(pg.hub.forge, pg.hub.full, shas);
+      }
       const i = pg.rows.findIndex((r) => r.number === keep);
       pg.sel = i >= 0 ? i : 0;
       if (pg.row) list.positionViewAtIndex(pg.sel, ListView.Contain);
@@ -381,11 +386,19 @@ Item {
           font.family: Zenon.glyphFace
           font.pixelSize: Zenon.px(16)
         }
+        // its checks (CiDot), for an open pull request whose commit is known
+        CiDot {
+          id: prCi
+          anchors.right: parent.right
+          anchors.rightMargin: 20
+          anchors.verticalCenter: parent.verticalCenter
+          c: { pg.win.mgr.ci; return frow.r.sha && pg.hub ? pg.win.mgr.ciOf(pg.hub.forge, pg.hub.full, frow.r.sha) : null; }
+        }
         Column {
           anchors.left: fg.right
           anchors.leftMargin: 12
-          anchors.right: parent.right
-          anchors.rightMargin: 20
+          anchors.right: prCi.visible ? prCi.left : parent.right
+          anchors.rightMargin: prCi.visible ? 12 : 20
           anchors.verticalCenter: parent.verticalCenter
           spacing: 3
           Text {

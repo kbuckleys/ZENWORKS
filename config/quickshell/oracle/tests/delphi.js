@@ -114,6 +114,11 @@ module.exports = {
     t.eq("error empty", D.errorText(""), "It did not work");
     t.eq("remember", D.remember([{ root: "/a" }, { root: "/b" }], "/b", "b", 5, 20).map((r) => r.root), ["/b", "/a"]);
     t.eq("tilde", D.tilde("/home/x/src", "/home/x"), "~/src");
+    t.eq("signed: none", D.signatureOf("N", ""), null);
+    t.eq("signed: good ssh", D.signatureOf("G", 'Good "git" signature for me@x.org with ED25519 key SHA256:abc').words, "Signed by me@x.org");
+    t.eq("signed: cannot check", D.signatureOf("E", "").ink, "muted");
+    t.eq("ci: words", D.ciWords({ runs: [{ state: "success" }, { state: "failure" }, { state: "success" }] }), "Checks: 1 failed · 2 passed");
+    t.eq("ci: running", D.ciWords({ runs: [{ state: "success" }, { state: "pending" }] }), "Checks running — 1 of 2 done");
     t.eq("release: next after v1.4.2", D.nextVersion("v1.4.2"), "v1.4.3");
     t.eq("release: next after 2.0", D.nextVersion("2.0"), "2.1");
     t.eq("release: next after release-7", D.nextVersion("release-7"), "release-8");

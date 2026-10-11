@@ -45,6 +45,7 @@ import github
 import gitlab
 import gitrun
 import repo as R
+import signing
 from graph import Lanes
 from gitrun import Cancel, Cancelled, GitError
 from rest import ForgeError
@@ -502,6 +503,12 @@ class Server:
                     if len(parts) >= 2 and R.remote_key(parts[1]) == want:
                         return {"root": root}
             return {"root": None}
+        if op == "signingStatus":
+            return signing.status()
+        if op == "signingSetup":
+            return signing.setup(kw.get("key", ""), kw.get("create", False), kw.get("email", ""), cancel)
+        if op == "signingOff":
+            return signing.off()
         if op == "identitySet":
             # global unless a repository is named — the first-run question
             # "who are you" is asked once, for every repository
@@ -617,6 +624,12 @@ class Server:
                                kw.get("body", ""), kw.get("draft", False))
         if op == "Merge":
             return f.merge(kw["full"], kw["number"], kw.get("method", "merge"))
+        if op == "Checks":
+            return f.checks(kw["full"], kw["sha"])
+        if op == "ChecksMany":
+            return f.checks_many(kw["full"], kw["shas"])
+        if op == "AddSigningKey":
+            return f.add_signing_key(kw["key"], kw.get("title", "delphi"))
         if op == "Releases":
             return f.releases(kw["full"])
         if op == "ReleaseNotes":

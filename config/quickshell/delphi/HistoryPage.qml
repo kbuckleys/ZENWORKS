@@ -43,7 +43,7 @@ Item {
     : pg.commits.length + (pg.ended ? "" : "+") + " commits" + (pg.onlyPath !== "" ? " to " + pg.onlyPath : "")
       + (pg.query !== "" ? " matching “" + pg.query + "”" : "")
   readonly property var hints: pg.planning ? plan.hints
-    : pg.area === "files" ? [["↑↓", "files"], ["shift ↑↓", "diff"], ["e", "edit"]]
+    : pg.area === "files" ? [["↑↓", "files"], ["shift ↑↓", "diff"], ["e", "edit"], ["w", pg.blamePath !== "" ? "the diff" : "who wrote it"]]
         .concat(pg.shownFiles[pg.fileSel] && pg.shownFiles[pg.fileSel].status === "D" && pg.scope !== "all" ? [["r", "bring back"]] : []).concat([["tab", "commits"]])
     : pg.scope === "all" ? [["↑↓", "commits"], ["tab", "files"], ["return", "open there"], ["v", "which history"]]
     : [["↑↓", "commits"], ["tab", "files"], ["v", "which history"], ["/", "search"], ["c", "copy id"], ["b", "branch here"],
@@ -203,12 +203,13 @@ Item {
         const i = want !== "" ? pg.commits.findIndex((c) => c.sha === want) : -1;
         pg.sel = Math.max(0, i);
         pg.wantSha = "";
+        pg.ciAsk(pg.commits.slice(0, 40).map((c) => c.sha));
         list.positionViewAtIndex(pg.sel, ListView.Contain);
         pg.loadCommit();
       }
     });
   }
-  Component.onCompleted: Qt.callLater(pg.reload)
+  Component.onCompleted: { Qt.callLater(pg.reload); Qt.callLater(pg.takeBlame); }
   Component.onDestruction: if (pg.session >= 0 && pg.win) pg.win.mgr.call("logClose", pg.win.root, { session: pg.session })
   Connections {
     target: pg.win
@@ -222,6 +223,41 @@ Item {
     list.positionViewAtIndex(pg.sel, ListView.Contain);
     if (pg.sel > pg.commits.length - 80) pg.more(false);
     detailWait.restart();
+  }
+
+  // ── CI ────────────────────────────────────────────────────────────────
+  // The forge's checks for this repository's commits (DelphiManager.ci):
+  // asked for the newest forty when the history loads, and for a commit
+  // when it is chosen; in the open repository only (the hub).
+  readonly property var hub: pg.win ? pg.win.hub : null
+  function ciOf(sha) {
+    if (!pg.hub || !pg.win) return null;
+    pg.win.mgr.ci;
+    return pg.win.mgr.ciOf(pg.hub.forge, pg.hub.full, sha);
+  }
+  function ciAsk(shas) { if (pg.hub && pg.scope !== "all") pg.win.mgr.ciAsk(pg.hub.forge, pg.hub.full, shas); }
+
+  // ── WHO WROTE THIS (BlameView, in place of the diff) ──────────────────
+  // A file's lines with the commit that last changed each: from a commit's
+  // files (w) as of that commit, following the commits as you move; from
+  // plato or terminus (DelphiManager.blame) as the file is now.
+  property string blamePath: ""
+  property string blameAt: "commit"   // commit | head
+  property int blameLine: 0
+  // one asked for from plato or terminus, taken up when its repository is
+  readonly property var blameWanted: pg.win ? pg.win.blameWanted : null
+  onBlameWantedChanged: Qt.callLater(pg.takeBlame)
+  function takeBlame() {
+    const b = pg.win ? pg.win.blameWanted : null;
+    if (!b || pg.win.root === "" || b.file.indexOf(pg.win.root + "/") !== 0) return;
+    pg.win.blameWanted = null;
+    pg.blameFile(b.file.slice(pg.win.root.length + 1), "head", b.line);
+  }
+  Connections { target: pg.win; function onRootChanged() { Qt.callLater(pg.takeBlame); } }
+  function blameFile(path, at, line) {
+    pg.blameAt = at || "commit";
+    pg.blameLine = line || 0;
+    pg.blamePath = path;
   }
 
   // ── A PEEK AT A COMMIT ─────────────────────────────────────────────────
@@ -308,6 +344,7 @@ Item {
   Timer { id: detailWait; interval: 60; onTriggered: pg.loadCommit() }
   function loadCommit() {
     const c = pg.commit;
+    if (c) pg.ciAsk([c.sha]);
     if (!c) { pg.message = null; pg.files = []; pg.diffFiles = []; return; }
     const sha = c.sha, root = pg.commitRoot;
     pg.win.mgr.call("message", root, { sha: sha }, (ok, m) => { if (!pg) return; if (ok && pg.commit && pg.commit.sha === sha) pg.message = m; });
@@ -333,6 +370,8 @@ Item {
     if (pg.shownFiles.length === 0) return;
     pg.fileSel = Math.max(0, Math.min(pg.shownFiles.length - 1, pg.fileSel + d));
     fileList.positionViewAtIndex(pg.fileSel, ListView.Contain);
+    // blaming: the next file's, at the same commit
+    if (pg.blamePath !== "" && pg.shownFiles[pg.fileSel]) pg.blameFile(pg.shownFiles[pg.fileSel].path, pg.blameAt, 0);
     pg.loadFileDiff();
   }
 
@@ -437,6 +476,11 @@ Item {
       if (k === Qt.Key_Down || k === Qt.Key_J) { pg.moveFile(1); return true; }
       if (k === Qt.Key_PageUp) { diff.page(-1); return true; }
       if (k === Qt.Key_PageDown) { diff.page(1); return true; }
+      if (k === Qt.Key_W && pg.shownFiles[pg.fileSel]) {
+        if (pg.blamePath !== "") pg.blamePath = ""; else pg.blameFile(pg.shownFiles[pg.fileSel].path, "commit", 0);
+        return true;
+      }
+      if (k === Qt.Key_Escape && pg.blamePath !== "") { pg.blamePath = ""; return true; }
       if (k === Qt.Key_E && pg.shownFiles[pg.fileSel]) { pg.win.edit(pg.absOf(pg.shownFiles[pg.fileSel].path)); return true; }
       if (k === Qt.Key_R && pg.shownFiles[pg.fileSel] && pg.shownFiles[pg.fileSel].status === "D" && pg.scope !== "all") { pg.bringBack([pg.shownFiles[pg.fileSel]]); return true; }
       if (k === Qt.Key_Escape) { pg.area = "commits"; return true; }
@@ -599,7 +643,7 @@ Item {
         }
         Text {
           id: who
-          anchors.right: when.left
+          anchors.right: ciCell.left
           anchors.rightMargin: 12
           anchors.verticalCenter: parent.verticalCenter
           width: Math.min(implicitWidth, 130)
@@ -609,6 +653,17 @@ Item {
           font.family: Zenon.face
           font.weight: Zenon.weight
           font.pixelSize: Zenon.px(13)
+        }
+        // what the forge's checks said of it (CiDot), in a column of its
+        // own so the dates stay aligned; none where nothing was asked
+        Item {
+          id: ciCell
+          anchors.right: when.left
+          anchors.rightMargin: pg.hub ? 10 : 0
+          anchors.verticalCenter: parent.verticalCenter
+          width: pg.hub ? Zenon.px(9) : 0
+          height: Zenon.px(9)
+          CiDot { anchors.centerIn: parent; c: pg.ciOf(crow.c.sha) }
         }
         Text {
           id: when
@@ -799,6 +854,40 @@ Item {
           font.pixelSize: Zenon.px(14)
         }
       }
+      // signed, and whether git could check it (D.signatureOf)
+      Text {
+        readonly property var sig: pg.message ? D.signatureOf(pg.message.signature, pg.message.signer) : null
+        visible: !!sig
+        width: parent.width
+        elide: Text.ElideRight
+        text: sig ? sig.glyph + "  " + sig.words : ""
+        color: sig ? Zenon[sig.ink] : Zenon.muted
+        font.family: Zenon.face
+        font.weight: Zenon.weight
+        font.pixelSize: Zenon.px(13)
+      }
+      // what the forge's checks said of it, each a click from its log
+      Row {
+        readonly property var c: pg.commit ? pg.ciOf(pg.commit.sha) : null
+        visible: !!c && c.state !== "none"
+        spacing: 8
+        CiDot { anchors.verticalCenter: parent.verticalCenter; c: parent.c }
+        Text {
+          anchors.verticalCenter: parent.verticalCenter
+          text: !parent.c ? "" : D.ciWords(parent.c)
+          color: !parent.c ? Zenon.muted : parent.c.state === "failure" ? Zenon.red : parent.c.state === "success" ? Zenon.green
+            : parent.c.state === "pending" ? Zenon.yellow : Zenon.muted
+          font.family: Zenon.face
+          font.weight: Zenon.weight
+          font.pixelSize: Zenon.px(13)
+        }
+      }
+      CiRuns {
+        width: parent.width
+        c: pg.commit ? pg.ciOf(pg.commit.sha) : null
+        visible: !!c && c.runs && c.runs.length > 0 && c.state !== "success"
+        most: 6
+      }
     }
     Rectangle { id: headRule; y: headCol.y + headCol.height + 12; width: parent.width; height: 1; color: Zenon.border; visible: !!pg.commit }
 
@@ -909,8 +998,23 @@ Item {
       onReset: pg.win.setSplit("historyFiles", 0)
     }
 
+    BlameView {
+      id: blameView
+      anchors.top: filesRule.bottom
+      anchors.left: parent.left
+      anchors.right: parent.right
+      anchors.bottom: parent.bottom
+      visible: pg.blamePath !== ""
+      win: pg.win
+      path: pg.blamePath
+      rev: pg.blameAt === "head" ? "" : pg.commit ? pg.commit.sha : ""
+      line: pg.blameLine
+      onPicked: (sha) => { pg.blamePath = ""; pg.jumpSha = sha; pg.reload(); }
+      onClosed: pg.blamePath = ""
+    }
     DiffView {
       id: diff
+      visible: pg.blamePath === ""
       anchors.top: filesRule.bottom
       anchors.left: parent.left
       anchors.right: parent.right

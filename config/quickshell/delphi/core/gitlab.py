@@ -346,6 +346,7 @@ def _row(r, pull):
     if pull:
         e.update(draft=bool(r.get("draft") or r.get("work_in_progress")), merged=st == "merged",
                  branch=r.get("source_branch"), base=r.get("target_branch"),
+                 sha=r.get("sha") or "",
                  sameProject=r.get("source_project_id") == r.get("target_project_id"))
     return e
 
@@ -463,3 +464,40 @@ def create_release(full, tag, target, name, body="", draft=False, prerelease=Fal
         raise ForgeError("GitLab has no draft releases — publish it, or keep the notes for later")
     return _rel(call("POST", f"/projects/{_pid(full)}/releases",
                      {"tag_name": tag, "ref": target, "name": name or tag, "description": body}))
+
+
+# ── CI ────────────────────────────────────────────────────────────────────
+# A commit's pipeline jobs, as GitLab reports them on the commit (its
+# statuses: one per job, external ones too).
+def checks(full, sha):
+    tok, _ = token()
+    rs = call("GET", f"/projects/{_pid(full)}/repository/commits/{sha}/statuses?per_page=100", tok=tok, anon=not tok)
+    # a job retried reports again: the newest of each name is what stands
+    seen, runs = set(), []
+    for s in sorted(rs or [], key=lambda x: x.get("id") or 0, reverse=True):
+        key = (s.get("name"), s.get("stage"))
+        if key in seen:
+            continue
+        seen.add(key)
+        runs.append({"name": (s.get("stage") + ": " if s.get("stage") else "") + (s.get("name") or ""),
+                     "state": "neutral" if s.get("allow_failure") and s.get("status") == "failed" else rest.ci_word(s.get("status")),
+                     "url": s.get("target_url") or "", "started": s.get("started_at"),
+                     "finished": s.get("finished_at")})
+    return {"sha": sha, "state": rest.ci_sum(runs), "runs": list(reversed(runs))}
+
+
+def checks_many(full, shas):
+    return rest.ci_many(checks, full, shas)
+
+
+# ── A KEY THAT SIGNS ──────────────────────────────────────────────────────
+# GitLab keeps one list of SSH keys, each for logging in, signing or both:
+# this one is for signing only.
+def add_signing_key(key, title="delphi"):
+    try:
+        r = call("POST", "/user/keys", {"title": title, "key": key, "usage_type": "signing"})
+    except ForgeError as e:
+        if e.status in (400, 422) and "taken" in str(e).lower():
+            return {"added": False, "already": True}
+        raise
+    return {"added": True, "id": r.get("id")}

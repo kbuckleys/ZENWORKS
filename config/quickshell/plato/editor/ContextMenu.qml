@@ -101,6 +101,8 @@ Item {
   ].concat(menu.gitClient ? [
     { text: "History of this file", icon: "\u{F02DA}",
       run: () => menu.gitClient.history(menu.path) },
+    { text: "Who wrote this line", icon: "\u{F0004}",
+      run: () => menu.gitClient.blame(menu.path, menu.ed.line) },
   ] : [])
   readonly property var gitSelectionItems: [
     { isSeparator: true },

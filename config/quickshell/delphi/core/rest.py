@@ -128,3 +128,50 @@ def request(method, url, headers, body=None, raw=False, again=False, waited=None
             raise ForgeError(f"cannot reach {who}: {why}")
     val = json.loads(txt) if txt else None
     return (val, link) if raw else val
+
+
+# ── CI: WHAT A FORGE'S CHECKS SAY OF A COMMIT ─────────────────────────────
+# GitHub's check runs and statuses, GitLab's job statuses, Forgejo's commit
+# statuses — each forge's words for how a check went, said one way here:
+# pending, success, failure, or neutral (skipped, cancelled by a newer run's
+# rule, nothing to say). A commit's state is its worst check's: any failure
+# fails it, else any still running keeps it pending; none at all is "none".
+_CI = {"success": "success", "passed": "success", "completed": "success",
+       "failure": "failure", "failed": "failure", "error": "failure",
+       "timed_out": "failure", "action_required": "failure", "startup_failure": "failure",
+       "pending": "pending", "queued": "pending", "in_progress": "pending",
+       "running": "pending", "created": "pending", "waiting": "pending",
+       "preparing": "pending", "scheduled": "pending", "requested": "pending",
+       "waiting_for_resource": "pending", "manual": "neutral",
+       "skipped": "neutral", "neutral": "neutral", "cancelled": "neutral",
+       "canceled": "neutral", "stale": "neutral", "warning": "success"}
+
+
+def ci_word(s):
+    return _CI.get(str(s or "").lower(), "neutral")
+
+
+def ci_sum(runs):
+    st = [r["state"] for r in runs]
+    if not st:
+        return "none"
+    if "failure" in st:
+        return "failure"
+    if "pending" in st:
+        return "pending"
+    return "success" if "success" in st else "neutral"
+
+
+def ci_many(fn, full, shas, limit=40):
+    """fn(full, sha) for each of the first `limit` commits, a few at once:
+    {sha: answer}; one that fails says nothing rather than failing the rest."""
+    from concurrent.futures import ThreadPoolExecutor
+    out = {}
+    def one(sha):
+        try:
+            out[sha] = fn(full, sha)
+        except Exception:
+            pass
+    with ThreadPoolExecutor(max_workers=6) as ex:
+        list(ex.map(one, list(shas)[:limit]))
+    return out

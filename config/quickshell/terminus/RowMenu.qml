@@ -761,6 +761,8 @@ PopupWindow {
           out.push({ label: "Discard changes" + many + "…", danger: true,
                      act: () => term.gitOn(rows(), "discard") });
         out.push({ label: "History in Delphi", act: () => term.gitHistory(t.path) });
+        if (!t.isDir)
+          out.push({ label: "Who wrote this", act: () => { const d = term.mgr.gitClient; if (d) d.blame(t.path, 0); } });
       }
       // Opening is one kind of thing and moving is another; the rule below
       // holds them apart. Cut first: the pair is ordered by how much of a

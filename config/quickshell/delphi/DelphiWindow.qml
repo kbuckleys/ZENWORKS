@@ -98,6 +98,9 @@ FloatingWindow {
   // History narrowed to one file (DelphiManager.history), absolute; one
   // outside the open repository counts for nothing
   property string historyFile: ""
+  // a blame asked for from outside (DelphiManager.blame), for History to
+  // take up once it has the repository: { file, line } or null
+  property var blameWanted: null
   property var info: null
   property var st: null
   property var refs: ({ local: [], remote: [], tags: [] })
@@ -285,7 +288,7 @@ FloatingWindow {
               { label: "Pushing", network: true, said: "Published " + b.head + " to " + remote });
       return;
     }
-    win.act("push", {}, { label: "Pushing", network: true, said: "Pushed",
+    win.act("push", {}, { label: "Pushing", network: true, said: "Pushed", then: () => win.watchCi(),
       failed: (err) => {
         const t = String(err && err.error || "");
         if (/rejected|non-fast-forward|fetch first/.test(t)) {
@@ -316,6 +319,43 @@ FloatingWindow {
     const f = o ? D.forgeOfHost(o.host) : null;
     return { glyph: f ? f.glyph : "\uF0C2", where: f ? f.name : o ? o.host : (r.push || r.fetch || "") };
   }
+  // ── THE CHECKS ON WHAT WAS PUSHED ──────────────────────────────────────
+  // The commit you are on, as each place Push sends it has it: the forge's
+  // checks for it there (DelphiManager.ci), asked when the commit changes,
+  // after a push, and every 15 s while any is still running or a push has
+  // not had its checks start yet (ten minutes at most).
+  function remoteHub(r) {
+    const o = r ? D.remoteOf(r.push || r.fetch || "") : null;
+    const f = o ? D.forgeOfHost(o.host) : null;
+    return f ? { forge: f.id, full: o.full, name: f.name } : null;
+  }
+  readonly property string headSha: win.branch && win.branch.oid ? win.branch.oid : ""
+  readonly property var pushNames: win.pushTargets.length > 0 ? win.pushTargets
+    : win.branch && win.branch.upstream ? [win.branch.upstream.split("/")[0]] : []
+  function headCiOf(name) {
+    win.mgr.ci;
+    const h = win.remoteHub(win.remotes.find((x) => x.name === name));
+    return h && win.headSha !== "" ? win.mgr.ciOf(h.forge, h.full, win.headSha) : null;
+  }
+  function askHeadCi() {
+    if (win.headSha === "" || !win.visible) return;
+    for (const n of win.pushNames) {
+      const h = win.remoteHub(win.remotes.find((x) => x.name === n));
+      if (h) win.mgr.ciAsk(h.forge, h.full, [win.headSha]);
+    }
+  }
+  property real ciWatchUntil: 0
+  onHeadShaChanged: Qt.callLater(win.askHeadCi)
+  onPushNamesChanged: Qt.callLater(win.askHeadCi)
+  Timer {
+    interval: 15000
+    repeat: true
+    running: win.visible && win.headSha !== ""
+      && (Date.now() < win.ciWatchUntil || win.pushNames.some((n) => { const c = win.headCiOf(n); return !!c && c.state === "pending"; }))
+    onTriggered: win.askHeadCi()
+  }
+  function watchCi() { win.ciWatchUntil = Date.now() + 10 * 60 * 1000; Qt.callLater(win.askHeadCi); }
+
   function pushItems() {
     const t = win.pushTargets, all = win.remotes.length > 0 && t.length === win.remotes.length;
     const tick = (names) => win.mgr.setPushTo(win.root, names);
@@ -342,6 +382,7 @@ FloatingWindow {
     const next = (i) => {
       if (!win) return;
       if (i >= names.length) {
+        if (done.length > 0) win.watchCi();
         win.say(bad.length === 0 ? "Pushed to " + done.join(", ")
           : (done.length > 0 ? "Pushed to " + done.join(", ") + " — " : "") + bad.join(", ") + (bad.length === 1 ? " refused it" : " refused it"), bad.length > 0);
         win.refresh();
@@ -1032,6 +1073,12 @@ FloatingWindow {
                   font.weight: Zenon.weight
                   font.pixelSize: Zenon.px(13)
                 }
+                // its checks on the commit you are on, there
+                CiDot {
+                  anchors.verticalCenter: parent.verticalCenter
+                  size: Zenon.px(8)
+                  c: win.headCiOf(modelData)
+                }
               }
             }
             Text {
@@ -1052,6 +1099,38 @@ FloatingWindow {
             onClicked: win.pushMenu(pushChip)
           }
           HeldRing { anchors.fill: parent; radius: parent.radius; z: 10; on: pushPop.isOpen }
+          HoverHandler { id: chipHover }
+          // resting on it: each place's checks, each a click from its log
+          Bubble {
+            window: win
+            target: pushChip
+            sticky: true
+            shown: chipHover.hovered && !pushPop.isOpen && pushChip.names.some((n) => { const c = win.headCiOf(n); return !!c && c.state !== "none"; })
+            cardWidth: 380
+            Repeater {
+              model: pushChip.names
+              delegate: Column {
+                id: rc
+                required property var modelData
+                readonly property var c: win.headCiOf(modelData)
+                readonly property var h: win.remoteHub(win.remotes.find((x) => x.name === modelData))
+                visible: !!c && c.state !== "none"
+                width: 352
+                spacing: 6
+                Text {
+                  width: parent.width
+                  elide: Text.ElideRight
+                  textFormat: Text.StyledText
+                  text: "<b>" + (rc.h ? rc.h.name : rc.modelData) + "</b>  <font color='" + Zenon.hex(Zenon.muted) + "'>" + D.ciWords(rc.c) + "</font>"
+                  color: Zenon.ink
+                  font.family: Zenon.face
+                  font.weight: Zenon.weight
+                  font.pixelSize: Zenon.px(14)
+                }
+                CiRuns { width: parent.width; c: rc.c; most: 6 }
+              }
+            }
+          }
         }
       }
 
@@ -1426,20 +1505,84 @@ FloatingWindow {
     // else the Accounts page's: its name, and its private address for
     // commits (its Status: noreply) to start from
     const site = D.FORGES[win.hub ? win.hub.forge : win.mgr.forge] || D.FORGES.github;
+    win.mgr.call("signingStatus", null, {}, (okS, sig) => {
     win.mgr.call(site.id + "Status", null, {}, (ok, gh) => {
       if (!win) return;
       const hub = ok && gh && gh.signedIn ? gh : null;
+      const signing = okS && sig ? sig : { on: false };
       win.ask({ title: "Who commits?", glyph: "",
         detail: "Git writes a name and an email into every commit, and will not commit without both. Set for all your repositories."
           + (hub && !id.email ? " The email below is " + site.name + "'s private one for your account: commits are linked to you, your real address stays out of them." : ""),
         fields: [{ key: "name", label: "Name", value: id.name || (hub ? hub.name || hub.login : ""), hint: "Ada Lovelace" },
                  { key: "email", label: "Email", value: id.email || (hub ? hub.noreply : ""), hint: "ada@example.com",
                    why: "git needs one" + (hub ? "" : " — your forge's private address (GitHub: Settings → Emails) works") }],
+        toggles: [{ key: "sign", label: "Sign my commits with an SSH key — forges show them as Verified", value: !!signing.on }],
         verb: "Save",
         then: (v) => win.act("identitySet", { name: v.name.trim(), email: v.email.trim() }, {
-          repo: null, said: "Saved — commits are now signed " + v.name.trim(),
-          then: () => win.mgr.call("info", win.root, {}, (ok2, info) => { if (ok2) win.info = info; if (then) then(); }) }) });
+          repo: null, said: "Saved — commits are now made by " + v.name.trim(),
+          then: () => {
+            win.mgr.call("info", win.root, {}, (ok2, info) => { if (ok2) win.info = info; if (then) then(); });
+            if (!!v.sign && !signing.on) win.askSigning(v.email.trim());
+            else if (!v.sign && signing.on) win.act("signingOff", {}, { repo: null, said: "Commits are no longer signed" });
+          } }) });
     });
+    });
+  }
+
+  // ── SIGNING COMMITS (core/signing.py) ──────────────────────────────────
+  // With an SSH key: one already there, or one made for it; git told to
+  // sign every commit and tag with it; then, where you are signed in, the
+  // key registered with the forge as a signing key, so it shows Verified.
+  // ssh-keygen missing: Ceres installs openssh first.
+  function askSigning(email) {
+    win.mgr.call("signingStatus", null, {}, (ok, st) => {
+      if (!win || !ok) return;
+      if (!st.keygen) {
+        win.card_({ question: "Signing needs openssh", glyph: "\uF084", ink: Zenon.ink,
+          detail: "git signs with ssh-keygen, which comes with openssh — not installed. Ceres can install it (it asks for your password).",
+          choices: [{ label: "Install openssh", ink: Zenon.cyan, run: () => win.mgr.installTool("openssh", "for signing your commits", (done) => { if (done && win) win.askSigning(email); }) },
+                    { label: "Cancel", ink: Zenon.muted }] });
+        return;
+      }
+      const use = (key, create) => win.act("signingSetup", { key: key, create: create, email: email }, {
+        repo: null, label: create ? "Making a signing key" : "Setting up signing",
+        then: (r) => { if (win) win.offerSigningKey(r); } });
+      const choices = st.keys.map((k) => ({ label: "Use " + D.baseName(k.path).replace(/\.pub$/, ""), run: () => use(k.path, false) }));
+      choices.push({ label: "Make a new key for signing", ink: Zenon.cyan, run: () => use("", true) }, { label: "Cancel", ink: Zenon.muted });
+      win.card_({ question: "Sign with which key?", glyph: "\uF084", ink: Zenon.ink,
+        detail: (st.keys.length > 0 ? "Your SSH keys are below, or make one only for signing. " : "There is no SSH key here yet. ")
+          + "A new one is made without a passphrase, so git signs without asking — kept in ~/.ssh, readable by you alone.",
+        items: st.keys.map((k) => D.tilde(k.path, win.home) + (k.comment ? "  ·  " + k.comment : "")),
+        choices: choices });
+    });
+  }
+  // the key, registered with each forge you are signed in to (asked first)
+  function offerSigningKey(r) {
+    const ids = D.FORGE_ORDER.slice();
+    const found = [];
+    let left = ids.length;
+    const ask = () => {
+      if (!win) return;
+      if (found.length === 0) { win.say("Commits are signed now — add the key to your forge so they show Verified"); return; }
+      win.card_({ question: "Commits are signed now", glyph: "\uF00C", ink: Zenon.green,
+        detail: "For them to show as Verified, the forge needs the key — as a signing key. Add it to "
+          + found.map((f) => f.name).join(" and ") + "?",
+        items: [r.public.slice(0, 60) + "…"],
+        choices: [{ label: "Add it", ink: Zenon.cyan, run: () => found.forEach((f) =>
+                      win.act(f.id + "AddSigningKey", { key: r.public, title: "delphi signing (" + win.home.split("/").pop() + ")" }, {
+                        repo: null, network: true, label: "Adding the key to " + f.name, refresh: false,
+                        then: (res) => win.say(res.already ? f.name + " already has it" : "Added to " + f.name
+                          + (res.verify ? " — confirm it there once: " + res.verify : "")),
+                        failed: (err) => win.fail("Could not add the key to " + f.name, null, err) })) },
+                  { label: "Copy the key", run: () => win.copy(r.public, "the public key") },
+                  { label: "Not now", ink: Zenon.muted }] });
+    };
+    for (const id of ids) {
+      win.mgr.call(D.FORGES[id].id + "Status", null, {}, (ok, st) => {
+        if (ok && st && st.signedIn) found.push(D.FORGES[id]);
+        if (--left === 0) ask();
+      });
+    }
   }
   onRootChanged: {
     if (win.root !== "") win.mgr.call("info", win.root, {}, (ok, info) => { if (ok) win.info = info; });

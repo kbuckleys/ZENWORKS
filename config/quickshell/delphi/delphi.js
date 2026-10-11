@@ -605,3 +605,35 @@ function notesFrom(commits, since) {
   var head = since ? "## Changes since " + since + "\n\n" : "## Changes\n\n";
   return head + cs.map(function (c) { return "- " + c.subject + " (" + c.sha + ")"; }).join("\n") + "\n";
 }
+
+// A commit's checks in words: "3 passed", "1 failed · 2 passed", "running —
+// 1 of 4 done"
+function ciWords(c) {
+  if (!c || !c.runs || c.runs.length === 0) return "";
+  var n = { success: 0, failure: 0, pending: 0, neutral: 0 };
+  c.runs.forEach(function (r) { n[r.state] = (n[r.state] || 0) + 1; });
+  var total = c.runs.length;
+  if (n.pending > 0) return "Checks running — " + (total - n.pending) + " of " + total + " done" + (n.failure ? ", " + n.failure + " failed" : "");
+  var parts = [];
+  if (n.failure) parts.push(n.failure + " failed");
+  if (n.success) parts.push(n.success + " passed");
+  if (n.neutral) parts.push(n.neutral + " skipped");
+  return "Checks: " + parts.join(" · ");
+}
+
+// A commit's signature, from git's %G? and %GG: null when unsigned.
+// { glyph, words, ink } — ink a Zenon colour's name. "Can't check" is a
+// signature git has no key to check against here (not a bad one).
+function signatureOf(code, signer) {
+  var c = String(code || "N");
+  var who = String(signer || "").split("\n").map(function (l) {
+    var m = /(?:Good|Bad) "git" signature for (.+?) with/.exec(l) || /(?:Good|Bad) signature from "?([^"]+)"?/.exec(l);
+    return m ? m[1] : "";
+  }).filter(function (x) { return x; })[0] || "";
+  if (c === "N") return null;
+  if (c === "G" || c === "U") return { glyph: "", words: "Signed" + (who ? " by " + who : ""), ink: "green" };
+  if (c === "B") return { glyph: "", words: "Bad signature — the commit is not what was signed", ink: "red" };
+  if (c === "X" || c === "Y") return { glyph: "", words: "Signed with a key that has expired", ink: "yellow" };
+  if (c === "R") return { glyph: "", words: "Signed with a revoked key", ink: "yellow" };
+  return { glyph: "", words: "Signed — no key here to check it with", ink: "muted" };
+}
