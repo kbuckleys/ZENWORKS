@@ -534,6 +534,7 @@ FocusScope {
     root: tree.rootPath
     marks: tree.git
     repoDirs: tree.repoDirs
+    namePeek: (row, entry) => namePeek.show(row, entry)
     noteWidth: tree.noteWidth
     // a directory read and found empty shows no chevron, as in terminus
     empties: {
@@ -591,6 +592,8 @@ FocusScope {
     TapHandler { onTapped: tg.hit() }
   }
   WindowTip { id: tips; window: tree.window }
+  // a name the sidebar's width cut short, shown whole (terminus/NamePeek)
+  NamePeek { id: namePeek; window: tree.window }
   Rectangle {
     id: bar
     visible: tree.toolbar

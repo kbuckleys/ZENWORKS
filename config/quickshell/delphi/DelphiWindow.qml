@@ -11,6 +11,8 @@
 //   Branches     local, remote, tags: switch, create, merge, rebase, delete
 //   Stashes      work put aside, and brought back
 //   Worktrees    the other checkouts of this repository
+//   Releases     the forge repository's releases, and a new one with its
+//                notes written for you (ReleasesPage)
 //   Dotfiles     its GNU Stow packages: what stow would link, and what is
 //                in the way; a config copied in; the command to run (never
 //                run here — DotfilesPage, core/stow.py)
@@ -53,10 +55,25 @@ FloatingWindow {
 
   property var mgr: null
 
-  onVisibleChanged: if (!win.visible) Qt.callLater(() => {
-    if (win.mgr) { win.unwatch(); win.mgr.release("window"); win.mgr.retire(win); }
-    win.destroy();
-  })
+  // CLOSED, IT IS KEPT, hidden: built afresh on every open, the window
+  // cost a 130–240 ms stall each time it came up (LagWatch, 2026-10-11 —
+  // the build itself 31–41 ms, the rest its first draw). Hidden, it lets go
+  // of the backend and its file watch; shown again, it takes them back and
+  // looks at the repository afresh, as terminus' kept window does.
+  property bool _shownOnce: false
+  onVisibleChanged: {
+    if (!win.mgr) return;
+    if (!win.visible) {
+      win.unwatch();
+      win.mgr.release("window");
+      return;
+    }
+    if (!win._shownOnce) { win._shownOnce = true; return; }
+    win.mgr.hold("window");
+    if (win.root !== "") { win.mgr.call("watch", win.root, {}); win.refresh(); }
+    Qt.callLater(win.checkTools);
+    Qt.callLater(win.refocus);
+  }
   onClosed: win.visible = false
   Component.onCompleted: {
     if (win.mgr) win.mgr.hold("window");
@@ -253,6 +270,7 @@ FloatingWindow {
       if (win.page !== "changes") win.setPage("changes");
       return;
     }
+    if (win.pushTargets.length > 0) { win.pushMany(win.pushTargets); return; }
     if (!b.upstream) {
       // nowhere to push yet: the Accounts page's Publish — to a repository
       // there already, or a new one — rather than a toast to go and find it
@@ -284,6 +302,61 @@ FloatingWindow {
   function setSplit(key, v) { if (win.mgr) win.mgr.setSplit(key, v); }
   // Publish pressed with no remote: the Accounts page asks how, once it can
   property bool wantPublish: false
+  // ── WHERE PUSH SENDS IT ────────────────────────────────────────────────
+  // (user, 2026-10-11: one forge at a time was not enough.) The remotes
+  // ticked in the push menu, by name — those still there; none ticked, the
+  // upstream as before. Kept per repository (DelphiManager.pushTo).
+  readonly property var pushTargets: {
+    const want = win.mgr && win.root !== "" ? win.mgr.pushTo[win.root] || [] : [];
+    return want.filter((n) => win.remotes.some((r) => r.name === n));
+  }
+  // a remote, said by its forge where delphi knows it (GitHub, Codeberg…)
+  function remoteWord(r) {
+    const o = D.remoteOf(r.push || r.fetch || "");
+    const f = o ? D.forgeOfHost(o.host) : null;
+    return { glyph: f ? f.glyph : "\uF0C2", where: f ? f.name : o ? o.host : (r.push || r.fetch || "") };
+  }
+  function pushItems() {
+    const t = win.pushTargets, all = win.remotes.length > 0 && t.length === win.remotes.length;
+    const tick = (names) => win.mgr.setPushTo(win.root, names);
+    const items = win.remotes.map((r) => {
+      const on = t.indexOf(r.name) >= 0, w = win.remoteWord(r);
+      return { text: r.name + "   " + w.where, icon: on ? "\uF00C" : w.glyph, keep: true,
+               mark: win.branch && win.branch.upstream && win.branch.upstream.indexOf(r.name + "/") === 0 ? "upstream" : "",
+               run: () => { tick(on ? t.filter((n) => n !== r.name) : t.concat([r.name])); pushPop.setItems(win.pushItems()); } };
+    });
+    items.push({ isSeparator: true },
+      { text: "All of them", icon: all ? "\uF00C" : "\uF0E8", keep: true,
+        run: () => { tick(all ? [] : win.remotes.map((r) => r.name)); pushPop.setItems(win.pushItems()); } },
+      { text: "Just the upstream", icon: t.length === 0 ? "\uF00C" : "\uF062", keep: true,
+        run: () => { tick([]); pushPop.setItems(win.pushItems()); } });
+    return items;
+  }
+  function pushMenu(at) {
+    const p = at.mapToItem(stage, 0, at.height + 6);
+    pushPop.open(p.x, p.y, win.pushItems());
+  }
+  // to each ticked remote in turn; one that refuses does not stop the rest
+  function pushMany(names) {
+    const b = win.branch, done = [], bad = [];
+    const next = (i) => {
+      if (!win) return;
+      if (i >= names.length) {
+        win.say(bad.length === 0 ? "Pushed to " + done.join(", ")
+          : (done.length > 0 ? "Pushed to " + done.join(", ") + " — " : "") + bad.join(", ") + (bad.length === 1 ? " refused it" : " refused it"), bad.length > 0);
+        win.refresh();
+        return;
+      }
+      const r = names[i];
+      const up = !!b.upstream && b.upstream.indexOf(r + "/") === 0;
+      win.act("push", up ? {} : { remote: r, branch: b.head, setUpstream: !b.upstream && i === 0 }, {
+        label: "Pushing to " + r + (names.length > 1 ? "  (" + (i + 1) + " of " + names.length + ")" : ""),
+        network: true, refresh: false,
+        then: () => { done.push(r); next(i + 1); },
+        failed: (err) => { bad.push(r); win.fail("Push to " + r + " did not work", null, err); next(i + 1); } });
+    };
+    next(0);
+  }
   function forcePush() {
     win.confirm({ question: "Force-push " + win.branchName + "?", glyph: "", ink: Zenon.red,
       detail: "Replaces the remote branch with yours. With a lease: refused if it moved since you last fetched.",
@@ -441,6 +514,7 @@ FloatingWindow {
     { id: "github", label: "Accounts", glyph: "\uF0C2" },
     { id: "repos", label: "Repositories", glyph: "" },
     { id: "dotfiles", label: "Dotfiles", glyph: "\uF487" },
+    { id: "releases", label: "Releases", glyph: "\uF412" },
   ]
   readonly property string page: win.mgr ? win.mgr.page : "changes"
   function setPage(p) {
@@ -881,16 +955,103 @@ FloatingWindow {
           font.pixelSize: Zenon.px(19)
         }
         Text {
+          id: headSub
           anchors.left: headTitle.right
           anchors.leftMargin: 12
-          anchors.right: parent.right
           anchors.baseline: headTitle.baseline
+          width: Math.min(implicitWidth, parent.width - x - (pushChip.visible ? pushChip.width + 12 : 0))
           elide: Text.ElideMiddle
           text: win.pageItem && win.pageItem.subtitle !== undefined ? win.pageItem.subtitle : D.tilde(win.root, win.home)
           color: Zenon.muted
           font.family: Zenon.face
           font.weight: Zenon.weight
           font.pixelSize: Zenon.px(14)
+        }
+        // ── WHERE PUSH GOES, beside the branch (a page that says so) ──
+        // Each remote it pushes to, by its forge's glyph and name: the
+        // ticked ones, or the upstream; with a choice of remotes, a click
+        // opens the menu to tick them (pushItems).
+        Rectangle {
+          id: pushChip
+          readonly property var names: win.pushTargets.length > 0 ? win.pushTargets
+            : win.branch && win.branch.upstream ? [win.branch.upstream.split("/")[0]] : []
+          readonly property bool choice: win.remotes.length > 1
+          visible: !!win.pageItem && !!win.pageItem.showsPush && win.root !== "" && win.remotes.length > 0
+          anchors.left: headSub.right
+          anchors.leftMargin: 12
+          anchors.verticalCenter: headTitle.verticalCenter
+          width: chipRow.implicitWidth + 22
+          height: Math.round(Zenon.px(14) * 2)
+          radius: height / 2
+          color: chipPress.pressed ? Zenon.wash(0.12) : Zenon.wash(0.05)
+          border.width: 1
+          border.color: Zenon.border
+          Row {
+            id: chipRow
+            anchors.centerIn: parent
+            spacing: 7
+            Text {
+              anchors.verticalCenter: parent.verticalCenter
+              text: "\uF062"
+              color: Zenon.muted
+              font.family: Zenon.glyphFace
+              font.pixelSize: Zenon.px(11)
+            }
+            Repeater {
+              model: pushChip.names.length > 0 ? pushChip.names : ["—"]
+              delegate: Row {
+                required property var modelData
+                required property int index
+                readonly property var r: win.remotes.find((x) => x.name === modelData) || null
+                readonly property var w: r ? win.remoteWord(r) : null
+                spacing: 5
+                anchors.verticalCenter: parent.verticalCenter
+                Text {
+                  visible: index > 0
+                  anchors.verticalCenter: parent.verticalCenter
+                  text: "+"
+                  color: Zenon.muted
+                  font.family: Zenon.face
+                  font.pixelSize: Zenon.px(13)
+                }
+                Text {
+                  visible: !!parent.w
+                  anchors.verticalCenter: parent.verticalCenter
+                  text: parent.w ? parent.w.glyph : ""
+                  color: Zenon.cyan
+                  font.family: Zenon.glyphFace
+                  font.pixelSize: Zenon.px(13)
+                }
+                Text {
+                  anchors.verticalCenter: parent.verticalCenter
+                  // the forge's name where it is one delphi knows, else the remote's
+                  text: !parent.r ? "not published"
+                    : parent.w && D.forgeOfHost((D.remoteOf(parent.r.push || parent.r.fetch || "") || {}).host) ? parent.w.where : modelData
+                  color: Zenon.ink
+                  font.family: Zenon.face
+                  font.weight: Zenon.weight
+                  font.pixelSize: Zenon.px(13)
+                }
+              }
+            }
+            Text {
+              visible: pushChip.choice
+              anchors.verticalCenter: parent.verticalCenter
+              text: "\uF078"
+              color: pushPop.isOpen ? Zenon.cyan : Zenon.muted
+              rotation: pushPop.isOpen ? 180 : 0
+              Behavior on rotation { NumberAnimation { duration: Zenon.normal; easing.type: Zenon.travelEase } }
+              font.family: Zenon.glyphFace
+              font.pixelSize: Zenon.px(10)
+            }
+          }
+          MouseArea {
+            id: chipPress
+            anchors.fill: parent
+            enabled: pushChip.choice
+            onClicked: win.pushMenu(pushChip)
+          }
+          HeldRing { anchors.fill: parent; radius: parent.radius; z: 10; on: pushPop.isOpen }
         }
       }
 
@@ -1068,13 +1229,23 @@ FloatingWindow {
           ready: !!win.branch && !!win.branch.upstream
           onClicked: win.pull()
         }
-        DialogButton {
+        // Push: where it goes is the chip beside the page's title (pushChip)
+        Row {
           visible: !win.netBusy && win.root !== ""
-          label: !win.branch ? "Push" : !win.branch.upstream && win.branch.head ? "Publish"
-            : win.branch.ahead > 0 ? "Push  ↑" + win.branch.ahead : "Push"
-          ink: win.branch && (win.branch.ahead > 0 || (!win.branch.upstream && win.branch.head)) ? Zenon.cyan : Zenon.muted
-          primary: !!win.branch && win.branch.ahead > 0 && win.branch.behind === 0
-          onClicked: win.push()
+          spacing: 2
+          DialogButton {
+            id: pushBtn
+            readonly property int n: win.pushTargets.length
+            label: !win.branch ? "Push"
+              : pushBtn.n > 1 ? (pushBtn.n === win.remotes.length ? "Push to all" : "Push to " + pushBtn.n)
+                + (win.branch.ahead > 0 ? "  ↑" + win.branch.ahead : "")
+              : pushBtn.n === 1 ? "Push to " + win.pushTargets[0]
+              : !win.branch.upstream && win.branch.head ? "Publish"
+              : win.branch.ahead > 0 ? "Push  ↑" + win.branch.ahead : "Push"
+            ink: win.branch && (win.branch.ahead > 0 || pushBtn.n > 0 || (!win.branch.upstream && win.branch.head)) ? Zenon.cyan : Zenon.muted
+            primary: !!win.branch && win.branch.ahead > 0 && win.branch.behind === 0
+            onClicked: win.push()
+          }
         }
       }
     }
@@ -1088,7 +1259,7 @@ FloatingWindow {
       anchors.bottom: foot.top
       source: win.root === "" && ["github", "repos"].indexOf(win.page) < 0 ? "ReposPage.qml"
         : ({ changes: "ChangesPage.qml", history: "HistoryPage.qml", branches: "BranchesPage.qml",
-             stashes: "StashesPage.qml", worktrees: "WorktreesPage.qml", dotfiles: "DotfilesPage.qml", github: "GitHubPage.qml",
+             stashes: "StashesPage.qml", worktrees: "WorktreesPage.qml", dotfiles: "DotfilesPage.qml", releases: "ReleasesPage.qml", github: "GitHubPage.qml",
              pulls: "ForgePage.qml", issues: "ForgePage.qml",
              repos: "ReposPage.qml" })[win.page] || "ChangesPage.qml"
       onLoaded: { item.win = win; Qt.callLater(win.refocus); }
@@ -1282,6 +1453,15 @@ FloatingWindow {
   }
 
   WindowTip { id: tips; window: win }
+  // where Push goes: the remotes, ticked; stays up while you tick
+  PopMenu {
+    id: pushPop
+    parent: stage
+    anchors.fill: parent
+    window: win
+    cardWidth: 330
+    onClosed: win.refocus()
+  }
   PopMenu {
     id: repoPop
     parent: stage

@@ -564,3 +564,44 @@ function stowCommand(root, target, name, how, home) {
   return "stow" + flag + " -d " + shellWord(tilde(root, home)) + " -t " + shellWord(tilde(target, home) || "~")
     + " " + shellWord(name);
 }
+
+// ── A CONFLICT'S TWO SIDES, BY WHAT THEY ARE ────────────────────────────
+// git's "ours" and "theirs" are positions, not people: in a rebase "ours" is
+// the branch being rebased ONTO and "theirs" is your own commit. Named here
+// for what each side is, from what git is in the middle of (status.
+// repo_state); a stash brought back leaves no state, and says so in its
+// markers ("Updated upstream" / "Stashed changes").
+function sideNames(state, oursLabel, theirsLabel) {
+  var op = state && state.op ? state.op : "";
+  if (op === "rebase") return { ours: "Upstream", theirs: "Your commit" };
+  if (op === "merge") return { ours: "Yours", theirs: "Merged in" };
+  if (op === "cherry-pick") return { ours: "Yours", theirs: "Picked commit" };
+  if (op === "revert") return { ours: "Yours", theirs: "The revert" };
+  if (/stash/i.test(String(theirsLabel || ""))) return { ours: "Your files", theirs: "The stash" };
+  return { ours: "Yours", theirs: "Theirs" };
+}
+
+// text into StyledText: its own < > & left as written
+function esc(s) {
+  return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+// ── THE NEXT RELEASE'S NAME ─────────────────────────────────────────────
+// The last tag with its last number one up — v1.4.2 → v1.4.3, 2.0 → 2.1,
+// release-7 → release-8 — and v0.1.0 when there is none, or no number to
+// count up. Only a suggestion: the field is there to change it.
+function nextVersion(tag) {
+  var t = String(tag || "");
+  var m = /^(.*?)(\d+)(\D*)$/.exec(t);
+  if (!m) return "v0.1.0";
+  return m[1] + (parseInt(m[2], 10) + 1) + m[3];
+}
+
+// Notes from commits ({ subject, sha }), as a changelog: one line each,
+// newest first, under what they came after.
+function notesFrom(commits, since) {
+  var cs = commits || [];
+  if (cs.length === 0) return "";
+  var head = since ? "## Changes since " + since + "\n\n" : "## Changes\n\n";
+  return head + cs.map(function (c) { return "- " + c.subject + " (" + c.sha + ")"; }).join("\n") + "\n";
+}

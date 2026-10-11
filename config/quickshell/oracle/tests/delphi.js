@@ -114,6 +114,11 @@ module.exports = {
     t.eq("error empty", D.errorText(""), "It did not work");
     t.eq("remember", D.remember([{ root: "/a" }, { root: "/b" }], "/b", "b", 5, 20).map((r) => r.root), ["/b", "/a"]);
     t.eq("tilde", D.tilde("/home/x/src", "/home/x"), "~/src");
+    t.eq("release: next after v1.4.2", D.nextVersion("v1.4.2"), "v1.4.3");
+    t.eq("release: next after 2.0", D.nextVersion("2.0"), "2.1");
+    t.eq("release: next after release-7", D.nextVersion("release-7"), "release-8");
+    t.eq("release: v0.1.0 first", D.nextVersion(""), "v0.1.0");
+    t.eq("release: notes from commits", D.notesFrom([{ subject: "Add b", sha: "abc" }], "v1"), "## Changes since v1\n\n- Add b (abc)\n");
     // servers of your own
     t.eq("server: an address as typed", D.hostOf("https://Git.Example.org/group/repo"), "git.example.org");
     t.eq("server: with a port and a user", D.hostOf("git@code.lan:3000"), "code.lan:3000");

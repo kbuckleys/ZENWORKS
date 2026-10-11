@@ -377,7 +377,7 @@ def route(op):
     return (FORGES[name], rest) if name in FORGES else None
 
 # Requests named here change the repository; they queue behind each other.
-WRITES = {"stowCopyIn", "stage", "stageAll", "unstage", "unstageAll", "discard", "clean",
+WRITES = {"stowCopyIn", "resolveBlocks", "ignore", "untrack", "stage", "stageAll", "unstage", "unstageAll", "discard", "clean",
           "stageLines", "unstageLines", "discardLines", "commit",
           "branchCreate", "branchTrack", "switch", "branchDelete",
           "branchRename", "setUpstream", "tagCreate", "tagDelete",
@@ -617,6 +617,13 @@ class Server:
                                kw.get("body", ""), kw.get("draft", False))
         if op == "Merge":
             return f.merge(kw["full"], kw["number"], kw.get("method", "merge"))
+        if op == "Releases":
+            return f.releases(kw["full"])
+        if op == "ReleaseNotes":
+            return f.release_notes(kw["full"], kw["tag"], kw["target"], kw.get("previous"))
+        if op == "CreateRelease":
+            return f.create_release(kw["full"], kw["tag"], kw["target"], kw.get("name", ""),
+                                    kw.get("body", ""), kw.get("draft", False), kw.get("prerelease", False))
         raise ForgeError(f"unknown request: {f.__name__}{op}")
 
     def close(self):

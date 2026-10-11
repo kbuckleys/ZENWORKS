@@ -401,6 +401,96 @@ FloatingWindow {
       onStreamFinished: if (infoProc.runFor === win.infoFor) win.info = Cer.parseInfo(infoOut.text)
     }
   }
+  // ── A PEEK AT A PACKAGE ────────────────────────────────────────────
+  // The pointer resting on a row that is not the chosen one: what it is,
+  // in terminus' Bubble hanging from the row (as delphi's pull requests
+  // peek) — its description, version, where from, how big. Asked with the
+  // same `info` the preview uses, once the pointer has stayed a moment.
+  property Item peekRow: null
+  property var peekPkg: null
+  property var peekInfo: null
+  onSelChanged: { win.peekInfo = null; }
+  Timer { id: peekWait; interval: 450; onTriggered: win.startPeek() }
+  function peekAt(row, pkg) {
+    win.peekRow = row;
+    win.peekPkg = pkg;
+    win.peekInfo = null;
+    if (pkg) peekWait.restart(); else peekWait.stop();
+  }
+  function startPeek() {
+    const p = win.peekPkg;
+    if (!p || !win.peekRow) return;
+    if (peekProc.running) { peekProc.again = true; return; }
+    peekProc.runFor = p.name;
+    peekProc.command = ["sh", "-c", Cer.infoCommand(win.script, p.name,
+      p.repo === "update" ? "update" : (p.aur ? "aur" : ""))];
+    peekProc.running = true;
+  }
+  Process {
+    id: peekProc
+    property string runFor: ""
+    property bool again: false
+    onExited: if (peekProc.again) { peekProc.again = false; win.startPeek(); }
+    stdout: StdioCollector {
+      id: peekOut
+      onStreamFinished: if (win.peekPkg && peekProc.runFor === win.peekPkg.name) win.peekInfo = Cer.parseInfo(peekOut.text)
+    }
+  }
+  Term.Bubble {
+    id: peekBubble
+    window: win
+    target: win.peekRow
+    shown: !!win.peekInfo && !!win.peekPkg && !(win.current && win.current.name === win.peekPkg.name)
+    cardWidth: 440
+    readonly property var m: win.peekInfo ? win.peekInfo.map : ({})
+    Text {
+      width: 412
+      elide: Text.ElideRight
+      textFormat: Text.StyledText
+      text: win.peekPkg ? "<b>" + Cer.esc(win.peekPkg.name) + "</b>  <font color='" + Ceres.ink.muted + "'>"
+        + Cer.esc(peekBubble.m["Version"] || win.peekPkg.version || "") + "</font>" : ""
+      color: Zenon.ink
+      font.family: Zenon.face
+      font.weight: Zenon.weight
+      font.pixelSize: Zenon.px(16)
+    }
+    Text {
+      width: 412
+      visible: text !== ""
+      wrapMode: Text.Wrap
+      maximumLineCount: 4
+      elide: Text.ElideRight
+      text: peekBubble.m["Description"] || ""
+      color: Zenon.soft
+      font.family: Zenon.face
+      font.weight: Zenon.weight
+      font.pixelSize: Zenon.px(14)
+    }
+    Text {
+      width: 412
+      elide: Text.ElideRight
+      text: [win.peekPkg ? (win.peekPkg.repo || "") : "",
+             peekBubble.m["Installed Size"] ? "installed " + peekBubble.m["Installed Size"]
+               : peekBubble.m["Download Size"] ? "download " + peekBubble.m["Download Size"] : "",
+             win.peekPkg && win.peekPkg.installed ? (win.peekPkg.state === "explicit" ? "installed by you" : "installed as a dependency") : "not installed"]
+        .filter((x) => x !== "").join("   ·   ")
+      color: Zenon.muted
+      font.family: Zenon.face
+      font.weight: Zenon.weight
+      font.pixelSize: Zenon.px(13)
+    }
+    Text {
+      width: 412
+      visible: text !== "" && text !== "None"
+      elide: Text.ElideMiddle
+      text: peekBubble.m["URL"] || ""
+      color: Zenon.blue
+      font.family: Zenon.face
+      font.weight: Zenon.weight
+      font.pixelSize: Zenon.px(13)
+    }
+  }
+
   // what needs the package and what it installed — installed packages only
   property var extras: null
   property string extrasFor: ""
@@ -2787,6 +2877,11 @@ FloatingWindow {
               TapHandler {
                 acceptedButtons: Qt.RightButton
                 onTapped: { win.sel = prow.index; win.toggleMark(prow.modelData); keys.forceActiveFocus(); }
+              }
+              // resting here: a peek at it (win.peekAt, the Bubble above)
+              HoverHandler {
+                onHoveredChanged: hovered ? win.peekAt(prow, prow.modelData)
+                  : win.peekRow === prow ? win.peekAt(null, null) : undefined
               }
             }
 

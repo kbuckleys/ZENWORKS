@@ -94,6 +94,15 @@ Scope {
   // where each dotfiles repository's packages go, by its root — chosen on
   // the Dotfiles page when it is not the .stowrc's or home
   property var stowTargets: ({})
+  // where Push sends a repository's branch, by its root: the remotes ticked
+  // in the head's push menu (none ticked: its upstream, as git would)
+  property var pushTo: ({})
+  function setPushTo(root, remotes) {
+    const o = Object.assign({}, mgr.pushTo);
+    if (remotes && remotes.length > 0) o[root] = remotes; else delete o[root];
+    mgr.pushTo = o;
+    mgr.keep_();
+  }
   // servers of your own (a self-hosted GitLab, a Forgejo or Gitea):
   // [{ kind, host, name }], laid into delphi.js' FORGES (D.setServers)
   property var servers: []
@@ -134,6 +143,7 @@ Scope {
       if (Array.isArray(st.servers)) mgr.servers = st.servers.filter((s) => s && D.SERVER_KINDS[s.kind] && D.hostOf(s.host));
       if (D.FORGES[st.forge]) mgr.forge = st.forge;
       if (st.stowTargets && typeof st.stowTargets === "object") mgr.stowTargets = st.stowTargets;
+      if (st.pushTo && typeof st.pushTo === "object") mgr.pushTo = st.pushTo;
     } catch (e) {}
   }
   function keep_() { keepTimer.restart(); }
@@ -141,7 +151,7 @@ Scope {
     id: keepTimer
     interval: 400
     onTriggered: stateFile.setText(JSON.stringify({
-      recents: mgr.recents, hidden: mgr.hidden, splits: mgr.splits, page: mgr.page, scanRoots: mgr.scanRoots, pullMode: mgr.pullMode, forge: mgr.forge, stowTargets: mgr.stowTargets, servers: mgr.servers }, null, 1))
+      recents: mgr.recents, hidden: mgr.hidden, splits: mgr.splits, page: mgr.page, scanRoots: mgr.scanRoots, pullMode: mgr.pullMode, forge: mgr.forge, stowTargets: mgr.stowTargets, servers: mgr.servers, pushTo: mgr.pushTo }, null, 1))
   }
   function set(key, value) {
     if (mgr[key] === value) return;
@@ -402,7 +412,7 @@ Scope {
     mgr.asks = mgr.asks.filter((a) => a.ask !== ask);
     mgr.send_({ id: ++mgr._n, op: "answer", args: { ask: ask, text: text } });
   }
-  onAsksChanged: if (mgr.asks.length > 0 && !mgr.win) mgr.withWindow(() => {})
+  onAsksChanged: if (mgr.asks.length > 0 && !(mgr.win && mgr.win.visible)) mgr.withWindow(() => {})
 
   signal changed(string root, var what)
 

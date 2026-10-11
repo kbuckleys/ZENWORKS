@@ -4394,6 +4394,10 @@ FloatingWindow {
       [{ label: "Discard", ink: Zenon.red, act: go }],
       rows.length > 1 ? rows.map((r) => r.name) : []);
   }
+  // a name cut short by its column, rested on: shown whole (NamePeek)
+  NamePeek { id: namePeek; window: root }
+  function peekName(row, entry) { namePeek.show(row, entry); }
+
   // one row's history in delphi: the commits that changed it
   function gitHistory(path) {
     const d = root.mgr ? root.mgr.gitClient : null;

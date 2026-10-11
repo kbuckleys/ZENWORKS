@@ -16,7 +16,10 @@
 //
 // x, y are in this item's coordinates. `mark` is the key that does the same
 // (drawn on the right, so the menu teaches it); `run` is called after the
-// card has gone. `held` is whatever the holder says the menu is about,
+// card has gone — unless the item says `keep`: then it runs with the card
+// still up (a list of things to tick, delphi's push targets), and the
+// holder hands the menu its items again to show the new ticks (setItems).
+// `held` is whatever the holder says the menu is about,
 // until it closes — for a HeldRing on that row.
 //
 // Out of plato's editor menu (plato/editor/ContextMenu.qml, 2026-10-10),
@@ -44,6 +47,7 @@ Item {
     card.open = true;
     catcher.forceActiveFocus();
   }
+  function setItems(items) { menu.items = items || []; }
   function close() {
     if (!card.open) return;
     card.open = false;
@@ -76,6 +80,7 @@ Item {
           danger: !!it.danger })
     onChosen: (i) => {
       const it = menu.items[i];
+      if (it && it.keep && it.run && it.enabled !== false) { it.run(); return; }
       menu.close();
       if (it && it.run && it.enabled !== false) it.run();
     }

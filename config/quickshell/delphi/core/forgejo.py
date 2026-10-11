@@ -46,7 +46,7 @@ def call(method, path, body=None, tok=None, raw=False, again=False, waited=None,
     if tok is None:
         tok, _ = token()
     if not tok and not anon:
-        raise ForgeError("not signed in to Codeberg", 401)
+        raise ForgeError(f"not signed in to {HOST}", 401)
     url = path if path.startswith("http") else API + path
     h = {"User-Agent": "delphi", "Accept": "application/json"}
     if tok:
@@ -346,3 +346,35 @@ def merge(full, number, method="merge"):
     call("POST", f"/repos/{full}/pulls/{number}/merge",
          {"Do": {"merge": "merge", "squash": "squash", "rebase": "rebase"}.get(method, "merge")})
     return {"merged": True, "sha": None}
+
+
+# ── RELEASES ──────────────────────────────────────────────────────────────
+# github.py's, on Forgejo's API (the same shape, drafts and pre-releases
+# too). It writes no notes itself: release_notes says so, and the window
+# writes them from the commits instead.
+def _rel(r):
+    return {"id": r.get("id"), "tag": r.get("tag_name") or "",
+            "name": r.get("name") or r.get("tag_name") or "",
+            "body": r.get("body") or "", "draft": bool(r.get("draft")),
+            "prerelease": bool(r.get("prerelease")),
+            "author": (r.get("author") or {}).get("login") or "",
+            "when": r.get("published_at") or r.get("created_at"),
+            "url": r.get("html_url"), "target": r.get("target_commitish") or "",
+            "assets": [{"name": a.get("name"), "size": a.get("size", 0),
+                        "downloads": a.get("download_count", 0),
+                        "url": a.get("browser_download_url")} for a in r.get("assets") or []]}
+
+
+def releases(full):
+    tok, _ = token()
+    return [_rel(r) for r in _paged(f"/repos/{full}/releases", tok, limit=100, anon=not tok)]
+
+
+def release_notes(full, tag, target, previous=None):
+    return {"name": tag, "body": "", "by": ""}
+
+
+def create_release(full, tag, target, name, body="", draft=False, prerelease=False):
+    return _rel(call("POST", f"/repos/{full}/releases",
+                     {"tag_name": tag, "target_commitish": target, "name": name or tag,
+                      "body": body, "draft": bool(draft), "prerelease": bool(prerelease)}))

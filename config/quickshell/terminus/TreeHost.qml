@@ -43,6 +43,9 @@ QtObject {
   property var empties: ({})
   // width kept free at a row's right end, for the holder's own word
   property int noteWidth: 0
+  // a cut-short name rested on: the holder's NamePeek, (row, entry) → …
+  property var namePeek: null
+  function peekName(row, entry) { if (host.namePeek) host.namePeek(row, entry); }
   // rename in place and the row menu, the holder's to do
   property var renameCommit: null
   property var renameEnd: null

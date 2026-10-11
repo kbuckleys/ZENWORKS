@@ -429,3 +429,37 @@ def merge(full, number, method="merge"):
     r = call("PUT", f"/projects/{_pid(full)}/merge_requests/{number}/merge",
              {"squash": method == "squash"})
     return {"merged": r.get("state") == "merged", "sha": r.get("merge_commit_sha")}
+
+
+# ── RELEASES ──────────────────────────────────────────────────────────────
+# github.py's, on GitLab's API. GitLab has no drafts or pre-releases (an
+# "upcoming" release is one dated ahead), and its own notes need a
+# changelog set up in the project: release_notes says none, and the window
+# writes them from the commits instead.
+def _rel(r):
+    links = (r.get("assets") or {}).get("links") or []
+    return {"id": r.get("tag_name"), "tag": r.get("tag_name") or "",
+            "name": r.get("name") or r.get("tag_name") or "",
+            "body": r.get("description") or "", "draft": False,
+            "prerelease": bool(r.get("upcoming_release")),
+            "author": (r.get("author") or {}).get("username") or "",
+            "when": r.get("released_at") or r.get("created_at"),
+            "url": ((r.get("_links") or {}).get("self")) or "",
+            "target": (r.get("commit") or {}).get("id") or "",
+            "assets": [{"name": a.get("name"), "size": 0, "downloads": -1, "url": a.get("url")} for a in links]}
+
+
+def releases(full):
+    tok, _ = token()
+    return [_rel(r) for r in _paged(f"/projects/{_pid(full)}/releases", tok, limit=100, anon=not tok)]
+
+
+def release_notes(full, tag, target, previous=None):
+    return {"name": tag, "body": "", "by": ""}
+
+
+def create_release(full, tag, target, name, body="", draft=False, prerelease=False):
+    if draft:
+        raise ForgeError("GitLab has no draft releases — publish it, or keep the notes for later")
+    return _rel(call("POST", f"/projects/{_pid(full)}/releases",
+                     {"tag_name": tag, "ref": target, "name": name or tag, "description": body}))

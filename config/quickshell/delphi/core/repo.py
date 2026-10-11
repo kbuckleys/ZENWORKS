@@ -151,6 +151,60 @@ class Repo:
         self.gitdir = info["gitdir"]
         self.git = Git(self.root, sock)
 
+    # ── kept out of the repository, kept on disk ───────────────────────────
+    # A file you make inside a repository and do not want in it (a build's
+    # binary, user 2026-10-11: spoot's bin/): ignored — in .gitignore, for
+    # everyone who clones it, or in the git directory's info/exclude, for
+    # this machine only. One already committed is first untracked (git rm
+    # --cached): the next commit takes it out of the repository, and the
+    # file stays where it is.
+    def ignore(self, patterns, where="gitignore", cancel=None):
+        path = (os.path.join(self.root, ".gitignore") if where == "gitignore"
+                else os.path.join(self.info["common"], "info", "exclude"))
+        try:
+            with open(path) as f:
+                have = f.read()
+        except OSError:
+            have = ""
+        lines = {l.strip() for l in have.splitlines()}
+        new = [p for p in patterns if p.strip() and p.strip() not in lines]
+        if new:
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with open(path, "a") as f:
+                if have and not have.endswith("\n"):
+                    f.write("\n")
+                f.write("\n".join(new) + "\n")
+        return {"added": new, "file": path}
+
+    def untrack(self, paths, ignore=True, where="gitignore", cancel=None):
+        self.git.run(["rm", "--cached", "-r", "-q", "--"] + list(paths), cancel=cancel)
+        if ignore:
+            self.ignore(["/" + p.strip("/") + ("/" if os.path.isdir(os.path.join(self.root, p)) else "")
+                         for p in paths], where, cancel)
+        return {"untracked": list(paths)}
+
+    # ── releases: what changed since the last one ─────────────────────────
+    def last_tag(self, rev="HEAD", cancel=None):
+        """The newest tag reachable from rev, or "" when there is none."""
+        try:
+            return self.git.run(["describe", "--tags", "--abbrev=0", rev],
+                                cancel=cancel, lock=False).strip()
+        except GitError:
+            return ""
+
+    def changelog(self, since="", until="HEAD", cancel=None):
+        """The commits since a tag (or all of them), oldest last, merges left
+        out — a release's notes where the forge writes none."""
+        rng = f"{since}..{until}" if since else until
+        out = self.git.run(["log", "--no-merges", "-z", f"--format=%s{US}%h{US}%an", rng],
+                           cancel=cancel, lock=False)
+        res = []
+        for rec in out.split("\0"):
+            f = rec.strip("\n").split(US)
+            if len(f) == 3 and f[0]:
+                res.append({"subject": f[0], "sha": f[1], "author": f[2]})
+        return res
+
     # ── dotfiles: its stow packages (core/stow.py; never stowed here) ────
     def stow_packages(self, target=None, cancel=None):
         return ST.packages(self.root, target, cancel)
@@ -822,9 +876,69 @@ class Repo:
     # ── conflicts ───────────────────────────────────────────────────────
     def take(self, path, side, cancel=None):
         """Resolve a conflicted file whole: our side or theirs, then mark it
-        resolved."""
+        resolved. A side that deleted the file has none to take: taking it
+        deletes the file (git rm), which is what that side did."""
+        n = 2 if side == "ours" else 3
+        try:
+            self.git.run(["cat-file", "-e", f":{n}:{path}"], cancel=cancel, lock=False)
+        except GitError:
+            self.git.run(["rm", "-q", "--", path], cancel=cancel)
+            return {"removed": True}
         self.git.run(["checkout", f"--{side}", "--", path], cancel=cancel)
         self.git.run(["add", "--", path], cancel=cancel)
+        return {"removed": False}
+
+    # ── one conflict at a time ──────────────────────────────────────────
+    # A conflicted file as git left it on disk, read into blocks: the
+    # stretches both sides agree on, and each conflict between its markers —
+    # our lines, the base's (when the conflict style shows them), theirs.
+    # The page chooses per conflict; resolve_blocks writes the file back
+    # with those chosen and the rest left marked, refusing if the file
+    # changed since it was read (the token is its content's hash).
+    def conflict_blocks(self, path, cancel=None):
+        import hashlib
+        full = os.path.join(self.root, path)
+        with open(full, "rb") as f:
+            raw = f.read()
+        token = hashlib.sha1(raw).hexdigest()
+        if b"\0" in raw[:8000]:
+            return {"binary": True, "token": token, "blocks": []}
+        text = raw.decode("utf-8", errors="replace")
+        return {"binary": False, "token": token, "blocks": _blocks(text)}
+
+    def resolve_blocks(self, path, choices, token, mark=False, cancel=None):
+        import hashlib
+        full = os.path.join(self.root, path)
+        with open(full, "rb") as f:
+            raw = f.read()
+        if hashlib.sha1(raw).hexdigest() != token:
+            raise GitError(["merge"], 1, f"{path} changed since it was shown — look again before choosing")
+        blocks = _blocks(raw.decode("utf-8", errors="replace"))
+        out, left, i = [], 0, 0
+        for b in blocks:
+            if "same" in b:
+                out += b["same"]
+                continue
+            how = choices.get(str(i))
+            i += 1
+            if how == "ours":
+                out += b["ours"]
+            elif how == "theirs":
+                out += b["theirs"]
+            elif how == "both":
+                out += b["ours"] + b["theirs"]
+            elif how == "theirsFirst":
+                out += b["theirs"] + b["ours"]
+            elif how == "neither":
+                pass
+            else:
+                out += b["raw"]
+                left += 1
+        with open(full, "w", encoding="utf-8", newline="") as f:
+            f.write("".join(out))
+        if left == 0 and mark:
+            self.git.run(["add", "--", path], cancel=cancel)
+        return {"left": left, "marked": left == 0 and mark}
 
     def mark_resolved(self, paths, cancel=None):
         self.git.run(["add", "--"] + list(paths), cancel=cancel)
@@ -846,6 +960,47 @@ class Repo:
                 f.write(data)
             res[side] = p
         return res
+
+
+def _blocks(text):
+    """A file's text → [{"same": [lines]} | {"ours", "base", "theirs":
+    [lines], "oursLabel", "theirsLabel", "raw": [lines]}], every line with
+    its own ending, so writing them back changes nothing not chosen. A
+    marker is seven of its character at a line's start, then a space or
+    the line's end; an opening without its close is left as text."""
+    lines = text.splitlines(keepends=True)
+    out, same, i = [], [], 0
+
+    def mark(line, ch):
+        body = line.rstrip("\r\n")
+        return body.startswith(ch * 7) and (len(body) == 7 or body[7] == " ")
+
+    while i < len(lines):
+        if mark(lines[i], "<"):
+            j, part, ours, base, theirs = i + 1, "ours", [], None, []
+            while j < len(lines) and not mark(lines[j], ">"):
+                if part == "ours" and mark(lines[j], "|"):
+                    part, base = "base", []
+                elif part in ("ours", "base") and lines[j].rstrip("\r\n") == "=" * 7:
+                    part = "theirs"
+                else:
+                    (ours if part == "ours" else base if part == "base" else theirs).append(lines[j])
+                j += 1
+            if j < len(lines) and part == "theirs":
+                if same:
+                    out.append({"same": same})
+                    same = []
+                out.append({"ours": ours, "base": base, "theirs": theirs,
+                            "oursLabel": lines[i].rstrip("\r\n")[8:].strip(),
+                            "theirsLabel": lines[j].rstrip("\r\n")[8:].strip(),
+                            "raw": lines[i:j + 1]})
+                i = j + 1
+                continue
+        same.append(lines[i])
+        i += 1
+    if same:
+        out.append({"same": same})
+    return out
 
 
 def _keys(chosen):

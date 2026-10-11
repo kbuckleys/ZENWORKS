@@ -110,9 +110,11 @@ Item {
   readonly property int stagedCount: pg.win && pg.win.st ? pg.win.st.staged.length : 0
 
   readonly property string title: "Changes"
-  readonly property string subtitle: !pg.win || !pg.win.st ? ""
-    : pg.win.branchName + (pg.win.branch && pg.win.branch.upstream
-      ? "  →  " + pg.win.branch.upstream : "")
+  // the branch only: where Push sends it is the chip beside it in the head
+  // (DelphiWindow's pushChip — the upstream named here read as the only
+  // place it would go, 2026-10-11)
+  readonly property string subtitle: !pg.win || !pg.win.st ? "" : pg.win.branchName
+  readonly property bool showsPush: true
   readonly property var hints: pg.area === "message"
     ? [["ctrl return", "commit"], ["esc", "back"]]
     : pg.area === "diff"
@@ -125,7 +127,7 @@ Item {
     ? [["space", (pg.file.area === "staged" ? "unstage " : "stage ") + pg.file.count], ["← →", "close / open"],
        ["d", "discard"], ["a", "stage all"], ["c", "message"]]
     : [["space", pg.file && pg.file.area === "staged" ? "unstage" : "stage"], ["a", "stage all"],
-       ["d", "discard"], ["e", "edit"], ["tab", "diff"], ["c", "message"], ["/", "filter"]]
+       ["d", "discard"], ["e", "edit"], ["i", "keep out"], ["tab", "diff"], ["c", "message"], ["/", "filter"]]
   readonly property var lead: pg.chosenRows()[0] || null
   readonly property var buttons: [
     { label: pg.markedCount > 0 ? "Discard " + pg.markedCount : "Discard", ink: Zenon.red,
@@ -326,6 +328,61 @@ Item {
     if (!f || f.kind === "deleted") return;
     pg.win.edit(pg.win.abs(pg.area === "diff" && diff.pathAtCursor !== "" ? diff.pathAtCursor : f.path));
   }
+  // ── KEPT OUT OF THE REPOSITORY, KEPT ON DISK ───────────────────────────
+  // (user, 2026-10-11: a binary spoot builds into its own bin/.) Not yet
+  // tracked: an ignore rule — .gitignore for everyone who clones it, or
+  // this machine only (the git directory's info/exclude); by its path, or
+  // every file of its kind. Tracked: untracked first (repo.untrack): the
+  // next commit takes it out of the repository, the file stays.
+  function keepOut(f) {
+    f = f || pg.file;
+    if (!f || f.area === "conflict") return;
+    const tracked = f.isDir ? !pg.allUntracked(f) : !(f.kind === "untracked" || f.area === "untracked");
+    const name = f.isDir ? f.path + "/" : f.path;
+    const pattern = "/" + (f.isDir ? f.path.replace(/\/+$/, "") + "/" : f.path);
+    const ext = !f.isDir && /\.[A-Za-z0-9]+$/.test(f.name) ? "*" + f.name.slice(f.name.lastIndexOf(".")) : "";
+    if (!tracked) {
+      const choices = [{ label: "In .gitignore", ink: Zenon.cyan, run: () => pg.win.act("ignore", { patterns: [pattern] }, { said: name + " is ignored — commit .gitignore so it stays so" }) },
+                       { label: "Only on this machine", run: () => pg.win.act("ignore", { patterns: [pattern], where: "exclude" }, { said: name + " is ignored here" }) }];
+      if (ext !== "") choices.push({ label: "Every " + ext + " file", run: () => pg.win.act("ignore", { patterns: [ext] }, { said: "Every " + ext + " file is ignored" }) });
+      choices.push({ label: "Cancel", ink: Zenon.muted });
+      pg.win.card_({ question: "Keep " + name + " out of the repository?", glyph: "\uF070", ink: Zenon.ink,
+        detail: "It stays on your disk; git stops offering it. In .gitignore for everyone who clones the repository, or only on this machine (.git/info/exclude).",
+        items: [pattern], choices: choices });
+      return;
+    }
+    const all = f.isDir ? f.paths : [f.path];
+    pg.win.card_({ question: "Stop tracking " + name + "?", glyph: "\uF070", ink: Zenon.yellow,
+      detail: "It leaves the repository with your next commit (and the remote's when you push), and stays on your disk. An ignore rule keeps it from coming back.",
+      items: all.length > 8 ? all.slice(0, 8).concat(["… and " + (all.length - 8) + " more"]) : all,
+      choices: [{ label: "Stop tracking", ink: Zenon.yellow, run: () => pg.win.act("untrack", { paths: [f.path] }, { said: name + " untracked — commit to take it out of the repository" }) },
+                { label: "Stop tracking, ignore here only", run: () => pg.win.act("untrack", { paths: [f.path], where: "exclude" }, { said: name + " untracked — commit to take it out" }) },
+                { label: "Cancel", ink: Zenon.muted }] });
+  }
+  // a directory row whose files git does not track at all
+  function allUntracked(f) {
+    const st = pg.win.st;
+    if (!st || !f.isDir) return false;
+    const pre = f.path.replace(/\/+$/, "") + "/";
+    return !st.unstaged.concat(st.staged).some((e) => e.path.indexOf(pre) === 0);
+  }
+  // ── the row menu ──────────────────────────────────────────────────────
+  function rowMenu(item, index) {
+    const f = pg.rows[index];
+    if (!f || f.head) return;
+    const staged = f.area === "staged", conflict = f.area === "conflict";
+    const items = [];
+    if (!conflict) items.push({ text: staged ? "Unstage" : "Stage", icon: staged ? "\uF068" : "\uF067", mark: "space", run: () => pg.toggle() });
+    if (!conflict && !staged) items.push({ text: "Discard changes", icon: "\uF0E2", mark: "d", danger: true, run: () => pg.discard() });
+    items.push({ isSeparator: true });
+    if (!f.isDir && f.kind !== "deleted") items.push({ text: "Edit in plato", icon: "\uF044", mark: "e", run: () => pg.edit() });
+    items.push({ text: "Show in terminus", icon: "\uF07C", run: () => pg.win.reveal(pg.win.abs(f.path)) });
+    if (!conflict) items.push({ isSeparator: true },
+      { text: "Keep out of the repository", icon: "\uF070", mark: "i", run: () => pg.keepOut(f) });
+    const p = item.mapToItem(pg, 40, item.height);
+    rowPop.open(p.x, p.y, items, index);
+  }
+
   // a conflict: one side whole, or the file as edited (markers gone) marked done
   function resolve(how) {
     const f = pg.file;
@@ -417,6 +474,7 @@ Item {
     if (k === Qt.Key_A) { if (shift) pg.unstageAll(); else pg.stageAll(); return true; }
     if (k === Qt.Key_D) { pg.discard(); return true; }
     if (k === Qt.Key_E) { pg.edit(); return true; }
+    if (k === Qt.Key_I) { pg.keepOut(); return true; }
     if (k === Qt.Key_C) { pg.area = "message"; pg.takeFocus(); return true; }
     if (pg.file && pg.file.area === "conflict") {
       if (k === Qt.Key_O) { pg.resolve("ours"); return true; }
@@ -544,7 +602,7 @@ Item {
           // ctrl: mark it; shift: mark from the last one to it; plain: the
           // cursor here, the marks cleared — as terminus clicks
           onChosen: (right, shift, ctrl) => {
-            if (right) return;
+            if (right) { pg.area = "list"; pg.moveTo(frow.index); pg.rowMenu(erow, frow.index); return; }
             pg.area = "list";
             if (ctrl) { pg.mark(frow.index); pg.anchor = frow.index; }
             else if (shift) { if (pg.anchor < 0) pg.anchor = pg.cur; pg.markRange(pg.anchor, frow.index); }
@@ -667,9 +725,20 @@ Item {
     border.color: Zenon.alpha(Zenon.cyan, 0.35)
   }
 
-  // ── a conflict: what each side did, and the ways out ───────────────────
+  // ── a conflict, one at a time (ConflictView) ──────────────────────────
+  ConflictView {
+    id: conflictView
+    anchors.fill: diff
+    visible: !!pg.file && pg.file.area === "conflict" && (conflictView.readable || conflictView.loading)
+    win: pg.win
+    file: pg.file && pg.file.area === "conflict" ? pg.file : null
+    onWholeFile: (side) => pg.resolve(side)
+    onEditIt: pg.edit()
+  }
+  // ── or, one it cannot read (binary, or a side deleted it): the file
+  // whole, either side's — what each side did, and the ways out
   Column {
-    visible: !!pg.file && pg.file.area === "conflict"
+    visible: !!pg.file && pg.file.area === "conflict" && !conflictView.readable && !conflictView.loading
     anchors.centerIn: diff
     width: Math.min(460, diff.width - 60)
     spacing: 14
@@ -710,6 +779,13 @@ Item {
       DialogButton { label: "Edit in plato"; ink: Zenon.cyan; onClicked: pg.edit() }
       DialogButton { label: "Mark resolved"; ink: Zenon.green; primary: true; onClicked: pg.resolve("done") }
     }
+  }
+  PopMenu {
+    id: rowPop
+    anchors.fill: parent
+    window: pg.win
+    cardWidth: 280
+    onClosed: pg.takeFocus()
   }
   // the seam between the files and the diff: dragged, it stays
   SeamGrip {

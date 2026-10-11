@@ -84,5 +84,5 @@ rm -f "$pkg/config/hypr/lua/theme.lua" "$pkg/config/kitty/theme.conf" \
 
 echo "-- left different (expected: the generic and generated files only):"
 for d in fastfetch hypr kitty quickshell xdg-desktop-portal xdg-desktop-portal-termfilechooser; do
-    [ -d "$cfg/$d" ] && diff -rq "$cfg/$d" "$pkg/config/$d" || true
+    [ -d "$cfg/$d" ] && diff -rq -x __pycache__ "$cfg/$d" "$pkg/config/$d" || true
 done

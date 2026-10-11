@@ -818,6 +818,102 @@ def forge_servers_of_your_own():
 
 
 @test
+def conflict_blocks_and_resolve():
+    # a real merge conflict, read into blocks, resolved one conflict at a
+    # time; and a side that deleted the file taken whole
+    mid = "1\n2\n3\n4\n5\n6\n7\n8\n"
+    d = fresh({"f": "a\nb\n" + mid + "e\n", "g": "keep\n"})
+    sh(d, "switch", "-q", "-c", "other")
+    write(d, "f", "a\nB-theirs\n" + mid + "E-theirs\n"); sh(d, "rm", "-q", "g"); sh(d, "commit", "-qam", "theirs")
+    sh(d, "switch", "-q", "main")
+    write(d, "f", "a\nB-ours\n" + mid + "E-ours\n"); write(d, "g", "changed\n"); sh(d, "commit", "-qam", "ours")
+    r = R.Repo(d)
+    res = r.merge("other")
+    eq(res["conflicts"], True)
+    cb = r.conflict_blocks("f")
+    cs = [b for b in cb["blocks"] if "ours" in b]
+    eq(len(cs), 2)
+    eq((cs[0]["ours"], cs[0]["theirs"], cs[0]["oursLabel"], cs[0]["theirsLabel"]),
+       (["B-ours\n"], ["B-theirs\n"], "HEAD", "other"))
+    eq("".join(x for b in cb["blocks"] for x in (b.get("same") or b["raw"])), read(d, "f"), "blocks are the file")
+    left = r.resolve_blocks("f", {"0": "theirs"}, cb["token"])
+    eq(left["left"], 1)
+    eq("<<<<<<<" in read(d, "f"), True, "the other conflict still marked")
+    try:
+        r.resolve_blocks("f", {"0": "ours"}, cb["token"])
+        raise AssertionError("an old token was taken")
+    except R.GitError:
+        pass
+    cb = r.conflict_blocks("f")
+    eq(r.resolve_blocks("f", {"0": "both"}, cb["token"], mark=True), {"left": 0, "marked": True})
+    eq(read(d, "f"), "a\nB-theirs\n" + mid + "E-ours\nE-theirs\n")
+    eq(r.take("g", "theirs"), {"removed": True}, "theirs deleted it: taking theirs deletes it")
+    eq(os.path.exists(os.path.join(d, "g")), False)
+    eq(r.status()["conflicts"], [])
+
+
+@test
+def release_changelog_since_last_tag():
+    d = fresh({"a": "1\n"})
+    sh(d, "tag", "v1.0.0")
+    write(d, "a", "2\n"); sh(d, "commit", "-qam", "Fix the thing")
+    write(d, "b", "1\n"); sh(d, "add", "b"); sh(d, "commit", "-qm", "Add b")
+    r = R.Repo(d)
+    eq(r.last_tag(), "v1.0.0")
+    eq([c["subject"] for c in r.changelog("v1.0.0")], ["Add b", "Fix the thing"])
+    eq(len(r.changelog()), 3, "no tag: every commit")
+    eq(R.Repo(fresh({"x": "1\n"})).last_tag(), "")
+
+
+@test
+def releases_asked_of_each_forge():
+    # what each forge is sent, and what comes back read (the network stubbed)
+    import github, gitlab, forgejo
+    sent = []
+    def fake(method, path, body=None, **kw):
+        sent.append((method, path, body))
+        return {"tag_name": "v2", "name": "Two", "body": "notes", "description": "notes",
+                "draft": bool(body and body.get("draft")), "html_url": "u", "assets": []}
+    saved = (github.call, gitlab.call, forgejo.call)
+    github.call = gitlab.call = forgejo.call = fake
+    try:
+        r = github.create_release("me/x", "v2", "main", "Two", "notes", draft=True)
+        eq((sent[-1][1], sent[-1][2]["target_commitish"], sent[-1][2]["draft"]), ("/repos/me/x/releases", "main", True))
+        eq((r["tag"], r["name"], r["draft"]), ("v2", "Two", True))
+        github.release_notes("me/x", "v2", "main", "v1")
+        eq((sent[-1][1], sent[-1][2]["previous_tag_name"]), ("/repos/me/x/releases/generate-notes", "v1"))
+        gitlab.create_release("me/x", "v2", "main", "Two", "notes")
+        eq((sent[-1][1], sent[-1][2]["ref"], sent[-1][2]["description"]), ("/projects/me%2Fx/releases", "main", "notes"))
+        try:
+            gitlab.create_release("me/x", "v2", "main", "Two", draft=True)
+            raise AssertionError("GitLab took a draft")
+        except gitlab.ForgeError:
+            pass
+        r = forgejo.create_release("me/x", "v2", "main", "", "notes", prerelease=True)
+        eq((sent[-1][1], sent[-1][2]["name"], sent[-1][2]["prerelease"]), ("/repos/me/x/releases", "v2", True))
+    finally:
+        github.call, gitlab.call, forgejo.call = saved
+
+
+@test
+def ignore_and_untrack_keep_the_files():
+    d = fresh({"src/a.c": "x\n", "build/out.bin": "binary\n"})
+    write(d, "bin/spoot", "made here\n")
+    r = R.Repo(d)
+    eq(r.ignore(["/bin/"])["added"], ["/bin/"])
+    eq(r.ignore(["/bin/"])["added"], [], "not twice")
+    eq([u["path"] for u in r.status()["untracked"]], [".gitignore"], "bin/ gone from the untracked")
+    r.ignore(["*.log"], where="exclude")
+    write(d, "x.log", "l\n")
+    eq("x.log" in [u["path"] for u in r.status()["untracked"]], False, "excluded on this machine")
+    eq(read(d, ".gitignore"), "/bin/\n", ".git/info/exclude, not .gitignore")
+    r.untrack(["build"])
+    eq(os.path.exists(os.path.join(d, "build", "out.bin")), True, "the file stays")
+    eq([s["path"] for s in r.status()["staged"]], ["build/out.bin"], "its removal staged")
+    eq("/build/" in read(d, ".gitignore"), True)
+
+
+@test
 def graph_octopus_and_criss_cross():
     L = Lanes()
     # A merges B C D (octopus); B and C share parent E; D's parent F; E, F → G

@@ -521,3 +521,40 @@ def open_pull(full, head, base, title, body="", draft=False):
 def merge(full, number, method="merge"):
     r = call("PUT", f"/repos/{full}/pulls/{number}/merge", {"merge_method": method})
     return {"merged": bool(r.get("merged")), "sha": r.get("sha")}
+
+
+# ── RELEASES ──────────────────────────────────────────────────────────────
+# A tag with a title, notes and files attached — what a repository's
+# "Releases" lists, newest first. Made here from a tag that may not exist
+# yet: GitHub makes it at `target` (a branch or a commit already pushed).
+# The notes can be written by GitHub itself from the pull requests merged
+# since the previous release (release_notes) — its "Generate release notes".
+def _rel(r):
+    return {"id": r.get("id"), "tag": r.get("tag_name") or "",
+            "name": r.get("name") or r.get("tag_name") or "",
+            "body": r.get("body") or "", "draft": bool(r.get("draft")),
+            "prerelease": bool(r.get("prerelease")), "author": _who(r.get("author")),
+            "when": r.get("published_at") or r.get("created_at"),
+            "url": r.get("html_url"), "target": r.get("target_commitish") or "",
+            "assets": [{"name": a.get("name"), "size": a.get("size", 0),
+                        "downloads": a.get("download_count", 0),
+                        "url": a.get("browser_download_url")} for a in r.get("assets") or []]}
+
+
+def releases(full):
+    tok, _ = token()
+    return [_rel(r) for r in _paged(f"/repos/{full}/releases", tok, limit=100)]
+
+
+def release_notes(full, tag, target, previous=None):
+    body = {"tag_name": tag, "target_commitish": target}
+    if previous:
+        body["previous_tag_name"] = previous
+    r = call("POST", f"/repos/{full}/releases/generate-notes", body)
+    return {"name": r.get("name") or tag, "body": r.get("body") or "", "by": "github"}
+
+
+def create_release(full, tag, target, name, body="", draft=False, prerelease=False):
+    return _rel(call("POST", f"/repos/{full}/releases",
+                     {"tag_name": tag, "target_commitish": target, "name": name or tag,
+                      "body": body, "draft": bool(draft), "prerelease": bool(prerelease)}))

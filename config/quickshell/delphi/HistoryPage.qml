@@ -181,6 +181,10 @@ Item {
       if (!ok || root !== pg.win.root) return;
       pg.session = res.session;
       pg.commits = [];
+      // a page still out belongs to the session just closed (its answer is
+      // dropped by its sid): it must not hold this one's first page back —
+      // two reloads close together left History empty (2026-10-11)
+      pg.paging = false;
       pg.more(true);
     });
   }
@@ -218,6 +222,75 @@ Item {
     list.positionViewAtIndex(pg.sel, ListView.Contain);
     if (pg.sel > pg.commits.length - 80) pg.more(false);
     detailWait.restart();
+  }
+
+  // ── A PEEK AT A COMMIT ─────────────────────────────────────────────────
+  // The pointer resting on a commit that is not the chosen one: its whole
+  // message, who and when, and how many files it touched, in terminus'
+  // Bubble hanging from the row — without moving the selection (as the
+  // pull requests peek, 2026-10-11).
+  property Item peekRow: null
+  property var peekC: null
+  property var peekMsg: null
+  property int peekFiles: -1
+  Timer { id: peekWait; interval: 500; onTriggered: pg.loadPeek() }
+  function peekAt(row, c) {
+    pg.peekRow = row;
+    pg.peekC = c;
+    pg.peekMsg = null;
+    pg.peekFiles = -1;
+    if (c) peekWait.restart(); else peekWait.stop();
+  }
+  function loadPeek() {
+    const c = pg.peekC;
+    if (!c || !pg.win) return;
+    const sha = c.sha, root = pg.win.root;
+    pg.win.mgr.call("message", root, { sha: sha }, (ok, m) => { if (pg && ok && pg.peekC && pg.peekC.sha === sha) pg.peekMsg = m; });
+    pg.win.mgr.call("files", root, { sha: sha }, (ok, fs) => { if (pg && ok && pg.peekC && pg.peekC.sha === sha) pg.peekFiles = fs.length; });
+  }
+  onSelChanged: pg.peekMsg = null
+  Bubble {
+    id: peekBubble
+    window: pg.win
+    target: pg.peekRow
+    shown: !!pg.peekMsg && !!pg.peekC && !(pg.commit && pg.commit.sha === pg.peekC.sha) && !pg.win.carding
+    cardWidth: 480
+    readonly property string body: pg.peekMsg ? String(pg.peekMsg.body || "") : ""
+    readonly property string rest: peekBubble.body.indexOf("\n") >= 0 ? peekBubble.body.slice(peekBubble.body.indexOf("\n") + 1).trim() : ""
+    Text {
+      width: 452
+      wrapMode: Text.Wrap
+      maximumLineCount: 3
+      elide: Text.ElideRight
+      text: pg.peekC ? pg.peekC.subject : ""
+      color: Zenon.ink
+      font.family: Zenon.face
+      font.weight: Font.Bold
+      font.pixelSize: Zenon.px(15)
+    }
+    Text {
+      width: 452
+      visible: peekBubble.rest !== ""
+      wrapMode: Text.Wrap
+      maximumLineCount: 10
+      elide: Text.ElideRight
+      text: peekBubble.rest
+      color: Zenon.soft
+      font.family: Zenon.face
+      font.weight: Zenon.weight
+      font.pixelSize: Zenon.px(14)
+    }
+    Text {
+      width: 452
+      elide: Text.ElideRight
+      text: !pg.peekC ? "" : pg.peekC.author + "  ·  " + D.stamp(pg.peekC.when) + "  ·  " + D.short(pg.peekC.sha)
+        + (pg.peekFiles >= 0 ? "  ·  " + pg.peekFiles + (pg.peekFiles === 1 ? " file" : " files") : "")
+      color: Zenon.muted
+      font.family: Zenon.face
+      font.weight: Zenon.weight
+      font.features: { "tnum": 1 }
+      font.pixelSize: Zenon.px(13)
+    }
   }
 
   // ── THE COMMIT ─────────────────────────────────────────────────────────
@@ -565,6 +638,11 @@ Item {
             pg.moveTo(crow.index);
             pg.win.focusKeys();
           }
+        }
+        // resting on a commit not chosen: a peek at it (peekBubble)
+        HoverHandler {
+          onHoveredChanged: hovered ? pg.peekAt(crow, crow.c)
+            : pg.peekRow === crow ? pg.peekAt(null, null) : undefined
         }
       }
       footer: Item {

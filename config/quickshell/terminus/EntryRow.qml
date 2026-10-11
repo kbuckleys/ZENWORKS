@@ -343,6 +343,9 @@ Item {
     onHoveredChanged: {
       if (hovered) host.hoverRow = true;
       else if (host.hoverRow) host.hoverRow = false;
+      // a name its column cut short: the host may show it whole (NamePeek)
+      if (typeof host.peekName === "function")
+        host.peekName(hovered && entryName.truncated && !entryRow.editing ? entryRow : null, entryRow.entry);
     }
   }
 
