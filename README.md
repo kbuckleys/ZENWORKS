@@ -1,7 +1,6 @@
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://github.com/user-attachments/assets/1f20c449-367c-4f12-a16c-c4258523ff75">
-  <img src="image-light.png" alt="">
-</picture>
+<p align="center">
+  <img src="zenworks.png" alt="ZENWORKS" width="800">
+</p>
 
 <h3><p align="center">
 A zen Arch-based ecosystem in Quickshell
