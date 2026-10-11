@@ -351,6 +351,8 @@ Item {
           // and wrong answer, and everything watching the cursor believed it.
           term.arriving = true;
           term.act.raw = term.enrich(Terminus.parseListing(listOut.text, term.cwd));
+          term.repoDirs = Terminus.mergeRepos(term.repoDirs, term.cwd, Terminus.parseRepos(listOut.text, term.cwd));
+          term.repoTop = Terminus.parseRepoTop(listOut.text);
           term.cutTaken(term.cwd, term.act.raw);
           // The listing also says which of this directory's remembered
           // branches are no longer here — see dropGone.

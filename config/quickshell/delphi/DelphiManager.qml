@@ -91,6 +91,31 @@ Scope {
   // the forge the Accounts page shows: github | gitlab | codeberg
   property string forge: "github"
   property bool showIgnored: false
+  // where each dotfiles repository's packages go, by its root — chosen on
+  // the Dotfiles page when it is not the .stowrc's or home
+  property var stowTargets: ({})
+  // servers of your own (a self-hosted GitLab, a Forgejo or Gitea):
+  // [{ kind, host, name }], laid into delphi.js' FORGES (D.setServers)
+  property var servers: []
+  onServersChanged: D.setServers(mgr.servers)
+  function addServer(kind, host, name) {
+    const id = D.serverId(kind, host);
+    mgr.servers = mgr.servers.filter((s) => D.serverId(s.kind, s.host) !== id)
+      .concat([{ kind: kind, host: host.toLowerCase(), name: name || host }]);
+    mgr.keep_();
+    return id;
+  }
+  function removeServer(id) {
+    if (mgr.forge === id) mgr.forge = "github";
+    mgr.servers = mgr.servers.filter((s) => D.serverId(s.kind, s.host) !== id);
+    mgr.keep_();
+  }
+  function setStowTarget(root, dir) {
+    const o = Object.assign({}, mgr.stowTargets);
+    if (dir) o[root] = dir; else delete o[root];
+    mgr.stowTargets = o;
+    mgr.keep_();
+  }
   FileView {
     id: stateFile
     path: Quickshell.statePath("delphi.json")
@@ -106,7 +131,9 @@ Scope {
       if (typeof st.page === "string") mgr.page = st.page;
       if (Array.isArray(st.scanRoots) && st.scanRoots.length > 0) mgr.scanRoots = st.scanRoots;
       if (["ff-only", "rebase", "merge"].indexOf(st.pullMode) >= 0) mgr.pullMode = st.pullMode;
+      if (Array.isArray(st.servers)) mgr.servers = st.servers.filter((s) => s && D.SERVER_KINDS[s.kind] && D.hostOf(s.host));
       if (D.FORGES[st.forge]) mgr.forge = st.forge;
+      if (st.stowTargets && typeof st.stowTargets === "object") mgr.stowTargets = st.stowTargets;
     } catch (e) {}
   }
   function keep_() { keepTimer.restart(); }
@@ -114,7 +141,7 @@ Scope {
     id: keepTimer
     interval: 400
     onTriggered: stateFile.setText(JSON.stringify({
-      recents: mgr.recents, hidden: mgr.hidden, splits: mgr.splits, page: mgr.page, scanRoots: mgr.scanRoots, pullMode: mgr.pullMode, forge: mgr.forge }, null, 1))
+      recents: mgr.recents, hidden: mgr.hidden, splits: mgr.splits, page: mgr.page, scanRoots: mgr.scanRoots, pullMode: mgr.pullMode, forge: mgr.forge, stowTargets: mgr.stowTargets, servers: mgr.servers }, null, 1))
   }
   function set(key, value) {
     if (mgr[key] === value) return;
@@ -437,6 +464,12 @@ Scope {
   // repository a path is in, on the page asked for.
   function show(path, page) {
     mgr.withWindow((w) => { w.openRepo(path); if (page) w.setPage(page); });
+  }
+
+  // One file's history: its repository opened, History narrowed to it
+  // (plato's right-click, terminus' row menu).
+  function history(file) {
+    mgr.withWindow((w) => { w.historyFile = file; w.openRepo(file); w.setPage("history"); });
   }
 
   IpcHandler {

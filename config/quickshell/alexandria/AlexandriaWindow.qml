@@ -726,8 +726,8 @@ FloatingWindow {
           cursorDelegate: Caret { field: famField }
           anchors.left: famLens.right
           anchors.leftMargin: 9
-          anchors.right: parent.right
-          anchors.rightMargin: 13
+          anchors.right: famClear.visible ? famClear.left : parent.right
+          anchors.rightMargin: famClear.visible ? 8 : 13
           anchors.verticalCenter: parent.verticalCenter
           text: win.query
           onTextChanged: if (win.query !== text) { win.toTop = true; win.query = text; }
@@ -749,6 +749,15 @@ FloatingWindow {
         }
         // focused for typing: terminus' held ring (user, 2026-10-11 — every
         // text field wears it, its own border staying neutral)
+        ClearChip {
+          id: famClear
+          size: Zenon.px(15)
+          shown: famField.text !== ""
+          anchors.right: parent.right
+          anchors.rightMargin: 9
+          anchors.verticalCenter: parent.verticalCenter
+          onClicked: { famField.text = ""; famField.forceActiveFocus(); }
+        }
         HeldRing { anchors.fill: parent; radius: parent.radius; z: 10; on: famField.activeFocus }
       }
 
@@ -1466,8 +1475,8 @@ FloatingWindow {
           }
           Text {
             id: glyphCount
-            anchors.right: parent.right
-            anchors.rightMargin: 14
+            anchors.right: glyphClear.visible ? glyphClear.left : parent.right
+            anchors.rightMargin: glyphClear.visible ? 10 : 14
             anchors.verticalCenter: parent.verticalCenter
             text: win.gix.count === win.charset.count ? win.charset.count + " glyphs"
               : win.gix.count + " of " + win.charset.count
@@ -1476,6 +1485,15 @@ FloatingWindow {
             font.weight: Zenon.weight
             font.features: { "tnum": 1 }
             font.pixelSize: Zenon.px(12)
+          }
+          ClearChip {
+            id: glyphClear
+            size: Zenon.px(15)
+            shown: glyphField.text !== ""
+            anchors.right: parent.right
+            anchors.rightMargin: 9
+            anchors.verticalCenter: parent.verticalCenter
+            onClicked: { glyphField.text = ""; glyphField.forceActiveFocus(); }
           }
           // focused for typing: terminus' held ring (user, 2026-10-11 — every
           // text field wears it, its own border staying neutral)
@@ -1937,7 +1955,9 @@ FloatingWindow {
       anchors.right: parent.right
       // 40, as delphi's (user, 2026-10-11)
       height: 40
-      Rectangle { anchors.fill: parent; color: Zenon.hintFrostBg }
+      // the head's translucent ground, as delphi's: hintFrostBg let so
+      // little through that the frost under it did not read (user, 2026-10-11)
+      Rectangle { anchors.fill: parent; color: Zenon.headBg }
       Rectangle { anchors.top: parent.top; width: parent.width; height: 1; color: Zenon.border }
       HintRow {
         id: footHints

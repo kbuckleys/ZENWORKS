@@ -114,6 +114,23 @@ module.exports = {
     t.eq("error empty", D.errorText(""), "It did not work");
     t.eq("remember", D.remember([{ root: "/a" }, { root: "/b" }], "/b", "b", 5, 20).map((r) => r.root), ["/b", "/a"]);
     t.eq("tilde", D.tilde("/home/x/src", "/home/x"), "~/src");
+    // servers of your own
+    t.eq("server: an address as typed", D.hostOf("https://Git.Example.org/group/repo"), "git.example.org");
+    t.eq("server: with a port and a user", D.hostOf("git@code.lan:3000"), "code.lan:3000");
+    t.eq("server: not an address", D.hostOf("not a host!"), "");
+    D.setServers([{ kind: "gitlab", host: "git.example.org", name: "Work" }, { kind: "nope", host: "x.org" }]);
+    t.eq("server: after the three, by kind@host", D.FORGE_ORDER, ["github", "gitlab", "codeberg", "gitlab@git.example.org"]);
+    t.eq("server: GitLab's words", D.FORGES["gitlab@git.example.org"].pulls, "Merge requests");
+    t.eq("server: a remote on it is its", D.hubOf([{ name: "origin", fetch: "https://git.example.org/team/app.git" }]).forge,
+      "gitlab@git.example.org");
+    D.setServers([]);
+    t.eq("server: removed, and the three as they were", [D.FORGE_ORDER, !!D.FORGES["gitlab@git.example.org"]],
+      [["github", "gitlab", "codeberg"], false]);
+    t.eq("stow: a package linked, from ~", D.stowCommand("/home/x/dot", "/home/x", "kitty", "stow", "/home/x"),
+      "stow -d ~/dot -t ~ kitty");
+    t.eq("stow: adopt, and a name that needs quoting", D.stowCommand("/home/x/my dots", "/home/x", "a b", "adopt", "/home/x"),
+      "stow --adopt -d ~/'my dots' -t ~ 'a b'");
+    t.eq("stow: undone", D.stowCommand("/srv/d", "/etc", "x", "unstow", "/home/x"), "stow -D -d /srv/d -t /etc x");
     const M = (xs) => D.autoMessage(xs.map(([p, k]) => ({ path: p, kind: k })));
     t.eq("auto: one", M([["dir/README.md", "added"]]), "Add README.md");
     t.eq("auto: two added", M([["README.md", "added"], ["LICENSE", "added"]]), "Add README.md and LICENSE");

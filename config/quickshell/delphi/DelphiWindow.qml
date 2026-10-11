@@ -11,6 +11,9 @@
 //   Branches     local, remote, tags: switch, create, merge, rebase, delete
 //   Stashes      work put aside, and brought back
 //   Worktrees    the other checkouts of this repository
+//   Dotfiles     its GNU Stow packages: what stow would link, and what is
+//                in the way; a config copied in; the command to run (never
+//                run here — DotfilesPage, core/stow.py)
 //   Pull requests, Issues   the forge repository's — GitHub, GitLab,
 //                Codeberg (ForgePage): read, say
 //                something, open one, check a pull request out, merge
@@ -75,6 +78,9 @@ FloatingWindow {
 
   // ── THE REPOSITORY ─────────────────────────────────────────────────────
   property string root: ""
+  // History narrowed to one file (DelphiManager.history), absolute; one
+  // outside the open repository counts for nothing
+  property string historyFile: ""
   property var info: null
   property var st: null
   property var refs: ({ local: [], remote: [], tags: [] })
@@ -92,7 +98,8 @@ FloatingWindow {
   }
   // where its pull requests and issues are: upstream's forge repository
   // for a fork, else origin's (D.hubOf) — { remote, full, web } or null
-  readonly property var hub: D.hubOf(win.remotes)
+  // (servers of your own count: a remote on one is that server's)
+  readonly property var hub: { win.mgr ? win.mgr.servers : null; return D.hubOf(win.remotes); }
 
   function openRepo(path) {
     if (!win.mgr) return;
@@ -107,6 +114,8 @@ FloatingWindow {
         win.unwatch();
         win.root = info.root;
         win.info = info;
+        // a narrowed History belongs to the repository its file is in
+        if (win.historyFile.indexOf(info.root + "/") !== 0) win.historyFile = "";
         win.st = null;
         win.refs = ({ local: [], remote: [], tags: [] });
         win.remotes = [];
@@ -431,6 +440,7 @@ FloatingWindow {
     { id: "issues", label: "Issues", glyph: "\uF41B" },
     { id: "github", label: "Accounts", glyph: "\uF0C2" },
     { id: "repos", label: "Repositories", glyph: "" },
+    { id: "dotfiles", label: "Dotfiles", glyph: "\uF487" },
   ]
   readonly property string page: win.mgr ? win.mgr.page : "changes"
   function setPage(p) {
@@ -508,9 +518,9 @@ FloatingWindow {
       text: r.name, icon: r.root === win.root ? "\uF00C" : "\uF401", mark: D.tilde(r.root, win.home).replace(/\/[^/]*$/, ""),
       run: () => { if (r.root !== win.root) win.openRepo(r.root); } }));
     if (items.length > 0) items.push({ isSeparator: true });
-    items.push({ text: "Open a directory…", icon: "\uF07C", mark: "ctrl o", run: () => win.chooseRepo() },
-               { text: "Clone…", icon: "\uF019", run: () => { win.setPage("repos"); Qt.callLater(() => { if (win.pageItem && win.pageItem.clone) win.pageItem.clone(); }); } },
-               { text: "All repositories…", icon: "\uF03A", run: () => win.setPage("repos") });
+    items.push({ text: "Open a directory", icon: "\uF07C", mark: "ctrl o", run: () => win.chooseRepo() },
+               { text: "Clone", icon: "\uF019", run: () => { win.setPage("repos"); Qt.callLater(() => { if (win.pageItem && win.pageItem.clone) win.pageItem.clone(); }); } },
+               { text: "All repositories", icon: "\uF03A", run: () => win.setPage("repos") });
     const p = repoChip.mapToItem(stage, 0, repoChip.height + 4);
     repoPop.open(p.x, p.y, items);
   }
@@ -607,14 +617,27 @@ FloatingWindow {
           anchors.rightMargin: 12
           anchors.verticalCenter: parent.verticalCenter
           text: "\uF078"
-          color: Zenon.muted
+          color: repoPop.isOpen ? Zenon.cyan : Zenon.muted
+          rotation: repoPop.isOpen ? 180 : 0
+          Behavior on rotation { NumberAnimation { duration: Zenon.normal; easing.type: Zenon.travelEase } }
           font.family: Zenon.glyphFace
           font.pixelSize: Zenon.px(11)
         }
         MouseArea {
+          id: repoPress
           anchors.fill: parent
           onClicked: win.repoMenu()
         }
+        // pressed, and held while its menu is open: terminus' held ring, as
+        // a row whose menu is open wears it (user, 2026-10-11: pressing it
+        // showed nothing)
+        Rectangle {
+          anchors.fill: parent
+          radius: parent.radius
+          color: Zenon.wash(0.06)
+          visible: repoPress.pressed
+        }
+        HeldRing { anchors.fill: parent; radius: parent.radius; z: 10; on: repoPop.isOpen || repoPress.pressed }
         HoverHandler {
           onHoveredChanged: hovered && win.root !== ""
             ? tips.show(repoChip, D.tilde(win.root, win.home), "") : tips.hide(repoChip)
@@ -803,6 +826,24 @@ FloatingWindow {
         follow: true
         chromeTop: 0
         bar: null
+        visible: !!modelData && modelData.visible
+      }
+    }
+
+    // ── AND WHAT IS STILL TO COME, UNDER THE FOOT ────────────────────────
+    // The same frost turned over (user, 2026-10-11): rows past a view's
+    // bottom rise out of the hint bar. Only views that run down to it — a
+    // page names them (footViews) when some of its views stop short, at a
+    // reply or a commit box; otherwise its edgeViews.
+    Repeater {
+      model: !win.pageItem ? [] : win.pageItem.footViews !== undefined ? win.pageItem.footViews
+        : win.pageItem.edgeViews || []
+      delegate: ScrollEdge {
+        required property var modelData
+        view: modelData
+        below: true
+        follow: true
+        bar: foot
         visible: !!modelData && modelData.visible
       }
     }
@@ -1047,7 +1088,7 @@ FloatingWindow {
       anchors.bottom: foot.top
       source: win.root === "" && ["github", "repos"].indexOf(win.page) < 0 ? "ReposPage.qml"
         : ({ changes: "ChangesPage.qml", history: "HistoryPage.qml", branches: "BranchesPage.qml",
-             stashes: "StashesPage.qml", worktrees: "WorktreesPage.qml", github: "GitHubPage.qml",
+             stashes: "StashesPage.qml", worktrees: "WorktreesPage.qml", dotfiles: "DotfilesPage.qml", github: "GitHubPage.qml",
              pulls: "ForgePage.qml", issues: "ForgePage.qml",
              repos: "ReposPage.qml" })[win.page] || "ChangesPage.qml"
       onLoaded: { item.win = win; Qt.callLater(win.refocus); }
@@ -1089,7 +1130,9 @@ FloatingWindow {
       anchors.right: parent.right
       // slimmer, as the head (user, 2026-10-11)
       height: 40
-      Rectangle { anchors.fill: parent; color: Zenon.hintFrostBg }
+      // the head's translucent ground: the rows under it (the foot's
+      // ScrollEdges) show through frosted, as under the head
+      Rectangle { anchors.fill: parent; color: Zenon.headBg }
       Rectangle { anchors.top: parent.top; width: parent.width; height: 1; color: Zenon.border }
       HintRow {
         rows: win.hintRows

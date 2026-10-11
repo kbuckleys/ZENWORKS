@@ -144,6 +144,29 @@ Item {
   readonly property color rowInk: !entryRow.entry ? Zenon.muted
     : entryRow.entry.inkKey ? Zenon[entryRow.entry.inkKey]
     : entryRow.entry.ink !== undefined ? entryRow.entry.ink : Zenon.muted
+  // ── A REPOSITORY, AND WHAT BELONGS TO ONE (user, 2026-10-11) ────────
+  // A directory with a .git in it has its glyph in this ink (its own glyph
+  // still: the colour is the mark, user 2026-10-11), and the
+  // guides that hang from it, or from anything under it, are drawn in it
+  // too: what a repository holds reads as its branch of the tree. The host
+  // says which directories are repositories (repoDirs: terminus' window,
+  // a TreeHost); one that does not know says none.
+  readonly property color repoInk: Zenon.magenta
+  readonly property bool isRepo: !!entryRow.entry && entryRow.entry.isDir
+    && !!entryRow.host.repoDirs && entryRow.host.repoDirs[entryRow.entry.path] === true
+  // the first guide column, from the left, that hangs from a repository
+  // (column k hangs from this row's ancestor k levels below the top);
+  // past every column when none does
+  readonly property int repoFrom: {
+    const rd = entryRow.host.repoDirs;
+    if (!rd || !entryRow.entry || entryRow.depth <= 0) return 1 << 30;
+    let p = Terminus.dirname(entryRow.entry.path), from = 1 << 30;
+    for (let lvl = entryRow.depth - 1; lvl >= 0; lvl--) {
+      if (rd[p] === true) from = lvl;
+      p = Terminus.dirname(p);
+    }
+    return from;
+  }
   // and the name's, which leaves the kind to the glyph — see nameInkOf
   readonly property color nameInk: !entryRow.entry ? entryRow.rowInk
     : entryRow.entry.nameKey ? Zenon[entryRow.entry.nameKey]
@@ -509,6 +532,8 @@ Item {
             // The column this row actually hangs from, as opposed to one
             // its ancestors merely pass through.
             readonly property bool tail: guideCol.index === entryRow.depth - 1
+            // in a repository's branch of the tree, its ink (repoFrom)
+            readonly property color ink: guideCol.index >= entryRow.repoFrom ? entryRow.repoInk : Zenon.muted
             // Does the branch in this column keep going below this row?
             // For the tail that is "have I a sibling still to come",
             // which is the bit for this row's OWN depth.
@@ -557,7 +582,7 @@ Item {
               y: 0
               width: 1
               height: guideCol.height
-              color: Zenon.muted
+              color: guideCol.ink
             }
 
             Rectangle {
@@ -566,7 +591,7 @@ Item {
               y: Math.round(guideCol.height / 2)
               width: guideCol.arm
               height: 1
-              color: Zenon.muted
+              color: guideCol.ink
             }
 
             // ── THE LAST CHILD, WHERE THE BRANCH TURNS ─────────
@@ -585,7 +610,7 @@ Item {
               anchors.fill: parent
               preferredRendererType: Shape.CurveRenderer
               ShapePath {
-                strokeColor: Zenon.muted
+                strokeColor: guideCol.ink
                 strokeWidth: 1
                 fillColor: "transparent"
                 capStyle: ShapePath.FlatCap
@@ -711,7 +736,7 @@ Item {
         width: Math.round(24 * host.zoom)
         horizontalAlignment: Text.AlignHCenter
         text: entryRow.entry ? entryRow.entry.glyph : ""
-        color: entryRow.rowInk
+        color: entryRow.isRepo ? entryRow.repoInk : entryRow.rowInk
         opacity: entryRow.dim ? 0.65 : 1
         font.family: Zenon.glyphFace   // JetBrainsMono's, whatever the shell face (Zenon.glyphFace)
         font.weight: Zenon.weight

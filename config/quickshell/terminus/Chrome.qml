@@ -1138,6 +1138,17 @@ Column {
         // the wrong place as soon as the caret is not at the end.
         cursorDelegate: Caret { field: filterField }
       }
+      // the filter cleared in one press, as Esc does (terminus/ClearChip)
+      ClearChip {
+        anchors.verticalCenter: parent.verticalCenter
+        size: Zenon.px(15)
+        shown: term.query !== ""
+        onClicked: {
+          filterField.text = "";
+          term.act.query = "";
+          term.contentRef.forceActiveFocus();
+        }
+      }
     }
 
     // ── the settings hatch ────────────────────────────────────────

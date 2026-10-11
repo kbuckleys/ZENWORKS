@@ -1234,6 +1234,14 @@ FloatingWindow {
   // in one, which is also how the bar knows to say nothing.
   property string gitRoot: ""
   property string gitBranch: ""
+  // Which directories seen are repositories (a .git in them), path → true:
+  // the listings say, alongside their rows (Terminus.reposTail). Not git
+  // mode's: always on, a stat per directory, and EntryRow gives such a
+  // directory git's glyph and the guides under it git's colour.
+  property var repoDirs: ({})
+  // the repository this directory is in, git mode or not ("" when none):
+  // the listing says (Terminus.parseRepoTop) — Delphi's entries go by it
+  property string repoTop: ""
 
 
   property string gitAsked: ""
@@ -4362,6 +4370,34 @@ FloatingWindow {
   function openInDelphi(path) {
     const d = root.mgr ? root.mgr.gitClient : null;
     if (d) d.show(path || root.cwd, "");
+  }
+
+  // ── git, through delphi (the row menu's, in git mode) ──────────────────
+  // Stage, unstage and discard are delphi's backend's (one git, one set of
+  // answers to its failures); terminus only says which rows. Then the
+  // gutter is asked again. Discard asks first: it cannot be undone.
+  function gitOn(rows, op) {
+    const d = root.mgr ? root.mgr.gitClient : null;
+    const top = root.gitRoot;
+    if (!d || top === "" || rows.length === 0) return;
+    const rel = rows.map((r) => r.path === top ? "." : r.path.slice(top.length + 1));
+    const go = () => d.call(op, top, { paths: rel }, (ok, res, err) => {
+      if (!ok) root.warn(String(err && err.error || "git said no").split("\n")[0]);
+      else root.status = (op === "stage" ? "staged " : op === "unstage" ? "unstaged " : "discarded changes to ")
+        + (rows.length === 1 ? rows[0].name : rows.length + " items");
+      root.scanGit();
+    });
+    if (op !== "discard") { go(); return; }
+    root.confirmRef.askMany(rows.length === 1 ? "Discard the changes to " + rows[0].name + "?"
+                                              : "Discard the changes to " + rows.length + " items?",
+      "Back as last committed (or staged). This cannot be undone.",
+      [{ label: "Discard", ink: Zenon.red, act: go }],
+      rows.length > 1 ? rows.map((r) => r.name) : []);
+  }
+  // one row's history in delphi: the commits that changed it
+  function gitHistory(path) {
+    const d = root.mgr ? root.mgr.gitClient : null;
+    if (d) d.history(path);
   }
 
   function applyBand(x1, y1, x2, y2, base) { return renameDrag.applyBand(x1, y1, x2, y2, base); }

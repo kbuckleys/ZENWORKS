@@ -36,6 +36,9 @@ QtObject {
   // git's state per path, a directory wearing its worst (terminus.js
   // gitWorse); empty: no git gutter at all
   property var marks: ({})
+  // directories that are repositories, path → true (FileTree reads them
+  // with each branch; see TerminusWindow.repoDirs)
+  property var repoDirs: ({})
   // directories read and found empty: no chevron
   property var empties: ({})
   // width kept free at a row's right end, for the holder's own word

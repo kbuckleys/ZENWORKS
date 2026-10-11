@@ -32,6 +32,8 @@ Item {
   // (DelphiWindow's ScrollEdges) — only those with nothing but controls
   // between them and the head: a view under a title would paint over it
   readonly property var edgeViews: [list, threadFlick]
+  // the views that run down to the foot (the thread stops at the reply)
+  readonly property var footViews: [list]
 
   readonly property string kind: pg.win && pg.win.page === "issues" ? "issues" : "pulls"
   readonly property bool pulls: pg.kind === "pulls"
@@ -340,10 +342,11 @@ Item {
         onChose: (v) => pg.who = v
       }
     }
+    // asking the forge: in the list's body, where the rows will be (user,
+    // 2026-10-11 — beside the switches it read as one of them)
     Working {
-      anchors.right: parent.right
-      anchors.rightMargin: 18
-      anchors.verticalCenter: seg.verticalCenter
+      anchors.centerIn: list
+      z: 5
       running: pg.loading
       visible: pg.loading
     }
@@ -691,32 +694,35 @@ Item {
     anchors.leftMargin: 1
     anchors.right: parent.right
     anchors.bottom: parent.bottom
-    height: 132
+    height: 150
     visible: pg.whole
     Rectangle { width: parent.width; height: 1; color: Zenon.border }
     MessageWell {
       id: reply
       x: 14
       y: 14
-      width: parent.width - 28 - send.width - 12
+      width: parent.width - 28
       height: parent.height - 28
+      footRoom: send.height + 8
       ghost: "Say something on #" + (pg.item ? pg.item.number : "") + " — markdown; ctrl return sends"
       passKeys: (e) => pg.win.key(e)
       onFocusedChanged: if (reply.focused) pg.area = "reply"
       onSubmitted: pg.send()
       onEscaped: pg.area = "list"
       onTabbed: pg.area = "list"
-    }
-    DialogButton {
-      id: send
-      anchors.right: parent.right
-      anchors.rightMargin: 14
-      anchors.bottom: reply.bottom
-      label: "Send"
-      ink: Zenon.cyan
-      ready: reply.text.trim() !== ""
-      primary: reply.text.trim() !== ""
-      onClicked: pg.send()
+      // in the well's corner, a part of the field (user, 2026-10-11: beside
+      // it, it sat there out of proportion to it)
+      DialogButton {
+        id: send
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        anchors.margins: 8
+        label: "Send"
+        ink: Zenon.cyan
+        ready: reply.text.trim() !== ""
+        primary: reply.text.trim() !== ""
+        onClicked: pg.send()
+      }
     }
   }
   Bubble {

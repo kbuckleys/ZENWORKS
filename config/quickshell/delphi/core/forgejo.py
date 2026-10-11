@@ -24,6 +24,9 @@ from rest import ForgeError
 
 HOST = "codeberg.org"
 API = f"https://{HOST}/api/v1"
+# the id the window knows this forge by: "codeberg", or "forgejo@<host>" for
+# a server of your own (server.hosted loads a copy of this module per host)
+FORGE_ID = "codeberg"
 NAME = "Codeberg"
 
 
@@ -66,7 +69,7 @@ def _paged(path, tok, limit=1000, anon=False):
 
 def status():
     tok, src = token()
-    res = {"signedIn": False, "source": src, "cli": False, "forge": "codeberg", "host": HOST}
+    res = {"signedIn": False, "source": src, "cli": False, "forge": FORGE_ID, "host": HOST}
     if not tok:
         return res
     try:

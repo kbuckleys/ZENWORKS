@@ -32,6 +32,8 @@ from rest import ForgeError
 
 HOST = "gitlab.com"
 API = f"https://{HOST}/api/v4"
+# "gitlab", or "gitlab@<host>" for a server of your own (server.hosted)
+FORGE_ID = "gitlab"
 NAME = "GitLab"
 
 
@@ -113,7 +115,7 @@ def _pid(full):
 
 def status():
     tok, src = token()
-    res = {"signedIn": False, "source": src, "cli": have_cli(), "forge": "gitlab", "host": HOST}
+    res = {"signedIn": False, "source": src, "cli": have_cli(), "forge": FORGE_ID, "host": HOST}
     if not tok:
         return res
     try:
@@ -124,7 +126,7 @@ def status():
     res.update(signedIn=True, login=me.get("username"), name=me.get("name"),
                avatar=me.get("avatar_url"), id=me.get("id"),
                # GitLab's private address for commits
-               noreply=f"{me.get('id')}-{me.get('username')}@users.noreply.gitlab.com")
+               noreply=f"{me.get('id')}-{me.get('username')}@users.noreply.{HOST}")
     return res
 
 

@@ -41,6 +41,39 @@ Item {
   // from `forge` itself, never `site`: in onForgeChanged a binding made
   // from it may not have caught up (the reload asked the forge just left)
   function op(name) { return (D.FORGES[pg.forge] || D.FORGES.github).id + name; }
+  // ── A SERVER OF YOUR OWN ───────────────────────────────────────────────
+  // A self-hosted GitLab, or a Forgejo or Gitea: which kind, then where;
+  // then it is a forge like the others in the switch, signed in to with a
+  // token (DelphiManager.servers, delphi.js setServers, server.route)
+  function addServer() {
+    const ask = (kind) => pg.win.ask({ title: "A " + D.SERVER_KINDS[kind].name + " server", glyph: D.SERVER_KINDS[kind].glyph,
+      detail: "Its address — git.example.org, or the https:// one from your browser. Delphi talks to its API there, over https.",
+      fields: [{ key: "host", label: "Address", hint: "git.example.org" },
+               { key: "name", label: "Called", hint: "as the switch shows it (optional)" }],
+      verb: "Add",
+      then: (v) => {
+        const host = D.hostOf(v.host);
+        if (host === "") { pg.win.say("That is not an address — git.example.org, say", true); return; }
+        const id = pg.win.mgr.addServer(kind, host, v.name.trim());
+        pg.win.mgr.set("forge", id);
+      } });
+    pg.win.card_({ question: "Add a server of your own", glyph: "\uF233", ink: Zenon.ink,
+      detail: "A GitLab you or your work runs, or a Forgejo or Gitea. Its repositories, pull requests and issues then work as GitHub's do here.",
+      choices: [{ label: "GitLab", ink: Zenon.cyan, run: () => ask("gitlab") },
+                { label: "Forgejo or Gitea", ink: Zenon.cyan, run: () => ask("forgejo") },
+                { label: "Cancel", ink: Zenon.muted }] });
+  }
+  function removeServer() {
+    if (!pg.site.server) return;
+    const s = pg.site;
+    pg.win.confirm({ question: "Remove " + s.name + "?", glyph: s.glyph, ink: Zenon.red,
+      detail: "It leaves the switch, and its token is forgotten. Your clones of its repositories stay as they are.",
+      verb: "Remove",
+      then: () => {
+        pg.win.mgr.call(s.id + "ForgetToken", null, {}, () => {});
+        pg.win.mgr.removeServer(s.id);
+      } });
+  }
   function switchTo(id) {
     if (!D.FORGES[id] || id === pg.forge) return;
     pg.win.mgr.set("forge", id);
@@ -65,7 +98,7 @@ Item {
   readonly property var hints: pg.signedIn
     ? [["return", "open"], ["c", "clone"], ["u", "upload files"], ["w", "web"], ["n", "new"], ["/", "filter"], ["[ ]", "forge"]]
     : [["return", "sign in"], ["[ ]", "forge"]]
-  readonly property var buttons: pg.signedIn ? [
+  readonly property var buttons: (pg.site.server ? [{ label: "Remove server", ink: Zenon.red, run: () => pg.removeServer() }] : []).concat(pg.signedIn ? [
     { label: "Sign out", run: () => pg.signOut() },
     { label: "Upload files", visible: !!pg.repo, run: () => pg.upload(pg.repo) },
     { label: pg.win && pg.win.root !== "" && !pg.win.origin ? "Publish " + pg.win.repoName : "New repository",
@@ -73,13 +106,15 @@ Item {
   ] : pg.was !== "" ? [
     { label: "Sign in another way", run: () => pg.signIn() },
     { label: "Install " + pg.site.pkg, ink: Zenon.cyan, primary: true, ready: !pg.checking && !pg.win.mgr.installing, run: () => pg.installThenSignIn() },
-  ] : [{ label: "Sign in", ink: Zenon.cyan, primary: true, ready: !pg.checking, run: () => pg.signIn() }]
+  ] : [{ label: "Sign in", ink: Zenon.cyan, primary: true, ready: !pg.checking, run: () => pg.signIn() }])
   function takeFocus() { if (!filter.focused && pg.win) pg.win.focusKeys(); }
 
   // An answer is for the forge it was asked of: one that comes after the
   // switch has moved on is dropped — GitHub's account once landed under
   // GitLab's name this way (2026-10-11).
   function reload() {
+    // a reload called for later, by a page already left: nothing to ask
+    if (!pg || !pg.win || typeof pg.op !== "function") return;
     pg.checking = true;
     const asked = pg.forge;
     pg.win.mgr.call(pg.op("Status"), null, {}, (ok, st) => { if (!pg || asked !== pg.forge) return;
@@ -110,7 +145,7 @@ Item {
     const items = pg.accountList.map((a) => ({
       text: a.login + (a.source === "keyring" ? "  (token)" : ""), icon: a.active ? "\uF00C" : "\uF007",
       enabled: !a.active && pg.many, run: () => pg.switchAccount(a.login) }));
-    if (pg.many) items.push({ text: "Add another account…", icon: "\uF067", run: () => pg.signIn(true) });
+    if (pg.many) items.push({ text: "Add another account", icon: "\uF067", run: () => pg.signIn(true) });
     items.push({ isSeparator: true },
                { text: "Sign out of " + me, icon: "\uF08B", danger: true, run: () => pg.signOut() });
     const p = accountChip.mapToItem(pg, 0, accountChip.height + 4);
@@ -250,8 +285,8 @@ Item {
       if (ok && res.root) { pg.win.openRepo(res.root); pg.win.setPage("changes"); return; }
       pg.win.card_({ question: r.full, glyph: pg.site.glyph, ink: Zenon.ink,
         detail: (r.description ? r.description + "  ·  " : "") + "Not cloned here yet.",
-        choices: [{ label: "Clone…", ink: Zenon.cyan, run: () => pg.clone(r) },
-                  { label: "Upload files…", run: () => pg.upload(r) },
+        choices: [{ label: "Clone", ink: Zenon.cyan, run: () => pg.clone(r) },
+                  { label: "Upload files", run: () => pg.upload(r) },
                   { label: "Open on the web", run: () => pg.web(r) },
                   { label: "Cancel" }] });
     });
@@ -286,7 +321,7 @@ Item {
                { key: "msg", label: "Commit message", value: was.msg || (paths.length === 1 ? "Add " + names[0] : "Add " + names.slice(0, 3).join(", ") + (paths.length > 3 ? " and " + (paths.length - 3) + " more" : "")) },
                { key: "branch", label: "Branch", options: branches,
                  value: was.branch && branches.indexOf(was.branch) >= 0 ? was.branch : branches[0],
-                 other: "New branch\u2026", otherHint: "a name for the new branch" }],
+                 other: "New branch", otherHint: "a name for the new branch" }],
       verb: "Review",
       then: (v) => pg.review(r, paths, branches, v) });
   }
@@ -337,14 +372,14 @@ Item {
     if (local) {
       pg.win.card_({ question: "Publish " + pg.win.repoName + " to " + pg.site.name, glyph: "", ink: Zenon.ink,
         detail: "To a repository you already have there — its history is taken in, and only what differs is left to commit — or as a new one.",
-        choices: [{ label: "To an existing one…", ink: Zenon.cyan, run: () => pg.connectExisting(null) },
+        choices: [{ label: "To an existing one", ink: Zenon.cyan, run: () => pg.connectExisting(null) },
                   { label: "As a new repository", run: () => pg.askCreate({ dir: pg.win.root, repo: true, open: true }) },
                   { label: "Cancel" }] });
       return;
     }
     pg.win.card_({ question: "A new repository on " + pg.site.name, glyph: "", ink: Zenon.ink,
       detail: "Empty, or filled from a directory: a git repository's history is pushed; a plain directory's files are uploaded.",
-      choices: [{ label: "From a directory…", ink: Zenon.cyan, run: () => pg.createFrom() },
+      choices: [{ label: "From a directory", ink: Zenon.cyan, run: () => pg.createFrom() },
                 { label: "Empty", run: () => pg.askCreate(null) },
                 { label: "Cancel" }] });
   }
@@ -552,9 +587,11 @@ Item {
     anchors.top: parent.top
     anchors.margins: 12
     z: 2
-    options: D.FORGE_ORDER.map((id) => [id, D.FORGES[id].name])
+    // the three, your own servers after them, and + to add one
+    options: { pg.win && pg.win.mgr ? pg.win.mgr.servers : null;
+               return D.FORGE_ORDER.map((id) => [id, D.FORGES[id].name]).concat([["+", "+"]]); }
     current: pg.forge
-    onChose: (v) => pg.switchTo(v)
+    onChose: (v) => v === "+" ? pg.addServer() : pg.switchTo(v)
   }
   // the account: its name, a menu on it (switch, add, sign out)
   Rectangle {
@@ -608,6 +645,7 @@ Item {
     height: 32
     textSize: Zenon.px(15)
     ghost: "  Filter " + pg.repos.length + " repositories  ( / )"
+    clearable: true
     onTextChanged: { pg.query = filter.text.trim(); pg.sel = 0; }
     onAccepted: pg.win.focusKeys()
     Keys.onEscapePressed: { filter.text = ""; pg.win.focusKeys(); }
@@ -692,8 +730,8 @@ Item {
             const p = mapToItem(pg, m.x, m.y);
             menu.open(p.x, p.y, [
               { text: "Open", icon: "", mark: "return", run: () => pg.openOne(rrow.r) },
-              { text: "Clone…", icon: "", mark: "c", run: () => pg.clone(rrow.r) },
-              { text: "Upload files…", icon: "", mark: "u", run: () => pg.upload(rrow.r) },
+              { text: "Clone", icon: "", mark: "c", run: () => pg.clone(rrow.r) },
+              { text: "Upload files", icon: "", mark: "u", run: () => pg.upload(rrow.r) },
               { text: "Open on the web", icon: "", mark: "w", run: () => pg.web(rrow.r) },
               { isSeparator: true },
               { text: "Copy the HTTPS address", icon: "", run: () => pg.win.copy(rrow.r.https) },

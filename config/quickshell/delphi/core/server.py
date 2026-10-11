@@ -48,6 +48,7 @@ import repo as R
 from graph import Lanes
 from gitrun import Cancel, Cancelled, GitError
 from rest import ForgeError
+from stow import StowError
 
 PROTOCOL = 1
 
@@ -335,8 +336,48 @@ def tools():
 # "codebergRepos") — every module answers to the same names (see forge).
 FORGES = {"github": github, "gitlab": gitlab, "codeberg": forgejo}
 
+# ── A SERVER OF YOUR OWN ───────────────────────────────────────────────────
+# A self-hosted GitLab, or a Forgejo or Gitea, is "gitlab@<host>" or
+# "forgejo@<host>": its requests are named so ("gitlab@git.example.orgStatus"),
+# and answered by a copy of that forge's module loaded for that host alone —
+# its own HOST and API, so two servers' requests running at once can never
+# cross, and not a line of the module had to learn about hosts.
+KINDS = {"gitlab": gitlab, "forgejo": forgejo}
+_HOSTED = {}
+_HOSTED_LOCK = threading.Lock()
+_ROUTE = re.compile(r"(github|gitlab|codeberg|forgejo)(?:@([a-z0-9][a-z0-9.\-]*(?::\d+)?))?(?=[A-Z])")
+
+
+def hosted(kind, host):
+    import importlib.util
+    key = f"{kind}@{host}"
+    with _HOSTED_LOCK:
+        mod = _HOSTED.get(key)
+        if mod is None:
+            base = KINDS[kind]
+            spec = importlib.util.spec_from_file_location(key, base.__file__)
+            mod = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(mod)
+            mod.API = base.API.replace(base.HOST, host, 1)
+            mod.HOST = host
+            mod.FORGE_ID = key
+            _HOSTED[key] = mod
+        return mod
+
+
+def route(op):
+    """(module, the request's own name) for a forge's request, else None."""
+    m = _ROUTE.match(op)
+    if not m:
+        return None
+    name, host = m.group(1), m.group(2)
+    rest = op[m.end():]
+    if host:
+        return (hosted(name, host), rest) if name in KINDS else None
+    return (FORGES[name], rest) if name in FORGES else None
+
 # Requests named here change the repository; they queue behind each other.
-WRITES = {"stage", "stageAll", "unstage", "unstageAll", "discard", "clean",
+WRITES = {"stowCopyIn", "stage", "stageAll", "unstage", "unstageAll", "discard", "clean",
           "stageLines", "unstageLines", "discardLines", "commit",
           "branchCreate", "branchTrack", "switch", "branchDelete",
           "branchRename", "setUpstream", "tagCreate", "tagDelete",
@@ -402,6 +443,8 @@ class Server:
         except ForgeError as e:
             send({"id": rid, "ok": False, "kind": "forge", "error": str(e),
                   "status": e.status})
+        except StowError as e:
+            send({"id": rid, "ok": False, "kind": "stow", "error": str(e)})
         except Exception as e:   # a bug here must not take the daemon down
             send({"id": rid, "ok": False, "kind": "internal",
                   "error": f"{type(e).__name__}: {e}"})
@@ -468,9 +511,9 @@ class Server:
                 if kw.get(k):
                     g.run(["config"] + where + [f"user.{k}", kw[k]])
             return {}
-        for name, mod in FORGES.items():
-            if op.startswith(name):
-                return self.forge(mod, op[len(name):], kw, cancel, emit)
+        fr = route(op)
+        if fr:
+            return self.forge(fr[0], fr[1], kw, cancel, emit)
         # ── one repository ──
         r, lock = self.repo(path)
         if op == "logOpen":
@@ -519,7 +562,7 @@ class Server:
     def forge(self, f, op, kw, cancel, emit):
         """A forge's request — `f` its module (github, gitlab, forgejo),
         every one answering to the same names."""
-        cli = {"github": "gh", "gitlab": "glab"}.get(f.__name__)
+        cli = {"github": "gh", "gitlab": "glab"}.get(f.__name__.split("@")[0])
         if op == "Status":
             st = f.status()
             if cli:

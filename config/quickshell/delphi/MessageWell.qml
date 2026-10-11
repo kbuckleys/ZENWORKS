@@ -30,6 +30,9 @@ Rectangle {
   property color noteInk: Zenon.muted
   property real textSize: Zenon.px(15)
   property var passKeys: null
+  // room kept free under the text for what the holder sets in the well's
+  // corner (ForgePage's Send, inside the field rather than beside it)
+  property int footRoom: 0
   signal submitted()
   signal escaped()
   signal tabbed()
@@ -46,6 +49,7 @@ Rectangle {
     id: flick
     anchors.fill: parent
     anchors.margins: 10
+    anchors.bottomMargin: 10 + mw.footRoom
     clip: true
     contentWidth: width
     contentHeight: edit.height

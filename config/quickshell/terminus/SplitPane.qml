@@ -121,6 +121,7 @@ Item {
         // ink at all.
         term.pas.raw = term.enrich(
           Terminus.parseListing(otherOut.text, term.otherCwd));
+        term.repoDirs = Terminus.mergeRepos(term.repoDirs, term.otherCwd, Terminus.parseRepos(otherOut.text, term.otherCwd));
         if (term.otherSel >= term.otherRows.length)
           term.pas.sel = Math.max(0, term.otherRows.length - 1);
         // and its pictures: makeThumbs covers both halves, but only the

@@ -72,7 +72,51 @@ function listPath(dir) {
 
 function listCommand(dir) {
   return "find " + Strings.shellQuote(listPath(dir)) + " -maxdepth 1 -mindepth 1"
-    + PRINTF + "2>/dev/null";
+    + PRINTF + "2>/dev/null" + reposTail(dir);
+}
+
+// ── AND WHICH OF ITS DIRECTORIES ARE REPOSITORIES ──────────────────────────
+// A directory with a .git in it, so the trees can tell a repository from a
+// directory (user, 2026-10-11). Asked in the same breath as the listing: a
+// stat per subdirectory and no reading of any of them, after find, whose
+// exit status is kept (a listing that failed still says so). Each comes back
+// as a record of two fields, "repo" and its name, which parseListing passes
+// over (an entry has six) and parseRepos picks out.
+function reposTail(dir) {
+  return "; s=$?; cd " + Strings.shellQuote(listPath(dir)) + " 2>/dev/null"
+    + " && { for x in */ .[!.]*/; do [ -e \"$x.git\" ] && printf 'repo\\037%s\\036' \"${x%/}\"; done;"
+    // and the repository the directory itself is in, git mode or not: its
+    // nearest parent with a .git, a test per level, no git run
+    + " d=${PWD%/}; while :; do if [ -e \"$d/.git\" ]; then printf 'top\\037%s\\036' \"${d:-/}\"; break; fi;"
+    + " [ -z \"$d\" ] && break; d=${d%/*}; done; }; exit $s";
+}
+
+// the repository a listing's directory is in (reposTail), or ""
+function parseRepoTop(text) {
+  for (const rec of String(text || "").split(RECORD)) {
+    const f = rec.split(FIELD);
+    if (f.length === 2 && f[0] === "top") return f[1];
+  }
+  return "";
+}
+
+function parseRepos(text, dir) {
+  const out = [];
+  for (const rec of String(text || "").split(RECORD)) {
+    const f = rec.split(FIELD);
+    if (f.length === 2 && f[0] === "repo" && f[1] !== "") out.push(joinPath(String(dir).replace(/\/+$/, "") || "/", f[1]));
+  }
+  return out;
+}
+
+// What a tree knows of repositories, with one directory's answer laid over
+// it: that directory's children as it says, everything else as it was.
+function mergeRepos(known, dir, found) {
+  const d = String(dir).replace(/\/+$/, "") || "/";
+  const out = {};
+  for (const k in known) if (dirname(k) !== d) out[k] = true;
+  for (const p of found) out[p] = true;
+  return out;
 }
 
 // The same listing, capped. A preview pane is a glance into a directory, and

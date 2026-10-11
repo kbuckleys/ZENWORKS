@@ -1,0 +1,3 @@
+# built by python when delphi runs; never shipped
+__pycache__/
+*.pyc

@@ -439,6 +439,38 @@ var FORGES = {
 };
 var FORGE_ORDER = ["github", "gitlab", "codeberg"];
 
+// ── SERVERS OF YOUR OWN ──────────────────────────────────────────────────
+// A self-hosted GitLab, or a Forgejo or Gitea: { kind: "gitlab"|"forgejo",
+// host, name? }, kept by the manager and laid into FORGES (after the three)
+// as "<kind>@<host>" — the name the daemon routes by (server.route). Signed
+// in to with a token: a server's own sign-in page is its own business.
+var SERVER_KINDS = {
+  gitlab:  { name: "GitLab", glyph: "\uF296", pull: "merge request", pulls: "Merge requests", refs: "merge-requests",
+             tokens: " → Preferences → Access tokens (scope: api)" },
+  forgejo: { name: "Forgejo or Gitea", glyph: "\uF233", pull: "pull request", pulls: "Pull requests", refs: "pull",
+             tokens: " → Settings → Applications (repository and issue access)" }
+};
+function serverId(kind, host) { return kind + "@" + String(host || "").toLowerCase(); }
+// a host as typed — https://git.example.org/, with a path even — to its name
+function hostOf(text) {
+  var t = String(text || "").trim().toLowerCase().replace(/^[a-z]+:\/\//, "");
+  t = t.replace(/^[^@\/]*@/, "").split("/")[0];
+  return /^[a-z0-9][a-z0-9.\-]*(:\d+)?$/.test(t) ? t : "";
+}
+function setServers(list) {
+  for (var k in FORGES) if (FORGES[k].server) delete FORGES[k];
+  FORGE_ORDER.length = 0;
+  FORGE_ORDER.push("github", "gitlab", "codeberg");
+  (list || []).forEach(function (s) {
+    var kind = SERVER_KINDS[s.kind];
+    if (!kind || !hostOf(s.host)) return;
+    var id = serverId(s.kind, s.host);
+    FORGES[id] = { id: id, kind: s.kind, server: true, name: s.name || s.host, host: s.host, glyph: kind.glyph,
+                   pull: kind.pull, pulls: kind.pulls, refs: kind.refs, cli: "", pkg: "", tokens: s.host + kind.tokens };
+    FORGE_ORDER.push(id);
+  });
+}
+
 function forgeOfHost(host) {
   var h = String(host || "").toLowerCase();
   for (var i = 0; i < FORGE_ORDER.length; i++)
@@ -513,4 +545,22 @@ function plainOf(text) {
     .replace(/(\*\*|__|\*|_|`)(\S(?:.*?\S)?)\1/g, "$2")
     .replace(/\n{2,}/g, "\n")
     .trim();
+}
+
+// ── DOTFILES ────────────────────────────────────────────────────────────
+// The stow command for one package, to copy and run by hand (delphi never
+// runs it). how: "stow" links it, "adopt" first takes the files in the way
+// into the package (replacing its copies) and then links, "unstow" removes
+// its links. Paths under home written from ~, quoted only where the shell
+// needs it.
+function shellWord(s) {
+  var t = String(s);
+  if (/^[A-Za-z0-9_@%+=:,.\/~-]+$/.test(t)) return t;
+  var q = "'" + t.replace(/'/g, "'\\''") + "'";
+  return t.indexOf("~/") === 0 ? "~/" + "'" + t.slice(2).replace(/'/g, "'\\''") + "'" : q;
+}
+function stowCommand(root, target, name, how, home) {
+  var flag = how === "adopt" ? " --adopt" : how === "unstow" ? " -D" : "";
+  return "stow" + flag + " -d " + shellWord(tilde(root, home)) + " -t " + shellWord(tilde(target, home) || "~")
+    + " " + shellWord(name);
 }

@@ -15,6 +15,11 @@
 --                 `git blame --porcelain` for that one line, off the main
 --                 loop, and dropped as soon as the line changes or the cursor
 --                 moves on. A setting (vim.g.plato_blame).
+--   hunk(action)  the change the cursor is in, staged ("apply": into git's
+--                 index, as `git add -p` would) or undone ("reset": the
+--                 lines back as last committed, an ordinary undo away).
+--                 mini.diff's own do_hunks; plato's right-click menu asks.
+--                 With a selection: only the selected lines of it.
 --
 -- mini.diff draws nothing itself here: its view is "number", which colours
 -- nvim's number column — a column plato draws on its own — so its signs
@@ -59,6 +64,56 @@ function M.list(buf)
   local out = {}
   for l, k in pairs(m) do out[#out + 1] = { l, k } end
   return out
+end
+
+-- ── one change: staged or undone ───────────────────────────────────────
+-- The whole change the cursor is in, not just its line: do_hunks takes the
+-- part of a hunk inside the region it is given, and mini.diff splits one
+-- edited block into a hunk per line it can pair up — so the hunks that
+-- touch are joined first, the block you see as one bar in the gutter.
+local function hunkAt(buf, line)
+  local ok, data = pcall(diff.get_buf_data, buf)
+  if not ok or not data or not data.hunks then return nil end
+  local spans = {}
+  for _, h in ipairs(data.hunks) do
+    local a = math.max(1, h.buf_start)
+    spans[#spans + 1] = { a, h.type == "delete" and a or h.buf_start + h.buf_count - 1 }
+  end
+  table.sort(spans, function(x, y) return x[1] < y[1] end)
+  local cur = nil
+  for _, sp in ipairs(spans) do
+    if cur and sp[1] <= cur[2] + 1 then
+      cur[2] = math.max(cur[2], sp[2])
+    else
+      if cur and line >= cur[1] and line <= cur[2] then return cur[1], cur[2] end
+      cur = { sp[1], sp[2] }
+    end
+  end
+  if cur and line >= cur[1] and line <= cur[2] then return cur[1], cur[2] end
+  return nil
+end
+
+function M.hunk(action, from, to)
+  local buf = api.nvim_get_current_buf()
+  if not diff then return end
+  local a, b = from, to
+  if not a then
+    a, b = hunkAt(buf, api.nvim_win_get_cursor(0)[1])
+    if not a then
+      vim.notify("No change on this line", vim.log.levels.WARN)
+      return
+    end
+  end
+  local ok, err = pcall(diff.do_hunks, buf, action, { line_start = a, line_end = b })
+  if not ok then vim.notify(tostring(err), vim.log.levels.ERROR) end
+end
+
+-- the selection's lines, read before the menu's Esc ends it
+function M.hunkSelected(action)
+  local a, b = vim.fn.line("v"), vim.fn.line(".")
+  if a > b then a, b = b, a end
+  api.nvim_feedkeys(api.nvim_replace_termcodes("<Esc>", true, false, true), "nx", false)
+  M.hunk(action, a, b)
 end
 
 -- ── blame ──────────────────────────────────────────────────────────────

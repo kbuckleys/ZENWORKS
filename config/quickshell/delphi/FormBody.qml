@@ -267,7 +267,7 @@ Item {
           visible: !!fcol.modelData.path && !!fb.chooseDir
           implicitWidth: 96
           height: fbox.height
-          label: "Choose…"
+          label: "Choose"
           onClicked: {
             const typed = fbox.text.trim();
             const start = typed.indexOf("/") === 0 ? typed.replace(/\/[^/]*$/, "") || "/" : "";

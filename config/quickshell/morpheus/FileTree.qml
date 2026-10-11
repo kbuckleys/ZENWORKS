@@ -110,6 +110,8 @@ FocusScope {
   property var kids: ({})
   // git state per path, directories rolled up to their worst descendant
   property var git: ({})
+  // the directories read that are repositories (TreeHost.repoDirs)
+  property var repoDirs: ({})
 
   function isOpen(p) { return tree.openDirs["k:" + p] === true; }
   // set while reset() clears and restores, so neither is remembered as a
@@ -166,6 +168,7 @@ FocusScope {
         const k = Object.assign({}, tree.kids);
         k["k:" + lister.dir] = rows;
         tree.kids = k;
+        tree.repoDirs = Terminus.mergeRepos(tree.repoDirs, lister.dir, Terminus.parseRepos(listed.text, lister.dir));
       }
     }
     onExited: Qt.callLater(() => {
@@ -288,6 +291,7 @@ FocusScope {
     tree.revealed = ({});
     tree.openDirs = ({});
     tree.git = ({});
+    tree.repoDirs = ({});
     tree.sel = 0;
     if (tree.rootPath === "") return;
     tree.readKids(tree.rootPath);
@@ -333,6 +337,7 @@ FocusScope {
       kids[k] = Terminus.enrich(Terminus.sortEntries(kids[k], "name", false, true, true, ({})), Icons);
     tree.revealed = ({});
     tree.git = ({});
+    tree.repoDirs = ({});
     tree.kids = kids;
     tree.openDirs = open;
     tree.sel = 0;
@@ -528,6 +533,7 @@ FocusScope {
     fontSize: tree.fontSize
     root: tree.rootPath
     marks: tree.git
+    repoDirs: tree.repoDirs
     noteWidth: tree.noteWidth
     // a directory read and found empty shows no chevron, as in terminus
     empties: {

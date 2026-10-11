@@ -730,6 +730,94 @@ def graph_shapes():
 
 
 @test
+def log_one_file():
+    # one file's history (plato's and terminus' "History"): only the commits
+    # that changed it, their parents rewritten so the graph's lines join
+    d = fresh({"f": "0\n", "g": "0\n"})
+    write(d, "g", "1\n"); sh(d, "add", "-A"); sh(d, "commit", "-q", "-m", "g only")
+    write(d, "f", "1\n"); sh(d, "add", "-A"); sh(d, "commit", "-q", "-m", "f one")
+    write(d, "g", "2\n"); sh(d, "add", "-A"); sh(d, "commit", "-q", "-m", "g again")
+    write(d, "f", "2\n"); sh(d, "add", "-A"); sh(d, "commit", "-q", "-m", "f two")
+    s = server.LogSession(R.Repo(d), {"path": "f"})
+    rows = s.page(50)["commits"]
+    s.close()
+    eq([c["subject"] for c in rows][:2], ["f two", "f one"])
+    eq(len(rows), 3, "the two edits and the commit that made it")
+    eq(rows[0]["parents"], [rows[1]["sha"]], "parent rewritten past g's commits")
+    continuous([c["graph"] for c in rows])
+
+
+@test
+def stow_packages_plan_and_copy():
+    # a dotfiles repository and a home of its own (a fixture: stow is never
+    # run on the user's files) — stow's dry run read, never a real stow but
+    # the one made here to have something linked
+    import stow as ST
+    if not ST.have_stow():
+        return
+    d = fresh({"kitty/.config/kitty/kitty.conf": "a\n", "zsh/.zshrc": "z\n",
+               "hypr/.config/hypr/h.lua": "h\n", "README.md": "r\n", "empty/.keep": ""})
+    os.remove(os.path.join(d, "empty", ".keep"))
+    home = os.path.join(TMP, f"home{n[0]}")
+    write(home, ".zshrc", "mine\n")
+    write(home, ".config/hypr/other.lua", "o\n")
+    subprocess.run(["stow", "-d", d, "-t", home, "hypr"], check=True, capture_output=True)
+    r = R.Repo(d)
+    out = r.stow_packages(target=home)
+    by = {p["name"]: p for p in out["packages"]}
+    eq(sorted(by), ["empty", "hypr", "kitty", "zsh"], "directories only; README is no package")
+    eq(by["kitty"]["state"], "tolink")
+    eq(by["kitty"]["links"], [".config/kitty"], "a directory folded into one link")
+    eq(by["zsh"]["state"], "conflicts")
+    eq(by["zsh"]["conflicts"], [".zshrc"])
+    eq(by["hypr"]["state"], "linked")
+    eq(by["empty"]["state"], "empty")
+    eq(by["kitty"]["dotted"], True)
+    pl = {f["path"]: f["state"] for f in r.stow_plan("zsh", target=home)["files"]}
+    eq(pl, {".zshrc": "inTheWay"})
+    pl = {f["path"]: f["state"] for f in r.stow_plan("hypr", target=home)["files"]}
+    eq(pl, {".config/hypr/h.lua": "linked"})
+    # copied in: the source left exactly as it was
+    write(home, ".config/foot/foot.ini", "f\n")
+    write(home, ".config/foot/.git/HEAD", "x\n")
+    res = r.stow_copy_in(os.path.join(home, ".config/foot"), "foot", target=home)
+    eq(res["copied"], 1, ".git left behind")
+    eq(read(d, "foot/.config/foot/foot.ini"), "f\n")
+    eq(read(home, ".config/foot/foot.ini"), "f\n")
+    eq(os.path.islink(os.path.join(home, ".config/foot")), False, "the source not linked")
+    eq(r.stow_copy_in(os.path.join(home, ".config/foot"), "foot", target=home)["copied"], 0,
+       "the same files again: nothing to do")
+    write(home, ".config/foot/foot.ini", "changed\n")
+    for bad in [(os.path.join(home, ".config/foot"), "foot"), ("/etc/hostname", "x"),
+                (os.path.join(home, ".zshrc"), "../up")]:
+        try:
+            r.stow_copy_in(bad[0], bad[1], target=home)
+            raise AssertionError(f"copied {bad}")
+        except ST.StowError:
+            pass
+    eq(read(d, "foot/.config/foot/foot.ini"), "f\n", "a different copy is not overwritten")
+
+
+@test
+def forge_servers_of_your_own():
+    # "gitlab@host" / "forgejo@host": a copy of the module per host, the
+    # built-in forges untouched, and two servers never sharing a host
+    import gitlab, forgejo
+    m, rest = server.route("gitlab@git.example.orgStatus")
+    eq(rest, "Status")
+    eq((m.HOST, m.API, m.FORGE_ID), ("git.example.org", "https://git.example.org/api/v4", "gitlab@git.example.org"))
+    m2, _ = server.route("forgejo@code.home.lan:3000Repos")
+    eq((m2.HOST, m2.API), ("code.home.lan:3000", "https://code.home.lan:3000/api/v1"))
+    eq(server.route("gitlab@git.example.orgRepos")[0] is m, True, "loaded once per host")
+    eq(server.route("forgejo@other.orgStatus")[0] is m2, False)
+    eq((gitlab.HOST, forgejo.HOST, forgejo.FORGE_ID), ("gitlab.com", "codeberg.org", "codeberg"), "the built-ins as they were")
+    eq(server.route("codebergStatus")[0] is forgejo, True)
+    eq(server.route("githubPlan")[1], "Plan")
+    eq(server.route("github@x.comStatus"), None, "GitHub has no servers of your own here")
+    eq(server.route("status"), None)
+
+
+@test
 def graph_octopus_and_criss_cross():
     L = Lanes()
     # A merges B C D (octopus); B and C share parent E; D's parent F; E, F → G

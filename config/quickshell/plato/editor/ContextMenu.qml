@@ -86,13 +86,39 @@ Item {
       run: () => { if (menu.ctx) menu.ctx.revealInTree(); } },
   ]
 
+  // ── git, when the file is in a repository ──────────────────────────
+  // The change under the cursor staged or undone (mini.diff's, through
+  // plato/git.lua — the gutter's bar is the change), and the file's history
+  // in delphi when the shell has it (PlatoManager.gitClient).
+  readonly property bool inRepo: ((menu.ed.status && menu.ed.status.branch) || "") !== "" && menu.path !== ""
+  readonly property var gitClient: menu.window && menu.window.mgr ? menu.window.mgr.gitClient : null
+  readonly property var gitCursorItems: [
+    { isSeparator: true },
+    { text: "Stage this change", icon: "\u{F0415}",
+      run: () => menu.client.cmd("lua require('plato.git').hunk('apply')") },
+    { text: "Undo this change", icon: "\u{F054C}",
+      run: () => menu.client.cmd("lua require('plato.git').hunk('reset')") },
+  ].concat(menu.gitClient ? [
+    { text: "History of this file", icon: "\u{F02DA}",
+      run: () => menu.gitClient.history(menu.path) },
+  ] : [])
+  readonly property var gitSelectionItems: [
+    { isSeparator: true },
+    { text: "Stage these lines", icon: "\u{F0415}",
+      run: () => menu.client.cmd("lua require('plato.git').hunkSelected('apply')") },
+    { text: "Undo changes in these lines", icon: "\u{F054C}",
+      run: () => menu.client.cmd("lua require('plato.git').hunkSelected('reset')") },
+  ]
+
   // the menu went away, chosen from or not: the keyboard goes back
   signal closed()
 
   // The card, its shield and its keys are terminus/PopMenu — the window
   // menu every window shares (delphi's lists too). This file is the items.
   function open(x, y) {
-    pop.open(x, y, menu.visual ? menu.selectionItems : menu.cursorItems);
+    pop.open(x, y, menu.visual
+      ? menu.selectionItems.concat(menu.inRepo ? menu.gitSelectionItems : [])
+      : menu.cursorItems.concat(menu.inRepo ? menu.gitCursorItems : []));
   }
   function close() { pop.close(); }
 

@@ -76,8 +76,8 @@ Variants {
     // swapping a source in place shows a black frame while the new file
     // decodes, which on a 4K background is very visible.
     property bool aFront: true
-    readonly property AnimatedImage front: surface.aFront ? imgA : imgB
-    readonly property AnimatedImage back: surface.aFront ? imgB : imgA
+    readonly property Item front: surface.aFront ? imgA : imgB
+    readonly property Item back: surface.aFront ? imgB : imgA
 
     // ── startup fade + zoom ──────────────────────────────────────────
     // WallContainer handles startup/unlock (whole surface zoom), per-Wall
@@ -251,25 +251,59 @@ Variants {
       }
     }
 
-    component Wall: AnimatedImage {
+    // ── ONE FRAME OF THE DOUBLE BUFFER: A STILL, OR AN ANIMATION ─────────
+    // Two pictures inside, and only one is ever handed the file: a still to
+    // an Image, which decodes off the GUI thread, an animation to an
+    // AnimatedImage. It was an AnimatedImage alone, and that decodes a
+    // still with QMovie ON the GUI thread: measured, a 5120x3200 background
+    // froze the shell for 115 ms at every start and every change, where
+    // Image (asynchronous) froze it for 0 ms and was ready as soon
+    // (approved 2026-10-09, done 2026-10-11). An animated .png (APNG) is
+    // shown as a still: nothing in its name says it moves.
+    component Wall: Item {
       id: wall
       // the file this frame is showing, as a path — see surface.show()
       property string path: ""
+      property url source: ""
+      // by the name: these are the formats that can move
+      readonly property bool moving: /\.(gif|webp|apng|mng)$/i.test(wall.path)
+      // as an Image's: Null, Loading, Ready, Error — of the one in use
+      readonly property int status: wall.moving ? anim.status : still.status
       // THIS surface's monitor, not a global. The Wall component is declared
       // inside the per-screen surface, so `surface.modelData` is the output
       // it is painting — which is the whole point of the fit being per
       // monitor: the portrait screen can centre what the landscape one crops.
-      fillMode: Picasso.fillModeFor(
+      readonly property int fillMode: Picasso.fillModeFor(
         surface.modelData ? surface.modelData.name : "")
-      // which part a crop keeps, already carried through the frame's turn
-      horizontalAlignment: scene.hAlign
-      verticalAlignment: scene.vAlign
-      asynchronous: true
-      cache: false
-      smooth: true
       anchors.fill: parent
-      playing: true
-      paused: false
+
+      Image {
+        id: still
+        anchors.fill: parent
+        source: wall.moving ? "" : wall.source
+        fillMode: wall.fillMode
+        // which part a crop keeps, already carried through the frame's turn
+        horizontalAlignment: scene.hAlign
+        verticalAlignment: scene.vAlign
+        sourceSize: wall.sourceSize
+        asynchronous: true
+        cache: false
+        smooth: true
+      }
+      AnimatedImage {
+        id: anim
+        anchors.fill: parent
+        source: wall.moving ? wall.source : ""
+        fillMode: wall.fillMode
+        horizontalAlignment: scene.hAlign
+        verticalAlignment: scene.vAlign
+        sourceSize: wall.sourceSize
+        asynchronous: true
+        cache: false
+        smooth: true
+        playing: true
+        paused: false
+      }
 
       // ── decode at screen size, not at file size ──────────────────────
       //
@@ -415,7 +449,8 @@ Variants {
       // is — "Binding loop detected for property sourceSize.width" — and it
       // fired four times on every start. Qt.size() writes both at once and
       // there is nothing left to chase its own tail.
-      sourceSize: Qt.size(
+      // (both pictures decode at this; see Image and AnimatedImage above)
+      readonly property size sourceSize: Qt.size(
         wall._wide ? 0
           : (wall._natW > 0 ? Math.min(wall._coverW, wall._natW) : wall._coverW),
         wall._wide

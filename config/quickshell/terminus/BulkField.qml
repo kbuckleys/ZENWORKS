@@ -21,6 +21,13 @@ Rectangle {
   // is not being typed in. A path keeps its tail, so a path field says Left.
   property int elide: Text.ElideRight
   signal accepted()
+  // ── A CHIP TO CLEAR IT (user, 2026-10-11) ─────────────────────────
+  // For a search or a filter: a small round × inside the field's right
+  // end, there while it holds text. Pressed, the text goes and `cleared`
+  // tells the holder — one that searches on Return searches again on it.
+  property bool clearable: false
+  signal cleared()
+  function clear() { fldIn.text = ""; fld.cleared(); }
   // Where Tab goes from here. The card owns the ring — a field should not
   // know what is next to it.
   signal tabbed()
@@ -89,7 +96,7 @@ Rectangle {
     cursorDelegate: Caret { field: fldIn }
     anchors.fill: parent
     anchors.leftMargin: 8
-    anchors.rightMargin: 8
+    anchors.rightMargin: clearChip.visible ? clearChip.width + 12 : 8
     verticalAlignment: Text.AlignVCenter
     color: Zenon.white
     selectionColor: Zenon.selBg
@@ -107,6 +114,15 @@ Rectangle {
     }
     Keys.onReturnPressed: (e) => { e.accepted = true; fld.accepted(); }
     Keys.onEnterPressed: (e) => { e.accepted = true; fld.accepted(); }
+  }
+  ClearChip {
+    id: clearChip
+    size: fld.textSize
+    shown: fld.clearable && fldIn.text !== ""
+    anchors.right: parent.right
+    anchors.rightMargin: Math.round((fld.height - height) / 2)
+    anchors.verticalCenter: parent.verticalCenter
+    onClicked: fld.clear()
   }
   // focused for typing: terminus' held ring (user, 2026-10-11 — every
   // text field wears it, its own border staying neutral)

@@ -36,12 +36,12 @@ Item {
   readonly property var hints: [["return", "open"], ["o", "open a directory"], ["c", "clone"], ["i", "new"],
                                 ["f", "find on disk"], ["d", "forget"], ["shift d", "delete"], ["/", "filter"]]
   readonly property var buttons: [
-    { label: "Delete…", ink: Zenon.red, visible: !!pg.row, run: () => pg.trash(pg.row) },
+    { label: "Delete", ink: Zenon.red, visible: !!pg.row, run: () => pg.trash(pg.row) },
     { label: "Forget", visible: !!pg.row, run: () => pg.forget(pg.row) },
     { label: "Find on disk", visible: !pg.scanning, run: () => pg.scan() },
-    { label: "New…", run: () => pg.init() },
-    { label: "Clone…", run: () => pg.clone() },
-    { label: "Open…", ink: Zenon.cyan, primary: true, run: () => pg.win.chooseRepo() },
+    { label: "New", run: () => pg.init() },
+    { label: "Clone", run: () => pg.clone() },
+    { label: "Open", ink: Zenon.cyan, primary: true, run: () => pg.win.chooseRepo() },
   ]
   function takeFocus() { if (!filter.focused && pg.win) pg.win.focusKeys(); }
 
@@ -183,6 +183,7 @@ Item {
     height: 32
     textSize: Zenon.px(15)
     ghost: "  Filter  ( / )"
+    clearable: true
     onTextChanged: pg.query = filter.text.trim()
     onAccepted: pg.win.focusKeys()
     Keys.onEscapePressed: { filter.text = ""; pg.win.focusKeys(); }

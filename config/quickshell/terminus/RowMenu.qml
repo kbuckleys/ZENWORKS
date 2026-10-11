@@ -675,7 +675,7 @@ PopupWindow {
         out.push({ label: "Open shell here", key: ";", act: () => term.openShell() });
         // in a repository: the git client on it (delphi, handed in by
         // shell.qml — see TerminusManager.gitClient)
-        if (term.gitRoot !== "" && term.mgr && term.mgr.gitClient)
+        if ((term.gitRoot !== "" || term.repoTop !== "") && term.mgr && term.mgr.gitClient)
           out.push({ label: "Open in Delphi", act: () => term.openInDelphi(term.cwd) });
         out.push({ label: term.dual ? "Close second pane" : "Second pane",
                    key: "\\", act: () => term.toggleDual() });
@@ -721,7 +721,8 @@ PopupWindow {
         out.push({ label: "Open in new tab", key: "shift return",
                    act: () => term.openInNewTab(t.path) });
       // a directory in a repository (or one itself): the git client on it
-      if (t.isDir && term.gitRoot !== "" && term.mgr && term.mgr.gitClient)
+      // (or a repository itself, in a directory that is not one)
+      if (t.isDir && (term.gitRoot !== "" || term.repoTop !== "" || term.repoDirs[t.path] === true) && term.mgr && term.mgr.gitClient)
         out.push({ label: "Open in Delphi", act: () => term.openInDelphi(t.path) });
       // The third way into a directory, and the one that does not leave
       // where you are. Only in the list: see pane.tree for why the
@@ -743,6 +744,24 @@ PopupWindow {
           || Terminus.dirname(t.path) !== term.cwd)
         out.push({ label: "Go to containing directory", key: "g r",
                    act: () => term.reveal() });
+      // ── GIT, ON WHAT ITS LETTER SAYS (git mode, delphi there) ────────
+      // Offered by the row's own state: stage what has changed, unstage
+      // what is staged, discard a tracked file's edits (asked first). The
+      // history is any row's, a directory's too (user, 2026-10-11).
+      // The history needs only a repository; the rest git mode's letters.
+      if ((term.gitRoot !== "" || term.repoTop !== "" || term.repoDirs[t.path] === true) && term.mgr && term.mgr.gitClient) {
+        const gs = term.gitRoot !== "" ? term.gitMarks[t.path] || "" : "";
+        const rows = () => term.acting();
+        out.push({ sep: true });
+        if (gs === "modified" || gs === "untracked" || gs === "deleted" || gs === "conflict")
+          out.push({ label: "Stage" + many, act: () => term.gitOn(rows(), "stage") });
+        if (gs === "staged")
+          out.push({ label: "Unstage" + many, act: () => term.gitOn(rows(), "unstage") });
+        if (gs === "modified" || gs === "deleted")
+          out.push({ label: "Discard changes" + many + "…", danger: true,
+                     act: () => term.gitOn(rows(), "discard") });
+        out.push({ label: "History in Delphi", act: () => term.gitHistory(t.path) });
+      }
       // Opening is one kind of thing and moving is another; the rule below
       // holds them apart. Cut first: the pair is ordered by how much of a
       // commitment it is, and the one that takes the file away is the one

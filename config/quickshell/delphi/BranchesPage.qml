@@ -168,25 +168,25 @@ Item {
     } else {
       items.push({ text: "Check out", icon: "", mark: "return", run: () => pg.open(b) });
     }
-    items.push({ text: "New branch from here…", icon: "", run: () => pg.create(b) });
+    items.push({ text: "New branch from here", icon: "", run: () => pg.create(b) });
     items.push({ isSeparator: true });
-    items.push({ text: "Merge into " + pg.win.branchName + "…", icon: "", mark: "m", enabled: !b.current, run: () => pg.merge(b) });
-    items.push({ text: "Rebase " + pg.win.branchName + " onto it…", icon: "", mark: "b", enabled: !b.current, run: () => pg.rebaseOnto(b) });
+    items.push({ text: "Merge into " + pg.win.branchName + "", icon: "", mark: "m", enabled: !b.current, run: () => pg.merge(b) });
+    items.push({ text: "Rebase " + pg.win.branchName + " onto it", icon: "", mark: "b", enabled: !b.current, run: () => pg.rebaseOnto(b) });
     if (b.kind === "local") {
       items.push({ isSeparator: true });
-      items.push({ text: "Follows…" + (b.upstream ? "  " + b.upstream : ""), icon: "", run: () => pg.follow(b) });
+      items.push({ text: "Follows" + (b.upstream ? "  " + b.upstream : ""), icon: "", run: () => pg.follow(b) });
       items.push({ text: "Push", icon: "", enabled: !!b.upstream || pg.win.remotes.length > 0,
                    run: () => pg.win.act("push", b.upstream ? { remote: b.upstream.split("/")[0], branch: b.name }
                                                            : { remote: pg.win.remotes[0].name, branch: b.name, setUpstream: true },
                                          { label: "Pushing", network: true, said: "Pushed " + b.name }) });
-      items.push({ text: "Tag it…", icon: "", run: () => pg.tag(b) });
-      items.push({ text: "Rename…", icon: "", mark: "r", run: () => pg.rename(b) });
-      items.push({ text: "Delete…", icon: "", mark: "d", danger: true, enabled: !b.current, run: () => pg.remove(b) });
+      items.push({ text: "Tag it", icon: "", run: () => pg.tag(b) });
+      items.push({ text: "Rename", icon: "", mark: "r", run: () => pg.rename(b) });
+      items.push({ text: "Delete", icon: "", mark: "d", danger: true, enabled: !b.current, run: () => pg.remove(b) });
     } else if (b.kind === "tag") {
       items.push({ isSeparator: true });
       items.push({ text: "Push the tag", icon: "", enabled: pg.win.remotes.length > 0,
                    run: () => pg.win.act("push", { remote: pg.win.remotes[0].name, branch: "refs/tags/" + b.name }, { label: "Pushing", network: true, said: "Pushed " + b.name }) });
-      items.push({ text: "Delete…", icon: "", mark: "d", danger: true, run: () => pg.remove(b) });
+      items.push({ text: "Delete", icon: "", mark: "d", danger: true, run: () => pg.remove(b) });
     }
     items.push({ isSeparator: true });
     items.push({ text: "Copy the name", icon: "", run: () => pg.win.copy(b.name) });
@@ -225,6 +225,7 @@ Item {
     height: 32
     textSize: Zenon.px(15)
     ghost: "  Filter branches and tags  ( / )"
+    clearable: true
     onTextChanged: pg.query = filter.text.trim()
     onAccepted: pg.win.focusKeys()
     Keys.onEscapePressed: { filter.text = ""; pg.win.focusKeys(); }

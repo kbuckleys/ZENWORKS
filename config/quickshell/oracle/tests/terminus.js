@@ -198,6 +198,30 @@ module.exports = {
     t.quotes("dollars are not expanded", "$HOME $(id)");
 
     t.has("listing is one level deep", T.listCommand("/d"), "-maxdepth 1");
+
+    // repositories among the listed directories, found in the same run
+    {
+      const fs = require("fs"), os = require("os"), path = require("path"), cp = require("child_process");
+      const d = fs.mkdtempSync(path.join(os.tmpdir(), "repos-"));
+      for (const x of ["a/.git", "b", ".h/.git", "c d"]) fs.mkdirSync(path.join(d, x), { recursive: true });
+      fs.writeFileSync(path.join(d, "c d", ".git"), "gitdir: elsewhere\n");
+      const out = cp.execSync(T.listCommand(d), { shell: "/bin/sh", encoding: "utf8" });
+      t.eq("repositories: a .git directory or file, hidden ones too",
+        T.parseRepos(out, d).sort(), [d + "/.h", d + "/a", d + "/c d"]);
+      t.eq("and the listing reads past them", T.parseListing(out, d).length, 4);
+      t.eq("the repository a directory is in, from inside it",
+        T.parseRepoTop(cp.execSync(T.listCommand(path.join(d, "a")), { shell: "/bin/sh", encoding: "utf8" })), path.join(d, "a"));
+      fs.mkdirSync(path.join(d, "a", "deep", "er"), { recursive: true });
+      t.eq("and from further down",
+        T.parseRepoTop(cp.execSync(T.listCommand(path.join(d, "a", "deep", "er")), { shell: "/bin/sh", encoding: "utf8" })), path.join(d, "a"));
+      t.eq("none: no repository", T.parseRepoTop(out), "");
+      let failed = 0;
+      try { cp.execSync(T.listCommand(d + "/nope"), { shell: "/bin/sh", stdio: "pipe" }); } catch (e) { failed = e.status; }
+      t.eq("a listing that failed still says so", failed !== 0, true);
+      fs.rmSync(d, { recursive: true, force: true });
+      t.eq("merged: that directory's children replaced, the rest kept",
+        Object.keys(T.mergeRepos({ "/x/old": true, "/y/z": true }, "/x", ["/x/new"])).sort(), ["/x/new", "/y/z"]);
+    }
     t.has("the peek is capped", T.peekCommand("/d"), "head -c");
 
     // The finder asks twice on purpose: directories ranked first, then files.

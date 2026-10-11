@@ -31,6 +31,8 @@ Item {
   // (DelphiWindow's ScrollEdges) — only those with nothing but controls
   // between them and the head: a view under a title would paint over it
   readonly property var edgeViews: pg.planning ? [] : pg.scope === "all" ? [acrossList] : [list, fileList]
+  // the views that run down to the foot (the files stop at the diff)
+  readonly property var footViews: pg.planning ? [] : pg.scope === "all" ? [acrossList] : [list, diff.view]
 
   readonly property string title: pg.planning ? "Rework " + plan.steps.length + " commits" : "History"
   readonly property string subtitle: pg.planning ? "onto " + D.short(plan.base) + "  ·  drag or alt ↑↓ to reorder"
@@ -38,23 +40,47 @@ Item {
     : pg.scope === "incoming" ? (pg.win && pg.win.branch && pg.win.branch.upstream
         ? (pg.commits.length === 0 && pg.ended ? "nothing incoming — up to date with " : pg.commits.length + " not pulled yet from ") + pg.win.branch.upstream
         : "this branch follows nothing upstream")
-    : pg.commits.length + (pg.ended ? "" : "+") + " commits" + (pg.query !== "" ? " matching “" + pg.query + "”" : "")
+    : pg.commits.length + (pg.ended ? "" : "+") + " commits" + (pg.onlyPath !== "" ? " to " + pg.onlyPath : "")
+      + (pg.query !== "" ? " matching “" + pg.query + "”" : "")
   readonly property var hints: pg.planning ? plan.hints
     : pg.area === "files" ? [["↑↓", "files"], ["shift ↑↓", "diff"], ["e", "edit"]]
-        .concat(pg.shownFiles[pg.fileSel] && pg.shownFiles[pg.fileSel].status === "D" ? [["r", "bring back"]] : []).concat([["tab", "commits"]])
-    : pg.scope === "all" ? [["↑↓", "commits"], ["return", "open there"], ["v", "which history"]]
+        .concat(pg.shownFiles[pg.fileSel] && pg.shownFiles[pg.fileSel].status === "D" && pg.scope !== "all" ? [["r", "bring back"]] : []).concat([["tab", "commits"]])
+    : pg.scope === "all" ? [["↑↓", "commits"], ["tab", "files"], ["return", "open there"], ["v", "which history"]]
     : [["↑↓", "commits"], ["tab", "files"], ["v", "which history"], ["/", "search"], ["c", "copy id"], ["b", "branch here"],
-       ["p", "cherry-pick"], ["i", "rework from here"], ["menu", "more"]]
+       ["p", "cherry-pick"], ["i", "rework from here"], ["f", "only a file"], ["menu", "more"]].concat(pg.onlyPath !== "" ? [["esc", "every file"]] : [])
   // what the chosen commit removed: each can be brought back from it
   readonly property var removed: pg.shownFiles.filter((f) => f.status === "D")
   readonly property var buttons: pg.planning ? plan.buttons : [
     { label: pg.removed.length === 1 ? "Bring back " + D.baseName(pg.removed[0].path) : "Bring back " + pg.removed.length + " removed",
-      visible: pg.removed.length > 0, run: () => pg.bringBack(pg.removed) },
+      visible: pg.removed.length > 0 && pg.scope !== "all", run: () => pg.bringBack(pg.removed) },
   ]
+
+  // ── ONE FILE'S HISTORY ─────────────────────────────────────────────────
+  // Asked for from plato or terminus (DelphiManager.history): only the
+  // commits that changed it, and that file chosen in each. Relative to the
+  // repository; a file outside the one open narrows nothing.
+  readonly property string onlyPath: {
+    const f = pg.win ? pg.win.historyFile : "", r = pg.win ? pg.win.root : "";
+    return r !== "" && f.indexOf(r + "/") === 0 ? f.slice(r.length + 1) : "";
+  }
+  onOnlyPathChanged: {
+    if (pathField.text.trim() !== pg.onlyPath) pathField.text = pg.onlyPath;
+    if (pg.win && pg.win.root !== "") pg.reload();
+  }
+  // the file filter's text (relative to the repository; ~ or the whole path
+  // will do), as what History is narrowed to — empty: every file
+  function filterPath(text) {
+    const t = String(text || "").trim().replace(/^~(?=\/)/, pg.win.home);
+    const r = pg.win.root;
+    pg.win.historyFile = t === "" ? "" : t.indexOf(r + "/") === 0 ? t : r + "/" + t.replace(/^\.?\/+/, "");
+  }
+  function everyFile() {
+    pg.win.historyFile = "";
+  }
 
   function takeFocus() {
     if (pg.planning) plan.takeFocus();
-    else if (search.focused) return;
+    else if (search.focused || pathField.focused) return;
     else if (pg.win) pg.win.focusKeys();
   }
 
@@ -95,6 +121,10 @@ Item {
       if (!pg) return;
       pg.acrossLoading = false;
       pg.across = ok ? res : [];
+      // the first commit chosen, so the right side shows something
+      if (pg.acrossSel < 0 || !pg.acrossRows[pg.acrossSel] || pg.acrossRows[pg.acrossSel].head)
+        pg.acrossSel = pg.acrossRows.findIndex((r) => !r.head);
+      detailWait.restart();
     });
   }
   readonly property var acrossRows: {
@@ -120,18 +150,28 @@ Item {
   property bool paging: false
   property string query: ""
   property int sel: 0
-  readonly property var commit: pg.sel >= 0 && pg.sel < pg.commits.length ? pg.commits[pg.sel] : null
+  // the commit the right side shows: every repository's list has its own
+  // rows, each in its own repository (commitRoot) — the right side read
+  // them from the open one, so it showed nothing there (user, 2026-10-11)
+  readonly property var commit: pg.scope === "all"
+    ? (pg.acrossRows[pg.acrossSel] && !pg.acrossRows[pg.acrossSel].head ? pg.acrossRows[pg.acrossSel] : null)
+    : pg.sel >= 0 && pg.sel < pg.commits.length ? pg.commits[pg.sel] : null
+  readonly property string commitRoot: pg.scope === "all" && pg.commit ? pg.commit.root : pg.win ? pg.win.root : ""
+  function absOf(path) { return pg.commitRoot + "/" + path; }
+  onAcrossSelChanged: if (pg.scope === "all") detailWait.restart()
+  onScopeChanged: { pg.area = "commits"; detailWait.restart(); }
   property string wantSha: ""
   readonly property string headSha: pg.win && pg.win.branch ? pg.win.branch.oid || "" : ""
 
   function reload() {
     if (!pg.win || pg.win.root === "") return;
-    if (pg.commit) pg.wantSha = pg.commit.sha;
+    if (pg.commit && pg.scope !== "all") pg.wantSha = pg.commit.sha;
     if (pg.session >= 0) pg.win.mgr.call("logClose", pg.win.root, { session: pg.session });
     pg.session = -1;
     pg.ended = false;
     if (pg.scope === "all") return;
     const args = pg.query !== "" ? { grep: pg.query } : {};
+    if (pg.onlyPath !== "") args.path = pg.onlyPath;
     if (pg.scope === "incoming") {
       if (!pg.win.branch || !pg.win.branch.upstream) { pg.commits = []; pg.ended = true; return; }
       args.revs = ["HEAD..@{upstream}"];
@@ -196,12 +236,12 @@ Item {
   function loadCommit() {
     const c = pg.commit;
     if (!c) { pg.message = null; pg.files = []; pg.diffFiles = []; return; }
-    const sha = c.sha;
-    pg.win.mgr.call("message", pg.win.root, { sha: sha }, (ok, m) => { if (!pg) return; if (ok && pg.commit && pg.commit.sha === sha) pg.message = m; });
-    pg.win.mgr.call("files", pg.win.root, { sha: sha }, (ok, fs) => { if (!pg) return;
+    const sha = c.sha, root = pg.commitRoot;
+    pg.win.mgr.call("message", root, { sha: sha }, (ok, m) => { if (!pg) return; if (ok && pg.commit && pg.commit.sha === sha) pg.message = m; });
+    pg.win.mgr.call("files", root, { sha: sha }, (ok, fs) => { if (!pg) return;
       if (!ok || !pg.commit || pg.commit.sha !== sha) return;
       pg.files = fs;
-      pg.fileSel = 0;
+      pg.fileSel = pg.onlyPath !== "" ? Math.max(0, pg.shownFiles.findIndex((f) => f.path === pg.onlyPath)) : 0;
       pg.loadFileDiff();
     });
   }
@@ -209,7 +249,7 @@ Item {
     const c = pg.commit, f = pg.shownFiles[pg.fileSel];
     if (!c || !f) { pg.diffFiles = []; return; }
     const sha = c.sha, path = f.path;
-    pg.win.mgr.call("show", pg.win.root, { rev: sha, path: path, budget: 6000 }, (ok, res) => { if (!pg) return;
+    pg.win.mgr.call("show", pg.commitRoot, { rev: sha, path: path, budget: 6000 }, (ok, res) => { if (!pg) return;
       if (ok && pg.commit && pg.commit.sha === sha && pg.shownFiles[pg.fileSel] && pg.shownFiles[pg.fileSel].path === path) {
         pg.diffFiles = res.files;
         diff.toFirst();
@@ -288,13 +328,13 @@ Item {
       { text: "Copy id", icon: "", mark: "c", run: () => pg.win.copy(c.sha, D.short(c.sha)) },
       { text: "Copy message", icon: "", run: () => pg.win.copy(c.subject, "the message") },
       { isSeparator: true },
-      { text: "Branch here…", icon: "", mark: "b", run: () => pg.branchHere(c) },
+      { text: "Branch here", icon: "", mark: "b", run: () => pg.branchHere(c) },
       { text: "Check out", icon: "", enabled: !here, run: () => pg.checkout(c) },
       { text: "Cherry-pick onto " + pg.win.branchName, icon: "", mark: "p", enabled: !here, run: () => pg.cherryPick(c) },
       { text: "Revert", icon: "", run: () => pg.revert(c) },
       { isSeparator: true },
-      { text: "Rework the commits after it…", icon: "", mark: "i", enabled: !here, run: () => pg.rework(c) },
-      { text: "Move " + pg.win.branchName + " here…", icon: "", enabled: !here, danger: true, run: () => pg.resetTo(c) },
+      { text: "Rework the commits after it", icon: "", mark: "i", enabled: !here, run: () => pg.rework(c) },
+      { text: "Move " + pg.win.branchName + " here", icon: "", enabled: !here, danger: true, run: () => pg.resetTo(c) },
     ];
   }
 
@@ -309,22 +349,23 @@ Item {
       pg.setScope(order[(order.indexOf(pg.scope) + 1) % order.length]);
       return true;
     }
-    if (pg.scope === "all") {
+    if (k === Qt.Key_Tab || k === Qt.Key_Backtab) { pg.area = pg.area === "files" ? "commits" : "files"; return true; }
+    if (pg.scope === "all" && pg.area !== "files") {
       if (k === Qt.Key_Up || k === Qt.Key_K) { pg.acrossStep(-1); return true; }
       if (k === Qt.Key_Down || k === Qt.Key_J) { pg.acrossStep(1); return true; }
       if ((k === Qt.Key_Return || k === Qt.Key_Enter) && pg.acrossRows[pg.acrossSel]) { pg.jumpTo(pg.acrossRows[pg.acrossSel]); return true; }
       return false;
     }
+    if (k === Qt.Key_F && pg.area !== "files") { pathField.claim(); return true; }
     if (k === Qt.Key_Slash) { if (pg.area === "files") fileFilter.claim(); else search.claim(); return true; }
-    if (k === Qt.Key_Tab || k === Qt.Key_Backtab) { pg.area = pg.area === "files" ? "commits" : "files"; return true; }
     if (pg.area === "files") {
       if (shift && (k === Qt.Key_Up || k === Qt.Key_Down)) { diff.move(k === Qt.Key_Up ? -1 : 1, false); return true; }
       if (k === Qt.Key_Up || k === Qt.Key_K) { pg.moveFile(-1); return true; }
       if (k === Qt.Key_Down || k === Qt.Key_J) { pg.moveFile(1); return true; }
       if (k === Qt.Key_PageUp) { diff.page(-1); return true; }
       if (k === Qt.Key_PageDown) { diff.page(1); return true; }
-      if (k === Qt.Key_E && pg.shownFiles[pg.fileSel]) { pg.win.edit(pg.win.abs(pg.shownFiles[pg.fileSel].path)); return true; }
-      if (k === Qt.Key_R && pg.shownFiles[pg.fileSel] && pg.shownFiles[pg.fileSel].status === "D") { pg.bringBack([pg.shownFiles[pg.fileSel]]); return true; }
+      if (k === Qt.Key_E && pg.shownFiles[pg.fileSel]) { pg.win.edit(pg.absOf(pg.shownFiles[pg.fileSel].path)); return true; }
+      if (k === Qt.Key_R && pg.shownFiles[pg.fileSel] && pg.shownFiles[pg.fileSel].status === "D" && pg.scope !== "all") { pg.bringBack([pg.shownFiles[pg.fileSel]]); return true; }
       if (k === Qt.Key_Escape) { pg.area = "commits"; return true; }
       return false;
     }
@@ -346,6 +387,7 @@ Item {
       return true;
     }
     if (k === Qt.Key_Escape && pg.query !== "") { search.text = ""; pg.query = ""; pg.reload(); return true; }
+    if (k === Qt.Key_Escape && pg.onlyPath !== "") { pg.everyFile(); return true; }
     return false;
   }
 
@@ -360,7 +402,8 @@ Item {
 
     Segments {
       id: scopes
-      x: 12
+      // centred in the column, the search under it (user, 2026-10-11)
+      x: Math.round((parent.width - width) / 2)
       y: 12
       textSize: Zenon.px(14)
       options: [["branch", "This branch"],
@@ -372,17 +415,40 @@ Item {
     BulkField {
       id: search
       visible: pg.scope !== "all"
-      // beside the buttons when there is room for it, else a row under them
-      // (a narrow column pushed it across the seam, 2026-10-11)
-      readonly property bool under: parent.width - scopes.width - 36 < 220
-      x: under ? 12 : scopes.x + scopes.width + 12
-      y: under ? scopes.y + scopes.height + 8 : 12
-      width: parent.width - x - 12
+      readonly property bool under: true
+      x: 12
+      y: scopes.y + scopes.height + 8
+      width: Math.round((parent.width - 32) * 0.55)
       height: scopes.height
       textSize: Zenon.px(14)
       ghost: "  Search messages  ( / )"
+      clearable: true
       onAccepted: { pg.query = search.text.trim(); pg.reload(); pg.win.focusKeys(); }
       Keys.onEscapePressed: { search.text = ""; if (pg.query !== "") { pg.query = ""; pg.reload(); } pg.win.focusKeys(); }
+      onTabbed: pathField.claim()
+      onCleared: if (pg.query !== "") { pg.query = ""; pg.reload(); }
+    }
+    // ONE FILE'S HISTORY, AS A FILTER (user, 2026-10-11: from plato it
+    // narrowed History with no way back but leaving the page): the file it
+    // is narrowed to, there to edit or clear — and a path typed here
+    // narrows it the same way
+    BulkField {
+      id: pathField
+      visible: pg.scope !== "all"
+      anchors.left: search.right
+      anchors.leftMargin: 8
+      anchors.right: parent.right
+      anchors.rightMargin: 12
+      y: search.y
+      height: search.height
+      textSize: Zenon.px(14)
+      ghost: "  Only a file or directory  ( f )"
+      clearable: true
+      Component.onCompleted: pathField.text = pg.onlyPath
+      onAccepted: { pg.filterPath(pathField.text); pg.win.focusKeys(); }
+      Keys.onEscapePressed: { pathField.text = ""; if (pg.onlyPath !== "") pg.filterPath(""); pg.win.focusKeys(); }
+      onBackTabbed: search.claim()
+      onCleared: if (pg.onlyPath !== "") pg.filterPath("")
     }
 
     ListView {
@@ -584,6 +650,7 @@ Item {
       EmptyMark { anchors.centerIn: parent; visible: !pg.acrossLoading && pg.acrossRows.length === 0; word: "No repositories opened yet" }
     }
     ElasticScroll { anchors.fill: acrossList; view: acrossList; visible: pg.scope === "all" }
+    Scrollbar { flick: acrossList; visible: pg.scope === "all"; anchors.right: acrossList.right; anchors.top: acrossList.top; anchors.bottom: acrossList.bottom }
     Scrollbar { flick: list; anchors.right: list.right; anchors.top: list.top; anchors.bottom: list.bottom }
   }
 
@@ -619,7 +686,8 @@ Item {
         width: parent.width
         elide: Text.ElideRight
         text: !pg.commit ? "" : pg.commit.author + "  ·  " + D.stamp(pg.commit.when) + "  ·  " + D.short(pg.commit.sha)
-          + (pg.commit.parents.length > 1 ? "  ·  merge of " + pg.commit.parents.length : "")
+          + ((pg.commit.parents || []).length > 1 ? "  ·  merge of " + pg.commit.parents.length : "")
+          + (pg.scope === "all" ? "  ·  " + D.baseName(pg.commitRoot) : "")
           + (pg.message && pg.message.signature === "G" ? "  ·   signed" : "")
         color: Zenon.muted
         font.family: Zenon.face
@@ -671,6 +739,7 @@ Item {
       height: pg.files.length > 1 ? 30 : 0
       textSize: Zenon.px(14)
       ghost: "  Filter " + pg.files.length + " files  ( / )"
+      clearable: true
       onTextChanged: pg.fileQuery = fileFilter.text.trim()
       onAccepted: { pg.area = "files"; pg.win.focusKeys(); }
       Keys.onEscapePressed: { fileFilter.text = ""; pg.area = "files"; pg.win.focusKeys(); }
@@ -741,7 +810,7 @@ Item {
         MouseArea {
           anchors.fill: parent
           onClicked: { pg.area = "files"; pg.fileSel = frow.index; pg.loadFileDiff(); pg.win.focusKeys(); }
-          onDoubleClicked: pg.win.edit(pg.win.abs(frow.modelData.path))
+          onDoubleClicked: pg.win.edit(pg.absOf(frow.modelData.path))
         }
       }
     }

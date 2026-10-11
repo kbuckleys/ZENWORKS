@@ -42,6 +42,8 @@ Item {
   // (DelphiWindow's ScrollEdges) — only those with nothing but controls
   // between them and the head: a view under a title would paint over it
   readonly property var edgeViews: [list, diff.view]
+  // the views that run down to the foot (the list stops at the commit box)
+  readonly property var footViews: [diff.view]
 
   // ── the filter ─────────────────────────────────────────────────────────
   // What is typed in the field over the list (/): only the changes whose
@@ -442,6 +444,7 @@ Item {
       height: 30
       textSize: Zenon.px(14)
       ghost: "  Filter changes  ( / )"
+      clearable: true
       onTextChanged: pg.query = changeFilter.text.trim()
       onAccepted: { pg.area = "list"; pg.win.focusKeys(); }
       Keys.onEscapePressed: { changeFilter.text = ""; pg.win.focusKeys(); }

@@ -572,6 +572,7 @@ QtObject {
             const m = Object.assign({}, pane.kids);
             const fresh = Terminus.parseListing(kidOut.text, dir);
             m["k:" + dir] = fresh;
+            if (pane.term) pane.term.repoDirs = Terminus.mergeRepos(pane.term.repoDirs, dir, Terminus.parseRepos(kidOut.text, dir));
             pane.kids = m;
             // Anything this branch used to hold and no longer does takes
             // its own remembered branch with it — see dropGone. One call:

@@ -21,6 +21,7 @@ import re
 import tempfile
 
 import diff as D
+import stow as ST
 import status as S
 from gitrun import Git, GitError, progress_of
 
@@ -149,6 +150,16 @@ class Repo:
         self.root = info["root"]
         self.gitdir = info["gitdir"]
         self.git = Git(self.root, sock)
+
+    # ── dotfiles: its stow packages (core/stow.py; never stowed here) ────
+    def stow_packages(self, target=None, cancel=None):
+        return ST.packages(self.root, target, cancel)
+
+    def stow_plan(self, name, target=None, cancel=None):
+        return ST.plan(self.root, name, target, cancel)
+
+    def stow_copy_in(self, src, package, target=None, cancel=None):
+        return ST.copy_in(self.root, src, package, target, cancel)
 
     # ── status ──────────────────────────────────────────────────────────
     def status(self, cancel=None, ignored=False):
@@ -335,6 +346,10 @@ class Repo:
         elif all_refs:
             a += ["--branches", "--remotes", "--tags", "HEAD"]
         if path:
+            # one file's history: --parents rewrites each commit's parents to
+            # the nearest ones that touched it, or the graph's lines would run
+            # off to commits that are not in the list
+            a.insert(1, "--parents")
             a += ["--", path]
         return a
 
