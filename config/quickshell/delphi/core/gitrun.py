@@ -92,14 +92,17 @@ class Creds:
     def __init__(self):
         self.user_helper = None   # None = not looked up yet
         self.gh_ok = False
+        self.glab_ok = False
 
-    def refresh(self, gh_ok=None):
+    def refresh(self, gh_ok=None, glab_ok=None):
         r = subprocess.run(["git", "config", "--get-all", "credential.helper"],
                            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
                            text=True)
         self.user_helper = r.stdout.strip()
         if gh_ok is not None:
             self.gh_ok = gh_ok
+        if glab_ok is not None:
+            self.glab_ok = glab_ok
 
     def args(self):
         if self.user_helper is None:
@@ -113,6 +116,9 @@ class Creds:
             # host, so a stale keyring entry cannot answer before gh does.
             a += ["-c", "credential.https://github.com.helper=",
                   "-c", "credential.https://github.com.helper=!gh auth git-credential"]
+        if self.glab_ok:
+            a += ["-c", "credential.https://gitlab.com.helper=",
+                  "-c", "credential.https://gitlab.com.helper=!glab auth git-credential"]
         return a
 
 

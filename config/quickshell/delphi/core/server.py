@@ -31,6 +31,7 @@ import inspect
 import json
 import os
 import re
+import shutil
 import socket
 import subprocess
 import sys
@@ -38,11 +39,14 @@ import tempfile
 import threading
 import time
 
+import forgejo
 import github
+import gitlab
 import gitrun
 import repo as R
 from graph import Lanes
 from gitrun import Cancel, Cancelled, GitError
+from rest import ForgeError
 
 PROTOCOL = 1
 
@@ -284,7 +288,52 @@ class Watch:
                 pass
 
 
+# ── the tools around git ────────────────────────────────────────────────
+# What delphi leans on that git does not bring: gh and glab (each forge's
+# sign-in), ssh (a remote at git@… or ssh://…), inotifywait (changes made
+# outside delphi, seen as they happen). Which are here, and — for the forge
+# tools — whom they had signed in, from their own config files: a sign-in
+# that outlived its tool is one a reinstall brings back (user, 2026-10-11:
+# missing tools noticed for accounts already signed in, not only at first).
+
+def _user_in(path, host):
+    """The `user:` under `host:` in a gh or glab config (YAML, read by its
+    indentation — no YAML library in the standard one)."""
+    try:
+        lines = open(os.path.expanduser(path)).read().splitlines()
+    except OSError:
+        return ""
+    inside, depth = False, 0
+    for l in lines:
+        if not l.strip() or l.lstrip().startswith("#"):
+            continue
+        ind = len(l) - len(l.lstrip())
+        key = l.strip()
+        if key.rstrip(":") == host and key.endswith(":"):
+            inside, depth = True, ind
+            continue
+        if inside and ind <= depth:
+            inside = False
+        if inside:
+            m = re.match(r"user:\s*(\S+)", key)
+            if m and m.group(1) not in ("''", '""'):
+                return m.group(1)
+    return ""
+
+
+def tools():
+    w = shutil.which
+    return {"gh": bool(w("gh")), "glab": bool(w("glab")), "ssh": bool(w("ssh")),
+            "inotifywait": bool(w("inotifywait")),
+            "ghUser": _user_in("~/.config/gh/hosts.yml", "github.com"),
+            "glabUser": _user_in("~/.config/glab-cli/config.yml", "gitlab.com")}
+
+
 # ── the ops ─────────────────────────────────────────────────────────────
+# The forges, by the prefix of their requests ("githubRepos", "gitlabRepos",
+# "codebergRepos") — every module answers to the same names (see forge).
+FORGES = {"github": github, "gitlab": gitlab, "codeberg": forgejo}
+
 # Requests named here change the repository; they queue behind each other.
 WRITES = {"stage", "stageAll", "unstage", "unstageAll", "discard", "clean",
           "stageLines", "unstageLines", "discardLines", "commit",
@@ -349,7 +398,7 @@ class Server:
         except GitError as e:
             send({"id": rid, "ok": False, "kind": "git", "error": e.err or str(e),
                   "code": e.code})
-        except github.ForgeError as e:
+        except ForgeError as e:
             send({"id": rid, "ok": False, "kind": "forge", "error": str(e),
                   "status": e.status})
         except Exception as e:   # a bug here must not take the daemon down
@@ -373,6 +422,42 @@ class Server:
             return R.clone(kw["url"], kw["dest"], self.asker.path, cancel, emit,
                            kw.get("depth"), kw.get("blobless", False),
                            kw.get("branch"))
+        if op == "across":
+            # the latest commits of each repository named, newest first in
+            # each — History's "All repositories" (a repository with none
+            # yet, or gone, is left out)
+            out = []
+            fmt = "%H%x1f%an%x1f%ct%x1f%s%x1e"
+            for root in kw.get("roots", []):
+                try:
+                    txt = gitrun.Git(root).run(["log", "-n", str(kw.get("count", 12)),
+                                                f"--format={fmt}", "HEAD"], lock=False)
+                except (GitError, OSError):
+                    continue
+                cs = []
+                for rec in txt.split("\x1e"):
+                    f = rec.strip("\n").split("\x1f")
+                    if len(f) == 4:
+                        cs.append({"sha": f[0], "author": f[1], "when": int(f[2] or 0), "subject": f[3]})
+                if cs:
+                    out.append({"root": root, "commits": cs})
+            return out
+        if op == "tools":
+            return tools()
+        if op == "whereCloned":
+            # which of these repositories is a clone of host/full — the one a
+            # forge's repository opens as, when it is here already
+            want = (kw["host"].lower(), kw["full"].lower().removesuffix(".git"))
+            for root in kw.get("roots", []):
+                try:
+                    out = gitrun.Git(root).run(["remote", "-v"], lock=False)
+                except (GitError, OSError):
+                    continue
+                for l in out.splitlines():
+                    parts = l.split()
+                    if len(parts) >= 2 and R.remote_key(parts[1]) == want:
+                        return {"root": root}
+            return {"root": None}
         if op == "identitySet":
             # global unless a repository is named — the first-run question
             # "who are you" is asked once, for every repository
@@ -382,8 +467,9 @@ class Server:
                 if kw.get(k):
                     g.run(["config"] + where + [f"user.{k}", kw[k]])
             return {}
-        if op.startswith("github"):
-            return self.forge(op[6:], kw, cancel, emit)
+        for name, mod in FORGES.items():
+            if op.startswith(name):
+                return self.forge(mod, op[len(name):], kw, cancel, emit)
         # ── one repository ──
         r, lock = self.repo(path)
         if op == "logOpen":
@@ -429,52 +515,65 @@ class Server:
                 return fn(**kw)
         return fn(**kw)
 
-    def forge(self, op, kw, cancel, emit):
+    def forge(self, f, op, kw, cancel, emit):
+        """A forge's request — `f` its module (github, gitlab, forgejo),
+        every one answering to the same names."""
+        cli = {"github": "gh", "gitlab": "glab"}.get(f.__name__)
         if op == "Status":
-            st = github.status()
-            gitrun.CREDS.refresh(gh_ok=st.get("source") == "gh")
+            st = f.status()
+            if cli:
+                gitrun.CREDS.refresh(**{cli + "_ok": st.get("source") == cli})
             return st
         if op == "Login":
-            st = github.login(emit, cancel)
-            gitrun.CREDS.refresh(gh_ok=True)
+            st = f.login(emit, cancel)
+            if cli:
+                gitrun.CREDS.refresh(**{cli + "_ok": True})
             return st
         if op == "Logout":
-            gitrun.CREDS.refresh(gh_ok=False)
-            return github.logout()
+            if cli:
+                gitrun.CREDS.refresh(**{cli + "_ok": False})
+            return f.logout(kw.get("login"))
+        if op == "Accounts":
+            return f.accounts()
+        if op == "Switch":
+            st = f.switch_account(kw["login"])
+            if cli:
+                gitrun.CREDS.refresh(**{cli + "_ok": st.get("source") == cli})
+            return st
         if op == "SetToken":
-            return github.set_token(kw["token"])
+            return f.set_token(kw["token"])
         if op == "ForgetToken":
-            return github.forget_token()
+            return f.forget_token()
         if op == "Repos":
-            return github.repos(cancel)
+            return f.repos(cancel)
         if op == "Create":
-            return github.create(kw["name"], kw.get("private", True),
-                                 kw.get("description", ""), kw.get("org"))
+            return f.create(kw["name"], kw.get("private", True),
+                            kw.get("description", ""), kw.get("org"))
         if op == "Plan":
-            return github.plan(kw["full"], kw["files"], kw.get("branch"))
+            return f.plan(kw["full"], kw["files"], kw.get("branch"))
         if op == "Branches":
-            return github.branches(kw["full"])
+            return f.branches(kw["full"])
         if op == "Upload":
-            return github.upload(kw["full"], kw["files"], kw["message"],
-                                 kw.get("branch"), emit, cancel)
+            return f.upload(kw["full"], kw["files"], kw["message"],
+                            kw.get("branch"), emit, cancel)
         if op == "Pulls":
-            return github.pulls(kw["full"], kw.get("state", "open"))
+            return f.pulls(kw["full"], kw.get("state", "open"))
         if op == "Issues":
-            return github.issues(kw["full"], kw.get("state", "open"))
+            return f.issues(kw["full"], kw.get("state", "open"))
         if op == "Thread":
-            return github.thread(kw["full"], kw["number"])
+            return f.thread(kw["full"], kw["number"], kw.get("pull", False))
         if op == "Comment":
-            return github.comment(kw["full"], kw["number"], kw["body"])
+            return f.comment(kw["full"], kw["number"], kw["body"], kw.get("pull", False))
         if op == "SetState":
-            return github.set_state(kw["full"], kw["number"], kw["open"])
+            return f.set_state(kw["full"], kw["number"], kw["open"], kw.get("pull", False))
         if op == "OpenIssue":
-            return github.open_issue(kw["full"], kw["title"], kw.get("body", ""))
+            return f.open_issue(kw["full"], kw["title"], kw.get("body", ""))
         if op == "OpenPull":
-            return github.open_pull(kw["full"], kw["head"], kw["base"], kw["title"],
-                                    kw.get("body", ""), kw.get("draft", False))
+            return f.open_pull(kw["full"], kw["head"], kw["base"], kw["title"],
+                               kw.get("body", ""), kw.get("draft", False))
         if op == "Merge":
-            return github.merge(kw["full"], kw["number"], kw.get("method", "merge"))
-        raise github.ForgeError(f"unknown request: github{op}")
+            return f.merge(kw["full"], kw["number"], kw.get("method", "merge"))
+        raise ForgeError(f"unknown request: {f.__name__}{op}")
 
     def close(self):
         for s in self.logs.values():
@@ -488,10 +587,11 @@ class Server:
 
 def main():
     srv = Server()
-    # Whether gh can answer for github.com decides the credential helpers
-    # every network call gets; asked once at start, then by githubStatus.
+    # Whether gh can answer for github.com, and glab for gitlab.com, decides
+    # the credential helpers every network call gets; asked once at start,
+    # then by each forge's Status.
     threading.Thread(target=lambda: gitrun.CREDS.refresh(
-        gh_ok=github.token()[1] == "gh"), daemon=True).start()
+        gh_ok=github.token()[1] == "gh", glab_ok=gitlab.token()[1] == "glab"), daemon=True).start()
     send({"event": {"ready": True, "protocol": PROTOCOL, "pid": os.getpid()}})
     try:
         for line in sys.stdin:

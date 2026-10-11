@@ -440,7 +440,9 @@ FocusScope {
   property string error: ""
   function run(cmd, after) {
     runner.after = after || null;
-    runner.command = ["sh", "-c", cmd];
+    // a script string, or terminus' { script, args } (trashCommand is one —
+    // handed to sh -c as it was, it ran "[object Object]")
+    runner.command = typeof cmd === "string" ? ["sh", "-c", cmd] : Terminus.shArgv(cmd);
     runner.running = true;
   }
   Process {

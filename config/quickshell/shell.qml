@@ -132,6 +132,8 @@ ShellRoot {
   // and the full package manager, a real window like terminus — built off
   // the startup path, see CeresManager
   CeresManager { }
+  // the job log in plato's font (see Ceres.editor)
+  Binding { target: Ceres; property: "editor"; value: plato }
   // a remembered sudo password does not survive the screen locking, and
   // neither does an unlocked vault
   Connections {

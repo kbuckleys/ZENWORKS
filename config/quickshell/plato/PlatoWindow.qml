@@ -444,32 +444,20 @@ FloatingWindow {
     }
   }
 
-  // the tree's edge: a hairline, and a handle to drag it wider or narrower
-  Rectangle {
+  // the tree's edge: terminus/SeamGrip — a hairline, cyan under the pointer,
+  // a handle to drag it wider or narrower, measured in the window's content.
+  // A DRAG INTO THE TREE MUST STAY A DRAG (its rows carry DragHandlers and
+  // its list is a Flickable): the grip does not let them take the pointer.
+  SeamGrip {
     visible: sidebarBox.visible
     // over the editor, which overlaps the handle's right half
     z: 10
-    anchors.left: sidebarBox.right
-    anchors.top: parent.top
-    anchors.bottom: parent.bottom
-    width: 1
-    color: Zenon.border
-    MouseArea {
-      anchors.fill: parent
-      anchors.leftMargin: -3
-      anchors.rightMargin: -3
-      cursorShape: Qt.SplitHCursor
-      // A DRAG INTO THE TREE MUST STAY A DRAG. Its rows each carry a
-      // DragHandler and its list is a Flickable, and either took the pointer
-      // from this the moment it crossed into them: the edge stopped mid-drag.
-      preventStealing: true
-      onPositionChanged: (m) => {
-        if (!pressed || !win.mgr) return;
-        const x = mapToItem(win.contentItem, m.x, 0).x;
-        win.mgr.dragTree(Math.round(Math.max(180, Math.min(700, win.width * 0.5, x))));
-      }
-      onReleased: if (win.mgr) win.mgr.dropTree()
-    }
+    frame: win.contentItem
+    at: sidebarBox.x + sidebarBox.width
+    min: 180
+    max: Math.max(180, Math.min(700, win.width * 0.5))
+    onMoved: (p) => { if (win.mgr) win.mgr.dragTree(p); }
+    onReleased: if (win.mgr) win.mgr.dropTree()
   }
 
   // ── THE GROUND, less the tab strip (see the window's colour) ──────

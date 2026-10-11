@@ -423,22 +423,46 @@ function tilde(p, home) {
 }
 
 // ── THE FORGE ───────────────────────────────────────────────────────────
-// The GitHub repository a checkout's pull requests and issues live on: the
-// one behind `upstream` when there is one (a fork's are its parent's), else
-// `origin`, else any remote on github.com. { remote, host, full, web } or
-// null.
+// The sites a repository can live on, and what each calls things. `refs`
+// is where a pull request's commits are kept on it (a checkout fetches
+// them from there); `pull`/`pulls` its own words for one.
+var FORGES = {
+  github:   { id: "github", name: "GitHub", host: "github.com", glyph: "\uF09B",
+              pull: "pull request", pulls: "Pull requests", refs: "pull", cli: "gh", pkg: "github-cli",
+              tokens: "github.com → Settings → Developer settings → Tokens" },
+  gitlab:   { id: "gitlab", name: "GitLab", host: "gitlab.com", glyph: "\uF296",
+              pull: "merge request", pulls: "Merge requests", refs: "merge-requests", cli: "glab", pkg: "glab",
+              tokens: "gitlab.com → Preferences → Access tokens (scope: api)" },
+  codeberg: { id: "codeberg", name: "Codeberg", host: "codeberg.org", glyph: "\uF330",
+              pull: "pull request", pulls: "Pull requests", refs: "pull", cli: "", pkg: "",
+              tokens: "codeberg.org → Settings → Applications (repository and issue access)" }
+};
+var FORGE_ORDER = ["github", "gitlab", "codeberg"];
+
+function forgeOfHost(host) {
+  var h = String(host || "").toLowerCase();
+  for (var i = 0; i < FORGE_ORDER.length; i++)
+    if (FORGES[FORGE_ORDER[i]].host === h) return FORGES[FORGE_ORDER[i]];
+  return null;
+}
+
+// The repository on a forge a checkout's pull requests and issues live on:
+// the one behind `upstream` when there is one (a fork's are its parent's),
+// else `origin`, else any remote on a forge delphi knows. { remote, host,
+// full, web, forge } or null — forge the FORGES id.
 function hubOf(remotes) {
   var rs = remotes || [];
-  function gh(r) {
+  function on(r) {
     var o = r ? remoteOf(r.fetch || r.push) : null;
-    return o && o.host === "github.com" ? { remote: r.name, host: o.host, full: o.full, web: o.web } : null;
+    var f = o ? forgeOfHost(o.host) : null;
+    return f ? { remote: r.name, host: o.host, full: o.full, web: o.web, forge: f.id } : null;
   }
   var named = ["upstream", "origin"];
   for (var i = 0; i < named.length; i++) {
     for (var j = 0; j < rs.length; j++)
-      if (rs[j].name === named[i] && gh(rs[j])) return gh(rs[j]);
+      if (rs[j].name === named[i] && on(rs[j])) return on(rs[j]);
   }
-  for (var k = 0; k < rs.length; k++) if (gh(rs[k])) return gh(rs[k]);
+  for (var k = 0; k < rs.length; k++) if (on(rs[k])) return on(rs[k]);
   return null;
 }
 

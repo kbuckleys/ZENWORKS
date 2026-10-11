@@ -130,6 +130,16 @@ def _progress(emit):
     return on
 
 
+def remote_key(url):
+    """A remote's address as (host, owner/name) — https, ssh and scp-like
+    alike — or None: what tells two addresses of one repository apart from
+    two repositories."""
+    u = str(url or "").strip()
+    m = (re.match(r"^(?:https?|ssh|git)://(?:[^@/]+@)?([^/:]+)(?::\d+)?/(.+?)(?:\.git)?/?$", u)
+         or re.match(r"^(?:[^@]+@)?([^:/]+):(.+?)(?:\.git)?/?$", u))
+    return (m.group(1).lower(), m.group(2).lower()) if m else None
+
+
 class Repo:
     def __init__(self, path, sock=None):
         info = discover(path)
@@ -600,7 +610,7 @@ class Repo:
         self.git.stream_ok(a, _progress(emit), cancel, creds=True)
 
     def pull_checkout(self, remote, number, branch=None, same=False,
-                      cancel=None, emit=None):
+                      refs="pull", cancel=None, emit=None):
         """A pull request's commits, on a branch here, switched to. One made
         from a branch of this same repository is that branch, tracking it —
         so a push goes back into the pull request. One from a fork is
@@ -613,8 +623,10 @@ class Repo:
             name, start = branch, track
         else:
             track = f"refs/remotes/{remote}/pr/{number}"
+            # GitHub and Forgejo keep a pull request at refs/pull/N/head,
+            # GitLab a merge request at refs/merge-requests/N/head
             self.git.stream_ok(["fetch", "--progress", remote,
-                                f"+refs/pull/{number}/head:{track}"],
+                                f"+refs/{refs}/{number}/head:{track}"],
                                _progress(emit), cancel, creds=True)
             name, start = f"pr-{number}", track
         if self.git.code(["rev-parse", "-q", "--verify", f"refs/heads/{name}"]) == 0:

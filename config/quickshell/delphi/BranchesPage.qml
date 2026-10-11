@@ -20,6 +20,10 @@ import "delphi.js" as D
 Item {
   id: pg
   property var win: null
+  // the views whose rows carry on up under the window's head, frosted
+  // (DelphiWindow's ScrollEdges) — only those with nothing but controls
+  // between them and the head: a view under a title would paint over it
+  readonly property var edgeViews: [list]
 
   readonly property string title: "Branches"
   readonly property string subtitle: pg.win ? "on " + pg.win.branchName : ""

@@ -4,7 +4,8 @@
 // https://github.com/kbuckleys/
 //
 // PULL REQUESTS and ISSUES — both pages, one file: which it is follows the
-// window's page. Of the GitHub repository the checkout belongs to (the
+// window's page. Of the forge repository the checkout belongs to —
+// GitHub, GitLab (merge requests) or Codeberg — (the
 // window's `hub`: upstream's for a fork, else origin's).
 //
 // The list on the left, newest-moved first, open or closed; on the right
@@ -27,28 +28,36 @@ import "delphi.js" as D
 Item {
   id: pg
   property var win: null
+  // the views whose rows carry on up under the window's head, frosted
+  // (DelphiWindow's ScrollEdges) — only those with nothing but controls
+  // between them and the head: a view under a title would paint over it
+  readonly property var edgeViews: [list, threadFlick]
 
   readonly property string kind: pg.win && pg.win.page === "issues" ? "issues" : "pulls"
   readonly property bool pulls: pg.kind === "pulls"
   readonly property var hub: pg.win ? pg.win.hub : null
   readonly property string hubFull: pg.hub ? pg.hub.full : ""
-  readonly property string noun: pg.pulls ? "pull request" : "issue"
+  // the forge it is on, its own requests and words (delphi.js FORGES)
+  readonly property var site: D.FORGES[pg.hub ? pg.hub.forge : "github"] || D.FORGES.github
+  // from `hub` itself, never `site` — see GitHubPage.op
+  function op(name) { return (D.FORGES[pg.hub ? pg.hub.forge : "github"] || D.FORGES.github).id + name; }
+  readonly property string noun: pg.pulls ? pg.site.pull : "issue"
 
-  readonly property string title: pg.pulls ? "Pull requests" : "Issues"
-  readonly property string subtitle: !pg.hub ? "Not on GitHub"
-    : pg.loading ? pg.hubFull + "  ·  asking GitHub…"
+  readonly property string title: pg.pulls ? pg.site.pulls : "Issues"
+  readonly property string subtitle: !pg.hub ? "Not on GitHub, GitLab or Codeberg"
+    : pg.loading ? pg.hubFull + "  ·  asking " + pg.site.name + "…"
     : pg.hubFull + "  ·  " + pg.rows.length + " " + pg.showing
   readonly property var hints: pg.area === "reply" ? [["ctrl return", "send"], ["esc", "back"]]
     : (pg.pulls ? [["c", "check out"], ["m", "merge"]] : [])
       .concat([["r", "reply"], ["x", pg.open ? "close" : "reopen"], ["w", "web"], ["n", "new"], ["s", pg.showing === "open" ? "closed" : "open"]])
   readonly property bool open: !!pg.item && pg.item.state === "open"
-  readonly property var buttons: !pg.hub ? [{ label: "Publish on GitHub", ink: Zenon.cyan, primary: true, run: () => pg.win.setPage("github") }]
-    : pg.signInNeeded ? [{ label: "Sign in on the GitHub page", ink: Zenon.cyan, primary: true, run: () => pg.win.setPage("github") }]
+  readonly property var buttons: !pg.hub ? [{ label: "Publish it", ink: Zenon.cyan, primary: true, run: () => pg.win.setPage("github") }]
+    : pg.signInNeeded ? [{ label: "Sign in to " + pg.site.name, ink: Zenon.cyan, primary: true, run: () => { pg.win.mgr.set("forge", pg.site.id); pg.win.setPage("github"); } }]
     : [
       { label: pg.open ? "Close" : "Reopen", ink: pg.open ? Zenon.red : Zenon.muted, visible: !!pg.item, run: () => pg.setOpen(!pg.open) },
       { label: "Merge", ink: Zenon.magenta, visible: pg.pulls && pg.open && !!pg.item && !pg.item.draft, run: () => pg.merge() },
       { label: "Check out", visible: pg.pulls && !!pg.item && pg.item.state !== "merged", run: () => pg.checkout() },
-      { label: pg.pulls ? "New pull request" : "New issue", ink: Zenon.cyan, primary: true, run: () => pg.pulls ? pg.newPull() : pg.newIssue() },
+      { label: pg.pulls ? "New " + pg.site.pull : "New issue", ink: Zenon.cyan, primary: true, run: () => pg.pulls ? pg.newPull() : pg.newIssue() },
     ]
   function takeFocus() {
     if (pg.area === "reply") reply.claim();
@@ -57,7 +66,21 @@ Item {
 
   // ── the list ───────────────────────────────────────────────────────────
   property string showing: "open"      // open | closed
-  property var rows: []
+  // every one listed, and those shown: all, others' (whose author is not
+  // you on this forge — what came in), or yours (user, 2026-10-11)
+  property var allRows: []
+  property string who: "all"          // all | others | mine
+  property string me: ""              // the account here, from its Status
+  readonly property var rows: pg.who === "all" || pg.me === "" ? pg.allRows
+    : pg.allRows.filter((r) => pg.who === "mine" ? r.author === pg.me : r.author !== pg.me)
+  onWhoChanged: { pg.sel = 0; pg.thread = null; if (pg.row) Qt.callLater(pg.loadThread); }
+  function loadMe() {
+    if (!pg.hub) { pg.me = ""; return; }
+    const forge = pg.hub.forge;
+    pg.win.mgr.call(pg.op("Status"), null, {}, (ok, st) => {
+      if (pg && pg.hub && pg.hub.forge === forge) pg.me = ok && st.signedIn ? st.login : "";
+    });
+  }
   property bool loading: false
   property string listError: ""
   property bool signInNeeded: false
@@ -69,37 +92,37 @@ Item {
   onAreaChanged: pg.takeFocus()
 
   function reload() {
-    if (!pg.win || !pg.hub) { pg.rows = []; pg.thread = null; return; }
+    if (!pg.win || !pg.hub) { pg.allRows = []; pg.thread = null; return; }
     const full = pg.hubFull, kind = pg.kind, showing = pg.showing;
     pg.loading = true;
     pg.listError = "";
     // from `kind` itself: in onKindChanged, `pulls` may not have caught up
-    pg.win.mgr.call(kind === "pulls" ? "githubPulls" : "githubIssues", null, { full: full, state: showing }, (ok, rs, err) => {
+    pg.win.mgr.call(pg.op(kind === "pulls" ? "Pulls" : "Issues"), null, { full: full, state: showing }, (ok, rs, err) => {
       if (!pg) return;
       // an answer for a list no longer shown: the page moved on meanwhile
       if (kind !== pg.kind || showing !== pg.showing || full !== pg.hubFull) return;
       pg.loading = false;
       if (!ok) {
-        pg.rows = [];
+        pg.allRows = [];
         pg.thread = null;
         pg.signInNeeded = !!err && err.status === 401;
-        pg.listError = pg.signInNeeded ? "Not signed in to GitHub" : D.errorText(err ? err.error : "");
+        pg.listError = pg.signInNeeded ? "Not signed in to " + pg.site.name : D.errorText(err ? err.error : "");
         return;
       }
       pg.signInNeeded = false;
       const keep = pg.wanted >= 0 ? pg.wanted : pg.row ? pg.row.number : -1;
       pg.wanted = -1;
-      pg.rows = rs;
-      const i = rs.findIndex((r) => r.number === keep);
+      pg.allRows = rs;
+      const i = pg.rows.findIndex((r) => r.number === keep);
       pg.sel = i >= 0 ? i : 0;
       if (pg.row) list.positionViewAtIndex(pg.sel, ListView.Contain);
       pg.loadThread();
     });
   }
-  onKindChanged: { pg.rows = []; pg.thread = null; pg.sel = 0; pg.area = "list"; pg.showing = "open"; pg.reload(); }
-  onShowingChanged: { pg.rows = []; pg.thread = null; pg.reload(); }
-  onHubFullChanged: pg.reload()
-  Component.onCompleted: Qt.callLater(pg.reload)
+  onKindChanged: { pg.allRows = []; pg.thread = null; pg.sel = 0; pg.area = "list"; pg.showing = "open"; pg.reload(); }
+  onShowingChanged: { pg.allRows = []; pg.thread = null; pg.reload(); }
+  onHubFullChanged: { pg.reload(); pg.loadMe(); }
+  Component.onCompleted: { Qt.callLater(pg.reload); Qt.callLater(pg.loadMe); }
 
   function moveTo(i) {
     if (pg.rows.length === 0) return;
@@ -131,7 +154,8 @@ Item {
     if (!r) { pg.thread = null; return; }
     const n = r.number, full = pg.hubFull;
     pg.threadLoading = true;
-    pg.win.mgr.call("githubThread", null, { full: full, number: n }, (ok, t, err) => {
+    // `pull`: GitLab numbers merge requests and issues apart
+    pg.win.mgr.call(pg.op("Thread"), null, { full: full, number: n, pull: pg.pulls }, (ok, t, err) => {
       if (!pg || !pg.row || pg.row.number !== n || full !== pg.hubFull) return;
       pg.threadLoading = false;
       if (ok) {
@@ -149,7 +173,7 @@ Item {
     const t = pg.item, body = reply.text.trim();
     if (!t || body === "") return;
     const n = t.number;
-    pg.win.act("githubComment", { full: pg.hubFull, number: n, body: body }, { repo: null, refresh: false, label: "Sending your comment on #" + n, network: true,
+    pg.win.act(pg.op("Comment"), { full: pg.hubFull, number: n, body: body, pull: pg.pulls }, { repo: null, refresh: false, label: "Sending your comment on #" + n, network: true,
       then: (c) => { if (!pg) return;
         reply.text = "";
         pg.area = "list";
@@ -164,7 +188,7 @@ Item {
   function setOpen(open) {
     const t = pg.item;
     if (!t || t.state === "merged") return;
-    const go = () => pg.win.act("githubSetState", { full: pg.hubFull, number: t.number, open: open }, { repo: null, refresh: false,
+    const go = () => pg.win.act(pg.op("SetState"), { full: pg.hubFull, number: t.number, open: open, pull: pg.pulls }, { repo: null, refresh: false,
       label: (open ? "Reopening #" : "Closing #") + t.number, network: true,
       said: (open ? "Reopened #" : "Closed #") + t.number, then: () => { if (pg) pg.reload(); } });
     if (open) { go(); return; }
@@ -179,7 +203,7 @@ Item {
     const t = pg.item;
     if (!t || !t.pull) return;
     const same = t.headRepo === pg.hubFull;
-    pg.win.act("pullCheckout", { remote: pg.hub.remote, number: t.number, branch: t.branch || null, same: same }, {
+    pg.win.act("pullCheckout", { remote: pg.hub.remote, number: t.number, branch: t.branch || null, same: same, refs: pg.site.refs }, {
       label: "Checking out #" + t.number, network: true,
       then: (res) => pg.win.say("On " + res.branch + (res.behind ? " — yours has moved apart from the pull request; left as it is" : ""), res.behind) });
   }
@@ -187,18 +211,18 @@ Item {
   function merge() {
     const t = pg.item;
     if (!t || !t.pull || t.state !== "open") return;
-    if (t.draft) { pg.win.say("#" + t.number + " is a draft — mark it ready on GitHub first", true); return; }
+    if (t.draft) { pg.win.say("#" + t.number + " is a draft — mark it ready on " + pg.site.name + " first", true); return; }
     if (pg.whole && t.mergeable === false) {
       pg.win.say("#" + t.number + " conflicts with " + t.base + " — check it out and resolve them", true);
       return;
     }
-    const go = (method, word) => pg.win.act("githubMerge", { full: pg.hubFull, number: t.number, method: method }, {
+    const go = (method, word) => pg.win.act(pg.op("Merge"), { full: pg.hubFull, number: t.number, method: method }, {
       repo: null, label: "Merging #" + t.number, network: true, refresh: false,
       then: () => { pg.win.say(word + " #" + t.number + " into " + t.base); if (pg) pg.reload(); pg.win.fetch(); } });
     pg.win.card_({ question: "Merge #" + t.number + " into " + t.base + "?", glyph: "", ink: Zenon.magenta,
       detail: t.title + (pg.whole ? "  ·  " + t.commits + (t.commits === 1 ? " commit" : " commits")
         + "  ·  +" + t.additions + " −" + t.deletions : "")
-        + (pg.whole && t.mergeState === "blocked" ? "  ·  GitHub says it is blocked (a review or a check) — it may refuse" : ""),
+        + (pg.whole && t.mergeState === "blocked" ? "  ·  " + pg.site.name + " says it is blocked (a review or a check) — it may refuse" : ""),
       choices: [{ label: "Merge", ink: Zenon.magenta, run: () => go("merge", "Merged") },
                 { label: "Squash", run: () => go("squash", "Squashed") },
                 { label: "Rebase", run: () => go("rebase", "Rebased") },
@@ -211,7 +235,7 @@ Item {
       fields: [{ key: "title", label: "Title", hint: "What is wrong, or wanted" },
                { key: "body", label: "More", lines: true, optional: true, hint: "Steps, what you expected, what happened — markdown" }],
       verb: "Open issue",
-      then: (v) => pg.win.act("githubOpenIssue", { full: pg.hubFull, title: v.title.trim(), body: v.body.trim() }, {
+      then: (v) => pg.win.act(pg.op("OpenIssue"), { full: pg.hubFull, title: v.title.trim(), body: v.body.trim() }, {
         repo: null, refresh: false, label: "Opening the issue", network: true,
         then: (r) => { pg.win.say("Opened #" + r.number); if (!pg) return; pg.wanted = r.number;
           if (pg.showing !== "open") pg.showing = "open"; else pg.reload(); } }) });
@@ -219,19 +243,19 @@ Item {
 
   // Propose the branch you are on: into which of the repository's branches,
   // its title and words (the last commit's, to start from), a draft or not.
-  // Pushed first when GitHub does not have all of it yet.
+  // Pushed first when the forge does not have all of it yet.
   function newPull() {
     const b = pg.win.branch, hub = pg.hub, o = pg.win.origin;
     if (!hub) return;
     if (!b || !b.head) { pg.win.say("Not on a branch — switch to the one to propose", true); return; }
     // origin a fork of the hub: the head is said as "owner:branch"
-    const fork = !!o && o.host === "github.com" && o.full !== hub.full;
+    const fork = !!o && o.host === hub.host && o.full !== hub.full;
     const owner = fork ? o.full.split("/")[0] : "";
     const pushTo = (pg.win.remotes.find((r) => r.name === "origin") || pg.win.remotes[0] || {}).name;
     const unpushed = !b.upstream || b.ahead > 0;
-    pg.win.act("githubBranches", { full: hub.full }, { repo: null, refresh: false, network: true,
+    pg.win.act(pg.op("Branches"), { full: hub.full }, { repo: null, refresh: false, network: true,
       label: "Asking " + hub.full + " for its branches",
-      failed: (err) => pg.win.fail("Could not ask GitHub", null, err),
+      failed: (err) => pg.win.fail("Could not ask " + pg.site.name, null, err),
       then: (br) => { if (!pg) return;
       const bases = br.branches.filter((n) => fork || n !== b.head);
       if (bases.length === 0) { pg.win.say("No other branch to propose it to", true); return; }
@@ -245,11 +269,11 @@ Item {
                      value: msg.split("\n").slice(1).join("\n").trim(), hint: "Why, and what to look at — markdown" },
                    { key: "base", label: "Into", options: bases }],
           toggles: [{ key: "draft", label: "A draft — not ready for review yet", value: false }],
-          verb: "Open pull request",
+          verb: "Open " + pg.site.pull,
           then: (v) => {
-            const go = () => pg.win.act("githubOpenPull", { full: hub.full, head: (fork ? owner + ":" : "") + b.head,
+            const go = () => pg.win.act(pg.op("OpenPull"), { full: hub.full, head: (fork ? owner + ":" : "") + b.head,
               base: v.base, title: v.title.trim(), body: v.body.trim(), draft: !!v.draft }, {
-              repo: null, label: "Opening the pull request", network: true, refresh: false,
+              repo: null, label: "Opening the " + pg.site.pull, network: true, refresh: false,
               then: (r) => { pg.win.say("Opened #" + r.number); if (!pg) return; pg.wanted = r.number;
                 if (pg.showing !== "open") pg.showing = "open"; else pg.reload(); } });
             if (!unpushed) { go(); return; }
@@ -288,23 +312,32 @@ Item {
     anchors.left: parent.left
     anchors.top: parent.top
     anchors.bottom: parent.bottom
-    width: Math.round(Math.min(500, pg.width * 0.38))
+    width: pg.win && pg.win.splits.forge ? pg.win.splits.forge : Math.round(Math.min(500, pg.width * 0.38))
 
-    Row {
+    // open or closed, and whose: two small sets of choices side by side
+    // (wrapping under each other only when the column is that narrow)
+    Flow {
       id: seg
-      x: 12
+      // centred in the column; wrapping only when it is that narrow
+      readonly property real want: openSeg.width + (whoSeg.visible ? 8 + whoSeg.width : 0)
+      width: Math.min(parent.width - 24, want)
+      x: Math.round((parent.width - width) / 2)
       y: 12
-      spacing: 6
+      spacing: 8
       visible: !!pg.hub
-      DialogButton {
-        label: "Open"
-        ink: pg.showing === "open" ? Zenon.cyan : Zenon.muted
-        onClicked: pg.showing = "open"
+      Segments {
+        id: openSeg
+        options: [["open", "Open"], ["closed", "Closed"]]
+        current: pg.showing
+        onChose: (v) => pg.showing = v
       }
-      DialogButton {
-        label: "Closed"
-        ink: pg.showing === "closed" ? Zenon.cyan : Zenon.muted
-        onClicked: pg.showing = "closed"
+      // known once the account here is
+      Segments {
+        id: whoSeg
+        visible: pg.me !== ""
+        options: [["all", "All"], ["others", "Others"], ["mine", "Mine"]]
+        current: pg.who
+        onChose: (v) => pg.who = v
       }
     }
     Working {
@@ -395,7 +428,7 @@ Item {
     ElasticScroll { anchors.fill: list; view: list }
     Scrollbar { flick: list; anchors.right: list.right; anchors.top: list.top; anchors.bottom: list.bottom }
 
-    // why there is no list: not on GitHub, not signed in, or GitHub failed
+    // why there is no list: on no forge delphi knows, not signed in, or the forge failed
     Column {
       anchors.centerIn: parent
       width: parent.width - 60
@@ -405,7 +438,7 @@ Item {
         width: parent.width
         horizontalAlignment: Text.AlignHCenter
         wrapMode: Text.Wrap
-        text: !pg.hub ? "This repository has no remote on GitHub" : pg.listError
+        text: !pg.hub ? "This repository has no remote on GitHub, GitLab or Codeberg" : pg.listError
         color: !pg.hub ? Zenon.muted : Zenon.red
         font.family: Zenon.face
         font.weight: Zenon.weight
@@ -419,9 +452,17 @@ Item {
       }
     }
   }
-  Rectangle { x: left.width; width: 1; height: parent.height; color: Zenon.border }
+  // the seam between the list and the one chosen: dragged, it stays
+  SeamGrip {
+    frame: pg
+    at: left.width
+    min: 280
+    max: pg.width - 380
+    onMoved: (p) => pg.win.setSplit("forge", p)
+    onReset: pg.win.setSplit("forge", 0)
+  }
 
-  // a pull request's or an issue's labels, as GitHub colours them
+  // a pull request's or an issue's labels, as the forge colours them
   component Labels: Flow {
     id: labs
     property var labels: []
@@ -610,6 +651,17 @@ Item {
           when: pg.whole ? pg.item.created : ""
           body: pg.whole ? pg.item.body : ""
           kind: "body"
+        }
+        // GitLab keeps a discussion for those signed in, even when public
+        Text {
+          visible: pg.whole && !!pg.item.signInToRead
+          width: parent.width
+          wrapMode: Text.Wrap
+          text: "Sign in to " + pg.site.name + " to read what was said on it."
+          color: Zenon.muted
+          font.family: Zenon.face
+          font.weight: Zenon.weight
+          font.pixelSize: Zenon.px(14)
         }
         Repeater {
           model: pg.whole ? pg.item.said : []

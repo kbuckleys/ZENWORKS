@@ -31,6 +31,7 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Hyprland
 import "../morpheus"
+import "../ceres"
 import "../morpheus/lagnotes.js" as LagNotes
 import "delphi.js" as D
 
@@ -61,7 +62,7 @@ Scope {
       Comment: "Stage, commit, branch, sync and browse history with git, in ZENWORKS",
       Icon: "git",
       Categories: ["Development", "RevisionControl"],
-      Keywords: ["git", "commit", "branch", "diff", "merge", "rebase", "github", "repository", "version control"],
+      Keywords: ["git", "commit", "branch", "diff", "merge", "rebase", "github", "gitlab", "codeberg", "repository", "version control"],
       Exec: Desktop.execLine(Quickshell.shellDir + "/delphi/bin/delphi", "%f"),
       Terminal: "false",
       StartupNotify: "false",
@@ -76,9 +77,19 @@ Scope {
   // repositories forgotten: left off the list, and out of what a scan finds,
   // until opened again — their files are not touched
   property var hidden: []
+  // where each page's seams were dragged to (terminus/SeamGrip), by name
+  property var splits: ({})
+  function setSplit(key, v) {
+    const o = Object.assign({}, mgr.splits);
+    if (v > 0) o[key] = Math.round(v); else delete o[key];
+    mgr.splits = o;
+    mgr.keep_();
+  }
   property string page: "changes"
   property var scanRoots: ["~"]
   property string pullMode: "ff-only"
+  // the forge the Accounts page shows: github | gitlab | codeberg
+  property string forge: "github"
   property bool showIgnored: false
   FileView {
     id: stateFile
@@ -90,10 +101,12 @@ Scope {
     try {
       const st = JSON.parse(stateFile.text() || "{}");
       if (Array.isArray(st.recents)) mgr.recents = st.recents.filter((r) => r && typeof r.root === "string");
+      if (st.splits && typeof st.splits === "object") mgr.splits = st.splits;
       if (Array.isArray(st.hidden)) mgr.hidden = st.hidden.filter((h) => typeof h === "string");
       if (typeof st.page === "string") mgr.page = st.page;
       if (Array.isArray(st.scanRoots) && st.scanRoots.length > 0) mgr.scanRoots = st.scanRoots;
       if (["ff-only", "rebase", "merge"].indexOf(st.pullMode) >= 0) mgr.pullMode = st.pullMode;
+      if (D.FORGES[st.forge]) mgr.forge = st.forge;
     } catch (e) {}
   }
   function keep_() { keepTimer.restart(); }
@@ -101,7 +114,7 @@ Scope {
     id: keepTimer
     interval: 400
     onTriggered: stateFile.setText(JSON.stringify({
-      recents: mgr.recents, hidden: mgr.hidden, page: mgr.page, scanRoots: mgr.scanRoots, pullMode: mgr.pullMode }, null, 1))
+      recents: mgr.recents, hidden: mgr.hidden, splits: mgr.splits, page: mgr.page, scanRoots: mgr.scanRoots, pullMode: mgr.pullMode, forge: mgr.forge }, null, 1))
   }
   function set(key, value) {
     if (mgr[key] === value) return;
@@ -257,7 +270,8 @@ Scope {
   }
 
   // ── AN UPLOAD UNDER WAY ────────────────────────────────────────────
-  // Files committed to GitHub with no clone (GitHubPage). The manager's,
+  // Files committed to a forge — GitHub, GitLab, Codeberg (job.forge) — with
+  // no clone (the Accounts page, GitHubPage.qml). The manager's,
   // not the window's: closing the window must neither stop it nor lose
   // what became of it (2026-10-11 — an upload begun with no repository
   // open showed no ring, Esc stopped it unseen, and its answer reached a
@@ -266,7 +280,7 @@ Scope {
   // one is up, and as a notification when none is.
   //   { id, full, branch, fresh, entries: [{ name, path, size, exists,
   //     state }], phase: sending | committing | done | failed,
-  //     waiting: seconds GitHub asked to pause for, or 0 }
+  //     waiting: seconds the forge asked to pause for, or 0, forge }
   property var upload: null
   readonly property bool uploading: !!mgr.upload && mgr.upload.phase !== "done" && mgr.upload.phase !== "failed"
   // the window's bubble is being read: the finished ring stays meanwhile
@@ -280,7 +294,8 @@ Scope {
       { entries: job.entries.map((e) => Object.assign({ state: "waiting" }, e)) });
     const n = job.entries.length;
     mgr.hold("upload");
-    const id = mgr.call("githubUpload", null, { full: job.full, files: files, message: message, branch: job.branch }, (ok, res, err) => {
+    const site = (D.FORGES[job.forge || "github"] || D.FORGES.github);
+    const id = mgr.call(site.id + "Upload", null, { full: job.full, files: files, message: message, branch: job.branch }, (ok, res, err) => {
       mgr.release("upload");
       set({ waiting: 0 });
       if (ok) {
@@ -289,12 +304,12 @@ Scope {
       } else {
         set({ phase: "failed", entries: each((e) => e.state === "sent" ? e : Object.assign({}, e, { state: e.state === "sending" ? "failed" : e.state })) });
         if (err && err.kind === "cancelled") mgr.tell("Upload stopped — nothing was committed", true);
-        else mgr.tellFailure("The upload did not finish", "Nothing was committed — the files are not on " + job.full + ".", err);
+        else mgr.tellFailure("The upload did not finish", "Nothing was committed — the files are not on " + site.name + " (" + job.full + ").", err);
       }
       uploadLinger.restart();
     }, (ev) => {
       if (!mgr.upload) return;
-      // GitHub asked for a pause (its limit on making content): said on the
+      // the forge asked for a pause (its limit on making content): said on the
       // ring until the next thing moves
       if (ev.phase === "waiting") { set({ waiting: ev.seconds }); return; }
       if (ev.file) set({ waiting: 0, entries: each((e) => e.path === ev.file ? Object.assign({}, e, { state: ev.state }) : e) });
@@ -309,6 +324,34 @@ Scope {
     id: uploadLinger
     interval: 5000
     onTriggered: { if (mgr.uploadLooked) uploadLinger.restart(); else mgr.upload = null; }
+  }
+
+  // ── A TOOL IT NEEDS, INSTALLED WHEN IT IS ASKED FOR ──────────────────
+  // gh for GitHub's sign-in, glab for GitLab's: installed when the forge
+  // that needs one is chosen and it is not there, not up front for every
+  // forge (user, 2026-10-11). Through Ceres, the suite's package manager —
+  // its own password card, its own log — so delphi never runs pacman or asks
+  // for a password itself. `done(ok)` once Ceres says how it went.
+  property var installing: null      // { pkg, done }
+  function installTool(pkg, why, done) {
+    if (Ceres.txBusy) { mgr.tell("Ceres is busy with another job — try again once it is done", true); return false; }
+    mgr.installing = { pkg: pkg, done: done || null };
+    const asked = Ceres.request([["-S", "--needed", pkg]], "Install " + pkg + " — " + why, 1);
+    if (!asked) { mgr.installing = null; mgr.tell("Ceres could not take the install of " + pkg + " — open Ceres to see why", true); }
+    return asked;
+  }
+  Connections {
+    target: Ceres
+    function onTxStateChanged() {
+      const job = mgr.installing;
+      if (!job) return;
+      const st = Ceres.txState;
+      if (st !== "done" && st !== "failed") return;
+      mgr.installing = null;
+      if (st === "done") mgr.tell("Installed " + job.pkg);
+      else mgr.tell(job.pkg + " was not installed" + (Ceres.txError ? ": " + Ceres.txError : ""), true);
+      if (job.done) job.done(st === "done");
+    }
   }
 
   // ── SAYING HOW SOMETHING ENDED ─────────────────────────────────────

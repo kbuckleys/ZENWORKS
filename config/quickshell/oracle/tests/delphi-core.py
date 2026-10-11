@@ -610,6 +610,57 @@ def bring_back_what_a_commit_removed():
     eq(sorted(e["path"] for e in r.status()["staged"]), ["LICENSE", "README.md"], "and staged")
 
 
+@test
+def forges_upload_as_one_commit():
+    # GitLab and Codeberg against fakes: a directory's files go as ONE
+    # request, created or updated as the branch has them; each is routed
+    # by its prefix in the daemon
+    import json as J
+    import gitlab
+    import forgejo
+    d = os.path.join(TMP, "fup")
+    write(d, "dir/new.txt", "n\n"); write(d, "dir/old.txt", "o\n")
+    sent = []
+
+    class Answer:
+        def __init__(self, v): self.v, self.headers = v, {}
+        def read(self): return J.dumps(self.v).encode()
+        def __enter__(self): return self
+        def __exit__(self, *a): pass
+
+    def fake(req, timeout):
+        u, m = req.full_url, req.get_method()
+        body = J.loads(req.data) if req.data else None
+        if m != "GET":
+            sent.append((m, u, body))
+        if u.endswith("/projects/me%2Fr") or u.endswith("/repos/me/r"):
+            return Answer({"default_branch": "main"})
+        if "/repository/tree" in u:
+            return Answer([{"path": "dir/old.txt", "type": "blob"}])
+        if "/branches/main" in u:
+            return Answer({"commit": {"id": "c0"}})
+        if "/git/trees/c0" in u:
+            return Answer({"tree": [{"path": "dir/old.txt", "type": "blob", "sha": "s0"}]})
+        return Answer({"id": "c1", "commit": {"sha": "c1"}})
+
+    keep = (gitlab.urllib.parse, gitlab.rest.urllib.request.urlopen, gitlab.token, forgejo.token)
+    gitlab.rest.urllib.request.urlopen = fake
+    gitlab.token = lambda: ("t", "keyring")
+    forgejo.token = lambda: ("t", "keyring")
+    try:
+        gitlab.upload("me/r", [{"local": os.path.join(d, "dir"), "path": "dir"}], "m")
+        forgejo.upload("me/r", [{"local": os.path.join(d, "dir"), "path": "dir"}], "m")
+    finally:
+        gitlab.rest.urllib.request.urlopen, gitlab.token, forgejo.token = keep[1], keep[2], keep[3]
+    eq(len(sent), 2, "one request each")
+    gl, fj = sent[0][2], sent[1][2]
+    eq(sorted((a["action"], a["file_path"]) for a in gl["actions"]),
+       [("create", "dir/new.txt"), ("update", "dir/old.txt")], "gitlab actions")
+    eq(sorted((f["operation"], f["path"], f.get("sha")) for f in fj["files"]),
+       [("create", "dir/new.txt", None), ("update", "dir/old.txt", "s0")], "codeberg files")
+    eq(sorted(server.FORGES), ["codeberg", "github", "gitlab"], "routed by prefix")
+
+
 def continuous(rows):
     """Every line leaving a row's bottom arrives at the next row's top, in
     the same column and colour — and nothing else arrives."""

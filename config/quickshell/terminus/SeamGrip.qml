@@ -5,11 +5,13 @@
 //
 // A SEAM YOU CAN TAKE HOLD OF — the line between two panes, and the grip
 // that drags it. Terminus' pane divider made a thing of its own (its
-// sidebar's and its split's grips, and plato's tree edge, are this same
-// design written in place): a 1px line in the border colour, a 9px grip
+// sidebar's and its split's grips and plato's tree edge were this design
+// written in place, three times; they are this now): a 1px line in the
+// border colour, a 9px grip
 // straddling it with the resize cursor, and the line CYAN under the pointer
 // and while dragged — the seam answering the cursor that changed shape over
-// it. Double click: back to where it starts.
+// it. Double click: back to where it starts. Its holders: delphi's pages,
+// terminus' sidebar edge and split, plato's tree edge.
 //
 //     SeamGrip { frame: page; at: leftW            // where the line is, in frame
 //                min: 280; max: page.width - 360
@@ -37,6 +39,8 @@ Item {
   property bool line: true
   signal moved(real pos)
   signal reset()
+  // the drag let go of (plato keeps the tree's width then)
+  signal released()
   readonly property bool held: grip.pressed
   readonly property bool lit: grip.pressed || grip.containsMouse
 
@@ -72,5 +76,6 @@ Item {
       seam.moved(Math.round(Math.max(seam.min, Math.min(seam.max, want))));
     }
     onDoubleClicked: seam.reset()
+    onReleased: seam.released()
   }
 }

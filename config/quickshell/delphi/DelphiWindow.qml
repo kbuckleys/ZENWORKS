@@ -11,9 +11,11 @@
 //   Branches     local, remote, tags: switch, create, merge, rebase, delete
 //   Stashes      work put aside, and brought back
 //   Worktrees    the other checkouts of this repository
-//   Pull requests, Issues   the GitHub repository's (ForgePage): read, say
+//   Pull requests, Issues   the forge repository's — GitHub, GitLab,
+//                Codeberg (ForgePage): read, say
 //                something, open one, check a pull request out, merge
-//   GitHub       the account, its repositories: clone, create, upload files
+//   Accounts     GitHub, GitLab, Codeberg: sign in, your repositories —
+//                clone, create, upload files (GitHubPage)
 //   Repositories the ones opened before, the ones found on disk, clone, init
 //
 // The head says where you are and carries Fetch, Pull and Push (with how
@@ -55,6 +57,7 @@ FloatingWindow {
   onClosed: win.visible = false
   Component.onCompleted: {
     if (win.mgr) win.mgr.hold("window");
+    Qt.callLater(win.checkTools);
     Qt.callLater(win.refocus);
   }
 
@@ -82,12 +85,12 @@ FloatingWindow {
     : win.branch.head || (win.branch.oid ? "detached at " + D.short(win.branch.oid) : "no commits yet")
   readonly property var state: win.st ? win.st.state : null
   readonly property string repoName: win.root === "" ? "" : D.baseName(win.root)
-  // the GitHub repository behind origin, when there is one
+  // the forge repository behind origin, when there is one
   readonly property var origin: {
     const o = win.remotes.find((r) => r.name === "origin") || win.remotes[0];
     return o ? D.remoteOf(o.fetch || o.push) : null;
   }
-  // where its pull requests and issues are: upstream's GitHub repository
+  // where its pull requests and issues are: upstream's forge repository
   // for a fork, else origin's (D.hubOf) — { remote, full, web } or null
   readonly property var hub: D.hubOf(win.remotes)
 
@@ -242,7 +245,7 @@ FloatingWindow {
       return;
     }
     if (!b.upstream) {
-      // nowhere to push yet: the GitHub page's Publish — to a repository
+      // nowhere to push yet: the Accounts page's Publish — to a repository
       // there already, or a new one — rather than a toast to go and find it
       if (win.remotes.length === 0) {
         win.wantPublish = true;
@@ -267,10 +270,10 @@ FloatingWindow {
       } });
   }
   // where each page's seams were dragged to (terminus/SeamGrip), by name —
-  // kept while the window is open
-  property var splits: ({})
-  function setSplit(key, v) { const o = Object.assign({}, win.splits); o[key] = v; win.splits = o; }
-  // Publish pressed with no remote: the GitHub page asks how, once it can
+  // the manager's, kept with delphi's state; 0 puts one back
+  readonly property var splits: win.mgr ? win.mgr.splits : ({})
+  function setSplit(key, v) { if (win.mgr) win.mgr.setSplit(key, v); }
+  // Publish pressed with no remote: the Accounts page asks how, once it can
   property bool wantPublish: false
   function forcePush() {
     win.confirm({ question: "Force-push " + win.branchName + "?", glyph: "", ink: Zenon.red,
@@ -289,8 +292,53 @@ FloatingWindow {
   }
   function fail(title, detail, err) {
     const text = D.errorText(err ? err.error : "");
+    // ssh not there: git cannot reach an ssh remote — said as that, with the
+    // way to have it, rather than git's "cannot run ssh"
+    if (/cannot run ssh|ssh: (command )?not found|unable to fork/i.test(String(err && err.error || ""))) {
+      win.card_({ question: "ssh is not installed", glyph: "", ink: Zenon.yellow,
+        detail: "This remote is reached over ssh, and ssh is not here. Ceres can install it (openssh) — it asks for your password — then try again.",
+        items: text.split("\n"),
+        choices: [{ label: "Install openssh", ink: Zenon.cyan, run: () => win.installNeed("openssh", "to reach ssh remotes") },
+                  { label: "OK", ink: Zenon.muted }] });
+      return;
+    }
     win.card_({ question: title, glyph: "", ink: Zenon.red, detail: detail || "",
       items: text.split("\n"), choices: [{ label: "OK", ink: Zenon.muted }] });
+  }
+
+  // ── WHAT IS MISSING ────────────────────────────────────────────────────
+  // The tools delphi leans on (delphi/core tools): asked on opening, on a
+  // repository opened, after every install — and what is missing that
+  // something here still needs is said in the sidebar, each with its
+  // Install (through Ceres). Not only when signing in: a forge's sign-in
+  // that outlived its tool (gh removed, gh's record still naming you) is
+  // the commonest case (user, 2026-10-11).
+  property var tools: null
+  function checkTools() {
+    win.mgr.call("tools", null, {}, (ok, t) => { if (ok && win) win.tools = t; });
+  }
+  readonly property var needs: {
+    const t = win.tools, out = [];
+    if (!t) return out;
+    if (!t.gh && t.ghUser) out.push({ pkg: "github-cli", why: "Your GitHub sign-in (" + t.ghUser + ") goes through gh, which is not installed" });
+    if (!t.glab && t.glabUser) out.push({ pkg: "glab", why: "Your GitLab sign-in (" + t.glabUser + ") goes through glab, which is not installed" });
+    const viaSsh = win.remotes.some((r) => /^(ssh:\/\/|[^@\/\s]+@[^:\s]+:)/.test(r.fetch || r.push || ""));
+    if (!t.ssh && viaSsh) out.push({ pkg: "openssh", why: "This repository's remote is reached over ssh, which is not installed" });
+    if (!t.inotifywait) out.push({ pkg: "inotify-tools", why: "Without inotifywait, changes made outside Delphi show only on refresh" });
+    return out;
+  }
+  // any install ended (here, or from the Accounts page): asked again
+  Connections {
+    target: win.mgr
+    function onInstallingChanged() { if (win.mgr && !win.mgr.installing) win.checkTools(); }
+  }
+  function installNeed(pkg, why) {
+    win.mgr.installTool(pkg, why, (ok) => {
+      if (!win) return;
+      win.checkTools();
+      if (ok) win.refresh();
+      if (ok && win.pageItem && win.pageItem.reload) win.pageItem.reload();
+    });
   }
 
   // ── THE CARDS ──────────────────────────────────────────────────────────
@@ -379,9 +427,9 @@ FloatingWindow {
     { id: "branches", label: "Branches", glyph: "" },
     { id: "stashes", label: "Stashes", glyph: "" },
     { id: "worktrees", label: "Worktrees", glyph: "" },
-    { id: "pulls", label: "Pull requests", glyph: "\uF407" },
+    { id: "pulls", label: win.hub && D.FORGES[win.hub.forge] ? D.FORGES[win.hub.forge].pulls : "Pull requests", glyph: "\uF407" },
     { id: "issues", label: "Issues", glyph: "\uF41B" },
-    { id: "github", label: "GitHub", glyph: "" },
+    { id: "github", label: "Accounts", glyph: "\uF0C2" },
     { id: "repos", label: "Repositories", glyph: "" },
   ]
   readonly property string page: win.mgr ? win.mgr.page : "changes"
@@ -452,6 +500,20 @@ FloatingWindow {
 
   // ── PLACES ─────────────────────────────────────────────────────────────
   // terminus' own directory picker, and its windows for "show me"
+  // THE REPOSITORY DROPDOWN, under the sidebar's chip: the ones opened before
+  // (the open one ticked, by its name, its place beside it), then the ways to
+  // another — a directory, a clone, every one there is
+  function repoMenu() {
+    const items = win.mgr.recents.slice(0, 14).map((r) => ({
+      text: r.name, icon: r.root === win.root ? "\uF00C" : "\uF401", mark: D.tilde(r.root, win.home).replace(/\/[^/]*$/, ""),
+      run: () => { if (r.root !== win.root) win.openRepo(r.root); } }));
+    if (items.length > 0) items.push({ isSeparator: true });
+    items.push({ text: "Open a directory…", icon: "\uF07C", mark: "ctrl o", run: () => win.chooseRepo() },
+               { text: "Clone…", icon: "\uF019", run: () => { win.setPage("repos"); Qt.callLater(() => { if (win.pageItem && win.pageItem.clone) win.pageItem.clone(); }); } },
+               { text: "All repositories…", icon: "\uF03A", run: () => win.setPage("repos") });
+    const p = repoChip.mapToItem(stage, 0, repoChip.height + 4);
+    repoPop.open(p.x, p.y, items);
+  }
   function chooseRepo() {
     if (!win.mgr.fileManager) return;
     win.mgr.fileManager.choose(true, win.root !== "" ? win.root : win.home, (paths) => {
@@ -538,9 +600,20 @@ FloatingWindow {
             font.pixelSize: Zenon.px(14)
           }
         }
+        // a dropdown: every repository opened before, and the ways to another
+        // (user, 2026-10-11) — the Repositories page is one row of it
+        Text {
+          anchors.right: parent.right
+          anchors.rightMargin: 12
+          anchors.verticalCenter: parent.verticalCenter
+          text: "\uF078"
+          color: Zenon.muted
+          font.family: Zenon.glyphFace
+          font.pixelSize: Zenon.px(11)
+        }
         MouseArea {
           anchors.fill: parent
-          onClicked: win.setPage("repos")
+          onClicked: win.repoMenu()
         }
         HoverHandler {
           onHoveredChanged: hovered && win.root !== ""
@@ -641,8 +714,61 @@ FloatingWindow {
         }
       }
 
+      // what is missing, and its Install — see `needs`
+      Rectangle {
+        id: needBox
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: whoLine.top
+        anchors.margins: 12
+        visible: win.needs.length > 0
+        height: needCol.implicitHeight + 20
+        radius: Zenon.windowRadius
+        color: Zenon.alpha(Zenon.yellow, 0.08)
+        border.width: 1
+        border.color: Zenon.alpha(Zenon.yellow, 0.4)
+        Column {
+          id: needCol
+          x: 12
+          y: 10
+          width: parent.width - 24
+          spacing: 10
+          Text {
+            text: "Missing"
+            color: Zenon.yellow
+            font.family: Zenon.face
+            font.weight: Font.Bold
+            font.pixelSize: Zenon.px(14)
+          }
+          Repeater {
+            model: win.needs
+            delegate: Column {
+              required property var modelData
+              width: needCol.width
+              spacing: 6
+              Text {
+                width: parent.width
+                wrapMode: Text.Wrap
+                text: modelData.why
+                color: Zenon.soft
+                font.family: Zenon.face
+                font.weight: Zenon.weight
+                font.pixelSize: Zenon.px(13)
+              }
+              DialogButton {
+                label: win.mgr.installing && win.mgr.installing.pkg === modelData.pkg ? "Installing…" : "Install " + modelData.pkg
+                ink: Zenon.cyan
+                ready: !win.mgr.installing
+                onClicked: win.installNeed(modelData.pkg, modelData.why.replace(/, which is not installed$/, ""))
+              }
+            }
+          }
+        }
+      }
+
       // who commits: the first thing to set, said until it is
       Text {
+        id: whoLine
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.bottom: parent.bottom
@@ -650,7 +776,9 @@ FloatingWindow {
         visible: !!win.info && !!win.info.identity
         elide: Text.ElideRight
         text: !win.info || !win.info.identity ? ""
-          : win.info.identity.name !== "" ? "  " + win.info.identity.name + "  ·  " + win.info.identity.email
+          // the forge this repository is on, as its mark (user, 2026-10-11);
+          // the person, when it is on none delphi knows
+          : win.info.identity.name !== "" ? (win.hub && D.FORGES[win.hub.forge] ? D.FORGES[win.hub.forge].glyph : "\uF007") + "  " + win.info.identity.name + "  ·  " + win.info.identity.email
           : "  Who commits? Set your name"
         color: win.info && win.info.identity && win.info.identity.name === "" ? Zenon.yellow : Zenon.muted
         font.family: Zenon.face
@@ -660,32 +788,62 @@ FloatingWindow {
       }
     }
 
+    // ── WHAT SCROLLS UP GOES UNDER THE HEAD ──────────────────────────────
+    // The suite's frost (morpheus/ScrollEdge, as ceres lays it): each of the
+    // page's views (its edgeViews) carries its rows on past its top edge,
+    // blurred, from the top of the window down — under the head, and under
+    // the search fields and buttons that stand over the view, so those are
+    // frosted by the same material (user, 2026-10-11). Declared before the
+    // head, so the head's translucent ground tints them.
+    Repeater {
+      model: win.pageItem && win.pageItem.edgeViews ? win.pageItem.edgeViews : []
+      delegate: ScrollEdge {
+        required property var modelData
+        view: modelData
+        follow: true
+        chromeTop: 0
+        bar: null
+        visible: !!modelData && modelData.visible
+      }
+    }
+
     // ── the head ─────────────────────────────────────────────────────────
     Item {
       id: head
       anchors.left: side.right
       anchors.right: parent.right
       anchors.top: parent.top
-      height: 64
+      // one row, the title and what it is about beside it (user, 2026-10-11:
+      // two rows were taller than a head needs to be)
+      height: 46
+      // a header's translucent ground: the rows that go up under it (the
+      // ScrollEdges below) show through it frosted, as in terminus and ceres
+      Rectangle { anchors.fill: parent; color: Zenon.headBg }
 
-      Column {
+      Item {
         anchors.left: parent.left
         anchors.leftMargin: 22
         anchors.right: sync.left
         anchors.rightMargin: 16
-        anchors.verticalCenter: parent.verticalCenter
-        spacing: 2
+        anchors.top: parent.top
+        anchors.bottom: parent.bottom
         Text {
-          width: parent.width
+          id: headTitle
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+          width: Math.min(implicitWidth, parent.width * 0.6)
           elide: Text.ElideRight
           text: win.pageItem && win.pageItem.title ? win.pageItem.title : (win.pages.find((p) => p.id === win.page) || {}).label || ""
           color: Zenon.ink
           font.family: Zenon.face
           font.weight: Font.Bold
-          font.pixelSize: Zenon.px(22)
+          font.pixelSize: Zenon.px(19)
         }
         Text {
-          width: parent.width
+          anchors.left: headTitle.right
+          anchors.leftMargin: 12
+          anchors.right: parent.right
+          anchors.baseline: headTitle.baseline
           elide: Text.ElideMiddle
           text: win.pageItem && win.pageItem.subtitle !== undefined ? win.pageItem.subtitle : D.tilde(win.root, win.home)
           color: Zenon.muted
@@ -716,6 +874,7 @@ FloatingWindow {
           readonly property int sent: win.mgr.upload ? win.mgr.upload.entries.filter((e) => e.state === "sent").length : 0
           readonly property string phase: win.mgr.upload ? win.mgr.upload.phase : ""
           readonly property int waiting: win.mgr.upload ? win.mgr.upload.waiting || 0 : 0
+          readonly property var site: D.FORGES[win.mgr.upload && win.mgr.upload.forge || "github"]
           readonly property color ink: upPill.phase === "failed" ? Zenon.red : upPill.phase === "done" ? Zenon.green : Zenon.cyan
           Rectangle {
             anchors.fill: parent
@@ -761,7 +920,7 @@ FloatingWindow {
               anchors.verticalCenter: parent.verticalCenter
               text: upPill.phase === "done" ? "Uploaded " + upPill.total
                 : upPill.phase === "failed" ? "Upload stopped"
-                : upPill.waiting > 0 ? "GitHub asked to wait " + upPill.waiting + " s"
+                : upPill.waiting > 0 ? upPill.site.name + " asked to wait " + upPill.waiting + " s"
                 : upPill.phase === "committing" ? "Committing"
                 : "Uploading " + Math.min(upPill.sent + 1, upPill.total) + " of " + upPill.total
               color: upPill.ink
@@ -775,7 +934,7 @@ FloatingWindow {
           // stopping is asked first: a click meant for the bubble must not
           // throw an upload away
           TapHandler { onTapped: if (win.mgr.uploading) win.confirm({ question: "Stop the upload?", glyph: "\uF093", ink: Zenon.red,
-            detail: "Nothing is committed: what was sent so far is left unused on GitHub.", verb: "Stop", then: () => win.mgr.stopUpload() }) }
+            detail: "Nothing is committed: what was sent so far is left unused on " + upPill.site.name + ".", verb: "Stop", then: () => win.mgr.stopUpload() }) }
           Bubble {
             id: upBubble
             window: win
@@ -789,7 +948,7 @@ FloatingWindow {
               spacing: 8
               Text {
                 anchors.verticalCenter: parent.verticalCenter
-                text: "\uF09B"
+                text: upPill.site.glyph
                 color: Zenon.ink
                 font.family: Zenon.glyphFace
                 font.pixelSize: Zenon.px(14)
@@ -813,7 +972,7 @@ FloatingWindow {
             Text {
               text: upPill.phase === "failed" ? "Stopped \u2014 nothing was committed"
                 : upPill.phase === "done" ? "Committed \u2014 all " + upPill.total + " are there"
-                : upPill.waiting > 0 ? "GitHub asked for a pause of " + upPill.waiting + " s \u2014 carrying on after it"
+                : upPill.waiting > 0 ? upPill.site.name + " asked for a pause of " + upPill.waiting + " s \u2014 carrying on after it"
                 : upPill.phase === "committing" ? "All sent \u2014 making the commit\u2026"
                 : upPill.sent + " of " + upPill.total + " sent  \u00b7  the wheel scrolls  \u00b7  click the ring to stop"
               color: upPill.phase === "failed" ? Zenon.red : upPill.phase === "done" ? Zenon.green : Zenon.muted
@@ -928,7 +1087,8 @@ FloatingWindow {
       anchors.bottom: parent.bottom
       anchors.left: side.right
       anchors.right: parent.right
-      height: 50
+      // slimmer, as the head (user, 2026-10-11)
+      height: 40
       Rectangle { anchors.fill: parent; color: Zenon.hintFrostBg }
       Rectangle { anchors.top: parent.top; width: parent.width; height: 1; color: Zenon.border }
       HintRow {
@@ -1048,24 +1208,29 @@ FloatingWindow {
   // first needed (or from the sidebar), for every repository at once
   function askIdentity(then) {
     const id = win.info && win.info.identity ? win.info.identity : { name: "", email: "" };
-    // GitHub's account, when signed in: its name, and its private address
-    // for commits (githubStatus: noreply) to start from
-    win.mgr.call("githubStatus", null, {}, (ok, gh) => {
+    // the forge's account, when signed in — the one this repository is on,
+    // else the Accounts page's: its name, and its private address for
+    // commits (its Status: noreply) to start from
+    const site = D.FORGES[win.hub ? win.hub.forge : win.mgr.forge] || D.FORGES.github;
+    win.mgr.call(site.id + "Status", null, {}, (ok, gh) => {
       if (!win) return;
       const hub = ok && gh && gh.signedIn ? gh : null;
       win.ask({ title: "Who commits?", glyph: "",
         detail: "Git writes a name and an email into every commit, and will not commit without both. Set for all your repositories."
-          + (hub && !id.email ? " The email below is GitHub's private one for your account: commits are linked to you, your real address stays out of them." : ""),
+          + (hub && !id.email ? " The email below is " + site.name + "'s private one for your account: commits are linked to you, your real address stays out of them." : ""),
         fields: [{ key: "name", label: "Name", value: id.name || (hub ? hub.name || hub.login : ""), hint: "Ada Lovelace" },
                  { key: "email", label: "Email", value: id.email || (hub ? hub.noreply : ""), hint: "ada@example.com",
-                   why: "git needs one" + (hub ? "" : " — GitHub's private address (Settings → Emails) works") }],
+                   why: "git needs one" + (hub ? "" : " — your forge's private address (GitHub: Settings → Emails) works") }],
         verb: "Save",
         then: (v) => win.act("identitySet", { name: v.name.trim(), email: v.email.trim() }, {
           repo: null, said: "Saved — commits are now signed " + v.name.trim(),
           then: () => win.mgr.call("info", win.root, {}, (ok2, info) => { if (ok2) win.info = info; if (then) then(); }) }) });
     });
   }
-  onRootChanged: if (win.root !== "") win.mgr.call("info", win.root, {}, (ok, info) => { if (ok) win.info = info; })
+  onRootChanged: {
+    if (win.root !== "") win.mgr.call("info", win.root, {}, (ok, info) => { if (ok) win.info = info; });
+    win.checkTools();
+  }
 
   function sequence(action) {
     if (!win.state) return;
@@ -1074,4 +1239,12 @@ FloatingWindow {
   }
 
   WindowTip { id: tips; window: win }
+  PopMenu {
+    id: repoPop
+    parent: stage
+    anchors.fill: parent
+    window: win
+    cardWidth: 340
+    onClosed: win.refocus()
+  }
 }

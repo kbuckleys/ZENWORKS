@@ -16,6 +16,10 @@ import "delphi.js" as D
 Item {
   id: pg
   property var win: null
+  // the views whose rows carry on up under the window's head, frosted
+  // (DelphiWindow's ScrollEdges) — only those with nothing but controls
+  // between them and the head: a view under a title would paint over it
+  readonly property var edgeViews: [list, diff.view]
 
   readonly property string title: "Stashes"
   readonly property string subtitle: pg.stashes.length === 0 ? "Nothing put aside"
@@ -112,7 +116,7 @@ Item {
     anchors.left: parent.left
     anchors.top: parent.top
     anchors.bottom: parent.bottom
-    width: Math.round(Math.min(460, pg.width * 0.36))
+    width: pg.win && pg.win.splits.stashes ? pg.win.splits.stashes : Math.round(Math.min(460, pg.width * 0.36))
     clip: true
     topMargin: 8
     bottomMargin: 8
@@ -161,7 +165,15 @@ Item {
   }
   ElasticScroll { anchors.fill: list; view: list }
   Scrollbar { flick: list; anchors.right: list.right; anchors.top: list.top; anchors.bottom: list.bottom }
-  Rectangle { x: list.width; width: 1; height: parent.height; color: Zenon.border }
+  // the seam between the stashes and the diff: dragged, it stays
+  SeamGrip {
+    frame: pg
+    at: list.width
+    min: 240
+    max: pg.width - 360
+    onMoved: (p) => pg.win.setSplit("stashes", p)
+    onReset: pg.win.setSplit("stashes", 0)
+  }
 
   DiffView {
     id: diff

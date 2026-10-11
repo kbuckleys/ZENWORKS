@@ -38,6 +38,10 @@ import "../morpheus/icons.js" as Icons
 Item {
   id: pg
   property var win: null
+  // the views whose rows carry on up under the window's head, frosted
+  // (DelphiWindow's ScrollEdges) — only those with nothing but controls
+  // between them and the head: a view under a title would paint over it
+  readonly property var edgeViews: [list, diff.view]
 
   // ── the filter ─────────────────────────────────────────────────────────
   // What is typed in the field over the list (/): only the changes whose
@@ -628,7 +632,6 @@ Item {
       }
     }
   }
-  Rectangle { x: left.width; width: 1; height: parent.height; color: Zenon.border }
 
   // ── the diff ───────────────────────────────────────────────────────────
   DiffView {
@@ -709,7 +712,6 @@ Item {
   SeamGrip {
     frame: pg
     at: left.width
-    line: false
     min: 260
     max: pg.width - 360
     onMoved: (p) => pg.win.setSplit("changes", p)

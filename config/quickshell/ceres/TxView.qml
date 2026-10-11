@@ -233,8 +233,10 @@ Item {
         selectionColor: Zenon.selBg
         selectedTextColor: Zenon.white
         color: Zenon.keyInk
-        font.family: Zenon.faceMono
-        font.weight: Zenon.weight
+        // plato's font — the family and weight set in its settings
+        // (user, 2026-10-11); the fixed face when plato is not there
+        font.family: Ceres.editor && Ceres.editor.fontFamily ? Ceres.editor.fontFamily : Zenon.faceMono
+        font.weight: Ceres.editor && Ceres.editor.fontWeight ? Ceres.editor.fontWeight : Zenon.weight
         font.pixelSize: 13 + view.grow
         text: "<div style='white-space:pre-wrap'>"
           + pane.lines.map(pane.lineHtml).join("<br>") + "</div>"

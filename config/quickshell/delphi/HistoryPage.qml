@@ -27,14 +27,23 @@ import "../morpheus/icons.js" as Icons
 Item {
   id: pg
   property var win: null
+  // the views whose rows carry on up under the window's head, frosted
+  // (DelphiWindow's ScrollEdges) — only those with nothing but controls
+  // between them and the head: a view under a title would paint over it
+  readonly property var edgeViews: pg.planning ? [] : pg.scope === "all" ? [acrossList] : [list, fileList]
 
   readonly property string title: pg.planning ? "Rework " + plan.steps.length + " commits" : "History"
   readonly property string subtitle: pg.planning ? "onto " + D.short(plan.base) + "  ·  drag or alt ↑↓ to reorder"
+    : pg.scope === "all" ? pg.across.length + " repositories, newest first in each"
+    : pg.scope === "incoming" ? (pg.win && pg.win.branch && pg.win.branch.upstream
+        ? (pg.commits.length === 0 && pg.ended ? "nothing incoming — up to date with " : pg.commits.length + " not pulled yet from ") + pg.win.branch.upstream
+        : "this branch follows nothing upstream")
     : pg.commits.length + (pg.ended ? "" : "+") + " commits" + (pg.query !== "" ? " matching “" + pg.query + "”" : "")
   readonly property var hints: pg.planning ? plan.hints
     : pg.area === "files" ? [["↑↓", "files"], ["shift ↑↓", "diff"], ["e", "edit"]]
         .concat(pg.shownFiles[pg.fileSel] && pg.shownFiles[pg.fileSel].status === "D" ? [["r", "bring back"]] : []).concat([["tab", "commits"]])
-    : [["↑↓", "commits"], ["tab", "files"], ["/", "search"], ["c", "copy id"], ["b", "branch here"],
+    : pg.scope === "all" ? [["↑↓", "commits"], ["return", "open there"], ["v", "which history"]]
+    : [["↑↓", "commits"], ["tab", "files"], ["v", "which history"], ["/", "search"], ["c", "copy id"], ["b", "branch here"],
        ["p", "cherry-pick"], ["i", "rework from here"], ["menu", "more"]]
   // what the chosen commit removed: each can be brought back from it
   readonly property var removed: pg.shownFiles.filter((f) => f.status === "D")
@@ -47,6 +56,61 @@ Item {
     if (pg.planning) plan.takeFocus();
     else if (search.focused) return;
     else if (pg.win) pg.win.focusKeys();
+  }
+
+  // ── WHICH HISTORY ──────────────────────────────────────────────────────
+  // branch: every branch's commits, on the graph (as it always was)
+  // incoming: what the upstream has that this branch has not pulled — others'
+  //   work, by who made it; fetched first, so it is what is there now
+  // all: every repository opened before, its latest commits under its name;
+  //   one chosen opens there (user, 2026-10-11: history by repository, and
+  //   a way to see commits from others)
+  property string scope: "branch"
+  property var across: []
+  property bool acrossLoading: false
+  property string jumpSha: ""
+  property int acrossSel: -1
+  function acrossStep(d) {
+    const rs = pg.acrossRows;
+    let i = pg.acrossSel;
+    do { i += d; } while (i >= 0 && i < rs.length && rs[i].head);
+    if (i >= 0 && i < rs.length) { pg.acrossSel = i; acrossList.positionViewAtIndex(i, ListView.Contain); }
+  }
+  function setScope(sc) {
+    if (sc === pg.scope) return;
+    pg.scope = sc;
+    if (sc === "all") { pg.loadAcross(); return; }
+    if (sc === "incoming" && pg.win.branch && pg.win.branch.upstream) {
+      pg.win.act("fetch", {}, { label: "Fetching what is new", network: true, refresh: false,
+        then: () => { if (pg) pg.reload(); }, failed: () => { if (pg) pg.reload(); } });
+      pg.commits = [];
+      return;
+    }
+    pg.reload();
+  }
+  function loadAcross() {
+    pg.acrossLoading = true;
+    const roots = pg.win.mgr.recents.map((r) => r.root);
+    pg.win.mgr.call("across", null, { roots: roots, count: 12 }, (ok, res) => {
+      if (!pg) return;
+      pg.acrossLoading = false;
+      pg.across = ok ? res : [];
+    });
+  }
+  readonly property var acrossRows: {
+    const out = [];
+    for (const r of pg.across) {
+      out.push({ head: true, root: r.root, name: D.baseName(r.root), count: r.commits.length });
+      for (const c of r.commits) out.push(Object.assign({ root: r.root }, c));
+    }
+    return out;
+  }
+  // a commit chosen there: its repository opened, its history on it
+  function jumpTo(r) {
+    pg.jumpSha = r.sha;
+    pg.scope = "branch";
+    if (r.root !== pg.win.root) pg.win.openRepo(r.root);
+    else pg.reload();
   }
 
   // ── THE LOG ────────────────────────────────────────────────────────────
@@ -66,7 +130,12 @@ Item {
     if (pg.session >= 0) pg.win.mgr.call("logClose", pg.win.root, { session: pg.session });
     pg.session = -1;
     pg.ended = false;
+    if (pg.scope === "all") return;
     const args = pg.query !== "" ? { grep: pg.query } : {};
+    if (pg.scope === "incoming") {
+      if (!pg.win.branch || !pg.win.branch.upstream) { pg.commits = []; pg.ended = true; return; }
+      args.revs = ["HEAD..@{upstream}"];
+    }
     const root = pg.win.root;
     pg.win.mgr.call("logOpen", root, args, (ok, res) => { if (!pg) return;
       if (!ok || root !== pg.win.root) return;
@@ -85,7 +154,9 @@ Item {
       pg.commits = pg.commits.concat(res.commits);
       pg.ended = res.end;
       if (first) {
-        const i = pg.wantSha !== "" ? pg.commits.findIndex((c) => c.sha === pg.wantSha) : -1;
+        const want = pg.jumpSha !== "" ? pg.jumpSha : pg.wantSha;
+        pg.jumpSha = "";
+        const i = want !== "" ? pg.commits.findIndex((c) => c.sha === want) : -1;
         pg.sel = Math.max(0, i);
         pg.wantSha = "";
         list.positionViewAtIndex(pg.sel, ListView.Contain);
@@ -232,6 +303,18 @@ Item {
     if (pg.planning) return plan.key(e);
     const k = e.key, ctrl = e.modifiers & Qt.ControlModifier, shift = e.modifiers & Qt.ShiftModifier;
     if (ctrl) return false;
+    // which history: this branch → incoming → every repository → …
+    if (k === Qt.Key_V) {
+      const order = ["branch", "incoming", "all"];
+      pg.setScope(order[(order.indexOf(pg.scope) + 1) % order.length]);
+      return true;
+    }
+    if (pg.scope === "all") {
+      if (k === Qt.Key_Up || k === Qt.Key_K) { pg.acrossStep(-1); return true; }
+      if (k === Qt.Key_Down || k === Qt.Key_J) { pg.acrossStep(1); return true; }
+      if ((k === Qt.Key_Return || k === Qt.Key_Enter) && pg.acrossRows[pg.acrossSel]) { pg.jumpTo(pg.acrossRows[pg.acrossSel]); return true; }
+      return false;
+    }
     if (k === Qt.Key_Slash) { if (pg.area === "files") fileFilter.claim(); else search.claim(); return true; }
     if (k === Qt.Key_Tab || k === Qt.Key_Backtab) { pg.area = pg.area === "files" ? "commits" : "files"; return true; }
     if (pg.area === "files") {
@@ -275,14 +358,28 @@ Item {
     anchors.bottom: parent.bottom
     width: pg.win && pg.win.splits.history ? pg.win.splits.history : Math.round(pg.width * 0.56)
 
+    Segments {
+      id: scopes
+      x: 12
+      y: 12
+      textSize: Zenon.px(14)
+      options: [["branch", "This branch"],
+                ["incoming", "Incoming" + (pg.win && pg.win.branch && pg.win.branch.behind > 0 ? "  " + pg.win.branch.behind : "")],
+                ["all", "All repositories"]]
+      current: pg.scope
+      onChose: (v) => pg.setScope(v)
+    }
     BulkField {
       id: search
-      anchors.left: parent.left
-      anchors.right: parent.right
-      anchors.top: parent.top
-      anchors.margins: 12
-      height: 32
-      textSize: Zenon.px(15)
+      visible: pg.scope !== "all"
+      // beside the buttons when there is room for it, else a row under them
+      // (a narrow column pushed it across the seam, 2026-10-11)
+      readonly property bool under: parent.width - scopes.width - 36 < 220
+      x: under ? 12 : scopes.x + scopes.width + 12
+      y: under ? scopes.y + scopes.height + 8 : 12
+      width: parent.width - x - 12
+      height: scopes.height
+      textSize: Zenon.px(14)
       ghost: "  Search messages  ( / )"
       onAccepted: { pg.query = search.text.trim(); pg.reload(); pg.win.focusKeys(); }
       Keys.onEscapePressed: { search.text = ""; if (pg.query !== "") { pg.query = ""; pg.reload(); } pg.win.focusKeys(); }
@@ -292,9 +389,10 @@ Item {
       id: list
       anchors.left: parent.left
       anchors.right: parent.right
-      anchors.top: search.bottom
+      anchors.top: search.visible && search.under ? search.bottom : scopes.bottom
       anchors.topMargin: 8
       anchors.bottom: parent.bottom
+      visible: pg.scope !== "all"
       clip: true
       bottomMargin: 6
       boundsBehavior: Flickable.StopAtBounds
@@ -416,9 +514,78 @@ Item {
       }
     }
     ElasticScroll { anchors.fill: list; view: list }
+
+    // ── every repository, its latest commits under its name ──────────────
+    ListView {
+      id: acrossList
+      visible: pg.scope === "all"
+      anchors.left: parent.left
+      anchors.right: parent.right
+      anchors.top: scopes.bottom
+      anchors.topMargin: 8
+      anchors.bottom: parent.bottom
+      clip: true
+      bottomMargin: 6
+      boundsBehavior: Flickable.StopAtBounds
+      model: pg.acrossRows
+      readonly property int rowH: Math.round(Zenon.px(15) * 2.2)
+      SelectBar { view: acrossList; host: pg.win; index: pg.acrossSel; on: pg.acrossSel >= 0; rowH: acrossList.rowH; color: pg.win.hiFill; radius: Zenon.windowRadius; inset: 8 }
+      delegate: Item {
+        id: arow
+        required property var modelData
+        required property int index
+        readonly property var r: arow.modelData
+        width: acrossList.width
+        height: acrossList.rowH
+        Text {
+          visible: !!arow.r.head
+          x: 18
+          anchors.verticalCenter: parent.verticalCenter
+          anchors.verticalCenterOffset: 4
+          textFormat: Text.StyledText
+          text: arow.r.head ? "<b>" + arow.r.name + "</b>  <font color='" + Zenon.hex(Zenon.muted) + "'>" + D.tilde(arow.r.root, pg.win.home) + "</font>" : ""
+          color: Zenon.ink
+          font.family: Zenon.face
+          font.weight: Zenon.weight
+          font.pixelSize: Zenon.px(14)
+        }
+        Text {
+          visible: !arow.r.head
+          x: 30
+          width: parent.width - 30 - whoText.width - 34
+          anchors.verticalCenter: parent.verticalCenter
+          elide: Text.ElideRight
+          text: arow.r.subject || ""
+          color: arow.r.root === pg.win.root ? Zenon.ink : Zenon.soft
+          font.family: Zenon.face
+          font.weight: Zenon.weight
+          font.pixelSize: Zenon.px(15)
+        }
+        Text {
+          id: whoText
+          visible: !arow.r.head
+          anchors.right: parent.right
+          anchors.rightMargin: 18
+          anchors.verticalCenter: parent.verticalCenter
+          text: arow.r.head ? "" : arow.r.author + "   " + D.ago(arow.r.when, Date.now())
+          color: Zenon.muted
+          font.family: Zenon.face
+          font.weight: Zenon.weight
+          font.pixelSize: Zenon.px(13)
+        }
+        MouseArea {
+          anchors.fill: parent
+          enabled: !arow.r.head
+          onClicked: { pg.acrossSel = arow.index; pg.win.focusKeys(); }
+          onDoubleClicked: pg.jumpTo(arow.r)
+        }
+      }
+      Working { anchors.centerIn: parent; running: pg.acrossLoading; visible: pg.acrossLoading }
+      EmptyMark { anchors.centerIn: parent; visible: !pg.acrossLoading && pg.acrossRows.length === 0; word: "No repositories opened yet" }
+    }
+    ElasticScroll { anchors.fill: acrossList; view: acrossList; visible: pg.scope === "all" }
     Scrollbar { flick: list; anchors.right: list.right; anchors.top: list.top; anchors.bottom: list.bottom }
   }
-  Rectangle { visible: !pg.planning; x: left.width; width: 1; height: parent.height; color: Zenon.border }
 
   // ── the commit ─────────────────────────────────────────────────────────
   Item {
@@ -489,6 +656,10 @@ Item {
     }
     Rectangle { id: headRule; y: headCol.y + headCol.height + 12; width: parent.width; height: 1; color: Zenon.border; visible: !!pg.commit }
 
+    // its files go up under the filter field, the commit's message and the
+    // window's head, frosted — the window's ScrollEdge (edgeViews), drawn
+    // under this page, so the title and message read over it (user,
+    // 2026-10-11: the frost carried up through them)
     // its files, filtered by what is typed here
     BulkField {
       id: fileFilter
@@ -577,7 +748,19 @@ Item {
     // the wheel and the bar, as every list has them
     ElasticScroll { anchors.fill: fileList; view: fileList }
     Scrollbar { flick: fileList; anchors.right: fileList.right; anchors.top: fileList.top; anchors.bottom: fileList.bottom }
-    Rectangle { id: filesRule; anchors.top: fileList.bottom; width: parent.width; height: 1; color: Zenon.border; visible: pg.files.length > 0 }
+    // (the line under the files is the seam's own, below)
+    Item { id: filesRule; anchors.top: fileList.bottom; width: parent.width; height: 1; visible: pg.files.length > 0 }
+    // the seam between its files and their diff
+    SeamGrip {
+      vertical: false
+      visible: pg.files.length > 0
+      frame: right
+      at: filesRule.y
+      min: fileList.y + 60
+      max: right.height - 160
+      onMoved: (p) => pg.win.setSplit("historyFiles", p - fileList.y)
+      onReset: pg.win.setSplit("historyFiles", 0)
+    }
 
     DiffView {
       id: diff
@@ -612,7 +795,6 @@ Item {
     visible: !pg.planning
     frame: pg
     at: left.width
-    line: false
     min: 320
     max: pg.width - 360
     onMoved: (p) => pg.win.setSplit("history", p)

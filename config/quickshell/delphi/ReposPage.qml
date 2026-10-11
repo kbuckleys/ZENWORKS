@@ -26,6 +26,10 @@ import Quickshell.Io
 Item {
   id: pg
   property var win: null
+  // the views whose rows carry on up under the window's head, frosted
+  // (DelphiWindow's ScrollEdges) — only those with nothing but controls
+  // between them and the head: a view under a title would paint over it
+  readonly property var edgeViews: [list]
 
   readonly property string title: "Repositories"
   readonly property string subtitle: pg.scanning ? "Looking…" : pg.win && pg.win.root !== "" ? "Now: " + D.tilde(pg.win.root, pg.win.home) : "None open"
@@ -94,7 +98,7 @@ Item {
   }
   // DELETE: the whole directory to the trash (terminus' own command, gio
   // trash — so the trash can give it back), after a card that says what
-  // goes and whether GitHub still has it. The one open here is closed first.
+  // goes and whether its forge still has it. The one open here is closed first.
   function trash(r) {
     if (!r) return;
     pg.win.mgr.call("remotes", r.root, {}, (ok, rs) => {
@@ -108,7 +112,8 @@ Item {
           if (pg.win.root === r.root) { pg.win.unwatch(); pg.win.closeRepo(); }
           trasher.root = r.root;
           trasher.name = r.name;
-          trasher.command = ["sh", "-c", Terminus.trashCommand([r.root])];
+          // terminus' command is { script, args }, run through its shArgv
+          trasher.command = Terminus.shArgv(Terminus.trashCommand([r.root]));
           trasher.running = true;
         } });
     });
@@ -129,7 +134,7 @@ Item {
 
   function clone() {
     pg.win.ask({ title: "Clone a repository", glyph: "",
-      detail: "Its address — https://… or git@… — from GitHub, GitLab, Codeberg or anywhere. Your own GitHub ones are on the GitHub page.",
+      detail: "Its address — https://… or git@… — from GitHub, GitLab, Codeberg or anywhere. Your own ones are on the Accounts page.",
       fields: [{ key: "url", label: "Address", hint: "https://codeberg.org/someone/something.git" },
                { key: "into", label: "Into the directory", value: pg.win.home + "/", path: true }],
       toggles: [{ key: "light", label: "History without file contents (much faster for huge repositories)", value: false }],
@@ -143,7 +148,7 @@ Item {
   }
   function init() {
     pg.win.ask({ title: "A new repository", glyph: "",
-      detail: "An empty repository in a directory — made if it is not there yet. To publish it, the GitHub page.",
+      detail: "An empty repository in a directory — made if it is not there yet. To publish it, the Accounts page.",
       fields: [{ key: "path", label: "Directory", value: pg.win.home + "/", path: true },
                { key: "branch", label: "First branch", value: "main" }],
       verb: "Create",

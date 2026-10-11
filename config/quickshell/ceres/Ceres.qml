@@ -39,6 +39,9 @@ Singleton {
   id: root
 
   // ── the answer ──────────────────────────────────────────────────────────
+  // plato's manager, handed in by shell.qml: the job log is set in the
+  // editor's font (its family and weight), as delphi's diffs are
+  property var editor: null
   property var repo: []
   property var aur: []
   readonly property int total: root.repo.length + root.aur.length

@@ -134,9 +134,11 @@ module.exports = {
 
     const rem = (name, url) => ({ name: name, fetch: url, push: url });
     t.eq("hub: upstream first", D.hubOf([rem("origin", "git@github.com:me/x.git"), rem("upstream", "https://github.com/them/x")]).full, "them/x");
-    t.eq("hub: origin", D.hubOf([rem("origin", "git@github.com:me/x.git")]), { remote: "origin", host: "github.com", full: "me/x", web: "https://github.com/me/x" });
-    t.eq("hub: upstream not on github", D.hubOf([rem("upstream", "https://codeberg.org/a/b"), rem("origin", "https://github.com/me/x")]).remote, "origin");
-    t.eq("hub: none", D.hubOf([rem("origin", "https://codeberg.org/a/b")]), null);
+    t.eq("hub: origin", D.hubOf([rem("origin", "git@github.com:me/x.git")]), { remote: "origin", host: "github.com", full: "me/x", web: "https://github.com/me/x", forge: "github" });
+    t.eq("hub: upstream on codeberg", D.hubOf([rem("upstream", "https://codeberg.org/a/b"), rem("origin", "https://github.com/me/x")]).forge, "codeberg");
+    t.eq("hub: gitlab subgroup", D.hubOf([rem("origin", "git@gitlab.com:grp/sub/x.git")]).full, "grp/sub/x");
+    t.eq("hub: none", D.hubOf([rem("origin", "https://git.example.org/a/b")]), null);
+    t.eq("forge words", [D.FORGES.gitlab.pulls, D.forgeOfHost("CODEBERG.org").name], ["Merge requests", "Codeberg"]);
     t.eq("seconds of iso", D.secondsOf("1970-01-02T00:00:00Z"), 86400);
     t.eq("seconds of nothing", D.secondsOf(null), 0);
     t.eq("mark merged", D.forgeMark({ pull: true, state: "merged" }).word, "Merged");

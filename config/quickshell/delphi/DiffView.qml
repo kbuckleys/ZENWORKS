@@ -34,6 +34,14 @@ Item {
   property bool more: false
   property string empty: "No changes"
   property var host: null
+  // its list, for the window's ScrollEdge (rows going up under the head)
+  readonly property alias view: list
+  // CODE IN PLATO'S FONT — the family and weight set in plato's settings
+  // (user, 2026-10-11), so a diff reads as the file does in the editor;
+  // the suite's fixed face when plato is not there to ask
+  readonly property var editor: dv.host && dv.host.mgr ? dv.host.mgr.editor : null
+  readonly property string codeFace: dv.editor && dv.editor.fontFamily ? dv.editor.fontFamily : Zenon.faceFixed
+  readonly property int codeWeight: dv.editor && dv.editor.fontWeight ? dv.editor.fontWeight : Zenon.weight
   readonly property var rows: D.diffRows(dv.files || [])
   property int cursor: 0
   property int anchor: -1
@@ -182,7 +190,7 @@ Item {
         horizontalAlignment: Text.AlignRight
         text: row.r.old ? row.r.old : ""
         color: Zenon.dimInk
-        font.family: Zenon.faceFixed
+        font.family: dv.codeFace
         font.features: { "tnum": 1 }
         font.pixelSize: Zenon.px(13)
       }
@@ -196,7 +204,7 @@ Item {
         horizontalAlignment: Text.AlignRight
         text: row.r.nu ? row.r.nu : ""
         color: Zenon.dimInk
-        font.family: Zenon.faceFixed
+        font.family: dv.codeFace
         font.features: { "tnum": 1 }
         font.pixelSize: Zenon.px(13)
       }
@@ -209,7 +217,7 @@ Item {
         verticalAlignment: Text.AlignVCenter
         text: row.r.kind !== "line" || row.r.t === " " ? "" : row.r.t
         color: row.r.t === "+" ? Zenon.green : Zenon.red
-        font.family: Zenon.faceFixed
+        font.family: dv.codeFace
         font.weight: Font.Bold
         font.pixelSize: Zenon.px(15)
       }
@@ -224,8 +232,8 @@ Item {
         textFormat: row.r.spans ? Text.RichText : Text.PlainText
         text: row.r.kind !== "line" ? "" : row.r.spans ? dv.richOf(row.r) : row.r.text.replace(/\t/g, "    ")
         color: row.r.t === " " ? Zenon.soft : Zenon.ink
-        font.family: Zenon.faceFixed
-        font.weight: Zenon.weight
+        font.family: dv.codeFace
+        font.weight: dv.codeWeight
         font.pixelSize: Zenon.px(15)
       }
       Text {

@@ -2075,46 +2075,21 @@ Column {
       // off the right-hand edge of the window — which is why the preview
       // pane had 12px of padding down its left side and 3px down its right.
       // A child of bodyBox costs the Row nothing.
-      MouseArea {
+      // terminus/SeamGrip (the suite's seam, since 2026-10-11): straddling
+      // bodyBox's left edge, which IS the divider, measured in the window's
+      // content — it travels with the divider, and a delta read off it
+      // jittered — and no line of its own here (the sidebar's edge is drawn
+      // with the sidebar). Double click springs it back to 200.
+      SeamGrip {
         id: sideGrip
-        width: 9
-        height: parent.height
-        // z above the body so the cursor changes over the seam even where a
-        // row is drawn right up to it
-        z: 9
         visible: term.sidebar
-        hoverEnabled: true
-        cursorShape: Qt.SizeHorCursor
-        preventStealing: true
-        // Straddling the divider, half either side — and measured from
-        // bodyBox's own left edge, which IS the divider, so this no longer
-        // has to follow side.width at all.
-        x: -4
-
-        // Where in the grip it was taken hold of, so the seam stays under
-        // the same part of the pointer for the whole drag.
-        property real grab: 0
-
-        // Measured in the window's coordinates, never in the grip's own.
-        //
-        // The grip travels with the divider, so while you drag it slides
-        // along underneath the pointer — and a delta taken from `m.x` is
-        // measured against an origin that is itself moving. Each frame
-        // overshot and the next corrected, which is what made the divider
-        // jitter. The window does not move, so a position mapped into it is
-        // stable.
-        onPressed: (m) => {
-          sideGrip.grab = m.x;
-        }
-        onPositionChanged: (m) => {
-          if (!sideGrip.pressed) return;
-          const px = sideGrip.mapToItem(term.contentRef, m.x, 0).x;
-          term.sidebarWidth = Math.max(term.sidebarMin,
-            Math.min(term.sidebarMax, px - sideGrip.grab + 4));
-        }
-        // Double click springs it back, so a width dragged somewhere silly is
-        // one gesture to undo rather than a careful drag back.
-        onDoubleClicked: term.sidebarWidth = 200
+        line: false
+        frame: term.contentRef
+        at: 0
+        min: term.sidebarMin
+        max: term.sidebarMax
+        onMoved: (p) => term.sidebarWidth = p
+        onReset: term.sidebarWidth = 200
       }
 
     // Ctrl+wheel zooms — see the overlay at the bottom of this Item.
@@ -3096,43 +3071,22 @@ Column {
     // the seam is neutral while it is only a seam, and says so the moment
     // it is a thing you can take hold of. That is not decoration — it is
     // the line answering the cursor that has just changed shape over it.
-    Rectangle {
-      width: 1
-      height: parent.height
-      x: term.paneSplit
-      visible: term.dual
-      color: splitGrip.pressed || splitGrip.containsMouse
-        ? Zenon.cyan : Zenon.border
-    }
-
-    // The divider, as something you can take hold of. The sidebar's grip in
-    // every respect — 9px straddling a 1px line, z above the body so the
-    // cursor changes over the seam, and measured in a frame that does NOT
-    // move: bodyBox's own width is fixed while the split is dragged, and
-    // reading the delta off the grip would be reading it against an origin
-    // sliding under the pointer.
-    MouseArea {
+    // terminus/SeamGrip: the line and its grip, cyan under the pointer,
+    // measured in bodyBox (whose width is fixed while the split is dragged);
+    // double click back to even
+    SeamGrip {
       id: splitGrip
-      width: 9
-      height: parent.height
-      x: term.paneSplit - 4
-      z: 9
       visible: term.dual
-      hoverEnabled: true
-      cursorShape: Qt.SizeHorCursor
-      preventStealing: true
-
-      property real grab: 0
-      onPressed: (m) => { splitGrip.grab = m.x; }
-      onPositionChanged: (m) => {
-        if (!splitGrip.pressed || bodyBox.width <= 0) return;
-        const px = splitGrip.mapToItem(bodyBox, m.x, 0).x - splitGrip.grab + 4;
-        term.paneFrac = Math.max(term.paneMinFrac,
-          Math.min(term.paneMaxFrac, px / bodyBox.width));
+      frame: bodyBox
+      at: term.paneSplit
+      min: bodyBox.width * term.paneMinFrac
+      max: bodyBox.width * term.paneMaxFrac
+      onMoved: (p) => {
+        if (bodyBox.width <= 0) return;
+        term.paneFrac = Math.max(term.paneMinFrac, Math.min(term.paneMaxFrac, p / bodyBox.width));
         term.viewSaveRef.restart();
       }
-      // back to even, the way the sidebar's grip springs back to 200
-      onDoubleClicked: { term.paneFrac = 0.5; term.viewSaveRef.restart(); }
+      onReset: { term.paneFrac = 0.5; term.viewSaveRef.restart(); }
     }
 
     // Which side the keyboard is in, ON the divider — as a GRIP.

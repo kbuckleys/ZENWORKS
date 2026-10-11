@@ -28,14 +28,18 @@ import urllib.error
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 
+import rest
+from files import SKIP_DIRS, SKIP_FILES, SKIP_ENDS, expand   # noqa: F401  (github.expand, the tests')
+from rest import ForgeError
+
 API = "https://api.github.com"
 HOST = "github.com"
 
 
-class ForgeError(Exception):
-    def __init__(self, msg, status=None):
-        super().__init__(msg)
-        self.status = status
+
+
+def _keyring(action, fields):
+    return rest.keyring(action, fields)
 
 
 def _gh(*args, input=None, timeout=20):
@@ -52,24 +56,6 @@ def have_gh():
     return _gh("--version") is not None
 
 
-def _keyring(action, fields):
-    # Only the keyring helper, whatever else the user has configured: this is
-    # delphi's own store, asked directly. Prompts are switched off, so a miss
-    # is an empty answer, never a question.
-    body = "".join(f"{k}={v}\n" for k, v in fields.items()) + "\n"
-    env = dict(os.environ, GIT_TERMINAL_PROMPT="0", GIT_ASKPASS="/bin/false",
-               SSH_ASKPASS="/bin/false")
-    try:
-        r = subprocess.run(["git", "-c", "credential.helper=",
-                            "-c", "credential.helper=libsecret",
-                            "credential", action], input=body, text=True,
-                           stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-                           env=env, timeout=20)
-    except (FileNotFoundError, subprocess.TimeoutExpired):
-        return {}
-    if r.returncode != 0:
-        return {}
-    return dict(l.split("=", 1) for l in r.stdout.splitlines() if "=" in l)
 
 
 def token():
@@ -85,7 +71,7 @@ def token():
 
 def status():
     tok, src = token()
-    res = {"signedIn": False, "source": src, "gh": have_gh()}
+    res = {"signedIn": False, "source": src, "gh": have_gh(), "cli": have_gh(), "forge": "github", "host": HOST}
     if not tok:
         return res
     try:
@@ -153,77 +139,62 @@ def login(emit, cancel):
     return status()
 
 
-def logout():
-    r = _gh("auth", "logout", "-h", HOST)
+# ── SEVERAL ACCOUNTS ────────────────────────────────────────────────────
+# gh keeps any number of accounts per host, one of them active; delphi lists
+# them, switches between them (gh auth switch), and adds one by signing in
+# again (gh auth login adds; it does not replace). A token in the keyring is
+# one more, shown as such.
+
+ACCOUNT = re.compile(r"account\s+(\S+)")
+ACTIVE = re.compile(r"Active account:\s*(true|false)")
+
+
+def accounts():
+    out, cur = [], None
+    r = _gh("auth", "status", "-h", HOST)
+    for line in (r.stdout + r.stderr if r is not None else "").splitlines():
+        m = ACCOUNT.search(line)
+        if m and HOST in line:
+            cur = {"login": m.group(1), "source": "gh", "active": False}
+            out.append(cur)
+            continue
+        a = ACTIVE.search(line)
+        if a and cur is not None:
+            cur["active"] = a.group(1) == "true"
+    if not out:
+        c = _keyring("fill", {"protocol": "https", "host": HOST})
+        if c.get("username"):
+            out.append({"login": c["username"], "source": "keyring", "active": True})
+    return {"accounts": out, "many": True}
+
+
+def switch_account(login):
+    r = _gh("auth", "switch", "-h", HOST, "-u", login)
+    if r is None or r.returncode != 0:
+        raise ForgeError((r.stderr or r.stdout).strip() if r is not None else "gh is not there")
+    return status()
+
+
+def logout(login=None):
+    # the account named, or the active one
+    r = _gh("auth", "logout", "-h", HOST, *(["-u", login] if login else []))
     return {"ok": r is not None and r.returncode == 0}
 
 
+
+
 def call(method, path, body=None, tok=None, raw=False, again=False, waited=None):
-    """One request to the API. `again`: a write that may be sent twice —
-    one whose second sending makes nothing new (a blob or a tree is named by
-    its content: the same one twice is the same one). `waited(seconds)` is
-    told when GitHub asks for a pause and it is kept."""
     if tok is None:
         tok, _ = token()
     if not tok:
         raise ForgeError("not signed in to GitHub", 401)
     url = path if path.startswith("http") else API + path
-    data = json.dumps(body).encode() if body is not None else None
-    req = urllib.request.Request(url, data=data, method=method, headers={
+    return rest.request(method, url, {
         "Authorization": "Bearer " + tok,
         "Accept": "application/vnd.github+json",
         "X-GitHub-Api-Version": "2022-11-28",
         "User-Agent": "delphi",
-    })
-    if data is not None:
-        req.add_header("Content-Type", "application/json")
-    # A READ IS TRIED AGAIN when the network failed it — a connection that
-    # hung (seen right after signing in, 2026-10-10: "timed out", and the
-    # same call took 0.7 s a minute later) or one refused — and so is a write
-    # marked `again`. Any other write is not: it may have landed, and doing
-    # it twice could make two of something. A stall is given up on early
-    # and tried again — answers come in half a second, and a stalled one
-    # (2026-10-11: one in a dozen) only ever stalls; the patience grows with
-    # each try.
-    #
-    # GITHUB'S "SLOW DOWN" (403 or 429 with Retry-After, or its secondary
-    # rate limit: content made too fast) is waited out as long as it says,
-    # a few times, for any request that may be sent again — a 468-file upload
-    # stopped on a timeout at file 341 (2026-10-11).
-    safe = method == "GET" or again
-    waits = (6, 10, 20, 30) if safe else (20,)
-    tries, pauses = len(waits), 0
-    n = 0
-    while True:
-        try:
-            with urllib.request.urlopen(req, timeout=waits[min(n, tries - 1)]) as r:
-                txt = r.read().decode()
-                link = r.headers.get("Link", "")
-            break
-        except urllib.error.HTTPError as e:
-            try:
-                msg = json.loads(e.read().decode()).get("message", "")
-            except Exception:
-                msg = ""
-            after = e.headers.get("Retry-After") if e.headers else None
-            slow = e.code == 429 or (e.code == 403 and (after or "rate limit" in msg.lower()))
-            if slow and safe and pauses < 4:
-                pauses += 1
-                pause = min(120, int(after) if after and after.isdigit() else 60)
-                if waited:
-                    waited(pause)
-                time.sleep(pause)
-                continue
-            raise ForgeError(msg or f"GitHub answered {e.code}", e.code)
-        except (urllib.error.URLError, TimeoutError, OSError) as e:
-            n += 1
-            if n < tries:
-                time.sleep(0.5 * n)
-                continue
-            why = getattr(e, "reason", None) or e
-            raise ForgeError(f"cannot reach GitHub: {why}")
-    val = json.loads(txt) if txt else None
-    return (val, link) if raw else val
+    }, body, raw, again, waited, who="GitHub")
 
 
 def _paged(path, tok, limit=1000):
@@ -273,88 +244,6 @@ def branches(full):
 BATCH_FILES = 100
 BATCH_BYTES = 2_000_000
 INLINE_BYTES = 400_000
-
-# What a chosen directory never sends: git's own (a .git directory is a
-# repository's history, not its files) and the caches tools leave beside
-# code. Inside a git work tree its ignore rules are kept as well (_ignored).
-SKIP_DIRS = {".git", "__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache"}
-SKIP_FILES = {".DS_Store", "Thumbs.db"}
-SKIP_ENDS = (".pyc", ".pyo")
-
-
-def _ignored(paths):
-    """Which of these files git would ignore, asked of the work tree each one
-    is in (none, when they are in none). Never raises: a question git cannot
-    answer leaves the file in."""
-    out, by_top = set(), {}
-    for p in paths:
-        by_top.setdefault(os.path.dirname(p), []).append(p)
-    tops = {}
-    for d in by_top:
-        try:
-            r = subprocess.run(["git", "-C", d, "rev-parse", "--show-toplevel"],
-                               stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-                               text=True, timeout=10)
-        except (OSError, subprocess.TimeoutExpired):
-            continue
-        if r.returncode == 0 and r.stdout.strip():
-            tops.setdefault(r.stdout.strip(), []).extend(by_top[d])
-    for top, ps in tops.items():
-        try:
-            r = subprocess.run(["git", "-C", top, "check-ignore", "-z", "--stdin"],
-                               input="\0".join(ps) + "\0", stdout=subprocess.PIPE,
-                               stderr=subprocess.DEVNULL, text=True, timeout=30)
-        except (OSError, subprocess.TimeoutExpired):
-            continue
-        out.update(x for x in r.stdout.split("\0") if x)
-    return out
-
-
-def expand(files, count=False):
-    """files: [{local, path}] where a local may be a DIRECTORY — it stands
-    for every file under it, each landing at path + its place inside (the
-    directory keeps its own name: path is where the directory itself goes).
-    Symbolic links to directories are not followed (a loop, or half the
-    disk); a link to a file uploads the file's contents. Sockets, devices
-    and broken links are left out, as are caches and what git ignores there
-    (see SKIP_DIRS). Sorted, so a plan and its upload agree. With `count`, a
-    pair: the files, and how many files were left out (a skipped directory
-    is passed by, not counted)."""
-    out, seen, walked, skipped = [], set(), [], [0]
-    for f in files:
-        local, path = f["local"], f["path"].strip("/")
-        if os.path.isdir(local) and not os.path.islink(local):
-            for top, dirs, names in os.walk(local):
-                dirs[:] = sorted(d for d in dirs if d not in SKIP_DIRS)
-                for n in sorted(names):
-                    full = os.path.join(top, n)
-                    if not os.path.isfile(full):
-                        continue
-                    if n in SKIP_FILES or n.endswith(SKIP_ENDS):
-                        skipped[0] += 1
-                        continue
-                    rel = os.path.relpath(full, local).replace(os.sep, "/")
-                    dest = path + "/" + rel if path else rel
-                    if dest not in seen:
-                        seen.add(dest)
-                        e = {"local": full, "path": dest}
-                        out.append(e)
-                        walked.append(e)
-        elif os.path.isfile(local):
-            if path not in seen:
-                seen.add(path)
-                out.append({"local": local, "path": path})
-    # a file chosen by name goes whatever git thinks; one found in a
-    # directory goes only if git would keep it
-    if walked:
-        drop = _ignored([e["local"] for e in walked])
-        if drop:
-            found = {id(e) for e in walked}
-            kept = [f for f in out if id(f) not in found or f["local"] not in drop]
-            skipped[0] += len(out) - len(kept)
-            out = kept
-    return (out, skipped[0]) if count else out
-
 
 def plan(full, files, branch=None):
     """What an upload would do, before it does it: each file's size, where
@@ -559,7 +448,7 @@ def issues(full, state="open"):
     return [_row(r, False) for r in rs if "pull_request" not in r]
 
 
-def thread(full, number):
+def thread(full, number, pull=False):
     """One issue or pull request, whole: its text, then what was said on it,
     oldest first — comments, and for a pull request its reviews (approved,
     changes asked for) among them."""
@@ -604,13 +493,13 @@ def thread(full, number):
     return out
 
 
-def comment(full, number, body):
+def comment(full, number, body, pull=False):
     c = call("POST", f"/repos/{full}/issues/{number}/comments", {"body": body})
     return {"author": _who(c.get("user")), "body": c.get("body") or "",
             "when": c.get("created_at"), "kind": "comment"}
 
 
-def set_state(full, number, open):
+def set_state(full, number, open, pull=False):
     r = call("PATCH", f"/repos/{full}/issues/{number}",
              {"state": "open" if open else "closed"})
     return {"state": r.get("state")}

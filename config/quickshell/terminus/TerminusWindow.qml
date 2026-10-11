@@ -901,7 +901,7 @@ FloatingWindow {
   // reads as the window resisting you rather than as smoothness. Exactly the
   // rule the sidebar's own Behavior follows; see `side`.
   Behavior on paneFrac {
-    enabled: !chrome.splitGrip.pressed
+    enabled: !chrome.splitGrip.held
     NumberAnimation { duration: Zenon.normal; easing.type: Zenon.ease }
   }
   readonly property real paneMinFrac: 0.15

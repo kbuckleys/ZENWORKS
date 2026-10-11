@@ -58,7 +58,7 @@ Rectangle {
   // squeezed, and fades with the slide. Not while it is being dragged:
   // easing every frame of a drag makes the edge lag the pointer.
   Behavior on width {
-    enabled: !term.sideGripRef.pressed && !term.sideFollowing
+    enabled: !term.sideGripRef.held && !term.sideFollowing
     NumberAnimation { duration: Math.round(Zenon.normal * 1.4); easing.type: Zenon.travelEase }
   }
 
@@ -66,7 +66,7 @@ Rectangle {
     anchors.right: parent.right
     width: 1
     height: parent.height
-    color: term.sideGripRef.pressed || term.sideGripRef.containsMouse
+    color: term.sideGripRef.lit
       ? Zenon.cyan : Zenon.border
   }
 

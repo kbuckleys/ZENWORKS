@@ -3,18 +3,22 @@
 // └─┘└─┘┘└┘└┴┘└─┘┴└─┴ ┴└─┘
 // https://github.com/kbuckleys/
 //
-// GITHUB — the account, and its repositories: clone one, open it on the
-// web, publish the repository you have open as a new one, or upload files
-// straight to one (a commit made on GitHub — no clone, no git here).
+// ACCOUNTS — GitHub, GitLab and Codeberg, one at a time (the switch at the
+// top; delphi.js FORGES): the account, and its repositories — clone one,
+// open it on the web, publish the repository you have open, or upload files
+// straight to one (a commit made there — no clone, no git here). Every
+// request is the chosen forge's own (op: "github…", "gitlab…", "codeberg…";
+// delphi/core github.py, gitlab.py, forgejo.py answer to the same names).
 //
 // SIGNING IN is a card on the window's sheet, like every other question:
-// the browser (gh's own sign-in — its one-time code shown on the card, Open
-// and Copy beside it, and the card goes when GitHub says yes), or a personal
-// access token pasted in, kept in the keyring. Either way git's own pushes
-// to github.com use it too (delphi/core: gitrun.Creds).
+// the browser where the forge's own command-line tool can do it — gh (its
+// one-time code shown on the card, Open and Copy beside it), glab (a page it
+// opens) — or a personal access token pasted in, kept in the keyring. Either
+// way git's own pushes there use it too (delphi/core: gitrun.Creds).
+// Codeberg has no such tool: a token.
 //
 //   ↑↓ repositories · return clone · u upload files · w open on the web
-//   / filter · n new repository
+//   / filter · n new repository · [ ] the forge before / after
 
 import QtQuick
 import Quickshell
@@ -26,60 +30,152 @@ import "../terminus/terminus.js" as Terminus
 Item {
   id: pg
   property var win: null
+  // the views whose rows carry on up under the window's head, frosted
+  // (DelphiWindow's ScrollEdges) — only those with nothing but controls
+  // between them and the head: a view under a title would paint over it
+  readonly property var edgeViews: [list]
 
-  property var account: null      // githubStatus
+  // the forge shown, and the words and requests that are its own
+  readonly property string forge: pg.win && pg.win.mgr ? pg.win.mgr.forge : "github"
+  readonly property var site: D.FORGES[pg.forge] || D.FORGES.github
+  // from `forge` itself, never `site`: in onForgeChanged a binding made
+  // from it may not have caught up (the reload asked the forge just left)
+  function op(name) { return (D.FORGES[pg.forge] || D.FORGES.github).id + name; }
+  function switchTo(id) {
+    if (!D.FORGES[id] || id === pg.forge) return;
+    pg.win.mgr.set("forge", id);
+  }
+  onForgeChanged: {
+    if (!pg.win) return;      // being made: the first reload comes on its own
+    pg.account = null; pg.repos = []; pg.listError = ""; pg.sel = 0; filter.text = ""; pg.reload();
+  }
+
+  property var account: null      // the forge's Status
+  // signed in before through the forge's tool, which is gone now: whom its
+  // record still names (the window's tools) — a reinstall brings it back
+  readonly property string was: pg.win && pg.win.tools && pg.site.cli && !pg.win.tools[pg.site.cli]
+    ? (pg.win.tools[pg.site.cli + "User"] || "") : ""
   property bool checking: true
   readonly property bool signedIn: !!pg.account && pg.account.signedIn
 
-  readonly property string title: "GitHub"
-  readonly property string subtitle: pg.checking ? "Asking GitHub…"
-    : pg.signedIn ? "Signed in as " + pg.account.login + (pg.account.source === "gh" ? " through gh" : " with a token")
+  readonly property string title: pg.site.name
+  readonly property string subtitle: pg.checking ? "Asking " + pg.site.name + "…"
+    : pg.signedIn ? "Signed in as " + pg.account.login + (pg.account.source === pg.site.cli && pg.site.cli ? " through " + pg.site.cli : " with a token")
     : "Not signed in"
   readonly property var hints: pg.signedIn
-    ? [["return", "clone"], ["u", "upload files"], ["w", "web"], ["n", "new"], ["/", "filter"]]
-    : [["return", "sign in"]]
+    ? [["return", "open"], ["c", "clone"], ["u", "upload files"], ["w", "web"], ["n", "new"], ["/", "filter"], ["[ ]", "forge"]]
+    : [["return", "sign in"], ["[ ]", "forge"]]
   readonly property var buttons: pg.signedIn ? [
     { label: "Sign out", run: () => pg.signOut() },
     { label: "Upload files", visible: !!pg.repo, run: () => pg.upload(pg.repo) },
     { label: pg.win && pg.win.root !== "" && !pg.win.origin ? "Publish " + pg.win.repoName : "New repository",
       ink: Zenon.cyan, primary: true, run: () => pg.create() },
+  ] : pg.was !== "" ? [
+    { label: "Sign in another way", run: () => pg.signIn() },
+    { label: "Install " + pg.site.pkg, ink: Zenon.cyan, primary: true, ready: !pg.checking && !pg.win.mgr.installing, run: () => pg.installThenSignIn() },
   ] : [{ label: "Sign in", ink: Zenon.cyan, primary: true, ready: !pg.checking, run: () => pg.signIn() }]
   function takeFocus() { if (!filter.focused && pg.win) pg.win.focusKeys(); }
 
+  // An answer is for the forge it was asked of: one that comes after the
+  // switch has moved on is dropped — GitHub's account once landed under
+  // GitLab's name this way (2026-10-11).
   function reload() {
     pg.checking = true;
-    pg.win.mgr.call("githubStatus", null, {}, (ok, st) => { if (!pg) return;
+    const asked = pg.forge;
+    pg.win.mgr.call(pg.op("Status"), null, {}, (ok, st) => { if (!pg || asked !== pg.forge) return;
       pg.checking = false;
       pg.account = ok ? st : null;
-      if (pg.signedIn) pg.loadRepos();
+      if (pg.signedIn) { pg.loadRepos(); pg.loadAccounts(); }
     });
   }
   Component.onCompleted: Qt.callLater(pg.reload)
 
+  // ── accounts ───────────────────────────────────────────────────────────
+  // Every account delphi can see on this forge (gh keeps several, one
+  // active; glab and a keyring token one) — the account menu's rows.
+  property var accountList: []
+  property bool many: false
+  function loadAccounts() {
+    const asked = pg.forge;
+    pg.win.mgr.call(pg.op("Accounts"), null, {}, (ok, a) => {
+      if (!pg || asked !== pg.forge || !ok) return;
+      pg.accountList = a.accounts;
+      pg.many = a.many;
+    });
+  }
+  // the menu on the account's name: switch to another, add one (where the
+  // forge's tool keeps several), sign out
+  function accountMenu() {
+    const me = pg.account ? pg.account.login : "";
+    const items = pg.accountList.map((a) => ({
+      text: a.login + (a.source === "keyring" ? "  (token)" : ""), icon: a.active ? "\uF00C" : "\uF007",
+      enabled: !a.active && pg.many, run: () => pg.switchAccount(a.login) }));
+    if (pg.many) items.push({ text: "Add another account…", icon: "\uF067", run: () => pg.signIn(true) });
+    items.push({ isSeparator: true },
+               { text: "Sign out of " + me, icon: "\uF08B", danger: true, run: () => pg.signOut() });
+    const p = accountChip.mapToItem(pg, 0, accountChip.height + 4);
+    menu.open(p.x, p.y, items);
+  }
+  function switchAccount(login) {
+    pg.win.act(pg.op("Switch"), { login: login }, { repo: null, refresh: false, network: true,
+      label: "Switching to " + login,
+      then: (st) => { if (!pg) return; pg.account = st; pg.repos = []; pg.loadRepos(); pg.loadAccounts();
+                      pg.win.say("Now " + login + " on " + pg.site.name); } });
+  }
+
   // ── signing in ─────────────────────────────────────────────────────────
-  function signIn() {
-    const gh = pg.account && pg.account.gh;
+  // `another`: an account added beside the one signed in (gh keeps both)
+  function signIn(another) {
+    // the browser, where the forge's own tool signs in (gh, glab), else a
+    // token; the tool not installed, it is offered — Ceres installs it
+    const has = !!pg.account && !!pg.account.cli;
+    const cli = has && pg.site.cli !== "";
+    const missing = !has && pg.site.cli !== "";
     const choices = [];
-    if (gh) choices.push({ label: "Use the browser", ink: Zenon.cyan, run: () => pg.browser() });
-    choices.push({ label: "Paste a token", ink: gh ? Zenon.muted : Zenon.cyan, run: () => pg.token() });
+    if (cli) choices.push({ label: "Use the browser", ink: Zenon.cyan, run: () => pg.browser() });
+    if (missing) choices.push({ label: "Install " + pg.site.pkg + ", then sign in", ink: Zenon.cyan, run: () => pg.installThenSignIn() });
+    choices.push({ label: "Paste a token", ink: cli || missing ? Zenon.muted : Zenon.cyan, run: () => pg.token() });
     choices.push({ label: "Cancel", ink: Zenon.muted });
-    pg.win.card_({ question: "Sign in to GitHub", glyph: "", ink: Zenon.ink,
-      detail: gh ? "In your browser, through the GitHub CLI — or with a personal access token you made."
-                 : "With a personal access token (github.com → Settings → Developer settings). Installing github-cli adds signing in with the browser.",
+    pg.win.card_({ question: another ? "Another account on " + pg.site.name : "Sign in to " + pg.site.name, glyph: pg.site.glyph, ink: Zenon.ink,
+      detail: cli ? "In your browser, through " + pg.site.cli + " — or with a personal access token you made."
+          + (another ? " It is added beside " + pg.account.login + " and becomes the one in use; switch back from the account menu." : "")
+        : missing ? "Signing in with the browser goes through " + pg.site.cli + ", which is not installed. Delphi can have Ceres install it ("
+          + pg.site.pkg + " — Ceres asks for your password), or paste a personal access token (" + pg.site.tokens + ")."
+        : "With a personal access token (" + pg.site.tokens + ").",
       choices: choices });
+  }
+  // the forge's tool, through Ceres, then the browser sign-in it gives —
+  // once Ceres says it is in, and the daemon finds it
+  function installThenSignIn() {
+    const asked = pg.forge;
+    pg.win.mgr.installTool(pg.site.pkg, "for signing in to " + pg.site.name, (ok) => {
+      if (!pg || !ok || asked !== pg.forge) return;
+      pg.win.mgr.call(pg.op("Status"), null, {}, (ok2, st) => {
+        if (!pg || asked !== pg.forge || !ok2) return;
+        pg.account = st;
+        // its record kept the sign-in: back as it was, nothing to ask
+        if (st.signedIn) { pg.win.say("Signed in again as " + st.login); pg.loadRepos(); pg.loadAccounts(); return; }
+        if (st.cli) pg.browser();
+      });
+    });
   }
   function browser() {
     let codeCard = -1, job = -1;
-    job = pg.win.act("githubLogin", {}, {
-      repo: null, label: "Signing in", refresh: false,
+    job = pg.win.act(pg.op("Login"), {}, {
+      repo: null, label: "Signing in to " + pg.site.name, network: true, refresh: false,
       event: (ev) => { if (!pg) return;
         if (!ev.device || codeCard >= 0) return;
         const d = ev.device;
-        codeCard = pg.win.card_({ question: "Your code:  " + d.code, glyph: "", ink: Zenon.cyan,
-          detail: "Enter it at " + d.url.replace(/^https:\/\//, "") + " — this card goes by itself once GitHub says yes.",
-          choices: [{ label: "Open GitHub", ink: Zenon.cyan, keep: true, run: () => Quickshell.execDetached(["xdg-open", d.url]) },
-                    { label: "Copy the code", keep: true, run: () => pg.win.copy(d.code, "the code") },
-                    { label: "Cancel", ink: Zenon.muted, run: () => pg.win.stop(job) }] });
+        // gh hands a one-time code to type; glab only a page to open
+        codeCard = pg.win.card_(d.code ? { question: "Your code:  " + d.code, glyph: pg.site.glyph, ink: Zenon.cyan,
+            detail: "Enter it at " + d.url.replace(/^https:\/\//, "") + " — this card goes by itself once " + pg.site.name + " says yes.",
+            choices: [{ label: "Open " + pg.site.name, ink: Zenon.cyan, keep: true, run: () => Quickshell.execDetached(["xdg-open", d.url]) },
+                      { label: "Copy the code", keep: true, run: () => pg.win.copy(d.code, "the code") },
+                      { label: "Cancel", ink: Zenon.muted, run: () => pg.win.stop(job) }] }
+          : { question: "Finish in your browser", glyph: pg.site.glyph, ink: Zenon.cyan,
+            detail: pg.site.name + " asks there whether " + pg.site.cli + " may act for you. This card goes by itself once it says yes.",
+            choices: [{ label: "Open the page again", ink: Zenon.cyan, keep: true, run: () => Quickshell.execDetached(["xdg-open", d.url]) },
+                      { label: "Cancel", ink: Zenon.muted, run: () => pg.win.stop(job) }] });
       },
       done: () => { if (codeCard >= 0) pg.win.dropCard(codeCard); },
       then: (st) => { pg.account = st; pg.win.say("Signed in as " + st.login); pg.loadRepos(); },
@@ -87,18 +183,19 @@ Item {
   }
   function token() {
     pg.win.ask({ title: "A personal access token", glyph: "",
-      detail: "Made at github.com → Settings → Developer settings → Tokens, with access to your repositories. Kept in your keyring; git uses it for github.com too.",
+      detail: "Made at " + pg.site.tokens + ", with access to your repositories. Kept in your keyring; git uses it for " + pg.site.host + " too.",
       secret: { key: "token", prompt: "paste your token", purpose: "ctrl v pastes it" },
       verb: "Sign in",
-      then: (v) => pg.win.act("githubSetToken", { token: v.token.trim() }, { repo: null, refresh: false,
-        label: "Checking the token with GitHub", network: true,
+      then: (v) => pg.win.act(pg.op("SetToken"), { token: v.token.trim() }, { repo: null, refresh: false,
+        label: "Checking the token with " + pg.site.name, network: true,
         then: (r) => { pg.win.say("Signed in as " + r.login); pg.reload(); } }) });
   }
   function signOut() {
     const src = pg.account ? pg.account.source : "";
-    pg.win.confirm({ question: "Sign out of GitHub?", glyph: "",
-      detail: src === "gh" ? "gh forgets this account (gh auth logout)." : "The token leaves your keyring.",
-      verb: "Sign out", then: () => pg.win.act(src === "gh" ? "githubLogout" : "githubForgetToken", {}, {
+    const viaCli = !!pg.site.cli && src === pg.site.cli;
+    pg.win.confirm({ question: "Sign out of " + pg.site.name + "?", glyph: pg.site.glyph,
+      detail: viaCli ? pg.site.cli + " forgets this account (" + pg.site.cli + " auth logout)." : "The token leaves your keyring.",
+      verb: "Sign out", then: () => pg.win.act(viaCli ? pg.op("Logout") : pg.op("ForgetToken"), {}, {
         repo: null, refresh: false, then: () => { pg.repos = []; pg.reload(); } }) });
   }
 
@@ -116,7 +213,8 @@ Item {
   function loadRepos() {
     pg.loadingRepos = true;
     pg.listError = "";
-    pg.win.mgr.call("githubRepos", null, {}, (ok, rs, err) => { if (!pg) return;
+    const asked = pg.forge;
+    pg.win.mgr.call(pg.op("Repos"), null, {}, (ok, rs, err) => { if (!pg || asked !== pg.forge) return;
       pg.loadingRepos = false;
       if (ok) { pg.repos = rs; Qt.callLater(pg.publishWanted); }
       else pg.listError = D.errorText(err ? err.error : "");
@@ -139,7 +237,25 @@ Item {
         said: "Cloned " + r.full, then: () => pg.win.openRepo(dest) });
     });
   }
-  function web(r) { if (r) Quickshell.execDetached(["xdg-open", "https://github.com/" + r.full]); }
+  // OPEN one: the clone of it here when there is one (among the repositories
+  // opened before — delphi/core whereCloned), else what can be done with it
+  // — the double click went straight to cloning's directory picker, which
+  // was not what a click on a repository meant (user, 2026-10-11)
+  function openOne(r) {
+    if (!r) return;
+    const roots = pg.win.mgr.recents.map((x) => x.root);
+    pg.win.mgr.call("whereCloned", null, { host: pg.site.host, full: r.full, roots: roots }, (ok, res) => {
+      if (!pg) return;
+      if (ok && res.root) { pg.win.openRepo(res.root); pg.win.setPage("changes"); return; }
+      pg.win.card_({ question: r.full, glyph: pg.site.glyph, ink: Zenon.ink,
+        detail: (r.description ? r.description + "  ·  " : "") + "Not cloned here yet.",
+        choices: [{ label: "Clone…", ink: Zenon.cyan, run: () => pg.clone(r) },
+                  { label: "Upload files…", run: () => pg.upload(r) },
+                  { label: "Open on the web", run: () => pg.web(r) },
+                  { label: "Cancel" }] });
+    });
+  }
+  function web(r) { if (r) Quickshell.execDetached(["xdg-open", "https://" + pg.site.host + "/" + r.full]); }
 
   // Upload: files and directories chosen in terminus (many at once; a
   // directory brings everything under it, under its own name), where they
@@ -153,7 +269,7 @@ Item {
       // new one can be typed, and is made from the default branch
       // as a job in the head (its pill, Esc stops it): a stalled request
       // takes seconds, and a toast that fades said nothing was happening
-      pg.win.act("githubBranches", { full: r.full }, { repo: null, label: "Asking " + r.name + " for its branches",
+      pg.win.act(pg.op("Branches"), { full: r.full }, { repo: null, label: "Asking " + r.name + " for its branches",
         network: true, refresh: false,
         then: (b) => { if (pg) pg.askUpload(r, paths, b.branches.length > 0 ? b.branches : [r.branch || "main"]); },
         failed: () => { if (pg) pg.askUpload(r, paths, [r.branch || "main"]); } });
@@ -183,7 +299,7 @@ Item {
       : paths.map((p) => ({ local: p, path: (dir ? dir + "/" : "") + D.baseName(p) }));
     const branch = String(v.branch || "").trim() || branches[0];
     const message = String(v.msg || "").trim();
-    pg.win.act("githubPlan", { full: r.full, files: files, branch: branch }, { repo: null, label: "Looking at " + r.name,
+    pg.win.act(pg.op("Plan"), { full: r.full, files: files, branch: branch }, { repo: null, label: "Looking at " + r.name,
       network: true, refresh: false,
       failed: (err) => pg.win.fail("Could not look at " + r.full, null, err),
       then: (plan) => { if (!pg) return;
@@ -206,7 +322,7 @@ Item {
         rows: entries,
         treeRoot: r.name,
         choices: [{ label: "Upload", ink: Zenon.cyan,
-                    run: () => pg.win.mgr.startUpload({ full: r.full, branch: plan.branch, fresh: plan.fresh, entries: entries }, sending, message) },
+                    run: () => pg.win.mgr.startUpload({ full: r.full, branch: plan.branch, fresh: plan.fresh, entries: entries, forge: pg.forge }, sending, message) },
                   { label: "Back", run: () => pg.askUpload(r, paths, branches, v) },
                   { label: "Cancel" }] });
     } });
@@ -218,14 +334,14 @@ Item {
   function create() {
     const local = pg.win.root !== "" && !pg.win.origin;
     if (local) {
-      pg.win.card_({ question: "Publish " + pg.win.repoName + " to GitHub", glyph: "", ink: Zenon.ink,
+      pg.win.card_({ question: "Publish " + pg.win.repoName + " to " + pg.site.name, glyph: "", ink: Zenon.ink,
         detail: "To a repository you already have there — its history is taken in, and only what differs is left to commit — or as a new one.",
         choices: [{ label: "To an existing one…", ink: Zenon.cyan, run: () => pg.connectExisting(null) },
                   { label: "As a new repository", run: () => pg.askCreate({ dir: pg.win.root, repo: true, open: true }) },
                   { label: "Cancel" }] });
       return;
     }
-    pg.win.card_({ question: "A new repository on GitHub", glyph: "", ink: Zenon.ink,
+    pg.win.card_({ question: "A new repository on " + pg.site.name, glyph: "", ink: Zenon.ink,
       detail: "Empty, or filled from a directory: a git repository's history is pushed; a plain directory's files are uploaded.",
       choices: [{ label: "From a directory…", ink: Zenon.cyan, run: () => pg.createFrom() },
                 { label: "Empty", run: () => pg.askCreate(null) },
@@ -248,15 +364,15 @@ Item {
   // the one this window has open
   function askCreate(from) {
     const name = from ? D.baseName(from.dir).replace(/[^A-Za-z0-9._-]+/g, "-") : "";
-    pg.win.ask({ title: !from ? "A new repository on GitHub" : from.open ? "Publish " + name + " to GitHub" : "A repository from " + D.baseName(from.dir),
+    pg.win.ask({ title: !from ? "A new repository on " + pg.site.name : from.open ? "Publish " + name + " to " + pg.site.name : "A repository from " + D.baseName(from.dir),
       glyph: "",
       detail: !from ? "" : from.repo ? "Its history is pushed there: " + D.tilde(from.dir, pg.win.home)
-        : "Its files are uploaded there, at the top — a commit made on GitHub; nothing is written into " + D.tilde(from.dir, pg.win.home) + ".",
+        : "Its files are uploaded there, at the top — a commit made on " + pg.site.name + "; nothing is written into " + D.tilde(from.dir, pg.win.home) + ".",
       fields: [{ key: "name", label: "Name", value: name },
                { key: "desc", label: "Description", hint: "optional", optional: true }],
       toggles: [{ key: "priv", label: "Private", value: true }],
       verb: !from ? "Create" : from.repo ? "Publish" : "Create and review",
-      then: (v) => pg.win.act("githubCreate", { name: v.name.trim(), private: !!v.priv, description: v.desc.trim() }, {
+      then: (v) => pg.win.act(pg.op("Create"), { name: v.name.trim(), private: !!v.priv, description: v.desc.trim() }, {
         repo: null, label: "Creating " + v.name.trim(), network: true, refresh: false,
         // the name is taken — by one of yours, most likely the very one
         // meant: connecting to it is offered rather than a dead end
@@ -293,11 +409,11 @@ Item {
   // with every file left as it is, so Changes shows only what differs.
   function connectExisting(r, dir) {
     const here = dir || pg.win.root;
-    if (here === "" || pg.repos.length === 0) { pg.win.say("No repositories on GitHub to connect to", true); return; }
+    if (here === "" || pg.repos.length === 0) { pg.win.say("No repositories on " + pg.site.name + " to connect to", true); return; }
     if (r) { pg.confirmConnect(r, here); return; }
     const name = D.baseName(here).toLowerCase();
     const sorted = pg.repos.slice().sort((a, b) => (b.name.toLowerCase() === name) - (a.name.toLowerCase() === name));
-    pg.win.ask({ title: "Connect " + D.baseName(here) + " to GitHub", glyph: "",
+    pg.win.ask({ title: "Connect " + D.baseName(here) + " to " + pg.site.name, glyph: "",
       detail: "Which of your repositories it is a copy of.",
       fields: [{ key: "full", label: "Repository", options: sorted.map((x) => x.full) }],
       verb: "Next",
@@ -318,7 +434,7 @@ Item {
     }
     pg.win.confirm({ question: "Connect " + D.baseName(here) + " to " + r.full + "?", glyph: "", ink: Zenon.cyan,
       detail: "Its history is downloaded and your branch is put on it. Your files stay exactly as they are; Changes then shows only what differs from " + r.full
-        + ", to commit and push on top. Nothing on GitHub is replaced.",
+        + ", to commit and push on top. Nothing on " + pg.site.name + " is replaced.",
       items: [D.tilde(here, pg.win.home) + "  →  " + r.full + " (" + (r.branch || "main") + ")"],
       verb: "Connect",
       then: () => pg.win.act("connect", { url: r.https, branch: r.branch || null, onto: !!onto }, { repo: here,
@@ -345,7 +461,7 @@ Item {
   function publish(dir, r) {
     pg.win.mgr.call("remotes", dir, {}, (ok, rs) => {
       if (!pg) return;
-      const name = ok && rs.some((x) => x.name === "origin") ? "github" : "origin";
+      const name = ok && rs.some((x) => x.name === "origin") ? pg.forge : "origin";
       pg.win.act("remoteAdd", { name: name, url: r.https }, { repo: dir, refresh: false, then: () => {
         pg.win.mgr.call("status", dir, {}, (ok2, st) => {
           if (!pg) return;
@@ -361,6 +477,12 @@ Item {
   function key(e) {
     const k = e.key;
     if (e.modifiers & Qt.ControlModifier) return false;
+    // the forge before / after
+    if (k === Qt.Key_BracketLeft || k === Qt.Key_BracketRight) {
+      const i = D.FORGE_ORDER.indexOf(pg.forge), n = D.FORGE_ORDER.length;
+      pg.switchTo(D.FORGE_ORDER[(i + (k === Qt.Key_BracketRight ? 1 : n - 1)) % n]);
+      return true;
+    }
     if (!pg.signedIn) {
       if (k === Qt.Key_Return || k === Qt.Key_Enter) { pg.signIn(); return true; }
       return false;
@@ -372,7 +494,8 @@ Item {
     if (k === Qt.Key_PageUp) { pg.moveTo(pg.sel - 12); return true; }
     if (k === Qt.Key_PageDown) { pg.moveTo(pg.sel + 12); return true; }
     if (!pg.repo) return false;
-    if (k === Qt.Key_Return || k === Qt.Key_Enter) { pg.clone(pg.repo); return true; }
+    if (k === Qt.Key_Return || k === Qt.Key_Enter) { pg.openOne(pg.repo); return true; }
+    if (k === Qt.Key_C) { pg.clone(pg.repo); return true; }
     if (k === Qt.Key_U) { pg.upload(pg.repo); return true; }
     if (k === Qt.Key_W) { pg.web(pg.repo); return true; }
     if (k === Qt.Key_Escape && pg.query !== "") { filter.text = ""; return true; }
@@ -387,7 +510,7 @@ Item {
     spacing: 14
     Text {
       anchors.horizontalCenter: parent.horizontalCenter
-      text: ""
+      text: pg.site.glyph
       color: Zenon.muted
       opacity: 0.5
       font.family: Zenon.glyphFace
@@ -399,8 +522,12 @@ Item {
       width: parent.width
       horizontalAlignment: Text.AlignHCenter
       wrapMode: Text.Wrap
-      text: pg.account && pg.account.error ? "GitHub did not take the saved sign-in: " + pg.account.error
+      text: pg.was !== "" ? "You were signed in to " + pg.site.name + " as " + pg.was + " through " + pg.site.cli
+          + ", which is no longer installed. Install it (" + pg.site.pkg + ", through Ceres) to pick that sign-in up again — or sign in another way."
+        : pg.account && pg.account.error ? pg.site.name + " did not take the saved sign-in: " + pg.account.error
         : "Sign in to clone your repositories, publish new ones and upload files."
+          + (pg.site.cli && pg.account && !pg.account.cli
+             ? "\n\n" + pg.site.cli + " is not installed: signing in with the browser needs it, and Delphi has Ceres install it when you choose that." : "")
       color: Zenon.muted
       font.family: Zenon.face
       font.weight: Zenon.weight
@@ -409,20 +536,73 @@ Item {
     DialogButton {
       visible: !pg.checking
       anchors.horizontalCenter: parent.horizontalCenter
-      label: "Sign in"
+      label: pg.was !== "" ? "Install " + pg.site.pkg : "Sign in"
       ink: Zenon.cyan
       primary: true
-      onClicked: pg.signIn()
+      onClicked: pg.was !== "" ? pg.installThenSignIn() : pg.signIn()
     }
   }
 
   // ── signed in ──────────────────────────────────────────────────────────
+  // which forge: one at a time, the choice kept (DelphiManager.forge)
+  Segments {
+    id: forgeSwitch
+    anchors.left: parent.left
+    anchors.top: parent.top
+    anchors.margins: 12
+    z: 2
+    options: D.FORGE_ORDER.map((id) => [id, D.FORGES[id].name])
+    current: pg.forge
+    onChose: (v) => pg.switchTo(v)
+  }
+  // the account: its name, a menu on it (switch, add, sign out)
+  Rectangle {
+    id: accountChip
+    visible: pg.signedIn
+    anchors.right: parent.right
+    anchors.rightMargin: 12
+    anchors.verticalCenter: forgeSwitch.verticalCenter
+    width: chipRow.implicitWidth + 24
+    height: 28
+    radius: Zenon.windowRadius
+    color: Zenon.wash(0.04)
+    border.width: 1
+    border.color: Zenon.border
+    Row {
+      id: chipRow
+      anchors.centerIn: parent
+      spacing: 8
+      Text {
+        anchors.verticalCenter: parent.verticalCenter
+        text: pg.site.glyph
+        color: Zenon.ink
+        font.family: Zenon.glyphFace
+        font.pixelSize: Zenon.px(14)
+      }
+      Text {
+        anchors.verticalCenter: parent.verticalCenter
+        text: pg.account && pg.account.login ? pg.account.login + (pg.accountList.length > 1 ? "  ·  " + pg.accountList.length + " accounts" : "") : ""
+        color: Zenon.ink
+        font.family: Zenon.face
+        font.weight: Font.Bold
+        font.pixelSize: Zenon.px(14)
+      }
+      Text {
+        anchors.verticalCenter: parent.verticalCenter
+        text: "\uF078"
+        color: Zenon.muted
+        font.family: Zenon.glyphFace
+        font.pixelSize: Zenon.px(10)
+      }
+    }
+    MouseArea { anchors.fill: parent; onClicked: pg.accountMenu() }
+  }
   BulkField {
     id: filter
     visible: pg.signedIn
     anchors.left: parent.left
     anchors.right: parent.right
-    anchors.top: parent.top
+    anchors.top: forgeSwitch.bottom
     anchors.margins: 12
     height: 32
     textSize: Zenon.px(15)
@@ -510,7 +690,8 @@ Item {
           if (m.button === Qt.RightButton) {
             const p = mapToItem(pg, m.x, m.y);
             menu.open(p.x, p.y, [
-              { text: "Clone…", icon: "", mark: "return", run: () => pg.clone(rrow.r) },
+              { text: "Open", icon: "", mark: "return", run: () => pg.openOne(rrow.r) },
+              { text: "Clone…", icon: "", mark: "c", run: () => pg.clone(rrow.r) },
               { text: "Upload files…", icon: "", mark: "u", run: () => pg.upload(rrow.r) },
               { text: "Open on the web", icon: "", mark: "w", run: () => pg.web(rrow.r) },
               { isSeparator: true },
@@ -521,7 +702,7 @@ Item {
           }
           pg.win.focusKeys();
         }
-        onDoubleClicked: pg.clone(rrow.r)
+        onDoubleClicked: pg.openOne(rrow.r)
       }
     }
     footer: Item { width: list.width; height: pg.loadingRepos ? 50 : 0; Working { anchors.centerIn: parent; running: pg.loadingRepos } }
