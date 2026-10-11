@@ -891,6 +891,12 @@ def releases_asked_of_each_forge():
             pass
         r = forgejo.create_release("me/x", "v2", "main", "", "notes", prerelease=True)
         eq((sent[-1][1], sent[-1][2]["name"], sent[-1][2]["prerelease"]), ("/repos/me/x/releases", "v2", True))
+        github.update_release("me/x", 7, "v2", "Two again", "better notes")
+        eq((sent[-1][0], sent[-1][1], sent[-1][2]["body"]), ("PATCH", "/repos/me/x/releases/7", "better notes"))
+        gitlab.update_release("me/x", "v2", "v2", "Two", "n")
+        eq((sent[-1][0], sent[-1][1]), ("PUT", "/projects/me%2Fx/releases/v2"))
+        forgejo.delete_release("me/x", 9)
+        eq((sent[-1][0], sent[-1][1]), ("DELETE", "/repos/me/x/releases/9"))
     finally:
         github.call, gitlab.call, forgejo.call = saved
 

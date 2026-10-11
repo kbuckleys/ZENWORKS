@@ -28,8 +28,8 @@ import "../terminus/terminus.js" as Terminus
 Item {
   id: pg
   property var win: null
-  readonly property var edgeViews: [list, body]
-  readonly property var footViews: [list, body]
+  readonly property var edgeViews: pg.edit ? [] : [list, body]
+  readonly property var footViews: pg.edit ? [] : [list, body]
 
   readonly property var hub: pg.win ? pg.win.hub : null
   readonly property string hubFull: pg.hub ? pg.hub.full : ""
@@ -38,16 +38,27 @@ Item {
   // GitLab (gitlab.com or a server of your own) has no drafts or pre-releases
   readonly property bool drafts: !!pg.hub && !/^gitlab/.test(pg.hub.forge)
 
-  readonly property string title: "Releases"
-  readonly property string subtitle: !pg.hub ? "Not on GitHub, GitLab or Codeberg"
+  readonly property string title: pg.edit ? (pg.edit.mode === "new" ? "New release" : "Editing " + pg.edit.tag) : "Releases"
+  readonly property string subtitle: pg.edit ? pg.hubFull
+    : !pg.hub ? "Not on GitHub, GitLab or Codeberg"
     : pg.loading ? pg.hubFull + "  ·  asking " + pg.site.name + "…"
     : pg.hubFull + "  ·  " + (pg.rels.length === 0 ? "none yet" : pg.rels.length + (pg.rels.length === 1 ? " release" : " releases"))
-  readonly property var hints: [["↑↓", "releases"], ["n", "new"], ["w", "web"], ["r", "refresh"]]
-  readonly property var buttons: [
+  readonly property var hints: pg.edit ? [["ctrl return", pg.edit.mode === "new" ? "publish" : "save"], ["esc", "back"], ["tab", "next field"]]
+    : [["↑↓", "releases"], ["n", "new"], ["e", "edit"], ["w", "web"], ["r", "refresh"]]
+  readonly property var buttons: pg.edit ? [
+    { label: "Cancel", run: () => pg.cancelEdit() },
+    { label: pg.edit.mode === "new" ? (pg.edit.draft ? "Save the draft" : "Publish") : (pg.edit.wasDraft && !pg.edit.draft ? "Publish" : "Save"),
+      ink: Zenon.cyan, primary: true, ready: pg.edit.tag.trim() !== "", run: () => pg.save() },
+  ] : [
+    { label: "Delete", ink: Zenon.red, visible: !!pg.rel, run: () => pg.remove() },
+    { label: "Edit", visible: !!pg.rel, run: () => pg.editRel(pg.rel) },
     { label: "On the web", visible: !!pg.rel, run: () => pg.web() },
     { label: "New release", ink: Zenon.cyan, primary: true, visible: !!pg.hub, run: () => pg.create() },
   ]
-  function takeFocus() { if (pg.win) pg.win.focusKeys(); }
+  function takeFocus() {
+    if (pg.edit) { if (!editor.typing) editor.claim(); return; }
+    if (pg.win) pg.win.focusKeys();
+  }
 
   property var rels: []
   property bool loading: false
@@ -56,17 +67,23 @@ Item {
   readonly property var rel: pg.sel >= 0 && pg.sel < pg.rels.length ? pg.rels[pg.sel] : null
   function reload() {
     if (!pg || !pg.win || !pg.hub) return;
-    const asked = pg.hubFull;
+    const asked = pg.hubFull, keep = pg.rel ? pg.rel.tag : "";
     pg.loading = true;
     pg.win.mgr.call(pg.op("Releases"), null, { full: asked }, (ok, res, err) => { if (!pg || asked !== pg.hubFull) return;
       pg.loading = false;
       pg.listError = ok ? "" : D.errorText(err ? err.error : "");
-      pg.rels = ok ? res : [];
-      pg.sel = Math.max(0, Math.min(pg.sel, pg.rels.length - 1));
+      if (!ok) { pg.rels = []; return; }
+      // one just made or changed here, which the forge's list may not have
+      // caught up with yet: kept as it was answered, until the list has it
+      const fresh = pg.pending.filter((p) => !res.some((r) => r.tag === p.tag && (r.body === p.body && r.name === p.name)));
+      pg.pending = fresh;
+      pg.rels = fresh.concat(res.filter((r) => !fresh.some((p) => p.tag === r.tag)));
+      const i = keep !== "" ? pg.rels.findIndex((r) => r.tag === keep) : -1;
+      pg.sel = i >= 0 ? i : Math.max(0, Math.min(pg.sel, pg.rels.length - 1));
     });
   }
   Component.onCompleted: Qt.callLater(pg.reload)
-  onHubFullChanged: { pg.rels = []; pg.reload(); }
+  onHubFullChanged: { pg.rels = []; pg.edit = null; pg.reload(); }
   function web() { if (pg.rel && pg.rel.url) Quickshell.execDetached(["xdg-open", pg.rel.url]); }
   function moveTo(i) {
     if (pg.rels.length === 0) return;
@@ -74,63 +91,108 @@ Item {
     list.positionViewAtIndex(pg.sel, ListView.Contain);
   }
 
-  // ── A NEW ONE ──────────────────────────────────────────────────────────
+  // ── WRITING ONE: A PAGE OF ITS OWN (user, 2026-10-11: the sheet was too
+  // tight for release notes) ─────────────────────────────────────────────
+  // `edit` is the release being written — a new one, or one there is — and
+  // while it is, the page is its editor (ReleaseEditor below): tag, the
+  // branch it is made from, title, draft and pre-release, and the notes,
+  // written or previewed. What is saved lands in the list at once
+  // (`pending`), not when the forge's list next mentions it.
+  property var edit: null
+  property var pending: []
   function create() {
     if (!pg.hub) return;
     const b = pg.win.branch;
     const here = b && b.head ? b.head : "";
     pg.win.mgr.call("lastTag", pg.win.root, {}, (ok, last) => { if (!pg) return;
       const prev = ok ? last : "";
-      const branches = pg.win.refs.local.map((l) => l.name);
-      const unpushed = b && b.ahead > 0 ? b.ahead : 0;
-      pg.win.ask({ title: "A new release of " + pg.hubFull, glyph: "", ink: Zenon.cyan,
-        detail: (prev !== "" ? "The last tag here is " + prev + ". " : "No tags here yet. ")
-          + pg.site.name + " makes the tag on the branch as it has it"
-          + (unpushed > 0 ? " — " + here + " has " + unpushed + (unpushed === 1 ? " commit" : " commits") + " not pushed yet, which would not be in it." : "."),
-        fields: [{ key: "tag", label: "Tag", value: D.nextVersion(prev), hint: "v1.0.0" },
-                 { key: "target", label: "From", value: here, options: branches.length > 0 ? branches : [here] }],
-        verb: "Next",
-        then: (v) => pg.notes(v.tag.trim(), v.target, prev) });
+      pg.edit = { mode: "new", id: null, tag: D.nextVersion(prev), target: here, name: "", body: "",
+                  draft: false, prerelease: false, wasDraft: false, prev: prev, by: "",
+                  unpushed: b && b.ahead > 0 ? b.ahead : 0 };
+      pg.writeNotes();
     });
   }
-  // the notes written for you, then the release itself asked about
-  function notes(tag, target, prev) {
-    if (tag === "") return;
-    const write = (body, by) => pg.askRelease(tag, target, body, by, prev);
-    const fromCommits = () => pg.win.mgr.call("changelog", pg.win.root, { since: prev, until: target }, (ok, cs) => {
+  function editRel(r) {
+    if (!r) return;
+    pg.edit = { mode: "edit", id: r.id, tag: r.tag, target: r.target, name: r.name, body: r.body,
+                draft: r.draft, prerelease: r.prerelease, wasDraft: r.draft, prev: "", by: "", unpushed: 0 };
+  }
+  function setEdit(k, v) {
+    if (!pg.edit) return;
+    const e = Object.assign({}, pg.edit);
+    e[k] = v;
+    pg.edit = e;
+  }
+  function cancelEdit() { pg.edit = null; Qt.callLater(pg.takeFocus); }
+  // The notes written for you: GitHub's own, else the commits since the
+  // last tag. Into the notes as they are — asked for again, they replace.
+  property bool writing: false
+  function writeNotes() {
+    const e = pg.edit;
+    if (!e || e.tag.trim() === "") return;
+    const tag = e.tag.trim(), target = e.target, prev = e.prev;
+    const put = (body, by) => { if (!pg || !pg.edit || pg.edit.tag.trim() !== tag) return;
+      pg.writing = false;
+      const n = Object.assign({}, pg.edit, { body: body, by: by });
+      pg.edit = n;
+      editor.reset();
+    };
+    const fromCommits = () => pg.win.mgr.call("changelog", pg.win.root, { since: prev, until: target || "HEAD" }, (ok, cs) => {
       if (!pg) return;
-      write(ok ? D.notesFrom(cs, prev) : "", ok && cs.length > 0 ? "commits" : "");
+      put(ok ? D.notesFrom(cs, prev) : "", ok && cs.length > 0 ? "commits" : "");
     });
-    pg.win.act(pg.op("ReleaseNotes"), { full: pg.hubFull, tag: tag, target: target, previous: prev || null }, {
-      repo: null, refresh: false, label: "Writing the notes",
-      then: (r) => { if (!pg) return; if (r && r.body) write(r.body, r.by); else fromCommits(); },
-      failed: () => { if (pg) fromCommits(); } });
+    pg.writing = true;
+    pg.win.mgr.call(pg.op("ReleaseNotes"), null, { full: pg.hubFull, tag: tag, target: target, previous: prev || null },
+      (ok, r) => { if (!pg) return; if (ok && r && r.body) put(r.body, r.by); else fromCommits(); });
   }
-  function askRelease(tag, target, body, by, prev) {
-    pg.win.ask({ title: "Release " + tag, glyph: "", ink: Zenon.cyan,
-      detail: (by === "github" ? "The notes are GitHub's, from what was merged since " + (prev || "the start") + "."
-              : by === "commits" ? "The notes are the commits since " + (prev || "the start") + "."
-              : "Nothing to write the notes from — say what is in it.")
-        + " Change anything before it goes.",
-      fields: [{ key: "name", label: "Title", value: tag, hint: tag },
-               { key: "body", label: "Notes", value: body, lines: true, optional: true, hint: "what is in it — markdown" }],
-      toggles: pg.drafts ? [{ key: "draft", label: "A draft (only you see it, until published)", value: false },
-                            { key: "prerelease", label: "A pre-release", value: false }] : [],
-      verb: "Publish",
-      then: (v) => pg.win.act(pg.op("CreateRelease"), {
-          full: pg.hubFull, tag: tag, target: target, name: v.name.trim() || tag, body: v.body,
-          draft: !!v.draft, prerelease: !!v.prerelease }, {
-        repo: null, label: "Publishing " + tag, network: true, refresh: false,
-        said: (v.draft ? "Saved " : "Released ") + tag,
-        then: () => { if (!pg) return; pg.sel = 0; pg.reload(); pg.win.act("fetch", {}, { refresh: true }); } }) });
+  function save() {
+    const e = pg.edit;
+    if (!e || e.tag.trim() === "") return;
+    const tag = e.tag.trim(), name = (e.name || "").trim() || tag;
+    const args = { full: pg.hubFull, tag: tag, name: name, body: e.body, draft: !!e.draft, prerelease: !!e.prerelease };
+    if (e.mode === "new") args.target = e.target; else args.id = e.id;
+    pg.win.act(pg.op(e.mode === "new" ? "CreateRelease" : "UpdateRelease"), args, {
+      repo: null, network: true, refresh: false,
+      label: (e.mode === "new" ? (e.draft ? "Saving " : "Publishing ") : "Saving ") + tag,
+      said: e.mode === "new" ? (e.draft ? "Saved the draft of " + tag : "Released " + tag) : "Saved " + tag,
+      then: (r) => {
+        if (!pg) return;
+        // in the list now, as the forge answered it
+        pg.pending = [r].concat(pg.pending.filter((p) => p.tag !== r.tag));
+        pg.rels = [r].concat(pg.rels.filter((x) => x.tag !== r.tag && (e.mode !== "edit" || x.id !== e.id)));
+        pg.sel = 0;
+        pg.edit = null;
+        relaxed.restart();
+        if (e.mode === "new") pg.win.act("fetch", {}, { refresh: true });
+        Qt.callLater(pg.takeFocus);
+      } });
+  }
+  // the forge's list asked again a moment later, when it has caught up
+  Timer { id: relaxed; interval: 4000; onTriggered: pg.reload() }
+  function remove() {
+    const r = pg.rel;
+    if (!r) return;
+    pg.win.confirm({ question: "Delete the release " + r.name + "?", glyph: "\uF412", ink: Zenon.red,
+      detail: "Its notes and the files attached go from " + pg.site.name + ". The tag " + r.tag + " stays — delete it from Branches if you want it gone too.",
+      verb: "Delete",
+      then: () => pg.win.act(pg.op("DeleteRelease"), { full: pg.hubFull, id: r.id, tag: r.tag }, {
+        repo: null, network: true, refresh: false, label: "Deleting " + r.name, said: "Deleted " + r.name,
+        then: () => { if (!pg) return; pg.pending = pg.pending.filter((p) => p.tag !== r.tag);
+                      pg.rels = pg.rels.filter((x) => x.tag !== r.tag); pg.sel = Math.min(pg.sel, pg.rels.length - 1); relaxed.restart(); } }) });
   }
 
   function key(e) {
     const k = e.key;
+    if (pg.edit) {
+      if ((e.modifiers & Qt.ControlModifier) && (k === Qt.Key_Return || k === Qt.Key_Enter)) { pg.save(); return true; }
+      if (k === Qt.Key_Escape) { pg.cancelEdit(); return true; }
+      return false;
+    }
     if (e.modifiers & Qt.ControlModifier) return false;
     if (k === Qt.Key_Up || k === Qt.Key_K) { pg.moveTo(pg.sel - 1); return true; }
     if (k === Qt.Key_Down || k === Qt.Key_J) { pg.moveTo(pg.sel + 1); return true; }
     if (k === Qt.Key_N) { pg.create(); return true; }
+    if (k === Qt.Key_E) { pg.editRel(pg.rel); return true; }
     if (k === Qt.Key_W) { pg.web(); return true; }
     if (k === Qt.Key_R) { pg.reload(); return true; }
     return false;
@@ -139,6 +201,7 @@ Item {
   // ── the list ───────────────────────────────────────────────────────────
   Item {
     id: left
+    visible: !pg.edit
     anchors.left: parent.left
     anchors.top: parent.top
     anchors.bottom: parent.bottom
@@ -237,7 +300,7 @@ Item {
     anchors.right: parent.right
     anchors.top: parent.top
     anchors.bottom: parent.bottom
-    visible: !!pg.rel
+    visible: !!pg.rel && !pg.edit
     clip: true
     contentWidth: width
     contentHeight: relCol.implicitHeight + 40
@@ -332,11 +395,19 @@ Item {
   Scrollbar { flick: body; visible: body.visible; anchors.right: body.right; anchors.top: body.top; anchors.bottom: body.bottom }
 
   SeamGrip {
+    visible: !pg.edit
     frame: pg
     at: left.width
     min: 260
     max: pg.width - 360
     onMoved: (p) => pg.win.setSplit("releases", p)
     onReset: pg.win.setSplit("releases", 0)
+  }
+
+  ReleaseEditor {
+    id: editor
+    anchors.fill: parent
+    visible: !!pg.edit
+    page: pg
   }
 }

@@ -133,9 +133,12 @@ Item {
     // The rules stay at 12. A separator that begins where the text does
     // leaves a notch at the panel's edge and stops being a separator.
     x: 15
+    // a first heading with no terminus to match (delphi's sidebar) has no
+    // rule and air above it — so neither does its text, which was set
+    // that far down into the row under it (2026-10-11)
     y: sideHead.first && term
        ? Math.round((sideHead.height - sideHead.rule - sideHeadText.height) / 2)
-       : sideHead.airAbove + sideHead.rule + sideHead.airIn
+       : (sideHead.first ? 0 : sideHead.airAbove + sideHead.rule) + sideHead.airIn
     text: sideHead.label
     // ── A TITLE, NOT A FILING LABEL ─────────────────────────────────
     // It was 11px grey caps with 1.8 of letter-spacing, which is the

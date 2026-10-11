@@ -94,6 +94,16 @@ Rectangle {
       }
     }
   }
+  // the suite's scroll feel and bar, for text longer than the well
+  // (release notes, 2026-10-11)
+  ElasticScroll { anchors.fill: flick; view: flick }
+  Scrollbar {
+    flick: flick
+    anchors.right: parent.right
+    anchors.rightMargin: 2
+    anchors.top: flick.top
+    anchors.bottom: flick.bottom
+  }
   Text {
     anchors.right: parent.right
     anchors.bottom: parent.bottom

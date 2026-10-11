@@ -407,3 +407,14 @@ def add_signing_key(key, title="delphi"):
             return {"added": False, "already": True}
         raise
     return {"added": True, "id": r.get("id"), "verify": f"https://{HOST}/user/settings/keys"}
+
+
+def update_release(full, id, tag, name, body="", draft=False, prerelease=False):
+    return _rel(call("PATCH", f"/repos/{full}/releases/{id}",
+                     {"tag_name": tag, "name": name or tag, "body": body,
+                      "draft": bool(draft), "prerelease": bool(prerelease)}))
+
+
+def delete_release(full, id, tag=""):
+    call("DELETE", f"/repos/{full}/releases/{id}")
+    return {}

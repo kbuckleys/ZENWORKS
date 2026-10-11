@@ -630,6 +630,11 @@ class Server:
             return f.checks_many(kw["full"], kw["shas"])
         if op == "AddSigningKey":
             return f.add_signing_key(kw["key"], kw.get("title", "delphi"))
+        if op == "UpdateRelease":
+            return f.update_release(kw["full"], kw["id"], kw["tag"], kw.get("name", ""), kw.get("body", ""),
+                                    kw.get("draft", False), kw.get("prerelease", False))
+        if op == "DeleteRelease":
+            return f.delete_release(kw["full"], kw["id"], kw.get("tag", ""))
         if op == "Releases":
             return f.releases(kw["full"])
         if op == "ReleaseNotes":

@@ -273,6 +273,7 @@ FloatingWindow {
       if (win.page !== "changes") win.setPage("changes");
       return;
     }
+    if (win.pushNothing) { win.say("Nothing to push — every place it goes has this commit"); return; }
     if (win.pushTargets.length > 0) { win.pushMany(win.pushTargets); return; }
     if (!b.upstream) {
       // nowhere to push yet: the Accounts page's Publish — to a repository
@@ -312,6 +313,19 @@ FloatingWindow {
   readonly property var pushTargets: {
     const want = win.mgr && win.root !== "" ? win.mgr.pushTo[win.root] || [] : [];
     return want.filter((n) => win.remotes.some((r) => r.name === n));
+  }
+  // NOTHING TO PUSH: the commit you are on is already where Push would
+  // send it — the upstream with nothing ahead, or every ticked remote's
+  // copy of the branch at it (as last fetched or pushed). Push is dimmed
+  // then (user, 2026-10-11); a branch not published anywhere never is.
+  readonly property bool pushNothing: {
+    const b = win.branch;
+    if (!b || !b.oid || !b.head) return false;
+    if (win.pushTargets.length === 0) return !!b.upstream && b.ahead === 0;
+    return win.pushTargets.every((r) => {
+      const e = win.refs.remote.find((x) => x.name === r + "/" + b.head);
+      return !!e && e.sha === b.oid;
+    });
   }
   // a remote, said by its forge where delphi knows it (GitHub, Codeberg…)
   function remoteWord(r) {
@@ -544,19 +558,28 @@ FloatingWindow {
   }
 
   // ── PAGES ──────────────────────────────────────────────────────────────
+  // In three groups, each under its heading (user, 2026-10-11: the list
+  // wanted a more logical arrangement): this repository's own work, its
+  // forge's (named for the forge it is on), and what is not about one
+  // repository. Ctrl 1–9 follow this order.
   readonly property var pages: [
-    { id: "changes", label: "Changes", glyph: "" },
-    { id: "history", label: "History", glyph: "" },
-    { id: "branches", label: "Branches", glyph: "" },
-    { id: "stashes", label: "Stashes", glyph: "" },
-    { id: "worktrees", label: "Worktrees", glyph: "" },
-    { id: "pulls", label: win.hub && D.FORGES[win.hub.forge] ? D.FORGES[win.hub.forge].pulls : "Pull requests", glyph: "\uF407" },
-    { id: "issues", label: "Issues", glyph: "\uF41B" },
-    { id: "github", label: "Accounts", glyph: "\uF0C2" },
-    { id: "repos", label: "Repositories", glyph: "" },
-    { id: "dotfiles", label: "Dotfiles", glyph: "\uF487" },
-    { id: "releases", label: "Releases", glyph: "\uF412" },
+    { id: "changes", label: "Changes", glyph: "", group: "repo" },
+    { id: "history", label: "History", glyph: "", group: "repo" },
+    { id: "branches", label: "Branches", glyph: "", group: "repo" },
+    { id: "stashes", label: "Stashes", glyph: "", group: "repo" },
+    { id: "worktrees", label: "Worktrees", glyph: "", group: "repo" },
+    { id: "dotfiles", label: "Dotfiles", glyph: "\uF487", group: "repo" },
+    { id: "pulls", label: win.hub && D.FORGES[win.hub.forge] ? D.FORGES[win.hub.forge].pulls : "Pull requests", glyph: "\uF407", group: "forge" },
+    { id: "issues", label: "Issues", glyph: "\uF41B", group: "forge" },
+    { id: "releases", label: "Releases", glyph: "\uF412", group: "forge" },
+    { id: "repos", label: "Repositories", glyph: "", group: "all" },
+    { id: "github", label: "Accounts", glyph: "\uF0C2", group: "all" },
   ]
+  function groupWord(g) {
+    return g === "repo" ? "Repository"
+      : g === "forge" ? (win.hub && D.FORGES[win.hub.forge] ? D.FORGES[win.hub.forge].name : "Forge")
+      : "Everywhere";
+  }
   readonly property string page: win.mgr ? win.mgr.page : "changes"
   function setPage(p) {
     if (win.mgr) win.mgr.set("page", p);
@@ -743,16 +766,14 @@ FloatingWindow {
           anchors.fill: parent
           onClicked: win.repoMenu()
         }
-        // pressed, and held while its menu is open: terminus' held ring, as
-        // a row whose menu is open wears it (user, 2026-10-11: pressing it
-        // showed nothing)
+        // pressed, darker — and kept so while its menu is open (user,
+        // 2026-10-11: no ring, the press itself held)
         Rectangle {
           anchors.fill: parent
           radius: parent.radius
-          color: Zenon.wash(0.06)
-          visible: repoPress.pressed
+          color: Zenon.wash(0.12)
+          visible: repoPress.pressed || repoPop.isOpen
         }
-        HeldRing { anchors.fill: parent; radius: parent.radius; z: 10; on: repoPop.isOpen || repoPress.pressed }
         HoverHandler {
           onHoveredChanged: hovered && win.root !== ""
             ? tips.show(repoChip, D.tilde(win.root, win.home), "") : tips.hide(repoChip)
@@ -762,7 +783,8 @@ FloatingWindow {
       Column {
         id: pageCol
         anchors.top: repoChip.bottom
-        anchors.topMargin: 12
+        // the first heading brings its own air (SideHead's airIn)
+        anchors.topMargin: 4
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.leftMargin: 8
@@ -770,10 +792,20 @@ FloatingWindow {
         spacing: 1
         Repeater {
           model: win.pages
-          delegate: ShelfRow {
-            id: pageRow
+          delegate: Column {
+            id: pageItem
             required property var modelData
             required property int index
+            width: pageCol.width
+            // a group's heading over its first page (terminus' SideHead)
+            SideHead {
+              visible: pageItem.index === 0 || win.pages[pageItem.index - 1].group !== pageItem.modelData.group
+              first: pageItem.index === 0
+              label: win.groupWord(pageItem.modelData.group)
+            }
+          ShelfRow {
+            id: pageRow
+            readonly property var modelData: pageItem.modelData
             width: pageCol.width
             glyph: pageRow.modelData.glyph
             label: pageRow.modelData.label
@@ -783,6 +815,7 @@ FloatingWindow {
             fill: win.hiFill
             opacity: win.root === "" && ["github", "repos"].indexOf(pageRow.modelData.id) < 0 ? 0.4 : 1
             onClicked: win.setPage(pageRow.modelData.id)
+          }
           }
         }
       }
@@ -1321,8 +1354,9 @@ FloatingWindow {
               : pushBtn.n === 1 ? "Push to " + win.pushTargets[0]
               : !win.branch.upstream && win.branch.head ? "Publish"
               : win.branch.ahead > 0 ? "Push  ↑" + win.branch.ahead : "Push"
-            ink: win.branch && (win.branch.ahead > 0 || pushBtn.n > 0 || (!win.branch.upstream && win.branch.head)) ? Zenon.cyan : Zenon.muted
-            primary: !!win.branch && win.branch.ahead > 0 && win.branch.behind === 0
+            ink: !win.pushNothing && win.branch && (win.branch.ahead > 0 || pushBtn.n > 0 || (!win.branch.upstream && win.branch.head)) ? Zenon.cyan : Zenon.muted
+            ready: !win.pushNothing
+            primary: !win.pushNothing && !!win.branch && (win.branch.ahead > 0 || pushBtn.n > 0) && win.branch.behind === 0
             onClicked: win.push()
           }
         }

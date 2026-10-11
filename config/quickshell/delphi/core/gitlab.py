@@ -501,3 +501,14 @@ def add_signing_key(key, title="delphi"):
             return {"added": False, "already": True}
         raise
     return {"added": True, "id": r.get("id")}
+
+
+def update_release(full, id, tag, name, body="", draft=False, prerelease=False):
+    # GitLab knows a release by its tag; the tag itself cannot be changed
+    t = urllib.parse.quote(tag or id, safe="")
+    return _rel(call("PUT", f"/projects/{_pid(full)}/releases/{t}", {"name": name or tag, "description": body}))
+
+
+def delete_release(full, id, tag=""):
+    call("DELETE", f"/projects/{_pid(full)}/releases/{urllib.parse.quote(tag or id, safe='')}")
+    return {}
