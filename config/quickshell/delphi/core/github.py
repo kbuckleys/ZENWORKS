@@ -29,6 +29,7 @@ import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 
 import rest
+import tokenstore
 from files import SKIP_DIRS, SKIP_FILES, SKIP_ENDS, expand   # noqa: F401  (github.expand, the tests')
 from rest import ForgeError
 
@@ -63,9 +64,10 @@ def token():
     r = _gh("auth", "token", "-h", HOST)
     if r is not None and r.returncode == 0 and r.stdout.strip():
         return r.stdout.strip(), "gh"
-    c = _keyring("fill", {"protocol": "https", "host": HOST})
-    if c.get("password"):
-        return c["password"], "keyring"
+    # the keyring, or delphi's own file where there is no keyring (tokenstore)
+    c = tokenstore.get(HOST)
+    if c:
+        return c["password"], c["where"]
     return None, None
 
 
@@ -91,16 +93,13 @@ def set_token(tok):
     """Check a personal access token against the API, then keep it in the
     keyring under the account it belongs to."""
     me = call("GET", "/user", tok=tok)
-    _keyring("approve", {"protocol": "https", "host": HOST,
-                         "username": me["login"], "password": tok})
-    return {"login": me["login"]}
+    # kept where it will be found again — and said where (tokenstore.put)
+    where = tokenstore.put(HOST, me["login"], tok)
+    return {"login": me["login"], "where": where}
 
 
 def forget_token():
-    c = _keyring("fill", {"protocol": "https", "host": HOST})
-    if c:
-        _keyring("reject", {"protocol": "https", "host": HOST,
-                            "username": c.get("username", "")})
+    tokenstore.drop(HOST)
 
 
 CODE = re.compile(r"one-time code[^A-Z0-9]*([A-Z0-9]{4}-[A-Z0-9]{4})", re.I)
@@ -162,9 +161,9 @@ def accounts():
         if a and cur is not None:
             cur["active"] = a.group(1) == "true"
     if not out:
-        c = _keyring("fill", {"protocol": "https", "host": HOST})
+        c = tokenstore.get(HOST)
         if c.get("username"):
-            out.append({"login": c["username"], "source": "keyring", "active": True})
+            out.append({"login": c["username"], "source": c["where"], "active": True})
     return {"accounts": out, "many": True}
 
 

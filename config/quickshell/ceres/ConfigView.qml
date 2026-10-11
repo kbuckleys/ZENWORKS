@@ -38,7 +38,23 @@ Item {
   property var cur: []
   property bool loaded: false
   property int gsel: 0
-  readonly property var group: Pac.GROUPS[view.gsel]
+  // pacman.conf's groups, and paru's after them: which paru builds your AUR
+  // packages, the same choice setup made (user, 2026-10-11). Not a line of
+  // the file — it is swapped by its own job, not by Review & save.
+  readonly property var groups: Pac.GROUPS.concat([{ id: "paru", title: "paru",
+    blurb: "Which paru builds your AUR packages. The other one is built from its AUR recipe, which fetches the source from github.com/Morganamilo/paru, and installed by pacman in place of this one. Building compiles Rust and takes a few minutes." }])
+  readonly property var group: view.groups[view.gsel]
+  // the card picked in the paru group; back to the installed one each visit
+  property string paruPick: "paru"
+  readonly property string paruHere: Ceres.deps.paruPkg
+  function resetParuPick() { view.paruPick = view.paruHere === "paru-git" ? "paru-git" : "paru"; }
+  onGselChanged: if (view.group.id === "paru") view.resetParuPick()
+  // off the deps' arrival, not paruHere's change: the button's label reading
+  // paruHere for the first time fired that, which wrote paruPick mid-read
+  Connections { target: Ceres; function onDepsChanged() { view.resetParuPick(); } }
+  Component.onCompleted: view.resetParuPick()
+  readonly property bool paruCanBuild: view.paruPick !== view.paruHere && !Ceres.txBusy
+  function buildParu() { if (view.paruCanBuild) Ceres.switchParu(view.paruPick); }
   readonly property int changes: view.loaded ? Pac.changedCount(view.orig, view.cur) : 0
 
   // ── the file ────────────────────────────────────────────────────────────
@@ -143,11 +159,13 @@ Item {
   }
   function groupDirty(id) {
     if (!view.loaded) return false;
+    if (id === "paru") return false;
     if (id === "repos") return JSON.stringify(Pac.repos(view.orig).map(r => [r.name, r.enabled, r.Include, r.Server, r.CacheServer, r.SigLevel, r.Usage]))
       !== JSON.stringify(view.reposNow.map(r => [r.name, r.enabled, r.Include, r.Server, r.CacheServer, r.SigLevel, r.Usage]));
     return Pac.SCHEMA.some(s => s.group === id && view.changedOpt(s.key));
   }
   function groupSummary(id) {
+    if (id === "paru") return view.paruHere || "not installed";
     if (!view.loaded) return "…";
     if (id === "repos") {
       const on = view.reposNow.filter(r => r.enabled).length;
@@ -180,12 +198,19 @@ Item {
   function key(event) {
     const k = event.key, ctrl = event.modifiers & Qt.ControlModifier;
     if (ctrl && k === Qt.Key_S) { view.askReview(); return true; }
-    if (k === Qt.Key_J || k === Qt.Key_Down) { view.gsel = Math.min(Pac.GROUPS.length - 1, view.gsel + 1); return true; }
+    if (view.group.id === "paru") {
+      if (k === Qt.Key_Left || k === Qt.Key_H) { view.paruPick = "paru"; return true; }
+      if (k === Qt.Key_Right || k === Qt.Key_L) { view.paruPick = "paru-git"; return true; }
+      if (k === Qt.Key_Return || k === Qt.Key_Enter) { view.buildParu(); return true; }
+    }
+    if (k === Qt.Key_J || k === Qt.Key_Down) { view.gsel = Math.min(view.groups.length - 1, view.gsel + 1); return true; }
     if (k === Qt.Key_K || k === Qt.Key_Up) { view.gsel = Math.max(0, view.gsel - 1); return true; }
     if (k === Qt.Key_R && view.changes === 0) { view.load(); return true; }
     return false;
   }
   readonly property var hints: [["j k", "choose"]]
+    .concat(view.group.id === "paru" ? [["\u2190 \u2192", "paru or paru-git"]]
+      .concat(view.paruCanBuild ? [["enter", "build " + view.paruPick]] : []) : [])
     .concat(view.changes > 0 ? [["ctrl s", "review & save"]] : [["r", "reload"]])
 
   // ── the left: groups ────────────────────────────────────────────────────
@@ -196,7 +221,7 @@ Item {
   FontMetrics { id: fmSum; font.family: Zenon.face; font.pixelSize: Zenon.px(15) }
   readonly property real sideW: {
     let w = 0;
-    for (const g of Pac.GROUPS)
+    for (const g of view.groups)
       w = Math.max(w, fmTitle.advanceWidth(g.title), fmSum.advanceWidth(view.groupSummary(g.id)));
     return Math.max(180, Math.ceil(w) + 26 + 16);
   }
@@ -236,7 +261,7 @@ Item {
       width: view.sideW
       spacing: 4
       Repeater {
-        model: Pac.GROUPS
+        model: view.groups
         delegate: Rectangle {
           id: grow
           required property var modelData
@@ -401,6 +426,37 @@ Item {
           delegate: RepoCard { required property var modelData; required property int index; repo: modelData; at: index; width: rows.width }
         }
         AddRepo { visible: view.group.id === "repos"; width: rows.width }
+
+        // ── paru ──────────────────────────────────────────────────────
+        Column {
+          visible: view.group.id === "paru"
+          width: rows.width
+          spacing: 14
+          ParuChoice {
+            width: parent.width
+            choice: view.paruPick
+            installed: view.paruHere
+            onPicked: (pkg) => { view.paruPick = pkg; view.released(); }
+          }
+          Text {
+            visible: view.paruHere !== "" && view.paruHere !== "paru" && view.paruHere !== "paru-git"
+            width: parent.width
+            wrapMode: Text.Wrap
+            text: "paru here comes from " + view.paruHere + ". Building either one replaces it."
+            color: Zenon.keyInk
+            font.family: Zenon.face
+            font.weight: Zenon.weight
+            font.pixelSize: Zenon.px(15)
+          }
+          DialogButton {
+            label: view.paruPick === view.paruHere ? view.paruPick + " is installed"
+              : "Build " + view.paruPick
+            ink: Zenon.cyan
+            primary: view.paruCanBuild
+            ready: view.paruCanBuild
+            onClicked: view.buildParu()
+          }
+        }
       }
     }
   }

@@ -188,7 +188,8 @@ Item {
       verb: "Sign in",
       then: (v) => pg.win.act(pg.op("SetToken"), { token: v.token.trim() }, { repo: null, refresh: false,
         label: "Checking the token with " + pg.site.name, network: true,
-        then: (r) => { pg.win.say("Signed in as " + r.login); pg.reload(); } }) });
+        // said where it was kept: delphi's own file, when there is no keyring
+        then: (r) => { pg.win.say("Signed in as " + r.login + (r.where === "file" ? " — kept in Delphi's own file (no keyring running)" : "")); pg.reload(); } }) });
   }
   function signOut() {
     const src = pg.account ? pg.account.source : "";

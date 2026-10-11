@@ -970,11 +970,14 @@ const APP_KINDS = [
     alias: "mail mailto email client",
     types: ["x-scheme-handler/mailto"],
     help: "What a mailto: link opens." },
-  // `preferred`: what the row holds before anybody chooses — this shell's
-  // own, where it has one. Every other kind starts at the system's answer.
+  // `preferred` (optional): what the row holds before anybody chooses,
+  // pinned. None is, since 2026-10-11 (user): every kind starts at System,
+  // and for directories, archives, text, images and fonts the system's
+  // answer is this shell's own — terminus, plato, picasso and alexandria
+  // write .desktop entries claiming those types.
   { id: "files", label: "Directories", probe: "inode/directory",
     alias: "file manager folder directory terminus",
-    types: ["inode/directory"], preferred: "terminus.desktop",
+    types: ["inode/directory"],
     help: "The file manager: what other applications open a directory with — a browser's Show in folder, for one. This shell's own directories always open in terminus." },
   { id: "text", label: "Text", probe: "text/plain",
     alias: "editor text code notes plain",

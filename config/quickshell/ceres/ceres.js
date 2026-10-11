@@ -1065,23 +1065,33 @@ const DEPS = [
 // Prints each missing program's name, one per line — and "cargo" when that
 // is missing too, since building paru needs it (rust provides it; someone on
 // rustup already has it, and must not be handed rust on top).
+// And, as "=<package>", whichever package owns the paru on the PATH — paru,
+// paru-git, paru-bin — for Settings, which offers to swap it for the other.
 function depsCommand() {
   return DEPS.map(d => "command -v " + q(d.bin) + " >/dev/null 2>&1 || echo " + q(d.bin)).join("; ")
-    + "; command -v cargo >/dev/null 2>&1 || echo cargo; true";
+    + "; command -v cargo >/dev/null 2>&1 || echo cargo"
+    + "; p=$(command -v paru) && pacman -Qqo \"$p\" 2>/dev/null | sed 's/^/=/'; true";
 }
 
-// → { missing: [{ pkg, aur, why: [..] }], paru: bool, cargo: bool } — one row
-// per PACKAGE, however many of its programs are missing.
+// → { missing: [{ pkg, aur, why: [..] }], paru: bool, cargo: bool, paruPkg } —
+// one row per PACKAGE, however many of its programs are missing; paruPkg is
+// the package paru came from, "" when there is none or pacman does not own it.
 function readDeps(text) {
   const gone = {};
-  for (const l of String(text ?? "").split("\n")) if (l.trim()) gone[l.trim()] = true;
+  let paruPkg = "";
+  for (const l of String(text ?? "").split("\n")) {
+    const t = l.trim();
+    if (t.startsWith("=")) paruPkg = t.slice(1);
+    else if (t) gone[t] = true;
+  }
   const byPkg = {}, order = [];
   for (const d of DEPS) {
     if (!gone[d.bin]) continue;
     if (!byPkg[d.pkg]) { byPkg[d.pkg] = { pkg: d.pkg, aur: !!d.aur, why: [] }; order.push(d.pkg); }
     byPkg[d.pkg].why.push(d.why);
   }
-  return { missing: order.map(p => byPkg[p]), paru: !!gone["paru"], cargo: !!gone["cargo"] };
+  return { missing: order.map(p => byPkg[p]), paru: !!gone["paru"], cargo: !!gone["cargo"],
+           paruPkg: gone["paru"] ? "" : paruPkg };
 }
 
 // The steps that install what is missing. `paru` is "paru", "paru-git" or ""
@@ -1107,21 +1117,40 @@ function setupSteps(deps, paru, buildDir, script) {
   }
   if (repo.length === 0 && !paru) return steps;
   steps.push(["@sudo", "pacman", "-Syu", "--needed", "--noconfirm"].concat(repo));
-  if (paru) {
-    const d = q(buildDir);
-    steps.push(["@user",
-      "set -e; rm -rf " + d + "; mkdir -p " + d + "; cd " + d + "; "
-      + "echo ':: Fetching the " + paru + " recipe from the AUR'; "
-      + "git clone --depth 1 " + q("https://aur.archlinux.org/" + paru + ".git") + " recipe; cd recipe; "
-      + "echo ':: Building " + paru + "'; "
-      + "makepkg --noconfirm --needed -f; "
-      + "pkgs=$(ls *.pkg.tar.* | grep -v -- '-debug-' | grep -v '\\.sig$'); "
-      + "echo ':: Installing ' $pkgs; "
-      + "sudo -A pacman -U --noconfirm $pkgs; "
-      + "cd /; rm -rf " + d]);
-  }
+  if (paru) steps.push(paruBuildStep(paru, buildDir));
   if (script) steps.push(["@user", q(script) + " aur"]);
   return steps;
+}
+
+// Building `paru` ("paru" or "paru-git") from its AUR recipe, as you, and
+// installing the result with pacman. `--ask 4` answers pacman's one question
+// here, "remove the conflicting package?", with yes: swapping paru for
+// paru-git (or back, or for paru-bin) is exactly that conflict, and is
+// done in the same transaction rather than removing paru first and hoping
+// the install goes through. The build comes first under `set -e`, so a
+// failed build leaves the paru you had.
+function paruBuildStep(paru, buildDir) {
+  const d = q(buildDir);
+  return ["@user",
+    "set -e; rm -rf " + d + "; mkdir -p " + d + "; cd " + d + "; "
+    + "echo ':: Fetching the " + paru + " recipe from the AUR'; "
+    + "git clone --depth 1 " + q("https://aur.archlinux.org/" + paru + ".git") + " recipe; cd recipe; "
+    + "echo ':: Building " + paru + "'; "
+    + "makepkg --noconfirm --needed -f; "
+    + "pkgs=$(ls *.pkg.tar.* | grep -v -- '-debug-' | grep -v '\\.sig$'); "
+    + "echo ':: Installing ' $pkgs; "
+    + "sudo -A pacman -U --noconfirm --ask 4 $pkgs; "
+    + "cd /; rm -rf " + d];
+}
+
+// SWAPPING THE PARU THAT IS THERE (Settings). Its build needs what setup put
+// in for it — base-devel, git, a Rust toolchain — which may have been
+// removed since; asked for with --needed and no -y, so nothing is synced or
+// upgraded on the way, and what is already in is skipped.
+function paruSwitchSteps(paru, deps, buildDir) {
+  const need = ["base-devel", "git"].concat(deps && deps.cargo ? ["rust"] : []);
+  return [["@sudo", "pacman", "-S", "--needed", "--noconfirm"].concat(need),
+          paruBuildStep(paru, buildDir)];
 }
 
 // ── sorting the package list ──────────────────────────────────────────────

@@ -661,6 +661,30 @@ def forges_upload_as_one_commit():
     eq(sorted(server.FORGES), ["codeberg", "github", "gitlab"], "routed by prefix")
 
 
+@test
+def tokens_kept_without_a_keyring():
+    # no Secret Service (as on the user's machine, 2026-10-11): a token goes
+    # to delphi's own file, owner-only, git's helper finds it there, and it
+    # goes again on forgetting
+    import stat
+    import rest
+    import tokenstore
+    keep = rest.keyring
+    rest.keyring = lambda action, fields: (rest.KEYRING.update(down=True), {})[1]
+    try:
+        eq(tokenstore.put("forge.example", "me", "s3cret-token"), "file", "where")
+        eq(tokenstore.get("forge.example")["password"], "s3cret-token", "read back")
+        eq(oct(stat.S_IMODE(os.stat(tokenstore.FILE).st_mode)), "0o600", "owner only")
+        helper = os.path.join(ROOT, "delphi", "bin", "delphi-credential")
+        r = subprocess.run([helper, "get"], input="protocol=https\nhost=forge.example\n\n",
+                           text=True, capture_output=True)
+        eq(r.stdout.split(), ["username=me", "password=s3cret-token"], "git's helper")
+        tokenstore.drop("forge.example")
+        eq(tokenstore.get("forge.example"), {}, "forgotten")
+    finally:
+        rest.keyring = keep
+
+
 def continuous(rows):
     """Every line leaving a row's bottom arrives at the next row's top, in
     the same column and colour — and nothing else arrives."""

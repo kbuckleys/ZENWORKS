@@ -26,7 +26,7 @@ return {
 	image_editor = "",
 
 	mail         = "",
-	files        = "terminus.desktop",
+	files        = "",
 	text         = "",
 	images       = "",
 	video        = "",

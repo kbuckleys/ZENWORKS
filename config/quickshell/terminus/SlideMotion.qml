@@ -439,13 +439,17 @@ Item {
   }
   function shownPath(dir) { return Terminus.shownPath(dir, term.archMounts); }
   function parentOf(dir) { return Terminus.parentOf(dir, term.archMounts); }
-  function enterArchive(r) {
+  // `kept`: no handing the file on when it will not mount. An archive opened
+  // FROM OUTSIDE (terminus' openArchive — terminus as the desktop's archive
+  // handler) would be handed straight back to terminus, round and round.
+  function enterArchive(r, kept) {
     if (!r) return;
     const mnt = term.archBase + "/" + Qt.md5(r.path);
     if (term.archMounts[mnt] === r.path) { term.goTo(mnt); return; }
     if (archMountProc.running) return;
     archMountProc.mnt = mnt;
     archMountProc.archive = r.path;
+    archMountProc.kept = !!kept;
     archMountProc.command = ["sh", "-c", Terminus.mountArchiveCommand(r.path, mnt,
       Terminus.terminusCacheDir() + "/archive-index")];
     archMountProc.running = true;
@@ -455,6 +459,7 @@ Item {
     id: archMountProc
     property string mnt: ""
     property string archive: ""
+    property bool kept: false
     onExited: (code) => {
       if (code !== 0) {
         // Not something ratarmount can read — a format it has no backend
@@ -462,7 +467,7 @@ Item {
         // whatever opens it.
         term.status = "could not open " + Terminus.basename(archMountProc.archive)
           + " as a directory";
-        term.openFile(archMountProc.archive);
+        if (!archMountProc.kept) term.openFile(archMountProc.archive);
         return;
       }
       const next = Object.assign({}, term.archMounts);

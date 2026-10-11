@@ -11,6 +11,7 @@
 
 import json
 import os
+import re
 import subprocess
 import time
 import urllib.error
@@ -26,7 +27,10 @@ class ForgeError(Exception):
 def keyring(action, fields):
     # Only the keyring helper, whatever else the user has configured: this is
     # delphi's own store, asked directly. Prompts are switched off, so a miss
-    # is an empty answer, never a question.
+    # is an empty answer, never a question. A keyring that is not there (no
+    # Secret Service running — the helper says "not activatable") is noted in
+    # KEYRING["down"], so tokenstore.py stores elsewhere instead of believing
+    # a store that did nothing (2026-10-11).
     body = "".join(f"{k}={v}\n" for k, v in fields.items()) + "\n"
     env = dict(os.environ, GIT_TERMINAL_PROMPT="0", GIT_ASKPASS="/bin/false",
                SSH_ASKPASS="/bin/false")
@@ -34,13 +38,32 @@ def keyring(action, fields):
         r = subprocess.run(["git", "-c", "credential.helper=",
                             "-c", "credential.helper=libsecret",
                             "credential", action], input=body, text=True,
-                           stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                           stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                            env=env, timeout=20)
     except (FileNotFoundError, subprocess.TimeoutExpired):
+        KEYRING["down"] = True
         return {}
+    KEYRING["down"] = bool(re.search(r"(store|lookup|erase) failed|not activatable|ServiceUnknown", r.stderr or ""))
     if r.returncode != 0:
         return {}
     return dict(l.split("=", 1) for l in r.stdout.splitlines() if "=" in l)
+
+
+KEYRING = {"down": False}
+
+
+def _hidden(text, headers):
+    """A forge's message with the request's own secret blanked out — Codeberg
+    answers a wrong token by quoting it ("task with token \"…\""), and the
+    message goes on a card (2026-10-11). Whatever the token is called, it is
+    a header's value, or the part after "Bearer " / "token "."""
+    t = str(text or "")
+    for v in (headers or {}).values():
+        sv = str(v)
+        for secret in (sv, sv.split(" ", 1)[-1]):
+            if len(secret) >= 8 and secret in t:
+                t = t.replace(secret, "…")
+    return t
 
 
 def request(method, url, headers, body=None, raw=False, again=False, waited=None, who="the forge"):
@@ -95,7 +118,7 @@ def request(method, url, headers, body=None, raw=False, again=False, waited=None
                     waited(pause)
                 time.sleep(pause)
                 continue
-            raise ForgeError(msg or f"{who} answered {e.code}", e.code)
+            raise ForgeError(_hidden(msg, headers) or f"{who} answered {e.code}", e.code)
         except (urllib.error.URLError, TimeoutError, OSError) as e:
             n += 1
             if n < tries:

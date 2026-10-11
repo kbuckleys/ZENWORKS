@@ -26,6 +26,7 @@ import subprocess
 import urllib.parse
 
 import rest
+import tokenstore
 from files import expand
 from rest import ForgeError
 
@@ -57,22 +58,41 @@ def token():
         m = re.search(r"Token(?: found)?:\s*(\S{12,})", r.stdout)
         if m and "*" not in m.group(1):
             return m.group(1), "glab"
-    c = rest.keyring("fill", {"protocol": "https", "host": HOST})
-    if c.get("password"):
-        return c["password"], "keyring"
+    # the keyring, or delphi's own file where there is no keyring (tokenstore)
+    c = tokenstore.get(HOST)
+    if c:
+        return c["password"], c["where"]
     return None, None
 
 
 def call(method, path, body=None, tok=None, raw=False, again=False, waited=None, anon=False):
+    given = tok is not None
+    src = None
     if tok is None:
-        tok, _ = token()
+        tok, src = token()
     if not tok and not anon:
         raise ForgeError("not signed in to GitLab", 401)
     url = path if path.startswith("http") else API + path
-    h = {"User-Agent": "delphi", "Accept": "application/json"}
-    if tok:
-        h["PRIVATE-TOKEN"] = tok
-    return rest.request(method, url, h, body, raw, again, waited, who=NAME)
+    def ask(t):
+        h = {"User-Agent": "delphi", "Accept": "application/json"}
+        if t:
+            # Bearer, which GitLab takes from a personal access token and an
+            # OAuth one alike — glab's browser/device sign-in gives the latter,
+            # and PRIVATE-TOKEN was answered 401 (2026-10-11)
+            h["Authorization"] = "Bearer " + t
+        return rest.request(method, url, h, body, raw, again, waited, who=NAME)
+    try:
+        return ask(tok)
+    except ForgeError as e:
+        # glab's OAuth token lasts two hours and glab renews it as it runs:
+        # once refused, glab is run once (so it renews), and asked again
+        if e.status != 401 or given or src != "glab":
+            raise
+        _glab("api", "user", timeout=30)
+        fresh, _ = token()
+        if not fresh or fresh == tok:
+            raise
+        return ask(fresh)
 
 
 def _paged(path, tok, limit=1000, anon=False):
@@ -110,44 +130,59 @@ def status():
 
 def set_token(tok):
     me = call("GET", "/user", tok=tok)
-    rest.keyring("approve", {"protocol": "https", "host": HOST,
-                             "username": me["username"], "password": tok})
-    return {"login": me["username"]}
+    # kept where it will be found again — and said where (tokenstore.put)
+    where = tokenstore.put(HOST, me["username"], tok)
+    return {"login": me["username"], "where": where}
 
 
 def forget_token():
-    c = rest.keyring("fill", {"protocol": "https", "host": HOST})
-    if c:
-        rest.keyring("reject", {"protocol": "https", "host": HOST,
-                                "username": c.get("username", "")})
+    tokenstore.drop(HOST)
 
 
-URL = re.compile(r"https://\S+")
+CODE = re.compile(r"one-time code:\s*([A-Z0-9-]{6,})", re.I)
+URL = re.compile(r"https://\S+/oauth/device\S*")
 
 
 def login(emit, cancel):
-    """glab's browser sign-in, without a terminal: glab opens a page on
-    gitlab.com and waits for it on a local port; the address is handed to
-    the window too (in case no browser opened), and the answer comes back
-    to glab itself."""
-    p = subprocess.Popen(["glab", "auth", "login", "--hostname", HOST, "--web",
-                          "--git-protocol", "https", "--api-protocol", "https"],
-                         stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
-                         stderr=subprocess.STDOUT, text=True, start_new_session=True)
+    """glab's sign-in, without a terminal: its DEVICE flow — a one-time code
+    and a page to type it at (gitlab.com/oauth/device), handed to the window
+    as gh's are, and glab waits until GitLab says yes. Every question glab
+    would put to a terminal is answered by a flag here; its first try (the
+    browser flow, --web) ended "sign-in did not finish" (2026-10-11).
+
+    Where there is no keyring (tokenstore: no Secret Service) glab would
+    fail at the very end, saving the token into one: --insecure-storage
+    keeps it in glab's own config file instead, as gh does in its hosts.yml."""
+    rest.keyring("fill", {"protocol": "https", "host": HOST})
+    a = ["glab", "auth", "login", "--hostname", HOST, "--device",
+         "--git-protocol", "https", "--api-protocol", "https",
+         "--container-registry-domains", f"{HOST},{HOST}:443,registry.{HOST}"]
+    if rest.KEYRING["down"]:
+        a.append("--insecure-storage")
+    p = subprocess.Popen(a, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                         stderr=subprocess.STDOUT, text=True, start_new_session=True,
+                         env=dict(os.environ, BROWSER="true", NO_PROMPT="1"))
     cancel.attach(p)
-    sent = False
+    sent, said = {}, []
     try:
         for line in p.stdout:
-            u = URL.search(line)
-            if u and not sent and "oauth" in u.group(0):
-                sent = True
-                emit({"device": {"url": u.group(0), "code": ""}})
+            said.append(line.strip())
+            m, u = CODE.search(line), URL.search(line)
+            if m:
+                sent["code"] = m.group(1)
+            if u:
+                sent["url"] = u.group(0)
+            if "code" in sent and "url" in sent and not sent.get("done"):
+                sent["done"] = True
+                emit({"device": {"code": sent["code"], "url": sent["url"]}})
         p.wait()
     finally:
         cancel.detach(p)
     cancel.check()
     if p.returncode != 0:
-        raise ForgeError("sign-in did not finish")
+        # glab's own last words, not a bare "did not finish"
+        why = [l for l in said if l and l not in ("ERROR",)][-2:]
+        raise ForgeError("sign-in did not finish" + (": " + " ".join(why) if why else ""))
     return status()
 
 

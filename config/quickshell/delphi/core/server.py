@@ -32,6 +32,7 @@ import json
 import os
 import re
 import shutil
+import signal
 import socket
 import subprocess
 import sys
@@ -592,6 +593,14 @@ def main():
     # then by each forge's Status.
     threading.Thread(target=lambda: gitrun.CREDS.refresh(
         gh_ok=github.token()[1] == "gh", glab_ok=gitlab.token()[1] == "glab"), daemon=True).start()
+    # Told to stop (SIGTERM: the window's manager going idle, or a kill):
+    # everything this started stops with it. A sign-in's gh or glab runs in
+    # a session of its own, so it outlived a plain exit and waited on for
+    # nothing (a stray glab from a stopped daemon, 2026-10-11).
+    def stop(sig, frame):
+        srv.close()
+        os._exit(0)
+    signal.signal(signal.SIGTERM, stop)
     send({"event": {"ready": True, "protocol": PROTOCOL, "pid": os.getpid()}})
     try:
         for line in sys.stdin:

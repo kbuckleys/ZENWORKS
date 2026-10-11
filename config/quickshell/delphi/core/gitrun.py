@@ -88,6 +88,9 @@ def _kill(proc):
 # their own, which always wins. For github.com, gh's helper goes first when gh
 # is signed in, so a `gh auth login` is all a user ever has to do. Both are
 # passed per call with -c, never written into anyone's gitconfig.
+HELPER = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "bin", "delphi-credential")
+
+
 class Creds:
     def __init__(self):
         self.user_helper = None   # None = not looked up yet
@@ -111,6 +114,9 @@ class Creds:
         if not self.user_helper and os.path.exists(
                 "/usr/lib/git-core/git-credential-libsecret"):
             a += ["-c", "credential.helper=libsecret"]
+        # delphi's own token file, where there is no keyring (core/tokenstore.py):
+        # its helper answers a host it holds a token for, and no other
+        a += ["-c", "credential.helper=!" + HELPER]
         if self.gh_ok:
             # The empty value clears the helpers collected so far for this
             # host, so a stale keyring entry cannot answer before gh does.

@@ -7,3 +7,4 @@ ChangeRow 1.0 ChangeRow.qml
 NewsView 1.0 NewsView.qml
 SetupView 1.0 SetupView.qml
 ConfigView 1.0 ConfigView.qml
+ParuChoice 1.0 ParuChoice.qml

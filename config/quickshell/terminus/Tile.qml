@@ -602,7 +602,9 @@ Item {
     anchors.fill: parent
     horizontalAlignment: Text.AlignHCenter
     color: Zenon.white
-    selectionColor: Zenon.selBg
+    // the accent, not selBg: the row being renamed is the selected row,
+    // already filled in selBg, so the highlighted name was invisible on it
+    selectionColor: Zenon.alpha(Zenon.cyan, 0.22)
     selectedTextColor: Zenon.white
     font.family: Zenon.face
     font.weight: Font.Bold

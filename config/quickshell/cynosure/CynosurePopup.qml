@@ -706,7 +706,7 @@ property var statusbar: null
               height: parent.height
               text: "\uF120"
               visible: inputBar.showInput
-              color: Zenon.yellow
+              color: Zenon.white
               font.family: Zenon.face
               font.weight: Font.Bold
               font.pixelSize: Zenon.px(18)
@@ -718,9 +718,9 @@ property var statusbar: null
               width: parent.width - promptText.width
               height: parent.height
               text: popup.query
-              color: Zenon.yellow
-              selectionColor: Zenon.yellow
-              selectedTextColor: Zenon.onAccent
+              color: Zenon.white
+              selectionColor: Zenon.selBg
+              selectedTextColor: Zenon.white
               cursorVisible: true
 
               cursorDelegate: Item {}
@@ -744,7 +744,7 @@ property var statusbar: null
                 width: 3
                 height: 20
                 radius: 1
-                color: Zenon.yellow
+                color: Zenon.white
                 opacity: 0.25
                 visible: inputBar.showInput
                 SequentialAnimation on opacity {
@@ -820,14 +820,14 @@ property var statusbar: null
               bottomLeftRadius: row.atLeftEdge ? popup.innerCorner : 0
               topRightRadius: row.atRightEdge ? popup.innerCorner : 0
               bottomRightRadius: row.atRightEdge ? popup.innerCorner : 0
-              color: index === popup.sel ? Zenon.yellow : "transparent"
+              color: index === popup.sel ? Zenon.alpha(Zenon.cyan, 0.3) : "transparent"
             }
 
             Text {
               id: rowText
               anchors.centerIn: parent
               text: Cynosure.highlight(modelData.displayText, popup.query)
-              color: index === popup.sel ? Zenon.onAccent : Zenon.yellow
+              color: Zenon.white
               font.family: Zenon.face
               font.weight: Font.Bold
               font.pixelSize: Zenon.px(16)
@@ -872,7 +872,7 @@ property var statusbar: null
             anchors.leftMargin: 12
             anchors.rightMargin: 12
             text: popup.pending ? popup.pending.name + "?" : popup.query
-            color: Zenon.yellow
+            color: Zenon.white
             font.family: Zenon.face
             font.weight: Font.Bold
             font.pixelSize: Zenon.px(16)
@@ -923,14 +923,14 @@ property var statusbar: null
               bottomLeftRadius: pickerBtn.atLeftEdge ? popup.innerCorner : 0
               topRightRadius: pickerBtn.atRightEdge ? popup.innerCorner : 0
               bottomRightRadius: pickerBtn.atRightEdge ? popup.innerCorner : 0
-              color: index === popup.sel ? Zenon.yellow : "transparent"
+              color: index === popup.sel ? Zenon.alpha(Zenon.cyan, 0.3) : "transparent"
             }
 
             Text {
               id: pickerText
               anchors.centerIn: parent
               text: modelData.label
-              color: index === popup.sel ? Zenon.onAccent : Zenon.yellow
+              color: Zenon.white
               font.family: Zenon.face
               font.weight: Font.Bold
               font.pixelSize: Zenon.px(16)

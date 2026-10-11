@@ -1043,69 +1043,22 @@ FloatingWindow {
           }
         }
 
-        // the pages: ONE control, three halves — ceres' switch: one border, a
-        // hairline between the halves, the lit one filled
-        Item {
+        // the pages: ONE control, three halves — terminus/Segments (the
+        // suite's switch, since 2026-10-11): one border, a hairline between,
+        // one highlight that slides to the page you are on
+        Segments {
           id: tabs
           anchors.verticalCenter: parent.verticalCenter
-          width: segRow.implicitWidth
           height: 32
-          Rectangle {
-            anchors.fill: parent
-            z: 1
-            radius: Zenon.windowRadius
-            color: "transparent"
-            border.width: 1
-            border.color: Zenon.border
-          }
-          Row {
-            id: segRow
-            anchors.fill: parent
-            Repeater {
-              model: win.pages
-              delegate: Row {
-                id: half
-                required property var modelData
-                required property int index
-                height: tabs.height
-                Rectangle {
-                  visible: half.index > 0
-                  width: 1
-                  height: parent.height
-                  color: Zenon.border
-                }
-                Rectangle {
-                  id: tab
-                  readonly property bool on: win.page === half.modelData[0]
-                  readonly property bool first: half.index === 0
-                  readonly property bool last: half.index === win.pages.length - 1
-                  width: halfText.implicitWidth + 32
-                  height: parent.height
-                  topLeftRadius: first ? Zenon.windowRadius : 0
-                  bottomLeftRadius: first ? Zenon.windowRadius : 0
-                  topRightRadius: last ? Zenon.windowRadius : 0
-                  bottomRightRadius: last ? Zenon.windowRadius : 0
-                  color: on ? Zenon.headBg : Zenon.alpha(Zenon.headBg, 0)
-                  Behavior on color { ColorAnimation { duration: Zenon.fast } }
-                  Text {
-                    id: halfText
-                    anchors.centerIn: parent
-                    text: half.modelData[1]
-                    color: tab.on ? Zenon.cyan : Zenon.keyInk
-                    font.family: Zenon.face
-                    font.weight: Font.Bold
-                    font.pixelSize: Zenon.px(16)
-                  }
-                  MouseArea {
-                    id: tabMa
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    onClicked: win.setPage(half.modelData[0])
-                    onContainsMouseChanged: containsMouse ? tips.show(tab, half.modelData[1], "ctrl " + (half.index + 1)) : tips.hide(tab)
-                  }
-                }
-              }
-            }
+          textSize: Zenon.px(16)
+          ink: Zenon.keyInk
+          options: win.pages
+          current: win.page
+          onChose: (v) => win.setPage(v)
+          onPointed: (v, at, inside) => {
+            const i = win.pages.findIndex((p) => p[0] === v);
+            if (inside && i >= 0) tips.show(at, win.pages[i][1], "ctrl " + (i + 1));
+            else tips.hide(at);
           }
         }
 
@@ -1982,7 +1935,8 @@ FloatingWindow {
       anchors.bottom: parent.bottom
       anchors.left: side.right
       anchors.right: parent.right
-      height: 50
+      // 40, as delphi's (user, 2026-10-11)
+      height: 40
       Rectangle { anchors.fill: parent; color: Zenon.hintFrostBg }
       Rectangle { anchors.top: parent.top; width: parent.width; height: 1; color: Zenon.border }
       HintRow {

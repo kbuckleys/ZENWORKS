@@ -668,7 +668,7 @@ Item {
       anchors.left: parent.left
       anchors.right: parent.right
       anchors.margins: 10
-      height: visible ? 30 : 0
+      height: pg.files.length > 1 ? 30 : 0
       textSize: Zenon.px(14)
       ghost: "  Filter " + pg.files.length + " files  ( / )"
       onTextChanged: pg.fileQuery = fileFilter.text.trim()

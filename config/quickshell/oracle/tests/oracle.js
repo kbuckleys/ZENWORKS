@@ -582,7 +582,7 @@ module.exports.defaultApps = (t, T) => {
     ["", "current", "DP-1"]);
   t.eq("an image editor is an editor, not a viewer or a browser",
     T.imageEditorOptions(s.apps).map((o) => o.value), ["", "gimp.desktop"]);
-  t.eq("directories default to terminus", T.appKind("files").preferred, "terminus.desktop");
+  t.ok("no kind is pinned: each starts at System", T.appKinds().every((k) => !k.preferred));
   t.eq("and the row says Directories", T.appKind("files").label, "Directories");
   t.ok("a calendar invite is not text", !T.inKind(T.appKind("text"), "text/calendar")
     && T.inKind(T.appKind("calendar"), "text/calendar"));

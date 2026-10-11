@@ -293,15 +293,19 @@ PopupWindow {
     // the order in force wears its direction where a key would sit — the
     // toolbar's sort button opens this list, and has to say what is on
     function sortMark(k) { return term.sortKey === k ? (term.sortDesc ? "\u2193" : "\u2191") : ""; }
+    // THE ORDER IN FORCE IS TICKED (user, 2026-10-11), in the glyph column
+    // either card lays when a row of it carries one — the arrow beside it
+    // still says which way
+    function sortTick(k) { return term.sortKey === k ? "\uf00c" : ""; }   // nf-fa-check
     readonly property var sortItems: [
-      { label: "Name", key: menu.sortMark("name"), act: () => term.setSort("name") },
-      { label: "Size", key: menu.sortMark("size"), act: () => term.setSort("size") },
-      { label: "Modified", key: menu.sortMark("time"), act: () => term.setSort("time") },
-      { label: "Kind", key: menu.sortMark("kind"), act: () => term.setSort("kind") },
+      { label: "Name", key: menu.sortMark("name"), glyph: menu.sortTick("name"), act: () => term.setSort("name") },
+      { label: "Size", key: menu.sortMark("size"), glyph: menu.sortTick("size"), act: () => term.setSort("size") },
+      { label: "Modified", key: menu.sortMark("time"), glyph: menu.sortTick("time"), act: () => term.setSort("time") },
+      { label: "Kind", key: menu.sortMark("kind"), glyph: menu.sortTick("kind"), act: () => term.setSort("kind") },
       // Same gate the sort ring in the settings panel uses: an order
       // that cannot tell any two rows apart is a row that does nothing.
       ...(term.anyTagged
-          ? [{ label: "Tag", key: menu.sortMark("tag") || ", t", act: () => term.setSort("tag") }]
+          ? [{ label: "Tag", key: menu.sortMark("tag") || ", t", glyph: menu.sortTick("tag"), act: () => term.setSort("tag") }]
           : []),
       { sep: true },
       // Not an order — a way of reading whichever order is in force.
@@ -413,10 +417,19 @@ PopupWindow {
       return w + 6;
     }
 
+    // the parent card's glyph column, as the submenu's (subGlyphs): laid
+    // when any row carries a glyph — the sort menu's tick, opened from the
+    // sort button
+    readonly property bool cardGlyphs: {
+      for (const it of menu.items) if (it.glyph !== undefined) return true;
+      return false;
+    }
+    readonly property real cardGlyphW: menu.cardGlyphs ? 16 + Zenon.menuIconGap : 0
+
     readonly property real cardWidth: {
       let w = 0;
       for (const it of menu.items)
-        w = Math.max(w, menu.rowWidth(it, menuLabelFm, menuKeyFm));
+        w = Math.max(w, menu.rowWidth(it, menuLabelFm, menuKeyFm) + menu.cardGlyphW);
       return Math.round(Math.max(200, Math.min(460, w)));
     }
 
@@ -1004,6 +1017,9 @@ PopupWindow {
             height: modelData.sep ? Zenon.menuSepHeight
               : (modelData.swatch ? Math.round(Zenon.menuRowHeight * 1.15)
                                   : Zenon.menuRowHeight)
+            // a row that does nothing here (Group headings outside list
+            // view) is dimmed and left alone, as the submenu's are
+            opacity: modelData.off ? 0.45 : 1
 
             Rectangle {
               anchors.verticalCenter: parent.verticalCenter
@@ -1117,7 +1133,7 @@ PopupWindow {
             }
             HoverHandler {
               id: itemHov
-              enabled: !modelData.sep && !modelData.swatch
+              enabled: !modelData.sep && !modelData.swatch && !modelData.off
               // Hovering a row with children opens them and hovering one
               // without closes whatever was open — so moving down the card
               // never leaves an orphaned second card beside an unrelated row.
@@ -1136,9 +1152,23 @@ PopupWindow {
             // through the "middle click" beside it and the two were printed
             // on top of each other. Now it stops short and elides.
             Text {
-              id: menuLabel
               anchors.left: parent.left
               anchors.leftMargin: 12
+              anchors.verticalCenter: parent.verticalCenter
+              width: 16
+              visible: menu.cardGlyphs && !modelData.sep && !modelData.swatch
+              text: modelData.glyph || ""
+              horizontalAlignment: Text.AlignHCenter
+              color: Zenon.white
+              font.family: Zenon.face
+              font.weight: Zenon.weight
+              font.pixelSize: Zenon.px(15)
+            }
+
+            Text {
+              id: menuLabel
+              anchors.left: parent.left
+              anchors.leftMargin: 12 + menu.cardGlyphW
               anchors.right: menuKey.visible ? menuKey.left
                            : (menuChev.visible ? menuChev.left
                              : (menuX.visible ? menuX.left : parent.right))
@@ -1267,7 +1297,7 @@ PopupWindow {
               // row and is declared after it, so it was taking every
               // click meant for a colour — the strip drew correctly and
               // could not be used.
-              enabled: !modelData.sep && !modelData.swatch
+              enabled: !modelData.sep && !modelData.swatch && !modelData.off
                        && !chosenAnim.running
             // No hand cursor. This is a file manager, not a page of links:
             // a row you can click is the normal state of everything here, so

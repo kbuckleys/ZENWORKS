@@ -285,6 +285,7 @@ Rectangle {
   Sheet {
     // clear: the listing is cut away under it (see sheetHole)
     ground: "transparent"
+    backdrop: term.sheetBackdrop   // the listing, frosted under the card
     splice: true
     onCardInkChanged: term.noteSheet("s8", cardInk, drawnX, drawnW, drawnY, drawnH)
     onDrawnXChanged: term.noteSheet("s8", cardInk, drawnX, drawnW, drawnY, drawnH)

@@ -381,6 +381,14 @@ module.exports = {
     const withList = C.setupSteps(C.readDeps("fzf\n"), "", "/b", "/s/ceres.sh");
     t.eq("and the AUR list refreshed last", withList[withList.length - 1], ["@user", "'/s/ceres.sh' aur"]);
     t.eq("nothing missing, nothing to do", C.setupSteps(C.readDeps(""), "", "/b").length, 0);
+    t.eq("the paru package is read", C.readDeps("fzf\n=paru-bin\n").paruPkg, "paru-bin");
+    t.eq("and is no missing program", C.readDeps("=paru-git\n").missing.length, 0);
+    t.eq("no paru, no package", C.readDeps("paru\n").paruPkg, "");
+    const sw = C.paruSwitchSteps("paru-git", C.readDeps(""), "/b");
+    t.eq("a switch syncs nothing", sw[0], ["@sudo", "pacman", "-S", "--needed", "--noconfirm", "base-devel", "git"]);
+    t.has("and builds the other recipe", sw[1][1], "https://aur.archlinux.org/paru-git.git");
+    t.has("taking the conflict's removal", sw[1][1], "pacman -U --noconfirm --ask 4");
+    t.ok("rust when there is no cargo", C.paruSwitchSteps("paru", C.readDeps("cargo\n"), "/b")[0].indexOf("rust") > 0);
     t.eq("a missing paru is said as such", C.readAur("sh: paru: command not found\n@@exit 127\n").error, "paru is not installed");
 
     // the bootstrap, end to end through the real wrapper: stand-in git,
@@ -412,7 +420,7 @@ module.exports = {
       t.has("bootstrap: a full upgrade with the deps", out2, "pacman: -Syu --needed --noconfirm fzf base-devel git");
       t.has("bootstrap: built", out2, "==> Making package: paru");
       t.has("bootstrap: installs only the package, as root",
-        out2, "pacman: -U --noconfirm paru-2.1.0-2-x86_64.pkg.tar.zst\n");
+        out2, "pacman: -U --noconfirm --ask 4 paru-2.1.0-2-x86_64.pkg.tar.zst\n");
       t.ok("bootstrap: build tree removed", !fs.existsSync(build));
       fs.rmSync(d2, { recursive: true, force: true });
     }

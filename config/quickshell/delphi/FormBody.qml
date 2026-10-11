@@ -96,6 +96,9 @@ Item {
     fb.missing = fb.missing.filter((k) => fb.valueOf(fb.fields.find((f) => f.key === k) || {}).trim() === "")
   function answer(ok) {
     if (ok && !fb.ready) {
+      // the secret not given yet (a paste that brought nothing): the field
+      // says so, red, rather than the verb doing nothing
+      if (fb.secret) { pw.failed = true; return; }
       fb.missing = fb.fields.filter((f) => !f.optional && fb.valueOf(f).trim() === "").map((f) => f.key);
       const i = fb.fields.findIndex((f) => f.key === fb.missing[0]);
       if (i >= 0 && fieldRep.itemAt(i)) fieldRep.itemAt(i).claim();
@@ -229,7 +232,7 @@ Item {
           id: well
           visible: fcol.multi
           width: parent.width
-          height: visible ? 120 : 0
+          height: fcol.multi ? 120 : 0     // not `visible`: see the secret field below
           ghost: fcol.modelData.hint || ""
           Component.onCompleted: if (fcol.multi) well.text = fcol.modelData.value || ""
           onTextChanged: if (fcol.multi) fcol.put(fcol.modelData.key, well.text)
@@ -282,7 +285,11 @@ Item {
       id: pw
       visible: !!fb.secret
       width: body.width - 36
-      height: visible ? implicitHeight + (pw.purpose !== "" ? 22 : 0) : 0
+      // sized by whether a secret is asked, never by `visible`: the card's
+      // slot shows only once it has height, and the field is visible only
+      // once the slot shows — each waited on the other, and the field
+      // stayed at nothing (a pasted token went in unseen, 2026-10-11)
+      height: fb.secret ? implicitHeight + (pw.purpose !== "" ? 22 : 0) : 0
       prompt: fb.secret && fb.secret.prompt ? fb.secret.prompt : "input your password"
       purpose: fb.secret && fb.secret.purpose ? fb.secret.purpose : ""
       onSubmitted: (p) => { pw.pw = p; fb.answer(true); }

@@ -108,7 +108,7 @@ Singleton {
   // Checked at startup and after every transaction. Anything missing is
   // named with its package and its purpose, and whatever needs paru is sent
   // to setup rather than left to fail — see setupSteps.
-  property var deps: ({ missing: [], paru: false, cargo: false })
+  property var deps: ({ missing: [], paru: false, cargo: false, paruPkg: "" })
   readonly property bool setupNeeded: root.deps.missing.length > 0
   readonly property string buildDir: Paths.cacheDir() + "/ceres/build"
   signal setupRequested()
@@ -136,6 +136,15 @@ Singleton {
     root._checkAfterSetup = root.request(steps,
       "install " + root.deps.missing.map(m => m.pkg).join(", "),
       n + (root.deps.paru ? 1 : 0));
+  }
+
+  // ── THE OTHER PARU (Settings) ───────────────────────────────────────────
+  // paru for paru-git or back: the chosen recipe built and installed over the
+  // one there, pacman taking the old one out in the same transaction — see
+  // Cer.paruSwitchSteps. Refused while a job runs, as everything is.
+  function switchParu(pkg) {
+    if (pkg !== "paru" && pkg !== "paru-git") return false;
+    return root.request(Cer.paruSwitchSteps(pkg, root.deps, root.buildDir), "install " + pkg, 1);
   }
 
   // ── Arch news ───────────────────────────────────────────────────────────

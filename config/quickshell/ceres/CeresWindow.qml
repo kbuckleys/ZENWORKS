@@ -28,6 +28,7 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Widgets
 import "../morpheus"
+import "../terminus" as Term
 import "."
 import "../oracle"
 import "ceres.js" as Cer
@@ -1311,7 +1312,7 @@ FloatingWindow {
       return;
     }
     if (win.tab === "settings") {
-      configView.gsel = Math.max(0, Math.min(5, configView.gsel + (d > 0 ? 1 : -1)));
+      configView.gsel = Math.max(0, Math.min(configView.groups.length - 1, configView.gsel + (d > 0 ? 1 : -1)));
       return;
     }
     if (win.tab === "packages") {
@@ -1586,77 +1587,21 @@ FloatingWindow {
       height: win.headHidden ? 0 : 56
 
       // ONE CONTROL, TWO HALVES: a switch between the two views rather than
-      // two buttons that happen to sit together. One border, a hairline
-      // between the halves, and the lit half filled.
-      //
-      // The fill ROUNDS ITS OWN OUTER CORNERS. `clip` only ever cuts to a
-      // rectangle, so the lit end tab's square corner showed past the
-      // switch's rounded one; the first and last halves now carry the same
-      // radius on their outside corners, and the border is drawn OVER the
-      // halves so no fill can ever sit on top of it.
-      Item {
+      // two buttons that happen to sit together — terminus/Segments, the
+      // suite's switch (this was its first, written here; 2026-10-11): one
+      // border drawn over the halves, a hairline between, one highlight that
+      // slides to the view you are on.
+      Term.Segments {
         id: seg
         anchors.left: parent.left
         anchors.leftMargin: 16
         anchors.verticalCenter: parent.verticalCenter
-        width: segRow.implicitWidth
         height: 32
-
-        Rectangle {
-          anchors.fill: parent
-          z: 1
-          radius: Zenon.windowRadius
-          color: "transparent"
-          border.width: 1
-          border.color: Zenon.border
-        }
-
-        Row {
-          id: segRow
-          anchors.fill: parent
-          Repeater {
-            model: win.tabs
-            delegate: Row {
-              id: half
-              required property var modelData
-              required property int index
-              height: seg.height
-              Rectangle {
-                visible: half.index > 0
-                width: 1
-                height: parent.height
-                color: Zenon.border
-              }
-              Rectangle {
-                readonly property bool on: win.tab === half.modelData[0]
-                readonly property bool first: half.index === 0
-                readonly property bool last: half.index === win.tabs.length - 1
-                width: halfText.implicitWidth + 32
-                height: parent.height
-                topLeftRadius: first ? Zenon.windowRadius : 0
-                bottomLeftRadius: first ? Zenon.windowRadius : 0
-                topRightRadius: last ? Zenon.windowRadius : 0
-                bottomRightRadius: last ? Zenon.windowRadius : 0
-                // the lit tab wears the list's own highlight — one "this one" for
-                // the whole window. It fades to headBg at alpha 0, never to
-                // "transparent": that is BLACK at alpha 0, and the fade passed
-                // through grey (a flash on every switch in a light theme).
-                color: on ? Zenon.headBg : Zenon.alpha(Zenon.headBg, 0)
-                Behavior on color { ColorAnimation { duration: Zenon.fast } }
-                Text {
-                  id: halfText
-                  anchors.centerIn: parent
-                  text: half.modelData[1]
-                  color: parent.on ? Zenon.cyan : Zenon.keyInk
-                  font.family: Zenon.face
-                  font.weight: Font.Bold
-                  font.pixelSize: Zenon.px(16)
-                }
-                TapHandler { onTapped: win.showTab(half.modelData[0]) }
-              }
-            }
-          }
-        }
+        textSize: Zenon.px(16)
+        ink: Zenon.keyInk
+        options: win.tabs
+        current: win.tab
+        onChose: (v) => win.showTab(v)
       }
 
       // WHAT HAS BEEN TYPED, NOT A BOX. The keys never leave the window — see

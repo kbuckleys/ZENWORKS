@@ -45,7 +45,13 @@ Scope {
       Exec: Desktop.execLine(Quickshell.shellDir + "/terminus/bin/terminus", "%f"),
       Terminal: "false",
       StartupNotify: "false",
-      MimeType: ["inode/directory"]
+      // and archives, which it opens as directories (openArchive) — so
+      // oracle's Default Apps can offer it for them
+      MimeType: ["inode/directory", "application/zip", "application/x-tar",
+                 "application/x-compressed-tar", "application/x-xz-compressed-tar",
+                 "application/x-zstd-compressed-tar", "application/x-bzip2-compressed-tar",
+                 "application/x-7z-compressed", "application/vnd.rar", "application/x-rar",
+                 "application/gzip", "application/zstd"]
     })]
   }
 
@@ -664,6 +670,7 @@ Scope {
   // first asks for one.
 
     IpcHandler {
+        id: ipc
         target: "Terminus"
 
 
@@ -718,6 +725,26 @@ Scope {
           if (w.cwd === dir) w.landWanted();
         }
         return w ? dir : "opening";
+      }
+
+      // ── A FILE HANDED TO TERMINUS (bin/terminus, terminus.desktop) ──
+      // An archive is opened as the directory it is — the window goes to
+      // where it lies, cursor on it, and mounts it — which is what makes
+      // terminus the desktop's archive handler. Anything else is revealed.
+      // A mount that fails says so and stops: handing the file on would
+      // hand it straight back here.
+      function openArchive(path: string): string {
+        if (path === "") return "usage: openArchive <path>";
+        const name = Terminus.basename(path);
+        if (!Terminus.isArchive(name)) return ipc.reveal(path);
+        const cut = path.lastIndexOf("/");
+        const dir = cut > 0 ? path.slice(0, cut) : "/";
+        const w = mgr.reveal(dir);
+        if (!w) return "opening";
+        w.wantSel = path;
+        if (w.cwd === dir) w.landWanted();
+        w.enterArchive({ path: path, name: name }, true);
+        return path;
       }
 
       // ── tags ──────────────────────────────────────────────────────

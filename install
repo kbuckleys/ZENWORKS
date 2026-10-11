@@ -8,7 +8,8 @@
 # user (it asks for sudo when it needs it):  ./install.sh
 #
 #   1. paru or paru-git, built from the AUR
-#   2. etc/pacman.conf put in place (all six repos, testing included), then a full sync
+#   2. etc/pacman.conf put in place (core, extra and multilib; the -testing
+#      repos are there but commented out), then a full sync
 #   3. every package the suite needs
 #   4. configs to $XDG_CONFIG_HOME and dotfiles to ~. Anything already there is
 #      moved to <name>.bak-<timestamp> first; nothing is overwritten. The
@@ -126,7 +127,7 @@ install_paru() {
 
 # ── 2. pacman.conf + sync ──────────────────────────────────────────────────
 install_pacman_conf() {
-  say "Installing pacman.conf (core, extra and multilib, plus their -testing repos)"
+  say "Installing pacman.conf (core, extra and multilib — testing repos left off)"
   if ! cmp -s "$REPO/etc/pacman.conf" /etc/pacman.conf; then
     sudo cp -- /etc/pacman.conf "/etc/pacman.conf.bak-$STAMP"
     note "kept the old one as /etc/pacman.conf.bak-$STAMP"

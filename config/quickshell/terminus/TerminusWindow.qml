@@ -3510,7 +3510,7 @@ FloatingWindow {
   function shownPath(dir) { return slide.shownPath(dir); }
   function parentOf(dir) { return slide.parentOf(dir); }
 
-  function enterArchive(r) { return slide.enterArchive(r); }
+  function enterArchive(r, kept) { return slide.enterArchive(r, kept); }
 
 
   // ── AND PUT AWAY WHEN NOTHING IS IN THEM ─────────────────────────────
@@ -3883,6 +3883,11 @@ FloatingWindow {
   property real spliceH: 0
   property var sheetInks: ({})
   function noteSheet(key, ink, x, w, y, h) { return cards.noteSheet(key, ink, x, w, y, h); }
+  // WHAT A SHEET FROSTS (user's nofronst.png, 2026-10-11): the listing, as
+  // the bars frost the rows that scroll under them. The hole cut under the
+  // card (sheetHole) is in the chrome's layer; the listing captured on its
+  // own is whole, so the card shows it blurred over the window's glass.
+  readonly property Item sheetBackdrop: chrome.bodyBox
 
   // ── THE BAND A SHEET HANGS FROM ────────────────────────────────────────
   // Every strip of chrome above an open sheet goes the sheet's own colour, so
@@ -5782,6 +5787,7 @@ FloatingWindow {
       Sheet {
         // clear: the listing is cut away under it (see sheetHole)
         ground: "transparent"
+        backdrop: root.sheetBackdrop   // the listing, frosted under the card
         splice: true
         onCardInkChanged: root.noteSheet("s0", cardInk, drawnX, drawnW, drawnY, drawnH)
         onDrawnXChanged: root.noteSheet("s0", cardInk, drawnX, drawnW, drawnY, drawnH)
@@ -6215,6 +6221,7 @@ FloatingWindow {
     BulkRename {
       // clear: the listing is cut away under it (see sheetHole)
       ground: "transparent"
+      backdrop: root.sheetBackdrop   // the listing, frosted under the card
       id: bulk
       z: 15
       host: root
@@ -6361,6 +6368,7 @@ FloatingWindow {
       Sheet {
         // clear: the listing is cut away under it (see sheetHole)
         ground: "transparent"
+        backdrop: root.sheetBackdrop   // the listing, frosted under the card
         splice: true
         onCardInkChanged: root.noteSheet("s2", cardInk, drawnX, drawnW, drawnY, drawnH)
         onDrawnXChanged: root.noteSheet("s2", cardInk, drawnX, drawnW, drawnY, drawnH)
@@ -6535,6 +6543,7 @@ FloatingWindow {
       Sheet {
         // clear: the listing is cut away under it (see sheetHole)
         ground: "transparent"
+        backdrop: root.sheetBackdrop   // the listing, frosted under the card
         splice: true
         onCardInkChanged: root.noteSheet("s4", cardInk, drawnX, drawnW, drawnY, drawnH)
         onDrawnXChanged: root.noteSheet("s4", cardInk, drawnX, drawnW, drawnY, drawnH)
@@ -6654,6 +6663,7 @@ FloatingWindow {
       Sheet {
         // clear: the listing is cut away under it (see sheetHole)
         ground: "transparent"
+        backdrop: root.sheetBackdrop   // the listing, frosted under the card
         splice: true
         onCardInkChanged: root.noteSheet("disktool", cardInk, drawnX, drawnW, drawnY, drawnH)
         onDrawnXChanged: root.noteSheet("disktool", cardInk, drawnX, drawnW, drawnY, drawnH)
@@ -6804,6 +6814,7 @@ FloatingWindow {
       Sheet {
         // clear: the listing is cut away under it (see sheetHole)
         ground: "transparent"
+        backdrop: root.sheetBackdrop   // the listing, frosted under the card
         splice: true
         onCardInkChanged: root.noteSheet("s10", cardInk, drawnX, drawnW, drawnY, drawnH)
         onDrawnXChanged: root.noteSheet("s10", cardInk, drawnX, drawnW, drawnY, drawnH)

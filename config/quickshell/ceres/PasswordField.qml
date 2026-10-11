@@ -16,6 +16,7 @@
 
 import QtQuick
 import Quickshell
+import Quickshell.Io
 import "../morpheus"
 import "."
 
@@ -51,8 +52,12 @@ Item {
     // passphrase. Its first line only — a copied line often brings its
     // newline along, and a password never holds one.
     if (event.matches(StandardKey.Paste)) {
+      // Quickshell's own read first; on Wayland it can come back empty while
+      // another client owns the clipboard (a token copied in the browser,
+      // 2026-10-11) — then wl-paste is asked, and its first line appended
       const t = String(Quickshell.clipboardText || "").split(/\r?\n/)[0];
       if (t !== "") { field.failed = false; field.pw += t; }
+      else if (!paster.running) paster.running = true;
       return true;
     }
     if (k === Qt.Key_Backspace) {
@@ -224,6 +229,20 @@ Item {
       NumberAnimation { target: entry; property: "x"; to: -7; duration: 90 }
       NumberAnimation { target: entry; property: "x"; to:  4; duration: 80 }
       NumberAnimation { target: entry; property: "x"; to:  0; duration: 70 }
+    }
+  }
+
+  // the clipboard asked of wl-paste, when Quickshell's read had nothing; what
+  // it hands back is held only in `pw`, as typed characters are
+  Process {
+    id: paster
+    command: ["wl-paste", "--no-newline", "--type", "text/plain"]
+    stdout: StdioCollector {
+      id: pasted
+      onStreamFinished: {
+        const t = String(pasted.text || "").split(/\r?\n/)[0];
+        if (t !== "") { field.failed = false; field.pw += t; }
+      }
     }
   }
 }

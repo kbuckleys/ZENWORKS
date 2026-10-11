@@ -18,6 +18,7 @@ import os
 import re
 
 import rest
+import tokenstore
 from files import expand
 from rest import ForgeError
 
@@ -31,9 +32,10 @@ def have_cli():
 
 
 def token():
-    c = rest.keyring("fill", {"protocol": "https", "host": HOST})
-    if c.get("password"):
-        return c["password"], "keyring"
+    # the keyring, or delphi's own file where there is no keyring (tokenstore)
+    c = tokenstore.get(HOST)
+    if c:
+        return c["password"], c["where"]
     return None, None
 
 
@@ -80,16 +82,13 @@ def status():
 
 def set_token(tok):
     me = call("GET", "/user", tok=tok)
-    rest.keyring("approve", {"protocol": "https", "host": HOST,
-                             "username": me["login"], "password": tok})
-    return {"login": me["login"]}
+    # kept where it will be found again — and said where (tokenstore.put)
+    where = tokenstore.put(HOST, me["login"], tok)
+    return {"login": me["login"], "where": where}
 
 
 def forget_token():
-    c = rest.keyring("fill", {"protocol": "https", "host": HOST})
-    if c:
-        rest.keyring("reject", {"protocol": "https", "host": HOST,
-                                "username": c.get("username", "")})
+    tokenstore.drop(HOST)
 
 
 def login(emit, cancel):

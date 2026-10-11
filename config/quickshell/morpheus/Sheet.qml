@@ -129,6 +129,13 @@ Item {
   // tab), cutting the listing out under drawnX/Y/W/H and passing "transparent".
   property color ground: Zenon.black
   readonly property bool frosted: !!sheet.backdrop
+  // ── FROSTED OVER A HOLE (terminus, user 2026-10-11) ──────────────────
+  // A clear ground means the host has cut its content away under the card,
+  // so nothing sharp is left under the glass to need a solid floor: the
+  // frost lies straight on the window's own glass, and over it only the
+  // scrim the bars lay over their frost (terminus' topScrim), not the
+  // near-black a card over live content needs to stay legible.
+  readonly property bool holed: sheet.ground.a === 0
 
   property real cardW: 560
   property real cardH: 200
@@ -218,7 +225,7 @@ Item {
       opacity: sheetCard.opacity
       radius: Zenon.dialogRadius
       // solid under the blur: a listing's text is no cover for itself
-      base: Zenon.black
+      base: sheet.holed ? "transparent" : Zenon.black
       // hanging from a bar: the blur comes in below the seam (the cut is
       // hidden above the well's top, so it is counted in)
       fadeTop: sheet.hangs && !sheet.fromBottom ? sheet.cut + 28 : 0
@@ -329,7 +336,8 @@ Item {
       Rectangle {
         anchors.fill: parent
         visible: sheet.frosted
-        color: Zenon.floor(Zenon.glass(sheet.glass))
+        color: sheet.holed ? Zenon.alpha(Zenon.ground, 0.35)
+                           : Zenon.floor(Zenon.glass(sheet.glass))
       }
 
       // The card keeps its own clicks, so a press on its empty space does
