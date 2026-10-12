@@ -38,9 +38,19 @@ Rectangle {
   // 2026-10-12: "a little more prominent") — bare, it was a hairline round
   // a word and read as a label, not something to press. The default answer
   // keeps a stronger wash, plus its ring and glow.
+  //
+  // A GREY BUTTON IS NOT A DIMMED ONE (user, 2026-10-12: Back beside a
+  // lit Close "almost looks dimmed"). Muted ink is the disabled look's own
+  // colour, so a plain button speaking in it reads as switched off: it
+  // says its word in the foreground ink instead, on the theme's own wash
+  // (lighter on a dark theme, darker on a light one) rather than a tint
+  // of grey. Only a button that is not ready keeps the muted word.
+  readonly property bool plain: Qt.colorEqual(btn.ink, Zenon.muted)
+  readonly property color word: btn.plain ? Zenon.white : btn.ink
   color: !btn.ready ? "transparent"
+    : btn.plain && !btnArea.pressed ? Zenon.wash(btn.primary ? 0.16 : 0.12)
     : Qt.rgba(btn.ink.r, btn.ink.g, btn.ink.b,
-              btnArea.pressed ? 0.45 : (btn.primary ? 0.14 : 0.08))
+              btnArea.pressed ? 0.45 : (btn.primary ? 0.14 : 0.10))
   border.width: 1
   border.color: Zenon.border
   opacity: btn.ready ? 1 : 0.55
@@ -98,7 +108,7 @@ Rectangle {
     id: btnText
     anchors.centerIn: parent
     text: btn.label
-    color: btn.ready ? btn.ink : Zenon.muted
+    color: btn.ready ? btn.word : Zenon.muted
     font.family: Zenon.face
     font.weight: Font.Bold
     font.pixelSize: Zenon.px(15)
