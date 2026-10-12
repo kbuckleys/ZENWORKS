@@ -16,6 +16,11 @@
 // Terminus still BUILDS the commands — what rsync is told is a file manager's
 // business — and hands the argv over. What happens after that is this file's:
 // the process, the progress, cancelling, the receipt, the notification.
+//
+// A JOB SOMETHING ELSE RUNS (iris' downloads, 2026-10-12): `adopt` makes the
+// row without a process, the one running it reports through `update` and
+// `exited`, and a cancel from the drawer is handed back as `cancelAsked` —
+// the same drawer, receipt and notification as a copy.
 
 pragma Singleton
 
@@ -71,6 +76,8 @@ Singleton {
   signal ended(int id, string op, int code, bool cancelled, string dest)
   // The first line of a job's stderr, for whichever window wants to say it.
   signal said(string text)
+  // An adopted job's cancel, for whatever runs it (see adopt).
+  signal cancelAsked(int id)
 
   // What the drawer never draws, kept out of the model: a QObject does not
   // belong in a ListModel row. Written at start, read at exit, bound by
@@ -154,6 +161,22 @@ Singleton {
     return id;
   }
 
+  // A job run elsewhere: its row and its receipt are here, its process is
+  // not. `names` are what it makes (one name: "<name> → <directory>").
+  function adopt(op, names, dest) {
+    const id = ++jobs.seq;
+    jobs.live++;
+    jobs.meta[id] = { proc: null, foreign: true, names: names, dest: dest, started: Date.now() };
+    jobs.model.append({
+      id: id, op: op,
+      what: names.length === 1 ? names[0] : names.length + " items",
+      to: dest ? (Terminus.basename(String(dest).replace(/\/+$/, "")) || "/") : "",
+      pct: 0, index: 0, total: names.length, entries: 0, seen: 0, cancelled: false,
+      rate: "", eta: "", state: "running" });
+    jobs.started++;
+    return id;
+  }
+
   function line(id, text) {
     const i = jobs.rowAt(id);
     if (i < 0) return;
@@ -226,6 +249,7 @@ Singleton {
     jobs.model.set(i, { cancelled: true });
     jobs.rev++;
     const m = jobs.meta[id];
+    if (m && m.foreign) { jobs.cancelAsked(id); return; }
     const pid = (m && m.proc) ? m.proc.processId : 0;
     if (pid > 0)
       Quickshell.execDetached(["sh", "-c", "kill -TERM -" + pid + " 2>/dev/null"]);

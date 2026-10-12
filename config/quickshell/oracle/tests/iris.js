@@ -40,5 +40,14 @@ module.exports = {
     t.eq("no title: the address, bare", I.tabName("", "https://archlinux.org/"), "archlinux.org");
     t.eq("a title that is the address: bare", I.tabName("https://a.b/", "https://a.b/"), "a.b");
     t.eq("nothing at all", I.tabName("", "about:blank"), "New tab");
+    // ── the site a login is for ──────────────────────────────────────
+    t.eq("subdomain to its site", I.siteOf("https://accounts.google.com/signin?x=1"), "google.com");
+    t.eq("deeper subdomain", I.siteOf("https://a.b.gist.github.com/x"), "github.com");
+    t.eq("already the site", I.siteOf("https://github.com/login"), "github.com");
+    t.eq("a registry's own second level", I.siteOf("https://www.bbc.co.uk/"), "bbc.co.uk");
+    t.eq("port dropped", I.siteOf("http://my.nas.local:5000/"), "nas.local");
+    t.eq("an address whole", I.siteOf("https://192.168.1.1/admin"), "192.168.1.1");
+    t.eq("one label whole", I.siteOf("http://localhost:3000/"), "localhost");
+    t.eq("no host, nothing", I.siteOf("about:blank"), "");
   }
 };

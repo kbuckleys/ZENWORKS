@@ -12,8 +12,8 @@
 // compositor places a popup for it. One card, so the two look and behave
 // exactly alike; see CardMenu for the row format.
 import QtQuick
-import Quickshell.Widgets
 import "."
+import "clip"
 
 Item {
   id: root
@@ -72,7 +72,7 @@ Item {
     }
   }
 
-  ClippingRectangle {
+  RoundClip {
     id: bg
     anchors.fill: parent
     anchors.margins: root.pad
@@ -92,7 +92,7 @@ Item {
     Rectangle {
       visible: Zenon.rimOn
       z: 100
-      // by id: a ClippingRectangle hands its children an inner item, and
+      // by id: the clip hands its children an inner item, and
       // that item has no radius
       x: bg.radius
       y: 1

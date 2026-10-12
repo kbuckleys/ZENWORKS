@@ -64,7 +64,7 @@ Item {
     return r !== "" && f.indexOf(r + "/") === 0 ? f.slice(r.length + 1) : "";
   }
   onOnlyPathChanged: {
-    if (pathField.text.trim() !== pg.onlyPath) pathField.text = pg.onlyPath;
+    if (!pathField.focused && pathField.text.trim() !== pg.onlyPath) pathField.text = pg.onlyPath;
     if (pg.win && pg.win.root !== "") pg.reload();
   }
   // the file filter's text (relative to the repository; ~ or the whole path
@@ -540,10 +540,18 @@ Item {
       textSize: Zenon.px(14)
       ghost: "  Search messages  ( / )"
       clearable: true
-      onAccepted: { pg.query = search.text.trim(); pg.reload(); pg.win.focusKeys(); }
-      Keys.onEscapePressed: { search.text = ""; if (pg.query !== "") { pg.query = ""; pg.reload(); } pg.win.focusKeys(); }
+      // narrows as it is typed (user, 2026-10-12), a beat after the last key
+      function apply() {
+        typing.stop();
+        const q = search.text.trim();
+        if (q !== pg.query) { pg.query = q; pg.reload(); }
+      }
+      onTextChanged: if (search.focused) typing.restart()
+      onAccepted: { search.apply(); pg.win.focusKeys(); }
+      Keys.onEscapePressed: { search.text = ""; search.apply(); pg.win.focusKeys(); }
       onTabbed: pathField.claim()
-      onCleared: if (pg.query !== "") { pg.query = ""; pg.reload(); }
+      onCleared: search.apply()
+      Timer { id: typing; interval: 220; onTriggered: search.apply() }
     }
     // ONE FILE'S HISTORY, AS A FILTER (user, 2026-10-11: from plato it
     // narrowed History with no way back but leaving the page): the file it
@@ -562,10 +570,14 @@ Item {
       ghost: "  Only a file or directory  ( f )"
       clearable: true
       Component.onCompleted: pathField.text = pg.onlyPath
-      onAccepted: { pg.filterPath(pathField.text); pg.win.focusKeys(); }
-      Keys.onEscapePressed: { pathField.text = ""; if (pg.onlyPath !== "") pg.filterPath(""); pg.win.focusKeys(); }
+      // as typed too, a little later than the search (a half-typed path
+      // narrows to nothing)
+      onTextChanged: if (pathField.focused) pathTyping.restart()
+      onAccepted: { pathTyping.stop(); pg.filterPath(pathField.text); pg.win.focusKeys(); }
+      Keys.onEscapePressed: { pathTyping.stop(); pathField.text = ""; if (pg.onlyPath !== "") pg.filterPath(""); pg.win.focusKeys(); }
       onBackTabbed: search.claim()
-      onCleared: if (pg.onlyPath !== "") pg.filterPath("")
+      onCleared: { pathTyping.stop(); if (pg.onlyPath !== "") pg.filterPath(""); }
+      Timer { id: pathTyping; interval: 400; onTriggered: pg.filterPath(pathField.text) }
     }
 
     ListView {

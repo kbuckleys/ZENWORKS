@@ -4,7 +4,9 @@
 # └─┘└─┘┘└┘└┴┘└─┘┴└─┴ ┴└─┘
 # https://github.com/kbuckleys/
 #
-# iris [url]            the browser, its own process (core/host.py says why)
+# iris [url]            the browser, its own process (core/host.py says why);
+#                       with iris already up, a tab in it (core/door.py)
+# iris --cloak [url]    a cloak tab: nothing kept, filtering still on
 # iris --lists          fetch the filter lists now and rebuild the engine
 # iris --check          compile every iris .qml in iris' own host (preflight)
 #

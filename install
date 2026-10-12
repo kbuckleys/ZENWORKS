@@ -52,6 +52,7 @@ PACKAGES=(
   # system & packages
   pacman-contrib expac gawk bandwhich iotop solaar glib2 gtk3 nodejs
   qt6-webengine python-adblock pyside6
+  libva-nvidia-driver libva-utils
   # fonts
   noto-fonts noto-fonts-cjk noto-fonts-extra noto-fonts-emoji
   ttf-jetbrains-mono-nerd ttf-dseg unicode-emoji

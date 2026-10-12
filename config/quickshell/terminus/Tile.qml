@@ -159,8 +159,14 @@ Item {
   }
 
   Rectangle {
-    anchors.fill: parent
-    anchors.margins: 4
+    // THE CURSOR'S SHAPE (user, 2026-10-12): SelectCell is fitted to what
+    // the tile holds — a name on two lines, or three with the detail —
+    // and the flare and the ring are the same box, not the whole cell.
+    // The same sums as SelectCell (x/y 4, height usedH − 4, capped).
+    x: 4
+    y: 4
+    width: Math.max(0, parent.width - 8)
+    height: Math.max(0, Math.min(parent.height - 8, tile.usedH - 4))
     radius: 6
     // NO CURSOR FILL: that is SelectCell, one rectangle the view slides
     // between tiles. The tick stays, because a tick is a property of the

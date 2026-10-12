@@ -338,7 +338,7 @@ Item {
         selectByMouse: true
         wrapMode: TextEdit.Wrap
         textFormat: pg.rel && pg.rel.body.trim() !== "" ? TextEdit.MarkdownText : TextEdit.PlainText
-        text: !pg.rel ? "" : pg.rel.body.trim() === "" ? "No notes" : D.mdOf(pg.rel.body)
+        text: !pg.rel ? "" : pg.rel.body.trim() === "" ? "No notes" : D.mdLinesOf(pg.rel.body)
         color: pg.rel && pg.rel.body.trim() !== "" ? Zenon.ink : Zenon.muted
         selectionColor: Zenon.alpha(Zenon.cyan, 0.4)
         font.family: Zenon.face

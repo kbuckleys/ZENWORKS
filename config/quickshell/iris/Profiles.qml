@@ -18,6 +18,7 @@
 
 import QtQuick
 import QtWebEngine
+import IrisHost
 
 QtObject {
   required property string dataDir
@@ -38,5 +39,30 @@ QtObject {
   Component.onCompleted: {
     normal = normalMade.instance();
     cloak = cloakMade.instance();
+    for (const p of [normal, cloak]) {
+      p.userScripts.insert(bareScrollbar());
+      // a page's notification, as the desktop's own: notify-send, so howler
+      // keeps it like any application's (only sites allowed to may send)
+      p.presentNotification.connect((n) => { Iris.notify(n.title, n.message, String(n.origin)); n.show(); });
+    }
+  }
+
+  // ── THE DOCUMENT'S OWN SCROLLBAR, HIDDEN ───────────────────────────
+  // The suite's (morpheus/Scrollbar) is drawn over the page instead; a
+  // panel inside a page keeps its own. Laid in iris' world, before the page
+  // has a <head>, so it is never seen.
+  function bareScrollbar() {
+    const s = WebEngine.script();
+    s.name = "iris-scrollbar";
+    s.injectionPoint = WebEngineScript.DocumentCreation;
+    s.worldId = WebEngineScript.ApplicationWorld;
+    s.runsOnSubFrames = false;
+    s.sourceCode = "(() => { const css = 'html{scrollbar-width:none !important}html::-webkit-scrollbar{display:none !important}';"
+      + " const add = () => { const st = document.createElement('style'); st.textContent = css;"
+      + " (document.head || document.documentElement).appendChild(st); };"
+      + " if (document.documentElement) add();"
+      + " else new MutationObserver((m, o) => { if (document.documentElement) { o.disconnect(); add(); } })"
+      + ".observe(document, { childList: true }); })();";
+    return s;
   }
 }

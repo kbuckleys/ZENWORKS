@@ -4436,6 +4436,7 @@ function jobSummary(op, names) {
              : op === "move" ? "Moved"
              : op === "archive" ? "Archived"
              : op === "extract" ? "Extracted"
+             : op === "download" ? "Downloaded"
              : "Finished";
   const list = names || [];
   if (list.length === 0) return verb;

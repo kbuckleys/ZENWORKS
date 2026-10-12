@@ -22,11 +22,13 @@
 //
 // A short wait before the first one, none between neighbours: running the
 // pointer along a toolbar reads each name as it passes, as it does anywhere.
-// Wears Tooltip's card, smaller, as a window's labels are.
+// Wears Tooltip's card, smaller, as a window's labels are (terminus/TipCard,
+// which iris lays over its page too).
 
 import QtQuick
 import Quickshell
 import "."
+import "../terminus" as Term
 
 PopupWindow {
   id: tip
@@ -84,48 +86,12 @@ PopupWindow {
     adjustment: PopupAdjustment.Flip | PopupAdjustment.Slide
   }
 
-  Rectangle {
+  Term.TipCard {
     id: card
     y: tip.gap
-    width: label.implicitWidth
-    height: label.implicitHeight
     opacity: tip.shade
-    // frosted: its own surface, so hyprland blurs what is behind it (tipBg)
-    color: Zenon.tipBg
-    border.color: Zenon.border
-    border.width: 1
-    radius: 6
-    // the glass rim, as Tooltip's card has it — see Zenon.rim
-    Rectangle {
-      visible: Zenon.rimOn
-      z: 100
-      x: parent.radius
-      y: 1
-      width: Math.max(0, parent.width - 2 * parent.radius)
-      height: 1
-      gradient: Gradient {
-        orientation: Gradient.Horizontal
-        GradientStop { position: 0.0; color: Zenon.alpha(Zenon.rim, 0) }
-        GradientStop { position: 0.25; color: Zenon.rim }
-        GradientStop { position: 0.75; color: Zenon.rim }
-        GradientStop { position: 1.0; color: Zenon.alpha(Zenon.rim, 0) }
-      }
-    }
-
-    Text {
-      id: label
-      leftPadding: 12
-      rightPadding: 12
-      topPadding: 6
-      bottomPadding: 6
-      textFormat: Text.StyledText
-      text: Strings.escapeHtml(tip.text)
-        + (tip.key !== "" ? "&#160;&#160;<font color=\"" + Zenon.hex(Zenon.muted) + "\">"
-           + Strings.escapeHtml(tip.key) + "</font>" : "")
-      color: Zenon.white
-      font.family: Zenon.face
-      font.weight: Font.Bold
-      font.pixelSize: Zenon.px(13)
-    }
+    text: Strings.escapeHtml(tip.text)
+      + (tip.key !== "" ? "&#160;&#160;<font color=\"" + Zenon.hex(Zenon.muted) + "\">"
+         + Strings.escapeHtml(tip.key) + "</font>" : "")
   }
 }

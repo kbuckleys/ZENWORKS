@@ -20,5 +20,17 @@ if sys.argv[1:2] == ["--lists"]:
     print(s.stats())
     sys.exit(0)
 
+# ── ONE IRIS ────────────────────────────────────────────────────────────
+# `iris [--cloak] [url]`: with an iris already up, the request is handed to
+# it (door.py) and this one leaves — before Qt is even imported.
+check = sys.argv[1:2] == ["--check"]
+cloak = "--cloak" in sys.argv[1:]
+args = [a for a in sys.argv[1:] if not a.startswith("--")]
+url = args[0] if args else ""
+if not check and not os.environ.get("IRIS_SELFTEST"):
+    import door
+    if door.knock(url, cloak):
+        sys.exit(0)
+
 from host import main
-sys.exit(main(sys.argv, check=sys.argv[1:2] == ["--check"]))
+sys.exit(main([sys.argv[0]] + ([url] if url else []), check=check, cloak=cloak))

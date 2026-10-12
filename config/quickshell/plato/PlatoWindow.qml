@@ -1073,8 +1073,12 @@ FloatingWindow {
       win.mgr.setTree(!win.mgr.treeShown);
       editor.forceActiveFocus();
     }
-    // under the editor only: the tree runs the window's full height beside it
-    anchors.left: editor.left
+    // under the editor only: the tree runs the window's full height beside it.
+    // Flush against the tree's hairline, as the tab strip is — not the
+    // editor's left, which is inset for the current line's bar and left a
+    // gap beside the tree (user, 2026-10-12: the two kept apart)
+    anchors.left: sidebarBox.right
+    anchors.leftMargin: sidebarBox.visible ? 1 : 0
     anchors.right: parent.right
     anchors.bottom: parent.bottom
     ed: st

@@ -35,7 +35,11 @@ node "$root/oracle/test.js" 2>&1 | grep -vE '^  ok ' || true
 node "$root/oracle/test.js" >/dev/null 2>&1 || fail=1
 
 echo "── QML tests"
-"$root/oracle/qmltests/run.sh" 2>&1 | grep -E 'Totals|FAIL' || fail=1
+# Totals must say "0 failed": a FAIL line still matched the old grep, and a
+# failing QML test passed preflight (found 2026-10-12, tst_cardbody).
+out=$("$root/oracle/qmltests/run.sh" 2>&1 | grep -E 'Totals|FAIL')
+printf '%s\n' "$out"
+printf '%s' "$out" | grep -q 'Totals: .* 0 failed' || fail=1
 
 echo "── delphi core"
 out=$(python3 "$root/oracle/tests/delphi-core.py" 2>&1) || fail=1
@@ -43,6 +47,10 @@ printf '%s\n' "$out" | grep -vE '^  ok ' || true
 
 echo "── calypso core"
 out=$(python3 "$root/oracle/tests/calypso-core.py" 2>&1) || fail=1
+printf '%s\n' "$out" | grep -vE '^  ok ' || true
+
+echo "── iris core"
+out=$(python3 "$root/oracle/tests/iris-core.py" 2>&1) || fail=1
 printf '%s\n' "$out" | grep -vE '^  ok ' || true
 
 echo "── compiling every .qml"
@@ -94,12 +102,13 @@ printf '%s' "$out" | grep -q ' 0 failed' || fail=1
 # 4. what the RUNNING shell has said since its last reload. Errors that only
 #    happen while things run (a null at startup, a recycled delegate) never
 #    reach a compile; they are only ever in this log, and only for windows
-#    that were open. The known noise is left out.
+#    that were open. The known noise is left out — iris closing its line to
+#    the shell (IrisManager's SocketServer) included: that is iris quitting.
 echo "── the live shell's warnings since its last reload"
 qs log 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g' \
   | awk '/Reloading configuration/{buf=""} {buf=buf"\n"$0} END{print buf}' \
   | grep -E 'WARN|ERROR' \
-  | grep -vE 'textinput|grabToImage|usedbeforedeclared|was built against Qt' \
+  | grep -vE 'textinput|grabToImage|usedbeforedeclared|was built against Qt|quickshell.io.socket.*PeerClosedError' \
   | sed 's/^/   /' | tail -15 || true
 
 [ $fail -eq 0 ] && echo "── all clear" || echo "── SOMETHING FAILED (above)"

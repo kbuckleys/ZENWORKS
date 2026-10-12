@@ -128,7 +128,8 @@ Rectangle {
 
           readonly property string opGlyph: jobRow.model.op === "move" ? "\uDB80\uDD90"
             : jobRow.model.op === "copy" ? "\uDB80\uDD8F"
-            : jobRow.model.op === "archive" ? "\uF187" : "\uF1C6"
+            : jobRow.model.op === "archive" ? "\uF187"
+            : jobRow.model.op === "download" ? "\uDB80\uDDDA" : "\uF1C6"
           readonly property string tail: {
             if (jobRow.ended)
               return jobRow.model.state === "failed" ? "failed"

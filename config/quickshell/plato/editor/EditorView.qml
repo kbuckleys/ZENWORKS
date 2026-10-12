@@ -288,7 +288,9 @@ Item {
     + (view.curItem ? view.curItem.gapXAt(view.ed.cursorRow, view.ed.cursorCol) : 0)
   readonly property real curY: (view.ed.curWin
     ? (view.ed.curWin.row + view.ed.cursorRow) * view.cellH : 0)
-    + (view.curItem ? view.curItem.body.y + view.curItem.gapAt(view.ed.cursorRow) : 0)
+    + (view.curItem ? view.curItem.body.y
+       + view.curItem.stretched(view.ed.cursorRow * view.cellH + view.curItem.gapAt(view.ed.cursorRow))
+       - view.ed.cursorRow * view.cellH : 0)
 
   readonly property color textInk: {
     view.ed.frame;
@@ -340,7 +342,8 @@ Item {
     }
     Behavior on y {
       // riding a scroll glide is not a move of its own: no second easing
-      enabled: cursor.glides && (!view.curItem || (view.curItem.body.y === 0 && view.curItem.gapH === 0))
+      enabled: cursor.glides && (!view.curItem || (view.curItem.body.y === 0 && view.curItem.gapH === 0
+                                                    && view.curItem.bandY === 0))
       NumberAnimation { duration: Zenon.brisk; easing.type: Zenon.travelEase }
     }
 

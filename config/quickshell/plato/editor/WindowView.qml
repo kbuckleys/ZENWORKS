@@ -36,9 +36,10 @@
 // jump of more than a screen is a jump: the drawing lands at once.
 //
 // AND THE EDGES GIVE. A wheel that asks past the top or the end, where nvim
-// has nowhere to go, stretches the content by morpheus' rubber band
-// (Elastic.pull, Apple's curve) and lets it settle back over Zenon.elastic —
-// the same answer to "there is no more" as every list in the shell.
+// has nowhere to go, stretches the content from that edge by morpheus'
+// rubber band (Elastic.pull for how far, Elastic.stretch for how much) and
+// lets it settle back over Zenon.elastic — the same answer to "there is no
+// more" as every list in the shell.
 //
 // THE CURRENT LINE is terminus' cursor (terminus/SelectBar.qml): one bar,
 // sliding between lines, covering every row of a wrapped one.
@@ -107,7 +108,7 @@ Item {
   // scrollbar is held: the text follows the hand, as it does on the
   // minimap, rather than gliding behind it.
   function glide() {
-    thrown.stop();
+    win.unthrow();
     if (!win.smoothScroll || win.byHand) { follow.stop(); win.pos = win.actual; return; }
     if (!follow.running) follow.start();
   }
@@ -172,23 +173,42 @@ Item {
   readonly property real lag: (win.actual - win.pos) * win.cellH
 
   // A JUMP TO AN END ARRIVES WITH ITS MOMENTUM: gg or G scrolls the screen
-  // in and carries on past the edge it reached, the way a coast runs into
-  // an edge and gives, then settles — one curve (OutBack), not a scroll and
-  // then a separate bounce. The overshoot is about a twentieth of the
-  // screen, half of what the wheel's band may stretch (Elastic.maxRaw).
+  // in at speed and runs into the edge it reached, which gives — the rows
+  // STRETCH from that edge (the band's stretch, see the band below), then
+  // settle — as a coast running into an edge does in Elastic: the travel,
+  // a 110 ms OutQuad push out, the settle back over Zenon.elastic. It used
+  // to overshoot the position itself (OutBack on pos), which slid the text
+  // past the edge: the old band (user, 2026-10-12). The push is about a
+  // twentieth of the screen, half of what the wheel's band may give.
   function throwIn() {
     follow.stop();
-    thrown.from = win.pos;
-    thrown.to = win.actual;
+    settle.stop();
+    letGo.stop();
+    win.raw = 0;
+    thrownPos.from = win.pos;
+    thrownPos.to = win.actual;
+    // reading down (G) the text runs into the end: the band past the bottom
+    thrownOut.to = (win.actual > win.pos ? -1 : 1) * win.height / 20;
     thrown.restart();
   }
-  NumberAnimation {
+  // a throw cut short (another scroll, a new buffer) leaves no stretch held
+  function unthrow() {
+    if (!thrown.running) return;
+    thrown.stop();
+    if (win.bandY !== 0 && win.raw === 0) { settle.from = win.bandY; settle.start(); }
+  }
+  SequentialAnimation {
     id: thrown
-    target: win
-    property: "pos"
-    duration: Zenon.elastic
-    easing.type: Easing.OutBack
-    easing.overshoot: 1.2
+    NumberAnimation {
+      id: thrownPos
+      target: win
+      property: "pos"
+      // arrives with its speed: the edge is what stops it
+      duration: Math.round(Zenon.elastic * 0.45)
+      easing.type: Easing.Linear
+    }
+    NumberAnimation { id: thrownOut; target: win; property: "bandY"; duration: 110; easing.type: Easing.OutQuad }
+    NumberAnimation { target: win; property: "bandY"; to: 0; duration: Zenon.elastic; easing.type: Easing.OutCubic }
     onFinished: refill.restart()
   }
 
@@ -229,7 +249,7 @@ Item {
 
   function land() {
     follow.stop();
-    thrown.stop();
+    win.unthrow();
     win.actual = 0;
     win.pos = 0;
   }
@@ -624,10 +644,23 @@ Item {
   // ── the band ───────────────────────────────────────────────────────
   // Called by EditorView when a wheel notch could not scroll this window.
   // `raw` is how far past the edge the wheel has asked to go, in pixels.
+  // bandY is how far past it that got (positive: past the top).
+  //
+  // SHOWN AS A STRETCH, NOT A SLIDE (user, 2026-10-12): the rows stretch
+  // from the edge they ran into, by Elastic's `stretch` of bandY over the
+  // window's height — morpheus' Android overscroll, which every Flickable
+  // gets from Elastic's stretcher. This is not a Flickable, so `content`
+  // carries the same Scale itself, and `stretched` maps a y in content to
+  // where it is drawn (the cursor rides on it).
   property real raw: 0
   property real bandY: 0
   Elastic { id: rubber }
+  readonly property real stretchK: 1 + rubber.stretch * Math.abs(win.bandY) / Math.max(1, win.height)
+  readonly property real stretchAt: win.bandY > 0 ? 0 : win.height
+  function stretched(y) { return win.stretchAt + (y - win.stretchAt) * win.stretchK; }
   function band(delta) {
+    // the wheel takes over a throw's stretch where it stands
+    if (thrown.running) { thrown.stop(); win.pos = win.actual; refill.restart(); }
     settle.stop();
     const d = win.height;
     win.raw = Math.max(-rubber.maxRaw(d), Math.min(rubber.maxRaw(d), win.raw + delta));
@@ -653,7 +686,8 @@ Item {
     id: content
     width: win.width
     height: win.height
-    y: win.lag + win.bandY
+    y: win.lag
+    transform: Scale { origin.y: win.stretchAt; yScale: win.stretchK }
     // THE SPLITS YOU ARE NOT IN STEP BACK, so where the keys go reads at a
     // glance; the current line's bar alone said it before
     opacity: win.dimInactive && !win.w.current && win.ed.winIds.length > 1 ? 0.55 : 1
@@ -897,6 +931,8 @@ Item {
       width: rowsTex.width
       height: rowsTex.height
       sourceItem: win.rowsCut ? rowsTex : null
+      // the texture is content without its transform: the band's stretch again
+      transform: Scale { origin.y: win.stretchAt; yScale: win.stretchK }
     }
   }
 
@@ -913,7 +949,8 @@ Item {
   // a window that touches the bar gets one.
   readonly property Item contentItem: content
   readonly property real contentX: 0
-  readonly property real contentY: -(win.lag + win.bandY)
+  // (the band stretches the rows in place: it moves nothing for the edge)
+  readonly property real contentY: -win.lag
   property Item edgeHost: null
   property Item topBar: null
   property Item bottomBar: null

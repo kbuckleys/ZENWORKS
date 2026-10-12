@@ -102,7 +102,7 @@ ShellRoot {
   DelphiManager { id: delphi; fileManager: terminus; editor: plato }
   // The browser, its own process: its .desktop entry and `qs ipc call Iris`
   // (iris/shell/IrisManager; the browser itself is iris/bin/iris).
-  IrisManager { }
+  IrisManager { quick: calypso }
   // a click on the bare desktop is a click away from terminus' menus
   Connections {
     target: icarusDesktop

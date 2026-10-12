@@ -17,7 +17,8 @@
 // already used across the suite): like ClippingRectangle, the content is
 // drawn through a texture, so keep the clip on whole pixels.
 //
-// Only what Sheet uses: color, radius, border, children. Directory of its own
+// What Sheet and CardBody use: color, radius (or each corner's), border,
+// children. Directory of its own
 // so a live reload finds it (a new morpheus/qmldir line needs a restart).
 
 import QtQuick
@@ -29,6 +30,12 @@ Item {
   // under the content, inside the border
   property color color: "transparent"
   property real radius: 0
+  // each corner its own, as on a Rectangle (a menu hinged to its parent
+  // squares the corners that meet it — CardBody); `radius` unless set
+  property real topLeftRadius: root.radius
+  property real topRightRadius: root.radius
+  property real bottomLeftRadius: root.radius
+  property real bottomRightRadius: root.radius
   // the ring: border.width / border.color, as on a Rectangle
   readonly property alias border: frame.border
   // not `data`: that is Item's own, and overriding it is a warning in Qt 6.12
@@ -76,7 +83,10 @@ Item {
     Rectangle {
       anchors.fill: parent
       anchors.margins: frame.border.width
-      radius: Math.max(0, root.radius - frame.border.width)
+      topLeftRadius: Math.max(0, root.topLeftRadius - frame.border.width)
+      topRightRadius: Math.max(0, root.topRightRadius - frame.border.width)
+      bottomLeftRadius: Math.max(0, root.bottomLeftRadius - frame.border.width)
+      bottomRightRadius: Math.max(0, root.bottomRightRadius - frame.border.width)
       antialiasing: true
     }
   }
@@ -85,7 +95,10 @@ Item {
     id: frame
     anchors.fill: parent
     color: "transparent"
-    radius: root.radius
+    topLeftRadius: root.topLeftRadius
+    topRightRadius: root.topRightRadius
+    bottomLeftRadius: root.bottomLeftRadius
+    bottomRightRadius: root.bottomRightRadius
     antialiasing: true
   }
 }

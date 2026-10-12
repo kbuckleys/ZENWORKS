@@ -45,8 +45,10 @@ import "."
 Item {
   id: root
 
-  // the ListView, GridView or Flickable this reports on
-  property Flickable flick: null
+  // the ListView, GridView or Flickable this reports on — or anything that
+  // answers a Flickable's questions (contentY, contentHeight, height,
+  // moving, cancelFlick…): iris' web pages (iris/PageScroll.qml) wear it too
+  property var flick: null
   // false while its view is not the one on screen
   property bool on: true
   // along the bottom edge of a sideways list — see the header

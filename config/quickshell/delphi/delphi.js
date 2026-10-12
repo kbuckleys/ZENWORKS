@@ -532,6 +532,42 @@ function mdOf(text) {
     .trim();
 }
 
+// A release's markdown for MarkdownText with every line kept as written
+// (user, 2026-10-12: the preview did not honour blank lines). GitHub keeps
+// a release's single newlines; Qt joined them, and spaced a paragraph no
+// more than a line. A text line before another becomes a hard break; a run
+// of blank lines between text, that many no-break-space lines (a line of
+// nbsp is text, not blank); next to a heading, list, quote, table or rule,
+// the first blank still ends the block and the rest are nbsp paragraphs.
+// Code fences pass untouched.
+function mdLinesOf(text) {
+  var src = String(text || "").replace(/\r\n/g, "\n").replace(/<!--[\s\S]*?-->/g, "");
+  var lines = mdOf(src.replace(/\n/g, "\u0001")).split("\u0001");
+  var block = /^\s{0,3}(#{1,6}(\s|$)|[-*+]\s|\d+[.)]\s|>|\||(-{3,}|\*{3,}|_{3,})\s*$)/;
+  var fence = /^\s{0,3}(```|~~~)/;
+  var out = [], prev = "", blanks = 0, inFence = false;
+  for (var i = 0; i < lines.length; i++) {
+    var l = lines[i];
+    if (inFence) { out.push(l); if (fence.test(l)) { inFence = false; prev = "block"; } continue; }
+    if (/^\s*$/.test(l)) { if (out.length) blanks++; continue; }
+    var kind = fence.test(l) || block.test(l) ? "block" : "text";
+    if (out.length) {
+      if (prev === "text" && kind === "text") {
+        out[out.length - 1] += "  ";
+        for (var b = 0; b < blanks; b++) out.push("\u00a0  ");
+      } else if (blanks > 0) {
+        out.push("");
+        for (var c = 1; c < blanks; c++) out.push("\u00a0", "");
+      }
+    }
+    out.push(l);
+    if (fence.test(l)) inFence = true;
+    prev = kind;
+    blanks = 0;
+  }
+  return out.join("\n");
+}
+
 // Markdown said plainly, for a few lines of preview: headings' #s, emphasis,
 // code fences and quote marks gone, a link or a picture its words, html
 // tags dropped, blank runs closed up.

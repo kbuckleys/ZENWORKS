@@ -658,6 +658,7 @@ module.exports = {
       "Moved 3 items");
     t.eq("archiving has its own verb", T.jobSummary("archive", ["src"]),
       "Archived src");
+    t.eq("a download has its own verb", T.jobSummary("download", ["iso.img"]), "Downloaded iso.img");
     t.eq("so does extract", T.jobSummary("extract", ["a.tar.gz"]),
       "Extracted a.tar.gz");
     // An op nobody has named yet still produces a sentence rather than

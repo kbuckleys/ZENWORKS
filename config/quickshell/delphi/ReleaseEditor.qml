@@ -224,7 +224,7 @@ Item {
         selectByMouse: true
         wrapMode: TextEdit.Wrap
         textFormat: ed.e && ed.e.body.trim() !== "" ? TextEdit.MarkdownText : TextEdit.PlainText
-        text: !ed.e || ed.e.body.trim() === "" ? "Nothing written yet" : D.mdOf(ed.e.body)
+        text: !ed.e || ed.e.body.trim() === "" ? "Nothing written yet" : D.mdLinesOf(ed.e.body)
         color: ed.e && ed.e.body.trim() !== "" ? Zenon.ink : Zenon.muted
         selectionColor: Zenon.alpha(Zenon.cyan, 0.4)
         font.family: Zenon.face

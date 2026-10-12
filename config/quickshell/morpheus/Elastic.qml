@@ -74,6 +74,56 @@ QtObject {
     return (b * d) / (elastic.c * (d - b));
   }
 
+  // ── PAST AN EDGE, THE CONTENT STRETCHES (Android's overscroll) ──────
+  // The band above still decides HOW FAR past the edge the wheel or the
+  // fingers have got, and the settle still brings it back; that distance
+  // is no longer shown as the content sliding off its edge but as the
+  // content STRETCHING from it, by `stretch` of the distance over the
+  // view's length — at the band's cap, a tenth of the view, 6%. The user's
+  // call (2026-10-12), first in iris, then here for every list.
+  //
+  // Shown by the view itself, not by moving contentY differently: the
+  // first time Elastic touches a view it gives the view's contentItem two
+  // transforms (`stretcher`), bound to its position — a translate that
+  // takes back whatever lies past the edge, and a scale from that edge by
+  // the same amount. So every path that moves the position past an edge
+  // (the notch, the fingers, the coast's bounce, the settle back) stretches
+  // the content, and nothing else had to change. A view without a
+  // contentItem (iris' web page) does its own, from this same number.
+  readonly property real stretch: 0.6
+  readonly property Component _stretcher: Component {
+    id: stretcher
+    QtObject {
+      property var view: null
+      property var el: null
+      readonly property bool across: !!el && el.horizontal
+      readonly property real pos: !view ? 0 : (across ? view.contentX : view.contentY)
+      readonly property real lo: !el || !view ? 0 : el.lo(view)
+      readonly property real hi: !el || !view ? 0 : el.hi(view)
+      readonly property real over: pos < lo ? pos - lo : (pos > hi ? pos - hi : 0)
+      readonly property real span: !view ? 1 : Math.max(1, across ? view.width : view.height)
+      readonly property real edge: over < 0 ? lo : hi + span
+      readonly property real factor: 1 + (el ? el.stretch : 0) * Math.abs(over) / span
+      readonly property Scale grow: Scale {
+        origin.x: across ? edge : 0
+        origin.y: across ? 0 : edge
+        xScale: across ? factor : 1
+        yScale: across ? 1 : factor
+      }
+      readonly property Translate hold: Translate { x: across ? over : 0; y: across ? 0 : over }
+    }
+  }
+  // the views already given one (a view keeps its stretcher for good; it is
+  // parented to the view's contentItem and goes with it)
+  property var _stretched: []
+  function stretchable(v) {
+    if (!v || !v.contentItem || elastic._stretched.indexOf(v) >= 0) return;
+    const s = stretcher.createObject(v.contentItem, { view: v, el: elastic });
+    if (!s) return;
+    v.contentItem.transform = [s.grow, s.hold];
+    elastic._stretched.push(v);
+  }
+
   // ── STATE ─────────────────────────────────────────────────────────────
   // One set, not one per view: a wheel belongs to one surface at a time and
   // there is no gesture that can band two at once.
@@ -134,6 +184,7 @@ QtObject {
   // Every notch, banded or not, goes through here.
   function scroll(v, delta) {
     if (!v) return;
+    elastic.stretchable(v);
     const top = elastic.lo(v);
     const most = elastic.hi(v);
     const from = (glide.running && glide.target === v) ? glide.goal : elastic.at(v);
@@ -208,6 +259,7 @@ QtObject {
   readonly property var _track: Feel.makeTrack()
   property real fingerRaw: 0
   function finger(v, phase, d) {
+    elastic.stretchable(v);
     const now = Date.now();
     const top = elastic.lo(v), most = elastic.hi(v);
     const h = Math.max(1, elastic.span(v));

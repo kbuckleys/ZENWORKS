@@ -42,6 +42,22 @@ function shown(url) {
   return s === "about:blank" ? "" : s;
 }
 
+// THE SITE A LOGIN IS FOR: the address' host down to its registrable name,
+// what a vault files a login under — accounts.google.com and mail.google.com
+// are both google.com, gist.github.com is github.com. Two labels, or three
+// where the second-to-last is a registry's own (co.uk, com.au, ac.jp…); an
+// address, a single label or no host at all is given back whole or "".
+function siteOf(url) {
+  const m = String(url || "").match(/^[a-z][a-z0-9+.-]*:\/\/([^\/?#:]+)/i);
+  if (!m) return "";
+  const host = m[1].toLowerCase().replace(/\.$/, "");
+  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host) || host.indexOf(".") < 0) return host;
+  const p = host.split(".");
+  const n = p.length >= 3 && p[p.length - 1].length === 2
+    && /^(co|com|net|org|gov|edu|ac|or|ne|go)$/.test(p[p.length - 2]) ? 3 : 2;
+  return p.slice(-n).join(".");
+}
+
 // A tab's name: the page's title, else its address without the scheme, else
 // "New tab".
 function tabName(title, url) {

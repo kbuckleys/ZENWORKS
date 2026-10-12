@@ -2625,6 +2625,42 @@ FloatingWindow {
 
   component Sep: Rectangle { width: 1; height: 26; color: Zenon.border; anchors.verticalCenter: parent ? parent.verticalCenter : undefined }
 
+  // ── A SHEET IS TERMINUS' GLASS (user, 2026-10-12) ───────────────────────
+  // The same treatment terminus' sheets got (see its sheetBackdrop):
+  //  - the picture or the gallery is CUT AWAY under the card (sheetHole),
+  //    so the card is the window's own glass with the frost over it;
+  //  - what the card frosts is sheetStage: the picture or the tiles AND
+  //    what runs on under the bar, so the glass either side of the seam is
+  //    blurred from one picture;
+  //  - while a sheet is up the bar's own frost (the picture's Frost, the
+  //    gallery's ScrollEdge) fades out and stripFrost — the card's recipe
+  //    over the same stage — fades in, the bar's veil rising to the card's.
+  //  - nothing behind is darkened (terminus' cardScrim is clear).
+  // The sheet furthest in is the one the bar and the hole follow.
+  readonly property var sheetUp: {
+    let best = null;
+    for (const sh of [propsSheet, confirmSheet, bulkCard])
+      if (sh && sh.cardInk > 0.001 && (!best || sh.cardInk > best.cardInk)) best = sh;
+    return best;
+  }
+  // only over the picture or the gallery: the annotator and the map have
+  // their own surfaces, and a card over them stays the solid one
+  readonly property bool sheetsGlass: win.mode === "view" || win.mode === "gallery"
+  readonly property real sheetInk: win.sheetUp && win.sheetsGlass ? win.sheetUp.cardInk : 0
+  readonly property bool sheetGlass: win.sheetInk > 0.001
+  // hanging from the bar (not bulk's floating card): its hidden corners
+  // are above the seam, and the hole stops there
+  readonly property bool sheetHangs: win.sheetUp === propsSheet || win.sheetUp === confirmSheet
+  readonly property real holeX: win.sheetUp ? win.sheetUp.drawnX : 0
+  readonly property real holeY: win.sheetUp ? win.sheetUp.drawnY : 0
+  readonly property real holeW: win.sheetUp ? win.sheetUp.drawnW : 0
+  readonly property real holeH: win.sheetUp ? win.sheetUp.drawnH : 0
+  readonly property bool holed: win.sheetGlass && win.holeW > 0 && win.holeH > 0
+  // the card's frost starts full at the seam: above it is stripFrost
+  readonly property real sheetSeam: win.sheetsGlass ? 1 : 0
+  readonly property color sheetGround: win.sheetsGlass ? "transparent" : Zenon.black
+  readonly property Item sheetBackdrop: win.sheetsGlass ? sheetStage : null
+
   // ── the bar ───────────────────────────────────────────────────────────
   Rectangle {
     id: bar
@@ -2643,8 +2679,8 @@ FloatingWindow {
     HoverHandler { id: barHover }
     // The hairline, opened over a sheet spliced out of the bar (properties),
     // so the bar and the card read as one piece.
-    readonly property real cutX: propsSheet.cardInk > 0.01 ? propsSheet.drawnX : bar.width
-    readonly property real cutW: propsSheet.cardInk > 0.01 ? propsSheet.drawnW : 0
+    readonly property real cutX: win.sheetHangs && win.sheetInk > 0.01 ? win.holeX : bar.width
+    readonly property real cutW: win.sheetHangs && win.sheetInk > 0.01 ? win.holeW : 0
     Rectangle { anchors.bottom: parent.bottom; width: bar.cutX; height: 1; color: Zenon.border }
     Rectangle { anchors.bottom: parent.bottom; x: bar.cutX + bar.cutW; width: Math.max(0, bar.width - x); height: 1; color: Zenon.border }
 
@@ -2655,6 +2691,30 @@ FloatingWindow {
       z: -1
       source: stage
       active: win.picShows && win.picTop < bar.height
+      // handing the bar to stripFrost while a sheet is up
+      opacity: 1 - win.sheetInk
+    }
+    // the bar's glass while a sheet is up — see sheetUp: the card's own
+    // settings over the card's own stage, under the card's veil
+    Frost {
+      id: stripFrost
+      anchors.fill: parent
+      z: -0.9
+      source: sheetStage
+      active: win.sheetGlass
+      visible: win.sheetGlass
+      opacity: win.sheetInk
+      blurMax: 64
+      saturation: -0.2
+      brightness: 0
+      scrim: 0
+    }
+    Rectangle {
+      anchors.fill: parent
+      z: -0.8
+      color: Zenon.ground
+      opacity: 0.6 * win.sheetInk
+      visible: opacity > 0.001
     }
 
     // back to the gallery this picture is from — its directory, or the picked
@@ -2973,6 +3033,16 @@ FloatingWindow {
     anchors.right: win.compare ? twin.left : parent.right
     anchors.bottom: parent.bottom
     clip: true
+    // cut away under an open sheet — see sheetUp
+    layer.enabled: win.holed && canvas.visible
+    layer.effect: MultiEffect {
+      maskEnabled: true
+      maskSource: canvasHole
+      maskInverted: true
+      // a ramp from alpha 0 to 1 (see terminus' chrome mask)
+      maskThresholdMin: 0.5
+      maskSpreadAtMin: 1
+    }
     visible: win.mode === "view"
     // the edges the fullscreen bar and strip slide in from (win.peekTop)
     HoverHandler { id: edgeHover; enabled: win.full }
@@ -3950,6 +4020,9 @@ FloatingWindow {
       width: grid.width
       height: bar.height
       visible: win.chrome
+      // handing the bar to stripFrost while a sheet is up
+      strength: 0.75 * (1 - win.sheetInk)
+      scrim: 0.35 * (1 - win.sheetInk)
     }
 
     // the gallery's last screenfuls, held decoded — terminus' own keeper
@@ -3973,6 +4046,15 @@ FloatingWindow {
       anchors.leftMargin: 6
       anchors.rightMargin: scrub.visible ? scrub.width + 6 : 6
       clip: true
+      // cut away under an open sheet — see sheetUp
+      layer.enabled: win.holed && galleryPane.visible
+      layer.effect: MultiEffect {
+        maskEnabled: true
+        maskSource: gridHole
+        maskInverted: true
+        maskThresholdMin: 0.5
+        maskSpreadAtMin: 1
+      }
       model: win.galleryItems
       // a target width, as terminus has it: the cells divide the pane
       // exactly, with no ragged strip down the right
@@ -6046,6 +6128,93 @@ FloatingWindow {
     }
   }
 
+  // ── WHAT A SHEET FROSTS — see sheetUp ─────────────────────────────────
+  // Copies, never drawn on screen (stageHide): the picture as the canvas
+  // has it, bar's stretch included; or the tiles, with the rows scrolled up
+  // under the bar (what the gallery's ScrollEdge frosts). Live only while a
+  // sheet is up.
+  Item {
+    id: sheetStage
+    width: win.width
+    height: win.height
+    readonly property bool on: win.sheetGlass
+    ShaderEffectSource {
+      visible: sheetStage.on && win.mode === "view"
+      x: canvas.x
+      y: canvas.y
+      width: canvas.width
+      height: canvas.height
+      sourceItem: visible ? stage : null
+      sourceRect: Qt.rect(-stage.x, -stage.y, canvas.width, canvas.height)
+      live: visible
+      hideSource: false
+    }
+    ShaderEffectSource {
+      readonly property real up: win.chrome ? bar.height : 0
+      visible: sheetStage.on && win.mode === "gallery"
+      x: galleryPane.x + grid.x
+      y: galleryPane.y + grid.y - up
+      width: grid.width
+      height: grid.height + up
+      sourceItem: visible ? grid.contentItem : null
+      sourceRect: Qt.rect(grid.contentX, grid.contentY - up, grid.width, grid.height + up)
+      live: visible
+      hideSource: false
+    }
+  }
+  // keeps the stage off the window: drawn only into the sheets' captures
+  ShaderEffectSource {
+    id: stageHide
+    width: 1
+    height: 1
+    visible: false
+    live: false
+    sourceItem: sheetStage
+    hideSource: true
+  }
+  // The card's footprint, in each cut item's coordinates: never drawn, a
+  // texture the masks read. A hanging card's top corners are above the
+  // seam, hidden: the hole stops at the bar, as the card does.
+  Item {
+    id: canvasHole
+    width: canvas.width
+    height: canvas.height
+    visible: false
+    layer.enabled: canvas.layer.enabled
+    Item {
+      readonly property real seam: win.sheetHangs ? bar.height : 0
+      y: seam
+      width: parent.width
+      height: Math.max(0, parent.height - seam)
+      clip: true
+      Rectangle {
+        x: win.holeX - canvas.x
+        y: win.holeY - canvas.y - parent.seam
+        width: win.holeW
+        height: win.holeH
+        radius: Zenon.dialogRadius
+        opacity: win.sheetInk
+        color: "white"
+      }
+    }
+  }
+  Item {
+    id: gridHole
+    width: grid.width
+    height: grid.height
+    visible: false
+    layer.enabled: grid.layer.enabled
+    Rectangle {
+      x: win.holeX - galleryPane.x - grid.x
+      y: win.holeY - galleryPane.y - grid.y
+      width: win.holeW
+      height: win.holeH
+      radius: Zenon.dialogRadius
+      opacity: win.sheetInk
+      color: "white"
+    }
+  }
+
   Item {
     id: propsBox
     anchors.fill: parent
@@ -6053,22 +6222,15 @@ FloatingWindow {
     property bool open: false
     visible: propsBox.open || propsSheet.cardInk > 0.01
     onOpenChanged: if (!propsBox.open) keys.forceActiveFocus()
-    // the window behind it darkened, as terminus does (its cardScrim) — from
-    // the bar down: the bar is the sheet's titlebar and stays lit
-    Rectangle {
-      anchors.fill: parent
-      anchors.topMargin: bar.height
-      color: Zenon.darken(0.55)
-      opacity: propsBox.open ? 1 : 0
-      visible: opacity > 0.01
-      Behavior on opacity {
-        NumberAnimation { duration: propsBox.open ? propsSheet.slideIn : propsSheet.slideOut; easing.type: Zenon.ease }
-      }
-    }
+    // nothing behind it darkened: the card's glass and shadow set it apart,
+    // as terminus' do (its cardScrim, clear since 2026-10-10)
     InputShield { visible: propsBox.open; onClicked: propsBox.open = false }
     Sheet {
       id: propsSheet
-      backdrop: win.mode === "view" ? canvas : galleryPane   // frosted over it — see morpheus/Sheet
+      // clear: the picture is cut away under it (see sheetUp)
+      ground: win.sheetGround
+      backdrop: win.sheetBackdrop   // the picture, frosted under the card
+      seamFrost: win.sheetSeam   // the bar's frost, carried over the seam
       // spliced out of the bar: flush to its bottom edge, sliding down out
       // of it, its own title on the card — as terminus' properties sheet
       floating: true
@@ -6151,7 +6313,10 @@ FloatingWindow {
     }
     InputShield { visible: confirm.open; onClicked: confirm.answer(false) }
     Sheet {
-      backdrop: win.mode === "view" ? canvas : galleryPane   // frosted over it — see morpheus/Sheet
+      // clear: the picture is cut away under it (see sheetUp)
+      ground: win.sheetGround
+      backdrop: win.sheetBackdrop   // the picture, frosted under the card
+      seamFrost: win.sheetSeam   // the bar's frost, carried over the seam
       id: confirmSheet
       shown: confirm.open
       fromTop: bar.height
@@ -6270,7 +6435,10 @@ FloatingWindow {
   }
 
   BulkRename {
-    backdrop: win.mode === "view" ? canvas : galleryPane   // frosted over it — see morpheus/Sheet
+    // clear: the picture is cut away under it (see sheetUp)
+    ground: win.sheetGround
+    backdrop: win.sheetBackdrop   // the picture, frosted under the card
+    scrim: Zenon.alpha(Zenon.ground, 0)
     id: bulkCard
     z: 12
     host: win

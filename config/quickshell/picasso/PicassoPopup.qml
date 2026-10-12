@@ -16,6 +16,7 @@ import Quickshell.Hyprland
 import Quickshell.Wayland
 import Quickshell.Widgets
 import "../morpheus"
+import "../terminus" as Term
 import "picasso.js" as Art
 
 LayerPopup {
@@ -1069,42 +1070,18 @@ LayerPopup {
             color: Zenon.border
           }
 
-          // PICTURES OR COLOURS. Two words at the strip's left edge, the
-          // one you are in lit — tab flips between them too.
-          Row {
+          // PICTURES OR COLOURS, at the strip's left edge: terminus'
+          // Segments, as picasso's card switches its tabs (user,
+          // 2026-10-12) — tab flips between them too.
+          Term.Segments {
             anchors.left: parent.left
-            anchors.leftMargin: 10
+            anchors.leftMargin: 8
             anchors.verticalCenter: parent.verticalCenter
             z: 2
-            spacing: 2
-            Repeater {
-              model: [{ k: "backgrounds", t: "Pictures" }, { k: "colors", t: "Colours" }]
-              delegate: Rectangle {
-                id: vBtn
-                required property var modelData
-                readonly property bool on: popup.view === vBtn.modelData.k
-                width: vText.implicitWidth + 18
-                height: 22
-                radius: 4
-                color: vBtn.on ? Zenon.wash(0.1)
-                  : (vMa.containsMouse ? Zenon.wash(0.05) : "transparent")
-                Text {
-                  id: vText
-                  anchors.centerIn: parent
-                  text: vBtn.modelData.t
-                  color: vBtn.on ? popup.headColor : (vMa.containsMouse ? popup.fgColor : popup.dimColor)
-                  font.family: Zenon.face
-                  font.weight: 600
-                  font.pixelSize: Zenon.px(13)
-                }
-                MouseArea {
-                  id: vMa
-                  anchors.fill: parent
-                  hoverEnabled: true
-                  onClicked: popup.setView(vBtn.modelData.k)
-                }
-              }
-            }
+            textSize: Zenon.px(13)
+            options: [["backgrounds", "Pictures"], ["colors", "Colours"]]
+            current: popup.view
+            onChose: (v) => popup.setView(v)
           }
 
           // THE STRIP'S RIGHT EDGE: what is running, then the two rings that
