@@ -60,6 +60,14 @@ Item {
   // left out is shown REFUSING rather than hidden, because a button that
   // vanishes teaches nothing about why.
   property var allowed: null
+  // ── OR AS THE SUITE'S SEGMENTS (user, 2026-10-11) ────────────────────
+  // The one pill split into its options (terminus/Segments), sized by its
+  // words, instead of a strip of separate buttons. Still this control for
+  // the keyboard — enrolled, walked with the arrows — only drawn the other
+  // way. `labels` names each option for it; a value without one is shown
+  // as it is.
+  property bool segmented: false
+  property var labels: ({})
   signal chose(string value)
 
   // ── WALKED ALONG RATHER THAN FLIPPED ────────────────────────────────
@@ -88,8 +96,24 @@ Item {
   width: parent ? parent.width : 0
   height: 34
 
+  Segments {
+    visible: seg.segmented
+    anchors.left: parent.left
+    anchors.leftMargin: 14
+    anchors.right: parent.right
+    anchors.rightMargin: 14
+    anchors.verticalCenter: parent.verticalCenter
+    // the column's width, in equal parts (user, 2026-10-11)
+    even: true
+    options: seg.options.map((o) => [o, seg.labels[o] || o])
+    current: seg.current
+    allowed: seg.allowed
+    onChose: (v) => seg.chose(v)
+  }
+
   Row {
     id: segRow
+    visible: !seg.segmented
     anchors.left: parent.left
     anchors.leftMargin: 14
     anchors.right: parent.right

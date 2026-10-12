@@ -1088,7 +1088,10 @@ PopupWindow {
                   // Whether EVERY selected row already carries it, which
                   // is what decides which way a click goes.
                   readonly property bool on: {
-                    const rows = term.acting();
+                    // about the held row (or its marks) when the menu was
+                    // opened on one, as the click below acts — see run()
+                    const h = menu.customItems ? null : term.heldRow;
+                    const rows = h ? (term.marked[h.path] ? term.markedRows() : [h]) : term.acting();
                     if (rows.length === 0) return false;
                     for (let i = 0; i < rows.length; ++i)
                       if (!Tags.hasTag(term.tagMarks[rows[i].path],
@@ -1119,10 +1122,9 @@ PopupWindow {
                   HoverHandler { id: swatchHov }
                   MouseArea {
                     anchors.fill: parent
-                    onClicked: {
-                      term.toggleTagHere(swatch.modelData.name);
-                      menu.open = false;
-                    }
+                    // Through run(), like every other verb: on a held row
+                    // it tags THAT row, not the cursor's (user, 2026-10-11)
+                    onClicked: menu.run(() => term.toggleTagHere(swatch.modelData.name))
                   }
                 }
               }

@@ -17,6 +17,7 @@
 //                       a value of your own, `otherHint` in it; with
 //                       `lines` it is a well of several lines (a pull
 //                       request's description) — ctrl+return answers there;
+//                       with `file` a file, typed or chosen (`chooseFile`);
 //                       with `path` a directory, typed or chosen (a
 //                       Choose… button: `chooseDir`, terminus' picker), a
 //                       chosen one followed by `pathTail` when the field
@@ -42,6 +43,8 @@ Item {
   signal done(bool ok, var values)
   // (start, reply(path)) → a directory picker; the window's is terminus'
   property var chooseDir: null
+  // (start, reply(path)) → a file picker, for a field with `file`
+  property var chooseFile: null
 
   readonly property var fields: fb.form && fb.form.fields ? fb.form.fields : []
   readonly property var toggles: fb.form && fb.form.toggles ? fb.form.toggles : []
@@ -250,7 +253,7 @@ Item {
           width: parent.width - (pick.visible ? pick.width + parent.spacing : 0)
           textSize: Zenon.px(16)
           ghost: fcol.modelData.hint || ""
-          elide: fcol.modelData.path ? Text.ElideLeft : Text.ElideRight
+          elide: fcol.modelData.path || fcol.modelData.file ? Text.ElideLeft : Text.ElideRight
           text: fcol.modelData.value || ""
           onTextChanged: {
             const v = Object.assign({}, fb.values);
@@ -261,16 +264,20 @@ Item {
           onTabbed: fb.walk(fcol.index, 1)
           onBackTabbed: fb.walk(fcol.index, -1)
         }
-        // a directory field: chosen in terminus' picker, or typed
+        // a directory field (or a file one): chosen in terminus' picker, or typed
         DialogButton {
           id: pick
-          visible: !!fcol.modelData.path && !!fb.chooseDir
+          visible: (!!fcol.modelData.path && !!fb.chooseDir) || (!!fcol.modelData.file && !!fb.chooseFile)
           implicitWidth: 96
           height: fbox.height
           label: "Choose"
           onClicked: {
             const typed = fbox.text.trim();
             const start = typed.indexOf("/") === 0 ? typed.replace(/\/[^/]*$/, "") || "/" : "";
+            if (fcol.modelData.file) {
+              fb.chooseFile(start, (file) => { if (file) { fbox.text = file; fbox.claim(); } });
+              return;
+            }
             fb.chooseDir(start, (dir) => {
               if (!dir) return;
               fbox.text = dir.replace(/\/+$/, "") + "/" + (fcol.modelData.pathTail || "");

@@ -626,6 +626,7 @@ FloatingWindow {
   readonly property int editorInset: 6
   EditorView {
     id: editor
+    hostWindow: win
     anchors.leftMargin: (sidebarBox.visible ? 1 : 0) + win.editorInset + win.zenMargin
     anchors.rightMargin: win.editorInset + win.zenMargin
     Behavior on anchors.leftMargin { NumberAnimation { duration: Zenon.normal * 2; easing.type: Zenon.travelEase } }

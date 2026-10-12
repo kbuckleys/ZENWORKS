@@ -402,7 +402,9 @@ Item {
       : (sideRow.active ? Zenon.cyan : Zenon.muted)
     font.family: Zenon.face
     font.weight: Zenon.weight
-    font.pixelSize: Zenon.px(15)
+    // delphi's sidebar type (ShelfRow): 14, the label soft until it is
+    // the one you are on (user, 2026-10-11: the two sidebars look alike)
+    font.pixelSize: Zenon.px(14)
   }
 
   // The name and the figure are TWO items, not one string.
@@ -430,11 +432,11 @@ Item {
     // takes that colour for its name as well, and the one you are
     // looking at is the one that is lit.
     color: sideRow.active
-      ? (sideRow.ink.a > 0 ? sideRow.ink : Zenon.white)
-      : Zenon.keyInk
-    font.weight: sideRow.active ? Font.DemiBold : Font.Normal
+      ? (sideRow.ink.a > 0 ? sideRow.ink : Zenon.ink)
+      : Zenon.soft
+    font.weight: Zenon.weight
     font.family: Zenon.face
-    font.pixelSize: Zenon.px(15)
+    font.pixelSize: Zenon.px(14)
   }
 
   Text {
@@ -450,7 +452,8 @@ Item {
     color: sideRow.detailInk
     font.family: Zenon.face
     font.weight: Zenon.weight
-    font.pixelSize: Zenon.px(13)
+    font.features: { "tnum": 1 }
+    font.pixelSize: Zenon.px(12)
   }
 
   // How full it is, under the name it belongs to, and how much is left

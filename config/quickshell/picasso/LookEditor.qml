@@ -15,6 +15,7 @@
 
 import QtQuick
 import "../morpheus"
+import "../terminus" as Term
 import "picasso.js" as Art
 
 Item {
@@ -66,58 +67,21 @@ Item {
       visible: ed.showBackdrop
       Head { id: bdHead; text: "Around it" }
     }
-    Row {
+    // Colour chosen again opens its picker — Segments answers a choice
+    // of the one already chosen as well.
+    Term.Segments {
       id: bdRow
       visible: ed.showBackdrop
-      spacing: 4
-      Repeater {
-        model: [{ k: "black", t: "Black" }, { k: "color", t: "Colour" },
-                { k: "accent", t: "Its colour" }, { k: "blur", t: "Blurred" }]
-        delegate: Seg {
-          id: bdSeg
-          required property var modelData
-          width: (ed.width - bdRow.spacing * 3) / 4
-          height: 52
-          chosen: ed.look.backdrop === bdSeg.modelData.k
-          kbOn: ed.kbRow === "backdrop" && bdSeg.chosen
-          onHit: {
-            if (bdSeg.chosen && bdSeg.modelData.k === "color") ed.editColor("backdrop");
-            else ed.touched("backdrop", bdSeg.modelData.k);
-          }
-          // a little swatch of what it would be
-          Rectangle {
-            anchors.horizontalCenter: parent.horizontalCenter
-            anchors.top: parent.top
-            anchors.topMargin: 8
-            width: 26
-            height: 14
-            radius: 3
-            border.width: 1
-            border.color: Zenon.wash(0.25)
-            color: bdSeg.modelData.k === "color" ? ed.look.backdropColor
-              : bdSeg.modelData.k === "accent" ? (Picasso.accentFor(ed.path) || "#555555")
-              : "#000000"
-            gradient: bdSeg.modelData.k === "blur" ? blurGrad : null
-          }
-          Text {
-            anchors.horizontalCenter: parent.horizontalCenter
-            anchors.bottom: parent.bottom
-            anchors.bottomMargin: 6
-            text: bdSeg.modelData.t
-            color: bdSeg.ink
-            font.family: Zenon.face
-            font.weight: bdSeg.chosen ? 600 : Font.Normal
-            font.pixelSize: Zenon.px(13)
-          }
-        }
+      width: ed.width
+      even: true
+      textSize: Zenon.px(13)
+      options: [["black", "Black"], ["color", "Colour"], ["accent", "Its colour"], ["blur", "Blurred"]]
+      current: ed.look.backdrop
+      onChose: (v) => {
+        if (v === "color" && ed.look.backdrop === "color") ed.editColor("backdrop");
+        else ed.touched("backdrop", v);
       }
-    }
-    Gradient {
-      id: blurGrad
-      orientation: Gradient.Horizontal
-      GradientStop { position: 0; color: "#5a6d8a" }
-      GradientStop { position: 0.5; color: "#a08a9a" }
-      GradientStop { position: 1; color: "#c9a27a" }
+      Ring { on: ed.kbRow === "backdrop" }
     }
     Text {
       visible: ed.showBackdrop && ed.look.backdrop === "color"

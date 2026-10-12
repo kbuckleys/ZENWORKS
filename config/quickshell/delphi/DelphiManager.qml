@@ -32,6 +32,7 @@ import Quickshell.Io
 import Quickshell.Hyprland
 import "../morpheus"
 import "../ceres"
+import "../terminus"
 import "../morpheus/lagnotes.js" as LagNotes
 import "delphi.js" as D
 
@@ -207,90 +208,24 @@ Scope {
   }
 
   // ── THE BACKEND ────────────────────────────────────────────────────
-  // One process, JSON lines both ways. Requests made before it has said
-  // "ready" wait in `_out` and go the moment it does.
-  property bool up: false
-  property string broken: ""
-  property var _out: []
-  property var _pending: ({})
-  property int _n: 0
-  property var _users: ({})
-  readonly property bool wanted: Object.keys(mgr._users).length > 0
-
-  Process {
-    id: daemon
+  // One process, JSON lines both ways — terminus/LineDaemon, the suite's
+  // line to a backend (calypso's too). A window holds it while it is open; a
+  // one-off question from terminus or plato starts it, and it goes a minute
+  // after the last.
+  LineDaemon {
+    id: line
+    name: "delphi"
     command: ["python3", Quickshell.shellDir + "/delphi/bin/delphid"]
-    stdinEnabled: true
-    stdout: SplitParser {
-      onRead: (line) => mgr.hear_(line)
-    }
-    stderr: SplitParser {
-      onRead: (line) => console.warn("delphid:", line)
-    }
-    onExited: (code) => {
-      mgr.up = false;
-      // every request still out fails now, not never
-      const p = mgr._pending;
-      mgr._pending = ({});
-      for (const k in p) {
-        try { if (p[k].done) p[k].done(false, null, { kind: "gone", error: "The git backend stopped" }); } catch (e) {}
-      }
-      mgr.asks = [];
-      if (code !== 0 && code !== 15 && mgr.wanted) {
-        console.warn("delphi: backend exited", code);
-        restartTimer.start();
-      }
-    }
+    protocol: mgr.protocol
+    goneText: "The git backend stopped"
+    onHeard: (ev) => mgr.event_(ev)
+    onStopped: mgr.asks = []
   }
-  // a crash with someone still using it: back, once a second at most
-  Timer { id: restartTimer; interval: 1000; onTriggered: if (mgr.wanted) mgr.start_() }
-  function start_() {
-    if (daemon.running) return;
-    mgr.broken = "";
-    daemon.running = true;
-  }
-  function send_(msg) {
-    if (!mgr.up) {
-      mgr._out.push(msg);
-      mgr.start_();
-      return;
-    }
-    daemon.write(JSON.stringify(msg) + "\n");
-  }
-  function hear_(line) {
-    let m;
-    try { m = JSON.parse(line); } catch (e) { console.warn("delphi: not JSON:", line); return; }
-    if (m.id === undefined || m.id === null) {
-      mgr.event_(m.event || {});
-      return;
-    }
-    const p = mgr._pending[m.id];
-    if (!p) return;
-    if (m.event) {
-      if (p.event) { try { p.event(m.event); } catch (e) { console.warn("delphi:", e); } }
-      return;
-    }
-    delete mgr._pending[m.id];
-    mgr._pendingChanged();
-    if (p.done) {
-      try { p.done(!!m.ok, m.ok ? m.result : null, m.ok ? null : m); }
-      catch (e) { console.warn("delphi:", p.op, e); }
-    }
-  }
+  readonly property bool up: line.up
+  readonly property string broken: line.broken
+  readonly property bool wanted: line.wanted
+  readonly property int inFlight: line.inFlight
   function event_(ev) {
-    if (ev.ready) {
-      if (ev.protocol !== mgr.protocol) {
-        mgr.broken = "The git backend speaks protocol " + ev.protocol + ", this window " + mgr.protocol;
-        console.warn("delphi:", mgr.broken);
-        daemon.running = false;
-        return;
-      }
-      mgr.up = true;
-      const q = mgr._out;
-      mgr._out = [];
-      for (const msg of q) daemon.write(JSON.stringify(msg) + "\n");
-      return;
-    }
     if (ev.ask !== undefined) {
       mgr.asks = mgr.asks.concat([ev]);
       return;
@@ -302,44 +237,11 @@ Scope {
   }
 
   function call(op, repo, args, done, event) {
-    const id = ++mgr._n;
-    mgr._pending[id] = { op: op, done: done || null, event: event || null };
-    mgr._pendingChanged();
-    mgr.send_({ id: id, op: op, repo: repo || null, args: args || {} });
-    if (!mgr.wanted) idleTimer.restart();
-    return id;
+    return line.request(op, { repo: repo || null, args: args || {} }, done, event);
   }
-  function cancel(id) {
-    if (!mgr._pending[id]) return;
-    mgr.send_({ id: ++mgr._n, op: "cancel", args: { id: id } });
-  }
-  readonly property int inFlight: Object.keys(mgr._pending).length
-
-  // ── WHO NEEDS IT ───────────────────────────────────────────────────
-  // A window holds the backend while it is open; a one-off question from
-  // terminus or plato starts it and the idle timer lets it go again.
-  function hold(who) {
-    const u = Object.assign({}, mgr._users);
-    u[who] = true;
-    mgr._users = u;
-    idleTimer.stop();
-    mgr.start_();
-  }
-  function release(who) {
-    const u = Object.assign({}, mgr._users);
-    delete u[who];
-    mgr._users = u;
-    if (!mgr.wanted) idleTimer.restart();
-  }
-  Timer {
-    id: idleTimer
-    interval: 60000
-    onTriggered: {
-      if (mgr.wanted || mgr.inFlight > 0) { idleTimer.restart(); return; }
-      mgr.up = false;
-      daemon.running = false;
-    }
-  }
+  function cancel(id) { line.cancel(id); }
+  function hold(who) { line.hold(who); }
+  function release(who) { line.release(who); }
 
   // ── AN UPLOAD UNDER WAY ────────────────────────────────────────────
   // Files committed to a forge — GitHub, GitLab, Codeberg (job.forge) — with
@@ -404,26 +306,17 @@ Scope {
   // forge (user, 2026-10-11). Through Ceres, the suite's package manager —
   // its own password card, its own log — so delphi never runs pacman or asks
   // for a password itself. `done(ok)` once Ceres says how it went.
-  property var installing: null      // { pkg, done }
+  // Ceres.install does the asking; this says how it went.
+  readonly property var installing: Ceres.installing      // { pkg }
   function installTool(pkg, why, done) {
-    if (Ceres.txBusy) { mgr.tell("Ceres is busy with another job — try again once it is done", true); return false; }
-    mgr.installing = { pkg: pkg, done: done || null };
-    const asked = Ceres.request([["-S", "--needed", pkg]], "Install " + pkg + " — " + why, 1);
-    if (!asked) { mgr.installing = null; mgr.tell("Ceres could not take the install of " + pkg + " — open Ceres to see why", true); }
+    if (Ceres.txBusy || Ceres.installing) { mgr.tell("Ceres is busy with another job — try again once it is done", true); return false; }
+    const asked = Ceres.install(pkg, why, (ok) => {
+      if (ok) mgr.tell("Installed " + pkg);
+      else mgr.tell(pkg + " was not installed" + (Ceres.txError ? ": " + Ceres.txError : ""), true);
+      if (done) done(ok);
+    });
+    if (!asked) mgr.tell("Ceres could not take the install of " + pkg + " — open Ceres to see why", true);
     return asked;
-  }
-  Connections {
-    target: Ceres
-    function onTxStateChanged() {
-      const job = mgr.installing;
-      if (!job) return;
-      const st = Ceres.txState;
-      if (st !== "done" && st !== "failed") return;
-      mgr.installing = null;
-      if (st === "done") mgr.tell("Installed " + job.pkg);
-      else mgr.tell(job.pkg + " was not installed" + (Ceres.txError ? ": " + Ceres.txError : ""), true);
-      if (job.done) job.done(st === "done");
-    }
   }
 
   // ── SAYING HOW SOMETHING ENDED ─────────────────────────────────────
@@ -445,7 +338,7 @@ Scope {
   property var asks: []
   function answer(ask, text) {
     mgr.asks = mgr.asks.filter((a) => a.ask !== ask);
-    mgr.send_({ id: ++mgr._n, op: "answer", args: { ask: ask, text: text } });
+    line.request("answer", { args: { ask: ask, text: text } });
   }
   onAsksChanged: if (mgr.asks.length > 0 && !(mgr.win && mgr.win.visible)) mgr.withWindow(() => {})
 

@@ -208,42 +208,20 @@ PlatoSheet {
     id: head
     width: parent.width
     height: 46
-    Row {
+    // the suite's segmented switch (terminus/Segments.qml)
+    Segments {
       x: 10
       anchors.verticalCenter: parent.verticalCenter
-      spacing: 4
-      Repeater {
-        model: [{ id: "installed", label: "Installed" }, { id: "updates", label: "Updates" },
-                { id: "parsers", label: "Parsers" }]
-        Item {
-          id: tab
-          required property var modelData
-          readonly property bool on: panel.page === tab.modelData.id
-          width: tabText.implicitWidth + 24
-          height: 30
-          Rectangle {
-            anchors.fill: parent
-            radius: 5
-            color: tab.on ? Zenon.wash(0.07) : tabHover.hovered ? Zenon.wash(0.04) : "transparent"
-          }
-          Text {
-            id: tabText
-            anchors.centerIn: parent
-            font: panel.face
-            color: tab.on ? Zenon.white : Zenon.muted
-            text: tab.modelData.label + (tab.modelData.id === "updates" && panel.report.updates.length > 0
-              ? "  " + panel.report.updates.length : "")
-          }
-          HoverHandler { id: tabHover; cursorShape: Qt.PointingHandCursor }
-          TapHandler {
-            onTapped: {
-              panel.page = tab.modelData.id; panel.sel = 0; panel.armed = "";
-              if (panel.page === "parsers" && panel.plugins && panel.plugins.parsers.length === 0)
-                panel.plugins.listParsers(panel.filetype);
-              panel.focusPage();
-            }
-          }
-        }
+      textSize: panel.face.pixelSize
+      options: [["installed", "Installed"],
+                ["updates", "Updates" + (panel.report.updates.length > 0 ? "  " + panel.report.updates.length : "")],
+                ["parsers", "Parsers"]]
+      current: panel.page
+      onChose: (v) => {
+        panel.page = v; panel.sel = 0; panel.armed = "";
+        if (panel.page === "parsers" && panel.plugins && panel.plugins.parsers.length === 0)
+          panel.plugins.listParsers(panel.filetype);
+        panel.focusPage();
       }
     }
     Text {

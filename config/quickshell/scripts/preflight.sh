@@ -12,7 +12,8 @@
 #      the type-name clashes
 #   2. the QML tests (oracle/qmltests) — clicks, drags, scrollbars
 #      and delphi's backend (oracle/tests/delphi-core.py), against
-#      throwaway repositories
+#      throwaway repositories, and calypso's (oracle/tests/calypso-core.py),
+#      against a throwaway gpg key and password store
 #   3. EVERY .qml compiled. The shell builds most windows lazily, so a file
 #      that no longer compiles stays silent until the day it is opened —
 #      plato was broken that way on 2026-10-08 and nothing said so.
@@ -40,13 +41,17 @@ echo "── delphi core"
 out=$(python3 "$root/oracle/tests/delphi-core.py" 2>&1) || fail=1
 printf '%s\n' "$out" | grep -vE '^  ok ' || true
 
+echo "── calypso core"
+out=$(python3 "$root/oracle/tests/calypso-core.py" 2>&1) || fail=1
+printf '%s\n' "$out" | grep -vE '^  ok ' || true
+
 echo "── compiling every .qml"
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 # Singletons first: compiled after a file that already pulled one in as a
 # singleton type, Qt intermittently refuses the file itself ("pragma Singleton
 # used with a non composite singleton type", seen for howler/Howler.qml).
-all=$(cd "$root" && find . -name '*.qml' -not -path './oracle/qmltests/*' -not -name 'shell.qml' \
+all=$(cd "$root" && find . -name '*.qml' -not -path './oracle/qmltests/*' -not \( -path './iris/*' -not -path './iris/shell/*' \) -not -name 'shell.qml' \
        | sed 's#^\./##' | sort)
 single=$(cd "$root" && printf '%s\n' $all | while read -r f; do grep -q '^pragma Singleton' "$f" && echo "$f"; done)
 printf '%s\n' $single > "$tmp/singletons"
@@ -75,6 +80,14 @@ ShellRoot {
 }
 EOF
 out=$(timeout 900 qs -p "$tmp/shell.qml" 2>&1 | grep 'PREFLIGHT' | sed 's/^.*PREFLIGHT/ /')
+printf '%s\n' "$out"
+printf '%s' "$out" | grep -q ' 0 failed' || fail=1
+
+# IRIS IS NOT QUICKSHELL. Its window runs in its own PySide6 host, with its
+# own module (IrisHost) and its own view of morpheus (iris/core/toolkit.py),
+# so its files are compiled there, the way they are loaded — all but
+# iris/shell/, the part the shell loads, compiled above with the shell's.
+out=$(QT_QPA_PLATFORM=offscreen timeout 120 "$root/iris/bin/iris" --check 2>&1 | grep 'PREFLIGHT' | sed 's/^.*PREFLIGHT/ /')
 printf '%s\n' "$out"
 printf '%s' "$out" | grep -q ' 0 failed' || fail=1
 

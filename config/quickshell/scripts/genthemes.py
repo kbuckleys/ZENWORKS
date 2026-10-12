@@ -60,7 +60,7 @@ THEMES = {
  "zenon-light": dict(name="Zenon Light", mode="light",
    ground="#f3f3f1", card="#e9eaec", surface="#dcdfe4", ink="#1d2025", soft="#474d58", keyInk="#3a3f4b",
    muted="#666c7a", dim="#b9c3c3", border="#9aa3ad",
-   red="#c4474e", orange="#c25f22", yellow="#8f7a1c", sand="#8f7a1c", green="#4a8538", cyan="#337b7b",
+   red="#c4474e", orange="#c25f22", yellow="#8f7a1c", green="#4a8538", cyan="#337b7b",
    blue="#2f6fbe", magenta="#8550b6", pink="#bc5f72"),
  # ── Catppuccin ──
  "catppuccin-frappe": dict(name="Catppuccin Frappé", mode="dark",
@@ -272,23 +272,22 @@ def from_oklch(L, C, H):
 # SAND IS ZENON'S PALE STRAW, NOT THE THEME'S GOLD. Zenon's is #e0d8a4 —
 # oklch .88 / .068 / 100: light, barely coloured, leaning green of yellow.
 # Handed a palette's own yellow (chroma .11–.16, hue 70–90) it came out as
-# mustard on every theme but Zenon (user, 2026-10-09: "ugly"), and in the
-# themes whose yellow IS their orange (Rosé Pine, Dayfox) it was the
-# `yellow` slot twice. So it keeps only the theme's hue, pulled halfway to
-# Zenon's, at Zenon's restraint: dark, Zenon's lightness (no brighter than
-# a step past the theme's own ink); light, Zenon Light's (#8f7a1c, .58 /
-# .11), walked darker only as far as legible() would.
+# mustard on every theme but Zenon (user, 2026-10-09: "ugly"). Pulled only
+# HALFWAY to Zenon's hue it was still beige — hue 85–93 — and the user
+# (2026-10-11) found it "not even as yellowish as it should be". So the hue
+# is no longer the theme's at all: dark, Zenon's straw at hue 100 (.88 / .09,
+# no brighter than a step past the theme's own ink); light, a GOLD at hue 88
+# started bright (.80 / .16) and walked darker only until it reads 3.2:1 —
+# a yellow dark enough for paper at hue 95+ is olive.
 def sand_of(p, light):
-    _, _, h = to_oklch(p["yellow"])
-    hue = h + (100 - h) * 0.5
     if light:
-        out = from_oklch(0.60, 0.10, hue)
-        while contrast(out, p["ground"]) < 3.0:
-            L, C, H = to_oklch(out)
-            out = from_oklch(L - 0.01, C, H)
+        L, out = 0.80, from_oklch(0.80, 0.16, 88)
+        while contrast(out, p["ground"]) < 3.2 and L > 0:
+            L -= 0.01
+            out = from_oklch(L, 0.16, 88)
         return out
     ink_l = to_oklch(p["ink"])[0]
-    return from_oklch(min(0.87, ink_l + 0.04), 0.07, hue)
+    return from_oklch(min(0.88, ink_l + 0.04), 0.09, 100)
 
 def legible(stem, key, h, ground, need=3.0):
     # Light palettes are drawn for an opaque page; on light glass a pale

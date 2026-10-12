@@ -85,7 +85,9 @@ Item {
   // zoom belongs to the pane and the directory records already keep it.
   function rememberCollectionView() {
     const f = term.collById(term.collOpenId);
-    if (!f || f.view === term.viewMode) return;
+    if (!f) return;
+    collections.rememberPageZoom();
+    if (f.view === term.viewMode) return;
     // An unsaved search keeps its view on itself, for as long as it lives.
     if (f.scratch) { f.view = term.viewMode; return; }
     // The built-in has no record on disk to write to — see recentsCollection.
@@ -106,12 +108,68 @@ Item {
   function rememberTagView() {
     const name = term.openTagName;
     if (name === "") return;
+    collections.rememberPageZoom();
     const cur = term.tagViews[name];
     if (cur && cur.view === term.viewMode) return;
     term.editTags((st) => {
       if (!st.views) st.views = ({});
+      const was = st.views[name] || {};
       st.views[name] = { view: term.viewMode };
+      if (was.zoom > 0) st.views[name].zoom = was.zoom;
     });
+  }
+  // ── A PAGE'S GRID ZOOM, ITS OWN AGAIN (user, 2026-10-11) ─────────────
+  // Zoom came out of the records because a stored value applied to a
+  // fitted grid read back slightly different and was written again, file
+  // reload after file reload (see the note above rememberCollectionView).
+  // It goes back in on terms that cannot loop: only a zoom changed IN THE
+  // GRID, never while terminus is applying one (applyDepth — rememberView
+  // stands down), written once the zooming has stopped (pageZoomSave), and
+  // only when it differs from what is stored by more than a rounding.
+  // Which page it belongs to is taken when it is asked for, so leaving
+  // before the save lands still writes it to the right one.
+  property var pageZoomFor: null
+  function rememberPageZoom() {
+    if (term.viewMode !== "grid") return;
+    const z = term.thumbZoom;
+    if (term.searchMode === "collection" && term.collOpenId !== -1)
+      pageZoomFor = { coll: term.collOpenId, zoom: z };
+    else if (term.searchMode === "tag" && term.openTagName !== "")
+      pageZoomFor = { tag: term.openTagName, zoom: z };
+    else return;
+    pageZoomSave.restart();
+  }
+  Timer {
+    id: pageZoomSave
+    interval: 400
+    onTriggered: {
+      const p = collections.pageZoomFor;
+      collections.pageZoomFor = null;
+      if (!p) return;
+      const near = (a) => Number(a) > 0 && Math.abs(Number(a) - p.zoom) < 0.01;
+      if (p.tag !== undefined) {
+        const cur = term.tagViews[p.tag];
+        if (cur && near(cur.zoom)) return;
+        term.editTags((st) => {
+          if (!st.views) st.views = ({});
+          const v = st.views[p.tag] || { view: "grid" };
+          v.zoom = p.zoom;
+          st.views[p.tag] = v;
+        });
+        return;
+      }
+      const f = term.collById(p.coll);
+      if (!f || near(f.zoom)) return;
+      if (f.scratch) { f.zoom = p.zoom; return; }
+      if (f.builtin) { term.recentsZoom = p.zoom; term.viewSaveRef.restart(); return; }
+      term.editCollections((list) => {
+        for (let i = 0; i < list.length; ++i)
+          if (list[i].id === p.coll) { list[i].zoom = p.zoom; return; }
+      });
+    }
+  }
+  function zoomOfPage(z) {
+    return Number(z) > 0 ? term.zoomClamp(Number(z)) : term.thumbZoomDefault;
   }
   // ALWAYS applied, never skipped. Returning early when a tag had no
   // stored view left the pane in whatever the last directory was using,
@@ -127,6 +185,8 @@ Item {
       ? v.view : Tags.DEFAULT_VIEW;
     term.applyDepth++;
     term.act.viewMode = want;
+    // the tag's own grid zoom, or the default — see rememberPageZoom
+    term.act.zoom = collections.zoomOfPage(v ? v.zoom : 0);
     Qt.callLater(() => { term.applyDepth = Math.max(0, term.applyDepth - 1); });
     if (!v) term.editTags((st) => {
       if (!st.views) st.views = ({});
@@ -145,6 +205,12 @@ Item {
     // not immediately read as a change worth remembering.
     term.applyDepth++;
     term.act.viewMode = want;
+    // ── AND ITS OWN GRID ZOOM (user, 2026-10-11) ───────────────────────
+    // Only the view was applied, so a collection in grid wore whatever zoom
+    // the directory it was opened from had been left at. Its own, kept by
+    // rememberPageZoom, or the smallest tile; leaving puts the directory's
+    // back (putBackView).
+    term.act.zoom = collections.zoomOfPage(f.zoom);
     Qt.callLater(() => { term.applyDepth = Math.max(0, term.applyDepth - 1); });
     if (f.builtin) return;
     if (!f.view) term.editCollections((list) => {
@@ -384,6 +450,30 @@ Item {
     term.status = "\u2026";
     term.runStat(paths, paths);
   }
+  // ── THE VIEW YOU HAD BEFORE THE RESULTS, PUT BACK ──────────────────
+  // Under applyDepth, so putting the pane back the way it was is not
+  // itself read as a change worth remembering against the directory. Every
+  // way out of a results page comes through here — Escape (clearSearch),
+  // and Back or a click to a directory (enter): those only went through the
+  // directory's own record, which a directory with none, or the one you
+  // were standing in (cwd unchanged, so nothing applied), never gave — and
+  // the collection's view stayed on the directory (user, 2026-10-11).
+  //
+  // `now`: the guard is let go at once rather than on the next turn —
+  // enter() changes cwd straight after, and the new directory's own record
+  // (applyDirView, which stands down under the guard) must still apply.
+  function putBackView(backView, now) {
+    if (!backView) return;
+    term.applyDepth++;
+    if (backView.view && term.viewRing.indexOf(backView.view) >= 0)
+      term.act.viewMode = backView.view;
+    const z = Number(backView.zoom);
+    if (!isNaN(z) && z > 0) term.zoom = term.zoomClamp(z);
+    const tz = Number(backView.thumbZoom);
+    if (!isNaN(tz) && tz > 0) term.act.zoom = term.zoomClamp(tz);
+    if (now) term.applyDepth = Math.max(0, term.applyDepth - 1);
+    else Qt.callLater(() => { term.applyDepth = Math.max(0, term.applyDepth - 1); });
+  }
   function clearSearch() {
     if (term.searchMode === "") return;
     // ── LEAVING ONE IS A STEP BACK, NOT A NEW PLACE ───────────────────
@@ -410,18 +500,7 @@ Item {
     term.searchBackSel = "";
     term.searchBackView = null;
     if (backSel !== "") term.wantSel = backSel;
-    // Under applyDepth, so putting the pane back the way it was is not
-    // itself read as a change worth remembering against the directory.
-    if (backView) {
-      term.applyDepth++;
-      if (backView.view && term.viewRing.indexOf(backView.view) >= 0)
-        term.act.viewMode = backView.view;
-      const z = Number(backView.zoom);
-      if (!isNaN(z) && z > 0) term.zoom = term.zoomClamp(z);
-      const tz = Number(backView.thumbZoom);
-      if (!isNaN(tz) && tz > 0) term.act.zoom = term.zoomClamp(tz);
-      Qt.callLater(() => { term.applyDepth = Math.max(0, term.applyDepth - 1); });
-    }
+    term.putBackView(backView);
     // THE STALE-LISTING GUARD HAS TO BE STOOD DOWN FIRST.
     //
     // Results replace `root.rows` without touching `lastListing`, so after a

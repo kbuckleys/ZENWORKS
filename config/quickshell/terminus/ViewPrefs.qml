@@ -45,7 +45,10 @@ Item {
     // is how this went wrong in the first place.
     if (term.searchMode !== "") {
       if (term.applyingDirView || term.applyDepth > 0) return;
-      if (term.searchMode === "collection" && term.collOpenId >= 0)
+      // -1 is "none open"; an id is a number (one you made) or a string
+      // ("builtin:recents", a search's "search:…") — `>= 0` was false for
+      // every string, so Recents never remembered its view (2026-10-11)
+      if (term.searchMode === "collection" && term.collOpenId !== -1)
         term.rememberCollectionView();
       else if (term.searchMode === "tag")
         term.rememberTagView();
@@ -66,9 +69,19 @@ Item {
     // sorts by name and a downloads directory sorts by date, and having to say so
     // again every time you walk in is the window forgetting something you have
     // already told it twice.
-    m[term.cwd] = { view: term.viewMode, zoom: term.zoom,
-                    thumbZoom: term.thumbZoom,
-                    sort: term.sortKey, desc: term.sortDesc };
+    // ── THE GRID'S ZOOM ONLY WHEN IT WAS THE GRID BEING ZOOMED ──────────
+    // A record is rewritten whenever anything about the directory changes
+    // (its sort, its view), and it used to take the grid zoom along every
+    // time — whatever the last grid had been left at — so directories never
+    // zoomed in the grid came back as large tiles (user, 2026-10-11). Now
+    // the zoom is kept only while the directory is in the grid, and an
+    // earlier choice survives a change made in another view.
+    const was = m[term.cwd];
+    const rec = { view: term.viewMode, zoom: term.zoom,
+                  sort: term.sortKey, desc: term.sortDesc };
+    if (term.viewMode === "grid") rec.thumbZoom = term.thumbZoom;
+    else if (was && was.thumbZoom !== undefined) rec.thumbZoom = was.thumbZoom;
+    m[term.cwd] = rec;
     while (o.length > term.dirViewCap) delete m[o.shift()];
     term.dirViews = m;
     term.dirViewOrder = o;
@@ -107,6 +120,13 @@ Item {
     // tab load — so the directory's own preference is not what is wanted.
     if (term.applyDepth > 0) return;
     const v = term.dirViews[term.cwd];
+    // No record, or none that chose a grid zoom: the grid starts at its
+    // default — the smallest tile — not at the last directory's size.
+    if (!v || !(Number(v.thumbZoom) > 0)) {
+      term.applyDepth++;
+      term.act.zoom = term.thumbZoomDefault;
+      term.applyDepth--;
+    }
     if (!v) return;
     term.applyDepth++;
     if (term.viewRing.indexOf(v.view) >= 0) term.act.viewMode = v.view;

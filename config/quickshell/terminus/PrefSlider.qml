@@ -66,7 +66,9 @@ Item {
                        Math.min(sl.to, sl.value + d * sl.wheelStep));
     if (v !== sl.value) sl.moved(v);
   }
-  Component.onCompleted: term.prefEnrol(sl)
+  // enrolled with terminus' panel for its keys; outside it (calypso's
+  // generator) a plain slider
+  Component.onCompleted: if (term) term.prefEnrol(sl)
 
   width: parent ? parent.width : 0
   height: 34

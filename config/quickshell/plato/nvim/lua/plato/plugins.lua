@@ -181,7 +181,8 @@ function M.parsersAdded(langs)
     local ft = vim.api.nvim_buf_is_loaded(b) and vim.bo[b].filetype or ""
     local lang = ft ~= "" and vim.treesitter.language.get_lang(ft) or nil
     if lang and want[lang] and not vim.b[b].plato_large then
-      if pcall(vim.treesitter.language.add, lang) then
+      local ok, loaded = pcall(vim.treesitter.language.add, lang)
+      if ok and loaded then
         pcall(vim.treesitter.start, b, lang)
         require("plato.hl").forget(b)
       end

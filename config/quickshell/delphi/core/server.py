@@ -50,18 +50,10 @@ from graph import Lanes
 from gitrun import Cancel, Cancelled, GitError
 from rest import ForgeError
 from stow import StowError
+from lines import send
+import lines
 
 PROTOCOL = 1
-
-_out_lock = threading.Lock()
-
-
-def send(msg):
-    line = json.dumps(msg, ensure_ascii=False, separators=(",", ":"))
-    with _out_lock:
-        sys.stdout.write(line + "\n")
-        sys.stdout.flush()
-
 
 def snake(name):
     return re.sub(r"(?<!^)(?=[A-Z])", "_", name).lower()
@@ -392,12 +384,12 @@ WRITES = {"stowCopyIn", "resolveBlocks", "ignore", "untrack", "stage", "stageAll
 ALIAS = {"files": "files_in", "refs": "refs", "lastMessage": "last_message"}
 
 
-class Server:
+class Server(lines.Service):
     def __init__(self):
+        super().__init__()
         self.asker = Asker()
         self.repos = {}
         self.locks = {}
-        self.cancels = {}
         self.logs = {}
         self.watches = {}
         self.n = 0
@@ -415,44 +407,29 @@ class Server:
                 self.locks[root] = threading.Lock()
             return self.repos[root], self.locks[root]
 
-    def handle(self, req):
-        rid, op = req.get("id"), req.get("op", "")
+    # the loop is morpheus/py/lines.Service's; an answer to git's question
+    # is given here, at once, never queued behind a thread's start
+    def special(self, req):
+        if req.get("op") != "answer":
+            return False
         args = req.get("args") or {}
-        if op == "cancel":
-            c = self.cancels.get(args.get("id"))
-            if c:
-                c.cancel()
-            return send({"id": rid, "ok": True, "result": {}})
-        if op == "answer":
-            return send({"id": rid, "ok": True,
-                         "result": self.asker.answer(args.get("ask"), args.get("text"))})
-        cancel = Cancel()
-        self.cancels[rid] = cancel
-        threading.Thread(target=self._run, args=(rid, op, req, args, cancel),
-                         daemon=True).start()
+        send({"id": req.get("id"), "ok": True,
+              "result": self.asker.answer(args.get("ask"), args.get("text"))})
+        return True
 
-    def _run(self, rid, op, req, args, cancel):
-        emit = lambda ev: send({"id": rid, "event": ev})
-        try:
-            res = self.dispatch(op, req.get("repo"), args, cancel, emit)
-            send({"id": rid, "ok": True, "result": res})
-        except Cancelled:
-            send({"id": rid, "ok": False, "kind": "cancelled", "error": "cancelled"})
-        except GitError as e:
-            send({"id": rid, "ok": False, "kind": "git", "error": e.err or str(e),
-                  "code": e.code})
-        except ForgeError as e:
-            send({"id": rid, "ok": False, "kind": "forge", "error": str(e),
-                  "status": e.status})
-        except StowError as e:
-            send({"id": rid, "ok": False, "kind": "stow", "error": str(e)})
-        except Exception as e:   # a bug here must not take the daemon down
-            send({"id": rid, "ok": False, "kind": "internal",
-                  "error": f"{type(e).__name__}: {e}"})
-        finally:
-            self.cancels.pop(rid, None)
+    def failure(self, e):
+        if isinstance(e, GitError):
+            return {"kind": "git", "error": e.err or str(e), "code": e.code}
+        if isinstance(e, ForgeError):
+            return {"kind": "forge", "error": str(e), "status": e.status}
+        if isinstance(e, StowError):
+            return {"kind": "stow", "error": str(e)}
+        return None
 
-    def dispatch(self, op, path, args, cancel, emit):
+    def dispatch(self, op, req, args, cancel, emit):
+        return self.serve_op(op, req.get("repo"), args, cancel, emit)
+
+    def serve_op(self, op, path, args, cancel, emit):
         kw = {snake(k): v for k, v in args.items()}
         # ── not tied to one repository ──
         if op == "ping":
@@ -649,8 +626,7 @@ class Server:
             s.close()
         for w in self.watches.values():
             w.close()
-        for c in list(self.cancels.values()):
-            c.cancel()
+        super().close()
         self.asker.close()
 
 
@@ -661,25 +637,4 @@ def main():
     # then by each forge's Status.
     threading.Thread(target=lambda: gitrun.CREDS.refresh(
         gh_ok=github.token()[1] == "gh", glab_ok=gitlab.token()[1] == "glab"), daemon=True).start()
-    # Told to stop (SIGTERM: the window's manager going idle, or a kill):
-    # everything this started stops with it. A sign-in's gh or glab runs in
-    # a session of its own, so it outlived a plain exit and waited on for
-    # nothing (a stray glab from a stopped daemon, 2026-10-11).
-    def stop(sig, frame):
-        srv.close()
-        os._exit(0)
-    signal.signal(signal.SIGTERM, stop)
-    send({"event": {"ready": True, "protocol": PROTOCOL, "pid": os.getpid()}})
-    try:
-        for line in sys.stdin:
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                req = json.loads(line)
-            except ValueError:
-                send({"ok": False, "kind": "protocol", "error": "not JSON"})
-                continue
-            srv.handle(req)
-    finally:
-        srv.close()
+    lines.serve(srv, PROTOCOL)

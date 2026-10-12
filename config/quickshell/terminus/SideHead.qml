@@ -47,6 +47,11 @@ Item {
   // neither, and Collections is always drawn, which is why Disks never
   // has to ask.
   property bool first: false
+  // the two rules drawn, or the heading alone (delphi's and terminus'
+  // sidebars, user 2026-10-11: no dividers — the settings panel keeps them)
+  property bool ruled: true
+  // the word's ink: the breadcrumb's in a terminus panel, muted elsewhere
+  property color ink: term ? term.crumbInk : Zenon.muted
 
   readonly property int rule: 1
   // Over the top rule, and it belongs to the group that just ended.
@@ -95,7 +100,7 @@ Item {
   // Edge to edge: inset, they read as underlines belonging to the word
   // rather than as the panel's own divisions.
   Rectangle {
-    visible: !sideHead.first
+    visible: sideHead.ruled && !sideHead.first
     width: sideHead.width
     y: sideHead.airAbove
     height: sideHead.rule
@@ -105,6 +110,7 @@ Item {
   // And opening this one, on the item's last pixel — so the first row,
   // and the cursor that fills it, begin on the very next one.
   Rectangle {
+    visible: sideHead.ruled
     width: sideHead.width
     y: sideHead.height - sideHead.rule
     height: sideHead.rule
@@ -170,7 +176,7 @@ Item {
     // with the one thing in it that IS selected.
     // guarded: a window built in the background (TerminusManager.prebuild)
     // evaluates this once before `term` arrives
-    color: term ? term.crumbInk : Zenon.muted
+    color: sideHead.ink
     font.family: Zenon.face
     font.weight: Font.Bold
     font.pixelSize: Zenon.px(13)

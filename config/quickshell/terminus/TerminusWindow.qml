@@ -1565,6 +1565,8 @@ FloatingWindow {
   // ── AND SO IS A COLLECTION ────────────────────────────────────────────
   function applyCollectionView(f) { return collections.applyCollectionView(f); }
 
+  function putBackView(v, now) { return collections.putBackView(v, now); }
+
   // ── RECENTS, WHICH IS BUILT IN RATHER THAN MADE ──────────────────────
   // Finder ships one saved search and this is it: what you have touched
   // lately, which is the answer to a surprisingly large share of "where did
@@ -1579,6 +1581,8 @@ FloatingWindow {
   // it in the view preferences instead, where view preferences live anyway.
   readonly property string recentsId: "builtin:recents"
   property string recentsView: Coll.DEFAULT_VIEW
+  // and its grid's zoom, 0 for the default — see rememberPageZoom
+  property real recentsZoom: 0
 
   readonly property var recentsCollection: ({
     id: root.recentsId,
@@ -1586,6 +1590,7 @@ FloatingWindow {
     ink: "blue",
     root: "~",
     view: root.recentsView,
+    zoom: root.recentsZoom,
     builtin: true,
     // Skips the application-state churn a home directory is mostly made of
     // — see NOISE in collections.js for what and why.
@@ -3895,7 +3900,28 @@ FloatingWindow {
   // the bars frost the rows that scroll under them. The hole cut under the
   // card (sheetHole) is in the chrome's layer; the listing captured on its
   // own is whole, so the card shows it blurred over the window's glass.
-  readonly property Item sheetBackdrop: chrome.bodyBox
+  //
+  // ── AND THE ROWS UNDER THE STRIP WITH IT (user, 2026-10-11) ───────────
+  // The listing alone ends at the seam, so the card's blur averaged the
+  // nothing above it into its top edge: a band ~30px deep, thinner and
+  // more see-through than the strip it hangs from, however the two frosts
+  // were matched. sheetStage is the listing AND the rows scrolled up under
+  // the bars (what the ScrollEdges frost), so the glass on both sides of
+  // the seam is blurred from the same picture.
+  readonly property Item sheetBackdrop: sheetStage
+  // ── WHILE A SHEET IS UP, THE STRIP IS THE SHEET'S GLASS (user, 2026-10-11)
+  // The card frosts sheetStage at the full kernel under a 0.6 veil; the
+  // strip frosted its rows its own way (ScrollEdge: fainter, ramped,
+  // another capture). Matching the numbers never made them one surface —
+  // two recipes meet at a line. So while a sheet is up the ScrollEdges fade
+  // out and stripFrost — a Frost of the same stage with the card's own
+  // settings — fades in over the strip, topScrim rising to the card's veil:
+  // one recipe, one picture, either side of the seam.
+  readonly property bool sheetGlass: root.sheetInk > 0.001
+  function edgeStrength(base) { return base * (1 - root.sheetInk); }
+  // The card's frost starts full at the seam (Sheet.seamFrost): above the
+  // seam is stripFrost, the same glass, whenever a sheet is up at all.
+  readonly property real sheetSeam: 1
 
   // ── THE BAND A SHEET HANGS FROM ────────────────────────────────────────
   // Every strip of chrome above an open sheet goes the sheet's own colour, so
@@ -5602,6 +5628,8 @@ FloatingWindow {
           visible: modelData.list.visible
           opacity: modelData.opacity
           scrim: 0   // laid once, full width — see topScrim
+          // handing the strip to stripFrost while a sheet is up
+          strength: root.edgeStrength(0.75)
           x: chrome.bodyRow.x + chrome.bodyBox.x + chrome.millerBox.x + chrome.miller.x + modelData.x
           y: 0
           width: modelData.width
@@ -5620,7 +5648,8 @@ FloatingWindow {
         visible: modelData.on
         // a grid's pictures frost far louder than rows of text — see
         // frostGrid
-        strength: index >= 2 ? root.frostGrid : root.frostRows
+        // handing the strip to stripFrost while a sheet is up
+        strength: root.edgeStrength(index >= 2 ? root.frostGrid : root.frostRows)
         scrim: 0   // laid once, full width — see topScrim
         x: side.width + chrome.bodyRow.x + chrome.bodyBox.x + modelData.x
         // from the window's top, under the tab strip too: the tabs frost
@@ -5699,10 +5728,16 @@ FloatingWindow {
       height: chrome.bodyRow.y + chrome.bodyBox.y
         + (chrome.millerBox.visible ? chrome.millerBox.y + chrome.miller.y : 0)
       color: Zenon.ground
-      opacity: (content.edgesOn(listEdges) || (chrome.millerBox.visible && content.edgesOn(millerEdges)))
-        ? 0.35 : 0
+      // and while a sheet is up, the card's own veil (Sheet.veil), in step
+      // with the card's arrival — see sheetGlass
+      opacity: Math.max((content.edgesOn(listEdges) || (chrome.millerBox.visible && content.edgesOn(millerEdges)))
+        ? 0.35 : 0, 0.6 * root.sheetInk)
       visible: opacity > 0.001
-      Behavior on opacity { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+      Behavior on opacity {
+        // the sheet's ink is already a curve: easing after it only lags it
+        enabled: !root.sheetGlass
+        NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
+      }
     }
     Rectangle {
       id: footScrim
@@ -5718,6 +5753,94 @@ FloatingWindow {
         || (chrome.millerBox.visible && content.edgesOn(footMillerEdges))) ? 0.62 : 0
       visible: opacity > 0.001
       Behavior on opacity { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+    }
+
+    // ── WHAT A SHEET FROSTS — see sheetBackdrop ──────────────────────
+    // Copies, never drawn on screen (stageHide): the listing, and over the
+    // strip the rows past each view's top, as each ScrollEdge captures them.
+    // Live only while a sheet is up.
+    Item {
+      id: sheetStage
+      width: parent.width
+      height: parent.height
+      readonly property bool on: root.sheetInk > 0.001
+      ShaderEffectSource {
+        x: side.width + chrome.bodyRow.x + chrome.bodyBox.x
+        y: chrome.bodyRow.y + chrome.bodyBox.y
+        width: chrome.bodyBox.width
+        height: chrome.bodyBox.height
+        sourceItem: sheetStage.on ? chrome.bodyBox : null
+        live: sheetStage.on
+        hideSource: false
+      }
+      Repeater {
+        model: [chrome.listA, chrome.listB, chrome.gridA, chrome.gridB]
+        delegate: ShaderEffectSource {
+          required property var modelData
+          readonly property real h: chrome.bodyRow.y + chrome.bodyBox.y + modelData.y
+          visible: sheetStage.on && modelData.on && modelData.visible && h > 0
+          x: side.width + chrome.bodyRow.x + chrome.bodyBox.x + modelData.x
+          width: modelData.width
+          height: h
+          sourceItem: visible ? modelData.contentItem : null
+          sourceRect: Qt.rect(modelData.contentX, modelData.contentY - h, modelData.width, h)
+          live: visible
+          hideSource: false
+        }
+      }
+      Item {
+        x: side.width
+        width: parent.width - side.width
+        height: parent.height
+        clip: true
+        visible: chrome.millerBox.visible
+        Repeater {
+          model: [chrome.colA, chrome.colB, chrome.colC]
+          delegate: ShaderEffectSource {
+            required property var modelData
+            readonly property var v: modelData.list
+            readonly property real h: chrome.bodyRow.y + chrome.bodyBox.y + chrome.millerBox.y + chrome.miller.y + modelData.y
+            visible: sheetStage.on && v.visible && h > 0
+            opacity: modelData.opacity
+            x: chrome.bodyRow.x + chrome.bodyBox.x + chrome.millerBox.x + chrome.miller.x + modelData.x
+            width: modelData.width
+            height: h
+            sourceItem: visible ? v.contentItem : null
+            sourceRect: Qt.rect(v.contentX, v.contentY - h, v.width, h)
+            live: visible
+            hideSource: false
+          }
+        }
+      }
+    }
+    // keeps the stage off the window: drawn only into the sheets' captures
+    ShaderEffectSource {
+      width: 1
+      height: 1
+      visible: false
+      live: false
+      sourceItem: sheetStage
+      hideSource: true
+    }
+
+    // the strip's glass while a sheet is up — see sheetGlass. Under the
+    // scrim and the chrome, as the ScrollEdges it stands in for; the card's
+    // own settings (Sheet's cardFrost over a hole).
+    Frost {
+      id: stripFrost
+      // over the grounds (z -1), under the edges and topScrim (z 0)
+      z: -0.5
+      x: side.width
+      width: parent.width - side.width
+      height: topScrim.height
+      source: sheetStage
+      active: root.sheetGlass
+      visible: root.sheetGlass
+      opacity: root.sheetInk
+      blurMax: 64
+      saturation: -0.2
+      brightness: 0
+      scrim: 0
     }
 
     // chrome, in its own file — see terminus/Chrome.qml
@@ -5828,6 +5951,7 @@ FloatingWindow {
         // clear: the listing is cut away under it (see sheetHole)
         ground: "transparent"
         backdrop: root.sheetBackdrop   // the listing, frosted under the card
+        seamFrost: root.sheetSeam   // the bar's frost, carried over the seam
         splice: true
         onCardInkChanged: root.noteSheet("s0", cardInk, drawnX, drawnW, drawnY, drawnH)
         onDrawnXChanged: root.noteSheet("s0", cardInk, drawnX, drawnW, drawnY, drawnH)
@@ -6262,6 +6386,7 @@ FloatingWindow {
       // clear: the listing is cut away under it (see sheetHole)
       ground: "transparent"
       backdrop: root.sheetBackdrop   // the listing, frosted under the card
+      seamFrost: root.sheetSeam   // the bar's frost, carried over the seam
       id: bulk
       z: 15
       host: root
@@ -6409,6 +6534,7 @@ FloatingWindow {
         // clear: the listing is cut away under it (see sheetHole)
         ground: "transparent"
         backdrop: root.sheetBackdrop   // the listing, frosted under the card
+        seamFrost: root.sheetSeam   // the bar's frost, carried over the seam
         splice: true
         onCardInkChanged: root.noteSheet("s2", cardInk, drawnX, drawnW, drawnY, drawnH)
         onDrawnXChanged: root.noteSheet("s2", cardInk, drawnX, drawnW, drawnY, drawnH)
@@ -6584,6 +6710,7 @@ FloatingWindow {
         // clear: the listing is cut away under it (see sheetHole)
         ground: "transparent"
         backdrop: root.sheetBackdrop   // the listing, frosted under the card
+        seamFrost: root.sheetSeam   // the bar's frost, carried over the seam
         splice: true
         onCardInkChanged: root.noteSheet("s4", cardInk, drawnX, drawnW, drawnY, drawnH)
         onDrawnXChanged: root.noteSheet("s4", cardInk, drawnX, drawnW, drawnY, drawnH)
@@ -6704,6 +6831,7 @@ FloatingWindow {
         // clear: the listing is cut away under it (see sheetHole)
         ground: "transparent"
         backdrop: root.sheetBackdrop   // the listing, frosted under the card
+        seamFrost: root.sheetSeam   // the bar's frost, carried over the seam
         splice: true
         onCardInkChanged: root.noteSheet("disktool", cardInk, drawnX, drawnW, drawnY, drawnH)
         onDrawnXChanged: root.noteSheet("disktool", cardInk, drawnX, drawnW, drawnY, drawnH)
@@ -6855,6 +6983,7 @@ FloatingWindow {
         // clear: the listing is cut away under it (see sheetHole)
         ground: "transparent"
         backdrop: root.sheetBackdrop   // the listing, frosted under the card
+        seamFrost: root.sheetSeam   // the bar's frost, carried over the seam
         splice: true
         onCardInkChanged: root.noteSheet("s10", cardInk, drawnX, drawnW, drawnY, drawnH)
         onDrawnXChanged: root.noteSheet("s10", cardInk, drawnX, drawnW, drawnY, drawnH)

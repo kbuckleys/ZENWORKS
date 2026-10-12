@@ -73,6 +73,13 @@ Item {
   // floor and tint, exactly the bar's black, and the blur comes in over
   // this many pixels — so the seam between the bar and the card is no seam.
   property real fadeTop: 0
+  // ── OR FROM GLASS ALREADY THERE ───────────────────────────────────────
+  // How much of the blur is already in at the faded edge, 0 to 1. A bar
+  // with rows frosted under it is glass of its own, fainter than a card's:
+  // fading the card in from nothing put a clear band between the two, and
+  // the bar's frost stopped dead at the seam (user's sheet.png, 2026-10-11).
+  // Started at the bar's own strength, the one frost runs into the other.
+  property real fadeFrom: 0
   // ── THIN CONTENT, BROUGHT BACK UP ─────────────────────────────────────
   // Text blurred far enough to be frost spreads its few pixels so thin
   // they all but vanish; blurred only a little, it is still text (plato's
@@ -91,7 +98,9 @@ Item {
   // A blur at a texture's edge averages in the nothing beyond it, which
   // reads as a dark rim on the glass. The capture is taken this much larger
   // on every side and the excess clipped away.
-  readonly property int pad: Math.min(48, frost.blurMax)
+  // The whole kernel (64 at most), so glass laid from two Frosts of one
+  // source meets edge to edge: each has the full context past the seam.
+  readonly property int pad: Math.min(64, frost.blurMax)
 
   // where this rectangle is, in the source's coordinates
   readonly property rect at: {
@@ -145,7 +154,10 @@ Item {
         maskEnabled: frost.masked
         maskSource: cornerTex
         maskThresholdMin: 0.5
-        maskSpreadAtMin: 0.2
+        // a fade needs the whole ramp: threshold half and spread 0.2 turned
+        // the gradient into an edge 6px wide, which is a seam, not a fade.
+        // Corners alone keep the narrow ramp, so their edge stays crisp.
+        maskSpreadAtMin: frost.fadeTop > 0 || frost.fadeBottom > 0 ? 1.0 : 0.2
       }
     }
   }
@@ -163,10 +175,10 @@ Item {
       radius: frost.radius
       readonly property real h: Math.max(1, height)
       gradient: Gradient {
-        GradientStop { position: 0.0; color: frost.fadeTop > 0 ? "#00ffffff" : "#ffffffff" }
+        GradientStop { position: 0.0; color: frost.fadeTop > 0 ? Qt.rgba(1, 1, 1, frost.fadeFrom) : "#ffffffff" }
         GradientStop { position: Math.min(0.5, frost.fadeTop / Math.max(1, frost.height)); color: "#ffffffff" }
         GradientStop { position: Math.max(0.5, 1 - frost.fadeBottom / Math.max(1, frost.height)); color: "#ffffffff" }
-        GradientStop { position: 1.0; color: frost.fadeBottom > 0 ? "#00ffffff" : "#ffffffff" }
+        GradientStop { position: 1.0; color: frost.fadeBottom > 0 ? Qt.rgba(1, 1, 1, frost.fadeFrom) : "#ffffffff" }
       }
     }
   }

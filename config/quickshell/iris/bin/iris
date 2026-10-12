@@ -1,0 +1,18 @@
+#!/bin/bash
+# ┌─┐┌─┐┌┐┌┬ ┬┌─┐┬─┐┬┌─┌─┐
+# ┌─┘├┤ │││││││ │├┬┘├┴┐└─┐
+# └─┘└─┘┘└┘└┴┘└─┘┴└─┴ ┴└─┘
+# https://github.com/kbuckleys/
+#
+# iris [url]            the browser, its own process (core/host.py says why)
+# iris --lists          fetch the filter lists now and rebuild the engine
+# iris --check          compile every iris .qml in iris' own host (preflight)
+#
+# A shell script first, so the GL vendor is decided the way the shell's own
+# launch decides it (scripts/egl.sh), before Qt loads any EGL. Bash for
+# `exec -a`: the process is named "iris", not "python3", which is what
+# fontconfig matches the suite's glyph rule on (morpheus/GlyphFallback).
+
+here=$(dirname "$(readlink -f "$0")")
+. "$here/../../scripts/egl.sh"
+exec -a iris /usr/bin/python3 -I "$here/../core/main.py" "$@"

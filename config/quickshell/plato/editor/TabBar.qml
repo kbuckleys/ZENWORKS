@@ -20,7 +20,11 @@
 // by nvim, and says so in the status line.
 //
 // Hidden while there is only one buffer: a single tab is just the window, and
-// a strip saying so is a strip of nothing.
+// a strip saying so is a strip of nothing — in iris as in plato.
+//
+// ALSO IRIS' TABS. Iris (its own process, not quickshell) hands this strip an
+// `ed` and a `client` of its own (iris/Tabs.qml): the same five things plato's
+// give it — `tabs`, `moveTab`, `tabOrderChanged`, `bufShow`, `bufClose`.
 
 import QtQuick
 import "../../morpheus"

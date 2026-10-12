@@ -490,60 +490,16 @@ FloatingWindow {
   //                                card up after its run — GitHub's sign-in
   //                                card, whose Open and Copy are not answers.
   //   dropCard(id)                 take one down (the sign-in that finished)
-  property var sheetQueue: []
-  property int cardN: 0
+  // delphi/CardSheet — the queue, the sheet and its bodies; git's own
+  // question goes first, as its `lead`
   readonly property var gitAsk: win.mgr && win.mgr.asks.length > 0 ? win.mgr.asks[0] : null
-  readonly property var card: win.gitAsk ? win.askForm(win.gitAsk)
-    : win.sheetQueue.length > 0 ? win.sheetQueue[0] : null
-  readonly property bool carding: win.card !== null
-  property int cardPick: 0
-  onCardChanged: { win.cardPick = 0; if (!win.card) Qt.callLater(win.refocus); }
-  function card_(c) {
-    const id = ++win.cardN;
-    // every answer speaks in a colour: one left without drew in Qt's default
-    // black, heavier than the rest (the sign-in card's Copy, 2026-10-10)
-    const choices = (c.choices || []).map((ch) => Object.assign({ ink: Zenon.muted }, ch));
-    win.sheetQueue = win.sheetQueue.concat([Object.assign({ kind: "confirm", id: id }, c, { choices: choices })]);
-    return id;
-  }
-  function dropCard(id) { win.sheetQueue = win.sheetQueue.filter((c) => c.id !== id); }
-  function confirm(c) {
-    return win.card_({ question: c.question, glyph: c.glyph || "", ink: c.ink || Zenon.cyan,
-      detail: c.detail || "", items: c.items || [],
-      choices: [{ label: c.verb || "OK", ink: c.ink || Zenon.cyan, run: c.then || null },
-                { label: "Cancel", ink: Zenon.muted, run: c.cancel || null }] });
-  }
-  function ask(form) {
-    const id = ++win.cardN;
-    win.sheetQueue = win.sheetQueue.concat([Object.assign({ kind: "form", id: id }, form)]);
-    return id;
-  }
-  // a confirmation's answer i
-  function choose(i) {
-    const c = win.card;
-    if (!c || c.kind !== "confirm") return;
-    if (c.gitAsk !== undefined) { win.mgr.answer(c.gitAsk, i === 0 ? "yes" : "no"); return; }
-    const ch = c.choices[i];
-    if (!ch) return;
-    if (!ch.keep) win.dropCard(c.id);
-    if (ch.run) ch.run();
-  }
-  // a form's answer
-  function settleForm(ok, values) {
-    const c = win.card;
-    if (!c || c.kind !== "form") return;
-    if (c.gitAsk !== undefined) { win.mgr.answer(c.gitAsk, ok ? values.answer : null); return; }
-    win.dropCard(c.id);
-    if (ok && c.then) c.then(values || {});
-    else if (!ok && c.cancel) c.cancel();
-  }
-  // Esc, or a click off the card
-  function dismiss() {
-    const c = win.card;
-    if (!c) return;
-    if (c.kind === "form") win.settleForm(false, null);
-    else win.choose(c.choices.length - 1);
-  }
+  readonly property var card: cards.card
+  readonly property bool carding: cards.carding
+  function card_(c) { return cards.card_(c); }
+  function dropCard(id) { cards.dropCard(id); }
+  function confirm(c) { return cards.confirm(c); }
+  function ask(form) { return cards.ask(form); }
+  function dismiss() { cards.dismiss(); }
   // git's or ssh's question, as a card: a password hidden, a username typed,
   // a host key read and agreed to
   function askForm(q) {
@@ -785,10 +741,9 @@ FloatingWindow {
         anchors.top: repoChip.bottom
         // the first heading brings its own air (SideHead's airIn)
         anchors.topMargin: 4
+        // edge to edge: the cursor spans the sidebar (user, 2026-10-11)
         anchors.left: parent.left
         anchors.right: parent.right
-        anchors.leftMargin: 8
-        anchors.rightMargin: 8
         spacing: 1
         Repeater {
           model: win.pages
@@ -801,12 +756,15 @@ FloatingWindow {
             SideHead {
               visible: pageItem.index === 0 || win.pages[pageItem.index - 1].group !== pageItem.modelData.group
               first: pageItem.index === 0
+              ruled: false
               label: win.groupWord(pageItem.modelData.group)
             }
           ShelfRow {
             id: pageRow
             readonly property var modelData: pageItem.modelData
             width: pageCol.width
+            radius: 0
+            indent: 18
             glyph: pageRow.modelData.glyph
             label: pageRow.modelData.label
             count: win.countOf(pageRow.modelData.id)
@@ -1447,86 +1405,45 @@ FloatingWindow {
   }
 
   // ── the card ───────────────────────────────────────────────────────────
-  InputShield { visible: win.carding; onClicked: win.dismiss() }
-  Sheet {
-    id: sheet
-    shown: win.carding
+  CardSheet {
+    id: cards
     fromTop: head.height
     leftInset: side.width
     cardW: 540
-    cardH: win.card && win.card.kind === "form" ? formBody.implicitHeight : confirmBody.implicitHeight
-    ConfirmBody {
-      id: confirmBody
-      visible: !!win.card && win.card.kind === "confirm"
-      width: parent.width
-      question: win.card && win.card.question ? win.card.question : ""
-      glyph: win.card && win.card.glyph ? win.card.glyph : ""
-      glyphInk: win.card && win.card.ink ? win.card.ink : Zenon.white
-      detail: win.card && win.card.detail ? win.card.detail : ""
-      items: win.card && win.card.items ? win.card.items : []
-      choices: win.card && win.card.choices ? win.card.choices : []
-      pick: win.cardPick
-      onPicked: (i) => win.cardPick = i
-      onChose: (i) => win.choose(i)
-      // a card about files on their way somewhere (the upload's breakdown):
-      // where each lands, as the tree terminus and plato show — morpheus'
-      // FileTree, of the given paths — with its size, new or replacing
-      Rectangle {
-        // (on the card, not `visible`: that is false while the sheet is)
-        readonly property bool wanted: !!win.card && !!win.card.rows
-        visible: wanted
-        width: confirmBody.width - 36
-        height: wanted ? Math.min(cardTree.flat.length, 10) * cardTree.rowH + 12 : 0
-        radius: Zenon.windowRadius
-        color: Zenon.wash(0.04)
-        border.width: 1
-        border.color: Zenon.border
-        FileTree {
-          id: cardTree
-          anchors.fill: parent
-          anchors.margins: 6
-          window: win
-          // given paths always, an empty list between cards: never the disk
-          rootPath: win.card && win.card.treeRoot ? win.card.treeRoot : "repository"
-          given: win.card && win.card.rows ? win.card.rows : []
-          fontSize: Zenon.px(14)
-          noteWidth: 150
-          noteOf: (e) => e.isDir ? null : {
-            text: "<font color='" + Zenon.muted + "'>" + Terminus.formatSize(e.size) + "</font>   " + (e.exists ? "replaces" : "new"),
-            ink: e.exists ? Zenon.yellow : Zenon.green }
-        }
+    lead: win.gitAsk ? win.askForm(win.gitAsk) : null
+    onLeadChose: (i) => win.mgr.answer(win.gitAsk.ask, i === 0 ? "yes" : "no")
+    onLeadSettled: (ok, values) => win.mgr.answer(win.gitAsk.ask, ok ? values.answer : null)
+    onCleared: win.refocus()
+    // a terminus picker for a FormBody directory field, from where it points
+    chooseDir: win.mgr && win.mgr.fileManager ? (start, reply) => win.mgr.fileManager.choose(true, start || win.home,
+      (paths) => reply(paths && paths.length > 0 ? paths[0] : "")) : null
+    // a card about files on their way somewhere (the upload's breakdown):
+    // where each lands, as the tree terminus and plato show — morpheus'
+    // FileTree, of the given paths — with its size, new or replacing
+    Rectangle {
+      // (on the card, not `visible`: that is false while the sheet is)
+      readonly property bool wanted: !!win.card && !!win.card.rows
+      visible: wanted
+      width: cards.cardW - 36
+      height: wanted ? Math.min(cardTree.flat.length, 10) * cardTree.rowH + 12 : 0
+      radius: Zenon.windowRadius
+      color: Zenon.wash(0.04)
+      border.width: 1
+      border.color: Zenon.border
+      FileTree {
+        id: cardTree
+        anchors.fill: parent
+        anchors.margins: 6
+        window: win
+        // given paths always, an empty list between cards: never the disk
+        rootPath: win.card && win.card.treeRoot ? win.card.treeRoot : "repository"
+        given: win.card && win.card.rows ? win.card.rows : []
+        fontSize: Zenon.px(14)
+        noteWidth: 150
+        noteOf: (e) => e.isDir ? null : {
+          text: "<font color='" + Zenon.muted + "'>" + Terminus.formatSize(e.size) + "</font>   " + (e.exists ? "replaces" : "new"),
+          ink: e.exists ? Zenon.yellow : Zenon.green }
       }
-    }
-    FormBody {
-      id: formBody
-      visible: !!win.card && win.card.kind === "form"
-      width: parent.width
-      form: win.card && win.card.kind === "form" ? win.card : null
-      // a directory field's Choose…: terminus' picker, from where it points
-      chooseDir: win.mgr && win.mgr.fileManager ? (start, reply) => win.mgr.fileManager.choose(true, start || win.home,
-        (paths) => reply(paths && paths.length > 0 ? paths[0] : "")) : null
-      onDone: (ok, values) => win.settleForm(ok, values)
-    }
-  }
-  // a confirmation has no field to hold the keyboard: it is held here
-  Item {
-    id: cardKeys
-    Keys.onPressed: (e) => {
-      const c = win.card;
-      e.accepted = true;
-      if (!c || c.kind !== "confirm") return;
-      const n = c.choices.length;
-      if (e.key === Qt.Key_Escape) win.dismiss();
-      else if (e.key === Qt.Key_Return || e.key === Qt.Key_Enter) win.choose(win.cardPick);
-      // the answers are drawn right to left (ConfirmBody): left is the next one
-      else if (e.key === Qt.Key_Left || e.key === Qt.Key_Tab) win.cardPick = (win.cardPick + 1) % n;
-      else if (e.key === Qt.Key_Right || e.key === Qt.Key_Backtab) win.cardPick = (win.cardPick + n - 1) % n;
-    }
-  }
-  Connections {
-    target: win
-    function onCardChanged() {
-      if (win.card && win.card.kind === "confirm") Qt.callLater(() => cardKeys.forceActiveFocus());
     }
   }
 

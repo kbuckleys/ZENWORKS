@@ -35,6 +35,7 @@ import "ceres"
 import "plato"
 import "alexandria"
 import "delphi"
+import "iris/shell"
 
 ShellRoot {
   id: root
@@ -99,6 +100,9 @@ ShellRoot {
   // Delphi; one backend, one way of asking for a password). Built on first
   // use; its backend runs only while something is using it.
   DelphiManager { id: delphi; fileManager: terminus; editor: plato }
+  // The browser, its own process: its .desktop entry and `qs ipc call Iris`
+  // (iris/shell/IrisManager; the browser itself is iris/bin/iris).
+  IrisManager { }
   // a click on the bare desktop is a click away from terminus' menus
   Connections {
     target: icarusDesktop
@@ -123,7 +127,10 @@ ShellRoot {
   // panel across with it. It picks its monitor when it opens and keeps it.
   ZeusPopup { id: zeus; statusbar: bar; liveScreen: root.focusedScreen; screen: zeus.homeScreen ? zeus.homeScreen : root.focusedScreen; morphMode: root.morphedFor("zeus") && root.morphOnPill && !zeus.pinned; morphFade: root.layerFade }
   IdeoPopup { id: ideo; statusbar: bar; screen: root.focusedScreen; morphMode: root.morphedFor("ideo") && root.morphOnPill; morphFade: root.layerFade }
-  CalypsoPopup { id: calypso; statusbar: bar; screen: root.focusedScreen; morphMode: root.morphedFor("calypso") && root.morphOnPill; morphFade: root.layerFade }
+  // the password manager: its accounts and backend, its window; Quick
+  // Access (the popup) asks through it
+  CalypsoManager { id: calypsoMgr; fileManager: terminus; quick: calypso }
+  CalypsoPopup { id: calypso; mgr: calypsoMgr; statusbar: bar; screen: root.focusedScreen; morphMode: root.morphedFor("calypso") && root.morphOnPill; morphFade: root.layerFade }
   MetisPopup { id: metis; statusbar: bar; screen: root.focusedScreen; morphMode: root.morphedFor("metis") && root.morphOnPill; morphFade: root.layerFade }
   HowlerPopup { id: howler; statusbar: bar; screen: root.focusedScreen; morphMode: root.morphedFor("howler") && root.morphOnPill; morphFade: root.layerFade }
   // what is waiting to be installed, out of the update count the way howler

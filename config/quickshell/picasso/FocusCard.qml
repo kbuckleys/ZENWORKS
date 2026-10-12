@@ -30,6 +30,7 @@ import Quickshell.Widgets
 import "../morpheus"
 import "picasso.js" as Art
 import "../terminus/terminus.js" as Terminus
+import "../terminus" as Term
 
 Item {
   id: card
@@ -141,6 +142,9 @@ Item {
   // Called by the picker each time the card opens: all monitors, nothing
   // touched, the slideshow's current answers if one is running.
   function reset() {
+    card.waiting = false;
+    card.busyText = "";
+    waitCap.stop();
     card.stageScreens = card.screenNames.slice();
     card.stageFit = "";
     card.stageLook = ({});
@@ -184,9 +188,10 @@ Item {
   // what is set: the scratch png lives in the runtime directory and would be
   // gone at the next boot.
   function apply() {
-    if (card.path === "" || card.stageScreens.length === 0 || adoptProc.running) return;
+    if (card.path === "" || card.stageScreens.length === 0 || adoptProc.running || card.waiting) return;
     const ad = card.picker.focusAdopt;
     if (ad && ad.tmp === card.path) {
+      card.busyText = "Writing it\u2026";
       adoptProc.command = Terminus.shArgv(Terminus.convertIntoCommand(ad.tmp, ad.dir, ad.name));
       adoptProc.running = true;
       return;
@@ -200,7 +205,39 @@ Item {
       const made = String(adoptOut.text || "").trim();
       // the card's close throws the scratch file away (dropAdopt)
       if (code === 0 && made !== "") card.applyPath(made);
+      else card.busyText = "";
     }
+  }
+
+  // ── APPLIED, AND WAITED FOR ───────────────────────────────────────────
+  // Setting the assignment is instant; the picture is not — a big file
+  // takes a second or more to decode for each monitor. So the card stays,
+  // Apply turned into the working dots (terminus/BusyButton, alexandria's),
+  // until every monitor it was applied to says it is showing it
+  // (Picasso.shown, reported by PicassoDaemon), and then goes.
+  property bool waiting: false
+  property string waitPath: ""
+  property var waitNames: []
+  property string busyText: ""
+  readonly property bool busy: card.waiting || adoptProc.running
+  readonly property bool arrived: card.waiting && Picasso.showing(card.waitNames, card.waitPath)
+  onArrivedChanged: if (card.arrived) card.finishWait()
+  Connections {
+    target: Picasso
+    function onLastFailureChanged() {
+      const f = Picasso.lastFailure;
+      if (card.waiting && f && f.path === card.waitPath && card.waitNames.indexOf(f.screen) >= 0)
+        card.finishWait();
+    }
+  }
+  // a decode that never answers must not hold the card forever
+  Timer { id: waitCap; interval: 30000; onTriggered: card.finishWait() }
+  function finishWait() {
+    if (!card.waiting) return;
+    card.waiting = false;
+    card.busyText = "";
+    waitCap.stop();
+    card.picker.closeFocus();
   }
   function applyPath(path) {
     const names = card.stageScreens.slice();
@@ -227,7 +264,12 @@ Item {
         span: card.spanning
       });
     }
-    card.picker.closeFocus();
+    card.waitPath = path;
+    card.waitNames = names;
+    card.busyText = card.slideOn ? "Starting\u2026" : "Applying\u2026";
+    card.waiting = true;
+    waitCap.restart();
+    if (card.arrived) card.finishWait();
   }
 
   // ── natural sizes ─────────────────────────────────────────────────────
@@ -708,7 +750,13 @@ Item {
             id: full
             anchors.fill: parent
             visible: !card.isColor
-            source: card.isColor || card.path === "" ? "" : Strings.fileUrl(card.path)
+            // Not a picture far bigger than the screen: Qt decodes a png
+            // whole on the shell's one loader thread before scaling it, and
+            // the daemon's own decode waited behind this one. The thumbnail
+            // under it stands in (card.dims says how big, as soon as known).
+            readonly property var nat: card.dims[card.path]
+            source: card.isColor || card.path === "" || !full.nat || full.nat.w * full.nat.h > 40000000 ? ""
+              : Strings.fileUrl(card.path)
             fillMode: Image.PreserveAspectFit
             asynchronous: true
             sourceSize.width: Math.ceil(preview.width * full.Screen.devicePixelRatio)
@@ -889,54 +937,18 @@ Item {
         height: card.sideH
 
         // the three tabs
-        Row {
+        // the card's three pages: the suite's segmented switch
+        Term.Segments {
           id: tabRow
           width: parent.width
-          height: 30
-          spacing: 4
-          Repeater {
-            model: [{ k: "place", t: "Place" }, { k: "look", t: "Look" },
-                    { k: "slides", t: "Slideshow" }]
-            delegate: Rectangle {
-              id: tabBtn
-              required property var modelData
-              readonly property bool on: card.tab === tabBtn.modelData.k
-              width: (tabRow.width - tabRow.spacing * 2) / 3
-              height: 30
-              radius: 5
-              color: tabBtn.on ? Zenon.wash(0.09)
-                : (tabMa.containsMouse ? Zenon.wash(0.05) : "transparent")
-              border.width: 1
-              border.color: tabBtn.on ? Zenon.wash(0.16) : "transparent"
-              Text {
-                anchors.centerIn: parent
-                text: tabBtn.modelData.t
-                color: tabBtn.on ? card.fgColor : (tabMa.containsMouse ? card.fgColor : card.dimColor)
-                font.family: Zenon.face
-                font.weight: tabBtn.on ? 600 : Font.Normal
-                font.pixelSize: card.ts
-              }
-              // a dot on a tab that has something staged in it
-              Rectangle {
-                anchors.right: parent.right
-                anchors.top: parent.top
-                anchors.margins: 6
-                width: 6
-                height: 6
-                radius: 3
-                color: card.highlight
-                visible: (tabBtn.modelData.k === "look" && card.lookTouched)
-                  || (tabBtn.modelData.k === "slides" && card.slideOn)
-              }
-              MouseArea {
-                id: tabMa
-                anchors.fill: parent
-                hoverEnabled: true
-                onClicked: { card.tab = tabBtn.modelData.k; card.editing = ""; }
-              }
-              Ring { on: card.kb("tabs") && tabBtn.on }
-            }
-          }
+          even: true
+          textSize: card.ts
+          options: [["place", "Place"], ["look", "Look"], ["slides", "Slideshow"]]
+          current: card.tab
+          // a dot on a page that has something staged in it
+          dotted: (card.lookTouched ? ["look"] : []).concat(card.slideOn ? ["slides"] : [])
+          onChose: (v) => { card.tab = v; card.editing = ""; }
+          Ring { on: card.kb("tabs") }
         }
 
         Rectangle {
@@ -1484,64 +1496,42 @@ Item {
 
               Item { width: 1; height: 4 }
               Head { text: "Every" }
-              Row {
+              Term.Segments {
                 id: ivRow
-                spacing: 4
-                Repeater {
-                  model: card.intervals
-                  delegate: Seg {
-                    id: ivSeg
-                    required property int modelData
-                    width: (slideTab.width - ivRow.spacing * 5) / 6
-                    label: card.minutesText(ivSeg.modelData)
-                    chosen: card.slideMinutes === ivSeg.modelData
-                    kbOn: card.kb("interval") && ivSeg.chosen
-                    onHit: card.slideMinutes = ivSeg.modelData
-                  }
-                }
+                width: slideTab.width
+                even: true
+                textSize: card.ts
+                options: card.intervals.map((m) => [String(m), card.minutesText(m)])
+                current: String(card.slideMinutes)
+                onChose: (v) => card.slideMinutes = parseInt(v, 10)
+                Ring { on: card.kb("interval") }
               }
 
               Item { width: 1; height: 4 }
-              Head { text: "Order" }
-              Row {
+              Term.Segments {
                 id: ordRow
-                spacing: 4
-                Seg {
-                  width: (slideTab.width - ordRow.spacing) / 2
-                  label: "In order"
-                  chosen: !card.slideShuffle
-                  kbOn: card.kb("order") && chosen
-                  onHit: card.slideShuffle = false
-                }
-                Seg {
-                  width: (slideTab.width - ordRow.spacing) / 2
-                  label: "Shuffle"
-                  chosen: card.slideShuffle
-                  kbOn: card.kb("order") && chosen
-                  onHit: card.slideShuffle = true
-                }
+                width: slideTab.width
+                even: true
+                textSize: card.ts
+                options: [["order", "In order"], ["shuffle", "Shuffle"]]
+                current: card.slideShuffle ? "shuffle" : "order"
+                onChose: (v) => card.slideShuffle = v === "shuffle"
+                Ring { on: card.kb("order") }
               }
 
               Item { width: 1; height: 4; visible: card.picker.query !== "" }
               Head { text: "From"; visible: card.picker.query !== "" }
-              Row {
+              Term.Segments {
                 id: poolRow
-                spacing: 4
                 visible: card.picker.query !== ""
-                Seg {
-                  width: (slideTab.width - poolRow.spacing) / 2
-                  label: "All " + Picasso.files.length
-                  chosen: card.slidePool === "all"
-                  kbOn: card.kb("pool") && chosen
-                  onHit: card.slidePool = "all"
-                }
-                Seg {
-                  width: (slideTab.width - poolRow.spacing) / 2
-                  label: "“" + card.picker.query + "”  " + card.picker.filtered.length
-                  chosen: card.slidePool === "filter"
-                  kbOn: card.kb("pool") && chosen
-                  onHit: card.slidePool = "filter"
-                }
+                width: slideTab.width
+                even: true
+                textSize: card.ts
+                options: [["all", "All " + Picasso.files.length],
+                          ["filter", "\u201c" + card.picker.query + "\u201d  " + card.picker.filtered.length]]
+                current: card.slidePool
+                onChose: (v) => card.slidePool = v
+                Ring { on: card.kb("pool") }
               }
 
               Text {
@@ -1575,11 +1565,14 @@ Item {
             onClicked: card.picker.closeFocus()
             Ring { on: card.kb("buttons", 0) }
           }
-          DialogButton {
+          Term.BusyButton {
             label: card.applyLabel
             ink: card.highlight
             primary: true
             ready: card.stageScreens.length > 0 && card.path !== ""
+            busy: card.busy
+            busyText: card.busyText
+            busyInk: card.highlight
             onClicked: card.apply()
             Ring { on: card.kb("buttons", 1) }
           }

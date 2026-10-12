@@ -15,18 +15,22 @@
 // is told its screen is; zooming changes the cell, and with it how many fit.
 
 import QtQuick
+import QtQuick.Effects
 import Quickshell
 import Quickshell.Io
 import "../../morpheus"
 import "keys.js" as KeyMap
 import "cells.js" as Cells
 import "../../morpheus/scrollfeel.js" as Feel
+import "../../terminus" as Term
 
 Item {
   id: view
 
   required property var ed
   required property var client
+  // the window this view is in: the change bubble hangs from it
+  property var hostWindow: null
   property int fontSize: 17
   property string fontFamily: Zenon.faceFixed
   property int fontWeight: Font.DemiBold
@@ -180,16 +184,19 @@ Item {
   function seamOf(w) {
     const right = w.col + w.width < view.ed.gridCols;
     const vx = (w.col + w.width) * view.cellW + Math.floor(view.cellW / 2);
-    return { right: right, top: w.row > 0, vx: vx, hy: w.row * view.cellH,
+    // the window above has a status row (nvim keeps one on every window but
+    // the last, 'laststatus' 0 or not): the seam runs down its middle
+    return { right: right, top: w.row > 0, vx: vx, hy: w.row * view.cellH - Math.ceil(view.cellH / 2),
              x: w.col * view.cellW, y: w.row * view.cellH,
              w: w.width * view.cellW, h: w.height * view.cellH };
   }
   Repeater {
-    model: view.ed.wins
+    // by id, as the windows are: `wins` is replaced on every resize
+    model: view.ed.winIds
     Item {
       id: seams
       required property var modelData
-      readonly property var w: modelData
+      readonly property var w: view.ed.winOf(modelData) || { id: modelData, row: 0, col: 0, width: 0, height: 0 }
       readonly property var g: view.seamOf(w)
       readonly property var cur: view.ed.curWin
       readonly property bool hereCurrent: !!cur && cur.id === w.id
@@ -198,7 +205,7 @@ Item {
         && cur.col === w.col + w.width + 1
         && cur.row < w.row + w.height && cur.row + cur.height > w.row
       readonly property bool aboveCurrent: !!cur && cur.id !== w.id
-        && cur.row + cur.height === w.row
+        && cur.row + cur.height + 1 >= w.row && cur.row + cur.height <= w.row
         && cur.col < w.col + w.width && cur.col + cur.width > w.col
 
       Rectangle {
@@ -857,6 +864,159 @@ Item {
   // Handed to nvim as mouse input on its own grid rather than turned into
   // cursor moves here, so a click in another split moves into it, a drag is
   // a visual selection and a double-click selects a word, as in the terminal.
+  // ── A CHANGE, ON A GUTTER BAR ─────────────────────────────────────
+  // The pointer resting on git's bar (EditorRow): the change in a Bubble
+  // hanging below its last row — what it took away in red, what it has now
+  // in green. A click on the bar opens it in place, or shuts it
+  // (git.lua expand).
+  Item {
+    id: hunkTip
+    // { win, line } under the pointer, and the change it is in (bridge hunk)
+    property var at: null
+    property var info: null
+    // the bubble's target: the change's last row on screen, at the bar
+    x: 0; y: 0; width: 4; height: view.cellH
+    function show(at) {
+      if (at && hunkTip.at && at.win === hunkTip.at.win && at.line === hunkTip.at.line) return;
+      hunkTip.at = at;
+      if (!at) { hunkWait.stop(); hunkTip.info = null; return; }
+      if (hunkTip.info && at.win === hunkTip.info.win
+          && at.line >= hunkTip.info.first && at.line <= hunkTip.info.last) return;
+      hunkTip.info = null;
+      hunkWait.restart();
+    }
+    function place(i) {
+      const w = i ? view.ed.winOf(i.win) : null;
+      if (!w) return;
+      const rows = view.ed.rowsOf(w.id);
+      let lastRow = -1;
+      for (let r = 0; r < rows.length; ++r)
+        if (rows[r] && rows[r].n >= i.first && rows[r].n <= i.last) lastRow = r;
+      if (lastRow < 0) lastRow = hunkTip.at ? hunkTip.at.row - w.row : 0;
+      hunkTip.x = w.col * view.cellW;
+      hunkTip.y = (w.row + lastRow) * view.cellH;
+    }
+    Timer {
+      id: hunkWait
+      interval: 300
+      onTriggered: {
+        const at = hunkTip.at;
+        if (!at) return;
+        view.client.request("hunk", { win: at.win, line: at.line }, (r) => {
+          if (hunkTip.at !== at || !r || typeof r !== "object") return;
+          r.win = at.win;
+          // placed BEFORE it is shown: the bubble measures its target as it
+          // opens, and the first one hung from the window's top corner
+          hunkTip.place(r);
+          hunkTip.info = r;
+        });
+      }
+    }
+    Connections {
+      target: view.ed
+      function onWinsChanged() { hunkTip.show(null); }
+    }
+    readonly property int most: 14
+    function lines(list, mark) {
+      if (!list) return [];
+      const out = list.slice(0, hunkTip.most).map((t) => mark + " " + t.replace(/\t/g, "    "));
+      if (list.length > hunkTip.most) out.push("  … " + (list.length - hunkTip.most) + " more");
+      return out;
+    }
+  }
+  // THE BAR UNDER THE POINTER, LIT: the change's whole bar widens and
+  // glows in its own colour, and a wash of it fades out across its rows —
+  // gliding from one change to the next, fading when the pointer leaves
+  Item {
+    id: gitGlow
+    property var bar: null
+    property color ink: Zenon.green
+    property bool lit: false
+    function hover(b) {
+      gitGlow.lit = !!b;
+      if (!b) return;
+      const fresh = gitGlow.opacity < 0.05;
+      gitGlow.ink = b.ink;
+      gitGlow.bar = b;
+      if (fresh) { glide.enabled = false; }
+      gitGlow.x = b.x;
+      gitGlow.y = b.top;
+      gitGlow.height = b.rows * view.cellH;
+      gitGlow.width = b.width;
+      glide.enabled = true;
+    }
+    opacity: gitGlow.lit ? 1 : 0
+    Behavior on opacity { NumberAnimation { duration: Zenon.normal; easing.type: Zenon.ease } }
+    Behavior on y { id: glide; NumberAnimation { duration: Zenon.normal; easing.type: Zenon.travelEase } }
+    Behavior on height { enabled: glide.enabled; NumberAnimation { duration: Zenon.normal; easing.type: Zenon.travelEase } }
+    Behavior on ink { ColorAnimation { duration: Zenon.fast } }
+    Rectangle {
+      width: Math.min(parent.width, view.cellW * 24)
+      height: parent.height
+      gradient: Gradient {
+        orientation: Gradient.Horizontal
+        GradientStop { position: 0; color: Qt.rgba(gitGlow.ink.r, gitGlow.ink.g, gitGlow.ink.b, 0.16) }
+        GradientStop { position: 1; color: "transparent" }
+      }
+    }
+    RectangularShadow {
+      x: 0; y: 1
+      width: 5
+      height: parent.height - 2
+      radius: 2.5
+      blur: 10
+      spread: 1
+      color: Qt.rgba(gitGlow.ink.r, gitGlow.ink.g, gitGlow.ink.b, 0.7)
+    }
+    Rectangle {
+      x: 0; y: 1
+      width: 5
+      height: parent.height - 2
+      radius: 2.5
+      color: gitGlow.ink
+    }
+  }
+
+  Term.Bubble {
+    window: view.hostWindow
+    target: hunkTip
+    // from the bar rightwards: centred on it, the card hung past the window
+    lean: true
+    shown: !!hunkTip.info && !!view.hostWindow
+    cardWidth: Math.max(320, Math.min(720, view.width * 0.6))
+    Text {
+      width: parent ? parent.width : 0
+      readonly property var i: hunkTip.info
+      text: !i ? "" : (i.kind === "add" ? i.new.length + (i.new.length === 1 ? " line added" : " lines added")
+        : i.kind === "delete" ? i.old.length + (i.old.length === 1 ? " line removed" : " lines removed")
+        : "changed: " + i.old.length + " → " + i.new.length + (i.new.length === 1 ? " line" : " lines"))
+        + (i.open ? "  ·  click to shut" : "  ·  click to open in place")
+      color: Zenon.muted
+      font.family: Zenon.face
+      font.weight: Zenon.weight
+      font.pixelSize: Zenon.px(13)
+      elide: Text.ElideRight
+    }
+    Column {
+      width: parent ? parent.width : 0
+      visible: !!hunkTip.info
+      Repeater {
+        model: hunkTip.info ? hunkTip.lines(hunkTip.info.old, "\u2212").map((t) => ({ t: t, c: "o" }))
+          .concat(hunkTip.lines(hunkTip.info.new, "+").map((t) => ({ t: t, c: "n" }))) : []
+        Text {
+          required property var modelData
+          width: parent.width
+          text: modelData.t
+          textFormat: Text.PlainText
+          elide: Text.ElideRight
+          color: modelData.c === "o" ? Zenon.red : Zenon.green
+          font.family: view.fontFamily
+          font.pixelSize: Math.max(12, view.fontSize - 2)
+        }
+      }
+    }
+  }
+
   MouseArea {
     id: area
     anchors.fill: parent
@@ -926,6 +1086,15 @@ Item {
         view.client.cmd("normal! zo");
         return;
       }
+      // git's bar in the gutter: that change opened in place, or shut
+      const bar = mouse.button === Qt.LeftButton && mouse.modifiers === Qt.NoModifier
+        ? gitBarAt(mouse.x, mouse.y) : null;
+      if (bar) {
+        hunkTip.show(null);
+        gitGlow.hover(null);
+        view.client.request("hunkExpand", { win: bar.win, line: bar.line });
+        return;
+      }
       // the gutter's ring (EditorRow): the fold on its line, opened or closed
       const ringLine = mouse.button === Qt.LeftButton && mouse.modifiers === Qt.NoModifier
         ? foldRingAt(mouse.x, mouse.y) : 0;
@@ -957,6 +1126,30 @@ Item {
       }
       return 0;
     }
+    // git's bar (EditorRow): the first few pixels of a window's gutter, on a
+    // row with a mark — or a row of a change opened in place
+    function gitBarAt(x, y) {
+      const r = row(y), c = col(x);
+      const ws = view.ed.wins;
+      for (let i = 0; i < ws.length; ++i) {
+        const w = ws[i];
+        if (r < w.row || r >= w.row + w.height || c < w.col || c >= w.col + w.width) continue;
+        if (!w.textoff || x - w.col * view.cellW > 8) return null;
+        const rows = view.ed.rowsOf(w.id);
+        const at = r - w.row;
+        const info = rows[at];
+        const marked = (it) => !!it && it.n > 0 && !!(it.v || it.dv);
+        if (!marked(info)) return null;
+        // the run of marked rows it is in: the bar the eye sees as one
+        let a = at, b = at;
+        while (a > 0 && marked(rows[a - 1])) a--;
+        while (b + 1 < w.height && marked(rows[b + 1])) b++;
+        const ink = info.dv || info.v === "d" ? Zenon.red : info.v === "a" ? Zenon.green : Zenon.yellow;
+        return { win: w.id, line: info.n, row: r, x: w.col * view.cellW, top: (w.row + a) * view.cellH,
+                 rows: b - a + 1, width: w.width * view.cellW, ink: ink };
+      }
+      return null;
+    }
     function foldPillAt(x, y) {
       const r = row(y), c = col(x);
       const ws = view.ed.wins;
@@ -971,11 +1164,14 @@ Item {
       return false;
     }
     hoverEnabled: true
-    onExited: { peek.hide(); overRail = false; overFold = false; }
+    onExited: { peek.hide(); hunkTip.show(null); gitGlow.hover(null); overRail = false; overFold = false; }
     onPositionChanged: (mouse) => {
       if (held === "") {
         overRail = onRail(mouse.x, mouse.y);
-        overFold = !overRail && (foldRingAt(mouse.x, mouse.y) > 0 || foldPillAt(mouse.x, mouse.y));
+        const bar = overRail ? null : gitBarAt(mouse.x, mouse.y);
+        hunkTip.show(bar);
+        gitGlow.hover(bar);
+        overFold = !overRail && (!!bar || foldRingAt(mouse.x, mouse.y) > 0 || foldPillAt(mouse.x, mouse.y));
         if (overRail || overFold) peek.hide(); else peek.hover(mouse.x, mouse.y);
         return;
       }
@@ -991,8 +1187,10 @@ Item {
       held = "";
     }
     onWheel: (wheel) => {
-      // the text moves out from under a peeked path
+      // the text moves out from under a peeked path (and a change's bubble)
       peek.hide();
+      hunkTip.show(null);
+      gitGlow.hover(null);
       // Ctrl and the wheel: zoom, as everywhere else
       if (wheel.modifiers & Qt.ControlModifier) {
         if (wheel.angleDelta.y !== 0) view.zoomRequested(wheel.angleDelta.y > 0 ? 1 : -1);
@@ -1086,12 +1284,15 @@ Item {
   }
 
   // the dividers' grips — see "between the windows"; above `area`
+  // BY ID: `wins` is replaced on every resize, and a Repeater over it
+  // destroyed the grip being dragged at the first step — the drag let go
+  // halfway (user capture, 2026-10-11)
   Repeater {
-    model: view.ed.wins
+    model: view.ed.winIds
     Item {
       id: grips
       required property var modelData
-      readonly property var w: modelData
+      readonly property var w: view.ed.winOf(modelData) || { id: modelData, row: 0, col: 0, width: 0, height: 0 }
       readonly property var g: view.seamOf(w)
       MouseArea {
         id: vGrip
@@ -1111,7 +1312,8 @@ Item {
         onPositionChanged: (m) => {
           if (!vGrip.pressed) return;
           const px = vGrip.mapToItem(view, m.x, 0).x;
-          const n = Math.max(1, Math.round(px / view.cellW) - grips.w.col);
+          // the seam is the middle of the separator column past the window
+          const n = Math.max(1, Math.round(px / view.cellW - 0.5) - grips.w.col);
           if (n === vGrip.sent) return;
           vGrip.sent = n;
           view.client.cmd("lua vim.api.nvim_win_set_width(" + grips.w.id + ", " + n + ")");
@@ -1141,12 +1343,14 @@ Item {
           let above = null;
           for (let i = 0; i < ws.length; ++i) {
             const o = ws[i];
-            if (o.row + o.height === grips.w.row && o.col < grips.w.col + grips.w.width
+            // with its status row between them
+            if (o.row + o.height + 1 >= grips.w.row && o.row + o.height <= grips.w.row
+                && o.col < grips.w.col + grips.w.width
                 && o.col + o.width > grips.w.col) { above = o; break; }
           }
           if (!above) return;
           const py = hGrip.mapToItem(view, 0, m.y).y;
-          const n = Math.max(1, Math.round(py / view.cellH) - above.row);
+          const n = Math.max(1, Math.round(py / view.cellH - 0.5) - above.row);
           if (n === hGrip.sent) return;
           hGrip.sent = n;
           view.client.cmd("lua vim.api.nvim_win_set_height(" + above.id + ", " + n + ")");

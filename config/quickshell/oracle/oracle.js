@@ -400,6 +400,15 @@ function alsoKeys(spec) {
   return (Array.isArray(spec.also) ? spec.also : [spec.also]).filter((k) => typeof k === "string" && k !== "");
 }
 
+// Whether an `also` setting is drawn: one with `onlyWhen` [key, value]
+// only while that key holds that value (the theme's Follow Background tone).
+function alsoShown(spec, get) {
+  if (!spec) return false;
+  const w = spec.onlyWhen;
+  if (!w || w.length !== 2) return true;
+  return String(get(w[0])) === String(w[1]);
+}
+
 function filterSchema(schema, section, query) {
   const out = [];
   const q = String(query || "").trim();

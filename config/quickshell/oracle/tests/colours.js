@@ -54,7 +54,7 @@ const BUDGET = {
 };
 
 const SKIP_DIR = /^(oracle\/tests|oracle\/qmltests|themes|scripts|plato\/nvim)(\/|$)/;
-const SKIP_FILE = new Set(["morpheus/Zenon.qml", "morpheus/wallpalette.js",
+const SKIP_FILE = new Set(["morpheus/zenon/ZenonBase.qml", "morpheus/wallpalette.js",
                            "morpheus/themesync.js", "oracle/test.js"]);
 const RGBA = /Qt\.rgba\(\s*([01])\s*,\s*\1\s*,\s*\1\s*,/g;
 const HEX = /["']#(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{8})["']/g;

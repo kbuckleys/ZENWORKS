@@ -15,13 +15,10 @@
 //
 // Its own popup surface, placed against the target as morpheus/WindowTip
 // places a tooltip — so the compositor frosts it, and it may hang past the
-// window's edge, sliding along it rather than being cut — in the tooltip's
-// own ground (Zenon.tipBg), border and glass rim. It fades in with a small
-// drop, as a card does.
-//
-// The card and its tail are ONE outline (a Canvas path), filled and drawn
-// once: a tail laid over a bordered card left the card's border running
-// across the tail's root (user, 2026-10-11).
+// window's edge, sliding along it rather than being cut. What is drawn —
+// card, tail, shadow, rim — is terminus/BubbleCard, which iris (not
+// quickshell, so no popup surfaces) lays over its page instead; this file
+// is where the card hangs and where its tail points.
 //
 // `sticky`: the pointer may go from the target onto the bubble and stay —
 // it holds the bubble up (after a moment's grace to cross the gap), so what
@@ -39,122 +36,125 @@ PopupWindow {
   property bool shown: false
   // the card's width; its height is what is in it
   property real cardWidth: 380
-  default property alias content: col.data
+  default property alias content: face.content
 
-  readonly property int tail: 8
-  readonly property int pad: 6
+  // the card's measures (BubbleCard says why they are what they are)
+  readonly property int tail: face.tail
+  readonly property int pad: face.pad
+  readonly property int padTop: face.padTop
   property bool sticky: false
-  readonly property bool over: overCard.hovered
-  readonly property bool open: bub.shown || (bub.sticky && (overCard.hovered || grace.running))
+  readonly property bool over: face.over
+  readonly property bool open: bub.shown || (bub.sticky && (face.over || grace.running))
   Timer { id: grace; interval: 350 }
   property real shade: bub.open ? 1 : 0
   Behavior on shade { NumberAnimation { duration: Zenon.menuFade; easing.type: Easing.OutCubic } }
 
   visible: bub.window !== null && bub.target !== null && bub.shade > 0.01
   color: "transparent"
-  implicitWidth: card.width + bub.pad * 2
-  implicitHeight: card.height + bub.tail + bub.pad * 2
+  // only the card (and its tail) takes the pointer, never the shadow's room
+  mask: Region { x: face.card.x; y: face.card.y - bub.tail; width: face.card.width; height: face.card.height + bub.tail }
+  implicitWidth: face.implicitWidth
+  implicitHeight: face.implicitHeight
 
   // where the target is, read as it is shown (a binding around mapToItem
   // does not re-run when the geometry under it moves), and again when it
   // is handed another target while up — a list's rows, one after another
   property rect at: Qt.rect(0, 0, 1, 1)
+  // THE TAIL POINTS AT THE POINTER (user, 2026-10-11: it sat in the middle
+  // of a wide row whatever part of it was hovered). The bubble opens under
+  // the pointer — the anchor narrowed to its x on the target — and then
+  // only the tail moves, along the card, as the pointer goes along the
+  // target: the popup itself is never moved under the hand.
+  // `pointX`: the pointer's x in the window (-1 off it), from a passive
+  // HoverHandler put on the window's content (it sees every move, whatever
+  // takes the hover underneath).
+  property real pointX: -1
+  property var _hover: null
+  function watch() {
+    if (bub._hover) { bub._hover.destroy(); bub._hover = null; }
+    const root = bub.window ? bub.window.contentItem : null;
+    if (!root) return;
+    bub._hover = Qt.createQmlObject("import QtQuick; HoverHandler {}", root, "BubbleHover");
+    bub._hover.pointChanged.connect(() => {
+      bub.pointX = bub._hover.hovered ? bub._hover.point.position.x : -1;
+    });
+  }
+  onWindowChanged: bub.watch()
+  Component.onCompleted: bub.watch()
+  Component.onDestruction: { if (bub._hover) bub._hover.destroy(); }
+  // `lean`: the card grows to the RIGHT of the target instead of centring
+  // under it — for a target at a window's left edge (plato's gutter bars),
+  // where a centred card hung out past the window and was slid back by the
+  // compositor, its tail left pointing at nothing
+  property bool lean: false
+  // where the target's middle was (window x) when the bubble was placed
+  property real homeX: 0
   function measure() {
     if (!bub.shown || !bub.target) return;
     const p = bub.target.mapToItem(null, 0, 0);
-    bub.at = Qt.rect(p.x, p.y, bub.target.width, bub.target.height);
+    const w = bub.target.width;
+    const follow = bub.pointX >= p.x && bub.pointX <= p.x + w && w > 40;
+    bub.homeX = follow ? bub.pointX : p.x + w / 2;
+    if (bub.lean)
+      bub.at = Qt.rect(Math.max(0, bub.homeX - (bub.pad + 14 + bub.tail)), p.y, 1, bub.target.height);
+    else if (follow)
+      bub.at = Qt.rect(bub.pointX, p.y, 1, bub.target.height);
+    else
+      bub.at = Qt.rect(p.x, p.y, w, bub.target.height);
+  }
+  // the popup's left edge, in the window (a slide at the screen's edge is
+  // not known here)
+  readonly property real popupX: bub.lean ? bub.at.x : bub.at.x + bub.at.width / 2 - bub.width / 2
+  // the pointer's x in the popup while it is on a wide target, else -1
+  readonly property real pointIn: {
+    if (bub.pointX < 0 || !bub.target || bub.target.width <= 40) return -1;
+    const p = bub.target.mapToItem(null, 0, 0);
+    if (bub.pointX < p.x || bub.pointX > p.x + bub.target.width) return -1;
+    return bub.pointX - bub.popupX;
   }
   onShownChanged: {
     if (!bub.shown && bub.sticky) grace.restart();
     bub.measure();
   }
   onTargetChanged: bub.measure()
+  // a target moved while it is up (or just before): measured again
+  Connections {
+    target: bub.target
+    ignoreUnknownSignals: true
+    function onXChanged() { bub.measure(); }
+    function onYChanged() { bub.measure(); }
+  }
   anchor {
     window: bub.window
     rect.x: Math.round(bub.at.x)
     rect.y: Math.round(bub.at.y)
     rect.width: Math.max(1, Math.round(bub.at.width))
     rect.height: Math.max(1, Math.round(bub.at.height))
-    edges: Edges.Bottom
-    gravity: Edges.Bottom
+    edges: bub.lean ? Edges.Bottom | Edges.Left : Edges.Bottom
+    gravity: bub.lean ? Edges.Bottom | Edges.Right : Edges.Bottom
     adjustment: PopupAdjustment.Slide
   }
 
-  Item {
+  BubbleCard {
+    id: face
     anchors.fill: parent
-    opacity: bub.shade
-    transform: Translate { y: (1 - bub.shade) * -4 }
+    shade: bub.shade
+    cardWidth: bub.cardWidth
+    sticky: bub.sticky
 
-    // where the tail's point is: under the target's middle when the card
-    // lets it be
-    readonly property real tailX: Math.max(card.x + 14 + bub.tail,
-      Math.min(card.x + card.width - 14 - bub.tail, bub.width / 2))
-    // the outline: card and tail as one path, filled, then drawn once
-    Canvas {
-      id: outline
-      anchors.fill: parent
-      onWidthChanged: requestPaint()
-      onHeightChanged: requestPaint()
-      Connections { target: Zenon; function onThemeEpochChanged() { outline.requestPaint(); } }
-      Connections { target: card; function onHeightChanged() { outline.requestPaint(); } function onWidthChanged() { outline.requestPaint(); } }
-      Connections { target: outline.parent; function onTailXChanged() { outline.requestPaint(); } }
-      onPaint: {
-        const c = getContext("2d");
-        c.reset();
-        const x = card.x + 0.5, y = card.y + 0.5, w = card.width - 1, h = card.height - 1;
-        const r = Math.min(card.radius, h / 2), t = bub.tail, tx = Math.round(outline.parent.tailX) + 0.5;
-        c.beginPath();
-        c.moveTo(x + r, y);
-        c.lineTo(tx - t, y);
-        c.lineTo(tx, y - t);
-        c.lineTo(tx + t, y);
-        c.lineTo(x + w - r, y);
-        c.arcTo(x + w, y, x + w, y + r, r);
-        c.lineTo(x + w, y + h - r);
-        c.arcTo(x + w, y + h, x + w - r, y + h, r);
-        c.lineTo(x + r, y + h);
-        c.arcTo(x, y + h, x, y + h - r, r);
-        c.lineTo(x, y + r);
-        c.arcTo(x, y, x + r, y, r);
-        c.closePath();
-        c.fillStyle = Zenon.tipBg;
-        c.fill();
-        c.lineWidth = 1;
-        c.strokeStyle = Zenon.border;
-        c.stroke();
-        // the glass rim, as the tooltips have it (see Zenon.rim): a light
-        // along the top, faded at its ends, broken where the tail rises
-        if (Zenon.rimOn) {
-          const y1 = y + 1, a = x + r, b = x + w - r;
-          const g = c.createLinearGradient(a, 0, b, 0);
-          g.addColorStop(0, Zenon.alpha(Zenon.rim, 0));
-          g.addColorStop(0.25, Zenon.rim);
-          g.addColorStop(0.75, Zenon.rim);
-          g.addColorStop(1, Zenon.alpha(Zenon.rim, 0));
-          c.strokeStyle = g;
-          c.beginPath();
-          c.moveTo(a, y1); c.lineTo(Math.max(a, tx - t - 2), y1);
-          c.moveTo(Math.min(b, tx + t + 2), y1); c.lineTo(b, y1);
-          c.stroke();
-        }
-      }
+    // where the tail's point is: at the pointer while it goes along a wide
+    // target; held there while it crosses onto the card; otherwise at the
+    // target's middle
+    function reaim() {
+      if (bub.pointIn >= 0) face.aim = bub.pointIn;
+      else if (!face.over) face.aim = bub.homeX - bub.popupX;
     }
-    Item {
-      id: card
-      x: bub.pad
-      y: bub.pad + bub.tail
-      width: bub.cardWidth
-      height: col.implicitHeight + 24
-      readonly property real radius: Zenon.windowRadius
-      // the pointer on it holds a sticky bubble up
-      HoverHandler { id: overCard; enabled: bub.sticky }
-      Column {
-        id: col
-        x: 14
-        y: 12
-        width: card.width - 28
-        spacing: 10
-      }
+    Connections {
+      target: bub
+      function onPointInChanged() { face.reaim(); }
+      function onHomeXChanged() { face.reaim(); }
+      function onPopupXChanged() { face.reaim(); }
+      function onWidthChanged() { face.reaim(); }
     }
   }
 }

@@ -29,6 +29,16 @@ Item {
   property real textSize: Zenon.px(14)
   // the unlit words' ink; the lit one's is the accent
   property color ink: Zenon.muted
+  // values that can be picked; null for all. One left out is shown faint
+  // and does not answer (terminus' settings: columns while split)
+  property var allowed: null
+  // Parts of one width, sharing whatever width the holder gives it (set
+  // `width`), rather than each as wide as its words — for a switch that
+  // spans a card (picasso's tabs, fits, intervals).
+  property bool even: false
+  // values that wear a small dot — something set under that choice
+  // (picasso's card: a look staged, a slideshow on)
+  property var dotted: []
   signal chose(string value)
   // the pointer on an option, or off it — for the holder's tooltip
   signal pointed(string value, Item at, bool inside)
@@ -73,7 +83,9 @@ Item {
         required property var modelData
         required property int index
         readonly property bool on: segs.current === one.modelData[0]
-        width: label.implicitWidth + 28
+        readonly property bool ok: segs.allowed === null || segs.allowed.indexOf(one.modelData[0]) >= 0
+        width: segs.even ? (segs.width - 2) / Math.max(1, segs.options.length)
+          : label.implicitWidth + 28
         height: row.height
         // between two options, a hairline
         Rectangle {
@@ -83,11 +95,33 @@ Item {
           anchors.verticalCenter: parent.verticalCenter
           color: Zenon.border
         }
+        // pressed, darker — the repository chip's press in delphi
+        // (Zenon.wash 0.12), in the highlight's own shape (user, 2026-10-11)
+        Rectangle {
+          x: 2
+          y: 2
+          width: parent.width - 4
+          height: parent.height - 4
+          radius: Math.max(0, Zenon.windowRadius - 2)
+          color: Zenon.wash(0.12)
+          visible: press.pressed && one.ok
+        }
+        Rectangle {
+          anchors.right: parent.right
+          anchors.top: parent.top
+          anchors.margins: 6
+          width: 6
+          height: 6
+          radius: 3
+          color: Zenon.cyan
+          visible: segs.dotted.indexOf(one.modelData[0]) >= 0
+        }
         Text {
           id: label
           anchors.centerIn: parent
           text: one.modelData[1]
           color: one.on ? Zenon.cyan : segs.ink
+          opacity: one.ok ? 1 : 0.35
           Behavior on color { ColorAnimation { duration: Zenon.fast } }
           font.family: Zenon.face
           font.weight: Font.Bold
@@ -95,7 +129,7 @@ Item {
           font.pixelSize: segs.textSize
         }
         HoverHandler { onHoveredChanged: segs.pointed(one.modelData[0], one, hovered) }
-        TapHandler { onTapped: segs.chose(one.modelData[0]) }
+        TapHandler { id: press; onTapped: { if (one.ok) segs.chose(one.modelData[0]); } }
       }
     }
   }

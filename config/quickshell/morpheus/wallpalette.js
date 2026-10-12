@@ -21,7 +21,18 @@
 //   - every other accent keeps its meaning (red is still the error) and is
 //     only turned up to 15 degrees towards the seed — harmonised.
 // Then every slot is pushed lighter (dark) or darker (light) until it reads
-// on the ground: ink 7:1, keyInk 4.5, soft 3.5, muted 2.6, accents 3.
+// on the ground: ink 7:1, keyInk 4.5, soft 3.5, muted 2.6, accents 3 — a
+// light theme asks more (soft 4.5, muted 3.2, accents 3.4): its glass over a
+// dark picture greys the ground the sums were done on.
+//
+// LIGHT ACCENTS START BRIGHT. They used to start at L .56 — already past
+// 3:1, so nothing walked, and a modest chroma there is brown and grey (user,
+// 2026-10-11: "muddy"). Now each starts light and saturated and walks darker
+// only until it reads, so it stops at the most vivid tone that does.
+//
+// SAND IS ZENON'S STRAW, NOT HARMONISED: hue 100, pale, in a dark theme; in a
+// light one a gold (hue 88) — a yellow dark enough to read on paper at hue 95+
+// is olive. Turned towards the seed it went mustard (user, 2026-10-11).
 
 // ── colour space ─────────────────────────────────────────────────────────
 function hexToRgb(h) {
@@ -150,16 +161,17 @@ function palette(colors, opts) {
   const txC = neutral ? 0.004 : Math.min(seedC, 0.008 + 0.02 * v);
   const lv = light
     ? { ground: 0.975, card: 0.95, surface: 0.9, dim: 0.82, border: 0.74,
-        ink: 0.32, keyInk: 0.42, soft: 0.48, muted: 0.6, acc: 0.56, pink: 0.62 }
+        ink: 0.32, keyInk: 0.42, soft: 0.48, muted: 0.6, acc: 0.74, pink: 0.76 }
     : { ground: 0.17, card: 0.2, surface: 0.27, dim: 0.37, border: 0.44,
         ink: 0.93, keyInk: 0.84, soft: 0.78, muted: 0.64, acc: 0.8, pink: 0.86 };
-  const accC = light ? 0.11 + 0.07 * v : 0.09 + 0.06 * v;
+  const accC = light ? 0.15 + 0.06 * v : 0.09 + 0.06 * v;
+  const need = light ? { soft: 4.5, muted: 3.2, acc: 3.4 } : { soft: 3.5, muted: 2.6, acc: 3 };
 
   const ground = oklch(lv.ground, bgC, seedH);
   const text = (L, need) => legible(L, txC, seedH, ground, need, light);
   const accent = (h, need, L, C) => legible(L === undefined ? lv.acc : L,
     C === undefined ? accC : C, h, ground, need, light);
-  const hues = { yellow: 60, sand: 95, green: 145, blue: 255, magenta: 320 };
+  const hues = { yellow: 60, green: 145, blue: 255, magenta: 320 };
   const c = {
     ground: ground,
     card: oklch(lv.card, bgC, seedH),
@@ -167,13 +179,14 @@ function palette(colors, opts) {
     dim: oklch(lv.dim, bgC, seedH),
     ink: text(lv.ink, 7),
     keyInk: text(lv.keyInk, 4.5),
-    soft: text(lv.soft, 3.5),
-    muted: text(lv.muted, 2.6),
-    cyan: accent(neutral ? 210 : seedH, 3, lv.acc, neutral ? accC * 0.7 : Math.max(accC, Math.min(seedC, 0.2))),
-    pink: accent(hueToward(10, seedH, neutral), 3, lv.pink, accC * 0.55),
+    soft: text(lv.soft, need.soft),
+    muted: text(lv.muted, need.muted),
+    cyan: accent(neutral ? 210 : seedH, need.acc, lv.acc, neutral ? accC * 0.7 : Math.max(accC, Math.min(seedC, 0.2))),
+    pink: accent(hueToward(10, seedH, neutral), need.acc, lv.pink, accC * (light ? 0.75 : 0.55)),
+    sand: light ? accent(88, need.acc, 0.8, 0.16) : accent(100, need.acc, 0.88, 0.09),
   };
-  for (const k in hues) c[k] = accent(hueToward(hues[k], seedH, neutral), 3);
-  c.red = accent(redFrom(seedH, neutral), 3, lv.acc, accC * 1.15);
+  for (const k in hues) c[k] = accent(hueToward(hues[k], seedH, neutral), need.acc);
+  c.red = accent(redFrom(seedH, neutral), need.acc, lv.acc, accC * 1.15);
   const border = oklch(lv.border, bgC, seedH);
   const a = (alpha, hex) => "#" + Math.round(alpha * 255).toString(16).padStart(2, "0") + hex.slice(1);
   c.sparkFill = a(0.2, c.cyan);

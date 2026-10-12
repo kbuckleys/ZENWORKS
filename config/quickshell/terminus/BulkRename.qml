@@ -36,6 +36,8 @@ Rectangle {
   id: bulk
   // what the card frosts over (see morpheus/Sheet), from the host
   property Item backdrop: null
+  // the bar's frost to start the card's from (see Sheet.seamFrost)
+  property real seamFrost: 0
   // the card's ground when not frosted (see morpheus/Sheet)
   property color ground: Zenon.black
 
@@ -424,6 +426,7 @@ Rectangle {
 
     Sheet {
       backdrop: bulk.backdrop   // frosted over it — see morpheus/Sheet
+      seamFrost: bulk.seamFrost
       ground: bulk.ground
       id: bulkSheet
       leftInset: bulk.leftInset

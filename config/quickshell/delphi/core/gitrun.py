@@ -24,9 +24,13 @@
 import os
 import signal
 import subprocess
+import sys
 import threading
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+# the suite's shared backend pieces (JSON lines, Cancel)
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(HERE)), "morpheus", "py"))
+import lines  # noqa: E402
 BIN = os.path.join(os.path.dirname(HERE), "bin")
 ASKPASS = os.path.join(BIN, "delphi-askpass")
 
@@ -39,48 +43,9 @@ class GitError(Exception):
         super().__init__(self.err or f"git {' '.join(args[:2])} exited {code}")
 
 
-class Cancelled(Exception):
-    pass
-
-
-class Cancel:
-    """A request's off switch. The worker running a request hands it to every
-    git call it makes; cancel() kills whichever one is running and makes every
-    later call raise Cancelled instead of starting."""
-
-    def __init__(self):
-        self.done = False
-        self._procs = set()
-        self._lock = threading.Lock()
-
-    def attach(self, proc):
-        with self._lock:
-            if self.done:
-                _kill(proc)
-                raise Cancelled()
-            self._procs.add(proc)
-
-    def detach(self, proc):
-        with self._lock:
-            self._procs.discard(proc)
-
-    def cancel(self):
-        with self._lock:
-            self.done = True
-            procs = list(self._procs)
-        for p in procs:
-            _kill(p)
-
-    def check(self):
-        if self.done:
-            raise Cancelled()
-
-
-def _kill(proc):
-    try:
-        os.killpg(proc.pid, signal.SIGTERM)
-    except (ProcessLookupError, PermissionError):
-        pass
+# A request's off switch and its exception are the suite's backends' own
+# (morpheus/py/lines.py), kept under these names for every caller here.
+Cancel, Cancelled, _kill = lines.Cancel, lines.Cancelled, lines.kill
 
 
 # Delphi's own answer to "who keeps the password": the keyring, through

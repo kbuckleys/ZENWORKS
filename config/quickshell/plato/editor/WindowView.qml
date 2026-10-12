@@ -242,7 +242,7 @@ Item {
     return r.n + "\u0001" + r.k + "\u0001" + r.t + "\u0001" + JSON.stringify(r.s)
       + "\u0001" + JSON.stringify(r.g || 0) + "\u0001" + r.f + "\u0001" + (r.v || "")
       + "\u0001" + (r.ig ? Array.from(r.ig).join(",") : "")
-      + "\u0001" + JSON.stringify([r.m || 0, r.sl || 0, r.vt || 0, r.fc || 0, r.md || 0, r.fo || 0]);
+      + "\u0001" + JSON.stringify([r.m || 0, r.sl || 0, r.vt || 0, r.fc || 0, r.md || 0, r.fo || 0, r.dv || 0, r.dx || 0]);
   }
   // ── what a frame's place() cost, for lag.log ──────────────────────
   // Scrolling stalled ~100 ms a few times a second, split or not, with no

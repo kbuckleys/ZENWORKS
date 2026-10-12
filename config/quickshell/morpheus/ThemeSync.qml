@@ -96,6 +96,36 @@ Item {
     onLoadFailed: exists = false
   }
 
+  // ── AND FOR IRIS ────────────────────────────────────────────────────
+  // Iris is its own process and wears morpheus/zenon/ZenonBase.qml as the
+  // shell does. What it cannot reach is what Zenon is MADE from here —
+  // Oracle's settings, the worn theme file, Follow Background's palette, the
+  // daylight, the background's accent — so those are written out whole, and
+  // iris re-reads them on change. Inputs, not results: the same base fed the
+  // same inputs computes the same Zenon, and nothing is worked out twice.
+  // Under the runtime directory: a session's state, gone at logout.
+  readonly property string zenonText: {
+    const cfg = {};
+    for (const k of Zenon.cfgKeys) cfg[k] = Zenon.cfg[k];
+    return JSON.stringify({ cfg: cfg, fileTheme: Zenon.fileTheme, followTheme: Zenon.followTheme,
+                            daylight: Zenon.daylight, wallAccent: String(Zenon.wallAccent) });
+  }
+  onZenonTextChanged: zenonSettle.restart()
+
+  Timer {
+    id: zenonSettle
+    interval: 60
+    running: true
+    onTriggered: zenonFile.setText(sync.zenonText)
+  }
+
+  FileView {
+    id: zenonFile
+    path: (Quickshell.env("XDG_RUNTIME_DIR") || "/tmp") + "/quickshell/zenon.json"
+    atomicWrites: true
+    printErrors: false
+  }
+
   FileView {
     id: hyprFile
     property bool exists: true

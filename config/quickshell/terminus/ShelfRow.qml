@@ -29,6 +29,9 @@ Rectangle {
   property color countInk: Zenon.muted
   property bool here: false
   property color fill: Zenon.alpha(Zenon.cyan, 0.12)
+  // the glyph's way in from the left, and the count's from the right: more
+  // when the row runs edge to edge (delphi's), so the words stay put
+  property int indent: 10
   signal clicked()
 
   height: 30
@@ -38,7 +41,7 @@ Rectangle {
   Text {
     id: shelfGlyph
     anchors.left: parent.left
-    anchors.leftMargin: 10
+    anchors.leftMargin: shelf.indent
     anchors.verticalCenter: parent.verticalCenter
     width: 20
     text: shelf.glyph
@@ -62,7 +65,7 @@ Rectangle {
   Text {
     id: shelfCount
     anchors.right: parent.right
-    anchors.rightMargin: 10
+    anchors.rightMargin: shelf.indent
     anchors.verticalCenter: parent.verticalCenter
     text: shelf.count
     color: shelf.countInk

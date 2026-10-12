@@ -21,6 +21,14 @@
 --                 mini.diff's own do_hunks; plato's right-click menu asks.
 --                 With a selection: only the selected lines of it.
 --
+--   info(buf, l)  the change at line l as { kind, first, last, old, new }:
+--                 the lines it took away and the lines it has now — what
+--                 plato's bubble shows over a gutter bar.
+--   expand(buf, l) the change at line l opened in place, or shut again: the
+--                 lines it took away drawn above it (virt_lines, so nvim
+--                 makes room for them and scrolls over them), red; the lines
+--                 it brought, tinted green (opened()).
+--
 -- mini.diff draws nothing itself here: its view is "number", which colours
 -- nvim's number column — a column plato draws on its own — so its signs
 -- never compete with diagnostics' for the one sign cell.
@@ -29,15 +37,23 @@ local api = vim.api
 local M = {}
 
 local diff = nil
+-- buf → { ["ref_start:ref_count"] = true }: the changes opened in place.
+-- Keyed by where they are in the COMMITTED text, which typing in the buffer
+-- does not move.
+local opened = {}
+local nsOld = api.nvim_create_namespace("plato.diffold")
 function M.setup()
   local ok, md = pcall(require, "mini.diff")
   if not ok then return end
   pcall(md.setup, { view = { style = "number" } })
   diff = md
-  -- a new state of the hunks is a new frame
+  -- a new state of the hunks is a new frame (and opened changes redrawn)
   api.nvim_create_autocmd("User", {
     pattern = "MiniDiffUpdated",
-    callback = function() require("plato.view").schedule() end,
+    callback = function(ev)
+      if ev.buf and opened[ev.buf] then M.paint(ev.buf) end
+      require("plato.view").schedule()
+    end,
   })
 end
 
@@ -114,6 +130,136 @@ function M.hunkSelected(action)
   if a > b then a, b = b, a end
   api.nvim_feedkeys(api.nvim_replace_termcodes("<Esc>", true, false, true), "nx", false)
   M.hunk(action, a, b)
+end
+
+-- ── one change, shown ─────────────────────────────────────────────────
+local function data(buf)
+  if not diff then return nil end
+  local ok, d = pcall(diff.get_buf_data, buf)
+  if not ok or not d or not d.hunks then return nil end
+  return d
+end
+
+local function refLines(d)
+  if d._lines then return d._lines end
+  local t = vim.split(d.ref_text or "", "\n", { plain = true })
+  if t[#t] == "" then t[#t] = nil end
+  return t
+end
+
+-- the hunks of the block line l is in (the same joining as hunkAt)
+local function blockAt(d, line)
+  local a, b = nil, nil
+  local spans = {}
+  for _, h in ipairs(d.hunks) do
+    local s = math.max(1, h.buf_start)
+    spans[#spans + 1] = { s, h.type == "delete" and s or h.buf_start + h.buf_count - 1, h }
+  end
+  table.sort(spans, function(x, y) return x[1] < y[1] end)
+  local groups, cur = {}, nil
+  for _, sp in ipairs(spans) do
+    if cur and sp[1] <= cur.b + 1 then
+      cur.b = math.max(cur.b, sp[2]); table.insert(cur.hs, sp[3])
+    else
+      cur = { a = sp[1], b = sp[2], hs = { sp[3] } }
+      groups[#groups + 1] = cur
+    end
+  end
+  for _, g in ipairs(groups) do
+    if line >= g.a and line <= g.b then return g end
+  end
+  return nil
+end
+
+function M.info(buf, line)
+  local d = data(buf)
+  if not d then return nil end
+  local g = blockAt(d, line)
+  if not g then return nil end
+  local ref = refLines(d)
+  local old, new, kinds = {}, {}, {}
+  for _, h in ipairs(g.hs) do
+    kinds[h.type] = true
+    for i = h.ref_start, h.ref_start + h.ref_count - 1 do old[#old + 1] = ref[i] or "" end
+    if h.buf_count > 0 then
+      for _, t in ipairs(api.nvim_buf_get_lines(buf, h.buf_start - 1, h.buf_start - 1 + h.buf_count, false)) do
+        new[#new + 1] = t
+      end
+    end
+  end
+  local kind = (kinds.change or (kinds.add and kinds.delete)) and "change"
+    or kinds.add and "add" or "delete"
+  local key = g.hs[1].ref_start .. ":" .. g.hs[1].ref_count
+  return { kind = kind, first = g.a, last = g.b, old = old, new = new,
+    open = opened[buf] ~= nil and opened[buf][key] == true }
+end
+
+-- the opened changes' old lines, as virtual lines above them
+function M.paint(buf)
+  if not api.nvim_buf_is_valid(buf) then return end
+  api.nvim_buf_clear_namespace(buf, nsOld, 0, -1)
+  local keys = opened[buf]
+  local d = data(buf)
+  if not keys or not d then return end
+  local ref = refLines(d)
+  local last = api.nvim_buf_line_count(buf)
+  local live = {}
+  for _, h in ipairs(d.hunks) do
+    local key = h.ref_start .. ":" .. h.ref_count
+    if keys[key] then
+      live[key] = true
+      if h.ref_count > 0 then
+        local vl = {}
+        for i = h.ref_start, h.ref_start + h.ref_count - 1 do
+          local t = (ref[i] or ""):gsub("\t", string.rep(" ", vim.bo[buf].tabstop))
+          vl[#vl + 1] = { { t, "PlatoDiffOld" } }
+        end
+        -- a deletion's lines went AFTER buf_start; a change's are its own
+        local row, above
+        if h.type == "delete" then
+          if h.buf_start == 0 then row, above = 0, true
+          else row, above = math.min(h.buf_start, last) - 1, false end
+        else
+          row, above = h.buf_start - 1, true
+        end
+        pcall(api.nvim_buf_set_extmark, buf, nsOld, row, 0,
+          { virt_lines = vl, virt_lines_above = above })
+      end
+    end
+  end
+  -- a change undone or committed is no longer open
+  for k in pairs(keys) do if not live[k] then keys[k] = nil end end
+  if next(keys) == nil then opened[buf] = nil end
+end
+
+function M.expand(buf, line)
+  local d = data(buf)
+  if not d then return false end
+  local g = blockAt(d, line)
+  if not g then return false end
+  opened[buf] = opened[buf] or {}
+  local keys = opened[buf]
+  local first = g.hs[1].ref_start .. ":" .. g.hs[1].ref_count
+  local shut = keys[first] == true
+  for _, h in ipairs(g.hs) do keys[h.ref_start .. ":" .. h.ref_count] = (not shut) or nil end
+  M.paint(buf)
+  -- the frame after nvim has laid the new rows out
+  vim.schedule(function() require("plato.view").schedule(true) end)
+  return not shut
+end
+
+-- the lines of this buffer inside an opened change: line → true
+function M.opened(buf)
+  local keys = opened[buf]
+  local d = keys and data(buf)
+  if not d then return nil end
+  local out = {}
+  for _, h in ipairs(d.hunks) do
+    if keys[h.ref_start .. ":" .. h.ref_count] and h.buf_count > 0 then
+      for l = h.buf_start, h.buf_start + h.buf_count - 1 do out[l] = true end
+    end
+  end
+  return out
 end
 
 -- ── blame ──────────────────────────────────────────────────────────────

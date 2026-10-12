@@ -722,8 +722,11 @@ Singleton {
     // ── appearance ──
     // `pick` makes a text setting a button that opens terminus' picker
     // rather than a field to type into — see PickControl in the panel.
-    { key: "theme", section: "look", alias: "colours colors palette dark light scheme zenon daytime follow",
-      label: "Theme", type: "enum", optionsFrom: "themes", open: true, chipW: 208,
+    // ONE ROW with Follow Background's tone (the user asked): the tone's
+    // dropdown stands beside the theme only while the theme IS Follow
+    // Background (`also` + the tone's `onlyWhen`)
+    { key: "theme", section: "look", alias: "colours colors palette dark light scheme zenon daytime follow background tone auto",
+      label: "Theme", type: "enum", optionsFrom: "themes", also: ["followMode"], open: true, chipW: 208,
       help: "The palette every component paints with. Zenon is the shell's own and the default; the rest are files in themes/, and anything a theme leaves out is Zenon's. A theme you saved yourself can be deleted: point at it in the list and press Delete." },
     { key: "themeDay", section: "look", alias: "follow daytime the sun day light theme sunrise",
       label: "Follow Daytime by day", type: "enum", optionsFrom: "themesNoSun", open: true, chipW: 208,
@@ -920,7 +923,10 @@ Singleton {
       help: "How far past the screen the image is drawn — the room the arrival's zoom moves in." },
 
     // ── Follow Background: the theme made from the background ──
-    { key: "followMode", section: "paper", alias: "follow background wallpaper dynamic theme tone dark light auto sun daytime",
+    // drawn in the Theme row (`within`), and only while that row says
+    // Follow Background (`onlyWhen`: [key, value])
+    { key: "followMode", section: "look", within: "theme", onlyWhen: ["theme", "follow"],
+      alias: "follow background wallpaper dynamic theme tone dark light auto sun daytime",
       label: "Follow Background tone", type: "enum",
       options: [ { value: "auto",  label: "Auto" },
                  { value: "dark",  label: "Dark" },

@@ -290,6 +290,11 @@ Item {
     // see pendingMake.
     term.pendingMake = null;
     term.makeGuardRef.stop();
+    // out of a results page: the view it was opened from comes back with
+    // it — see putBackView. A directory with a record of its own still
+    // has the last word, once cwd changes below.
+    const backView = term.searchMode !== "" ? term.searchBackView : null;
+    term.searchBackView = null;
     term.searchMode = "";
     term.searchQuery = "";
     // Navigating out of results is leaving them behind, not going back: the
@@ -297,6 +302,7 @@ Item {
     // somewhere on purpose.
     term.searchBackCwd = "";
     term.searchBackSel = "";
+    term.putBackView(backView, true);
     term.millerStep(term.cwd, path);
     // Held across the cursor reset below — see `arriving`. Dropped the
     // instant there are real rows to be about, which is the seed if there is

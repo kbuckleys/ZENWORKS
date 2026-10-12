@@ -989,6 +989,24 @@ Item {
       function square(r, edge, m) {
         return (m.modifiers & Qt.ShiftModifier) ? V.fitAspect(r, edge, 1, tw, th) : r;
       }
+      // RIGHT-DRAG RESIZES from anywhere, as the region capture does: the
+      // corner nearest the pointer follows it. `p` in cropLayer's coordinates.
+      property var rr0: null
+      property point rp0
+      property string redge: ""
+      function rPress(p) {
+        const r = cropLayer.r, k = cropLayer.k;
+        cropLayer.rr0 = r;
+        cropLayer.rp0 = p;
+        cropLayer.redge = (p.x / k < r.x + r.w / 2 ? "l" : "r") + (p.y / k < r.y + r.h / 2 ? "t" : "b");
+      }
+      function rMove(p, m) {
+        if (!cropLayer.rr0) return;
+        const dx = (p.x - cropLayer.rp0.x) / cropLayer.k, dy = (p.y - cropLayer.rp0.y) / cropLayer.k;
+        const r = cropLayer.square(Cap.resizeRect(cropLayer.rr0, cropLayer.redge, dx, dy,
+                                                  cropLayer.tw, cropLayer.th), cropLayer.redge, m);
+        if (r.w >= 4 && r.h >= 4) ann.draft = r;
+      }
 
       Rectangle { x: 0; y: 0; width: parent.width; height: cropLayer.r.y * cropLayer.k; color: "#99000000" }
       Rectangle { x: 0; y: (cropLayer.r.y + cropLayer.r.h) * cropLayer.k; width: parent.width
@@ -1002,10 +1020,17 @@ Item {
       MouseArea {
         anchors.fill: parent
         cursorShape: Qt.CrossCursor
+        acceptedButtons: Qt.LeftButton | Qt.RightButton
         property real ax: 0
         property real ay: 0
-        onPressed: (m) => { keys.forceActiveFocus(); ax = m.x / cropLayer.k; ay = m.y / cropLayer.k; }
+        onPressed: (m) => {
+          keys.forceActiveFocus();
+          if (m.button === Qt.RightButton) { cropLayer.rPress(Qt.point(m.x, m.y)); return; }
+          ax = m.x / cropLayer.k; ay = m.y / cropLayer.k;
+        }
+        onReleased: cropLayer.rr0 = null
         onPositionChanged: (m) => {
+          if (cropLayer.rr0) { cropLayer.rMove(Qt.point(m.x, m.y), m); return; }
           const cx = m.x / cropLayer.k, cy = m.y / cropLayer.k;
           const r = cropLayer.square(Cap.rectOf(ax, ay, cx, cy, cropLayer.tw, cropLayer.th),
                                      (cx < ax ? "l" : "r") + (cy < ay ? "t" : "b"), m);
@@ -1055,12 +1080,15 @@ Item {
               : (grip.modelData === "l" || grip.modelData === "r") ? Qt.SizeHorCursor : Qt.SizeVerCursor
             property var r0: null
             property point p0
+            acceptedButtons: Qt.LeftButton | Qt.RightButton
             onPressed: (m) => {
               keys.forceActiveFocus();
+              if (m.button === Qt.RightButton) { grip.r0 = null; cropLayer.rPress(grip.mapToItem(cropLayer, m.x, m.y)); return; }
               grip.r0 = cropLayer.r;
               grip.p0 = grip.mapToItem(cropLayer, m.x, m.y);
             }
             onPositionChanged: (m) => {
+              if (cropLayer.rr0) { cropLayer.rMove(grip.mapToItem(cropLayer, m.x, m.y), m); return; }
               if (!grip.r0) return;
               const p = grip.mapToItem(cropLayer, m.x, m.y);
               const dx = (p.x - grip.p0.x) / cropLayer.k, dy = (p.y - grip.p0.y) / cropLayer.k;
@@ -1069,7 +1097,7 @@ Item {
                                                         cropLayer.tw, cropLayer.th), grip.modelData, m);
               if (r.w >= 4 && r.h >= 4) ann.draft = r;
             }
-            onReleased: grip.r0 = null
+            onReleased: { grip.r0 = null; cropLayer.rr0 = null; }
             // a double click on the box applies it
             onDoubleClicked: if (grip.body) ann.tool = ann.back
             Rectangle {

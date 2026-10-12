@@ -85,6 +85,10 @@ function M.apply()
   set("NonText", { fg = p.bright_black })
   -- a closed fold's count of lines, in the pill after its first line
   set("PlatoFoldChip", { fg = p.bright_black })
+  -- the line's last commit sits on a filled green chip (EditorRow): ground ink
+  set("PlatoBlame", { fg = p.black, nocombine = true })
+  -- what a change opened in place took away (git.lua expand)
+  set("PlatoDiffOld", { fg = p.red, nocombine = true })
   -- rainbow brackets (brackets.lua), a colour a level, round and round
   for i, c in ipairs({ p.blue, p.magenta, p.yellow, p.cyan, p.green, p.bright_red }) do
     set("PlatoRainbow" .. i, { fg = c })

@@ -217,6 +217,11 @@ module.exports = {
     t.eq("no also, no keys", T.alsoKeys({}), []);
     t.eq("a row drawn within another is never a row",
       T.filterSchema([{ key: "a", section: "look" }, { key: "b", section: "look", within: "a" }], "look", "").length, 1);
+    // `onlyWhen`: the theme's Follow Background tone, only under that theme
+    const tone = { key: "followMode", onlyWhen: ["theme", "follow"] };
+    t.eq("an also with no onlyWhen is always shown", T.alsoShown({ key: "fontWeight" }, () => ""), true);
+    t.eq("onlyWhen shows it under its value", T.alsoShown(tone, (k) => k === "theme" ? "follow" : ""), true);
+    t.eq("and hides it under any other", T.alsoShown(tone, () => "zenon"), false);
 
     // ── the file ────────────────────────────────────────────────────────
     // Only what has been CHANGED is written. A file holding every default

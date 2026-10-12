@@ -2196,6 +2196,9 @@ FloatingWindow {
                           required property var modelData
                           spec: modelData
                           value: (Oracle.revision, Oracle.get(modelData.key))
+                          // `onlyWhen` [key, value]: the theme's tone shows
+                          // only while the theme is Follow Background
+                          visible: (Oracle.revision, Ora.alsoShown(modelData, (k) => Oracle.get(k)))
                         }
                       }
                       // …then its numbers (the size). A NUMBER IN A ROW OF

@@ -245,12 +245,27 @@ FloatingWindow {
   property string editingColor: ""
   property string customTint: "#7a8cff"
   readonly property bool edited: Object.keys(Art.lookDiff(win.look)).length > 0 || win.crop !== null || win.straighten !== 0
+    || win.resizeK !== 1
+
+  // ── RESIZED ON SAVE ───────────────────────────────────────────────────
+  // A scale of what is saved — the crop when there is one, else the whole
+  // picture — applied by the bake's grab (grabToImage's target size), so a
+  // save, a conversion and a background all come out at it. A scale rather
+  // than a size: a crop drawn after it keeps the same proportion.
+  property real resizeK: 1
+  readonly property real outW: win.crop ? win.crop.w : win.tw
+  readonly property real outH: win.crop ? win.crop.h : win.th
+  function resizeTo(w) {
+    if (!(w > 0) || win.outW <= 0) return;
+    win.resizeK = Math.max(1 / win.outW, Math.min(1, w / win.outW));
+    if (Math.round(win.outW * win.resizeK) >= Math.round(win.outW)) win.resizeK = 1;
+  }
 
   // Worth asking about before it is dropped: a look, or a crop set up in the
   // edit panel. A box merely dragged out on the picture is a selection — it
   // goes with the picture, unasked, the way a selection does anywhere.
   readonly property bool precious: Object.keys(Art.lookDiff(win.look)).length > 0
-    || (win.crop !== null && win.cropStaged) || win.straighten !== 0
+    || (win.crop !== null && win.cropStaged) || win.straighten !== 0 || win.resizeK !== 1
 
   // In the middle of something that must not be thrown away — the manager
   // opens a second window rather than reuse this one.
@@ -271,6 +286,7 @@ FloatingWindow {
     win.cropping = false;
     win.cropStaged = false;
     win.straighten = 0;
+    win.resizeK = 1;
     win.editingColor = "";
   }
   function turn(d) { if (!win.stillOnly()) return; win.setLook("rotate", (win.look.rotate + d + 360) % 360); win.fitted = true; win.refit(true); }
@@ -281,13 +297,80 @@ FloatingWindow {
   readonly property bool isVid: Terminus.isVideo(Terminus.basename(win.path))
   readonly property var vid: vidLoader.item
   property bool muted: false
-  readonly property real nw: win.isVid ? (win.vid ? win.vid.vw : 0) : (win.img ? win.img.implicitWidth : 0)
-  readonly property real nh: win.isVid ? (win.vid ? win.vid.vh : 0) : (win.img ? win.img.implicitHeight : 0)
+  readonly property real nw: win.isVid ? (win.vid ? win.vid.vw : 0)
+    : win.natNow ? win.natNow.w : (win.img ? win.img.implicitWidth : 0)
+  readonly property real nh: win.isVid ? (win.vid ? win.vid.vh : 0)
+    : win.natNow ? win.natNow.h : (win.img ? win.img.implicitHeight : 0)
+
+  // ── A BIG PICTURE IS SHOWN FROM A SCREEN-SIZED DECODE FIRST ──────────
+  // Every still is asked for no bigger than `capPx` on either side — Qt
+  // scales it down while decoding (a jpeg far faster, at the DCT) and never
+  // up — and the stage, the step's ghost, the flight and the read-ahead all
+  // ask exactly that, so they share one cache entry (the size is part of
+  // the key; see lag.log's rule). A 15119x8504 picture was 514 MB of RGBA
+  // and a texture to match, uploaded on every visit; now it is one of at
+  // most `capPx` until it is zoomed past what that decode can show, when
+  // `sharp` decodes the whole file over it (user, 2026-10-11: "not fast
+  // enough at working with very high-res images").
+  //
+  // The picture's real size then comes from the file's header (`natDims`,
+  // magick identify -ping) rather than the decode, so zoom, crop, the pixel
+  // probe and every saved edit stay in the picture's own pixels.
+  readonly property int capPx: {
+    let m = 0;
+    for (const sc of Quickshell.screens) m = Math.max(m, sc.width, sc.height);
+    return Math.max(4096, Math.ceil(m * 2));
+  }
+  readonly property size stillAsk: win.vector ? Qt.size(Math.max(stage.width, stage.height) * 2, 0)
+    : Qt.size(win.capPx, win.capPx)
+  // this decode stopped at the cap — there is more of the picture than it holds
+  readonly property bool capped: !win.isVid && !win.vector && !win.animated && win.fallback === ""
+    && !!win.img && win.img.status === Image.Ready
+    && (win.img.implicitWidth >= win.capPx || win.img.implicitHeight >= win.capPx)
+  property var natDims: ({})
+  readonly property var natNow: win.capped ? (win.natDims[win.path] || null) : null
+  onCappedChanged: if (win.capped && !(win.path in win.natDims)) win.askNat(win.path)
+  function askNat(p) {
+    if (natProc.running) { natProc.again = true; return; }
+    natProc.forPath = p;
+    natProc.command = ["magick", "identify", "-ping", "-format", "%w %h %[EXIF:Orientation]\\n", p + "[0]"];
+    natProc.running = true;
+  }
+  Process {
+    id: natProc
+    property string forPath: ""
+    property bool again: false
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: {
+        const m = String(text || "").trim().split("\n")[0].match(/^(\d+)\s+(\d+)\s*(\d*)/);
+        const next = Object.assign({}, win.natDims);
+        if (m) {
+          const w = parseInt(m[1], 10), h = parseInt(m[2], 10), o = parseInt(m[3] || "1", 10);
+          // turned by its EXIF, as autoTransform shows it
+          next[natProc.forPath] = o >= 5 && o <= 8 ? { w: h, h: w } : { w: w, h: h };
+        } else if (win.img) {
+          // no answer: the decode's own size, so the picture still shows
+          next[natProc.forPath] = { w: win.img.implicitWidth, h: win.img.implicitHeight };
+        }
+        win.natDims = next;
+      }
+    }
+    onExited: if (natProc.again) { natProc.again = false; if (win.capped && !(win.path in win.natDims)) win.askNat(win.path); }
+  }
+  // Zoomed past what the decode holds: the whole file, over it. Latched for
+  // the picture, so zooming back out does not throw the decode away.
+  property string sharpFor: ""
+  readonly property bool sharpWanted: win.capped && !!win.natNow && !!win.img
+    && pic.width > (win.look.rotate % 180 === 0 ? win.img.implicitWidth : win.img.implicitHeight) * 1.05
+  onSharpWantedChanged: if (win.sharpWanted) win.sharpFor = win.path
   readonly property var turned: V.turnedSize(win.nw, win.nh, win.look.rotate)
   readonly property real tw: win.turned.w
   readonly property real th: win.turned.h
   readonly property bool loaded: win.isVid ? (win.vid !== null && win.nw > 0)
-    : (win.img !== null && win.img.status === Image.Ready && win.nw > 0)
+    : (win.img !== null && win.img.status === Image.Ready && win.nw > 0
+       // a capped decode waits for the picture's real size (natDims)
+       && (!win.capped || !!win.natNow))
   // Says so and answers false for a video: what is asked of it is for pictures.
   function stillOnly() {
     if (!win.isVid) return true;
@@ -769,8 +852,7 @@ FloatingWindow {
         win.sidecars = side;
         let dirs = [];
         if (d !== "") {
-          dirs = Terminus.sortEntries(all.filter((r) => r.isDir && !r.isHidden),
-                                      "name", false, false, true, null);
+          dirs = win.sortedDirs(all.filter((r) => r.isDir && !r.isHidden));
         }
         if (win.picked.length > 0)
           rows.sort((a, b) => win.picked.indexOf(a.path) - win.picked.indexOf(b.path));
@@ -833,8 +915,50 @@ FloatingWindow {
     return Terminus.sortEntries(rows, win.sortKey, win.sortKey !== "name", false, true, null);
   }
   function sortBy(key) { if (win.mgr) win.mgr.setSort(key); }
+
+  // ── THE DIRECTORIES IN THE SAME ORDER ─────────────────────────────────
+  // They kept to their names whatever the order said (user, 2026-10-11).
+  // Newest is their own time; Largest is what is IN them — `du`, asked once
+  // per directory and kept, in name order until it answers (terminus'
+  // "usage" order, which reads the `du` a row carries).
+  property var dirDu: ({})
+  function sortedDirs(dirs) {
+    const k = win.sortKey;
+    if (k === "size") {
+      const want = dirs.filter((r) => !(r.path in win.dirDu)).map((r) => r.path);
+      if (want.length > 0) { win.askDu(want); return Terminus.sortEntries(dirs, "name", false, false, true, null); }
+      return Terminus.sortEntries(dirs.map((r) => Object.assign({}, r, { du: win.dirDu[r.path] })),
+                                  "usage", true, false, true, null);
+    }
+    if (k === "time" || k === "taken") return Terminus.sortEntries(dirs, "time", true, false, true, null);
+    return Terminus.sortEntries(dirs, "name", false, false, true, null);
+  }
+  function askDu(paths) {
+    if (duProc.running) { duProc.again = true; return; }
+    duProc.command = ["du", "-sb", "--"].concat(paths);
+    duProc.running = true;
+  }
+  Process {
+    id: duProc
+    property bool again: false
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: {
+        const next = Object.assign({}, win.dirDu);
+        for (const line of String(text || "").split("\n")) {
+          const tab = line.indexOf("\t");
+          if (tab > 0) next[line.slice(tab + 1)] = parseInt(line.slice(0, tab), 10) || 0;
+        }
+        win.dirDu = next;
+        if (win.sortKey === "size") { win.reflow(); win.directories = win.sortedDirs(win.directories); }
+      }
+    }
+    onExited: if (duProc.again) { duProc.again = false; win.resort(); }
+  }
+
   function resort() {
     win.reflow();
+    if (win.directories.length > 0) win.directories = win.sortedDirs(win.directories);
     if (win.picked.length > 0 || win.allRows.length === 0) return;
     win.allRows = win.sorted(win.allRows);
     win.setRows(win.filtered(win.allRows));
@@ -933,6 +1057,7 @@ FloatingWindow {
       win.enterK = 0;
       win.resetEdit();
       win.fallback = "";
+      win.sharpFor = "";
       win.gifPaused = false;
       win.pixel = null;
       win.index = to;
@@ -1288,7 +1413,7 @@ FloatingWindow {
       cache: true
       autoTransform: true
       // as the stage's still asks — the size is part of the cache's key
-      sourceSize.width: 0
+      sourceSize: Qt.size(win.capPx, win.capPx)
       source: win.holdPaths[index] !== "" ? win.urlOf(win.holdPaths[index]) : ""
     }
   }
@@ -2078,12 +2203,15 @@ FloatingWindow {
     bakeLoader.active = true;
   }
 
+  // from the bake's start until the file is written — the Save button's
+  // working dots (terminus/BusyButton)
+  property bool saving: false
   function bake(dest, then) {
     if (win.fallback !== "") { win.say("this is a preview copy — the original cannot be edited here"); return; }
     if (bakeLoader.active) return;
     win.bakeDest = dest;
     win.bakeThen = then;
-    win.say("saving…");
+    win.saving = true;
     bakeLoader.active = true;
   }
   function baked(tmp) {
@@ -2096,8 +2224,9 @@ FloatingWindow {
     }
     const dest = win.bakeDest, then = win.bakeThen;
     bakeLoader.active = false;
-    if (tmp === "") { win.say("could not render the edit"); if (then) then(false); return; }
+    if (tmp === "") { win.saving = false; win.say("could not render the edit"); if (then) then(false); return; }
     win.run(["sh", "-c", 'magick "$1" -quality 92 "$2" && rm -f "$1"', "sh", tmp, dest], (code) => {
+      win.saving = false;
       if (code !== 0) { win.say("could not save to " + dest); if (then) then(false); return; }
       win.say("saved · " + dest.replace(Paths.home(), "~"));
       win.afterSave(dest);
@@ -2552,7 +2681,7 @@ FloatingWindow {
     Column {
       anchors.left: backBtn.visible ? backBtn.right : parent.left
       anchors.leftMargin: backBtn.visible ? 10 : 16
-      anchors.right: sortRow.visible ? sortRow.left : tools.left
+      anchors.right: sortRow.left
       anchors.rightMargin: 16
       anchors.verticalCenter: parent.verticalCenter
       spacing: 1
@@ -2595,33 +2724,9 @@ FloatingWindow {
     Row {
       id: sortRow
       anchors.right: tools.left
-      anchors.rightMargin: 16
-      anchors.verticalCenter: parent.verticalCenter
-      visible: bar.width >= 1080
-      spacing: 4
-      Head { anchors.verticalCenter: parent.verticalCenter; text: "Order"; rightPadding: 8 }
-      Repeater {
-        model: [{ k: "name", t: "Name" }, { k: "time", t: "Newest" }, { k: "size", t: "Largest" }]
-        delegate: Seg {
-          required property var modelData
-          anchors.verticalCenter: parent.verticalCenter
-          width: 76
-          height: 28
-          label: modelData.t
-          live: win.picked.length === 0
-          chosen: win.sortKey === modelData.k
-          onHit: win.sortBy(modelData.k)
-        }
-      }
-    }
-
-    Row {
-      id: tools
-      anchors.right: parent.right
       anchors.rightMargin: 12
       anchors.verticalCenter: parent.verticalCenter
-      spacing: 2
-
+      spacing: 4
       // How zoomed: terminus' meter (ZoomMeter.qml). The gallery's tiles on
       // terminus' own scale; a picture's zoom along its stops, which run on
       // a log scale (5% to 3200%) so 100% sits near the middle.
@@ -2652,7 +2757,28 @@ FloatingWindow {
             : tips.hide(zoomBox)
         }
       }
-      Sep { visible: zoomBox.visible }
+      Row {
+        anchors.verticalCenter: parent.verticalCenter
+        visible: bar.width >= 1080
+        spacing: 4
+        Segments {
+          anchors.verticalCenter: parent.verticalCenter
+          textSize: Zenon.px(13)
+          options: [["name", "Name"], ["time", "Newest"], ["size", "Largest"]]
+          current: win.sortKey
+          allowed: win.picked.length === 0 ? null : []
+          onChose: (v) => win.sortBy(v)
+        }
+      }
+    }
+
+    Row {
+      id: tools
+      anchors.right: parent.right
+      anchors.rightMargin: 12
+      anchors.verticalCenter: parent.verticalCenter
+      spacing: 2
+
       // ── the search ──────────────────────────────────────────────
       // A magnifier among the tools, in the gallery and on a picture, that
       // opens leftwards into the field when you search (`/`, ctrl+f, a
@@ -2862,6 +2988,12 @@ FloatingWindow {
     height: canvas.height - (win.full ? 0 : bar.height + strip.height)
     onWidthChanged: win.refit(false)
     onHeightChanged: win.refit(false)
+    // A step slides within the room, not under the edit panel: the stage
+    // does not clip (a zoomed picture runs on under the chrome), but the
+    // picture leaving and the one arriving were seen sliding through the
+    // panel's frost (user's capture, 2026-10-11). Only while a step plays,
+    // only with the panel open.
+    clip: panel.width > 0 && (win.ghost !== null || (win.enterDir !== 0 && win.enterK < 1))
 
     // ── what lies under the picture ─────────────────────────────────────
     // Fitted, it lifts off the window on a soft shadow; zoomed, it IS the
@@ -2927,7 +3059,7 @@ FloatingWindow {
       // for no size at all, missed, and decoded the whole picture again on
       // the GUI thread: every step of a 4–5K picture froze the shell for
       // 170–250 ms (lag.log, 2026-10-09; ~5 ms once it matched).
-      sourceSize.width: win.vector ? Math.max(stage.width, stage.height) * 2 : 0
+      sourceSize: win.stillAsk
       asynchronous: false
       cache: true
       mipmap: true
@@ -2994,6 +3126,21 @@ FloatingWindow {
           // frame mirrors after, so a mirrored one turns the other way here
           rotation: win.straighten * (win.look.mirror ? -1 : 1)
           scale: V.straightenScale(width, height, win.straighten)
+        }
+        // the whole file, over the capped decode, once zoomed past it — see
+        // capPx. Not cached: hundreds of megabytes are not kept for later.
+        Image {
+          id: sharpImg
+          anchors.fill: parent
+          rotation: imgLoader.rotation
+          scale: imgLoader.scale
+          source: win.sharpFor !== "" && win.sharpFor === win.path && win.capped ? win.stageUrl : ""
+          visible: sharpImg.status === Image.Ready && win.sharpWanted
+          fillMode: Image.Stretch
+          autoTransform: true
+          asynchronous: true
+          cache: false
+          smooth: win.vz < 3
         }
       }
       // a video, outside the Scene — no look is worn by one
@@ -3087,7 +3234,7 @@ FloatingWindow {
         mipmap: true
         // 0 is "as the file says"; a vector has no size of its own worth
         // trusting, so it is drawn big enough to zoom into
-        sourceSize.width: win.vector ? Math.max(stage.width, stage.height) * 2 : 0
+        sourceSize: win.stillAsk
         onStatusChanged: if (status === Image.Error) win.renderFallback()
       }
     }
@@ -3276,6 +3423,38 @@ FloatingWindow {
       readonly property real k: win.vz
       readonly property var r: win.crop || { x: 0, y: 0, w: win.tw, h: win.th }
 
+      // RIGHT-DRAG RESIZES from wherever the pointer is, as the region
+      // capture does (PicassoCapture): the corner nearest it follows, so the
+      // box is adjusted without finding a handle. A right click that does
+      // not travel is still the menu. `p` is in cropLayer's coordinates.
+      property var rr0: null
+      property point rp0
+      property string redge: ""
+      property bool rmoved: false
+      function rPress(p) {
+        cropLayer.rr0 = cropLayer.r;
+        cropLayer.rp0 = p;
+        cropLayer.rmoved = false;
+        const r = cropLayer.r, k = cropLayer.k;
+        cropLayer.redge = (p.x / k < r.x + r.w / 2 ? "l" : "r") + (p.y / k < r.y + r.h / 2 ? "t" : "b");
+      }
+      function rMove(p) {
+        if (!cropLayer.rr0) return;
+        if (!cropLayer.rmoved && Math.abs(p.x - cropLayer.rp0.x) < 4 && Math.abs(p.y - cropLayer.rp0.y) < 4) return;
+        cropLayer.rmoved = true;
+        const dx = (p.x - cropLayer.rp0.x) / cropLayer.k, dy = (p.y - cropLayer.rp0.y) / cropLayer.k;
+        let r = Cap.resizeRect(cropLayer.rr0, cropLayer.redge, dx, dy, win.tw, win.th);
+        const ratio = win.ratioValue(win.cropRatio);
+        if (ratio > 0) r = V.fitAspect(r, cropLayer.redge, ratio, win.tw, win.th);
+        if (r.w >= 4 && r.h >= 4) win.crop = r;
+      }
+      // true when it was a click (the menu's)
+      function rRelease() {
+        const click = cropLayer.rr0 !== null && !cropLayer.rmoved;
+        cropLayer.rr0 = null;
+        return click;
+      }
+
       // what is cut away, darkened
       Rectangle { x: 0; y: 0; width: parent.width; height: cropLayer.r.y * cropLayer.k; color: "#99000000" }
       Rectangle { x: 0; y: (cropLayer.r.y + cropLayer.r.h) * cropLayer.k; width: parent.width
@@ -3296,11 +3475,14 @@ FloatingWindow {
         onPressed: (m) => {
           keys.forceActiveFocus();
           drawing = m.button === Qt.LeftButton;
-          if (!drawing) { win.openMenu(mapToItem(null, m.x, m.y), false); return; }
+          if (!drawing) { cropLayer.rPress(Qt.point(m.x, m.y)); return; }
           ax = m.x / cropLayer.k; ay = m.y / cropLayer.k;
         }
+        onReleased: (m) => {
+          if (m.button === Qt.RightButton && cropLayer.rRelease()) win.openMenu(mapToItem(null, m.x, m.y), false);
+        }
         onPositionChanged: (m) => {
-          if (!drawing) return;
+          if (!drawing) { cropLayer.rMove(Qt.point(m.x, m.y)); return; }
           const cx = m.x / cropLayer.k, cy = m.y / cropLayer.k;
           let r = Cap.rectOf(ax, ay, cx, cy, win.tw, win.th);
           const ratio = win.ratioValue(win.cropRatio);
@@ -3358,13 +3540,14 @@ FloatingWindow {
               keys.forceActiveFocus();
               if (m.button === Qt.RightButton) {
                 grip.r0 = null;
-                win.openMenu(grip.mapToItem(null, m.x, m.y), true);
+                cropLayer.rPress(grip.mapToItem(cropLayer, m.x, m.y));
                 return;
               }
               grip.r0 = cropLayer.r;
               grip.p0 = grip.mapToItem(cropLayer, m.x, m.y);
             }
             onPositionChanged: (m) => {
+              if (cropLayer.rr0) { cropLayer.rMove(grip.mapToItem(cropLayer, m.x, m.y)); return; }
               if (!grip.r0) return;
               const p = grip.mapToItem(cropLayer, m.x, m.y);
               const dx = (p.x - grip.p0.x) / cropLayer.k, dy = (p.y - grip.p0.y) / cropLayer.k;
@@ -3374,7 +3557,11 @@ FloatingWindow {
               if (ratio > 0) r = V.fitAspect(r, grip.modelData, ratio, win.tw, win.th);
               if (r.w >= 4 && r.h >= 4) win.crop = r;
             }
-            onReleased: grip.r0 = null
+            onReleased: (m) => {
+              grip.r0 = null;
+              if (m.button === Qt.RightButton && cropLayer.rRelease())
+                win.openMenu(grip.mapToItem(null, m.x, m.y), true);
+            }
             Rectangle {
               visible: !grip.body
               anchors.centerIn: parent
@@ -3473,9 +3660,12 @@ FloatingWindow {
       onPaint: {
         const at = stage.pixelAt;
         if (!at || !win.img) return;
+        // the decode may be smaller than the picture (capPx): read it there
+        const src = sharpImg.visible ? sharpImg : win.img;
+        const k = win.nw > 0 ? src.implicitWidth / win.nw : 1;
         const ctx = getContext("2d");
         ctx.clearRect(0, 0, 1, 1);
-        ctx.drawImage(win.img, at.x, at.y, 1, 1, 0, 0, 1, 1);
+        ctx.drawImage(src, Math.floor(at.x * k), Math.floor(at.y * k), 1, 1, 0, 0, 1, 1);
         const d = ctx.getImageData(0, 0, 1, 1).data;
         win.pixel = { x: at.x, y: at.y, hex: V.pixelHex(d[0], d[1], d[2]) };
       }
@@ -4375,8 +4565,7 @@ FloatingWindow {
         // flying back to the gallery hands this the stage's own url, and a
         // different size is a cache miss, decoded whole on the GUI thread.
         // A thumbnail asked at 0 is decoded at its own small size.
-        sourceSize.width: win.vector && String(flyImg.source) === String(win.stageUrl)
-          ? Math.max(stage.width, stage.height) * 2 : 0
+        sourceSize: String(flyImg.source) === String(win.stageUrl) ? win.stillAsk : Qt.size(0, 0)
         asynchronous: false
         cache: true
         mipmap: true
@@ -4848,12 +5037,79 @@ FloatingWindow {
           Text {
             width: parent.width
             visible: win.cropping
-            text: "drag the box or its edges, or draw a new one · esc when done"
+            text: "drag the box or its edges, or draw a new one · right-drag resizes from anywhere · esc when done"
             color: Zenon.soft
             font.family: Zenon.face
             font.weight: Zenon.weight
             font.pixelSize: Zenon.px(12)
             wrapMode: Text.WordWrap
+          }
+
+          // ── resize ──────────────────────────────────────────────
+          Item { width: 1; height: 8 }
+          Item {
+            width: parent.width
+            height: sizeHead.height
+            Head { id: sizeHead; text: "Resize" }
+            Text {
+              anchors.right: parent.right
+              anchors.verticalCenter: sizeHead.verticalCenter
+              text: win.outW > 0 ? Math.round(win.outW) + " \u00d7 " + Math.round(win.outH)
+                + (win.resizeK !== 1 ? "  \u2192  " + Math.round(win.outW * win.resizeK) + " \u00d7 " + Math.round(win.outH * win.resizeK) : "")
+                : ""
+              color: win.resizeK !== 1 ? Zenon.cyan : Zenon.soft
+              font.family: Zenon.face
+              font.weight: Zenon.weight
+              font.pixelSize: Zenon.px(12)
+            }
+          }
+          Segments {
+            width: parent.width
+            even: true
+            textSize: Zenon.px(13)
+            options: [["1", "Original"], ["0.75", "75%"], ["0.5", "50%"], ["0.25", "25%"]]
+            current: String(win.resizeK)
+            onChose: (v) => win.resizeK = parseFloat(v)
+          }
+          // or a width of its own; the height follows the proportion
+          Row {
+            spacing: 8
+            Rectangle {
+              width: 96
+              height: 30
+              radius: Zenon.windowRadius
+              color: Zenon.wash(0.04)
+              border.width: 1
+              border.color: Zenon.border
+              TextInput {
+                id: sizeField
+                anchors.fill: parent
+                anchors.leftMargin: 10
+                anchors.rightMargin: 10
+                verticalAlignment: TextInput.AlignVCenter
+                text: win.outW > 0 ? String(Math.round(win.outW * win.resizeK)) : ""
+                validator: IntValidator { bottom: 1; top: 100000 }
+                color: Zenon.white
+                selectionColor: Zenon.cyan
+                selectedTextColor: Zenon.onAccent
+                font.family: Zenon.face
+                font.weight: Zenon.weight
+                font.pixelSize: Zenon.px(13)
+                font.features: { "tnum": 1 }
+                onAccepted: { win.resizeTo(parseInt(sizeField.text, 10)); keys.forceActiveFocus(); }
+                onActiveFocusChanged: if (!activeFocus) win.resizeTo(parseInt(sizeField.text, 10))
+                Keys.onEscapePressed: (e) => { e.accepted = true; keys.forceActiveFocus(); }
+              }
+              HeldRing { anchors.fill: parent; radius: parent.radius; z: 10; on: sizeField.activeFocus }
+            }
+            Text {
+              anchors.verticalCenter: parent.verticalCenter
+              text: "\u00d7  " + (win.outH > 0 ? Math.round(win.outH * win.resizeK) : "") + " px  \u00b7  in proportion"
+              color: Zenon.soft
+              font.family: Zenon.face
+              font.weight: Zenon.weight
+              font.pixelSize: Zenon.px(12)
+            }
           }
 
           // terminus' conversion and its targets — see convertTo
@@ -4955,9 +5211,11 @@ FloatingWindow {
         anchors.bottom: parent.bottom
         anchors.margins: 18
         spacing: 8
-        DialogButton { label: "Reset"; ink: Zenon.muted; ready: win.edited; onClicked: win.resetEdit() }
-        DialogButton { label: "Save New"; ink: Zenon.white; ready: win.edited || win.scratch; onClicked: win.saveNew() }
-        DialogButton { label: "Save"; ink: Zenon.cyan; primary: true; ready: win.edited; onClicked: win.save() }
+        DialogButton { label: "Reset"; ink: Zenon.muted; ready: win.edited && !win.saving; onClicked: win.resetEdit() }
+        DialogButton { label: "Save New"; ink: Zenon.white; ready: (win.edited || win.scratch) && !win.saving; onClicked: win.saveNew() }
+        // the save under way, as alexandria's install is shown
+        BusyButton { label: "Save"; ink: Zenon.cyan; primary: true; ready: win.edited
+                     busy: win.saving; busyText: "Saving\u2026"; onClicked: win.save() }
       }
 
       // a short window leaves the panel taller than it: the rail, in the
@@ -5264,7 +5522,7 @@ FloatingWindow {
   // what is converted is what is on screen.
   function convertTo(ext) {
     if (win.path === "" || !win.stillOnly()) return;
-    const withEdit = win.crop !== null || win.straighten !== 0 || Object.keys(Art.lookDiff(win.look)).length > 0;
+    const withEdit = win.edited;
     if (!withEdit) {
       win.run(Terminus.shArgv(Terminus.convertCommand([win.path], ext)), (code) => {
         win.say(code === 0 ? "converted to " + ext + " beside it" : "could not convert it");
@@ -6058,6 +6316,8 @@ FloatingWindow {
           autoTransform: true
           asynchronous: true
           cache: false
+          // grabbed smaller when resized — averaged down, not sampled
+          mipmap: win.resizeK < 1
           onStatusChanged: {
             if (status === Image.Ready) settle.start();
             else if (status === Image.Error) win.baked("");
@@ -6072,7 +6332,8 @@ FloatingWindow {
           const ok = bk.grabToImage((res) => {
             const tmp = Paths.runtimeDir() + "/picasso-view-" + Date.now() + ".png";
             win.baked(res.saveToFile(tmp) ? tmp : "");
-          }, Qt.size(bk.width, bk.height));
+          }, Qt.size(Math.max(1, Math.round(bk.width * win.resizeK)),
+                     Math.max(1, Math.round(bk.height * win.resizeK))));
           if (!ok) win.baked("");
         }
       }

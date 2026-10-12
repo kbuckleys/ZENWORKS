@@ -423,9 +423,26 @@ Item {
           if (thumb.status === Image.Ready && thumb.pooled && term.keepThumb)
             term.keepThumb(thumb.source);
           // the original, on screen: hold it (see the source above)
+          // ON THE NEXT TURN: an original already in Qt's cache is Ready
+          // while `source` is still being assigned, and writing heldOriginal
+          // (which `source` reads) then re-ran the binding inside itself —
+          // "Binding loop detected for property source" on coming back to a
+          // grid zoomed past the cache (2026-10-11). An owned Timer, not
+          // Qt.callLater: tiles are torn down with calls still queued.
           if (thumb.status === Image.Ready && tile.entry && thumb.original
-              && String(thumb.source).indexOf("file://" + Thumbs.dir()) !== 0)
-            thumb.heldOriginal = tile.entry.path;
+              && String(thumb.source).indexOf("file://" + Thumbs.dir()) !== 0) {
+            holdLater.path = tile.entry.path;
+            holdLater.restart();
+          }
+        }
+        Timer {
+          id: holdLater
+          interval: 0
+          property string path: ""
+          onTriggered: {
+            if (tile.entry && tile.entry.path === holdLater.path)
+              thumb.heldOriginal = holdLater.path;
+          }
         }
       }
     }

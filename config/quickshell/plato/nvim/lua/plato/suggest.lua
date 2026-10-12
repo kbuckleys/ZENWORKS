@@ -48,7 +48,11 @@ function M.missing(buf)
   local ft = vim.bo[buf].filetype
   if ft == "" then return nil end
   local lang = vim.treesitter.language.get_lang(ft) or ft
-  if pcall(vim.treesitter.language.add, lang) then return nil end
+  -- language.add RETURNS its failure (nil, "No parser for …") rather than
+  -- throwing it, so pcall alone said every language loaded and nothing was
+  -- ever offered (user, 2026-10-11: a .yaml)
+  local ok, loaded = pcall(vim.treesitter.language.add, lang)
+  if ok and loaded then return nil end
   if not buildable(lang) then return nil end
   return lang
 end

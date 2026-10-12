@@ -1725,10 +1725,23 @@ function ansiToRich(text, family) {
   let out = "";
   let open = 0;
   let i = 0;
+  // ── A NEWLINE TAKES THE FORMAT BEFORE IT, AND A BACKGROUND WITH IT ────
+  // Qt's rich text gives the line break the format of the character just
+  // before it, and a break wearing a background paints that background to
+  // the full width of the text and down through the lines after it: plato's
+  // code panels ran off the right of quick look and swallowed the heading
+  // under them (user's md.png, 2026-10-11). An unstyled zero-width space
+  // before every break gives the break nothing to inherit. Only once a
+  // background has been seen — the rest never needed it.
+  let bg = false;
+  const lines = (t) => {
+    const h = Strings.escapeHtml(t);
+    return bg ? h.replace(/\n/g, "\u200b\n") : h;
+  };
   while (i < src.length) {
     const esc = src.indexOf("\u001b[", i);
-    if (esc < 0) { out += Strings.escapeHtml(src.slice(i)); break; }
-    out += Strings.escapeHtml(src.slice(i, esc));
+    if (esc < 0) { out += lines(src.slice(i)); break; }
+    out += lines(src.slice(i, esc));
     const end = src.indexOf("m", esc);
     if (end < 0) { i = src.length; break; }
     const codes = src.slice(esc + 2, end).split(";").map((n) => parseInt(n, 10) || 0);
@@ -1748,6 +1761,7 @@ function ansiToRich(text, family) {
         out += "<span style=\"text-decoration:line-through;\">"; open++; k++;
       } else if (c === 48 && codes[k+1] === 2) {
         // a background: plato's rendered markdown (inline code, code panels)
+        bg = true;
         out += "<span style=\"background-color:rgb(" + (codes[k+2]|0) + ","
           + (codes[k+3]|0) + "," + (codes[k+4]|0) + ");\">";
         open++; k += 5;
@@ -4290,7 +4304,13 @@ function gitInk(state) {
 
 const GIT_MARK = {
   conflict: "U", deleted: "D", modified: "M",
-  staged: "+", untracked: "?", ignored: "○"
+  staged: "+", untracked: "?", ignored: "○",
+  // ── NOT IN A REPOSITORY AT ALL (user, 2026-10-11) ───────────────────
+  // With the mode on, the gutter is a column whether or not there is
+  // anything to say, and outside a repository it was an empty one — the
+  // mode looked like it had done nothing. A neutral dot says it asked, and
+  // git has no opinion here. Muted, by gitInk's default.
+  outside: "\u00b7"
 };
 
 // Reached through a function rather than as Terminus.GIT_MARK, for the reason

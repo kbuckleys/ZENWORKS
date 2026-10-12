@@ -26,6 +26,16 @@ Rectangle {
   // end, there while it holds text. Pressed, the text goes and `cleared`
   // tells the holder — one that searches on Return searches again on it.
   property bool clearable: false
+  // ── A SECRET, OR CODE (calypso's editor, 2026-10-12) ──────────────
+  // `masked`: drawn as dots, as a password field is, until the holder
+  // shows it; `mono`: in the monospaced face (a key, a code).
+  property bool masked: false
+  property bool mono: false
+  // A field holding a secret hands its copies to the holder instead of the
+  // clipboard: calypso's go out marked sensitive, so the clipboard history
+  // never keeps them (user, 2026-10-12). function(text) or null.
+  property var copyHook: null
+  readonly property string family: fld.mono ? Zenon.faceMono : Zenon.face
   signal cleared()
   function clear() { fldIn.text = ""; fld.cleared(); }
   // Where Tab goes from here. The card owns the ring — a field should not
@@ -64,7 +74,7 @@ Rectangle {
     visible: fldIn.text === ""
     text: fld.ghost
     color: Zenon.muted
-    font.family: Zenon.face
+    font.family: fld.family
     font.weight: Zenon.weight
     font.pixelSize: fld.textSize
   }
@@ -81,10 +91,10 @@ Rectangle {
     anchors.fill: fldIn
     verticalAlignment: Text.AlignVCenter
     visible: fld.overflows && !fldIn.activeFocus
-    text: fldIn.text
+    text: fld.masked ? "\u2022".repeat(fldIn.text.length) : fldIn.text
     elide: fld.elide
     color: Zenon.white
-    font.family: Zenon.face
+    font.family: fld.family
     font.weight: Zenon.weight
     font.pixelSize: fld.textSize
   }
@@ -101,9 +111,11 @@ Rectangle {
     color: Zenon.white
     selectionColor: Zenon.selBg
     selectedTextColor: Zenon.white
-    font.family: Zenon.face
+    font.family: fld.family
     font.weight: Zenon.weight
     font.pixelSize: fld.textSize
+    echoMode: fld.masked ? TextInput.Password : TextInput.Normal
+    passwordCharacter: "\u2022"
     clip: true
     // Before the specific handlers below, which is where Tab has to be
     // caught: a TextInput otherwise hands it to the scene's own focus chain,
@@ -111,6 +123,13 @@ Rectangle {
     Keys.onPressed: (e) => {
       if (e.key === Qt.Key_Tab) { e.accepted = true; fld.tabbed(); return; }
       if (e.key === Qt.Key_Backtab) { e.accepted = true; fld.backTabbed(); return; }
+      if (fld.copyHook && (e.matches(StandardKey.Copy) || e.matches(StandardKey.Cut))) {
+        e.accepted = true;
+        const t = fldIn.selectedText !== "" ? fldIn.selectedText : fldIn.text;
+        if (t !== "") fld.copyHook(t);
+        if (e.matches(StandardKey.Cut) && fldIn.selectedText !== "") fldIn.remove(fldIn.selectionStart, fldIn.selectionEnd);
+        return;
+      }
     }
     Keys.onReturnPressed: (e) => { e.accepted = true; fld.accepted(); }
     Keys.onEnterPressed: (e) => { e.accepted = true; fld.accepted(); }

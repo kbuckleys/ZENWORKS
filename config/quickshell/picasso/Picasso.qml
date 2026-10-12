@@ -231,6 +231,28 @@ Singleton {
     root.sortIndex = (root.sortIndex + 1) % root.sortModes.length;
   }
 
+  // ── what each monitor is actually showing ────────────────────────────
+  // monitor name -> path (or colour) once it is decoded and on screen, as
+  // PicassoDaemon reports it. `assignment` changes the instant something is
+  // applied; this changes when the picture arrives — what an Apply waits on.
+  property var shown: ({})
+  // the last picture a monitor could not show: { screen, path, at }
+  property var lastFailure: null
+  function noteShown(screenName, path) {
+    if (!screenName || root.shown[screenName] === path) return;
+    const next = Object.assign({}, root.shown);
+    next[screenName] = path;
+    root.shown = next;
+  }
+  function noteFailed(screenName, path) {
+    root.lastFailure = { screen: screenName, path: path, at: Date.now() };
+  }
+  // every one of these monitors shows `path` now
+  function showing(screenNames, path) {
+    for (const n of screenNames) if (root.shown[n] !== path) return false;
+    return true;
+  }
+
   function wallpaperFor(screenName) {
     const a = root.assignment;
     if (a[screenName]) return a[screenName];

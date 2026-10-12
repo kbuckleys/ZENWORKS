@@ -31,6 +31,8 @@ Rectangle {
   id: side
   // the terminus window (`term`, never `root` — see terminus-split notes)
   property var term: null
+  // the cursor's fill: delphi's hiFill (and alexandria's)
+  readonly property color hiFill: Zenon.alpha(Zenon.cyan, 0.12)
   // while Hyprland resizes the window for it, the sidebar is whatever
   // the window has gained (see sideKeepW); otherwise it slides on its own
   width: term.sideKeepW >= 0
@@ -152,7 +154,9 @@ Rectangle {
       // .prebuild) has not handed term its own properties yet
       readonly property var cur: term && term.sideAt ? term.sideAt : null
       visible: !!sideBar.cur && sideBar.cur.visible
-      color: Zenon.border
+      // delphi's highlight, as the rest of this column now is (user,
+      // 2026-10-11: the two sidebars look alike)
+      color: side.hiFill
 
       // mapToItem is a function call over geometry, not a property
       // read, so it is given the things that move to watch — the
@@ -241,7 +245,7 @@ Rectangle {
       // is written first — the leading heading wants no room above
       // it, and that is a different heading depending on what you
       // have.
-      SideHead { term: side.term
+      SideHead { term: side.term; ruled: false; ink: Zenon.muted
         label: "BOOKMARKS"
         visible: !!term && term.bookmarks.length > 0
         first: true
@@ -305,7 +309,7 @@ Rectangle {
       // picker, with its colour — but a sidebar entry that lists
       // nothing is a place you can go to find an empty room, and
       // the count beside each row is the promise this keeps.
-      SideHead { term: side.term
+      SideHead { term: side.term; ruled: false; ink: Zenon.muted
         label: "TAGS"
         visible: !!term && term.sideTags.length > 0
         first: !!term && term.bookmarks.length === 0
@@ -349,7 +353,7 @@ Rectangle {
       // Never empty now: Recents is built in and always here, so
       // unlike the sections above this one has no hidden state —
       // see allCollections.
-      SideHead { term: side.term
+      SideHead { term: side.term; ruled: false; ink: Zenon.muted
         label: "COLLECTIONS"
         visible: !!term && term.sideCollections.length > 0
         first: !!term && term.bookmarks.length === 0 && term.sideTags.length === 0
@@ -396,7 +400,7 @@ Rectangle {
 
       Item { width: 1; height: term.sideCollections.length === 0 ? 0 : 8 }
 
-      SideHead { term: side.term
+      SideHead { term: side.term; ruled: false; ink: Zenon.muted
         label: "DISKS"
         visible: !!term && term.disks.length > 0
         first: !!term && term.bookmarks.length === 0 && term.sideTags.length === 0
@@ -487,14 +491,14 @@ Rectangle {
     height: term.picking ? term.chromeRef.portalBar.height : 41
     opacity: sideFlick.opacity
     color: term.sidebarBg   // the body, as the sidebar is
-    Rectangle { width: parent.width; height: 1; color: Zenon.border }
+    // no rule over it: the sidebar has no dividers (user, 2026-10-11)
 
     // lit while you are in it, as the list's own rows are by the
     // sliding bar (which belongs to the list, so cannot come down here)
     Rectangle {
       anchors.fill: trashRow
       visible: !!term && term.inTrash && term.searchMode === ""
-      color: Zenon.border
+      color: side.hiFill
     }
     SideRow { term: side.term
       id: trashRow

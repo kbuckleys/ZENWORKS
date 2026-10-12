@@ -119,9 +119,10 @@ const list = [
   { keys: "li", title: "Language servers", run: (c) => c.client.cmd("checkhealth vim.lsp") },
 
   // ── git, through fugitive ─────────────────────────────────────────────
-  { keys: "gs", title: "Git status", run: (c) => c.client.cmd("Git") },
-  { keys: "gb", title: "Git blame", run: (c) => c.client.cmd("Git blame") },
-  { keys: "gl", title: "Git log", run: (c) => c.client.cmd("Git log --oneline") },
+  // each one a toggle: up again, it closes (confine.lua)
+  { keys: "gs", title: "Git status", run: (c) => c.client.cmd("lua require('plato.confine').toggle('status', 'Git')") },
+  { keys: "gb", title: "Git blame", run: (c) => c.client.cmd("lua require('plato.confine').toggle('blame', 'Git blame')") },
+  { keys: "gl", title: "Git log", run: (c) => c.client.cmd("lua require('plato.confine').toggle('log', 'Git log --oneline')") },
 
   // ── several cursors (multicursor.nvim; see its config file) ──────────
   { keys: "mn", title: "Add cursor at next match", run: (c) => c.client.cmd("lua require('multicursor-nvim').matchAddCursor(1)") },

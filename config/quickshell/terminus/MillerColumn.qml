@@ -264,6 +264,9 @@ Item {
       // room to say — but results are not a directory, and two of them can
       // share a name. See colFoundNarrow.
       showMeta: col.isLive && term.searchMode !== ""
+      // what the grid says under a tile, said at the row's end instead
+      // (user, 2026-10-11) — not where the metadata columns are showing
+      aside: colRow.showMeta ? "" : term.tileDetail(colRow.row, term.sortKey)
       whereOnly: col.isLive
 
       onChosen: (right, shift, ctrl) => {

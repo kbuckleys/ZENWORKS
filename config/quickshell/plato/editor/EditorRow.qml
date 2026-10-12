@@ -74,17 +74,30 @@ Item {
   }
 
   // ── git: a bar down the gutter's left edge ─────────────────────────
-  // green added, yellow changed; lines deleted here, a red wedge at the
-  // top of the line below them (see git.lua)
+  // green added, yellow changed, red where lines were deleted (on the line
+  // below them) — all the same bar (user, 2026-10-11). Hovered: the change
+  // in a bubble; clicked: opened in place (EditorView, git.lua expand).
   Rectangle {
-    visible: row.gitGutter && row.gutterW > 0 && !!row.info.v
+    visible: row.gitGutter && row.gutterW > 0 && (!!row.info.v || !!row.info.dv)
     x: 1
-    y: row.info.v === "d" ? 0 : 1
-    width: row.info.v === "d" ? 5 : 3
-    height: row.info.v === "d" ? 3 : row.cellH - 2
+    y: 1
+    width: 3
+    height: row.cellH - 2
     radius: 1.5
-    color: row.info.v === "a" ? Zenon.green : row.info.v === "c" ? Zenon.yellow : Zenon.red
+    color: row.info.dv ? Zenon.red : row.info.v === "a" ? Zenon.green
+      : row.info.v === "c" ? Zenon.yellow : Zenon.red
     opacity: 0.85
+  }
+  // A CHANGE OPENED IN PLACE: what it took away (rows of their own, `dv`)
+  // on a red wash, what it has now (`dx`) on a green one, the width of the
+  // row from the text's start
+  Rectangle {
+    visible: !!row.info.dv || !!row.info.dx
+    x: row.textX - 2
+    width: Math.max(0, row.width - x)
+    height: row.cellH
+    color: row.info.dv ? Zenon.red : Zenon.green
+    opacity: 0.12
   }
 
   // ── the gutter: a sign, then the number ────────────────────────────
@@ -394,17 +407,24 @@ Item {
   // fold's "⋯ N lines" is a quiet pill of its own.
   readonly property var vt: row.info.vt ? Array.from(row.info.vt) : null
   function sevInk(k) {
-    return k === "e" ? Zenon.red : k === "w" ? Zenon.yellow : k === "i" ? Zenon.blue : Zenon.cyan;
+    return k === "e" ? Zenon.red : k === "w" ? Zenon.yellow : k === "i" ? Zenon.blue
+      : k === "g" ? Zenon.green : Zenon.cyan;
   }
+  // A line's last commit (git.lua's blame, kind "g") is no diagnostic: it
+  // wears the path chip's shape instead, filled green (user, 2026-10-11).
   Rectangle {
     visible: row.vt !== null
+    readonly property bool commit: !!row.vt && row.vt[2] === "g"
     readonly property color ink: row.vt ? row.sevInk(row.vt[2]) : "transparent"
-    x: row.vt ? row.textX + (row.vt[0] - 0.5) * row.cellW : 0
-    width: row.vt ? (row.vt[1] - row.vt[0] + (row.vt[3] ? 0.5 : 1)) * row.cellW : 0
+    x: row.vt ? row.textX + (row.vt[0] - (commit ? 0 : 0.5)) * row.cellW - (commit ? 3 : 0) : 0
+    width: row.vt ? (row.vt[1] - row.vt[0] + (row.vt[3] ? 0.5 : commit ? 0 : 1)) * row.cellW + (commit ? 6 : 0) : 0
     y: 1
     height: row.cellH - 2
-    radius: height / 2
-    color: Qt.rgba(ink.r, ink.g, ink.b, 0.13)
+    radius: commit ? 5 : height / 2
+    // the commit's chip is filled: its text is in the ground's ink (theme.lua)
+    color: commit ? ink : Qt.rgba(ink.r, ink.g, ink.b, 0.13)
+    border.width: 0
+    border.color: Qt.rgba(ink.r, ink.g, ink.b, 0.40)
   }
   // ── A FOLD STARTS HERE ─────────────────────────────────────────────
   // The file tree's expander, exactly (terminus/EntryRow): nf-fa-circle_o

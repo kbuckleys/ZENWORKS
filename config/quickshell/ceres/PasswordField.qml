@@ -98,6 +98,9 @@ Item {
   // ask for a token, a key's passphrase, a host's password
   property string prompt: "input your password"
 
+  FontMetrics { id: dotFm; font.family: Zenon.face; font.weight: Zenon.weight; font.pixelSize: 15 + field.grow }
+  readonly property int maxDots: Math.max(8, Math.floor((field.width - 48) / (dotFm.advanceWidth("\u{F09DE}") + 5)))
+
   Item {
     id: entry
     width: parent.width
@@ -171,8 +174,11 @@ Item {
           font.pixelSize: 14 + field.grow
         }
 
+        // As many dots as fit the field, never more: a long passphrase ran
+        // its dots out past the field's ends (calypso's lock, 2026-10-12).
+        // Past that the row stays full and the caret keeps blinking.
         Repeater {
-          model: field.pw.length
+          model: Math.min(field.pw.length, field.maxDots)
           delegate: Text {
             anchors.verticalCenter: parent.verticalCenter
             // U+F09DE, past the BMP, written as its surrogate pair

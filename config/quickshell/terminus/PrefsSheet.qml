@@ -94,6 +94,7 @@ Item {
     // clear: the listing is cut away under it (see sheetHole)
     ground: "transparent"
     backdrop: term.sheetBackdrop   // the listing, frosted under the card
+    seamFrost: term.sheetSeam   // the bar's frost, carried over the seam
     splice: true
     onCardInkChanged: term.noteSheet("s1", cardInk, drawnX, drawnW, drawnY, drawnH)
     onDrawnXChanged: term.noteSheet("s1", cardInk, drawnX, drawnW, drawnY, drawnH)
@@ -229,6 +230,8 @@ Item {
         // so it is shown refusing rather than quietly doing nothing.
         PrefSeg { term: prefs.term
           options: ["columns", "list", "grid"]
+          segmented: true
+          labels: ({ columns: "Columns", list: "List", grid: "Grid" })
           current: term.viewMode
           allowed: term.viewRing
           onChose: (v) => term.setView(v)

@@ -129,6 +129,7 @@ function methods.input(p)
 end
 
 function methods.open(p)
+  require("plato.confine").toFile()
   vim.cmd.edit(vim.fn.fnameescape(p.path))
   view.schedule(true)
   return true
@@ -255,15 +256,33 @@ do
   })
 end
 
+-- in the file's window: never into the git status the cursor happens to be in
 function methods.bufShow(p)
-  if api.nvim_buf_is_valid(p.id) then api.nvim_set_current_buf(p.id) end
+  if api.nvim_buf_is_valid(p.id) then
+    require("plato.confine").toFile()
+    api.nvim_set_current_buf(p.id)
+  end
   return true
 end
 function methods.bufClose(p)
   if not api.nvim_buf_is_valid(p.id) then return true end
+  -- its side windows first: else :bdelete closes the file's window and
+  -- leaves the git status as the whole editor
+  if not vim.bo[p.id].modified or p.force then require("plato.confine").drop(p.id) end
   local ok, err = pcall(vim.cmd.bdelete, { args = { tostring(p.id) }, bang = p.force == true })
   if not ok then vim.notify(tostring(err):gsub("^.-(E%d+)", "%1"), vim.log.levels.ERROR) end
   return ok
+end
+
+-- a gutter bar: the change at a window's line, for the bubble; opened in
+-- place or shut (git.lua)
+function methods.hunk(p)
+  if not api.nvim_win_is_valid(p.win) then return vim.NIL end
+  return require("plato.git").info(api.nvim_win_get_buf(p.win), p.line) or vim.NIL
+end
+function methods.hunkExpand(p)
+  if not api.nvim_win_is_valid(p.win) then return false end
+  return require("plato.git").expand(api.nvim_win_get_buf(p.win), p.line)
 end
 
 -- ── for the picker and the leader menu ─────────────────────────────────
@@ -306,6 +325,7 @@ end
 -- it is passed over, and said so. Answers the buffers, in the order given,
 -- so plato can put their tabs where they were dropped.
 function methods.dropped(p)
+  require("plato.confine").toFile()
   local ids, skipped = {}, 0
   for _, path in ipairs(p.paths or {}) do
     if vim.fn.isdirectory(path) == 1 then skipped = skipped + 1
@@ -391,6 +411,7 @@ end
 
 -- open a file, optionally at a line and column (1-based), as grep's results do
 function methods.openAt(p)
+  require("plato.confine").toFile()
   vim.cmd.edit(vim.fn.fnameescape(p.path))
   if p.line then
     local last = api.nvim_buf_line_count(0)

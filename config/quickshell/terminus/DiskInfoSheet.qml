@@ -122,6 +122,7 @@ Rectangle {
     // clear: the listing is cut away under it (see sheetHole)
     ground: "transparent"
     backdrop: term.sheetBackdrop   // the listing, frosted under the card
+    seamFrost: term.sheetSeam   // the bar's frost, carried over the seam
     splice: true
     onCardInkChanged: term.noteSheet("s5", cardInk, drawnX, drawnW, drawnY, drawnH)
     onDrawnXChanged: term.noteSheet("s5", cardInk, drawnX, drawnW, drawnY, drawnH)

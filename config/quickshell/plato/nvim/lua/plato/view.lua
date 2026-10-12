@@ -364,7 +364,7 @@ end
 -- Highlights, signs and end-of-line virtual text, from any namespace — which
 -- is how diagnostics arrive, and how any plugin that marks text will.
 local function extmarks(buf, top, bot)
-  local deco, signs, virt, conceal = {}, {}, {}, {}
+  local deco, signs, virt, conceal, vlines = {}, {}, {}, {}, {}
   local marks = api.nvim_buf_get_extmarks(buf, -1, { top, 0 }, { bot, -1 },
     { details = true, overlap = true })
   for _, m in ipairs(marks) do
@@ -398,11 +398,18 @@ local function extmarks(buf, top, bot)
       virt[row] = virt[row] or {}
       for _, chunk in ipairs(d.virt_text) do table.insert(virt[row], chunk) end
     end
+    -- whole rows of virtual text, above or below the line (git.lua's opened
+    -- changes): nvim gives them screen rows, so they are rows here too
+    if d.virt_lines and row >= top and row <= bot then
+      vlines[row] = vlines[row] or { above = {}, below = {} }
+      local into = d.virt_lines_above and vlines[row].above or vlines[row].below
+      for _, vl in ipairs(d.virt_lines) do into[#into + 1] = vl end
+    end
   end
   for _, list in pairs(deco) do
     table.sort(list, function(a, b) return a[4] < b[4] end)
   end
-  return deco, signs, virt, conceal
+  return deco, signs, virt, conceal, vlines
 end
 
 -- ── spans ───────────────────────────────────────────────────────────────
@@ -572,7 +579,7 @@ local function build(win, isCurrent, mode, margin)
   local hlTop = math.max(0, top - margin)
   local hlBot = math.min(last - 1, bot + margin * 2)
   local tsPaints, tsConceal, tsHidden = hl.treesitter(buf, hlTop, hlBot)
-  local deco, signs, virt, xConceal = extmarks(buf, hlTop, hlBot)
+  local deco, signs, virt, xConceal, vlines = extmarks(buf, hlTop, hlBot)
   local mdLines = md and mdm.compute(buf, hlTop, hlBot) or {}
   local mdRaw = md and mdm.rawLine()
   local found = searchMatches(buf, top, bot, isCurrent and view.lnum - 1 or -1, view.col)
@@ -657,6 +664,8 @@ local function build(win, isCurrent, mode, margin)
   local clicks = md and {} or nil
   -- git's marks for this buffer (git.lua): a bar down the gutter's edge
   local vcs = require("plato.git").marks(buf)
+  -- the lines of the changes opened in place (git.lua expand)
+  local vopen = vcs and require("plato.git").opened(buf)
   -- the cursor's cell, and which character of its row's text that is: the
   -- same number unless a wide character comes before it on the row
   local cursorRow, cursorCol, cursorChar = 0, 0, 0
@@ -665,6 +674,25 @@ local function build(win, isCurrent, mode, margin)
     local vc = vim.fn.virtcol(".", 1)
     local onTab = api.nvim_get_current_line():sub(view.col + 1, view.col + 1) == "\t"
     ccolAbs = ((mode == "n" and onTab) and vc[2] or vc[1]) - 1
+  end
+
+  -- one row of virtual text belonging to line l (0-based): no number, its
+  -- own k (negative: never a piece of the line), `dv` "a" above it or "b"
+  -- below. Chunks keep their groups; tabs are spaces already (git.lua).
+  local function virtRow(l, k, chunks, side)
+    local s, base, nc = "", {}, 0
+    for _, ch in ipairs(chunks) do
+      local t, g = ch[1] or "", ch[2]
+      if type(g) == "table" then g = g[#g] end
+      local w = cellWidth(t)
+      for c = nc, nc + w - 1 do base[c] = g end
+      s, nc = s .. t, nc + w
+    end
+    local c0 = wrap and 0 or view.leftcol
+    local c1 = math.min(nc, c0 + width)
+    local piece = c1 > c0 and cellSlice(s, c0, c1) or ""
+    return { n = l + 1, k = k, t = piece, f = false, dv = side,
+      s = c1 > c0 and charSpans(piece, spans(base, {}, {}, c0, c1)) or {} }
   end
 
   -- ── THE LINES, AS ROWS ─────────────────────────────────────────────────
@@ -720,6 +748,17 @@ local function build(win, isCurrent, mode, margin)
         -- last line, and the loop's own step moves past it
         l = vim.fn.foldclosedend(l + 1) - 1
       else
+        -- VIRTUAL LINES above it: on the top line, only the 'topfill' of
+        -- them nvim scrolled into view
+        local vls = vlines[l]
+        if vls and #vls.above > 0 then
+          local list = vls.above
+          local skip = (live and l == top) and math.max(0, #list - (view.topfill or 0)) or 0
+          for j = skip + 1, #list do
+            if #rows >= height then break end
+            rows[#rows + 1] = virtRow(l, -j, list[j], "a")
+          end
+        end
         local line = api.nvim_buf_get_lines(buf, l, l + 1, false)[1] or ""
         -- a :s being typed: the line as it would become (subst.lua)
         local subLit
@@ -849,11 +888,13 @@ local function build(win, isCurrent, mode, margin)
               local w = math.min(full, rowEnd - ncells)
               if w <= 0 then pill = pill and { pill[1], pill[2], pill[3], true }; break end
               -- a diagnostic sits in a pill of its severity's colour
-              local sev = type(g) == "string" and g:match("^DiagnosticVirtualText(%a+)")
+              -- (and a line's last commit, from git.lua's blame, in a green chip)
+              local sev = type(g) == "string"
+                and (g == "PlatoBlame" and "Blame" or g:match("^DiagnosticVirtualText(%a+)"))
               if sev then
                 local lead = #(s:match("^%s*"))
                 if lead < w then
-                  local kind = ({ Error = "e", Warn = "w", Info = "i", Hint = "h" })[sev] or "h"
+                  local kind = ({ Error = "e", Warn = "w", Info = "i", Hint = "h", Blame = "g" })[sev] or "h"
                   if pill then pill[2] = ncells + w
                   else pill = { ncells + lead, ncells + w, kind, false } end
                 end
@@ -934,11 +975,18 @@ local function build(win, isCurrent, mode, margin)
             s = charSpans(piece, spans(base, dl, ol, c0, c1)),
             g = sign and { sign[1], sign[2] and hl.style(sign[2]) or 0 } or nil,
             v = vcs and vcs[l + 1] or nil,
+            dx = (vopen and vopen[l + 1]) and 1 or nil,
             ig = (guides and k == 0 and not (wrap and from > 0)) and guideCols(l + 1, wrap and 0 or from) or nil,
             m = m, sl = slc, vt = vt,
             fo = (opensFold and k == 0 and not (wrap and from > 0)) and 1 or nil,
             md = mdl and mdRow(mdl, k, pieces, wrap and 0 or from, mdRaw and live and isCurrent and l == view.lnum - 1) or nil,
           }
+        end
+        if vls and #vls.below > 0 then
+          for j = 1, #vls.below do
+            if #rows >= height then break end
+            rows[#rows + 1] = virtRow(l, -100 - j, vls.below[j], "b")
+          end
         end
       end
       l = l + 1
@@ -996,9 +1044,11 @@ local function build(win, isCurrent, mode, margin)
       if rows[i].n > 0 then
         local r = rows[i]
         nextL = r.f and vim.fn.foldclosedend(r.n) or r.n
-        if not r.f then
+        -- a virtual row above a line the window did not reach: that line next
+        if r.dv == "a" then nextL = r.n - 1
+        elseif not r.f and not r.dv then
           for j = i, 1, -1 do
-            if rows[j].n ~= r.n then break end
+            if rows[j].n ~= r.n or rows[j].dv then break end
             shownOfLast = shownOfLast + 1
           end
           -- the top line shows from skipcol: those rows came first
@@ -1060,7 +1110,7 @@ local function signature(row)
     .. "\1" .. vim.json.encode(row.s) .. "\1" .. vim.json.encode(row.g or false)
     .. "\1" .. (row.v or "") .. "\1" .. (row.ig and table.concat(row.ig, ",") or "")
     .. "\1" .. vim.json.encode({ row.m or false, row.sl or false, row.vt or false, row.fc or false,
-      row.md or false, row.fo or false })
+      row.md or false, row.fo or false, row.dv or false, row.dx or false })
 end
 
 -- ── the editor window ───────────────────────────────────────────────────
@@ -1118,17 +1168,21 @@ local function floats(mode)
 end
 
 -- ── the open buffers: plato's tabs ─────────────────────────────────────
--- Every listed buffer, in nvim's order, sent only when something about the
+-- Every file buffer, in nvim's order, sent only when something about the
 -- list changed — a buffer opened or closed, renamed, modified or saved, or
--- another one made current.
+-- another one made current. Side windows' buffers (fugitive's, help) are
+-- not tabs, and the current tab is the file window's even while the cursor
+-- is in one of them (confine.lua).
 --   { id, name, path, modified, current, pin? }
 local sentBuffers = ""
 local function buffers()
-  local cur = api.nvim_win_get_buf(editorWindow())
+  local confine = require("plato.confine")
+  local fw = confine.fileWin()
+  local cur = api.nvim_win_get_buf(fw or editorWindow())
   local pins = require("plato.pins").numbers()
   local out = {}
   for _, b in ipairs(api.nvim_list_bufs()) do
-    if vim.bo[b].buflisted then
+    if confine.isTab(b) then
       local full = api.nvim_buf_get_name(b)
       out[#out + 1] = {
         id = b,

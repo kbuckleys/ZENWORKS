@@ -509,6 +509,39 @@ Singleton {
     return true;
   }
 
+  // ── A TOOL ANOTHER APP NEEDS, INSTALLED WHEN IT IS ASKED FOR ───────────
+  // Delphi's forge tools (gh, glab, stow, openssh) and calypso's vault CLIs
+  // (rbw, op, keepassxc…): installed when the thing that needs one is
+  // chosen, not up front. Through here, so the app never runs pacman or asks
+  // for a password itself — Ceres' own password card, its own log.
+  //
+  //   install(pkg, why, done) → whether Ceres took it; done(ok) once it ends
+  //                              (pkg: a name, or a list of them)
+  //   installing               { pkg, pkgs } while one is out, else null
+  //
+  // Lifted out of delphi/DelphiManager (installTool, 2026-10-11) when
+  // calypso wanted the same.
+  property var installing: null
+  property var _installDone: null
+  function install(pkg, why, done) {
+    if (root.txBusy || root.installing) return false;
+    // one package, or several at once (calypso's QR scan: zbar grim slurp)
+    const pkgs = Array.isArray(pkg) ? pkg : [pkg];
+    root.installing = { pkg: pkgs.join(" "), pkgs: pkgs };
+    root._installDone = done || null;
+    const asked = root.request([["-S", "--needed"].concat(pkgs)], "Install " + pkgs.join(", ") + (why ? " — " + why : ""), pkgs.length);
+    if (!asked) { root.installing = null; root._installDone = null; }
+    return asked;
+  }
+  onTxStateChanged: {
+    if (!root.installing) return;
+    if (root.txState !== "done" && root.txState !== "failed") return;
+    const done = root._installDone;
+    root.installing = null;
+    root._installDone = null;
+    if (done) done(root.txState === "done");
+  }
+
   // ── THE PASSWORD, REMEMBERED THE WAY SUDO REMEMBERS IT ─────────────────
   // sudo keeps a password good for five minutes after it was last used, but
   // keyed to the process that asked (no terminal: its parent pid), and every

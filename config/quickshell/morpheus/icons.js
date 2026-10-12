@@ -637,7 +637,11 @@ const APPS = {
   // U+F031, the font book
   "alexandria": "\uF031",
   // U+F419, the git client
-  "delphi": "\uF419"
+  "delphi": "\uF419",
+  // U+EB11, the password manager
+  "calypso": "\uEB11",
+  // U+F0B95, the browser
+  "iris": "\uDB82\uDF95"
 };
 
 // The glyph for a launcher entry, or "" when nothing claims it. `names` is

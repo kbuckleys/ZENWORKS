@@ -990,8 +990,8 @@ FloatingWindow {
       Column {
         anchors.left: parent.left
         anchors.leftMargin: 22
-        anchors.right: headTools.left
-        anchors.rightMargin: 16
+        anchors.right: parent.right
+        anchors.rightMargin: 32 + headTools.implicitWidth
         anchors.verticalCenter: parent.verticalCenter
         spacing: 2
         Text {
@@ -1021,55 +1021,20 @@ FloatingWindow {
       // Whatever is not there takes no room: the bookmark on an opened file
       // (it cannot be bookmarked), the size meter on Info (nothing to size).
       // Anchored side by side, a hidden one left its hole (user, 2026-10-09).
+      // Laid out from a FIXED right edge: a Row that shrank to its content
+      // jumped right as a whole the moment the meter hid, then its children
+      // glided back from where they had been (segments-jump.mp4, 2026-10-11).
+      // So the row is wide and right-to-left — children listed right first —
+      // and only what stood beside a hidden tool moves.
       Row {
         id: headTools
         anchors.right: parent.right
         anchors.rightMargin: 16
+        width: parent.width / 2
+        layoutDirection: Qt.RightToLeft
         anchors.verticalCenter: parent.verticalCenter
         spacing: 12
         move: Transition { NumberAnimation { properties: "x"; duration: Zenon.fast; easing.type: Zenon.ease } }
-
-        // How large: terminus' meter (ZoomMeter.qml), as picasso's bar has it —
-        // the sample's size on Specimen, the cells on Glyphs
-        Item {
-          id: zoomBox
-          anchors.verticalCenter: parent.verticalCenter
-          visible: win.page !== "info"
-          width: zoomMeter.implicitWidth + 8
-          height: 32
-          ZoomMeter {
-            id: zoomMeter
-            anchors.centerIn: parent
-            value: win.zoomAt
-            onSeek: (f) => win.zoomSeek(f)
-            onStep: (d) => win.zoom(d)
-            onReset: win.zoom(0)
-          }
-          HoverHandler {
-            onHoveredChanged: hovered
-              ? tips.show(zoomBox, (win.page === "glyphs" ? "Glyph size  \u00b7  " + win.cell : "Sample size  \u00b7  " + win.size) + "px", "ctrl + \u2212 0")
-              : tips.hide(zoomBox)
-          }
-        }
-
-        // the pages: ONE control, three halves — terminus/Segments (the
-        // suite's switch, since 2026-10-11): one border, a hairline between,
-        // one highlight that slides to the page you are on
-        Segments {
-          id: tabs
-          anchors.verticalCenter: parent.verticalCenter
-          height: 32
-          textSize: Zenon.px(16)
-          ink: Zenon.keyInk
-          options: win.pages
-          current: win.page
-          onChose: (v) => win.setPage(v)
-          onPointed: (v, at, inside) => {
-            const i = win.pages.findIndex((p) => p[0] === v);
-            if (inside && i >= 0) tips.show(at, win.pages[i][1], "ctrl " + (i + 1));
-            else tips.hide(at);
-          }
-        }
 
         Rectangle {
           id: favBtn
@@ -1094,6 +1059,48 @@ FloatingWindow {
             hoverEnabled: true
             onClicked: win.toggleFav()
             onContainsMouseChanged: containsMouse ? tips.show(favBtn, win.fav ? "Remove bookmark" : "Bookmark", "ctrl s") : tips.hide(favBtn)
+          }
+        }
+
+        // the pages: ONE control, three halves — terminus/Segments (the
+        // suite's switch, since 2026-10-11): one border, a hairline between,
+        // one highlight that slides to the page you are on
+        Segments {
+          id: tabs
+          anchors.verticalCenter: parent.verticalCenter
+          height: 32
+          textSize: Zenon.px(16)
+          ink: Zenon.keyInk
+          options: win.pages
+          current: win.page
+          onChose: (v) => win.setPage(v)
+          onPointed: (v, at, inside) => {
+            const i = win.pages.findIndex((p) => p[0] === v);
+            if (inside && i >= 0) tips.show(at, win.pages[i][1], "ctrl " + (i + 1));
+            else tips.hide(at);
+          }
+        }
+
+        // How large: terminus' meter (ZoomMeter.qml), as picasso's bar has it —
+        // the sample's size on Specimen, the cells on Glyphs
+        Item {
+          id: zoomBox
+          anchors.verticalCenter: parent.verticalCenter
+          visible: win.page !== "info"
+          width: zoomMeter.implicitWidth + 8
+          height: 32
+          ZoomMeter {
+            id: zoomMeter
+            anchors.centerIn: parent
+            value: win.zoomAt
+            onSeek: (f) => win.zoomSeek(f)
+            onStep: (d) => win.zoom(d)
+            onReset: win.zoom(0)
+          }
+          HoverHandler {
+            onHoveredChanged: hovered
+              ? tips.show(zoomBox, (win.page === "glyphs" ? "Glyph size  \u00b7  " + win.cell : "Sample size  \u00b7  " + win.size) + "px", "ctrl + \u2212 0")
+              : tips.hide(zoomBox)
           }
         }
       }
@@ -1977,58 +1984,15 @@ FloatingWindow {
         // is out the button becomes the shell's working dots and what is
         // going on — "Installing 4 families…" — and grows or shrinks to fit
         // it, one shape turning into the other rather than a swap.
-        Item {
+        BusyButton {
           id: openSlot
           visible: !win.picking
           anchors.verticalCenter: parent.verticalCenter
-          width: win.installing ? busyPill.implicitWidth : openBtn.implicitWidth
-          height: 28
-          Behavior on width { NumberAnimation { duration: Zenon.normal; easing.type: Easing.OutCubic } }
-          DialogButton {
-            id: openBtn
-            anchors.right: parent.right
-            label: "Open a font\u2026"
-            opacity: win.installing ? 0 : 1
-            visible: opacity > 0
-            Behavior on opacity { NumberAnimation { duration: Zenon.fast } }
-            onClicked: win.chooseFile()
-          }
-          Rectangle {
-            id: busyPill
-            anchors.right: parent.right
-            implicitWidth: busyRow.implicitWidth + 34
-            width: parent.width
-            height: 28
-            radius: 4
-            clip: true
-            color: Zenon.alpha(win.mgr && win.mgr.busyKind === "remove" ? Zenon.red : Zenon.cyan, 0.08)
-            border.width: 1
-            border.color: Zenon.alpha(win.mgr && win.mgr.busyKind === "remove" ? Zenon.red : Zenon.cyan, 0.4)
-            opacity: win.installing ? 1 : 0
-            visible: opacity > 0
-            Behavior on opacity { NumberAnimation { duration: Zenon.fast } }
-            Row {
-              id: busyRow
-              anchors.centerIn: parent
-              spacing: 10
-              Working {
-                anchors.verticalCenter: parent.verticalCenter
-                running: win.installing
-                ink: win.mgr && win.mgr.busyKind === "remove" ? Zenon.red : Zenon.cyan
-                dot: 5
-                gap: 4
-              }
-              Text {
-                id: busyText
-                anchors.verticalCenter: parent.verticalCenter
-                text: win.busyShown
-                color: win.mgr && win.mgr.busyKind === "remove" ? Zenon.red : Zenon.cyan
-                font.family: Zenon.face
-                font.weight: Font.Bold
-                font.pixelSize: Zenon.px(15)
-              }
-            }
-          }
+          label: "Open a font\u2026"
+          busy: win.installing
+          busyText: win.busyShown
+          busyInk: win.mgr && win.mgr.busyKind === "remove" ? Zenon.red : Zenon.cyan
+          onClicked: win.chooseFile()
         }
         DialogButton {
           visible: win.removable.length > 0 && !win.picking && !win.installing

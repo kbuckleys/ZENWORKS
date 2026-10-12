@@ -120,7 +120,7 @@ Variants {
     readonly property bool introReady: surface.framed
       // no background set is a legitimate resting state, not something to wait on
       && (surface.want === "" || surface.solid !== ""
-          || surface.front.status === Image.Ready)
+          || surface.front.showing)
 
     onIntroReadyChanged: if (surface.introReady) surface.playIntro()
 
@@ -164,6 +164,18 @@ Variants {
 
     onWantChanged: surface.load()
 
+    // ── WHAT THIS MONITOR IS SHOWING, told to the store ─────────────────
+    // So whoever applied a background can wait for it to be on screen (the
+    // card's Apply turns into working dots until it is) rather than for the
+    // assignment, which is instant and says nothing about a decode.
+    readonly property string onScreen: surface.solid !== "" ? surface.want
+      : surface.front.showing ? surface.front.path : ""
+    onOnScreenChanged: Picasso.noteShown(surface.screenName, surface.onScreen)
+    function failed(img) {
+      if (img.status === Image.Error && img.path !== "" && img.path === surface.want)
+        Picasso.noteFailed(surface.screenName, img.path);
+    }
+
     function load() {
       // Asked of `want` itself, not of `solid`: this runs from onWantChanged,
       // which can fire before the binding on `solid` has caught up.
@@ -192,7 +204,7 @@ Variants {
       // url wouldn't reload and ready() would never fire, so the flip stalls
       // and the old background stays — looks like picasso refused the pick.
       if (surface.want === backSrc) {
-        if (surface.back.status === Image.Ready) {
+        if (surface.back.showing) {
           // back already decoded, just flip to it (with zoom)
           if (surface._initialLoadDone) {
             if (surface.back === imgA) imgA._pendingZoom = true;
@@ -231,9 +243,16 @@ Variants {
       img.source = path === "" ? "" : Strings.fileUrl(path);
     }
 
-    // flip only once the incoming image has actually decoded
+    // Flip only once the incoming image has actually decoded — and only an
+    // image that IS the one wanted. A frame decodes again whenever its size
+    // changes (a span lays the picture across the whole desk, a fit or a
+    // turn reshapes the frame), and that includes the frame holding the
+    // picture being replaced: its second "ready" flipped the OLD background
+    // back to the front a moment after the new one arrived (user's capture,
+    // 2026-10-11) — the pick seemed refused, and picking it again did nothing.
     function ready(img) {
-      if (img === surface.back && img.status === Image.Ready) {
+      if (img === surface.back && img.status === Image.Ready
+          && img.path === surface.want && img.path !== surface.front.path) {
         surface.aFront = !surface.aFront;
         // the crossfade and the zoom run Arrival.duration from here
         Picasso.transitionUntil = Math.max(Picasso.transitionUntil, Date.now() + Arrival.duration);
@@ -269,6 +288,19 @@ Variants {
       readonly property bool moving: /\.(gif|webp|apng|mng)$/i.test(wall.path)
       // as an Image's: Null, Loading, Ready, Error — of the one in use
       readonly property int status: wall.moving ? anim.status : still.status
+      // THIS frame's picture has been decoded at least once. Not `status`:
+      // a frame decodes again when its size changes, and drawn by status it
+      // went black for the length of that decode (the desktop blacked out
+      // for a second when a span was applied). The pixels it had stay on
+      // screen meanwhile — retainWhileLoading — so it stays shown.
+      property string readyPath: ""
+      readonly property bool showing: wall.path !== "" && wall.readyPath === wall.path
+      // (a Connections, as below: the Walls' own onStatusChanged would replace
+      // a handler written here)
+      Connections {
+        target: wall
+        function onStatusChanged() { if (wall.status === Image.Ready) wall.readyPath = wall.path; }
+      }
       // THIS surface's monitor, not a global. The Wall component is declared
       // inside the per-screen surface, so `surface.modelData` is the output
       // it is painting — which is the whole point of the fit being per
@@ -280,13 +312,16 @@ Variants {
       Image {
         id: still
         anchors.fill: parent
-        source: wall.moving ? "" : wall.source
+        // the file the probe settled on: the picture itself, or its
+        // screen-sized copy when it is far bigger than the screen (useFile)
+        source: wall.moving || wall.useFile === "" ? "" : Strings.fileUrl(wall.useFile)
         fillMode: wall.fillMode
         // which part a crop keeps, already carried through the frame's turn
         horizontalAlignment: scene.hAlign
         verticalAlignment: scene.vAlign
         sourceSize: wall.sourceSize
         asynchronous: true
+        retainWhileLoading: true
         cache: false
         smooth: true
       }
@@ -299,6 +334,7 @@ Variants {
         verticalAlignment: scene.vAlign
         sourceSize: wall.sourceSize
         asynchronous: true
+        retainWhileLoading: true
         cache: false
         smooth: true
         playing: true
@@ -392,26 +428,58 @@ Variants {
       // behaviour is simply the uncapped cover.
       property int _natW: 0
       property int _natH: 0
+
+      // ── A PICTURE FAR BIGGER THAN THE SCREEN IS SHOWN FROM A COPY ──────
+      // Qt decodes every picture on ONE loader thread for the whole shell,
+      // and a png is decoded whole before it is scaled: a 15119x8504
+      // background took 1.3 s per monitor there, and every picture anywhere
+      // in the shell waited behind it (user: applying a large one "freezes
+      // picasso for like a second", 2026-10-11). So the probe now runs
+      // FIRST, and a picture over BIG_PX that is three times the screen's
+      // area is made into a cover-sized jpeg by ImageMagick in its own
+      // process — once, kept in the cache by path, time, size and screen
+      // size — and that is what Qt decodes. The background on screen stays
+      // until it is ready. Not for "centred" and "tiled", which show the
+      // picture at its own size, and not for an animation.
+      //
+      // `useFile` is what the still is given: "" while the probe is out.
+      property string useFile: ""
+      readonly property bool natural: wall.fillMode === Image.Pad || wall.fillMode === Image.Tile
+      // the cover size the copy was made for, so a frame that grows (a span)
+      // past it is measured again rather than shown blurred
+      property size copyFor: Qt.size(0, 0)
       Process {
         id: sizeProbe
         // Which file this run is measuring. A frame can be handed a new
         // picture while the last probe is still out; `running = true` then
         // does nothing, and the old file's size was taken as the new one's.
         property string forPath: ""
+        property size forCover: Qt.size(0, 0)
         property bool again: false
-        onExited: if (sizeProbe.again) { sizeProbe.again = false; wall._measure(); }
+        onExited: {
+          // nothing usable came back (no magick): the picture itself
+          if (sizeProbe.forPath === wall.path && wall.useFile === "" && wall.path !== "")
+            wall.useFile = wall.path;
+          if (sizeProbe.again) { sizeProbe.again = false; wall._measure(); }
+        }
         stdout: StdioCollector {
           id: sizeOut
           waitForEnd: true
           onStreamFinished: {
             if (sizeProbe.forPath !== wall.path) return;
-            const m = String(sizeOut.text).trim().match(/^(\d+)\s+(\d+)/);
-            if (!m) return;
-            wall._natW = parseInt(m[1], 10);
-            wall._natH = parseInt(m[2], 10);
+            const lines = String(sizeOut.text).trim().split("\n");
+            const m = (lines[0] || "").match(/^(\d+)\s+(\d+)/);
+            if (m) {
+              wall._natW = parseInt(m[1], 10);
+              wall._natH = parseInt(m[2], 10);
+            }
+            const copy = lines.length > 1 && lines[1].indexOf("FILE ") === 0 ? lines[1].slice(5) : "";
+            wall.copyFor = copy !== "" ? sizeProbe.forCover : Qt.size(0, 0);
+            wall.useFile = copy !== "" ? copy : wall.path;
           }
         }
       }
+      readonly property real bigPx: 40000000
 
       // Measured from Component.onCompleted as well as on every change: a
       // source assigned while the object is still being built has already
@@ -420,15 +488,47 @@ Variants {
       // It resets the aspect latch too — both questions are asked again of
       // every new file.
       function _measure() {
-        wall._natW = 0;
-        wall._natH = 0;
-        if (wall.path === "") return;
+        // a new picture: nothing shown from the old file's copy
+        if (sizeProbe.forPath !== wall.path) { wall.useFile = ""; wall._natW = 0; wall._natH = 0; }
+        if (wall.path === "") { wall.useFile = ""; return; }
+        // laid out yet? the copy is made for the frame's size
+        if (wall.width < 2 || wall.height < 2) { sizeLater.restart(); return; }
         if (sizeProbe.running) { sizeProbe.again = true; return; }
         sizeProbe.forPath = wall.path;
-        sizeProbe.command = ["magick", "identify", "-format", "%w %h",
-          wall.path + "[0]"];
+        // the cover at zoom, whichever way the frame is shaped
+        const cw = Math.max(1, wall._coverW), ch = Math.max(1, wall._coverH);
+        sizeProbe.forCover = Qt.size(cw, ch);
+        const copying = !wall.moving && !wall.natural;
+        sizeProbe.command = ["sh", "-c",
+          'set -- "$1" "$2" "$3" "$4" "$5" "$6"; '
+          + 'wh=$(magick identify -ping -format "%w %h" "$1[0]" 2>/dev/null) || exit 0; '
+          + 'echo "$wh"; [ "$5" = 1 ] || exit 0; '
+          + 'set -- "$1" "$2" "$3" "$4" "$5" "$6" $wh; '
+          + '[ "$(( $7 * $8 ))" -gt "$6" ] && [ "$(( $7 * $8 ))" -gt "$(( 3 * $2 * $3 ))" ] || exit 0; '
+          + 'key=$(printf "%s:%s" "$1" "$(stat -c %Y:%s "$1")" | md5sum | cut -c1-20); '
+          + 'out="$4/$key-$2x$3.jpg"; '
+          + 'if [ ! -s "$out" ]; then mkdir -p "$4" && magick "$1[0]" -auto-orient -resize "$2x$3^" -quality 93 "$out.part.jpg" '
+          + '&& mv -f "$out.part.jpg" "$out" || exit 0; fi; '
+          + 'touch -c "$out"; echo "FILE $out"; '
+          // copies not shown for a month go (each use touches its own)
+          + 'find "$4" -name "*.jpg" -mtime +30 -delete 2>/dev/null; exit 0',
+          "sh", wall.path, String(cw), String(ch),
+          Paths.cacheDir() + "/quickshell/picasso/backgrounds", copying ? "1" : "0", String(wall.bigPx)];
         sizeProbe.running = true;
       }
+      // grown past the copy it shows (spanned across the desk): a bigger copy
+      Timer {
+        id: regrow
+        interval: 300
+        onTriggered: if (wall.copyFor.width > 0
+                         && (wall._coverW > wall.copyFor.width * 1.02 || wall._coverH > wall.copyFor.height * 1.02))
+                       wall._measure()
+      }
+      on_CoverWChanged: regrow.restart()
+      on_CoverHChanged: regrow.restart()
+      Timer { id: sizeLater; interval: 50; onTriggered: wall._measure() }
+      // centred or tiled shows the picture at its own size: never the copy
+      onNaturalChanged: wall._measure()
       Component.onCompleted: wall._measure()
 
       // Headroom for the zoom: the surface scales to Oracle.backgroundZoom on
@@ -505,14 +605,14 @@ Variants {
 
           Wall {
             id: imgA
-            opacity: surface.aFront && status === Image.Ready ? 1 : 0
-            onStatusChanged: surface.ready(imgA)
+            opacity: surface.aFront && showing ? 1 : 0
+            onStatusChanged: { surface.ready(imgA); surface.failed(imgA); }
           }
 
           Wall {
             id: imgB
-            opacity: !surface.aFront && status === Image.Ready ? 1 : 0
-            onStatusChanged: surface.ready(imgB)
+            opacity: !surface.aFront && showing ? 1 : 0
+            onStatusChanged: { surface.ready(imgB); surface.failed(imgB); }
           }
         }
       }

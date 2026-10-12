@@ -101,6 +101,11 @@ Item {
   // Set on a pane that has room for the WHERE column but not for the
   // numbers beside it — the miller middle column, and nothing else so far.
   property bool whereOnly: false
+  // ── THE GRID'S SECOND LINE, ON THE RIGHT (user, 2026-10-11) ───────────
+  // A row too narrow for the metadata columns (the miller columns) says the
+  // one thing a tile says under its name — term.tileDetail: what the pane
+  // is sorted by, or the size / the count — muted, at the row's right end.
+  property string aside: ""
   readonly property var frac:
     (host.searchMode !== "" && entryRow.live)
       ? (entryRow.whereOnly ? host.colFoundNarrow : host.colFound)
@@ -708,8 +713,12 @@ Item {
         id: entryGit
         anchors.left: entryTwist.right
         anchors.verticalCenter: parent.verticalCenter
+        // "outside" once the scan has answered and found no repository
+        // (gitAsked empty: not still asking) — see Terminus' GIT_MARK. A host
+        // without those two (TreeHost) never says so.
         readonly property string state: (host.git && entryRow.entry)
-          ? (host.gitMarks[entryRow.entry.path] || "") : ""
+          ? (host.gitMarks[entryRow.entry.path]
+             || (host.gitRoot === "" && host.gitAsked === "" ? "outside" : "")) : ""
         visible: host.git
         width: host.git ? Math.round(18 * host.zoom) : 0
         horizontalAlignment: Text.AlignHCenter
@@ -747,15 +756,17 @@ Item {
         font.pixelSize: Math.round(18 * host.zoom)
       }
 
-      // ── the bookmark, beside the name ─────────────────────────
+      // ── the bookmark, after the row's own glyph ──────────────────
       // So that `b b` is a key you can aim. The toggle goes both ways and
       // the only way to know which way it will go was to open the sidebar
       // and read the list; now the row says so itself. Same glyph the
-      // sidebar lists it under, because it is the same fact.
+      // sidebar lists it under, because it is the same fact. Beside the
+      // icon, before the name, since 2026-10-11 (user) — it was at the
+      // row's far end, away from what it marks.
       Text {
         id: entryBookmark
-        anchors.right: parent.right
-        anchors.rightMargin: 12
+        anchors.left: entryGlyph.right
+        anchors.leftMargin: Math.round(4 * host.zoom)
         anchors.verticalCenter: parent.verticalCenter
         visible: !!entryRow.entry && host.isBookmarked(entryRow.entry.path)
         text: "\uF02E"
@@ -775,8 +786,8 @@ Item {
       // the names.
       Row {
         id: entryTags
-        anchors.right: entryBookmark.visible ? entryBookmark.left : parent.right
-        anchors.rightMargin: entryBookmark.visible ? 7 : 12
+        anchors.right: parent.right
+        anchors.rightMargin: 12
         anchors.verticalCenter: parent.verticalCenter
         // Room between them. At three pixels two tags read as one wide
         // mark rather than as two, which is the one thing the row has to
@@ -803,15 +814,36 @@ Item {
         }
       }
 
+      // the tile's second line, at the end of the row — see `aside`
+      Text {
+        id: entryAside
+        anchors.right: entryTags.visible ? entryTags.left
+          : parent.right
+        anchors.rightMargin: entryTags.visible ? 10 : 12
+        anchors.verticalCenter: parent.verticalCenter
+        visible: entryRow.aside !== "" && !entryRow.editing
+        // never more than a third of the row: the name is what the row is
+        width: Math.min(implicitWidth, Math.round(parent.width / 3))
+        elide: Text.ElideRight
+        text: entryRow.aside
+        color: Zenon.muted
+        opacity: entryRow.dim ? 0.5 : 1
+        font.family: Zenon.face
+        font.weight: Zenon.weight
+        font.features: { "tnum": 1 }
+        font.pixelSize: Math.round(13 * host.zoom)
+      }
+
       Text {
         id: entryName
-        anchors.left: entryGlyph.right
+        anchors.left: entryBookmark.visible ? entryBookmark.right : entryGlyph.right
         // The glyph column already centres the icon with air either side;
         // 12 on top of that left a gap wider than the icon (user, 2026-10-09)
         anchors.leftMargin: Math.round(6 * host.zoom)
-        anchors.right: entryTags.visible ? entryTags.left
-          : (entryBookmark.visible ? entryBookmark.left : parent.right)
-        anchors.rightMargin: 12
+        anchors.right: entryAside.visible ? entryAside.left
+          : entryTags.visible ? entryTags.left
+          : parent.right
+        anchors.rightMargin: entryAside.visible ? 10 : 12
         anchors.verticalCenter: parent.verticalCenter
         visible: !entryRow.editing
         // plain unless a filter has something to light, so the common row
@@ -865,7 +897,7 @@ Item {
       }
       Loader {
         id: entryEditBox
-        anchors.left: entryGlyph.right
+        anchors.left: entryBookmark.visible ? entryBookmark.right : entryGlyph.right
         anchors.leftMargin: Math.round(6 * host.zoom)
         anchors.right: parent.right
         anchors.rightMargin: 12

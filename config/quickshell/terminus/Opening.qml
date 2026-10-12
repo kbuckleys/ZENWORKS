@@ -210,6 +210,7 @@ Item {
         pickerW: keptPickerW,
         pickerH: keptPickerH,
         recentsView: term.recentsView,
+        recentsZoom: term.recentsZoom,
         recentsShown: term.recentsShown,
         grouped: term.grouped,
         perDirView: term.perDirView,
@@ -226,7 +227,9 @@ Item {
         paneOpen: keptOpen,
         paneZooms: [term.paneLRef.zoom, term.paneRRef.zoom],
         paneFrac: term.paneFrac,
-        dirViews: term.dirViews
+        dirViews: term.dirViews,
+        // see the load: records from 2 on hold only grid zooms you chose
+        dirViewsV: 2
       }) + "\n");
     }
   }
@@ -266,6 +269,7 @@ Item {
         && term.viewRing.indexOf(s.recentsView) >= 0)
       term.recentsView = s.recentsView;
     if (typeof s.recentsShown === "boolean") term.recentsShown = s.recentsShown;
+    if (Number(s.recentsZoom) > 0) term.recentsZoom = Number(s.recentsZoom);
     if (typeof s.perDirView === "boolean") term.perDirView = s.perDirView;
     if (typeof s.thumbsOn === "boolean") term.thumbsOn = s.thumbsOn;
     if (typeof s.dirsFirst === "boolean") term.dirsFirst = s.dirsFirst;
@@ -351,6 +355,17 @@ Item {
     if (!isNaN(pf) && pf > 0)
       term.paneFrac = Math.max(term.paneMinFrac, Math.min(term.paneMaxFrac, pf));
     if (s.dirViews && typeof s.dirViews === "object") {
+      // ── GRID ZOOMS NOBODY CHOSE, DROPPED ONCE (user, 2026-10-11) ──────
+      // Before version 2 every record took whatever grid zoom was current
+      // when anything about the directory changed — inherited from the last
+      // grid, from an older default, the pane's fitted drift — so grids
+      // opened large though the default is the smallest tile. Those cannot
+      // be told from a zoom chosen on purpose, so all of them go, once.
+      if (s.dirViewsV !== 2) {
+        for (const k in s.dirViews)
+          if (s.dirViews[k]) delete s.dirViews[k].thumbZoom;
+        opening.viewSave.restart();
+      }
       term.dirViews = s.dirViews;
       term.dirViewOrder = Object.keys(s.dirViews);
     }

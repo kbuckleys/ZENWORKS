@@ -10,8 +10,8 @@
 // way it is; they came with it.
 
 import QtQuick
-import Quickshell.Widgets
 import "."
+import "clip"
 
 Item {
   id: sheet
@@ -123,6 +123,15 @@ Item {
   // and how many times that frost is stacked to bring thin content back up
   // (Frost.gain; plato's sheets use 3, and splice from its bars too).
   property int gain: 1
+  // ── THE BAR'S OWN FROST, CARRIED OVER THE SEAM ───────────────────────
+  // A hanging card's glass fades in from the seam. Over a bar with nothing
+  // under it that fade starts from nothing, as the bar is; over a bar with
+  // rows frosted through it, it starts from that bar's frost (ScrollEdge's
+  // strength, 0 to 1) and runs a longer way, so the bar's faint glass and
+  // the card's full glass are one frost thickening downward rather than
+  // two meeting at a line (user's sheet.png, 2026-10-11).
+  property real seamFrost: 0
+  readonly property real seamRun: sheet.seamFrost > 0 ? 72 : 28
   // THE CARD'S OWN GROUND when it is not frosted: black, unless the host
   // clears what is under the card itself and wants its own glass to show —
   // terminus does (user, 2026-10-11: a sheet is the same glass as the active
@@ -136,6 +145,8 @@ Item {
   // scrim the bars lay over their frost (terminus' topScrim), not the
   // near-black a card over live content needs to stay legible.
   readonly property bool holed: sheet.ground.a === 0
+  // how much ground lies over a holed card's frost — see the card's veil
+  property real veil: 0.6
 
   property real cardW: 560
   property real cardH: 200
@@ -212,9 +223,9 @@ Item {
     }
 
     // ── THE FROST, UNDER THE CARD, NOT IN IT ─────────────────────────────
-    // A ClippingRectangle renders no MultiEffect inside it, so the glass is
-    // laid here and follows the card — place, size, scale, fade — with its
-    // own rounded corners (Frost.radius).
+    // The card's clip (clip/RoundClip) draws its content through a texture,
+    // so the glass is laid here and follows the card — place, size, scale,
+    // fade — with its own rounded corners (Frost.radius).
     Frost {
       id: cardFrost
       x: sheetCard.x
@@ -228,10 +239,30 @@ Item {
       base: sheet.holed ? "transparent" : Zenon.black
       // hanging from a bar: the blur comes in below the seam (the cut is
       // hidden above the well's top, so it is counted in)
-      fadeTop: sheet.hangs && !sheet.fromBottom ? sheet.cut + 28 : 0
-      fadeBottom: sheet.hangs && sheet.fromBottom ? sheet.cut + 28 : 0
+      fadeTop: sheet.hangs && !sheet.fromBottom ? sheet.cut + sheet.seamRun : 0
+      fadeBottom: sheet.hangs && sheet.fromBottom ? sheet.cut + sheet.seamRun : 0
+      // ── FROM THE SEAM, NOT FROM THE HIDDEN CORNERS ──────────────────
+      // The card's top `cut` px are above the well and never seen, but the
+      // fade runs from the card's top: started at seamFrost there, it was
+      // already past the bar's strength by the seam. Solved back so the
+      // first row you can see is exactly the bar's.
+      fadeFrom: sheet.seamFrost <= 0 ? 0
+        : Math.max(0, (sheet.seamFrost * (sheet.cut + sheet.seamRun) - sheet.cut) / sheet.seamRun)
+      // ── AND THE BAR'S OWN MATERIAL ─────────────────────────────────
+      // Over a hole the card is the same glass as the bar it hangs from,
+      // so it frosts as the bar's rows do (ScrollEdge: no darkening, -0.2
+      // saturation). The card's darker, greyer frost met the bar's at a
+      // visible line (user, 2026-10-11). Over live content it keeps the
+      // darker one, which is what keeps its words legible there.
+      brightness: sheet.holed ? 0 : -0.12
+      saturation: sheet.holed ? -0.2 : -0.3
       // softer than a bar's: thin text blurred at 64 is no shape at all
-      blurMax: sheet.blur
+      // ── OVER A HOLE, AS SOFT AS THE BAR ABOVE IT ────────────────────
+      // At 32 the card showed the tiles under it as shapes while the strip
+      // it hangs from was a haze: two frosts meeting at the seam (user,
+      // 2026-10-11). Over a hole there is no text of the card's own to keep
+      // legible against it, so it takes the whole kernel and the two blend.
+      blurMax: sheet.holed ? Math.max(sheet.blur, 64) : sheet.blur
       gain: sheet.gain
       visible: sheet.frosted
       source: sheet.backdrop
@@ -240,7 +271,9 @@ Item {
       track: [well.x, well.y]
     }
 
-    ClippingRectangle {
+    // plain Qt Quick, not quickshell's ClippingRectangle: the same sheet
+    // loads in iris (clip/RoundClip.qml; pixel-checked against the old one)
+    RoundClip {
       id: sheetCard
       // ── ON WHOLE PIXELS ─────────────────────────────────────────────
       // Centring is a halving, and half of an odd number is half a pixel:
@@ -248,7 +281,7 @@ Item {
       // pixel columns, which is exactly what blurry text in a card is.
       // Position and size are rounded so the content lands on the grid.
       x: Math.round((well.width - sheetCard.width) / 2)
-      // THE BORDER IS NOT PART OF THE ROOM. A ClippingRectangle insets what
+      // THE BORDER IS NOT PART OF THE ROOM. The clip insets what
       // it holds by its own border on every side, so a card built to hold
       // exactly cardH gave its contents cardH LESS TWO — measured: a 466
       // card handing its body 464, and a palette that asks for fourteen
@@ -333,10 +366,14 @@ Item {
 
       // the black over the frost (which is under the card — see cardFrost);
       // first, so everything on the card draws over it
+      // ── LESS SEE-THROUGH THAN THE BAR (user, 2026-10-11) ────────────────
+      // Over a hole the card wears `veil` of the ground; terminus' strip
+      // takes the same veil and frost while a sheet is up (see its topScrim),
+      // so the two are one glass.
       Rectangle {
         anchors.fill: parent
         visible: sheet.frosted
-        color: sheet.holed ? Zenon.alpha(Zenon.ground, 0.35)
+        color: sheet.holed ? Zenon.alpha(Zenon.ground, sheet.veil)
                            : Zenon.floor(Zenon.glass(sheet.glass))
       }
 

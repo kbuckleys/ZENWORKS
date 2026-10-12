@@ -1,0 +1,15 @@
+#!/bin/sh
+# ┌─┐┌─┐┌┐┌┬ ┬┌─┐┬─┐┬┌─┌─┐
+# ┌─┘├┤ │││││││ │├┬┘├┴┐└─┐
+# └─┘└─┘┘└┘└┴┘└─┘┴└─┴ ┴└─┘
+# https://github.com/kbuckleys/
+#
+# calypso           the password manager's window, from a terminal, a
+#                   keybind, or calypso.desktop (which CalypsoManager writes
+#                   on startup)
+# calypso quick     Quick Access, the bar's popup: find a login, type it in
+
+case ${1:-} in
+  quick) exec qs ipc call Calypso toggle >/dev/null ;;
+  *)     exec qs ipc call Calypso open >/dev/null ;;
+esac
