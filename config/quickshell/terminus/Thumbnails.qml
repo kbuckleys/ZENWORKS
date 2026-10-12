@@ -54,16 +54,7 @@ Item {
   // file. Size and mtime are two thirds of what the key was made from, and
   // the row carries both — so this is the whole check, and it is free.
   function indexHit(r) {
-    const e = term.thumbIndex[r.path];
-    if (typeof e !== "string") return "";
-    const p = e.split("|");
-    if (p.length !== 3) return "";
-    // The key is made from `stat -c %Y`, a whole second; the row's mtime is
-    // a float off the same stat. Compare what the hash actually saw.
-    if (Number(p[0]) !== r.size || Number(p[1]) !== Math.floor(r.mtime)) return "";
-    // Either a thumbnail, or the standing answer that there will not be
-    // one. Both are answers; only the empty string means "ask".
-    return Thumbs.isNone(p[2]) ? Thumbs.none() : Thumbs.fileFor(p[2]);
+    return Thumbs.indexHit(term.thumbIndex, r.path, r.size, r.mtime);
   }
   // thumbFile is keyed by PATH, and it lives as long as the shell does —
   // days. The index beside it checks size and mtime; the map never did. So

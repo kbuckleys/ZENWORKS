@@ -236,6 +236,24 @@ function keyOf(thumb) {
 
 function fileFor(key) { return dir() + "/" + key + "." + EXT; }
 
+// What the index (indexPath, parsed) says a file's thumbnail is, if the file
+// is still the one it was made from: its path, NONE for "there will not be
+// one", or "" for "ask". Size and mtime are two thirds of the key and every
+// listing has both, so this is the whole check and it is free — a tile can
+// draw its thumbnail on the frame it is made, not after a process answers
+// (terminus' tiles; picasso's gallery since 2026-10-12, whose tiles waited
+// for a batch and scrolled in blank).
+function indexHit(index, path, size, mtime) {
+  const e = index ? index[path] : undefined;
+  if (typeof e !== "string") return "";
+  const p = e.split("|");
+  if (p.length !== 3) return "";
+  // the key is made from `stat -c %Y`, a whole second; the row's mtime is
+  // a float off the same stat
+  if (Number(p[0]) !== size || Number(p[1]) !== Math.floor(mtime)) return "";
+  return isNone(p[2]) ? NONE : fileFor(p[2]);
+}
+
 // source -> thumbnail, from what generate() reported.
 function size() { return SIZE; }
 

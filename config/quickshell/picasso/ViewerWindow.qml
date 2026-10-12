@@ -1275,7 +1275,39 @@ FloatingWindow {
   property var thumbs: ({})
   property var thumbQueue: []
 
-  function wantThumb(p) {
+  // ── THE POOL'S INDEX, AS TERMINUS READS IT ───────────────────────────
+  // Every tile used to wait for a thumbnail process to name its file —
+  // queued on the tile's creation, answered 48 at a time — so a scroll
+  // into rows not yet built ran through blank cells with only their names,
+  // filling in behind (user's capture, 2026-10-12: smooth in terminus, not
+  // here). Terminus' tiles ask the shared index first (Thumbs.indexHit):
+  // a file whose thumbnail is on disk is drawn on the frame its tile is
+  // made, and through the ThumbKeeper/cacheBuffer already decoded. Read
+  // again on each directory, not watched (terminus' reason: every window
+  // writes it).
+  property var thumbIndex: ({})
+  FileView {
+    id: thumbIndexFile
+    path: Thumbs.indexPath()
+    blockLoading: true
+    printErrors: false
+    onTextChanged: {
+      let o = null;
+      try { o = JSON.parse(String(thumbIndexFile.text() || "{}")); } catch (e) { o = null; }
+      win.thumbIndex = (o && typeof o === "object" && !Array.isArray(o)) ? o : ({});
+    }
+  }
+  onDirChanged: thumbIndexFile.reload()
+  // the index's answer for a row, or "" (also for "there will be none")
+  function onDisk(r) {
+    if (!r || !r.path || typeof r.size !== "number") return "";
+    const s = Thumbs.indexHit(win.thumbIndex, r.path, r.size, r.mtime);
+    return s !== "" && !Thumbs.isNone(s) ? s : "";
+  }
+
+  function wantThumb(p, r) {
+    // already on disk, as the index says: nothing to make
+    if (r && win.onDisk(r) !== "") return;
     if (p in win.thumbs || win.thumbQueue.indexOf(p) >= 0) return;
     win.thumbQueue.push(p);
     thumbKick.restart();
@@ -4085,7 +4117,7 @@ FloatingWindow {
         // the picture, for a flight into it or out of it (flyIn/flyOut)
         readonly property alias thumbItem: pic
         Component.onCompleted: {
-          if (!cell.directory && !cell.fill) win.wantThumb(cell.modelData.path);
+          if (!cell.directory && !cell.fill) win.wantThumb(cell.modelData.path, cell.modelData);
           // a fresh directory comes up a tile after a tile, top to bottom —
           // terminus' TileRise, which its grid does on arriving too
           if (win.staggering) { rise.hide(); rise.start(grid, cell.index); }
@@ -4181,8 +4213,10 @@ FloatingWindow {
             color: "transparent"
             measure: !cell.directory && !cell.fill
             path: cell.directory || cell.fill ? "" : cell.modelData.path
-            thumb: win.thumbs[cell.modelData.path] ?? ""
-            wait: !(cell.modelData.path in win.thumbs)
+            // the batch's answer, else the index's (win.onDisk) at once
+            readonly property string known: cell.directory || cell.fill ? "" : win.onDisk(cell.modelData)
+            thumb: win.thumbs[cell.modelData.path] ?? pic.known
+            wait: !(cell.modelData.path in win.thumbs) && pic.known === ""
             spinner: false
             // decoded as terminus' tiles are, and kept (see Thumb.pooled)
             pooled: true
@@ -4748,7 +4782,7 @@ FloatingWindow {
         width: 100
         // room under it, inside the list's clip, for the current one's pip
         height: stripList.height - 7
-        Component.onCompleted: win.wantThumb(tile.modelData.path)
+        Component.onCompleted: win.wantThumb(tile.modelData.path, tile.modelData)
 
         // the current one lifted off the strip on a shadow, with a pip
         // under it — the others already stand back at 0.6
@@ -4779,8 +4813,10 @@ FloatingWindow {
           anchors.fill: parent
           anchors.margins: tile.current ? 0 : 4
           path: tile.modelData.path
-          thumb: win.thumbs[tile.modelData.path] ?? ""
-          wait: !(tile.modelData.path in win.thumbs)
+          // as the gallery's tiles: the index's answer at once (win.onDisk)
+          readonly property string known: win.onDisk(tile.modelData)
+          thumb: win.thumbs[tile.modelData.path] ?? known
+          wait: !(tile.modelData.path in win.thumbs) && known === ""
           spinner: false
           fade: false
           opacity: tile.current || tileMa.containsMouse ? 1 : 0.6
