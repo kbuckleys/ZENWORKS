@@ -136,9 +136,13 @@ function themeOptions(text) {
     try {
       const t = JSON.parse(line.slice(tab + 1));
       if (t && typeof t.name === "string" && t.name.trim() !== "") label = t.name.trim();
+      custom = !!(t && t.custom === true);
+      // one you made yourself is marked with U+F2C0 (Buck's pick,
+      // 2026-10-12) — and keeps its light mark beside it: what it was
+      // made as is still worth knowing
+      if (custom) label += "  \uF2C0";
       // a light theme is marked with a glyph (U+F19E2, Buck's pick), not spelled out
       if (t && t.mode === "light") label += "  \u{F19E2}";
-      custom = !!(t && t.custom === true);
     } catch (e) {
       label = stem + " \u00b7 broken";
     }

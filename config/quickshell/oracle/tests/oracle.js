@@ -689,6 +689,10 @@ module.exports.themes = (t, T) => {
   t.eq("follow background comes second", opts[1].value, "follow");
   t.eq("a saved theme is custom", opts.find((o) => o.value === "custom-dune").custom, true);
   t.eq("a shipped one is not", opts.find((o) => o.value === "nord").custom, undefined);
+  t.eq("a saved one wears the user glyph", opts.find((o) => o.value === "custom-dune").label, "Dune  \uF2C0");
+  t.eq("a saved light one keeps its light mark too",
+    T.themeOptions("custom-sky\t{ \"name\": \"Sky\", \"mode\": \"light\", \"custom\": true }").find((o) => o.value === "custom-sky").label,
+    "Sky  \uF2C0  \u{F19E2}");
   t.eq("follow the sun comes third", opts[2].value, "sun");
   t.eq("nothing in themes/ is zenon, follow background and follow the sun", T.themeOptions("").length, 3);
   const withLight = T.themeOptions([

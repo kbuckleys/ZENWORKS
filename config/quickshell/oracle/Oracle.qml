@@ -734,6 +734,12 @@ Singleton {
     { key: "themeNight", section: "look", alias: "follow daytime the sun night dark theme sunset",
       label: "Follow Daytime by night", type: "enum", optionsFrom: "themesNoSun", open: true, chipW: 208,
       help: "Only while the theme is Follow Daytime: what it wears from sunset to sunrise." },
+    // with the other theme rows, not under Background (user, 2026-10-12):
+    // what it makes is a theme, and it lands in the Theme list above
+    // (marked there with U+F2C0, its light mark kept — Ora.themeOptions)
+    { key: "actionSaveFollow", section: "look", alias: "follow background save keep freeze theme wallpaper",
+      label: "Keep this Follow Background", type: "action", verb: "Save",
+      help: "Saves the palette Follow Background is wearing now as a theme of its own, named after the picture, so it outlives the background. It appears in Theme straight away." },
     // drawn as the Font row's second dropdown (`within`), not a row of its own
     { key: "fontWeight", section: "look", within: "fontFamily", alias: "font weight bold semibold light regular medium thickness",
       label: "Font weight", type: "enum",
@@ -942,9 +948,6 @@ Singleton {
     { key: "followSlideshow", section: "paper", alias: "follow background wallpaper slideshow",
       label: "Follow the slideshow", type: "bool",
       help: "A slideshow on that monitor changes the theme with every picture. Off, the theme stays with the picture the slideshow started on." },
-    { key: "actionSaveFollow", section: "paper", alias: "follow background save keep freeze theme wallpaper",
-      label: "Keep this Follow Background", type: "action", verb: "Save",
-      help: "Saves the palette Follow Background is wearing now as a theme of its own, named after the picture, so it outlives the background. It appears in Theme straight away." },
     { key: "wallpaperTint", section: "paper", alias: "tint wallpaper accent colour color glass background",
       label: "Background tint", type: "real", min: 0, max: 0.3, step: 0.02,
       help: "Lays the glass in a little of the background's own colour, so the pill and its panels read as lit by what is behind them. Zero is the theme's plain ground." },

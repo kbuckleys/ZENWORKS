@@ -28,12 +28,13 @@ LayerPopup {
   // this is where you are — in the same grey.
   readonly property color titleColor: Zenon.keyInk
   // ── ITS TEXT SIZE ──────────────────────────────────────────────────
-  // The shell's (Zenon.px) plus `bump`: four pixels larger by default
-  // (user, 2026-10-08), moved by oracle's lexiTextStep, which Ctrl + / - /
+  // The shell's (Zenon.px) plus `bump`: the shell's own size by default
+  // (user: four larger on 2026-10-08, brought back to none on 2026-10-12),
+  // moved by oracle's lexiTextStep, which Ctrl + / - /
   // 0 here step. Only the words — the header glyphs, the hints and the
   // "copied" note beside them keep the shell's size. The rows the words
   // sit on grow by the same amount, so a larger step never clips.
-  readonly property int bump: 4 + Oracle.lexiTextStep
+  readonly property int bump: 0 + Oracle.lexiTextStep
   function tpx(n) { return Math.max(8, Zenon.px(n) + popup.bump); }
   function stepText(d) {
     Oracle.set("lexiTextStep", d === 0 ? 0 : Oracle.lexiTextStep + d);

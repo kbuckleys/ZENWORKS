@@ -4094,6 +4094,15 @@ FloatingWindow {
       cellHeight: Math.round(168 * win.gzoom)
       currentIndex: win.gidx
       boundsBehavior: Flickable.StopAtBounds
+      // ── TILES RECYCLED, AS TERMINUS' GRID RECYCLES THEM ───────────────
+      // A row scrolled into view used to be built new: a dozen items a
+      // tile and, the dear part, a fresh rounded clip (Thumb is a
+      // ClippingRectangle, drawn through a texture of its own) — a GPU
+      // allocation per tile per row, which is the hitch terminus' grid
+      // never had (user, 2026-10-12: "smooth in terminus, not in
+      // picasso"). A tile that scrolls off is pooled and handed the next
+      // row's picture instead; `arrive` is what a new or reused one does.
+      reuseItems: true
       onCurrentIndexChanged: if (win.mode === "gallery") grid.positionViewAtIndex(win.gidx, GridView.Contain)
 
       delegate: Item {
@@ -4116,12 +4125,27 @@ FloatingWindow {
         z: cell.chip ? 2 : 0
         // the picture, for a flight into it or out of it (flyIn/flyOut)
         readonly property alias thumbItem: pic
-        Component.onCompleted: {
+        function arrive() {
           if (!cell.directory && !cell.fill) win.wantThumb(cell.modelData.path, cell.modelData);
           // a fresh directory comes up a tile after a tile, top to bottom —
           // terminus' TileRise, which its grid does on arriving too
           if (win.staggering) { rise.hide(); rise.start(grid, cell.index); }
           else if (win.reflowing && !cell.fill) cell.glideIn();
+        }
+        Component.onCompleted: cell.arrive()
+        // back out of the pool for another row: nothing of the last one's
+        // motion carried over, then arrived as a new one would
+        GridView.onPooled: {
+          glide.stop();
+          glideFade.stop();
+          cellFlareAnim.stop();
+          cellFlare.glow = 0;
+          if (win.hoverThumb === cell.index) win.hoverThumb = -1;
+        }
+        GridView.onReused: {
+          cell.opacity = 1;
+          rise.show();
+          cell.arrive();
         }
         TileRise { id: rise }
 

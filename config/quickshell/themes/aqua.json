@@ -1,0 +1,29 @@
+{
+  "name": "Aqua",
+  "mode": "light",
+  "colors": {
+    "ground": "#f2f7ff",
+    "card": "#e5efff",
+    "surface": "#d0dff7",
+    "dim": "#b6c5dd",
+    "ink": "#2d333c",
+    "keyInk": "#474e57",
+    "soft": "#585e68",
+    "muted": "#7a818b",
+    "cyan": "#3a83f0",
+    "pink": "#c7638d",
+    "sand": "#a68000",
+    "yellow": "#dd5c00",
+    "green": "#009863",
+    "blue": "#2d85ef",
+    "magenta": "#a367df",
+    "red": "#ed426f",
+    "sparkFill": "#333a83f0",
+    "border": "#669dacc3",
+    "headBg": "#66d0dff7",
+    "selBg": "#4db6c5dd",
+    "onAccent": "#f2f7ff",
+    "wash": "#000000",
+    "shadow": "#000000"
+  }
+}
