@@ -1,7 +1,7 @@
 {
   "plugins": {
     "SchemaStore.nvim": {
-      "rev": "b463a5e79f84fd9ca22dd47f41754387d8fe7af4",
+      "rev": "a470cbcd112e717a8955efee3929bd59f7473c7b",
       "src": "https://github.com/b0o/SchemaStore.nvim"
     },
     "conform.nvim": {

@@ -32,8 +32,14 @@ import "../morpheus"
 Item {
   id: face
   property real shade: 0
-  // the card's width; its height is what is in it
+  // the card's widest; its height is what is in it, and its width is too —
+  // FITTED (user, 2026-10-12: "bubble needs to autofit"): the card is as
+  // wide as what is in it is naturally, up to this. Two short lines no
+  // longer hang in a card sized for a paragraph. `fit: false` keeps the
+  // card at cardWidth whatever is in it.
   property real cardWidth: 380
+  property bool fit: true
+  readonly property int fitMin: 120
   // the pointer on the card says so (`over`) — only while sticky
   property bool sticky: false
   readonly property bool over: overCard.hovered
@@ -157,11 +163,58 @@ Item {
       }
     }
   }
+  // ── THE FIT ─────────────────────────────────────────────────────
+  // What the content would take, unconstrained: a Text's implicitWidth is
+  // its unwrapped line (whatever width it has been given), a layout's is
+  // what its children ask, a scrolling view asks for everything. A plain
+  // Item or positioner is read through its children's (x + their own),
+  // never through its width — that is usually bound to the card's, which
+  // is what is being worked out. Measured by hand, not bound, for the same
+  // reason, and again whenever the content may have changed.
+  property real fitWidth: face.cardWidth
+  function natural(it) {
+    if (!it || !it.visible) return 0;
+    if (it.contentY !== undefined) return 1e6;               // a Flickable/ListView
+    if (it.wrapMode !== undefined || it.font !== undefined)   // Text, TextEdit, a label
+      return it.implicitWidth;
+    const isPositioner = it.populate !== undefined;           // Row, Column, Flow, Grid
+    if (!isPositioner && it.implicitWidth > 0) return it.implicitWidth;
+    let w = 0;
+    for (let i = 0; i < it.children.length; i++) {
+      const k = it.children[i];
+      const n = face.natural(k);
+      if (n > 0) w = Math.max(w, (isPositioner ? k.x : Math.max(0, k.x)) + n);
+    }
+    return w;
+  }
+  function refit() {
+    let w = 0;
+    for (let i = 0; i < col.children.length; i++)
+      w = Math.max(w, face.natural(col.children[i]));
+    face.fitWidth = Math.max(face.fitMin, Math.min(face.cardWidth, Math.ceil(w) + 28));
+  }
+  onCardWidthChanged: face.refit()
+  onShadeChanged: if (face.shade > 0 && face.shade < 0.2) face.refit()
+  // content that changes while it is up (a progress, a peek's next row)
+  Timer {
+    interval: 250
+    repeat: true
+    running: face.fit && face.shade > 0
+    onTriggered: face.refit()
+  }
+  Connections {
+    target: col
+    function onChildrenChanged() { refitSoon.restart(); }
+    function onImplicitHeightChanged() { refitSoon.restart(); }
+  }
+  Timer { id: refitSoon; interval: 0; onTriggered: face.refit() }
+  Component.onCompleted: refitSoon.restart()
+
   Item {
     id: card
     x: face.pad
     y: face.padTop + face.tail
-    width: face.cardWidth
+    width: face.fit ? face.fitWidth : face.cardWidth
     height: col.implicitHeight + 24
     readonly property real radius: Zenon.windowRadius
     // the pointer on it holds a sticky bubble up

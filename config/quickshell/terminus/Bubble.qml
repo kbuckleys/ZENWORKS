@@ -34,8 +34,10 @@ PopupWindow {
   property var window: null
   property Item target: null
   property bool shown: false
-  // the card's width; its height is what is in it
+  // the card's widest — it fits what is in it, up to this (BubbleCard's
+  // `fit`); `fit: false` holds it at this width. Its height is what is in it
   property real cardWidth: 380
+  property bool fit: true
   default property alias content: face.content
 
   // the card's measures (BubbleCard says why they are what they are)
@@ -140,6 +142,7 @@ PopupWindow {
     anchors.fill: parent
     shade: bub.shade
     cardWidth: bub.cardWidth
+    fit: bub.fit
     sticky: bub.sticky
 
     // where the tail's point is: at the pointer while it goes along a wide

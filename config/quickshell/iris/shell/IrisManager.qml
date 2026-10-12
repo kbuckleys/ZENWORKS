@@ -36,8 +36,10 @@ Scope {
   id: mgr
 
   readonly property string bin: Quickshell.shellDir + "/iris/bin/iris"
-  // calypso's Quick Access, handed in by shell.qml
+  // calypso's Quick Access, and calypso itself (a suggested password is
+  // made and kept there), handed in by shell.qml
   property var quick: null
+  property var vault: null
   readonly property var mimes: ["x-scheme-handler/http", "x-scheme-handler/https",
                                 "text/html", "application/xhtml+xml"]
 
@@ -80,6 +82,8 @@ Scope {
   //                 {job: "progress", key, pct, rate, eta}
   //                 {job: "end", key, state: "done" | "failed" | "stopped"}
   //                 {fill: site}             a login form: Quick Access
+  //                 {suggest: {site, url, username, twice}}   a sign-up:
+  //                                          calypso makes, keeps, types
   //   here → iris   {cancel: key}            the drawer's stop
   property var link: null
   // iris' key for a download ↔ the Jobs row it is
@@ -101,6 +105,11 @@ Scope {
     let m = null;
     try { m = JSON.parse(line); } catch (e) { return; }
     if (m && typeof m.fill === "string") { if (mgr.quick) mgr.quick.openFor(m.fill); return; }
+    if (m && m.suggest) {
+      const s = m.suggest;
+      if (mgr.vault) mgr.vault.suggest(String(s.site || ""), String(s.url || ""), String(s.username || ""), !!s.twice);
+      return;
+    }
     if (!m || m.key === undefined) return;
     if (m.job === "start") {
       const id = Jobs.adopt("download", [String(m.name || "download")], String(m.dest || ""));

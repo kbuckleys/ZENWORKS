@@ -19,6 +19,7 @@ import time
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 TMP = tempfile.mkdtemp(prefix="iris-test-")
 os.environ["XDG_RUNTIME_DIR"] = TMP
+os.environ["XDG_CACHE_HOME"] = os.path.join(TMP, "cache")
 sys.path.insert(0, os.path.join(ROOT, "iris", "core"))
 
 from PySide6.QtCore import QCoreApplication, QTimer  # noqa: E402
@@ -112,6 +113,24 @@ eq("a dead iris' socket answers nobody", door.knock("https://c.org"), False)
 d2 = door.Door()
 eq("and the next iris listens there anyway", d2._server.isListening(), True)
 d2.close()
+
+# ── the shield: a page's hiding rules and scriptlets ───────────────────────
+import shield  # noqa: E402
+os.makedirs(shield.LISTS_DIR, exist_ok=True)
+with open(shield._list_path("easylist"), "w") as f:
+    f.write("example.org##.sponsored\nexample.org##+js(acs, Promise, adblock)\n##.generic-ad\n@@||example.net^$generichide\n")
+with open(shield._list_path(shield.SCRIPTLETS[0]), "w") as f:
+    f.write("/// abort-current-script.js\n/// alias acs.js\n(function() {\n    const target = '{{1}}';\n    const needle = '{{2}}';\n})();\n")
+sh = shield.Shield()
+c = sh.cosmetic("https://example.org/page")
+eq("a site's hide rule, as a style sheet", ".sponsored{display:none!important}" in c["css"], True)
+eq("its scriptlet, its arguments filled in", "Promise" in c["script"] and "adblock" in c["script"], True)
+eq("the generic rules apply", c["generic"], True)
+eq("a generic rule, for the class that calls for it", sh.generic("https://example.org/page", ["generic-ad", "other"], []),
+   ".generic-ad{display:none!important}")
+eq("nothing for classes no rule names", sh.generic("https://example.org/page", ["plain"], []), "")
+eq("a site exempted from generic rules says so", sh.cosmetic("https://example.net/")["generic"], False)
+eq("not a web page: nothing", sh.cosmetic("about:blank"), {"css": "", "script": "", "generic": False})
 
 print(f"\niris core: {count - len(fails)} passed, {len(fails)} failed")
 for f in fails:

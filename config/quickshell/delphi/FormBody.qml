@@ -52,6 +52,20 @@ Item {
   property var values: ({})
   property var flags: ({})
   property int pick: 0
+  // ── HELD WHILE IT WORKS (`hold` on the form, CardSheet) ──────────────
+  // The verb turns into the suite's working pill (BusyButton) and the card
+  // stays up until the work is done; a refusal (refuse(text)) puts the verb
+  // back with the reason under the fields — a wrong password shakes the
+  // field — so it can be tried again where it was asked (user, 2026-10-12:
+  // "change the login button to the progress animation instead").
+  property bool busy: false
+  property string busyText: ""
+  property string fault: ""
+  function refuse(text) {
+    fb.busy = false;
+    fb.fault = String(text || "");
+    if (fb.secret) { pw.failed = true; Qt.callLater(fb.focusFirst); }
+  }
   // a dropdown's "something else" choice — what its typed value is kept under
   readonly property string other: "\u0001other"
   // BulkDrop's host contract: the one open list, and the wheel's step
@@ -70,6 +84,8 @@ Item {
     fb.values = v;
     fb.flags = t;
     fb.missing = [];
+    fb.busy = false;
+    fb.fault = "";
     fb.pick = 0;
     pw.pw = "";
     pw.failed = false;
@@ -98,6 +114,8 @@ Item {
   onValuesChanged: if (fb.missing.length > 0)
     fb.missing = fb.missing.filter((k) => fb.valueOf(fb.fields.find((f) => f.key === k) || {}).trim() === "")
   function answer(ok) {
+    if (fb.busy && ok) return;
+    if (ok) fb.fault = "";
     if (ok && !fb.ready) {
       // the secret not given yet (a paste that brought nothing): the field
       // says so, red, rather than the verb doing nothing
@@ -159,7 +177,8 @@ Item {
     detail: fb.form && fb.form.detail ? fb.form.detail : ""
     items: fb.form && fb.form.items ? fb.form.items : []
     choices: [{ label: fb.form && fb.form.verb ? fb.form.verb : "OK",
-                ink: fb.ready ? (fb.form && fb.form.verbInk ? fb.form.verbInk : Zenon.cyan) : Zenon.muted },
+                ink: fb.ready ? (fb.form && fb.form.verbInk ? fb.form.verbInk : Zenon.cyan) : Zenon.muted,
+                busy: fb.busy, busyText: fb.busyText },
               { label: fb.form && fb.form.cancelLabel ? fb.form.cancelLabel : "Cancel", ink: Zenon.muted }]
     pick: fb.pick
     onPicked: (i) => fb.pick = i
@@ -298,9 +317,21 @@ Item {
       // stayed at nothing (a pasted token went in unseen, 2026-10-11)
       height: fb.secret ? implicitHeight + (pw.purpose !== "" ? 22 : 0) : 0
       prompt: fb.secret && fb.secret.prompt ? fb.secret.prompt : "input your password"
-      purpose: fb.secret && fb.secret.purpose ? fb.secret.purpose : ""
+      busy: fb.busy
+      purpose: fb.fault !== "" ? fb.fault : fb.secret && fb.secret.purpose ? fb.secret.purpose : ""
       onSubmitted: (p) => { pw.pw = p; fb.answer(true); }
       onCancelled: fb.answer(false)
+    }
+    // why a held answer was refused (a secret's reason is under its field)
+    Text {
+      visible: fb.fault !== "" && !fb.secret
+      width: body.width - 36
+      wrapMode: Text.Wrap
+      text: fb.fault
+      color: Zenon.red
+      font.family: Zenon.face
+      font.weight: Zenon.weight
+      font.pixelSize: Zenon.px(13)
     }
     Repeater {
       model: fb.toggles

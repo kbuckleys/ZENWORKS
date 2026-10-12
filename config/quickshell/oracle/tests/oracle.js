@@ -380,6 +380,37 @@ module.exports = {
     t.has("repeats are counted, not listed", B.pollers.text, "hyprctl \u00d75");
     t.eq("errors are bad", B.log.level, "bad");
     t.eq("no output at all did not run", T.readCheckup("", 1).tests.text, "did not run");
+
+    // ── about this computer ───────────────────────────────────────────────
+    const ff = JSON.stringify([
+      { type: "OS", result: { id: "arch", idLike: "", name: "Arch Linux", prettyName: "Arch Linux" } },
+      { type: "Host", result: { vendor: "Gigabyte Technology Co., Ltd.", name: "B365M H", version: "" } },
+      { type: "Kernel", result: { architecture: "x86_64", name: "Linux", release: "7.2.9-arch1-1" } },
+      { type: "Uptime", result: { uptime: 90061000 } },
+      { type: "Packages", result: { all: 941, pacman: 941, flatpakSystem: 0 } },
+      { type: "WM", result: { prettyName: "Hyprland", protocolName: "Wayland", version: "0.56.2" } },
+      { type: "CPU", result: { cpu: "Intel(R) Core(TM) i5-9400F", cores: { logical: 6 }, frequency: { max: 4100 } } },
+      { type: "GPU", result: [{ vendor: "NVIDIA", name: "GeForce RTX 5060 Ti", type: "Discrete" }] },
+      { type: "Memory", result: { total: 33568792576, used: 4401385472 } },
+      { type: "Disk", result: [{ mountpoint: "/", filesystem: "ext4", bytes: { used: 18326032384, total: 48890621952 } }] },
+      { type: "Battery", error: "No batteries found" },
+      { type: "Locale", result: "en_US.UTF-8" }
+    ]);
+    const PC = T.readComputer(ff, "Quickshell 0.3.2 (revision , distributed by Arch Linux)");
+    const pcv = (k) => (PC.rows.find((r) => r.k === k) || {}).v;
+    t.eq("arch wears its logo", PC.glyph, "\uF303");
+    t.eq("the summary line", PC.summary, "Arch Linux \u00b7 Intel Core i5-9400F \u00b7 GeForce RTX 5060 Ti \u00b7 31.3 GiB");
+    t.eq("os carries the arch", pcv("OS"), "Arch Linux x86_64");
+    t.eq("uptime in words", pcv("Uptime"), "1 day, 1 hour, 1 min");
+    t.eq("empty package managers are left out", pcv("Packages"), "941 (pacman)");
+    t.eq("quickshell is its version", pcv("Quickshell"), "0.3.2");
+    t.eq("cpu with threads and clock", pcv("CPU"), "Intel(R) Core(TM) i5-9400F (6) @ 4.10 GHz");
+    t.eq("memory as used of total", pcv("Memory"), "4.1 GiB / 31.3 GiB (13%)");
+    t.eq("a disk is named by its mount", pcv("Disk (/)"), "17.1 GiB / 45.5 GiB (37%) \u00b7 ext4");
+    t.eq("a module that failed is left out", pcv("Battery"), undefined);
+    t.eq("garbage reads as nothing", T.readComputer("not json", "").ok, false);
+    t.eq("a derivative borrows its parent's logo",
+      T.readComputer(JSON.stringify([{ type: "OS", result: { id: "mystery", idLike: "arch", name: "X" } }]), "").glyph, "\uF303");
   },
 
   // The Font row stores a FAMILY and the picker hands back a FILE; whichever

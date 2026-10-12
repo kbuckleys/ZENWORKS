@@ -15,7 +15,12 @@
 //                                card up after its run (a sign-in's Open and
 //                                Copy are not answers)
 //   confirm({ question, glyph, ink, detail, items, verb, then, cancel }) → id
-//   ask(form) → id               a FormBody card — fields, a password
+//   ask(form) → id               a FormBody card — fields, a password.
+//                                `hold: true` keeps it up while the answer
+//                                works: then(values, finish) — its verb is
+//                                the working pill (`busyText`) until
+//                                finish(true) takes it down; finish("why")
+//                                refuses, leaving it up to try again
 //   dropCard(id)                 take one down (the sign-in that finished)
 //
 // `lead` is a card that goes before the queue, owned by whoever set it
@@ -96,6 +101,20 @@ Item {
     const c = deck.card;
     if (!c || c.kind !== "form") return;
     if (c === deck.lead) { deck.leadSettled(ok, values); return; }
+    if (ok && c.hold && c.then) {
+      formBody.busyText = c.busyText || (c.verb || "OK") + "\u2026";
+      formBody.busy = true;
+      c.then(values || {}, (res) => {
+        // the card may have been put away (Esc) while it worked
+        if (!deck.sheetQueue.some((x) => x.id === c.id)) return;
+        if (typeof res === "string" && res !== "") {
+          if (deck.card === c) formBody.refuse(res);
+          return;
+        }
+        deck.dropCard(c.id);
+      });
+      return;
+    }
     deck.dropCard(c.id);
     if (ok && c.then) c.then(values || {});
     else if (!ok && c.cancel) c.cancel();

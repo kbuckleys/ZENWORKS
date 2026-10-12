@@ -1733,3 +1733,117 @@ function inputCheck(xkb, field, value, layout) {
   }
   return "";
 }
+
+// ── ABOUT THIS COMPUTER ───────────────────────────────────────────────────
+// fastfetch's --format json, read into the About section's fold-out: a
+// line for the row itself (`summary`), the distro's logo glyph and the
+// facts, one `{ k, v }` per line, in fastfetch's own order. `qs` is the
+// first line of `qs --version`, which fastfetch does not know about.
+// A module fastfetch could not read comes back with an `error` and no
+// `result`; it is left out, as fastfetch leaves it out of its own print.
+// (a function: a library's top-level const is not reachable from QML)
+function computerModules() {
+  return "OS:Host:Kernel:Uptime:Packages:WM:Display:CPU:GPU:Memory:Swap:Disk:LocalIp:Battery:Locale";
+}
+
+// Nerd Font logos (nf-linux-*), by os-release ID — and ID_LIKE after it, so
+// an Arch derivative without a logo of its own wears Arch's
+const DISTRO_GLYPHS = {
+  arch: "", archarm: "", artix: "", endeavouros: "",
+  manjaro: "", garuda: "", cachyos: "", debian: "",
+  ubuntu: "", linuxmint: "", pop: "", elementary: "",
+  fedora: "", rhel: "", centos: "", rocky: "",
+  almalinux: "", opensuse: "", "opensuse-tumbleweed": "",
+  "opensuse-leap": "", gentoo: "", nixos: "", void: "",
+  alpine: "", slackware: "", kali: "", zorin: ""
+};
+
+function bytes(n) {
+  const units = ["B", "KiB", "MiB", "GiB", "TiB"];
+  let v = Number(n) || 0, i = 0;
+  while (v >= 1024 && i < units.length - 1) { v /= 1024; ++i; }
+  return (i === 0 ? String(v) : v.toFixed(v >= 100 ? 0 : 1)) + " " + units[i];
+}
+
+function usage(used, total) {
+  if (!total) return "";
+  return bytes(used) + " / " + bytes(total) + " (" + Math.round(used / total * 100) + "%)";
+}
+
+function span(ms) {
+  let s = Math.floor((Number(ms) || 0) / 1000);
+  const d = Math.floor(s / 86400); s -= d * 86400;
+  const h = Math.floor(s / 3600); s -= h * 3600;
+  const m = Math.floor(s / 60);
+  const out = [];
+  if (d) out.push(d + (d === 1 ? " day" : " days"));
+  if (h) out.push(h + (h === 1 ? " hour" : " hours"));
+  if (m || out.length === 0) out.push(m + (m === 1 ? " min" : " mins"));
+  return out.join(", ");
+}
+
+function ghz(mhz) {
+  return mhz ? (mhz / 1000).toFixed(2) + " GHz" : "";
+}
+
+function readComputer(json, qsVersion) {
+  let list = [];
+  try { list = JSON.parse(String(json || "")); } catch (e) { list = []; }
+  if (!Array.isArray(list)) list = [];
+  const by = {};
+  for (const m of list) if (m && m.type && m.result !== undefined && m.result !== null) by[m.type] = m.result;
+  const rows = [];
+  const put = (k, v) => { if (v !== undefined && v !== null && String(v).trim() !== "") rows.push({ k: k, v: String(v).trim() }); };
+  const os = by.OS || {}, kern = by.Kernel || {};
+  put("OS", [os.prettyName || os.name, kern.architecture].filter((x) => !!x).join(" "));
+  const host = by.Host || {};
+  put("Host", [host.vendor, host.name || host.family, host.version].filter((x) => !!x && !/to be filled|default string/i.test(x)).join(" "));
+  put("Kernel", [kern.name, kern.release].filter((x) => !!x).join(" "));
+  if (by.Uptime) put("Uptime", span(by.Uptime.uptime));
+  if (by.Packages) {
+    const p = by.Packages;
+    const parts = Object.keys(p).filter((k) => k !== "all" && Number(p[k]) > 0).map((k) => p[k] + " (" + k + ")");
+    put("Packages", parts.join(", "));
+  }
+  if (by.WM) put("WM", [by.WM.prettyName || by.WM.processName, by.WM.version].filter((x) => !!x).join(" ")
+    + (by.WM.protocolName ? " (" + by.WM.protocolName + ")" : ""));
+  put("Quickshell", String(qsVersion || "").replace(/^Quickshell\s+/, "").replace(/\s*\(.*$/, ""));
+  for (const d of (Array.isArray(by.Display) ? by.Display : [])) {
+    const o = d.output || {};
+    put("Display", (d.name ? d.name + "  " : "") + o.width + "×" + o.height
+      + (o.refreshRate ? " @ " + Math.round(o.refreshRate) + " Hz" : "")
+      + (d.scaled && d.scaled.width && d.scaled.width !== o.width && d.scaled.width !== o.height
+        ? " (as " + d.scaled.width + "×" + d.scaled.height + ")" : ""));
+  }
+  if (by.CPU) {
+    const c = by.CPU, cores = c.cores || {};
+    put("CPU", c.cpu + (cores.logical ? " (" + cores.logical + ")" : "")
+      + ((c.frequency || {}).max ? " @ " + ghz(c.frequency.max) : ""));
+  }
+  for (const g of (Array.isArray(by.GPU) ? by.GPU : []))
+    put("GPU", [g.vendor, g.name].filter((x) => !!x && !(g.name || "").startsWith(x + " ")).join(" ")
+      + (g.type ? " [" + g.type + "]" : ""));
+  if (by.Memory) put("Memory", usage(by.Memory.used, by.Memory.total));
+  for (const s of (Array.isArray(by.Swap) ? by.Swap : []))
+    put("Swap", usage(s.used, s.total) + (s.name ? "  " + s.name.replace(/^\/dev\//, "") : ""));
+  for (const d of (Array.isArray(by.Disk) ? by.Disk : []))
+    put("Disk (" + d.mountpoint + ")", usage((d.bytes || {}).used, (d.bytes || {}).total) + (d.filesystem ? " · " + d.filesystem : ""));
+  for (const n of (Array.isArray(by.LocalIp) ? by.LocalIp : []))
+    put("Local IP (" + n.name + ")", n.ipv4 || n.ipv6 || "");
+  for (const b of (Array.isArray(by.Battery) ? by.Battery : []))
+    put("Battery", Math.round(b.capacity) + "%" + (b.status ? " · " + String(b.status).toLowerCase() : ""));
+  if (typeof by.Locale === "string") put("Locale", by.Locale);
+
+  const ids = [os.id].concat(String(os.idLike || "").split(/\s+/)).filter((x) => !!x);
+  let glyph = "";
+  for (const id of ids) if (DISTRO_GLYPHS[id]) { glyph = DISTRO_GLYPHS[id]; break; }
+  const cpu = by.CPU ? String(by.CPU.cpu || "").replace(/\((R|TM)\)/g, "").replace(/\s+/g, " ").replace(/ CPU| Processor/g, "") : "";
+  const gpu = Array.isArray(by.GPU) && by.GPU.length ? by.GPU[0].name : "";
+  return {
+    ok: rows.length > 0,
+    glyph: glyph,
+    title: os.prettyName || os.name || "",
+    rows: rows,
+    summary: [os.prettyName || os.name, cpu, gpu, by.Memory ? bytes(by.Memory.total) : ""].filter((x) => !!x).join(" · ")
+  };
+}

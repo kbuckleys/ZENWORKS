@@ -67,7 +67,7 @@ Item {
     lock.win.mgr.unlock(lock.acct, secret, (ok, err) => {
       lock.busy = false;
       if (ok) return;
-      if (err && err.kind === "auth") { field.failed = true; lock.failure = err.error && err.error.indexOf("Wrong") !== 0 ? err.error : ""; }
+      if (err && err.kind === "auth") { field.failed = true; lock.failure = C.authNote(err); }
       else lock.failure = C.failWords(err);
     });
   }
@@ -132,6 +132,8 @@ Item {
         id: field
         anchors.fill: parent
         grow: 2
+        washRadius: Zenon.windowRadius + 4
+        busy: lock.busy
         prompt: C.unlockPrompt(lock.info ? lock.info.asks : "password")
         purpose: lock.busy ? "unlocking…" : "unlocks " + (lock.acct ? lock.acct.name : "the vault")
         onSubmitted: (pw) => lock.submit(pw)

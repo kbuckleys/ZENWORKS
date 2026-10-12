@@ -76,6 +76,13 @@ class Bridge(QObject):
     @Slot(result="QVariantMap")
     def shieldStats(self): return self._shield.stats()
 
+    # what a page shows (shield.py's cosmetic filtering)
+    @Slot(str, result="QVariantMap")
+    def cosmeticFor(self, url): return self._shield.cosmetic(url)
+
+    @Slot(str, list, list, result=str)
+    def genericFor(self, url, classes, ids): return self._shield.generic(url, classes, ids)
+
     @Slot(str)
     def report(self, line):
         print("iris:", line, flush=True)

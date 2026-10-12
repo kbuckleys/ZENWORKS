@@ -34,9 +34,13 @@ Rectangle {
   // NO HOVER TINT (user, 2026-10-11): the suite's buttons do not light up
   // as the pointer passes; the `hovered` signal still tells a card where
   // the pointer is.
+  // The plain button wears a faint wash of its ink at rest (user,
+  // 2026-10-12: "a little more prominent") — bare, it was a hairline round
+  // a word and read as a label, not something to press. The default answer
+  // keeps a stronger wash, plus its ring and glow.
   color: !btn.ready ? "transparent"
     : Qt.rgba(btn.ink.r, btn.ink.g, btn.ink.b,
-              btnArea.pressed ? 0.45 : (btn.primary ? 0.12 : 0.0))
+              btnArea.pressed ? 0.45 : (btn.primary ? 0.14 : 0.08))
   border.width: 1
   border.color: Zenon.border
   opacity: btn.ready ? 1 : 0.55

@@ -110,7 +110,11 @@ class Bitwarden(Provider):
         low = t.lower()
         if "two-step" in low or "two step" in low or "2fa" in low:
             return "two-step"
-        if "invalid master password" in low or "username or password is incorrect" in low:
+        # bw's newer builds decrypt through the Rust SDK, whose refusal is
+        # "ERROR bitwarden_crypto::keys::master_key: error=The decryption
+        # operation failed" — a wrong password, said by a crate
+        if ("invalid master password" in low or "username or password is incorrect" in low
+                or "decryption operation failed" in low or "master_key" in low):
             return "Wrong master password"
         if "new device" in low or "verification" in low and "email" in low:
             return "Bitwarden sent a verification code to your email — enter it as the 2FA code"

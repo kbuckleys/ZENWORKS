@@ -4,7 +4,7 @@
 // https://github.com/kbuckleys/
 //
 // FIND IN PAGE (Ctrl+F) — a strip along the window's foot, in the bar's own
-// ground and hairline: terminus/BulkField to type in, found as it is typed
+// glass (the window's ground, as terminus' bars) and hairline: terminus/BulkField to type in, found as it is typed
 // (Chromium's own findText, highlights and all), "3 of 12", and the next or
 // previous match (Return / ↓, Shift+Return / ↑, or the keys beside it).
 // Escape, or the ×, clears the highlights and puts it away.
@@ -24,7 +24,7 @@ Rectangle {
 
   height: find.open ? 42 : 0
   visible: find.open
-  color: Zenon.headBg
+  color: Zenon.layerBg
   Rectangle { width: parent.width; height: 1; color: Zenon.border }
 
   function show() {

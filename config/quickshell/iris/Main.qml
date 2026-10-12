@@ -8,12 +8,10 @@
 //
 //   the strip      plato/editor/TabBar (terminus' strip), fed by Tabs.qml;
 //                  hidden while there is one tab, as plato's is
-//   the bar        picasso's bar ground (Zenon.headBg); back / forward /
-//                  reload are morpheus/TransportKey, the address line is
-//                  terminus/BulkField
-//   the frost      morpheus/Frost under both, as picasso's bars have — the
-//                  page's top band, blurred and shifted up into the glass
-//                  (Frost.sampleShift says why it is not the page itself)
+//   the bar        terminus' glass: the window's own ground (Zenon.layerBg)
+//                  with the desktop frosted through it, the active tab the
+//                  same surface; back / forward / reload are
+//                  morpheus/TransportKey, the address line terminus/BulkField
 //   the pages      Page.qml, one per tab, made and destroyed with it
 //
 //   the line's     what History remembers that fits what is typed, on
@@ -63,8 +61,6 @@ Window {
     win.fullPage = false;
   }
 
-  // measuring only (IRIS_NOFROST=1): the chrome without its frost
-  readonly property bool noFrost: Iris.env("IRIS_NOFROST") === "1"
   readonly property font face: Qt.font({ family: Zenon.face, weight: Zenon.weight, pixelSize: Zenon.px(14) })
 
   Tabs {
@@ -111,8 +107,13 @@ Window {
   Downloads { normal: Iris.profile; cloak: Iris.cloak }
 
   // ── THE SESSION, kept as it changes (and as the window closes) ─────
+  // OFF (user, 2026-10-12: "disable the open last page thing"): iris opens
+  // fresh, and keeps no session to open. The machinery stays (Tabs'
+  // restore/sessionText, core/keep.py's Session) for when iris has settings
+  // and this is a switch there.
+  readonly property bool restoreSession: false
   Timer { id: keeper; interval: 1000; onTriggered: win.keep() }
-  function keep() { if (!Iris.selftest) { keeper.stop(); Session.save(deck.sessionText()); } }
+  function keep() { if (!Iris.selftest && win.restoreSession) { keeper.stop(); Session.save(deck.sessionText()); } }
   onClosing: win.keep()
 
   // another `iris <url>` handed its request here (core/door.py)
@@ -135,24 +136,18 @@ Window {
     visible: !win.fullPage
     z: 1
 
-    // the frost, under everything the chrome draws (as picasso's bars lay it):
-    // what is just below the chrome, a band its own height, blurred into it
-    Frost {
-      anchors.fill: parent
-      source: pages
-      sampleShift: Qt.point(0, chrome.height)
-      active: !!deck.here && !win.noFrost
-    }
-    // the strip's glass, over the frost and tinting it — laid here, as plato
-    // lays its own (TabBar's groundBelow): the active tab in the bar's ground,
-    // so it runs on into the bar, the others thinner
+    // ── TERMINUS' GLASS (user, 2026-10-12: "like in terminus") ────────
+    // The window is clear, so hyprland frosts the desktop through whatever
+    // the chrome leaves see-through. The bar and the active tab are one
+    // surface — the window's own ground at the window's alpha (layerBg),
+    // as terminus' path bar and active tab are — and an inactive tab is
+    // thinner, tinted glass (TabGlass' own `away`). Laid here, as plato and
+    // terminus lay it, under the strip (TabBar's groundBelow).
     TabGlass {
       width: strip.width
       height: strip.height
       visible: strip.visible
       cell: strip.hereCell
-      here: Zenon.headBg
-      away: Zenon.alpha(Zenon.tabAwayInk, Zenon.tabAway(Zenon.headBg.a))
     }
 
     // ── THE STRIP ──────────────────────────────────────────────────────
@@ -174,7 +169,7 @@ Window {
       anchors.left: parent.left
       anchors.right: parent.right
       height: 42
-      color: Zenon.headBg
+      color: Zenon.layerBg
 
       Row {
         id: keys
@@ -218,6 +213,14 @@ Window {
           glyph: deck.here ? Math.round(deck.here.zoomFactor * 100) + "%" : ""
           size: Zenon.px(13)
           onActivated: win.zoom(0)
+        }
+        // a sign-up: calypso makes a password, keeps it, types it (Alt+G)
+        TransportKey {
+          visible: !!deck.here && deck.here.hasSignup
+          glyph: "\u{F0068}"
+          size: Zenon.px(18)
+          ink: Zenon.sand
+          onActivated: win.suggestPassword()
         }
         // a cloak tab says so, beside its line
         Text {
@@ -391,6 +394,21 @@ Window {
   }
   function toPage() { if (deck.here) deck.here.forceActiveFocus(); }
 
+  // ── A NEW PASSWORD, FROM CALYPSO ───────────────────────────────────
+  // The page's new-password field under the cursor, then the shell's
+  // calypso (via IrisManager): it makes a password, saves the login — this
+  // site, this page, the username typed in the form — and types it in, and
+  // into the confirmation after a Tab. The password never passes iris.
+  function suggestPassword() {
+    const p = deck.here;
+    if (!p) return;
+    const site = I.siteOf(String(p.url)), url = String(p.url);
+    p.focusNewPassword((r) => {
+      if (r.found) Shell.send({ suggest: { site: site, url: url, username: r.username, twice: r.twice } });
+      if (Iris.selftest) Iris.report("suggest: found " + r.found + ", confirmation " + r.twice + ", username \"" + r.username + "\" for " + site);
+    });
+  }
+
   // ── FIND, ALONG THE FOOT ───────────────────────────────────────────
   FindBar {
     id: findBar
@@ -500,6 +518,7 @@ Window {
   Shortcut { sequence: "Ctrl+W"; onActivated: if (deck.here) deck.close(deck.here.tabId) }
   Shortcut { sequences: ["Ctrl+L", "F6"]; onActivated: address.claim() }
   Shortcut { sequence: "Ctrl+Shift+L"; onActivated: win.fill() }
+  Shortcut { sequence: "Alt+G"; onActivated: win.suggestPassword() }
   Shortcut { sequences: ["Ctrl+F", "F3"]; onActivated: findBar.show() }
   Shortcut { sequences: ["Ctrl+=", "Ctrl++"]; onActivated: win.zoom(1) }
   Shortcut { sequence: "Ctrl+-"; onActivated: win.zoom(-1) }
@@ -517,13 +536,45 @@ Window {
     if (Iris.selftest && Iris.startUrl.startsWith("churn:")) { churn.start(); return; }
     if (Iris.selftest && Iris.startUrl.startsWith("drive:")) { driver.begin(); return; }
     if (Iris.selftest && Iris.startUrl.startsWith("gaps:")) { gaps.begin(Iris.startUrl.slice(5)); return; }
+    // IRIS_SELFTEST="signup:<url> <url> …" — each page: does it read as a
+    // sign-up, and what suggest would ask calypso for
+    if (Iris.selftest && Iris.startUrl.startsWith("signup:")) {
+      const urls = Iris.startUrl.slice(7).split(" ");
+      const page = deck.open(urls[0]);
+      let at = 0;
+      page.loadingChanged.connect((req) => {
+        if (req.status !== WebEngineView.LoadSucceededStatus) return;
+        signupCheck.restart();
+      });
+      signupCheck.next = () => {
+        Iris.report("signup " + urls[at] + ": login " + page.hasLogin + ", sign-up " + page.hasSignup);
+        if (page.hasSignup) win.suggestPassword();
+        if (++at < urls.length) page.url = urls[at]; else lookEnd.restart();
+      };
+      return;
+    }
+    // IRIS_SELFTEST="look:<url> <url> …" — the pages in tabs, held a while to be
+    // looked at (a screenshot), the first in front
+    if (Iris.selftest && Iris.startUrl.startsWith("look:")) {
+      const urls = Iris.startUrl.slice(5).split(" ");
+      for (const u of urls) deck.open(u, u !== urls[0]);
+      lookEnd.start();
+      return;
+    }
+    if (Iris.selftest && Iris.startUrl.startsWith("cosmetic:")) {
+      const urls = Iris.startUrl.slice(9).split(" ");
+      cosmeticCheck.urls = urls;
+      cosmeticCheck.page = deck.open(urls[0]);
+      cosmeticCheck.restart();
+      return;
+    }
     if (Iris.selftest && Iris.startUrl.startsWith("onewheel:")) {
       const page = deck.open(Iris.startUrl.slice(9));
       page.loadingChanged.connect((req) => { if (req.status === WebEngineView.LoadSucceededStatus) oneWheel.start(); });
       return;
     }
     if (Iris.selftest) { test.begin(); return; }
-    const restored = deck.restore(Session.load());
+    const restored = win.restoreSession && deck.restore(Session.load());
     const start = Iris.startUrl, blank = !start || start === "about:blank";
     if (Iris.startCloak) {
       deck.open(blank ? "about:blank" : start, false, undefined, true);
@@ -670,6 +721,29 @@ Window {
   }
 
   Timer { id: finishLater; interval: 1000; onTriggered: test.finish() }
+  Timer { id: lookEnd; interval: 9000; onTriggered: { Iris.report("LOOK DONE"); Qt.quit(); } }
+  Timer { id: signupCheck; property var next: null; interval: 1500; onTriggered: if (next) next() }
+
+  // IRIS_SELFTEST="cosmetic:<url> <url> …" — each page loaded, then what the
+  // shield laid into it, and whether the boxes it should hide are hidden
+  Timer {
+    id: cosmeticCheck
+    property var urls: []
+    property int at: 0
+    property var page: null
+    interval: 7000
+    onTriggered: {
+      const p = page;
+      const names = p.userScripts.collection.map(s => s.name + " (" + s.sourceCode.length + " bytes)").join(", ");
+      p.runJavaScript(
+        "JSON.stringify({ sheet: (document.getElementById('iris-hide') || { textContent: '' }).textContent.split('}').length - 1,"
+        + " boxes: [...document.querySelectorAll('[data-probe]')].map(e => e.dataset.probe + ':' + getComputedStyle(e).display) })",
+        (j) => {
+          Iris.report("cosmetic " + urls[at] + "\n  laid in: " + names + "\n  in the page: " + j);
+          if (++at < urls.length) { p.url = urls[at]; restart(); } else Qt.quit();
+        });
+    }
+  }
 
   // IRIS_SELFTEST="gaps:<page>" — find, zoom, notifications, location,
   // fullscreen, print, a bad certificate and a site's sign-in, one after

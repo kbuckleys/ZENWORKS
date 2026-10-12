@@ -51,7 +51,9 @@ PACKAGES=(
   kitty zsh zoxide neovim git curl fastfetch stow
   # system & packages
   pacman-contrib expac gawk bandwhich iotop solaar glib2 gtk3 nodejs
+  # iris, the browser (its own PySide6 process, Qt WebEngine, the shield);
   qt6-webengine python-adblock pyside6
+  # libva-nvidia-driver is its video decoding on NVIDIA, unused elsewhere
   libva-nvidia-driver libva-utils
   # fonts
   noto-fonts noto-fonts-cjk noto-fonts-extra noto-fonts-emoji

@@ -1107,6 +1107,13 @@ Singleton {
     // anyone asks of a settings panel, and the answer was only discoverable by
     // reading the source — so the panel says it. `info` rows hold nothing, are
     // never written, and never count as changed; see Ora.stored.
+    // ABOUT THIS COMPUTER (user, 2026-10-12: "something like fastfetch"):
+    // a readout that folds open (`fold`) into fastfetch's facts — the
+    // summary on the row, the lot underneath. See readComputer.
+    { key: "infoComputer", section: "about", label: "About this computer", type: "info",
+      fold: "computer",
+      alias: "fastfetch neofetch system hardware cpu gpu memory kernel distro os host uptime packages specs",
+      help: "The machine under the shell, as fastfetch reads it. Click to unfold." },
     { key: "infoStatePath", section: "about", label: "Kept in", type: "info",
       // a path identifies itself by its END, so this one elides from the left
       elideLeft: true,
@@ -1277,6 +1284,11 @@ Singleton {
       const r = root.checkup[hs.health];
       return r ? r.text : "not run yet";
     }
+    if (key === "infoComputer") {
+      if (root.computerReading && !root.computer) return "reading\u2026";
+      if (!root.computer) return "";
+      return root.computer.ok ? root.computer.summary : root.computer.why;
+    }
     if (key === "infoStatePath") return root.statePath;
     if (key === "infoMonitorsPath") return root.monitorsPath;
     if (key === "infoDefaultsPath") return root.defaultsPath;
@@ -1332,6 +1344,44 @@ Singleton {
     doctorProc.command = ["bash", Quickshell.shellDir + "/oracle/doctor.sh",
       Quickshell.shellDir, "", String(since)];
     doctorProc.running = true;
+  }
+
+  // ── ABOUT THIS COMPUTER ───────────────────────────────────────────────
+  // fastfetch's JSON and quickshell's version, read once on the first visit
+  // to About and again after five minutes (uptime, memory and disks move).
+  property var computer: null
+  property bool computerReading: false
+  property double computerAt: 0
+  function readComputer(force) {
+    if (root.computerReading) return;
+    if (!force && root.computer && Date.now() - root.computerAt < 300000) return;
+    root.computerReading = true;
+    root.revision++;
+    computerProc.running = true;
+  }
+  Process {
+    id: computerProc
+    command: ["bash", "-c",
+      "command -v fastfetch >/dev/null || { echo NOFASTFETCH; exit 0; }; "
+      + "fastfetch --format json -s '" + Ora.computerModules() + "' 2>/dev/null; "
+      + "printf '\\n@@QS@@\\n'; qs --version 2>/dev/null | head -1"]
+    stdout: StdioCollector {
+      id: computerOut
+      onStreamFinished: {
+        const t = computerOut.text;
+        const cut = t.indexOf("@@QS@@");
+        if (t.indexOf("NOFASTFETCH") === 0) {
+          root.computer = { ok: false, rows: [], why: "fastfetch is not installed", missing: true };
+        } else {
+          const c = Ora.readComputer(cut >= 0 ? t.slice(0, cut) : t, cut >= 0 ? t.slice(cut + 6).trim() : "");
+          if (!c.ok) c.why = "fastfetch said nothing";
+          root.computer = c;
+        }
+        root.computerAt = Date.now();
+        root.computerReading = false;
+        root.revision++;
+      }
+    }
   }
 
   Process {

@@ -12,7 +12,7 @@
 //     Sheet { cardH: body.implicitHeight
 //       ConfirmBody { id: body; width: parent.width
 //         question: …; detail: …; items: [names]
-//         choices: [{ label, ink }, …, { label: "Cancel", ink }]
+//         choices: [{ label, ink, busy, busyText }, …, { label: "Cancel", ink }]
 //         onChose: (i) => … } }
 //
 // `choices` in order of preference — the first is the primary one, Cancel
@@ -239,12 +239,17 @@ Item {
     layoutDirection: Qt.RightToLeft
     Repeater {
       model: cb.choices
-      delegate: DialogButton {
+      // a choice can be `busy` (a held form's verb while it works): it
+      // turns into the working pill, saying `busyText`
+      delegate: BusyButton {
         required property var modelData
         required property int index
         label: modelData.label
         ink: modelData.ink
         primary: index === cb.pick
+        busy: !!modelData.busy
+        busyText: modelData.busyText || (modelData.label + "\u2026")
+        busyInk: modelData.ink
         onClicked: cb.chose(index)
       }
     }

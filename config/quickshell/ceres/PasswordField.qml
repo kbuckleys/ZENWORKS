@@ -24,6 +24,14 @@ Item {
   id: field
   // Text size over the panel's: the window reads 2px larger.
   property int grow: 0
+  // the red wash a wrong password lays behind the field: square and strong
+  // by default (ceres' band); rounded and softer for a field that sits in a
+  // card or a rounded box of its own (calypso)
+  property real washRadius: 0
+  // the answer is being checked: the prompt, lock and dots give way to the
+  // working dots — nothing to type while it is (user, 2026-10-12: no
+  // "input your master password" during the unlock)
+  property bool busy: false
 
   property string pw: ""
   // sudo refused the last one. Cleared by the first key typed after it.
@@ -41,6 +49,8 @@ Item {
     const k = event.key;
     if (k === Qt.Key_CapsLock) { CapsLock.read(); return true; }
     if (k === Qt.Key_Escape) { field.pw = ""; field.cancelled(); return true; }
+    // nothing typed in while the last answer is checked
+    if (field.busy) return true;
     if (k === Qt.Key_Return || k === Qt.Key_Enter) {
       if (field.pw === "") return true;
       const p = field.pw;
@@ -108,7 +118,8 @@ Item {
 
     Rectangle {
       anchors.fill: parent
-      color: field.failed ? Zenon.alpha(Zenon.red, 0.3) : Zenon.alpha(Zenon.red, 0)
+      radius: field.washRadius
+      color: field.failed ? Zenon.alpha(Zenon.red, field.washRadius > 0 ? 0.16 : 0.3) : Zenon.alpha(Zenon.red, 0)
       Behavior on color { ColorAnimation { duration: Zenon.fast; easing.type: Zenon.ease } }
     }
 
@@ -122,13 +133,22 @@ Item {
         anchors.horizontalCenter: parent.horizontalCenter
         spacing: 5
 
+        Working {
+          anchors.verticalCenter: parent.verticalCenter
+          visible: field.busy
+          running: field.busy && field.visible
+          ink: Zenon.pink
+          dot: 6
+          gap: 5
+        }
+
         Item {
           id: glyphBox
           anchors.verticalCenter: parent.verticalCenter
-          visible: field.pw.length === 0
+          visible: field.pw.length === 0 && !field.busy
           implicitWidth: lockGlyph.implicitWidth + 9
           implicitHeight: lockGlyph.implicitHeight
-          readonly property bool lit: field.visible && field.pw.length === 0
+          readonly property bool lit: field.visible && field.pw.length === 0 && !field.busy
 
           Text {
             id: lockGlyph
@@ -166,7 +186,7 @@ Item {
         Text {
           id: fieldMsg
           anchors.verticalCenter: parent.verticalCenter
-          visible: field.pw.length === 0
+          visible: field.pw.length === 0 && !field.busy
           text: field.failed ? "wrong password" : field.prompt
           color: field.failed ? Zenon.red : Zenon.muted
           font.family: Zenon.face
@@ -178,7 +198,7 @@ Item {
         // its dots out past the field's ends (calypso's lock, 2026-10-12).
         // Past that the row stays full and the caret keeps blinking.
         Repeater {
-          model: Math.min(field.pw.length, field.maxDots)
+          model: field.busy ? 0 : Math.min(field.pw.length, field.maxDots)
           delegate: Text {
             anchors.verticalCenter: parent.verticalCenter
             // U+F09DE, past the BMP, written as its surrogate pair
@@ -192,7 +212,7 @@ Item {
 
         Rectangle {
           id: caret
-          readonly property bool on: field.pw.length > 0
+          readonly property bool on: field.pw.length > 0 && !field.busy
           anchors.verticalCenter: parent.verticalCenter
           width: 3
           height: 20
@@ -209,8 +229,13 @@ Item {
         }
       }
 
+      // held inside the field, cut short at its end: a backend's raw error
+      // once ran out past both edges (calypso, 2026-10-12)
       Text {
         anchors.horizontalCenter: parent.horizontalCenter
+        width: Math.min(implicitWidth, field.width - 32)
+        horizontalAlignment: Text.AlignHCenter
+        elide: Text.ElideRight
         visible: field.purpose !== ""
         text: field.purpose
         color: Zenon.keyInk

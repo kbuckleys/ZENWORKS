@@ -140,6 +140,10 @@ LayerPopup {
     popup.sel = 0;
     popup.failMsg = "";
     popup.activeEntry = null;
+    // never back on the actions card it closed from (a copy closes it
+    // there): with the entry gone it came up as bare placeholders
+    // (user, 2026-10-12); settleMode picks unlock or empty over this
+    popup.mode = "list";
     if (popup.mgr) {
       popup.mgr.hold("quick");
       popup.mgr.loadPlatforms();
@@ -264,7 +268,7 @@ LayerPopup {
     popup.mgr.unlock(popup.lockAcct, secret, (ok, err) => {
       popup.unlocking = false;
       if (ok) { popup.mode = "list"; popup.syncFocus(); return; }
-      if (err && err.kind === "auth") { field.failed = true; popup.failMsg = err.error && err.error.indexOf("Wrong") !== 0 ? err.error : ""; }
+      if (err && err.kind === "auth") { field.failed = true; popup.failMsg = C.authNote(err); }
       else popup.failMsg = C.failWords(err);
     });
   }
@@ -756,6 +760,8 @@ LayerPopup {
                 id: field
                 width: parent.width
                 visible: popup.lockAsks
+                washRadius: Zenon.windowRadius
+                busy: popup.unlocking
                 prompt: C.unlockPrompt(popup.lockAcct && popup.mgr && popup.mgr.platformInfo(popup.lockAcct.kind)
                   ? popup.mgr.platformInfo(popup.lockAcct.kind).asks : "password")
                 purpose: popup.failMsg !== "" ? popup.failMsg : popup.unlocking ? "unlocking…" : "unlocks " + (popup.lockAcct ? popup.lockAcct.name : "the vault")

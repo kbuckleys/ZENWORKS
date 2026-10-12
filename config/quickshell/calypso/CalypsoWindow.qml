@@ -60,6 +60,10 @@ FloatingWindow {
       return;
     }
     win.mgr.hold("window");
+    // what hiding forgot, asked again: the item under the cursor is the
+    // same one, so onItemChanged never fires and its card came back as
+    // bare placeholders (user, 2026-10-12, after a copy and a reopen)
+    Qt.callLater(win.ensureDetail);
   }
   onClosed: win.visible = false
   Component.onCompleted: if (win.mgr) win.mgr.hold("window")
@@ -195,10 +199,20 @@ FloatingWindow {
     win.thawPulse++;
     list.positionViewAtIndex(win.sel, top ? ListView.Beginning : ListView.Contain);
   }
+  // The arrows GLIDE the list along with the cursor, as the wheel does
+  // (Elastic's follow), rather than jumping it a row at a time.
   function move(d) {
     if (win.shown.length === 0) return;
     win.sel = Math.max(0, Math.min(win.shown.length - 1, win.sel + d));
-    list.positionViewAtIndex(win.sel, ListView.Contain);
+    if (win.sel >= win.tops.length) { list.positionViewAtIndex(win.sel, ListView.Contain); return; }
+    const pad = 8;
+    const top = list.originY + win.tops[win.sel], bottom = top + win.rowH;
+    const from = list.contentY, to = from + list.height - list.bottomMargin;
+    let delta = 0;
+    if (top - pad - (win.rows[win.sel] && win.rows[win.sel].head !== "" ? win.secH : 0) < from)
+      delta = top - pad - (win.rows[win.sel].head !== "" ? win.secH : 0) - from;
+    else if (bottom + pad > to) delta = bottom + pad - to;
+    if (delta !== 0) listWheel.elastic.scroll(list, delta);
   }
 
   // ── THE ITEM IN FULL ───────────────────────────────────────────────────
@@ -239,6 +253,13 @@ FloatingWindow {
     });
   }
   function reprompt(secret) { win.loadDetail(secret); }
+  // the item in view with nothing loaded for it (forget() ran under it)
+  function ensureDetail() {
+    if (win.item && !win.detail && !win.detailBusy && !win.inTrash) {
+      win.lastKey = C.keyOf(win.item);
+      win.loadDetail();
+    }
+  }
   function loadCode() {
     const it = win.item;
     if (!it || !win.visible) return;
@@ -266,7 +287,7 @@ FloatingWindow {
   Connections {
     target: win.mgr
     function onLocked(id) { if (id === "" || (win.item && win.item.acct === id)) win.forget(); }
-    function onUnlocked(id) { if (win.lockTarget === id) win.lockTarget = ""; Qt.callLater(win.refocus); }
+    function onUnlocked(id) { if (win.lockTarget === id) win.lockTarget = ""; Qt.callLater(win.refocus); Qt.callLater(win.ensureDetail); }
   }
 
   // ── WHAT A FIELD DOES ──────────────────────────────────────────────────
@@ -456,27 +477,39 @@ FloatingWindow {
       detail: form.detail, fields: fields, toggles: kind === "keepass" && !again
         ? [{ key: "create", label: "Make a new database there", value: false }] : [],
       verb: form.then2 === "setup" ? "Continue" : again ? "Sign in" : "Add",
-      then: (v) => {
+      // held: an Add that signs in at once works on the card, its verb the
+      // working pill (CardSheet `hold`)
+      hold: true, busyText: again ? "Signing in…" : "Adding…",
+      then: (v, finish) => {
         const values = Object.assign({ how: how }, v);
         // the password on its own card, after the fields: 1Password's and
         // Bitwarden's sign-in needs it, and a new KeePass database is made
         // with one
         const pw = form.then2 === "setup" || (kind === "keepass" && v.create);
-        if (!pw) { win.runSetup(kind, values, null, again); return; }
+        if (!pw) { win.runSetup(kind, values, null, again, finish); return; }
+        finish(true);
         cards.ask({ title: kind === "keepass" ? "A password for the new database" : "Your " + p.name + " password",
           glyph: "\uF023", ink: Zenon.red,
           secret: { key: "pw", prompt: kind === "keepass" ? "input a master password" : "input your master password",
                     purpose: kind === "keepass" ? "locks " + (v.path || "the database") : "signs " + (v.email || "you") + " in to " + p.name },
           verb: kind === "keepass" ? "Make it" : "Sign in",
-          then: (s) => win.runSetup(kind, values, s.pw, again) });
+          hold: true, busyText: kind === "keepass" ? "Making it…" : "Signing in…",
+          then: (s, finish) => win.runSetup(kind, values, s.pw, again, finish) });
       } });
   }
   property int setupCard: -1
-  function runSetup(kind, values, secret, again) {
+  // `finish`: the held card that asked (CardSheet `hold`) — a wrong
+  // password is said on it, to try again there; anything else takes it
+  // down and goes on as before
+  function runSetup(kind, values, secret, again, finish) {
     const p = C.platform(kind);
-    win.busyText = (again ? "Signing in to " : "Adding ") + p.name + "…";
+    if (!finish) win.busyText = (again ? "Signing in to " : "Adding ") + p.name + "…";
     const done = (ok, err, acct) => {
       win.busyText = "";
+      if (finish) {
+        if (!ok && err && err.kind === "auth" && secret) { finish(C.authNote(err) || "check it and try again"); return; }
+        finish(true);
+      }
       if (win.setupCard >= 0) { cards.dropCard(win.setupCard); win.setupCard = -1; }
       if (!ok && err && err.kind === "2fa") {
         // two-step login: the code, and the way it came — then the same
@@ -485,7 +518,8 @@ FloatingWindow {
           fields: [{ key: "method", label: "Code from", options: [["app", "Authenticator app"], ["email", "Email"], ["key", "YubiKey"]],
                      value: values.method || "app" },
                    { key: "code", label: "Code", hint: "123456" }],
-          verb: "Sign in", then: (v) => win.runSetup(kind, Object.assign({}, values, v), secret, again) });
+          verb: "Sign in", hold: true, busyText: "Signing in…",
+          then: (v, finish) => win.runSetup(kind, Object.assign({}, values, v), secret, again, finish) });
         return;
       }
       if (!ok) {
@@ -1135,7 +1169,14 @@ FloatingWindow {
         bottomMargin: 8
         boundsBehavior: Flickable.StopAtBounds
         model: rowModel
-        cacheBuffer: 600
+        // EVERY ROW BUILT (as oracle's list with its Arrangement): rows come
+        // in two heights — with a section heading, without — and a ListView
+        // sizes what it has not built from the average of what it has, so
+        // its origin and extent moved under the wheel's glide, which is
+        // aimed at a contentY: the scroll hitched and jumped (user,
+        // 2026-10-12: "scrolling animation is broken"). Built, they are
+        // measured, not guessed. Capped for a vault of thousands.
+        cacheBuffer: Math.min(60000, win.tops.length > 0 ? win.tops[win.tops.length - 1] + win.rowH : 0) + 600
         SelectBar {
           view: list
           host: win
@@ -1274,7 +1315,7 @@ FloatingWindow {
           visible: running
         }
       }
-      ElasticScroll { anchors.fill: list; view: list }
+      ElasticScroll { id: listWheel; anchors.fill: list; view: list }
       Scrollbar { flick: list; anchors.right: list.right; anchors.top: list.top; anchors.bottom: list.bottom }
       ScrollEdge { view: list; below: true; follow: true; bar: foot }
       // ── WHAT SCROLLS UP GOES UNDER THE SEARCH AND THE HEAD ──

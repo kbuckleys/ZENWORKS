@@ -223,6 +223,8 @@ const SITES = [
   ["proton.me",     cp(0xF01EE)],
   ["musixmatch",    cp(0xF001)],
   ["coolors",       cp(0xEFCC)],
+  ["raindrop",      cp(0xE34A)],
+  ["figma",         cp(0xEF47)],
   ["dominos",       cp(0xF0409)],
   ["burger",        cp(0xF0685)],
   ["elmenus",       cp(0xF025A)],
@@ -516,5 +518,25 @@ function failWords(err) {
   if (!err) return "Something went wrong";
   if (err.kind === "gone") return "Calypso's backend stopped";
   if (err.kind === "missing") return err.error;
-  return String(err.error || "Something went wrong");
+  return plainError(err.error) || "Something went wrong";
+}
+
+// What an unlock's refusal adds to the field's own "wrong password": nothing
+// when that is all it says, else the reason in plain words.
+function authNote(err) {
+  const t = err && err.error ? String(err.error) : "";
+  if (t === "" || /wrong|invalid (master )?password|incorrect|decryption operation failed|bad passphrase/i.test(t)) return "";
+  return plainError(t);
+}
+
+// A tool's raw error made fit to read: a log prefix ("ERROR
+// some_crate::module: error=") and a trailing full stop off, the first
+// letter raised.
+function plainError(t) {
+  let s = String(t || "").split("\n")[0].trim();
+  s = s.replace(/^(error|warn(ing)?|fatal)\b[:\s]*/i, "");
+  s = s.replace(/^[\w-]+(::[\w-]+)+:?\s*/, "");
+  s = s.replace(/^error\s*=\s*/i, "");
+  s = s.replace(/\.$/, "");
+  return s.charAt(0).toUpperCase() + s.slice(1);
 }

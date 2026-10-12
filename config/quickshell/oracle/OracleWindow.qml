@@ -115,6 +115,8 @@ FloatingWindow {
   // is why you are typing — so a non-empty query searches all of them and the
   // toolbar goes quiet rather than lying about which one you are in.
   property string section: "bar"
+  // the key of the row folded open (About this computer), or ""
+  property string unfolded: ""
   // The last section that actually HAS settings in it. "Reset one section"
   // lives in the about section, so `section` at the moment it is clicked is
   // always "about" — which holds nothing but actions, so the reset would be a
@@ -553,6 +555,7 @@ FloatingWindow {
     // a page that makes you press a button to learn anything. Not again
     // within a minute: flicking between sections should not rerun it.
     if (id === "health" && Date.now() - Oracle.checkedAt > 60000) Oracle.runCheckup();
+    if (id === "about") Oracle.readComputer(false);
     // and the monitors are looked at again, in case one came or went while
     // nothing was watching — a dock, a KVM, a cable on its way out
     if (id === "display") Oracle.scanDisplays();
@@ -1112,8 +1115,22 @@ FloatingWindow {
     width: popup.controlW + 60
     height: 28
 
+    // a row that folds open says so, and which way it is (see `fold`)
+    Text {
+      id: foldMark
+      visible: !!(nfo.spec && nfo.spec.fold)
+      anchors.right: parent.right
+      anchors.verticalCenter: parent.verticalCenter
+      text: "\uF054"
+      rotation: popup.unfolded === (nfo.spec ? nfo.spec.key : "") ? 90 : 0
+      Behavior on rotation { NumberAnimation { duration: Zenon.menuFade; easing.type: Easing.OutCubic } }
+      color: popup.fgColor
+      font.family: Zenon.glyphFace
+      font.pixelSize: Zenon.px(12)
+    }
     Text {
       anchors.fill: parent
+      anchors.rightMargin: foldMark.visible ? foldMark.implicitWidth + 12 : 0
       verticalAlignment: Text.AlignVCenter
       // LEFT, like every control beside it. It was right-aligned against the
       // panel edge, which put a column of facts and a column of buttons on
@@ -1897,10 +1914,43 @@ FloatingWindow {
                 required property var modelData
                 required property int index
                 width: list.width
-                height: settingRow.arrange ? popup.arrangeH : popup.rowH
+                height: settingRow.arrange ? popup.arrangeH
+                  : popup.rowH + (settingRow.open ? foldBody.height : 0)
+                Behavior on height { NumberAnimation { duration: Zenon.menuFade; easing.type: Easing.OutCubic } }
+                clip: settingRow.fold
 
                 readonly property var spec: settingRow.modelData
                 readonly property bool arrange: settingRow.spec.type === "arrange"
+
+                // ── A ROW THAT FOLDS OPEN ────────────────────────────────
+                // `fold` (About this computer): the row is its usual self
+                // on top — label, help, its readout — and a click anywhere
+                // on it opens what it folds underneath, a click again shuts
+                // it. The label and the control stay centred in that top
+                // band (rowHead), not in the grown row.
+                readonly property bool fold: !!settingRow.spec.fold
+                readonly property bool open: settingRow.fold && popup.unfolded === settingRow.spec.key
+                Item { id: rowHead; width: parent.width; height: popup.rowH }
+                MouseArea {
+                  anchors.fill: rowHead
+                  visible: settingRow.fold
+                  cursorShape: Qt.PointingHandCursor
+                  onClicked: popup.unfolded = settingRow.open ? "" : settingRow.spec.key
+                }
+                Loader {
+                  id: foldBody
+                  y: popup.rowH
+                  width: parent.width
+                  height: item ? item.implicitHeight : 0
+                  active: settingRow.fold && (settingRow.open || settingRow.height > popup.rowH)
+                  source: settingRow.spec.fold === "computer" ? "ComputerPanel.qml" : ""
+                  onLoaded: {
+                    item.face = Qt.binding(() => popup.face);
+                    item.fgColor = Qt.binding(() => popup.fgColor);
+                    item.dimColor = Qt.binding(() => popup.dimColor);
+                    item.highlight = Qt.binding(() => popup.highlight);
+                  }
+                }
 
                 // ── A MONITOR'S ROWS, AS ONE GROUP ───────────────────────
                 // Two monitors' Resolution rows look exactly alike, so each
@@ -1965,7 +2015,7 @@ FloatingWindow {
                   anchors.leftMargin: settingRow.monitorRow && !settingRow.monitorHead ? 36 : 24
                   anchors.right: controlSlot.left
                   anchors.rightMargin: 18
-                  anchors.verticalCenter: parent.verticalCenter
+                  anchors.verticalCenter: rowHead.verticalCenter
                   spacing: 2
 
                   Row {
@@ -2114,7 +2164,7 @@ FloatingWindow {
                   visible: !settingRow.arrange
                   anchors.right: parent.right
                   anchors.rightMargin: 20
-                  anchors.verticalCenter: parent.verticalCenter
+                  anchors.verticalCenter: rowHead.verticalCenter
                   // WHAT THE CONTROL ACTUALLY NEEDS, measured off the one
                   // that got loaded rather than reserved for the widest kind
                   // there is. This is what hands a bool row's 200 spare

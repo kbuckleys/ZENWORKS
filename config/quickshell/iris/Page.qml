@@ -29,8 +29,11 @@ WebEngineView {
   property string pendingTitle: ""
   // when it was last hidden (0 while looked at): Tabs puts it to sleep
   property real hiddenSince: 0
-  // a password field is on the page: the bar offers calypso (see fill)
+  // a password field is on the page: the bar offers calypso (see fill);
+  // a NEW password field (a sign-up, a change of password): calypso offers
+  // to make one too (see suggest)
   property bool hasLogin: false
+  property bool hasSignup: false
 
   // ── THE SUITE'S SCROLLING ──────────────────────────────────────────
   // The document as a view, for morpheus' Elastic and Scrollbar
@@ -124,6 +127,72 @@ WebEngineView {
     page.wantsTab(request);
   }
 
+  // ── WHAT IT SHOWS: the lists' hiding rules and scriptlets ────────────
+  // Armed as each page is about to open (core/shield.py's cosmetic): its
+  // own hide rules as a style sheet, laid in iris' world before the page has
+  // drawn anything; its scriptlets in the page's own world, before the
+  // page's first script, which is the only place they can do their work.
+  // Where the lists' generic rules apply, a watcher (iris' world) notes the
+  // classes and ids the page grows, and `generic` asks the shield for the
+  // rules they call for, every couple of seconds while the page is looked at.
+  property string armedFor: ""
+  property bool genericOn: false
+  onNavigationRequested: (request) => { if (request.isMainFrame) page.arm(String(request.url)); }
+  function arm(url) {
+    if (url === page.armedFor) return;
+    page.armedFor = url;
+    const c = Iris.cosmeticFor(url);
+    page.genericOn = c.generic;
+    const scripts = [];
+    const one = (name, world, source) => {
+      const s = WebEngine.script();
+      s.name = name;
+      s.injectionPoint = WebEngineScript.DocumentCreation;
+      s.worldId = world;
+      s.runsOnSubFrames = false;
+      s.sourceCode = source;
+      scripts.push(s);
+    };
+    one("iris-hide", WebEngineScript.ApplicationWorld,
+        "(() => { let st = null; window.__irisHide = (css) => { if (!css) return;"
+      + " if (!st) { st = document.createElement('style'); st.id = 'iris-hide'; }"
+      + " st.textContent += css + '\\n'; const root = document.head || document.documentElement;"
+      + " if (root && !st.isConnected) root.appendChild(st); };"
+      + " const seen = new Set(), fresh = { c: new Set(), i: new Set() };"
+      + " const note = (el) => { if (!el || el.nodeType !== 1) return;"
+      + "   if (el.id && !seen.has('#' + el.id)) { seen.add('#' + el.id); fresh.i.add(el.id); }"
+      + "   for (const c of el.classList || []) if (!seen.has('.' + c)) { seen.add('.' + c); fresh.c.add(c); } };"
+      + " window.__irisTake = () => { const r = { c: [...fresh.c], i: [...fresh.i] }; fresh.c.clear(); fresh.i.clear(); return r; };"
+      + " const css = " + JSON.stringify(c.css) + ";"
+      + " const start = () => { __irisHide(css);"
+      + (c.generic ? " document.querySelectorAll('[class],[id]').forEach(note);"
+                   + " new MutationObserver((ms) => { for (const m of ms) for (const n of m.addedNodes) {"
+                   + "   note(n); if (n.querySelectorAll) n.querySelectorAll('[class],[id]').forEach(note); } })"
+                   + "   .observe(document.documentElement, { childList: true, subtree: true });" : "")
+      + " };"
+      + " if (document.documentElement) start();"
+      + " else new MutationObserver((m, o) => { if (document.documentElement) { o.disconnect(); start(); } })"
+      + "   .observe(document, { childList: true }); })();");
+    if (c.script) one("iris-scriptlets", WebEngineScript.MainWorld, c.script);
+    page.userScripts.collection = scripts;
+  }
+  function generic() {
+    if (!page.genericOn) return;
+    const url = page.armedFor;
+    page.runJavaScript("window.__irisTake ? __irisTake() : null", WebEngineScript.ApplicationWorld, (r) => {
+      if (!r || (!r.c.length && !r.i.length)) return;
+      const css = Iris.genericFor(url, r.c, r.i);
+      if (css) page.runJavaScript("__irisHide(" + JSON.stringify(css) + ")", WebEngineScript.ApplicationWorld);
+    });
+  }
+  readonly property Timer genericTick: Timer {
+    interval: 2000
+    repeat: true
+    running: page.genericOn && page.visible && page.lifecycleState === WebEngineView.LifecycleState.Active
+    triggeredOnStart: true
+    onTriggered: page.generic()
+  }
+
   // the first look at a restored tab loads it
   onVisibleChanged: if (page.visible && page.pendingUrl !== "") {
     page.url = page.pendingUrl;
@@ -132,7 +201,7 @@ WebEngineView {
 
   // ── WHAT IS KEPT (never for a cloak tab) ────────────────────────────
   onLoadingChanged: (req) => {
-    if (req.status !== WebEngineView.LoadSucceededStatus) { page.hasLogin = false; return; }
+    if (req.status !== WebEngineView.LoadSucceededStatus) { page.hasLogin = false; page.hasSignup = false; return; }
     if (!page.cloaked) History.visit(String(req.url), page.title);
     page.lookForLogin();
   }
@@ -142,8 +211,31 @@ WebEngineView {
   // see these, nor can they fake an answer. A form drawn after the page
   // loaded (a sign-in dialog) is found when fill is asked for anyway.
   function lookForLogin() {
-    page.runJavaScript("!!document.querySelector('input[type=password]')",
-                       WebEngineScript.ApplicationWorld, (has) => page.hasLogin = !!has);
+    page.runJavaScript(
+      "(() => { const pw = [...document.querySelectorAll('input[type=password]')];"
+      + " const shown = pw.filter(i => i.offsetParent !== null);"
+      + " return { login: pw.length > 0,"
+      + "   signup: !!document.querySelector('input[autocomplete~=new-password]') || shown.length >= 2 }; })()",
+      WebEngineScript.ApplicationWorld, (r) => { page.hasLogin = !!r && r.login; page.hasSignup = !!r && r.signup; });
+  }
+  // The NEW password field put under the cursor — the one a form marks as
+  // new-password, else the first of two shown — for calypso to type a made
+  // password into. `then({ found, twice, username })`: whether a second (a
+  // confirmation) follows it, and what is in the form's username field.
+  function focusNewPassword(then) {
+    page.forceActiveFocus();
+    page.runJavaScript(
+      "(() => { const shown = [...document.querySelectorAll('input[type=password]')].filter(i => i.offsetParent !== null);"
+      + " const marked = shown.filter(i => /\\bnew-password\\b/.test(i.autocomplete || ''));"
+      + " const set = marked.length ? marked : shown; if (!set.length) return { found: false };"
+      + " const first = set[0], after = shown[shown.indexOf(first) + 1];"
+      + " const named = document.querySelector('input[autocomplete~=username],input[autocomplete~=email],input[type=email]');"
+      + " const text = [...document.querySelectorAll('input')].filter(i => /^(text|email|tel|)$/.test(i.type)"
+      + "   && i.offsetParent !== null && (i.compareDocumentPosition(first) & Node.DOCUMENT_POSITION_FOLLOWING));"
+      + " const user = (named && named.offsetParent !== null) ? named : text[text.length - 1];"
+      + " first.focus();"
+      + " return { found: true, twice: !!after && (!marked.length || marked.indexOf(after) >= 0), username: user ? user.value : '' }; })()",
+      WebEngineScript.ApplicationWorld, (r) => { if (then) then(r || { found: false }); });
   }
   // The username field put under the cursor — the one a form marks as
   // such, else the visible text field before the password, else the password
