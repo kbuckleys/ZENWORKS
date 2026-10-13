@@ -28,6 +28,7 @@
 
 import QtQuick
 import "../../morpheus"
+import "../../terminus" as Term
 
 Rectangle {
   id: tabStrip
@@ -52,7 +53,7 @@ Rectangle {
 
   readonly property var tabs: tabStrip.ed.tabs
   // terminus' path bar height, which its tab strip shares
-  implicitHeight: tabStrip.tabs.length > 1 ? 34 : 0
+  implicitHeight: tabStrip.tabs.length > 1 ? 32 : 0
   visible: implicitHeight > 0
   clip: true
   // TRANSPARENT: an inactive tab is the window's own body showing through
@@ -247,13 +248,17 @@ Rectangle {
         // reads this cell's place): the window's ground with the thin glass
         // cut away under it, as terminus' (2026-10-11). Only a carried tab
         // paints its own.
-        color: tabCell.lifted ? Zenon.alpha(Zenon.layerBg, Zenon.tabOver(Zenon.layerBg.a))
-          : Zenon.alpha(Zenon.tabAwayInk, 0)
+        // carried, it looks as it did (user, 2026-10-13): the movement says
+        // which one is in hand, no ground of its own
+        color: Zenon.alpha(Zenon.tabAwayInk, 0)
         onHereChanged: if (here) tabStrip.hereCell = tabCell
+        // a tab's own hue (iris' cloak tabs: plato's visual-mode magenta,
+        // as their bar wears it), over its glass; plato's tabs have none
         Rectangle {
           anchors.fill: parent
-          visible: tabCell.lifted
-          color: tabStrip.hereBg
+          anchors.bottomMargin: -1
+          visible: !!tabCell.modelData.tint
+          color: tabCell.modelData.tint ? Zenon.alpha(tabCell.modelData.tint, 0.17) : "transparent"
         }
 
         Rectangle {
@@ -313,11 +318,20 @@ Rectangle {
             color: Zenon.sand
             anchors.verticalCenter: tabLabel.verticalCenter
           }
+          // still loading (iris' pages: a tab's optional `loading`): the
+          // shell's three dots in the label's place, until it has
+          Working {
+            anchors.verticalCenter: parent.verticalCenter
+            running: !!tabCell.modelData.loading
+            ink: tabStrip.hereInk
+            dot: Math.max(4, Math.round(tabStrip.face.pixelSize / 3.5))
+          }
           Text {
             id: tabLabel
-            // room either side for the close button, while it shows
-            width: Math.min(implicitWidth, tabCell.width - 16 - (dot.visible ? dot.width + 6 : 0)
-              - (closeX.visible ? 2 * (closeX.width + 8) : 0)
+            visible: !tabCell.modelData.loading
+            // never more than four fifths of the tab (user, 2026-10-13: every
+            // strip in the suite), the rest elided; the close chip lies over its end
+            width: Math.min(implicitWidth, tabCell.width * 0.8, tabCell.width - 16 - (dot.visible ? dot.width + 6 : 0)
               - (pinNo.visible ? pinNo.width + 6 : 0))
             elide: Text.ElideMiddle
             textFormat: Text.PlainText
@@ -349,28 +363,18 @@ Rectangle {
         // A × at the tab's right end while the pointer is on it (a middle
         // click still closes too). Closing a tab with unsaved changes is
         // refused by nvim, as ever.
-        Text {
+        // the search fields' clear chip (terminus/ClearChip), laid OVER the
+        // label's end rather than making room beside it (user, 2026-10-13):
+        // the name stays where it is as the pointer comes and goes
+        Term.ClearChip {
           id: closeX
           anchors.right: parent.right
           anchors.rightMargin: 8
           anchors.verticalCenter: parent.verticalCenter
+          size: tabStrip.face.pixelSize
           opacity: tabMouse.containsMouse && !tabMouse.dragging && tabCell.width > 70 ? 1 : 0
           Behavior on opacity { NumberAnimation { duration: Zenon.fast } }
           visible: opacity > 0
-          text: "\u{F0156}"
-          font.family: Zenon.faceMono
-          font.weight: Zenon.weight
-          font.pixelSize: tabStrip.face.pixelSize
-          color: tabMouse.overClose ? (tabCell.modelData.modified ? Zenon.pink : Zenon.white) : Zenon.muted
-          Behavior on color { ColorAnimation { duration: Zenon.fast } }
-          Rectangle {
-            anchors.centerIn: parent
-            width: parent.height + 2
-            height: width
-            radius: 4
-            z: -1
-            color: Zenon.wash(tabMouse.overClose ? 0.08 : 0)
-          }
         }
 
         MouseArea {

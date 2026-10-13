@@ -1141,6 +1141,9 @@ Singleton {
     { key: "actionResetAll", section: "about", label: "Reset everything", type: "action",
       verb: "Reset all",
       help: "Every setting in every section back to its default." },
+    { key: "actionUpdate", section: "about", label: "Update ZENWORKS", type: "action",
+      verb: "Update",
+      help: "Fetch the published ZENWORKS and lay it over this one — your default apps, monitors, input and theme files are kept. Runs in the jobs drawer; nothing is left behind. Refused where ZENWORKS is maintained (scripts/update.sh)." },
     { key: "actionRestart", section: "about", label: "Restart the shell", type: "action",
       verb: "Restart",
       help: "For the few settings that only take effect on a fresh start." }
@@ -1503,6 +1506,7 @@ Singleton {
   // `context` is whatever the panel was standing in when the row was clicked,
   // so "reset a section" can mean the one you are looking at without the
   // action needing a second control beside it.
+  signal updateAsked()
   function run(key, context) {
     if (key === "actionCheckup") { root.runCheckup(); return; }
     if (key === "actionDisplayScan") { root.scanDisplays(); return; }
@@ -1512,6 +1516,8 @@ Singleton {
     if (key === "actionSaveFollow") { root.nameFollowRequested(); return; }
     if (key === "actionResetSection") { root.resetSection(context); return; }
     if (key === "actionResetAll") { root.resetAll(); return; }
+    // the shell's side starts it, as a job in the drawer (OracleManager)
+    if (key === "actionUpdate") { root.updateAsked(); return; }
     if (key === "actionRestart") {
       // Through scripts/restart.sh, in a shell that has already been
       // detached, so the replacement is never a child of the instance it

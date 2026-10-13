@@ -25,6 +25,7 @@
 
 import QtQuick
 import QtWebEngine
+import "../morpheus"
 import "iris.js" as I
 
 QtObject {
@@ -66,6 +67,8 @@ QtObject {
   signal changed()
 
   readonly property string cloakMark: "\u{F05F9}"
+  // plato's visual mode's hue (its statusline), for a cloak tab and its bar
+  readonly property color cloakInk: Zenon.magenta
   // what the strip draws (reads each page's title and url, so a page's new
   // title redraws its tab)
   readonly property var tabs: deck.views.map((v, i) => ({
@@ -74,6 +77,10 @@ QtObject {
       + (v.pendingUrl !== "" ? I.tabName(v.pendingTitle, v.pendingUrl) : I.tabName(v.title, v.url)),
     path: v.pendingUrl !== "" ? v.pendingUrl : I.shown(v.url),
     current: i === deck.current,
+    // loading: the strip shows the shell's dots in its name's place
+    loading: v.loading && v.pendingUrl === "",
+    // a cloak tab's hue, as its bar's (TabBar draws it over the tab's glass)
+    tint: v.cloaked ? deck.cloakInk : undefined,
     // plato's own: an unsaved buffer, a pinned one — a page is neither
     modified: false,
     pin: 0
@@ -138,7 +145,14 @@ QtObject {
 
   // a page asked for a new tab or window: beside it, cloaked if it is, and
   // in the background when that is what was asked (a middle click)
+  //
+  // ONE NOBODY CLICKED FOR (a pop-up) is held back, unless its site is let
+  // to: the line offers it instead (Page.blockedPopup)
   function adopt(request, from) {
+    if (!request.isUserInitiated && from.siteSet.popups !== 1) {
+      from.blockedPopup = String(request.requestedUrl);
+      return;
+    }
     const bg = request.destination === WebEngineNewWindowRequest.InNewBackgroundTab;
     const v = deck.open("", bg, deck.views.indexOf(from) + 1, from.cloaked);
     request.openIn(v);
@@ -149,11 +163,25 @@ QtObject {
     if (i >= 0) deck.current = i;
   }
 
+  // ── CLOSED, AND BROUGHT BACK (Ctrl+Shift+T) ────────────────────────
+  // The last tabs closed, newest last — where they were and what they
+  // showed. Never a cloak tab's: closed, it is gone.
+  property var closed: []
+  function reopen() {
+    if (!deck.closed.length) return null;
+    const c = deck.closed[deck.closed.length - 1];
+    deck.closed = deck.closed.slice(0, -1);
+    return deck.open(c.url, false, Math.min(c.at, deck.views.length));
+  }
+
   function close(id) {
     const i = deck.indexOf(id);
     if (i < 0) return;
     const was = deck.here;
     const v = deck.views[i];
+    const url = v.pendingUrl !== "" ? v.pendingUrl : String(v.url);
+    if (!v.cloaked && url !== "" && url !== "about:blank")
+      deck.closed = deck.closed.slice(-24).concat([{ url: url, at: i }]);
     const list = deck.views.slice();
     list.splice(i, 1);
     deck.views = list;

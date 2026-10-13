@@ -69,8 +69,12 @@ QtObject {
   // to what the wheel ASKED for — clamp the drawn value instead and `raw`
   // climbs invisibly, and the band then ignores the first several notches
   // of the way back.
+  //
+  // LESS SINCE (user, 2026-10-13: "reduce the bounce"): 6% of the view, which
+  // also caps how far a coast bounces off an edge (scrollfeel's bounceFor).
+  readonly property real reach: 0.06
   function maxRaw(d) {
-    const b = d * 0.10;
+    const b = d * elastic.reach;
     return (b * d) / (elastic.c * (d - b));
   }
 
@@ -79,7 +83,7 @@ QtObject {
   // fingers have got, and the settle still brings it back; that distance
   // is no longer shown as the content sliding off its edge but as the
   // content STRETCHING from it, by `stretch` of the distance over the
-  // view's length — at the band's cap, a tenth of the view, 6%. The user's
+  // view's length — at the band's cap (`reach`, 6% of the view), under 3%. The user's
   // call (2026-10-12), first in iris, then here for every list.
   //
   // Shown by the view itself, not by moving contentY differently: the
@@ -90,7 +94,7 @@ QtObject {
   // (the notch, the fingers, the coast's bounce, the settle back) stretches
   // the content, and nothing else had to change. A view without a
   // contentItem (iris' web page) does its own, from this same number.
-  readonly property real stretch: 0.6
+  readonly property real stretch: 0.45
   readonly property Component _stretcher: Component {
     id: stretcher
     QtObject {

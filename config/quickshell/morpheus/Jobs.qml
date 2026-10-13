@@ -28,8 +28,13 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import "../terminus/terminus.js" as Terminus
+import "jobs"
 
-Singleton {
+// THE ROWS AND HOW THEY END are JobsBase's (morpheus/jobs, 2026-10-13) —
+// plain Qt Quick, so iris keeps its downloads in one and draws them with the
+// same card. This adds what only the shell has: the processes, their
+// progress lines, killing them, and the toast when a long one lands.
+JobsBase {
   id: jobs
 
   // ── why a ListModel and not a list ────────────────────────────────────
@@ -38,56 +43,12 @@ Singleton {
   // reports progress several times a second, so the drawer would have thrown
   // its rows away and built new ones at that rate. A ListModel is edited in
   // PLACE: set() touches the roles it is given and the delegate that is
-  // already on screen simply re-reads them.
-  property ListModel model: ListModel {}
+  // already on screen simply re-reads them. (The model is JobsBase's.)
 
-  // Rows that ended badly / well and are still in the drawer, and how many
-  // are actually running. Counts rather than searches, because a binding
-  // cannot walk a ListModel and notice when it changes.
-  property int faults: 0
-  property int done: 0
-  property int live: 0
-  // Bumped once per event, read by the glow animations — a counter rather
-  // than a signal so a Connections can watch each one.
-  property int started: 0
-  property int faulted: 0
-  property int finished: 0
+  // each job's Process, by id — destroyed once it has landed
+  property var procs: ({})
 
-  // The live jobs' overall progress, 0..100, for the bar: the mean of what is
-  // running, so three copies read as one number.
-  readonly property int pct: {
-    jobs.model.count;
-    jobs.rev;
-    let sum = 0, n = 0;
-    for (let i = 0; i < jobs.model.count; ++i) {
-      const j = jobs.model.get(i);
-      if (j.state !== "running") continue;
-      sum += j.pct;
-      ++n;
-    }
-    return n === 0 ? 100 : Math.round(sum / n);
-  }
-  // Bumped on every progress line, because a binding cannot see a ListModel's
-  // contents change — only its count.
-  property int rev: 0
-
-  // A job has ended. Every terminus window listens and re-reads whatever it
-  // is showing; `dest` is where the job wrote.
-  signal ended(int id, string op, int code, bool cancelled, string dest)
-  // The first line of a job's stderr, for whichever window wants to say it.
-  signal said(string text)
-  // An adopted job's cancel, for whatever runs it (see adopt).
-  signal cancelAsked(int id)
-
-  // What the drawer never draws, kept out of the model: a QObject does not
-  // belong in a ListModel row. Written at start, read at exit, bound by
-  // nothing — so a plain map.
-  property var meta: ({})
-  property int seq: 0
-
-  Component {
-    id: runner
-
+  readonly property Component runner: Component {
     Process {
       id: proc
       property int jobId: -1
@@ -119,61 +80,15 @@ Singleton {
     }
   }
 
-  // By id, never by position: a row can be removed while another job is
-  // mid-flight, and an index held across that is pointing at the wrong job.
-  function rowAt(id) {
-    for (let i = 0; i < jobs.model.count; ++i)
-      if (jobs.model.get(i).id === id) return i;
-    return -1;
-  }
-
-  function update(id, patch) {
-    const i = jobs.rowAt(id);
-    if (i < 0) return;
-    jobs.model.set(i, patch);
-    jobs.rev++;
-  }
-
   // `argv` is the whole command, setsid included — see terminus' startJob.
   function start(op, paths, dest, argv) {
-    const id = ++jobs.seq;
-    const proc = runner.createObject(jobs, { jobId: id });
+    const proc = jobs.runner.createObject(jobs);
     if (!proc) return -1;
-    jobs.live++;
+    const id = jobs.begin(op, paths.map((p) => Terminus.basename(p)), dest, { pid: () => proc.processId });
+    proc.jobId = id;
+    jobs.procs[id] = proc;
     proc.command = argv;
-    const names = paths.map((p) => Terminus.basename(p));
-    jobs.meta[id] = { proc: proc, names: names, dest: dest, started: Date.now() };
-    jobs.model.append({
-      id: id, op: op,
-      what: names.length === 1 ? names[0] : names.length + " items",
-      // where it is going, as its directory's name — the drawer says
-      // "<thing> → <directory>", the way the Copy to / Move to header does
-      to: dest ? (Terminus.basename(String(dest).replace(/\/+$/, "")) || "/") : "",
-      pct: 0, index: 0, total: paths.length,
-      // entries counted rather than bytes measured, for the two ops whose
-      // tools report no percentage of their own
-      entries: 0, seen: 0, cancelled: false,
-      rate: "", eta: "",
-      // "running" until it ends; then "done", "failed" or "stopped"
-      state: "running" });
-    jobs.started++;
     proc.running = true;
-    return id;
-  }
-
-  // A job run elsewhere: its row and its receipt are here, its process is
-  // not. `names` are what it makes (one name: "<name> → <directory>").
-  function adopt(op, names, dest) {
-    const id = ++jobs.seq;
-    jobs.live++;
-    jobs.meta[id] = { proc: null, foreign: true, names: names, dest: dest, started: Date.now() };
-    jobs.model.append({
-      id: id, op: op,
-      what: names.length === 1 ? names[0] : names.length + " items",
-      to: dest ? (Terminus.basename(String(dest).replace(/\/+$/, "")) || "/") : "",
-      pct: 0, index: 0, total: names.length, entries: 0, seen: 0, cancelled: false,
-      rate: "", eta: "", state: "running" });
-    jobs.started++;
     return id;
   }
 
@@ -207,90 +122,23 @@ Singleton {
     jobs.update(id, r ? { pct: pct, rate: r.rate, eta: r.eta } : { pct: pct });
   }
 
-  function exited(id, code) {
-    const i = jobs.rowAt(id);
-    if (i < 0) return;
-    const row = jobs.model.get(i);
-    const op = row.op;
-    const cancelled = row.cancelled;
-    const m = jobs.meta[id] || { names: [], started: 0, proc: null, dest: "" };
-    // EVERY ENDED ROW STAYS until it has been read — a failure because it is
-    // the news, a success because the drawer closing on it is the receipt
-    // arriving and leaving in the same frame. See clearEnded.
-    if (code !== 0) {
-      jobs.model.set(i, { state: cancelled ? "stopped" : "failed", pct: 100 });
-      jobs.faults++;
-      jobs.faulted++;
-    } else {
-      jobs.model.set(i, { state: "done", pct: 100 });
-      jobs.done++;
-      jobs.finished++;
-    }
-    jobs.rev++;
-    linger.restart();
-    jobs.live = Math.max(0, jobs.live - 1);
-    delete jobs.meta[id];
-    // Later: the stderr collector may still be closing, and destroying the
-    // Process under it loses the one line that says what went wrong.
-    if (m.proc) Qt.callLater(() => { if (m.proc) m.proc.destroy(); });
-    // A toast only for a job long enough to have stopped watching — through
-    // notify-send, so it lands in howler's history like any application's.
-    if (code === 0 && Date.now() - (m.started || 0) > 3000)
-      Quickshell.execDetached(["notify-send", "-a", "terminus",
-        Terminus.jobSummary(op, m.names)]);
-    jobs.ended(id, op, code, cancelled, m.dest || "");
-  }
-
   // Kill the job's whole process group — the reason it runs under setsid.
   // execDetached, so two cancels in one breath cannot share a killer.
-  function cancel(id) {
-    const i = jobs.rowAt(id);
-    if (i < 0) return;
-    jobs.model.set(i, { cancelled: true });
-    jobs.rev++;
-    const m = jobs.meta[id];
-    if (m && m.foreign) { jobs.cancelAsked(id); return; }
-    const pid = (m && m.proc) ? m.proc.processId : 0;
+  stopHook: (m) => {
+    const pid = m.pid ? m.pid() : 0;
     if (pid > 0)
       Quickshell.execDetached(["sh", "-c", "kill -TERM -" + pid + " 2>/dev/null"]);
   }
 
-  function cancelAll() {
-    // ids first: each cancel writes the model, and walking a model that is
-    // being written is how you skip every second row
-    const ids = [];
-    for (let i = 0; i < jobs.model.count; ++i)
-      if (jobs.model.get(i).state === "running") ids.push(jobs.model.get(i).id);
-    for (const id of ids) jobs.cancel(id);
-  }
-
-  // One row put away by hand: stopped if it is running, dismissed if not.
-  function dismiss(id) {
-    const i = jobs.rowAt(id);
-    if (i < 0) return;
-    const st = jobs.model.get(i).state;
-    if (st === "running") { jobs.cancel(id); return; }
-    jobs.model.remove(i);
-    if (st === "done") jobs.done = Math.max(0, jobs.done - 1);
-    else jobs.faults = Math.max(0, jobs.faults - 1);
-  }
-
-  // Every row that has stopped, dropped — once the drawer has been read, or
-  // by the timer for the case where nobody looked.
-  function clearEnded() {
-    if (jobs.faults === 0 && jobs.done === 0) return;
-    for (let i = jobs.model.count - 1; i >= 0; --i)
-      if (jobs.model.get(i).state !== "running") jobs.model.remove(i);
-    jobs.faults = 0;
-    jobs.done = 0;
-    linger.stop();
-  }
-
-  // Long enough to notice from across the room, short enough that a failure
-  // half an hour ago is not still shouting at you.
-  Timer {
-    id: linger
-    interval: 12000
-    onTriggered: jobs.clearEnded()
+  onLanded: (id, op, names, startedAt, code) => {
+    // Later: the stderr collector may still be closing, and destroying the
+    // Process under it loses the one line that says what went wrong.
+    const proc = jobs.procs[id];
+    delete jobs.procs[id];
+    if (proc) Qt.callLater(() => proc.destroy());
+    // A toast only for a job long enough to have stopped watching — through
+    // notify-send, so it lands in howler's history like any application's.
+    if (code === 0 && Date.now() - (startedAt || 0) > 3000)
+      Quickshell.execDetached(["notify-send", "-a", "terminus", Terminus.jobSummary(op, names)]);
   }
 }

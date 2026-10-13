@@ -34,6 +34,7 @@ import QtQuick
 import QtWebEngine
 import "../morpheus"
 import "../terminus" as Term
+import IrisHost
 import "iris.js" as I
 
 Item {
@@ -130,6 +131,12 @@ Item {
   // `page`: the tab it is for — Go back takes it back where it was
   function certificate(error, page) {
     error.defer();
+    // upgraded by HTTPS first: the http site it really is, offered as such
+    if (Iris.wasUpgraded(String(error.url))) {
+      error.rejectCertificate();
+      dlg.plain({ url: error.url }, page);
+      return;
+    }
     const can = error.overridable;
     dlg.ask({
       question: "This connection isn't private",
@@ -148,6 +155,95 @@ Item {
     });
   }
 
+  // HTTPS FIRST (core/shield.py): a site asked for over http was asked for
+  // over https, and has no secure version — or one whose certificate is not
+  // its own (`certificate` hands those here). Go back, or load it over plain
+  // http for the rest of this run, with what that costs said plainly.
+  function plain(req, page) {
+    const url = String(req.url), host = I.hostOf(url);
+    dlg.ask({
+      question: host + " has no secure connection",
+      glyph: "\u{F033F}", glyphInk: Zenon.yellow,
+      detail: "Iris asked for it over HTTPS and it did not answer. Over plain HTTP, anyone on the network can read and change what you send and see.",
+      choices: [{ label: "Go back", ink: Zenon.cyan }, { label: "Continue over HTTP", ink: Zenon.red }],
+      cancel: 0,
+      done: (i) => {
+        if (i === 1) { Iris.allowPlain(host); if (page) page.url = url.replace(/^https:/, "http:"); return; }
+        if (page) backSoon.go(page);
+      }
+    });
+  }
+
+  // ── A SECURITY KEY OR PASSKEY (WebAuthn) ───────────────────────────
+  // Chromium hands each step to the browser to show, and waits on it: a
+  // sign-in that asks for a key (Apple's, Google's) hung with nothing on
+  // screen. Each step is a card — whose key, its PIN, "touch your key", what
+  // went wrong — and the card goes when the key answers.
+  function webAuth(request) {
+    const W = WebEngineWebAuthUxRequest;
+    const site = String(request.relyingPartyId || "This site");
+    const step = () => {
+      const st = request.state;
+      dlg.drop(request);
+      if (st === W.WebAuthUxState.SelectAccount) {
+        const names = request.userNames || [];
+        dlg.ask({
+          owner: request,
+          question: "Sign in to " + site + " as",
+          glyph: "\u{F0306}", glyphInk: Zenon.sand,
+          detail: "Your security key holds more than one account for this site.",
+          choices: names.map(n => ({ label: String(n), ink: Zenon.cyan })).concat([{ label: "Cancel", ink: Zenon.muted }]),
+          done: (i) => { if (i < names.length) request.setSelectedAccount(names[i]); else request.cancel(); }
+        });
+      } else if (st === W.WebAuthUxState.CollectPin) {
+        const r = request.pinRequest;
+        const left = r && r.remainingAttempts >= 0 ? "  ·  " + r.remainingAttempts + " tries left" : "";
+        dlg.ask({
+          owner: request,
+          question: "Your security key's PIN",
+          glyph: "\u{F0306}", glyphInk: Zenon.sand,
+          detail: site + " asks for it" + left,
+          choices: [{ label: "Continue", ink: Zenon.cyan }, { label: "Cancel", ink: Zenon.muted }],
+          fields: [{ ghost: "PIN", masked: true }],
+          done: (i, v) => { if (i === 0) request.setPin(v[0]); else request.cancel(); }
+        });
+      } else if (st === W.WebAuthUxState.FinishTokenCollection) {
+        dlg.ask({
+          owner: request,
+          question: "Touch your security key",
+          glyph: "\u{F0306}", glyphInk: Zenon.cyan,
+          detail: "to sign in to " + site,
+          choices: [{ label: "Cancel", ink: Zenon.muted }],
+          cancel: 0,
+          done: () => request.cancel()
+        });
+      } else if (st === W.WebAuthUxState.RequestFailed) {
+        dlg.ask({
+          owner: request,
+          question: "The security key did not sign you in",
+          glyph: "\u{F0026}", glyphInk: Zenon.yellow,
+          detail: site,
+          choices: [{ label: "Try again", ink: Zenon.cyan }, { label: "Cancel", ink: Zenon.muted }],
+          done: (i) => { if (i === 0) request.retry(); else request.cancel(); }
+        });
+      }
+    };
+    request.stateChanged.connect(step);
+    step();
+  }
+  // a card no longer wanted: the request it was for has moved on
+  function drop(owner) {
+    dlg.waiting = dlg.waiting.filter(w => w.owner !== owner);
+    if (dlg.spec && dlg.spec.owner === owner) {
+      dlg.spec = null;
+      if (dlg.waiting.length) {
+        const next = dlg.waiting[0];
+        dlg.waiting = dlg.waiting.slice(1);
+        Qt.callLater(() => dlg.ask(next));
+      }
+    }
+  }
+
   function signIn(request) {
     request.accepted = true;
     dlg.ask({
@@ -160,13 +256,23 @@ Item {
     });
   }
 
-  function protocol(request) {
+  // asked once per site and kind of link: the answer is kept (History) and
+  // given silently each time the site offers again — a mail site offers on
+  // every load. A cloak tab uses what was answered, and keeps nothing.
+  function protocol(request, page) {
+    const scheme = String(request.scheme), origin = String(request.origin);
+    const known = History.handlerAnswer(scheme, origin);
+    if (known >= 0) { if (known) request.accept(); else request.reject(); return; }
+    const cloaked = !!page && page.cloaked;
     dlg.ask({
       question: "Open " + String(request.scheme) + ": links with " + dlg.says(request.origin) + "?",
       glyph: "\u{F0337}", glyphInk: Zenon.cyan,
       detail: String(request.origin),
       choices: dlg.allowBlock,
-      done: (i) => { if (i === 0) request.accept(); else request.reject(); }
+      done: (i) => {
+        if (!cloaked) History.keepHandler(scheme, origin, i === 0);
+        if (i === 0) request.accept(); else request.reject();
+      }
     });
   }
 

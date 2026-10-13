@@ -31,7 +31,48 @@ QtObject {
   readonly property real width: ps.page.width / ps.zoom
   readonly property real height: ps.page.height / ps.zoom
   readonly property real contentWidth: ps.page.contentsSize.width
-  readonly property real contentHeight: ps.page.contentsSize.height
+  // ── THE DOCUMENT'S HEIGHT, ASKED OF IT ──────────────────────────────
+  // Chromium's contentsSize goes STALE: a page that grew as its foot was
+  // reached (measured 2026-10-13: 4860 px in the page, 2430 in contentsSize,
+  // for as long as nothing else redrew) left the wheel at a foot that was no
+  // longer there — the stretch played, and the next wheel did nothing until
+  // the user scrolled up and down again. So the document is asked for its
+  // own height (`measure`) near its foot and while it moves, and the
+  // newer of the two answers stands.
+  property real docHeight: 0
+  readonly property real contentHeight: ps.docHeight
+  readonly property Connections sized: Connections {
+    target: ps.page
+    function onContentsSizeChanged() { ps.docHeight = ps.page.contentsSize.height; }
+  }
+  Component.onCompleted: ps.docHeight = ps.page.contentsSize.height
+  function measure() {
+    ps.page.runJavaScript("(() => { const e = document.scrollingElement || document.documentElement;"
+      + " return e ? e.scrollHeight : 0; })()", WebEngineScript.ApplicationWorld, (h) => {
+      if (h > 0 && Math.abs(h - ps.docHeight) > 0.5) ps.docHeight = h;
+    });
+  }
+  // near the foot, and while moving, every so often
+  readonly property Timer measuring: Timer {
+    interval: 300
+    repeat: true
+    running: ps.page.visible && (ps.moving || ps.contentY >= ps.most - ps.height)
+    triggeredOnStart: true
+    onTriggered: ps.measure()
+  }
+  // ── AND WHEN IT CHANGES UNDER A STRETCH NOBODY IS DRIVING ───────────
+  // A document that shrank (a single-page app moving on) left contentY far
+  // past the new foot: the page stretched to many times its height and stayed
+  // so (the user's screenshots, 2026-10-12). Not driven lately, the place is
+  // taken back from Chromium's own.
+  onMostChanged: {
+    if (Date.now() - ps.drivenAt < 600) return;
+    if (ps.contentY >= 0 && ps.contentY <= ps.most) return;
+    ps.taking = true;
+    ps.contentY = Math.max(0, Math.min(ps.most, ps.page.scrollPosition.y));
+    ps.sent = Math.round(ps.contentY);
+    ps.taking = false;
+  }
   readonly property real contentX: 0
   readonly property real originX: 0
   readonly property real originY: 0
@@ -42,7 +83,14 @@ QtObject {
 
   property real contentY: 0
   // past the ends: how far the wheel has asked beyond them, in item px
-  readonly property real band: (ps.contentY - Math.max(0, Math.min(ps.most, ps.contentY))) * ps.zoom
+  // never more than Elastic's own furthest (its `reach` of the view),
+  // whatever contentY says
+  property real reach: 0.06
+  readonly property real band: {
+    const b = (ps.contentY - Math.max(0, Math.min(ps.most, ps.contentY))) * ps.zoom;
+    const cap = ps.page.height * ps.reach;
+    return Math.max(-cap, Math.min(cap, b));
+  }
   property bool moving: false
   function cancelFlick() {}
 

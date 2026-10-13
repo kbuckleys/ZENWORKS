@@ -71,7 +71,8 @@ Column {
     width: parent.width
     // the path bar's height, so the two strips stack as one band of chrome
     // rather than two of slightly different depths
-    height: (term.alwaysTabs || term.tabs.length > 1) ? term.headH : 0
+    // two under the path bar's (user, 2026-10-13: every strip 2px lower)
+    height: (term.alwaysTabs || term.tabs.length > 1) ? term.headH - 2 : 0
     visible: height > 0
     clip: true
     // The path bar's own colour. Leaving the strip transparent removed the
@@ -375,11 +376,7 @@ Column {
           // shows through it, and the difference reads at a glance.
           // (the glass itself is the window's tabGlass, under the frost)
           color: Zenon.alpha(Zenon.tabAwayInk, 0)
-          Rectangle {
-            anchors.fill: parent
-            visible: tabCell.lifted
-            color: term.tabBg
-          }
+          // (carried, it looks as it did — user, 2026-10-13: no ground)
 
           Rectangle {
             anchors.right: parent.right
@@ -411,8 +408,9 @@ Column {
           Text {
             id: tabLabel
             anchors.centerIn: parent
-            // room either side for the close button, while it shows
-            width: parent.width - 16 - (closeX.visible ? 2 * (closeX.width + 8) : 0)
+            // never more than four fifths of the tab (user, 2026-10-13: every
+            // strip in the suite), the rest elided; the close chip lies over its end
+            width: Math.min(parent.width * 0.8, parent.width - 16)
             horizontalAlignment: Text.AlignHCenter
             elide: Text.ElideMiddle
             text: Terminus.basename(term.shownPath(here ? term.cwd : modelData.cwd))
@@ -434,28 +432,18 @@ Column {
           // ── CLOSE, UNDER THE POINTER ───────────────────────────
           // A × at the tab's right end while the pointer is on it, as
           // plato's tabs have; a middle click still closes too.
-          Text {
+          // the search fields' clear chip, laid OVER the label's end
+          // rather than making room beside it (user, 2026-10-13): the name
+          // stays where it is as the pointer comes and goes
+          ClearChip {
             id: closeX
             anchors.right: parent.right
             anchors.rightMargin: 8
             anchors.verticalCenter: parent.verticalCenter
+            size: Math.round(16 * term.zoom)
             opacity: tabHov.hovered && !tabMouse.dragging && tabCell.width > 70 && !term.modal ? 1 : 0
             Behavior on opacity { NumberAnimation { duration: Zenon.fast } }
             visible: opacity > 0
-            text: "\u{F0156}"
-            font.family: Zenon.faceMono
-            font.weight: Zenon.weight
-            font.pixelSize: Math.round(16 * term.zoom)
-            color: tabMouse.overClose ? Zenon.white : Zenon.muted
-            Behavior on color { ColorAnimation { duration: Zenon.fast } }
-            Rectangle {
-              anchors.centerIn: parent
-              width: parent.height + 2
-              height: width
-              radius: 4
-              z: -1
-              color: Zenon.wash(tabMouse.overClose ? 0.08 : 0)
-            }
           }
 
           HoverHandler { id: tabHov }
@@ -1291,215 +1279,20 @@ Column {
     // reports nothing is a permanent invitation to check on nothing, and
     // the whole point of putting this in the bar is that the bar is
     // already where you look to find out what the window is doing.
-    Item {
+    JobsGlyph {
       id: jobsToggle
       opacity: crumbBar.chromeInk
       enabled: crumbBar.chromeLive
       anchors.right: sortToggle.left
       anchors.rightMargin: 2
       anchors.verticalCenter: crumbInner.verticalCenter
-      readonly property bool live: Jobs.model.count > 0
-      // ONE COLOUR, READ BY EVERYTHING. The glyph, the count, the glow and
-      // the burst all wear it, so "something went wrong" is a single fact
-      // about the drawer rather than four things that have to be kept in
-      // step. Red is reserved for exactly this — the same rule the confirm
-      // card's verbInk follows.
-      // Bad news first — a failure alongside a success is still a
-      // failure to go and look at. Then green, but only once nothing is
-      // RUNNING: green while a second job is still going would be
-      // reporting the batch finished when half of it has not.
-      readonly property color tone: Jobs.faults > 0 ? Zenon.red
-        : (Jobs.live === 0 && Jobs.done > 0 ? Zenon.green
-                                                   : Zenon.cyan)
-      width: jobsToggle.live ? 32 : 0
-      visible: width > 0.5
       height: crumbInner.height
-      // Grows and collapses rather than appearing: it sits between the
-      // status chip and the hamburger, and a button that pops into
-      // existence shoves everything to its left across in one frame.
-      Behavior on width {
-        NumberAnimation { duration: Zenon.normal; easing.type: Zenon.ease }
+      onHoveredChanged: {
+        term.jobsOverGlyph = hovered;
+        if (hovered) term.jobsDrawerRef.openFrom(jobsToggle);
+        term.jobsDrawerRef.settle();
       }
-
-      // How lit the glow is, 0 to 1. Driven by the two animations below
-      // rather than bound to anything: it has to BURST when a job starts
-      // and then settle into a breath, and a binding can only ever say
-      // one of those.
-      property real glow: 0
-
-      // ── the glow ────────────────────────────────────────────────
-      // A blurred COPY of the glyph underneath the real one, not the
-      // glyph itself blurred — blurring the thing you are meant to read
-      // is how an icon becomes a smudge. The copy is what spreads; the
-      // glyph on top of it stays sharp.
-      Item {
-        anchors.centerIn: parent
-        width: parent.height
-        height: parent.height
-        opacity: jobsToggle.glow
-        visible: opacity > 0.01
-        // it swells with the burst, which is most of what makes a glow
-        // read as an event rather than as a colour
-        scale: 1.0 + 0.55 * jobsToggle.glow
-        layer.enabled: true
-        layer.effect: MultiEffect {
-          blurEnabled: true
-          // blurMax is the kernel, which is the actual softness knob —
-          // `blur` alone is only the fraction of it that gets used. The
-          // menu's shadow note spells this out at length.
-          blurMax: 48
-          blur: 1.0
-          brightness: 0.5
-          saturation: 0.4
-          autoPaddingEnabled: true
-        }
-
-        Text {
-          anchors.centerIn: parent
-          text: jobsGlyph.text
-          color: jobsToggle.tone
-          font: jobsGlyph.font
-        }
-      }
-
-      Text {
-        id: jobsGlyph
-        anchors.centerIn: parent
-        // nf-fa-download, as an escape — a literal nerd glyph does not
-        // survive the trip through a shell heredoc and arrives as
-        // nothing at all. The browser's own sign for "things are coming
-        // in", which is what this is.
-        text: "\uF019"
-        color: jobsHov.hovered && Jobs.faults === 0
-          ? Zenon.white : jobsToggle.tone
-        font.family: Zenon.face
-        font.weight: Zenon.weight
-        font.pixelSize: Zenon.px(15)
-      }
-
-      // How many, when there is more than one — the same thing a browser
-      // does, and the reason the glyph alone is not enough now that jobs
-      // run together.
-      Text {
-        anchors.right: parent.right
-        anchors.rightMargin: -1
-        anchors.top: parent.top
-        anchors.topMargin: 5
-        visible: Jobs.model.count > 1
-        text: Jobs.model.count
-        color: Zenon.black
-        style: Text.Outline
-        styleColor: jobsToggle.tone
-        font.family: Zenon.face
-        font.weight: Font.Bold
-        font.pixelSize: Zenon.px(10)
-      }
-
-      // ON HOVER, not on click. Checking what is running is a glance, and
-      // a glance should not cost a click and then a second click to put
-      // it away again.
-      HoverHandler {
-        id: jobsHov
-        onHoveredChanged: {
-          term.jobsOverGlyph = hovered;
-          if (hovered) term.jobsDrawerRef.openFrom(jobsToggle);
-          term.jobsDrawerRef.settle();
-        }
-      }
-
-      // A BURST when a job starts, then a breath for as long as any is
-      // running. Two animations rather than one, because they answer two
-      // different questions — "something just began" and "something is
-      // still going" — and one curve cannot say both.
-      SequentialAnimation {
-        id: jobsGlowBurst
-        NumberAnimation { target: jobsToggle; property: "glow"; to: 1.0;
-                          duration: 140; easing.type: Easing.OutQuad }
-        NumberAnimation { target: jobsToggle; property: "glow"; to: 0.5;
-                          duration: 460; easing.type: Easing.InQuad }
-      }
-
-      SequentialAnimation {
-        id: jobsFaultBurst
-        NumberAnimation { target: jobsToggle; property: "glow"; to: 1.0;
-                          duration: 110; easing.type: Easing.OutQuad }
-        NumberAnimation { target: jobsToggle; property: "glow"; to: 0.62;
-                          duration: 320; easing.type: Easing.InQuad }
-      }
-
-      // FINISHING IS NEWS TOO. It bursts like a start and a fault do,
-      // and then it STAYS — settling to a floor instead of fading out,
-      // because the green is the receipt and a receipt that dims itself
-      // after half a second is one you had to be watching for.
-      SequentialAnimation {
-        id: jobsDoneBurst
-        NumberAnimation { target: jobsToggle; property: "glow"; to: 1.0;
-                          duration: 130; easing.type: Easing.OutQuad }
-        NumberAnimation { target: jobsToggle; property: "glow"; to: 0.55;
-                          duration: 420; easing.type: Easing.InQuad }
-      }
-
-      SequentialAnimation {
-        id: jobsGlowPulse
-        // jobsLive, not live: rows outlive the work now, and a drawer
-        // sitting there green is finished — breathing at you is what
-        // something still running does.
-        running: Jobs.live > 0 && !jobsGlowBurst.running
-                 && !jobsFaultBurst.running && !jobsDoneBurst.running
-        loops: Animation.Infinite
-        NumberAnimation { target: jobsToggle; property: "glow"
-                          to: Jobs.faults > 0 ? 0.95 : 0.78
-                          duration: 880; easing.type: Easing.InOutQuad }
-        NumberAnimation { target: jobsToggle; property: "glow"
-                          to: Jobs.faults > 0 ? 0.45 : 0.28
-                          duration: 880; easing.type: Easing.InOutQuad }
-      }
-
-      // and out when the last one finishes, rather than freezing at
-      // whatever the pulse was on
-      NumberAnimation {
-        id: jobsGlowOut
-        target: jobsToggle
-        property: "glow"
-        to: 0
-        duration: Zenon.normal
-        easing.type: Zenon.ease
-      }
-
-      Connections {
-        target: Jobs
-        function onStartedChanged() {
-          jobsGlowOut.stop();
-          jobsGlowBurst.restart();
-        }
-        // A failure bursts too, and harder: it settles to a brighter floor
-        // than a start does, so a drawer with bad news in it is lit even
-        // when nothing is running behind it.
-        function onFaultedChanged() {
-          jobsGlowOut.stop();
-          jobsFaultBurst.restart();
-        }
-        // Only when the LAST one lands. Each job in a batch finishing
-        // would otherwise re-burst the glyph while the rest are still
-        // going, which reads as "done" three times before it is.
-        function onFinishedChanged() {
-          if (Jobs.live > 0) return;
-          jobsGlowOut.stop();
-          jobsDoneBurst.restart();
-        }
-      }
-
-      // The model's own count, rather than a second counter kept in step
-      // with it by hand: the last job leaving IS the count reaching zero.
-      Connections {
-        target: Jobs.model
-        function onCountChanged() {
-          if (Jobs.model.count > 0) return;
-          jobsGlowBurst.stop();
-          jobsGlowOut.restart();
-          term.jobsDrawerRef.open = false;
-        }
-      }
+      onEmptied: term.jobsDrawerRef.open = false
     }
 
     // What used to be a bar of its own along the bottom. Two full-width

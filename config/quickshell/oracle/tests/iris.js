@@ -49,5 +49,17 @@ module.exports = {
     t.eq("an address whole", I.siteOf("https://192.168.1.1/admin"), "192.168.1.1");
     t.eq("one label whole", I.siteOf("http://localhost:3000/"), "localhost");
     t.eq("no host, nothing", I.siteOf("about:blank"), "");
+    // ── the host ─────────────────────────────────────────────────────
+    t.eq("host lower-cased", I.hostOf("https://www.Reddit.com/r/x"), "www.reddit.com");
+    t.eq("host without user or port", I.hostOf("http://user@host:80/"), "host");
+    t.eq("no host", I.hostOf("file:///x"), "");
+    t.eq("an ipv6 host", I.hostOf("http://[::1]:3/"), "[::1]");
+    // ── the line at rest ─────────────────────────────────────────────
+    t.eq("rest: the site, bare", I.restOf("https://www.reddit.com/r/linux/comments/x?a=1"), "reddit.com");
+    t.eq("rest: a subdomain kept", I.restOf("https://mail.google.com/mail/u/0/"), "mail.google.com");
+    t.eq("rest: plain http too", I.restOf("http://neverssl.com/online"), "neverssl.com");
+    t.eq("rest: a file by its name", I.restOf("file:///home/u/My%20Doc.pdf"), "My Doc.pdf");
+    t.eq("rest: an internal page as itself", I.restOf("chrome://gpu/"), "chrome://gpu/");
+    t.eq("rest: blank is nothing", I.restOf("about:blank"), "");
   }
 };

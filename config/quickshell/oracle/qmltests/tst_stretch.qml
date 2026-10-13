@@ -50,7 +50,7 @@ Item {
       const t = list.contentItem.transform;
       verify(t.length === 2, "the list was given its stretcher");
       verify(t[0].yScale > 1.01, "stretched: " + t[0].yScale);
-      verify(t[0].yScale <= 1 + elastic.stretch * 0.1 + 0.001, "no further than the band's cap: " + t[0].yScale);
+      verify(t[0].yScale <= 1 + elastic.stretch * elastic.reach + 0.001, "no further than the band's cap: " + t[0].yScale);
       fuzzyCompare(rowTop(0), 0, 0.5, "the first row is held to the top, not slid off it");
       tryVerify(() => Math.abs(t[0].yScale - 1) < 0.001 && list.contentY === 0, 2500, "and it settles back");
     }

@@ -17,32 +17,43 @@
 //   the page     back · forward · reload · save page · view source
 //
 // Every action is Chromium's own (triggerWebAction), so the clipboard, a
-// download and the page's own undo history behave as they always do. Inside
-// the window, so solid (Zenon.menuBgSolid is CardBody's own reading of it);
-// a click anywhere else, Escape, or the page moving on puts it away.
+// download and the page's own undo history behave as they always do.
+//
+// THE SHELL'S MENU, NOT ONE DRAWN IN THE WINDOW (user, 2026-10-13: "wrong
+// shadows, no frost, no animation"): the card is CardBody in a popup surface
+// of its own (morpheus/surface/PopupSurface), as CardPopup hangs it — the
+// compositor frosts it, it casts MenuShadow and fades and grows in as every
+// menu does. Up / Down walk its rows, Return picks; a click anywhere else,
+// Escape, or the page moving on puts it away.
 
 import QtQuick
 import QtWebEngine
+import QtQuick.Window
 import "../morpheus"
+import "../morpheus/surface"
 import "iris.js" as I
 
 Item {
   id: menu
-  anchors.fill: parent
-  visible: menu.rows.length > 0
-  z: 20
+  // the window the card hangs from
+  required property Window host
 
   // the tabs (Tabs.qml), for what opens a page
   required property var deck
 
   property var page: null
-  property var rows: []            // CardBody's rows
+  property var rows: []            // CardBody's rows (kept while it fades)
   property var acts: []            // what each row does, by index
   property point at: Qt.point(0, 0)
+  property bool open: false
+  property int active: -1
 
   function close() {
+    if (!menu.open) return;
     const p = menu.page;
-    menu.rows = []; menu.acts = []; menu.page = null;
+    menu.open = false;
+    menu.active = -1;
+    menu.page = null;
     if (p) p.forceActiveFocus();
   }
 
@@ -94,7 +105,10 @@ Item {
       add("Select all", "\u{F0486}", "Ctrl+A", web(W.SelectAll), !!(f & ContextMenuRequest.CanSelectAll));
     } else if (sel !== "") {
       add("Copy", "\u{F018F}", "Ctrl+C", web(W.Copy));
-      const shortSel = sel.length > 28 ? sel.slice(0, 27) + "…" : sel;
+      // one line, whatever the selection spans (a name and a title below it
+      // wrapped the row onto two, over "Copy")
+      const flat = sel.replace(/\s+/g, " ");
+      const shortSel = flat.length > 28 ? flat.slice(0, 27) + "…" : flat;
       add("Search for “" + shortSel + "”", "\u{F0349}", "", tab(I.SEARCH + encodeURIComponent(sel)));
     } else if (link === "" && media === "") {
       add("Back", "\u{F004D}", "Alt+Left", web(W.Back), page.canGoBack);
@@ -110,36 +124,55 @@ Item {
     menu.acts = acts;
     menu.rows = rows;
     menu.at = where;
-    menu.forceActiveFocus();
+    menu.active = -1;
+    menu.open = true;
   }
 
-  // ── THE CARD ───────────────────────────────────────────────────────
-  // a press anywhere else puts it away (and goes no further)
-  MouseArea {
-    anchors.fill: parent
-    acceptedButtons: Qt.AllButtons
-    onPressed: menu.close()
-    onWheel: menu.close()
-  }
-  CardBody {
-    id: card
-    pad: 18
-    model: menu.rows
-    shade: menu.visible ? 1 : 0
-    readonly property real cardW: Zenon.menuWidth + 60
-    readonly property real cardH: menu.rows.reduce((h, r) => h + card.rowHeight(r), 0) + 2 * Zenon.menuCardPad + 2
-    width: cardW + 2 * pad
-    height: cardH + 2 * pad
-    // at the pointer, turned back from the window's right and bottom edges
-    x: Math.max(-pad, Math.min(menu.width - cardW - 4, menu.at.x) - pad)
-    y: Math.max(-pad, Math.min(menu.height - cardH - 4, menu.at.y) - pad)
-    onChosen: (i) => {
-      const act = menu.acts[i];
-      menu.close();
-      if (act) act();
+  // ── THE CARD, ON A SURFACE OF ITS OWN ──────────────────────────────
+  readonly property int pad: 36
+  readonly property real cardW: Zenon.menuWidth + 60
+  readonly property real cardH: menu.rows.reduce((h, r) => h + card.rowHeight(r), 0) + 2 * Zenon.menuCardPad + 2
+  function step(by) {
+    const n = menu.rows.length;
+    let i = menu.active;
+    for (let k = 0; k < n; ++k) {
+      i = (i + by + n) % n;
+      const r = menu.rows[i];
+      if (r && !r.isSeparator && r.enabled !== false) { menu.active = i; return; }
     }
   }
-  Keys.onEscapePressed: menu.close()
+  function pick(i) {
+    const act = menu.acts[i];
+    menu.close();
+    if (act) act();
+  }
+  readonly property alias surface: surf
+  PopupSurface {
+    id: surf
+    host: menu.host
+    open: menu.open
+    width: menu.cardW + 2 * menu.pad
+    height: menu.cardH + 2 * menu.pad
+    // the card's corner at the pointer, turned back from the window's right
+    // and bottom edges
+    at: Qt.point(Math.max(0, Math.min(menu.host.width - menu.cardW - 4, menu.at.x)) - menu.pad,
+                 Math.max(0, Math.min(menu.host.height - menu.cardH - 4, menu.at.y)) - menu.pad)
+    onDismissed: menu.close()
+    onKeyPressed: (e) => {
+      if (e.key === Qt.Key_Down) { e.accepted = true; menu.step(1); }
+      else if (e.key === Qt.Key_Up) { e.accepted = true; menu.step(-1); }
+      else if ((e.key === Qt.Key_Return || e.key === Qt.Key_Enter) && menu.active >= 0) { e.accepted = true; menu.pick(menu.active); }
+    }
+    CardBody {
+      id: card
+      anchors.fill: parent
+      pad: menu.pad
+      model: menu.rows
+      shade: surf.shade
+      activeIndex: menu.active
+      onChosen: (i) => menu.pick(i)
+    }
+  }
   // the page it was for, gone somewhere else
   Connections {
     target: menu.page

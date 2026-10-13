@@ -57,7 +57,54 @@ class History(QObject):
         self._db.execute("CREATE TABLE IF NOT EXISTS pages (url TEXT PRIMARY KEY, title TEXT,"
                          " visits INTEGER NOT NULL DEFAULT 0, last INTEGER NOT NULL DEFAULT 0)")
         self._db.execute("CREATE INDEX IF NOT EXISTS pages_last ON pages(last)")
+        # the page's favicon, as Qt WebEngine names it (image://favicon/…),
+        # for the line's suggestions (a history from before had none)
+        if "icon" not in [r[1] for r in self._db.execute("PRAGMA table_info(pages)")]:
+            self._db.execute("ALTER TABLE pages ADD COLUMN icon TEXT NOT NULL DEFAULT ''")
         self._db.execute("CREATE TABLE IF NOT EXISTS zoom (site TEXT PRIMARY KEY, factor REAL NOT NULL)")
+        self._db.execute("CREATE TABLE IF NOT EXISTS sites (host TEXT NOT NULL, key TEXT NOT NULL,"
+                         " value INTEGER NOT NULL, PRIMARY KEY (host, key))")
+        self._db.execute("CREATE TABLE IF NOT EXISTS handlers (scheme TEXT NOT NULL, origin TEXT NOT NULL,"
+                         " allowed INTEGER NOT NULL, PRIMARY KEY (scheme, origin))")
+        self._db.commit()
+
+    # ── A SITE'S OFFER TO OPEN A KIND OF LINK (mailto: …) ───────────────
+    # Chromium in Qt keeps the answer in memory only, and a mail site offers
+    # again on every load: asked once, the answer is kept here and given for
+    # it ever after (-1: never asked).
+    # ── A SITE'S OWN SETTINGS (the line's site bubble) ──────────────────
+    # host → { key: 0 | 1 } for what was set by hand: "shield" (content
+    # blocking), "autoplay", "popups". Not there = the default.
+    @Slot(str, result="QVariantMap")
+    def site(self, host):
+        return {k: int(v) for k, v in self._db.execute(
+            "SELECT key, value FROM sites WHERE host = ?", (host,)).fetchall()} if host else {}
+
+    @Slot(str, str, int)
+    def setSite(self, host, key, value):
+        if not host:
+            return
+        if value < 0:
+            self._db.execute("DELETE FROM sites WHERE host = ? AND key = ?", (host, key))
+        else:
+            self._db.execute("INSERT INTO sites(host, key, value) VALUES (?, ?, ?)"
+                             " ON CONFLICT(host, key) DO UPDATE SET value = excluded.value", (host, key, value))
+        self._db.commit()
+
+    def hosts_with(self, key, value):
+        return [h for (h,) in self._db.execute("SELECT host FROM sites WHERE key = ? AND value = ?", (key, value))]
+
+    @Slot(str, str, result=int)
+    def handlerAnswer(self, scheme, origin):
+        row = self._db.execute("SELECT allowed FROM handlers WHERE scheme = ? AND origin = ?",
+                               (scheme, origin)).fetchone()
+        return int(row[0]) if row else -1
+
+    @Slot(str, str, bool)
+    def keepHandler(self, scheme, origin, allowed):
+        self._db.execute("INSERT INTO handlers(scheme, origin, allowed) VALUES (?, ?, ?)"
+                         " ON CONFLICT(scheme, origin) DO UPDATE SET allowed = excluded.allowed",
+                         (scheme, origin, 1 if allowed else 0))
         self._db.commit()
 
     @Slot(str, result=float)
@@ -93,6 +140,12 @@ class History(QObject):
             self._db.execute("UPDATE pages SET title = ? WHERE url = ?", (title, url))
             self._db.commit()
 
+    @Slot(str, str)
+    def setIcon(self, url, icon):
+        if url and not url.startswith(SKIP):
+            self._db.execute("UPDATE pages SET icon = ? WHERE url = ?", (icon or "", url))
+            self._db.commit()
+
     @Slot(str, int, result="QVariantList")
     def suggest(self, typed, limit):
         t = typed.strip().lower()
@@ -100,11 +153,11 @@ class History(QObject):
             return []
         like = "%" + t.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
         rows = self._db.execute(
-            "SELECT url, title, visits, last FROM pages WHERE url LIKE ? ESCAPE '\\'"
+            "SELECT url, title, visits, last, icon FROM pages WHERE url LIKE ? ESCAPE '\\'"
             " OR title LIKE ? ESCAPE '\\' ORDER BY last DESC LIMIT 400", (like, like)).fetchall()
         now = time.time()
-        scored = sorted(((rank(u, ti, v, la, t, now), u, ti) for u, ti, v, la in rows), reverse=True)
-        return [{"url": u, "title": ti} for s, u, ti in scored[:max(1, limit)] if s > 0]
+        scored = sorted(((rank(u, ti, v, la, t, now), u, ti, ic) for u, ti, v, la, ic in rows), reverse=True)
+        return [{"url": u, "title": ti, "icon": ic} for s, u, ti, ic in scored[:max(1, limit)] if s > 0]
 
     def close(self):
         self._db.close()

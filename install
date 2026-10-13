@@ -10,7 +10,7 @@
 #   1. paru or paru-git, built from the AUR
 #   2. etc/pacman.conf put in place (core, extra and multilib; the -testing
 #      repos are there but commented out), then a full sync
-#   3. every package the suite needs
+#   3. every package the suite needs, and the few it builds from pkgbuilds/
 #   4. configs to $XDG_CONFIG_HOME and dotfiles to ~. Anything already there is
 #      moved to <name>.bak-<timestamp> first; nothing is overwritten. The
 #      .desktop entries for plato, picasso and terminus are not shipped: the
@@ -59,6 +59,7 @@ PACKAGES=(
   noto-fonts noto-fonts-cjk noto-fonts-extra noto-fonts-emoji
   ttf-jetbrains-mono-nerd ttf-dseg unicode-emoji
   otf-san-francisco otf-san-francisco-mono
+  p7zip                     # to unpack Apple's New York download (pkgbuilds/)
 )
 
 # ── output ──────────────────────────────────────────────────────────────────
@@ -145,6 +146,26 @@ install_pacman_conf() {
 install_packages() {
   say "Installing packages"
   paru -S --needed "${PACKAGES[@]}"
+  install_pkgbuilds
+}
+
+# The packages this repo builds itself (pkgbuilds/<name>/PKGBUILD): ones whose
+# AUR recipe is broken. otf-new-york, Apple's serif: the AUR checksum is from
+# before Apple re-issued the download (2025-07), and the new image unpacks one
+# level deeper. Each is built in a scratch directory, never in the repo, and
+# skipped when already installed.
+install_pkgbuilds() {
+  local dir name tmp
+  for dir in "$REPO"/pkgbuilds/*/; do
+    [[ -f "$dir/PKGBUILD" ]] || continue
+    name="$(basename -- "$dir")"
+    if pacman -Qq "$name" >/dev/null 2>&1; then note "$name is already installed"; continue; fi
+    say "Building $name"
+    tmp="$(mktemp -d)"
+    cp -a -- "$dir" "$tmp/$name"
+    (cd -- "$tmp/$name" && makepkg -si --needed --noconfirm) || note "$name did not build; see pkgbuilds/$name"
+    rm -rf -- "$tmp"
+  done
 }
 
 # ── 4. files ────────────────────────────────────────────────────────────────

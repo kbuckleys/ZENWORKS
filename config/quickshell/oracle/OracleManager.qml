@@ -19,9 +19,21 @@ import QtQuick
 import Quickshell
 import Quickshell.Hyprland
 import Quickshell.Io
+import "../morpheus"
 import "../morpheus/lagnotes.js" as LagNotes
 
 Scope {
+  // ── UPDATE ZENWORKS (oracle's About → Update) ──────────────────────
+  // scripts/update.sh as a job in the shell's drawer, beside terminus'
+  // copies: its progress, a stop that kills it, the receipt when it lands.
+  // Under setsid, as every job, so a stop takes its git and rsync with it.
+  Connections {
+    target: Oracle
+    function onUpdateAsked() {
+      Jobs.start("update", ["ZENWORKS"], "",
+                 ["setsid", "-w", Quickshell.shellDir + "/scripts/update.sh"]);
+    }
+  }
   id: mgr
 
   // handed to the window, for the Font and Location pickers

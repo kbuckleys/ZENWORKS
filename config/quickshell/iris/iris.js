@@ -58,6 +58,57 @@ function siteOf(url) {
   return p.slice(-n).join(".");
 }
 
+// The host of an address, lower-cased ("" for none).
+function hostOf(url) {
+  const m = String(url || "").match(/^[a-z][a-z0-9+.-]*:\/\/(?:[^@\/?#]*@)?(\[[^\]]*\]|[^\/?#:]+)/i);
+  return m ? m[1].toLowerCase() : "";
+}
+
+// THE LINE AT REST (Safari's): the site, not the whole address — the host
+// without its "www.", a file by its name, an internal page as itself; an
+// empty page, nothing (the line's ghost shows instead).
+function restOf(url) {
+  const s = shown(url);
+  if (s === "") return "";
+  if (/^file:\/\//i.test(s)) {
+    const f = decodeURIComponent(s.replace(/[?#].*$/, "").replace(/\/$/, "")).split("/").pop();
+    return f || s;
+  }
+  const host = hostOf(s);
+  if (/^https?:/i.test(s) && host !== "") return host.replace(/^www\./, "");
+  return s.replace(/[?#].*$/, "");
+}
+
+// The key a site's own settings are kept under: its host without "www.".
+function siteKey(url) {
+  return hostOf(url).replace(/^www\./, "");
+}
+
+// ── A STYLE SHEET IRIS LAYS IN A PAGE ──────────────────────────────────
+// Script source (for iris' own world) defining window.__irisSheet(id, css,
+// add): the sheet `id` set to `css`, or `css` added to it. A CONSTRUCTED
+// sheet, adopted by the document — a page's Content-Security-Policy refuses
+// a <style> element it did not write (kernel.org's default-src 'self': the
+// page's own scrollbar came back beside the suite's, 2026-10-13), but not a
+// sheet built through the CSSOM. A <style> only where a sheet cannot be
+// built. Adopted again once the page has loaded, should its own script have
+// replaced the list.
+function sheetJs() {
+  return "(() => { if (window.__irisSheet) return; const sheets = {}, els = {};"
+    + " const adopt = () => { try { const want = Object.values(sheets);"
+    + "   const have = document.adoptedStyleSheets || [];"
+    + "   if (want.some(w => have.indexOf(w) < 0)) document.adoptedStyleSheets = have.filter(h => want.indexOf(h) < 0).concat(want);"
+    + " } catch (e) {} };"
+    + " window.__irisSheet = (id, css, add) => {"
+    + "   let sh = sheets[id]; const text = (add && sh ? sh.__text : '') + css + '\\n';"
+    + "   try { if (!sh) { sh = sheets[id] = new CSSStyleSheet(); } sh.replaceSync(text); sh.__text = text; adopt(); return; }"
+    + "   catch (e) { delete sheets[id]; }"
+    + "   let st = els[id]; if (!st) { st = els[id] = document.createElement('style'); st.id = id; }"
+    + "   st.textContent = text; const root = document.head || document.documentElement;"
+    + "   if (root && !st.isConnected) root.appendChild(st); };"
+    + " addEventListener('DOMContentLoaded', adopt); addEventListener('load', adopt); })();";
+}
+
 // A tab's name: the page's title, else its address without the scheme, else
 // "New tab".
 function tabName(title, url) {

@@ -9,16 +9,26 @@
 // wording), and how it ended. The drawer's stop comes back as a cancel.
 // From either profile: a cloak tab's download is the user's file all the
 // same, and lands where the others do.
+//
+// AND IN IRIS' OWN DRAWER (2026-10-13): `jobs` is a JobsBase of iris' own
+// (morpheus/jobs — the shell's Jobs without its processes), which the bar's
+// glyph and its bubble draw with the shell's own JobsGlyph and JobsCard.
 
 import QtQuick
 import QtWebEngine
 import IrisHost
+import "../morpheus/jobs"
 import "../terminus/terminus.js" as Terminus
 
 QtObject {
   id: dl
   required property var normal
   required property var cloak
+
+  // iris' drawer: one row per download (its key ↔ the row's id)
+  readonly property JobsBase jobs: JobsBase {
+    onCancelAsked: (id) => { for (const k in dl.live) if (dl.live[k].row === id) dl.live[k].item.cancel(); }
+  }
 
   property int serial: 0
   // key → { item, started, lastBytes, lastAt }; `running` counts them (a
@@ -30,7 +40,8 @@ QtObject {
     item.downloadDirectory = Iris.downloadDir;
     item.accept();
     const key = ++dl.serial;
-    dl.live[key] = { item: item, started: Date.now(), lastBytes: 0, lastAt: Date.now() };
+    const row = dl.jobs.adopt("download", [item.downloadFileName], item.downloadDirectory);
+    dl.live[key] = { item: item, row: row, started: Date.now(), lastBytes: 0, lastAt: Date.now() };
     dl.running++;
     Shell.send({ job: "start", key: key, name: item.downloadFileName, dest: item.downloadDirectory });
     item.stateChanged.connect(() => dl.ended(key));
@@ -46,6 +57,8 @@ QtObject {
       : s === WebEngineDownloadRequest.DownloadInterrupted ? "failed" : "";
     if (state === "") return;
     Shell.send({ job: "end", key: key, state: state });
+    if (state === "stopped") dl.jobs.update(d.row, { cancelled: true });
+    dl.jobs.exited(d.row, state === "done" ? 0 : 1);
     if (Iris.selftest) Iris.report("download " + state + ": " + d.item.downloadFileName
                                    + " (" + Terminus.formatSize(d.item.receivedBytes) + ")");
     delete dl.live[key];
@@ -65,10 +78,11 @@ QtObject {
         const rate = (got - d.lastBytes) * 1000 / Math.max(1, now - d.lastAt);
         d.lastBytes = got;
         d.lastAt = now;
-        Shell.send({ job: "progress", key: Number(key),
-                     pct: all > 0 ? Math.round(got * 100 / all) : 0,
-                     rate: rate > 0 ? Terminus.formatSize(Math.round(rate)) + "/s" : "",
-                     eta: all > 0 ? Terminus.etaFrom(now - d.started, got, all) : "" });
+        const p = { pct: all > 0 ? Math.round(got * 100 / all) : 0,
+                    rate: rate > 0 ? Terminus.formatSize(Math.round(rate)) + "/s" : "",
+                    eta: all > 0 ? Terminus.etaFrom(now - d.started, got, all) : "" };
+        Shell.send({ job: "progress", key: Number(key), pct: p.pct, rate: p.rate, eta: p.eta });
+        dl.jobs.update(d.row, p);
       }
     }
   }

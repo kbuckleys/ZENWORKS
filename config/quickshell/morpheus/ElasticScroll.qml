@@ -17,7 +17,8 @@
 // see the note at the top of Elastic.
 //
 // SAFE TO LAY OVER ANYTHING. NoButton means it never takes a press, so
-// clicks, drags, hovers and rubber-band selection underneath are untouched;
+// clicks, drags, hovers, pointer shapes and rubber-band selection underneath
+// are untouched;
 // a wheel it does not want is declined and falls through to the view, which
 // goes on scrolling exactly as before.
 
@@ -84,6 +85,17 @@ MouseArea {
   // it here is how an overlay starts swallowing things it was promised not
   // to.
   hoverEnabled: false
+  // ── NO POINTER SHAPE OF ITS OWN ───────────────────────────────────────
+  // A MouseArea is born carrying the arrow, and Qt Quick shows the shape of
+  // the topmost item that has one, so this overlay hid every cursorShape
+  // underneath: a row's hand, a field's I-beam (found in iris, 2026-10-13).
+  // undefined is the property's reset, QQuickItem::unsetCursor, and the
+  // shape falls through to whatever is under the pointer again.
+  //
+  // Not a WheelHandler instead: its `blocking` takes the event before onWheel
+  // runs, and the event's `accepted` is never read back, so a wheel could not
+  // be declined to the view (Qt 6.12, qquickwheelhandler.cpp).
+  cursorShape: undefined
   z: 6
 
   onWheel: (w) => {

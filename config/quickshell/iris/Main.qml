@@ -36,6 +36,7 @@ import QtWebEngine
 import "../morpheus"
 import "../plato/editor" as Plato
 import "../terminus" as Term
+import "../morpheus/surface"
 import IrisHost
 import "iris.js" as I
 
@@ -69,13 +70,13 @@ Window {
     page: Component { Page { } }
     normal: Iris.profile
     cloak: Iris.cloak
-    sendWheel: Iris.scrollMode() === "js" ? null : win.sendWheel
+    sendWheel: win.scrollMode === "js" ? null : win.scrollMode === "raf" ? win.aimPage : win.sendWheel
     stretchBy: wheel.elastic.stretch
     // the last tab closed: nothing to come back to
     onEmptied: { win.keep(); Qt.quit(); }
     onChanged: if (!Iris.selftest) keeper.restart()
     onMenuAsked: (page, request) => pageMenu.show(page, request,
-      page.mapToItem(pageMenu, request.position.x, request.position.y))
+      page.mapToItem(win.contentItem, request.position.x, request.position.y))
     // a page asking something is brought forward to ask it
     onAnswerAsked: (page, kind, request) => { deck.show(page.tabId); pageDialog[kind](request, page); }
     onFullScreenAsked: (page, on) => win.fullPage = on
@@ -104,7 +105,7 @@ Window {
   }
 
   // into the download directory, and the shell's Jobs drawer (Downloads.qml)
-  Downloads { normal: Iris.profile; cloak: Iris.cloak }
+  Downloads { id: downloads; normal: Iris.profile; cloak: Iris.cloak }
 
   // ── THE SESSION, kept as it changes (and as the window closes) ─────
   // OFF (user, 2026-10-12: "disable the open last page thing"): iris opens
@@ -136,18 +137,45 @@ Window {
     visible: !win.fullPage
     z: 1
 
-    // ── TERMINUS' GLASS (user, 2026-10-12: "like in terminus") ────────
-    // The window is clear, so hyprland frosts the desktop through whatever
-    // the chrome leaves see-through. The bar and the active tab are one
-    // surface — the window's own ground at the window's alpha (layerBg),
-    // as terminus' path bar and active tab are — and an inactive tab is
-    // thinner, tinted glass (TabGlass' own `away`). Laid here, as plato and
-    // terminus lay it, under the strip (TabBar's groundBelow).
+    // ── PLATO'S CHROME, LAYER FOR LAYER (user, 2026-10-13: "look at plato")
+    // As PlatoWindow lays it: the strip's own glass first (TabGlass — the
+    // active tab in the window's ground, an inactive one a thinner tinted
+    // glass), the bar in the window's ground; then the frost of what runs on
+    // beneath, over both; then the ground again, over that; then the strip
+    // and the bar's keys. Plato's text runs on under its bars; a page cannot
+    // (its fixed headers and full-height apps would go behind the bar), so
+    // what is frosted is the band of page just below (morpheus/Frost's
+    // sampleShift) — the page drifts up through the glass as it scrolls.
+    // Blurred harder than plato's text (a page has headings and pictures,
+    // and blurred as plato's they still read), and the ground over it at half.
     TabGlass {
       width: strip.width
       height: strip.height
       visible: strip.visible
       cell: strip.hereCell
+    }
+    Rectangle {
+      y: strip.height
+      width: parent.width
+      height: bar.height
+      color: Zenon.layerBg
+    }
+    Frost {
+      anchors.fill: parent
+      source: pages
+      sampleShift: chrome.height
+      track: [strip.height, pages.y]
+      blurMax: 64
+      scrim: 0
+      brightness: 0
+      saturation: -0.2
+      opacity: 0.75
+      active: !win.fullPage && !!deck.here
+    }
+    Rectangle {
+      anchors.fill: parent
+      color: Zenon.ground
+      opacity: 0.5
     }
 
     // ── THE STRIP ──────────────────────────────────────────────────────
@@ -163,13 +191,30 @@ Window {
     }
 
     // ── THE BAR ────────────────────────────────────────────────────────
+    // Safari's line (user, 2026-10-13): the address field CENTRED in the bar,
+    // taller than the bar's own keys and in larger type; at rest it shows
+    // the site alone, centred, and the whole address once typed in. Inside
+    // it, the page's own state as chips: at its left the site's settings
+    // (how it is connected, and what it may do — a bubble), at its right
+    // calypso's two keys and the zoom. How far the page has loaded fills the
+    // field from behind, as ceres' band fills (terminus/ProgressFill), and
+    // fades once it has.
     Rectangle {
       id: bar
       anchors.top: strip.bottom
       anchors.left: parent.left
       anchors.right: parent.right
       height: 42
-      color: Zenon.layerBg
+      // its ground is laid under the frost (above); the bar itself is clear
+      color: "transparent"
+
+      // a cloak tab's bar wears its hue, as plato's statusline wears visual
+      // mode's — and its tab in the strip the same (Tabs' `tint`)
+      Rectangle {
+        anchors.fill: parent
+        color: Zenon.alpha(deck.cloakInk, !!deck.here && deck.here.cloaked ? 0.17 : 0)
+        Behavior on color { ColorAnimation { duration: Zenon.normal } }
+      }
 
       Row {
         id: keys
@@ -198,56 +243,144 @@ Window {
           enabled: !!deck.here
           onActivated: deck.here.loading ? deck.here.stop() : deck.here.reload()
         }
-        // a login form on the page: calypso, for it (Ctrl+Shift+L)
-        TransportKey {
-          visible: !!deck.here && deck.here.hasLogin
-          glyph: "\u{F0306}"
-          size: Zenon.px(18)
-          ink: Zenon.sand
-          onActivated: win.fill()
-        }
-        // zoomed: how far, and a click puts it back to 100%
-        TransportKey {
-          visible: !!deck.here && Math.abs(deck.here.zoomFactor - 1) > 0.001
-          anchors.verticalCenter: parent.verticalCenter
-          glyph: deck.here ? Math.round(deck.here.zoomFactor * 100) + "%" : ""
-          size: Zenon.px(13)
-          onActivated: win.zoom(0)
-        }
-        // a sign-up: calypso makes a password, keeps it, types it (Alt+G)
-        TransportKey {
-          visible: !!deck.here && deck.here.hasSignup
-          glyph: "\u{F0068}"
-          size: Zenon.px(18)
-          ink: Zenon.sand
-          onActivated: win.suggestPassword()
-        }
-        // a cloak tab says so, beside its line
-        Text {
-          visible: !!deck.here && deck.here.cloaked
-          anchors.verticalCenter: parent.verticalCenter
-          text: deck.cloakMark
-          color: Zenon.magenta
-          font.family: Zenon.glyphFace
-          font.pixelSize: Zenon.px(18)
-        }
       }
 
-      Term.BulkField {
-        id: address
-        anchors.left: keys.right
-        anchors.leftMargin: 16
+      // the bar's right end: what happens beside the page (downloads)
+      Row {
+        id: tail
         anchors.right: parent.right
         anchors.rightMargin: 14
         anchors.verticalCenter: parent.verticalCenter
-        textSize: Zenon.px(14)
-        ghost: deck.here && deck.here.cloaked ? "Cloaked: nothing is kept  ·  search or type an address"
+        spacing: 16
+        // ── DOWNLOADS: terminus' drawer, in iris' bar ─────────────────
+        // The shell's own glyph (terminus/JobsGlyph: there only while there
+        // is something, glowing, breathing, bursting as terminus' does) over
+        // iris' own downloads; on hover — or Ctrl+J, which holds it open —
+        // their drawer, the shell's card in a bubble hung from it.
+        Term.JobsGlyph {
+          id: dlGlyph
+          anchors.verticalCenter: parent.verticalCenter
+          jobs: downloads.jobs
+          size: Zenon.px(16)
+          onEmptied: win.dlPinned = false
+        }
+      }
+
+      // centred whatever the two ends hold: the field keeps clear of the
+      // wider of them on both sides
+      readonly property real sideRoom: Math.max(keys.width, tail.width) + 28
+      Term.BulkField {
+        id: address
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.verticalCenter: parent.verticalCenter
+        width: Math.max(240, Math.min(760, parent.width - 2 * bar.sideRoom))
+        height: 34
+        // the suite's card rounding, so the line and the suggestions hanging
+        // from it round alike at all four outer corners
+        radius: Zenon.menuRadius
+        textSize: Zenon.px(16)
+        leadIn: siteChip.width + 6
+        tailIn: chips.width + (chips.width > 0 ? 8 : 0)
+        ghostCentred: true
+        spliced: hintSurface.open
+        restText: deck.here ? I.restOf(deck.here.pendingUrl || String(deck.here.url)) : ""
+        ghost: deck.here && deck.here.cloaked ? "Cloaked · search or type an address"
                                               : "Search or type an address"
-        onAccepted: win.hint >= 0 && win.hint < win.hints.length ? win.goTo(win.hints[win.hint].url)
-                                                                  : win.go(address.text)
+
+        // how far the page has loaded, filling the field from behind
+        Term.ProgressFill {
+          anchors.fill: parent
+          anchors.margins: 1
+          z: -1
+          radius: address.radius - 1
+          frac: deck.here ? deck.here.loadProgress / 100 : 0
+          done: !deck.here || !deck.here.loading
+          fades: true
+        }
+
+        // the site: how it is connected, and a click for what it may do
+        TransportKey {
+          id: siteChip
+          anchors.left: parent.left
+          anchors.leftMargin: 10
+          anchors.verticalCenter: parent.verticalCenter
+          z: 2
+          readonly property string url: deck.here ? String(deck.here.url) : ""
+          readonly property bool web: /^https?:/i.test(siteChip.url)
+          readonly property bool secure: /^https:/i.test(siteChip.url)
+          visible: siteChip.web
+          glyph: siteChip.secure ? "\u{F033E}" : "\u{F033F}"
+          ink: siteChip.secure ? Zenon.white : Zenon.yellow
+          size: Zenon.px(15)
+          onActivated: win.openSite(siteChip)
+        }
+
+        Row {
+          id: chips
+          anchors.right: parent.right
+          anchors.rightMargin: 10
+          anchors.verticalCenter: parent.verticalCenter
+          spacing: 12
+          z: 2
+          // a login form on the page: calypso, for it (Ctrl+Shift+L)
+          TransportKey {
+            anchors.verticalCenter: parent.verticalCenter
+            visible: !!deck.here && deck.here.hasLogin
+            glyph: "\u{F0306}"
+            size: Zenon.px(15)
+            ink: Zenon.sand
+            onActivated: win.fill()
+          }
+          // a sign-up: calypso makes a password, keeps it, types it (Alt+G)
+          TransportKey {
+            anchors.verticalCenter: parent.verticalCenter
+            visible: !!deck.here && deck.here.hasSignup
+            glyph: "\u{F0068}"
+            size: Zenon.px(15)
+            ink: Zenon.sand
+            onActivated: win.suggestPassword()
+          }
+          // a pop-up held back: a click opens it, beside its page
+          TransportKey {
+            anchors.verticalCenter: parent.verticalCenter
+            visible: !!deck.here && deck.here.blockedPopup !== ""
+            glyph: "\u{F03CC}"
+            size: Zenon.px(15)
+            ink: Zenon.yellow
+            onActivated: {
+              const p = deck.here;
+              deck.open(p.blockedPopup, false, deck.views.indexOf(p) + 1, p.cloaked);
+              p.blockedPopup = "";
+            }
+          }
+          // zoomed: how far, at the field's right edge; a click puts it back
+          TransportKey {
+            anchors.verticalCenter: parent.verticalCenter
+            visible: !!deck.here && Math.abs(deck.here.zoomFactor - 1) > 0.001
+            glyph: deck.here ? Math.round(deck.here.zoomFactor * 100) + "%" : ""
+            size: Zenon.px(13)
+            onActivated: win.zoom(0)
+          }
+        }
+
+        // Return goes; Ctrl+Return makes a bare name www.<name>.com; Alt+Return
+        // opens it in a new tab
+        onAccepted: {
+          const lit = win.hint >= 0 && win.hint < win.hints.length ? win.hints[win.hint].url : "";
+          const t = address.text.trim();
+          if (address.acceptModifiers & Qt.AltModifier) {
+            const url = lit || I.toUrl(t);
+            if (url !== "") { win.hints = []; deck.open(url); }
+          } else if (lit) win.goTo(lit);
+          else win.go((address.acceptModifiers & Qt.ControlModifier) && /^[a-z0-9-]+$/i.test(t) ? "www." + t + ".com" : t);
+        }
         // typed, not set: what History has that fits it
         onTextChanged: if (address.focused && !win.setting) win.suggest()
-        onFocusedChanged: if (!address.focused) win.hints = []
+        // left (a pick from the suggestions, a click on the page): the
+        // line shows the page's address again, not what was typed — "re"
+        // stayed in it after a suggestion took the tab to reddit (the url
+        // changed while the line still had the keys, so it was not shown)
+        onFocusedChanged: if (!address.focused) { win.hints = []; win.showAddress(true); }
         Keys.onDownPressed: if (win.hints.length) win.hint = Math.min(win.hints.length - 1, win.hint + 1)
         Keys.onUpPressed: if (win.hints.length) win.hint = Math.max(-1, win.hint - 1)
         // Escape: the suggestions go first; then what was typed, and the
@@ -259,15 +392,6 @@ Window {
         }
       }
 
-      // how far the page has loaded, along the bar's foot
-      Rectangle {
-        anchors.bottom: parent.bottom
-        height: 2
-        width: deck.here ? parent.width * deck.here.loadProgress / 100 : 0
-        visible: !!deck.here && deck.here.loading
-        color: Zenon.cyan
-        Behavior on width { NumberAnimation { duration: Zenon.fast; easing.type: Zenon.travelEase } }
-      }
       Rectangle {
         anchors.bottom: parent.bottom
         width: parent.width
@@ -301,18 +425,32 @@ Window {
   }
 
   // ── THE RIGHT-CLICK MENU: the suite's card, not Chromium's ──────────
-  PageMenu { id: pageMenu; deck: deck }
+  PageMenu { id: pageMenu; host: win; deck: deck }
   // ── A PAGE'S QUESTIONS: the suite's confirmation card ───────────────
   PageDialog { id: pageDialog; backdrop: pages; barBottom: chrome.height }
 
   // ── THE SUITE'S SCROLLING, OVER THE PAGE ───────────────────────────
   // morpheus' ElasticScroll and Scrollbar on the page's document
-  // (PageScroll.qml): the wheel accelerates, glides and bands as every list
-  // in the shell does, and the scrollbar is the shell's, hiding when still.
-  // Declined — so the event goes to Chromium as it came — over a panel or a
-  // frame that scrolls itself, a page that does not scroll, sideways, and
-  // with Ctrl (Chromium's zoom).
+  // (PageScroll.qml): the wheel accelerates, glides and stretches as every
+  // list in the shell does, and the scrollbar is the shell's, hiding when
+  // still. Declined — so the event goes to Chromium as it came — over a
+  // panel or a frame that scrolls itself, a page that does not scroll,
+  // sideways, and with Ctrl (Chromium's zoom).
+  //
+  // EVEN AT EVERY FRAME (measured 2026-10-13, the flick: self-test: where
+  // the document stands at each frame Chromium draws). The glide is
+  // sampled at Qt's frames and Chromium draws on a clock of its own; with
+  // Chromium's smooth scrolling off (Qt WebEngine's default) it gathered
+  // the samples onto its frames unevenly — steps of 19 11 31 26 21 80 52 44
+  // 118 px frame to frame, judder on 15–17 of 55 frames: the "choppy". With
+  // it on (core/host.py) Chromium eases each sample onto its own frames:
+  // 2 3 5 8 12 17 23 32 42 53 61 71 77 82 80 74 66 57 …, judder 0–2.
+  // (Handing Chromium accelerated notches to animate instead measured
+  // worse — 6 — and is Chromium's curve, not the suite's.)
   property bool passWheel: false
+  // IRIS_SCROLL, for measuring: "js" the glide through scrollTo, "native"
+  // Chromium's own wheel with nothing of the suite's
+  readonly property string scrollMode: Iris.scrollMode()
   // how a page is moved (PageScroll.send): a precise wheel into Chromium at
   // the pointer, with this overlay stood aside for the moment it takes.
   // DOUBLED: Qt WebEngine hands Chromium half a synthetic wheel's pixels —
@@ -324,9 +462,29 @@ Window {
     Iris.wheelAt(win, at.x, at.y, dy * 2);
     wheel.enabled = true;
   }
+  // PROTOTYPE (IRIS_SCROLL=raf): the glide's goal handed to the page, which
+  // follows it with scrollfeel's own follow at every frame Chromium draws
+  property real aimed: -1
+  property string feelSrc: ""
+  function aimPage(dy) {
+    const p = deck.here;
+    if (!p) return;
+    const g = wheel.elastic._glide, s = p.scroller;
+    const goal = Math.round(Math.max(0, Math.min(s.most, g.running && g.target === s ? g.goal : s.contentY)));
+    if (goal === win.aimed) return;
+    win.aimed = goal;
+    if (!win.feelSrc) win.feelSrc = Iris.feelSource();
+    p.runJavaScript("(window.__irisAim || (window.__irisAim = (function () {" + win.feelSrc +
+      "; let goal = 0, y = 0, last = 0, run = false;" +
+      " function tick(t) { y = follow(y, goal, t - last); last = t; window.scrollTo(0, y);" +
+      "   if (y !== goal) requestAnimationFrame(tick); else run = false; }" +
+      " return function (g) { goal = g; if (!run) { run = true; y = window.scrollY; last = performance.now(); requestAnimationFrame(tick); } };" +
+      "})()))(" + goal + ")", WebEngineScript.ApplicationWorld);
+  }
   ElasticScroll {
     id: wheel
     anchors.fill: pages
+    enabled: win.scrollMode !== "native"
     // a notch is Chromium's own measure (about 53 CSS px), not a tenth of the
     // view as for a list: a page is read, and a tenth of a tall window per
     // click ran away from the eye (user, 2026-10-12). The shell's
@@ -340,6 +498,21 @@ Window {
     }
     pick: (x, y) => !deck.here || win.passWheel || deck.here.overInner || !deck.here.scroller.scrolls
       ? null : deck.here.scroller
+    // the wheel only: the pointer's shape stays the page's (a link's hand…),
+    // as ElasticScroll carries no shape of its own
+  }
+  // ── A MIDDLE CLICK SCROLLS: iris' puck (AutoScroll.qml) ─────────────
+  AutoScroll {
+    id: autoScroll
+    area: pages
+    // a middle click on a link is Chromium's (a tab behind)
+    leave: (x, y) => !deck.here || deck.here.hovered !== ""
+    wheel: (x, y, dy) => {
+      const at = pages.mapToItem(win.contentItem, x, y);
+      wheel.enabled = false;
+      Iris.wheelAt(win, at.x, at.y, dy * 2);
+      wheel.enabled = true;
+    }
   }
   Scrollbar {
     flick: deck.here ? deck.here.scroller : null
@@ -357,21 +530,41 @@ Window {
     win.hints = address.text.trim() === "" ? [] : History.suggest(address.text, 6);
     win.hint = -1;
   }
-  CardBody {
-    id: hintCard
-    z: 5
-    pad: 18
-    readonly property point at: address.mapToItem(win.contentItem, 0, address.height)
-    x: at.x - pad
-    y: at.y + 4 - pad
-    width: address.width + 2 * pad
-    height: win.hints.length * Zenon.menuRowHeight + 2 * Zenon.menuCardPad + 2 + 2 * pad
-    visible: win.hints.length > 0 && address.focused
-    shade: visible ? 1 : 0
-    model: win.hints.map(h => ({ text: h.title || h.url, hint: I.tabName("", h.url).split("/")[0] }))
-    activeIndex: win.hint
-    onChosen: (i) => win.goTo(win.hints[i].url)
+  // On a popup surface of its own, as every menu (morpheus/surface): frosted
+  // by the compositor, its shadow and fade. It never takes the keyboard —
+  // the line keeps it, and Up / Down walk the list from there.
+  PopupSurface {
+    id: hintSurface
+    host: win
+    grab: false
+    readonly property int pad: 36
+    // the field's foot, re-read whenever anything above it moves (the strip
+    // coming in pushed the field down and the list stayed — over the line)
+    readonly property point under: { address.x; address.y; address.width; bar.y; bar.width; strip.height; chrome.height;
+                                      return address.mapToItem(win.contentItem, 0, address.height); }
+    open: win.hints.length > 0 && address.focused
+    // SPLICED FROM THE LINE (user, 2026-10-13): flush with its foot, the
+    // two borders one line, the field squared off and in the card's ground
+    // while the list hangs (BulkField's `spliced`, CardBody's squareEdge)
+    at: Qt.point(hintSurface.under.x - hintSurface.pad, hintSurface.under.y - 1 - hintSurface.pad)
+    width: address.width + 2 * hintSurface.pad
+    height: Math.max(1, win.shownHints.length) * Zenon.menuRowHeight + 2 * Zenon.menuCardPad + 2 + 2 * hintSurface.pad
+    CardBody {
+      id: hintCard
+      anchors.fill: parent
+      pad: hintSurface.pad
+      shade: hintSurface.shade
+      squareEdge: "top"
+      // each with its site's favicon (History keeps it), a globe where none
+      model: win.shownHints.map(h => ({ text: h.title || h.url, hint: I.tabName("", h.url).split("/")[0],
+                                         image: h.icon || "", icon: h.icon ? "" : "\u{F059F}" }))
+      activeIndex: win.hint
+      onChosen: (i) => win.goTo(win.shownHints[i].url)
+    }
   }
+  // the list as it was last shown, kept while it fades out
+  property var shownHints: []
+  onHintsChanged: if (win.hints.length) win.shownHints = win.hints
 
   // go where the line says: an address, or a search (iris.js)
   function go(typed) {
@@ -407,6 +600,57 @@ Window {
       if (r.found) Shell.send({ suggest: { site: site, url: url, username: r.username, twice: r.twice } });
       if (Iris.selftest) Iris.report("suggest: found " + r.found + ", confirmation " + r.twice + ", username \"" + r.username + "\" for " + site);
     });
+  }
+
+  // ── THE DOWNLOADS' DRAWER, hung from their glyph ───────────────────
+  property bool dlPinned: false
+  Term.BubbleSurface {
+    id: dlDrawer
+    host: win
+    target: dlGlyph
+    grab: false
+    sticky: true
+    fit: false
+    cardWidth: 400
+    shown: (dlGlyph.hovered || win.dlPinned) && downloads.jobs.model.count > 0
+    // read once the pointer has left it, as terminus' drawer does
+    onOpenChanged: if (!open) downloads.jobs.clearEnded()
+    JobsCard {
+      width: 372
+      bare: true
+      jobs: downloads.jobs
+      nouns: ["download", "downloads"]
+    }
+  }
+
+  // ── THE SITE'S SETTINGS, from the line's site chip ─────────────────
+  SiteSettings { id: siteCard; host: win; onShownChanged: if (!shown) win.putAwayAt = Date.now() }
+  property real putAwayAt: 0
+  function openSite(chip) {
+    // the press that put it away was on the chip itself: that is the toggle
+    if (siteCard.shown || Date.now() - win.putAwayAt < 400) { siteCard.shown = false; return; }
+    if (deck.here) siteCard.openFor(deck.here, chip);
+  }
+
+  // ── A PRESS ANYWHERE IN THE WINDOW PUTS A POPUP AWAY ───────────────
+  // The compositor dismisses a grabbing popup on a click outside it — when
+  // it grants the grab, which hyprland does only for a popup opened on a
+  // fresh press, and the chips open theirs on release (user, 2026-10-13:
+  // "let me click out of that bubble"). So the window watches its own
+  // presses too: a passive point handler over everything, which takes
+  // nothing — the press goes on to the page, the line, the strip.
+  Item {
+    anchors.fill: parent
+    z: 100
+    PointHandler {
+      acceptedButtons: Qt.AllButtons
+      grabPermissions: PointerHandler.TakeOverForbidden
+      onActiveChanged: if (active) {
+        if (siteCard.shown) siteCard.shown = false;
+        win.dlPinned = false;
+        if (pageMenu.open) pageMenu.close();
+      }
+    }
   }
 
   // ── FIND, ALONG THE FOOT ───────────────────────────────────────────
@@ -511,12 +755,36 @@ Window {
     target: deck.here
     ignoreUnknownSignals: true
     function onUrlChanged() { win.showAddress(false); }
+    function onLoadingChanged() { win.showAddress(false); }
   }
 
+  // ── THE KEYS, AS OTHER BROWSERS HAVE THEM ──────────────────────────
   Shortcut { sequence: "Ctrl+T"; onActivated: win.newTab() }
+  Shortcut { sequence: "Ctrl+Shift+T"; onActivated: deck.reopen() }
+  Shortcut { sequence: "Ctrl+J"; onActivated: win.dlPinned = !win.dlPinned && downloads.jobs.model.count > 0 }
+  Shortcut { sequences: ["Alt+D", "Ctrl+K", "Ctrl+E"]; onActivated: address.claim() }
+  Shortcut { sequences: ["Ctrl+PgDown"]; onActivated: deck.step(1) }
+  Shortcut { sequences: ["Ctrl+PgUp"]; onActivated: deck.step(-1) }
+  Shortcut { sequence: "Ctrl+Shift+PgDown"; onActivated: deck.moveTab(deck.current, Math.min(deck.views.length - 1, deck.current + 1)) }
+  Shortcut { sequence: "Ctrl+Shift+PgUp"; onActivated: deck.moveTab(deck.current, Math.max(0, deck.current - 1)) }
+  // Ctrl+1 … Ctrl+8 that tab, Ctrl+9 the last (and Alt+, as on Linux Chrome)
+  Instantiator {
+    model: 9
+    delegate: Shortcut {
+      required property int index
+      sequences: ["Ctrl+" + (index + 1), "Alt+" + (index + 1)]
+      onActivated: if (deck.views.length) deck.current = index === 8 ? deck.views.length - 1 : Math.min(index, deck.views.length - 1)
+    }
+  }
+  Shortcut { sequences: ["Ctrl+Shift+R", "Shift+F5", "Ctrl+F5"]; onActivated: if (deck.here) deck.here.reloadAndBypassCache() }
+  Shortcut { sequence: "Ctrl+U"; onActivated: if (deck.here) deck.here.triggerWebAction(WebEngineView.ViewSource) }
+  Shortcut { sequence: "Ctrl+S"; onActivated: if (deck.here) deck.here.triggerWebAction(WebEngineView.SavePage) }
+  Shortcut { sequence: "F11"; onActivated: win.visibility = win.visibility === Window.FullScreen ? Window.Windowed : Window.FullScreen }
+  Shortcut { sequence: "Alt+Home"; onActivated: if (deck.here) { deck.here.url = "about:blank"; address.claim(); } }
   Shortcut { sequence: "Ctrl+Shift+N"; onActivated: { deck.open("about:blank", false, undefined, true); address.claim(); } }
   Shortcut { sequence: "Ctrl+W"; onActivated: if (deck.here) deck.close(deck.here.tabId) }
   Shortcut { sequences: ["Ctrl+L", "F6"]; onActivated: address.claim() }
+  Shortcut { sequences: ["Ctrl+Shift+P"]; onActivated: win.printPage() }
   Shortcut { sequence: "Ctrl+Shift+L"; onActivated: win.fill() }
   Shortcut { sequence: "Alt+G"; onActivated: win.suggestPassword() }
   Shortcut { sequences: ["Ctrl+F", "F3"]; onActivated: findBar.show() }
@@ -535,6 +803,7 @@ Window {
   Component.onCompleted: {
     if (Iris.selftest && Iris.startUrl.startsWith("churn:")) { churn.start(); return; }
     if (Iris.selftest && Iris.startUrl.startsWith("drive:")) { driver.begin(); return; }
+    if (Iris.selftest && Iris.startUrl.startsWith("flick:")) { flick.begin(); return; }
     if (Iris.selftest && Iris.startUrl.startsWith("gaps:")) { gaps.begin(Iris.startUrl.slice(5)); return; }
     // IRIS_SELFTEST="signup:<url> <url> …" — each page: does it read as a
     // sign-up, and what suggest would ask calypso for
@@ -566,6 +835,67 @@ Window {
       cosmeticCheck.urls = urls;
       cosmeticCheck.page = deck.open(urls[0]);
       cosmeticCheck.restart();
+      return;
+    }
+    // IRIS_SELFTEST="lazy:<url>" — a page that grows as its foot is reached:
+    // wheeled to the foot, the stretch let play, then wheeled on — the
+    // document must keep going into what loaded meanwhile
+    if (Iris.selftest && Iris.startUrl.startsWith("lazy:")) {
+      const page = deck.open(Iris.startUrl.slice(5));
+      page.loadingChanged.connect((req) => { if (req.status === WebEngineView.LoadSucceededStatus) lazyCheck.start(); });
+      return;
+    }
+    // IRIS_SELFTEST="cursor:<url>" — the pointer over each element with an
+    // id, and the shape the window shows for it
+    if (Iris.selftest && Iris.startUrl.startsWith("cursor:")) {
+      const page = deck.open(Iris.startUrl.slice(7));
+      page.loadingChanged.connect((req) => { if (req.status === WebEngineView.LoadSucceededStatus) cursorCheck.start(); });
+      return;
+    }
+    // IRIS_SELFTEST="site:<url>" — the site chip clicked: what the bubble
+    // shows, a setting changed and kept, and a picture of it
+    if (Iris.selftest && Iris.startUrl.startsWith("site:")) {
+      const page = deck.open(Iris.startUrl.slice(5));
+      page.loadingChanged.connect((req) => { if (req.status === WebEngineView.LoadSucceededStatus) siteCheck.start(); });
+      return;
+    }
+    // IRIS_SELFTEST="hints:<url> <typed>" — the page visited and its tab
+    // closed, then typed in the line: what is suggested, and whether its
+    // favicon still loads
+    if (Iris.selftest && Iris.startUrl.startsWith("hints:")) {
+      const parts = Iris.startUrl.slice(6).split(" ");
+      const page = deck.open(parts[0]);
+      deck.open("about:blank", true);
+      hintsCheck.typed = parts[1];
+      page.loadingChanged.connect((req) => { if (req.status === WebEngineView.LoadSucceededStatus) hintsCheck.start(); });
+      return;
+    }
+    // IRIS_SELFTEST="dl:<file url>" — a download: the bar's glyph, its
+    // drawer pinned open (Ctrl+J's), the row as it runs and lands
+    if (Iris.selftest && Iris.startUrl.startsWith("dl:")) {
+      deck.open("about:blank");
+      deck.here.url = Iris.startUrl.slice(3);
+      dlCheck.start();
+      return;
+    }
+    // IRIS_SELFTEST="auto:<url>" — a middle click (a click: it stays on),
+    // the pointer moved below it, the page scrolling; a click ends it
+    if (Iris.selftest && Iris.startUrl.startsWith("auto:")) {
+      const page = deck.open(Iris.startUrl.slice(5));
+      page.loadingChanged.connect((req) => { if (req.status === WebEngineView.LoadSucceededStatus) autoCheck.start(); });
+      return;
+    }
+    // IRIS_SELFTEST="bars:<url>" — whether the page's own scrollbar is gone
+    if (Iris.selftest && Iris.startUrl.startsWith("bars:")) {
+      const page = deck.open(Iris.startUrl.slice(5));
+      page.loadingChanged.connect((req) => {
+        if (req.status !== WebEngineView.LoadSucceededStatus) return;
+        page.runJavaScript("JSON.stringify({ adopted: (document.adoptedStyleSheets || []).length,"
+          + " sw: getComputedStyle(document.documentElement).scrollbarWidth, bodySw: getComputedStyle(document.body).scrollbarWidth,"
+          + " gutter: innerWidth - document.documentElement.clientWidth, scroller: document.scrollingElement && document.scrollingElement.nodeName,"
+          + " htmlOverflow: getComputedStyle(document.documentElement).overflowY, bodyOverflow: getComputedStyle(document.body).overflowY })",
+          (j) => { Iris.report("bars " + j); Qt.quit(); });
+      });
       return;
     }
     if (Iris.selftest && Iris.startUrl.startsWith("onewheel:")) {
@@ -601,7 +931,7 @@ Window {
     // the shell's Zenon as iris wears it, and the toolkit pieces iris builds on
     function toolkit() {
       Iris.report("zenon theme " + Zenon.themeName + "  cyan " + Zenon.hex(Zenon.cyan)
-                  + "  ground " + Zenon.hex(Zenon.ground) + "  face " + Zenon.face + "  fast " + Zenon.fast);
+                  + "  ground " + Zenon.hex(Zenon.ground) + "  face " + Zenon.face + "  fast " + Zenon.fast + "  light " + Zenon.light);
       for (const f of ["morpheus/Elastic", "morpheus/ElasticScroll", "morpheus/TabGlass", "morpheus/Frost",
                        "morpheus/ScrollEdge", "morpheus/DialogButton", "morpheus/Sheet", "terminus/BubbleCard"]) {
         const c = Qt.createComponent("../" + f + ".qml");
@@ -736,7 +1066,7 @@ Window {
       const p = page;
       const names = p.userScripts.collection.map(s => s.name + " (" + s.sourceCode.length + " bytes)").join(", ");
       p.runJavaScript(
-        "JSON.stringify({ sheet: (document.getElementById('iris-hide') || { textContent: '' }).textContent.split('}').length - 1,"
+        "JSON.stringify({ sheet: (document.adoptedStyleSheets || []).reduce((n, sh) => n + sh.cssRules.length, 0),"
         + " boxes: [...document.querySelectorAll('[data-probe]')].map(e => e.dataset.probe + ':' + getComputedStyle(e).display) })",
         (j) => {
           Iris.report("cosmetic " + urls[at] + "\n  laid in: " + names + "\n  in the page: " + j);
@@ -836,6 +1166,144 @@ Window {
     }
   }
   Timer {
+    id: autoCheck
+    property int step: 0
+    interval: 800
+    repeat: true
+    onTriggered: {
+      const p = deck.here, c = pages.mapToItem(win.contentItem, 300, 300);
+      if (step === 0) { Iris.middle(win, c.x, c.y); }
+      else if (step === 1) {
+        Iris.report("auto: on " + autoScroll.active + ", held " + autoScroll.held + ", puck at " + autoScroll.home.x + "," + autoScroll.home.y + ", page at " + Math.round(p.scrollPosition.y));
+        Iris.hover(win, c.x, c.y + 120);
+      } else if (step === 3) {
+        Iris.report("auto: pointer 120 px below — speed " + Math.round(autoScroll.speed) + " px/s, page now at " + Math.round(p.scrollPosition.y));
+        const out = Iris.shotPath(); if (out) win.contentItem.grabToImage((r) => r.saveToFile(out + "-auto.png"));
+        Iris.click(win, c.x, c.y + 120, false);
+      } else if (step === 4) {
+        Iris.report("auto: after a click — on " + autoScroll.active + ", page stopped at " + Math.round(p.scrollPosition.y));
+        stop(); quitSoon.start();
+      }
+      ++step;
+    }
+  }
+  Timer {
+    id: dlCheck
+    property int step: 0
+    interval: 700
+    repeat: true
+    onTriggered: {
+      const j = downloads.jobs, row = j.model.count ? j.model.get(0) : null;
+      Iris.report("dl " + step + ": glyph " + dlGlyph.visible + " (" + dlGlyph.width + "px), rows " + j.model.count
+                  + (row ? " — " + row.what + " " + row.state + " " + row.pct + "%" : "") + ", drawer " + dlDrawer.visible);
+      if (step === 1) win.dlPinned = true;
+      if (step === 3) { const out = Iris.shotPath(); if (out) dlDrawer.contentItem.grabToImage((r) => r.saveToFile(out + "-dl.png")); }
+      if (++step > 4) { stop(); quitSoon.start(); }
+    }
+  }
+  Timer {
+    id: hintsCheck
+    property string typed: ""
+    property int step: 0
+    property var probe: null
+    interval: 2500
+    repeat: true
+    onTriggered: {
+      if (step === 0) { deck.close(deck.views[0].tabId); address.claim(); address.text = typed; }
+      else if (step === 1) {
+        Iris.report("hints for \"" + typed + "\": " + JSON.stringify(win.hints).slice(0, 220) + "  surface up " + hintSurface.visible);
+        const icon = win.hints.length ? win.hints[0].icon : "";
+        if (icon) hintsCheck.probe = Qt.createQmlObject("import QtQuick; Image { source: '" + icon + "' }", win.contentItem);
+      } else {
+        const out = Iris.shotPath();
+        if (out) hintSurface.contentItem.grabToImage((r) => r.saveToFile(out + "-hints.png"));
+        Iris.report("favicon after its tab closed: " + (hintsCheck.probe ? ["Null", "Ready", "Loading", "Error"][hintsCheck.probe.status] + " " + hintsCheck.probe.implicitWidth + "px" : "none kept"));
+        stop(); quitSoon.start();
+      }
+      ++step;
+    }
+  }
+  Timer { id: quitSoon; interval: 500; onTriggered: Qt.quit() }
+  Timer {
+    id: siteCheck
+    property int step: 0
+    interval: 900
+    repeat: true
+    onTriggered: {
+      const p = deck.here;
+      if (step === 0) {
+        Iris.report("site: line at rest \"" + address.restText + "\", chip shown " + siteChip.visible + " secure " + siteChip.secure);
+        win.openSite(siteChip);
+      } else if (step === 1) {
+        Iris.report("site: bubble open " + siteCard.visible + " at " + siteCard.x + "," + siteCard.y + " " + siteCard.width + "x" + siteCard.height
+                    + "  key " + siteCard.key + "  set " + JSON.stringify(siteCard.set));
+        Iris.report("site: notifications " + siteCard.stateOf(siteCard.permission(WebEnginePermission.PermissionType.Notifications)));
+        siteCard.choose("autoplay", 0);
+        const out = Iris.shotPath();
+        if (out) siteCard.contentItem.grabToImage((r) => r.saveToFile(out + "-site.png"));
+      } else if (step === 2) {
+        Iris.report("site: after Autoplay Block — kept " + JSON.stringify(Iris.site(siteCard.key)) + ", page waits for a click " + p.settings.playbackRequiresUserGesture);
+        siteCard.choose("shield", 0);
+      } else if (step === 3) {
+        Iris.report("site: blocking off — cosmetic now " + JSON.stringify(Iris.cosmeticFor(String(p.url))).slice(0, 80));
+        siteCard.choose("shield", -1); siteCard.choose("autoplay", -1);
+      } else if (step === 4) {
+        p.runJavaScript("document.addEventListener('mousedown', () => document.title = 'pressed', true)");
+        if (!siteCard.shown) win.openSite(siteChip);
+      } else if (step === 5) {
+        const q = pages.mapToItem(win.contentItem, pages.width / 2, pages.height / 2);
+        Iris.report("site: bubble up again " + siteCard.shown + "; a click on the page");
+        Iris.click(win, q.x, q.y, false);
+      } else { Iris.report("site: after a click on the page — shown " + siteCard.shown + ", the page had the press: " + (p.title === "pressed")); stop(); Qt.quit(); }
+      ++step;
+    }
+  }
+  Timer {
+    id: cursorCheck
+    property var spots: []
+    property int i: -1
+    interval: 700
+    repeat: true
+    onTriggered: {
+      const p = deck.here;
+      if (i < 0) {
+        p.runJavaScript("JSON.stringify([...document.querySelectorAll('[id]')].map(e => { const r = e.getBoundingClientRect(); return [e.id, r.left + 6, r.top + r.height / 2]; }))",
+          (j) => { cursorCheck.spots = JSON.parse(j); cursorCheck.i = 0; });
+        i = 0; return;
+      }
+      // Qt applies an item's new cursor where the system pointer is
+      // (QCursor::pos), which offscreen never moves: hover again once
+      // Chromium has answered, so the window takes it up
+      if (i > 0 && i <= spots.length) { const s0 = spots[i - 1], q0 = p.mapToItem(win.contentItem, s0[1], s0[2]); Iris.hover(win, q0.x + 1, q0.y); }
+      if (i > 0 && i <= spots.length) Iris.report("cursor over #" + spots[i - 1][0] + ": " + Iris.cursorOf(win) + "  (link hovered: \"" + p.hovered + "\")  over: " + Iris.itemsAt(win, p.mapToItem(win.contentItem, spots[i - 1][1], spots[i - 1][2]).x, p.mapToItem(win.contentItem, spots[i - 1][1], spots[i - 1][2]).y));
+      if (i >= spots.length) { stop(); Qt.quit(); return; }
+      const s = spots[i++], q = p.mapToItem(win.contentItem, s[1], s[2]);
+      Iris.hover(win, q.x - 2, q.y); Iris.hover(win, q.x, q.y);
+    }
+  }
+  Timer {
+    id: lazyCheck
+    property int step: 0
+    interval: 1500
+    repeat: true
+    function say(what) {
+      const p = deck.here, s = p.scroller;
+      Iris.report("lazy " + what + ": document " + Math.round(s.contentHeight) + " most " + Math.round(s.most)
+                  + " contentY " + Math.round(s.contentY) + " page at " + Math.round(p.scrollPosition.y)
+                  + " band " + s.band.toFixed(1));
+      p.runJavaScript("JSON.stringify([document.documentElement.scrollHeight, scrollY, innerHeight])", (j) => Iris.report("lazy   page says [height, scrollY, innerHeight] " + j));
+    }
+    onTriggered: {
+      const at = () => Iris.notch(win, pages.width / 2, chrome.height + pages.height / 2, 1);
+      if (step === 0) { say("start"); for (let i = 0; i < 40; ++i) at(); }
+      else if (step === 1) { say("after 40 notches"); at(); at(); }
+      else if (step === 2) { say("after 2 more (should have gone on)"); for (let i = 0; i < 6; ++i) at(); }
+      else if (step === 3) { say("after 6 more"); }
+      else { stop(); Qt.quit(); }
+      ++step;
+    }
+  }
+  Timer {
     id: oneWheel
     property int step: 0
     interval: 1500
@@ -846,6 +1314,65 @@ Window {
       Iris.report("onewheel: now at " + p.scrollPosition.y);
       Qt.quit();
     }
+  }
+  // IRIS_SELFTEST="flick:<url>" — the page loaded, then wheel clicks as a
+  // mouse sends them (a burst of five, a pause, three more), with where the
+  // document stands at every frame Chromium draws (its own rAF clock):
+  // reported as the steps frame to frame, and how unevenly they come —
+  // judder, in numbers. IRIS_SCROLL picks the delivery being judged.
+  Timer {
+    id: flick
+    property int step: 0
+    property var plan: [1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1]
+    interval: 45
+    repeat: true
+    function begin() {
+      const page = deck.open(Iris.startUrl.slice(6));
+      page.loadingChanged.connect((req) => {
+        if (req.status !== WebEngineView.LoadSucceededStatus || flick.step) return;
+        flick.step = -1;
+        flickSoon.start();
+      });
+    }
+    onTriggered: {
+      if (flick.step >= flick.plan.length) { flick.stop(); flickEnd.start(); return; }
+      if (flick.plan[flick.step++]) Iris.notch(win, pages.width / 2, chrome.height + pages.height / 2, 1);
+    }
+  }
+  Timer {
+    id: flickSoon
+    interval: 2500
+    onTriggered: {
+      deck.here.runJavaScript("window.__f=[];(function f(t){__f.push([t,scrollY]);if(__f.length<400)requestAnimationFrame(f)})(performance.now())");
+      Iris.report("FLICK START " + Iris.scrollMode());
+      flick.step = 0;
+      flick.start();
+    }
+  }
+  Timer {
+    id: flickEnd
+    interval: 1600
+    onTriggered: deck.here.runJavaScript("JSON.stringify(__f)", (j) => {
+      const f = JSON.parse(j), d = [], dt = [];
+      for (let i = 1; i < f.length; ++i) { d.push(f[i][1] - f[i - 1][1]); dt.push(f[i][0] - f[i - 1][0]); }
+      // moving frames only; judder = a step that differs from the mean of
+      // its two neighbours by more than a third of it (and 1.5 px)
+      let moving = 0, judder = 0, stalls = 0, worst = 0;
+      for (let i = 1; i + 1 < d.length; ++i) {
+        const around = (d[i - 1] + d[i + 1]) / 2;
+        if (Math.abs(around) < 0.5 && Math.abs(d[i]) < 0.5) continue;
+        ++moving;
+        const off = Math.abs(d[i] - around);
+        worst = Math.max(worst, off);
+        if (off > Math.max(1.5, Math.abs(around) / 3)) ++judder;
+        if (Math.abs(d[i]) < 0.5 && Math.abs(around) > 2) ++stalls;
+      }
+      const start = d.findIndex(x => x !== 0), end = d.length - [...d].reverse().findIndex(x => x !== 0);
+      Iris.report("FLICK steps " + d.slice(Math.max(0, start), end).map(x => Math.round(x)).join(" "));
+      Iris.report("FLICK " + moving + " moving frames, judder " + judder + ", stalls " + stalls + ", worst " + worst.toFixed(1)
+        + " px, frame " + (dt.reduce((a, b) => a + b, 0) / dt.length).toFixed(2) + " ms, travelled " + Math.round(f[f.length - 1][1]) + " px");
+      Qt.quit();
+    })
   }
   Timer { id: driveSoon; interval: 3500; onTriggered: { Iris.report("DRIVE START " + Iris.scrollMode()); driver.start(); } }
   Timer { id: driveEnd; interval: 800; onTriggered: Qt.quit() }
@@ -905,12 +1432,12 @@ Window {
     property int i: 0
     interval: 900
     onTriggered: {
-      if (pageMenu.rows.length) {
+      if (pageMenu.open) {
         Iris.report("menu on " + test.menuSpots[i - 1][0] + ": " + pageMenu.rows.map(r => r.isSeparator ? "—" : r.text + (r.enabled === false ? " (off)" : "")).join(" · "));
         if (i === 1 && Iris.shotPath() !== "") {
           // the window itself, from inside: what the menu looks like
           const out = Iris.shotPath();
-          win.contentItem.grabToImage((r) => { r.saveToFile(out); Iris.report("menu shot saved"); pageMenu.close(); menuCheck.restart(); });
+          pageMenu.surface.contentItem.grabToImage((r) => { r.saveToFile(out); Iris.report("menu shot saved"); pageMenu.close(); menuCheck.restart(); });
           return;
         }
         pageMenu.close();

@@ -21,6 +21,9 @@ Rectangle {
   // is not being typed in. A path keeps its tail, so a path field says Left.
   property int elide: Text.ElideRight
   signal accepted()
+  // the modifiers held with that Return (iris: Ctrl+Return completes a
+  // name to www.<name>.com, Alt+Return opens a new tab) — read in onAccepted
+  property int acceptModifiers: 0
   // ── A CHIP TO CLEAR IT (user, 2026-10-11) ─────────────────────────
   // For a search or a filter: a small round × inside the field's right
   // end, there while it holds text. Pressed, the text goes and `cleared`
@@ -35,6 +38,17 @@ Rectangle {
   // clipboard: calypso's go out marked sensitive, so the clipboard history
   // never keeps them (user, 2026-10-12). function(text) or null.
   property var copyHook: null
+  // ── CHIPS INSIDE, AND A FACE AT REST (iris' address line, 2026-10-13) ──
+  // `leadIn` / `tailIn`: room kept clear inside either end for the holder's
+  // own chips (children of the field, anchored there). `restText`: what the
+  // field shows, centred, while it is not being typed in (Safari's line: the
+  // site, not the whole address) — typing in it brings the text back whole.
+  property real leadIn: 0
+  property real tailIn: 0
+  property string restText: ""
+  // the ghost centred in the field, not at its start (iris' line)
+  property bool ghostCentred: false
+  readonly property bool resting: fld.restText !== "" && !fldIn.activeFocus
   readonly property string family: fld.mono ? Zenon.faceMono : Zenon.face
   signal cleared()
   function clear() { fldIn.text = ""; fld.cleared(); }
@@ -53,7 +67,15 @@ Rectangle {
 
   height: Math.max(26, fld.textSize + 12)
   radius: 4
-  color: Qt.rgba(Zenon.white.r, Zenon.white.g, Zenon.white.b, 0.05)
+  // ── A CARD HANGING FROM IT (iris' line and its suggestions, 2026-10-13)
+  // `spliced`: a list hangs flush from the field's foot as one piece with it
+  // — the field squares its bottom corners and wears the card's ground
+  // (Zenon.menuBg), so the two are one surface; the focus ring steps aside
+  // (it would draw a box round half of it).
+  property bool spliced: false
+  bottomLeftRadius: fld.spliced ? 0 : fld.radius
+  bottomRightRadius: fld.spliced ? 0 : fld.radius
+  color: fld.spliced ? Zenon.menuBg : Qt.rgba(Zenon.white.r, Zenon.white.g, Zenon.white.b, 0.05)
   border.width: 1
   border.color: Zenon.border
   Behavior on border.color { ColorAnimation { duration: Zenon.fast } }
@@ -69,8 +91,11 @@ Rectangle {
 
   Text {
     anchors.fill: parent
-    anchors.leftMargin: 8
+    anchors.leftMargin: 8 + fld.leadIn
+    anchors.rightMargin: 8 + fld.tailIn
     verticalAlignment: Text.AlignVCenter
+    horizontalAlignment: fld.ghostCentred ? Text.AlignHCenter : Text.AlignLeft
+    elide: Text.ElideRight
     visible: fldIn.text === ""
     text: fld.ghost
     color: Zenon.muted
@@ -90,7 +115,7 @@ Rectangle {
   Text {
     anchors.fill: fldIn
     verticalAlignment: Text.AlignVCenter
-    visible: fld.overflows && !fldIn.activeFocus
+    visible: fld.overflows && !fldIn.activeFocus && !fld.resting
     text: fld.masked ? "\u2022".repeat(fldIn.text.length) : fldIn.text
     elide: fld.elide
     color: Zenon.white
@@ -99,14 +124,27 @@ Rectangle {
     font.pixelSize: fld.textSize
   }
 
+  Text {
+    anchors.fill: fldIn
+    verticalAlignment: Text.AlignVCenter
+    horizontalAlignment: Text.AlignHCenter
+    visible: fld.resting && fldIn.text !== ""
+    text: fld.restText
+    elide: Text.ElideMiddle
+    color: Zenon.white
+    font.family: fld.family
+    font.weight: Zenon.weight
+    font.pixelSize: fld.textSize
+  }
+
   TextInput {
     id: fldIn
-    opacity: fld.overflows && !fldIn.activeFocus ? 0 : 1
+    opacity: (fld.overflows && !fldIn.activeFocus) || (fld.resting && fldIn.text !== "") ? 0 : 1
 
     cursorDelegate: Caret { field: fldIn }
     anchors.fill: parent
-    anchors.leftMargin: 8
-    anchors.rightMargin: clearChip.visible ? clearChip.width + 12 : 8
+    anchors.leftMargin: 8 + fld.leadIn
+    anchors.rightMargin: (clearChip.visible ? clearChip.width + 12 : 8) + fld.tailIn
     verticalAlignment: Text.AlignVCenter
     color: Zenon.white
     selectionColor: Zenon.selBg
@@ -131,8 +169,8 @@ Rectangle {
         return;
       }
     }
-    Keys.onReturnPressed: (e) => { e.accepted = true; fld.accepted(); }
-    Keys.onEnterPressed: (e) => { e.accepted = true; fld.accepted(); }
+    Keys.onReturnPressed: (e) => { e.accepted = true; fld.acceptModifiers = e.modifiers; fld.accepted(); }
+    Keys.onEnterPressed: (e) => { e.accepted = true; fld.acceptModifiers = e.modifiers; fld.accepted(); }
   }
   ClearChip {
     id: clearChip
@@ -145,5 +183,5 @@ Rectangle {
   }
   // focused for typing: terminus' held ring (user, 2026-10-11 — every
   // text field wears it, its own border staying neutral)
-  HeldRing { anchors.fill: parent; radius: parent.radius; z: 10; on: fldIn.activeFocus }
+  HeldRing { anchors.fill: parent; radius: parent.radius; z: 10; on: fldIn.activeFocus && !fld.spliced }
 }

@@ -132,6 +132,20 @@ eq("nothing for classes no rule names", sh.generic("https://example.org/page", [
 eq("a site exempted from generic rules says so", sh.cosmetic("https://example.net/")["generic"], False)
 eq("not a web page: nothing", sh.cosmetic("about:blank"), {"css": "", "script": "", "generic": False})
 
+# ── HTTPS first ─────────────────────────────────────────────────────────────
+from PySide6.QtCore import QUrl  # noqa: E402
+up = lambda u: (lambda r: r.toString() if r is not None else None)(sh.upgrade(QUrl(u)))
+eq("plain http upgraded", up("http://example.com/a?b=1"), "https://example.com/a?b=1")
+eq("port 80 dropped with it", up("http://example.com:80/"), "https://example.com/")
+eq("another port kept", up("http://example.com:8080/"), "https://example.com:8080/")
+eq("https left", up("https://example.com/"), None)
+eq("this machine left", up("http://localhost:3000/"), None)
+eq("the local network left", up("http://192.168.1.1/"), None)
+eq("a .local name left", up("http://nas.local/"), None)
+eq("a bare intranet name left", up("http://printer/"), None)
+sh.allow_plain("old.example.com")
+eq("a site let through stays plain", up("http://old.example.com/"), None)
+
 print(f"\niris core: {count - len(fails)} passed, {len(fails)} failed")
 for f in fails:
     print("  FAIL " + f)

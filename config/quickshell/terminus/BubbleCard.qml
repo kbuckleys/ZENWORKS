@@ -64,7 +64,35 @@ Item {
   implicitWidth: card.width + face.pad * 2
   implicitHeight: face.padTop + face.tail + card.height + face.pad
   opacity: face.shade
-  transform: Translate { y: (1 - face.shade) * -4 }
+  // ── A QUICK, BOUNCY POP (user, 2026-10-13) ───────────────────────────
+  // Opening, it springs out from its tail's point — a little past full size
+  // and back (a back-out curve over the holder's fade); closing, it simply
+  // shrinks away. `opening` is which way the fade is going.
+  property bool opening: true
+  property real lastShade: 0
+  onShadeChanged: {
+    face.opening = face.shade >= face.lastShade;
+    face.lastShade = face.shade;
+    // (and the fit, measured again as it comes up — see THE FIT)
+    if (face.shade > 0 && face.shade < 0.2) face.refit();
+  }
+  function backOut(t) {
+    const c1 = 2.4, c3 = c1 + 1, u = t - 1;
+    return 1 + c3 * u * u * u + c1 * u * u;
+  }
+  readonly property real pop: face.opening ? face.backOut(Math.max(0, Math.min(1, face.shade))) : face.shade
+  transform: Scale {
+    origin.x: face.tailX
+    origin.y: face.padTop
+    xScale: 0.8 + 0.2 * face.pop
+    yScale: 0.8 + 0.2 * face.pop
+  }
+  // ── THE CARD BEFORE WHAT IS IN IT ────────────────────────────────────
+  // The outline is a Canvas, painted a frame after it is asked: what is in
+  // the card showed first, floating, then the bubble arrived around it
+  // (user, 2026-10-13). Each opening, the content waits for that paint.
+  property bool drawn: false
+  onOpeningChanged: if (face.opening && face.shade < 0.3) { face.drawn = false; face.repaint(); }
 
   readonly property real tailX: Math.max(card.x + 14 + face.tail,
     Math.min(card.x + card.width - 14 - face.tail, face.aim))
@@ -135,6 +163,7 @@ Item {
   Canvas {
     id: outline
     anchors.fill: parent
+    onPainted: face.drawn = true
     onPaint: {
       const c = getContext("2d");
       c.reset();
@@ -194,7 +223,6 @@ Item {
     face.fitWidth = Math.max(face.fitMin, Math.min(face.cardWidth, Math.ceil(w) + 28));
   }
   onCardWidthChanged: face.refit()
-  onShadeChanged: if (face.shade > 0 && face.shade < 0.2) face.refit()
   // content that changes while it is up (a progress, a peek's next row)
   Timer {
     interval: 250
@@ -225,6 +253,7 @@ Item {
       y: 12
       width: card.width - 28
       spacing: 10
+      opacity: face.drawn ? 1 : 0
     }
   }
 }

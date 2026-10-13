@@ -35,6 +35,7 @@
 import base64, os, re, threading, time, urllib.request
 
 import adblock
+from PySide6.QtCore import QUrl
 from PySide6.QtWebEngineCore import QWebEngineUrlRequestInterceptor, QWebEngineUrlRequestInfo
 
 CACHE = os.path.join(os.environ.get("XDG_CACHE_HOME") or os.path.expanduser("~/.cache"),
@@ -79,6 +80,25 @@ KINDS = {
     RT.ResourceTypePluginResource: "object",
     RT.ResourceTypeWebSocket: "websocket",
 }
+
+
+def _local(host):
+    """This machine, or the local network: no https to ask for."""
+    if host in ("localhost", "") or host.endswith((".localhost", ".local", ".lan", ".home.arpa", ".internal", ".test")):
+        return True
+    if "." not in host and ":" not in host:
+        return True                     # a bare name: an intranet's
+    p = host.split(".")
+    if len(p) == 4 and all(x.isdigit() for x in p):
+        a, b = int(p[0]), int(p[1])
+        return a in (10, 127) or (a == 192 and b == 168) or (a == 172 and 16 <= b <= 31) or (a == 169 and b == 254)
+    return host.startswith("[") or ":" in host and host.startswith(("fe80", "fd", "fc", "::1"))
+
+
+def _site_host(host):
+    """A host as the site settings key it: lower-cased, without "www."."""
+    h = host.lower()
+    return h[4:] if h.startswith("www.") else h
 
 
 def _list_path(name):
@@ -149,6 +169,10 @@ class Shield(QWebEngineUrlRequestInterceptor):
         self.blocked = 0
         self.spent_ns = 0
         self.worst_ns = 0
+        self.https_first = True
+        self.off = set()                # sites the user turned blocking off for
+        self.plain = set()              # hosts let through on plain http, this run
+        self.upgraded = set()           # hosts asked for over https in its place
         self._load()
 
     # ── engine ──────────────────────────────────────────────────────────
@@ -202,13 +226,43 @@ class Shield(QWebEngineUrlRequestInterceptor):
         if wait:
             th.join()
 
+    # ── HTTPS FIRST ─────────────────────────────────────────────────────
+    # A page or frame asked for over plain http is asked for over https
+    # instead — the address typed, a link, a redirect. A site with no secure
+    # version fails to load, and the window offers to go on in plain http
+    # (`allow_plain`, for this run only). Never for this machine or the local
+    # network, which have no certificates to give.
+    def upgrade(self, url):
+        """The https form of a plain-http page address, or None to leave it."""
+        if url.scheme() != "http":
+            return None
+        host = url.host().lower()
+        if host in self.plain or _local(host):
+            return None
+        up = QUrl(url)
+        up.setScheme("https")
+        if up.port() == 80:
+            up.setPort(-1)
+        return up
+
+    def allow_plain(self, host):
+        self.plain.add(host.lower())
+
     # ── the interceptor ─────────────────────────────────────────────────
     def interceptRequest(self, info):
+        kind = KINDS.get(info.resourceType(), "other")
+        if kind in ("document", "subdocument") and self.https_first:
+            up = self.upgrade(info.requestUrl())
+            if up is not None:
+                self.upgraded.add(up.host().lower())
+                info.redirect(up)
+                return
         e = self.engine
         if e is None:
             return
-        kind = KINDS.get(info.resourceType(), "other")
         if kind == "document":          # never block a page the user asked for
+            return
+        if self.off and _site_host(info.firstPartyUrl().host()) in self.off:
             return
         t = time.perf_counter_ns()
         r = e.check_network_urls(info.requestUrl().toString(),
@@ -229,7 +283,8 @@ class Shield(QWebEngineUrlRequestInterceptor):
         parse costs only itself), its scriptlets as one script, and whether
         the lists' generic rules apply to it at all."""
         e = self.engine
-        if e is None or not url.startswith(("http:", "https:")):
+        if e is None or not url.startswith(("http:", "https:")) or \
+                (self.off and _site_host(QUrl(url).host()) in self.off):
             return {"css": "", "script": "", "generic": False}
         r = e.url_cosmetic_resources(url)
         rules = [s + "{display:none!important}" for s in r.hide_selectors]

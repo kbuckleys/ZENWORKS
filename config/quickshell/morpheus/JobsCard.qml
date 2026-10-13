@@ -16,17 +16,25 @@ Rectangle {
   // Whether the pointer is on the card — the drawer and the bar panel each
   // keep themselves open while it is.
   readonly property bool hovered: cardHov.hovered
+  // whose jobs: the shell's (Jobs) unless handed others — iris' downloads,
+  // a JobsBase of its own (morpheus/jobs)
+  property var jobs: Jobs
+  // the rows alone, for a card that already has its ground and border
+  // (iris lays them in a bubble, terminus/BubbleSurface)
+  property bool bare: false
+  // what one and several are called in its head
+  property var nouns: ["operation", "operations"]
   width: 352
   height: jobsCol.implicitHeight
-  color: Zenon.black
+  color: jobsCard.bare ? "transparent" : Zenon.black
   border.color: Zenon.border
-  border.width: 1
+  border.width: jobsCard.bare ? 0 : 1
   radius: 8
   // How far in the card is, 0..1 — the holder's fade, which the card
   // grows with from its top right corner (where it hangs from).
   property real shown: 1
   transformOrigin: Item.TopRight
-  scale: 0.96 + 0.04 * jobsCard.shown
+  scale: jobsCard.bare ? 1 : 0.96 + 0.04 * jobsCard.shown
 
   HoverHandler { id: cardHov }
 
@@ -45,15 +53,15 @@ Rectangle {
         anchors.leftMargin: 12
         anchors.verticalCenter: parent.verticalCenter
         text: {
-          const bad = Jobs.faults;
-          const live = Jobs.model.count - bad;
-          const runs = live === 1 ? "1 operation" : live + " operations";
+          const bad = jobsCard.jobs.faults;
+          const live = jobsCard.jobs.model.count - bad;
+          const runs = live === 1 ? "1 " + jobsCard.nouns[0] : live + " " + jobsCard.nouns[1];
           if (bad === 0) return runs;
           const said = bad === 1 ? "1 did not finish"
                                  : bad + " did not finish";
           return live === 0 ? said : runs + "  \u00b7  " + said;
         }
-        color: Jobs.faults > 0 ? Zenon.red : Zenon.muted
+        color: jobsCard.jobs.faults > 0 ? Zenon.red : Zenon.muted
         font.family: Zenon.face
         font.weight: Zenon.weight
         font.pixelSize: Zenon.px(12)
@@ -67,7 +75,7 @@ Rectangle {
         anchors.right: parent.right
         anchors.rightMargin: 12
         anchors.verticalCenter: parent.verticalCenter
-        visible: Jobs.model.count - Jobs.faults > 1
+        visible: jobsCard.jobs.model.count - jobsCard.jobs.faults > 1
         text: "stop all"
         color: stopAllHov.hovered ? Zenon.red : Zenon.muted
         font.family: Zenon.face
@@ -77,13 +85,13 @@ Rectangle {
         HoverHandler { id: stopAllHov }
         MouseArea {
           anchors.fill: parent
-          onClicked: Jobs.cancelAll()
+          onClicked: jobsCard.jobs.cancelAll()
         }
       }
     }
 
     Repeater {
-      model: Jobs.model
+      model: jobsCard.jobs.model
 
       // `model` rather than named roles: the row carries nine of them
       // and declaring each one as a required property is nine lines
@@ -129,7 +137,8 @@ Rectangle {
           readonly property string opGlyph: jobRow.model.op === "move" ? "\uDB80\uDD90"
             : jobRow.model.op === "copy" ? "\uDB80\uDD8F"
             : jobRow.model.op === "archive" ? "\uF187"
-            : jobRow.model.op === "download" ? "\uDB80\uDDDA" : "\uF1C6"
+            : jobRow.model.op === "download" ? "\uDB80\uDDDA"
+            : jobRow.model.op === "update" ? "\uDB81\uDEB0" : "\uF1C6"
           readonly property string tail: {
             if (jobRow.ended)
               return jobRow.model.state === "failed" ? "failed"
@@ -267,7 +276,7 @@ Rectangle {
             // gesture: make this row go away. On one that is running
             // that means stop it; on one that already stopped there is
             // nothing left to stop, only to dismiss.
-            onClicked: Jobs.dismiss(jobRow.model.id)
+            onClicked: jobsCard.jobs.dismiss(jobRow.model.id)
           }
         }
 
@@ -326,7 +335,7 @@ Rectangle {
             : (jobRow.ended || jobRow.model.cancelled ? Zenon.muted
                                                       : Zenon.cyan)
           // The row is edited in place rather than rebuilt — see the
-          // note on Jobs.model — which is what lets this animate at all.
+          // note on jobsCard.jobs.model — which is what lets this animate at all.
           // Off while sweeping: the chase is already an animation, and
           // easing it a second time turns it to soup.
           Behavior on value {

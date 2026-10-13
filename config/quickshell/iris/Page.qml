@@ -79,6 +79,7 @@ WebEngineView {
   onCertificateError: (error) => page.wantsAnswer("certificate", error)
   onAuthenticationDialogRequested: (request) => page.wantsAnswer("signIn", request)
   onRegisterProtocolHandlerRequested: (request) => page.wantsAnswer("protocol", request)
+  onWebAuthUxRequested: (request) => page.wantsAnswer("webAuth", request)
 
   // a video (or a game, a slide deck) wanting the whole screen: the window
   // goes fullscreen with it and the chrome steps aside (Main)
@@ -95,7 +96,20 @@ WebEngineView {
   // which is Chromium's) it is kept — never for a cloak tab.
   property string zoomSite: ""
   property bool zoomSetting: false
+  // ── ITS SITE'S OWN SETTINGS (the line's site bubble) ────────────────
+  // autoplay: blocked = media waits for a click; popups: whether a page may
+  // open a tab nobody clicked for (Tabs.adopt). Read as each site opens.
+  property string siteKey: ""
+  property var siteSet: ({})
+  function applySite() {
+    page.siteSet = page.siteKey ? Iris.site(page.siteKey) : {};
+    page.settings.playbackRequiresUserGesture = page.siteSet.autoplay === 0;
+  }
+  // a tab the page tried to open on its own, held back: the line offers it
+  property string blockedPopup: ""
   onUrlChanged: {
+    const key = I.siteKey(String(page.url));
+    if (key !== page.siteKey) { page.siteKey = key; page.blockedPopup = ""; page.applySite(); }
     const site = I.siteOf(String(page.url));
     if (site === page.zoomSite) return;
     page.zoomSite = site;
@@ -121,6 +135,10 @@ WebEngineView {
 
   anchors.fill: parent
   visible: false
+  // a PDF opens in the page (Chromium's own viewer), not as a download;
+  // plugins are what carry the viewer
+  settings.pluginsEnabled: true
+  settings.pdfViewerEnabled: true
   onNewWindowRequested: (request) => {
     if (Iris.selftest) Iris.report("page " + page.tabId + " asked for a new tab: " + request.requestedUrl
                                    + " (" + request.destination + ", user " + request.isUserInitiated + ")");
@@ -154,10 +172,7 @@ WebEngineView {
       scripts.push(s);
     };
     one("iris-hide", WebEngineScript.ApplicationWorld,
-        "(() => { let st = null; window.__irisHide = (css) => { if (!css) return;"
-      + " if (!st) { st = document.createElement('style'); st.id = 'iris-hide'; }"
-      + " st.textContent += css + '\\n'; const root = document.head || document.documentElement;"
-      + " if (root && !st.isConnected) root.appendChild(st); };"
+        I.sheetJs() + "(() => { window.__irisHide = (css) => { if (css) __irisSheet('iris-hide', css, true); };"
       + " const seen = new Set(), fresh = { c: new Set(), i: new Set() };"
       + " const note = (el) => { if (!el || el.nodeType !== 1) return;"
       + "   if (el.id && !seen.has('#' + el.id)) { seen.add('#' + el.id); fresh.i.add(el.id); }"
@@ -201,6 +216,11 @@ WebEngineView {
 
   // ── WHAT IS KEPT (never for a cloak tab) ────────────────────────────
   onLoadingChanged: (req) => {
+    // an address asked for over http and upgraded (HTTPS first,
+    // core/shield.py) that has no secure version: the window offers plain http
+    if (req.status === WebEngineView.LoadFailedStatus && req.errorDomain === WebEngineLoadingInfo.ConnectionErrorDomain
+        && Iris.wasUpgraded(String(req.url)))
+      page.wantsAnswer("plain", req);
     if (req.status !== WebEngineView.LoadSucceededStatus) { page.hasLogin = false; page.hasSignup = false; return; }
     if (!page.cloaked) History.visit(String(req.url), page.title);
     page.lookForLogin();
@@ -253,4 +273,6 @@ WebEngineView {
       WebEngineScript.ApplicationWorld, (found) => { page.hasLogin = !!found; if (then) then(!!found); });
   }
   onTitleChanged: if (!page.cloaked && !page.loading) History.retitle(String(page.url), page.title)
+  // its favicon, for the line's suggestions
+  onIconChanged: if (!page.cloaked && String(page.icon) !== "") History.setIcon(String(page.url), String(page.icon))
 }

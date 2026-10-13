@@ -26,6 +26,7 @@
 import QtQuick
 import Quickshell
 import "../morpheus"
+import "../terminus" as Term
 import "."
 import "ceres.js" as Cer
 
@@ -288,30 +289,14 @@ Item {
         : Math.min(1, Ceres.txEvents.length
             / Math.max(1, Ceres.txExpected, Ceres.txEvents.length))
 
-      // ── THE FILL ──────────────────────────────────────────────────────
-      // In the window's own accent, not a wash of yellow: a ramp that
-      // deepens toward the leading edge, so the band reads as moving
-      // rightward even while it is still. No line at the edge: it read as a
-      // text cursor. Red, all of it, while cancelling.
-      readonly property color ink: Ceres.txCancelling ? Zenon.red : Zenon.cyan
-      Item {
-        id: fill
-        anchors.left: parent.left
-        anchors.top: parent.top
-        anchors.bottom: parent.bottom
+      // ── THE FILL: terminus/ProgressFill (lifted out of here) ──────────
+      // Red, all of it, while cancelling.
+      Term.ProgressFill {
+        anchors.fill: parent
         anchors.margins: 1
-        width: Math.max(0, (parent.width - 2) * track.frac)
-        Behavior on width { NumberAnimation { duration: Zenon.slow; easing.type: Zenon.ease } }
-
-        Rectangle {
-          anchors.fill: parent
-          radius: Zenon.windowRadius - 1
-          gradient: Gradient {
-            orientation: Gradient.Horizontal
-            GradientStop { position: 0.0; color: Qt.rgba(track.ink.r, track.ink.g, track.ink.b, 0.04) }
-            GradientStop { position: 1.0; color: Qt.rgba(track.ink.r, track.ink.g, track.ink.b, 0.20) }
-          }
-        }
+        radius: Zenon.windowRadius - 1
+        frac: track.frac
+        ink: Ceres.txCancelling ? Zenon.red : Zenon.cyan
       }
 
       Text {
