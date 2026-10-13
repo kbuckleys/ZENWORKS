@@ -3,6 +3,7 @@
 -- └─┘└─┘┘└┘└┴┘└─┘┴└─┴ ┴└─┘
 -- https://github.com/kbuckleys/
 
+hl.window_rule({ match = { class = "kitty" },                                       float = true, persistent_size = true })
 hl.window_rule({ match = { class = "org.quickshell", title = "ceres" },             float = true, persistent_size = true })
 hl.window_rule({ match = { class = "org.quickshell", title = "delphi" },            float = true, persistent_size = true })
 hl.window_rule({ match = { class = "org.quickshell", title = "oracle" },            float = true, persistent_size = true })
@@ -13,7 +14,6 @@ hl.window_rule({ match = { class = "org.quickshell", title = "picasso-view" },  
 hl.window_rule({ match = { class = "org.quickshell", title = "plato-capture" },     float = true, persistent_size = true })
 hl.window_rule({ match = { class = "org.quickshell", title = "terminus-picker" },   float = true, persistent_size = true })
 hl.window_rule({ match = { class = "steam", title = "Steam Settings" },             float = true, persistent_size = true })
-hl.window_rule({ match = { title = "^cynosure$" },                                  float = true, size = { 1000, 1000 }})
 hl.window_rule({ match = { class = "net.davidotek.pupgui2" },                       float = true })
 hl.window_rule({ match = { class = "mpv" },                                         float = true })
 
