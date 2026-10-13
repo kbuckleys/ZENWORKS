@@ -96,15 +96,10 @@ hl.config({
 	general = {
         layout = "scrolling",
 		border_size = 0,
-		col = {
-			inactive_border = "#45505C4D",
-			active_border = "#45505CCC",
-		},
 		gaps_out = 0,
 		gaps_in = 0,
 		snap = {
 			enabled = true,
-            border_overlap = true,
 		},
 	},
 
