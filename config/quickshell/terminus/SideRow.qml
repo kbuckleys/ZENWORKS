@@ -235,6 +235,9 @@ Item {
   property string dropPath: ""
   // the trash's row: what is dropped on it is trashed, not moved in
   property bool trashDrop: false
+  // The swell's colour. A drop on the trash is a trashing, so it wears the
+  // yellow of the trash confirmation's button (user, 2026-10-13).
+  readonly property color dropInk: sideRow.trashDrop ? Zenon.yellow : Zenon.cyan
 
   DropArea {
     id: rowDrop
@@ -270,9 +273,9 @@ Item {
     anchors.rightMargin: 4
     visible: sideRow.swell > 0.01
     opacity: sideRow.swell
-    color: Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b, 0.14)
+    color: Qt.rgba(sideRow.dropInk.r, sideRow.dropInk.g, sideRow.dropInk.b, 0.14)
     border.width: 1
-    border.color: Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b, sideRow.breath)
+    border.color: Qt.rgba(sideRow.dropInk.r, sideRow.dropInk.g, sideRow.dropInk.b, sideRow.breath)
     radius: 4
   }
 

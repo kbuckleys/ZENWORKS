@@ -567,7 +567,20 @@ Item {
       id: previewOut
       waitForEnd: true
       onStreamFinished: {
-        const t = previewOut.text;
+        // ── ONLY THE RUN THAT WAS ASKED FOR ───────────────────────────
+        // beginPeek kills the run in flight and starts the next on the same
+        // Process, and the KILLED run's stream still finishes — after the
+        // restart, with whatever it had (usually nothing). previewFor already
+        // named the new file, so that empty answer was drawn and CACHED as
+        // the new file's text, and the real answer, arriving next to a
+        // cleared previewFor, was thrown away: "sometimes the preview cannot
+        // show text", for good (user, 2026-10-13). Each run now prints its
+        // number first; a stream that does not open with the current one is
+        // a run nobody is waiting for.
+        const raw = previewOut.text;
+        const nl = raw.indexOf("\n");
+        if (nl < 0 || raw.slice(0, nl) !== "peek" + preview.peekSeq) return;
+        const t = raw.slice(nl + 1);
         const cur = term.currentRow();
         // The answer is about a row we have since left. Nothing to draw and
         // above all nothing to cache: a wrong entry here is permanent.
@@ -729,10 +742,15 @@ Item {
     term.previewKind = "dir";
     preview.beginPeek(path, Terminus.peekCommand(path));
   }
+  // Numbered, so a killed run's late stream is told from the answer — see
+  // previewProc's collector.
+  property int peekSeq: 0
   function beginPeek(path, command) {
     previewProc.running = false;
     term.previewFor = path;
-    previewProc.command = ["sh", "-c", command];
+    preview.peekSeq++;
+    previewProc.command = ["sh", "-c", "printf 'peek%s\\n' \"$1\"; " + command,
+                           "terminus-peek", String(preview.peekSeq)];
     previewProc.running = true;
   }
   // Deciding a preview WITHOUT a process has to cancel the one in flight, or

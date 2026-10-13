@@ -49,6 +49,14 @@ Item {
   readonly property Item card: card
 
   readonly property int tail: 8
+  // ── OR STANDING ON ITS TARGET, POINTING DOWN ────────────────────────
+  // For a target at the bottom of the screen (the bar, at the bottom by
+  // default): the card above, the tail under it. The room is turned over
+  // with it — the target's side keeps the small `padTop` (it is never
+  // raised off the target, see below), the far side takes `pad`. The
+  // shadow's last 20 px below the card are then cut by the surface's edge,
+  // which sits on the bar's: the bar reads as what it falls on.
+  property bool up: false
   // the room around the card for its shadow, at the sides and below; above
   // it, only the 6 it always had. The anchor rect is the target's own and
   // never moved: raised to make room above, it went past the window's top
@@ -63,6 +71,8 @@ Item {
 
   implicitWidth: card.width + face.pad * 2
   implicitHeight: face.padTop + face.tail + card.height + face.pad
+  // where the tail's point is, in this item's y
+  readonly property real tipY: face.up ? card.y + card.height + face.tail : face.padTop
   opacity: face.shade
   // ── A QUICK, BOUNCY POP (user, 2026-10-13) ───────────────────────────
   // Opening, it springs out from its tail's point — a little past full size
@@ -83,7 +93,7 @@ Item {
   readonly property real pop: face.opening ? face.backOut(Math.max(0, Math.min(1, face.shade))) : face.shade
   transform: Scale {
     origin.x: face.tailX
-    origin.y: face.padTop
+    origin.y: face.tipY
     xScale: 0.8 + 0.2 * face.pop
     yScale: 0.8 + 0.2 * face.pop
   }
@@ -103,13 +113,20 @@ Item {
     const r = Math.min(card.radius, h / 2), t = face.tail, tx = Math.round(face.tailX) + 0.5;
     c.beginPath();
     c.moveTo(x + r, y);
-    c.lineTo(tx - t, y);
-    c.lineTo(tx, y - t);
-    c.lineTo(tx + t, y);
+    if (!face.up) {
+      c.lineTo(tx - t, y);
+      c.lineTo(tx, y - t);
+      c.lineTo(tx + t, y);
+    }
     c.lineTo(x + w - r, y);
     c.arcTo(x + w, y, x + w, y + r, r);
     c.lineTo(x + w, y + h - r);
     c.arcTo(x + w, y + h, x + w - r, y + h, r);
+    if (face.up) {
+      c.lineTo(tx + t, y + h);
+      c.lineTo(tx, y + h + t);
+      c.lineTo(tx - t, y + h);
+    }
     c.lineTo(x + r, y + h);
     c.arcTo(x, y + h, x, y + h - r, r);
     c.lineTo(x, y + r);
@@ -118,6 +135,7 @@ Item {
   }
   function repaint() { outline.requestPaint(); hole.requestPaint(); }
   onTailXChanged: face.repaint()
+  onUpChanged: face.repaint()
   onWidthChanged: face.repaint()
   onHeightChanged: face.repaint()
   Connections { target: Zenon; function onThemeEpochChanged() { face.repaint(); } }
@@ -186,8 +204,12 @@ Item {
         g.addColorStop(1, Zenon.alpha(Zenon.rim, 0));
         c.strokeStyle = g;
         c.beginPath();
-        c.moveTo(a, y1); c.lineTo(Math.max(a, tx - t - 2), y1);
-        c.moveTo(Math.min(b, tx + t + 2), y1); c.lineTo(b, y1);
+        if (face.up) {
+          c.moveTo(a, y1); c.lineTo(b, y1);
+        } else {
+          c.moveTo(a, y1); c.lineTo(Math.max(a, tx - t - 2), y1);
+          c.moveTo(Math.min(b, tx + t + 2), y1); c.lineTo(b, y1);
+        }
         c.stroke();
       }
     }
@@ -241,7 +263,7 @@ Item {
   Item {
     id: card
     x: face.pad
-    y: face.padTop + face.tail
+    y: face.up ? face.pad : face.padTop + face.tail
     width: face.fit ? face.fitWidth : face.cardWidth
     height: col.implicitHeight + 24
     readonly property real radius: Zenon.windowRadius

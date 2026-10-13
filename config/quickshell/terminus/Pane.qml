@@ -193,7 +193,7 @@ QtObject {
     const kept = Terminus.filterEntries(pane.raw, "", term.showHidden,
                                         term.portalGhost);
     if (term.searchMode !== "") return kept;
-    if (term.usage) {
+    if (term.sizing) {
       const m = term.dirSizes;
       for (let i = 0; i < kept.length; ++i) {
         const r = kept[i];
@@ -935,7 +935,7 @@ QtObject {
     // and so is which of them are being watched — see watchAim
     term.paneWatchAim.restart();
     // And which of them still need measuring — see usageDelay.
-    if (pane.active && term.usage) term.paneUsageDelay.restart();
+    if (pane.active && term.sizing) term.paneUsageDelay.restart();
     // The rows under the cursor are new ones, so what the preview is OF has
     // changed even when the cursor itself has not moved.
     if (pane.active && pane.viewMode === "columns") term.refreshPreview();

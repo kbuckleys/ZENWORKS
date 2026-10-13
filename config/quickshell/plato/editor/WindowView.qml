@@ -978,10 +978,10 @@ Item {
     bar: win.topBar
     track: win.edgeTrack
     scrolled: win.moreAbove
-    // stays ON (the bar's scrim reads it), but frosts nothing while the hung
-    // sticky lines lay one frost from the strip's top to their own bottom
-    strength: win.stickyUnder ? 0 : 0.75
-    gapRows: !win.stickyUnder
+    // stays ON (the bar's scrim reads it), but frosts nothing: the strip's
+    // glass is one Frost (see stripGlass), terminus' sheet's
+    strength: win.stripGlass || win.stickyUnder ? 0 : 0.75
+    gapRows: !(win.stripGlass || win.stickyUnder)
     visible: !!win.edgeHost && !!win.topBar && win.w.row === 0
   }
   ScrollEdge {
@@ -1137,17 +1137,17 @@ Item {
       anchors.fill: parent
       visible: !sticky.hung
       source: rowsTex
-      blurMax: 32
+      // terminus' sheet's glass (user, 2026-10-13)
+      blurMax: 64
       scrim: 0
       brightness: 0
       saturation: -0.2
-      opacity: 0.75
     }
     Rectangle {
       anchors.fill: parent
       visible: !sticky.hung
       color: Zenon.ground
-      opacity: 0.35
+      opacity: 0.6
     }
 
     Column {
@@ -1227,20 +1227,30 @@ Item {
   // ── HUNG FROM THE STRIP, THE STRIP AND THE BAR ARE ONE FROST ────────
   // Two frosts met in a seam where the tab strip ended (user, 2026-10-11):
   // the strip's edge fading in over the tabs, the bar starting its own.
-  // So while the lines hang from the strip, the edge under the strip steps
-  // aside (strength 0, no gap rows) and this lays ONE frost from the strip's
-  // top to the bar's bottom, in the window's edgeHost — under the tabs, as
-  // the edge was. Fading in over the strip as the edge did (70% of the way
-  // down), the bar's ground beneath it and its scrim over it; the strip's
-  // own scrim the plato window still lays.
+  // So while the lines hang from the strip, this lays ONE frost from the
+  // strip's top to the bar's bottom, in the window's edgeHost — under the
+  // tabs, the bar's ground beneath it and the veil over it.
+  //
+  // AND THE STRIP'S OWN GLASS, ALWAYS (user, 2026-10-13: terminus' sheet
+  // frost "in tabs and sidebars"): with no lines hung it is the strip alone
+  // — the window's stretch of it — frosted the same way, so the edge under
+  // the strip (topEdge) stands down for good. Terminus' sheet's settings:
+  // the full kernel, at full strength; the veil (0.6, the sheet's) laid
+  // over the strip by the plato window, over the lines here.
   readonly property bool stickyUnder: sticky.hung && sticky.visible && !!win.edgeHost
+  readonly property bool stripGlass: !!win.edgeHost && !!win.topBar && win.w.row === 0
+  readonly property point edgeAt: {
+    void [win.x, win.y, win.width, win.edgeTrack, win.stickyTop];
+    return win.edgeHost ? win.mapToItem(win.edgeHost, 0, 0) : Qt.point(0, 0);
+  }
   Item {
     parent: win.edgeHost
-    visible: win.stickyUnder
-    x: sticky.x
-    width: sticky.width
-    height: sticky.y + sticky.height
+    visible: win.stripGlass || win.stickyUnder
+    x: win.stickyUnder ? sticky.x : win.edgeAt.x
+    width: win.stickyUnder ? sticky.width : win.width
+    height: win.stickyUnder ? sticky.y + sticky.height : win.stickyTop
     Rectangle {
+      visible: win.stickyUnder
       y: sticky.y
       width: parent.width
       height: sticky.height
@@ -1249,21 +1259,20 @@ Item {
     Frost {
       anchors.fill: parent
       source: content
-      track: [sticky.x, sticky.y, sticky.at.x, sticky.at.y, content.y]
-      fadeTop: sticky.y * 0.7
-      blurMax: 32
+      track: [sticky.x, sticky.y, sticky.at.x, sticky.at.y, content.y, win.edgeAt.x, win.edgeAt.y]
+      blurMax: 64
       scrim: 0
       brightness: 0
       saturation: -0.2
-      opacity: 0.75
-      active: win.stickyUnder
+      active: win.stripGlass || win.stickyUnder
     }
     Rectangle {
+      visible: win.stickyUnder
       y: sticky.y
       width: parent.width
       height: sticky.height
       color: Zenon.ground
-      opacity: 0.35
+      opacity: 0.6
     }
   }
 

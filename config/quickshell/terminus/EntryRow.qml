@@ -939,7 +939,12 @@ Item {
           entryEdit.forceActiveFocus();
           editClaim.tries = 0;
           editClaim.restart();
+          // terminus' window only — plato's tree and delphi host rows too
+          if ("renameField" in host) host.renameField = entryEdit;
         }
+        Component.onDestruction: if (host && host.renameField === entryEdit) host.renameField = null
+        // the window's way in when a key reached it instead — see renameField
+        function commitNow() { host.commitRename(entryRow.entry, entryEdit.text); }
 
         // ASK UNTIL IT HAS IT, the same as the window's own focusClaim.
         //

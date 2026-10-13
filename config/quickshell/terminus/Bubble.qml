@@ -45,6 +45,9 @@ PopupWindow {
   readonly property int pad: face.pad
   readonly property int padTop: face.padTop
   property bool sticky: false
+  // standing on the target, tail down, instead of hanging under it — for a
+  // target at the bottom of the screen (the bar's jobs). See BubbleCard.up.
+  property bool up: false
   readonly property bool over: face.over
   readonly property bool open: bub.shown || (bub.sticky && (face.over || grace.running))
   Timer { id: grace; interval: 350 }
@@ -54,7 +57,8 @@ PopupWindow {
   visible: bub.window !== null && bub.target !== null && bub.shade > 0.01
   color: "transparent"
   // only the card (and its tail) takes the pointer, never the shadow's room
-  mask: Region { x: face.card.x; y: face.card.y - bub.tail; width: face.card.width; height: face.card.height + bub.tail }
+  mask: Region { x: face.card.x; y: bub.up ? face.card.y : face.card.y - bub.tail
+                 width: face.card.width; height: face.card.height + bub.tail }
   implicitWidth: face.implicitWidth
   implicitHeight: face.implicitHeight
 
@@ -132,8 +136,10 @@ PopupWindow {
     rect.y: Math.round(bub.at.y)
     rect.width: Math.max(1, Math.round(bub.at.width))
     rect.height: Math.max(1, Math.round(bub.at.height))
-    edges: bub.lean ? Edges.Bottom | Edges.Left : Edges.Bottom
-    gravity: bub.lean ? Edges.Bottom | Edges.Right : Edges.Bottom
+    edges: bub.up ? (bub.lean ? Edges.Top | Edges.Left : Edges.Top)
+      : (bub.lean ? Edges.Bottom | Edges.Left : Edges.Bottom)
+    gravity: bub.up ? (bub.lean ? Edges.Top | Edges.Right : Edges.Top)
+      : (bub.lean ? Edges.Bottom | Edges.Right : Edges.Bottom)
     adjustment: PopupAdjustment.Slide
   }
 
@@ -141,6 +147,7 @@ PopupWindow {
     id: face
     anchors.fill: parent
     shade: bub.shade
+    up: bub.up
     cardWidth: bub.cardWidth
     fit: bub.fit
     sticky: bub.sticky

@@ -97,10 +97,8 @@ Item {
     out.pickerSidebar = term.sidebar;
     out.pickerSidebarWidth = term.sidebarWidth;
     out.pickerSideGrew = term.sideGrew;
-    if (term.pickerW > 0 && term.pickerH > 0) {
-      out.pickerW = term.pickerW;
-      out.pickerH = term.pickerH;
-    }
+    delete out.pickerW;
+    delete out.pickerH;
     viewFile.setText(JSON.stringify(out));
   }
   // Debounced, because zoom arrives as a burst of ctrl-+ and writing the file
@@ -148,9 +146,6 @@ Item {
       if (cur && typeof cur.pickerView === "string")
         keptPickerView = cur.pickerView;
       term.pickerView = keptPickerView;
-      // The dialog's size is the dialog's, for the same reason.
-      const keptPickerW = cur && typeof cur.pickerW === "number" ? cur.pickerW : undefined;
-      const keptPickerH = cur && typeof cur.pickerH === "number" ? cur.pickerH : undefined;
       // and so is its sidebar
       const keptPickerSide = cur && typeof cur.pickerSidebar === "boolean" ? cur.pickerSidebar : undefined;
       const keptPickerSideW = cur && typeof cur.pickerSidebarWidth === "number" ? cur.pickerSidebarWidth : undefined;
@@ -200,15 +195,11 @@ Item {
         usage: term.usage,
         git: term.git,
         showHidden: term.showHidden,
-        winW: term.winW,
-        winH: term.winH,
         splitGrew: term.splitGrew,
         sideGrew: term.sideGrew,
         pickerSidebar: keptPickerSide,
         pickerSidebarWidth: keptPickerSideW,
         pickerSideGrew: keptPickerSideGrew,
-        pickerW: keptPickerW,
-        pickerH: keptPickerH,
         recentsView: term.recentsView,
         recentsZoom: term.recentsZoom,
         recentsShown: term.recentsShown,
@@ -285,26 +276,6 @@ Item {
     if (typeof s.lastSaveDir === "string" && term.mgr
         && term.mgr.lastSaveDir === "") term.mgr.lastSaveDir = s.lastSaveDir;
     if (typeof s.sessionReplay === "boolean") term.sessionReplay = s.sessionReplay;
-    // ── AND THE SIZE, WRITTEN BEFORE THERE IS A SURFACE TO RESIZE ──────
-    // This runs from Component.onCompleted, where `visible` has just been
-    // put back to `shown` — which is false — so the window has not been
-    // mapped yet and the implicit size is still the size it will be born
-    // at. Assigning here replaces a constant binding with a constant, which
-    // costs nothing; assigning it later would be a resize in front of you.
-    //
-    // Clamped at minimumSize, because a stored 40x40 is a window a
-    // compositor may decline to show at all, and a preferences file is a
-    // thing a person can edit by hand.
-    const wantW = Number(s.winW);
-    const wantH = Number(s.winH);
-    if (!isNaN(wantW) && wantW >= 560 && !isNaN(wantH) && wantH >= 320) {
-      term.winW = Math.round(wantW);
-      term.winH = Math.round(wantH);
-      term.implicitWidth = term.winW;
-      term.implicitHeight = term.winH;
-    }
-    // A dialog is born at the size the last dialog was left at, if one
-    // ever was — written here for the same no-surface-yet reason.
     // How much of that size a split added — see fitSplit.
     const sg = Number(s.splitGrew);
     if (!isNaN(sg) && sg > 0) term.splitGrew = Math.round(sg);
@@ -320,14 +291,6 @@ Item {
         term.sidebarWidth = Math.max(term.sidebarMin, Math.min(term.sidebarMax, psw));
       const psg = Number(s.pickerSideGrew);
       term.sideGrew = !isNaN(psg) && psg > 0 && term.sidebar ? Math.round(psg) : 0;
-    }
-    const pw = Number(s.pickerW);
-    const ph = Number(s.pickerH);
-    if (term.isPicker && !isNaN(pw) && pw >= 560 && !isNaN(ph) && ph >= 320) {
-      term.pickerW = Math.round(pw);
-      term.pickerH = Math.round(ph);
-      term.implicitWidth = term.pickerW;
-      term.implicitHeight = term.pickerH;
     }
     // The second pane comes back the way it was left, and its directory with
     // it — but only if that directory still exists, for the same reason the

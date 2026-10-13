@@ -662,7 +662,11 @@ Item {
       tileEdit.forceActiveFocus();
       tileClaim.tries = 0;
       tileClaim.restart();
+      term.renameField = tileEdit;
     }
+    Component.onDestruction: if (term.renameField === tileEdit) term.renameField = null
+    // the window's way in when a key reached it instead — see renameField
+    function commitNow() { term.commitRename(tile.entry, tileEdit.text); }
 
     // asks until it has the keyboard — see EntryRow's editClaim
     Timer {

@@ -156,58 +156,10 @@ FloatingWindow {
   implicitWidth: 1100
   implicitHeight: 680
 
-  // ── THE SIZE YOU LEFT IT AT ───────────────────────────────────────────
-  // The two above are the size a window is BORN at, and they were the size
-  // it was born at every single time: resize the window, close it, open it
-  // again and you are back to 1100x680. Every other thing about how this
-  // window is set up is remembered — which view, how zoomed, how wide the
-  // sidebar — and its actual dimensions were the one that was not.
-  //
-  // STORAGE, NOT A BINDING. `implicitWidth: root.winW` with `winW` following
-  // `width` is a circle: the window's size feeds the size it asks to be.
-  // Even where that settles it rewrites the value every step, which is the
-  // shape the thumbnail zoom got caught in. So these are written by hand, in
-  // one direction each — noteSize reads the window, loadViewPrefs writes the
-  // implicit size once, before the surface exists.
-  //
-  // Seeded with the defaults above rather than with 0, so a window that is
-  // never resized writes back the size it has instead of writing a zero that
-  // the loader would have to reject.
-  property int winW: 1100
-  property int winH: 680
-  // The dialog's own, in a slot of its own for the reason pickerView has
-  // one: a save dialog is a place with its own habits, and resizing it must
-  // not resize your file manager. 0 means never set — a first dialog is
-  // born at the file manager's size, as it always was.
-  property int pickerW: 0
-  property int pickerH: 0
-
-  onWidthChanged: { root.noteSize(); root.noteSideWidth(); }
-  onHeightChanged: root.noteSize()
-
-  function noteSize() {
-    // A PICKER IS A DIALOG and its size is the portal's business, not a
-    // preference — the same exclusion viewSave makes for everything else.
-    // Nothing to learn from a window that is not on screen: an unmapped
-    // surface reports whatever it was last given, including 0.
-    if (!root.visible || root.width < 200 || root.height < 200) return;
-    // A PICKER remembers too, but into its own slot and through its own
-    // merged write — viewSave declines to write anything for a dialog.
-    if (root.isPicker) {
-      if (root.width === root.pickerW && root.height === root.pickerH) return;
-      root.pickerW = root.width;
-      root.pickerH = root.height;
-      opening.pickerSave.restart();
-      return;
-    }
-    if (root.picking) return;
-    if (root.width === root.winW && root.height === root.winH) return;
-    root.winW = root.width;
-    root.winH = root.height;
-    // Through the same debounce the rest of the preferences use, which is
-    // what keeps a drag-resize to one write rather than one per frame.
-    opening.viewSave.restart();
-  }
+  // The size you left it at is hyprland's: persistent_size on the
+  // "terminus" and "terminus-picker" rules (hypr/lua/rules.lua). The two
+  // above are only the size a window is born at the very first time.
+  onWidthChanged: root.noteSideWidth()
 
   // `shown` and `visible` are kept in step BOTH WAYS, and neither is a binding.
   //
@@ -1260,6 +1212,13 @@ FloatingWindow {
   // mostly a matter of measuring every directory instead of the selected one
   // and drawing the answer as a length rather than only as a number.
   property bool usage: false
+  // Whether directories are being measured: the usage mode, or a size sort.
+  // A directory's own entry is 4096 bytes whatever it holds, so a size sort
+  // that read it left every directory in name order — and a home full of
+  // directories looked like the sort did nothing (user, 2026-10-13). Under
+  // a size sort they are measured with du, as the usage mode measures them.
+  readonly property bool sizing: root.usage || root.act.sortBy === "size"
+  onSizingChanged: if (root.sizing) Qt.callLater(root.measureAll)
   // What the mode overrides, so leaving it puts things back rather than
   // leaving you in an order and a view you did not choose.
   property string usagePrevSort: ""
@@ -3918,7 +3877,15 @@ FloatingWindow {
   // settings — fades in over the strip, topScrim rising to the card's veil:
   // one recipe, one picture, either side of the seam.
   readonly property bool sheetGlass: root.sheetInk > 0.001
-  function edgeStrength(base) { return base * (1 - root.sheetInk); }
+  // ── AND NOW ALWAYS (user, 2026-10-13: "terminus sheet frost is the frost
+  // i want in tabs and sidebars, as well as terminus bar") ──────────────
+  // The sheet's glass is the strip's standing glass: stripFrost always in,
+  // the veil always the card's (glassVeil), the ScrollEdges stood down for
+  // good — one recipe whether a sheet is up or not. The sidebar wears the
+  // same veil. (`glassInk` is how much of it is in: all, now.)
+  readonly property real glassInk: 1
+  readonly property real glassVeil: 0.6
+  function edgeStrength(base) { return base * (1 - Math.max(root.sheetInk, root.glassInk)); }
   // The card's frost starts full at the seam (Sheet.seamFrost): above the
   // seam is stripFrost, the same glass, whenever a sheet is up at all.
   readonly property real sheetSeam: 1
@@ -4170,7 +4137,6 @@ FloatingWindow {
   // card. Two items, one question — the drawer stays open while the pointer
   // is over EITHER.
   property bool jobsOverGlyph: false
-  property bool jobsOverCard: false
 
   // A job ended, in this window or any other: whatever this window is
   // showing may be where it wrote.
@@ -4331,6 +4297,10 @@ FloatingWindow {
   readonly property alias bulkRef: bulk
   readonly property alias thumbnailsRef: thumbnails
   property bool renaming: false
+  // The field the name is being typed into, while one exists (EntryRow's or
+  // Tile's sets it), so a key that reaches the window during a rename can be
+  // handed back to it — see the renaming guard in the key handler.
+  property Item renameField: null
 
   // WHICH ROW IS BEING NAMED, by path.
   //
@@ -5075,7 +5045,38 @@ FloatingWindow {
       // Swallowed rather than returned, so nothing behind acts on it either.
       // Return and Escape never arrive: the field consumes both, to commit and
       // to cancel.
-      if (root.renaming) { event.accepted = true; return; }
+      //
+      // A KEY HERE WHILE THE FIELD IS NOT FOCUSED means the field never got
+      // the keyboard, or something took it back: the ring was up and every
+      // key, Escape included, was swallowed — a rename you could neither
+      // type into nor leave (user, 2026-10-13). So the field is given the
+      // keyboard again and this key is not lost: Escape cancels, Return
+      // commits, and a typed character replaces the selection as it would
+      // have in the field.
+      if (root.renaming) {
+        event.accepted = true;
+        const f = root.renameField;
+        if (!f) {
+          if (event.key === Qt.Key_Escape) root.endRename(true);
+          return;
+        }
+        if (f.activeFocus) return;
+        f.forceActiveFocus();
+        if (event.key === Qt.Key_Escape) { root.endRename(true); return; }
+        if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+          f.commitNow();
+          return;
+        }
+        if (event.text !== "" && event.text.charCodeAt(0) >= 32
+            && !(event.modifiers & (Qt.ControlModifier | Qt.AltModifier | Qt.MetaModifier))) {
+          if (f.selectedText !== "") f.remove(f.selectionStart, f.selectionEnd);
+          f.insert(f.cursorPosition, event.text);
+        } else if (event.key === Qt.Key_Backspace) {
+          if (f.selectedText !== "") f.remove(f.selectionStart, f.selectionEnd);
+          else if (f.cursorPosition > 0) f.remove(f.cursorPosition - 1, f.cursorPosition);
+        }
+        return;
+      }
 
       if (menuPop.menu.open) {
         // EVERY key belongs to the menu while it is up — the listing behind
@@ -5636,6 +5637,26 @@ FloatingWindow {
           height: chrome.bodyRow.y + chrome.bodyBox.y + chrome.millerBox.y + chrome.miller.y + modelData.y
         }
       }
+      // ── AND THE PREVIEW'S OWN SCROLLERS ───────────────────────────
+      // A text file or an archive's tree scrolled in the preview slot went
+      // under the bar sharp-edged, the one view in the window that did
+      // (user, 2026-10-13). They sit inset inside previewPane, so they
+      // find themselves (follow) rather than adding up the offsets.
+      Repeater {
+        id: previewEdges
+        model: [chrome.textScroll, chrome.archiveList]
+        delegate: ScrollEdge {
+          required property var modelData
+          view: modelData
+          follow: true
+          chromeTop: 0
+          track: [chrome.miller.x, chrome.previewPane.x, chrome.bodyRow.y]
+          visible: modelData.visible
+          opacity: chrome.previewPane.opacity
+          scrim: 0   // laid once, full width — see topScrim
+          strength: root.edgeStrength(root.frostRows)
+        }
+      }
     }
 
     Repeater {
@@ -5730,8 +5751,9 @@ FloatingWindow {
       color: Zenon.ground
       // and while a sheet is up, the card's own veil (Sheet.veil), in step
       // with the card's arrival — see sheetGlass
-      opacity: Math.max((content.edgesOn(listEdges) || (chrome.millerBox.visible && content.edgesOn(millerEdges)))
-        ? 0.35 : 0, 0.6 * root.sheetInk)
+      opacity: Math.max((content.edgesOn(listEdges) || (chrome.millerBox.visible
+          && (content.edgesOn(millerEdges) || content.edgesOn(previewEdges))))
+        ? 0.35 : 0, root.glassVeil * Math.max(root.sheetInk, root.glassInk))
       visible: opacity > 0.001
       Behavior on opacity {
         // the sheet's ink is already a curve: easing after it only lags it
@@ -5763,7 +5785,7 @@ FloatingWindow {
       id: sheetStage
       width: parent.width
       height: parent.height
-      readonly property bool on: root.sheetInk > 0.001
+      readonly property bool on: Math.max(root.sheetInk, root.glassInk) > 0.001
       ShaderEffectSource {
         x: side.width + chrome.bodyRow.x + chrome.bodyBox.x
         y: chrome.bodyRow.y + chrome.bodyBox.y
@@ -5834,9 +5856,9 @@ FloatingWindow {
       width: parent.width - side.width
       height: topScrim.height
       source: sheetStage
-      active: root.sheetGlass
-      visible: root.sheetGlass
-      opacity: root.sheetInk
+      active: root.sheetGlass || root.glassInk > 0.001
+      visible: active
+      opacity: Math.max(root.sheetInk, root.glassInk)
       blurMax: 64
       saturation: -0.2
       brightness: 0
@@ -6166,77 +6188,26 @@ FloatingWindow {
     // Hangs off the glyph in the breadcrumb bar and shows every job at once,
     // live. No focus is taken and no shield is laid down: it is a glance, not
     // a dialog, and the listing behind it stays as usable as it was.
-    Item {
+    //
+    // IN A BUBBLE (user, 2026-10-13), the suite's hover card with its tail
+    // on the glyph — terminus/Bubble, as iris hangs its downloads. Sticky:
+    // the pointer may cross onto it and stay, to press a row's ×. The card
+    // is morpheus' JobsCard, bare (the bubble is its ground and border).
+    Bubble {
       id: jobsDrawer
-      anchors.fill: parent
-      z: 14
-      visible: opacity > 0.01
-      opacity: jobsDrawer.open ? 1 : 0
-      Behavior on opacity { NumberAnimation { duration: Zenon.fast; easing.type: Zenon.ease } }
-
-      property bool open: false
-      // where the card's TOP RIGHT corner goes, in this item's coordinates —
-      // the same arithmetic the prefs panel does from the hamburger
-      property real px: 0
-      property real py: 0
-
-      function openFrom(item) {
-        const p = item.mapToItem(jobsDrawer, item.width, item.height);
-        jobsDrawer.px = p.x;
-        jobsDrawer.py = p.y + 6;
-        jobsDrawer.open = true;
-      }
-
-      // ONE DECISION, ASKED FROM BOTH SIDES. The glyph and the card each
-      // report whether the pointer is on them; this is the only thing that
-      // acts on the answer, so the two cannot disagree about whether the
-      // drawer should still be up.
-      function settle() {
-        if (root.jobsOverGlyph || root.jobsOverCard) {
-          jobsLinger.stop();
-          jobsDrawer.open = true;
-          return;
-        }
-        jobsLinger.restart();
-      }
-
-      // The gap between the glyph and the card is a few pixels of bar, and
-      // for those few pixels the pointer is over neither. Closing on the
-      // frame that happens would make the drawer impossible to reach.
-      Timer {
-        id: jobsLinger
-        interval: 220
-        onTriggered: {
-          if (root.jobsOverGlyph || root.jobsOverCard) return;
-          jobsDrawer.open = false;
-          // You opened it and moved away, so you have read whatever went
-          // wrong: the red goes with the pointer rather than sitting there
-          // until a timer decides you are done.
-          root.clearEndedJobs();
-        }
-      }
-
-      // the same shadow the menu and the prefs panel carry
-      MenuShadow {
-        panel: jobsCard
-        cornerRadius: 8
-        transformOrigin: Item.TopRight
-        scale: jobsCard.scale
-      }
-
-      // The card itself is morpheus' — the jobs are the shell's now, not
-      // this window's, and the bar draws the same card. See Jobs.qml.
+      window: root
+      target: chrome.jobsToggle
+      shown: root.jobsOverGlyph && Jobs.model.count > 0
+      sticky: true
+      fit: false
+      cardWidth: 400
+      // You opened it and moved away, so you have read whatever went
+      // wrong: the red goes with the pointer rather than sitting there
+      // until a timer decides you are done.
+      onOpenChanged: if (!open) root.clearEndedJobs()
       JobsCard {
-        id: jobsCard
-        x: Math.round(Math.max(4,
-             Math.min(jobsDrawer.px - jobsCard.width, jobsDrawer.width - jobsCard.width - 4)))
-        y: Math.round(Math.max(4,
-             Math.min(jobsDrawer.py, jobsDrawer.height - jobsCard.height - 4)))
-        shown: jobsDrawer.opacity
-        onHoveredChanged: {
-          root.jobsOverCard = jobsCard.hovered;
-          jobsDrawer.settle();
-        }
+        width: 372
+        bare: true
       }
     }
 

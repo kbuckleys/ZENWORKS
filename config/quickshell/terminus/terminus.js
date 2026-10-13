@@ -377,7 +377,7 @@ function sortEntries(rows, key, desc, dirsFirst, natural, tags) {
       d: (usage || dirsFirst === false) ? 0 : (r.isDir ? 0 : 1),
       nm: nm,
       num: usage ? (r.du !== undefined && r.du !== null ? r.du : r.size)
-         : (key === "size" ? r.size : (key === "time" ? r.mtime : 0)),
+         : (key === "size" ? sizeOf_(r) : (key === "time" ? r.mtime : 0)),
       kr: kind ? kindRank(r.name) : 0,
       ex: kind ? extOf(nm) : "",
       // rank on the wheel, and the tag's own name to break ties among the
@@ -435,6 +435,15 @@ function sortEntries(rows, key, desc, dirsFirst, natural, tags) {
   const out = new Array(n);
   for (let i = 0; i < n; ++i) out[i] = dec[i].r;
   return out;
+}
+
+// A row's size for the size sort. A directory's own entry is a block
+// (4096) whatever it holds, so it is its measured `du` when the caller has
+// attached one, and -1 — the small end, among themselves by name — while it
+// has not been measured.
+function sizeOf_(r) {
+  if (!r.isDir) return r.size;
+  return r.du !== undefined && r.du !== null ? r.du : -1;
 }
 
 // The seven presets in the order tags.js declares them, which is a colour

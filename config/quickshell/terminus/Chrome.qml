@@ -32,6 +32,7 @@ Column {
   // the terminus window (`term`, never `root` — see terminus-split notes)
   property var term: null
   readonly property alias gridA: gridA
+  readonly property alias jobsToggle: jobsToggle
   readonly property alias gridB: gridB
   readonly property alias listA: listA
   readonly property alias listB: listB
@@ -746,13 +747,11 @@ Column {
         crumbFlick.contentX = crumbFlick.maxX;
         // With a way back down on the end, the end is not where you are.
         // Where you are wins: never scrolled off the left.
-        for (let i = 0; i < crumbTrail.children.length; ++i) {
-          const c = crumbTrail.children[i];
-          if (c.modelData && c.modelData.path === term.cwd) {
-            if (c.x < crumbFlick.contentX)
-              crumbFlick.contentX = Math.max(0, c.x - 8);
-            break;
-          }
+        const c = crumbSegs.partAt(term.cwd);
+        if (c) {
+          const cx = c.mapToItem(crumbTrail, 0, 0).x;
+          if (cx < crumbFlick.contentX)
+            crumbFlick.contentX = Math.max(0, cx - 8);
         }
       }
       // The trail is rebuilt whenever the path changes, so this fires then
@@ -767,121 +766,39 @@ Column {
       height: crumbFlick.height
       spacing: 0
 
-      Repeater {
-        model: term.crumbList
-
-        delegate: Row {
-          id: crumbRow
-          required property var modelData
-          required property int index
-
-          // FULL HEIGHT, and that is what levels the trail with the rest of
-          // the bar. A Row lays its children out along x and leaves y alone,
-          // so a delegate that sized itself to its label sat at the very top
-          // of the strip with every other thing on the bar centred beside it
-          // — measured at five pixels of air above the crumbs and eighteen
-          // below. Standing the delegate the full height of the bar gives
-          // the labels inside it a parent worth centring against, and it is
-          // what lets the separator below be a rule rather than a character.
-          height: crumbFlick.height
-
-          // NO ENTRANCE. Each step used to fade and slide in as it was
-          // created, which was written for the case of one step being
-          // added to the end of the trail. The Repeater's model is the
-          // whole path, so a path change destroys and rebuilds EVERY step,
-          // and all of them ran it at once — the entire trail blinking on
-          // each navigation. That is not movement, it is a flicker, and at
-          // 140ms it is over before it reads as anything.
-          //
-          // What the trail actually does now is travel: the miller columns
-          // slide and the trail simply is what it is when they arrive.
-
-          // ── the separator ────────────────────────────────────────
-          // A plain slash, which is what a path is written with. It was a
-          // chevron, then a hairline, then a leaned rule cut to the bar's
-          // exact height — and the leaned one was the wrong kind of exact:
-          // a rule has ends, and ends have to be reasoned about every time
-          // the bar's height or its border changes. A character has none of
-          // that. It sits on the same baseline as the names either side of
-          // it and moves with them.
-          //
-          // msgBorder, the hairline colour, so the separator stays chrome
-          // and does not compete with the steps it is separating.
-          Text {
-            anchors.verticalCenter: parent.verticalCenter
-            // NONE AFTER THE FILESYSTEM ROOT, which is already a slash —
-            // "/" then "home" reads as "/home" and a separator between
-            // them would double it. Everything else gets one, `~`
-            // included, which is why this asks what came BEFORE rather
-            // than counting from the start.
-            visible: index > 0 && term.crumbList[index - 1].path !== "/"
-            opacity: modelData.ghost === true ? 0.45 : 1
-            text: " / "
-            color: Zenon.border
-            font.family: Zenon.face
-            font.weight: Zenon.weight
-            font.pixelSize: Zenon.px(15)
-          }
-
-          Text {
-            id: crumbLabel
-            anchors.verticalCenter: parent.verticalCenter
-            text: modelData.label
-            // The last crumb is where you are; the rest are somewhere to
-            // go. They stay muted under the pointer: a path is something
-            // you READ, and lighting a segment up as the cursor crosses it
-            // makes the whole bar twitch on the way to somewhere else.
-            // They are still clickable — see below.
-            // Where you are is the step whose path IS cwd, not the last
-            // one: past it the trail goes on as the way back down.
-            color: term.crumbDropPath === modelData.path ? Zenon.cyan
-              : modelData.path === term.cwd
-              ? term.crumbInk : Zenon.muted
-            // the way back down — see crumbDeep. Lit fully while a drag
-            // is over it, so the target reads as a target.
-            opacity: modelData.ghost === true
-              && term.crumbDropPath !== modelData.path ? 0.45 : 1
-            font.family: Zenon.face
-            font.weight: Font.Medium
-            font.pixelSize: Zenon.px(15)
-
-            // the step a drag is over, lit like a directory about to take
-            // one — see crumbDrop. Behind the label, not beside it: in a
-            // Row a sibling would take up room in the trail.
-            Rectangle {
-              z: -1
-              anchors.fill: parent
-              anchors.leftMargin: -4
-              anchors.rightMargin: -4
-              anchors.topMargin: -2
-              anchors.bottomMargin: -2
-              radius: 4
-              visible: term.crumbDropPath === modelData.path
-              color: Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b, 0.12)
-            }
-
-            // the step a menu is open on (term.sideMenuAt, set by crumbMenu)
-            HeldRing {
-              anchors.fill: parent
-              anchors.leftMargin: -5
-              anchors.rightMargin: -5
-              anchors.topMargin: -3
-              anchors.bottomMargin: -3
-              on: term.sideMenuAt === crumbLabel
-            }
-            // left goes there, middle opens it in a tab (as a sidebar row
-            // does), right is its menu — see term.crumbMenu
-            MouseArea {
-              anchors.fill: parent
-              acceptedButtons: Qt.LeftButton | Qt.MiddleButton | Qt.RightButton
-              onClicked: (m) => {
-                if (m.button === Qt.RightButton)
-                  term.crumbMenu(crumbLabel, m.x, m.y, modelData.path, modelData.label);
-                else if (m.button === Qt.MiddleButton) term.openInNewTab(modelData.path);
-                else term.goTo(modelData.path);
-              }
-            }
-          }
+      // ── THE STEPS, AS SEGMENTS (user, 2026-10-13) ───────────────
+      // One bordered pill split into the path's steps, the step you are
+      // in lit by the slide every switch in the suite has (terminus/
+      // Segments). It keeps everything a crumb did: left goes there,
+      // middle opens it in a tab (as a sidebar row does), right is its
+      // menu — the part held in HeldRing while it is open (sideMenuAt,
+      // set by crumbMenu); past where you are, the way back down
+      // (crumbDeep) drawn faint; a drag over a step lights it (crumbDrop,
+      // below, asks valueAt) and a hold goes there (crumbSpring).
+      //
+      // NO ENTRANCE: a path change rebuilds every step at once, and an
+      // arrival animated on each was the whole trail blinking. The lit
+      // part slides to the new step instead, which is travel.
+      Segments {
+        id: crumbSegs
+        anchors.verticalCenter: parent.verticalCenter
+        height: Math.min(implicitHeight, crumbFlick.height - 6)
+        textSize: Zenon.px(14)
+        weight: Font.Medium
+        pad: 22
+        ink: Zenon.muted
+        options: term.crumbList.map((c) => [String(c.path), c.label])
+        current: term.cwd
+        faint: term.crumbList.filter((c) => c.ghost === true).map((c) => String(c.path))
+        hot: term.crumbDropPath
+        heldAt: term.sideMenuAt
+        buttons: Qt.LeftButton | Qt.MiddleButton | Qt.RightButton
+        onPressed: (v, at, button, x, y) => {
+          if (button === Qt.RightButton) {
+            const c = term.crumbList.find((k) => String(k.path) === v);
+            term.crumbMenu(at, x, y, v, c ? c.label : v);
+          } else if (button === Qt.MiddleButton) term.openInNewTab(v);
+          else term.goTo(v);
         }
       }
 
@@ -1011,7 +928,7 @@ Column {
     //
     // ONE DropArea over the whole trail, not one per crumb, for the
     // reason dropHint is one over the whole body: going somewhere
-    // rebuilds the trail — every step, see crumbRow — and a DropArea
+    // rebuilds the trail — every step, see crumbSegs — and a DropArea
     // inside a step would be destroyed with the drag still over it.
     // This one outlives every path, and asks which step is under the
     // pointer instead.
@@ -1023,9 +940,8 @@ Column {
       // a crumb row and its separator both count as that step, the
       // search chip and the space past the end as nothing.
       function pathAt(x, y) {
-        const p = crumbTrail.mapFromItem(crumbDrop, x, y);
-        const c = crumbTrail.childAt(p.x, p.y);
-        return (c && c.modelData && c.modelData.path) ? String(c.modelData.path) : "";
+        const p = crumbSegs.mapFromItem(crumbDrop, x, y);
+        return crumbSegs.valueAt(p.x, p.y);
       }
       // ── THE TRAIL MOVES UNDER A STILL POINTER TOO ──────────────
       // A window resize, the trail re-pinning to its end, the wheel, or
@@ -1226,6 +1142,31 @@ Column {
       }
     }
 
+    // ── which view, as pictures (user, 2026-10-13) ────────────────
+    // Finder's view switch: the three layouts side by side, the one in
+    // force lit, right after the sort button. The shared Segments
+    // (terminus/Segments.qml) with a glyph for a label — columns, list
+    // and grid in the order the settings panel names them. While split,
+    // columns is not in the ring (see setView), so it shows refusing.
+    Segments {
+      id: viewSegs
+      opacity: crumbBar.chromeInk
+      enabled: crumbBar.chromeLive
+      anchors.right: splitToggle.left
+      anchors.rightMargin: 4
+      anchors.verticalCenter: crumbInner.verticalCenter
+      // not in a picker, whose layout pick() decides
+      visible: !term.picking
+      width: visible ? implicitWidth : 0
+      textSize: Zenon.px(13)
+      options: [["columns", "\uDB85\uDC87"],   // nf-md-view_column_outline
+                ["list", "\uDB85\uDC8B"],      // nf-md-view_list_outline
+                ["grid", "\uDB84\uDDD9"]]      // nf-md-view_grid_outline
+      current: term.viewMode
+      allowed: term.viewRing
+      onChose: (v) => term.setView(v)
+    }
+
     // ── the order, beside the split (user, 2026-10-10) ────────────
     // The sort submenu the row menu and `,` already spell out, from the
     // bar: lit while it is open, and while the listing is in any order but
@@ -1234,7 +1175,8 @@ Column {
       id: sortToggle
       opacity: crumbBar.chromeInk
       enabled: crumbBar.chromeLive
-      anchors.right: splitToggle.left
+      anchors.right: viewSegs.left
+      anchors.rightMargin: viewSegs.visible ? 2 : 0
       anchors.verticalCenter: crumbInner.verticalCenter
       width: 30
       height: crumbInner.height
@@ -1287,12 +1229,8 @@ Column {
       anchors.rightMargin: 2
       anchors.verticalCenter: crumbInner.verticalCenter
       height: crumbInner.height
-      onHoveredChanged: {
-        term.jobsOverGlyph = hovered;
-        if (hovered) term.jobsDrawerRef.openFrom(jobsToggle);
-        term.jobsDrawerRef.settle();
-      }
-      onEmptied: term.jobsDrawerRef.open = false
+      // the drawer (a Bubble on this glyph) follows the pointer
+      onHoveredChanged: term.jobsOverGlyph = hovered
     }
 
     // What used to be a bar of its own along the bottom. Two full-width
@@ -2670,6 +2608,39 @@ Column {
               font.weight: term.codeWeight
               font.pixelSize: Math.round(17 * term.zoom)
             }
+          }
+
+          // ── THE TEXT GOES ON UNDER ITS FOOTER, FROSTED ─────────────
+          // The facts at the foot of a text preview stood on a hard edge:
+          // the document stopped dead above them (user, 2026-10-13). They
+          // are a bar like the window's, so what has not scrolled up yet
+          // shows through them frosted, rising out of them as it comes —
+          // ScrollEdge turned over, as the picker's footer has it. Under
+          // the facts (z), so their words sit on the frost.
+          ScrollEdge {
+            id: factsEdge
+            view: textScroll
+            below: true
+            follow: true
+            bar: facts
+            chromeBottom: previewPane.height
+            z: -1
+            visible: textScroll.visible && facts.visible && facts.atFoot
+            strength: term.edgeStrength(term.frostRows)
+            // laid across the whole pane below, not the inset text's width
+            // — a scrim per view reads as a box (see topScrim)
+            scrim: 0
+          }
+          Rectangle {
+            z: -1
+            x: 0
+            y: facts.y
+            width: previewPane.width
+            height: previewPane.height - facts.y
+            color: Zenon.ground
+            opacity: factsEdge.on ? 0.35 : 0
+            visible: opacity > 0.001
+            Behavior on opacity { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
           }
 
           // A new file starts at the top of itself, not wherever the last

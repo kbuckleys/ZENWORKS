@@ -360,7 +360,7 @@ Item {
           // a directory you walk into while the mode is on measures itself,
           // because a usage view of a directory it has not looked at is a column
           // of dashes
-          if (term.usage) Qt.callLater(term.measureAll);
+          if (term.sizing) Qt.callLater(term.measureAll);
           // Land on the directory we just came out of rather than on the first
           // row: walking up and back down a tree should return you to where you
           // were, not to the top of every level on the way.

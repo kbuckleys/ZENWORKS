@@ -146,8 +146,8 @@ Window {
     // (its fixed headers and full-height apps would go behind the bar), so
     // what is frosted is the band of page just below (morpheus/Frost's
     // sampleShift) — the page drifts up through the glass as it scrolls.
-    // Blurred harder than plato's text (a page has headings and pictures,
-    // and blurred as plato's they still read), and the ground over it at half.
+    // At terminus' sheet's settings, as every strip now is: the full kernel
+    // at full strength, the 0.6 veil over it.
     TabGlass {
       width: strip.width
       height: strip.height
@@ -169,13 +169,14 @@ Window {
       scrim: 0
       brightness: 0
       saturation: -0.2
-      opacity: 0.75
       active: !win.fullPage && !!deck.here
     }
+    // terminus' sheet's veil (user, 2026-10-13: its frost on every strip,
+    // terminus' bar and iris' navbar alike)
     Rectangle {
       anchors.fill: parent
       color: Zenon.ground
-      opacity: 0.5
+      opacity: 0.6
     }
 
     // ── THE STRIP ──────────────────────────────────────────────────────
@@ -187,7 +188,8 @@ Window {
       groundBelow: true
       ed: deck
       client: deck
-      face: win.face
+      // the strips' size (plato's chromeSize, terminus' 16), in iris' face
+      face: Qt.font({ family: Zenon.face, weight: Zenon.weight, pixelSize: Zenon.px(16) })
     }
 
     // ── THE BAR ────────────────────────────────────────────────────────
@@ -1051,7 +1053,15 @@ Window {
   }
 
   Timer { id: finishLater; interval: 1000; onTriggered: test.finish() }
-  Timer { id: lookEnd; interval: 9000; onTriggered: { Iris.report("LOOK DONE"); Qt.quit(); } }
+  Timer {
+    id: lookEnd
+    interval: 9000
+    onTriggered: {
+      Iris.report("LOOK DONE");
+      const out = Iris.shotPath();
+      if (out) win.contentItem.grabToImage((r) => { r.saveToFile(out + "-look.png"); Qt.quit(); }); else Qt.quit();
+    }
+  }
   Timer { id: signupCheck; property var next: null; interval: 1500; onTriggered: if (next) next() }
 
   // IRIS_SELFTEST="cosmetic:<url> <url> …" — each page loaded, then what the

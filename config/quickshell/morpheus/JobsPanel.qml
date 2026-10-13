@@ -3,55 +3,36 @@
 // └─┘└─┘┘└┘└┴┘└─┘┴└─┴ ┴└─┘
 // https://github.com/kbuckleys/
 //
-// The bar's view of the jobs: JobsCard, hanging off JobsModule on hover, the
-// way NowPlayingPanel hangs off the audio group — held open while the pointer
-// is on either, with the same short grace for crossing the gap between them.
+// The bar's view of the jobs: JobsCard, in the suite's bubble (terminus/
+// Bubble) with its tail on JobsModule, as terminus' drawer and iris'
+// downloads hang theirs (user, 2026-10-13). Sticky: held up while the
+// pointer is on the module or crosses onto the card, with the bubble's own
+// grace for the gap. Standing on the bar when the bar is at the bottom.
 
 import QtQuick
+import Quickshell
 import "."
+import "../terminus" as Term
 
-CursorAnchor {
+Term.Bubble {
   id: panel
 
-  interactive: true
-  hitArea: card
-  gap: 6
-
+  // the bar item it hangs from, and whether the pointer is on it
+  property Item anchorItem: null
   property bool sourceHovered: false
 
-  readonly property bool wanted: (panel.sourceHovered || card.hovered)
-    && Jobs.model.count > 0
-  property bool held: false
-  onWantedChanged: {
-    if (panel.wanted) { panel.held = true; unlatch.stop(); }
-    else unlatch.restart();
-  }
-  Timer {
-    id: unlatch
-    interval: 220
-    onTriggered: {
-      panel.held = panel.wanted;
-      // read once the pointer has left it, as terminus' drawer does
-      if (!panel.held) Jobs.clearEnded();
-    }
-  }
-  show: panel.held
-
-  pad: Zenon.menuShadowPad
-  implicitWidth: card.width + Zenon.menuShadowPad * 2
-  implicitHeight: card.height + Zenon.menuShadowPad * 2
-
-  MenuShadow {
-    panel: card
-    cornerRadius: card.radius
-    opacity: card.opacity
-  }
+  window: panel.anchorItem ? panel.anchorItem.QsWindow.window : null
+  target: panel.anchorItem
+  shown: panel.sourceHovered && Jobs.model.count > 0
+  sticky: true
+  fit: false
+  cardWidth: 400
+  up: !Zenon.barTop
+  // read once the pointer has left it, as terminus' drawer does
+  onOpenChanged: if (!panel.open) Jobs.clearEnded()
 
   JobsCard {
-    id: card
-    x: Zenon.menuShadowPad
-    y: Zenon.menuShadowPad
-    opacity: panel.showFactor
-    shown: panel.showFactor
+    width: 372
+    bare: true
   }
 }

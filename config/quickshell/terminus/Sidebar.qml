@@ -53,6 +53,13 @@ Rectangle {
 
   clip: true
   color: term.sidebarBg
+  // the sheet's veil, as the strip and the bars wear it (term.glassVeil)
+  Rectangle {
+    anchors.fill: parent
+    z: -1
+    color: Zenon.ground
+    opacity: side.term.glassVeil
+  }
   // ── IT SLIDES OUT, AS PLATO'S TREE DOES ──────────────────
   // The same motion, a little quicker: this box's width eases over
   // 1.4x the normal duration while the column inside keeps its full

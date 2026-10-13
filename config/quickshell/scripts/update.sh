@@ -22,12 +22,18 @@
 # they are often edited by hand. Everything else in the suite's config
 # directories is made exactly the published one.
 #
-# NOT ON THE MAINTAINER'S MACHINE: there the live config is AHEAD of what is
-# published, and this would roll it back. A machine with the package
-# checkout (~/Projects/ZENWORKS, sync-package.sh's) refuses without --force.
+# NOT THE CONFIG ON THE MAINTAINER'S MACHINE: there the live config is AHEAD
+# of what is published, and laying it over would roll it back. A machine with
+# the package checkout (~/Projects/ZENWORKS, sync-package.sh's) keeps its
+# config (--force lays it anyway) — and still gets what is missing, below.
 #
-# Packages the new version needs and this machine lacks are listed at the
-# end, for ceres (or paru) to install; this installs none itself.
+# WHAT IS MISSING IS INSTALLED (user, 2026-10-13): the packages the published
+# installer lists that this machine lacks, and what ZENWORKS builds itself
+# (quickshell/pkgbuilds/<name> — New York, whose AUR recipe is broken) that
+# is not installed. Not here — a job has no terminal for sudo — but by ceres,
+# which asks for the password on its own card: this writes what is needed to
+# $XDG_RUNTIME_DIR/zenworks-update.json, and the shell (OracleManager) reads
+# it, removes it, and hands it to ceres. By hand, it is printed instead.
 #
 # The repository: $ZENWORKS_REPO, else the published one. Run by oracle's
 # Update (as a job in the shell's drawer), or by hand.
@@ -48,13 +54,18 @@ for a in "$@"; do
   esac
 done
 
+# run from the shell, a failure is said where it can be read: a notification
+said() { [[ -t 1 ]] || notify-send -a ZENWORKS "Update failed" "$1" 2>/dev/null || true; echo "update: $1" >&2; }
+trap 'said "stopped at line $LINENO (exit $?)"' ERR
+
+maintained=""
 if [[ -z "$force" && -d "$HOME/Projects/ZENWORKS/config" ]]; then
-  echo "update: this machine maintains ZENWORKS (~/Projects/ZENWORKS) — its config is ahead of the published one; --force to roll it back anyway" >&2
-  exit 3
+  maintained=1
+  echo "update: this machine maintains ZENWORKS (~/Projects/ZENWORKS) — its config is ahead of the published one and is left as it is (--force lays it anyway); what is missing is still installed"
 fi
 
 for tool in git rsync; do
-  command -v "$tool" >/dev/null || { echo "update: $tool is needed" >&2; exit 4; }
+  command -v "$tool" >/dev/null || { said "$tool is needed"; exit 4; }
 done
 
 # the scratch directory, and the promise that it goes whatever happens
@@ -62,7 +73,7 @@ tmp="$(mktemp -d "${TMPDIR:-/tmp}/zenworks-update.XXXXXX")"
 trap 'rm -rf -- "$tmp"' EXIT INT TERM
 
 echo "update: fetching $REPO"
-git clone --quiet --depth 1 -- "$REPO" "$tmp/zenworks"
+git clone --quiet --depth 1 -- "$REPO" "$tmp/zenworks" || { said "could not fetch $REPO"; exit 5; }
 rev="$(git -C "$tmp/zenworks" log -1 --format='%h %cs %s' 2>/dev/null || true)"
 echo "update: published version: ${rev:-unknown}"
 
@@ -70,6 +81,7 @@ changed=0
 n=0
 for d in "${CONFIGS[@]}"; do
   n=$((n + 1))
+  [[ -n "$maintained" ]] && continue
   src="$tmp/zenworks/config/$d"
   [[ -d "$src" ]] || continue
   ex=(--exclude=__pycache__ --exclude='*.pyc')
@@ -88,7 +100,7 @@ for d in "${CONFIGS[@]}"; do
   [[ -t 1 ]] || printf '\r%d%%\r' $((n * 100 / ${#CONFIGS[@]}))
 done
 
-if [[ -z "$dry" ]]; then
+if [[ -z "$dry" && -z "$maintained" ]]; then
   # a repository uploaded through GitHub's web page loses its executable
   # bits: the scripts and the launchers, set again (as the installer does)
   find "$CONFIG/quickshell" "$CONFIG/hypr" "$CONFIG/xdg-desktop-portal-termfilechooser" \
@@ -96,20 +108,35 @@ if [[ -z "$dry" ]]; then
 fi
 
 # what the new version installs that this machine does not have
-missing=""
+missing=()
 if [[ -f "$tmp/zenworks/install" ]]; then
   wanted=$(sed -n '/^PACKAGES=(/,/^)/p' "$tmp/zenworks/install" | sed 's/#.*//' | tr -s ' \t' '\n' | grep -v -e '^PACKAGES=($' -e '^)$' -e '^$' || true)
-  for p in $wanted; do pacman -Qq "$p" >/dev/null 2>&1 || missing+="$p "; done
+  for p in $wanted; do pacman -Qq "$p" >/dev/null 2>&1 || missing+=("$p"); done
 fi
+# and what ZENWORKS builds itself, from the config just laid
+build=()
+for dir in "$CONFIG"/quickshell/pkgbuilds/*/; do
+  [[ -f "$dir/PKGBUILD" ]] || continue
+  name="$(basename -- "$dir")"
+  pacman -Qq "$name" >/dev/null 2>&1 || build+=("${dir%/}")
+done
 
 if [[ -n "$dry" ]]; then
   echo "update: $changed file(s) would change (nothing was)"
+elif [[ -n "$maintained" ]]; then
+  echo "update: config left as it is"
 else
   echo "update: $changed file(s) changed — the shell reloads on its own"
 fi
-if [[ -n "$missing" ]]; then
-  echo "update: packages to install: $missing"
-  # run from the shell, there is no terminal to read that in
-  [[ -t 1 ]] || notify-send -a ZENWORKS "Updated — some packages are needed" "Install with ceres or paru: $missing" 2>/dev/null || true
+(( ${#missing[@]} )) && echo "update: packages to install: ${missing[*]}"
+(( ${#build[@]} )) && echo "update: to build: ${build[*]}"
+
+# for the shell (not by hand, not a dry run): what ceres is to install —
+# read once and removed (OracleManager), so nothing stays
+if [[ -z "$dry" && ! -t 1 ]] && (( ${#missing[@]} + ${#build[@]} )); then
+  out="${XDG_RUNTIME_DIR:-/tmp}/zenworks-update.json"
+  list() { local first=1; for x in "$@"; do (( first )) || printf ','; first=0; printf '"%s"' "$x"; done; }
+  { printf '{"missing":['; list "${missing[@]}"; printf '],"build":['; list "${build[@]}"; printf ']}\n'; } > "$out.part"
+  mv -f -- "$out.part" "$out"
 fi
 exit 0

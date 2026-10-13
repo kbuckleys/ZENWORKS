@@ -285,6 +285,14 @@ FloatingWindow {
       NumberAnimation { id: treeSlide; duration: Zenon.normal * 2; easing.type: Zenon.travelEase }
     }
 
+    // the sheet's veil, as terminus' sidebar and every strip wear it
+    // (user, 2026-10-13: terminus' sheet frost "in tabs and sidebars")
+    Rectangle {
+      anchors.fill: parent
+      color: Zenon.ground
+      opacity: 0.6
+    }
+
     FileTree {
       id: sidebar
       // fading with the slide: faint while it is barely out, whole once it is
@@ -512,7 +520,9 @@ FloatingWindow {
       width: tabs.width
       height: tabs.height
       color: Zenon.ground
-      opacity: tabs.visible && editor.edgesAbove ? 0.35 : 0
+      // the sheet's veil, always (user, 2026-10-13): the strip's glass is
+      // terminus' sheet's — see WindowView's stripGlass
+      opacity: tabs.visible ? 0.6 : 0
       visible: opacity > 0.001
       Behavior on opacity { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
     }

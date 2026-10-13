@@ -54,8 +54,8 @@ Item {
           // measureMarked. Nothing to say in the status line.
           term.duQuiet = false;
           Qt.callLater(term.measureMarked);
-          if (term.usage) Qt.callLater(term.measureAll);
-        } else if (term.usage) {
+          if (term.sizing) Qt.callLater(term.measureAll);
+        } else if (term.sizing) {
           term.status = "";
           // whatever this batch could not reach, and anything listed since it
           // started — see measureAll's note about being busy
@@ -160,7 +160,7 @@ Item {
     onTriggered: term.measureAll()
   }
   function measureAll() {
-    if (!term.usage) return;
+    if (!term.sizing) return;
     // Busy is not the same as done. This used to just give up, and since the
     // only caller was the listing, nothing ever came back to it: walk into a
     // directory while the previous one is still being measured and its directories

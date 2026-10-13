@@ -447,66 +447,93 @@ Rectangle {
         // The caption band stood here. It is the floating card's own
         // header now — see Sheet.floating, which draws the title and glyph.
 
+        // ── WHICH KIND OF RENAME, AND HOW IT READS NAMES ──────────
+        // (user, 2026-10-13: "a visual polish to be on par with the rest
+        // of the suite".) The three modes are a switch, so they are the
+        // suite's switch — Segments, as ceres', alexandria's and delphi's
+        // are — rather than a dropdown hiding two of them; the two
+        // settings that change what every verb means sit opposite it, lit
+        // while they hold.
+        Item {
+          id: modeRow
+          width: parent.width
+          height: 48
+
+          Segments {
+            id: modeDrop
+            anchors.left: parent.left
+            anchors.leftMargin: 16
+            anchors.verticalCenter: parent.verticalCenter
+            keys: true
+            textSize: Zenon.px(13)
+            options: [["replace", "Replace text"],
+                      ["add",     "Add text"],
+                      ["format",  "Format"]]
+            current: bulk.mode
+            onChose: (v) => bulk.mode = v
+            // Forward into whichever mode is now showing, back to the
+            // last row — the switch is the top of the ring.
+            onTabbed: bulk.focusFrom(modeDrop, 1)
+            onBackTabbed: bulk.focusFrom(modeDrop, -1)
+          }
+
+          Row {
+            anchors.right: parent.right
+            anchors.rightMargin: 16
+            anchors.verticalCenter: parent.verticalCenter
+            spacing: 6
+            // Two switches rather than two more verbs: they change what
+            // every button below MEANS rather than doing anything
+            // themselves, and a thing that stays on has to look like it.
+            // Written out rather than symbolised: ".*" meaning "regular
+            // expression" is a thing you either already know or cannot
+            // guess.
+            BulkVerb {
+              label: "keep .ext"
+              on: bulk.stemOnly
+              onClicked: bulk.stemOnly = !bulk.stemOnly
+            }
+            BulkVerb {
+              label: "regex"
+              on: bulk.regex
+              // only find and replace reads a pattern
+              dim: bulk.mode !== "replace"
+              onClicked: bulk.regex = !bulk.regex
+            }
+          }
+        }
+
         // ── the pattern ───────────────────────────────────────
-        // Return in either field applies it. A BUTTON rather than a live
+        // Return in any field applies it. A BUTTON rather than a live
         // binding: the replace runs from the original names, so making it
         // live would wipe a hand edit every time the caret moved through
         // the pattern.
         Item {
           id: patRow
           width: parent.width
-          height: 46
-          // Lifted as a WHOLE while any of its dropdowns is open. Giving
-          // the list its own z is not enough: z only orders an item among
-          // its siblings, and the list's siblings are inside patRow while
-          // the things it has to cover are the rows below patRow.
-          z: (modeDrop.expanded || addWhere.expanded || fmtKind.expanded
-              || fmtWhere.expanded) ? 60 : 0
+          height: 44
 
-          // Every mode's controls live between the dropdown and the
-          // button, so the row keeps one shape whichever mode is showing
-          // and the button never moves when you switch.
-          readonly property real innerL: 16 + modeDrop.width + 8
-          readonly property real innerR: patRow.width - 16 - applyBtn.width - 8
+          // Every mode's controls live left of the button, so the row
+          // keeps one shape whichever mode is showing and the button
+          // never moves when you switch.
+          readonly property real innerL: 16
+          readonly property real innerR: patRow.width - 16 - applyBtn.width - 10
           readonly property real innerW: Math.max(80, patRow.innerR - patRow.innerL)
 
-          BulkDrop {
-
-            host: bulk
-            id: modeDrop
-            overlay: dropLayer
-            anchors.left: parent.left
-            anchors.leftMargin: 16
-            anchors.verticalCenter: parent.verticalCenter
-            options: [["replace", "Replace Text"],
-                      ["add",     "Add Text"],
-                      ["format",  "Format"]]
-            value: bulk.mode
-            onPicked: (v) => bulk.mode = v
-            // Forward into whichever mode is now showing, back to the
-            // last row — the picker is the top of the ring.
-            onTabbed: bulk.focusFrom(modeDrop, 1)
-            onBackTabbed: bulk.focusFrom(modeDrop, -1)
-          }
-
           // ── replace text ─────────────────────────────────────
-          // Return in either field applies it. A BUTTON rather than a
-          // live binding: the replace runs from the original names, so
-          // making it live would wipe a hand edit every time the caret
-          // moved through the pattern.
           Item {
             visible: bulk.mode === "replace"
             x: patRow.innerL
             width: patRow.innerW
             height: parent.height
-            readonly property real cell: Math.max(50, (width - 22) / 2)
+            readonly property real cell: Math.max(50, (width - 30) / 2)
 
             BulkField {
               id: findField
               anchors.left: parent.left
               anchors.verticalCenter: parent.verticalCenter
               width: parent.cell
-              ghost: "find"
+              ghost: bulk.regex ? "find (regular expression)" : "find"
               onAccepted: bulk.applyReplace(findField.text, replField.text)
               onTabbed: bulk.focusFrom(findField, 1)
               onBackTabbed: bulk.focusFrom(findField, -1)
@@ -515,11 +542,10 @@ Rectangle {
             Text {
               id: patArrow
               anchors.left: findField.right
-              anchors.leftMargin: 8
               anchors.verticalCenter: parent.verticalCenter
-              width: 14
+              width: 30
               horizontalAlignment: Text.AlignHCenter
-              text: "\u2192"
+              text: "→"
               color: Zenon.muted
               font.family: Zenon.face
               font.weight: Zenon.weight
@@ -529,7 +555,6 @@ Rectangle {
             BulkField {
               id: replField
               anchors.left: patArrow.right
-              anchors.leftMargin: 8
               anchors.verticalCenter: parent.verticalCenter
               width: parent.cell
               ghost: "replace with"
@@ -550,23 +575,22 @@ Rectangle {
               id: addField
               anchors.left: parent.left
               anchors.verticalCenter: parent.verticalCenter
-              width: Math.max(60, parent.width - addWhere.width - 8)
+              width: Math.max(60, parent.width - addWhere.width - 10)
               ghost: "text to add"
               onAccepted: bulk.applyAdd(addField.text, bulk.addWhere)
               onTabbed: bulk.focusFrom(addField, 1)
               onBackTabbed: bulk.focusFrom(addField, -1)
             }
 
-            BulkDrop {
-
-              host: bulk
+            Segments {
               id: addWhere
-            overlay: dropLayer
               anchors.right: parent.right
               anchors.verticalCenter: parent.verticalCenter
-              options: [["before", "before name"], ["after", "after name"]]
-              value: bulk.addWhere
-              onPicked: (v) => bulk.addWhere = v
+              keys: true
+              textSize: Zenon.px(13)
+              options: [["before", "Before name"], ["after", "After name"]]
+              current: bulk.addWhere
+              onChose: (v) => bulk.addWhere = v
               onTabbed: bulk.focusFrom(addWhere, 1)
               onBackTabbed: bulk.focusFrom(addWhere, -1)
             }
@@ -582,18 +606,18 @@ Rectangle {
             width: patRow.innerW
             height: parent.height
 
-            BulkDrop {
-
-              host: bulk
+            Segments {
               id: fmtKind
-            overlay: dropLayer
               anchors.left: parent.left
               anchors.verticalCenter: parent.verticalCenter
-              options: [["index",   "Name and Index"],
-                        ["counter", "Name and Counter"],
-                        ["date",    "Name and Date"]]
-              value: bulk.fmtKind
-              onPicked: (v) => bulk.fmtKind = v
+              keys: true
+              textSize: Zenon.px(13)
+              pad: 22
+              options: [["index",   "Index"],
+                        ["counter", "Counter"],
+                        ["date",    "Date"]]
+              current: bulk.fmtKind
+              onChose: (v) => bulk.fmtKind = v
               onTabbed: bulk.focusFrom(fmtKind, 1)
               onBackTabbed: bulk.focusFrom(fmtKind, -1)
             }
@@ -605,24 +629,24 @@ Rectangle {
               anchors.verticalCenter: parent.verticalCenter
               width: Math.max(50, parent.width - fmtKind.width
                       - fmtWhere.width - (fmtStart.visible ? fmtStart.width + 8 : 0)
-                      - 24)
-              ghost: "custom format"
+                      - 16)
+              ghost: "name"
               onAccepted: bulk.applyFormat(fmtField.text)
               onTabbed: bulk.focusFrom(fmtField, 1)
               onBackTabbed: bulk.focusFrom(fmtField, -1)
             }
 
-            BulkDrop {
-
-              host: bulk
+            Segments {
               id: fmtWhere
-            overlay: dropLayer
               anchors.right: fmtStart.visible ? fmtStart.left : parent.right
               anchors.rightMargin: fmtStart.visible ? 8 : 0
               anchors.verticalCenter: parent.verticalCenter
-              options: [["before", "before name"], ["after", "after name"]]
-              value: bulk.fmtWhere
-              onPicked: (v) => bulk.fmtWhere = v
+              keys: true
+              textSize: Zenon.px(13)
+              pad: 22
+              options: [["before", "Before"], ["after", "After"]]
+              current: bulk.fmtWhere
+              onChose: (v) => bulk.fmtWhere = v
               onTabbed: bulk.focusFrom(fmtWhere, 1)
               onBackTabbed: bulk.focusFrom(fmtWhere, -1)
             }
@@ -631,10 +655,10 @@ Rectangle {
               id: fmtStart
               anchors.right: parent.right
               anchors.verticalCenter: parent.verticalCenter
-              width: 58
+              width: 64
               // A date has nothing to count from.
               visible: bulk.fmtKind !== "date"
-              ghost: "start"
+              ghost: "from 1"
               // NOT bound to bulkFmtStart, written to it: a two-way
               // binding on a field you are typing in fights the caret.
               onTextChanged: bulk.fmtStart = fmtStart.text
@@ -666,12 +690,6 @@ Rectangle {
           }
         }
 
-        Rectangle {
-          width: parent.width
-          height: 1
-          color: Zenon.border
-        }
-
         // ── the verbs ─────────────────────────────────────────
         // A find and a replace answer "change this into that", which is
         // one of the things batch renaming is for and not the common one.
@@ -685,7 +703,7 @@ Rectangle {
         // card opened with, because a stack of verbs needs a bottom.
         Item {
           width: parent.width
-          height: 42
+          height: 40
 
           Row {
             anchors.left: parent.left
@@ -696,9 +714,12 @@ Rectangle {
             BulkVerb { label: "abc";  onClicked: bulk.applyCase("lower") }
             BulkVerb { label: "ABC";  onClicked: bulk.applyCase("upper") }
             BulkVerb { label: "Abc";  onClicked: bulk.applyCase("title") }
+            Item { width: 6; height: 1 }
             BulkVerb { label: "tidy"; onClicked: bulk.applyTidy() }
-            BulkVerb { label: "1 ·";  onClicked: bulk.applyNumber("prefix") }
-            BulkVerb { label: "· 1";  onClicked: bulk.applyNumber("suffix") }
+            Item { width: 6; height: 1 }
+            // what they make, written as a name would read
+            BulkVerb { label: "1 name";  onClicked: bulk.applyNumber("prefix") }
+            BulkVerb { label: "name 1";  onClicked: bulk.applyNumber("suffix") }
           }
 
           Row {
@@ -706,27 +727,10 @@ Rectangle {
             anchors.rightMargin: 16
             anchors.verticalCenter: parent.verticalCenter
             spacing: 6
-
-            // Two switches rather than two more verbs: they change what
-            // every button above MEANS rather than doing anything
-            // themselves, and a thing that stays on has to look like it.
-            // Written out rather than symbolised. There is room, and
-            // ".*" meaning "regular expression" is a thing you either
-            // already know or cannot guess.
-            BulkVerb {
-              label: "keep .ext"
-              on: bulk.stemOnly
-              onClicked: bulk.stemOnly = !bulk.stemOnly
-            }
-            BulkVerb {
-              label: "regex"
-              on: bulk.regex
-              onClicked: bulk.regex = !bulk.regex
-            }
             BulkVerb {
               label: "undo"
               // Dimmed rather than hidden when there is nothing to undo:
-              // a button that comes and goes moves the two beside it.
+              // a button that comes and goes moves the one beside it.
               dim: bulk.history.length === 0
               onClicked: bulk.undoEdit()
             }
@@ -745,19 +749,20 @@ Rectangle {
         }
 
         // ── the two columns ───────────────────────────────────
-        Rectangle {
+        // Captions as the listing's own column heads are: muted words on
+        // the card, no band of their own.
+        Item {
           width: parent.width
-          height: 22
-          color: Zenon.headBg
+          height: 26
 
           Text {
             x: 46
             width: (parent.width - 60) * 0.42
             height: parent.height
             verticalAlignment: Text.AlignVCenter
-            text: "NOW"
+            text: "Name"
             color: Zenon.muted
-            font.family: Zenon.faceFixed
+            font.family: Zenon.face
             font.weight: Zenon.weight
             font.pixelSize: Zenon.px(12)
           }
@@ -766,18 +771,11 @@ Rectangle {
             x: 46 + (parent.width - 60) * 0.42 + 12
             height: parent.height
             verticalAlignment: Text.AlignVCenter
-            text: "TO"
+            text: "Becomes"
             color: Zenon.muted
-            font.family: Zenon.faceFixed
+            font.family: Zenon.face
             font.weight: Zenon.weight
             font.pixelSize: Zenon.px(12)
-          }
-
-          Rectangle {
-            anchors.bottom: parent.bottom
-            width: parent.width
-            height: 1
-            color: Zenon.border
           }
         }
 
@@ -787,7 +785,7 @@ Rectangle {
           // fixed height left a band of empty card under three names and
           // could not show thirty.
           height: Math.max(34, Math.min(bulkList.contentHeight,
-            bulk.height - 100 - 26 - 46 - 1 - 22 - 52))
+            bulk.height - 100 - 48 - 44 - 40 - 1 - 26 - 1 - 52))
 
           SelectBar {
 
