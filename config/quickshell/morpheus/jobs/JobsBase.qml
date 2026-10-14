@@ -15,6 +15,7 @@
 
 import QtQuick
 import "../../terminus/terminus.js" as Terminus
+import "../icons.js" as Icons
 
 QtObject {
   id: jobs
@@ -97,6 +98,8 @@ QtObject {
       // where it is going, as its directory's name — the drawer says
       // "<thing> → <directory>", the way the Copy to / Move to header does
       to: dest ? (Terminus.basename(String(dest).replace(/\/+$/, "")) || "/") : "",
+      // and its glyph, the one its crumb wears
+      toGlyph: dest ? Terminus.dirGlyph(dest, Icons) : "",
       pct: 0, index: 0, total: names.length,
       // entries counted rather than bytes measured, for the two ops whose
       // tools report no percentage of their own

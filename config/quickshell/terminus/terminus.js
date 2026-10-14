@@ -4289,6 +4289,20 @@ function glyphOf(r, icons) {
   return icons.kindGlyph(kind) || g;
 }
 
+// A directory's glyph from its PATH, for everywhere a directory is named
+// outside a listing row: the crumbs, the save pill, Copy to / Move to, the
+// jobs drawer. One rule, so they cannot drift apart again. Home by its own
+// name ("buck" is claimed by no rule), the root a disk; `label` names it
+// instead of its basename (an archive's step is named for the archive,
+// not its mount).
+function dirGlyph(path, icons, label) {
+  const p = String(path || "").replace(/(.)\/+$/, "$1");
+  if (p === "") return "";
+  if (p === "/") return "";
+  return icons.glyphFor({
+    name: p === Paths.home() ? "home" : (label || basename(p)), isDir: true });
+}
+
 function enrich(rows, icons) {
   for (const r of rows) {
     r.inkKey = inkKeyOf(r);

@@ -127,15 +127,22 @@ Singleton {
         const o = JSON.parse(storePrefs.text());
         root.flatpakPref = String(o.flatpak || "");
         root.flatpakScope = o.scope === "user" ? "user" : "system";
+        root.preferSource = o.prefer === "flatpak" ? "flatpak" : "native";
       } catch (e) { root.flatpakPref = ""; }
     }
   }
   // where the last Flatpak went — the install sheet starts there
   property string flatpakScope: "system"
+  // WHICH SIDE AN APP'S PAGE OPENS ON when it comes from both (Settings ›
+  // Channels; user, 2026-10-15): "native" — the repos or the AUR — or
+  // "flatpak". What is installed still leads, whichever this says.
+  property string preferSource: "native"
   // setText never fires `loaded` for our own write: the properties are set here
   function saveStorePrefs() {
-    storePrefs.setText(JSON.stringify({ flatpak: root.flatpakPref, scope: root.flatpakScope }));
+    storePrefs.setText(JSON.stringify({ flatpak: root.flatpakPref, scope: root.flatpakScope,
+                                        prefer: root.preferSource }));
   }
+  function setPreferSource(v) { root.preferSource = v === "flatpak" ? "flatpak" : "native"; root.saveStorePrefs(); }
   function setFlatpakPref(v) { root.flatpakPref = v; root.saveStorePrefs(); }
   function setFlatpakScope(v) { root.flatpakScope = v === "user" ? "user" : "system"; root.saveStorePrefs(); }
   readonly property bool setupNeeded: root.deps.missing.length > 0 || root.flatpakAsk
@@ -191,9 +198,9 @@ Singleton {
     if (ok) root.setFlatpakPref("yes");
     return ok;
   }
-  function removeFlatpak() {
+  function removeFlatpak(deleteData) {
     if (!root.deps.flatpak) return false;
-    const ok = root.request(Cer.flatpakRemoveSteps(), "remove flatpak", 1);
+    const ok = root.request(Cer.flatpakRemoveSteps(!!deleteData), "remove flatpak", 1);
     if (ok) root.setFlatpakPref("no");
     return ok;
   }
@@ -794,6 +801,14 @@ Singleton {
     // marked as drawn over the line before — see runProc's command
     const redraw = String(raw).charCodeAt(0) === 1;
     const line = Cer.cleanLine(raw);
+    // Flatpak's progress, from the raw line — its percentage travels in a
+    // terminal sequence cleanLine takes off, often on a line of nothing
+    // else — as the whole job's, as pacman's Total bar is
+    const fp = Cer.flatpakProgressOf(raw);
+    if (fp && !root.txCancelling) {
+      if (fp.phase !== "") root.txPhase = fp.phase;
+      if (fp.pct >= 0) root.txTotal = { frac: fp.pct / 100, size: "", rate: fp.rate, eta: fp.eta, of: fp.of };
+    }
     // the pty ends every line with a return as well as a break, and each
     // became a line of its own on the way here
     if (line === "") return;

@@ -23,11 +23,14 @@ pragma Singleton
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import Quickshell.Hyprland
 import Quickshell.Services.Mpris
 import Quickshell.Services.Notifications
+import Qt.labs.folderlistmodel
 import "../oracle"
 import "../morpheus"
 import "howler.js" as Wolf
+import "../morpheus/offspecial.js" as Off
 
 Singleton {
   id: root
@@ -155,6 +158,17 @@ Singleton {
   // notification arrived — the player may well have exited by the time
   // anything reads the history back.
   function playerFor(notif) {
+    const p = root.mprisFor(notif);
+    if (!p) return "";
+    const id = String(p.identity || "");
+    return id !== "" ? id : String(notif.appName || "").toLowerCase();
+  }
+
+  // THE PLAYER ITSELF, for a toast that wants to drive it or draw its cover.
+  // Spotify's own client sends a track toast with no picture and no transport
+  // — "Artist — Album" and a Skip button — so both come from here instead.
+  function mprisFor(notif) {
+    if (!notif) return null;
     const entry = String(notif.desktopEntry || "");
     const name = String(notif.appName || "").toLowerCase();
     const summary = String(notif.summary || "");
@@ -168,26 +182,168 @@ Singleton {
       // routinely different programs. Measured here: spoot posts the
       // notification, spotifyd holds the bus name, and no amount of comparing
       // those two names will ever agree. What they do agree on is the song.
-      if (summary !== "" && String(p.trackTitle || "") === summary)
-        return id !== "" ? id : name;
-      if (entry !== "" && String(p.desktopEntry || "") === entry) return id;
-      if (id !== "" && id.toLowerCase() === name) return id;
+      if (summary !== "" && String(p.trackTitle || "") === summary) return p;
+      if (entry !== "" && String(p.desktopEntry || "") === entry) return p;
+      if (id !== "" && id.toLowerCase() === name) return p;
     }
-    return "";
+    return null;
+  }
+
+  // ── WHAT A TRACK IS, BEYOND ITS NAME ────────────────────────────────────
+  // Explicit and has-lyrics, asked of the network once per track by
+  // trackfacts.py — spoot wrote these into its toast, nothing else does. Kept
+  // by track for the session: a toast for the same song twice asks once.
+  // A key holds `true` while its question is out, then the answer.
+  property var facts: ({})
+  property var factsQueue: []
+
+  function factsKey(p) {
+    if (!p) return "";
+    const md = p.metadata || {};
+    const tid = String(md["mpris:trackid"] || "");
+    if (tid.indexOf("spotify") >= 0) return tid;
+    const t = String(p.trackTitle || "");
+    return t === "" ? "" : t + "\u0001" + String(p.trackArtist || "");
+  }
+
+  // Returns the key, so a toast can read root.facts[key] as it fills in.
+  function askFacts(p) {
+    const key = root.factsKey(p);
+    if (key === "" || root.facts[key] !== undefined) return key;
+    const md = p.metadata || {};
+    const f = Object.assign({}, root.facts);
+    f[key] = true;
+    root.facts = f;
+    root.factsQueue = root.factsQueue.concat([{ key: key, argv: [
+      String(md["mpris:trackid"] || ""), String(md["xesam:url"] || ""),
+      String(p.trackTitle || ""), String(p.trackArtist || ""),
+      String(p.trackAlbum || ""),
+      String(p.lengthSupported && p.length > 0 ? p.length : 0)
+    ] }]);
+    root.nextFacts();
+    return key;
+  }
+
+  function nextFacts() {
+    if (factsProc.running || root.factsQueue.length === 0) return;
+    const job = root.factsQueue[0];
+    root.factsQueue = root.factsQueue.slice(1);
+    factsProc.key = job.key;
+    factsProc.command = ["python3", "-I",
+      Quickshell.shellDir + "/howler/trackfacts.py"].concat(job.argv);
+    factsProc.running = true;
+  }
+
+  Process {
+    id: factsProc
+    property string key: ""
+    stdout: StdioCollector {
+      onStreamFinished: {
+        let got = null;
+        try { got = JSON.parse(this.text); } catch (e) { got = null; }
+        const f = Object.assign({}, root.facts);
+        f[factsProc.key] = got && typeof got === "object" ? got : {};
+        root.facts = f;
+      }
+    }
+    onExited: Qt.callLater(root.nextFacts)
+  }
+
+  // The marks a toast draws for a track, in the order spoot drew them:
+  // liked, explicit, lyrics. Nothing at all until something is known.
+  function factMarks(key) {
+    const f = key !== "" ? root.facts[key] : null;
+    if (!f || typeof f !== "object") return "";
+    const out = [];
+    if (f.liked === true) out.push(String.fromCodePoint(0xf02d1));
+    if (f.explicit === true) out.push(String.fromCodePoint(0xf0b0c));
+    if (f.lyrics === true) out.push(String.fromCodePoint(0xf0bc2));
+    return out.join("  ");
+  }
+
+  // ── OPENING A PLAYER FROM ITS TOAST ─────────────────────────────────────
+  // What a click on a track means when the sender attached no `default` of
+  // its own. Its window is brought forward if it has one; Raise is asked as
+  // well, which is what shows a player that was closed to the tray.
+  function raisePlayer(p) {
+    if (!p) return;
+    if (p.canRaise) p.raise();
+    const entry = String(p.desktopEntry || "").replace(/[^A-Za-z0-9._-]/g, "");
+    if (entry !== "")
+      // the player may live in the special: showing it is wanted here
+      // (OffSpecial)
+      Quickshell.execDetached(Off.wanted('hl.dsp.focus({ window = "class:(?i)^(' + entry + ')$" })'));
+  }
+
+  // ── A RECORDING'S FRAME, KEPT ───────────────────────────────────────────
+  // The recorder writes its frame to the runtime directory, which is wiped at
+  // logout — so a recording's row would lose its picture on the next boot.
+  // Copied here as the row is made, and dropped once no row names it (see
+  // `frames`). A screenshot needs none of this: its picture is its file.
+  readonly property string framesDir: Paths.cacheDir() + "/quickshell/howler-frames"
+  // The row keeps both: the original for the rest of this session (the copy
+  // may not have landed when the panel first asks for it), the copy after.
+  function keepFrame(src) {
+    if (src.charAt(0) !== "/" || src.indexOf(root.framesDir + "/") === 0) return "";
+    const dest = root.framesDir + "/" + Date.now() + "-" + src.split("/").pop();
+    Quickshell.execDetached(["sh", "-c", 'mkdir -p "$1" && cp -f "$2" "$3"',
+      "sh", root.framesDir, src, dest]);
+    return dest;
+  }
+
+  // ONCE, AT START: every frame in the directory that no row names is gone.
+  // Listed here rather than by a shell glob, and removed by exact path — the
+  // only things this can delete are pngs directly inside framesDir.
+  FolderListModel {
+    id: frames
+    folder: "file://" + root.framesDir
+    nameFilters: ["*.png"]
+    showDirs: false
+    showHidden: false
+    property bool pruned: false
+    onStatusChanged: if (status === FolderListModel.Ready) root.pruneFrames()
+  }
+  function pruneFrames() {
+    if (frames.pruned || !root.historyRead || frames.status !== FolderListModel.Ready) return;
+    frames.pruned = true;
+    const keep = {};
+    for (let i = 0; i < root.history.length; ++i) {
+      keep[String(root.history[i].captureKept || "")] = true;
+      keep[String(root.history[i].capturePicture || "")] = true;
+    }
+    const gone = [];
+    for (let i = 0; i < frames.count; ++i) {
+      const f = root.framesDir + "/" + frames.get(i, "fileName");
+      if (!keep[f]) gone.push(f);
+    }
+    if (gone.length > 0) Quickshell.execDetached(["rm", "-f", "--"].concat(gone));
   }
 
   function rowOf(notif) {
+    // A track with no picture of its own keeps its player's cover, as the
+    // toast draws it. A web address survives a restart (Wolf.localImage),
+    // which a provider handle would not.
+    const p = root.mprisFor(notif);
     return {
       id: notif.id,
       time: Date.now(),
       appName: String(notif.appName || ""),
       appIcon: String(notif.appIcon || ""),
-      image: String(notif.image || ""),
+      image: String(notif.image || "") || (p ? String(p.trackArtUrl || "") : ""),
       summary: String(notif.summary || ""),
       body: String(notif.body || ""),
       urgency: notif.urgency,
       desktopEntry: String(notif.desktopEntry || ""),
-      mprisPlayer: root.playerFor(notif)
+      mprisPlayer: root.playerFor(notif),
+      // THE PICTURE A CAPTURE IS, by path. Its `image` is a provider handle
+      // that dies with the toast, and a path in `image` is thrown away on
+      // the way to disk (Wolf.keepable) — so a screenshot's row had no
+      // picture at all. These are the capture's own files, which outlive
+      // the session; see Wolf.capturePicture.
+      capture: String((notif.hints || {})["x-howler-capture"] || ""),
+      captureFile: String((notif.hints || {})["x-howler-file"] || ""),
+      capturePicture: String((notif.hints || {})["x-howler-picture"] || ""),
+      captureKept: root.keepFrame(String((notif.hints || {})["x-howler-picture"] || ""))
     };
   }
 
@@ -366,5 +522,12 @@ Singleton {
     onTriggered: stateFile.setText(Wolf.serialize(root.history))
   }
 
-  Component.onCompleted: root.history = Wolf.parse(stateFile.text())
+  // The prune waits on this: a listing that landed before the history was
+  // read would have found every frame unnamed.
+  property bool historyRead: false
+  Component.onCompleted: {
+    root.history = Wolf.parse(stateFile.text());
+    root.historyRead = true;
+    root.pruneFrames();
+  }
 }

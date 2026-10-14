@@ -69,6 +69,21 @@ module.exports = {
     t.eq("whatever its case or spacing", H.safeMarkup("<IMG\nsrc=x/>a"), "a");
     t.eq("the formatting the markup is for stays", H.safeMarkup("<b>bold</b>"), "<b>bold</b>");
 
+    // ── a capture is drawn as its own file ────────────────────────────────
+    // Its `image` is a handle into the toast and is dropped on save; the
+    // file the capture wrote is what the history draws instead.
+    const shot = { capture: "shot", captureFile: "/home/u/Pictures/s.png",
+                   image: "image://qsimage/4/1" };
+    t.eq("a screenshot row is its file", H.capturePictures(shot).join(), "file:///home/u/Pictures/s.png");
+    t.eq("and survives the trip to disk",
+      H.capturePictures(H.parse(H.serialize([shot]))[0]).join(), "file:///home/u/Pictures/s.png");
+    t.eq("a recording is its kept frame, then the recorder's, never the video",
+      H.capturePictures({ capture: "video", captureFile: "/v.mp4",
+                          captureKept: "/k.png", capturePicture: "/v.jpg" }).join(),
+      "file:///k.png,file:///v.jpg");
+    t.eq("an ordinary row has none", H.capturePictures({ image: "x" }).length, 0);
+    t.eq("nor does a capture with no path", H.capturePictures({ capture: "shot" }).length, 0);
+
     // ── the parse contract ────────────────────────────────────────────────
     t.eq("empty text is an empty history", H.parse("").length, 0);
     t.eq("so is nonsense", H.parse("{{{").length, 0);

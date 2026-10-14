@@ -572,6 +572,9 @@ function settledSteps(steps, settle, choices) {
 // The escapes and stray control characters out, and the pty's trailing space.
 function cleanLine(raw) {
   return String(raw ?? "")
+    // a terminal's OSC — Flatpak's progress (9;4) among them — whole: the
+    // control characters alone came off and left "]9;4;1;45" in the log
+    .replace(/\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)/g, "")
     .replace(/\x1b\[[0-9;?]*[ -\/]*[@-~]/g, "")
     .replace(/\x1b[()][A-Za-z0-9]/g, "")
     .replace(/\x1b[=>78]/g, "")
@@ -579,6 +582,34 @@ function cleanLine(raw) {
     // the next line (see runProc in Ceres), and a mark behind it goes unread
     .replace(/[\x00-\x1f\x7f]/g, "")
     .replace(/\s+$/, "");
+}
+
+// ── FLATPAK'S PROGRESS (user, 2026-10-15: a first install sat behind a sheet
+// that seemed to do nothing while its runtimes came down). On a terminal it
+// reports the whole job's percentage as the terminal progress sequence,
+// OSC 9;4 — read from the RAW line, before cleanLine takes it off — and
+// draws "Installing 2/5… ▌ 45%  4.1 MB/s  00:12" lines. → { pct, of, rate,
+// eta, phase } (any may be missing), or null for a line that says nothing.
+function flatpakProgressOf(raw) {
+  const r = String(raw ?? "");
+  let pct = -1;
+  const osc = r.match(/\x1b\]9;4;[12];(\d{1,3})/g);
+  if (osc) pct = parseInt(/(\d{1,3})$/.exec(osc[osc.length - 1])[1], 10);
+  const line = cleanLine(r);
+  const job = /(Installing|Updating|Uninstalling)(?: (\d+)\/(\d+))?\u2026?/.exec(line);
+  if (pct < 0 && job) {
+    const p = /(\d{1,3})%/.exec(line);
+    if (p) pct = parseInt(p[1], 10);
+  }
+  if (pct < 0 && !job) return null;
+  const rate = /([\d.]+\s?[kKMGT]?i?B)\/s/.exec(line);
+  const eta = /\b(\d\d:\d\d(?::\d\d)?)\s*$/.exec(line);
+  return {
+    pct: pct >= 0 ? Math.min(100, pct) : -1,
+    of: job && job[2] ? job[2] + " of " + job[3] : "",
+    phase: job ? job[1] + (job[2] ? " " + job[2] + " of " + job[3] : "") : "",
+    rate: rate ? rate[1] + "/s" : "", eta: eta ? eta[1] : ""
+  };
 }
 
 // A pacman bar line, read: what it is about, how far, and — for a download —
@@ -890,7 +921,12 @@ function changeLabel(install, remove) {
 // the file) belong to.
 function historyCommand(limit) {
   return "tac /var/log/pacman.log 2>/dev/null | grep -m " + Math.max(1, limit | 0)
-    + " -E '\\[ALPM\\] (installed|upgraded|removed|downgraded|reinstalled) |\\[PACMAN\\] Running '";
+    + " -E '\\[ALPM\\] (installed|upgraded|removed|downgraded|reinstalled) |\\[PACMAN\\] Running '"
+    // and Flatpak's, after a mark (user, 2026-10-14): its own journal, and the
+    // names of what is installed, so an event says Spotify, not its id
+    + "; echo '@@flatpak'; command -v flatpak >/dev/null 2>&1 && "
+    + "{ flatpak history --columns=time,change,application,branch,installation 2>/dev/null | tail -n " + Math.max(1, limit | 0) + "; "
+    + "echo '@@fpnames'; flatpak list --app --columns=application,name 2>/dev/null; }; true";
 }
 
 const STAMP_RE = /^\[(\d{4}-\d\d-\d\d)T(\d\d:\d\d)(?::\d\d)?([+-]\d{4})?\]/;
@@ -898,10 +934,12 @@ const STAMP_RE = /^\[(\d{4}-\d\d-\d\d)T(\d\d:\d\d)(?::\d\d)?([+-]\d{4})?\]/;
 // → [{ date, time, command, events: [{verb,name,from,to}] }], newest first.
 // Read in the order tac gives it: a transaction's events arrive BEFORE the
 // line that started it, so they are collected until that line closes them.
-function readHistory(text) {
+function readHistory(text, now) {
+  const all = String(text ?? "");
+  const cut = all.indexOf("@@flatpak");
   const out = [];
   let pending = [];
-  for (const line of String(text ?? "").split("\n")) {
+  for (const line of (cut < 0 ? all : all.slice(0, cut)).split("\n")) {
     const st = STAMP_RE.exec(line);
     if (!st) continue;
     const e = readEvent(line);
@@ -917,7 +955,74 @@ function readHistory(text) {
   // showing, as a transaction whose command fell off the end
   if (pending.length)
     out.push({ date: pending[0].date, time: pending[0].time, command: "", events: pending });
-  return out;
+  if (cut < 0) return out;
+  // Flatpak's, among them by time — newest first, as pacman's are
+  return out.concat(readFlatpakHistory(all.slice(cut), now))
+    .sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time));
+}
+
+// ── FLATPAK'S HISTORY ─────────────────────────────────────────────────────
+// `flatpak history`: "Oct 14 21:52:25 \t deploy install \t com.spotify.Client
+// \t stable \t user". Installs, updates and removals; pulls and remotes are
+// not news. Its time has no year — this one, unless that would be ahead of
+// today. Events closer than five minutes, in one installation, are one job:
+// an app's runtimes come down over minutes before the app itself. Those
+// RUNTIMES (a version for a branch: 25.08, 1.4 — an app's is stable, beta or
+// master) fold into one line, so the job reads as the app it was for.
+const FP_MONTHS = { Jan: 1, Feb: 2, Mar: 3, Apr: 4, May: 5, Jun: 6, Jul: 7, Aug: 8, Sep: 9, Oct: 10, Nov: 11, Dec: 12 };
+const FP_VERBS = { "deploy install": "installed", "deploy update": "upgraded", "uninstall": "removed" };
+function readFlatpakHistory(text, now) {
+  const today = now ? new Date(now) : new Date();
+  const names = {};
+  const lines = String(text ?? "").split("\n");
+  const at = lines.indexOf("@@fpnames");
+  if (at >= 0) for (const l of lines.slice(at + 1)) {
+    const f = l.split("\t");
+    if (f.length >= 2 && f[0]) names[f[0]] = f[1] || f[0];
+  }
+  const ev = [];
+  for (const l of at >= 0 ? lines.slice(0, at) : lines) {
+    const f = l.split("\t");
+    const verb = FP_VERBS[(f[1] || "").trim()];
+    const m = /^(\w{3})\s+(\d+)\s+(\d\d):(\d\d)/.exec(f[0] || "");
+    if (!verb || !m || !f[2] || !FP_MONTHS[m[1]]) continue;
+    let y = today.getFullYear();
+    const mo = FP_MONTHS[m[1]], d = Number(m[2]);
+    if (mo > today.getMonth() + 1 || (mo === today.getMonth() + 1 && d > today.getDate())) y--;
+    const pad = n => (n < 10 ? "0" : "") + n;
+    ev.push({ date: y + "-" + pad(mo) + "-" + pad(d), time: m[3] + ":" + m[4], verb: verb, id: f[2],
+              runtime: !/^(stable|beta|master)$/.test((f[3] || "").trim()), scope: (f[4] || "").trim(),
+              t: Date.UTC(y, mo - 1, d, Number(m[3]), Number(m[4])) });
+  }
+  // one job: same installation, under five minutes from the event before
+  // — and of one kind: an app removed minutes after another was installed is
+  // a job of its own, not part of the install (runtimes go with the job
+  // they came in, whatever their verb)
+  const jobs = [];
+  for (const e of ev) {
+    const last = jobs.length ? jobs[jobs.length - 1] : null;
+    const kind = e.runtime ? "" : (e.verb === "removed" ? "out" : "in");
+    if (last && last.scope === e.scope && e.t - last.end <= 5 * 60000 && (!kind || !last.kind || last.kind === kind)) {
+      last.events.push(e);
+      last.end = e.t;
+      if (kind) last.kind = kind;
+    } else jobs.push({ scope: e.scope, end: e.t, kind: kind, events: [e] });
+  }
+  return jobs.map(j => {
+    const apps = j.events.filter(e => !e.runtime);
+    const rts = j.events.filter(e => e.runtime);
+    const events = apps.map(e => ({ verb: e.verb, name: names[e.id] || e.id, from: "", to: "", flatpak: true, id: e.id }));
+    if (rts.length) {
+      const v = rts[0].verb;
+      const n = new Set(rts.map(e => e.id)).size;
+      events.push({ verb: v, name: n + (n === 1 ? " runtime" : " runtimes"), from: "", to: "", flatpak: true, runtime: true });
+    }
+    const lead = (apps[0] || j.events[0]).verb;
+    const first = j.events[0];
+    return { date: first.date, time: first.time, flatpak: true, scope: j.scope,
+             command: "flatpak " + (lead === "installed" ? "install" : lead === "removed" ? "uninstall" : "update"),
+             events: events };
+  });
 }
 
 // "pacman --sync -y -u --noconfirm --" → "full upgrade", and so on: what a
@@ -925,6 +1030,9 @@ function readHistory(text) {
 function describeCommand(cmd) {
   const c = String(cmd ?? "");
   if (c === "") return "";
+  // Flatpak's jobs: what they did, and that they were Flatpak's
+  const fp = /^flatpak (install|uninstall|update)$/.exec(c);
+  if (fp) return "Flatpak " + ({ install: "install", uninstall: "removal", update: "update" })[fp[1]];
   if (/--sync\b.*-y\b.*-u\b|--sync\b.*-u\b.*-y\b|-Syu/.test(c)) return "full upgrade";
   if (/--sync\b|^pacman -S/.test(c)) return "install";
   if (/--remove\b|^pacman -R/.test(c)) return "remove";
@@ -979,13 +1087,15 @@ function maintCommand(cloneDir) {
     // installations, with flatpak's own sizes (user, 2026-10-14)
     + "echo '@@fpapps'; command -v flatpak >/dev/null 2>&1 && flatpak list --app --columns=name,application,size,installation 2>/dev/null\n"
     + "echo '@@fprt'; command -v flatpak >/dev/null 2>&1 && flatpak list --runtime --columns=name,application,size,installation 2>/dev/null\n"
+    + "echo '@@fpunused'; " + flatpakUnusedCommand() + "\n"
     + "echo '@@end'";
 }
 
 function readMaint(text) {
   const m = { orphans: [], pacnew: [], cacheCount: 0, cacheBytes: 0, stale: 0,
               clones: [], synced: 0, aurList: 0, keep: { n: 0, size: "" }, uninst: { n: 0, size: "" },
-              fpApps: [], fpRuntimes: [] };
+              fpApps: [], fpRuntimes: [], fpUnused: [] };
+  const unusedLines = [];
   let sec = "";
   for (const raw of String(text ?? "").split("\n")) {
     const l = raw.replace(/\s+$/, "");
@@ -1005,11 +1115,13 @@ function readMaint(text) {
     else if (sec === "aurlist") m.aurList = (Number(l) || 0) * 1000;
     else if (sec === "keep") m.keep = readPrune(l);
     else if (sec === "uninst") m.uninst = readPrune(l);
+    else if (sec === "fpunused") unusedLines.push(l);
     else if ((sec === "fpapps" || sec === "fprt") && f.length >= 2)
       (sec === "fpapps" ? m.fpApps : m.fpRuntimes).push({ name: f[0] || f[1], version: f[1],
         right: (f[2] || "").trim() + (f[3] && f[3].trim() === "user" ? " \u00b7 just you" : "") });
   }
   m.clones.sort((a, b) => b.size - a.size);
+  m.fpUnused = readFlatpakUnused(unusedLines.join("\n"));
   return m;
 }
 
@@ -1206,6 +1318,10 @@ function flatpakUpdatesCommand() {
     + "  out=$(flatpak remote-ls --$sc --updates --app --columns=application,version 2>/dev/null) "
     + "|| { [ \"$sc\" = system ] && s=1; }\n"
     + "  [ -n \"$out\" ] && printf '%s\\n' \"$out\" | sed \"s/^/U\t$sc\t/\"\n"
+    // and the runtimes the apps share, which update on their own and were
+    // never counted — a runtime-only update went unseen and unapplied
+    + "  rt=$(flatpak remote-ls --$sc --updates --runtime --columns=application 2>/dev/null)\n"
+    + "  [ -n \"$rt\" ] && printf '%s\\n' \"$rt\" | sed \"s/^/R\t$sc\t/\"\n"
     + "done\n"
     + "echo '" + EXIT_MARK + "'\"$s\"";
 }
@@ -1226,21 +1342,33 @@ function readFlatpakUpdates(text) {
     list.push({ name: h.name, id: f[2], from: h.version, to: to && to !== h.version ? to : "new build",
                 scope: f[1], flatpak: true });
   }
+  // the runtimes: one row for each installation's, "3 runtimes"
+  const rts = {};
+  for (const l of r.lines) {
+    const f = l.split("\t");
+    if (f[0] === "R" && f.length >= 3 && f[2]) (rts[f[1]] = rts[f[1]] || new Set()).add(f[2]);
+  }
+  for (const sc of Object.keys(rts)) {
+    const n = rts[sc].size;
+    list.push({ name: n + (n === 1 ? " runtime" : " runtimes"), id: "", from: "", to: "shared libraries",
+                scope: sc, flatpak: true, runtime: true });
+  }
   return { ok: r.code === 0, list: list, error: r.code === 0 ? "" : "flatpak check failed" };
 }
 // Every one: the system's as root, yours without
 function flatpakUpdateSteps(list) {
   const steps = [];
   if ((list || []).some(u => u.scope !== "user"))
-    steps.push(["@sudo", "flatpak", "update", "--system", "--noninteractive", "-y"]);
+    steps.push(["@sudo", "flatpak", "update", "--system", "-y"]);
   if ((list || []).some(u => u.scope === "user"))
-    steps.push(["@user", "flatpak update --user --noninteractive -y"]);
+    steps.push(["@user", "flatpak update --user -y"]);
   return steps;
 }
-// Just this one
+// Just this one — or, for the runtimes row, that installation's all
 function flatpakUpdateOne(u) {
-  if (u.scope === "user") return [["@user", "flatpak update --user --noninteractive -y " + q(u.id)]];
-  return [["@sudo", "flatpak", "update", "--system", "--noninteractive", "-y", u.id]];
+  if (u.runtime) return flatpakUpdateSteps([u]);
+  if (u.scope === "user") return [["@user", "flatpak update --user -y " + q(u.id)]];
+  return [["@sudo", "flatpak", "update", "--system", "-y", u.id]];
 }
 
 // ── FLATPAK, LATER OR NOT AT ALL (Settings › Channels; user, 2026-10-14) ──
@@ -1254,17 +1382,79 @@ function flatpakAddSteps() {
 // system's, each only when there is any (uninstall --all with nothing there
 // is an error) — then Flathub's remote, then flatpak itself. What apps kept
 // in ~/.var/app is the user's and stays; the sheet says so.
-function flatpakRemoveSteps() {
+//
+// AND NOTHING LEFT BEHIND (user, 2026-10-15: Ceres keeps the system clean).
+// After the package: Flatpak's own stores — the system's (/var/lib/flatpak:
+// its repository, the catalogue, the exports), yours (~/.local/share/flatpak)
+// and its cache — and Ceres' own Flathub figures. `deleteData` takes what
+// the apps kept too (~/.var/app, Flatpak's alone): asked, ticked by default.
+function flatpakRemoveSteps(deleteData) {
+  const dd = deleteData ? " --delete-data" : "";
   return [
     ["@user", "if flatpak list --user --columns=ref 2>/dev/null | grep -q .; then "
-      + "flatpak uninstall --user --all --noninteractive -y; fi; "
+      + "flatpak uninstall --user --all --noninteractive -y" + dd + "; fi; "
       + "if flatpak list --system --columns=ref 2>/dev/null | grep -q .; then "
-      + "sudo -A flatpak uninstall --system --all --noninteractive -y; fi; "
+      + "sudo -A flatpak uninstall --system --all --noninteractive -y" + dd + "; fi; "
       + "sudo -A flatpak remote-delete --system --force flathub 2>/dev/null; true"],
-    ["@sudo", "pacman", "-Rns", "--noconfirm", "flatpak"]
+    ["@sudo", "pacman", "-Rns", "--noconfirm", "flatpak"],
+    ["@sudo", "rm", "-rf", "--", "/var/lib/flatpak"],
+    ["@user", "rm -rf -- \"${XDG_DATA_HOME:-$HOME/.local/share}/flatpak\" \"${XDG_CACHE_HOME:-$HOME/.cache}/flatpak\" "
+      + "\"${XDG_CACHE_HOME:-$HOME/.cache}/ceres/store/flathub-stats.json\""
+      + (deleteData ? " \"$HOME/.var/app\"" : "")]
   ];
 }
 
+// ── WHAT FLATPAK LEAVES ABOUT, for Maintenance ───────────────────────────
+// Runtimes nothing installed needs any more — removed apps leave theirs
+// (Spotify's six were found so). `flatpak uninstall --unused` with no
+// keyboard lists them and stops at its question.
+function flatpakUnusedCommand() {
+  return "command -v flatpak >/dev/null 2>&1 || exit 0; for sc in user system; do "
+    + "flatpak uninstall --unused --$sc </dev/null 2>/dev/null | sed \"s/^/$sc\t/\"; done; true";
+}
+// → [{ scope, id, branch }]
+function readFlatpakUnused(text) {
+  const out = [];
+  for (const l of String(text ?? "").split("\n")) {
+    const f = l.split("\t").map(x => x.trim());
+    if (f.length >= 5 && /^\d+\.$/.test(f[1]) && f[3]) out.push({ scope: f[0], id: f[3], branch: f[4] || "" });
+  }
+  return out;
+}
+// Take them out — only from the installations that have any
+function flatpakUnusedSteps(unused) {
+  const steps = [];
+  if ((unused || []).some(u => u.scope === "system"))
+    steps.push(["@sudo", "flatpak", "uninstall", "--unused", "--system", "--noninteractive", "-y"]);
+  if ((unused || []).some(u => u.scope === "user"))
+    steps.push(["@user", "flatpak uninstall --unused --user --noninteractive -y"]);
+  return steps;
+}
+// Repair's dry run, both installations: what it would fix. A clean one
+// says only that it verified and checked; anything else is a problem.
+function flatpakRepairCommand() {
+  return "command -v flatpak >/dev/null 2>&1 || exit 0; for sc in user system; do "
+    + "flatpak repair --$sc --dry-run 2>&1 | sed \"s/^/$sc\t/\"; done; true";
+}
+function readFlatpakRepair(text) {
+  const problems = [];
+  for (const l of String(text ?? "").split("\n")) {
+    const i = l.indexOf("\t");
+    if (i < 0) continue;
+    const m = cleanLine(l.slice(i + 1)).trim();
+    if (m === "" || /^\[\d+\/\d+\] Verifying|^Checking remotes|^Working on the|^Pruning|^Nothing/i.test(m)) continue;
+    problems.push({ scope: l.slice(0, i), text: m });
+  }
+  return { problems: problems };
+}
+
+// WITH ITS PROGRESS: installs and updates run without --noninteractive,
+// which prints nothing but the ref (watched on a real install, 2026-10-15);
+// -y answers what there is to answer, the steps name the remote and the ref
+// so there is nothing to choose, and stdin is /dev/null in any case. Its
+// terminal progress then reaches flatpakProgressOf. Removals keep it: they
+// have no download to show.
+//
 // ONE FLATPAK APP, in or out. "system" is for everyone and goes through
 // sudo; "user" is yours alone and needs no password — Flathub is added for
 // you first, since setup added it for the system only.
@@ -1272,12 +1462,19 @@ const FLATHUB_URL = "https://dl.flathub.org/repo/flathub.flatpakrepo";
 function flatpakInstallSteps(id, scope) {
   if (scope === "user")
     return [["@user", "flatpak remote-add --user --if-not-exists flathub " + q(FLATHUB_URL)
-      + " && flatpak install --user --noninteractive -y flathub " + q(id)]];
-  return [["@sudo", "flatpak", "install", "--system", "--noninteractive", "-y", "flathub", id]];
+      + " && flatpak install --user -y flathub " + q(id)]];
+  return [["@sudo", "flatpak", "install", "--system", "-y", "flathub", id]];
 }
-function flatpakUninstallSteps(id, scope) {
-  if (scope === "user") return [["@user", "flatpak uninstall --user --noninteractive -y " + q(id)]];
-  return [["@sudo", "flatpak", "uninstall", "--system", "--noninteractive", "-y", id]];
+// ...AND WHAT IT LEAVES (user, 2026-10-15): its data in ~/.var/app when
+// asked (ticked by default), then any runtime nothing needs any more —
+// removing Spotify had left six behind.
+function flatpakUninstallSteps(id, scope, deleteData) {
+  const dd = deleteData ? " --delete-data" : "";
+  if (scope === "user")
+    return [["@user", "flatpak uninstall --user --noninteractive -y" + dd + " " + q(id)
+      + " && flatpak uninstall --unused --user --noninteractive -y"]];
+  return [["@sudo", "flatpak", "uninstall", "--system", "--noninteractive", "-y"].concat(deleteData ? ["--delete-data"] : []).concat([id]),
+          ["@sudo", "flatpak", "uninstall", "--unused", "--system", "--noninteractive", "-y"]];
 }
 
 // `flatpak list --app --columns=name,application,installation` → rows

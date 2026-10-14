@@ -11,6 +11,7 @@ import "../oracle"
 import "."
 // qualified, for HeldRing alone
 import "../terminus" as Term
+import "offspecial.js" as Off
 
 Item {
   id: root
@@ -126,7 +127,8 @@ Item {
       var sp = root.specialWorkspace !== null
           ? root.specialWorkspace.name.replace(/^special:/, "")
           : root.specialName;
-      Hyprland.dispatch('hl.dsp.workspace.toggle_special("' + sp + '")');
+      // asked for: OffSpecial leaves a show it was told about alone
+      Quickshell.execDetached(Off.wanted('hl.dsp.workspace.toggle_special("' + sp + '")'));
     }
   }
 

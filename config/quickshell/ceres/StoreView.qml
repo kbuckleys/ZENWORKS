@@ -88,8 +88,9 @@ Item {
           if (!store.loaded) store.failed = true;
           return;
         }
-        // the page open on an app shows it as it is now
-        if (store.app) store.app = store.apps.find(a => a.key === store.app.key) || store.app;
+        // the page open on an app shows it as it is now — its facts too, a
+        // job having changed them (an install, an override)
+        if (store.app) { store.app = store.apps.find(a => a.key === store.app.key) || store.app; store.facts(); }
       }
     }
   }
@@ -172,19 +173,14 @@ Item {
   readonly property real artW: (content.width - store.pad * 2 - (store.artCols - 1) * 20) / store.artCols
   readonly property var stories: St.stories(store.apps, store.features, store.artCols)
   readonly property var shelves: St.shelves(store.apps, store.cols, store.features.concat(store.stories), 3, store.artCols)
-  // THE KEYS WALK THE ROWS: the row shelves, end to end, as one grid `cols`
-  // wide. Pictures are for the pointer.
-  readonly property var rowShelves: store.shelves.filter(s => !s.art)
-  readonly property var shelfStart: {
-    const out = {};
-    let n = 0;
-    for (const s of store.rowShelves) { out[s.title] = n; n += s.apps.length; }
-    return out;
-  }
-  readonly property var discoverApps: [].concat.apply([], store.rowShelves.map(s => s.apps))
+  // THE KEYS WALK A SECTION'S GRID, OR A SEARCH'S. Discover had a cursor of
+  // its own across the carousel, artwork and shelves — not really useful
+  // (user, 2026-10-15), and gone: there the arrows scroll the page.
   readonly property var gridApps: store.searching ? St.search(store.apps, store.query)
     : store.section === "discover" ? [] : St.sectionApps(store.apps, store.section)
-  readonly property var walked: store.view === "discover" ? store.discoverApps : store.gridApps
+  readonly property var walked: store.view === "discover" ? [] : store.gridApps
+  readonly property var walkRows: St.chunkRows(store.gridApps.length, store.cols)
+  onWalkedChanged: if (store.sel >= store.walked.length) store.sel = Math.max(0, store.walked.length - 1)
   // the front page's pictures, fetched as soon as it knows which they are
   // NEVER WHILE THE VIEW IS BEING BUILT: a Process started from a binding's
   // first settling read as running and never ran, and every picture after
@@ -199,7 +195,8 @@ Item {
       .map(a => a.shot).filter(u => u);
     if (urls.length) store.fetchShots(urls, false);
   }
-  readonly property var current: store.walked[store.sel] || null
+  // the app under the keys' cursor; on Discover, the one featured
+  readonly property var current: store.view === "discover" ? (heroView.app || null) : (store.walked[store.sel] || null)
 
   // ── doing ──────────────────────────────────────────────────────────────
   function get(a) {
@@ -232,7 +229,7 @@ Item {
   }
   function show(a) {
     store.app = a;
-    store.variant = a.source;
+    store.variant = St.openingSource(a, Ceres.preferSource);
     store.detail = null;
     page.contentY = 0;
     // A NEW PAGE STOPS THE LAST ONE'S ASKING: a Process already running
@@ -272,7 +269,13 @@ Item {
       infoProc.flatpak = true;
       infoProc.command = ["flatpak", "remote-info", "--system", "flathub", a.pkg];
       infoProc.running = true;
-      metaProc.command = ["flatpak", "remote-info", "--system", "--show-metadata", "flathub", a.pkg];
+      // installed: its own metadata, and your overrides laid over it —
+      // what it may touch NOW; not installed: what Flathub says it asks for
+      metaProc.command = a.installed
+        ? ["sh", "-c", "flatpak info --" + (a.scope === "user" ? "user" : "system") + " --show-metadata " + Cer.q(a.pkg)
+            + " 2>/dev/null; echo '@@override'; flatpak override --" + (a.scope === "user" ? "user" : "system")
+            + " --show " + Cer.q(a.pkg) + " 2>/dev/null; true"]
+        : ["flatpak", "remote-info", "--system", "--show-metadata", "flathub", a.pkg];
       metaProc.running = true;
     } else if (store.script !== "") {
       infoProc.flatpak = false;
@@ -311,8 +314,41 @@ Item {
     property int seq: -1
     stdout: StdioCollector {
       id: metaOut
-      onStreamFinished: if (metaProc.seq === store.factSeq) store.perms = St.permissions(metaOut.text)
+      onStreamFinished: {
+        if (metaProc.seq !== store.factSeq) return;
+        const t = metaOut.text, i = t.indexOf("@@override");
+        store.perms = i < 0 ? St.permissions(t, "") : St.permissions(t.slice(0, i), t.slice(i));
+      }
     }
+  }
+
+  // ── A PERMISSION, SWITCHED (user, 2026-10-15) ───────────────────────────
+  // An override, as Flatpak keeps them: yours, at once and with no
+  // password, then read back; the system's, through Ceres' password sheet
+  // as any change of the system's is (and read back when that job is done —
+  // see refresh). Reset takes every override away.
+  function setPerm(row, on) {
+    const a = store.shown;
+    if (!a || !a.installed || a.source !== "flatpak") return;
+    const flag = St.overrideFlag(row, on);
+    if (!flag) return;
+    store.override(St.overrideSteps(a.pkg, a.scope, flag), "change what " + a.name + " may touch");
+  }
+  function resetPerms() {
+    const a = store.shown;
+    if (!a || !a.installed || a.source !== "flatpak") return;
+    store.override(St.overrideResetSteps(a.pkg, a.scope), "put " + a.name + "'s access back as it asks");
+  }
+  function override(steps, label) {
+    if (steps[0][0] === "@user") {
+      permProc.running = false;
+      permProc.command = ["sh", "-c", steps[0][1]];
+      Qt.callLater(() => { permProc.running = true; });
+    } else if (!store.busy) Ceres.request(steps, label, 0);
+  }
+  Process {
+    id: permProc
+    onExited: store.facts()
   }
   // Screenshots come over the network once and are kept (ceres-store
   // shots); each is drawn the moment its file lands, in its place.
@@ -380,22 +416,24 @@ Item {
       return true;
     }
     if (store.view === "page") {
-      if (k === Qt.Key_Return || k === Qt.Key_Enter) { store.act(store.app); return true; }
+      // the page's source, not the card's: Spotify switched to Flathub
+      // is Flathub's to get
+      if (k === Qt.Key_Return || k === Qt.Key_Enter) { store.act(store.shown); return true; }
       if (k === Qt.Key_Down || k === Qt.Key_PageDown) { page.flick(0, k === Qt.Key_PageDown ? -2600 : -900); return true; }
       if (k === Qt.Key_Up || k === Qt.Key_PageUp) { page.flick(0, k === Qt.Key_PageUp ? 2600 : 900); return true; }
       return false;
     }
-    const n = store.walked.length;
-    let d = 0;
-    if (k === Qt.Key_Right) d = 1;
-    else if (k === Qt.Key_Left) d = -1;
-    else if (k === Qt.Key_Down) d = store.cols;
-    else if (k === Qt.Key_Up) d = -store.cols;
-    else if (k === Qt.Key_PageDown) d = store.cols * 4;
-    else if (k === Qt.Key_PageUp) d = -store.cols * 4;
-    if (d !== 0) {
-      store.sel = St.step(store.sel, d, n);
-      store.keepInView();
+    const dir = k === Qt.Key_Right ? "right" : k === Qt.Key_Left ? "left" : k === Qt.Key_Down ? "down"
+      : k === Qt.Key_Up ? "up" : k === Qt.Key_PageDown ? "pagedown" : k === Qt.Key_PageUp ? "pageup" : "";
+    if (dir !== "") {
+      // Discover: across turns the carousel, up and down scroll the page
+      if (store.view === "discover") {
+        if (dir === "left" || dir === "right") heroView.turn(dir === "left" ? -1 : 1);
+        else discover.flick(0, dir === "down" ? -900 : dir === "up" ? 900 : dir === "pagedown" ? -2600 : 2600);
+        return true;
+      }
+      store.sel = St.stepRows(store.sel, dir, store.walkRows);
+      grid.positionViewAtIndex(store.sel, GridView.Contain);
       return true;
     }
     if ((k === Qt.Key_Return || k === Qt.Key_Enter) && store.current) {
@@ -412,25 +450,8 @@ Item {
     if (store.app) { store.stepBack(); return true; }
     return false;
   }
-  function keepInView() {
-    if (store.view === "discover") {
-      // the card's row within its shelf, measured down the column
-      let shelf = null;
-      for (let i = 0; i < shelfRep.count; i++) {
-        const it = shelfRep.itemAt(i);
-        if (it && !it.modelData.art && store.shelfStart[it.modelData.title] <= store.sel) shelf = it;
-      }
-      if (!shelf) return;
-      const row = Math.floor((store.sel - store.shelfStart[shelf.modelData.title]) / store.cols);
-      const top = shelf.y + shelf.gridY + row * 92;
-      const bottom = top + 92;
-      if (top < discover.contentY + 8) discover.contentY = Math.max(0, top - 8);
-      else if (bottom > discover.contentY + discover.height - 8)
-        discover.contentY = Math.min(discover.contentHeight - discover.height, bottom - discover.height + 8);
-    } else {
-      grid.positionViewAtIndex(store.sel, GridView.Contain);
-    }
-  }
+
+
 
   // ── the sidebar ────────────────────────────────────────────────────────
   Item {
@@ -583,6 +604,7 @@ Item {
         // NO TITLE: the sidebar says where you are (user, 2026-10-14)
         // ── the features ──────────────────────────────────────────────
         StoreHero {
+          id: heroView
           visible: store.features.length > 0
           width: parent.width
           height: Math.round(Math.max(280, Math.min(460, width * 0.42)))
@@ -666,13 +688,11 @@ Item {
                 delegate: StoreCard {
                   required property var modelData
                   required property int index
-                  readonly property int at: store.shelfStart[shelf.modelData.title] + index
                   width: store.cardW
                   height: 92
                   app: modelData
                   busy: store.busy
-                  here: at === store.sel
-                  onOpened: { store.sel = at; store.open(modelData); }
+                  onOpened: store.open(modelData)
                   onGot: store.get(modelData)
                   onLaunched: store.launch(modelData)
                 }
@@ -778,6 +798,8 @@ Item {
 
       readonly property var a: store.shown
       readonly property bool aur: !!page.a && page.a.source === "aur"
+      // a Flatpak that is here: its permissions are switches
+      readonly property bool permsLive: !!page.a && page.a.source === "flatpak" && !!page.a.installed
       // the app's own brand colour when its catalogue gives one; else the
       // colour of its icon (user, 2026-10-14), else the accent
       readonly property color brand: page.a && page.a.color ? page.a.color
@@ -984,6 +1006,8 @@ Item {
                 textSize: Zenon.px(15)
                 ink: Zenon.keyInk
                 options: St.sources(store.app)
+                // each channel's own mark before its name (user, 2026-10-15)
+                glyphOf: (v) => St.sourceGlyph({ source: v })
                 current: store.variant
                 onChose: (v) => { store.variant = v; store.released(); }
               }
@@ -1146,10 +1170,14 @@ Item {
                 font.pixelSize: Zenon.px(17)
               }
               Text {
+                width: permCol.width - 40
+                wrapMode: Text.Wrap
                 textFormat: Text.StyledText
                 text: !store.perms || store.perms.length === 0
                   ? "<b>Sealed.</b> Runs in Flatpak's sandbox and asks for nothing beyond drawing its window and playing sound."
-                  : "<b>Runs in Flatpak's sandbox,</b> with access to:"
+                  : page.permsLive
+                    ? "<b>Runs in Flatpak's sandbox.</b> Untick what it should not have \u2014 it takes effect the next time it starts."
+                    : "<b>Runs in Flatpak's sandbox,</b> with access to:"
                 color: Zenon.keyInk
                 font.family: Zenon.face
                 font.weight: Zenon.weight
@@ -1158,24 +1186,58 @@ Item {
             }
             Repeater {
               model: store.perms || []
-              delegate: Row {
+              delegate: Item {
+                id: permRow
                 required property var modelData
-                spacing: 10
-                leftPadding: 30
+                width: permCol.width
+                height: 26
+                // installed: a switch for each — off is an override
+                Check {
+                  id: permCheck
+                  visible: page.permsLive
+                  x: 30
+                  anchors.verticalCenter: parent.verticalCenter
+                  lit: permRow.modelData.on
+                  enabled2: !(store.busy && page.a.scope !== "user")
+                  onToggled: store.setPerm(permRow.modelData, !permRow.modelData.on)
+                }
+                // not installed: what it would have, by how much it reaches
                 Rectangle {
+                  visible: !page.permsLive
+                  x: 30
                   anchors.verticalCenter: parent.verticalCenter
                   width: 7
                   height: 7
                   radius: 3.5
-                  color: modelData.level === "high" ? Zenon.yellow : modelData.level === "mid" ? Zenon.blue : Zenon.muted
+                  color: permRow.modelData.level === "high" ? Zenon.yellow : permRow.modelData.level === "mid" ? Zenon.blue : Zenon.muted
                 }
                 Text {
-                  text: modelData.text
-                  color: Zenon.white
+                  x: page.permsLive ? 30 + permCheck.width + 10 : 47
+                  anchors.verticalCenter: parent.verticalCenter
+                  textFormat: Text.StyledText
+                  text: Cer.esc(permRow.modelData.text)
+                    + (permRow.modelData.changed ? "  <font color='" + Zenon.hex(Zenon.cyan) + "'>"
+                      + (permRow.modelData.on ? "given by you" : "taken away") + "</font>" : "")
+                  color: page.permsLive && !permRow.modelData.on ? Zenon.muted : Zenon.white
                   font.family: Zenon.face
                   font.weight: Zenon.weight
                   font.pixelSize: Zenon.px(15)
                 }
+              }
+            }
+            // anything changed: one press puts it all back as the app asks
+            Item {
+              visible: page.permsLive && (store.perms || []).some(p => p.changed)
+              width: permCol.width
+              height: visible ? permReset.height + 6 : 0
+              DialogButton {
+                id: permReset
+                x: 30
+                anchors.bottom: parent.bottom
+                label: "Reset to defaults"
+                ink: Zenon.muted
+                ready: !(store.busy && page.a.scope !== "user")
+                onClicked: store.resetPerms()
               }
             }
           }
@@ -1270,39 +1332,44 @@ Item {
           readonly property bool long: aboutBlocks.implicitHeight > about.fold + 40
           width: parent.width
           spacing: 6
-          // FOLDED, IT FADES (user, 2026-10-14): the TEXT is faded, through
-          // a mask — a fade painted in the window's colour drew a dark band,
-          // the window being glass over whatever is behind it
+          // FOLDED, IT FADES (user, 2026-10-14/15). The TEXT fades — a fade
+          // painted in the window's colour drew a dark band on its glass — and
+          // without an effect: MultiEffect's mask, then OpacityMask, left it
+          // cut off on screen. The fold is the words to just above the edge,
+          // then the last stretch again in thin strips, each a copy of the
+          // words clipped to its slice and fainter than the one above.
+          readonly property real fadeH: 64
+          readonly property int strips: 16
+          readonly property bool folded: about.long && !about.open
           Item {
             id: aboutClip
             width: parent.width
-            height: about.long && !about.open ? about.fold : aboutBlocks.implicitHeight
-            clip: true
-            layer.enabled: about.long && !about.open
-            layer.effect: MultiEffect {
-              maskEnabled: true
-              maskSource: aboutMask
-              maskThresholdMin: 0.0
-              maskSpreadAtMin: 1.0
-            }
-            StoreBlocks {
-              id: aboutBlocks
+            height: about.folded ? about.fold : aboutBlocks.implicitHeight
+            Item {
               width: parent.width
-              blocks: store.detail ? store.detail.desc || [] : []
+              height: about.folded ? about.fold - about.fadeH : parent.height
+              clip: true
+              StoreBlocks {
+                id: aboutBlocks
+                width: parent.width
+                blocks: store.detail ? store.detail.desc || [] : []
+              }
             }
-          }
-          Item {
-            id: aboutMask
-            width: aboutClip.width
-            height: aboutClip.height
-            visible: false
-            layer.enabled: true
-            Rectangle {
-              anchors.fill: parent
-              gradient: Gradient {
-                GradientStop { position: 0.0; color: Zenon.alpha(Zenon.white, 1) }
-                GradientStop { position: 0.45; color: Zenon.alpha(Zenon.white, 1) }
-                GradientStop { position: 1.0; color: Zenon.alpha(Zenon.white, 0) }
+            Repeater {
+              model: about.folded ? about.strips : 0
+              delegate: Item {
+                required property int index
+                readonly property real sliceH: about.fadeH / about.strips
+                y: about.fold - about.fadeH + index * sliceH
+                width: aboutClip.width
+                height: sliceH
+                clip: true
+                opacity: 1 - (index + 1) / (about.strips + 1)
+                StoreBlocks {
+                  y: -parent.y
+                  width: aboutClip.width
+                  blocks: aboutBlocks.blocks
+                }
               }
             }
           }

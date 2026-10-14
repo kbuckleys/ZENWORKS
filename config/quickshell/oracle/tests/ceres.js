@@ -443,11 +443,68 @@ module.exports = {
     t.eq("named, from → to", [fu.list[0].name, fu.list[0].from, fu.list[0].to, fu.list[0].scope], ["Spotify", "1.2.9", "1.3.0", "system"]);
     t.eq("a rebuild says so", fu.list[1].to, "new build");
     t.ok("a failed system check is a failure", !C.readFlatpakUpdates("@@exit 1\n").ok);
+    const rto = C.readFlatpakUpdates("R\tsystem\torg.freedesktop.Platform\nR\tsystem\torg.freedesktop.Platform.GL.default\n"
+      + "R\tuser\torg.gnome.Platform\n@@exit 0\n");
+    t.eq("runtime-only updates are seen, one row each installation", rto.list.map(u => u.scope + " " + u.name), ["system 2 runtimes", "user 1 runtime"]);
+    t.eq("and updated, the system's as root", C.flatpakUpdateOne(rto.list[0])[0].slice(0, 4), ["@sudo", "flatpak", "update", "--system"]);
+    t.ok("yours without", !C.needsRoot(C.flatpakUpdateOne(rto.list[1])));
+    t.eq("Update all takes them", C.flatpakUpdateSteps(rto.list).length, 2);
     t.eq("all: system as root, yours without", C.flatpakUpdateSteps(fu.list).map(st => st[0]), ["@sudo", "@user"]);
     t.ok("yours alone needs no root", !C.needsRoot(C.flatpakUpdateSteps([fu.list[1]])));
     t.eq("just one", C.flatpakUpdateOne(fu.list[0])[0].slice(-1), ["com.spotify.Client"]);
     t.has("in the tooltip", C.describe([], [], { muted: "#1", arrow: "#2", repo: "#3", aur: "#4", warn: "#5", flat: "#6" }, 5, [], fu.list),
       "2 Flatpak Updates");
+    // Flatpak in History
+    const fh = "@@flatpak\n"
+      + "Oct 14 21:46:06\tadd remote\t\t\tuser\n"
+      + "Oct 14 21:47:08\tpull\torg.freedesktop.Platform.GL.default\t25.08\tuser\n"
+      + "Oct 14 21:47:08\tdeploy install\torg.freedesktop.Platform.GL.default\t25.08\tuser\n"
+      + "Oct 14 21:49:56\tdeploy install\torg.freedesktop.Platform.Locale\t25.08\tuser\n"
+      + "Oct 14 21:52:25\tdeploy install\tcom.spotify.Client\tstable\tuser\n"
+      + "Oct 14 23:10:00\tuninstall\tcom.spotify.Client\tstable\tuser\n"
+      + "@@fpnames\ncom.spotify.Client\tSpotify\n";
+    const now = Date.UTC(2026, 9, 15, 9, 0);
+    const fpTx = C.readFlatpakHistory(fh, now);
+    t.eq("two jobs: an install and, later, a removal", fpTx.length, 2);
+    t.eq("the install, by the app's name, its runtimes in one line",
+      fpTx[0].events.map(e => e.verb + " " + e.name), ["installed Spotify", "installed 2 runtimes"]);
+    t.eq("dated this year, at its first event", [fpTx[0].date, fpTx[0].time], ["2026-10-14", "21:47"]);
+    t.eq("said as Flatpak's", C.describeCommand(fpTx[0].command), "Flatpak install");
+    t.eq("a removal", C.describeCommand(fpTx[1].command), "Flatpak removal");
+    const mixed = C.readFlatpakHistory("Oct 14 22:31:00\tdeploy install\ta.Notes\tstable\tuser\n"
+      + "Oct 14 22:32:00\tuninstall\tcom.spotify.Client\tstable\tuser\n"
+      + "Oct 14 22:32:30\tuninstall\torg.x.Platform\t25.08\tuser\n", now);
+    t.eq("an install and a removal minutes apart are two jobs", mixed.map(x => C.describeCommand(x.command)), ["Flatpak install", "Flatpak removal"]);
+    t.eq("the runtime goes with the removal", mixed[1].events.map(e => e.name), ["com.spotify.Client", "1 runtime"]);
+    t.eq("a date ahead of today is last year's", C.readFlatpakHistory("Dec 31 10:00:00\tdeploy install\ta.b\tstable\tsystem\n", now)[0].date, "2025-12-31");
+    const merged = C.readHistory("[2026-10-14T22:00:00+0300] [ALPM] installed gimp (3.0-1)\n"
+      + "[2026-10-14T22:00:00+0300] [PACMAN] Running 'pacman -S gimp'\n" + fh, now);
+    t.eq("among pacman's, newest first", merged.map(x => x.command.split(" ")[0] + " " + x.time), ["flatpak 23:10", "pacman 22:00", "flatpak 21:47"]);
+    // Flatpak's progress
+    const fpp = C.flatpakProgressOf("\x1b]9;4;1;45\x07Installing 2/5\u2026 \u2588\u2588\u258c   45%  4.1 MB/s  00:12");
+    t.eq("read from its terminal progress, with what and how fast",
+      [fpp.pct, fpp.of, fpp.phase, fpp.rate, fpp.eta], [45, "2 of 5", "Installing 2 of 5", "4.1 MB/s", "00:12"]);
+    t.eq("the percentage on the line, with no sequence", C.flatpakProgressOf("Updating 1/1\u2026 80%").pct, 80);
+    t.eq("a phase alone", C.flatpakProgressOf("Uninstalling 1/2\u2026").phase, "Uninstalling 1 of 2");
+    t.eq("anything else is nothing", C.flatpakProgressOf("Looking for matches\u2026"), null);
+    t.eq("and the sequence never reaches the log", C.cleanLine("\x1b]9;4;1;45\x07Installing 2/5"), "Installing 2/5");
+    // Flatpak's leftovers
+    const un = C.readFlatpakUnused("user\t\nuser\t 1.\t   \torg.freedesktop.Platform.GL.default\t25.08\tr\n"
+      + "user\t 2.\t   \torg.freedesktop.Platform\t25.08\tr\nsystem\tNothing unused to uninstall\n");
+    t.eq("unused runtimes read, whose", un.map(u => u.scope + " " + u.id), ["user org.freedesktop.Platform.GL.default", "user org.freedesktop.Platform"]);
+    t.eq("taken out only where there are any", C.flatpakUnusedSteps(un).map(st => st[0]), ["@user"]);
+    t.eq("none, nothing to do", C.flatpakUnusedSteps([]).length, 0);
+    t.eq("a clean repair finds nothing", C.readFlatpakRepair("user\t[1/2] Verifying flathub:app/x\u2026\nuser\tChecking remotes...\nsystem\tWorking on the system installation at /var/lib/flatpak\n").problems.length, 0);
+    t.eq("anything else is a problem", C.readFlatpakRepair("user\tObject missing: abc.file\n").problems.map(p => p.text), ["Object missing: abc.file"]);
+    t.has("removing one: its data when asked", C.flatpakUninstallSteps("a.b", "user", true)[0][1], "--delete-data 'a.b'");
+    t.has("and the runtimes it leaves", C.flatpakUninstallSteps("a.b", "user", false)[0][1], "uninstall --unused --user");
+    t.eq("the system's too", C.flatpakUninstallSteps("a.b", "system", true).map(st => st.slice(0, 3).join(" ")), ["@sudo flatpak uninstall", "@sudo flatpak uninstall"]);
+    const gone = C.flatpakRemoveSteps(true);
+    t.ok("removing Flatpak clears its stores", gone.some(st => st.join(" ") === "@sudo rm -rf -- /var/lib/flatpak"));
+    t.has("yours and its cache", gone[gone.length - 1][1], "/flatpak\" \"${XDG_CACHE_HOME:-$HOME/.cache}/flatpak\"");
+    t.has("and the apps' data when asked", gone[gone.length - 1][1], ".var/app");
+    t.ok("not when not", C.flatpakRemoveSteps(false)[3][1].indexOf(".var/app") < 0);
+    t.ok("installs show their progress", C.flatpakInstallSteps("a.b", "system")[0].indexOf("--noninteractive") < 0);
     // Flatpak in Maintenance
     const mfp = C.readMaint("@@fpapps\nSpotify\tcom.spotify.Client\t14.1 MB\tuser\n@@fprt\nFreedesktop Platform\torg.freedesktop.Platform\t600 MB\tsystem\n@@end\n");
     t.eq("apps and runtimes read", [mfp.fpApps.length, mfp.fpRuntimes.length], [1, 1]);

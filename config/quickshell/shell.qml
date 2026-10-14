@@ -59,6 +59,9 @@ ShellRoot {
     source: "morpheus/LagWatch.qml"
     onLoaded: { item.watch = bg; item.openLayer = Qt.binding(() => root.activeLayer); }
   }
+  // the suite's windows never open into a shown special workspace — see
+  // morpheus/OffSpecial
+  Loader { source: "morpheus/OffSpecial.qml" }
   // is the sun up? for Follow Daytime — see chronos/SunClock
   Loader { source: "chronos/SunClock.qml" }
   // the background, on its own background layer per monitor

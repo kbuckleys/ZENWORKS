@@ -815,7 +815,15 @@ Column {
         weight: Font.Medium
         pad: 22
         ink: Zenon.muted
-        options: term.crumbList.map((c) => [String(c.path), c.label])
+        // home is its glyph alone: the house already says "~" (user, 2026-10-15)
+        options: term.crumbList.map((c) => [String(c.path), String(c.path) === Paths.home() ? "" : c.label])
+        // each step wears its directory's glyph, as the sidebar's rows do:
+        // by its label (an archive's step is named for the archive, not its
+        // mount), home as "home" ("buck" is claimed by no rule), the root a disk
+        glyphOf: (v) => {
+          const c = term.crumbList.find((k) => String(k.path) === v);
+          return Terminus.dirGlyph(v, Icons, c ? c.label : "");
+        }
         current: term.cwd
         faint: term.crumbList.filter((c) => c.ghost === true).map((c) => String(c.path))
         hot: term.crumbDropPath
@@ -3586,8 +3594,9 @@ Column {
           anchors.leftMargin: 8
           anchors.verticalCenter: parent.verticalCenter
           spacing: 6
+          // the directory's own glyph, as its crumb wears it
           Text {
-            text: "\uF07B"
+            text: Terminus.dirGlyph(term.saveDir, Icons)
             color: Zenon.cyan
             font.family: Zenon.face
             font.weight: Zenon.weight

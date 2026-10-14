@@ -285,37 +285,92 @@ const FS_WORDS = {
   "xdg-videos": ["Your Videos directory", "mid"],
   "xdg-desktop": ["Your Desktop directory", "mid"]
 };
-function permissions(metadata) {
+// A metadata or override file's [Context], as { key: [values] }.
+function contextOf(text) {
   const ctx = {};
   let inCtx = false;
-  for (const raw of String(metadata ?? "").split("\n")) {
+  for (const raw of String(text ?? "").split("\n")) {
     const l = raw.trim();
     if (/^\[.*\]$/.test(l)) { inCtx = l === "[Context]"; continue; }
     if (!inCtx) continue;
     const i = l.indexOf("=");
     if (i > 0) ctx[l.slice(0, i)] = l.slice(i + 1).split(";").filter(x => x);
   }
-  const out = [];
-  const has = (k, v) => (ctx[k] || []).indexOf(v) >= 0;
-  for (const f of ctx.filesystems || []) {
-    const ro = /:ro$/.test(f);
-    const key = f.replace(/:(ro|rw|create)$/, "");
-    const w = FS_WORDS[key];
-    if (w) out.push({ text: ro && /^Can read and change/.test(w[0]) ? w[0].replace(" and change", "") : w[0] + (key.startsWith("xdg-") ? (ro ? ", to read" : ", to read and change") : ""), level: ro && w[1] === "high" ? "mid" : w[1] });
-    else if (/^[~/]/.test(key)) out.push({ text: "The directory " + key + (ro ? ", to read" : ""), level: "mid" });
+  return ctx;
+}
+
+// One permission in words — { text, level } — or null for what is not news.
+function permWords(kind, value, raw) {
+  if (kind === "filesystems") {
+    const ro = /:ro$/.test(raw || "");
+    const w = FS_WORDS[value];
+    if (w) return { text: ro && /^Can read and change/.test(w[0]) ? w[0].replace(" and change", "")
+                      : w[0] + (value.startsWith("xdg-") ? (ro ? ", to read" : ", to read and change") : ""),
+                    level: ro && w[1] === "high" ? "mid" : w[1] };
+    if (/^[~/]/.test(value)) return { text: "The directory " + value + (ro ? ", to read" : ""), level: "mid" };
+    return null;
   }
-  if (has("devices", "all")) out.push({ text: "Every device: cameras, controllers, USB", level: "high" });
-  else {
-    if (has("devices", "input")) out.push({ text: "Input devices such as controllers", level: "mid" });
+  const words = {
+    "devices:all": ["Every device: cameras, controllers, USB", "high"],
+    "devices:input": ["Input devices such as controllers", "mid"],
+    "shared:network": ["The network", "mid"],
+    "sockets:system-bus": ["The system's message bus", "high"],
+    "sockets:session-bus": ["Everything on your session's message bus", "high"],
+    "sockets:ssh-auth": ["Your SSH keys, through the agent", "high"],
+    "sockets:cups": ["Printing", "low"],
+    "sockets:pcsc": ["Smart cards", "mid"]
+  }[kind + ":" + value];
+  return words ? { text: words[0], level: words[1] } : null;
+}
+
+// WHAT AN APP MAY TOUCH, and — given its overrides — what it may NOW
+// (user, 2026-10-15: each one a switch). Every row: { text, level, kind,
+// value, raw, on, changed }. `on` is the app's own ask with the overrides
+// laid over it ("!home" takes home away); `changed` says an override speaks
+// of it. Something the overrides grant that the app never asked for is a
+// row too, on and changed.
+function permissions(metadata, overrides) {
+  const ctx = contextOf(metadata), over = contextOf(overrides);
+  const bare = v => v.replace(/:(ro|rw|create)$/, "");
+  const said = (kind, value) => (over[kind] || []).find(x => bare(x.replace(/^!/, "")) === value);
+  const out = [], seen = {};
+  const add = (kind, raw, asked) => {
+    const value = bare(raw);
+    if (seen[kind + ":" + value]) return;
+    seen[kind + ":" + value] = true;
+    const w = permWords(kind, value, raw);
+    if (!w) return;
+    const o = said(kind, value);
+    out.push({ text: w.text, level: w.level, kind: kind, value: value, raw: raw,
+               on: o ? !o.startsWith("!") : asked, changed: !!o });
+  };
+  for (const kind of ["filesystems", "devices", "shared", "sockets"]) {
+    for (const raw of ctx[kind] || []) add(kind, raw, true);
+    for (const raw of over[kind] || []) if (!raw.startsWith("!")) add(kind, raw, false);
   }
-  if (has("shared", "network")) out.push({ text: "The network", level: "mid" });
-  if (has("sockets", "system-bus")) out.push({ text: "The system's message bus", level: "high" });
-  if (has("sockets", "session-bus")) out.push({ text: "Everything on your session's message bus", level: "high" });
-  if (has("sockets", "ssh-auth")) out.push({ text: "Your SSH keys, through the agent", level: "high" });
-  if (has("sockets", "cups")) out.push({ text: "Printing", level: "low" });
-  if (has("sockets", "pcsc")) out.push({ text: "Smart cards", level: "mid" });
+  // every device says the lesser ones too: input goes under all
+  if (out.some(r => r.kind === "devices" && r.value === "all" && r.on))
+    for (let i = out.length - 1; i >= 0; i--) if (out[i].kind === "devices" && out[i].value === "input") out.splice(i, 1);
   const rank = { high: 0, mid: 1, low: 2 };
   return out.sort((a, b) => rank[a.level] - rank[b.level]);
+}
+
+// The `flatpak override` flag that turns a row on or off. Back on, it is
+// given as the app asked for it (xdg-pictures:ro stays read-only).
+function overrideFlag(row, on) {
+  const verb = { filesystems: ["--filesystem=", "--nofilesystem="], shared: ["--share=", "--unshare="],
+                 devices: ["--device=", "--nodevice="], sockets: ["--socket=", "--nosocket="] }[row.kind];
+  if (!verb) return "";
+  return on ? verb[0] + (row.kind === "filesystems" ? row.raw : row.value) : verb[1] + row.value;
+}
+// the steps that set it — yours as you, the system's as root
+function overrideSteps(id, scope, flag) {
+  if (scope === "user") return [["@user", "flatpak override --user " + flag + " " + id]];
+  return [["@sudo", "flatpak", "override", "--system", flag, id]];
+}
+function overrideResetSteps(id, scope) {
+  if (scope === "user") return [["@user", "flatpak override --user --reset " + id]];
+  return [["@sudo", "flatpak", "override", "--system", "--reset", id]];
 }
 
 // Flathub's monthly installs, as a strip says them: 52K, 1.2M, 840.
@@ -365,4 +420,51 @@ const MULTI_GLYPH = "\uDB80\uDF28";
 function cardGlyph(app) {
   if (app && (app.others || []).length) return MULTI_GLYPH;
   return sourceGlyph(app);
+}
+
+// WHERE A PAGE OPENS (Settings › Channels' "Open apps on"): the card's own
+// source, unless the preference is Flathub and the card has Flathub's build
+// — and never away from what is installed, which the card already leads with.
+function openingSource(app, prefer) {
+  if (!app) return "";
+  if (app.installed || prefer !== "flatpak") return app.source;
+  return (app.others || []).some(o => o.source === "flatpak") ? "flatpak" : app.source;
+}
+
+// ── WALKING ROWS OF ANY WIDTH (user, 2026-10-15) ───────────────────────────
+// A page as rows: Discover's carousel is one item, its artwork row four, a
+// shelf `cols` a row, Play's pictures their own count. `rows` are lengths,
+// `sel` a flat index; `dir` is left, right, up, down, pageup or pagedown.
+// Across stops at a row's ends; up and down keep to the same place along
+// the row — the same column between rows alike, the nearest share of the
+// width between rows that are not — and stop at the page's ends.
+function rowOf(sel, rows) {
+  let start = 0;
+  for (let r = 0; r < rows.length; r++) {
+    if (sel < start + rows[r]) return { r: r, c: sel - start, start: start };
+    start += rows[r];
+  }
+  return null;
+}
+function stepRows(sel, dir, rows) {
+  if (!rows || !rows.length) return 0;
+  const at = rowOf(sel, rows);
+  if (!at) return 0;
+  if (dir === "left") return at.c > 0 ? sel - 1 : sel;
+  if (dir === "right") return at.c < rows[at.r] - 1 ? sel + 1 : sel;
+  const by = dir === "up" ? -1 : dir === "down" ? 1 : dir === "pageup" ? -4 : dir === "pagedown" ? 4 : 0;
+  if (!by) return sel;
+  const nr = Math.max(0, Math.min(rows.length - 1, at.r + by));
+  if (nr === at.r) return sel;
+  let start = 0;
+  for (let r = 0; r < nr; r++) start += rows[r];
+  const nc = rows[nr] === rows[at.r] ? Math.min(at.c, rows[nr] - 1)
+    : Math.min(rows[nr] - 1, Math.floor((at.c + 0.5) * rows[nr] / rows[at.r]));
+  return start + nc;
+}
+// n items in rows of `cols`
+function chunkRows(n, cols) {
+  const out = [];
+  for (let i = 0; i < n; i += Math.max(1, cols)) out.push(Math.min(Math.max(1, cols), n - i));
+  return out;
 }

@@ -3,8 +3,8 @@
 // └─┘└─┘┘└┘└┴┘└─┘┴└─┴ ┴└─┘
 // https://github.com/kbuckleys/
 //
-// OVER A NOTE'S FIRST LINE — what Apple draws there. A note: when it was
-// last edited, small and centred. A journal entry: the reflection it
+// OVER A NOTE'S FIRST LINE — what Apple draws there. A note: nothing (when
+// it was last edited is on its row in the list). A journal entry: the reflection it
 // answers, then its day (click: another day), its mood (click: how it
 // felt), its bookmark. A sticky: that it is on the desktop.
 
@@ -20,17 +20,8 @@ Column {
   spacing: 10
   bottomPadding: 10
 
-  // ── a note's date ──
-  Text {
-    visible: !!nh.n && nh.n.kind === "note"
-    width: parent.width
-    horizontalAlignment: Text.AlignHCenter
-    text: nh.n && nh.n.modified ? N.dateTime(nh.n.modified) : ""
-    color: Zenon.muted
-    font.family: Zenon.face
-    font.weight: Zenon.weight
-    font.pixelSize: Zenon.px(12)
-  }
+  // a note's date is not here: it is the selected row's fourth line in
+  // the list (NoteRowBody; user, 2026-10-15)
   Text {
     visible: !!nh.n && nh.n.kind === "sticky"
     width: parent.width

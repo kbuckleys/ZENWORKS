@@ -245,6 +245,10 @@ PanelWindow {
           const r = toast.modelData;
           if (!r) return "";
           if (r.image && r.image !== "") return r.image;
+          // A TRACK WITH NO PICTURE OF ITS OWN wears its player's cover.
+          // Spotify's client sends none at all — the bar's panel had the
+          // art all along because it reads MPRIS, and now so does this.
+          if (toast.artUrl !== "") return toast.artUrl;
           if (r.appIcon && r.appIcon !== "")
             return String(r.appIcon).indexOf("/") === 0
               ? "file://" + r.appIcon : "image://icon/" + r.appIcon;
@@ -262,10 +266,36 @@ PanelWindow {
         // row of blank space where the glyphs had been. What this answers is
         // "was this a track when it arrived", and that does not change.
         property string player: ""
+        // The player object itself, found the same way at the same moment —
+        // what the transport drives and the cover is read from when the
+        // sender attached neither.
+        property var mpris: null
+        property string artUrl: ""
+        // Which track the facts (explicit, lyrics) are being asked about.
+        property string factsKey: ""
+
+        // THE COVER CAN TRAIL THE TITLE. A player that announces the new
+        // title first and the new art a beat later would leave this toast
+        // with the last song's cover — so a change is taken for as long as
+        // the player is still on this toast's track, and never after.
+        function catchArt() {
+          const p = toast.mpris;
+          if (!p || !toast.modelData) return;
+          if (String(p.trackTitle || "") !== String(toast.modelData.summary || "")) return;
+          const a = String(p.trackArtUrl || "");
+          if (a !== "") toast.artUrl = a;
+        }
+        Connections {
+          target: toast.mpris
+          ignoreUnknownSignals: true
+          function onTrackArtUrlChanged() { toast.catchArt(); }
+        }
 
         // ── WHAT THE SENDER PUT IN THE BODY ──────────────────────────
-        // spoot writes the artist, a line break, and then the track's status
-        // marks — liked, explicit, lyrics. Two different kinds of thing on
+        // spoot wrote the artist, a line break, and then the track's status
+        // marks — liked, explicit, lyrics. A player that sends no marks
+        // (Spotify's client: "Artist — Album" and nothing more) gets them
+        // from Howler.askFacts instead, drawn the same way. Two different kinds of thing on
         // two lines, so they are drawn as two lines: the marks get a row of
         // their own rather than trailing the artist's name.
         readonly property var bodyLines: {
@@ -283,8 +313,10 @@ PanelWindow {
         // from every sender stole the update toast's first package and set
         // it in a centred grey row of its own.
         readonly property bool musical: toast.player !== ""
-        readonly property string marks:
-          toast.musical && toast.bodyLines.length > 1 ? toast.bodyLines[1] : ""
+        readonly property bool sentMarks: toast.musical && toast.bodyLines.length > 1
+        readonly property string marks: !toast.musical ? ""
+          : toast.sentMarks ? toast.bodyLines[1]
+          : Howler.factMarks(toast.factsKey)
 
         // ── A BODY THAT IS THE WHOLE MESSAGE ─────────────────────────
         // Everything that is not spoot sends one piece of text, and
@@ -323,7 +355,11 @@ PanelWindow {
         // that sent it.
         //
         // `default` is the spec's name for "the toast itself was clicked",
-        // which is how clicking a track opens spoot.
+        // which is how clicking a track opened spoot.
+        //
+        // A PLAYER THAT SENDS NO TRANSPORT gets one anyway. Spotify's client
+        // attaches a lone "Skip" under a random id; the three verbs are drawn
+        // for it and driven over MPRIS, the way the bar drives them.
         readonly property var transportActs: {
           const out = [];
           const acts = toast.modelData ? (toast.modelData.actions || []) : [];
@@ -331,6 +367,9 @@ PanelWindow {
             const id = String(acts[i].identifier || "");
             if (id.indexOf(":") > 0) out.push(acts[i]);
           }
+          if (out.length === 0 && toast.musical && toast.mpris)
+            return [{ identifier: "howler:prev" }, { identifier: "howler:playpause" },
+                    { identifier: "howler:next" }];
           return out;
         }
         readonly property var defaultAct: {
@@ -448,14 +487,37 @@ PanelWindow {
         Component.onCompleted: {
           toast.player = toast.modelData
             ? Howler.playerFor(toast.modelData) : "";
+          toast.mpris = toast.modelData ? Howler.mprisFor(toast.modelData) : null;
+          if (toast.mpris) {
+            // At arrival the player is on the track the toast is about,
+            // whichever way it matched; catchArt is stricter afterwards.
+            toast.artUrl = String(toast.mpris.trackArtUrl || "");
+            if (!toast.sentMarks) toast.factsKey = Howler.askFacts(toast.mpris);
+          }
           // A CAPTURE ARRIVES ONCE ITS PICTURE IS IN. Until then the card
           // does not know its own shape, and one that arrived at 16:9 and
           // then snapped tall was a card changing its mind in front of you.
           if (toast.captureKind !== "" && capImg.status === Image.Loading)
             toast.waiting = true;
+          // SO DOES A TRACK, ONCE ITS COVER IS. Spotify's cover is a web
+          // address, fetched as the toast is made — so the card arrived with
+          // an empty square and the art popped into it a moment later. Held
+          // for at most `artWait`: a slow network gets the toast without its
+          // picture rather than no toast.
+          else if (toast.musical && toast.hasIcon && iconImg.status === Image.Loading) {
+            toast.waiting = true;
+            artWait.start();
+          }
           else arrive.start();
         }
         property bool waiting: false
+        function release() {
+          if (!toast.waiting) return;
+          toast.waiting = false;
+          artWait.stop();
+          arrive.start();
+        }
+        Timer { id: artWait; interval: 1500; onTriggered: toast.release() }
 
         ParallelAnimation {
           id: arrive
@@ -496,6 +558,49 @@ PanelWindow {
           leave.start();
         }
 
+        // ── A LEFT CLICK OPENS, AND LOOKS IT ─────────────────────────
+        // Left and right both made the toast go, and nothing else told them
+        // apart. So the one that OPENS flares first — the same cyan flare an
+        // opened file gives in terminus' grid (OpenFlare) — and goes out on
+        // its tail; the one that dismisses simply goes. What it opens runs at
+        // the END of the leave, not at the click: invoking an action has the
+        // server close the notification at once, and a toast closed by the
+        // server is gone that frame, flare and all.
+        //
+        // `pending` returns whether it closed the notification itself, so the
+        // leave knows whether there is anything left to expire.
+        property var pending: null
+        function open() {
+          const n = toast.modelData;
+          if (toast.closing || !n) return;
+          let then = null;
+          if (toast.capture) {
+            const k = toast.captureKind, f = toast.captureFile;
+            then = () => { Howler.captureOpen(k, f); return false; };
+          } else if (toast.defaultAct) {
+            const a = toast.defaultAct;
+            then = () => { const res = n.resident; a.invoke(); return !res; };
+          } else if (toast.musical && toast.mpris) {
+            // A TRACK OPENS ITS PLAYER. Not acts[0]: Spotify's only action
+            // is Skip, and clicking the song you wanted to see skipped it.
+            const p = toast.mpris;
+            then = () => { Howler.raisePlayer(p); return false; };
+          } else {
+            const acts = n.actions || [];
+            if (acts.length > 0) {
+              const a = acts[0];
+              then = () => { const res = n.resident; a.invoke(); return !res; };
+            }
+          }
+          // Nothing to open is just "seen": no flare for what does not open.
+          toast.closing = true;
+          if (!then) { leave.start(); return; }
+          toast.pending = then;
+          flare.fire();
+          openHold.start();
+        }
+        Timer { id: openHold; interval: flare.rise; onTriggered: leave.start() }
+
         // THE ARRIVAL, REVERSED. It goes back out the way it came in rather
         // than fading on the spot, so the corner it belongs to is as legible
         // on the way out as on the way in.
@@ -510,7 +615,12 @@ PanelWindow {
           NumberAnimation { target: grow; properties: "xScale,yScale"
                             to: Howler.growFrom
                             duration: Howler.closeMs; easing.type: Easing.InQuad }
-          onFinished: if (toast.modelData) toast.modelData.expire()
+          onFinished: {
+            const n = toast.modelData, f = toast.pending;
+            toast.pending = null;
+            if (f && f()) return;
+            if (n) n.expire();
+          }
         }
 
         // The ordinary shadow every card in this shell casts. The glow
@@ -567,10 +677,7 @@ PanelWindow {
               cache: false
               sourceSize.width: Howler.captureWidth * 2
               source: toast.capPicture
-              onStatusChanged: if (toast.waiting && status !== Image.Loading) {
-                toast.waiting = false;
-                arrive.start();
-              }
+              onStatusChanged: if (status !== Image.Loading) toast.release()
             }
 
             // A recording says it is one; a still and a video are otherwise
@@ -671,12 +778,14 @@ PanelWindow {
               color: "transparent"
 
               Image {
+                id: iconImg
                 anchors.fill: parent
                 fillMode: Image.PreserveAspectCrop
                 asynchronous: true
                 sourceSize.width: Howler.iconSize
                 sourceSize.height: Howler.iconSize
                 source: toast.source
+                onStatusChanged: if (status !== Image.Loading) toast.release()
               }
             }
 
@@ -727,6 +836,11 @@ PanelWindow {
                 // what they were covering. Made transparent, the line still
                 // occupies its row, the column keeps its height, and the
                 // buttons sit exactly where the artist's name was.
+                //
+                // A KEPT THIRD ROW WAS TRIED INSTEAD (2026-10-15) so the
+                // artist was never covered, and undone the same day: a track
+                // with no marks then carried an empty line under the artist
+                // and its words sat high on the card until it was hovered.
                 opacity: transport.visible && toast.marks === "" ? 0 : 1
                 text: toast.bodyText
                 textFormat: Howler.markup ? Text.StyledText : Text.PlainText
@@ -754,6 +868,12 @@ PanelWindow {
                 width: parent.width
                 height: toast.marks !== "" ? marksText.implicitHeight : 0
                 visible: height > 0
+                // LOOKED UP MARKS LAND A MOMENT AFTER THE TOAST, so the row
+                // opens rather than snapping in under a card already read.
+                Behavior on height {
+                  enabled: !toast.sentMarks
+                  NumberAnimation { duration: Howler.openMs; easing.type: Zenon.travelEase }
+                }
 
                 Text {
                   id: marksText
@@ -770,7 +890,9 @@ PanelWindow {
                   text: toast.marks
                   textFormat: Howler.markup ? Text.StyledText : Text.PlainText
                   color: Howler.bodyInk
-                  font.family: Zenon.face
+                  // Marks howler worked out itself are glyphs and nothing
+                  // else; a sender's are whatever it wrote.
+                  font.family: toast.sentMarks ? Zenon.face : Zenon.glyphFace
                   font.weight: Zenon.weight
                   font.pixelSize: Howler.fontSize - 2
                 }
@@ -786,6 +908,11 @@ PanelWindow {
               // artist's name when there are not.
               anchors.horizontalCenter: text.horizontalCenter
               anchors.bottom: text.bottom
+              // DROPPED A LITTLE WHEN IT COVERS THE ARTIST. The glyphs are
+              // the larger size and sat hard under the title; pushed down
+              // into the card's own gutter they clear it, and the words
+              // around them do not move (user, 2026-10-15).
+              anchors.bottomMargin: toast.marks === "" ? -4 : 0
               visible: toast.transportActs.length > 0 && toastHov.hovered
               spacing: 18
 
@@ -801,15 +928,16 @@ PanelWindow {
                     String(modelData.identifier || "").split(":").pop()
                   text: verb === "prev" ? "\uF04A"
                       : verb === "next" ? "\uF04E"
-                      : (NowPlaying.playing ? "\uF04C" : "\uF04B")
+                      : ((toast.mpris ? toast.mpris.isPlaying : NowPlaying.playing)
+                         ? "\uF04C" : "\uF04B")
                   color: btnHov.hovered ? Howler.titleInk : Howler.bodyInk
                   font.family: Zenon.face
                   font.weight: Zenon.weight
                   font.pixelSize: Howler.fontSize
                   // A MouseArea, not a TapHandler: a handler lets the
                   // press through to the card's own tap and pressing
-                  // Previous would have opened spoot as well as skipping
-                  // back. A MouseArea consumes it.
+                  // Previous would have opened the player as well as
+                  // skipping back. A MouseArea consumes it.
                   HoverHandler { id: btnHov }
                   MouseArea {
                     anchors.fill: parent
@@ -823,10 +951,15 @@ PanelWindow {
                     // read-only here, so the press goes where the bar's own
                     // transport sends it instead, and the toast stays up
                     // to show the track it just moved to.
+                    //
+                    // THE TOAST'S OWN PLAYER when it has one, so a toast
+                    // from a paused player beside a playing one drives the
+                    // player it is about. The bar's choice otherwise.
                     onClicked: {
-                      if (parent.verb === "prev") NowPlaying.previous();
-                      else if (parent.verb === "next") NowPlaying.next();
-                      else NowPlaying.toggle();
+                      const p = toast.mpris;
+                      if (parent.verb === "prev") p ? p.previous() : NowPlaying.previous();
+                      else if (parent.verb === "next") p ? p.next() : NowPlaying.next();
+                      else p ? p.togglePlaying() : NowPlaying.toggle();
                     }
                   }
                 }
@@ -834,34 +967,29 @@ PanelWindow {
             }
           }
 
-          // A click is an answer: the first action if the notification offered
-          // one, and otherwise simply "seen". Below the transport, which takes
-          // its own taps first.
-          // Left is "answer it" — the sender's default action if it offered
-          // one, which for a track is what opens spoot. Right is "I have seen
-          // it", which is the gesture mako had and the one the hand already
-          // knows.
+          // A click is an answer. Below the transport, which takes its own
+          // taps first. Left is "open it" — see toast.open for what that is
+          // for each kind of toast, and the flare that says so. Right is "I
+          // have seen it", which is the gesture mako had and the one the
+          // hand already knows.
           TapHandler {
             acceptedButtons: Qt.LeftButton
-            onTapped: {
-              const n = toast.modelData;
-              if (!n) return;
-              // A capture clicked is a capture opened, whatever it carries.
-              if (toast.capture) {
-                Howler.captureOpen(toast.captureKind, toast.captureFile);
-                toast.goAway();
-                return;
-              }
-              if (toast.defaultAct) { toast.defaultAct.invoke(); return; }
-              const acts = n.actions || [];
-              if (acts.length > 0) { acts[0].invoke(); return; }
-              n.dismiss();
-            }
+            onTapped: toast.open()
           }
 
           TapHandler {
             acceptedButtons: Qt.RightButton
             onTapped: toast.goAway()
+          }
+
+          // Over everything, picture and words alike, and clipped to the
+          // card's corners by the card.
+          OpenFlare {
+            id: flare
+            anchors.fill: parent
+            radius: Howler.radius
+            wash: false
+            z: 10
           }
         }
       }

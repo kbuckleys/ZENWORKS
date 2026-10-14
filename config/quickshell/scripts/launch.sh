@@ -24,4 +24,17 @@
 # screen-sized copies first.
 export QT_IMAGEIO_MAXALLOC=2048
 
+# FLATPAK'S APPS IN THE LAUNCHER. Flatpak exports their desktop entries under
+# its own share directories; /etc/profile.d/flatpak.sh adds them for a login
+# shell, and a session that never ran one — this one — never saw them. Set
+# HERE, where the shell is always started (user, 2026-10-15: "installed
+# flatpaks don't generate .desktop entries?"), so a restart is enough, and
+# everything the shell launches inherits it. Hyprland's base.lua sets the
+# same for what it starts itself. Harmless with no Flatpak: nothing is there.
+d="${XDG_DATA_DIRS:-/usr/local/share:/usr/share}"
+for x in /var/lib/flatpak/exports/share "${XDG_DATA_HOME:-$HOME/.local/share}/flatpak/exports/share"; do
+  case ":$d:" in *":$x:"*) ;; *) d="$x:$d" ;; esac
+done
+export XDG_DATA_DIRS="$d"
+
 exec qs "$@"

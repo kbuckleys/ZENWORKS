@@ -26,6 +26,8 @@
 //              DropArea laid over the whole trail
 //   partAt     the part item showing a value, null for none
 //   weight, pad  the words' weight and the room either side of them
+//   glyphOf    value → a glyph drawn before its word, "" for none (the
+//              directory's own, from the shell's map: user, 2026-10-15)
 //
 // ── AND FROM THE KEYBOARD (`keys`, 2026-10-13) ─────────────────────────
 // For a card walked with Tab (the batch rename's): `claim()` gives it the
@@ -69,6 +71,7 @@ Item {
   property int weight: Font.Bold
   property real pad: 28
   property bool keys: false
+  property var glyphOf: null
   readonly property bool focused: segs.activeFocus
   function claim() { if (segs.keys) segs.forceActiveFocus(); }
   signal chose(string value)
@@ -137,19 +140,32 @@ Item {
 
   // the one highlight, under the words, sliding to the chosen option
   readonly property Item litItem: segs.index >= 0 && rep.count > segs.index ? rep.itemAt(segs.index) : null
+  // THE HIGHLIGHT FROM NUMBERS, NOT FROM A PART (user, 2026-10-15: a switch
+  // in a sheet, and Ceres' Channels, first showed nothing chosen). An even
+  // switch's parts are its width shared out, so where the chosen one is
+  // needs no part to have been laid out; only a sized-by-words switch reads
+  // its part. And it does not SLIDE until it has been seen at its size — its
+  // first place is taken, not travelled to from where an unsized, hidden
+  // switch would have put it.
+  readonly property real partW: (segs.width - 2) / Math.max(1, segs.options.length)
+  property bool settled: false
+  function settle() { if (!segs.settled && segs.visible && segs.width > 0) Qt.callLater(() => { segs.settled = true; }); }
+  onVisibleChanged: segs.settle()
+  onWidthChanged: segs.settle()
+  Component.onCompleted: segs.settle()
   Rectangle {
     id: lit
-    visible: !!segs.litItem
-    x: segs.litItem ? row.x + segs.litItem.x + 2 : 0
+    visible: segs.index >= 0 && (segs.even || !!segs.litItem)
+    x: segs.even ? row.x + segs.index * segs.partW + 2 : segs.litItem ? row.x + segs.litItem.x + 2 : 0
     y: 3
-    width: segs.litItem ? segs.litItem.width - 4 : 0
+    width: Math.max(0, segs.even ? segs.partW - 4 : segs.litItem ? segs.litItem.width - 4 : 0)
     height: segs.height - 6
     radius: Math.max(0, Zenon.windowRadius - 2)
     color: Zenon.alpha(Zenon.cyan, segs.strong ? 0.28 : 0.16)
     border.width: segs.strong ? 1 : 0
     border.color: Zenon.alpha(Zenon.cyan, 0.75)
-    Behavior on x { NumberAnimation { duration: Zenon.normal; easing.type: Zenon.travelEase } }
-    Behavior on width { NumberAnimation { duration: Zenon.normal; easing.type: Zenon.travelEase } }
+    Behavior on x { enabled: segs.settled; NumberAnimation { duration: Zenon.normal; easing.type: Zenon.travelEase } }
+    Behavior on width { enabled: segs.settled; NumberAnimation { duration: Zenon.normal; easing.type: Zenon.travelEase } }
   }
 
   Row {
@@ -167,7 +183,7 @@ Item {
         readonly property bool on: segs.current === one.modelData[0]
         readonly property bool ok: segs.allowed === null || segs.allowed.indexOf(one.modelData[0]) >= 0
         width: segs.even ? (segs.width - 2) / Math.max(1, segs.options.length)
-          : label.implicitWidth + segs.pad
+          : label.implicitWidth + mark.room + segs.pad
         height: row.height
         // between two options, a hairline
         Rectangle {
@@ -231,6 +247,7 @@ Item {
           id: label
           anchors.centerIn: parent
           anchors.verticalCenterOffset: segs.artRoom / 2 - segs.noteRoom / 2
+          anchors.horizontalCenterOffset: mark.room / 2
           text: one.modelData[1]
           color: one.on || segs.hot === one.modelData[0] ? Zenon.cyan : segs.ink
           opacity: !one.ok ? 0.35
@@ -240,6 +257,24 @@ Item {
           font.weight: segs.weight
           font.features: { "tnum": 1 }
           font.pixelSize: segs.textSize
+        }
+        // its glyph, before the word, in the word's ink. A step with no
+        // word is its glyph alone (home in the crumbs), so the gap goes too
+        // and the glyph sits centred.
+        Text {
+          id: mark
+          readonly property real gap: label.text !== "" ? 7 : 0
+          readonly property real room: mark.text !== "" ? mark.implicitWidth + gap : 0
+          anchors.right: label.left
+          anchors.rightMargin: gap
+          anchors.verticalCenter: label.verticalCenter
+          visible: mark.text !== ""
+          text: segs.glyphOf ? String(segs.glyphOf(String(one.modelData[0])) || "") : ""
+          color: label.color
+          opacity: label.opacity
+          font.family: Zenon.face
+          font.weight: Zenon.weight
+          font.pixelSize: Math.round(segs.textSize * 1.05)
         }
         Text {
           visible: one.modelData.length > 2 && !!one.modelData[2]

@@ -60,3 +60,4 @@ singleton Jobs 1.0 Jobs.qml
 JobsCard 1.0 JobsCard.qml
 JobsModule 1.0 JobsModule.qml
 JobsPanel 1.0 JobsPanel.qml
+OpenFlare 1.0 OpenFlare.qml

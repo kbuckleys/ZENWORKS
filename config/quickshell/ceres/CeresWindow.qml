@@ -110,8 +110,12 @@ FloatingWindow {
     win.typing = t === "packages";
     if (t === "packages" && win.found.length === 0) win.search();
     if (t === "store" && !storeView.loaded) storeView.load();
-    if (t === "history") win.loadHistory();
-    if (t === "maintenance") win.loadMaint();
+    // the Store's catalogue too: a Flatpak since removed is named from it
+    if (t === "history") { win.loadHistory(); if (!storeView.loaded) storeView.load(); }
+    if (t === "maintenance") {
+      win.loadMaint();
+      if (win.maintItems[win.msel] && win.maintItems[win.msel].key === "flatpak" && !win.fpRepair) win.checkFlatpakRepair();
+    }
     // read once; after that the edits in hand are what the tab shows
     if (t === "settings" && !configView.loaded) configView.load();
     keys.forceActiveFocus();
@@ -176,7 +180,25 @@ FloatingWindow {
   readonly property bool fpUp: win.face === "fpoff" && !win.authUp
   function removeFlatpak() {
     win.overlay = "";
-    Ceres.removeFlatpak();
+    Ceres.removeFlatpak(win.fpDeleteData);
+  }
+
+  // WHAT THE APPS KEPT, gone with them unless you say otherwise (user,
+  // 2026-10-15: Ceres keeps the system clean): a removal sheet's box,
+  // ticked when it opens, with how much it is — ~/.var/app/<id> for one
+  // app, ~/.var/app for Flatpak itself.
+  property bool fpDeleteData: true
+  property string fpDataSize: ""
+  function measureData(id) {
+    win.fpDeleteData = true;
+    win.fpDataSize = "";
+    fpDuProc.running = false;
+    fpDuProc.command = ["sh", "-c", "du -sh -- \"$HOME/.var/app\"" + (id ? "/" + Cer.q(id) : "") + " 2>/dev/null | cut -f1"];
+    Qt.callLater(() => { fpDuProc.running = true; });
+  }
+  Process {
+    id: fpDuProc
+    stdout: StdioCollector { id: fpDuOut; onStreamFinished: win.fpDataSize = fpDuOut.text.trim() }
   }
 
   // ── ONE FLATPAK APP, IN OR OUT (the Store's Get / Remove on Flathub) ───
@@ -195,6 +217,8 @@ FloatingWindow {
     win.fpScope = remove ? (app.scope === "user" ? "user" : "system") : Ceres.flatpakScope;
     win.fpInfo = null;
     win.fpPerms = null;
+    win.fpRuntime = null;
+    if (remove) win.measureData(app.pkg);
     if (!remove) {
       fpInfoProc.running = false;
       fpMetaProc.running = false;
@@ -209,7 +233,7 @@ FloatingWindow {
     const a = win.fpApp;
     if (!a || Ceres.txBusy) return;
     win.overlay = "";
-    if (win.fpRemove) Ceres.request(Cer.flatpakUninstallSteps(a.pkg, win.fpScope), "remove " + a.name, 0);
+    if (win.fpRemove) Ceres.request(Cer.flatpakUninstallSteps(a.pkg, win.fpScope, win.fpDeleteData), "remove " + a.name, 0);
     else {
       Ceres.setFlatpakScope(win.fpScope);
       Ceres.request(Cer.flatpakInstallSteps(a.pkg, win.fpScope), "install " + a.name, 0);
@@ -217,7 +241,39 @@ FloatingWindow {
   }
   Process {
     id: fpInfoProc
-    stdout: StdioCollector { id: fpInfoOut; onStreamFinished: win.fpInfo = St.remoteInfo(fpInfoOut.text) }
+    stdout: StdioCollector {
+      id: fpInfoOut
+      onStreamFinished: {
+        win.fpInfo = St.remoteInfo(fpInfoOut.text);
+        // and the runtime it runs on: here already, or what it costs first
+        const rt = win.fpInfo["Runtime"] || "";
+        win.fpRuntime = null;
+        if (rt === "") return;
+        fpRtProc.running = false;
+        fpRtProc.command = ["sh", "-c", "rt=" + Cer.q(rt) + "; "
+          + "flatpak list --runtime --columns=ref 2>/dev/null | grep -qx \"$rt\" && { echo '@@have'; exit 0; }; "
+          + "flatpak remote-info --system flathub \"runtime/$rt\" 2>/dev/null"];
+        Qt.callLater(() => { fpRtProc.running = true; });
+      }
+    }
+  }
+  // THE RUNTIME FIRST (user, 2026-10-15: "are all flatpak downloads this
+  // big?"): an app needs the runtime it is built on — hundreds of MB — and
+  // the first app on one brings it down. The sheet says so, and how much,
+  // when it is not here yet. null: here already, or not known.
+  property var fpRuntime: null
+  Process {
+    id: fpRtProc
+    stdout: StdioCollector {
+      id: fpRtOut
+      onStreamFinished: {
+        if (fpRtOut.text.indexOf("@@have") >= 0) { win.fpRuntime = null; return; }
+        const i = St.remoteInfo(fpRtOut.text);
+        win.fpRuntime = i["Download Size"] ? { name: (fpRtOut.text.split("\n")[0] || "").split(" - ")[0].trim(),
+                                              ref: i["Ref"] || "", download: i["Download Size"],
+                                              installed: i["Installed Size"] || "" } : null;
+      }
+    }
   }
   Process {
     id: fpMetaProc
@@ -273,7 +329,12 @@ FloatingWindow {
   }
 
   // ── Packages: the query, the rows, the marks ───────────────────────────
-  property string query: ""
+  // ONE QUERY FOR EVERY TAB THAT SEARCHES (user, 2026-10-15): looked for in
+  // the Store and not there, it is in Packages the moment you switch — never
+  // typed twice. Each tab's own name for it stays, read-only, so every
+  // reader reads the one text.
+  property string sharedQuery: ""
+  readonly property string query: win.sharedQuery
   property bool installedOnly: false
   // what the search returned, in its order — and `rows`, what is drawn and
   // walked: the same, sorted by the column you chose, if you chose one
@@ -359,7 +420,7 @@ FloatingWindow {
 
   // ── Updates: the pending list, with headings ────────────────────────────
   // typed in the Updates tab; narrows the list by name, as the other tabs do
-  property string uquery: ""
+  readonly property string uquery: win.sharedQuery
   onUqueryChanged: { win.usel = 1; while (win.updateRows[win.usel] && win.updateRows[win.usel].head) win.usel++; }
   readonly property var updateRows: {
     const out = [];
@@ -396,16 +457,13 @@ FloatingWindow {
   // `/` goes back in; and only then does Esc clear the text, then the marks.
   property bool typing: false
   // the Store's search — see StoreView.query
-  property string squery: ""
+  readonly property string squery: win.sharedQuery
   readonly property bool filters: win.tab !== "maintenance" && win.tab !== "settings"
   readonly property string filterText:
     win.tab === "packages" ? win.query : win.tab === "history" ? win.hquery
     : win.tab === "updates" ? win.uquery : win.tab === "store" ? win.squery : ""
   function setFilter(t) {
-    if (win.tab === "store") win.squery = t;
-    else if (win.tab === "packages") win.query = t;
-    else if (win.tab === "history") win.hquery = t;
-    else if (win.tab === "updates") win.uquery = t;
+    if (win.filters) win.sharedQuery = t;
   }
   // One place typing is understood, for every tab that filters. Returns
   // whether the key was a filter key.
@@ -439,6 +497,8 @@ FloatingWindow {
     if (win.tab === "packages") return win.rows[win.sel] || null;
     const r = win.updateRows[win.usel];
     // a Flatpak row is looked up by its id, of Flathub (Cer.infoCommand)
+    // (the runtimes row is several things, and has no one record to show)
+    if (r && !r.head && r.flatpak && r.u.runtime) return null;
     return r && !r.head ? (r.flatpak ? { name: r.u.id, repo: "flatpak", aur: false }
                                      : { name: r.u.name, repo: "update", aur: r.aur }) : null;
   }
@@ -615,7 +675,7 @@ FloatingWindow {
       const at = win.rows.findIndex(r => r.name === name);
       win.seekName = "";
       if (at >= 0) { win.sel = at; pkgList.positionViewAtIndex(at, ListView.Contain); }
-    } else win.query = name;
+    } else win.sharedQuery = name;
     keys.forceActiveFocus();
   }
   function startExtras() {
@@ -767,7 +827,8 @@ FloatingWindow {
 
   function undoTransaction(ti) {
     const t = win.history[ti];
-    if (!t || Ceres.txBusy) return;
+    // Flatpak's jobs are not pacman's to take back
+    if (!t || t.flatpak || Ceres.txBusy) return;
     win.confirmKind = "undo";
     win.undoTx = t;
     win.undo = null;
@@ -883,7 +944,7 @@ FloatingWindow {
 
   // ── History: pacman.log as transactions ────────────────────────────────
   property var history: []
-  property string hquery: ""
+  readonly property string hquery: win.sharedQuery
   property int hsel: 0
   onHqueryChanged: win.hsel = win.firstEvent(win.historyRows)
 
@@ -896,13 +957,27 @@ FloatingWindow {
     stdout: StdioCollector {
       id: historyOut
       onStreamFinished: {
-        win.history = Cer.readHistory(historyOut.text);
+        win.history = Cer.readHistory(historyOut.text, Date.now());
         win.hsel = win.firstEvent(win.historyRows);
       }
     }
   }
 
   // headings and events in one model; typing narrows it to one package
+  // A FLATPAK GONE has no name of its own any more (flatpak names only
+  // what is installed): the Store's catalogue knows it, once it has loaded
+  readonly property var fpNames: {
+    const m = {};
+    for (const a of storeView.apps) {
+      if (a.source === "flatpak") m[a.pkg] = a.name;
+      for (const o of a.others || []) if (o.source === "flatpak") m[o.pkg] = a.name;
+    }
+    return m;
+  }
+  function fpNamed(e) {
+    if (!e.flatpak || e.runtime || e.name !== e.id || !win.fpNames[e.id]) return e;
+    return Object.assign({}, e, { name: win.fpNames[e.id] });
+  }
   readonly property var historyRows: {
     const out = [];
     const q = win.hquery.toLowerCase();
@@ -911,7 +986,8 @@ FloatingWindow {
       const t = win.history[ti];
       const ev = q.trim() === "" ? t.events : t.events.filter(e => Cer.matchesAll(e.name, q));
       if (ev.length === 0) continue;
-      const tally = Cer.tally(ev), parts = [];
+      // the runtimes line is not a count of its own: "1 installed", the app
+      const tally = Cer.tally(ev.filter(e => !e.runtime)), parts = [];
       for (const v of Cer.VERBS) if (tally[v].length) parts.push(tally[v].length + " " + v);
       // A new day opens a section, terminus' sidebar heading exactly: 13
       // of air and a rule closing the day above (not before the first), 7,
@@ -922,7 +998,7 @@ FloatingWindow {
       }
       out.push({ head: true, kind: "tx", time: t.time, tx: ti,
                  what: Cer.describeCommand(t.command), counts: parts.join(" \u00b7 ") });
-      for (const e of ev) out.push({ head: false, e: e, tx: ti });
+      for (const e of ev) out.push({ head: false, e: win.fpNamed(e), tx: ti });
     }
     return out;
   }
@@ -970,6 +1046,8 @@ FloatingWindow {
   function lookCache() {
     const e = win.hevent;
     if (!e) return;
+    // Flatpak's: no pacman package, no cache, nothing in the archive
+    if (e.flatpak) { win.installedNow = ""; win.cached = []; win.archived = []; return; }
     if (cacheProc.running) { cacheProc.again = true; return; }
     cacheProc.forName = e.name;
     cacheProc.command = ["sh", "-c", "pacman -Q -- " + Cer.q(e.name)
@@ -1027,7 +1105,7 @@ FloatingWindow {
   // the cache if it still has it, and otherwise from the archive.
   readonly property var wayBack: {
     const e = win.hevent;
-    if (!e) return null;
+    if (!e || e.flatpak) return null;
     const want = e.verb === "removed" ? e.to : e.from;
     if (!want || want === win.installedNow) return null;
     return win.cached.find(c => c.version === want)
@@ -1115,6 +1193,19 @@ FloatingWindow {
     : (win.maint.orphans.length ? 1 : 0) + (win.maint.pacnew.length ? 1 : 0)
       + (win.maint.stale ? 1 : 0)
 
+  // REPAIR'S DRY RUN, in the background when Flatpak's item is shown — it
+  // checksums every installed file, seconds of work, so not on every load.
+  // null: not yet known (the button says it is checking).
+  property var fpRepair: null
+  function checkFlatpakRepair() {
+    if (fpRepairProc.running || !Ceres.deps.flatpak) return;
+    fpRepairProc.running = true;
+  }
+  Process {
+    id: fpRepairProc
+    command: ["sh", "-c", Cer.flatpakRepairCommand()]
+    stdout: StdioCollector { id: fpRepairOut; onStreamFinished: win.fpRepair = Cer.readFlatpakRepair(fpRepairOut.text) }
+  }
   function loadMaint() {
     maintProc.command = ["sh", "-c", Cer.maintCommand(Paths.cacheDir() + "/paru/clone")];
     maintProc.running = true;
@@ -1160,7 +1251,9 @@ FloatingWindow {
     // No line here: its health is the body's, which has room for it.
     case "mirrors": return "";
     case "flatpak": return m.fpApps.length + (m.fpApps.length === 1 ? " app \u00b7 " : " apps \u00b7 ")
-      + m.fpRuntimes.length + (m.fpRuntimes.length === 1 ? " runtime" : " runtimes");
+      + m.fpRuntimes.length + (m.fpRuntimes.length === 1 ? " runtime" : " runtimes")
+      + (m.fpUnused.length ? " \u00b7 " + m.fpUnused.length + " unused" : "")
+      + (win.fpRepair && win.fpRepair.problems.length ? " \u00b7 needs repair" : "");
     case "sync": return (m.synced ? "synced " + Cer.age(Date.now() - m.synced) : "never synced")
       + (m.aurList ? " \u00b7 AUR list " + Cer.age(Date.now() - m.aurList).replace(" ago", " old") : "");
     }
@@ -1232,7 +1325,9 @@ FloatingWindow {
     return (key === "orphans" && m.orphans.length > 0) || (key === "pacnew" && m.pacnew.length > 0)
       || (key === "cache" && m.stale > 0) || (key === "oldcode" && Ceres.staleApps.length > 0)
       || (key === "aurhealth" && Ceres.aurHealth.problems.length > 0)
-      || (key === "mirrors" && win.mirrorsWant);
+      || (key === "mirrors" && win.mirrorsWant)
+      // Flatpak's leftovers are the system's hygiene too
+      || (key === "flatpak" && (m.fpUnused.length > 0 || (!!win.fpRepair && win.fpRepair.problems.length > 0)));
   }
 
   // How an item stands, for its dot: "bad" when something is broken or
@@ -1290,7 +1385,14 @@ FloatingWindow {
   // and Maintenance is opened far more often than this is looked at.
   property var mirrors: null
   property bool mirrorsLoading: false
-  onMselChanged: if (win.maintItems[win.msel].key === "mirrors" && !win.mirrors) win.loadMirrors()
+  // what an item looks up only when it is looked at: the mirrors' status,
+  // Flatpak's repair dry run
+  onMselChanged: {
+    const it = win.maintItems[win.msel];
+    if (!it) return;
+    if (it.key === "mirrors" && !win.mirrors) win.loadMirrors();
+    if (it.key === "flatpak" && !win.fpRepair) win.checkFlatpakRepair();
+  }
   function loadMirrors() {
     if (mirrorProc.running) return;
     win.mirrorsLoading = true;
@@ -1399,13 +1501,18 @@ FloatingWindow {
     else if (key === "flatpak") {
       // the system's as root, yours without — each a no-op when there is
       // nothing to do
-      if (which === "repair")
-        Ceres.request([["@sudo", "flatpak", "repair", "--system"], ["@user", "flatpak repair --user"]],
-                      "repair Flatpak", 0);
-      else
-        Ceres.request([["@sudo", "flatpak", "uninstall", "--unused", "--system", "--noninteractive", "-y"],
-                       ["@user", "flatpak uninstall --unused --user --noninteractive -y"]],
-                      "remove unused runtimes", 0);
+      // each only where its dry run found something: a clean installation
+      // is not asked for a password to do nothing
+      if (which === "repair") {
+        const where = win.fpRepair ? win.fpRepair.problems.map(p => p.scope) : [];
+        const steps = [];
+        if (where.indexOf("system") >= 0) steps.push(["@sudo", "flatpak", "repair", "--system"]);
+        if (where.indexOf("user") >= 0) steps.push(["@user", "flatpak repair --user"]);
+        if (steps.length) { win.fpRepair = null; Ceres.request(steps, "repair Flatpak", 0); }
+      } else {
+        const steps = Cer.flatpakUnusedSteps(m.fpUnused);
+        if (steps.length) Ceres.request(steps, "remove unused runtimes", 0);
+      }
     }
     else if (key === "mirrors") {
       if (which === "rank" || !win.ranked) win.rankMirrors();
@@ -1484,9 +1591,8 @@ FloatingWindow {
 
   function back() {
     if (win.authUp) { win.cancelAuth(); return true; }
-    // A job still running is not a step back — it is the window going away
-    // while the job carries on, which is what the hint promises. Answering
-    // "handled" here left Esc doing nothing at all.
+    // A job still running has nothing to step back to: Esc leaves it be
+    // (shift+Esc cancels it). A finished one is put away.
     if (win.face === "tx") {
       if (Ceres.txBusy) return false;
       Ceres.txClear();
@@ -1499,8 +1605,8 @@ FloatingWindow {
     // off an app's page, back to the shelf or the results it was opened from
     if (win.tab === "store" && storeView.back()) return true;
     // Out of the field, then the text, then the marks, then the window — the
-    // cheapest thing to redo goes first. Esc in an empty field with nothing
-    // marked has nothing to step out of, and closes, as it always did.
+    // cheapest thing to redo goes first. Esc with nothing to step out of does
+    // nothing: it never closes the window (user, 2026-10-15).
     const marked = (win.tab === "packages" && win.markCount > 0)
       || (win.tab === "updates" && win.umarkCount > 0);
     if (win.typing) {
@@ -1575,7 +1681,9 @@ FloatingWindow {
       }
       if (win.msgUp) {
         event.accepted = true;
-        if (Ceres.txBusy) { if (k === Qt.Key_Escape) win.dismiss(); return; }
+        // ESC NEVER CLOSES CERES (user, 2026-10-15): it steps out of things;
+        // the window closes as any window does
+        if (Ceres.txBusy) return;
         if (k === Qt.Key_Return || k === Qt.Key_Enter || k === Qt.Key_Escape) Ceres.txClear();
         else if (k === Qt.Key_T && Ceres.txState === "failed") Ceres.txInTerminal();
         return;
@@ -1587,7 +1695,7 @@ FloatingWindow {
           setupView.choice = setupView.choice === "paru" ? "paru-git" : "paru";
         // the Flatpak box: space ticks it, as space marks a row
         else if (k === Qt.Key_Space && Ceres.flatpakAsk) setupView.flatpak = !setupView.flatpak;
-        else if (k === Qt.Key_Escape) { if (Ceres.deps.paru) win.dismiss(); else win.showSetup = false; }
+        else if (k === Qt.Key_Escape && !Ceres.deps.paru) win.showSetup = false;
         return;
       }
       if (win.face === "news") {
@@ -1598,7 +1706,7 @@ FloatingWindow {
       }
       if (k === Qt.Key_Escape) {
         event.accepted = true;
-        if (!win.back()) win.dismiss();
+        win.back();
         return;
       }
       if (win.face === "tx") {
@@ -1890,8 +1998,16 @@ FloatingWindow {
           height: 32
           radius: Zenon.windowRadius
           color: Zenon.wash(win.typing ? 0.08 : 0.04)
+          // the frame stays the border; while you are in it, the ring every
+          // focused field wears (terminus' HeldRing — user, 2026-10-15)
           border.width: 1
-          border.color: win.typing ? Zenon.alpha(Zenon.cyan, 0.6) : Zenon.border
+          border.color: Zenon.border
+          Term.HeldRing {
+            anchors.fill: parent
+            radius: parent.radius
+            z: 10
+            on: win.typing && win.face === "browse"
+          }
           Text {
             id: sfGlyph
             anchors.left: parent.left
@@ -2296,7 +2412,26 @@ FloatingWindow {
               font.weight: Font.Bold
               font.pixelSize: Zenon.px(24)
             }
+            // A FLATPAK'S EVENT: what it was, and why there is no way back
             Text {
+              visible: !!win.hevent && !!win.hevent.flatpak
+              width: parent.width
+              wrapMode: Text.Wrap
+              textFormat: Text.StyledText
+              readonly property var tx: win.hevent ? win.history[win.historyRows[win.hsel].tx] : null
+              text: !win.hevent || !win.hevent.flatpak ? ""
+                : (win.hevent.runtime
+                  ? "The shared runtimes Flatpak apps run on \u2014 pulled in with the app beside them, and taken out by Maintenance \u203A Flatpak once nothing needs them."
+                  : "<font color='" + Zenon.muted + "'>Flatpak</font>  " + Cer.esc(win.hevent.id || "")
+                    + (tx && tx.scope ? "  <font color='" + Zenon.muted + "'>\u00B7 " + (tx.scope === "user" ? "just you" : "everyone") + "</font>" : "")
+                    + "<br><br>Flatpak keeps no older versions here to go back to; the Store has the app as it is now.")
+              color: Zenon.white
+              font.family: Zenon.face
+              font.weight: Zenon.weight
+              font.pixelSize: Zenon.px(16)
+            }
+            Text {
+              visible: !win.hevent || !win.hevent.flatpak
               textFormat: Text.StyledText
               text: !win.hevent ? "" : (win.installedNow !== ""
                 ? "<font color='" + Zenon.muted + "'>installed now</font>  " + Cer.esc(win.installedNow)
@@ -2308,6 +2443,7 @@ FloatingWindow {
               bottomPadding: 8
             }
             Text {
+              visible: !win.hevent || !win.hevent.flatpak
               text: win.cached.length ? "In the package cache" : "Nothing of it in the package cache"
               color: Zenon.muted
               font.family: Zenon.face
@@ -2369,7 +2505,7 @@ FloatingWindow {
         onChangeAsked: (row) => win.confirmOne(row)
         onFlatpakAsked: (app, remove) => win.askFlatpak(app, remove)
         onReleased: keys.forceActiveFocus()
-        onSearchLeft: { win.squery = ""; win.typing = false; }
+        onSearchLeft: { win.sharedQuery = ""; win.typing = false; }
       }
 
       ConfigView {
@@ -2378,7 +2514,7 @@ FloatingWindow {
         anchors.fill: parent
         onReleased: keys.forceActiveFocus()
         onReviewAsked: win.overlay = "conf"
-        onFlatpakRemoveAsked: { Ceres.listFlatpaks(); win.overlay = "fpoff"; }
+        onFlatpakRemoveAsked: { Ceres.listFlatpaks(); win.measureData(""); win.overlay = "fpoff"; }
       }
 
       // ── Maintenance ─────────────────────────────────────────────────
@@ -2607,12 +2743,16 @@ FloatingWindow {
               label: "Remove unused"
               ink: Zenon.cyan
               primary: true
+              // only when there is something to remove (user, 2026-10-15)
+              ready: !!mdetail.m && mdetail.m.fpUnused.length > 0 && !Ceres.txBusy
               onClicked: win.maintGo("")
             }
             DialogButton {
               visible: mdetail.key === "flatpak"
-              label: "Repair"
+              label: !win.fpRepair ? "Checking\u2026" : "Repair"
               ink: Zenon.muted
+              // and only when the dry run found something to repair
+              ready: !!win.fpRepair && win.fpRepair.problems.length > 0 && !Ceres.txBusy
               onClicked: win.maintGo("repair")
             }
             DialogButton {
@@ -2786,7 +2926,14 @@ FloatingWindow {
               : mdetail.key === "pacnew" ? mdetail.m.pacnew.map(p => ({ name: p }))
               : mdetail.key === "oldcode" ? win.oldCodeRows
               : mdetail.key === "mirrors" ? win.mirrorRows
-              : mdetail.key === "flatpak" ? [{ head: true, name: "Apps" }].concat(mdetail.m.fpApps)
+              : mdetail.key === "flatpak" ? (mdetail.m.fpUnused.length
+                    ? [{ head: true, name: "Unused \u2014 nothing needs them" }]
+                      .concat(mdetail.m.fpUnused.map(u => ({ name: u.id, version: u.branch, right: u.scope === "user" ? "just you" : "everyone" })))
+                    : [])
+                  .concat(win.fpRepair && win.fpRepair.problems.length
+                    ? [{ head: true, name: "Repair would fix" }].concat(win.fpRepair.problems.map(p => ({ name: p.text, right: p.scope })))
+                    : [])
+                  .concat([{ head: true, name: "Apps" }]).concat(mdetail.m.fpApps)
                   .concat([{ head: true, name: "Runtimes" }]).concat(mdetail.m.fpRuntimes)
               : mdetail.key === "aurhealth" ? Ceres.aurHealth.problems.map(p => ({
                   name: p.name,
@@ -3515,7 +3662,7 @@ FloatingWindow {
       return (txView.settleInfo.providers.length ? [["\u2190 \u2192", "provider"]] : [])
         .concat(txView.settleable ? [["y", txView.settleInfo.conflicts.length ? "replace and install" : "install"]] : [])
         .concat([["t", "open in terminal"], ["esc", "cancel"]]);
-    if (win.msgUp) return Ceres.txBusy ? [["esc", "hide \u2014 it keeps going"], ["shift esc", "cancel"]]
+    if (win.msgUp) return Ceres.txBusy ? [["shift esc", "cancel"]]
       : Ceres.txState === "failed" ? [["return", "ok"], ["t", "open in terminal"]] : [["return", "ok"]];
     switch (win.face) {
 
@@ -3523,16 +3670,16 @@ FloatingWindow {
     case "setup": return (Ceres.deps.paru ? [["\u2190 \u2192", "paru or paru-git"]] : [])
       .concat(Ceres.flatpakAsk ? [["space", "Flatpak apps"]] : [])
       .concat([["return", Ceres.deps.missing.length || setupView.flatpak ? "install" : "done"],
-               ["esc", Ceres.deps.paru ? "close" : "not now"]]);
+               ].concat(Ceres.deps.paru ? [] : [["esc", "not now"]]));
     case "tx":
-      if (Ceres.txBusy) return [["esc", "hide — it keeps going"], ["shift esc", "cancel"]];
+      if (Ceres.txBusy) return [["shift esc", "cancel"]];
       if (txView.settleable)
         return (txView.settleInfo.providers.length ? [["\u2190 \u2192", "provider"]] : [])
           .concat([["y", txView.settleInfo.conflicts.length ? "replace and install" : "install"],
                    ["t", "open in terminal"], ["return", "back"]]);
       return Ceres.txState === "failed"
-        ? [["t", "open in terminal"], ["return", "back"], ["esc", "close"]]
-        : [["return", "back"], ["esc", "close"]];
+        ? [["t", "open in terminal"], ["return", "back"]]
+        : [["return", "back"]];
     case "review": return [["← →", "other packages"], ["j k", "scroll"], ["esc", "back"]];
     case "fpoff": return [["return", "remove flatpak"], ["esc", "back"]];
     case "fpget": return win.fpRemove ? [["return", "remove"], ["esc", "back"]]
@@ -3549,22 +3696,25 @@ FloatingWindow {
       if (storeView.view === "page")
         return [["return", storeView.app && storeView.app.installed ? "open" : "get"],
                 ["\u2191 \u2193", "scroll"], ["esc", "back"]];
-      return [["\u2190 \u2192 \u2191 \u2193", "move"], ["return", "app page"], ["ctrl return", "get / open"],
-              ["alt \u2191 \u2193", "sections"]]
+      // Discover has no cursor: across turns the features, up and down scroll
+      return (storeView.view === "discover"
+        ? [["\u2190 \u2192", "featured"], ["\u2191 \u2193", "scroll"], ["return", "open featured"]]
+        : [["\u2190 \u2192 \u2191 \u2193", "move"], ["return", "app page"], ["ctrl return", "get / open"]])
+        .concat([["alt \u2191 \u2193", "sections"]])
         .concat(win.typing ? (win.squery !== "" ? [["esc", "done typing"]] : []) : [["/", "search"]])
         .concat([["ctrl tab", "next"]]);
     }
     if (win.tab === "history")
       return (win.wayBack ? [["return", "go back to " + win.wayBack.version]] : [])
-        .concat(win.hevent ? [["ctrl z", "undo this transaction"]] : [])
+        .concat(win.hevent && !win.hevent.flatpak ? [["ctrl z", "undo this transaction"]] : [])
         .concat(win.typing ? [] : [["j k", "move"], ["/", "filter"]])
-        .concat([["ctrl tab", "next"], ["esc", win.hquery === "" ? "close" : win.typing ? "done" : "clear"]]);
+        .concat([["ctrl tab", "next"]]).concat(win.hquery === "" ? [] : [["esc", win.typing ? "done" : "clear"]]);
     if (win.tab === "maintenance")
-      return [["j k", "choose"], ["return", "do it"], ["r", "recheck"], ["ctrl tab", "next"], ["esc", "close"]];
+      return [["j k", "choose"], ["return", "do it"], ["r", "recheck"], ["ctrl tab", "next"]];
     if (win.tab === "settings")
-      return configView.hints.concat([["ctrl tab", "next"], ["esc", "close"]]);
+      return configView.hints.concat([["ctrl tab", "next"]]);
     if (win.tab === "updates")
-      return Ceres.total === 0 ? [["ctrl r", "check"], ["ctrl tab", "next"], ["esc", "close"]]
+      return Ceres.total === 0 ? [["ctrl r", "check"], ["ctrl tab", "next"]]
         : [[win.typing ? "tab" : "space", "mark"]].concat(win.typing ? [] : [["/", "filter"]])
           .concat([["ctrl a", "mark all"], ["return", win.umarkCount ? "update marked" : "update this"],
            ["ctrl return", "update all"], ["ctrl r", "check"], ["ctrl tab", "next"]]);
@@ -3773,6 +3923,48 @@ FloatingWindow {
           font.family: Zenon.face
           font.weight: Font.Bold
           font.pixelSize: Zenon.px(17)
+        }
+        // HOW FAR, when the job says (user, 2026-10-15): a Flatpak's
+        // download — runtimes and all — reported as the whole job's share,
+        // on the job page's own fill
+        Rectangle {
+          visible: Ceres.txBusy && !!Ceres.txTotal
+          width: parent.width
+          height: visible ? 30 : 0
+          radius: Zenon.windowRadius
+          color: Zenon.darken(0.25)
+          border.width: 1
+          border.color: Zenon.border
+          clip: true
+          Term.ProgressFill {
+            anchors.fill: parent
+            anchors.margins: 1
+            radius: Zenon.windowRadius - 1
+            frac: Ceres.txTotal ? Ceres.txTotal.frac : 0
+            ink: Zenon.cyan
+          }
+          Text {
+            anchors.left: parent.left
+            anchors.leftMargin: 12
+            anchors.verticalCenter: parent.verticalCenter
+            text: Ceres.txTotal ? Math.round(Ceres.txTotal.frac * 100) + "%" : ""
+            color: Zenon.white
+            font.family: Zenon.face
+            font.weight: Font.Bold
+            font.features: { "tnum": 1 }
+            font.pixelSize: Zenon.px(14)
+          }
+          Text {
+            anchors.right: parent.right
+            anchors.rightMargin: 12
+            anchors.verticalCenter: parent.verticalCenter
+            text: !Ceres.txTotal ? "" : [Ceres.txTotal.rate, Ceres.txTotal.eta].filter(x => x).join("  \u00B7  ")
+            color: Zenon.keyInk
+            font.family: Zenon.face
+            font.weight: Zenon.weight
+            font.features: { "tnum": 1 }
+            font.pixelSize: Zenon.px(14)
+          }
         }
         // while it runs, the latest thing it said
         Text {
@@ -4163,6 +4355,21 @@ FloatingWindow {
           current: win.fpScope
           onChose: (v) => win.fpScope = v
         }
+        // its runtime, when that comes first
+        Text {
+          visible: !win.fpRemove && !!win.fpRuntime
+          width: parent.width
+          wrapMode: Text.Wrap
+          textFormat: Text.StyledText
+          text: !win.fpRuntime ? "" : "<b>First, its runtime:</b> " + Cer.esc(win.fpRuntime.name || "the libraries it is built on")
+            + " \u2014 " + win.fpRuntime.download + " more to download"
+            + (win.fpRuntime.installed ? ", " + win.fpRuntime.installed + " on disk" : "")
+            + ". Every app built on it shares it, so it comes down once."
+          color: Zenon.keyInk
+          font.family: Zenon.face
+          font.weight: Zenon.weight
+          font.pixelSize: Zenon.px(15)
+        }
         // what its sandbox lets it touch, the worst first
         Text {
           visible: !win.fpRemove && win.fpPerms !== null
@@ -4180,11 +4387,17 @@ FloatingWindow {
           visible: win.fpRemove
           width: parent.width
           wrapMode: Text.Wrap
-          text: "What it kept in ~/.var/app/" + (fpGetSheet.a ? fpGetSheet.a.pkg : "") + " stays."
+          text: "Any runtime nothing else needs goes with it."
           color: Zenon.keyInk
           font.family: Zenon.face
           font.weight: Zenon.weight
           font.pixelSize: Zenon.px(15)
+        }
+        Check {
+          visible: win.fpRemove && win.fpDataSize !== ""
+          lit: win.fpDeleteData
+          label: "Also delete what it kept \u2014 ~/.var/app/" + (fpGetSheet.a ? fpGetSheet.a.pkg : "") + ", " + win.fpDataSize
+          onToggled: win.fpDeleteData = !win.fpDeleteData
         }
       }
 
@@ -4229,7 +4442,7 @@ FloatingWindow {
       fromTop: 0
       cardW: Math.min(720, win.width - 60)
       readonly property var apps: Ceres.flatpakApps
-      cardH: Math.min(win.height - 90, 150 + (fpSheet.apps.length ? 34 + Math.min(12, fpSheet.apps.length) * 26 : 0)
+      cardH: Math.min(win.height - 90, 190 + (fpSheet.apps.length ? 34 + Math.min(12, fpSheet.apps.length) * 26 : 0)
         + fpBtns.height + 30)
 
       Column {
@@ -4247,10 +4460,12 @@ FloatingWindow {
         Text {
           width: parent.width
           wrapMode: Text.Wrap
-          text: fpSheet.apps.length === 0
-            ? "No Flatpak apps are installed. Flathub is removed as a source, and flatpak itself is uninstalled."
-            : (fpSheet.apps.length === 1 ? "This app is removed with it" : "These " + fpSheet.apps.length + " apps are removed with it")
-              + ", with the runtimes they share. Flathub is removed as a source. What the apps kept in ~/.var/app stays."
+          // everything that goes, said before it goes (user, 2026-10-15)
+          text: (fpSheet.apps.length === 0 ? "No Flatpak apps are installed. "
+            : (fpSheet.apps.length === 1 ? "This app goes" : "These " + fpSheet.apps.length + " apps go")
+              + ", with every runtime. ")
+            + "Then Flathub as a source, the flatpak package, and what Flatpak keeps itself \u2014 its stores in "
+            + "/var/lib/flatpak and ~/.local/share/flatpak, and its cache \u2014 so nothing of it is left."
           color: Zenon.keyInk
           font.family: Zenon.face
           font.weight: Zenon.weight
@@ -4304,6 +4519,12 @@ FloatingWindow {
             font.weight: Zenon.weight
             font.pixelSize: Zenon.px(14)
           }
+        }
+        Check {
+          visible: win.fpDataSize !== ""
+          lit: win.fpDeleteData
+          label: "Also delete what the apps kept \u2014 ~/.var/app, " + win.fpDataSize
+          onToggled: win.fpDeleteData = !win.fpDeleteData
         }
       }
 

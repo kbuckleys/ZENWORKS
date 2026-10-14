@@ -103,6 +103,18 @@ Rectangle {
       font.pixelSize: Zenon.px(14)
       lineHeight: 1.08
     }
+    // selected: when it was last edited, in full, as a list row has it
+    // (NoteRowBody; user, 2026-10-15)
+    Text {
+      visible: card.here && !!card.note && !!card.note.modified
+      width: parent.width
+      elide: Text.ElideRight
+      text: visible ? N.dateTime(card.note.modified) : ""
+      color: Zenon.muted
+      font.family: Zenon.face
+      font.weight: Zenon.weight
+      font.pixelSize: Zenon.px(12)
+    }
     ContentMarks {
       visible: items.length > 0 && !!card.note && !card.note.sealed
       d: card.d

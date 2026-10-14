@@ -5,7 +5,8 @@
 //
 // WHAT A ROW OF CLIO'S LIST SAYS — Apple's three lines: the title; the
 // date and the first words after it; the container it is in (in All Notes, a
-// tag, a search). A pin, a lock, a checklist's progress; a picture's
+// tag, a search). The selected row has a fourth, before the container: when
+// it was last edited, in full — once over the open note (user, 2026-10-15). A pin, a lock, a checklist's progress; a picture's
 // thumbnail at the end. A sticky wears its colour.
 
 import QtQuick
@@ -23,6 +24,10 @@ Item {
   readonly property bool sticky: !!rb.note && rb.note.kind === "sticky"
   readonly property bool showFolder: !!rb.win && !rb.sticky && rb.note && rb.note.kind === "note"
     && (rb.win.scope.shelf === "all" || rb.win.scope.shelf === "tag" || rb.win.scope.shelf === "smart" || rb.win.query !== "")
+
+  // whether the selected row says when it was last edited (NoteList grows
+  // the row for it: hereH)
+  readonly property bool edited: !!rb.note && !rb.sticky && !rb.note.deleted && !!rb.note.modified
 
   // a sticky's colour
   Rectangle {
@@ -106,6 +111,17 @@ Item {
         font.pixelSize: Zenon.px(12)
         font.features: { "tnum": 1 }
       }
+    }
+    // selected: when it was last edited, in full
+    Text {
+      visible: rb.here && rb.edited
+      width: parent.width
+      elide: Text.ElideRight
+      text: rb.edited ? N.dateTime(rb.note.modified) : ""
+      color: Zenon.muted
+      font.family: Zenon.face
+      font.weight: Zenon.weight
+      font.pixelSize: Zenon.px(12)
     }
     // where it is, and what it holds besides words
     Row {

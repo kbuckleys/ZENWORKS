@@ -711,13 +711,16 @@ function gallerySeek(items, i, d, cols) {
 //   items   galleryLayout's (laid out with cols 1, so no fillers)
 //   chips   its chips: { item index: chip } — where a section starts
 //   ratioOf a function path → width / height, or 0 when not yet known
-//   o       { width, rowH, gap, dirRatio, guess, headH }
+//   o       { width, rowH, gap, dirRatio, guess, headH, inset }
 //           headH: room above a section's first row for its chip
+//           inset: room each side of the rows, inside `width` — where the
+//           gallery's cursor stands out past a tile (the grid clips)
 //
 // Returns { rects: [{ x, y, w, h, line }], lines: [{ y, h, start, end }],
 // height }: every item's place in the content, top to bottom, in order.
 function justifyLayout(items, chips, ratioOf, o) {
-  const W = Math.max(1, o.width), gap = o.gap || 0, rowH = Math.max(1, o.rowH);
+  const inset = o.inset || 0;
+  const W = Math.max(1, o.width - 2 * inset), gap = o.gap || 0, rowH = Math.max(1, o.rowH);
   const guess = o.guess || 1.5;
   const rects = new Array((items || []).length), lines = [];
   let y = 0, i = 0;
@@ -759,7 +762,7 @@ function justifyLayout(items, chips, ratioOf, o) {
     let x = 0;
     for (let j = start; j < k; ++j) {
       const w = j === k - 1 && full ? Math.max(1, W - x) : Math.max(1, Math.round(ratio(items[j]) * h));
-      rects[j] = { x: x, y: y, w: Math.min(w, W), h: Math.round(h), line: 0 };
+      rects[j] = { x: inset + x, y: y, w: Math.min(w, W), h: Math.round(h), line: 0 };
       x += w + gap;
     }
     i = Math.max(k, start + 1);

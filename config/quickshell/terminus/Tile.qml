@@ -127,13 +127,7 @@ Item {
   }
 
 
-  // A cyan flare on the tile that was just opened.
-  //
-  // Opening from a grid gives no feedback of its own — the window that comes
-  // up is somewhere else, and if it takes a moment there is nothing to say
-  // the keypress landed. This says it, on the tile it landed on, and is gone
-  // before it can become clutter.
-  property real glow: 0
+  // A cyan flare on the tile that was just opened — OpenFlare, below.
   Connections {
     target: term
     // Files only, the same rule the list rows follow. Opening a DIRECTORY
@@ -143,19 +137,8 @@ Item {
     // which is the case the flare was for.
     function onOpenPulseChanged() {
       if (tile.current && !tile.passive
-          && tile.entry && !tile.entry.isDir) flare.restart();
+          && tile.entry && !tile.entry.isDir) flare.fire();
     }
-  }
-  // The flare in and out on smooth curves. It used to drive the border's
-  // WIDTH (1 → 3 → 1), which can only move in whole pixels, so it went
-  // up and down in visible steps. The ring below keeps one width and
-  // the flare fades it instead.
-  SequentialAnimation {
-    id: flare
-    NumberAnimation { target: tile; property: "glow"; to: 1; duration: 140;
-                      easing.type: Easing.OutCubic }
-    NumberAnimation { target: tile; property: "glow"; to: 0; duration: 620;
-                      easing.type: Easing.InOutSine }
   }
 
   Rectangle {
@@ -196,15 +179,10 @@ Item {
     border.color: !tile.passive ? Zenon.cyan : Zenon.border
 
     // the flare itself, over the tile's own fill
-    // the flare: a wash and a 3px ring, faded by `glow`
-    Rectangle {
+    OpenFlare {
+      id: flare
       anchors.fill: parent
       radius: parent.radius
-      visible: tile.glow > 0.003
-      opacity: tile.glow
-      color: Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b, 0.18)
-      border.width: 3
-      border.color: Zenon.cyan
     }
   }
   HoverHandler {

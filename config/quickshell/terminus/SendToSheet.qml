@@ -233,10 +233,7 @@ Rectangle {
   // "buck", which no rule claims, and the tree's root row for it is
   // labelled "Home" for the same reason.
   function glyphOf(n) {
-    if (!n) return "";
-    return Icons.glyphFor({
-      name: n.path === Paths.home() ? "home" : Terminus.basename(n.path),
-      isDir: true });
+    return n ? Terminus.dirGlyph(n.path, Icons) : "";
   }
 
   function pretty(p) {

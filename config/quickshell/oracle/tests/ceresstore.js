@@ -87,11 +87,30 @@ module.exports = {
     t.eq("remote-info read", [ri["Version"], ri["Download Size"], ri["Installed Size"]], ["1.2.95", "9.8 MB", "14.1 MB"]);
     const meta = "[Application]\nname=x\n\n[Context]\nshared=ipc;network;\nsockets=x11;wayland;\ndevices=dri;\nfilesystems=xdg-pictures:ro;host;\n\n[Session Bus Policy]\nx=talk\n";
     const perms = S.permissions(meta);
-    t.eq("all your files first", perms[0], { text: "Can read and change all your files", level: "high" });
+    const tl = (p) => ({ text: p.text, level: p.level });
+    t.eq("all your files first", tl(perms[0]), { text: "Can read and change all your files", level: "high" });
     t.ok("the network said", perms.some(p => p.text === "The network"));
     t.ok("pictures, to read", perms.some(p => p.text === "Your Pictures directory, to read"));
     t.ok("drawing and sound are not news", !perms.some(p => /x11|wayland|dri/i.test(p.text)));
-    t.eq("home read-only is not high", S.permissions("[Context]\nfilesystems=home:ro;\n")[0], { text: "Can read your home directory", level: "mid" });
+    t.eq("home read-only is not high", tl(S.permissions("[Context]\nfilesystems=home:ro;\n")[0]), { text: "Can read your home directory", level: "mid" });
+
+    // ── overrides: each permission a switch ───────────────────────────────
+    const nn = "[Context]\nshared=ipc;network;\nsockets=wayland;\nfilesystems=home;xdg-pictures:ro;\n";
+    const plain = S.permissions(nn, "");
+    t.ok("as the app asks: all on, none changed", plain.every(p => p.on && !p.changed));
+    const off = S.permissions(nn, "[Context]\nfilesystems=!home;\nshared=!network;\n");
+    const row = (rows, v) => rows.find(p => p.value === v);
+    t.eq("home taken away", [row(off, "home").on, row(off, "home").changed], [false, true]);
+    t.eq("the network too", row(off, "network").on, false);
+    t.eq("pictures untouched", [row(off, "xdg-pictures").on, row(off, "xdg-pictures").changed], [true, false]);
+    const extra = S.permissions(nn, "[Context]\nsockets=ssh-auth;\n");
+    t.eq("a grant the app never asked for is a row, on and changed", [row(extra, "ssh-auth").on, row(extra, "ssh-auth").changed], [true, true]);
+    t.eq("off: the no- flag", S.overrideFlag(row(plain, "home"), false), "--nofilesystem=home");
+    t.eq("on: as the app asked, read-only kept", S.overrideFlag(row(plain, "xdg-pictures"), true), "--filesystem=xdg-pictures:ro");
+    t.eq("the network off", S.overrideFlag(row(plain, "network"), false), "--unshare=network");
+    t.eq("yours, with no root", S.overrideSteps("a.b", "user", "--nofilesystem=home")[0][0], "@user");
+    t.eq("the system's, as root", S.overrideSteps("a.b", "system", "--nofilesystem=home")[0].slice(0, 4), ["@sudo", "flatpak", "override", "--system"]);
+    t.has("reset", S.overrideResetSteps("a.b", "user")[0][1], "--reset a.b");
     t.eq("a sealed app asks for nothing", S.permissions("[Context]\nsockets=wayland;\n"), []);
 
     // ── one app, more than one source ─────────────────────────────────────
@@ -104,9 +123,28 @@ module.exports = {
     t.eq("the switch, own first", S.sources(spot).map(x => x[0]), ["aur", "flatpak"]);
     t.has("says which is here", S.sources(spot)[1][1], "installed");
     t.eq("one source, no switch", S.sources(gimp), []);
+    t.eq("opens on its own by default", S.openingSource(spot, "native"), "aur");
+    const notHere = Object.assign({}, spot, { others: [Object.assign({}, spot.others[0], { installed: false })] });
+    t.eq("on Flathub's when that is preferred", S.openingSource(notHere, "flatpak"), "flatpak");
+    t.eq("but never away from what is installed", S.openingSource(Object.assign({}, notHere, { installed: true }), "flatpak"), "aur");
+    t.eq("an app only one source has opens on it", S.openingSource(gimp, "flatpak"), "arch");
     t.eq("more than one: the layers mark", S.cardGlyph(spot), "\uDB80\uDF28");
     t.eq("one: its source's", S.cardGlyph(gimp), "\uF303");
     t.eq("an install from the Flathub side goes to Flathub", S.asSource(spot, "flatpak").source, "flatpak");
+
+    // ── walking rows of any width ─────────────────────────────────────────
+    const rows = [1, 4, 3, 3];           // carousel, artwork, a shelf of two rows of three
+    t.eq("down from the carousel: the artwork's middle", S.stepRows(0, "down", rows), 1 + 2);
+    t.eq("down from artwork's first: the shelf's first", S.stepRows(1, "down", rows), 5);
+    t.eq("down from artwork's last: the shelf's last", S.stepRows(4, "down", rows), 7);
+    t.eq("up from any shelf card: the carousel", S.stepRows(6, "up", [1, 3]), 0);
+    t.eq("same widths keep the column", S.stepRows(6, "down", rows), 9);
+    t.eq("across stops at a row's end", S.stepRows(4, "right", rows), 4);
+    t.eq("and at its start", S.stepRows(5, "left", rows), 5);
+    t.eq("the page's end", S.stepRows(9, "down", rows), 9);
+    t.eq("a page down, clamped", S.stepRows(0, "pagedown", rows), 9);
+    t.eq("rows of a grid", S.chunkRows(7, 3), [3, 3, 1]);
+    t.eq("down into a short last row", S.stepRows(5, "down", S.chunkRows(7, 3)), 6);
 
     // ── the page ──────────────────────────────────────────────────────────
     t.eq("links in the page's order", S.links({ donation: "d", homepage: "h" }).map(l => l.label), ["Website", "Donate"]);

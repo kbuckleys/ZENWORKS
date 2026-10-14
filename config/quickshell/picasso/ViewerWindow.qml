@@ -215,7 +215,11 @@ FloatingWindow {
   readonly property var glay: !win.shapesReady ? ({ rects: [], lines: [], height: 0 })
     : V.justifyLayout(win.galleryItems, win.layout.chips, win.shapeOf, {
     width: Math.max(1, win.layW), rowH: win.rowH, gap: win.galleryGap,
-    dirRatio: 1.5, guess: 1.5, headH: win.sectionH })
+    dirRatio: 1.5, guess: 1.5, headH: win.sectionH, inset: win.gridInset })
+  // room each side of the rows inside the grid, for the cursor's rim, which
+  // stands 4 out from a tile and was clipped off the first column
+  // (user's clip.png, 2026-10-15); the grid's own margins give it back
+  readonly property int gridInset: 4
   // reading shapes for the stills that have none yet (or have changed)
   property bool shapesBusy: false
   function missingShapes() {
@@ -4222,8 +4226,8 @@ FloatingWindow {
         }
       }
       anchors.fill: parent
-      anchors.leftMargin: 10
-      anchors.rightMargin: scrub.visible ? scrub.width + 10 : 10
+      anchors.leftMargin: 10 - win.gridInset
+      anchors.rightMargin: (scrub.visible ? scrub.width + 10 : 10) - win.gridInset
       clip: true
       // cut away under an open sheet — see sheetUp
       layer.enabled: win.holed && galleryPane.visible
@@ -4626,7 +4630,7 @@ FloatingWindow {
           x: 0
           y: -win.sectionH + 13
           z: 3
-          width: grid.width
+          width: grid.width - 2 * win.gridInset
           height: 1
           color: Zenon.border
         }

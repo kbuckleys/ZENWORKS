@@ -188,6 +188,8 @@ module.exports = {
     t.eq("hit: nothing below the end", V.itemAt(L4, 150, 900), -1);
     t.eq("box: what it touches", V.itemsIn(L4, 50, 50, 160, 150), [0, 1, 3, 4]);
     t.eq("pool: the most in a span", V.poolSize(L4, 150), 6);
+    const L5 = V.justifyLayout(pics([1, 1, 1]), {}, () => 1, { width: 308, rowH: 100, gap: 0, inset: 4 });
+    t.eq("justify: inset keeps room each side", [L5.rects[0].x, L5.rects[2].x + L5.rects[2].w], [4, 304]);
     t.eq("shapes: read, turned, first frame kept",
       V.parseShapes("/a.jpg\t600\t400\tTopLeft\n/b.jpg\t600\t400\tRightTop\n/b.jpg\t1\t1\t\n/c.png\t0\t0\t\n"),
       { "/a.jpg": 1.5, "/b.jpg": 0.6667 });

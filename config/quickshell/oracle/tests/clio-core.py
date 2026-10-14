@@ -71,28 +71,34 @@ try:
 
     # the lock
     raises("no password, no unlock", lambda: s.unlock({"password": "x"}), "nopassword")
-    raises("no key, no sealing", lambda: s.save({"note": dict(note, id="n2"), "seal": True}), "locked")
+    # A TITLE BASE64 CANNOT SPELL: spaces and punctuation are not in its
+    # alphabet, so finding it in the sealed text can only mean it leaked. It
+    # was "Hi" — two letters any ciphertext holds now and then, and the
+    # check failed at random.
+    secret = "Marmalade, at seventeen past!"
+    sealme = dict(note, id="n2", blocks=[{"k": "title", "h": secret}])
+    raises("no key, no sealing", lambda: s.save({"note": sealme, "seal": True}), "locked")
     s.password({"password": "pw1", "hint": "one"})
-    res = s.save({"note": dict(note, id="n2"), "seal": True})
+    res = s.save({"note": sealme, "seal": True})
     disk = lambda i: server.read_note(s.ix.find(i))
     on_disk = disk("n2")
-    eq("a locked page shows none of its words", "Hi</" in open(s.ix.find("n2")).read().split("<body", 1)[1], False)
+    eq("a locked page shows none of its words", "Marmalade" in open(s.ix.find("n2")).read().split("<body", 1)[1], False)
     eq("sealed on disk: no blocks", "blocks" in on_disk, False)
-    eq("and not readable", "Hi" in on_disk["sealed"], False)
+    eq("and not readable", secret in on_disk["sealed"], False)
     eq("the save says so", res["sealed"] == on_disk["sealed"], True)
-    eq("unsealed with the key", s.unseal_note({"id": "n2"})["blocks"], note["blocks"])
+    eq("unsealed with the key", s.unseal_note({"id": "n2"})["blocks"], sealme["blocks"])
     s.key = None
     raises("locked again", lambda: s.unseal_note({"id": "n2"}), "locked")
     raises("a wrong password", lambda: s.unlock({"password": "nope"}), "auth")
     s.unlock({"password": "pw1"})
-    eq("the right one", s.unseal_note({"id": "n2"})["blocks"], note["blocks"])
+    eq("the right one", s.unseal_note({"id": "n2"})["blocks"], sealme["blocks"])
     eq("the hint is said", s.load()["hint"], "one")
     raises("changing it needs the old one", lambda: s.password({"password": "pw2", "old": "bad"}), "auth")
     eq("changed: every sealed note carried over", s.password({"password": "pw2", "old": "pw1"})["resealed"], 1)
     s.key = None
     raises("the old password is gone", lambda: s.unlock({"password": "pw1"}), "auth")
     s.unlock({"password": "pw2"})
-    eq("and the note still opens", s.unseal_note({"id": "n2"})["blocks"], note["blocks"])
+    eq("and the note still opens", s.unseal_note({"id": "n2"})["blocks"], sealme["blocks"])
     # a sealed text tampered with is refused before decrypting
     j = disk("n2")
     v, mac, c = j["sealed"].split(":")

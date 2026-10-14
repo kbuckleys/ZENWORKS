@@ -126,7 +126,7 @@ const DIRS = {
   "documents": "", "downloads": "󰃘", "dropbox": "",
   "electron": "󱀤", "elixir": "", "etc": "",
   "extensions": "", "fast": "", "fish": "",
-  "flask": "", "fonts": "", "foot": "󰽒",
+  "flatpak": "", "flask": "", "fonts": "", "foot": "󰽒",
   "games": "", "gdrive": "", "git": "󰊢",
   "go": "󰟓", "gtk-3.0": "", "gtk-4.0": "",
   "gtk-5.0": "", "helpers": "", "home": "",

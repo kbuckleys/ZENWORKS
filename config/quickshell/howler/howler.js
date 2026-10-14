@@ -44,6 +44,26 @@ function keepable(row) {
   return out;
 }
 
+// WHAT A CAPTURE ROW IS DRAWN AS: its picture, by path. Not `image` — a
+// capture's image is a handle into the toast that sent it — but the file the
+// capture wrote, which is a screenshot or a recording's frame the user kept.
+// It is still a path and can still be gone (moved, deleted, a frame cleaned
+// away), so this is a LIST to try in order, and the panel falls back to the
+// row's icon once it runs out. A recording's frame is the copy howler kept
+// first (Howler.keepFrame), then the recorder's own, which lasts until logout.
+function capturePictures(row) {
+  if (!row) return [];
+  const k = String(row.capture || "");
+  const fs = k === "shot" ? [row.captureFile]
+    : k === "video" ? [row.captureKept, row.capturePicture] : [];
+  const out = [];
+  for (let i = 0; i < fs.length; ++i) {
+    const f = String(fs[i] || "");
+    if (f.charAt(0) === "/") out.push("file://" + f);
+  }
+  return out;
+}
+
 // A body as StyledText may show it. A notification's body is whatever the
 // sender put there, and StyledText honours <img src=…> — a remote URL
 // included, which is a tracking pixel fetched the moment the toast draws.

@@ -507,6 +507,42 @@ Item {
               view.released();
             }
           }
+
+          // ── which side an app's page opens on ──────────────────────
+          // An app from both — Spotify from the AUR and from Flathub — has
+          // one card; this is which build its page shows first (user,
+          // 2026-10-15). What is installed always leads.
+          Item { width: 1; height: 8; visible: Ceres.deps.flatpak }
+          Text {
+            visible: Ceres.deps.flatpak
+            text: "Open apps on"
+            color: Zenon.muted
+            font.family: Zenon.face
+            font.weight: Font.Bold
+            font.pixelSize: Zenon.px(15)
+          }
+          Segments {
+            visible: Ceres.deps.flatpak
+            width: parent.width
+            even: true
+            strong: true
+            textSize: Zenon.px(16)
+            ink: Zenon.keyInk
+            options: [["native", "Arch and the AUR", "the system's own builds, first"],
+                      ["flatpak", "Flathub", "sandboxed builds, first, where there are"]]
+            current: Ceres.preferSource
+            onChose: (v) => { Ceres.setPreferSource(v); view.released(); }
+          }
+          Text {
+            visible: Ceres.deps.flatpak
+            width: parent.width
+            wrapMode: Text.Wrap
+            text: "For apps with both. Whichever you have installed opens first either way, and each app's page can switch."
+            color: Zenon.keyInk
+            font.family: Zenon.face
+            font.weight: Zenon.weight
+            font.pixelSize: Zenon.px(15)
+          }
         }
       }
     }

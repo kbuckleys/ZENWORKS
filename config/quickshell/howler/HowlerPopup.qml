@@ -461,14 +461,24 @@ LayerPopup {
             color: "transparent"
 
             Image {
+              id: shotImg
               anchors.fill: parent
               fillMode: Image.PreserveAspectCrop
               cache: true
               asynchronous: true
               sourceSize.width: 80
               sourceSize.height: 80
+              // A capture is its own picture, while the file is still there;
+              // each that will not load gives way to the next, and the last
+              // to the row's icon below.
+              readonly property var pictures: Wolf.capturePictures(row.modelData)
+              property int tried: 0
+              onStatusChanged: if (status === Image.Error
+                                   && tried < pictures.length
+                                   && source.toString() === pictures[tried]) tried++
               source: {
                 const r = row.modelData;
+                if (shotImg.tried < shotImg.pictures.length) return shotImg.pictures[shotImg.tried];
                 if (r.image && r.image !== "") return r.image;
                 if (r.appIcon && r.appIcon !== "")
                   return r.appIcon.indexOf("/") === 0

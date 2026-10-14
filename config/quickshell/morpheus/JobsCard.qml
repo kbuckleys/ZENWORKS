@@ -188,7 +188,7 @@ Rectangle {
             Text {
               id: jobDir
               visible: jobRowLabel.hasTo
-              text: "\uF07B"
+              text: jobRow.model.toGlyph || "\uF07B"
               rightPadding: 5
               color: jobRow.ended ? jobRow.ink : Zenon.cyan
               font.family: Zenon.face
