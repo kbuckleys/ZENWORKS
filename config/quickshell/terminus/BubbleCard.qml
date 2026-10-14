@@ -5,8 +5,7 @@
 //
 // A BUBBLE'S CARD — the speech bubble itself, wherever it is hung: its card,
 // its tail, its shadow, what is in it. terminus/Bubble hangs it in a popup
-// surface of its own beside a shell window; iris, which is not quickshell,
-// lays it over its page. Plain Qt Quick, so both can.
+// surface of its own beside a shell window. Plain Qt Quick.
 //
 // In the tooltip's own ground (Zenon.tipBg), border and glass rim. It fades
 // in with a small drop (`shade`, 0 → 1), as a card does.

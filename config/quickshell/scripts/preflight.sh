@@ -49,17 +49,13 @@ echo "── calypso core"
 out=$(python3 "$root/oracle/tests/calypso-core.py" 2>&1) || fail=1
 printf '%s\n' "$out" | grep -vE '^  ok ' || true
 
-echo "── iris core"
-out=$(python3 "$root/oracle/tests/iris-core.py" 2>&1) || fail=1
-printf '%s\n' "$out" | grep -vE '^  ok ' || true
-
 echo "── compiling every .qml"
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 # Singletons first: compiled after a file that already pulled one in as a
 # singleton type, Qt intermittently refuses the file itself ("pragma Singleton
 # used with a non composite singleton type", seen for howler/Howler.qml).
-all=$(cd "$root" && find . -name '*.qml' -not -path './oracle/qmltests/*' -not \( -path './iris/*' -not -path './iris/shell/*' \) -not -name 'shell.qml' \
+all=$(cd "$root" && find . -name '*.qml' -not -path './oracle/qmltests/*' -not -name 'shell.qml' \
        | sed 's#^\./##' | sort)
 single=$(cd "$root" && printf '%s\n' $all | while read -r f; do grep -q '^pragma Singleton' "$f" && echo "$f"; done)
 printf '%s\n' $single > "$tmp/singletons"
@@ -91,19 +87,11 @@ out=$(timeout 900 qs -p "$tmp/shell.qml" 2>&1 | grep 'PREFLIGHT' | sed 's/^.*PRE
 printf '%s\n' "$out"
 printf '%s' "$out" | grep -q ' 0 failed' || fail=1
 
-# IRIS IS NOT QUICKSHELL. Its window runs in its own PySide6 host, with its
-# own module (IrisHost) and its own view of morpheus (iris/core/toolkit.py),
-# so its files are compiled there, the way they are loaded — all but
-# iris/shell/, the part the shell loads, compiled above with the shell's.
-out=$(QT_QPA_PLATFORM=offscreen timeout 120 "$root/iris/bin/iris" --check 2>&1 | grep 'PREFLIGHT' | sed 's/^.*PREFLIGHT/ /')
-printf '%s\n' "$out"
-printf '%s' "$out" | grep -q ' 0 failed' || fail=1
-
 # 4. what the RUNNING shell has said since its last reload. Errors that only
 #    happen while things run (a null at startup, a recycled delegate) never
 #    reach a compile; they are only ever in this log, and only for windows
-#    that were open. The known noise is left out — iris closing its line to
-#    the shell (IrisManager's SocketServer) included: that is iris quitting.
+#    that were open. The known noise is left out — a socket's peer closing
+#    its line included: that is the other end quitting.
 echo "── the live shell's warnings since its last reload"
 qs log 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g' \
   | awk '/Reloading configuration/{buf=""} {buf=buf"\n"$0} END{print buf}' \

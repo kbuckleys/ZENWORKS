@@ -640,8 +640,6 @@ const APPS = {
   "delphi": "\uF419",
   // U+EB11, the password manager
   "calypso": "\uEB11",
-  // U+F0B95, the browser
-  "iris": "\uDB82\uDF95",
   // U+F114, the file manager \u2014 the glyph icarus' Files entry wears
   "terminus": "\uF114"
 };

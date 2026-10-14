@@ -506,39 +506,6 @@ Scope {
     return asked;
   }
 
-  // ── A NEW LOGIN, SUGGESTED (iris, 2026-10-12) ───────────────────────
-  // A sign-up or a change of password in iris: a password made here (the
-  // generator's own defaults), saved as a login for `site` — `username`
-  // from the form, `url` the page — in the first open account that can make
-  // logins, and only then typed where iris has put the cursor (and again
-  // after a Tab into the confirmation, when the form has one). The password
-  // goes nowhere but the vault and the field. Nothing open that can take it:
-  // Quick Access opens on the site to unlock, and nothing is made.
-  function suggest(site, url, username, twice) {
-    const acct = mgr.accounts.find((a) => (mgr.states[a.id] || {}).unlocked
-      && C.canCreate(mgr.platformInfo(a.kind), "login"));
-    if (!acct) {
-      if (mgr.quick) mgr.quick.openFor(site);
-      mgr.tell("Unlock an account that can keep logins, then ask again", true);
-      return;
-    }
-    mgr.call("generate", null, { opts: {} }, (ok, made, err) => {
-      if (!ok) { mgr.tell("No password made: " + err, true); return; }
-      const draft = { kind: "login", title: site || "Login", folder: "", fav: false, notes: "", tags: [],
-                      fields: { username: username || null, password: made.value },
-                      urls: url ? [url] : [], custom: [] };
-      mgr.save(acct, null, draft, (saved, res, err2) => {
-        // never typed unless it is kept: a password nobody can look up
-        // again is a locked door
-        if (!saved) { mgr.tell("The login was not saved, so nothing was filled in: " + err2, true); return; }
-        mgr.call("typeText", null, { parts: twice ? [made.value, "\t", made.value] : [made.value] }, (typed, r, err3) => {
-          mgr.tell(typed ? "Saved a new login for " + (site || "this site") + " in " + (acct.name || acct.kind)
-                         : "Saved a new login for " + (site || "this site") + ", but typing it failed: " + err3, !typed);
-        });
-      });
-    });
-  }
-
   // ── SAYING HOW SOMETHING ENDED ─────────────────────────────────────
   function tell(text, bad) {
     if (mgr.win && mgr.win.visible) { mgr.win.say(text, bad); return; }

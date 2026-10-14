@@ -103,6 +103,7 @@ Item {
       // results while one is up, so this is all it takes to bring it back.
       search: term.searchMode === "" ? null : {
         mode: term.searchMode, query: term.searchQuery, coll: term.collOpenId,
+        spec: term.searchSpec, scratch: term.scratchOpen ? term.scratchColl : null,
         backCwd: term.searchBackCwd, backSel: term.searchBackSel,
         backView: term.searchBackView
       }
@@ -119,6 +120,10 @@ Item {
     term.searchBackCwd = s ? s.backCwd : "";
     term.searchBackSel = s ? s.backSel : "";
     term.searchBackView = s ? s.backView : null;
+    term.searchSpec = s && s.spec ? s.spec : null;
+    // an unsaved search's collection is the tab's too: two results tabs
+    // each keep the question they were asked
+    if (s && s.scratch) term.scratchColl = s.scratch;
   }
   // Put a saved tab back on screen. `otherRaw` travels with it so stepping
   // between tabs does not re-list a directory that was already listed —

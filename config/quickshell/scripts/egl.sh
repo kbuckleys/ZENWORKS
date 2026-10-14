@@ -3,8 +3,7 @@
 # └─┘└─┘┘└┘└┴┘└─┘┴└─┴ ┴└─┘
 # https://github.com/kbuckleys/
 #
-# SOURCED, NOT RUN — by scripts/launch.sh (the shell) and iris/bin/iris (the
-# browser, its own process), so the two decide the GL vendor one way.
+# SOURCED, NOT RUN — by scripts/launch.sh (the shell).
 #
 # NVIDIA's EGL only, ONLY ON A MACHINE THAT IS ALL NVIDIA. glvnd otherwise
 # loads Mesa's EGL as well, and Mesa brings its gallium/LLVM rasteriser into

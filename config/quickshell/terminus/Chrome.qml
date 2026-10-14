@@ -32,6 +32,7 @@ Column {
   // the terminus window (`term`, never `root` — see terminus-split notes)
   property var term: null
   readonly property alias gridA: gridA
+  readonly property alias searchBar: searchBar
   readonly property alias jobsToggle: jobsToggle
   readonly property alias gridB: gridB
   readonly property alias listA: listA
@@ -414,7 +415,16 @@ Column {
             width: Math.min(parent.width * 0.8, parent.width - 16)
             horizontalAlignment: Text.AlignHCenter
             elide: Text.ElideMiddle
-            text: Terminus.basename(term.shownPath(here ? term.cwd : modelData.cwd))
+            // A SEARCH'S TAB IS NAMED FOR THE SEARCH, as Finder names its
+            // window — "fx" twice across the strip said nothing about which
+            // one held the results (2026-10-13). The magnifier, as the crumb
+            // chip wears it.
+            text: {
+              const sr = here ? (term.searchPage ? term.searchSpec : null)
+                : (modelData.search && modelData.search.spec ? modelData.search.spec : null);
+              if (sr && sr.query !== "") return "\uF002  " + sr.query;
+              return Terminus.basename(term.shownPath(here ? term.cwd : modelData.cwd));
+            }
             // The active crumb's ink. The tab and the last path segment
             // are the same claim made twice — this is where you are — and
             // they were two different greys saying it.
@@ -1674,6 +1684,13 @@ Column {
   // Only the list view has columns to name. The miller layout's panes are
   // one column each and the grid has none, so the strip collapses rather
   // than standing there labelling nothing.
+  // ── A SEARCH'S OWN BAR, on its results tab — see SearchBar.qml ──
+  SearchBar {
+    id: searchBar
+    term: chrome.term
+    width: parent.width
+  }
+
   Rectangle {
     id: colHeads
     width: parent.width
@@ -1719,7 +1736,7 @@ Column {
     id: bodyRow
     width: parent.width
     height: parent.height - tabStrip.height - crumbBar.height
-      - colHeads.height - portalBar.height
+      - searchBar.height - colHeads.height - portalBar.height
 
     // NOT BLURRED behind a card any more: the window is darkened
     // instead — see root.cardScrim, which every card's overlay wears.

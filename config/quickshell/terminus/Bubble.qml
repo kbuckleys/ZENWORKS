@@ -16,8 +16,7 @@
 // Its own popup surface, placed against the target as morpheus/WindowTip
 // places a tooltip — so the compositor frosts it, and it may hang past the
 // window's edge, sliding along it rather than being cut. What is drawn —
-// card, tail, shadow, rim — is terminus/BubbleCard, which iris (not
-// quickshell, so no popup surfaces) lays over its page instead; this file
+// card, tail, shadow, rim — is terminus/BubbleCard; this file
 // is where the card hangs and where its tail points.
 //
 // `sticky`: the pointer may go from the target onto the bubble and stay —

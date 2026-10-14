@@ -7,7 +7,7 @@
 # THE ONE WAY THIS SHELL IS STARTED — autostart, oracle's Restart, icarus'
 # restart. Arguments go straight to qs (-n, -d).
 #
-# The GL vendor: scripts/egl.sh, shared with iris.
+# The GL vendor: scripts/egl.sh.
 . "$(dirname "$(readlink -f "$0")")/egl.sh"
 
 # NO MALLOC_ARENA_MAX. It was here, measured as saving RAM — but quickshell is

@@ -1582,6 +1582,16 @@ FloatingWindow {
   property var scratchColl: null
   // What the search sheet last ran, so `s` over its results reopens on it.
   property var lastSearch: null
+  // ── WHAT THIS TAB'S SEARCH ASKED, FOR ITS BAR ────────────────────────
+  // { kind, query, root, rules } — what the results page's own bar (terminus/
+  // SearchBar) shows and re-runs when you change the scope or the kind.
+  // Per tab: it travels in the tab's search record (see Tabs.tabState).
+  property var searchSpec: null
+  // Whether the page on screen is a search's results (a find, a grep, or a
+  // refined search running as an unsaved collection).
+  readonly property bool searchPage: (root.searchMode === "find"
+    || root.searchMode === "grep" || root.scratchOpen) && !!root.searchSpec
+  function respec(change) { return searching.respec(change); }
   readonly property bool scratchOpen: root.searchMode === "collection"
     && !!root.scratchColl && root.collOpenId === root.scratchColl.id
 
@@ -6190,7 +6200,7 @@ FloatingWindow {
     // a dialog, and the listing behind it stays as usable as it was.
     //
     // IN A BUBBLE (user, 2026-10-13), the suite's hover card with its tail
-    // on the glyph — terminus/Bubble, as iris hangs its downloads. Sticky:
+    // on the glyph — terminus/Bubble. Sticky:
     // the pointer may cross onto it and stay, to press a row's ×. The card
     // is morpheus' JobsCard, bare (the bubble is its ground and border).
     Bubble {

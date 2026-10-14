@@ -16,11 +16,11 @@ Rectangle {
   // Whether the pointer is on the card — the drawer and the bar panel each
   // keep themselves open while it is.
   readonly property bool hovered: cardHov.hovered
-  // whose jobs: the shell's (Jobs) unless handed others — iris' downloads,
-  // a JobsBase of its own (morpheus/jobs)
+  // whose jobs: the shell's (Jobs) unless handed others — a JobsBase
+  // of its own (morpheus/jobs)
   property var jobs: Jobs
   // the rows alone, for a card that already has its ground and border
-  // (iris lays them in a bubble, terminus/BubbleSurface)
+  // (a bubble, terminus/Bubble)
   property bool bare: false
   // what one and several are called in its head
   property var nouns: ["operation", "operations"]

@@ -6,8 +6,7 @@
 // THE JOBS' GLYPH — the drawer's handle in a bar: there only while there is
 // work, glowing as it starts, breathing while it runs, bursting green when
 // the last lands (red on a fault), with a count once there are two. Lifted
-// out of terminus' path bar (Chrome.qml, 2026-10-13) for iris' downloads,
-// which hang the same drawer from it. The holder opens its drawer on
+// out of terminus' path bar (Chrome.qml, 2026-10-13). The holder opens its drawer on
 // `hovered` and puts it away on `emptied`.
 //
 //     JobsGlyph { jobs: myJobs        // a JobsBase; the shell's Jobs by default
@@ -24,7 +23,7 @@ import "../morpheus"
 
 Item {
   id: jobsToggle
-  // whose jobs: the shell's unless handed others (iris' downloads)
+  // whose jobs: the shell's unless handed others
   property var jobs: Jobs
   // the glyph's size
   property int size: Zenon.px(15)

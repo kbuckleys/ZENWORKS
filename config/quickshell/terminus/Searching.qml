@@ -166,6 +166,33 @@ Item {
       }
     }
   }
+  // ── THE RESULTS BAR CHANGED THE QUESTION ──────────────────────────────
+  // Scope or kind (terminus/SearchBar), merged over the tab's spec and run
+  // again in this tab. The same fork the search sheet takes (collEdit.
+  // runSearch): a bare query over this directory is the plain find or rg,
+  // anything else — another root, refinements — runs as an unsaved
+  // collection.
+  function respec(change) {
+    if (!term.searchSpec) return;
+    const s = Object.assign({}, term.searchSpec, change);
+    term.searchSpec = s;
+    term.lastSearch = { kind: s.kind, query: s.query, root: s.root, rules: s.rules || [] };
+    const where = Coll.expandHome(String(s.root || "").trim(), Paths.home());
+    term.cancelCollection();
+    if ((s.rules || []).length === 0 && s.query !== ""
+        && (where === "" || where === term.cwd)) {
+      term.search(s.kind, s.query);
+      return;
+    }
+    const d = Coll.blank(Date.now());
+    d.root = where === "" ? term.cwd : where;
+    d.rules = [];
+    if (s.query !== "") d.rules.push(s.kind === "grep"
+      ? { kind: "content", op: "text", value: s.query }
+      : { kind: "name", op: "contains", value: s.query });
+    for (const r of (s.rules || [])) d.rules.push({ kind: r.kind, op: r.op, value: r.value });
+    term.searchScratch(d, s.query);
+  }
   function search(mode, query) {
     if (query === "") return;
     // WHERE YOU WERE, so Escape can put you back there.

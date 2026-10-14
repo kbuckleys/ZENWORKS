@@ -10,10 +10,9 @@
 // offers first — some other Nerd Font, at another size and weight.
 //
 // So this writes one fontconfig rule, scoped to this process (fontconfig
-// knows it as "quickshell") and to iris, the suite's browser, which runs as a
-// process of its own named "iris" (iris/bin/iris) and draws the same icons —
-// nothing else on the desktop: after the family asked for, JetBrainsMono Nerd
-// Font Propo, before any other. Glyphs the chosen face has stay its own. Qt reads fontconfig once, at start, so
+// knows it as "quickshell") — nothing else on the desktop: after the family
+// asked for, JetBrainsMono Nerd Font Propo, before any other. Glyphs the
+// chosen face has stay its own. Qt reads fontconfig once, at start, so
 // the rule's first write counts from the next shell start; it is only ever
 // rewritten when its text changes.
 //
@@ -31,14 +30,10 @@ Item {
     "<!DOCTYPE fontconfig SYSTEM \"urn:fontconfig:fonts.dtd\">",
     "<!-- Written by quickshell (morpheus/GlyphFallback.qml): the shell's icons",
     "     come from JetBrainsMono Nerd Font whatever face its text is set in.",
-    "     Only the quickshell and iris processes are affected. -->",
+    "     Only the quickshell process is affected. -->",
     "<fontconfig>",
     "  <match target=\"pattern\">",
     "    <test name=\"prgname\"><string>quickshell</string></test>",
-    "    <edit name=\"family\" mode=\"append\" binding=\"strong\"><string>JetBrainsMono Nerd Font Propo</string></edit>",
-    "  </match>",
-    "  <match target=\"pattern\">",
-    "    <test name=\"prgname\"><string>iris</string></test>",
     "    <edit name=\"family\" mode=\"append\" binding=\"strong\"><string>JetBrainsMono Nerd Font Propo</string></edit>",
     "  </match>",
     "</fontconfig>",

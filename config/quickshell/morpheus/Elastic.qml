@@ -84,7 +84,7 @@ QtObject {
   // is no longer shown as the content sliding off its edge but as the
   // content STRETCHING from it, by `stretch` of the distance over the
   // view's length — at the band's cap (`reach`, 6% of the view), under 3%. The user's
-  // call (2026-10-12), first in iris, then here for every list.
+  // call (2026-10-12), for every list.
   //
   // Shown by the view itself, not by moving contentY differently: the
   // first time Elastic touches a view it gives the view's contentItem two
@@ -93,7 +93,7 @@ QtObject {
   // the same amount. So every path that moves the position past an edge
   // (the notch, the fingers, the coast's bounce, the settle back) stretches
   // the content, and nothing else had to change. A view without a
-  // contentItem (iris' web page) does its own, from this same number.
+  // contentItem does its own, from this same number.
   readonly property real stretch: 0.45
   readonly property Component _stretcher: Component {
     id: stretcher

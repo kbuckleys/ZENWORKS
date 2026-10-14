@@ -88,7 +88,7 @@ MouseArea {
   // ── NO POINTER SHAPE OF ITS OWN ───────────────────────────────────────
   // A MouseArea is born carrying the arrow, and Qt Quick shows the shape of
   // the topmost item that has one, so this overlay hid every cursorShape
-  // underneath: a row's hand, a field's I-beam (found in iris, 2026-10-13).
+  // underneath: a row's hand, a field's I-beam (2026-10-13).
   // undefined is the property's reset, QQuickItem::unsetCursor, and the
   // shape falls through to whatever is under the pointer again.
   //

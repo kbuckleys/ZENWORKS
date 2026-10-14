@@ -29,8 +29,8 @@
 #
 # WHAT IS MISSING IS INSTALLED (user, 2026-10-13): the packages the published
 # installer lists that this machine lacks, and what ZENWORKS builds itself
-# (quickshell/pkgbuilds/<name> — New York, whose AUR recipe is broken) that
-# is not installed. Not here — a job has no terminal for sudo — but by ceres,
+# (quickshell/pkgbuilds/<name>, for a package whose AUR recipe is broken —
+# none at present) that is not installed. Not here — a job has no terminal for sudo — but by ceres,
 # which asks for the password on its own card: this writes what is needed to
 # $XDG_RUNTIME_DIR/zenworks-update.json, and the shell (OracleManager) reads
 # it, removes it, and hands it to ceres. By hand, it is printed instead.

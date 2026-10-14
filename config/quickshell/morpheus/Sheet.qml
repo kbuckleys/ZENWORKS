@@ -271,8 +271,8 @@ Item {
       track: [well.x, well.y]
     }
 
-    // plain Qt Quick, not quickshell's ClippingRectangle: the same sheet
-    // loads in iris (clip/RoundClip.qml; pixel-checked against the old one)
+    // plain Qt Quick, not quickshell's ClippingRectangle (clip/RoundClip.qml;
+    // pixel-checked against the old one)
     RoundClip {
       id: sheetCard
       // ── ON WHOLE PIXELS ─────────────────────────────────────────────

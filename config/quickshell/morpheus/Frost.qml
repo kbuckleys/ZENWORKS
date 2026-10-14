@@ -90,12 +90,11 @@ Item {
   property int gain: 1
   property real fadeBottom: 0
   // ── WHAT IS JUST PAST IT, FOR WHAT CANNOT GO UNDER IT ─────────────────
-  // How far down the source to sample, past this rectangle. A web page
-  // cannot run on under iris' chrome (its fixed headers and full-height
-  // apps would sit behind the bar), so iris' chrome samples the band of page
-  // just below itself (shift = the chrome's height): the page drifts up
-  // through the glass as it scrolls (user, 2026-10-13). 0 for everything
-  // that really is under its bar.
+  // How far down the source to sample, past this rectangle. Content that
+  // cannot run on under its bar samples the band just below the bar
+  // (shift = the bar's height): it drifts up through the glass as it
+  // scrolls (user, 2026-10-13). 0 for everything that really is under its
+  // bar.
   property real sampleShift: 0
   readonly property bool masked: frost.radius > 0 || frost.fadeTop > 0 || frost.fadeBottom > 0
 

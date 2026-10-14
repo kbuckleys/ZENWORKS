@@ -29,8 +29,8 @@ Scope {
   // copies: its progress, a stop that kills it, the receipt when it lands.
   // Under setsid, as every job, so a stop takes its git and rsync with it.
   //
-  // WHAT IT FOUND MISSING, CERES INSTALLS (user, 2026-10-13: "automatically
-  // install missing fonts like new york"): the script leaves a one-shot note
+  // WHAT IT FOUND MISSING, CERES INSTALLS (user, 2026-10-13): the script
+  // leaves a one-shot note
   // ($XDG_RUNTIME_DIR/zenworks-update.json — the packages the published
   // installer lists that are not here, the pkgbuilds ZENWORKS builds itself
   // that are not installed), read and removed here once the job lands, and

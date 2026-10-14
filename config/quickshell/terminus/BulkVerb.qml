@@ -26,12 +26,12 @@ Rectangle {
   opacity: verb.dim ? 0.4 : 1
   Behavior on opacity { NumberAnimation { duration: Zenon.fast } }
   implicitWidth: verbText.implicitWidth + 18
-  implicitHeight: 24
+  implicitHeight: 26
   radius: Zenon.windowRadius
-  color: verb.on
-    ? Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b, 0.18)
-    : (verbHov.hovered ? Zenon.headBg
-       : Qt.rgba(Zenon.white.r, Zenon.white.g, Zenon.white.b, 0.05))
+  // No hover tint — the suite's buttons answer only at rest, lit and
+  // pressed (user, 2026-10-11); pressed is the wash Segments presses with.
+  color: verb.on ? Zenon.alpha(Zenon.cyan, 0.16)
+    : verbPress.pressed ? Zenon.wash(0.12) : Zenon.wash(0.04)
   border.width: 1
   border.color: verb.on ? Zenon.cyan : Zenon.border
   Behavior on color { ColorAnimation { duration: Zenon.fast } }
@@ -47,8 +47,8 @@ Rectangle {
     font.pixelSize: Zenon.px(13)
   }
 
-  HoverHandler { id: verbHov }
   MouseArea {
+    id: verbPress
     anchors.fill: parent
     onClicked: verb.clicked()
   }

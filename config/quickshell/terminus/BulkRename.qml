@@ -390,7 +390,7 @@ Rectangle {
     repeat: true
     property int tries: 0
     onTriggered: {
-      if (!bulk.open || modeDrop.focused
+      if (!bulk.open || bulk.ring()[1].focused
           || bulkClaim.tries++ > 12) {
         bulkClaim.stop();
         return;
@@ -402,7 +402,10 @@ Rectangle {
       // row one meant reaching for the mouse or tabbing backwards to use
       // it. Editing a single name by hand is what the in-place rename is
       // for; this card is open because the pattern is what you wanted.
-      modeDrop.claim();
+      // The mode's first FIELD, not the mode switch above it (a Segments
+      // since 2026-10-13): letters typed into a switch go nowhere, and
+      // the switch is one Shift-Tab away.
+      bulk.ring()[1].claim();
     }
   }
 

@@ -161,14 +161,6 @@ LayerPopup {
     if (popup.mgr) popup.mgr.release("quick");
   }
   function toggle() { if (popup.shown) popup.closePopup(); else popup.openPopup(); }
-  // open already searching for `text` — iris' fill (iris/shell/IrisManager):
-  // the site whose login form is in front of you, so its logins come first.
-  // Locked, the search waits behind the unlock.
-  function openFor(text) {
-    popup.openPopup();
-    popup.query = String(text || "");
-    filterInput.text = popup.query;
-  }
   function settleMode() {
     if (!popup.mgr || popup.mgr.accounts.length === 0) popup.mode = "empty";
     else if (!popup.mgr.anyOpen) popup.mode = "unlock";

@@ -6,14 +6,12 @@
 // JOBS, WITHOUT THE PROCESSES — the rows, their counts and how each one ends,
 // in plain Qt Quick: what the drawer (JobsCard) and its glyph (terminus/
 // JobsGlyph) read. Split out of the shell's Jobs singleton (2026-10-13), as
-// ZenonBase was out of Zenon, so iris — not quickshell, so no Process and no
-// singleton of the shell's — keeps its downloads in one of these and draws
-// them with the very same card and glyph.
+// ZenonBase was out of Zenon.
 //
 //   morpheus/Jobs.qml   = this + the processes it runs (rsync, archivers),
 //                          their progress lines and the toast when one lands
-//   iris/Downloads.qml  = one of these, its rows adopted (adopt / update /
-//                          exited), a drawer cancel coming back as cancelAsked
+//   a row run elsewhere  = adopted (adopt / update / exited), a drawer
+//                          cancel coming back as cancelAsked
 //
 // The rows are a ListModel, edited in place — see the note in Jobs.qml.
 

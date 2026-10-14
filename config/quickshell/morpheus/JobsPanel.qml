@@ -4,8 +4,8 @@
 // https://github.com/kbuckleys/
 //
 // The bar's view of the jobs: JobsCard, in the suite's bubble (terminus/
-// Bubble) with its tail on JobsModule, as terminus' drawer and iris'
-// downloads hang theirs (user, 2026-10-13). Sticky: held up while the
+// Bubble) with its tail on JobsModule, as terminus' drawer hangs its
+// own (user, 2026-10-13). Sticky: held up while the
 // pointer is on the module or crosses onto the card, with the bubble's own
 // grace for the gap. Standing on the bar when the bar is at the bottom.
 

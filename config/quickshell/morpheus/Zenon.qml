@@ -6,9 +6,7 @@
 //
 // THE SHELL'S ZENON: zenon/ZenonBase.qml — every token, colour and helper,
 // and the reasons for each — fed what only the shell has: Oracle's settings
-// and the worn theme file. Iris wears the same base in its own process, fed
-// the shell's snapshot of these inputs (ThemeSync), so nothing is computed
-// twice and the two cannot drift.
+// and the worn theme file.
 
 pragma Singleton
 

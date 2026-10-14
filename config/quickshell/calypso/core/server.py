@@ -204,7 +204,6 @@ class Server(lines.Service):
             return hand.copy(str(args.get("text") or ""), 0)
         if op == "typeText":
             # plain text, or `parts` — strings in order, "\t" alone the Tab key
-            # (iris' suggested password: the field, Tab, its confirmation)
             parts = args.get("parts")
             return hand.type_([str(p) for p in parts] if isinstance(parts, list)
                               else [str(args.get("text") or "")])

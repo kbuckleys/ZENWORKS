@@ -51,15 +51,10 @@ PACKAGES=(
   kitty zsh zoxide neovim git curl fastfetch stow
   # system & packages
   pacman-contrib expac gawk bandwhich iotop solaar glib2 gtk3 nodejs
-  # iris, the browser (its own PySide6 process, Qt WebEngine, the shield);
-  qt6-webengine python-adblock pyside6
-  # libva-nvidia-driver is its video decoding on NVIDIA, unused elsewhere
-  libva-nvidia-driver libva-utils
   # fonts
   noto-fonts noto-fonts-cjk noto-fonts-extra noto-fonts-emoji
   ttf-jetbrains-mono-nerd ttf-dseg unicode-emoji
   otf-san-francisco otf-san-francisco-mono
-  p7zip                     # to unpack Apple's New York download (quickshell/pkgbuilds)
 )
 
 # ── output ──────────────────────────────────────────────────────────────────
@@ -151,10 +146,8 @@ install_packages() {
 
 # The packages ZENWORKS builds itself (config/quickshell/pkgbuilds/<name>/
 # PKGBUILD — in the config, so the updater finds them too): ones whose
-# AUR recipe is broken. otf-new-york, Apple's serif: the AUR checksum is from
-# before Apple re-issued the download (2025-07), and the new image unpacks one
-# level deeper. Each is built in a scratch directory, never in the repo, and
-# skipped when already installed.
+# AUR recipe is broken; none at present. Each is built in a scratch
+# directory, never in the repo, and skipped when already installed.
 install_pkgbuilds() {
   local dir name tmp
   for dir in "$REPO"/config/quickshell/pkgbuilds/*/; do

@@ -5,9 +5,7 @@
 //
 // ZENON, WHEREVER IT IS HOSTED — every token, colour and helper the suite
 // draws with, needing nothing but QtQuick. morpheus/Zenon.qml is the shell's
-// singleton: this, fed Oracle's settings and the worn theme file. Iris, its
-// own process, wears the same base fed the live shell's snapshot of those
-// same inputs (ThemeSync writes it), so the two can never compute apart.
+// singleton: this, fed Oracle's settings and the worn theme file.
 //
 // `cfg` is where every setting comes from — Oracle in the shell. Nothing in
 // here reads Oracle, quickshell or a file itself.
@@ -16,18 +14,9 @@ import QtQuick
 
 QtObject {
   id: root
-  // the settings Zenon is made from: Oracle in the shell, the shell's
-  // snapshot of it in iris. Empty until handed one — every read falls back.
+  // the settings Zenon is made from: Oracle. Empty until handed one —
+  // every read falls back.
   property var cfg: ({})
-  // EVERY cfg key read below, and only those: what ThemeSync carries to iris.
-  // oracle/tests/zenon.js fails when a read is missing from this list.
-  readonly property var cfgKeys: [
-    "barBlur", "barGap", "barMaxWidth", "barOpacity", "barPadBar", "barPadModule",
-    "barPosition", "barRadius", "barScreenPad", "barSlot", "barTextSize",
-    "fontFamily", "fontSize", "fontWeight", "glassRim", "menuOpacity", "menuRadius",
-    "menuRowHeight", "menuWidth", "motionScale", "panelOpacity", "scrollbarAutohide",
-    "scrollFrost", "shadowStrength", "theme", "themeDay", "themeNight", "wallpaperTint"
-  ]
   // ── THEMES, AND WHY ZENON IS STILL THE ANSWER ────────────────────────
   // Every colour below is read through pick(): the theme Oracle names, if it
   // has that slot as a valid hex, and ZENON's own value otherwise. So Zenon

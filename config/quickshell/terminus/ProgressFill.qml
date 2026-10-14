@@ -4,7 +4,7 @@
 // https://github.com/kbuckleys/
 //
 // HOW FAR, AS A FILL — ceres' transaction band (lifted out of ceres/TxView,
-// 2026-10-13, for iris' address line), laid inside whatever shows it:
+// 2026-10-13), laid inside whatever shows it:
 //
 //     Rectangle { id: band; radius: 6; …
 //       ProgressFill { anchors.fill: parent; anchors.margins: 1; frac: 0.4
@@ -16,7 +16,7 @@
 // it stay the loudest thing there. The width eases as `frac` moves.
 //
 // `fades`: the fill goes (fades out) when `done` comes, rather than sitting
-// full — iris' page load, finished.
+// full.
 
 import QtQuick
 import "../morpheus"

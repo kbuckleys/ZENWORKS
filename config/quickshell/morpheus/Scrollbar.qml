@@ -47,7 +47,7 @@ Item {
 
   // the ListView, GridView or Flickable this reports on — or anything that
   // answers a Flickable's questions (contentY, contentHeight, height,
-  // moving, cancelFlick…): iris' web pages (iris/PageScroll.qml) wear it too
+  // moving, cancelFlick…)
   property var flick: null
   // false while its view is not the one on screen
   property bool on: true

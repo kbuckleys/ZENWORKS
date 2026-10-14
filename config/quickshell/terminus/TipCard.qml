@@ -4,8 +4,7 @@
 // https://github.com/kbuckleys/
 //
 // A TOOLTIP'S CARD — the label itself, wherever it hangs: morpheus/WindowTip
-// hangs it in a popup surface beside a shell window; iris, which is not
-// quickshell, lays it over its page for Chromium's own tooltips. Tooltip's
+// hangs it in a popup surface beside a shell window. Tooltip's
 // card, smaller, as a window's labels are. Here in terminus, beside
 // BubbleCard, for the same reason: a live reload finds a new file in a
 // directory without a qmldir (morpheus/tip/ importing its own parent did

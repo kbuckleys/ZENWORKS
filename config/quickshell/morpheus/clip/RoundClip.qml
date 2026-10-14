@@ -4,8 +4,7 @@
 // https://github.com/kbuckleys/
 //
 // A ROUNDED CLIP IN PLAIN QT QUICK — what quickshell's ClippingRectangle does,
-// without quickshell, so a part that needs one (Sheet) loads in iris as well
-// as in the shell. Same three layers as ClippingRectangle's shader:
+// without quickshell. Same three layers as ClippingRectangle's shader:
 //
 //   inside      the background, then the content over it, cut to the area
 //               inside the border (the border's inner edge, radius − width)

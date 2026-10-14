@@ -22,8 +22,7 @@
 //
 // A short wait before the first one, none between neighbours: running the
 // pointer along a toolbar reads each name as it passes, as it does anywhere.
-// Wears Tooltip's card, smaller, as a window's labels are (terminus/TipCard,
-// which iris lays over its page too).
+// Wears Tooltip's card, smaller, as a window's labels are (terminus/TipCard).
 
 import QtQuick
 import Quickshell

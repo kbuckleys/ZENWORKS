@@ -20,11 +20,10 @@
 // by nvim, and says so in the status line.
 //
 // Hidden while there is only one buffer: a single tab is just the window, and
-// a strip saying so is a strip of nothing — in iris as in plato.
+// a strip saying so is a strip of nothing.
 //
-// ALSO IRIS' TABS. Iris (its own process, not quickshell) hands this strip an
-// `ed` and a `client` of its own (iris/Tabs.qml): the same five things plato's
-// give it — `tabs`, `moveTab`, `tabOrderChanged`, `bufShow`, `bufClose`.
+// What it reads of plato: `tabs`, `moveTab`, `tabOrderChanged`, `bufShow`,
+// `bufClose`.
 
 import QtQuick
 import "../../morpheus"
@@ -252,7 +251,7 @@ Rectangle {
         // which one is in hand, no ground of its own
         color: Zenon.alpha(Zenon.tabAwayInk, 0)
         onHereChanged: if (here) tabStrip.hereCell = tabCell
-        // a tab's own hue (iris' cloak tabs: plato's visual-mode magenta,
+        // a tab's own hue (plato's visual-mode magenta,
         // as their bar wears it), over its glass; plato's tabs have none
         Rectangle {
           anchors.fill: parent
@@ -318,7 +317,7 @@ Rectangle {
             color: Zenon.sand
             anchors.verticalCenter: tabLabel.verticalCenter
           }
-          // still loading (iris' pages: a tab's optional `loading`): the
+          // still loading (a tab's optional `loading`): the
           // shell's three dots in the label's place, until it has
           Working {
             anchors.verticalCenter: parent.verticalCenter

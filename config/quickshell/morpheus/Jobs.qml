@@ -17,7 +17,7 @@
 // business — and hands the argv over. What happens after that is this file's:
 // the process, the progress, cancelling, the receipt, the notification.
 //
-// A JOB SOMETHING ELSE RUNS (iris' downloads, 2026-10-12): `adopt` makes the
+// A JOB SOMETHING ELSE RUNS (2026-10-12): `adopt` makes the
 // row without a process, the one running it reports through `update` and
 // `exited`, and a cancel from the drawer is handed back as `cancelAsked` —
 // the same drawer, receipt and notification as a copy.
@@ -31,8 +31,7 @@ import "../terminus/terminus.js" as Terminus
 import "jobs"
 
 // THE ROWS AND HOW THEY END are JobsBase's (morpheus/jobs, 2026-10-13) —
-// plain Qt Quick, so iris keeps its downloads in one and draws them with the
-// same card. This adds what only the shell has: the processes, their
+// plain Qt Quick. This adds what only the shell has: the processes, their
 // progress lines, killing them, and the toast when a long one lands.
 JobsBase {
   id: jobs

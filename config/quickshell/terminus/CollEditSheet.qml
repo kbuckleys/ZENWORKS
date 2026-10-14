@@ -238,13 +238,23 @@ Rectangle {
     const where = Coll.expandHome(collRoot.text.trim(), Paths.home());
     term.lastSearch = { kind: collEdit.searchKind, query: q,
                         root: collRoot.text, rules: extra };
+    const spec = { kind: collEdit.searchKind, query: q,
+                   root: where === "" ? term.cwd : where, rules: extra };
     const d = collEdit.draftNow();
     collEdit.dismiss();
-    if (extra.length === 0 && q !== "" && (where === "" || where === term.cwd)) {
-      term.search(collEdit.searchKind, q);
-      return;
-    }
-    term.searchScratch(d, q);
+    const plain = extra.length === 0 && q !== "" && (where === "" || where === term.cwd);
+    const run = () => {
+      term.searchSpec = spec;
+      if (plain) term.search(spec.kind, q);
+      else term.searchScratch(d, q);
+    };
+    // ── IN A TAB OF ITS OWN, LIKE FINDER'S (user, 2026-10-13) ────────
+    // A search is a place of its own with its own bar (SearchBar: where,
+    // names or contents, more rules, save), and the directory you asked
+    // from stays as it was in the tab you asked from. Refining from the
+    // results page itself — `s` over them, the bar's + — stays in it.
+    if (term.searchPage) run();
+    else term.openRealmInNewTab(run);
   }
 
   // "save as collection": the name row opens and takes the keyboard.

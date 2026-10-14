@@ -35,7 +35,6 @@ import "ceres"
 import "plato"
 import "alexandria"
 import "delphi"
-import "iris/shell"
 
 ShellRoot {
   id: root
@@ -100,9 +99,6 @@ ShellRoot {
   // Delphi; one backend, one way of asking for a password). Built on first
   // use; its backend runs only while something is using it.
   DelphiManager { id: delphi; fileManager: terminus; editor: plato }
-  // The browser, its own process: its .desktop entry and `qs ipc call Iris`
-  // (iris/shell/IrisManager; the browser itself is iris/bin/iris).
-  IrisManager { quick: calypso; vault: calypsoMgr }
   // a click on the bare desktop is a click away from terminus' menus
   Connections {
     target: icarusDesktop
