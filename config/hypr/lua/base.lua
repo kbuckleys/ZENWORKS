@@ -101,7 +101,7 @@ hl.config({
 			active_border = "#45505CCC",
 		},
 		gaps_out = 0,
-		gaps_in = -2,
+		gaps_in = 0,
 		snap = {
 			enabled = true,
             border_overlap = true,
