@@ -10,6 +10,7 @@ hl.window_rule({ match = { class = "org.quickshell", title = "oracle" },        
 hl.window_rule({ match = { class = "org.quickshell", title = "calypso" },           float = true, persistent_size = true })
 hl.window_rule({ match = { class = "org.quickshell", title = "terminus" },          float = true, persistent_size = true })
 hl.window_rule({ match = { class = "org.quickshell", title = "alexandria" },        float = true, persistent_size = true })
+hl.window_rule({ match = { class = "org.quickshell", title = "clio" },              float = true, persistent_size = true })
 hl.window_rule({ match = { class = "org.quickshell", title = "picasso-view" },      float = true, persistent_size = true })
 hl.window_rule({ match = { class = "org.quickshell", title = "plato-capture" },     float = true, persistent_size = true })
 hl.window_rule({ match = { class = "org.quickshell", title = "terminus-picker" },   float = true, persistent_size = true })

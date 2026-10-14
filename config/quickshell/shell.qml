@@ -83,6 +83,12 @@ ShellRoot {
   // nothing. A note has to be above the thing whose whole job is catching
   // what misses everything else.
   ClioBoard { }
+  // and the stickies pinned above windows, on the top layer
+  ClioBoard { above: true }
+  // and the notebook they belong to: Apple's Notes and Journal in a
+  // window, the stickies its Desktop folder. Built on first use, like
+  // plato; until then an ipc handler (Clio's own) and a reminder clock.
+  ClioManager { id: clioApp; fileManager: terminus; fontBook: alexandria }
 
   // The file manager. NOT in the morph ring and not in the height switch
   // below: it is a real xdg-toplevel, so hyprland owns its size and position

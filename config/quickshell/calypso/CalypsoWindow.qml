@@ -283,6 +283,7 @@ FloatingWindow {
     win.code = null;
     win.detail = null;
     win.lastKey = "";
+    detailPane.drop();
   }
   Connections {
     target: win.mgr
@@ -776,13 +777,15 @@ FloatingWindow {
   // the account the lock pane is for: the one in view if it is locked; with
   // every account locked, the one chosen on its switch (else the first)
   property string lockTarget: ""
-  readonly property var lockedAccts: win.mgr ? win.mgr.accounts.filter((a) => !(win.mgr.states[a.id] || {}).unlocked) : []
-  readonly property bool noneOpen: !!win.mgr && win.mgr.accounts.length > 0 && !win.mgr.anyOpen
+  // (an account the daemon has not answered for yet is not locked: see
+  // CalypsoManager.isLocked)
+  readonly property var lockedAccts: win.mgr ? win.mgr.accounts.filter((a) => win.mgr.isLocked(a)) : []
+  readonly property bool noneOpen: !!win.mgr && win.mgr.accounts.length > 0 && !win.mgr.anyOpen && !win.mgr.checking
   readonly property var lockAcct: {
     if (!win.mgr) return null;
     if (win.scope.acct) {
       const a = win.mgr.accountOf(win.scope.acct);
-      return a && !(win.mgr.states[a.id] || {}).unlocked ? a : null;
+      return a && win.mgr.isLocked(a) ? a : null;
     }
     if (!win.noneOpen) return null;
     return win.lockedAccts.find((a) => a.id === win.lockTarget) || win.lockedAccts[0] || null;

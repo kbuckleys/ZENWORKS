@@ -86,7 +86,7 @@ PlatoSheet {
       : page === "updates" || (page === undefined && panel.report.updates.length > 0)
       ? "updates" : "installed";
     panel.parserFilter = "";
-    field.text = "";
+    filterField.text = "";
     if (panel.page === "parsers" && panel.plugins) panel.plugins.listParsers(panel.filetype);
     panel.sel = 0;
     panel.expanded = ({});
@@ -101,10 +101,10 @@ PlatoSheet {
   // keep their letters.
   readonly property bool filtering: panel.page === "parsers"
   function focusPage() {
-    if (panel.filtering) field.forceActiveFocus(); else keys.forceActiveFocus();
+    if (panel.filtering) filterField.forceActiveFocus(); else keys.forceActiveFocus();
   }
   onPageChanged: {
-    if (!panel.filtering) { panel.parserFilter = ""; field.text = ""; }
+    if (!panel.filtering) { panel.parserFilter = ""; filterField.text = ""; }
     if (panel.shown) panel.focusPage();
   }
   function close() {
@@ -177,12 +177,12 @@ PlatoSheet {
     });
   }
   function submitAdd() {
-    const text = field.text;
+    const text = filterField.text;
     const err = panel.plugins ? panel.plugins.install(text) : "";
     panel.problem = err;
     if (err !== "") return;
     panel.adding = false;
-    field.text = "";
+    filterField.text = "";
     keys.forceActiveFocus();
     // to the new one, at the end of the list
     Qt.callLater(() => { panel.sel = Math.max(0, panel.rows.length - 1); });
@@ -418,7 +418,7 @@ PlatoSheet {
     border.width: 1
     border.color: Zenon.border
     TextInput {
-      id: field
+      id: filterField
       anchors.fill: parent
       anchors.leftMargin: 12
       anchors.rightMargin: 12
@@ -426,7 +426,7 @@ PlatoSheet {
       font: panel.face
       color: Zenon.white
       selectionColor: Qt.rgba(Zenon.magenta.r, Zenon.magenta.g, Zenon.magenta.b, 0.5)
-      cursorDelegate: Caret { field: field }
+      cursorDelegate: Caret { field: filterField }
       clip: true
       Keys.onPressed: (event) => {
         if (panel.filtering) { panel.parserKey(event); return; }
@@ -438,11 +438,11 @@ PlatoSheet {
       }
       onTextChanged: {
         panel.problem = "";
-        if (panel.filtering) { panel.parserFilter = field.text.trim().toLowerCase(); panel.sel = 0; }
+        if (panel.filtering) { panel.parserFilter = filterField.text.trim().toLowerCase(); panel.sel = 0; }
       }
     }
     Text {
-      visible: field.text === ""
+      visible: filterField.text === ""
       anchors.verticalCenter: parent.verticalCenter
       x: 12
       font: panel.face
@@ -451,7 +451,7 @@ PlatoSheet {
     }
     // focused for typing: terminus' held ring (user, 2026-10-11 — every
     // text field wears it, its own border staying neutral)
-    HeldRing { anchors.fill: parent; radius: parent.radius; z: 10; on: field.activeFocus }
+    HeldRing { anchors.fill: parent; radius: parent.radius; z: 10; on: filterField.activeFocus }
   }
 
 
@@ -466,7 +466,7 @@ PlatoSheet {
     event.accepted = true;
     if (!(ctrl && k === Qt.Key_D)) panel.armed = "";
     if (k === Qt.Key_Escape) {
-      if (field.text !== "") field.text = ""; else panel.close();
+      if (filterField.text !== "") filterField.text = ""; else panel.close();
     } else if (k === Qt.Key_Tab || k === Qt.Key_Backtab) {
       panel.page = k === Qt.Key_Backtab ? "updates" : "installed";
       panel.sel = 0;
@@ -511,15 +511,15 @@ PlatoSheet {
       if (t === "g") { panel.sel = 0; return; }
       if (t === "G") { panel.sel = Math.max(0, n - 1); return; }
 
-      if (panel.filtering) { field.forceActiveFocus(); return; }
+      if (panel.filtering) { filterField.forceActiveFocus(); return; }
 
       if (panel.page === "installed") {
         const p = panel.selInstalled();
         if (t === "a" && !panel.busy) {
           panel.adding = true;
           panel.problem = "";
-          field.text = "";
-          field.forceActiveFocus();
+          filterField.text = "";
+          filterField.forceActiveFocus();
         }
         else if (k === Qt.Key_Space && p) panel.plugins.setEnabled(p.name, !p.enabled);
         else if ((t === "c" || k === Qt.Key_Return || k === Qt.Key_Enter) && p) panel.configureSel();

@@ -696,6 +696,7 @@ LayerPopup {
           }
 
           NerdPreview {
+            id: nerdPreview
             visible: popup.previewW > 0
             anchors.right: parent.right
             anchors.top: parent.top
@@ -856,7 +857,11 @@ LayerPopup {
     // at the size it is going to keep.
     if (popup.entries.length === 0) return maxRows * rowH;
     const rows = Math.ceil(popup.filtered.length / cols());
-    return Math.max(1, Math.min(rows, maxRows)) * rowH;
+    const h = Math.max(1, Math.min(rows, maxRows)) * rowH;
+    // A filter down to a row or two would squash the nerd preview beside
+    // it; the grid is held open to what the pane needs while it has a glyph.
+    return popup.previewW > 0 && popup.filtered.length > 0
+      ? Math.max(h, nerdPreview.needH) : h;
   }
 
   function calcHeight() {

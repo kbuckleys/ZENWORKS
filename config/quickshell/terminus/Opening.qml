@@ -446,7 +446,7 @@ Item {
     out.push({ sep: true });
     out.push({ label: term.isBookmarked(path) ? "Remove bookmark" : "Bookmark",
                act: () => term.toggleBookmarkFor(path) });
-    out.push({ label: "Open a shell here",
+    out.push({ label: "Open terminal here",
                act: () => term.run(Terminus.shellCommand(path, term.termCmd)) });
     term.menuPopRef.menu.openCustom(item, { x: x, y: y }, out, false);
     term.sideMenuAt = item;

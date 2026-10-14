@@ -198,9 +198,23 @@ FloatingWindow {
   readonly property int rowH: Math.round(180 * win.gzoomLaid)
   readonly property int galleryGap: 10
   readonly property int sectionH: 30
+  // ── THE GALLERY KEEPS ITS WIDTH WHILE A PICTURE IS SHOWN (2026-10-14) ──
+  // Every fullscreen toggle stalled the window 300–1000 ms (user's
+  // picasso-lag capture; lag.log): the hidden gallery re-laid every row at
+  // the new width and its pool of tiles was made again — the Repeater's
+  // model is a number, which a change rebuilds whole. The layout follows the
+  // grid only while the gallery is in sight, and catches up on the way back
+  // (onModeChanged, before the flight looks for its tile).
+  property real layW: 1
+  readonly property bool gallerySeen: win.mode === "gallery" || galleryOut.running
+  function layCatchUp() {
+    if (win.layW !== grid.width) win.layW = grid.width;
+    grid.sizePool();
+  }
+  onGallerySeenChanged: if (win.gallerySeen) win.layCatchUp()
   readonly property var glay: !win.shapesReady ? ({ rects: [], lines: [], height: 0 })
     : V.justifyLayout(win.galleryItems, win.layout.chips, win.shapeOf, {
-    width: Math.max(1, grid.width), rowH: win.rowH, gap: win.galleryGap,
+    width: Math.max(1, win.layW), rowH: win.rowH, gap: win.galleryGap,
     dirRatio: 1.5, guess: 1.5, headH: win.sectionH })
   // reading shapes for the stills that have none yet (or have changed)
   property bool shapesBusy: false
@@ -2733,6 +2747,7 @@ FloatingWindow {
   onModeChanged: {
     const was = win.lastMode;
     win.lastMode = win.mode;
+    if (win.mode === "gallery") win.layCatchUp();
     if (was === "gallery" && win.mode === "view") win.flyIn();
     else if (was === "view" && win.mode === "gallery") win.flyOut();
     if (win.mode !== "view" && win.full) win.full = false;
@@ -4247,6 +4262,8 @@ FloatingWindow {
       property int pool: 0
       function sizePool() {
         if (win.glay.lines.length === 0 && win.galleryItems.length > 0) return;
+        // hidden, the pool keeps its size — see layW
+        if (!win.gallerySeen && grid.pool > 0) return;
         grid.pool = Math.min(win.galleryItems.length,
           V.poolSize(win.glay, grid.height + 2 * grid.buffer) + 24);
       }
@@ -4255,6 +4272,7 @@ FloatingWindow {
         function onGlayChanged() { grid.sizePool(); }
       }
       onHeightChanged: grid.sizePool()
+      onWidthChanged: if (win.gallerySeen || win.layW <= 1) win.layW = grid.width
       // slot s stands for the item at or after firstShown that it is due
       function giOf(s) {
         const P = grid.pool, g0 = grid.firstShown;
@@ -4672,6 +4690,8 @@ FloatingWindow {
     }
 
     SelectCell { view: grid; index: win.gidx
+      // the accent: only its rim shows round a full-bleed tile
+      ink: Zenon.cyan
       // not while the tiles are scaled between two layouts (see zoomK)
       on: win.mode === "gallery" && Math.abs(win.zoomK - 1) < 0.001
       // the tile's own place, a little out from it, as the rows are justified

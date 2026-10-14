@@ -101,7 +101,9 @@ function sane(n, id) {
     size: migrateSize(n.size, n.sv),
     sv: SIZE_VERSION,
     face: String(n.face || ""),
-    z: Math.round(Number(n.z) || 0)
+    z: Math.round(Number(n.z) || 0),
+    // pinned above windows: drawn on the board in the top layer (ClioBoard)
+    above: !!n.above
   };
 }
 

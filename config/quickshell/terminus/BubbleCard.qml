@@ -8,7 +8,7 @@
 // surface of its own beside a shell window. Plain Qt Quick.
 //
 // In the tooltip's own ground (Zenon.tipBg), border and glass rim. It fades
-// in with a small drop (`shade`, 0 → 1), as a card does.
+// in (`shade`, 0 → 1) and expands out of its tail with a spring.
 //
 // The card and its tail are ONE outline (a Canvas path), filled and drawn
 // once: a tail laid over a bordered card left the card's border running
@@ -72,29 +72,79 @@ Item {
   implicitHeight: face.padTop + face.tail + card.height + face.pad
   // where the tail's point is, in this item's y
   readonly property real tipY: face.up ? card.y + card.height + face.tail : face.padTop
-  opacity: face.shade
-  // ── A QUICK, BOUNCY POP (user, 2026-10-13) ───────────────────────────
-  // Opening, it springs out from its tail's point — a little past full size
-  // and back (a back-out curve over the holder's fade); closing, it simply
-  // shrinks away. `opening` is which way the fade is going.
+  // the glass comes up fast, so the spring is what is seen; going, it
+  // stays until the spring has nearly drawn it back into the tail
+  opacity: face.opening ? Math.min(1, face.shade * 1.8) : Math.min(1, Math.max(0, face.grow) * 2.5)
+  // ── IT EXPANDS OUT OF ITS TAIL, WITH A SPRING (user, 2026-10-14) ──────
+  // macOS' popovers: from about a third of its size at the tail's point to
+  // a little past full and back, on its own clock rather than the fade's.
+  // Closing is the same spring played backwards: a swell, then drawn back
+  // into the tail (InBack is OutBack reversed in time). `opening` is which
+  // way the holder's fade is going; `grow` 0 → 1 is the size, and the
+  // bubble is up while either is (Bubble.visible).
+  //
+  // ONE AFTER ANOTHER, NO SPRING (user, 2026-10-14). Going waits a moment
+  // (collapseSoon) before it starts: asked back in that time — ceres'
+  // package peek, the pointer going down the names — it was never gone, so
+  // it neither shrinks nor springs again, only moves to what it is about.
   property bool opening: true
   property real lastShade: 0
+  property real grow: 0
+  property real heldH: 0
+  readonly property int springTime: 300
   onShadeChanged: {
+    const wasShut = face.lastShade <= 0.001;
+    // the size it leaves at, taken before `opening` turns and holds it
+    if (face.opening && face.shade < face.lastShade) face.heldH = card.height;
     face.opening = face.shade >= face.lastShade;
     face.lastShade = face.shade;
-    // (and the fit, measured again as it comes up — see THE FIT)
-    if (face.shade > 0 && face.shade < 0.2) face.refit();
+    if (face.opening) collapseSoon.stop();
+    if (face.opening && face.shade > 0 && (wasShut || growOut.running || !growIn.running && face.grow < 1)) {
+      growOut.stop();
+      growIn.from = Math.max(0, face.grow);
+      growIn.restart();
+      // the fit, measured again as it comes up (never going: a card that
+      // changed size as it left was drawn a frame without its outline,
+      // what was in it floating) — see THE FIT
+      if (face.shade < 0.2) face.refit();
+    } else if (!face.opening && !growOut.running && !collapseSoon.running && face.grow > 0) {
+      collapseSoon.restart();
+    }
   }
-  function backOut(t) {
-    const c1 = 2.4, c3 = c1 + 1, u = t - 1;
-    return 1 + c3 * u * u * u + c1 * u * u;
+  Timer {
+    id: collapseSoon
+    interval: 160
+    onTriggered: {
+      if (face.opening || face.grow <= 0) return;
+      growIn.stop();
+      growOut.from = Math.min(1, face.grow);
+      growOut.restart();
+    }
   }
-  readonly property real pop: face.opening ? face.backOut(Math.max(0, Math.min(1, face.shade))) : face.shade
+  NumberAnimation {
+    id: growIn
+    target: face
+    property: "grow"
+    to: 1
+    duration: face.springTime
+    easing.type: Easing.OutBack
+    easing.overshoot: 2.2
+  }
+  NumberAnimation {
+    id: growOut
+    target: face
+    property: "grow"
+    to: 0
+    duration: face.springTime
+    easing.type: Easing.InBack
+    easing.overshoot: 2.2
+  }
+  readonly property real pop: Math.max(0, face.grow)
   transform: Scale {
     origin.x: face.tailX
     origin.y: face.tipY
-    xScale: 0.8 + 0.2 * face.pop
-    yScale: 0.8 + 0.2 * face.pop
+    xScale: 0.35 + 0.65 * face.pop
+    yScale: 0.35 + 0.65 * face.pop
   }
   // ── THE CARD BEFORE WHAT IS IN IT ────────────────────────────────────
   // The outline is a Canvas, painted a frame after it is asked: what is in
@@ -109,7 +159,7 @@ Item {
   // and the shadow's hole share it)
   function trace(c) {
     const x = card.x + 0.5, y = card.y + 0.5, w = card.width - 1, h = card.height - 1;
-    const r = Math.min(card.radius, h / 2), t = face.tail, tx = Math.round(face.tailX) + 0.5;
+    const r = Math.max(0, Math.min(card.radius, h / 2)), t = face.tail, tx = Math.round(face.tailX) + 0.5;
     c.beginPath();
     c.moveTo(x + r, y);
     if (!face.up) {
@@ -238,6 +288,8 @@ Item {
     return w;
   }
   function refit() {
+    // never while it goes (see the spring): it leaves at the size it had
+    if (!face.opening) return;
     let w = 0;
     for (let i = 0; i < col.children.length; i++)
       w = Math.max(w, face.natural(col.children[i]));
@@ -264,7 +316,9 @@ Item {
     x: face.pad
     y: face.up ? face.pad : face.padTop + face.tail
     width: face.fit ? face.fitWidth : face.cardWidth
-    height: col.implicitHeight + 24
+    // held as it was while it goes: a holder clearing what is in it as it
+    // shuts must not shrink the card under its own outline
+    height: face.opening ? col.implicitHeight + 24 : face.heldH
     readonly property real radius: Zenon.windowRadius
     // the pointer on it holds a sticky bubble up
     HoverHandler { id: overCard; enabled: face.sticky }
@@ -274,7 +328,9 @@ Item {
       y: 12
       width: card.width - 28
       spacing: 10
-      opacity: face.drawn ? 1 : 0
+      // waiting for the outline coming in; gone first going out, so the
+      // card draws back into its tail empty
+      opacity: !face.drawn ? 0 : face.opening ? 1 : Math.max(0, Math.min(1, (face.grow - 0.6) / 0.3))
     }
   }
 }

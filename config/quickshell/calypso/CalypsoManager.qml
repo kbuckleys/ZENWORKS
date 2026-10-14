@@ -217,19 +217,26 @@ Scope {
     }
     return out;
   }
-  readonly property bool loading: mgr.accounts.some((a) => (mgr.states[a.id] || {}).loading)
+  // NOT KNOWN YET IS NOT LOCKED (user, 2026-10-14): until the daemon has
+  // answered `status`, an account is neither — a vault the daemon kept open
+  // across a shell restart flashed the lock for the second bw takes to say
+  // so. `known` comes with the first answer; until then the window and Quick
+  // Access show the reading mark, never the password field.
+  function isLocked(a) { const st = mgr.states[a.id] || {}; return !!st.known && !st.unlocked; }
+  readonly property bool checking: mgr.accounts.some((a) => !(mgr.states[a.id] || {}).known)
+  readonly property bool loading: mgr.checking || mgr.accounts.some((a) => (mgr.states[a.id] || {}).loading)
 
   function refresh(acct, then) {
     if (!acct) return;
     mgr.setState(acct.id, { busy: true });
     mgr.call("status", acct, {}, (ok, st, err) => {
       if (!ok) {
-        mgr.setState(acct.id, { busy: false, unlocked: false, installed: !(err && err.kind === "missing"),
+        mgr.setState(acct.id, { busy: false, known: true, unlocked: false, installed: !(err && err.kind === "missing"),
                                 error: C.failWords(err) });
         if (then) then(false);
         return;
       }
-      mgr.setState(acct.id, Object.assign({ busy: false, error: "" }, st));
+      mgr.setState(acct.id, Object.assign({ busy: false, known: true, error: "" }, st));
       if (st.unlocked) mgr.loadItems(acct, then);
       else {
         mgr.dropItems(acct.id);

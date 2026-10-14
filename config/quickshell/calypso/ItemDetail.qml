@@ -26,8 +26,43 @@ import "calypso.js" as C
 Item {
   id: pane
   property var win: null
-  readonly property var it: win ? win.item : null
-  readonly property var d: win ? win.detail : null
+  readonly property var it: pane.holding ? pane.heldIt : (win ? win.item : null)
+  readonly property var d: pane.holding ? pane.heldD : (win ? win.detail : null)
+  // ── THE LAST ITEM STAYS UNTIL THE NEXT ONE IS IN (2026-10-14) ─────────
+  // Every new choice blanked the fields for a frame — the new name over the
+  // asking dots — before the daemon's answer came, a flicker on every click
+  // (user's flicker capture). The pane now keeps drawing the item it had,
+  // name and fields together, until the next one's detail is in (or
+  // holdCap: a slow vault shows the dots as before). The window's own
+  // item/detail move at once, so a key acts on the chosen item; the pane
+  // takes no clicks while it holds.
+  property var heldIt: null
+  property var heldD: null
+  property bool holding: false
+  property var lastIt: null
+  property var lastD: null
+  // the window forgot (an account locked, it hid): nothing to hold on to
+  function drop() { pane.lastIt = null; pane.lastD = null; pane.release(); }
+  function release() { holdCap.stop(); pane.holding = false; pane.heldIt = null; pane.heldD = null; }
+  Timer { id: holdCap; interval: 200; onTriggered: pane.release() }
+  Connections {
+    target: pane.win
+    function onDetailChanged() {
+      if (!pane.win.detail) return;
+      pane.lastIt = pane.win.item;
+      pane.lastD = pane.win.detail;
+      pane.release();
+    }
+    function onItemChanged() {
+      const it = pane.win.item;
+      if (!it || !pane.lastD || C.keyOf(it) === C.keyOf(pane.lastIt) || pane.win.inTrash) { pane.release(); return; }
+      if (pane.win.detail && C.keyOf(pane.lastIt) === C.keyOf(pane.win.item)) return;
+      if (!pane.holding) { pane.heldIt = pane.lastIt; pane.heldD = pane.lastD; pane.holding = true; }
+      holdCap.restart();
+    }
+    function onDetailErrChanged() { if (pane.win.detailErr !== "") pane.release(); }
+  }
+  enabled: !pane.holding
   // BEHIND THE RE-PROMPT, the keys are its field's. A PasswordField draws
   // and never listens, and nothing handed it a key: every one went to the
   // search, so a card that asks again could never be opened (user,

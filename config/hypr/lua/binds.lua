@@ -30,6 +30,7 @@ hl.bind("SUPER + J",              hl.dsp.exec_cmd("qs ipc call Ideo emoji"))
 hl.bind("SUPER + SHIFT + J",      hl.dsp.exec_cmd("qs ipc call Ideo nerd"))
 hl.bind("SUPER + V",              hl.dsp.exec_cmd("qs ipc call Calypso toggle"))
 hl.bind("SUPER + SHIFT + V",      hl.dsp.exec_cmd("qs ipc call Calypso window"))
+hl.bind("SUPER + O",              hl.dsp.exec_cmd("qs ipc call Clio open"))
 hl.bind("SUPER + K",              hl.dsp.exec_cmd("qs ipc call Zeus toggle"))
 hl.bind("SUPER + D",              hl.dsp.exec_cmd("qs ipc call Lexi toggle"))
 hl.bind("SUPER + SHIFT + B",      hl.dsp.exec_cmd("qs ipc call Picasso toggle"))
@@ -37,13 +38,8 @@ hl.bind("SUPER + CONTROL + P",    hl.dsp.exec_cmd("qs ipc call Picasso pick"))
 hl.bind("PRINT",                  hl.dsp.exec_cmd("qs ipc call Picasso shot screen"))
 hl.bind("SUPER + PRINT",          hl.dsp.exec_cmd("qs ipc call Picasso shot window"))
 hl.bind("SUPER + SHIFT + PRINT",  hl.dsp.exec_cmd("qs ipc call Picasso shot region"))
-hl.bind("SUPER + N",              hl.dsp.exec_cmd("qs ipc call Plato capture"))
 hl.bind("SUPER + P",              hl.dsp.exec_cmd("qs ipc call Ceres toggleWindow packages"))
 hl.bind("SUPER + SHIFT + P",      hl.dsp.exec_cmd("qs ipc call Ceres toggleWindow updates"))
-
--- spoot: a personal project outside this repo; drop these two if you do not have it
-hl.bind("SUPER + M",          hl.dsp.exec_cmd("~/Projects/spoot/bin/spoot"))
-hl.bind("SUPER + SHIFT + M",  hl.dsp.exec_cmd("~/Projects/spoot/bin/spoot --listen"))
 
 -- WORKSPACES
 hl.bind("SUPER + GRAVE",  hl.dsp.workspace.toggle_special("special"))

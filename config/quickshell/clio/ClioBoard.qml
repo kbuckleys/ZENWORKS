@@ -40,18 +40,27 @@ import "../terminus"
 import "clio.js" as Scribe
 
 Variants {
+  id: layerOf
   model: Quickshell.screens
+  // TWO WALLS. The one under the windows (bottom layer) holds every sticky
+  // but those pinned above windows; a second, `above` (top layer), holds
+  // only those. shell.qml makes both. A sticky pinned or let down goes from
+  // one to the other.
+  property bool above: false
 
   PanelWindow {
     id: board
     required property var modelData
+    readonly property bool above: layerOf.above
+    // whether a sticky is this wall's to draw
+    function mine(n) { return !!n && !!n.above === board.above; }
 
     screen: board.modelData
     readonly property real originX: board.screen ? board.screen.x : 0
     readonly property real originY: board.screen ? board.screen.y : 0
 
-    WlrLayershell.layer: WlrLayer.Bottom
-    WlrLayershell.namespace: "clio"
+    WlrLayershell.layer: board.above ? WlrLayer.Top : WlrLayer.Bottom
+    WlrLayershell.namespace: board.above ? "clio-above" : "clio"
     // A note is typed into, so the surface has to be able to hold the
     // keyboard — but only while one is being edited.
     WlrLayershell.keyboardFocus: WlrKeyboardFocus.OnDemand
@@ -69,6 +78,7 @@ Variants {
     // its pop out (user, twice).
     property int drawn: 0
     visible: (Clio.shown || board.drawn > 0) && Clio.rows.count > 0
+      && (!board.above || Clio.notes.some((n) => n.above))
 
     // The head's height, and where it meets its note: a pixel INTO it, so
     // the head's edge and the note's lie on one line, the seam between them.
@@ -103,7 +113,7 @@ Variants {
         // Nothing for a note on its way out, or for a wall fading away: what
         // is leaving is drawn, not touched, and the desktop under it is the
         // desktop again from the moment it was asked for.
-        readonly property bool live: !!n && Clio.shown && !Clio.isLeaving(key)
+        readonly property bool live: !!n && board.mine(n) && Clio.shown && !Clio.isLeaving(key)
         // And the head, which floats off the note while it is edited — over
         // its top edge, or under its bottom one when the top has no room.
         readonly property bool headed: live && board.editing === key
@@ -359,7 +369,7 @@ Variants {
           // `z` again, which is the whole reason these share a surface.
           z: slot.note ? slot.note.z : 0
 
-          visible: slot.note !== null
+          visible: slot.note !== null && board.mine(slot.note)
           property bool busy: false
 
           // ── CHOOSING A TYPEFACE ──────────────────────────────────────
@@ -434,8 +444,14 @@ Variants {
               { text: "Typeface", icon: "\uE659", run: () => slot.openFaces() },
               { isSeparator: true },
               { text: "New note", icon: "\uF067", run: () => Clio.addHere() },
+              // the notebook, on this sticky in its Stickies shelf
+              { text: "Open in Clio", icon: "\uEBAF", enabled: Clio.app !== null,
+                run: () => Clio.app.openSticky(slot.noteId) },
+              { text: slot.note && slot.note.above ? "Back under windows" : "Keep above windows", icon: "\u{F0931}",
+                run: () => Clio.set(slot.noteId, "above", !(slot.note && slot.note.above)) },
+              { text: "Gather stickies", icon: "\u{F0044}", run: () => Clio.gather() },
               { text: "Hide notes", icon: "\uF070", run: () => Clio.toggle() },
-              { text: "Delete note", icon: "\uF1F8", run: () => Clio.remove(slot.noteId) }
+              { text: "Delete note", icon: "\uF1F8", run: () => Clio.discard(slot.noteId) }
             ];
           }
 
@@ -467,7 +483,7 @@ Variants {
           enabled: !slot.leaving
           property real popK: 0
           // counted on the board while drawn at all (see board.drawn)
-          readonly property bool onScreen: slot.popK > 0.001
+          readonly property bool onScreen: slot.popK > 0.001 && board.mine(slot.note)
           onOnScreenChanged: board.drawn += slot.onScreen ? 1 : -1
           Component.onDestruction: if (slot.onScreen) board.drawn -= 1
           property real liftK: slot.lifted ? 1.015 : 1
@@ -1350,7 +1366,7 @@ Variants {
                 id: closeMa
                 anchors.fill: parent
                 anchors.margins: -4
-                onClicked: Clio.remove(slot.noteId)
+                onClicked: Clio.discard(slot.noteId)
               }
             }
           }

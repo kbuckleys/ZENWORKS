@@ -178,7 +178,10 @@ class Bitwarden(Provider):
         self.cfg["email"] = email
         return dict(self.status(cancel), email=email)
 
-    def unlock(self, secret, cancel):
+    def unlock(self, secret, cancel, keep=False):
+        """keep: only the password is being checked (an item's re-prompt) —
+        the vault already read stays, not read again through two more bw
+        starts (~0.5 s of node each, plus decrypting every item)"""
         with Fifo("calypso-bw-" + self.aid, secret or "") as f:
             code, out, err = self.bw(["unlock", "--passwordfile", f.path, "--raw"], cancel,
                                      session=False, timeout=120)
@@ -189,7 +192,8 @@ class Bitwarden(Provider):
             raise VaultError(self.why(err, out), "auth")
         with _lock:
             _sessions[self.aid] = out.strip().splitlines()[-1]
-            _vaults.pop(self.aid, None)
+            if not keep:
+                _vaults.pop(self.aid, None)
         return {}
 
     def lock(self, cancel):
@@ -241,9 +245,23 @@ class Bitwarden(Provider):
             v = _vaults.get(self.aid)
         if v and not fresh:
             return v
-        items = {i["id"]: i for i in self.json(["list", "items"], cancel) or [] if i.get("id")}
-        folders = {f["id"]: f["name"] for f in self.json(["list", "folders"], cancel) or []
-                   if f.get("id")}
+        # the two lists side by side: each is its own bw start (~0.5 s of node)
+        got = {}
+
+        def fetch(what):
+            try:
+                got[what] = self.json(["list", what], cancel) or []
+            except BaseException as e:
+                got[what] = e
+        side = threading.Thread(target=fetch, args=("folders",), daemon=True)
+        side.start()
+        fetch("items")
+        side.join()
+        for what in ("items", "folders"):
+            if isinstance(got[what], BaseException):
+                raise got[what]
+        items = {i["id"]: i for i in got["items"] if i.get("id")}
+        folders = {f["id"]: f["name"] for f in got["folders"] if f.get("id")}
         v = {"items": items, "folders": folders, "at": time.time()}
         with _lock:
             _vaults[self.aid] = v
@@ -284,8 +302,7 @@ class Bitwarden(Provider):
             if secret is None:
                 return {"id": id, "reprompt": True, "sections": [], "notes": ""}
             # the master password, checked the way the vault is opened
-            self.unlock(secret, cancel)
-            e, v = self.raw(id, cancel)
+            self.unlock(secret, cancel, keep=True)
         kind = TYPES.get(e.get("type"), "other")
         main = []
         if kind == "login":

@@ -2561,7 +2561,7 @@ FloatingWindow {
              ["x x", "cut"], ["x t", "move to"], ["p", "paste"],
              ["d", "trash"], ["D", "delete for good"],
              ["a", "create (end in / for a directory)"], ["r", "rename"],
-             ["c m", "permissions"], [";  ctrl s", "shell here"],
+             ["c m", "permissions"],
              ["u", "undo trash / move / rename"],
              ["z", "measure directory size"],
              ["c a", "archive selection"],
@@ -2727,7 +2727,13 @@ FloatingWindow {
       ["hidden files",      ".",       () => root.showHidden = !root.showHidden],
       ["disk usage",        ", u",     () => root.toggleUsage()],
       ["git status",        ", g",     () => root.toggleGit()],
-      ["open a shell here", "ctrl s",  () => root.openShell()],
+      // the directory under the cursor, not the one you are standing in —
+      // the same thing ctrl return and the row menu's entry do
+      ["open terminal here", "ctrl \u21b5", () => {
+        const r = root.currentRow();
+        if (r && r.isDir) root.run(Terminus.shellCommand(r.path, root.termCmd));
+        else root.openShell();
+      }],
       ["settings",          "",        () => prefs.open = true]
     ];
     for (let i = 0; i < one.length; i++)
@@ -2858,6 +2864,15 @@ FloatingWindow {
   // It reads that state rather than starting any of its own: whatever the
   // cursor is on has already been worked out by the time you ask.
   property bool looking: false
+  // THE WINDOW STAYS WHILE QUICK LOOK IS UP (user, 2026-10-14): a close
+  // from the compositor (super+q, a titlebar) is refused until the look is
+  // put away — it is the window's own card, over the screen, and would be
+  // left floating over nothing. FloatingWindow has no say in a close; its
+  // QQuickWindow's `closing` does.
+  Connections {
+    target: content.Window.window
+    function onClosing(close) { if (root.looking) close.accepted = false; }
+  }
 
   function quickLook() { return preview.quickLook(); }
 

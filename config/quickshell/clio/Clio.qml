@@ -23,6 +23,7 @@ import QtQml.Models
 import Quickshell
 import Quickshell.Io
 import "../morpheus"
+import "../oracle"
 import "clio.js" as Scribe
 
 Singleton {
@@ -39,6 +40,10 @@ Singleton {
   property bool shown: true
 
   readonly property int count: root.notes.length
+
+  // The notebook's manager (ClioManager, set by itself): the window, the
+  // journal. Through here so `qs ipc call Clio …` stays the one handle.
+  property var app: null
 
   // ── WHAT THE VIEWS ARE DRIVEN BY ───────────────────────────────────────
   // `notes` is the truth — it is what is reasoned about and what is written
@@ -185,6 +190,46 @@ Singleton {
     return note.id;
   }
 
+  // ── ON THE MAIN MONITOR ────────────────────────────────────────────────
+  // One made from Clio's window, with no pointer on the desk to go by: on
+  // the main monitor (oracle's Display setting), cascaded from its corner.
+  function addOnMain() {
+    const s = Oracle.pickScreen("");
+    const cascade = (root.notes.length % 8) * 26;
+    return s ? root.add(s.x + 120 + cascade, s.y + 120 + cascade) : root.add();
+  }
+
+  // ── GATHERED ───────────────────────────────────────────────────────────
+  // Every sticky not on a screen there is now (made on a monitor since
+  // unplugged, or on another machine's desk) brought onto the main one,
+  // cascaded from its corner. How many came.
+  function gather() {
+    const sc = Quickshell.screens;
+    const on = (n) => {
+      const cx = n.x + Math.min(n.w, 120) / 2, cy = n.y + 15;
+      for (let i = 0; i < sc.length; i++)
+        if (cx >= sc[i].x && cx < sc[i].x + sc[i].width && cy >= sc[i].y && cy < sc[i].y + sc[i].height) return true;
+      return false;
+    };
+    const s = Oracle.pickScreen("");
+    if (!s) return 0;
+    let k = 0;
+    const out = root.notes.map((n) => {
+      if (on(n)) return n;
+      const c = ({});
+      for (const f in n) c[f] = n[f];
+      c.x = s.x + 120 + (k % 8) * 26;
+      c.y = s.y + 120 + (k % 8) * 26;
+      k++;
+      return c;
+    });
+    if (k === 0) return 0;
+    root.notes = out;
+    root.shown = true;
+    root.save();
+    return k;
+  }
+
   // ── WHERE YOU ARE LOOKING ──────────────────────────────────────────────
   // A note made from the menu appeared at 120,120 of the layout, which is the
   // top-left of the leftmost monitor — so asking for one on the right-hand
@@ -217,6 +262,29 @@ Singleton {
         root.add(parseInt(m[1], 10) - 40, parseInt(m[2], 10) - 13);
       }
     }
+  }
+
+  // ── TO THE TRASH ───────────────────────────────────────────────────────
+  // A sticky deleted with words on it goes to Clio's Trash (as a note that
+  // remembers where it stood, so restoring puts it back); an empty one, or
+  // one with Clio's app not there, simply goes.
+  function discard(id) {
+    const i = root.indexOf(id);
+    if (i < 0) return;
+    const blank = String(root.notes[i].text || "").replace(/<[^>]*>/g, "").replace(/&nbsp;|\s/g, "") === "";
+    if (!blank && root.app && root.app.loaded) root.app.trashSticky(id);
+    else root.remove(id);
+  }
+  // a sticky as it was (out of the Trash), with its own id if still free
+  function readd(rec) {
+    const note = ({});
+    for (const k in rec) note[k] = rec[k];
+    if (!note.id || root.indexOf(note.id) >= 0) note.id = Scribe.newId();
+    root.notes = root.notes.concat([note]);
+    keyModel.append({ key: note.id });
+    root.shown = true;
+    root.save();
+    return note.id;
   }
 
   function remove(id) {
@@ -308,9 +376,12 @@ Singleton {
   // one fact.
   function save() { saveTimer.restart(); }
 
+  // In the notebook's own directory beside the notes (clio/core/server.py),
+  // so the stickies travel with it to another machine. CLIO_DIR as there.
+  readonly property string dir: Quickshell.env("CLIO_DIR") || Quickshell.env("HOME") + "/Documents/Clio"
   FileView {
     id: stateFile
-    path: Quickshell.statePath("clio-notes.json")
+    path: root.dir + "/.stickies.json"
     blockLoading: true
     printErrors: false
     // NO onLoaded — the shape howler and chronos both use. FileView re-reads
@@ -344,13 +415,63 @@ Singleton {
       return n + " removed";
     }
 
+    function open(): string {
+      if (!root.app) return "no notebook";
+      root.app.open();
+      return "ok";
+    }
+
+    function journal(): string {
+      if (!root.app) return "no notebook";
+      root.app.journal();
+      return "ok";
+    }
+
+    // a quick note: a card to put a line down without the window
+    function capture(): string {
+      if (!root.app) return "no notebook";
+      root.app.capture();
+      return "ok";
+    }
+
+    // today's journal entry, opened or begun
+    function today(): string {
+      if (!root.app) return "no notebook";
+      root.app.today();
+      return "ok";
+    }
+
+    function note(): string {
+      if (!root.app) return "no notebook";
+      root.app.note();
+      return "ok";
+    }
+
     function status(): string {
       return root.count + " notes, " + (root.shown ? "shown" : "hidden");
     }
   }
 
+  // where they were kept before, read once if the new place has none yet:
+  // the notebook's directory under a shown name, then the shell's state
+  FileView {
+    id: shownFile
+    path: root.dir + "/stickies.json"
+    blockLoading: true
+    printErrors: false
+  }
+  FileView {
+    id: oldFile
+    path: Quickshell.statePath("clio-notes.json")
+    blockLoading: true
+    printErrors: false
+  }
+
   Component.onCompleted: {
-    root.notes = Scribe.parse(stateFile.text());
+    const here = stateFile.text();
+    const before = here !== "" ? "" : shownFile.text() !== "" ? shownFile.text() : oldFile.text();
+    root.notes = Scribe.parse(here !== "" ? here : before);
+    if (before !== "") stateFile.setText(before);
     root.resync();
     // Carry on above whatever was saved, so a note raised today still lands
     // in front of one raised last week.

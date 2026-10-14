@@ -29,6 +29,8 @@ const BUDGET = {
   "terminus/Chrome.qml": 11,
   "artemis/artemis.js": 1,
   "cerberus/CerberusLock.qml": 2,
+  "clio/JournalCalendar.qml": 2,
+  "clio/Paper.qml": 2,             // white paper and its ink, in every theme   // a day's number and mood dot over its picture
   "metis/ChipStrip.qml": 6,
   "morpheus/Frost.qml": 6,
   "morpheus/ScrollEdge.qml": 5,

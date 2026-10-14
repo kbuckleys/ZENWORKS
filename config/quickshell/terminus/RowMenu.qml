@@ -672,7 +672,6 @@ PopupWindow {
         if (term.inTrash)
           out.push({ label: "Empty the trash", danger: true,
                      act: () => term.emptyTrash() });
-        out.push({ label: "Open shell here", key: ";", act: () => term.openShell() });
         // in a repository: the git client on it (delphi, handed in by
         // shell.qml — see TerminusManager.gitClient)
         if ((term.gitRoot !== "" || term.repoTop !== "") && term.mgr && term.mgr.gitClient)

@@ -112,13 +112,13 @@ const DIRS = {
   ".venv": "󰌠", ".vim": "", ".vscode": "",
   ".wine": "", ".zen": "󰺕", ".zsh": "󰑷",
   "__pycache__": "󰌠", "__tests__": "󰙨", "addons": "",
-  "api": "󱂛", "app": "󰅩", "arch": "󰣇",
+  "api": "󱂛", "app": "󰅩", "arch": "󰣇", "attachments": "󰁦",
   "archive": "", "archives": "", "assets": "",
   "audio": "󰎅", "audiobooks": "", "backup": "",
   "backups": "", "bin": "", "bittorrents": "",
   "books": "", "boot": "", "build": "",
   "cache": "", "captures": "󰹑", "certs": "",
-  "claude": "", "cliphist": "", "components": "",
+  "claude": "", "clio": "", "cliphist": "", "components": "",
   "controllers": "", "courses": "", "database": "",
   "db": "", "desktop": "", "dev": "",
   "development": "", "discord": "", "dist": "",
@@ -132,7 +132,7 @@ const DIRS = {
   "gtk-5.0": "", "helpers": "", "home": "",
   "hooks": "", "hypr": "", "hyprland": "",
   "icons": "", "images": "", "img": "",
-  "include": "󰅩", "internal": "󰅩", "keys": "",
+  "include": "󰅩", "internal": "󰅩", "keys": "", "journals": "󰭤",
   "laravel": "", "lib": "󰅩", "library": "",
   "log": "", "logs": "", "lost+found": "",
   "lua": "", "mail": "󰇮", "man": "",
@@ -640,6 +640,8 @@ const APPS = {
   "delphi": "\uF419",
   // U+EB11, the password manager
   "calypso": "\uEB11",
+  // U+EBAF, the notebook (its desktop id is clio)
+  "clio": "\uEBAF",
   // U+F114, the file manager \u2014 the glyph icarus' Files entry wears
   "terminus": "\uF114"
 };

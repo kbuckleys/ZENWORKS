@@ -699,10 +699,14 @@ Item {
     }
   }
 
-  // The tile a menu is open about (HeldRing.qml), as a disk row is.
+  // The tile a menu is open about (HeldRing.qml), as a disk row is —
+  // fitted as the cursor is (user, 2026-10-14): the box of what the tile
+  // holds, not the whole cell
   HeldRing {
-    anchors.fill: parent
-    anchors.margins: 4
+    x: 4
+    y: 4
+    width: Math.max(0, parent.width - 8)
+    height: Math.max(0, Math.min(parent.height - 8, tile.usedH - 4))
     z: 5
     radius: 6
     on: !!tile.term && tile.term.sideMenuAt === tile
@@ -711,8 +715,10 @@ Item {
   // Lit while a drag is over this directory — the grid's answer to the same
   // question the list row answers with its own outline.
   Rectangle {
-    anchors.fill: parent
-    anchors.margins: 4
+    x: 4
+    y: 4
+    width: Math.max(0, parent.width - 8)
+    height: Math.max(0, Math.min(parent.height - 8, tile.usedH - 4))
     z: 6
     visible: tile.dropTarget
     color: Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b, 0.12)

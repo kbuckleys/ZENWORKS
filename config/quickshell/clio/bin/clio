@@ -1,0 +1,14 @@
+#!/bin/sh
+# ┌─┐┌─┐┌┐┌┬ ┬┌─┐┬─┐┬┌─┌─┐
+# ┌─┘├┤ │││││││ │├┬┘├┴┐└─┐
+# └─┘└─┘┘└┘└┴┘└─┘┴└─┴ ┴└─┘
+# https://github.com/kbuckleys/
+#
+# clio              the notebook, from a terminal, a keybind, or clio.desktop
+# clio --journal    a new journal entry
+# clio --note       a new note
+case $1 in
+  --journal) exec qs ipc call Clio journal >/dev/null ;;
+  --note) exec qs ipc call Clio note >/dev/null ;;
+  *) exec qs ipc call Clio open >/dev/null ;;
+esac

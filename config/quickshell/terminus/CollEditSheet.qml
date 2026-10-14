@@ -375,6 +375,57 @@ Rectangle {
     return out;
   }
 
+  // ── THE PLACES MENU (placesVerb) ─────────────────────────────────
+  // the usual home directories this home has, looked for once
+  property var homeDirs: []
+  Process {
+    running: true
+    command: ["sh", "-c", 'for d in Desktop Documents Downloads Pictures Music Videos; do [ -d "$HOME/$d" ] && echo "$d"; done']
+    stdout: StdioCollector { onStreamFinished: collEdit.homeDirs = text.split("\n").filter((l) => l !== "") }
+  }
+  PopMenu {
+    id: placesMenu
+    anchors.fill: parent
+    window: collEdit.term
+    cardWidth: 260
+    onClosed: if (collEdit.open) collRoot.claim()
+  }
+  function setRoot(dir) {
+    if (!dir) return;
+    collRoot.text = dir;
+    collEdit.nameRev = collEdit.nameRev + 1;
+  }
+  function askPlace(from) {
+    const home = Paths.home(), seen = {}, rows = [];
+    const add = (path, label) => {
+      if (!path || seen[path]) return;
+      seen[path] = true;
+      rows.push({ text: label, icon: Icons.glyphFor({ name: path === home ? "home" : Terminus.basename(path) || "/", isDir: true }),
+                  run: () => collEdit.setRoot(path) });
+    };
+    add(term.cwd, "Here — " + (term.cwd === "/" ? "/" : Terminus.basename(term.cwd)));
+    add(home, "Home");
+    for (const d of collEdit.homeDirs) add(home + "/" + d, d);
+    const marks = (term.bookmarks || []).filter((b) => !seen[b]);
+    if (marks.length > 0) {
+      rows.push({ isSeparator: true });
+      for (const b of marks) add(b, b === "/" ? "/" : Terminus.basename(b));
+    }
+    rows.push({ isSeparator: true });
+    add("/", "Everywhere");
+    rows.push({ text: "Choose a directory…", icon: "\uf07c",
+                enabled: !!term.mgr && !term.picking, run: collEdit.pickPlace });
+    const at = from.mapToItem(collEdit, 0, from.height + 4);
+    placesMenu.open(at.x, at.y, rows);
+  }
+  function pickPlace() {
+    const start = Coll.expandHome(collRoot.text.trim(), Paths.home()) || term.cwd;
+    term.mgr.choose(true, start, (paths) => {
+      if (paths && paths.length > 0) collEdit.setRoot(paths[0]);
+      collRoot.claim();
+    });
+  }
+
   function focusFrom(cur, dir) {
     const r = collEdit.ring();
     if (r.length === 0) return;
@@ -510,8 +561,8 @@ Rectangle {
             id: collRoot
             anchors.left: collEdit.searching ? searchQ.right : collName.right
             anchors.leftMargin: 12
-            anchors.right: parent.right
-            anchors.rightMargin: 16
+            anchors.right: placesVerb.left
+            anchors.rightMargin: 8
             anchors.verticalCenter: parent.verticalCenter
             ghost: "where to look"
             elide: Text.ElideLeft
@@ -519,6 +570,18 @@ Rectangle {
             onTabbed: collEdit.focusFrom(collRoot, 1)
             onBackTabbed: collEdit.focusFrom(collRoot, -1)
             onAccepted: collEdit.commit()
+          }
+          // WHERE, CHOSEN RATHER THAN TYPED (user, 2026-10-14): the
+          // usual places, the bookmarks, and terminus' own picker for
+          // the rest. The field stays, for a path you have in mind.
+          BulkVerb {
+            id: placesVerb
+            anchors.right: parent.right
+            anchors.rightMargin: 16
+            anchors.verticalCenter: parent.verticalCenter
+            label: "places \u25BE"
+            on: placesMenu.isOpen
+            onClicked: collEdit.askPlace(placesVerb)
           }
         }
 

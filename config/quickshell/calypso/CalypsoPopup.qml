@@ -111,7 +111,7 @@ LayerPopup {
       return 0;
     });
   }
-  readonly property var lockedAccts: popup.mgr ? popup.mgr.accounts.filter((a) => !(popup.mgr.states[a.id] || {}).unlocked) : []
+  readonly property var lockedAccts: popup.mgr ? popup.mgr.accounts.filter((a) => popup.mgr.isLocked(a)) : []
   readonly property var lockAcct: popup.lockedAccts.find((a) => a.id === popup.lockTarget) || popup.lockedAccts[0] || null
   readonly property bool lockAsks: {
     const info = popup.mgr && popup.lockAcct ? popup.mgr.platformInfo(popup.lockAcct.kind) : null;
@@ -180,13 +180,15 @@ LayerPopup {
   function toggle() { if (popup.shown) popup.closePopup(); else popup.openPopup(); }
   function settleMode() {
     if (!popup.mgr || popup.mgr.accounts.length === 0) popup.mode = "empty";
-    else if (!popup.mgr.anyOpen) popup.mode = "unlock";
+    // not answered for yet: the list's "reading the vaults…", not the lock
+    else if (!popup.mgr.anyOpen && !popup.mgr.checking) popup.mode = "unlock";
     else if (popup.mode !== "actions" && popup.mode !== "error") popup.mode = "list";
     popup.syncFocus();
   }
   Connections {
     target: popup.mgr
     function onAnyOpenChanged() { if (popup.shown && popup.mode !== "actions") popup.settleMode(); }
+    function onCheckingChanged() { if (popup.shown && popup.mode !== "actions") popup.settleMode(); }
   }
   // the shell's screen lock: every account, and the daemon stopped
   function lockVault() {

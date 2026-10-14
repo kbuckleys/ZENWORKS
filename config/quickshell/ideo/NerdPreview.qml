@@ -33,6 +33,10 @@ Item {
   readonly property string niceName: pv.parts.length > 1
     ? pv.parts.slice(1).join(" ").replace(/_/g, " ") : pv.cls
   readonly property string hex: pv.entry ? String(pv.entry.code).toUpperCase() : ""
+  // What the pane needs to show all of itself. A filter can leave the grid
+  // one row tall, and the pane shares the grid's height, so ideo holds the
+  // grid open to this rather than letting the details spill off the card.
+  readonly property int needH: Math.ceil(body.implicitHeight) + 24
 
   // the seam to the grid
   Rectangle {
@@ -42,6 +46,7 @@ Item {
   }
 
   Column {
+    id: body
     visible: !!pv.entry
     anchors.left: parent.left
     anchors.right: parent.right

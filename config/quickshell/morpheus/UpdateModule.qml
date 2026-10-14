@@ -10,6 +10,8 @@ import "helpers.js" as Helpers
 import "../oracle"
 import "../ceres"
 import "."
+// qualified, for HeldRing alone
+import "../terminus" as Term
 
 Collapsible {
   id: root
@@ -44,6 +46,14 @@ Collapsible {
       Behavior on width { NumberAnimation { duration: 150; easing.type: Easing.OutQuad } }
       height: Zenon.slot
       anchors.verticalCenter: parent.verticalCenter
+
+      // outlined while its menu is open (terminus/HeldRing.qml)
+      Term.HeldRing {
+        anchors.fill: parent
+        anchors.topMargin: 3
+        anchors.bottomMargin: 3
+        on: menu.open
+      }
 
       BarText {
         id: iconGlyph
@@ -94,11 +104,31 @@ Collapsible {
     onEntered: root.hovered = true
     onExited: root.hovered = false
     acceptedButtons: Qt.LeftButton | Qt.RightButton
-    // Left is ceres' panel; right is the whole of ceres, on its Updates tab.
+    // Left is ceres' panel; right is its menu (the bell's, the tray's card).
     onClicked: (m) => {
-      if (m.button === Qt.RightButton)
-        Quickshell.execDetached(["qs", "ipc", "call", "Ceres", "window", "updates"]);
+      if (m.button === Qt.RightButton) menu.show();
       else root.activated();
+    }
+  }
+
+  // ── THE UPDATES' MENU (user, 2026-10-14) ────────────────────────────
+  // What ceres already does, from where the hand is: the panel, the whole
+  // window on either tab, and a check now rather than at the next tick.
+  TrayMenu {
+    id: menu
+    anchorItem: root
+    items: [
+      { text: "Show updates", icon: "󰏗" },
+      { text: "Open Ceres", icon: "\uDB82\uDCC7" },
+      { isSeparator: true },
+      { text: Ceres.checking ? "Checking…" : "Check now", icon: "󰑓", enabled: !Ceres.checking && !Ceres.txBusy },
+      { text: "Packages", icon: "\uF487" }
+    ]
+    onPicked: (i) => {
+      if (i === 0) root.activated();
+      else if (i === 1) Ceres.openWindow("updates");
+      else if (i === 3) Ceres.check();
+      else if (i === 4) Ceres.openWindow("packages");
     }
   }
 
@@ -107,6 +137,6 @@ Collapsible {
     cursorArea: mouse
     text: Ceres.describe(5)
     styled: true
-    show: mouse.containsMouse && root.active
+    show: mouse.containsMouse && root.active && !menu.open
   }
 }

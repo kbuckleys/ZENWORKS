@@ -41,6 +41,11 @@ Item {
   // { x, y, w, h } in the view's content: the cursor's box, outright. Null
   // (as terminus has it) is the GridView's cell at `index`.
   property var rect: null
+  // the cursor's colour; unset, the shared rule's (terminus' look).
+  // Picasso's justified tiles hide all but its rim, so it wears the accent
+  // there (user, 2026-10-14: "hardly visible")
+  property color ink: "transparent"
+  readonly property bool inked: cell.ink.a > 0
   property int index: 0
   property bool on: true
   property bool animate: true
@@ -158,12 +163,12 @@ Item {
         NumberAnimation { duration: Zenon.fast; easing.type: Zenon.travelEase }
       }
       radius: 6
-      color: Zenon.border
+      color: cell.inked ? Qt.rgba(cell.ink.r, cell.ink.g, cell.ink.b, 0.55) : Zenon.border
       // See the note on Tile's border: over a thumbnail the fill is
       // hidden by the picture, so the outline is what says "here" —
       // and it has to be on the thing that travels.
       border.width: 1
-      border.color: Zenon.border
+      border.color: cell.inked ? cell.ink : Zenon.border
       visible: cell.on && cell.filled
     }
   }

@@ -44,6 +44,21 @@ PopupWindow {
   readonly property int pad: face.pad
   readonly property int padTop: face.padTop
   property bool sticky: false
+  // ── A CLICK OFF IT ────────────────────────────────────────────────────
+  // `dismissable`: while it is up, a press anywhere else in its window says
+  // `dismissed` (and goes no further) — for a bubble opened by a click,
+  // which the holder shuts. A catcher laid over the window's content.
+  property bool dismissable: false
+  signal dismissed()
+  property var _catch: null
+  readonly property bool catching: bub.dismissable && bub.shown && bub.window !== null
+  onCatchingChanged: {
+    if (bub._catch) { bub._catch.destroy(); bub._catch = null; }
+    if (!bub.catching || !bub.window.contentItem) return;
+    bub._catch = Qt.createQmlObject('import QtQuick; MouseArea { anchors.fill: parent; z: 1e9; acceptedButtons: Qt.AllButtons }',
+                                    bub.window.contentItem);
+    bub._catch.pressed.connect(() => bub.dismissed());
+  }
   // standing on the target, tail down, instead of hanging under it — for a
   // target at the bottom of the screen (the bar's jobs). See BubbleCard.up.
   property bool up: false
@@ -53,7 +68,7 @@ PopupWindow {
   property real shade: bub.open ? 1 : 0
   Behavior on shade { NumberAnimation { duration: Zenon.menuFade; easing.type: Easing.OutCubic } }
 
-  visible: bub.window !== null && bub.target !== null && bub.shade > 0.01
+  visible: bub.window !== null && bub.target !== null && (bub.shade > 0.01 || face.grow > 0.01)
   color: "transparent"
   // only the card (and its tail) takes the pointer, never the shadow's room
   mask: Region { x: face.card.x; y: bub.up ? face.card.y : face.card.y - bub.tail
@@ -86,7 +101,7 @@ PopupWindow {
   }
   onWindowChanged: bub.watch()
   Component.onCompleted: bub.watch()
-  Component.onDestruction: { if (bub._hover) bub._hover.destroy(); }
+  Component.onDestruction: { if (bub._hover) bub._hover.destroy(); if (bub._catch) bub._catch.destroy(); }
   // `lean`: the card grows to the RIGHT of the target instead of centring
   // under it — for a target at a window's left edge (plato's gutter bars),
   // where a centred card hung out past the window and was slid back by the

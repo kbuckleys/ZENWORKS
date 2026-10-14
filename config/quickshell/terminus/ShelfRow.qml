@@ -32,6 +32,10 @@ Rectangle {
   // the glyph's way in from the left, and the count's from the right: more
   // when the row runs edge to edge (delphi's), so the words stay put
   property int indent: 10
+  // and the count's alone, for rows indented by depth (clio's folders)
+  property int countIndent: shelf.indent
+  // a glyph's own colour at rest (a journal's, a sticky's); unset, muted
+  property color glyphInk: "transparent"
   signal clicked()
 
   height: 30
@@ -45,7 +49,7 @@ Rectangle {
     anchors.verticalCenter: parent.verticalCenter
     width: 20
     text: shelf.glyph
-    color: shelf.here ? Zenon.cyan : Zenon.muted
+    color: shelf.here ? Zenon.cyan : shelf.glyphInk.a > 0 ? shelf.glyphInk : Zenon.muted
     font.family: Zenon.glyphFace
     font.pixelSize: Zenon.px(14)
   }
@@ -65,7 +69,7 @@ Rectangle {
   Text {
     id: shelfCount
     anchors.right: parent.right
-    anchors.rightMargin: shelf.indent
+    anchors.rightMargin: shelf.countIndent
     anchors.verticalCenter: parent.verticalCenter
     text: shelf.count
     color: shelf.countInk

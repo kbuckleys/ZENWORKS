@@ -48,6 +48,9 @@ printf '%s\n' "$out" | grep -vE '^  ok ' || true
 echo "── calypso core"
 out=$(python3 "$root/oracle/tests/calypso-core.py" 2>&1) || fail=1
 printf '%s\n' "$out" | grep -vE '^  ok ' || true
+# and clio's notebook (oracle/tests/clio-core.py): a throwaway CLIO_DIR
+out=$(python3 "$root/oracle/tests/clio-core.py" 2>&1) || fail=1
+printf '%s\n' "$out" | grep -vE '^  ok ' || true
 
 echo "── compiling every .qml"
 tmp=$(mktemp -d)

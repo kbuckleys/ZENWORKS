@@ -419,16 +419,29 @@ FloatingWindow {
   // in terminus' Bubble hanging from the row (as delphi's pull requests
   // peek) — its description, version, where from, how big. Asked with the
   // same `info` the preview uses, once the pointer has stayed a moment.
+  //
+  // ONE AFTER ANOTHER (user, 2026-10-14): what the bubble shows is
+  // `peekShown` — a row, its package and its info together — and it is
+  // swapped whole once the next package's info is in, never cleared on
+  // the way: the bubble stays up on the last one meanwhile, then moves
+  // on, rather than closing, showing the next name with nothing under it
+  // and opening again. With a peek up, the next row is asked at once
+  // (nearly); it goes only when the pointer has left the rows a moment.
   property Item peekRow: null
   property var peekPkg: null
   property var peekInfo: null
-  onSelChanged: { win.peekInfo = null; }
+  property var peekShown: null
+  onSelChanged: { win.peekInfo = null; win.peekShown = null; }
   Timer { id: peekWait; interval: 450; onTriggered: win.startPeek() }
+  Timer { id: peekLeave; interval: 220; onTriggered: if (!win.peekPkg) win.peekShown = null }
   function peekAt(row, pkg) {
     win.peekRow = row;
     win.peekPkg = pkg;
     win.peekInfo = null;
-    if (pkg) peekWait.restart(); else peekWait.stop();
+    if (!pkg) { peekWait.stop(); peekLeave.restart(); return; }
+    peekLeave.stop();
+    peekWait.interval = win.peekShown ? 90 : 450;
+    peekWait.restart();
   }
   function startPeek() {
     const p = win.peekPkg;
@@ -446,22 +459,27 @@ FloatingWindow {
     onExited: if (peekProc.again) { peekProc.again = false; win.startPeek(); }
     stdout: StdioCollector {
       id: peekOut
-      onStreamFinished: if (win.peekPkg && peekProc.runFor === win.peekPkg.name) win.peekInfo = Cer.parseInfo(peekOut.text)
+      onStreamFinished: {
+        if (!win.peekPkg || peekProc.runFor !== win.peekPkg.name) return;
+        win.peekInfo = Cer.parseInfo(peekOut.text);
+        win.peekShown = { row: win.peekRow, pkg: win.peekPkg, info: win.peekInfo };
+      }
     }
   }
   Term.Bubble {
     id: peekBubble
     window: win
-    target: win.peekRow
-    shown: !!win.peekInfo && !!win.peekPkg && !(win.current && win.current.name === win.peekPkg.name)
+    target: win.peekShown ? win.peekShown.row : null
+    shown: !!win.peekShown && !(win.current && win.current.name === win.peekShown.pkg.name)
+    readonly property var pkg: win.peekShown ? win.peekShown.pkg : null
     cardWidth: 440
-    readonly property var m: win.peekInfo ? win.peekInfo.map : ({})
+    readonly property var m: win.peekShown ? win.peekShown.info.map : ({})
     Text {
       width: 412
       elide: Text.ElideRight
       textFormat: Text.StyledText
-      text: win.peekPkg ? "<b>" + Cer.esc(win.peekPkg.name) + "</b>  <font color='" + Ceres.ink.muted + "'>"
-        + Cer.esc(peekBubble.m["Version"] || win.peekPkg.version || "") + "</font>" : ""
+      text: peekBubble.pkg ? "<b>" + Cer.esc(peekBubble.pkg.name) + "</b>  <font color='" + Ceres.ink.muted + "'>"
+        + Cer.esc(peekBubble.m["Version"] || peekBubble.pkg.version || "") + "</font>" : ""
       color: Zenon.ink
       font.family: Zenon.face
       font.weight: Zenon.weight
@@ -482,10 +500,10 @@ FloatingWindow {
     Text {
       width: 412
       elide: Text.ElideRight
-      text: [win.peekPkg ? (win.peekPkg.repo || "") : "",
+      text: [peekBubble.pkg ? (peekBubble.pkg.repo || "") : "",
              peekBubble.m["Installed Size"] ? "installed " + peekBubble.m["Installed Size"]
                : peekBubble.m["Download Size"] ? "download " + peekBubble.m["Download Size"] : "",
-             win.peekPkg && win.peekPkg.installed ? (win.peekPkg.state === "explicit" ? "installed by you" : "installed as a dependency") : "not installed"]
+             peekBubble.pkg && peekBubble.pkg.installed ? (peekBubble.pkg.state === "explicit" ? "installed by you" : "installed as a dependency") : "not installed"]
         .filter((x) => x !== "").join("   ·   ")
       color: Zenon.muted
       font.family: Zenon.face
