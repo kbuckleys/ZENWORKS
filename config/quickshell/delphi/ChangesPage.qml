@@ -768,10 +768,39 @@ Item {
   // CLEAN (user, 2026-10-14: "nothing to commit" alone said nothing
   // else): in the diff's place, the last commit, where the branch stands
   // with its upstream and when that was last asked, and what to do about it
+  //
+  // A PUSH, in the same place (user, 2026-10-14): while one runs the clean
+  // view fades out and the push (PushSummary: where, a meter, the commits)
+  // fades in; once it has landed and lingered, out it goes and the clean
+  // view — the branch's new standing — comes back. One, then the other,
+  // never both at once. The push bubble stays down meanwhile (holdsPush).
+  readonly property bool holdsPush: pg.clean && pg.query === ""
+  readonly property bool wantPush: !!pg.win && !!pg.win.pushing
+  property bool pushUp: false      // which of the two has the place
+  property real placeOp: 1         // and how far in it is
+  onWantPushChanged: placeSwap.restart()
+  Component.onCompleted: pg.pushUp = pg.wantPush
+  SequentialAnimation {
+    id: placeSwap
+    NumberAnimation { target: pg; property: "placeOp"; to: 0; duration: Zenon.normal; easing.type: Easing.InCubic }
+    ScriptAction { script: pg.pushUp = pg.wantPush }
+    NumberAnimation { target: pg; property: "placeOp"; to: 1; duration: Zenon.normal; easing.type: Easing.OutCubic }
+  }
+  PushSummary {
+    anchors.centerIn: diff
+    lineWidth: Math.min(diff.width - 48, 520)
+    centered: true
+    spacing: 10
+    visible: pg.holdsPush && pg.pushUp && opacity > 0
+    opacity: pg.pushUp ? pg.placeOp : 0
+    p: pg.win ? pg.win.pushing : null
+    job: pg.win ? pg.win.netJob : null
+  }
   Column {
     anchors.centerIn: diff
     width: Math.min(diff.width - 48, 520)
-    visible: pg.clean && pg.query === ""
+    visible: pg.holdsPush && !pg.pushUp && opacity > 0
+    opacity: pg.pushUp ? 0 : pg.placeOp
     spacing: 10
     readonly property var b: pg.win && pg.win.branch ? pg.win.branch : null
     readonly property var tip: pg.win ? (pg.win.refs.local || []).find((r) => r.current) || null : null

@@ -104,6 +104,18 @@ PanelWindow {
     Math.min(Howler.maxWidth,
       Howler.width + Howler.iconSize + Howler.padding * 4 + Howler.borderSize * 2),
     toasts.anyCapture ? Howler.captureWidth : 0)
+  // THE WIDTH IS WHAT GLIDES, NOT THE POSITION. The column's x used to
+  // animate while the lane snapped to its new width, so for the length of
+  // the glide the lane's centre was off by half the change — and a capture
+  // arriving in that window slid down AND across: a diagonal swoop instead
+  // of the vertical one. Animating the width with x bound straight to it
+  // keeps the two in step: a centred stack does not move at all, and a
+  // corner one moves sideways only.
+  property real laneW: toasts.stackW
+  Behavior on laneW {
+    enabled: toasts.busy
+    NumberAnimation { duration: Howler.openMs; easing.type: Zenon.travelEase }
+  }
 
   Column {
     id: column
@@ -124,13 +136,6 @@ PanelWindow {
     x: toasts.side === "left" ? 16
      : toasts.side === "right" ? toasts.width - column.width - 16
      : (toasts.width - column.width) / 2
-    // The lane widening for a capture moves the column; the toasts already
-    // up glide over rather than jumping. Only while there is something on
-    // screen to see it — an empty stack just goes where it is told.
-    Behavior on x {
-      enabled: toasts.busy
-      NumberAnimation { duration: Howler.openMs; easing.type: Zenon.travelEase }
-    }
     y: toasts.atTop ? column.lift : toasts.height - column.height - column.lift
 
     HowlerOsd {
@@ -149,7 +154,7 @@ PanelWindow {
     // and the stack closes the gap behind it.
     ListView {
       id: stack
-      width: toasts.stackW
+      width: toasts.laneW
       height: Math.min(contentHeight, toasts.screen ? toasts.screen.height - 120 : 800)
       spacing: Howler.margin
       interactive: false
@@ -356,7 +361,7 @@ PanelWindow {
         // of the lane — measured at x=0 against the 48 the binding asked
         // for. What the view does not touch is what a child of the delegate
         // does, so the centring moved one level in.
-        width: toasts.stackW
+        width: toasts.laneW
         // ── AS WIDE AS WHAT IS IN IT ─────────────────────────────────
         // The content was only measured for a LIST; everything else took the
         // nominal width whether it needed it or not, so a four-word

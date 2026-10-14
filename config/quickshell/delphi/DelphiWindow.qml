@@ -1458,7 +1458,7 @@ FloatingWindow {
             hoverEnabled: true
             onClicked: if (win.netJob) win.stop(win.netJob.id)
             // the bubble says what is going; the tip only while it is not up
-            onContainsMouseChanged: containsMouse && !win.pushing ? tips.show(parent, "Stop", "esc") : tips.hide(parent)
+            onContainsMouseChanged: containsMouse && !pushBubble.shown ? tips.show(parent, "Stop", "esc") : tips.hide(parent)
           }
         }
         // the commits a push is sending (win.pushing); it hangs from the pill
@@ -1467,62 +1467,10 @@ FloatingWindow {
           id: pushBubble
           window: win
           target: netPill.visible ? netPill : pushBtn
-          shown: !!win.pushing && win.visible
+          // not while the page holds the push in its own place (Changes, clean)
+          shown: !!win.pushing && win.visible && !(win.pageItem && win.pageItem.holdsPush)
           cardWidth: 460
-          readonly property var p: win.pushing || ({ commits: [], more: 0, state: "going", where: "", branch: "" })
-          Text {
-            text: (pushBubble.p.state === "done" ? "Pushed to " : pushBubble.p.state === "failed" ? "Not pushed to " : "Pushing to ")
-              + pushBubble.p.where + "  \u00b7  " + pushBubble.p.branch
-            color: pushBubble.p.state === "done" ? Zenon.green : pushBubble.p.state === "failed" ? Zenon.red : Zenon.ink
-            font.family: Zenon.face
-            font.weight: Font.Bold
-            font.pixelSize: Zenon.px(14)
-          }
-          Text {
-            visible: pushBubble.p.whole || pushBubble.p.commits === null || pushBubble.p.commits.length === 0
-            text: pushBubble.p.whole ? "A new branch there: every commit on it goes"
-              : pushBubble.p.commits === null ? "Reading the commits\u2026" : "No new commits \u2014 the branch moves to this one"
-            color: Zenon.muted
-            font.family: Zenon.face
-            font.weight: Zenon.weight
-            font.pixelSize: Zenon.px(13)
-          }
-          Column {
-            spacing: 4
-            visible: !!pushBubble.p.commits && pushBubble.p.commits.length > 0
-            Repeater {
-              model: pushBubble.p.commits || []
-              delegate: Row {
-                id: cr
-                required property var modelData
-                spacing: 10
-                Text {
-                  text: cr.modelData.sha
-                  color: Zenon.yellow
-                  font.family: Zenon.face
-                  font.features: { "tnum": 1 }
-                  font.pixelSize: Zenon.px(13)
-                }
-                Text {
-                  width: 460 - 28 - 80
-                  elide: Text.ElideRight
-                  text: cr.modelData.subject
-                  color: Zenon.ink
-                  font.family: Zenon.face
-                  font.weight: Zenon.weight
-                  font.pixelSize: Zenon.px(14)
-                }
-              }
-            }
-            Text {
-              visible: pushBubble.p.more > 0
-              text: "and " + pushBubble.p.more + " more"
-              color: Zenon.muted
-              font.family: Zenon.face
-              font.weight: Zenon.weight
-              font.pixelSize: Zenon.px(13)
-            }
-          }
+          PushSummary { p: win.pushing; lineWidth: 460 - 28 }
         }
         DialogButton {
           id: fetchBtn

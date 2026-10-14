@@ -207,11 +207,16 @@ Item {
       host: nl.win
       index: nl.win ? nl.win.selIndex : -1
       rowH: nl.rowH
+      // summed from the rows, not read off the delegate: a new sort rebuilds
+      // every delegate, and one asked for before it is laid out left -1 —
+      // index × rowH, blind to the date headings above it
       rowY: {
-        void [list.contentY, list.originY, list.count, nl.rows, nl.win.selIndex];
-        const d = nl.win.selIndex >= 0 ? list.itemAtIndex(nl.win.selIndex) : null;
-        if (!d) return -1;
-        return d.y - list.originY + (d.head !== "" ? nl.secH : 0);
+        const i = nl.win ? nl.win.selIndex : -1;
+        const r = nl.rows;
+        if (i < 0 || i >= r.length) return -1;
+        let y = 0;
+        for (let k = 0; k < i; k++) y += nl.rowH + (r[k].head !== "" ? nl.secH : 0);
+        return y + (r[i].head !== "" ? nl.secH : 0);
       }
       on: nl.win && nl.win.selIndex >= 0
       color: nl.win ? nl.win.hiFill : "transparent"
