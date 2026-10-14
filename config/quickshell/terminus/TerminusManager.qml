@@ -588,8 +588,9 @@ Scope {
     w.setSaveName(saving ? saveName : "");
     w.setView(w.pickerView);
     w.dual = false;
-    w.shown = true;
-    w.claimFocus();
+    // held until its listing is in, as a portal request's is (fulfil): shown
+    // at once, its rows were drawn under the compositor's open animation
+    w.revealWhenReady();
     return true;
   }
 

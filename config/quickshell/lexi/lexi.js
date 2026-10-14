@@ -39,6 +39,8 @@ const ICON_AUDIO = "\uDB81\uDFC5";
 const ICON_CORRECTED = "\uF040";
 const ICON_TRANSLATE = "\uDB81\uDDCA";
 const ICON_STAR = "\uDB80\uDEDA";
+const ICON_SWAP = "\uDB81\uDCE1";
+const ICON_COPY = "\uDB80\uDD8F";
 
 // History caps
 const DICT_HISTORY_MAX = 100;

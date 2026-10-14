@@ -216,6 +216,18 @@ Item {
         onMenu: (x, y) => side.win.menuRef.open(x, y, [{ text: "New container…", icon: "\u{F0257}", run: () => side.win.askFolder("") },
                                                       { text: "New smart container…", icon: "\u{F0968}", run: () => side.win.askSmart(null) }])
       }
+      // starting one from a template, and the templates kept (saving,
+      // importing, deleting them) — the compose button's right click, in sight
+      ClioShelf {
+        id: tplRow
+        host: side
+        glyph: "\u{F0DC9}"
+        label: "From a template"
+        muted: true
+        held: side.win.menuHeld === "templates"
+        onClicked: { const p = tplRow.mapToItem(side.win.stageItem, 12, tplRow.height); side.win.templateMenu(p.x, p.y); side.win.menuHeld = "templates"; }
+        onMenu: (x, y) => { side.win.templateMenu(x, y); side.win.menuHeld = "templates"; }
+      }
 
       SideHead { ruled: false; label: "Smart Containers"; visible: smartRep.count > 0 }
       Repeater {

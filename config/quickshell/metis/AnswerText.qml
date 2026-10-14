@@ -14,8 +14,9 @@ import "metis.js" as Metis
 //
 // THE DIGITS ROLL. Each is a column of 0–9 behind a one-digit window that
 // slides to its new value, so an answer settling as you type is seen
-// settling rather than flickering. The slots are by position: as long as the
-// answer keeps its length, every digit rolls from where it was.
+// settling rather than flickering. The slots are counted from the RIGHT: an
+// answer that gains a figure ("97" → "102") rolls each place from where it
+// was, ones under ones, rather than every slot shifting over by one.
 //
 // Every digit is the width of a 0, so the face being proportional no longer
 // shuffles the answer sideways as it changes.
@@ -38,6 +39,8 @@ Item {
 
   Row {
     id: row
+    // slot 0 is the last character, drawn rightmost (see above)
+    layoutDirection: Qt.RightToLeft
 
     Repeater {
       model: root.chars.length
@@ -45,7 +48,7 @@ Item {
       delegate: Item {
         id: slot
         required property int index
-        readonly property var ch: root.chars[slot.index] || ({ c: "", big: false, quiet: false })
+        readonly property var ch: root.chars[root.chars.length - 1 - slot.index] || ({ c: "", big: false, quiet: false })
         readonly property bool digit: slot.ch.big && /^[0-9]$/.test(slot.ch.c)
         readonly property var fm: slot.ch.big ? bigFm : slot.ch.quiet ? quietFm : smallFm
 

@@ -461,6 +461,79 @@ module.exports = {
         .lines.every((l) => !/to USD$/.test(l)));
 
     // ── currencies, rates, pins, explain ──────────────────────────────────
+    t.eq("a country for its money", ex("100 qatar to usd"), "100 QAR to usd");
+    t.eq("on both sides", ex("100 qatar to egypt"), "100 QAR to EGP");
+    t.eq("as the target", ex("50 usd in qatar"), "50 usd to QAR");
+    t.eq("its people", ex("100 qatari to usd"), "100 QAR to usd");
+    t.eq("its money spelled out", ex("100 qatari riyals in usd"), "100 QAR to usd");
+    t.eq("two words", ex("20 south korean won to usd"), "20 KRW to usd");
+    t.eq("before guinea", ex("5 guinea-bissau to usd"), "5 XOF to usd");
+    t.eq("a name the xml lacks", ex("10 uk to egp"), "10 GBP to egp");
+    t.eq("money of", ex("usd to japan money"), "usd to JPY");
+    t.eq("no amount", ex("qatar to usd"), "QAR to usd");
+    t.eq("any case", ex("100 Saudi Arabia in EUR"), "100 SAR to EUR");
+    t.eq("no space", ex("100qatar to usd"), "100QAR to usd");
+    t.eq("pounds beside a country's code are sterling", ex("100 qatar to pounds"), "100 QAR to GBP");
+    t.eq("lebanese pounds are not sterling", ex("100 lebanese pounds to usd"), "100 LBP to usd");
+    t.eq("a lone country is one of its money", ex("qatar"), "1 QAR to QAR");
+    t.eq("the", ex("100 dollars to the uk"), "100 dollars to GBP");
+    t.eq("the, alone", ex("the bahamas currency"), "1 BSD to BSD");
+    t.ok("the clock still has qatar", M.prepare("time in qatar").kind !== "qalc");
+    t.ok("and the map jordan", M.prepare("distance from cairo to jordan").kind !== "qalc");
+    t.eq("a dram is still a weight", ex("5 dram to g"), "5 dram to g");
+
+    // ── which dinar ───────────────────────────────────────────────────────
+    t.eq("a dinar is asked about", M.prepare("100 dinar to usd").bad, "dinar");
+    t.ok("and says it is a which", M.prepare("100 dinars to usd").which);
+    t.eq("its codes are the chips", M.suggest("dinar", [])[0], "KWD");
+    t.eq("plurals too", M.suggest("pesos", [])[0], "MXN");
+    t.eq("a named dinar is not asked about", ex("100 kuwaiti dinars to usd"), "100 KWD to usd");
+    t.eq("a franc as a target", M.prepare("50 usd to francs").bad, "francs");
+    t.eq("the short word for a chip", M.moneyShort("KWD"), "Kuwait");
+    t.eq("or the name for a shared one", M.moneyShort("EUR"), "Euro");
+    t.eq("a currency's name", M.moneyInfo("qar").name, "Qatari riyal");
+
+    // ── tips beside the field ─────────────────────────────────────────────
+    const tp = M.tipsFor("100 qatar to egypt");
+    t.eq("a tip per name", tp.length, 2);
+    t.eq("as typed", tp[0].word + " " + tp[0].to, "qatar QAR");
+    t.eq("a lone country is a tip", M.tipsFor("japan")[0].to, "JPY");
+    t.eq("no tip for the clock", M.tipsFor("time in qatar").length, 0);
+    t.eq("a name is a tip", M.tipsFor("rent / 3", { rent: { raw: "1200", shown: "1200" } })[0].to, "1200");
+
+    // ── named values ──────────────────────────────────────────────────────
+    const V = { rent: { raw: "1200", shown: "1200" } };
+    t.eq("a name stands for its value", M.prepare("rent / 3", { vars: V }).expr, "(1200) / 3");
+    t.eq("an assignment asks its right side", M.prepare("rent = 1200").expr, "1200");
+    t.eq("and says what it names", M.prepare("rent = 1200").assign, "rent");
+    t.eq("from an older value", M.prepare("rent = rent * 1.1", { vars: V }).expr, "(1200) * 1.1");
+    t.eq("a lone x is an equation", M.prepare("x = 5").assign, undefined);
+    t.eq("unless let", M.prepare("let x = 5").assign, "x");
+    t.eq("forget", M.prepare("forget rent", { vars: V }).forget, "rent");
+    t.eq("vars round trip", M.parseVars(M.serializeVars(V)).rent.raw, "1200");
+    t.eq("a currency code is no name", M.prepare("usd = 5").assign, undefined);
+
+    // ── pairs, trend, learning ────────────────────────────────────────────
+    t.eq("a pair", JSON.stringify(M.moneyPair("100 QAR to usd", "$27.47")), '{"from":"QAR","to":"USD"}');
+    t.eq("a sign", JSON.stringify(M.moneyPair("€20 to MAD", "MAD 220")), '{"from":"EUR","to":"MAD"}');
+    t.eq("no pair for one currency", M.moneyPair("100 usd", "$100"), null);
+    t.eq("a trend read", M.readTrend("2026-10-01 2\n2026-09-01 1\n2026-09-15 1.5\n").length, 3);
+    t.eq("too short is none", M.readTrend("2026-10-01 2\n").length, 0);
+    t.eq("its change", M.trendSummary([{ date: "2026-07-01", v: 1 }, { date: "2026-10-01", v: 1.05 }]).pctText, "+5.0%");
+    t.eq("a stale dot", M.ageInk(5 * 86400), "red");
+    t.eq("a fresh dot", M.ageInk(3600), "green");
+    const LR = [{ expr: "100 qatar to usd", result: "$27", parse: "100 QAR → USD", kind: "currency" },
+      { expr: "5 QAR to egp", result: "EGP 70", parse: "", kind: "currency" },
+      { expr: "3 km", result: "3 km", kind: "length" }];
+    t.eq("learned from use", M.recentMoney(LR).join(), "QAR");
+    t.ok("a learned chip", M.chipPlan({ base: "27 USD", result: "$27", raw: "$27", input: "100 QAR to usd" }, ["QAR"])
+      .lines.some((l) => /to QAR$/.test(l)) === false);
+    t.ok("offered when not asked in", M.chipPlan({ base: "27 USD", result: "$27", raw: "$27", input: "100 usd" }, ["QAR"])
+      .lines.some((l) => /to QAR$/.test(l)));
+    t.eq("a chip's rate", M.chipFacts("EGP 1,300", "$27", "currency")[1].text, "1 USD = 48.15 EGP");
+    t.eq("a unit chip's ratio", M.chipFacts("3.107 mi", "5 km", "length")[0].text, "1 km = 0.6214 mi");
+    t.eq("none for a temperature", M.chipFacts("86 °F", "30 °C", "temp").length, 0);
+    t.eq("the tape adds raws", M.tapeSum([{ raw: "5 km" }, { raw: "300 m" }]), "(5 km) + (300 m)");
     t.ok("EGP is a chip", M.CURRENCIES.indexOf("EGP") !== -1);
     const P1 = M.togglePin([{ expr: "a", result: "1" }, { expr: "b", result: "2" }], { expr: "b", result: "2" });
     t.eq("pinned first", M.recentsOf(P1, 12)[0].expr, "b");

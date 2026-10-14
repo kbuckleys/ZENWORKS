@@ -25,6 +25,7 @@ Bubble {
   fit: false
   cardWidth: 452
   signal used(var item)
+  signal choose()
 
   // the newest first, each file once (the same file put in twice is one)
   readonly property var items: {
@@ -44,17 +45,34 @@ Bubble {
     return out;
   }
 
-  Row {
-    spacing: 10
-    Text { anchors.verticalCenter: parent.verticalCenter; text: "\u{F03E2}"; color: Zenon.cyan; font.family: Zenon.glyphFace; font.pixelSize: Zenon.px(15) }
-    Text { anchors.verticalCenter: parent.verticalCenter; text: "Pictures and files"; color: Zenon.ink; font.family: Zenon.face; font.weight: Font.Bold; font.pixelSize: Zenon.px(15) }
-    Text { anchors.verticalCenter: parent.verticalCenter; text: "drag onto the note, or click"; color: Zenon.muted; font.family: Zenon.face; font.weight: Zenon.weight; font.pixelSize: Zenon.px(12) }
+  Item {
+    width: 424
+    height: Math.max(head.height, chooseBtn.height)
+    Row {
+      id: head
+      anchors.verticalCenter: parent.verticalCenter
+      spacing: 10
+      Text { anchors.verticalCenter: parent.verticalCenter; text: "\u{F03E2}"; color: Zenon.cyan; font.family: Zenon.glyphFace; font.pixelSize: Zenon.px(15) }
+      Text { anchors.verticalCenter: parent.verticalCenter; text: "Pictures and files"; color: Zenon.ink; font.family: Zenon.face; font.weight: Font.Bold; font.pixelSize: Zenon.px(15) }
+    }
+    // from anywhere, without a drag: terminus' picker, several at once
+    DialogButton {
+      id: chooseBtn
+      visible: !!tray.mgr && !!tray.mgr.fileManager
+      anchors.right: parent.right
+      anchors.verticalCenter: parent.verticalCenter
+      glyph: true
+      label: "\u{EAF7}"
+      onClicked: tray.choose()
+    }
   }
 
   Text {
     visible: tray.items.length === 0
     width: 424
-    text: "Nothing put in a note yet."
+    wrapMode: Text.WordWrap
+    text: "Nothing put in a note yet — add some from Terminus, or drop them on the note."
+    horizontalAlignment: Text.AlignHCenter
     color: Zenon.muted
     font.family: Zenon.face
     font.weight: Zenon.weight
@@ -72,6 +90,8 @@ Bubble {
     interactive: contentHeight > height
     Grid {
       id: grid
+      // centred: a row of fewer than four sits in the middle, not to the left
+      x: Math.max(0, Math.round((flick.width - grid.width) / 2))
       columns: 4
       spacing: 8
       Repeater {
@@ -139,6 +159,19 @@ Bubble {
         }
       }
     }
+  }
+
+  // how to use what is shown, under it (the head is the title and the button)
+  Text {
+    visible: tray.items.length > 0
+    width: 424
+    text: "Drag one onto the note, or click it to put it in where the caret is."
+    horizontalAlignment: Text.AlignHCenter
+    color: Zenon.muted
+    font.family: Zenon.face
+    font.weight: Zenon.weight
+    font.pixelSize: Zenon.px(12)
+    wrapMode: Text.WordWrap
   }
 
   // ── THE DRAG ──

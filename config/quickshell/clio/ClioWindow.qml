@@ -214,13 +214,30 @@ FloatingWindow {
   function templateMenu(x, y) {
     const ts = win.mgr.templates;
     const items = ts.map((t) => ({ text: t.name, icon: "\u{F0DC9}", run: () => win.fromTemplate(t) }));
-    if (ts.length === 0) items.push({ text: "No templates yet", icon: "", enabled: false });
+    if (ts.length === 0) items.push({ text: "No templates yet — save or import one", icon: "", enabled: false });
     items.push({ isSeparator: true },
-               { text: "Save this as a template…", icon: "\u{F0193}", enabled: !!win.current && !win.current.sealed && win.current.kind !== "sticky",
-                 run: () => win.saveTemplate(win.current) });
+               { text: "Save this note as a template…", icon: "\u{F0193}", enabled: !!win.current && !win.current.sealed && win.current.kind !== "sticky",
+                 run: () => win.saveTemplate(win.current) },
+               { text: "Import a template…", icon: "", enabled: !!win.mgr.fileManager, run: () => win.importTemplate() });
     if (ts.length > 0) items.push({ text: "Delete a template…", icon: "", danger: true,
       run: () => menu.open(x, y, ts.map((t) => ({ text: t.name, icon: "", danger: true, run: () => win.mgr.deleteTemplate(t.id) }))) });
     menu.open(x, y, items);
+  }
+  // a Markdown, text or HTML file chosen, named, kept
+  function importTemplate() {
+    if (!win.mgr.fileManager) return;
+    win.mgr.fileManager.choose(false, Quickshell.env("HOME") + "/Documents", (paths) => {
+      if (!paths || !paths.length) return;
+      const path = paths[0];
+      const stem = path.replace(/^.*\//, "").replace(/\.[^.]*$/, "");
+      cards.ask({ title: "Import a template", glyph: "\u{F0DC9}", ink: Zenon.cyan,
+        detail: "Its words, lists and tables, to start new notes and entries from. {date}, {weekday}, {time}, {day}, {month} and {year} are filled in when it is used.",
+        fields: [{ key: "name", label: "Name", value: stem || "Template" }], verb: "Import",
+        then: (v) => {
+          const t = win.mgr.importTemplate(path, v.name.trim());
+          win.say(t ? "Imported as a template" : "Nothing in it to make a template from", !t);
+        } });
+    });
   }
   function saveTemplate(n) {
     if (!n) return;

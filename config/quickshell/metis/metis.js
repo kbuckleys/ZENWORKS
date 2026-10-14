@@ -421,8 +421,595 @@ function tzDiff(a, b) {
     label: placeLabel(a) + " → " + placeLabel(b) };
 }
 
+// EGP second: it is the one asked for most here (Africa/Cairo)
+const CURRENCIES = ["USD", "EGP", "EUR", "GBP", "JPY", "CNY", "CHF"];
+
 // money written out, for telling pounds sterling from pounds weight
 const CURRENCY_WORD = /\b(?:usd|eur|gbp|egp|jpy|cny|chf|aud|cad|inr|sar|aed|btc|dollars?|euros?|yen|yuan|francs?|bucks?|riyals?|dirhams?|rupees?)\b|[$€£¥]/i;
+
+// ── money by the country it is spent in ──
+// Nobody remembers that Qatar is QAR. A country, the people of it ("qatari")
+// or its money spelled out ("qatari riyals") stands for its code. Built from
+// the <countries> and <title> of qalc's own currencies.xml, plus the names
+// people use and the xml does not (uk, uae, korea, burma, holland …).
+const COUNTRY_MONEY = {
+  AED: "abu dhabi|dubai|emirates|emirati|emirati dirham|emirati dirhams|uae|uae dirham|uae dirhams|united arab emirates",
+  AFN: "afghan|afghan afghani|afghan afghanis|afghani|afghanis|afghanistan",
+  ALL: "albania|albanian|albanian lek|albanian leks|lek",
+  AMD: "armenia|armenian|armenian dram|armenian drams",
+  ANG: "curacao|curaçao|netherlands antillean guilder|netherlands antillean guilders|sint maarten",
+  AOA: "angola|angolan|angolan kwanza|angolan kwanzas|kwanza|kwanzas",
+  ARS: "argentina|argentine|argentine peso|argentine pesos",
+  AUD: "australia|australian|australian dollar|australian dollars",
+  AWG: "aruba|aruban|aruban florin|aruban florins",
+  AZN: "azerbaijan|azerbaijani|azerbaijani manat|azerbaijani manats",
+  BAM: "bosnia and herzegovina|bosnian|bosnian mark|bosnian marks",
+  BBD: "barbadian|barbadian dollar|barbadian dollars|barbados",
+  BDT: "bangladesh|bangladeshi|bangladeshi taka|bangladeshi takas|taka",
+  BHD: "bahrain|bahraini|bahraini dinar|bahraini dinars",
+  BIF: "burundi|burundian|burundian franc|burundian francs",
+  BMD: "bermuda|bermudian|bermudian dollar|bermudian dollars",
+  BND: "brunei|brunei dollar|brunei dollars",
+  BOB: "bolivia|bolivian|bolivian boliviano|bolivian bolivianos",
+  BRL: "brazil|brazilian|brazilian reais|brazilian real|reais",
+  BSD: "bahamas|bahamian|bahamian dollar|bahamian dollars",
+  BWP: "botswana|botswana pula|botswana pulas|pula",
+  BYN: "belarus|belarusian|belarusian ruble|belarusian rubles",
+  BZD: "belize|belize dollar|belize dollars",
+  CAD: "canada|canadian|canadian dollar|canadian dollars",
+  CDF: "congo-kinshasa|congolese|congolese franc|congolese francs|democratic republic of the congo|dr congo|drc",
+  CHF: "liechtenstein|swiss|swiss franc|swiss francs|switzerland",
+  CLP: "chile|chilean|chilean peso|chilean pesos",
+  CNY: "china|chinese|chinese yuan|chinese yuans|renminbi|rmb|yuan renminbi",
+  COP: "colombia|colombian|colombian peso|colombian pesos",
+  CRC: "costa rica|costa rican colon|costa rican colons",
+  CUP: "cuba|cuban|cuban peso|cuban pesos",
+  CVE: "cabo verde|cape verde|cape verdean escudo|cape verdean escudos",
+  CZK: "czech republic|czech|czech crown|czech crowns|czech koruna|czech korunas|czechia",
+  DJF: "djibouti|djiboutian|djiboutian franc|djiboutian francs",
+  DKK: "danish|danish krone|danish kroner|denmark|faroe islands|greenland",
+  DOP: "dominican|dominican peso|dominican pesos|dominican republic",
+  DZD: "algeria|algerian|algerian dinar|algerian dinars",
+  EGP: "egypt|egyptian|egyptian pound|egyptian pounds",
+  ERN: "eritrea|eritrean|eritrean nafka|eritrean nafkas|nakfa",
+  ETB: "birr|ethiopia|ethiopian|ethiopian birr|ethiopian birrs",
+  EUR: "andorra|austria|belgium|bulgaria|croatia|cyprus|estonia|europe|european|european euro|european euros|eurozone|finland|france|germany|greece|holland|ireland|italy|kosovo|latvia|lithuania|luxembourg|malta|monaco|montenegro|netherlands|portugal|san marino|slovakia|slovenia|spain|vatican|vatican city",
+  FJD: "fiji|fijian|fijian dollar|fijian dollars",
+  FKP: "falkland islands|falkland islands pound|falkland islands pounds",
+  GBP: "britain|british|british pound|british pounds|england|great britain|northern ireland|scotland|u.k.|uk|united kingdom|wales",
+  GEL: "georgia|georgian|georgian lari|georgian laris|lari",
+  GGP: "guernsey|guernsey pound|guernsey pounds",
+  GHS: "cedi|cedis|ghana|ghanaian|ghanaian cedi|ghanaian cedis",
+  GIP: "gibraltar|gibraltar pound|gibraltar pounds",
+  GMD: "dalasi|gambia|gambian|gambian dalasi|gambian dalasis",
+  GNF: "guinea|guinean|guinean franc|guinean francs",
+  GTQ: "guatemala|guatemalan|guatemalan quetzal|guatemalan quetzals|quetzal|quetzales",
+  GYD: "guyana|guyanese|guyanese dollar|guyanese dollars",
+  HKD: "hong kong|hong kong dollar|hong kong dollars",
+  HNL: "honduran|honduran lempira|honduran lempiras|honduras|lempira|lempiras",
+  HTG: "gourde|gourdes|haiti|haitian|haitian gourde|haitian gourdes",
+  HUF: "forint|forints|hungarian|hungarian forint|hungarian forints|hungary",
+  IDR: "indonesia|indonesian|indonesian rupiah|indonesian rupiahs",
+  ILS: "israel|israeli|israeli shekel|israeli shekels|palestine|shekel|shekels",
+  INR: "india|indian|indian rupee|indian rupees",
+  IQD: "iraq|iraqi|iraqi dinar|iraqi dinars",
+  IRR: "iran|iranian|iranian rial|iranian rials",
+  ISK: "iceland|icelandic|icelandic krona|icelandic kronor",
+  JMD: "jamaica|jamaican|jamaican dollar|jamaican dollars",
+  JOD: "jordan|jordanian|jordanian dinar|jordanian dinars",
+  JPY: "japan|japanese|japanese yen",
+  KES: "kenya|kenyan|kenyan shilling|kenyan shillings",
+  KGS: "kyrgyzstan|kyrgyzstani|kyrgyzstani som|kyrgyzstani soms",
+  KHR: "cambodia|cambodian|cambodian riel|cambodian riels|riel|riels",
+  KMF: "comorian|comorian franc|comorian francs|comoros",
+  KPW: "north korea|north korean won",
+  KRW: "korea|korean|korean won|south korea|south korean won",
+  KWD: "kuwait|kuwaiti|kuwaiti dinar|kuwaiti dinars",
+  KYD: "cayman islands|cayman islands dollar|cayman islands dollars",
+  KZT: "kazakhstan|kazakhstani|kazakhstani tenge|kazakhstani tenges|tenge",
+  LAK: "kip|lao|lao kip|lao kips|laos",
+  LBP: "lebanese|lebanese pound|lebanese pounds|lebanon",
+  LKR: "sri lanka|sri lankan rupee|sri lankan rupees",
+  LRD: "liberia|liberian|liberian dollar|liberian dollars",
+  LSL: "lesotho|lesotho loti|lesotho lotis|loti|maloti",
+  LYD: "libya|libyan|libyan dinar|libyan dinars",
+  MAD: "moroccan|moroccan dirham|moroccan dirhams|morocco",
+  MDL: "moldova|moldovan|moldovan lei|moldovan leu",
+  MGA: "ariary|madagascar|malagasy|malagasy ariary|malagasy ariarys",
+  MKD: "denar|denars|macedonia|macedonian|macedonian denar|macedonian denars|north macedonia",
+  MMK: "burma|burmese|burmese kyat|burmese kyats|kyat|kyats|myanmar",
+  MNT: "mongolia|mongolian|mongolian tugrik|mongolian tugriks|togrog|tugrik",
+  MOP: "macanese|macanese pataca|macanese patacas|macao|macau|pataca|patacas",
+  MRU: "mauritania|mauritanian|mauritanian ouguiya|mauritanian ouguiyas|ouguiya",
+  MUR: "mauritian|mauritian rupee|mauritian rupees|mauritius",
+  MVR: "maldives|maldivian|maldivian rufiyaa|maldivian rufiyaas|rufiyaa",
+  MWK: "malawi|malawian|malawian kwacha|malawian kwachas",
+  MXN: "mexican|mexican peso|mexican pesos|mexico",
+  MYR: "malaysia|malaysian|malaysian ringgit|malaysian ringgits|ringgit",
+  MZN: "meticais|metical|mozambican|mozambican metical|mozambican meticals|mozambique",
+  NAD: "namibia|namibian|namibian dollar|namibian dollars",
+  NGN: "naira|nigeria|nigerian|nigerian naira|nigerian nairas",
+  NIO: "nicaragua|nicaraguan|nicaraguan cordoba|nicaraguan cordobas",
+  NOK: "norway|norwegian|norwegian krone|norwegian kroner",
+  NPR: "nepal|nepalese|nepalese rupee|nepalese rupees",
+  NZD: "new zealand|new zealand dollar|new zealand dollars",
+  OMR: "oman|omani|omani rial|omani rials",
+  PAB: "balboa|balboas|panama|panamanian|panamanian balboa|panamanian balboas",
+  PEN: "peru|peruvian|peruvian sol|peruvian soles",
+  PGK: "kina|papua new guinea|papua new guinean kina|papua new guinean kinas",
+  PHP: "philippine|philippine peso|philippine pesos|philippines",
+  PKR: "pakistan|pakistani|pakistani rupee|pakistani rupees",
+  PLN: "poland|polish|polish zloty|polish zlotys|zloty|zlotych|zlotys",
+  PYG: "paraguay|paraguayan|paraguayan guarani|paraguayan guaranis",
+  QAR: "qatar|qatari|qatari riyal|qatari riyals",
+  RON: "romania|romanian|romanian lei|romanian leu",
+  RSD: "serbia|serbian|serbian dinar|serbian dinars",
+  RUB: "russia|russian|russian ruble|russian rubles",
+  RWF: "rwanda|rwandan|rwandan franc|rwandan francs",
+  SAR: "saudi|saudi arabia|saudi riyal|saudi riyals",
+  SBD: "solomon islands|solomon islands dollar|solomon islands dollars",
+  SCR: "seychelles|seychellois|seychellois rupee|seychellois rupees",
+  SDG: "sudan|sudanese|sudanese pound|sudanese pounds",
+  SEK: "kronor|sweden|swedish|swedish krona|swedish kronor",
+  SGD: "singapore|singapore dollar|singapore dollars",
+  SLE: "leone|leones|sierra leone|sierra leonean leone|sierra leonean leones",
+  SOS: "somali|somali shilling|somali shillings|somalia",
+  SRD: "suriname|surinamese|surinamese dollar|surinamese dollars",
+  STN: "dobra|dobras|sao tome and principe|sao tome dobra|sao tome dobras",
+  SYP: "syria|syrian|syrian pound|syrian pounds",
+  SZL: "emalangeni|eswatini|lilangeni|swazi|swazi lilangeni|swazi lilangenis|swaziland",
+  THB: "baht|thai|thai baht|thai bahts|thailand",
+  TJS: "somoni|tajikistan|tajikistani|tajikistani somoni|tajikistani somonis",
+  TMT: "turkmen|turkmen manat|turkmen manats|turkmenistan",
+  TND: "tunisia|tunisian|tunisian dinar|tunisian dinars",
+  TOP: "paanga|tonga|tongan|tongan paanga|tongan paangas",
+  TRY: "lira|turkey|turkish|turkish lira|turkish liras|turkish lire|turkiye|türkiye",
+  TTD: "trinidad and tobago|trinidad and tobago dollar|trinidad and tobago dollars",
+  TWD: "new taiwan dollar|new taiwan dollars|ntd|taiwan|taiwan dollar|taiwan dollars",
+  TZS: "tanzania|tanzanian|tanzanian shilling|tanzanian shillings",
+  UAH: "hryvnia|hryvnias|ukraine|ukrainian|ukrainian hryvnia|ukrainian hryvnias",
+  UGX: "uganda|ugandan|ugandan shilling|ugandan shillings",
+  USD: "america|american dollar|american dollars|east timor|ecuador|el salvador|marshall islands|micronesia|palau|puerto rico|timor-leste|u.s.a.|united states|united states of america|us dollar|us dollars|usa|zimbabwe",
+  UYU: "uruguay|uruguayan|uruguayan peso|uruguayan pesos",
+  UZS: "uzbek|uzbek som|uzbek soms|uzbekistan",
+  VES: "bolivar|bolivars|bolívar|venezuela|venezuelan|venezuelan bolivar|venezuelan bolivars",
+  VND: "dong|vietnam|vietnamese|vietnamese dong|vietnamese dongs",
+  VUV: "vanuatu|vanuatu vatu|vanuatu vatus|vatu",
+  XAF: "cameroon|central african franc|central african francs|central african republic|chad|congo-brazzaville|equatorial guinea|gabon|republic of congo|republic of the congo",
+  XCD: "anguilla|antigua and barbuda|dominica|eastern caribbean dollar|eastern caribbean dollars|grenada|montserrat|saint kitts and nevis|saint lucia|saint vincent and the grenadines",
+  XOF: "benin|burkina faso|cfa franc|cfa francs|cote d'ivoire|côte d'ivoire|guinea-bissau|ivory coast|mali|niger|senegal|togo|west african franc|west african francs",
+  XPF: "cfp|cfp franc|cfp francs|french polynesia|new caledonia|wallis and futuna",
+  YER: "yemen|yemeni|yemeni rial|yemeni rials",
+  ZAR: "rand|south africa|south african rand",
+  ZMW: "zambia|zambian|zambian kwacha|zambian kwachas",
+};
+const MONEY_NAME = {};
+for (const code in COUNTRY_MONEY)
+  for (const n of COUNTRY_MONEY[code].split("|")) MONEY_NAME[n] = code;
+// longest first: "south korean won" before "south korea", "guinea-bissau" before "guinea"
+const MONEY_NAMES = Object.keys(MONEY_NAME).sort((a, b) => b.length - a.length)
+  .map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|");
+// only where money goes — after an amount, or either side of to/in/as — so
+// "time in qatar" and "distance to jordan" are left for the clock and the map
+const MONEY_AT = new RegExp("(^|[\\d)\\]]\\s*|\\b(?:to|in|into|as|from)\\s+(?:the\\s+)?|\\s)(" + MONEY_NAMES
+  + ")(?:'s)?(?:\\s+(?:money|currency|cash))?(?=$|[\\s,;)])", "gi");
+const MONEY_ALONE = new RegExp("^(?:the\\s+)?(" + MONEY_NAMES + ")(?:'s)?(?:\\s+(?:money|currency|cash))?$", "i");
+
+function countryMoney(s) {
+  // a country on its own is one of its money, so the chips say what it is worth
+  const one = MONEY_ALONE.exec(s);
+  if (one) return "1 " + MONEY_NAME[one[1].toLowerCase()];
+  return s.replace(MONEY_AT, (all, before, name, at, whole) => {
+    const after = whole.slice(at + all.length);
+    const placed = /\S/.test(before) || /^\s+(?:to|in|into|as)\s/i.test(after);
+    return placed ? before.replace(/the\s+$/i, "") + MONEY_NAME[name.toLowerCase()] : all;
+  });
+}
+// what each code is, for the bubbles: "name|symbol|where it is spent"
+const MONEY_INFO = {
+  EUR: "Euro|€|Andorra, Austria, Belgium, Bulgaria, Croatia, Cyprus, Estonia, Finland, France, Germany, Greece, Ireland, Italy, Latvia, Lithuania, Luxembourg, Malta, Netherlands, Portugal, San Marino, Slovakia, Slovenia, Spain, Vatican City",
+  USD: "US dollar|$|United States, East Timor, Ecuador, El Salvador, Micronesia, Marshall Islands, Palau, Zimbabwe",
+  JPY: "Japanese yen|¥|Japan",
+  DKK: "Danish krone||Denmark",
+  GBP: "British pound|£|United Kingdom",
+  THB: "Thai baht|฿|Thailand",
+  SEK: "Swedish krona||Sweden",
+  CHF: "Swiss franc||Switzerland",
+  NOK: "Norwegian krone||Norway",
+  RUB: "Russian ruble|₽|Russia",
+  PHP: "Philippine peso|₱|Philippines",
+  MYR: "Malaysian ringgit||Malaysia",
+  CNY: "Chinese yuan||China",
+  IDR: "Indonesian rupiah||Indonesia",
+  CZK: "Czech koruna|Kč|Czech Republic",
+  HUF: "Hungarian forint||Hungary",
+  PLN: "Polish zloty|zł|Poland",
+  RON: "Romanian leu||Romania",
+  TRY: "Turkish lira|₺|Turkey",
+  AUD: "Australian dollar||Australia",
+  CAD: "Canadian dollar||Canada",
+  HKD: "Hong Kong dollar||Hong Kong",
+  NZD: "New Zealand dollar||New Zealand",
+  SGD: "Singapore dollar||Singapore",
+  KRW: "South Korean won|₩|South Korea",
+  ZAR: "South African rand||South Africa",
+  INR: "Indian rupee|₹|India",
+  ILS: "Israeli new shekel|₪|Israel",
+  MXN: "Mexican peso||Mexico",
+  BRL: "Brazilian real||Brazil",
+  ISK: "Icelandic króna||Iceland",
+  BTC: "Bitcoin|₿|",
+  KES: "Kenyan shilling||Kenya",
+  AFN: "Afghan afghani|؋|Afghanistan",
+  ALL: "Albanian lek||Albania",
+  DZD: "Algerian dinar||Algeria",
+  AOA: "Angolan kwanza||Angola",
+  XCD: "Eastern Caribbean dollar||Antigua and Barbuda, Dominica, Grenada, Montserrat, Saint Kitts and Nevis, Saint Lucia, Saint Vincent and the Grenadines, Anguilla",
+  ARS: "Argentine peso||Argentina",
+  AMD: "Armenian dram|֏|Armenia",
+  AWG: "Aruban florin||Aruba",
+  ANG: "Netherlands Antillean guilder||Curaçao, Sint Maarten",
+  AZN: "Azerbaijani manat|₼|Azerbaijan",
+  BSD: "Bahamian dollar||Bahamas",
+  BHD: "Bahraini dinar||Bahrain",
+  BDT: "Bangladeshi taka|৳|Bangladesh",
+  BBD: "Barbadian dollar||Barbados",
+  BYN: "Belarusian ruble||Belarus",
+  BZD: "Belize dollar||Belize",
+  XOF: "West African CFA franc||Benin, Burkina Faso, Guinea-Bissau, Ivory Coast, Mali, Niger, Senegal, Togo",
+  BMD: "Bermudian dollar||Bermuda",
+  BOB: "Bolivian boliviano||Bolivia",
+  BAM: "Bosnia-Herzegovina convertible mark||Bosnia and Herzegovina",
+  BWP: "Botswana pula||Botswana",
+  BND: "Brunei dollar||Brunei",
+  BIF: "Burundian franc||Burundi",
+  KHR: "Cambodian riel|៛|Cambodia",
+  XAF: "Central African CFA franc||Cameroon, Central African Republic, Chad, Republic of the Congo, Equatorial Guinea, Gabon",
+  CVE: "Cape Verdean escudo||Cape Verde",
+  KYD: "Cayman Islands dollar||Cayman Islands",
+  CLP: "Chilean peso||Chile",
+  COP: "Colombian peso||Colombia",
+  KMF: "Comorian franc||Comoros",
+  CDF: "Congolese franc||Democratic Republic of the Congo",
+  CRC: "Costa Rican colón|₡|Costa Rica",
+  CUP: "Cuban peso||Cuba",
+  DJF: "Djiboutian franc||Djibouti",
+  DOP: "Dominican peso||Dominican Republic",
+  EGP: "Egyptian pound||Egypt",
+  ERN: "Eritrean nafka||Eritrea",
+  ETB: "Ethiopian birr||Ethiopia",
+  FKP: "Falkland Islands pound||Falkland Islands",
+  FJD: "Fijian dollar||Fiji",
+  XPF: "CFP franc||French Polynesia, New Caledonia, Wallis and Futuna",
+  GMD: "Gambian dalasi||Gambia",
+  GEL: "Georgian lari|₾|Georgia",
+  GHS: "Ghanaian cedi|₵|Ghana",
+  GIP: "Gibraltar pound||Gibraltar",
+  GTQ: "Guatemalan quetzal||Guatemala",
+  GGP: "Guernsey pound||Guernsey",
+  GNF: "Guinean franc||Guinea",
+  GYD: "Guyanese dollar||Guyana",
+  HTG: "Haitian gourde||Haiti",
+  HNL: "Honduran lempira||Honduras",
+  IRR: "Iranian rial|﷼|Iran",
+  IQD: "Iraqi dinar||Iraq",
+  JMD: "Jamaican dollar||Jamaica",
+  JOD: "Jordanian dinar||Jordan",
+  KZT: "Kazakhstani tenge|₸|Kazakhstan",
+  KPW: "North Korean won||North Korea",
+  KWD: "Kuwaiti dinar||Kuwait",
+  KGS: "Kyrgyzstani som||Kyrgyzstan",
+  LAK: "Lao kip|₭|Laos",
+  LBP: "Lebanese pound||Lebanon",
+  LSL: "Lesotho loti||Lesotho",
+  LRD: "Liberian dollar||Liberia",
+  LYD: "Libyan dinar||Libya",
+  MOP: "Macanese pataca||Macau",
+  MKD: "Macedonian denar||Macedonia",
+  MGA: "Malagasy ariary||Madagascar",
+  MWK: "Malawian kwacha||Malawi",
+  MVR: "Maldivian rufiyaa|ރ|Maldives",
+  MRU: "Mauritanian ouguiya||Mauritania",
+  MUR: "Mauritian rupee||Mauritius",
+  MDL: "Moldovan leu||Moldova",
+  MNT: "Mongolian tögrög|₮|Mongolia",
+  MAD: "Moroccan dirham||Morocco",
+  MZN: "Mozambican metical||Mozambique",
+  MMK: "Burmese kyat||Myanmar",
+  NAD: "Namibian dollar||Namibia",
+  NPR: "Nepalese rupee|रू|Nepal",
+  NIO: "Nicaraguan córdoba||Nicaragua",
+  NGN: "Nigerian naira|₦|Nigeria",
+  OMR: "Omani rial||Oman",
+  PKR: "Pakistani rupee||Pakistan",
+  PAB: "Panamanian balboa||Panama",
+  PGK: "Papua New Guinean kina||Papua New Guinea",
+  PYG: "Paraguayan guaraní|₲|Paraguay",
+  PEN: "Peruvian sol||Peru",
+  QAR: "Qatari riyal||Qatar",
+  RWF: "Rwandan franc||Rwanda",
+  STN: "São Tomé and Príncipe dobra||Sao Tome and Principe",
+  SAR: "Saudi riyal||Saudi Arabia",
+  RSD: "Serbian dinar||Serbia",
+  SCR: "Seychellois rupee||Seychelles",
+  SLE: "Sierra Leonean leone||Sierra Leone",
+  SBD: "Solomon Islands dollar||Solomon Islands",
+  SOS: "Somali shilling||Somalia",
+  LKR: "Sri Lankan rupee|௹|Sri Lanka",
+  SDG: "Sudanese pound||Sudan",
+  SRD: "Surinamese dollar||Suriname",
+  SZL: "Swazi lilangeni||Eswatini",
+  SYP: "Syrian pound||Syria",
+  TWD: "New Taiwan dollar||Taiwan",
+  TJS: "Tajikistani somoni||Tajikistan",
+  TZS: "Tanzanian shilling||Tanzania",
+  TOP: "Tongan paʻanga||Tonga",
+  TTD: "Trinidad and Tobago dollar||Trinidad and Tobago",
+  TND: "Tunisian dinar||Tunisia",
+  TMT: "Turkmenistan manat||Turkmenistan",
+  UGX: "Ugandan shilling||Uganda",
+  UAH: "Ukrainian hryvnia|₴|Ukraine",
+  AED: "United Arab Emirates dirham||United Arab Emirates",
+  UYU: "Uruguayan peso||Uruguay",
+  UZS: "Uzbekistan soʻm||Uzbekistan",
+  VUV: "Vanuatu vatu||Vanuatu",
+  VES: "Venezuelan bolívar||Venezuela",
+  VND: "Vietnamese đồng|₫|Vietnam",
+  YER: "Yemeni rial||Yemen",
+  ZMW: "Zambian kwacha||Zambia",
+};
+function moneyInfo(code) {
+  const c = String(code || "").toUpperCase();
+  const row = MONEY_INFO[c];
+  if (!row) return null;
+  const [name, sym, where] = row.split("|");
+  return { code: c, name: name, sym: sym, where: where ? where.split(", ") : [] };
+}
+// a code of any currency qalc knows, as countryMoney leaves it
+function hasMoneyCode(s) {
+  return (String(s).match(/\b[A-Z]{3}\b/g) || []).some((c) => c in MONEY_INFO);
+}
+
+// the short word beside a code on a chip: the country, or the name
+function moneyShort(code) {
+  const i = moneyInfo(code);
+  if (!i) return "";
+  return i.where.length === 1 ? i.where[0] : i.name;
+}
+
+// A name that is half the world's: "dinar" is Kuwait's and Jordan's and
+// six more. qalc reads every one of these as something else without a word
+// ("1 dinar" was 0.254 m³), so it is asked which — the commonest first.
+const MONEY_WHICH = {
+  dinar: ["KWD", "JOD", "BHD", "IQD", "LYD", "TND", "DZD", "RSD"],
+  peso: ["MXN", "PHP", "ARS", "COP", "CLP", "DOP", "UYU", "CUP"],
+  riyal: ["SAR", "QAR"], rial: ["OMR", "IRR", "YER"],
+  franc: ["CHF", "XOF", "XAF", "XPF", "RWF", "BIF", "DJF", "GNF", "KMF", "CDF"],
+  krone: ["DKK", "NOK"], kroner: ["DKK", "NOK"], krona: ["SEK", "ISK"], kronur: ["ISK"],
+  shilling: ["KES", "UGX", "TZS", "SOS"], dirham: ["AED", "MAD"], manat: ["AZN", "TMT"],
+  kwacha: ["ZMW", "MWK"], som: ["UZS", "KGS"], leu: ["RON", "MDL"], lei: ["RON", "MDL"]
+};
+function whichMoney(word) {
+  const w = String(word || "").toLowerCase();
+  return MONEY_WHICH[w] || MONEY_WHICH[w.replace(/(?:e?s)$/, "")] || [];
+}
+const WHICH_AT = new RegExp("(^|[\\d)\\]]\\s*|\\b(?:to|in|into|as|from)\\s+|\\s)("
+  + Object.keys(MONEY_WHICH).join("|") + ")(?:e?s)?(?=$|[\\s,;)])", "gi");
+// the first such name where money goes, or ""
+function moneyAsk(s) {
+  WHICH_AT.lastIndex = 0;
+  let m;
+  while ((m = WHICH_AT.exec(s)) !== null) {
+    const after = s.slice(m.index + m[0].length);
+    if (/\S/.test(m[1]) || /^\s+(?:to|in|into|as)\s/i.test(after) || /^\s*$/.test(s.replace(m[0], "")))
+      return m[0].slice(m[1].length);
+  }
+  return "";
+}
+
+// ── the tips beside the field ──
+// What was understood on the way, said where you are typing: "qatar → QAR",
+// "rent = 1,200". [{word, to, kind: "money" | "name"}], in the order typed.
+function tipsFor(input, vars, prep) {
+  const s = String(input || "").trim().replace(/\s+/g, " ");
+  // only what the question was taken as: "time in qatar" went to the clock
+  const p = prep || prepare(s, { vars: vars });
+  const money = p.kind === "qalc" || p.kind === "mixed" || !!p.bad;
+  const out = [], seen = {};
+  const add = (word, to, kind) => {
+    const k = kind + word.toLowerCase();
+    if (seen[k]) return;
+    seen[k] = true;
+    out.push({ word: word, to: to, kind: kind });
+  };
+  const one = MONEY_ALONE.exec(s);
+  if (money && one) add(one[1], MONEY_NAME[one[1].toLowerCase()], "money");
+  else if (money) {
+    MONEY_AT.lastIndex = 0;
+    let m;
+    while ((m = MONEY_AT.exec(s)) !== null) {
+      const after = s.slice(m.index + m[0].length);
+      if (/\S/.test(m[1]) || /^\s+(?:to|in|into|as)\s/i.test(after))
+        add(m[2], MONEY_NAME[m[2].toLowerCase()], "money");
+    }
+  }
+  const v = vars || {};
+  const as = assignOf(s);
+  for (const name of Object.keys(v))
+    if ((!as || as.name !== name) && new RegExp("\\b" + name + "\\b", "i").test(s))
+      add(name, v[name].shown || v[name].raw, "name");
+  return out;
+}
+
+// ── named values ──
+// "rent = 1200", then "rent / 3". Two letters at least, or "let x = 5": a
+// lone x before = is an equation to solve. Kept in ~/.cache/metis-names.
+const NAME_RESERVED = ["ans", "let", "pi", "e", "i", "to", "in", "as", "of", "and", "or", "forget"];
+function assignOf(s) {
+  const m = /^(let\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*:?=\s*(.+)$/.exec(String(s || "").trim());
+  if (!m || /=/.test(m[3])) return null;
+  const name = m[2].toLowerCase();
+  if (NAME_RESERVED.indexOf(name) !== -1 || (!m[1] && name.length < 2)) return null;
+  if (name in MONEY_INFO || name.toUpperCase() in MONEY_INFO) return null;
+  return { name: name, rhs: m[3] };
+}
+function forgetOf(s) {
+  const m = /^(?:forget|unset|clear|delete)\s+([A-Za-z_][A-Za-z0-9_]*)$/i.exec(String(s || "").trim());
+  return m ? m[1].toLowerCase() : "";
+}
+function useNames(s, vars) {
+  const names = Object.keys(vars || {}).sort((a, b) => b.length - a.length);
+  for (const n of names)
+    s = s.replace(new RegExp("\\b" + n + "\\b", "gi"), "(" + vars[n].raw + ")");
+  return s;
+}
+function varsPath() {
+  return Paths.cacheDir() + "/metis-names";
+}
+function parseVars(text) {
+  let o;
+  try { o = JSON.parse(String(text || "")); } catch (e) { return {}; }
+  const out = {};
+  if (o && typeof o === "object")
+    for (const k of Object.keys(o))
+      if (/^[a-z_][a-z0-9_]*$/.test(k) && o[k] && typeof o[k].raw === "string" && o[k].raw !== "")
+        out[k] = { raw: o[k].raw, shown: typeof o[k].shown === "string" ? o[k].shown : o[k].raw };
+  return out;
+}
+function serializeVars(vars) {
+  return JSON.stringify(vars || {});
+}
+function setName(vars, name, raw, shown) {
+  const out = Object.assign({}, vars || {});
+  out[name] = { raw: raw, shown: shown || raw };
+  return out;
+}
+function dropName(vars, name) {
+  const out = Object.assign({}, vars || {});
+  delete out[name];
+  return out;
+}
+
+// ── a currency answer's pair, for its trend ──
+// {from, to} codes, or null: what it was asked in and what it came to
+const MONEY_SIGN = { "$": "USD", "€": "EUR", "£": "GBP", "¥": "JPY", "₹": "INR", "₩": "KRW", "₽": "RUB", "₿": "BTC" };
+const MONEY_WORDS = [[/\b(?:dollars?|bucks?)\b/i, "USD"], [/\beuros?\b/i, "EUR"], [/\b(?:pounds?|sterling|quid)\b/i, "GBP"],
+  [/\byen\b/i, "JPY"], [/\b(?:yuan|rmb)\b/i, "CNY"], [/\brupees?\b/i, "INR"], [/\bwon\b/i, "KRW"],
+  [/\brubles?\b/i, "RUB"], [/\bbitcoins?\b/i, "BTC"]];
+function moneyIn(s) {
+  const t = String(s || "");
+  let best = null;
+  const take = (at, code) => { if (at >= 0 && (best === null || at < best.at)) best = { at: at, code: code }; };
+  const re = /\b[A-Za-z]{3}\b/g;
+  let m;
+  while ((m = re.exec(t)) !== null)
+    if (m[0].toUpperCase() in MONEY_INFO && !/^(?:all|top|try|cup|mad|pen|bob|gel)$/.test(m[0])) { take(m.index, m[0].toUpperCase()); break; }
+  for (const k in MONEY_SIGN) take(t.indexOf(k), MONEY_SIGN[k]);
+  for (const [re2, code] of MONEY_WORDS) { const x = re2.exec(t); if (x) take(x.index, code); }
+  return best ? best.code : "";
+}
+function moneyPair(expr, result) {
+  const e = String(expr || "");
+  const cut = /\s+to\s+/i.exec(e);
+  const from = moneyIn(cut ? e.slice(0, cut.index) : e);
+  const to = moneyIn(cut ? e.slice(cut.index + cut[0].length) : "") || moneyIn(result);
+  return from && to && from !== to ? { from: from, to: to } : null;
+}
+
+// ── the trend ── weekly snapshots of the same rates qalc uses (the
+// fawazahmed0 currency-api), each fetched once and kept: a past day's rates
+// never change. scripts/metis-trend.py prints "YYYY-MM-DD value" lines.
+function trendDir() {
+  return Paths.cacheDir() + "/metis-rates";
+}
+function readTrend(text) {
+  const pts = [];
+  for (const line of String(text || "").split("\n")) {
+    const m = /^(\d{4}-\d{2}-\d{2}) ([\d.eE+-]+)$/.exec(line.trim());
+    if (m && isFinite(Number(m[2])) && Number(m[2]) > 0) pts.push({ date: m[1], v: Number(m[2]) });
+  }
+  pts.sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : 0);
+  return pts.length >= 3 ? pts : [];
+}
+// "+1.2%" over the run, and the run's low and high
+function trendSummary(pts) {
+  if (!pts || pts.length < 2) return null;
+  const a = pts[0].v, b = pts[pts.length - 1].v;
+  const vs = pts.map((p) => p.v);
+  const pct = (b - a) / a * 100;
+  return { first: a, last: b, low: Math.min.apply(null, vs), high: Math.max.apply(null, vs), pct: pct,
+    pctText: (pct >= 0 ? "+" : "−") + Math.abs(pct).toFixed(Math.abs(pct) < 10 ? 1 : 0) + "%",
+    weeks: Math.round((Date.parse(pts[pts.length - 1].date) - Date.parse(pts[0].date)) / 6048e5) };
+}
+// a rate as it reads: four figures, no more
+function rateText(v) {
+  const n = Number(v);
+  if (!isFinite(n) || n <= 0) return "";
+  return group(String(Number(n.toPrecision(n >= 1000 ? 7 : 4))));
+}
+
+// ── the rates' age, as a dot ──
+function ageInk(ageSec) {
+  const a = Number(ageSec);
+  if (!isFinite(a) || a < 0) return "red";
+  return a < 86400 ? "green" : a < 3 * 86400 ? "sand" : "red";
+}
+function ageText(ageSec) {
+  const a = Number(ageSec);
+  if (!isFinite(a)) return "";
+  if (a < 0) return "no exchange rates on disk";
+  return ratesNote(a).replace(/^rates /, "") + " · fetched twice a day at most";
+}
+
+// ── the currencies learned from use ──
+// The two you ask about most lately that are not in the standing row:
+// asked about QAR twice, and QAR is offered under every money answer.
+function recentMoney(rows) {
+  const n = {}, first = {};
+  (rows || []).slice(0, 30).forEach((r, i) => {
+    if (r.kind !== "currency") return;
+    const codes = String(r.expr + " " + (r.parse || "") + " " + r.result).match(/\b[A-Z]{3}\b/g) || [];
+    for (const c of codes)
+      if (c in MONEY_INFO && CURRENCIES.indexOf(c) === -1) {
+        n[c] = (n[c] || 0) + 1;
+        if (!(c in first)) first[c] = i;
+      }
+  });
+  return Object.keys(n).sort((a, b) => n[b] - n[a] || first[a] - first[b]).slice(0, 2);
+}
+
+// ── what a chip's bubble says ──
+// A currency chip: the rate both ways. A unit chip: one of the answer's
+// unit in the chip's, while that is a plain ratio (not for °C, not a pace).
+// [{text, big?}] lines, or [].
+function chipFacts(chip, result, kind) {
+  const c = String(chip || ""), r = String(result || "");
+  const cv = numOf(c), rv = numOf(r);
+  const lines = [];
+  if (kind === "currency") {
+    const cc = moneyIn(c), rc = moneyIn(r);
+    const ci = moneyInfo(cc);
+    if (ci) lines.push({ text: ci.name + (ci.sym ? "  " + ci.sym : ""), big: true });
+    if (cc && rc && cc !== rc && isFinite(cv) && isFinite(rv) && cv > 0 && rv > 0) {
+      lines.push({ text: "1 " + rc + " = " + rateText(cv / rv) + " " + cc });
+      lines.push({ text: "1 " + cc + " = " + rateText(rv / cv) + " " + rc });
+    }
+    if (ci && ci.where.length > 0 && ci.where.length <= 3) lines.push({ text: "spent in " + ci.where.join(", "), muted: true });
+    return lines;
+  }
+  const cu = unitOf(c), ru = unitOf(r);
+  if (/°|\/(?:km|mi)$|:/.test(c + r) || !cu || !ru || !isFinite(cv) || !isFinite(rv) || rv === 0) return lines;
+  lines.push({ text: "1 " + ru + " = " + rateText(cv / rv) + " " + cu });
+  lines.push({ text: "1 " + cu + " = " + rateText(rv / cv) + " " + ru });
+  return lines;
+}
+
+// ── the tape (ctrl+h) ── the kept answers, oldest at the top like a till
+// roll, and the ones marked added up by qalc — so 5 km and 300 m add too.
+function tapeSum(rows) {
+  const parts = (rows || []).map((r) => r.raw || "").filter((x) => x !== "");
+  return parts.length >= 1 ? parts.map((x) => "(" + x + ")").join(" + ") : "";
+}
 
 // ── what you typed → what qalc is asked ───────────────────────────────────
 // Returns {kind:"qalc", expr, alt, target, …}, {kind:"tz", …}, {kind:"local",
@@ -446,6 +1033,21 @@ function prepare(input, ctx) {
     s = s.replace(/^(?:what\s*(?:'s|’s|\s+is|\s+are)|whats|how\s+much\s+is|calculate|calc|compute|convert|evaluate|solve|work\s+out)\s+/i, "");
   s = s.replace(/\s*(?:->|→|=>)\s*/g, " to ");
   if (!s) return { kind: "qalc", expr: "" };
+
+  // ── named values ── "forget rent", "rent = 1200", then rent stands for it
+  const vars = ctx.vars || {};
+  const gone = forgetOf(s);
+  if (gone && vars[gone])
+    return Object.assign(local("forget " + gone, "", gone + " = " + vars[gone].shown, []),
+      { forget: gone, category: "calc" });
+  const as = assignOf(s);
+  if (as) {
+    const r = prepare(as.rhs, ctx);
+    if (r.bad || (r.kind === "qalc" && !r.expr)) return r;
+    r.assign = as.name;
+    return r;
+  }
+  s = useNames(s, vars);
 
   // ── going on from the last answer ──
   // "* 2", "+ 15%", "to EUR" on their own carry on from it; "-5" is a number
@@ -510,10 +1112,14 @@ function prepare(input, ctx) {
 
   // Pounds next to money are sterling, not weight: "50 dollars in pounds"
   // was $50 (qalc could not turn dollars into lb and gave them back)
-  s = s.replace(/\begyptian\s+pounds?\b/gi, "EGP")
-    .replace(/\b(?:british\s+pounds?|pounds?\s+sterling|sterling|quid)\b/gi, "GBP");
-  if (CURRENCY_WORD.test(s.replace(/\bpounds?\b/gi, "")))
+  s = countryMoney(s.replace(/\begyptian\s+pounds?\b/gi, "EGP")
+    .replace(/\b(?:british\s+pounds?|pounds?\s+sterling|sterling|quid)\b/gi, "GBP"));
+  const bare = s.replace(/\bpounds?\b/gi, "");
+  if (CURRENCY_WORD.test(bare) || hasMoneyCode(bare))
     s = s.replace(/\bpounds?\b/gi, "GBP");
+  // "100 dinar": whose? asked, not guessed (MONEY_WHICH)
+  const which = moneyAsk(s);
+  if (which) return { bad: which, which: true };
   // "0 k in c": a lone k beside a temperature is kelvin, not a thousand
   s = s.replace(/(\d)\s*k\b(?=\s+(?:to|in|as|into)\s+(?:°|deg(?:rees?)?\s+)?(?:c|f|celsius|fahrenheit)\b)/gi, "$1 K")
     .replace(/(°?\s*(?:c|f|celsius|fahrenheit)\s+(?:to|in|as|into))\s+k$/i, "$1 K");
@@ -953,6 +1559,7 @@ function readCalc(text, prep) {
   if (prep && prep.label) parse = prep.label;
   // a reading of our own for a tip, a split, a list: qalc's own was its
   // plumbing — "((USD × 80) × 15) / 100", "max([(3 kilograms)  (500 grams)])"
+  if (prep && prep.assign) parse = prep.assign + " = " + (parse || prep.expr);
   if (prep && prep.say) parse = prep.say + (parse.indexOf("  · ") >= 0 ? parse.slice(parse.indexOf("  · ")) : "");
 
   let shown = result;
@@ -1108,8 +1715,6 @@ const CATEGORIES = [
   { sig: "m^−2", name: "fuel", to: ["mpg", "km/L", { to: "L/(100 km)", inv: true }] }
 ];
 
-// EGP second: it is the one asked for most here (Africa/Cairo)
-const CURRENCIES = ["USD", "EGP", "EUR", "GBP", "JPY", "CNY", "CHF"];
 
 function categoryOf(base, result) {
   const b = String(base || "").trim();
@@ -1127,7 +1732,7 @@ function categoryOf(base, result) {
 
 // The chip list for an answer: [{line, pace?, label?}] for the chip run, plus
 // any chip that needs no qalc at all (a duration, a height).
-function chipPlan(calc) {
+function chipPlan(calc, learned) {
   const c = categoryOf(calc.base, calc.result);
   if (!c) {
     const only = [roundedChip(calc.result), wordScale(calc.result)].filter((x) => x !== "");
@@ -1162,7 +1767,11 @@ function chipPlan(calc) {
     // not the one it was asked in: "100 egp to usd" had "EGP 100.001"
     const said = { USD: /\$|\bdollars?\b|\bbucks?\b/i, EUR: /€|\beuros?\b/i, GBP: /£|\bpounds?\b|\bsterling\b/i,
       JPY: /¥|\byen\b/i, CNY: /\byuan\b|\brmb\b/i, CHF: /\bfrancs?\b/i };
-    for (const k of CURRENCIES)
+    // the standing row, with the ones you have been asking about after
+    // USD and EGP (recentMoney)
+    const row = CURRENCIES.slice(0, 2).concat((learned || []).filter((k) => CURRENCIES.indexOf(k) === -1),
+      CURRENCIES.slice(2));
+    for (const k of row)
       if (!new RegExp("\\b" + k + "\\b", "i").test(calc.input || "")
           && !(said[k] && said[k].test(calc.input || "")))
         specs.push({ to: k });
@@ -1183,7 +1792,8 @@ function chipPlan(calc) {
   if (words) local.unshift(words);
   if (short) local.unshift(short);
   const lines = specs.map((s) => (s.inv ? "1/(" + r + ")" : "(" + (s.from || r) + ")") + " to " + s.to);
-  return { lines: lines, specs: specs, local: local };
+  // money gets two more: the standing row and the ones learned
+  return { lines: lines, specs: specs, local: local, max: c.name === "currency" ? 8 : 6 };
 }
 
 function chipScript() {
@@ -1220,7 +1830,7 @@ function readChips(text, plan, calc) {
     seen[t] = true;
     chips.push(t);
   }
-  return chips.slice(0, 6);
+  return chips.slice(0, plan.max || 6);
 }
 
 // 6000 → "1 h 40 min"; 90061 → "1 d 1 h 1 min"; 330 → "5 min 30 s"
@@ -1856,6 +2466,9 @@ function subseq(w, c) {
 function suggest(word, names) {
   const w = String(word || "");
   const lw = w.toLowerCase();
+  // a money name more than one country spends: its codes, to pick from
+  const codes = whichMoney(lw);
+  if (codes.length > 0) return codes.slice();
   if (lw.length < 2 || STOPWORDS.indexOf(lw) !== -1) return [];
   const seen = {}, scored = [];
   // and places, from the index's bucket for the word's first letters:
@@ -2283,7 +2896,7 @@ function answerChars(text) {
 function parseWorth(prep, parse, input) {
   if (!parse) return false;
   if (!prep || prep.kind !== "qalc") return true;
-  if (prep.label || prep.say || prep.pace || prep.round) return true;
+  if (prep.label || prep.say || prep.pace || prep.round || prep.assign) return true;
   if (prep.auto) return false;
   const flat = (x) => String(x || "").toLowerCase().replace(/[\s()]/g, "").replace(/[×*]/g, "*");
   return flat(parse) !== flat(input);
@@ -2440,3 +3053,10 @@ function complete(text, names) {
 // ── for a first open, with nothing kept yet ───────────────────────────────
 const EXAMPLES = ["5 km in miles", "days until christmas", "3pm tokyo to london",
   "distance from cairo to london", "tip 15% on 80", "1.5 hours in hours and minutes"];
+
+// what the trend run is: scripts/metis-trend.py, given qalc's own rates.json
+// for the newest point. $1 the script, $2 from, $3 to, $4 the cache.
+function trendScript() {
+  return "d=\"${QALCULATE_USER_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/qalculate}\"\n"
+    + "exec python3 -I \"$1\" \"$2\" \"$3\" \"$4\" \"$d/rates.json\" 2>/dev/null </dev/null\n";
+}

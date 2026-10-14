@@ -100,16 +100,15 @@ Item {
     Rectangle { anchors.fill: parent; color: Zenon.headBg }
     Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Zenon.border }
 
-    // where the note is (the container, the journal), or the sticky's colours
+    // a note in the Trash says so, or the sticky's colours (where a note
+    // lives is not said here: its row in the list says it — user, 2026-10-14)
     Text {
       x: 18
       anchors.verticalCenter: parent.verticalCenter
       width: Math.max(0, tools.x - 30)
       elide: Text.ElideRight
-      visible: !pane.isSticky
-      text: !pane.note ? "" : pane.note.deleted ? "In the Trash · restore it to edit"
-        : pane.isEntry ? (pane.mgr.journalOf(pane.note.journal) || {}).name || ""
-        : pane.win.folderName(pane.note.folder)
+      visible: !pane.isSticky && !!pane.note && pane.note.deleted
+      text: "In the Trash · restore it to edit"
       color: pane.note && pane.note.deleted ? Zenon.red : Zenon.muted
       font.family: Zenon.face
       font.weight: Zenon.weight
@@ -459,6 +458,11 @@ Item {
   // ── THE TRAY: what is already in Clio, to use again ────────────────────
   property bool trayOpen: false
   onNoteChanged: if (!pane.note || pane.isSticky) pane.trayOpen = false
+  // the picker asked for once the tray is wholly gone (its collapse ended,
+  // the popup unmapped); the timer only in case that never comes
+  property bool pickPending: false
+  function pickNow() { if (!pane.pickPending) return; pane.pickPending = false; pickLater.stop(); Qt.callLater(() => pane.win.attachFile()); }
+  Timer { id: pickLater; interval: 400; onTriggered: pane.pickNow() }
   AttachTray {
     window: pane.win
     target: trayTool
@@ -467,6 +471,10 @@ Item {
     dismissable: true
     onDismissed: pane.trayOpen = false
     onUsed: (it) => pane.win.dropFiles([it.path], ed.caretGap())
+    // the tray put away first: building the picker holds the shell a few
+    // hundred ms, and a fade caught in that hold hung over the note
+    onChoose: { pane.pickPending = true; pane.trayOpen = false; pickLater.restart(); }
+    onVisibleChanged: if (!visible) pane.pickNow()
   }
 
   // ── THE EDITOR ─────────────────────────────────────────────────────────

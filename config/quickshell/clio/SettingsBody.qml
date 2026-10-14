@@ -24,12 +24,6 @@ Column {
   readonly property int gap: 36
   readonly property real colW: Math.floor((sb.width - 44 - sb.gap) / 2)
 
-  Row {
-    spacing: 12
-    Text { anchors.verticalCenter: parent.verticalCenter; text: "\u{F08BB}"; color: Zenon.cyan; font.family: Zenon.glyphFace; font.pixelSize: Zenon.px(18) }
-    Text { anchors.verticalCenter: parent.verticalCenter; text: "Settings"; color: Zenon.ink; font.family: Zenon.face; font.weight: Font.Bold; font.pixelSize: Zenon.px(19) }
-  }
-
   // two columns: the notes (and the stickies) on the left, the journal and
   // the lock on the right
   Row {
@@ -79,7 +73,8 @@ Column {
           SettingLine {
             width: sb.colW
             label: "Templates"
-            note: !sb.mgr || sb.mgr.templates.length === 0 ? "None yet — a note's menu saves one" : sb.mgr.templates.map((t) => t.name).join(", ")
+            note: !sb.mgr || sb.mgr.templates.length === 0 ? "None yet — save one from a note's menu, or import one" : sb.mgr.templates.map((t) => t.name).join(", ")
+            DialogButton { visible: !!sb.mgr && !!sb.mgr.fileManager; label: "Import…"; onClicked: { sb.closed(); sb.win.importTemplate(); } }
             DialogButton {
               id: tplBtn
               visible: !!sb.mgr && sb.mgr.templates.length > 0

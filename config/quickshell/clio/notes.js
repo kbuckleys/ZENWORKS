@@ -751,20 +751,19 @@ function derive(n) {
 // latest day first: the sidebar's Recent. Nothing in the Trash, nothing empty
 // and never opened since it was made.
 function recent(notes, seen, k) {
-  seen = seen || {};
   var out = [];
   for (var i = 0; i < notes.length; i++) {
     var n = notes[i];
     if (n.deleted || (n.kind !== "note" && n.kind !== "entry")) continue;
-    var at = Math.max(n.modified || 0, seen[n.id] || 0);
+    var at = n.modified || 0;
     if (!at) continue;
-    if (n.blocks && !seen[n.id] && (n.d ? n.d.text : derive(n).text).trim() === "") continue;
+    if (n.blocks && (n.d ? n.d.text : derive(n).text).trim() === "") continue;
     out.push({ n: n, at: at });
   }
-  // by DAY, then by when each was made: opening one moves it to its
-  // day, never to the top of it (user, 2026-10-14: the row jumped under
-  // the pointer as it was chosen)
-  out.sort(function (a, b) { return dayStart(b.at) - dayStart(a.at) || (b.n.created || 0) - (a.n.created || 0); });
+  // by when each was last EDITED, newest first (user, 2026-10-14): not by
+  // day, not by being opened — choosing a row never moves it, writing in
+  // one brings it to the top
+  out.sort(function (a, b) { return b.at - a.at; });
   return out.slice(0, k || 5);
 }
 
@@ -1285,6 +1284,71 @@ function templateOf(blocks) {
     if (o.k === "check") o.c = false;
     return o;
   });
+}
+// A Markdown (or plain text) file as blocks — markdownOf read back: what it
+// writes, this reads; pictures and files are left out as templateOf does.
+function mdRun(s) {
+  var codes = [];
+  var t = escape(s).replace(/`([^`]+)`/g, function (m, c) { codes.push(c); return "\u0000" + (codes.length - 1) + "\u0000"; });
+  t = t.replace(/!\[[^\]]*\]\([^)]*\)/g, "")
+    .replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, '<a href="$2">$1</a>')
+    .replace(/\*\*([^*]+)\*\*|__([^_]+)__/g, function (m, a, b) { return "<b>" + (a || b) + "</b>"; })
+    .replace(/(^|[^*\w])\*([^*\s][^*]*?)\*(?!\*)/g, "$1<i>$2</i>")
+    .replace(/(^|[^_\w])_([^_\s][^_]*?)_(?!\w)/g, "$1<i>$2</i>")
+    .replace(/~~([^~]+)~~/g, "<s>$1</s>");
+  return t.replace(/\u0000(\d+)\u0000/g, function (m, i) { return codes[+i]; });
+}
+function blocksOfMarkdown(text) {
+  var lines = String(text || "").replace(/\r\n?/g, "\n").split("\n");
+  var out = [];
+  var para = null;
+  var endPara = function () { para = null; };
+  for (var i = 0; i < lines.length; i++) {
+    var line = lines[i];
+    var m;
+    if (/^\s*```/.test(line)) {
+      var code = [];
+      for (i++; i < lines.length && !/^\s*```/.test(lines[i]); i++) code.push(lines[i]);
+      out.push(block("mono", code.join("\n"))); endPara(); continue;
+    }
+    if (/^\s*$/.test(line)) { endPara(); continue; }
+    if (/^\s*([-*_])(\s*\1){2,}\s*$/.test(line)) { out.push(block("rule", "")); endPara(); continue; }
+    if ((m = line.match(/^(#{1,6})\s+(.*?)\s*#*\s*$/))) {
+      out.push(block(m[1].length === 1 ? "title" : m[1].length === 2 ? "heading" : "subheading", mdRun(m[2]))); endPara(); continue;
+    }
+    if (/^\s*\|.*\|\s*$/.test(line)) {
+      var rows = [];
+      for (; i < lines.length && /^\s*\|.*\|\s*$/.test(lines[i]); i++) {
+        if (/^\s*\|(\s*:?-+:?\s*\|)+\s*$/.test(lines[i])) continue;
+        rows.push(lines[i].trim().slice(1, -1).replace(/\\\|/g, "\u0001").split("|").map(function (c) { return mdRun(c.trim().replace(/\u0001/g, "|")); }));
+      }
+      i--;
+      var w = Math.max.apply(null, rows.map(function (r) { return r.length; }));
+      rows.forEach(function (r) { while (r.length < w) r.push(""); });
+      out.push(block("table", "", { rows: rows })); endPara(); continue;
+    }
+    if ((m = line.match(/^>\s?(.*)$/))) {
+      var last = out[out.length - 1];
+      if (para && last && last.k === "quote") last.h += "<br />" + mdRun(m[1]);
+      else { out.push(block("quote", mdRun(m[1]))); para = out[out.length - 1]; }
+      continue;
+    }
+    if ((m = line.match(/^(\s*)(?:[-*+]|\d+[.)])\s+\[([ xX])\]\s+(.*)$/))) {
+      out.push(block("check", mdRun(m[3]), { c: false, l: Math.floor(m[1].replace(/\t/g, "  ").length / 2) })); endPara(); continue;
+    }
+    if ((m = line.match(/^(\s*)([-*+]|\d+[.)])\s+(.*)$/))) {
+      var l = Math.floor(m[1].replace(/\t/g, "  ").length / 2);
+      out.push(block(/\d/.test(m[2]) ? "number" : m[2] === "*" ? "bullet" : "dash", mdRun(m[3]), l ? { l: l } : null)); endPara(); continue;
+    }
+    // a paragraph: its lines run on, a line ending in two spaces breaks
+    var run = mdRun(line.replace(/\s+$/, ""));
+    var br = / {2,}$/.test(line);
+    if (para && para.k === "body") para.h += (para._br ? "<br />" : " ") + run;
+    else { out.push(block("body", run)); para = out[out.length - 1]; }
+    para._br = br;
+  }
+  out.forEach(function (b) { delete b._br; if (b.k !== "mono" && b.k !== "table" && b.k !== "rule") b.h = inline(b.h); });
+  return out;
 }
 function fillTemplate(blocks, ms) {
   var d = new Date(ms);

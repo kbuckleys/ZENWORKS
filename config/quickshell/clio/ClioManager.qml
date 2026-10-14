@@ -347,6 +347,19 @@ Scope {
     mgr.setMeta({ templates: mgr.templates.concat([t]) });
     return t.id;
   }
+  // a template from a file: Markdown or text (as Export writes them), or
+  // HTML; its pictures and files left out as a saved one's are
+  function importTemplate(path, name) {
+    readFile.path = "";
+    readFile.path = path;
+    const text = readFile.text();
+    if (!text) return null;
+    const bs = N.templateOf(/\.html?$/i.test(path) ? N.blocksOf(text) : N.blocksOfMarkdown(text));
+    if (!bs.length) return null;
+    mgr.addTemplate(name, bs);
+    return bs;
+  }
+  FileView { id: readFile; blockLoading: true; printErrors: false }
   function deleteTemplate(id) { mgr.setMeta({ templates: mgr.templates.filter((t) => t.id !== id) }); }
   function setDaily(id) { mgr.setMeta({ daily: id || "" }); }
   function templateBlocks(id, ms) {

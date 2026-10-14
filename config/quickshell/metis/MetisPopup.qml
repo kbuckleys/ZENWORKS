@@ -12,6 +12,7 @@ import Quickshell.Wayland
 import "../morpheus"
 import "metis.js" as Metis
 import "../morpheus/helpers.js" as Helpers
+import "../terminus" as Term
 
 LayerPopup {
   id: popup
@@ -94,7 +95,7 @@ LayerPopup {
   // the rest of the word being typed, offered faintly; → takes it
   readonly property string completion:
     filterInput.activeFocus && filterInput.cursorPosition === filterInput.text.length
-      && popup.histIdx < 0 ? Metis.complete(filterInput.text, popup.qalcNames) : ""
+      && popup.histIdx < 0 ? Metis.complete(filterInput.text, popup.qalcNames.concat(Object.keys(popup.vars))) : ""
 
   readonly property var parseInk: ({
     muted: String(Zenon.muted), arrow: String(Zenon.blue), target: String(Zenon.white),
@@ -158,6 +159,62 @@ LayerPopup {
   // how old the exchange rates on disk are, in seconds (NaN: not known yet)
   property real ratesAge: NaN
 
+  // ── names ── "rent = 1200", kept in ~/.cache/metis-names: {name: {raw, shown}}
+  property var vars: ({})
+  property bool varsLoaded: false
+
+  // ── tips ── what a word in the field was taken as, at the field's right
+  // ("qatar → QAR", "rent = 1,200"); hover one for its bubble
+  readonly property var tips: !popup.tapeMode && popup.histIdx < 0 && popup.query.trim() !== ""
+    ? Metis.tipsFor(popup.query, popup.vars).slice(0, 3) : []
+
+  // ── which ── "100 dinar": the question is whose, and the chips are codes
+  readonly property bool shownWhich: popup.shownBad && Metis.whichMoney(popup.badWord).length > 0
+
+  // ── trend ── three months of a money answer's rate (TrendStrip), and the
+  // pair it is of; kept per pair for the session, so typing "100" → "1000"
+  // does not run it again
+  property var shownTrend: []
+  property var trendPair: null
+  property var trendCache: ({})
+
+  // ── tape ── ctrl+h: the kept answers as a till roll, marked ones summed
+  property bool tapeMode: false
+  property int tapeIdx: -1
+  property var tapeMarks: ({})
+  property string tapeTotal: ""
+  property bool tapeTotalBad: false
+  readonly property var tapeRows: popup.tapeMode ? popup.history.slice(0, 50).reverse() : []
+  readonly property var nameList: Object.keys(popup.vars).sort()
+    .map((k) => ({ name: k, shown: popup.vars[k].shown }))
+
+  // ── the bubble ── one, moved between whatever is hovered: a tip, a chip,
+  // the rates' dot, the trend. Its target is kept when it goes, so it can fade.
+  property Item bubbleTarget: null
+  property bool bubbleOn: false
+  property var bubbleLines: []      // [{text, big?, muted?}]
+  // false while a line is still being fetched (a tip's rates): the bubble
+  // waits for it rather than opening and then growing (Bubble.ready)
+  property bool bubbleReady: true
+  // a currency tip's rate lines, once fetched: a second hover is instant
+  property var tipRates: ({})
+  function bubbleAt(item, lines, pending) {
+    if (!item || !lines || lines.length === 0) return;
+    popup.bubbleReady = !pending;
+    // still to come: shut first, so it opens whole on its new target
+    // rather than reshaping in place there
+    if (pending) popup.bubbleOn = false;
+    popup.bubbleLines = lines;
+    popup.bubbleTarget = item;
+    popup.bubbleOn = true;
+  }
+  function bubbleOff(item) {
+    if (popup.bubbleTarget === item) popup.bubbleOn = false;
+  }
+
+  // what the strip says for a moment in place of its keys
+  property string flashText: "copied"
+
   // ── AS WIDE AS WHAT IT IS SHOWING ─────────────────────────────────
   // It was a fixed 600 while every other layer fits itself. Now: the
   // widest of what you typed, the result under it and the hint strip, and
@@ -166,6 +223,9 @@ LayerPopup {
   FontMetrics { id: inFm; font.family: Zenon.face; font.weight: Font.Bold; font.pixelSize: Zenon.px(20) }
   FontMetrics { id: exprFm; font.family: Zenon.face; font.weight: Font.Bold; font.pixelSize: Zenon.px(14) }
   readonly property var hintRows: {
+    if (popup.tapeMode)
+      return [["↑↓", "move"], ["space", "mark"], ["return", "open"],
+        ["ctrl return", Object.keys(popup.tapeMarks).length > 0 ? "copy total" : "copy"], ["esc", "close tape"]];
     if (popup.histIdx >= 0)
       return [["return", "paste"], ["ctrl return", "copy"], ["tab", "edit"],
         ["ctrl p", popup.history[popup.histIdx] && popup.history[popup.histIdx].pin ? "unpin" : "pin"],
@@ -175,12 +235,14 @@ LayerPopup {
         ? [["return", "open"], ["ctrl return", "copy"], ["tab", "recent"],
            ["ctrl p", popup.recents[popup.chipIdx] && popup.recents[popup.chipIdx].pin ? "unpin" : "pin"],
            ["esc", "close"]]
-        : [["tab", "recent"], ["↑↓", "history"], ["esc", "close"]];
+        : [["tab", "recent"], ["↑↓", "history"], ["ctrl h", "tape"], ["esc", "close"]];
     if (popup.exampleMode)
       return [["tab", "examples"], ["return", "try it"], ["esc", "close"]];
     if (popup.completion !== "")
       return (popup.chips.length > 0 ? [["→", "finish word"], ["return", "paste"], ["tab", "units"]]
         : [["→", "finish word"], ["return", "paste"]]).concat([["esc", "clear · close"]]);
+    if (popup.shownWhich)
+      return [["tab", "pick one"], ["return", "use it"], ["esc", "clear · close"]];
     if (popup.shownBad)
       return popup.chips.length > 0
         ? [["tab", "did you mean"], ["return", "use it"], ["esc", "clear · close"]]
@@ -188,6 +250,8 @@ LayerPopup {
     return (popup.chips.length > 0
         ? [["return", "paste"], ["ctrl return", "copy"], ["tab", "units"]]
         : [["return", "paste"], ["ctrl return", "copy"]])
+      .concat(popup.shownPrep && popup.shownPrep.assign ? [["return", "save " + popup.shownPrep.assign]] : [])
+      .concat(popup.shownPrep && popup.shownPrep.forget ? [["return", "forget it"]] : [])
       .concat(popup.readings.length > 1 ? [["ctrl e", "explain"]] : [])
       .concat(popup.shownKind === "currency"
         ? [["ctrl r", popup.ratesRefreshing ? "updating…" : "rates"]] : [])
@@ -199,7 +263,8 @@ LayerPopup {
   readonly property int minW: Math.max(360, Math.ceil(hintMeasure.implicitWidth + 48))
   readonly property int panelWidth: {
     const want = Math.max(
-      inFm.advanceWidth(popup.query) + 120,
+      inFm.advanceWidth(popup.query) + 120 + (popup.tips.length > 0 ? tipRow.implicitWidth + 12 : 0),
+      popup.tapeMode ? 560 : 0,
       popup.parseShown ? exprFm.advanceWidth(popup.parseLine) + 60 : 0,
       answerMeasure.implicitWidth + 60,
       // The chips as drawn (ChipStrip.contentW is its row's own width, which
@@ -312,8 +377,11 @@ LayerPopup {
         }
         let parse = r.parse || "";
         if (r.category === "currency") {
+          // a day old or more is said in words; fresher, the dot beside the
+          // answer says it (hover it for the age)
           const note = Metis.ratesNote(popup.ratesAge);
-          if (note !== "") parse = (parse !== "" ? parse : calcProc.runExpr) + "  · " + note;
+          if (note !== "" && !(popup.ratesAge >= 0 && popup.ratesAge < 86400))
+            parse = (parse !== "" ? parse : calcProc.runExpr) + "  · " + note;
         }
         popup.showAnswer(calcProc.runExpr, r.result, prep.kind === "tz" ? "" : r.raw, parse);
         popup.shownWork = r.work || "";
@@ -327,11 +395,118 @@ LayerPopup {
           popup.chipMode = "units";
           popup.chips = r.chips || [];
           popup.chipIdx = -1;
+        } else if (prep.assign) {
+          // a value being named: its hex and binary are not what it is for
+          popup.chips = [];
+          popup.chipIdx = -1;
         } else {
           popup.askChips(r);
         }
+        if (r.category === "currency") popup.askTrend(Metis.moneyPair(prep.expr, r.result));
       }
     }
+  }
+
+  // ── the trend ── (scripts/metis-trend.py; a first run fetches a few
+  // weekly snapshots, every later one reads them from the cache)
+  Process {
+    id: trendProc
+    property int runSeq: 0
+    property var pair: null
+    property var next: null
+    onExited: if (trendProc.next) {
+      const n = trendProc.next;
+      trendProc.next = null;
+      popup.askTrend(n);
+    }
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: {
+        const pts = Metis.readTrend(text);
+        const p = trendProc.pair;
+        const cache = Object.assign({}, popup.trendCache);
+        cache[p.from + ">" + p.to] = pts;
+        popup.trendCache = cache;
+        if (trendProc.runSeq === popup.seq && popup.shownKind === "currency") {
+          popup.trendPair = p;
+          popup.shownTrend = pts;
+        }
+      }
+    }
+  }
+
+  function askTrend(pair) {
+    if (!pair) return;
+    const key = pair.from + ">" + pair.to;
+    if (key in popup.trendCache) {
+      popup.trendPair = pair;
+      popup.shownTrend = popup.trendCache[key];
+      return;
+    }
+    if (trendProc.running) { trendProc.next = pair; return; }
+    trendProc.runSeq = popup.seq;
+    trendProc.pair = pair;
+    trendProc.command = ["bash", "-c", Metis.trendScript(), "metis",
+      Helpers.script("metis-trend.py"), pair.from, pair.to, Metis.trendDir()];
+    trendProc.running = true;
+  }
+
+  // ── a tip's rates ── one short qalc run when a money tip is hovered:
+  // what one of it is in USD and EGP
+  Process {
+    id: tipProc
+    property var tip: null
+    property Item item: null
+    property var head: []
+    property var targets: []
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: {
+        const out = text.split("\n");
+        const rates = [];
+        for (let i = 0; i < tipProc.targets.length && i < out.length; ++i) {
+          const r = Metis.rateText(Metis.numOf(Metis.tidy(Metis.stripAnsi(out[i]))));
+          if (r !== "") rates.push({ text: "1 " + tipProc.tip.to + " = " + r + " " + tipProc.targets[i] });
+        }
+        const cache = Object.assign({}, popup.tipRates);
+        cache[tipProc.tip.to] = rates;
+        popup.tipRates = cache;
+        if (popup.bubbleTarget !== tipProc.item || !popup.bubbleOn) return;
+        popup.bubbleLines = tipProc.head.concat(rates);
+        popup.bubbleReady = true;
+      }
+    }
+  }
+
+  function tipBubble(item, tip) {
+    if (tip.kind === "name") {
+      const v = popup.vars[tip.word] || {};
+      popup.bubbleAt(item, [{ text: tip.word + " = " + Metis.group(v.shown || ""), big: true },
+        { text: "set as  " + tip.word + " = …  · stands in for it anywhere" },
+        { text: "forget " + tip.word + "  takes it away", muted: true }]);
+      return;
+    }
+    const i = Metis.moneyInfo(tip.to);
+    if (!i) return;
+    const where = i.where.length > 4 ? i.where.slice(0, 4).join(", ") + " and " + (i.where.length - 4) + " more"
+      : i.where.join(", ");
+    const head = [{ text: i.name + (i.sym ? "   " + i.sym : ""), big: true },
+      { text: "“" + tip.word + "” is " + i.code + (where ? " · spent in " + where : ""), muted: true }];
+    // the rates, kept from an earlier hover, or fetched before it opens
+    if (i.code in popup.tipRates) {
+      popup.bubbleAt(item, head.concat(popup.tipRates[i.code]));
+      return;
+    }
+    popup.bubbleAt(item, head, true);
+    if (tipProc.running) return;
+    const targets = ["USD", "EGP"].filter((c) => c !== i.code);
+    tipProc.tip = tip;
+    tipProc.item = item;
+    tipProc.head = head;
+    tipProc.targets = targets;
+    tipProc.command = ["bash", "-c", Metis.chipScript(), "metis"]
+      .concat(targets.map((c) => "1 " + i.code + " to " + c));
+    tipProc.running = true;
   }
 
   Timer {
@@ -368,7 +543,7 @@ LayerPopup {
     popup.chipIdx = -1;
     popup.chipMode = "units";
     const plan = calc.base !== undefined && calc.base !== ""
-      ? Metis.chipPlan(calc) : { lines: [], specs: [], local: [] };
+      ? Metis.chipPlan(calc, Metis.recentMoney(popup.history)) : { lines: [], specs: [], local: [] };
     if (plan.lines.length === 0) {
       popup.chips = plan.local.filter((x) => x !== "").slice(0, 6);
       return;
@@ -394,6 +569,9 @@ LayerPopup {
 
   function showAnswer(expr, result, raw, parse) {
     chipProc.next = null;
+    popup.shownTrend = [];
+    popup.trendPair = null;
+    popup.bubbleOn = false;
     popup.stale = false;
     staleTimer.stop();
     popup.shownKind = "calc";
@@ -414,6 +592,9 @@ LayerPopup {
 
   function showBad(expr, word) {
     chipProc.next = null;
+    popup.shownTrend = [];
+    popup.trendPair = null;
+    popup.bubbleOn = false;
     popup.stale = false;
     staleTimer.stop();
     popup.shownKind = "calc";
@@ -471,6 +652,23 @@ LayerPopup {
     writeProc.running = true;
     writeProc.write(job.content);
     writeProc.stdinEnabled = false;
+  }
+
+  Process {
+    id: varsReadProc
+    command: ["sh", "-c", "cat \"$1\" 2>/dev/null", "metis-read", Metis.varsPath()]
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: {
+        popup.vars = Object.assign(Metis.parseVars(text), popup.vars);
+        popup.varsLoaded = true;
+      }
+    }
+  }
+
+  function saveVars(v) {
+    popup.vars = v;
+    popup.writeFile(Metis.varsPath(), Metis.serializeVars(v));
   }
 
   Process {
@@ -552,6 +750,7 @@ LayerPopup {
     popup.clearShown();
     popup.histIdx = -1;
     popup.copied = false;
+    popup.tapeMode = false;
 
     focusRetry.counter = 0;
     focusRetry.restart();
@@ -559,6 +758,7 @@ LayerPopup {
     popup.syncFocus();
 
     if (!popup.histLoaded && !histReadProc.running) histReadProc.running = true;
+    if (!popup.varsLoaded && !varsReadProc.running) varsReadProc.running = true;
     if (popup.qalcNames.length === 0 && !namesProc.running) namesProc.running = true;
     if (!popup.placesLoaded && !placesProc.running) placesProc.running = true;
     if (!ratesProc.running) ratesProc.running = true;
@@ -566,6 +766,9 @@ LayerPopup {
 
   function clearShown() {
     chipProc.next = null;
+    popup.shownTrend = [];
+    popup.trendPair = null;
+    popup.bubbleOn = false;
     popup.stale = false;
     staleTimer.stop();
     popup.shownTint = "";
@@ -621,7 +824,7 @@ LayerPopup {
     const s = ++popup.seq;
     // answered here and now, or not at all: nothing to ask once a run ends
     calcProc.pending = false;
-    const prep = Metis.prepare(q, { ans: popup.ans });
+    const prep = Metis.prepare(q, { ans: popup.ans, vars: popup.vars });
     // an English word left over is said so at once — qalc would only have
     // read it as a unit
     if (prep.bad) {
@@ -749,6 +952,8 @@ LayerPopup {
   function refreshRates() {
     if (popup.ratesRefreshing || ratesProc.running) return;
     popup.ratesRefreshing = true;
+    popup.trendCache = ({});
+    popup.tipRates = ({});
     ratesProc.command = ["bash", "-c", Metis.ratesScript(), "metis", "force"];
     ratesProc.running = true;
   }
@@ -757,6 +962,25 @@ LayerPopup {
   // under a question it could not read, the name it might have meant, put
   // in the field in place of the word that failed
   function takeShown(copyOnly) {
+    if (popup.tapeMode) {
+      popup.tapeTake(copyOnly);
+      return;
+    }
+    // "rent = 1200": saved, and the field cleared for the next question
+    const p = popup.shownPrep;
+    if (!popup.shownBad && p && p.assign && popup.shownRaw && !popup.stale) {
+      popup.keepShown();
+      popup.saveVars(Metis.setName(popup.vars, p.assign, popup.shownRaw, popup.shownResult));
+      popup.flash("saved " + p.assign);
+      filterInput.clear();
+      return;
+    }
+    if (!popup.shownBad && p && p.forget) {
+      popup.saveVars(Metis.dropName(popup.vars, p.forget));
+      popup.flash("forgot " + p.forget);
+      filterInput.clear();
+      return;
+    }
     if (popup.exampleMode) {
       if (popup.chipIdx >= 0) popup.recall(popup.examples[popup.chipIdx]);
       return;
@@ -771,6 +995,7 @@ LayerPopup {
     }
     if (popup.shownBad) {
       if (popup.chipIdx >= 0) popup.applyFix(popup.chips[popup.chipIdx]);
+      else shake.restart();   // nothing to take: said with a shake
       return;
     }
     if (copyOnly) popup.copyOnly(popup.pickText);
@@ -794,6 +1019,7 @@ LayerPopup {
     popup.detach("printf '%s' " + Strings.shellQuote(text) + " | wl-copy >/dev/null 2>&1");
     // nothing is typed anywhere, so without a word it looks like nothing
     // happened: "copied" in the strip, then the panel goes
+    popup.flashText = "copied";
     popup.copied = true;
     copiedTimer.restart();
   }
@@ -810,8 +1036,85 @@ LayerPopup {
     if (!text) return;
     popup.keepShown();
     popup.detach("printf '%s' " + Strings.shellQuote(text) + " | wl-copy >/dev/null 2>&1");
+    popup.flash("copied");
+  }
+
+  // a word in the strip for a moment: "copied", "saved rent"
+  function flash(what) {
+    popup.flashText = what;
     popup.copied = true;
     copiedFlash.restart();
+  }
+
+  // ── the tape ──
+  function tapeToggleOpen() {
+    if (popup.tapeMode) { popup.tapeMode = false; return; }
+    if (popup.history.length === 0) return;
+    popup.tapeMarks = ({});
+    popup.tapeTotal = "";
+    popup.tapeTotalBad = false;
+    popup.tapeMode = true;
+    popup.tapeIdx = popup.tapeRows.length - 1;
+    Qt.callLater(() => tapeList.reveal(popup.tapeIdx));
+  }
+  function tapeStep(delta) {
+    const n = popup.tapeRows.length;
+    if (n === 0) return;
+    popup.tapeIdx = Math.max(0, Math.min(n - 1, popup.tapeIdx + delta));
+    tapeList.reveal(popup.tapeIdx);
+  }
+  function tapeMark(i) {
+    if (i < 0 || i >= popup.tapeRows.length) return;
+    const m = Object.assign({}, popup.tapeMarks);
+    if (m[i]) delete m[i]; else m[i] = true;
+    popup.tapeMarks = m;
+    popup.tapeIdx = i;
+    popup.tapeAdd();
+  }
+  function tapeAdd() {
+    const rows = Object.keys(popup.tapeMarks).map((k) => popup.tapeRows[Number(k)]).filter((r) => r);
+    const expr = Metis.tapeSum(rows);
+    popup.tapeTotalBad = false;
+    if (expr === "") { popup.tapeTotal = ""; return; }
+    // one marked row is its own total
+    if (rows.length === 1) { popup.tapeTotal = rows[0].result; return; }
+    popup.tapeTotal = "…";
+    tapeProc.expr = expr;
+    if (tapeProc.running) { tapeProc.again = true; return; }
+    tapeProc.command = ["bash", "-c", Metis.calcScript(), "metis", expr, "", ""];
+    tapeProc.running = true;
+  }
+  function tapeTake(copyOnly) {
+    const row = popup.tapeRows[popup.tapeIdx];
+    if (copyOnly) {
+      const marked = Object.keys(popup.tapeMarks).length > 0;
+      if (marked && !popup.tapeTotalBad && popup.tapeTotal !== "…") popup.copyOnly(popup.tapeTotal);
+      else if (row) popup.copyOnly(row.result);
+      return;
+    }
+    if (!row) return;
+    popup.tapeMode = false;
+    popup.recall(row.expr);
+  }
+
+  Process {
+    id: tapeProc
+    property string expr: ""
+    property bool again: false
+    onExited: if (tapeProc.again) {
+      tapeProc.again = false;
+      tapeProc.command = ["bash", "-c", Metis.calcScript(), "metis", tapeProc.expr, "", ""];
+      tapeProc.running = true;
+    }
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: {
+        if (tapeProc.again) return;
+        const r = Metis.readCalc(text, { kind: "qalc", expr: tapeProc.expr, target: "" });
+        popup.tapeTotalBad = !!r.bad || !r.result;
+        popup.tapeTotal = r.bad ? "" : (r.result || "");
+      }
+    }
   }
 
   Timer {
@@ -908,7 +1211,9 @@ LayerPopup {
 
       Keys.onEscapePressed: (event) => {
         event.accepted = true;
-        if (popup.histIdx >= 0) {
+        if (popup.tapeMode) {
+          popup.tapeMode = false;
+        } else if (popup.histIdx >= 0) {
           popup.histStep(-popup.histIdx - 1);   // back to what is typed
         } else if (filterInput.text !== "") {
           popup.keepShown();
@@ -920,6 +1225,23 @@ LayerPopup {
       }
 
       Keys.onPressed: (event) => {
+        if ((event.modifiers & Qt.ControlModifier) && event.key === Qt.Key_H) {
+          event.accepted = true;
+          popup.tapeToggleOpen();
+          return;
+        }
+        if (popup.tapeMode) {
+          if (event.key === Qt.Key_Up || event.key === Qt.Key_Down) {
+            event.accepted = true;
+            popup.tapeStep(event.key === Qt.Key_Up ? -1 : 1);
+            return;
+          }
+          if (event.key === Qt.Key_Space) {
+            event.accepted = true;
+            popup.tapeMark(popup.tapeIdx);
+            return;
+          }
+        }
         if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
           event.accepted = true;
           popup.takeShown((event.modifiers & Qt.ControlModifier) !== 0);
@@ -975,12 +1297,28 @@ LayerPopup {
           width: parent.width
           height: 46
 
+          // the rule under the field goes red while what is in it cannot be
+          // read (a question asked back — "which dinar?" — stays quiet)
           Rectangle {
             anchors.bottom: parent.bottom
             anchors.left: parent.left
             anchors.right: parent.right
             height: 1
-            color: Zenon.border
+            color: popup.shownBad && !popup.shownWhich && !popup.stale
+              ? Zenon.alpha(Zenon.red, 0.55) : Zenon.border
+            Behavior on color { ColorAnimation { duration: Zenon.normal } }
+          }
+
+          // Return on a question that cannot be read: a shake, the way a
+          // login field says no
+          transform: Translate { id: shakeX }
+          SequentialAnimation {
+            id: shake
+            NumberAnimation { target: shakeX; property: "x"; to: -7; duration: 45; easing.type: Easing.OutQuad }
+            NumberAnimation { target: shakeX; property: "x"; to: 6; duration: 70; easing.type: Easing.InOutQuad }
+            NumberAnimation { target: shakeX; property: "x"; to: -4; duration: 60; easing.type: Easing.InOutQuad }
+            NumberAnimation { target: shakeX; property: "x"; to: 2; duration: 50; easing.type: Easing.InOutQuad }
+            NumberAnimation { target: shakeX; property: "x"; to: 0; duration: 45; easing.type: Easing.OutQuad }
           }
 
           Row {
@@ -995,7 +1333,7 @@ LayerPopup {
               width: 22
               horizontalAlignment: Text.AlignHCenter
               text: Metis.glyphFor(popup.resultShown && !popup.shownBad ? popup.shownKind : "calc")
-              color: popup.shownBad ? Zenon.red : popup.headColor
+              color: popup.shownBad && !popup.shownWhich ? Zenon.red : popup.headColor
               Behavior on color { ColorAnimation { duration: Zenon.normal } }
               anchors.verticalCenter: parent.verticalCenter
               font.family: Zenon.face
@@ -1014,7 +1352,7 @@ LayerPopup {
             }
 
             Item {
-              width: parent.width - 66
+              width: parent.width - 66 - (popup.tips.length > 0 ? tipRow.implicitWidth + 12 : 0)
               height: parent.height
               clip: true
 
@@ -1067,7 +1405,7 @@ LayerPopup {
                 y: parent.height / 2 + 12
                 height: 2
                 radius: 1
-                color: Zenon.red
+                color: popup.shownWhich ? Zenon.blue : Zenon.red
               }
 
               // the rest of the word being typed, faint after the cursor
@@ -1124,6 +1462,7 @@ LayerPopup {
                 }
 
                 onTextChanged: {
+                  popup.tapeMode = false;
                   popup.query = filterInput.text;
                   popup.histIdx = -1;
                   popup.chipIdx = -1;
@@ -1132,13 +1471,37 @@ LayerPopup {
               }
 
             }
+
+            // what the words were taken as — "qatar → QAR" — at the right of
+            // the field. By count, not by the list: the tips are worked out
+            // on every keystroke, and a new list would rebuild (and re-pop)
+            // the ones already there.
+            Row {
+              id: tipRow
+              anchors.verticalCenter: parent.verticalCenter
+              spacing: 6
+              visible: popup.tips.length > 0
+
+              Repeater {
+                model: popup.tips.length
+                delegate: MetisTip {
+                  id: tipItem
+                  required property int index
+                  readonly property var tip: popup.tips[tipItem.index] || ({ word: "", to: "", kind: "money" })
+                  word: tipItem.tip.word
+                  joiner: tipItem.tip.kind === "name" ? "=" : "→"
+                  to: tipItem.tip.kind === "name" ? Metis.group(tipItem.tip.to) : tipItem.tip.to
+                  onHoveredChanged: tipItem.hovered ? popup.tipBubble(tipItem, tipItem.tip) : popup.bubbleOff(tipItem)
+                }
+              }
+            }
           }
         }
 
         // ------------------------------------------------- result --
         Item {
           width: parent.width
-          height: popup.resultShown ? popup.resultH : 0
+          height: popup.resultShown && !popup.tapeMode ? popup.resultH : 0
           Behavior on height { NumberAnimation { duration: Zenon.normal; easing.type: Zenon.ease } }
           clip: true
 
@@ -1203,8 +1566,8 @@ LayerPopup {
 
               Text {
                 anchors.verticalCenter: parent.verticalCenter
-                text: popup.badWord !== "" ? "can't read" : "can't make sense of that"
-                color: Zenon.red
+                text: popup.shownWhich ? "which" : popup.badWord !== "" ? "can't read" : "can't make sense of that"
+                color: popup.shownWhich ? Zenon.keyInk : Zenon.red
                 font.family: Zenon.face
                 font.weight: Font.Bold
                 font.pixelSize: Zenon.px(19)
@@ -1216,19 +1579,30 @@ LayerPopup {
                 width: badWordText.implicitWidth + 16
                 height: badWordText.implicitHeight + 6
                 radius: 5
-                color: Qt.rgba(Zenon.red.r, Zenon.red.g, Zenon.red.b, 0.10)
+                readonly property color ink: popup.shownWhich ? Zenon.blue : Zenon.red
+                color: Zenon.alpha(ink, 0.10)
                 border.width: 1
-                border.color: Qt.rgba(Zenon.red.r, Zenon.red.g, Zenon.red.b, 0.32)
+                border.color: Zenon.alpha(ink, 0.32)
 
                 Text {
                   id: badWordText
                   anchors.centerIn: parent
                   text: popup.badWord
-                  color: Zenon.red
+                  color: parent.ink
                   font.family: Zenon.face
                   font.weight: 600
                   font.pixelSize: Zenon.px(19)
                 }
+              }
+
+              Text {
+                anchors.verticalCenter: parent.verticalCenter
+                visible: popup.shownWhich
+                text: "?"
+                color: Zenon.keyInk
+                font.family: Zenon.face
+                font.weight: Font.Bold
+                font.pixelSize: Zenon.px(19)
               }
             }
 
@@ -1241,6 +1615,43 @@ LayerPopup {
               spacing: 10
               opacity: popup.stale ? 0.45 : 1
               Behavior on opacity { NumberAnimation { duration: Zenon.normal } }
+
+              // how fresh the rates are, as a dot: green under a day, sand
+              // under three, red past that; hover it for the age. It
+              // breathes while ctrl+r is fetching.
+              Item {
+                id: rateDot
+                visible: popup.shownKind === "currency" && !popup.fromHistory
+                anchors.verticalCenter: parent.verticalCenter
+                width: 14
+                height: 14
+                Rectangle {
+                  anchors.centerIn: parent
+                  width: 8
+                  height: 8
+                  radius: 4
+                  color: Zenon[Metis.ageInk(popup.ratesAge)]
+                  Behavior on color { ColorAnimation { duration: Zenon.slow } }
+                  SequentialAnimation on opacity {
+                    running: popup.ratesRefreshing
+                    loops: Animation.Infinite
+                    onRunningChanged: if (!running) parent.opacity = 1
+                    NumberAnimation { to: 0.25; duration: 420; easing.type: Easing.InOutSine }
+                    NumberAnimation { to: 1; duration: 420; easing.type: Easing.InOutSine }
+                  }
+                }
+                MouseArea {
+                  anchors.fill: parent
+                  anchors.margins: -4
+                  hoverEnabled: true
+                  acceptedButtons: Qt.NoButton
+                  onContainsMouseChanged: containsMouse
+                    ? popup.bubbleAt(rateDot, [{ text: "Exchange rates", big: true },
+                        { text: Metis.ageText(popup.ratesAge) },
+                        { text: "ctrl r fetches them now", muted: true }])
+                    : popup.bubbleOff(rateDot)
+                }
+              }
 
               // the sky where a time-zone answer lands: sun, low sun, moon
               Text {
@@ -1307,6 +1718,27 @@ LayerPopup {
             progress: popup.shownProgress
             opacity: popup.stale ? 0.45 : 1
           }
+
+          TrendStrip {
+            id: trendStrip
+            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.top: parent.top
+            width: Math.min(parent.width - 64, 460)
+            visible: popup.shownTrend.length > 0 && popup.shownStrip.length === 0
+            points: popup.shownTrend
+            from: popup.trendPair ? popup.trendPair.from : ""
+            to: popup.trendPair ? popup.trendPair.to : ""
+            opacity: popup.stale ? 0.45 : 1
+            onHoveredChanged: {
+              const t = trendStrip.sum;
+              if (!trendStrip.hovered || !t) { popup.bubbleOff(trendStrip); return; }
+              popup.bubbleAt(trendStrip, [
+                { text: "1 " + trendStrip.from + " in " + trendStrip.to + ", " + t.weeks + " weeks", big: true },
+                { text: Metis.rateText(t.first) + "  →  " + Metis.rateText(t.last) + "   (" + t.pctText + ")" },
+                { text: "low " + Metis.rateText(t.low) + "  ·  high " + Metis.rateText(t.high) },
+                { text: "a snapshot a week, the newest the one used here", muted: true }]);
+            }
+          }
         }
 
         // -------------------------------------------------- chips --
@@ -1333,11 +1765,26 @@ LayerPopup {
               model: popup.recentMode ? [] : popup.chips
 
               delegate: MetisChip {
+                id: unitChip
                 required property var modelData
                 required property int index
                 order: index
                 sel: index === popup.chipIdx
                 label: popup.chipMode === "fix" ? modelData : Metis.group(modelData)
+                // "which dinar": Kuwait KWD, Jordan JOD …
+                sub: popup.shownWhich ? Metis.moneyShort(modelData) : ""
+                onHoveredChanged: {
+                  if (!hovered) { popup.bubbleOff(unitChip); return; }
+                  if (popup.shownWhich) {
+                    const i = Metis.moneyInfo(modelData);
+                    if (i) popup.bubbleAt(unitChip, [{ text: i.name + (i.sym ? "   " + i.sym : ""), big: true },
+                      { text: i.code + " · spent in " + i.where.slice(0, 4).join(", "), muted: true }]);
+                    return;
+                  }
+                  if (popup.chipMode !== "units") return;
+                  popup.bubbleAt(unitChip, Metis.chipFacts(modelData, popup.shownResult, popup.shownKind)
+                    .concat([{ text: "click copies · tab, then return, pastes", muted: true }]));
+                }
                 // A CLICK COPIES, as a click on the answer does; it never
                 // types. It used to close the panel and wtype the value into
                 // whatever had the focus next — a terminal, an editor — which
@@ -1353,6 +1800,7 @@ LayerPopup {
               model: popup.recents
 
               delegate: MetisChip {
+                id: recentChip
                 required property var modelData
                 required property int index
                 order: index
@@ -1360,6 +1808,13 @@ LayerPopup {
                 label: Metis.group(modelData.result)
                 sub: modelData.expr
                 pinned: modelData.pin === true
+                // the whole question — the chip cuts it at 170 px
+                onHoveredChanged: hovered
+                  ? popup.bubbleAt(recentChip, [{ text: modelData.expr, big: true },
+                      { text: "= " + Metis.group(modelData.result) }]
+                      .concat(modelData.parse && modelData.parse !== modelData.expr
+                        ? [{ text: modelData.parse, muted: true }] : []))
+                  : popup.bubbleOff(recentChip)
                 // Brought back, not pasted: a kept answer is picked to look
                 // at again or build on, and pasting closed the panel out from
                 // under it. Return does the same; ctrl+return copies it.
@@ -1380,6 +1835,32 @@ LayerPopup {
                 label: modelData
                 onClicked: popup.recall(modelData)
               }
+            }
+          }
+        }
+
+        // --------------------------------------------------- tape --
+        Item {
+          width: parent.width
+          height: popup.tapeMode ? tapeList.implicitHeight : 0
+          Behavior on height { NumberAnimation { duration: Zenon.normal; easing.type: Zenon.ease } }
+          clip: true
+
+          TapeList {
+            id: tapeList
+            width: parent.width
+            rows: popup.tapeRows
+            idx: popup.tapeIdx
+            marks: popup.tapeMarks
+            sum: popup.tapeTotal
+            sumBad: popup.tapeTotalBad
+            names: popup.nameList
+            onToggled: (i) => popup.tapeMark(i)
+            onPicked: (i) => { popup.tapeIdx = i; popup.tapeTake(false); }
+            onNameClicked: (name) => {
+              popup.tapeMode = false;
+              filterInput.insert(filterInput.cursorPosition, name);
+              filterInput.forceActiveFocus();
             }
           }
         }
@@ -1408,7 +1889,7 @@ LayerPopup {
 
           Text {
             anchors.centerIn: parent
-            text: "\uF00C  copied"
+            text: "\uF00C  " + popup.flashText
             color: Zenon.green
             opacity: popup.copied ? 1 : 0
             scale: popup.copied ? 1 : 0.85
@@ -1427,15 +1908,48 @@ LayerPopup {
 
   // a history row shows with the field empty too
   readonly property bool resultShown: popup.query.trim().length > 0 || popup.histIdx >= 0
-  readonly property int chipRowH: (popup.recentMode ? popup.recents.length > 0
+  readonly property int chipRowH: popup.tapeMode ? 0 : (popup.recentMode ? popup.recents.length > 0
     : popup.exampleMode ? true
     : popup.chips.length > 0 && popup.resultShown) ? 38 : 0
-  readonly property int visualH: !popup.resultShown || popup.shownBad ? 0
+  readonly property int visualH: !popup.resultShown || popup.shownBad || popup.tapeMode ? 0
     : popup.shownStrip.length > 0 ? 50
-    : popup.shownProgress !== null ? 38 : 0
+    : popup.shownProgress !== null ? 38
+    : popup.shownTrend.length > 0 ? 46 : 0
 
   function calcHeight() {
+    if (popup.tapeMode) return 46 + tapeList.implicitHeight + 34;
     return 46 + (popup.resultShown ? popup.resultH : 0) + popup.visualH + popup.chipRowH + 34;
+  }
+
+  // ── the bubble ── hung from whatever bubbleAt was handed
+  Term.Bubble {
+    id: infoBubble
+    window: popup
+    target: popup.bubbleTarget
+    shown: popup.bubbleOn && popup.shown && !popup.collapsing
+    cardWidth: 340
+    up: !Zenon.barTop
+    ready: popup.bubbleReady
+    // it stands on things mid-panel, not on the bar: its shadow whole
+    roomBelow: true
+
+    Column {
+      spacing: 4
+      Repeater {
+        model: popup.bubbleLines
+        delegate: Text {
+          required property var modelData
+          width: Math.min(implicitWidth, 312)
+          wrapMode: Text.Wrap
+          text: modelData.text
+          color: modelData.big ? Zenon.white : modelData.muted ? Zenon.muted : Zenon.keyInk
+          font.family: Zenon.face
+          font.weight: modelData.big ? Font.Bold : 500
+          font.pixelSize: Zenon.px(modelData.big ? 14 : 12)
+          font.features: { "tnum": 1 }
+        }
+      }
+    }
   }
 
   Timer {

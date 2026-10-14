@@ -65,6 +65,15 @@ LayerPopup {
   property string transText: ""
   property var live: null            // { translation, roman, source } | { error }
   property int liveSeq: 0
+  // WAITING ON A TRANSLATION: typed and not sent yet, or sent and not back.
+  // By sequence rather than a flag, so everything that already moves
+  // liveSeq — back, clear, swap, a cache hit — ends the wait as well.
+  property int liveSentSeq: -1
+  property int liveDoneSeq: -1
+  readonly property bool livePending: Lexicon.hasContent(popup.transText) &&
+    (liveTimer.running ||
+     (popup.liveSentSeq === popup.liveSeq && popup.liveDoneSeq !== popup.liveSeq))
+  readonly property bool liveShown: popup.live !== null || popup.livePending
   property var targetLang: ({ code: "en", name: "English" })
 
   // ── WHICH LANGUAGE THE DICTIONARY IS READING ──────────────────────────
@@ -100,6 +109,9 @@ LayerPopup {
   // shows it, and this shell already says "this is one object, quoted from
   // somewhere else" that way everywhere else.
   property string dictErrorWord: ""
+  // the word as typed, before a correction replaced dictQuery with the
+  // title it resolved to
+  property string dictAskedAs: ""
 
   readonly property bool dictMessage:
     popup.dictError !== "" && !popup.dictLoading
@@ -318,6 +330,67 @@ LayerPopup {
     NumberAnimation { duration: Zenon.slow; easing.type: Zenon.ease }
   }
   readonly property int maxBodyH: 520
+
+  // ── A THING YOU CAN CLICK, DRAWN AS ONE ───────────────────────────────
+  // The error word's tinted pill, generalised: a glyph, a word, or both, in
+  // one ink, brighter under the pointer and brighter again while pressed.
+  // Without a click it is a label and does not light up.
+  component Chip: Rectangle {
+    id: chip
+    property string glyph: ""
+    property string label: ""
+    property color ink: popup.headColor
+    property bool clickable: true
+    property int labelPx: popup.tpx(13)
+    property int glyphPx: popup.tpx(15)
+    signal clicked()
+
+    width: chipRow.implicitWidth + 14
+    height: chipRow.implicitHeight + 4
+    radius: 5
+    color: Qt.rgba(chip.ink.r, chip.ink.g, chip.ink.b,
+                   chipMa.pressed ? 0.24 : chipMa.containsMouse ? 0.16 : 0.08)
+    border.width: 1
+    border.color: Qt.rgba(chip.ink.r, chip.ink.g, chip.ink.b,
+                          chipMa.containsMouse ? 0.45 : 0.28)
+    Behavior on color { ColorAnimation { duration: Zenon.fast } }
+
+    Row {
+      id: chipRow
+      anchors.centerIn: parent
+      spacing: 5
+
+      Text {
+        anchors.verticalCenter: parent.verticalCenter
+        visible: chip.glyph !== ""
+        text: chip.glyph
+        color: chip.ink
+        font.family: Zenon.face
+        font.weight: Zenon.weight
+        font.pixelSize: chip.glyphPx
+      }
+
+      Text {
+        anchors.verticalCenter: parent.verticalCenter
+        visible: chip.label !== ""
+        text: chip.label
+        textFormat: Text.PlainText
+        color: chip.ink
+        font.family: Zenon.face
+        font.weight: 600
+        font.pixelSize: chip.labelPx
+      }
+    }
+
+    MouseArea {
+      id: chipMa
+      anchors.fill: parent
+      enabled: chip.clickable
+      hoverEnabled: chip.clickable
+      cursorShape: chip.clickable ? Qt.PointingHandCursor : Qt.ArrowCursor
+      onClicked: chip.clicked()
+    }
+  }
 
   // ── THE KEYS, DRAWN AS KEYS ──────────────────────────────────────────
   // They were a run of rich text with the key set in bold and the word after
@@ -747,6 +820,7 @@ LayerPopup {
 
   function startLookup(word) {
     popup.dictQuery = word;
+    popup.dictAskedAs = word;
     popup.dictError = "";
     popup.dictErrorWord = "";
     popup.dictResult = null;
@@ -992,6 +1066,7 @@ LayerPopup {
     if (hit) { popup.liveSeq++; popup.live = hit; return; }
 
     const seq = ++popup.liveSeq;
+    popup.liveSentSeq = seq;
     const rq = Lexicon.translateRequest(split.text, code, split.source);
 
     let req = new XMLHttpRequest();
@@ -1000,6 +1075,7 @@ LayerPopup {
     req.onreadystatechange = () => {
       if (req.readyState !== XMLHttpRequest.DONE) return;
       if (seq !== popup.liveSeq) return;
+      popup.liveDoneSeq = seq;
       if (req.status !== 200) {
         popup.live = { error: true };
         return;
@@ -1696,7 +1772,7 @@ LayerPopup {
             id: liveBlock
             width: parent.width
             height: visible ? liveCol.height : 0
-            visible: popup.view === "input" && popup.live !== null && popup.appMode === "trans"
+            visible: popup.view === "input" && popup.liveShown && popup.appMode === "trans"
 
             Column {
               id: liveCol
@@ -1705,23 +1781,18 @@ LayerPopup {
               bottomPadding: 14
               spacing: 4
 
-              Text {
+              // FIRST ONE OUT: nothing to show yet but that it is coming —
+              // the dictionary's dots, so both halves wait the same way
+              Item {
                 width: parent.width
-                visible: popup.live !== null && !popup.live.error
-                horizontalAlignment: Text.AlignHCenter
-                text: {
-                  const det = popup.live && popup.live.source
-                    ? Lexicon.sourceName(popup.live.source) : "auto";
-                  return det + "  →  " + popup.targetLang.name;
-                }
-                color: popup.dimColor
-                font.family: Zenon.face
-                font.weight: 500
-                font.pixelSize: popup.tpx(16)
-
-                MouseArea {
-                  anchors.fill: parent
-                  onClicked: popup.toggleSwap()
+                height: 28
+                visible: popup.livePending && popup.live === null
+                Working {
+                  anchors.centerIn: parent
+                  running: parent.visible
+                  ink: popup.headColor
+                  dot: 5
+                  gap: 7
                 }
               }
 
@@ -1737,37 +1808,133 @@ LayerPopup {
                 font.pixelSize: popup.tpx(16)
               }
 
-              Text {
+              // The answer, and the romanisation under it. While a newer
+              // one is out the old stays, faded, rather than blinking away.
+              Column {
                 width: parent.width
-                leftPadding: 30
-                rightPadding: 30
                 visible: popup.live !== null && !popup.live.error
-                text: popup.live && !popup.live.error
-                  ? "<b>" + Strings.escapeHtml(popup.live.translation) + "</b>" : ""
-                color: popup.fgColor
-                wrapMode: Text.WordWrap
-                horizontalAlignment: Text.AlignHCenter
-                textFormat: Text.RichText
-                font.family: Zenon.face
-                font.weight: 500
-                font.pixelSize: popup.tpx(17)
+                spacing: 6
+                opacity: popup.livePending ? 0.45 : 1
+                Behavior on opacity { NumberAnimation { duration: Zenon.normal; easing.type: Zenon.ease } }
+
+                Text {
+                  width: parent.width
+                  leftPadding: 30
+                  rightPadding: 30
+                  text: popup.live && !popup.live.error
+                    ? "<b>" + Strings.escapeHtml(popup.live.translation) + "</b>" : ""
+                  color: popup.fgColor
+                  wrapMode: Text.WordWrap
+                  horizontalAlignment: Text.AlignHCenter
+                  textFormat: Text.RichText
+                  font.family: Zenon.face
+                  font.weight: 500
+                  font.pixelSize: popup.tpx(17)
+
+                  // a click takes it, the same as alt c
+                  MouseArea {
+                    anchors.fill: parent
+                    enabled: popup.clipCmd !== ""
+                    cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+                    onClicked: popup.copyCurrent()
+                  }
+                }
+
+                // a reading aid, not a second answer: a size down, apart
+                Text {
+                  width: parent.width
+                  leftPadding: 30
+                  rightPadding: 30
+                  visible: !!(popup.live && popup.live.roman)
+                  text: popup.live && popup.live.roman
+                    ? "<i>" + Strings.escapeHtml(popup.live.roman) + "</i>" : ""
+                  color: popup.exColor
+                  opacity: 0.85
+                  wrapMode: Text.WordWrap
+                  horizontalAlignment: Text.AlignHCenter
+                  textFormat: Text.RichText
+                  font.family: Zenon.face
+                  font.weight: 500
+                  font.pixelSize: popup.tpx(15)
+                }
               }
 
-              Text {
+              // ── ONE STRIP UNDER THE ANSWER ────────────────────────────
+              // The pair on the left — what it was read as, what it became —
+              // and on the right what you can do with it. Outside the faded
+              // column, so the controls stay solid while a newer answer is out.
+              Item {
                 width: parent.width
-                leftPadding: 30
-                rightPadding: 30
-                visible: popup.live !== null && !popup.live.error &&
-                         popup.live.roman
-                text: popup.live && popup.live.roman
-                  ? "<i>" + Strings.escapeHtml(popup.live.roman) + "</i>" : ""
-                color: popup.exColor
-                wrapMode: Text.WordWrap
-                horizontalAlignment: Text.AlignHCenter
-                textFormat: Text.RichText
-                font.family: Zenon.face
-                font.weight: 500
-                font.pixelSize: popup.tpx(17)
+                height: Math.max(pairRow.height, actRow.height) + 6
+                visible: popup.live !== null && !popup.live.error
+
+                // FROM → TO, as the two things they are. The detected source
+                // swaps the pair, the target opens the picker shift return
+                // opens, and the glyph between them is the swap itself.
+                Row {
+                  id: pairRow
+                  anchors.left: parent.left
+                  anchors.leftMargin: 30
+                  anchors.bottom: parent.bottom
+                  spacing: 8
+
+                  Chip {
+                    anchors.verticalCenter: parent.verticalCenter
+                    label: popup.live && popup.live.source
+                      ? Lexicon.sourceName(popup.live.source) : "auto"
+                    ink: popup.dimColor
+                    onClicked: popup.toggleSwap()
+                  }
+
+                  Text {
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: Lexicon.ICON_SWAP
+                    color: swapMa.containsMouse ? popup.headColor : popup.dimColor
+                    font.family: Zenon.face
+                    font.weight: Zenon.weight
+                    font.pixelSize: popup.tpx(16)
+                    MouseArea {
+                      id: swapMa
+                      anchors.fill: parent
+                      anchors.margins: -4
+                      hoverEnabled: true
+                      cursorShape: Qt.PointingHandCursor
+                      onClicked: popup.toggleSwap()
+                    }
+                  }
+
+                  Chip {
+                    anchors.verticalCenter: parent.verticalCenter
+                    label: popup.targetLang.name
+                    onClicked: popup.openPicker()
+                  }
+                }
+
+                // what return and alt c already do, for the pointer
+                Row {
+                  id: actRow
+                  anchors.right: parent.right
+                  anchors.rightMargin: 30
+                  anchors.bottom: parent.bottom
+                  spacing: 8
+
+                  Chip {
+                    anchors.verticalCenter: parent.verticalCenter
+                    visible: popup.playerCmd !== ""
+                    glyph: Lexicon.ICON_AUDIO
+                    label: popup.targetLang.code
+                    onClicked: popup.speakLive()
+                  }
+
+                  Chip {
+                    anchors.verticalCenter: parent.verticalCenter
+                    visible: popup.clipCmd !== ""
+                    glyph: Lexicon.ICON_COPY
+                    label: popup.copied ? "copied" : "copy"
+                    ink: popup.dimColor
+                    onClicked: popup.copyCurrent()
+                  }
+                }
               }
             }
           }
@@ -1834,93 +2001,116 @@ LayerPopup {
                 width: parent.width
                 height: 32 + popup.bump
 
+                // THREE GROUPS, each its own Row, so the gaps belong to the
+                // groups and not to spacers: a Row skips an invisible child,
+                // a nested Row with nothing showing included. The word sits
+                // with its language, the pronunciation reads as one thing
+                // apart from it, and the audio is a chip — glyph and code
+                // together, at a distance from the IPA, so it reads as the
+                // button it is rather than more transcription.
                 Row {
                   anchors.centerIn: parent
-                  spacing: 10
+                  spacing: 16
 
-                  Text {
-                    text: Lexicon.ICON_HEAD
-                    color: popup.titleColor
+                  Row {
                     anchors.verticalCenter: parent.verticalCenter
-                    font.family: Zenon.face
-                    font.weight: Zenon.weight
-                    font.pixelSize: Zenon.px(19)
+                    spacing: 8
+
+                    Text {
+                      text: Lexicon.ICON_HEAD
+                      color: popup.titleColor
+                      anchors.verticalCenter: parent.verticalCenter
+                      rightPadding: 2
+                      font.family: Zenon.face
+                      font.weight: Zenon.weight
+                      font.pixelSize: Zenon.px(19)
+                    }
+
+                    Text {
+                      // No trailing "…" while it is out: the dots in the body
+                      // below say it, and two things saying it at once made
+                      // the word itself twitch as the ellipsis came and went.
+                      // plain text, so nothing needs escaping — escaped and
+                      // left to AutoText, "&" showed up as "&amp;"
+                      text: popup.dictQuery
+                      textFormat: Text.PlainText
+                      color: popup.titleColor
+                      anchors.verticalCenter: parent.verticalCenter
+                      font.family: Zenon.face
+                      font.weight: 600
+                      font.pixelSize: popup.tpx(18)
+                    }
+
+                    // WHICH DICTIONARY THIS IS, when it is not the one you
+                    // would assume. Silent for English, because a label
+                    // that is always there stops being read. A chip, so
+                    // it is also the way to a different one — the same
+                    // picker shift return opens.
+                    Chip {
+                      visible: !popup.dictIsEnglish
+                      anchors.verticalCenter: parent.verticalCenter
+                      label: popup.dictLangEn
+                      ink: popup.dimColor
+                      onClicked: popup.openDictPicker()
+                    }
                   }
 
-                  Text {
-                    // No trailing "…" while it is out: the dots in the body
-                    // below say it, and two things saying it at once made
-                    // the word itself twitch as the ellipsis came and went.
-                    // plain text, so nothing needs escaping — escaped and
-                    // left to AutoText, "&" showed up as "&amp;"
-                    text: popup.dictQuery
-                    textFormat: Text.PlainText
-                    color: popup.titleColor
+                  Row {
                     anchors.verticalCenter: parent.verticalCenter
-                    font.family: Zenon.face
-                    font.weight: 600
-                    font.pixelSize: popup.tpx(18)
-                  }
-
-                  // WHICH DICTIONARY THIS IS, when it is not the one you
-                  // would assume. Silent for English, because a label
-                  // that is always there stops being read.
-                  Text {
-                    visible: !popup.dictIsEnglish
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: popup.dictLangEn
-                    color: popup.dimColor
-                    font.family: Zenon.face
-                    font.weight: 500
-                    font.pixelSize: popup.tpx(14)
-                  }
-
-                  Item {
-                    width: 14; height: 1
                     visible: popup.showIpa || popup.showAudio
-                  }
+                    spacing: 12
 
-                  Text {
-                    visible: popup.showIpa
-                    text: popup.dictResult ? popup.dictResult.ipa || "" : ""
-                    color: popup.headColor
-                    anchors.verticalCenter: parent.verticalCenter
-                    font.family: Zenon.face
-                    font.weight: 600
-                    font.pixelSize: popup.tpx(18)
-                  }
+                    // lighter than the word, so the word stays the title
+                    Text {
+                      visible: popup.showIpa
+                      text: popup.dictResult ? popup.dictResult.ipa || "" : ""
+                      color: popup.headColor
+                      anchors.verticalCenter: parent.verticalCenter
+                      font.family: Zenon.face
+                      font.weight: 500
+                      font.pixelSize: popup.tpx(17)
+                    }
 
-                  Text {
-                    visible: popup.showAudio
-                    text: Lexicon.ICON_AUDIO + " " +
-                          (popup.dictResult && popup.dictResult.audio
-                            ? popup.dictResult.audio.code || "" : "")
-                    color: popup.headColor
-                    anchors.verticalCenter: parent.verticalCenter
-                    font.family: Zenon.face
-                    font.weight: 600
-                    font.pixelSize: popup.tpx(18)
-
-                    MouseArea {
-                      anchors.fill: parent
+                    // space plays it too; this is for the pointer
+                    Chip {
+                      visible: popup.showAudio
+                      anchors.verticalCenter: parent.verticalCenter
+                      glyph: Lexicon.ICON_AUDIO
+                      label: popup.dictResult && popup.dictResult.audio
+                        ? popup.dictResult.audio.code || "" : ""
                       onClicked: popup.playDictAudio()
                     }
                   }
 
-                  Item {
-                    width: 16; height: 1
+                  // WHAT IT WAS CORRECTED FROM. "CORRECTED" in capitals was
+                  // the loudest thing in the strip and said the least: the
+                  // word you typed, struck through, says what happened and
+                  // lets you see whether the guess was the right one.
+                  Row {
                     visible: popup.showCorrected
-                  }
-
-                  Text {
-                    visible: popup.showCorrected
-                    text: Lexicon.ICON_CORRECTED + " CORRECTED"
-                    color: popup.dimColor
-                    font.italic: true
                     anchors.verticalCenter: parent.verticalCenter
-                    font.family: Zenon.face
-                    font.weight: Zenon.weight
-                    font.pixelSize: popup.tpx(15)
+                    spacing: 5
+
+                    Text {
+                      anchors.verticalCenter: parent.verticalCenter
+                      text: Lexicon.ICON_CORRECTED + " from"
+                      color: popup.dimColor
+                      font.family: Zenon.face
+                      font.weight: 500
+                      font.pixelSize: popup.tpx(13)
+                    }
+
+                    Text {
+                      anchors.verticalCenter: parent.verticalCenter
+                      text: popup.dictAskedAs
+                      textFormat: Text.PlainText
+                      color: popup.dimColor
+                      font.italic: true
+                      font.strikeout: true
+                      font.family: Zenon.face
+                      font.weight: 500
+                      font.pixelSize: popup.tpx(13)
+                    }
                   }
                 }
               }
@@ -2624,7 +2814,7 @@ LayerPopup {
       // the icon row, the input, the rule, the result and the 30 of the
       // hints. It used to keep the empty-input allowance as well, which
       // left a 36px band under the translation.
-      if (popup.live !== null)
+      if (popup.liveShown)
         return Math.min(38 + popup.tAreaH() + 1 + liveCol.height + 30, 500);
       return Math.min(36 + 30 + popup.tAreaH() + 30, 500);
     }

@@ -43,6 +43,10 @@ PopupWindow {
   readonly property int tail: face.tail
   readonly property int pad: face.pad
   readonly property int padTop: face.padTop
+  // standing up, room for the shadow under the tail as well (BubbleCard);
+  // the anchor goes down by that room, so the tail's point does not move
+  property bool roomBelow: false
+  readonly property real drop: bub.up && bub.roomBelow ? face.pad - face.padTop : 0
   property bool sticky: false
   // ── A CLICK OFF IT ────────────────────────────────────────────────────
   // `dismissable`: while it is up, a press anywhere else in its window says
@@ -67,7 +71,33 @@ PopupWindow {
   readonly property bool over: face.over
   // (a dismissable bubble was opened by a click and goes on one, at once:
   // the grace and the hover hold are for bubbles that come on a hover)
-  readonly property bool open: bub.shown || (bub.sticky && !bub.dismissable && (face.over || grace.running))
+  // ── ONLY WHEN WHAT IS IN IT IS IN (user, 2026-10-14) ───────────────────
+  // A bubble that opened and then grew as its content arrived — a rate
+  // fetched, a row read — looked like it was still being built. `ready`
+  // is the holder saying it is all there (true unless it says otherwise);
+  // until then `shown` waits, up to `readyWait` ms, after which it opens
+  // with what it has rather than not at all. And it is fitted to that
+  // content before the first frame, not a tick after: `armed`.
+  property bool ready: true
+  property int readyWait: 700
+  property bool armed: false
+  Timer {
+    id: readyGive
+    interval: bub.readyWait
+    onTriggered: bub.arm()
+  }
+  function arm() {
+    if (!bub.shown) { bub.armed = false; return; }
+    face.refit();
+    bub.armed = true;
+  }
+  function rearm() {
+    if (!bub.shown) { readyGive.stop(); bub.armed = false; return; }
+    if (bub.ready) { readyGive.stop(); bub.arm(); }
+    else if (!bub.armed && !readyGive.running) readyGive.restart();
+  }
+  onReadyChanged: bub.rearm()
+  readonly property bool open: bub.armed || (bub.sticky && !bub.dismissable && (face.over || grace.running))
   Timer { id: grace; interval: 350 }
   property real shade: bub.open ? 1 : 0
   Behavior on shade { NumberAnimation { duration: Zenon.menuFade; easing.type: Easing.OutCubic } }
@@ -137,6 +167,7 @@ PopupWindow {
     return bub.pointX - bub.popupX;
   }
   onShownChanged: {
+    bub.rearm();
     if (!bub.shown && bub.sticky && !bub.dismissable) grace.restart();
     bub.measure();
   }
@@ -151,9 +182,9 @@ PopupWindow {
   anchor {
     window: bub.window
     rect.x: Math.round(bub.at.x)
-    rect.y: Math.round(bub.at.y)
+    rect.y: Math.round(bub.at.y + bub.drop)
     rect.width: Math.max(1, Math.round(bub.at.width))
-    rect.height: Math.max(1, Math.round(bub.at.height))
+    rect.height: Math.max(1, Math.round(bub.at.height - bub.drop))
     edges: bub.up ? (bub.lean ? Edges.Top | Edges.Left : Edges.Top)
       : (bub.lean ? Edges.Bottom | Edges.Left : Edges.Bottom)
     gravity: bub.up ? (bub.lean ? Edges.Top | Edges.Right : Edges.Top)
@@ -166,6 +197,8 @@ PopupWindow {
     anchors.fill: parent
     shade: bub.shade
     up: bub.up
+    lean: bub.lean
+    roomBelow: bub.roomBelow
     cardWidth: bub.cardWidth
     fit: bub.fit
     sticky: bub.sticky

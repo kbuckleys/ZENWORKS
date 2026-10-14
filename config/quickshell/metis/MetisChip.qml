@@ -21,6 +21,8 @@ Rectangle {
   // a kept answer pinned to the front of the row (ctrl+p)
   property bool pinned: false
   property int order: 0
+  // the pointer is on it — for the bubble that says more (MetisPopup)
+  readonly property bool hovered: hover.containsMouse
   signal clicked()
 
   width: row.implicitWidth + 18

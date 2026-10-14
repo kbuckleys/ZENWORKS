@@ -66,8 +66,19 @@ Rectangle {
   // width (see sideFlick), so the sidebar is UNCOVERED rather than
   // squeezed, and fades with the slide. Not while it is being dragged:
   // easing every frame of a drag makes the edge lag the pointer.
+  // NOT AS IT IS BUILT: the saved "sidebar on" is read while the window is
+  // made (loadViewPrefs), and easing that from nothing drew a picker with
+  // no sidebar for its first frames, then slid one in. Armed only once the
+  // window has been on screen a moment.
+  property bool armed: false
+  Timer { id: armTimer; interval: 120; onTriggered: side.armed = true }
+  Connections {
+    target: side.term
+    function onVisibleChanged() { if (side.term.visible) armTimer.restart(); else { armTimer.stop(); side.armed = false; } }
+  }
+  Component.onCompleted: if (side.term && side.term.visible) armTimer.restart()
   Behavior on width {
-    enabled: !term.sideGripRef.held && !term.sideFollowing
+    enabled: side.armed && !term.sideGripRef.held && !term.sideFollowing
     NumberAnimation { duration: Math.round(Zenon.normal * 1.4); easing.type: Zenon.travelEase }
   }
 
