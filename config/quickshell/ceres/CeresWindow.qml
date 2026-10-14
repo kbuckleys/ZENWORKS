@@ -3,7 +3,7 @@
 // └─┘└─┘┘└┘└┴┘└─┘┴└─┴ ┴└─┘
 // https://github.com/kbuckleys/
 //
-// CERES — the package manager, as a window.
+// CERES — the Store and the package manager, as a window.
 //
 // ZENU's views, without a terminal in the way:
 //
@@ -32,6 +32,7 @@ import "../terminus" as Term
 import "."
 import "../oracle"
 import "ceres.js" as Cer
+import "store.js" as St
 
 FloatingWindow {
   id: win
@@ -76,11 +77,16 @@ FloatingWindow {
   onOnboardHChanged: if (win.onboarding) win.implicitHeight = win.onboardH
 
   // ── where we are ────────────────────────────────────────────────────────
-  property string tab: "updates"
-  // The views, in switch order: [name, label]. Round 4 adds to this.
+  // THE STORE OPENS FIRST (user, 2026-10-14): Ceres is where apps are
+  // found now, and the updates are a tab away — the bar's count still opens
+  // straight onto them (present("updates")).
+  property string tab: "store"
+  // The views, in switch order: [name, label].
   readonly property var tabs: [
-    ["updates", Ceres.total > 0 ? "Updates  " + Ceres.total : "Updates"],
+    ["store", "Store"],
     ["packages", "Packages"],
+    // after Packages (user, 2026-10-14): find, then keep current
+    ["updates", Ceres.total > 0 ? "Updates  " + Ceres.total : "Updates"],
     ["history", "History"],
     ["maintenance", win.maint && win.maintCount > 0 ? "Maintenance  " + win.maintCount : "Maintenance"],
     ["settings", configView.changes > 0 ? "Settings  " + configView.changes : "Settings"]
@@ -99,8 +105,11 @@ FloatingWindow {
     win.tab = t;
     // Packages is a search, so it opens in the field; the others are lists
     // you came to read and mark, and `/` is there when one needs narrowing.
+    // The Store opens with its search idle, as the App Store does — the
+    // arrows walk its shelves — and a letter typed goes straight into it.
     win.typing = t === "packages";
     if (t === "packages" && win.found.length === 0) win.search();
+    if (t === "store" && !storeView.loaded) storeView.load();
     if (t === "history") win.loadHistory();
     if (t === "maintenance") win.loadMaint();
     // read once; after that the edits in hand are what the tab shows
@@ -147,7 +156,7 @@ FloatingWindow {
   readonly property bool msgUp: win.quietJob && !win.authUp && !win.settleUp
   // how far in the sheets are, for the stage's blur
   readonly property real sheetInk: Math.max(passSheet.cardInk, msgSheet.cardInk,
-                                            confirmSheet.cardInk, confSheet.cardInk,
+                                            confirmSheet.cardInk, confSheet.cardInk, fpSheet.cardInk, fpGetSheet.cardInk,
                                             settleSheet.cardInk)
   // ONE SHEET AT A TIME. Go ahead on the confirm asks for the password, and
   // the password's sheet came up BEHIND the confirm's — the prompt was there
@@ -157,10 +166,63 @@ FloatingWindow {
   // WHAT THE PAGE IS, under whatever sheet is over it. The confirm is a
   // sheet, so the page beneath it is the one it came from — the list, still
   // there, softened.
-  readonly property string page: (win.face === "confirm" || win.face === "conf")
+  readonly property string page: (win.face === "confirm" || win.face === "conf" || win.face === "fpoff"
+                                  || win.face === "fpget")
     ? "browse" : win.face
   // pacman.conf's review: a sheet over the Settings tab, like the confirm
   readonly property bool confUp: win.face === "conf" && !win.authUp
+  // Settings › Channels' Remove Flatpak…, asked in a sheet that names the
+  // apps going with it (user, 2026-10-14)
+  readonly property bool fpUp: win.face === "fpoff" && !win.authUp
+  function removeFlatpak() {
+    win.overlay = "";
+    Ceres.removeFlatpak();
+  }
+
+  // ── ONE FLATPAK APP, IN OR OUT (the Store's Get / Remove on Flathub) ───
+  // A sheet of its own rather than the confirm sheet, which is pacman's
+  // plan: where it goes — for everyone (the password) or just you (none;
+  // user, 2026-10-14) — its sizes, and what its sandbox lets it touch.
+  property var fpApp: null
+  property bool fpRemove: false
+  property string fpScope: "system"
+  property var fpInfo: null
+  property var fpPerms: null
+  readonly property bool fpGetUp: win.face === "fpget" && !win.authUp
+  function askFlatpak(app, remove) {
+    win.fpApp = app;
+    win.fpRemove = remove;
+    win.fpScope = remove ? (app.scope === "user" ? "user" : "system") : Ceres.flatpakScope;
+    win.fpInfo = null;
+    win.fpPerms = null;
+    if (!remove) {
+      fpInfoProc.running = false;
+      fpMetaProc.running = false;
+      fpInfoProc.command = ["flatpak", "remote-info", "--system", "flathub", app.pkg];
+      fpMetaProc.command = ["flatpak", "remote-info", "--system", "--show-metadata", "flathub", app.pkg];
+      fpInfoProc.running = true;
+      fpMetaProc.running = true;
+    }
+    win.overlay = "fpget";
+  }
+  function goFlatpak() {
+    const a = win.fpApp;
+    if (!a || Ceres.txBusy) return;
+    win.overlay = "";
+    if (win.fpRemove) Ceres.request(Cer.flatpakUninstallSteps(a.pkg, win.fpScope), "remove " + a.name, 0);
+    else {
+      Ceres.setFlatpakScope(win.fpScope);
+      Ceres.request(Cer.flatpakInstallSteps(a.pkg, win.fpScope), "install " + a.name, 0);
+    }
+  }
+  Process {
+    id: fpInfoProc
+    stdout: StdioCollector { id: fpInfoOut; onStreamFinished: win.fpInfo = St.remoteInfo(fpInfoOut.text) }
+  }
+  Process {
+    id: fpMetaProc
+    stdout: StdioCollector { id: fpMetaOut; onStreamFinished: win.fpPerms = St.permissions(fpMetaOut.text) }
+  }
   // THE HEAD STANDS DOWN while there is nothing it could do: through
   // onboarding, and for the whole of a job — tabs and a filter over a
   // progress bar are only noise.
@@ -280,7 +342,7 @@ FloatingWindow {
     win.marks = m;
   }
   function markAllUpdates() {
-    const rows = win.updateRows.filter(r => !r.head);
+    const rows = win.updateRows.filter(r => !r.head && !r.flatpak);
     const all = rows.every(r => !!win.umarks[r.u.name]);
     const m = {};
     if (!all) for (const r of rows) m[r.u.name] = r;
@@ -312,6 +374,12 @@ FloatingWindow {
       out.push({ head: true, label: "AUR", n: aur.length, aur: true });
       for (const u of aur) out.push({ head: false, u: u, aur: true });
     }
+    // Flatpak's: updated by Flatpak, never marked into a pacman job
+    const flat = Ceres.flat.filter(u => Cer.matchesAll(u.name, q));
+    if (flat.length) {
+      out.push({ head: true, label: "Flatpak", n: flat.length, aur: false, flatpak: true });
+      for (const u of flat) out.push({ head: false, u: u, aur: false, flatpak: true });
+    }
     return out;
   }
 
@@ -327,12 +395,15 @@ FloatingWindow {
   // leaves the field first, text kept; out of it space marks, j k move and
   // `/` goes back in; and only then does Esc clear the text, then the marks.
   property bool typing: false
+  // the Store's search — see StoreView.query
+  property string squery: ""
   readonly property bool filters: win.tab !== "maintenance" && win.tab !== "settings"
   readonly property string filterText:
     win.tab === "packages" ? win.query : win.tab === "history" ? win.hquery
-    : win.tab === "updates" ? win.uquery : ""
+    : win.tab === "updates" ? win.uquery : win.tab === "store" ? win.squery : ""
   function setFilter(t) {
-    if (win.tab === "packages") win.query = t;
+    if (win.tab === "store") win.squery = t;
+    else if (win.tab === "packages") win.query = t;
     else if (win.tab === "history") win.hquery = t;
     else if (win.tab === "updates") win.uquery = t;
   }
@@ -367,7 +438,9 @@ FloatingWindow {
   readonly property var current: {
     if (win.tab === "packages") return win.rows[win.sel] || null;
     const r = win.updateRows[win.usel];
-    return r && !r.head ? { name: r.u.name, repo: "update", aur: r.aur } : null;
+    // a Flatpak row is looked up by its id, of Flathub (Cer.infoCommand)
+    return r && !r.head ? (r.flatpak ? { name: r.u.id, repo: "flatpak", aur: false }
+                                     : { name: r.u.name, repo: "update", aur: r.aur }) : null;
   }
   property var info: null
   property string infoFor: ""
@@ -654,7 +727,7 @@ FloatingWindow {
     && win.installNames.length < win.pendingNames.length
 
   function toggleUmark(r) {
-    if (!r || r.head) return;
+    if (!r || r.head || r.flatpak) return;
     const m = Object.assign({}, win.umarks);
     if (m[r.u.name]) delete m[r.u.name];
     else m[r.u.name] = r;
@@ -679,7 +752,9 @@ FloatingWindow {
     if (marked.length) win.confirmUpdates(marked);
     else {
       const r = win.updateRows[win.usel];
-      if (r && !r.head) win.confirmUpdates([r]);
+      // a Flatpak row is Flatpak's to update, on its own
+      if (r && !r.head && r.flatpak) Ceres.updateFlatpak(r.u);
+      else if (r && !r.head) win.confirmUpdates([r]);
     }
   }
 
@@ -755,9 +830,9 @@ FloatingWindow {
         return;
       }
       // all of them is not a partial upgrade — it is the full one
-      if (!win.partial) { Ceres.request(Cer.upgradeSteps(), "", -1); return; }
+      if (!win.partial) { Ceres.request(Cer.upgradeSteps(), "", Ceres.repo.length + Ceres.aur.length); return; }
       Ceres.request([["-Sy", "--needed"].concat(names)],
-                    "update " + names.length + " of " + Ceres.total + " \u00b7 partial upgrade",
+                    "update " + names.length + " of " + win.pendingNames.length + " \u00b7 partial upgrade",
                     names.length);
       return;
     }
@@ -1024,6 +1099,7 @@ FloatingWindow {
   property int msel: 0
   property int pnsel: 0
   property var pnDiff: []
+  // Flatpak's item, when Flatpak is here (user, 2026-10-14)
   readonly property var maintItems: [
     { key: "orphans", title: "Orphaned packages" },
     { key: "pacnew", title: "Configuration files" },
@@ -1033,7 +1109,7 @@ FloatingWindow {
     { key: "mirrors", title: "Mirrors" },
     { key: "oldcode", title: "Running old code" },
     { key: "aurhealth", title: "AUR health" }
-  ]
+  ].concat(Ceres.deps.flatpak ? [{ key: "flatpak", title: "Flatpak" }] : [])
   // how many things want doing, for the tab's label
   readonly property int maintCount: !win.maint ? 0
     : (win.maint.orphans.length ? 1 : 0) + (win.maint.pacnew.length ? 1 : 0)
@@ -1083,6 +1159,8 @@ FloatingWindow {
     }
     // No line here: its health is the body's, which has room for it.
     case "mirrors": return "";
+    case "flatpak": return m.fpApps.length + (m.fpApps.length === 1 ? " app \u00b7 " : " apps \u00b7 ")
+      + m.fpRuntimes.length + (m.fpRuntimes.length === 1 ? " runtime" : " runtimes");
     case "sync": return (m.synced ? "synced " + Cer.age(Date.now() - m.synced) : "never synced")
       + (m.aurList ? " \u00b7 AUR list " + Cer.age(Date.now() - m.aurList).replace(" ago", " old") : "");
     }
@@ -1318,6 +1396,17 @@ FloatingWindow {
         Ceres.request([["@sudo", "paccache", "-rk" + win.keepVersions]],
                       "keep " + win.keepVersions + " versions of each package", 0);
     } else if (key === "clones") win.dropClones(which === "all");
+    else if (key === "flatpak") {
+      // the system's as root, yours without — each a no-op when there is
+      // nothing to do
+      if (which === "repair")
+        Ceres.request([["@sudo", "flatpak", "repair", "--system"], ["@user", "flatpak repair --user"]],
+                      "repair Flatpak", 0);
+      else
+        Ceres.request([["@sudo", "flatpak", "uninstall", "--unused", "--system", "--noninteractive", "-y"],
+                       ["@user", "flatpak uninstall --unused --user --noninteractive -y"]],
+                      "remove unused runtimes", 0);
+    }
     else if (key === "mirrors") {
       if (which === "rank" || !win.ranked) win.rankMirrors();
       else win.useRanked();
@@ -1387,6 +1476,7 @@ FloatingWindow {
         win.peek();
         win.loadHistory();
         win.loadMaint();
+        storeView.refresh();
         cacheDelay.restart();
       }
     }
@@ -1405,6 +1495,9 @@ FloatingWindow {
     if (win.face === "review") { win.overlay = "confirm"; return true; }
     if (win.face === "confirm") { win.overlay = ""; return true; }
     if (win.face === "conf") { win.overlay = ""; return true; }
+    if (win.face === "fpoff" || win.face === "fpget") { win.overlay = ""; return true; }
+    // off an app's page, back to the shelf or the results it was opened from
+    if (win.tab === "store" && storeView.back()) return true;
     // Out of the field, then the text, then the marks, then the window — the
     // cheapest thing to redo goes first. Esc in an empty field with nothing
     // marked has nothing to step out of, and closes, as it always did.
@@ -1489,9 +1582,11 @@ FloatingWindow {
       }
       if (win.face === "setup") {
         event.accepted = true;
-        if (k === Qt.Key_Return || k === Qt.Key_Enter) Ceres.setup(setupView.choice);
-        else if (k === Qt.Key_Left || k === Qt.Key_Right)
+        if (k === Qt.Key_Return || k === Qt.Key_Enter) Ceres.setup(setupView.choice, setupView.flatpak);
+        else if ((k === Qt.Key_Left || k === Qt.Key_Right) && Ceres.deps.paru)
           setupView.choice = setupView.choice === "paru" ? "paru-git" : "paru";
+        // the Flatpak box: space ticks it, as space marks a row
+        else if (k === Qt.Key_Space && Ceres.flatpakAsk) setupView.flatpak = !setupView.flatpak;
         else if (k === Qt.Key_Escape) { if (Ceres.deps.paru) win.dismiss(); else win.showSetup = false; }
         return;
       }
@@ -1526,6 +1621,18 @@ FloatingWindow {
         else if (k === Qt.Key_K || k === Qt.Key_Up) reviewList.flick(0, 900);
         return;
       }
+      if (win.face === "fpget") {
+        event.accepted = true;
+        if (k === Qt.Key_Return || k === Qt.Key_Enter) win.goFlatpak();
+        else if (!win.fpRemove && (k === Qt.Key_Left || k === Qt.Key_Right))
+          win.fpScope = win.fpScope === "system" ? "user" : "system";
+        return;
+      }
+      if (win.face === "fpoff") {
+        event.accepted = true;
+        if (k === Qt.Key_Return || k === Qt.Key_Enter) win.removeFlatpak();
+        return;
+      }
       if (win.face === "conf") {
         event.accepted = true;
         if (k === Qt.Key_Return || k === Qt.Key_Enter) win.saveConf();
@@ -1543,9 +1650,16 @@ FloatingWindow {
         win.cycleTab(k === Qt.Key_Backtab || (event.modifiers & Qt.ShiftModifier) ? -1 : 1);
         return;
       }
-      if (ctrl && k >= Qt.Key_1 && k <= Qt.Key_5) {
+      if (ctrl && k >= Qt.Key_1 && k <= Qt.Key_6) {
         event.accepted = true;
         win.showTab(win.tabs[k - Qt.Key_1][0]);
+        return;
+      }
+      // the Store walks a grid, not a list: its arrows are its own
+      if (win.tab === "store") {
+        if (!win.typing && !ctrl && !(event.modifiers & Qt.AltModifier) && event.text
+            && /^[A-Za-z0-9]$/.test(event.text)) win.typing = true;
+        event.accepted = storeView.key(event) || win.filterKey(event);
         return;
       }
       if (k === Qt.Key_Down || (ctrl && k === Qt.Key_J)) { event.accepted = true; win.move(1); return; }
@@ -1592,7 +1706,7 @@ FloatingWindow {
         else if (ctrl && k === Qt.Key_A) { event.accepted = true; win.markAllUpdates(); }
         else if ((k === Qt.Key_Return || k === Qt.Key_Enter) && Ceres.total > 0) {
           event.accepted = true;
-          if (ctrl) Ceres.request(Cer.upgradeSteps(), "", -1);
+          if (ctrl) Ceres.updateAll();
           else win.confirmUpdate();
         }
         else event.accepted = win.filterKey(event);
@@ -1670,7 +1784,7 @@ FloatingWindow {
     // carry on through, it is that summary — and the rows were painted
     // over it, scrolling up across the description to the tabs.
     Repeater {
-      model: [histList, hdetail, maintSide, pkgList, updList, infoPane]
+      model: [histList, hdetail, maintSide, pkgList, updList, infoPane].concat(storeView.edgeViews)
       delegate: ScrollEdge {
         required property var modelData
         view: modelData
@@ -1688,6 +1802,7 @@ FloatingWindow {
     // draws over them)
     Repeater {
       model: [histList, hdetail, maintSide, mdList, pnView, pkgList, updList, infoPane, configView.pageFlick]
+        .concat(storeView.edgeViews)
       delegate: ScrollEdge {
         required property var modelData
         view: modelData
@@ -1762,41 +1877,58 @@ FloatingWindow {
           font.pixelSize: Zenon.px(16)
         }
 
-        Row {
+        // THE SEARCH IS A FIELD, at the right of the tab bar (user,
+        // 2026-10-14): the Store's first, then every tab that filters — it
+        // used to be the query said as a line. Still not a text box: the keys
+        // never leave the window (see `typing`); it shows what is typed, with
+        // a caret while you are in it, and a click puts you back in.
+        Rectangle {
+          id: searchField
           visible: win.filters
           anchors.verticalCenter: parent.verticalCenter
-          spacing: 8
-          TapHandler { onTapped: { win.typing = true; keys.forceActiveFocus(); } }
+          width: 260
+          height: 32
+          radius: Zenon.windowRadius
+          color: Zenon.wash(win.typing ? 0.08 : 0.04)
+          border.width: 1
+          border.color: win.typing ? Zenon.alpha(Zenon.cyan, 0.6) : Zenon.border
           Text {
+            id: sfGlyph
+            anchors.left: parent.left
+            anchors.leftMargin: 10
             anchors.verticalCenter: parent.verticalCenter
             text: "\uF002"
             color: win.typing || win.filterText !== "" ? Zenon.cyan : Zenon.muted
             font.family: Zenon.face
             font.weight: Zenon.weight
-            font.pixelSize: Zenon.px(15)
+            font.pixelSize: Zenon.px(13)
           }
           Row {
+            anchors.left: sfGlyph.right
+            anchors.leftMargin: 9
+            anchors.right: parent.right
+            anchors.rightMargin: 10
             anchors.verticalCenter: parent.verticalCenter
             spacing: 1
+            clip: true
             Text {
               visible: win.filterText !== ""
               text: win.filterText
-              // out of the field the text still holds, a step back
               color: win.typing ? Zenon.white : Zenon.keyInk
               font.family: Zenon.face
               font.weight: Zenon.weight
-              font.pixelSize: Zenon.px(17)
+              font.pixelSize: Zenon.px(15)
             }
             Rectangle {
-              id: qCaret
+              id: sfCaret
               visible: win.face === "browse" && win.typing
               anchors.verticalCenter: parent.verticalCenter
               width: 2
-              height: 16
+              height: 15
               color: Zenon.white
               opacity: 0.3
               SequentialAnimation on opacity {
-                running: qCaret.visible
+                running: sfCaret.visible
                 loops: Animation.Infinite
                 NumberAnimation { to: 1; duration: 550; easing.type: Easing.InOutSine }
                 NumberAnimation { to: 0.3; duration: 550; easing.type: Easing.InOutSine }
@@ -1804,14 +1936,14 @@ FloatingWindow {
             }
             Text {
               visible: win.filterText === ""
-              text: win.typing ? (win.tab === "packages" ? "type to search" : "type to filter")
-                : (win.tab === "packages" ? "/ to search" : "/ to filter")
+              text: "Search"
               color: Zenon.muted
               font.family: Zenon.face
               font.weight: Zenon.weight
-              font.pixelSize: Zenon.px(17)
+              font.pixelSize: Zenon.px(15)
             }
           }
+          TapHandler { onTapped: { win.typing = true; keys.forceActiveFocus(); } }
         }
 
         // A CHECKBOX: it is a condition on the search, on or off, and a box
@@ -2227,12 +2359,26 @@ FloatingWindow {
       }
 
       // ── Settings: pacman.conf ─────────────────────────────────────────
+      // ── the Store ────────────────────────────────────────────────────
+      StoreView {
+        id: storeView
+        visible: win.page === "browse" && win.tab === "store"
+        anchors.fill: parent
+        query: win.squery
+        script: win.script
+        onChangeAsked: (row) => win.confirmOne(row)
+        onFlatpakAsked: (app, remove) => win.askFlatpak(app, remove)
+        onReleased: keys.forceActiveFocus()
+        onSearchLeft: { win.squery = ""; win.typing = false; }
+      }
+
       ConfigView {
         id: configView
         visible: win.page === "browse" && win.tab === "settings"
         anchors.fill: parent
         onReleased: keys.forceActiveFocus()
         onReviewAsked: win.overlay = "conf"
+        onFlatpakRemoveAsked: { Ceres.listFlatpaks(); win.overlay = "fpoff"; }
       }
 
       // ── Maintenance ─────────────────────────────────────────────────
@@ -2383,6 +2529,8 @@ FloatingWindow {
               oldcode: "Programs that were already running when an upgrade replaced their libraries. They keep using the old copies until they restart: restart the apps, and log out and back in for the session services. Only your own processes can be seen; system services need root to inspect.",
               mirrors: "Where pacman downloads from, in the order it tries them. Health comes from archlinux.org's own mirror status, which checks every mirror for how far behind it is. "
                 + "Ranking times every mirror it reports as fully synced from this machine, rates the quickest twelve on a real download, and offers the fastest ten. The list you have now is kept as mirrorlist.ceres-bak.",
+              flatpak: "Flatpak's apps and the runtimes they share, for everyone and just for you. Removing unused runtimes takes out the ones no installed app needs any more \u2014 left behind as apps are removed and updated. "
+                + "Repair checks every installed file against what Flathub published, and fetches again whatever does not match.",
               sync: "The system's package databases and ceres' list of AUR packages. Ceres checks for updates against its own copy, so these only move when something upgrades or you sync them here. "
                 + "After a sync, update before installing anything new: installing onto freshly synced databases without upgrading can pull in libraries newer than what installed programs were built against."
             })[mdetail.key]
@@ -2453,6 +2601,19 @@ FloatingWindow {
               ink: win.ranked ? Zenon.muted : Zenon.cyan
               primary: !win.ranked
               onClicked: win.maintGo("rank")
+            }
+            DialogButton {
+              visible: mdetail.key === "flatpak"
+              label: "Remove unused"
+              ink: Zenon.cyan
+              primary: true
+              onClicked: win.maintGo("")
+            }
+            DialogButton {
+              visible: mdetail.key === "flatpak"
+              label: "Repair"
+              ink: Zenon.muted
+              onClicked: win.maintGo("repair")
             }
             DialogButton {
               visible: mdetail.key === "sync"
@@ -2625,6 +2786,8 @@ FloatingWindow {
               : mdetail.key === "pacnew" ? mdetail.m.pacnew.map(p => ({ name: p }))
               : mdetail.key === "oldcode" ? win.oldCodeRows
               : mdetail.key === "mirrors" ? win.mirrorRows
+              : mdetail.key === "flatpak" ? [{ head: true, name: "Apps" }].concat(mdetail.m.fpApps)
+                  .concat([{ head: true, name: "Runtimes" }]).concat(mdetail.m.fpRuntimes)
               : mdetail.key === "aurhealth" ? Ceres.aurHealth.problems.map(p => ({
                   name: p.name,
                   right: p.gone ? "no longer in the AUR"
@@ -2968,9 +3131,9 @@ FloatingWindow {
                 anchors.left: parent.left
                 anchors.leftMargin: 10
                 anchors.verticalCenter: parent.verticalCenter
-                text: (urow.modelData.aur ? "" : "") + "  " + urow.modelData.label
+                text: (urow.modelData.flatpak ? "\uF324" : urow.modelData.aur ? "" : "") + "  " + urow.modelData.label
                   + "  " + urow.modelData.n
-                color: urow.modelData.aur ? Ceres.ink.aur : Ceres.ink.repo
+                color: urow.modelData.flatpak ? Ceres.ink.flat : urow.modelData.aur ? Ceres.ink.aur : Ceres.ink.repo
                 font.family: Zenon.face
                 font.weight: Font.Bold
                 font.pixelSize: Zenon.px(16)
@@ -3358,7 +3521,9 @@ FloatingWindow {
 
     case "news": return [["return", "continue"], ["esc", "back"]];
     case "setup": return (Ceres.deps.paru ? [["\u2190 \u2192", "paru or paru-git"]] : [])
-      .concat([["return", "install"], ["esc", Ceres.deps.paru ? "close" : "not now"]]);
+      .concat(Ceres.flatpakAsk ? [["space", "Flatpak apps"]] : [])
+      .concat([["return", Ceres.deps.missing.length || setupView.flatpak ? "install" : "done"],
+               ["esc", Ceres.deps.paru ? "close" : "not now"]]);
     case "tx":
       if (Ceres.txBusy) return [["esc", "hide — it keeps going"], ["shift esc", "cancel"]];
       if (txView.settleable)
@@ -3369,6 +3534,9 @@ FloatingWindow {
         ? [["t", "open in terminal"], ["return", "back"], ["esc", "close"]]
         : [["return", "back"], ["esc", "close"]];
     case "review": return [["← →", "other packages"], ["j k", "scroll"], ["esc", "back"]];
+    case "fpoff": return [["return", "remove flatpak"], ["esc", "back"]];
+    case "fpget": return win.fpRemove ? [["return", "remove"], ["esc", "back"]]
+      : [["\u2190 \u2192", "everyone or just you"], ["return", "install"], ["esc", "back"]];
     case "conf":
       return (configView.review && configView.review.ok ? [["return", "save"]] : []).concat([["esc", "back"]]);
     case "confirm":
@@ -3376,6 +3544,15 @@ FloatingWindow {
       return [["return", "go ahead"]]
         .concat(win.aurTargets.length ? [["r", "review PKGBUILD"]] : [])
         .concat([["esc", "back"]]);
+    }
+    if (win.tab === "store") {
+      if (storeView.view === "page")
+        return [["return", storeView.app && storeView.app.installed ? "open" : "get"],
+                ["\u2191 \u2193", "scroll"], ["esc", "back"]];
+      return [["\u2190 \u2192 \u2191 \u2193", "move"], ["return", "app page"], ["ctrl return", "get / open"],
+              ["alt \u2191 \u2193", "sections"]]
+        .concat(win.typing ? (win.squery !== "" ? [["esc", "done typing"]] : []) : [["/", "search"]])
+        .concat([["ctrl tab", "next"]]);
     }
     if (win.tab === "history")
       return (win.wayBack ? [["return", "go back to " + win.wayBack.version]] : [])
@@ -3438,10 +3615,11 @@ FloatingWindow {
 
       DialogButton {
         visible: win.face === "setup"
-        label: "Install"
+        // only the Flatpak question left, answered no: nothing to install
+        label: Ceres.deps.missing.length || setupView.flatpak ? "Install" : "Done"
         ink: Zenon.cyan
         primary: true
-        onClicked: Ceres.setup(setupView.choice)
+        onClicked: Ceres.setup(setupView.choice, setupView.flatpak)
       }
       DialogButton {
         visible: win.face === "browse" && Ceres.setupNeeded
@@ -3493,7 +3671,7 @@ FloatingWindow {
         label: "Update all"
         ink: Zenon.cyan
         primary: true
-        onClicked: Ceres.request(Cer.upgradeSteps(), "", -1)
+        onClicked: Ceres.updateAll()
       }
     }
   }
@@ -3909,6 +4087,245 @@ FloatingWindow {
           primary: !!confSheet.rv && confSheet.rv.ok
           ready: !!confSheet.rv && confSheet.rv.ok
           onClicked: win.saveConf()
+        }
+      }
+    }
+  }
+
+  // ── one Flatpak app, in or out ──────────────────────────────────────────
+  Item {
+    anchors.fill: parent
+    z: 10
+    visible: win.fpGetUp || fpGetSheet.cardInk > 0.01
+
+    InputShield {
+      visible: win.fpGetUp
+      onClicked: win.overlay = ""
+    }
+
+    Sheet {
+      backdrop: stage   // frosted over it — see morpheus/Sheet
+      id: fpGetSheet
+      shown: win.fpGetUp
+      fromTop: 0
+      cardW: Math.min(720, win.width - 60)
+      readonly property var a: win.fpApp
+      readonly property var perms: win.fpPerms || []
+      cardH: Math.min(win.height - 90, fpGetCol.implicitHeight + 36 + fpGetBtns.height + 26)
+
+      Column {
+        id: fpGetCol
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: parent.top
+        anchors.margins: 18
+        spacing: 14
+        Row {
+          spacing: 16
+          StoreIcon {
+            anchors.verticalCenter: parent.verticalCenter
+            app: fpGetSheet.a
+            size: 56
+          }
+          Column {
+            anchors.verticalCenter: parent.verticalCenter
+            spacing: 3
+            Text {
+              text: !fpGetSheet.a ? "" : (win.fpRemove ? "Remove " : "Install ") + fpGetSheet.a.name + (win.fpRemove ? "?" : "")
+              color: Zenon.white
+              font.family: Zenon.face
+              font.weight: Font.Bold
+              font.pixelSize: Zenon.px(20)
+            }
+            Text {
+              text: win.fpRemove
+                ? "Installed " + (win.fpScope === "user" ? "just for you" : "for everyone") + " from Flathub"
+                : "From Flathub" + (fpGetSheet.a && fpGetSheet.a.verified ? " \u00B7 verified publisher" : "")
+                  + (win.fpInfo && win.fpInfo["Download Size"]
+                    ? "  \u00B7  " + win.fpInfo["Download Size"] + " download, " + win.fpInfo["Installed Size"] + " on disk" : "")
+              color: Zenon.keyInk
+              font.family: Zenon.face
+              font.weight: Zenon.weight
+              font.pixelSize: Zenon.px(15)
+            }
+          }
+        }
+        // where it goes — the last place chosen, to start with
+        Term.Segments {
+          visible: !win.fpRemove
+          width: parent.width
+          even: true
+          strong: true
+          textSize: Zenon.px(16)
+          ink: Zenon.keyInk
+          options: [["system", "For everyone", "asks for your password"],
+                    ["user", "Just me", "only you \u00B7 no password"]]
+          current: win.fpScope
+          onChose: (v) => win.fpScope = v
+        }
+        // what its sandbox lets it touch, the worst first
+        Text {
+          visible: !win.fpRemove && win.fpPerms !== null
+          width: parent.width
+          wrapMode: Text.Wrap
+          text: fpGetSheet.perms.length === 0 ? "Sealed: it asks for nothing beyond its window and sound."
+            : "It may use: " + fpGetSheet.perms.slice(0, 5).map(p => p.text.charAt(0).toLowerCase() + p.text.slice(1)).join("; ")
+              + (fpGetSheet.perms.length > 5 ? "; and " + (fpGetSheet.perms.length - 5) + " more" : "") + "."
+          color: fpGetSheet.perms.some(p => p.level === "high") ? Zenon.yellow : Zenon.keyInk
+          font.family: Zenon.face
+          font.weight: Zenon.weight
+          font.pixelSize: Zenon.px(15)
+        }
+        Text {
+          visible: win.fpRemove
+          width: parent.width
+          wrapMode: Text.Wrap
+          text: "What it kept in ~/.var/app/" + (fpGetSheet.a ? fpGetSheet.a.pkg : "") + " stays."
+          color: Zenon.keyInk
+          font.family: Zenon.face
+          font.weight: Zenon.weight
+          font.pixelSize: Zenon.px(15)
+        }
+      }
+
+      Row {
+        id: fpGetBtns
+        anchors.bottom: parent.bottom
+        anchors.bottomMargin: 14
+        anchors.right: parent.right
+        anchors.rightMargin: 16
+        spacing: 8
+        DialogButton {
+          label: "Back"
+          ink: Zenon.muted
+          onClicked: win.overlay = ""
+        }
+        DialogButton {
+          label: win.fpRemove ? "Remove" : "Install"
+          ink: win.fpRemove ? Zenon.red : Zenon.cyan
+          primary: true
+          ready: !Ceres.txBusy
+          onClicked: win.goFlatpak()
+        }
+      }
+    }
+  }
+
+  // ── Flatpak, taken away — what goes with it ─────────────────────────────
+  Item {
+    anchors.fill: parent
+    z: 10
+    visible: win.fpUp || fpSheet.cardInk > 0.01
+
+    InputShield {
+      visible: win.fpUp
+      onClicked: win.overlay = ""
+    }
+
+    Sheet {
+      backdrop: stage   // frosted over it — see morpheus/Sheet
+      id: fpSheet
+      shown: win.fpUp
+      fromTop: 0
+      cardW: Math.min(720, win.width - 60)
+      readonly property var apps: Ceres.flatpakApps
+      cardH: Math.min(win.height - 90, 150 + (fpSheet.apps.length ? 34 + Math.min(12, fpSheet.apps.length) * 26 : 0)
+        + fpBtns.height + 30)
+
+      Column {
+        anchors.fill: parent
+        anchors.margins: 18
+        anchors.bottomMargin: 18 + fpBtns.height + 12
+        spacing: 10
+        Text {
+          text: "Remove Flatpak?"
+          color: Zenon.white
+          font.family: Zenon.face
+          font.weight: Font.Bold
+          font.pixelSize: Zenon.px(20)
+        }
+        Text {
+          width: parent.width
+          wrapMode: Text.Wrap
+          text: fpSheet.apps.length === 0
+            ? "No Flatpak apps are installed. Flathub is removed as a source, and flatpak itself is uninstalled."
+            : (fpSheet.apps.length === 1 ? "This app is removed with it" : "These " + fpSheet.apps.length + " apps are removed with it")
+              + ", with the runtimes they share. Flathub is removed as a source. What the apps kept in ~/.var/app stays."
+          color: Zenon.keyInk
+          font.family: Zenon.face
+          font.weight: Zenon.weight
+          font.pixelSize: Zenon.px(15)
+        }
+        Column {
+          visible: fpSheet.apps.length > 0
+          width: parent.width
+          topPadding: 4
+          spacing: 4
+          Repeater {
+            model: fpSheet.apps.slice(0, 12)
+            delegate: Row {
+              required property var modelData
+              width: parent.width
+              height: 22
+              spacing: 10
+              Text {
+                anchors.verticalCenter: parent.verticalCenter
+                text: "\uF324"
+                color: Zenon.red
+                font.family: Zenon.face
+                font.weight: Zenon.weight
+                font.pixelSize: Zenon.px(14)
+              }
+              Text {
+                anchors.verticalCenter: parent.verticalCenter
+                width: parent.width - 150
+                elide: Text.ElideRight
+                text: modelData.name
+                color: Zenon.white
+                font.family: Zenon.face
+                font.weight: Zenon.weight
+                font.pixelSize: Zenon.px(15)
+              }
+              Text {
+                anchors.verticalCenter: parent.verticalCenter
+                text: modelData.scope === "user" ? "just you" : "everyone"
+                color: Zenon.muted
+                font.family: Zenon.face
+                font.weight: Zenon.weight
+                font.pixelSize: Zenon.px(14)
+              }
+            }
+          }
+          Text {
+            visible: fpSheet.apps.length > 12
+            text: "and " + (fpSheet.apps.length - 12) + " more"
+            color: Zenon.muted
+            font.family: Zenon.face
+            font.weight: Zenon.weight
+            font.pixelSize: Zenon.px(14)
+          }
+        }
+      }
+
+      Row {
+        id: fpBtns
+        anchors.bottom: parent.bottom
+        anchors.bottomMargin: 14
+        anchors.right: parent.right
+        anchors.rightMargin: 16
+        spacing: 8
+        DialogButton {
+          label: "Back"
+          ink: Zenon.muted
+          onClicked: win.overlay = ""
+        }
+        DialogButton {
+          label: fpSheet.apps.length ? "Remove Flatpak and " + fpSheet.apps.length + (fpSheet.apps.length === 1 ? " app" : " apps")
+            : "Remove Flatpak"
+          ink: Zenon.red
+          primary: true
+          ready: !Ceres.txBusy
+          onClicked: win.removeFlatpak()
         }
       }
     }

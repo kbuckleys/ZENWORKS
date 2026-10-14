@@ -1,0 +1,759 @@
+#!/usr/bin/env python3
+# ┌─┐┌─┐┌┐┌┬ ┬┌─┐┬─┐┬┌─┌─┐
+# ┌─┘├┤ │││││││ │├┬┘├┴┐└─┐
+# └─┘└─┘┘└┘└┴┘└─┘┴└─┴ ┴└─┘
+# https://github.com/kbuckleys/
+#
+# CERES STORE — the app catalogue, read once and kept small.
+#
+#   ceres-store list              every app, as one JSON line: the cards
+#   ceres-store detail <key>      one app's page: description, links,
+#                                 screenshots, releases — as JSON
+#   ceres-store shots <url>...    screenshots fetched into the cache; one
+#                                 "url<TAB>path" line each as it lands
+#                                 ("url<TAB>" when it could not be had)
+#
+# WHERE IT COMES FROM. Arch's own AppStream catalogue, archlinux-appstream-
+# data: /usr/share/swcatalog/xml/{core,extra,multilib}.xml.gz, with icons
+# already cut to 48/64/128 under /usr/share/swcatalog/icons (JPEG XL, read by
+# kimageformats). Desktop applications only — the Store shows apps; the
+# Packages tab is still where every package is.
+#
+# HOW POPULAR, from pkgstats.archlinux.de: the share of Arch machines that
+# report having the package, fetched at most once a week. It orders the
+# shelves. Offline, the last answer is kept; never fetched, everything is 0
+# and the order is by name.
+#
+# CACHED in ~/.cache/ceres/store against the catalogue's and the sync
+# databases' mtimes, so `list` after the first is a file read and one
+# `pacman -Qq` for what is installed now — that part is never cached.
+
+import concurrent.futures
+import gzip
+import hashlib
+import json
+import os
+import shutil
+import re
+import subprocess
+import sys
+import time
+import urllib.request
+import xml.etree.ElementTree as ET
+
+XML_DIR = "/usr/share/swcatalog/xml"
+ICON_DIR = "/usr/share/swcatalog/icons"
+REPOS = ["core", "extra", "multilib"]
+CACHE = os.path.join(os.environ.get("XDG_CACHE_HOME") or os.path.expanduser("~/.cache"), "ceres", "store")
+INDEX = os.path.join(CACHE, "apps.json")
+DETAIL = os.path.join(CACHE, "detail.json")
+STAMP = os.path.join(CACHE, "stamp")
+POP = os.path.join(CACHE, "popularity.json")
+SHOTS = os.path.join(CACHE, "shots")
+POP_URL = "https://pkgstats.archlinux.de/api/packages?limit=10000&offset={}"
+POP_AGE = 7 * 86400
+LANG_ATTR = "{http://www.w3.org/XML/1998/namespace}lang"
+UA = "ceres-store (https://github.com/kbuckleys/)"
+
+
+# ── the locale's text, else the untranslated ────────────────────────────────
+# AppStream repeats name, summary and description once per language, each
+# with xml:lang; the one without is the original (English, nearly always).
+def locales():
+    raw = os.environ.get("LC_MESSAGES") or os.environ.get("LC_ALL") or os.environ.get("LANG") or ""
+    full = raw.split(".")[0].split("@")[0]
+    out = []
+    if full and full not in ("C", "POSIX"):
+        out.append(full)
+        if "_" in full:
+            out.append(full.split("_")[0])
+    return out
+
+
+def pick(elems, langs):
+    """The element for the first matching locale, else the untranslated one."""
+    by = {}
+    for e in elems:
+        by.setdefault(e.get(LANG_ATTR) or "", e)
+    for l in langs:
+        if l in by:
+            return by[l]
+    # `is not None`, never truth: an element with no children is false, so
+    # `by.get("") or …` passed over every untranslated <name> and took the
+    # first language in the file (Avahi's came out in Azerbaijani)
+    if "" in by:
+        return by[""]
+    return elems[0] if elems else None
+
+
+def text(e):
+    return " ".join("".join(e.itertext()).split()) if e is not None else ""
+
+
+# A description, as blocks the page can draw: {"p": text} and {"ul": [items]}
+# ({"ol": [...]} when numbered). Whitespace inside a paragraph is the XML's
+# wrapping, not the author's, and is folded.
+def blocks(desc):
+    out = []
+    if desc is None:
+        return out
+    for child in desc:
+        tag = child.tag
+        if tag == "p":
+            t = text(child)
+            if t:
+                out.append({"p": t})
+        elif tag in ("ul", "ol"):
+            items = [text(li) for li in child if li.tag == "li"]
+            items = [i for i in items if i]
+            if items:
+                out.append({tag: items})
+    return out
+
+
+def best_icon(comp, icon_dir):
+    """The largest cached icon on disk, and the stock name as a fallback.
+    `icon_dir(size)` is where a catalogue keeps that size's icons."""
+    cached, stock = {}, ""
+    for ic in comp.findall("icon"):
+        kind = ic.get("type")
+        name = (ic.text or "").strip()
+        # a @2 copy is the same picture at twice the pixels, in another place
+        if kind == "cached" and name and not ic.get("scale"):
+            cached[int(ic.get("width") or 0)] = name
+        elif kind == "stock" and name:
+            stock = name
+    for size in sorted(cached, reverse=True):
+        p = os.path.join(icon_dir(size), cached[size])
+        if os.path.exists(p):
+            return p, stock
+    return "", stock
+
+
+def brand(comp):
+    """The primary colour meant for a dark page, else any primary."""
+    colours = {}
+    for c in comp.findall("branding/color"):
+        if c.get("type") == "primary" and c.text:
+            colours[c.get("scheme_preference") or ""] = c.text.strip()
+    return colours.get("dark") or colours.get("") or colours.get("light") or ""
+
+
+# A screenshot's picture: Flathub's ~1248px thumbnail when it has one — what
+# the page draws, at a fraction of the original's weight — else the source.
+def shot_image(imgs):
+    thumbs = [i for i in imgs if i.get("type") == "thumbnail" and (i.text or "").strip()]
+    big = [i for i in thumbs if int(i.get("width") or 0) >= 1000]
+    if big:
+        return min(big, key=lambda i: int(i.get("width") or 0))
+    return next((i for i in imgs if i.get("type") == "source"), imgs[0] if imgs else None)
+
+
+def component(comp, langs, icon_dir):
+    """One desktop application, as the Store keeps it — any catalogue's."""
+    icon, stock = best_icon(comp, icon_dir)
+    # translated too: the first <name> was GIMP's in Russian
+    dev = text(pick(comp.findall("developer/name"), langs)) \
+        or text(pick(comp.findall("developer_name"), langs))
+    kw = pick(comp.findall("keywords"), langs)
+    keywords = [text(k) for k in kw.findall("keyword")] if kw is not None else []
+    urls = {}
+    for u in comp.findall("url"):
+        if u.get("type") and u.text:
+            urls.setdefault(u.get("type"), u.text.strip())
+    shots = []
+    for s in comp.findall("screenshots/screenshot"):
+        img = shot_image(s.findall("image"))
+        if img is None or not (img.text or "").strip():
+            continue
+        cap = pick(s.findall("caption"), langs)
+        shots.append({"url": img.text.strip(), "caption": text(cap),
+                      "default": s.get("type") == "default"})
+    # the default one leads; the rest keep the author's order (GIMP marks
+    # all four default, and moving each to the front reversed them)
+    lead = next((i for i, x in enumerate(shots) if x["default"]), 0)
+    shots = [{"url": x["url"], "caption": x["caption"]} for x in shots[lead:lead + 1] + shots[:lead] + shots[lead + 1:]]
+    releases = []
+    for r in comp.findall("releases/release")[:3]:
+        releases.append({"version": r.get("version") or "",
+                         "date": int(r.get("timestamp") or 0),
+                         "notes": blocks(pick(r.findall("description"), langs))})
+    launch = comp.find("launchable[@type='desktop-id']")
+    cid = (comp.findtext("id") or "").strip()
+    verified = any(v.get("key") == "flathub::verification::verified" and (v.text or "").strip() == "true"
+                   for v in comp.findall("custom/value"))
+    return {
+        "id": cid,
+        "pkg": (comp.findtext("pkgname") or "").strip(),
+        "name": text(pick(comp.findall("name"), langs)) or cid,
+        "summary": text(pick(comp.findall("summary"), langs)),
+        "icon": icon,
+        "stock": stock,
+        "cats": [c.text.strip() for c in comp.findall("categories/category") if c.text],
+        "dev": dev,
+        "color": brand(comp),
+        "keywords": keywords,
+        "desc": blocks(pick(comp.findall("description"), langs)),
+        "urls": urls,
+        "license": (comp.findtext("project_license") or "").strip(),
+        "shots": shots,
+        "releases": releases,
+        "launch": (launch.text or "").strip() if launch is not None else "",
+        "verified": verified,
+    }
+
+
+def catalogue(path, langs, icon_dir):
+    """Every desktop application in an AppStream catalogue (.xml or .xml.gz)."""
+    if not os.path.exists(path):
+        return
+    opener = gzip.open if path.endswith(".gz") else open
+    with opener(path, "rb") as f:
+        for _, comp in ET.iterparse(f, events=("end",)):
+            if comp.tag != "component":
+                continue
+            if comp.get("type") == "desktop-application" and (comp.findtext("id") or "").strip():
+                yield component(comp, langs, icon_dir)
+            comp.clear()
+
+
+def parse_repo(repo, langs, available):
+    apps = []
+    path = os.path.join(XML_DIR, repo + ".xml.gz")
+    root = os.path.join(ICON_DIR, "archlinux-arch-" + repo)
+    for c in catalogue(path, langs, lambda size: os.path.join(root, "%dx%d" % (size, size))):
+        # the catalogue is a snapshot; a package since dropped from the
+        # repos would be a card with nothing behind it
+        if not c["pkg"] or (available and c["pkg"] not in available):
+            continue
+        c.update({"key": "arch:" + c["id"], "source": "arch", "repo": repo})
+        apps.append(c)
+    return apps
+
+
+# ── Flathub's catalogue ─────────────────────────────────────────────────────
+# Fetched by flatpak itself (`flatpak update --appstream`) into the system
+# installation; for now it is the AUR's artwork (see aur_apps) — phase 3
+# shows Flathub's own apps from it too.
+FLATHUB = "/var/lib/flatpak/appstream/flathub/x86_64/active"
+
+
+# HOW POPULAR ON FLATHUB: its own monthly installs, from its `popular`
+# collection (every page), and what is trending — fetched weekly, the last
+# answer kept offline. Installs are put on pkgstats' scale by the top app:
+# Flathub's most installed counts as FLATHUB_TOP percent — enough to stand
+# among the well used, never over what most of Arch has.
+FLATHUB_STATS = os.path.join(CACHE, "flathub-stats.json")
+FLATHUB_API = "https://flathub.org/api/v2/collection/{}?page={}&per_page=250"
+FLATHUB_TOP = 30.0
+
+
+def flathub_stats():
+    old = {"installs": {}, "trending": []}
+    try:
+        with open(FLATHUB_STATS) as f:
+            old = json.load(f)
+        if time.time() - os.path.getmtime(FLATHUB_STATS) < POP_AGE:
+            return old
+    except (OSError, ValueError):
+        pass
+    if not shutil.which("flatpak"):
+        return old
+    installs, trending = {}, []
+    try:
+        page = 1
+        while page <= 40:
+            d = fetch_json(FLATHUB_API.format("popular", page))
+            for h in d.get("hits") or []:
+                if h.get("app_id"):
+                    installs[h["app_id"]] = h.get("installs_last_month") or 0
+            if page >= (d.get("totalPages") or 1):
+                break
+            page += 1
+        d = fetch_json(FLATHUB_API.format("trending", 1))
+        trending = [h["app_id"] for h in d.get("hits") or [] if h.get("app_id")]
+    except Exception:
+        return old
+    out = {"installs": installs, "trending": trending}
+    if installs:
+        write_json(FLATHUB_STATS, out)
+    return out if installs else old
+
+
+def flathub(langs):
+    path = os.path.join(FLATHUB, "appstream.xml.gz")
+    if not os.path.exists(path):
+        path = os.path.join(FLATHUB, "appstream.xml")
+    return list(catalogue(path, langs, lambda size: os.path.join(FLATHUB, "icons", "%dx%d" % (size, size))))
+
+
+# ── the AUR, as apps ────────────────────────────────────────────────────────
+# The AUR has no catalogue: a package is a name, a line of description and a
+# URL. Most of its 120,000 are libraries, tools and variants — not apps. An
+# AUR package comes into the Store only when it is RECOGNISED as an app
+# Flathub describes, and then wears that app's icon, screenshots and words:
+#
+#   the same homepage or source repository, AND a word of the app's name in
+#   the package's — or the package's name, stripped of -bin, -git and the
+#   like, being the app's (id's last part, or its name hyphenated)
+#
+# A URL alone was not enough: lib32-gstreamer shares GStreamer's homepage
+# with its Debug Viewer, the Android SDK's tools Android Studio's. Libraries
+# never count. Several builds of one app (zen-browser-bin, -twilight-bin …)
+# are one card: the most used stable build, the others its `alts`.
+AUR_META = os.path.join(CACHE, "aur-meta.json.gz")
+AUR_META_URL = "https://aur.archlinux.org/packages-meta-v1.json.gz"
+AUR_AGE = 3 * 86400
+VARIANT = re.compile(r"-(bin|git|svn|hg|appimage|nightly|beta|alpha|stable|latest|dev|electron\d*|wayland|"
+                     r"native|unstable|preview|canary|insiders|twilight|edge|lts|full|cn|jre|universal|bwrap)$")
+UNSTABLE = re.compile(r"-(git|svn|hg|nightly|beta|alpha|dev|unstable|preview|canary|insiders|twilight|edge)(-bin)?$")
+LIBRARY = re.compile(r"^(lib32-|lib(?=[a-z0-9]))|-(sdk|headers|docs?|devel|plugins?|cmdline-tools|system-image.*|dkms)$")
+
+
+def refresh_aur_meta():
+    """The AUR's package list with descriptions, fetched every three days."""
+    fresh = os.path.exists(AUR_META) and time.time() - os.path.getmtime(AUR_META) < AUR_AGE
+    if not fresh:
+        try:
+            req = urllib.request.Request(AUR_META_URL, headers={"User-Agent": UA})
+            with urllib.request.urlopen(req, timeout=90) as r:
+                data = r.read()
+            json.loads(gzip.decompress(data))          # whole, or not kept
+            os.makedirs(CACHE, exist_ok=True)
+            tmp = AUR_META + ".%d" % os.getpid()
+            with open(tmp, "wb") as f:
+                f.write(data)
+            os.replace(tmp, AUR_META)
+        except Exception:
+            pass
+
+
+def aur_meta():
+    try:
+        with gzip.open(AUR_META, "rb") as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return []
+
+
+def norm_url(u):
+    u = (u or "").strip().lower()
+    u = re.sub(r"^[a-z+]+://", "", u)
+    u = re.sub(r"^www\.", "", u)
+    u = u.split("#")[0].split("?")[0].rstrip("/")
+    u = re.sub(r"/index\.html?$", "", u)
+    u = re.sub(r"\.git$", "", u)
+    m = re.match(r"(github\.com|gitlab\.com|codeberg\.org)/([^/]+/[^/]+)", u)
+    return m.group(1) + "/" + m.group(2) if m else u
+
+
+def stem(name):
+    n = name.lower()
+    for _ in range(3):
+        n = VARIANT.sub("", n)
+    return n
+
+
+def words(s):
+    return {w for w in re.split(r"[^a-z0-9]+", s.lower()) if len(w) >= 3}
+
+
+def aur_apps(meta, fl, repo_ids, repo_names, repo_same=lambda c: False):
+    by_url, by_name = {}, {}
+    for c in fl:
+        for t in ("homepage", "vcs-browser"):
+            if c["urls"].get(t):
+                by_url.setdefault(norm_url(c["urls"][t]), []).append(c)
+        for k in {c["id"].split(".")[-1].lower(), re.sub(r"\s+", "-", c["name"].lower())}:
+            by_name.setdefault(k, []).append(c)
+    builds = {}
+    for p in meta:
+        name = p.get("Name") or ""
+        if not name or LIBRARY.search(name) or LIBRARY.search(stem(name)) or name in repo_names:
+            continue
+        s = stem(name)
+        named = by_name.get(s, [])
+        hits = by_url.get(norm_url(p.get("URL")), []) if p.get("URL") else []
+        match = next((c for c in hits if c in named), None)
+        if match is None and len(hits) == 1:
+            # EVERY word of the package's name is the app's: dropbox-cli,
+            # nautilus-dropbox and bitwarden-cli-bin share their app's site
+            # but are not it (and an installed bitwarden-cli made Bitwarden
+            # read as installed). heroic-games-launcher is Heroic, by its id.
+            c = hits[0]
+            app_words = words(c["name"]) | {w.lower() for w in c["id"].split(".")} \
+                | {re.sub(r"[^a-z0-9]", "", c["name"].lower())}
+            own = words(s.replace("-", " "))
+            if (own and own <= app_words) or re.sub(r"[^a-z0-9]", "", s) in app_words:
+                match = c
+        if match is None and len(named) == 1 and hits == [] and p.get("URL"):
+            # named after the app, with a URL on the app's own site
+            c = named[0]
+            site = norm_url(p["URL"]).split("/")[0]
+            if any(norm_url(u).split("/")[0] == site for u in c["urls"].values()):
+                match = c
+        if match is None or match["id"] in repo_ids or repo_same(match):
+            continue
+        builds.setdefault(match["id"], (match, []))[1].append(p)
+    apps = []
+    for cid, (c, ps) in builds.items():
+        # the build a card installs: stable before -git and nightlies, then
+        # the most used; the rest are its alternatives
+        ps.sort(key=lambda p: (bool(UNSTABLE.search(p["Name"])), -(p.get("Popularity") or 0)))
+        lead = ps[0]
+        a = dict(c)
+        a.update({"key": "aur:" + cid, "source": "aur", "repo": "aur", "pkg": lead["Name"],
+                  "alts": [p["Name"] for p in ps[1:6]], "votes": lead.get("NumVotes") or 0,
+                  "maintainer": lead.get("Maintainer") or "", "outOfDate": bool(lead.get("OutOfDate")),
+                  "aurDesc": lead.get("Description") or ""})
+        apps.append(a)
+    return apps
+
+
+# ── popularity ──────────────────────────────────────────────────────────────
+def fetch_json(url, timeout=30):
+    req = urllib.request.Request(url, headers={"User-Agent": UA})
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        return json.load(r)
+
+
+def popularity():
+    """name → percent of machines; refreshed weekly, the last answer kept offline."""
+    old = {}
+    try:
+        with open(POP) as f:
+            old = json.load(f)
+        if time.time() - os.path.getmtime(POP) < POP_AGE:
+            return old
+    except (OSError, ValueError):
+        pass
+    pop, offset = {}, 0
+    try:
+        while True:
+            d = fetch_json(POP_URL.format(offset))
+            rows = d.get("packagePopularities") or []
+            for r in rows:
+                pop[r["name"]] = r.get("popularity") or 0
+            offset += len(rows)
+            if not rows or offset >= (d.get("total") or 0):
+                break
+    except Exception:
+        return old
+    if pop:
+        write_json(POP, pop)
+    return pop or old
+
+
+# ── the cache ───────────────────────────────────────────────────────────────
+def write_json(path, obj):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    tmp = path + ".%d" % os.getpid()
+    with open(tmp, "w") as f:
+        json.dump(obj, f, ensure_ascii=False, separators=(",", ":"))
+    os.replace(tmp, path)
+
+
+# Raised whenever what the index holds changes shape, so an old cache is
+# rebuilt rather than read without the new fields (the `shot` field came in
+# and the front page found no pictures).
+FORMAT = 7
+
+
+def stamp():
+    parts = ["v%d" % FORMAT]
+    for repo in REPOS:
+        p = os.path.join(XML_DIR, repo + ".xml.gz")
+        parts.append(str(int(os.path.getmtime(p))) if os.path.exists(p) else "-")
+    for p in ("/var/lib/pacman/sync", POP, AUR_META, os.path.join(FLATHUB, "appstream.xml.gz"), FLATHUB_STATS):
+        parts.append(str(int(os.path.getmtime(p))) if os.path.exists(p) else "-")
+    parts.append(",".join(locales()))
+    parts.append("flatpak" if shutil.which("flatpak") else "-")
+    return " ".join(parts)
+
+
+def pacman_names(args):
+    try:
+        out = subprocess.run(["pacman"] + args, capture_output=True, text=True, timeout=30).stdout
+    except (OSError, subprocess.SubprocessError):
+        return set()
+    return set(out.split())
+
+
+# The cards carry what a grid and a search need; everything else waits in
+# detail.json for the page that asks for it.
+#
+# POLISHED: screenshots and a description, and the one app its package
+# brings. The shelves stand on these — popularity alone put Avahi's browsers
+# and Qt's four tools at the top, there because other things depend on them,
+# not because anyone went looking. Everything is still in its category.
+CARD = ("key", "source", "repo", "id", "pkg", "name", "summary", "icon", "stock",
+        "cats", "dev", "color", "pop", "keywords", "polished", "launch", "alts", "shot",
+        "verified", "trend", "installs", "others")
+PAGE = ("desc", "urls", "license", "shots", "fallbackShots", "releases", "verified",
+        "votes", "maintainer", "outOfDate", "aurDesc")
+
+
+def build(force=False):
+    pop = popularity()
+    refresh_aur_meta()
+    s = stamp()
+    try:
+        if not force and open(STAMP).read() == s and os.path.exists(INDEX) and os.path.exists(DETAIL):
+            return
+    except OSError:
+        pass
+    langs = locales()
+    available = pacman_names(["-Slq"])
+    apps = []
+    for repo in REPOS:
+        apps.extend(parse_repo(repo, langs, available))
+    # the AUR's apps, in Flathub's clothes; an app the repos have is the
+    # repos' (one card per app across sources is phase 4)
+    repo_ids = {a["id"] for a in apps} | {re.sub(r"\.desktop$", "", a["id"]) for a in apps}
+    # the same app under another id — Arch's mpv is mpv.desktop, Flathub's
+    # io.mpv.Mpv — is known by its name. Not by its homepage: Code - OSS
+    # (repos) and Visual Studio Code (AUR) share one, and are two apps.
+    repo_titles = {a["name"].lower() for a in apps}
+    same = lambda c: c["name"].lower() in repo_titles
+    fl = flathub(langs)
+    # A STAND-IN FOR A DEAD LINK: an Arch app's screenshots are its
+    # upstream's links, and they rot (mpv.io's 404s). Its Flathub twin —
+    # by id, any case (io.mpv.mpv / io.mpv.Mpv), or by name — lends its
+    # own, fetched only once one of the app's fails.
+    twin = {}
+    for c in fl:
+        twin.setdefault(c["id"].lower(), c)
+        twin.setdefault("name:" + c["name"].lower(), c)
+    for a in apps:
+        t = twin.get(re.sub(r"\.desktop$", "", a["id"]).lower()) or twin.get("name:" + a["name"].lower())
+        a["fallbackShots"] = [x["url"] for x in t["shots"]] if t else []
+    aur = aur_apps(aur_meta(), fl, repo_ids, available, same)
+    apps.extend(aur)
+    # FLATHUB'S OWN, when Flatpak is here: every app neither the repos nor
+    # the AUR already has a card for — one card per app; which source a
+    # shared app should come from is the page's to offer (phase 4)
+    # THE SAME APP ELSEWHERE (user, 2026-10-14: "why can't I find Spotify
+    # on Flatpak?"): one card per app still, but a card knows its other
+    # sources, and its page offers them — Arch or AUR, or Flathub's build.
+    has_flatpak = bool(shutil.which("flatpak"))
+    stats = flathub_stats() if has_flatpak else {"installs": {}, "trending": []}
+    if has_flatpak:
+        by_id = {c["id"]: c for c in fl}
+        for a in apps + aur:
+            t = by_id.get(a["id"]) if a["source"] == "aur" else \
+                (twin.get(re.sub(r"\.desktop$", "", a["id"]).lower()) or twin.get("name:" + a["name"].lower()))
+            if t:
+                a["others"] = [{"source": "flatpak", "repo": "flathub", "pkg": t["id"], "launch": t["launch"],
+                                "verified": t["verified"], "installs": stats["installs"].get(t["id"], 0)}]
+    if has_flatpak:
+        top = max(stats["installs"].values() or [1]) or 1
+        trend = {a: i for i, a in enumerate(stats.get("trending") or [])}
+        aur_ids = {a["id"] for a in aur}
+        for c in fl:
+            if c["id"] in repo_ids or c["id"] in aur_ids or same(c):
+                continue
+            a = dict(c)
+            a.update({"key": "flatpak:" + c["id"], "source": "flatpak", "repo": "flathub", "pkg": c["id"],
+                      "flatpop": FLATHUB_TOP * (stats["installs"].get(c["id"], 0) / top),
+                      "installs": stats["installs"].get(c["id"], 0),
+                      "trend": trend.get(c["id"], -1)})
+            apps.append(a)
+    detail = {}
+    per = {}
+    for a in apps:
+        per[a["pkg"]] = per.get(a["pkg"], 0) + 1
+    for a in apps:
+        a.setdefault("alts", [])
+        # the first screenshot, for the front page's artwork
+        a["shot"] = a["shots"][0]["url"] if a["shots"] else ""
+        # pkgstats counts what machines HAVE, whichever repo it came from —
+        # so repo and AUR apps stand on one scale
+        a["pop"] = a["flatpop"] if a["source"] == "flatpak" \
+            else max([pop.get(a["pkg"], 0)] + [pop.get(n, 0) for n in a["alts"]])
+        a.setdefault("trend", -1)
+        a.setdefault("installs", 0)
+        a.setdefault("others", [])
+        a["polished"] = bool(a["shots"]) and bool(a["desc"]) and per[a["pkg"]] == 1
+        detail[a["key"]] = {k: a.get(k) for k in PAGE}
+    apps.sort(key=lambda a: (-a["pop"], a["name"].lower()))
+    write_json(INDEX, [{k: a[k] for k in CARD} for a in apps])
+    write_json(DETAIL, detail)
+    with open(STAMP, "w") as f:
+        f.write(s)
+
+
+def cmd_list():
+    build()
+    with open(INDEX) as f:
+        apps = json.load(f)
+    installed = pacman_names(["-Qq"])
+    fp = flatpak_installed()
+    for a in apps:
+        if a["source"] == "flatpak":
+            a["installed"] = a["pkg"] in fp
+            a["scope"] = fp.get(a["pkg"], "")
+            continue
+        # another build of it counts: zen-browser-twilight-bin installed is
+        # Zen installed, and Remove takes out the one that is here
+        here = a["pkg"] if a["pkg"] in installed else next((n for n in a.get("alts") or [] if n in installed), "")
+        a["installed"] = here != ""
+        if here and here != a["pkg"]:
+            a["alts"] = [a["pkg"]] + [n for n in a["alts"] if n != here]
+            a["pkg"] = here
+    for a in apps:
+        for o in a.get("others") or []:
+            if o["source"] == "flatpak":
+                o["installed"] = o["pkg"] in fp
+                o["scope"] = fp.get(o["pkg"], "")
+        # the copy you have leads: Open and Remove act on what is here
+        if not a["installed"]:
+            got = next((o for o in a.get("others") or [] if o.get("installed")), None)
+            if got:
+                lead = {k: a.get(k) for k in SWAP}
+                a.update({k: got.get(k, a.get(k)) for k in SWAP})
+                a["others"] = [lead] + [o for o in a["others"] if o is not got]
+    fix_launch([a for a in apps if a["installed"] and a["source"] != "flatpak"])
+    sys.stdout.write(json.dumps({"apps": apps}, ensure_ascii=False, separators=(",", ":")) + "\n")
+
+
+# what changes when a card leads with another source
+SWAP = ("source", "repo", "pkg", "launch", "verified", "installs", "installed", "scope", "alts")
+
+
+def flatpak_installed():
+    """app id → "system" / "user", for the Flatpak apps installed here."""
+    if not shutil.which("flatpak"):
+        return {}
+    try:
+        out = subprocess.run(["flatpak", "list", "--app", "--columns=application,installation"],
+                             capture_output=True, text=True, timeout=30).stdout
+    except (OSError, subprocess.SubprocessError):
+        return {}
+    got = {}
+    for line in out.splitlines():
+        f = line.split("\t")
+        if f and f[0]:
+            got.setdefault(f[0], (f[1] if len(f) > 1 else "system").strip())
+    return got
+
+
+# OPEN NEEDS THE ENTRY THE PACKAGE ACTUALLY INSTALLED. An AUR build wears
+# Flathub's description, whose desktop id is Flathub's (com.brave.Browser);
+# brave-bin installs brave-browser.desktop. When the catalogue's id is not
+# on disk, the package's own file list says which entry it put there.
+APPS_DIRS = ["/usr/share/applications", "/usr/local/share/applications"]
+
+
+def fix_launch(apps):
+    def present(i):
+        return i and any(os.path.exists(os.path.join(d, i)) for d in APPS_DIRS)
+    need = [a for a in apps if not present(a.get("launch"))]
+    if not need:
+        return
+    try:
+        out = subprocess.run(["pacman", "-Ql"] + sorted({a["pkg"] for a in need}),
+                             capture_output=True, text=True, timeout=30).stdout
+    except (OSError, subprocess.SubprocessError):
+        return
+    entries = {}
+    for line in out.splitlines():
+        pkg, _, path = line.partition(" ")
+        if path.endswith(".desktop") and os.path.dirname(path) in APPS_DIRS:
+            entries.setdefault(pkg, []).append(os.path.basename(path))
+    for a in need:
+        found = entries.get(a["pkg"]) or []
+        # the entry named most like the app, else the package's first
+        want = re.sub(r"[^a-z0-9]", "", a["name"].lower())
+        best = next((e for e in found if want and want in re.sub(r"[^a-z0-9]", "", e.lower())), found[0] if found else "")
+        a["launch"] = best
+
+
+def cmd_detail(key):
+    build()
+    with open(DETAIL) as f:
+        d = json.load(f).get(key)
+    sys.stdout.write(json.dumps(d or {}, ensure_ascii=False, separators=(",", ":")) + "\n")
+
+
+# ── screenshots ─────────────────────────────────────────────────────────────
+# Fetched once, kept under a hash of their URL; a month unseen and they go.
+def shot_path(url):
+    ext = os.path.splitext(url.split("?")[0])[1].lower()
+    if ext not in (".png", ".jpg", ".jpeg", ".webp", ".gif", ".avif", ".jxl"):
+        ext = ".img"
+    return os.path.join(SHOTS, hashlib.sha1(url.encode()).hexdigest() + ext)
+
+
+def fetch_shot(url):
+    path = shot_path(url)
+    if os.path.exists(path) and os.path.getsize(path) > 0:
+        os.utime(path)
+        return url, path
+    # A HARD DEADLINE: urlopen's timeout is per read, so a server trickling
+    # bytes held a whole queue of pictures for minutes. Twenty seconds for
+    # the whole file, then it is given up and the next one goes.
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": UA})
+        start, chunks, size = time.time(), [], 0
+        with urllib.request.urlopen(req, timeout=10) as r:
+            while True:
+                if time.time() - start > 20 or size > 32 * 1024 * 1024:
+                    return url, ""
+                chunk = r.read(64 * 1024)
+                if not chunk:
+                    break
+                chunks.append(chunk)
+                size += len(chunk)
+        data = b"".join(chunks)
+        if not data:
+            return url, ""
+        tmp = path + ".%d" % os.getpid()
+        with open(tmp, "wb") as f:
+            f.write(data)
+        os.replace(tmp, path)
+        return url, path
+    except Exception:
+        return url, ""
+
+
+def prune_shots():
+    cutoff = time.time() - 30 * 86400
+    try:
+        for n in os.listdir(SHOTS):
+            p = os.path.join(SHOTS, n)
+            if os.path.getmtime(p) < cutoff:
+                os.remove(p)
+    except OSError:
+        pass
+
+
+def cmd_shots(urls):
+    os.makedirs(SHOTS, exist_ok=True)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as ex:
+        for url, path in ex.map(fetch_shot, urls):
+            sys.stdout.write(url + "\t" + path + "\n")
+            sys.stdout.flush()
+    prune_shots()
+
+
+def main(argv):
+    if not argv:
+        sys.stderr.write("usage: ceres-store list | detail <key> | shots <url>...\n")
+        return 2
+    cmd = argv[0]
+    if cmd == "list":
+        cmd_list()
+    elif cmd == "detail" and len(argv) == 2:
+        cmd_detail(argv[1])
+    elif cmd == "shots":
+        cmd_shots(argv[1:])
+    elif cmd == "build":
+        build(force="--force" in argv)
+    else:
+        sys.stderr.write("ceres-store: unknown command\n")
+        return 2
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

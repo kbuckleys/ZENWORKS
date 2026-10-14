@@ -33,22 +33,27 @@ Item {
   signal released()
   // "Review & save" was asked for: the window opens its sheet over this.
   signal reviewAsked()
+  // Remove Flatpak… — the window asks in a sheet, naming what goes with it
+  signal flatpakRemoveAsked()
 
   property var orig: []
   property var cur: []
   property bool loaded: false
   property int gsel: 0
-  // pacman.conf's groups, and paru's after them: which paru builds your AUR
-  // packages, the same choice setup made (user, 2026-10-11). Not a line of
-  // the file — it is swapped by its own job, not by Review & save.
-  readonly property var groups: Pac.GROUPS.concat([{ id: "paru", title: "paru",
-    blurb: "Which paru builds your AUR packages. The other one is built from its AUR recipe, which fetches the source from github.com/Morganamilo/paru, and installed by pacman in place of this one. Building compiles Rust and takes a few minutes." }])
+  // pacman.conf's groups, and then CHANNELS (user, 2026-10-14; it was
+  // "paru" until Flatpak came in): where apps come from beyond the repos.
+  // The AUR's, through paru — which paru builds your AUR packages, the same
+  // choice setup made (user, 2026-10-11) — and Flathub's. Not lines of the
+  // file: each is changed by its own job, not by Review & save. The id stays
+  // "paru".
+  readonly property var groups: Pac.GROUPS.concat([{ id: "paru", title: "Channels",
+    blurb: "Where apps come from beyond the repos. The AUR comes through paru: the other paru is built from its AUR recipe, which fetches the source from github.com/Morganamilo/paru, and installed by pacman in place of this one. Building compiles Rust and takes a few minutes." }])
   readonly property var group: view.groups[view.gsel]
   // the card picked in the paru group; back to the installed one each visit
   property string paruPick: "paru"
   readonly property string paruHere: Ceres.deps.paruPkg
   function resetParuPick() { view.paruPick = view.paruHere === "paru-git" ? "paru-git" : "paru"; }
-  onGselChanged: if (view.group.id === "paru") view.resetParuPick()
+  onGselChanged: if (view.group.id === "paru") { view.resetParuPick(); Ceres.listFlatpaks(); }
   // off the deps' arrival, not paruHere's change: the button's label reading
   // paruHere for the first time fired that, which wrote paruPick mid-read
   Connections { target: Ceres; function onDepsChanged() { view.resetParuPick(); } }
@@ -165,7 +170,7 @@ Item {
     return Pac.SCHEMA.some(s => s.group === id && view.changedOpt(s.key));
   }
   function groupSummary(id) {
-    if (id === "paru") return view.paruHere || "not installed";
+    if (id === "paru") return (view.paruHere || "no paru") + (Ceres.deps.flatpak ? " \u00B7 Flathub" : "");
     if (!view.loaded) return "…";
     if (id === "repos") {
       const on = view.reposNow.filter(r => r.enabled).length;
@@ -427,11 +432,18 @@ Item {
         }
         AddRepo { visible: view.group.id === "repos"; width: rows.width }
 
-        // ── paru ──────────────────────────────────────────────────────
+        // ── channels: the AUR, through paru ───────────────────────────
         Column {
           visible: view.group.id === "paru"
           width: rows.width
           spacing: 14
+          Text {
+            text: "The AUR, through paru"
+            color: Zenon.muted
+            font.family: Zenon.face
+            font.weight: Font.Bold
+            font.pixelSize: Zenon.px(15)
+          }
           ParuChoice {
             width: parent.width
             choice: view.paruPick
@@ -456,51 +468,51 @@ Item {
             ready: view.paruCanBuild
             onClicked: view.buildParu()
           }
+
+          // ── channels: Flathub ──────────────────────────────────────
+          // Added later, or taken away, as setup's question was answered
+          // (user, 2026-10-14). Taking it away asks in a sheet first,
+          // naming the apps that go with it — see the window's fpSheet.
+          Item { width: 1; height: 12 }
+          Text {
+            text: "Flathub, through Flatpak"
+            color: Zenon.muted
+            font.family: Zenon.face
+            font.weight: Font.Bold
+            font.pixelSize: Zenon.px(15)
+          }
+          Text {
+            width: parent.width
+            wrapMode: Text.Wrap
+            text: !Ceres.deps.flatpak
+              ? "Not added. With it, the Store carries Flathub's sandboxed apps beside the repos and the AUR; "
+                + "Flathub is added for the whole system, and each install asks whether it is for everyone or just you."
+              : "Added, with Flathub for the whole system. "
+                + (Ceres.flatpakApps.length === 0 ? "No Flatpak apps are installed."
+                  : Ceres.flatpakApps.length === 1 ? "1 Flatpak app is installed."
+                  : Ceres.flatpakApps.length + " Flatpak apps are installed.")
+            color: Zenon.keyInk
+            font.family: Zenon.face
+            font.weight: Zenon.weight
+            font.pixelSize: Zenon.px(15)
+          }
+          DialogButton {
+            label: Ceres.deps.flatpak ? "Remove Flatpak\u2026" : "Add Flatpak"
+            ink: Ceres.deps.flatpak ? Zenon.red : Zenon.cyan
+            primary: !Ceres.deps.flatpak
+            ready: !Ceres.txBusy
+            onClicked: {
+              if (Ceres.deps.flatpak) view.flatpakRemoveAsked();
+              else Ceres.addFlatpak();
+              view.released();
+            }
+          }
         }
       }
     }
   }
 
   // ── controls ────────────────────────────────────────────────────────────
-  // The Installed checkbox's look: a box with a tick, cyan when on.
-  component Check: Row {
-    id: ck
-    property bool lit: false
-    property string label: ""
-    property bool enabled2: true
-    signal toggled()
-    spacing: 8
-    opacity: ck.enabled2 ? 1 : 0.4
-    Rectangle {
-      anchors.verticalCenter: parent.verticalCenter
-      width: 18
-      height: 18
-      radius: Zenon.windowRadius - 1
-      color: ck.lit ? Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b, 0.2) : "transparent"
-      border.width: 1
-      border.color: ck.lit ? Zenon.cyan : Zenon.keyInk
-      Text {
-        anchors.centerIn: parent
-        visible: ck.lit
-        text: ""
-        color: Zenon.cyan
-        font.family: Zenon.face
-        font.weight: Zenon.weight
-        font.pixelSize: Zenon.px(11)
-      }
-    }
-    Text {
-      visible: ck.label !== ""
-      anchors.verticalCenter: parent.verticalCenter
-      text: ck.label
-      color: ck.lit ? Zenon.white : Zenon.keyInk
-      font.family: Zenon.face
-      font.weight: Zenon.weight
-      font.pixelSize: Zenon.px(15)
-    }
-    TapHandler { enabled: ck.enabled2; onTapped: ck.toggled() }
-  }
-
   // One of a few, the tab pill's lit look for the chosen one.
   component Chip: Rectangle {
     id: chip

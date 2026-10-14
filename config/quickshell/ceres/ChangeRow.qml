@@ -34,7 +34,15 @@ Item {
     font.pixelSize: 13 + ch.grow
   }
 
+  // THE NAME IS WHAT THE ROW IS (user, 2026-10-14): a long version pair —
+  // 2.1.1791890110+634daf2-1 → 2.1.1791988261+2a8e017-1 — in a narrow
+  // window took the whole row and the name was elided to nothing. The name
+  // keeps its own width, up to this share of the row; the versions have the
+  // rest, and give way from the left: the old version first, the new one
+  // last.
+  readonly property real nameShare: 0.45
   Text {
+    id: chName
     anchors.left: chGlyph.right
     anchors.right: vers.left
     anchors.rightMargin: 12
@@ -51,6 +59,10 @@ Item {
     id: vers
     anchors.right: parent.right
     anchors.verticalCenter: parent.verticalCenter
+    width: Math.max(0, Math.min(vers.implicitWidth,
+      ch.width - chGlyph.width - 12 - Math.min(chName.implicitWidth, ch.width * ch.nameShare)))
+    elide: Text.ElideLeft
+    horizontalAlignment: Text.AlignRight
     textFormat: Text.StyledText
     // WHAT MOVED, LIT: the new version's part that differs from the old,
     // from the separator before the first difference on, in full white and

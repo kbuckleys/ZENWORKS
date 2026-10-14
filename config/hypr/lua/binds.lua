@@ -38,7 +38,7 @@ hl.bind("SUPER + CONTROL + P",    hl.dsp.exec_cmd("qs ipc call Picasso pick"))
 hl.bind("PRINT",                  hl.dsp.exec_cmd("qs ipc call Picasso shot screen"))
 hl.bind("SUPER + PRINT",          hl.dsp.exec_cmd("qs ipc call Picasso shot window"))
 hl.bind("SUPER + SHIFT + PRINT",  hl.dsp.exec_cmd("qs ipc call Picasso shot region"))
-hl.bind("SUPER + P",              hl.dsp.exec_cmd("qs ipc call Ceres toggleWindow packages"))
+hl.bind("SUPER + P",              hl.dsp.exec_cmd("qs ipc call Ceres toggleWindow store"))
 hl.bind("SUPER + SHIFT + P",      hl.dsp.exec_cmd("qs ipc call Ceres toggleWindow updates"))
 
 -- WORKSPACES

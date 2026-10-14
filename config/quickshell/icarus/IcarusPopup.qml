@@ -314,9 +314,11 @@ Item {
     sep();
     // With the machinery, below the rule: it manages the system the desktop
     // runs on rather than acting on the desktop itself.
+    // THE STORE (user, 2026-10-14; it was "Package Manager", opening on
+    // the package list): Ceres' first tab, under its own glyph, U+F0D68
     if (Oracle.menuShowPackages)
-      rows.push({ text: "Package Manager", icon: "\uF487", hasChildren: false,
-                  kind: "shellcmd", cmd: "qs ipc call Ceres window packages",
+      rows.push({ text: "Store", icon: "\uDB83\uDD68", hasChildren: false,
+                  kind: "shellcmd", cmd: "qs ipc call Ceres window store",
                   isSeparator: false, enabled: true });
     // The shell's own pair, behind their own door — see shellOnlyEntries.
     rows.push({ text: "Shell", icon: "\uF120", hasChildren: true,

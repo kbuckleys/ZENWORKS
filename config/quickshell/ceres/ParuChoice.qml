@@ -3,84 +3,46 @@
 // └─┘└─┘┘└┘└┴┘└─┘┴└─┴ ┴└─┘
 // https://github.com/kbuckleys/
 //
-// WHICH PARU — the tagged release or the latest commit, two cards side by
-// side. Setup asks it once, before paru exists; Settings asks it again
-// whenever you want the other one (user, 2026-10-11), so the cards are one
-// piece rather than two copies that drift apart.
+// WHICH PARU — the tagged release or the latest commit. Setup asks it once,
+// before paru exists; Settings › Channels asks it again whenever you want the
+// other one (user, 2026-10-11), so it is one piece rather than two copies
+// that drift apart.
 //
-// `choice` is what is picked, held by whoever asked; a tap says so through
-// `picked`. `installed`, when given, marks the card that is the paru on this
-// machine now.
+// THE SUITE'S SWITCH (user, 2026-10-14): terminus/Segments, two halves, each
+// with its line of explanation under it (Segments' notes), as the cards had —
+// the release marked recommended; paru-git is kept as the fallback it once
+// had to be, when the release lagged and -git was the way to go.
+//
+// `choice` is what is picked, held by whoever asked; a pick says so through
+// `picked`. `installed`, when given, is the paru on this machine now.
 
 import QtQuick
 import "../morpheus"
+import "../terminus" as Term
 
-Row {
+Item {
   id: pick
 
   property string choice: "paru"
   property string installed: ""
   signal picked(string pkg)
 
-  spacing: 12
-  Repeater {
-    model: [["paru", "Latest release", "the tagged version, updated when paru cuts one"],
-            ["paru-git", "Latest commit", "follows paru's GitHub master as it moves"]]
-    delegate: Rectangle {
-      id: opt
-      required property var modelData
-      readonly property bool on: pick.choice === opt.modelData[0]
-      readonly property bool here: pick.installed === opt.modelData[0]
-      width: (pick.width - 12) / 2
-      height: optCol.implicitHeight + 24
-      radius: Zenon.windowRadius
-      color: opt.on ? Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b, 0.2) : "transparent"
-      border.width: 1
-      border.color: opt.on ? Zenon.cyan : Zenon.border
-      Column {
-        id: optCol
-        anchors.left: parent.left
-        anchors.right: parent.right
-        anchors.top: parent.top
-        anchors.margins: 12
-        spacing: 4
-        Row {
-          spacing: 10
-          Text {
-            text: opt.modelData[0]
-            color: opt.on ? Zenon.cyan : Zenon.white
-            font.family: Zenon.face
-            font.weight: Font.Bold
-            font.pixelSize: Zenon.px(18)
-          }
-          Text {
-            anchors.baseline: parent.children[0].baseline
-            visible: opt.here
-            text: "installed"
-            color: Zenon.green
-            font.family: Zenon.face
-            font.weight: Zenon.weight
-            font.pixelSize: Zenon.px(15)
-          }
-        }
-        Text {
-          text: opt.modelData[1]
-          color: Zenon.white
-          font.family: Zenon.face
-          font.weight: Zenon.weight
-          font.pixelSize: Zenon.px(16)
-        }
-        Text {
-          width: parent.width
-          wrapMode: Text.Wrap
-          text: opt.modelData[2]
-          color: Zenon.muted
-          font.family: Zenon.face
-          font.weight: Zenon.weight
-          font.pixelSize: Zenon.px(15)
-        }
-      }
-      TapHandler { onTapped: pick.picked(opt.modelData[0]) }
-    }
+  function note(pkg, line) { return line + (pick.installed === pkg ? "  \u00B7  installed" : ""); }
+
+  implicitHeight: seg.height
+  height: implicitHeight
+
+  Term.Segments {
+    id: seg
+    width: pick.width
+    even: true
+    // the choice made plain, as the Flatpak sheet's (user, 2026-10-14)
+    strong: true
+    textSize: Zenon.px(16)
+    ink: Zenon.keyInk
+    options: [["paru", "Latest release \u00B7 recommended", pick.note("paru", "paru \u2014 each tagged version")],
+              ["paru-git", "Latest commit", pick.note("paru-git", "paru-git \u2014 GitHub master, the fallback")]]
+    current: pick.choice
+    onChose: (v) => pick.picked(v)
   }
 }

@@ -68,6 +68,10 @@ LayerPopup {
       out.push({ head: true, label: "AUR", n: Ceres.aur.length, aur: true });
       for (const u of Ceres.aur) out.push({ head: false, u: u, aur: true });
     }
+    if (Ceres.flat.length) {
+      out.push({ head: true, label: "Flatpak", n: Ceres.flat.length, aur: false, flatpak: true });
+      for (const u of Ceres.flat) out.push({ head: false, u: u, aur: false, flatpak: true });
+    }
     return out;
   }
 
@@ -151,7 +155,7 @@ LayerPopup {
   // ── what the keys do ────────────────────────────────────────────────────
   function startAuth() {
     if (Ceres.total === 0 || Ceres.txBusy) return;
-    Ceres.request(Cer.upgradeSteps(), "", -1);
+    Ceres.updateAll();
   }
 
   function back() {
@@ -412,9 +416,9 @@ LayerPopup {
               visible: modelData.head
               anchors.left: parent.left
               anchors.verticalCenter: parent.verticalCenter
-              text: (modelData.aur ? "" : "") + "  " + modelData.label
+              text: (modelData.flatpak ? "\uF324" : modelData.aur ? "" : "") + "  " + modelData.label
                 + "  " + modelData.n
-              color: modelData.aur ? Ceres.ink.aur : Ceres.ink.repo
+              color: modelData.flatpak ? Ceres.ink.flat : modelData.aur ? Ceres.ink.aur : Ceres.ink.repo
               font.family: Zenon.face
               font.weight: Font.Bold
               font.pixelSize: Zenon.px(13)

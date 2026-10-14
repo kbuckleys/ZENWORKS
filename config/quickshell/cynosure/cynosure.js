@@ -39,7 +39,7 @@ const SHELL_ACTIONS = [
   { name: "Shutdown", glyph: "\u23FB", keys: "shutdown power off poweroff halt", sh: "hyprshutdown -p 'systemctl poweroff'", confirm: true },
   { name: "Settings", glyph: "\uF013", keys: "oracle preferences options config", ipc: "Oracle open" },
   { name: "Check for updates", glyph: "\uF2F1", keys: "ceres upgrade refresh sync", ipc: "Ceres check" },
-  { name: "Package manager", glyph: "\uF487", keys: "ceres packages install remove paru pacman aur", ipc: "Ceres window packages" },
+  { name: "Store", glyph: "\uDB83\uDD68", keys: "ceres store apps app store packages install remove paru pacman aur flatpak flathub", ipc: "Ceres window store" },
   { name: "Updates", glyph: "\uF062", keys: "ceres upgrade packages", ipc: "Ceres window updates" },
   { name: "Package history", glyph: "\uF1DA", keys: "ceres downgrade rollback log", ipc: "Ceres window history" },
   { name: "Package maintenance", glyph: "\uF0AD", keys: "ceres clean cache orphans pacnew", ipc: "Ceres window maintenance" },

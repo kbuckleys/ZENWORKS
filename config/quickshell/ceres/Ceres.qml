@@ -44,7 +44,9 @@ Singleton {
   property var editor: null
   property var repo: []
   property var aur: []
-  readonly property int total: root.repo.length + root.aur.length
+  // Flatpak's, beside them (user, 2026-10-14): { name, id, from, to, scope }
+  property var flat: []
+  readonly property int total: root.repo.length + root.aur.length + root.flat.length
   // The running kernel's modules have been upgraded away — see restartCommand.
   property bool restartNeeded: false
 
@@ -108,8 +110,35 @@ Singleton {
   // Checked at startup and after every transaction. Anything missing is
   // named with its package and its purpose, and whatever needs paru is sent
   // to setup rather than left to fail — see setupSteps.
-  property var deps: ({ missing: [], paru: false, cargo: false, paruPkg: "" })
-  readonly property bool setupNeeded: root.deps.missing.length > 0
+  property var deps: ({ missing: [], paru: false, cargo: false, paruPkg: "", flatpak: true })
+  // ── FLATPAK, IF YOU WANT IT (user, 2026-10-14) ──────────────────────────
+  // Not a dependency: a question setup asks once — Arch and the AUR, or
+  // Flathub's apps in the Store too. The answer is kept ("yes" / "no");
+  // "" is not asked yet, and with no flatpak here that alone is setup to do.
+  // Having flatpak already is an answer: nothing to ask.
+  property string flatpakPref: ""
+  readonly property bool flatpakAsk: !root.deps.flatpak && root.flatpakPref === ""
+  FileView {
+    id: storePrefs
+    path: Quickshell.statePath("ceres-store.json")
+    printErrors: false
+    onLoaded: {
+      try {
+        const o = JSON.parse(storePrefs.text());
+        root.flatpakPref = String(o.flatpak || "");
+        root.flatpakScope = o.scope === "user" ? "user" : "system";
+      } catch (e) { root.flatpakPref = ""; }
+    }
+  }
+  // where the last Flatpak went — the install sheet starts there
+  property string flatpakScope: "system"
+  // setText never fires `loaded` for our own write: the properties are set here
+  function saveStorePrefs() {
+    storePrefs.setText(JSON.stringify({ flatpak: root.flatpakPref, scope: root.flatpakScope }));
+  }
+  function setFlatpakPref(v) { root.flatpakPref = v; root.saveStorePrefs(); }
+  function setFlatpakScope(v) { root.flatpakScope = v === "user" ? "user" : "system"; root.saveStorePrefs(); }
+  readonly property bool setupNeeded: root.deps.missing.length > 0 || root.flatpakAsk
   readonly property string buildDir: Paths.cacheDir() + "/ceres/build"
   signal setupRequested()
   property bool _checkAfterSetup: false
@@ -120,22 +149,68 @@ Singleton {
     command: ["sh", "-c", Cer.depsCommand()]
     stdout: StdioCollector {
       id: depsOut
-      onStreamFinished: root.deps = Cer.readDeps(depsOut.text)
+      onStreamFinished: { root.deps = Cer.readDeps(depsOut.text); root.listFlatpaks(); }
     }
   }
 
   // `paru` is "paru", "paru-git" or "" when paru is already here.
-  function setup(paru) {
+  // `flatpak`: the answer to setup's Flatpak question, when it was asked —
+  // kept the moment Install is pressed, so a "no" alone (nothing else to
+  // install) is the whole of setup, and setup is done.
+  function setup(paru, flatpak) {
+    const wantFlatpak = root.flatpakAsk && !!flatpak;
+    if (root.flatpakAsk) root.setFlatpakPref(wantFlatpak ? "yes" : "no");
     const steps = Cer.setupSteps(root.deps, root.deps.paru ? (paru || "paru") : "", root.buildDir,
-                                 Quickshell.shellDir + "/scripts/ceres.sh");
+                                 Quickshell.shellDir + "/scripts/ceres.sh", wantFlatpak);
     if (steps.length === 0) return;
-    const n = root.deps.missing.filter(m => !m.aur).length;
+    const n = root.deps.missing.filter(m => !m.aur).length + (wantFlatpak && !root.deps.flatpak ? 1 : 0);
     // and once it is all in, a fresh look for updates — armed only for a
     // setup that was actually started, or the next unrelated job ran the
     // check in its place
     root._checkAfterSetup = root.request(steps,
-      "install " + root.deps.missing.map(m => m.pkg).join(", "),
+      "install " + root.deps.missing.map(m => m.pkg).concat(wantFlatpak ? ["flatpak"] : []).join(", "),
       n + (root.deps.paru ? 1 : 0));
+  }
+
+  // ── FLATPAK, LATER OR NOT AT ALL (Settings › Channels) ─────────────────
+  // The apps Flatpak has here, for the sheet that asks before removing it —
+  // read when Channels is shown, and after every job.
+  property var flatpakApps: []
+  function listFlatpaks() { if (root.deps.flatpak) fpListProc.running = true; else root.flatpakApps = []; }
+  Process {
+    id: fpListProc
+    command: ["flatpak", "list", "--app", "--columns=name,application,installation"]
+    stdout: StdioCollector {
+      id: fpListOut
+      onStreamFinished: root.flatpakApps = Cer.parseFlatpaks(fpListOut.text)
+    }
+  }
+  function addFlatpak() {
+    if (root.deps.flatpak) return false;
+    const ok = root.request(Cer.flatpakAddSteps(), "install flatpak", 1);
+    if (ok) root.setFlatpakPref("yes");
+    return ok;
+  }
+  function removeFlatpak() {
+    if (!root.deps.flatpak) return false;
+    const ok = root.request(Cer.flatpakRemoveSteps(), "remove flatpak", 1);
+    if (ok) root.setFlatpakPref("no");
+    return ok;
+  }
+
+  // ── UPDATE ALL — the system and Flatpak's, in one job ───────────────────
+  // The system first (-Syu, as ever), then Flatpak's — the system's as root,
+  // yours without. With only Flatpak's pending, only theirs: no sync for
+  // nothing. pacman.log hears of the system's alone, so that is what the
+  // job expects to see there.
+  function updateAll() {
+    const sys = root.repo.length + root.aur.length;
+    const steps = (sys > 0 ? Cer.upgradeSteps() : []).concat(Cer.flatpakUpdateSteps(root.flat));
+    if (steps.length === 0) return false;
+    return root.request(steps, "", sys);
+  }
+  function updateFlatpak(u) {
+    return root.request(Cer.flatpakUpdateOne(u), "update " + u.name, 0);
   }
 
   // ── THE OTHER PARU (Settings) ───────────────────────────────────────────
@@ -242,7 +317,8 @@ Singleton {
     }
     if (root.setupNeeded)
       out.push({ level: "bad",
-        text: "Setup needed: " + Cer.nameList(root.deps.missing.map(m => m.pkg), 2) });
+        text: root.deps.missing.length ? "Setup needed: " + Cer.nameList(root.deps.missing.map(m => m.pkg), 2)
+          : "Setup: Flatpak apps in the Store?" });
     if (root.restartNeeded) out.push({ level: "warn", text: "Reboot needed: kernel upgraded" });
     if (root.staleApps.length)
       out.push({ level: "warn", text: "Restart " + Cer.nameList(root.staleApps.map(g => g.name), 2) });
@@ -258,11 +334,12 @@ Singleton {
 
   readonly property var ink: ({
     muted: Zenon.hex(Zenon.muted), arrow: Zenon.hex(Zenon.yellow), repo: Zenon.hex(Zenon.blue), aur: Zenon.hex(Zenon.magenta),
+    flat: Zenon.hex(Zenon.cyan),
     warn: Zenon.hex(Zenon.red)
   })
 
   function describe(limit) {
-    return Cer.describe(root.repo, root.aur, root.ink, limit, root.notes);
+    return Cer.describe(root.repo, root.aur, root.ink, limit, root.notes, root.flat);
   }
 
   // ── asking ──────────────────────────────────────────────────────────────
@@ -282,12 +359,14 @@ Singleton {
     root.lastTry = Date.now();
     root._repoOut = null;
     root._aurOut = null;
-    root._pending = 2;
+    root._flatOut = null;
+    root._pending = 3;
     repoProc.command = ["sh", "-c", "mkdir -p " + Cer.q(root.dbPath) + "; "
       + Cer.repoCommand(root.dbPath, true)];
     repoProc.running = true;
     aurProc.command = ["sh", "-c", Cer.aurCommand()];
     aurProc.running = true;
+    flatProc.running = true;
   }
 
   // After a transaction: the same question without the network. Only once
@@ -303,11 +382,13 @@ Singleton {
     root._online = false;
     root._repoOut = null;
     root._aurOut = null;
-    root._pending = 2;
+    root._flatOut = null;
+    root._pending = 3;
     repoProc.command = ["sh", "-c", Cer.repoCommand(root.dbPath, false)];
     repoProc.running = true;
     aurProc.command = ["sh", "-c", Cer.aurRecheckCommand(root.aur)];
     aurProc.running = true;
+    flatProc.running = true;
   }
 
   function landed() {
@@ -318,6 +399,10 @@ Singleton {
     // being down says nothing about the AUR.
     if (r && r.ok) root.repo = r.list;
     if (a && a.ok) root.aur = a.list;
+    // Flatpak's answer is believed when it came; its failing is not the
+    // check failing — the system's two halves decide that
+    const f = root._flatOut;
+    if (f && f.ok) root.flat = f.list;
     if (root._online) {
       if (r && r.ok && a && a.ok) {
         root.lastOk = Date.now();
@@ -350,6 +435,19 @@ Singleton {
     }
   }
 
+  property var _flatOut: null
+  Process {
+    id: flatProc
+    command: ["sh", "-c", Cer.flatpakUpdatesCommand()]
+    stdout: StdioCollector {
+      id: flatText
+      onStreamFinished: {
+        root._flatOut = Cer.readFlatpakUpdates(flatText.text);
+        root.landed();
+      }
+    }
+  }
+
   Process {
     id: aurProc
     stdout: StdioCollector {
@@ -375,7 +473,7 @@ Singleton {
   // can never describe the same list differently — minus the notes, which
   // are about the answer rather than news.
   function announce() {
-    const all = root.repo.concat(root.aur);
+    const all = root.repo.concat(root.aur).concat(root.flat);
     const fresh = Cer.arrivals(all, root.told);
     root.told = Cer.stillTold(all, root.told).concat(fresh.map(Cer.keyOf));
     if (fresh.length === 0 || !Oracle.updateNotify) return;
@@ -391,7 +489,7 @@ Singleton {
     toastProc.next = [
       "notify-send", "-a", root.appName, "-u", "normal", "-w",
       "-A", "default=Open", "",
-      Cer.describe(root.repo, root.aur, root.ink, 5, [])
+      Cer.describe(root.repo, root.aur, root.ink, 5, [], root.flat)
     ];
     if (toastProc.running) { toastProc.running = false; return; }
     root.sendToast();
@@ -409,7 +507,9 @@ Singleton {
   // an update toast asks for this: a toast is news, and the window is where
   // the news is read in full.
   signal windowRequested(string view)
-  function openWindow(view) { root.checkDeps(); root.windowRequested(view || "updates"); }
+  // no view named — a keybind, the launcher — is the Store, Ceres' first tab
+  // (user, 2026-10-14); the bar, its panel and the update toast name Updates
+  function openWindow(view) { root.checkDeps(); root.windowRequested(view || "store"); }
   // A keybind's version: open on that view, or close if it is already the
   // one on screen.
   signal windowToggleRequested(string view)
@@ -536,7 +636,9 @@ Singleton {
     root.nextSteps = steps;
     root.nextLabel = label;
     root.nextExpected = expected;
-    if (root._pw !== "") root.upgradeAll(root._pw);
+    // nothing of root's — a Flatpak just for you — asks for no password
+    if (!Cer.needsRoot(steps)) root.upgradeAll("", true);
+    else if (root._pw !== "") root.upgradeAll(root._pw);
     else root.authRequested();
     return true;
   }
@@ -607,8 +709,8 @@ Singleton {
     root.nextLabel = "";
   }
 
-  function upgradeAll(password) {
-    if (root.txBusy || !password) return;
+  function upgradeAll(password, noAuth) {
+    if (root.txBusy || (!password && !noAuth)) return;
     root.txSteps = root.nextSteps;
     root.txSettle = null;
     root.txState = "auth";
@@ -620,7 +722,8 @@ Singleton {
     root.txLive = null;
     root.txTotal = null;
     root.txCancelling = false;
-    root.txExpected = root.nextExpected >= 0 ? root.nextExpected : root.total;
+    // pacman.log hears of the system's updates only — never Flatpak's
+    root.txExpected = root.nextExpected >= 0 ? root.nextExpected : root.repo.length + root.aur.length;
     root._trying = password;
     root._sizesBefore = null;
     root.measureSizes(false);
@@ -642,7 +745,7 @@ Singleton {
     // row, and a download filled the log with a table of its own progress.
     // this run's own marks — see Cer.runCommand
     root._tag = Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
-    runProc.command = ["sh", "-c", "{\n" + Cer.runCommand(root.fifoPath, root.askpassPath, root.txSteps, root._tag)
+    runProc.command = ["sh", "-c", "{\n" + Cer.runCommand(root.fifoPath, root.askpassPath, root.txSteps, root._tag, !!noAuth)
       + "\n} 2>&1 | gawk -v RS='\\r\\n|\\r|\\n' "
       + "'{ printf \"%s%s\\n\", (cr ? \"\\001\" : \"\"), $0; cr = (RT == \"\\r\"); fflush() }'"];
     runProc.running = true;
@@ -702,10 +805,13 @@ Singleton {
       // the retry ran whatever came next — a full upgrade. sudo accepting
       // the password is the moment the transaction is committed to.
       root.forgetNext();
-      // sudo took it: remembered, for five minutes from now
-      root._pw = root._trying;
+      // sudo took it: remembered, for five minutes from now — and a job that
+      // asked for none must not forget one that is remembered
+      if (root._trying !== "") {
+        root._pw = root._trying;
+        pwExpiry.restart();
+      }
       root._trying = "";
-      pwExpiry.restart();
       root.txState = "running";
       root.txPhase = "Starting";
       return;
@@ -923,7 +1029,7 @@ Singleton {
 
   function save() {
     stateFile.setText(JSON.stringify({
-      repo: root.repo, aur: root.aur, lastOk: root.lastOk,
+      repo: root.repo, aur: root.aur, flat: root.flat, lastOk: root.lastOk,
       lastTry: root.lastTry, failures: root.failures, error: root.error,
       told: root.told, news: root.news, newsFetched: root.newsFetched,
       dismissedNews: root.dismissedNews, lastUpgrade: root.lastUpgrade
@@ -939,6 +1045,7 @@ Singleton {
     if (!s) return;
     root.repo = s.repo || [];
     root.aur = s.aur || [];
+    root.flat = s.flat || [];
     root.lastOk = s.lastOk || 0;
     root.lastTry = s.lastTry || 0;
     root.failures = s.failures || 0;
@@ -1014,13 +1121,13 @@ Singleton {
     }
 
     function toggleWindow(view: string): string {
-      root.windowToggleRequested(view || "updates");
-      return "toggled window " + (view || "updates");
+      root.windowToggleRequested(view || "store");
+      return "toggled window " + (view || "store");
     }
 
     function window(view: string): string {
       root.openWindow(view);
-      return "window " + (view || "updates");
+      return "window " + (view || "store");
     }
 
     function open(): string {

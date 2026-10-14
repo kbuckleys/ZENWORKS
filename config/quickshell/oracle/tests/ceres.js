@@ -181,6 +181,14 @@ module.exports = {
       } catch (e) { return e.stdout ? String(e.stdout).replace(/\r/g, "") : "threw " + e.message; }
     };
     const calls = () => { try { return fs.readFileSync(fifo + ".calls", "utf8").length / 2; } catch (e) { return 0; } };
+    // no password at all: the steps run, the marks are the same, sudo never
+    const free = execFileSync("/bin/sh", ["-c", C.runCommand(fifo, askpass, [["@user", "echo just-me"]], "", true)],
+      { encoding: "utf8", input: "\n", timeout: 20000,
+        env: Object.assign({}, process.env, { PATH: bin + ":" + process.env.PATH }) }).replace(/\r/g, "");
+    t.has("a user's job runs", free, "just-me");
+    t.has("marked authed", free, "@@authed");
+    t.eq("and ends 0", C.splitExit(free).code, 0);
+    t.eq("without asking sudo", calls(), 0);
     const good = run("right", C.upgradeSteps());
     t.eq("right password: exit 0", C.splitExit(good).code, 0);
     t.has("authed before paru", good, "@@authed");
@@ -405,6 +413,61 @@ module.exports = {
     t.eq("the paru package is read", C.readDeps("fzf\n=paru-bin\n").paruPkg, "paru-bin");
     t.eq("and is no missing program", C.readDeps("=paru-git\n").missing.length, 0);
     t.eq("no paru, no package", C.readDeps("paru\n").paruPkg, "");
+    // the Store's catalogue is a directory, not a program
+    t.has("a data dependency is tested as a path", C.depsCommand(), "[ -e '/usr/share/swcatalog/xml' ]");
+    t.eq("and named by its package", C.readDeps("/usr/share/swcatalog/xml\n").missing.map(m => m.pkg),
+      ["archlinux-appstream-data"]);
+    // Flatpak: asked, never required
+    t.ok("flatpak here when not reported", C.readDeps("").flatpak);
+    t.ok("and not when reported", !C.readDeps("flatpak\n").flatpak);
+    t.eq("and it is no missing dependency", C.readDeps("flatpak\n").missing.length, 0);
+    const fp = C.setupSteps(C.readDeps("flatpak\nfzf\n"), "", "/b", "", true);
+    t.eq("flatpak in the same pacman call", fp[0], ["@sudo", "pacman", "-Syu", "--needed", "--noconfirm", "fzf", "flatpak"]);
+    t.eq("then Flathub, system-wide", fp[1].slice(0, 5), ["@sudo", "flatpak", "remote-add", "--if-not-exists", "--system"]);
+    const fpOnly = C.setupSteps(C.readDeps(""), "", "/b", "", true);
+    t.eq("flatpak already here: only the remote", fpOnly.length, 1);
+    t.eq("which is Flathub", fpOnly[0][5], "flathub");
+    t.eq("asked no: nothing", C.setupSteps(C.readDeps("flatpak\n"), "", "/b", "", false).length, 0);
+    // a job with nothing of root's in it
+    t.ok("a user's flatpak needs no root", !C.needsRoot([["@user", "flatpak install --user -y flathub x"]]));
+    t.ok("a system one does", C.needsRoot([["@sudo", "flatpak", "install", "--system", "x"]]));
+    t.ok("an @user line that sudos does", C.needsRoot([["@user", "sudo -A flatpak uninstall --system --all"]]));
+    t.ok("a paru step does", C.needsRoot([["-S", "x"]]));
+    const na = C.runCommand("/f", "/a", [["@user", "echo hi"]], "T", true);
+    t.ok("no sudo when nothing needs it", na.indexOf("sudo") < 0 && na.indexOf("@@authedT") >= 0);
+    // Flatpak updates
+    const fu = C.readFlatpakUpdates("I\tsystem\tcom.spotify.Client\tSpotify\t1.2.9\n"
+      + "I\tuser\torg.a.B\tB\t2.0\n"
+      + "U\tsystem\tcom.spotify.Client\t1.3.0\nU\tuser\torg.a.B\t2.0\n@@exit 0\n");
+    t.ok("read", fu.ok);
+    t.eq("named, from → to", [fu.list[0].name, fu.list[0].from, fu.list[0].to, fu.list[0].scope], ["Spotify", "1.2.9", "1.3.0", "system"]);
+    t.eq("a rebuild says so", fu.list[1].to, "new build");
+    t.ok("a failed system check is a failure", !C.readFlatpakUpdates("@@exit 1\n").ok);
+    t.eq("all: system as root, yours without", C.flatpakUpdateSteps(fu.list).map(st => st[0]), ["@sudo", "@user"]);
+    t.ok("yours alone needs no root", !C.needsRoot(C.flatpakUpdateSteps([fu.list[1]])));
+    t.eq("just one", C.flatpakUpdateOne(fu.list[0])[0].slice(-1), ["com.spotify.Client"]);
+    t.has("in the tooltip", C.describe([], [], { muted: "#1", arrow: "#2", repo: "#3", aur: "#4", warn: "#5", flat: "#6" }, 5, [], fu.list),
+      "2 Flatpak Updates");
+    // Flatpak in Maintenance
+    const mfp = C.readMaint("@@fpapps\nSpotify\tcom.spotify.Client\t14.1 MB\tuser\n@@fprt\nFreedesktop Platform\torg.freedesktop.Platform\t600 MB\tsystem\n@@end\n");
+    t.eq("apps and runtimes read", [mfp.fpApps.length, mfp.fpRuntimes.length], [1, 1]);
+    t.eq("with size, and whose", mfp.fpApps[0].right, "14.1 MB \u00b7 just you");
+    t.eq("the system's says nothing more", mfp.fpRuntimes[0].right, "600 MB");
+    // one Flatpak app
+    t.eq("for everyone, as root", C.flatpakInstallSteps("a.b", "system")[0].slice(0, 3), ["@sudo", "flatpak", "install"]);
+    t.ok("just you, no root", !C.needsRoot(C.flatpakInstallSteps("a.b", "user")));
+    t.has("with Flathub added for you first", C.flatpakInstallSteps("a.b", "user")[0][1], "remote-add --user --if-not-exists flathub");
+    t.ok("taken out of yours, no root", !C.needsRoot(C.flatpakUninstallSteps("a.b", "user")));
+    t.eq("out of the system's, as root", C.flatpakUninstallSteps("a.b", "system")[0][1], "flatpak");
+    // Settings › Channels
+    t.eq("added later: flatpak alone, no upgrade", C.flatpakAddSteps()[0], ["@sudo", "pacman", "-S", "--needed", "--noconfirm", "flatpak"]);
+    t.eq("then Flathub", C.flatpakAddSteps()[1][5], "flathub");
+    const fpRm = C.flatpakRemoveSteps();
+    t.has("removed: the user's apps first", fpRm[0][1], "flatpak uninstall --user --all");
+    t.has("and the system's, as root", fpRm[0][1], "sudo -A flatpak uninstall --system --all");
+    t.eq("then flatpak itself", fpRm[1], ["@sudo", "pacman", "-Rns", "--noconfirm", "flatpak"]);
+    t.eq("installed apps read", C.parseFlatpaks("Inkscape\torg.inkscape.Inkscape\tsystem\nLutris\tnet.lutris.Lutris\tuser\n"),
+      [{ name: "Inkscape", id: "org.inkscape.Inkscape", scope: "system" }, { name: "Lutris", id: "net.lutris.Lutris", scope: "user" }]);
     const sw = C.paruSwitchSteps("paru-git", C.readDeps(""), "/b");
     t.eq("a switch syncs nothing", sw[0], ["@sudo", "pacman", "-S", "--needed", "--noconfirm", "base-devel", "git"]);
     t.has("and builds the other recipe", sw[1][1], "https://aur.archlinux.org/paru-git.git");

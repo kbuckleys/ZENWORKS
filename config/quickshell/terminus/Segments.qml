@@ -114,7 +114,18 @@ Item {
   property Component art: null
   property real artH: 16
   readonly property real artRoom: segs.art ? segs.artH + 8 : 0
-  implicitHeight: Math.round(segs.textSize * 2.1) + segs.artRoom
+  // A NOTE UNDER A LABEL: an option given a third field, [value, label,
+  // note], says a line more under its label, muted — so a choice that needs
+  // explaining (Ceres' paru: release or commit, user 2026-10-14) explains
+  // itself in the switch, as its cards used to.
+  // A CHOICE THAT MATTERS, MADE PLAIN (user, 2026-10-14: Ceres' "for
+  // everyone / just me" read as nothing chosen): the chosen half filled
+  // deeper and ringed in the accent. Off, the suite's quiet switch.
+  property bool strong: false
+  readonly property bool noted: segs.options.some(o => o.length > 2 && o[2])
+  property real noteSize: Math.round(segs.textSize * 0.86)
+  readonly property real noteRoom: segs.noted ? Math.round(segs.noteSize * 1.5) : 0
+  implicitHeight: Math.round(segs.textSize * 2.1) + segs.artRoom + segs.noteRoom
   width: implicitWidth
   height: implicitHeight
 
@@ -134,7 +145,9 @@ Item {
     width: segs.litItem ? segs.litItem.width - 4 : 0
     height: segs.height - 6
     radius: Math.max(0, Zenon.windowRadius - 2)
-    color: Zenon.alpha(Zenon.cyan, 0.16)
+    color: Zenon.alpha(Zenon.cyan, segs.strong ? 0.28 : 0.16)
+    border.width: segs.strong ? 1 : 0
+    border.color: Zenon.alpha(Zenon.cyan, 0.75)
     Behavior on x { NumberAnimation { duration: Zenon.normal; easing.type: Zenon.travelEase } }
     Behavior on width { NumberAnimation { duration: Zenon.normal; easing.type: Zenon.travelEase } }
   }
@@ -217,7 +230,7 @@ Item {
         Text {
           id: label
           anchors.centerIn: parent
-          anchors.verticalCenterOffset: segs.artRoom / 2
+          anchors.verticalCenterOffset: segs.artRoom / 2 - segs.noteRoom / 2
           text: one.modelData[1]
           color: one.on || segs.hot === one.modelData[0] ? Zenon.cyan : segs.ink
           opacity: !one.ok ? 0.35
@@ -227,6 +240,21 @@ Item {
           font.weight: segs.weight
           font.features: { "tnum": 1 }
           font.pixelSize: segs.textSize
+        }
+        Text {
+          visible: one.modelData.length > 2 && !!one.modelData[2]
+          anchors.top: label.bottom
+          anchors.topMargin: 2
+          anchors.horizontalCenter: parent.horizontalCenter
+          width: Math.min(implicitWidth, one.width - 16)
+          horizontalAlignment: Text.AlignHCenter
+          elide: Text.ElideRight
+          text: one.modelData.length > 2 ? String(one.modelData[2]) : ""
+          color: Zenon.muted
+          opacity: label.opacity
+          font.family: Zenon.face
+          font.weight: Zenon.weight
+          font.pixelSize: segs.noteSize
         }
         HoverHandler { onHoveredChanged: segs.pointed(one.modelData[0], one, hovered) }
         TapHandler {

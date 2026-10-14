@@ -224,10 +224,10 @@ function esc(s) {
 // `ink` is { muted, arrow, repo, aur, warn } as hex strings; `limit` rows per
 // group before the rest fold into an ellipsis. `notes` are lines set above
 // the lists — stale, restart — in the warning ink.
-function describe(repo, aur, ink, limit, notes) {
+function describe(repo, aur, ink, limit, notes, flat) {
   const lines = [];
   for (const n of notes || []) lines.push("<font color='" + ink.warn + "'>" + esc(n) + "</font>");
-  if ((notes || []).length && ((repo || []).length || (aur || []).length)) lines.push("");
+  if ((notes || []).length && ((repo || []).length || (aur || []).length || (flat || []).length)) lines.push("");
 
   function group(list, glyph, color, one, many) {
     if (!list || list.length === 0) return;
@@ -245,6 +245,9 @@ function describe(repo, aur, ink, limit, notes) {
   }
   group(repo, "", ink.repo, "Update", "Updates");
   group(aur, "", ink.aur, "AUR Update", "AUR Updates");
+  // Flathub's, beside the system's (user, 2026-10-14) — the bar's tooltip
+  // and the toast both
+  group(flat, "\uF324", ink.flat || ink.repo, "Flatpak Update", "Flatpak Updates");
   return lines.join("\n");
 }
 
@@ -291,11 +294,19 @@ function ptyCommand(cmd) {
 // output passes through the same stream, and an AUR build or an install
 // script that printed "@@exit 0" ended the job on the spot — the window
 // unlocked for a second transaction while pacman still held its lock.
-function runCommand(fifo, askpass, steps, tag) {
+function runCommand(fifo, askpass, steps, tag, noAuth) {
   const t = String(tag ?? "");
   const mark = EXIT_MARK.replace(/ $/, "") + t + " ";
   const run = (steps || []).map(a =>
     "[ \"$s\" -eq 0 ] && { " + ptyCommand(stepCommand(a)) + " </dev/null 2>&1 || s=$?; }\n").join("");
+  // NOTHING OF ROOT'S, NO PASSWORD (a Flatpak installed just for you): no
+  // sudo to warm, no fifo to serve — marked authed at once, so the job is
+  // read exactly as one that was asked for a password. See needsRoot.
+  if (noAuth)
+    return "IFS= read -r pw; pw=\n"
+      + "printf '\\n@@authed" + t + "\\n'\n"
+      + "s=0\n" + run
+      + "printf '\\n" + mark + "%s\\n' \"$s\"";
   return "f=" + q(fifo) + "\n"
     + "clean() { rm -f \"$f\" \"$f.spent\" \"$f.once\"; }\n"
     + "clean; mkfifo -m 600 \"$f\" || { echo '" + mark + "9'; exit 9; }\n"
@@ -320,6 +331,12 @@ function runCommand(fifo, askpass, steps, tag) {
     // it landed on the end of that text and went unread, and a removal that
     // had worked was reported as "paru stopped (exit -1)".
     + "printf '\\n" + mark + "%s\\n' \"$s\"";
+}
+
+// Whether any step needs root: a pacman/paru step, an @sudo, or an @user
+// shell line that calls sudo itself. One that does not runs with no password.
+function needsRoot(steps) {
+  return (steps || []).some(a => a[0] !== "@user" || /\bsudo\b/.test(a[1] || ""));
 }
 
 // A transaction's own marks, found at the END of a line as well as being the
@@ -709,6 +726,9 @@ function parseRows(text) {
 }
 
 function infoCommand(script, name, repo) {
+  // Flathub's record, its keys unindented so parseInfo reads it as pacman's
+  if (repo === "flatpak")
+    return "flatpak remote-info --system flathub " + q(name) + " 2>/dev/null | sed 's/^ *//'";
   return q(script) + " info " + q(name) + " " + q(repo || "");
 }
 
@@ -955,12 +975,17 @@ function maintCommand(cloneDir) {
     // nothing says so instead of taking a password to do it.
     + "echo '@@keep'; paccache -dk2 2>&1 | tail -n1\n"
     + "echo '@@uninst'; paccache -duk0 2>&1 | tail -n1\n"
+    // Flatpak's, when it is here: its apps and the runtimes they share, both
+    // installations, with flatpak's own sizes (user, 2026-10-14)
+    + "echo '@@fpapps'; command -v flatpak >/dev/null 2>&1 && flatpak list --app --columns=name,application,size,installation 2>/dev/null\n"
+    + "echo '@@fprt'; command -v flatpak >/dev/null 2>&1 && flatpak list --runtime --columns=name,application,size,installation 2>/dev/null\n"
     + "echo '@@end'";
 }
 
 function readMaint(text) {
   const m = { orphans: [], pacnew: [], cacheCount: 0, cacheBytes: 0, stale: 0,
-              clones: [], synced: 0, aurList: 0, keep: { n: 0, size: "" }, uninst: { n: 0, size: "" } };
+              clones: [], synced: 0, aurList: 0, keep: { n: 0, size: "" }, uninst: { n: 0, size: "" },
+              fpApps: [], fpRuntimes: [] };
   let sec = "";
   for (const raw of String(text ?? "").split("\n")) {
     const l = raw.replace(/\s+$/, "");
@@ -980,6 +1005,9 @@ function readMaint(text) {
     else if (sec === "aurlist") m.aurList = (Number(l) || 0) * 1000;
     else if (sec === "keep") m.keep = readPrune(l);
     else if (sec === "uninst") m.uninst = readPrune(l);
+    else if ((sec === "fpapps" || sec === "fprt") && f.length >= 2)
+      (sec === "fpapps" ? m.fpApps : m.fpRuntimes).push({ name: f[0] || f[1], version: f[1],
+        right: (f[2] || "").trim() + (f[3] && f[3].trim() === "user" ? " \u00b7 just you" : "") });
   }
   m.clones.sort((a, b) => b.size - a.size);
   return m;
@@ -1100,6 +1128,9 @@ function isUpgrade(steps) {
 // wants it for — so a missing one is reported as something to install and a
 // reason, not as a command that failed. paru is the one not in the repos: it
 // is built from its AUR recipe (see setupSteps).
+//
+// A `file` in place of a `bin` is data rather than a program, there or not:
+// the Store's app catalogue is a directory archlinux-appstream-data fills.
 const DEPS = [
   { bin: "paru",              pkg: "paru",              aur: true, why: "installs and updates packages, the AUR included" },
   { bin: "checkupdates",      pkg: "pacman-contrib",    why: "checks for updates without root" },
@@ -1113,21 +1144,31 @@ const DEPS = [
   { bin: "git",               pkg: "git",               why: "AUR builds" },
   { bin: "xdg-open",          pkg: "xdg-utils",         why: "opening links" },
   { bin: "xdg-terminal-exec", pkg: "xdg-terminal-exec", why: "anything that needs a terminal" },
-  { bin: "notify-send",       pkg: "libnotify",         why: "update toasts" }
+  { bin: "notify-send",       pkg: "libnotify",         why: "update toasts" },
+  { file: "/usr/share/swcatalog/xml", pkg: "archlinux-appstream-data",
+    why: "the Store: icons, descriptions and screenshots of Arch's apps" },
+  { file: "/usr/lib/qt6/plugins/imageformats/kimg_jxl.so", pkg: "kimageformats",
+    why: "the Store's app icons, which Arch ships as JPEG XL" }
 ];
+function depKey(d) { return d.bin || d.file; }
 
 // Prints each missing program's name, one per line — and "cargo" when that
 // is missing too, since building paru needs it (rust provides it; someone on
 // rustup already has it, and must not be handed rust on top).
 // And, as "=<package>", whichever package owns the paru on the PATH — paru,
 // paru-git, paru-bin — for Settings, which offers to swap it for the other.
+// And "flatpak" when there is no flatpak: not a dependency — the Store asks
+// whether you want it (see setupSteps' `flatpak`).
 function depsCommand() {
-  return DEPS.map(d => "command -v " + q(d.bin) + " >/dev/null 2>&1 || echo " + q(d.bin)).join("; ")
+  return DEPS.map(d => (d.file ? "[ -e " + q(d.file) + " ]" : "command -v " + q(d.bin) + " >/dev/null 2>&1")
+    + " || echo " + q(depKey(d))).join("; ")
     + "; command -v cargo >/dev/null 2>&1 || echo cargo"
+    + "; command -v flatpak >/dev/null 2>&1 || echo flatpak"
     + "; p=$(command -v paru) && pacman -Qqo \"$p\" 2>/dev/null | sed 's/^/=/'; true";
 }
 
-// → { missing: [{ pkg, aur, why: [..] }], paru: bool, cargo: bool, paruPkg } —
+// → { missing: [{ pkg, aur, why: [..] }], paru: bool, cargo: bool, paruPkg,
+//     flatpak } — flatpak is whether it is HERE, unlike paru and cargo;
 // one row per PACKAGE, however many of its programs are missing; paruPkg is
 // the package paru came from, "" when there is none or pacman does not own it.
 function readDeps(text) {
@@ -1140,12 +1181,114 @@ function readDeps(text) {
   }
   const byPkg = {}, order = [];
   for (const d of DEPS) {
-    if (!gone[d.bin]) continue;
+    if (!gone[depKey(d)]) continue;
     if (!byPkg[d.pkg]) { byPkg[d.pkg] = { pkg: d.pkg, aur: !!d.aur, why: [] }; order.push(d.pkg); }
     byPkg[d.pkg].why.push(d.why);
   }
   return { missing: order.map(p => byPkg[p]), paru: !!gone["paru"], cargo: !!gone["cargo"],
-           paruPkg: gone["paru"] ? "" : paruPkg };
+           paruPkg: gone["paru"] ? "" : paruPkg, flatpak: !gone["flatpak"] };
+}
+
+// Flathub, as a remote for the whole system — see setupSteps
+const FLATHUB_STEP = ["@sudo", "flatpak", "remote-add", "--if-not-exists", "--system",
+                      "flathub", "https://dl.flathub.org/repo/flathub.flatpakrepo"];
+
+// ── FLATPAK UPDATES (user, 2026-10-14) ───────────────────────────────────
+// Asked of both installations — the system's and yours — with what is
+// installed now, so a row reads "name  from → to" as the system's do. The
+// mark is the system's answer: yours failing (no remote of your own) is not
+// a failed check. No flatpak at all is an empty answer, not an error.
+function flatpakUpdatesCommand() {
+  return "command -v flatpak >/dev/null 2>&1 || { echo '" + EXIT_MARK + "0'; exit 0; }\n"
+    + "s=0\n"
+    + "for sc in system user; do\n"
+    + "  flatpak list --$sc --app --columns=application,name,version 2>/dev/null | sed \"s/^/I\t$sc\t/\"\n"
+    + "  out=$(flatpak remote-ls --$sc --updates --app --columns=application,version 2>/dev/null) "
+    + "|| { [ \"$sc\" = system ] && s=1; }\n"
+    + "  [ -n \"$out\" ] && printf '%s\\n' \"$out\" | sed \"s/^/U\t$sc\t/\"\n"
+    + "done\n"
+    + "echo '" + EXIT_MARK + "'\"$s\"";
+}
+// → { ok, list: [{ name, id, from, to, scope, flatpak: true }] }. A new build
+// of the same version says so rather than "1.2 → 1.2".
+function readFlatpakUpdates(text) {
+  const r = splitExit(text);
+  const have = {}, list = [];
+  for (const l of r.lines) {
+    const f = l.split("\t");
+    if (f[0] === "I" && f.length >= 4) have[f[1] + " " + f[2]] = { name: f[3] || f[2], version: f[4] || "" };
+  }
+  for (const l of r.lines) {
+    const f = l.split("\t");
+    if (f[0] !== "U" || f.length < 3 || !f[2]) continue;
+    const h = have[f[1] + " " + f[2]] || { name: f[2], version: "" };
+    const to = (f[3] || "").trim();
+    list.push({ name: h.name, id: f[2], from: h.version, to: to && to !== h.version ? to : "new build",
+                scope: f[1], flatpak: true });
+  }
+  return { ok: r.code === 0, list: list, error: r.code === 0 ? "" : "flatpak check failed" };
+}
+// Every one: the system's as root, yours without
+function flatpakUpdateSteps(list) {
+  const steps = [];
+  if ((list || []).some(u => u.scope !== "user"))
+    steps.push(["@sudo", "flatpak", "update", "--system", "--noninteractive", "-y"]);
+  if ((list || []).some(u => u.scope === "user"))
+    steps.push(["@user", "flatpak update --user --noninteractive -y"]);
+  return steps;
+}
+// Just this one
+function flatpakUpdateOne(u) {
+  if (u.scope === "user") return [["@user", "flatpak update --user --noninteractive -y " + q(u.id)]];
+  return [["@sudo", "flatpak", "update", "--system", "--noninteractive", "-y", u.id]];
+}
+
+// ── FLATPAK, LATER OR NOT AT ALL (Settings › Channels; user, 2026-10-14) ──
+// Added: flatpak from the repos (no -y: nothing else moves), then Flathub
+// for the whole system, as setup would have.
+function flatpakAddSteps() {
+  return [["@sudo", "pacman", "-S", "--needed", "--noconfirm", "flatpak"], FLATHUB_STEP];
+}
+
+// Removed: every Flatpak app and runtime first — the user's own, then the
+// system's, each only when there is any (uninstall --all with nothing there
+// is an error) — then Flathub's remote, then flatpak itself. What apps kept
+// in ~/.var/app is the user's and stays; the sheet says so.
+function flatpakRemoveSteps() {
+  return [
+    ["@user", "if flatpak list --user --columns=ref 2>/dev/null | grep -q .; then "
+      + "flatpak uninstall --user --all --noninteractive -y; fi; "
+      + "if flatpak list --system --columns=ref 2>/dev/null | grep -q .; then "
+      + "sudo -A flatpak uninstall --system --all --noninteractive -y; fi; "
+      + "sudo -A flatpak remote-delete --system --force flathub 2>/dev/null; true"],
+    ["@sudo", "pacman", "-Rns", "--noconfirm", "flatpak"]
+  ];
+}
+
+// ONE FLATPAK APP, in or out. "system" is for everyone and goes through
+// sudo; "user" is yours alone and needs no password — Flathub is added for
+// you first, since setup added it for the system only.
+const FLATHUB_URL = "https://dl.flathub.org/repo/flathub.flatpakrepo";
+function flatpakInstallSteps(id, scope) {
+  if (scope === "user")
+    return [["@user", "flatpak remote-add --user --if-not-exists flathub " + q(FLATHUB_URL)
+      + " && flatpak install --user --noninteractive -y flathub " + q(id)]];
+  return [["@sudo", "flatpak", "install", "--system", "--noninteractive", "-y", "flathub", id]];
+}
+function flatpakUninstallSteps(id, scope) {
+  if (scope === "user") return [["@user", "flatpak uninstall --user --noninteractive -y " + q(id)]];
+  return [["@sudo", "flatpak", "uninstall", "--system", "--noninteractive", "-y", id]];
+}
+
+// `flatpak list --app --columns=name,application,installation` → rows
+function parseFlatpaks(text) {
+  const out = [];
+  for (const l of String(text ?? "").split("\n")) {
+    const f = l.split("\t");
+    if (f.length < 2 || !f[1]) continue;
+    out.push({ name: f[0] || f[1], id: f[1], scope: (f[2] || "system").trim() });
+  }
+  return out;
 }
 
 // The steps that install what is missing. `paru` is "paru", "paru-git" or ""
@@ -1162,15 +1305,22 @@ function readDeps(text) {
 // upgrading is the partial upgrade Arch warns against. Last, with paru in
 // place, ceres' own AUR list is fetched (`script aur`), so onboarding ends
 // with nothing left to sync by hand.
-function setupSteps(deps, paru, buildDir, script) {
+//
+// `flatpak` true: Flatpak comes in the same pacman call, and Flathub is added
+// as a system remote — the one place the Store's Flatpak apps come from. The
+// remote is added even when flatpak was already here; --if-not-exists makes
+// that a no-op for someone who added it themselves.
+function setupSteps(deps, paru, buildDir, script, flatpak) {
   const repo = (deps.missing || []).filter(m => !m.aur).map(m => m.pkg);
+  if (flatpak && !deps.flatpak) repo.push("flatpak");
   const steps = [];
   if (paru) {
     for (const p of ["base-devel", "git"]) if (repo.indexOf(p) < 0) repo.push(p);
     if (deps.cargo) repo.push("rust");
   }
-  if (repo.length === 0 && !paru) return steps;
-  steps.push(["@sudo", "pacman", "-Syu", "--needed", "--noconfirm"].concat(repo));
+  if (repo.length === 0 && !paru && !flatpak) return steps;
+  if (repo.length || paru) steps.push(["@sudo", "pacman", "-Syu", "--needed", "--noconfirm"].concat(repo));
+  if (flatpak) steps.push(FLATHUB_STEP);
   if (paru) steps.push(paruBuildStep(paru, buildDir));
   if (script) steps.push(["@user", q(script) + " aur"]);
   return steps;

@@ -9,6 +9,23 @@ hl.env("__GL_SHADER_DISK_CACHE_SIZE", "21474836480")
 hl.env("__GL_SHADER_DISK_CACHE_SKIP_CLEANUP", "1")
 hl.env("QSG_RENDER_LOOP", "threaded")
 
+-- FLATPAK'S APPS IN THE LAUNCHER: Flatpak exports their desktop entries
+-- under its own share directories, which /etc/profile.d/flatpak.sh adds to
+-- XDG_DATA_DIRS for a login shell — and a session started without one never
+-- saw them. Added here, ahead of the system's, once only (a reload runs this
+-- again with what it set). Harmless with no Flatpak: the directories are not
+-- there, and nothing looks in them.
+local dataDirs = os.getenv("XDG_DATA_DIRS")
+if not dataDirs or dataDirs == "" then dataDirs = "/usr/local/share:/usr/share" end
+local fpUser = os.getenv("HOME") .. "/.local/share/flatpak/exports/share"
+local fpSystem = "/var/lib/flatpak/exports/share"
+for _, d in ipairs({ fpSystem, fpUser }) do
+	if not (":" .. dataDirs .. ":"):find(":" .. d .. ":", 1, true) then
+		dataDirs = d .. ":" .. dataDirs
+	end
+end
+hl.env("XDG_DATA_DIRS", dataDirs)
+
 -- DEFAULT PROGRAMS, for command-line tools: the editor git and sudoedit open,
 -- and the browser a link is handed to. Chosen in oracle's Default Apps and
 -- kept in defaults.lua; guarded like binds.lua, so a broken file costs these
