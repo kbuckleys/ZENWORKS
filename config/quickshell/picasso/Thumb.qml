@@ -56,6 +56,8 @@ ClippingRectangle {
   property bool measure: false
 
   readonly property int status: img.status
+  // what the tile is showing, for a flight out of it (picasso's flyIn)
+  readonly property url shownUrl: img.status === Image.Ready ? img.source : ""
   // a new thumbnail is a new chance
   onThumbChanged: img.thumbFailed = false
 

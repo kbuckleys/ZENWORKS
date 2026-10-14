@@ -33,6 +33,11 @@
 // leave (`tabbed`, `backTabbed`) for the holder's ring to place, and it
 // wears the HeldRing every focused field wears while it has the keys.
 //
+// ── A PICTURE OVER EACH WORD (`art`, 2026-10-14) ───────────────────────
+// For a switch whose choices are shapes (picasso's Fit): `art` is a
+// Component made once per part, above its word, `artH` tall. It reads
+// `parent.value` (the part's value) and `parent.ink` (its word's colour).
+//
 // terminus' PrefSeg is the settings panel's own (enrolled with its window
 // for the keyboard); this is the one for anywhere else.
 
@@ -106,7 +111,10 @@ Item {
     return "";
   }
   implicitWidth: row.implicitWidth + 2
-  implicitHeight: Math.round(segs.textSize * 2.1)
+  property Component art: null
+  property real artH: 16
+  readonly property real artRoom: segs.art ? segs.artH + 8 : 0
+  implicitHeight: Math.round(segs.textSize * 2.1) + segs.artRoom
   width: implicitWidth
   height: implicitHeight
 
@@ -196,9 +204,20 @@ Item {
           color: Zenon.cyan
           visible: segs.dotted.indexOf(one.modelData[0]) >= 0
         }
+        Loader {
+          active: !!segs.art
+          sourceComponent: segs.art
+          readonly property string value: String(one.modelData[0])
+          readonly property color ink: label.color
+          opacity: label.opacity
+          anchors.horizontalCenter: parent.horizontalCenter
+          anchors.bottom: label.top
+          anchors.bottomMargin: 6
+        }
         Text {
           id: label
           anchors.centerIn: parent
+          anchors.verticalCenterOffset: segs.artRoom / 2
           text: one.modelData[1]
           color: one.on || segs.hot === one.modelData[0] ? Zenon.cyan : segs.ink
           opacity: !one.ok ? 0.35

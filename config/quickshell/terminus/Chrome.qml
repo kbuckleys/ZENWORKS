@@ -73,8 +73,9 @@ Column {
     width: parent.width
     // the path bar's height, so the two strips stack as one band of chrome
     // rather than two of slightly different depths
-    // two under the path bar's (user, 2026-10-13: every strip 2px lower)
-    height: (term.alwaysTabs || term.tabs.length > 1) ? term.headH - 2 : 0
+    // two under the path bar's (user, 2026-10-13: every strip 2px lower),
+    // then the tabs 2px back up (user, 2026-10-14): the bar's own height
+    height: (term.alwaysTabs || term.tabs.length > 1) ? term.headH : 0
     visible: height > 0
     clip: true
     // The path bar's own colour. Leaving the strip transparent removed the
@@ -143,8 +144,13 @@ Column {
     property int seenCount: 0
     Connections {
       target: term
-      function onTabsChanged() { Qt.callLater(() => { tabStrip.seenCount = term.tabs.length; }); }
+      function onTabsChanged() { Qt.callLater(() => { tabStrip.seenCount = term.tabs.length; tabStrip.dropAt = -1; }); }
     }
+    // ── A DROPPED TAB SETTLES FROM WHERE IT WAS LET GO (2026-10-14) ────
+    // The release rebuilds every cell at its new slot; the carried one
+    // starts at the pointer's place and slides the last few pixels home.
+    property int dropAt: -1
+    property real dropX: 0
     Component.onCompleted: tabStrip.seenCount = term.tabs.length
     // THE TABS' GLASS IS LAID BY THE WINDOW, UNDER THE FROST (2026-10-10):
     // painted here it lay OVER the rows scrolled up under the strip, so the
@@ -327,6 +333,12 @@ Column {
               if (grew && (tabCell.index === term.tab || tabCell.index >= tabStrip.seenCount))
                 tabIn.start();
               else tabCell.opacity = 1;
+              if (tabCell.index === tabStrip.dropAt) {
+                const dw = tabStrip.width / Math.max(1, term.tabs.length);
+                tabCell.shiftX = tabStrip.dropX - tabCell.index * dw;
+                if (Math.abs(tabCell.shiftX) > 0.5) closeUp.start();
+                else tabCell.shiftX = 0;
+              }
               return;
             }
             // a survivor of a close: there already, sliding from its old place
@@ -452,8 +464,9 @@ Column {
             anchors.rightMargin: 8
             anchors.verticalCenter: parent.verticalCenter
             size: Math.round(16 * term.zoom)
+            held: tabMouse.pressed && tabMouse.overClose && !tabMouse.dragging
+            // shown and hidden outright, no fade (user, 2026-10-14)
             opacity: tabHov.hovered && !tabMouse.dragging && tabCell.width > 70 && !term.modal ? 1 : 0
-            Behavior on opacity { NumberAnimation { duration: Zenon.fast } }
             visible: opacity > 0
           }
 
@@ -506,6 +519,7 @@ Column {
             }
 
             onPressed: (m) => {
+              tabMouse.overClose = tabMouse.onClose(m);
               if (m.button !== Qt.LeftButton) return;
               tabMouse.grabDx = tabMouse.stripX(m) - tabCell.x;
               tabMouse.dragging = false;
@@ -545,6 +559,10 @@ Column {
               // that died with its component has nothing left to put back.
               const st = tabMouse.strip;
               if (!st) return;
+              if (was && st.dragFrom !== st.dragTo) {
+                st.dropAt = st.dragTo;
+                st.dropX = st.dragX;
+              }
               if (was) term.moveTab(st.dragFrom, st.dragTo);
               st.endDrag();
             }
@@ -837,7 +855,8 @@ Column {
         anchors.verticalCenter: parent.verticalCenter
         visible: term.searchMode !== ""
         width: visible ? chipText.implicitWidth + 18 : 0
-        height: 21
+        // the crumb Segments' height beside it (user, 2026-10-14)
+        height: crumbSegs.height
         radius: Zenon.windowRadius
         // ── THE COLOUR OF THE THING, NOT OF "A SEARCH" ──────────
         // Sand was right while every chip was a search. A tag has a
@@ -849,6 +868,8 @@ Column {
           if (term.searchMode === "tag") return term.tagInk(term.searchQuery);
           if (term.searchMode === "collection" && !term.scratchOpen) {
             const f = term.collById(term.collOpenId);
+            // Recents is neutral, as its sidebar row is
+            if (f && f.builtin) return Zenon.soft;
             if (f && f.ink) return Zenon[f.ink] || Zenon.cyan;
             return Zenon.cyan;
           }
@@ -1442,21 +1463,8 @@ Column {
         font.pixelSize: Zenon.px(14)
       }
 
-      // What the zoom is at, and a control for it — the shared meter
-      // (ZoomMeter.qml, picasso's bar has it too). Thumbs and the two list
-      // layouts scale independently, so it follows whichever view you are
-      // in. Its steps are the same 0.1 notch the keys and ctrl+wheel use.
-      ZoomMeter {
-        anchors.verticalCenter: parent.verticalCenter
-        // across the whole travel, not out of some absolute maximum
-        value: (term.activeZoom - term.zoomMin)
-               / Math.max(0.0001, term.zoomMax - term.zoomMin)
-        onSeek: (f) => term.setZoom(term.zoomMin + f * (term.zoomMax - term.zoomMin))
-        onStep: (d) => term.zoomBy(d * 0.1)
-        onReset: term.zoomReset()
-      }
-
-      // WHAT IT IS SEARCHING, and nothing else. The view mode used to
+      // WHAT IT IS SEARCHING, and nothing else — before the zoom meter,
+      // not between it and the sort (user, 2026-10-14). The view mode used to
       // share this slot as its fallback — a word that named what you were
       // already looking at, beside a menu that is one click away and says
       // the same thing. Nothing was read off it that the window was not
@@ -1471,6 +1479,20 @@ Column {
         font.family: Zenon.face
         font.weight: Zenon.weight
         font.pixelSize: Zenon.px(14)
+      }
+
+      // What the zoom is at, and a control for it — the shared meter
+      // (ZoomMeter.qml, picasso's bar has it too). Thumbs and the two list
+      // layouts scale independently, so it follows whichever view you are
+      // in. Its steps are the same 0.1 notch the keys and ctrl+wheel use.
+      ZoomMeter {
+        anchors.verticalCenter: parent.verticalCenter
+        // across the whole travel, not out of some absolute maximum
+        value: (term.activeZoom - term.zoomMin)
+               / Math.max(0.0001, term.zoomMax - term.zoomMin)
+        onSeek: (f) => term.setZoom(term.zoomMin + f * (term.zoomMax - term.zoomMin))
+        onStep: (d) => term.zoomBy(d * 0.1)
+        onReset: term.zoomReset()
       }
 
       // Which branch, while the mode is on and there is one to name. The
@@ -2634,30 +2656,40 @@ Column {
           // shows through them frosted, rising out of them as it comes —
           // ScrollEdge turned over, as the picker's footer has it. Under
           // the facts (z), so their words sit on the frost.
-          ScrollEdge {
-            id: factsEdge
-            view: textScroll
-            below: true
-            follow: true
-            bar: facts
-            chromeBottom: previewPane.height
+          // ── THE BAR'S GLASS, NOT A SCROLLEDGE (user, 2026-10-14) ──────
+          // The ScrollEdges all stood down when the strip became stripFrost
+          // (term.glassInk), this one with them, so the footer was a hard
+          // edge again. It wears the strip's recipe instead: the text past
+          // the view's bottom (its content item, which the view's clip does
+          // not cut) frosted as the card frosts, under the card's veil.
+          readonly property bool factsUnder: textScroll.visible && facts.visible
+            && facts.atFoot
+            && textScroll.contentY < textScroll.contentHeight - textScroll.height - 0.5
+          Item {
             z: -1
-            visible: textScroll.visible && facts.visible && facts.atFoot
-            strength: term.edgeStrength(term.frostRows)
-            // laid across the whole pane below, not the inset text's width
-            // — a scrim per view reads as a box (see topScrim)
-            scrim: 0
-          }
-          Rectangle {
-            z: -1
-            x: 0
             y: facts.y
             width: previewPane.width
             height: previewPane.height - facts.y
-            color: Zenon.ground
-            opacity: factsEdge.on ? 0.35 : 0
+            opacity: previewPane.factsUnder ? 1 : 0
             visible: opacity > 0.001
             Behavior on opacity { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+            Frost {
+              x: textScroll.x
+              width: textScroll.width
+              height: parent.height
+              source: textScroll.contentItem
+              track: [textScroll.contentY, facts.y]
+              active: parent.visible
+              blurMax: 64
+              saturation: -0.2
+              brightness: 0
+              scrim: 0
+            }
+            Rectangle {
+              anchors.fill: parent
+              color: Zenon.ground
+              opacity: term.glassVeil
+            }
           }
 
           // A new file starts at the top of itself, not wherever the last

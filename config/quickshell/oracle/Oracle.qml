@@ -304,6 +304,9 @@ Singleton {
   // ScrollEdge: rows past a list's edge, frosted under the bar over them.
   // Off, every list stops at its edge and nothing is captured or blurred.
   property bool scrollFrost: true
+  // morpheus/Elastic's rubber band past a list's ends (user, 2026-10-14):
+  // on by default; off, the wheel and the fingers stop dead at the edge
+  property bool elasticScroll: true
   // Zenon.rim: a hairline of light along the top edge of glass surfaces
   property bool glassRim: true
   // how much of the background's accent the glass is laid in (Zenon.glassBase)
@@ -793,6 +796,9 @@ Singleton {
     { key: "scrollFrost", section: "look", alias: "scroll edge frost blur ghost rows under bar toolbar fade",
       label: "Frost under bars", type: "bool",
       help: "Rows scrolled past a list's edge carry on under the bar above it (or below it), blurred and fading out. Off, a list simply stops at its edge." },
+    { key: "elasticScroll", section: "look", alias: "elastic rubber band bounce overscroll scroll edge stretch",
+      label: "Elastic scrolling", type: "bool",
+      help: "Scrolling past the end of a list stretches it a little and springs back, as macOS does, and a fling bounces off the end. Off, every list stops dead at its edge." },
     { key: "glassRim", section: "look", alias: "rim highlight edge glass light shine border top",
       label: "Glass rim", type: "bool",
       help: "A hairline of light along the top edge of the pill, its panels, menus and tooltips, the way the edge of a pane of glass catches the light." },

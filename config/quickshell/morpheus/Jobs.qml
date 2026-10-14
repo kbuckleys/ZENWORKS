@@ -16,11 +16,6 @@
 // Terminus still BUILDS the commands — what rsync is told is a file manager's
 // business — and hands the argv over. What happens after that is this file's:
 // the process, the progress, cancelling, the receipt, the notification.
-//
-// A JOB SOMETHING ELSE RUNS (2026-10-12): `adopt` makes the
-// row without a process, the one running it reports through `update` and
-// `exited`, and a cancel from the drawer is handed back as `cancelAsked` —
-// the same drawer, receipt and notification as a copy.
 
 pragma Singleton
 

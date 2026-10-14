@@ -238,6 +238,27 @@ module.exports = {
     t.eq("settle: what comes in and what it replaces", settle.conflicts,
       [{ pkg: "nodejs-lts-krypton", replaces: ["nodejs"], inner: false }]);
     t.eq("settle: any other failure is not a question", C.settleOf(["error: target not found: x"]), null);
+    // pacman's own form of the refusal (bitwarden-cli, 2026-10-14)
+    const pacForm = C.settleOf([
+      "looking for conflicting packages...",
+      ":: nodejs-lts-jod-22.23.3-2 and nodejs-26.11.1-1 are in conflict. Remove nodejs? [y/N]",
+      "error: unresolvable package conflicts detected",
+      "error: failed to prepare transaction (conflicting dependencies)",
+      ":: nodejs-lts-jod-22.23.3-2 and nodejs-26.11.1-1 are in conflict"]);
+    t.eq("settle: pacman's 'are in conflict', once", pacForm.conflicts,
+      [{ pkg: "nodejs-lts-jod", replaces: ["nodejs"], inner: false }]);
+    t.eq("settle: pacman's form is answered through --useask",
+      C.settledSteps([["-S", "--needed", "bitwarden-cli"]], pacForm, {}),
+      [["-S", "--useask", "--needed", "bitwarden-cli"]]);
+    t.eq("required by, per package", C.requiredByOf(
+      "Name            : nodejs\nVersion         : 26.11.1-1\nRequired By     : node-gyp  nodejs-nopt  npm\n                  semver\n\n"
+      + "Name            : foo\nRequired By     : None\n"), { nodejs: ["node-gyp", "nodejs-nopt", "npm", "semver"], foo: [] });
+    t.eq("tx kind: an install", C.txKindOf([["-S", "--needed", "bitwarden-cli"]]), "install");
+    t.eq("tx kind: an update", C.txKindOf([["-Syu"]]), "update");
+    t.eq("tx kind: a removal", C.txKindOf([["-Rs", "x"]]), "remove");
+    t.eq("tx kind: settled install is still one", C.txKindOf([["-S", "--useask", "x"], ["@sudo", "pacman", "-D", "--asdeps", "b"]]), "install");
+    t.eq("settle: a conflict line without the refusal is not a question",
+      C.settleOf([":: a-1-1 and b-2-1 are in conflict"]), null);
     t.eq("settle: menus across repos keep counting",
       C.settleOf([":: There are 3 providers available for java-runtime:", ":: Repository extra:",
                   "    1) jre-openjdk  2) jre11-openjdk", ":: Repository AUR:", "    3) zulu",

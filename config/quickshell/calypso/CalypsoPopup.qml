@@ -51,7 +51,24 @@ LayerPopup {
 
   // col 0 is typed where the cursor is, col 1 goes on the clipboard. Index
   // 0 is where the choice starts — "both" is what you want nine times in ten.
-  readonly property var actionTypes: [
+  //
+  // A CARD IS NOT A LOGIN (user, 2026-10-14): its own four, typed or
+  // copied — number, expiry, security code, cardholder. Kinds "t:<ref>" and
+  // "c:<ref>" name the card's field (base.field refs, the same on every
+  // platform).
+  readonly property bool cardShown: !!popup.activeEntry && popup.activeEntry.kind === "card"
+  readonly property var cardActions: [
+    { kind: "t:number",     col: 0, glyph: "\u{F0FEF}", label: "number" },
+    { kind: "t:expiry",     col: 0, glyph: "\u{F00ED}", label: "expiry date" },
+    { kind: "t:code",       col: 0, glyph: "\u{F0306}", label: "security code" },
+    { kind: "t:cardholder", col: 0, glyph: "\u{F0004}", label: "cardholder" },
+    { kind: "c:number",     col: 1, glyph: "\u{F0FEF}", label: "number" },
+    { kind: "c:expiry",     col: 1, glyph: "\u{F00ED}", label: "expiry date" },
+    { kind: "c:code",       col: 1, glyph: "\u{F0306}", label: "security code" },
+    { kind: "c:cardholder", col: 1, glyph: "\u{F0004}", label: "cardholder" },
+  ]
+  readonly property var actionTypes: popup.cardShown ? popup.cardActions : popup.loginActions
+  readonly property var loginActions: [
     { kind: "both",     col: 0, glyph: "", label: "user ⇥ pass" },
     { kind: "user",     col: 0, glyph: "", label: "username" },
     { kind: "pass",     col: 0, glyph: "", label: "password" },
@@ -234,7 +251,9 @@ LayerPopup {
     const e = popup.activeEntry;
     if (!e || !popup.mgr) return;
     const acct = popup.mgr.accountOf(e.acct);
-    const parts = { both: ["username", "\t", "password"], user: ["username"], pass: ["password"], totp: ["totp"] }[kind];
+    const field = kind.slice(0, 2) === "t:" || kind.slice(0, 2) === "c:" ? kind.slice(2) : "";
+    const parts = kind.slice(0, 2) === "t:" ? [field]
+      : { both: ["username", "\t", "password"], user: ["username"], pass: ["password"], totp: ["totp"] }[kind];
     popup.mgr.used(e);
     if (parts) {
       popup.closePopup();
@@ -246,7 +265,7 @@ LayerPopup {
       });
       return;
     }
-    const ref = { copypass: "password", copyuser: "username", copytotp: "totp" }[kind];
+    const ref = field || { copypass: "password", copyuser: "username", copytotp: "totp" }[kind];
     popup.mgr.call("copy", acct, { item: e.id, ref: ref, totp: ref === "totp", clear: popup.mgr.clearAfter }, (ok, r, err) => {
       if (!ok && err && err.kind === "needs") { popup.closePopup(); popup.mgr.withWindow((w) => { w.wake(); w.failed(err, null); }); return; }
       if (!ok) { popup.errorMsg = C.failWords(err); popup.mode = "error"; popup.syncFocus(); return; }

@@ -720,6 +720,11 @@ PopupWindow {
       if (t.isDir)
         out.push({ label: "Open in new tab", key: "shift return",
                    act: () => term.openInNewTab(t.path) });
+      // a shell in the directory under the pointer, not the one you are
+      // standing in (user, 2026-10-14) — the same command `;` runs
+      if (t.isDir)
+        out.push({ label: "Open terminal here", key: "ctrl return",
+                   act: () => term.run(Terminus.shellCommand(t.path, term.termCmd)) });
       // a directory in a repository (or one itself): the git client on it
       // (or a repository itself, in a directory that is not one)
       if (t.isDir && (term.gitRoot !== "" || term.repoTop !== "" || term.repoDirs[t.path] === true) && term.mgr && term.mgr.gitClient)

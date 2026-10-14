@@ -84,13 +84,13 @@ Item {
     width: 3
     height: row.cellH - 2
     radius: 1.5
-    color: row.info.dv ? Zenon.red : row.info.v === "a" ? Zenon.green
+    color: row.info.dv ? Zenon.red : row.info.dx || row.info.v === "a" ? Zenon.green
       : row.info.v === "c" ? Zenon.yellow : Zenon.red
     opacity: 0.85
   }
   // A CHANGE OPENED IN PLACE: what it took away (rows of their own, `dv`)
   // on a red wash, what it has now (`dx`) on a green one, the width of the
-  // row from the text's start
+  // row from the text's start; the text red or green, and the bar too
   Rectangle {
     visible: !!row.info.dv || !!row.info.dx
     x: row.textX - 2

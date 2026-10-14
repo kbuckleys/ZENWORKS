@@ -594,6 +594,17 @@ FocusScope {
   WindowTip { id: tips; window: tree.window }
   // a name the sidebar's width cut short, shown whole (terminus/NamePeek)
   NamePeek { id: namePeek; window: tree.window }
+  // ── THE ROWS GO ON UNDER THE TOOLBAR, frosted ─────────────────────
+  // as under every bar in the shell (user, 2026-10-14: plato's tree bar
+  // was the one that stayed clear). Declared before the bar: its glyphs
+  // draw over the frost.
+  ScrollEdge {
+    view: list
+    follow: true
+    below: tree.toolbarBottom
+    bar: bar
+    visible: tree.toolbar
+  }
   Rectangle {
     id: bar
     visible: tree.toolbar
@@ -721,6 +732,8 @@ FocusScope {
       index: list.held ? tree.sel : tree.flat.findIndex((r) => r.e.path === tree.shownPath)
       rowH: treeHost.rowH
       on: list.held || tree.flat.some((r) => r.e.path === tree.shownPath)
+      // the theme's accent, as terminus' sidebar wears it (user, 2026-10-14)
+      color: Zenon.alpha(Zenon.cyan, 0.12)
     }
 
     delegate: EntryRow {

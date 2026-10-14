@@ -1188,42 +1188,30 @@ Item {
               font.pixelSize: card.tsSmall
             }
 
-            Row {
+            // ── SEGMENTS, PICTOGRAMS KEPT (user, 2026-10-14) ──────────
+            // The suite's switch, each part with its FitGlyph over the word.
+            // Lit is the fit in force; a staged one wears the dot as the
+            // tabs do, and choosing it again unstages it (pickFit).
+            Term.Segments {
               id: fitRow
               anchors.top: fitHead.bottom
               anchors.topMargin: 8
-              spacing: 4
-              Repeater {
-                model: Picasso.fitModes
-                delegate: Seg {
-                  id: fitSeg
-                  required property string modelData
-                  width: (pictureOpts.width - fitRow.spacing * 4) / 5
-                  height: 56
-                  chosen: card.stageFit === fitSeg.modelData
-                  current: card.stageFit === "" && card.sharedFit === fitSeg.modelData
-                  kbOn: card.kb("fit") && card.effFit === fitSeg.modelData
-                  onHit: card.pickFit(fitSeg.modelData)
-
-                  FitGlyph {
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    anchors.top: parent.top
-                    anchors.topMargin: 10
-                    mode: fitSeg.modelData
-                    ink: fitSeg.ink
-                  }
-                  Text {
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    anchors.bottom: parent.bottom
-                    anchors.bottomMargin: 6
-                    text: Picasso.fitLabels[fitSeg.modelData]
-                    color: fitSeg.ink
-                    font.family: Zenon.face
-                    font.weight: fitSeg.chosen ? 600 : Font.Normal
-                    font.pixelSize: card.tsSmall
-                  }
+              width: pictureOpts.width
+              even: true
+              textSize: card.tsSmall
+              weight: Font.Normal
+              artH: 16
+              art: Component {
+                FitGlyph {
+                  mode: parent ? parent.value : "crop"
+                  ink: parent ? parent.ink : card.dimColor
                 }
               }
+              options: Picasso.fitModes.map((m) => [m, Picasso.fitLabels[m]])
+              current: card.effFit
+              dotted: card.stageFit !== "" ? [card.stageFit] : []
+              onChose: (v) => card.pickFit(v)
+              Ring { on: card.kb("fit") }
             }
 
             // which part of the picture a crop keeps — a picture of the

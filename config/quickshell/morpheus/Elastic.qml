@@ -293,7 +293,7 @@ QtObject {
     const asked = elastic.at(v) + d;
     const to = Math.max(top, Math.min(most, asked));
     elastic.put(v, to);
-    if (asked !== to && phase !== Qt.ScrollMomentum) {
+    if (asked !== to && phase !== Qt.ScrollMomentum && Zenon.elasticScroll) {
       elastic.atTop = asked < top;
       elastic.fingerRaw = Math.min(elastic.maxRaw(h), Math.abs(asked - to));
       const b = elastic.pull(elastic.fingerRaw, h);
@@ -314,6 +314,9 @@ QtObject {
   // positive past the bottom. Returns the contentY the band wants, or NaN
   // when it has nothing to say and the plain clamped target should stand.
   function take(v, lost, clamped) {
+    // oracle's "Elastic scrolling" off (Zenon.elasticScroll): the wheel stops
+    // dead at an edge, no band (user, 2026-10-14)
+    if (!Zenon.elasticScroll) { if (elastic.band) elastic.letGo(); return NaN; }
     const banded = elastic.band === v && elastic.raw > 0;
     if (lost === 0 && !banded) return NaN;
     // Already answered at this edge — see `spent`.
@@ -441,6 +444,7 @@ QtObject {
         const edge = elastic.atTop ? top : most;
         const b = Feel.bounceFor(coast.vel, elastic.pull(elastic.maxRaw(elastic.span(v)), elastic.span(v)));
         elastic.put(v, edge);
+        if (!Zenon.elasticScroll) return;   // off: the coast just stops there
         bounce.target = v;
         bounce.to = elastic.atTop ? edge - b : edge + b;
         bounce.restart();

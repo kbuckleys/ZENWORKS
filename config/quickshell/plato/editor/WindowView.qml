@@ -203,12 +203,13 @@ Item {
       id: thrownPos
       target: win
       property: "pos"
-      // arrives with its speed: the edge is what stops it
-      duration: Math.round(Zenon.elastic * 0.45)
+      // arrives with its speed: the edge is what stops it. Quicker all
+      // through since 2026-10-14 (user: "a bit slow"): ~0.8 s → ~0.55 s
+      duration: Math.round(Zenon.elastic * 0.3)
       easing.type: Easing.Linear
     }
-    NumberAnimation { id: thrownOut; target: win; property: "bandY"; duration: 110; easing.type: Easing.OutQuad }
-    NumberAnimation { target: win; property: "bandY"; to: 0; duration: Zenon.elastic; easing.type: Easing.OutCubic }
+    NumberAnimation { id: thrownOut; target: win; property: "bandY"; duration: Math.round(Zenon.elastic / 6); easing.type: Easing.OutQuad }
+    NumberAnimation { target: win; property: "bandY"; to: 0; duration: Math.round(Zenon.elastic * 0.7); easing.type: Easing.OutCubic }
     onFinished: refill.restart()
   }
 

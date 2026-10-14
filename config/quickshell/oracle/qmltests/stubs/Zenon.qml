@@ -12,6 +12,8 @@ QtObject {
   readonly property int normal: 140
   readonly property int brisk: 75
   readonly property int elastic: 420
+  // oracle's "Elastic scrolling", on as it ships
+  readonly property bool elasticScroll: true
   // the menu card's, for CardBody (values as morpheus/Zenon has them)
   readonly property color white: "#dfdfdd"
   readonly property color red: "#e78284"

@@ -701,6 +701,161 @@ function gallerySeek(items, i, d, cols) {
   return k >= 0 && k < n ? k : i;
 }
 
+// ── JUSTIFIED ROWS (user, 2026-10-14: gallery.jpg) ─────────────────────
+// The gallery's pictures in rows of one height, each at its own shape, the
+// row stretched to the width exactly — no names, no padding cells. The
+// directories go in the same rows, first, at dirRatio (their cover over
+// their name: user, 2026-10-14, "let it join the party"); a section (a
+// date, a burst, alike pictures) starts a row of its own.
+//
+//   items   galleryLayout's (laid out with cols 1, so no fillers)
+//   chips   its chips: { item index: chip } — where a section starts
+//   ratioOf a function path → width / height, or 0 when not yet known
+//   o       { width, rowH, gap, dirRatio, guess, headH }
+//           headH: room above a section's first row for its chip
+//
+// Returns { rects: [{ x, y, w, h, line }], lines: [{ y, h, start, end }],
+// height }: every item's place in the content, top to bottom, in order.
+function justifyLayout(items, chips, ratioOf, o) {
+  const W = Math.max(1, o.width), gap = o.gap || 0, rowH = Math.max(1, o.rowH);
+  const guess = o.guess || 1.5;
+  const rects = new Array((items || []).length), lines = [];
+  let y = 0, i = 0;
+  const n = (items || []).length;
+  const ratio = (it) => {
+    if (it.isDir) return o.dirRatio || 1.13;
+    const r = ratioOf ? Number(ratioOf(it.path)) : 0;
+    return r > 0 && isFinite(r) ? Math.max(0.2, Math.min(6, r)) : guess;
+  };
+  const close = (start, end, h) => {
+    lines.push({ y: y, h: h, start: start, end: end });
+    for (let k = start; k < end; ++k) rects[k].line = lines.length - 1;
+    y += h + gap;
+  };
+  // pictures: a row fills up until, stretched to the width, it would be no
+  // taller than rowH; it takes whichever of with or without the last
+  // picture comes nearer rowH (never a lone picture left towering)
+  while (i < n) {
+    const start = i;
+    if (o.headH && chips && chips[start]) y += o.headH;
+    let sum = 0, k = i;
+    let h = rowH, full = false;
+    for (; k < n; ++k) {
+      if (k > start && chips && chips[k]) break;
+      const r = ratio(items[k]);
+      const hWith = (W - gap * (k - start)) / (sum + r);
+      if (hWith <= rowH && k > start) {
+        const hWithout = (W - gap * (k - start - 1)) / sum;
+        full = true;
+        if (hWithout / rowH < rowH / hWith && hWithout <= rowH * 1.5) { h = hWithout; break; }
+        sum += r; h = hWith; ++k; break;
+      }
+      sum += r;
+      if (hWith <= rowH) { h = hWith; full = true; ++k; break; }   // one picture wider than the row
+    }
+    // a row that ran out (a section's or the folder's last) is not stretched
+    if (!full) h = rowH;
+    h = Math.max(rowH * 0.4, h);
+    let x = 0;
+    for (let j = start; j < k; ++j) {
+      const w = j === k - 1 && full ? Math.max(1, W - x) : Math.max(1, Math.round(ratio(items[j]) * h));
+      rects[j] = { x: x, y: y, w: Math.min(w, W), h: Math.round(h), line: 0 };
+      x += w + gap;
+    }
+    i = Math.max(k, start + 1);
+    close(start, i, Math.round(h));
+  }
+  return { rects: rects, lines: lines, height: Math.max(0, y - gap) };
+}
+
+// The item a step lands on: ±1 along the order, or a row up or down (dl ±1)
+// to the item there whose middle is nearest this one's.
+function justifySeek(L, i, d, dl) {
+  const n = L.rects.length;
+  if (n === 0) return 0;
+  if (!dl) return Math.max(0, Math.min(n - 1, i + d));
+  const r = L.rects[i];
+  if (!r) return 0;
+  const to = r.line + dl;
+  if (to < 0 || to >= L.lines.length) return i;
+  const line = L.lines[to], mid = r.x + r.w / 2;
+  let best = line.start, bd = Infinity;
+  for (let k = line.start; k < line.end; ++k) {
+    const q = L.rects[k], dd = Math.abs(q.x + q.w / 2 - mid);
+    if (dd < bd) { bd = dd; best = k; }
+  }
+  return best;
+}
+
+// The first line whose bottom is at or below y (binary search), or the count.
+function lineAt(L, y) {
+  let lo = 0, hi = L.lines.length;
+  while (lo < hi) {
+    const m = (lo + hi) >> 1;
+    if (L.lines[m].y + L.lines[m].h < y) lo = m + 1; else hi = m;
+  }
+  return lo;
+}
+// The item under a point of the content, or -1.
+function itemAt(L, x, y) {
+  const li = lineAt(L, y);
+  const line = L.lines[li];
+  if (!line || y < line.y) return -1;
+  for (let k = line.start; k < line.end; ++k) {
+    const q = L.rects[k];
+    if (x >= q.x && x < q.x + q.w) return k;
+  }
+  return -1;
+}
+// Every item a box of the content touches.
+function itemsIn(L, x1, y1, x2, y2) {
+  const out = [];
+  for (let li = lineAt(L, y1); li < L.lines.length && L.lines[li].y <= y2; ++li) {
+    const line = L.lines[li];
+    for (let k = line.start; k < line.end; ++k) {
+      const q = L.rects[k];
+      if (q.x < x2 && q.x + q.w > x1) out.push(k);
+    }
+  }
+  return out;
+}
+// The most items any stretch of `span` pixels holds: how many tiles the
+// gallery keeps made, recycled as it scrolls (see the gallery's pool).
+function poolSize(L, span) {
+  let best = 0, a = 0, count = 0;
+  for (let b = 0; b < L.lines.length; ++b) {
+    count += L.lines[b].end - L.lines[b].start;
+    // a line still in sight while any of it is within the span
+    while (L.lines[b].y - (L.lines[a].y + L.lines[a].h) >= span) {
+      count -= L.lines[a].end - L.lines[a].start;
+      ++a;
+    }
+    best = Math.max(best, count);
+  }
+  return best;
+}
+
+// ── the pictures' shapes, before they are decoded ─────────────────────
+// `magick identify -ping` reads only the header: "path\tw\th\torientation"
+// a line (a gif's frames each say it again — the first is kept). An EXIF
+// turn of a quarter swaps the sides, as the picture will be shown.
+function shapesArgv(paths) {
+  return ["magick", "identify", "-ping", "-quiet", "-format", "%d/%f\t%w\t%h\t%[orientation]\n", "--"]
+    .concat((paths || []).map((p) => p + "[0]"));
+}
+function parseShapes(text) {
+  const out = {};
+  for (const l of String(text || "").split("\n")) {
+    const f = l.split("\t");
+    if (f.length < 3 || f[0] === "" || f[0] in out) continue;
+    let w = Number(f[1]), h = Number(f[2]);
+    if (!(w > 0 && h > 0)) continue;
+    if (/^(LeftTop|RightTop|RightBottom|LeftBottom)$/.test(f[3] || "")) { const t = w; w = h; h = t; }
+    out[f[0]] = Math.round(w / h * 10000) / 10000;
+  }
+  return out;
+}
+
 // ── the map ──────────────────────────────────────────────────────────────
 // Web Mercator, in tiles: the world is 2^z tiles of 256 across at zoom z.
 const TILE = 256;

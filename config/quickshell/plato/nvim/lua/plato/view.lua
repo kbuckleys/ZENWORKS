@@ -666,6 +666,9 @@ local function build(win, isCurrent, mode, margin)
   local vcs = require("plato.git").marks(buf)
   -- the lines of the changes opened in place (git.lua expand)
   local vopen = vcs and require("plato.git").opened(buf)
+  -- and what they have now, in green as what went is in red (user,
+  -- 2026-10-14): every cell PlatoDiffNew in place of its syntax colour
+  local newInk = setmetatable({}, { __index = function() return "PlatoDiffNew" end })
   -- the cursor's cell, and which character of its row's text that is: the
   -- same number unless a wide character comes before it on the row
   local cursorRow, cursorCol, cursorChar = 0, 0, 0
@@ -972,7 +975,7 @@ local function build(win, isCurrent, mode, margin)
           end
           rows[#rows + 1] = {
             n = l + 1, k = k, t = piece, f = false,
-            s = charSpans(piece, spans(base, dl, ol, c0, c1)),
+            s = charSpans(piece, spans((vopen and vopen[l + 1]) and newInk or base, dl, ol, c0, c1)),
             g = sign and { sign[1], sign[2] and hl.style(sign[2]) or 0 } or nil,
             v = vcs and vcs[l + 1] or nil,
             dx = (vopen and vopen[l + 1]) and 1 or nil,

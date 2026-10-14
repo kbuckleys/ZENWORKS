@@ -231,7 +231,12 @@ LayerPopup {
   // was nine tenths empty. The cells are a fixed size, so the only width
   // this grid can honestly be is a whole number of them.
   readonly property int cellW: popup.appMode === "emoji" ? 52 : 62
-  readonly property int colsMax: Math.max(1, Math.floor(1000 / popup.cellW))
+  // ── THE NERD GLYPH, LOOKED AT (user, 2026-10-14) ─────────────────────
+  // A pane right of the grid with the selected icon large, its name, its
+  // set, the class and the codepoint. Nerd mode only; it takes its width
+  // out of the grid's ceiling, so the panel does not grow for it.
+  readonly property int previewW: popup.appMode === "nerd" ? 250 : 0
+  readonly property int colsMax: Math.max(1, Math.floor((1000 - popup.previewW) / popup.cellW))
   // Nothing loaded yet is not the same as nothing to show — the same rule
   // gridHeight() already follows. Measured as one column, the pill morphed
   // to a sliver and snapped wide the instant the set landed.
@@ -253,7 +258,7 @@ LayerPopup {
   readonly property int minW: Math.ceil(hintLine.implicitWidth) + popup.hintPad * 2
 
   readonly property int panelWidth:
-    Math.max(popup.minW, popup.colsUsed * popup.cellW)
+    Math.max(popup.minW, popup.colsUsed * popup.cellW + popup.previewW)
   readonly property int panelTarget: Zenon.layerWidth(popup.panelWidth)
 
   // WHAT IS ON SCREEN, which is not the target while the pill is moving.
@@ -604,6 +609,7 @@ LayerPopup {
 
           Text {
             anchors.centerIn: parent
+            anchors.horizontalCenterOffset: -popup.previewW / 2
             visible: popup.shown && popup.filtered.length === 0 &&
                      (popup.appMode !== "nerd" || !popup.nerdLoading)
             text: popup.nerdFailed && popup.appMode === "nerd"
@@ -627,6 +633,7 @@ LayerPopup {
             on: grid.visible
             z: 1
             anchors.right: parent.right
+            anchors.rightMargin: popup.previewW
             anchors.top: parent.top
             anchors.bottom: parent.bottom
             anchors.topMargin: 4
@@ -646,7 +653,7 @@ LayerPopup {
             // holding it open, and then the leftover belongs on both sides
             // of the pictures rather than all of it on the right.
             width: popup.colsUsed * popup.cellW
-            x: Math.round((parent.width - grid.width) / 2)
+            x: Math.round((parent.width - popup.previewW - grid.width) / 2)
             anchors.top: parent.top
             anchors.bottom: parent.bottom
             clip: true
@@ -686,6 +693,17 @@ LayerPopup {
                 }
               }
             }
+          }
+
+          NerdPreview {
+            visible: popup.previewW > 0
+            anchors.right: parent.right
+            anchors.top: parent.top
+            anchors.bottom: parent.bottom
+            width: popup.previewW
+            // read off sel and filtered, which a call to currentRow() would hide
+            entry: popup.appMode === "nerd" ? (popup.filtered[popup.sel] || null) : null
+            ink: popup.entryColor
           }
         }
 

@@ -476,6 +476,8 @@ function accountName(kind, values, taken) {
 // one that works.
 function actionEnabled(kind, it) {
   if (!it) return false;
+  // a card's own (CalypsoPopup.cardActions): every one, whatever it holds
+  if (kind.indexOf(":") > 0) return it.kind === "card";
   const wantsUser = kind === "user" || kind === "copyuser" || kind === "both";
   const wantsTotp = kind === "totp" || kind === "copytotp";
   if (wantsUser && !it.sub) return false;

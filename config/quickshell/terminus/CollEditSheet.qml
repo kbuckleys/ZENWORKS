@@ -783,6 +783,8 @@ Rectangle {
               label: collEdit.searching && !collEdit.naming ? "Search"
                 : (collEdit.making ? "Create" : "Save")
               ink: collEdit.searching && !collEdit.naming ? Zenon.sand : Zenon.cyan
+              // the sheet's default answer glows (user, 2026-10-14)
+              primary: true
               ready: collEdit.searching && !collEdit.naming ? collEdit.asks
                 : collEdit.ready
               onClicked: collEdit.commit()

@@ -9,8 +9,7 @@
 // out of terminus' path bar (Chrome.qml, 2026-10-13). The holder opens its drawer on
 // `hovered` and puts it away on `emptied`.
 //
-//     JobsGlyph { jobs: myJobs        // a JobsBase; the shell's Jobs by default
-//                 onHoveredChanged: … ; onEmptied: … }
+//     JobsGlyph { onHoveredChanged: … ; onEmptied: … }
 //
 // A browser's downloads button, and for the same reason: work that takes
 // time is not the thing you are doing, it is a thing that is happening, and
@@ -23,8 +22,8 @@ import "../morpheus"
 
 Item {
   id: jobsToggle
-  // whose jobs: the shell's unless handed others
-  property var jobs: Jobs
+  // the shell's jobs
+  readonly property var jobs: Jobs
   // the glyph's size
   property int size: Zenon.px(15)
   // the pointer is on it (the holder opens its drawer from that)

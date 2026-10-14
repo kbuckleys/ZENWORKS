@@ -6,13 +6,101 @@
 #
 # calypsod — calypso's backend. JSON lines on stdin/stdout; see core/server.py.
 # Runs without quickshell: `calypsod` in a terminal and typed requests work.
+#
+#   calypsod            a BRIDGE: stdin/stdout ⇄ the server's socket, the
+#                       server started (detached) when none is listening, or
+#                       replaced when it runs older code
+#   calypsod --serve    the server itself (see server.py, OUTLIVING QUICKSHELL)
+#   calypsod --stdio    the old way: the daemon on stdin/stdout, no socket
 
+import json
 import os
+import socket
+import subprocess
 import sys
+import threading
+import time
 
 here = os.path.dirname(os.path.realpath(__file__))
 sys.path.insert(0, os.path.join(os.path.dirname(here), "core"))
 
 import server  # noqa: E402
 
-server.main()
+
+def connect(path):
+    s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    try:
+        s.connect(path)
+        return s
+    except OSError:
+        s.close()
+        return None
+
+
+def spawn():
+    log = open(os.path.join(server.runtime_dir(), "calypsod.log"), "ab")
+    subprocess.Popen([sys.executable, os.path.realpath(__file__), "--serve"],
+                     stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=log,
+                     start_new_session=True, close_fds=True, cwd="/")
+
+
+def reach(path):
+    s = connect(path)
+    if s:
+        return s
+    spawn()
+    for _ in range(100):
+        time.sleep(0.05)
+        s = connect(path)
+        if s:
+            return s
+    sys.stderr.write("calypsod: the server did not start (see calypsod.log)\n")
+    sys.exit(1)
+
+
+def bridge():
+    path = server.sock_path()
+    want = server.build()
+    s = reach(path)
+    rf = s.makefile("rb")
+    first = rf.readline()
+    try:
+        ev = (json.loads(first) or {}).get("event") or {}
+    except ValueError:
+        ev = {}
+    # a server from older code: stopped (what it held goes) and started anew
+    if ev.get("ready") and ev.get("build") != want:
+        try:
+            os.kill(int(ev.get("pid")), 15)
+        except (TypeError, ValueError, OSError):
+            pass
+        s.close()
+        for _ in range(40):
+            if not os.path.exists(path):
+                break
+            time.sleep(0.05)
+        s = reach(path)
+        rf = s.makefile("rb")
+        first = rf.readline()
+    out = sys.stdout.buffer
+    out.write(first)
+    out.flush()
+
+    def down():
+        for line in rf:
+            out.write(line)
+            out.flush()
+        os._exit(1)   # the server went: LineDaemon starts this again if wanted
+    threading.Thread(target=down, daemon=True).start()
+    for line in sys.stdin.buffer:
+        s.sendall(line)
+    os._exit(0)
+
+
+if __name__ == "__main__":
+    if "--serve" in sys.argv:
+        server.serve()
+    elif "--stdio" in sys.argv:
+        server.main()
+    else:
+        bridge()

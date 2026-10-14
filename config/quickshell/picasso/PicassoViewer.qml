@@ -97,6 +97,7 @@ Scope {
   }
   Component.onCompleted: {
     mgr.loadHashes_();
+    mgr.loadShapes_();
     try {
       const st = JSON.parse(stateFile.text() || "{}");
       if (["name", "time", "size", "taken"].indexOf(st.sort) >= 0) mgr.sortKey = st.sort;
@@ -162,6 +163,38 @@ Scope {
   }
   function loadHashes_() {
     try { mgr.hashes = JSON.parse(hashFile.text() || "{}") || {}; } catch (e) { mgr.hashes = ({}); }
+  }
+
+  // ── EACH PICTURE'S SHAPE, for the gallery's justified rows ─────────────
+  // width / height by path, with the sig it was read for (2026-10-14):
+  // read from the headers (viewer.js shapesArgv) or reported by a tile once
+  // it has decoded. Kept on disk, so a folder seen before lays out at once;
+  // written a moment after the last change, not on every tile's report.
+  property var shapes: ({})
+  function noteShapes(got, rows) {
+    const next = Object.assign({}, mgr.shapes);
+    let changed = false;
+    for (const r of rows) {
+      const v = got[r.path];
+      if (!(v > 0)) continue;
+      const sig = mgr.sigOf(r), was = next[r.path];
+      if (was && was.sig === sig && Math.abs(was.r - v) < 0.002) continue;
+      next[r.path] = { sig: sig, r: v };
+      changed = true;
+    }
+    if (!changed) return;
+    mgr.shapes = next;
+    shapeSave.restart();
+  }
+  Timer { id: shapeSave; interval: 1500; onTriggered: shapeFile.setText(JSON.stringify(mgr.shapes)) }
+  FileView {
+    id: shapeFile
+    path: Paths.cacheDir() + "/picasso/shapes.json"
+    blockLoading: true
+    printErrors: false
+  }
+  function loadShapes_() {
+    try { mgr.shapes = JSON.parse(shapeFile.text() || "{}") || {}; } catch (e) { mgr.shapes = ({}); }
   }
 
   // Which of the optional tools this machine has (viewer.js EXTRA_TOOLS):

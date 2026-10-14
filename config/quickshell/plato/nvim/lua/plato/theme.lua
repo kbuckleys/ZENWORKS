@@ -89,6 +89,8 @@ function M.apply()
   set("PlatoBlame", { fg = p.black, nocombine = true })
   -- what a change opened in place took away (git.lua expand)
   set("PlatoDiffOld", { fg = p.red, nocombine = true })
+  -- and what it has now, the same in green
+  set("PlatoDiffNew", { fg = p.green, nocombine = true })
   -- rainbow brackets (brackets.lua), a colour a level, round and round
   for i, c in ipairs({ p.blue, p.magenta, p.yellow, p.cyan, p.green, p.bright_red }) do
     set("PlatoRainbow" .. i, { fg = c })

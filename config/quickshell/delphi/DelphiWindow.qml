@@ -285,11 +285,13 @@ FloatingWindow {
         return;
       }
       const remote = win.remotes.find((r) => r.name === "origin") ? "origin" : win.remotes[0].name;
+      win.pushShow([remote]);
       win.act("push", { remote: remote, branch: b.head, setUpstream: true },
-              { label: "Pushing", network: true, said: "Published " + b.head + " to " + remote });
+              { label: "Pushing", network: true, said: "Published " + b.head + " to " + remote, done: win.pushEnd });
       return;
     }
-    win.act("push", {}, { label: "Pushing", network: true, said: "Pushed", then: () => win.watchCi(),
+    win.pushShow([b.upstream.split("/")[0]]);
+    win.act("push", {}, { label: "Pushing", network: true, said: "Pushed", then: () => win.watchCi(), done: win.pushEnd,
       failed: (err) => {
         const t = String(err && err.error || "");
         if (/rejected|non-fast-forward|fetch first/.test(t)) {
@@ -393,9 +395,11 @@ FloatingWindow {
   // to each ticked remote in turn; one that refuses does not stop the rest
   function pushMany(names) {
     const b = win.branch, done = [], bad = [];
+    win.pushShow(names);
     const next = (i) => {
       if (!win) return;
       if (i >= names.length) {
+        win.pushEnd(done.length > 0);
         if (done.length > 0) win.watchCi();
         win.say(bad.length === 0 ? "Pushed to " + done.join(", ")
           : (done.length > 0 ? "Pushed to " + done.join(", ") + " — " : "") + bad.join(", ") + (bad.length === 1 ? " refused it" : " refused it"), bad.length > 0);
@@ -415,8 +419,46 @@ FloatingWindow {
   function forcePush() {
     win.confirm({ question: "Force-push " + win.branchName + "?", glyph: "", ink: Zenon.red,
       detail: "Replaces the remote branch with yours. With a lease: refused if it moved since you last fetched.",
-      verb: "Force-push", then: () => win.act("push", { force: true }, { label: "Pushing", network: true, said: "Pushed" }) });
+      verb: "Force-push", then: () => {
+        if (win.branch && win.branch.upstream) win.pushShow([win.branch.upstream.split("/")[0]]);
+        win.act("push", { force: true }, { label: "Pushing", network: true, said: "Pushed", done: win.pushEnd });
+      } });
   }
+
+  // ── WHAT A PUSH SENDS, popped from the pill (user, 2026-10-14) ─────────
+  // The commits going out, as the remote's copy of the branch does not have
+  // them yet (repo.changelog since it), in a Bubble from the "Pushing" pill
+  // for as long as the push runs and a moment after it lands. A branch no
+  // remote has yet goes whole: said, not listed.
+  //   { where, commits (null while read), more, state going|done|failed }
+  property var pushing: null
+  readonly property int pushListMax: 12
+  function pushShow(names) {
+    const b = win.branch;
+    if (!b || !b.head) return;
+    pushLinger.stop();
+    let since = "";
+    for (const r of names) {
+      const e = win.refs.remote.find((x) => x.name === r + "/" + b.head);
+      if (e) { since = e.name; break; }
+    }
+    if (since === "" && b.upstream) since = b.upstream;
+    win.pushing = { where: names.join(", "), branch: b.head, commits: since === "" ? [] : null,
+                    whole: since === "", more: 0, state: "going" };
+    if (since === "") return;
+    win.mgr.call("changelog", win.root, { since: since, until: "HEAD" }, (ok, cs) => {
+      if (!win || !win.pushing) return;
+      const list = ok && cs ? cs : [];
+      win.pushing = Object.assign({}, win.pushing, {
+        commits: list.slice(0, win.pushListMax), more: Math.max(0, list.length - win.pushListMax) });
+    });
+  }
+  function pushEnd(ok) {
+    if (!win.pushing) return;
+    win.pushing = Object.assign({}, win.pushing, { state: ok ? "done" : "failed" });
+    pushLinger.restart();
+  }
+  Timer { id: pushLinger; interval: 2600; onTriggered: win.pushing = null }
 
   // ── WHAT IT SAYS ───────────────────────────────────────────────────────
   property string said: ""
@@ -654,7 +696,11 @@ FloatingWindow {
       anchors.bottom: parent.bottom
       width: 250
 
+      // TERMINUS' AND PLATO'S TWO LAYERS (user, 2026-10-14: "all must
+      // match"): an inactive tab's thinner glass, then the sheet's veil
+      // over it. The veil alone left this a pale band beside them.
       Rectangle { anchors.fill: parent; color: Zenon.alpha(Zenon.tabAwayInk, Zenon.tabAway(Zenon.layerBg.a)) }
+      Rectangle { anchors.fill: parent; color: Zenon.ground; opacity: 0.6 }
       Rectangle { anchors.right: parent.right; width: 1; height: parent.height; color: Zenon.border }
 
       // the repository, and the branch it is on
@@ -1214,7 +1260,14 @@ FloatingWindow {
             // held up while the pointer is on it, so its list can be scrolled
             sticky: true
             onOverChanged: win.mgr.uploadLooked = upHover.hovered || upBubble.over
-            shown: upHover.hovered && !!win.mgr.upload
+            // POPS ON ITS OWN while the upload runs, and a moment after it
+            // lands, as a push's does (user, 2026-10-14); then on hover
+            shown: !!win.mgr.upload && (upHover.hovered || upBubble.popped)
+            property bool popped: false
+            readonly property bool running: !!win.mgr.upload && upPill.phase !== "done" && upPill.phase !== "failed"
+            onRunningChanged: { if (upBubble.running) { upLinger.stop(); upBubble.popped = true; } else upLinger.restart(); }
+            Component.onCompleted: upBubble.popped = upBubble.running
+            Timer { id: upLinger; interval: 2600; onTriggered: upBubble.popped = false }
             cardWidth: 440
             Row {
               spacing: 8
@@ -1256,6 +1309,7 @@ FloatingWindow {
           }
         }
         Rectangle {
+          id: netPill
           visible: !!win.netJob
           anchors.verticalCenter: parent.verticalCenter
           width: netRow.implicitWidth + 30
@@ -1284,7 +1338,71 @@ FloatingWindow {
             anchors.fill: parent
             hoverEnabled: true
             onClicked: if (win.netJob) win.stop(win.netJob.id)
-            onContainsMouseChanged: containsMouse ? tips.show(parent, "Stop", "esc") : tips.hide(parent)
+            // the bubble says what is going; the tip only while it is not up
+            onContainsMouseChanged: containsMouse && !win.pushing ? tips.show(parent, "Stop", "esc") : tips.hide(parent)
+          }
+        }
+        // the commits a push is sending (win.pushing); it hangs from the pill
+        // while it runs, and from Push once it has landed
+        Bubble {
+          id: pushBubble
+          window: win
+          target: netPill.visible ? netPill : pushBtn
+          shown: !!win.pushing && win.visible
+          cardWidth: 460
+          readonly property var p: win.pushing || ({ commits: [], more: 0, state: "going", where: "", branch: "" })
+          Text {
+            text: (pushBubble.p.state === "done" ? "Pushed to " : pushBubble.p.state === "failed" ? "Not pushed to " : "Pushing to ")
+              + pushBubble.p.where + "  \u00b7  " + pushBubble.p.branch
+            color: pushBubble.p.state === "done" ? Zenon.green : pushBubble.p.state === "failed" ? Zenon.red : Zenon.ink
+            font.family: Zenon.face
+            font.weight: Font.Bold
+            font.pixelSize: Zenon.px(14)
+          }
+          Text {
+            visible: pushBubble.p.whole || pushBubble.p.commits === null || pushBubble.p.commits.length === 0
+            text: pushBubble.p.whole ? "A new branch there: every commit on it goes"
+              : pushBubble.p.commits === null ? "Reading the commits\u2026" : "No new commits \u2014 the branch moves to this one"
+            color: Zenon.muted
+            font.family: Zenon.face
+            font.weight: Zenon.weight
+            font.pixelSize: Zenon.px(13)
+          }
+          Column {
+            spacing: 4
+            visible: !!pushBubble.p.commits && pushBubble.p.commits.length > 0
+            Repeater {
+              model: pushBubble.p.commits || []
+              delegate: Row {
+                id: cr
+                required property var modelData
+                spacing: 10
+                Text {
+                  text: cr.modelData.sha
+                  color: Zenon.yellow
+                  font.family: Zenon.face
+                  font.features: { "tnum": 1 }
+                  font.pixelSize: Zenon.px(13)
+                }
+                Text {
+                  width: 460 - 28 - 80
+                  elide: Text.ElideRight
+                  text: cr.modelData.subject
+                  color: Zenon.ink
+                  font.family: Zenon.face
+                  font.weight: Zenon.weight
+                  font.pixelSize: Zenon.px(14)
+                }
+              }
+            }
+            Text {
+              visible: pushBubble.p.more > 0
+              text: "and " + pushBubble.p.more + " more"
+              color: Zenon.muted
+              font.family: Zenon.face
+              font.weight: Zenon.weight
+              font.pixelSize: Zenon.px(13)
+            }
           }
         }
         DialogButton {

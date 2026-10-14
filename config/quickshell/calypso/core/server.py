@@ -118,6 +118,9 @@ class Server(lines.Service):
         super().__init__()
         self.held = {}             # (account, item) → { ref: value, role:ref… }
         self.lock = threading.Lock()
+        # stay when the window goes (serve_socket): auto-lock "Never" with an
+        # account open — the manager says so (op linger)
+        self.linger = False
 
     def failure(self, e):
         if isinstance(e, Locked):
@@ -179,6 +182,9 @@ class Server(lines.Service):
     def dispatch(self, op, req, args, cancel, emit):
         if op == "ping":
             return {"protocol": PROTOCOL}
+        if op == "linger":
+            self.linger = bool(args.get("on"))
+            return {"linger": self.linger}
         if op == "platforms":
             out = []
             for p in PLATFORMS:
@@ -321,6 +327,45 @@ class Server(lines.Service):
         super().close()
         with self.lock:
             self.held.clear()
+
+
+# ── OUTLIVING QUICKSHELL ───────────────────────────────────────────────────
+# With auto-lock "Never", never means never — not "until quickshell
+# restarts" (user, 2026-10-14). Everything an unlock holds (bw's and op's
+# session keys, KeePass' open database, Proton's) is this process' memory,
+# so the process must outlive the shell: `calypsod --serve` listens on a
+# socket in $XDG_RUNTIME_DIR, in a session of its own, and the `calypsod`
+# the window starts is only a bridge to it (bin/calypsod). The server stays
+# when its bridge goes only while lingering; otherwise it locks (closes)
+# and exits exactly as the old stdin daemon did.
+def runtime_dir():
+    base = os.environ.get("XDG_RUNTIME_DIR") or "/tmp"
+    d = os.path.join(base, "calypso")
+    os.makedirs(d, mode=0o700, exist_ok=True)
+    os.chmod(d, 0o700)
+    return d
+
+
+def sock_path():
+    return os.path.join(runtime_dir(), "calypsod.sock")
+
+
+def build():
+    """this code's stamp: a server running older code is replaced"""
+    import hashlib
+    h = hashlib.sha1()
+    for name in sorted(os.listdir(HERE)):
+        if name.endswith(".py"):
+            with open(os.path.join(HERE, name), "rb") as f:
+                h.update(name.encode() + f.read())
+    with open(lines.__file__, "rb") as f:
+        h.update(f.read())
+    return h.hexdigest()[:12]
+
+
+def serve():
+    srv = Server()
+    lines.serve_socket(srv, PROTOCOL, sock_path(), lambda: srv.linger, {"build": build()})
 
 
 def main():

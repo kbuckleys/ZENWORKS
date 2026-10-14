@@ -375,7 +375,9 @@ Rectangle {
           slot: -1
           label: modelData.name
           glyph: "\uEC78"
-          ink: Zenon[modelData.ink] || Zenon.cyan
+          // Recents is neutral, as a bookmark is (user, 2026-10-14): no
+          // ink, so the glyph is muted and lights cyan only while open
+          ink: modelData.builtin ? "transparent" : (Zenon[modelData.ink] || Zenon.cyan)
           // ── LIT ONLY WHILE A COLLECTION IS WHAT IS SHOWN ──
           // collOpenId is a stored value: written when a collection
           // opens and cleared only by Escape back to a directory.
@@ -390,17 +392,13 @@ Rectangle {
           // none is ever added without the line.
           active: term.searchMode === "collection"
             && term.collOpenId === modelData.id
-          // A built-in has no record to delete or rules to edit, so
-          // its cross takes it off the sidebar instead — Settings
-          // brings it back ("Recents in sidebar").
-          showRemove: true
+          // A built-in has no record to delete or rules to edit, and
+          // Recents stays put (user, 2026-10-14): no cross on it.
+          showRemove: !modelData.builtin
           editable: !modelData.builtin
           onChosen: term.goToCollection(modelData.id)
           onTabbed: term.openRealmInNewTab(() => term.goToCollection(modelData.id))
-          onRemoved: {
-            if (modelData.builtin) { term.recentsShown = false; term.viewSaveRef.restart(); }
-            else term.dropCollection(modelData.id);
-          }
+          onRemoved: { if (!modelData.builtin) term.dropCollection(modelData.id); }
           onEdited: term.collEditRef.ask(modelData.id)
         }
       }

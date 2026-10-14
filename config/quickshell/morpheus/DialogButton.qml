@@ -22,11 +22,13 @@ Rectangle {
   property color ink: Zenon.muted
   property bool primary: false
   property bool ready: true
+  // the label is a glyph (a Nerd icon), the button square-ish round it
+  property bool glyph: false
   signal clicked()
   // so a card can keep its keyboard highlight and the pointer in step
   signal hovered()
 
-  implicitWidth: Math.max(96, btnText.implicitWidth + 34)
+  implicitWidth: btn.glyph ? Math.max(36, btnText.implicitWidth + 20) : Math.max(96, btnText.implicitWidth + 34)
   implicitHeight: 28
   radius: 4
   // at rest, and pressed — the pressed one is the point: a button that
@@ -109,7 +111,7 @@ Rectangle {
     anchors.centerIn: parent
     text: btn.label
     color: btn.ready ? btn.word : Zenon.muted
-    font.family: Zenon.face
+    font.family: btn.glyph ? Zenon.glyphFace : Zenon.face
     font.weight: Font.Bold
     font.pixelSize: Zenon.px(15)
   }

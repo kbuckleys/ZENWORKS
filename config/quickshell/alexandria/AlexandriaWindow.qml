@@ -694,7 +694,11 @@ FloatingWindow {
       anchors.bottom: parent.bottom
       width: Math.round(Math.min(360, Math.max(260, win.width * 0.24)))
 
+      // TERMINUS' AND PLATO'S TWO LAYERS (user, 2026-10-14: "all must
+      // match"): an inactive tab's thinner glass, then the sheet's veil
+      // over it. The veil alone left this a pale band beside them.
       Rectangle { anchors.fill: parent; color: Zenon.alpha(Zenon.tabAwayInk, Zenon.tabAway(Zenon.layerBg.a)) }
+      Rectangle { anchors.fill: parent; color: Zenon.ground; opacity: 0.6 }
       Rectangle { anchors.right: parent.right; width: 1; height: parent.height; color: Zenon.border }
 
       // the search

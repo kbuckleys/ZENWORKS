@@ -10,8 +10,6 @@
 //
 //   morpheus/Jobs.qml   = this + the processes it runs (rsync, archivers),
 //                          their progress lines and the toast when one lands
-//   a row run elsewhere  = adopted (adopt / update / exited), a drawer
-//                          cancel coming back as cancelAsked
 //
 // The rows are a ListModel, edited in place — see the note in Jobs.qml.
 
@@ -61,12 +59,9 @@ QtObject {
   signal landed(int id, string op, var names, real startedAt, int code)
   // The first line of a job's stderr, for whichever window wants to say it.
   signal said(string text)
-  // An adopted job's cancel, for whatever runs it (see adopt).
-  signal cancelAsked(int id)
 
   // How one of the holder's own jobs is stopped — function(meta), the meta
-  // its start wrote (the shell's: kill the process group). Adopted jobs
-  // never come here: theirs is cancelAsked.
+  // its start wrote (the shell's: kill the process group).
   property var stopHook: null
 
   // What the drawer never draws, kept out of the model: a QObject does not
@@ -113,12 +108,6 @@ QtObject {
     return id;
   }
 
-  // A job run elsewhere: its row and its receipt are here, its process is
-  // not. `names` are what it makes (one name: "<name> → <directory>").
-  function adopt(op, names, dest) {
-    return jobs.begin(op, names, dest, { foreign: true });
-  }
-
   function exited(id, code) {
     const i = jobs.rowAt(id);
     if (i < 0) return;
@@ -152,7 +141,6 @@ QtObject {
     jobs.model.set(i, { cancelled: true });
     jobs.rev++;
     const m = jobs.meta[id];
-    if (m && m.foreign) { jobs.cancelAsked(id); return; }
     if (m && jobs.stopHook) jobs.stopHook(m);
   }
 

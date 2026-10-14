@@ -10,8 +10,8 @@
 // directory without a qmldir (morpheus/tip/ importing its own parent did
 // not reload).
 //
-// `text` is the holder's: rich (WindowTip escapes and adds its muted key,
-// through Strings) or, `plain`, set as it is — a page's tooltip.
+// `text` is the holder's, rich: WindowTip escapes it and adds its muted key,
+// through Strings.
 
 import QtQuick
 import "../morpheus"
@@ -19,7 +19,6 @@ import "../morpheus"
 Rectangle {
   id: card
   property string text: ""
-  property bool plain: false
   width: label.implicitWidth
   height: label.implicitHeight
   // frosted: its own surface, so hyprland blurs what is behind it (tipBg)
@@ -50,7 +49,7 @@ Rectangle {
     rightPadding: 12
     topPadding: 6
     bottomPadding: 6
-    textFormat: card.plain ? Text.PlainText : Text.StyledText
+    textFormat: Text.StyledText
     text: card.text
     color: Zenon.white
     font.family: Zenon.face

@@ -113,16 +113,62 @@ Rectangle {
     opacity: bar.ink
     enabled: bar.ink > 0.5
 
-    // more rules: the search sheet, opened on this search
-    DialogButton {
+    // more rules: the search sheet, opened on this search. A drawn plus and
+    // the word, as compact as the chip it is (user, 2026-10-14: a 96px
+    // button holding a lone "+" read as unfinished)
+    Rectangle {
+      id: addRule
       anchors.verticalCenter: parent.verticalCenter
-      label: "+"
-      onClicked: { bar.refine(); }
+      width: addRow.implicitWidth + 22
+      height: 28
+      radius: 4
+      // no hover tint, as DialogButton (user, 2026-10-11)
+      color: Zenon.wash(addMa.pressed ? 0.24 : 0.12)
+      border.width: 1
+      border.color: Zenon.border
+      Behavior on color { ColorAnimation { duration: Zenon.fast; easing.type: Zenon.ease } }
+      Row {
+        id: addRow
+        anchors.centerIn: parent
+        spacing: 7
+        Item {
+          anchors.verticalCenter: parent.verticalCenter
+          width: 11
+          height: 11
+          Repeater {
+            model: [0, 90]
+            Rectangle {
+              required property var modelData
+              anchors.centerIn: parent
+              width: 11
+              height: 2
+              radius: 1
+              rotation: modelData
+              color: Zenon.cyan
+            }
+          }
+        }
+        Text {
+          anchors.verticalCenter: parent.verticalCenter
+          text: "Rules"
+          color: Zenon.white
+          font.family: Zenon.face
+          font.weight: Font.Bold
+          font.pixelSize: Zenon.px(14)
+        }
+      }
+      MouseArea {
+        id: addMa
+        anchors.fill: parent
+        onClicked: bar.refine()
+      }
     }
     DialogButton {
       anchors.verticalCenter: parent.verticalCenter
       label: "Save"
       ink: Zenon.cyan
+      // the default answer, lit and breathing (user, 2026-10-14)
+      primary: true
       onClicked: { bar.refine(); term.collEditRef.beginNaming(); }
     }
   }

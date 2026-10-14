@@ -57,8 +57,6 @@ Item {
   // already leaves around a card inside its window, so nothing here can fall
   // outside the room reserved for it.
   property int reach: Zenon.menuShadowPad
-  // the shape cast reaches this far above the panel too (CardBody's lead)
-  property real lead: 0
 
   // WHAT IS CAST, as opposed to where. A menu casts a dark drop; howler's
   // critical toast casts red light with no offset at all. Same ring, same
@@ -73,9 +71,9 @@ Item {
   Item {
     id: group
     x: -root.reach
-    y: -root.reach - root.lead
+    y: -root.reach
     width: root.width + root.reach * 2
-    height: root.height + root.lead + root.reach * 2
+    height: root.height + root.reach * 2
 
     layer.enabled: true
     layer.effect: MultiEffect {
@@ -91,7 +89,7 @@ Item {
       x: root.reach
       y: root.reach
       width: root.width
-      height: root.height + root.lead
+      height: root.height
       radius: root.cornerRadius
       blur: root.softness
       spread: root.grow
@@ -116,7 +114,7 @@ Item {
       x: root.reach
       y: root.reach
       width: root.width
-      height: root.height + root.lead
+      height: root.height
       radius: root.cornerRadius
       color: "white"
     }

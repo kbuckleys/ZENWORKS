@@ -282,8 +282,13 @@ LayerPopup {
           anchors.left: parent.left
           anchors.leftMargin: 16
           anchors.verticalCenter: parent.verticalCenter
-          text: popup.face === "progress" ? "Updating"
-            : popup.face === "result" ? (Ceres.txState === "done" ? "Updated" : "Update failed")
+          // named for what the steps are (2026-10-14: another app's install
+          // failed under "Update failed")
+          readonly property var words: Ceres.txKind === "install" ? ["Installing", "Installed", "Install failed"]
+            : Ceres.txKind === "remove" ? ["Removing", "Removed", "Removal failed"]
+            : ["Updating", "Updated", "Update failed"]
+          text: popup.face === "progress" ? words[0]
+            : popup.face === "result" ? (Ceres.txState === "done" ? words[1] : words[2])
             : Ceres.total === 0 ? "Up to date"
             : "Updates  " + Ceres.total
           color: popup.face === "result" && Ceres.txState === "failed" ? Zenon.red : Zenon.blue

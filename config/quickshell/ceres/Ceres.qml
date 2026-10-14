@@ -456,6 +456,38 @@ Singleton {
   // to replace (Cer.settleOf) — or null. The tx view asks it, and
   // txSettleRun runs the same steps again, answered.
   property var txSettle: null
+  // ── WHAT STILL NEEDS WHAT A SETTLE WOULD REMOVE (2026-10-14) ──────────
+  // { installed package: [packages that require it] }, asked of pacman as
+  // soon as a settle names a replacement, so the sheet can say who leans on
+  // what goes (nodejs: npm, node-gyp…) before you agree to it.
+  property var txNeeds: ({})
+  property var _needsFor: []
+  onTxSettleChanged: {
+    root.txNeeds = ({});
+    const names = [];
+    for (const c of (root.txSettle ? root.txSettle.conflicts : []))
+      for (const r of c.replaces) if (names.indexOf(r) < 0) names.push(r);
+    root._needsFor = names;
+    if (names.length === 0) return;
+    needsProc.running = false;
+    needsProc.command = ["sh", "-c", Cer.requiredByCommand(names)];
+    needsProc.running = true;
+  }
+  Process {
+    id: needsProc
+    stdout: StdioCollector {
+      id: needsOut
+      // a killed run still reports its partial text after a restart (see
+      // terminus' previewProc): only names this settle asked about count
+      onStreamFinished: {
+        const r = Cer.requiredByOf(needsOut.text), out = {};
+        for (const n of root._needsFor) if (r[n]) out[n] = r[n];
+        root.txNeeds = out;
+      }
+    }
+  }
+  // what the steps are, for titles: "update", "install", "remove", "other"
+  readonly property string txKind: Cer.txKindOf(root.txSteps)
   property var _sizesBefore: null
   // The bar pacman is drawing right now, read — see Cer.progressOf. The one
   // live reading a transaction has: what is downloading, how fast, how long.

@@ -200,6 +200,20 @@ Item {
   // The strip just above the viewport, in the content's own coordinates: the
   // content item sits at -contentX, -contentY, so the viewport's top is
   // contentY there. The view's clip is its own, and is not in the capture.
+  //
+  // A STRETCHED VIEW. A capture never sees its source's own transforms, and
+  // a view that shows the band as a Scale on its content (plato's
+  // WindowView: `stretchK` from `stretchAt`, in the content's coordinates)
+  // had its rows frosted unstretched under the bars all through the band
+  // (user capture, 2026-10-14). Such a view's strip is read back through
+  // the stretch: from where the drawn edge's rows really are, 1/k as tall,
+  // and drawn at full height — the rows stretched as they are on screen.
+  readonly property real _k: edge.view && edge.view.stretchK > 0 ? edge.view.stretchK : 1
+  readonly property real _o: edge.view && edge.view.stretchAt !== undefined ? edge.view.stretchAt : 0
+  function _unstretch(y) {
+    const cy = edge.view.contentY;
+    return edge._k === 1 ? cy + y : edge._o + (cy + y - edge._o) / edge._k;
+  }
   ShaderEffectSource {
     id: cap
     width: edge.width
@@ -207,9 +221,8 @@ Item {
     sourceItem: edge.on ? edge.view.contentItem : null
     sourceRect: edge.on
       ? Qt.rect(edge.view.contentX,
-                edge.below ? edge.view.contentY + edge.view.height - edge.pad
-                           : edge.view.contentY - edge.height,
-                edge.view.width, edge.height + edge.pad)
+                edge._unstretch(edge.below ? edge.view.height - edge.pad : -edge.height),
+                edge.view.width, (edge.height + edge.pad) / edge._k)
       : Qt.rect(0, 0, 0, 0)
     live: edge.on
     hideSource: false

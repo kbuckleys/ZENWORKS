@@ -134,7 +134,6 @@ FloatingWindow {
   // burst, a group of alike pictures — starts a fresh line, padded to it
   // with empty cells, its heading a chip on its first picture. A folded
   // burst shows only its first.
-  readonly property int gcols: Math.max(1, Math.round(grid.width / (190 * win.gzoom)))
 
   // ── the gallery's zoom — terminus' grid zoom ──────────────────────────
   // The same number terminus' thumbZoom is, on the same scale: a cell is
@@ -149,13 +148,135 @@ FloatingWindow {
   function gzoomSet(z) {
     const v = Math.round(Math.max(win.gzoomMin, Math.min(win.gzoomMax, z)) * 100) / 100;
     if (win.mgr) win.mgr.setGalleryZoom(v);
-    // the cursor's tile is kept in sight while the cells resize under it
-    gzoomFollow.restart();
   }
   function gzoomBy(d) { win.gzoomSet((win.mgr ? win.mgr.galleryZoom : win.gzoom) + d); }
-  Timer { id: gzoomFollow; interval: Zenon.normal + 60 }
-  onGzoomChanged: if (gzoomFollow.running && win.mode === "gallery") grid.positionViewAtIndex(win.gidx, GridView.Contain)
-  readonly property var layout: V.galleryLayout(win.shownDirectories, win.rows, win.gcols, win.sectionAt, win.hiddenRows)
+
+  // ── THE ZOOM IS LAID OUT ONCE, AND SCALED UNTIL THEN (2026-10-14) ──────
+  // Laying the rows out at every frame of the eased zoom resized every tile
+  // every frame (a rounded clip made again each time) — the user's "very
+  // choppy". The rows are laid at `gzoomLaid`, which catches up with the
+  // zoom asked for once the steps stop and its ease is over; until then the
+  // tiles already made are scaled together (`zoomK`, a GPU transform on
+  // the grid's content), about the middle of the view.
+  property real gzoomLaid: win.mgr ? win.mgr.galleryZoom : 1.0
+  readonly property real gzoomAsked: win.mgr ? win.mgr.galleryZoom : 1.0
+  onGzoomAskedChanged: zoomLay.restart()
+  Timer {
+    id: zoomLay
+    interval: Zenon.normal + 40
+    onTriggered: {
+      win.gzoomLaid = win.gzoomAsked;
+      if (win.mode === "gallery") Qt.callLater(() => win.galleryReveal(win.gidx, false));
+    }
+  }
+  readonly property real zoomK: win.gzoom / Math.max(0.01, win.gzoomLaid)
+  // laid out with no padding cells: the rows below are justified instead
+  readonly property var layout: V.galleryLayout(win.shownDirectories, win.rows, 1, win.sectionAt, win.hiddenRows)
+
+  // ── JUSTIFIED ROWS (user, 2026-10-14: gallery.jpg) ────────────────────
+  // The pictures in rows of one height, each at its own shape, no names; the
+  // directories lead the first row, their cover over their name. Each
+  // item's place is worked out here (viewer.js justifyLayout) and the grid
+  // only draws a pool of tiles at those places — see `grid`. The shapes are
+  // the manager's (mgr.shapes, read from the files' headers, or reported by
+  // a tile once decoded); a new folder waits for them (shapesReady), and
+  // one still not known is laid out at 3:2.
+  readonly property var shapes: win.mgr && win.mgr.shapes ? win.mgr.shapes : ({})
+  // ── A NEW FOLDER IS LAID OUT ONCE, AT ITS TRUE SHAPES (2026-10-14) ────
+  // The user's first visit stalled again and again (lag.log, 100–470 ms in
+  // picasso-view): every shape that arrived re-laid the gallery, and a tile
+  // resized is its rounded clip made again — ~1 ms a tile, 80 of them. The
+  // headers read in ~80 ms for 400 pictures, so a folder not seen before
+  // waits for them (at most shapesCap) before it is laid out at all, and is
+  // then laid out once. Later shapes (a second batch, a video's frame) only
+  // move the rows from theirs on.
+  property bool shapesReady: true
+  property string shapesDir: ""
+  Timer { id: shapesCap; interval: 800; onTriggered: win.shapesSettled() }
+  function shapesSettled() { shapesCap.stop(); win.shapesReady = true; win.shapesDir = win.dir; }
+  function shapeOf(p) { const s = win.shapes[p]; return s ? s.r : 0; }
+  readonly property int rowH: Math.round(180 * win.gzoomLaid)
+  readonly property int galleryGap: 10
+  readonly property int sectionH: 30
+  readonly property var glay: !win.shapesReady ? ({ rects: [], lines: [], height: 0 })
+    : V.justifyLayout(win.galleryItems, win.layout.chips, win.shapeOf, {
+    width: Math.max(1, grid.width), rowH: win.rowH, gap: win.galleryGap,
+    dirRatio: 1.5, guess: 1.5, headH: win.sectionH })
+  // reading shapes for the stills that have none yet (or have changed)
+  property bool shapesBusy: false
+  function missingShapes() {
+    if (!win.mgr) return [];
+    return win.allRows.filter((r) => {
+      if (Terminus.isVideo(r.name || "")) return false;
+      const s = win.shapes[r.path];
+      return !s || s.sig !== win.mgr.sigOf(r);
+    });
+  }
+  function needShapes() {
+    if (!win.mgr || win.shapesBusy || !win.mgr.noteShapes) { win.shapesSettled(); return; }
+    const rows = win.missingShapes().slice(0, 400);
+    if (rows.length === 0) { win.shapesSettled(); return; }
+    win.shapesBusy = true;
+    win.capture(V.shapesArgv(rows.map((r) => r.path)), (text) => {
+      const got = V.parseShapes(text);
+      win.mgr.noteShapes(got, rows);
+      win.shapesBusy = false;
+      // the first batch is the top of the folder: lay it out now
+      win.shapesSettled();
+      // the rest, if there were more than one batch; unreadable ones are
+      // left to their tiles (reportShape), not asked again and again
+      if (rows.some((r) => got[r.path] > 0)) Qt.callLater(win.needShapes);
+    });
+  }
+  onAllRowsChanged: Qt.callLater(win.needShapes)
+  // a folder (d) not laid out yet, with shapes to read: hold it until they
+  // are in (see shapesReady). Asked by the listing, which knows the folder
+  // before win.dir does.
+  function holdForShapes(d) {
+    if (d === win.shapesDir || win.missingShapes().length === 0) return;
+    win.shapesReady = false;
+    shapesCap.restart();
+  }
+  // a tile that decoded tells its shape, for what the headers could not say
+  // (a video's frame, a format magick cannot ping)
+  // gathered and handed over together, so a screenful of videos is one
+  // re-layout and not one each
+  property var shapeReports: ({})
+  function reportShape(p, ratio) {
+    if (!win.mgr || !win.mgr.noteShapes || !(ratio > 0) || win.shapes[p]) return;
+    win.shapeReports[p] = ratio;
+    shapeReportFlush.restart();
+  }
+  Timer {
+    id: shapeReportFlush
+    interval: 400
+    onTriggered: {
+      const got = win.shapeReports, rows = [];
+      win.shapeReports = ({});
+      for (const p in got) { const ri = win.rowIndex[p]; if (ri !== undefined) rows.push(win.rows[ri]); }
+      if (rows.length && win.mgr) win.mgr.noteShapes(got, rows);
+    }
+  }
+  // scrolled so a tile is in sight (`top`: at the top, under any chip)
+  function galleryReveal(gi, top) {
+    const r = win.glay.rects[gi];
+    if (!r) return;
+    const lo = -grid.topMargin, max = Math.max(lo, grid.contentHeight + grid.bottomMargin - grid.height);
+    const head = win.layout.chips[gi] ? win.sectionH : 0;
+    let y = grid.contentY;
+    if (top) y = r.y - head - 8;
+    else if (r.y - head - 8 < y) y = r.y - head - 8;
+    else if (r.y + r.h + 8 > y + grid.height) y = r.y + r.h + 8 - grid.height;
+    grid.contentY = Math.max(lo, Math.min(max, y));
+  }
+  // the tile drawing an item, if it is made
+  function cellAt(gi) {
+    for (let s = 0; s < tilePool.count; ++s) {
+      const c = tilePool.itemAt(s);
+      if (c && c.gi === gi) return c;
+    }
+    return null;
+  }
   readonly property var galleryItems: win.layout.items
   readonly property var rowIndex: {
     const o = {};
@@ -183,7 +304,9 @@ FloatingWindow {
   }
   onLayoutChanged: {
     notePos.restart();   // where each tile now is — see tilePos
-    const it = win.galleryItems[win.gidx];
+    // read off the layout itself: this can run while galleryItems is still
+    // being worked out from it, and read that way it is undefined
+    const it = (win.layout.items || [])[win.gidx];
     if (it && it.isDir) return;
     const at = win.itemOfPath(win.path);
     if (at >= 0 && at !== win.gidx) win.gidx = at;
@@ -615,8 +738,9 @@ FloatingWindow {
     const ri = win.rowOfItem(win.gidx);
     if (ri >= 0) win.go(ri);
   }
-  function gallerySeek(d) {
-    win.gallerySel(V.gallerySeek(win.galleryItems, win.gidx, d, win.gcols));
+  // ±d along the order, or a row up or down (dl) to the nearest tile there
+  function gallerySeek(d, dl) {
+    win.gallerySel(V.justifySeek(win.glay, win.gidx, d, dl || 0));
   }
 
   // ── when they were taken ──────────────────────────────────────────────
@@ -858,6 +982,7 @@ FloatingWindow {
           rows.sort((a, b) => win.picked.indexOf(a.path) - win.picked.indexOf(b.path));
         else rows = win.sorted(rows);
         win.allRows = rows;
+        if (!listProc.refresh) win.holdForShapes(d);
         win.readTags();
         if (win.wantsTimes) win.needMeta(() => win.resort());
         // a refresh: the same directory, read again — only what changed moves
@@ -1150,10 +1275,9 @@ FloatingWindow {
     id: notePos
     interval: 0
     onTriggered: {
-      const out = {}, items = win.layout.items, c = win.gcols;
-      const cw = grid.cellWidth, ch = grid.cellHeight;
+      const out = {}, items = win.layout.items, rs = win.glay.rects;
       for (let i = 0; i < items.length; ++i)
-        if (items[i].path) out[items[i].path] = { x: (i % c) * cw, y: Math.floor(i / c) * ch };
+        if (items[i].path && rs[i]) out[items[i].path] = { x: rs[i].x, y: rs[i].y };
       win.tilePos = out;
     }
   }
@@ -1179,12 +1303,19 @@ FloatingWindow {
     return { x: win.margin + (rw - w) / 2, y: win.margin + (rh - h) / 2, w: w, h: h };
   }
   function flyIn() {
-    const cell = grid.itemAtIndex(win.itemOfPath(win.path));
+    const cell = win.cellAt(win.itemOfPath(win.path));
     const th = cell ? cell.thumbItem : null;
-    if (!th || !th.visible || !th.measured || win.isVid) return;
-    const url = win.thumbUrl(win.path);
-    if (url === "") return;
-    const r = win.loaded ? { x: pic.x, y: pic.y, w: pic.width, h: pic.height } : win.guessRect(th.ratio);
+    // NOT th.visible (user, 2026-10-14: no zoom in from the gallery): this
+    // runs once the mode is already "view", so the gallery pane — and the
+    // tile with it — was always hidden here and the flight never left.
+    if (!th || win.isVid) return;
+    // THE TILE'S OWN PICTURE (2026-10-14, still no zoom in): gallery tiles
+    // read the shared pool index (Thumbs.indexHit), which never fills
+    // win.thumbs, so thumbUrl was "" for them and the flight never left.
+    const url = String(th.shownUrl) !== "" ? th.shownUrl : win.thumbUrl(win.path);
+    if (String(url) === "") return;
+    const r = win.loaded ? { x: pic.x, y: pic.y, w: pic.width, h: pic.height }
+      : win.guessRect(th.measured ? th.ratio : (win.tw > 0 && win.th > 0 ? win.tw / win.th : th.ratio));
     if (!r) return;
     const from = th.mapToItem(flyLayer, 0, 0, th.width, th.height);
     const to = stage.mapToItem(flyLayer, r.x, r.y);
@@ -1196,9 +1327,8 @@ FloatingWindow {
   function flyOut() {
     const gi = win.itemOfPath(win.path);
     if (gi < 0 || !win.loaded || win.isVid) return;
-    grid.positionViewAtIndex(gi, GridView.Contain);
-    grid.forceLayout();
-    const cell = grid.itemAtIndex(gi);
+    win.galleryReveal(gi, false);
+    const cell = win.cellAt(gi);
     const th = cell ? cell.thumbItem : null;
     if (!th || !th.measured) return;
     // a zoomed picture leaves from where it would sit fitted
@@ -2479,11 +2609,10 @@ FloatingWindow {
       else if (k === Qt.Key_Delete && shift) win.deleteForever(gallery ? win.targets(cur) : (cur !== "" ? [cur] : []));
       else if (k === Qt.Key_Delete) win.trash(gallery ? win.targets(cur) : (cur !== "" ? [cur] : []));
       else if (gallery) {
-        const cols = win.gcols;
         if (k === Qt.Key_Left || k === Qt.Key_H) win.gallerySeek(-1);
         else if (k === Qt.Key_Right || k === Qt.Key_L) win.gallerySeek(1);
-        else if (k === Qt.Key_Up || k === Qt.Key_K) win.gallerySeek(-cols);
-        else if (k === Qt.Key_Down || k === Qt.Key_J) win.gallerySeek(cols);
+        else if (k === Qt.Key_Up || k === Qt.Key_K) win.gallerySeek(0, -1);
+        else if (k === Qt.Key_Down || k === Qt.Key_J) win.gallerySeek(0, 1);
         else if (k === Qt.Key_M) win.openMap();
         else if (k === Qt.Key_Plus || k === Qt.Key_Equal) win.gzoomBy(0.1);
         else if (k === Qt.Key_Minus) win.gzoomBy(-0.1);
@@ -2613,7 +2742,7 @@ FloatingWindow {
       // back from a picture, the cursor is on it — unless it was left on a directory
       const on = win.galleryItems[win.gidx];
       if (win.index >= 0 && (!on || !on.isDir)) { const at = win.itemOfPath(win.path); if (at >= 0) win.gidx = at; }
-      Qt.callLater(() => grid.positionViewAtIndex(win.gidx, GridView.Contain));
+      Qt.callLater(() => win.galleryReveal(win.gidx, false));
     }
   }
 
@@ -4059,15 +4188,19 @@ FloatingWindow {
 
     // the gallery's last screenfuls, held decoded — terminus' own keeper
     ThumbKeeper { id: thumbKeeper }
-    GridView {
+    // ── THE GRID: A POOL OF TILES AT THE LAYOUT'S PLACES (2026-10-14) ────
+    // A GridView can only draw equal cells. The rows are justified now, so
+    // this is a Flickable as tall as win.glay, and a fixed pool of tiles —
+    // enough for the screen and one more each way (V.poolSize), as the old
+    // grid's cacheBuffer kept — each showing the item its slot stands for
+    // in the window around the view. Scrolled, only the slot that wraps
+    // round takes a new item: the tiles are recycled exactly as the
+    // GridView's reuseItems recycled them (the 2026-10-12 hitch fix).
+    Flickable {
       id: grid
-      // a screen's worth of tiles made ahead each way, so a scroll finds
-      // them already built (and, through the keeper, already decoded)
-      cacheBuffer: Math.max(0, grid.height)
-      // ctrl+wheel zooms the tiles, as in terminus' grid
       ElasticScroll {
         view: grid
-        step: grid.cellHeight
+        step: win.rowH
         intercept: (w) => {
           if (!(w.modifiers & Qt.ControlModifier)) return false;
           win.gzoomBy(w.angleDelta.y > 0 ? 0.1 : -0.1);
@@ -4075,8 +4208,8 @@ FloatingWindow {
         }
       }
       anchors.fill: parent
-      anchors.leftMargin: 6
-      anchors.rightMargin: scrub.visible ? scrub.width + 6 : 6
+      anchors.leftMargin: 10
+      anchors.rightMargin: scrub.visible ? scrub.width + 10 : 10
       clip: true
       // cut away under an open sheet — see sheetUp
       layer.enabled: win.holed && galleryPane.visible
@@ -4087,37 +4220,79 @@ FloatingWindow {
         maskThresholdMin: 0.5
         maskSpreadAtMin: 1
       }
-      model: win.galleryItems
-      // a target width, as terminus has it: the cells divide the pane
-      // exactly, with no ragged strip down the right
-      cellWidth: Math.floor(grid.width / win.gcols)
-      cellHeight: Math.round(168 * win.gzoom)
-      currentIndex: win.gidx
+      contentWidth: width
+      // the zoom between two layouts — see gzoomLaid
+      Scale {
+        id: zoomScale
+        origin.x: grid.width / 2
+        origin.y: grid.contentY + grid.height / 2
+        xScale: win.zoomK
+        yScale: win.zoomK
+      }
+      Component.onCompleted: grid.contentItem.transform = [zoomScale]
+      // room above the first row and below the last, as the old cells had
+      topMargin: 10
+      bottomMargin: 16
+      contentHeight: win.glay.height
       boundsBehavior: Flickable.StopAtBounds
-      // ── TILES RECYCLED, AS TERMINUS' GRID RECYCLES THEM ───────────────
-      // A row scrolled into view used to be built new: a dozen items a
-      // tile and, the dear part, a fresh rounded clip (Thumb is a
-      // ClippingRectangle, drawn through a texture of its own) — a GPU
-      // allocation per tile per row, which is the hitch terminus' grid
-      // never had (user, 2026-10-12: "smooth in terminus, not in
-      // picasso"). A tile that scrolls off is pooled and handed the next
-      // row's picture instead; `arrive` is what a new or reused one does.
-      reuseItems: true
-      onCurrentIndexChanged: if (win.mode === "gallery") grid.positionViewAtIndex(win.gidx, GridView.Contain)
+      // the window of items the pool covers: from a screen above the view
+      readonly property real buffer: grid.height
+      readonly property int firstShown: {
+        const li = V.lineAt(win.glay, grid.contentY - grid.buffer);
+        const line = win.glay.lines[li];
+        return line ? line.start : win.galleryItems.length;
+      }
+      // held while a folder waits for its shapes (glay empty), so the tiles
+      // are kept rather than torn down and made again
+      property int pool: 0
+      function sizePool() {
+        if (win.glay.lines.length === 0 && win.galleryItems.length > 0) return;
+        grid.pool = Math.min(win.galleryItems.length,
+          V.poolSize(win.glay, grid.height + 2 * grid.buffer) + 24);
+      }
+      Connections {
+        target: win
+        function onGlayChanged() { grid.sizePool(); }
+      }
+      onHeightChanged: grid.sizePool()
+      // slot s stands for the item at or after firstShown that it is due
+      function giOf(s) {
+        const P = grid.pool, g0 = grid.firstShown;
+        if (P <= 0) return -1;
+        const gi = s + P * Math.ceil((g0 - s) / P);
+        return gi < win.galleryItems.length ? gi : -1;
+      }
+      Connections {
+        target: win
+        function onGidxChanged() { if (win.mode === "gallery") win.galleryReveal(win.gidx, false); }
+      }
 
+      Repeater {
+      id: tilePool
+      model: grid.pool
       delegate: Item {
         id: cell
-        required property var modelData
+        // the slot; `gi` is the item it draws now
         required property int index
-        width: grid.cellWidth
-        height: grid.cellHeight
+        readonly property int gi: grid.giOf(cell.index)
+        readonly property bool live: cell.gi >= 0
+        readonly property var modelData: cell.live ? win.galleryItems[cell.gi] : ({ isFill: true, path: "" })
+        readonly property var rect: cell.live ? win.glay.rects[cell.gi] : null
+        x: cell.rect ? cell.rect.x : 0
+        y: cell.rect ? cell.rect.y : -100000
+        width: cell.rect ? cell.rect.w : 0
+        height: cell.rect ? cell.rect.h : 0
+        visible: cell.live && !!cell.rect
+        // a picture is a tile, its shape and nothing else; a directory keeps
+        // its glyph or cover and its name, as terminus draws one
+        readonly property bool tile: !cell.directory && !cell.fill
         readonly property bool directory: !!cell.modelData.isDir
         // an empty cell, ending a line before a section
         readonly property bool fill: !!cell.modelData.isFill
-        readonly property bool here: cell.index === win.gidx
+        readonly property bool here: cell.gi === win.gidx
         readonly property bool marked: !cell.directory && !cell.fill && !!win.marks[cell.modelData.path]
         readonly property var tagged: cell.directory || cell.fill ? [] : (win.tags[cell.modelData.path] || [])
-        readonly property var chip: win.layout.chips[cell.index] || null
+        readonly property var chip: win.layout.chips[cell.gi] || null
         readonly property int ri: cell.directory || cell.fill ? -1 : (win.rowIndex[cell.modelData.path] ?? -1)
         readonly property var burst: cell.ri >= 0 ? (win.burstAt[cell.ri] || null) : null
         readonly property bool best: !!win.dupes && !cell.fill && !!win.dupes.keep[cell.modelData.path]
@@ -4129,23 +4304,31 @@ FloatingWindow {
           if (!cell.directory && !cell.fill) win.wantThumb(cell.modelData.path, cell.modelData);
           // a fresh directory comes up a tile after a tile, top to bottom —
           // terminus' TileRise, which its grid does on arriving too
-          if (win.staggering) { rise.hide(); rise.start(grid, cell.index); }
+          if (win.staggering) {
+            rise.hide();
+            const first = win.glay.lines[V.lineAt(win.glay, grid.contentY)];
+            rise.startAt(cell.gi - (first ? first.start : 0));
+          }
           else if (win.reflowing && !cell.fill) cell.glideIn();
         }
         Component.onCompleted: cell.arrive()
-        // back out of the pool for another row: nothing of the last one's
-        // motion carried over, then arrived as a new one would
-        GridView.onPooled: {
+        // the slot handed another item — the view scrolled (the pool's
+        // recycling), or a filter or a new order put another picture at
+        // this index: nothing of the last one's motion carried over, then
+        // arrived as a new one would. Keyed on the PATH, since a reorder
+        // changes what is at an index without changing the index.
+        property int lastGi: -1
+        readonly property string itemKey: cell.live ? cell.gi + "\u0001" + (cell.modelData.path || "") : ""
+        onItemKeyChanged: {
           glide.stop();
           glideFade.stop();
           cellFlareAnim.stop();
           cellFlare.glow = 0;
-          if (win.hoverThumb === cell.index) win.hoverThumb = -1;
-        }
-        GridView.onReused: {
+          if (cell.lastGi >= 0 && win.hoverThumb === cell.lastGi) win.hoverThumb = -1;
+          cell.lastGi = cell.gi;
           cell.opacity = 1;
           rise.show();
-          cell.arrive();
+          if (cell.live) cell.arrive();
         }
         TileRise { id: rise }
 
@@ -4166,9 +4349,7 @@ FloatingWindow {
         function glideIn() {
           const was = win.tilePos[cell.modelData.path];
           if (!was) { cell.opacity = 0; glideFade.start(); return; }
-          const c = win.gcols;
-          glide.from(was.x - (cell.index % c) * grid.cellWidth,
-                     was.y - Math.floor(cell.index / c) * grid.cellHeight);
+          glide.from(was.x - cell.x, was.y - cell.y);
         }
         NumberAnimation { id: glideFade; target: cell; property: "opacity"; to: 1; duration: 260; easing.type: Easing.OutCubic }
 
@@ -4181,23 +4362,34 @@ FloatingWindow {
         DragHandler {
           target: null
           // from the picture itself; off it, a drag is the box (see gband)
-          enabled: active || (!cell.directory && !cell.fill && win.hoverThumb === cell.index)
+          enabled: active || (!cell.directory && !cell.fill && win.hoverThumb === cell.gi)
           onActiveChanged: if (active) win.dragOut(cell, cell.modelData.path)
         }
 
         Item {
           id: thumbBox
           anchors.top: parent.top
-          anchors.topMargin: 12
+          // the whole cell, a directory's too (user, 2026-10-14: as tall as
+          // the pictures, its name inside)
           anchors.horizontalCenter: parent.horizontalCenter
-          width: parent.width - 24
-          height: parent.height - 68
+          width: parent.width
+          height: parent.height
           // marked, the picture steps back a little inside its ring
           scale: cell.marked ? 0.9 : 1
           Behavior on scale { NumberAnimation { duration: win.stepMs; easing.type: Easing.OutBack; easing.overshoot: 1.6 } }
 
+          // a directory with no pictures in it: its glyph on a tile of its own
+          Rectangle {
+            anchors.fill: parent
+            visible: cell.directory && !dirCover.shown
+            radius: Zenon.windowRadius + 2
+            color: Zenon.wash(0.05)
+            border.width: 1
+            border.color: Zenon.border
+          }
           // a directory with pictures in it is drawn as them, as terminus'
-          // grid draws one — see terminus/FolderCover.qml
+          // grid draws one — see terminus/FolderCover.qml. Its tile is laid
+          // at the cover's own 3:2 (dirRatio), so the cover fills it.
           FolderCover {
             id: dirCover
             anchors.fill: parent
@@ -4212,29 +4404,66 @@ FloatingWindow {
           Text {
             id: dirGlyph
             anchors.centerIn: parent
+            // a little above the middle, clear of the name along the foot
+            anchors.verticalCenterOffset: -Math.round(parent.height * 0.08)
             visible: cell.directory && !dirCover.shown
             text: cell.directory ? Terminus.glyphOf(cell.modelData, Icons) : ""
             color: cell.directory ? Terminus.inkOf(cell.modelData) : Zenon.cyan
             font.family: Zenon.face
             font.weight: Zenon.weight
-            font.pixelSize: Math.round(64 * win.gzoom)
+            font.pixelSize: Math.round(win.rowH * 0.36)
+          }
+          // ── ITS NAME, INSIDE IT ─────────────────────────────────────
+          // Along the foot over a soft shade, beside the cover's glyph badge
+          // (FolderCover puts it bottom-left, side·0.22 wide, side·0.06 in).
+          Rectangle {
+            visible: cell.directory && dirCover.shown
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.bottom: parent.bottom
+            height: Math.round(parent.height * 0.5)
+            radius: Zenon.windowRadius
+            gradient: Gradient {
+              // the theme's ground, so the name's ink reads on it either way
+              GradientStop { position: 0.0; color: Zenon.alpha(Zenon.ground, 0) }
+              GradientStop { position: 1.0; color: Zenon.alpha(Zenon.ground, 0.65) }
+            }
+          }
+          Text {
+            visible: cell.directory
+            readonly property real side: parent.height
+            readonly property int inset: Math.max(3, Math.round(side * 0.06))
+            readonly property int badge: dirCover.shown ? Math.max(16, Math.round(side * 0.22)) : 0
+            x: inset + (badge > 0 ? badge + 8 : 6)
+            width: parent.width - x - inset - 4
+            y: dirCover.shown ? parent.height - inset - badge / 2 - height / 2
+                              : parent.height - height - inset - 4
+            text: cell.modelData.isUp ? "Up to " + (Terminus.basename(cell.modelData.path) || "/") : (cell.modelData.name || "")
+            elide: Text.ElideRight
+            color: Zenon.white
+            font.family: Zenon.face
+            font.weight: cell.here ? Font.Bold : Font.DemiBold
+            font.pixelSize: Zenon.px(14)
           }
           Thumb {
             id: pic
             HoverHandler {
               onHoveredChanged: {
-                if (hovered) win.hoverThumb = cell.index;
-                else if (win.hoverThumb === cell.index) win.hoverThumb = -1;
+                if (hovered) win.hoverThumb = cell.gi;
+                else if (win.hoverThumb === cell.gi) win.hoverThumb = -1;
               }
             }
-            visible: !cell.directory && !cell.fill && pic.measured
+            // the whole cell, which is already the picture's shape (the rows
+            // are justified); nothing under it (user, 2026-10-14: no chip
+            // round every tile)
+            visible: cell.tile
             // a picture flying back in lands here; until it does, it is the flyer
             opacity: win.flyTarget !== "" && win.flyTarget === cell.modelData.path ? 0 : 1
-            anchors.centerIn: parent
-            width: Math.max(1, Math.min(thumbBox.width, thumbBox.height * pic.ratio))
-            height: Math.max(1, Math.min(thumbBox.height, thumbBox.width / pic.ratio))
-            radius: Zenon.windowRadius
+            anchors.fill: parent
+            radius: Zenon.windowRadius + 2
             color: "transparent"
+            // decoded, it says its shape, for what the headers could not
+            onMeasuredChanged: if (pic.measured && cell.tile) win.reportShape(cell.modelData.path, pic.ratio)
             measure: !cell.directory && !cell.fill
             path: cell.directory || cell.fill ? "" : cell.modelData.path
             // the batch's answer, else the index's (win.onDisk) at once
@@ -4327,7 +4556,9 @@ FloatingWindow {
           anchors.right: parent.right
           anchors.margins: 8
           horizontalAlignment: Text.AlignHCenter
-          visible: !cell.fill
+          // none now: a picture is a tile with no name (gallery.jpg), and a
+          // directory carries its name inside its tile
+          visible: false
           name: cell.modelData.isUp ? "Up to " + (Terminus.basename(cell.modelData.path) || "/") : (cell.modelData.name || "")
           // what the filter's words matched, lit
           mark: win.filterWords
@@ -4374,17 +4605,18 @@ FloatingWindow {
         // A section begins here: a rule across the grid's line, and its name.
         Rectangle {
           visible: !!cell.chip && cell.chip.text !== ""
-          x: 6
-          y: 11
+          // in the room the layout keeps above a section's first row
+          x: 0
+          y: -win.sectionH + 13
           z: 3
-          width: grid.width - 12
+          width: grid.width
           height: 1
           color: Zenon.border
         }
         Rectangle {
           visible: !!cell.chip && cell.chip.text !== ""
-          x: 10
-          y: 1
+          x: 4
+          y: -win.sectionH + 2
           z: 4
           width: chipRow.implicitWidth + 18
           height: 22
@@ -4430,15 +4662,21 @@ FloatingWindow {
           onClicked: (m) => {
             keys.forceActiveFocus();
             if (!cell.directory && (m.modifiers & Qt.ControlModifier)) win.toggleMark(cell.modelData.path);
-            else if (!cell.directory && (m.modifiers & Qt.ShiftModifier)) win.markRange(win.gidx, cell.index);
-            win.gallerySel(cell.index);
+            else if (!cell.directory && (m.modifiers & Qt.ShiftModifier)) win.markRange(win.gidx, cell.gi);
+            win.gallerySel(cell.gi);
           }
-          onDoubleClicked: win.galleryOpen(cell.index)
+          onDoubleClicked: win.galleryOpen(cell.gi)
         }
+      }
       }
     }
 
-    SelectCell { view: grid; index: win.gidx; on: win.mode === "gallery" }
+    SelectCell { view: grid; index: win.gidx
+      // not while the tiles are scaled between two layouts (see zoomK)
+      on: win.mode === "gallery" && Math.abs(win.zoomK - 1) < 0.001
+      // the tile's own place, a little out from it, as the rows are justified
+      rect: { const r = win.glay.rects[win.gidx]; return r ? { x: r.x - 4, y: r.y - 4, w: r.w + 8, h: r.h + 8 } : null; }
+    }
 
     // a soft shade falling from the bar onto the grid once it is scrolled
     // (terminus/TopShade, as terminus' views have it)
@@ -4456,9 +4694,9 @@ FloatingWindow {
       readonly property var starts: Object.keys(win.layout.chips).map(Number)
         .filter((i) => win.layout.chips[i] && win.layout.chips[i].text !== "")
         .sort((a, b) => a - b)
-      readonly property real scrolled: grid.contentY - grid.originY
-      readonly property real ch: grid.cellHeight
-      function rowY(i) { return Math.floor(i / win.gcols) * pinned.ch; }
+      readonly property real scrolled: grid.contentY
+      // where a section's head begins, in the content
+      function rowY(i) { const r = win.glay.rects[i]; return r ? r.y - win.sectionH : 0; }
       readonly property int cur: {
         let c = -1;
         for (const i of pinned.starts) { if (pinned.rowY(i) < pinned.scrolled - 0.5) c = i; else break; }
@@ -4510,7 +4748,7 @@ FloatingWindow {
         MouseArea {
           anchors.fill: parent
           cursorShape: Qt.PointingHandCursor
-          onClicked: { keys.forceActiveFocus(); grid.positionViewAtIndex(pinned.cur, GridView.Beginning); }
+          onClicked: { keys.forceActiveFocus(); win.galleryReveal(pinned.cur, true); }
         }
       }
     }
@@ -4551,16 +4789,14 @@ FloatingWindow {
       function apply() {
         const w = gband.x2 - gband.x1, h = gband.y2 - gband.y1;
         if (w > 2 && h > 2) gband.held = Qt.rect(gband.x1, gband.y1, w, h);
-        const cols = win.gcols, cw = grid.cellWidth, ch = grid.cellHeight;
-        const top = grid.contentY - grid.originY;
-        const r1 = Math.floor((gband.y1 + top) / ch), r2 = Math.floor((gband.y2 + top) / ch);
-        const c1 = Math.floor((gband.x1 - grid.x) / cw), c2 = Math.floor((gband.x2 - grid.x) / cw);
+        // what the box covers, from the layout's places (V.itemsIn): a tile
+        // scrolled out of the pool still has its place
+        const top = grid.contentY;
         const next = Object.assign({}, gband.base);
-        for (let r = Math.max(0, r1); r <= r2; ++r)
-          for (let c = Math.max(0, c1); c <= Math.min(cols - 1, c2); ++c) {
-            const it = win.galleryItems[r * cols + c];
-            if (it && !it.isDir && !it.isFill) next[it.path] = true;
-          }
+        for (const gi of V.itemsIn(win.glay, gband.x1 - grid.x, gband.y1 + top, gband.x2 - grid.x, gband.y2 + top)) {
+          const it = win.galleryItems[gi];
+          if (it && !it.isDir && !it.isFill) next[it.path] = true;
+        }
         win.marks = next;
       }
     }
@@ -4571,8 +4807,8 @@ FloatingWindow {
       running: gband.active && (gband.py < 40 || gband.py > galleryPane.height - 40)
       onTriggered: {
         const d = gband.py < 40 ? -(40 - gband.py) / 2 : (gband.py - galleryPane.height + 40) / 2;
-        const max = Math.max(grid.originY, grid.originY + grid.contentHeight - grid.height);
-        grid.contentY = Math.max(grid.originY, Math.min(max, grid.contentY + d));
+        const max = Math.max(-grid.topMargin, grid.contentHeight + grid.bottomMargin - grid.height);
+        grid.contentY = Math.max(-grid.topMargin, Math.min(max, grid.contentY + d));
         gband.apply();
       }
     }
@@ -4639,7 +4875,7 @@ FloatingWindow {
             onClicked: {
               keys.forceActiveFocus();
               win.gallerySel(modelData.gi);
-              grid.positionViewAtIndex(modelData.gi, GridView.Beginning);
+              win.galleryReveal(modelData.gi, true);
             }
             onContainsMouseChanged: containsMouse ? tips.show(parent, modelData.text) : tips.hide(parent)
           }
@@ -4654,7 +4890,7 @@ FloatingWindow {
       acceptedButtons: Qt.RightButton
       onPressed: (m) => {
         keys.forceActiveFocus();
-        win.galleryMenu(grid.indexAt(m.x + grid.contentX, m.y + grid.contentY), mapToItem(null, m.x, m.y));
+        win.galleryMenu(V.itemAt(win.glay, m.x + grid.contentX, m.y + grid.contentY), mapToItem(null, m.x, m.y));
       }
     }
 

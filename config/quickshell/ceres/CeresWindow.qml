@@ -132,10 +132,23 @@ FloatingWindow {
   readonly property bool quietJob: Ceres.txState !== "" && Ceres.txState !== "authfail"
     && Ceres.txExpected === 0
   // never two sheets at once: the password's goes first
-  readonly property bool msgUp: win.quietJob && !win.authUp
+  // ── PARU'S UNASKED QUESTION, IN A SHEET (user, 2026-10-14) ────────────
+  // A failed run that only wanted an answer — a package to replace, a
+  // provider to pick (Ceres.txSettle) — asks it in settleSheet rather than
+  // in the failure page or message. Cancel (esc) puts it aside: the plain
+  // failure underneath, with its Open in terminal, is what is left.
+  property bool settleAside: false
+  Connections {
+    target: Ceres
+    function onTxSettleChanged() { win.settleAside = false; }
+  }
+  readonly property bool settleUp: txView.settling && Ceres.txState === "failed"
+    && !win.settleAside && !win.authUp
+  readonly property bool msgUp: win.quietJob && !win.authUp && !win.settleUp
   // how far in the sheets are, for the stage's blur
   readonly property real sheetInk: Math.max(passSheet.cardInk, msgSheet.cardInk,
-                                            confirmSheet.cardInk, confSheet.cardInk)
+                                            confirmSheet.cardInk, confSheet.cardInk,
+                                            settleSheet.cardInk)
   // ONE SHEET AT A TIME. Go ahead on the confirm asks for the password, and
   // the password's sheet came up BEHIND the confirm's — the prompt was there
   // and could not be seen until the confirm was dismissed. The confirm steps
@@ -1441,6 +1454,14 @@ FloatingWindow {
       }
       // the sheet takes every key while it is up
       if (win.authUp) { event.accepted = field.key(event); return; }
+      if (win.settleUp) {
+        event.accepted = true;
+        if ((k === Qt.Key_Y || k === Qt.Key_Return || k === Qt.Key_Enter) && txView.settleable) txView.settle();
+        else if (k === Qt.Key_T) Ceres.txInTerminal();
+        else if (k === Qt.Key_Escape) win.settleAside = true;
+        else if (k === Qt.Key_Left || k === Qt.Key_Right) txView.pickNext(k === Qt.Key_Left ? -1 : 1);
+        return;
+      }
       if (win.msgUp) {
         event.accepted = true;
         if (Ceres.txBusy) { if (k === Qt.Key_Escape) win.dismiss(); return; }
@@ -1615,13 +1636,9 @@ FloatingWindow {
     anchors.right: parent.right
     anchors.top: parent.top
     anchors.bottom: foot.top
-    layer.enabled: win.sheetInk > 0.01
-    layer.effect: MultiEffect {
-      blurEnabled: true
-      blurMax: 40
-      blur: win.sheetInk
-      autoPaddingEnabled: false
-    }
+    // NO BLUR UNDER A SHEET (user, 2026-10-14): the page stays sharp round
+    // the card, as terminus' does; the card frosts what it covers itself
+    // (Sheet.backdrop: stage)
 
     // ── ROWS GO UNDER THE HEAD ──────────────────────────────────────────────
     // Whichever lists are showing carry their scrolled-off rows on under the
@@ -3301,6 +3318,8 @@ FloatingWindow {
       TxView {
         id: txView
         grow: 2
+        // asked in settleSheet instead
+        inlineSettle: false
         visible: win.face === "tx"
         anchors.fill: parent
         anchors.margins: 20
@@ -3311,6 +3330,10 @@ FloatingWindow {
   // What the keys do, for whatever is on screen.
   readonly property var hintRows: {
     if (win.authUp) return [["return", "confirm"], ["esc", "cancel"]];
+    if (win.settleUp)
+      return (txView.settleInfo.providers.length ? [["\u2190 \u2192", "provider"]] : [])
+        .concat(txView.settleable ? [["y", txView.settleInfo.conflicts.length ? "replace and install" : "install"]] : [])
+        .concat([["t", "open in terminal"], ["esc", "cancel"]]);
     if (win.msgUp) return Ceres.txBusy ? [["esc", "hide \u2014 it keeps going"], ["shift esc", "cancel"]]
       : Ceres.txState === "failed" ? [["return", "ok"], ["t", "open in terminal"]] : [["return", "ok"]];
     switch (win.face) {
@@ -3422,7 +3445,7 @@ FloatingWindow {
         onClicked: Ceres.passNews()
       }
       DialogButton {
-        visible: win.face === "tx" && txView.settleable
+        visible: win.face === "tx" && txView.settleable && !win.settleUp
         label: txView.settling && txView.settleInfo.conflicts.length ? "Replace and install" : "Install"
         ink: Zenon.cyan
         primary: true
@@ -3594,6 +3617,154 @@ FloatingWindow {
             ink: Zenon.cyan
             primary: true
             onClicked: Ceres.txClear()
+          }
+        }
+      }
+    }
+  }
+
+  // ── the question paru could not ask — see settleUp ──────────────────────
+  Item {
+    z: 20
+    anchors.fill: parent
+    visible: win.settleUp || settleSheet.cardInk > 0.01
+
+    InputShield {
+      visible: win.settleUp
+      onClicked: win.settleAside = true
+    }
+
+    Sheet {
+      backdrop: stage   // frosted over it — see morpheus/Sheet
+      id: settleSheet
+      shown: win.settleUp
+      fromTop: 0
+      cardW: Math.min(620, win.width - 60)
+      cardH: settleCol.implicitHeight + 40
+
+      Column {
+        id: settleCol
+        readonly property var info: txView.settleInfo
+        readonly property var conflicts: settleCol.info ? settleCol.info.conflicts : []
+        readonly property var providers: settleCol.info ? settleCol.info.providers : []
+        readonly property var gone: {
+          const out = [];
+          for (const c of settleCol.conflicts) for (const r of c.replaces) if (out.indexOf(r) < 0) out.push(r);
+          return out;
+        }
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: parent.top
+        anchors.margins: 20
+        spacing: 10
+
+        Text {
+          width: parent.width
+          wrapMode: Text.Wrap
+          text: settleCol.gone.length === 1 && txView.settleable ? "Replace " + settleCol.gone[0] + "?"
+            : settleCol.conflicts.length ? "Packages in conflict" : "Which provider?"
+          color: Zenon.white
+          font.family: Zenon.face
+          font.weight: Font.Bold
+          font.pixelSize: Zenon.px(19)
+        }
+        Text {
+          width: parent.width
+          wrapMode: Text.Wrap
+          text: !settleCol.conflicts.length
+            ? "More than one package can provide this. Pick one and it is installed with it."
+            : txView.settleable
+              ? "What is coming in cannot be installed next to what you have. Going ahead removes "
+                + (settleCol.gone.length === 1 ? "it" : "them") + " and installs the replacement in one transaction."
+              : "Two of the packages coming in conflict with each other. Pick another provider, or settle it in a terminal."
+          color: Zenon.keyInk
+          font.family: Zenon.face
+          font.weight: Zenon.weight
+          font.pixelSize: Zenon.px(15)
+        }
+
+        // every replacement: what comes in, and what goes
+        Repeater {
+          model: settleCol.conflicts
+          delegate: Text {
+            required property var modelData
+            width: settleCol.width
+            wrapMode: Text.Wrap
+            textFormat: Text.StyledText
+            text: "<font color='" + Zenon.green + "'>+ " + modelData.pkg + "</font>"
+              + (modelData.inner
+                ? "  <font color='" + Zenon.muted + "'>conflicts with</font>  "
+                  + "<font color='" + Zenon.yellow + "'>" + modelData.replaces.join(", ") + "</font>"
+                : "  <font color='" + Zenon.muted + "'>replaces</font>  "
+                  + "<font color='" + Zenon.red + "'>\u2212 " + modelData.replaces.join(", ") + "</font>")
+            color: Zenon.ink
+            font.family: Zenon.face
+            font.weight: Font.Bold
+            font.pixelSize: Zenon.px(16)
+          }
+        }
+
+        // who still leans on what goes (Ceres.txNeeds, pacman's Required By)
+        Repeater {
+          model: settleCol.gone.filter((g) => (Ceres.txNeeds[g] || []).length > 0)
+          delegate: Text {
+            required property string modelData
+            width: settleCol.width
+            wrapMode: Text.Wrap
+            text: modelData + " is required by " + Ceres.txNeeds[modelData].join(", ")
+              + ". They stay only if the replacement provides what they need; pacman stops if it does not."
+            color: Zenon.yellow
+            font.family: Zenon.face
+            font.weight: Zenon.weight
+            font.pixelSize: Zenon.px(14)
+          }
+        }
+
+        // a provider menu each, as the suite's switch
+        Repeater {
+          model: settleCol.providers
+          delegate: Row {
+            id: provLine
+            required property var modelData
+            spacing: 10
+            Text {
+              anchors.verticalCenter: parent.verticalCenter
+              text: provLine.modelData.name + " from"
+              color: Zenon.keyInk
+              font.family: Zenon.face
+              font.weight: Zenon.weight
+              font.pixelSize: Zenon.px(15)
+            }
+            Term.Segments {
+              anchors.verticalCenter: parent.verticalCenter
+              textSize: Zenon.px(14)
+              pad: 22
+              options: provLine.modelData.options.map((o) => [o, o])
+              current: txView.pickOf(provLine.modelData)
+              onChose: (v) => txView.pick(provLine.modelData.name, v)
+            }
+          }
+        }
+
+        Row {
+          anchors.right: parent.right
+          spacing: 8
+          topPadding: 8
+          DialogButton {
+            label: "Open in terminal"
+            ink: Zenon.yellow
+            onClicked: Ceres.txInTerminal()
+          }
+          DialogButton {
+            label: "Cancel"
+            onClicked: win.settleAside = true
+          }
+          DialogButton {
+            visible: txView.settleable
+            label: settleCol.conflicts.length ? "Replace and install" : "Install"
+            ink: Zenon.cyan
+            primary: true
+            onClicked: txView.settle()
           }
         }
       }

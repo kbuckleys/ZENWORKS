@@ -1338,8 +1338,12 @@ LayerPopup {
                 order: index
                 sel: index === popup.chipIdx
                 label: popup.chipMode === "fix" ? modelData : Metis.group(modelData)
+                // A CLICK COPIES, as a click on the answer does; it never
+                // types. It used to close the panel and wtype the value into
+                // whatever had the focus next — a terminal, an editor — which
+                // read it as keys (user, 2026-10-14). Return still pastes.
                 onClicked: popup.chipMode === "fix"
-                  ? popup.applyFix(modelData) : popup.copyPaste(modelData)
+                  ? popup.applyFix(modelData) : popup.copyStay(modelData)
               }
             }
 

@@ -48,7 +48,11 @@ Item {
   function start(view, index) {
     const cols = Math.max(1, Math.floor(view.width / Math.max(1, view.cellWidth)));
     const first = Math.floor(Math.max(0, view.contentY - view.originY) / Math.max(1, view.cellHeight)) * cols;
-    const nth = index - first;
+    rise.startAt(index - first);
+  }
+  // the same, with the tile's turn counted by the caller (picasso's
+  // justified rows, which have no columns to count by)
+  function startAt(nth) {
     if (nth < 0 || rise.beat * nth > rise.most) { rise.show(); return; }
     rise.delay = rise.beat * nth;
     anim.restart();

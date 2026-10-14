@@ -23,6 +23,9 @@ Rectangle {
   // the field's text size: the chip is a little bigger than its letters
   property real size: 14
   property bool shown: true
+  // pressed from outside: a tab's own MouseArea takes the press over its ×
+  property bool held: false
+  readonly property bool down: press.pressed || chip.held
   signal clicked()
 
   visible: chip.shown
@@ -31,14 +34,26 @@ Rectangle {
   radius: width / 2
   // the ink's own colour, faint: a disc that reads on dark glass and on
   // light alike (a wash, white over, vanished on a light theme)
-  color: Zenon.alpha(Zenon.ink, press.pressed ? 0.3 : 0.16)
-  Text {
-    anchors.centerIn: parent
-    text: ""
-    color: Zenon.ink
-    opacity: 0.8
-    font.family: Zenon.glyphFace
-    font.pixelSize: Math.round(chip.size * 0.7)
+  // PRESSED, DARKENED (user, 2026-10-14): the disc goes to shade and the
+  // cross dims, as a button pressed in
+  color: chip.down ? Zenon.darken(0.35) : Zenon.alpha(Zenon.ink, 0.16)
+  // ── THE CROSS IS DRAWN, NOT TYPED (user, 2026-10-14) ──────────────
+  // The glyph (nf-fa-times) was centred by its line box, not its ink, so
+  // the × sat off the disc's middle — worst at the tabs' size. Two strokes
+  // crossing at the disc's centre cannot miss it.
+  Repeater {
+    model: [45, -45]
+    Rectangle {
+      required property var modelData
+      anchors.centerIn: parent
+      width: Math.round(chip.width * 0.46)
+      height: Math.max(1.5, chip.size / 10)
+      radius: height / 2
+      rotation: modelData
+      antialiasing: true
+      color: Zenon.ink
+      opacity: chip.down ? 0.55 : 0.8
+    }
   }
   MouseArea {
     id: press

@@ -371,7 +371,7 @@ def route(op):
 
 # Requests named here change the repository; they queue behind each other.
 WRITES = {"stowCopyIn", "resolveBlocks", "ignore", "untrack", "stage", "stageAll", "unstage", "unstageAll", "discard", "clean",
-          "stageLines", "unstageLines", "discardLines", "commit",
+          "stageLines", "unstageLines", "discardLines", "commit", "undoCommit",
           "branchCreate", "branchTrack", "switch", "branchDelete",
           "branchRename", "setUpstream", "tagCreate", "tagDelete",
           "remoteAdd", "remoteRemove", "remoteSetUrl", "fetch", "pull", "push",

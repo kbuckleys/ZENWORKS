@@ -1569,10 +1569,9 @@ FloatingWindow {
   // The sidebar's list and the palette's: the built-in first, then yours.
   readonly property var allCollections:
     [root.recentsCollection].concat(root.collections)
-  // The sidebar's, which Recents can be taken out of — see its row's cross.
-  property bool recentsShown: true
-  readonly property var sideCollections: root.recentsShown
-    ? root.allCollections : root.collections
+  // The sidebar's: the same, Recents always in it (user, 2026-10-14: it
+  // cannot be removed; the "Recents in sidebar" setting went with its cross).
+  readonly property var sideCollections: root.allCollections
 
   // ── A SEARCH THAT HAS NOT BEEN SAVED ─────────────────────────────────
   // A refined search is a collection in every way but one: nobody named it.
@@ -5335,6 +5334,17 @@ FloatingWindow {
           && (event.key === Qt.Key_Return || event.key === Qt.Key_Enter)) {
         event.accepted = true; props.ask(); return;
       }
+      // CTRL+RETURN: A TERMINAL THERE (user, 2026-10-14) — in the directory
+      // under the cursor, or where you are standing over a file. Before the
+      // plain Return, which takes any Return at all.
+      if ((event.modifiers & Qt.ControlModifier)
+          && (event.key === Qt.Key_Return || event.key === Qt.Key_Enter)) {
+        event.accepted = true;
+        const tr = root.currentRow();
+        if (tr && tr.isDir) root.run(Terminus.shellCommand(tr.path, root.termCmd));
+        else root.openShell();
+        return;
+      }
       // SHIFT+RETURN IS THE OTHER WAY TO OPEN IT. Before the plain Return
       // below, which takes any Return at all and opens the row in place,
       // modifiers and all.
@@ -5836,6 +5846,31 @@ FloatingWindow {
             opacity: modelData.opacity
             x: chrome.bodyRow.x + chrome.bodyBox.x + chrome.millerBox.x + chrome.miller.x + modelData.x
             width: modelData.width
+            height: h
+            sourceItem: visible ? v.contentItem : null
+            sourceRect: Qt.rect(v.contentX, v.contentY - h, v.width, h)
+            live: visible
+            hideSource: false
+          }
+        }
+        // ── AND THE PREVIEW'S OWN SCROLLERS (user, 2026-10-14) ────────
+        // A text file or an archive's tree scrolled in the preview slot
+        // went under the bar sharp-edged once the strip became stripFrost
+        // (its ScrollEdges stood down, and this stage had no copy of them).
+        // Inset inside previewPane, so the pane's offsets are added too.
+        Repeater {
+          model: [chrome.textScroll, chrome.archiveList]
+          delegate: ShaderEffectSource {
+            required property var modelData
+            readonly property var v: modelData
+            readonly property real paneTop: chrome.bodyRow.y + chrome.bodyBox.y + chrome.millerBox.y
+              + chrome.miller.y + chrome.previewPane.y
+            readonly property real h: paneTop + v.y
+            visible: sheetStage.on && v.visible && h > 0
+            opacity: chrome.previewPane.opacity
+            x: chrome.bodyRow.x + chrome.bodyBox.x + chrome.millerBox.x + chrome.miller.x
+              + chrome.previewPane.x + v.x
+            width: v.width
             height: h
             sourceItem: visible ? v.contentItem : null
             sourceRect: Qt.rect(v.contentX, v.contentY - h, v.width, h)

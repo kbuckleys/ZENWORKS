@@ -159,6 +159,38 @@ module.exports = {
     t.eq("no sections, no padding", V.galleryLayout([{ path: "/up" }], [{ path: "/a" }], 3, {}, null).items.length, 2);
     t.eq("seek past a filler", V.gallerySeek(L.items, 4, 1, 3), 6);
     t.eq("seek back past fillers", V.gallerySeek(L.items, 3, -1, 3), 0);
+
+    // ── justified rows ─────────────────────────────────────────────────
+    const pics = (rs) => rs.map((r, i) => ({ path: "/p" + i, r: r }));
+    const ro = (items) => (p) => { const it = items.find((x) => x.path === p); return it ? it.r : 0; };
+    const J1 = pics([1.5, 1.5, 1.5, 1.5, 1.5]);
+    const L1 = V.justifyLayout(J1, {}, ro(J1), { width: 1000, rowH: 200, gap: 10, dirW: 190, dirH: 168 });
+    t.eq("justify: every item placed", L1.rects.every((r) => !!r), true);
+    t.eq("justify: a full row meets the width", (() => { const l = L1.lines[0]; const q = L1.rects[l.end - 1]; return q.x + q.w; })(), 1000);
+    t.eq("justify: a row is near the height asked", L1.lines[0].h >= 200 / 1.5 && L1.lines[0].h <= 200 * 1.5, true);
+    t.eq("justify: rows run in order, no overlap", L1.rects.every((q, i) => i === 0 || q.y > L1.rects[i - 1].y || q.x > L1.rects[i - 1].x), true);
+    t.eq("justify: the last row keeps rowH", L1.lines[L1.lines.length - 1].h, 200);
+    const J2 = [{ path: "/d1", isDir: true }, { path: "/d2", isDir: true }].concat(pics([1, 2]));
+    const L2 = V.justifyLayout(J2, {}, ro(J2), { width: 1000, rowH: 100, gap: 0, dirRatio: 1 });
+    t.eq("justify: directories join the pictures' row", [L2.rects[1].x, L2.rects[2].y, L2.rects[2].line], [L2.rects[0].w, 0, 0]);
+    t.eq("justify: a directory keeps its shape", Math.round(L2.rects[0].w / L2.rects[0].h * 100), 100);
+    const J3 = pics([1.5, 1.5, 1.5, 1.5]);
+    const L3 = V.justifyLayout(J3, { 2: { text: "May" } }, ro(J3), { width: 1000, rowH: 200, gap: 0 });
+    t.eq("justify: a section starts a row", [L3.rects[2].x, L3.rects[2].line > L3.rects[1].line], [0, true]);
+    t.eq("justify: a section's head is given room", V.justifyLayout(J3, { 2: { text: "May" } }, ro(J3), { width: 1000, rowH: 200, gap: 0, headH: 30 }).rects[2].y - L3.rects[2].y, 30);
+    t.eq("justify: unknown shapes take the guess", V.justifyLayout(pics([0]), {}, () => 0, { width: 1000, rowH: 100, gap: 0, guess: 1.5 }).rects[0].w, 150);
+    t.eq("justify: a panorama alone is cut to the width", V.justifyLayout(pics([20]), {}, () => 6, { width: 300, rowH: 100, gap: 0 }).rects[0].w <= 300, true);
+    const L4 = V.justifyLayout(pics([1, 1, 1, 1, 1, 1]), {}, () => 1, { width: 300, rowH: 100, gap: 0 });
+    t.eq("seek: down to the nearest middle", V.justifySeek(L4, 1, 0, 1), 4);
+    t.eq("seek: up from the top stays", V.justifySeek(L4, 1, 0, -1), 1);
+    t.eq("seek: along", V.justifySeek(L4, 2, 1, 0), 3);
+    t.eq("hit: the item under a point", V.itemAt(L4, 150, 150), 4);
+    t.eq("hit: nothing below the end", V.itemAt(L4, 150, 900), -1);
+    t.eq("box: what it touches", V.itemsIn(L4, 50, 50, 160, 150), [0, 1, 3, 4]);
+    t.eq("pool: the most in a span", V.poolSize(L4, 150), 6);
+    t.eq("shapes: read, turned, first frame kept",
+      V.parseShapes("/a.jpg\t600\t400\tTopLeft\n/b.jpg\t600\t400\tRightTop\n/b.jpg\t1\t1\t\n/c.png\t0\t0\t\n"),
+      { "/a.jpg": 1.5, "/b.jpg": 0.6667 });
     t.eq("down onto a filler goes back along its line", V.gallerySeek(L.items, 4, 3, 3), 6);
     t.eq("up onto fillers", V.gallerySeek(L.items, 4, -3, 3), 0);
 

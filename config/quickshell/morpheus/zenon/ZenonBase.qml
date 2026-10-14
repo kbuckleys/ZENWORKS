@@ -3,11 +3,11 @@
 // └─┘└─┘┘└┘└┴┘└─┘┴└─┴ ┴└─┘
 // https://github.com/kbuckleys/
 //
-// ZENON, WHEREVER IT IS HOSTED — every token, colour and helper the suite
-// draws with, needing nothing but QtQuick. morpheus/Zenon.qml is the shell's
+// ZENON'S BASE — every token, colour and helper the suite draws with,
+// needing nothing but QtQuick. morpheus/Zenon.qml is the shell's
 // singleton: this, fed Oracle's settings and the worn theme file.
 //
-// `cfg` is where every setting comes from — Oracle in the shell. Nothing in
+// `cfg` is where every setting comes from — Oracle. Nothing in
 // here reads Oracle, quickshell or a file itself.
 
 import QtQuick
@@ -699,6 +699,9 @@ QtObject {
   readonly property bool scrollAutohide: cfg.scrollbarAutohide
   // whether morpheus/ScrollEdge frosts rows past a list's edge at all
   readonly property bool scrollFrost: cfg.scrollFrost
+  // oracle's "Elastic scrolling": the rubber band past a list's ends
+  // (morpheus/Elastic). Off, a list stops at its edge.
+  readonly property bool elasticScroll: cfg.elasticScroll !== false
 
   // THE CURVE FOR SOMETHING THAT TRAVELS, as opposed to something that
   // appears. `ease` above is quintic, which is right for a panel arriving:

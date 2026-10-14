@@ -46,6 +46,23 @@ Item {
   readonly property bool slides: bar.animate && (!bar.host || bar.host.cursorSlide !== false)
   readonly property bool filled: !bar.view || bar.view.count === undefined || bar.view.count > 0
 
+  // A BAR COMING BACK LANDS, IT DOES NOT FLY IN. While it has no row (index
+  // -1: plato's tree between closing one file's directory and reading the
+  // next one's) or is off, it waits where it is, hidden; on its way back it
+  // seats on the row without the slide. It used to sweep down from above the
+  // first row on every tab switch (user capture, 2026-10-14). `settled` is
+  // set a turn after it shows, so `on` and `index` may change in either
+  // order in the same turn.
+  readonly property bool shown: bar.on && bar.filled && (bar.rowY >= 0 || bar.index >= 0)
+  property bool settled: false
+  onShownChanged: { if (!bar.shown) bar.settled = false; else settle.restart(); }
+  Component.onCompleted: settle.restart()
+  Timer { id: settle; interval: 0; onTriggered: bar.settled = bar.shown }
+  property real _lastY: 0
+  readonly property real wantY: bar.rowY >= 0 ? bar.rowY
+    : bar.index >= 0 ? bar.index * bar.rowH : bar._lastY
+  onWantYChanged: if (bar.rowY >= 0 || bar.index >= 0) bar._lastY = bar.wantY
+
   // without a view, the item whose rows these are (plato's editor window)
   property Item within: null
 
@@ -65,14 +82,14 @@ Item {
       width: parent.width - 2 * bar.inset
       radius: bar.radius
       height: bar.rowH
-      y: bar.rowY >= 0 ? bar.rowY : bar.index * bar.rowH
+      y: bar.wantY
       Behavior on y {
         id: slide
-        enabled: bar.slides
+        enabled: bar.slides && bar.settled
         YAnimator { duration: Zenon.fast; easing.type: Zenon.travelEase }
       }
       color: bar.color
-      visible: bar.on && bar.filled
+      visible: bar.shown
 
       Connections {
         target: bar.host
@@ -80,13 +97,10 @@ Item {
         function onThawPulseChanged() { slot.reseat(); }
       }
       function reseat() {
-        const want = bar.rowY >= 0 ? bar.rowY : bar.index * bar.rowH;
-        if (Math.abs(slot.y - want) < 0.5) return;
+        if (Math.abs(slot.y - bar.wantY) < 0.5) return;
         slide.enabled = false;
-        slot.y = Qt.binding(function() {
-          return bar.rowY >= 0 ? bar.rowY : bar.index * bar.rowH;
-        });
-        slide.enabled = Qt.binding(function() { return bar.slides; });
+        slot.y = Qt.binding(function() { return bar.wantY; });
+        slide.enabled = Qt.binding(function() { return bar.slides && bar.settled; });
       }
     }
   }

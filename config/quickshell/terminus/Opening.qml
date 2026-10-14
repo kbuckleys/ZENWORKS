@@ -202,7 +202,6 @@ Item {
         pickerSideGrew: keptPickerSideGrew,
         recentsView: term.recentsView,
         recentsZoom: term.recentsZoom,
-        recentsShown: term.recentsShown,
         grouped: term.grouped,
         perDirView: term.perDirView,
         lastSaveDir: term.mgr ? term.mgr.lastSaveDir : "",
@@ -259,7 +258,6 @@ Item {
     if (typeof s.recentsView === "string" && s.recentsView !== ""
         && term.viewRing.indexOf(s.recentsView) >= 0)
       term.recentsView = s.recentsView;
-    if (typeof s.recentsShown === "boolean") term.recentsShown = s.recentsShown;
     if (Number(s.recentsZoom) > 0) term.recentsZoom = Number(s.recentsZoom);
     if (typeof s.perDirView === "boolean") term.perDirView = s.perDirView;
     if (typeof s.thumbsOn === "boolean") term.thumbsOn = s.thumbsOn;

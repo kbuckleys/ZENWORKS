@@ -89,13 +89,6 @@ Item {
   // blur per copy, over this item's area only — keep it small.
   property int gain: 1
   property real fadeBottom: 0
-  // ── WHAT IS JUST PAST IT, FOR WHAT CANNOT GO UNDER IT ─────────────────
-  // How far down the source to sample, past this rectangle. Content that
-  // cannot run on under its bar samples the band just below the bar
-  // (shift = the bar's height): it drifts up through the glass as it
-  // scrolls (user, 2026-10-13). 0 for everything that really is under its
-  // bar.
-  property real sampleShift: 0
   readonly property bool masked: frost.radius > 0 || frost.fadeTop > 0 || frost.fadeBottom > 0
 
   readonly property bool on: frost.active && !!frost.source && frost.visible
@@ -113,9 +106,9 @@ Item {
   readonly property rect at: {
     const s = frost.source;
     if (!s) return Qt.rect(0, 0, 0, 0);
-    void [frost.x, frost.y, frost.width, frost.height, s.x, s.y, s.width, s.height, frost.track, frost.sampleShift];
+    void [frost.x, frost.y, frost.width, frost.height, s.x, s.y, s.width, s.height, frost.track];
     const o = frost.mapToItem(s, 0, 0);
-    return Qt.rect(o.x - frost.pad, o.y + frost.sampleShift - frost.pad,
+    return Qt.rect(o.x - frost.pad, o.y - frost.pad,
                    frost.width + 2 * frost.pad, frost.height + 2 * frost.pad);
   }
 

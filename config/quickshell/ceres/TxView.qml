@@ -50,6 +50,9 @@ Item {
   // for the holder's ← →.
   readonly property var settleInfo: view.failed ? Ceres.txSettle : null
   readonly property bool settling: !!view.settleInfo
+  // the question drawn in this view (the bar's panel); the window asks it
+  // in a sheet of its own instead (user, 2026-10-14)
+  property bool inlineSettle: true
   // only conflicts between installed and incoming packages can be agreed to;
   // two incoming packages that conflict need a different provider instead
   readonly property bool settleable: view.settling
@@ -418,7 +421,7 @@ Item {
     // confirm sheet's green and red. Nothing is replaced until you say so.
     Column {
       id: settleBox
-      visible: view.settling
+      visible: view.settling && view.inlineSettle
       anchors.top: resultLine.bottom
       anchors.topMargin: visible ? 12 : 0
       anchors.left: parent.left

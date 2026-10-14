@@ -410,12 +410,6 @@ Item {
         }
 
         PrefRow { term: prefs.term
-          label: "Recents in sidebar"
-          on: term.recentsShown
-          onToggled: { term.recentsShown = !term.recentsShown; term.viewSaveRef.restart(); }
-        }
-
-        PrefRow { term: prefs.term
           label: "Always show tabs"
           on: term.alwaysTabs
           onToggled: term.alwaysTabs = !term.alwaysTabs

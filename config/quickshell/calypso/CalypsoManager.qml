@@ -25,7 +25,8 @@
 //
 // LOCKED BY ITSELF: after `lockAfter` minutes with nothing asked (oracle's
 // "never" is 0), and whenever the screen locks — every account locked and
-// the daemon stopped, so nothing it held in memory survives.
+// the daemon stopped, so nothing it held in memory survives. "Never" also
+// outlives a quickshell restart (see `lingers`).
 //
 // Reached through:
 //   `qs ipc call Calypso open`     the window — bin/calypso, calypso.desktop
@@ -167,6 +168,15 @@ Scope {
       if (mgr.anyOpen) Qt.callLater(mgr.refreshAll);
     }
   }
+  // NEVER MEANS NEVER (user, 2026-10-14): with auto-lock "Never" and an
+  // account open, the daemon is told to stay when quickshell goes (it runs
+  // apart, on a socket — core/server.py, OUTLIVING QUICKSHELL), and the
+  // next shell finds the vaults as they were. Any other setting, or every
+  // account locked, and it goes with the shell as it always did.
+  readonly property bool lingers: mgr.lockAfter === 0 && mgr.anyOpen
+  function sayLinger() { if (line.up) line.request("linger", { args: { on: mgr.lingers } }, null); }
+  onLingersChanged: mgr.sayLinger()
+  Connections { target: line; function onUpChanged() { mgr.sayLinger(); } }
   readonly property bool up: line.up
   readonly property string broken: line.broken
   readonly property bool anyOpen: mgr.accounts.some((a) => (mgr.states[a.id] || {}).unlocked)

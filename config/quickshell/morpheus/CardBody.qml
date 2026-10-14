@@ -25,12 +25,6 @@ Item {
   property bool hinged: false
   property bool onRight: false
   property string squareEdge: ""
-  // ── HUNG FROM SOMETHING ABOVE IT, ONE SHAPE WITH IT ───────────────────
-  // `lead` px of clear room above the card, inside the pad: the card starts
-  // that far down, and its shadow is cast by the card and that room as one —
-  // so the thing the card hangs from (drawn by its holder, under the clear
-  // room) is wrapped by the same shadow, and the two read as one raised piece.
-  property real lead: 0
 
   signal chosen(int index)
 
@@ -82,7 +76,6 @@ Item {
     id: bg
     anchors.fill: parent
     anchors.margins: root.pad
-    anchors.topMargin: root.pad + root.lead
     // Grows out of its own top-left corner rather than appearing at full
     // size, so the card unfolds FROM the thing it belongs to.
     transformOrigin: Item.TopLeft
@@ -423,7 +416,6 @@ Item {
 
   MenuShadow {
     panel: bg
-    lead: root.lead
     reach: root.pad
     grow: Math.round(Zenon.menuShadowGrow * root.shadowScale)
     softness: Math.round(Zenon.menuShadowBlur * root.shadowScale)

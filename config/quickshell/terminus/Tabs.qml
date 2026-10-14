@@ -282,8 +282,9 @@ Item {
   function moveTab(from, to) {
     if (from < 0 || to < 0 || from === to) return;
     if (from >= term.tabs.length || to >= term.tabs.length) return;
-    term.saveTab();
+    // saveTab's write folded into this one: two writes were two rebuilds
     const next = term.tabs.slice();
+    next[term.tab] = term.tabState();
     const rec = next.splice(from, 1)[0];
     next.splice(to, 0, rec);
     // the three cases: you moved the tab you are on, you moved one from
@@ -292,11 +293,14 @@ Item {
     if (cur === from) cur = to;
     else if (from < cur && cur <= to) cur -= 1;
     else if (to <= cur && cur < from) cur += 1;
-    term.tabs = next;
-    // set AFTER the list, and deliberately not through switchTab: nothing has
-    // been entered or left, so there is nothing to load — reloading here would
-    // throw away the listing and rebuild the identical one.
+    // deliberately not through switchTab: nothing has been entered or left,
+    // so there is nothing to load — reloading here would throw away the
+    // listing and rebuild the identical one.
+    // SET BEFORE THE LIST (user, 2026-10-14: a drop replayed the switch):
+    // after it, the rebuilt cells were made with the OLD index lit, and the
+    // labels then faded across to the right one as if the tab had switched.
     term.tab = cur;
+    term.tabs = next;
   }
   function switchTab(i) {
     if (i === term.tab || i < 0 || i >= term.tabs.length) return;

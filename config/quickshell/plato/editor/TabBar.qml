@@ -51,8 +51,9 @@ Rectangle {
   property var tips: null
 
   readonly property var tabs: tabStrip.ed.tabs
-  // terminus' path bar height, which its tab strip shares
-  implicitHeight: tabStrip.tabs.length > 1 ? 32 : 0
+  // terminus' path bar height, which its tab strip shares (2px up again,
+  // user 2026-10-14, as terminus')
+  implicitHeight: tabStrip.tabs.length > 1 ? 34 : 0
   visible: implicitHeight > 0
   clip: true
   // TRANSPARENT: an inactive tab is the window's own body showing through
@@ -107,7 +108,24 @@ Rectangle {
   property var prevIds: []
   property real prevCellW: 0
   property var prevNames: ({})
+  // ── A DROPPED TAB IS ALREADY WHERE IT LANDED (user, 2026-10-14) ───────
+  // A drag's release rebuilt the strip from prevIds, the order BEFORE the
+  // drag: the dropped tab jumped back to its old slot and slid over again,
+  // the whole drag replayed. So a release records the order as it is on
+  // screen (every other tab already in its new slot) and where the carried
+  // one was let go, and only that one settles the last few pixels.
+  property var dropId: null
+  property real dropX: 0
+  function noteDrop(from, to) {
+    const ids = tabStrip.tabs.map((b) => b.id);
+    const [id] = ids.splice(from, 1);
+    ids.splice(to, 0, id);
+    tabStrip.prevIds = ids;
+    tabStrip.dropId = id;
+    tabStrip.dropX = tabStrip.dragX;
+  }
   function record() {
+    tabStrip.dropId = null;
     tabStrip.prevIds = tabStrip.tabs.map((b) => b.id);
     tabStrip.prevCellW = tabStrip.width / Math.max(1, tabStrip.tabs.length);
     const names = {};
@@ -220,7 +238,8 @@ Rectangle {
           const was = tabStrip.prevIds.indexOf(id);
           if (!fresh && was >= 0 && tabStrip.animate && tabStrip.prevCellW > 0) {
             const w = tabStrip.width / Math.max(1, tabStrip.tabs.length);
-            tabCell.shiftX = was * tabStrip.prevCellW - tabCell.index * w;
+            tabCell.shiftX = (id === tabStrip.dropId ? tabStrip.dropX : was * tabStrip.prevCellW)
+              - tabCell.index * w;
             tabCell.shiftW = tabStrip.prevCellW - w;
             if (Math.abs(tabCell.shiftX) > 0.5 || Math.abs(tabCell.shiftW) > 0.5) closeUp.start();
             else { tabCell.shiftX = 0; tabCell.shiftW = 0; }
@@ -371,8 +390,9 @@ Rectangle {
           anchors.rightMargin: 8
           anchors.verticalCenter: parent.verticalCenter
           size: tabStrip.face.pixelSize
+          held: tabMouse.pressed && tabMouse.overClose && !tabMouse.dragging
+          // shown and hidden outright, no fade (user, 2026-10-14)
           opacity: tabMouse.containsMouse && !tabMouse.dragging && tabCell.width > 70 ? 1 : 0
-          Behavior on opacity { NumberAnimation { duration: Zenon.fast } }
           visible: opacity > 0
         }
 
@@ -407,6 +427,7 @@ Rectangle {
 
           onPressed: (m) => {
             if (tabStrip.tips) tabStrip.tips.hide(tabCell);
+            tabMouse.overClose = tabMouse.onClose(m);
             if (m.button !== Qt.LeftButton) return;
             tabMouse.grabDx = tabMouse.stripX(m) - tabCell.x;
             tabMouse.dragging = false;
@@ -432,6 +453,7 @@ Rectangle {
             const st = tabMouse.strip;
             if (!st) return;
             const from = st.dragFrom, to = st.dragTo;
+            if (was && from >= 0 && to >= 0 && from !== to) st.noteDrop(from, to);
             st.endDrag();
             if (was) st.ed.moveTab(from, to);
           }

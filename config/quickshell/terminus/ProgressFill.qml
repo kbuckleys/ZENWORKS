@@ -14,9 +14,6 @@
 // edge, so the band reads as moving rightward even while it is still. No
 // line at the edge — it read as a text cursor. Translucent, so the words on
 // it stay the loudest thing there. The width eases as `frac` moves.
-//
-// `fades`: the fill goes (fades out) when `done` comes, rather than sitting
-// full.
 
 import QtQuick
 import "../morpheus"
@@ -26,12 +23,8 @@ Item {
   property real frac: 0            // 0..1
   property color ink: Zenon.cyan
   property real radius: 0
-  property bool done: false
-  property bool fades: false
   Component.onCompleted: pf._at = Math.max(0, Math.min(1, pf.frac))
 
-  opacity: pf.fades && pf.done ? 0 : 1
-  Behavior on opacity { NumberAnimation { duration: Zenon.slow; easing.type: Zenon.ease } }
 
   // forward it eases; back (a new start) it is simply there — a fill
   // sliding backward across the band read as something undone

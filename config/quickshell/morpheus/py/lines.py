@@ -32,13 +32,21 @@ import sys
 import threading
 
 _out_lock = threading.Lock()
+# where messages go: stdout, or the client of serve_socket (None: nobody,
+# an answer for a client that has gone is dropped)
+_sink = sys.stdout
 
 
 def send(msg):
     line = json.dumps(msg, ensure_ascii=False, separators=(",", ":"))
     with _out_lock:
-        sys.stdout.write(line + "\n")
-        sys.stdout.flush()
+        if _sink is None:
+            return
+        try:
+            _sink.write(line + "\n")
+            _sink.flush()
+        except (OSError, ValueError):
+            pass   # the client went mid-answer
 
 
 class Cancelled(Exception):
@@ -165,3 +173,93 @@ def serve(service, protocol, ready=None):
             service.handle(req)
     finally:
         service.close()
+
+
+# ── OR ON A SOCKET, OUTLIVING ITS WINDOW ──────────────────────────────────
+# The same loop for a daemon that must not die with quickshell (calypso
+# with auto-lock "Never": an unlocked vault stays unlocked across a shell
+# restart). It listens on `path` (mode 0600, only this user's processes
+# answered); its client is a bridge the window starts (calypso/bin/calypsod)
+# relaying stdin/stdout, so LineDaemon never knows. ONE CLIENT: a new one
+# takes over (an old shell still dying), answers for the old are dropped.
+# When the client goes, linger() says whether to wait for the next one;
+# otherwise everything stops, as serve() does at the end of stdin.
+def serve_socket(service, protocol, path, linger, ready=None):
+    import socket
+    import struct
+    global _sink
+
+    def stop(sig, frame):
+        service.close()
+        try:
+            os.unlink(path)
+        except OSError:
+            pass
+        os._exit(0)
+    signal.signal(signal.SIGTERM, stop)
+    signal.signal(signal.SIGHUP, signal.SIG_IGN)
+    try:
+        os.unlink(path)
+    except OSError:
+        pass
+    old = os.umask(0o177)
+    sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    sock.bind(path)
+    os.umask(old)
+    os.chmod(path, 0o600)
+    sock.listen(2)
+    state = {"conn": None}
+    gate = threading.Lock()
+
+    def reader(conn):
+        global _sink
+        try:
+            for line in conn.makefile("r", encoding="utf-8"):
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    req = json.loads(line)
+                except ValueError:
+                    send({"ok": False, "kind": "protocol", "error": "not JSON"})
+                    continue
+                service.handle(req)
+        except (OSError, ValueError):
+            pass
+        with gate:
+            if state["conn"] is not conn:
+                return            # replaced: the new client goes on
+            state["conn"] = None
+            with _out_lock:
+                _sink = None
+        try:
+            conn.close()
+        except OSError:
+            pass
+        if not linger():
+            stop(None, None)
+
+    with _out_lock:
+        _sink = None
+    while True:
+        conn, _ = sock.accept()
+        try:
+            uid = struct.unpack("3i", conn.getsockopt(socket.SOL_SOCKET, socket.SO_PEERCRED, 12))[1]
+        except OSError:
+            uid = -1
+        if uid != os.getuid():
+            conn.close()
+            continue
+        with gate:
+            prev = state["conn"]
+            state["conn"] = conn
+            with _out_lock:
+                _sink = conn.makefile("w", encoding="utf-8")
+        if prev is not None:
+            try:
+                prev.shutdown(socket.SHUT_RDWR)
+            except OSError:
+                pass
+        send({"event": dict({"ready": True, "protocol": protocol, "pid": os.getpid()},
+                            **(ready or {}))})
+        threading.Thread(target=reader, args=(conn,), daemon=True).start()

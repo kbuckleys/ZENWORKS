@@ -406,6 +406,37 @@ Item {
       pg.win.mgr.call("lastMessage", pg.win.root, {}, (ok, m) => { if (!pg) return; if (ok && msgWell.text.trim() === "") msgWell.text = m; });
     }
   }
+  // ── taking the last commit back ──────────────────────────────────────
+  readonly property bool canUndo: !!pg.win && !!pg.win.branch && !!pg.win.branch.oid && !pg.amend
+  property string lastSubject: ""
+  function readSubject() {
+    if (!pg.win || !pg.canUndo) { pg.lastSubject = ""; return; }
+    pg.win.mgr.call("lastMessage", pg.win.root, {}, (ok, m) => {
+      if (pg.win && ok) pg.lastSubject = String(m || "").split("\n")[0];
+    });
+  }
+  readonly property string headOid: pg.win && pg.win.branch && pg.win.branch.oid ? pg.win.branch.oid : ""
+  onHeadOidChanged: pg.readSubject()
+  onWinChanged: Qt.callLater(pg.readSubject)
+  function undoCommit() {
+    if (!pg.canUndo) return;
+    const b = pg.win.branch;
+    const go = () => pg.win.act("undoCommit", {}, {
+      label: "Undoing the commit",
+      then: (r) => {
+        // the message back in the box, unless one is being written
+        if (msgWell.text.trim() === "" && r && r.message) msgWell.text = r.message;
+        pg.win.say("Commit undone — its changes are staged again");
+      } });
+    // on the remote already: undoing it here leaves it there, and the next
+    // push would have to force
+    if (b.upstream && b.ahead === 0)
+      pg.win.confirm({ question: "Undo a commit that is already pushed?", glyph: "\uF0E2", ink: Zenon.yellow,
+        detail: "“" + pg.lastSubject + "” is on " + b.upstream + " too. It stays there; pushing again afterwards needs a force-push.",
+        verb: "Undo it here", then: go });
+    else go();
+  }
+
   function commit() {
     if (!pg.canCommit) {
       if (pg.stagedCount === 0 && !pg.amend) pg.win.say("Nothing staged to commit", true);
@@ -426,6 +457,8 @@ Item {
   function key(e) {
     const k = e.key, ctrl = e.modifiers & Qt.ControlModifier, shift = e.modifiers & Qt.ShiftModifier;
     if (ctrl && (k === Qt.Key_Return || k === Qt.Key_Enter)) { pg.commit(); return true; }
+    // ctrl z: the last commit taken back — not in the message, whose own it is
+    if (ctrl && k === Qt.Key_Z && pg.area !== "message") { pg.undoCommit(); return true; }
     if (ctrl) return false;
     if (pg.area === "diff") {
       if (k === Qt.Key_Escape) { if (diff.anchor >= 0) diff.anchor = -1; else pg.area = "list"; return true; }
@@ -677,11 +710,32 @@ Item {
         anchors.topMargin: 16
         width: 200
         height: 28
-        label: "Amend the last commit"
+        // short: the undo glyph and Commit share the row (2026-10-14)
+        label: "Amend last"
         on: pg.amend
         onToggled: pg.amend = !pg.amend
       }
+      // UNDO THE LAST COMMIT (user, 2026-10-14): what it changed staged
+      // again and its message back in the box — undoCommit
       DialogButton {
+        id: undoBtn
+        visible: pg.canUndo
+        anchors.right: commitBtn.left
+        anchors.rightMargin: 8
+        anchors.top: commitBtn.top
+        // U+F054D (user, 2026-10-14): a word overlapped the Amend switch
+        label: "\u{F054D}"
+        glyph: true
+        ink: Zenon.muted
+        onClicked: pg.undoCommit()
+        HoverHandler {
+          onHoveredChanged: if (pg.win) hovered
+            ? pg.win.tip(undoBtn, "Take back “" + pg.lastSubject + "” — its changes stay staged", "ctrl z")
+            : pg.win.untip(undoBtn)
+        }
+      }
+      DialogButton {
+        id: commitBtn
         anchors.right: msgWell.right
         anchors.top: msgWell.bottom
         anchors.topMargin: 14

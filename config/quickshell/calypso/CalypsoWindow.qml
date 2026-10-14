@@ -799,8 +799,17 @@ FloatingWindow {
   function refocus() {
     if (cards.carding || win.adding || win.genOpen || win.setOpen || win.bigValue !== "") { if (!cards.carding) keySink.forceActiveFocus(); return; }
     if (win.editing) { if (editorLoader.item) editorLoader.item.focusFirst(); return; }
-    if (win.lockAcct) keySink.forceActiveFocus();
+    // an item asking for the master password again takes the typing
+    if (win.lockAcct || detailPane.asking) keySink.forceActiveFocus();
     else searchField.forceActiveFocus();
+  }
+  function takeKeys() { keySink.forceActiveFocus(); }
+  // a re-prompting item arriving takes the keys from the search; and once
+  // it is open, they go back
+  property bool _asked: false
+  onDetailChanged: {
+    const a = !!win.detail && !!win.detail.reprompt;
+    if (a !== win._asked) { win._asked = a; Qt.callLater(win.refocus); }
   }
   function unwind() {
     if (win.adding) { win.adding = false; win.refocus(); return; }
@@ -832,6 +841,11 @@ FloatingWindow {
       if (e.key === Qt.Key_Escape) { win.unwind(); return true; }
       return lockPane.key(e);
     }
+    // the re-prompt's field (see ItemDetail.asking): typing, ↵, paste —
+    // not while the search has the keys, and never the list's moves
+    if (detailPane.asking && !searchField.activeFocus && !alt
+        && [Qt.Key_Escape, Qt.Key_Up, Qt.Key_Down, Qt.Key_PageUp, Qt.Key_PageDown, Qt.Key_Tab].indexOf(e.key) < 0
+        && (!ctrl || e.matches(StandardKey.Paste)) && detailPane.key(e)) return true;
     if (e.key === Qt.Key_Escape) { win.unwind(); return true; }
     if (ctrl && e.key === Qt.Key_C) { win.copyRole(alt ? "totp" : shift ? "username" : "password"); return true; }
     if (ctrl && e.key === Qt.Key_R) { const f = win.fieldWith("password"); if (f) win.revealField(f); return true; }
@@ -863,7 +877,7 @@ FloatingWindow {
         e.accepted = true;
       }
     }
-    Keys.onReleased: (e) => { if (win.lockAcct) lockPane.keyUp(e); }
+    Keys.onReleased: (e) => { if (win.lockAcct) lockPane.keyUp(e); else detailPane.keyUp(e); }
   }
 
   // ── THE STAGE ──────────────────────────────────────────────────────────
@@ -881,7 +895,11 @@ FloatingWindow {
       anchors.bottom: parent.bottom
       width: 250
 
+      // TERMINUS' AND PLATO'S TWO LAYERS (user, 2026-10-14: "all must
+      // match"): an inactive tab's thinner glass, then the sheet's veil
+      // over it. The veil alone left this a pale band beside them.
       Rectangle { anchors.fill: parent; color: Zenon.alpha(Zenon.tabAwayInk, Zenon.tabAway(Zenon.layerBg.a)) }
+      Rectangle { anchors.fill: parent; color: Zenon.ground; opacity: 0.6 }
       Rectangle { anchors.right: parent.right; width: 1; height: parent.height; color: Zenon.border }
 
       // which accounts are in view — a menu of them (scopeMenu)

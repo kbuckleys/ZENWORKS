@@ -371,6 +371,23 @@ class Repo:
         self.git.stream_ok(a, _progress(emit), cancel, input=message)
         return self.head()
 
+    def undo_commit(self, cancel=None):
+        """The last commit taken back: its changes staged again, its message
+        handed back for the box (Changes' Undo, user 2026-10-14). The first
+        commit of a branch has no parent to go back to: the branch is made
+        unborn again, everything still staged."""
+        msg = self.last_message()
+        try:
+            self.git.run(["rev-parse", "--verify", "--quiet", "HEAD~1"], cancel=cancel, lock=False)
+            first = False
+        except GitError:
+            first = True
+        if first:
+            self.git.run(["update-ref", "-d", "HEAD"], cancel=cancel)
+        else:
+            self.git.run(["reset", "--soft", "HEAD~1"], cancel=cancel)
+        return {"message": msg, "first": first}
+
     def last_message(self):
         return self.git.run(["log", "-1", "--format=%B"], lock=False).rstrip("\n")
 

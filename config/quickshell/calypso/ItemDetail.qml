@@ -28,6 +28,13 @@ Item {
   property var win: null
   readonly property var it: win ? win.item : null
   readonly property var d: win ? win.detail : null
+  // BEHIND THE RE-PROMPT, the keys are its field's. A PasswordField draws
+  // and never listens, and nothing handed it a key: every one went to the
+  // search, so a card that asks again could never be opened (user,
+  // 2026-10-14). The window hands them here (win.key) while this is up.
+  readonly property bool asking: !!pane.d && !!pane.d.reprompt
+  function key(e) { return pane.asking && rePw.key(e); }
+  function keyUp(e) { return pane.asking && rePw.keyUp(e); }
   readonly property alias flick: flick
 
   Flickable {
@@ -209,6 +216,8 @@ Item {
         color: Zenon.wash(0.04)
         border.width: 1
         border.color: Zenon.border
+        // a click on it takes the keys back from the search
+        MouseArea { anchors.fill: parent; onClicked: pane.win.takeKeys() }
         Column {
           id: reCol
           anchors.centerIn: parent
@@ -228,6 +237,7 @@ Item {
             width: parent.width
             prompt: "input your master password"
             purpose: "shows this item, once"
+            busy: !!pane.win && pane.win.detailBusy
             onSubmitted: (p) => pane.win.reprompt(p)
           }
         }

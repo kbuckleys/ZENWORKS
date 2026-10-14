@@ -35,7 +35,12 @@ import "../morpheus"
 Item {
   id: cell
   property var host: null
-  property GridView view: null
+  // a GridView, or any Flickable when `rect` places the cursor (picasso's
+  // justified rows, 2026-10-14)
+  property Flickable view: null
+  // { x, y, w, h } in the view's content: the cursor's box, outright. Null
+  // (as terminus has it) is the GridView's cell at `index`.
+  property var rect: null
   property int index: 0
   property bool on: true
   property bool animate: true
@@ -55,7 +60,7 @@ Item {
   // one of these is covered by construction and no call site has to
   // remember. Flickable has no `count`; ListView and GridView both do, and
   // the guard is for the moment before `view` is assigned.
-  readonly property bool filled: !!cell.view && cell.view.count > 0
+  readonly property bool filled: !!cell.view && (cell.rect ? true : cell.view.count > 0)
 
 
 
@@ -90,12 +95,13 @@ Item {
 
     Rectangle {
       id: box
-      readonly property real cw: cell.view ? cell.view.cellWidth : 0
-      readonly property real ch: cell.view ? cell.view.cellHeight : 0
+      // a plain Flickable (rect-placed) has no cells
+      readonly property real cw: cell.view && cell.view.cellWidth !== undefined ? cell.view.cellWidth : 0
+      readonly property real ch: cell.view && cell.view.cellHeight !== undefined ? cell.view.cellHeight : 0
 
-      readonly property real slotX: (cell.index % cell.cols) * box.cw + 4
-      readonly property real slotY:
-        Math.floor(cell.index / cell.cols) * box.ch + 4
+      readonly property real slotX: cell.rect ? cell.rect.x : (cell.index % cell.cols) * box.cw + 4
+      readonly property real slotY: cell.rect ? cell.rect.y
+        : Math.floor(cell.index / cell.cols) * box.ch + 4
 
       x: box.slotX
       y: box.slotY
@@ -136,11 +142,17 @@ Item {
         });
       }
 
-      width: Math.max(0, cw - 8)
+      width: cell.rect ? cell.rect.w : Math.max(0, cw - 8)
+      // only placed by rect do the widths differ; a GridView's never change
+      Behavior on width {
+        enabled: !!cell.rect && cell.animate && cell.slides
+        NumberAnimation { duration: Zenon.fast; easing.type: Zenon.travelEase }
+      }
       // FITTED TO WHAT IS IN THE CELL when the caller says how tall that is
       // (fitH): a one-line name left the bottom of the cell an empty band
       // inside the cursor (user, 2026-10-10). The whole cell otherwise.
-      height: cell.fitH > 0 ? Math.min(Math.max(0, ch - 8), cell.fitH) : Math.max(0, ch - 8)
+      height: cell.rect ? cell.rect.h
+        : cell.fitH > 0 ? Math.min(Math.max(0, ch - 8), cell.fitH) : Math.max(0, ch - 8)
       Behavior on height {
         enabled: cell.animate && cell.slides
         NumberAnimation { duration: Zenon.fast; easing.type: Zenon.travelEase }

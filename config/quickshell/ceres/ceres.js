@@ -428,16 +428,44 @@ function failureOf(lines) {
 //   :: Conflicts found:
 //       nodejs-lts-krypton: nodejs          ← coming in: what it replaces
 //
+// Or pacman's own form of the same refusal, when paru hands the targets
+// straight on (2026-10-14: bitwarden-cli wanted nodejs-lts-jod):
+//
+//   :: nodejs-lts-jod-22.23.3-2 and nodejs-26.11.1-1 are in conflict. Remove nodejs? [y/N]
+//   error: unresolvable package conflicts detected
+//
+// read as the same "nodejs-lts-jod replaces nodejs" (--useask answers it).
+//
 // null when the log holds no refused conflict — a provider menu alone was
 // answered (with the first) and is not why anything failed.
+// "nodejs-lts-jod-22.23.3-2" → "nodejs-lts-jod": pacman names a package
+// there with its version and release
+function stripVersion(s) {
+  const m = /^(.+)-[^-]+-\d+(?:\.\d+)?$/.exec(String(s));
+  return m ? m[1] : String(s);
+}
 function settleOf(lines) {
   const ls = (lines || []).map(l => String(l));
-  if (!ls.some(l => /can not install conflicting packages with --noconfirm/i.test(l))) return null;
+  const refused = ls.some(l => /can not install conflicting packages with --noconfirm/i.test(l))
+    || (ls.some(l => /unresolvable package conflicts detected/i.test(l))
+        && ls.some(l => /^::\s*\S+ and \S+ are in conflict/.test(l.trim())));
+  if (!refused) return null;
   const providers = [], conflicts = [];
   let prov = null, section = "";
   for (const raw of ls) {
     const l = raw.replace(/^Enter a number \(default=\d+\):\s*/, "");
-    let m = /^::\s*There are \d+ providers available for (\S+?):?$/.exec(l.trim());
+    // pacman's question (with "Remove X?" naming the installed one bare) or
+    // its echo in the error, once per pair
+    let m = /^::\s*(\S+) and (\S+) are in conflict(?:\s*\(([^)]*)\))?\.?(?:\s*Remove (\S+)\?)?/.exec(l.trim());
+    if (m) {
+      const pkg = stripVersion(m[1]);
+      const gone = m[4] || stripVersion(m[2]);
+      if (!conflicts.some(c => c.pkg === pkg && c.replaces.indexOf(gone) >= 0))
+        conflicts.push({ pkg: pkg, replaces: [gone], inner: false });
+      section = "";
+      continue;
+    }
+    m = /^::\s*There are \d+ providers available for (\S+?):?$/.exec(l.trim());
     if (m) { prov = { name: m[1], options: [] }; providers.push(prov); section = "prov"; continue; }
     if (/^::\s*Repository /.test(l.trim()) && section === "prov") continue;
     m = /^::\s*(Inner conflicts|Conflicts) found:?$/i.exec(l.trim());
@@ -457,6 +485,32 @@ function settleOf(lines) {
     }
   }
   return { providers: providers.filter(p => p.options.length > 1), conflicts: conflicts };
+}
+
+// What still needs each package a settle would remove: `pacman -Qi a b`
+// prints one block per package; its "Required By" is who breaks (or must be
+// satisfied by what replaces it). { name: [requirers] }
+function requiredByOf(text) {
+  const out = {};
+  for (const block of String(text ?? "").split(/\n\s*\n/)) {
+    const info = parseInfo(block);
+    const n = info.map["Name"];
+    if (n) out[n] = listField(info.map["Required By"]);
+  }
+  return out;
+}
+function requiredByCommand(names) {
+  return "LC_ALL=C pacman -Qi -- " + (names || []).map(q).join(" ") + " 2>/dev/null";
+}
+
+// What a transaction is, for its title: an update (-Syu), an install of
+// named packages (-S), a removal (-R), or something else (a cache sweep).
+function txKindOf(steps) {
+  const ss = (steps || []).filter(a => a && a[0] !== "@sudo" && a[0] !== "@user");
+  if (ss.some(a => /^-S\w*u/.test(a[0] || "") || /^-S\w*y/.test(a[0] || ""))) return "update";
+  if (ss.length && ss.every(a => /^-S/.test(a[0] || ""))) return "install";
+  if (ss.length && ss.every(a => /^-R/.test(a[0] || ""))) return "remove";
+  return ss.length ? "update" : "other";
 }
 
 // The same steps, now answered. `choices` maps a provider menu's name to

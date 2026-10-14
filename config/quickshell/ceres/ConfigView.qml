@@ -530,65 +530,19 @@ Item {
   // Separate chips for two different choices read as one list of five, and
   // wrapping could split a choice across two lines; a bar wraps whole.
   // `options` is [[value, label], …]; `dim` is the inherited look.
-  component Segmented: Rectangle {
-    id: seg
-    property var options: []
+  // ── THE SUITE'S SWITCH (user, 2026-10-14) ───────────────────────────
+  // Settings → Signatures' bars are terminus' Segments now, the one sliding
+  // highlight every switch in the suite has. Inherited (`dim`) is the same
+  // switch held back, so a value the file does not set reads as a default.
+  component Segmented: Segments {
     property string value: ""
     property bool dim: false
     signal picked(string value)
-    width: segRow.implicitWidth + 4
-    height: 32
-    radius: Zenon.windowRadius
-    color: "transparent"
-    border.width: 1
-    border.color: Zenon.border
-    Row {
-      id: segRow
-      anchors.centerIn: parent
-      Repeater {
-        model: seg.options
-        delegate: Item {
-          id: part
-          required property var modelData
-          required property int index
-          readonly property bool lit: seg.value === part.modelData[0]
-          width: partText.implicitWidth + 18
-          height: 28
-          // between two unchosen options only: the fill is its own edge
-          Rectangle {
-            visible: part.index > 0 && !part.lit
-              && seg.value !== seg.options[part.index - 1][0]
-            anchors.left: parent.left
-            anchors.verticalCenter: parent.verticalCenter
-            width: 1
-            height: 16
-            color: Zenon.border
-          }
-          Rectangle {
-            anchors.fill: parent
-            visible: part.lit
-            radius: Zenon.windowRadius - 1
-            // INHERITED, not chosen: an outline in the muted ink over a faint
-            // fill — it was a grey fill with no edge, which read as nothing
-            // picked at all
-            color: seg.dim ? Zenon.wash(0.05)
-              : Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b, 0.2)
-            border.width: 1
-            border.color: seg.dim ? Qt.rgba(Zenon.muted.r, Zenon.muted.g, Zenon.muted.b, 0.7) : Zenon.cyan
-          }
-          Text {
-            id: partText
-            anchors.centerIn: parent
-            text: part.modelData[1]
-            color: part.lit ? (seg.dim ? Zenon.keyInk : Zenon.cyan) : Zenon.muted
-            font.family: Zenon.face
-            font.weight: Zenon.weight
-            font.pixelSize: Zenon.px(15)
-          }
-          TapHandler { onTapped: seg.picked(part.modelData[0]) }
-        }
-      }
-    }
+    current: value
+    textSize: Zenon.px(14)
+    pad: 22
+    opacity: dim ? 0.55 : 1
+    onChose: (v) => picked(v)
   }
 
   // A line of text, committed on return or when it lets go; Esc puts it back.
