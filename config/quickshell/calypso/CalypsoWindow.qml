@@ -1694,7 +1694,8 @@ FloatingWindow {
       HintRow {
         rows: win.hintRows
         anchors.verticalCenter: parent.verticalCenter
-        x: 16
+        // only keys in this strip: centred (no button ever joins it)
+        x: Math.round((foot.width - width) / 2)
         maxWidth: foot.width - 32
       }
     }

@@ -1974,7 +1974,9 @@ FloatingWindow {
         id: footHints
         rows: win.hintRows
         anchors.verticalCenter: parent.verticalCenter
-        x: 16
+        // centred while the strip is only keys; at the left once a button
+        // joins it (as ceres' foot) — a Row of hidden children is zero wide
+        x: footBtns.width > 0 ? 16 : Math.round((foot.width - width) / 2)
         maxWidth: foot.width - 32 - (footBtns.width > 0 ? footBtns.width + 36 : 0)
       }
       Row {

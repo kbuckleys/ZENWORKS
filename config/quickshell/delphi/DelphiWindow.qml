@@ -293,6 +293,7 @@ FloatingWindow {
         if (o.then) o.then(res);
       } else if (err && err.kind === "cancelled") {
         win.say((o.label || "That") + " — stopped");
+        if (o.stopped) o.stopped();
       } else {
         if (o.failed) o.failed(err);
         else win.fail((o.label || "That") + " did not work", null, err);
@@ -398,11 +399,11 @@ FloatingWindow {
       const remote = win.remotes.find((r) => r.name === "origin") ? "origin" : win.remotes[0].name;
       win.pushShow([remote]);
       win.act("push", { remote: remote, branch: b.head, setUpstream: true },
-              { label: "Pushing", network: true, said: "Published " + b.head + " to " + remote, done: win.pushEnd });
+              { label: "Pushing", network: true, said: "Published " + b.head + " to " + remote, stopped: () => win.pushEnd(false, true), done: (ok) => win.pushEnd(ok) });
       return;
     }
     win.pushShow([b.upstream.split("/")[0]]);
-    win.act("push", {}, { label: "Pushing", network: true, said: "Pushed", then: () => win.watchCi(), done: win.pushEnd,
+    win.act("push", {}, { label: "Pushing", network: true, said: "Pushed", then: () => win.watchCi(), stopped: () => win.pushEnd(false, true), done: (ok) => win.pushEnd(ok),
       failed: (err) => {
         const t = String(err && err.error || "");
         if (/rejected|non-fast-forward|fetch first/.test(t)) {
@@ -523,6 +524,8 @@ FloatingWindow {
         label: "Pushing to " + r + (names.length > 1 ? "  (" + (i + 1) + " of " + names.length + ")" : ""),
         network: true, refresh: false,
         then: () => { done.push(r); next(i + 1); },
+        // stopped: the rest are not gone on to, and the push is over
+        stopped: () => { win.pushEnd(false, true); win.refresh(); },
         failed: (err) => { bad.push(r); win.fail("Push to " + r + " did not work", null, err); next(i + 1); } });
     };
     next(0);
@@ -532,7 +535,7 @@ FloatingWindow {
       detail: "Replaces the remote branch with yours. With a lease: refused if it moved since you last fetched.",
       verb: "Force-push", then: () => {
         if (win.branch && win.branch.upstream) win.pushShow([win.branch.upstream.split("/")[0]]);
-        win.act("push", { force: true }, { label: "Pushing", network: true, said: "Pushed", done: win.pushEnd });
+        win.act("push", { force: true }, { label: "Pushing", network: true, said: "Pushed", stopped: () => win.pushEnd(false, true), done: (ok) => win.pushEnd(ok) });
       } });
   }
 
@@ -541,7 +544,7 @@ FloatingWindow {
   // them yet (repo.changelog since it), in a Bubble from the "Pushing" pill
   // for as long as the push runs and a moment after it lands. A branch no
   // remote has yet goes whole: said, not listed.
-  //   { where, commits (null while read), more, state going|done|failed }
+  //   { where, commits (null while read), more, state going|done|failed|stopped }
   property var pushing: null
   readonly property int pushListMax: 12
   function pushShow(names) {
@@ -564,9 +567,10 @@ FloatingWindow {
         commits: list.slice(0, win.pushListMax), more: Math.max(0, list.length - win.pushListMax) });
     });
   }
-  function pushEnd(ok) {
-    if (!win.pushing) return;
-    win.pushing = Object.assign({}, win.pushing, { state: ok ? "done" : "failed" });
+  function pushEnd(ok, stopped) {
+    // once: a stopped push is also done (act's done after its stopped)
+    if (!win.pushing || win.pushing.state !== "going") return;
+    win.pushing = Object.assign({}, win.pushing, { state: ok ? "done" : stopped ? "stopped" : "failed" });
     pushLinger.restart();
   }
   Timer { id: pushLinger; interval: 2600; onTriggered: win.pushing = null }
@@ -1568,7 +1572,9 @@ FloatingWindow {
       HintRow {
         rows: win.hintRows
         anchors.verticalCenter: parent.verticalCenter
-        x: 16
+        // centred while the strip is only keys; at the left once a button
+        // joins it (as ceres' foot) — a Row of hidden children is zero wide
+        x: footBtns.width > 0 ? 16 : Math.round((foot.width - width) / 2)
         maxWidth: foot.width - 32 - (footBtns.width > 0 ? footBtns.width + 36 : 0)
       }
       Row {

@@ -26,9 +26,11 @@ Column {
     width: ps.lineWidth
     horizontalAlignment: ps.centered ? Text.AlignHCenter : Text.AlignLeft
     elide: Text.ElideRight
-    text: (ps.q.state === "done" ? "Pushed to " : ps.q.state === "failed" ? "Not pushed to " : "Pushing to ")
+    text: (ps.q.state === "done" ? "Pushed to " : ps.q.state === "failed" ? "Not pushed to "
+           : ps.q.state === "stopped" ? "Stopped pushing to " : "Pushing to ")
       + ps.q.where + "  ·  " + ps.q.branch
-    color: ps.q.state === "done" ? Zenon.green : ps.q.state === "failed" ? Zenon.red : Zenon.ink
+    color: ps.q.state === "done" ? Zenon.green : ps.q.state === "failed" ? Zenon.red
+      : ps.q.state === "stopped" ? Zenon.yellow : Zenon.ink
     font.family: Zenon.face
     font.weight: Font.Bold
     font.pixelSize: Zenon.px(ps.centered ? 17 : 14)
