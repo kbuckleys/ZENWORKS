@@ -23,6 +23,9 @@ hl.layer_rule({ match = { namespace = ".*" }, blur = true, ignore_alpha = 0.5 })
 hl.layer_rule({ match = { namespace = "morpheus-bar(-clear)?" }, animation = "none" })
 -- the pill with oracle's Blur behind off: after the global rule, so it wins
 hl.layer_rule({ match = { namespace = "morpheus-bar-clear" }, blur = false })
+-- cerberus' black veil, faded in before the lock and out after it: no map
+-- animation to fight its own fade, and no blur to pop in at half alpha
+hl.layer_rule({ match = { namespace = "cerberus-veil" }, animation = "none", blur = false })
 
 -- SPECIAL WORKSPACE
 hl.workspace_rule({ workspace = "special:special", gaps_out = 30 })

@@ -239,7 +239,7 @@ LayerPopup {
     if (popup.exampleMode)
       return [["tab", "examples"], ["return", "try it"], ["esc", "close"]];
     if (popup.completion !== "")
-      return (popup.chips.length > 0 ? [["→", "finish word"], ["return", "paste"], ["tab", "units"]]
+      return (popup.chips.length > 0 ? [["→", "finish word"], ["return", popup.chipIdx >= 0 ? "copy" : "paste"], ["tab", "units"]]
         : [["→", "finish word"], ["return", "paste"]]).concat([["esc", "clear · close"]]);
     if (popup.shownWhich)
       return [["tab", "pick one"], ["return", "use it"], ["esc", "clear · close"]];
@@ -248,7 +248,8 @@ LayerPopup {
         ? [["tab", "did you mean"], ["return", "use it"], ["esc", "clear · close"]]
         : [["esc", "clear · close"], ["↑↓", "history"]];
     return (popup.chips.length > 0
-        ? [["return", "paste"], ["ctrl return", "copy"], ["tab", "units"]]
+        ? (popup.chipIdx >= 0 ? [["return", "copy"], ["tab", "units"]]
+           : [["return", "paste"], ["ctrl return", "copy"], ["tab", "units"]])
         : [["return", "paste"], ["ctrl return", "copy"]])
       .concat(popup.shownPrep && popup.shownPrep.assign ? [["return", "save " + popup.shownPrep.assign]] : [])
       .concat(popup.shownPrep && popup.shownPrep.forget ? [["return", "forget it"]] : [])
@@ -998,7 +999,10 @@ LayerPopup {
       else shake.restart();   // nothing to take: said with a shake
       return;
     }
-    if (copyOnly) popup.copyOnly(popup.pickText);
+    // a chip is copied, as a click on it is — never typed: wtype sent it
+    // into whatever had the focus next, a terminal read it as keys (user,
+    // 2026-10-14). Only the answer itself still pastes.
+    if (copyOnly || (popup.chipMode === "units" && popup.chipIdx >= 0)) popup.copyOnly(popup.pickText);
     else popup.copyPaste(popup.pickText);
   }
 
@@ -1783,12 +1787,12 @@ LayerPopup {
                   }
                   if (popup.chipMode !== "units") return;
                   popup.bubbleAt(unitChip, Metis.chipFacts(modelData, popup.shownResult, popup.shownKind)
-                    .concat([{ text: "click copies · tab, then return, pastes", muted: true }]));
+                    .concat([{ text: "click copies · tab, then return, copies", muted: true }]));
                 }
                 // A CLICK COPIES, as a click on the answer does; it never
                 // types. It used to close the panel and wtype the value into
                 // whatever had the focus next — a terminal, an editor — which
-                // read it as keys (user, 2026-10-14). Return still pastes.
+                // read it as keys (user, 2026-10-14). Return copies a chip too.
                 onClicked: popup.chipMode === "fix"
                   ? popup.applyFix(modelData) : popup.copyStay(modelData)
               }

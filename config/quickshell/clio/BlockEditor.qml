@@ -1422,6 +1422,21 @@ Item {
           }
         }
         if (!h.it.isText) return;
+        // a third click on the word just doubled: its whole row (the
+        // press comes as a plain one after a double click, so it is
+        // caught here — the double click's handler never sees it)
+        const t3 = overlay.tripleAt;
+        if (!shift && overlay.tripleTimer.running && t3 && t3.i === h.i && Math.abs(m.x - t3.x) + Math.abs(m.y - t3.y) < 10) {
+          overlay.tripleTimer.stop();
+          overlay.tripleAt = null;
+          ed.cross = null;
+          ed.mediaSel = "";
+          h.it.te.forceActiveFocus();
+          h.it.te.selectAll();
+          ed.anchor = { i: h.i, p: 0 };
+          overlay.downAt = null;
+          return;
+        }
         const pos = h.it.posAt(h.x, h.y);
         if (shift && (ed.cursorKey !== "" || ed.cross)) {
           if (!ed.anchor) { const cur = ed.current(); ed.anchor = cur ? { i: ed.indexOf(cur.key), p: cur.te.cursorPosition } : { i: h.i, p: pos }; }
@@ -1460,12 +1475,13 @@ Item {
         if (c && (c.act === "media")) { ed.mediaOpened(ed.blockOf(h.it.key)); return; }
         if (c && c.act === "file") { ed.fileOpened(ed.blockOf(h.it.key)); return; }
         if (!h.it.isText) return;
-        // a word; a third click (within the double-click time) the line
-        if (overlay.tripleTimer.running) { h.it.te.selectAll(); return; }
+        // a word; a third click (see onPressed) the row
         h.it.te.cursorPosition = h.it.posAt(h.x, h.y);
         h.it.te.selectWord();
+        overlay.tripleAt = { i: h.i, x: m.x, y: m.y };
         overlay.tripleTimer.restart();
       }
+      property var tripleAt: null
       readonly property Timer tripleTimer: Timer { interval: 400 }
     }
     // after the overlay, so what is in it takes its own clicks

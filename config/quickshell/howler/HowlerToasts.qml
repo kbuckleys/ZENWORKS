@@ -90,8 +90,20 @@ PanelWindow {
   readonly property real slideY: toasts.sideways ? 0
     : (toasts.atTop ? -Howler.slideByV : Howler.slideByV)
 
-  readonly property real stackW: Math.min(Howler.maxWidth,
-    Howler.width + Howler.iconSize + Howler.padding * 4 + Howler.borderSize * 2)
+  // WIDER WHILE A CAPTURE IS UP. A screenshot toast is its picture at
+  // Howler.captureWidth, and a card wider than the lane hangs past the mask —
+  // its buttons would be drawn where no click lands. So the lane grows for as
+  // long as one is on screen, and goes back once it has gone.
+  readonly property bool anyCapture: {
+    const v = toasts.rows ? toasts.rows.values : [];
+    for (let i = 0; i < v.length; ++i)
+      if (v[i] && v[i].hints && v[i].hints["x-howler-capture"]) return true;
+    return false;
+  }
+  readonly property real stackW: Math.max(
+    Math.min(Howler.maxWidth,
+      Howler.width + Howler.iconSize + Howler.padding * 4 + Howler.borderSize * 2),
+    toasts.anyCapture ? Howler.captureWidth : 0)
 
   Column {
     id: column
@@ -112,6 +124,13 @@ PanelWindow {
     x: toasts.side === "left" ? 16
      : toasts.side === "right" ? toasts.width - column.width - 16
      : (toasts.width - column.width) / 2
+    // The lane widening for a capture moves the column; the toasts already
+    // up glide over rather than jumping. Only while there is something on
+    // screen to see it — an empty stack just goes where it is told.
+    Behavior on x {
+      enabled: toasts.busy
+      NumberAnimation { duration: Howler.openMs; easing.type: Zenon.travelEase }
+    }
     y: toasts.atTop ? column.lift : toasts.height - column.height - column.lift
 
     HowlerOsd {
@@ -176,6 +195,47 @@ PanelWindow {
         visible: !toast.hushed
 
         readonly property bool hasIcon: Howler.iconsEnabled && toast.source !== ""
+
+        // ── A CAPTURE IS ITS PICTURE ─────────────────────────────────
+        // A screenshot or a recording says so in two hints — the kind and
+        // the file — and sends the picture as its image (for a recording,
+        // a frame pulled out of it). Such a toast is drawn as that picture
+        // and nothing else: no title, no body, no icon beside words, with
+        // its buttons over the bottom of it. A picture that will not load
+        // falls back to an ordinary toast, which still says what happened.
+        readonly property var hints: toast.modelData ? (toast.modelData.hints || ({})) : ({})
+        readonly property string captureKind: {
+          const k = String(toast.hints["x-howler-capture"] || "");
+          return k === "shot" || k === "video" ? k : "";
+        }
+        readonly property string captureFile: String(toast.hints["x-howler-file"] || "")
+        // THE PICTURE BY ITS PATH, never through `source`. That one hands
+        // anything not starting with "/" to the icon theme, and notify-send
+        // can deliver its -i path as a file:// url — which the icon provider
+        // "found" as an empty image: Ready, no size, no error, and a blank
+        // card. The notification's own image did no better for a recording's
+        // frame, so that is named outright too: a screenshot IS its file, and
+        // a recording sends the path of its frame in x-howler-picture.
+        readonly property string capPicture: {
+          const f = toast.captureKind === "shot" ? toast.captureFile
+            : String(toast.hints["x-howler-picture"] || "");
+          return f === "" ? "" : "file://" + f;
+        }
+        // A picture that loaded as nothing is no picture either.
+        readonly property bool capture: toast.captureKind !== "" && toast.captureFile !== ""
+          && toast.capPicture !== "" && capImg.status !== Image.Error
+          && !(capImg.status === Image.Ready && capImg.implicitWidth <= 0)
+        // THE PICTURE'S OWN SHAPE. Full width unless that would pass the
+        // maximum height, in which case it narrows — a tall window shot is
+        // a tall card, not a wide one with most of it cut off. Past the
+        // floor it is cropped instead, which only an extreme shape reaches.
+        // 16:9 until the picture has said otherwise.
+        readonly property real capRatio: capImg.implicitWidth > 0
+          ? capImg.implicitHeight / capImg.implicitWidth : 9 / 16
+        readonly property int capW: Math.max(Math.min(260, Howler.captureWidth),
+          Math.min(Howler.captureWidth, Math.round(Howler.maxHeight / toast.capRatio)))
+        readonly property int capH: Math.min(Howler.maxHeight,
+          Math.max(120, Math.round(toast.capW * toast.capRatio)))
         readonly property string source: {
           const r = toast.modelData;
           if (!r) return "";
@@ -323,7 +383,7 @@ PanelWindow {
         // rectangle, so asking it how tall it wants to be while it is sized
         // by the answer is a loop — and a ListView resolves that loop to a
         // zero-height delegate, which is a stack of nothing at all.
-        height: toast.hushed ? 0 : Math.min(Howler.maxHeight,
+        height: toast.hushed ? 0 : toast.capture ? toast.capH : Math.min(Howler.maxHeight,
           Math.max(Howler.minHeight,
             Math.max(iconBox.height + Howler.iconPadding * 2,
                      text.implicitHeight + Howler.padding * 2)))
@@ -383,8 +443,14 @@ PanelWindow {
         Component.onCompleted: {
           toast.player = toast.modelData
             ? Howler.playerFor(toast.modelData) : "";
-          arrive.start();
+          // A CAPTURE ARRIVES ONCE ITS PICTURE IS IN. Until then the card
+          // does not know its own shape, and one that arrived at 16:9 and
+          // then snapped tall was a card changing its mind in front of you.
+          if (toast.captureKind !== "" && capImg.status === Image.Loading)
+            toast.waiting = true;
+          else arrive.start();
         }
+        property bool waiting: false
 
         ParallelAnimation {
           id: arrive
@@ -469,7 +535,7 @@ PanelWindow {
         ClippingRectangle {
           id: card
           anchors.horizontalCenter: parent.horizontalCenter
-          width: toast.cardW
+          width: toast.capture ? toast.capW : toast.cardW
           height: parent.height
           radius: Howler.radius
           color: Howler.bg
@@ -478,8 +544,99 @@ PanelWindow {
 
           HoverHandler { id: toastHov }
 
+          // ── THE CAPTURE ──────────────────────────────────────────────
+          // Inside the border, so the card's edge is still drawn round it.
+          // Decoded at twice the widest a card can be, which is sharp on a
+          // scaled output and still nothing like the size of a 4K png.
+          Item {
+            id: capView
+            anchors.fill: parent
+            anchors.margins: Howler.borderSize
+            visible: toast.capture
+
+            Image {
+              id: capImg
+              anchors.fill: parent
+              fillMode: Image.PreserveAspectCrop
+              asynchronous: true
+              cache: false
+              sourceSize.width: Howler.captureWidth * 2
+              source: toast.capPicture
+              onStatusChanged: if (toast.waiting && status !== Image.Loading) {
+                toast.waiting = false;
+                arrive.start();
+              }
+            }
+
+            // A recording says it is one; a still and a video are otherwise
+            // the same rectangle of picture.
+            Text {
+              anchors.centerIn: parent
+              visible: toast.captureKind === "video"
+              text: "\uF04B"
+              color: Zenon.white
+              opacity: 0.85
+              style: Text.Outline
+              styleColor: Howler.bg
+              font.family: Zenon.glyphFace
+              font.pixelSize: 40
+            }
+
+            // ── AND WHAT YOU CAN DO WITH IT ────────────────────────────
+            // No Open among them: the toast itself opens it, on a click.
+            // On hover, like the transport: the picture is the message, and
+            // a row of buttons across it for its whole life would be the
+            // thing you see instead. Glyphs, floating ON the picture rather
+            // than in a strip of their own, each on a disc of the card's
+            // glass so they read over a white screenshot and a black one.
+            Row {
+              id: capBar
+              anchors.horizontalCenter: parent.horizontalCenter
+              anchors.bottom: parent.bottom
+              anchors.bottomMargin: Howler.padding
+              spacing: 8
+              opacity: toastHov.hovered ? 1 : 0
+              visible: opacity > 0
+              Behavior on opacity {
+                NumberAnimation { duration: Zenon.fast; easing.type: Zenon.ease }
+              }
+
+              Repeater {
+                model: [
+                  { glyph: "\uF07C", act: "reveal" },
+                  { glyph: "\uF040", act: "annotate" }
+                ].filter(b => b.act !== "annotate" || toast.captureKind === "shot")
+
+                delegate: Item {
+                  required property var modelData
+                  width: capBtn.width
+                  height: capBtn.height
+                  // the glass under the button's own wash, which keeps its
+                  // pressed tint
+                  Rectangle {
+                    anchors.fill: parent
+                    radius: capBtn.radius
+                    color: Howler.bg
+                  }
+                  DialogButton {
+                    id: capBtn
+                    glyph: true
+                    label: parent.modelData.glyph
+                    onClicked: {
+                      const a = parent.modelData.act;
+                      if (a === "reveal") Howler.captureReveal(toast.captureFile);
+                      else Howler.captureAnnotate(toast.captureFile);
+                      toast.goAway();
+                    }
+                  }
+                }
+              }
+            }
+          }
+
           Item {
             id: inner
+            visible: !toast.capture
             anchors.fill: parent
             anchors.margins: Howler.padding
             // THE PICTURE DOES NOT WANT THE TEXT'S GUTTER. The wide side inset
@@ -684,6 +841,12 @@ PanelWindow {
             onTapped: {
               const n = toast.modelData;
               if (!n) return;
+              // A capture clicked is a capture opened, whatever it carries.
+              if (toast.capture) {
+                Howler.captureOpen(toast.captureKind, toast.captureFile);
+                toast.goAway();
+                return;
+              }
               if (toast.defaultAct) { toast.defaultAct.invoke(); return; }
               const acts = n.actions || [];
               if (acts.length > 0) { acts[0].invoke(); return; }

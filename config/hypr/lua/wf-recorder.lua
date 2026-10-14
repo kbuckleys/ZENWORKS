@@ -22,7 +22,22 @@ if pgrep -x wf-recorder >/dev/null; then
   done
   file=$(cat "$output_dir/.active-recording" 2>/dev/null)
   if [ -n "$file" ] && [ -f "$file" ]; then
-    notify-send -u low "󰕧 Recording Stopped" "$file"
+    # howler's capture card: a frame of the recording, with the hints that
+    # say what it is a frame of. A recording too short to seek a second
+    # into gives its first frame instead; no frame at all is a plain toast.
+    thumb="${XDG_RUNTIME_DIR:-/tmp}/howler-capture-$(basename "$file" .mp4).png"
+    # (ffmpeg seeking past the end still exits 0, having written nothing,
+    # so the fallback goes by whether the file is there, not by the status)
+    rm -f "$thumb"
+    ffmpeg -nostdin -loglevel quiet -y -ss 1 -i "$file" -frames:v 1 "$thumb"
+    [ -s "$thumb" ] || ffmpeg -nostdin -loglevel quiet -y -i "$file" -frames:v 1 "$thumb"
+    if [ -s "$thumb" ]; then
+      notify-send -i "$thumb" -h string:x-howler-capture:video -h "string:x-howler-file:$file" \
+        -h "string:x-howler-picture:$thumb" \
+        "󰕧 Recording Stopped" "$file"
+    else
+      notify-send -u low "󰕧 Recording Stopped" "$file"
+    fi
   else
     notify-send "󰕧 Recording Stopped"
   fi

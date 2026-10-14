@@ -907,7 +907,7 @@ FloatingWindow {
     Rectangle {
       anchors.horizontalCenter: pane.horizontalCenter
       anchors.bottom: foot.top
-      anchors.bottomMargin: 18
+      anchors.bottomMargin: 18 + pane.findH
       width: Math.min(saidText.implicitWidth + 32, 560)
       height: 34
       radius: Zenon.windowRadius
@@ -940,7 +940,13 @@ FloatingWindow {
         view: modelData
         below: true
         follow: true
-        bar: foot
+        // the note's find bar sits over the hint strip: both are chrome,
+        // frosted as one from the note's foot down (no bar named, or the
+        // find bar is the unfrosted gap) — and under the pane, so its
+        // fields draw over the frost
+        readonly property bool note: modelData === pane.editor.flick
+        bar: note && pane.finding ? null : foot
+        z: note ? -0.5 : 0
         visible: modelData.visible
       }
     }

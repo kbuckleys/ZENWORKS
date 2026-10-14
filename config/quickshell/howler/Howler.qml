@@ -124,6 +124,7 @@ Singleton {
   readonly property int maxHeight:    Oracle.notifMaxHeight
   readonly property int width:        Oracle.notifWidth
   readonly property int maxWidth:     Oracle.notifMaxWidth
+  readonly property int captureWidth: Math.min(Oracle.notifMaxWidth, Oracle.notifCaptureWidth)
   readonly property int lift:         Oracle.notifLift
   readonly property bool markup:      Oracle.notifMarkup
 
@@ -202,6 +203,10 @@ Singleton {
     bodyMarkupSupported: true
     imageSupported: true
     persistenceSupported: true
+    // A CAPTURE SAYS SO IN ITS HINTS — what kind (`shot` or `video`), which
+    // file, and for a recording which picture of it — and is drawn as its picture with buttons of its own. The
+    // server drops every hint it was not asked to keep, so these are named.
+    extraHints: ["x-howler-capture", "x-howler-file", "x-howler-picture"]
 
     onNotification: (notif) => {
       // TRACKED FIRST. An untracked notification is closed the moment this
@@ -303,6 +308,24 @@ Singleton {
   // at the next restart and oracle's own panel never saw it change.
   function toggleMusicTracking() {
     Oracle.set("notifTrackMusic", !Oracle.notifTrackMusic);
+  }
+
+  // ── WHAT A CAPTURE TOAST'S BUTTONS DO ───────────────────────────────────
+  // Through each program's own IPC, the way clio and the viewer reach
+  // terminus — howler asks, and the program that owns the verb does it. A
+  // picture opens in picasso's viewer; a recording in whatever the desktop
+  // plays video with, since nothing in this shell does.
+  function captureOpen(kind, file) {
+    if (file === "") return;
+    Quickshell.execDetached(kind === "shot"
+      ? ["qs", "ipc", "call", "Picasso", "view", file]
+      : ["xdg-open", file]);
+  }
+  function captureReveal(file) {
+    if (file !== "") Quickshell.execDetached(["qs", "ipc", "call", "Terminus", "reveal", file]);
+  }
+  function captureAnnotate(file) {
+    if (file !== "") Quickshell.execDetached(["qs", "ipc", "call", "Picasso", "annotate", file]);
   }
 
   // ONE row. A notification id is the server's, and the server numbers from

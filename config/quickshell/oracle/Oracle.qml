@@ -344,6 +344,11 @@ Singleton {
   // everything instead, which is the opposite of fitting.
   property int notifWidth: 200
   property int notifMaxWidth: 800
+  // A SCREENSHOT OR A RECORDING IS ITS PICTURE. That toast is the capture
+  // and nothing else, so it wants room to be recognised in rather than the
+  // width its words would earn — this wide, unless maximum width says less,
+  // and narrower still when a tall capture would pass the maximum height.
+  property int notifCaptureWidth: 480
   // how far the stack floats above the pill
   property int notifLift: 20
   // whether a music player's track change earns a row in the bell's history.
@@ -516,12 +521,11 @@ Singleton {
   property bool lockHideCursor: true
   property real lockShade: 0.6
   property int lockFailLimit: 3
-  // How hard the desktop behind the lock is blurred. See CerberusLock's
-  // blurPipeline: the blur is done ONCE at capture by downsampling, blurring
-  // and upsampling again, so this is the percentage the shot is reduced to —
-  // smaller is blurrier, and the cost is paid at lock time rather than on
-  // every frame.
-  property int lockBlurStrength: 8
+  // How hard the live desktop behind the lock is frosted: Hyprland's blur
+  // passes while locked (at Cerberus' frostSize). Every window's
+  // blur gets it for the length of the lock — see CerberusLock's frost.
+  // 5 (hyprlock's) was too frosty live (user, 2026-10-14)
+  property int lockFrost: 4
   property int lockClockSize: 18
   property int lockDateSize: 14
   // How wide the password field is, as a fraction of the monitor.
@@ -839,6 +843,9 @@ Singleton {
     { key: "notifMaxWidth", section: "notify", label: "Maximum width", type: "int",
       min: 300, max: 1600, step: 20, unit: "px", pairMin: "notifWidth",
       help: "Where it stops growing and wraps instead. Never narrower than the minimum." },
+    { key: "notifCaptureWidth", section: "notify", label: "Capture width", type: "int",
+      min: 240, max: 1200, step: 20, unit: "px",
+      help: "A screenshot or recording toast is the capture itself, this wide. Maximum width still has the last word." },
     { key: "notifLift", section: "notify", label: "Gap above the pill", type: "int",
       min: 0, max: 120, step: 2, unit: "px",
       help: "How far the toasts stand off the bar, on whichever edge it is." },
@@ -979,6 +986,9 @@ Singleton {
     { key: "lockShade", section: "idle", label: "Lock dimming", type: "real",
       min: 0, max: 1, step: 0.05,
       help: "How far the blurred desktop is darkened behind the lock." },
+    { key: "lockFrost", section: "idle", label: "Lock frost", type: "int",
+      min: 1, max: 8, step: 1, alias: "blur lock screen frosted",
+      help: "How heavily the desktop behind the lock is blurred. Higher is more frosted." },
     // ── WHEN THE WAY OUT IS OFFERED, NOT HOW MANY TRIES YOU GET ──────
     // pam_faillock decides how many wrong passwords lock the account; this
     // decides when the lock shows the button that clears them. It used to
@@ -991,9 +1001,6 @@ Singleton {
     { key: "lockWidgetMonitor", section: "idle", label: "Lock screen monitor",
       type: "enum", optionsFrom: "screens", open: true, chipW: 208,
       help: "Which output carries the clock and the password field. Automatic uses the main monitor (Display)." },
-    { key: "lockBlurStrength", section: "idle", label: "Lock blur", type: "int",
-      min: 1, max: 40, step: 1, unit: "%",
-      help: "The desktop is shrunk to this, blurred, and blown back up — once, at lock time. Smaller is blurrier." },
     { key: "lockClockSize", section: "idle", label: "Lock clock size", type: "int",
       min: 8, max: 48, step: 1, unit: "pt",
       help: "The time above the password field." },

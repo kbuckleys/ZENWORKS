@@ -25,7 +25,7 @@
 //   ← → h l  space   previous, next      home end   first, last
 //     (zoomed in, ← → h l pan instead — space still steps)
 //   backspace   back to the gallery
-//   ↑ ↓ k j pan    alt+j puts the strip under the picture away, alt+k
+//   ↑ ↓ k j pan    alt+s puts the strip under the picture away and
 //     brings it back (its handle too)
 //   + - 0 1 2   zoom in, out, fit, actual size, double     a double click too
 //   return   actual size, or back to the fit when it is there
@@ -2657,9 +2657,8 @@ FloatingWindow {
       else if (k === Qt.Key_Right || k === Qt.Key_L || k === Qt.Key_PageDown || k === Qt.Key_Space) win.step(1);
       else if (k === Qt.Key_Home) win.go(0);
       else if (k === Qt.Key_End) win.go(win.rows.length - 1);
-      // alt+j puts the strip away, down out of sight; alt+k brings it back
-      else if (alt && k === Qt.Key_J) { if (win.mgr) win.mgr.setStrip(false); }
-      else if (alt && k === Qt.Key_K) { if (win.mgr) win.mgr.setStrip(true); }
+      // alt+s puts the strip away, down out of sight, and brings it back
+      else if (alt && k === Qt.Key_S) win.toggleStrip();
       else if (k === Qt.Key_Up || k === Qt.Key_K) win.panKey(k, 0, 1, e.isAutoRepeat);
       else if (k === Qt.Key_Down || k === Qt.Key_J) win.panKey(k, 0, -1, e.isAutoRepeat);
       else if (k === Qt.Key_Plus || k === Qt.Key_Equal) win.zoomStep(1);
@@ -5307,7 +5306,7 @@ FloatingWindow {
           if (navTab.edge === "left") tips.show(navTab, "Previous", "\u2190");
           else if (navTab.edge === "right") tips.show(navTab, "Next", "\u2192");
           else tips.show(navTab, win.stripShown ? "Put the strip away" : "Show the strip",
-                         win.stripShown ? "alt+j" : "alt+k");
+                         "alt+s");
         }
         onClicked: {
           keys.forceActiveFocus();
@@ -6075,7 +6074,7 @@ FloatingWindow {
         { text: "Slideshow faster", icon: "\uf017", act: "faster", hint: "]" },
         { text: "Shuffle the slideshow", icon: "\uf074", act: "shuffle", mark: win.shuffle },
         { text: "Fullscreen", icon: "\uf065", act: "full", hint: "f" },
-        { text: "The strip", icon: "\uf00a", act: "strip", hint: "alt+j  alt+k", mark: win.stripShown },
+        { text: "The strip", icon: "\uf00a", act: "strip", hint: "alt+s", mark: win.stripShown },
         { text: "Monitor outlines", icon: "\uf108", act: "monitors", hint: "W", mark: stage.monitorsShown },
         { text: "Map of the directory", icon: "\uf279", act: "map", enabled: win.rows.length > 0 },
         { text: "Info", icon: "\uf129", act: "info", hint: "i", mark: win.infoShown }

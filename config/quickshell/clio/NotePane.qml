@@ -190,6 +190,7 @@ Item {
 
   // ── FIND ───────────────────────────────────────────────────────────────
   property bool finding: false
+  readonly property real findH: findBar.height
   function openFind() {
     if (!pane.note || pane.locked) return;
     pane.finding = true;
@@ -249,6 +250,13 @@ Item {
     return { b: f.weight >= Font.Bold && it.te.font.weight < Font.DemiBold, i: f.italic, u: f.underline, s: f.strikeout };
   }
   readonly property string kindHere: { void ed.cursorKey; void ed.rev; const it = ed.current(); return it ? it.kind : ""; }
+  // the caret (or every line chosen) in a Monostyled block: plain text,
+  // so marks, alignment and clearing do nothing there — dimmed on the bar
+  readonly property bool inMono: {
+    void ed.cursorKey; void ed.rev; void ed.cross;
+    const ts = ed.targets();
+    return ts.length > 0 && ts.every((x) => ed.blocks[x] && ed.blocks[x].k === "mono");
+  }
   Rectangle {
     id: formatBar
     readonly property var handler: barHover
@@ -259,7 +267,7 @@ Item {
     width: parent.width
     height: pane.formatUp ? 46 : 0
     clip: true
-    // over the find bar too while it is only hovered
+    // over the note below it
     z: 4.5
     // the head's own ground: the note frosted under it, as under the head
     color: Zenon.headBg
@@ -305,7 +313,7 @@ Item {
             onPressed: ed.setKind(modelData[0])
           }
         }
-        Item { width: 5; height: parent.height; Rectangle { anchors.centerIn: parent; width: 1; height: 18; color: Zenon.border } }
+        Item { width: 21; height: parent.height; Rectangle { anchors.centerIn: parent; width: 1; height: 18; color: Zenon.border } }
         // lists and the quote
         Repeater {
           model: [["bullet", "ctrl shift 7"], ["dash", "ctrl shift 8"], ["number", "ctrl shift 9"], ["check", "ctrl shift l"], ["quote", ""]]
@@ -323,7 +331,7 @@ Item {
             onPressed: ed.setKind(modelData[0])
           }
         }
-        Item { width: 5; height: parent.height; Rectangle { anchors.centerIn: parent; width: 1; height: 18; color: Zenon.border } }
+        Item { width: 21; height: parent.height; Rectangle { anchors.centerIn: parent; width: 1; height: 18; color: Zenon.border } }
         // how the lines sit
         Repeater {
           model: [["", "\uF036", "Along the left"], ["center", "\uF037", "Centred"], ["right", "\uF038", "Along the right"], ["justify", "\uF039", "Justified"]]
@@ -335,12 +343,13 @@ Item {
             size: 26
             glyph: modelData[1]
             litInk: Zenon.cyan
-            lit: (pane.kindHere !== "" || ed.mediaSel !== "") && pane.alignHere === modelData[0]
+            enabled: !pane.inMono
+            lit: enabled && (pane.kindHere !== "" || ed.mediaSel !== "") && pane.alignHere === modelData[0]
             tip: modelData[2]
             onPressed: ed.setAlign(modelData[0])
           }
         }
-        Item { width: 5; height: parent.height; Rectangle { anchors.centerIn: parent; width: 1; height: 18; color: Zenon.border } }
+        Item { width: 21; height: parent.height; Rectangle { anchors.centerIn: parent; width: 1; height: 18; color: Zenon.border } }
         // the marks on the words chosen
         Repeater {
           model: [["b", "", "Bold", "ctrl b"], ["i", "", "Italic", "ctrl i"], ["u", "", "Underline", "ctrl u"], ["s", "", "Strikethrough", "ctrl shift x"]]
@@ -352,33 +361,40 @@ Item {
             size: 26
             glyph: modelData[1]
             litInk: Zenon.cyan
-            lit: !!pane.marksHere[modelData[0]]
+            enabled: !pane.inMono
+            lit: enabled && !!pane.marksHere[modelData[0]]
             tip: modelData[2]
             keys: modelData[3]
             onPressed: ed.mark(modelData[0])
           }
         }
-        Item { width: 5; height: parent.height; Rectangle { anchors.centerIn: parent; width: 1; height: 18; color: Zenon.border } }
+        Item { width: 21; height: parent.height; Rectangle { anchors.centerIn: parent; width: 1; height: 18; color: Zenon.border } }
         ClioTool { anchors.verticalCenter: parent.verticalCenter; pane: formatBar.host; onHoveredChanged: formatBar.host.formatHover(); size: 26; glyph: ""; tip: "Outdent"; keys: "shift tab"; onPressed: ed.indent(-1) }
         ClioTool { anchors.verticalCenter: parent.verticalCenter; pane: formatBar.host; onHoveredChanged: formatBar.host.formatHover(); size: 26; glyph: ""; tip: "Indent"; keys: "tab"; onPressed: ed.indent(1) }
-        ClioTool { anchors.verticalCenter: parent.verticalCenter; pane: formatBar.host; onHoveredChanged: formatBar.host.formatHover(); size: 26; glyph: "\u{F0265}"; tip: "Clear formatting"; onPressed: ed.plainText() }
+        Item { width: 21; height: parent.height; Rectangle { anchors.centerIn: parent; width: 1; height: 18; color: Zenon.border } }
+        ClioTool { anchors.verticalCenter: parent.verticalCenter; pane: formatBar.host; onHoveredChanged: formatBar.host.formatHover(); size: 26; glyph: "\u{F0265}"; tip: "Clear formatting"; enabled: !pane.inMono; onPressed: ed.plainText() }
       }
     }
   }
 
-  Rectangle {
+  // ── FIND IN NOTE ── at the foot of the note, over the hint strip and
+  // dressed as it is (user, 2026-10-14): the note goes on under it frosted
+  // (the window's bottom edge, see ClioWindow), the fields centred
+  Item {
     id: findBar
-    anchors.top: head.bottom
-    anchors.topMargin: formatBar.height
+    anchors.bottom: parent.bottom
     width: parent.width
-    height: pane.finding ? 46 : 0
+    height: pane.finding && pane.win ? pane.win.footH + 8 : 0
     clip: true
     z: 4
-    color: Zenon.headBg
     Behavior on height { NumberAnimation { duration: Zenon.fast; easing.type: Zenon.ease } }
-    Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Zenon.border }
+    Rectangle { anchors.fill: parent; color: Zenon.hintFrostBg }
+    Rectangle { anchors.top: parent.top; width: parent.width; height: 1; color: Zenon.border }
     Row {
-      x: 14
+      id: findRow
+      readonly property real fit: Math.min(1, (findBar.width - 24) / Math.max(1, width))
+      scale: fit
+      x: Math.round((findBar.width - width) / 2)
       anchors.verticalCenter: parent.verticalCenter
       spacing: 8
       Rectangle {
@@ -480,8 +496,8 @@ Item {
   // ── THE EDITOR ─────────────────────────────────────────────────────────
   BlockEditor {
     id: ed
-    anchors.top: findBar.bottom
-    anchors.bottom: parent.bottom
+    anchors.top: formatBar.bottom
+    anchors.bottom: findBar.top
     anchors.left: parent.left
     anchors.right: parent.right
     visible: !!pane.note && !pane.locked && pane.loadedOne
@@ -590,11 +606,11 @@ Item {
 
   // (the format bar kept up moves the editor down, and away again: its
   // frost re-measured each time, or a band of it stayed where the bar was)
-  // (head, format bar and find bar frosted as one strip, from the pane's
+  // (head and format bar frosted as one strip, from the pane's
   // top down to the note — no bar named, see morpheus/ScrollEdge; and
   // re-measured as the bars come and go, or a band of frost stayed where
   // one had been)
-  ScrollEdge { view: ed.flick; follow: true; bar: null; chromeTop: 0; visible: ed.visible; track: [findBar.y, findBar.height, ed.y, formatBar.height] }
+  ScrollEdge { view: ed.flick; follow: true; bar: null; chromeTop: 0; visible: ed.visible; track: [ed.y, formatBar.height] }
 
   // ── MENUS ──────────────────────────────────────────────────────────────
   function formatMenu(x, y) {
@@ -606,14 +622,14 @@ Item {
       k("bullet", "Bulleted list", "ctrl shift 7"), k("dash", "Dashed list", "ctrl shift 8"), k("number", "Numbered list", "ctrl shift 9"),
       k("check", "Checklist", "ctrl shift l"), k("quote", "Block quote"),
       { isSeparator: true },
-      { text: "Bold", icon: "", mark: "ctrl b", run: () => ed.mark("b") },
-      { text: "Italic", icon: "", mark: "ctrl i", run: () => ed.mark("i") },
-      { text: "Underline", icon: "", mark: "ctrl u", run: () => ed.mark("u") },
-      { text: "Strikethrough", icon: "", mark: "ctrl shift x", run: () => ed.mark("s") },
+      { text: "Bold", enabled: !pane.inMono, icon: "", mark: "ctrl b", run: () => ed.mark("b") },
+      { text: "Italic", enabled: !pane.inMono, icon: "", mark: "ctrl i", run: () => ed.mark("i") },
+      { text: "Underline", enabled: !pane.inMono, icon: "", mark: "ctrl u", run: () => ed.mark("u") },
+      { text: "Strikethrough", enabled: !pane.inMono, icon: "", mark: "ctrl shift x", run: () => ed.mark("s") },
       { isSeparator: true },
       { text: "Indent", icon: "", mark: "tab", run: () => ed.indent(1) },
       { text: "Outdent", icon: "", mark: "shift tab", run: () => ed.indent(-1) },
-      { text: "Clear formatting", icon: "\u{F0265}", run: () => ed.plainText() }]
+      { text: "Clear formatting", enabled: !pane.inMono, icon: "\u{F0265}", run: () => ed.plainText() }]
       .concat(!pane.mgr.fontBook ? [] : [{ isSeparator: true },
         { text: pane.isSticky ? "Font for this sticky…" : pane.isEntry ? "Font for the journal…" : "Font for notes…", icon: "\uF031",
           run: () => pane.mgr.chooseFace(pane.isEntry, pane.note) }]));

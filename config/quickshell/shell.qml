@@ -450,8 +450,7 @@ ShellRoot {
 
   function startBarIntro() {
     if (root.barIntroArmed) return;
-    // nothing is arriving while the lock is up; parkIntro holds it at 0 and the
-    // unlock replay is what plays it
+    // nothing is arriving while the lock is up; the unlock replay plays it
     if (cerberus.locked || cerberus.covering) return;
     root.barIntroArmed = true;
     Arrival.note("armed");
@@ -475,10 +474,11 @@ ShellRoot {
     onTriggered: root.startBarIntro()
   }
 
-  // Replay the background zoom and pill slide on unlock. The pill and
-  // background sit at 0 while the lock is up (so no static frame shows through
-  // the fade), then animate 0→1 once on unlock. No 1→0 reset on unlock
-  // itself — that was the static-then-animate double.
+  // Replay the background zoom and pill slide on unlock. NOT parked at 0 while
+  // the lock is up any more: Cerberus' frost is the live desktop, and a parked
+  // pill and background showed through it as black (user, 2026-10-14). They
+  // drop to 0 at the release instead, which Cerberus does under its black
+  // veil, so the reset is never seen and the arrival plays as the veil lifts.
   property double _lastUnlock: 0
   function parkIntro() {
     barIntroTimer.stop();
@@ -490,19 +490,15 @@ ShellRoot {
   Connections {
     target: cerberus
     function onLockedChanged() {
-      if (cerberus.locked) parkIntro();
-      else {
-        const now = Date.now();
-        if (now - root._lastUnlock < 1500) return;
-        root._lastUnlock = now;
-        root.barIntroArmed = true;
-        barIntroTimer.interval = 60;
-        barIntroTimer.restart();
-        Picasso.replayIntro();
-      }
-    }
-    function onCoveringChanged() {
-      if (cerberus.covering) parkIntro();
+      if (cerberus.locked) return;
+      const now = Date.now();
+      if (now - root._lastUnlock < 1500) return;
+      root._lastUnlock = now;
+      root.parkIntro();
+      root.barIntroArmed = true;
+      barIntroTimer.interval = 60;
+      barIntroTimer.restart();
+      Picasso.replayIntro();
     }
   }
 

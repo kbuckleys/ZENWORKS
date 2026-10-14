@@ -177,18 +177,19 @@ Scope {
   // a shell that died with the pointer hidden gives it back when it starts
   Component.onCompleted: Picasso.showCursor(true)
 
-  // Clipboard, and the toast. -w and a default action, the way ceres' update
-  // toast does it: howler invokes `default` on a left click and notify-send
-  // prints its name, so the click is heard by the shell this spawned — which
-  // then asks picasso for the annotation window. Detached, so any number of
-  // screenshots can each be waiting on their own toast.
+  // Clipboard, and the toast. The toast is howler's capture card — the
+  // screenshot itself, with Open, Show in terminus and Annotate on it — and
+  // the two hints are what make it one: what kind of capture, and which file.
+  // The words are still sent, for the bell's history, which draws rows of
+  // text. Howler does the buttons through picasso's own IPC, so nothing here
+  // waits on the toast.
   function announce(file) {
     const name = file.split("/").pop();
     Quickshell.execDetached(["sh", "-c",
       "wl-copy --type image/png < " + cap.sh(file) + "; "
-      + "a=$(notify-send -a picasso -i " + cap.sh(file) + " -w -A default=Annotate "
-      + cap.sh("Screenshot saved") + " " + cap.sh(name + " · copied · click to annotate") + "); "
-      + "[ \"$a\" = default ] && qs ipc call Picasso annotate " + cap.sh(file)]);
+      + "notify-send -a picasso -i " + cap.sh(file)
+      + " -h string:x-howler-capture:shot -h string:x-howler-file:" + cap.sh(file) + " "
+      + cap.sh("Screenshot saved") + " " + cap.sh(name + " · copied")]);
   }
 
   // ── the region ────────────────────────────────────────────────────────

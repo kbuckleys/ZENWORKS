@@ -47,20 +47,53 @@ Scope {
 
   //   background { color = rgba(0,0,0,0.6), blur_size = 12, blur_passes = 5 }
   readonly property real shadeAlpha: Oracle.lockShade
-   //   blur_size 12 over 5 passes is an enormous blur — the result is colour
-  //   smears with no legible text left. Qt's MultiEffect could not reach it:
-  //   its radius caps at 64px, which across a 2560px output still left text
-  //   readable, which on a lock screen is the entire point missed. So the
-  //   blur happens once at capture instead of every frame on the GPU —
-  //   downsample, blur, upsample, which is what those five passes are.
-   //   The two resizes are each other's inverse, so the shot comes back at the
-   //   size it went in at whatever the strength is set to: shrink to N%, blur,
-   //   then blow back up by 100/N. Written as arithmetic rather than as two
-   //   numbers, because two numbers can be set so they do not undo each other,
-   //   and the result of that is a lock screen at the wrong resolution.
-   readonly property string blurPipeline:
-     "-resize " + Oracle.lockBlurStrength + "% -blur 0x10 -resize "
-     + Math.round(10000 / Math.max(1, Oracle.lockBlurStrength)) + "%"
+  // THE FROST IS LIVE, AND IT IS HYPRLAND'S. misc:session_lock_xray keeps the
+  // desktop rendering under the lock and misc:session_lock_blur blurs it
+  // behind the lock surface (both in hypr/lua/base.lua), with the same
+  // decoration.blur every window gets. It used to be a grim screenshot blurred
+  // by ImageMagick at lock time: a frozen picture, and about a second of black
+  // while the blur ran. The strength is now the compositor's, not this file's.
+  //
+  // XRAY MEANS THE SURFACE MUST COVER. Under it the desktop is really there,
+  // so anything on the lock left transparent shows it — blurred, but there.
+  // Only the shade below is see-through, and the curtain is opaque whenever
+  // the lock is coming or going. A dead shell is still covered: Hyprland's
+  // lockdead screen is drawn opaque, xray or not.
+  readonly property color dark: "black"
+
+  // ── HEAVIER WHILE LOCKED ─────────────────────────────────────────────
+  // The everyday window blur (2 passes) left the desktop half-legible behind
+  // the lock. Hyprland has one blur for everything, so the lock raises it
+  // for its own length and puts it back — both while the screen is black,
+  // so no window is ever seen changing. The size is hyprlock's blur_size 12
+  // (the same dual-kawase size); Oracle's Lock frost is the passes, the
+  // coarse knob — each one roughly doubles the spread.
+  readonly property int frostSize: 12
+  //
+  // What was there is saved to a file before the first raise, and the file is
+  // what gets put back: a shell that died mid-lock restores it on its next
+  // start (below). flock keeps a raise and a restore fired a moment apart
+  // from interleaving.
+  readonly property string blurSave: (Quickshell.env("XDG_RUNTIME_DIR") || "/tmp") + "/cerberus-blur"
+
+  function hyprBlur(size, passes) {
+    return "hyprctl -q eval \"hl.config({ decoration = { blur = { size = " + size
+      + ", passes = " + passes + " } } })\"";
+  }
+
+  function frost(on) {
+    const f = Strings.shellQuote(root.blurSave);
+    const opt = (o) => "$(hyprctl getoption decoration:blur:" + o + " | awk 'NR==1{print $2}')";
+    const script = on
+      ? "[ -f " + f + " ] || echo \"" + opt("size") + " " + opt("passes") + "\" > " + f + "; "
+        + root.hyprBlur(root.frostSize, Math.max(1, Oracle.lockFrost))
+      : "[ -f " + f + " ] || exit 0; read s p < " + f + "; "
+        + "[ -n \"$p\" ] && " + root.hyprBlur("$s", "$p") + "; rm -f " + f;
+    Quickshell.execDetached(["flock", root.blurSave + ".lock", "sh", "-c", script]);
+  }
+
+  // the restore a lock that never finished still owes
+  Component.onCompleted: root.frost(false)
 
   //   input-field { font_color / check_color / fail_color = rgba(223,223,221,1) }
   readonly property color fg: Zenon.white
@@ -87,14 +120,13 @@ Scope {
   //   fade_on_empty = false: an empty field keeps the placeholder rather than
   //   fading itself out, so there is always something on screen to aim at.
   readonly property bool fadeOnEmpty: false
-  //   dots_text_format / check_text / fail_text.
-  //   The first two are above the BMP (U+F09DE dot, U+F051B stopwatch) and are
-  //   written as literal characters. They were "\u{...}" escapes, which is
-  //   valid ES6 but NOT what QML's own string lexer accepts — it only takes the
-  //   four-digit form — so both were silently becoming something else and the
-  //   stopwatch never appeared. A four-digit escape cannot express them either:
-  //   "\uF09DE" reads as U+F09D followed by "E". Literal characters are the one
-  //   form with no trap in it.
+  //   dots_text_format / fail_text / the unlocked glyph.
+  //   The dot is above the BMP (U+F09DE) and is written as a literal
+  //   character. It was a "\u{...}" escape, which is valid ES6 but NOT what
+  //   QML's own string lexer accepts — it only takes the four-digit form — so
+  //   it was silently becoming something else. A four-digit escape cannot
+  //   express it either: "\uF09DE" reads as U+F09D followed by "E". A literal
+  //   character is the one form with no trap in it.
   readonly property string dotGlyph: "󰧞"
   readonly property string failGlyph: "\uF00D"
   readonly property string unlockedGlyph: "\uF52A"
@@ -123,17 +155,123 @@ Scope {
   // 72px lock standing in the middle of the desktop. The same three symbols
   // still read from across the room at this size without dominating it.
   readonly property real glyphScale: 0.24
-  // Nerd Font draws these at different heights inside the same em box. Inked
-  // at a common size the lock stands 76 units tall and the stopwatch only 70,
-  // which is why the stopwatch read as the smaller icon even though both were
-  // set at the same pixelSize. Compensated so the two agree on screen.
 
   // ── motion ───────────────────────────────────────────────────────────
-  // No fade — the lock appears and vanishes as a hard cut. Instant is
-  // safer than a transition on a security surface: nothing is left
-  // half-visible and the session is never shown through a fading layer.
+  // TWO FADES, NEVER A CROSSFADE (the user asked, 2026-10-14). Locking, the
+  // desktop goes to black under a veil, the lock goes up behind the black,
+  // and only then does the lock come out of it. Unlocking is the same run
+  // backwards. Every fade is a fade from or to solid black, so the session
+  // is never seen through a half-faded lock, which is why this used to be a
+  // hard cut.
+  //
+  //   veil      a black layer over every output, outside the lock — what
+  //             the DESKTOP fades into and back out of
+  //   curtain   black inside each lock surface, over the frost and the
+  //             widgets — what the LOCK fades out of and back into
+  //
+  // stage:  ""  →  dimming  →  up  →  lifting  →  clearing  →  ""
+  //   dimming   veil coming in; the session is still unlocked
+  //   up        locked; the curtain opens once the compositor says secure
+  //   lifting   curtain closing; then the veil goes black, unseen, and the
+  //             lock is let go once the veil has really been drawn
+  //   clearing  unlocked; the veil going out over the desktop
+  //
+  // The steps are Timers, not animation ends. Animations run on frames, and a
+  // lock surface on an output that is asleep draws none; the escape hatch
+  // must still get you out.
+  // the veil is mapped for the whole run, so it never maps or unmaps visibly
   property bool covering: false
-  property real reveal: root.covering ? 1 : 0
+  property string stage: ""
+  property real veil: 0
+  property real curtain: 1
+  // true for the instant a value must jump instead of fade
+  property bool snap: false
+  // THE LOCK ARRIVES THE WAY THE DESKTOP DOES (user, 2026-10-14): as the
+  // curtain opens, the shade and the widgets settle from the background
+  // arrival's zoom down to 1 — the same knob, duration and ease, so locking
+  // and unlocking are one language. Only the lock's own drawing can move;
+  // the frost behind it is the compositor's and stays put. Zoomed from
+  // LARGER, so the shade always covers the screen on the way in. Lifting
+  // is not zoomed: the unlock has the background's own arrival.
+  property real rise: 1
+  readonly property real riseBy: Math.max(0, Oracle.backgroundZoom - 1)
+  readonly property int riseTime: Arrival.duration
+  readonly property int fadeOut: 220
+  readonly property int fadeIn: 320
+
+  function jump(what, to) {
+    root.snap = true;
+    root[what] = to;
+    root.snap = false;
+  }
+
+  Timer {
+    id: dimDone
+    interval: root.fadeOut
+    onTriggered: {
+      root.frost(true);
+      root.engage();
+    }
+  }
+
+  Timer {
+    id: secureWait
+    // The curtain opens on `secure`: by then the compositor has drawn the
+    // lock on every output. Not forever, though — a lock that never says so
+    // is still a lock, and a black one you cannot see the field on is worse.
+    interval: 800
+    onTriggered: root.openCurtain()
+  }
+
+  Timer {
+    id: liftDone
+    interval: root.fadeOut
+    onTriggered: {
+      // The veil goes black under the closed curtain. The lock is let go
+      // only once every veil has drawn that frame (veilPainted): released a
+      // frame early, the desktop shows for it.
+      root.veilPainted = ({});
+      root.jump("veil", 1);
+      root.frost(false);
+      handOff.restart();
+    }
+  }
+
+  // which outputs' veils have drawn their black since the hand-off began
+  property var veilPainted: ({})
+  function veilFrame(name) {
+    if (root.stage !== "lifting" || !handOff.running || root.veil < 1) return;
+    root.veilPainted[name] = true;
+    if (Object.keys(root.veilPainted).length >= Quickshell.screens.length)
+      root.unlockNow();
+  }
+
+  Timer {
+    id: handOff
+    // the cap, should a veil never get a frame: let go anyway
+    interval: 250
+    onTriggered: root.unlockNow()
+  }
+
+  Timer {
+    id: clearDone
+    interval: root.fadeIn
+    onTriggered: {
+      if (root.stage !== "clearing") return;
+      root.stage = "";
+      root.covering = false;
+    }
+  }
+
+  function openCurtain() {
+    secureWait.stop();
+    if (root.stage !== "up") return;
+    // gone while the curtain still hides it: with xray on, the veil is drawn
+    // under the lock too, and a black veil there is a black frost
+    root.jump("veil", 0);
+    root.curtain = 0;
+    root.rise = 1;
+  }
 
 
   // ── now playing awareness ────────────────────────────────────────
@@ -234,8 +372,6 @@ Scope {
   // failure pollUptime met, and the same answer: a bool this file writes.
   property bool locked: false
 
-  readonly property string shotDir: (Quickshell.env("XDG_RUNTIME_DIR") || "/tmp") + "/cerberus"
-
   // ── the trail ────────────────────────────────────────────────────────
   // Everything that goes wrong with this lock goes wrong at the one moment
   // nobody can read a log. The screen is black or it is deaf, the only way
@@ -280,7 +416,9 @@ Scope {
   }
 
   function submit() {
-    if (root.phase !== "input") return;
+    // only while the lock is up and open: an Enter during the lift would
+    // start a check on a lock that is already going away
+    if (root.phase !== "input" || root.stage !== "up") return;
     root.phase = "checking";
     if (!pam.start()) {
       // the stack would not even load; do not sit on a spinner forever
@@ -313,31 +451,60 @@ Scope {
   readonly property bool capsOn: CapsLock.on
 
   function engage() {
-    // Once per lock. lockDelay engages without the screenshot when grim is
-    // slow, and grim finishing afterwards must not engage again: that reset
-    // keysSeen mid-lock and wrote a second "lock:engage" into the trail.
-    // The surface's own flag, read directly, as lock() does — so a lock the
-    // compositor dropped can still be engaged again.
-    if (sessionLock.locked) return;
-    sessionLock.locked = true;
+    // Once per lock, when the veil is black. The surface's own flag, read
+    // directly, as lock() does — so a lock the compositor dropped can still
+    // be engaged again. Already up, it must still leave `dimming`: returning
+    // early there left the veil black over a lock nobody could get out of.
+    if (!sessionLock.locked) {
+      // closed before the surfaces exist, so they map black, and zoomed out
+      // ready to arrive
+      root.jump("curtain", 1);
+      root.jump("rise", 0);
+      sessionLock.locked = true;
+    }
+    root.stage = "up";
     root.locked = true;
-    root.covering = true;
     root.keysSeen = 0;
     CapsLock.read();
     root.note("lock:engage screens=" + Quickshell.screens.length);
+    secureWait.restart();
   }
 
   function release() {
+    // already on the way out
+    if (root.stage === "lifting" || root.stage === "clearing") return;
+    // nothing to let go of: lifting from here put the veil black over a live
+    // desktop and faded it out again (`qs ipc call Cerberus unlock` unlocked)
+    if (root.stage === "" && !sessionLock.locked) return;
+    // asked before the lock was even up: just bring the desktop back
+    if (root.stage === "dimming") {
+      dimDone.stop();
+      root.pollUptime = false;
+      root.stage = "clearing";
+      root.veil = 0;
+      clearDone.restart();
+      return;
+    }
     // Whether keys arrived, not how many: the count is roughly the length of
     // the password, and this file outlives the lock.
     root.note("lock:release keys=" + (root.keysSeen > 0 ? "yes" : "none")
       + " keyboard=" + root.keyboardHere);
     root.pollUptime = false;
-    root.covering = false;
+    secureWait.stop();
+    root.covering = true;
+    root.stage = "lifting";
+    root.curtain = 1;
+    liftDone.restart();
+  }
+
+  function unlockNow() {
+    if (root.stage !== "lifting") return;
+    handOff.stop();
     sessionLock.locked = false;
     root.locked = false;
-    root.shotReady = false;
-    wipeProc.running = true;
+    root.stage = "clearing";
+    root.veil = 0;
+    clearDone.restart();
   }
 
   PamContext {
@@ -382,12 +549,11 @@ Scope {
   Timer {
     id: successReset
     interval: 400
-    onTriggered: {
-      if (root.phase === "success") {
-        root.phase = "input";
-        root.release();
-      }
-    }
+    // The phase STAYS "success" through the lift. Put back to "input" here,
+    // the empty field's lock glyph faded in over the unlocked glyph while
+    // the curtain closed (user, 2026-10-14); lock() starts the next one at
+    // "input" instead.
+    onTriggered: if (root.phase === "success") root.release()
   }
 
   // Runs the whole time the lock is up, fast while it is provably deaf and
@@ -493,95 +659,77 @@ Scope {
     }
   }
 
-  // ── the shot behind the blur ─────────────────────────────────────────
-  //   background { path = screenshot }
-  // Captured BEFORE the lock surfaces map — a capture taken afterwards would
-  // photograph the lock itself. Written to XDG_RUNTIME_DIR, which is tmpfs and
-  // mode 700, and wiped on unlock.
+  // ── the veil ─────────────────────────────────────────────────────────
+  // What the desktop fades into before the lock and back out of after it.
+  // A layer of the shell's own, so it is only ever in front of the session
+  // while the session is unlocked: dimming and clearing. While locked it is
+  // kept at nothing, because with xray it is drawn under the lock as well.
+  // Mapped for the whole run (see `covering`), never mapped black; hypr's
+  // rules give it no map animation and no blur.
+  Variants {
+    model: Quickshell.screens
 
-  // Stage one: the raw grab. Must finish BEFORE the lock surfaces map, or it
-  // photographs the lock instead of the desktop — so its cost is the cost of
-  // locking, and it is paid every single time.
-  //
-  // It used to be two sequential `grim -o … .png`, measured at 1.15s for these
-  // two outputs, essentially all of it libpng deflating 11MB of pixels nobody
-  // was ever going to look at un-blurred. Written as ppm and run in parallel
-  // the same capture takes 27ms. That was the delay when locking.
-  Process {
-    id: shotProc
-    onExited: {
-      lockDelay.stop();
-      root.engage();
-      blurProc.running = true;
+    PanelWindow {
+      id: veilWin
+      required property var modelData
+      screen: veilWin.modelData
+      visible: root.covering
+      color: "transparent"
+      exclusionMode: ExclusionMode.Ignore
+      anchors { top: true; bottom: true; left: true; right: true }
+      WlrLayershell.layer: WlrLayer.Overlay
+      WlrLayershell.namespace: "cerberus-veil"
+      WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
+
+      Rectangle {
+        id: veilInk
+        anchors.fill: parent
+        color: root.dark
+        opacity: root.veil
+        Behavior on opacity {
+          enabled: !root.snap
+          NumberAnimation {
+            duration: root.stage === "dimming" ? root.fadeOut : root.fadeIn
+            easing.type: Easing.InOutCubic
+          }
+        }
+      }
+
+      // the unlock waits on this: a veil that has drawn its black
+      Connections {
+        target: veilInk.Window.window
+        enabled: root.stage === "lifting"
+        function onFrameSwapped() { root.veilFrame(veilWin.modelData.name); }
+      }
     }
-  }
-
-  // Stage two: the blur, which costs the better part of a second per output.
-  // Deliberately AFTER the lock is up rather than before it — nothing slow
-  // belongs between you and a locked screen. The surfaces are opaque black
-  // until this lands, so nothing shows through in the meantime.
-  Process {
-    id: blurProc
-    // An unlock that beat the blur wiped the directory before the blur had
-    // written into it, and the shot then sat there until the next lock.
-    onExited: {
-      if (root.locked) root.shotReady = true;
-      else wipeProc.running = true;
-    }
-  }
-
-  Process {
-    id: wipeProc
-    // Quoted, with the globs OUTSIDE the quotes so they still expand. It is
-    // one `rm -f` away from a path that came out of the environment —
-    // XDG_RUNTIME_DIR — and an unquoted one with a space in it removes
-    // something else entirely.
-    command: ["sh", "-c", "rm -f " + Strings.shellQuote(root.shotDir) + "/*.png "
-      + Strings.shellQuote(root.shotDir) + "/*.ppm"]
-  }
-
-  // the blurred shot only exists once stage two has finished; until then the
-  // Image must not be pointed at a file that is not there, or it latches on
-  // an error and never retries
-  property bool shotReady: false
-
-  Timer {
-    id: lockDelay
-    // A screenshot must never be what stands between you and a locked
-    // screen. If grim has not finished by now, lock without one. It now
-    // finishes in ~27ms, so this is a guard against a wedged grim rather
-    // than something the eye is ever meant to reach.
-    interval: 250
-    onTriggered: root.engage()
   }
 
   function lock() {
     root.pollUptime = true;
-    if (sessionLock.locked) return;
+    // a lock the compositor dropped: start again from the desktop
+    if (root.stage === "up" && !sessionLock.locked) root.stage = "";
+    if (root.stage === "dimming" || root.stage === "up") return;
+    if (root.stage === "lifting") {
+      // still locked; the curtain only has to open again
+      liftDone.stop();
+      handOff.stop();
+      root.jump("veil", 0);
+      root.frost(true);
+      root.phase = "input";
+      root.stage = "up";
+      root.curtain = 0;
+      return;
+    }
+    // clearing: the session is already back, so the veil comes in again
+    // from wherever it had got to
+    clearDone.stop();
     root.pw = "";
     root.phase = "input";
     tallyProc.running = true;
-    root.shotReady = false;
-    const screens = Quickshell.screens;
-    const grabs = [];
-    const blurs = [];
-    for (let i = 0; i < screens.length; ++i) {
-      const n = screens[i].name;
-      const raw = root.shotDir + "/" + n + ".ppm";
-      const out = root.shotDir + "/" + n + ".png";
-      // backgrounded and waited on, so two outputs cost what one does
-      const q = Strings.shellQuote;
-      grabs.push("grim -t ppm -o " + q(n) + " " + q(raw) + " 2>/dev/null &");
-      blurs.push("{ magick " + q(raw) + " " + root.blurPipeline + " " + q(out)
-        + " 2>/dev/null; rm -f " + q(raw) + "; } &");
-    }
-    shotProc.command = ["sh", "-c",
-      "mkdir -p " + Strings.shellQuote(root.shotDir) + "; "
-        + grabs.join(" ") + " wait"];
-    blurProc.command = ["sh", "-c",
-      blurs.length === 0 ? "true" : blurs.join(" ") + " wait"];
-    shotProc.running = true;
-    lockDelay.restart();
+    root.covering = true;
+    root.stage = "dimming";
+    root.veil = 1;
+    dimDone.restart();
   }
 
   IpcHandler {
@@ -608,7 +756,11 @@ Scope {
   WlSessionLock {
     id: sessionLock
 
-    onSecureChanged: root.note("lock:secure=" + sessionLock.secure)
+    onSecureChanged: {
+      root.note("lock:secure=" + sessionLock.secure);
+      // drawn on every output: the lock may come out of the black now
+      if (sessionLock.secure) root.openCurtain();
+    }
 
     surface: WlSessionLockSurface {
       id: surf
@@ -632,9 +784,8 @@ Scope {
       }
       Component.onDestruction: root.note("surface:-"
         + (surf.screen ? surf.screen.name : "?"))
-      // Transparent, because the opaque floor now lives INSIDE the faded
-      // content — a surface that painted its own black would have nothing to
-      // fade from, and the lock would still arrive in a single frame.
+      // Transparent, so Hyprland's frost shows behind the shade. The black
+      // when there is no frost to show is the curtain's.
       color: "transparent"
 
       readonly property bool showsWidgets:
@@ -723,38 +874,43 @@ Scope {
           } else if (event.text && event.text.length > 0 &&
                      !(event.modifiers & Qt.ControlModifier) &&
                      !(event.modifiers & Qt.MetaModifier)) {
-            if (root.phase !== "checking") root.pw += event.text;
+            if (root.phase !== "checking" && root.stage === "up") root.pw += event.text;
           }
         }
       }
 
-      // everything with a picture on it, faded as one
+      // The curtain: over everything with a picture on it, the frost behind
+      // included. Opaque whenever the lock is coming or going — see `stage`.
+      Rectangle {
+        anchors.fill: parent
+        z: 1
+        color: root.dark
+        opacity: root.curtain
+        // opening, it keeps time with the rise below
+        Behavior on opacity {
+          enabled: !root.snap
+          NumberAnimation {
+            duration: root.stage === "lifting" ? root.fadeOut : root.riseTime
+            easing.type: root.stage === "lifting" ? Easing.InOutCubic : Zenon.ease
+          }
+        }
+      }
+
+      // everything with a picture on it, over the compositor's live frost
       Item {
         id: content
         anchors.fill: parent
-        opacity: root.reveal
-
-        // an opaque floor, so a missing or slow screenshot can never leave
-        // the desktop showing through once the fade has finished
-        Rectangle {
-          anchors.fill: parent
-          color: Zenon.light ? Zenon.ground : "black"
+        // eased here, on the item, from the jump/settle the root decides
+        property real k: root.rise
+        Behavior on k {
+          enabled: !root.snap
+          NumberAnimation { duration: root.riseTime; easing.type: Zenon.ease }
         }
-
-        Image {
-          id: shot
-          anchors.fill: parent
-          source: (root.shotReady && surf.screen)
-            ? "file://" + root.shotDir + "/" + surf.screen.name + ".png" : ""
-          fillMode: Image.PreserveAspectCrop
-          cache: false
-          // off the GUI thread: a whole-monitor PNG per screen, decoded while
-          // the lock is animating in. Nothing waits on it — it fades in when
-          // Ready, below.
-          asynchronous: true
-          // it arrives a beat after the lock does; fading is kinder than a snap
-          opacity: shot.status === Image.Ready ? 1 : 0
-          Behavior on opacity { NumberAnimation { duration: 220; easing.type: Easing.OutQuint } }
+        transform: Scale {
+          origin.x: content.width / 2
+          origin.y: content.height / 2
+          xScale: 1 + root.riseBy * (1 - content.k)
+          yScale: 1 + root.riseBy * (1 - content.k)
         }
 
         //   background { color = rgba(0,0,0,0.6) } — over the blur, not instead
@@ -808,10 +964,9 @@ Scope {
             // NOT `state`. Every Item already has a `state` property, so that
             // id resolved to the enclosing item's state string instead of to
             // this Text — `state.pulse` came back undefined, opacity went NaN,
-            // and neither the stopwatch nor the cross was ever drawn.
+            // and the cross was never drawn.
             id: verdict
             anchors.centerIn: parent
-            //   check_text / fail_text / unlocked
             //   fail_text / unlocked. The WAIT is not a glyph any more — see
             //   the dots below.
             text: root.phase === "fail" ? root.failGlyph : root.unlockedGlyph
@@ -883,19 +1038,24 @@ Scope {
             id: caps
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.verticalCenter: parent.verticalCenter
-            anchors.verticalCenterOffset: field.height * root.glyphScale * 0.85
+            anchors.verticalCenterOffset: field.height * root.glyphScale * 1.15
             text: "󰌎"
             color: Zenon.red
-            opacity: root.capsOn ? 1 : 0
+            // on the lock glyph's beat, with its zoom (see the placeholder)
+            opacity: root.capsOn && content.k > 0.6 ? 1 : 0
             visible: opacity > 0.01
+            scale: opacity > 0.5 ? 1 : 0.7
             Behavior on opacity {
               NumberAnimation { duration: 180; easing.type: Easing.OutQuint }
             }
+            Behavior on scale { NumberAnimation { duration: 220; easing.type: Easing.OutBack } }
             font.family: root.fontFamily
             font.weight: root.fontWeight
-            // Roughly half the lock above it: large enough to read at a
+            // Under two thirds of the lock above it: large enough to read at a
             // glance, small enough that the lock stays the thing in the middle.
-            font.pixelSize: field.height * root.glyphScale * 0.45
+            // Up from half, and set further down, at the user's ask
+            // (2026-10-14).
+            font.pixelSize: field.height * root.glyphScale * 0.6
           }
 
           //   placeholder_text — only while there is nothing typed yet
@@ -906,8 +1066,11 @@ Scope {
             color: root.fg
             //   fade_on_empty = false: an empty field keeps this rather than
             //   fading itself out
+            // ...and it arrives on its own beat (user, 2026-10-14): held back
+            // until the lock's rise is most of the way in, then its own fade
+            // and OutBack zoom below, so the lock lands and THEN the glyph
             opacity: (root.phase === "input" && root.pw.length === 0
-              && !root.fadeOnEmpty) ? 1 : 0
+              && !root.fadeOnEmpty && content.k > 0.6) ? 1 : 0
             visible: opacity > 0.01
             scale: opacity > 0.5 ? 1 : 0.7
             Behavior on opacity { NumberAnimation { duration: 150; easing.type: Easing.OutQuint } }
@@ -1325,8 +1488,8 @@ Scope {
   // 12 minutes" — a sentence, next to a seven-segment clock. Two units is as
   // much as anyone reads off a glance.
   property string uptimeText: ""
-  // The mark between the two readings. Dimmed to the unlit-segment ink, so it
-  // separates without competing with either number.
+  // The mark between the two readings, in the digits' own ink (see the Text
+  // that draws it).
   readonly property string uptimeSep: "󱑼"
   readonly property int sepSize: 20
 

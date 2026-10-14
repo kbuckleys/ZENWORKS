@@ -81,6 +81,11 @@ hl.config({
 	misc = {
         font_family = "JetBrainsMono Nerd Font Medium",
 		allow_session_lock_restore = true,
+		-- cerberus' frost: the desktop keeps rendering under the lock and is
+		-- blurred live behind it (with decoration.blur below), instead of a
+		-- screenshot blurred at lock time
+		session_lock_xray = true,
+		session_lock_blur = true,
 		disable_splash_rendering = true,
 		initial_workspace_tracking = 0,
 		close_special_on_empty = true,
