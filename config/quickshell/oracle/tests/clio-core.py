@@ -24,6 +24,7 @@ TMP = tempfile.mkdtemp(prefix="clio-test-")
 os.environ["CLIO_DIR"] = os.path.join(TMP, "clio")
 
 import server  # noqa: E402
+import page  # noqa: E402
 
 server.ROUNDS = 1000   # the real count takes a second a time
 fails = []
@@ -73,7 +74,9 @@ try:
     raises("no key, no sealing", lambda: s.save({"note": dict(note, id="n2"), "seal": True}), "locked")
     s.password({"password": "pw1", "hint": "one"})
     res = s.save({"note": dict(note, id="n2"), "seal": True})
-    on_disk = json.load(open(os.path.join(TMP, "clio", "Notes", "n2.json")))
+    disk = lambda i: server.read_note(s.ix.find(i))
+    on_disk = disk("n2")
+    eq("a locked page shows none of its words", "Hi</" in open(s.ix.find("n2")).read().split("<body", 1)[1], False)
     eq("sealed on disk: no blocks", "blocks" in on_disk, False)
     eq("and not readable", "Hi" in on_disk["sealed"], False)
     eq("the save says so", res["sealed"] == on_disk["sealed"], True)
@@ -91,7 +94,7 @@ try:
     s.unlock({"password": "pw2"})
     eq("and the note still opens", s.unseal_note({"id": "n2"})["blocks"], note["blocks"])
     # a sealed text tampered with is refused before decrypting
-    j = json.load(open(os.path.join(TMP, "clio", "Notes", "n2.json")))
+    j = disk("n2")
     v, mac, c = j["sealed"].split(":")
     raises("tampered", lambda: server.unseal(s.key, v + ":" + mac + ":" + c[:-8] + "AAAAAAA="), "auth")
 
@@ -107,10 +110,11 @@ try:
     eq("reused, not copied", again["src"], keep["src"])
     s.save({"note": {"id": "n1", "blocks": [keep]}})
     s.save({"note": {"id": "n4", "blocks": [{"k": "body", "h": "x"}, again]}, "seal": True})
-    eq("a locked note says what it uses", json.load(open(os.path.join(TMP, "clio", "Notes", "n4.json")))["uses"], [keep["src"]])
+    eq("a locked note says what it uses", disk("n4")["uses"], [keep["src"]])
     att = lambda f: os.path.exists(os.path.join(TMP, "clio", "Attachments", f))
+    p1 = s.ix.find("n1")
     s.remove({"id": "n1"})
-    eq("what another note uses stays", (os.path.exists(os.path.join(TMP, "clio", "Notes", "n1.json")), att(keep["src"])), (False, True))
+    eq("what another note uses stays", (os.path.exists(p1), att(keep["src"])), (False, True))
     s.remove({"id": "n4"})
     eq("and goes with the last", att(keep["src"]), False)
 
@@ -119,16 +123,16 @@ try:
     seen = [n for n in s.load()["notes"] if n["id"] == "n5"][0]["_disk"]
     first = s.save({"note": {"id": "n5", "blocks": [{"k": "title", "h": "B"}]}, "expect": seen})
     eq("saved over what it read", ("conflict" in first, first["mtime"] > 0), (False, True))
-    p5 = os.path.join(TMP, "clio", "Notes", "n5.json")
-    json.dump({"id": "n5", "blocks": [{"k": "title", "h": "There"}]}, open(p5, "w"))
+    p5 = s.ix.find("n5")
+    server.write_note(p5, {"id": "n5", "blocks": [{"k": "title", "h": "There"}]})
     os.utime(p5, (first["mtime"] + 5, first["mtime"] + 5))
     clash = s.save({"note": {"id": "n5", "blocks": [{"k": "title", "h": "Here"}]}, "expect": first["mtime"]})
     eq("changed elsewhere: both kept", (clash.get("conflict"), clash["disk"]["blocks"][0]["h"], clash["copy"]["blocks"][0]["h"],
-                                        json.load(open(p5))["blocks"][0]["h"]), (True, "There", "Here (this machine)", "There"))
+                                        server.read_note(p5)["blocks"][0]["h"]), (True, "There", "Here (this machine)", "There"))
 
     # notes and entries apart: Notes/ and Journals/, and the old one directory split
-    s.save({"note": {"id": "e1", "kind": "entry", "blocks": []}})
-    eq("an entry in Journals", os.path.exists(os.path.join(TMP, "clio", "Journals", "e1.json")), True)
+    s.save({"note": {"id": "e1", "kind": "entry", "date": 1791960176052, "blocks": [{"k": "body", "h": "Rain"}]}})
+    eq("an entry in Journals, by its day", os.path.relpath(s.ix.find("e1"), os.path.join(TMP, "clio")), "Journals/2026-10-14 Rain.html")
     os.makedirs(os.path.join(TMP, "clio", "notes"))
     json.dump({"id": "e2", "kind": "entry"}, open(os.path.join(TMP, "clio", "notes", "e2.json"), "w"))
     json.dump({"id": "n7", "kind": "note"}, open(os.path.join(TMP, "clio", "notes", "n7.json"), "w"))
@@ -137,6 +141,9 @@ try:
                          os.path.exists(os.path.join(TMP, "clio", "notes"))), (True, True, False))
     s.remove({"id": "e2"})
     eq("removed from where it is", os.path.exists(os.path.join(TMP, "clio", "Journals", "e2.json")), False)
+    server.to_pages()
+    eq("the old JSON made pages, kept aside", (s.ix.find("n7") is not None and s.ix.find("n7").endswith(".html"),
+        os.path.exists(os.path.join(TMP, "clio", ".json-backup", "Notes", "n7.json")), os.path.exists(os.path.join(TMP, "clio", "Notes", "n7.json"))), (True, True, False))
 
     # the old layout, a directory per note, gathered into the shared one
     old = os.path.join(TMP, "clio", "attachments", "n9")
@@ -145,9 +152,49 @@ try:
     s.save({"note": {"id": "n9", "blocks": [{"k": "image", "src": "n9/p.png"}]}})
     s.save({"note": {"id": "n8", "blocks": [{"k": "image", "src": "n9/p.png"}]}, "seal": True})
     server.gather()
-    moved = json.load(open(os.path.join(TMP, "clio", "Notes", "n9.json")))["blocks"][0]["src"]
+    moved = disk("n9")["blocks"][0]["src"]
     eq("moved and pointed at", (att(moved), moved.startswith("n9/"), os.path.exists(os.path.join(TMP, "clio", "attachments"))), (True, False, False))
     eq("a locked note put right when opened", s.unseal_note({"id": "n8"})["blocks"][0]["src"], moved)
+
+    # THE PAGES: named by title, renamed with it, a clash kept apart, and
+    # read back exactly
+    s.save({"note": {"id": "t1", "kind": "note", "blocks": [{"k": "title", "h": "Groceries"}]}})
+    pt = s.ix.find("t1")
+    eq("named by its title", os.path.basename(pt), "Groceries.html")
+    s.save({"note": {"id": "t1", "kind": "note", "name": "Shop: Mon/Tue", "blocks": [{"k": "title", "h": "Groceries"}]}})
+    eq("renamed with it, made safe", (os.path.basename(s.ix.find("t1")), os.path.exists(pt)), ("Shop Mon Tue.html", False))
+    s.save({"note": {"id": "t2abcd", "kind": "note", "name": "Shop: Mon/Tue", "blocks": []}})
+    eq("the same title kept apart", os.path.basename(s.ix.find("t2abcd")), "Shop Mon Tue (abcd).html")
+    rich = {"v": 1, "id": "r1", "kind": "note", "created": 5, "modified": 6, "pinned": True, "folder": "f1",
+            "blocks": [{"k": "title", "h": "A <b>b</b> &amp; c"}, {"k": "body", "h": "x<br />y", "align": "center"},
+                       {"k": "check", "h": "tick", "c": True, "due": 9}, {"k": "check", "h": "two", "c": False, "l": 1},
+                       {"k": "number", "h": "n"}, {"k": "mono", "h": "if a < b:\n  </p>"},
+                       {"k": "image", "h": "", "src": "p.png", "w": 0.5, "beside": True, "ocr": "words"},
+                       {"k": "table", "h": "", "rows": [["a", "<i>b</i>"], ["", "d"]]}, {"k": "rule", "h": ""},
+                       {"k": "file", "h": "", "src": "d.pdf", "name": "d.pdf", "size": 3},
+                       {"k": "sketch", "h": "", "src": "s.png", "strokes": [[1, 2]], "aspect": 0.5}]}
+    s.save({"note": rich})
+    back = server.read_note(s.ix.find("r1"))
+    eq("a page read back is the note, exactly", back, rich)
+    eq("and it is HTML a browser shows", "<h1 data-k=\"title\">A <b>b</b> &amp; c</h1>" in open(s.ix.find("r1")).read(), True)
+    # a page made elsewhere is a note too
+    fp = os.path.join(TMP, "clio", "Notes", "Recipe.html")
+    open(fp, "w").write("<html><head><title>Recipe</title></head><body><h2>Dough</h2><p>Flour <script>x</script>and <b>water</b></p><ul><li>salt</li></ul></body></html>")
+    got = [n for n in s.load()["notes"] if n.get("created") and s.ix.find(n["id"]) == fp]
+    eq("a page from elsewhere read", [(b["k"], b["h"]) for b in got[0]["blocks"]] if got else None,
+       [("title", "Recipe"), ("heading", "Dough"), ("body", "Flour and <b>water</b>"), ("bullet", "salt")])
+    # changes from outside: told apart from our own
+    s.load()
+    eq("nothing changed after a read", s.changed()["changed"], False)
+    s.save({"note": {"id": "c1", "kind": "note", "blocks": [{"k": "title", "h": "Mine"}]}})
+    eq("our own write is not a change", s.changed()["changed"], False)
+    pc = s.ix.find("c1")
+    os.utime(pc, (os.path.getmtime(pc) + 3, os.path.getmtime(pc) + 3))
+    eq("a page touched elsewhere is", s.changed()["changed"], True)
+    s.load()
+    open(os.path.join(TMP, "clio", "Notes", "Dropped in.html"), "w").write("<p>hi</p>")
+    eq("a page come from elsewhere is", s.changed()["changed"], True)
+    eq("a note's page, asked for", s.dispatch("pathOf", None, {"id": "c1"}, None, None)["path"], pc)
 finally:
     shutil.rmtree(TMP, ignore_errors=True)
 

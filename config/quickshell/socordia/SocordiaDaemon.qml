@@ -112,10 +112,11 @@ Scope {
     // Said out loud, because a toggle you cannot see is a toggle you
     // forget is on — and then the screen simply never locks. (The bar now
     // shows a cup while it is on, but the toast is what says what it means.)
+    // The same words and cups as cynosure's row, and one line of what it means.
     Quickshell.execDetached(["notify-send", "-a", "socordia",
-      root.forceAwake ? "Keep Awake is on" : "Keep Awake is off",
-      root.forceAwake ? "The screen will not lock, dim or turn off until you switch this off."
-                      : "Idle lock and screen-off are back on their timers."]);
+      root.forceAwake ? "\u{F06CA}  Caffeinated" : "\u{F0FAB}  Decaffeinated",
+      root.forceAwake ? "The screen stays on until you decaffeinate."
+                      : "The screen will lock and sleep as usual."]);
     return root.forceAwake ? "staying awake" : "idle timers armed";
   }
 

@@ -18,23 +18,33 @@ Item {
   property string tip: ""
   property string keys: ""
   property bool lit: false
+  // a word's size and weight (the format bar's style names)
+  property int wordPx: Zenon.px(15)
+  property int wordWeight: Font.Bold
+  // what the lit state is drawn in: the lock's yellow, the format bar's cyan
+  property color litInk: Zenon.yellow
+  readonly property bool hovered: hov.hovered
   signal pressed(real x, real y)
 
-  width: 34
+  // the format bar's are narrower, to fit every format across the note
+  property int size: 34
+  property int pad: 18
+  width: tool.word !== "" ? Math.max(tool.size, label.implicitWidth + tool.pad) : tool.size
   height: 30
   opacity: tool.enabled ? 1 : 0.35
   Rectangle {
     anchors.fill: parent
     radius: Zenon.windowRadius
-    color: press.pressed ? Zenon.wash(0.14) : tool.lit ? Zenon.alpha(Zenon.yellow, 0.14) : "transparent"
+    color: press.pressed ? Zenon.wash(0.14) : tool.lit ? Zenon.alpha(tool.litInk, 0.14) : hov.hovered && tool.enabled ? Zenon.wash(0.07) : "transparent"
   }
   Text {
+    id: label
     anchors.centerIn: parent
     text: tool.word !== "" ? tool.word : tool.glyph
-    color: tool.lit ? Zenon.yellow : Zenon.soft
+    color: tool.lit ? tool.litInk : Zenon.soft
     font.family: tool.word !== "" ? Zenon.face : Zenon.glyphFace
-    font.weight: Font.Bold
-    font.pixelSize: tool.word !== "" ? Zenon.px(15) : Zenon.px(16)
+    font.weight: tool.word !== "" ? tool.wordWeight : Font.Bold
+    font.pixelSize: tool.word !== "" ? tool.wordPx : Zenon.px(16)
   }
   MouseArea {
     id: press
@@ -45,6 +55,7 @@ Item {
     }
   }
   HoverHandler {
+    id: hov
     onHoveredChanged: hovered && tool.tip !== "" ? tool.pane.win.tipsItem.show(tool, tool.tip, tool.keys) : tool.pane.win.tipsItem.hide(tool)
   }
 }

@@ -482,20 +482,39 @@ function forgeOfHost(host) {
 // the one behind `upstream` when there is one (a fork's are its parent's),
 // else `origin`, else any remote on a forge delphi knows. { remote, host,
 // full, web, forge } or null — forge the FORGES id.
-function hubOf(remotes) {
+function hubOf(remotes, own) {
   var rs = remotes || [];
   function on(r) {
     var o = r ? remoteOf(r.fetch || r.push) : null;
     var f = o ? forgeOfHost(o.host) : null;
     return f ? { remote: r.name, host: o.host, full: o.full, web: o.web, forge: f.id } : null;
   }
-  var named = ["upstream", "origin"];
+  // own: the one that is yours (origin first) — what Archive acts on,
+  // never the project a fork came from
+  var named = own ? ["origin", "upstream"] : ["upstream", "origin"];
   for (var i = 0; i < named.length; i++) {
     for (var j = 0; j < rs.length; j++)
       if (rs[j].name === named[i] && on(rs[j])) return on(rs[j]);
   }
   for (var k = 0; k < rs.length; k++) if (on(rs[k])) return on(rs[k]);
   return null;
+}
+
+// ── AT A GLANCE ─────────────────────────────────────────────────────────
+// What a repository's summary (delphi/core summaries) says needs doing, as
+// words for Repositories' rows, each with a Zenon colour's name; empty when
+// there is nothing. ci: what its forge's checks said of its head, or null.
+function attentionOf(s, ci) {
+  var out = [];
+  if (!s) return out;
+  if (s.state && s.state.op) out.push({ word: s.state.op + " under way", ink: "yellow" });
+  if (s.conflicts > 0) out.push({ word: s.conflicts + (s.conflicts === 1 ? " conflict" : " conflicts"), ink: "red" });
+  if (s.changed > 0) out.push({ word: s.changed + " changed", ink: "yellow" });
+  if (s.ahead > 0) out.push({ word: "↑" + s.ahead + " to push", ink: "cyan" });
+  if (s.behind > 0) out.push({ word: "↓" + s.behind + " to pull", ink: "cyan" });
+  if (s.branch && s.remotes && s.remotes.length > 0 && !s.upstream && s.oid) out.push({ word: "not published", ink: "muted" });
+  if (ci && ci.state === "failure") out.push({ word: "checks failing", ink: "red" });
+  return out;
 }
 
 // GitHub's "2026-10-09T20:04:39Z" → unix seconds (what ago() reads)

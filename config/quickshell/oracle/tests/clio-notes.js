@@ -166,6 +166,22 @@ module.exports = {
     t.eq("new fields survive a read", (() => { const c = N.clean({ id: "x", fromDesktop: { x: 1 }, uses: ["a.png"], blocks: [
         { k: "image", src: "p.png", beside: true, ocr: "hi" }, { k: "check", h: "a", due: 5 }, { k: "body", beside: true }] });
       return [c.fromDesktop.x, c.uses[0], c.blocks[0].beside, c.blocks[0].ocr, c.blocks[1].due, c.blocks[2].beside]; })(), [1, "a.png", true, "hi", 5, undefined]);
+    t.eq("an entry read back from disk keeps its journal", (() => { const c = N.clean({ id: "x", kind: "entry", journal: "j1", date: 7, bookmark: true, _disk: 9, blocks: [] });
+      return [c.journal, c.date, c.bookmark, c._disk, c.folder]; })(), ["j1", 7, true, 9, undefined]);
+    t.eq("a name given is the title, over the first line", N.titleOf({ name: "Groceries", blocks: [{ k: "title", h: "Monday" }] }), "Groceries");
+    t.eq("a name survives a read, sealed too", [N.clean({ id: "x", name: " A ", blocks: [] }).name, N.clean({ id: "x", name: "B", sealed: "s", title: "B" }).name], ["A", "B"]);
+    t.eq("recent: written or opened, newest first, no Trash, no empty", N.recent([
+        { id: "a", kind: "note", modified: 10, created: 2, blocks: [{ k: "title", h: "A" }] },
+        { id: "b", kind: "entry", modified: 5, created: 1, blocks: [{ k: "body", h: "B" }] },
+        { id: "c", kind: "note", modified: 30, deleted: 31, blocks: [{ k: "title", h: "C" }] },
+        { id: "d", kind: "note", modified: 40, blocks: [{ k: "title", h: "" }] }], { b: 20 }, 5).map((r) => r.n.id), ["a", "b"]);
+    t.eq("recent: a day apart, the later day first", N.recent([
+        { id: "a", kind: "note", modified: 1000, created: 9, blocks: [{ k: "title", h: "A" }] },
+        { id: "b", kind: "note", modified: 1000 + 86400000 * 2, created: 1, blocks: [{ k: "title", h: "B" }] }], {}, 5).map((r) => r.n.id), ["b", "a"]);
+    t.eq("alignment kept on words, dropped elsewhere", [N.clean({ id: "x", blocks: [{ k: "body", h: "a", align: "center" }] }).blocks[0].align,
+      N.clean({ id: "x", blocks: [{ k: "mono", h: "a", align: "right" }] }).blocks[0].align, N.clean({ id: "x", blocks: [{ k: "body", h: "a", align: "sideways" }] }).blocks[0].align],
+      ["center", undefined, undefined]);
+    t.eq("alignment exported", N.htmlOf([{ k: "body", h: "a", align: "right" }], "").indexOf("text-align: right") >= 0, true);
     t.eq("window fields never written", Object.keys(N.stored({ id: "x", _disk: 3, d: {} })), ["id"]);
     t.eq("words read off a picture are searchable", N.derive({ blocks: [{ k: "title", h: "T" }, { k: "image", src: "p", ocr: "invoice 42" }] }).text.indexOf("invoice") >= 0, true);
 

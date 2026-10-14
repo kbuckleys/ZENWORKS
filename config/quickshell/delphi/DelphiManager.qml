@@ -89,6 +89,16 @@ Scope {
   property string page: "changes"
   property var scanRoots: ["~"]
   property string pullMode: "ff-only"
+  // the open repository fetched quietly every few minutes (DelphiWindow
+  // quietFetch) — Fetch's right-click turns it off
+  property bool autoFetch: true
+  // root → when it was last fetched (ms), quietly or not; this session only
+  property var fetchedAt: ({})
+  function noteFetched(root) {
+    const o = Object.assign({}, mgr.fetchedAt);
+    o[root] = Date.now();
+    mgr.fetchedAt = o;
+  }
   // the forge the Accounts page shows: github | gitlab | codeberg
   property string forge: "github"
   property bool showIgnored: false
@@ -176,6 +186,7 @@ Scope {
       if (typeof st.page === "string") mgr.page = st.page;
       if (Array.isArray(st.scanRoots) && st.scanRoots.length > 0) mgr.scanRoots = st.scanRoots;
       if (["ff-only", "rebase", "merge"].indexOf(st.pullMode) >= 0) mgr.pullMode = st.pullMode;
+      if (typeof st.autoFetch === "boolean") mgr.autoFetch = st.autoFetch;
       if (Array.isArray(st.servers)) mgr.servers = st.servers.filter((s) => s && D.SERVER_KINDS[s.kind] && D.hostOf(s.host));
       if (D.FORGES[st.forge]) mgr.forge = st.forge;
       if (st.stowTargets && typeof st.stowTargets === "object") mgr.stowTargets = st.stowTargets;
@@ -187,7 +198,7 @@ Scope {
     id: keepTimer
     interval: 400
     onTriggered: stateFile.setText(JSON.stringify({
-      recents: mgr.recents, hidden: mgr.hidden, splits: mgr.splits, page: mgr.page, scanRoots: mgr.scanRoots, pullMode: mgr.pullMode, forge: mgr.forge, stowTargets: mgr.stowTargets, servers: mgr.servers, pushTo: mgr.pushTo }, null, 1))
+      recents: mgr.recents, hidden: mgr.hidden, splits: mgr.splits, page: mgr.page, scanRoots: mgr.scanRoots, pullMode: mgr.pullMode, autoFetch: mgr.autoFetch, forge: mgr.forge, stowTargets: mgr.stowTargets, servers: mgr.servers, pushTo: mgr.pushTo }, null, 1))
   }
   function set(key, value) {
     if (mgr[key] === value) return;
@@ -204,6 +215,18 @@ Scope {
   function forget(root) {
     mgr.recents = mgr.recents.filter((r) => r.root !== root);
     if (mgr.hidden.indexOf(root) < 0) mgr.hidden = mgr.hidden.concat([root]);
+    mgr.keep_();
+  }
+  // off every list, Forgotten too — one whose files are gone from disk,
+  // with nothing left to come back to
+  function drop(root) {
+    mgr.recents = mgr.recents.filter((r) => r.root !== root);
+    mgr.hidden = mgr.hidden.filter((h) => h !== root);
+    mgr.keep_();
+  }
+  // back on the lists (found on disk again) without opening it
+  function unforget(root) {
+    mgr.hidden = mgr.hidden.filter((h) => h !== root);
     mgr.keep_();
   }
 

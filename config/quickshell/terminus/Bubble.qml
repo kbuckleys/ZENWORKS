@@ -55,15 +55,19 @@ PopupWindow {
   onCatchingChanged: {
     if (bub._catch) { bub._catch.destroy(); bub._catch = null; }
     if (!bub.catching || !bub.window.contentItem) return;
-    bub._catch = Qt.createQmlObject('import QtQuick; MouseArea { anchors.fill: parent; z: 1e9; acceptedButtons: Qt.AllButtons }',
+    // (its own `hit`: a MouseArea's `pressed` is a property as well as a
+    // signal, and the property is what a connect finds)
+    bub._catch = Qt.createQmlObject('import QtQuick; MouseArea { signal hit(); anchors.fill: parent; z: 1e9; acceptedButtons: Qt.AllButtons; onPressed: hit() }',
                                     bub.window.contentItem);
-    bub._catch.pressed.connect(() => bub.dismissed());
+    bub._catch.hit.connect(() => bub.dismissed());
   }
   // standing on the target, tail down, instead of hanging under it — for a
   // target at the bottom of the screen (the bar's jobs). See BubbleCard.up.
   property bool up: false
   readonly property bool over: face.over
-  readonly property bool open: bub.shown || (bub.sticky && (face.over || grace.running))
+  // (a dismissable bubble was opened by a click and goes on one, at once:
+  // the grace and the hover hold are for bubbles that come on a hover)
+  readonly property bool open: bub.shown || (bub.sticky && !bub.dismissable && (face.over || grace.running))
   Timer { id: grace; interval: 350 }
   property real shade: bub.open ? 1 : 0
   Behavior on shade { NumberAnimation { duration: Zenon.menuFade; easing.type: Easing.OutCubic } }
@@ -133,7 +137,7 @@ PopupWindow {
     return bub.pointX - bub.popupX;
   }
   onShownChanged: {
-    if (!bub.shown && bub.sticky) grace.restart();
+    if (!bub.shown && bub.sticky && !bub.dismissable) grace.restart();
     bub.measure();
   }
   onTargetChanged: bub.measure()

@@ -47,8 +47,17 @@ Item {
   // of the column, and where in the row; its y is the editor's to set
   readonly property var share: { void (blk.editor ? blk.editor.rev : 0); void (blk.editor ? blk.editor.blocks : null);
                                  return blk.editor ? blk.editor.shareOf(blk.key) : { slot: 0, n: 1 }; }
-  width: blk.editor ? Math.floor((blk.editor.columnW - blk.editor.rowGap * (blk.share.n - 1)) / blk.share.n) : 600
-  x: blk.share.slot * (blk.width + (blk.editor ? blk.editor.rowGap : 0))
+  // its even share of the column; a picture's size is worked out from it
+  readonly property real slotW: blk.editor ? Math.floor((blk.editor.columnW - blk.editor.rowGap * (blk.share.n - 1)) / blk.share.n) : 600
+  // ALIGNED (the row's first block says how — BlockEditor.rowAlign): the
+  // row's pictures packed together, each as wide as it is drawn, and the
+  // editor places the group; along the left, the even slots as before
+  readonly property bool isMedia: blk.kind === "image" || blk.kind === "sketch" || blk.kind === "file"
+  readonly property string rowAlign: blk.isMedia && blk.editor ? blk.editor.rowAlign(blk.key) : ""
+  readonly property real contentW: blk.kind === "file" ? fileChip.width : media.width
+  width: blk.isMedia && blk.rowAlign !== "" ? blk.contentW + blk.indentW : blk.slotW
+  x: blk.isMedia && blk.rowAlign !== "" && blk.editor ? blk.editor.rowX(blk.key)
+     : blk.share.slot * (blk.slotW + (blk.editor ? blk.editor.rowGap : 0))
   onHeightChanged: if (blk.editor) blk.editor.relayout()
   onVisibleChanged: if (blk.editor) Qt.callLater(blk.editor.relayout)
   // the one being carried somewhere else in the note
@@ -145,8 +154,10 @@ Item {
     Rectangle {
       visible: blk.kind === "check"
       anchors.verticalCenter: parent.verticalCenter
-      x: 2
-      width: Math.round(blk.ts * 1.1)
+      x: 3
+      // the ring a little under the line's cap height (user, 2026-10-14:
+      // at 1.1 × the text it stood taller than the words beside it)
+      width: Math.round(blk.ts * 0.86)
       height: width
       radius: width / 2
       color: blk.b && blk.b.c ? Zenon.yellow : "transparent"
@@ -159,7 +170,7 @@ Item {
         text: ""
         color: Zenon.onAccent
         font.family: Zenon.glyphFace
-        font.pixelSize: Math.round(blk.ts * 0.62)
+        font.pixelSize: Math.round(blk.ts * 0.5)
       }
     }
     Text {
@@ -247,6 +258,10 @@ Item {
       bottomPadding: blk.kind === "mono" ? 10 : 0
       textFormat: blk.kind === "mono" ? TextEdit.PlainText : TextEdit.RichText
       wrapMode: TextEdit.Wrap
+      // a block's alignment; left alone, Qt sets a right-to-left script
+      // along the right by itself
+      horizontalAlignment: !blk.b || !blk.b.align ? TextEdit.AlignLeft
+        : blk.b.align === "center" ? TextEdit.AlignHCenter : blk.b.align === "right" ? TextEdit.AlignRight : TextEdit.AlignJustify
       readOnly: !blk.editor || blk.editor.readOnly
       selectByMouse: false
       activeFocusOnPress: false
@@ -260,7 +275,7 @@ Item {
       font.pixelSize: Math.round(blk.ts * (blk.kind === "title" ? 1.75 : blk.kind === "heading" ? 1.4
         : blk.kind === "subheading" ? 1.15 : blk.kind === "mono" ? 0.88 : 1))
       font.italic: false
-      cursorDelegate: Caret { field: text }
+      cursorDelegate: Caret { field: text; thick: 3; low: 0.45; steady: true }
       readonly property real firstLineH: {
         void [text.font.pixelSize, text.length];
         const r = text.positionToRectangle(0);
@@ -290,7 +305,7 @@ Item {
       id: media
       visible: blk.kind === "image" || blk.kind === "sketch"
       x: blk.indentW
-      readonly property real room: Math.max(80, parent.width - blk.indentW)
+      readonly property real room: Math.max(80, blk.slotW - blk.indentW)
       // a sketch with its strokes is drawn from them (so in this theme's
       // colours); its saved picture is only for exports and thumbnails
       readonly property bool drawn: blk.kind === "sketch" && !!blk.b && !!blk.b.strokes
@@ -376,7 +391,7 @@ Item {
       id: fileChip
       visible: blk.kind === "file"
       x: blk.indentW
-      width: visible ? Math.min(parent.width - blk.indentW, fileRow.implicitWidth + 28) : 0
+      width: visible ? Math.min(blk.slotW - blk.indentW, fileRow.implicitWidth + 28) : 0
       height: 54
       radius: Zenon.windowRadius
       color: Zenon.wash(0.05)

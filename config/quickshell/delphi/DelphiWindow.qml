@@ -126,6 +126,18 @@ FloatingWindow {
     if (!path) { win.setPage("repos"); return; }
     win.mgr.call("discover", null, { path: path }, (ok, info) => {
       if (!ok || !info || info.bare) {
+        // one delphi still lists, whose files went: the way off the lists,
+        // rather than a toast and the same row there next time
+        const listed = win.mgr.recents.some((r) => r.root === path) || win.mgr.hidden.indexOf(path) >= 0;
+        if (listed && !(info && info.bare)) {
+          win.card_({ question: D.baseName(path) + " is not here any more", glyph: "\uF071", ink: Zenon.yellow,
+            detail: "Its directory is gone, or no longer a repository. Removing it takes it off Delphi's lists; its forge is not touched.",
+            items: [D.tilde(path, win.home)],
+            choices: [{ label: "Remove from Delphi", ink: Zenon.cyan, run: () => { win.mgr.drop(path); win.say("Removed " + D.baseName(path)); } },
+                      { label: "Keep it listed", ink: Zenon.muted }] });
+          if (win.root === "") win.setPage("repos");
+          return;
+        }
         win.say(info && info.bare ? "A bare repository has no working tree to show" : "Not in a repository: " + D.tilde(path, win.home), true);
         if (win.root === "") win.setPage("repos");
         return;
@@ -156,6 +168,53 @@ FloatingWindow {
     win.remotes = [];
     win.repoEpoch++;
     win.setPage("repos");
+  }
+  // FORGET one: off delphi's lists, nothing on disk or on its forge touched
+  // — for a repository no longer kept up. The open one is closed first, so
+  // it does not come straight back. Opening it again remembers it.
+  function forgetRepo(root, name) {
+    if (!root || !win.mgr) return;
+    if (root === win.root) { win.unwatch(); win.closeRepo(); }
+    win.mgr.forget(root);
+    win.say("Forgot " + (name || D.baseName(root)) + " — files and forge untouched; it waits under Forgotten in Repositories");
+  }
+  // APPLY A PATCH (user, 2026-10-14): a file chosen in terminus — a
+  // mailbox one (History's Save as a patch, a forge's .patch) lands as its
+  // commits through git am, stopping on conflicts as a rebase does; a plain
+  // diff lands as staged changes (delphi/core apply_patch)
+  function applyPatch() {
+    if (!win.mgr.fileManager || win.root === "") return;
+    win.mgr.fileManager.choose(false, win.home, (paths) => {
+      if (!paths || paths.length === 0) return;
+      win.act("applyPatch", { path: paths[0] }, { label: "Applying " + D.baseName(paths[0]),
+        then: (r) => {
+          if (r.conflicts) { win.say("Stopped on conflicts — resolve them in Changes", true); win.setPage("changes"); return; }
+          win.say(r.how === "commits" ? "Applied " + D.baseName(paths[0]) + " as commits" : "Applied — the changes are staged");
+          win.setPage(r.how === "commits" ? "history" : "changes");
+        },
+        failed: (err) => win.fail("The patch does not apply", "It may be for another version of these files, or already applied.", err) });
+    });
+  }
+  // ARCHIVE ON ITS FORGE (user, 2026-10-14): for one no longer kept up and
+  // not to be deleted — the forge's copy goes read-only (no pushes, issues
+  // or pull requests; it says it is archived), and can be unarchived from
+  // the Accounts page. hub: { forge, full } (D.hubOf). With o.root, the
+  // copy here can be forgotten in the same go.
+  function archiveOnForge(hub, o) {
+    const f = D.FORGES[hub.forge];
+    if (!f) return;
+    const opts = o || {};
+    const run = (forget) => win.act(f.id + "Archive", { full: hub.full, on: true }, { repo: null, network: true, refresh: false,
+      label: "Archiving " + hub.full, said: "Archived " + hub.full + " on " + f.name + (forget ? " — and forgotten here" : ""),
+      then: () => { if (forget) win.forgetRepo(opts.root, opts.name); if (opts.then) opts.then(); } });
+    const choices = [{ label: "Archive", ink: Zenon.yellow, run: () => run(false) }];
+    if (opts.root) choices.push({ label: "Archive and forget it here", ink: Zenon.yellow, run: () => run(true) });
+    choices.push({ label: "Cancel", ink: Zenon.muted });
+    win.card_({ question: "Archive " + hub.full + "?", glyph: f.glyph, ink: Zenon.yellow,
+      detail: "It stays on " + f.name + ", read-only: nothing can be pushed, and issues and pull requests close to new activity. "
+        + "Its page says it is archived. You can unarchive it from the Accounts page."
+        + (opts.root ? " Forgetting it here leaves its files where they are." : ""),
+      choices: choices });
   }
   // bumped on every repository change: pages drop what they held of the last
   property int repoEpoch: 0
@@ -257,7 +316,59 @@ FloatingWindow {
   // goes on with this window closed, and the ring below draws it.
 
   // the three in the head
-  function fetch() { win.act("fetch", {}, { label: "Fetching", network: true, said: "Fetched" }); }
+  function fetch() {
+    const root = win.root;
+    win.act("fetch", {}, { label: "Fetching", network: true, said: "Fetched", then: () => win.mgr.noteFetched(root) });
+  }
+
+  // ── FETCHED IN THE BACKGROUND (user, 2026-10-14) ──────────────────────
+  // The open repository, every five minutes while the window is up (and a
+  // few seconds after one is opened, when it was not fetched lately): so
+  // Pull's ↓ and History's Incoming say what is there now. It never asks
+  // for anything (delphi/core fetch_quiet), shows no pill, and a failure
+  // is silent — a Fetch pressed says what is wrong.
+  readonly property int fetchEvery: 5 * 60 * 1000
+  property bool quietFetching: false
+  function quietFetch() {
+    if (!win.mgr.autoFetch || win.quietFetching || win.netBusy || win.root === "" || win.remotes.length === 0) return;
+    const root = win.root;
+    if (Date.now() - (win.mgr.fetchedAt[root] || 0) < win.fetchEvery - 5000) return;
+    win.quietFetching = true;
+    win.mgr.call("fetchQuiet", root, {}, (ok) => {
+      if (!win) return;
+      win.quietFetching = false;
+      if (!ok) return;
+      win.mgr.noteFetched(root);
+      if (root === win.root) win.refresh();
+    });
+  }
+  Timer {
+    interval: 30000
+    repeat: true
+    running: win.visible && win.mgr && win.mgr.autoFetch && win.root !== ""
+    onTriggered: win.quietFetch()
+  }
+  Timer { id: fetchSoon; interval: 4000; onTriggered: win.quietFetch() }
+  onRemotesChanged: if (win.remotes.length > 0) fetchSoon.restart()
+  // Fetch's and Pull's right-click: how each behaves
+  function fetchMenu(item) {
+    const items = [{ text: "Fetch now", icon: "\uF021", mark: "ctrl shift f", run: () => win.fetch() },
+                   { text: "Fetch every 5 minutes, quietly", icon: win.mgr.autoFetch ? "\uF00C" : "",
+                     run: () => { win.mgr.set("autoFetch", !win.mgr.autoFetch); if (win.mgr.autoFetch) win.quietFetch(); } }];
+    const at = win.mgr.fetchedAt[win.root];
+    if (at) items.push({ isSeparator: true }, { text: "Last fetched " + D.ago(Math.floor(at / 1000), Date.now()), icon: "\uF017", enabled: false });
+    const p = item.mapToItem(stage, 0, item.height + 4);
+    repoPop.open(p.x, p.y, items);
+  }
+  function pullMenu(item) {
+    const ways = [["ff-only", "Only fast-forward"], ["rebase", "Rebase your commits onto theirs"], ["merge", "Merge when both moved"]];
+    const items = [{ text: "Pull now", icon: "\uF019", mark: "ctrl shift l", enabled: !!win.branch && !!win.branch.upstream, run: () => win.pull() },
+                   { isSeparator: true }];
+    for (const w of ways) items.push({ text: w[1], icon: win.mgr.pullMode === w[0] ? "\uF00C" : "",
+                                       run: () => win.mgr.set("pullMode", w[0]) });
+    const p = item.mapToItem(stage, 0, item.height + 4);
+    repoPop.open(p.x, p.y, items);
+  }
   function pull() {
     win.act("pull", { mode: win.mgr.pullMode }, { label: "Pulling", network: true, said: "Pulled",
       failed: (err) => win.fail("Pull did not work", win.mgr.pullMode === "ff-only"
@@ -657,6 +768,14 @@ FloatingWindow {
     items.push({ text: "Open a directory", icon: "\uF07C", mark: "ctrl o", run: () => win.chooseRepo() },
                { text: "Clone", icon: "\uF019", run: () => { win.setPage("repos"); Qt.callLater(() => { if (win.pageItem && win.pageItem.clone) win.pageItem.clone(); }); } },
                { text: "All repositories", icon: "\uF03A", run: () => win.setPage("repos") });
+    if (win.root !== "") {
+      const name = D.baseName(win.root), root = win.root;
+      items.push({ isSeparator: true }, { text: "Apply a patch…", icon: "\uF0EA", run: () => win.applyPatch() });
+      if (win.hub) items.push({ text: "Archive on " + (D.FORGES[win.hub.forge] ? D.FORGES[win.hub.forge].name : win.hub.host) + "…", icon: "\uF187",
+                                run: () => win.archiveOnForge(D.hubOf(win.remotes, true) || win.hub, { root: root, name: name }) });
+      items.push({ isSeparator: true },
+                 { text: "Forget " + name, icon: "\uF070", run: () => win.forgetRepo(root, name) });
+    }
     const p = repoChip.mapToItem(stage, 0, repoChip.height + 4);
     repoPop.open(p.x, p.y, items);
   }
@@ -1406,16 +1525,20 @@ FloatingWindow {
           }
         }
         DialogButton {
+          id: fetchBtn
           visible: !win.netBusy && win.root !== ""
           label: "Fetch"
           onClicked: win.fetch()
+          MouseArea { anchors.fill: parent; acceptedButtons: Qt.RightButton; onClicked: win.fetchMenu(fetchBtn) }
         }
         DialogButton {
+          id: pullBtn
           visible: !win.netBusy && win.root !== ""
           label: win.branch && win.branch.behind > 0 ? "Pull  ↓" + win.branch.behind : "Pull"
           ink: win.branch && win.branch.behind > 0 ? Zenon.cyan : Zenon.muted
           ready: !!win.branch && !!win.branch.upstream
           onClicked: win.pull()
+          MouseArea { anchors.fill: parent; acceptedButtons: Qt.RightButton; onClicked: win.pullMenu(pullBtn) }
         }
         // Push: where it goes is the chip beside the page's title (pushChip)
         Row {

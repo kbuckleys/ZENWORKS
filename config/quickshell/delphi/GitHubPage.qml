@@ -96,7 +96,7 @@ Item {
     : pg.signedIn ? "Signed in as " + pg.account.login + (pg.account.source === pg.site.cli && pg.site.cli ? " through " + pg.site.cli : " with a token")
     : "Not signed in"
   readonly property var hints: pg.signedIn
-    ? [["return", "open"], ["c", "clone"], ["u", "upload files"], ["w", "web"], ["n", "new"], ["/", "filter"], ["[ ]", "forge"]]
+    ? [["return", "open"], ["c", "clone"], ["u", "upload files"], ["w", "web"], ["a", pg.repo && pg.repo.archived ? "unarchive" : "archive"], ["n", "new"], ["/", "filter"], ["[ ]", "forge"]]
     : [["return", "sign in"], ["[ ]", "forge"]]
   readonly property var buttons: (pg.site.server ? [{ label: "Remove server", ink: Zenon.red, run: () => pg.removeServer() }] : []).concat(pg.signedIn ? [
     { label: "Sign out", run: () => pg.signOut() },
@@ -290,6 +290,29 @@ Item {
                   { label: "Open on the web", run: () => pg.web(r) },
                   { label: "Cancel" }] });
     });
+  }
+  // ARCHIVE (user, 2026-10-14): read-only on the forge, kept — the clone
+  // here, when there is one, can be forgotten in the same go
+  // (DelphiWindow.archiveOnForge); an archived one unarchived
+  function archive(r) {
+    if (!r) return;
+    const hub = { forge: pg.forge, full: r.full };
+    if (r.archived) {
+      pg.win.confirm({ question: "Unarchive " + r.full + "?", glyph: pg.site.glyph, ink: Zenon.cyan,
+        detail: "It takes pushes, issues and pull requests again.", verb: "Unarchive",
+        then: () => pg.win.act(pg.op("Archive"), { full: r.full, on: false }, { repo: null, network: true, refresh: false,
+          label: "Unarchiving " + r.full, said: "Unarchived " + r.full, then: () => { if (pg) pg.markArchived(r.full, false); } }) });
+      return;
+    }
+    const roots = pg.win.mgr.recents.map((x) => x.root);
+    pg.win.mgr.call("whereCloned", null, { host: pg.site.host, full: r.full, roots: roots }, (ok, res) => {
+      if (!pg) return;
+      const root = ok && res.root ? res.root : "";
+      pg.win.archiveOnForge(hub, { root: root, name: root ? D.baseName(root) : "", then: () => { if (pg) pg.markArchived(r.full, true); } });
+    });
+  }
+  function markArchived(full, on) {
+    pg.repos = pg.repos.map((x) => x.full === full ? Object.assign({}, x, { archived: on }) : x);
   }
   function web(r) { if (r) Quickshell.execDetached(["xdg-open", "https://" + pg.site.host + "/" + r.full]); }
 
@@ -534,6 +557,7 @@ Item {
     if (k === Qt.Key_C) { pg.clone(pg.repo); return true; }
     if (k === Qt.Key_U) { pg.upload(pg.repo); return true; }
     if (k === Qt.Key_W) { pg.web(pg.repo); return true; }
+    if (k === Qt.Key_A) { pg.archive(pg.repo); return true; }
     if (k === Qt.Key_Escape && pg.query !== "") { filter.text = ""; return true; }
     return false;
   }
@@ -691,8 +715,10 @@ Item {
         Text {
           width: parent.width
           elide: Text.ElideRight
-          text: rrow.r.full + (rrow.r.archived ? "   ·   archived" : "") + (rrow.r.empty ? "   ·   empty" : "")
-          color: rrow.index === pg.sel ? Zenon.ink : Zenon.soft
+          textFormat: Text.StyledText
+          text: D.esc(rrow.r.full) + (rrow.r.archived ? "&nbsp;&nbsp;&nbsp;<font color='" + Zenon.hex(Zenon.yellow) + "'>archived</font>" : "")
+            + (rrow.r.empty ? "&nbsp;&nbsp;&nbsp;<font color='" + Zenon.hex(Zenon.muted) + "'>empty</font>" : "")
+          color: rrow.r.archived ? Zenon.muted : rrow.index === pg.sel ? Zenon.ink : Zenon.soft
           font.family: Zenon.face
           font.weight: Zenon.weight
           font.pixelSize: Zenon.px(16)
@@ -733,6 +759,7 @@ Item {
               { text: "Clone", icon: "", mark: "c", run: () => pg.clone(rrow.r) },
               { text: "Upload files", icon: "", mark: "u", run: () => pg.upload(rrow.r) },
               { text: "Open on the web", icon: "", mark: "w", run: () => pg.web(rrow.r) },
+              { text: rrow.r.archived ? "Unarchive" : "Archive…", icon: "\uF187", mark: "a", run: () => pg.archive(rrow.r) },
               { isSeparator: true },
               { text: "Copy the HTTPS address", icon: "", run: () => pg.win.copy(rrow.r.https) },
               { text: "Copy the SSH address", icon: "", run: () => pg.win.copy(rrow.r.ssh) },
@@ -744,7 +771,10 @@ Item {
         onDoubleClicked: pg.openOne(rrow.r)
       }
     }
-    footer: Item { width: list.width; height: pg.loadingRepos ? 50 : 0; Working { anchors.centerIn: parent; running: pg.loadingRepos } }
+    // the first answer awaited in the list's middle, as every page does; more
+    // coming after rows are there, under them
+    footer: Item { width: list.width; height: pg.loadingRepos && pg.shown.length > 0 ? 50 : 0; Working { anchors.centerIn: parent; running: pg.loadingRepos && pg.shown.length > 0 } }
+    Working { anchors.centerIn: parent; running: pg.loadingRepos && pg.shown.length === 0; visible: running }
     EmptyMark {
       anchors.centerIn: parent
       visible: pg.shown.length === 0 && !pg.loadingRepos && pg.listError === ""

@@ -89,6 +89,8 @@ function blankEntry(journal, date, prompt) {
 // ── READING A SAVED ONE ──────────────────────────────────────────────────
 // Every field present and of its type, whatever the file said: the window
 // reads them unguarded.
+var ALIGNS = ["center", "right", "justify"];
+
 function cleanBlock(b) {
   if (!b || typeof b !== "object") return null;
   var out = block(String(b.k || "body"), String(b.h || ""));
@@ -104,6 +106,10 @@ function cleanBlock(b) {
   if (b.aspect) out.aspect = Math.max(0.1, Math.min(4, Number(b.aspect) || 0.6));
   // standing beside the block before it, in a row (pictures and files)
   if (b.beside && (out.k === "image" || out.k === "sketch" || out.k === "file")) out.beside = true;
+  // how its lines sit (BlockEditor.setAlign); along the left is no field
+  // (a picture's or a file's: its row's, when it leads one)
+  if ((isText(out) && out.k !== "mono" || out.k === "image" || out.k === "sketch" || out.k === "file")
+      && ALIGNS.indexOf(b.align) >= 0) out.align = b.align;
   // a checklist item's reminder, when it is due (ms)
   if (b.due && out.k === "check") out.due = Number(b.due) || 0;
   // the words read off a picture (tesseract), for search and for copying
@@ -131,12 +137,6 @@ function clean(n) {
     deleted: Number(n.deleted) || 0, pinned: !!n.pinned
   };
   if (out.kind === "note") out.folder = String(n.folder || "");
-  // a sticky in the Trash: where it stood, to stand there again
-  if (n.fromDesktop && typeof n.fromDesktop === "object") out.fromDesktop = n.fromDesktop;
-  // the files a locked note uses from other notes, said in the clear
-  if (Array.isArray(n.uses) && n.uses.length) out.uses = n.uses.map(String);
-  // when its file was last written, as read (the sync guard: ClioManager)
-  if (n._disk) out._disk = Number(n._disk) || 0;
   else {
     out.journal = String(n.journal || "");
     out.date = Number(n.date) || out.created;
@@ -144,6 +144,14 @@ function clean(n) {
     out.bookmark = !!n.bookmark;
     out.prompt = String(n.prompt || "");
   }
+  // a name given it (the menu's Rename…): its title, over the first line
+  if (n.name && String(n.name).trim() !== "") out.name = String(n.name).trim().slice(0, 200);
+  // a sticky in the Trash: where it stood, to stand there again
+  if (n.fromDesktop && typeof n.fromDesktop === "object") out.fromDesktop = n.fromDesktop;
+  // the files a locked note uses from other notes, said in the clear
+  if (Array.isArray(n.uses) && n.uses.length) out.uses = n.uses.map(String);
+  // when its file was last written, as read (the sync guard: ClioManager)
+  if (n._disk) out._disk = Number(n._disk) || 0;
   // sealed: the blocks are on disk encrypted, and only the head is readable
   if (n.sealed) {
     out.sealed = String(n.sealed);
@@ -439,28 +447,29 @@ function htmlOf(blocks, base, opts) {
     }
     closeTo(0);
     var src = b.src ? (base ? base + "/" : "") + b.src : "";
+    var al = b.align ? " style=\"text-align: " + b.align + ";\"" : "";
     switch (b.k) {
-      case "title": out.push("<h1>" + b.h + "</h1>"); break;
-      case "heading": out.push("<h2>" + b.h + "</h2>"); break;
-      case "subheading": out.push("<h3>" + b.h + "</h3>"); break;
+      case "title": out.push("<h1" + al + ">" + b.h + "</h1>"); break;
+      case "heading": out.push("<h2" + al + ">" + b.h + "</h2>"); break;
+      case "subheading": out.push("<h3" + al + ">" + b.h + "</h3>"); break;
       case "mono": out.push("<pre>" + escape(b.h) + "</pre>"); break;
-      case "quote": out.push("<blockquote>" + b.h + "</blockquote>"); break;
+      case "quote": out.push("<blockquote" + al + ">" + b.h + "</blockquote>"); break;
       case "rule": out.push("<hr />"); break;
       case "image": case "sketch":
-        out.push("<p><img src=\"" + escape(opts.sticky ? "file://" + src : src) + "\""
+        out.push("<p" + al + "><img src=\"" + escape(opts.sticky ? "file://" + src : src) + "\""
           + (opts.imgWidth ? " width=\"" + Math.round(opts.imgWidth * (b.w || 1)) + "\"" : "") + " /></p>");
         break;
-      case "file": out.push("<p><a href=\"" + escape(src) + "\">" + escape(b.name || "file") + "</a></p>"); break;
+      case "file": out.push("<p" + al + "><a href=\"" + escape(src) + "\">" + escape(b.name || "file") + "</a></p>"); break;
       case "table":
         out.push("<table border=\"1\" cellpadding=\"6\" style=\"border-collapse: collapse;\">"
           + b.rows.map(function (row) { return "<tr>" + row.map(function (c) { return "<td>" + c + "</td>"; }).join("") + "</tr>"; }).join("")
           + "</table>");
         break;
       case "check":
-        out.push("<p>" + (b.c ? "☑ " : "☐ ") + b.h + "</p>"); break;
+        out.push("<p" + al + ">" + (b.c ? "☑ " : "☐ ") + b.h + "</p>"); break;
       case "bullet": case "dash": case "number":
-        out.push("<p>" + (b.k === "number" ? nums[i] + ". " : b.k === "dash" ? "– " : "• ") + b.h + "</p>"); break;
-      default: out.push("<p>" + b.h + "</p>");
+        out.push("<p" + al + ">" + (b.k === "number" ? nums[i] + ". " : b.k === "dash" ? "– " : "• ") + b.h + "</p>"); break;
+      default: out.push("<p" + al + ">" + b.h + "</p>");
     }
   }
   closeTo(0);
@@ -701,7 +710,7 @@ function tagsOf(text) {
 
 function derive(n) {
   if (!n.blocks) {
-    return { title: n.title || "Locked note", preview: "", text: "", tags: [], words: 0, chars: 0,
+    return { title: n.name || n.title || "Locked note", preview: "", text: "", tags: [], words: 0, chars: 0,
              checks: 0, done: 0, images: [], files: 0, table: false, sketch: false, links: [] };
   }
   var bs = n.blocks;
@@ -726,7 +735,7 @@ function derive(n) {
   // (no \p{L}: QML's engine takes it and matches nothing)
   var words = (text.match(/\S+/g) || []).filter(function (w) { return /[A-Za-z0-9\u00C0-\uFFFF]/.test(w); }).length;
   return {
-    title: title.slice(0, 200),
+    title: (n.name || title).slice(0, 200),
     preview: rest.join("  ").slice(0, 240),
     text: text,
     tags: tagsOf(text),
@@ -735,6 +744,28 @@ function derive(n) {
     checks: checks, done: done,
     images: images, files: files, table: table, sketch: sketch, links: links
   };
+}
+
+// ── RECENT ──
+// The notes and entries last written or opened (`seen`: id → when), the
+// latest day first: the sidebar's Recent. Nothing in the Trash, nothing empty
+// and never opened since it was made.
+function recent(notes, seen, k) {
+  seen = seen || {};
+  var out = [];
+  for (var i = 0; i < notes.length; i++) {
+    var n = notes[i];
+    if (n.deleted || (n.kind !== "note" && n.kind !== "entry")) continue;
+    var at = Math.max(n.modified || 0, seen[n.id] || 0);
+    if (!at) continue;
+    if (n.blocks && !seen[n.id] && (n.d ? n.d.text : derive(n).text).trim() === "") continue;
+    out.push({ n: n, at: at });
+  }
+  // by DAY, then by when each was made: opening one moves it to its
+  // day, never to the top of it (user, 2026-10-14: the row jumped under
+  // the pointer as it was chosen)
+  out.sort(function (a, b) { return dayStart(b.at) - dayStart(a.at) || (b.n.created || 0) - (a.n.created || 0); });
+  return out.slice(0, k || 5);
 }
 
 function titleOf(n, untitled) {
@@ -922,6 +953,13 @@ function clock(ms) { var d = new Date(ms); return two(d.getHours()) + ":" + two(
 
 // A date as short as it can be and still be read: the time today, the
 // weekday this week, the day and month this year, the full date before.
+// a day as the sidebar's Recent says it: Today, Yesterday, a weekday this
+// week, a date before
+function dayShort(ms, now) {
+  if (!ms) return "";
+  var ago = daysBetween(ms, now);
+  return ago <= 0 ? "Today" : dateShort(ms, now);
+}
 function dateShort(ms, now) {
   if (!ms) return "";
   var ago = daysBetween(ms, now);

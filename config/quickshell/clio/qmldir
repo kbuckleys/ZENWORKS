@@ -30,3 +30,4 @@ SettingLine 1.0 SettingLine.qml
 SettingsBody 1.0 SettingsBody.qml
 SketchPad 1.0 SketchPad.qml
 TableBlock 1.0 TableBlock.qml
+NotePeek 1.0 NotePeek.qml

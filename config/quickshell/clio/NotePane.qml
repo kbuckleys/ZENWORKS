@@ -104,7 +104,7 @@ Item {
     Text {
       x: 18
       anchors.verticalCenter: parent.verticalCenter
-      width: parent.width - tools.width - 40
+      width: Math.max(0, tools.x - 30)
       elide: Text.ElideRight
       visible: !pane.isSticky
       text: !pane.note ? "" : pane.note.deleted ? "In the Trash · restore it to edit"
@@ -116,6 +116,7 @@ Item {
       font.pixelSize: Zenon.px(13)
     }
     Row {
+      id: swatches
       x: 16
       anchors.verticalCenter: parent.verticalCenter
       spacing: 6
@@ -135,15 +136,30 @@ Item {
       }
     }
 
+    // centred on the note (user, 2026-10-14), the format bar under it too
     Row {
       id: tools
-      anchors.right: parent.right
-      anchors.rightMargin: 12
+      // (never over a sticky's colours, nor off the pane's left edge)
+      x: Math.max(swatches.visible ? swatches.x + swatches.width + 14 : 12, Math.round((parent.width - width) / 2))
       anchors.verticalCenter: parent.verticalCenter
       spacing: 4
       visible: !!pane.note && !pane.locked
       readonly property bool writable: !!pane.note && !pane.note.deleted
-      ClioTool { pane: pane; glyph: ""; word: "Aa"; tip: "Formats"; enabled: tools.writable; onPressed: (x, y) => pane.formatMenu(x, y) }
+      ClioTool {
+        id: aaTool
+        pane: pane
+        word: "Aa"
+        tip: pane.formatPinned ? "Formats — click to put away" : "Formats — click to keep them up"
+        lit: pane.formatPinned
+        litInk: Zenon.cyan
+        enabled: tools.writable
+        onHoveredChanged: pane.formatHover()
+        onPressed: {
+          pane.formatPinned = !pane.formatPinned;
+          // put away by the click: gone now, though the pointer is still on Aa
+          if (!pane.formatPinned) { pane.formatHush = true; formatLeave.stop(); pane.formatShown = false; }
+        }
+      }
       ClioTool { pane: pane; glyph: "\u{F0C52}"; tip: "Checklist"; keys: "ctrl shift l"; enabled: tools.writable; onPressed: ed.setKind("check") }
       ClioTool { pane: pane; glyph: ""; tip: "Table"; keys: "ctrl alt t"; enabled: tools.writable; onPressed: ed.insertTable() }
       ClioTool { pane: pane; glyph: ""; tip: "Put in…"; enabled: tools.writable; onPressed: (x, y) => pane.attachMenu(x, y) }
@@ -190,9 +206,171 @@ Item {
     ed.find("");
     pane.focusEditor(false);
   }
+  // ── THE FORMAT BAR ─────────────────────────────────────────────────────
+  // Every format at once, in a second bar under the toolbar: shown while
+  // the pointer is on Aa (or on the bar), kept up by a click on Aa. The
+  // note slides down to make room and goes under it frosted, as under the
+  // head (user, 2026-10-14). Its buttons never take the keyboard: the
+  // caret and the selection stay where they were.
+  property bool formatPinned: false
+  property bool formatShown: false
+  readonly property bool formatUp: (pane.formatShown || pane.formatPinned) && !!pane.note && !pane.locked && !pane.note.deleted
+  // a click put it away: the hover does not bring it back until the
+  // pointer has left Aa (and the bar) once
+  property bool formatHush: false
+  // the pointer on the bar (see fmtRoom: why there is no Flickable)
+  // (the handler itself, not formatBar.hovered: its own hoveredChanged
+  // ran before that binding caught up, read "still on the bar", and the
+  // bar never went — user, 2026-10-14)
+  function barHovered() { return formatBar.handler.hovered; }
+  // decided once every hover that changed with this move has changed
+  function formatHover() { Qt.callLater(pane.formatSettle); }
+  function formatSettle() {
+    if (aaTool.hovered || pane.barHovered()) {
+      if (pane.formatHush) return;
+      formatLeave.stop();
+      pane.formatShown = true;
+    } else {
+      pane.formatHush = false;
+      formatLeave.restart();
+    }
+  }
+  Timer { id: formatLeave; interval: 380; onTriggered: if (!aaTool.hovered && !pane.barHovered()) pane.formatShown = false }
+  // the kind of block the caret is in, lit on the bar
+  readonly property string alignHere: ed.alignHere()
+  // the marks on the words in hand (the caret's, or the selection's), lit
+  // on the bar; a heading's own weight is not "bold" (TextEdit's
+  // cursorSelection, Qt 6.7)
+  readonly property var marksHere: {
+    void ed.cursorKey; void ed.rev;
+    const it = ed.current();
+    if (!it || !it.isText || !it.te || !it.te.cursorSelection) return ({});
+    void it.te.cursorPosition; void it.te.selectionStart; void it.te.selectionEnd; void it.te.length;
+    const f = it.te.cursorSelection.font;
+    return { b: f.weight >= Font.Bold && it.te.font.weight < Font.DemiBold, i: f.italic, u: f.underline, s: f.strikeout };
+  }
+  readonly property string kindHere: { void ed.cursorKey; void ed.rev; const it = ed.current(); return it ? it.kind : ""; }
+  Rectangle {
+    id: formatBar
+    readonly property var handler: barHover
+    // the pane, as its buttons are handed it: `pane: pane` in a delegate
+    // binds ClioTool's own `pane` to itself (null) — the side: side trap
+    readonly property Item host: pane
+    anchors.top: head.bottom
+    width: parent.width
+    height: pane.formatUp ? 46 : 0
+    clip: true
+    // over the find bar too while it is only hovered
+    z: 4.5
+    // the head's own ground: the note frosted under it, as under the head
+    color: Zenon.headBg
+    Behavior on height { NumberAnimation { duration: Zenon.fast; easing.type: Zenon.ease } }
+    Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Zenon.border }
+    HoverHandler { id: barHover; onHoveredChanged: pane.formatHover() }
+    // (no Flickable: it filtered the pointer, and the hover over the
+    // buttons went stale — the bar jumped, then would not go. A pane too
+    // narrow for every format gets the row a little smaller instead.)
+    Item {
+      id: fmtRoom
+      anchors.fill: parent
+      anchors.leftMargin: 4
+      anchors.rightMargin: 4
+      Row {
+        id: fmtRow
+        // centred, under the toolbar it opens from
+        readonly property real fit: Math.min(1, fmtRoom.width / Math.max(1, width))
+        scale: fit
+        transformOrigin: Item.Center
+        x: Math.round((fmtRoom.width - width) / 2)
+        height: parent.height
+        spacing: 0
+        // the paragraph styles, each named in its own weight
+        Repeater {
+          model: [["title", "Title", "ctrl shift t", Font.Bold], ["heading", "Heading", "ctrl shift h", Font.Bold],
+                  ["subheading", "Subheading", "ctrl shift j", Font.DemiBold], ["body", "Body", "ctrl shift b", Font.Normal],
+                  ["mono", "Mono", "ctrl shift m", Font.Normal]]
+          delegate: ClioTool {
+            required property var modelData
+            anchors.verticalCenter: parent.verticalCenter
+            pane: formatBar.host
+            onHoveredChanged: formatBar.host.formatHover()
+            size: 26
+            word: modelData[1]
+            wordPx: Zenon.px(12)
+            pad: 10
+            wordWeight: modelData[3]
+            litInk: Zenon.cyan
+            lit: pane.kindHere === modelData[0]
+            tip: N.KINDS[modelData[0]].label
+            keys: modelData[2]
+            onPressed: ed.setKind(modelData[0])
+          }
+        }
+        Item { width: 5; height: parent.height; Rectangle { anchors.centerIn: parent; width: 1; height: 18; color: Zenon.border } }
+        // lists and the quote
+        Repeater {
+          model: [["bullet", "ctrl shift 7"], ["dash", "ctrl shift 8"], ["number", "ctrl shift 9"], ["check", "ctrl shift l"], ["quote", ""]]
+          delegate: ClioTool {
+            required property var modelData
+            anchors.verticalCenter: parent.verticalCenter
+            pane: formatBar.host
+            onHoveredChanged: formatBar.host.formatHover()
+            size: 26
+            glyph: N.KINDS[modelData[0]].glyph
+            litInk: Zenon.cyan
+            lit: pane.kindHere === modelData[0]
+            tip: N.KINDS[modelData[0]].label
+            keys: modelData[1]
+            onPressed: ed.setKind(modelData[0])
+          }
+        }
+        Item { width: 5; height: parent.height; Rectangle { anchors.centerIn: parent; width: 1; height: 18; color: Zenon.border } }
+        // how the lines sit
+        Repeater {
+          model: [["", "\uF036", "Along the left"], ["center", "\uF037", "Centred"], ["right", "\uF038", "Along the right"], ["justify", "\uF039", "Justified"]]
+          delegate: ClioTool {
+            required property var modelData
+            anchors.verticalCenter: parent.verticalCenter
+            pane: formatBar.host
+            onHoveredChanged: formatBar.host.formatHover()
+            size: 26
+            glyph: modelData[1]
+            litInk: Zenon.cyan
+            lit: (pane.kindHere !== "" || ed.mediaSel !== "") && pane.alignHere === modelData[0]
+            tip: modelData[2]
+            onPressed: ed.setAlign(modelData[0])
+          }
+        }
+        Item { width: 5; height: parent.height; Rectangle { anchors.centerIn: parent; width: 1; height: 18; color: Zenon.border } }
+        // the marks on the words chosen
+        Repeater {
+          model: [["b", "", "Bold", "ctrl b"], ["i", "", "Italic", "ctrl i"], ["u", "", "Underline", "ctrl u"], ["s", "", "Strikethrough", "ctrl shift x"]]
+          delegate: ClioTool {
+            required property var modelData
+            anchors.verticalCenter: parent.verticalCenter
+            pane: formatBar.host
+            onHoveredChanged: formatBar.host.formatHover()
+            size: 26
+            glyph: modelData[1]
+            litInk: Zenon.cyan
+            lit: !!pane.marksHere[modelData[0]]
+            tip: modelData[2]
+            keys: modelData[3]
+            onPressed: ed.mark(modelData[0])
+          }
+        }
+        Item { width: 5; height: parent.height; Rectangle { anchors.centerIn: parent; width: 1; height: 18; color: Zenon.border } }
+        ClioTool { anchors.verticalCenter: parent.verticalCenter; pane: formatBar.host; onHoveredChanged: formatBar.host.formatHover(); size: 26; glyph: ""; tip: "Outdent"; keys: "shift tab"; onPressed: ed.indent(-1) }
+        ClioTool { anchors.verticalCenter: parent.verticalCenter; pane: formatBar.host; onHoveredChanged: formatBar.host.formatHover(); size: 26; glyph: ""; tip: "Indent"; keys: "tab"; onPressed: ed.indent(1) }
+        ClioTool { anchors.verticalCenter: parent.verticalCenter; pane: formatBar.host; onHoveredChanged: formatBar.host.formatHover(); size: 26; glyph: "\u{F0265}"; tip: "Clear formatting"; onPressed: ed.plainText() }
+      }
+    }
+  }
+
   Rectangle {
     id: findBar
     anchors.top: head.bottom
+    anchors.topMargin: formatBar.height
     width: parent.width
     height: pane.finding ? 46 : 0
     clip: true
@@ -342,6 +520,18 @@ Item {
     }
   }
 
+  // ── A LINK TO A NOTE, PEEKED AT ── a moment after the pointer stops on it
+  readonly property var linkNote: { const id = N.noteLink(ed.hoverLink); return id && pane.mgr ? pane.mgr.noteOf(id) : null; }
+  property bool linkPeek: false
+  onLinkNoteChanged: { pane.linkPeek = false; if (pane.linkNote) linkWait.restart(); else linkWait.stop(); }
+  Timer { id: linkWait; interval: 450; onTriggered: pane.linkPeek = !!pane.linkNote }
+  NotePeek {
+    win: pane.win
+    target: ed.linkSpotItem
+    note: pane.linkNote
+    shown: pane.linkPeek && !!pane.linkNote && pane.visible && !pane.win.menuRef.isOpen && !pane.win.sheetOpen
+  }
+
   // ── NOTHING CHOSEN ─────────────────────────────────────────────────────
   EmptyMark {
     anchors.centerIn: parent
@@ -390,7 +580,13 @@ Item {
     }
   }
 
-  ScrollEdge { view: ed.flick; follow: true; bar: head; visible: ed.visible }
+  // (the format bar kept up moves the editor down, and away again: its
+  // frost re-measured each time, or a band of it stayed where the bar was)
+  // (head, format bar and find bar frosted as one strip, from the pane's
+  // top down to the note — no bar named, see morpheus/ScrollEdge; and
+  // re-measured as the bars come and go, or a band of frost stayed where
+  // one had been)
+  ScrollEdge { view: ed.flick; follow: true; bar: null; chromeTop: 0; visible: ed.visible; track: [findBar.y, findBar.height, ed.y, formatBar.height] }
 
   // ── MENUS ──────────────────────────────────────────────────────────────
   function formatMenu(x, y) {

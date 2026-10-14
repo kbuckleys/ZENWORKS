@@ -11,7 +11,7 @@
 //
 //     PopMenu { id: menu; anchors.fill: parent; window: win
 //               onClosed: list.forceActiveFocus() }
-//     menu.open(x, y, [ { text, icon, mark, enabled, danger, run },
+//     menu.open(x, y, [ { text, icon, iconInk, mark, enabled, danger, run },
 //                       { isSeparator: true }, … ])
 //
 // x, y are in this item's coordinates. `mark` is the key that does the same
@@ -77,7 +77,7 @@ Item {
     cardWidth: menu.cardWidth
     model: menu.items.map((it) => it.isSeparator ? { isSeparator: true }
       : { text: it.text, icon: it.icon, hint: it.mark || "", enabled: it.enabled !== false,
-          danger: !!it.danger })
+          danger: !!it.danger, iconInk: it.iconInk })
     onChosen: (i) => {
       const it = menu.items[i];
       if (it && it.keep && it.run && it.enabled !== false) { it.run(); return; }

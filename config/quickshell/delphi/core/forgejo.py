@@ -128,6 +128,12 @@ def repos(cancel=None):
             for r in rs]
 
 
+def archive(full, on=True):
+    """Forgejo's (Codeberg's) archived flag, set by editing the repository."""
+    r = call("PATCH", f"/repos/{full}", {"archived": bool(on)})
+    return {"archived": r.get("archived", bool(on)) if isinstance(r, dict) else bool(on)}
+
+
 def create(name, private=True, description="", org=None):
     body = {"name": name, "private": private, "description": description, "auto_init": False}
     r = call("POST", f"/orgs/{org}/repos" if org else "/user/repos", body)

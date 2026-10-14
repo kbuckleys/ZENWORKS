@@ -78,15 +78,15 @@ Item {
   // ── IT EXPANDS OUT OF ITS TAIL, WITH A SPRING (user, 2026-10-14) ──────
   // macOS' popovers: from about a third of its size at the tail's point to
   // a little past full and back, on its own clock rather than the fade's.
-  // Closing is the same spring played backwards: a swell, then drawn back
-  // into the tail (InBack is OutBack reversed in time). `opening` is which
+  // Closing is quicker and plain: drawn straight back into the tail, at
+  // once — no wait, no swell (user, 2026-10-14). `opening` is which
   // way the holder's fade is going; `grow` 0 → 1 is the size, and the
   // bubble is up while either is (Bubble.visible).
   //
-  // ONE AFTER ANOTHER, NO SPRING (user, 2026-10-14). Going waits a moment
-  // (collapseSoon) before it starts: asked back in that time — ceres'
-  // package peek, the pointer going down the names — it was never gone, so
-  // it neither shrinks nor springs again, only moves to what it is about.
+  // ONE AFTER ANOTHER (ceres' package peek, the pointer going down the
+  // names): the holder keeps it shown across the hop (ceres' peekShown),
+  // so it never starts to go. Asked back while going, it grows from where
+  // it had got to.
   property bool opening: true
   property real lastShade: 0
   property real grow: 0
@@ -98,7 +98,6 @@ Item {
     if (face.opening && face.shade < face.lastShade) face.heldH = card.height;
     face.opening = face.shade >= face.lastShade;
     face.lastShade = face.shade;
-    if (face.opening) collapseSoon.stop();
     if (face.opening && face.shade > 0 && (wasShut || growOut.running || !growIn.running && face.grow < 1)) {
       growOut.stop();
       growIn.from = Math.max(0, face.grow);
@@ -107,15 +106,7 @@ Item {
       // changed size as it left was drawn a frame without its outline,
       // what was in it floating) — see THE FIT
       if (face.shade < 0.2) face.refit();
-    } else if (!face.opening && !growOut.running && !collapseSoon.running && face.grow > 0) {
-      collapseSoon.restart();
-    }
-  }
-  Timer {
-    id: collapseSoon
-    interval: 160
-    onTriggered: {
-      if (face.opening || face.grow <= 0) return;
+    } else if (!face.opening && !growOut.running && face.grow > 0) {
       growIn.stop();
       growOut.from = Math.min(1, face.grow);
       growOut.restart();
@@ -130,14 +121,14 @@ Item {
     easing.type: Easing.OutBack
     easing.overshoot: 2.2
   }
+  // going: straight back into the tail, no swell first (user, 2026-10-14)
   NumberAnimation {
     id: growOut
     target: face
     property: "grow"
     to: 0
-    duration: face.springTime
-    easing.type: Easing.InBack
-    easing.overshoot: 2.2
+    duration: 180
+    easing.type: Easing.InCubic
   }
   readonly property real pop: Math.max(0, face.grow)
   transform: Scale {
@@ -328,9 +319,12 @@ Item {
       y: 12
       width: card.width - 28
       spacing: 10
-      // waiting for the outline coming in; gone first going out, so the
-      // card draws back into its tail empty
-      opacity: !face.drawn ? 0 : face.opening ? 1 : Math.max(0, Math.min(1, (face.grow - 0.6) / 0.3))
+      // waiting for the outline coming in; going out it stays, and goes
+      // back into the tail WITH the card — one thing collapsing, not a
+      // blank card and then a collapse (user, 2026-10-14). A holder must
+      // keep what is in it until the bubble is gone (AttachTray: `visible`,
+      // not `shown`), or the card shrinks round what is left — its title.
+      opacity: face.drawn ? 1 : 0
     }
   }
 }

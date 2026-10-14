@@ -28,7 +28,8 @@ Bubble {
 
   // the newest first, each file once (the same file put in twice is one)
   readonly property var items: {
-    if (!tray.shown || !tray.mgr) return [];
+    // (kept while it closes: emptied then, the card shrank to its title)
+    if (!tray.visible || !tray.mgr) return [];
     const out = [], seen = {};
     const notes = tray.mgr.notes.slice().sort((a, b) => b.modified - a.modified);
     for (const n of notes) {

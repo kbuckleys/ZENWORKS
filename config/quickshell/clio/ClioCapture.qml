@@ -89,7 +89,7 @@ PanelWindow {
         Row {
           anchors.verticalCenter: parent.verticalCenter
           spacing: 10
-          Text { anchors.verticalCenter: parent.verticalCenter; text: ""; color: Zenon.sand; font.family: Zenon.glyphFace; font.pixelSize: Zenon.px(18) }
+          Text { anchors.verticalCenter: parent.verticalCenter; text: ""; color: Zenon.sand; font.family: Zenon.glyphFace; font.pixelSize: Zenon.px(18) }
           Text { anchors.verticalCenter: parent.verticalCenter; text: "Quick note"; color: Zenon.ink; font.family: Zenon.face; font.weight: Font.Bold; font.pixelSize: Zenon.px(16) }
         }
         Segments {

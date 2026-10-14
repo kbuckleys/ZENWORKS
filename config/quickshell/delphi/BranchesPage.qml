@@ -252,18 +252,10 @@ Item {
       readonly property var b: brow.modelData
       width: list.width
       height: list.rowH
-      Text {
+      GroupHead {
         visible: !!brow.b.head
-        x: 22
-        anchors.verticalCenter: parent.verticalCenter
-        anchors.verticalCenterOffset: 4
-        text: brow.b.head ? brow.b.title.toUpperCase() + "   " + brow.b.count : ""
-        color: Zenon.muted
-        font.family: Zenon.face
-        font.weight: Font.Bold
-        font.letterSpacing: 1
-        font.features: { "tnum": 1 }
-        font.pixelSize: Zenon.px(12)
+        title: brow.b.head ? brow.b.title : ""
+        count: brow.b.head ? brow.b.count : -1
       }
       Item {
         anchors.fill: parent

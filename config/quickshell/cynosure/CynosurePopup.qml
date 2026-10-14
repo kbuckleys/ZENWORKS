@@ -57,7 +57,7 @@ PanelWindow {
   // picker is the confirm: it already is the second step for a typed
   // command, so a verb that must ask reuses it rather than growing a third.
   property var pending: null
-  // socordia's switch, handed in by shell.qml so the Keep awake row can say
+  // socordia's switch, handed in by shell.qml so the Caffeinate row can say
   // which way it is — rebuilt the moment it flips.
   property bool keepAwake: false
   onKeepAwakeChanged: popup.rebuild()
@@ -608,6 +608,57 @@ property var statusbar: null
     return Math.min(1000, Math.ceil(inputBar.width + popup.fittedListW));
   }
 
+  // The cursor both strips slide. The view sizes it to the current row; it
+  // takes that row's edge flags for its insets and corners, so it is held
+  // off the panel's stroke and rounds only where the row sits in a pill
+  // corner — the rule each row used to apply to its own highlight.
+  //
+  // Placed by hand, not by the view: highlightFollowsCurrentItem's smoothed
+  // follow at this speed read as a jump, not a slide. The view still parents
+  // it in its content, so the row's own x is the right coordinate, and a
+  // plain eased NumberAnimation is a move you can actually watch.
+  component SelBar: Item {
+    id: sb
+    property Item cur: null
+    x: sb.cur ? sb.cur.x : 0
+    y: 0
+    width: sb.cur ? sb.cur.width : 0
+    height: sb.cur ? sb.cur.height : 0
+    visible: !!sb.cur
+    Behavior on x { NumberAnimation { duration: Zenon.normal; easing.type: Easing.OutCubic } }
+    Behavior on width { NumberAnimation { duration: Zenon.normal; easing.type: Easing.OutCubic } }
+    readonly property bool atLeft: !!sb.cur && sb.cur.atLeftEdge
+    readonly property bool atRight: !!sb.cur && sb.cur.atRightEdge
+    Rectangle {
+      anchors.fill: parent
+      anchors.topMargin: popup.edgeInset
+      anchors.bottomMargin: popup.edgeInset
+      anchors.leftMargin: sb.atLeft ? popup.edgeInset : 0
+      anchors.rightMargin: sb.atRight ? popup.edgeInset : 0
+      radius: 0
+      topLeftRadius: sb.atLeft ? popup.innerCorner : 0
+      bottomLeftRadius: sb.atLeft ? popup.innerCorner : 0
+      topRightRadius: sb.atRight ? popup.innerCorner : 0
+      bottomRightRadius: sb.atRight ? popup.innerCorner : 0
+      color: Zenon.alpha(Zenon.cyan, 0.3)
+    }
+  }
+
+  // The divider between two rows: the panel's own stroke, the whole height
+  // of the strip, so it meets the top and bottom border and the strip reads
+  // as cells. Morphed the panel draws no stroke (the pill does), but the
+  // pill's is the same Zenon.border, so this one stays.
+  component RowRule: Rectangle {
+    property bool shown: false
+    anchors.left: parent.left
+    anchors.top: parent.top
+    anchors.bottom: parent.bottom
+    width: bg.border.width
+    color: Zenon.border
+    opacity: shown ? 1 : 0
+    Behavior on opacity { NumberAnimation { duration: Zenon.fast; easing.type: Zenon.ease } }
+  }
+
   // The moving part. Its width eases on the GPU instead of on the compositor.
   Item {
     id: strip
@@ -770,7 +821,13 @@ property var statusbar: null
           clip: true
           model: popup.filtered
           snapMode: ListView.SnapOneItem
-          highlightMoveDuration: 120
+          // ── THE CURSOR SLIDES ─────────────────────────────────────
+          // One highlight carried from row to row (see SelBar), rather
+          // than each row lighting its own. -1 while the picker is up, so it is not left sitting under
+          // a hidden row and slides in from nowhere on the way back.
+          currentIndex: popup.mode === "search" ? popup.sel : -1
+          highlightFollowsCurrentItem: false
+          highlight: SelBar { cur: list.currentItem }
           // realise offscreen delegates so ListView.contentWidth is an exact sum
           // of real delegate widths rather than an average-based estimate
           cacheBuffer: 4000
@@ -779,8 +836,9 @@ property var statusbar: null
             id: row
             required property var modelData
             required property int index
-            width: rowText.implicitWidth + 24
+            width: rowText.implicitWidth + 28
             height: ListView.view.height
+            readonly property bool selected: row.index === popup.sel
 
             // Half an entry is worse than no entry, so anything not wholly
             // inside the strip is simply not painted — whether it is cut off
@@ -804,35 +862,40 @@ property var statusbar: null
               && inputBar.width < 0.5
             readonly property bool atRightEdge: row.index === popup.fitLast
 
-            Rectangle {
-              id: selRect
-              // held off the panel's stroke, and only on the sides that
-              // actually touch it
-              anchors.fill: parent
-              anchors.topMargin: popup.edgeInset
-              anchors.bottomMargin: popup.edgeInset
-              anchors.leftMargin: row.atLeftEdge ? popup.edgeInset : 0
-              anchors.rightMargin: row.atRightEdge ? popup.edgeInset : 0
-              // only the row that actually sits in a pill corner
-              // rounds off, so the strip stays square-edged in the middle
-              radius: 0
-              topLeftRadius: row.atLeftEdge ? popup.innerCorner : 0
-              bottomLeftRadius: row.atLeftEdge ? popup.innerCorner : 0
-              topRightRadius: row.atRightEdge ? popup.innerCorner : 0
-              bottomRightRadius: row.atRightEdge ? popup.innerCorner : 0
-              color: index === popup.sel ? Zenon.alpha(Zenon.cyan, 0.3) : "transparent"
+            // A hairline between this row and the one before it — not
+            // before the first row on screen, and not beside the cursor,
+            // which already marks that edge.
+            RowRule {
+              shown: row.index > Math.max(0, popup.fitFirst)
+                && !row.selected && row.index - 1 !== popup.sel
             }
 
-            Text {
+            // The glyph is its own Text, a real gap from the title: as one
+            // rich-text run, its "  " collapsed to a single space and the
+            // glyph sat right on the word.
+            Row {
               id: rowText
               anchors.centerIn: parent
-              text: Cynosure.highlight(modelData.displayText, popup.query)
-              color: Zenon.white
-              font.family: Zenon.face
-              font.weight: Font.Bold
-              font.pixelSize: Zenon.px(16)
-              textFormat: Text.RichText
-              horizontalAlignment: Text.AlignHCenter
+              spacing: Zenon.px(9)
+
+              Text {
+                visible: text !== ""
+                anchors.verticalCenter: parent.verticalCenter
+                text: row.modelData.glyph || ""
+                color: Zenon.white
+                font.family: Zenon.face
+                font.pixelSize: Zenon.px(17)
+              }
+
+              Text {
+                anchors.verticalCenter: parent.verticalCenter
+                text: Cynosure.highlight(row.modelData.label, popup.query)
+                color: Zenon.white
+                font.family: Zenon.face
+                font.weight: Font.Bold
+                font.pixelSize: Zenon.px(16)
+                textFormat: Text.RichText
+              }
             }
 
             MouseArea {
@@ -893,15 +956,20 @@ property var statusbar: null
           orientation: ListView.Horizontal
           clip: true
           model: popup.pickerRows
-          highlightMoveDuration: 120
+          // the same sliding cursor as the search strip
+          currentIndex: popup.mode === "picker" ? popup.sel : -1
+          highlightFollowsCurrentItem: false
+          highlight: SelBar { cur: pickerList.currentItem }
           cacheBuffer: 4000
 
           delegate: Item {
             id: pickerBtn
             required property var modelData
             required property int index
-            width: pickerText.implicitWidth + 24
+            width: pickerText.implicitWidth + 28
             height: ListView.view.height
+            readonly property bool selected: index === popup.sel
+            readonly property var face: Cynosure.splitGlyph(modelData.label)
 
             // Same rule as the search strip, asked of the picker's own
             // content: msgArea always holds the pill's left end, so index 0
@@ -911,29 +979,35 @@ property var statusbar: null
             readonly property bool atLeftEdge: msgArea.width < 0.5 && index === 0
             readonly property bool atRightEdge: index === popup.pickerRows.length - 1
 
-            Rectangle {
-              id: pickerSelRect
-              anchors.fill: parent
-              anchors.topMargin: popup.edgeInset
-              anchors.bottomMargin: popup.edgeInset
-              anchors.leftMargin: pickerBtn.atLeftEdge ? popup.edgeInset : 0
-              anchors.rightMargin: pickerBtn.atRightEdge ? popup.edgeInset : 0
-              radius: 0
-              topLeftRadius: pickerBtn.atLeftEdge ? popup.innerCorner : 0
-              bottomLeftRadius: pickerBtn.atLeftEdge ? popup.innerCorner : 0
-              topRightRadius: pickerBtn.atRightEdge ? popup.innerCorner : 0
-              bottomRightRadius: pickerBtn.atRightEdge ? popup.innerCorner : 0
-              color: index === popup.sel ? Zenon.alpha(Zenon.cyan, 0.3) : "transparent"
+            // the picker is never filtered, so the run is the whole model
+            RowRule {
+              shown: pickerBtn.index > 0
+                && !pickerBtn.selected && pickerBtn.index - 1 !== popup.sel
             }
 
-            Text {
+            // same split as the search rows
+            Row {
               id: pickerText
               anchors.centerIn: parent
-              text: modelData.label
-              color: Zenon.white
-              font.family: Zenon.face
-              font.weight: Font.Bold
-              font.pixelSize: Zenon.px(16)
+              spacing: Zenon.px(9)
+
+              Text {
+                visible: text !== ""
+                anchors.verticalCenter: parent.verticalCenter
+                text: pickerBtn.face.glyph
+                color: Zenon.white
+                font.family: Zenon.face
+                font.pixelSize: Zenon.px(17)
+              }
+
+              Text {
+                anchors.verticalCenter: parent.verticalCenter
+                text: pickerBtn.face.label
+                color: Zenon.white
+                font.family: Zenon.face
+                font.weight: Font.Bold
+                font.pixelSize: Zenon.px(16)
+              }
             }
 
             MouseArea {

@@ -13,8 +13,14 @@
 // rework everything after it — reorder, reword, squash, drop — in the plan
 // (RebasePlan.qml), which runs as one interactive rebase.
 //
-//   ↑↓ commits · tab its files · / search messages · c copy id · b branch
-//   here · p cherry-pick · i rework from here · menu: everything else
+// Which history (v): this branch, incoming, Compare (two refs: what one
+// has that the other lacks, and the whole difference), Lost (commits no
+// ref holds any more — the reflog's and dangling ones, each with what left
+// it, to branch or cherry-pick back), and every repository.
+//
+//   ↑↓ commits · tab its files · / search (s: messages or the changes
+//   themselves) · c copy id · b branch here · p cherry-pick · i rework from
+//   here · menu: everything else (a patch of it, too)
 
 import QtQuick
 import Quickshell
@@ -37,22 +43,34 @@ Item {
   readonly property string title: pg.planning ? "Rework " + plan.steps.length + " commits" : "History"
   readonly property string subtitle: pg.planning ? "onto " + D.short(plan.base) + "  ·  drag or alt ↑↓ to reorder"
     : pg.scope === "all" ? pg.across.length + " repositories, newest first in each"
+    : pg.scope === "compare" ? (!pg.cmpReady ? "Choose two branches or tags"
+        : pg.cmpCount ? pg.cmpTo + " has " + pg.cmpCount.right + (pg.cmpCount.right === 1 ? " commit " : " commits ") + pg.cmpFrom + " lacks"
+          + (pg.cmpCount.left > 0 ? "  ·  " + pg.cmpCount.left + " the other way" : "") : "")
+    : pg.scope === "lost" ? (pg.lostLoading ? "Looking through the reflogs…"
+        : pg.commits.length === 0 && pg.ended ? "Nothing lost — every commit is on a branch"
+        : pg.commits.length + " commits no branch holds  ·  kept about 90 days  ·  b branch, p cherry-pick")
     : pg.scope === "incoming" ? (pg.win && pg.win.branch && pg.win.branch.upstream
         ? (pg.commits.length === 0 && pg.ended ? "nothing incoming — up to date with " : pg.commits.length + " not pulled yet from ") + pg.win.branch.upstream
         : "this branch follows nothing upstream")
-    : pg.commits.length + (pg.ended ? "" : "+") + " commits" + (pg.onlyPath !== "" ? " to " + pg.onlyPath : "")
-      + (pg.query !== "" ? " matching “" + pg.query + "”" : "")
+    : pg.commits.length + (pg.ended ? "" : "+") + (pg.commits.length === 1 && pg.ended ? " commit" : " commits") + (pg.onlyPath !== "" ? " to " + pg.onlyPath : "")
+      + (pg.query !== "" ? (pg.searchIn === "changes" ? " that added or removed “" : " matching “") + pg.query + "”" : "")
   readonly property var hints: pg.planning ? plan.hints
     : pg.area === "files" ? [["↑↓", "files"], ["shift ↑↓", "diff"], ["e", "edit"], ["w", pg.blamePath !== "" ? "the diff" : "who wrote it"]]
         .concat(pg.shownFiles[pg.fileSel] && pg.shownFiles[pg.fileSel].status === "D" && pg.scope !== "all" ? [["r", "bring back"]] : []).concat([["tab", "commits"]])
     : pg.scope === "all" ? [["↑↓", "commits"], ["tab", "files"], ["return", "open there"], ["v", "which history"]]
-    : [["↑↓", "commits"], ["tab", "files"], ["v", "which history"], ["/", "search"], ["c", "copy id"], ["b", "branch here"],
-       ["p", "cherry-pick"], ["i", "rework from here"], ["f", "only a file"], ["menu", "more"]].concat(pg.onlyPath !== "" ? [["esc", "every file"]] : [])
+    : pg.scope === "compare" && pg.whole ? [["↓", "its commits"], ["tab", "files"], ["x", "swap"], ["v", "which history"]]
+    : [["↑↓", "commits"], ["tab", "files"], ["v", "which history"], ["/", "search"], ["s", pg.searchIn === "changes" ? "search messages" : "search changes"]]
+      .concat(pg.scope === "compare" ? [["a", "the whole difference"], ["x", "swap"]] : []).concat([["c", "copy id"], ["b", "branch here"],
+       ["p", "cherry-pick"], ["i", "rework from here"], ["f", "only a file"], ["menu", "more"]]).concat(pg.onlyPath !== "" ? [["esc", "every file"]] : [])
   // what the chosen commit removed: each can be brought back from it
-  readonly property var removed: pg.shownFiles.filter((f) => f.status === "D")
+  readonly property var removed: pg.commit && pg.commit.range ? [] : pg.shownFiles.filter((f) => f.status === "D")
   readonly property var buttons: pg.planning ? plan.buttons : [
     { label: pg.removed.length === 1 ? "Bring back " + D.baseName(pg.removed[0].path) : "Bring back " + pg.removed.length + " removed",
       visible: pg.removed.length > 0 && pg.scope !== "all", run: () => pg.bringBack(pg.removed) },
+    { label: "Save as patches", visible: pg.scope === "compare" && pg.cmpReady && !!pg.cmpCount && pg.cmpCount.right > 0,
+      run: () => pg.savePatch(pg.cmpFrom, pg.cmpTo) },
+    { label: "Restore as a branch", ink: Zenon.cyan, primary: true, visible: pg.scope === "lost" && !!pg.commit,
+      run: () => pg.branchHere(pg.commit) },
   ]
 
   // ── ONE FILE'S HISTORY ─────────────────────────────────────────────────
@@ -106,6 +124,8 @@ Item {
     if (sc === pg.scope) return;
     pg.scope = sc;
     if (sc === "all") { pg.loadAcross(); return; }
+    if (sc === "compare" && !pg.cmpReady) pg.compareDefaults();
+    if (sc === "compare") pg.whole = true;
     if (sc === "incoming" && pg.win.branch && pg.win.branch.upstream) {
       pg.win.act("fetch", {}, { label: "Fetching what is new", network: true, refresh: false,
         then: () => { if (pg) pg.reload(); }, failed: () => { if (pg) pg.reload(); } });
@@ -143,6 +163,88 @@ Item {
     else pg.reload();
   }
 
+  // ── COMPARE (user, 2026-10-14) ─────────────────────────────────────────
+  // Two refs: the commits To has that From lacks (From..To), and, chosen
+  // first, the whole difference To made since they parted (From...To) —
+  // files and diff as a commit's are. x swaps them.
+  property string cmpFrom: ""
+  property string cmpTo: ""
+  property var cmpCount: null
+  property bool whole: true
+  readonly property bool cmpReady: pg.cmpFrom !== "" && pg.cmpTo !== "" && pg.cmpFrom !== pg.cmpTo
+  // From: what this branch follows, else main or master, else another
+  // branch; To: this branch
+  function compareDefaults() {
+    const local = pg.win.refs.local || [];
+    const here = local.find((b) => b.current);
+    pg.cmpTo = here ? here.name : "HEAD";
+    const other = (n) => n !== pg.cmpTo && (local.some((b) => b.name === n) || (pg.win.refs.remote || []).some((b) => b.name === n));
+    pg.cmpFrom = here && here.upstream ? here.upstream
+      : ["main", "master", "origin/main", "origin/master"].find(other) || (local.find((b) => !b.current) || { name: "" }).name;
+  }
+  function swapCompare() {
+    const f = pg.cmpFrom;
+    pg.cmpFrom = pg.cmpTo;
+    pg.cmpTo = f;
+    pg.whole = true;
+    pg.reload();
+  }
+  function askCount() {
+    pg.cmpCount = null;
+    if (!pg.cmpReady) return;
+    const a = pg.cmpFrom, b = pg.cmpTo;
+    pg.win.mgr.call("countBetween", pg.win.root, { a: a, b: b }, (ok, res) => {
+      if (pg && ok && pg.cmpFrom === a && pg.cmpTo === b) pg.cmpCount = res;
+    });
+  }
+  // a ref chosen from a menu: branches, then remote ones, then the tags
+  function pickRef(item, which) {
+    const refs = pg.win.refs;
+    const items = [];
+    const add = (list, icon, most) => {
+      for (const r of (list || []).slice(0, most))
+        items.push({ text: r.name, icon: icon, mark: D.ago(r.when, Date.now()),
+                     run: () => { if (which === "from") pg.cmpFrom = r.name; else pg.cmpTo = r.name; pg.whole = true; pg.reload(); } });
+    };
+    add(refs.local, "\uE725", 12);
+    if (items.length) items.push({ isSeparator: true });
+    add(refs.remote, "\uF0C2", 8);
+    const tags = (refs.tags || []).slice().sort((x, y) => y.when - x.when);
+    if (tags.length) { items.push({ isSeparator: true }); add(tags, "\uF02B", 6); }
+    const p = item.mapToItem(pg, 0, item.height + 4);
+    menu.open(p.x, p.y, items);
+  }
+
+  // ── LOST (user, 2026-10-14) ────────────────────────────────────────────
+  // delphi/core lost: the tips no ref reaches, each with what left it
+  // ("reset: moving to HEAD~2"), drawn as one log (tips --not --all)
+  property var lostNotes: ({})
+  property bool lostLoading: false
+
+  // ── SEARCH IN ──────────────────────────────────────────────────────────
+  // messages (git log --grep) or the changes themselves (-S: the commits
+  // that added or removed the text)
+  property string searchIn: "messages"
+  function toggleSearchIn() {
+    pg.searchIn = pg.searchIn === "messages" ? "changes" : "messages";
+    if (pg.query !== "") pg.reload();
+  }
+
+  // ── PATCHES ────────────────────────────────────────────────────────────
+  // a commit (or Compare's From..To) as mailbox patch files, in a
+  // directory chosen in terminus — Apply a patch (Changes) takes them back
+  function savePatch(rev, upto) {
+    if (!pg.win.mgr.fileManager) return;
+    const root = pg.commitRoot;
+    pg.win.mgr.fileManager.choose(true, pg.win.home, (paths) => {
+      if (!paths || paths.length === 0) return;
+      pg.win.act("formatPatch", { rev: rev, upto: upto || null, dest: paths[0] }, { repo: root, refresh: false,
+        label: "Writing patches",
+        then: (res) => pg.win.say(res.files.length === 1 ? "Saved " + D.baseName(res.files[0])
+          : "Saved " + res.files.length + " patches in " + D.tilde(paths[0], pg.win.home)) });
+    });
+  }
+
   // ── THE LOG ────────────────────────────────────────────────────────────
   property var commits: []
   property int session: -1
@@ -155,11 +257,16 @@ Item {
   // them from the open one, so it showed nothing there (user, 2026-10-11)
   readonly property var commit: pg.scope === "all"
     ? (pg.acrossRows[pg.acrossSel] && !pg.acrossRows[pg.acrossSel].head ? pg.acrossRows[pg.acrossSel] : null)
+    : pg.scope === "compare" && pg.whole ? (pg.cmpReady ? pg.rangeCommit : null)
     : pg.sel >= 0 && pg.sel < pg.commits.length ? pg.commits[pg.sel] : null
+  // Compare's whole difference, standing where a commit would
+  readonly property var rangeCommit: ({ range: true, sha: "", parents: [], refs: [], author: "", when: 0,
+    subject: "Everything " + pg.cmpTo + " changed since it parted from " + pg.cmpFrom })
   readonly property string commitRoot: pg.scope === "all" && pg.commit ? pg.commit.root : pg.win ? pg.win.root : ""
   function absOf(path) { return pg.commitRoot + "/" + path; }
   onAcrossSelChanged: if (pg.scope === "all") detailWait.restart()
   onScopeChanged: { pg.area = "commits"; detailWait.restart(); }
+  onWholeChanged: detailWait.restart()
   property string wantSha: ""
   readonly property string headSha: pg.win && pg.win.branch ? pg.win.branch.oid || "" : ""
 
@@ -170,13 +277,35 @@ Item {
     pg.session = -1;
     pg.ended = false;
     if (pg.scope === "all") return;
-    const args = pg.query !== "" ? { grep: pg.query } : {};
+    const args = pg.query === "" ? {} : pg.searchIn === "changes" ? { pickaxe: pg.query } : { grep: pg.query };
     if (pg.onlyPath !== "") args.path = pg.onlyPath;
     if (pg.scope === "incoming") {
       if (!pg.win.branch || !pg.win.branch.upstream) { pg.commits = []; pg.ended = true; return; }
       args.revs = ["HEAD..@{upstream}"];
     }
+    if (pg.scope === "compare") {
+      pg.askCount();
+      if (!pg.cmpReady) { pg.commits = []; pg.ended = true; return; }
+      args.revs = [pg.cmpFrom + ".." + pg.cmpTo];
+      detailWait.restart();
+    }
     const root = pg.win.root;
+    if (pg.scope === "lost") {
+      pg.lostLoading = true;
+      pg.commits = [];
+      pg.win.mgr.call("lost", root, {}, (ok, res) => { if (!pg) return;
+        pg.lostLoading = false;
+        if (!ok || root !== pg.win.root || pg.scope !== "lost") { pg.ended = true; return; }
+        pg.lostNotes = res.notes;
+        if (res.tips.length === 0) { pg.commits = []; pg.ended = true; return; }
+        args.revs = res.tips.concat(["--not", "--all"]);
+        pg.openLog(root, args);
+      });
+      return;
+    }
+    pg.openLog(root, args);
+  }
+  function openLog(root, args) {
     pg.win.mgr.call("logOpen", root, args, (ok, res) => { if (!pg) return;
       if (!ok || root !== pg.win.root) return;
       pg.session = res.session;
@@ -219,6 +348,9 @@ Item {
 
   function moveTo(i) {
     if (pg.commits.length === 0) return;
+    // Compare: above the first commit is the whole difference
+    if (pg.scope === "compare" && i < 0) { pg.whole = true; return; }
+    if (pg.scope === "compare") pg.whole = false;
     pg.sel = Math.max(0, Math.min(pg.commits.length - 1, i));
     list.positionViewAtIndex(pg.sel, ListView.Contain);
     if (pg.sel > pg.commits.length - 80) pg.more(false);
@@ -344,8 +476,19 @@ Item {
   Timer { id: detailWait; interval: 60; onTriggered: pg.loadCommit() }
   function loadCommit() {
     const c = pg.commit;
-    if (c) pg.ciAsk([c.sha]);
+    if (c && !c.range) pg.ciAsk([c.sha]);
     if (!c) { pg.message = null; pg.files = []; pg.diffFiles = []; return; }
+    if (c.range) {
+      const a = pg.cmpFrom, b = pg.cmpTo;
+      pg.message = null;
+      pg.win.mgr.call("filesBetween", pg.win.root, { a: a, b: b }, (ok, fs) => { if (!pg) return;
+        if (!ok || !pg.commit || !pg.commit.range || pg.cmpFrom !== a || pg.cmpTo !== b) return;
+        pg.files = fs;
+        pg.fileSel = 0;
+        pg.loadFileDiff();
+      });
+      return;
+    }
     const sha = c.sha, root = pg.commitRoot;
     pg.win.mgr.call("message", root, { sha: sha }, (ok, m) => { if (!pg) return; if (ok && pg.commit && pg.commit.sha === sha) pg.message = m; });
     pg.win.mgr.call("files", root, { sha: sha }, (ok, fs) => { if (!pg) return;
@@ -359,7 +502,9 @@ Item {
     const c = pg.commit, f = pg.shownFiles[pg.fileSel];
     if (!c || !f) { pg.diffFiles = []; return; }
     const sha = c.sha, path = f.path;
-    pg.win.mgr.call("show", pg.commitRoot, { rev: sha, path: path, budget: 6000 }, (ok, res) => { if (!pg) return;
+    const ask = c.range ? ["compare", { a: pg.cmpFrom, b: pg.cmpTo, path: path, budget: 6000 }]
+                        : ["show", { rev: sha, path: path, budget: 6000 }];
+    pg.win.mgr.call(ask[0], pg.commitRoot, ask[1], (ok, res) => { if (!pg) return;
       if (ok && pg.commit && pg.commit.sha === sha && pg.shownFiles[pg.fileSel] && pg.shownFiles[pg.fileSel].path === path) {
         pg.diffFiles = res.files;
         diff.toFirst();
@@ -447,6 +592,8 @@ Item {
       { isSeparator: true },
       { text: "Rework the commits after it", icon: "", mark: "i", enabled: !here, run: () => pg.rework(c) },
       { text: "Move " + pg.win.branchName + " here", icon: "", enabled: !here, danger: true, run: () => pg.resetTo(c) },
+      { isSeparator: true },
+      { text: "Save as a patch…", icon: "\uF0C7", run: () => pg.savePatch(c.sha) },
     ];
   }
 
@@ -457,7 +604,7 @@ Item {
     if (ctrl) return false;
     // which history: this branch → incoming → every repository → …
     if (k === Qt.Key_V) {
-      const order = ["branch", "incoming", "all"];
+      const order = ["branch", "incoming", "compare", "lost", "all"];
       pg.setScope(order[(order.indexOf(pg.scope) + 1) % order.length]);
       return true;
     }
@@ -468,7 +615,14 @@ Item {
       if ((k === Qt.Key_Return || k === Qt.Key_Enter) && pg.acrossRows[pg.acrossSel]) { pg.jumpTo(pg.acrossRows[pg.acrossSel]); return true; }
       return false;
     }
-    if (k === Qt.Key_F && pg.area !== "files") { pathField.claim(); return true; }
+    if (k === Qt.Key_S && pg.area !== "files" && pg.scope !== "compare") { pg.toggleSearchIn(); return true; }
+    if (pg.scope === "compare" && pg.area !== "files") {
+      if (k === Qt.Key_X) { pg.swapCompare(); return true; }
+      if (k === Qt.Key_A) { pg.whole = true; return true; }
+      if (pg.whole && (k === Qt.Key_Down || k === Qt.Key_J)) { pg.moveTo(0); return true; }
+      if (pg.whole && pg.commit) return false;
+    }
+    if (k === Qt.Key_F && pg.area !== "files" && pg.scope !== "compare") { pathField.claim(); return true; }
     if (k === Qt.Key_Slash) { if (pg.area === "files") fileFilter.claim(); else search.claim(); return true; }
     if (pg.area === "files") {
       if (shift && (k === Qt.Key_Up || k === Qt.Key_Down)) { diff.move(k === Qt.Key_Up ? -1 : 1, false); return true; }
@@ -476,7 +630,7 @@ Item {
       if (k === Qt.Key_Down || k === Qt.Key_J) { pg.moveFile(1); return true; }
       if (k === Qt.Key_PageUp) { diff.page(-1); return true; }
       if (k === Qt.Key_PageDown) { diff.page(1); return true; }
-      if (k === Qt.Key_W && pg.shownFiles[pg.fileSel]) {
+      if (k === Qt.Key_W && pg.shownFiles[pg.fileSel] && !(pg.commit && pg.commit.range)) {
         if (pg.blamePath !== "") pg.blamePath = ""; else pg.blameFile(pg.shownFiles[pg.fileSel].path, "commit", 0);
         return true;
       }
@@ -492,7 +646,7 @@ Item {
     if (k === Qt.Key_PageDown) { pg.moveTo(pg.sel + 15); return true; }
     if (k === Qt.Key_Home) { pg.moveTo(0); return true; }
     if (k === Qt.Key_End) { pg.moveTo(pg.commits.length - 1); return true; }
-    if (!pg.commit) return false;
+    if (!pg.commit || pg.commit.range) return false;
     if (k === Qt.Key_C) { pg.win.copy(pg.commit.sha, D.short(pg.commit.sha)); return true; }
     if (k === Qt.Key_B) { pg.branchHere(pg.commit); return true; }
     if (k === Qt.Key_P) { pg.cherryPick(pg.commit); return true; }
@@ -525,20 +679,21 @@ Item {
       textSize: Zenon.px(14)
       options: [["branch", "This branch"],
                 ["incoming", "Incoming" + (pg.win && pg.win.branch && pg.win.branch.behind > 0 ? "  " + pg.win.branch.behind : "")],
-                ["all", "All repositories"]]
+                ["compare", "Compare"], ["lost", "Lost"],
+                ["all", "Everywhere"]]
       current: pg.scope
       onChose: (v) => pg.setScope(v)
     }
     BulkField {
       id: search
-      visible: pg.scope !== "all"
+      visible: pg.scope !== "all" && pg.scope !== "compare"
       readonly property bool under: true
       x: 12
       y: scopes.y + scopes.height + 8
-      width: Math.round((parent.width - 32) * 0.55)
+      width: Math.round((parent.width - 32) * 0.42)
       height: scopes.height
       textSize: Zenon.px(14)
-      ghost: "  Search messages  ( / )"
+      ghost: pg.searchIn === "changes" ? "  Search the changes  ( / )" : "  Search messages  ( / )"
       clearable: true
       // narrows as it is typed (user, 2026-10-12), a beat after the last key
       function apply() {
@@ -557,10 +712,57 @@ Item {
     // narrowed History with no way back but leaving the page): the file it
     // is narrowed to, there to edit or clear — and a path typed here
     // narrows it the same way
+    // what the search looks in: messages, or the changes themselves (s)
+    Segments {
+      id: searchIn
+      visible: search.visible
+      anchors.left: search.right
+      anchors.leftMargin: 8
+      y: search.y
+      textSize: Zenon.px(13)
+      options: [["messages", "Messages"], ["changes", "Changes"]]
+      current: pg.searchIn
+      onChose: (v) => { if (v !== pg.searchIn) pg.toggleSearchIn(); }
+    }
+    // COMPARE's two refs, in place of the search: From → To, and a swap
+    Row {
+      id: cmpRow
+      visible: pg.scope === "compare"
+      x: 12
+      y: scopes.y + scopes.height + 8
+      height: scopes.height
+      spacing: 8
+      DialogButton {
+        id: fromBtn
+        anchors.verticalCenter: parent.verticalCenter
+        label: (pg.cmpFrom || "Choose") + "  ▾"
+        onClicked: pg.pickRef(fromBtn, "from")
+      }
+      Text {
+        anchors.verticalCenter: parent.verticalCenter
+        text: "→"
+        color: Zenon.muted
+        font.family: Zenon.face
+        font.pixelSize: Zenon.px(16)
+      }
+      DialogButton {
+        id: toBtn
+        anchors.verticalCenter: parent.verticalCenter
+        label: (pg.cmpTo || "Choose") + "  ▾"
+        ink: Zenon.cyan
+        onClicked: pg.pickRef(toBtn, "to")
+      }
+      DialogButton {
+        anchors.verticalCenter: parent.verticalCenter
+        label: "⇄  Swap"
+        ready: pg.cmpReady
+        onClicked: pg.swapCompare()
+      }
+    }
     BulkField {
       id: pathField
-      visible: pg.scope !== "all"
-      anchors.left: search.right
+      visible: pg.scope !== "all" && pg.scope !== "compare"
+      anchors.left: searchIn.right
       anchors.leftMargin: 8
       anchors.right: parent.right
       anchors.rightMargin: 12
@@ -584,7 +786,7 @@ Item {
       id: list
       anchors.left: parent.left
       anchors.right: parent.right
-      anchors.top: search.visible && search.under ? search.bottom : scopes.bottom
+      anchors.top: cmpRow.visible ? cmpRow.bottom : search.visible && search.under ? search.bottom : scopes.bottom
       anchors.topMargin: 8
       anchors.bottom: parent.bottom
       visible: pg.scope !== "all"
@@ -596,7 +798,36 @@ Item {
       reuseItems: true
       readonly property int rowH: Math.round(Zenon.px(15) * 2.2)
       onContentYChanged: if (contentY + height > contentHeight - 600) pg.more(false)
-      SelectBar { view: list; host: pg.win; index: pg.sel; rowH: list.rowH; color: pg.area === "commits" ? pg.win.hiFill : Zenon.wash(0.05) }
+      SelectBar { view: list; host: pg.win; index: pg.sel; on: !(pg.scope === "compare" && pg.whole); rowH: list.rowH; color: pg.area === "commits" ? pg.win.hiFill : Zenon.wash(0.05) }
+      // Compare: the whole difference, a row above the commits
+      header: Item {
+        width: list.width
+        height: pg.scope === "compare" && pg.cmpReady ? list.rowH + 6 : 0
+        visible: height > 0
+        Rectangle {
+          anchors.fill: parent
+          anchors.leftMargin: 8
+          anchors.rightMargin: 8
+          anchors.bottomMargin: 6
+          radius: Zenon.windowRadius
+          color: pg.whole ? (pg.area === "commits" ? pg.win.hiFill : Zenon.wash(0.05)) : wholeHover.hovered ? Zenon.wash(0.04) : "transparent"
+          border.width: 1
+          border.color: Zenon.border
+          Text {
+            x: 14
+            width: parent.width - 28
+            anchors.verticalCenter: parent.verticalCenter
+            elide: Text.ElideRight
+            text: "⇄   The whole difference" + (pg.whole && pg.files.length > 0 ? "  ·  " + pg.files.length + (pg.files.length === 1 ? " file" : " files") : "")
+            color: pg.whole ? Zenon.ink : Zenon.soft
+            font.family: Zenon.face
+            font.weight: Zenon.weight
+            font.pixelSize: Zenon.px(15)
+          }
+          HoverHandler { id: wholeHover }
+          MouseArea { anchors.fill: parent; onClicked: { pg.area = "commits"; pg.whole = true; pg.win.focusKeys(); } }
+        }
+      }
       delegate: Item {
         id: crow
         required property var modelData
@@ -658,9 +889,10 @@ Item {
           anchors.right: ciCell.left
           anchors.rightMargin: 12
           anchors.verticalCenter: parent.verticalCenter
-          width: Math.min(implicitWidth, 130)
+          readonly property var note: pg.scope === "lost" ? pg.lostNotes[crow.c.sha] : null
+          width: Math.min(implicitWidth, note ? 240 : 130)
           elide: Text.ElideRight
-          text: crow.c.author
+          text: note ? note.what : crow.c.author
           color: Zenon.muted
           font.family: Zenon.face
           font.weight: Zenon.weight
@@ -714,14 +946,18 @@ Item {
       }
       footer: Item {
         width: list.width
-        height: pg.ended ? 0 : 40
-        Working { anchors.centerIn: parent; running: pg.paging }
+        height: pg.ended && !pg.lostLoading ? 0 : 40
+        Working { anchors.centerIn: parent; running: pg.paging || pg.lostLoading }
       }
       EmptyMark {
         anchors.centerIn: parent
-        visible: pg.commits.length === 0 && pg.ended
+        visible: pg.commits.length === 0 && pg.ended && !pg.lostLoading
         filtered: pg.query !== ""
-        word: pg.query !== "" ? "" : "No commits yet"
+        word: pg.query !== "" ? ""
+          : pg.scope === "lost" ? "Nothing lost — every commit is on a branch"
+          : pg.scope === "compare" ? (pg.cmpReady ? pg.cmpTo + " has nothing " + pg.cmpFrom + " lacks" : "Choose two branches or tags")
+          : pg.scope === "incoming" ? "Nothing incoming"
+          : "No commits yet"
       }
     }
     ElasticScroll { anchors.fill: list; view: list }
@@ -748,17 +984,12 @@ Item {
         readonly property var r: arow.modelData
         width: acrossList.width
         height: acrossList.rowH
-        Text {
+        GroupHead {
           visible: !!arow.r.head
-          x: 18
-          anchors.verticalCenter: parent.verticalCenter
-          anchors.verticalCenterOffset: 4
-          textFormat: Text.StyledText
-          text: arow.r.head ? "<b>" + arow.r.name + "</b>  <font color='" + Zenon.hex(Zenon.muted) + "'>" + D.tilde(arow.r.root, pg.win.home) + "</font>" : ""
-          color: Zenon.ink
-          font.family: Zenon.face
-          font.weight: Zenon.weight
-          font.pixelSize: Zenon.px(14)
+          inset: 18
+          title: arow.r.head ? arow.r.name : ""
+          count: arow.r.head ? arow.r.count : -1
+          note: arow.r.head ? D.tilde(arow.r.root, pg.win.home) : ""
         }
         Text {
           visible: !arow.r.head
@@ -830,7 +1061,11 @@ Item {
       Text {
         width: parent.width
         elide: Text.ElideRight
-        text: !pg.commit ? "" : pg.commit.author + "  ·  " + D.stamp(pg.commit.when) + "  ·  " + D.short(pg.commit.sha)
+        text: !pg.commit ? "" : pg.commit.range ? pg.cmpFrom + "..." + pg.cmpTo + "  ·  " + pg.files.length + (pg.files.length === 1 ? " file" : " files")
+            + (pg.cmpCount ? "  ·  " + pg.cmpCount.right + (pg.cmpCount.right === 1 ? " commit" : " commits") : "")
+          : pg.commit.author + "  ·  " + D.stamp(pg.commit.when) + "  ·  " + D.short(pg.commit.sha)
+          + (pg.scope === "lost" && pg.lostNotes[pg.commit.sha] ? "  ·  left by “" + pg.lostNotes[pg.commit.sha].what + "”"
+             + (pg.lostNotes[pg.commit.sha].when ? " " + D.ago(pg.lostNotes[pg.commit.sha].when, Date.now()) : "") : "")
           + ((pg.commit.parents || []).length > 1 ? "  ·  merge of " + pg.commit.parents.length : "")
           + (pg.scope === "all" ? "  ·  " + D.baseName(pg.commitRoot) : "")
           + (pg.message && pg.message.signature === "G" ? "  ·   signed" : "")
@@ -838,7 +1073,7 @@ Item {
         font.family: Zenon.face
         font.weight: Zenon.weight
         font.pixelSize: Zenon.px(13)
-        MouseArea { anchors.fill: parent; onClicked: if (pg.commit) pg.win.copy(pg.commit.sha, D.short(pg.commit.sha)) }
+        MouseArea { anchors.fill: parent; onClicked: if (pg.commit && !pg.commit.range) pg.win.copy(pg.commit.sha, D.short(pg.commit.sha)) }
       }
       // the body, when there is more than the subject
       Flickable {

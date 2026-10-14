@@ -175,6 +175,10 @@ module.exports = {
     t.eq("md picture", D.mdOf("see ![shot](https://x/y.png \"t\")"), "see [shot](https://x/y.png)");
     t.eq("md img tag", D.mdOf('<img width="5" src="https://x/z.png">'), "[picture](https://x/z.png)");
     t.eq("plain", D.plainOf("## Why\n\nIt **breaks** on `x` — see [the log](https://l)\n\n> quoted"), "Why\nIt breaks on x — see the log\nquoted");
+    t.eq("hub: own prefers origin", D.hubOf([rem("origin", "git@github.com:me/x.git"), rem("upstream", "https://github.com/them/x")], true).full, "me/x");
+    t.eq("attention: clean", D.attentionOf({ changed: 0, ahead: 0, behind: 0, conflicts: 0, state: null, branch: "main", upstream: "origin/main", oid: "a", remotes: [{}] }, null), []);
+    t.eq("attention: words", D.attentionOf({ changed: 2, ahead: 1, behind: 3, conflicts: 0, state: { op: "rebase" }, branch: "main", upstream: null, oid: "a", remotes: [{}] },
+      { state: "failure" }).map((a) => a.word), ["rebase under way", "2 changed", "↑1 to push", "↓3 to pull", "not published", "checks failing"]);
     t.eq("md details", D.mdOf("<details><summary>Log</summary>\n\nline</details>"), "Log\n\nline");
   },
 };

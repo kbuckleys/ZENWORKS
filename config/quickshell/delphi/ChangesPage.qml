@@ -108,6 +108,7 @@ Item {
   readonly property var file: pg.cur >= 0 && pg.cur < pg.rows.length && !pg.rows[pg.cur].head ? pg.rows[pg.cur] : null
   property string area: "list"     // list | diff | message
   readonly property int stagedCount: pg.win && pg.win.st ? pg.win.st.staged.length : 0
+  readonly property bool clean: !!pg.win && !!pg.win.st && pg.rows.every((r) => r.head)
 
   readonly property string title: "Changes"
   // the branch only: where Push sends it is the chip beside it in the head
@@ -576,24 +577,18 @@ Item {
         Item {
           anchors.fill: parent
           visible: !!frow.r.head
-          Text {
-            x: 16
-            anchors.verticalCenter: parent.verticalCenter
-            anchors.verticalCenterOffset: 3
-            text: frow.r.head ? frow.r.title.toUpperCase() + "   " + frow.r.count : ""
-            color: frow.r.id === "conflict" ? Zenon.red : Zenon.muted
-            font.family: Zenon.face
-            font.weight: Font.Bold
-            font.letterSpacing: 1
-            font.features: { "tnum": 1 }
-            font.pixelSize: Zenon.px(12)
+          GroupHead {
+            inset: 16
+            title: frow.r.head ? frow.r.title : ""
+            count: frow.r.head ? frow.r.count : -1
+            ink: frow.r.id === "conflict" ? Zenon.red : Zenon.muted
           }
           Text {
             visible: !!frow.r.head && frow.r.count > 0 && frow.r.id !== "conflict"
             anchors.right: parent.right
             anchors.rightMargin: 16
             anchors.verticalCenter: parent.verticalCenter
-            anchors.verticalCenterOffset: 3
+            anchors.verticalCenterOffset: 4
             text: pg.query !== "" ? (frow.r.id === "staged" ? "Unstage these" : "Stage these")
               : frow.r.id === "staged" ? "Unstage all" : "Stage all"
             color: headMa.containsMouse ? Zenon.cyan : Zenon.muted
@@ -667,7 +662,7 @@ Item {
       }
       EmptyMark {
         anchors.centerIn: parent
-        visible: !!pg.win && !!pg.win.st && pg.rows.every((r) => r.head)
+        visible: pg.clean
         filtered: pg.query !== ""
         word: pg.query !== "" ? "" : "Nothing to commit"
       }
@@ -769,6 +764,74 @@ Item {
     onWantMore: pg.moreDiff()
     // a click in the diff is working in the diff
     onTouched: pg.area = "diff"
+  }
+  // CLEAN (user, 2026-10-14: "nothing to commit" alone said nothing
+  // else): in the diff's place, the last commit, where the branch stands
+  // with its upstream and when that was last asked, and what to do about it
+  Column {
+    anchors.centerIn: diff
+    width: Math.min(diff.width - 48, 520)
+    visible: pg.clean && pg.query === ""
+    spacing: 10
+    readonly property var b: pg.win && pg.win.branch ? pg.win.branch : null
+    readonly property var tip: pg.win ? (pg.win.refs.local || []).find((r) => r.current) || null : null
+    readonly property real fetched: pg.win && pg.win.mgr.fetchedAt[pg.win.root] || 0
+    Text {
+      width: parent.width
+      horizontalAlignment: Text.AlignHCenter
+      text: "All committed"
+      color: Zenon.ink
+      font.family: Zenon.face
+      font.weight: Font.Bold
+      font.pixelSize: Zenon.px(17)
+    }
+    Text {
+      visible: !!parent.tip
+      width: parent.width
+      horizontalAlignment: Text.AlignHCenter
+      elide: Text.ElideRight
+      text: parent.tip ? "Last: “" + parent.tip.subject + "”  ·  " + D.ago(parent.tip.when, Date.now()) : ""
+      color: Zenon.soft
+      font.family: Zenon.face
+      font.weight: Zenon.weight
+      font.pixelSize: Zenon.px(14)
+    }
+    Text {
+      width: parent.width
+      horizontalAlignment: Text.AlignHCenter
+      wrapMode: Text.Wrap
+      readonly property var b: parent.b
+      text: !b || !b.oid ? "No commits yet"
+        : !b.upstream ? (pg.win.remotes.length > 0 ? "Not published yet" : "No remote — this is the only copy")
+        : (b.ahead === 0 && b.behind === 0 ? "Up to date with " + b.upstream
+           : [b.ahead > 0 ? "↑" + b.ahead + " to push" : "", b.behind > 0 ? "↓" + b.behind + " to pull" : ""].filter((w) => w).join("  ·  ")
+             + "  —  " + b.upstream)
+          + (parent.fetched ? "  ·  fetched " + D.ago(Math.floor(parent.fetched / 1000), Date.now()) : "")
+      color: !b || !b.upstream ? Zenon.muted : b.ahead > 0 || b.behind > 0 ? Zenon.cyan : Zenon.green
+      font.family: Zenon.face
+      font.weight: Zenon.weight
+      font.pixelSize: Zenon.px(14)
+    }
+    Row {
+      anchors.horizontalCenter: parent.horizontalCenter
+      spacing: 8
+      topPadding: 4
+      DialogButton { label: "History"; onClicked: pg.win.setPage("history") }
+      DialogButton { label: "Apply a patch"; onClicked: pg.win.applyPatch() }
+      DialogButton {
+        visible: !!parent.parent.b && parent.parent.b.behind > 0
+        label: "Pull  ↓" + (parent.parent.b ? parent.parent.b.behind : 0)
+        ink: Zenon.cyan
+        onClicked: pg.win.pull()
+      }
+      DialogButton {
+        visible: !!parent.parent.b && !!parent.parent.b.oid && (parent.parent.b.ahead > 0 || !parent.parent.b.upstream) && pg.win.remotes.length > 0
+        label: parent.parent.b && parent.parent.b.upstream ? "Push  ↑" + parent.parent.b.ahead : "Publish"
+        ink: Zenon.cyan
+        primary: true
+        onClicked: pg.win.push()
+      }
+    }
   }
   // the edge the diff wears while it has the keys
   Rectangle {

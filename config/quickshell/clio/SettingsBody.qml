@@ -27,7 +27,7 @@ Column {
   Row {
     spacing: 12
     Text { anchors.verticalCenter: parent.verticalCenter; text: "\u{F08BB}"; color: Zenon.cyan; font.family: Zenon.glyphFace; font.pixelSize: Zenon.px(18) }
-    Text { anchors.verticalCenter: parent.verticalCenter; text: "Clio settings"; color: Zenon.ink; font.family: Zenon.face; font.weight: Font.Bold; font.pixelSize: Zenon.px(19) }
+    Text { anchors.verticalCenter: parent.verticalCenter; text: "Settings"; color: Zenon.ink; font.family: Zenon.face; font.weight: Font.Bold; font.pixelSize: Zenon.px(19) }
   }
 
   // two columns: the notes (and the stickies) on the left, the journal and

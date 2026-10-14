@@ -378,7 +378,7 @@ WRITES = {"stowCopyIn", "resolveBlocks", "ignore", "untrack", "stage", "stageAll
           "stashPush", "stashApply", "stashDrop", "stashBranch",
           "worktreeAdd", "worktreeRemove", "worktreePrune", "merge",
           "cherryPick", "revert", "rebase", "rebaseInteractive", "sequence",
-          "reset", "take", "markResolved", "pullCheckout", "connect", "bringBack"}
+          "reset", "take", "markResolved", "pullCheckout", "connect", "bringBack", "applyPatch"}
 
 # Request op → Repo method, where the names differ.
 ALIAS = {"files": "files_in", "refs": "refs", "lastMessage": "last_message"}
@@ -466,6 +466,19 @@ class Server(lines.Service):
             return out
         if op == "tools":
             return tools()
+        if op == "summaries":
+            return R.summaries(kw.get("roots", []), cancel)
+        if op == "missing":
+            # which of these repositories lost their files: "gone" (the
+            # directory is not there) or "plain" (there, but no .git any more)
+            # — the Repositories page's "Missing" rows
+            out = {}
+            for root in kw.get("roots", []):
+                if not os.path.isdir(root):
+                    out[root] = "gone"
+                elif not os.path.exists(os.path.join(root, ".git")):
+                    out[root] = "plain"
+            return out
         if op == "whereCloned":
             # which of these repositories is a clone of host/full — the one a
             # forge's repository opens as, when it is here already
@@ -612,6 +625,8 @@ class Server(lines.Service):
                                     kw.get("draft", False), kw.get("prerelease", False))
         if op == "DeleteRelease":
             return f.delete_release(kw["full"], kw["id"], kw.get("tag", ""))
+        if op == "Archive":
+            return f.archive(kw["full"], kw.get("on", True))
         if op == "Releases":
             return f.releases(kw["full"])
         if op == "ReleaseNotes":

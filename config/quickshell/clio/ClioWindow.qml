@@ -146,6 +146,7 @@ FloatingWindow {
     win.commit();
     win.selId = id;
     pane.show(win.current);
+    win.mgr.markSeen(id);
   }
   function move(d) {
     if (win.shown.length === 0) return;
@@ -315,6 +316,16 @@ FloatingWindow {
     if (!win.mgr.blocksOf(n)) { win.say("Unlock it first", true); return; }
     win.mgr.toDesktop(n.id);
     win.say("Put on the desktop — it is a sticky now");
+  }
+  // a name of its own, kept over the first line; emptied, the first line
+  // names it again
+  function renameNote(n) {
+    if (!n || n.kind === "sticky") return;
+    win.commit();
+    cards.ask({ title: n.kind === "entry" ? "Name this entry" : "Rename note", glyph: "\u{F0455}", ink: Zenon.cyan,
+      detail: "Shown in the list in place of its first line. Leave it empty to go back to the first line.",
+      fields: [{ key: "name", label: "Name", value: n.name || N.titleOf(n, ""), optional: true }], verb: "Rename",
+      then: (v) => { win.mgr.setField(n.id, "name", v.name.trim(), false); win.say(v.name.trim() ? "Renamed" : "Named by its first line again"); } });
   }
   function folderName(id) {
     if (!id) return "Notes";
@@ -598,6 +609,11 @@ FloatingWindow {
   Connections {
     target: win.mgr
     function onChangedHere(id) { if (win.current && win.current.id === id) pane.show(win.mgr.noteOf(id)); }
+    // pages changed outside Clio, read again: the note open shown afresh
+    function onDiskChanged() {
+      pane.show(win.current);
+      win.say("Updated from the disk");
+    }
     function onConflicted(id, copy) {
       if (win.current && win.current.id === id) pane.show(win.mgr.noteOf(id));
       win.say("Changed on another machine too — both kept, this one as “(this machine)”", true);
@@ -631,6 +647,7 @@ FloatingWindow {
     const items = [];
     if (n.kind === "note") items.push({ text: n.pinned ? "Unpin" : "Pin", icon: "\u{F0403}", mark: "ctrl p", run: () => win.togglePin(n) });
     if (n.kind === "entry") items.push({ text: n.bookmark ? "Remove bookmark" : "Bookmark", icon: n.bookmark ? "" : "", run: () => win.mgr.setField(n.id, "bookmark", !n.bookmark, false) });
+    items.push({ text: "Rename…", icon: "\u{F0455}", run: () => win.renameNote(n) });
     items.push({ text: locked ? "Remove lock" : "Lock", icon: locked ? "" : "", run: () => locked ? win.removeLock(n) : win.lockNote(n) });
     if (n.kind === "note") {
       items.push({ text: "Move to…", icon: "", run: () => win.moveMenu(n, x, y) },
@@ -645,6 +662,7 @@ FloatingWindow {
                { text: "Print…", icon: "\u{F042A}", enabled: win.canPrint, run: () => win.printNote(n) },
                { text: "Save as a template…", icon: "\u{F0DC9}", enabled: !locked, run: () => win.saveTemplate(n) },
                { text: "Info", icon: "", run: () => win.infoOf(n) },
+               { text: "Show page in Terminus", icon: "\uF07C", run: () => { win.commit(); win.mgr.revealPage(n.id); } },
                { isSeparator: true },
                { text: n.kind === "entry" ? "Delete entry" : "Delete", icon: "", mark: "delete", danger: true, run: () => win.trashNote(n) });
     menu.open(x, y, items);
@@ -697,6 +715,47 @@ FloatingWindow {
                    (ok, r, err) => win.say(ok ? "Exported " + list.length + " entries" : "Not exported: " + (err ? err.error : ""), !ok));
     };
     if (win.mgr.fileManager) win.mgr.fileManager.choose(true, Quickshell.env("HOME") + "/Documents", (p) => { if (p && p.length) go(p[0]); });
+  }
+
+  // ── CARRYING ───────────────────────────────────────────────────────────
+  // A note, an entry or a sticky pressed and moved: a card under the
+  // pointer, the sidebar row it would land on lit (only one it can land
+  // on), and on release: the Trash trashes it, a container takes a note or
+  // a sticky, Stickies puts a note on the desktop, a journal takes an entry.
+  property var carried: null
+  function canLand(d, n) {
+    if (!d || !n) return false;
+    if (d.shelf === "trash") return !n.deleted;
+    if (d.shelf === "folder") return n.kind === "note" || n.kind === "sticky";
+    if (d.shelf === "desktop") return n.kind === "note";
+    if (d.shelf === "journal") return n.kind === "entry" && n.journal !== d.id;
+    return false;
+  }
+  function carry(n, from, m) {
+    const p = from.mapToItem(stage, m.x, m.y);
+    win.carried = n;
+    carryCard.x = p.x + 12;
+    carryCard.y = p.y + 6;
+    const s = stage.mapToItem(side, p.x, p.y);
+    const d = side.dropAt(s.x, s.y);
+    side.dropHot = win.canLand(d, n) ? JSON.stringify(d) : "";
+  }
+  function land(from, m) {
+    const n = win.carried;
+    win.carried = null;
+    side.dropHot = "";
+    if (!n) return;
+    const p = from.mapToItem(side, m.x, m.y);
+    const d = side.dropAt(p.x, p.y);
+    if (!win.canLand(d, n)) return;
+    if (d.shelf === "trash") win.trashNote(n);
+    else if (d.shelf === "desktop") win.toDesktop(n);
+    else if (d.shelf === "folder") win.moveNote(n, d.id);
+    else if (d.shelf === "journal") {
+      win.commit();
+      win.mgr.setField(n.id, "journal", d.id, false);
+      win.say("Moved to " + (win.mgr.journalOf(d.id) || {}).name);
+    }
   }
 
   // ── KEYS ───────────────────────────────────────────────────────────────
@@ -985,6 +1044,43 @@ FloatingWindow {
       shown: win.linkOpen
       onPicked: (n) => { win.linkOpen = false; Qt.callLater(() => pane.editor.insertNoteLink(n.id, N.titleOf(n))); }
       onClosed: win.linkOpen = false
+    }
+  }
+
+  // the card a carried note rides on
+  Rectangle {
+    id: carryCard
+    parent: stage
+    z: 1000
+    visible: win.carried !== null
+    width: Math.min(260, carryText.implicitWidth + 44)
+    height: 34
+    radius: Zenon.windowRadius
+    color: Zenon.hud(0.9)
+    border.width: 1
+    border.color: Zenon.alpha(side.dropHot.indexOf("trash") >= 0 ? Zenon.yellow : Zenon.cyan, 0.6)
+    Row {
+      x: 12
+      anchors.verticalCenter: parent.verticalCenter
+      spacing: 8
+      Text {
+        anchors.verticalCenter: parent.verticalCenter
+        text: !win.carried ? "" : win.carried.kind === "entry" ? "\u{F0B64}" : win.carried.kind === "sticky" ? "\u{F178F}" : "\u{F11D7}"
+        color: Zenon.sand
+        font.family: Zenon.glyphFace
+        font.pixelSize: Zenon.px(14)
+      }
+      Text {
+        id: carryText
+        anchors.verticalCenter: parent.verticalCenter
+        width: Math.min(implicitWidth, 200)
+        elide: Text.ElideRight
+        text: win.carried ? N.titleOf(win.carried, win.carried.kind === "entry" ? N.dateLong(win.carried.date) : "") : ""
+        color: Zenon.ink
+        font.family: Zenon.face
+        font.weight: Font.DemiBold
+        font.pixelSize: Zenon.px(13)
+      }
     }
   }
 

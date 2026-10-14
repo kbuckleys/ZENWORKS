@@ -23,18 +23,31 @@ Rectangle {
   readonly property var pics: card.note && !card.note.sealed ? card.d.images.slice(0, 4) : []
   readonly property var mood: card.note && card.note.mood ? N.moodOf(card.note.mood.v) : null
 
-  height: col.implicitHeight + 24
+  // a page's air: a little more round the words than a list row has
+  height: col.implicitHeight + 32
   radius: Zenon.windowRadius + 4
   color: card.here ? Zenon.alpha(Zenon.cyan, 0.10) : Zenon.wash(0.04)
   border.width: card.here ? 2 : 1
   border.color: card.here ? Zenon.alpha(Zenon.cyan, 0.55) : Zenon.border
 
+  // the mood, as a thin edge down the card's left: a journal scrolled
+  // through reads as its weather
+  Rectangle {
+    visible: !!card.mood
+    x: 5
+    y: 14
+    width: 3
+    height: parent.height - 28
+    radius: 1.5
+    color: card.mood ? Zenon.alpha(Zenon[card.mood.ink] || Zenon.muted, 0.85) : "transparent"
+  }
+
   Column {
     id: col
-    x: 12
-    y: 12
-    width: parent.width - 24
-    spacing: 8
+    x: 16
+    y: 16
+    width: parent.width - 32
+    spacing: 10
 
     // the pictures: one wide, or up to four in a row
     Row {
@@ -155,8 +168,18 @@ Rectangle {
   MouseArea {
     anchors.fill: parent
     acceptedButtons: Qt.LeftButton | Qt.RightButton
+    // carried to the Trash, or to another journal (win.carry)
+    property point at
+    property bool moving: false
+    onPressed: (m) => { at = Qt.point(m.x, m.y); moving = false; }
+    onPositionChanged: (m) => {
+      if (!pressed || m.buttons !== Qt.LeftButton || !card.note) return;
+      if (!moving && Math.abs(m.x - at.x) + Math.abs(m.y - at.y) > 8) moving = true;
+      if (moving) card.win.carry(card.note, this, m);
+    }
+    onReleased: (m) => { if (moving) card.win.land(this, m); moving = false; }
     onClicked: (m) => {
-      if (!card.note) return;
+      if (!card.note || moving) return;
       if (m.button === Qt.RightButton) { const p = mapToItem(card.win.stageItem, m.x, m.y); card.win.noteMenu(card.note, p.x, p.y); return; }
       card.win.choose(card.note.id);
       card.win.refocus();

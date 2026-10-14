@@ -228,6 +228,12 @@ def create(name, private=True, description="", org=None):
             "ssh": p["ssh_url_to_repo"], "branch": p.get("default_branch") or "main"}
 
 
+def archive(full, on=True):
+    """GitLab's archive / unarchive (the project goes read-only)."""
+    p = call("POST", f"/projects/{_pid(full)}/{'archive' if on else 'unarchive'}")
+    return {"archived": p.get("archived", bool(on)) if isinstance(p, dict) else bool(on)}
+
+
 def _default(full, tok):
     return call("GET", f"/projects/{_pid(full)}", tok=tok).get("default_branch") or "main"
 

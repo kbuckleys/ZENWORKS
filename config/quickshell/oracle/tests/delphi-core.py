@@ -1200,6 +1200,124 @@ def daemon_watch():
         dm.close()
 
 
+@test
+def missing_repositories():
+    # a repository whose directory went, or whose .git went, is reported;
+    # one still whole is not
+    whole, plain = fresh(), fresh()
+    shutil.rmtree(os.path.join(plain, ".git"))
+    gone = os.path.join(TMP, "never-there")
+    srv = server.Server()
+    out = srv.serve_op("missing", None, {"roots": [whole, plain, gone]}, None, None)
+    eq(out, {plain: "plain", gone: "gone"})
+
+
+@test
+def compare_counts_and_files():
+    d = fresh({"a": "1\n"})
+    sh(d, "switch", "-q", "-c", "side")
+    write(d, "b", "2\n"); sh(d, "add", "b"); sh(d, "commit", "-q", "-m", "b")
+    write(d, "c", "3\n"); sh(d, "add", "c"); sh(d, "commit", "-q", "-m", "c")
+    sh(d, "switch", "-q", "-")
+    main_ = sh(d, "rev-parse", "--abbrev-ref", "HEAD").strip()
+    write(d, "a", "1\n9\n"); sh(d, "commit", "-q", "-am", "a")
+    r = R.Repo(d)
+    eq(r.count_between(main_, "side"), {"left": 1, "right": 2})
+    eq(sorted(f["path"] for f in r.files_between(main_, "side")), ["b", "c"], "only side's own")
+    eq([f["status"] for f in r.files_between(main_, "side")], ["A", "A"])
+
+
+@test
+def lost_after_reset_and_dropped_stash():
+    d = fresh({"a": "1\n"})
+    for n in ("two", "three"):
+        sh(d, "commit", "-q", "--allow-empty", "-m", n)
+    three = sh(d, "rev-parse", "HEAD").strip()
+    sh(d, "reset", "-q", "--hard", "HEAD~2")
+    write(d, "a", "x\n"); sh(d, "stash", "-q"); sh(d, "stash", "drop", "-q")
+    got = R.Repo(d).lost()
+    eq(three in got["tips"], True, "the reset-away tip")
+    eq(got["notes"][three]["what"].startswith("reset"), True, "what left it: " + got["notes"][three]["what"])
+    two = sh(d, "rev-parse", three + "~1").strip()
+    eq(two in got["tips"] and two not in got["notes"], True, "the one under it: no note of its own")
+    eq(any(n["what"].startswith("dropped") for n in got["notes"].values()), True, "the dropped stash")
+    eq(len(R.Repo(fresh({"a": "1\n"})).lost()["tips"]), 0, "nothing lost")
+
+
+@test
+def patch_out_and_back_in():
+    src = fresh({"a": "1\n"})
+    write(src, "a", "1\n2\n"); sh(src, "commit", "-q", "-am", "two lines")
+    out = os.path.join(TMP, "patches")
+    files = R.Repo(src).format_patch("HEAD", out)["files"]
+    eq(len(files), 1)
+    dst = fresh({"a": "1\n"})
+    res = R.Repo(dst).apply_patch(files[0])
+    eq((res["how"], res["done"]), ("commits", True))
+    eq(sh(dst, "log", "-1", "--format=%s").strip(), "two lines")
+    # a plain diff: staged changes, no commit
+    plain = os.path.join(TMP, "plain.diff")
+    with open(plain, "w") as fh:
+        fh.write(sh(src, "diff", "HEAD~1", "HEAD"))
+    dst2 = fresh({"a": "1\n"})
+    eq(R.Repo(dst2).apply_patch(plain)["how"], "changes")
+    eq(read(dst2, "a"), "1\n2\n")
+    eq("a" in sh(dst2, "diff", "--cached", "--name-only"), True, "staged")
+
+
+@test
+def summaries_and_quiet_fetch():
+    up = fresh({"a": "1\n"})
+    down = os.path.join(TMP, "down")
+    sh(TMP, "clone", "-q", up, down)
+    write(down, "new", "n\n")
+    sh(up, "commit", "-q", "--allow-empty", "-m", "upstream moved")
+    R.Repo(down).fetch_quiet()
+    s = {x["root"]: x for x in R.summaries([down, os.path.join(TMP, "nope")])}
+    eq(list(s), [down], "the missing one left out")
+    eq((s[down]["behind"], s[down]["ahead"], s[down]["changed"]), (1, 0, 1))
+    eq(s[down]["remotes"][0]["name"], "origin")
+
+
+@test
+def search_in_changes():
+    d = fresh({"a": "1\n"})
+    write(d, "a", "1\nneedle\n"); sh(d, "commit", "-q", "-am", "plain words")
+    write(d, "a", "1\nneedle\nmore\n"); sh(d, "commit", "-q", "-am", "more")
+    r = R.Repo(d)
+    out = r.git.run(r.log_args(pickaxe="needle"))
+    eq([c["subject"] for c in R.parse_log(out + R.RS)[0]], ["plain words"], "only the commit that added it")
+
+
+@test
+def forges_archive():
+    import json as J
+    import github, gitlab, forgejo
+    sent = []
+
+    class Answer:
+        def __init__(self, v): self.v, self.headers = v, {}
+        def read(self): return J.dumps(self.v).encode()
+        def __enter__(self): return self
+        def __exit__(self, *a): pass
+
+    def fake(req, timeout):
+        sent.append((req.get_method(), req.full_url.split("/api")[-1].split(".com")[-1],
+                     J.loads(req.data) if req.data else None))
+        return Answer({"archived": True})
+
+    keep = (github.urllib.request.urlopen, gitlab.rest.urllib.request.urlopen, github.token, gitlab.token, forgejo.token)
+    github.urllib.request.urlopen = gitlab.rest.urllib.request.urlopen = fake
+    github.token = gitlab.token = forgejo.token = lambda: ("t", "keyring")
+    try:
+        github.archive("me/r"); gitlab.archive("me/r", False); forgejo.archive("me/r")
+    finally:
+        (github.urllib.request.urlopen, gitlab.rest.urllib.request.urlopen,
+         github.token, gitlab.token, forgejo.token) = keep
+    eq([(m, b) for m, _, b in sent], [("PATCH", {"archived": True}), ("POST", None), ("PATCH", {"archived": True})])
+    eq(sent[1][1].endswith("/projects/me%2Fr/unarchive"), True, sent[1][1])
+
+
 def main():
     want = sys.argv[1] if len(sys.argv) > 1 else ""
     ok = bad = 0

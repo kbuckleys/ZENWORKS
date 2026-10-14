@@ -131,6 +131,41 @@ def _progress(emit):
     return on
 
 
+def summaries(roots, cancel=None):
+    """Each repository at a glance — Repositories' rows and what needs
+    attention: its branch, how many files changed, ahead/behind its
+    upstream, what it is in the middle of, its remotes (for the forge). A
+    repository that is not there any more is left out (the "missing" op
+    says so). Asked of several at once: they are separate processes."""
+    from concurrent.futures import ThreadPoolExecutor
+
+    def one(root):
+        if cancel is not None and cancel.done:
+            return None
+        try:
+            g = Git(root)
+            st = S.parse(g.run(["status", "--porcelain=v2", "-z", "--branch", "--show-stash",
+                                "--untracked-files=normal"], lock=False))
+            rv = g.run(["remote", "-v"], lock=False)
+            gitdir = discover(root)["gitdir"]
+        except (GitError, OSError, TypeError):
+            return None
+        rs, names = [], set()
+        for l in rv.splitlines():
+            p = l.split()
+            if len(p) >= 2 and p[0] not in names:
+                names.add(p[0])
+                rs.append({"name": p[0], "fetch": p[1], "push": p[1]})
+        b = st["branch"]
+        return {"root": root, "branch": b["head"], "oid": b["oid"], "upstream": b["upstream"],
+                "ahead": b["ahead"], "behind": b["behind"], "stash": st["stash"],
+                "changed": len(st["staged"]) + len(st["unstaged"]) + len(st["untracked"]),
+                "conflicts": len(st["conflicts"]), "state": S.repo_state(gitdir), "remotes": rs}
+
+    with ThreadPoolExecutor(max_workers=6) as pool:
+        return [r for r in pool.map(one, roots) if r]
+
+
 def remote_key(url):
     """A remote's address as (host, owner/name) — https, ssh and scp-like
     alike — or None: what tells two addresses of one repository apart from
@@ -403,7 +438,7 @@ class Repo:
                           "%D", "%s"]) + RS
 
     def log_args(self, revs=None, path=None, all_refs=True, first_parent=False,
-                 grep=None, author=None):
+                 grep=None, author=None, pickaxe=None):
         a = ["log", "--topo-order", "-z", f"--format={self.LOG_FORMAT}",
              "--decorate=full"]
         if first_parent:
@@ -412,6 +447,10 @@ class Repo:
             a += ["--regexp-ignore-case", f"--grep={grep}"]
         if author:
             a += [f"--author={author}"]
+        if pickaxe:
+            # the commits that added or removed this text (not the ones that
+            # only moved it) — History's search in the changes themselves
+            a += [f"-S{pickaxe}"]
         if revs:
             a += list(revs)
         elif all_refs:
@@ -435,9 +474,16 @@ class Repo:
     def files_in(self, sha, cancel=None):
         """The files a commit touched, with counts — the list beside a
         commit's diff, cheap before any diff is read."""
-        out = self.git.run(["show", "--format=", "-z", "--numstat",
-                            "--find-renames", "--diff-merges=first-parent", sha],
-                           cancel=cancel, lock=False)
+        return self._files(["show", "--format=", "-z", "--find-renames",
+                            "--diff-merges=first-parent", sha], cancel)
+
+    def files_between(self, a, b, cancel=None):
+        """The files b changed since it parted from a (a...b) — what History's
+        Compare shows as the whole difference, as compare() diffs it."""
+        return self._files(["diff", "-z", "--find-renames", f"{a}...{b}"], cancel)
+
+    def _files(self, base, cancel):
+        out = self.git.run(base[:1] + ["--numstat"] + base[1:], cancel=cancel, lock=False)
         res, parts, i = [], out.split("\0"), 0
         while i < len(parts):
             rec = parts[i]; i += 1
@@ -454,8 +500,7 @@ class Repo:
             res.append(e)
         # what happened to each: A added, M modified, D deleted, R renamed —
         # a file a commit removed is one that can be brought back from it
-        st = self.git.run(["show", "--format=", "-z", "--name-status",
-                           "--find-renames", "--diff-merges=first-parent", sha],
+        st = self.git.run(base[:1] + ["--name-status"] + base[1:],
                           cancel=cancel, lock=False).split("\0")
         how, i = {}, 0
         while i < len(st):
@@ -478,6 +523,93 @@ class Repo:
             raise GitError(["checkout"], 1, "the first commit removed nothing — there is nothing before it")
         self.git.run(["checkout", f"{sha}^", "--"] + list(paths), cancel=cancel)
         return {"paths": list(paths)}
+
+    def count_between(self, a, b, cancel=None):
+        """How far apart two refs are: commits a has that b lacks (left) and
+        b has that a lacks (right)."""
+        out = self.git.run(["rev-list", "--left-right", "--count", f"{a}...{b}"],
+                           cancel=cancel, lock=False).split()
+        return {"left": int(out[0]), "right": int(out[1])}
+
+    # ── lost commits ───────────────────────────────────────────────────
+    # Commits no branch, tag, remote or stash holds any more — left by a
+    # reset, a rebase, an amend, a deleted branch, a dropped stash. The
+    # reflogs remember where every ref has been (for ~90 days); fsck finds
+    # the dangling ones they do not (a dropped stash). Of those, the ones
+    # nothing reaches now are the lost; History shows them as a log of
+    # their tips (`tip… --not --all`), each with what left it behind.
+    def lost(self, cancel=None, most=300):
+        fmt = "%H%x1f%gd%x1f%gs"
+        out = self.git.run(["log", "-g", "--all", "--date=unix", f"--format={fmt}"],
+                           cancel=cancel, ok=(0, 128), lock=False)
+        seen, notes, last = [], {}, {}
+        for line in out.splitlines():
+            f = line.split("\x1f")
+            if len(f) != 3:
+                continue
+            sha, sel, what = f
+            ref, _, when = sel.partition("@{")
+            when = int(when.rstrip("}") or 0) if when.rstrip("}").isdigit() else 0
+            # newest first: the entry just before this one in its ref's log
+            # is what moved the ref off it
+            after = last.get(ref)
+            if sha not in notes:
+                seen.append(sha)
+                notes[sha] = {"what": (after or (what, when))[0], "when": (after or (what, when))[1], "ref": ref}
+            last[ref] = (what, when)
+        dang = self.git.run(["fsck", "--connectivity-only", "--dangling", "--no-progress"],
+                            cancel=cancel, ok=(0, 1, 2), lock=False)
+        for line in dang.splitlines():
+            p = line.split()
+            if len(p) == 3 and p[0] == "dangling" and p[1] == "commit" and p[2] not in notes:
+                seen.append(p[2])
+                notes[p[2]] = {"what": "dropped (a stash, most likely)", "when": 0, "ref": ""}
+        if not seen:
+            return {"tips": [], "notes": {}}
+        gone = set(self.git.run(["rev-list", "--stdin", "--not", "--all"], input="\n".join(seen) + "\n",
+                                cancel=cancel, lock=False).split())
+        lost = [sha for sha in seen if sha in gone][:most]
+        if not lost:
+            return {"tips": [], "notes": {}}
+        # only the true tips carry a note: a lost commit under another lost
+        # one was left by the commit made on it, not by what lost them both
+        tips = set(self.git.run(["merge-base", "--independent"] + lost, cancel=cancel, lock=False).split())
+        return {"tips": lost, "notes": {sha: notes[sha] for sha in lost if sha in tips}}
+
+    # ── patches ────────────────────────────────────────────────────────
+    def format_patch(self, rev, dest, upto=None, cancel=None):
+        """One commit (rev) or a range (rev..upto) as mailbox patches in dest
+        — files `git am` (or Apply a patch) takes back. Returns their paths."""
+        os.makedirs(dest, exist_ok=True)
+        a = ["format-patch", "--no-stat", "-o", dest]
+        a += [f"{rev}..{upto}"] if upto else ["-1", rev]
+        out = self.git.run(a, cancel=cancel, lock=False)
+        return {"files": [l.strip() for l in out.splitlines() if l.strip()]}
+
+    def apply_patch(self, path, cancel=None, emit=None):
+        """A patch file onto this repository: a mailbox one (format-patch's,
+        a forge's .patch) as its commits, through `git am --3way` — conflicts
+        stop it as a rebase would; a plain diff as changes in the working
+        tree and the index, with a three-way merge where it does not fit."""
+        with open(path, "rb") as fh:
+            head = fh.read(4096).decode("utf-8", "replace")
+        if head.startswith("From ") and "\nSubject:" in head:
+            r = self._may_conflict(["am", "--3way", path], cancel, emit)
+            r["how"] = "commits"
+            return r
+        self.git.run(["apply", "--3way", "--index", path], cancel=cancel)
+        return {"done": True, "how": "changes"}
+
+    # ── fetched quietly ────────────────────────────────────────────────
+    # The window's every-few-minutes fetch: never asks anything (no askpass
+    # broker — a credential the helpers do not have fails, unseen), gives
+    # up on a stalled connection, and says nothing about progress.
+    def fetch_quiet(self, cancel=None):
+        quiet = Git(self.root)
+        quiet.run(["-c", "http.lowSpeedLimit=1000", "-c", "http.lowSpeedTime=20",
+                   "fetch", "--all", "--prune", "--quiet"], cancel=cancel, creds=True,
+                  extra={"GIT_SSH_COMMAND": "ssh -o BatchMode=yes -o ConnectTimeout=10"})
+        return {}
 
     def blame(self, path, rev=None, cancel=None):
         a = ["blame", "--porcelain", "-w"]

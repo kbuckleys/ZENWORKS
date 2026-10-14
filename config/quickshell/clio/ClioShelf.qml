@@ -33,14 +33,30 @@ ShelfRow {
   Component.onCompleted: if (row.drop && row.host) row.host.register(row)
   Component.onDestruction: if (row.host) row.host.unregister(row)
 
+  // ── SOMETHING CARRIED OVER IT: terminus' sidebar swell ──
+  // the row grows a little and its outline breathes for as long as the
+  // drop is on offer; on the Trash in yellow, a trashing (terminus/SideRow)
+  readonly property color dropInk: !!row.drop && row.drop.shelf === "trash" ? Zenon.yellow : Zenon.cyan
+  property real swell: row.hot ? 1 : 0
+  Behavior on swell { NumberAnimation { duration: Zenon.fast; easing.type: Easing.OutCubic } }
+  scale: 1 + 0.03 * row.swell
+  property real breath: 0.35
+  SequentialAnimation on breath {
+    running: row.hot
+    loops: Animation.Infinite
+    NumberAnimation { to: 1; duration: 520; easing.type: Easing.InOutSine }
+    NumberAnimation { to: 0.35; duration: 520; easing.type: Easing.InOutSine }
+  }
   Rectangle {
     anchors.fill: parent
-    anchors.margins: 2
+    anchors.leftMargin: 4
+    anchors.rightMargin: 4
     radius: Zenon.windowRadius
-    visible: row.hot
-    color: Zenon.alpha(Zenon.cyan, 0.18)
+    visible: row.swell > 0.01
+    opacity: row.swell
+    color: Zenon.alpha(row.dropInk, 0.14)
     border.width: 1
-    border.color: Zenon.alpha(Zenon.cyan, 0.7)
+    border.color: Zenon.alpha(row.dropInk, row.breath)
   }
   // a container's own containers: shown or folded
   Text {

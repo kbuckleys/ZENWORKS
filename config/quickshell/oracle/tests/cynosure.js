@@ -100,9 +100,12 @@ module.exports = {
     t.ok("an app and a verb of the same name keep separate counts",
       C.actionKey({ name: "Files" }) !== "Files");
     const awakeRow = (on) => C.buildRows([], [], {}, C.SHELL_ACTIONS, { awake: on })
-      .find((r) => r.key === "shell:Keep Awake");
-    t.eq("off reads OFF", awakeRow(false).text, "Keep Awake OFF");
-    t.eq("on reads ON", awakeRow(true).text, "Keep Awake ON");
+      .find((r) => r.key === "shell:Caffeinate");
+    t.eq("off offers Caffeinate", awakeRow(false).text, "Caffeinate");
+    t.eq("on offers Decaffeinate", awakeRow(true).text, "Decaffeinate");
+    t.eq("each wears its own cup", awakeRow(true).glyph + awakeRow(false).glyph, "\u{F0FAB}\u{F06CA}");
+    t.eq("a glyph splits off its label", C.splitGlyph("G  Back"), { glyph: "G", label: "Back" });
+    t.eq("a bare label has no glyph", C.splitGlyph("Back"), { glyph: "", label: "Back" });
     t.eq("the count survives the flip", awakeRow(true).key, awakeRow(false).key);
     const glyphOf = (names) => names.indexOf("firefox.desktop") >= 0 ? "G" : "";
     const withG = C.buildRows([{ name: "Firefox", exec: "firefox %u", id: "firefox.desktop" },

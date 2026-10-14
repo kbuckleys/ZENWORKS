@@ -36,6 +36,49 @@ Item {
   function register(r) { side.dropRows = side.dropRows.concat([r]); }
   function unregister(r) { side.dropRows = side.dropRows.filter((x) => x !== r); }
 
+  // ── RECENT ── handed to its Repeater only when what it shows changed: a
+  // fresh array each save rebuilt the rows under the pointer (the peek lost
+  // its row as it opened)
+  property var recentRows: []
+  property string recentSig: ""
+  function rerecent() {
+    if (!side.mgr) return;
+    const r = N.recent(side.mgr.notes, side.mgr.seen, 6);
+    const sig = JSON.stringify(r.map((x) => [x.n.id, N.titleOf(x.n), N.dayShort(x.at, Date.now()), !!x.n.sealed, x.n.journal || ""]));
+    if (sig === side.recentSig) {
+      // the same rows: their notes brought up to date in place
+      for (let i = 0; i < r.length && i < side.recentRows.length; i++) side.recentRows[i].n = r[i].n;
+      return;
+    }
+    side.recentSig = sig;
+    side.recentRows = r;
+  }
+  Connections {
+    target: side.mgr
+    function onNotesChanged() { side.rerecent(); }
+    function onSeenChanged() { side.rerecent(); }
+  }
+  onMgrChanged: side.rerecent()
+
+  // ── A RECENT ROW, PEEKED AT ── a moment after the pointer stops on it
+  property Item peekRow: null
+  property var peekNote: null
+  function peekAt(row, n) {
+    if (row) { peekLeave.stop(); if (row !== side.peekRow || !side.peekNote) { side.peekRow = row; side.peekNote = n; peekWait.restart(); } }
+    else peekLeave.restart();
+  }
+  // off a row: gone unless the pointer is on another a beat later
+  Timer { id: peekLeave; interval: 120; onTriggered: { peekWait.stop(); side.peekNote = null; } }
+  Timer { id: peekWait; interval: 450; onTriggered: side.peekShown = !!side.peekNote }
+  property bool peekShown: false
+  onPeekNoteChanged: if (!side.peekNote) side.peekShown = false
+  NotePeek {
+    win: side.win
+    target: side.peekRow
+    note: side.peekNote
+    shown: side.peekShown && !!side.peekNote && !side.win.carried && !side.win.menuRef.isOpen
+  }
+
   // TERMINUS' AND PLATO'S TWO LAYERS: an inactive tab's glass, the sheet's veil
   Rectangle { anchors.fill: parent; color: Zenon.alpha(Zenon.tabAwayInk, Zenon.tabAway(Zenon.layerBg.a)) }
   Rectangle { anchors.fill: parent; color: Zenon.ground; opacity: 0.6 }
@@ -52,7 +95,7 @@ Item {
       spacing: 10
       Text {
         anchors.verticalCenter: parent.verticalCenter
-        text: ""
+        text: ""
         color: Zenon.sand
         font.family: Zenon.glyphFace
         font.pixelSize: Zenon.px(20)
@@ -240,6 +283,7 @@ Item {
           glyphInk: Zenon[modelData.hue] || Zenon.cyan
           label: modelData.name
           here: side.scope.shelf === "journal" && side.scope.id === modelData.id
+          drop: ({ shelf: "journal", id: modelData.id })
           count: String(side.mgr.notes.filter((n) => n.kind === "entry" && n.journal === modelData.id && !n.deleted).length)
           held: side.win.menuHeld === "j:" + modelData.id
           onClicked: side.win.setScope({ shelf: "journal", id: modelData.id })
@@ -252,6 +296,39 @@ Item {
         label: "New journal"
         muted: true
         onClicked: side.win.askJournal(null)
+      }
+
+      // ── RECENT: the notes and entries last written or opened ──
+      // a way back to what was just in hand, wherever it lives; the time on
+      // the right, as the list's rows have it
+      SideHead { ruled: false; label: "Recent"; visible: recentRep.count > 0 }
+      Repeater {
+        id: recentRep
+        model: side.recentRows
+        delegate: ClioShelf {
+          required property var modelData
+          readonly property var n: modelData.n
+          readonly property bool entry: n.kind === "entry"
+          readonly property var journal: entry ? side.mgr.journalOf(n.journal) : null
+          readonly property bool barred: entry && side.win.journalLocked(n.journal)
+          host: side
+          glyph: n.sealed || barred ? "\uF023" : entry ? "\u{F0B64}" : "\u{F09ED}"
+          glyphInk: n.sealed || barred ? Zenon.yellow : entry ? (Zenon[journal.hue] || Zenon.cyan) : Zenon.muted
+          label: barred ? N.dateLong(n.date) : entry ? N.titleOf(n, N.dateLong(n.date)) : N.titleOf(n)
+          here: side.win.selId === n.id
+          count: N.dayShort(modelData.at, Date.now())
+          held: side.win.menuHeld === n.id
+          onClicked: { side.peekNote = null; side.win.openNote(n.id); }
+          onMenu: (x, y) => side.win.noteMenu(n, x, y)
+          // (a hover-only MouseArea: inside the sidebar's Flickable a
+          // HoverHandler's hover dropped as soon as it came)
+          MouseArea {
+            anchors.fill: parent
+            hoverEnabled: true
+            acceptedButtons: Qt.NoButton
+            onContainsMouseChanged: side.peekAt(containsMouse ? parent : null, parent.n)
+          }
+        }
       }
     }
   }

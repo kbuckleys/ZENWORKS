@@ -445,7 +445,7 @@ Variants {
               { isSeparator: true },
               { text: "New note", icon: "\uF067", run: () => Clio.addHere() },
               // the notebook, on this sticky in its Stickies shelf
-              { text: "Open in Clio", icon: "\uEBAF", enabled: Clio.app !== null,
+              { text: "Open in Clio", icon: "\uE678", enabled: Clio.app !== null,
                 run: () => Clio.app.openSticky(slot.noteId) },
               { text: slot.note && slot.note.above ? "Back under windows" : "Keep above windows", icon: "\u{F0931}",
                 run: () => Clio.set(slot.noteId, "above", !(slot.note && slot.note.above)) },

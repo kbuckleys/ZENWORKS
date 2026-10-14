@@ -119,6 +119,37 @@ Scope {
       if (then) then();
     });
   }
+  // ── PAGES CHANGED ELSEWHERE ──
+  // Every few seconds while the window is up, the backend is asked whether
+  // any page changed that it did not write (another machine synced, an
+  // editor): then the notebook is read again — but only when nothing of
+  // ours is still going to the disk and the note open is not being
+  // written in. While it is, the sync guard keeps both versions instead.
+  signal diskChanged()
+  Timer {
+    interval: 4000
+    repeat: true
+    running: !!mgr.win && mgr.win.visible && mgr.loaded
+    onTriggered: mgr.checkDisk()
+  }
+  function checkDisk() {
+    if (mgr.loading) return;
+    mgr.call("changed", {}, (ok, r) => {
+      if (!ok || !r.changed || mgr.loading) return;
+      const p = mgr.win ? mgr.win.paneRef : null;
+      if (mgr._writing > 0 || Object.keys(mgr._pending).length || Object.keys(mgr._inflight).length
+          || p && (p.dirty || p.editing)) return;
+      mgr.load(() => mgr.diskChanged());
+    });
+  }
+  // a note's page, shown in terminus
+  function revealPage(id) {
+    mgr.call("pathOf", { id: id }, (ok, r, err) => {
+      if (!ok) { mgr.failed("No page for that note yet", err); return; }
+      Quickshell.execDetached(["qs", "ipc", "call", "Terminus", "reveal", r.path]);
+    });
+  }
+
   // The Trash keeps what is in it until it is emptied, as terminus' does
 
   function noteOf(id) {
@@ -574,6 +605,18 @@ Scope {
   property string remindAt: "21:00"
   property var remindDays: [0, 1, 2, 3, 4, 5, 6]
   property string remindedOn: ""
+  // when each note or entry was last opened in the window: with the time
+  // it was last written, what the sidebar's Recent lists
+  property var seen: ({})
+  function markSeen(id) {
+    if (!id || id.startsWith("s:")) return;
+    const s = {};
+    s[id] = Date.now();
+    // the newest forty kept
+    Object.keys(mgr.seen).filter((k) => k !== id).sort((a, b) => mgr.seen[b] - mgr.seen[a]).slice(0, 39)
+      .forEach((k) => s[k] = mgr.seen[k]);
+    mgr.set("seen", s);
+  }
   FileView {
     id: stateFile
     path: Quickshell.statePath("clio-app.json")
@@ -581,7 +624,7 @@ Scope {
     printErrors: false
   }
   readonly property var _keys: ["sort", "view", "groupByDate", "sinkChecked", "scope", "shut", "journalFilter",
-                                "textScale", "noteFace", "journalFace", "remind", "remindAt", "remindDays", "remindedOn", "told", "startWith", "lockAfter"]
+                                "textScale", "noteFace", "journalFace", "remind", "remindAt", "remindDays", "remindedOn", "told", "startWith", "lockAfter", "seen"]
   property bool _ready: false
   Component.onDestruction: if (keepTimer.running) mgr.keepNow()
   function readState() {

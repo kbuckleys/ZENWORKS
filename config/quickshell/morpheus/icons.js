@@ -118,7 +118,7 @@ const DIRS = {
   "backups": "", "bin": "", "bittorrents": "",
   "books": "", "boot": "", "build": "",
   "cache": "", "captures": "󰹑", "certs": "",
-  "claude": "", "clio": "", "cliphist": "", "components": "",
+  "claude": "", "clio": "", "cliphist": "", "components": "",
   "controllers": "", "courses": "", "database": "",
   "db": "", "desktop": "", "dev": "",
   "development": "", "discord": "", "dist": "",
@@ -640,8 +640,8 @@ const APPS = {
   "delphi": "\uF419",
   // U+EB11, the password manager
   "calypso": "\uEB11",
-  // U+EBAF, the notebook (its desktop id is clio)
-  "clio": "\uEBAF",
+  // U+E678, the notebook (its desktop id is clio)
+  "clio": "\uE678",
   // U+F114, the file manager \u2014 the glyph icarus' Files entry wears
   "terminus": "\uF114"
 };

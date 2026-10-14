@@ -20,7 +20,7 @@ Collapsible {
   property bool screenActive: false
   property bool recording: false
   property bool cameraActive: false
-  // socordia's Keep Awake: the screen will not lock or sleep. Handed in by
+  // socordia's Caffeinate: the screen will not lock or sleep. Handed in by
   // shell.qml; a click on the cup asks for it to be switched off.
   property bool awake: false
   signal awakeToggled()
@@ -161,7 +161,7 @@ Collapsible {
       if (root.cameraActive) parts.push("Camera in use");
       if (root.micMuted) parts.push("Microphone muted — click to unmute");
       else if (root.micActive) parts.push("Microphone in use — click to mute");
-      if (root.awake) parts.push("Keep Awake is on — click the cup to let the screen sleep");
+      if (root.awake) parts.push("Caffeinated — click the cup to decaffeinate");
       return parts.join("\n");
     }
     show: mouse.containsMouse && root.active

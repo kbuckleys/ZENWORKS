@@ -226,6 +226,15 @@ def create(name, private=True, description="", org=None):
             "branch": r.get("default_branch") or "main"}
 
 
+# ── archived: read-only on the forge, kept, and undoable ──────────────
+# For a repository no longer kept up but not to be deleted (user,
+# 2026-10-14): nothing can be pushed to it, and it says so to visitors.
+def archive(full, on=True):
+    """Archived (on) or back to normal: GitHub's own flag, both ways."""
+    r = call("PATCH", f"/repos/{full}", {"archived": bool(on)})
+    return {"archived": r.get("archived", bool(on))}
+
+
 def branches(full):
     """A repository's branches, the default one first."""
     tok, _ = token()

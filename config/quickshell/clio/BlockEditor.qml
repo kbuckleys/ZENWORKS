@@ -106,7 +106,9 @@ Item {
     ed._undo = [];
     ed._redo = [];
     ed._lastSnap = 0;
-    view.contentY = 0;
+    // (an undo keeps the page where it was: from the top, the caret was
+    // only revealed at the window's edge, and the note seemed to jump)
+    if (!opts.keepY) view.contentY = 0;
     if (opts.focus) Qt.callLater(() => ed.focusEnd(opts.focus === "start"));
   }
   // what is there, as it is kept: no runtime keys
@@ -486,6 +488,58 @@ Item {
     ed.edited();
     const it = ed.current();
     if (it && !ed.cross) Qt.callLater(() => { if (it.te) it.te.forceActiveFocus(); });
+  }
+  // how the lines of the blocks in hand sit: "" (along the left, or the
+  // right for a right-to-left script), "center", "right", "justify". A
+  // picture chosen: its row's, kept on the row's first block
+  function setAlign(a) {
+    let ts;
+    if (ed.mediaSel !== "" && !ed.cross) ts = [ed.rowStart(ed.indexOf(ed.mediaSel))];
+    else ts = ed.targets().map((x) => ed.sideKind(ed.blocks[x]) ? ed.rowStart(x) : x)
+      .filter((x, n, all) => all.indexOf(x) === n && (ed.sideKind(ed.blocks[x]) || N.isText(ed.blocks[x]) && ed.blocks[x].k !== "mono"));
+    if (ts.length === 0 || ts[0] < 0) return;
+    ed.flushTyping();
+    ed.snap(true);
+    for (const x of ts) { if (a) ed.blocks[x].align = a; else delete ed.blocks[x].align; }
+    ed.rev++;
+    ed.edited();
+  }
+  function alignHere() {
+    void ed.rev; void ed.cursorKey; void ed.mediaSel;
+    const k = ed.mediaSel !== "" ? ed.mediaSel : ed.cursorKey;
+    const i = ed.indexOf(k);
+    if (i < 0) return "";
+    const b = ed.blocks[ed.sideKind(ed.blocks[i]) ? ed.rowStart(i) : i];
+    return b && b.align ? b.align : "";
+  }
+  // the first block of the row block i stands in (itself, alone)
+  function rowStart(i) { if (i < 0) return i; while (i > 0 && ed.joins(i)) i--; return i; }
+  // a picture's row: how it is aligned (its first block's say)
+  function rowAlign(k) {
+    void ed.rev; void ed.blocks;
+    const i = ed.indexOf(k);
+    if (i < 0) return "";
+    const b = ed.blocks[ed.rowStart(i)];
+    return b && b.align ? b.align : "";
+  }
+  // an aligned row's block x: the row's pictures packed together (each as
+  // wide as it is drawn) and the group set centre or right; justified,
+  // spread from edge to edge
+  function rowX(k) {
+    void ed.rev; void ed.blocks;
+    const i = ed.indexOf(k);
+    if (i < 0) return 0;
+    const s = ed.rowStart(i);
+    let e = i;
+    while (e + 1 < ed.blocks.length && ed.joins(e + 1)) e++;
+    const a = ed.rowAlign(k), ws = [];
+    for (let x = s; x <= e; x++) { const it = rep.itemAt(x); ws.push(it ? it.width : 0); }
+    const before = ws.slice(0, i - s).reduce((p, w) => p + w, 0);
+    const sum = ws.reduce((p, w) => p + w, 0), n = ws.length;
+    if (a === "justify") return n === 1 ? 0 : before + (i - s) * Math.max(ed.rowGap, (ed.columnW - sum) / (n - 1));
+    const total = sum + ed.rowGap * (n - 1);
+    const start = Math.max(0, a === "center" ? (ed.columnW - total) / 2 : ed.columnW - total);
+    return Math.round(start + before + (i - s) * ed.rowGap);
   }
   function toggleCheck(k) {
     const ts = k ? [ed.indexOf(k)] : ed.targets();
@@ -1054,8 +1108,10 @@ Item {
     ed._redo = [];
   }
   function restore(st) {
-    ed.load(st.blocks);
-    Qt.callLater(() => ed.place(st.at, st.pos));
+    const y = view.contentY;
+    ed.load(st.blocks, { keepY: true });
+    view.contentY = Math.max(0, Math.min(y, view.contentHeight - view.height));
+    Qt.callLater(() => { view.contentY = Math.max(0, Math.min(y, view.contentHeight - view.height)); ed.place(st.at, st.pos); });
     ed.edited();
   }
   function undo() {
@@ -1176,6 +1232,8 @@ Item {
 
   // ── THE PAGE ───────────────────────────────────────────────────────────
   property string hoverKey: ""
+  property string hoverLink: ""
+  readonly property Item linkSpotItem: linkSpot
   Flickable {
     id: view
     anchors.fill: parent
@@ -1273,6 +1331,10 @@ Item {
         if (h && !overlay.pressed) {
           ed.hoverKey = h.it.key;
           overlay.cursorShape = h.it.cursorAt(h.x, h.y);
+          // a link under the pointer (a note's: peeked at, NotePane)
+          const tp = h.it.isText ? h.it.textPoint(h.x, h.y) : null;
+          ed.hoverLink = tp ? h.it.te.linkAt(tp.x, tp.y) : "";
+          if (ed.hoverLink !== "") { linkSpot.x = m.x - 6; linkSpot.y = m.y - 10; }
         }
         if (!overlay.pressed || !overlay.downAt) return;
         if (Math.abs(m.x - overlay.downAt.x) + Math.abs(m.y - overlay.downAt.y) > 3) overlay.moved = true;
@@ -1303,7 +1365,9 @@ Item {
         if (vy < 20) view.contentY = Math.max(0, view.contentY - 12);
         else if (vy > view.height - 20) view.contentY = Math.min(Math.max(0, view.contentHeight - view.height), view.contentY + 12);
       }
-      onExited: ed.hoverKey = ""
+      onExited: { ed.hoverKey = ""; ed.hoverLink = ""; }
+      // where the link under the pointer is, for a bubble to hang from
+      Item { id: linkSpot; width: 12; height: 20 }
       onCanceled: { ed.dragKey = ""; ed.dropAt = -1; ed.dropBeside = -1; overlay.grab = null; overlay.downAt = null; }
       onPressed: (m) => {
         overlay.moved = false;

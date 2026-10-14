@@ -26,14 +26,29 @@ Rectangle {
   // the TextInput or TextEdit this is the cursor of
   property Item field: null
 
-  width: 2
+  // how thick, and how far the breath fades — a page of writing (clio)
+  // wants a plainer caret than a one-line field
+  property int thick: 2
+  property real low: 0.2
+  // `steady`: held full while the caret moves (typing, arrows), breathing
+  // again only once it rests
+  property bool steady: false
+
+  width: caret.thick
   color: Zenon.cyan
   visible: caret.field !== null && caret.field.activeFocus
 
   SequentialAnimation on opacity {
+    id: breath
     running: caret.visible
     loops: Animation.Infinite
-    NumberAnimation { to: 0.2; duration: 620; easing.type: Easing.InOutQuad }
+    PauseAnimation { duration: caret.steady ? 500 : 0 }
+    NumberAnimation { to: caret.low; duration: 620; easing.type: Easing.InOutQuad }
     NumberAnimation { to: 1.0; duration: 620; easing.type: Easing.InOutQuad }
+  }
+  Connections {
+    target: caret.steady ? caret.field : null
+    ignoreUnknownSignals: true
+    function onCursorPositionChanged() { caret.opacity = 1; if (breath.running) breath.restart(); }
   }
 }

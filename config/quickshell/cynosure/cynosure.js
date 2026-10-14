@@ -67,11 +67,14 @@ const SHELL_ACTIONS = [
   // one in its picker (see timerChoices) instead of running `ipc` blind.
   { name: "Start timer", glyph: "\uF017", keys: "chronos pomodoro focus countdown", ipc: "Chronos start", choose: "timer" },
   { name: "Stop timer", glyph: "\uF28D", keys: "chronos pomodoro halt countdown", ipc: "Chronos halt" },
-  // A toggle in socordia (forceAwake flips), so the row says which way it is. Not
-  // `Socordia release`: that drops logind's delay lock before a suspend, an
-  // escape hatch rather than the way back from keeping awake.
-  // `state` names a live flag the popup passes in, and the row wears it.
-  { name: "Keep Awake", glyph: "\uF0F4", keys: "socordia idle inhibit caffeine sleep", ipc: "Socordia awake", state: "awake" },
+  // A toggle in socordia (forceAwake flips), so the row says what pressing it
+  // does: Caffeinate while the screen may sleep, Decaffeinate while it is
+  // held awake. Not `Socordia release`: that drops logind's delay lock before
+  // a suspend, an escape hatch rather than the way back from keeping awake.
+  // `state` names a live flag the popup passes in; while it is set the row
+  // wears `on` instead. `name` stays the frecency key in both states.
+  { name: "Caffeinate", glyph: "\u{F06CA}", keys: "socordia keep awake idle inhibit caffeine coffee decaf sleep",
+    ipc: "Socordia awake", state: "awake", on: { name: "Decaffeinate", glyph: "\u{F0FAB}" } },
   { name: "Reload shell", glyph: "\uF01E", keys: "quickshell restart qs", sh: "{dir}/scripts/restart.sh" },
 ];
 
@@ -162,11 +165,23 @@ function getApps(modelValues) {
   return apps;
 }
 
-// A toggle's row wears its state — "Keep Awake ON" while it is on, "Keep
-// Awake OFF" while it is off — or you cannot tell which way it is.
+// A toggle's row wears its state — Caffeinate while it is off, Decaffeinate
+// while it is on — or you cannot tell which way it is.
+function actionFace(a, states) {
+  return a.state && a.on && (states || {})[a.state] ? a.on : a;
+}
+
 function actionLabel(a, states) {
-  if (!a.state) return a.name;
-  return a.name + ((states || {})[a.state] ? " ON" : " OFF");
+  return actionFace(a, states).name;
+}
+
+// "glyph  label" split at its first double space — the history lines and the
+// picker labels are stored that way. Drawn as two pieces: in rich text the
+// double space collapses to one and the glyph sits on the word.
+function splitGlyph(s) {
+  const t = String(s);
+  const idx = t.indexOf("  ");
+  return idx > 0 ? { glyph: t.slice(0, idx), label: t.slice(idx + 2) } : { glyph: "", label: t.trim() };
 }
 
 // `glyphOf` is morpheus' appGlyph — handed in rather than imported, so this
@@ -179,17 +194,19 @@ function buildRows(apps, histLines, freq, actions, states, glyphOf) {
   for (const a of apps) {
     const g = glyphOf ? glyphOf([a.id, a.exec, a.name]) : "";
     rows.push({ kind: "app", key: a.name, text: a.name, exec: a.exec, id: a.id, icon: a.icon, words: a.words || "",
-      displayText: g ? g + "  " + a.name : a.name });
+      glyph: g || "", label: a.name, displayText: g ? g + "  " + a.name : a.name });
   }
   for (const a of actions || []) {
-    rows.push({ kind: "shell", key: actionKey(a), text: actionLabel(a, states), exec: "", keys: a.keys, action: a,
-      displayText: a.glyph + "  " + actionLabel(a, states) });
+    const f = actionFace(a, states);
+    rows.push({ kind: "shell", key: actionKey(a), text: f.name, exec: "", keys: a.keys, action: a,
+      glyph: f.glyph, label: f.name, displayText: f.glyph + "  " + f.name });
   }
   for (const line of histLines) {
     const cmd = stripPrefix(line);
     if (appNames[cmd.toLowerCase()]) continue;
     const glyph = line.startsWith(ICON_P) ? ICON_P : ICON_T;
-    rows.push({ kind: "hist", key: cmd, text: cmd, exec: "", glyph, raw: line, displayText: line });
+    rows.push({ kind: "hist", key: cmd, text: cmd, exec: "", glyph: splitGlyph(line).glyph || glyph,
+      label: cmd, raw: line, displayText: line });
   }
   rows.sort((a, b) => {
     const fa = freq[a.key] || 0;

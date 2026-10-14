@@ -28,6 +28,10 @@
 #   password {password, hint, old}   the Clio password set or changed —
 #                            every sealed note sealed again under the new one
 #   unlock {password} · lockNow · unseal {id}
+#   pathOf {id}              the page a note is kept in
+#   changed                  whether any page changed, came or went since
+#                            this backend last read or wrote them (another
+#                            machine, an editor): the window reads again
 #
 # THE LOCK. One Clio password, as Apple's Notes has: PBKDF2-SHA256 (600 000
 # rounds, a random salt) makes 64 bytes of key from it — half encrypts (as
@@ -36,8 +40,9 @@
 # encrypted (HMAC-SHA256, checked before anything is decrypted). The key
 # lives here only while unlocked; the password itself never stays.
 #
-# Layout: ~/Documents/Clio/{Notes/<id>.json, Journals/<id>.json (the
-# entries), Attachments/<file>, and,
+# Layout: ~/Documents/Clio/{Notes/<title>.html, Journals/<day title>.html
+# (the entries) — each a page a browser opens as the note (page.py), named
+# by its title and renamed with it — Attachments/<file>, and,
 # hidden, .meta.json, .lock.json, .stickies.json, .moved.json}. Attachments
 # are SHARED: one directory, a block's `src` a name in it, and a file put in
 # twice (the tray) one file used twice — it goes when nothing uses it. — one directory, read from where
@@ -60,6 +65,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(HERE)), "morpheus", "py"))
 
 import lines  # noqa: E402
+import page  # noqa: E402
 
 PROTOCOL = 1
 ROUNDS = 600000
@@ -130,9 +136,8 @@ def in_att(src):
 KINDS = {"note": "Notes", "entry": "Journals"}
 
 
-def note_path(i, kind=None):
-    # where note `i` is written: by its kind when it is known, otherwise
-    # wherever it already is (a journal entry, or else a note)
+def legacy_path(i, kind=None):
+    # where note `i` was written before the pages: <id>.json by its kind
     if kind is not None:
         return path_of(KINDS.get(kind, "Notes"), i + ".json")
     for d in ("Journals", "Notes"):
@@ -142,15 +147,111 @@ def note_path(i, kind=None):
     return path_of("Notes", i + ".json")
 
 
-def note_files():
-    # every note's and entry's file
+def note_files(ext=(".html", ".json")):
+    # every note's and entry's file (a page, or one not yet made a page)
     out = []
     for d in KINDS.values():
         dd = path_of(d)
         for n in sorted(os.listdir(dd)) if os.path.isdir(dd) else []:
-            if n.endswith(".json"):
+            if n.endswith(ext) and not n.startswith(".") and not n.endswith(".part"):
                 out.append(os.path.join(dd, n))
     return out
+
+
+def kind_of_path(p):
+    return "entry" if os.path.basename(os.path.dirname(p)) == KINDS["entry"] else "note"
+
+
+def read_note(p):
+    # a note's file, read: a page (page.note_of), or the JSON it was before
+    if p.endswith(".json"):
+        j = read_json(p, None)
+        return j if isinstance(j, dict) and j.get("id") else None
+    try:
+        with open(p, encoding="utf-8", errors="replace") as f:
+            return page.note_of(f.read(), p, kind_of_path(p))
+    except OSError:
+        return None
+
+
+def write_note(p, note):
+    if p.endswith(".json"):
+        write_atomic(p, json.dumps(note, ensure_ascii=False, indent=1))
+    else:
+        write_atomic(p, page.page_of(note))
+
+
+class Index:
+    # which file each note is in: pages are named by their titles, so an id
+    # is looked up, never built into a path. Read again whenever an id is
+    # not where it was (a sync, a file renamed by hand).
+    def __init__(self):
+        self.paths = {}
+
+    def scan(self):
+        self.paths = {}
+        for p in note_files():
+            n = read_note(p)
+            if n and n["id"] not in self.paths:
+                self.paths[str(n["id"])] = p
+        return self.paths
+
+    def find(self, i):
+        p = self.paths.get(i)
+        if p and os.path.exists(p):
+            return p
+        return self.scan().get(i)
+
+    def owner(self, p):
+        return next((i for i, q in self.paths.items() if q == p), None)
+
+    def place(self, note, now=None):
+        # the page note `note` goes in: its title's name in its kind's
+        # directory; a clash with another note's gets the id's tail
+        i = str(note["id"])
+        d = path_of(KINDS.get(note.get("kind") or "note", "Notes"))
+        base = page.file_title(note)
+        for cand in (base, "%s (%s)" % (base, i[-4:]), "%s (%s)" % (base, i)):
+            p = os.path.join(d, cand + ".html")
+            if p == now or not os.path.exists(p) or self.owner(p) in (None, i) and read_id(p) in (None, i):
+                return p
+        return os.path.join(d, i + ".html")
+
+
+def read_id(p):
+    n = read_note(p)
+    return str(n["id"]) if n else None
+
+
+def to_pages():
+    # The notebook as pages, once: each <id>.json made its title's .html,
+    # and the JSON put aside, untouched, in .json-backup/ (user, 2026-10-14)
+    old = note_files((".json",))
+    if not old:
+        return 0
+    ix = Index()
+    ix.scan()
+    done = 0
+    for p in old:
+        n = read_note(p)
+        back = path_of(".json-backup", os.path.basename(os.path.dirname(p)), os.path.basename(p))
+        os.makedirs(os.path.dirname(back), exist_ok=True)
+        if n:
+            i = str(n["id"])
+            have = ix.paths.get(i)
+            # (a page already there: the JSON wins only if it is newer — an
+            # old backend still running wrote it after the switch)
+            if not have or have.endswith(".json") or os.path.getmtime(p) > os.path.getmtime(have):
+                dst = have if have and have.endswith(".html") else ix.place(n)
+                write_note(dst, n)
+                # the time it had: the window's sync guard compares it, and
+                # the switch is not an edit from another machine
+                st = os.stat(p)
+                os.utime(dst, (st.st_atime, st.st_mtime))
+                ix.paths[i] = dst
+            done += 1
+        shutil.move(p, back)
+    return done
 
 
 def safe_id(i):
@@ -228,6 +329,24 @@ class Server(lines.Service):
         super().__init__()
         self.key = None
         self.lock = threading.Lock()
+        self.ix = Index()
+        # every page as this backend last read or wrote it: path → mtime
+        self.known = {}
+
+    def mark(self, p, gone=False):
+        if gone:
+            self.known.pop(p, None)
+        elif p and os.path.exists(p):
+            self.known[p] = os.path.getmtime(p)
+
+    def changed(self):
+        now = {}
+        for p in note_files(".html"):
+            try:
+                now[p] = os.path.getmtime(p)
+            except OSError:
+                pass
+        return {"changed": now != self.known}
 
     def failure(self, e):
         if isinstance(e, ClioError):
@@ -239,14 +358,18 @@ class Server(lines.Service):
     # ── reading ──
     def load(self):
         notes = []
+        self.ix.paths = {}
+        self.known = {}
         for p in note_files():
-            j = read_json(p, None)
-            if isinstance(j, dict) and j.get("id"):
+            j = read_note(p)
+            if j and str(j["id"]) not in self.ix.paths:
+                self.ix.paths[str(j["id"])] = p
                 # when it was written, as read: a save sends it back, and a
                 # file changed since (another machine, synced) is not
                 # written over (save)
                 j["_disk"] = os.path.getmtime(p)
                 notes.append(j)
+            self.mark(p)
         lk = read_json(path_of(LOCK), {})
         return {"notes": notes, "meta": read_json(path_of(META), {}),
                 "password": bool(lk.get("check")), "hint": lk.get("hint", ""),
@@ -267,37 +390,60 @@ class Server(lines.Service):
                 # are on disk in the clear anyway: attachments are not sealed)
                 note["uses"] = sorted({str(b["src"]) for b in blocks if isinstance(b, dict) and b.get("src")})
         note.pop("_disk", None)
-        p = note_path(i, "entry" if note.get("kind") == "entry" else "note")
+        note.setdefault("kind", "note")
         with self.lock:
+            now = self.ix.find(i)
+            p = now or self.ix.place(note)
             # THE SYNC GUARD. The file changed since it was read (another
             # machine wrote it, and it came over): neither is lost. What is
             # here goes in as a copy beside it, and the window is handed the
             # other one to show.
             expect = args.get("expect")
             if expect and os.path.exists(p) and abs(os.path.getmtime(p) - float(expect)) > 0.001:
-                disk = read_json(p, None)
-                if isinstance(disk, dict) and disk.get("id"):
+                disk = read_note(p)
+                if disk:
                     copy = dict(note, id=i[0] + secrets.token_hex(6), conflictOf=i)
                     bs = copy.get("blocks")
                     if isinstance(bs, list) and bs and isinstance(bs[0], dict):
                         bs = [dict(b) for b in bs]
                         bs[0]["h"] = str(bs[0].get("h") or "") + " (this machine)"
                         copy["blocks"] = bs
-                    cp = os.path.join(os.path.dirname(p), copy["id"] + ".json")
-                    write_atomic(cp, json.dumps(copy, ensure_ascii=False, indent=1))
+                    if copy.get("name"):
+                        copy["name"] = copy["name"] + " (this machine)"
+                    cp = self.ix.place(copy)
+                    write_note(cp, copy)
+                    self.ix.paths[copy["id"]] = cp
+                    self.mark(cp)
+                    self.mark(p)
                     disk["_disk"] = os.path.getmtime(p)
                     copy["_disk"] = os.path.getmtime(cp)
                     return {"conflict": True, "disk": disk, "copy": copy}
-            write_atomic(p, json.dumps(note, ensure_ascii=False, indent=1))
+            # written under its title, as a page: renamed when the title
+            # changed (or it was still the JSON it was before)
+            want = self.ix.place(note, now)
+            write_note(want, note)
+            if now and now != want:
+                try:
+                    os.remove(now)
+                except OSError:
+                    pass
+                self.mark(now, gone=True)
+            self.ix.paths[i] = want
+            self.mark(want)
+            p = want
         return {"sealed": "sealed" in note and note["sealed"] or "", "mtime": os.path.getmtime(p)}
 
     def remove(self, args):
         i = safe_id(args.get("id"))
-        gone = self.srcs_of(read_json(note_path(i), {}))
-        try:
-            os.remove(note_path(i))
-        except FileNotFoundError:
-            pass
+        p = self.ix.find(i)
+        gone = self.srcs_of(read_note(p) if p else None)
+        if p:
+            try:
+                os.remove(p)
+            except FileNotFoundError:
+                pass
+            self.ix.paths.pop(i, None)
+            self.mark(p, gone=True)
         # its files go with it, save those another note uses as well
         keep = self.used(skip=i)
         for src in gone - keep:
@@ -323,8 +469,9 @@ class Server(lines.Service):
         # locked note (blocks sealed) the list it keeps in the clear (`uses`)
         out = set()
         for p in note_files():
-            if os.path.basename(p) != skip + ".json":
-                out |= self.srcs_of(read_json(p, None))
+            n = read_note(p)
+            if n and str(n["id"]) != skip:
+                out |= self.srcs_of(n)
         return out
 
     def meta(self, args):
@@ -499,12 +646,13 @@ class Server(lines.Service):
         resealed = []
         if old_key is not None:
             for p in note_files():
-                j = read_json(p, None)
-                if isinstance(j, dict) and j.get("sealed"):
+                j = read_note(p)
+                if j and j.get("sealed"):
                     j["sealed"] = seal(key, unseal(old_key, j["sealed"]))
                     resealed.append((p, j))
         for p, j in resealed:
-            write_atomic(p, json.dumps(j, ensure_ascii=False, indent=1))
+            write_note(p, j)
+            self.mark(p)
         write_atomic(path_of(LOCK), json.dumps({
             "salt": base64.b64encode(salt).decode(), "check": check_of(key),
             "hint": str(args.get("hint") or ""), "rounds": ROUNDS}))
@@ -526,8 +674,9 @@ class Server(lines.Service):
         if self.key is None:
             raise ClioError("Locked", "locked")
         i = safe_id(args.get("id"))
-        j = read_json(note_path(i), None)
-        if not isinstance(j, dict) or not j.get("sealed"):
+        p = self.ix.find(i)
+        j = read_note(p) if p else None
+        if not j or not j.get("sealed"):
             raise ClioError("Not a locked note")
         blocks = unseal(self.key, j["sealed"])
         # sealed before the attachments were gathered: their new names
@@ -571,6 +720,13 @@ class Server(lines.Service):
             return {}
         if op == "unseal":
             return self.unseal_note(args)
+        if op == "pathOf":
+            p = self.ix.find(safe_id(args.get("id")))
+            if not p:
+                raise ClioError("That note has no page")
+            return {"path": p}
+        if op == "changed":
+            return self.changed()
         raise ClioError("No such request: " + op)
 
 
@@ -598,8 +754,8 @@ def gather():
             moved[i + "/" + name] = new
     write_atomic(path_of(MOVED), json.dumps(moved, ensure_ascii=False, indent=1))
     for p in note_files():
-        j = read_json(p, None)
-        if not isinstance(j, dict):
+        j = read_note(p)
+        if not j:
             continue
         changed = False
         for b in j.get("blocks") or []:
@@ -610,7 +766,7 @@ def gather():
             j["uses"] = [moved.get(u, u) for u in j["uses"]]
             changed = True
         if changed:
-            write_atomic(p, json.dumps(j, ensure_ascii=False, indent=1))
+            write_note(p, j)
     if not any(files for _, _, files in os.walk(old)):
         shutil.rmtree(old, ignore_errors=True)
 
@@ -626,7 +782,7 @@ def split():
         if not n.endswith(".json") or not os.path.isfile(src):
             continue
         j = read_json(src, None)
-        dst = note_path(n[:-5], "entry" if isinstance(j, dict) and j.get("kind") == "entry" else "note")
+        dst = legacy_path(n[:-5], "entry" if isinstance(j, dict) and j.get("kind") == "entry" else "note")
         os.makedirs(os.path.dirname(dst), exist_ok=True)
         if not os.path.exists(dst):
             shutil.move(src, dst)
@@ -654,6 +810,7 @@ def main():
         hide()
         split()
         gather()
+        to_pages()
     except OSError as e:
         print("clio: could not move the notebook over:", e, file=sys.stderr)
     lines.serve(Server(), PROTOCOL)

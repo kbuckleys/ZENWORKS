@@ -123,32 +123,10 @@ Item {
   readonly property int rowH: 66 + Zenon.px(4)
   readonly property int secH: 34
 
-  // ── CARRYING ONE ───────────────────────────────────────────────────────
-  // a press that moves: a card under the pointer, the sidebar lit where it
-  // would land, the note moved on release
-  property var carried: null
-  function carry(n, from, m) {
-    const p = from.mapToItem(nl.win.stageItem, m.x, m.y);
-    nl.carried = n;
-    dragCard.x = p.x + 12;
-    dragCard.y = p.y + 6;
-    const s = nl.win.stageItem.mapToItem(sideOf(), p.x, p.y);
-    const d = sideOf().dropAt(s.x, s.y);
-    sideOf().dropHot = d ? JSON.stringify(d) : "";
-  }
-  function sideOf() { return nl.win.sideRef; }
-  function land(from, m) {
-    const n = nl.carried;
-    nl.carried = null;
-    sideOf().dropHot = "";
-    if (!n) return;
-    const p = from.mapToItem(sideOf(), m.x, m.y);
-    const d = sideOf().dropAt(p.x, p.y);
-    if (!d) return;
-    if (d.shelf === "trash") nl.win.trashNote(n);
-    else if (d.shelf === "desktop") nl.win.toDesktop(n);
-    else if (d.shelf === "folder") nl.win.moveNote(n, d.id);
-  }
+  // ── CARRYING ONE ── the window's (win.carry / win.land), shared with the
+  // journal's cards
+  function carry(n, from, m) { nl.win.carry(n, from, m); }
+  function land(from, m) { nl.win.land(from, m); }
 
   Component {
     id: rowDelegate
@@ -188,7 +166,7 @@ Item {
           onPressed: (m) => { at = Qt.point(m.x, m.y); moving = false; }
           onPositionChanged: (m) => {
             if (!pressed || m.buttons !== Qt.LeftButton) return;
-            if (!moving && Math.abs(m.x - at.x) + Math.abs(m.y - at.y) > 8 && row.n.kind !== "entry") moving = true;
+            if (!moving && Math.abs(m.x - at.x) + Math.abs(m.y - at.y) > 8) moving = true;
             if (moving) nl.carry(row.n, this, m);
           }
           onReleased: (m) => { if (moving) nl.land(this, m); moving = false; }
@@ -364,35 +342,4 @@ Item {
     }
   }
   ElasticScroll { anchors.fill: grid; view: grid; visible: grid.visible }
-
-  // the card a carried note rides on
-  Rectangle {
-    id: dragCard
-    parent: nl.win ? nl.win.stageItem : nl
-    z: 1000
-    visible: nl.carried !== null
-    width: Math.min(260, dragText.implicitWidth + 44)
-    height: 34
-    radius: Zenon.windowRadius
-    color: Zenon.hud(0.9)
-    border.width: 1
-    border.color: Zenon.alpha(Zenon.cyan, 0.6)
-    Row {
-      x: 12
-      anchors.verticalCenter: parent.verticalCenter
-      spacing: 8
-      Text { text: "\u{F11D7}"; color: Zenon.sand; font.family: Zenon.glyphFace; font.pixelSize: Zenon.px(14); anchors.verticalCenter: parent.verticalCenter }
-      Text {
-        id: dragText
-        anchors.verticalCenter: parent.verticalCenter
-        width: Math.min(implicitWidth, 200)
-        elide: Text.ElideRight
-        text: nl.carried ? N.titleOf(nl.carried) : ""
-        color: Zenon.ink
-        font.family: Zenon.face
-        font.weight: Font.DemiBold
-        font.pixelSize: Zenon.px(13)
-      }
-    }
-  }
 }
