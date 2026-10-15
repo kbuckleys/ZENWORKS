@@ -34,8 +34,10 @@ Rectangle {
   width: implicitWidth
   height: implicitHeight
   radius: Zenon.windowRadius
+  // PRESSED, DARKENED — the suite's press (user, 2026-10-15); the fill
+  // only, the word keeps its ink
   color: !get.ready ? Zenon.wash(0.05)
-    : getMa.pressed ? Zenon.alpha(Zenon.cyan, 0.40)
+    : getMa.pressed ? Zenon.darken(0.35)
     : Zenon.alpha(Zenon.cyan, get.big ? 0.22 : 0.16)
   border.width: 1
   border.color: get.ready ? Zenon.alpha(Zenon.cyan, 0.5) : Zenon.border

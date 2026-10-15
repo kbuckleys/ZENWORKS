@@ -1036,7 +1036,7 @@ Item {
                 width: linkRow.implicitWidth + 26
                 height: 32
                 radius: Zenon.windowRadius
-                color: linkMa.pressed ? Zenon.wash(0.14) : Zenon.wash(0.05)
+                color: linkMa.pressed ? Zenon.darken(0.35) : Zenon.wash(0.05)   // the suite's press (2026-10-15)
                 border.width: 1
                 border.color: Zenon.border
                 Row {
@@ -1436,7 +1436,7 @@ Item {
             width: 44
             height: 24
             radius: Zenon.windowRadius
-            color: moreMa.pressed ? Zenon.wash(0.14) : Zenon.wash(0.06)
+            color: moreMa.pressed ? Zenon.darken(0.35) : Zenon.wash(0.06)   // the suite's press (2026-10-15)
             border.width: 1
             border.color: Zenon.border
             Text {

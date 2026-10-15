@@ -30,6 +30,7 @@ Item {
   property real maxWidth: 400
   property bool editable: false
   readonly property bool editing: field.visible
+  readonly property Item input: field
   signal renamed(string name)
   signal done()
 
@@ -84,7 +85,9 @@ Item {
     anchors.fill: parent
     verticalAlignment: Text.AlignVCenter
     horizontalAlignment: contentWidth < width ? Text.AlignHCenter : Text.AlignLeft
-    cursorDelegate: Caret { field: field }
+    // through tn: inside the Caret, a bare `field` is its own property, and
+    // `field: field` bound it to itself (a binding loop, 2026-10-15)
+    cursorDelegate: Caret { field: tn.input }
     color: Zenon.white
     selectionColor: Zenon.alpha(Zenon.cyan, 0.22)
     selectedTextColor: Zenon.white

@@ -1,0 +1,48 @@
+#!/usr/bin/env python3
+# ┌─┐┌─┐┌┐┌┬ ┬┌─┐┬─┐┬┌─┌─┐
+# ┌─┘├┤ │││││││ │├┬┘├┴┐└─┐
+# └─┘└─┘┘└┘└┴┘└─┘┴└─┴ ┴└─┘
+# https://github.com/kbuckleys/
+#
+# tether CMD [ARG...] — runs CMD so that it dies with whatever started it.
+#
+# A watcher started with -m (inotifywait, udevadm monitor, gdbus monitor,
+# tail -F) never ends by itself. When quickshell exits cleanly its Process
+# objects kill their children; when it does not (a crash, a SIGKILL, a
+# `timeout`-killed `qs -p` harness) the watcher is reparented to init and
+# runs for ever, one set more per shell that went — eight pacman watches by
+# 2026-10-15. So every long-running watcher in the suite is started through
+# this: the kernel sends CMD SIGTERM the moment its parent goes, however it
+# goes (PR_SET_PDEATHSIG, kept across the exec below).
+#
+# THE SIGNAL FOLLOWS THE THREAD THAT FORKED, not the process: a parent that
+# spawns from a short-lived thread sees its child killed when that thread
+# ends. Quickshell starts every Process from its main thread; python
+# backends use morpheus/py/tether.py, which forks from one thread kept for
+# the daemon's life.
+#
+# Stdlib only, and exec'd into at once, so the pid quickshell holds is the
+# watcher's own and stopping the Process stops the watcher.
+
+import ctypes
+import os
+import signal
+import sys
+
+PR_SET_PDEATHSIG = 1
+
+if len(sys.argv) < 2:
+    sys.stderr.write("usage: tether CMD [ARG...]\n")
+    sys.exit(2)
+
+parent = os.getppid()
+ctypes.CDLL(None, use_errno=True).prctl(PR_SET_PDEATHSIG, signal.SIGTERM, 0, 0, 0)
+# The parent may have gone between the fork and the prctl above, and then
+# the signal will never come: already reparented, so stop here.
+if os.getppid() != parent:
+    sys.exit(0)
+try:
+    os.execvp(sys.argv[1], sys.argv[1:])
+except OSError as e:
+    sys.stderr.write("tether: %s: %s\n" % (sys.argv[1], e.strerror))
+    sys.exit(127)

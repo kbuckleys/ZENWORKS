@@ -52,6 +52,7 @@ from rest import ForgeError
 from stow import StowError
 from lines import send
 import lines
+import tether
 
 PROTOCOL = 1
 
@@ -238,9 +239,10 @@ class Watch:
 
     def _spawn(self, argv, what):
         try:
-            p = subprocess.Popen(argv, stdout=subprocess.PIPE,
-                                 stderr=subprocess.DEVNULL, text=True,
-                                 start_new_session=True)
+            # tethered: dies with this daemon even when it is SIGKILLed
+            p = tether.popen(argv, stdout=subprocess.PIPE,
+                             stderr=subprocess.DEVNULL, text=True,
+                             start_new_session=True)
         except FileNotFoundError:
             return
         self.procs.append(p)
