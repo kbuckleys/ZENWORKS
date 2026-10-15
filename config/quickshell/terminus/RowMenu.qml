@@ -39,6 +39,7 @@ import "../picasso"
 import "../oracle"
 import "terminus.js" as Terminus
 import "../morpheus/icons.js" as Icons
+import "menuglyphs.js" as MenuGlyphs
 import "../morpheus/thumbs.js" as Thumbs
 import "tags.js" as Tags
 import "collections.js" as Coll
@@ -420,8 +421,10 @@ PopupWindow {
     // the parent card's glyph column, as the submenu's (subGlyphs): laid
     // when any row carries a glyph — the sort menu's tick, opened from the
     // sort button
+    // ...and every row has one now (menuglyphs.js, user 2026-10-15), so
+    // the column is laid whenever any row's words are in the table
     readonly property bool cardGlyphs: {
-      for (const it of menu.items) if (it.glyph !== undefined) return true;
+      for (const it of menu.items) if (it.glyph !== undefined || MenuGlyphs.of(it) !== "") return true;
       return false;
     }
     readonly property real cardGlyphW: menu.cardGlyphs ? 16 + Zenon.menuIconGap : 0
@@ -481,7 +484,7 @@ PopupWindow {
     // a row the map does not know, as icarus' app list keeps it, so the
     // names stay in one line down the card.
     readonly property bool subGlyphs: {
-      for (const it of menu.subItems) if (it.glyph !== undefined) return true;
+      for (const it of menu.subItems) if (it.glyph !== undefined || MenuGlyphs.of(it) !== "") return true;
       return false;
     }
     readonly property real subGlyphW: menu.subGlyphs ? 16 + Zenon.menuIconGap : 0
@@ -692,7 +695,7 @@ PopupWindow {
         out.push({ sep: true });
         // THIS directory, not whatever the cursor is resting on. Last, where
         // every other file manager puts it.
-        out.push({ label: "Properties",
+        out.push({ label: "Info", glyph: "\u{F064E}",
                    act: () => term.propsRef.askPath(term.cwd) });
         return out;
       }
@@ -919,7 +922,7 @@ PopupWindow {
       // menu entries opening the same card one tab apart is the menu
       // being longer to say the same thing. c m still goes straight to
       // that tab for anyone who reaches for it.
-      out.push({ label: "Properties", key: "alt return", act: () => term.propsRef.ask() });
+      out.push({ label: "Info", glyph: "\u{F064E}", key: "alt return", act: () => term.propsRef.ask() });
       if (menu.isImage) {
         out.push({ sep: true });
         // ── THE QUICK ACTIONS ────────────────────────────────
@@ -1184,7 +1187,7 @@ PopupWindow {
               anchors.verticalCenter: parent.verticalCenter
               width: 16
               visible: menu.cardGlyphs && !modelData.sep && !modelData.swatch
-              text: modelData.glyph || ""
+              text: MenuGlyphs.of(modelData)
               horizontalAlignment: Text.AlignHCenter
               color: Zenon.white
               font.family: Zenon.face
@@ -1551,7 +1554,7 @@ PopupWindow {
                 anchors.verticalCenter: parent.verticalCenter
                 width: 16
                 visible: menu.subGlyphs && !modelData.sep
-                text: modelData.glyph || ""
+                text: MenuGlyphs.of(modelData)
                 horizontalAlignment: Text.AlignHCenter
                 color: Zenon.white
                 font.family: Zenon.face

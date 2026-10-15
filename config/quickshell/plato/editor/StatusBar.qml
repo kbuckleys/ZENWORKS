@@ -526,7 +526,7 @@ Item {
       opacity: diagHover.hovered ? 1 : 0.9
       DiagCount { font: bar.font; glyphSize: bar.iconSize; n: parent.d.e; glyph: "\u{F0159}"; ink: Zenon.red }
       DiagCount { font: bar.font; glyphSize: bar.iconSize; n: parent.d.w; glyph: "\u{F0026}"; ink: Zenon.yellow }
-      DiagCount { font: bar.font; glyphSize: bar.iconSize; n: parent.d.e + parent.d.w > 0 ? 0 : parent.d.i; glyph: "\u{F02FC}"; ink: Zenon.blue }
+      DiagCount { font: bar.font; glyphSize: bar.iconSize; n: parent.d.e + parent.d.w > 0 ? 0 : parent.d.i; glyph: "\u{F064E}"; ink: Zenon.blue }
       DiagCount { font: bar.font; glyphSize: bar.iconSize; n: parent.d.e + parent.d.w > 0 ? 0 : parent.d.h; glyph: "\u{F0335}"; ink: Zenon.cyan }
       HoverHandler { id: diagHover; cursorShape: Qt.PointingHandCursor
         onHoveredChanged: bar.tip(parent, hovered, "Diagnostics", "space d d") }

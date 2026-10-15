@@ -437,6 +437,7 @@ Item {
       { label: "Open", act: () => term.goTo(path) },
       { label: "Open in new tab", act: () => term.newTab(path) },
       { label: "Go to\u2026", key: "g space", act: () => term.sendToRef.ask("go") },
+      { label: "Paste path and go", act: () => opening.pastePathAndGo(path) },
       { sep: true },
       { label: "Copy path", act: () => term.copyText(path, "copied " + path) }
     ];
@@ -450,5 +451,50 @@ Item {
                act: () => term.run(Terminus.shellCommand(path, term.termCmd)) });
     term.menuPopRef.menu.openCustom(item, { x: x, y: y }, out, false);
     term.sideMenuAt = item;
+  }
+
+  // ── PASTE PATH AND GO (user, 2026-10-15) ──────────────────────────────
+  // A step's menu: whatever path is on the clipboard, gone to. Read as
+  // text and made a place in the shell — a file:// URI decoded, quotes and
+  // edge space shed, ~ expanded, a relative one taken from the step that
+  // was right-clicked. A directory is entered; a file is landed on in its
+  // own directory, as reveal does; anything else is said, not guessed at.
+  function pastePathAndGo(base) {
+    pastePathProc.running = false;
+    pastePathProc.command = ["bash", "-c",
+      't=$(wl-paste -n -t text 2>/dev/null | head -n1); '
+      + 't="${t#"${t%%[![:space:]]*}"}"; t="${t%"${t##*[![:space:]]}"}"; '
+      + 'case $t in \\"*\\") t=${t:1:-1};; \\\'*\\\') t=${t:1:-1};; esac; '
+      + 'case $t in file://*) t=${t#file://}; t=${t#localhost}; '
+      + 't=$(printf "%b" "${t//%/\\\\x}");; esac; '
+      + 'case $t in "~") t=$HOME;; "~/"*) t=$HOME/${t#"~/"};; esac; '
+      + '[ -z "$t" ] && { printf "x\\t"; exit; }; '
+      + 'case $t in /*) ;; *) t=$1/$t;; esac; t=$(realpath -s -m -- "$t"); '
+      + 'if [ -d "$t" ]; then printf "d\\t%s" "$t"; elif [ -e "$t" ]; then printf "f\\t%s" "$t"; '
+      + 'else printf "x\\t%s" "$t"; fi',
+      "pastego", String(base)];
+    pastePathProc.running = true;
+  }
+  Process {
+    id: pastePathProc
+    stdout: StdioCollector {
+      id: pastePathOut
+      waitForEnd: true
+      onStreamFinished: {
+        const out = String(pastePathOut.text || "");
+        const kind = out.slice(0, 1);
+        const p = out.slice(2);
+        if (kind === "d") { term.goTo(p); return; }
+        if (kind === "f") {
+          const dir = Terminus.dirname(p);
+          if (term.searchMode !== "") term.clearSearch();
+          term.wantSel = p;
+          if (dir === term.cwd) term.landWanted();
+          else term.goTo(dir);
+          return;
+        }
+        term.warn(p === "" ? "no path on the clipboard" : "no such place: " + p);
+      }
+    }
   }
 }

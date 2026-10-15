@@ -503,6 +503,44 @@ Scope {
   // the words in a picture of Clio's (tesseract), "" for none
   function ocr(src, done) { mgr.call("ocr", { src: src }, (ok, r) => done(ok ? r.text || "" : "")); }
   function copyText(t) { mgr.call("copyText", { text: t }, () => {}); }
+
+  // ── DOES A PICTURE USE TRANSPARENCY ─────────────────────────────────────
+  // A picture with see-through parts is drawn with square corners (user,
+  // 2026-10-15) — by what it IS, not what it is called: a png with no alpha
+  // in use is a photograph and keeps its rounding. Asked of magick once per
+  // file (and version), in turn, and remembered: path -> true when clear.
+  // Unknown until answered (askClear), which draws rounded, as most are.
+  property var clear: ({})
+  property var _clearQueue: []
+  function askClear(path) {
+    if (path === "" || mgr.clear[path] !== undefined || mgr._clearQueue.indexOf(path) >= 0) return;
+    mgr._clearQueue = mgr._clearQueue.concat([path]);
+    if (!clearProc.running) Qt.callLater(mgr._clearNext);
+  }
+  function _clearNext() {
+    if (clearProc.running || mgr._clearQueue.length === 0) return;
+    const path = mgr._clearQueue[0];
+    clearProc.asked = path;
+    // a jpeg cannot carry alpha, so it is not decoded to prove it
+    clearProc.command = ["sh", "-c",
+      'case "$1" in *.jpg|*.JPG|*.jpeg|*.JPEG|*.jpe|*.JPE) echo True; exit;; esac; '
+      + 'magick identify -format "%[opaque]" "$1[0]" 2>/dev/null', "clear", path.replace(/\?v=.*$/, "")];
+    clearProc.running = true;
+  }
+  Process {
+    id: clearProc
+    property string asked: ""
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: {
+        const next = Object.assign({}, mgr.clear);
+        next[clearProc.asked] = String(text).trim() === "False";
+        mgr.clear = next;
+        mgr._clearQueue = mgr._clearQueue.filter((q) => q !== clearProc.asked);
+        Qt.callLater(mgr._clearNext);
+      }
+    }
+  }
   function exportNote(n, format, dir, done) {
     const bs = mgr.blocksOf(n);
     if (!bs) { done(false, "Unlock it first"); return; }

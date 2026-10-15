@@ -47,6 +47,12 @@ FloatingWindow {
 
   readonly property string script: Quickshell.shellDir + "/scripts/ceres.sh"
   property var mgr: null
+  // the head's glyph buttons say what they are here (user, 2026-10-15)
+  readonly property string checkTip: Ceres.checking ? "Checking for updates…"
+    : Ceres.lastOk > 0 ? "Check for updates · last checked " + Cer.age(Ceres.now - Ceres.lastOk)
+    : "Check for updates"
+  WindowTip { id: headTip; window: win }
+  onCheckTipChanged: if (headTip.target === refreshChip) headTip.text = win.checkTip
 
   // The size you left it at, handed back by the manager the next time it
   // builds one — see CeresManager. Written once a resize settles.
@@ -1323,7 +1329,7 @@ FloatingWindow {
     const m = win.maint;
     if (!m) return false;
     return (key === "orphans" && m.orphans.length > 0) || (key === "pacnew" && m.pacnew.length > 0)
-      || (key === "cache" && m.stale > 0) || (key === "oldcode" && Ceres.staleApps.length > 0)
+      || (key === "cache" && m.stale > 0) || (key === "oldcode" && Ceres.oldCode.length > 0)
       || (key === "aurhealth" && Ceres.aurHealth.problems.length > 0)
       || (key === "mirrors" && win.mirrorsWant)
       // Flatpak's leftovers are the system's hygiene too
@@ -1339,7 +1345,7 @@ FloatingWindow {
       if (!h.ok) return "";
       return h.problems.some(p => p.gone) ? "bad" : h.problems.length ? "warn" : "ok";
     }
-    if (key === "oldcode") return Ceres.staleApps.length ? "warn" : "ok";
+    if (key === "oldcode") return Ceres.oldCode.length ? "warn" : "ok";
     if (key === "mirrors") {
       const h = win.mirrors;
       if (!h) return "";
@@ -1985,149 +1991,171 @@ FloatingWindow {
           font.pixelSize: Zenon.px(16)
         }
 
-        // THE SEARCH IS A FIELD, at the right of the tab bar (user,
-        // 2026-10-14): the Store's first, then every tab that filters — it
-        // used to be the query said as a line. Still not a text box: the keys
-        // never leave the window (see `typing`); it shows what is typed, with
-        // a caret while you are in it, and a click puts you back in.
-        Rectangle {
-          id: searchField
-          visible: win.filters
-          anchors.verticalCenter: parent.verticalCenter
-          width: 260
-          height: 32
-          radius: Zenon.windowRadius
-          color: Zenon.wash(win.typing ? 0.08 : 0.04)
-          // the frame stays the border; while you are in it, the ring every
-          // focused field wears (terminus' HeldRing — user, 2026-10-15)
-          border.width: 1
-          border.color: Zenon.border
-          Term.HeldRing {
-            anchors.fill: parent
-            radius: parent.radius
-            z: 10
-            on: win.typing && win.face === "browse"
-          }
-          Text {
-            id: sfGlyph
-            anchors.left: parent.left
-            anchors.leftMargin: 10
-            anchors.verticalCenter: parent.verticalCenter
-            text: "\uF002"
-            color: win.typing || win.filterText !== "" ? Zenon.cyan : Zenon.muted
-            font.family: Zenon.face
-            font.weight: Zenon.weight
-            font.pixelSize: Zenon.px(13)
-          }
-          Row {
-            anchors.left: sfGlyph.right
-            anchors.leftMargin: 9
-            anchors.right: parent.right
-            anchors.rightMargin: 10
-            anchors.verticalCenter: parent.verticalCenter
-            spacing: 1
-            clip: true
-            Text {
-              visible: win.filterText !== ""
-              text: win.filterText
-              color: win.typing ? Zenon.white : Zenon.keyInk
-              font.family: Zenon.face
-              font.weight: Zenon.weight
-              font.pixelSize: Zenon.px(15)
-            }
-            Rectangle {
-              id: sfCaret
-              visible: win.face === "browse" && win.typing
-              anchors.verticalCenter: parent.verticalCenter
-              width: 2
-              height: 15
-              color: Zenon.white
-              opacity: 0.3
-              SequentialAnimation on opacity {
-                running: sfCaret.visible
-                loops: Animation.Infinite
-                NumberAnimation { to: 1; duration: 550; easing.type: Easing.InOutSine }
-                NumberAnimation { to: 0.3; duration: 550; easing.type: Easing.InOutSine }
-              }
-            }
-            Text {
-              visible: win.filterText === ""
-              text: "Search"
-              color: Zenon.muted
-              font.family: Zenon.face
-              font.weight: Zenon.weight
-              font.pixelSize: Zenon.px(15)
-            }
-          }
-          TapHandler { onTapped: { win.typing = true; keys.forceActiveFocus(); } }
-        }
-
-        // A CHECKBOX: it is a condition on the search, on or off, and a box
-        // with a tick says exactly that. The same cyan as the lit tab.
+        // the search and the chips beside it, closer to each other than the
+        // head's other pieces (user, 2026-10-15)
         Row {
-          id: onlyInstalled
-          visible: win.tab === "packages"
+          visible: win.filters || win.tab === "packages" || win.tab === "updates"
           anchors.verticalCenter: parent.verticalCenter
           spacing: 8
+
+          // THE SEARCH IS A FIELD, at the right of the tab bar (user,
+          // 2026-10-14): the Store's first, then every tab that filters — it
+          // used to be the query said as a line. Still not a text box: the keys
+          // never leave the window (see `typing`); it shows what is typed, with
+          // a caret while you are in it, and a click puts you back in.
           Rectangle {
+            id: searchField
+            visible: win.filters
             anchors.verticalCenter: parent.verticalCenter
-            width: 16
-            height: 16
-            radius: Zenon.windowRadius - 1
-            color: win.installedOnly ? Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b, 0.2) : "transparent"
+            width: 260
+            height: 32
+            radius: Zenon.windowRadius
+            color: Zenon.wash(win.typing ? 0.08 : 0.04)
+            // the frame stays the border; while you are in it, the ring every
+            // focused field wears (terminus' HeldRing — user, 2026-10-15)
             border.width: 1
-            border.color: win.installedOnly ? Zenon.cyan : Zenon.keyInk
+            border.color: Zenon.border
+            Term.HeldRing {
+              anchors.fill: parent
+              radius: parent.radius
+              z: 10
+              on: win.typing && win.face === "browse"
+            }
             Text {
-              anchors.centerIn: parent
-              visible: win.installedOnly
-              text: "\uF00C"
-              color: Zenon.cyan
+              id: sfGlyph
+              anchors.left: parent.left
+              anchors.leftMargin: 10
+              anchors.verticalCenter: parent.verticalCenter
+              text: "\uF002"
+              color: win.typing || win.filterText !== "" ? Zenon.cyan : Zenon.muted
               font.family: Zenon.face
               font.weight: Zenon.weight
-              font.pixelSize: Zenon.px(10)
+              font.pixelSize: Zenon.px(13)
             }
+            Row {
+              anchors.left: sfGlyph.right
+              anchors.leftMargin: 9
+              anchors.right: sfClear.visible ? sfClear.left : parent.right
+              anchors.rightMargin: 10
+              anchors.verticalCenter: parent.verticalCenter
+              spacing: 1
+              clip: true
+              Text {
+                visible: win.filterText !== ""
+                text: win.filterText
+                color: win.typing ? Zenon.white : Zenon.keyInk
+                font.family: Zenon.face
+                font.weight: Zenon.weight
+                font.pixelSize: Zenon.px(15)
+              }
+              Rectangle {
+                id: sfCaret
+                visible: win.face === "browse" && win.typing
+                anchors.verticalCenter: parent.verticalCenter
+                width: 2
+                height: 15
+                color: Zenon.white
+                opacity: 0.3
+                SequentialAnimation on opacity {
+                  running: sfCaret.visible
+                  loops: Animation.Infinite
+                  NumberAnimation { to: 1; duration: 550; easing.type: Easing.InOutSine }
+                  NumberAnimation { to: 0.3; duration: 550; easing.type: Easing.InOutSine }
+                }
+              }
+              Text {
+                visible: win.filterText === ""
+                text: "Search"
+                color: Zenon.muted
+                font.family: Zenon.face
+                font.weight: Zenon.weight
+                font.pixelSize: Zenon.px(15)
+              }
+            }
+            // THE TEXT, CLEARED (user, 2026-10-15): a × at the end while there
+            // is any — ctrl+u's own, for the pointer; you stay in the field.
+            // Terminus' tab close chip, the suite's one × (user, 2026-10-15)
+            Term.ClearChip {
+              id: sfClear
+              shown: win.filterText !== ""
+              anchors.right: parent.right
+              anchors.rightMargin: 8
+              anchors.verticalCenter: parent.verticalCenter
+              size: Zenon.px(15)
+              z: 1
+              onClicked: { win.setFilter(""); win.typing = true; keys.forceActiveFocus(); }
+            }
+            TapHandler { onTapped: { win.typing = true; keys.forceActiveFocus(); } }
           }
-          Text {
-            anchors.verticalCenter: parent.verticalCenter
-            text: "Installed"
-            color: win.installedOnly ? Zenon.white : Zenon.keyInk
-            font.family: Zenon.face
-            font.weight: Zenon.weight
-            font.pixelSize: Zenon.px(16)
-          }
-          TapHandler { onTapped: { win.installedOnly = !win.installedOnly; keys.forceActiveFocus(); } }
-        }
 
-        // how fresh the list is, and the way to make it fresher — Updates only
-        Row {
-          visible: win.tab === "updates"
-          anchors.verticalCenter: parent.verticalCenter
-          spacing: 10
-          Text {
+          // A TOGGLE CHIP (user, 2026-10-15; the glyph U+F0C7 theirs): a condition on the search, on or
+          // off — lit cyan like the lit tab while it holds. The glyph alone; the
+          // tip names it.
+          Rectangle {
+            id: onlyInstalled
+            visible: win.tab === "packages"
             anchors.verticalCenter: parent.verticalCenter
-            text: Ceres.checking ? "checking…"
-              : Ceres.lastOk > 0 ? "checked " + Cer.age(Ceres.now - Ceres.lastOk) : ""
-            color: Zenon.muted
-            font.family: Zenon.face
-            font.weight: Zenon.weight
-            font.pixelSize: Zenon.px(14)
-          }
-          Text {
-            id: refresh
-            anchors.verticalCenter: parent.verticalCenter
-            text: ""
-            color: refreshHov.hovered ? Zenon.white : Zenon.keyInk
-            font.family: Zenon.face
-            font.weight: Zenon.weight
-            font.pixelSize: Zenon.px(16)
-            RotationAnimation on rotation {
-              running: Ceres.checking
-              loops: Animation.Infinite
-              from: 0; to: 360; duration: 900
-              onRunningChanged: if (!running) refresh.rotation = 0
+            width: 32
+            height: 32
+            radius: Zenon.windowRadius
+            // PRESSED, DARKENED as terminus' ClearChip is (user, 2026-10-15)
+            color: onlyTap.pressed ? Zenon.darken(0.35)
+                 : win.installedOnly ? Zenon.alpha(Zenon.cyan, 0.2)
+                 : onlyHov.hovered ? Zenon.wash(0.08) : Zenon.wash(0.05)
+            border.width: 1
+            border.color: win.installedOnly ? Zenon.alpha(Zenon.cyan, 0.7) : Zenon.border
+            Text {
+              anchors.centerIn: parent
+              text: "\uF0C7"
+              color: win.installedOnly ? Zenon.cyan : onlyHov.hovered ? Zenon.white : Zenon.keyInk
+              opacity: onlyTap.pressed ? 0.55 : 1
+              font.family: Zenon.face
+              font.weight: Zenon.weight
+              font.pixelSize: Zenon.px(16)
             }
-            HoverHandler { id: refreshHov }
-            TapHandler { onTapped: Ceres.check() }
+            HoverHandler {
+              id: onlyHov
+              onHoveredChanged: hovered ? headTip.show(onlyInstalled, "Installed only") : headTip.hide(onlyInstalled)
+            }
+            TapHandler { id: onlyTap; onTapped: { win.installedOnly = !win.installedOnly; keys.forceActiveFocus(); } }
+          }
+
+          // the way to make the list fresher — Updates only. A chip like the
+          // Installed one, the glyph alone (user, 2026-10-15); when it last
+          // checked rides in its tip. Lit while a check runs, the glyph turning.
+          Rectangle {
+            id: refreshChip
+            visible: win.tab === "updates"
+            anchors.verticalCenter: parent.verticalCenter
+            width: 32
+            height: 32
+            radius: Zenon.windowRadius
+            color: refreshTap.pressed ? Zenon.darken(0.35)
+                 : Ceres.checking ? Zenon.alpha(Zenon.cyan, 0.2)
+                 : refreshHov.hovered ? Zenon.wash(0.08) : Zenon.wash(0.05)
+            border.width: 1
+            border.color: Ceres.checking ? Zenon.alpha(Zenon.cyan, 0.7) : Zenon.border
+            Text {
+              id: refresh
+              anchors.centerIn: parent
+              text: "\uF021"
+              color: Ceres.checking ? Zenon.cyan : refreshHov.hovered ? Zenon.white : Zenon.keyInk
+              opacity: refreshTap.pressed ? 0.55 : 1
+              font.family: Zenon.face
+              font.weight: Zenon.weight
+              font.pixelSize: Zenon.px(16)
+              RotationAnimation on rotation {
+                running: Ceres.checking
+                loops: Animation.Infinite
+                from: 0; to: 360; duration: 900
+                onRunningChanged: if (!running) refresh.rotation = 0
+              }
+            }
+            HoverHandler {
+              id: refreshHov
+              onHoveredChanged: hovered ? headTip.show(refreshChip, win.checkTip) : headTip.hide(refreshChip)
+            }
+            TapHandler { id: refreshTap; onTapped: Ceres.check() }
           }
         }
       }
@@ -2138,7 +2166,7 @@ FloatingWindow {
 
     // ── THE MESSAGE BAR ──────────────────────────────────────────────
     // The notes Ceres keeps about its own answer — a failed check, a reboot
-    // or a re-login owed, news unread. None of them is an update, and they
+    // or a service restart owed, news unread. None of them is an update, and they
     // hold whether there are updates or not, so they sit in a bar of their
     // own above the list rather than as loose red lines that read like part
     // of it. Each row wears its own level; the bar wears the worst of them.
@@ -2154,70 +2182,14 @@ FloatingWindow {
                && Ceres.noteItems.length > 0
       height: visible ? noteBar.height + 20 : 0
 
-      function inkOf(level) {
-        return level === "bad" ? Zenon.red : level === "warn" ? Zenon.yellow : Zenon.blue;
-      }
-      function glyphOf(level) {
-        return level === "bad" ? "\uF06A" : level === "warn" ? "\uF071" : "\uF05A";
-      }
-      readonly property color worst: {
-        const items = Ceres.noteItems;
-        if (items.some(n => n.level === "bad")) return Zenon.red;
-        if (items.some(n => n.level === "warn")) return Zenon.yellow;
-        return Zenon.blue;
-      }
-
-      Rectangle {
+      // the bar itself — ceres/NoteBar, shared with the quick-access panel
+      NoteBar {
         id: noteBar
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: parent.top
         anchors.margins: 12
         anchors.topMargin: 10
-        height: noteCol.implicitHeight + 16
-        radius: Zenon.windowRadius
-        color: Qt.rgba(notes.worst.r, notes.worst.g, notes.worst.b, 0.10)
-        border.width: 1
-        border.color: Qt.rgba(notes.worst.r, notes.worst.g, notes.worst.b, 0.45)
-
-        Column {
-          id: noteCol
-          anchors.left: parent.left
-          anchors.right: parent.right
-          anchors.verticalCenter: parent.verticalCenter
-          anchors.leftMargin: 12
-          anchors.rightMargin: 12
-          spacing: 4
-          Repeater {
-            model: Ceres.noteItems
-            delegate: Row {
-              required property var modelData
-              width: noteCol.width
-              height: 24
-              spacing: 10
-              Text {
-                width: 18
-                anchors.verticalCenter: parent.verticalCenter
-                horizontalAlignment: Text.AlignHCenter
-                text: notes.glyphOf(modelData.level)
-                color: notes.inkOf(modelData.level)
-                font.family: Zenon.face
-                font.weight: Zenon.weight
-                font.pixelSize: Zenon.px(15)
-              }
-              Text {
-                width: parent.width - 28
-                anchors.verticalCenter: parent.verticalCenter
-                elide: Text.ElideRight
-                text: modelData.text
-                color: Zenon.white
-                font.family: Zenon.face
-                font.weight: Zenon.weight
-                font.pixelSize: Zenon.px(16)
-              }
-            }
-          }
-        }
       }
     }
 
@@ -2662,7 +2634,8 @@ FloatingWindow {
               cache: "Every package pacman has downloaded. Old versions are what History goes back to; stale downloads are left by interrupted transactions and are never reused.",
               clones: "paru's build directories for AUR packages. Cloned again whenever a rebuild needs one.",
               aurhealth: "What the AUR says about your AUR packages. Flagged out of date means someone reported that upstream has moved on and the package has not caught up; orphaned means it has no maintainer, and no one will update it; gone means it is no longer in the AUR at all. Any of these is worth a look before the package breaks.",
-              oldcode: "Programs that were already running when an upgrade replaced their libraries. They keep using the old copies until they restart: restart the apps, and log out and back in for the session services. Only your own processes can be seen; system services need root to inspect.",
+              oldcode: "Programs that were already running when an upgrade replaced their libraries. They keep using the old copies until they restart: restart the apps yourself, and Ceres restarts the session services. "
+                + "Logging out does not do it \u2014 your services run as long as any session of yours does, a tty you started the desktop from included. Only your own processes can be seen; system services need root to inspect.",
               mirrors: "Where pacman downloads from, in the order it tries them. Health comes from archlinux.org's own mirror status, which checks every mirror for how far behind it is. "
                 + "Ranking times every mirror it reports as fully synced from this machine, rates the quickest twelve on a real download, and offers the fastest ten. The list you have now is kept as mirrorlist.ceres-bak.",
               flatpak: "Flatpak's apps and the runtimes they share, for everyone and just for you. Removing unused runtimes takes out the ones no installed app needs any more \u2014 left behind as apps are removed and updated. "
@@ -2737,6 +2710,14 @@ FloatingWindow {
               ink: win.ranked ? Zenon.muted : Zenon.cyan
               primary: !win.ranked
               onClicked: win.maintGo("rank")
+            }
+            DialogButton {
+              visible: mdetail.key === "oldcode" && Ceres.staleServices.length > 0
+              label: Ceres.staleServices.length === 1 ? "Restart the service" : "Restart " + Ceres.staleServices.length + " services"
+              ink: Zenon.cyan
+              primary: true
+              ready: !Ceres.txBusy
+              onClicked: Ceres.restartStaleServices()
             }
             DialogButton {
               visible: mdetail.key === "flatpak"

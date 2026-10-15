@@ -14,6 +14,7 @@
 
 import QtQuick
 import Quickshell
+import Quickshell.Io
 import "../morpheus"
 import "../terminus"
 import "notes.js" as N
@@ -502,6 +503,7 @@ Item {
     anchors.right: parent.right
     visible: !!pane.note && !pane.locked && pane.loadedOne
     base: pane.mgr ? pane.mgr.base : ""
+    mgr: pane.mgr
     readOnly: !pane.note || !!pane.note.deleted
     sinkOnTick: !!pane.mgr && pane.mgr.sinkChecked
     textSize: Math.round(Zenon.px(16) * (pane.mgr ? pane.mgr.textScale : 1))
@@ -538,6 +540,7 @@ Item {
       if (pane.isSticky || !pane.note) { ed.pasteText(); return; }
       pane.mgr.pasteImage(pane.note.id, (b) => { if (b) ed.attachBlock(b); else ed.pasteText(); });
     }
+    onPastePlainAsked: pane.pastePlain()
     onMenuAsked: (x, y, info) => {
       const p = ed.mapToItem(pane.win.stageItem, x, y);
       pane.editMenu(p.x, p.y, info);
@@ -674,6 +677,22 @@ Item {
                { text: "The time", icon: "", run: () => pane.typeHere(N.clock(Date.now())) });
     pane.win.menuRef.open(x, y, items);
   }
+  // the clipboard as words only (BlockEditor.pastePlain)
+  function pastePlain() {
+    plainProc.running = false;
+    plainProc.running = true;
+  }
+  Process {
+    id: plainProc
+    command: ["sh", "-c", "wl-paste -n -t text 2>/dev/null"]
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: {
+        if (text === "") { pane.win.say("No words on the clipboard", true); return; }
+        ed.pastePlain(text);
+      }
+    }
+  }
   function typeHere(t) {
     const it = ed.current();
     if (!it || !it.isText) { ed.focusEnd(false); Qt.callLater(() => pane.typeHere(t)); return; }
@@ -733,6 +752,7 @@ Item {
       { text: "Cut", icon: "\u{F0190}", mark: "ctrl x", enabled: hasSel && !ro, run: () => { if (ed.cross) { ed.copyCross(); ed.deleteCross(); } else it.te.cut(); } },
       { text: "Copy", icon: "\u{F018F}", mark: "ctrl c", enabled: hasSel, run: () => { if (ed.cross) ed.copyCross(); else it.te.copy(); } },
       { text: "Paste", icon: "\u{F0192}", mark: "ctrl v", enabled: !ro, run: () => ed.pasteAsked() },
+      { text: "Paste as plain text", icon: "\u{F0192}", mark: "ctrl shift v", enabled: !ro, run: () => pane.pastePlain() },
       { text: "Select all", icon: "\u{F0486}", mark: "ctrl a", run: () => ed.selectAll() }];
     const c = info.control;
     if (info.link) items.push({ isSeparator: true },

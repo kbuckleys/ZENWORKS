@@ -369,7 +369,7 @@ FloatingWindow {
     if (d.tags.length) lines.push("Tags: " + d.tags.map((t) => "#" + t).join(" "));
     const back = win.mgr.notes.filter((o) => o.d && o.d.links.indexOf(n.id) >= 0 && !o.deleted);
     if (back.length) lines.push("Linked from: " + back.map((o) => N.titleOf(o)).join(", "));
-    cards.card_({ question: N.titleOf(n, "Entry"), glyph: "", ink: Zenon.cyan, detail: lines.join("\n"),
+    cards.card_({ question: N.titleOf(n, "Entry"), glyph: "\u{F064E}", ink: Zenon.cyan, detail: lines.join("\n"),
                   choices: [{ label: "Close", ink: Zenon.muted }] });
   }
   function exportNote(n, format) {
@@ -678,7 +678,7 @@ FloatingWindow {
                { text: "Export as PDF…", icon: "\u{F0226}", run: () => win.exportNote(n, "pdf") },
                { text: "Print…", icon: "\u{F042A}", enabled: win.canPrint, run: () => win.printNote(n) },
                { text: "Save as a template…", icon: "\u{F0DC9}", enabled: !locked, run: () => win.saveTemplate(n) },
-               { text: "Info", icon: "", run: () => win.infoOf(n) },
+               { text: "Info", icon: "\u{F064E}", run: () => win.infoOf(n) },
                { text: "Show page in Terminus", icon: "\uF07C", run: () => { win.commit(); win.mgr.revealPage(n.id); } },
                { isSeparator: true },
                { text: n.kind === "entry" ? "Delete entry" : "Delete", icon: "", mark: "delete", danger: true, run: () => win.trashNote(n) });

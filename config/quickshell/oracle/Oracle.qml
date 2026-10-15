@@ -283,7 +283,8 @@ Singleton {
   // threshold — 0.5 on this machine — so a surface taken past that stops being
   // blurred and becomes a flat panel. That is a legitimate thing to want; it
   // is just worth knowing which side of the line you are on.
-  property real barOpacity: 0.50
+  // fully opaque unless asked (user, 2026-10-15)
+  property real barOpacity: 1.0
   property real panelOpacity: 0.90
   // How heavy a shadow a layer casts, and a menu. They are deliberately two
   // numbers: a layer sits near an edge and a shadow loud enough to lift it off

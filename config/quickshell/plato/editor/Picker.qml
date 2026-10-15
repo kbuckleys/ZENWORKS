@@ -271,7 +271,7 @@ PlatoSheet {
       });
       picker.results = picker.rank(rows, (r) => r.text, q);
     } else if (picker.mode === "diags") {
-      const glyphs = ["", "\u{F0159}", "\u{F0026}", "\u{F02FC}", "\u{F0335}"];
+      const glyphs = ["", "\u{F0159}", "\u{F0026}", "\u{F064E}", "\u{F0335}"];
       const rows = picker.nvimList.map((d) => ({
         label: d.text, sev: d.sev, glyph: glyphs[d.sev] || "",
         detail: picker.tidy(d.path) + ":" + d.line + (d.source ? "  " + d.source : ""),

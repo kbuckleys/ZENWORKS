@@ -258,7 +258,7 @@ QtObject {
   // the row it tints composites to ~0.56 rather than falling under.
   //
   // The pill is the one surface a person can drive UNDER the floor by hand:
-  // Bar opacity starts at exactly 0.50 and its slider goes down to 0.10. Every
+  // Bar opacity starts opaque (1.0, since 2026-10-15) and its slider goes down to 0.10. Every
   // step towards transparent used to hand back the blur and show the desktop
   // through sharp, which is the opposite of what asking for a see-through bar
   // is asking for. barBlur decides which side of the floor it may land on —

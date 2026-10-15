@@ -2612,7 +2612,7 @@ FloatingWindow {
     ["dialogs", [["esc", "close"], ["return", "accept"],
                  ["\u2190 \u2192 \u2191 \u2193", "move (permissions)"],
                  ["space", "toggle a bit"],
-                 ["s", "checksum (properties)"]]],
+                 ["s", "checksum (info)"]]],
     ["menu", [["menu key", "actions for the row"],
               [root.mouseKey(2), "actions for the row"],
               ["\u2014", "archive · open with"],
@@ -2705,7 +2705,7 @@ FloatingWindow {
       // verb here listed with no key at all — the palette drew it with an
       // empty chip while the keymap wrote the key down separately, so neither
       // half said the whole thing.
-      ["properties",        "alt \u21b5",  () => props.ask()],
+      ["info",              "alt \u21b5",  () => props.ask()],
       ["permissions",       "c m",     () => root.openProperties(1)],
       ["disks",             "M",       () => disks.ask()],
       ["tags",              "c t",     () => tagPick.ask()],
@@ -3728,7 +3728,7 @@ FloatingWindow {
     if (confirm.open) return confirm.heading;
     if (props.open)
       return props.many ? props.rows.length + " items"
-        : (props.rows[0] ? props.rows[0].name : "Properties");
+        : (props.rows[0] ? props.rows[0].name : "Info");
     if (bulk.open)
       return bulk.names.length === 1 ? "Rename 1 item"
         : "Rename " + bulk.names.length + " items";
@@ -4342,6 +4342,19 @@ FloatingWindow {
   property string renamePath: ""
 
   function beginRename() { return renameDrag.beginRename(); }
+  // RENAMED FROM THE PROPERTIES CARD (user, 2026-10-15): its name on the bar
+  // is a field (Chrome's barName). The row's own rename does the moving —
+  // the clash card, tags, undo — and the card follows the file, unless the
+  // clash card is asking first.
+  function renameFromProps(name) {
+    const r = props.rows[0];
+    if (!r || props.many) return;
+    const err = Terminus.nameError(name);
+    if (err !== "") { root.warn(err); return; }
+    renameDrag.commitRename(r, name);
+    if (!confirm.open)
+      props.rows = [Object.assign({}, r, { name: name, path: Terminus.joinPath(Terminus.dirname(r.path), name) })];
+  }
 
   // `cancelled` is Escape rather than Return, and for something that was
   // created a moment ago that means "I did not want this after all" — so it

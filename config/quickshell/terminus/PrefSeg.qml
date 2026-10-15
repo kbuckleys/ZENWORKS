@@ -135,7 +135,9 @@ Item {
         readonly property bool ok: seg.allowed === null
           || seg.allowed.indexOf(segBtn.modelData) >= 0
         readonly property bool on: seg.current === segBtn.modelData
-        color: segBtn.on
+        // PRESSED, DARKENED as ClearChip and Segments are (user, 2026-10-15)
+        color: segPress.pressed && segBtn.ok ? Zenon.darken(0.35)
+          : segBtn.on
           ? Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b, 0.18)
           : (segHov.hovered && segBtn.ok ? Zenon.surface : "transparent")
         border.width: 1
@@ -150,6 +152,7 @@ Item {
           text: segBtn.modelData
           elide: Text.ElideRight
           color: segBtn.on ? Zenon.cyan : Zenon.keyInk
+          opacity: segPress.pressed ? 0.55 : 1
           font.family: Zenon.face
           font.weight: Zenon.weight
           font.pixelSize: Zenon.px(14)
@@ -157,6 +160,7 @@ Item {
 
         HoverHandler { id: segHov; enabled: segBtn.ok }
         MouseArea {
+          id: segPress
           anchors.fill: parent
           enabled: segBtn.ok
           onClicked: seg.chose(segBtn.modelData)

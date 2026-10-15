@@ -513,6 +513,18 @@ FocusScope {
       });
     }
   }
+  // A path renamed from outside the row — plato's properties sheet, its
+  // title (user, 2026-10-15) — the same move the row's edit makes. `then`
+  // gets the new path once it is done.
+  function renamePath(from, text, then) {
+    const name = String(text).trim();
+    if (!from || name === "" || name === Terminus.basename(from)) return;
+    const to = Terminus.joinPath(from.slice(0, from.lastIndexOf("/")), name);
+    tree.run(Terminus.renameCommand(from, name), () => {
+      tree.pathChanged(from, to);
+      if (then) then(to);
+    });
+  }
   function trashSel() {
     const p = tree.selPath();
     if (p === "") return;
@@ -543,13 +555,9 @@ FocusScope {
       return out;
     }
     renameCommit: (entry, text) => {
-      const name = String(text).trim();
       treeHost.renaming = false;
       list.forceActiveFocus();
-      if (!entry || name === "" || name === entry.name) return;
-      const from = entry.path;
-      const to = Terminus.joinPath(from.slice(0, from.lastIndexOf("/")), name);
-      tree.run(Terminus.renameCommand(from, name), () => tree.pathChanged(from, to));
+      if (entry) tree.renamePath(entry.path, text);
     }
     renameEnd: (cancel) => { treeHost.renaming = false; list.forceActiveFocus(); }
     // only while the card is up, however it closes
@@ -916,7 +924,7 @@ FocusScope {
       { isSeparator: true },
     ]);
     if (tree.props) out.push(
-      { text: "Properties", icon: "\u{F02FD}", hint: "alt ↵", run: () => tree.propsWanted(p) },
+      { text: "Info", icon: "\u{F064E}", hint: "alt ↵", run: () => tree.propsWanted(p) },
       { isSeparator: true });
     if (!isDir) out.push({ text: "Open with its app", icon: "\u{F03CC}",
       run: () => tree.run(Terminus.openOrAskCommand(p)) });

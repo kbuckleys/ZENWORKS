@@ -73,6 +73,20 @@ Item {
   // a click away from the card: whoever owns the sheet decides what that is
   signal dismissed()
 
+  // A TITLE OF ITS OWN ON THE CARD (morpheus/Sheet's floating head, kept
+  // spliced to the strip it hangs from): the properties sheet's file name,
+  // as picasso's card wears it — terminus puts it on its bar, plato's tab
+  // strip has no room for it (user, 2026-10-15). `renamable` makes the
+  // name a field; see Sheet.renamable.
+  property string title: ""
+  property string glyph: ""
+  property color glyphInk: Zenon.cyan
+  property bool renamable: false
+  signal renamed(string name)
+  signal renameDone()
+  readonly property bool renaming: sheet.renaming
+  function beginRename() { sheet.beginRename(); }
+
   z: 300
   visible: layer.shown || sheet.cardInk > 0.01
 
@@ -101,6 +115,14 @@ Item {
     blur: 30
     gain: 3
     id: sheet
+    floating: layer.title !== ""
+    splice: true
+    title: layer.title
+    glyph: layer.glyph
+    glyphInk: layer.glyphInk
+    renamable: layer.renamable
+    onRenamed: (n) => layer.renamed(n)
+    onRenameDone: layer.renameDone()
     shown: layer.shown
     fromTop: layer.fromTop
     fromBottom: layer.fromBottom

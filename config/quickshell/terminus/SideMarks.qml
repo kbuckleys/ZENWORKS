@@ -349,7 +349,7 @@ Item {
       out.push({ label: "Format\u2026", act: () => term.diskToolRef.ask(d, "format") });
     }
     out.push({ sep: true });
-    out.push({ label: "Properties", act: () => term.diskInfoRef.ask(d) });
+    out.push({ label: "Info", glyph: "\u{F064E}", act: () => term.diskInfoRef.ask(d) });
     term.menuPopRef.menu.openCustom(item, { x: x, y: y }, out, false);
     term.sideMenuAt = item;
   }

@@ -61,6 +61,15 @@ Item {
   property string glyph: ""
   property color titleInk: Zenon.white
   property color glyphInk: Zenon.cyan
+  // A FLOATING TITLE THAT RENAMES (user, 2026-10-15): a click on the
+  // header's name makes it a field (morpheus/TitleName); Return hands the
+  // new name up as `renamed`, and `renameDone` follows either ending so the
+  // holder can take its keys back. Off, the header is a title only.
+  property bool renamable: false
+  signal renamed(string name)
+  signal renameDone()
+  readonly property bool renaming: headName.editing
+  function beginRename() { headName.begin(); }
   // The least a floating card stands below the bar, when the window is too
   // short to centre it.
   property real gap: 18
@@ -408,15 +417,16 @@ Item {
             font.weight: Zenon.weight
             font.pixelSize: Zenon.px(16)
           }
-          Text {
+          TitleName {
+            id: headName
             anchors.verticalCenter: parent.verticalCenter
-            width: Math.min(implicitWidth, sheetHead.width - 80)
-            elide: Text.ElideMiddle
+            maxWidth: sheetHead.width - 80
             text: sheet.heldTitle
             color: sheet.titleInk
-            font.family: Zenon.face
-            font.weight: Font.Bold
-            font.pixelSize: Zenon.px(16)
+            pixelSize: Zenon.px(16)
+            editable: sheet.renamable && sheet.shown
+            onRenamed: (n) => sheet.renamed(n)
+            onDone: sheet.renameDone()
           }
         }
         Rectangle {

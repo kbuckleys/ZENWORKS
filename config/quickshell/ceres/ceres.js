@@ -1620,6 +1620,27 @@ function readStale(text) {
     .sort((a, b) => (a.service - b.service) || (b.pids.length - a.pids.length) || (a.name < b.name ? -1 : 1));
 }
 
+// A STALE SERVICE IS RESTARTED, NOT LOGGED OUT OF (user, 2026-10-15: "I
+// re-logged and still see it"). User services belong to systemd's user
+// manager, which lives as long as ANY session of yours does — leaving the
+// desktop for the tty it was started from, and back, never ends it, and the
+// service runs on with its old code. Restarting the unit is what renews it:
+// yours, so no password.
+//
+// A unit whose file went with its package (removing Flatpak takes
+// flatpak-session-helper.service with it) still runs, but systemd can no
+// longer start it: restart says "Unit … not found". Its LoadState is then
+// not-found, and stopping it is all that is left to do — judged by whether
+// it still runs: systemd drops a fileless unit the moment it stops, and its
+// stop then reports "not loaded" for a stop that worked.
+function restartServicesSteps(units) {
+  const u = (units || []).filter(x => /\.service$/.test(x));
+  if (!u.length) return [];
+  return [["@user", "r=0; for u in " + u.map(q).join(" ") + "; do "
+    + "if [ \"$(systemctl --user show -p LoadState --value \"$u\")\" = not-found ]; "
+    + "then systemctl --user stop \"$u\" 2>/dev/null; ! systemctl --user is-active -q \"$u\" || r=1; else systemctl --user restart \"$u\" || r=1; fi; done; exit $r"]];
+}
+
 // "firefox, discord" / "firefox, discord and 3 more" — for a one-line note
 function nameList(names, most) {
   const n = names.length;

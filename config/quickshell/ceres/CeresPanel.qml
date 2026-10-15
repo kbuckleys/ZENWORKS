@@ -55,7 +55,6 @@ LayerPopup {
   readonly property int rowH: 32
   readonly property int headH: 44
   readonly property int footH: 48
-  readonly property int noteH: 22
 
   // Headings and packages in one model, so the list scrolls as one thing.
   readonly property var rows: {
@@ -87,8 +86,8 @@ LayerPopup {
 
   // shell.qml asks for this by name to size the morph.
   function calcHeight() {
-    return popup.headH + Ceres.notes.length * popup.noteH
-      + (Ceres.notes.length ? 8 : 0) + popup.bodyH() + popup.footH;
+    // the notes take what their bar takes, a button and all
+    return popup.headH + notes.height + popup.bodyH() + popup.footH;
   }
   readonly property int panelWidth: 720
 
@@ -342,35 +341,31 @@ LayerPopup {
       }
 
       // ── what is wrong with the answer ───────────────────────────────
-      Column {
+      // the window's bar, in the panel's sizes (user, 2026-10-15: plain red
+      // lines here, and no way to answer them) — ceres/NoteBar
+      Item {
         id: notes
         anchors.top: head.bottom
-        anchors.topMargin: Ceres.notes.length ? 6 : 0
         anchors.left: parent.left
         anchors.right: parent.right
-        anchors.leftMargin: 16
-        anchors.rightMargin: 16
-        Repeater {
-          model: Ceres.notes
-          delegate: Text {
-            required property string modelData
-            width: notes.width
-            height: popup.noteH
-            verticalAlignment: Text.AlignVCenter
-            elide: Text.ElideRight
-            text: modelData
-            color: Zenon.red
-            font.family: Zenon.face
-            font.weight: Zenon.weight
-            font.pixelSize: Zenon.px(13)
-          }
+        height: Ceres.noteItems.length ? noteBar.height + 14 : 0
+        NoteBar {
+          id: noteBar
+          anchors.left: parent.left
+          anchors.right: parent.right
+          anchors.top: parent.top
+          anchors.leftMargin: 12
+          anchors.rightMargin: 12
+          anchors.topMargin: 8
+          textSize: Zenon.px(14)
+          glyphSize: Zenon.px(13)
+          rowH: 22
         }
       }
 
       Item {
         id: body
         anchors.top: notes.bottom
-        anchors.topMargin: Ceres.notes.length ? 2 : 0
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.bottom: foot.top

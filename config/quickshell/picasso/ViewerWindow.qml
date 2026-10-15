@@ -1990,28 +1990,36 @@ FloatingWindow {
     if (!p) return;
     const name = Terminus.basename(p);
     const dot = name.lastIndexOf(".");
-    confirm.askText("Rename " + name, name, "Rename", (text) => {
-      const n = String(text).trim();
-      if (n === name) return;
-      const err = Terminus.nameError(n);
-      if (err !== "") { win.say(err); return; }
-      win.run(["sh", "-c", Terminus.renameCommand(p, n)], (code) => {
-        if (code !== 0) { win.say("could not rename it — is " + n + " taken?"); return; }
-        const to = Terminus.joinPath(Terminus.dirname(p), n);
-        const move = (o) => { if (!(p in o)) return o; const c = Object.assign({}, o); c[to] = c[p]; delete c[p]; return c; };
-        win.marks = move(win.marks);
-        win.tags = move(win.tags);
-        win.thumbs = move(win.thumbs);
-        if (win.picked.length > 0) win.picked = win.picked.map((q) => q === p ? to : q);
-        if (win.cmpPath === p) win.cmpPath = to;
-        win.allRows = win.allRows.map((r) => r.path !== p ? r
-          : Object.assign({}, r, { name: n, path: to, hay: undefined }));
-        if (win.picked.length === 0) win.allRows = win.sorted(win.allRows);
-        if (win.path === p) win.path = to;
-        win.setRows(win.filtered(win.allRows));
-        win.say("renamed to " + n);
-      });
-    }, "", dot > 0 ? dot : name.length);
+    confirm.askText("Rename " + name, name, "Rename", (text) => win.renameTo(p, text),
+      "", dot > 0 ? dot : name.length);
+  }
+  // the doing, apart from the asking — the card above and the properties
+  // sheet's title (user, 2026-10-15) both end here
+  function renameTo(p, text) {
+    const name = Terminus.basename(p);
+    const n = String(text).trim();
+    if (n === name) return;
+    const err = Terminus.nameError(n);
+    if (err !== "") { win.say(err); return; }
+    win.run(["sh", "-c", Terminus.renameCommand(p, n)], (code) => {
+      if (code !== 0) { win.say("could not rename it — is " + n + " taken?"); return; }
+      const to = Terminus.joinPath(Terminus.dirname(p), n);
+      // the properties card, if it is about this file, follows it
+      if (propsCard.rows.length === 1 && propsCard.rows[0].path === p)
+        propsCard.rows = [Object.assign({}, propsCard.rows[0], { name: n, path: to })];
+      const move = (o) => { if (!(p in o)) return o; const c = Object.assign({}, o); c[to] = c[p]; delete c[p]; return c; };
+      win.marks = move(win.marks);
+      win.tags = move(win.tags);
+      win.thumbs = move(win.thumbs);
+      if (win.picked.length > 0) win.picked = win.picked.map((q) => q === p ? to : q);
+      if (win.cmpPath === p) win.cmpPath = to;
+      win.allRows = win.allRows.map((r) => r.path !== p ? r
+        : Object.assign({}, r, { name: n, path: to, hay: undefined }));
+      if (win.picked.length === 0) win.allRows = win.sorted(win.allRows);
+      if (win.path === p) win.path = to;
+      win.setRows(win.filtered(win.allRows));
+      win.say("renamed to " + n);
+    });
   }
 
   // ── renaming several ──────────────────────────────────────────────────
@@ -2527,6 +2535,7 @@ FloatingWindow {
       if (propsBox.open) {
         e.accepted = true;
         if (e.key === Qt.Key_Escape) { if (propsCard.tab === 1) propsCard.tab = 0; else propsBox.open = false; }
+        else if (e.key === Qt.Key_F2) propsSheet.beginRename();
         else propsCard.handleKey(e.key);
         return;
       }
@@ -3155,7 +3164,7 @@ FloatingWindow {
       Sep {}
       Tool { glyph: "\uf065"; name: "Fullscreen"; key: "f"; live: win.mode === "view" && win.loaded
              onHit: win.fullscreen() }
-      Tool { glyph: ""; name: "Info"; key: "i"; on: win.infoShown && win.mode === "view"
+      Tool { glyph: "\u{F01C6}"; name: "Details"; key: "i"; on: win.infoShown && win.mode === "view"
              live: win.mode === "view"; onHit: win.infoShown = !win.infoShown }
       Tool { glyph: ""; name: "Copy the picture"; key: "ctrl+c"; live: win.path !== ""; onHit: win.copyImage() }
       Tool { glyph: ""; name: "Show in terminus"; key: "o"; live: win.dir !== ""; onHit: win.reveal() }
@@ -6038,7 +6047,7 @@ FloatingWindow {
         branch("Export for the web", "\uf1d8", "export"),
         sep,
         { text: "Show in terminus", icon: "\uf07c", act: "reveal", hint: "o" },
-        { text: "Properties", icon: "\uf05a", act: "props", hint: "alt+enter" },
+        { text: "Info", icon: "\u{F064E}", act: "props", hint: "alt+enter" },
         { text: "Move to trash", icon: "\uf1f8", act: "trash", hint: "d" },
         { text: "Delete permanently…", icon: "\uf00d", act: "deleteP", hint: "D", asks: true }
       ]);
@@ -6081,7 +6090,7 @@ FloatingWindow {
         { text: "The strip", icon: "\uf00a", act: "strip", hint: "alt+s", mark: win.stripShown },
         { text: "Monitor outlines", icon: "\uf108", act: "monitors", hint: "W", mark: stage.monitorsShown },
         { text: "Map of the directory", icon: "\uf279", act: "map", enabled: win.rows.length > 0 },
-        { text: "Info", icon: "\uf129", act: "info", hint: "i", mark: win.infoShown }
+        { text: "Details", icon: "\u{F01C6}", act: "info", hint: "i", mark: win.infoShown }
       ]);
 
     case "convert":
@@ -6115,7 +6124,7 @@ FloatingWindow {
       ]).concat(fileRows()).concat(editIn).concat([
         sep,
         { text: "Show in terminus", icon: "\uf07c", act: "reveal" },
-        { text: "Properties", icon: "\uf05a", act: "props", hint: "alt+enter" },
+        { text: "Info", icon: "\u{F064E}", act: "props", hint: "alt+enter" },
         { text: "Move to trash", icon: "\uf1f8", act: "trashP", hint: "d" },
         { text: "Delete permanently…", icon: "\uf00d", act: "deleteP", hint: "D", asks: true }
       ]));
@@ -6145,7 +6154,7 @@ FloatingWindow {
       ]).concat(fileRows()).concat([
         sep,
         { text: "Unmark all", icon: "\uf00d", act: "unmarkAll", hint: "esc" },
-        { text: "Properties", icon: "\uf05a", act: "props", hint: "alt+enter" },
+        { text: "Info", icon: "\u{F064E}", act: "props", hint: "alt+enter" },
         { text: "Move " + ps.length + " to trash", icon: "\uf1f8", act: "trashP", hint: "d" },
         { text: "Delete " + ps.length + " permanently…", icon: "\uf00d", act: "deleteP", hint: "D", asks: true }
       ]);
@@ -6157,7 +6166,7 @@ FloatingWindow {
         { text: "Show in terminus", icon: "\uf07c", act: "revealDirectory" },
         { text: "Copy path", icon: "\uf0c1", act: "copyPathP" },
         sep,
-        { text: "Properties", icon: "\uf05a", act: "props", hint: "alt+enter" }
+        { text: "Info", icon: "\u{F064E}", act: "props", hint: "alt+enter" }
       ];
 
     case "gallery": {
@@ -6188,7 +6197,7 @@ FloatingWindow {
         sep,
         { text: "Slideshow", icon: "\uf04b", act: "play", hint: "s", enabled: win.rows.length > 1 },
         { text: "Show in terminus", icon: "\uf07c", act: "reveal", enabled: win.dir !== "" },
-        { text: "Properties of this directory", icon: "\uf05a", act: "props", enabled: win.dir !== "" && win.picked.length === 0 }
+        { text: "Info on this directory", icon: "\u{F064E}", act: "props", enabled: win.dir !== "" && win.picked.length === 0 }
       ]));
     }
 
@@ -6557,11 +6566,15 @@ FloatingWindow {
       shown: propsBox.open
       fromTop: bar.height
       title: propsCard.many ? propsCard.rows.length + " items"
-        : (propsCard.rows[0] ? propsCard.rows[0].name : "Properties")
+        : (propsCard.rows[0] ? propsCard.rows[0].name : "Info")
       glyph: propsCard.many ? "\uf0c5" : (propsCard.rows[0] ? propsCard.rows[0].glyph || "" : "")
       glyphInk: propsCard.rows[0] && !propsCard.many ? Terminus.inkOf(propsCard.rows[0]) : Zenon.cyan
       cardW: propsCard.wantW
       cardH: propsCard.implicitHeight
+      // the title renames the file (user, 2026-10-15) — one file, not a set
+      renamable: !propsCard.many && !!propsCard.rows[0]
+      onRenamed: (n) => { if (propsCard.rows[0]) win.renameTo(propsCard.rows[0].path, n); }
+      onRenameDone: keys.forceActiveFocus()
       PropsCard {
         id: propsCard
         width: parent.width

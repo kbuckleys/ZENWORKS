@@ -32,6 +32,9 @@ Item {
   property var blocks: []
   property int rev: 0
   property string base: ""
+  // the notebook (ClioManager), for what a block asks of it — a picture's
+  // transparency (Block's media.clear); null where there is none
+  property var mgr: null
   property bool readOnly: false
   // a box ticked sinks under the unticked ones (Apple's "Sort checked items")
   property bool sinkOnTick: false
@@ -63,6 +66,8 @@ Item {
   signal fileOpened(var block)
   // ctrl+v with a picture on the clipboard is the owner's to keep
   signal pasteAsked()
+  // ctrl+shift+v: the clipboard's words without their formatting
+  signal pastePlainAsked()
   // the caret left the bottom of the last block downwards, or Esc
   signal escaped()
   // files dropped on the note from outside (terminus, say), and where:
@@ -284,6 +289,7 @@ Item {
       return false;
     }
     if (ctrl && e.key === Qt.Key_V && !shift) { ed.pasteAsked(); return true; }
+    if (ctrl && e.key === Qt.Key_V && shift) { ed.pastePlainAsked(); return true; }
     if (ctrl && !shift && e.key === Qt.Key_B) { ed.mark("b"); return true; }
     if (ctrl && !shift && e.key === Qt.Key_I) { ed.mark("i"); return true; }
     if (ctrl && !shift && e.key === Qt.Key_U) { ed.mark("u"); return true; }
@@ -711,6 +717,21 @@ Item {
     if (ed.cross) ed.deleteCross();
     const now = ed.current();
     if (now && now.isText) now.te.paste();
+  }
+
+  // PASTE AS PLAIN TEXT (user, 2026-10-15): the words alone, at the caret,
+  // over whatever is selected — escaped, a line break a soft break, as a
+  // rich paste flattened by "Plain text" (see the rewrite above) would be
+  function pastePlain(text) {
+    const t = String(text || "").replace(/\r\n?/g, "\n").replace(/\n+$/, "");
+    if (t === "" || ed.readOnly) return;
+    if (ed.cross) ed.deleteCross();
+    const it = ed.current();
+    if (!it || !it.isText) return;
+    ed.snap(false);
+    const te = it.te;
+    if (te.selectionStart !== te.selectionEnd) te.remove(te.selectionStart, te.selectionEnd);
+    te.insert(te.cursorPosition, it.kind === "mono" ? t : N.escape(t).replace(/\n/g, "<br />"));
   }
 
   // ── TABLES ─────────────────────────────────────────────────────────────

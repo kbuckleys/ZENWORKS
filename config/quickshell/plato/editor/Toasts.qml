@@ -147,7 +147,7 @@ Item {
   }
   function glyph(tone) {
     return tone === "error" ? "\u{F0159}" : tone === "warn" ? "\u{F0026}"
-      : tone === "progress" ? "\u{F012C}" : "\u{F02FC}";
+      : tone === "progress" ? "\u{F012C}" : "\u{F064E}";
   }
 
   ListView {

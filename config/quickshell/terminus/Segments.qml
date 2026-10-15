@@ -193,15 +193,17 @@ Item {
           anchors.verticalCenter: parent.verticalCenter
           color: Zenon.border
         }
-        // pressed, darker — the repository chip's press in delphi
-        // (Zenon.wash 0.12), in the highlight's own shape (user, 2026-10-11)
+        // PRESSED, DARKENED (user, 2026-10-15): the shade and dimmed ink of
+        // terminus' ClearChip, in the highlight's own shape — every switch in
+        // the suite presses the same way the × does (it was a lighter wash,
+        // delphi's repository chip, 2026-10-11)
         Rectangle {
           x: 2
           y: 2
           width: parent.width - 4
           height: parent.height - 4
           radius: Math.max(0, Zenon.windowRadius - 2)
-          color: Zenon.wash(0.12)
+          color: Zenon.darken(0.35)
           visible: press.pressed && one.ok
         }
         // a drag over it: lit as a directory about to take one
@@ -251,6 +253,7 @@ Item {
           text: one.modelData[1]
           color: one.on || segs.hot === one.modelData[0] ? Zenon.cyan : segs.ink
           opacity: !one.ok ? 0.35
+            : press.pressed ? 0.55
             : segs.faint.indexOf(one.modelData[0]) >= 0 && segs.hot !== one.modelData[0] ? 0.45 : 1
           Behavior on color { ColorAnimation { duration: Zenon.fast } }
           font.family: Zenon.face

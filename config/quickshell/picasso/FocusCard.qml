@@ -81,11 +81,18 @@ Item {
   readonly property string baseScreen: card.stageScreens.length > 0
     ? card.stageScreens[0] : card.picker.screenName
   readonly property var look: Art.lookOf(Object.assign(
-    {}, Picasso.lookFor(card.baseScreen), card.stageLook))
+    {}, card.baseLookOf(card.baseScreen), card.stageLook))
 
+  // What a staged monitor starts from: its own look while it is showing this
+  // picture already, else that look without the old picture's filters — what
+  // applying it will leave (Picasso.freshLooks), so the preview tells the truth
+  function baseLookOf(name) {
+    const l = Picasso.lookFor(name);
+    return card.path !== "" && Picasso.wallpaperFor(name) !== card.path ? Art.freshLook(l) : l;
+  }
   function lookFor(name) {
     if (card.stageScreens.indexOf(name) < 0) return Picasso.lookFor(name);
-    return Art.lookOf(Object.assign({}, Picasso.lookFor(name), card.stageLook));
+    return Art.lookOf(Object.assign({}, card.baseLookOf(name), card.stageLook));
   }
 
   function setLook(key, value) {
@@ -709,8 +716,31 @@ Item {
         width: card.previewW
         height: card.previewH
         radius: 7
-        color: card.isColor ? card.colorHex : Zenon.mix(Zenon.ground, Zenon.card, 0.5)
+        // the letterbox wears the look's "Around it" (user, 2026-10-15: the
+        // options showed nothing here) — black, a colour, its own colour,
+        // or itself blurred (bdBlur, below)
+        color: card.isColor ? card.colorHex
+          : Art.groundOf(card.look, card.look.backdrop === "accent" ? Picasso.accentFor(card.path) : "")
         Behavior on color { ColorAnimation { duration: Zenon.normal; easing.type: Zenon.ease } }
+        Image {
+          id: bdBlurSrc
+          anchors.fill: parent
+          visible: false
+          source: !card.isColor && card.look.backdrop === "blur" ? preview.thumbSrc : ""
+          fillMode: Image.PreserveAspectCrop
+          asynchronous: true
+          sourceSize.width: 128
+          sourceSize.height: 128
+        }
+        MultiEffect {
+          anchors.fill: parent
+          visible: bdBlurSrc.source.toString() !== "" && bdBlurSrc.status === Image.Ready
+          source: bdBlurSrc
+          blurEnabled: true
+          blur: 1.0
+          blurMax: 32
+          brightness: -0.12
+        }
 
         readonly property var row: card.picker.focusRow
         readonly property string thumbSrc: {
@@ -733,6 +763,10 @@ Item {
             blur: card.look.blur
             blurMax: Math.max(1, Math.round(64 * pic.unit))
             saturation: card.look.saturation
+            // light and contrast, as the wall's Scene has them — left off
+            // here, the two sliders moved nothing you could see
+            brightness: card.look.brightness
+            contrast: card.look.contrast
             colorization: card.look.tint !== "" ? card.look.tintAmount : 0
             colorizationColor: card.look.tint === "accent"
               ? (Picasso.accentFor(card.path) || "#808080")
@@ -1355,6 +1389,8 @@ Item {
             look: card.look
             path: card.path
             showBackdrop: !card.isColor
+            // cropped or stretched, the picture covers the screen
+            fills: card.effFit === "crop" || card.effFit === "stretch"
             kbRow: card.kbShown ? card.kbRow : ""
             customTint: card.customTint
             tips: cardTips

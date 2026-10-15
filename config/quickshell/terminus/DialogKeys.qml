@@ -428,6 +428,8 @@ Item {
       return;
     }
 
+    // F2: the name on the bar becomes a field (see renameFromProps)
+    if (event.key === Qt.Key_F2) { term.chromeRef.beginBarRename(); return; }
     // the card's own keys — the permissions grid, Tab, Return, s; see
     // PropsCard.handleKey
     term.propsRef.handleKey(event.key);

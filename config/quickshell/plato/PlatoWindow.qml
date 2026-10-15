@@ -1154,6 +1154,10 @@ FloatingWindow {
     fromTop: tabs.height
     onClosed: (keysTo) => (keysTo || (win.treeShown ? sidebar : editor)).forceActiveFocus()
     onSaid: (t) => toasts.take({ kind: "props", text: t })
+    onRenameWanted: (from, name) => sidebar.renamePath(from, name, (to) => {
+      propsSheet.showPath(to);
+      toasts.take({ kind: "props", text: "renamed to " + name });
+    })
     // its "open with" list, on the tree's own menu
     onMenuWanted: (item, rows) =>
       sidebar.openRows(item.mapToItem(null, 0, item.height), rows, () => propsSheet.takeKeys())

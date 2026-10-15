@@ -49,10 +49,13 @@ Rectangle {
   // of grey. Only a button that is not ready keeps the muted word.
   readonly property bool plain: Qt.colorEqual(btn.ink, Zenon.muted)
   readonly property color word: btn.plain ? Zenon.white : btn.ink
+  // PRESSED, DARKENED (user, 2026-10-15): the shade and dimmed word of
+  // terminus' ClearChip and Segments — every button in the suite presses
+  // the same way (it was its own ink, deeper)
   color: !btn.ready ? "transparent"
-    : btn.plain && !btnArea.pressed ? Zenon.wash(btn.primary ? 0.16 : 0.12)
-    : Qt.rgba(btn.ink.r, btn.ink.g, btn.ink.b,
-              btnArea.pressed ? 0.45 : (btn.primary ? 0.14 : 0.10))
+    : btnArea.pressed ? Zenon.darken(0.35)
+    : btn.plain ? Zenon.wash(btn.primary ? 0.16 : 0.12)
+    : Qt.rgba(btn.ink.r, btn.ink.g, btn.ink.b, btn.primary ? 0.14 : 0.10)
   border.width: 1
   border.color: Zenon.border
   opacity: btn.ready ? 1 : 0.55
@@ -68,14 +71,63 @@ Rectangle {
   // ring's opacity rather than keeping time of its own, so the two can
   // never drift apart. Behind the button (z -1), so the label sits on top.
   RectangularShadow {
+    id: glow
     anchors.fill: parent
     z: -1
     radius: parent.radius
     blur: 14
     spread: 1
     color: Qt.rgba(btn.ink.r, btn.ink.g, btn.ink.b, 0.55)
-    visible: pulseRing.visible
+    visible: pulseRing.visible && !btnArea.pressed
     opacity: pulseRing.opacity
+  }
+  // PRESSED, THE GLOW OUTSIDE ONLY (user, 2026-10-15): the darkened fill is
+  // see-through, and the glow under it lit the button from inside. While
+  // held, the same glow with the button's own shape cut out of it — a
+  // layer only for as long as the press, so the resting glow stays free.
+  Item {
+    id: glowCut
+    readonly property real room: 24
+    anchors.fill: parent
+    anchors.margins: -room
+    z: -1
+    visible: pulseRing.visible && btnArea.pressed
+    Item {
+      id: glowSrc
+      anchors.fill: parent
+      visible: false
+      layer.enabled: glowCut.visible
+      RectangularShadow {
+        anchors.fill: parent
+        anchors.margins: glowCut.room
+        radius: btn.radius
+        blur: glow.blur
+        spread: glow.spread
+        color: glow.color
+      }
+    }
+    Item {
+      id: glowHole
+      anchors.fill: parent
+      visible: false
+      layer.enabled: glowCut.visible
+      Rectangle {
+        anchors.fill: parent
+        anchors.margins: glowCut.room
+        radius: btn.radius
+        antialiasing: true
+      }
+    }
+    MultiEffect {
+      anchors.fill: parent
+      source: glowSrc
+      maskEnabled: true
+      maskInverted: true
+      maskSource: glowHole
+      maskThresholdMin: 0.5
+      maskSpreadAtMin: 1.0
+      opacity: pulseRing.opacity
+    }
   }
 
   // The pulse lives on a child rather than on the button, so pressing can
@@ -111,6 +163,7 @@ Rectangle {
     anchors.centerIn: parent
     text: btn.label
     color: btn.ready ? btn.word : Zenon.muted
+    opacity: btnArea.pressed ? 0.55 : 1
     font.family: btn.glyph ? Zenon.glyphFace : Zenon.face
     font.weight: Font.Bold
     font.pixelSize: Zenon.px(15)

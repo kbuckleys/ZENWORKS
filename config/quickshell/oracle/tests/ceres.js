@@ -488,6 +488,13 @@ module.exports = {
     t.eq("a phase alone", C.flatpakProgressOf("Uninstalling 1/2\u2026").phase, "Uninstalling 1 of 2");
     t.eq("anything else is nothing", C.flatpakProgressOf("Looking for matches\u2026"), null);
     t.eq("and the sequence never reaches the log", C.cleanLine("\x1b]9;4;1;45\x07Installing 2/5"), "Installing 2/5");
+    // stale services, restarted
+    t.eq("a stale service is restarted, as you", C.restartServicesSteps(["flatpak-session-helper.service"]),
+      [["@user", "r=0; for u in 'flatpak-session-helper.service'; do "
+        + "if [ \"$(systemctl --user show -p LoadState --value \"$u\")\" = not-found ]; "
+        + "then systemctl --user stop \"$u\" 2>/dev/null; ! systemctl --user is-active -q \"$u\" || r=1; else systemctl --user restart \"$u\" || r=1; fi; done; exit $r"]]);
+    t.ok("which needs no password", !C.needsRoot(C.restartServicesSteps(["a.service"])));
+    t.eq("only services", C.restartServicesSteps(["session-2.scope"]), []);
     // Flatpak's leftovers
     const un = C.readFlatpakUnused("user\t\nuser\t 1.\t   \torg.freedesktop.Platform.GL.default\t25.08\tr\n"
       + "user\t 2.\t   \torg.freedesktop.Platform\t25.08\tr\nsystem\tNothing unused to uninstall\n");

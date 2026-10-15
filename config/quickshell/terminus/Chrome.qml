@@ -38,6 +38,8 @@ Column {
   readonly property alias listA: listA
   readonly property alias listB: listB
   readonly property alias archiveList: archiveList
+  // the properties card's name on the bar, as a field — see renameFromProps
+  function beginBarRename() { barName.begin(); }
   readonly property alias band: band
   readonly property alias bodyBox: bodyBox
   readonly property alias bodyRow: bodyRow
@@ -661,9 +663,12 @@ Column {
       opacity: crumbBar.chromeInk
       enabled: crumbBar.chromeLive
       anchors.left: parent.left
-      anchors.leftMargin: 8
+      // the same room either side of it (user, 2026-10-15: 8 here against
+      // the trail's 12 read as a toggle pushed left; then tightened)
+      anchors.leftMargin: 6
       anchors.verticalCenter: crumbInner.verticalCenter
-      width: 34
+      // tight to its glyph (user, 2026-10-15: tighten it)
+      width: 26
       height: crumbInner.height
 
       Text {
@@ -675,6 +680,8 @@ Column {
         text: "\uEC02"
         color: term.sidebar ? Zenon.cyan
           : (sideHov.hovered ? Zenon.white : Zenon.muted)
+        // lit and unlit fade, as split's and the zoom's do (user, 2026-10-15)
+        Behavior on color { ColorAnimation { duration: Zenon.fast } }
         font.family: Zenon.face
         font.weight: Zenon.weight
         font.pixelSize: Zenon.px(18)
@@ -703,8 +710,9 @@ Column {
       anchors.left: sideToggle.right
       // Clear of the toggle rather than touching it. The glyph is a
       // control and the trail is text; at 4px the first step read as a
-      // label ON the button instead of the beginning of a path.
-      anchors.leftMargin: 12
+      // label ON the button instead of the beginning of a path. Matches
+      // the toggle's own leftMargin, so it sits centred between the two.
+      anchors.leftMargin: 6
       anchors.right: filterInline.left
       anchors.rightMargin: 12
       anchors.verticalCenter: crumbInner.verticalCenter
@@ -1117,6 +1125,8 @@ Column {
         text: "\uF0C9"
         color: (term.prefsRef.open || term.burgerOn) ? Zenon.cyan
           : (prefsHov.hovered ? Zenon.white : Zenon.muted)
+        // lit and unlit fade, as split's and the zoom's do (user, 2026-10-15)
+        Behavior on color { ColorAnimation { duration: Zenon.fast } }
         font.family: Zenon.face
         font.weight: Zenon.weight
         font.pixelSize: Zenon.px(16)
@@ -1570,16 +1580,20 @@ Column {
           font.weight: Zenon.weight
           font.pixelSize: Zenon.px(16)
         }
-        Text {
+        // the properties card's file, renamed from its name here (user,
+        // 2026-10-15) — click it, or F2; see renameFromProps
+        TitleName {
+          id: barName
           anchors.verticalCenter: parent.verticalCenter
-          width: Math.min(implicitWidth, barHead.parent.width - 32
-            - (barHeadGlyph.visible ? barHeadGlyph.implicitWidth + 8 : 0))
-          elide: Text.ElideMiddle
+          maxWidth: barHead.parent.width - 32
+            - (barHeadGlyph.visible ? barHeadGlyph.implicitWidth + 8 : 0)
           text: term.barTitle
           color: term.barTitleInk
-          font.family: Zenon.face
-          font.weight: Font.Bold
-          font.pixelSize: Zenon.px(15)
+          pixelSize: Zenon.px(15)
+          editable: term.propsRef.open && !term.propsRef.many && !!term.propsRef.rows[0]
+            && !term.confirmRef.open
+          onRenamed: (n) => term.renameFromProps(n)
+          onDone: term.prefsDialogKeys.forceActiveFocus()
         }
       }
 

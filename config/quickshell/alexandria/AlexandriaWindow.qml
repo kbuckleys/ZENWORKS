@@ -202,7 +202,7 @@ FloatingWindow {
     win.setShelf(ids[(at + d + ids.length) % ids.length]);
   }
   readonly property string page: win.mgr ? win.mgr.page : "specimen"
-  readonly property var pages: [["specimen", "Specimen", ""], ["glyphs", "Glyphs", "\u{F0AEC}"], ["info", "Info", ""]]
+  readonly property var pages: [["specimen", "Specimen", ""], ["glyphs", "Glyphs", "\u{F0AEC}"], ["info", "Info", "\u{F064E}"]]
   function setPage(p) {
     if (win.mgr) win.mgr.set("page", p);
     if (p === "glyphs" && win.mgr) win.mgr.needNames();
@@ -1075,7 +1075,11 @@ FloatingWindow {
           height: 32
           textSize: Zenon.px(16)
           ink: Zenon.keyInk
-          options: win.pages
+          // [value, label] only: a third field is a note under the word in
+          // Segments (since 2026-10-14), so the glyph goes before it instead
+          options: win.pages.map((p) => [p[0], p[1]])
+          glyphOf: (v) => { const p = win.pages.find((q) => q[0] === v); return p ? p[2] : ""; }
+          pad: 24
           current: win.page
           onChose: (v) => win.setPage(v)
           onPointed: (v, at, inside) => {

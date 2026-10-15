@@ -72,6 +72,14 @@ Singleton {
   readonly property var staleApps: root.oldCode.filter(g => !g.service)
   readonly property var staleServices: root.oldCode.filter(g => g.service)
   function checkStale() { if (!staleProc.running) staleProc.running = true; }
+  // the stale user services, restarted (Cer.restartServicesSteps): no
+  // password; the look after every job then finds them renewed
+  function restartStaleServices() {
+    const units = root.staleServices.map(g => g.unit);
+    const steps = Cer.restartServicesSteps(units);
+    if (!steps.length) return false;
+    return root.request(steps, "restart " + Cer.nameList(root.staleServices.map(g => g.name), 2), 0);
+  }
   Process {
     id: staleProc
     command: ["sh", "-c", Cer.staleCommand()]
@@ -330,8 +338,14 @@ Singleton {
     if (root.staleApps.length)
       out.push({ level: "warn", text: "Restart " + Cer.nameList(root.staleApps.map(g => g.name), 2) });
     if (root.staleServices.length)
+      // with the answer in the note itself (user, 2026-10-15): the window's
+      // note bar draws `act` as a button beside it
       out.push({ level: "warn", text: root.staleServices.length
-        + (root.staleServices.length === 1 ? " service needs" : " services need") + " a re-login" });
+        + (root.staleServices.length === 1 ? " service needs" : " services need") + " a restart",
+        // named for what it restarts, never "Restart" alone — that reads as
+        // the computer (user, 2026-10-15)
+        act: root.staleServices.length === 1 ? "Restart service" : "Restart services",
+        run: "restartStaleServices" });
     if (root.unreadNews.length)
       out.push({ level: "info", text: root.unreadNews.length + " unread Arch news"
         + (root.unreadNews.length === 1 ? " item" : " items") });

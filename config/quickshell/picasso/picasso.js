@@ -204,6 +204,26 @@ function lookDiff(look) {
   return out;
 }
 
+// What fills the space around a picture, as a colour: the look's backdrop
+// colour, the picture's own (`accent`, when known), otherwise black — the
+// blurred backdrop is drawn over black. The focus card's preview asks it.
+function groundOf(look, accent) {
+  const l = lookOf(look);
+  if (l.backdrop === "color") return l.backdropColor;
+  if (l.backdrop === "accent" && accent) return accent;
+  return presetColors[0].hex;   // Black
+}
+
+// A new picture's look: what belongs to the MONITOR kept — its turn, its
+// mirror, what fills the space around a picture — and every filter the last
+// picture wore left behind (user, 2026-10-15: a new background inherited the
+// old one's dim, blur and tint).
+function freshLook(look) {
+  const l = lookOf(look);
+  return lookOf({ rotate: l.rotate, mirror: l.mirror,
+                  backdrop: l.backdrop, backdropColor: l.backdropColor });
+}
+
 // is anything asked of the effect pass at all — it costs a layer, so a
 // monitor with a plain look must not pay for one
 function lookNeedsFx(look) {

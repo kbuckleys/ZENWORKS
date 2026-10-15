@@ -26,6 +26,9 @@ Item {
   property string path: ""
   // a background has space around it to fill; a photo being edited does not
   property bool showBackdrop: true
+  // the picture covers the whole screen (cropped, stretched): nothing is
+  // left around it for the backdrop to fill, and the row says so
+  property bool fills: false
   property string kbRow: ""
   // what the custom tint swatch holds when the tint is one of the presets
   property string customTint: "#7a8cff"
@@ -82,6 +85,16 @@ Item {
         else ed.touched("backdrop", v);
       }
       Ring { on: ed.kbRow === "backdrop" }
+    }
+    Text {
+      visible: ed.showBackdrop && ed.fills
+      width: parent.width
+      wrapMode: Text.WordWrap
+      text: "cropped or stretched, it fills the screen — this shows once it is fitted, centred or tiled"
+      color: Zenon.soft
+      font.family: Zenon.face
+      font.weight: Zenon.weight
+      font.pixelSize: Zenon.px(13)
     }
     Text {
       visible: ed.showBackdrop && ed.look.backdrop === "color"

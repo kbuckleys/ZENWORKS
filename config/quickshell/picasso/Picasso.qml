@@ -263,7 +263,15 @@ Singleton {
   // one background everywhere: clears the per-monitor overrides too, otherwise
   // "set everywhere" would quietly leave an old override in place — and the
   // span, which is one more override by another name
-  function setAll(path) {
+  // `keepLook`: the slideshow's turn, which keeps the look it was started
+  // with; anything else is a new picture and starts clean (see freshLooks)
+  function setAll(path, keepLook) {
+    if (!keepLook) {
+      const names = Object.keys(root.looks);
+      for (let i = 0; i < Quickshell.screens.length; ++i)
+        if (names.indexOf(Quickshell.screens[i].name) < 0) names.push(Quickshell.screens[i].name);
+      root.freshLooks(names.filter((n) => root.wallpaperFor(n) !== path));
+    }
     root.assignment = { [root.fallbackKey]: path };
     root.span = null;
     saveTimer.restart();
@@ -272,7 +280,8 @@ Singleton {
   // A monitor given a picture of its own has left whatever span it was in,
   // and a span with a monitor missing is not the picture anyone chose — so
   // the span goes, and the others keep the image fitted to themselves.
-  function setFor(screenName, path) {
+  function setFor(screenName, path, keepLook) {
+    if (!keepLook && root.wallpaperFor(screenName) !== path) root.freshLooks([screenName]);
     const next = Object.assign({}, root.assignment);
     next[screenName] = path;
     root.assignment = next;
@@ -288,9 +297,10 @@ Singleton {
   // extra fact that it is a slice.
   property var span: null
 
-  function setSpan(path, screens) {
+  function setSpan(path, screens, keepLook) {
     const names = (screens || []).slice();
-    if (names.length < 2) { if (names.length === 1) root.setFor(names[0], path); return; }
+    if (names.length < 2) { if (names.length === 1) root.setFor(names[0], path, keepLook); return; }
+    if (!keepLook) root.freshLooks(names.filter((n) => root.wallpaperFor(n) !== path));
     const next = Object.assign({}, root.assignment);
     for (const n of names) next[n] = path;
     root.assignment = next;
@@ -329,6 +339,22 @@ Singleton {
     const merged = Art.lookDiff(Object.assign(Art.lookOf(next[screenName]), patch));
     if (Object.keys(merged).length === 0) delete next[screenName];
     else next[screenName] = merged;
+    root.looks = next;
+    saveTimer.restart();
+  }
+
+  // A NEW PICTURE STARTS CLEAN: the filters the old one wore (dim, blur,
+  // colour, light, contrast, tint, vignette, its crop's anchor) are dropped;
+  // the monitor's own turn, mirror and backdrop stay — see Art.freshLook.
+  function freshLooks(names) {
+    if (names.length === 0) return;
+    const next = Object.assign({}, root.looks);
+    for (const n of names) {
+      if (!(n in next)) continue;
+      const fresh = Art.lookDiff(Art.freshLook(next[n]));
+      if (Object.keys(fresh).length === 0) delete next[n];
+      else next[n] = fresh;
+    }
     root.looks = next;
     saveTimer.restart();
   }
@@ -457,9 +483,9 @@ Singleton {
     if (names.length === 0) return;
     const next = Art.nextSlide(root.slidePool(), root.wallpaperFor(names[0]), ss.shuffle);
     if (next === "") return;
-    if (ss.span && names.length > 1) root.setSpan(next, names);
-    else if (names.length === all.length) root.setAll(next);
-    else for (const n of names) root.setFor(n, next);
+    if (ss.span && names.length > 1) root.setSpan(next, names, true);
+    else if (names.length === all.length) root.setAll(next, true);
+    else for (const n of names) root.setFor(n, next, true);
   }
 
   Timer {
@@ -484,55 +510,48 @@ Singleton {
     // one at a time, and a rescan asked for meanwhile — a file dropped into
     // the directory, the popup opened — runs when this one ends rather than
     // being a no-op restart that left the new file out until the next open
-    if (scanProc.running) { scanProc.again = true; return; }
+    if (scanProc.running || makeProc.running) { scanProc.again = true; return; }
     root.scanning = true;
-    const exts = root.extensions.join("\\|");
-    const dirQ = Strings.shellQuote(root.dir);
-    // The KEY AND THE SIZE ARE NOT PICASSO'S ANY MORE. Both come from
-    // morpheus/thumbs.js, so a background terminus has already thumbnailed is
-    // found here under the name terminus' generator gave it, and vice versa.
-    // find only has to produce the path now: the shared expression stats the
-    // file itself, which is also what guarantees both sides hash exactly the
-    // same bytes rather than two spellings of the same mtime.
-    scanProc.command = ["sh", "-c",
-      'mkdir -p ' + Strings.shellQuote(Thumbs.dir()) + '; ' +
-      // Recursive: backgrounds arrive in per-pack subdirectories, and a
-      // depth limit silently hid most of them. Dot-directories are pruned so
-      // a stray .thumbnails or version-control dir is not treated as art.
-      'find ' + dirQ + " -type f -not -path '*/.*' -iregex '.*\\.\\(" + exts + "\\)$' " +
-      "-print 2>/dev/null | sort | " +
-      'while IFS= read -r p; do ' +
-      '  set -- "$p"; ' +
-      Thumbs.keyExpr() +
-      // Touched when it already exists — see the note in Thumbs.generate
-      // on why an untouched thumbnail is one the sweep deletes.
-      '  if [ -s "$out" ]; then touch -c "$out"; else magick "$1"[0] -auto-orient -thumbnail '
-        + Thumbs.size() + 'x' + Thumbs.size() + ' -strip "$out" 2>/dev/null; fi; ' +
-      // path, thumb, mtime, size — the last two so the picker can order by
-      // them without going back to the disk on every sort change
-      '  if [ -s "$out" ]; then printf \'%s\\t%s\\t%s\\t%s\\n\' "$1" "$out" "$mt" "$sz"; ' +
-      '  else printf \'%s\\t\\t%s\\t%s\\n\' "$1" "$mt" "$sz"; fi; ' +
-      'done; ' +
-      // The pool is shared, so "delete anything no background claims" would
-      // delete every thumbnail terminus made. Age is the only question either
-      // side can answer about the other's entries.
-      Thumbs.sweep(30)];
+    // ONE PROCESS, NOT FIVE A PICTURE (user, 2026-10-15: quick access
+    // indexing was slow) — picasso/bin/scan.py walks, stats and names every
+    // thumbnail itself, under morpheus/thumbs.js' key (shared with terminus).
+    // Listed first with whatever the pool has, so the picker fills at once;
+    // anything missing is made after, many at a time (makeProc), and the
+    // list is given again with them in.
+    scanProc.command = root.scanArgv("list");
     scanProc.running = true;
+  }
+  function scanArgv(mode) {
+    return ["sh", "-c", 'python3 "$0" "$@"; ' + Thumbs.sweep(30),
+      Quickshell.shellDir + "/picasso/bin/scan.py", mode, root.dir, Thumbs.dir(),
+      String(Thumbs.size()), root.extensions.join(",")];
   }
 
   Process {
     id: scanProc
     property bool again: false
-    onExited: if (scanProc.again) { scanProc.again = false; Qt.callLater(root.scan); }
+    onExited: if (scanProc.again && !makeProc.running) { scanProc.again = false; Qt.callLater(root.scan); }
     stdout: StdioCollector {
       waitForEnd: true
       // `text` is StdioCollector's own property, not a signal parameter.
       // Declaring it as one shadowed the property with undefined, and the
       // scan quietly returned nothing at all.
       onStreamFinished: {
-        root.files = Art.parseRows(text);
-        root.scanning = false;
+        const rows = Art.parseRows(text);
+        root.files = rows;
+        if (rows.some((r) => r.thumb === "")) {
+          makeProc.command = root.scanArgv("make");
+          makeProc.running = true;
+        } else root.scanning = false;
       }
+    }
+  }
+  Process {
+    id: makeProc
+    onExited: { root.scanning = false; if (scanProc.again) { scanProc.again = false; Qt.callLater(root.scan); } }
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: root.files = Art.parseRows(text)
     }
   }
 

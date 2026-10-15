@@ -1034,6 +1034,29 @@ Scope {
           //
           // It arrives and leaves rather than blinking — pressing the key
           // again re-reads the state and the fade runs the other way.
+          // AND IT GLOWS (user, 2026-10-15): morpheus' Glow, the meter's
+          // bloom, red behind the glyph — a solid source the glyph's size,
+          // blurred into room twice that, breathing slowly while caps is on.
+          Glow {
+            id: capsGlow
+            anchors.centerIn: caps
+            width: caps.font.pixelSize * 2.6
+            height: caps.font.pixelSize * 2.6
+            sourceW: caps.font.pixelSize * 0.8
+            sourceH: caps.font.pixelSize * 0.8
+            soft: 40
+            ink: Zenon.red
+            scale: caps.scale
+            property real breath: 0.75
+            opacity: caps.opacity * capsGlow.breath
+            visible: opacity > 0.01
+            SequentialAnimation on breath {
+              running: capsGlow.visible
+              loops: Animation.Infinite
+              NumberAnimation { to: 0.45; duration: 1400; easing.type: Easing.InOutSine }
+              NumberAnimation { to: 0.85; duration: 1400; easing.type: Easing.InOutSine }
+            }
+          }
           Text {
             id: caps
             anchors.horizontalCenter: parent.horizontalCenter

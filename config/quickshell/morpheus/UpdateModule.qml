@@ -27,7 +27,7 @@ Collapsible {
   // announcing and the memory of both. This module only draws the count.
   readonly property bool hasUpdates: Ceres.total > 0
   readonly property string countText: String(Ceres.total)
-  // A reboot (kernel) or a re-login (user services on replaced code) is owed,
+  // A reboot (kernel) or a service restart (user services on replaced code) is owed,
   // and the transaction that caused it has finished: the icon says so.
   readonly property bool owed: !Ceres.txBusy
     && (Ceres.restartNeeded || Ceres.staleServices.length > 0)

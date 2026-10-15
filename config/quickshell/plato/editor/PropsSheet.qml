@@ -19,6 +19,7 @@ import QtQuick
 import QtQuick.Window
 import "../../morpheus"
 import "../../terminus" as Term
+import "../../terminus/terminus.js" as Terminus
 
 PlatoSheet {
   id: sheet
@@ -33,6 +34,9 @@ PlatoSheet {
   property Item cameFrom: null
   // the card's "open with" list, for the holder's menu (CardPopup rows)
   signal menuWanted(Item item, var rows)
+  // the title renamed: the holder moves it (the tree's own rename, so nvim
+  // hears of it) and hands the new path back to showPath
+  signal renameWanted(string from, string name)
 
   modal: true
   cardW: card.wantW
@@ -40,6 +44,21 @@ PlatoSheet {
   hints: card.tab === 1 ? [["space", "flip"], ["return", "apply"], ["esc", "back"]]
     : [["tab", "permissions"], ["s", "sha256"], ["esc", "close"]]
   onDismissed: sheet.close()
+
+  // its name on the card, as picasso's (see PlatoSheet.title); a click on it,
+  // or F2, renames — one file or directory, not a set
+  readonly property var row: card.rows.length === 1 ? card.rows[0] : null
+  title: card.many ? card.rows.length + " items" : (sheet.row ? sheet.row.name : "Info")
+  glyph: card.many ? "\uf0c5" : (sheet.row ? sheet.row.glyph || "" : "")
+  glyphInk: sheet.row ? Terminus.inkOf(sheet.row) : Zenon.cyan
+  renamable: !!sheet.row
+  onRenamed: (n) => {
+    if (!sheet.row) return;
+    const err = Terminus.nameError(n);
+    if (err !== "") { sheet.said(err); return; }
+    sheet.renameWanted(sheet.row.path, n);
+  }
+  onRenameDone: keys.forceActiveFocus()
 
   function showPath(path) {
     if (!path) return;
@@ -68,6 +87,7 @@ PlatoSheet {
     Keys.onPressed: (e) => {
       e.accepted = true;
       if (e.key === Qt.Key_Escape && card.tab !== 1) { sheet.close(); return; }
+      if (e.key === Qt.Key_F2) { sheet.beginRename(); return; }
       if (!card.handleKey(e.key)) e.accepted = false;
     }
 

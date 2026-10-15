@@ -731,9 +731,10 @@ FloatingWindow {
     if (ctrl && shift && k === Qt.Key_P) { win.push(); return true; }
     if (ctrl && k === Qt.Key_R) { win.refresh(); if (win.pageItem && win.pageItem.reload) win.pageItem.reload(); return true; }
     if (ctrl && k === Qt.Key_O) { win.chooseRepo(); return true; }
+    // Escape stops a fetch, pull or push, and never closes the window
+    // (user, 2026-10-15) — a window you work in is closed on purpose
     if (k === Qt.Key_Escape) {
-      if (win.netJob) { win.stop(win.netJob.id); return true; }
-      win.visible = false;
+      if (win.netJob) win.stop(win.netJob.id);
       return true;
     }
     return false;
@@ -756,7 +757,7 @@ FloatingWindow {
   readonly property var hintRows: {
     const own = win.pageItem && win.pageItem.hints ? win.pageItem.hints : [];
     return own.concat([["ctrl 1–9", "pages"], ["ctrl shift f l p", "fetch pull push"],
-                       ["ctrl r", "refresh"], ["esc", win.netJob ? "stop" : "close"]]);
+                       ["ctrl r", "refresh"]].concat(win.netJob ? [["esc", "stop"]] : []));
   }
 
   // ── PLACES ─────────────────────────────────────────────────────────────

@@ -123,7 +123,12 @@ Item {
   property bool syncing: false
   function load() {
     if (!blk.b || !blk.isText) return;
-    const want = blk.b.h || "";
+    // THE LIVE BLOCK, NOT `b`: `b` is a copy taken at the last structural
+    // change (editor.rev), and typing since only reaches the editor's own
+    // block — so a repaint read from it put the text back as it was
+    // (user, 2026-10-15: applying a background undid the last edit)
+    const live = blk.editor ? blk.editor.blockOf(blk.key) : null;
+    const want = (live ? live.h : blk.b.h) || "";
     if (want === blk.shown && text.length >= 0 && blk._loaded) return;
     blk.syncing = true;
     text.text = blk.kind === "mono" ? want : blk.editor.display(want);
@@ -137,7 +142,13 @@ Item {
   // the theme changed: colours by name are painted again
   Connections {
     target: Zenon
-    function onThemeEpochChanged() { if (blk.isText && blk.kind !== "mono") { blk._loaded = false; blk.load(); } }
+    function onThemeEpochChanged() {
+      if (!blk.isText || blk.kind === "mono") return;
+      // typing not yet read back is read first, so it is not painted over
+      if (blk.editor) blk.editor.flushTyping();
+      blk._loaded = false;
+      blk.load();
+    }
   }
 
   readonly property real textX: blk.indentW + blk.markW + (blk.kind === "mono" ? 14 : 0)
@@ -313,7 +324,21 @@ Item {
       width: visible ? Math.round(Math.min(room * (blk.b && blk.b.w ? blk.b.w : 1), Math.max(60, natural))) : 0
       height: !visible ? 0 : media.drawn ? Math.round(width * (blk.b.aspect || 0.6))
         : pic.implicitWidth > 0 ? Math.round(width * pic.implicitHeight / pic.implicitWidth) : 140
-      radius: 8
+      // a picture that USES transparency is not rounded (user, 2026-10-15):
+      // its shape is its own, and a corner cut off a cut-out reads as damage.
+      // Asked of the picture itself (ClioManager.askClear), not its type; a
+      // photograph and a sketch's card keep theirs.
+      readonly property string file: blk.kind === "image" && blk.b && blk.b.src && blk.editor
+        ? blk.editor.base + "/" + blk.b.src + (blk.b.v ? "?v=" + blk.b.v : "") : ""
+      readonly property var mgr: blk.editor ? blk.editor.mgr : null
+      // read here, asked for below: a binding that queued the question
+      // looped on its own answer
+      readonly property bool seeThrough: !!media.mgr && media.file !== "" && media.mgr.clear[media.file] === true
+      function askClear() { if (media.mgr && media.file !== "") media.mgr.askClear(media.file); }
+      onFileChanged: media.askClear()
+      onMgrChanged: media.askClear()
+      Component.onCompleted: media.askClear()
+      radius: media.seeThrough ? 0 : 8
       color: blk.kind === "sketch" ? Zenon.wash(0.04) : "transparent"
       Image {
         id: pic

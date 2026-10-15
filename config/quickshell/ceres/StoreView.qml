@@ -18,7 +18,7 @@
 //   a search      typed, as everywhere in Ceres; names, packages, summaries,
 //                 developers and keywords
 //   an app        its page: screenshots, description, what is new, the
-//                 facts, its links — and Get / Open / Remove
+//                 facts — and in its banner, Get / Open / Remove and its links
 //
 // NOTHING IS INSTALLED FROM IN HERE. Get and Remove hand a Packages row to the
 // window (changeAsked), which opens the same confirm sheet, password and log
@@ -876,7 +876,7 @@ Item {
         Rectangle {
           id: banner
           width: parent.width
-          height: Math.max(220, bannerRow.implicitHeight + 64)
+          height: Math.max(220, bannerRow.implicitHeight + 64, bannerLinks.visible ? bannerLinks.implicitHeight + 64 : 0)
           radius: Zenon.windowRadius
           border.width: 1
           border.color: Zenon.border
@@ -892,7 +892,7 @@ Item {
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.leftMargin: 40
-            anchors.rightMargin: 40
+            anchors.rightMargin: bannerLinks.visible ? 40 + bannerLinks.width + 32 : 40
             anchors.verticalCenter: parent.verticalCenter
             spacing: 34
             StoreIcon {
@@ -1010,6 +1010,62 @@ Item {
                 glyphOf: (v) => St.sourceGlyph({ source: v })
                 current: store.variant
                 onChose: (v) => { store.variant = v; store.released(); }
+              }
+            }
+          }
+
+          // ── its links ─────────────────────────────────────────────────
+          // IN THE BANNER'S RIGHT, where the gradient stood empty (user,
+          // 2026-10-15: "might as well make use of the space"); the name's
+          // column gives way to them
+          Flow {
+            id: bannerLinks
+            readonly property var list: St.links(store.detail && store.detail.urls || {})
+            visible: list.length > 0
+            anchors.right: parent.right
+            anchors.rightMargin: 40
+            anchors.verticalCenter: parent.verticalCenter
+            width: Math.min(300, parent.width * 0.3)
+            layoutDirection: Qt.RightToLeft
+            spacing: 10
+            Repeater {
+              model: parent.list
+              delegate: Rectangle {
+                id: link
+                required property var modelData
+                width: linkRow.implicitWidth + 26
+                height: 32
+                radius: Zenon.windowRadius
+                color: linkMa.pressed ? Zenon.wash(0.14) : Zenon.wash(0.05)
+                border.width: 1
+                border.color: Zenon.border
+                Row {
+                  id: linkRow
+                  anchors.centerIn: parent
+                  spacing: 8
+                  Text {
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: link.modelData.glyph
+                    color: Zenon.cyan
+                    font.family: Zenon.face
+                    font.weight: Zenon.weight
+                    font.pixelSize: Zenon.px(14)
+                  }
+                  Text {
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: link.modelData.label
+                    color: Zenon.white
+                    font.family: Zenon.face
+                    font.weight: Zenon.weight
+                    font.pixelSize: Zenon.px(15)
+                  }
+                }
+                MouseArea {
+                  id: linkMa
+                  anchors.fill: parent
+                  cursorShape: Qt.PointingHandCursor
+                  onClicked: Qt.openUrlExternally(link.modelData.url)
+                }
               }
             }
           }
@@ -1492,54 +1548,6 @@ Item {
                   font.weight: Zenon.weight
                   font.pixelSize: Zenon.px(15)
                 }
-              }
-            }
-          }
-        }
-
-        // ── its links ─────────────────────────────────────────────────
-        Flow {
-          readonly property var list: St.links(store.detail && store.detail.urls || {})
-          visible: list.length > 0
-          width: parent.width
-          spacing: 10
-          Repeater {
-            model: parent.list
-            delegate: Rectangle {
-              id: link
-              required property var modelData
-              width: linkRow.implicitWidth + 26
-              height: 32
-              radius: Zenon.windowRadius
-              color: linkMa.pressed ? Zenon.wash(0.14) : Zenon.wash(0.05)
-              border.width: 1
-              border.color: Zenon.border
-              Row {
-                id: linkRow
-                anchors.centerIn: parent
-                spacing: 8
-                Text {
-                  anchors.verticalCenter: parent.verticalCenter
-                  text: link.modelData.glyph
-                  color: Zenon.cyan
-                  font.family: Zenon.face
-                  font.weight: Zenon.weight
-                  font.pixelSize: Zenon.px(14)
-                }
-                Text {
-                  anchors.verticalCenter: parent.verticalCenter
-                  text: link.modelData.label
-                  color: Zenon.white
-                  font.family: Zenon.face
-                  font.weight: Zenon.weight
-                  font.pixelSize: Zenon.px(15)
-                }
-              }
-              MouseArea {
-                id: linkMa
-                anchors.fill: parent
-                cursorShape: Qt.PointingHandCursor
-                onClicked: Qt.openUrlExternally(link.modelData.url)
               }
             }
           }
