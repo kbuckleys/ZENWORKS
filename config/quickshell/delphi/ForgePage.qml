@@ -56,7 +56,7 @@ Item {
   readonly property var buttons: !pg.hub ? [{ label: "Publish it", ink: Zenon.cyan, primary: true, run: () => pg.win.setPage("github") }]
     : pg.signInNeeded ? [{ label: "Sign in to " + pg.site.name, ink: Zenon.cyan, primary: true, run: () => { pg.win.mgr.set("forge", pg.site.id); pg.win.setPage("github"); } }]
     : [
-      { label: pg.open ? "Close" : "Reopen", ink: pg.open ? Zenon.red : Zenon.muted, visible: !!pg.item, run: () => pg.setOpen(!pg.open) },
+      { label: pg.open ? "Close" : "Reopen", ink: pg.open ? Zenon.red : Zenon.accentMuted, visible: !!pg.item, run: () => pg.setOpen(!pg.open) },
       { label: "Merge", ink: Zenon.magenta, visible: pg.pulls && pg.open && !!pg.item && !pg.item.draft, run: () => pg.merge() },
       { label: "Check out", visible: pg.pulls && !!pg.item && pg.item.state !== "merged", run: () => pg.checkout() },
       { label: pg.pulls ? "New " + pg.site.pull : "New issue", ink: Zenon.cyan, primary: true, run: () => pg.pulls ? pg.newPull() : pg.newIssue() },
@@ -405,7 +405,7 @@ Item {
             width: parent.width
             elide: Text.ElideRight
             text: frow.r.title
-            color: frow.index === pg.sel ? Zenon.ink : Zenon.soft
+            color: frow.index === pg.sel ? Zenon.ink : Zenon.accentSoft
             font.family: Zenon.face
             font.weight: Zenon.weight
             font.pixelSize: Zenon.px(15)
@@ -416,7 +416,7 @@ Item {
             text: "#" + frow.r.number + "  ·  " + frow.r.author + "  ·  " + D.ago(D.secondsOf(frow.r.updated), Date.now())
               + (frow.r.pull && frow.r.branch ? "  ·  " + frow.r.branch : "")
               + (frow.r.comments > 0 ? "  ·  " + frow.r.comments + (frow.r.comments === 1 ? " comment" : " comments") : "")
-            color: Zenon.muted
+            color: Zenon.accentMuted
             font.family: Zenon.face
             font.weight: Zenon.weight
             font.features: { "tnum": 1 }
@@ -455,7 +455,7 @@ Item {
         horizontalAlignment: Text.AlignHCenter
         wrapMode: Text.Wrap
         text: !pg.hub ? "This repository has no remote on GitHub, GitLab or Codeberg" : pg.listError
-        color: !pg.hub ? Zenon.muted : Zenon.red
+        color: !pg.hub ? Zenon.accentMuted : Zenon.red
         font.family: Zenon.face
         font.weight: Zenon.weight
         font.pixelSize: Zenon.px(15)
@@ -536,7 +536,7 @@ Item {
           + (post.kind === "approved" ? "  <font color='" + Zenon.green + "'>approved</font>"
             : post.kind === "changes" ? "  <font color='" + Zenon.yellow + "'>asked for changes</font>"
             : post.kind === "review" ? "  reviewed" : "")
-          + "  <font color='" + Zenon.muted + "'>·  " + D.ago(D.secondsOf(post.when), Date.now()) + "</font>"
+          + "  <font color='" + Zenon.accentMuted + "'>·  " + D.ago(D.secondsOf(post.when), Date.now()) + "</font>"
         color: Zenon.ink
         font.family: Zenon.face
         font.weight: Zenon.weight
@@ -550,7 +550,7 @@ Item {
         wrapMode: Text.Wrap
         textFormat: post.body.trim() === "" ? Text.PlainText : Text.MarkdownText
         text: post.body.trim() === "" ? "No description" : D.mdOf(post.body)
-        color: post.body.trim() === "" ? Zenon.muted : Zenon.soft
+        color: post.body.trim() === "" ? Zenon.accentMuted : Zenon.accentSoft
         linkColor: Zenon.cyan
         font.family: Zenon.face
         font.weight: Zenon.weight
@@ -589,7 +589,7 @@ Item {
           wrapMode: Text.Wrap
           textFormat: Text.StyledText
           text: pg.item ? pg.item.title.replace(/&/g, "&amp;").replace(/</g, "&lt;")
-            + "  <font color='" + Zenon.muted + "'>#" + pg.item.number + "</font>" : ""
+            + "  <font color='" + Zenon.accentMuted + "'>#" + pg.item.number + "</font>" : ""
           color: Zenon.ink
           font.family: Zenon.face
           font.weight: Font.Bold
@@ -634,7 +634,7 @@ Item {
             text: !pg.item ? "" : pg.item.author + " opened it " + D.ago(D.secondsOf(pg.item.created), Date.now())
               + (pg.item.pull && pg.item.branch ? "  ·  " + (pg.item.headRepo && pg.item.headRepo !== pg.hubFull ? pg.item.headRepo.split("/")[0] + ":" : "")
                 + pg.item.branch + "  →  " + pg.item.base : "")
-            color: Zenon.muted
+            color: Zenon.accentMuted
             font.family: Zenon.face
             font.weight: Zenon.weight
             font.pixelSize: Zenon.px(14)
@@ -654,7 +654,7 @@ Item {
               : pg.item.mergeable === false ? "  ·  <font color='" + Zenon.red + "'>conflicts with " + pg.item.base + "</font>"
               : pg.item.mergeState === "blocked" ? "  ·  <font color='" + Zenon.yellow + "'>waiting on a review or a check</font>"
               : pg.item.mergeable === true ? "  ·  <font color='" + Zenon.green + "'>merges cleanly</font>" : "")
-          color: Zenon.soft
+          color: Zenon.accentSoft
           font.family: Zenon.face
           font.weight: Zenon.weight
           font.features: { "tnum": 1 }
@@ -674,7 +674,7 @@ Item {
           width: parent.width
           wrapMode: Text.Wrap
           text: "Sign in to " + pg.site.name + " to read what was said on it."
-          color: Zenon.muted
+          color: Zenon.accentMuted
           font.family: Zenon.face
           font.weight: Zenon.weight
           font.pixelSize: Zenon.px(14)
@@ -763,7 +763,7 @@ Item {
       text: !pg.peek ? "" : "<font color='" + Zenon[peekBubble.mark.ink] + "'>" + peekBubble.mark.word + "</font>"
         + "  ·  #" + pg.peek.number + " by " + pg.peek.author + "  ·  " + D.ago(D.secondsOf(pg.peek.created), Date.now())
         + (pg.peek.pull && pg.peek.branch ? "  ·  " + pg.peek.branch + " → " + pg.peek.base : "")
-      color: Zenon.muted
+      color: Zenon.accentMuted
       font.family: Zenon.face
       font.weight: Zenon.weight
       font.pixelSize: Zenon.px(13)
@@ -775,7 +775,7 @@ Item {
       maximumLineCount: 6
       elide: Text.ElideRight
       text: pg.peek ? (D.plainOf(pg.peek.excerpt) || "No description") : ""
-      color: pg.peek && pg.peek.excerpt ? Zenon.soft : Zenon.muted
+      color: pg.peek && pg.peek.excerpt ? Zenon.accentSoft : Zenon.accentMuted
       font.family: Zenon.face
       font.weight: Zenon.weight
       font.pixelSize: Zenon.px(14)
@@ -783,7 +783,7 @@ Item {
     Text {
       visible: !!pg.peek && pg.peek.comments > 0
       text: pg.peek ? pg.peek.comments + (pg.peek.comments === 1 ? " comment" : " comments") + "  ·  updated " + D.ago(D.secondsOf(pg.peek.updated), Date.now()) : ""
-      color: Zenon.muted
+      color: Zenon.accentMuted
       font.family: Zenon.face
       font.weight: Zenon.weight
       font.pixelSize: Zenon.px(13)

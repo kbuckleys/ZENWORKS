@@ -138,7 +138,7 @@ PanelWindow {
             Text {
               visible: field.text === ""
               text: cap.into === "today" ? "What happened, what you thought…" : "Something to keep…"
-              color: Zenon.muted
+              color: Zenon.accentMuted
               font: field.font
             }
           }

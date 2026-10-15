@@ -350,7 +350,7 @@ Item {
       anchors.right: parent.right
       horizontalAlignment: Text.AlignHCenter
       elide: Text.ElideRight
-      color: Zenon.muted
+      color: Zenon.accentMuted
       font.family: Zenon.face
       font.weight: Zenon.weight
       font.pixelSize: Math.round(13 * term.zoom)

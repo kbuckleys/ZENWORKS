@@ -73,7 +73,7 @@ Column {
     visible: ps.q.whole || ps.q.commits === null || ps.q.commits.length === 0
     text: ps.q.whole ? "A new branch there: every commit on it goes"
       : ps.q.commits === null ? "Reading the commits…" : "No new commits — the branch moves to this one"
-    color: Zenon.muted
+    color: Zenon.accentMuted
     font.family: Zenon.face
     font.weight: Zenon.weight
     font.pixelSize: Zenon.px(13)
@@ -109,7 +109,7 @@ Column {
     Text {
       visible: ps.q.more > 0
       text: "and " + ps.q.more + " more"
-      color: Zenon.muted
+      color: Zenon.accentMuted
       font.family: Zenon.face
       font.weight: Zenon.weight
       font.pixelSize: Zenon.px(13)

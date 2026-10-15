@@ -134,7 +134,7 @@ FloatingWindow {
             detail: "Its directory is gone, or no longer a repository. Removing it takes it off Delphi's lists; its forge is not touched.",
             items: [D.tilde(path, win.home)],
             choices: [{ label: "Remove from Delphi", ink: Zenon.cyan, run: () => { win.mgr.drop(path); win.say("Removed " + D.baseName(path)); } },
-                      { label: "Keep it listed", ink: Zenon.muted }] });
+                      { label: "Keep it listed", ink: Zenon.accentMuted }] });
           if (win.root === "") win.setPage("repos");
           return;
         }
@@ -209,7 +209,7 @@ FloatingWindow {
       then: () => { if (forget) win.forgetRepo(opts.root, opts.name); if (opts.then) opts.then(); } });
     const choices = [{ label: "Archive", ink: Zenon.yellow, run: () => run(false) }];
     if (opts.root) choices.push({ label: "Archive and forget it here", ink: Zenon.yellow, run: () => run(true) });
-    choices.push({ label: "Cancel", ink: Zenon.muted });
+    choices.push({ label: "Cancel", ink: Zenon.accentMuted });
     win.card_({ question: "Archive " + hub.full + "?", glyph: f.glyph, ink: Zenon.yellow,
       detail: "It stays on " + f.name + ", read-only: nothing can be pushed, and issues and pull requests close to new activity. "
         + "Its page says it is archived. You can unarchive it from the Accounts page."
@@ -593,11 +593,11 @@ FloatingWindow {
         detail: "This remote is reached over ssh, and ssh is not here. Ceres can install it (openssh) — it asks for your password — then try again.",
         items: text.split("\n"),
         choices: [{ label: "Install openssh", ink: Zenon.cyan, run: () => win.installNeed("openssh", "to reach ssh remotes") },
-                  { label: "OK", ink: Zenon.muted }] });
+                  { label: "OK", ink: Zenon.accentMuted }] });
       return;
     }
     win.card_({ question: title, glyph: "", ink: Zenon.red, detail: detail || "",
-      items: text.split("\n"), choices: [{ label: "OK", ink: Zenon.muted }] });
+      items: text.split("\n"), choices: [{ label: "OK", ink: Zenon.accentMuted }] });
   }
 
   // ── WHAT IS MISSING ────────────────────────────────────────────────────
@@ -663,7 +663,7 @@ FloatingWindow {
     const a = D.askCard(q);
     if (a.confirm) return { kind: "confirm", gitAsk: q.ask, question: a.title,
       glyph: "", ink: Zenon.yellow, detail: "", items: a.detail.split("\n").filter((l) => l.trim() !== ""),
-      choices: [{ label: "Trust it", ink: Zenon.yellow }, { label: "Cancel", ink: Zenon.muted }] };
+      choices: [{ label: "Trust it", ink: Zenon.yellow }, { label: "Cancel", ink: Zenon.accentMuted }] };
     if (a.secret) return { kind: "form", gitAsk: q.ask, title: a.title, glyph: "", ink: Zenon.red,
       secret: { key: "answer", prompt: "input your " + a.title.toLowerCase(), purpose: a.detail }, verb: "Send" };
     return { kind: "form", gitAsk: q.ask, title: a.title, glyph: "", detail: a.detail,
@@ -836,7 +836,10 @@ FloatingWindow {
         anchors.margins: 12
         height: 58
         radius: Zenon.windowRadius
-        color: Zenon.wash(0.04)
+        // pressed, darker — and kept so while its menu is open (user,
+        // 2026-10-11: no ring, the press itself held). The suite's shade
+        // since 2026-10-15, the fill only: the words keep their ink (user)
+        color: repoPress.pressed || repoPop.isOpen ? Zenon.darken(0.35) : Zenon.wash(0.04)
         border.width: 1
         border.color: Zenon.border
         Text {
@@ -868,7 +871,7 @@ FloatingWindow {
             width: parent.width
             elide: Text.ElideRight
             text: win.root === "" ? "Open or clone one" : "  " + win.branchName
-            color: win.branch && !win.branch.head ? Zenon.yellow : Zenon.muted
+            color: win.branch && !win.branch.head ? Zenon.yellow : Zenon.accentMuted
             font.family: Zenon.face
             font.weight: Zenon.weight
             font.pixelSize: Zenon.px(14)
@@ -881,7 +884,7 @@ FloatingWindow {
           anchors.rightMargin: 12
           anchors.verticalCenter: parent.verticalCenter
           text: "\uF078"
-          color: repoPop.isOpen ? Zenon.cyan : Zenon.muted
+          color: repoPop.isOpen ? Zenon.cyan : Zenon.accentMuted
           rotation: repoPop.isOpen ? 180 : 0
           Behavior on rotation { NumberAnimation { duration: Zenon.normal; easing.type: Zenon.travelEase } }
           font.family: Zenon.glyphFace
@@ -891,14 +894,6 @@ FloatingWindow {
           id: repoPress
           anchors.fill: parent
           onClicked: win.repoMenu()
-        }
-        // pressed, darker — and kept so while its menu is open (user,
-        // 2026-10-11: no ring, the press itself held)
-        Rectangle {
-          anchors.fill: parent
-          radius: parent.radius
-          color: Zenon.wash(0.12)
-          visible: repoPress.pressed || repoPop.isOpen
         }
         HoverHandler {
           onHoveredChanged: hovered && win.root !== ""
@@ -938,7 +933,7 @@ FloatingWindow {
             glyph: pageRow.modelData.glyph
             label: pageRow.modelData.label
             count: win.countOf(pageRow.modelData.id)
-            countInk: pageRow.modelData.id === "changes" && win.st && win.st.conflicts.length > 0 ? Zenon.red : Zenon.muted
+            countInk: pageRow.modelData.id === "changes" && win.st && win.st.conflicts.length > 0 ? Zenon.red : Zenon.accentMuted
             here: win.page === pageRow.modelData.id
             fill: win.hiFill
             opacity: win.root === "" && ["github", "repos"].indexOf(pageRow.modelData.id) < 0 ? 0.4 : 1
@@ -983,7 +978,7 @@ FloatingWindow {
             wrapMode: Text.Wrap
             visible: !!win.st && win.st.conflicts.length > 0
             text: win.st ? win.st.conflicts.length + (win.st.conflicts.length === 1 ? " conflict" : " conflicts") + " to resolve" : ""
-            color: Zenon.soft
+            color: Zenon.accentSoft
             font.family: Zenon.face
             font.weight: Zenon.weight
             font.pixelSize: Zenon.px(14)
@@ -1049,7 +1044,7 @@ FloatingWindow {
                 width: parent.width
                 wrapMode: Text.Wrap
                 text: modelData.why
-                color: Zenon.soft
+                color: Zenon.accentSoft
                 font.family: Zenon.face
                 font.weight: Zenon.weight
                 font.pixelSize: Zenon.px(13)
@@ -1079,7 +1074,7 @@ FloatingWindow {
           // the person, when it is on none delphi knows
           : win.info.identity.name !== "" ? (win.hub && D.FORGES[win.hub.forge] ? D.FORGES[win.hub.forge].glyph : "\uF007") + "  " + win.info.identity.name + "  ·  " + win.info.identity.email
           : "  Who commits? Set your name"
-        color: win.info && win.info.identity && win.info.identity.name === "" ? Zenon.yellow : Zenon.muted
+        color: win.info && win.info.identity && win.info.identity.name === "" ? Zenon.yellow : Zenon.accentMuted
         font.family: Zenon.face
         font.weight: Zenon.weight
         font.pixelSize: Zenon.px(13)
@@ -1164,7 +1159,7 @@ FloatingWindow {
           width: Math.min(implicitWidth, parent.width - x - (pushChip.visible ? pushChip.width + 12 : 0))
           elide: Text.ElideMiddle
           text: win.pageItem && win.pageItem.subtitle !== undefined ? win.pageItem.subtitle : D.tilde(win.root, win.home)
-          color: Zenon.muted
+          color: Zenon.accentMuted
           font.family: Zenon.face
           font.weight: Zenon.weight
           font.pixelSize: Zenon.px(14)
@@ -1185,7 +1180,7 @@ FloatingWindow {
           width: chipRow.implicitWidth + 22
           height: Math.round(Zenon.px(14) * 2)
           radius: height / 2
-          color: chipPress.pressed ? Zenon.wash(0.12) : Zenon.wash(0.05)
+          color: chipPress.pressed ? Zenon.darken(0.35) : Zenon.wash(0.05)
           border.width: 1
           border.color: Zenon.border
           Row {
@@ -1195,7 +1190,7 @@ FloatingWindow {
             Text {
               anchors.verticalCenter: parent.verticalCenter
               text: "\uF062"
-              color: Zenon.muted
+              color: Zenon.accentMuted
               font.family: Zenon.glyphFace
               font.pixelSize: Zenon.px(11)
             }
@@ -1212,7 +1207,7 @@ FloatingWindow {
                   visible: index > 0
                   anchors.verticalCenter: parent.verticalCenter
                   text: "+"
-                  color: Zenon.muted
+                  color: Zenon.accentMuted
                   font.family: Zenon.face
                   font.pixelSize: Zenon.px(13)
                 }
@@ -1246,7 +1241,7 @@ FloatingWindow {
               visible: pushChip.choice
               anchors.verticalCenter: parent.verticalCenter
               text: "\uF078"
-              color: pushPop.isOpen ? Zenon.cyan : Zenon.muted
+              color: pushPop.isOpen ? Zenon.cyan : Zenon.accentMuted
               rotation: pushPop.isOpen ? 180 : 0
               Behavior on rotation { NumberAnimation { duration: Zenon.normal; easing.type: Zenon.travelEase } }
               font.family: Zenon.glyphFace
@@ -1282,7 +1277,7 @@ FloatingWindow {
                   width: parent.width
                   elide: Text.ElideRight
                   textFormat: Text.StyledText
-                  text: "<b>" + (rc.h ? rc.h.name : rc.modelData) + "</b>  <font color='" + Zenon.hex(Zenon.muted) + "'>" + D.ciWords(rc.c) + "</font>"
+                  text: "<b>" + (rc.h ? rc.h.name : rc.modelData) + "</b>  <font color='" + Zenon.hex(Zenon.accentMuted) + "'>" + D.ciWords(rc.c) + "</font>"
                   color: Zenon.ink
                   font.family: Zenon.face
                   font.weight: Zenon.weight
@@ -1424,7 +1419,7 @@ FloatingWindow {
                 : upPill.waiting > 0 ? upPill.site.name + " asked for a pause of " + upPill.waiting + " s \u2014 carrying on after it"
                 : upPill.phase === "committing" ? "All sent \u2014 making the commit\u2026"
                 : upPill.sent + " of " + upPill.total + " sent  \u00b7  the wheel scrolls  \u00b7  click the ring to stop"
-              color: upPill.phase === "failed" ? Zenon.red : upPill.phase === "done" ? Zenon.green : Zenon.muted
+              color: upPill.phase === "failed" ? Zenon.red : upPill.phase === "done" ? Zenon.green : Zenon.accentMuted
               font.family: Zenon.face
               font.weight: Zenon.weight
               font.features: { "tnum": 1 }
@@ -1488,7 +1483,7 @@ FloatingWindow {
           id: pullBtn
           visible: !win.netBusy && win.root !== ""
           label: win.branch && win.branch.behind > 0 ? "Pull  ↓" + win.branch.behind : "Pull"
-          ink: win.branch && win.branch.behind > 0 ? Zenon.cyan : Zenon.muted
+          ink: win.branch && win.branch.behind > 0 ? Zenon.cyan : Zenon.accentMuted
           ready: !!win.branch && !!win.branch.upstream
           onClicked: win.pull()
           MouseArea { anchors.fill: parent; acceptedButtons: Qt.RightButton; onClicked: win.pullMenu(pullBtn) }
@@ -1506,7 +1501,7 @@ FloatingWindow {
               : pushBtn.n === 1 ? "Push to " + win.pushTargets[0]
               : !win.branch.upstream && win.branch.head ? "Publish"
               : win.branch.ahead > 0 ? "Push  ↑" + win.branch.ahead : "Push"
-            ink: !win.pushNothing && win.branch && (win.branch.ahead > 0 || pushBtn.n > 0 || (!win.branch.upstream && win.branch.head)) ? Zenon.cyan : Zenon.muted
+            ink: !win.pushNothing && win.branch && (win.branch.ahead > 0 || pushBtn.n > 0 || (!win.branch.upstream && win.branch.head)) ? Zenon.cyan : Zenon.accentMuted
             ready: !win.pushNothing
             primary: !win.pushNothing && !!win.branch && (win.branch.ahead > 0 || pushBtn.n > 0) && win.branch.behind === 0
             onClicked: win.push()
@@ -1590,7 +1585,7 @@ FloatingWindow {
             required property var modelData
             visible: modelData.visible !== false
             label: modelData.label
-            ink: modelData.ink || Zenon.muted
+            ink: modelData.ink || Zenon.accentMuted
             primary: !!modelData.primary
             ready: modelData.ready !== false
             onClicked: modelData.run()
@@ -1637,7 +1632,7 @@ FloatingWindow {
         fontSize: Zenon.px(14)
         noteWidth: 150
         noteOf: (e) => e.isDir ? null : {
-          text: "<font color='" + Zenon.muted + "'>" + Terminus.formatSize(e.size) + "</font>   " + (e.exists ? "replaces" : "new"),
+          text: "<font color='" + Zenon.accentMuted + "'>" + Terminus.formatSize(e.size) + "</font>   " + (e.exists ? "replaces" : "new"),
           ink: e.exists ? Zenon.yellow : Zenon.green }
       }
     }
@@ -1688,14 +1683,14 @@ FloatingWindow {
         win.card_({ question: "Signing needs openssh", glyph: "\uF084", ink: Zenon.ink,
           detail: "git signs with ssh-keygen, which comes with openssh — not installed. Ceres can install it (it asks for your password).",
           choices: [{ label: "Install openssh", ink: Zenon.cyan, run: () => win.mgr.installTool("openssh", "for signing your commits", (done) => { if (done && win) win.askSigning(email); }) },
-                    { label: "Cancel", ink: Zenon.muted }] });
+                    { label: "Cancel", ink: Zenon.accentMuted }] });
         return;
       }
       const use = (key, create) => win.act("signingSetup", { key: key, create: create, email: email }, {
         repo: null, label: create ? "Making a signing key" : "Setting up signing",
         then: (r) => { if (win) win.offerSigningKey(r); } });
       const choices = st.keys.map((k) => ({ label: "Use " + D.baseName(k.path).replace(/\.pub$/, ""), run: () => use(k.path, false) }));
-      choices.push({ label: "Make a new key for signing", ink: Zenon.cyan, run: () => use("", true) }, { label: "Cancel", ink: Zenon.muted });
+      choices.push({ label: "Make a new key for signing", ink: Zenon.cyan, run: () => use("", true) }, { label: "Cancel", ink: Zenon.accentMuted });
       win.card_({ question: "Sign with which key?", glyph: "\uF084", ink: Zenon.ink,
         detail: (st.keys.length > 0 ? "Your SSH keys are below, or make one only for signing. " : "There is no SSH key here yet. ")
           + "A new one is made without a passphrase, so git signs without asking — kept in ~/.ssh, readable by you alone.",
@@ -1722,7 +1717,7 @@ FloatingWindow {
                           + (res.verify ? " — confirm it there once: " + res.verify : "")),
                         failed: (err) => win.fail("Could not add the key to " + f.name, null, err) })) },
                   { label: "Copy the key", run: () => win.copy(r.public, "the public key") },
-                  { label: "Not now", ink: Zenon.muted }] });
+                  { label: "Not now", ink: Zenon.accentMuted }] });
     };
     for (const id of ids) {
       win.mgr.call(D.FORGES[id].id + "Status", null, {}, (ok, st) => {

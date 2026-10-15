@@ -312,7 +312,7 @@ LayerPopup {
             anchors.verticalCenter: parent.verticalCenter
             text: Ceres.checking ? "checking…"
               : Ceres.lastOk > 0 ? "checked " + Cer.age(Ceres.now - Ceres.lastOk) : ""
-            color: Zenon.muted
+            color: Zenon.accentMuted
             font.family: Zenon.face
             font.weight: Zenon.weight
             font.pixelSize: Zenon.px(12)
@@ -322,7 +322,7 @@ LayerPopup {
             id: refresh
             anchors.verticalCenter: parent.verticalCenter
             text: ""
-            color: refreshHov.hovered ? Zenon.white : Zenon.keyInk
+            color: refreshHov.hovered ? Zenon.white : Zenon.accentKey
             font.family: Zenon.face
             font.weight: Zenon.weight
             font.pixelSize: Zenon.px(14)
@@ -375,7 +375,7 @@ LayerPopup {
           anchors.centerIn: parent
           visible: popup.face === "list" && popup.rows.length === 0
           text: Ceres.lastOk > 0 ? "nothing to update" : "not checked yet"
-          color: Zenon.muted
+          color: Zenon.accentMuted
           font.family: Zenon.face
           font.weight: Font.Bold
           font.pixelSize: Zenon.px(15)
@@ -513,7 +513,7 @@ LayerPopup {
           DialogButton {
             visible: popup.face === "news"
             label: "Back"
-            ink: Zenon.muted
+            ink: Zenon.accentMuted
             onClicked: Ceres.holdBack()
           }
           DialogButton {
@@ -539,7 +539,7 @@ LayerPopup {
           DialogButton {
             visible: popup.face === "list"
             label: "Manage packages"
-            ink: Zenon.muted
+            ink: Zenon.accentMuted
             onClicked: { popup.closePopup(); Ceres.openWindow("updates"); }
           }
           DialogButton {
@@ -552,7 +552,7 @@ LayerPopup {
           DialogButton {
             visible: popup.face === "result"
             label: "Back"
-            ink: Zenon.muted
+            ink: Zenon.accentMuted
             onClicked: Ceres.txClear()
           }
         }

@@ -69,7 +69,7 @@ Item {
       width: parent.width - 32 - closeBtn.width
       elide: Text.ElideMiddle
       textFormat: Text.StyledText
-      text: "<b>Who wrote " + D.esc(D.baseName(bv.path)) + "</b>  <font color='" + Zenon.hex(Zenon.muted) + "'>"
+      text: "<b>Who wrote " + D.esc(D.baseName(bv.path)) + "</b>  <font color='" + Zenon.hex(Zenon.accentMuted) + "'>"
         + (bv.got ? Object.keys(bv.got.commits).length + " commits · " + bv.got.lines.length + " lines" : "") + "</font>"
       color: Zenon.ink
       font.family: Zenon.face
@@ -133,9 +133,9 @@ Item {
         elide: Text.ElideRight
         textFormat: Text.StyledText
         text: ln.mine ? "<font color='" + Zenon.hex(Zenon.yellow) + "'>not committed yet</font>"
-          : D.esc(ln.c.author || "") + "  <font color='" + Zenon.hex(Zenon.muted) + "'>"
+          : D.esc(ln.c.author || "") + "  <font color='" + Zenon.hex(Zenon.accentMuted) + "'>"
             + D.ago(parseInt(ln.c.authortime || "0", 10), Date.now()) + "  ·  " + D.esc(ln.c.summary || "") + "</font>"
-        color: Zenon.soft
+        color: Zenon.accentSoft
         font.family: Zenon.face
         font.weight: Zenon.weight
         font.pixelSize: Zenon.px(13)
@@ -152,7 +152,7 @@ Item {
         anchors.verticalCenter: parent.verticalCenter
         horizontalAlignment: Text.AlignRight
         text: String(ln.index + 1)
-        color: Zenon.muted
+        color: Zenon.accentMuted
         font.family: bv.codeFace
         font.pixelSize: Zenon.px(13)
       }

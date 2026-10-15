@@ -397,7 +397,7 @@ Scope {
               }
               Text {
                 text: pane.mx < 0 ? "" : Math.floor(pane.mx) + ", " + Math.floor(pane.my)
-                color: Zenon.muted
+                color: Zenon.accentMuted
                 font.family: Zenon.faceMono
                 font.weight: Zenon.weight
                 font.pixelSize: Zenon.px(12)
@@ -463,7 +463,7 @@ Scope {
                   visible: !hintCell.isKey
                   anchors.verticalCenter: parent.verticalCenter
                   text: hintCell.modelData
-                  color: Zenon.muted
+                  color: Zenon.accentMuted
                   font.family: Zenon.face
                   font.weight: Zenon.weight
                   font.pixelSize: Zenon.px(12)

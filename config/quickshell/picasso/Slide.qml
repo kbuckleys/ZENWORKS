@@ -29,7 +29,7 @@ Item {
     anchors.verticalCenter: parent.verticalCenter
     width: 88
     text: sl.label
-    color: sl.value !== sl.rest ? Zenon.white : Zenon.soft
+    color: sl.value !== sl.rest ? Zenon.white : Zenon.accentSoft
     font.family: Zenon.face
     font.weight: Zenon.weight
     font.pixelSize: Zenon.px(14)
@@ -41,7 +41,7 @@ Item {
     width: 44
     horizontalAlignment: Text.AlignRight
     text: sl.valueText
-    color: slValMa.containsMouse ? Zenon.cyan : Zenon.soft
+    color: slValMa.containsMouse ? Zenon.cyan : Zenon.accentSoft
     font.family: Zenon.face
     font.weight: Zenon.weight
     font.pixelSize: Zenon.px(13)

@@ -549,7 +549,7 @@ Rectangle {
               width: 30
               horizontalAlignment: Text.AlignHCenter
               text: "→"
-              color: Zenon.muted
+              color: Zenon.accentMuted
               font.family: Zenon.face
               font.weight: Zenon.weight
               font.pixelSize: Zenon.px(15)
@@ -764,7 +764,7 @@ Rectangle {
             height: parent.height
             verticalAlignment: Text.AlignVCenter
             text: "Name"
-            color: Zenon.muted
+            color: Zenon.accentMuted
             font.family: Zenon.face
             font.weight: Zenon.weight
             font.pixelSize: Zenon.px(12)
@@ -775,7 +775,7 @@ Rectangle {
             height: parent.height
             verticalAlignment: Text.AlignVCenter
             text: "Becomes"
-            color: Zenon.muted
+            color: Zenon.accentMuted
             font.family: Zenon.face
             font.weight: Zenon.weight
             font.pixelSize: Zenon.px(12)
@@ -849,7 +849,7 @@ Rectangle {
                 horizontalAlignment: Text.AlignRight
                 verticalAlignment: Text.AlignVCenter
                 text: bulkRow.index + 1
-                color: Zenon.muted
+                color: Zenon.accentMuted
                 font.family: Zenon.face
                 font.weight: Zenon.weight
                 font.pixelSize: Zenon.px(12)
@@ -865,7 +865,7 @@ Rectangle {
                 elide: Text.ElideMiddle
                 // Dimmed once the row is going to change: the old name is
                 // then history, and the eye should be on the new one.
-                color: bulkRow.moved ? Zenon.muted : Zenon.keyInk
+                color: bulkRow.moved ? Zenon.accentMuted : Zenon.accentKey
                 font.family: Zenon.face
                 font.weight: Zenon.weight
                 font.pixelSize: Zenon.px(14)
@@ -1000,7 +1000,7 @@ Rectangle {
                 : bulk.changes + (bulk.changes === 1
                     ? " name will change" : " names will change"))
             color: !bulk.sound ? Zenon.red
-              : (bulk.changes === 0 ? Zenon.muted : Zenon.cyan)
+              : (bulk.changes === 0 ? Zenon.accentMuted : Zenon.cyan)
             font.family: Zenon.face
             font.weight: Zenon.weight
             font.pixelSize: Zenon.px(14)
@@ -1014,7 +1014,7 @@ Rectangle {
 
             DialogButton {
               label: "Cancel"
-              ink: Zenon.muted
+              ink: Zenon.accentMuted
               onClicked: bulk.dismiss()
             }
 

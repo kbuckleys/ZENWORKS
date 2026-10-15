@@ -96,8 +96,8 @@ Item {
       }
     }
     Item { width: 10; height: 1 }
-    DialogButton { anchors.verticalCenter: parent.verticalCenter; glyph: true; label: "\u{F0652}"; ink: pad.marker ? Zenon.yellow : Zenon.muted; onClicked: { pad.marker = !pad.marker; pad.erasing = false; } }
-    DialogButton { anchors.verticalCenter: parent.verticalCenter; glyph: true; label: "\u{F01FE}"; ink: pad.erasing ? Zenon.red : Zenon.muted; onClicked: pad.erasing = !pad.erasing }
+    DialogButton { anchors.verticalCenter: parent.verticalCenter; glyph: true; label: "\u{F0652}"; ink: pad.marker ? Zenon.yellow : Zenon.accentMuted; onClicked: { pad.marker = !pad.marker; pad.erasing = false; } }
+    DialogButton { anchors.verticalCenter: parent.verticalCenter; glyph: true; label: "\u{F01FE}"; ink: pad.erasing ? Zenon.red : Zenon.accentMuted; onClicked: pad.erasing = !pad.erasing }
     DialogButton { anchors.verticalCenter: parent.verticalCenter; glyph: true; label: ""; ready: pad.strokes.length > 0; onClicked: pad.undo() }
     DialogButton { anchors.verticalCenter: parent.verticalCenter; glyph: true; label: ""; ready: pad.undone.length > 0; onClicked: pad.redo() }
     DialogButton { anchors.verticalCenter: parent.verticalCenter; label: "Clear"; ready: pad.strokes.length > 0; onClicked: { pad.undone = pad.strokes.slice().reverse(); pad.strokes = []; paper.requestPaint(); } }
@@ -129,7 +129,7 @@ Item {
       onPaint: {
         const c = getContext("2d");
         c.reset();
-        c.fillStyle = String(Zenon.muted);
+        c.fillStyle = String(Zenon.accentMuted);
         for (let x = 24; x < width; x += 24) for (let y = 24; y < height; y += 24) c.fillRect(x, y, 1.5, 1.5);
       }
     }

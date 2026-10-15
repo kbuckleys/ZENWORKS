@@ -116,7 +116,7 @@ Item {
       anchors.rightMargin: 16
       anchors.verticalCenter: parent.verticalCenter
       text: "\u{F08BB}"
-      color: gearPress.pressed ? Zenon.ink : Zenon.muted
+      color: gearPress.pressed ? Zenon.ink : Zenon.accentMuted
       font.family: Zenon.glyphFace
       font.pixelSize: Zenon.px(16)
       MouseArea {
@@ -175,7 +175,7 @@ Item {
           anchors.verticalCenter: parent.verticalCenter
           visible: Clio.count > 0
           text: Clio.shown ? "" : ""
-          color: Zenon.muted
+          color: Zenon.accentMuted
           font.family: Zenon.glyphFace
           font.pixelSize: Zenon.px(12)
           MouseArea { anchors.fill: parent; anchors.margins: -6; onClicked: Clio.toggle() }
@@ -272,7 +272,7 @@ Item {
               id: tagText
               anchors.centerIn: parent
               text: "#" + modelData.name
-              color: parent.on ? Zenon.cyan : Zenon.soft
+              color: parent.on ? Zenon.cyan : Zenon.accentSoft
               font.family: Zenon.face
               font.weight: Zenon.weight
               font.pixelSize: Zenon.px(12)
@@ -325,7 +325,7 @@ Item {
           readonly property bool barred: entry && side.win.journalLocked(n.journal)
           host: side
           glyph: n.sealed || barred ? "\uF023" : entry ? "\u{F0B64}" : "\u{F09ED}"
-          glyphInk: n.sealed || barred ? Zenon.yellow : entry ? (Zenon[journal.hue] || Zenon.cyan) : Zenon.muted
+          glyphInk: n.sealed || barred ? Zenon.yellow : entry ? (Zenon[journal.hue] || Zenon.cyan) : Zenon.accentMuted
           label: barred ? N.dateLong(n.date) : entry ? N.titleOf(n, N.dateLong(n.date)) : N.titleOf(n)
           here: side.win.selId === n.id
           count: N.dayShort(modelData.at, Date.now())
@@ -376,7 +376,7 @@ Item {
       here: side.scope.shelf === "trash"
       count: trashFoot.count === 0 ? "empty" : String(trashFoot.count)
       // orange (Zenon's yellow) while there is something in it
-      countInk: trashFoot.count > 0 ? Zenon.yellow : Zenon.muted
+      countInk: trashFoot.count > 0 ? Zenon.yellow : Zenon.accentMuted
       held: side.win.menuHeld === "trash"
       drop: ({ shelf: "trash", id: "" })
       onClicked: side.win.setScope({ shelf: "trash" })

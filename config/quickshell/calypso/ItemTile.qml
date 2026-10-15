@@ -28,7 +28,7 @@ Rectangle {
   property bool ringed: false
   readonly property var mark: C.markOf(tile.item)
   readonly property string slot: tile.ink !== "" ? tile.ink : tile.mark.ink
-  readonly property color hue: Zenon[tile.slot] !== undefined ? Zenon[tile.slot] : Zenon.muted
+  readonly property color hue: Zenon[tile.slot] !== undefined ? Zenon[tile.slot] : Zenon.accentMuted
 
   width: tile.size
   height: tile.size

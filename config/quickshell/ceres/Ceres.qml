@@ -354,7 +354,7 @@ Singleton {
   readonly property var notes: root.noteItems.map(n => n.text)
 
   readonly property var ink: ({
-    muted: Zenon.hex(Zenon.muted), arrow: Zenon.hex(Zenon.yellow), repo: Zenon.hex(Zenon.blue), aur: Zenon.hex(Zenon.magenta),
+    muted: Zenon.hex(Zenon.accentMuted), arrow: Zenon.hex(Zenon.yellow), repo: Zenon.hex(Zenon.blue), aur: Zenon.hex(Zenon.magenta),
     flat: Zenon.hex(Zenon.cyan),
     warn: Zenon.hex(Zenon.red)
   })

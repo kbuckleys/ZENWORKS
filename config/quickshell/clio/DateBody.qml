@@ -87,7 +87,7 @@ Column {
           Text {
             anchors.centerIn: parent
             text: modelData.day
-            color: parent.parent.chosen ? Zenon.onAccent : modelData.out ? Zenon.alpha(Zenon.muted, 0.5) : Zenon.ink
+            color: parent.parent.chosen ? Zenon.onAccent : modelData.out ? Zenon.alpha(Zenon.accentMuted, 0.5) : Zenon.ink
             font.family: Zenon.face
             font.weight: Zenon.weight
             font.pixelSize: Zenon.px(13)
@@ -99,7 +99,7 @@ Column {
   }
   Row {
     spacing: 10
-    Text { anchors.verticalCenter: parent.verticalCenter; text: "Time"; color: Zenon.muted; font.family: Zenon.face; font.weight: Zenon.weight; font.pixelSize: Zenon.px(14) }
+    Text { anchors.verticalCenter: parent.verticalCenter; text: "Time"; color: Zenon.accentMuted; font.family: Zenon.face; font.weight: Zenon.weight; font.pixelSize: Zenon.px(14) }
     DialogButton { glyph: true; label: ""; onClicked: { const t = (db.hour * 60 + db.minute - 15 + 1440) % 1440; db.hour = Math.floor(t / 60); db.minute = t % 60; } }
     Text {
       anchors.verticalCenter: parent.verticalCenter

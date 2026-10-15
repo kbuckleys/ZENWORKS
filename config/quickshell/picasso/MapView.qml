@@ -240,7 +240,7 @@ Item {
       id: credit
       anchors.centerIn: parent
       text: "© OpenStreetMap contributors"
-      color: creditMa.containsMouse ? Zenon.cyan : Zenon.muted
+      color: creditMa.containsMouse ? Zenon.cyan : Zenon.accentMuted
       font.family: Zenon.face
       font.weight: Zenon.weight
       font.pixelSize: Zenon.px(11)

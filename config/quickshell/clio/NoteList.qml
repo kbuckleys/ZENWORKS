@@ -61,7 +61,7 @@ Item {
       anchors.leftMargin: 8
       anchors.baseline: scopeName.baseline
       text: nl.win ? nl.win.shown.length + (nl.win.onDesktop ? (nl.win.shown.length === 1 ? " sticky" : " stickies") : nl.win.shown.length === 1 ? " note" : " notes") : ""
-      color: Zenon.muted
+      color: Zenon.accentMuted
       font.family: Zenon.face
       font.weight: Zenon.weight
       font.pixelSize: Zenon.px(13)
@@ -150,7 +150,7 @@ Item {
         verticalAlignment: Text.AlignBottom
         bottomPadding: 7
         text: row.head
-        color: row.head === "Pinned" ? Zenon.sand : Zenon.muted
+        color: row.head === "Pinned" ? Zenon.sand : Zenon.accentMuted
         font.family: Zenon.face
         font.weight: Font.DemiBold
         font.pixelSize: Zenon.px(12)
@@ -288,7 +288,7 @@ Item {
           wrapMode: Text.Wrap
           elide: Text.ElideRight
           text: tile.n.sealed ? "" : (tile.n.d.preview || tile.n.d.title)
-          color: Zenon.soft
+          color: Zenon.accentSoft
           font.family: Zenon.face
           font.weight: Zenon.weight
           font.pixelSize: Zenon.px(11)
@@ -298,7 +298,7 @@ Item {
           visible: !!tile.n.sealed
           anchors.centerIn: parent
           text: ""
-          color: Zenon.muted
+          color: Zenon.accentMuted
           font.family: Zenon.glyphFace
           font.pixelSize: Zenon.px(28)
         }
@@ -313,7 +313,7 @@ Item {
           horizontalAlignment: Text.AlignHCenter
           elide: Text.ElideRight
           text: (tile.n.pinned ? "\u{F0403} " : "") + N.titleOf(tile.n)
-          color: tile.here ? Zenon.ink : Zenon.soft
+          color: tile.here ? Zenon.ink : Zenon.accentSoft
           font.family: Zenon.face
           font.weight: Font.DemiBold
           font.pixelSize: Zenon.px(13)
@@ -322,7 +322,7 @@ Item {
           width: parent.width
           horizontalAlignment: Text.AlignHCenter
           text: N.dateShort(nl.mgr && nl.mgr.sort === "created" ? tile.n.created : tile.n.modified, Date.now())
-          color: Zenon.muted
+          color: Zenon.accentMuted
           font.family: Zenon.face
           font.weight: Zenon.weight
           font.pixelSize: Zenon.px(11)

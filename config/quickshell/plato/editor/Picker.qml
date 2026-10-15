@@ -606,7 +606,7 @@ PlatoSheet {
       font.family: Zenon.face
       font.weight: Zenon.weight
       font.pixelSize: 14
-      color: picker.grepBusy ? Zenon.cyan : Zenon.muted
+      color: picker.grepBusy ? Zenon.cyan : Zenon.accentMuted
       text: picker.grepBusy ? "searching\u2026 " + (picker.results.length || "")
         : picker.results.length >= 300 ? "first 300"
         : picker.results.length === 0 ? "no matches"
@@ -657,7 +657,7 @@ PlatoSheet {
       font.family: Zenon.face
       font.weight: Zenon.weight
       font.pixelSize: 16
-      color: Zenon.muted
+      color: Zenon.accentMuted
       text: picker.mode === "menu" ? picker.menuTitle
         : picker.mode === "grep" && picker.root !== "" ? "Search in " + picker.tidy(picker.root)
         : (picker.titles[picker.mode] || "")
@@ -786,7 +786,7 @@ PlatoSheet {
         font.family: Zenon.face
         font.weight: Zenon.weight
         font.pixelSize: 13
-        color: Zenon.muted
+        color: Zenon.accentMuted
         text: item.modelData.detail || ""
       }
       // no hover: the bar is the cursor and the keys move it; a click picks
@@ -839,7 +839,7 @@ PlatoSheet {
         .replace(/ /g, "&nbsp;");
       const lines = String(diff || "").split("\n").filter((l) => l !== "").slice(0, 200);
       if (lines.length === 0) { preview.show(key, "empty", ""); return; }
-      const ink = (l) => l.startsWith("@@") ? Zenon.muted : l.startsWith("+") ? Zenon.green
+      const ink = (l) => l.startsWith("@@") ? Zenon.accentMuted : l.startsWith("+") ? Zenon.green
         : l.startsWith("-") ? Zenon.red : Zenon.white;
       preview.show(key, "text", lines.map((l) =>
         "<span style=\"color:" + ink(l) + "\">" + esc(l) + "</span>").join("<br>"));

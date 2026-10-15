@@ -532,7 +532,7 @@ Item {
             }
             color: {
               const r = props.rows[0];
-              return r ? props.host.inkFor(r) : Zenon.muted;
+              return r ? props.host.inkFor(r) : Zenon.accentMuted;
             }
             font.family: specimen ? propFace.font.family
               : Zenon.face
@@ -572,7 +572,7 @@ Item {
             horizontalAlignment: Text.AlignRight
             verticalAlignment: Text.AlignVCenter
             text: "tags"
-            color: Zenon.muted
+            color: Zenon.accentMuted
             font.family: Zenon.face
             font.weight: Zenon.weight
             font.pixelSize: Zenon.px(16)
@@ -627,7 +627,7 @@ Item {
               horizontalAlignment: Text.AlignRight
               verticalAlignment: Text.AlignVCenter
               text: modelData[0]
-              color: Zenon.muted
+              color: Zenon.accentMuted
               font.family: Zenon.face
               font.weight: Zenon.weight
               font.pixelSize: Zenon.px(16)
@@ -655,7 +655,7 @@ Item {
               readonly property bool acts: propValue.askable
                 || propValue.pickable || propValue.opensPerms
               color: propValue.acts
-                ? (sumHov.hovered ? Zenon.cyan : Zenon.keyInk) : Zenon.white
+                ? (sumHov.hovered ? Zenon.cyan : Zenon.accentKey) : Zenon.white
               font.family: Zenon.face
               font.weight: Zenon.weight
               font.pixelSize: Zenon.px(16)
@@ -832,7 +832,7 @@ Item {
             Text {
               anchors.centerIn: parent
               text: modelData[0]
-              color: parent.on ? Zenon.cyan : Zenon.muted
+              color: parent.on ? Zenon.cyan : Zenon.accentMuted
               font.family: Zenon.faceMono
               font.weight: Zenon.weight
               font.pixelSize: Zenon.px(14)
@@ -938,7 +938,7 @@ Item {
                 Text {
                   anchors.centerIn: parent
                   text: modelData[0]
-                  color: parent.parent.on ? Zenon.cyan : Zenon.muted
+                  color: parent.parent.on ? Zenon.cyan : Zenon.accentMuted
                   font.family: Zenon.faceMono
                   font.weight: Font.Bold
                   font.pixelSize: Zenon.px(16)
@@ -964,7 +964,7 @@ Item {
             horizontalAlignment: Text.AlignHCenter
             verticalAlignment: Text.AlignVCenter
             text: String((props.permMode >> permRow.shift) & 7)
-            color: Zenon.muted
+            color: Zenon.accentMuted
             font.family: Zenon.faceMono
             font.weight: Zenon.weight
             font.pixelSize: Zenon.px(15)
@@ -998,7 +998,7 @@ Item {
 
           DialogButton {
             label: "Revert"
-            ink: Zenon.muted
+            ink: Zenon.accentMuted
             onClicked: props.permMode = props.permWas
           }
 
@@ -1053,7 +1053,7 @@ Item {
         DialogButton {
           visible: props.tab === 1
           label: "Back"
-          ink: Zenon.muted
+          ink: Zenon.accentMuted
           onClicked: props.tab = 0
         }
 

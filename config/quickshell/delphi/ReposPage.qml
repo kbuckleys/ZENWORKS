@@ -396,7 +396,7 @@ Item {
           x: 24
           anchors.verticalCenter: parent.verticalCenter
           text: ""
-          color: parent.lostAs !== "" ? Zenon.yellow : parent.here ? Zenon.cyan : Zenon.muted
+          color: parent.lostAs !== "" ? Zenon.yellow : parent.here ? Zenon.cyan : Zenon.accentMuted
           font.family: Zenon.glyphFace
           font.pixelSize: Zenon.px(17)
         }
@@ -413,7 +413,7 @@ Item {
             visible: !!tail.hub
             anchors.verticalCenter: parent.verticalCenter
             text: tail.hub && D.FORGES[tail.hub.forge] ? D.FORGES[tail.hub.forge].glyph : ""
-            color: Zenon.muted
+            color: Zenon.accentMuted
             font.family: Zenon.glyphFace
             font.pixelSize: Zenon.px(15)
           }
@@ -446,12 +446,12 @@ Item {
               const dot = "&nbsp;&nbsp;·&nbsp;&nbsp;";
               // what needs doing first: a long path would elide it away
               const parts = needs.map((a) => "<font color='" + Zenon.hex(Zenon[a.ink]) + "'>" + D.esc(a.word) + "</font>");
-              if (sum && sum.branch) parts.push("<font color='" + Zenon.hex(Zenon.soft) + "'>" + D.esc(sum.branch) + "</font>");
+              if (sum && sum.branch) parts.push("<font color='" + Zenon.hex(Zenon.accentSoft) + "'>" + D.esc(sum.branch) + "</font>");
               if (needs.length === 0 && rrow.r.at) parts.push(D.ago(Math.floor(rrow.r.at / 1000), Date.now()));
               parts.push(D.esc(D.tilde(rrow.r.root, pg.win.home)));
               return parts.join(dot);
             }
-            color: Zenon.muted
+            color: Zenon.accentMuted
             font.family: Zenon.face
             font.weight: Zenon.weight
             font.pixelSize: Zenon.px(13)

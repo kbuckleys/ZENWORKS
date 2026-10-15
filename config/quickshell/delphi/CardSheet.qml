@@ -70,7 +70,7 @@ Item {
     const id = ++deck.cardN;
     // every answer speaks in a colour: one left without drew in Qt's default
     // black, heavier than the rest (the sign-in card's Copy, 2026-10-10)
-    const choices = (c.choices || []).map((ch) => Object.assign({ ink: Zenon.muted }, ch));
+    const choices = (c.choices || []).map((ch) => Object.assign({ ink: Zenon.accentMuted }, ch));
     deck.sheetQueue = deck.sheetQueue.concat([Object.assign({ kind: "confirm", id: id }, c, { choices: choices })]);
     return id;
   }
@@ -79,7 +79,7 @@ Item {
     return deck.card_({ question: c.question, glyph: c.glyph || "", ink: c.ink || Zenon.cyan,
       detail: c.detail || "", items: c.items || [],
       choices: [{ label: c.verb || "OK", ink: c.ink || Zenon.cyan, run: c.then || null },
-                { label: "Cancel", ink: Zenon.muted, run: c.cancel || null }] });
+                { label: "Cancel", ink: Zenon.accentMuted, run: c.cancel || null }] });
   }
   function ask(form) {
     const id = ++deck.cardN;

@@ -45,7 +45,7 @@ Rectangle {
     id: getText
     anchors.centerIn: parent
     text: get.word
-    color: get.ready ? Zenon.cyan : Zenon.muted
+    color: get.ready ? Zenon.cyan : Zenon.accentMuted
     font.family: Zenon.face
     font.weight: Font.Bold
     font.pixelSize: Zenon.px(get.big ? 16 : 14)

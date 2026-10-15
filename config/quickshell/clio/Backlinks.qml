@@ -24,7 +24,7 @@ Column {
     topPadding: 10
     bottomPadding: 4
     text: "\u{F0339}  Linked from"
-    color: Zenon.muted
+    color: Zenon.accentMuted
     font.family: Zenon.face
     font.weight: Font.Bold
     font.pixelSize: Zenon.px(12)
@@ -62,7 +62,7 @@ Column {
         Text {
           anchors.verticalCenter: parent.verticalCenter
           text: N.dateShort(row.modelData.modified, Date.now())
-          color: Zenon.muted
+          color: Zenon.accentMuted
           font.family: Zenon.face
           font.weight: Zenon.weight
           font.pixelSize: Zenon.px(12)

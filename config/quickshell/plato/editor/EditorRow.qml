@@ -170,7 +170,7 @@ Item {
   }
   function calloutInk(k) {
     return k === "note" ? Zenon.blue : k === "tip" ? Zenon.green : k === "important" ? Zenon.magenta
-      : k === "warning" ? Zenon.yellow : k === "caution" ? Zenon.red : Zenon.muted;
+      : k === "warning" ? Zenon.yellow : k === "caution" ? Zenon.red : Zenon.accentMuted;
   }
   function has(e, c) { return !!e && e.indexOf(c) >= 0; }
   // the glyph for a code block's language: the file tree's, for a file of it
@@ -243,14 +243,14 @@ Item {
         text: g
         font.family: row.face.family
         font.pixelSize: Math.round(row.face.pixelSize * 0.85)
-        color: Zenon.muted
+        color: Zenon.accentMuted
         anchors.verticalCenter: parent.verticalCenter
       }
       Text {
         text: parent.visible ? row.md.lang : ""
         font.family: row.face.family
         font.pixelSize: Math.round(row.face.pixelSize * 0.8)
-        color: Zenon.muted
+        color: Zenon.accentMuted
         anchors.verticalCenter: parent.verticalCenter
       }
     }
@@ -282,7 +282,7 @@ Item {
       required property int index
       readonly property bool atTop: row.has(row.mdQ.e, "t")
       readonly property bool atBottom: row.has(row.mdQ.e, "b")
-      readonly property color ink: index === 0 && row.mdQ.k ? row.calloutInk(row.mdQ.k) : Zenon.muted
+      readonly property color ink: index === 0 && row.mdQ.k ? row.calloutInk(row.mdQ.k) : Zenon.accentMuted
       x: Math.round(row.textX + modelData * row.cellW + row.cellW * 0.3)
       y: atTop ? 3 : 0
       width: 3
@@ -311,7 +311,7 @@ Item {
       color: !tableFrame.visible ? "transparent" : row.mdT.h ? Zenon.wash(0.07)
         : row.mdT.z ? Zenon.wash(0.035) : Zenon.wash(0.012)
       border.width: 1
-      border.color: Zenon.alpha(Zenon.muted, 0.65)
+      border.color: Zenon.alpha(Zenon.accentMuted, 0.65)
     }
     // the columns' rules, one line down the whole table
     Repeater {
@@ -321,7 +321,7 @@ Item {
         x: Math.round((modelData - row.mdT.x - 0.5) * row.cellW)
         width: 1
         height: row.cellH
-        color: Zenon.alpha(Zenon.muted, 0.65)
+        color: Zenon.alpha(Zenon.accentMuted, 0.65)
       }
     }
     // the rule under the header (its --- row is hidden), or across that
@@ -331,7 +331,7 @@ Item {
       y: row.mdT && row.mdT.u ? row.cellH - 1 : Math.round(row.cellH / 2)
       width: parent.width
       height: 1
-      color: Zenon.alpha(Zenon.muted, 0.85)
+      color: Zenon.alpha(Zenon.accentMuted, 0.85)
     }
   }
 
@@ -344,9 +344,9 @@ Item {
     height: 1
     gradient: Gradient {
       orientation: Gradient.Horizontal
-      GradientStop { position: 0; color: Qt.rgba(Zenon.muted.r, Zenon.muted.g, Zenon.muted.b, 0) }
-      GradientStop { position: 0.5; color: Zenon.muted }
-      GradientStop { position: 1; color: Qt.rgba(Zenon.muted.r, Zenon.muted.g, Zenon.muted.b, 0) }
+      GradientStop { position: 0; color: Qt.rgba(Zenon.accentMuted.r, Zenon.accentMuted.g, Zenon.accentMuted.b, 0) }
+      GradientStop { position: 0.5; color: Zenon.accentMuted }
+      GradientStop { position: 1; color: Qt.rgba(Zenon.accentMuted.r, Zenon.accentMuted.g, Zenon.accentMuted.b, 0) }
     }
   }
 
@@ -441,7 +441,7 @@ Item {
     horizontalAlignment: Text.AlignHCenter
     verticalAlignment: Text.AlignVCenter
     text: row.info.fo === 2 ? "\uf10c" : "\uf111"
-    color: Zenon.muted
+    color: Zenon.accentMuted
     font.family: Zenon.glyphMono
     font.weight: Zenon.weight
     // the tree's 14 px at its own zoom; here, the editor's text size
@@ -486,7 +486,7 @@ Item {
       x: Math.floor(row.textX + modelData * row.cellW + row.cellW / 2)
       width: 1
       height: row.cellH
-      color: Zenon.muted
+      color: Zenon.accentMuted
       opacity: lit ? 1 : 0.55
     }
   }

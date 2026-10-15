@@ -1255,7 +1255,7 @@ PopupWindow {
               anchors.verticalCenter: parent.verticalCenter
               visible: !modelData.sep && !modelData.swatch && !!modelData.strike
               text: "\uf00d"   // nf-fa-times
-              color: strikeHov.hovered ? Zenon.red : Zenon.muted
+              color: strikeHov.hovered ? Zenon.red : Zenon.accentMuted
               font.family: Zenon.faceMono
               font.weight: Zenon.weight
               font.pixelSize: Zenon.px(14)
@@ -1586,7 +1586,7 @@ PopupWindow {
                 text: modelData.hint || ""
                 elide: Text.ElideRight
                 horizontalAlignment: Text.AlignRight
-                color: Zenon.muted
+                color: Zenon.accentMuted
                 font.family: Zenon.face
                 font.weight: Zenon.weight
                 font.pixelSize: Zenon.px(13)

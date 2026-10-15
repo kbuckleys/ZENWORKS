@@ -576,7 +576,7 @@ Item {
             Rectangle {
               anchors.centerIn: parent
               width: [5, 9, 14][index]; height: width; radius: width / 2
-              color: ann.size === index ? Zenon.white : Zenon.muted
+              color: ann.size === index ? Zenon.white : Zenon.accentMuted
             }
             MouseArea {
               anchors.fill: parent
@@ -602,7 +602,7 @@ Item {
           radius: ann.rounded ? 4 : 0
           color: "transparent"
           border.width: 1.5
-          border.color: ann.rounded ? Zenon.white : Zenon.muted
+          border.color: ann.rounded ? Zenon.white : Zenon.accentMuted
           Behavior on radius { NumberAnimation { duration: Zenon.fast } }
         }
         MouseArea {
@@ -631,7 +631,7 @@ Item {
             Text {
               anchors.centerIn: parent
               text: modelData[0]
-              color: can ? Zenon.white : Zenon.muted
+              color: can ? Zenon.white : Zenon.accentMuted
               font.family: Zenon.face
               font.weight: Zenon.weight
               font.pixelSize: Zenon.px(15)
@@ -672,7 +672,7 @@ Item {
         font.pixelSize: Zenon.px(13)
         rightPadding: 6
       }
-      DialogButton { label: "Copy"; ink: Zenon.muted; onClicked: ann.copy() }
+      DialogButton { label: "Copy"; ink: Zenon.accentMuted; onClicked: ann.copy() }
       DialogButton { label: "Save New"; ink: Zenon.white; onClicked: ann.saveNew() }
       DialogButton { label: "Save"; ink: Zenon.cyan; primary: true; ready: ann.dirty
                      onClicked: ann.saveTo(ann.path) }
@@ -688,7 +688,7 @@ Item {
       visible: bar.tight
       Repeater {
         model: [
-          { g: "\uf0c5", name: "Copy", key: "", ink: Zenon.muted, live: true, act: () => ann.copy() },
+          { g: "\uf0c5", name: "Copy", key: "", ink: Zenon.accentMuted, live: true, act: () => ann.copy() },
           { g: "\uf0c7", name: "Save New", key: "", ink: Zenon.white, live: true, act: () => ann.saveNew() },
           { g: "\uf00c", name: "Save", key: "", ink: Zenon.cyan, live: ann.dirty, act: () => ann.saveTo(ann.path) }
         ]
@@ -699,7 +699,7 @@ Item {
           Text {
             anchors.centerIn: parent
             text: modelData.g
-            color: modelData.live ? modelData.ink : Zenon.muted
+            color: modelData.live ? modelData.ink : Zenon.accentMuted
             opacity: modelData.live ? 1 : 0.5
             font.family: Zenon.face
             font.weight: Zenon.weight
@@ -1146,7 +1146,7 @@ Item {
         id: cropHint
         anchors.centerIn: parent
         text: "return apply  ·  esc cancel  ·  ⌫ whole picture  ·  shift square"
-        color: Zenon.muted
+        color: Zenon.accentMuted
         font.family: Zenon.face
         font.weight: Zenon.weight
         font.pixelSize: Zenon.px(12)
@@ -1184,7 +1184,7 @@ Item {
         anchors.bottom: parent.bottom
         anchors.margins: 14
         spacing: 8
-        DialogButton { label: "Keep editing"; ink: Zenon.muted; onClicked: discard.open = false }
+        DialogButton { label: "Keep editing"; ink: Zenon.accentMuted; onClicked: discard.open = false }
         DialogButton { label: "Discard"; ink: Zenon.red; primary: true
                        onClicked: { discard.open = false; ann.dirty = false; ann.finished(); } }
       }

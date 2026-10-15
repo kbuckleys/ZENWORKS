@@ -107,9 +107,9 @@ Item {
     return "";
   }
   function stateInk(p) {
-    if (!p) return Zenon.muted;
+    if (!p) return Zenon.accentMuted;
     return p.state === "linked" ? Zenon.green : p.state === "tolink" ? Zenon.cyan
-      : p.state === "conflicts" || p.state === "error" ? Zenon.red : Zenon.muted;
+      : p.state === "conflicts" || p.state === "error" ? Zenon.red : Zenon.accentMuted;
   }
   function cmd(how) { return pg.pkg ? D.stowCommand(pg.win.root, pg.target, pg.pkg.name, how, pg.win.home) : ""; }
   // the command for the package as it stands: link it, or undo the links
@@ -221,7 +221,7 @@ Item {
             width: parent.width
             elide: Text.ElideRight
             text: prow.p.name
-            color: prow.index === pg.sel ? Zenon.ink : Zenon.soft
+            color: prow.index === pg.sel ? Zenon.ink : Zenon.accentSoft
             font.family: Zenon.face
             font.weight: Zenon.weight
             font.pixelSize: Zenon.px(16)
@@ -235,7 +235,7 @@ Item {
               + "  ·  " + prow.p.files + (prow.p.files === 1 ? " file" : " files")
               + (prow.p.dotted || prow.p.state === "empty" ? "" : "  ·  not laid out like a home")
             textFormat: Text.StyledText
-            color: Zenon.muted
+            color: Zenon.accentMuted
             font.family: Zenon.face
             font.weight: Zenon.weight
             font.features: { "tnum": 1 }
@@ -270,7 +270,7 @@ Item {
         text: pg.info && !pg.info.stow
           ? "Reading what your packages would do takes GNU Stow"
           : "No packages here. A package is a directory laid out like your home — kitty/.config/kitty/kitty.conf — and Copy into a package makes one."
-        color: Zenon.muted
+        color: Zenon.accentMuted
         font.family: Zenon.face
         font.weight: Zenon.weight
         font.pixelSize: Zenon.px(15)
@@ -322,7 +322,7 @@ Item {
         : pg.pkg.state === "tolink" ? "Stow would link these into " + D.tilde(pg.target, pg.win.home) + ". Nothing of yours is in the way."
         : pg.pkg.state === "empty" ? "Nothing in it yet."
         : ""
-      color: Zenon.muted
+      color: Zenon.accentMuted
       font.family: Zenon.face
       font.weight: Zenon.weight
       font.pixelSize: Zenon.px(14)
@@ -386,7 +386,7 @@ Item {
               id: cwhy
               width: parent.width
               text: crow.modelData[1]
-              color: Zenon.muted
+              color: Zenon.accentMuted
               font.family: Zenon.face
               font.weight: Zenon.weight
               font.pixelSize: Zenon.px(13)

@@ -188,7 +188,7 @@ Item {
           anchors.verticalCenter: parent.verticalCenter
           visible: field.pw.length === 0 && !field.busy
           text: field.failed ? "wrong password" : field.prompt
-          color: field.failed ? Zenon.red : Zenon.muted
+          color: field.failed ? Zenon.red : Zenon.accentMuted
           font.family: Zenon.face
           font.weight: Zenon.weight
           font.pixelSize: 14 + field.grow
@@ -238,7 +238,7 @@ Item {
         elide: Text.ElideRight
         visible: field.purpose !== ""
         text: field.purpose
-        color: Zenon.keyInk
+        color: Zenon.accentKey
         font.family: Zenon.face
         font.weight: Zenon.weight
         font.pixelSize: 12 + field.grow

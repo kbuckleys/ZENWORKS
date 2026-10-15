@@ -79,7 +79,7 @@ Item {
       width: parent.width
       elide: Text.ElideRight
       text: card.app ? card.app.summary : ""
-      color: Zenon.muted
+      color: Zenon.accentMuted
       font.family: Zenon.face
       font.weight: Zenon.weight
       font.pixelSize: Zenon.px(13)

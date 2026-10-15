@@ -62,7 +62,7 @@ Item {
         width: parent.width
         wrapMode: Text.Wrap
         text: "With nothing asked of calypso for that long. Locking the screen locks it at once, whatever this says."
-        color: Zenon.muted
+        color: Zenon.accentMuted
         font.family: Zenon.face
         font.weight: Zenon.weight
         font.pixelSize: Zenon.px(12)
@@ -88,7 +88,7 @@ Item {
         width: parent.width
         wrapMode: Text.Wrap
         text: "Passwords, codes and keys copied from calypso are marked sensitive: the clipboard history (Folio, cliphist) never keeps them."
-        color: Zenon.muted
+        color: Zenon.accentMuted
         font.family: Zenon.face
         font.weight: Zenon.weight
         font.pixelSize: Zenon.px(12)

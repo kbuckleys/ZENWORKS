@@ -21,7 +21,7 @@ Row {
   property int count: -1
   property string note: ""
   property int inset: 22
-  property color ink: Zenon.muted
+  property color ink: Zenon.accentMuted
   x: head.inset
   anchors.verticalCenter: parent ? parent.verticalCenter : undefined
   anchors.verticalCenterOffset: 4
@@ -47,7 +47,7 @@ Row {
   Text {
     visible: head.note !== ""
     text: head.note
-    color: Zenon.muted
+    color: Zenon.accentMuted
     opacity: 0.8
     font.family: Zenon.face
     font.weight: Zenon.weight

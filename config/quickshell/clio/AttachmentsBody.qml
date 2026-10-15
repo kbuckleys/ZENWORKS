@@ -119,7 +119,7 @@ Item {
         Column {
           anchors.verticalCenter: parent.verticalCenter
           Text { text: modelData.b.name || "file"; color: Zenon.ink; font.family: Zenon.face; font.weight: Font.DemiBold; font.pixelSize: Zenon.px(14) }
-          Text { text: N.sizeText(modelData.b.size) + "  ·  in " + N.titleOf(modelData.note, "an entry"); color: Zenon.muted; font.family: Zenon.face; font.weight: Zenon.weight; font.pixelSize: Zenon.px(12) }
+          Text { text: N.sizeText(modelData.b.size) + "  ·  in " + N.titleOf(modelData.note, "an entry"); color: Zenon.accentMuted; font.family: Zenon.face; font.weight: Zenon.weight; font.pixelSize: Zenon.px(12) }
         }
       }
       MouseArea {

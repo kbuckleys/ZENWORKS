@@ -67,7 +67,7 @@ Rectangle {
   property Item hereCell: null
 
   // the ink of "this is where you are", as terminus writes its active tab
-  readonly property color hereInk: Zenon.keyInk
+  readonly property color hereInk: Zenon.accentKey
 
   // ── carrying one along the strip ───────────────────────────────────
   // As terminus: the order is not touched until the tab is let go. The drag
@@ -170,7 +170,7 @@ Rectangle {
           elide: Text.ElideMiddle
           textFormat: Text.PlainText
           text: ghost.name
-          color: Zenon.muted
+          color: Zenon.accentMuted
           font.family: Zenon.face
           font.weight: Zenon.weight
           font.pixelSize: tabStrip.face.pixelSize

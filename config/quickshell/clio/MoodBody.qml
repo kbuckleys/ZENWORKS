@@ -21,7 +21,7 @@ Column {
   property var words: []
   property var about: []
   readonly property var mood: N.moodOf(mb.v)
-  readonly property color ink: Zenon[mb.mood.ink] || Zenon.muted
+  readonly property color ink: Zenon[mb.mood.ink] || Zenon.accentMuted
 
   // what the entry already says, each time the sheet comes up
   onNChanged: mb.reset()
@@ -63,7 +63,7 @@ Column {
       gradient: Gradient {
         orientation: Gradient.Horizontal
         GradientStop { position: 0; color: Zenon.magenta }
-        GradientStop { position: 0.5; color: Zenon.muted }
+        GradientStop { position: 0.5; color: Zenon.accentMuted }
         GradientStop { position: 1; color: Zenon.yellow }
       }
     }
@@ -82,7 +82,7 @@ Column {
           width: parent.on ? 34 : 18
           height: width
           radius: width / 2
-          color: Zenon[modelData.ink] || Zenon.muted
+          color: Zenon[modelData.ink] || Zenon.accentMuted
           border.width: parent.on ? 3 : 0
           border.color: Zenon.ink
           Behavior on width { NumberAnimation { duration: Zenon.fast; easing.type: Easing.OutBack } }
@@ -94,7 +94,7 @@ Column {
       anchors.bottom: parent.bottom
       anchors.horizontalCenter: parent.horizontalCenter
       text: mb.chosen ? mb.mood.label : "Choose a place on the scale"
-      color: mb.chosen ? mb.ink : Zenon.muted
+      color: mb.chosen ? mb.ink : Zenon.accentMuted
       font.family: Zenon.face
       font.weight: Font.Bold
       font.pixelSize: Zenon.px(15)
@@ -103,7 +103,7 @@ Column {
   Text {
     visible: mb.chosen
     text: "What best describes it?"
-    color: Zenon.muted
+    color: Zenon.accentMuted
     font.family: Zenon.face
     font.weight: Font.DemiBold
     font.pixelSize: Zenon.px(13)
@@ -120,7 +120,7 @@ Column {
   Text {
     visible: mb.chosen
     text: "What is having the biggest impact?"
-    color: Zenon.muted
+    color: Zenon.accentMuted
     font.family: Zenon.face
     font.weight: Font.DemiBold
     font.pixelSize: Zenon.px(13)

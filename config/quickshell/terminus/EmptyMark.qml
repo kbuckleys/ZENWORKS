@@ -35,7 +35,7 @@ Column {
     anchors.horizontalCenter: parent.horizontalCenter
     // nf-fa-search
     text: mark.filtered ? "" : ""
-    color: Zenon.muted
+    color: Zenon.accentMuted
     opacity: 0.35
     font.family: Zenon.face
     font.weight: Zenon.weight
@@ -45,7 +45,7 @@ Column {
   Text {
     anchors.horizontalCenter: parent.horizontalCenter
     text: mark.word !== "" ? mark.word : mark.filtered ? "No matches" : "Empty"
-    color: Zenon.muted
+    color: Zenon.accentMuted
     font.family: Zenon.face
     font.weight: Font.Bold
     font.pixelSize: Zenon.px(15)

@@ -88,7 +88,7 @@ Item {
           }
           Text {
             text: "Every open account, read here on this machine — nothing about your passwords leaves it"
-            color: Zenon.muted
+            color: Zenon.accentMuted
             font.family: Zenon.face
             font.weight: Zenon.weight
             font.pixelSize: Zenon.px(13)
@@ -115,7 +115,7 @@ Item {
             radius: Zenon.windowRadius + 6
             color: press.pressed ? Zenon.wash(0.12) : Zenon.wash(0.04)
             border.width: 1
-            border.color: card.n > 0 ? Zenon.alpha(Zenon[modelData.ink] || Zenon.muted, 0.5) : Zenon.border
+            border.color: card.n > 0 ? Zenon.alpha(Zenon[modelData.ink] || Zenon.accentMuted, 0.5) : Zenon.border
             Column {
               x: 16
               y: 14
@@ -142,7 +142,7 @@ Item {
                 maximumLineCount: 2
                 elide: Text.ElideRight
                 text: card.modelData.say
-                color: Zenon.muted
+                color: Zenon.accentMuted
                 font.family: Zenon.face
                 font.weight: Zenon.weight
                 font.pixelSize: Zenon.px(12)
@@ -184,7 +184,7 @@ Item {
             width: parent.width
             wrapMode: Text.Wrap
             text: "Asks Have I Been Pwned whether each password has turned up in a breach. Only the first five characters of each password's SHA-1 hash are sent; the answer is compared here, so neither a password nor its whole hash ever leaves this machine."
-            color: Zenon.muted
+            color: Zenon.accentMuted
             font.family: Zenon.face
             font.weight: Zenon.weight
             font.pixelSize: Zenon.px(13)

@@ -720,7 +720,7 @@ FloatingWindow {
           anchors.leftMargin: 13
           anchors.verticalCenter: parent.verticalCenter
           text: ""
-          color: Zenon.muted
+          color: Zenon.accentMuted
           font.family: Zenon.glyphFace
           font.pixelSize: Zenon.px(13)
         }
@@ -747,7 +747,7 @@ FloatingWindow {
             anchors.verticalCenter: parent.verticalCenter
             text: win.mgr && win.mgr.families.length > 0
               ? "Search " + win.mgr.families.length + " families" : "Reading the fonts…"
-            color: Zenon.muted
+            color: Zenon.accentMuted
             font: famField.font
           }
         }
@@ -874,7 +874,7 @@ FloatingWindow {
             anchors.baselineOffset: 26
             elide: Text.ElideRight
             text: famRow.modelData.name
-            color: famRow.index === win.sel ? Zenon.ink : Zenon.soft
+            color: famRow.index === win.sel ? Zenon.ink : Zenon.accentSoft
             font.family: famRow.faced && famRow.rep ? famRow.rep.family : Zenon.face
             font.styleName: famRow.faced && famRow.rep ? famRow.rep.style : ""
             font.pixelSize: 19
@@ -893,7 +893,7 @@ FloatingWindow {
               else if (f.user) bits.push("yours");
               return bits.join("  ·  ");
             }
-            color: Zenon.muted
+            color: Zenon.accentMuted
             font.family: Zenon.face
             font.weight: Zenon.weight
             font.pixelSize: Zenon.px(11)
@@ -1014,7 +1014,7 @@ FloatingWindow {
             ? A.styleLabel(win.fam, win.style) + "  ·  " + A.weightName(win.style.css) + " " + win.style.css
               + (win.style.mono ? "  ·  monospaced" : "") + (win.picking ? "  ·  " + win.picking.title : "")
             : ""
-          color: win.picking ? Zenon.cyan : Zenon.muted
+          color: win.picking ? Zenon.cyan : Zenon.accentMuted
           font.family: Zenon.face
           font.weight: Zenon.weight
           font.pixelSize: Zenon.px(13)
@@ -1053,7 +1053,7 @@ FloatingWindow {
           Text {
             anchors.centerIn: parent
             text: win.fav ? "\uF02E" : "\uF097"
-            color: win.fav ? Zenon.sand : Zenon.muted
+            color: win.fav ? Zenon.sand : Zenon.accentMuted
             font.family: Zenon.glyphFace
             font.pixelSize: Zenon.px(15)
           }
@@ -1074,7 +1074,7 @@ FloatingWindow {
           anchors.verticalCenter: parent.verticalCenter
           height: 32
           textSize: Zenon.px(16)
-          ink: Zenon.keyInk
+          ink: Zenon.accentKey
           // [value, label] only: a third field is a note under the word in
           // Segments (since 2026-10-14), so the glyph goes before it instead
           options: win.pages.map((p) => [p[0], p[1]])
@@ -1190,7 +1190,7 @@ FloatingWindow {
                   Text {
                     anchors.centerIn: parent
                     text: tool.modelData[0]
-                    color: toolMa.containsMouse ? Zenon.cyan : Zenon.muted
+                    color: toolMa.containsMouse ? Zenon.cyan : Zenon.accentMuted
                     font.family: Zenon.glyphFace
                     font.pixelSize: Zenon.px(13)
                   }
@@ -1214,7 +1214,7 @@ FloatingWindow {
             Text {
               text: win.langs.length === 1 ? "1 LANGUAGE  ·  " + win.langs[0].label.toUpperCase()
                 : win.langs.length + " LANGUAGES"
-              color: Zenon.muted
+              color: Zenon.accentMuted
               font.family: Zenon.face
               font.weight: Font.Bold
               font.letterSpacing: 1.2
@@ -1242,7 +1242,7 @@ FloatingWindow {
                     id: langText
                     anchors.centerIn: parent
                     text: langChip.modelData.label
-                    color: langChip.here ? Zenon.cyan : Zenon.soft
+                    color: langChip.here ? Zenon.cyan : Zenon.accentSoft
                     font.family: win.style ? win.style.family : Zenon.face
                     font.styleName: win.style ? win.style.style : ""
                     font.pixelSize: Zenon.px(14)
@@ -1266,7 +1266,7 @@ FloatingWindow {
             visible: !!win.fam
             Text {
               text: win.fam ? (win.fam.styles.length === 1 ? "1 STYLE" : win.fam.styles.length + " STYLES") : ""
-              color: Zenon.muted
+              color: Zenon.accentMuted
               font.family: Zenon.face
               font.weight: Font.Bold
               font.letterSpacing: 1.2
@@ -1305,7 +1305,7 @@ FloatingWindow {
                   anchors.verticalCenter: parent.verticalCenter
                   elide: Text.ElideRight
                   text: A.styleLabel(win.fam, styleRow.modelData)
-                  color: styleRow.here ? Zenon.cyan : Zenon.muted
+                  color: styleRow.here ? Zenon.cyan : Zenon.accentMuted
                   font.family: Zenon.face
                   font.weight: Zenon.weight
                   font.pixelSize: Zenon.px(12)
@@ -1344,7 +1344,7 @@ FloatingWindow {
             visible: !!win.style
             Text {
               text: "SIZES"
-              color: Zenon.muted
+              color: Zenon.accentMuted
               font.family: Zenon.face
               font.weight: Font.Bold
               font.letterSpacing: 1.2
@@ -1363,7 +1363,7 @@ FloatingWindow {
                   anchors.baseline: fallLine.baseline
                   horizontalAlignment: Text.AlignRight
                   text: fall.modelData
-                  color: Zenon.muted
+                  color: Zenon.accentMuted
                   font.family: Zenon.face
                   font.weight: Zenon.weight
                   font.features: { "tnum": 1 }
@@ -1390,7 +1390,7 @@ FloatingWindow {
             visible: !!win.style
             Text {
               text: "TEXT"
-              color: Zenon.muted
+              color: Zenon.accentMuted
               font.family: Zenon.face
               font.weight: Font.Bold
               font.letterSpacing: 1.2
@@ -1410,7 +1410,7 @@ FloatingWindow {
               width: Math.min(parent.width, 720)
               wrapMode: Text.Wrap
               text: win.script.paragraph
-              color: Zenon.soft
+              color: Zenon.accentSoft
               lineHeight: 1.45
               font.family: win.style ? win.style.family : Zenon.face
               font.styleName: win.style ? win.style.style : ""
@@ -1456,7 +1456,7 @@ FloatingWindow {
             anchors.leftMargin: 13
             anchors.verticalCenter: parent.verticalCenter
             text: ""
-            color: Zenon.muted
+            color: Zenon.accentMuted
             font.family: Zenon.glyphFace
             font.pixelSize: Zenon.px(13)
           }
@@ -1482,7 +1482,7 @@ FloatingWindow {
               visible: glyphField.text === ""
               anchors.verticalCenter: parent.verticalCenter
               text: "Search by name, codepoint or character — folder, U+F031, →"
-              color: Zenon.muted
+              color: Zenon.accentMuted
               font: glyphField.font
               elide: Text.ElideRight
               width: glyphField.width
@@ -1495,7 +1495,7 @@ FloatingWindow {
             anchors.verticalCenter: parent.verticalCenter
             text: win.gix.count === win.charset.count ? win.charset.count + " glyphs"
               : win.gix.count + " of " + win.charset.count
-            color: Zenon.muted
+            color: Zenon.accentMuted
             font.family: Zenon.face
             font.weight: Zenon.weight
             font.features: { "tnum": 1 }
@@ -1570,7 +1570,7 @@ FloatingWindow {
               anchors.bottom: parent.bottom
               anchors.bottomMargin: 6
               text: A.hex(gcell.cp)
-              color: gcell.here ? Zenon.cyan : Zenon.muted
+              color: gcell.here ? Zenon.cyan : Zenon.accentMuted
               font.family: Zenon.faceMono
               font.weight: Zenon.weight
               font.pixelSize: 10
@@ -1648,7 +1648,7 @@ FloatingWindow {
               width: parent.width
               elide: Text.ElideRight
               text: A.uplus(win.gcp) + "  ·  " + (A.blockName(win.gcp, win.mgr ? win.mgr.blocks : []) || "—")
-              color: Zenon.muted
+              color: Zenon.accentMuted
               font.family: Zenon.face
               font.weight: Zenon.weight
               font.pixelSize: Zenon.px(12)
@@ -1667,7 +1667,7 @@ FloatingWindow {
                   anchors.leftMargin: 10
                   anchors.verticalCenter: parent.verticalCenter
                   text: spell.modelData.label
-                  color: Zenon.muted
+                  color: Zenon.accentMuted
                   font.family: Zenon.face
                   font.weight: Zenon.weight
                   font.pixelSize: Zenon.px(12)
@@ -1691,7 +1691,7 @@ FloatingWindow {
                   anchors.rightMargin: 10
                   anchors.verticalCenter: parent.verticalCenter
                   text: ""
-                  color: spellMa.containsMouse ? Zenon.cyan : Zenon.muted
+                  color: spellMa.containsMouse ? Zenon.cyan : Zenon.accentMuted
                   font.family: Zenon.glyphFace
                   font.pixelSize: Zenon.px(11)
                 }
@@ -1711,7 +1711,7 @@ FloatingWindow {
             anchors.topMargin: 18
             x: 18
             text: "GROUPS"
-            color: Zenon.muted
+            color: Zenon.accentMuted
             font.family: Zenon.face
             font.weight: Font.Bold
             font.letterSpacing: 1.2
@@ -1746,7 +1746,7 @@ FloatingWindow {
                 anchors.verticalCenter: parent.verticalCenter
                 elide: Text.ElideRight
                 text: grow.modelData.name
-                color: grow.here ? Zenon.ink : Zenon.soft
+                color: grow.here ? Zenon.ink : Zenon.accentSoft
                 font.family: Zenon.face
                 font.weight: Zenon.weight
                 font.pixelSize: Zenon.px(13)
@@ -1757,7 +1757,7 @@ FloatingWindow {
                 anchors.rightMargin: 10
                 anchors.verticalCenter: parent.verticalCenter
                 text: grow.modelData.count
-                color: Zenon.muted
+                color: Zenon.accentMuted
                 font.family: Zenon.face
                 font.weight: Zenon.weight
                 font.features: { "tnum": 1 }
@@ -1838,7 +1838,7 @@ FloatingWindow {
                 Text {
                   width: 120
                   text: factRow.modelData[0]
-                  color: Zenon.muted
+                  color: Zenon.accentMuted
                   font.family: Zenon.face
                   font.weight: Zenon.weight
                   font.pixelSize: Zenon.px(13)
@@ -1863,7 +1863,7 @@ FloatingWindow {
             visible: !!win.fam
             Text {
               text: win.fam ? (win.fam.files.length === 1 ? "1 FILE" : win.fam.files.length + " FILES") : ""
-              color: Zenon.muted
+              color: Zenon.accentMuted
               font.family: Zenon.face
               font.weight: Font.Bold
               font.letterSpacing: 1.2
@@ -1887,7 +1887,7 @@ FloatingWindow {
                   anchors.verticalCenter: parent.verticalCenter
                   elide: Text.ElideMiddle
                   text: fileRow.modelData
-                  color: win.style && win.style.file === fileRow.modelData ? Zenon.cyan : Zenon.soft
+                  color: win.style && win.style.file === fileRow.modelData ? Zenon.cyan : Zenon.accentSoft
                   font.family: Zenon.faceMono
                   font.weight: Zenon.weight
                   font.pixelSize: Zenon.px(12)
@@ -1897,7 +1897,7 @@ FloatingWindow {
                   anchors.rightMargin: 10
                   anchors.verticalCenter: parent.verticalCenter
                   text: ""
-                  color: fileMa.containsMouse ? Zenon.cyan : Zenon.muted
+                  color: fileMa.containsMouse ? Zenon.cyan : Zenon.accentMuted
                   font.family: Zenon.glyphFace
                   font.pixelSize: Zenon.px(12)
                 }
@@ -2053,7 +2053,7 @@ FloatingWindow {
       // one family: its files; many: the families, the files under each counted
       items: win.removeFams.length === 1 ? win.removable.map((f) => f.replace(/.*\//, ""))
         : win.removeFams.map((f) => f.name + (f.files.length > 1 ? "  \u00b7  " + f.files.length + " files" : ""))
-      choices: [{ label: "Remove", ink: Zenon.red }, { label: "Cancel", ink: Zenon.muted }]
+      choices: [{ label: "Remove", ink: Zenon.red }, { label: "Cancel", ink: Zenon.accentMuted }]
       pick: win.askPick
       onPicked: (i) => win.askPick = i
       onChose: (i) => win.answer(i === 0)

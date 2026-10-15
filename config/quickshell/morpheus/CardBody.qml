@@ -164,7 +164,7 @@ Item {
             // `danger` is for a row that is ARMED — one that has been clicked
             // once and is waiting to be confirmed. Arming is not an event, so it
             // does not flash; the row going red is the reply.
-            readonly property color ink: !row.on ? Zenon.muted
+            readonly property color ink: !row.on ? Zenon.accentMuted
               : ((row.modelData.danger || false) ? Zenon.red : Zenon.white)
             // Lit by the pointer, OR because the card it opened is still up.
             // A branch you are standing inside is still the row you came from,
@@ -270,7 +270,7 @@ Item {
                 anchors.verticalCenter: parent.verticalCenter
                 width: text === "" ? 0 : implicitWidth
                 text: row.modelData.hint || ""
-                color: Zenon.muted
+                color: Zenon.accentMuted
                 font.family: Zenon.face
                 font.weight: Zenon.weight
                 font.pixelSize: Zenon.px(13)
@@ -299,7 +299,7 @@ Item {
                 // like a disabled row.
                 color: (row.modelData.mark || false) ? Zenon.cyan
                   : (row.branch ? Zenon.white
-                    : Zenon.muted)
+                    : Zenon.accentMuted)
                 font.family: Zenon.face
                 font.weight: Zenon.weight
                 // The chevron matches the label it punctuates, which is 16.

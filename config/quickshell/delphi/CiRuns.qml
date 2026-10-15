@@ -35,7 +35,7 @@ Column {
         width: cr.width - 20
         elide: Text.ElideRight
         text: one.modelData.name + (one.modelData.state === "failure" ? "  — failed" : one.modelData.state === "pending" ? "  — running" : "")
-        color: one.modelData.url ? Zenon.ink : Zenon.soft
+        color: one.modelData.url ? Zenon.ink : Zenon.accentSoft
         font.family: Zenon.face
         font.weight: Zenon.weight
         font.pixelSize: cr.textSize
@@ -51,7 +51,7 @@ Column {
   Text {
     visible: cr.runs.length > cr.most
     text: "and " + (cr.runs.length - cr.most) + " more"
-    color: Zenon.muted
+    color: Zenon.accentMuted
     font.family: Zenon.face
     font.weight: Zenon.weight
     font.pixelSize: cr.textSize

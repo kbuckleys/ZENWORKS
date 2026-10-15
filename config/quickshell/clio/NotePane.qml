@@ -110,7 +110,7 @@ Item {
       elide: Text.ElideRight
       visible: !pane.isSticky && !!pane.note && pane.note.deleted
       text: "In the Trash · restore it to edit"
-      color: pane.note && pane.note.deleted ? Zenon.red : Zenon.muted
+      color: pane.note && pane.note.deleted ? Zenon.red : Zenon.accentMuted
       font.family: Zenon.face
       font.weight: Zenon.weight
       font.pixelSize: Zenon.px(13)
@@ -424,14 +424,14 @@ Item {
             else if (e.key === Qt.Key_Return || e.key === Qt.Key_Enter) { ed.findStep(e.modifiers & Qt.ShiftModifier ? -1 : 1); e.accepted = true; }
             else if (e.key === Qt.Key_Tab) { replaceField.forceActiveFocus(); e.accepted = true; }
           }
-          Text { visible: findField.text === ""; anchors.verticalCenter: parent.verticalCenter; text: "Find in note"; color: Zenon.muted; font: findField.font }
+          Text { visible: findField.text === ""; anchors.verticalCenter: parent.verticalCenter; text: "Find in note"; color: Zenon.accentMuted; font: findField.font }
         }
         HeldRing { anchors.fill: parent; radius: parent.radius; z: 10; on: findField.activeFocus }
       }
       Text {
         anchors.verticalCenter: parent.verticalCenter
         text: findField.text === "" ? "" : ed.findHits.length === 0 ? "none" : (ed.findAt + 1) + " of " + ed.findHits.length
-        color: ed.findHits.length === 0 && findField.text !== "" ? Zenon.red : Zenon.muted
+        color: ed.findHits.length === 0 && findField.text !== "" ? Zenon.red : Zenon.accentMuted
         font.family: Zenon.face
         font.weight: Zenon.weight
         font.pixelSize: Zenon.px(13)
@@ -464,7 +464,7 @@ Item {
             else if (e.key === Qt.Key_Return || e.key === Qt.Key_Enter) { ed.replaceHit(replaceField.text); e.accepted = true; }
             else if (e.key === Qt.Key_Backtab) { findField.forceActiveFocus(); e.accepted = true; }
           }
-          Text { visible: replaceField.text === ""; anchors.verticalCenter: parent.verticalCenter; text: "Replace with"; color: Zenon.muted; font: replaceField.font }
+          Text { visible: replaceField.text === ""; anchors.verticalCenter: parent.verticalCenter; text: "Replace with"; color: Zenon.accentMuted; font: replaceField.font }
         }
         HeldRing { anchors.fill: parent; radius: parent.radius; z: 10; on: replaceField.activeFocus }
       }
@@ -593,7 +593,7 @@ Item {
       horizontalAlignment: Text.AlignHCenter
       wrapMode: Text.Wrap
       text: pane.isEntry ? "Enter the Clio password to read and write in it." : "Enter the Clio password to view it. Every locked note opens with it, until you Lock Now or close Clio."
-      color: Zenon.muted
+      color: Zenon.accentMuted
       font.family: Zenon.face
       font.weight: Zenon.weight
       font.pixelSize: Zenon.px(14)

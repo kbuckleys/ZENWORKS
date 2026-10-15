@@ -100,7 +100,7 @@ Item {
     horizontalAlignment: Text.AlignRight
     text: sl.readout
     color: (sl.neutral >= 0 && Math.abs(sl.value - sl.neutral) < 0.001)
-      ? Zenon.muted : Zenon.cyan
+      ? Zenon.accentMuted : Zenon.cyan
     font.family: Zenon.face
     font.weight: Zenon.weight
     font.pixelSize: Zenon.px(13)

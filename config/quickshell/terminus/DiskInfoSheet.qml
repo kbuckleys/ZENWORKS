@@ -191,7 +191,7 @@ Rectangle {
         text: diskInfo.cur
           ? diskInfo.cur.fsUsed + " of " + diskInfo.cur.fsSize + " used"
           : ""
-        color: Zenon.muted
+        color: Zenon.accentMuted
         font.family: Zenon.face
         font.weight: Zenon.weight
         font.pixelSize: Zenon.px(13)
@@ -202,7 +202,7 @@ Rectangle {
         anchors.top: diskInfoGauge.bottom
         anchors.topMargin: 8
         text: Math.round(diskInfo.used * 100) + "%"
-        color: Zenon.muted
+        color: Zenon.accentMuted
         font.family: Zenon.face
         font.weight: Zenon.weight
         font.pixelSize: Zenon.px(13)
@@ -254,7 +254,7 @@ Rectangle {
             anchors.verticalCenter: parent.verticalCenter
             width: 130
             text: factRow.modelData[0]
-            color: Zenon.muted
+            color: Zenon.accentMuted
             font.family: Zenon.face
             font.weight: Zenon.weight
             font.pixelSize: Zenon.px(14)
@@ -313,7 +313,7 @@ Rectangle {
         anchors.verticalCenter: parent.verticalCenter
         elide: Text.ElideRight
         text: "click a value to copy it"
-        color: Zenon.muted
+        color: Zenon.accentMuted
         font.family: Zenon.face
         font.weight: Zenon.weight
         font.pixelSize: Zenon.px(13)
@@ -327,13 +327,13 @@ Rectangle {
         DialogButton {
           visible: Terminus.ejectable(diskInfo.cur)
           label: "Safely remove"
-          ink: Zenon.muted
+          ink: Zenon.accentMuted
           onClicked: { term.ejectDisk(diskInfo.cur); diskInfo.dismiss(); }
         }
         DialogButton {
           visible: !!diskInfo.cur && !diskInfo.system
           label: diskInfo.cur && diskInfo.cur.mount !== "" ? "Unmount" : "Mount"
-          ink: Zenon.muted
+          ink: Zenon.accentMuted
           onClicked: diskInfo.toggle()
         }
         DialogButton {
@@ -345,7 +345,7 @@ Rectangle {
         }
         DialogButton {
           label: "Close"
-          ink: Zenon.muted
+          ink: Zenon.accentMuted
           onClicked: diskInfo.dismiss()
         }
       }

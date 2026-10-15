@@ -24,7 +24,7 @@ Rectangle {
     id: label
     anchors.centerIn: parent
     text: chip.word
-    color: chip.on ? Zenon.ink : Zenon.soft
+    color: chip.on ? Zenon.ink : Zenon.accentSoft
     font.family: Zenon.face
     font.weight: chip.on ? Font.DemiBold : Zenon.weight
     font.pixelSize: Zenon.px(13)

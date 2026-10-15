@@ -105,7 +105,7 @@ Item {
         horizontalAlignment: Text.AlignHCenter
         elide: Text.ElideMiddle
         text: lock.st.user ? lock.p.name + "  ·  " + lock.st.user : lock.p.name
-        color: Zenon.muted
+        color: Zenon.accentMuted
         font.family: Zenon.face
         font.weight: Zenon.weight
         font.pixelSize: Zenon.px(14)
@@ -160,7 +160,7 @@ Item {
         ? lock.p.name + " is read through " + (lock.info ? lock.info.cli : "its own tool") + ", which is not installed. Ceres installs it"
           + (lock.info && lock.info.aur ? " from the AUR" : "") + " — it asks for your password."
         : lock.p.name + " is signed out on this machine. Sign in once; after that the master password opens it."
-      color: Zenon.muted
+      color: Zenon.accentMuted
       font.family: Zenon.face
       font.weight: Zenon.weight
       font.pixelSize: Zenon.px(13)
@@ -181,7 +181,7 @@ Item {
       horizontalAlignment: Text.AlignHCenter
       wrapMode: Text.Wrap
       text: lock.info ? lock.info.blurb : ""
-      color: Zenon.alpha(Zenon.muted, 0.8)
+      color: Zenon.alpha(Zenon.accentMuted, 0.8)
       font.family: Zenon.face
       font.weight: Zenon.weight
       font.pixelSize: Zenon.px(12)

@@ -40,6 +40,8 @@ Column {
   readonly property alias archiveList: archiveList
   // the properties card's name on the bar, as a field — see renameFromProps
   function beginBarRename() { barName.begin(); }
+  // the bar's renamable title, for the sheet's shield to let clicks through to
+  readonly property Item barNameItem: barName
   readonly property alias band: band
   readonly property alias bodyBox: bodyBox
   readonly property alias bodyRow: bodyRow
@@ -263,7 +265,7 @@ Column {
             horizontalAlignment: Text.AlignHCenter
             elide: Text.ElideMiddle
             text: ghost.name
-            color: Zenon.muted
+            color: Zenon.accentMuted
             font.family: Zenon.face
             font.weight: Zenon.weight
             font.pixelSize: Math.round(16 * term.zoom)
@@ -679,7 +681,7 @@ Column {
         // at all, which is exactly what the toggle did.
         text: "\uEC02"
         color: term.sidebar ? Zenon.cyan
-          : (sideHov.hovered ? Zenon.white : Zenon.muted)
+          : (sideHov.hovered ? Zenon.white : Zenon.accentMuted)
         // lit and unlit fade, as split's and the zoom's do (user, 2026-10-15)
         Behavior on color { ColorAnimation { duration: Zenon.fast } }
         font.family: Zenon.face
@@ -822,7 +824,7 @@ Column {
         textSize: Zenon.px(14)
         weight: Font.Medium
         pad: 22
-        ink: Zenon.muted
+        ink: Zenon.accentMuted
         // home is its glyph alone: the house already says "~" (user, 2026-10-15)
         options: term.crumbList.map((c) => [String(c.path), String(c.path) === Paths.home() ? "" : c.label])
         // each step wears its directory's glyph, as the sidebar's rows do:
@@ -885,7 +887,7 @@ Column {
           if (term.searchMode === "collection" && !term.scratchOpen) {
             const f = term.collById(term.collOpenId);
             // Recents is neutral, as its sidebar row is
-            if (f && f.builtin) return Zenon.soft;
+            if (f && f.builtin) return Zenon.accentSoft;
             if (f && f.ink) return Zenon[f.ink] || Zenon.cyan;
             return Zenon.cyan;
           }
@@ -1124,7 +1126,7 @@ Column {
         // the trip through a shell heredoc, and arrives as nothing at all.
         text: "\uF0C9"
         color: (term.prefsRef.open || term.burgerOn) ? Zenon.cyan
-          : (prefsHov.hovered ? Zenon.white : Zenon.muted)
+          : (prefsHov.hovered ? Zenon.white : Zenon.accentMuted)
         // lit and unlit fade, as split's and the zoom's do (user, 2026-10-15)
         Behavior on color { ColorAnimation { duration: Zenon.fast } }
         font.family: Zenon.face
@@ -1177,7 +1179,7 @@ Column {
         // nf-fa-columns, as an escape (see the hamburger's note)
         text: "\uF0DB"
         color: term.dual ? Zenon.cyan
-          : (splitHov.hovered ? Zenon.white : Zenon.muted)
+          : (splitHov.hovered ? Zenon.white : Zenon.accentMuted)
         font.family: Zenon.face
         font.weight: Zenon.weight
         font.pixelSize: Zenon.px(15)
@@ -1235,7 +1237,7 @@ Column {
         // nf-fa-sort (U+F0DC), as an escape (see the hamburger's note)
         text: "\uF0DC"
         color: term.sortMenuOn || term.sortKey !== "name" || term.sortDesc ? Zenon.cyan
-          : (sortHov.hovered ? Zenon.white : Zenon.muted)
+          : (sortHov.hovered ? Zenon.white : Zenon.accentMuted)
         font.family: Zenon.face
         font.weight: Zenon.weight
         font.pixelSize: Zenon.px(15)
@@ -1418,7 +1420,7 @@ Column {
           anchors.centerIn: parent
           textFormat: Text.StyledText
           text: "\uF0E2&#160;&#160;" + term.undoLabel
-            + "&#160;&#160;<font color=\"" + Zenon.hex(Zenon.muted) + "\">u</font>"
+            + "&#160;&#160;<font color=\"" + Zenon.hex(Zenon.accentMuted) + "\">u</font>"
           color: Zenon.cyan
           font.family: Zenon.face
           font.weight: Zenon.weight
@@ -1475,7 +1477,7 @@ Column {
           return term.inTrash && term.trashSize !== ""
             ? items + " \u00b7 " + term.trashSize : items;
         }
-        color: (term.markedCount > 0 || term.visualOn) ? Zenon.cyan : Zenon.muted
+        color: (term.markedCount > 0 || term.visualOn) ? Zenon.cyan : Zenon.accentMuted
         font.family: Zenon.face
         font.weight: Zenon.weight
         font.pixelSize: Zenon.px(14)
@@ -1522,7 +1524,7 @@ Column {
         anchors.verticalCenter: parent.verticalCenter
         visible: term.git && term.gitBranch !== ""
         text: "\uE725  " + term.gitBranch   // nf-dev-git_branch
-        color: Zenon.muted
+        color: Zenon.accentMuted
         font.family: Zenon.face
         font.weight: Zenon.weight
         font.pixelSize: Zenon.px(14)
@@ -1680,7 +1682,7 @@ Column {
             visible: !!term.sendToRef.current
             text: term.sendToRef.glyphOf(term.sendToRef.current) || ""
             rightPadding: 3
-            color: term.sendToRef.blocked ? Zenon.muted : Zenon.cyan
+            color: term.sendToRef.blocked ? Zenon.accentMuted : Zenon.cyan
             font.family: Zenon.face
             font.weight: Zenon.weight
             font.pixelSize: Zenon.px(15)
@@ -1693,7 +1695,7 @@ Column {
             elide: Text.ElideMiddle
             text: (term.sendToRef.current ? term.sendToRef.current.name : "") || ""
             // and the place's name the same — its glyph carries the colour
-            color: term.sendToRef.blocked ? Zenon.muted : Zenon.white
+            color: term.sendToRef.blocked ? Zenon.accentMuted : Zenon.white
             font.family: Zenon.face
             font.weight: Zenon.weight
             font.pixelSize: Zenon.px(15)
@@ -2437,7 +2439,7 @@ Column {
                   horizontalAlignment: Text.AlignRight
                   verticalAlignment: Text.AlignVCenter
                   text: modelData[0]
-                  color: Zenon.muted
+                  color: Zenon.accentMuted
                   font.family: Zenon.face
                   font.weight: Zenon.weight
                   font.pixelSize: Zenon.px(16)
@@ -2544,7 +2546,7 @@ Column {
                 // 30% alpha and the guides came out as a suggestion of a
                 // tree. They are structure — meant to be seen at a glance
                 // and never read — which is exactly what muted is for.
-                color: Zenon.muted
+                color: Zenon.accentMuted
                 font.family: Zenon.faceMono
                 font.weight: Zenon.weight
                 font.pixelSize: Math.round(15 * term.zoom)
@@ -2782,7 +2784,7 @@ Column {
             anchors.centerIn: parent
             visible: term.previewKind === "binary" || term.previewKind === "none"
             text: term.previewKind === "binary" ? "binary" : ""
-            color: Zenon.muted
+            color: Zenon.accentMuted
             font.family: Zenon.face
             font.weight: Zenon.weight
             font.pixelSize: Zenon.px(13)
@@ -2960,7 +2962,7 @@ Column {
         x: modelData === 0 ? term.paneSplit - 4 : term.paneSplit + 3
         y: (parent.height - height) / 2
         z: 4
-        color: lit ? Zenon.cyan : Zenon.muted
+        color: lit ? Zenon.cyan : Zenon.accentMuted
         Behavior on color { ColorAnimation { duration: Zenon.fast } }
       }
     }
@@ -3583,7 +3585,7 @@ Column {
         anchors.leftMargin: 11
         anchors.verticalCenter: parent.verticalCenter
         text: Icons.glyphFor({ name: saveField.text || "x", isDir: false })
-        color: Zenon.keyInk
+        color: Zenon.accentKey
         font.family: Zenon.face
         font.weight: Zenon.weight
         font.pixelSize: Zenon.px(14)
@@ -3726,7 +3728,7 @@ Column {
         anchors.verticalCenter: parent.verticalCenter
         visible: portalPicks.picks.length === 0
         text: "nothing selected"
-        color: Zenon.muted
+        color: Zenon.accentMuted
         font.family: Zenon.face
         font.weight: Zenon.weight
         font.pixelSize: Zenon.px(13)
@@ -3780,7 +3782,7 @@ Column {
           anchors.verticalCenter: parent.verticalCenter
           visible: portalPicks.picks.length > portalPicks.shown
           text: "+" + (portalPicks.picks.length - portalPicks.shown) + " more"
-          color: Zenon.soft
+          color: Zenon.accentSoft
           font.family: Zenon.face
           font.weight: Zenon.weight
           font.pixelSize: Zenon.px(13)
@@ -3797,7 +3799,7 @@ Column {
 
       DialogButton {
         label: "Cancel"
-        ink: Zenon.muted
+        ink: Zenon.accentMuted
         onClicked: term.portalCancel()
       }
 

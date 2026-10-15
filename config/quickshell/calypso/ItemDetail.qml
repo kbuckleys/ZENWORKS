@@ -127,7 +127,7 @@ Item {
             Text {
               anchors.verticalCenter: parent.verticalCenter
               text: pane.win ? C.platform(pane.win.acctOf(pane.it).kind).glyph : ""
-              color: pane.win ? (Zenon[C.platform(pane.win.acctOf(pane.it).kind).ink] || Zenon.muted) : Zenon.muted
+              color: pane.win ? (Zenon[C.platform(pane.win.acctOf(pane.it).kind).ink] || Zenon.accentMuted) : Zenon.accentMuted
               font.family: Zenon.glyphFace
               font.pixelSize: Zenon.px(13)
             }
@@ -137,7 +137,7 @@ Item {
               elide: Text.ElideMiddle
               text: !pane.it || !pane.win ? "" : [C.kindOf(pane.it.kind).one, pane.it.folder,
                      (pane.win.acctOf(pane.it) || {}).name].filter((s) => !!s).join("  ·  ")
-              color: Zenon.muted
+              color: Zenon.accentMuted
               font.family: Zenon.face
               font.weight: Zenon.weight
               font.pixelSize: Zenon.px(14)
@@ -158,7 +158,7 @@ Item {
           }
           FieldAct {
             glyph: pane.win && pane.it && pane.win.isFav(pane.it) ? "" : ""
-            ink: pane.win && pane.it && pane.win.isFav(pane.it) ? Zenon.sand : Zenon.muted
+            ink: pane.win && pane.it && pane.win.isFav(pane.it) ? Zenon.sand : Zenon.accentMuted
             tip: pane.win && pane.it && pane.win.isFav(pane.it) ? "Leave favourites" : "Add to favourites"
             tips: pane.win ? pane.win.tipsItem : null
             onClicked: pane.win.toggleFav(pane.it)
@@ -183,9 +183,9 @@ Item {
           width: body.width
           height: 44
           radius: Zenon.windowRadius + 2
-          color: Zenon.alpha(Zenon[pr.ink] || Zenon.muted, 0.1)
+          color: Zenon.alpha(Zenon[pr.ink] || Zenon.accentMuted, 0.1)
           border.width: 1
-          border.color: Zenon.alpha(Zenon[pr.ink] || Zenon.muted, 0.4)
+          border.color: Zenon.alpha(Zenon[pr.ink] || Zenon.accentMuted, 0.4)
           Row {
             x: 14
             anchors.verticalCenter: parent.verticalCenter
@@ -193,7 +193,7 @@ Item {
             Text {
               anchors.verticalCenter: parent.verticalCenter
               text: "\u{F0ECC}"
-              color: Zenon[parent.parent.pr.ink] || Zenon.muted
+              color: Zenon[parent.parent.pr.ink] || Zenon.accentMuted
               font.family: Zenon.glyphFace
               font.pixelSize: Zenon.px(15)
             }
@@ -290,7 +290,7 @@ Item {
             visible: sec.modelData.title !== ""
             leftPadding: 4
             text: sec.modelData.title.toUpperCase()
-            color: Zenon.muted
+            color: Zenon.accentMuted
             font.family: Zenon.face
             font.weight: Font.DemiBold
             font.pixelSize: Zenon.px(11)
@@ -331,7 +331,7 @@ Item {
         Text {
           leftPadding: 4
           text: "ATTACHMENTS"
-          color: Zenon.muted
+          color: Zenon.accentMuted
           font.family: Zenon.face
           font.weight: Font.DemiBold
           font.pixelSize: Zenon.px(11)
@@ -361,7 +361,7 @@ Item {
                   x: 18
                   anchors.verticalCenter: parent.verticalCenter
                   text: "\u{F03E2}"
-                  color: Zenon.muted
+                  color: Zenon.accentMuted
                   font.family: Zenon.glyphFace
                   font.pixelSize: Zenon.px(15)
                 }
@@ -372,7 +372,7 @@ Item {
                   anchors.rightMargin: 8
                   anchors.verticalCenter: parent.verticalCenter
                   elide: Text.ElideMiddle
-                  text: modelData.name + (modelData.size ? "  <font color='" + Zenon.muted + "'>" + modelData.size + "</font>" : "")
+                  text: modelData.name + (modelData.size ? "  <font color='" + Zenon.accentMuted + "'>" + modelData.size + "</font>" : "")
                   textFormat: Text.StyledText
                   color: Zenon.ink
                   font.family: Zenon.face
@@ -412,7 +412,7 @@ Item {
         Text {
           leftPadding: 4
           text: "NOTES"
-          color: Zenon.muted
+          color: Zenon.accentMuted
           font.family: Zenon.face
           font.weight: Font.DemiBold
           font.pixelSize: Zenon.px(11)
@@ -434,7 +434,7 @@ Item {
             selectByMouse: true
             wrapMode: TextEdit.Wrap
             text: pane.d ? pane.d.notes : ""
-            color: Zenon.soft
+            color: Zenon.accentSoft
             selectionColor: Zenon.alpha(Zenon.cyan, 0.4)
             font.family: Zenon.face
             font.weight: Zenon.weight
@@ -485,7 +485,7 @@ Item {
           if (pane.d.created) bits.push("made " + C.dateWords(pane.d.created));
           return bits.join("  ·  ");
         }
-        color: Zenon.muted
+        color: Zenon.accentMuted
         font.family: Zenon.face
         font.weight: Zenon.weight
         font.pixelSize: Zenon.px(12)
@@ -510,14 +510,14 @@ Item {
     Text {
       anchors.horizontalCenter: parent.horizontalCenter
       text: ""
-      color: Zenon.alpha(Zenon.muted, 0.35)
+      color: Zenon.alpha(Zenon.accentMuted, 0.35)
       font.family: Zenon.glyphFace
       font.pixelSize: 72
     }
     Text {
       anchors.horizontalCenter: parent.horizontalCenter
       text: pane.win && pane.win.detailErr !== "" && pane.it ? pane.win.detailErr : "Nothing chosen"
-      color: pane.win && pane.win.detailErr !== "" && pane.it ? Zenon.red : Zenon.muted
+      color: pane.win && pane.win.detailErr !== "" && pane.it ? Zenon.red : Zenon.accentMuted
       font.family: Zenon.face
       font.weight: Zenon.weight
       font.pixelSize: Zenon.px(15)

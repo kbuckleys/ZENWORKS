@@ -146,9 +146,9 @@ Item {
   // Through the row's SLOT (inkKey, see terminus.js), so a theme change
   // reaches a row that is already on screen: Zenon[key] is a property read
   // the binding depends on, and it is only re-run when that changes.
-  readonly property color rowInk: !entryRow.entry ? Zenon.muted
+  readonly property color rowInk: !entryRow.entry ? Zenon.accentMuted
     : entryRow.entry.inkKey ? Zenon[entryRow.entry.inkKey]
-    : entryRow.entry.ink !== undefined ? entryRow.entry.ink : Zenon.muted
+    : entryRow.entry.ink !== undefined ? entryRow.entry.ink : Zenon.accentMuted
   // ── A REPOSITORY, AND WHAT BELONGS TO ONE (user, 2026-10-11) ────────
   // A directory with a .git in it has its glyph in this ink (its own glyph
   // still: the colour is the mark, user 2026-10-11), and the
@@ -541,7 +541,7 @@ Item {
             // its ancestors merely pass through.
             readonly property bool tail: guideCol.index === entryRow.depth - 1
             // in a repository's branch of the tree, its ink (repoFrom)
-            readonly property color ink: guideCol.index >= entryRow.repoFrom ? entryRow.repoInk : Zenon.muted
+            readonly property color ink: guideCol.index >= entryRow.repoFrom ? entryRow.repoInk : Zenon.accentMuted
             // Does the branch in this column keep going below this row?
             // For the tail that is "have I a sibling still to come",
             // which is the bit for this row's OWN depth.
@@ -681,7 +681,7 @@ Item {
             // ONE COLOUR. The fill is the state; brightening it as well
             // said the same thing twice and made an open branch's
             // marker compete with the name beside it.
-            color: Zenon.muted
+            color: Zenon.accentMuted
             font.family: Zenon.glyphMono   // JetBrainsMono's, whatever the shell face (Zenon.glyphFace)
             font.weight: Zenon.weight
             font.pixelSize: Math.round(14 * host.zoom)
@@ -826,7 +826,7 @@ Item {
         width: Math.min(implicitWidth, Math.round(parent.width / 3))
         elide: Text.ElideRight
         text: entryRow.aside
-        color: Zenon.muted
+        color: Zenon.accentMuted
         opacity: entryRow.dim ? 0.5 : 1
         font.family: Zenon.face
         font.weight: Zenon.weight
@@ -1023,7 +1023,7 @@ Item {
       // at the end of the path, so eliding the tail would leave two rows
       // reading the same and eliding the head keeps them apart.
       elide: Text.ElideLeft
-      color: Zenon.muted
+      color: Zenon.accentMuted
       opacity: entryRow.dim ? 0.65 : 1
       font.family: Zenon.face
       font.weight: Zenon.weight
@@ -1052,7 +1052,7 @@ Item {
       text: (entryRow.entry && !entryRow.entry.isDir)
         ? host.kindOf(entryRow.entry) : ""
       elide: Text.ElideRight
-      color: Zenon.muted
+      color: Zenon.accentMuted
       opacity: entryRow.dim ? 0.65 : 1
       font.family: Zenon.face
       font.weight: Zenon.weight
@@ -1129,7 +1129,7 @@ Item {
         // because grey on a tinted band is the one place that colour stops
         // being readable.
         ink: sizeCell.on
-          ? (sizeCell.biggest ? Zenon.sand : Zenon.white) : Zenon.muted
+          ? (sizeCell.biggest ? Zenon.sand : Zenon.white) : Zenon.accentMuted
         fontSize: Math.round(14 * host.zoom)
         fontWeight: sizeCell.on ? Font.Medium : Font.Normal
         label: {
@@ -1153,7 +1153,7 @@ Item {
       leftPadding: Math.round(14 * host.zoom)
       verticalAlignment: Text.AlignVCenter
       text: entryRow.entry ? host.whenOf(entryRow.entry) : ""
-      color: Zenon.muted
+      color: Zenon.accentMuted
       font.family: Zenon.face
       font.weight: Zenon.weight
       font.pixelSize: Math.round(14 * host.zoom)

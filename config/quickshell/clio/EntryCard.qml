@@ -39,7 +39,7 @@ Rectangle {
     width: 3
     height: parent.height - 28
     radius: 1.5
-    color: card.mood ? Zenon.alpha(Zenon[card.mood.ink] || Zenon.muted, 0.85) : "transparent"
+    color: card.mood ? Zenon.alpha(Zenon[card.mood.ink] || Zenon.accentMuted, 0.85) : "transparent"
   }
 
   Column {
@@ -97,7 +97,7 @@ Rectangle {
       maximumLineCount: 4
       elide: Text.ElideRight
       text: card.note && !card.note.sealed ? card.d.preview : ""
-      color: Zenon.soft
+      color: Zenon.accentSoft
       font.family: card.win ? card.win.mgr.faceFor(true) : Zenon.face
       font.weight: Zenon.weight
       font.pixelSize: Zenon.px(14)
@@ -110,7 +110,7 @@ Rectangle {
       width: parent.width
       elide: Text.ElideRight
       text: visible ? N.dateTime(card.note.modified) : ""
-      color: Zenon.muted
+      color: Zenon.accentMuted
       font.family: Zenon.face
       font.weight: Zenon.weight
       font.pixelSize: Zenon.px(12)
@@ -140,7 +140,7 @@ Rectangle {
         anchors.verticalCenter: parent.verticalCenter
         text: card.note ? N.DAYS[new Date(card.note.date).getDay()] + ", " + new Date(card.note.date).getDate() + " "
           + N.MONTHS[new Date(card.note.date).getMonth()].slice(0, 3) : ""
-        color: Zenon.muted
+        color: Zenon.accentMuted
         font.family: Zenon.face
         font.weight: Font.DemiBold
         font.pixelSize: Zenon.px(12)
@@ -155,12 +155,12 @@ Rectangle {
           width: moodWord.implicitWidth + 16
           height: 22
           radius: 11
-          color: card.mood ? Zenon.alpha(Zenon[card.mood.ink] || Zenon.muted, 0.16) : "transparent"
+          color: card.mood ? Zenon.alpha(Zenon[card.mood.ink] || Zenon.accentMuted, 0.16) : "transparent"
           Text {
             id: moodWord
             anchors.centerIn: parent
             text: card.mood ? card.mood.label : ""
-            color: card.mood ? Zenon[card.mood.ink] || Zenon.muted : Zenon.muted
+            color: card.mood ? Zenon[card.mood.ink] || Zenon.accentMuted : Zenon.accentMuted
             font.family: Zenon.face
             font.weight: Font.DemiBold
             font.pixelSize: Zenon.px(11)

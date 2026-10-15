@@ -173,7 +173,7 @@ Item {
     width: root.horizontal ? root.thumbH : across
     height: root.horizontal ? across : root.thumbH
     radius: across / 2
-    color: Zenon.keyInk
+    color: Zenon.accentKey
     opacity: ma.dragging ? 0.90 : (ma.containsMouse ? 0.70 : 0.40)
     Behavior on across { NumberAnimation { duration: Zenon.fast; easing.type: Zenon.ease } }
     Behavior on opacity { NumberAnimation { duration: Zenon.fast; easing.type: Zenon.ease } }

@@ -88,7 +88,7 @@ Column {
           Text {
             anchors.verticalCenter: parent.verticalCenter
             text: String(cal.year)
-            color: Zenon.muted
+            color: Zenon.accentMuted
             font.family: Zenon.face
             font.weight: Zenon.weight
             font.pixelSize: Zenon.px(14)
@@ -112,7 +112,7 @@ Column {
         horizontalAlignment: Text.AlignHCenter
         verticalAlignment: Text.AlignVCenter
         text: modelData
-        color: index >= 5 ? Zenon.muted : Zenon.soft
+        color: index >= 5 ? Zenon.accentMuted : Zenon.accentSoft
         font.family: Zenon.face
         font.weight: Font.Bold
         font.pixelSize: Zenon.px(11)
@@ -168,7 +168,7 @@ Column {
           anchors.centerIn: parent
           anchors.verticalCenterOffset: cell.day && cell.day.mood ? -3 : 0
           text: cell.modelData.day
-          color: cell.isToday && !cell.pic ? Zenon.onAccent : cell.pic ? "#ffffff" : cell.index % 7 >= 5 ? Zenon.muted : Zenon.ink
+          color: cell.isToday && !cell.pic ? Zenon.onAccent : cell.pic ? "#ffffff" : cell.index % 7 >= 5 ? Zenon.accentMuted : Zenon.ink
           style: cell.pic ? Text.Raised : Text.Normal
           styleColor: Zenon.alpha(Zenon.shadowRgb, 0.5)
           font.family: Zenon.face
@@ -185,7 +185,7 @@ Column {
           height: 5
           radius: 2.5
           visible: !!cell.day && !!cell.day.mood
-          color: cell.day && cell.day.mood ? Zenon[cell.day.mood.ink] || Zenon.muted : "transparent"
+          color: cell.day && cell.day.mood ? Zenon[cell.day.mood.ink] || Zenon.accentMuted : "transparent"
           border.width: cell.pic || cell.isToday ? 1 : 0
           border.color: "#ffffff"
         }
@@ -212,7 +212,7 @@ Column {
     horizontalAlignment: Text.AlignHCenter
     text: cal.monthCount === 0 ? "Nothing written this month — a day clicked starts one"
       : cal.monthCount + (cal.monthCount === 1 ? " entry" : " entries") + " this month"
-    color: Zenon.muted
+    color: Zenon.accentMuted
     font.family: Zenon.face
     font.weight: Zenon.weight
     font.pixelSize: Zenon.px(11)
@@ -229,7 +229,7 @@ Column {
     Text {
       anchors.centerIn: parent
       text: chev.glyph
-      color: chevMa.containsMouse ? Zenon.cyan : Zenon.muted
+      color: chevMa.containsMouse ? Zenon.cyan : Zenon.accentMuted
       font.family: Zenon.face
       font.weight: Font.Bold
       font.pixelSize: Zenon.px(17)

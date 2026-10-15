@@ -71,7 +71,7 @@ Item {
             Text {
               anchors.horizontalCenter: parent.horizontalCenter
               text: stat.modelData.word
-              color: Zenon.muted
+              color: Zenon.accentMuted
               font.family: Zenon.face
               font.weight: Zenon.weight
               font.pixelSize: Zenon.px(11)
@@ -193,7 +193,7 @@ Item {
         anchors.verticalCenter: parent.verticalCenter
         glyph: true
         label: ""
-        ink: jl.calendar || jl.win.day !== "" ? Zenon.cyan : Zenon.muted
+        ink: jl.calendar || jl.win.day !== "" ? Zenon.cyan : Zenon.accentMuted
         onClicked: jl.calendar = !jl.calendar
         HoverHandler { onHoveredChanged: hovered ? jl.win.tipsItem.show(calBtn, "Calendar of entries") : jl.win.tipsItem.hide(calBtn) }
       }
@@ -272,7 +272,7 @@ Item {
         verticalAlignment: Text.AlignBottom
         bottomPadding: 6
         text: row.head
-        color: Zenon.muted
+        color: Zenon.accentMuted
         font.family: Zenon.face
         font.weight: Font.Bold
         font.pixelSize: Zenon.px(15)

@@ -67,7 +67,7 @@ Rectangle {
     Text {
       anchors.verticalCenter: parent.verticalCenter
       text: "Search"
-      color: Zenon.muted
+      color: Zenon.accentMuted
       font.family: Zenon.face
       font.weight: Zenon.weight
       font.pixelSize: Zenon.px(13)
@@ -98,7 +98,7 @@ Rectangle {
       visible: !!bar.spec && (bar.spec.rules || []).length > 0
       text: bar.spec ? "+ " + (bar.spec.rules || []).length
         + ((bar.spec.rules || []).length === 1 ? " rule" : " rules") : ""
-      color: Zenon.muted
+      color: Zenon.accentMuted
       font.family: Zenon.face
       font.weight: Zenon.weight
       font.pixelSize: Zenon.px(13)

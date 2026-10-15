@@ -45,7 +45,7 @@ Item {
   property real cardH: 200
   // the footer: a line of text (the query, a state), then key chips
   property string footText: ""
-  property color footInk: Zenon.muted
+  property color footInk: Zenon.accentMuted
   property var hints: []
   // no footer at all (the leader menu): no hairline, no chips
   property bool foot: true
@@ -182,7 +182,7 @@ Item {
             Text {
               anchors.verticalCenter: parent.verticalCenter
               text: pair.modelData[1]
-              color: Zenon.muted
+              color: Zenon.accentMuted
               font.family: Zenon.face
               font.weight: Zenon.weight
               font.pixelSize: 13

@@ -27,7 +27,7 @@ Column {
     width: parent.width
     horizontalAlignment: Text.AlignHCenter
     text: Clio.shown ? "On the desktop" : "On the desktop · hidden"
-    color: Zenon.muted
+    color: Zenon.accentMuted
     font.family: Zenon.face
     font.weight: Zenon.weight
     font.pixelSize: Zenon.px(12)
@@ -50,7 +50,7 @@ Column {
       width: parent.width - 28
       wrapMode: Text.Wrap
       text: "\u{F0336}  " + (nh.entry ? nh.n.prompt : "")
-      color: Zenon.soft
+      color: Zenon.accentSoft
       font.family: Zenon.face
       font.weight: Font.DemiBold
       font.italic: true
@@ -86,15 +86,15 @@ Column {
       width: moodText.implicitWidth + 24
       radius: Zenon.windowRadius
       readonly property var mood: nh.entry && nh.n.mood ? N.moodOf(nh.n.mood.v) : null
-      color: moodPress.pressed ? Zenon.wash(0.12) : mood ? Zenon.alpha(Zenon[mood.ink] || Zenon.muted, 0.14) : Zenon.wash(0.05)
+      color: moodPress.pressed ? Zenon.wash(0.12) : mood ? Zenon.alpha(Zenon[mood.ink] || Zenon.accentMuted, 0.14) : Zenon.wash(0.05)
       border.width: 1
-      border.color: mood ? Zenon.alpha(Zenon[mood.ink] || Zenon.muted, 0.5) : Zenon.border
+      border.color: mood ? Zenon.alpha(Zenon[mood.ink] || Zenon.accentMuted, 0.5) : Zenon.border
       Text {
         id: moodText
         anchors.centerIn: parent
         text: parent.mood ? "\u{F01F5}  " + parent.mood.label + (nh.n.mood.words.length ? " · " + nh.n.mood.words.slice(0, 3).join(", ") : "")
           : "\u{F01F5}  How did it feel?"
-        color: parent.mood ? Zenon.ink : Zenon.muted
+        color: parent.mood ? Zenon.ink : Zenon.accentMuted
         font.family: Zenon.face
         font.weight: Font.DemiBold
         font.pixelSize: Zenon.px(13)
@@ -113,7 +113,7 @@ Column {
       Text {
         anchors.centerIn: parent
         text: parent.on ? "" : ""
-        color: parent.on ? Zenon.sand : Zenon.muted
+        color: parent.on ? Zenon.sand : Zenon.accentMuted
         font.family: Zenon.glyphFace
         font.pixelSize: Zenon.px(14)
       }

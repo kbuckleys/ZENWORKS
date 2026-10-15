@@ -61,7 +61,7 @@ Item {
       detail: "A GitLab you or your work runs, or a Forgejo or Gitea. Its repositories, pull requests and issues then work as GitHub's do here.",
       choices: [{ label: "GitLab", ink: Zenon.cyan, run: () => ask("gitlab") },
                 { label: "Forgejo or Gitea", ink: Zenon.cyan, run: () => ask("forgejo") },
-                { label: "Cancel", ink: Zenon.muted }] });
+                { label: "Cancel", ink: Zenon.accentMuted }] });
   }
   function removeServer() {
     if (!pg.site.server) return;
@@ -169,8 +169,8 @@ Item {
     const choices = [];
     if (cli) choices.push({ label: "Use the browser", ink: Zenon.cyan, run: () => pg.browser() });
     if (missing) choices.push({ label: "Install " + pg.site.pkg + ", then sign in", ink: Zenon.cyan, run: () => pg.installThenSignIn() });
-    choices.push({ label: "Paste a token", ink: cli || missing ? Zenon.muted : Zenon.cyan, run: () => pg.token() });
-    choices.push({ label: "Cancel", ink: Zenon.muted });
+    choices.push({ label: "Paste a token", ink: cli || missing ? Zenon.accentMuted : Zenon.cyan, run: () => pg.token() });
+    choices.push({ label: "Cancel", ink: Zenon.accentMuted });
     pg.win.card_({ question: another ? "Another account on " + pg.site.name : "Sign in to " + pg.site.name, glyph: pg.site.glyph, ink: Zenon.ink,
       detail: cli ? "In your browser, through " + pg.site.cli + " — or with a personal access token you made."
           + (another ? " It is added beside " + pg.account.login + " and becomes the one in use; switch back from the account menu." : "")
@@ -206,11 +206,11 @@ Item {
             detail: "Enter it at " + d.url.replace(/^https:\/\//, "") + " — this card goes by itself once " + pg.site.name + " says yes.",
             choices: [{ label: "Open " + pg.site.name, ink: Zenon.cyan, keep: true, run: () => Quickshell.execDetached(["xdg-open", d.url]) },
                       { label: "Copy the code", keep: true, run: () => pg.win.copy(d.code, "the code") },
-                      { label: "Cancel", ink: Zenon.muted, run: () => pg.win.stop(job) }] }
+                      { label: "Cancel", ink: Zenon.accentMuted, run: () => pg.win.stop(job) }] }
           : { question: "Finish in your browser", glyph: pg.site.glyph, ink: Zenon.cyan,
             detail: pg.site.name + " asks there whether " + pg.site.cli + " may act for you. This card goes by itself once it says yes.",
             choices: [{ label: "Open the page again", ink: Zenon.cyan, keep: true, run: () => Quickshell.execDetached(["xdg-open", d.url]) },
-                      { label: "Cancel", ink: Zenon.muted, run: () => pg.win.stop(job) }] });
+                      { label: "Cancel", ink: Zenon.accentMuted, run: () => pg.win.stop(job) }] });
       },
       done: () => { if (codeCard >= 0) pg.win.dropCard(codeCard); },
       then: (st) => { pg.account = st; pg.win.say("Signed in as " + st.login); pg.loadRepos(); },
@@ -571,7 +571,7 @@ Item {
     Text {
       anchors.horizontalCenter: parent.horizontalCenter
       text: pg.site.glyph
-      color: Zenon.muted
+      color: Zenon.accentMuted
       opacity: 0.5
       font.family: Zenon.glyphFace
       font.pixelSize: Zenon.px(64)
@@ -588,7 +588,7 @@ Item {
         : "Sign in to clone your repositories, publish new ones and upload files."
           + (pg.site.cli && pg.account && !pg.account.cli
              ? "\n\n" + pg.site.cli + " is not installed: signing in with the browser needs it, and Delphi has Ceres install it when you choose that." : "")
-      color: Zenon.muted
+      color: Zenon.accentMuted
       font.family: Zenon.face
       font.weight: Zenon.weight
       font.pixelSize: Zenon.px(15)
@@ -652,7 +652,7 @@ Item {
       Text {
         anchors.verticalCenter: parent.verticalCenter
         text: "\uF078"
-        color: Zenon.muted
+        color: Zenon.accentMuted
         font.family: Zenon.glyphFace
         font.pixelSize: Zenon.px(10)
       }
@@ -701,7 +701,7 @@ Item {
         x: 24
         anchors.verticalCenter: parent.verticalCenter
         text: rrow.r.private ? "" : rrow.r.fork ? "" : ""
-        color: rrow.r.private ? Zenon.yellow : Zenon.muted
+        color: rrow.r.private ? Zenon.yellow : Zenon.accentMuted
         font.family: Zenon.glyphFace
         font.pixelSize: Zenon.px(17)
       }
@@ -717,8 +717,8 @@ Item {
           elide: Text.ElideRight
           textFormat: Text.StyledText
           text: D.esc(rrow.r.full) + (rrow.r.archived ? "&nbsp;&nbsp;&nbsp;<font color='" + Zenon.hex(Zenon.yellow) + "'>archived</font>" : "")
-            + (rrow.r.empty ? "&nbsp;&nbsp;&nbsp;<font color='" + Zenon.hex(Zenon.muted) + "'>empty</font>" : "")
-          color: rrow.r.archived ? Zenon.muted : rrow.index === pg.sel ? Zenon.ink : Zenon.soft
+            + (rrow.r.empty ? "&nbsp;&nbsp;&nbsp;<font color='" + Zenon.hex(Zenon.accentMuted) + "'>empty</font>" : "")
+          color: rrow.r.archived ? Zenon.accentMuted : rrow.index === pg.sel ? Zenon.ink : Zenon.accentSoft
           font.family: Zenon.face
           font.weight: Zenon.weight
           font.pixelSize: Zenon.px(16)
@@ -728,7 +728,7 @@ Item {
           width: parent.width
           elide: Text.ElideRight
           text: rrow.r.description
-          color: Zenon.muted
+          color: Zenon.accentMuted
           font.family: Zenon.face
           font.weight: Zenon.weight
           font.pixelSize: Zenon.px(13)
@@ -740,7 +740,7 @@ Item {
         anchors.rightMargin: 24
         anchors.verticalCenter: parent.verticalCenter
         text: rrow.r.pushed ? D.ago(Date.parse(rrow.r.pushed) / 1000, Date.now()) : ""
-        color: Zenon.muted
+        color: Zenon.accentMuted
         font.family: Zenon.face
         font.weight: Zenon.weight
         font.features: { "tnum": 1 }
@@ -791,7 +791,7 @@ Item {
         horizontalAlignment: Text.AlignHCenter
         wrapMode: Text.Wrap
         text: "Could not list your repositories — " + pg.listError
-        color: Zenon.muted
+        color: Zenon.accentMuted
         font.family: Zenon.face
         font.weight: Zenon.weight
         font.pixelSize: Zenon.px(15)

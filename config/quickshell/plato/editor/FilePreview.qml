@@ -247,7 +247,7 @@ Item {
     font.family: Zenon.face
     font.weight: Zenon.weight
     font.pixelSize: 14
-    color: Zenon.muted
+    color: Zenon.accentMuted
     text: fp.message
   }
 }

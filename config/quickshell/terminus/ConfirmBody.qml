@@ -128,7 +128,7 @@ Item {
       width: Math.min(implicitWidth, detailText.room
         - (detailCap.visible ? detailCap.width + detailText.spacing : 0))
       text: cb.detailLine
-      color: Zenon.muted
+      color: Zenon.accentMuted
       font.family: Zenon.face
       font.weight: Zenon.weight
       // 15: at 13 a card's message read as a footnote (user, 2026-10-11)
@@ -203,7 +203,7 @@ Item {
         height: 22
         verticalAlignment: Text.AlignVCenter
         text: "and " + (cb.items.length - cb.maxItems) + " more"
-        color: Zenon.muted
+        color: Zenon.accentMuted
         font.family: Zenon.face
         font.weight: Zenon.weight
         font.pixelSize: Zenon.px(13)

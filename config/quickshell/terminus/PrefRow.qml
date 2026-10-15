@@ -121,7 +121,7 @@ Item {
       width: 10
       height: 10
       radius: width / 2   // a knob: round whatever the window is
-      color: pref.on ? Zenon.cyan : Zenon.muted
+      color: pref.on ? Zenon.cyan : Zenon.accentMuted
       Behavior on x {
         NumberAnimation { duration: Zenon.fast; easing.type: Zenon.ease }
       }

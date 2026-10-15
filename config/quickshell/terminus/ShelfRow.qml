@@ -26,7 +26,7 @@ Rectangle {
   property string label: ""
   // what is on it: a number, or a word ("3 ahead"); empty, nothing
   property string count: ""
-  property color countInk: Zenon.muted
+  property color countInk: Zenon.accentMuted
   property bool here: false
   property color fill: Zenon.alpha(Zenon.cyan, 0.12)
   // the glyph's way in from the left, and the count's from the right: more
@@ -49,7 +49,7 @@ Rectangle {
     anchors.verticalCenter: parent.verticalCenter
     width: 20
     text: shelf.glyph
-    color: shelf.here ? Zenon.cyan : shelf.glyphInk.a > 0 ? shelf.glyphInk : Zenon.muted
+    color: shelf.here ? Zenon.cyan : shelf.glyphInk.a > 0 ? shelf.glyphInk : Zenon.accentMuted
     font.family: Zenon.glyphFace
     font.pixelSize: Zenon.px(14)
   }
@@ -61,7 +61,7 @@ Rectangle {
     anchors.verticalCenter: parent.verticalCenter
     elide: Text.ElideRight
     text: shelf.label
-    color: shelf.here ? Zenon.ink : Zenon.soft
+    color: shelf.here ? Zenon.ink : Zenon.accentSoft
     font.family: Zenon.face
     font.weight: Zenon.weight
     font.pixelSize: Zenon.px(14)

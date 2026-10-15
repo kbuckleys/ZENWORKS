@@ -1019,7 +1019,7 @@ PanelWindow {
             anchors.topMargin: 3
             anchors.horizontalCenter: parent.horizontalCenter
             text: String(pageCell.page)
-            color: pageCell.here ? Zenon.cyan : Zenon.muted
+            color: pageCell.here ? Zenon.cyan : Zenon.accentMuted
             font.family: Zenon.face
             font.weight: Zenon.weight
             font.pixelSize: Math.round(11 * root.zoom)
@@ -1220,7 +1220,7 @@ PanelWindow {
             anchors.left: parent.left
             anchors.verticalCenter: parent.verticalCenter
             text: modelData.prefix || ""
-            color: Zenon.muted
+            color: Zenon.accentMuted
             font.family: Zenon.faceMono
             font.weight: Zenon.weight
             font.pixelSize: Math.round(15 * root.zoom)
@@ -1341,7 +1341,7 @@ PanelWindow {
 
               Text {
                 text: modelData[0]
-                color: Zenon.keyInk
+                color: Zenon.accentKey
                 font.family: Zenon.face
                 font.pixelSize: Math.round(16 * root.zoom)
                 font.weight: Font.Bold
@@ -1758,7 +1758,7 @@ PanelWindow {
             visible: look.playable && lookPlayer.duration > 0
             text: Terminus.formatClock(lookPlayer.position)
               + " / " + Terminus.formatClock(lookPlayer.duration)
-            color: Zenon.muted
+            color: Zenon.accentMuted
             font.family: Zenon.faceMono
             font.weight: Zenon.weight
             font.pixelSize: Zenon.px(11)
@@ -1786,7 +1786,7 @@ PanelWindow {
             leftPadding: 3
             rightPadding: 8
             text: "rotate"
-            color: Zenon.muted
+            color: Zenon.accentMuted
             font.family: Zenon.face
             font.weight: Zenon.weight
             font.pixelSize: Zenon.px(12)
@@ -1803,7 +1803,7 @@ PanelWindow {
             leftPadding: 3
             rightPadding: 8
             text: "audio"
-            color: Zenon.muted
+            color: Zenon.accentMuted
             font.family: Zenon.face
             font.weight: Zenon.weight
             font.pixelSize: Zenon.px(12)
@@ -1823,7 +1823,7 @@ PanelWindow {
             leftPadding: 3
             rightPadding: 8
             text: "prev / next"
-            color: Zenon.muted
+            color: Zenon.accentMuted
             font.family: Zenon.face
             font.weight: Zenon.weight
             font.pixelSize: Zenon.px(12)
@@ -1842,7 +1842,7 @@ PanelWindow {
             leftPadding: 3
             rightPadding: 8
             text: "page"
-            color: Zenon.muted
+            color: Zenon.accentMuted
             font.family: Zenon.face
             font.weight: Zenon.weight
             font.pixelSize: Zenon.px(12)
@@ -1859,7 +1859,7 @@ PanelWindow {
             leftPadding: 3
             rightPadding: 8
             text: "first / last"
-            color: Zenon.muted
+            color: Zenon.accentMuted
             font.family: Zenon.face
             font.weight: Zenon.weight
             font.pixelSize: Zenon.px(12)
@@ -1886,7 +1886,7 @@ PanelWindow {
             visible: look.scrollable
             leftPadding: 3
             text: "scroll"
-            color: Zenon.muted
+            color: Zenon.accentMuted
             font.family: Zenon.face
             font.weight: Zenon.weight
             font.pixelSize: Zenon.px(12)

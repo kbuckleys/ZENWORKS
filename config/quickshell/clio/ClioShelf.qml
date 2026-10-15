@@ -64,7 +64,7 @@ ShelfRow {
     x: row.indent - 14
     anchors.verticalCenter: parent.verticalCenter
     text: row.shut ? "" : ""
-    color: Zenon.muted
+    color: Zenon.accentMuted
     font.family: Zenon.glyphFace
     font.pixelSize: Zenon.px(9)
     MouseArea { anchors.fill: parent; anchors.margins: -6; onClicked: row.toggled() }

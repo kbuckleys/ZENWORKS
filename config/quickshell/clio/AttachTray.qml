@@ -73,7 +73,7 @@ Bubble {
     wrapMode: Text.WordWrap
     text: "Nothing put in a note yet — add some from Terminus, or drop them on the note."
     horizontalAlignment: Text.AlignHCenter
-    color: Zenon.muted
+    color: Zenon.accentMuted
     font.family: Zenon.face
     font.weight: Zenon.weight
     font.pixelSize: Zenon.px(13)
@@ -133,7 +133,7 @@ Bubble {
                 horizontalAlignment: Text.AlignHCenter
                 elide: Text.ElideMiddle
                 text: tile.modelData.name
-                color: Zenon.soft
+                color: Zenon.accentSoft
                 font.family: Zenon.face
                 font.weight: Zenon.weight
                 font.pixelSize: Zenon.px(11)
@@ -167,7 +167,7 @@ Bubble {
     width: 424
     text: "Drag one onto the note, or click it to put it in where the caret is."
     horizontalAlignment: Text.AlignHCenter
-    color: Zenon.muted
+    color: Zenon.accentMuted
     font.family: Zenon.face
     font.weight: Zenon.weight
     font.pixelSize: Zenon.px(12)

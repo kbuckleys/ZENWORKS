@@ -53,7 +53,7 @@ Item {
   property string current: ""
   property real textSize: Zenon.px(14)
   // the unlit words' ink; the lit one's is the accent
-  property color ink: Zenon.muted
+  property color ink: Zenon.accentMuted
   // values that can be picked; null for all. One left out is shown faint
   // and does not answer (terminus' settings: columns while split)
   property var allowed: null
@@ -288,7 +288,7 @@ Item {
           horizontalAlignment: Text.AlignHCenter
           elide: Text.ElideRight
           text: one.modelData.length > 2 ? String(one.modelData[2]) : ""
-          color: Zenon.muted
+          color: Zenon.accentMuted
           opacity: label.opacity
           font.family: Zenon.face
           font.weight: Zenon.weight

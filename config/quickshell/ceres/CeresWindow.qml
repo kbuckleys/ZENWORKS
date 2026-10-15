@@ -631,7 +631,7 @@ FloatingWindow {
       maximumLineCount: 4
       elide: Text.ElideRight
       text: peekBubble.m["Description"] || ""
-      color: Zenon.soft
+      color: Zenon.accentSoft
       font.family: Zenon.face
       font.weight: Zenon.weight
       font.pixelSize: Zenon.px(14)
@@ -644,7 +644,7 @@ FloatingWindow {
                : peekBubble.m["Download Size"] ? "download " + peekBubble.m["Download Size"] : "",
              peekBubble.pkg && peekBubble.pkg.installed ? (peekBubble.pkg.state === "explicit" ? "installed by you" : "installed as a dependency") : "not installed"]
         .filter((x) => x !== "").join("   ·   ")
-      color: Zenon.muted
+      color: Zenon.accentMuted
       font.family: Zenon.face
       font.weight: Zenon.weight
       font.pixelSize: Zenon.px(13)
@@ -1151,7 +1151,7 @@ FloatingWindow {
       anchors.leftMargin: 12
       anchors.verticalCenter: parent.verticalCenter
       text: vrow.v ? vrow.v.version : ""
-      color: vrow.current ? Zenon.muted : Zenon.white
+      color: vrow.current ? Zenon.accentMuted : Zenon.white
       font.family: Zenon.face
       font.weight: Zenon.weight
       font.pixelSize: Zenon.px(16)
@@ -1162,7 +1162,7 @@ FloatingWindow {
       anchors.verticalCenter: parent.verticalCenter
       text: vrow.current ? "installed" : vrow.back ? "\u21b5 go back"
         : (vrow.v && vrow.v.url ? "download" : "install")
-      color: vrow.current ? Zenon.muted : vrow.back ? Zenon.yellow : Zenon.keyInk
+      color: vrow.current ? Zenon.accentMuted : vrow.back ? Zenon.yellow : Zenon.accentKey
       font.family: Zenon.face
       font.weight: Zenon.weight
       font.pixelSize: Zenon.px(14)
@@ -1851,14 +1851,14 @@ FloatingWindow {
   }
   function verbInk(v) {
     return ({ upgraded: Zenon.blue, installed: Zenon.green, removed: Zenon.red,
-              downgraded: Zenon.yellow, reinstalled: Zenon.cyan })[v] || Zenon.keyInk;
+              downgraded: Zenon.yellow, reinstalled: Zenon.cyan })[v] || Zenon.accentKey;
   }
 
   // ── pieces ──────────────────────────────────────────────────────────────
   function repoInk(repo) {
     if (/-testing$/.test(repo)) return Zenon.red;
     return ({ core: Zenon.cyan, extra: Zenon.green, multilib: Zenon.yellow,
-              aur: Zenon.magenta, local: Zenon.white })[repo] || Zenon.keyInk;
+              aur: Zenon.magenta, local: Zenon.white })[repo] || Zenon.accentKey;
   }
 
   component Rule: Rectangle {
@@ -1952,7 +1952,7 @@ FloatingWindow {
         anchors.verticalCenter: parent.verticalCenter
         height: 32
         textSize: Zenon.px(16)
-        ink: Zenon.keyInk
+        ink: Zenon.accentKey
         options: win.tabs
         current: win.tab
         onChose: (v) => win.showTab(v)
@@ -2027,7 +2027,7 @@ FloatingWindow {
               anchors.leftMargin: 10
               anchors.verticalCenter: parent.verticalCenter
               text: "\uF002"
-              color: win.typing || win.filterText !== "" ? Zenon.cyan : Zenon.muted
+              color: win.typing || win.filterText !== "" ? Zenon.cyan : Zenon.accentMuted
               font.family: Zenon.face
               font.weight: Zenon.weight
               font.pixelSize: Zenon.px(13)
@@ -2043,7 +2043,7 @@ FloatingWindow {
               Text {
                 visible: win.filterText !== ""
                 text: win.filterText
-                color: win.typing ? Zenon.white : Zenon.keyInk
+                color: win.typing ? Zenon.white : Zenon.accentKey
                 font.family: Zenon.face
                 font.weight: Zenon.weight
                 font.pixelSize: Zenon.px(15)
@@ -2066,7 +2066,7 @@ FloatingWindow {
               Text {
                 visible: win.filterText === ""
                 text: "Search"
-                color: Zenon.muted
+                color: Zenon.accentMuted
                 font.family: Zenon.face
                 font.weight: Zenon.weight
                 font.pixelSize: Zenon.px(15)
@@ -2107,7 +2107,7 @@ FloatingWindow {
             Text {
               anchors.centerIn: parent
               text: "\uF0C7"
-              color: win.installedOnly ? Zenon.cyan : onlyHov.hovered ? Zenon.white : Zenon.keyInk
+              color: win.installedOnly ? Zenon.cyan : onlyHov.hovered ? Zenon.white : Zenon.accentKey
               opacity: onlyTap.pressed ? 0.55 : 1
               font.family: Zenon.face
               font.weight: Zenon.weight
@@ -2139,7 +2139,7 @@ FloatingWindow {
               id: refresh
               anchors.centerIn: parent
               text: "\uF021"
-              color: Ceres.checking ? Zenon.cyan : refreshHov.hovered ? Zenon.white : Zenon.keyInk
+              color: Ceres.checking ? Zenon.cyan : refreshHov.hovered ? Zenon.white : Zenon.accentKey
               opacity: refreshTap.pressed ? 0.55 : 1
               font.family: Zenon.face
               font.weight: Zenon.weight
@@ -2258,7 +2258,7 @@ FloatingWindow {
               x: 15
               y: (hrow.modelData.first ? 0 : 14) + 7
               text: hrow.modelData.label || ""
-              color: Zenon.keyInk
+              color: Zenon.accentKey
               font.family: Zenon.face
               font.weight: Font.Bold
               font.pixelSize: Zenon.px(15)
@@ -2288,14 +2288,14 @@ FloatingWindow {
               }
               Text {
                 text: hrow.modelData.what || ""
-                color: Zenon.keyInk
+                color: Zenon.accentKey
                 font.family: Zenon.face
                 font.weight: Font.Bold
                 font.pixelSize: Zenon.px(16)
               }
               Text {
                 text: hrow.modelData.counts || ""
-                color: Zenon.muted
+                color: Zenon.accentMuted
                 font.family: Zenon.face
                 font.weight: Zenon.weight
                 font.pixelSize: Zenon.px(15)
@@ -2333,7 +2333,7 @@ FloatingWindow {
             anchors.centerIn: parent
             visible: win.historyRows.length === 0 && !historyProc.running
             text: win.hquery !== "" ? "nothing matches" : "no history"
-            color: Zenon.muted
+            color: Zenon.accentMuted
             font.family: Zenon.face
             font.weight: Font.Bold
             font.pixelSize: Zenon.px(17)
@@ -2394,8 +2394,8 @@ FloatingWindow {
               text: !win.hevent || !win.hevent.flatpak ? ""
                 : (win.hevent.runtime
                   ? "The shared runtimes Flatpak apps run on \u2014 pulled in with the app beside them, and taken out by Maintenance \u203A Flatpak once nothing needs them."
-                  : "<font color='" + Zenon.muted + "'>Flatpak</font>  " + Cer.esc(win.hevent.id || "")
-                    + (tx && tx.scope ? "  <font color='" + Zenon.muted + "'>\u00B7 " + (tx.scope === "user" ? "just you" : "everyone") + "</font>" : "")
+                  : "<font color='" + Zenon.accentMuted + "'>Flatpak</font>  " + Cer.esc(win.hevent.id || "")
+                    + (tx && tx.scope ? "  <font color='" + Zenon.accentMuted + "'>\u00B7 " + (tx.scope === "user" ? "just you" : "everyone") + "</font>" : "")
                     + "<br><br>Flatpak keeps no older versions here to go back to; the Store has the app as it is now.")
               color: Zenon.white
               font.family: Zenon.face
@@ -2406,8 +2406,8 @@ FloatingWindow {
               visible: !win.hevent || !win.hevent.flatpak
               textFormat: Text.StyledText
               text: !win.hevent ? "" : (win.installedNow !== ""
-                ? "<font color='" + Zenon.muted + "'>installed now</font>  " + Cer.esc(win.installedNow)
-                : "<font color='" + Zenon.muted + "'>not installed</font>")
+                ? "<font color='" + Zenon.accentMuted + "'>installed now</font>  " + Cer.esc(win.installedNow)
+                : "<font color='" + Zenon.accentMuted + "'>not installed</font>")
               color: Zenon.white
               font.family: Zenon.face
               font.weight: Zenon.weight
@@ -2417,7 +2417,7 @@ FloatingWindow {
             Text {
               visible: !win.hevent || !win.hevent.flatpak
               text: win.cached.length ? "In the package cache" : "Nothing of it in the package cache"
-              color: Zenon.muted
+              color: Zenon.accentMuted
               font.family: Zenon.face
               font.weight: Font.Bold
               font.pixelSize: Zenon.px(15)
@@ -2432,7 +2432,7 @@ FloatingWindow {
               visible: win.archived.length > 0
               topPadding: 10
               text: "From the Arch archive"
-              color: Zenon.muted
+              color: Zenon.accentMuted
               font.family: Zenon.face
               font.weight: Font.Bold
               font.pixelSize: Zenon.px(15)
@@ -2444,7 +2444,7 @@ FloatingWindow {
             Text {
               visible: win.archived.length > 10
               text: "+ " + (win.archived.length - 10) + " older in the archive"
-              color: Zenon.muted
+              color: Zenon.accentMuted
               font.family: Zenon.face
               font.weight: Zenon.weight
               font.pixelSize: Zenon.px(15)
@@ -2457,7 +2457,7 @@ FloatingWindow {
               topPadding: 10
               text: "A version installed from here stays until the next full upgrade replaces it. "
                 + "To hold it, add the package to IgnorePkg in /etc/pacman.conf."
-              color: Zenon.muted
+              color: Zenon.accentMuted
               font.family: Zenon.face
               font.weight: Zenon.weight
               font.pixelSize: Zenon.px(15)
@@ -2583,7 +2583,7 @@ FloatingWindow {
                     visible: text !== ""
                     text: win.maintSummary(mrow.modelData.key)
                     color: mrow.level === "bad" ? Zenon.red
-                      : mrow.level === "warn" ? Zenon.yellow : Zenon.muted
+                      : mrow.level === "warn" ? Zenon.yellow : Zenon.accentMuted
                     font.family: Zenon.face
                     font.weight: Zenon.weight
                     font.pixelSize: Zenon.px(15)
@@ -2643,7 +2643,7 @@ FloatingWindow {
               sync: "The system's package databases and ceres' list of AUR packages. Ceres checks for updates against its own copy, so these only move when something upgrades or you sync them here. "
                 + "After a sync, update before installing anything new: installing onto freshly synced databases without upgrading can pull in libraries newer than what installed programs were built against."
             })[mdetail.key]
-            color: Zenon.keyInk
+            color: Zenon.accentKey
             font.family: Zenon.face
             font.weight: Zenon.weight
             font.pixelSize: Zenon.px(16)
@@ -2680,7 +2680,7 @@ FloatingWindow {
               visible: mdetail.key === "cache"
               ready: !!mdetail.m && !!mdetail.m.uninst && mdetail.m.uninst.n > 0
               label: "Drop uninstalled"
-              ink: Zenon.muted
+              ink: Zenon.accentMuted
               onClicked: win.maintGo("uninstalled")
             }
             DialogButton {
@@ -2707,7 +2707,7 @@ FloatingWindow {
               visible: mdetail.key === "mirrors"
               ready: !win.ranking && !!win.mirrors && win.mirrors.statusOk
               label: win.ranking ? "Ranking\u2026" : win.ranked ? "Rank again" : "Rank from here"
-              ink: win.ranked ? Zenon.muted : Zenon.cyan
+              ink: win.ranked ? Zenon.accentMuted : Zenon.cyan
               primary: !win.ranked
               onClicked: win.maintGo("rank")
             }
@@ -2731,7 +2731,7 @@ FloatingWindow {
             DialogButton {
               visible: mdetail.key === "flatpak"
               label: !win.fpRepair ? "Checking\u2026" : "Repair"
-              ink: Zenon.muted
+              ink: Zenon.accentMuted
               // and only when the dry run found something to repair
               ready: !!win.fpRepair && win.fpRepair.problems.length > 0 && !Ceres.txBusy
               onClicked: win.maintGo("repair")
@@ -2776,7 +2776,7 @@ FloatingWindow {
                 Text {
                   width: cacheFacts.labelW
                   text: modelData[0]
-                  color: Zenon.keyInk
+                  color: Zenon.accentKey
                   font.family: Zenon.face
                   font.weight: Zenon.weight
                   font.pixelSize: Zenon.px(16)
@@ -2785,7 +2785,7 @@ FloatingWindow {
                   text: modelData[1].n === 0 ? "none"
                     : modelData[1].n + (modelData[1].n === 1 ? " file" : " files")
                       + (modelData[1].size ? " · " + modelData[1].size : "")
-                  color: modelData[1].n === 0 ? Zenon.muted : Zenon.yellow
+                  color: modelData[1].n === 0 ? Zenon.accentMuted : Zenon.yellow
                   font.family: Zenon.face
                   font.weight: Zenon.weight
                   font.pixelSize: Zenon.px(16)
@@ -2826,7 +2826,7 @@ FloatingWindow {
                 Text {
                   width: mirrorFacts.labelW
                   text: modelData[0]
-                  color: Zenon.keyInk
+                  color: Zenon.accentKey
                   font.family: Zenon.face
                   font.weight: Zenon.weight
                   font.pixelSize: Zenon.px(16)
@@ -2836,7 +2836,7 @@ FloatingWindow {
                   width: mirrorFacts.width - mirrorFacts.labelW - 12
                   elide: Text.ElideRight
                   text: modelData[1]
-                  color: modelData[2] ? Zenon.yellow : Zenon.muted
+                  color: modelData[2] ? Zenon.yellow : Zenon.accentMuted
                   font.family: Zenon.face
                   font.weight: Zenon.weight
                   font.pixelSize: Zenon.px(16)
@@ -2949,9 +2949,9 @@ FloatingWindow {
                 anchors.verticalCenter: parent.verticalCenter
                 textFormat: Text.StyledText
                 font.weight: mitem.modelData.head ? Font.Bold : Font.Normal
-                text: mitem.modelData.head ? "<font color='" + Zenon.muted + "'>" + Cer.esc(mitem.modelData.name) + "</font>"
+                text: mitem.modelData.head ? "<font color='" + Zenon.accentMuted + "'>" + Cer.esc(mitem.modelData.name) + "</font>"
                   : Cer.esc(mitem.modelData.name) + (mitem.modelData.version
-                  ? "  <font color='" + Zenon.muted + "'>" + Cer.esc(mitem.modelData.version) + "</font>" : "")
+                  ? "  <font color='" + Zenon.accentMuted + "'>" + Cer.esc(mitem.modelData.version) + "</font>" : "")
                   + (mdetail.key === "clones" && !mitem.modelData.installed
                     ? "  <font color='" + Zenon.yellow + "'>not installed</font>" : "")
                 color: Zenon.white
@@ -2965,7 +2965,7 @@ FloatingWindow {
                 width: Math.min(implicitWidth, mitem.width * 0.5)
                 elide: Text.ElideLeft
                 text: mitem.modelData.size ? Cer.bytes(mitem.modelData.size) : (mitem.modelData.right || "")
-                color: Zenon.muted
+                color: Zenon.accentMuted
                 font.family: Zenon.face
                 font.weight: Zenon.weight
                 font.pixelSize: Zenon.px(15)
@@ -3003,7 +3003,7 @@ FloatingWindow {
               wrapMode: Text.WrapAnywhere
               text: modelData.text
               color: modelData.ink === "add" ? Zenon.green : modelData.ink === "del" ? Zenon.red
-                : modelData.ink === "hunk" ? Zenon.cyan : Zenon.keyInk
+                : modelData.ink === "hunk" ? Zenon.cyan : Zenon.accentKey
               font.family: "monospace"
               font.pixelSize: Zenon.px(15)
             }
@@ -3063,7 +3063,7 @@ FloatingWindow {
                 verticalAlignment: Text.AlignVCenter
                 horizontalAlignment: ch.rightAlign ? Text.AlignRight : Text.AlignLeft
                 text: ch.on ? ch.label + (win.sortDesc ? " \u25BE" : " \u25B4") : ch.label
-                color: ch.on ? Zenon.cyan : (chHov.hovered ? Zenon.keyInk : Zenon.muted)
+                color: ch.on ? Zenon.cyan : (chHov.hovered ? Zenon.accentKey : Zenon.accentMuted)
                 font.family: Zenon.faceFixed
                 font.weight: Zenon.weight
                 font.pixelSize: Zenon.px(12)
@@ -3133,7 +3133,7 @@ FloatingWindow {
                   : modelData.state === "avail" ? "○" : "●"
                 color: prow.mark ? (modelData.installed ? Zenon.red : Zenon.green)
                   : modelData.state === "explicit" ? Zenon.green
-                  : modelData.state === "dep" ? Zenon.dimInk : Zenon.muted
+                  : modelData.state === "dep" ? Zenon.dimInk : Zenon.accentMuted
                 font.family: Zenon.face
                 font.weight: Zenon.weight
                 font.pixelSize: Zenon.px(15)
@@ -3159,7 +3159,7 @@ FloatingWindow {
                 anchors.rightMargin: 12
                 anchors.verticalCenter: parent.verticalCenter
                 text: modelData.size > 0 ? Cer.bytes(modelData.size) : ""
-                color: Zenon.muted
+                color: Zenon.accentMuted
                 font.family: Zenon.face
                 font.weight: Zenon.weight
                 font.pixelSize: Zenon.px(15)
@@ -3215,7 +3215,7 @@ FloatingWindow {
               anchors.centerIn: parent
               visible: pkgList.count === 0 && !searchProc.running
               text: win.query !== "" ? "nothing matches" : "nothing here"
-              color: Zenon.muted
+              color: Zenon.accentMuted
               font.family: Zenon.face
               font.weight: Font.Bold
               font.pixelSize: Zenon.px(17)
@@ -3303,7 +3303,7 @@ FloatingWindow {
               anchors.centerIn: parent
               visible: win.updateRows.length === 0
               text: Ceres.lastOk > 0 ? "up to date" : "not checked yet"
-              color: Zenon.muted
+              color: Zenon.accentMuted
               font.family: Zenon.face
               font.weight: Font.Bold
               font.pixelSize: Zenon.px(17)
@@ -3361,7 +3361,7 @@ FloatingWindow {
               width: parent.width
               wrapMode: Text.Wrap
               text: win.info ? (win.info.map["Description"] || "") : ""
-              color: Zenon.keyInk
+              color: Zenon.accentKey
               font.family: Zenon.face
               font.weight: Zenon.weight
               font.pixelSize: Zenon.px(17)
@@ -3380,7 +3380,7 @@ FloatingWindow {
                 Text {
                   width: 150
                   text: frow.modelData[0]
-                  color: Zenon.muted
+                  color: Zenon.accentMuted
                   font.family: Zenon.face
                   font.weight: Zenon.weight
                   font.pixelSize: Zenon.px(16)
@@ -3422,7 +3422,7 @@ FloatingWindow {
                 Text {
                   anchors.verticalCenter: parent.verticalCenter
                   text: ih.label
-                  color: ih.foldable && ihHov.hovered ? Zenon.white : Zenon.keyInk
+                  color: ih.foldable && ihHov.hovered ? Zenon.white : Zenon.accentKey
                   font.family: Zenon.face
                   font.weight: Font.Bold
                   font.pixelSize: Zenon.px(15)
@@ -3463,12 +3463,12 @@ FloatingWindow {
                   radius: 12
                   color: chipHov.hovered ? Zenon.headBg : "transparent"
                   border.width: 1
-                  border.color: chipHov.hovered ? Zenon.keyInk : Zenon.border
+                  border.color: chipHov.hovered ? Zenon.accentKey : Zenon.border
                   Text {
                     id: chipWord
                     anchors.centerIn: parent
                     text: chip.modelData
-                    color: chipHov.hovered ? Zenon.white : Zenon.keyInk
+                    color: chipHov.hovered ? Zenon.white : Zenon.accentKey
                     font.family: Zenon.face
                     font.weight: Zenon.weight
                     font.pixelSize: Zenon.px(14)
@@ -3482,7 +3482,7 @@ FloatingWindow {
                 height: 24
                 verticalAlignment: Text.AlignVCenter
                 text: win.extras ? "and " + (win.extras.rdeps.length - 40) + " more" : ""
-                color: Zenon.muted
+                color: Zenon.accentMuted
                 font.family: Zenon.face
                 font.weight: Zenon.weight
                 font.pixelSize: Zenon.px(14)
@@ -3512,7 +3512,7 @@ FloatingWindow {
                   width: infoCol.width
                   elide: Text.ElideMiddle
                   text: modelData
-                  color: Zenon.keyInk
+                  color: Zenon.accentKey
                   font.family: Zenon.faceFixed
                   font.weight: Zenon.weight
                   font.pixelSize: Zenon.px(15)
@@ -3521,7 +3521,7 @@ FloatingWindow {
               Text {
                 visible: !!win.extras && win.extras.files.length > 60
                 text: win.extras ? "+ " + (win.extras.files.length - 60) + " more" : ""
-                color: Zenon.muted
+                color: Zenon.accentMuted
                 font.family: Zenon.face
                 font.weight: Zenon.weight
                 font.pixelSize: Zenon.px(15)
@@ -3533,7 +3533,7 @@ FloatingWindow {
             anchors.centerIn: parent
             visible: !win.info || win.info.fields.length === 0
             text: win.current ? "…" : ""
-            color: Zenon.muted
+            color: Zenon.accentMuted
             font.family: Zenon.face
             font.weight: Zenon.weight
             font.pixelSize: Zenon.px(17)
@@ -3599,7 +3599,7 @@ FloatingWindow {
                 wrapMode: Text.WrapAnywhere
                 text: modelData.text
                 color: modelData.ink === "add" ? Zenon.green : modelData.ink === "del" ? Zenon.red
-                  : modelData.ink === "hunk" ? Zenon.cyan : Zenon.keyInk
+                  : modelData.ink === "hunk" ? Zenon.cyan : Zenon.accentKey
                 font.family: "monospace"
                 font.pixelSize: Zenon.px(15)
               }
@@ -3761,7 +3761,7 @@ FloatingWindow {
       DialogButton {
         visible: win.face === "news"
         label: "Back"
-        ink: Zenon.muted
+        ink: Zenon.accentMuted
         onClicked: Ceres.holdBack()
       }
       DialogButton {
@@ -3787,7 +3787,7 @@ FloatingWindow {
       DialogButton {
         visible: win.face === "tx" && !Ceres.txBusy
         label: "Back"
-        ink: Zenon.muted
+        ink: Zenon.accentMuted
         onClicked: Ceres.txClear()
       }
       DialogButton {
@@ -3848,7 +3848,7 @@ FloatingWindow {
         spacing: 8
         DialogButton {
           label: "Cancel"
-          ink: Zenon.muted
+          ink: Zenon.accentMuted
           onClicked: win.cancelAuth()
         }
         DialogButton {
@@ -3940,7 +3940,7 @@ FloatingWindow {
             anchors.rightMargin: 12
             anchors.verticalCenter: parent.verticalCenter
             text: !Ceres.txTotal ? "" : [Ceres.txTotal.rate, Ceres.txTotal.eta].filter(x => x).join("  \u00B7  ")
-            color: Zenon.keyInk
+            color: Zenon.accentKey
             font.family: Zenon.face
             font.weight: Zenon.weight
             font.features: { "tnum": 1 }
@@ -3954,7 +3954,7 @@ FloatingWindow {
           horizontalAlignment: Text.AlignHCenter
           elide: Text.ElideRight
           text: Ceres.txLog.length ? Ceres.txLog[Ceres.txLog.length - 1] : ""
-          color: Zenon.keyInk
+          color: Zenon.accentKey
           font.family: Zenon.face
           font.weight: Zenon.weight
           font.pixelSize: Zenon.px(15)
@@ -3964,7 +3964,7 @@ FloatingWindow {
           width: parent.width
           horizontalAlignment: Text.AlignHCenter
           text: Ceres.txDisk
-          color: Zenon.keyInk
+          color: Zenon.accentKey
           font.family: Zenon.face
           font.weight: Zenon.weight
           font.pixelSize: Zenon.px(15)
@@ -4046,7 +4046,7 @@ FloatingWindow {
               ? "What is coming in cannot be installed next to what you have. Going ahead removes "
                 + (settleCol.gone.length === 1 ? "it" : "them") + " and installs the replacement in one transaction."
               : "Two of the packages coming in conflict with each other. Pick another provider, or settle it in a terminal."
-          color: Zenon.keyInk
+          color: Zenon.accentKey
           font.family: Zenon.face
           font.weight: Zenon.weight
           font.pixelSize: Zenon.px(15)
@@ -4062,9 +4062,9 @@ FloatingWindow {
             textFormat: Text.StyledText
             text: "<font color='" + Zenon.green + "'>+ " + modelData.pkg + "</font>"
               + (modelData.inner
-                ? "  <font color='" + Zenon.muted + "'>conflicts with</font>  "
+                ? "  <font color='" + Zenon.accentMuted + "'>conflicts with</font>  "
                   + "<font color='" + Zenon.yellow + "'>" + modelData.replaces.join(", ") + "</font>"
-                : "  <font color='" + Zenon.muted + "'>replaces</font>  "
+                : "  <font color='" + Zenon.accentMuted + "'>replaces</font>  "
                   + "<font color='" + Zenon.red + "'>\u2212 " + modelData.replaces.join(", ") + "</font>")
             color: Zenon.ink
             font.family: Zenon.face
@@ -4099,7 +4099,7 @@ FloatingWindow {
             Text {
               anchors.verticalCenter: parent.verticalCenter
               text: provLine.modelData.name + " from"
-              color: Zenon.keyInk
+              color: Zenon.accentKey
               font.family: Zenon.face
               font.weight: Zenon.weight
               font.pixelSize: Zenon.px(15)
@@ -4172,7 +4172,7 @@ FloatingWindow {
 
         Text {
           id: confTitle
-          text: "pacman.conf  <font color='" + Zenon.muted + "'>"
+          text: "pacman.conf  <font color='" + Zenon.accentMuted + "'>"
             + configView.changes + (configView.changes === 1 ? " line changed" : " lines changed") + "</font>"
           textFormat: Text.StyledText
           color: Zenon.white
@@ -4187,7 +4187,7 @@ FloatingWindow {
           text: !confSheet.rv ? "Checking with pacman-conf\u2026"
             : confSheet.rv.ok ? "pacman-conf reads it cleanly. The file you have now is kept as pacman.conf.ceres-bak."
             : "pacman-conf objects \u2014 fix these before saving:"
-          color: !confSheet.rv ? Zenon.muted : confSheet.rv.ok ? Zenon.green : Zenon.red
+          color: !confSheet.rv ? Zenon.accentMuted : confSheet.rv.ok ? Zenon.green : Zenon.red
           font.family: Zenon.face
           font.weight: Zenon.weight
           font.pixelSize: Zenon.px(15)
@@ -4235,7 +4235,7 @@ FloatingWindow {
             elide: Text.ElideRight
             text: modelData.text
             color: modelData.ink === "add" ? Zenon.green : modelData.ink === "del" ? Zenon.red
-              : modelData.ink === "hunk" ? Zenon.cyan : Zenon.keyInk
+              : modelData.ink === "hunk" ? Zenon.cyan : Zenon.accentKey
             font.family: "monospace"
             font.pixelSize: Zenon.px(15)
           }
@@ -4251,7 +4251,7 @@ FloatingWindow {
         spacing: 8
         DialogButton {
           label: "Back"
-          ink: Zenon.muted
+          ink: Zenon.accentMuted
           onClicked: win.overlay = ""
         }
         DialogButton {
@@ -4316,7 +4316,7 @@ FloatingWindow {
                 : "From Flathub" + (fpGetSheet.a && fpGetSheet.a.verified ? " \u00B7 verified publisher" : "")
                   + (win.fpInfo && win.fpInfo["Download Size"]
                     ? "  \u00B7  " + win.fpInfo["Download Size"] + " download, " + win.fpInfo["Installed Size"] + " on disk" : "")
-              color: Zenon.keyInk
+              color: Zenon.accentKey
               font.family: Zenon.face
               font.weight: Zenon.weight
               font.pixelSize: Zenon.px(15)
@@ -4330,7 +4330,7 @@ FloatingWindow {
           even: true
           strong: true
           textSize: Zenon.px(16)
-          ink: Zenon.keyInk
+          ink: Zenon.accentKey
           options: [["system", "For everyone", "asks for your password"],
                     ["user", "Just me", "only you \u00B7 no password"]]
           current: win.fpScope
@@ -4346,7 +4346,7 @@ FloatingWindow {
             + " \u2014 " + win.fpRuntime.download + " more to download"
             + (win.fpRuntime.installed ? ", " + win.fpRuntime.installed + " on disk" : "")
             + ". Every app built on it shares it, so it comes down once."
-          color: Zenon.keyInk
+          color: Zenon.accentKey
           font.family: Zenon.face
           font.weight: Zenon.weight
           font.pixelSize: Zenon.px(15)
@@ -4359,7 +4359,7 @@ FloatingWindow {
           text: fpGetSheet.perms.length === 0 ? "Sealed: it asks for nothing beyond its window and sound."
             : "It may use: " + fpGetSheet.perms.slice(0, 5).map(p => p.text.charAt(0).toLowerCase() + p.text.slice(1)).join("; ")
               + (fpGetSheet.perms.length > 5 ? "; and " + (fpGetSheet.perms.length - 5) + " more" : "") + "."
-          color: fpGetSheet.perms.some(p => p.level === "high") ? Zenon.yellow : Zenon.keyInk
+          color: fpGetSheet.perms.some(p => p.level === "high") ? Zenon.yellow : Zenon.accentKey
           font.family: Zenon.face
           font.weight: Zenon.weight
           font.pixelSize: Zenon.px(15)
@@ -4369,7 +4369,7 @@ FloatingWindow {
           width: parent.width
           wrapMode: Text.Wrap
           text: "Any runtime nothing else needs goes with it."
-          color: Zenon.keyInk
+          color: Zenon.accentKey
           font.family: Zenon.face
           font.weight: Zenon.weight
           font.pixelSize: Zenon.px(15)
@@ -4391,7 +4391,7 @@ FloatingWindow {
         spacing: 8
         DialogButton {
           label: "Back"
-          ink: Zenon.muted
+          ink: Zenon.accentMuted
           onClicked: win.overlay = ""
         }
         DialogButton {
@@ -4447,7 +4447,7 @@ FloatingWindow {
               + ", with every runtime. ")
             + "Then Flathub as a source, the flatpak package, and what Flatpak keeps itself \u2014 its stores in "
             + "/var/lib/flatpak and ~/.local/share/flatpak, and its cache \u2014 so nothing of it is left."
-          color: Zenon.keyInk
+          color: Zenon.accentKey
           font.family: Zenon.face
           font.weight: Zenon.weight
           font.pixelSize: Zenon.px(15)
@@ -4485,7 +4485,7 @@ FloatingWindow {
               Text {
                 anchors.verticalCenter: parent.verticalCenter
                 text: modelData.scope === "user" ? "just you" : "everyone"
-                color: Zenon.muted
+                color: Zenon.accentMuted
                 font.family: Zenon.face
                 font.weight: Zenon.weight
                 font.pixelSize: Zenon.px(14)
@@ -4495,7 +4495,7 @@ FloatingWindow {
           Text {
             visible: fpSheet.apps.length > 12
             text: "and " + (fpSheet.apps.length - 12) + " more"
-            color: Zenon.muted
+            color: Zenon.accentMuted
             font.family: Zenon.face
             font.weight: Zenon.weight
             font.pixelSize: Zenon.px(14)
@@ -4518,7 +4518,7 @@ FloatingWindow {
         spacing: 8
         DialogButton {
           label: "Back"
-          ink: Zenon.muted
+          ink: Zenon.accentMuted
           onClicked: win.overlay = ""
         }
         DialogButton {
@@ -4643,7 +4643,7 @@ FloatingWindow {
             spacing: 4
             Text {
               text: stat.label
-              color: Zenon.muted
+              color: Zenon.accentMuted
               font.family: Zenon.face
               font.weight: Zenon.weight
               font.pixelSize: Zenon.px(15)
@@ -4783,7 +4783,7 @@ FloatingWindow {
                 visible: card.detail !== "" && card.detail !== card.error
                 wrapMode: Text.Wrap
                 text: card.detail
-                color: Zenon.muted
+                color: Zenon.accentMuted
                 font.family: Zenon.face
                 font.weight: Zenon.weight
                 font.pixelSize: Zenon.px(14)
@@ -4802,9 +4802,9 @@ FloatingWindow {
                   // escaped: a dependency is written with its version bound,
                   // "foo<2" or "bar>=1", and StyledText read those as tags
                   text: "<b><font color='" + Zenon.white + "'>" + Strings.escapeHtml(modelData.by) + "</font></b>"
-                    + "<font color='" + Zenon.muted + "'>  needs  </font>"
+                    + "<font color='" + Zenon.accentMuted + "'>  needs  </font>"
                     + Strings.escapeHtml(modelData.deps.join(", "))
-                  color: Zenon.keyInk
+                  color: Zenon.accentKey
                   font.family: Zenon.face
                   font.weight: Zenon.weight
                   font.pixelSize: Zenon.px(15)
@@ -4817,7 +4817,7 @@ FloatingWindow {
                   width: bannerCol.width
                   wrapMode: Text.Wrap
                   text: modelData
-                  color: Zenon.keyInk
+                  color: Zenon.accentKey
                   font.family: Zenon.face
                   font.weight: Zenon.weight
                   font.pixelSize: Zenon.px(15)
@@ -4826,7 +4826,7 @@ FloatingWindow {
               Text {
                 visible: card.blocks.needs.length > 6
                 text: "+ " + (card.blocks.needs.length - 6) + " more"
-                color: Zenon.muted
+                color: Zenon.accentMuted
                 font.family: Zenon.face
                 font.weight: Zenon.weight
                 font.pixelSize: Zenon.px(15)
@@ -4839,7 +4839,7 @@ FloatingWindow {
                 wrapMode: Text.Wrap
                 text: "Mark " + (card.blocks.needs.length === 1 ? card.blocks.needs[0].by
                     : card.blocks.needs.length + " packages") + " for removal as well, or leave this installed."
-                color: Zenon.muted
+                color: Zenon.accentMuted
                 font.family: Zenon.face
                 font.weight: Zenon.weight
                 font.italic: true
@@ -4883,7 +4883,7 @@ FloatingWindow {
                 anchors.bottom: parent.bottom
                 anchors.bottomMargin: 4
                 text: ent.modelData.name
-                color: Zenon.muted
+                color: Zenon.accentMuted
                 font.family: Zenon.face
                 font.weight: Font.Bold
                 font.pixelSize: Zenon.px(15)
@@ -4897,7 +4897,7 @@ FloatingWindow {
                 anchors.verticalCenter: parent.verticalCenter
                 width: 20
                 text: ent.modelData.target ? (card.removing ? "" : win.confirmKind === "update" ? "\uF062" : win.confirmKind === "undo" ? "\uF0E2" : "") : "·"
-                color: ent.modelData.target ? card.ink : Zenon.muted
+                color: ent.modelData.target ? card.ink : Zenon.accentMuted
                 font.family: Zenon.face
                 font.weight: Zenon.weight
                 font.pixelSize: Zenon.px(15)
@@ -4908,7 +4908,7 @@ FloatingWindow {
                 anchors.left: entGlyph.right
                 anchors.verticalCenter: parent.verticalCenter
                 text: ent.modelData.name
-                color: ent.modelData.target ? Zenon.white : Zenon.keyInk
+                color: ent.modelData.target ? Zenon.white : Zenon.accentKey
                 font.family: Zenon.face
                 font.weight: ent.modelData.target ? Font.Bold : Font.Normal
                 font.pixelSize: Zenon.px(ent.modelData.target ? 17 : 16)
@@ -4922,7 +4922,7 @@ FloatingWindow {
                 anchors.verticalCenter: parent.verticalCenter
                 elide: Text.ElideRight
                 text: ent.modelData.version || ""
-                color: Zenon.muted
+                color: Zenon.accentMuted
                 font.family: Zenon.face
                 font.weight: Zenon.weight
                 font.pixelSize: Zenon.px(15)
@@ -4958,7 +4958,7 @@ FloatingWindow {
                 anchors.right: parent.right
                 anchors.verticalCenter: parent.verticalCenter
                 text: ent.modelData.size > 0 ? Cer.bytes(ent.modelData.size) : ""
-                color: Zenon.muted
+                color: Zenon.accentMuted
                 font.family: Zenon.face
                 font.weight: Zenon.weight
                 font.pixelSize: Zenon.px(15)
@@ -5050,7 +5050,7 @@ FloatingWindow {
         }
         DialogButton {
           label: "Back"
-          ink: Zenon.muted
+          ink: Zenon.accentMuted
           onClicked: win.overlay = ""
         }
         DialogButton {

@@ -22,7 +22,7 @@ Item {
   // the panel's palette, handed in rather than reached for
   property string face: Zenon.face
   property color fgColor: Zenon.white
-  property color dimColor: Zenon.muted
+  property color dimColor: Zenon.accentMuted
   property color highlight: Zenon.cyan
 
   readonly property var c: (Oracle.revision, Oracle.computer)

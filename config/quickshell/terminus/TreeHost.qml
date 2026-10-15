@@ -95,7 +95,7 @@ QtObject {
   function whenOf(e) { return Terminus.formatTime(e.mtime); }
   function kindOf(e) { return e.isDir ? "directory" : Terminus.kindOf(e.name); }
   readonly property var tagMarks: ({})
-  function tagInk(name) { return Zenon.muted; }
+  function tagInk(name) { return Zenon.accentMuted; }
   function isBookmarked(p) { return false; }
 
   // no dragging out, and nothing dropped in

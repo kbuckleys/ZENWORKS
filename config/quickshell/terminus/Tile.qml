@@ -559,7 +559,7 @@ Item {
     visible: !tile.editing && tile.detail !== ""
     text: tile.detail
     opacity: tile.dim ? 0.5 : 1
-    color: Zenon.muted
+    color: Zenon.accentMuted
     font.family: Zenon.face
     font.weight: Zenon.weight
     font.features: { "tnum": 1 }

@@ -81,7 +81,7 @@ Item {
         anchors.verticalCenter: parent.verticalCenter
         elide: Text.ElideMiddle
         text: row.e.path !== row.probe.name ? "→  " + row.e.path : ""
-        color: Zenon.muted
+        color: Zenon.accentMuted
         font.family: Zenon.face
         font.weight: Zenon.weight
         font.pixelSize: Zenon.px(13)
@@ -92,7 +92,7 @@ Item {
         anchors.rightMargin: 10
         anchors.verticalCenter: parent.verticalCenter
         text: row.e.size >= 0 ? Terminus.formatSize(row.e.size) : ""
-        color: Zenon.muted
+        color: Zenon.accentMuted
         font.family: Zenon.face
         font.weight: Zenon.weight
         font.features: { "tnum": 1 }

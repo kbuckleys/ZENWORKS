@@ -233,9 +233,9 @@ PlatoSheet {
       horizontalAlignment: Text.AlignRight
       font: panel.face
       color: panel.page === "parsers"
-        ? (panel.armed !== "" ? Zenon.yellow : panel.plugins && panel.plugins.parserPhase === "failed" ? Zenon.red : Zenon.muted)
+        ? (panel.armed !== "" ? Zenon.yellow : panel.plugins && panel.plugins.parserPhase === "failed" ? Zenon.red : Zenon.accentMuted)
         : panel.problem !== "" || panel.phase === "failed" ? Zenon.red
-        : panel.armed !== "" ? Zenon.yellow : Zenon.muted
+        : panel.armed !== "" ? Zenon.yellow : Zenon.accentMuted
       text: {
         if (panel.page === "parsers") {
           if (panel.armed !== "") return "ctrl d again removes " + panel.armed;
@@ -314,7 +314,7 @@ PlatoSheet {
         font.weight: Zenon.weight
         font.pixelSize: panel.face.pixelSize
         color: (item.r.kind === "installed" && item.r.p.enabled) || (item.r.kind === "parser" && item.r.x.installed)
-          ? Zenon.green : item.r.kind === "parser" && item.r.x.bundled ? Zenon.blue : Zenon.muted
+          ? Zenon.green : item.r.kind === "parser" && item.r.x.bundled ? Zenon.blue : Zenon.accentMuted
         text: (item.r.kind === "installed" && item.r.p.enabled) || (item.r.kind === "parser" && (item.r.x.installed || item.r.x.bundled))
           ? "●" : "○"
       }
@@ -326,9 +326,9 @@ PlatoSheet {
         textFormat: Text.PlainText
         font: panel.face
         color: item.r.kind === "error" ? Zenon.red
-          : item.r.kind === "commit" ? (item.r.c.dir === "in" ? Zenon.white : Zenon.muted)
-          : item.r.kind === "installed" && !item.r.p.enabled ? Zenon.muted
-          : item.r.kind === "parser" && !item.r.x.installed && !item.r.x.bundled && !item.r.want ? Zenon.muted
+          : item.r.kind === "commit" ? (item.r.c.dir === "in" ? Zenon.white : Zenon.accentMuted)
+          : item.r.kind === "installed" && !item.r.p.enabled ? Zenon.accentMuted
+          : item.r.kind === "parser" && !item.r.x.installed && !item.r.x.bundled && !item.r.want ? Zenon.accentMuted
           : Zenon.white
         text: {
           const r = item.r;
@@ -345,7 +345,7 @@ PlatoSheet {
         anchors.rightMargin: 12
         anchors.verticalCenter: parent.verticalCenter
         font: panel.face
-        color: Zenon.muted
+        color: Zenon.accentMuted
         visible: item.r.kind !== "error"
         text: {
           const r = item.r;
@@ -386,7 +386,7 @@ PlatoSheet {
       Text {
         anchors.horizontalCenter: parent.horizontalCenter
         font: panel.face
-        color: Zenon.muted
+        color: Zenon.accentMuted
         text: {
           if (panel.page === "installed") return "no plugins yet — a adds one";
           if (panel.page === "updates") {
@@ -446,7 +446,7 @@ PlatoSheet {
       anchors.verticalCenter: parent.verticalCenter
       x: 12
       font: panel.face
-      color: Zenon.muted
+      color: Zenon.accentMuted
       text: panel.filtering ? "type to filter languages" : "owner/repo, or a git URL"
     }
     // focused for typing: terminus' held ring (user, 2026-10-11 — every

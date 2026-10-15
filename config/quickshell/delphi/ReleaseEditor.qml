@@ -55,7 +55,7 @@ Item {
       Column {
         spacing: 5
         width: 170
-        Text { text: "Tag"; color: Zenon.muted; font.family: Zenon.face; font.weight: Zenon.weight; font.pixelSize: Zenon.px(13) }
+        Text { text: "Tag"; color: Zenon.accentMuted; font.family: Zenon.face; font.weight: Zenon.weight; font.pixelSize: Zenon.px(13) }
         BulkField {
           id: tagField
           width: parent.width
@@ -73,7 +73,7 @@ Item {
       Column {
         visible: !!ed.e && ed.e.mode === "new"
         spacing: 5
-        Text { text: "From"; color: Zenon.muted; font.family: Zenon.face; font.weight: Zenon.weight; font.pixelSize: Zenon.px(13) }
+        Text { text: "From"; color: Zenon.accentMuted; font.family: Zenon.face; font.weight: Zenon.weight; font.pixelSize: Zenon.px(13) }
         DialogButton {
           id: fromBtn
           height: Math.round(Zenon.px(15) * 2.2)
@@ -90,7 +90,7 @@ Item {
       Column {
         spacing: 5
         width: parent.width - x
-        Text { text: "Title"; color: Zenon.muted; font.family: Zenon.face; font.weight: Zenon.weight; font.pixelSize: Zenon.px(13) }
+        Text { text: "Title"; color: Zenon.accentMuted; font.family: Zenon.face; font.weight: Zenon.weight; font.pixelSize: Zenon.px(13) }
         BulkField {
           id: titleField
           width: parent.width
@@ -115,7 +115,7 @@ Item {
           + ed.page.site.name + " makes the tag on " + (ed.e.target || "the branch") + " as it has it"
           + (ed.e.unpushed > 0 ? " — " + ed.e.unpushed + (ed.e.unpushed === 1 ? " commit" : " commits") + " here are not pushed yet, and would not be in it." : ".")
         : ed.e.wasDraft ? "A draft: only you see it until it is published." : ""
-      color: ed.e && ed.e.unpushed > 0 ? Zenon.yellow : Zenon.muted
+      color: ed.e && ed.e.unpushed > 0 ? Zenon.yellow : Zenon.accentMuted
       font.family: Zenon.face
       font.weight: Zenon.weight
       font.pixelSize: Zenon.px(13)
@@ -167,7 +167,7 @@ Item {
           anchors.verticalCenter: parent.verticalCenter
           visible: !!ed.e && ed.e.by !== ""
           text: ed.e && ed.e.by === "github" ? "written by GitHub, from what was merged" : ed.e && ed.e.by === "commits" ? "written from the commits since " + (ed.e.prev || "the start") : ""
-          color: Zenon.muted
+          color: Zenon.accentMuted
           font.family: Zenon.face
           font.weight: Zenon.weight
           font.pixelSize: Zenon.px(13)
@@ -225,7 +225,7 @@ Item {
         wrapMode: TextEdit.Wrap
         textFormat: ed.e && ed.e.body.trim() !== "" ? TextEdit.MarkdownText : TextEdit.PlainText
         text: !ed.e || ed.e.body.trim() === "" ? "Nothing written yet" : D.mdLinesOf(ed.e.body)
-        color: ed.e && ed.e.body.trim() !== "" ? Zenon.ink : Zenon.muted
+        color: ed.e && ed.e.body.trim() !== "" ? Zenon.ink : Zenon.accentMuted
         selectionColor: Zenon.alpha(Zenon.cyan, 0.4)
         font.family: Zenon.face
         font.weight: Zenon.weight

@@ -36,7 +36,7 @@ Item {
       width: 12
       height: 12
       radius: 6
-      color: sw.on ? Zenon.cyan : Zenon.muted
+      color: sw.on ? Zenon.cyan : Zenon.accentMuted
       Behavior on x { NumberAnimation { duration: Zenon.fast; easing.type: Zenon.ease } }
     }
     Ring { on: sw.kbOn }
@@ -47,7 +47,7 @@ Item {
     anchors.right: parent.right
     anchors.verticalCenter: parent.verticalCenter
     text: sw.label
-    color: sw.on ? Zenon.white : Zenon.muted
+    color: sw.on ? Zenon.white : Zenon.accentMuted
     font.family: Zenon.face
     font.weight: Zenon.weight
     font.pixelSize: Zenon.px(14)

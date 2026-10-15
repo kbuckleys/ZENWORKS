@@ -298,7 +298,7 @@ Item {
       Text {
         x: 14
         text: "opens with"
-        color: Zenon.muted
+        color: Zenon.accentMuted
         font.family: Zenon.face
         font.weight: Zenon.weight
         font.pixelSize: Zenon.px(12)
@@ -372,7 +372,7 @@ Item {
             anchors.rightMargin: 12
             anchors.verticalCenter: parent.verticalCenter
             text: ""   // nf-fa-times, as the row menu uses
-            color: handlerXHov.hovered ? Zenon.red : Zenon.muted
+            color: handlerXHov.hovered ? Zenon.red : Zenon.accentMuted
             font.family: Zenon.faceMono
             font.weight: Zenon.weight
             font.pixelSize: Zenon.px(14)
@@ -465,7 +465,7 @@ Item {
           horizontalAlignment: Text.AlignHCenter
           text: appRow.modelData.glyph || ""
           color: appRow.handler ? Zenon.cyan
-               : (appRow.target ? Zenon.white : Zenon.keyInk)
+               : (appRow.target ? Zenon.white : Zenon.accentKey)
           font.family: Zenon.face
           font.weight: Zenon.weight
           font.pixelSize: Zenon.px(16)
@@ -480,7 +480,7 @@ Item {
           text: modelData.name
           elide: Text.ElideRight
           color: appRow.handler ? Zenon.cyan
-               : (appRow.target ? Zenon.white : Zenon.keyInk)
+               : (appRow.target ? Zenon.white : Zenon.accentKey)
           font.family: Zenon.face
           font.weight: Zenon.weight
           font.pixelSize: Zenon.px(16)
@@ -498,7 +498,7 @@ Item {
           text: modelData.id
           elide: Text.ElideMiddle
           horizontalAlignment: Text.AlignRight
-          color: Zenon.muted
+          color: Zenon.accentMuted
           font.family: Zenon.face
           font.weight: Zenon.weight
           font.pixelSize: Zenon.px(13)
@@ -524,7 +524,7 @@ Item {
         anchors.leftMargin: 43
         anchors.verticalCenter: parent.verticalCenter
         text: "nothing matches"
-        color: Zenon.muted
+        color: Zenon.accentMuted
         font.family: Zenon.face
         font.weight: Zenon.weight
         font.pixelSize: Zenon.px(16)
@@ -552,7 +552,7 @@ Item {
           anchors.verticalCenter: parent.verticalCenter
           rightPadding: 2
           text: picker.query !== "" ? picker.query : "type to filter"
-          color: picker.query !== "" ? Zenon.sand : Zenon.muted
+          color: picker.query !== "" ? Zenon.sand : Zenon.accentMuted
           font.family: Zenon.face
           font.weight: Zenon.weight
           font.pixelSize: Zenon.px(13)
@@ -576,7 +576,7 @@ Item {
             Text {
               anchors.verticalCenter: parent.verticalCenter
               text: appHintPair.modelData[1]
-              color: Zenon.muted
+              color: Zenon.accentMuted
               font.family: Zenon.face
               font.weight: Zenon.weight
               font.pixelSize: Zenon.px(13)

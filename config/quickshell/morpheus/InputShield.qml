@@ -26,16 +26,28 @@ Item {
   // input of its own, which is where the shield underneath would otherwise
   // hear it.
   property Item keep: null
+  // WHAT IN THE HEAD IS STILL LIVE (user, 2026-10-15: the properties
+  // sheet's title is renamed by clicking it, and the shield swallowed the
+  // click). A press on one of these goes past the shield to it.
+  property var through: []
   signal clicked()
+  function letThrough(from, x, y) {
+    for (const it of shield.through) {
+      if (it && it.visible && it.contains(it.mapFromItem(from, x, y))) return true;
+    }
+    return false;
+  }
 
   // Swallows EVERYTHING, the head band included: the point of the shield
   // is that nothing behind a modal reacts, and that is as true of the
   // header as it is of the listing.
   MouseArea {
+    id: swallow
     anchors.fill: parent
     acceptedButtons: Qt.AllButtons
     // claimed as well, so nothing behind lights up under the pointer
     hoverEnabled: true
+    onPressed: (m) => { if (shield.letThrough(swallow, m.x, m.y)) m.accepted = false; }
     WheelHandler {
       // every device, and nothing passed on
       onWheel: (e) => { e.accepted = true; }

@@ -51,7 +51,7 @@ Item {
   // sidebars, user 2026-10-11: no dividers — the settings panel keeps them)
   property bool ruled: true
   // the word's ink: the breadcrumb's in a terminus panel, muted elsewhere
-  property color ink: term ? term.crumbInk : Zenon.muted
+  property color ink: term ? term.crumbInk : Zenon.accentMuted
 
   readonly property int rule: 1
   // Over the top rule, and it belongs to the group that just ended.

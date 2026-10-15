@@ -177,9 +177,9 @@ Item {
     detail: fb.form && fb.form.detail ? fb.form.detail : ""
     items: fb.form && fb.form.items ? fb.form.items : []
     choices: [{ label: fb.form && fb.form.verb ? fb.form.verb : "OK",
-                ink: fb.ready ? (fb.form && fb.form.verbInk ? fb.form.verbInk : Zenon.cyan) : Zenon.muted,
+                ink: fb.ready ? (fb.form && fb.form.verbInk ? fb.form.verbInk : Zenon.cyan) : Zenon.accentMuted,
                 busy: fb.busy, busyText: fb.busyText },
-              { label: fb.form && fb.form.cancelLabel ? fb.form.cancelLabel : "Cancel", ink: Zenon.muted }]
+              { label: fb.form && fb.form.cancelLabel ? fb.form.cancelLabel : "Cancel", ink: Zenon.accentMuted }]
     pick: fb.pick
     onPicked: (i) => fb.pick = i
     onChose: (i) => fb.answer(i === 0)
@@ -217,7 +217,7 @@ Item {
           visible: !!fcol.modelData.label
           readonly property bool wanted: fb.missing.indexOf(fcol.modelData.key) >= 0
           text: (fcol.modelData.label || "") + (wanted ? "  —  needed" + (fcol.modelData.why ? ": " + fcol.modelData.why : "") : "")
-          color: wanted ? Zenon.red : Zenon.soft
+          color: wanted ? Zenon.red : Zenon.accentSoft
           font.family: Zenon.face
           font.weight: Zenon.weight
           font.pixelSize: Zenon.px(14)

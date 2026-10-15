@@ -82,7 +82,7 @@ Item {
         : body.waiting === 0 ? "all mounted"
         : body.waiting + " not mounted"
       color: body.note !== "" ? Zenon.red
-        : body.waiting === 0 ? Zenon.green : Zenon.muted
+        : body.waiting === 0 ? Zenon.green : Zenon.accentMuted
       font.family: Zenon.face
       font.weight: Zenon.weight
       font.pixelSize: Zenon.px(14)
@@ -160,7 +160,7 @@ Item {
                  [row.modelData.vendor, row.modelData.model].filter(x => x).join(" "),
                  row.mounted ? "at " + row.modelData.mount : ""]
             .filter(x => x).join("  ·  ")
-          color: row.mounted ? Zenon.keyInk : Zenon.muted
+          color: row.mounted ? Zenon.accentKey : Zenon.accentMuted
           font.family: Zenon.face
           font.weight: Zenon.weight
           font.pixelSize: Zenon.px(13)
@@ -222,7 +222,7 @@ Item {
       elide: Text.ElideRight
       text: (body.many ? "↑↓ choose   m mount" : "")
         + (body.details ? (body.many ? "   " : "") + "i details" : "")
-      color: Zenon.muted
+      color: Zenon.accentMuted
       font.family: Zenon.face
       font.weight: Zenon.weight
       font.pixelSize: Zenon.px(13)
@@ -236,7 +236,7 @@ Item {
       spacing: 8
       DialogButton {
         label: (body.many && body.waiting === 0) || foot.onlyMounted ? "Close" : "Not now"
-        ink: Zenon.muted
+        ink: Zenon.accentMuted
         onClicked: body.dismissed()
       }
       // the pill's plain Mount: mount it and stay where you are

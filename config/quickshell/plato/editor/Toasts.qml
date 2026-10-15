@@ -143,7 +143,7 @@ Item {
 
   function ink(tone) {
     return tone === "error" ? Zenon.red : tone === "warn" ? Zenon.yellow
-      : tone === "progress" ? Zenon.cyan : Zenon.muted;
+      : tone === "progress" ? Zenon.cyan : Zenon.accentMuted;
   }
   function glyph(tone) {
     return tone === "error" ? "\u{F0159}" : tone === "warn" ? "\u{F0026}"
@@ -308,7 +308,7 @@ Item {
             font.family: Zenon.face
             font.weight: Zenon.weight
             font.pixelSize: 12
-            color: dismissHover.hovered ? Zenon.white : Zenon.muted
+            color: dismissHover.hovered ? Zenon.white : Zenon.accentMuted
             text: "dismiss"
             HoverHandler { id: dismissHover; cursorShape: Qt.PointingHandCursor }
             TapHandler { onTapped: root.answer(card.ask, "") }
@@ -324,7 +324,7 @@ Item {
           font.family: Zenon.face
           font.weight: Zenon.weight
           font.pixelSize: 11
-          color: Zenon.muted
+          color: Zenon.accentMuted
           text: "any key"
         }
         HoverHandler { id: hover }

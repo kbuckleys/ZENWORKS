@@ -119,7 +119,7 @@ Item {
             width: sameCol.width
             elide: Text.ElideRight
             text: String(modelData).replace(/\r?\n$/, "") || " "
-            color: Zenon.muted
+            color: Zenon.accentMuted
             font.family: cv.codeFace
             font.pixelSize: Zenon.px(14)
           }
@@ -127,7 +127,7 @@ Item {
         Text {
           visible: sameCol.folds
           text: "···  " + (sameCol.lines.length - 4) + " lines the same  ···"
-          color: Zenon.dimInk !== undefined ? Zenon.dimInk : Zenon.muted
+          color: Zenon.dimInk !== undefined ? Zenon.dimInk : Zenon.accentMuted
           font.family: Zenon.face
           font.weight: Zenon.weight
           font.pixelSize: Zenon.px(13)
@@ -140,7 +140,7 @@ Item {
             width: sameCol.width
             elide: Text.ElideRight
             text: String(modelData).replace(/\r?\n$/, "") || " "
-            color: Zenon.muted
+            color: Zenon.accentMuted
             font.family: cv.codeFace
             font.pixelSize: Zenon.px(14)
           }
@@ -193,7 +193,7 @@ Item {
             text: blk.how === "both" ? cv.names.ours + " first  ·  <u>" + cv.names.theirs + " first instead</u>"
                                      : cv.names.theirs + " first  ·  <u>" + cv.names.ours + " first instead</u>"
             textFormat: Text.StyledText
-            color: Zenon.muted
+            color: Zenon.accentMuted
             font.family: Zenon.face
             font.weight: Zenon.weight
             font.pixelSize: Zenon.px(13)
@@ -213,8 +213,8 @@ Item {
                 width: parent.width
                 elide: Text.ElideRight
                 textFormat: Text.StyledText
-                text: "<b>" + side.modelData[1] + "</b>" + (side.modelData[2] ? "  <font color='" + Zenon.hex(Zenon.muted) + "'>" + D.esc(side.modelData[2]) + "</font>" : "")
-                  + (side.modelData[3].length === 0 ? "  <font color='" + Zenon.hex(Zenon.muted) + "'>— nothing here</font>" : "")
+                text: "<b>" + side.modelData[1] + "</b>" + (side.modelData[2] ? "  <font color='" + Zenon.hex(Zenon.accentMuted) + "'>" + D.esc(side.modelData[2]) + "</font>" : "")
+                  + (side.modelData[3].length === 0 ? "  <font color='" + Zenon.hex(Zenon.accentMuted) + "'>— nothing here</font>" : "")
                 color: side.modelData[0] === "ours" ? Zenon.cyan : Zenon.magenta
                 font.family: Zenon.face
                 font.weight: Zenon.weight
@@ -262,7 +262,7 @@ Item {
       x: 16
       anchors.verticalCenter: parent.verticalCenter
       text: cv.chosen + " of " + cv.count + " chosen"
-      color: cv.chosen === cv.count ? Zenon.green : Zenon.muted
+      color: cv.chosen === cv.count ? Zenon.green : Zenon.accentMuted
       font.family: Zenon.face
       font.weight: Zenon.weight
       font.features: { "tnum": 1 }

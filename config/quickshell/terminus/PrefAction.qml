@@ -82,7 +82,7 @@ Item {
     anchors.rightMargin: 14
     anchors.verticalCenter: parent.verticalCenter
     text: act.verb
-    color: actHov.hovered && act.enabled ? Zenon.cyan : Zenon.muted
+    color: actHov.hovered && act.enabled ? Zenon.cyan : Zenon.accentMuted
     font.family: Zenon.face
     font.weight: Zenon.weight
     font.pixelSize: Zenon.px(13)

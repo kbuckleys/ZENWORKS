@@ -226,7 +226,7 @@ Item {
           radius: 1
           x: modelData === 0 ? seams.g.vx - 4 : seams.g.vx + 3
           y: seams.g.y + (seams.g.h - height) / 2
-          color: lit ? Zenon.cyan : Zenon.muted
+          color: lit ? Zenon.cyan : Zenon.accentMuted
           Behavior on color { ColorAnimation { duration: Zenon.fast } }
         }
       }
@@ -249,7 +249,7 @@ Item {
           radius: 1
           x: seams.g.x + (seams.g.w - width) / 2
           y: modelData === 0 ? seams.g.hy - 4 : seams.g.hy + 3
-          color: lit ? Zenon.cyan : Zenon.muted
+          color: lit ? Zenon.cyan : Zenon.accentMuted
           Behavior on color { ColorAnimation { duration: Zenon.fast } }
         }
       }
@@ -353,7 +353,7 @@ Item {
       anchors.fill: parent
       color: "transparent"
       border.width: 1
-      border.color: Zenon.muted
+      border.color: Zenon.accentMuted
     }
 
     // A NEW MODE MORPHS THE CARET: the block narrows to insert's bar, the
@@ -994,7 +994,7 @@ Item {
         : i.kind === "delete" ? i.old.length + (i.old.length === 1 ? " line removed" : " lines removed")
         : "changed: " + i.old.length + " → " + i.new.length + (i.new.length === 1 ? " line" : " lines"))
         + (i.open ? "  ·  click to shut" : "  ·  click to open in place")
-      color: Zenon.muted
+      color: Zenon.accentMuted
       font.family: Zenon.face
       font.weight: Zenon.weight
       font.pixelSize: Zenon.px(13)

@@ -462,6 +462,16 @@ QtObject {
   readonly property color hintFrostBg: floor(glass(0.6))
   readonly property color selBg:     pick("selBg")
   readonly property color keyInk:    pick("keyInk")
+  // ── THE GREYS, IN THE ACCENT (user, 2026-10-15) ─────────────────────
+  // A window's chrome — section heads, the steps behind the current crumb,
+  // a count, a glyph at rest — in its theme's accent rather than a neutral
+  // grey, as the cursor is: the same three greys, each drawn part of the
+  // way to cyan (the accent; Follow Background's seed). Same lightness
+  // order, so a muted word stays quieter than a soft one.
+  readonly property real accentGreyMix: 0.4
+  readonly property color accentMuted: mix(muted, cyan, accentGreyMix)
+  readonly property color accentSoft:  mix(soft, cyan, accentGreyMix)
+  readonly property color accentKey:   mix(keyInk, cyan, accentGreyMix)
   // ── spacing ──────────────────────────────────────────────────────────
   // Four values, and only four. padModule is a module's own breathing room,
   // gap is the space between two neighbours, padBar is the pill's end caps,

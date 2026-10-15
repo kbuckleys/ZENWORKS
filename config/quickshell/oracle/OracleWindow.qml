@@ -75,7 +75,7 @@ FloatingWindow {
   readonly property color bgColor: Zenon.layerBg
   readonly property color fgColor: Zenon.white
   readonly property color headColor: Zenon.cyan
-  readonly property color dimColor: Zenon.muted
+  readonly property color dimColor: Zenon.accentMuted
   // WHAT YOU ARE TOUCHING, and what has been CHANGED, are two different
   // facts and now wear two different colors.
   //

@@ -240,7 +240,7 @@ Item {
       // an escape, not the character: literal nerd glyphs do not survive
       // every editor and tool on their way into this file
       text: "\uEC02"
-      color: bar.treeShown ? Zenon.cyan : (treeHover.hovered ? Zenon.white : Zenon.muted)
+      color: bar.treeShown ? Zenon.cyan : (treeHover.hovered ? Zenon.white : Zenon.accentMuted)
       font.family: Zenon.face
       font.weight: Zenon.weight
       font.pixelSize: bar.glyphSize
@@ -265,7 +265,7 @@ Item {
     font.pixelSize: bar.font.pixelSize - 2
     font.weight: Font.DemiBold
     font.letterSpacing: 1.2
-    color: bar.tinted ? bar.modeInk : Zenon.muted
+    color: bar.tinted ? bar.modeInk : Zenon.accentMuted
     text: bar.ed.modeName.toUpperCase()
     Behavior on color { ColorAnimation { duration: Zenon.normal } }
     // as wide as the longest name, so the path does not shift with the mode
@@ -305,7 +305,7 @@ Item {
       Text {
         anchors.verticalCenter: parent.verticalCenter
         font: bar.font
-        color: Zenon.muted
+        color: Zenon.accentMuted
         textFormat: Text.PlainText
         text: parent.cut >= 0 ? parent.path.slice(0, parent.cut + 1) : ""
       }
@@ -319,7 +319,7 @@ Item {
       Text {
         anchors.verticalCenter: parent.verticalCenter
         // light red: Zenon's pink (the palette's bright red)
-        color: bar.ed.modified ? Zenon.pink : Zenon.muted
+        color: bar.ed.modified ? Zenon.pink : Zenon.accentMuted
         // unsaved: U+EA73, the glyph the user chose for it (tabs and the
         // buffer picker wear the same), as an escape so it survives editors
         font.family: bar.ed.modified ? Zenon.faceMono : bar.font.family
@@ -405,7 +405,7 @@ Item {
             visible: crumb.index > 0
             anchors.verticalCenter: parent.verticalCenter
             font: bar.font
-            color: Zenon.muted
+            color: Zenon.accentMuted
             text: " \u203A "
           }
           Text {
@@ -413,13 +413,13 @@ Item {
             font.family: Zenon.faceMono
             font.weight: Zenon.weight
             font.pixelSize: bar.font.pixelSize
-            color: crumbHover.hovered ? Zenon.white : Zenon.muted
+            color: crumbHover.hovered ? Zenon.white : Zenon.accentMuted
             text: Kinds.glyph(crumb.modelData.kind)
           }
           Text {
             anchors.verticalCenter: parent.verticalCenter
             font: bar.font
-            color: crumbHover.hovered ? Zenon.white : Zenon.muted
+            color: crumbHover.hovered ? Zenon.white : Zenon.accentMuted
             textFormat: Text.PlainText
             text: crumb.modelData.name
           }
@@ -499,13 +499,13 @@ Item {
         font.family: Zenon.faceMono
         font.weight: Zenon.weight
         font.pixelSize: bar.iconSize
-        color: lspRow.lsp.busy ? Zenon.blue : Zenon.muted
+        color: lspRow.lsp.busy ? Zenon.blue : Zenon.accentMuted
         text: "\u{F0493}"
       }
       Text {
         anchors.verticalCenter: parent.verticalCenter
         font: bar.font
-        color: parent.lsp.busy ? Zenon.blue : Zenon.muted
+        color: parent.lsp.busy ? Zenon.blue : Zenon.accentMuted
         textFormat: Text.PlainText
         elide: Text.ElideRight
         width: Math.min(implicitWidth, 260)
@@ -552,7 +552,7 @@ Item {
       Text {
         anchors.verticalCenter: parent.verticalCenter
         font: bar.font
-        color: Zenon.muted
+        color: Zenon.accentMuted
         textFormat: Text.PlainText
         elide: Text.ElideRight
         width: Math.min(implicitWidth, 180)
@@ -582,7 +582,7 @@ Item {
       readonly property var ind: bar.st.indent || { tabs: false, width: 4 }
       font: bar.font
       // white outside normal mode, as the line count beside the position is
-      color: fmtHover.hovered || bar.tinted ? Zenon.white : Zenon.muted
+      color: fmtHover.hovered || bar.tinted ? Zenon.white : Zenon.accentMuted
       textFormat: Text.PlainText
       text: (ind.tabs ? "tabs " : "spaces ") + ind.width
         + (bar.st.eol && bar.st.eol !== "unix" ? " · " + (bar.st.eol === "dos" ? "CRLF" : "CR") : "")
@@ -594,7 +594,7 @@ Item {
     Text {
       anchors.verticalCenter: parent.verticalCenter
       font: bar.font
-      color: Zenon.muted
+      color: Zenon.accentMuted
       text: bar.ed.filetype
       visible: text !== ""
     }
@@ -605,8 +605,8 @@ Item {
       // the line in white (the mode's ink outside normal mode), the column
       // a step back: the line is what you navigate by
       Text { anchors.verticalCenter: parent.verticalCenter; font: bar.font; color: bar.tinted ? bar.modeInk : Zenon.white; text: bar.ed.line }
-      Text { anchors.verticalCenter: parent.verticalCenter; font: bar.font; color: Zenon.muted; text: ":" + bar.ed.column }
-      Text { anchors.verticalCenter: parent.verticalCenter; font: bar.font; color: bar.tinted ? Zenon.white : Zenon.muted; text: "  " + bar.ed.lines }
+      Text { anchors.verticalCenter: parent.verticalCenter; font: bar.font; color: Zenon.accentMuted; text: ":" + bar.ed.column }
+      Text { anchors.verticalCenter: parent.verticalCenter; font: bar.font; color: bar.tinted ? Zenon.white : Zenon.accentMuted; text: "  " + bar.ed.lines }
     }
     Row {
       readonly property var sel: bar.st.sel || null
@@ -624,7 +624,7 @@ Item {
       Text {
         anchors.verticalCenter: parent.verticalCenter
         font: bar.font
-        color: Zenon.muted
+        color: Zenon.accentMuted
         text: !parent.sel ? "" : parent.sel.cols ? "  block"
           : parent.sel.lines > 1
           ? "  " + parent.sel.words + " words · " + parent.sel.chars + " chars"
@@ -681,7 +681,7 @@ Item {
       font.family: Zenon.faceMono
       font.weight: Zenon.weight
       font.pixelSize: bar.iconSize
-      color: Zenon.muted
+      color: Zenon.accentMuted
       text: "󰍉"
     }
     Text {
@@ -744,7 +744,7 @@ Item {
       anchors.leftMargin: 10
       anchors.verticalCenter: parent.verticalCenter
       font: bar.font
-      color: Zenon.muted
+      color: Zenon.accentMuted
       textFormat: Text.PlainText
       text: bar.ed.cmdlinePrompt
     }

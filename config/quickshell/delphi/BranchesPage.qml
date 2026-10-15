@@ -306,7 +306,7 @@ Item {
           anchors.verticalCenter: parent.verticalCenter
           elide: Text.ElideRight
           text: brow.b.subject || ""
-          color: Zenon.muted
+          color: Zenon.accentMuted
           font.family: Zenon.face
           font.weight: Zenon.weight
           font.pixelSize: Zenon.px(14)
@@ -317,7 +317,7 @@ Item {
           anchors.rightMargin: 24
           anchors.verticalCenter: parent.verticalCenter
           text: brow.b.when ? D.ago(brow.b.when, Date.now()) : ""
-          color: Zenon.muted
+          color: Zenon.accentMuted
           font.family: Zenon.face
           font.weight: Zenon.weight
           font.features: { "tnum": 1 }

@@ -3571,7 +3571,7 @@ FloatingWindow {
   // bars use it too: a bind's description and the directory you are standing in
   // are both "the thing this window is about right now", and they were two
   // hard-coded greys that happened to differ.
-  readonly property color crumbInk: Zenon.keyInk
+  readonly property color crumbInk: Zenon.accentKey   // the chrome greys in the accent (user, 2026-10-15)
 
   // ── the mouse, as a glyph ─────────────────────────────────────────────
   // "middle click" is three syllables of hint sitting next to a two-word
@@ -6038,6 +6038,8 @@ FloatingWindow {
 
       InputShield {
         keepTop: chrome.tabStrip.height + chrome.crumbBar.height
+        // the title on the bar renames the file: click it (see TitleName)
+        through: [chrome.barNameItem]
         onClicked: { props.open = false; content.forceActiveFocus(); }
       }
 
@@ -6532,7 +6534,7 @@ FloatingWindow {
       function askMany(heading, detail, choices, items) {
         confirm.items = items || [];
         const all = choices.slice();
-        all.push({ label: "Cancel", ink: Zenon.muted, act: null });
+        all.push({ label: "Cancel", ink: Zenon.accentMuted, act: null });
         confirm.pick = 0;
         confirm.heading = heading;
         confirm.detail = detail;

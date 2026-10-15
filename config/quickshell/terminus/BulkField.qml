@@ -75,7 +75,7 @@ Rectangle {
     elide: Text.ElideRight
     visible: fldIn.text === ""
     text: fld.ghost
-    color: Zenon.muted
+    color: Zenon.accentMuted
     font.family: fld.family
     font.weight: Zenon.weight
     font.pixelSize: fld.textSize

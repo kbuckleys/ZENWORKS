@@ -988,7 +988,7 @@ Rectangle {
           text: sendTo.blocked && sendTo.current ? "cannot go there"
               : (sendTo.query !== "" ? sendTo.query : "type to filter")
           color: sendTo.query !== "" && !sendTo.blocked
-            ? Zenon.sand : Zenon.muted
+            ? Zenon.sand : Zenon.accentMuted
           font.family: Zenon.face
           font.weight: Zenon.weight
           font.pixelSize: Zenon.px(13)
@@ -1002,7 +1002,7 @@ Rectangle {
           anchors.verticalCenter: parent.verticalCenter
           visible: sendTo.crawling && !(sendTo.blocked && sendTo.current)
           text: "searching\u2026"
-          color: Zenon.muted
+          color: Zenon.accentMuted
           font.family: Zenon.face
           font.weight: Zenon.weight
           font.pixelSize: Zenon.px(13)
@@ -1035,7 +1035,7 @@ Rectangle {
             Text {
               anchors.verticalCenter: parent.verticalCenter
               text: hintPair.modelData[1]
-              color: Zenon.muted
+              color: Zenon.accentMuted
               font.family: Zenon.face
               font.weight: Zenon.weight
               font.pixelSize: Zenon.px(13)

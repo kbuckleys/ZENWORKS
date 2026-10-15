@@ -207,7 +207,7 @@ Rectangle {
           anchors.leftMargin: 16
           anchors.verticalCenter: parent.verticalCenter
           text: diskRow.modelData.removable ? "\uF0A0" : "\uF1C0"
-          color: diskRow.mounted ? Zenon.cyan : Zenon.muted
+          color: diskRow.mounted ? Zenon.cyan : Zenon.accentMuted
           font.family: Zenon.faceMono
           font.weight: Zenon.weight
           font.pixelSize: Zenon.px(16)
@@ -241,7 +241,7 @@ Rectangle {
           anchors.verticalCenter: parent.verticalCenter
           elide: Text.ElideMiddle
           text: diskRow.mounted ? diskRow.modelData.mount : "not mounted"
-          color: diskRow.mounted ? Zenon.keyInk : Zenon.muted
+          color: diskRow.mounted ? Zenon.accentKey : Zenon.accentMuted
           font.family: Zenon.faceMono
           font.weight: Zenon.weight
           font.pixelSize: Zenon.px(14)
@@ -292,7 +292,7 @@ Rectangle {
           width: 62
           horizontalAlignment: Text.AlignRight
           text: diskRow.modelData.fstype
-          color: Zenon.muted
+          color: Zenon.accentMuted
           font.family: Zenon.faceMono
           font.weight: Zenon.weight
           font.pixelSize: Zenon.px(12)
@@ -329,7 +329,7 @@ Rectangle {
           rightPadding: 2
           text: disks.rows.length === 0 ? "no disks" : ""
           visible: disks.rows.length === 0
-          color: Zenon.muted
+          color: Zenon.accentMuted
           font.family: Zenon.face
           font.weight: Zenon.weight
           font.pixelSize: Zenon.px(14)
@@ -352,7 +352,7 @@ Rectangle {
             Text {
               anchors.verticalCenter: parent.verticalCenter
               text: dfPair.modelData[1]
-              color: Zenon.muted
+              color: Zenon.accentMuted
               font.family: Zenon.face
               font.weight: Zenon.weight
               font.pixelSize: Zenon.px(13)

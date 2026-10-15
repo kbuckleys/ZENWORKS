@@ -50,7 +50,7 @@ Item {
     spacing: 3
     Text {
       text: row.field ? row.field.label : ""
-      color: row.justCopied ? Zenon.cyan : Zenon.muted
+      color: row.justCopied ? Zenon.cyan : Zenon.accentMuted
       font.family: Zenon.face
       font.weight: Zenon.weight
       font.pixelSize: Zenon.px(12)
@@ -69,7 +69,7 @@ Item {
         maximumLineCount: 12
         color: row.isTotp ? Zenon.cyan
           : row.field && row.field.kind === "url" ? Zenon.blue
-          : row.secret && !row.open ? Zenon.soft : Zenon.ink
+          : row.secret && !row.open ? Zenon.accentSoft : Zenon.ink
         font.family: row.secret || row.isTotp ? Zenon.faceMono : Zenon.face
         font.weight: row.isTotp ? Font.Bold : Zenon.weight
         font.pixelSize: row.isTotp ? Zenon.px(20) : Zenon.px(15)

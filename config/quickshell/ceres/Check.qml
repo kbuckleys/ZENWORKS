@@ -25,7 +25,7 @@ Row {
     radius: Zenon.windowRadius - 1
     color: ck.lit ? Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b, 0.2) : "transparent"
     border.width: 1
-    border.color: ck.lit ? Zenon.cyan : Zenon.keyInk
+    border.color: ck.lit ? Zenon.cyan : Zenon.accentKey
     Text {
       anchors.centerIn: parent
       visible: ck.lit
@@ -40,7 +40,7 @@ Row {
     visible: ck.label !== ""
     anchors.verticalCenter: parent.verticalCenter
     text: ck.label
-    color: ck.lit ? Zenon.white : Zenon.keyInk
+    color: ck.lit ? Zenon.white : Zenon.accentKey
     font.family: Zenon.face
     font.weight: Zenon.weight
     font.pixelSize: Zenon.px(15)

@@ -496,7 +496,7 @@ Item {
             width: 22
             horizontalAlignment: Text.AlignHCenter
             text: srow.modelData[2]
-            color: srow.on ? Zenon.cyan : Zenon.keyInk
+            color: srow.on ? Zenon.cyan : Zenon.accentKey
             font.family: Zenon.face
             font.weight: Zenon.weight
             font.pixelSize: Zenon.px(15)
@@ -520,7 +520,7 @@ Item {
             anchors.verticalCenter: parent.verticalCenter
             visible: srow.modelData[0] === "installed" && store.loaded
             text: visible ? String(store.apps.filter(a => a.installed).length) : ""
-            color: Zenon.muted
+            color: Zenon.accentMuted
             font.family: Zenon.face
             font.weight: Zenon.weight
             font.pixelSize: Zenon.px(14)
@@ -570,7 +570,7 @@ Item {
       Text {
         anchors.horizontalCenter: parent.horizontalCenter
         text: store.failed ? "The app catalogue could not be read" : "Reading the app catalogue"
-        color: store.failed ? Zenon.red : Zenon.muted
+        color: store.failed ? Zenon.red : Zenon.accentMuted
         font.family: Zenon.face
         font.weight: Font.Bold
         font.pixelSize: Zenon.px(16)
@@ -665,7 +665,7 @@ Item {
                 visible: shelf.modelData.key !== ""
                 anchors.verticalCenter: parent.verticalCenter
                 text: "\u203A"
-                color: Zenon.muted
+                color: Zenon.accentMuted
                 font.family: Zenon.face
                 font.weight: Font.Bold
                 font.pixelSize: Zenon.px(22)
@@ -772,7 +772,7 @@ Item {
         visible: store.gridApps.length === 0
         text: store.searching ? "No apps for \u201C" + store.query.trim() + "\u201D"
           : store.section === "installed" ? "No apps from the catalogue are installed" : "Nothing here yet"
-        color: Zenon.muted
+        color: Zenon.accentMuted
         font.family: Zenon.face
         font.weight: Font.Bold
         font.pixelSize: Zenon.px(16)
@@ -859,7 +859,7 @@ Item {
         // back to where it was opened from
         Text {
           text: "\u2039  " + (store.searching ? "Results" : St.section(store.section)[1])
-          color: Zenon.keyInk
+          color: Zenon.accentKey
           font.family: Zenon.face
           font.weight: Zenon.weight
           font.pixelSize: Zenon.px(15)
@@ -1004,7 +1004,7 @@ Item {
                 even: true
                 strong: true
                 textSize: Zenon.px(15)
-                ink: Zenon.keyInk
+                ink: Zenon.accentKey
                 options: St.sources(store.app)
                 // each channel's own mark before its name (user, 2026-10-15)
                 glyphOf: (v) => St.sourceGlyph({ source: v })
@@ -1120,7 +1120,7 @@ Item {
                   width: parent.width
                   horizontalAlignment: Text.AlignHCenter
                   text: modelData[0]
-                  color: Zenon.muted
+                  color: Zenon.accentMuted
                   font.family: Zenon.face
                   font.weight: Font.Bold
                   font.pixelSize: Zenon.px(11)
@@ -1131,7 +1131,7 @@ Item {
                   horizontalAlignment: Text.AlignHCenter
                   elide: Text.ElideRight
                   text: modelData[1]
-                  color: Zenon.keyInk
+                  color: Zenon.accentKey
                   font.family: Zenon.face
                   font.weight: Font.Bold
                   font.pixelSize: Zenon.px(21)
@@ -1141,7 +1141,7 @@ Item {
                   horizontalAlignment: Text.AlignHCenter
                   elide: Text.ElideRight
                   text: modelData[2]
-                  color: Zenon.muted
+                  color: Zenon.accentMuted
                   font.family: Zenon.face
                   font.weight: Zenon.weight
                   font.pixelSize: Zenon.px(13)
@@ -1188,7 +1188,7 @@ Item {
                 + (d.maintainer ? " \u2014 this one by " + d.maintainer : "") + "; you can read the PKGBUILD "
                 + "before it builds. Described here by its Flathub listing."
                 + (d.outOfDate ? "  <font color='" + Zenon.hex(Zenon.yellow) + "'>Flagged out of date.</font>" : "")
-              color: Zenon.keyInk
+              color: Zenon.accentKey
               font.family: Zenon.face
               font.weight: Zenon.weight
               font.pixelSize: Zenon.px(15)
@@ -1234,7 +1234,7 @@ Item {
                   : page.permsLive
                     ? "<b>Runs in Flatpak's sandbox.</b> Untick what it should not have \u2014 it takes effect the next time it starts."
                     : "<b>Runs in Flatpak's sandbox,</b> with access to:"
-                color: Zenon.keyInk
+                color: Zenon.accentKey
                 font.family: Zenon.face
                 font.weight: Zenon.weight
                 font.pixelSize: Zenon.px(15)
@@ -1265,7 +1265,7 @@ Item {
                   width: 7
                   height: 7
                   radius: 3.5
-                  color: permRow.modelData.level === "high" ? Zenon.yellow : permRow.modelData.level === "mid" ? Zenon.blue : Zenon.muted
+                  color: permRow.modelData.level === "high" ? Zenon.yellow : permRow.modelData.level === "mid" ? Zenon.blue : Zenon.accentMuted
                 }
                 Text {
                   x: page.permsLive ? 30 + permCheck.width + 10 : 47
@@ -1274,7 +1274,7 @@ Item {
                   text: Cer.esc(permRow.modelData.text)
                     + (permRow.modelData.changed ? "  <font color='" + Zenon.hex(Zenon.cyan) + "'>"
                       + (permRow.modelData.on ? "given by you" : "taken away") + "</font>" : "")
-                  color: page.permsLive && !permRow.modelData.on ? Zenon.muted : Zenon.white
+                  color: page.permsLive && !permRow.modelData.on ? Zenon.accentMuted : Zenon.white
                   font.family: Zenon.face
                   font.weight: Zenon.weight
                   font.pixelSize: Zenon.px(15)
@@ -1291,7 +1291,7 @@ Item {
                 x: 30
                 anchors.bottom: parent.bottom
                 label: "Reset to defaults"
-                ink: Zenon.muted
+                ink: Zenon.accentMuted
                 ready: !(store.busy && page.a.scope !== "user")
                 onClicked: store.resetPerms()
               }
@@ -1364,14 +1364,14 @@ Item {
                 anchors.centerIn: parent
                 running: shot.file === "" && !(shot.modelData.url in store.shots)
                 visible: running
-                ink: Zenon.muted
+                ink: Zenon.accentMuted
               }
             }
             Text {
               width: shotFrame.width
               elide: Text.ElideRight
               text: shot.modelData.caption || ""
-              color: Zenon.muted
+              color: Zenon.accentMuted
               font.family: Zenon.face
               font.weight: Zenon.weight
               font.pixelSize: Zenon.px(14)
@@ -1480,7 +1480,7 @@ Item {
           Text {
             text: parent.rel ? "Version " + parent.rel.version
               + (parent.rel.date ? "  ·  " + St.releaseDate(parent.rel.date) : "") : ""
-            color: Zenon.muted
+            color: Zenon.accentMuted
             font.family: Zenon.face
             font.weight: Zenon.weight
             font.pixelSize: Zenon.px(14)
@@ -1534,7 +1534,7 @@ Item {
                 spacing: 2
                 Text {
                   text: modelData[0]
-                  color: Zenon.muted
+                  color: Zenon.accentMuted
                   font.family: Zenon.face
                   font.weight: Zenon.weight
                   font.pixelSize: Zenon.px(13)

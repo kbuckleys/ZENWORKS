@@ -144,7 +144,7 @@ Item {
         Text {
           anchors.horizontalCenter: parent.horizontalCenter
           text: gen.wordsMissing ? "Words need a word list — the words package" : gen.err
-          color: gen.wordsMissing ? Zenon.muted : Zenon.red
+          color: gen.wordsMissing ? Zenon.accentMuted : Zenon.red
           font.family: Zenon.face
           font.weight: Zenon.weight
           font.pixelSize: Zenon.px(13)
@@ -260,7 +260,7 @@ Item {
       spacing: 8
       DialogButton { label: "Close"; onClicked: gen.closed() }
       DialogButton { label: "New one"; onClicked: gen.make() }
-      DialogButton { label: "Copy"; ink: gen.using ? Zenon.muted : Zenon.cyan; primary: !gen.using; ready: gen.value !== ""; onClicked: gen.copy() }
+      DialogButton { label: "Copy"; ink: gen.using ? Zenon.accentMuted : Zenon.cyan; primary: !gen.using; ready: gen.value !== ""; onClicked: gen.copy() }
       DialogButton { visible: gen.using; label: "Use it"; ink: Zenon.cyan; primary: true; ready: gen.value !== ""; onClicked: gen.used(gen.value) }
     }
   }

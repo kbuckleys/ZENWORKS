@@ -42,7 +42,7 @@ Column {
   // fewer lines, for a hover card
   property bool compact: false
   property color ink: Zenon.ink
-  property color quiet: Zenon.muted
+  property color quiet: Zenon.accentMuted
 
   spacing: Math.round(12 * spec.zoom)
 

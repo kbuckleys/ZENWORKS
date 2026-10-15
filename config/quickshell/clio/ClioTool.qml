@@ -41,7 +41,7 @@ Item {
     id: label
     anchors.centerIn: parent
     text: tool.word !== "" ? tool.word : tool.glyph
-    color: tool.lit ? tool.litInk : Zenon.soft
+    color: tool.lit ? tool.litInk : Zenon.accentSoft
     font.family: tool.word !== "" ? Zenon.face : Zenon.glyphFace
     font.weight: tool.word !== "" ? tool.wordWeight : Font.Bold
     font.pixelSize: tool.word !== "" ? tool.wordPx : Zenon.px(16)

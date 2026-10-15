@@ -53,7 +53,7 @@ Item {
         : (np.entry.isDir ? "directory" : Terminus.formatSize(np.entry.size) + "  ·  " + Terminus.kindOf(np.entry.name))
           + (np.entry.mtime ? "  ·  " + Terminus.formatTime(np.entry.mtime) : "")
           + (np.entry.isLink ? "  ·  a link" : "")
-      color: Zenon.muted
+      color: Zenon.accentMuted
       font.family: Zenon.face
       font.weight: Zenon.weight
       font.pixelSize: Zenon.px(13)

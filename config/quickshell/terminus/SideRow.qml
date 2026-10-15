@@ -39,7 +39,7 @@ Item {
   id: sideRow
   property string label: ""
   property string detail: ""
-  property color detailInk: Zenon.muted
+  property color detailInk: Zenon.accentMuted
   property string glyph: ""
   // A COLOUR OF ITS OWN, when the row has one to give. Bookmarks and disks
   // do not — their glyph says what KIND of thing the row is and the muted
@@ -402,7 +402,7 @@ Item {
     // that. Taking a tag's colour away to repeat it would lose more than
     // it tells.
     color: sideRow.ink.a > 0 ? sideRow.ink
-      : (sideRow.active ? Zenon.cyan : Zenon.muted)
+      : (sideRow.active ? Zenon.cyan : Zenon.accentMuted)
     font.family: Zenon.face
     font.weight: Zenon.weight
     // delphi's sidebar type (ShelfRow): 14, the label soft until it is
@@ -436,7 +436,7 @@ Item {
     // looking at is the one that is lit.
     color: sideRow.active
       ? (sideRow.ink.a > 0 ? sideRow.ink : Zenon.ink)
-      : Zenon.soft
+      : Zenon.accentSoft
     font.weight: Zenon.weight
     font.family: Zenon.face
     font.pixelSize: Zenon.px(14)
@@ -483,7 +483,7 @@ Item {
     accent: sideRow.gaugeInk
     label: sideRow.detail
     ink: sideRow.used > 0.85 ? sideRow.gaugeInk
-      : (sideRow.active ? Zenon.white : Zenon.keyInk)
+      : (sideRow.active ? Zenon.white : Zenon.accentKey)
     fontSize: 13
   }
 
@@ -497,7 +497,7 @@ Item {
     // click on.
     visible: sideRow.showRemove && sideHover.hovered
     text: "\uf00d"   // nf-fa-times
-    color: removeHov.hovered ? Zenon.red : Zenon.muted
+    color: removeHov.hovered ? Zenon.red : Zenon.accentMuted
     font.family: Zenon.faceMono
     font.weight: Zenon.weight
     font.pixelSize: Zenon.px(13)
@@ -523,7 +523,7 @@ Item {
     // green: it is a verb sitting on every mounted disk at once, and a
     // column of green marks down the sidebar was louder than the disks.
     color: mountHov.hovered ? Zenon.cyan
-      : (sideRow.mounted ? term.crumbInk : Zenon.muted)
+      : (sideRow.mounted ? term.crumbInk : Zenon.accentMuted)
     font.family: Zenon.face
     font.weight: Zenon.weight
     font.pixelSize: Zenon.px(14)

@@ -8,7 +8,7 @@
 // body of a new one (FormBody's `lines` field). The suite's caret, its
 // ghost text while empty, a note in the corner (the subject's length).
 //
-//     MessageWell { ghost: "…"; note: "48"; noteInk: Zenon.muted
+//     MessageWell { ghost: "…"; note: "48"; noteInk: Zenon.accentMuted
 //                   onSubmitted: …        // ctrl+return
 //                   onEscaped: …          // esc
 //                   onTabbed: …; onBackTabbed: … }
@@ -27,7 +27,7 @@ Rectangle {
   readonly property bool focused: edit.activeFocus
   property string ghost: ""
   property string note: ""
-  property color noteInk: Zenon.muted
+  property color noteInk: Zenon.accentMuted
   property real textSize: Zenon.px(15)
   property var passKeys: null
   // room kept free under the text for what the holder sets in the well's
@@ -89,7 +89,7 @@ Rectangle {
         width: parent.width
         wrapMode: Text.Wrap
         text: mw.ghost
-        color: Zenon.muted
+        color: Zenon.accentMuted
         font: edit.font
       }
     }

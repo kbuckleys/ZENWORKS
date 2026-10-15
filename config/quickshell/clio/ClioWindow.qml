@@ -370,7 +370,7 @@ FloatingWindow {
     const back = win.mgr.notes.filter((o) => o.d && o.d.links.indexOf(n.id) >= 0 && !o.deleted);
     if (back.length) lines.push("Linked from: " + back.map((o) => N.titleOf(o)).join(", "));
     cards.card_({ question: N.titleOf(n, "Entry"), glyph: "\u{F064E}", ink: Zenon.cyan, detail: lines.join("\n"),
-                  choices: [{ label: "Close", ink: Zenon.muted }] });
+                  choices: [{ label: "Close", ink: Zenon.accentMuted }] });
   }
   function exportNote(n, format) {
     if (!n) return;

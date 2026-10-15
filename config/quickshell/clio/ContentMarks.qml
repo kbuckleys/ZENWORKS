@@ -29,7 +29,7 @@ Row {
     if (d.files > 0) out.push({ g: "\u{F03E2}", t: String(d.files), ink: Zenon.blue });
     if (d.table) out.push({ g: "\u{F04EB}", t: "Table", ink: Zenon.green });
     if (d.sketch) out.push({ g: "\u{F0F49}", t: "Sketch", ink: Zenon.magenta });
-    if (d.checks > 0 && !marks.noChecks) out.push({ g: "\u{F0C52}", t: d.done + "/" + d.checks, ink: d.done === d.checks ? Zenon.green : Zenon.muted });
+    if (d.checks > 0 && !marks.noChecks) out.push({ g: "\u{F0C52}", t: d.done + "/" + d.checks, ink: d.done === d.checks ? Zenon.green : Zenon.accentMuted });
     if ((d.links || []).length > 0) out.push({ g: "\u{F0339}", t: String(d.links.length), ink: Zenon.yellow });
     return out;
   }
@@ -49,7 +49,7 @@ Row {
       Text {
         anchors.verticalCenter: parent.verticalCenter
         text: modelData.t
-        color: Zenon.muted
+        color: Zenon.accentMuted
         font.family: Zenon.face
         font.weight: Font.DemiBold
         font.pixelSize: marks.textSize

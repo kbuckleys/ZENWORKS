@@ -94,7 +94,7 @@ Item {
     font.family: Zenon.face
     font.weight: Zenon.weight
     font.pixelSize: 13
-    color: Zenon.muted
+    color: Zenon.accentMuted
     readonly property string home: Quickshell.env("HOME")
     text: (card.file.startsWith(caption.home + "/") ? "~" + card.file.slice(caption.home.length) : card.file)
       + (card.note !== "" ? "  ·  " + card.note : card.hint !== "" ? "  ·  " + card.hint : "")

@@ -228,7 +228,7 @@ Item {
           x: 22
           anchors.verticalCenter: parent.verticalCenter
           text: ""
-          color: rrow.r.draft ? Zenon.muted : rrow.r.prerelease ? Zenon.yellow : rrow.index === 0 ? Zenon.green : Zenon.cyan
+          color: rrow.r.draft ? Zenon.accentMuted : rrow.r.prerelease ? Zenon.yellow : rrow.index === 0 ? Zenon.green : Zenon.cyan
           font.family: Zenon.glyphFace
           font.pixelSize: Zenon.px(17)
         }
@@ -243,8 +243,8 @@ Item {
             width: parent.width
             elide: Text.ElideRight
             textFormat: Text.StyledText
-            text: D.esc(rrow.r.name) + (rrow.r.name !== rrow.r.tag ? "  <font color='" + Zenon.hex(Zenon.muted) + "'>" + D.esc(rrow.r.tag) + "</font>" : "")
-            color: rrow.index === pg.sel ? Zenon.ink : Zenon.soft
+            text: D.esc(rrow.r.name) + (rrow.r.name !== rrow.r.tag ? "  <font color='" + Zenon.hex(Zenon.accentMuted) + "'>" + D.esc(rrow.r.tag) + "</font>" : "")
+            color: rrow.index === pg.sel ? Zenon.ink : Zenon.accentSoft
             font.family: Zenon.face
             font.weight: Zenon.weight
             font.pixelSize: Zenon.px(15)
@@ -256,7 +256,7 @@ Item {
                    rrow.r.author, rrow.r.when ? D.ago(D.secondsOf(rrow.r.when), Date.now()) : "",
                    rrow.r.assets.length > 0 ? rrow.r.assets.length + (rrow.r.assets.length === 1 ? " file" : " files") : ""]
               .filter((x) => x !== "").join("  ·  ")
-            color: Zenon.muted
+            color: Zenon.accentMuted
             font.family: Zenon.face
             font.weight: Zenon.weight
             font.features: { "tnum": 1 }
@@ -285,7 +285,7 @@ Item {
       horizontalAlignment: Text.AlignHCenter
       wrapMode: Text.Wrap
       text: !pg.hub ? "This repository has no remote on GitHub, GitLab or Codeberg" : pg.listError
-      color: !pg.hub ? Zenon.muted : Zenon.red
+      color: !pg.hub ? Zenon.accentMuted : Zenon.red
       font.family: Zenon.face
       font.weight: Zenon.weight
       font.pixelSize: Zenon.px(15)
@@ -326,7 +326,7 @@ Item {
         text: !pg.rel ? "" : [pg.rel.tag, pg.rel.draft ? "a draft" : pg.rel.prerelease ? "a pre-release" : "",
           pg.rel.author ? "by " + pg.rel.author : "", pg.rel.when ? D.stamp(D.secondsOf(pg.rel.when)) : ""]
           .filter((x) => x !== "").join("  ·  ")
-        color: Zenon.muted
+        color: Zenon.accentMuted
         font.family: Zenon.face
         font.weight: Zenon.weight
         font.pixelSize: Zenon.px(14)
@@ -339,7 +339,7 @@ Item {
         wrapMode: TextEdit.Wrap
         textFormat: pg.rel && pg.rel.body.trim() !== "" ? TextEdit.MarkdownText : TextEdit.PlainText
         text: !pg.rel ? "" : pg.rel.body.trim() === "" ? "No notes" : D.mdLinesOf(pg.rel.body)
-        color: pg.rel && pg.rel.body.trim() !== "" ? Zenon.ink : Zenon.muted
+        color: pg.rel && pg.rel.body.trim() !== "" ? Zenon.ink : Zenon.accentMuted
         selectionColor: Zenon.alpha(Zenon.cyan, 0.4)
         font.family: Zenon.face
         font.weight: Zenon.weight
@@ -350,7 +350,7 @@ Item {
       Text {
         visible: !!pg.rel && pg.rel.assets.length > 0
         text: "Files"
-        color: Zenon.keyInk
+        color: Zenon.accentKey
         font.family: Zenon.face
         font.weight: Font.Bold
         font.pixelSize: Zenon.px(14)
@@ -381,7 +381,7 @@ Item {
             text: [arow.modelData.size > 0 ? Terminus.formatSize(arow.modelData.size) : "",
                    arow.modelData.downloads >= 0 ? arow.modelData.downloads + (arow.modelData.downloads === 1 ? " download" : " downloads") : ""]
               .filter((x) => x !== "").join("  ·  ")
-            color: Zenon.muted
+            color: Zenon.accentMuted
             font.family: Zenon.face
             font.weight: Zenon.weight
             font.features: { "tnum": 1 }

@@ -62,7 +62,7 @@ Item {
         width: parent.width - (pin.visible ? pin.width + 6 : 0) - (rb.note && rb.note.sealed ? 18 : 0)
         elide: Text.ElideRight
         text: rb.note ? N.titleOf(rb.note) : ""
-        color: rb.here ? Zenon.ink : Zenon.soft
+        color: rb.here ? Zenon.ink : Zenon.accentSoft
         font.family: Zenon.face
         font.weight: Font.Bold
         font.pixelSize: Zenon.px(15)
@@ -96,7 +96,7 @@ Item {
         width: parent.width - (when.visible ? when.width + 8 : 0) - (checks.visible ? checks.width + 8 : 0)
         elide: Text.ElideRight
         text: !rb.note ? "" : rb.note.sealed ? "Locked" : rb.d.preview !== "" ? rb.d.preview : "No additional text"
-        color: Zenon.muted
+        color: Zenon.accentMuted
         font.family: Zenon.face
         font.weight: Zenon.weight
         font.pixelSize: Zenon.px(13)
@@ -105,7 +105,7 @@ Item {
         id: checks
         visible: rb.d.checks > 0
         text: "\u{F0C52} " + rb.d.done + "/" + rb.d.checks
-        color: rb.d.done === rb.d.checks ? Zenon.green : Zenon.muted
+        color: rb.d.done === rb.d.checks ? Zenon.green : Zenon.accentMuted
         font.family: Zenon.face
         font.weight: Zenon.weight
         font.pixelSize: Zenon.px(12)
@@ -118,7 +118,7 @@ Item {
       width: parent.width
       elide: Text.ElideRight
       text: rb.edited ? N.dateTime(rb.note.modified) : ""
-      color: Zenon.muted
+      color: Zenon.accentMuted
       font.family: Zenon.face
       font.weight: Zenon.weight
       font.pixelSize: Zenon.px(12)
@@ -133,7 +133,7 @@ Item {
         width: Math.min(implicitWidth, parent.width - (rowMarks.visible ? rowMarks.width + 10 : 0))
         elide: Text.ElideRight
         text: "  " + (rb.win ? rb.win.folderName(rb.note ? rb.note.folder : "") : "")
-        color: Zenon.muted
+        color: Zenon.accentMuted
         opacity: 0.8
         font.family: Zenon.face
         font.weight: Zenon.weight

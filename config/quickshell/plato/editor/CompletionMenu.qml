@@ -152,7 +152,7 @@ Item {
         elide: Text.ElideRight
         textFormat: Text.PlainText
         font: menu.face
-        color: Zenon.muted
+        color: Zenon.accentMuted
         text: String(item.modelData.kind || "")
           + (item.modelData.menu ? " " + item.modelData.menu : "")
       }

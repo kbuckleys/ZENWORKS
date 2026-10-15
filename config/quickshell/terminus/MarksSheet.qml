@@ -328,7 +328,7 @@ Rectangle {
           anchors.verticalCenter: parent.verticalCenter
           visible: markRow.index === marks.sel
           text: "\uEA76"
-          color: dropHov.hovered ? Zenon.red : Zenon.muted
+          color: dropHov.hovered ? Zenon.red : Zenon.accentMuted
           font.family: Zenon.face
           font.weight: Zenon.weight
           font.pixelSize: Zenon.px(14)
@@ -365,7 +365,7 @@ Rectangle {
             return p === h ? "~"
               : (p.indexOf(h + "/") === 0 ? "~" + p.slice(h.length) : p);
           }
-          color: Zenon.muted
+          color: Zenon.accentMuted
           font.family: Zenon.face
           font.weight: Zenon.weight
           font.pixelSize: Zenon.px(13)
@@ -379,7 +379,7 @@ Rectangle {
       anchors.centerIn: marksList
       visible: marks.all.length === 0
       text: "nothing bookmarked yet \u2014 b a adds this directory"
-      color: Zenon.muted
+      color: Zenon.accentMuted
       font.family: Zenon.face
       font.weight: Zenon.weight
       font.pixelSize: Zenon.px(14)
@@ -410,7 +410,7 @@ Rectangle {
           text: marks.query !== "" ? marks.query
             : (marks.rows.length === 0 ? "nothing matches"
                                        : "type to filter")
-          color: marks.query !== "" ? Zenon.sand : Zenon.muted
+          color: marks.query !== "" ? Zenon.sand : Zenon.accentMuted
           font.family: Zenon.face
           font.weight: Zenon.weight
           font.pixelSize: Zenon.px(14)
@@ -440,7 +440,7 @@ Rectangle {
             Text {
               anchors.verticalCenter: parent.verticalCenter
               text: mfPair.modelData[1]
-              color: Zenon.muted
+              color: Zenon.accentMuted
               font.family: Zenon.face
               font.weight: Zenon.weight
               font.pixelSize: Zenon.px(14)

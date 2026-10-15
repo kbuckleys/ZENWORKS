@@ -24,7 +24,7 @@ Item {
     y: line.stacked ? 0 : Math.round((line.height - height) / 2)
     width: line.stacked ? line.width : line.width - slot.width - 16
     Text { id: head; text: line.label; color: Zenon.ink; font.family: Zenon.face; font.weight: Font.DemiBold; font.pixelSize: Zenon.px(14) }
-    Text { visible: text !== ""; width: parent.width; wrapMode: Text.Wrap; text: line.note; color: Zenon.muted; font.family: Zenon.face; font.weight: Zenon.weight; font.pixelSize: Zenon.px(12) }
+    Text { visible: text !== ""; width: parent.width; wrapMode: Text.Wrap; text: line.note; color: Zenon.accentMuted; font.family: Zenon.face; font.weight: Zenon.weight; font.pixelSize: Zenon.px(12) }
   }
   Item {
     id: slot

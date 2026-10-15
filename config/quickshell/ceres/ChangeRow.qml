@@ -72,7 +72,7 @@ Item {
     text: !ch.u ? "" : (ch.u.from
       ? "<font color='" + Ceres.ink.muted + "'>" + Cer.esc(ch.u.from) + "</font>  "
         + "<font color='" + Ceres.ink.arrow + "'>→</font>  "
-        + "<font color='" + Zenon.keyInk + "'>" + Cer.esc(ch.u.to.slice(0, vers.same)) + "</font>"
+        + "<font color='" + Zenon.accentKey + "'>" + Cer.esc(ch.u.to.slice(0, vers.same)) + "</font>"
         + "<b>" + Cer.esc(ch.u.to.slice(vers.same)) + "</b>"
       : Cer.esc(ch.u.to || ""))
     color: Zenon.white

@@ -69,7 +69,7 @@ Item {
     Text {
       readonly property var sec: St.sectionOf(art.app)
       text: sec ? sec[1].toUpperCase() : ""
-      color: Zenon.muted
+      color: Zenon.accentMuted
       font.family: Zenon.face
       font.weight: Font.Bold
       font.pixelSize: Zenon.px(12)
@@ -88,7 +88,7 @@ Item {
       width: parent.width
       elide: Text.ElideRight
       text: art.app ? art.app.summary : ""
-      color: Zenon.keyInk
+      color: Zenon.accentKey
       font.family: Zenon.face
       font.weight: Zenon.weight
       font.pixelSize: Zenon.px(14)

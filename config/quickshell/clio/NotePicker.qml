@@ -68,7 +68,7 @@ Item {
       font.weight: Zenon.weight
       font.pixelSize: Zenon.px(15)
       Keys.onPressed: (e) => { if (np.key(e)) e.accepted = true; }
-      Text { visible: pickField.text === ""; anchors.verticalCenter: parent.verticalCenter; text: "Search notes"; color: Zenon.muted; font: pickField.font }
+      Text { visible: pickField.text === ""; anchors.verticalCenter: parent.verticalCenter; text: "Search notes"; color: Zenon.accentMuted; font: pickField.font }
     }
     HeldRing { anchors.fill: parent; radius: parent.radius; z: 10; on: pickField.activeFocus }
   }
@@ -94,7 +94,7 @@ Item {
         anchors.verticalCenter: parent.verticalCenter
         width: parent.width - 24
         elide: Text.ElideRight
-        text: N.escape(N.titleOf(modelData)) + "   " + "<font color=\"" + Zenon.muted + "\">" + N.escape(np.win.folderName(modelData.folder)) + "</font>"
+        text: N.escape(N.titleOf(modelData)) + "   " + "<font color=\"" + Zenon.accentMuted + "\">" + N.escape(np.win.folderName(modelData.folder)) + "</font>"
         textFormat: Text.StyledText
         color: Zenon.ink
         font.family: Zenon.face

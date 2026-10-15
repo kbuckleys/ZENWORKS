@@ -346,7 +346,7 @@ Item {
       const choices = [{ label: "In .gitignore", ink: Zenon.cyan, run: () => pg.win.act("ignore", { patterns: [pattern] }, { said: name + " is ignored — commit .gitignore so it stays so" }) },
                        { label: "Only on this machine", run: () => pg.win.act("ignore", { patterns: [pattern], where: "exclude" }, { said: name + " is ignored here" }) }];
       if (ext !== "") choices.push({ label: "Every " + ext + " file", run: () => pg.win.act("ignore", { patterns: [ext] }, { said: "Every " + ext + " file is ignored" }) });
-      choices.push({ label: "Cancel", ink: Zenon.muted });
+      choices.push({ label: "Cancel", ink: Zenon.accentMuted });
       pg.win.card_({ question: "Keep " + name + " out of the repository?", glyph: "\uF070", ink: Zenon.ink,
         detail: "It stays on your disk; git stops offering it. In .gitignore for everyone who clones the repository, or only on this machine (.git/info/exclude).",
         items: [pattern], choices: choices });
@@ -358,7 +358,7 @@ Item {
       items: all.length > 8 ? all.slice(0, 8).concat(["… and " + (all.length - 8) + " more"]) : all,
       choices: [{ label: "Stop tracking", ink: Zenon.yellow, run: () => pg.win.act("untrack", { paths: [f.path] }, { said: name + " untracked — commit to take it out of the repository" }) },
                 { label: "Stop tracking, ignore here only", run: () => pg.win.act("untrack", { paths: [f.path], where: "exclude" }, { said: name + " untracked — commit to take it out" }) },
-                { label: "Cancel", ink: Zenon.muted }] });
+                { label: "Cancel", ink: Zenon.accentMuted }] });
   }
   // a directory row whose files git does not track at all
   function allUntracked(f) {
@@ -581,7 +581,7 @@ Item {
             inset: 16
             title: frow.r.head ? frow.r.title : ""
             count: frow.r.head ? frow.r.count : -1
-            ink: frow.r.id === "conflict" ? Zenon.red : Zenon.muted
+            ink: frow.r.id === "conflict" ? Zenon.red : Zenon.accentMuted
           }
           Text {
             visible: !!frow.r.head && frow.r.count > 0 && frow.r.id !== "conflict"
@@ -591,7 +591,7 @@ Item {
             anchors.verticalCenterOffset: 4
             text: pg.query !== "" ? (frow.r.id === "staged" ? "Unstage these" : "Stage these")
               : frow.r.id === "staged" ? "Unstage all" : "Stage all"
-            color: headMa.containsMouse ? Zenon.cyan : Zenon.muted
+            color: headMa.containsMouse ? Zenon.cyan : Zenon.accentMuted
             font.family: Zenon.face
             font.weight: Zenon.weight
             font.pixelSize: Zenon.px(13)
@@ -647,7 +647,7 @@ Item {
             anchors.rightMargin: 12
             anchors.verticalCenter: parent.verticalCenter
             text: frow.r.isDir ? String(frow.r.count) : ""
-            color: Zenon.muted
+            color: Zenon.accentMuted
             font.family: Zenon.face
             font.weight: Zenon.weight
             font.features: { "tnum": 1 }
@@ -721,7 +721,7 @@ Item {
         // U+F054D (user, 2026-10-14): a word overlapped the Amend switch
         label: "\u{F054D}"
         glyph: true
-        ink: Zenon.muted
+        ink: Zenon.accentMuted
         onClicked: pg.undoCommit()
         HoverHandler {
           onHoveredChanged: if (pg.win) hovered
@@ -820,7 +820,7 @@ Item {
       horizontalAlignment: Text.AlignHCenter
       elide: Text.ElideRight
       text: parent.tip ? "Last: “" + parent.tip.subject + "”  ·  " + D.ago(parent.tip.when, Date.now()) : ""
-      color: Zenon.soft
+      color: Zenon.accentSoft
       font.family: Zenon.face
       font.weight: Zenon.weight
       font.pixelSize: Zenon.px(14)
@@ -836,7 +836,7 @@ Item {
            : [b.ahead > 0 ? "↑" + b.ahead + " to push" : "", b.behind > 0 ? "↓" + b.behind + " to pull" : ""].filter((w) => w).join("  ·  ")
              + "  —  " + b.upstream)
           + (parent.fetched ? "  ·  fetched " + D.ago(Math.floor(parent.fetched / 1000), Date.now()) : "")
-      color: !b || !b.upstream ? Zenon.muted : b.ahead > 0 || b.behind > 0 ? Zenon.cyan : Zenon.green
+      color: !b || !b.upstream ? Zenon.accentMuted : b.ahead > 0 || b.behind > 0 ? Zenon.cyan : Zenon.green
       font.family: Zenon.face
       font.weight: Zenon.weight
       font.pixelSize: Zenon.px(14)
@@ -911,7 +911,7 @@ Item {
       horizontalAlignment: Text.AlignHCenter
       wrapMode: Text.Wrap
       text: "Take one side whole, or edit the file in plato — keep what you want between the <<<<<<< and >>>>>>> marks, delete the marks — then mark it resolved."
-      color: Zenon.muted
+      color: Zenon.accentMuted
       font.family: Zenon.face
       font.weight: Zenon.weight
       font.pixelSize: Zenon.px(14)

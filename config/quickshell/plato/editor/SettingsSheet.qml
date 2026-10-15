@@ -176,7 +176,7 @@ PlatoSheet {
     : sheet.tallest * sheet.rowH + 14 + sheet.helpH)
   footText: sheet.picking ? (fontQuery.text === "" ? "type to filter" : fontQuery.text)
     : query.text === "" ? "type to filter settings" : query.text
-  footInk: (sheet.picking ? fontQuery.text : query.text) !== "" ? Zenon.white : Zenon.muted
+  footInk: (sheet.picking ? fontQuery.text : query.text) !== "" ? Zenon.white : Zenon.accentMuted
   hints: sheet.picking || drop.open ? [["↑↓", "move"], ["↵", "use"], ["esc", "back"]]
     : [["↑↓", "move"], ["←→", "change"]].concat(sheet.twoCols ? [["ctrl ←→", "column"]] : [])
       .concat([["ctrl r", "default"], ["esc", query.text !== "" ? "clear" : "close"]])
@@ -396,7 +396,7 @@ PlatoSheet {
     font.family: Zenon.face
     font.weight: Zenon.weight
     font.pixelSize: 14
-    color: Zenon.muted
+    color: Zenon.accentMuted
     text: sheet.editing !== "" ? "" : sheet.cur ? (sheet.cur.help || "") : ""
   }
   Rectangle {
@@ -453,7 +453,7 @@ PlatoSheet {
         radius: 7
         y: 3
         x: sw.on ? track.width - width - 3 : 3
-        color: sw.on ? Zenon.cyan : Zenon.muted
+        color: sw.on ? Zenon.cyan : Zenon.accentMuted
         Behavior on x { NumberAnimation { duration: Zenon.fast; easing.type: Zenon.ease } }
         Behavior on color { ColorAnimation { duration: Zenon.fast; easing.type: Zenon.ease } }
       }
@@ -553,7 +553,7 @@ PlatoSheet {
       font.family: Zenon.faceMono
       font.weight: Zenon.weight
       font.pixelSize: 13
-      color: Zenon.muted
+      color: Zenon.accentMuted
       text: "\u{F0141}"
     }
     Text {
@@ -577,7 +577,7 @@ PlatoSheet {
       font.family: Zenon.faceMono
       font.weight: Zenon.weight
       font.pixelSize: 13
-      color: Zenon.muted
+      color: Zenon.accentMuted
       text: "\u{F0142}"
     }
     MouseArea {
@@ -660,7 +660,7 @@ PlatoSheet {
         font.family: Zenon.faceMono
         font.weight: Zenon.weight
         font.pixelSize: 13
-        color: Zenon.muted
+        color: Zenon.accentMuted
         text: "\u{F0140}"
       }
       MouseArea {
@@ -801,7 +801,7 @@ PlatoSheet {
         anchors.verticalCenter: parent.verticalCenter
         font.family: fam.modelData
         font.pixelSize: 16
-        color: Zenon.muted
+        color: Zenon.accentMuted
         text: "{ 0O il1 => }"
       }
       MouseArea {
@@ -860,7 +860,7 @@ PlatoSheet {
     font.family: Zenon.face
     font.weight: Zenon.weight
     font.pixelSize: 16
-    color: Zenon.muted
+    color: Zenon.accentMuted
     text: "No setting matches “" + query.text + "”"
   }
 }

@@ -139,7 +139,7 @@ Item {
           width: parent.width
           elide: Text.ElideRight
           text: srow.modelData.message.replace(/^(WIP )?[Oo]n [^:]+: /, "")
-          color: srow.index === pg.sel ? Zenon.ink : Zenon.soft
+          color: srow.index === pg.sel ? Zenon.ink : Zenon.accentSoft
           font.family: Zenon.face
           font.weight: Zenon.weight
           font.pixelSize: Zenon.px(15)
@@ -149,7 +149,7 @@ Item {
           elide: Text.ElideRight
           text: srow.modelData.ref + "  ·  " + D.ago(srow.modelData.when, Date.now())
             + ((srow.modelData.message.match(/^(?:WIP )?[Oo]n ([^:]+):/) || [])[1] ? "  ·  on " + srow.modelData.message.match(/^(?:WIP )?[Oo]n ([^:]+):/)[1] : "")
-          color: Zenon.muted
+          color: Zenon.accentMuted
           font.family: Zenon.face
           font.weight: Zenon.weight
           font.pixelSize: Zenon.px(13)

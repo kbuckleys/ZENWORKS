@@ -40,7 +40,7 @@ Item {
   required property Item panel
 
   readonly property color highlight: Zenon.cyan
-  readonly property color dimColor: Zenon.muted
+  readonly property color dimColor: Zenon.accentMuted
   readonly property color fgColor: Zenon.white
   readonly property color entryColor: Zenon.pink
 

@@ -842,7 +842,7 @@ FloatingWindow {
             font.weight: Zenon.weight
             font.pixelSize: 12
             font.letterSpacing: 1
-            color: Zenon.muted
+            color: Zenon.accentMuted
             text: section.modelData.title.toUpperCase()
             bottomPadding: 4
           }
@@ -892,7 +892,7 @@ FloatingWindow {
                   font.family: Zenon.face
                   font.weight: Zenon.weight
                   font.pixelSize: 13
-                  color: Zenon.muted
+                  color: Zenon.accentMuted
                   text: entry.project
                     ? win.tidyPath(entry.path) + "  ·  " + entry.modelData.files
                       + (entry.modelData.files === 1 ? " file" : " files") + "  ·  " + entry.modelData.ago
@@ -936,7 +936,7 @@ FloatingWindow {
               font.family: Zenon.face
               font.weight: Zenon.weight
               font.pixelSize: 12
-              color: Zenon.muted
+              color: Zenon.accentMuted
               text: modelData[1]
             }
           }

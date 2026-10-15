@@ -106,7 +106,9 @@ Item {
   // the ring every field being typed in wears (terminus' EditRing look)
   Rectangle {
     anchors.fill: parent
-    anchors.margins: -5
+    // little reach up and down: the bar is short, and the sheet's card
+    // hanging under it covered the lower edge (user, 2026-10-15: "sunken")
+    anchors.margins: -2
     anchors.leftMargin: -7
     anchors.rightMargin: -7
     radius: 4

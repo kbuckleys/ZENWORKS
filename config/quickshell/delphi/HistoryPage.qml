@@ -443,7 +443,7 @@ Item {
       maximumLineCount: 10
       elide: Text.ElideRight
       text: peekBubble.rest
-      color: Zenon.soft
+      color: Zenon.accentSoft
       font.family: Zenon.face
       font.weight: Zenon.weight
       font.pixelSize: Zenon.px(14)
@@ -453,7 +453,7 @@ Item {
       elide: Text.ElideRight
       text: !pg.peekC ? "" : pg.peekC.author + "  ·  " + D.stamp(pg.peekC.when) + "  ·  " + D.short(pg.peekC.sha)
         + (pg.peekFiles >= 0 ? "  ·  " + pg.peekFiles + (pg.peekFiles === 1 ? " file" : " files") : "")
-      color: Zenon.muted
+      color: Zenon.accentMuted
       font.family: Zenon.face
       font.weight: Zenon.weight
       font.features: { "tnum": 1 }
@@ -741,7 +741,7 @@ Item {
       Text {
         anchors.verticalCenter: parent.verticalCenter
         text: "→"
-        color: Zenon.muted
+        color: Zenon.accentMuted
         font.family: Zenon.face
         font.pixelSize: Zenon.px(16)
       }
@@ -819,7 +819,7 @@ Item {
             anchors.verticalCenter: parent.verticalCenter
             elide: Text.ElideRight
             text: "⇄   The whole difference" + (pg.whole && pg.files.length > 0 ? "  ·  " + pg.files.length + (pg.files.length === 1 ? " file" : " files") : "")
-            color: pg.whole ? Zenon.ink : Zenon.soft
+            color: pg.whole ? Zenon.ink : Zenon.accentSoft
             font.family: Zenon.face
             font.weight: Zenon.weight
             font.pixelSize: Zenon.px(15)
@@ -879,7 +879,7 @@ Item {
           anchors.verticalCenter: parent.verticalCenter
           elide: Text.ElideRight
           text: crow.c.subject
-          color: crow.index === pg.sel ? Zenon.ink : Zenon.soft
+          color: crow.index === pg.sel ? Zenon.ink : Zenon.accentSoft
           font.family: Zenon.face
           font.weight: Zenon.weight
           font.pixelSize: Zenon.px(15)
@@ -893,7 +893,7 @@ Item {
           width: Math.min(implicitWidth, note ? 240 : 130)
           elide: Text.ElideRight
           text: note ? note.what : crow.c.author
-          color: Zenon.muted
+          color: Zenon.accentMuted
           font.family: Zenon.face
           font.weight: Zenon.weight
           font.pixelSize: Zenon.px(13)
@@ -917,7 +917,7 @@ Item {
           width: Zenon.px(64)
           horizontalAlignment: Text.AlignRight
           text: D.ago(crow.c.when, Date.now())
-          color: Zenon.muted
+          color: Zenon.accentMuted
           font.family: Zenon.face
           font.weight: Zenon.weight
           font.features: { "tnum": 1 }
@@ -998,7 +998,7 @@ Item {
           anchors.verticalCenter: parent.verticalCenter
           elide: Text.ElideRight
           text: arow.r.subject || ""
-          color: arow.r.root === pg.win.root ? Zenon.ink : Zenon.soft
+          color: arow.r.root === pg.win.root ? Zenon.ink : Zenon.accentSoft
           font.family: Zenon.face
           font.weight: Zenon.weight
           font.pixelSize: Zenon.px(15)
@@ -1010,7 +1010,7 @@ Item {
           anchors.rightMargin: 18
           anchors.verticalCenter: parent.verticalCenter
           text: arow.r.head ? "" : arow.r.author + "   " + D.ago(arow.r.when, Date.now())
-          color: Zenon.muted
+          color: Zenon.accentMuted
           font.family: Zenon.face
           font.weight: Zenon.weight
           font.pixelSize: Zenon.px(13)
@@ -1069,7 +1069,7 @@ Item {
           + ((pg.commit.parents || []).length > 1 ? "  ·  merge of " + pg.commit.parents.length : "")
           + (pg.scope === "all" ? "  ·  " + D.baseName(pg.commitRoot) : "")
           + (pg.message && pg.message.signature === "G" ? "  ·   signed" : "")
-        color: Zenon.muted
+        color: Zenon.accentMuted
         font.family: Zenon.face
         font.weight: Zenon.weight
         font.pixelSize: Zenon.px(13)
@@ -1095,7 +1095,7 @@ Item {
             const i = b.indexOf("\n");
             return i < 0 ? "" : b.slice(i + 1).replace(/^\s+/, "");
           }
-          color: Zenon.soft
+          color: Zenon.accentSoft
           font.family: Zenon.face
           font.weight: Zenon.weight
           font.pixelSize: Zenon.px(14)
@@ -1108,7 +1108,7 @@ Item {
         width: parent.width
         elide: Text.ElideRight
         text: sig ? sig.glyph + "  " + sig.words : ""
-        color: sig ? Zenon[sig.ink] : Zenon.muted
+        color: sig ? Zenon[sig.ink] : Zenon.accentMuted
         font.family: Zenon.face
         font.weight: Zenon.weight
         font.pixelSize: Zenon.px(13)
@@ -1122,8 +1122,8 @@ Item {
         Text {
           anchors.verticalCenter: parent.verticalCenter
           text: !parent.c ? "" : D.ciWords(parent.c)
-          color: !parent.c ? Zenon.muted : parent.c.state === "failure" ? Zenon.red : parent.c.state === "success" ? Zenon.green
-            : parent.c.state === "pending" ? Zenon.yellow : Zenon.muted
+          color: !parent.c ? Zenon.accentMuted : parent.c.state === "failure" ? Zenon.red : parent.c.state === "success" ? Zenon.green
+            : parent.c.state === "pending" ? Zenon.yellow : Zenon.accentMuted
           font.family: Zenon.face
           font.weight: Zenon.weight
           font.pixelSize: Zenon.px(13)
@@ -1199,7 +1199,7 @@ Item {
           anchors.verticalCenter: parent.verticalCenter
           elide: Text.ElideMiddle
           text: (frow.modelData.from ? frow.modelData.from + "  →  " : "") + frow.modelData.path
-          color: frow.modelData.status === "D" ? Zenon.muted : frow.index === pg.fileSel ? Zenon.ink : Zenon.soft
+          color: frow.modelData.status === "D" ? Zenon.accentMuted : frow.index === pg.fileSel ? Zenon.ink : Zenon.accentSoft
           font.strikeout: frow.modelData.status === "D"
           font.family: Zenon.face
           font.weight: Zenon.weight
@@ -1215,7 +1215,7 @@ Item {
             : frow.modelData.added === null ? "binary"
             : "<font color=\"" + Zenon.hex(Zenon.green) + "\">+" + frow.modelData.added + "</font>  "
               + "<font color=\"" + Zenon.hex(Zenon.red) + "\">−" + frow.modelData.deleted + "</font>"
-          color: Zenon.muted
+          color: Zenon.accentMuted
           font.family: Zenon.face
           font.weight: Zenon.weight
           font.features: { "tnum": 1 }

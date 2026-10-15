@@ -119,7 +119,7 @@ Item {
       if (/^(?:::|==>)\s/.test(t))
         return "<span style='color:" + Zenon.cyan + "'><b>" + e + "</b></span>";
       if (Cer.progressOf(t))
-        return "<span style='color:" + Zenon.muted + "'>" + e + "</span>";
+        return "<span style='color:" + Zenon.accentMuted + "'>" + e + "</span>";
       return e;
     }
 
@@ -138,7 +138,7 @@ Item {
         anchors.leftMargin: 12
         anchors.verticalCenter: parent.verticalCenter
         text: "Log"
-        color: Zenon.muted
+        color: Zenon.accentMuted
         font.family: Zenon.face
         font.weight: Font.Bold
         font.pixelSize: 13 + view.grow
@@ -154,7 +154,7 @@ Item {
         Text {
           visible: !pane.follow
           text: "  latest"
-          color: latestMa.containsMouse ? Zenon.white : Zenon.keyInk
+          color: latestMa.containsMouse ? Zenon.white : Zenon.accentKey
           font.family: Zenon.face
           font.weight: Zenon.weight
           font.pixelSize: 13 + view.grow
@@ -171,7 +171,7 @@ Item {
           text: copied.running ? "  copied"
             : (logText.selectedText !== "" ? "  copy selection" : "  copy log")
           color: copied.running ? Zenon.green
-            : (copyMa.containsMouse ? Zenon.white : Zenon.keyInk)
+            : (copyMa.containsMouse ? Zenon.white : Zenon.accentKey)
           font.family: Zenon.face
           font.weight: Zenon.weight
           font.pixelSize: 13 + view.grow
@@ -236,7 +236,7 @@ Item {
         textFormat: TextEdit.RichText
         selectionColor: Zenon.selBg
         selectedTextColor: Zenon.white
-        color: Zenon.keyInk
+        color: Zenon.accentKey
         // plato's font — the family and weight set in its settings
         // (user, 2026-10-11); the fixed face when plato is not there
         font.family: Ceres.editor && Ceres.editor.fontFamily ? Ceres.editor.fontFamily : Zenon.faceMono
@@ -335,7 +335,7 @@ Item {
           const e = Ceres.txEvents[Ceres.txEvents.length - 1];
           return e ? e.verb + " " + e.name + (e.to ? " " + e.to : "") : "";
         }
-        color: Zenon.keyInk
+        color: Zenon.accentKey
         font.family: Zenon.face
         font.weight: Zenon.weight
         font.pixelSize: 14 + view.grow
@@ -356,7 +356,7 @@ Item {
           text: !track.total ? ""
             : [track.total.of, track.total.size, track.total.rate, track.total.eta]
                 .filter(x => x !== "").join("   ")
-          color: Zenon.keyInk
+          color: Zenon.accentKey
           font.family: Zenon.faceMono
           font.weight: Zenon.weight
           font.pixelSize: 13 + view.grow
@@ -365,7 +365,7 @@ Item {
           anchors.verticalCenter: parent.verticalCenter
           text: track.total ? Math.floor(track.frac * 100) + "%"
             : Ceres.txEvents.length + " / " + Math.max(Ceres.txExpected, Ceres.txEvents.length)
-          color: track.total ? Zenon.white : Zenon.keyInk
+          color: track.total ? Zenon.white : Zenon.accentKey
           font.family: Zenon.face
           font.weight: track.total ? Font.Bold : Font.Normal
           font.pixelSize: 14 + view.grow
@@ -438,7 +438,7 @@ Item {
           Text {
             anchors.verticalCenter: parent.verticalCenter
             text: provRow.modelData.name + " from"
-            color: Zenon.keyInk
+            color: Zenon.accentKey
             font.family: Zenon.face
             font.weight: Zenon.weight
             font.pixelSize: 14 + view.grow
@@ -482,10 +482,10 @@ Item {
           textFormat: Text.StyledText
           text: "<font color='" + Zenon.green + "'>+ " + modelData.pkg + "</font>"
             + (modelData.inner
-              ? "  <font color='" + Zenon.muted + "'>conflicts with</font>  "
+              ? "  <font color='" + Zenon.accentMuted + "'>conflicts with</font>  "
                 + "<font color='" + Zenon.yellow + "'>" + modelData.replaces.join(", ") + "</font>"
-                + "  <font color='" + Zenon.muted + "'>— both incoming; pick another provider or use a terminal</font>"
-              : "  <font color='" + Zenon.muted + "'>replaces</font>  "
+                + "  <font color='" + Zenon.accentMuted + "'>— both incoming; pick another provider or use a terminal</font>"
+              : "  <font color='" + Zenon.accentMuted + "'>replaces</font>  "
                 + "<font color='" + Zenon.red + "'>\u2212 " + modelData.replaces.join(", ") + "</font>")
           color: Zenon.ink
           font.family: Zenon.face

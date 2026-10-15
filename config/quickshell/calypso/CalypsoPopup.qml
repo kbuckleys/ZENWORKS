@@ -34,8 +34,8 @@ LayerPopup {
   property var mgr: null
 
   readonly property color bgColor: Zenon.layerBg
-  readonly property color keyColor: Zenon.keyInk
-  readonly property color dimColor: Zenon.muted
+  readonly property color keyColor: Zenon.accentKey
+  readonly property color dimColor: Zenon.accentMuted
   readonly property color entryColor: Zenon.pink
 
   // list · actions · unlock · empty · error

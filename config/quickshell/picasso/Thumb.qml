@@ -135,7 +135,7 @@ ClippingRectangle {
     anchors.centerIn: parent
     visible: img.status === Image.Error
     text: ""
-    color: Zenon.muted
+    color: Zenon.accentMuted
     font.family: Zenon.face
     font.weight: Zenon.weight
     font.pixelSize: Zenon.px(22)
@@ -145,7 +145,7 @@ ClippingRectangle {
     anchors.centerIn: parent
     visible: box.spinner && (img.status === Image.Loading || (box.wait && !img.hasThumb))
     text: ""
-    color: Zenon.muted
+    color: Zenon.accentMuted
     font.family: Zenon.face
     font.weight: Zenon.weight
     font.pixelSize: Zenon.px(18)

@@ -1311,7 +1311,7 @@ Item {
     }
     function ink(k) {
       return k === "e" ? Zenon.red : k === "w" ? Zenon.yellow : k === "i" ? Zenon.blue
-        : k === "h" ? Zenon.muted : k === "s" ? Zenon.sand : k === "a" ? Zenon.green
+        : k === "h" ? Zenon.accentMuted : k === "s" ? Zenon.sand : k === "a" ? Zenon.green
         : k === "c" ? Zenon.yellow : Zenon.red;
     }
     Repeater {

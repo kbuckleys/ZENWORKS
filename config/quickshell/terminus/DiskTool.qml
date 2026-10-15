@@ -195,7 +195,7 @@ FocusScope {
                                tool.disk.path, tool.disk.size,
                                tool.mounted ? "mounted at " + tool.disk.mount : "not mounted"]
                               .filter((x) => x).join("  ·  ")
-      color: Zenon.muted
+      color: Zenon.accentMuted
       font.family: Zenon.faceMono
       font.weight: Zenon.weight
       font.pixelSize: Zenon.px(13)
@@ -258,7 +258,7 @@ FocusScope {
           const mnt = tool.mounted ? " It is unmounted while this runs and mounted again after." : "";
           return verb + ntfs + btrfs + mnt + " Needs your password.";
         }
-        color: Zenon.soft
+        color: Zenon.accentSoft
         font.family: Zenon.face
         font.weight: Zenon.weight
         font.pixelSize: Zenon.px(13)
@@ -291,7 +291,7 @@ FocusScope {
           width: 110
           anchors.verticalCenter: parent.verticalCenter
           text: "erase"
-          color: Zenon.muted
+          color: Zenon.accentMuted
           font.family: Zenon.face
           font.weight: Zenon.weight
           font.pixelSize: Zenon.px(13)
@@ -316,7 +316,7 @@ FocusScope {
           width: 110
           anchors.verticalCenter: parent.verticalCenter
           text: "format"
-          color: Zenon.muted
+          color: Zenon.accentMuted
           font.family: Zenon.face
           font.weight: Zenon.weight
           font.pixelSize: Zenon.px(13)
@@ -343,7 +343,7 @@ FocusScope {
         width: body.width - 118
         wrapMode: Text.WordWrap
         text: tool.fmt ? tool.fmt.note : ""
-        color: Zenon.soft
+        color: Zenon.accentSoft
         font.family: Zenon.face
         font.weight: Zenon.weight
         font.pixelSize: Zenon.px(13)
@@ -356,7 +356,7 @@ FocusScope {
           width: 110
           anchors.verticalCenter: parent.verticalCenter
           text: "label"
-          color: Zenon.muted
+          color: Zenon.accentMuted
           font.family: Zenon.face
           font.weight: Zenon.weight
           font.pixelSize: Zenon.px(13)
@@ -375,7 +375,7 @@ FocusScope {
             return c !== label.text.trim() && label.text.trim() !== ""
               ? "saved as “" + c + "”" : "up to " + tool.fmt.labelMax;
           }
-          color: Zenon.muted
+          color: Zenon.accentMuted
           font.family: Zenon.face
           font.weight: Zenon.weight
           font.pixelSize: Zenon.px(12)
@@ -389,7 +389,7 @@ FocusScope {
           width: 110
           anchors.verticalCenter: parent.verticalCenter
           text: tool.target === "ext4" || tool.target === "xfs" ? "block size" : "cluster size"
-          color: Zenon.muted
+          color: Zenon.accentMuted
           font.family: Zenon.face
           font.weight: Zenon.weight
           font.pixelSize: Zenon.px(13)
@@ -419,7 +419,7 @@ FocusScope {
           width: 110
           anchors.verticalCenter: parent.verticalCenter
           text: "kept for root"
-          color: Zenon.muted
+          color: Zenon.accentMuted
           font.family: Zenon.face
           font.weight: Zenon.weight
           font.pixelSize: Zenon.px(13)
@@ -480,7 +480,7 @@ FocusScope {
           width: logView.width
           wrapMode: Text.WrapAnywhere
           text: modelData
-          color: modelData.indexOf("$ ") === 0 ? Zenon.cyan : Zenon.soft
+          color: modelData.indexOf("$ ") === 0 ? Zenon.cyan : Zenon.accentSoft
           font.family: Zenon.faceMono
           font.weight: Zenon.weight
           font.pixelSize: Zenon.px(12)
@@ -503,7 +503,7 @@ FocusScope {
         wrapMode: Text.WordWrap
         text: tool.running ? (tool.mode === "format" ? "formatting…" : "running " + (tool.can ? tool.can.tool : "") + "…")
           : (tool.verdict ? tool.verdict.line : "")
-        color: tool.running ? Zenon.soft : (tool.verdict && tool.verdict.ok ? Zenon.green : Zenon.red)
+        color: tool.running ? Zenon.accentSoft : (tool.verdict && tool.verdict.ok ? Zenon.green : Zenon.red)
         font.family: Zenon.face
         font.weight: Zenon.weight
         font.pixelSize: Zenon.px(14)
@@ -520,7 +520,7 @@ FocusScope {
     spacing: 8
     DialogButton {
       label: tool.done ? "Close" : "Cancel"
-      ink: Zenon.muted
+      ink: Zenon.accentMuted
       ready: !tool.running
       onClicked: if (!tool.running) tool.closed()
     }

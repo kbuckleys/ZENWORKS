@@ -41,7 +41,7 @@ Item {
       anchors.leftMargin: 12
       anchors.verticalCenter: parent.verticalCenter
       text: ""
-      color: Zenon.muted
+      color: Zenon.accentMuted
       font.family: Zenon.glyphFace
       font.pixelSize: Zenon.px(13)
     }
@@ -74,7 +74,7 @@ Item {
         visible: searchField.text === ""
         anchors.verticalCenter: parent.verticalCenter
         text: !bar.win ? "" : bar.win.inJournal ? "Search entries" : bar.win.onDesktop ? "Search stickies" : "Search notes"
-        color: Zenon.muted
+        color: Zenon.accentMuted
         font: searchField.font
       }
     }
@@ -148,7 +148,7 @@ Item {
             id: tk
             anchors.centerIn: parent
             text: modelData
-            color: Zenon.soft
+            color: Zenon.accentSoft
             font.family: Zenon.face
             font.weight: Zenon.weight
             font.pixelSize: Zenon.px(12)

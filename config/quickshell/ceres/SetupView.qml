@@ -75,7 +75,7 @@ Item {
             width: view.width - view.nameW - 12
             wrapMode: Text.Wrap
             text: modelData.why.join("; ")
-            color: Zenon.keyInk
+            color: Zenon.accentKey
             font.family: Zenon.face
             font.weight: Zenon.weight
             font.pixelSize: Zenon.px(16)
@@ -93,7 +93,7 @@ Item {
 
       Text {
         text: "Build paru from"
-        color: Zenon.muted
+        color: Zenon.accentMuted
         font.family: Zenon.face
         font.weight: Font.Bold
         font.pixelSize: Zenon.px(15)
@@ -111,7 +111,7 @@ Item {
         text: "Built from its AUR recipe, which fetches the source from github.com/Morganamilo/paru, "
           + "and installed by pacman, so paru is tracked like any other package. Building compiles Rust "
           + "and takes a few minutes."
-        color: Zenon.muted
+        color: Zenon.accentMuted
         font.family: Zenon.face
         font.weight: Zenon.weight
         font.pixelSize: Zenon.px(15)
@@ -127,7 +127,7 @@ Item {
 
       Text {
         text: "Apps in the Store"
-        color: Zenon.muted
+        color: Zenon.accentMuted
         font.family: Zenon.face
         font.weight: Font.Bold
         font.pixelSize: Zenon.px(15)
@@ -171,7 +171,7 @@ Item {
             width: parent.width
             wrapMode: Text.Wrap
             text: "Sandboxed apps from Flathub, in the Store beside the repos and the AUR"
-            color: Zenon.muted
+            color: Zenon.accentMuted
             font.family: Zenon.face
             font.weight: Zenon.weight
             font.pixelSize: Zenon.px(15)
@@ -187,7 +187,7 @@ Item {
           ? "Installs flatpak and adds Flathub as a source for the whole system. Each Flatpak "
             + "install then asks whether it is for everyone or just you."
           : "Flatpak can be added later from Settings."
-        color: Zenon.muted
+        color: Zenon.accentMuted
         font.family: Zenon.face
         font.weight: Zenon.weight
         font.pixelSize: Zenon.px(15)

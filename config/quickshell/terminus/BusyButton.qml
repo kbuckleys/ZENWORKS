@@ -20,7 +20,7 @@ import "../morpheus"
 Item {
   id: bb
   property string label: ""
-  property color ink: Zenon.muted
+  property color ink: Zenon.accentMuted
   property bool primary: false
   property bool ready: true
   property bool busy: false

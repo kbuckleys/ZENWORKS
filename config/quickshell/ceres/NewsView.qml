@@ -85,7 +85,7 @@ Item {
         }
         Text {
           text: Qt.formatDate(new Date(card.modelData.date), "ddd d MMM yyyy")
-          color: Zenon.muted
+          color: Zenon.accentMuted
           font.family: Zenon.face
           font.weight: Zenon.weight
           font.pixelSize: 12 + view.grow
@@ -96,7 +96,7 @@ Item {
           maximumLineCount: 4
           elide: Text.ElideRight
           text: card.modelData.text
-          color: Zenon.keyInk
+          color: Zenon.accentKey
           font.family: Zenon.face
           font.weight: Zenon.weight
           font.pixelSize: 13 + view.grow

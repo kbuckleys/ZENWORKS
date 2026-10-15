@@ -91,7 +91,7 @@ Item {
       width: parent.width
       wrapMode: Text.WordWrap
       text: "cropped or stretched, it fills the screen — this shows once it is fitted, centred or tiled"
-      color: Zenon.soft
+      color: Zenon.accentSoft
       font.family: Zenon.face
       font.weight: Zenon.weight
       font.pixelSize: Zenon.px(13)
@@ -99,7 +99,7 @@ Item {
     Text {
       visible: ed.showBackdrop && ed.look.backdrop === "color"
       text: "click Colour again to choose it"
-      color: Zenon.soft
+      color: Zenon.accentSoft
       font.family: Zenon.face
       font.weight: Zenon.weight
       font.pixelSize: Zenon.px(13)
@@ -190,7 +190,7 @@ Item {
             visible: sw.modelData === ""
             anchors.centerIn: parent
             width: 20; height: 2; rotation: -45
-            color: Zenon.muted
+            color: Zenon.accentMuted
           }
           // its own colour: a small image mark; custom: a plus
           Text {
@@ -230,7 +230,7 @@ Item {
 
     Text {
       text: "Reset look"
-      color: resetMa.containsMouse || ed.kbRow === "reset" ? Zenon.cyan : Zenon.soft
+      color: resetMa.containsMouse || ed.kbRow === "reset" ? Zenon.cyan : Zenon.accentSoft
       font.family: Zenon.face
       font.weight: 600
       font.pixelSize: Zenon.px(14)

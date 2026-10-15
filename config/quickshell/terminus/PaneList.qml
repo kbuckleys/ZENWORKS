@@ -174,7 +174,7 @@ ListView {
         anchors.bottom: parent.bottom
         anchors.bottomMargin: 3
         text: cell.head
-        color: Zenon.muted
+        color: Zenon.accentMuted
         font.family: Zenon.face
         font.weight: Font.Bold
         font.pixelSize: Math.round(11 * term.zoom)

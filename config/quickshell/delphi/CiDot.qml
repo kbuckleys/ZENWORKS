@@ -25,7 +25,7 @@ Item {
     anchors.fill: parent
     radius: width / 2
     color: dot.state_ === "pending" ? "transparent"
-      : dot.state_ === "success" ? Zenon.green : dot.state_ === "failure" ? Zenon.red : Zenon.muted
+      : dot.state_ === "success" ? Zenon.green : dot.state_ === "failure" ? Zenon.red : Zenon.accentMuted
     border.width: dot.state_ === "pending" ? Math.max(1.5, dot.size / 5) : 0
     border.color: Zenon.yellow
   }

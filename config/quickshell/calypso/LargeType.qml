@@ -25,7 +25,7 @@ Item {
     spacing: 18
     Text {
       text: big.label
-      color: Zenon.muted
+      color: Zenon.accentMuted
       font.family: Zenon.face
       font.weight: Zenon.weight
       font.pixelSize: Zenon.px(13)
@@ -56,7 +56,7 @@ Item {
             anchors.bottom: parent.bottom
             anchors.bottomMargin: 3
             text: index + 1
-            color: Zenon.muted
+            color: Zenon.accentMuted
             font.family: Zenon.face
             font.pixelSize: 10
           }

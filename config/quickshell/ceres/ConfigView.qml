@@ -303,7 +303,7 @@ Item {
               width: parent.width
               elide: Text.ElideRight
               text: view.groupSummary(grow.modelData.id)
-              color: Zenon.muted
+              color: Zenon.accentMuted
               font.family: Zenon.face
               font.weight: Zenon.weight
               font.pixelSize: Zenon.px(15)
@@ -350,7 +350,7 @@ Item {
       }
       DialogButton {
         label: "Discard"
-        ink: Zenon.muted
+        ink: Zenon.accentMuted
         onClicked: { view.discard(); view.released(); }
       }
       DialogButton {
@@ -375,7 +375,7 @@ Item {
       width: parent.width
       wrapMode: Text.Wrap
       text: view.group.blurb
-      color: Zenon.keyInk
+      color: Zenon.accentKey
       font.family: Zenon.face
       font.weight: Zenon.weight
       font.pixelSize: Zenon.px(16)
@@ -439,7 +439,7 @@ Item {
           spacing: 14
           Text {
             text: "The AUR, through paru"
-            color: Zenon.muted
+            color: Zenon.accentMuted
             font.family: Zenon.face
             font.weight: Font.Bold
             font.pixelSize: Zenon.px(15)
@@ -455,7 +455,7 @@ Item {
             width: parent.width
             wrapMode: Text.Wrap
             text: "paru here comes from " + view.paruHere + ". Building either one replaces it."
-            color: Zenon.keyInk
+            color: Zenon.accentKey
             font.family: Zenon.face
             font.weight: Zenon.weight
             font.pixelSize: Zenon.px(15)
@@ -476,7 +476,7 @@ Item {
           Item { width: 1; height: 12 }
           Text {
             text: "Flathub, through Flatpak"
-            color: Zenon.muted
+            color: Zenon.accentMuted
             font.family: Zenon.face
             font.weight: Font.Bold
             font.pixelSize: Zenon.px(15)
@@ -491,7 +491,7 @@ Item {
                 + (Ceres.flatpakApps.length === 0 ? "No Flatpak apps are installed."
                   : Ceres.flatpakApps.length === 1 ? "1 Flatpak app is installed."
                   : Ceres.flatpakApps.length + " Flatpak apps are installed.")
-            color: Zenon.keyInk
+            color: Zenon.accentKey
             font.family: Zenon.face
             font.weight: Zenon.weight
             font.pixelSize: Zenon.px(15)
@@ -516,7 +516,7 @@ Item {
           Text {
             visible: Ceres.deps.flatpak
             text: "Open apps on"
-            color: Zenon.muted
+            color: Zenon.accentMuted
             font.family: Zenon.face
             font.weight: Font.Bold
             font.pixelSize: Zenon.px(15)
@@ -527,7 +527,7 @@ Item {
             even: true
             strong: true
             textSize: Zenon.px(16)
-            ink: Zenon.keyInk
+            ink: Zenon.accentKey
             options: [["native", "Arch and the AUR", "the system's own builds, first"],
                       ["flatpak", "Flathub", "sandboxed builds, first, where there are"]]
             current: Ceres.preferSource
@@ -538,7 +538,7 @@ Item {
             width: parent.width
             wrapMode: Text.Wrap
             text: "For apps with both. Whichever you have installed opens first either way, and each app's page can switch."
-            color: Zenon.keyInk
+            color: Zenon.accentKey
             font.family: Zenon.face
             font.weight: Zenon.weight
             font.pixelSize: Zenon.px(15)
@@ -566,7 +566,7 @@ Item {
       id: chipText
       anchors.centerIn: parent
       text: chip.label
-      color: chip.lit ? (chip.dim ? Zenon.keyInk : Zenon.cyan) : Zenon.muted
+      color: chip.lit ? (chip.dim ? Zenon.accentKey : Zenon.cyan) : Zenon.accentMuted
       font.family: Zenon.face
       font.weight: Zenon.weight
       font.pixelSize: Zenon.px(15)
@@ -639,7 +639,7 @@ Item {
       visible: input.text === "" && !input.activeFocus
       elide: Text.ElideRight
       text: fld.placeholder
-      color: Zenon.muted
+      color: Zenon.accentMuted
       font.family: Zenon.face
       font.weight: Zenon.weight
       font.pixelSize: Zenon.px(15)
@@ -686,7 +686,7 @@ Item {
           spacing: 8
           Text {
             text: sc.modelData[1]
-            color: Zenon.muted
+            color: Zenon.accentMuted
             font.family: Zenon.face
             font.weight: Zenon.weight
             font.pixelSize: Zenon.px(12)
@@ -721,7 +721,7 @@ Item {
       Item { width: 96; height: 18 }
       Text {
         text: "SIGNATURE CHECK"
-        color: Zenon.muted
+        color: Zenon.accentMuted
         font.family: Zenon.face
         font.weight: Zenon.weight
         font.pixelSize: Zenon.px(12)
@@ -729,14 +729,14 @@ Item {
       }
       Text {
         text: "KEY TRUST"
-        color: Zenon.muted
+        color: Zenon.accentMuted
         font.family: Zenon.face
         font.weight: Zenon.weight
         font.pixelSize: Zenon.px(12)
         font.letterSpacing: 1
       }
       // row by row, as a Grid fills: the label, its check, its trust
-      Text { width: 96; text: "Packages"; color: Zenon.keyInk; font.family: Zenon.face; font.pixelSize: Zenon.px(15) }
+      Text { width: 96; text: "Packages"; color: Zenon.accentKey; font.family: Zenon.face; font.pixelSize: Zenon.px(15) }
       Segmented {
         options: [["Never", "Never"], ["Optional", "Optional"], ["Required", "Required"]]
         value: se.sig.pkg.check
@@ -749,7 +749,7 @@ Item {
         dim: se.inherited
         onPicked: (v) => se.pick("pkg", "trust", v)
       }
-      Text { width: 96; text: "Databases"; color: Zenon.keyInk; font.family: Zenon.face; font.pixelSize: Zenon.px(15) }
+      Text { width: 96; text: "Databases"; color: Zenon.accentKey; font.family: Zenon.face; font.pixelSize: Zenon.px(15) }
       Segmented {
         options: [["Never", "Never"], ["Optional", "Optional"], ["Required", "Required"]]
         value: se.sig.db.check
@@ -781,7 +781,7 @@ Item {
           height: sr.inline ? 32 : 22
           verticalAlignment: Text.AlignVCenter
           text: sr.modelData[1]
-          color: Zenon.keyInk
+          color: Zenon.accentKey
           font.family: Zenon.face
           font.weight: Zenon.weight
           font.pixelSize: Zenon.px(15)
@@ -858,7 +858,7 @@ Item {
         }
         Text {
           text: orow.spec.key
-          color: Zenon.muted
+          color: Zenon.accentMuted
           font.family: Zenon.face
           font.weight: Zenon.weight
           font.pixelSize: Zenon.px(13)
@@ -868,7 +868,7 @@ Item {
           topPadding: 8
           wrapMode: Text.Wrap
           text: orow.spec.help
-          color: Zenon.keyInk
+          color: Zenon.accentKey
           font.family: Zenon.face
           font.weight: Zenon.weight
           font.pixelSize: Zenon.px(14)
@@ -879,7 +879,7 @@ Item {
           Text {
             text: orow.now.set ? "set in pacman.conf"
               : orow.spec.key === "SigLevel" ? "pacman's default" : "as Everything"
-            color: Zenon.muted
+            color: Zenon.accentMuted
             font.family: Zenon.face
             font.weight: Zenon.weight
             font.pixelSize: Zenon.px(13)
@@ -930,7 +930,7 @@ Item {
           anchors.rightMargin: 12
           elide: Text.ElideRight
           anchors.verticalCenter: parent.verticalCenter
-          text: orow.spec.label + "  <font color='" + Zenon.muted + "'>" + orow.spec.key + "</font>"
+          text: orow.spec.label + "  <font color='" + Zenon.accentMuted + "'>" + orow.spec.key + "</font>"
           textFormat: Text.StyledText
           color: Zenon.white
           font.family: Zenon.face
@@ -956,7 +956,7 @@ Item {
               anchors.verticalCenter: parent.verticalCenter
               text: orow.now.set ? "set in pacman.conf"
                 : orow.spec.key === "SigLevel" ? "pacman's default" : "as Everything"
-              color: Zenon.muted
+              color: Zenon.accentMuted
               font.family: Zenon.face
               font.weight: Zenon.weight
               font.pixelSize: Zenon.px(14)
@@ -994,7 +994,7 @@ Item {
               anchors.verticalCenter: parent.verticalCenter
               horizontalAlignment: Text.AlignHCenter
               text: orow.now.set ? orow.now.value : "—"
-              color: orow.now.set ? Zenon.white : Zenon.muted
+              color: orow.now.set ? Zenon.white : Zenon.accentMuted
               font.family: Zenon.face
               font.weight: Font.Bold
               font.pixelSize: Zenon.px(17)
@@ -1031,7 +1031,7 @@ Item {
         width: parent.width
         wrapMode: Text.Wrap
         text: orow.spec.help
-        color: Zenon.keyInk
+        color: Zenon.accentKey
         font.family: Zenon.face
         font.weight: Zenon.weight
         font.pixelSize: Zenon.px(15)
@@ -1063,7 +1063,7 @@ Item {
         width: parent.width
         wrapMode: Text.Wrap
         text: orow.spec.help
-        color: Zenon.keyInk
+        color: Zenon.accentKey
         font.family: Zenon.face
         font.weight: Zenon.weight
         font.pixelSize: Zenon.px(15)
@@ -1073,7 +1073,7 @@ Item {
         spacing: 12
         Text {
           text: orow.now.set ? "set in the file" : "unset · pacman uses: " + orow.spec.def
-          color: Zenon.muted
+          color: Zenon.accentMuted
           font.family: Zenon.face
           font.weight: Zenon.weight
           font.pixelSize: Zenon.px(14)
@@ -1118,7 +1118,7 @@ Item {
       height: view.narrow ? 22 : 32
       verticalAlignment: Text.AlignVCenter
       text: lab.label
-      color: Zenon.keyInk
+      color: Zenon.accentKey
       font.family: Zenon.face
       font.weight: Zenon.weight
       font.pixelSize: Zenon.px(15)
@@ -1181,7 +1181,7 @@ Item {
               anchors.verticalCenter: parent.verticalCenter
               visible: card.repo.enabled
               text: card.open ? "" : ""
-              color: Zenon.muted
+              color: Zenon.accentMuted
               font.family: Zenon.face
               font.weight: Zenon.weight
               font.pixelSize: Zenon.px(12)
@@ -1192,7 +1192,7 @@ Item {
               width: Math.min(implicitWidth, titleRow.width - 22)
               elide: Text.ElideRight
               text: (card.at + 1) + ".  [" + card.repo.name + "]"
-              color: card.repo.enabled ? Zenon.white : Zenon.muted
+              color: card.repo.enabled ? Zenon.white : Zenon.accentMuted
               font.family: Zenon.face
               font.weight: Font.Bold
               font.pixelSize: Zenon.px(17)
@@ -1205,7 +1205,7 @@ Item {
               elide: Text.ElideRight
               text: !card.repo.official ? "third party"
                 : /testing|unstable/.test(card.repo.name) ? "pre-release" : "Arch"
-              color: !card.repo.official ? Zenon.magenta : /testing|unstable/.test(card.repo.name) ? Zenon.yellow : Zenon.muted
+              color: !card.repo.official ? Zenon.magenta : /testing|unstable/.test(card.repo.name) ? Zenon.yellow : Zenon.accentMuted
               font.family: Zenon.face
               font.weight: Zenon.weight
               font.pixelSize: Zenon.px(14)
@@ -1246,7 +1246,7 @@ Item {
         leftPadding: 28
         elide: Text.ElideRight
         text: view.repoSummary(card.repo)
-        color: Zenon.muted
+        color: Zenon.accentMuted
         font.family: Zenon.face
         font.weight: Zenon.weight
         font.pixelSize: Zenon.px(14)
@@ -1294,7 +1294,7 @@ Item {
               spacing: 8
               Text {
                 text: card.repo.SigLevel === "" ? "inherited from [options]" : "this repository's own"
-                color: Zenon.muted
+                color: Zenon.accentMuted
                 font.family: Zenon.face
                 font.weight: Zenon.weight
                 font.pixelSize: Zenon.px(14)
@@ -1381,7 +1381,7 @@ Item {
         wrapMode: Text.Wrap
         text: "Added last, so Arch's own repositories win where both have a package of the same name. "
           + "Most third-party repositories also need their signing key imported with pacman-key first."
-        color: Zenon.keyInk
+        color: Zenon.accentKey
         font.family: Zenon.face
         font.weight: Zenon.weight
         font.pixelSize: Zenon.px(15)
@@ -1411,7 +1411,7 @@ Item {
         spacing: 8
         DialogButton {
           label: "Cancel"
-          ink: Zenon.muted
+          ink: Zenon.accentMuted
           onClicked: { add.open = false; add.name = ""; add.servers = ""; }
         }
         DialogButton {

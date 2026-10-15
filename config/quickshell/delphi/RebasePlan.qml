@@ -145,7 +145,7 @@ Item {
     wrapMode: Text.Wrap
     text: plan.problem !== "" ? plan.problem
       : "Oldest first — the order they are replayed in. Nothing changes until Run; Abort in the sidebar undoes a run that stopped."
-    color: plan.problem !== "" ? Zenon.red : Zenon.muted
+    color: plan.problem !== "" ? Zenon.red : Zenon.accentMuted
     font.family: Zenon.face
     font.weight: Zenon.weight
     font.pixelSize: Zenon.px(14)
@@ -194,7 +194,7 @@ Item {
             Text {
               anchors.centerIn: parent
               text: modelData.key
-              color: parent.on ? Zenon[modelData.ink] : Zenon.muted
+              color: parent.on ? Zenon[modelData.ink] : Zenon.accentMuted
               font.family: Zenon.faceMono
               font.weight: Font.Bold
               font.pixelSize: Zenon.px(13)
@@ -214,7 +214,7 @@ Item {
         anchors.leftMargin: 16
         anchors.verticalCenter: parent.verticalCenter
         text: D.short(srow.modelData.sha)
-        color: Zenon.muted
+        color: Zenon.accentMuted
         font.family: Zenon.faceFixed
         font.pixelSize: Zenon.px(14)
       }

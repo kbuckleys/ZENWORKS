@@ -20,7 +20,7 @@ Rectangle {
   property string tip: ""
   property var tips: null
   property bool on: false
-  property color ink: Zenon.muted
+  property color ink: Zenon.accentMuted
   signal clicked()
 
   width: 28

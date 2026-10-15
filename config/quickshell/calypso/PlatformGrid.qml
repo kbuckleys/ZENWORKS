@@ -85,7 +85,7 @@ Item {
               : grid.win.mgr.installing && grid.win.mgr.installing.pkg === cell.info.pkg ? "installing…"
               : cell.info.installed ? (cell.has > 0 ? cell.has + " added" : " ready")
               : cell.info.aur ? "AUR · installs" : "installs"
-            color: cell.info && cell.info.installed ? Zenon.green : Zenon.muted
+            color: cell.info && cell.info.installed ? Zenon.green : Zenon.accentMuted
             font.family: Zenon.face
             font.weight: Zenon.weight
             font.pixelSize: Zenon.px(11)
@@ -111,7 +111,7 @@ Item {
               width: parent.width
               elide: Text.ElideRight
               text: cell.p.tagline
-              color: Zenon.muted
+              color: Zenon.accentMuted
               font.family: Zenon.face
               font.weight: Zenon.weight
               font.pixelSize: Zenon.px(12)
@@ -143,7 +143,7 @@ Item {
               width: 300
               wrapMode: Text.Wrap
               text: cell.info ? cell.info.blurb.charAt(0).toUpperCase() + cell.info.blurb.slice(1) + "." : ""
-              color: Zenon.muted
+              color: Zenon.accentMuted
               font.family: Zenon.face
               font.weight: Zenon.weight
               font.pixelSize: Zenon.px(12)
@@ -158,7 +158,7 @@ Item {
       wrapMode: Text.Wrap
       horizontalAlignment: Text.AlignHCenter
       text: "NordPass and Enpass keep no command-line tool, so calypso cannot read them."
-      color: Zenon.alpha(Zenon.muted, 0.8)
+      color: Zenon.alpha(Zenon.accentMuted, 0.8)
       font.family: Zenon.face
       font.weight: Zenon.weight
       font.pixelSize: Zenon.px(12)

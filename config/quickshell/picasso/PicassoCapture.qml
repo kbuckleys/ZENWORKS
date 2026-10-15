@@ -474,20 +474,20 @@ Scope {
             rightPadding: 6
             Text {
               text: "right-drag to resize  ·  drag inside to move"
-              color: Zenon.keyInk
+              color: Zenon.accentKey
               font.family: Zenon.face
               font.weight: Zenon.weight
               font.pixelSize: Zenon.px(12)
             }
             Text {
               text: "arrows move  ·  ctrl+arrows size  ·  t copy text  ·  ↵ save  ·  esc abort"
-              color: Zenon.muted
+              color: Zenon.accentMuted
               font.family: Zenon.face
               font.weight: Zenon.weight
               font.pixelSize: Zenon.px(11)
             }
           }
-          DialogButton { label: "Abort"; ink: Zenon.muted; onClicked: region.finish(false) }
+          DialogButton { label: "Abort"; ink: Zenon.accentMuted; onClicked: region.finish(false) }
           DialogButton { label: "Copy text"; ink: Zenon.sand; onClicked: region.finish(true, true) }
           DialogButton { label: "Save"; ink: Zenon.cyan; primary: true; onClicked: region.finish(true) }
         }
@@ -534,7 +534,7 @@ Scope {
               spacing: 6
               Text {
                 text: chip.modelData.key
-                color: Zenon.keyInk
+                color: Zenon.accentKey
                 font.family: Zenon.faceMono
                 font.weight: Zenon.weight
                 font.pixelSize: Zenon.px(11)
@@ -578,7 +578,7 @@ Scope {
         id: hint
         anchors.centerIn: parent
         text: "drag to select  ·  click a window to take it  ·  1–7 a preset  ·  esc to abort"
-        color: Zenon.keyInk
+        color: Zenon.accentKey
         font.family: Zenon.face
         font.weight: Zenon.weight
         font.pixelSize: Zenon.px(14)

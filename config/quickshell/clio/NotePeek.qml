@@ -54,7 +54,7 @@ Bubble {
     text: !peek.note || !peek.win ? ""
       : (peek.note.kind === "entry" ? (peek.mgr.journalOf(peek.note.journal) || {}).name || "Journal" : peek.win.folderName(peek.note.folder))
         + "  ·  " + (peek.note.kind === "entry" ? N.dateLong(peek.note.date) : "Edited " + N.dateShort(peek.note.modified, Date.now()))
-    color: Zenon.muted
+    color: Zenon.accentMuted
     font.family: Zenon.face
     font.weight: Zenon.weight
     font.pixelSize: Zenon.px(12)
@@ -66,7 +66,7 @@ Bubble {
     maximumLineCount: 4
     elide: Text.ElideRight
     text: peek.closed ? "Locked — open it with the Clio password." : peek.d.preview
-    color: peek.closed ? Zenon.muted : Zenon.soft
+    color: peek.closed ? Zenon.accentMuted : Zenon.accentSoft
     font.family: Zenon.face
     font.weight: Zenon.weight
     font.italic: peek.closed

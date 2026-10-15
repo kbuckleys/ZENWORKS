@@ -452,7 +452,7 @@ FloatingWindow {
         detail: p.name + " is read through " + info.cli + ", which is not installed. Ceres installs it"
           + (info.aur ? " from the AUR" : "") + " — it asks for your password — then you sign in.",
         choices: [{ label: "Install " + info.pkg, ink: Zenon.cyan, run: () => win.mgr.install(kind, (ok) => { if (ok) win.askSetup(kind); }) },
-                  { label: "Cancel", ink: Zenon.muted }] });
+                  { label: "Cancel", ink: Zenon.accentMuted }] });
       return;
     }
     win.askSetup(kind);
@@ -464,8 +464,8 @@ FloatingWindow {
       cards.card_({ question: "Sign in to Proton Pass", glyph: C.platform(kind).glyph, ink: Zenon.magenta,
         detail: "In your browser — the way for SSO and security keys — or here, with your email and password.",
         choices: [{ label: "Use the browser", ink: Zenon.cyan, run: () => win.protonBrowser(again) },
-                  { label: "Sign in here", ink: Zenon.muted, run: () => win.askSetup(kind, "here", again) },
-                  { label: "Cancel", ink: Zenon.muted }] });
+                  { label: "Sign in here", ink: Zenon.accentMuted, run: () => win.askSetup(kind, "here", again) },
+                  { label: "Cancel", ink: Zenon.accentMuted }] });
       return;
     }
     const form = C.setupForm(kind, how);
@@ -527,7 +527,7 @@ FloatingWindow {
         cards.card_({ question: again ? "Not signed in to " + p.name : p.name + " was not added", glyph: p.glyph, ink: Zenon.red,
           detail: C.failWords(err),
           choices: [{ label: "Try again", ink: Zenon.cyan, run: () => win.askSetup(kind, values.how, again) },
-                    { label: "Close", ink: Zenon.muted }] });
+                    { label: "Close", ink: Zenon.accentMuted }] });
         return;
       }
       win.say((again ? "Signed in to " : "Added ") + acct.name);
@@ -544,7 +544,7 @@ FloatingWindow {
       cards.card_({ question: "Install " + err.pkgs.join(", ") + "?", glyph: "\uF019", ink: Zenon.cyan,
         detail: C.failWords(err) + ". Ceres installs " + (err.pkgs.length > 1 ? "them" : "it") + " — it asks for your password.",
         choices: [{ label: "Install", ink: Zenon.cyan, run: () => Ceres.install(err.pkgs, "for calypso", (ok) => { if (ok && retry) retry(); }) },
-                  { label: "Cancel", ink: Zenon.muted }] });
+                  { label: "Cancel", ink: Zenon.accentMuted }] });
       return;
     }
     if (err && err.kind === "cancelled") return;
@@ -565,7 +565,7 @@ FloatingWindow {
   // pass-cli says the sign-in landed
   function protonBrowser(again) {
     win.setupCard = cards.card_({ question: "Sign in to Proton Pass in your browser", glyph: C.platform("proton").glyph, ink: Zenon.magenta,
-      detail: "Waiting for pass-cli to give the address…", choices: [{ label: "Cancel", ink: Zenon.muted }] });
+      detail: "Waiting for pass-cli to give the address…", choices: [{ label: "Cancel", ink: Zenon.accentMuted }] });
     win.runSetup("proton", { how: "browser" }, null, again);
   }
   Connections {
@@ -575,8 +575,8 @@ FloatingWindow {
       win.setupCard = cards.card_({ question: "Sign in to Proton Pass in your browser", glyph: C.platform("proton").glyph, ink: Zenon.magenta,
         detail: "Open this address, sign in there, and calypso carries on by itself:\n" + url,
         choices: [{ label: "Open", ink: Zenon.cyan, keep: true, run: () => win.openUrl(url) },
-                  { label: "Copy", ink: Zenon.muted, keep: true, run: () => win.mgr.call("copyText", null, { text: url }, () => win.say("Copied the address")) },
-                  { label: "Cancel", ink: Zenon.muted }] });
+                  { label: "Copy", ink: Zenon.accentMuted, keep: true, run: () => win.mgr.call("copyText", null, { text: url }, () => win.say("Copied the address")) },
+                  { label: "Cancel", ink: Zenon.accentMuted }] });
     }
   }
   function renameAccount(a) {
@@ -592,7 +592,7 @@ FloatingWindow {
         + (signs ? " — and " + p.name + " can be signed out on this machine too." : "."),
       choices: (signs ? [{ label: "Remove and sign out", ink: Zenon.red, run: () => win.mgr.removeAccount(a, true) }] : [])
         .concat([{ label: "Remove", ink: Zenon.red, run: () => win.mgr.removeAccount(a, false) },
-                 { label: "Cancel", ink: Zenon.muted }]) });
+                 { label: "Cancel", ink: Zenon.accentMuted }]) });
   }
   property string busyText: ""
   function syncAcct(a) {
@@ -677,7 +677,7 @@ FloatingWindow {
     if (editorLoader.item && editorLoader.item.dirty) {
       cards.card_({ question: "Leave without saving?", glyph: "\uF044", ink: Zenon.yellow,
         detail: "What was changed here is lost.",
-        choices: [{ label: "Discard", ink: Zenon.red, run: go }, { label: "Keep editing", ink: Zenon.muted }] });
+        choices: [{ label: "Discard", ink: Zenon.red, run: go }, { label: "Keep editing", ink: Zenon.accentMuted }] });
       return;
     }
     go();
@@ -707,7 +707,7 @@ FloatingWindow {
         : "Into " + C.platform(win.acctOf(it).kind).name + "'s trash, where it can be restored.",
       choices: [{ label: word, ink: Zenon.red, run: () => win.mgr.remove(win.acctOf(it), it.id, permanent, (ok, r, err) => {
                   if (ok) win.say((gone ? "Deleted " : "Moved ") + it.title + (gone ? "" : " out of the way")); else win.failed(err, null); }) },
-                { label: "Cancel", ink: Zenon.muted }] });
+                { label: "Cancel", ink: Zenon.accentMuted }] });
   }
   function restoreItem(it) {
     win.mgr.restore(win.acctOf(it), it.id, (ok, r, err) => { if (ok) win.say("Restored " + it.title); else win.failed(err, null); });
@@ -948,7 +948,7 @@ FloatingWindow {
             text: !win.mgr ? "" : acctChip.acct ? C.platform(acctChip.acct.kind).name
               : win.mgr.accounts.length === 0 ? "No accounts yet"
               : win.mgr.accounts.length === 1 ? "1 account" : "Every account (" + win.mgr.accounts.length + ")"
-            color: Zenon.muted
+            color: Zenon.accentMuted
             font.family: Zenon.face
             font.weight: Zenon.weight
             font.pixelSize: Zenon.px(13)
@@ -960,7 +960,7 @@ FloatingWindow {
           anchors.rightMargin: 12
           anchors.verticalCenter: parent.verticalCenter
           text: ""
-          color: win.menuHeld === "chip" && menu.isOpen ? Zenon.cyan : Zenon.muted
+          color: win.menuHeld === "chip" && menu.isOpen ? Zenon.cyan : Zenon.accentMuted
           rotation: win.menuHeld === "chip" && menu.isOpen ? 180 : 0
           Behavior on rotation { NumberAnimation { duration: Zenon.normal; easing.type: Zenon.travelEase } }
           font.family: Zenon.glyphFace
@@ -1011,7 +1011,7 @@ FloatingWindow {
                 : modelData.id === "trash" ? (win.mgr.trashItems.length > 0 ? String(win.mgr.trashItems.length) : "")
                 : modelData.id === "watch" ? (win.mgr.auditing ? "\u2026" : Object.keys(win.mgr.audits).length === 0 ? "" : String(C.count(win.mgr.items, { shelf: "watch", acct: win.scope.acct }, win.mgr.favs, win.mgr.flags)))
                 : String(C.count(win.mgr.items, { shelf: modelData.id, acct: win.scope.acct }, win.mgr.favs))
-              countInk: modelData.id === "watch" && Object.keys(win.mgr ? win.mgr.flags : {}).length > 0 ? Zenon.yellow : Zenon.muted
+              countInk: modelData.id === "watch" && Object.keys(win.mgr ? win.mgr.flags : {}).length > 0 ? Zenon.yellow : Zenon.accentMuted
               onClicked: win.setScope({ shelf: modelData.id, acct: win.scope.acct })
             }
           }
@@ -1053,7 +1053,7 @@ FloatingWindow {
               count: acctRow.st.busy || acctRow.st.loading ? "…"
                 : acctRow.st.installed === false ? ""
                 : acctRow.st.unlocked ? String(acctRow.st.count !== undefined ? acctRow.st.count : "") : ""
-              countInk: acctRow.st.installed === false || acctRow.st.error ? Zenon.red : acctRow.st.unlocked ? Zenon.muted : Zenon.yellow
+              countInk: acctRow.st.installed === false || acctRow.st.error ? Zenon.red : acctRow.st.unlocked ? Zenon.accentMuted : Zenon.yellow
               onClicked: win.setScope({ shelf: "all", acct: modelData.id })
               MouseArea {
                 anchors.fill: parent
@@ -1083,7 +1083,7 @@ FloatingWindow {
                     }
                     Text {
                       text: C.platform(acctRow.modelData.kind).name + (acctRow.st.user ? "  ·  " + acctRow.st.user : "")
-                      color: Zenon.muted
+                      color: Zenon.accentMuted
                       font.family: Zenon.face
                       font.weight: Zenon.weight
                       font.pixelSize: Zenon.px(12)
@@ -1156,7 +1156,7 @@ FloatingWindow {
         indent: 18
         glyph: ""
         label: "Add an account"
-        countInk: Zenon.muted
+        countInk: Zenon.accentMuted
         count: "ctrl n"
         here: win.adding
         fill: win.hiFill
@@ -1234,7 +1234,7 @@ FloatingWindow {
             verticalAlignment: Text.AlignBottom
             bottomPadding: 6
             text: rowItem.head
-            color: Zenon.muted
+            color: Zenon.accentMuted
             font.family: Zenon.face
             font.weight: Font.DemiBold
             font.pixelSize: Zenon.px(12)
@@ -1265,7 +1265,7 @@ FloatingWindow {
                 elide: Text.ElideRight
                 textFormat: Text.StyledText
                 text: C.highlight(rowItem.it.title, win.query, Zenon.cyan)
-                color: rowItem.here ? Zenon.ink : Zenon.soft
+                color: rowItem.here ? Zenon.ink : Zenon.accentSoft
                 font.family: Zenon.face
                 font.weight: Font.DemiBold
                 font.pixelSize: Zenon.px(15)
@@ -1275,7 +1275,7 @@ FloatingWindow {
                 elide: Text.ElideRight
                 visible: text !== ""
                 text: rowItem.it.sub || rowItem.it.host || (win.scope.acct ? "" : (win.acctOf(rowItem.it).name || ""))
-                color: Zenon.muted
+                color: Zenon.accentMuted
                 font.family: Zenon.face
                 font.weight: Zenon.weight
                 font.pixelSize: Zenon.px(13)
@@ -1376,7 +1376,7 @@ FloatingWindow {
           anchors.leftMargin: 13
           anchors.verticalCenter: parent.verticalCenter
           text: ""
-          color: Zenon.muted
+          color: Zenon.accentMuted
           font.family: Zenon.glyphFace
           font.pixelSize: Zenon.px(13)
         }
@@ -1408,7 +1408,7 @@ FloatingWindow {
             visible: searchField.text === ""
             anchors.verticalCenter: parent.verticalCenter
             text: !win.mgr ? "" : "Search " + (win.scope.acct ? (win.mgr.accountOf(win.scope.acct) || {}).name || "" : "everything")
-            color: Zenon.muted
+            color: Zenon.accentMuted
             font: searchField.font
           }
         }
@@ -1438,7 +1438,7 @@ FloatingWindow {
           anchors.left: parent.left
           anchors.verticalCenter: parent.verticalCenter
           text: win.shown.length === 1 ? "1 item" : win.shown.length + " items"
-          color: Zenon.muted
+          color: Zenon.accentMuted
           font.family: Zenon.face
           font.weight: Zenon.weight
           font.pixelSize: Zenon.px(13)
@@ -1538,7 +1538,7 @@ FloatingWindow {
             horizontalAlignment: Text.AlignHCenter
             wrapMode: Text.Wrap
             text: "Calypso reads them where they are, through each platform's own tool — installed for you when you choose it. Add as many as you keep."
-            color: Zenon.muted
+            color: Zenon.accentMuted
             font.family: Zenon.face
             font.weight: Zenon.weight
             font.pixelSize: Zenon.px(15)
@@ -1594,7 +1594,7 @@ FloatingWindow {
         text: !win.mgr || win.welcoming ? "" : win.lockAcct ? win.lockAcct.name
           : win.scope.acct ? (win.mgr.accountOf(win.scope.acct) || {}).name || ""
           : win.mgr.accounts.filter((a) => (win.mgr.states[a.id] || {}).unlocked).length + " of " + win.mgr.accounts.length + " accounts open"
-        color: Zenon.muted
+        color: Zenon.accentMuted
         font.family: Zenon.face
         font.weight: Zenon.weight
         font.pixelSize: Zenon.px(14)

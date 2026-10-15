@@ -600,7 +600,7 @@ Rectangle {
             anchors.leftMargin: 16
             anchors.verticalCenter: saveName.verticalCenter
             text: "save as"
-            color: Zenon.muted
+            color: Zenon.accentMuted
             font.family: Zenon.face
             font.weight: Zenon.weight
             font.pixelSize: collEdit.textSize - 2
@@ -764,7 +764,7 @@ Rectangle {
               anchors.rightMargin: 16
               anchors.verticalCenter: parent.verticalCenter
               text: "\uEA76"
-              color: ruleDropHov.hovered ? Zenon.red : Zenon.muted
+              color: ruleDropHov.hovered ? Zenon.red : Zenon.accentMuted
               font.family: Zenon.face
               font.weight: Zenon.weight
               font.pixelSize: Zenon.px(14)
@@ -805,8 +805,8 @@ Rectangle {
               ? (collEdit.searching ? "type something to look for" : "no rules yet")
               : collEdit.sentence
             // An empty search is not a mistake, just not a question yet.
-            color: collEdit.searching && !collEdit.naming ? Zenon.muted
-              : (collEdit.ready ? Zenon.muted : Zenon.red)
+            color: collEdit.searching && !collEdit.naming ? Zenon.accentMuted
+              : (collEdit.ready ? Zenon.accentMuted : Zenon.red)
             font.family: Zenon.face
             font.weight: Zenon.weight
             font.pixelSize: collEdit.textSize - 2

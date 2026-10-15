@@ -118,7 +118,7 @@ Rectangle {
       anchors.bottom: parent.bottom
       anchors.bottomMargin: 14
       text: "drop to bookmark"
-      color: Zenon.muted
+      color: Zenon.accentMuted
       font.family: Zenon.face
       font.weight: Zenon.weight
       font.pixelSize: Zenon.px(13)
@@ -263,7 +263,7 @@ Rectangle {
       // is written first — the leading heading wants no room above
       // it, and that is a different heading depending on what you
       // have.
-      SideHead { term: side.term; ruled: false; ink: Zenon.muted
+      SideHead { term: side.term; ruled: false; ink: Zenon.accentMuted
         label: "BOOKMARKS"
         visible: !!term && term.bookmarks.length > 0
         first: true
@@ -327,7 +327,7 @@ Rectangle {
       // picker, with its colour — but a sidebar entry that lists
       // nothing is a place you can go to find an empty room, and
       // the count beside each row is the promise this keeps.
-      SideHead { term: side.term; ruled: false; ink: Zenon.muted
+      SideHead { term: side.term; ruled: false; ink: Zenon.accentMuted
         label: "TAGS"
         visible: !!term && term.sideTags.length > 0
         first: !!term && term.bookmarks.length === 0
@@ -371,7 +371,7 @@ Rectangle {
       // Never empty now: Recents is built in and always here, so
       // unlike the sections above this one has no hidden state —
       // see allCollections.
-      SideHead { term: side.term; ruled: false; ink: Zenon.muted
+      SideHead { term: side.term; ruled: false; ink: Zenon.accentMuted
         label: "COLLECTIONS"
         visible: !!term && term.sideCollections.length > 0
         first: !!term && term.bookmarks.length === 0 && term.sideTags.length === 0
@@ -416,7 +416,7 @@ Rectangle {
 
       Item { width: 1; height: term.sideCollections.length === 0 ? 0 : 8 }
 
-      SideHead { term: side.term; ruled: false; ink: Zenon.muted
+      SideHead { term: side.term; ruled: false; ink: Zenon.accentMuted
         label: "DISKS"
         visible: !!term && term.disks.length > 0
         first: !!term && term.bookmarks.length === 0 && term.sideTags.length === 0
@@ -527,7 +527,7 @@ Rectangle {
       detail: term.trashCount === 0 ? "empty"
         : term.trashCount + (term.trashSize !== "" ? " · " + term.trashSize : "")
       // orange (Zenon's yellow) while there is something in it
-      detailInk: term.trashCount > 0 ? Zenon.yellow : Zenon.muted
+      detailInk: term.trashCount > 0 ? Zenon.yellow : Zenon.accentMuted
       trashDrop: true
       hasMenu: true
       onMenuAsked: (x, y) => term.trashMenu(trashRow, x, y)

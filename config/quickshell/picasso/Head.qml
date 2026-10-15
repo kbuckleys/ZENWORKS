@@ -9,7 +9,7 @@ import QtQuick
 import "../morpheus"
 
 Text {
-  color: Zenon.soft
+  color: Zenon.accentSoft
   font.family: Zenon.face
   font.weight: 600
   font.pixelSize: Zenon.px(13)

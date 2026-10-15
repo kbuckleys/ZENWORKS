@@ -110,7 +110,7 @@ Item {
         x: 24
         anchors.verticalCenter: parent.verticalCenter
         text: ""
-        color: trow.t.current ? Zenon.cyan : trow.t.prunable ? Zenon.red : Zenon.muted
+        color: trow.t.current ? Zenon.cyan : trow.t.prunable ? Zenon.red : Zenon.accentMuted
         font.family: Zenon.glyphFace
         font.pixelSize: Zenon.px(19)
       }
@@ -136,7 +136,7 @@ Item {
           elide: Text.ElideMiddle
           text: D.tilde(trow.t.path, pg.win.home) + (trow.t.prunable ? "   ·   directory gone — prune it" : "")
             + (trow.t.locked ? "   ·   locked" : "")
-          color: trow.t.prunable ? Zenon.red : Zenon.muted
+          color: trow.t.prunable ? Zenon.red : Zenon.accentMuted
           font.family: Zenon.face
           font.weight: Zenon.weight
           font.pixelSize: Zenon.px(13)

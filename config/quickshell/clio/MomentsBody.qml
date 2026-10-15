@@ -68,7 +68,7 @@ Item {
     spacing: 12
     Text { anchors.verticalCenter: parent.verticalCenter; text: "\u{F02EF}"; color: Zenon.magenta; font.family: Zenon.glyphFace; font.pixelSize: Zenon.px(18) }
     Text { anchors.verticalCenter: parent.verticalCenter; text: "Moments"; color: Zenon.ink; font.family: Zenon.face; font.weight: Font.Bold; font.pixelSize: Zenon.px(19) }
-    Text { anchors.verticalCenter: parent.verticalCenter; text: "pictures from the last 30 days, and things to write about"; color: Zenon.muted; font.family: Zenon.face; font.weight: Zenon.weight; font.pixelSize: Zenon.px(13) }
+    Text { anchors.verticalCenter: parent.verticalCenter; text: "pictures from the last 30 days, and things to write about"; color: Zenon.accentMuted; font.family: Zenon.face; font.weight: Zenon.weight; font.pixelSize: Zenon.px(13) }
   }
   DialogButton { anchors.right: parent.right; anchors.rightMargin: 20; y: 16; label: "Close"; onClicked: mo.closed() }
 
@@ -86,7 +86,7 @@ Item {
       spacing: 14
 
       // reflections
-      Text { text: "REFLECTIONS"; color: Zenon.muted; font.family: Zenon.face; font.weight: Font.DemiBold; font.pixelSize: Zenon.px(11); font.letterSpacing: 0.8 }
+      Text { text: "REFLECTIONS"; color: Zenon.accentMuted; font.family: Zenon.face; font.weight: Font.DemiBold; font.pixelSize: Zenon.px(11); font.letterSpacing: 0.8 }
       Flow {
         width: parent.width
         spacing: 8
@@ -118,12 +118,12 @@ Item {
       }
 
       // the days, and their pictures
-      Text { text: "PICTURES"; color: Zenon.muted; font.family: Zenon.face; font.weight: Font.DemiBold; font.pixelSize: Zenon.px(11); font.letterSpacing: 0.8 }
+      Text { text: "PICTURES"; color: Zenon.accentMuted; font.family: Zenon.face; font.weight: Font.DemiBold; font.pixelSize: Zenon.px(11); font.letterSpacing: 0.8 }
       Working { running: mo.scanning; visible: running }
       Text {
         visible: !mo.scanning && mo.days.length === 0
         text: "No pictures in the last 30 days"
-        color: Zenon.muted
+        color: Zenon.accentMuted
         font.family: Zenon.face
         font.weight: Zenon.weight
         font.pixelSize: Zenon.px(14)

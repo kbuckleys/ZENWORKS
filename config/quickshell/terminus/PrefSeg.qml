@@ -151,7 +151,7 @@ Item {
           verticalAlignment: Text.AlignVCenter
           text: segBtn.modelData
           elide: Text.ElideRight
-          color: segBtn.on ? Zenon.cyan : Zenon.keyInk
+          color: segBtn.on ? Zenon.cyan : Zenon.accentKey
           opacity: segPress.pressed ? 0.55 : 1
           font.family: Zenon.face
           font.weight: Zenon.weight

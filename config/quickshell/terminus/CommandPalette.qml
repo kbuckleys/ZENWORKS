@@ -351,7 +351,7 @@ Rectangle {
           text: cmdPalette.query !== "" ? cmdPalette.query
             : (cmdPalette.shown.length === 0 ? "nothing matches"
                                           : "type to filter")
-          color: cmdPalette.query !== "" ? Zenon.sand : Zenon.muted
+          color: cmdPalette.query !== "" ? Zenon.sand : Zenon.accentMuted
           font.family: Zenon.face
           font.weight: Zenon.weight
           font.pixelSize: Zenon.px(13)
@@ -380,7 +380,7 @@ Rectangle {
             Text {
               anchors.verticalCenter: parent.verticalCenter
               text: pfPair.modelData[1]
-              color: Zenon.muted
+              color: Zenon.accentMuted
               font.family: Zenon.face
               font.weight: Zenon.weight
               font.pixelSize: Zenon.px(13)

@@ -39,7 +39,7 @@ Item {
     // the choice made plain, as the Flatpak sheet's (user, 2026-10-14)
     strong: true
     textSize: Zenon.px(16)
-    ink: Zenon.keyInk
+    ink: Zenon.accentKey
     options: [["paru", "Latest release \u00B7 recommended", pick.note("paru", "paru \u2014 each tagged version")],
               ["paru-git", "Latest commit", pick.note("paru-git", "paru-git \u2014 GitHub master, the fallback")]]
     current: pick.choice

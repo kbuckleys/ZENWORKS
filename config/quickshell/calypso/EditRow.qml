@@ -79,7 +79,7 @@ Item {
     Text {
       visible: !row.labelEditable
       text: row.label
-      color: Zenon.muted
+      color: Zenon.accentMuted
       font.family: Zenon.face
       font.weight: Zenon.weight
       font.pixelSize: Zenon.px(12)
@@ -126,7 +126,7 @@ Item {
       Text {
         anchors.verticalCenter: parent.verticalCenter
         text: row.strength ? row.strength.word : ""
-        color: Zenon.muted
+        color: Zenon.accentMuted
         font.family: Zenon.face
         font.weight: Zenon.weight
         font.pixelSize: Zenon.px(11)

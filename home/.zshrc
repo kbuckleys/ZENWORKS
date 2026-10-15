@@ -75,11 +75,6 @@ zstyle ':completion:*' matcher-list 'm:{a-z}={A-Za-z}'
 zstyle ':completion:*' menu no
 setopt glob_dots
 
-export FZF_DEFAULT_OPTS='
-  --color=fg+:#dfdfdd,bg+:#20242a,pointer:#e0d8a4,marker:#fab387,hl+:#b6e0a4,hl::#b6e0a4,spinner:#9bbfbf,border:#20242a,info:#eebebe
-  --border=top
-'
-
 # Aliases
 alias hypr='start-hyprland'
 alias icat='kitten icat'

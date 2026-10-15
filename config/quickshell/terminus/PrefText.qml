@@ -101,7 +101,7 @@ Item {
       verticalAlignment: Text.AlignVCenter
       visible: ptextIn.text === "" && !ptextIn.activeFocus
       text: ptext.ghost
-      color: Zenon.muted
+      color: Zenon.accentMuted
       font.family: Zenon.face
       font.weight: Zenon.weight
       font.pixelSize: Zenon.px(12)

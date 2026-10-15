@@ -98,7 +98,7 @@ Item {
             Text {
               anchors.verticalCenter: parent.verticalCenter
               text: ed.st ? C.kindOf(ed.st.kind).one : ""
-              color: Zenon.muted
+              color: Zenon.accentMuted
               font.family: Zenon.face
               font.weight: Zenon.weight
               font.pixelSize: Zenon.px(13)
@@ -116,7 +116,7 @@ Item {
               anchors.verticalCenter: parent.verticalCenter
               visible: !!ed.st && (ed.st.id !== "" || ed.win.writable(ed.st.kind).length <= 1)
               text: (C.platform(ed.acct.kind).glyph || "") + "  " + (ed.acct.name || "")
-              color: Zenon.muted
+              color: Zenon.accentMuted
               font.family: Zenon.face
               font.weight: Zenon.weight
               font.pixelSize: Zenon.px(13)
@@ -197,7 +197,7 @@ Item {
         Text {
           leftPadding: 4
           text: "WEBSITES"
-          color: Zenon.muted
+          color: Zenon.accentMuted
           font.family: Zenon.face
           font.weight: Font.DemiBold
           font.pixelSize: Zenon.px(11)
@@ -249,7 +249,7 @@ Item {
         Text {
           leftPadding: 4
           text: "MORE"
-          color: Zenon.muted
+          color: Zenon.accentMuted
           font.family: Zenon.face
           font.weight: Font.DemiBold
           font.pixelSize: Zenon.px(11)
@@ -321,7 +321,7 @@ Item {
         Text {
           leftPadding: 4
           text: "NOTES"
-          color: Zenon.muted
+          color: Zenon.accentMuted
           font.family: Zenon.face
           font.weight: Font.DemiBold
           font.pixelSize: Zenon.px(11)
@@ -346,7 +346,7 @@ Item {
         Text {
           leftPadding: 4
           text: "TAGS"
-          color: Zenon.muted
+          color: Zenon.accentMuted
           font.family: Zenon.face
           font.weight: Font.DemiBold
           font.pixelSize: Zenon.px(11)

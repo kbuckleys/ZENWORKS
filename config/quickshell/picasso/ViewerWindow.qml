@@ -2957,7 +2957,7 @@ FloatingWindow {
             : win.note !== "" ? win.note
             : win.mode === "map" ? win.mapPoints.length + " of " + win.rows.length + " say where  \u00b7  a pin opens its picture  \u00b7  esc goes back"
             : (win.mode === "gallery" ? win.where : win.facts)
-          color: win.note !== "" ? Zenon.sand : Zenon.muted
+          color: win.note !== "" ? Zenon.sand : Zenon.accentMuted
           font.family: Zenon.face
           font.weight: Zenon.weight
           font.pixelSize: Zenon.px(12)
@@ -3101,7 +3101,7 @@ FloatingWindow {
             anchors.verticalCenter: parent.verticalCenter
             visible: filterField.text === "" && win.filterText === ""
             text: "Search"
-            color: Zenon.muted
+            color: Zenon.accentMuted
             font: filterField.font
           }
         }
@@ -3120,7 +3120,7 @@ FloatingWindow {
           text: win.filterText === "" ? ""
             : win.rows.length + " of " + win.allRows.length
               + (win.shownDirectories.length > 0 ? "  +" + win.shownDirectories.length : "")
-          color: win.filterText !== "" && win.rows.length === 0 && win.shownDirectories.length === 0 ? Zenon.red : Zenon.muted
+          color: win.filterText !== "" && win.rows.length === 0 && win.shownDirectories.length === 0 ? Zenon.red : Zenon.accentMuted
           font.family: Zenon.face
           font.weight: Zenon.weight
           font.pixelSize: Zenon.px(12)
@@ -3132,7 +3132,7 @@ FloatingWindow {
           anchors.verticalCenter: parent.verticalCenter
           visible: searchPill.busy && win.filterText !== ""
           text: "\uf00d"
-          color: clearHover.hovered ? Zenon.white : Zenon.muted
+          color: clearHover.hovered ? Zenon.white : Zenon.accentMuted
           font.family: Zenon.face
           font.weight: Zenon.weight
           font.pixelSize: Zenon.px(12)
@@ -3960,7 +3960,7 @@ FloatingWindow {
         Text {
           anchors.verticalCenter: parent.verticalCenter
           text: "y copies"
-          color: Zenon.muted
+          color: Zenon.accentMuted
           font.family: Zenon.face
           font.weight: Zenon.weight
           font.pixelSize: Zenon.px(11)
@@ -4002,7 +4002,7 @@ FloatingWindow {
         anchors.leftMargin: 14
         anchors.verticalCenter: parent.verticalCenter
         text: win.vid ? V.clock(win.vid.position) + " / " + V.clock(win.vid.duration) : ""
-        color: Zenon.muted
+        color: Zenon.accentMuted
         font.family: Zenon.faceMono
         font.weight: Zenon.weight
         font.pixelSize: Zenon.px(12)
@@ -4668,7 +4668,7 @@ FloatingWindow {
             Text {
               visible: text !== ""
               text: cell.chip ? (cell.chip.sub || "") : ""
-              color: Zenon.muted
+              color: Zenon.accentMuted
               font.family: Zenon.face
               font.weight: Zenon.weight
               font.pixelSize: Zenon.px(12)
@@ -4676,7 +4676,7 @@ FloatingWindow {
             Text {
               visible: !!cell.chip && !!cell.chip.burst
               text: "fold \uf068"
-              color: foldMa.containsMouse ? Zenon.cyan : Zenon.muted
+              color: foldMa.containsMouse ? Zenon.cyan : Zenon.accentMuted
               font.family: Zenon.face
               font.weight: Zenon.weight
               font.pixelSize: Zenon.px(12)
@@ -4770,7 +4770,7 @@ FloatingWindow {
           Text {
             visible: text !== ""
             text: pinned.chip ? (pinned.chip.sub || "") : ""
-            color: Zenon.muted
+            color: Zenon.accentMuted
             font.family: Zenon.face
             font.weight: Zenon.weight
             font.pixelSize: Zenon.px(12)
@@ -4895,7 +4895,7 @@ FloatingWindow {
           height: 22
           verticalAlignment: Text.AlignVCenter
           text: modelData.short
-          color: index === scrub.here ? Zenon.cyan : (scrubMa.containsMouse ? Zenon.white : Zenon.muted)
+          color: index === scrub.here ? Zenon.cyan : (scrubMa.containsMouse ? Zenon.white : Zenon.accentMuted)
           font.family: Zenon.face
           font.weight: index === scrub.here ? 600 : 400
           font.pixelSize: Zenon.px(12)
@@ -5303,7 +5303,7 @@ FloatingWindow {
         anchors.horizontalCenterOffset: navTab.edge === "left" ? -1 : navTab.edge === "right" ? 1 : 0
         anchors.verticalCenterOffset: navTab.side ? 0 : 1
         text: navTab.glyph
-        color: navTab.hot ? Zenon.cyan : Zenon.muted
+        color: navTab.hot ? Zenon.cyan : Zenon.accentMuted
         font.family: Zenon.face
         font.weight: Zenon.weight
         font.pixelSize: Zenon.px(navTab.side ? 16 : 14)
@@ -5400,7 +5400,7 @@ FloatingWindow {
               anchors.right: parent.right
               visible: win.crop !== null
               text: "Clear"
-              color: clearMa.containsMouse ? Zenon.cyan : Zenon.soft
+              color: clearMa.containsMouse ? Zenon.cyan : Zenon.accentSoft
               font.family: Zenon.face
               font.weight: 600
               font.pixelSize: Zenon.px(13)
@@ -5448,7 +5448,7 @@ FloatingWindow {
             width: parent.width
             visible: win.cropping
             text: "drag the box or its edges, or draw a new one · right-drag resizes from anywhere · esc when done"
-            color: Zenon.soft
+            color: Zenon.accentSoft
             font.family: Zenon.face
             font.weight: Zenon.weight
             font.pixelSize: Zenon.px(12)
@@ -5467,7 +5467,7 @@ FloatingWindow {
               text: win.outW > 0 ? Math.round(win.outW) + " \u00d7 " + Math.round(win.outH)
                 + (win.resizeK !== 1 ? "  \u2192  " + Math.round(win.outW * win.resizeK) + " \u00d7 " + Math.round(win.outH * win.resizeK) : "")
                 : ""
-              color: win.resizeK !== 1 ? Zenon.cyan : Zenon.soft
+              color: win.resizeK !== 1 ? Zenon.cyan : Zenon.accentSoft
               font.family: Zenon.face
               font.weight: Zenon.weight
               font.pixelSize: Zenon.px(12)
@@ -5515,7 +5515,7 @@ FloatingWindow {
             Text {
               anchors.verticalCenter: parent.verticalCenter
               text: "\u00d7  " + (win.outH > 0 ? Math.round(win.outH * win.resizeK) : "") + " px  \u00b7  in proportion"
-              color: Zenon.soft
+              color: Zenon.accentSoft
               font.family: Zenon.face
               font.weight: Zenon.weight
               font.pixelSize: Zenon.px(12)
@@ -5548,7 +5548,7 @@ FloatingWindow {
                   Text {
                     anchors.horizontalCenter: parent.horizontalCenter
                     text: modelData.hint
-                    color: Zenon.soft
+                    color: Zenon.accentSoft
                     font.family: Zenon.face
                     font.weight: Zenon.weight
                     font.pixelSize: Zenon.px(11)
@@ -5561,7 +5561,7 @@ FloatingWindow {
             width: parent.width
             text: win.edited ? "a new file beside it, with the edit" + (win.crop ? " and the crop" : "")
                              : "a new file beside it — the original stays"
-            color: Zenon.soft
+            color: Zenon.accentSoft
             font.family: Zenon.face
             font.weight: Zenon.weight
             font.pixelSize: Zenon.px(12)
@@ -5621,7 +5621,7 @@ FloatingWindow {
         anchors.bottom: parent.bottom
         anchors.margins: 18
         spacing: 8
-        DialogButton { label: "Reset"; ink: Zenon.muted; ready: win.edited && !win.saving; onClicked: win.resetEdit() }
+        DialogButton { label: "Reset"; ink: Zenon.accentMuted; ready: win.edited && !win.saving; onClicked: win.resetEdit() }
         DialogButton { label: "Save New"; ink: Zenon.white; ready: (win.edited || win.scratch) && !win.saving; onClicked: win.saveNew() }
         // the save under way, as alexandria's install is shown
         BusyButton { label: "Save"; ink: Zenon.cyan; primary: true; ready: win.edited
@@ -5740,7 +5740,7 @@ FloatingWindow {
             Text {
               width: 104
               text: modelData.k
-              color: Zenon.muted
+              color: Zenon.accentMuted
               font.family: Zenon.face
               font.weight: Zenon.weight
               font.pixelSize: Zenon.px(14)
@@ -5749,7 +5749,7 @@ FloatingWindow {
               width: infoCol.width - 116
               text: modelData.v
               color: modelData.url || modelData.mapAt ? (linkMa.containsMouse ? Zenon.cyan : Zenon.blue)
-                : (modelData.note ? Zenon.muted : Zenon.white)
+                : (modelData.note ? Zenon.accentMuted : Zenon.white)
               font.family: Zenon.face
               font.weight: Zenon.weight
               font.pixelSize: Zenon.px(modelData.note ? 12 : 14)
@@ -6665,7 +6665,7 @@ FloatingWindow {
         glyphInk: confirm.okInk
         detail: confirm.detail
         items: confirm.items
-        choices: [{ label: confirm.okLabel, ink: confirm.okInk }, { label: "Cancel", ink: Zenon.muted }]
+        choices: [{ label: confirm.okLabel, ink: confirm.okInk }, { label: "Cancel", ink: Zenon.accentMuted }]
         pick: confirm.pick
         onPicked: (i) => confirm.pick = i
         onChose: (i) => confirm.answer(i === 0)
@@ -6728,7 +6728,7 @@ FloatingWindow {
         anchors.rightMargin: 18
         y: 94
         text: confirm.fieldHint
-        color: Zenon.muted
+        color: Zenon.accentMuted
         font.family: Zenon.face
         font.weight: Zenon.weight
         font.pixelSize: Zenon.px(12)
@@ -6740,7 +6740,7 @@ FloatingWindow {
         anchors.bottom: parent.bottom
         anchors.margins: 14
         spacing: 8
-        DialogButton { label: "Cancel"; ink: Zenon.muted; onClicked: confirm.answer(false) }
+        DialogButton { label: "Cancel"; ink: Zenon.accentMuted; onClicked: confirm.answer(false) }
         DialogButton { label: confirm.okLabel; ink: confirm.okInk; primary: true; onClicked: confirm.answer(true) }
       }
       Item {

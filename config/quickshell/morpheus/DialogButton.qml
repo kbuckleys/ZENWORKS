@@ -47,7 +47,9 @@ Rectangle {
   // says its word in the foreground ink instead, on the theme's own wash
   // (lighter on a dark theme, darker on a light one) rather than a tint
   // of grey. Only a button that is not ready keeps the muted word.
-  readonly property bool plain: Qt.colorEqual(btn.ink, Zenon.muted)
+  // the plain grey, neutral or in the accent (user, 2026-10-15: the
+  // windows' greys follow the accent now)
+  readonly property bool plain: Qt.colorEqual(btn.ink, Zenon.muted) || Qt.colorEqual(btn.ink, Zenon.accentMuted)
   readonly property color word: btn.plain ? Zenon.white : btn.ink
   // PRESSED, DARKENED (user, 2026-10-15): the shade and dimmed word of
   // terminus' ClearChip and Segments — every button in the suite presses

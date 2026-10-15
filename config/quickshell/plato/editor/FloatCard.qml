@@ -64,7 +64,7 @@ Item {
     font.family: Zenon.face
     font.weight: Zenon.weight
     font.pixelSize: 13
-    color: Zenon.muted
+    color: Zenon.accentMuted
     text: card.title + (card.f.cursor ? "    q close · \u21b5 open" : "")
   }
   Rectangle {

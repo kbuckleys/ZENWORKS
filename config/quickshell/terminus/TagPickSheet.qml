@@ -459,7 +459,7 @@ Rectangle {
           anchors.verticalCenter: parent.verticalCenter
           text: tagRow.modelData.on ? "\uF00C"
             : (tagRow.modelData.partly ? "\uF068" : "")
-          color: tagRow.modelData.on ? Zenon.cyan : Zenon.muted
+          color: tagRow.modelData.on ? Zenon.cyan : Zenon.accentMuted
           font.family: Zenon.face
           font.weight: Zenon.weight
           font.pixelSize: Zenon.px(13)
@@ -476,7 +476,7 @@ Rectangle {
           visible: !tagRow.editing
           text: tagRow.modelData.count > 0
             ? String(tagRow.modelData.count) : ""
-          color: Zenon.muted
+          color: Zenon.accentMuted
           font.family: Zenon.face
           font.weight: Zenon.weight
           font.pixelSize: Zenon.px(13)
@@ -521,7 +521,7 @@ Rectangle {
           text: tagPick.query !== "" ? tagPick.query
             : (tagPick.targets.length === 1 ? "1 item"
                : tagPick.targets.length + " items")
-          color: tagPick.query !== "" ? Zenon.sand : Zenon.muted
+          color: tagPick.query !== "" ? Zenon.sand : Zenon.accentMuted
           font.family: Zenon.face
           font.weight: Zenon.weight
           font.pixelSize: Zenon.px(14)
@@ -542,7 +542,7 @@ Rectangle {
             Text {
               anchors.verticalCenter: parent.verticalCenter
               text: modelData[1]
-              color: Zenon.muted
+              color: Zenon.accentMuted
               font.family: Zenon.face
               font.weight: Zenon.weight
               font.pixelSize: Zenon.px(13)
