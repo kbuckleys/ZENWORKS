@@ -96,7 +96,7 @@ hl.config({
 		use_nearest_neighbor = false,
 	},
 	misc = {
-        font_family = "JetBrainsMono Nerd Font Medium",
+        font_family = "SF Pro Text SemiBold",
 		allow_session_lock_restore = true,
 		-- cerberus' frost: the desktop keeps rendering under the lock and is
 		-- blurred live behind it (with decoration.blur below), instead of a
@@ -116,7 +116,7 @@ hl.config({
 	},
 
 	general = {
-        layout = "scrolling",
+        layout = "dwindle",
 		border_size = 1,
 		col = {
 			inactive_border = "#45505C4D",
