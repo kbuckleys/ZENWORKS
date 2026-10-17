@@ -2,7 +2,11 @@
 // ┌─┘├┤ │││││││ │├┬┘├┴┐└─┐
 // └─┘└─┘┘└┘└┴┘└─┘┴└─┴ ┴└─┘
 // https://github.com/kbuckleys/
-//
+
+.pragma library
+// ONE COPY FOR THE WHOLE SHELL. Without the pragma every component instance
+// that imports this file evaluated all of it again (see morpheus/icons.js).
+
 // PACMAN.CONF, EDITED BY HAND — the pure half of ceres' Settings tab.
 //
 // THE FILE STAYS YOURS. Nothing here regenerates pacman.conf from a model: a

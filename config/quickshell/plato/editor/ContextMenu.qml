@@ -25,7 +25,6 @@ import Quickshell
 import "../../morpheus"
 // qualified: plato/editor has its own Selection, and so does terminus
 import "../../terminus" as Term
-import "actions.js" as Actions
 
 Item {
   id: menu

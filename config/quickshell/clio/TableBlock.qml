@@ -9,7 +9,6 @@
 // and columns are added and taken away from the right-click menu.
 
 import QtQuick
-import QtQuick.Window
 import "../morpheus"
 import "notes.js" as N
 

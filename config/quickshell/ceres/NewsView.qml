@@ -15,7 +15,6 @@ import QtQuick
 import Quickshell
 import "../morpheus"
 import "."
-import "ceres.js" as Cer
 
 Item {
   id: view

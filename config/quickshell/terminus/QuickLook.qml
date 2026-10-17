@@ -13,22 +13,13 @@
 // offered as aliases.
 
 import QtQuick
-import QtQuick.Window
 import Quickshell
 import Quickshell.Io
 import Quickshell.Widgets
 import Quickshell.Wayland
-import Quickshell.Hyprland
-import QtQuick.Effects
 import QtMultimedia
 import "../morpheus"
-import "../picasso"
-import "../oracle"
 import "terminus.js" as Terminus
-import "../morpheus/icons.js" as Icons
-import "../morpheus/thumbs.js" as Thumbs
-import "tags.js" as Tags
-import "collections.js" as Coll
 
 PanelWindow {
   id: lookLayer

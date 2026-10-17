@@ -167,8 +167,7 @@ LayerPopup {
       popup.mgr.refreshAll();
     }
     popup.settleMode();
-    focusRetry.counter = 0;
-    focusRetry.restart();
+    focusRetry.begin();
     popup.playOpen();
     popup.syncFocus();
   }
@@ -371,30 +370,16 @@ LayerPopup {
   // ── the panel ──────────────────────────────────────────────────────────
   MouseArea { anchors.fill: parent; z: 0; onClicked: popup.closePopup() }
 
-  Item {
+  LayerPanel {
     id: panel
+    host: popup
+    ground: bgRoot
     width: Math.round(popup.liveWidth)
     height: popup.calcHeight()
-    Behavior on height { NumberAnimation { duration: Zenon.slow; easing.type: Zenon.ease } }
-    // placed by y, never a top/bottom anchor pair (see the old note: a flip
-    // stretched the panel to the screen and unbound its height)
-    anchors.horizontalCenter: parent.horizontalCenter
-    y: Zenon.barTop ? Zenon.edgeLift(popup.morphMode, popup.screen, popup.statusbar)
-      : parent.height - height - Zenon.edgeLift(popup.morphMode, popup.screen, popup.statusbar)
-    z: 1
-    opacity: popup.contentFade
-    transform: Scale {
-      origin.x: panel.width / 2
-      origin.y: Zenon.barTop ? 0 : panel.height
-      xScale: popup.panelX
-      yScale: popup.panelY
-    }
-
-    MouseArea { anchors.fill: parent }
-    LayerShadow { panel: bgRoot; cornerRadius: Zenon.pillRadius; morphed: popup.morphMode }
 
     // a rounded clip (Qt's own clip is the bounding box): the strips painted
     // to the panel's edge would fill the corners in
+
     ClippingRectangle {
       id: bgRoot
       anchors.fill: parent
@@ -924,16 +909,10 @@ LayerPopup {
     }
   }
 
-  Timer {
+  FocusRetry {
     id: focusRetry
-    interval: 60
-    repeat: true
-    property int counter: 0
-    onTriggered: {
-      if (!popup.shown) { stop(); return; }
-      popup.syncFocus();
-      if ((popup.mode === "list" && filterInput.activeFocus) || (popup.mode !== "list" && bgRoot.activeFocus)) stop();
-      if (focusRetry.counter++ > 12) stop();
-    }
+    live: popup.shown
+    took: (popup.mode === "list" && filterInput.activeFocus) || (popup.mode !== "list" && bgRoot.activeFocus)
+    onPlace: popup.syncFocus()
   }
 }

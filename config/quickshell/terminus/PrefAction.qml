@@ -8,24 +8,8 @@
 // one passes it (`term: root`).
 
 import QtQuick
-import QtQuick.Shapes
-import QtQuick.Window
 import Quickshell
-import Quickshell.Io
-import Quickshell.Widgets
-import Quickshell.Wayland
-import Quickshell.Hyprland
-import QtQuick.Effects
-import QtMultimedia
-import Qt.labs.folderlistmodel
 import "../morpheus"
-import "../picasso"
-import "../oracle"
-import "terminus.js" as Terminus
-import "../morpheus/icons.js" as Icons
-import "../morpheus/thumbs.js" as Thumbs
-import "tags.js" as Tags
-import "collections.js" as Coll
 
 Item {
   // the terminus window — passed in by whoever makes one. NOT `root`:
@@ -51,12 +35,10 @@ Item {
   height: 32
   opacity: act.enabled ? 1 : 0.45
 
-  // Kept for the verb at the end of the row, which goes cyan under the
-  // pointer — a word lighting up is a button saying it is one, and that is
-  // not the same thing as a band across the row. The cursor itself is
-  // prefBar; see its note.
-  HoverHandler { id: actHov }
+  // NO HOVER TINT in the sheets (user, 2026-10-17): the verb no longer goes
+  // cyan under the pointer. The cursor itself is prefBar; see its note.
   MouseArea {
+    id: actPress
     anchors.fill: parent
     enabled: act.enabled
     onClicked: act.triggered()
@@ -82,7 +64,9 @@ Item {
     anchors.rightMargin: 14
     anchors.verticalCenter: parent.verticalCenter
     text: act.verb
-    color: actHov.hovered && act.enabled ? Zenon.cyan : Zenon.accentMuted
+    color: Zenon.accentMuted
+    // pressed, dimmed as every button in the suite (user, 2026-10-17)
+    opacity: actPress.pressed ? Zenon.pressDim : 1
     font.family: Zenon.face
     font.weight: Zenon.weight
     font.pixelSize: Zenon.px(13)

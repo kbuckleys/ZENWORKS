@@ -15,7 +15,6 @@
 import QtQuick
 import Quickshell
 import Quickshell.Widgets
-import Quickshell.Io
 import Quickshell.Wayland
 import Quickshell.Services.Notifications
 import "../morpheus"

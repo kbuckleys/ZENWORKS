@@ -3,6 +3,10 @@
 // └─┘└─┘┘└┘└┴┘└─┘┴└─┴ ┴└─┘
 // https://github.com/kbuckleys/
 
+.pragma library
+// ONE COPY FOR THE WHOLE SHELL. Without the pragma every component instance
+// that imports this file evaluated all of it again (see morpheus/icons.js).
+
 // Parse /usr/share/unicode/emoji/emoji-test.txt (Unicode 17.0).
 // Keeps fully-qualified + minimally-qualified entries with their names;
 // components (skin tones, ZWJ pieces) and unqualified duplicates are dropped.

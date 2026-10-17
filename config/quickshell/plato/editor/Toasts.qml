@@ -215,7 +215,7 @@ Item {
         id: body
         x: list.width - width + card.slide
         width: Math.min(card.maxW, Math.max(180, words.implicitWidth + 30 + 28 + 18,
-          card.ask > 0 ? buttons.implicitWidth + 42 + 18 : 0))
+          card.ask > 0 ? buttons.childrenRect.width + 42 + 18 : 0))
         height: Math.max(40, words.height + 22) + (card.ask > 0 ? buttons.height + 8 : 0)
         radius: Zenon.windowRadius
         color: Zenon.alpha(Zenon.card, 0.96)
@@ -261,13 +261,16 @@ Item {
           lineHeight: 1.1
           text: card.text
         }
-        // a question's choices: a button each, with its key
-        Row {
+        // a question's choices: a button each, with its key. They wrap
+        // inside the card rather than run past its edge — a long language
+        // name ("Never for gitignore") pushed "dismiss" out of sight.
+        Flow {
           id: buttons
           visible: card.ask > 0
           x: 16 + 26
           y: words.y + words.height + 10
-          height: visible ? 28 : 0
+          width: card.maxW - 42 - 18
+          height: visible ? childrenRect.height : 0
           spacing: 8
           Repeater {
             model: card.choiceList
@@ -303,7 +306,8 @@ Item {
             }
           }
           Text {
-            anchors.verticalCenter: parent.verticalCenter
+            height: 28
+            verticalAlignment: Text.AlignVCenter
             leftPadding: 4
             font.family: Zenon.face
             font.weight: Zenon.weight

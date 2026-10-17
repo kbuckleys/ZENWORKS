@@ -80,13 +80,6 @@ Scope {
     else if (!mgr.win) mgr.prebuild();
   }
 
-  function focusedScreen() {
-    const m = Hyprland.focusedMonitor;
-    if (m) for (const s of Quickshell.screens) if (s.name === m.name) return s;
-    // none in focus: the main monitor (oracle's Display setting)
-    return Oracle.pickScreen("");
-  }
-
   // ── ITS SIZE, REMEMBERED ─────────────────────────────────────────────
   // The last size the window was left at, handed to each window built.
   // Hyprland's rule for ceres floats it and nothing more: a rule `size`
@@ -110,7 +103,7 @@ Scope {
   }
 
   function build() {
-    const scr = mgr.focusedScreen();
+    const scr = Oracle.focusedScreen();
     const props = { mgr: mgr };
     if (scr) props.screen = scr;
     const sz = mgr.savedSize();
@@ -129,7 +122,7 @@ Scope {
   property var incubator: null
   function prebuild() {
     if (mgr.incubator || mgr.win || !mgr.comp || mgr.comp.status !== Component.Ready) return;
-    const scr = mgr.focusedScreen();
+    const scr = Oracle.focusedScreen();
     const props = { mgr: mgr };
     if (scr) props.screen = scr;
     const sz = mgr.savedSize();
@@ -163,7 +156,7 @@ Scope {
       mgr.compile();
       return;
     }
-    const scr = mgr.focusedScreen();
+    const scr = Oracle.focusedScreen();
     if (!mgr.alive()) mgr.win = null;
     // on the wrong monitor, or on none — a screen that went away leaves the
     // window holding nothing to be drawn on

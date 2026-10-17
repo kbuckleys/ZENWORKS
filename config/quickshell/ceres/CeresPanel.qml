@@ -21,9 +21,7 @@
 import QtQuick
 import Quickshell
 import Quickshell.Widgets
-import Quickshell.Io
 import Quickshell.Hyprland
-import Quickshell.Wayland
 import "../morpheus"
 import "."
 import "../oracle"
@@ -236,36 +234,12 @@ LayerPopup {
   }
 
   // ── the card ────────────────────────────────────────────────────────────
-  Item {
+  LayerPanel {
     id: panel
+    host: popup
+    ground: bgRoot
     width: Zenon.layerWidth(popup.panelWidth)
     height: popup.calcHeight()
-    Behavior on height { NumberAnimation { duration: Zenon.slow; easing.type: Zenon.ease } }
-    // Either edge. A layer opens out of the pill, so it has to be on the
-    // same one, off whichever it is by the same lift. Placed by y, NOT by a
-    // top/bottom anchor pair: flipping two anchors at runtime updates one
-    // before the other, for that instant both apply and stretch the panel to
-    // the screen, and that stretch overwrites — and so unbinds — `height`.
-    // The panel then stayed screen-tall until the shell was restarted.
-    anchors.horizontalCenter: parent.horizontalCenter
-    y: Zenon.barTop ? Zenon.edgeLift(popup.morphMode, popup.screen, popup.statusbar)
-      : parent.height - height - Zenon.edgeLift(popup.morphMode, popup.screen, popup.statusbar)
-    z: 1
-    opacity: popup.contentFade
-    transform: Scale {
-      origin.x: panel.width / 2
-      origin.y: Zenon.barTop ? 0 : panel.height
-      xScale: popup.panelX
-      yScale: popup.panelY
-    }
-
-    MouseArea { anchors.fill: parent }
-
-    LayerShadow {
-      panel: bgRoot
-      cornerRadius: Zenon.pillRadius
-      morphed: popup.morphMode
-    }
 
     ClippingRectangle {
       id: bgRoot

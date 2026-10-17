@@ -23,7 +23,6 @@
 
 import QtQuick
 import QtQuick.Effects
-import QtQuick.Window
 import Quickshell
 import Quickshell.Io
 import Quickshell.Widgets
@@ -228,7 +227,11 @@ Item {
   property string busyText: ""
   readonly property bool busy: card.waiting || adoptProc.running
   readonly property bool arrived: card.waiting && Picasso.showing(card.waitNames, card.waitPath)
-  onArrivedChanged: if (card.arrived) card.finishWait()
+  // A tick later, not from inside the change: finishWait() clears `waiting`,
+  // which `arrived` reads, and doing that while `arrived` is still notifying
+  // was a binding loop. The card's own Timer, so it dies with the card.
+  onArrivedChanged: if (card.arrived) arriveLater.restart()
+  Timer { id: arriveLater; interval: 0; onTriggered: card.finishWait() }
   Connections {
     target: Picasso
     function onLastFailureChanged() {

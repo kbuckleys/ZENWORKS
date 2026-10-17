@@ -27,7 +27,6 @@ import "../terminus"
 import "../ceres"
 import "../morpheus/lagnotes.js" as LagNotes
 import "notes.js" as N
-import "clio.js" as Scribe
 import "../metis/metis.js" as Metis
 
 Scope {
@@ -875,35 +874,18 @@ Scope {
   // ── THE WINDOW ─────────────────────────────────────────────────────────
   // One, reused; floating (hypr/lua/rules.lua, title "clio").
   property var win: null
-  property var _comp: null
-  property var _waiting: []
-  function _withComponent(fn) {
-    if (mgr._comp && mgr._comp.status === Component.Ready) { fn(); return; }
-    mgr._waiting.push(fn);
-    if (mgr._comp) return;
-    const comp = Qt.createComponent(Qt.resolvedUrl("ClioWindow.qml"), Component.Asynchronous);
-    mgr._comp = comp;
-    const settle = () => {
-      if (comp.status === Component.Loading) return;
-      const queued = mgr._waiting;
-      mgr._waiting = [];
-      if (comp.status !== Component.Ready) {
-        console.warn("clio:", comp.errorString());
-        mgr._comp = null;
-        return;
-      }
-      for (const f of queued) f();
-    };
-    if (comp.status === Component.Loading) comp.statusChanged.connect(settle);
-    else settle();
+  LazyComponent {
+    id: lazy
+    source: Qt.resolvedUrl("ClioWindow.qml")
+    tag: "clio"
   }
   function withWindow(fn) {
     if (!mgr._ready) mgr.readState();
-    mgr._withComponent(() => {
+    lazy.withReady(() => {
       let fresh = false;
       if (!mgr.win) {
         const t0 = Date.now();
-        mgr.win = mgr._comp.createObject(mgr, { mgr: mgr });
+        mgr.win = lazy.comp.createObject(mgr, { mgr: mgr });
         LagNotes.mark("clio window", t0);
         if (!mgr.win) return;
         fresh = true;
@@ -925,7 +907,7 @@ Scope {
     mgr.flush();
     if (mgr.unlocked) mgr.lockNow();
     if (mgr.win === w) mgr.win = null;
-    if (!mgr.win && mgr._waiting.length === 0) mgr._comp = null;
+    if (!mgr.win && lazy.waiting.length === 0) lazy.comp = null;
     line.release("window");
   }
   function hold() { line.hold("window"); }

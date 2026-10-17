@@ -6,6 +6,7 @@
 import QtQuick
 import Quickshell
 import "helpers.js" as Helpers
+// a library: the same copy chronos itself uses
 import "../chronos/chronos.js" as Chr
 import "../chronos/weather.js" as Wx
 import "../chronos"

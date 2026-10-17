@@ -26,21 +26,15 @@
 // switch. It opens, it sits where the compositor puts it, and it closes.
 
 import QtQuick
-import QtQuick.Shapes
-import QtQuick.Window
 import Quickshell
 import Quickshell.Io
-import Quickshell.Widgets
-import Quickshell.Wayland
 import Quickshell.Hyprland
 import QtQuick.Effects
-import QtMultimedia
 import Qt.labs.folderlistmodel
 import "../morpheus"
 import "../picasso"
 import "../oracle"
 import "terminus.js" as Terminus
-import "../morpheus/icons.js" as Icons
 import "../morpheus/thumbs.js" as Thumbs
 import "tags.js" as Tags
 import "collections.js" as Coll
@@ -3133,8 +3127,6 @@ FloatingWindow {
     return e && e.isDir && root.repoDirs[e.path] === true ? Zenon.magenta : root.inkFor(e);
   }
 
-  function nameInkOf(e) { return listing.nameInkOf(e); }
-
   // Text previews in plato's colors, when plato is part of this shell — see
   // previewCommand in terminus.js. Markdown comes out rendered, as plato
   // draws it (headings, tables, boxes; plato's markdown settings apply).
@@ -6059,9 +6051,6 @@ FloatingWindow {
       function ask() { card.ask(); }
       function askPath(path) { card.askPath(path); }
       function show(sel) { card.show(sel); }
-      function togglePermBit() { card.togglePermBit(); }
-      function applyPerms() { card.applyPerms(); }
-      function computeChecksum() { card.computeChecksum(); }
       function handleKey(k) { return card.handleKey(k); }
 
       InputShield {

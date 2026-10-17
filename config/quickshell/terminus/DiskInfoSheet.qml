@@ -17,24 +17,9 @@
 // term.<id>Ref (the window's aliases).
 
 import QtQuick
-import QtQuick.Shapes
-import QtQuick.Window
 import Quickshell
-import Quickshell.Io
-import Quickshell.Widgets
-import Quickshell.Wayland
-import Quickshell.Hyprland
-import QtQuick.Effects
-import QtMultimedia
-import Qt.labs.folderlistmodel
 import "../morpheus"
-import "../picasso"
-import "../oracle"
 import "terminus.js" as Terminus
-import "../morpheus/icons.js" as Icons
-import "../morpheus/thumbs.js" as Thumbs
-import "tags.js" as Tags
-import "collections.js" as Coll
 
 Rectangle {
   id: diskInfo
@@ -266,14 +251,12 @@ Rectangle {
             anchors.verticalCenter: parent.verticalCenter
             elide: Text.ElideMiddle
             text: factRow.modelData[1]
-            color: factMa.containsMouse ? Zenon.cyan : Zenon.white
+            color: Zenon.white
             font.family: Zenon.faceMono
             font.weight: Zenon.weight
             font.pixelSize: Zenon.px(14)
             MouseArea {
-              id: factMa
               anchors.fill: parent
-              hoverEnabled: true
               onClicked: term.copyText(factRow.modelData[1],
                                        "copied " + factRow.modelData[0])
             }

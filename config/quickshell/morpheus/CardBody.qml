@@ -38,43 +38,8 @@ Item {
     return (m && m.isSeparator) ? Zenon.menuSepHeight : Zenon.menuRowHeight;
   }
 
-  // The flash a row gives when it is clicked, and the reason the card
-  // outlives the click: the action runs at the END of it.
-  component ChosenFlash: Item {
-    id: flash
-    anchors.fill: parent
-    z: 3
-    property var pending: null
-    property real chosen: 0
-    readonly property bool running: flashAnim.running
-
-    function fire(act) {
-      flash.pending = act;
-      flashAnim.restart();
-    }
-
-    SequentialAnimation {
-      id: flashAnim
-      NumberAnimation { target: flash; property: "chosen"; to: 1;
-                        duration: 60; easing.type: Easing.OutQuad }
-      NumberAnimation { target: flash; property: "chosen"; to: 0;
-                        duration: 130; easing.type: Easing.InQuad }
-      ScriptAction {
-        script: {
-          const act = flash.pending;
-          flash.pending = null;
-          if (act) act();
-        }
-      }
-    }
-
-    Rectangle {
-      anchors.fill: parent
-      visible: flash.chosen > 0
-      color: Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b,
-                     0.55 * flash.chosen)
-    }
-  }
+  // The flash a row gives when it is clicked (morpheus/ChosenFlash), and the
+  // reason the card outlives the click: the action runs at the END of it.
 
   RoundClip {
     id: bg

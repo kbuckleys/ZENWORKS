@@ -35,7 +35,6 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
-import Quickshell.Hyprland
 import "../morpheus"
 import "../oracle"
 import "capture.js" as Cap
@@ -62,13 +61,6 @@ Scope {
       if (region.active) { region.finish(false); return; }
       cap.shoot(mode);
     }
-  }
-
-  function focusedScreen() {
-    const m = Hyprland.focusedMonitor;
-    if (m) for (const s of Quickshell.screens) if (s.name === m.name) return s;
-    // none in focus: the main monitor (oracle's Display setting)
-    return Oracle.pickScreen("");
   }
 
   function sh(s) { return Strings.shellQuote(s); }
@@ -103,7 +95,7 @@ Scope {
     try { clients = JSON.parse(parts[1]); } catch (e) {}
     try { active = JSON.parse(parts[2]); } catch (e) {}
     try { opts = JSON.parse(parts[3]); } catch (e) {}
-    const scr = cap.focusedScreen();
+    const scr = Oracle.focusedScreen();
     const mon = mons.find(m => m.focused) || mons.find(m => scr && m.name === scr.name);
     if (!mon || !scr) { cap.busy = false; return; }
     const plain = cap.wantMode === "window-plain";

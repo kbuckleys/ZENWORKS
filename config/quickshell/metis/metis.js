@@ -2,7 +2,15 @@
 // ┌─┘├┤ │││││││ │├┬┘├┴┐└─┐
 // └─┘└─┘┘└┘└┴┘└─┘┴└─┴ ┴└─┘
 // https://github.com/kbuckleys/
-//
+
+.pragma library
+.import qs.morpheus as Morpheus
+// ONE COPY FOR THE WHOLE SHELL. Without the pragma every component instance
+// that imports this file (the popup, each tape row, each answer, clio)
+// evaluated all of it again. The shell's Paths comes in through the import
+// above (the same instance); the node tests hand in a stub of their own.
+var Paths = typeof Morpheus !== "undefined" ? Morpheus.Paths : globalThis.Paths;
+
 // THE PURE HALF OF METIS: what you typed → what qalc is asked, and what qalc
 // said → what is shown.
 //
@@ -261,6 +269,8 @@ function isKnownZone(word) {
 // main: its own names, biggest first, filed by their first three letters —
 // completion runs on every keystroke, and scanning forty thousand names to
 // finish one word was 50 ms of typing lag
+// Shared by every importer: the popup fills it (setIndex) on its first open,
+// and clio's sums read places through the same index from then on.
 let INDEX = { keys: {}, main: {} };
 
 function placesPath() {

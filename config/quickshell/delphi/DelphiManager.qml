@@ -381,34 +381,17 @@ Scope {
   // ── THE WINDOW ─────────────────────────────────────────────────────
   // One, reused: opening another repository turns the window to it.
   property var win: null
-  property var _comp: null
-  property var _waiting: []
-  function _withComponent(fn) {
-    if (mgr._comp && mgr._comp.status === Component.Ready) { fn(); return; }
-    mgr._waiting.push(fn);
-    if (mgr._comp) return;
-    const comp = Qt.createComponent(Qt.resolvedUrl("DelphiWindow.qml"), Component.Asynchronous);
-    mgr._comp = comp;
-    const settle = () => {
-      if (comp.status === Component.Loading) return;
-      const queued = mgr._waiting;
-      mgr._waiting = [];
-      if (comp.status !== Component.Ready) {
-        console.warn("delphi:", comp.errorString());
-        mgr._comp = null;
-        return;
-      }
-      for (const f of queued) f();
-    };
-    if (comp.status === Component.Loading) comp.statusChanged.connect(settle);
-    else settle();
+  LazyComponent {
+    id: lazy
+    source: Qt.resolvedUrl("DelphiWindow.qml")
+    tag: "delphi"
   }
   function withWindow(fn) {
-    mgr._withComponent(() => {
+    lazy.withReady(() => {
       let fresh = false;
       if (!mgr.win) {
         const t0 = Date.now();
-        mgr.win = mgr._comp.createObject(mgr, { mgr: mgr });
+        mgr.win = lazy.comp.createObject(mgr, { mgr: mgr });
         LagNotes.mark("delphi window", t0);
         if (!mgr.win) return;
         fresh = true;
@@ -420,7 +403,7 @@ Scope {
   }
   function retire(w) {
     if (mgr.win === w) mgr.win = null;
-    if (!mgr.win && mgr._waiting.length === 0) mgr._comp = null;
+    if (!mgr.win && lazy.waiting.length === 0) lazy.comp = null;
   }
 
   function open(path) {

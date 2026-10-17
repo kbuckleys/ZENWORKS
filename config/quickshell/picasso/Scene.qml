@@ -26,7 +26,6 @@
 //     }
 
 import QtQuick
-import QtQuick.Window
 import QtQuick.Effects
 import "picasso.js" as Art
 

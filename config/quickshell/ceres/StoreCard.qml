@@ -16,7 +16,6 @@ import QtQuick
 import Quickshell
 import "../morpheus"
 import "."
-import "store.js" as St
 
 Item {
   id: card

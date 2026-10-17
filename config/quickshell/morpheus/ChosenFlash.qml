@@ -15,12 +15,12 @@
 // this: nothing has happened yet, and 190ms between pointing at a branch and
 // seeing it is a menu that feels slow.
 //
-// Its own file since the Home cards moved into HomeCard.qml: an inline
-// component cannot be reached from another file, and a second copy is how
+// In morpheus: icarus' Home cards and every CardBody menu flash the same
+// flash. It was a file in icarus and an inline copy in CardBody, which is how
 // the two would drift.
 
 import QtQuick
-import "../morpheus"
+import "."
 
 Item {
   id: flash

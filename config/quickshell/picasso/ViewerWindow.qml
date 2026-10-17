@@ -78,7 +78,6 @@
 // the trash and anything written over in place — a save, a turn, marks.
 
 import QtQuick
-import QtQuick.Window
 import QtQuick.Effects
 import QtMultimedia
 import Quickshell
@@ -3674,182 +3673,21 @@ FloatingWindow {
     }
 
     // ── the crop, over the picture ──────────────────────────────────────
-    Item {
+    // picasso/CropBox, as the annotator's is. A right click that does not
+    // travel is still the menu.
+    CropBox {
       id: cropLayer
       x: pic.x; y: pic.y; width: pic.width; height: pic.height
       visible: win.cropping && win.loaded && !win.peekOriginal
-      readonly property real k: win.vz
-      readonly property var r: win.crop || { x: 0, y: 0, w: win.tw, h: win.th }
-
-      // RIGHT-DRAG RESIZES from wherever the pointer is, as the region
-      // capture does (PicassoCapture): the corner nearest it follows, so the
-      // box is adjusted without finding a handle. A right click that does
-      // not travel is still the menu. `p` is in cropLayer's coordinates.
-      property var rr0: null
-      property point rp0
-      property string redge: ""
-      property bool rmoved: false
-      function rPress(p) {
-        cropLayer.rr0 = cropLayer.r;
-        cropLayer.rp0 = p;
-        cropLayer.rmoved = false;
-        const r = cropLayer.r, k = cropLayer.k;
-        cropLayer.redge = (p.x / k < r.x + r.w / 2 ? "l" : "r") + (p.y / k < r.y + r.h / 2 ? "t" : "b");
-      }
-      function rMove(p) {
-        if (!cropLayer.rr0) return;
-        if (!cropLayer.rmoved && Math.abs(p.x - cropLayer.rp0.x) < 4 && Math.abs(p.y - cropLayer.rp0.y) < 4) return;
-        cropLayer.rmoved = true;
-        const dx = (p.x - cropLayer.rp0.x) / cropLayer.k, dy = (p.y - cropLayer.rp0.y) / cropLayer.k;
-        let r = Cap.resizeRect(cropLayer.rr0, cropLayer.redge, dx, dy, win.tw, win.th);
-        const ratio = win.ratioValue(win.cropRatio);
-        if (ratio > 0) r = V.fitAspect(r, cropLayer.redge, ratio, win.tw, win.th);
-        if (r.w >= 4 && r.h >= 4) win.crop = r;
-      }
-      // true when it was a click (the menu's)
-      function rRelease() {
-        const click = cropLayer.rr0 !== null && !cropLayer.rmoved;
-        cropLayer.rr0 = null;
-        return click;
-      }
-
-      // what is cut away, darkened
-      Rectangle { x: 0; y: 0; width: parent.width; height: cropLayer.r.y * cropLayer.k; color: "#99000000" }
-      Rectangle { x: 0; y: (cropLayer.r.y + cropLayer.r.h) * cropLayer.k; width: parent.width
-                  height: parent.height - y; color: "#99000000" }
-      Rectangle { x: 0; y: cropLayer.r.y * cropLayer.k; width: cropLayer.r.x * cropLayer.k
-                  height: cropLayer.r.h * cropLayer.k; color: "#99000000" }
-      Rectangle { x: (cropLayer.r.x + cropLayer.r.w) * cropLayer.k; y: cropLayer.r.y * cropLayer.k
-                  width: parent.width - x; height: cropLayer.r.h * cropLayer.k; color: "#99000000" }
-
-      // a fresh box, dragged out anywhere
-      MouseArea {
-        anchors.fill: parent
-        cursorShape: Qt.CrossCursor
-        acceptedButtons: Qt.LeftButton | Qt.RightButton
-        property real ax: 0
-        property real ay: 0
-        property bool drawing: false
-        onPressed: (m) => {
-          keys.forceActiveFocus();
-          drawing = m.button === Qt.LeftButton;
-          if (!drawing) { cropLayer.rPress(Qt.point(m.x, m.y)); return; }
-          ax = m.x / cropLayer.k; ay = m.y / cropLayer.k;
-        }
-        onReleased: (m) => {
-          if (m.button === Qt.RightButton && cropLayer.rRelease()) win.openMenu(mapToItem(null, m.x, m.y), false);
-        }
-        onPositionChanged: (m) => {
-          if (!drawing) { cropLayer.rMove(Qt.point(m.x, m.y)); return; }
-          const cx = m.x / cropLayer.k, cy = m.y / cropLayer.k;
-          let r = Cap.rectOf(ax, ay, cx, cy, win.tw, win.th);
-          const ratio = win.ratioValue(win.cropRatio);
-          if (ratio > 0) r = V.fitAspect(r, (cx < ax ? "l" : "r") + (cy < ay ? "t" : "b"), ratio, win.tw, win.th);
-          if (r.w >= 4 && r.h >= 4) win.crop = r;
-        }
-      }
-
-      Rectangle {
-        id: cropBox
-        x: cropLayer.r.x * cropLayer.k
-        y: cropLayer.r.y * cropLayer.k
-        width: cropLayer.r.w * cropLayer.k
-        height: cropLayer.r.h * cropLayer.k
-        color: "transparent"
-        border.width: 1
-        border.color: Zenon.cyan
-
-        // thirds, for placing things
-        Repeater {
-          model: 2
-          Rectangle { required property int index; x: cropBox.width * (index + 1) / 3; width: 1
-                      height: cropBox.height; color: Qt.rgba(1, 1, 1, 0.25) }
-        }
-        Repeater {
-          model: 2
-          Rectangle { required property int index; y: cropBox.height * (index + 1) / 3; height: 1
-                      width: cropBox.width; color: Qt.rgba(1, 1, 1, 0.25) }
-        }
-
-        // the box itself moves; its corners and sides resize it
-        Repeater {
-          model: ["move", "tl", "t", "tr", "l", "r", "bl", "b", "br"]
-          delegate: MouseArea {
-            id: grip
-            required property string modelData
-            readonly property bool body: grip.modelData === "move"
-            readonly property real gx: grip.modelData.indexOf("l") >= 0 ? 0
-              : grip.modelData.indexOf("r") >= 0 ? cropBox.width : cropBox.width / 2
-            readonly property real gy: grip.modelData.indexOf("t") >= 0 ? 0
-              : grip.modelData.indexOf("b") >= 0 ? cropBox.height : cropBox.height / 2
-            x: grip.body ? 0 : grip.gx - 9
-            y: grip.body ? 0 : grip.gy - 9
-            width: grip.body ? cropBox.width : 18
-            height: grip.body ? cropBox.height : 18
-            z: grip.body ? 0 : 1
-            cursorShape: grip.body ? Qt.SizeAllCursor
-              : (grip.modelData === "tl" || grip.modelData === "br") ? Qt.SizeFDiagCursor
-              : (grip.modelData === "tr" || grip.modelData === "bl") ? Qt.SizeBDiagCursor
-              : (grip.modelData === "l" || grip.modelData === "r") ? Qt.SizeHorCursor : Qt.SizeVerCursor
-            property var r0: null
-            property point p0
-            acceptedButtons: Qt.LeftButton | Qt.RightButton
-            onPressed: (m) => {
-              keys.forceActiveFocus();
-              if (m.button === Qt.RightButton) {
-                grip.r0 = null;
-                cropLayer.rPress(grip.mapToItem(cropLayer, m.x, m.y));
-                return;
-              }
-              grip.r0 = cropLayer.r;
-              grip.p0 = grip.mapToItem(cropLayer, m.x, m.y);
-            }
-            onPositionChanged: (m) => {
-              if (cropLayer.rr0) { cropLayer.rMove(grip.mapToItem(cropLayer, m.x, m.y)); return; }
-              if (!grip.r0) return;
-              const p = grip.mapToItem(cropLayer, m.x, m.y);
-              const dx = (p.x - grip.p0.x) / cropLayer.k, dy = (p.y - grip.p0.y) / cropLayer.k;
-              if (grip.body) { win.crop = Cap.moveRect(grip.r0, dx, dy, win.tw, win.th); return; }
-              let r = Cap.resizeRect(grip.r0, grip.modelData, dx, dy, win.tw, win.th);
-              const ratio = win.ratioValue(win.cropRatio);
-              if (ratio > 0) r = V.fitAspect(r, grip.modelData, ratio, win.tw, win.th);
-              if (r.w >= 4 && r.h >= 4) win.crop = r;
-            }
-            onReleased: (m) => {
-              grip.r0 = null;
-              if (m.button === Qt.RightButton && cropLayer.rRelease())
-                win.openMenu(grip.mapToItem(null, m.x, m.y), true);
-            }
-            Rectangle {
-              visible: !grip.body
-              anchors.centerIn: parent
-              width: 10; height: 10; radius: 2
-              color: Zenon.cyan
-              border.width: 1
-              border.color: "#000000"
-            }
-          }
-        }
-      }
-
-      // the size it will be saved at
-      Rectangle {
-        x: cropBox.x + 6
-        y: Math.max(6, cropBox.y - height - 6)
-        width: cropSize.implicitWidth + 12
-        height: 22
-        radius: 4
-        color: Zenon.hud(0.8)
-        Text {
-          id: cropSize
-          anchors.centerIn: parent
-          text: Math.round(cropLayer.r.w) + " × " + Math.round(cropLayer.r.h)
-          color: Zenon.white
-          font.family: Zenon.face
-          font.weight: Zenon.weight
-          font.pixelSize: Zenon.px(12)
-        }
-      }
+      k: win.vz
+      r: win.crop || { x: 0, y: 0, w: win.tw, h: win.th }
+      tw: win.tw
+      th: win.th
+      ratio: win.ratioValue(win.cropRatio)
+      clickMenu: true
+      onDrawn: (r) => win.crop = r
+      onTouched: keys.forceActiveFocus()
+      onMenuAsked: (at, onBox) => win.openMenu(at, onBox)
     }
 
     // prev and next are the edge tabs, below with the strip's (navTabs)

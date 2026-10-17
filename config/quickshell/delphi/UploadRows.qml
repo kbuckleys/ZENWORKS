@@ -14,7 +14,6 @@
 
 import QtQuick
 import "../morpheus"
-import "../terminus"
 import "delphi.js" as D
 import "../terminus/terminus.js" as Terminus
 import "../morpheus/icons.js" as Icons

@@ -40,6 +40,7 @@ pragma Singleton
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import Quickshell.Hyprland
 import "oracle.js" as Ora
 
 Singleton {
@@ -1231,6 +1232,15 @@ Singleton {
       if (!best || s.x < best.x || (s.x === best.x && s.y < best.y)) best = s;
     }
     return main || best;
+  }
+
+  // The monitor Hyprland has in focus, as a screen; with none in focus, the
+  // main one (Display). What a window opened from a key or the bar lands on.
+  // Was written out in ceres', oracle's and picasso's capture managers.
+  function focusedScreen() {
+    const m = Hyprland.focusedMonitor;
+    if (m) for (const s of Quickshell.screens) if (s.name === m.name) return s;
+    return root.pickScreen("");
   }
 
   readonly property var screenOptions: {

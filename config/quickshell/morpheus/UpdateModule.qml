@@ -5,8 +5,6 @@
 
 import QtQuick
 import Quickshell
-import Quickshell.Io
-import "helpers.js" as Helpers
 import "../oracle"
 import "../ceres"
 import "."

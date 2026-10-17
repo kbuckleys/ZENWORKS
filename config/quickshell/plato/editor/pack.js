@@ -2,7 +2,11 @@
 // ┌─┘├┤ │││││││ │├┬┘├┴┐└─┐
 // └─┘└─┘┘└┘└┴┘└─┘┴└─┴ ┴└─┘
 // https://github.com/kbuckleys/
-//
+
+.pragma library
+// ONE COPY FOR THE WHOLE SHELL. Without the pragma every component instance
+// that imports this file evaluated all of it again (see morpheus/icons.js).
+
 // vim.pack's confirmation buffer, read into something a panel can draw.
 //
 // nvim/pack.lua prints the buffer vim.pack.update() writes for a person to

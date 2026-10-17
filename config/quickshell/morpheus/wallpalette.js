@@ -2,7 +2,11 @@
 // ┌─┘├┤ │││││││ │├┬┘├┴┐└─┐
 // └─┘└─┘┘└┘└┴┘└─┘┴└─┴ ┴└─┘
 // https://github.com/kbuckleys/
-//
+
+.pragma library
+// ONE COPY FOR THE WHOLE SHELL. Without the pragma every component instance
+// that imports this file evaluated all of it again (see morpheus/icons.js).
+
 // FOLLOW BACKGROUND: a theme made from a background. picasso/FollowBackground
 // asks ImageMagick for the picture's dominant colors (parseHistogram) and
 // this turns them into a theme in the shape themes/*.json have, so Zenon,

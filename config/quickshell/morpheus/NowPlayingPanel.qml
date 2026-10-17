@@ -13,7 +13,6 @@
 // while the pointer is on it as well as on the module that opened it.
 
 import QtQuick
-import QtQuick.Window
 import Quickshell.Widgets
 import "."
 

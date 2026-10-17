@@ -10,7 +10,6 @@
 
 import QtQuick
 import "../morpheus"
-import "../terminus"
 import "notes.js" as N
 
 Item {

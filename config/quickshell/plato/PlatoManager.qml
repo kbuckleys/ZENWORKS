@@ -69,8 +69,6 @@ Scope {
   }
 
   property var wins: []
-  property var _comp: null
-  property var _waiting: []
 
   // ── what every window shares: plato's settings ────────────────────
   // core/Settings.qml, drawn by the settings sheet in every window (Space ,
@@ -208,29 +206,12 @@ Scope {
     kept.sessions = JSON.stringify(mgr.wins.map((w) => ({ id: w.sessionId, capture: w.capture })));
   }
 
-  // Run `fn` once the window type is compiled, compiling it if this is the
-  // first window since plato was last closed.
-  function _withComponent(fn) {
-    if (mgr._comp && mgr._comp.status === Component.Ready) { fn(); return; }
-    mgr._waiting.push(fn);
-    if (mgr._comp) return;
-    const comp = Qt.createComponent(Qt.resolvedUrl("PlatoWindow.qml"), Component.Asynchronous);
-    mgr._comp = comp;
-    const settle = () => {
-      if (comp.status === Component.Loading) return;
-      const queued = mgr._waiting;
-      mgr._waiting = [];
-      if (comp.status !== Component.Ready) {
-        console.warn("plato:", comp.errorString());
-        mgr._comp = null;
-        // nothing is coming: opens must not keep waiting for it
-        mgr._queued = null;
-        return;
-      }
-      for (const f of queued) f();
-    };
-    if (comp.status === Component.Loading) comp.statusChanged.connect(settle);
-    else settle();
+  LazyComponent {
+    id: lazy
+    source: Qt.resolvedUrl("PlatoWindow.qml")
+    tag: "plato"
+    // nothing is coming: opens must not keep waiting for it
+    onFailed: mgr._queued = null
   }
 
   function _newId() {
@@ -238,9 +219,9 @@ Scope {
   }
 
   function spawn(path, id, reconnect, then, capture) {
-    mgr._withComponent(() => {
+    lazy.withReady(() => {
       const t0 = Date.now();
-      const w = mgr._comp.createObject(mgr, {
+      const w = lazy.comp.createObject(mgr, {
         mgr: mgr,
         sessionId: id || mgr._newId(),
         reconnect: !!reconnect,
@@ -249,7 +230,7 @@ Scope {
       });
       LagNotes.mark("plato window", t0);
       if (!w) {
-        console.warn("plato: the window could not be made:", mgr._comp.errorString());
+        console.warn("plato: the window could not be made:", lazy.comp.errorString());
         // nothing is coming: opens waiting for this window must not wait
         // forever — every later `Plato open` would have queued behind it
         mgr._queued = null;
@@ -283,7 +264,7 @@ Scope {
     mgr.wins = mgr.wins.filter((x) => x !== w);
     mgr._remember();
     // the last one: let the compiled type go with it
-    if (mgr.wins.length === 0) mgr._comp = null;
+    if (mgr.wins.length === 0) lazy.comp = null;
   }
 
   // "~" and relative paths: relative to home, since an ipc call does not

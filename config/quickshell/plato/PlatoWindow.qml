@@ -1069,6 +1069,8 @@ FloatingWindow {
   // from: the status line goes black under the key hints or the leader
   // card and opens its hairline over them; the tab strip, the same for the
   // picker, the plugins and the settings (see TabBar/StatusBar spliceInk).
+  // where the editor's column starts: a sheet's dim stops there
+  readonly property real treeEdge: sidebarBox.visible ? sidebarBox.width + 1 : 0
   function spliceOf(list) {
     let best = null;
     for (const s of list)
@@ -1135,6 +1137,7 @@ FloatingWindow {
     // menu rises from the status bar (Picker.rising)
     fromTop: tabs.height
     toBottom: status.height
+    dimLeft: picker.rising ? 0 : win.treeEdge
     // rising, it is the leader's twin: over the editor's column, spliced
     // out of the status line there (downSheet)
     anchors.fill: picker.rising ? keyWell : parent
@@ -1153,6 +1156,7 @@ FloatingWindow {
   PluginPanel {
     backdrop: editor   // frosted over it — see morpheus/Sheet
     id: pluginPanel
+    dimLeft: win.treeEdge
     // terminus' sheets hang from the chrome: here, the tab strip
     fromTop: tabs.height
     plugins: win.mgr ? win.mgr.plugins : null
@@ -1165,6 +1169,7 @@ FloatingWindow {
   SettingsSheet {
     backdrop: editor   // frosted over it — see morpheus/Sheet
     id: settingsSheet
+    dimLeft: win.treeEdge
     // terminus' sheets hang from the chrome: here, the tab strip
     fromTop: tabs.height
     settings: win.settings
@@ -1178,6 +1183,7 @@ FloatingWindow {
   PropsSheet {
     backdrop: editor   // frosted over it — see morpheus/Sheet
     id: propsSheet
+    dimLeft: win.treeEdge
     fromTop: tabs.height
     onClosed: (keysTo) => (keysTo || (win.treeShown ? sidebar : editor)).forceActiveFocus()
     onSaid: (t) => toasts.take({ kind: "props", text: t })

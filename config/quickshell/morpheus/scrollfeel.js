@@ -2,7 +2,11 @@
 // ┌─┘├┤ │││││││ │├┬┘├┴┐└─┐
 // └─┘└─┘┘└┘└┴┘└─┘┴└─┴ ┴└─┘
 // https://github.com/kbuckleys/
-//
+
+.pragma library
+// ONE COPY FOR THE WHOLE SHELL. Without the pragma every component instance
+// that imports this file evaluated all of it again (see morpheus/icons.js).
+
 // ── HOW A SCROLL FEELS, IN NUMBERS ──────────────────────────────────────
 // The macOS feel, as pure functions: Elastic (and plato's editor, and
 // picasso's strip, which cannot be an Elastic) do the moving; this says how

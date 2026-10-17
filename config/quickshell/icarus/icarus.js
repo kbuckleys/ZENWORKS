@@ -3,6 +3,14 @@
 // └─┘└─┘┘└┘└┴┘└─┘┴└─┴ ┴└─┘
 // https://github.com/kbuckleys/
 
+.pragma library
+.import qs.morpheus as Morpheus
+// ONE COPY FOR THE WHOLE SHELL. Without the pragma every component instance
+// that imports this file evaluated all of it again (see morpheus/icons.js).
+// The shell's singletons come in through the imports above (the same
+// instances); the node tests hand in stubs of their own.
+var Strings = typeof Morpheus !== "undefined" ? Morpheus.Strings : globalThis.Strings;
+
 function dirname(p) {
   if (!p || p === "/") return "/";
   const s = String(p).replace(/\/+$/, "");

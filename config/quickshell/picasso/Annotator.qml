@@ -974,162 +974,22 @@ Item {
     }
 
     // ── the crop box, while the crop tool is in the hand ──────────────
-    // The viewer's own: the rest darkened, thirds, a body that moves and
-    // grips that resize. Shift keeps it square. Return or another tool
-    // applies it, esc puts it back, ⌫ lets go of it.
-    Item {
+    // picasso/CropBox, as the viewer's is. Shift keeps it square. Return or
+    // another tool applies it, esc puts it back, ⌫ lets go of it.
+    CropBox {
       id: cropLayer
       x: paper.x; y: paper.y
       width: paper.width * paper.fit; height: paper.height * paper.fit
       visible: ann.cropping
-      readonly property real k: paper.fit
-      readonly property var r: ann.draft || ann.whole
-      readonly property real tw: paper.width
-      readonly property real th: paper.height
-      function square(r, edge, m) {
-        return (m.modifiers & Qt.ShiftModifier) ? V.fitAspect(r, edge, 1, tw, th) : r;
-      }
-      // RIGHT-DRAG RESIZES from anywhere, as the region capture does: the
-      // corner nearest the pointer follows it. `p` in cropLayer's coordinates.
-      property var rr0: null
-      property point rp0
-      property string redge: ""
-      function rPress(p) {
-        const r = cropLayer.r, k = cropLayer.k;
-        cropLayer.rr0 = r;
-        cropLayer.rp0 = p;
-        cropLayer.redge = (p.x / k < r.x + r.w / 2 ? "l" : "r") + (p.y / k < r.y + r.h / 2 ? "t" : "b");
-      }
-      function rMove(p, m) {
-        if (!cropLayer.rr0) return;
-        const dx = (p.x - cropLayer.rp0.x) / cropLayer.k, dy = (p.y - cropLayer.rp0.y) / cropLayer.k;
-        const r = cropLayer.square(Cap.resizeRect(cropLayer.rr0, cropLayer.redge, dx, dy,
-                                                  cropLayer.tw, cropLayer.th), cropLayer.redge, m);
-        if (r.w >= 4 && r.h >= 4) ann.draft = r;
-      }
-
-      Rectangle { x: 0; y: 0; width: parent.width; height: cropLayer.r.y * cropLayer.k; color: "#99000000" }
-      Rectangle { x: 0; y: (cropLayer.r.y + cropLayer.r.h) * cropLayer.k; width: parent.width
-                  height: parent.height - y; color: "#99000000" }
-      Rectangle { x: 0; y: cropLayer.r.y * cropLayer.k; width: cropLayer.r.x * cropLayer.k
-                  height: cropLayer.r.h * cropLayer.k; color: "#99000000" }
-      Rectangle { x: (cropLayer.r.x + cropLayer.r.w) * cropLayer.k; y: cropLayer.r.y * cropLayer.k
-                  width: parent.width - x; height: cropLayer.r.h * cropLayer.k; color: "#99000000" }
-
-      // a fresh box, dragged out anywhere
-      MouseArea {
-        anchors.fill: parent
-        cursorShape: Qt.CrossCursor
-        acceptedButtons: Qt.LeftButton | Qt.RightButton
-        property real ax: 0
-        property real ay: 0
-        onPressed: (m) => {
-          keys.forceActiveFocus();
-          if (m.button === Qt.RightButton) { cropLayer.rPress(Qt.point(m.x, m.y)); return; }
-          ax = m.x / cropLayer.k; ay = m.y / cropLayer.k;
-        }
-        onReleased: cropLayer.rr0 = null
-        onPositionChanged: (m) => {
-          if (cropLayer.rr0) { cropLayer.rMove(Qt.point(m.x, m.y), m); return; }
-          const cx = m.x / cropLayer.k, cy = m.y / cropLayer.k;
-          const r = cropLayer.square(Cap.rectOf(ax, ay, cx, cy, cropLayer.tw, cropLayer.th),
-                                     (cx < ax ? "l" : "r") + (cy < ay ? "t" : "b"), m);
-          if (r.w >= 4 && r.h >= 4) ann.draft = r;
-        }
-      }
-
-      Rectangle {
-        id: cropBox
-        x: cropLayer.r.x * cropLayer.k
-        y: cropLayer.r.y * cropLayer.k
-        width: cropLayer.r.w * cropLayer.k
-        height: cropLayer.r.h * cropLayer.k
-        color: "transparent"
-        border.width: 1
-        border.color: Zenon.cyan
-
-        Repeater {
-          model: 2
-          Rectangle { required property int index; x: cropBox.width * (index + 1) / 3; width: 1
-                      height: cropBox.height; color: Qt.rgba(1, 1, 1, 0.25) }
-        }
-        Repeater {
-          model: 2
-          Rectangle { required property int index; y: cropBox.height * (index + 1) / 3; height: 1
-                      width: cropBox.width; color: Qt.rgba(1, 1, 1, 0.25) }
-        }
-
-        Repeater {
-          model: ["move", "tl", "t", "tr", "l", "r", "bl", "b", "br"]
-          delegate: MouseArea {
-            id: grip
-            required property string modelData
-            readonly property bool body: grip.modelData === "move"
-            readonly property real gx: grip.modelData.indexOf("l") >= 0 ? 0
-              : grip.modelData.indexOf("r") >= 0 ? cropBox.width : cropBox.width / 2
-            readonly property real gy: grip.modelData.indexOf("t") >= 0 ? 0
-              : grip.modelData.indexOf("b") >= 0 ? cropBox.height : cropBox.height / 2
-            x: grip.body ? 0 : grip.gx - 9
-            y: grip.body ? 0 : grip.gy - 9
-            width: grip.body ? cropBox.width : 18
-            height: grip.body ? cropBox.height : 18
-            z: grip.body ? 0 : 1
-            cursorShape: grip.body ? Qt.SizeAllCursor
-              : (grip.modelData === "tl" || grip.modelData === "br") ? Qt.SizeFDiagCursor
-              : (grip.modelData === "tr" || grip.modelData === "bl") ? Qt.SizeBDiagCursor
-              : (grip.modelData === "l" || grip.modelData === "r") ? Qt.SizeHorCursor : Qt.SizeVerCursor
-            property var r0: null
-            property point p0
-            acceptedButtons: Qt.LeftButton | Qt.RightButton
-            onPressed: (m) => {
-              keys.forceActiveFocus();
-              if (m.button === Qt.RightButton) { grip.r0 = null; cropLayer.rPress(grip.mapToItem(cropLayer, m.x, m.y)); return; }
-              grip.r0 = cropLayer.r;
-              grip.p0 = grip.mapToItem(cropLayer, m.x, m.y);
-            }
-            onPositionChanged: (m) => {
-              if (cropLayer.rr0) { cropLayer.rMove(grip.mapToItem(cropLayer, m.x, m.y), m); return; }
-              if (!grip.r0) return;
-              const p = grip.mapToItem(cropLayer, m.x, m.y);
-              const dx = (p.x - grip.p0.x) / cropLayer.k, dy = (p.y - grip.p0.y) / cropLayer.k;
-              if (grip.body) { ann.draft = Cap.moveRect(grip.r0, dx, dy, cropLayer.tw, cropLayer.th); return; }
-              const r = cropLayer.square(Cap.resizeRect(grip.r0, grip.modelData, dx, dy,
-                                                        cropLayer.tw, cropLayer.th), grip.modelData, m);
-              if (r.w >= 4 && r.h >= 4) ann.draft = r;
-            }
-            onReleased: { grip.r0 = null; cropLayer.rr0 = null; }
-            // a double click on the box applies it
-            onDoubleClicked: if (grip.body) ann.tool = ann.back
-            Rectangle {
-              visible: !grip.body
-              anchors.centerIn: parent
-              width: 10; height: 10; radius: 2
-              color: Zenon.cyan
-              border.width: 1
-              border.color: "#000000"
-            }
-          }
-        }
-      }
-
-      // the size it will be saved at
-      Rectangle {
-        x: cropBox.x + 6
-        y: Math.max(6, cropBox.y - height - 6)
-        width: cropSize.implicitWidth + 12
-        height: 22
-        radius: 4
-        color: Zenon.hud(0.8)
-        Text {
-          id: cropSize
-          anchors.centerIn: parent
-          text: Math.round(cropLayer.r.w) + " × " + Math.round(cropLayer.r.h)
-          color: Zenon.white
-          font.family: Zenon.face
-          font.weight: Zenon.weight
-          font.pixelSize: Zenon.px(12)
-        }
-      }
+      k: paper.fit
+      r: ann.draft || ann.whole
+      tw: paper.width
+      th: paper.height
+      shiftSquare: true
+      onDrawn: (r) => ann.draft = r
+      onTouched: keys.forceActiveFocus()
+      // a double click on the box applies it
+      onBodyDoubleClicked: ann.tool = ann.back
     }
 
     // what the keys do, while cropping

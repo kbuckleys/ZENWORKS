@@ -2,7 +2,11 @@
 // ┌─┘├┤ │││││││ │├┬┘├┴┐└─┐
 // └─┘└─┘┘└┘└┴┘└─┘┴└─┴ ┴└─┘
 // https://github.com/kbuckleys/
-//
+
+.pragma library
+// ONE COPY FOR THE WHOLE SHELL. Without the pragma every component instance
+// that imports this file evaluated all of it again (see morpheus/icons.js).
+
 // HOWLER's pure half — what a notification is worth keeping, and what has to
 // be thrown away before it is written down. No QML in here; Howler.qml runs
 // the server and the panels draw it.

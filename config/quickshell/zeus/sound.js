@@ -2,7 +2,11 @@
 // ┌─┘├┤ │││││││ │├┬┘├┴┐└─┐
 // └─┘└─┘┘└┘└┴┘└─┘┴└─┴ ┴└─┘
 // https://github.com/kbuckleys/
-//
+
+.pragma library
+// ONE COPY FOR THE WHOLE SHELL. Without the pragma every component instance
+// that imports this file evaluated all of it again (see morpheus/icons.js).
+
 // The sound view's pure half — naming, filtering and the one thing that has to
 // be parsed out of a command's output. Everything live (volumes, mutes, peaks,
 // who is linked to what) comes from the pipewire service as objects, so none of

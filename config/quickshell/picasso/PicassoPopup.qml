@@ -8,14 +8,12 @@
 // the desk, how it is fitted, and one button that puts it there.
 
 import QtQuick
-import QtQuick.Effects
-import QtQuick.Window
 import Quickshell
 import Quickshell.Io
 import Quickshell.Hyprland
-import Quickshell.Wayland
 import Quickshell.Widgets
 import "../morpheus"
+import "../morpheus/gridnav.js" as Nav
 import "../terminus" as Term
 import "picasso.js" as Art
 
@@ -338,16 +336,14 @@ LayerPopup {
   }
 
   function clampSel() {
-    const len = popup.filtered.length;
-    if (len === 0) popup.sel = 0;
-    else popup.sel = Math.max(0, Math.min(popup.sel, len - 1));
+    popup.sel = Nav.clamp(popup.sel, popup.filtered.length);
     followSelection();
   }
 
   function moveSel(delta) {
     const len = popup.filtered.length;
     if (len === 0) return;
-    popup.sel = Math.max(0, Math.min(popup.sel + delta, len - 1));
+    popup.sel = Nav.clamp(popup.sel + delta, len);
     followSelection();
   }
 
@@ -496,50 +492,24 @@ LayerPopup {
     }
   }
 
-  Item {
+  LayerPanel {
     id: panel
+    host: popup
+    ground: bgRoot
+    shadowRadius: bgRoot.radius
     width: Zenon.layerWidth(1000)
     height: popup.calcHeight()
-    Behavior on height { NumberAnimation { duration: Zenon.slow; easing.type: Zenon.ease } }
-    // Either edge. A layer opens out of the pill, so it has to be on the
-    // same one, off whichever it is by the same lift. Placed by y, NOT by a
-    // top/bottom anchor pair: flipping two anchors at runtime updates one
-    // before the other, for that instant both apply and stretch the panel to
-    // the screen, and that stretch overwrites — and so unbinds — `height`.
-    // The panel then stayed screen-tall until the shell was restarted.
-    anchors.horizontalCenter: parent.horizontalCenter
-    y: Zenon.barTop ? Zenon.edgeLift(popup.morphMode, popup.screen, popup.statusbar)
-      : parent.height - height - Zenon.edgeLift(popup.morphMode, popup.screen, popup.statusbar)
-    z: 1
     // Out of sight while the card is shown alone — opacity rather than
     // visible, because the keys are the panel's (bgRoot holds the focus) and
     // an invisible item cannot hold it.
     opacity: popup.cardOnly ? 0 : popup.contentFade
-    transform: Scale {
-      origin.x: panel.width / 2
-      // grows out of the edge the bar is on, which is the edge it came from
-      origin.y: Zenon.barTop ? 0 : panel.height
-      xScale: popup.panelX
-      yScale: popup.panelY
-    }
-
-    // Swallows what no control wanted, so a press on bare panel is not a
-    // press on the desktop behind it.
-    MouseArea {
-      anchors.fill: parent
-    }
-
-    LayerShadow {
-      panel: bgRoot
-      cornerRadius: bgRoot.radius
-      morphed: popup.morphMode
-    }
 
     // ClippingRectangle, not Rectangle + clip: true. Qt's own clip is
     // RECTANGULAR — it clips to the bounding box and knows nothing about the
     // radius — so every square child painted to the panel's edge (the bottom
     // strip most visibly) filled in the rounded corners behind it. This one
     // clips to the rounded shape itself.
+
     ClippingRectangle {
       id: bgRoot
       anchors.fill: parent
@@ -1173,16 +1143,14 @@ LayerPopup {
             }
           }
 
-          Column {
+          Item {
             anchors.fill: parent
-            topPadding: 6
-            bottomPadding: 6
-            spacing: -2
 
             // The count, and beside it the hint for the one thing it also
-            // is: the filter you type into.
+            // is: the filter you type into. Centered on the line, as the
+            // rings beside it are (it hung from a 6px top pad, 2026-10-17).
             Row {
-              anchors.horizontalCenter: parent.horizontalCenter
+              anchors.centerIn: parent
               spacing: 0
 
               Item {

@@ -11,7 +11,6 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
-import QtQuick.Window
 import "../morpheus"
 import "../oracle"
 import "picasso.js" as Art

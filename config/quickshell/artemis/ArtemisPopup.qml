@@ -13,10 +13,10 @@ import Quickshell
 import Quickshell.Widgets
 import Quickshell.Io
 import Quickshell.Hyprland
-import Quickshell.Wayland
 import "artemis.js" as Artemis
 import "../morpheus/icons.js" as Icons
 import "../morpheus"
+import "../morpheus/gridnav.js" as Nav
 import "../terminus"
 import "../terminus/terminus.js" as Terminus
 
@@ -340,8 +340,7 @@ LayerPopup {
     // refreshes the view when it lands, ~19ms later.
     popup.refresh()
     popup.reindex()
-    focusRetry.counter = 0
-    focusRetry.restart()
+    focusRetry.begin()
     popup.playOpen();
   }
 
@@ -551,15 +550,7 @@ LayerPopup {
   function moveVert(delta) {
     const len = popup.rowCount()
     if (len === 0) return
-    const cols = popup.textColsUsed
-    const rows = Math.ceil(len / cols)
-    const row = Math.floor(popup.sel / cols)
-    const col = popup.sel % cols
-    let newRow = (row + delta) % rows
-    if (newRow < 0) newRow += rows
-    const rowValid = (newRow === rows - 1) ? (len - newRow * cols) : cols
-    const newCol = Math.min(col, rowValid - 1)
-    popup.sel = newRow * cols + newCol
+    popup.sel = Nav.vert(popup.sel, delta, len, popup.textColsUsed)
     popup.followSelection()
   }
 
@@ -571,13 +562,7 @@ LayerPopup {
       popup.stepSel(delta)
       return
     }
-    const row = Math.floor(popup.sel / cols)
-    const col = popup.sel % cols
-    const rowStart = row * cols
-    const rowLen = Math.min(cols, len - rowStart)
-    const newCol = (col + delta) % rowLen
-    const adjCol = newCol < 0 ? newCol + rowLen : newCol
-    popup.sel = rowStart + adjCol
+    popup.sel = Nav.horiz(popup.sel, delta, len, cols)
     popup.followSelection()
   }
 
@@ -601,10 +586,7 @@ LayerPopup {
   }
 
   function clampSel() {
-    const len = popup.rowCount()
-    if (len === 0) popup.sel = 0
-    else if (popup.sel >= len) popup.sel = len - 1
-    else if (popup.sel < 0) popup.sel = 0
+    popup.sel = Nav.clamp(popup.sel, popup.rowCount())
     popup.followSelection()
   }
 
@@ -627,45 +609,19 @@ LayerPopup {
     return popup.bodyH;
   }
 
-  Item {
+  LayerPanel {
     id: panel
+    host: popup
+    ground: bg
     width: Math.round(popup.liveWidth)
     height: popup.bodyH
-    // Zenon.slow is the pill's own height easing in shell.qml; if these drift
-    // apart the panel visibly detaches from its background mid-resize
-    Behavior on height { NumberAnimation { duration: Zenon.slow; easing.type: Zenon.ease } }
-    // Either edge. A layer opens out of the pill, so it has to be on the
-    // same one, off whichever it is by the same lift. Placed by y, NOT by a
-    // top/bottom anchor pair: flipping two anchors at runtime updates one
-    // before the other, for that instant both apply and stretch the panel to
-    // the screen, and that stretch overwrites — and so unbinds — `height`.
-    // The panel then stayed screen-tall until the shell was restarted.
-    anchors.horizontalCenter: parent.horizontalCenter
-    y: Zenon.barTop ? Zenon.edgeLift(popup.morphMode, popup.screen, popup.statusbar)
-      : parent.height - height - Zenon.edgeLift(popup.morphMode, popup.screen, popup.statusbar)
-    z: 1
-    opacity: popup.contentFade
-    transform: Scale {
-      origin.x: panel.width / 2
-      // grows out of the edge the bar is on, which is the edge it came from
-      origin.y: Zenon.barTop ? 0 : panel.height
-      xScale: popup.panelX
-      yScale: popup.panelY
-    }
-
-    MouseArea { anchors.fill: parent }
-
-    LayerShadow {
-      panel: bg
-      cornerRadius: Zenon.pillRadius
-      morphed: popup.morphMode
-    }
 
     // ClippingRectangle, not Rectangle + clip: true. Qt's own clip is
     // RECTANGULAR — it clips to the bounding box and knows nothing about the
     // radius — so every square child painted to the panel's edge (the bottom
     // strip most visibly) filled in the rounded corners behind it. This one
     // clips to the rounded shape itself.
+
     ClippingRectangle {
       id: bg
       anchors.fill: parent
@@ -1242,20 +1198,11 @@ LayerPopup {
     onCancelled: if (popup.shown) searchInput.forceActiveFocus()
   }
 
-  Timer {
+  FocusRetry {
     id: focusRetry
-    interval: 60
-    repeat: true
-    onTriggered: {
-      if (!popup.shown) {
-        stop()
-        return
-      }
-      searchInput.forceActiveFocus()
-      if (searchInput.activeFocus) stop()
-      if (focusRetry.counter++ > 12) stop()
-    }
-    property int counter: 0
+    live: popup.shown
+    took: searchInput.activeFocus
+    onPlace: searchInput.forceActiveFocus()
   }
 
   Timer {

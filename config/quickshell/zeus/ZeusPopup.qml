@@ -15,6 +15,7 @@ import "zeus.js" as Zeus
 import "sound.js" as Sound
 import "../morpheus"
 import "../morpheus/helpers.js" as Helpers
+import "../morpheus/gridnav.js" as Nav
 import "../oracle"
 
 LayerPopup {
@@ -1049,8 +1050,7 @@ LayerPopup {
     upProc.running = true;
     refreshTimer.restart();
 
-    focusRetry.counter = 0;
-    focusRetry.restart();
+    focusRetry.begin();
     popup.playOpen();
     popup.syncFocus();
   }
@@ -1273,8 +1273,7 @@ LayerPopup {
     popup.filtered = popup.treeMode
       ? Zeus.buildTree(rows, popup.sortKey, popup.sortDesc, popup.folded)
       : Zeus.sortRows(rows, popup.sortKey, popup.sortDesc);
-    if (popup.sel >= popup.filtered.length) popup.sel = popup.filtered.length - 1;
-    if (popup.sel < 0) popup.sel = 0;
+    popup.sel = Nav.clamp(popup.sel, popup.filtered.length);
     grid.positionViewAtIndex(popup.sel, ListView.Contain);
   }
 
@@ -1405,22 +1404,14 @@ LayerPopup {
   function moveVert(delta) {
     const len = popup.filtered.length;
     if (len === 0) return;
-    const rows = Math.ceil(len / popup.cols);
-    const row = Math.floor(popup.sel / popup.cols);
-    const col = popup.sel % popup.cols;
-    let newRow = ((row + delta) % rows + rows) % rows;
-    const rowLen = (newRow === rows - 1) ? (len - newRow * popup.cols) : popup.cols;
-    popup.sel = newRow * popup.cols + Math.min(col, rowLen - 1);
+    popup.sel = Nav.vert(popup.sel, delta, len, popup.cols);
     Qt.callLater(() => grid.positionViewAtIndex(popup.sel, ListView.Contain));
   }
 
   function moveHoriz(delta) {
     const len = popup.filtered.length;
     if (len < 2) return;
-    const col = popup.sel % popup.cols;
-    const base = popup.sel - col;
-    const rowLen = Math.min(popup.cols, len - base);
-    popup.sel = base + (((col + delta) % rowLen) + rowLen) % rowLen;
+    popup.sel = Nav.horiz(popup.sel, delta, len, popup.cols);
     Qt.callLater(() => grid.positionViewAtIndex(popup.sel, ListView.Contain));
   }
 
@@ -1433,12 +1424,13 @@ LayerPopup {
     onClicked: popup.closePopup()
   }
 
-  Item {
+  LayerPanel {
     id: panel
+    host: popup
+    ground: bgRoot
     width: Zenon.layerWidth(1000)
     height: popup.calcHeight()
-    // Zenon.slow is the pill's own height easing in shell.qml
-    Behavior on height { NumberAnimation { duration: Zenon.slow; easing.type: Zenon.ease } }
+    anchors.horizontalCenter: undefined
     // Anchors and x/y cannot both drive a position, and pinned it is x/y that
     // has to — so the unpinned case is written out rather than anchored. These
     // two expressions ARE the anchors they replace: centered horizontally, and
@@ -1460,15 +1452,6 @@ LayerPopup {
     // the panel grows and shrinks with the view; pinned near an edge that must
     // not push it off the screen
     onHeightChanged: popup.clampPin()
-    z: 1
-    opacity: popup.contentFade
-    transform: Scale {
-      origin.x: panel.width / 2
-      // grows out of the edge the bar is on, which is the edge it came from
-      origin.y: Zenon.barTop ? 0 : panel.height
-      xScale: popup.panelX
-      yScale: popup.panelY
-    }
 
     // Sits UNDER everything the panel draws, so it only ever sees a press the
     // content did not want — an empty stretch of a graph, the strip beside a
@@ -1520,12 +1503,6 @@ LayerPopup {
       acceptedButtons: Qt.AllButtons
       grabPermissions: PointerHandler.TakeOverForbidden
       onPressedChanged: if (pressed) popup.holding = true
-    }
-
-    LayerShadow {
-      panel: bgRoot
-      cornerRadius: Zenon.pillRadius
-      morphed: popup.morphMode
     }
 
     // ClippingRectangle, not Rectangle + clip: true. Qt's own clip is
@@ -3785,27 +3762,17 @@ LayerPopup {
     return 156;
   }
 
-  Timer {
+  FocusRetry {
     id: focusRetry
-    interval: 60
-    repeat: true
-    onTriggered: {
-      if (!popup.shown) {
-        stop();
-        return;
-      }
-      popup.syncFocus();
-      if (popup.confirming
-          ? bgRoot.activeFocus
-          : ((popup.mode === "list" && listBar.typing) ||
-             (popup.mode === "net" && netBar.typing) ||
-             (popup.mode === "sound" && soundBar.typing) ||
-             (popup.mode !== "list" && popup.mode !== "net"
-              && popup.mode !== "sound" && bgRoot.activeFocus)))
-        stop();
-      if (focusRetry.counter++ > 12) stop();
-    }
-    property int counter: 0
+    live: popup.shown
+    took: popup.confirming
+        ? bgRoot.activeFocus
+        : ((popup.mode === "list" && listBar.typing) ||
+        (popup.mode === "net" && netBar.typing) ||
+        (popup.mode === "sound" && soundBar.typing) ||
+        (popup.mode !== "list" && popup.mode !== "net"
+        && popup.mode !== "sound" && bgRoot.activeFocus))
+    onPlace: popup.syncFocus()
   }
 
 

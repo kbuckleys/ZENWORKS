@@ -309,33 +309,16 @@ LayerPopup {
   }
 
   // ── the card ────────────────────────────────────────────────────────────
-  Item {
+  LayerPanel {
     id: panel
+    host: popup
+    ground: bgRoot
+    // a press anywhere on the card is the card being taken up
+    onPressed: popup.engage()
     width: Zenon.layerWidth(popup.panelWidth)
     height: popup.calcHeight()
-    Behavior on height { NumberAnimation { duration: Zenon.slow; easing.type: Zenon.ease } }
-    // placed by y, not by an anchor pair — see CeresPanel
-    anchors.horizontalCenter: parent.horizontalCenter
-    y: Zenon.barTop ? Zenon.edgeLift(popup.morphMode, popup.screen, popup.statusbar)
-      : parent.height - height - Zenon.edgeLift(popup.morphMode, popup.screen, popup.statusbar)
-    z: 1
-    opacity: popup.contentFade
-    transform: Scale {
-      origin.x: panel.width / 2
-      origin.y: Zenon.barTop ? 0 : panel.height
-      xScale: popup.panelX
-      yScale: popup.panelY
-    }
 
     HoverHandler { id: hover }
-    // a press anywhere on the card is the card being taken up
-    MouseArea { anchors.fill: parent; onPressed: popup.engage() }
-
-    LayerShadow {
-      panel: bgRoot
-      cornerRadius: Zenon.pillRadius
-      morphed: popup.morphMode
-    }
 
     ClippingRectangle {
       id: bgRoot

@@ -13,9 +13,11 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Hyprland
 import Quickshell.Wayland
+// a library; its markup escaping is morpheus Strings'
 import "cynosure.js" as Cynosure
 import "../morpheus/icons.js" as Icons
 import "../morpheus"
+import "../morpheus/gridnav.js" as Nav
 import "../chronos"
 import "../oracle"
 
@@ -229,41 +231,14 @@ property var statusbar: null
     popup.rebuild();
   }
 
-  Process {
-    id: writeProc
-    onExited: popup.drainWrite()
-  }
-  property var writeQueue: []
-
-  function writeFile(path, content) {
-    popup.writeQueue.push({ path: path, content: content });
-    popup.drainWrite();
-  }
-
-  function drainWrite() {
-    if (popup.writeQueue.length === 0 || writeProc.running) return;
-    const job = popup.writeQueue.shift();
-    // Through stdin, not argv. A cache rewritten as one `printf '%s' <all of
-    // it>` argument fails with E2BIG once it passes 128 KiB (a single argv
-    // string's limit), and nothing is written. Closing stdin ends `cat`.
-    //
-    // Beside the file and renamed over it: `cat >` truncates first, so a
-    // crash mid-write lost the whole history.
-    writeProc.command = ["sh", "-c",
-      "cat > \"$1.tmp.$$\" && mv -f \"$1.tmp.$$\" \"$1\" || rm -f \"$1.tmp.$$\"",
-      "cynosure-write", job.path];
-    writeProc.stdinEnabled = true;
-    writeProc.running = true;
-    writeProc.write(job.content);
-    writeProc.stdinEnabled = false;
-  }
+  AtomicWriter { id: writer; tag: "cynosure-write" }
 
   function writeHistory() {
-    popup.writeFile(Cynosure.histPath(), Cynosure.serializeHistory(popup.histLines));
+    writer.write(Cynosure.histPath(), Cynosure.serializeHistory(popup.histLines));
   }
 
   function writeFreq() {
-    popup.writeFile(Cynosure.freqPath(), Cynosure.serializeFreq(popup.freqMap));
+    writer.write(Cynosure.freqPath(), Cynosure.serializeFreq(popup.freqMap));
   }
 
   function refreshApps() {
@@ -290,8 +265,7 @@ property var statusbar: null
   function applyFilter() {
     popup.filtered = Cynosure.filterRows(popup.rows, popup.query);
     fitTimer.restart();
-    if (popup.sel >= popup.filtered.length) popup.sel = popup.filtered.length - 1;
-    if (popup.sel < 0) popup.sel = 0;
+    popup.sel = Nav.clamp(popup.sel, popup.filtered.length);
     popup.followSelection();
   }
 
@@ -388,20 +362,11 @@ property var statusbar: null
     input.readOnly = true;
   }
 
-  Timer {
+  FocusRetry {
     id: focusRetry
-    interval: 60
-    repeat: true
-    onTriggered: {
-      if (!popup.shown) {
-        stop();
-        return;
-      }
-      input.forceActiveFocus();
-      if (input.activeFocus) stop();
-      if (focusRetry.counter++ > 12) stop();
-    }
-    property int counter: 0
+    live: popup.shown
+    took: input.activeFocus
+    onPlace: input.forceActiveFocus()
   }
 
   function backToSearch() {
@@ -428,8 +393,7 @@ property var statusbar: null
     histCat.running = false;
     histCat.running = true;
     popup.applyFilter();
-    focusRetry.counter = 0;
-    focusRetry.restart();
+    focusRetry.begin();
   }
 
   // standalone close on selection should keep the strip at its current
@@ -474,7 +438,7 @@ property var statusbar: null
   function moveSel(delta) {
     const len = popup.mode === "picker" ? popup.pickerRows.length : popup.filtered.length;
     if (len === 0) return;
-    popup.sel = (popup.sel + delta + len) % len;
+    popup.sel = Nav.wrap(popup.sel, delta, len);
     popup.followSelection();
   }
 

@@ -10,7 +10,6 @@
 // as Apple's: bookmarked, with photos, with a mood, reflections.
 
 import QtQuick
-import Quickshell.Widgets
 import "../morpheus"
 import "../terminus"
 import "notes.js" as N

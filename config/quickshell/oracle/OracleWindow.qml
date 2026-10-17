@@ -41,7 +41,6 @@ import Quickshell
 import Quickshell.Widgets
 import Quickshell.Io
 import Quickshell.Hyprland
-import Quickshell.Wayland
 import "."
 import "oracle.js" as Ora
 import "../morpheus"
@@ -240,6 +239,8 @@ FloatingWindow {
     // the answer goes to Oracle, which outlives this window
     popup.fontBook.pick({
       title: key === "monoFamily" ? "Monospace font" : "Font for the shell",
+      // the book lists what the row's dropdown does: fixed-width only
+      mono: key === "monoFamily",
       family: String(Oracle.get(key) || ""),
       weight: Number(Oracle.get(Oracle.weightKeyOf[key] || "fontWeight")) || 400
     }, (family, fcWeight) => {
@@ -473,8 +474,7 @@ FloatingWindow {
     }
     popup.visible = true;
     if (cold) {
-      focusRetry.counter = 0;
-      focusRetry.restart();
+      focusRetry.begin();
     }
     popup.syncFocus();
   }
@@ -496,17 +496,11 @@ FloatingWindow {
     });
   }
 
-  Timer {
+  FocusRetry {
     id: focusRetry
-    interval: 60
-    repeat: true
-    property int counter: 0
-    onTriggered: {
-      if (!popup.shown) { stop(); return; }
-      popup.syncFocus();
-      if (filterInput.activeFocus) stop();
-      if (focusRetry.counter++ > 12) stop();
-    }
+    live: popup.shown
+    took: filterInput.activeFocus
+    onPlace: popup.syncFocus()
   }
 
   // ── moving about ──────────────────────────────────────────────────────

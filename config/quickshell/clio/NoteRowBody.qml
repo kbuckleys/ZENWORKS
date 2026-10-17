@@ -24,8 +24,9 @@ Item {
   readonly property var d: rb.note && rb.note.d ? rb.note.d : ({ title: "", preview: "", images: [], checks: 0, done: 0 })
   readonly property bool sticky: !!rb.note && rb.note.kind === "sticky"
   // the third line's time: when deleted in the Trash, else by the sort
+  // (0 when the note has no such time yet, rather than undefined into a real)
   readonly property real stamp: !rb.note || rb.sticky ? 0 : rb.note.deleted ? rb.note.deleted
-    : rb.mgr && rb.mgr.sort === "created" ? rb.note.created : rb.note.modified
+    : (rb.mgr && rb.mgr.sort === "created" ? rb.note.created : rb.note.modified) || 0
 
   // a sticky's color
   Rectangle {
@@ -84,7 +85,8 @@ Item {
         text: !rb.note ? "" : rb.note.sealed ? "Locked" : rb.d.preview !== "" ? rb.d.preview : "No additional text"
         color: Zenon.accentMuted
         font.family: Zenon.face
-        font.weight: Zenon.weight
+        // the second line bold too (user, 2026-10-17)
+        font.weight: Font.Bold
         font.pixelSize: Zenon.px(13)
       }
       Text {

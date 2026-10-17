@@ -11,7 +11,6 @@
 // or Stickies).
 
 import QtQuick
-import QtQuick.Effects
 import Quickshell.Widgets
 import "../morpheus"
 import "../terminus"

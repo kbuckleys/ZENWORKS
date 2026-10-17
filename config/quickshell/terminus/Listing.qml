@@ -8,25 +8,12 @@
 // one-line forwarder for each function here, so callers are unchanged.
 
 import QtQuick
-import QtQuick.Shapes
-import QtQuick.Window
 import Quickshell
 import Quickshell.Io
-import Quickshell.Widgets
-import Quickshell.Wayland
-import Quickshell.Hyprland
-import QtQuick.Effects
-import QtMultimedia
-import Qt.labs.folderlistmodel
 import "../morpheus"
-import "../picasso"
-import "../oracle"
 import "terminus.js" as Terminus
 import "../morpheus/icons.js" as Icons
 import "../morpheus/lagnotes.js" as LagNotes
-import "../morpheus/thumbs.js" as Thumbs
-import "tags.js" as Tags
-import "collections.js" as Coll
 
 Item {
   id: listing
@@ -239,8 +226,6 @@ Item {
   // the name keeps only what is about the ENTRY rather than its type: a
   // directory, a link and where it leads, something you can run, an empty file.
   function nameInkFor(e) { return Terminus.rowNameInk(e); }
-  // shared with every other row of files — see terminus.js
-  function nameInkOf(e) { return Terminus.nameInkOf(e); }
   // shared with every other row of files — see terminus.js
   function inkOf(e) { return Terminus.inkOf(e); }
   // Icons.glyphFor answers from a table of extensions somebody wrote down,

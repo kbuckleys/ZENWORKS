@@ -57,8 +57,10 @@ const list = [
   { keys: "/", title: "Search in project", run: (c) => c.picker.open("grep") },
   { keys: "b", title: "Switch buffer", run: (c) => c.picker.open("buffers") },
   { keys: "p", title: "Command palette", run: (c) => c.picker.open("commands") },
-  // Space Space: terminus' open dialog, at the current file's directory
-  { keys: " ", title: "Open via file dialog…", run: (c) => c.choose(c.here(), false,
+  // Space Space: terminus' open dialog, at the current file's directory.
+  // `settle`: run once the leader card has gone — a window spawning under
+  // its collapse made the collapse stutter (user, 2026-10-17)
+  { keys: " ", title: "Open via file dialog…", settle: true, run: (c) => c.choose(c.here(), false,
       (paths) => { if (paths.length) c.client.openAt(paths[0]); }) },
   { title: "File tree", hint: "|", run: (c) => c.toggleTree() },
   { keys: "E", title: "Show in file manager",
@@ -78,7 +80,7 @@ const list = [
   { keys: "oa", title: "Open or close the fold here", run: (c) => c.client.cmd("normal! za") },
   { keys: "w", title: "Save", run: (c) => c.save(false) },
   { keys: "W", title: "Save all", run: (c) => c.save(true) },
-  { keys: "S", title: "Save as…", run: (c) => c.choose(c.here(), true,
+  { keys: "S", title: "Save as…", settle: true, run: (c) => c.choose(c.here(), true,
       (paths) => { if (paths.length) c.client.cmd(saveAsCmd(paths[0])); }) },
   { keys: "q", title: "Close buffer", run: (c) => c.client.cmd("bdelete") },
   // from the terminal nvim's leader binds

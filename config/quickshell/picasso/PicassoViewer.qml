@@ -227,8 +227,6 @@ Scope {
   }
 
   property var wins: []
-  property var _comp: null
-  property var _waiting: []
 
   Connections {
     target: Picasso
@@ -236,27 +234,10 @@ Scope {
     function onAnnotateRequested(path) { mgr.open(path, "annotate"); }
   }
 
-  // Run `fn` once the window type is compiled, compiling it if this is the
-  // first window since the viewer was last closed.
-  function _withComponent(fn) {
-    if (mgr._comp && mgr._comp.status === Component.Ready) { fn(); return; }
-    mgr._waiting.push(fn);
-    if (mgr._comp) return;
-    const comp = Qt.createComponent(Qt.resolvedUrl("ViewerWindow.qml"), Component.Asynchronous);
-    mgr._comp = comp;
-    const settle = () => {
-      if (comp.status === Component.Loading) return;
-      const queued = mgr._waiting;
-      mgr._waiting = [];
-      if (comp.status !== Component.Ready) {
-        console.warn("picasso viewer:", comp.errorString());
-        mgr._comp = null;
-        return;
-      }
-      for (const f of queued) f();
-    };
-    if (comp.status === Component.Loading) comp.statusChanged.connect(settle);
-    else settle();
+  LazyComponent {
+    id: lazy
+    source: Qt.resolvedUrl("ViewerWindow.qml")
+    tag: "picasso viewer"
   }
 
   function open(paths, mode) {
@@ -283,9 +264,9 @@ Scope {
   }
 
   function spawn(list, mode, solo) {
-    mgr._withComponent(() => {
+    lazy.withReady(() => {
       const t0 = Date.now();
-      const w = mgr._comp.createObject(mgr, { mgr: mgr, fileManager: mgr.fileManager, solo: solo });
+      const w = lazy.comp.createObject(mgr, { mgr: mgr, fileManager: mgr.fileManager, solo: solo });
       if (!w) return;
       LagNotes.mark("picasso window", t0);
       mgr.wins = mgr.wins.concat([w]);
@@ -299,6 +280,6 @@ Scope {
   // A window that has closed. The last one takes the compiled type with it.
   function retire(w) {
     mgr.wins = mgr.wins.filter((x) => x !== w);
-    if (mgr.wins.length === 0 && mgr._waiting.length === 0) mgr._comp = null;
+    if (mgr.wins.length === 0 && lazy.waiting.length === 0) lazy.comp = null;
   }
 }

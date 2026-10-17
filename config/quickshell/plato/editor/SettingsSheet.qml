@@ -24,7 +24,6 @@
 
 import QtQuick
 import Quickshell
-import Quickshell.Io
 import "../../morpheus"
 import "../../terminus"
 import "../../oracle/oracle.js" as Ora

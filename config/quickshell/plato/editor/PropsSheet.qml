@@ -16,7 +16,6 @@
 // there), Escape backs out of the permissions page, then closes.
 
 import QtQuick
-import QtQuick.Window
 import "../../morpheus"
 import "../../terminus" as Term
 import "../../terminus/terminus.js" as Terminus

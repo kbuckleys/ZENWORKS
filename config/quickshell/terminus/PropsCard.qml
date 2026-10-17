@@ -660,15 +660,10 @@ Item {
               readonly property bool acts: propValue.askable
                 || propValue.pickable || propValue.opensPerms
               color: propValue.acts
-                ? (sumHov.hovered ? Zenon.cyan : Zenon.accentKey) : Zenon.white
+                ? Zenon.accentKey : Zenon.white
               font.family: Zenon.face
               font.weight: Zenon.weight
               font.pixelSize: Zenon.px(16)
-
-              HoverHandler {
-                id: sumHov
-                enabled: propValue.acts
-              }
 
               MouseArea {
                 anchors.fill: parent
@@ -778,12 +773,10 @@ Item {
             height: 1
             color: permOctal.activeFocus
               ? (permOctal.parsed >= 0 ? Zenon.cyan : Zenon.red)
-              : (permOctalMa.containsMouse ? Zenon.border : "transparent")
+              : "transparent"
           }
           MouseArea {
-            id: permOctalMa
             anchors.fill: parent
-            hoverEnabled: true
             cursorShape: Qt.IBeamCursor
             acceptedButtons: Qt.NoButton
           }
@@ -826,8 +819,10 @@ Item {
             width: 62
             height: 24
             radius: 4
-            color: on ? Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b, 0.20)
-              : (presetHov.hovered ? Zenon.border : "transparent")
+            // PRESSED, DARKENED as every button in the suite (user, 2026-10-17)
+            color: presetPress.pressed ? Zenon.pressFill
+              : on ? Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b, 0.20)
+              : "transparent"
             border.width: 1
             border.color: Zenon.border
             Behavior on color {
@@ -838,13 +833,14 @@ Item {
               anchors.centerIn: parent
               text: modelData[0]
               color: parent.on ? Zenon.cyan : Zenon.accentMuted
+              opacity: presetPress.pressed ? Zenon.pressDim : 1
               font.family: Zenon.faceMono
               font.weight: Zenon.weight
               font.pixelSize: Zenon.px(14)
             }
 
-            HoverHandler { id: presetHov }
             MouseArea {
+              id: presetPress
               anchors.fill: parent
               // the high bits — setuid and friends — are left alone: this
               // is a shortcut for the nine, not a reset of the whole mode
@@ -931,9 +927,10 @@ Item {
                 width: 50
                 height: 26
                 radius: 4
-                color: parent.on
+                color: bitPress.pressed ? Zenon.pressFill
+                  : parent.on
                   ? Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b, 0.20)
-                  : (bitHov.hovered ? Zenon.border : "transparent")
+                  : "transparent"
                 border.width: 1
                 border.color: Zenon.border
                 Behavior on color {
@@ -944,14 +941,15 @@ Item {
                   anchors.centerIn: parent
                   text: modelData[0]
                   color: parent.parent.on ? Zenon.cyan : Zenon.accentMuted
+                  opacity: bitPress.pressed ? Zenon.pressDim : 1
                   font.family: Zenon.faceMono
                   font.weight: Font.Bold
                   font.pixelSize: Zenon.px(16)
                 }
               }
 
-              HoverHandler { id: bitHov }
               MouseArea {
+                id: bitPress
                 anchors.fill: parent
                 onClicked: {
                   props.permCursor = permRow.index * 3 + parent.index;

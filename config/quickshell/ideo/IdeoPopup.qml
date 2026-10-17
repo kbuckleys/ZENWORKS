@@ -8,9 +8,9 @@ import Quickshell
 import Quickshell.Widgets
 import Quickshell.Io
 import Quickshell.Hyprland
-import Quickshell.Wayland
 import "ideo.js" as Ideo
 import "../morpheus"
+import "../morpheus/gridnav.js" as Nav
 
 LayerPopup {
   id: popup
@@ -189,8 +189,7 @@ LayerPopup {
     popup.applyFilter();
 
     if (cold) {
-      focusRetry.counter = 0;
-      focusRetry.restart();
+      focusRetry.begin();
     }
     popup.syncFocus();
   }
@@ -353,7 +352,7 @@ LayerPopup {
   function moveSel(delta) {
     const len = popup.filtered.length;
     if (len === 0) return;
-    popup.sel = ((popup.sel + delta) % len + len) % len;
+    popup.sel = Nav.wrap(popup.sel, delta, len);
     Qt.callLater(() => grid.positionViewAtIndex(popup.sel, ListView.Contain));
   }
 
@@ -421,44 +420,19 @@ LayerPopup {
     onClicked: popup.closePopup()
   }
 
-  Item {
+  LayerPanel {
     id: panel
+    host: popup
+    ground: bgRoot
     width: Math.round(popup.liveWidth)
     height: popup.calcHeight()
-    // Zenon.slow is the pill's own height easing in shell.qml
-    Behavior on height { NumberAnimation { duration: Zenon.slow; easing.type: Zenon.ease } }
-    // Either edge. A layer opens out of the pill, so it has to be on the
-    // same one, off whichever it is by the same lift. Placed by y, NOT by a
-    // top/bottom anchor pair: flipping two anchors at runtime updates one
-    // before the other, for that instant both apply and stretch the panel to
-    // the screen, and that stretch overwrites — and so unbinds — `height`.
-    // The panel then stayed screen-tall until the shell was restarted.
-    anchors.horizontalCenter: parent.horizontalCenter
-    y: Zenon.barTop ? Zenon.edgeLift(popup.morphMode, popup.screen, popup.statusbar)
-      : parent.height - height - Zenon.edgeLift(popup.morphMode, popup.screen, popup.statusbar)
-    z: 1
-    opacity: popup.contentFade
-    transform: Scale {
-      origin.x: panel.width / 2
-      // grows out of the edge the bar is on, which is the edge it came from
-      origin.y: Zenon.barTop ? 0 : panel.height
-      xScale: popup.panelX
-      yScale: popup.panelY
-    }
-
-    MouseArea { anchors.fill: parent }
-
-    LayerShadow {
-      panel: bgRoot
-      cornerRadius: Zenon.pillRadius
-      morphed: popup.morphMode
-    }
 
     // ClippingRectangle, not Rectangle + clip: true. Qt's own clip is
     // RECTANGULAR — it clips to the bounding box and knows nothing about the
     // radius — so every square child painted to the panel's edge (the bottom
     // strip most visibly) filled in the rounded corners behind it. This one
     // clips to the rounded shape itself.
+
     ClippingRectangle {
       id: bgRoot
       anchors.fill: parent
@@ -869,19 +843,10 @@ LayerPopup {
       popup.gridHeight() + (popup.formatMode ? 26 : 32);
   }
 
-  Timer {
+  FocusRetry {
     id: focusRetry
-    interval: 60
-    repeat: true
-    onTriggered: {
-      if (!popup.shown) {
-        stop();
-        return;
-      }
-      popup.syncFocus();
-      if (filterInput.activeFocus) stop();
-      if (focusRetry.counter++ > 12) stop();
-    }
-    property int counter: 0
+    live: popup.shown
+    took: filterInput.activeFocus
+    onPlace: popup.syncFocus()
   }
 }

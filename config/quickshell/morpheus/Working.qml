@@ -26,7 +26,6 @@
 // up rather than leaving a hole where the dots were.
 
 import QtQuick
-import QtQuick.Window
 import "."
 
 Item {

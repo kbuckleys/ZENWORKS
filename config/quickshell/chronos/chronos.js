@@ -3,6 +3,10 @@
 // └─┘└─┘┘└┘└┴┘└─┘┴└─┘┴└─┘
 // https://github.com/kbuckleys/
 
+.pragma library
+// ONE COPY FOR THE WHOLE SHELL. Without the pragma every component instance
+// that imports this file evaluated all of it again (see morpheus/icons.js).
+
 const MONTHS = [
   "January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December"

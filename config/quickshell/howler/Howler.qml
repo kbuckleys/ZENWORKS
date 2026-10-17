@@ -23,7 +23,6 @@ pragma Singleton
 import QtQuick
 import Quickshell
 import Quickshell.Io
-import Quickshell.Hyprland
 import Quickshell.Services.Mpris
 import Quickshell.Services.Notifications
 import Qt.labs.folderlistmodel

@@ -106,14 +106,25 @@ Item {
     onActiveFocusChanged: if (!activeFocus && visible) tn.cancel()
   }
 
+  FontMetrics {
+    id: inkFm
+    font.family: Zenon.face
+    font.weight: tn.weight
+    font.pixelSize: tn.pixelSize
+  }
+
   // the ring every field being typed in wears (terminus' EditRing look)
   Rectangle {
-    anchors.fill: parent
-    // little reach up and down: the bar is short, and the sheet's card
-    // hanging under it covered the lower edge (user, 2026-10-15: "sunken")
-    anchors.margins: -4
-    anchors.leftMargin: -7
-    anchors.rightMargin: -7
+    // ON THE LETTERS, NOT THE LINE: the line box keeps room for descenders
+    // a name rarely has, so a ring around it sat low under the caps (user,
+    // 2026-10-17: still "sunken"). Centered on the cap band instead, the
+    // same reach above the caps as below the baseline.
+    readonly property real inkMid: (tn.height - inkFm.height) / 2
+      + inkFm.ascent - inkFm.capHeight / 2
+    x: -7
+    width: tn.width + 14
+    height: Math.round(inkFm.capHeight + 2 * 8)
+    y: Math.round(inkMid - height / 2)
     radius: 4
     color: "transparent"
     border.width: 2

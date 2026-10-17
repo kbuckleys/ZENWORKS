@@ -98,8 +98,27 @@ PlatoSheet {
   function take(e) {
     if (e.group) { card.prefix += e.key; return; }
     card.close();
-    e.action.run(card.ctx);
+    if (!e.action.settle) { e.action.run(card.ctx); return; }
+    // AFTER THE CARD HAS GONE (Actions' `settle`): a window spawned under
+    // the collapse (terminus' dialog) made it stutter. Run once the ink is
+    // out — or at a ceiling, should the card never finish.
+    card.owed = e.action;
+    settleCeiling.restart();
+    card.payOwed();
   }
+  property var owed: null
+  function payOwed() {
+    if (!card.owed || (card.cardInk > 0.01 && settleCeiling.running)) return;
+    const a = card.owed;
+    card.owed = null;
+    settleCeiling.stop();
+    a.run(card.ctx);
+  }
+  onCardInkChanged: card.payOwed()
+  // opened again before it was paid: the action is dropped, as a key
+  // that went somewhere else would be
+  onShownChanged: if (card.shown) { card.owed = null; settleCeiling.stop(); }
+  Timer { id: settleCeiling; interval: Zenon.sheetOut + 150; onTriggered: card.payOwed() }
 
   Item {
     id: keys

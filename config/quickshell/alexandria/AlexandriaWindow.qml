@@ -43,7 +43,6 @@ import Quickshell.Io
 import Quickshell.Hyprland
 import "../morpheus"
 import "../terminus"
-import "../oracle"
 import "alexandria.js" as A
 
 FloatingWindow {
@@ -73,9 +72,14 @@ FloatingWindow {
   property bool shelfOpened: false
   readonly property var shelves: (win.loose.length > 0
     ? [{ id: "opened", label: "Opened", glyph: "" }] : []).concat(A.SHELVES)
-  readonly property var shown: win.shelf === "opened"
-    ? win.loose.filter((f) => A.familyMatches(f, win.query))
-    : A.shelve(win.mgr ? win.mgr.families : [], win.shelf, win.query, win.mgr ? win.mgr.favs : {})
+  readonly property var shown: {
+    const fams = win.shelf === "opened"
+      ? win.loose.filter((f) => A.familyMatches(f, win.query))
+      : A.shelve(win.mgr ? win.mgr.families : [], win.shelf, win.query, win.mgr ? win.mgr.favs : {});
+    // picking oracle's Monospace font: only what lays text out on a grid,
+    // on every shelf, as its dropdown lists
+    return win.picking && win.picking.mono ? fams.filter((f) => f.mono) : fams;
+  }
   property int sel: 0
   readonly property var fam: win.sel >= 0 && win.sel < win.shown.length ? win.shown[win.sel] : null
   property int styleIdx: 0
@@ -358,7 +362,7 @@ FloatingWindow {
   property var pickFn: null
   property bool pickFresh: false
   function beginPick(opts, fn, fresh) {
-    win.picking = { title: opts.title || "Choose a font" };
+    win.picking = { title: opts.title || "Choose a font", mono: !!opts.mono };
     win.pickFn = fn || null;
     win.pickFresh = !!fresh;
     win.shelfOpened = false;

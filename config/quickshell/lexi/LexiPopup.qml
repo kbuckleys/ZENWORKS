@@ -9,9 +9,9 @@ import Quickshell
 import Quickshell.Widgets
 import Quickshell.Io
 import Quickshell.Hyprland
-import Quickshell.Wayland
 import "lexi.js" as Lexicon
 import "../morpheus"
+import "../morpheus/gridnav.js" as Nav
 import "../oracle"
 
 LayerPopup {
@@ -133,7 +133,7 @@ LayerPopup {
     const m = Object.assign({}, popup.usageMap);
     m[code] = (m[code] || 0) + 1;
     popup.usageMap = m;
-    popup.writeFile(Lexicon.usagePath(), Lexicon.serializeUsage(m));
+    writer.write(Lexicon.usagePath(), Lexicon.serializeUsage(m));
   }
 
   // shared list state
@@ -558,11 +558,7 @@ LayerPopup {
     }
   }
 
-  Process {
-    id: writeProc
-    onExited: popup.drainWrite()
-  }
-  property var writeQueue: []
+  AtomicWriter { id: writer; tag: "lexi-write" }
 
   Process {
     id: probeProc
@@ -629,35 +625,12 @@ LayerPopup {
   property var transCache: Lexicon.emptyCache()
 
   function saveDictCache() {
-    popup.writeFile(Lexicon.dictCachePath(),
+    writer.write(Lexicon.dictCachePath(),
       Lexicon.serializeCache(popup.dictCache));
   }
   function saveTransCache() {
-    popup.writeFile(Lexicon.transCachePath(),
+    writer.write(Lexicon.transCachePath(),
       Lexicon.serializeCache(popup.transCache));
-  }
-
-  function writeFile(path, content) {
-    popup.writeQueue.push({ path: path, content: content });
-    popup.drainWrite();
-  }
-
-  function drainWrite() {
-    if (popup.writeQueue.length === 0 || writeProc.running) return;
-    const job = popup.writeQueue.shift();
-    // Through stdin, not argv. A cache rewritten as one `printf '%s' <all of
-    // it>` argument fails with E2BIG once it passes 128 KiB (a single argv
-    // string's limit), and nothing is written. Closing stdin ends `cat`.
-    //
-    // Beside the file and renamed over it: `cat >` truncates first, so a
-    // crash mid-write lost the whole cache or history.
-    writeProc.command = ["sh", "-c",
-      "cat > \"$1.tmp.$$\" && mv -f \"$1.tmp.$$\" \"$1\" || rm -f \"$1.tmp.$$\"",
-      "lexi-write", job.path];
-    writeProc.stdinEnabled = true;
-    writeProc.running = true;
-    writeProc.write(job.content);
-    writeProc.stdinEnabled = false;
   }
 
   function detach(script) {
@@ -744,8 +717,7 @@ LayerPopup {
 
     readCaches();
 
-    focusRetry.counter = 0;
-    focusRetry.restart();
+    focusRetry.begin();
     popup.playOpen();
     popup.syncFocus();
   }
@@ -857,7 +829,7 @@ LayerPopup {
     if (result.corrected) popup.dictQuery = result.title;
 
     popup.dictHist = Lexicon.addDictHistory(popup.dictHist, result.title);
-    popup.writeFile(Lexicon.dictHistoryPath(),
+    writer.write(Lexicon.dictHistoryPath(),
       Lexicon.serializeDictHistory(popup.dictHist));
 
     if (result.audio && popup.playerCmd !== "")
@@ -1165,7 +1137,7 @@ LayerPopup {
       popup.live = hit;
       popup.transHist = Lexicon.addTransHistory(
         popup.transHist, code, source, text, hit.translation);
-      popup.writeFile(Lexicon.transHistoryPath(),
+      writer.write(Lexicon.transHistoryPath(),
         Lexicon.serializeTransHistory(popup.transHist));
       return;
     }
@@ -1194,7 +1166,7 @@ LayerPopup {
 
       popup.transHist = Lexicon.addTransHistory(
         popup.transHist, code, source, text, parsed.translation);
-      popup.writeFile(Lexicon.transHistoryPath(),
+      writer.write(Lexicon.transHistoryPath(),
         Lexicon.serializeTransHistory(popup.transHist));
     };
     req.send(rq.body);
@@ -1257,7 +1229,7 @@ LayerPopup {
     popup.bumpUsage(newTarget.code);
     popup.transHist = Lexicon.addTransHistory(
       popup.transHist, newTarget.code, null, newInput, newLive.translation);
-    popup.writeFile(Lexicon.transHistoryPath(),
+    writer.write(Lexicon.transHistoryPath(),
       Lexicon.serializeTransHistory(popup.transHist));
 
     popup.swapping = false;
@@ -1311,7 +1283,7 @@ LayerPopup {
       if (popup.sel >= filtered.length) return;
       const word = filtered[popup.sel];
       popup.dictHist = Lexicon.removeDictHistory(popup.dictHist, word);
-      popup.writeFile(Lexicon.dictHistoryPath(),
+      writer.write(Lexicon.dictHistoryPath(),
         Lexicon.serializeDictHistory(popup.dictHist));
     } else {
       const q = (popup.query || "").toLowerCase();
@@ -1321,7 +1293,7 @@ LayerPopup {
       if (popup.sel >= filtered.length) return;
       const e = filtered[popup.sel];
       popup.transHist = Lexicon.removeTransHistory(popup.transHist, e.code, e.text);
-      popup.writeFile(Lexicon.transHistoryPath(),
+      writer.write(Lexicon.transHistoryPath(),
         Lexicon.serializeTransHistory(popup.transHist));
     }
     popup.clampSel();
@@ -1359,9 +1331,7 @@ LayerPopup {
   }
 
   function clampSel() {
-    const len = popup.selLength();
-    if (len === 0) popup.sel = 0;
-    else popup.sel = Math.max(0, Math.min(popup.sel, len - 1));
+    popup.sel = Nav.clamp(popup.sel, popup.selLength());
     popup.followSelection();
   }
 
@@ -1449,7 +1419,7 @@ LayerPopup {
   function moveSel(delta) {
     const len = popup.selLength();
     if (len === 0) return;
-    popup.sel = ((popup.sel + delta) % len + len) % len;
+    popup.sel = Nav.wrap(popup.sel, delta, len);
     popup.followSelection();
   }
 
@@ -1461,45 +1431,19 @@ LayerPopup {
     onClicked: popup.closePopup()
   }
 
-  Item {
+  LayerPanel {
     id: panel
+    host: popup
+    ground: bgRoot
     width: Math.round(popup.liveWidth)
     height: popup.calcHeight()
-    // Zenon.slow is the pill's own height easing in shell.qml. Width eases
-    // in liveWidth instead, which knows whether the pill is driving it.
-    Behavior on height { NumberAnimation { duration: Zenon.slow; easing.type: Zenon.ease } }
-    // Either edge. A layer opens out of the pill, so it has to be on the
-    // same one, off whichever it is by the same lift. Placed by y, NOT by a
-    // top/bottom anchor pair: flipping two anchors at runtime updates one
-    // before the other, for that instant both apply and stretch the panel to
-    // the screen, and that stretch overwrites — and so unbinds — `height`.
-    // The panel then stayed screen-tall until the shell was restarted.
-    anchors.horizontalCenter: parent.horizontalCenter
-    y: Zenon.barTop ? Zenon.edgeLift(popup.morphMode, popup.screen, popup.statusbar)
-      : parent.height - height - Zenon.edgeLift(popup.morphMode, popup.screen, popup.statusbar)
-    z: 1
-    opacity: popup.contentFade
-    transform: Scale {
-      origin.x: panel.width / 2
-      // grows out of the edge the bar is on, which is the edge it came from
-      origin.y: Zenon.barTop ? 0 : panel.height
-      xScale: popup.panelX
-      yScale: popup.panelY
-    }
-
-    MouseArea { anchors.fill: parent }
-
-    LayerShadow {
-      panel: bgRoot
-      cornerRadius: Zenon.pillRadius
-      morphed: popup.morphMode
-    }
 
     // ClippingRectangle, not Rectangle + clip: true. Qt's own clip is
     // RECTANGULAR — it clips to the bounding box and knows nothing about the
     // radius — so every square child painted to the panel's edge (the bottom
     // strip most visibly) filled in the rounded corners behind it. This one
     // clips to the rounded shape itself.
+
     ClippingRectangle {
       id: bgRoot
       anchors.fill: parent
@@ -2848,21 +2792,12 @@ LayerPopup {
     return count === 0 ? 44 : Math.min(count * (32 + popup.bump), 480);
   }
 
-  Timer {
+  FocusRetry {
     id: focusRetry
-    interval: 60
-    repeat: true
-    onTriggered: {
-      if (!popup.shown) {
-        stop();
-        return;
-      }
-      popup.syncFocus();
-      if (wordInput.activeFocus || tArea.activeFocus ||
-          (popup.view !== "input" && bgRoot.activeFocus)) stop();
-      if (focusRetry.counter++ > 12) stop();
-    }
-    property int counter: 0
+    live: popup.shown
+    took: wordInput.activeFocus || tArea.activeFocus ||
+        (popup.view !== "input" && bgRoot.activeFocus)
+    onPlace: popup.syncFocus()
   }
 
   Component.onCompleted: {

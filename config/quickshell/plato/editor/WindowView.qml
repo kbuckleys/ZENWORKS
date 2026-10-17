@@ -763,7 +763,9 @@ Item {
     id: content
     width: win.width
     height: win.height
-    y: win.lag
+    // ON WHOLE PIXELS: the glide's lag is fractional every frame, and text
+    // drawn between pixels is resampled soft — the scroll blurred it
+    y: Math.round(win.lag)
     transform: Scale { origin.y: win.stretchAt; yScale: win.stretchK }
     // THE SPLITS YOU ARE NOT IN STEP BACK, so where the keys go reads at a
     // glance; the current line's bar alone said it before
@@ -936,7 +938,8 @@ Item {
         property var owe: null
         property real pos: 0
         visible: key !== ""
-        y: pos * win.cellH + slide + win.gapAt(pos)
+        // whole pixels, as content is: a sliding line between them blurs
+        y: Math.round(pos * win.cellH + slide + win.gapAt(pos))
         // an in-line delete's room, held open (see AND ACROSS)
         gapCol: win.igRow >= 0 && pos === win.igRow ? win.igCol : -1
         gapW: win.igW
@@ -1045,7 +1048,7 @@ Item {
   readonly property Item contentItem: content
   readonly property real contentX: 0
   // (the band stretches the rows in place: it moves nothing for the edge)
-  readonly property real contentY: -win.lag
+  readonly property real contentY: -content.y
   property Item edgeHost: null
   property Item topBar: null
   property Item bottomBar: null

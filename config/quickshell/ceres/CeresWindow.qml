@@ -23,14 +23,11 @@
 // asked for the few hundred that match; see Cer.searchCommand.
 
 import QtQuick
-import QtQuick.Effects
 import Quickshell
 import Quickshell.Io
-import Quickshell.Widgets
 import "../morpheus"
 import "../terminus" as Term
 import "."
-import "../oracle"
 import "ceres.js" as Cer
 import "store.js" as St
 
@@ -3883,7 +3880,7 @@ FloatingWindow {
     anchors.bottom: parent.bottom
     anchors.left: parent.left
     anchors.right: parent.right
-    height: 50
+    height: 40   // the window feet's height (clio, calypso, delphi); 50 stood too tall, 2026-10-17
 
     // see-through: the lists rise out of it — see the stage's ScrollEdges
     Rectangle { anchors.fill: parent; color: Zenon.hintFrostBg }

@@ -24,6 +24,7 @@
 
 import QtQuick
 import "."
+// a library: one copy for every scroll view, not one each
 import "scrollfeel.js" as Feel
 
 QtObject {

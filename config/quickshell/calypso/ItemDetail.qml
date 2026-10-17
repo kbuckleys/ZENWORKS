@@ -19,7 +19,6 @@
 
 import QtQuick
 import "../morpheus"
-import "../terminus"
 import "../ceres"
 import "calypso.js" as C
 

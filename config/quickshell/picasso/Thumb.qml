@@ -16,7 +16,6 @@
 //           gallery that fills in and one that stalls
 
 import QtQuick
-import QtQuick.Window
 import Quickshell.Widgets
 import "../morpheus"
 import "../morpheus/thumbs.js" as Thumbs

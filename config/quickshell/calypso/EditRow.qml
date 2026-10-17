@@ -16,7 +16,6 @@
 import QtQuick
 import "../morpheus"
 import "../terminus"
-import "calypso.js" as C
 
 Item {
   id: row

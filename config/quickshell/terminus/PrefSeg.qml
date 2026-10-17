@@ -29,24 +29,8 @@
 // one passes it (`term: root`).
 
 import QtQuick
-import QtQuick.Shapes
-import QtQuick.Window
 import Quickshell
-import Quickshell.Io
-import Quickshell.Widgets
-import Quickshell.Wayland
-import Quickshell.Hyprland
-import QtQuick.Effects
-import QtMultimedia
-import Qt.labs.folderlistmodel
 import "../morpheus"
-import "../picasso"
-import "../oracle"
-import "terminus.js" as Terminus
-import "../morpheus/icons.js" as Icons
-import "../morpheus/thumbs.js" as Thumbs
-import "tags.js" as Tags
-import "collections.js" as Coll
 
 Item {
   // the terminus window — passed in by whoever makes one. NOT `root`:
@@ -139,7 +123,7 @@ Item {
         color: segPress.pressed && segBtn.ok ? Zenon.pressFill
           : segBtn.on
           ? Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b, 0.18)
-          : (segHov.hovered && segBtn.ok ? Zenon.surface : "transparent")
+          : "transparent"
         border.width: 1
         border.color: segBtn.on ? Zenon.cyan : Zenon.border
         opacity: segBtn.ok ? 1 : 0.35
@@ -158,7 +142,6 @@ Item {
           font.pixelSize: Zenon.px(14)
         }
 
-        HoverHandler { id: segHov; enabled: segBtn.ok }
         MouseArea {
           id: segPress
           anchors.fill: parent

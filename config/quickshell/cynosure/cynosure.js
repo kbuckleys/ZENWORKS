@@ -3,6 +3,18 @@
 // └─┘└─┘┘└┘└┴┘└─┘┴└─┴ ┴└─┘
 // https://github.com/kbuckleys/
 
+.pragma library
+.import qs.morpheus as Morpheus
+.import Quickshell as QuickshellModule
+// ONE COPY FOR THE WHOLE SHELL. Without the pragma every component instance
+// that imports this file evaluated all of it again (see morpheus/icons.js).
+// The shell's singletons come in through the imports above (the same
+// instances); the node tests hand in stubs of their own.
+var Desktop = typeof Morpheus !== "undefined" ? Morpheus.Desktop : globalThis.Desktop;
+var Paths = typeof Morpheus !== "undefined" ? Morpheus.Paths : globalThis.Paths;
+var Strings = typeof Morpheus !== "undefined" ? Morpheus.Strings : globalThis.Strings;
+var Quickshell = typeof QuickshellModule !== "undefined" ? QuickshellModule.Quickshell : globalThis.Quickshell;
+
 function histPath() {
   return Paths.cacheDir() + "/cynosure-history";
 }
@@ -312,8 +324,9 @@ function launchAppCommand(id) {
   return Desktop.launchCommand(id, "");
 }
 
+// the shell's one escaping rule (morpheus/Strings)
 function escMarkup(s) {
-  return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  return Strings.escapeHtml(s);
 }
 
 function highlight(text, query) {

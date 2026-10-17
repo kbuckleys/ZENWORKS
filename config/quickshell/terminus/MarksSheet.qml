@@ -8,24 +8,10 @@
 // term.<id>Ref (the window's aliases).
 
 import QtQuick
-import QtQuick.Shapes
-import QtQuick.Window
 import Quickshell
-import Quickshell.Io
-import Quickshell.Widgets
-import Quickshell.Wayland
-import Quickshell.Hyprland
-import QtQuick.Effects
-import QtMultimedia
-import Qt.labs.folderlistmodel
 import "../morpheus"
-import "../picasso"
-import "../oracle"
 import "terminus.js" as Terminus
 import "../morpheus/icons.js" as Icons
-import "../morpheus/thumbs.js" as Thumbs
-import "tags.js" as Tags
-import "collections.js" as Coll
 
 Rectangle {
   id: marks
@@ -328,13 +314,14 @@ Rectangle {
           anchors.verticalCenter: parent.verticalCenter
           visible: markRow.index === marks.sel
           text: "\uEA76"
-          color: dropHov.hovered ? Zenon.red : Zenon.accentMuted
+          color: Zenon.accentMuted
+          opacity: markDropPress.pressed ? Zenon.pressDim : 1
           font.family: Zenon.face
           font.weight: Zenon.weight
           font.pixelSize: Zenon.px(14)
 
-          HoverHandler { id: dropHov }
           MouseArea {
+            id: markDropPress
             anchors.fill: parent
             anchors.margins: -6
             onClicked: {

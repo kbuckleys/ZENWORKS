@@ -123,13 +123,6 @@ Scope {
     if (mgr.pending !== null) { const p = mgr.pending; mgr.pending = null; mgr.open(p[0]); }
   }
 
-  function focusedScreen() {
-    const m = Hyprland.focusedMonitor;
-    if (m) for (const s of Quickshell.screens) if (s.name === m.name) return s;
-    // none in focus: the main monitor (oracle's Display setting)
-    return Oracle.pickScreen("");
-  }
-
   // ── ITS SIZE, REMEMBERED ─────────────────────────────────────────────
   // Hyprland's rule for oracle floats it and nothing more: a rule `size`
   // would override this on every map.
@@ -154,7 +147,7 @@ Scope {
   }
 
   function build() {
-    const scr = mgr.focusedScreen();
+    const scr = Oracle.focusedScreen();
     const props = { mgr: mgr, fileManager: mgr.fileManager, fontBook: mgr.fontBook };
     if (scr) props.screen = scr;
     if (mgr.section !== "") props.section = mgr.section;
@@ -173,7 +166,7 @@ Scope {
       mgr.compile();
       return;
     }
-    const scr = mgr.focusedScreen();
+    const scr = Oracle.focusedScreen();
     if (!mgr.alive()) mgr.win = null;
     if (mgr.win && !mgr.win.visible && (!mgr.win.screen || (scr && mgr.win.screen !== scr))) {
       mgr.win.destroy();

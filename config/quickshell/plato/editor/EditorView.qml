@@ -264,11 +264,9 @@ Item {
   // follow a jump without a keystroke ever waiting on it. (Both can be
   // switched off in the settings sheet.)
   //
-  // IN THE INK OF WHAT IT IS ON. A block over a string is the string's
-  // green, over a keyword the keyword's color: the cursor reads as part of
-  // the text rather than a cyan hole in it. Off the text (blank space, past
-  // the end) it is the text's own color; an ink too dark to see itself —
-  // black on a search match — gives way to it too.
+  // IN THE THEME'S ACCENT, SHADED AWAY FROM THE PAGE (user, 2026-10-17):
+  // darker on a light theme, lighter on a dark one, so it stands off the
+  // text in either. It was the ink of what it sat on.
   readonly property string shape: {
     const m = view.ed.modeName;
     if (m === "insert" || m === "command") return "bar";
@@ -292,25 +290,7 @@ Item {
        + view.curItem.stretched(view.ed.cursorRow * view.cellH + view.curItem.gapAt(view.ed.cursorRow))
        - view.ed.cursorRow * view.cellH : 0)
 
-  readonly property color textInk: {
-    view.ed.frame;
-    const fallback = view.ed.normalFg;
-    const w = view.ed.curWin;
-    if (!w) return fallback;
-    const r = view.ed.rowsOf(w.id)[view.ed.cursorRow];
-    if (!r || !r.s) return fallback;
-    const c = view.ed.cursorCol;
-    for (let i = 0; i < r.s.length; ++i) {
-      const sp = r.s[i];
-      if (c < sp[0] || c >= sp[0] + sp[1]) continue;
-      const st = view.ed.styles[sp[2]];
-      if (!st || !st.fg) return fallback;
-      const ink = Qt.color(st.fg);
-      // too dark to show against the editor's background
-      return 0.2126 * ink.r + 0.7152 * ink.g + 0.0722 * ink.b < 0.28 ? fallback : ink;
-    }
-    return fallback;
-  }
+  readonly property color caretInk: Zenon.light ? Qt.darker(Zenon.cyan, 1.35) : Qt.lighter(Zenon.cyan, 1.3)
 
   property bool moving: false
   Timer { id: still; interval: 500; onTriggered: view.moving = false }
@@ -368,12 +348,13 @@ Item {
       // character above it left readable — what will be replaced
       readonly property int under: view.ed.replacePending ? 3 : 2
       y: view.shape === "underline" ? view.cellH - caret.under : 0
-      width: view.shape === "bar" ? 2 : view.cellW
+      // insert's bar a pixel wider than it was (user, 2026-10-17)
+      width: view.shape === "bar" ? 3 : view.cellW
       height: view.shape === "underline" ? caret.under : view.cellH
       Behavior on width { NumberAnimation { duration: Zenon.brisk; easing.type: Zenon.travelEase } }
       Behavior on height { NumberAnimation { duration: Zenon.brisk; easing.type: Zenon.travelEase } }
       Behavior on y { NumberAnimation { duration: Zenon.brisk; easing.type: Zenon.travelEase } }
-      color: view.ed.replacePending ? Zenon.yellow : view.textInk
+      color: view.ed.replacePending ? Zenon.yellow : view.caretInk
       Behavior on color { ColorAnimation { duration: Zenon.brisk } }
       opacity: 1
       SequentialAnimation on opacity {

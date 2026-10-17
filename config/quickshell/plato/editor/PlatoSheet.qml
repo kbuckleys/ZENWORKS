@@ -41,6 +41,11 @@ Item {
   // one that is not (the key hints) is only the card, and every click and
   // key goes on past it as if it were not there
   property bool modal: true
+  // how far in from the left the dim starts: a sheet across the whole
+  // window leaves the tree beside the editor as it was, as terminus' sheets
+  // leave its sidebar (user, 2026-10-17: dimmed below the strip only, its
+  // top was a ghost of the tab bar)
+  property real dimLeft: 0
   property real cardW: 620
   property real cardH: 200
   // the footer: a line of text (the query, a state), then key chips
@@ -93,6 +98,7 @@ Item {
   Rectangle {
     anchors.fill: parent
     anchors.topMargin: layer.fromTop
+    anchors.leftMargin: layer.dimLeft
     anchors.bottomMargin: layer.fromBottom ? layer.toBottom : 0
     color: Zenon.darken(0.32)
     visible: layer.modal

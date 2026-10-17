@@ -20,7 +20,6 @@
 // the person at the keyboard, not against your own processes.
 
 import QtQuick
-import QtQuick.Window
 import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland

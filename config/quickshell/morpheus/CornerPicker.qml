@@ -28,8 +28,6 @@
 import QtQuick
 import Quickshell
 import Quickshell.Widgets
-import Quickshell.Wayland
-import "../oracle"
 import "."
 
 // An xdg-popup, hung off the window that opened it — see CardPopup for why a

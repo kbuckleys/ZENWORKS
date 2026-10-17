@@ -8,7 +8,6 @@ import Quickshell
 import Quickshell.Widgets
 import Quickshell.Io
 import Quickshell.Hyprland
-import Quickshell.Wayland
 import "../morpheus"
 import "metis.js" as Metis
 import "../morpheus/helpers.js" as Helpers
@@ -154,7 +153,8 @@ LayerPopup {
   property var qalcNames: []
   property var qalcPrefixes: []
   // the place index's names are in (Metis.setIndex) — read once a session,
-  // about a quarter of a second for its hundred thousand lines
+  // about a quarter of a second for its hundred thousand lines. metis.js is a
+  // library, so clio's sums see the same index once it is in
   property bool placesLoaded: false
   // how old the exchange rates on disk are, in seconds (NaN: not known yet)
   property real ratesAge: NaN
@@ -628,32 +628,13 @@ LayerPopup {
       expr: popup.shownExpr, result: popup.shownResult,
       raw: popup.shownRaw, parse: popup.shownParse, kind: popup.shownKind
     });
-    popup.writeFile(Metis.historyPath(), Metis.serializeHistory(popup.history));
+    writer.write(Metis.historyPath(), Metis.serializeHistory(popup.history));
   }
 
   // ── on disk ── ~/.cache/metis-history, through stdin, beside the file and
   // renamed over it: lexi's way, for lexi's reasons (argv limits; a crash
   // mid-write)
-  property var writeQueue: []
-  Process {
-    id: writeProc
-    onExited: popup.drainWrite()
-  }
-  function writeFile(path, content) {
-    popup.writeQueue.push({ path: path, content: content });
-    popup.drainWrite();
-  }
-  function drainWrite() {
-    if (popup.writeQueue.length === 0 || writeProc.running) return;
-    const job = popup.writeQueue.shift();
-    writeProc.command = ["sh", "-c",
-      "cat > \"$1.tmp.$$\" && mv -f \"$1.tmp.$$\" \"$1\" || rm -f \"$1.tmp.$$\"",
-      "metis-write", job.path];
-    writeProc.stdinEnabled = true;
-    writeProc.running = true;
-    writeProc.write(job.content);
-    writeProc.stdinEnabled = false;
-  }
+  AtomicWriter { id: writer; tag: "metis-write" }
 
   Process {
     id: varsReadProc
@@ -669,7 +650,7 @@ LayerPopup {
 
   function saveVars(v) {
     popup.vars = v;
-    popup.writeFile(Metis.varsPath(), Metis.serializeVars(v));
+    writer.write(Metis.varsPath(), Metis.serializeVars(v));
   }
 
   Process {
@@ -753,8 +734,7 @@ LayerPopup {
     popup.copied = false;
     popup.tapeMode = false;
 
-    focusRetry.counter = 0;
-    focusRetry.restart();
+    focusRetry.begin();
     popup.playOpen();
     popup.syncFocus();
 
@@ -939,7 +919,7 @@ LayerPopup {
     }
     if (!row) return;
     popup.history = Metis.togglePin(popup.history, row);
-    popup.writeFile(Metis.historyPath(), Metis.serializeHistory(popup.history));
+    writer.write(Metis.historyPath(), Metis.serializeHistory(popup.history));
     // the selection follows the chip to where the pin moved it
     if (popup.recentMode) {
       const i = popup.recents.findIndex((r) => r.expr === row.expr && r.result === row.result);
@@ -1157,44 +1137,19 @@ LayerPopup {
     onClicked: popup.closePopup()
   }
 
-  Item {
+  LayerPanel {
     id: panel
+    host: popup
+    ground: bgRoot
     width: Math.round(popup.liveWidth)
     height: popup.calcHeight()
-    // Zenon.slow is the pill's own height easing in shell.qml
-    Behavior on height { NumberAnimation { duration: Zenon.slow; easing.type: Zenon.ease } }
-    // Either edge. A layer opens out of the pill, so it has to be on the
-    // same one, off whichever it is by the same lift. Placed by y, NOT by a
-    // top/bottom anchor pair: flipping two anchors at runtime updates one
-    // before the other, for that instant both apply and stretch the panel to
-    // the screen, and that stretch overwrites — and so unbinds — `height`.
-    // The panel then stayed screen-tall until the shell was restarted.
-    anchors.horizontalCenter: parent.horizontalCenter
-    y: Zenon.barTop ? Zenon.edgeLift(popup.morphMode, popup.screen, popup.statusbar)
-      : parent.height - height - Zenon.edgeLift(popup.morphMode, popup.screen, popup.statusbar)
-    z: 1
-    opacity: popup.contentFade
-    transform: Scale {
-      origin.x: panel.width / 2
-      // grows out of the edge the bar is on, which is the edge it came from
-      origin.y: Zenon.barTop ? 0 : panel.height
-      xScale: popup.panelX
-      yScale: popup.panelY
-    }
-
-    MouseArea { anchors.fill: parent }
-
-    LayerShadow {
-      panel: bgRoot
-      cornerRadius: Zenon.pillRadius
-      morphed: popup.morphMode
-    }
 
     // ClippingRectangle, not Rectangle + clip: true. Qt's own clip is
     // RECTANGULAR — it clips to the bounding box and knows nothing about the
     // radius — so every square child painted to the panel's edge (the bottom
     // strip most visibly) filled in the rounded corners behind it. This one
     // clips to the rounded shape itself.
+
     ClippingRectangle {
       id: bgRoot
       anchors.fill: parent
@@ -1978,19 +1933,10 @@ LayerPopup {
     }
   }
 
-  Timer {
+  FocusRetry {
     id: focusRetry
-    interval: 60
-    repeat: true
-    onTriggered: {
-      if (!popup.shown) {
-        stop();
-        return;
-      }
-      popup.syncFocus();
-      if (filterInput.activeFocus) stop();
-      if (focusRetry.counter++ > 12) stop();
-    }
-    property int counter: 0
+    live: popup.shown
+    took: filterInput.activeFocus
+    onPlace: popup.syncFocus()
   }
 }

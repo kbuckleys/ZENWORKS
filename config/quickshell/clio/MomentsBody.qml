@@ -18,7 +18,6 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Widgets
 import "../morpheus"
-import "../terminus"
 import "notes.js" as N
 import "../morpheus/thumbs.js" as Thumbs
 
@@ -289,4 +288,6 @@ Item {
     }
   }
   ElasticScroll { anchors.fill: flick; view: flick }
+  // on the sheet's edge, not the list's 18 in from it
+  Scrollbar { flick: flick; anchors.right: parent.right; anchors.top: flick.top; anchors.bottom: flick.bottom }
 }

@@ -19,7 +19,6 @@ import QtQuick
 import Quickshell
 import Quickshell.Widgets
 import "../morpheus"
-import "../terminus"
 import "notes.js" as N
 import "../morpheus/icons.js" as Icons
 

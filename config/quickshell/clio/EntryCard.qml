@@ -111,7 +111,8 @@ Rectangle {
       layer.effect: MultiEffect { blurEnabled: true; blur: 1; blurMax: 20 }
       color: Zenon.accentSoft
       font.family: card.win ? card.win.mgr.faceFor(true) : Zenon.face
-      font.weight: Zenon.weight
+      // the second row bold, as in the notes list (user, 2026-10-17)
+      font.weight: Font.Bold
       font.pixelSize: Zenon.px(14)
       lineHeight: 1.08
     }

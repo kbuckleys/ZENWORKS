@@ -199,7 +199,9 @@ Item {
     id: dropChip
     anchors.fill: parent
     radius: Zenon.windowRadius
-    color: drop.expanded || dropHov.hovered ? Zenon.headBg
+    // PRESSED, DARKENED as every button in the suite (user, 2026-10-17)
+    color: dropPress.pressed ? Zenon.pressFill
+      : drop.expanded ? Zenon.headBg
       : Qt.rgba(Zenon.white.r, Zenon.white.g, Zenon.white.b, 0.05)
     border.width: 1
     border.color: drop.expanded || drop.activeFocus ? Zenon.cyan
@@ -230,8 +232,8 @@ Item {
       font.pixelSize: drop.textSize - 2
     }
   }
-  HoverHandler { id: dropHov }
   MouseArea {
+    id: dropPress
     anchors.fill: parent
     onClicked: {
       drop.claim();
