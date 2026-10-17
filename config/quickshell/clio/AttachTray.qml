@@ -90,7 +90,7 @@ Bubble {
     interactive: contentHeight > height
     Grid {
       id: grid
-      // centred: a row of fewer than four sits in the middle, not to the left
+      // centered: a row of fewer than four sits in the middle, not to the left
       x: Math.max(0, Math.round((flick.width - grid.width) / 2))
       columns: 4
       spacing: 8
@@ -115,6 +115,9 @@ Bubble {
               sourceSize.width: 220
               fillMode: Image.PreserveAspectCrop
               asynchronous: true
+              // faded in as it arrives, not popped in (2026-10-17)
+              opacity: status === Image.Ready ? 1 : 0
+              Behavior on opacity { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
             }
             Column {
               visible: !tile.modelData.pic

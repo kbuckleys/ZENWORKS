@@ -215,7 +215,7 @@ Rectangle {
   // comes back is listed underneath the local matches as flat rows.
   //
   // FLAT, DELIBERATELY. A hit six levels down would otherwise need its
-  // whole ancestry synthesised into the tree to be drawn in place, and
+  // whole ancestry synthesized into the tree to be drawn in place, and
   // the result is harder to read than the path itself: the answer to
   // "where?" is the path, so the row is the path.
   property var hits: []
@@ -231,7 +231,7 @@ Rectangle {
   //
   // Home by its own name rather than by the user's: the basename of ~ is
   // "buck", which no rule claims, and the tree's root row for it is
-  // labelled "Home" for the same reason.
+  // labeled "Home" for the same reason.
   function glyphOf(n) {
     return n ? Terminus.dirGlyph(n.path, Icons) : "";
   }
@@ -653,7 +653,7 @@ Rectangle {
   Item {
     id: sendToWell
     // the sidebar sliding moves the well, and the bar's title with it
-    onXChanged: term.noteSheet("send", sendToCard.opacity, x + sendToCard.x, sendToCard.width)
+    onXChanged: sendToCard.note()
     anchors.left: parent.left
     // under the bar it hangs from, which starts where the sidebar ends
     anchors.leftMargin: term.sideRef.width
@@ -675,13 +675,41 @@ Rectangle {
     opacity: sendToCard.opacity
   }
 
+  // ── FROSTED LIKE EVERY OTHER SHEET (user, 2026-10-17) ──────────────
+  // It was a black card: the one sheet not wearing the glass. The same
+  // recipe morpheus/Sheet uses over a hole — the listing is cut away under
+  // the card (noteSheet with its box, see sheetHole), the stage frosted
+  // under it at the bar's material, the card's veil over that.
+  Frost {
+    x: sendToCard.x
+    y: sendToCard.y
+    width: sendToCard.width
+    height: sendToCard.height
+    opacity: sendToCard.opacity
+    radius: Zenon.dialogRadius
+    base: "transparent"
+    brightness: 0
+    saturation: -0.2
+    blurMax: 64
+    scrim: 0
+    source: term.sheetBackdrop
+    active: sendToCard.opacity > 0.01
+    track: [sendToWell.x, sendToWell.y]
+  }
+
   Rectangle {
     id: sendToCard
     anchors.horizontalCenter: parent.horizontalCenter
     // goes dark on the bar and opens its hairline, as a Sheet does
-    onOpacityChanged: term.noteSheet("send", opacity, sendToWell.x + x, width)
-    onXChanged: term.noteSheet("send", opacity, sendToWell.x + x, width)
-    onWidthChanged: term.noteSheet("send", opacity, sendToWell.x + x, width)
+    // and its whole box, so the listing is cut away under it
+    function note() {
+      term.noteSheet("send", opacity, sendToWell.x + x, width, sendToWell.y + y, height);
+    }
+    onOpacityChanged: note()
+    onXChanged: note()
+    onYChanged: note()
+    onWidthChanged: note()
+    onHeightChanged: note()
     // AS WIDE AS IT NEEDS, AND NEVER WIDER THAN THE WINDOW. The well is
     // the window's width, so the sheet may reach the frame on either side
     // and stops exactly there. 560 is the floor rather than the size: a
@@ -796,7 +824,8 @@ Rectangle {
       }
     }
 
-    color: Zenon.black
+    // the veil every sheet wears over its frost (Sheet.veil)
+    color: Zenon.alpha(Zenon.ground, term.glassVeil)
     border.color: Zenon.border
     border.width: 1
     radius: Zenon.dialogRadius
@@ -841,6 +870,8 @@ Rectangle {
 
       host: term
       view: sendToList
+      // the sidebar's highlight, as the listing's (user, 2026-10-17)
+      color: term.hiFill
       index: sendTo.sel
       rowH: sendToCard.rowH
     }
@@ -975,7 +1006,7 @@ Rectangle {
       // They were one run of text with the glyphs spaced into it, which
       // made this the only list of keys in the window not wearing the
       // chip every other one wears — the context menu and F1 are both
-      // KeyCap, and this is the third list. Spelt out as chip-and-word
+      // KeyCap, and this is the third list. Spelled out as chip-and-word
       // pairs so a key and what it does stay together.
       Row {
         id: sendToHints

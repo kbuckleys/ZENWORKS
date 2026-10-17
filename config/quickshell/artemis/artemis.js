@@ -297,6 +297,66 @@ function highlightedPreview(text, query, opts) {
   return out;
 }
 
+// ── TWO LINES A ROW ──────────────────────────────────────────────────────
+// The name on top, the directory it is in underneath — folio's shape (user
+// 2026-10-17). One path was one line, and the name you were looking for sat
+// at the far end of it, wherever that was this time; now every name starts
+// at the same x and the path is the quieter line under it.
+//
+// $HOME reads as ~ — it is the root of the index, so all it ever said was
+// "under here", and it is the widest thing on the second line. A directory's
+// trailing slash is dropped: the glyph already says it is one.
+function shownPath(path, home) {
+  const s = String(path).replace(/(.)\/+$/, "$1");
+  const h = String(home || "").replace(/\/+$/, "");
+  if (h && (s === h || s.indexOf(h + "/") === 0)) return "~" + s.slice(h.length);
+  return s;
+}
+
+// where the name starts in a shownPath
+function nameAt(s) {
+  return String(s).lastIndexOf("/") + 1;
+}
+
+// s[a, b) as rich text, the lit letters in `match`
+function inked_(s, lit, a, b, match) {
+  let out = "";
+  let i = a;
+  while (i < b) {
+    const m = !!lit[i];
+    let e = i + 1;
+    while (e < b && !!lit[e] === m) ++e;
+    const chunk = Strings.escapeHtml(s.slice(i, e));
+    out += m ? "<span style=\"color:" + match + ";font-weight:700;\">" + chunk + "</span>" : chunk;
+    i = e;
+  }
+  return out;
+}
+
+// { name, dir } as rich text. The letters are matched ONCE, against the
+// whole shown path, and the two lines are cut from that — matching each line
+// on its own would light a term in the name and again in the directory.
+// `dirAvail` is in characters; past it the directory loses its MIDDLE, two
+// thirds of what is kept going to the end of it, which is the directory the
+// file is actually in.
+function rowLines(path, query, home, dirAvail, match) {
+  const s = shownPath(path, home);
+  const ink = match;  // always passed: Zenon.magenta from the popup
+  const lit = matchPositions(s, query);
+  const cut = nameAt(s);
+  // the slash between the two lines belongs to neither — except "/" itself
+  const dirEnd = cut > 1 ? cut - 1 : cut;
+  let dir;
+  if (dirEnd <= dirAvail || dirAvail < 4) {
+    dir = inked_(s, lit, 0, dirEnd, ink);
+  } else {
+    const head = Math.floor((dirAvail - 1) / 3);
+    const tail = dirAvail - 1 - head;
+    dir = inked_(s, lit, 0, head, ink) + "…" + inked_(s, lit, dirEnd - tail, dirEnd, ink);
+  }
+  return { name: inked_(s, lit, cut, s.length, ink), dir: dir };
+}
+
 // A directory goes to terminus. A FILE does not come through here: it is opened
 // by terminus.js' openOrAskCommand, which is what terminus itself opens with,
 // so the two agree on what a file opens with — and on what to do when nothing
@@ -311,7 +371,7 @@ function openDirCommand(path) {
     + " >/dev/null 2>&1 &";
 }
 
-// PAIRS, NOT MARKUP. It used to hand back finished rich text with the colours
+// PAIRS, NOT MARKUP. It used to hand back finished rich text with the colors
 // written in as hex — the palette living in a second place, and a hint that
 // could only ever be drawn one way. The popup draws these as chips now; what
 // belongs here is which key and what it does.

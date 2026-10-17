@@ -41,11 +41,11 @@ Item {
   property string detail: ""
   property color detailInk: Zenon.accentMuted
   property string glyph: ""
-  // A COLOUR OF ITS OWN, when the row has one to give. Bookmarks and disks
+  // A COLOR OF ITS OWN, when the row has one to give. Bookmarks and disks
   // do not — their glyph says what KIND of thing the row is and the muted
-  // grey is right for that — but a tag's colour IS the tag, and a row that
-  // drew it grey was throwing away the one thing that tells two of them
-  // apart at a glance. Unset means the old behaviour, unchanged.
+  // gray is right for that — but a tag's color IS the tag, and a row that
+  // drew it gray was throwing away the one thing that tells two of them
+  // apart at a glance. Unset means the old behavior, unchanged.
   property color ink: "transparent"
   // Whether right-clicking this row means anything. Off for bookmarks and
   // disks, which are places rather than definitions.
@@ -161,7 +161,7 @@ Item {
     border.color: Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b, 0.55)
   }
 
-  // The colour a gauge is drawn in. Nearly full is worth saying in colour
+  // The color a gauge is drawn in. Nearly full is worth saying in color
   // rather than making you read the number and do the arithmetic.
   readonly property color gaugeInk: sideRow.used > 0.95 ? Zenon.red
     : (sideRow.used > 0.85 ? Zenon.yellow : Zenon.cyan)
@@ -174,7 +174,7 @@ Item {
 
   // NO FILL AND NO HOVER TINT. The cursor is sideBar, one rectangle the
   // column slides between rows — a fill here is a mark that can only blink.
-  // And the hover never coloured anything after the listing's argument was
+  // And the hover never colored anything after the listing's argument was
   // applied here: the cursor is already marked, and a third highlight
   // following the pointer made the list twitch as it crossed. The hover is
   // still WATCHED, because it is what reveals the remove cross.
@@ -235,7 +235,7 @@ Item {
   property string dropPath: ""
   // the trash's row: what is dropped on it is trashed, not moved in
   property bool trashDrop: false
-  // The swell's colour. A drop on the trash is a trashing, so it wears the
+  // The swell's color. A drop on the trash is a trashing, so it wears the
   // yellow of the trash confirmation's button (user, 2026-10-13).
   readonly property color dropInk: sideRow.trashDrop ? Zenon.yellow : Zenon.cyan
 
@@ -366,7 +366,7 @@ Item {
   MouseArea {
     anchors.fill: parent
     // BELOW the drag handler, which claims the press first once it decides
-    // the pointer is travelling. A click that never travelled still lands
+    // the pointer is traveling. A click that never traveled still lands
     // here, so tapping a bookmark goes there as it always did.
     acceptedButtons: Qt.LeftButton | Qt.MiddleButton | Qt.RightButton
     onClicked: (m) => {
@@ -397,14 +397,14 @@ Item {
     width: 20
     horizontalAlignment: Text.AlignHCenter
     text: sideRow.glyph
-    // The row's own colour wins even while active: the cyan is there to
+    // The row's own color wins even while active: the cyan is there to
     // say "this is where you are", and the label beside it already says
-    // that. Taking a tag's colour away to repeat it would lose more than
+    // that. Taking a tag's color away to repeat it would lose more than
     // it tells.
     color: sideRow.ink.a > 0 ? sideRow.ink
       : (sideRow.active ? Zenon.cyan : Zenon.accentMuted)
     font.family: Zenon.face
-    font.weight: Zenon.weight
+    font.weight: Zenon.titleWeight
     // delphi's sidebar type (ShelfRow): 14, the label soft until it is
     // the one you are on (user, 2026-10-11: the two sidebars look alike)
     font.pixelSize: Zenon.px(14)
@@ -425,19 +425,19 @@ Item {
         : (removeBtn.visible ? removeBtn.left : sideRow.right))
     anchors.rightMargin: 8
     anchors.verticalCenter: parent.verticalCenter
-    // Above the band rather than centred on the row, once there is a band.
+    // Above the band rather than centered on the row, once there is a band.
     anchors.verticalCenterOffset: sideRow.used >= 0 ? -11 : 0
     text: sideRow.label
     elide: Text.ElideMiddle
     // THE TITLE SAYS IT TOO, not just the bar beside it. White against
     // keyInk is a difference you have to go looking for on a row whose
-    // glyph is already carrying a colour of its own — so the active row
-    // takes that colour for its name as well, and the one you are
+    // glyph is already carrying a color of its own — so the active row
+    // takes that color for its name as well, and the one you are
     // looking at is the one that is lit.
     color: sideRow.active
       ? (sideRow.ink.a > 0 ? sideRow.ink : Zenon.ink)
       : Zenon.accentSoft
-    font.weight: Zenon.weight
+    font.weight: Zenon.titleWeight
     font.family: Zenon.face
     font.pixelSize: Zenon.px(14)
   }
@@ -519,7 +519,7 @@ Item {
     // eject when it is mounted, mount when it is not — the glyph is the
     // action the click performs, not the state it is in
     text: sideRow.mounted ? "\uF052" : "\uF0AB"
-    // The eject wears the crumb bar's "where you are" grey rather than
+    // The eject wears the crumb bar's "where you are" gray rather than
     // green: it is a verb sitting on every mounted disk at once, and a
     // column of green marks down the sidebar was louder than the disks.
     color: mountHov.hovered ? Zenon.cyan

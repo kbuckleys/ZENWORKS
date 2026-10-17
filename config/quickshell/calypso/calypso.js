@@ -54,7 +54,7 @@ function kindOf(id) {
 // the shelves above the kinds
 const SHELVES = [
   { id: "all",   label: "All items",          glyph: "\u{F0A6A}" },
-  { id: "fav",   label: "Favourites",         glyph: "" },
+  { id: "fav",   label: "Favorites",         glyph: "" },
   { id: "totp",  label: "One-time passwords", glyph: "\u{F097F}" },
   { id: "watch", label: "Watchtower",         glyph: "\u{F0565}" },
   { id: "trash", label: "Trash",              glyph: "" },
@@ -248,7 +248,7 @@ function siteMatches(host, key) {
   return host === key || host.endsWith("." + key);
 }
 
-// the glyph an item wears, and its colour (a Zenon slot); `brand` says it
+// the glyph an item wears, and its color (a Zenon slot); `brand` says it
 // is a site's own mark
 function markOf(it) {
   if (!it) return { glyph: kindOf("login").glyph, ink: "muted", brand: false };
@@ -271,7 +271,7 @@ function markOf(it) {
 // `key` is unique across accounts.
 function keyOf(it) { return it ? it.acct + "\u0001" + it.id : ""; }
 
-// favourite: the platform's own (1Password's) or calypso's (favs[key])
+// favorite: the platform's own (1Password's) or calypso's (favs[key])
 function isFav(it, favs) { return !!(it && (it.fav || (favs && favs[keyOf(it)]))); }
 
 // scope: { shelf: all|fav|totp, kind, acct, folder, tag } — any left out

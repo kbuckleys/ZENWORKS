@@ -5,13 +5,13 @@
 //
 // FOLLOW BACKGROUND: the theme made from a background. While Oracle's theme
 // is "follow", the followed monitor's background (Oracle.followMonitor, the
-// first by default) is asked for its dominant colours and turned into a
+// first by default) is asked for its dominant colors and turned into a
 // palette (morpheus/wallpalette.js), which Zenon wears as followTheme. All
 // the rest — every component, ThemeSync's kitty and hyprland, plato, the
 // previews — is what any theme gets.
 //
-// THE COLOURS, ONCE PER PICTURE. ImageMagick shrinks the image and counts
-// twelve colours; the answer is kept on disk under the file's path, size
+// THE COLORS, ONCE PER PICTURE. ImageMagick shrinks the image and counts
+// twelve colors; the answer is kept on disk under the file's path, size
 // and mtime, so a background seen before costs a cat, and in memory for the
 // session.
 //
@@ -96,7 +96,7 @@ Item {
     }
   }
 
-  // the palette last made, so a change of tone or colour remakes it
+  // the palette last made, so a change of tone or color remakes it
   // without asking ImageMagick again
   property var hist: []
   function make(colors) {
@@ -126,7 +126,7 @@ Item {
   // ── WHEN IT IS PUT ON ────────────────────────────────────────────
   // At once, unless a background is mid-animation (Picasso.transitionUntil):
   // then the moment it ends. It used to fade in over eight steps, and every
-  // step re-evaluated every colour binding in the shell — ~100 ms on the
+  // step re-evaluated every color binding in the shell — ~100 ms on the
   // thread the background's zoom also runs on — so the zoom played in
   // bursts (Buck's capture, 2026-10-08). One change, where nothing moves.
   // A cached palette usually lands before the new picture has even

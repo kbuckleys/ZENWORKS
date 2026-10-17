@@ -4,7 +4,7 @@
 // https://github.com/kbuckleys/
 //
 // PICASSO'S CAPTURE HALF, the pure part — the screenshot's names and
-// geometry, and the colour picker's arithmetic. Nothing here touches
+// geometry, and the color picker's arithmetic. Nothing here touches
 // Quickshell or a process, which is what lets oracle/tests check it.
 
 // ── the screenshot ────────────────────────────────────────────────────────
@@ -82,7 +82,7 @@ const PRESETS = [
   { key: "7", label: "Screen", full: true }
 ];
 
-// The selection reshaped to a preset, about its own centre — or, with none
+// The selection reshaped to a preset, about its own center — or, with none
 // drawn yet (w ≤ 2), about the screen's, at 60% of it. A shape keeps the
 // selection's width unless the height would not fit; a size too big for the
 // screen is scaled down at its own shape. Always whole and on screen.
@@ -134,7 +134,7 @@ function windowsOn(clients, monitor, ws) {
   return out;
 }
 
-// ── the colour picker ─────────────────────────────────────────────────────
+// ── the color picker ─────────────────────────────────────────────────────
 // The schemes it can speak, in the order the wheel walks them.
 const SCHEMES = ["hex", "rgb", "hsl", "hsv", "oklch", "cmyk"];
 const SCHEME_LABELS = { hex: "HEX", rgb: "RGB", hsl: "HSL", hsv: "HSV",
@@ -201,7 +201,7 @@ function cmykOf(r, g, b) {
            y: (1 - b / 255 - k) / (1 - k), k: k };
 }
 
-// A colour written in one scheme, as it would be pasted into CSS or a
+// A color written in one scheme, as it would be pasted into CSS or a
 // config file.
 function format(r, g, b, scheme) {
   r = Math.round(r); g = Math.round(g); b = Math.round(b);
@@ -230,7 +230,7 @@ function format(r, g, b, scheme) {
   }
 }
 
-// Black or white, whichever reads on this colour — for the loupe's
+// Black or white, whichever reads on this color — for the loupe's
 // crosshair and the swatch's label.
 function inkOn(r, g, b) {
   const lum = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;

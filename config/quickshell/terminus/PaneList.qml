@@ -140,13 +140,34 @@ ListView {
     width: plist.width
 
     // from its old row to this one, on a reorder — see Pane.reflow
-    Glide { id: rowGlide; limit: plist.height }
+    Glide { id: rowGlide; limit: plist.height; duration: plist.pane && plist.pane.branchPath !== "" ? 220 : 320 }
     function glideCheck() {
       if (!plist.pane || !plist.pane.reflowing) { rowGlide.stop(); return; }
       const was = plist.pane.wasAt(cell.path);
-      if (was < 0) return;
+      if (was < 0) {
+        // a branch's own row, new in the listing: down out of its
+        // directory's row, fading in as it comes
+        if (plist.pane.inBranch(cell.path) && plist.pane.branchAt >= 0) {
+          rowGlide.from(0, (plist.pane.branchAt - cell.index) * term.rowH);
+          cellFade.restart();
+        }
+        return;
+      }
       rowGlide.from(0, (was - cell.index) * term.rowH);
     }
+    // under the rows already standing, so a branch slides out from behind
+    // its directory rather than over the rows above it
+    z: plist.pane && plist.pane.inBranch(cell.path) ? -1 : 0
+    NumberAnimation {
+      id: cellFade
+      target: cell
+      property: "opacity"
+      from: 0
+      to: 1
+      duration: 220
+      easing.type: Easing.OutCubic
+    }
+    ListView.onReused: { cellFade.stop(); cell.opacity = 1; cell.glideCheck(); }
     onPathChanged: cell.glideCheck()
     onIndexChanged: cell.glideCheck()
     Component.onCompleted: cell.glideCheck()

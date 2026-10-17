@@ -4,7 +4,7 @@
 // https://github.com/kbuckleys/
 //
 // THE LOOK, as controls: what fills the space around a picture, then dim,
-// vignette, blur, colour, light, contrast and tint. The focus card's Look
+// vignette, blur, color, light, contrast and tint. The focus card's Look
 // tab and the viewer's edit panel are both this, so a photo and a background
 // are edited with the same hands and the answers mean the same thing —
 // the look they produce is one picasso.js look, painted by one Scene.
@@ -22,7 +22,7 @@ Item {
   id: ed
 
   property var look: Art.lookOf({})
-  // the picture the look is for — its own colour is a tint and a backdrop
+  // the picture the look is for — its own color is a tint and a backdrop
   property string path: ""
   // a background has space around it to fill; a photo being edited does not
   property bool showBackdrop: true
@@ -38,15 +38,15 @@ Item {
 
   function swatchName(k) {
     if (k === "") return "No tint";
-    if (k === "accent") return "Its own colour";
-    if (k === "custom") return "A colour of your own";
+    if (k === "accent") return "Its own color";
+    if (k === "custom") return "A color of your own";
     for (const c of Art.presetColors) if (c.hex === k) return c.name;
     return k;
   }
 
   signal touched(string key, var value)
   signal resetLook()
-  // the colour picker, for "tint" or "backdrop" — the owner shows it
+  // the color picker, for "tint" or "backdrop" — the owner shows it
   signal editColor(string which)
 
   readonly property bool tintIsCustom:
@@ -63,14 +63,14 @@ Item {
     spacing: 6
 
     // What fills the space a picture does not — around a fitted or
-    // centred one, or the corners a turn leaves bare.
+    // centered one, or the corners a turn leaves bare.
     Item {
       width: parent.width
       height: bdHead.height
       visible: ed.showBackdrop
       Head { id: bdHead; text: "Around it" }
     }
-    // Colour chosen again opens its picker — Segments answers a choice
+    // Color chosen again opens its picker — Segments answers a choice
     // of the one already chosen as well.
     Term.Segments {
       id: bdRow
@@ -78,7 +78,7 @@ Item {
       width: ed.width
       even: true
       textSize: Zenon.px(13)
-      options: [["black", "Black"], ["color", "Colour"], ["accent", "Its colour"], ["blur", "Blurred"]]
+      options: [["black", "Black"], ["color", "Color"], ["accent", "Its color"], ["blur", "Blurred"]]
       current: ed.look.backdrop
       onChose: (v) => {
         if (v === "color" && ed.look.backdrop === "color") ed.editColor("backdrop");
@@ -90,7 +90,7 @@ Item {
       visible: ed.showBackdrop && ed.fills
       width: parent.width
       wrapMode: Text.WordWrap
-      text: "cropped or stretched, it fills the screen — this shows once it is fitted, centred or tiled"
+      text: "cropped or stretched, it fills the screen — this shows once it is fitted, centered or tiled"
       color: Zenon.accentSoft
       font.family: Zenon.face
       font.weight: Zenon.weight
@@ -98,7 +98,7 @@ Item {
     }
     Text {
       visible: ed.showBackdrop && ed.look.backdrop === "color"
-      text: "click Colour again to choose it"
+      text: "click Color again to choose it"
       color: Zenon.accentSoft
       font.family: Zenon.face
       font.weight: Zenon.weight
@@ -133,7 +133,7 @@ Item {
     }
     Slide {
       width: parent.width
-      label: "Colour"
+      label: "Color"
       value: ed.look.saturation; from: -1; to: 1; rest: 0
       valueText: ed.signed(ed.look.saturation)
       kbOn: ed.kbRow === "saturation"
@@ -192,7 +192,7 @@ Item {
             width: 20; height: 2; rotation: -45
             color: Zenon.accentMuted
           }
-          // its own colour: a small image mark; custom: a plus
+          // its own color: a small image mark; custom: a plus
           Text {
             anchors.centerIn: parent
             visible: sw.modelData === "accent" || sw.isCustom

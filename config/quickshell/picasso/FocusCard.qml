@@ -9,7 +9,7 @@
 //
 //   Place      which monitors, drawn to scale where they sit; spanning them
 //              as one; the fit; which part a crop keeps; turn and mirror
-//   Look       what fills the space around it; dim, blur, colour, light,
+//   Look       what fills the space around it; dim, blur, color, light,
 //              contrast, tint — LookEditor, which the viewer's edit panel is too
 //   Slideshow  keep going through the rest of them on a timer
 //
@@ -63,7 +63,7 @@ Item {
   property var stageLook: ({})
   property bool stageSpan: false
   property string tab: "place"
-  // "" or which colour the picker is open for: "tint" or "backdrop"
+  // "" or which color the picker is open for: "tint" or "backdrop"
   property string editing: ""
 
   property bool slideOn: false
@@ -280,7 +280,7 @@ Item {
   }
 
   // ── natural sizes ─────────────────────────────────────────────────────
-  // Centred and tiled depend on how big the picture really is, so the map
+  // Centered and tiled depend on how big the picture really is, so the map
   // cannot draw them honestly from a thumbnail alone. identify reads the
   // header and nothing else; the answers are kept for the life of the shell.
   property var dims: ({})
@@ -501,7 +501,7 @@ Item {
     return true;
   }
 
-  // escape, innermost first: the colour being edited, then the card
+  // escape, innermost first: the color being edited, then the card
   function cancel() {
     if (card.editing !== "") { card.editing = ""; return true; }
     return false;
@@ -658,7 +658,7 @@ Item {
     // OVER THE PICKER, lifted off it towards the middle of the screen, so it
     // reads as the grid's own card and not a dialog. Held on screen.
     readonly property int lift: 70
-    // Alone — the viewer's setter, no grid under it — it is simply centred.
+    // Alone — the viewer's setter, no grid under it — it is simply centered.
     x: Math.round(card.panel.x + (card.panel.width - cardWrap.width) / 2)
     y: card.picker.cardOnly ? Math.round((card.height - cardWrap.height) / 2)
       : Math.round(Math.max(24, Math.min(card.height - cardWrap.height - 24,
@@ -717,7 +717,7 @@ Item {
         height: card.previewH
         radius: 7
         // the letterbox wears the look's "Around it" (user, 2026-10-15: the
-        // options showed nothing here) — black, a colour, its own colour,
+        // options showed nothing here) — black, a color, its own color,
         // or itself blurred (bdBlur, below)
         color: card.isColor ? card.colorHex
           : Art.groundOf(card.look, card.look.backdrop === "accent" ? Picasso.accentFor(card.path) : "")
@@ -749,7 +749,7 @@ Item {
           return t !== "" ? "file://" + t : Strings.fileUrl(card.path);
         }
 
-        // THE PICTURE WEARS THE LOOK. Blur, colour and tint are laid over it
+        // THE PICTURE WEARS THE LOOK. Blur, color and tint are laid over it
         // here as they will be on the wall, scaled down with it — a blur of
         // forty pixels on a 2560 screen is nine on this preview.
         Item {
@@ -817,7 +817,7 @@ Item {
           }
         }
 
-        // a colour is its own preview: the hex, large, in whichever ink
+        // a color is its own preview: the hex, large, in whichever ink
         // reads against it
         Text {
           anchors.centerIn: parent
@@ -865,7 +865,7 @@ Item {
           Ring { on: card.kb("browse") }
         }
 
-        // already up somewhere — pink, the colour of "in use"
+        // already up somewhere — pink, the color of "in use"
         Rectangle {
           anchors.right: parent.right
           anchors.top: parent.top
@@ -946,7 +946,7 @@ Item {
           anchors.verticalCenter: parent.verticalCenter
           anchors.verticalCenterOffset: 3
           text: {
-            if (card.isColor) return "solid colour";
+            if (card.isColor) return "solid color";
             const d = card.dims[card.path];
             const parts = [];
             if (d) parts.push(d.w + " × " + d.h);
@@ -1206,7 +1206,7 @@ Item {
             anchors.topMargin: 14
             width: parent.width
             height: 200
-            // a colour has no picture to fit, place or turn
+            // a color has no picture to fit, place or turn
             visible: !card.isColor
 
             Head { id: fitHead; text: "Fit" }
@@ -1400,7 +1400,7 @@ Item {
           }
         }
 
-        // ── choosing a colour for the look ───────────────────────────
+        // ── choosing a color for the look ───────────────────────────
         Item {
           anchors.top: tabRow.bottom
           anchors.topMargin: 22
@@ -1410,7 +1410,7 @@ Item {
 
           Head {
             id: edHead
-            text: card.editing === "tint" ? "Tint colour" : "Colour around it"
+            text: card.editing === "tint" ? "Tint color" : "Color around it"
           }
           Text {
             anchors.right: parent.right

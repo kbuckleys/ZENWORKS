@@ -141,7 +141,7 @@ Item {
         // frame or two, across a results list that just appeared.
         //
         // thawPulse is the existing way to say "re-seat without
-        // travelling"; see its own note.
+        // traveling"; see its own note.
         term.thawPulse++;
         // ── AND THE BRANCHES, WHICH THE QUERY DOES NOT COVER ────────
         // The rows above are the TOP LEVEL. A row spliced in by opening a

@@ -436,7 +436,7 @@ Scope {
         if (m.button === Qt.RightButton) { ptr.grab = ""; return; }
         const drew = ptr.grab === "new";
         ptr.grab = "";
-        // a click that never travelled: take the window under it whole
+        // a click that never traveled: take the window under it whole
         if (drew && Math.abs(m.x - ptr.px) < 4 && Math.abs(m.y - ptr.py) < 4) {
           const w = Cap.windowAt(cap.wins, m.x, m.y);
           region.sel = w ? Cap.rectOf(w.x, w.y, w.x + w.w, w.y + w.h, region.width, region.height)
@@ -495,7 +495,7 @@ Scope {
     }
 
     // ── the quick presets ─────────────────────────────────────────────
-    // Shapes about the selection's centre (or the screen's, before one is
+    // Shapes about the selection's center (or the screen's, before one is
     // drawn), exact sizes in real pixels, the whole screen, and the last
     // region saved. Above the answer when there is a selection, above the
     // hint when there is not.

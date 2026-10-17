@@ -31,3 +31,6 @@ SettingsBody 1.0 SettingsBody.qml
 SketchPad 1.0 SketchPad.qml
 TableBlock 1.0 TableBlock.qml
 NotePeek 1.0 NotePeek.qml
+HeadButton 1.0 HeadButton.qml
+SpellMarks 1.0 SpellMarks.qml
+HighlightsBody 1.0 HighlightsBody.qml

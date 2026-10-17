@@ -1485,7 +1485,7 @@ FloatingWindow {
               flickableDirection: Flickable.HorizontalFlick
               boundsBehavior: Flickable.StopAtBounds
               clip: true
-              // centred when it all fits, scrolled when it does not
+              // centered when it all fits, scrolled when it does not
               leftMargin: Math.max(0, (width - tabRow.width) / 2)
 
               // every move of the strip — the wheel, a revealed tab, a
@@ -1560,7 +1560,7 @@ FloatingWindow {
                       Behavior on color { ColorAnimation { duration: Zenon.fast; easing.type: Zenon.ease } }
                     }
 
-                    // The icon over the name, as one group centred in the tile.
+                    // The icon over the name, as one group centered in the tile.
                     Column {
                       id: tabGroup
                       anchors.centerIn: parent
@@ -1574,7 +1574,7 @@ FloatingWindow {
                         // A box the size of the DRAWING, not of the glyph's
                         // line: a Nerd Font's line box is far taller than its
                         // icons, and measuring the group by it made the
-                        // highlight fill the tile and sit the pair off-centre.
+                        // highlight fill the tile and sit the pair off-center.
                         width: tabIcon.implicitWidth
                         height: 24
 
@@ -1926,7 +1926,7 @@ FloatingWindow {
                 // `fold` (About this computer): the row is its usual self
                 // on top — label, help, its readout — and a click anywhere
                 // on it opens what it folds underneath, a click again shuts
-                // it. The label and the control stay centred in that top
+                // it. The label and the control stay centered in that top
                 // band (rowHead), not in the grown row.
                 readonly property bool fold: !!settingRow.spec.fold
                 readonly property bool open: settingRow.fold && popup.unfolded === settingRow.spec.key
@@ -2073,7 +2073,7 @@ FloatingWindow {
                     }
 
                     // RESTORE DEFAULT, said with a glyph beside the name
-                    // (U+E612, the user's pick): the coloured name is a way
+                    // (U+E612, the user's pick): the colored name is a way
                     // back too, but nothing on it says so. Only while moved.
                     Item {
                       visible: settingRow.moved
@@ -2085,7 +2085,7 @@ FloatingWindow {
                         width: parent.width + 4
                         height: parent.width + 4
                         radius: 5
-                        color: restoreMa.containsMouse ? Zenon.wash(restoreMa.pressed ? 0.14 : 0.08) : "transparent"
+                        color: restoreMa.containsMouse ? (restoreMa.pressed ? Zenon.pressWash(0.14) : Zenon.wash(0.08)) : "transparent"
                       }
                       Text {
                         id: restoreGlyph

@@ -4,7 +4,7 @@
 // https://github.com/kbuckleys/
 //
 // FOLLOW BACKGROUND: a theme made from a background. picasso/FollowBackground
-// asks ImageMagick for the picture's dominant colours (parseHistogram) and
+// asks ImageMagick for the picture's dominant colors (parseHistogram) and
 // this turns them into a theme in the shape themes/*.json have, so Zenon,
 // ThemeSync, plato and every preview take it like any other.
 //
@@ -13,28 +13,28 @@
 // at one number are nowhere near one brightness.
 //
 // THE BACKGROUND LENDS A HUE, NOT A LOOK:
-//   - the seed is its most colourful colour that is also really there;
+//   - the seed is its most colorful color that is also really there;
 //   - grounds and text take the seed's hue at low chroma — tinted, not
-//     coloured; a grey picture gives an all but neutral theme;
+//     colored; a gray picture gives an all but neutral theme;
 //   - cyan, the shell's own accent (selection, focus, the clock), BECOMES
-//     the seed, so the highlight is the background's colour;
+//     the seed, so the highlight is the background's color;
 //   - every other accent keeps its meaning (red is still the error) and is
-//     only turned up to 15 degrees towards the seed — harmonised.
+//     only turned up to 15 degrees towards the seed — harmonized.
 // Then every slot is pushed lighter (dark) or darker (light) until it reads
 // on the ground: ink 7:1, keyInk 4.5, soft 3.5, muted 2.6, accents 3 — a
 // light theme asks more (soft 4.5, muted 3.2, accents 3.4): its glass over a
-// dark picture greys the ground the sums were done on.
+// dark picture grays the ground the sums were done on.
 //
 // LIGHT ACCENTS START BRIGHT. They used to start at L .56 — already past
-// 3:1, so nothing walked, and a modest chroma there is brown and grey (user,
+// 3:1, so nothing walked, and a modest chroma there is brown and gray (user,
 // 2026-10-11: "muddy"). Now each starts light and saturated and walks darker
 // only until it reads, so it stops at the most vivid tone that does.
 //
-// SAND IS ZENON'S STRAW, NOT HARMONISED: hue 100, pale, in a dark theme; in a
+// SAND IS ZENON'S STRAW, NOT HARMONIZED: hue 100, pale, in a dark theme; in a
 // light one a gold (hue 88) — a yellow dark enough to read on paper at hue 95+
 // is olive. Turned towards the seed it went mustard (user, 2026-10-11).
 
-// ── colour space ─────────────────────────────────────────────────────────
+// ── color space ─────────────────────────────────────────────────────────
 function hexToRgb(h) {
   const s = String(h).replace(/^#/, "").slice(-6);
   return [0, 2, 4].map((i) => parseInt(s.slice(i, i + 2), 16) / 255);
@@ -71,7 +71,7 @@ function oklchToRgbRaw(L, C, h) {
   ].map(gam);
 }
 
-// a colour the screen can show: chroma given up, hue and lightness kept
+// a color the screen can show: chroma given up, hue and lightness kept
 function oklch(L, C, h) {
   L = Math.max(0, Math.min(1, L));
   const fits = (c) => oklchToRgbRaw(L, c, h).every((v) => v >= -0.0005 && v <= 1.0005);
@@ -91,7 +91,7 @@ function contrast(a, b) {
 }
 
 // ── ImageMagick's answer ─────────────────────────────────────────────────
-// `magick … -colors 12 -format %c histogram:info:-` prints a line per colour:
+// `magick … -colors 12 -format %c histogram:info:-` prints a line per color:
 //   "      4210: (23,41,60) #17293C srgb(23,41,60)"
 function parseHistogram(text) {
   const out = [];
@@ -110,7 +110,7 @@ function hueToward(h, seed, neutral) {
 }
 
 // RED KEEPS ITS DISTANCE. It is the error, and the accent is the
-// background's colour: a rose background made both the same pink, and a
+// background's color: a rose background made both the same pink, and a
 // failure read as a selection. Within 45 degrees of the seed, red steps
 // away from it instead of towards it, to at least 40 degrees apart.
 function redFrom(seed, neutral) {
@@ -121,7 +121,7 @@ function redFrom(seed, neutral) {
   return (seed - Math.sign(d || 1) * 40 + 360) % 360;
 }
 
-// lightness walked away from the ground until the colour reads on it
+// lightness walked away from the ground until the color reads on it
 function legible(L, C, h, ground, need, light) {
   let hex = oklch(L, C, h);
   for (let i = 0; i < 100 && contrast(hex, ground) < need; ++i) {
@@ -145,7 +145,7 @@ function palette(colors, opts) {
   const light = o.mode === "light" || (o.mode !== "dark" && avgL > 0.62);
   const v = Math.max(0, Math.min(1, o.vivid === undefined ? 0.5 : Number(o.vivid)));
 
-  // the seed: colourful AND present, never a speck of near-black or white
+  // the seed: colorful AND present, never a speck of near-black or white
   let seed = null, best = -1;
   for (const c of lch) {
     if (c.L < 0.2 || c.L > 0.94) continue;

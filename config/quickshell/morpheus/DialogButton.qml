@@ -8,9 +8,9 @@
 // button are two buttons the day one of them is changed. So it lives here,
 // and terminus and ceres both use this file.
 //
-//   ink       the colour it speaks in — its label, its fill, its ring
+//   ink       the color it speaks in — its label, its fill, its ring
 //   primary   the default answer: filled a little, ringed, and breathing
-//   ready     false greys it out and stops it answering
+//   ready     false grays it out and stops it answering
 
 import QtQuick
 import QtQuick.Effects
@@ -41,22 +41,22 @@ Rectangle {
   // a word and read as a label, not something to press. The default answer
   // keeps a stronger wash, plus its ring and glow.
   //
-  // A GREY BUTTON IS NOT A DIMMED ONE (user, 2026-10-12: Back beside a
+  // A GRAY BUTTON IS NOT A DIMMED ONE (user, 2026-10-12: Back beside a
   // lit Close "almost looks dimmed"). Muted ink is the disabled look's own
-  // colour, so a plain button speaking in it reads as switched off: it
+  // color, so a plain button speaking in it reads as switched off: it
   // says its word in the foreground ink instead, on the theme's own wash
   // (lighter on a dark theme, darker on a light one) rather than a tint
-  // of grey. Only a button that is not ready keeps the muted word.
-  // the plain grey, neutral or in the accent (user, 2026-10-15: the
-  // windows' greys follow the accent now)
+  // of gray. Only a button that is not ready keeps the muted word.
+  // the plain gray, neutral or in the accent (user, 2026-10-15: the
+  // windows' grays follow the accent now)
   readonly property bool plain: Qt.colorEqual(btn.ink, Zenon.muted) || Qt.colorEqual(btn.ink, Zenon.accentMuted)
   readonly property color word: btn.plain ? Zenon.white : btn.ink
   // PRESSED, DARKENED (user, 2026-10-15): the shade and dimmed word of
   // terminus' ClearChip and Segments — every button in the suite presses
   // the same way (it was its own ink, deeper)
   color: !btn.ready ? "transparent"
-    : btnArea.pressed ? Zenon.darken(0.35)
-    : btn.plain ? Zenon.wash(btn.primary ? 0.16 : 0.12)
+    : btnArea.pressed ? Zenon.pressFill
+    : btn.plain ? Zenon.buttonRest(btn.primary)
     : Qt.rgba(btn.ink.r, btn.ink.g, btn.ink.b, btn.primary ? 0.14 : 0.10)
   border.width: 1
   border.color: Zenon.border
@@ -165,7 +165,7 @@ Rectangle {
     anchors.centerIn: parent
     text: btn.label
     color: btn.ready ? btn.word : Zenon.muted
-    opacity: btnArea.pressed ? 0.55 : 1
+    opacity: btnArea.pressed ? Zenon.pressDim : 1
     font.family: btn.glyph ? Zenon.glyphFace : Zenon.face
     font.weight: Font.Bold
     font.pixelSize: Zenon.px(15)

@@ -40,7 +40,7 @@ PACKAGES=(
   pipewire pipewire-pulse wireplumber libpulse alsa-utils pamixer playerctl
   gst-plugins-good gst-plugins-bad gst-plugins-ugly
   ffmpeg mpv imagemagick perl-image-exiftool poppler ghostscript djvulibre
-  tesseract tesseract-data-eng
+  tesseract tesseract-data-eng hunspell hunspell-en_us
   # wayland utilities
   wl-clipboard wl-clip-persist cliphist grim slurp wf-recorder wtype libnotify
   # files, archives & mounts

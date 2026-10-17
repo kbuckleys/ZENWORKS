@@ -29,7 +29,7 @@ module.exports = {
     ["a.ttf", "a.OTF", "a.ttc", "a.otc", "a.pfb", "a.pfa", "a.woff", "a.woff2"].forEach((n) =>
       t.ok("a font: " + n, T.isFont(n)));
     t.ok("not a font: a.fnt.txt", !T.isFont("a.fnt.txt"));
-    // ── previews in plato's colours ───────────────────────────────────────
+    // ── previews in plato's colors ───────────────────────────────────────
     t.eq("no plato renderer: bat, as before, for a regular file only",
       T.previewCommand("/x/a.js", ""), "[ -f '/x/a.js' ] && " + T.batCommand("/x/a.js"));
     // a pipe never ends: an nvim previewing ~/.steam/steam.pipe sat blocked
@@ -47,7 +47,7 @@ module.exports = {
     // plato's rendered markdown: backgrounds, italic, underline, strikethrough
     const md = T.ansiToRich("\u001b[0;38;2;1;2;3;48;2;32;36;42mcode\u001b[0m \u001b[0;3mi\u001b[0;4mu\u001b[0;9ms\u001b[0m");
     t.eq("ansi: a background", md.indexOf("background-color:rgb(32,36,42)") > 0, true);
-    t.eq("ansi: and its colour too", md.indexOf("color:rgb(1,2,3)") > 0, true);
+    t.eq("ansi: and its color too", md.indexOf("color:rgb(1,2,3)") > 0, true);
     t.eq("ansi: italic, underline, struck",
       ["font-style:italic", "text-decoration:underline", "text-decoration:line-through"].every((x) => md.indexOf(x) > 0), true);
     t.eq("and bat's range", /--line-range=40:\+89 /.test(T.batCommand("/x/a.js", 40)), true);
@@ -267,7 +267,7 @@ module.exports = {
 
     // ── WHAT QT CANNOT OPEN ───────────────────────────────────────────────
     // Every one of these is an image by every other measure — the glyph, the
-    // colour, the sort — and none of them can be handed to an Image element.
+    // color, the sort — and none of them can be handed to an Image element.
     // They go to ImageMagick instead; see root.needsRender.
     for (const e of ["cr2", "nef", "arw", "dng", "heic", "avif", "jxl",
                      "psd", "xcf", "exr", "pcx"]) {
@@ -378,7 +378,7 @@ module.exports = {
     t.ok("nor is a different one", !T.samePaths(["/a", "/b"], ["/a", "/c"]));
     t.ok("nor is nothing", !T.samePaths(["/a"], null));
     // our own yank comes back through the reader's decoding intact, or it
-    // would never be recognised and a cut would paste as a copy
+    // would never be recognized and a cut would paste as a copy
     const uriNames = ["/d/a b.jpg", "/d/100%.txt", "/d/#1.txt", "/d/caf\u00e9", "/d/it's", "/d/why?.txt"];
     const fileUrl = (p) => "file://" + p.split("/").map(encodeURIComponent).join("/");
     const back = uriNames.map((p) => decodeURIComponent(fileUrl(p).slice(7)));
@@ -516,7 +516,7 @@ module.exports = {
     // scan happened to find first — a stale user override would otherwise be
     // the end of it. See openWithCommand.
     const ow = T.openWithCommand("nvim.desktop", "/d/notes.md");
-    t.has("gio, which honours Terminal=true", ow, "gio launch");
+    t.has("gio, which honors Terminal=true", ow, "gio launch");
     t.ok("never gtk-launch", ow.indexOf("gtk-launch") === -1);
     t.has("the file argument comes along", ow, "'/d/notes.md'");
     t.has("it falls through to the next entry", ow, "&& exit 0");
@@ -921,14 +921,14 @@ module.exports = {
     t.eq("so is fullscreen or maximized", T.splitRoom(Object.assign(fl(0, 800, 1), { fullscreen: 1 }), mons, 1600, 16, 560), null);
     t.eq("a hand-widened window is not shrunk by a grow",
       T.splitRoom(fl(1090, 1200, 0), mons, 2000, 16, 560), null);
-    t.eq("an odd ask is evened, so a centred grow lands on whole pixels",
+    t.eq("an odd ask is evened, so a centered grow lands on whole pixels",
       T.splitRoom(fl(1800, 1000, 1), mons, 1271, 16, 560).dw, 270);
     t.eq("and an odd give-back too",
       T.splitRoom(fl(1800, 1271, 1), mons, 1000, 16, 560).dw, -270);
     t.eq("unsplitting hands the room back",
       T.splitRoom(fl(1400, 1800, 1), mons, 1000, 16, 560).dw, -800);
     // Resized first, always; moved only when the edge it grows from asks for
-    // it — never recentred. Both relative, both naming the window.
+    // it — never recentered. Both relative, both naming the window.
     const sel = 'window = "address:0xab"';
     const still = T.splitRoomDispatches("0xab", { dw: 10, dx: 0 });
     t.eq("no dx, no move", still.length, 1);
@@ -940,7 +940,7 @@ module.exports = {
     t.ok("both relative", moved.every((d) => d.indexOf("relative = true") >= 0));
     t.ok("the offsets are the room's", moved[0].indexOf("x = -800,") >= 0 && moved[1].indexOf("x = 400,") >= 0);
     t.ok("both named by address", moved.every((d) => d.indexOf(sel) >= 0));
-    t.ok("nothing is centred", moved.concat(still).every((d) => !/cent(er|re)/.test(d)));
+    t.ok("nothing is centered", moved.concat(still).every((d) => !/cent(er|re)/.test(d)));
 
     // ── A BIG SELECTION, THROUGH A REAL SHELL ─────────────────────────────
     // Every builder over a list of paths, run the way the window runs it —
@@ -1117,7 +1117,7 @@ module.exports = {
       t.eq("and of sd do not", T.firstPartition("/dev/sdc"), "/dev/sdc1");
       t.eq("fsck's 1 is fixed", T.repairVerdict("e2fsck", "repair", 1).ok, true);
       t.eq("fsck's 4 is not", T.repairVerdict("e2fsck", "repair", 4).ok, false);
-      t.has("a dismissed password says so", T.repairVerdict("ntfsfix", "repair", 126).line, "cancelled");
+      t.has("a dismissed password says so", T.repairVerdict("ntfsfix", "repair", 126).line, "canceled");
       const fc = T.formatCommand({ fs: "exfat", label: "S", device: "/dev/sdb", table: "gpt",
                                    mounts: ["/dev/sdb1"], mountAfter: true });
       t.ok("a whole-drive format unmounts, partitions, then makes",

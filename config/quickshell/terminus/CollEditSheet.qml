@@ -129,7 +129,7 @@ Rectangle {
     d.root = collRoot.text;
     d.rules = [];
     // The query is the first rule, written the way a collection would
-    // have spelt it — so what is run and what is saved are one thing.
+    // have spelled it — so what is run and what is saved are one thing.
     if (collEdit.searching) {
       if (String(d.root).trim() === "") d.root = term.cwd;
       const q = searchQ.text.trim();
@@ -228,7 +228,7 @@ Rectangle {
   }
 
   // Return in search mode. A bare query in the directory you are in
-  // is the search `s` always ran — find or rg, ignore files honoured —
+  // is the search `s` always ran — find or rg, ignore files honored —
   // and anything refined runs through the collection pipeline as a
   // collection nobody has saved yet. See root.searchScratch.
   function runSearch() {

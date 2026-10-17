@@ -5,7 +5,7 @@
 //
 // CALYPSO'S WINDOW — three columns, as 1Password lays its own out:
 //
-//   the sidebar   all items, favourites, one-time passwords; the kinds
+//   the sidebar   all items, favorites, one-time passwords; the kinds
 //                 (logins, cards, notes…); your accounts, each on its
 //                 platform, locked or open; the folders and tags in view
 //   the list      a search over everything open, A–Z or most recent,
@@ -26,8 +26,8 @@
 //   typing / ctrl+f    search          ↑ ↓  ctrl+j/k   items
 //   return  ctrl+c     copy the password          ctrl+shift+c  the username
 //   ctrl+alt+c         copy the one-time code     ctrl+r        reveal
-//   ctrl+o             open the website           ctrl+d        favourite
-//   ctrl+1…3           all · favourites · codes   ctrl+tab      sort
+//   ctrl+o             open the website           ctrl+d        favorite
+//   ctrl+1…3           all · favorites · codes   ctrl+tab      sort
 //   ctrl+s  sync       ctrl+n  add an account     ctrl+l        lock all
 //   esc     unwinds: the search, the scope, then closes
 
@@ -156,7 +156,7 @@ FloatingWindow {
   function isFav(it) { return C.isFav(it, win.mgr ? win.mgr.favs : {}); }
   function toggleFav(it) {
     if (!it) return;
-    if (it.fav) { win.say("A favourite in " + C.platform(win.acctOf(it).kind).name + " itself — change it there"); return; }
+    if (it.fav) { win.say("A favorite in " + C.platform(win.acctOf(it).kind).name + " itself — change it there"); return; }
     win.mgr.setFav(it, !win.isFav(it));
   }
 
@@ -370,7 +370,7 @@ FloatingWindow {
       { text: "Copy one-time code", icon: "\u{F097F}", mark: "ctrl alt c", enabled: codes, run: () => win.copyRole("totp") },
       { isSeparator: true },
       { text: "Open the website", icon: "", mark: "ctrl o", enabled: !!it.host, run: () => win.website() },
-      { text: fav ? "Leave favourites" : "Add to favourites", icon: fav ? "" : "", mark: "ctrl d", run: () => win.toggleFav(it) },
+      { text: fav ? "Leave favorites" : "Add to favorites", icon: fav ? "" : "", mark: "ctrl d", run: () => win.toggleFav(it) },
       { isSeparator: true },
       { text: "Edit", icon: "\uF044", mark: "ctrl e", enabled: win.canEdit(it), run: () => win.editItem() },
       { text: "Duplicate", icon: "\u{F0191}", enabled: win.canDuplicate(it), run: () => win.duplicateItem(it) },
@@ -1694,7 +1694,7 @@ FloatingWindow {
       HintRow {
         rows: win.hintRows
         anchors.verticalCenter: parent.verticalCenter
-        // only keys in this strip: centred (no button ever joins it)
+        // only keys in this strip: centered (no button ever joins it)
         x: Math.round((foot.width - width) / 2)
         maxWidth: foot.width - 32
       }

@@ -121,7 +121,7 @@ case "${1:-}" in
     build
     if [ -z "$q" ]; then
       # Nothing typed: what you chose to install, or everything installed.
-      # The whole catalogue in arbitrary order is not an answer to anything.
+      # The whole catalog in arbitrary order is not an answer to anything.
       if [ "$mode" = installed ]; then awk -F'\t' '$1 != "avail"' "$ROWS"
       else awk -F'\t' '$1 == "explicit"' "$ROWS"; fi | LC_ALL=C sort -t$'\t' -k2,2 | head -n 500
     else

@@ -39,7 +39,7 @@ function longDay(d) {
 // changes height as you page through months, and a calendar does not resize
 // under the cursor.
 //
-// The leading and trailing cells carry the neighbouring months' real dates
+// The leading and trailing cells carry the neighboring months' real dates
 // rather than blanks: they are drawn dimmed, which keeps the grid a continuous
 // run of days instead of a shape with two bites out of it, and means clicking
 // anywhere in the grid lands on an actual date.

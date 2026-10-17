@@ -212,7 +212,7 @@ Item {
 
   // The NAME of whatever currently opens this type, not its desktop id: the
   // id is what the association database deals in, the name is what you
-  // recognise. Falls back to the id when the scan found no entry for it,
+  // recognize. Falls back to the id when the scan found no entry for it,
   // which is what a stale association looks like.
   readonly property string openWithLabel: {
     if (!props.host.appsScanned) return "\u2026";
@@ -332,7 +332,7 @@ Item {
                 // ── AND THE WAY TO THE GRID ──────────────────────
                 // It reads as a fact and acts as a door. Both
                 // spellings, the same pair the grid itself shows, so
-                // the page you arrive at is recognisably the row you
+                // the page you arrive at is recognizably the row you
                 // clicked rather than a different subject.
                 ["permissions",
                   ("000" + (props.permMode & 511).toString(8)).slice(-3)
@@ -427,7 +427,7 @@ Item {
             // wants to sit in with air around it, and a photograph shown at
             // 88 on its long edge is a stamp. They answer different
             // questions: the glyph is a MARK, the one you picked the row
-            // out by, and only has to be recognisable; the thumbnail is the
+            // out by, and only has to be recognizable; the thumbnail is the
             // thing itself, and this is the one panel where you look AT it.
             //
             // AS TALL AS THE FACTS BESIDE IT, which is the one measurement
@@ -481,7 +481,7 @@ Item {
               // NOT CLEARED ON CLOSE. It used to empty the moment the
               // card was told to go, so the picture became the glyph on
               // the first frame of the fade and the card re-laid itself
-              // out — narrower, recentred — while it was leaving.
+              // out — narrower, recentered — while it was leaving.
               //
               // THE POOL'S COPY FIRST, even for a picture Qt can open:
               // a 480px JPEG decodes in a few milliseconds, so it is
@@ -532,7 +532,12 @@ Item {
             }
             color: {
               const r = props.rows[0];
-              return r ? props.host.inkFor(r) : Zenon.accentMuted;
+              if (!r) return Zenon.accentMuted;
+              // a repository's glyph is git's magenta, as its row's is
+              // (host.repoDirs: terminus; picasso has none)
+              const rd = props.host.repoDirs;
+              return r.isDir && rd && rd[r.path] === true ? Zenon.magenta
+                : props.host.inkFor(r);
             }
             font.family: specimen ? propFace.font.family
               : Zenon.face
@@ -551,8 +556,8 @@ Item {
         // ── TAGS, WHICH ARE NOT A STRING ─────────────────────────
         // A row of its own rather than an entry in `facts`, because
         // every fact there is a label and a piece of text and a tag is
-        // a label and a COLOUR. Flattening them to "red · work" would
-        // hand back exactly what the colour was carrying.
+        // a label and a COLOR. Flattening them to "red · work" would
+        // hand back exactly what the color was carrying.
         //
         // Absent, not empty, for an untagged file: a card that says
         // "tags —" about most files is a row of nothing on most cards.
@@ -708,7 +713,7 @@ Item {
 
 
       // ONE RHYTHM. Everything below the title is 12px apart and the grid
-      // is centred rather than left-padded — it used to start 40px in and
+      // is centered rather than left-padded — it used to start 40px in and
       // end 146px short of the right edge, which is what made the card
       // look like it was leaning.
 
@@ -858,7 +863,7 @@ Item {
 
       Item { width: 1; height: permGrid.gap }
 
-      // A GRID with its columns named, rather than three unlabelled rows
+      // A GRID with its columns named, rather than three unlabeled rows
       // of three: r, w and x are not obvious from the boxes alone, and the
       // heading costs one row of small type.
       Row {
@@ -1049,7 +1054,7 @@ Item {
         // page, the other leaves the card.
         //
         // A positioner skips an invisible child, so on the
-        // properties page Close is centred exactly as it was.
+        // properties page Close is centered exactly as it was.
         DialogButton {
           visible: props.tab === 1
           label: "Back"

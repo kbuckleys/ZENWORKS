@@ -27,7 +27,7 @@ CursorAnchor {
   gap: 6
 
   // No cursorArea is passed in by the modules that host this, which is what
-  // puts it centred over the module instead of wherever the pointer happened
+  // puts it centered over the module instead of wherever the pointer happened
   // to enter. It also means there is a fixed place to aim for on the way to
   // the buttons, rather than a panel that sat somewhere new every time.
 
@@ -71,23 +71,6 @@ CursorAnchor {
     border.color: Zenon.border
     border.width: 1
     radius: 6
-    // the glass rim: light along the top edge, fading out before the
-    // corners turn — see Zenon.rim
-    Rectangle {
-      visible: Zenon.rimOn
-      z: 100
-      x: parent.radius
-      y: 1
-      width: Math.max(0, parent.width - 2 * parent.radius)
-      height: 1
-      gradient: Gradient {
-        orientation: Gradient.Horizontal
-        GradientStop { position: 0.0; color: Zenon.alpha(Zenon.rim, 0) }
-        GradientStop { position: 0.25; color: Zenon.rim }
-        GradientStop { position: 0.75; color: Zenon.rim }
-        GradientStop { position: 1.0; color: Zenon.alpha(Zenon.rim, 0) }
-      }
-    }
 
     // Handlers, not a filling MouseArea. A MouseArea reports containsMouse
     // false the moment the pointer crosses onto a CHILD MouseArea, so putting

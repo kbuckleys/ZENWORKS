@@ -159,7 +159,7 @@ Item {
           FieldAct {
             glyph: pane.win && pane.it && pane.win.isFav(pane.it) ? "" : ""
             ink: pane.win && pane.it && pane.win.isFav(pane.it) ? Zenon.sand : Zenon.accentMuted
-            tip: pane.win && pane.it && pane.win.isFav(pane.it) ? "Leave favourites" : "Add to favourites"
+            tip: pane.win && pane.it && pane.win.isFav(pane.it) ? "Leave favorites" : "Add to favorites"
             tips: pane.win ? pane.win.tipsItem : null
             onClicked: pane.win.toggleFav(pane.it)
           }
@@ -455,7 +455,7 @@ Item {
             height: 26
             width: tagText.implicitWidth + 22
             radius: 13
-            color: tagPress.pressed ? Zenon.wash(0.14) : Zenon.alpha(Zenon.magenta, 0.1)
+            color: tagPress.pressed ? Zenon.pressWash(0.14) : Zenon.alpha(Zenon.magenta, 0.1)
             border.width: 1
             border.color: Zenon.alpha(Zenon.magenta, 0.35)
             Text {

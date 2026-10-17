@@ -64,9 +64,9 @@ Item {
   }
   // justMade holds the names this window has asked for but not yet seen in
   // a listing, so two quick creates cannot both pick "new file". It is
-  // pruned when the row turns up — and a create that is CANCELLED, or
+  // pruned when the row turns up — and a create that is CANCELED, or
   // renamed into something else, produces no such row, so its name stayed
-  // reserved for the rest of the session. Eight cancelled attempts in one
+  // reserved for the rest of the session. Eight canceled attempts in one
   // directory and the next one is offered as "new file 9", which is what the
   // capture shows.
   function unreserve(path) {
@@ -170,7 +170,7 @@ Item {
     term.status = "background set";
   }
   // Which rows a rubber band covers. Worked out from the geometry rather than
-  // by asking each delegate whether it intersects: a ListView only realises
+  // by asking each delegate whether it intersects: a ListView only realizes
   // the delegates near the viewport, so anything scrolled out has no item to
   // ask — but it still has an index, and the index is what the band is really
   // selecting.
@@ -565,12 +565,12 @@ Item {
     const paths = [];
     // THINGS DROPPED IN FROM OUTSIDE THE MACHINE. An image dragged off a web
     // page is not a file and never was — it arrives as an http address, and
-    // this used to discard it along with the text selections and the colours,
+    // this used to discard it along with the text selections and the colors,
     // so dragging a picture out of a browser into a file manager did nothing
     // at all. Dropping one HERE plainly means "keep this here", so it is
     // fetched into the directory it landed on.
     const remote = [];
-    // A drop with nothing we can use — a text selection, a colour — is not
+    // A drop with nothing we can use — a text selection, a color — is not
     // for us. Now that the DropArea takes everything, this is the filter.
     if (!urls || urls.length === 0) return;
     for (const u of urls) {
@@ -602,8 +602,8 @@ Item {
     // ASKED WHERE IT WAS DROPPED, not in the middle of the screen.
     //
     // This was a confirm card: a drop that had just landed on a particular
-    // directory threw a dialog into the centre of the window, and answering it
-    // meant travelling back from where the pointer already was. A small menu
+    // directory threw a dialog into the center of the window, and answering it
+    // meant traveling back from where the pointer already was. A small menu
     // at the release point is the same question asked in the place the answer
     // is about — and it is dismissed the way every other menu is, so letting
     // go of the idea costs an Escape or a click rather than finding "Cancel".

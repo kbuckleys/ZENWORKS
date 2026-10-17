@@ -24,6 +24,11 @@ Item {
   // what the lit state is drawn in: the lock's yellow, the format bar's cyan
   property color litInk: Zenon.yellow
   readonly property bool hovered: hov.hovered
+  // `menu`: it opens the window's menu, and stays pressed while that is up
+  // (the window's menuHeld names it; user, 2026-10-17)
+  property bool menu: false
+  readonly property bool held: tool.menu && !!tool.pane && !!tool.pane.win && tool.pane.win.menuRef.isOpen
+    && tool.pane.win.menuHeld === "tool:" + tool.glyph
   signal pressed(real x, real y)
 
   // the format bar's are narrower, to fit every format across the note
@@ -35,7 +40,7 @@ Item {
   Rectangle {
     anchors.fill: parent
     radius: Zenon.windowRadius
-    color: press.pressed ? Zenon.wash(0.14) : tool.lit ? Zenon.alpha(tool.litInk, 0.14) : hov.hovered && tool.enabled ? Zenon.wash(0.07) : "transparent"
+    color: press.pressed || tool.held ? Zenon.pressWash(0.14) : tool.lit ? Zenon.alpha(tool.litInk, 0.14) : hov.hovered && tool.enabled ? Zenon.wash(0.07) : "transparent"
   }
   Text {
     id: label
@@ -52,6 +57,7 @@ Item {
     onClicked: {
       const p = tool.mapToItem(tool.pane.win.stageItem, 0, tool.height + 4);
       tool.pressed(p.x, p.y);
+      if (tool.menu && tool.pane.win.menuRef.isOpen) tool.pane.win.menuHeld = "tool:" + tool.glyph;
     }
   }
   HoverHandler {

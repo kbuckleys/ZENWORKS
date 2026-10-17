@@ -61,7 +61,7 @@ Item {
   readonly property int rowH: 30
   default property alias body: content.data
 
-  // Which end it comes from, changed WITHOUT the card travelling between
+  // Which end it comes from, changed WITHOUT the card traveling between
   // them (Sheet.noGlide): `set` makes the change (a picker opened from the
   // status line after one opened from the tab strip).
   function setEnd(set) {
@@ -109,7 +109,7 @@ Item {
     // over code, not pictures: lines of text blurred as far as terminus'
     // thumbnails are, under as much black, came out as a plain black card.
     // Frosted properly and stacked (Sheet.gain), so the code reads as soft
-    // streaks of its colours — blurred only a little it stayed legible.
+    // streaks of its colors — blurred only a little it stayed legible.
     // As dark as terminus' sheets: Sheet's own glass (0.8), not a lighter
     // one of plato's (the user asked, 2026-10-08)
     blur: 30

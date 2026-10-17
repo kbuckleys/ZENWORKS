@@ -80,7 +80,7 @@ Singleton {
   // the same moment rather than drifting apart.
   function delay() {
     // Turned off, there is nothing to wait for: the shortest interval a Timer
-    // will honour, so the value lands on the frame after the window exists and
+    // will honor, so the value lands on the frame after the window exists and
     // the Behavior — running at duration 0 — puts it there without a slide.
     if (!root.enabled) return 1;
     const a = root.age();

@@ -7,7 +7,7 @@ import QtQuick
 import QtQuick.Effects
 import "../morpheus"
 
-// THE ROW OF CHIPS, WHEN THERE ARE MORE THAN FIT. Centred while they fit;
+// THE ROW OF CHIPS, WHEN THERE ARE MORE THAN FIT. Centered while they fit;
 // past that it scrolls sideways — the wheel or a touchpad, with the shell's
 // own feel (morpheus ElasticScroll, as howler's filter chips have it) — and
 // whichever end has more beyond it fades out instead of being cut off at the
@@ -75,7 +75,7 @@ Item {
 
     Row {
       id: row
-      // centred while it fits, from the left once it scrolls
+      // centered while it fits, from the left once it scrolls
       x: strip.overflow ? 0 : (flick.width - row.implicitWidth) / 2
       spacing: strip.spacing
     }

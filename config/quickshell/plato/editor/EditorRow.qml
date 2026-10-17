@@ -3,13 +3,13 @@
 // └─┘└─┘┘└┘└┴┘└─┘┴└─┴ ┴└─┘
 // https://github.com/kbuckleys/
 //
-// One screen row: its gutter, and its text in colour.
+// One screen row: its gutter, and its text in color.
 //
 // FOUR LAYERS, back to front: the backgrounds of its spans (a selection, a
-// search match, a colour code's own colour), the text itself, and underlines
-// — straight or curled, in the colour the highlight asks for, which is why
+// search match, a color code's own color), the text itself, and underlines
+// — straight or curled, in the color the highlight asks for, which is why
 // they are drawn here rather than left to the text's own <u>: that one is
-// always the text's colour and always straight, and a diagnostic's is neither.
+// always the text's color and always straight, and a diagnostic's is neither.
 //
 // THE TEXT IS ONE ITEM. The spans become StyledText — <font>, <b>, <i>, <s> —
 // and every space is &nbsp;: StyledText is HTML underneath and folds a run of
@@ -67,7 +67,7 @@ Item {
   width: parent ? parent.width : 0
   height: row.cellH
 
-  // a new colourscheme: same rows, other colours
+  // a new colorscheme: same rows, other colors
   Connections {
     target: row.ed
     function onStylesReset() { row.infoChanged(); }
@@ -157,7 +157,7 @@ Item {
   // ── rendered markdown's blocks (view.lua's `md`) ───────────────────
   // Drawn under the text: a heading's band, fading out to the right with an
   // accent at its start; a code block's framed panel and its language in
-  // the corner; a quote's bars, a callout tinted in its colour; a table's
+  // the corner; a quote's bars, a callout tinted in its color; a table's
   // frame, its header lit and its rows striped; a rule that fades at both
   // ends. A block that spans rows is one shape: each row draws its slice of
   // a taller rounded rectangle, and only the block's first and last rows
@@ -402,7 +402,7 @@ Item {
 
   // ── a diagnostic's pill, and a fold's ──────────────────────────────
   // The message at a line's end sits in a soft pill of its severity's
-  // colour, half a cell of air either side; one the window's edge cut short
+  // color, half a cell of air either side; one the window's edge cut short
   // ends in "…" (view.lua) and its pill runs into the edge. A closed
   // fold's "⋯ N lines" is a quiet pill of its own.
   readonly property var vt: row.info.vt ? Array.from(row.info.vt) : null
@@ -430,7 +430,7 @@ Item {
   // The file tree's expander, exactly (terminus/EntryRow): nf-fa-circle_o
   // closed, nf-fa-circle open — the same ring, filled once the branch is
   // showing — in the muted ink, no animation. It sits in the gap between
-  // the number and the text, centred on it; a click there opens or closes
+  // the number and the text, centered on it; a click there opens or closes
   // the fold (EditorView.foldRingAt). `fo`: 1 an open fold starts on this
   // line, 2 this row is a closed fold.
   Text {

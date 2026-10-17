@@ -30,7 +30,7 @@ Item {
     color: Zenon.wash(0.04)
     border.width: 1
     border.color: Zenon.border
-    // until it lands: the app's colour, and its icon in the middle
+    // until it lands: the app's color, and its icon in the middle
     Rectangle {
       anchors.fill: parent
       visible: shotImg.status !== Image.Ready

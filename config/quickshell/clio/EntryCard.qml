@@ -9,6 +9,7 @@
 // right clicked, the entry's menu.
 
 import QtQuick
+import QtQuick.Effects
 import Quickshell.Widgets
 import "../morpheus"
 import "../terminus"
@@ -22,6 +23,10 @@ Rectangle {
   readonly property var d: card.note && card.note.d ? card.note.d : ({ title: "", preview: "", images: [], words: 0 })
   readonly property var pics: card.note && !card.note.sealed ? card.d.images.slice(0, 4) : []
   readonly property var mood: card.note && card.note.mood ? N.moodOf(card.note.mood.v) : null
+  // the journal's privacy (Settings, "Blur previews"): the words and
+  // pictures frosted until the pointer is on the card or it is the one open
+  readonly property bool veiled: !!card.win && card.win.mgr.journalBlur && !card.here && !cardHover.hovered
+  HoverHandler { id: cardHover }
 
   // a page's air: a little more round the words than a list row has
   height: col.implicitHeight + 32
@@ -54,6 +59,8 @@ Rectangle {
       visible: card.pics.length > 0
       width: parent.width
       spacing: 4
+      layer.enabled: card.veiled
+      layer.effect: MultiEffect { blurEnabled: true; blur: 1; blurMax: 40 }
       Repeater {
         model: card.pics
         delegate: ClippingRectangle {
@@ -76,6 +83,9 @@ Rectangle {
             sourceSize.width: 420
             fillMode: Image.PreserveAspectCrop
             asynchronous: true
+            // faded in as it arrives, not popped in (2026-10-17)
+            opacity: status === Image.Ready ? 1 : 0
+            Behavior on opacity { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
           }
         }
       }
@@ -97,16 +107,18 @@ Rectangle {
       maximumLineCount: 4
       elide: Text.ElideRight
       text: card.note && !card.note.sealed ? card.d.preview : ""
+      layer.enabled: card.veiled
+      layer.effect: MultiEffect { blurEnabled: true; blur: 1; blurMax: 20 }
       color: Zenon.accentSoft
       font.family: card.win ? card.win.mgr.faceFor(true) : Zenon.face
       font.weight: Zenon.weight
       font.pixelSize: Zenon.px(14)
       lineHeight: 1.08
     }
-    // selected: when it was last edited, in full, as a list row has it
-    // (NoteRowBody; user, 2026-10-15)
+    // when it was last edited, in full, on every card as a list row has it
+    // (NoteRowBody; user, 2026-10-17)
     Text {
-      visible: card.here && !!card.note && !!card.note.modified
+      visible: !!card.note && !!card.note.modified
       width: parent.width
       elide: Text.ElideRight
       text: visible ? N.dateTime(card.note.modified) : ""

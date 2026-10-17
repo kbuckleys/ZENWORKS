@@ -16,7 +16,7 @@
 // pure display. One reading, one history, and the bar's meter and zeus' graph
 // can never tell you two different things.
 //
-// The inks live here too, for the same reason: a reading's colour IS part of
+// The inks live here too, for the same reason: a reading's color IS part of
 // the reading in this shell — red is cpu wherever you see it.
 
 pragma Singleton
@@ -364,7 +364,7 @@ Singleton {
   property var diskWriteHistory: []
   // Every local filesystem, not only "/": what parseMounts makes of df, on
   // the capacity clock. Its rates are kept apart, by device name, because
-  // they move every second and the list itself does not — a view modelled on
+  // they move every second and the list itself does not — a view modeled on
   // the list is built once per mount, not once per tick.
   property var disks: []
   property var diskRates: ({})     // dev -> { read, write } bytes/sec
@@ -594,7 +594,7 @@ Singleton {
   // Dividing log10(1 + bytes) by log10(1 + max) puts idle traffic most of the
   // way up: 36 kB/s — a page loading in the background — measured 62/100, so
   // the top two notches were the only ones that ever moved and the meter looked
-  // permanently near full without ever reaching it. Normalising the log over
+  // permanently near full without ever reaching it. Normalizing the log over
   // floor..max instead spends the range where the traffic actually is.
   //
   // The ceiling is LEARNED, not guessed. Any fixed full-scale figure is a guess

@@ -104,6 +104,9 @@ Item {
     return Qt.PointingHandCursor;
   }
   // where (x, y) in the block is, in the TextEdit
+  // ── SPELLING ── its marks (SpellMarks, a child of the text)
+  readonly property var spellRuns: spell.runs
+  function spellAt(pos) { return spell.at(pos); }
   function textPoint(x, y) { return Qt.point(x - text.x, y - body.y - text.y); }
   function posAt(x, y) {
     const p = blk.textPoint(x, y);
@@ -139,7 +142,7 @@ Item {
   property bool _loaded: false
   onBChanged: Qt.callLater(blk.load)
   Component.onCompleted: blk.load()
-  // the theme changed: colours by name are painted again
+  // the theme changed: colors by name are painted again
   Connections {
     target: Zenon
     function onThemeEpochChanged() {
@@ -278,7 +281,8 @@ Item {
       activeFocusOnPress: false
       persistentSelection: true
       color: blk.b && blk.b.k === "check" && blk.b.c ? Zenon.muted : blk.kind === "quote" ? Zenon.soft : Zenon.ink
-      selectionColor: Zenon.alpha(Zenon.cyan, 0.32)
+      // while finding, the match is marked yellow, as Apple's find marks it
+      selectionColor: blk.editor && blk.editor.findQuery !== "" ? Zenon.alpha(Zenon.yellow, 0.5) : Zenon.alpha(Zenon.cyan, 0.32)
       selectedTextColor: color
       font.family: blk.kind === "mono" ? Zenon.faceMono : (blk.editor ? blk.editor.face : Zenon.face)
       font.weight: blk.kind === "title" || blk.kind === "heading" ? Font.Bold
@@ -297,8 +301,19 @@ Item {
         if (blk.syncing || !blk.editor || !blk.isText) return;
         blk.editor.typed(blk.key, blk);
       }
-      onActiveFocusChanged: if (activeFocus && blk.editor) blk.editor.focused(blk.key)
-      onCursorPositionChanged: if (activeFocus && blk.editor) blk.editor.caretMoved(blk.key, blk)
+      // a squiggle under each wrong word
+      SpellMarks {
+        id: spell
+        field: text
+        mgr: blk.editor ? blk.editor.mgr : null
+        active: blk.isText && blk.kind !== "mono" && !!blk.editor && !blk.editor.readOnly
+      }
+      onActiveFocusChanged: {
+        if (activeFocus && blk.editor) blk.editor.focused(blk.key);
+      }
+      onCursorPositionChanged: {
+        if (activeFocus && blk.editor) blk.editor.caretMoved(blk.key, blk);
+      }
       Keys.onPressed: (e) => { if (blk.editor && blk.editor.key(blk.key, blk, e)) e.accepted = true; }
     }
     // Math Notes' answer, ghosted after the "=" until taken (tab)
@@ -318,7 +333,7 @@ Item {
       x: blk.indentW
       readonly property real room: Math.max(80, blk.slotW - blk.indentW)
       // a sketch with its strokes is drawn from them (so in this theme's
-      // colours); its saved picture is only for exports and thumbnails
+      // colors); its saved picture is only for exports and thumbnails
       readonly property bool drawn: blk.kind === "sketch" && !!blk.b && !!blk.b.strokes
       readonly property real natural: media.drawn ? room : pic.implicitWidth > 0 ? pic.implicitWidth : room
       width: visible ? Math.round(Math.min(room * (blk.b && blk.b.w ? blk.b.w : 1), Math.max(60, natural))) : 0

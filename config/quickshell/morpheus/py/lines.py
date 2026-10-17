@@ -12,7 +12,7 @@
 # and reads one line per message:
 #
 #   {"id": 7, "ok": true, "result": ...}            the answer, exactly once
-#   {"id": 7, "ok": false, "error": "...", "kind": "cancelled"|...}
+#   {"id": 7, "ok": false, "error": "...", "kind": "canceled"|...}
 #   {"id": 7, "event": {...}}                       progress, before the answer
 #   {"event": {...}}                                not tied to a request
 #

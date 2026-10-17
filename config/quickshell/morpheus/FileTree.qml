@@ -76,7 +76,7 @@ FocusScope {
   // draw theirs — at the text's own size they read as specks
   property int toolbarGlyphSize: tree.fontSize + 4
   // the band along the bottom instead of the top (plato: in line with its
-  // status line), and its colour — the tab strip's band by default, or the
+  // status line), and its color — the tab strip's band by default, or the
   // tree's own background where it should read as part of the tree
   property bool toolbarBottom: false
   property color toolbarColor: Zenon.headBg
@@ -133,11 +133,45 @@ FocusScope {
     }
     const o = Object.assign({}, tree.openDirs);
     if (want) o["k:" + p] = true; else delete o["k:" + p];
+    tree.branchMoved(p);
     tree.openDirs = o;
     if (want && tree.kids["k:" + p] === undefined) tree.readKids(p);
     watcher.restartSoon();
   }
   function toggle(p) { tree.setOpen(p, !tree.isOpen(p)); }
+
+  // ── A BRANCH OPENING OR CLOSING SLIDES (user, 2026-10-17) ─────────────
+  // terminus' list does it (Pane.branchMoved): the rows below glide from
+  // their old places to their new ones, and an opening branch's own rows
+  // come down out of the directory's row, fading in. The model is a plain
+  // array, so every change builds the rows afresh — each reads where its
+  // path stood (`prevAt`) as it is made. Held a while, as a branch not read
+  // yet lands a moment after it is opened.
+  property var prevAt: ({})
+  property string branchPath: ""
+  property int branchAt: -1
+  function branchMoved(p) {
+    const at = ({});
+    let b = -1;
+    for (let i = 0; i < tree.flat.length; ++i) {
+      at["k:" + tree.flat[i].e.path] = i;
+      if (tree.flat[i].e.path === p) b = i;
+    }
+    if (b < 0) return;
+    tree.prevAt = at;
+    tree.branchAt = b;
+    tree.branchPath = p;
+    branchOff.restart();
+  }
+  Timer {
+    id: branchOff
+    interval: 700
+    onTriggered: { tree.branchPath = ""; tree.prevAt = ({}); }
+  }
+  function inBranch(path) {
+    const b = tree.branchPath;
+    return b !== "" && String(path).indexOf(b === "/" ? "/" : b + "/") === 0;
+  }
 
   // ── reading directories: one `find` at a time, in the order asked ──────
   property var queue: []
@@ -258,8 +292,8 @@ FocusScope {
       // on the next tick: stopped and started in one, a Process may not
       // notice it was ever stopped, and keeps watching the old set
       Qt.callLater(() => {
-        watcher.command = ["inotifywait", "-m", "-q", "-e", "create,delete,moved_to,moved_from",
-          "--format", "%w"].concat(dirs);
+        watcher.command = Paths.tether(["inotifywait", "-m", "-q", "-e", "create,delete,moved_to,moved_from",
+          "--format", "%w"].concat(dirs));
         watcher.running = true;
       });
     }
@@ -568,7 +602,7 @@ FocusScope {
   readonly property real rowH: treeHost.rowH
 
   // ── the toolbar ────────────────────────────────────────────────────
-  // The root's name on the left, the verbs on the right, in the band colour
+  // The root's name on the left, the verbs on the right, in the band color
   // of a tab strip so the two read as one line across the window.
   component ToolGlyph: Item {
     id: tg
@@ -767,6 +801,28 @@ FocusScope {
       // cursor here, focused or not
       passive: false
       onToggled: { tree.sel = row.index; tree.toggle(row.modelData.e.path); }
+      // the slide, as it is built — see branchMoved
+      Glide { id: rowGlide; limit: list.height; duration: 220 }
+      z: tree.inBranch(row.modelData.e.path) ? -1 : 0
+      NumberAnimation {
+        id: rowFade
+        target: row
+        property: "opacity"
+        from: 0
+        to: 1
+        duration: 220
+        easing.type: Easing.OutCubic
+      }
+      Component.onCompleted: {
+        if (tree.branchPath === "") return;
+        const was = tree.prevAt["k:" + row.modelData.e.path];
+        if (was !== undefined) {
+          if (was !== row.index) rowGlide.from(0, (was - row.index) * treeHost.rowH);
+        } else if (tree.inBranch(row.modelData.e.path) && tree.branchAt >= 0) {
+          rowGlide.from(0, (tree.branchAt - row.index) * treeHost.rowH);
+          rowFade.restart();
+        }
+      }
       onChosen: (right, shift, ctrl) => {
         // A right click holds the row for its menu and leaves the cursor
         // AND the keyboard be (user, 2026-10-09) — see heldAt. Taking the

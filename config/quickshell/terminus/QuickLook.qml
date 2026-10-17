@@ -130,7 +130,7 @@ PanelWindow {
     // Measured, not guessed, and measured once per directory rather than
     // once per row: the longest name by CHARACTER COUNT, then that one
     // string laid out for its real width. The rows themselves cannot
-    // be asked — the list virtualises them, so the long one is very
+    // be asked — the list virtualizes them, so the long one is very
     // often not built.
     readonly property string dirWidest: {
       let best = "";
@@ -395,7 +395,7 @@ PanelWindow {
 
     // Down the first column, then the second — the order `ls` uses and
     // the order a person scanning for a name expects. Row-major would
-    // put neighbours side by side and break the alphabet.
+    // put neighbors side by side and break the alphabet.
     readonly property var dirPairs: {
       const n = look.dirRows.length;
       if (n === 0) return [];
@@ -567,7 +567,7 @@ PanelWindow {
         // ANSWERED, not merely absent. dirRows still holds the LAST
         // directory's listing while this one is being read, so "empty" is
         // only true once the reply on screen is about this path — the
-        // guard the old centred "Empty" label carried before the facts
+        // guard the old centered "Empty" label carried before the facts
         // took the sentence over.
         ["items", (look.reading || root.previewShown !== r.path) ? "\u2026"
           : (n === 0 ? "empty" : n + (n === 1 ? " item" : " items"))],
@@ -858,7 +858,7 @@ PanelWindow {
       // The card is sized to what it shows, and a 100px icon made a
       // 100px card: the name and the key hints were crushed into the
       // picture's width and cut off. The caption's natural width is now
-      // the floor, and a picture smaller than that sits centred in the
+      // the floor, and a picture smaller than that sits centered in the
       // room — see shotX. Nothing in the caption reads the card's width,
       // so this cannot loop; capped at the window like everything else.
       readonly property real capMinW: Math.min(look.width * 0.9,
@@ -906,7 +906,7 @@ PanelWindow {
         // the panel's width and the panel's width comes from the picture.
         // The panel IS the picture's size, so the corner is 0, 0 — and the
         // border draws over the edge, which is what a frame is. A PDF's
-        // page strip, when it has one, is to its right. Centred when the
+        // page strip, when it has one, is to its right. Centered when the
         // caption is wider than the picture — see capMinW.
         x: lookFrame.shotX
         y: 0
@@ -954,7 +954,7 @@ PanelWindow {
       // as it is made. Click one to go there; PageUp and PageDown step.
       ListView {
         id: lookPages
-        // pinned to the card's right edge, whatever the page is centred in
+        // pinned to the card's right edge, whatever the page is centered in
         x: lookFrame.width - look.sideW
         y: 0
         width: look.sideW
@@ -1302,25 +1302,25 @@ PanelWindow {
         // ── the directory ────────────────────────────────────────────
         Column {
           id: lookDirSide
-          // ── THE BOX IS CENTRED; THE LINES ARE NOT ─────────────
+          // ── THE BOX IS CENTERED; THE LINES ARE NOT ─────────────
           // Pinned to the top-left of a half taller and wider than it
           // is, the facts read as having fallen into a corner of the
           // card rather than as being placed in it. So the column is
-          // sized to the facts and centred on both axes — and every
+          // sized to the facts and centered on both axes — and every
           // line inside it still starts at its left edge, because a
-          // centred RAG-BOTH label column is not a properties list,
+          // centered RAG-BOTH label column is not a properties list,
           // it is a poem.
           anchors.verticalCenter: parent.verticalCenter
-          // The INK centred, not the box. Every fact carries 10px of
-          // padding BELOW it, including the last one, so a box centred
+          // The INK centered, not the box. Every fact carries 10px of
+          // padding BELOW it, including the last one, so a box centered
           // by its own height hangs half that gap high.
           anchors.verticalCenterOffset: Math.round(5 * root.zoom)
           x: Math.round((lookDirSide.room - lookDirSide.width) / 2)
           spacing: 0
 
-          // The half it is centred in — which is the whole pane when
+          // The half it is centered in — which is the whole pane when
           // an empty directory leaves no contents half to sit beside.
-          // Read off the PANE, because centring cannot feed a width.
+          // Read off the PANE, because centering cannot feed a width.
           readonly property real room:
             lookDirPane.split ? lookDirPane.leftW : lookDirPane.width
           // What it may not grow past. Read off the READING WIDTH,
@@ -1417,7 +1417,7 @@ PanelWindow {
           // wheel's clamp to 0 then left the first rows above the
           // fold. So a change of pitch rewinds too, and so does
           // opening the viewer, and anything the wheel still had in
-          // flight for the last directory is cancelled first.
+          // flight for the last directory is canceled first.
           function rewind() {
             lookDirWheel.elastic.halt(lookDir);
             lookDir.positionViewAtBeginning();
@@ -1597,7 +1597,7 @@ PanelWindow {
         // says that better by simply being the thing.
         // ── AND NOT OVER THE TWO THAT NOW HAVE SOMETHING ────────
         // An archive whose listing is still being read says nothing
-        // rather than apologising and then filling in — `arc` rather
+        // rather than apologizing and then filling in — `arc` rather
         // than `tree`, so the gap before the rows arrive is silent too.
         visible: !lookShot.visible && !look.pending && !look.reading
                  && !look.hasText && !look.playable
@@ -1701,7 +1701,7 @@ PanelWindow {
         }
 
         // ── THE NAME LEFT, THE KEYS RIGHT ─────────────────────────
-        // Centred, the name moved every time you stepped to a file with a
+        // Centered, the name moved every time you stepped to a file with a
         // longer one — a title that shifts under the eye on every keypress,
         // in the one place you are pressing a key repeatedly. Pinned left it
         // starts in the same spot whatever it says, and the room it is not

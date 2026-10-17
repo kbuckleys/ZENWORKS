@@ -141,7 +141,89 @@ function dragFileCommand(id, dir) {
       Strings.shellQuote(file);
 }
 
-// PAIRS, NOT MARKUP. It used to hand back finished rich text with the colours
+// ── WHEN EACH ENTRY ARRIVED ─────────────────────────────────────────────
+// cliphist keeps no time at all: its database is id → bytes and nothing
+// else. So folio keeps its own ledger beside it, id → milliseconds, filled
+// in by watching the database for the one CLOSE_WRITE each `cliphist store`
+// makes (a list or a decode makes none, so reading it back cannot loop).
+//
+// An id the ledger has never seen gets `now` when the scan was set off by a
+// store, and 0 — "no time known" — when it was the scan the shell does on
+// starting, because those arrived while nobody was watching and stamping
+// them with the start time would be a confident lie. The very first run has
+// no ledger, so everything already there is 0 the same way.
+//
+// `carry` is a re-copy from folio itself: cliphist dedupes by deleting the
+// old entry and storing it again under a new id, and the moment it was
+// first taken belongs to the new id rather than being reset to now.
+function ledgerPath() {
+  return thumbDir() + "/folio-ledger.json";
+}
+
+function parseLedger(text) {
+  try {
+    const o = JSON.parse(text || "");
+    return o && typeof o === "object" ? o : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+function listIds(text) {
+  const ids = [];
+  for (const line of String(text || "").split("\n")) {
+    const m = line.match(/^(\d+)\t/);
+    if (m) ids.push(m[1]);
+  }
+  return ids;
+}
+
+// ids are newest first, as cliphist lists them. Returns the new ledger, or
+// null when nothing changed and there is nothing to write.
+function reconcile(ledger, ids, live, now, carry) {
+  const out = {};
+  let changed = false;
+  let carried = false;
+  for (const id of ids) {
+    if (ledger[id] !== undefined) { out[id] = ledger[id]; continue; }
+    changed = true;
+    if (!live) { out[id] = 0; continue; }
+    // only the newest unseen id can be the re-copy
+    if (carry !== null && carry !== undefined && !carried) { out[id] = carry; carried = true; }
+    else out[id] = now;
+  }
+  for (const id in ledger) if (out[id] === undefined) { changed = true; break; }
+  return changed ? out : null;
+}
+
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+// "Today · 14:32", "Yesterday · 9:05 PM", "Oct 3 · 14:32", and the year only
+// when it is not this one. Both halves always: what this row is for is when
+// you copied it, and "3d ago" answers only half of that.
+function stampLabel(ms, now, h24) {
+  if (!ms) return "Time unknown";
+  const d = new Date(ms);
+  const n = new Date(now);
+  const mins = String(d.getMinutes()).padStart(2, "0");
+  const time = h24
+    ? String(d.getHours()).padStart(2, "0") + ":" + mins
+    : ((d.getHours() + 11) % 12 + 1) + ":" + mins + (d.getHours() < 12 ? " AM" : " PM");
+  const day0 = new Date(n.getFullYear(), n.getMonth(), n.getDate()).getTime();
+  const then0 = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const back = Math.round((day0 - then0) / 86400000);
+  let day;
+  if (back === 0) day = "Today";
+  else if (back === 1) day = "Yesterday";
+  else {
+    day = MONTHS[d.getMonth()] + " " + d.getDate();
+    if (d.getFullYear() !== n.getFullYear()) day += " " + d.getFullYear();
+  }
+  return day + " · " + time;
+}
+
+// PAIRS, NOT MARKUP. It used to hand back finished rich text with the colors
 // written into it as hex — which meant the palette lived in two places, and a
 // hint could only ever be drawn one way. The popup draws these as chips now;
 // what belongs here is which key and what it does.

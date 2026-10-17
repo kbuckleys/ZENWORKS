@@ -55,7 +55,7 @@ Scope {
     })]
   }
 
-  // Windows are CREATED, not modelled.
+  // Windows are CREATED, not modeled.
   //
   // The first version put an Instantiator over a JS array of ids and pushed a
   // new id onto it. Replacing the array makes the Instantiator rebuild every
@@ -588,7 +588,7 @@ Scope {
     w.setSaveName(saving ? saveName : "");
     w.setView(w.pickerView);
     w.dual = false;
-    // held until its listing is in, as a portal request's is (fulfil): shown
+    // held until its listing is in, as a portal request's is (fulfill): shown
     // at once, its rows were drawn under the compositor's open animation
     w.revealWhenReady();
     return true;
@@ -630,7 +630,7 @@ Scope {
   //
   // A save names a file that does not exist yet — that is what a save IS — so
   // every save request was answered with a path the portal then threw away,
-  // and the application received response code 2: not "the user cancelled" but
+  // and the application received response code 2: not "the user canceled" but
   // "the dialog failed". Firefox answers that by downloading into its own
   // last-used directory on its own, which is where the half-written file that
   // started all of this was coming from.
@@ -798,7 +798,7 @@ Scope {
         const w = mgr.dataWin();
         if (!w) return "no window";
         // allCollections, not collections: the built-in Recents is
-        // synthesised rather than stored — see recentsCollection — so
+        // synthesized rather than stored — see recentsCollection — so
         // the stored list does not contain it and `Terminus collection
         // Recents` quietly matched nothing.
         const all = w.allCollections;
@@ -941,7 +941,7 @@ Scope {
           //
           // portalAnswer clears `portal` and only then queues the write, so
           // there was a window of a frame or two where the dialog was gone and
-          // the answer had not been written yet. A poll landing in it cancelled
+          // the answer had not been written yet. A poll landing in it canceled
           // a save that had actually been confirmed, and the asking program
           // fell back to the file it had already written in the directory it
           // suggested — which is how a save aimed at one directory ended up as
@@ -991,7 +991,7 @@ Scope {
           // "clip.mp4_". portal.log shows it exactly: every underscored
           // request follows a save of that same name into that same directory.
           // The field took it verbatim, and the file landed with an
-          // extension nothing recognises.
+          // extension nothing recognizes.
           //
           // Stripped only where what is left has a real extension, so a
           // name that genuinely ends in "_" keeps it. Clobbering is the
@@ -1013,7 +1013,7 @@ Scope {
 
         let w = mgr.picker();
         if (!w) return "no window";
-        // A request already open is ANSWERED — cancelled — before this one
+        // A request already open is ANSWERED — canceled — before this one
         // takes the window. Overwriting `portal` dropped the first request's
         // `out`, so its .done file was never written and the application
         // that asked first waited on it for good. Asked for again after,

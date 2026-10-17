@@ -20,7 +20,7 @@
 //                                             : tip.hide(button)
 //     }
 //
-// A short wait before the first one, none between neighbours: running the
+// A short wait before the first one, none between neighbors: running the
 // pointer along a toolbar reads each name as it passes, as it does anywhere.
 // Wears Tooltip's card, smaller, as a window's labels are (terminus/TipCard).
 
@@ -48,7 +48,7 @@ PopupWindow {
     tip.key = key || "";
     const p = item.mapToItem(null, 0, 0);
     tip.at = Qt.rect(p.x, p.y, item.width, item.height);
-    // already up for a neighbour: straight across, no second wait
+    // already up for a neighbor: straight across, no second wait
     if (tip.shade > 0.5) { wait.stop(); tip.wanted = true; }
     else wait.restart();
   }

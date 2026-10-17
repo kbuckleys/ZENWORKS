@@ -24,6 +24,7 @@ import Quickshell.Io
 import Quickshell.Hyprland
 import "../morpheus"
 import "../terminus"
+import "../ceres"
 import "../morpheus/lagnotes.js" as LagNotes
 import "notes.js" as N
 import "clio.js" as Scribe
@@ -651,6 +652,14 @@ Scope {
   // shell's own (Zenon.face), and follows it
   property string noteFace: ""
   property string journalFace: ""
+  // ── SPELLING ── on unless turned off (user, 2026-10-17); the dictionaries
+  // used ([] = the one for this machine's language)
+  property bool spellOn: true
+  property var spellLangs: []
+  // the journal's previews frosted until hovered (EntryCard.veiled)
+  property bool journalBlur: false
+  // curly quotes and dashes as you type (BlockEditor.smarten)
+  property bool smartPunct: true
   // the journal's reminder: on, at, on which days (0 Sunday … 6 Saturday)
   property bool remind: false
   property string remindAt: "21:00"
@@ -675,7 +684,7 @@ Scope {
     printErrors: false
   }
   readonly property var _keys: ["sort", "view", "groupByDate", "sinkChecked", "scope", "shut", "journalFilter",
-                                "textScale", "noteFace", "journalFace", "remind", "remindAt", "remindDays", "remindedOn", "told", "startWith", "lockAfter", "seen"]
+                                "textScale", "noteFace", "journalFace", "remind", "remindAt", "remindDays", "remindedOn", "told", "startWith", "lockAfter", "seen", "spellOn", "spellLangs", "journalBlur", "smartPunct"]
   property bool _ready: false
   Component.onDestruction: if (keepTimer.running) mgr.keepNow()
   function readState() {
@@ -696,6 +705,88 @@ Scope {
     stateFile.setText(JSON.stringify(o));
   }
   Timer { id: keepTimer; interval: 400; onTriggered: mgr.keepNow() }
+
+  // ── SPELLING ───────────────────────────────────────────────────────────
+  // hunspell in the backend (core/spell.py). What it said of each word is
+  // kept here: word → its suggestions when wrong, null when right; a word not
+  // in it is asked about, in one batch a moment after the asking stops.
+  // spellEpoch moves whenever answers land, and the blocks redraw their marks.
+  property var spellBad: ({})
+  property int spellEpoch: 0
+  property var _spellWant: ({})
+  // "Ignore Spelling": until Clio closes; "Learn Spelling": in the notebook
+  property var spellIgnored: ({})
+  readonly property var learnedSet: { const o = {}; for (const w of mgr.meta.learned || []) o[w.toLowerCase()] = true; return o; }
+  // the dictionaries on this machine: { have, langs, default }
+  property var spellInfo: ({ have: true, langs: [], default: [] })
+  function spellRefresh() {
+    mgr.call("spellLangs", {}, (ok, r) => { if (ok) mgr.spellInfo = r; });
+  }
+  function spellAsk(words) {
+    if (!mgr.spellOn) return;
+    let any = false;
+    for (const w of words) if (!(w in mgr.spellBad) && !mgr._spellWant[w]) { mgr._spellWant[w] = true; any = true; }
+    if (any) spellBatch.restart();
+  }
+  Timer {
+    id: spellBatch
+    interval: 120
+    onTriggered: {
+      const words = Object.keys(mgr._spellWant);
+      mgr._spellWant = ({});
+      if (words.length === 0) return;
+      mgr.call("spell", { words: words, langs: mgr.spellLangs }, (ok, r, err) => {
+        const b = Object.assign({}, mgr.spellBad);
+        if (ok) for (const w of words) b[w] = r.bad[w] !== undefined ? r.bad[w] : null;
+        else {
+          // no hunspell, no dictionary: every word counts as right, and the
+          // settings say why
+          for (const w of words) b[w] = null;
+          if (err && err.kind === "missing") mgr.spellInfo = Object.assign({}, mgr.spellInfo, { have: false });
+        }
+        mgr.spellBad = b;
+        mgr.spellEpoch++;
+      });
+    }
+  }
+  // the suggestions for a word that is wrong; null when it is right (or not
+  // asked about yet, or taught, or ignored)
+  function misspelt(w) {
+    if (!mgr.spellOn) return null;
+    const v = mgr.spellBad[w];
+    if (!v) return null;
+    const l = w.toLowerCase();
+    if (mgr.learnedSet[l] || mgr.spellIgnored[l]) return null;
+    return v;
+  }
+  function learnWord(w) {
+    const l = String(w).toLowerCase();
+    if (mgr.learnedSet[l]) return;
+    mgr.setMeta({ learned: (mgr.meta.learned || []).concat([w]) });
+    mgr.spellEpoch++;
+  }
+  function unlearnWord(w) {
+    const l = String(w).toLowerCase();
+    mgr.setMeta({ learned: (mgr.meta.learned || []).filter((x) => x.toLowerCase() !== l) });
+    mgr.spellEpoch++;
+  }
+  function ignoreWord(w) {
+    const o = Object.assign({}, mgr.spellIgnored);
+    o[String(w).toLowerCase()] = true;
+    mgr.spellIgnored = o;
+    mgr.spellEpoch++;
+  }
+  function setSpellOn(on) { mgr.set("spellOn", !!on); mgr.spellEpoch++; }
+  function setSpellLangs(langs) {
+    mgr.set("spellLangs", langs);
+    // other dictionaries, other answers
+    mgr.spellBad = ({});
+    mgr.spellEpoch++;
+  }
+  // more languages: Ceres' packages, asked for hunspell's dictionaries
+  function moreLanguages() {
+    Ceres.searchPackages("hunspell");
+  }
 
   // the face a note or an entry is written in; `journal` for entries
   function faceFor(journal) { return (journal ? mgr.journalFace : mgr.noteFace) || Zenon.face; }

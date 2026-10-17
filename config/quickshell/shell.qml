@@ -273,7 +273,7 @@ ShellRoot {
   // happen may be another layer opening — the two arrive from one keypress and
   // in either order — and clearing activeLayer in between sends the pill all
   // the way back to morpheus' width before it expands again. Two frames of
-  // grace, cancelled by beginMorph, is the difference between a handover and
+  // grace, canceled by beginMorph, is the difference between a handover and
   // a bounce. A real close is delayed by those two frames and nothing else.
   Timer {
     id: layerRelease
@@ -331,7 +331,7 @@ ShellRoot {
   // ── THE CROSSFADE IS MEASURED OFF THE PILL, NOT OFF A CLOCK ──────────
   // The pill's shape eases on its own curve (Zenon.morphBezier), so a fade
   // keyed to a timer drifts from it: one frame into a collapse the shape had
-  // travelled 62% of the way while a linear timer said 10%, leaving the
+  // traveled 62% of the way while a linear timer said 10%, leaving the
   // layer's text hanging off both rounded ends. So progress is where the
   // pill's width actually is between its two sizes, and the fade cannot
   // drift from the shape whatever curve or duration the shape is given.
@@ -566,7 +566,7 @@ ShellRoot {
   }
 
   // ── WHAT THE PILL IS CARRYING ─────────────────────────────────────────
-  // Each module switch is honoured where the module itself decides whether it
+  // Each module switch is honored where the module itself decides whether it
   // has anything to say — a Collapsible's `active`, or a plain `visible` on
   // the ones that are ordinary Items. A RowLayout leaves an invisible child
   // out of the layout entirely, so switching one off is the same motion the
@@ -590,7 +590,7 @@ ShellRoot {
   // the gap that FOLLOWS item i of the run: there only when item i itself is
   // up and something after it is. "Anything at or before i" doubled the gap
   // whenever a meter in the middle was switched off — both the gap after it
-  // and the one before it stood between the same two neighbours.
+  // and the one before it stood between the same two neighbors.
   function meterGap(i) {
     if (!root.meterRun[i]) return false;
     for (let k = i + 1; k < root.meterRun.length; ++k)
@@ -795,12 +795,12 @@ ShellRoot {
       // refresh rate.
       width: root.currentBarWidth
       height: root.pillMorphed ? root.barHeightExpanded : root.barHeightCollapsed
-      // Centred in the surface and pinned to the screen's edge. Both are
+      // Centered in the surface and pinned to the screen's edge. Both are
       // DERIVED from the animated size rather than animated themselves, so
       // there is no second curve to drift out of step with the first — a
       // pill whose width and x ease separately grows lopsided.
       //
-      // Centred across the output, and held off the edge it lives on by
+      // Centered across the output, and held off the edge it lives on by
       // the screen padding the surface's margins used to supply. Measured
       // against bar.width/height, which are now constants — the surface is
       // the output and never moves, so there is no longer any difference
@@ -837,23 +837,6 @@ ShellRoot {
       border.width: 1
       // single uniform radius so all four corners stay even during morph
       radius: root.pillRadius
-      // the glass rim: light along the top edge, fading out before the
-      // corners turn — see Zenon.rim
-      Rectangle {
-        visible: Zenon.rimOn
-        z: 100
-        x: parent.radius
-        y: 1
-        width: Math.max(0, parent.width - 2 * parent.radius)
-        height: 1
-        gradient: Gradient {
-          orientation: Gradient.Horizontal
-          GradientStop { position: 0.0; color: Zenon.alpha(Zenon.rim, 0) }
-          GradientStop { position: 0.25; color: Zenon.rim }
-          GradientStop { position: 0.75; color: Zenon.rim }
-          GradientStop { position: 1.0; color: Zenon.alpha(Zenon.rim, 0) }
-        }
-      }
       clip: true
       opacity: root.barIntro
       // Rises INTO the screen from whichever edge it lives on: up from below
@@ -891,7 +874,7 @@ ShellRoot {
         : Math.max(0, nowMod.width + Zenon.gap * 2 + 1)
       Rectangle {
         id: takeover
-        // Faded rather than switched. BarText already eases its colour, so
+        // Faded rather than switched. BarText already eases its color, so
         // without this the green vanished in one frame while the text was
         // still crossfading from black — half a beat of black on black.
         visible: nowMod.active && rise > 0.01
@@ -1076,7 +1059,7 @@ ShellRoot {
             onActivated: chronos.toggle()
           }
           // The meters, in one run. No titles and no temperatures between
-          // them: they are told apart by colour — magenta/blue throughput,
+          // them: they are told apart by color — magenta/blue throughput,
           // pink gpu, red cpu, yellow ram, green volume — and a label between two
           // of them would break the row of notches that makes them read as one
           // instrument. The exact numbers are all still in the tooltips.

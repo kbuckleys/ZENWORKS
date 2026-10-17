@@ -40,7 +40,7 @@ Item {
   property bool sinkOnTick: false
   property real textSize: Zenon.px(16)
   property string face: Zenon.face
-  // the page's own width, centred when the pane is wider (Apple's column)
+  // the page's own width, centered when the pane is wider (Apple's column)
   property real maxColumn: 760
   readonly property real columnW: Math.max(200, Math.min(ed.width - 2 * ed.sidePad, ed.maxColumn))
   property real sidePad: 34
@@ -122,7 +122,7 @@ Item {
     return ed.blocks.map((b) => { const o = {}; for (const k in b) if (k !== "_key") o[k] = b[k]; return o; });
   }
 
-  // a colour by name painted for the screen, a link painted cyan; and back
+  // a color by name painted for the screen, a link painted cyan; and back
   function inkHex(name) { return String(Zenon[name] || Zenon.ink).toLowerCase(); }
   function markHex(name) {
     const c = Zenon.mix(Zenon.ground, Zenon[name] || Zenon.sand, Zenon.light ? 0.35 : 0.4);
@@ -146,7 +146,81 @@ Item {
     // a ghost answer goes with any edit but the one that asked it
     if (ed.ghostKey === k) ed.ghost = "";
     mathTimer.restart();
+    Qt.callLater(() => ed.tagCheck(item));
     ed.edited();
+  }
+
+  // ── SMART PUNCTUATION ──────────────────────────────────────────────────
+  // " and ' open after a space, a bracket or the line's start, and close
+  // otherwise (an apostrophe is a closing ’); a second - after a word is an
+  // em dash. Not in Monostyled blocks, and never at a line's start, where
+  // "---" is a divider. Ctrl+Z after one takes it back to what was typed.
+  function smarten(it, b, e) {
+    if (!ed.mgr || !ed.mgr.smartPunct || b.k === "mono" || !it.isText) return false;
+    const te = it.te;
+    if (te.selectionStart !== te.selectionEnd) return false;
+    const pos = te.cursorPosition;
+    const prev = pos > 0 ? te.getText(pos - 1, pos) : "";
+    if (e.text === "\"" || e.text === "'") {
+      const open = prev === "" || /[\s(\[{\u2014\u2013\u201C\u2018]/.test(prev);
+      const ch = e.text === "\"" ? (open ? "\u201C" : "\u201D") : (open ? "\u2018" : "\u2019");
+      te.insert(pos, ch);
+      return true;
+    }
+    if (e.text === "-" && prev === "-" && pos >= 2 && te.getText(0, pos) !== "-" && !/\s/.test(te.getText(pos - 2, pos - 1))) {
+      te.remove(pos - 1, pos);
+      te.insert(pos - 1, "\u2014");
+      return true;
+    }
+    return false;
+  }
+
+  // ── #TAG, COMPLETED ────────────────────────────────────────────────────
+  // A # and the start of a word: the notebook's tags that begin so, offered
+  // under the caret, the most used first. Tab or Return takes the one lit,
+  // ↑↓ choose, Esc puts them away; typing on narrows them.
+  property string tagKey: ""
+  property int tagFrom: -1
+  property var tagHits: []
+  property int tagAt: 0
+  property point tagSpot: Qt.point(0, 0)
+  function tagClear() { if (ed.tagHits.length > 0) ed.tagHits = []; ed.tagKey = ""; ed.tagFrom = -1; }
+  function tagCheck(it) {
+    if (!it || !it.isText || it.kind === "mono" || !ed.mgr || !it.te.activeFocus) { ed.tagClear(); return; }
+    const te = it.te;
+    const pos = te.cursorPosition;
+    const back = te.getText(Math.max(0, pos - 48), pos);
+    const m = back.match(new RegExp("(^|[\\s(])#([" + N.LETTER + "0-9_-]*)$"));
+    if (!m) { ed.tagClear(); return; }
+    const pre = m[2].toLowerCase();
+    const rows = N.tagRows(ed.mgr.notes.filter((n) => n.kind !== "sticky"))
+      .filter((t) => t.name.startsWith(pre) && t.name !== pre)
+      .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name)).slice(0, 6);
+    if (rows.length === 0) { ed.tagClear(); return; }
+    ed.tagKey = it.key;
+    ed.tagFrom = pos - m[2].length - 1;
+    ed.tagHits = rows.map((t) => t.name);
+    ed.tagAt = 0;
+    const r = te.cursorRectangle;
+    ed.tagSpot = te.mapToItem(ed, r.x, r.y + r.height + 4);
+  }
+  function tagTake(name) {
+    const it = ed.itemOf(ed.tagKey);
+    if (!it || ed.tagFrom < 0) { ed.tagClear(); return; }
+    const te = it.te;
+    const from = ed.tagFrom + 1, to = te.cursorPosition;
+    ed.tagClear();
+    te.forceActiveFocus();
+    te.remove(from, to);
+    te.insert(from, N.escape(name) + "&nbsp;");
+  }
+  function tagKeyPress(k, e) {
+    if (ed.tagHits.length === 0 || ed.tagKey !== k) return false;
+    if (e.key === Qt.Key_Down) { ed.tagAt = (ed.tagAt + 1) % ed.tagHits.length; return true; }
+    if (e.key === Qt.Key_Up) { ed.tagAt = (ed.tagAt - 1 + ed.tagHits.length) % ed.tagHits.length; return true; }
+    if (e.key === Qt.Key_Tab || e.key === Qt.Key_Return || e.key === Qt.Key_Enter) { ed.tagTake(ed.tagHits[ed.tagAt]); return true; }
+    if (e.key === Qt.Key_Escape) { ed.tagClear(); return true; }
+    return false;
   }
   Timer { id: typingTimer; interval: 120; onTriggered: ed.flushTyping() }
   function flushTyping() {
@@ -243,9 +317,10 @@ Item {
     ed.place(ed.blocks.length - 1, "end");
   }
   property string cursorKey: ""
-  function focused(k) { ed.cursorKey = k; if (ed.mediaSel !== "" && ed.mediaSel !== k) ed.mediaSel = ""; }
+  function focused(k) { if (ed.tagKey !== "" && ed.tagKey !== k) ed.tagClear(); ed.cursorKey = k; if (ed.mediaSel !== "" && ed.mediaSel !== k) ed.mediaSel = ""; }
   function caretMoved(k, it) {
     if (!ed.crossing) ed.cross = null;
+    if (ed.tagKey !== "" && (k !== ed.tagKey || it.te.cursorPosition <= ed.tagFrom)) ed.tagClear();
     ed.reveal(it, it.te.cursorRectangle);
   }
   // the caret kept in view as it moves (the glide is Elastic's)
@@ -280,6 +355,10 @@ Item {
 
     // a selection over several blocks takes every key first
     if (ed.cross && ed.crossKey(e)) return true;
+    // then the tags offered, if any
+    if (ed.tagKeyPress(k, e)) return true;
+    // curly quotes and dashes, as typed (Settings: Smart punctuation)
+    if (!ctrl && !alt && ed.smarten(it, b, e)) return true;
 
     // undo is the page's, not one block's
     if (ctrl && e.key === Qt.Key_Z && !shift) { ed.undo(); return true; }
@@ -343,6 +422,18 @@ Item {
       te.remove(0, 2);
       ed.flushTyping();
       ed.replace(i, 1, [N.block("rule", ""), N.block("body", "")], { at: i + 1, pos: "start" });
+      return true;
+    }
+
+    // alt ↑ ↓: the line itself carried past the one above or below (a
+    // checklist reordered by keys), the caret going with it
+    if (alt && !ctrl && !shift && (e.key === Qt.Key_Up || e.key === Qt.Key_Down)) {
+      const to = e.key === Qt.Key_Up ? i - 1 : i + 2;
+      if (to < 0 || to > ed.blocks.length) return true;
+      ed.moveBlock(k, to, false);
+      ed.mediaSel = "";
+      const at = ed.indexOf(k);
+      Qt.callLater(() => ed.place(at, pos));
       return true;
     }
 
@@ -529,7 +620,7 @@ Item {
     return b && b.align ? b.align : "";
   }
   // an aligned row's block x: the row's pictures packed together (each as
-  // wide as it is drawn) and the group set centre or right; justified,
+  // wide as it is drawn) and the group set center or right; justified,
   // spread from edge to edge
   function rowX(k) {
     void ed.rev; void ed.blocks;
@@ -569,6 +660,25 @@ Item {
     ed.rev++;
     ed.edited();
   }
+  // every ticked item gone, in one undo step (Apple's "Delete Checked Items")
+  function deleteTicked() {
+    ed.flushTyping();
+    const gone = [];
+    ed.blocks.forEach((b, x) => { if (b.k === "check" && b.c) gone.push(x); });
+    if (gone.length === 0) return 0;
+    ed.snap(true);
+    for (let n = gone.length - 1; n >= 0; n--) {
+      const x = gone[n];
+      delete ed._byKey[ed.blocks[x]._key];
+      keys.remove(x, 1);
+    }
+    ed.blocks = ed.blocks.filter((b) => !(b.k === "check" && b.c));
+    if (ed.blocks.length === 0) { ed.blocks = [ed._mk(N.block("body", ""))]; keys.append({ key: ed.blocks[0]._key }); }
+    ed.anchor = null;
+    ed.rev++;
+    ed.edited();
+    return gone.length;
+  }
   function sinkChecked() {
     ed.flushTyping();
     // within each run of checklist items: the ticked ones last, in order
@@ -601,7 +711,7 @@ Item {
     ed.setAttr(k, "fold", !b.fold);
   }
 
-  // ── MARKS AND COLOURS ──────────────────────────────────────────────────
+  // ── MARKS AND COLORS ──────────────────────────────────────────────────
   // a run of each block in the selection, rewritten by `fn(run)`; with no
   // selection, the word under the caret (Apple's), else the whole line
   function rewrite(fn) {
@@ -652,6 +762,24 @@ Item {
   }
   function highlight(name) {
     ed.rewrite((run) => N.colour(run, "background-color", name ? N.sentinel("mark", N.MARKERS.indexOf(name)) : ""));
+  }
+  // a typeface for the words in hand only, the rest of the block keeping
+  // the note's ("" takes them back to it) — notes.js face
+  // a wrong word put right: the suggestion in its place, one undo step
+  function respellWord(key, run, word) {
+    const it = ed.itemOf(key);
+    if (!it || !it.isText || ed.readOnly) return;
+    if (it.te.getText(run.a, run.b).replace(/’/g, "'") !== run.w) return;
+    ed.flushTyping();
+    ed.snap(true);
+    it.te.remove(run.a, run.b);
+    it.te.insert(run.a, N.escape(word));
+    it.te.cursorPosition = run.a + word.length;
+    ed.flushTyping();
+    ed.edited();
+  }
+  function runFace(family) {
+    ed.rewrite((run) => N.face(run, family));
   }
   function plainText() {
     ed.rewrite((run) => N.escape(N.plain(run)).replace(/\n/g, "<br />"));
@@ -1197,8 +1325,37 @@ Item {
   property var findHits: []
   property int findAt: -1
   property string findQuery: ""
+  // words shown for a moment — a note opened from a search, or at one of
+  // its highlights: scrolled to and lit yellow, then let go
+  property bool flashing: false
+  function flashText(q) {
+    ed.find(String(q || ""));
+    if (ed.findHits.length === 0) { ed.findQuery = ""; return; }
+    ed.flashing = true;
+    flashTimer.restart();
+  }
+  Timer {
+    id: flashTimer
+    interval: 1600
+    onTriggered: {
+      if (!ed.flashing) return;
+      ed.flashing = false;
+      ed.unmarkHit();
+      ed.findQuery = "";
+      ed.findHits = [];
+      ed.findAt = -1;
+    }
+  }
+  // the match shown before, unmarked: selections persist, so a step into
+  // another block left the last one marked too
+  function unmarkHit() {
+    const h = ed.findHits[ed.findAt];
+    const it = h ? rep.itemAt(h.i) : null;
+    if (it && it.isText) it.te.deselect();
+  }
   function find(q) {
     ed.flushTyping();
+    ed.unmarkHit();
     ed.findQuery = q;
     const out = [];
     const lq = q.toLowerCase();
@@ -1217,6 +1374,7 @@ Item {
   }
   function findStep(d) {
     if (ed.findHits.length === 0) return;
+    ed.unmarkHit();
     ed.findAt = (ed.findAt + d + ed.findHits.length) % ed.findHits.length;
     ed.showHit();
   }
@@ -1229,6 +1387,21 @@ Item {
     if (!it) return;
     it.te.select(h.a, h.b);
     ed.reveal(it, it.te.positionToRectangle(h.a));
+  }
+  // find put away: no match left marked (the selection IS the mark, and a
+  // persistent one stayed after the bar closed — user, 2026-10-17); the
+  // caret goes to the end of the match it was on. Whether it placed one.
+  function endFind() {
+    const h = ed.findHits[ed.findAt];
+    ed.unmarkHit();
+    ed.findQuery = "";
+    ed.findHits = [];
+    ed.findAt = -1;
+    const it = h ? rep.itemAt(h.i) : null;
+    if (!it || !it.isText) return false;
+    it.te.forceActiveFocus();
+    it.te.cursorPosition = h.b;
+    return true;
   }
   function replaceHit(t) {
     const h = ed.findHits[ed.findAt];
@@ -1406,7 +1579,9 @@ Item {
           if (c && c.act === "cell" && h.it.table()) h.it.table().focusCell(c.r, c.c, c.pos);
           if (!h.it.isText && c && (c.act === "media" || c.act === "file" || c.act === "resize")) { ed.mediaSel = h.it.key; keySink.forceActiveFocus(); }
           const p = overlay.mapToItem(ed, m.x, m.y);
-          ed.menuAsked(p.x, p.y, { key: h.it.key, kind: h.it.kind, control: c,
+          // a wrong word under the pointer: its suggestions head the menu
+          const sp = h.it.isText ? h.it.spellAt(h.it.posAt(h.x, h.y)) : null;
+          ed.menuAsked(p.x, p.y, { key: h.it.key, kind: h.it.kind, control: c, spell: sp,
                                    link: c && c.act === "link" ? c.href : "", cell: c && c.act === "cell" ? c : null });
           return;
         }
@@ -1552,4 +1727,45 @@ Item {
 
   ElasticScroll { id: wheel; anchors.fill: view; view: view }
   Scrollbar { flick: view; anchors.right: view.right; anchors.top: view.top; anchors.bottom: view.bottom }
+
+  // the tags offered (tagCheck), under the caret
+  Rectangle {
+    visible: ed.tagHits.length > 0
+    z: 60
+    x: Math.min(ed.tagSpot.x, ed.width - width - 8)
+    y: ed.tagSpot.y
+    width: Math.max(160, tagCol.implicitWidth + 12)
+    height: tagCol.implicitHeight + 8
+    radius: Zenon.menuRadius
+    color: Zenon.menuBgSolid
+    border.width: 1
+    border.color: Zenon.border
+    Column {
+      id: tagCol
+      x: 4
+      y: 4
+      Repeater {
+        model: ed.tagHits
+        delegate: Rectangle {
+          required property string modelData
+          required property int index
+          width: Math.max(152, tagWord.implicitWidth + 24)
+          height: Zenon.menuRowHeight - 4
+          radius: Zenon.windowRadius
+          color: index === ed.tagAt || tagRowMouse.containsMouse ? Zenon.alpha(Zenon.cyan, 0.16) : "transparent"
+          Text {
+            id: tagWord
+            anchors.verticalCenter: parent.verticalCenter
+            x: 10
+            text: "#" + modelData
+            color: Zenon.ink
+            font.family: Zenon.face
+            font.weight: Font.DemiBold
+            font.pixelSize: Zenon.px(14)
+          }
+          MouseArea { id: tagRowMouse; anchors.fill: parent; hoverEnabled: true; onClicked: ed.tagTake(modelData) }
+        }
+      }
+    }
+  }
 }

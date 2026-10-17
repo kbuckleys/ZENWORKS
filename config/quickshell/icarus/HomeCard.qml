@@ -262,15 +262,15 @@ PanelWindow {
     return h;
   }
   readonly property int maxListH: card.screen
-    ? card.screen.height - Zenon.padScreen * 2 - Zenon.menuCardPad * 2 - card.headerH
+    ? card.screen.height - Zenon.padScreen * 2 - 2 - card.headerH
     : 500
-  readonly property int bgH: Zenon.menuCardPad * 2 + card.headerH
+  readonly property int bgH: 2 + card.headerH
     + Math.max(Zenon.menuRowHeight, Math.min(card.listH, card.maxListH))
 
   // A row's top, in screen coordinates — for the card a directory opens, and for
   // the right-click menu the keyboard opens.
   function rowScreenTop(i) {
-    return card.cardY + Zenon.menuCardPad + card.headerH + card.rowY(i) - flick.contentY;
+    return card.cardY + 1 + card.headerH + card.rowY(i) - flick.contentY;
   }
 
   readonly property real parentX: card.parentCard ? card.parentCard.cardX : 0
@@ -365,7 +365,9 @@ PanelWindow {
 
     Column {
       anchors.fill: parent
-      anchors.margins: Zenon.menuCardPad
+      // sideways only: the rows run flush to the border top and bottom
+      anchors.leftMargin: Zenon.menuCardPad
+      anchors.rightMargin: Zenon.menuCardPad
       spacing: 0
 
       // ── THE PATH YOU ARE IN ──────────────────────────────────────────
@@ -468,7 +470,9 @@ PanelWindow {
           width: 30
           Rectangle {
             anchors.fill: parent
-            color: openHover.containsMouse ? Zenon.border : "transparent"
+            // out to the border, as every band
+            anchors.rightMargin: -Zenon.menuCardPad
+            color: openHover.containsMouse ? Zenon.menuHi : "transparent"
           }
           Text {
             anchors.centerIn: parent
@@ -571,15 +575,12 @@ PanelWindow {
 
                 Rectangle {
                   anchors.fill: parent
-                  // across the card to just inside its border, as every
-                  // menu's band (CardBody); the last row rounds into the
-                  // card's free corner
-                  anchors.leftMargin: 1 - Zenon.menuCardPad
-                  anchors.rightMargin: 1 - Zenon.menuCardPad
-                  readonly property real inner: entry.index === rowRepeater.count - 1 ? Math.max(0, Zenon.menuRadius - Zenon.menuCardPad) : 0
-                  bottomLeftRadius: bg.againstLeft ? 0 : inner
-                  bottomRightRadius: bg.againstLeft ? inner : 0
-                  color: entry.lit ? Zenon.border : "transparent"
+                  // flush to the border, square, the card's clip rounding
+                  // the last row into its free corner — every menu's band
+                  // (CardBody)
+                  anchors.leftMargin: -Zenon.menuCardPad
+                  anchors.rightMargin: -Zenon.menuCardPad
+                  color: entry.lit ? Zenon.menuHi : "transparent"
                 }
 
                 Rectangle {

@@ -8,7 +8,7 @@
 #
 #   scripts/preflight.sh
 #
-#   1. the JS tests (oracle/test.js) — the pure halves, the colour budget,
+#   1. the JS tests (oracle/test.js) — the pure halves, the color budget,
 #      the type-name clashes
 #   2. the QML tests (oracle/qmltests) — clicks, drags, scrollbars
 #      and delphi's backend (oracle/tests/delphi-core.py), against

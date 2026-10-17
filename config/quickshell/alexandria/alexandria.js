@@ -518,8 +518,8 @@ const SAMPLES = [
 const PARAGRAPH = "The library of Alexandria was one of the largest and most significant "
   + "libraries of the ancient world. It was dedicated to the Muses, the nine goddesses of the "
   + "arts, and it is said to have held hundreds of thousands of scrolls, copied from every "
-  + "ship that put into the harbour. Its scholars measured the earth, edited Homer, and "
-  + "catalogued everything they could lay their hands on.";
+  + "ship that put into the harbor. Its scholars measured the earth, edited Homer, and "
+  + "cataloged everything they could lay their hands on.";
 
 // The alphabet line of the specimen, Latin's
 const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ\nabcdefghijklmnopqrstuvwxyz\n0123456789  &@#$%*  .,;:!?  ()[]{}<>  \"'`~^|\\/  →←↑↓  äéîøüß  ½ ¾ €£¥";

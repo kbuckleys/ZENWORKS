@@ -7,8 +7,8 @@
 // lifted out so cpu, gpu, volume and the volume OSD read as the same
 // instrument rather than four lookalikes that drift apart.
 //
-// Unlit segments are the accent dimmed rather than a neutral grey, so a meter
-// keeps its identity at rest: a red bar at 0% is still recognisably the cpu.
+// Unlit segments are the accent dimmed rather than a neutral gray, so a meter
+// keeps its identity at rest: a red bar at 0% is still recognizably the cpu.
 
 import QtQuick
 import "."
@@ -40,7 +40,7 @@ Item {
   readonly property int span: root.segCount * (root.segLength + root.segGap) - root.segGap
 
   // A meter that has pinned should say so from the corner of the eye, without
-  // adding a colour the bar does not already use.
+  // adding a color the bar does not already use.
   readonly property bool maxed: root.segCount > 0 && root.lit === root.segCount
 
   implicitWidth: root.vertical ? root.thickness : root.span

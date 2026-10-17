@@ -531,7 +531,7 @@ property var statusbar: null
     for (let i = 0; i < popup.filtered.length; ++i) {
       const it = list.itemAtIndex(i);
       // ── AN UNBUILT ROW IS OFF ONE END OR THE OTHER ──────────────────
-      // This used to stop at the first row the view had not realised, on
+      // This used to stop at the first row the view had not realized, on
       // the reading that it was past the far end. It can just as well be
       // BEFORE the near one: wrap to the end of a long list (Up from the
       // first row) and the view scrolls so far that it lets the first rows
@@ -704,7 +704,7 @@ property var statusbar: null
     transform: Translate {
       id: spawnT
       // the slide is the standalone entrance, out of whichever edge the bar
-      // is on. Morphed, the pill has already travelled that distance and the
+      // is on. Morphed, the pill has already traveled that distance and the
       // panel IS the pill, so a second slide reads as the two coming apart.
       y: popup.morphMode ? 0
         : (Zenon.barTop ? -1 : 1) * bg.height * (1 - popup.showFactor)
@@ -828,7 +828,7 @@ property var statusbar: null
           currentIndex: popup.mode === "search" ? popup.sel : -1
           highlightFollowsCurrentItem: false
           highlight: SelBar { cur: list.currentItem }
-          // realise offscreen delegates so ListView.contentWidth is an exact sum
+          // realize offscreen delegates so ListView.contentWidth is an exact sum
           // of real delegate widths rather than an average-based estimate
           cacheBuffer: 4000
 

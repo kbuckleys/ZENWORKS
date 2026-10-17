@@ -9,7 +9,7 @@
 -- and plato does not want one: it draws lines, not cells. So nvim is asked
 -- the questions a renderer needs answered — which buffer lines are on screen
 -- and in what order (folds and wrapping make that a question), what each one
--- looks like once tabs are expanded, what colour every part of it is, where
+-- looks like once tabs are expanded, what color every part of it is, where
 -- the cursor is in screen terms — and the answers are sent as plain data.
 --
 -- nvim stays the authority on the viewport. Its window is sized to plato's
@@ -19,7 +19,7 @@
 -- A SCREEN ROW is { i, n, k, t, s, g, f }:
 --   i  the row on screen          n  the buffer line (0 past the end)
 --   k  which wrapped piece of the line this is (0 = its first row)
---   t  the text as drawn          s  its colours: { {col, len, style}, ... }
+--   t  the text as drawn          s  its colors: { {col, len, style}, ... }
 --   g  the sign in the gutter     f  a closed fold
 --   ig the indent guides: the cells, from the text's left, a guide runs down
 --   m  the bracket at the cursor and its partner: the cells to outline
@@ -234,7 +234,7 @@ local function searchPattern(committed)
     pat, cur = vim.fn.getreg("/"), "CurSearch"
   end
   if not pat or pat == "" then return nil end
-  -- matchbufline honours 'ignorecase' but not 'smartcase'; searching does
+  -- matchbufline honors 'ignorecase' but not 'smartcase'; searching does
   if vim.o.ignorecase and vim.o.smartcase and not pat:find("\\[cC]")
       and pat:gsub("\\.", ""):find("%u") then
     pat = "\\C" .. pat
@@ -280,10 +280,10 @@ local function selection(mode)
   return out
 end
 
--- ── colour codes, in their own colour ──────────────────────────────────
+-- ── color codes, in their own color ──────────────────────────────────
 -- "#9fcbfc", "#fff", "rgb(255, 0, 0)", Qt.rgba(1, 1, 1, 0.5): each is painted
 -- with itself as its background and black or white text on it, whichever
--- reads — as a colour picker would show it. A colour with alpha is shown as
+-- reads — as a color picker would show it. A color with alpha is shown as
 -- it would look over the editor's own near-black.
 --
 -- EIGHT DIGITS MEAN TWO THINGS. CSS writes #rrggbbaa; Qt writes #aarrggbb.
@@ -297,7 +297,7 @@ local function colorGroup(r, g, b, a)
   local hexv = string.format("%02x%02x%02x", r, g, b)
   local name = "PlatoColor_" .. hexv
   if not madeColor[name] then
-    -- relative luminance, roughly: light colours get black text
+    -- relative luminance, roughly: light colors get black text
     local lum = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255
     api.nvim_set_hl(0, name, { bg = "#" .. hexv, fg = lum > 0.55 and "#000000" or "#ffffff" })
     madeColor[name] = true
@@ -307,7 +307,7 @@ end
 
 local function hexDigits(h) return tonumber(h, 16) end
 
--- every colour on a line: { {b0, b1, group}, ... } in bytes, end exclusive
+-- every color on a line: { {b0, b1, group}, ... } in bytes, end exclusive
 local function colorCodes(line, qml)
   local out = {}
   if line:find("#", 1, true) then
@@ -343,7 +343,7 @@ local function colorCodes(line, qml)
       if not s then break end
       local nums = {}
       for n in args:gmatch("[%d%.]+") do nums[#nums + 1] = tonumber(n) end
-      -- only literal numbers count: Qt.rgba(Zenon.cyan.r, ...) is no colour
+      -- only literal numbers count: Qt.rgba(Zenon.cyan.r, ...) is no color
       local literal = not args:sub(2, -2):find("[^%d%.,%s%%]")
       if literal and (#nums == 3 or #nums == 4) and nums[1] and nums[2] and nums[3] then
         local unit = fn:find("Qt%.") ~= nil
@@ -414,7 +414,7 @@ end
 
 -- ── spans ───────────────────────────────────────────────────────────────
 -- cells [c0, c1) of the three layers as { {col, len, style}, ... }, runs of
--- plain Normal left out (the client draws those in Normal's colour anyway)
+-- plain Normal left out (the client draws those in Normal's color anyway)
 local function spans(base, deco, over, c0, c1)
   local out = {}
   local runKey, runStart
@@ -422,7 +422,7 @@ local function spans(base, deco, over, c0, c1)
   local function close(at)
     local id = runKey and runKey ~= "\0\0" and hl.style(rb, rd, ro) or 0
     if id ~= 0 then
-      -- different groups, same colour ("(", "a", ")"): one span, not three
+      -- different groups, same color ("(", "a", ")"): one span, not three
       local prev = out[#out]
       if prev and prev[3] == id and prev[1] + prev[2] == runStart - c0 then
         prev[2] = prev[2] + at - runStart
@@ -525,7 +525,7 @@ end
 -- documentation. Run inside nvim_win_call, so every "current window" question
 -- (w0, winsaveview, virtcol, foldclosed) is asked of this one.
 --
--- CONCEAL is honoured where the window asks for it: markdown in a hover hides
+-- CONCEAL is honored where the window asks for it: markdown in a hover hides
 -- its fences and backticks with treesitter's conceal and conceal_lines, and
 -- without it the card shows raw ```lua lines. On the cursor's own line,
 -- concealing stops unless 'concealcursor' names the mode, as nvim does.
@@ -543,7 +543,7 @@ local function build(win, isCurrent, mode, margin)
   local ts = vim.bo[buf].tabstop
   local last = api.nvim_buf_line_count(buf)
   local qml = vim.bo[buf].filetype == "qml"
-  -- a file too big for the extras (large.lua): no colour codes, no guides,
+  -- a file too big for the extras (large.lua): no color codes, no guides,
   -- no spelling
   local large = vim.b[buf].plato_large == true
   local guides = not large and vim.g.plato_guides ~= false and vim.bo[buf].buftype == ""
@@ -553,7 +553,7 @@ local function build(win, isCurrent, mode, margin)
   local spell = not large and vim.wo[win].spell
   local prose = spell and require("plato.spell").prose(buf)
   local plain = vim.bo[buf].buftype == "" and api.nvim_win_get_config(win).relative == ""
-  -- rainbow brackets (brackets.lua): a colour a level
+  -- rainbow brackets (brackets.lua): a color a level
   local rainbow = not large and plain and vim.g.plato_rainbow ~= false
   local brackets = require("plato.brackets")
   -- markdown drawn as what it means (markdown.lua), in an editor's window
@@ -667,7 +667,7 @@ local function build(win, isCurrent, mode, margin)
   -- the lines of the changes opened in place (git.lua expand)
   local vopen = vcs and require("plato.git").opened(buf)
   -- and what they have now, in green as what went is in red (user,
-  -- 2026-10-14): every cell PlatoDiffNew in place of its syntax colour
+  -- 2026-10-14): every cell PlatoDiffNew in place of its syntax color
   local newInk = setmetatable({}, { __index = function() return "PlatoDiffNew" end })
   -- the cursor's cell, and which character of its row's text that is: the
   -- same number unless a wide character comes before it on the row
@@ -719,7 +719,7 @@ local function build(win, isCurrent, mode, margin)
     else
       local fold = vim.fn.foldclosed(l + 1)
       if fold ~= -1 then
-        -- A CLOSED FOLD IS ITS FIRST LINE, in its own colours, and a pill
+        -- A CLOSED FOLD IS ITS FIRST LINE, in its own colors, and a pill
         -- after it saying how many lines are folded under it — not
         -- foldtext's dashes across the row.
         local fe = vim.fn.foldclosedend(l + 1)
@@ -791,7 +791,7 @@ local function build(win, isCurrent, mode, margin)
 
         local base, dl, ol = {}, {}, {}
         if subLit then
-          -- the preview's own colours: the text plain, what is new lit
+          -- the preview's own colors: the text plain, what is new lit
           for _, r in ipairs(subLit) do paint(ol, chars, ncells, r[1], r[2], "Substitute") end
         elseif tsPaints then
           for _, p in ipairs(tsPaints[l] or {}) do paint(base, chars, ncells, p[1], p[2], p[3]) end
@@ -803,7 +803,7 @@ local function build(win, isCurrent, mode, margin)
         if mdl and not subLit then
           for _, p in ipairs(mdl.paint) do paint(base, chars, ncells, p[1], p[2], p[3]) end
         end
-        -- rainbow brackets, over the syntax's own colour — but not a bracket
+        -- rainbow brackets, over the syntax's own color — but not a bracket
         -- the syntax says is in a string or a comment
         if rainbow and not md and not subLit and line:find("[%(%)%[%]{}]") then
           for _, rb in ipairs(brackets.rainbow(buf, l, line)) do
@@ -890,7 +890,7 @@ local function build(win, isCurrent, mode, margin)
               local full = cellWidth(s)
               local w = math.min(full, rowEnd - ncells)
               if w <= 0 then pill = pill and { pill[1], pill[2], pill[3], true }; break end
-              -- a diagnostic sits in a pill of its severity's colour
+              -- a diagnostic sits in a pill of its severity's color
               -- (and a line's last commit, from git.lua's blame, in a green chip)
               local sev = type(g) == "string"
                 and (g == "PlatoBlame" and "Blame" or g:match("^DiagnosticVirtualText(%a+)"))
@@ -1548,7 +1548,7 @@ function M.setup(send)
       M.schedule(true)
     end,
   })
-  -- new colours: every style number means something else now
+  -- new colors: every style number means something else now
   api.nvim_create_autocmd("ColorScheme", {
     group = group,
     callback = function()
@@ -1583,7 +1583,7 @@ function M.setup(send)
 end
 
 -- a new client knows nothing: forget what the last one was told, and tell it
--- every style and the UI colours before the first frame
+-- every style and the UI colors before the first frame
 function M.reset()
   sentWins = {}
   if emit then emit({ event = "theme", ui = hl.ui(), styles = hl.all(), reset = true }) end

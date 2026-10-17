@@ -28,7 +28,7 @@ Rectangle {
   width: row.implicitWidth + 18
   height: 26
   radius: 5
-  // selected: blue, outlined — a grey fill alone was too quiet to find
+  // selected: blue, outlined — a gray fill alone was too quiet to find
   color: chip.sel ? Qt.rgba(Zenon.blue.r, Zenon.blue.g, Zenon.blue.b, 0.14)
     : hover.containsMouse ? Qt.rgba(Zenon.border.r, Zenon.border.g, Zenon.border.b, 0.45)
     : Zenon.alpha(Zenon.border, 0)

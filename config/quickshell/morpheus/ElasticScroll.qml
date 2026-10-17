@@ -5,7 +5,7 @@
 //
 // ── ELASTIC SCROLLING, DROPPED OVER A VIEW ──────────────────────────────
 // Lay one of these over a Flickable and its wheel gets Finder's rubber band
-// and the smooth notch that goes with it. All the behaviour is in Elastic;
+// and the smooth notch that goes with it. All the behavior is in Elastic;
 // this is only the part that catches the event.
 //
 //     ListView { id: rows; ... }
@@ -41,7 +41,7 @@ MouseArea {
   //
   // A child of a plain Flickable is parented to its contentItem, so
   // `parent` is the whole scrolled content: it travels with the rows, and
-  // cancelling that with contentX/contentY is what keeps this over the
+  // canceling that with contentX/contentY is what keeps this over the
   // visible part.
   //
   // ── BUT ONLY IF THAT IS WHERE WE LANDED ───────────────────────────────

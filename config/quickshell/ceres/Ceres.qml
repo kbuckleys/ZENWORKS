@@ -222,7 +222,7 @@ Singleton {
     const sys = root.repo.length + root.aur.length;
     const steps = (sys > 0 ? Cer.upgradeSteps() : []).concat(Cer.flatpakUpdateSteps(root.flat));
     if (steps.length === 0) return false;
-    return root.request(steps, "", sys);
+    return root.request(steps, "", sys, root.flat.length);
   }
   function updateFlatpak(u) {
     return root.request(Cer.flatpakUpdateOne(u), "update " + u.name, 0);
@@ -304,7 +304,7 @@ Singleton {
     root.dismissNews(root.unreadNews.map(n => n.link));
     root.newsGate = false;
     root._held = null;
-    if (h) root.request(h.steps, h.label, h.expected);
+    if (h) root.request(h.steps, h.label, h.expected, h.flat);
   }
   function holdBack() {
     root.newsGate = false;
@@ -531,6 +531,10 @@ Singleton {
   // no view named — a keybind, the launcher — is the Store, Ceres' first tab
   // (user, 2026-10-14); the bar, its panel and the update toast name Updates
   function openWindow(view) { root.checkDeps(); root.windowRequested(view || "store"); }
+  // Packages, searched for `q` — another app's way to "these, from Ceres"
+  // (clio's spelling languages: hunspell). The window takes it as it shows.
+  property string askedQuery: ""
+  function searchPackages(q) { root.askedQuery = String(q || ""); root.openWindow("packages"); }
   // A keybind's version: open on that view, or close if it is already the
   // one on screen.
   signal windowToggleRequested(string view)
@@ -638,11 +642,17 @@ Singleton {
   property var nextSteps: Cer.upgradeSteps()
   property int nextExpected: -1
   property string nextLabel: ""
+  property int nextFlat: 0
+  // what the running (or last) job was asked as — see Cer.doneLine
+  property string txLabel: ""
+  property int txFlat: 0
 
   // Asks for a password for these steps: the panel or the window answers
   // with its field, whichever is on screen — unless one is still
   // remembered, in which case the steps simply run.
-  function request(steps, label, expected) {
+  // `flat`: how many Flatpak updates the steps take, for the result line —
+  // pacman.log never hears of them
+  function request(steps, label, expected, flat) {
     if (root.txBusy) return false;
     // Anything paru is asked to do, with no paru to ask: setup comes first.
     if (root.deps.paru && steps.some(a => a[0] !== "@sudo" && a[0] !== "@user")) {
@@ -650,13 +660,14 @@ Singleton {
       return false;
     }
     if (Cer.isUpgrade(steps) && root.unreadNews.length > 0) {
-      root._held = { steps: steps, label: label, expected: expected };
+      root._held = { steps: steps, label: label, expected: expected, flat: flat || 0 };
       root.newsGate = true;
       return true;
     }
     root.nextSteps = steps;
     root.nextLabel = label;
     root.nextExpected = expected;
+    root.nextFlat = flat || 0;
     // nothing of root's — a Flatpak just for you — asks for no password
     if (!Cer.needsRoot(steps)) root.upgradeAll("", true);
     else if (root._pw !== "") root.upgradeAll(root._pw);
@@ -728,11 +739,14 @@ Singleton {
     root.nextSteps = Cer.upgradeSteps();
     root.nextExpected = -1;
     root.nextLabel = "";
+    root.nextFlat = 0;
   }
 
   function upgradeAll(password, noAuth) {
     if (root.txBusy || (!password && !noAuth)) return;
     root.txSteps = root.nextSteps;
+    root.txLabel = root.nextLabel;
+    root.txFlat = root.nextFlat;
     root.txSettle = null;
     root.txState = "auth";
     root.txPhase = "Authenticating";
@@ -794,7 +808,7 @@ Singleton {
         + "; printf '\\nPress RETURN to close.'; read _"]);
   }
 
-  // ── CANCELLING ────────────────────────────────────────────────────────
+  // ── CANCELING ────────────────────────────────────────────────────────
   // SIGINT to everything the run started — pacman's own ctrl+c, delivered
   // through sudo, which relays it. pacman decides what that means: a download
   // or a check stops there, and a transaction already writing to the disk
@@ -805,7 +819,7 @@ Singleton {
     const pid = runProc.processId;
     if (!pid) return;
     root.txCancelling = true;
-    root.txPhase = "Cancelling";
+    root.txPhase = "Canceling";
     Quickshell.execDetached(["sh", "-c",
       "kids() { for c in $(pgrep -P \"$1\"); do kids \"$c\"; echo \"$c\"; done; }; "
       + "kill -INT $(kids \"$0\") \"$0\" 2>/dev/null", String(pid)]);
@@ -898,7 +912,7 @@ Singleton {
       }
       // Whatever ended the job, a password still waiting to be confirmed is
       // done with. `authed` is what normally clears it, and a job that died
-      // before sudo answered — the fifo refused, cancelled during auth, the
+      // before sudo answered — the fifo refused, canceled during auth, the
       // wrapper killed — never gets there: the plaintext sat here, with no
       // expiry running, until the screen next locked.
       root._trying = "";
@@ -906,7 +920,7 @@ Singleton {
       root.txCancelling = false;
       root.txLive = null;
       root.txTotal = null;
-      root.txError = cancelled ? "Cancelled"
+      root.txError = cancelled ? "Canceled"
         : code === 0 ? "" : (Cer.failureOf(root.txLog)
           || "paru stopped (exit " + code + ")");
       root.txSettle = !cancelled && code !== 0 ? Cer.settleOf(root.txLog) : null;
@@ -1018,8 +1032,8 @@ Singleton {
   Process {
     id: lockWatch
     running: true
-    command: ["inotifywait", "-m", "-q", "-e", "delete", "--format", "%f",
-              "/var/lib/pacman"]
+    command: Paths.tether(["inotifywait", "-m", "-q", "-e", "delete", "--format", "%f",
+                           "/var/lib/pacman"])
     stdout: SplitParser {
       onRead: (line) => { if (line.trim() === "db.lck") settle.restart(); }
     }
@@ -1088,6 +1102,12 @@ Singleton {
 
   IpcHandler {
     target: "Ceres"
+
+    // Packages, searched for a query
+    function search(q: string): string {
+      root.searchPackages(q);
+      return "searching " + q;
+    }
 
     function status(): string {
       return "repo=" + root.repo.length + " aur=" + root.aur.length

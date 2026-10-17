@@ -5,6 +5,7 @@ QtObject {
   readonly property color cyan: "#9bbfbf"
   readonly property color keyInk: "#a2a8bc"
   readonly property color border: Qt.rgba(0.271, 0.314, 0.361, 0.3)
+  readonly property color menuHi: Qt.rgba(0.608, 0.749, 0.749, 0.16)
   readonly property int fast: 110
   readonly property int ease: Easing.OutQuint
   property bool scrollAutohide: true
@@ -26,7 +27,7 @@ QtObject {
   readonly property int menuSepHeight: 7
   readonly property int menuCardPad: 4
   readonly property int menuIconGap: 12
-  readonly property int menuMaxHeight: menuRowHeight * 22 +menuCardPad * 2
+  readonly property int menuMaxHeight: menuRowHeight * 22 + 2
   readonly property int menuShadowGrow: 4
   readonly property int menuShadowBlur: 24
   readonly property int menuShadowDrop: 6

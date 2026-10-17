@@ -12,7 +12,7 @@
 // are all switched off (see nvim/init.lua); the same facts arrive as state
 // and are laid out here.
 //
-// THE MODE IS A COLOUR AND A WORD, NOT A CHIP. The bar takes the mode's
+// THE MODE IS A COLOR AND A WORD, NOT A CHIP. The bar takes the mode's
 // ink — a breath of tint across it, the position, and the mode's name in
 // small capitals beside the tree's switch — green inserting,
 // magenta selecting, red replacing, yellow on the command line, and muted
@@ -67,7 +67,7 @@ Item {
   // plugin updates waiting (core/Plugins.qml), and a click on their count
   property int pluginUpdates: 0
   // ── A SHEET SPLICED OUT OF THIS BAR ──────────────────────────────
-  // While one hangs from here, the bar goes black — the glass's own colour
+  // While one hangs from here, the bar goes black — the glass's own color
   // at its seam (morpheus/Sheet, Frost.fade*) — and its hairline opens over
   // the card, so the two read as one piece. From the plato window; x in
   // this bar's own coordinates.
@@ -533,7 +533,7 @@ Item {
       TapHandler { onTapped: bar.diagnosticsClicked() }
     }
     // ── git: the branch, and this file's changes ────────────────────
-    // as the gutter colours them: added green, changed yellow, removed red.
+    // as the gutter colors them: added green, changed yellow, removed red.
     // A click: fugitive's status.
     Row {
       readonly property var df: bar.st.diff || null

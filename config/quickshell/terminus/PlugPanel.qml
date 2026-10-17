@@ -102,7 +102,7 @@ LayerPopup {
 
   Process {
     id: udev
-    command: ["udevadm", "monitor", "--udev", "--subsystem-match=block"]
+    command: Paths.tether(["udevadm", "monitor", "--udev", "--subsystem-match=block"])
     running: true
     stdout: SplitParser {
       onRead: (line) => { if (/\(block\)\s*$/.test(line)) reread.restart(); }

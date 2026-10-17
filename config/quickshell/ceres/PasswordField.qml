@@ -245,7 +245,7 @@ Item {
       }
     }
 
-    // Just past the dots, clear of the centred row so it never shifts it.
+    // Just past the dots, clear of the centered row so it never shifts it.
     // Plain x/y rather than anchors — see the layer-window anchor note.
     CapsGlyph {
       shown: field.visible

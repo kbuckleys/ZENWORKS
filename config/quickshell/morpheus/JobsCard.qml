@@ -107,7 +107,7 @@ Rectangle {
           : (jobRow.ended || jobRow.model.cancelled ? Zenon.muted : Zenon.white)
 
         // icarus' menu highlight, which the context menu and its submenu
-        // already wear. A drawer that lit its rows a different colour
+        // already wear. A drawer that lit its rows a different color
         // from every other list in this window read as a different piece
         // of software — the same argument the context menu's own note
         // makes about matching the desktop menu.

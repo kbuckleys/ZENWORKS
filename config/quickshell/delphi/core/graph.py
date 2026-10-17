@@ -16,12 +16,12 @@
 #      each further parent (a merge) joins the column already waiting for it,
 #      or takes a free one.
 #
-# A row is drawn in two halves, top (the edge above → the node's centre) and
-# bottom (the centre → the edge below). Each half is a list of
-# [fromColumn, toColumn, colour]; a straight pass-through is [c, c, colour].
-# Colours stay with a line, not a column: a lane keeps the colour it was born
+# A row is drawn in two halves, top (the edge above → the node's center) and
+# bottom (the center → the edge below). Each half is a list of
+# [fromColumn, toColumn, color]; a straight pass-through is [c, c, color].
+# Colors stay with a line, not a column: a lane keeps the color it was born
 # with however far it travels, and a new line takes the next one. The window
-# maps colour numbers onto the theme's palette.
+# maps color numbers onto the theme's palette.
 #
 # Columns are not compacted while a line still runs through them. A freed
 # column is reused by the next newcomer, and trailing free columns are
@@ -31,7 +31,7 @@
 class Lanes:
     def __init__(self):
         self.lanes = []    # column → hash it waits for (None = free)
-        self.colour = []   # column → colour number of the line in it
+        self.colour = []   # column → color number of the line in it
         self.next_colour = 0
 
     def _free(self):

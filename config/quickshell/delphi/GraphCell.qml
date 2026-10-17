@@ -5,12 +5,12 @@
 //
 // ONE ROW OF THE COMMIT GRAPH. The lanes come laid out from the backend
 // (delphi/core/graph.py): the node's column, and the row's two halves as
-// [from, to, colour] — the top half from the row's top edge to its centre,
-// the bottom half from the centre down. This only draws them: a straight
+// [from, to, color] — the top half from the row's top edge to its center,
+// the bottom half from the center down. This only draws them: a straight
 // stroke where a line passes, an S where it changes column, a dot for the
 // commit (a ring for a merge, larger for the one checked out).
 //
-// Colours are the graph's own numbers, mapped onto the theme's accents
+// Colors are the graph's own numbers, mapped onto the theme's accents
 // (delphi.js laneInk), and repainted on a theme change.
 
 import QtQuick

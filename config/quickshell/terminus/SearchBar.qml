@@ -123,7 +123,7 @@ Rectangle {
       height: 28
       radius: 4
       // no hover tint, as DialogButton (user, 2026-10-11)
-      color: Zenon.wash(addMa.pressed ? 0.24 : 0.12)
+      color: addMa.pressed ? Zenon.pressWash(0.24) : Zenon.wash(0.12)
       border.width: 1
       border.color: Zenon.border
       Behavior on color { ColorAnimation { duration: Zenon.fast; easing.type: Zenon.ease } }

@@ -10,7 +10,7 @@
 // That is the argument for the suite: a quoting slip here does not raise an
 // error, it runs. And the parsing half has to survive getfattr's own format,
 // which C-quotes its values in OCTAL and prints nothing at all for a file
-// with no attribute — two behaviours easy to write a parser against by
+// with no attribute — two behaviors easy to write a parser against by
 // assuming rather than by reading.
 
 "use strict";
@@ -19,7 +19,7 @@ module.exports = {
   module: "terminus/tags.js",
   cases: (T, t) => {
     // ── the seven ─────────────────────────────────────────────────────────
-    // Named for the COLOUR a person means, mapped onto Zenon's own names,
+    // Named for the COLOR a person means, mapped onto Zenon's own names,
     // which disagree: Zenon's `yellow` is #fab387, which is orange.
     t.eq("there are seven presets", T.PRESETS.length, 7);
     t.eq("orange means Zenon's yellow", T.presetInk("orange"), "yellow");
@@ -27,7 +27,7 @@ module.exports = {
     t.eq("purple means Zenon's magenta", T.presetInk("purple"), "magenta");
     t.eq("a tag of one's own has no preset ink", T.presetInk("work"), "");
     t.eq("and nor does the empty string", T.presetInk(""), "");
-    // presetInk returns the NAME of a colour, not a colour. Handing the
+    // presetInk returns the NAME of a color, not a color. Handing the
     // resolved value to a definition made every renamed preset come out cyan,
     // because tagInk looks the name up again on the way out.
     t.ok("a preset ink is a name, not a #hex",
@@ -42,11 +42,11 @@ module.exports = {
     t.eq("nothing is no tags", T.splitTags(""), []);
     t.eq("and neither is undefined", T.splitTags(undefined), []);
 
-    // normalise is what makes two files carrying the same set carry the same
+    // normalize is what makes two files carrying the same set carry the same
     // STRING, which is what lets a plain comparison answer "are these alike".
-    t.eq("normalise sorts", T.normalise(["work", "red"]), ["red", "work"]);
-    t.eq("normalise dedupes", T.normalise(["red", "red"]), ["red"]);
-    t.eq("normalise drops the empties", T.normalise(["red", "", "  "]),
+    t.eq("normalize sorts", T.normalise(["work", "red"]), ["red", "work"]);
+    t.eq("normalize dedupes", T.normalise(["red", "red"]), ["red"]);
+    t.eq("normalize drops the empties", T.normalise(["red", "", "  "]),
       ["red"]);
     // A comma cannot survive inside a name: it is the separator, so a tag
     // holding one would read back as two.
@@ -212,7 +212,7 @@ module.exports = {
     t.eq("a scan of / is the whole index", Object.keys(T.mergeScan(scanIdx, {}, "/")), []);
 
     // Tag names are user text, and some user text is also an Object key.
-    t.eq("a tag called constructor survives normalising",
+    t.eq("a tag called constructor survives normalizing",
       T.normalise(["constructor", "toString"]), ["constructor", "toString"]);
     t.eq("and is counted from zero", T.tally({ "/a": ["constructor"] })["constructor"], 1);
 
@@ -233,7 +233,7 @@ module.exports = {
     t.eq("starring rates five", T.sidecarRating(true, 2), "5");
     t.eq("unstarring clears a five", T.sidecarRating(false, 5), "");
     t.eq("any other rating is left", T.sidecarRating(false, 3), "-");
-    t.eq("the favourite goes as the rating, not a word",
+    t.eq("the favorite goes as the rating, not a word",
       T.writeSidecarsArgv([{ path: "/p/a.jpg", names: ["favourite", "red"], rating: "5" }], {}).slice(4),
       ["/p/a.jpg.xmp", "5", "1", "red"]);
   }

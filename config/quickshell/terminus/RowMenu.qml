@@ -503,7 +503,7 @@ PopupWindow {
     // what subCol will come to: its rows, and the padding it puts above and
     // below them
     readonly property real subCardH: {
-      let h = 2 * Zenon.menuCardPad;
+      let h = 2;   // the border: the rows run flush to it top and bottom
       for (const it of menu.subItems)
         h += it.sep ? Zenon.menuSepHeight : Zenon.menuRowHeight;
       return h;
@@ -521,7 +521,8 @@ PopupWindow {
     onSubShadeChanged: if (menu.subShade <= 0.01 && menu.subAt < 0) menu.subShown = -1
 
     readonly property real subRowTop: {
-      let y = Zenon.menuCardPad;
+      // the card's top against the row's, so the two first rows line up
+      let y = 0;
       for (let i = 0; i < menu.subShown && i < menu.items.length; ++i)
         y += menu.items[i].sep ? Zenon.menuSepHeight : Zenon.menuRowHeight;
       return y;
@@ -610,16 +611,16 @@ PopupWindow {
     // pointer that had just arrived somewhere specific — so the menu takes
     // an explicit list and opens where the drop happened.
     property var customItems: null
-    // Centred entries, for the handed-in menus only. A row menu is a column
+    // Centered entries, for the handed-in menus only. A row menu is a column
     // of verbs you read down the left edge, and it has keys along the right
     // to line up against; the drop menu is three short answers to one
     // question with nothing in the right-hand column, and left-aligning
     // those leaves them hanging off the side of a card sized for them.
     property bool centered: false
 
-    // `center` is optional and defaults to the drop menu's behaviour, which
+    // `center` is optional and defaults to the drop menu's behavior, which
     // is what every earlier caller wanted. A list with a submenu in it
-    // wants the other one: centred labels leave the parent row's arrow
+    // wants the other one: centered labels leave the parent row's arrow
     // floating away from the text it belongs to.
     // `right` hangs the card's RIGHT edge on the point instead of its
     // left. A menu dropped from a button in the corner of the window
@@ -811,7 +812,7 @@ PopupWindow {
       // the middle and read as one long list of unrelated verbs.
       out.push({ sep: true });
       // Only where it can do something: an Extract on a text file and a
-      // Restore outside the trash are entries that exist to be greyed out.
+      // Restore outside the trash are entries that exist to be grayed out.
       if (t.isDir)
         out.push({ label: "Calculate size" + many, key: "z",
                    act: () => term.measureDirs() });
@@ -909,10 +910,10 @@ PopupWindow {
       out.push({ sep: true });
       // ── THE TAGS THEMSELVES, NOT A DOOR TO THEM ──────────────
       // A row saying "Tags" that opens a card is two gestures for the
-      // commonest one there is. Finder puts the colours in the menu
+      // commonest one there is. Finder puts the colors in the menu
       // and so does this: one click, one tag, menu closed.
       //
-      // The seven that come with a colour only — an arbitrary tag has
+      // The seven that come with a color only — an arbitrary tag has
       // no swatch to show and the picker is where those live, which
       // the row underneath still reaches.
       out.push({ swatch: true });
@@ -1010,11 +1011,9 @@ PopupWindow {
       x: menuPop.pad
       y: menuPop.pad
       width: menu.cardWidth
-      // EXACTLY the column, which already carries 4px of padding at each
-      // end. The extra 8 here was a second bottom padding — the column sits
-      // at the card's top, so every pixel of it landed underneath the last
-      // row and nowhere else.
-      height: menuCol.implicitHeight
+      // the column and the 1px border around it: the rows run flush to the
+      // border top and bottom (folio's cursor, every menu — 2026-10-17)
+      height: menuCol.implicitHeight + 2
       // FROSTED, like quick look. It was solid because it was an item
       // inside the window, over terminus' own rows, which nothing can
       // blur. It is its own popup surface now (menuPop), and hyprland
@@ -1032,8 +1031,6 @@ PopupWindow {
       Column {
         id: menuCol
         width: parent.width
-        topPadding: Zenon.menuCardPad
-        bottomPadding: Zenon.menuCardPad
 
         Repeater {
           model: menu.items
@@ -1069,7 +1066,7 @@ PopupWindow {
             // The ring is the state: a tag already on everything
             // selected wears one, and clicking it takes it off. It is
             // the only way to show a toggle on a thing whose whole job
-            // is to be a colour, and it is what Finder does.
+            // is to be a color, and it is what Finder does.
             Row {
               // Above the row's own MouseArea, which fills the whole row
               // and is declared after this — the same reason menuX
@@ -1111,7 +1108,7 @@ PopupWindow {
                     radius: width / 2
                     color: swatchHov.hovered
                       ? Zenon.wash(0.10) : "transparent"
-                    // the chosen tag's ring, in its own colour — a
+                    // the chosen tag's ring, in its own color — a
                     // special case of the one-border rule, see Zenon.border
                     border.width: swatch.on ? 2 : 0
                     border.color: Zenon[swatch.modelData.ink] || Zenon.cyan
@@ -1139,27 +1136,20 @@ PopupWindow {
 
             Rectangle {
               anchors.fill: parent
-              // INSIDE THE BORDER: the band spans the card but stops short of
-              // its 1px edge, and the first and last rows round their outer
-              // corners to the card's curve, inset (user, 2026-10-10 — as
-              // morpheus/CardBody, every other menu)
-              anchors.leftMargin: 1
-              anchors.rightMargin: 1
-              topLeftRadius: index === 0 ? Math.max(0, Zenon.menuRadius - Zenon.menuCardPad) : 0
-              topRightRadius: topLeftRadius
-              bottomLeftRadius: index === menu.items.length - 1 ? Math.max(0, Zenon.menuRadius - Zenon.menuCardPad) : 0
-              bottomRightRadius: bottomLeftRadius
+              // FLUSH TO THE BORDER, square: the card's clip rounds the
+              // first and last rows into its corners (user, 2026-10-17 —
+              // folio's cursor, as morpheus/CardBody and every other menu)
               visible: !modelData.sep && !modelData.swatch
               // icarus' menu highlight, worn here too — the two are the same
               // gesture on the same desktop, and a context menu that lit its
-              // rows a different colour from the desktop menu read as a
+              // rows a different color from the desktop menu read as a
               // different piece of software.
               // The keyboard's row counts as highlighted only while the
               // keyboard is in THIS card — with a submenu open the cursor
               // has moved into it and the parent row keeps its subAt tint
               color: itemHov.hovered || menu.subAt === index
                      || (menu.subSel < 0 && menu.at === index)
-                ? Zenon.border : "transparent"
+                ? Zenon.menuHi : "transparent"
             }
             HoverHandler {
               id: itemHov
@@ -1204,7 +1194,7 @@ PopupWindow {
                              : (menuX.visible ? menuX.left : parent.right))
               // The label and its key are two different statements — what
               // this does, and what performs it — and at 10px they read as
-              // one run of text with a box at the end of it. Centred, the
+              // one run of text with a box at the end of it. Centered, the
               // gap has to match the left inset or the middle is not the
               // middle.
               anchors.rightMargin: menu.centered ? 12 : 22
@@ -1223,7 +1213,7 @@ PopupWindow {
             // The key that does the same thing, so the menu teaches the
             // keyboard rather than competing with it. A footnote to the
             // entry, not a second label — but it was drawn in msgBorder,
-            // which is a BORDER colour carrying 30% alpha, so it came out
+            // which is a BORDER color carrying 30% alpha, so it came out
             // barely there. keyInk is the palette's name for exactly this:
             // dimmer than the label, still meant to be read.
             KeyCap {
@@ -1325,7 +1315,7 @@ PopupWindow {
               anchors.fill: parent
               // AND NOT OVER THE SWATCH STRIP. This one fills the whole
               // row and is declared after it, so it was taking every
-              // click meant for a colour — the strip drew correctly and
+              // click meant for a color — the strip drew correctly and
               // could not be used.
               enabled: !modelData.sep && !modelData.swatch && !modelData.off
                        && !chosenAnim.running
@@ -1473,8 +1463,6 @@ PopupWindow {
         Column {
           id: subCol
           width: parent.width
-          topPadding: Zenon.menuCardPad
-          bottomPadding: Zenon.menuCardPad
 
           Repeater {
             model: subCard.items
@@ -1529,22 +1517,16 @@ PopupWindow {
                 color: Zenon.border
               }
 
-              // muted: greyed, no highlight, no click (see step's `off`)
+              // muted: grayed, no highlight, no click (see step's `off`)
               opacity: modelData.off ? 0.45 : 1
 
               Rectangle {
                 anchors.fill: parent
-                // inside the border, as the parent card's band
-                anchors.leftMargin: 1
-                anchors.rightMargin: 1
-                topLeftRadius: subRow.index === 0 ? Math.max(0, Zenon.menuRadius - Zenon.menuCardPad) : 0
-                topRightRadius: topLeftRadius
-                bottomLeftRadius: subRow.index === subCard.items.length - 1 ? Math.max(0, Zenon.menuRadius - Zenon.menuCardPad) : 0
-                bottomRightRadius: bottomLeftRadius
+                // flush to the border, as the parent card's band
                 visible: !modelData.sep && !modelData.off
                 // the same highlight the parent card wears, from icarus
                 color: subHov.hovered || menu.subSel === subRow.index
-                  ? Zenon.border : "transparent"
+                  ? Zenon.menuHi : "transparent"
               }
               HoverHandler { id: subHov; enabled: !modelData.sep }
 

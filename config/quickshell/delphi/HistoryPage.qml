@@ -673,7 +673,7 @@ Item {
 
     Segments {
       id: scopes
-      // centred in the column, the search under it (user, 2026-10-11)
+      // centered in the column, the search under it (user, 2026-10-11)
       x: Math.round((parent.width - width) / 2)
       y: 12
       textSize: Zenon.px(14)

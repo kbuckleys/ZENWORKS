@@ -12,12 +12,12 @@
 //
 // Laid out around `target` (the field's Loader) as its sibling, declared
 // before it so it sits under the text. `fontPx` sizes the ring to the line
-// rather than to the whole row, which would touch its neighbours.
+// rather than to the whole row, which would touch its neighbors.
 //
 // AS WIDE AS WHAT IS TYPED: it hugs the name and grows and shrinks with it,
 // never narrower than a few letters (a blank name for a thing just made
 // still has its ring) nor wider than the field. `centered` for a field that
-// centres its text — the tile's — so the ring stays on the text.
+// centers its text — the tile's — so the ring stays on the text.
 
 import QtQuick
 import "../morpheus"

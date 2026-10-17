@@ -64,7 +64,7 @@ function M.check(buf)
   if util.readJson(declinedPath)[lang] then return end
   asked[lang] = true
   local bridge = require("plato.bridge")
-  bridge.ask(("No syntax parser for %s yet — colours come from the regex engine. Build one? (a few seconds)")
+  bridge.ask(("No syntax parser for %s yet — colors come from the regex engine. Build one? (a few seconds)")
     :format(lang), "info", {
       { key = "b", label = "Build " .. lang },
       { key = "l", label = "Not now" },

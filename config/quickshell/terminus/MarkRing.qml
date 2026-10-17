@@ -39,22 +39,6 @@ Item {
     border.width: 2
     border.color: Zenon.cyan
   }
-  Rectangle {
-    x: parent.width - width + 6
-    y: -6
-    width: 22
-    height: 22
-    radius: 11
-    color: Zenon.cyan
-    scale: mark.on ? 1 : 0.4
-    Behavior on scale { NumberAnimation { duration: Zenon.normal; easing.type: Easing.OutBack } }
-    Text {
-      anchors.centerIn: parent
-      text: ""
-      color: Zenon.black
-      font.family: Zenon.face
-      font.weight: Zenon.weight
-      font.pixelSize: Zenon.px(12)
-    }
-  }
+  // no check badge in the corner any more: the ring and the wash say it
+  // (user, 2026-10-17, terminus and picasso alike)
 }

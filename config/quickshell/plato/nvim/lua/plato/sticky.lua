@@ -14,8 +14,8 @@
 -- has no parser for, which on this machine is most of them (QML among them).
 --
 --   M.context(win, buf, top) → { { n, chunks = { {text, fg, bold}, ... } } }
---                              innermost last, at most M.max, coloured as the
---                              view colours (hl.lua), tabs expanded
+--                              innermost last, at most M.max, colored as the
+--                              view colors (hl.lua), tabs expanded
 
 local api = vim.api
 local hl = require("plato.hl")
@@ -29,7 +29,7 @@ local function indentOf(s)
   return n
 end
 
--- one line, as runs of one colour
+-- one line, as runs of one color
 local function chunks(buf, l, s)
   local group = hl.byteGroups(buf, l, s, hl.treesitter(buf, l, l))
   local out, cur, piece, col = {}, false, {}, 0
@@ -64,7 +64,7 @@ end
 -- key, and nearly every one leaves the top of the view and the text as
 -- they were.
 local lastKey, lastOut = nil, {}
--- new colours: the chunks carry them, so the answer is worked out again
+-- new colors: the chunks carry them, so the answer is worked out again
 function M.forget() lastKey = nil end
 
 function M.context(win, buf, top)

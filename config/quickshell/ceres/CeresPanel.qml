@@ -81,7 +81,9 @@ LayerPopup {
     if (popup.face === "auth") return field.implicitHeight + (field.purpose !== "" ? 12 : 0);
     if (popup.face === "progress") return 260;
     if (popup.face === "news") return Math.min(Oracle.notifMaxHeight, 110 + Ceres.unreadNews.length * 150);
-    return Math.min(Oracle.notifMaxHeight, 72 + tx.resultRows * 24);
+    // the log stays under the result (TxView) — room for it, or it was a
+    // collapsed frame under one line (user, 2026-10-17)
+    return Math.min(Oracle.notifMaxHeight, 72 + tx.resultRows * 24 + (tx.failed ? 0 : 150));
   }
 
   // shell.qml asks for this by name to size the morph.
@@ -289,6 +291,7 @@ LayerPopup {
           // failed under "Update failed")
           readonly property var words: Ceres.txKind === "install" ? ["Installing", "Installed", "Install failed"]
             : Ceres.txKind === "remove" ? ["Removing", "Removed", "Removal failed"]
+            : Ceres.txKind === "other" ? ["Working", "Done", "Failed"]
             : ["Updating", "Updated", "Update failed"]
           text: popup.face === "progress" ? words[0]
             : popup.face === "result" ? (Ceres.txState === "done" ? words[1] : words[2])
@@ -481,7 +484,7 @@ LayerPopup {
 
         HintRow {
           // at the left: this strip always carries at least one button on the
-          // right, so centring only ever pushed the keys into it
+          // right, so centering only ever pushed the keys into it
           anchors.left: parent.left
           anchors.leftMargin: 16
           anchors.verticalCenter: parent.verticalCenter

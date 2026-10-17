@@ -55,7 +55,7 @@ Item {
 
   // ── THE BAR DARKENS WHILE IT HAS SOMETHING UNDER IT ───────────────────
   // What the material does for its labels: bright pictures frosted behind
-  // light grey text left the bar's quieter words hard to read, so over the
+  // light gray text left the bar's quieter words hard to read, so over the
   // ghosts goes this much black, and only while there are ghosts. At the top
   // the bar is exactly what it always was.
   property real scrim: 0.35
@@ -309,7 +309,7 @@ Item {
 
   // Over the ghosts and under the bar — the bar's part only: over the gap
   // it is a black band with nothing above it. Eased in and out so crossing
-  // the top of the list never flicks the bar between two greys; it outlives
+  // the top of the list never flicks the bar between two grays; it outlives
   // `on` by its own fade, which is why it is not inside the item above.
   Rectangle {
     y: edge.barY

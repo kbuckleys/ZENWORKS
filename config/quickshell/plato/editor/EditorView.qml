@@ -167,7 +167,7 @@ Item {
   // ── between the windows ────────────────────────────────────────────
   // TERMINUS' DIVIDER, without its shadows (user, 2026-10-09: the hairline
   // that was here was barely visible). A 1px line in the neutral border
-  // colour that turns cyan under the pointer; a 9px grip straddling it, so
+  // color that turns cyan under the pointer; a 9px grip straddling it, so
   // the cursor changes over the seam and a drag resizes the window — a
   // double click evens them (wincmd =); and two short bars either side of
   // its middle, the one on the side of the current window lit. nvim leaves
@@ -265,9 +265,9 @@ Item {
   // switched off in the settings sheet.)
   //
   // IN THE INK OF WHAT IT IS ON. A block over a string is the string's
-  // green, over a keyword the keyword's colour: the cursor reads as part of
+  // green, over a keyword the keyword's color: the cursor reads as part of
   // the text rather than a cyan hole in it. Off the text (blank space, past
-  // the end) it is the text's own colour; an ink too dark to see itself —
+  // the end) it is the text's own color; an ink too dark to see itself —
   // black on a search match — gives way to it too.
   readonly property string shape: {
     const m = view.ed.modeName;
@@ -390,7 +390,7 @@ Item {
       }
 
       // a block covers its character, so the character is drawn again on
-      // top of it in the background's colour — the terminal's reverse video
+      // top of it in the background's color — the terminal's reverse video
       Text {
         visible: view.shape === "block"
         width: view.cellW
@@ -430,7 +430,7 @@ Item {
   // THE TABS RUN ON OVER THE MAP. The windows' frost under the tab strip
   // (WindowView's ScrollEdge, and its darkening) stops at their right edge,
   // where the map begins, so the last tab came out two shades: dark over
-  // the text, the bar's own grey over the map. The map's column, and the
+  // the text, the bar's own gray over the map. The map's column, and the
   // inset past it to the window's edge, goes under the bar the same way,
   // whenever the window beside it has rows above.
   property real mapEdgeOut: 0
@@ -928,7 +928,7 @@ Item {
     }
   }
   // THE BAR UNDER THE POINTER, LIT: the change's whole bar widens and
-  // glows in its own colour, and a wash of it fades out across its rows —
+  // glows in its own color, and a wash of it fades out across its rows —
   // gliding from one change to the next, fading when the pointer leaves
   Item {
     id: gitGlow
@@ -983,7 +983,7 @@ Item {
   Term.Bubble {
     window: view.hostWindow
     target: hunkTip
-    // from the bar rightwards: centred on it, the card hung past the window
+    // from the bar rightwards: centered on it, the card hung past the window
     lean: true
     shown: !!hunkTip.info && !!view.hostWindow
     cardWidth: Math.max(320, Math.min(720, view.width * 0.6))

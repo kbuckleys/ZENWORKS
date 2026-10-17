@@ -89,7 +89,17 @@ PopupWindow {
   function arm() {
     if (!bub.shown) { bub.armed = false; return; }
     face.refit();
-    bub.armed = true;
+    if (!bub.armed) settle.restart();
+  }
+  // FITTED A FRAME LATER, THEN OPENED (user's bubble.mp4, 2026-10-17): a
+  // fit taken in the same tick as `shown` could read the words before they
+  // were laid out — calypso's cards opened at the card's narrowest (120),
+  // text cut, and jumped to their width a refit later. One frame on, the
+  // words are in; the fit is taken again and only then does it open.
+  Timer {
+    id: settle
+    interval: 16
+    onTriggered: { if (!bub.shown) return; face.refit(); bub.armed = true; }
   }
   function rearm() {
     if (!bub.shown) { readyGive.stop(); bub.armed = false; return; }
@@ -136,9 +146,9 @@ PopupWindow {
   onWindowChanged: bub.watch()
   Component.onCompleted: bub.watch()
   Component.onDestruction: { if (bub._hover) bub._hover.destroy(); if (bub._catch) bub._catch.destroy(); }
-  // `lean`: the card grows to the RIGHT of the target instead of centring
+  // `lean`: the card grows to the RIGHT of the target instead of centering
   // under it — for a target at a window's left edge (plato's gutter bars),
-  // where a centred card hung out past the window and was slid back by the
+  // where a centered card hung out past the window and was slid back by the
   // compositor, its tail left pointing at nothing
   property bool lean: false
   // where the target's middle was (window x) when the bubble was placed

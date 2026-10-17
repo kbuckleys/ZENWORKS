@@ -157,7 +157,7 @@ Singleton {
   // The theme made from a background (picasso/FollowBackground). Its tone:
   // "auto" reads the picture's brightness, or always dark, or always light.
   property string followMode: "auto"
-  // how much of the background's colour the grounds and text take, 0..1
+  // how much of the background's color the grounds and text take, 0..1
   property real followVivid: 0.5
   // whose background: "" is the first monitor (the leftmost)
   property string followMonitor: ""
@@ -346,7 +346,7 @@ Singleton {
   property int notifWidth: 200
   property int notifMaxWidth: 800
   // A SCREENSHOT OR A RECORDING IS ITS PICTURE. That toast is the capture
-  // and nothing else, so it wants room to be recognised in rather than the
+  // and nothing else, so it wants room to be recognized in rather than the
   // width its words would earn — this wide, unless maximum width says less,
   // and narrower still when a tall capture would pass the maximum height.
   property int notifCaptureWidth: 480
@@ -954,8 +954,8 @@ Singleton {
                  { value: "sun",   label: "Daytime" } ],
       help: "Only while the theme is Follow Background. Auto reads how bright the background is; Daytime is light from sunrise to sunset and dark after." },
     { key: "followVivid", section: "paper", alias: "follow background wallpaper colour color saturation vivid",
-      label: "Follow Background colour", type: "real", min: 0, max: 1, step: 0.05,
-      help: "Only while the theme is Follow Background. How much of the background's colour the panels and text take: low is nearly neutral, high is tinted through." },
+      label: "Follow Background color", type: "real", min: 0, max: 1, step: 0.05,
+      help: "Only while the theme is Follow Background. How much of the background's color the panels and text take: low is nearly neutral, high is tinted through." },
     { key: "followMonitor", section: "paper", alias: "follow background wallpaper monitor screen display",
       label: "Follow Background monitor", type: "enum", optionsFrom: "screens", open: true, chipW: 208,
       help: "Whose background the theme is made from. Automatic is the main monitor (Display). The background tint follows the same one." },
@@ -964,7 +964,7 @@ Singleton {
       help: "A slideshow on that monitor changes the theme with every picture. Off, the theme stays with the picture the slideshow started on." },
     { key: "wallpaperTint", section: "paper", alias: "tint wallpaper accent colour color glass background",
       label: "Background tint", type: "real", min: 0, max: 0.3, step: 0.02,
-      help: "Lays the glass in a little of the background's own colour, so the pill and its panels read as lit by what is behind them. Zero is the theme's plain ground." },
+      help: "Lays the glass in a little of the background's own color, so the pill and its panels read as lit by what is behind them. Zero is the theme's plain ground." },
     // ── idle & lock ──
     { key: "idleEnabled", section: "idle", label: "Idle timers", type: "bool",
       help: "Off, nothing happens however long you are away. The lock still works by hand." },
@@ -993,7 +993,7 @@ Singleton {
     // ── WHEN THE WAY OUT IS OFFERED, NOT HOW MANY TRIES YOU GET ──────
     // pam_faillock decides how many wrong passwords lock the account; this
     // decides when the lock shows the button that clears them. It used to
-    // be labelled as though it were pam's number, and set above pam's it
+    // be labeled as though it were pam's number, and set above pam's it
     // only hid the button while pam was already refusing you. Cerberus now
     // reads pam's own deny and never waits past it — see failDeny there.
     { key: "lockFailLimit", section: "idle", label: "Offer a reset after", type: "int",
@@ -1340,7 +1340,7 @@ Singleton {
   function infoLevel(key) {
     const hs = root.spec(key);
     // "" for a plain fact, or a check with no answer yet: only a reading
-    // the checkup actually made is coloured, green included
+    // the checkup actually made is colored, green included
     if (!hs || !hs.health || root.checking) return "";
     const r = root.checkup[hs.health];
     return r ? r.level : "";
@@ -1565,9 +1565,9 @@ Singleton {
   // different monitors — and so its box in the Arrangement is the same color
   // as its settings below. Cyan and the orange are left out: they already
   // mean "selected" and "changed" in this panel.
-  // The Zenon SLOT, not the colour: Oracle cannot import Zenon, which
+  // The Zenon SLOT, not the color: Oracle cannot import Zenon, which
   // imports Oracle, so the caller reads it — Zenon[Oracle.displayAccent(n)]
-  // — and a theme recolours the monitors with everything else.
+  // — and a theme recolors the monitors with everything else.
   function displayAccent(name) {
     const inks = ["blue", "magenta", "green", "sand", "pink"];
     for (let i = 0; i < root.displays.length; ++i)

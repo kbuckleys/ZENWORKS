@@ -43,7 +43,7 @@ Item {
       // Scaled to the samples actually held, not to maxPoints. Every module
       // caps its history at 30 while this reserved 32 slots, so the trace was
       // permanently inset by two steps on the left and never reached the right
-      // edge — which read as the sparkline sitting off-centre in its tooltip.
+      // edge — which read as the sparkline sitting off-center in its tooltip.
       const step = n > 1 ? w / (n - 1) : 0;
       const offset = 0;
 

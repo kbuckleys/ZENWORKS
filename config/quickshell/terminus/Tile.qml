@@ -372,7 +372,7 @@ Item {
         // A step of 64 puts both panes, and every zoom inside the step, on
         // ONE key. It only ever rounds UP, so nothing is decoded smaller
         // than it is drawn and no tile loses resolution — it just stops
-        // asking for a resolution nobody can tell apart from its neighbour.
+        // asking for a resolution nobody can tell apart from its neighbor.
         // ── A POOL THUMBNAIL DECODES AT ITS OWN SIZE ─────────────
         // Not at the tile's. Qt caches a decoded image under (url,
         // sourceSize), so tying the size to the tile meant three things,
@@ -395,7 +395,7 @@ Item {
           : Math.max(320, Math.ceil(thumbBox.width / 64) * 64)
         sourceSize.height: thumb.pooled ? Thumbs.size()
           : Math.max(320, Math.ceil(thumbBox.height / 64) * 64)
-        // A remembered name the pool no longer honours — see thumbMiss.
+        // A remembered name the pool no longer honors — see thumbMiss.
         // Only when the source WAS the thumbnail: an error on the
         // original is a format Qt cannot read, which is a different
         // story and noteBlind's.
@@ -497,9 +497,9 @@ Item {
     visible: !tile.editing
     // THE BADGE READS WITH THE NAME. It used to sit in the corner of the
     // thumbnail, which put it over the picture and a long way from the thing
-    // it qualifies. Inline it has to survive centring, wrapping to two lines
+    // it qualifies. Inline it has to survive centering, wrapping to two lines
     // and eliding — which a Row beside the label would not — so it is part
-    // of the same string, coloured with StyledText. The name is escaped
+    // of the same string, colored with StyledText. The name is escaped
     // because it is now markup: an ampersand in a filename would otherwise
     // eat the rest of the label.
     // The git mark leads, because it is about the file rather than about
@@ -517,7 +517,7 @@ Item {
             // collapses a run of ordinary ones to a single space, so the gap
             // asked for was never the gap drawn.
             ? "<font color=\"" + Zenon.hex(Zenon.sand) + "\">\uF02E</font>&#160;&#160;" : "")
-          // Tags last, nearest the name, one coloured mark each — the
+          // Tags last, nearest the name, one colored mark each — the
           // list's tag column, said inline for the same reason as above.
           + tile.tagList.map((t) => "<font color=\"" + Zenon.hex(term.tagInk(t))
               + "\">\uF02B</font>&#160;").join("")
@@ -533,7 +533,9 @@ Item {
     font.family: Zenon.face
     // the same weight as every other name: the cursor's ground already
     // says which one it is, and bold only made the name jump wider
-    font.weight: Font.Medium
+    // the Font weight oracle sets, as every other label (user, 2026-10-17:
+    // the lists were the one thing that ignored it)
+    font.weight: Zenon.weight
     // NOT scaled by zoom, unlike the tile and the glyph above it.
     // Zoom in a thumbnail view is about how big the PICTURES are;
     // scaling the filenames with them meant zooming out to fit more
@@ -608,7 +610,7 @@ Item {
     selectionColor: Zenon.alpha(Zenon.cyan, 0.22)
     selectedTextColor: Zenon.white
     font.family: Zenon.face
-    font.weight: Font.Bold
+    font.weight: Zenon.weight
     // Whatever tileName is: a name that changed size the moment you
     // started renaming it would be jumping under the cursor.
     font.pixelSize: Zenon.px(14)

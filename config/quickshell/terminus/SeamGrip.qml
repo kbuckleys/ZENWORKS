@@ -7,7 +7,7 @@
 // that drags it. Terminus' pane divider made a thing of its own (its
 // sidebar's and its split's grips and plato's tree edge were this design
 // written in place, three times; they are this now): a 1px line in the
-// border colour, a 9px grip
+// border color, a 9px grip
 // straddling it with the resize cursor, and the line CYAN under the pointer
 // and while dragged — the seam answering the cursor that changed shape over
 // it. Double click: back to where it starts. Its holders: delphi's pages,

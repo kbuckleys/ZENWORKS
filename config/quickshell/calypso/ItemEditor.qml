@@ -12,7 +12,7 @@
 //   generator's dice and its strength, a one-time password scanned off the
 //   screen or pasted
 //   its websites; fields of your own, hidden or plain; its notes (delphi's
-//   MessageWell); its tags; a favourite
+//   MessageWell); its tags; a favorite
 //
 // What the platform's tool cannot do (C.can — the daemon's `can`) is not
 // offered: a field of your own on a platform without them, a one-time
@@ -338,7 +338,7 @@ Item {
         }
       }
 
-      // ── its tags, and a favourite ─────────────────────────────────────
+      // ── its tags, and a favorite ─────────────────────────────────────
       Column {
         visible: C.can(ed.info, "tags")
         width: parent.width
@@ -363,7 +363,7 @@ Item {
       Switch {
         visible: C.can(ed.info, "fav")
         width: parent.width
-        label: "A favourite, in " + C.platform(ed.acct.kind).name + " too"
+        label: "A favorite, in " + C.platform(ed.acct.kind).name + " too"
         on: !!ed.st && ed.st.fav
         onToggled: { ed.st.fav = !ed.st.fav; on = ed.st.fav; ed.touch(); }
       }

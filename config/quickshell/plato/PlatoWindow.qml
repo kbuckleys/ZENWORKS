@@ -98,7 +98,7 @@ FloatingWindow {
 
   EditorState {
     id: st
-    // the settings' "Current line number colour", one of zenon's
+    // the settings' "Current line number color", one of zenon's
     numberHere: {
       const k = win.settings ? win.settings.lineNumberInk : "white";
       const ink = Zenon[k];
@@ -133,7 +133,7 @@ FloatingWindow {
 
   // ── ZEN MODE ───────────────────────────────────────────────────────
   // Space z: the tree, the tabs and the status line put away, the text in a
-  // centred column (the settings' "Zen mode text width"), and everything
+  // centered column (the settings' "Zen mode text width"), and everything
   // but the cursor's paragraph faded back (nvim says which lines that is:
   // view.lua's `para`). Per window, and not kept: it is a mood, not a
   // setting. Esc does not leave it; Space z does.
@@ -156,18 +156,18 @@ FloatingWindow {
     function onRevisionChanged() { if (nvim.ready) win.pushOptions(); }
   }
 
-  // ── THE SHELL'S THEME, FOR NVIM'S COLOURS ──────────────────────────
-  // The text is coloured by nvim's highlight groups (theme.lua), which
+  // ── THE SHELL'S THEME, FOR NVIM'S COLORS ──────────────────────────
+  // The text is colored by nvim's highlight groups (theme.lua), which
   // are Zenon's own palette. Under another theme nvim is sent the resolved
-  // colours — Zenon has already filled in any slot the theme left out —
+  // colors — Zenon has already filled in any slot the theme left out —
   // and rebuilds its groups; null is Zenon itself, so Zenon's bright_
   // variants stay exactly as palette.lua has them. Hex without alpha:
-  // nvim's colours have none.
+  // nvim's colors have none.
   readonly property var themeMsg: Zenon.nvimTheme()
   function pushTheme() { nvim.request("theme", win.themeMsg || {}); }
   // once the theme has settled (Zenon.themeEpoch): a Follow Background
   // crossfade is several steps, and nvim rebuilding its groups on each was
-  // a stutter for colours nobody would see
+  // a stutter for colors nobody would see
   Connections { target: Zenon; function onThemeEpochChanged() { if (nvim.ready) win.pushTheme(); } }
 
   // :w (or the leader's Save) on a buffer with no file: terminus' save
@@ -302,7 +302,7 @@ FloatingWindow {
       anchors.bottom: parent.bottom
       width: win.treeTarget
       // its band of buttons along the bottom, in line with the status line
-      // and in the tree's own colour
+      // and in the tree's own color
       toolbar: true
       toolbarBottom: true
       toolbarColor: "transparent"
@@ -349,7 +349,7 @@ FloatingWindow {
   // showing the tree in a floating window widens it by the tree, as far as
   // the monitor allows, and hiding it gives exactly that back, from the left
   // edge so the editor holds still — pushed inward only if the monitor's
-  // edge is in the way, never recentred. Tiled, fullscreen or maximized,
+  // edge is in the way, never recentered. Tiled, fullscreen or maximized,
   // the layout owns the size and nothing happens. Hyprland does the resize, because a mapped
   // Quickshell window ignores a new implicitWidth.
   //
@@ -468,7 +468,7 @@ FloatingWindow {
     onReleased: if (win.mgr) win.mgr.dropTree()
   }
 
-  // ── THE GROUND, less the tab strip (see the window's colour) ──────
+  // ── THE GROUND, less the tab strip (see the window's color) ──────
   // the tree's: an inactive tab's thinner glass, not the window's (user,
   // 2026-10-10, as terminus' sidebar and alexandria's)
   Rectangle {
@@ -627,7 +627,7 @@ FloatingWindow {
     },
   })
 
-  // zen's column: the configured width in cells, plus the gutter, centred
+  // zen's column: the configured width in cells, plus the gutter, centered
   readonly property real zenMargin: !win.zen ? 0 : Math.max(0, (win.width - sidebarBox.width
     - ((win.settings ? win.settings.zenWidth : 100) + 10) * editor.cellW) / 2)
   // THE EDITOR'S INSET, ON EVERY SIDE THAT MEETS THE WINDOW: the gap above
@@ -752,7 +752,7 @@ FloatingWindow {
     return p.indexOf(home + "/") === 0 ? "~" + p.slice(home.length) : p === home ? "~" : p;
   }
   // ON THE BLANK WINDOW, not the editor. Split (:vsplit, :split), the card
-  // was centred on the whole editor and lay across both windows and over
+  // was centered on the whole editor and lay across both windows and over
   // the text of the other one (user, 2026-10-09). It goes on the window it
   // is about — the current one, the blank one — in the window's own size.
   readonly property rect startRect: {

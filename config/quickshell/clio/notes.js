@@ -13,7 +13,7 @@
 // paragraph of one kind — a heading, a checklist item, a picture — and the
 // window draws each with an item of its own: a checkbox is a real checkbox,
 // a picture a real picture, a table a grid. Inside a text block the words
-// are Qt's inline rich text (bold, a link, a colour), kept as the run of
+// are Qt's inline rich text (bold, a link, a color), kept as the run of
 // inline markup a TextEdit hands back.
 //
 //   { k: kind, h: inline html, c: checked, l: indent level,
@@ -231,13 +231,16 @@ function inline(html) {
 
 // What is not ours to keep from a run: a face and a size (a block's kind
 // says those), the blue Qt paints a link in (the window paints its own),
-// empty spans, and the colour sentinels decoded back (see paint).
+// empty spans, and the color sentinels decoded back (see paint).
 function tidy(s) {
   s = String(s || "");
   s = s.replace(/<a\b([^>]*)><span style="[^"]*">([\s\S]*?)<\/span><\/a>/gi, "<a$1>$2</a>");
   s = s.replace(/style="([^"]*)"/gi, function (m, st) {
     var kept = st.split(";").map(function (d) { return d.trim(); }).filter(function (d) {
-      return d !== "" && !/^(font-family|font-size|-qt-|margin|text-indent|line-height)/i.test(d)
+      // a face chosen for a run is kept: it carries the 'clio-face' marker
+      // family (see face), which a paste's own fonts do not
+      if (/^font-family/i.test(d)) return FACE_MARK.test(d);
+      return d !== "" && !/^(font-size|-qt-|margin|text-indent|line-height)/i.test(d)
         && !/^text-decoration:\s*none$/i.test(d);
     });
     return kept.length === 0 ? "style=\"\"" : "style=\" " + kept.join("; ") + ";\"";
@@ -246,11 +249,11 @@ function tidy(s) {
   return s;
 }
 
-// ── COLOURS, BY NAME ─────────────────────────────────────────────────────
-// A colour typed into a note is one of the theme's, by NAME: written out as
-// a sentinel hex nobody would choose, and painted the theme's real colour
-// only while it is on screen — so a note coloured under one theme is still
-// coloured right under the next (themes memory: a colour copied is frozen).
+// ── COLORS, BY NAME ─────────────────────────────────────────────────────
+// A color typed into a note is one of the theme's, by NAME: written out as
+// a sentinel hex nobody would choose, and painted the theme's real color
+// only while it is on screen — so a note colored under one theme is still
+// colored right under the next (themes memory: a color copied is frozen).
 var INKS = ["magenta", "pink", "yellow", "green", "blue", "cyan", "red"];
 var MARKERS = ["sand", "pink", "green", "blue", "magenta"];
 function sentinel(kind, i) {
@@ -258,8 +261,8 @@ function sentinel(kind, i) {
   var h = (kind === "mark" ? 16 : 0) + i;
   return "#01c1" + (h < 16 ? "0" : "") + h.toString(16);
 }
-// sentinel → colour (painting) and back (keeping). `ink(name)` and
-// `mark(name)` give the colour as #rrggbb.
+// sentinel → color (painting) and back (keeping). `ink(name)` and
+// `mark(name)` give the color as #rrggbb.
 function paint(html, ink, mark) {
   return String(html || "").replace(/#01c1([0-9a-f]{2})/gi, function (m, x) {
     var v = parseInt(x, 16);
@@ -297,12 +300,72 @@ function toggleMark(run, tag) {
   if (!m) return run;
   return marked(run, tag) ? unmark(run, tag) : m.open + run + m.close;
 }
-// a colour on a run: `css` is "color" or "background-color"; value "" takes it off
+// a color on a run: `css` is "color" or "background-color"; value "" takes it off
 function colour(run, css, value) {
   var re = css === "color" ? /(^|[\s;"])color:\s*#[0-9a-f]{6}\s*;?/gi : /background-color:\s*#[0-9a-f]{6}\s*;?/gi;
   var s = tidy(String(run || "").replace(re, "$1"));
   if (!value) return s;
   return "<span style=\"" + css + ":" + value + ";\">" + s + "</span>";
+}
+
+// ── THE WORDS TO SPELL ───────────────────────────────────────────────────
+// [{ w, a, b }] of a block's plain text: letters with ' or ’ inside. Not a
+// word to check: one with a digit, a #tag, an @name, an address (a run with
+// :// or a dot in it, or www.), and a short acronym in capitals.
+// Letters by range, not \p{L}: QML's engine has no Unicode property escapes
+// (the regex compiled and matched nothing). Latin, Greek, Cyrillic,
+// Armenian, Hebrew, Arabic, Devanagari and the Latin/Greek extensions, with
+// combining marks.
+var LETTER = "A-Za-zªµºÀ-ÖØ-öø-ʯ̀-ͯͰ-ϿЀ-ԯ"
+  + "Ա-ևא-תؠ-ٟऀ-ॿḀ-῿";
+var SPELL_TOKEN = new RegExp("[" + LETTER + "0-9_./:@#'’-]+", "g");
+var SPELL_WORD = new RegExp("[" + LETTER + "]+(?:['’][" + LETTER + "]+)*", "g");
+var SPELL_DOTTED = new RegExp("[" + LETTER + "]\\.[" + LETTER + "]");
+function spellWords(t) {
+  var out = [];
+  var s = String(t || "");
+  var re = new RegExp(SPELL_TOKEN.source, "g");
+  var m;
+  while ((m = re.exec(s)) !== null) {
+    var tok = m[0];
+    if (/:\/\/|^www\.|@|^#/.test(tok)) continue;
+    if (SPELL_DOTTED.test(tok)) continue;
+    var inner = new RegExp(SPELL_WORD.source, "g");
+    var w;
+    while ((w = inner.exec(tok)) !== null) {
+      var word = w[0];
+      var a = m.index + w.index;
+      var next = s.charAt(a + word.length);
+      var prev = a > 0 ? s.charAt(a - 1) : "";
+      if (/\d/.test(prev) || /\d|_/.test(next)) continue;
+      if (word.length < 2) continue;
+      if (word.length <= 5 && word === word.toUpperCase()) continue;
+      out.push({ w: word.replace(/’/g, "'"), a: a, b: a + word.length });
+    }
+  }
+  return out;
+}
+
+// ── A FACE FOR A RUN ─────────────────────────────────────────────────────
+// A word or a selection in a typeface of its own, the rest of the block
+// keeping the note's (user, 2026-10-17). Written with a second family that
+// names no font, 'clio-face': Qt keeps the list as it was given, and it is
+// how tidy tells a face chosen here from the fonts a paste brings along
+// (those go, as before). "" takes the run back to the note's face.
+var FACE_MARK = /clio-face/i;
+function face(run, family) {
+  var s = String(run || "").replace(/font-family:[^;"]*clio-face[^;"]*;?/gi, "");
+  s = tidy(s);
+  if (!family) return s;
+  return "<span style=\"font-family:'" + String(family).replace(/['"<>;]/g, "") + "','clio-face';\">" + s + "</span>";
+}
+// the chosen face in a run, if one covers it all ("" when none or mixed)
+function faceOf(run) {
+  var all = String(run || "").match(/font-family:\s*'([^']*)'\s*,\s*'clio-face'/gi);
+  if (!all) return "";
+  var names = all.map(function (m) { return m.replace(/font-family:\s*'([^']*)'.*/i, "$1"); });
+  for (var i = 1; i < names.length; i++) if (names[i] !== names[0]) return "";
+  return names[0];
 }
 
 // ── MANY PARAGRAPHS INTO BLOCKS ──────────────────────────────────────────
@@ -775,20 +838,33 @@ function titleOf(n, untitled) {
 // ── SEARCH ───────────────────────────────────────────────────────────────
 // Every word somewhere — the title counting most. And Apple's search tokens,
 // typed: #tag, is:pinned, is:locked, has:checklist, has:picture, has:file,
-// has:table, has:sketch, is:done (every box ticked), is:todo.
+// has:table, has:sketch, is:done (every box ticked), is:todo; and when:
+// edited:today, edited:week, edited:month, edited:year, edited:7d (any
+// number of days), the same for created: (a smart container's rules).
 function terms(query) {
   var words = [], filters = [];
   String(query || "").toLowerCase().split(/\s+/).forEach(function (w) {
     if (w === "") return;
-    if (/^#./.test(w) || /^(is|has):./.test(w)) filters.push(w);
+    if (/^#./.test(w) || /^(is|has|edited|created):./.test(w)) filters.push(w);
     else words.push(w);
   });
   return { words: words, filters: filters };
 }
 
-function passes(n, f) {
+// how far back a when-rule reaches, in days (today: since midnight)
+function sinceOf(v, now) {
+  if (v === "today") return dayStart(now);
+  var days = v === "week" ? 7 : v === "month" ? 30 : v === "year" ? 365 : /^\d+d$/.test(v) ? parseInt(v, 10) : -1;
+  return days < 0 ? -1 : now - days * 86400000;
+}
+function passes(n, f, now) {
   var d = n.d || derive(n);
   if (f[0] === "#") return d.tags.indexOf(f.slice(1)) >= 0;
+  var when = f.match(/^(edited|created):(.+)$/);
+  if (when) {
+    var since = sinceOf(when[2], now || Date.now());
+    return since < 0 || (when[1] === "edited" ? n.modified : n.created) >= since;
+  }
   switch (f) {
     case "is:pinned": return !!n.pinned;
     case "is:locked": return !!n.sealed || !!n.locked;
@@ -802,6 +878,7 @@ function passes(n, f) {
     case "has:sketch": case "has:drawing": return d.sketch;
     case "has:link": return /href="/.test(JSON.stringify(n.blocks || []));
     case "has:mood": return !!n.mood;
+    case "has:highlight": return /background-color:\s*#01c11/i.test(JSON.stringify(n.blocks || []));
   }
   return true;
 }
@@ -1195,7 +1272,10 @@ function cleanMeta(m) {
   // the template a day's journal entry starts from ("" none)
   var daily = String(m.daily || "");
   if (!templates.some(function (t) { return t.id === daily; })) daily = "";
-  return { folders: folders, journals: journals, templates: templates, daily: daily };
+  // words taught to the spelling (Learn Spelling), with the notebook so
+  // another machine knows them too
+  var learned = (Array.isArray(m.learned) ? m.learned : []).map(String).filter(function (w) { return w !== "" && w.length <= 60; });
+  return { folders: folders, journals: journals, templates: templates, daily: daily, learned: learned };
 }
 
 // a name not yet taken among `names`: "New Container", "New Container 2"…
@@ -1227,9 +1307,9 @@ function htmlOfText(t) { return escape(t).replace(/\n/g, "<br />"); }
 function noteLink(href) { var m = String(href || "").match(/^clio:note\/(.+)$/); return m ? m[1] : ""; }
 
 // ── SKETCHES ─────────────────────────────────────────────────────────────
-// A sketch is its strokes, kept by colour NAME and in coordinates scaled to
+// A sketch is its strokes, kept by color NAME and in coordinates scaled to
 // its width (x, y in 0..1 of the width) — drawn afresh at any size, in the
-// theme of the moment. `ink(name)` gives the colour.
+// theme of the moment. `ink(name)` gives the color.
 //   strokes: [{ c: "ink" | a hue name, w: width as a share of the width,
 //               hl: a highlighter (wide, see-through), p: [[x, y]…] }]
 function paintStrokes(ctx, strokes, width, ink) {
@@ -1446,6 +1526,70 @@ function dueChecks(notes, now, told) {
       out.push({ id: n.id, key: k, h: plain(b.h), due: b.due });
     }
   }
+  return out;
+}
+
+// ── THE LAST DAYS, BY MOOD ───────────────────────────────────────────────
+// [{ key, ms, wrote, mood }] for the `n` days ending today, oldest first:
+// whether anything was written, and the day's mood (the mean of its entries'
+// moods, rounded; null when none was logged).
+function moodDays(entries, now, n) {
+  var by = {};
+  for (var i = 0; i < entries.length; i++) {
+    var e = entries[i];
+    if (e.deleted) continue;
+    var k = dayKey(e.date);
+    var o = by[k] || (by[k] = { sum: 0, count: 0, wrote: true });
+    if (e.mood && typeof e.mood.v === "number") { o.sum += e.mood.v; o.count++; }
+  }
+  var out = [];
+  var t = dayStart(now);
+  for (var d = n - 1; d >= 0; d--) {
+    var ms = dayStart(t - d * 86400000 + 43200000);
+    var key = dayKey(ms);
+    var x = by[key];
+    out.push({ key: key, ms: ms, wrote: !!x, mood: x && x.count ? Math.round(x.sum / x.count) : null });
+  }
+  return out;
+}
+
+// ── FROM YOUR JOURNAL ────────────────────────────────────────────────────
+// One older entry brought back (a month or more ago), the same one all day
+// and another tomorrow; null when there is none so old.
+function resurface(entries, now) {
+  var old = entries.filter(function (e) { return !e.deleted && !e.sealed && e.date < now - 30 * 86400000; });
+  if (old.length === 0) return null;
+  old.sort(function (a, b) { return a.date - b.date; });
+  var k = dayKey(now), h = 0;
+  for (var i = 0; i < k.length; i++) h = (h * 31 + k.charCodeAt(i)) % 1000003;
+  return old[h % old.length];
+}
+
+// ── HIGHLIGHTS ───────────────────────────────────────────────────────────
+// Every highlighted run in the notebook: [{ id, title, kind, text, marker,
+// modified }], the newest note first. A sealed note keeps its own; a deleted
+// one is not asked.
+function highlights(notes) {
+  var out = [];
+  var re = /<span style="[^"]*background-color:\s*#01c1(1[0-9a-f])[^"]*">([\s\S]*?)<\/span>/gi;
+  for (var i = 0; i < notes.length; i++) {
+    var n = notes[i];
+    if (n.deleted || n.sealed || n.kind === "sticky") continue;
+    var bs = n.blocks || [];
+    for (var j = 0; j < bs.length; j++) {
+      var h = String(bs[j].h || "");
+      if (h.indexOf("#01c11") < 0) continue;
+      var m;
+      re.lastIndex = 0;
+      while ((m = re.exec(h)) !== null) {
+        var t = plain(m[2]).replace(/\s+/g, " ").trim();
+        if (t === "") continue;
+        out.push({ id: n.id, title: titleOf(n), kind: n.kind, text: t,
+                   marker: MARKERS[parseInt(m[1], 16) - 16] || "sand", modified: n.modified || 0 });
+      }
+    }
+  }
+  out.sort(function (a, b) { return b.modified - a.modified; });
   return out;
 }
 

@@ -4,7 +4,7 @@
 // https://github.com/kbuckleys/
 //
 // PICASSO'S CAPTURE: the names a screenshot is saved under, the region's
-// geometry, and every colour scheme the picker speaks.
+// geometry, and every color scheme the picker speaks.
 
 "use strict";
 

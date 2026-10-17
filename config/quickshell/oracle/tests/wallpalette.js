@@ -25,8 +25,8 @@ module.exports = {
   module: "morpheus/wallpalette.js",
   cases: (W, t) => {
     const h = W.parseHistogram(HIST);
-    t.eq("three colours read, the junk line skipped", h.length, 3);
-    t.eq("count and colour", JSON.stringify(h[0]), JSON.stringify({ hex: "#17293c", n: 4210 }));
+    t.eq("three colors read, the junk line skipped", h.length, 3);
+    t.eq("count and color", JSON.stringify(h[0]), JSON.stringify({ hex: "#17293c", n: 4210 }));
     t.eq("nothing to go on is null", W.palette([], {}), null);
 
     // an orange picture: the shell's accent turns orange
@@ -35,9 +35,9 @@ module.exports = {
     t.ok("the accent takes the wallpaper's hue", hc > 30 && hc < 80);
     t.eq("asked for dark, dark", orange.mode, "dark");
 
-    // a grey picture: a neutral theme
+    // a gray picture: a neutral theme
     const grey = W.palette([{ hex: "#808080", n: 10 }, { hex: "#303030", n: 10 }], { mode: "dark" });
-    t.ok("grey gives an all but neutral ground",
+    t.ok("gray gives an all but neutral ground",
       W.rgbToOklch(W.hexToRgb(grey.colors.ground)).C < 0.01);
 
     // auto: a bright picture is a light theme, a dark one dark
@@ -62,7 +62,7 @@ module.exports = {
       }
     }
     t.eq("every slot reads on its ground, 1800 palettes", fails.slice(0, 3).join(" | "), "");
-    t.eq("every colour is a hex Zenon takes", shapes, 0);
+    t.eq("every color is a hex Zenon takes", shapes, 0);
 
     // a rose background: red must not become the accent
     const rose = W.palette([{ hex: "#1c080e", n: 60 }, { hex: "#e0607f", n: 30 }], { mode: "dark" });

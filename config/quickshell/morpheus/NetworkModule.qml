@@ -91,7 +91,7 @@ Item {
         ? root.iface + ": " + root.ipaddr + "\n" + speeds
         : speeds;
     }
-    // two short standalone lines, not a list — centred reads better
+    // two short standalone lines, not a list — centered reads better
     align: Text.AlignHCenter
     show: mouse.containsMouse
     // one trace per channel, in the same two inks the meter beside it uses

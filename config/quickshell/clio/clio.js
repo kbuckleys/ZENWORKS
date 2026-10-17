@@ -10,7 +10,7 @@
 .pragma library
 
 // The palette a note can wear, by NAME. The names are zenon's, resolved to
-// colours by the board — the same split oracle and howler use, and for the
+// colors by the board — the same split oracle and howler use, and for the
 // same reason: a file full of hex is a palette said twice.
 var HUES = ["sand", "yellow", "green", "cyan", "blue", "magenta", "pink"];
 
@@ -71,7 +71,7 @@ function blank(id, x, y, hue) {
     y: Math.round(Number(y) || 0),
     // Wide enough for the whole head: formatting, size, every swatch and
     // the close. At 260 the swatches were the first thing the bar gave up,
-    // so a new note could not be recoloured until it was dragged wider.
+    // so a new note could not be recolored until it was dragged wider.
     w: 350,
     h: 220,
     size: DEFAULT_SIZE,
@@ -128,7 +128,7 @@ function serialize(notes) {
 }
 
 // The next hue in the ring, so notes made one after another are not all the
-// same colour — the point of a wall of stickies is telling them apart.
+// same color — the point of a wall of stickies is telling them apart.
 function nextHue(notes) {
   if (!notes || notes.length === 0) return HUES[0];
   var last = notes[notes.length - 1].hue;
@@ -157,7 +157,7 @@ function inline(html) {
 }
 
 // ── WHAT A TAG LOOKS LIKE ONCE QT HAS BEEN THROUGH IT ────────────────────
-// Nothing inserted as <b> stays <b>: Qt normalises the document into inline
+// Nothing inserted as <b> stays <b>: Qt normalizes the document into inline
 // styles the moment it reparses it. So asking "is this already bold" cannot
 // look for the tag that was inserted — it has to look for what the tag became.
 var MARKS = {

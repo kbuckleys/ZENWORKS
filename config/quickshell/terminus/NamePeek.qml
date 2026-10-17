@@ -43,7 +43,7 @@ Item {
       text: np.entry ? np.entry.name : ""
       color: Zenon.ink
       font.family: Zenon.face
-      font.weight: Font.Medium
+      font.weight: Zenon.weight
       font.pixelSize: Zenon.px(15)
     }
     Text {

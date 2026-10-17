@@ -19,7 +19,7 @@ PanelWindow {
   // everything below converts out of
   required property Item anchorItem
   // the hovering MouseArea; the popout rides its pointer. Without one it
-  // falls back to sitting centred over the anchor item.
+  // falls back to sitting centered over the anchor item.
   property MouseArea cursorArea: null
   property bool show: false
   // Held shut regardless of `show`. The caller owns "is the pointer on me";
@@ -80,7 +80,7 @@ PanelWindow {
   visible: anchorRoot.showFactor > 0.01
 
   // Pointer in screen coordinates, falling back to the anchor item's top
-  // centre. The bar is its own layer-shell surface inset from the screen
+  // center. The bar is its own layer-shell surface inset from the screen
   // edges, so item coordinates are window-relative; Zenon.winOrigin converts
   // them back — without it every popout lands one side-margin too far left.
   readonly property point livePoint: {
@@ -101,7 +101,7 @@ PanelWindow {
   property point hotspot: anchorRoot.livePoint
   // Only something that was riding the pointer needs latching. A popout with
   // no cursorArea is placed off its anchor item, and that anchor moves — the
-  // pill recentres itself as modules come and go — so it stays bound.
+  // pill recenters itself as modules come and go — so it stays bound.
   onShowChanged: {
     if (anchorRoot.interactive && anchorRoot.cursorArea && anchorRoot.show)
       anchorRoot.hotspot = anchorRoot.livePoint;

@@ -7,7 +7,7 @@
 //
 // The Packages tab is still where every package is, searched by name; this
 // is the other way in — what an app is, what it looks like, who makes it —
-// for the desktop applications the catalogues describe:
+// for the desktop applications the catalogs describe:
 //
 //   the sidebar   Discover, the sections (Create, Work, Play …), Installed
 //   Discover      after the Mac App Store (user, 2026-10-14): features
@@ -24,7 +24,7 @@
 // window (changeAsked), which opens the same confirm sheet, password and log
 // as the Packages tab — one way a change happens, whichever tab asked.
 //
-// The catalogue is ceres/bin/ceres-store's; the rules — sections, search,
+// The catalog is ceres/bin/ceres-store's; the rules — sections, search,
 // shelves, the keys — are store.js's, and tested there.
 
 import QtQuick
@@ -56,7 +56,7 @@ Item {
   readonly property string tool: Quickshell.shellDir + "/ceres/bin/ceres-store"
   readonly property bool busy: Ceres.txBusy
 
-  // ── the catalogue ──────────────────────────────────────────────────────
+  // ── the catalog ──────────────────────────────────────────────────────
   property var apps: []
   property bool loading: false
   property bool loaded: false
@@ -124,7 +124,7 @@ Item {
   // Every section and page you go to, as a browser keeps them: back steps
   // to the last, forward undoes a back, and going somewhere new drops what
   // was ahead. A page is kept by its app's key, so after a job it comes
-  // back as the catalogue now has it.
+  // back as the catalog now has it.
   property var trail: []
   property var ahead: []
   function here() { return { section: store.section, app: store.app ? store.app.key : "" }; }
@@ -184,7 +184,7 @@ Item {
   // the front page's pictures, fetched as soon as it knows which they are
   // NEVER WHILE THE VIEW IS BEING BUILT: a Process started from a binding's
   // first settling read as running and never ran, and every picture after
-  // it waited in the queue behind it. After the catalogue, on the next turn.
+  // it waited in the queue behind it. After the catalog, on the next turn.
   onFeaturesChanged: if (store.loaded) Qt.callLater(store.fetchArt)
   onShelvesChanged: if (store.loaded) Qt.callLater(store.fetchArt)
   onLoadedChanged: if (store.loaded) Qt.callLater(store.fetchArt)
@@ -283,10 +283,20 @@ Item {
       infoProc.running = true;
     }
   }
-  // the page's ‹ and Esc: a step back, as mouse 4 is
+  // the page's Esc: a step back, as mouse 4 is
   function closePage() { store.stepBack(); store.released(); }
   // a screenshot, large, over the page; Esc or a click puts it back
   property string lightbox: ""
+  // the page's screenshots, in order, for ← → and the lightbox's own
+  // previous / next (user, 2026-10-17: no closing one to open the next)
+  property var lightboxFiles: []
+  readonly property int lightboxAt: store.lightboxFiles.indexOf(store.lightbox)
+  function lightboxStep(d) {
+    const i = store.lightboxAt + d;
+    if (store.lightboxAt < 0 || i < 0 || i >= store.lightboxFiles.length) return false;
+    store.lightbox = store.lightboxFiles[i];
+    return true;
+  }
   Process {
     id: detailProc
     stdout: StdioCollector {
@@ -415,6 +425,10 @@ Item {
       if (i >= 0 && i < keys.length) store.showSection(keys[i]);
       return true;
     }
+    if (store.lightbox !== "" && (k === Qt.Key_Left || k === Qt.Key_Right)) {
+      store.lightboxStep(k === Qt.Key_Right ? 1 : -1);
+      return true;
+    }
     if (store.view === "page") {
       // the page's source, not the card's: Spotify switched to Flathub
       // is Flathub's to get
@@ -478,7 +492,7 @@ Item {
           height: 34
           radius: Zenon.windowRadius
           color: srow.on ? Zenon.alpha(Zenon.cyan, 0.14) : "transparent"
-          // Installed under a hairline: it is yours, not the catalogue's
+          // Installed under a hairline: it is yours, not the catalog's
           Rectangle {
             visible: srow.modelData[0] === "installed"
             anchors.bottom: parent.top
@@ -569,7 +583,7 @@ Item {
       }
       Text {
         anchors.horizontalCenter: parent.horizontalCenter
-        text: store.failed ? "The app catalogue could not be read" : "Reading the app catalogue"
+        text: store.failed ? "The app catalog could not be read" : "Reading the app catalog"
         color: store.failed ? Zenon.red : Zenon.accentMuted
         font.family: Zenon.face
         font.weight: Font.Bold
@@ -771,7 +785,7 @@ Item {
         anchors.centerIn: parent
         visible: store.gridApps.length === 0
         text: store.searching ? "No apps for \u201C" + store.query.trim() + "\u201D"
-          : store.section === "installed" ? "No apps from the catalogue are installed" : "Nothing here yet"
+          : store.section === "installed" ? "No apps from the catalog are installed" : "Nothing here yet"
         color: Zenon.accentMuted
         font.family: Zenon.face
         font.weight: Font.Bold
@@ -800,15 +814,15 @@ Item {
       readonly property bool aur: !!page.a && page.a.source === "aur"
       // a Flatpak that is here: its permissions are switches
       readonly property bool permsLive: !!page.a && page.a.source === "flatpak" && !!page.a.installed
-      // the app's own brand colour when its catalogue gives one; else the
-      // colour of its icon (user, 2026-10-14), else the accent
+      // the app's own brand color when its catalog gives one; else the
+      // color of its icon (user, 2026-10-14), else the accent
       readonly property color brand: page.a && page.a.color ? page.a.color
         : iconTint.found.a > 0 ? iconTint.found : Zenon.cyan
 
-      // ── THE ICON'S COLOUR, sampled once a page ─────────────────────────
+      // ── THE ICON'S COLOR, sampled once a page ─────────────────────────
       // Drawn at 16×16 and averaged over its vivid pixels — weighted by
       // saturation and brightness, so Spotify's green wins over its black,
-      // and a grey icon gives nothing (the accent stands in). 256 pixels,
+      // and a gray icon gives nothing (the accent stands in). 256 pixels,
       // once per page opened: nothing to keep or cache.
       Canvas {
         id: iconTint
@@ -856,23 +870,7 @@ Item {
         width: page.colW
         spacing: 24
 
-        // back to where it was opened from
-        Text {
-          text: "\u2039  " + (store.searching ? "Results" : St.section(store.section)[1])
-          color: Zenon.accentKey
-          font.family: Zenon.face
-          font.weight: Zenon.weight
-          font.pixelSize: Zenon.px(15)
-          MouseArea {
-            id: backMa
-            anchors.fill: parent
-            anchors.margins: -6
-            cursorShape: Qt.PointingHandCursor
-            onClicked: store.closePage()
-          }
-        }
-
-        // ── the banner, in the app's own colour (the App Store's head) ──
+        // ── the banner, in the app's own color (the App Store's head) ──
         Rectangle {
           id: banner
           width: parent.width
@@ -952,6 +950,9 @@ Item {
                   visible: !!page.a && page.a.installed
                   anchors.verticalCenter: parent.verticalCenter
                   label: "Remove"
+                  // Get's own size beside it (user, 2026-10-17)
+                  height: 32
+                  width: Math.max(92, implicitWidth)
                   ink: Zenon.red
                   ready: !store.busy
                   onClicked: store.remove(page.a)
@@ -1036,7 +1037,7 @@ Item {
                 width: linkRow.implicitWidth + 26
                 height: 32
                 radius: Zenon.windowRadius
-                color: linkMa.pressed ? Zenon.darken(0.35) : Zenon.wash(0.05)   // the suite's press (2026-10-15)
+                color: linkMa.pressed ? Zenon.pressFill : Zenon.wash(0.05)   // the suite's press (2026-10-15)
                 border.width: 1
                 border.color: Zenon.border
                 Row {
@@ -1074,7 +1075,7 @@ Item {
         // ── the strip: what there is to know at a glance ──────────────
         // The App Store's ratings, age and chart are not ours to have; what
         // is: how much of Arch uses it, the AUR's votes, who makes it, what
-        // it is, its licence, its size.
+        // it is, its license, its size.
         Row {
           id: strip
           readonly property var cells: {
@@ -1090,7 +1091,7 @@ Item {
             if (sec) out.push(["CATEGORY", sec[2], sec[1]]);
             if (a.dev) out.push(["DEVELOPER", "\uF2BD", a.dev]);
             const lic = St.licence(d.license || i["Licenses"] || "");
-            if (lic) out.push(["LICENCE", lic.split(/[ (]/)[0].replace(/-or-later$/, "+"), lic === "Proprietary" ? "proprietary" : "licence"]);
+            if (lic) out.push(["LICENSE", lic.split(/[ (]/)[0].replace(/-or-later$/, "+"), lic === "Proprietary" ? "proprietary" : "licence"]);
             const sz = St.sizeParts(i["Installed Size"] || i["Download Size"] || "");
             if (sz[0]) out.push(["SIZE", sz[0], sz[1]]);
             return out;
@@ -1358,7 +1359,10 @@ Item {
                 anchors.fill: parent
                 enabled: shot.file !== ""
                 cursorShape: Qt.PointingHandCursor
-                onClicked: store.lightbox = shot.file
+                onClicked: {
+                  store.lightboxFiles = shotList.list.map(x => store.shots[x.url] || "").filter(f => f !== "");
+                  store.lightbox = shot.file;
+                }
               }
               Working {
                 anchors.centerIn: parent
@@ -1389,7 +1393,7 @@ Item {
           width: parent.width
           spacing: 6
           // FOLDED, IT FADES (user, 2026-10-14/15). The TEXT fades — a fade
-          // painted in the window's colour drew a dark band on its glass — and
+          // painted in the window's color drew a dark band on its glass — and
           // without an effect: MultiEffect's mask, then OpacityMask, left it
           // cut off on screen. The fold is the words to just above the edge,
           // then the last stretch again in thin strips, each a copy of the
@@ -1436,7 +1440,7 @@ Item {
             width: 44
             height: 24
             radius: Zenon.windowRadius
-            color: moreMa.pressed ? Zenon.darken(0.35) : Zenon.wash(0.06)   // the suite's press (2026-10-15)
+            color: moreMa.pressed ? Zenon.pressFill : Zenon.wash(0.06)   // the suite's press (2026-10-15)
             border.width: 1
             border.color: Zenon.border
             Text {
@@ -1515,7 +1519,7 @@ Item {
               if (i["Download Size"] && !a.installed) out.push(["Download", i["Download Size"]]);
               if (i["Installed Size"]) out.push(["Size", i["Installed Size"]]);
               const lic = St.licence(store.detail && store.detail.license || i["Licenses"] || "");
-              if (lic) out.push(["Licence", lic]);
+              if (lic) out.push(["License", lic]);
               if (a.cats && a.cats.length) out.push(["Category", a.cats.slice(0, 3).join(", ")]);
               const d = store.detail || {};
               if (page.aur && d.votes) out.push(["AUR votes", String(d.votes)]);
@@ -1574,6 +1578,21 @@ Item {
       anchors.fill: parent
       cursorShape: Qt.PointingHandCursor
       onClicked: store.lightbox = ""
+    }
+    // previous and next, picasso's edge tabs (morpheus/EdgeTab)
+    EdgeTab {
+      edge: "left"
+      anchors.left: parent.left
+      anchors.verticalCenter: parent.verticalCenter
+      shown: store.lightboxAt > 0
+      onClicked: { store.lightboxStep(-1); store.released(); }
+    }
+    EdgeTab {
+      edge: "right"
+      anchors.right: parent.right
+      anchors.verticalCenter: parent.verticalCenter
+      shown: store.lightboxAt >= 0 && store.lightboxAt < store.lightboxFiles.length - 1
+      onClicked: { store.lightboxStep(1); store.released(); }
     }
   }
 

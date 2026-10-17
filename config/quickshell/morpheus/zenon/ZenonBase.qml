@@ -3,7 +3,7 @@
 // └─┘└─┘┘└┘└┴┘└─┘┴└─┴ ┴└─┘
 // https://github.com/kbuckleys/
 //
-// ZENON'S BASE — every token, colour and helper the suite draws with,
+// ZENON'S BASE — every token, color and helper the suite draws with,
 // needing nothing but QtQuick. morpheus/Zenon.qml is the shell's
 // singleton: this, fed Oracle's settings and the worn theme file.
 //
@@ -18,11 +18,11 @@ QtObject {
   // every read falls back.
   property var cfg: ({})
   // ── THEMES, AND WHY ZENON IS STILL THE ANSWER ────────────────────────
-  // Every colour below is read through pick(): the theme Oracle names, if it
+  // Every color below is read through pick(): the theme Oracle names, if it
   // has that slot as a valid hex, and ZENON's own value otherwise. So Zenon
   // is not a file that can go missing — it is the table right here, and a
   // theme is only ever a set of overrides on top of it. A theme that names
-  // three colours gets those three; a file that is gone, half-written or not
+  // three colors gets those three; a file that is gone, half-written or not
   // JSON at all gets Zenon, whole. "zenon" never reads a file at all.
   //
   // A theme is themes/<name>.json in this config:
@@ -122,7 +122,7 @@ QtObject {
     : ground
   readonly property color ink:    pick("ink")
 
-  // The three ways the shell lays a colour over something, as functions so
+  // The three ways the shell lays a color over something, as functions so
   // a call site states its alpha and nothing else. floor: the ground itself,
   // part see-through (a panel, a scrim). wash: a hover, a press, a rule.
   // shade: a shadow. Written out as Qt.rgba(0,0,0,a) and Qt.rgba(1,1,1,a)
@@ -132,7 +132,7 @@ QtObject {
   // theme with deep accents wants it light.
   readonly property color onAccent:  pick("onAccent")
   // ── THE THEME AS PLATO'S NVIM TAKES IT ───────────────────────────────
-  // The resolved colours under Zenon's slot names, as #rrggbb (nvim's have
+  // The resolved colors under Zenon's slot names, as #rrggbb (nvim's have
   // no alpha), or null for Zenon itself, which nvim already is. One answer
   // for the live editor (PlatoWindow) and for every preview rendered by
   // plato/nvim/render.lua — terminus' pane, quick look, plato's file cards.
@@ -170,7 +170,7 @@ QtObject {
   // darken: a region that is not a shadow — a modal's scrim, a
   // recessed well, the shade under a bar a list scrolls beneath. Every theme
   // darkens for these, a light one included, but black at Zenon's strengths
-  // over white paper is a grey slab, so a light theme gets half.
+  // over white paper is a gray slab, so a light theme gets half.
   // ── LIGHT GLASS IS DENSER GLASS ────────────────────────────────────
   // Every opacity in this shell was tuned as black over a blurred desktop,
   // where the blur goes DARK and type in a pastel ink stands out of it. Light
@@ -191,11 +191,36 @@ QtObject {
   // gets its lift like every other surface. Exactly #cc000000 in Zenon.
   function hud(a) { return floor(glass(a)); }
   function darken(a) { return shade(light ? a * 0.5 : a); }
-  // any colour at another alpha: `Qt.rgba(c.r, c.g, c.b, a)`, said once
+  // ── THE SUITE'S PRESS ──────────────────────────────────────────────
+  // A button, a segment, a tab's ×, held down: its fill darkens and its
+  // type dims, as if pushed in (user, 2026-10-15). On dark glass that is
+  // shadow at 0.35 and type at 0.55. On paper the same black came out at
+  // half strength (darken) — a faint gray smudge — and type at 0.55 went
+  // muddy (user, 2026-10-17). A light theme presses with its own ink drawn
+  // a little toward the accent, deep enough to read as pressed, and keeps
+  // its type nearly whole.
+  // 0.3 on paper (user, 2026-10-17): at 0.2 a plain button, resting on a
+  // 0.12–0.16 wash of its own, hardly changed under the finger
+  // and more accent than ink, and TRULY dark (user, 2026-10-17: a pressed
+  // Cancel was a neutral gray barely deeper than its rest) — the button's
+  // own accent gray (buttonRest), pushed well down toward the ink
+  readonly property color pressFill: light ? alpha(mix(ink, cyan, 0.35), 0.46) : shade(0.35)
+  readonly property real pressDim: light ? 0.9 : 0.55
+  // a plain button at rest: a wash of the ink on dark glass; on paper the
+  // window's accent gray (accentMuted), as every other gray in a window
+  // leans to the accent — a black wash read as a neutral gray slab beside
+  // them (user, 2026-10-17)
+  function buttonRest(primary) {
+    return light ? alpha(accentMuted, primary ? 0.3 : 0.24) : wash(primary ? 0.16 : 0.12);
+  }
+  // the lighter presses (a wash over a chip or a row) on dark glass; paper
+  // shares the suite's press, as a black wash there is gray
+  function pressWash(a) { return light ? pressFill : wash(a); }
+  // any color at another alpha: `Qt.rgba(c.r, c.g, c.b, a)`, said once
   function alpha(c, a) { return Qt.rgba(c.r, c.g, c.b, a); }
-  // a colour t of the way to another, alpha included. What "goes solid
+  // a color t of the way to another, alpha included. What "goes solid
   // behind a sheet" means: towards ground, which was only ever black by
-  // coincidence — scaling a colour's rgb down reached black in Zenon and a
+  // coincidence — scaling a color's rgb down reached black in Zenon and a
   // black bar in a light theme.
   function mix(a, b, t) {
     return Qt.rgba(a.r + (b.r - a.r) * t, a.g + (b.g - a.g) * t,
@@ -218,17 +243,17 @@ QtObject {
   // borderColor copy in nine popups. One value, read from here, so the
   // shell cannot come apart again without someone editing this line.
   //
-  // THE SPECIAL CASES, and only these, change colour or width with STATE —
+  // THE SPECIAL CASES, and only these, change color or width with STATE —
   // at rest each is still this border: the save field (red for a bad name,
   // yellow for Replace), focus and "on" rings in terminus and oracle, the
-  // open dropdown chip, a tag swatch's own-colour ring, the grid tile's open
+  // open dropdown chip, a tag swatch's own-color ring, the grid tile's open
   // flare, a critical toast's accent, chronos' running pomodoro, zeus'
   // hovered profile, the corner picker's chosen cell. A cue is not a border.
   //
   // Below hyprland's ignore_alpha on purpose — Buck's call. The note above
   // is why the old one sat over it: an edge that faint is not blurred
   // behind, so it reads as a hairline of the desktop itself.
-  // The colour is spoot's highlight bar (its Theme.selectedBg, #45505c) —
+  // The color is spoot's highlight bar (its Theme.selectedBg, #45505c) —
   // Buck's call, replacing the cyan it started as — at 30%.
   // Hyprland's window borders (hypr/lua/base.lua) are this same value, copied
   // by hand: change one, change the other.
@@ -316,13 +341,16 @@ QtObject {
   readonly property int menuWidth:     cfg.menuWidth
   readonly property int menuRowHeight: cfg.menuRowHeight
   readonly property int menuSepHeight: 7
-  readonly property int menuCardPad:   4    // the column's inset in the card
+  // the labels' inset from the card's sides. Sideways only: the rows run
+  // flush to the border top and bottom, the card's round clip cutting the
+  // first and last bands (folio's cursor, every menu — user 2026-10-17)
+  readonly property int menuCardPad:   4
   // THE TALLEST A CARD GETS: twenty-two rows, and past that it scrolls (CardBody).
   // A menu as tall as the screen — xkb's ninety-nine keyboard layouts — is
   // not a menu but a wall, and its far end was out of reach. Eighteen was
   // too few: picasso's picture menu is eighteen rows and five separators,
   // and scrolled for its last row.
-  readonly property int menuMaxHeight: menuRowHeight * 22 + menuCardPad * 2
+  readonly property int menuMaxHeight: menuRowHeight * 22 + 2
   // The air between a row's icon and its label. The icon sits in a 16px box
   // and most Font Awesome glyphs do not fill it, so the gap reads narrower
   // than the number suggests — 8 had the two touching on the wider marks.
@@ -414,7 +442,7 @@ QtObject {
   readonly property color headBg:    pick("headBg")
   // THE ACTIVE TAB'S FILL (plato's and terminus' strips). headBg in a dark
   // theme; in a light one headBg is a pale tint at 40% over pale glass and
-  // the active tab vanished into its neighbours (user, tab-visibility.png,
+  // the active tab vanished into its neighbors (user, tab-visibility.png,
   // 2026-10-08) — there it is the ink, washed thin, which reads as a tab.
   readonly property color tabHere: light ? Qt.rgba(ink.r, ink.g, ink.b, 0.11) : headBg
   // AN INACTIVE TAB'S GLASS, given the window's alpha (plato's and terminus'
@@ -448,7 +476,7 @@ QtObject {
   // had already learned this and put an opaque floor under itself.
   //
   // BLACK, and nothing over it. Tinting it with headBg first kept the strip
-  // in the chrome's blue-grey family and left it reading as a panel rather
+  // in the chrome's blue-gray family and left it reading as a panel rather
   // than as a floor — which is the one thing a hint bar must not do: it is the
   // quietest row on a popup and it stands over the busiest part of one.
   readonly property color hintBg: ground
@@ -462,19 +490,25 @@ QtObject {
   readonly property color hintFrostBg: floor(glass(0.6))
   readonly property color selBg:     pick("selBg")
   readonly property color keyInk:    pick("keyInk")
-  // ── THE GREYS, IN THE ACCENT (user, 2026-10-15) ─────────────────────
+  // ── THE GRAYS, IN THE ACCENT (user, 2026-10-15) ─────────────────────
   // A window's chrome — section heads, the steps behind the current crumb,
   // a count, a glyph at rest — in its theme's accent rather than a neutral
-  // grey, as the cursor is: the same three greys, each drawn part of the
+  // gray, as the cursor is: the same three grays, each drawn part of the
   // way to cyan (the accent; Follow Background's seed). Same lightness
   // order, so a muted word stays quieter than a soft one.
   readonly property real accentGreyMix: 0.4
   readonly property color accentMuted: mix(muted, cyan, accentGreyMix)
   readonly property color accentSoft:  mix(soft, cyan, accentGreyMix)
   readonly property color accentKey:   mix(keyInk, cyan, accentGreyMix)
+  // THE MENU CURSOR: the lit row of every menu — CardBody, icarus, folio,
+  // terminus' right-click and drop menus — in the theme's accent, as the
+  // windows' rows already are (their hiFill, the same cyan at 0.12), not
+  // the border gray it was (user, 2026-10-17). A shade stronger than the
+  // windows': a menu's ground is opaque and its band runs the whole card.
+  readonly property color menuHi:      alpha(cyan, 0.16)
   // ── spacing ──────────────────────────────────────────────────────────
   // Four values, and only four. padModule is a module's own breathing room,
-  // gap is the space between two neighbours, padBar is the pill's end caps,
+  // gap is the space between two neighbors, padBar is the pill's end caps,
   // padScreen is the pill's clearance from the screen edge.
   // A Divider carries a gap on each side itself, so it never needs spacers.
   readonly property int padModule: cfg.barPadModule
@@ -485,7 +519,7 @@ QtObject {
   // it would have sat morphed into one.
   readonly property int padScreen:  cfg.barScreenPad
   // Every module occupies a slot of this height, and BarText fills it, so a
-  // short label beside a taller sibling still sits on the bar's centre line.
+  // short label beside a taller sibling still sits on the bar's center line.
   readonly property int slot:      cfg.barSlot
   // the bar's type size; every module reads it through BarText
   readonly property int textSize:  cfg.barTextSize
@@ -506,8 +540,8 @@ QtObject {
   // come out different.
   readonly property int layerMax: cfg.barMaxWidth
   function layerWidth(want) {
-    // EVEN, ALWAYS. Every layer is centred — the pill by its own margins,
-    // the rest by anchors.horizontalCenter — and centring an ODD width
+    // EVEN, ALWAYS. Every layer is centered — the pill by its own margins,
+    // the rest by anchors.horizontalCenter — and centering an ODD width
     // inside an even-width monitor puts the whole panel on a half pixel.
     //
     // That is not a cosmetic half pixel. Each of these panels clips through
@@ -546,6 +580,10 @@ QtObject {
   // label set Bold or Medium keeps that. Medium by default; oracle's
   // Font weight, which picking a font file sets to that file's own cut.
   readonly property int weight: Number(cfg.fontWeight) || 500
+  // A TITLE'S WEIGHT: a sidebar's place, a category, a disk's name and the
+  // glyph before it, terminus' breadcrumbs — the name only, never its
+  // reading (a count, a size). Bold, whatever the family (user, 2026-10-17).
+  readonly property int titleWeight: Font.Bold
   // ── THE SHELL'S TEXT SIZE ──────────────────────────────────────────────
   // Oracle's Font size (the Font row's stepper), as a factor over the 16 px
   // every label was sized against. A label's size goes through px(): its own
@@ -830,13 +868,13 @@ QtObject {
     return padScreen + (onPill ? statusbar.pillHeight : 0);
   }
 
-  // Unlit meter notch: the accent dimmed, so a meter reads as one colour
+  // Unlit meter notch: the accent dimmed, so a meter reads as one color
   // whether its segments are lit or not. Kept well clear of the lit segment
   // in both brightness and alpha — but not so faint that the meter's own
   // shape disappears, which is what the first pass at these numbers did.
   function trough(c) {
     // Light: the accent, faint. Darkening a deep accent on paper only made
-    // a grey notch, which read as a different meter.
+    // a gray notch, which read as a different meter.
     if (light) return Qt.rgba(c.r, c.g, c.b, 0.22);
     return Qt.rgba(c.r * 0.62, c.g * 0.62, c.b * 0.62, 0.42);
   }

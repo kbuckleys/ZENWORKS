@@ -9,7 +9,7 @@
 // its title; draft and pre-release where the forge has them; then the notes,
 // the rest of the page — written, or previewed as the forge will show them,
 // and "Write them for me" for GitHub's own or the commits since the last
-// tag. Saving and cancelling are the page's buttons; ctrl return saves.
+// tag. Saving and canceling are the page's buttons; ctrl return saves.
 //
 // The fields write into page.edit as they are typed; reset() puts
 // page.edit back into them (opening one, notes written for you).

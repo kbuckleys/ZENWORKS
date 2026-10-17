@@ -123,7 +123,7 @@ Item {
   // and when neither side has enough, it takes what there is and scrolls.
   function reposition() {
     const rowH = Zenon.menuRowHeight;
-    const want = drop.options.length * rowH + 8;
+    const want = drop.options.length * rowH + 2;   // + the border
     if (!drop.overlay) {
       drop.listX = 0;
       drop.listY = drop.height + 4;
@@ -137,10 +137,10 @@ Item {
     // Downwards by preference — that is where a menu is looked for — and
     // upwards only when down genuinely has less room.
     if (want <= below || below >= above) {
-      drop.listH = Math.min(want, Math.max(rowH + 8, below));
+      drop.listH = Math.min(want, Math.max(rowH + 2, below));
       drop.listY = pt.y + drop.height + 4;
     } else {
-      drop.listH = Math.min(want, Math.max(rowH + 8, above));
+      drop.listH = Math.min(want, Math.max(rowH + 2, above));
       drop.listY = pt.y - drop.listH - 4;
     }
   }
@@ -257,7 +257,7 @@ Item {
     width: Math.max(drop.width, drop.widest + 24)
     height: drop.listH
     // THE SAME SURFACE THIS WINDOW'S OTHER MENUS ARE. panelBg is
-    // rgba(0,0,0,panelOpacity) — a colour built for a layer surface with
+    // rgba(0,0,0,panelOpacity) — a color built for a layer surface with
     // the compositor's blur behind it. There is no blur behind anything
     // inside a window, so it was simply see-through, and the verb chips
     // underneath read straight through the list.
@@ -270,11 +270,9 @@ Item {
     ListView {
       id: dropView
       anchors.fill: parent
-      anchors.topMargin: 4
-      anchors.bottomMargin: 4
-      // inside the 1px border, as every menu's band (user, 2026-10-10)
-      anchors.leftMargin: 1
-      anchors.rightMargin: 1
+      // flush to the 1px border on all four sides, as every menu's band
+      // (users, 2026-10-10 and 2026-10-17 — folio's cursor)
+      anchors.margins: 1
       clip: true
       model: drop.options
       // Follows the keyboard, so arrowing past the bottom of a clamped
@@ -295,12 +293,13 @@ Item {
         // Either pointer: the keyboard's row and the mouse's row light
         // the same way, because they are the same thing said twice.
         color: rowHov.hovered || drop.cursor === dropRow.index
-          ? Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b, 0.16)
+          ? Zenon.menuHi
           : "transparent"
-        // the first and last rounded into the list's corners, inset
-        topLeftRadius: dropRow.index === 0 ? Math.max(0, Zenon.menuRadius - 4) : 0
+        // the first and last follow the list's corners, just inside the
+        // border (a plain Rectangle, so nothing clips them round for it)
+        topLeftRadius: dropRow.index === 0 ? Math.max(0, Zenon.menuRadius - 1) : 0
         topRightRadius: topLeftRadius
-        bottomLeftRadius: dropRow.index === drop.options.length - 1 ? Math.max(0, Zenon.menuRadius - 4) : 0
+        bottomLeftRadius: dropRow.index === drop.options.length - 1 ? Math.max(0, Zenon.menuRadius - 1) : 0
         bottomRightRadius: bottomLeftRadius
 
         Text {

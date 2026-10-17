@@ -7,7 +7,7 @@
 return {
   black           = "#000000",
 
-  -- Surface colour for every overlay (floats, which-key, yazi, fzf). Reads as
+  -- Surface color for every overlay (floats, which-key, yazi, fzf). Reads as
   -- black, but is deliberately one step off it: kitty decides translucency by
   -- comparing a cell's background against the *value* of the default one --
   -- cell_vertex.glsl's background_opacity_for() is "opacity if bg == colorval

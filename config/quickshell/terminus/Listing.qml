@@ -122,7 +122,7 @@ Item {
       : (Terminus.isAudio(r.name) ? "audio"
         : (Terminus.isImage(r.name) ? "image"
           // OR whatever the pane actually decided. A great many text files
-          // have no extension to recognise — .zshrc, a Makefile, a script —
+          // have no extension to recognize — .zshrc, a Makefile, a script —
           // and those are exactly the ones previewKind gets right by looking
           // at the bytes. The name is only the fast path.
           : (Terminus.isPdf(r.name) ? "pdf"
@@ -223,7 +223,7 @@ Item {
   // That is the list that flashes in the last column. Reading the pane
   // directly cannot be a frame behind it.
   function currentRow() { return term.heldBox.row || term.act.view[term.act.sel] || null; }
-  // The colour and the glyph are worked out ONCE PER LISTING and stored on the
+  // The color and the glyph are worked out ONCE PER LISTING and stored on the
   // row, not asked for every time a delegate is drawn.
   //
   // They used to be functions called from bindings, which means once per row
@@ -233,8 +233,8 @@ Item {
   // they arrive and the delegates read a field.
   function inkFor(e) { return Terminus.rowInk(e); }
   // The NAME's ink, which is not the glyph's. The glyph already says what
-  // kind of file it is, in its shape and its colour; the name saying it a
-  // second time spent five colours on one fact and left none for anything
+  // kind of file it is, in its shape and its color; the name saying it a
+  // second time spent five colors on one fact and left none for anything
   // else a name might want to say. So the kinds are the glyph's alone, and
   // the name keeps only what is about the ENTRY rather than its type: a
   // directory, a link and where it leads, something you can run, an empty file.
@@ -246,11 +246,11 @@ Item {
   // Icons.glyphFor answers from a table of extensions somebody wrote down,
   // and the set of image formats is not a set anybody finishes writing down:
   // forty-one of the ones this window already calls images had no line in it
-  // and drew the plain page — the same mark a file type nothing recognises
+  // and drew the plain page — the same mark a file type nothing recognizes
   // gets, beside a .cr2 drawing a picture.
   //
   // So when the table has nothing, the KIND answers instead. This window has
-  // already worked the kind out for the sort and the colour, and it is the
+  // already worked the kind out for the sort and the color, and it is the
   // one place that knows it — Icons is shared with artemis and has no
   // opinion about what counts as an image.
   //

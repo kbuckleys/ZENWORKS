@@ -4,7 +4,7 @@
 // https://github.com/kbuckleys/
 //
 // WHAT THE CHECKS SAID — a commit's CI, as one small mark: a green dot
-// passed, a red one failed, a ring still running, a grey dot nothing
+// passed, a red one failed, a ring still running, a gray dot nothing
 // either way. Nothing at all where there are no checks (or none asked
 // yet). `c` is DelphiManager.ciOf's answer.
 //

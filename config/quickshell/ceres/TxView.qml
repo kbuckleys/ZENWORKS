@@ -37,7 +37,7 @@ Item {
 
   readonly property bool running: Ceres.txBusy
   readonly property bool failed: Ceres.txState === "failed"
-  readonly property bool cancelled: view.failed && Ceres.txError === "Cancelled"
+  readonly property bool cancelled: view.failed && Ceres.txError === "Canceled"
   readonly property var tally: Cer.tally(Ceres.txEvents)
 
   // What a holder of this view needs to size itself for the result.
@@ -293,7 +293,7 @@ Item {
             / Math.max(1, Ceres.txExpected, Ceres.txEvents.length))
 
       // ── THE FILL: terminus/ProgressFill (lifted out of here) ──────────
-      // Red, all of it, while cancelling.
+      // Red, all of it, while canceling.
       Term.ProgressFill {
         anchors.fill: parent
         anchors.margins: 1
@@ -397,16 +397,17 @@ Item {
       wrapMode: Text.Wrap
       text: {
         if (view.cancelled)
-          return "Cancelled" + (Ceres.txEvents.length
+          return "Canceled" + (Ceres.txEvents.length
             ? " — " + Ceres.txEvents.length + " already changed, and kept" : "");
         if (view.failed) return Ceres.txError;
         const t = view.tally, parts = [];
         for (const v of Cer.VERBS) if (t[v].length) parts.push(t[v].length + " " + v);
+        if (Ceres.txFlat > 0) parts.push(Ceres.txFlat + " Flatpak updated");
         // A run that changed no package — paccache, the download sweep — is
         // reported in the tool's own words rather than as "nothing changed",
         // which for a cache cleanup reads as the button not working.
         return (parts.length ? parts.join(" · ")
-                             : ((Cer.summaryLine ? Cer.summaryLine(Ceres.txLog) : "") || "nothing changed"))
+                             : (Cer.summaryLine(Ceres.txLog) || Cer.doneLine(Ceres.txLabel) || "nothing changed"))
           + (Ceres.txDisk !== "" ? "      " + Ceres.txDisk : "");
       }
       color: view.cancelled ? Zenon.yellow : view.failed ? Zenon.red : Zenon.white

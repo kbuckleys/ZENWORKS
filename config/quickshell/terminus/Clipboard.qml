@@ -138,7 +138,7 @@ Item {
         if (clash.length === 0) { term.commitPaste("overwrite"); return; }
         // Three answers, and Overwrite is deliberately NOT the one Enter takes
         // by reflex being listed first — it is, because it is the one you
-        // usually mean, but it wears the alarm colour so a blind Enter is at
+        // usually mean, but it wears the alarm color so a blind Enter is at
         // least an informed one. "Keep both" renames the incoming copy; "Skip"
         // keeps what is already there and takes the rest of the selection.
         // ── THE WORD HAS TO BE THE ONE THAT HAPPENS ──────────────────
@@ -211,7 +211,7 @@ Item {
   }
   function startJob(op, paths, dest, clash) {
     term.spendMarks();
-    // setsid, so the job gets a process group of its own and CANCELLING it can
+    // setsid, so the job gets a process group of its own and CANCELING it can
     // take the whole tree down rather than leaving rsync running orphaned.
     const argv = ["setsid"].concat(Terminus.shArgv(
       op === "archive" ? Terminus.archiveJobCommand(paths, dest)

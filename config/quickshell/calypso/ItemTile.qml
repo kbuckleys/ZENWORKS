@@ -4,7 +4,7 @@
 // https://github.com/kbuckleys/
 //
 // AN ITEM'S FACE — the site's own mark where the font has one (C.markOf),
-// else its kind's glyph, in its kind's colour, on nothing (no chip).
+// else its kind's glyph, in its kind's color, on nothing (no chip).
 // The list's rows, the detail's head and Quick Access all wear it, so an
 // item looks the same wherever it is met.
 //
@@ -32,7 +32,7 @@ Rectangle {
 
   width: tile.size
   height: tile.size
-  // NO CHIP: the glyph stands alone in its kind's colour (user,
+  // NO CHIP: the glyph stands alone in its kind's color (user,
   // 2026-10-12: "lose the chips around glyphs in all of calypso") — sized
   // up to fill the square a tinted tile used to
   color: Zenon.alpha(tile.hue, 0)

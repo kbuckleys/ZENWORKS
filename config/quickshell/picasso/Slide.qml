@@ -3,7 +3,7 @@
 // └─┘└─┘┘└┘└┴┘└─┘┴└─┴ ┴└─┘
 // https://github.com/kbuckleys/
 //
-// A labelled slider: the name on the left, the track, the value on the
+// A labeled slider: the name on the left, the track, the value on the
 // right. A click on the value puts it back to its default.
 //
 // One of picasso's controls, shared by the focus card and the viewer.

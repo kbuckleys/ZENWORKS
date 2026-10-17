@@ -87,6 +87,12 @@ Column {
           }
           SettingLine {
             width: sb.colW
+            label: "Smart punctuation"
+            note: "“Curly quotes” and — dashes as you type"
+            Segments { options: [[true, "On"], [false, "Off"]]; current: sb.mgr ? sb.mgr.smartPunct : true; textSize: Zenon.px(12); onChose: (v) => sb.mgr.set("smartPunct", v) }
+          }
+          SettingLine {
+            width: sb.colW
             label: "Stickies on the desktop"
             Segments { options: [[true, "Shown"], [false, "Hidden"]]; current: Clio.shown; textSize: Zenon.px(12); onChose: (v) => Clio.shown = v }
           }
@@ -120,6 +126,12 @@ Column {
                   .concat(sb.mgr.templates.map((x) => ({ text: x.name, icon: "\u{F0DC9}", run: () => sb.mgr.setDaily(x.id) }))));
               }
             }
+          }
+          SettingLine {
+            width: sb.colW
+            label: "Blur previews"
+            note: "Entries' words and pictures frosted in the list until the pointer is on them"
+            Segments { options: [[true, "On"], [false, "Off"]]; current: sb.mgr ? sb.mgr.journalBlur : false; textSize: Zenon.px(12); onChose: (v) => sb.mgr.set("journalBlur", v) }
           }
           SettingLine {
             width: sb.colW
@@ -173,12 +185,87 @@ Column {
             label: "Lock again after"
             Segments { options: [[5, "5 min"], [10, "10"], [30, "30"], [60, "1 h"], [0, "Never"]]; current: sb.mgr ? sb.mgr.lockAfter : 10; textSize: Zenon.px(12); onChose: (v) => sb.mgr.set("lockAfter", v) }
           }
+
+          // ── SPELLING ── hunspell's (ClioManager's spelling), in notes,
+          // entries and stickies
+          SideHead { width: sb.colW; ruled: false; label: "Spelling" }
+          SettingLine {
+            width: sb.colW
+            label: "Check spelling"
+            note: sb.mgr && !sb.mgr.spellInfo.have ? "hunspell is not installed" : "A red line under a word it does not know; right click for guesses"
+            Segments { options: [[true, "On"], [false, "Off"]]; current: sb.mgr ? sb.mgr.spellOn : true; textSize: Zenon.px(12); onChose: (v) => sb.mgr.setSpellOn(v) }
+          }
+          SettingLine {
+            width: sb.colW
+            visible: !!sb.mgr && sb.mgr.spellOn
+            label: "Languages"
+            note: sb.mgr && sb.mgr.spellInfo.langs.length === 0 ? "No dictionaries yet" : "Words right in any one of them count as right"
+            Flow {
+              width: sb.colW * 0.55
+              spacing: 4
+              Repeater {
+                model: sb.mgr ? sb.mgr.spellInfo.langs : []
+                delegate: MoodChip {
+                  required property string modelData
+                  readonly property var inUse: sb.mgr.spellLangs.length > 0 ? sb.mgr.spellLangs : sb.mgr.spellInfo.default
+                  word: sb.langName(modelData)
+                  on: inUse.indexOf(modelData) >= 0
+                  onClicked: {
+                    const next = on ? inUse.filter((c) => c !== modelData) : inUse.concat([modelData]);
+                    if (next.length > 0) sb.mgr.setSpellLangs(next);
+                  }
+                }
+              }
+            }
+          }
+          SettingLine {
+            width: sb.colW
+            label: "More languages"
+            note: "Dictionaries are packages: Ceres opens on them"
+            DialogButton { label: "Find in Ceres…"; onClicked: { sb.closed(); sb.mgr.moreLanguages(); } }
+          }
+          SettingLine {
+            width: sb.colW
+            visible: !!sb.mgr && (sb.mgr.meta.learned || []).length > 0
+            label: "Learned words"
+            note: sb.mgr ? (sb.mgr.meta.learned || []).length + ((sb.mgr.meta.learned || []).length === 1 ? " word" : " words") + ", kept with the notebook" : ""
+            DialogButton {
+              id: learnedBtn
+              label: "Forget…"
+              onClicked: {
+                const p = learnedBtn.mapToItem(sb.win.stageItem, 0, learnedBtn.height + 4);
+                sb.win.menuRef.open(p.x, p.y, (sb.mgr.meta.learned || []).slice().sort()
+                  .map((w) => ({ text: w, icon: "", danger: true, run: () => sb.mgr.unlearnWord(w) })));
+              }
+            }
+          }
     }
   }
   Item {
     width: sb.width - 44
     height: 32
     DialogButton { anchors.right: parent.right; label: "Close"; ink: Zenon.cyan; primary: true; onClicked: sb.closed() }
+  }
+
+  // the dictionaries looked at again whenever the sheet comes up: one added
+  // through Ceres since shows
+  Connections {
+    target: sb.win
+    ignoreUnknownSignals: true
+    function onSetOpenChanged() { if (sb.win.setOpen && sb.mgr) sb.mgr.spellRefresh(); }
+  }
+  // "en_US" → "American English", in its own language; "de_DE" → "Deutsch
+  // (Deutschland)" when the language's name does not already say where;
+  // "-large" said after a dot
+  function langName(code) {
+    const base = String(code).split("-")[0];
+    const l = Qt.locale(base);
+    let n = l.nativeLanguageName || base;
+    n = n.charAt(0).toUpperCase() + n.slice(1);
+    const t = base.indexOf("_") > 0 ? l.nativeTerritoryName : "";
+    const plain = Qt.locale(base.split("_")[0]).nativeLanguageName;
+    const extra = String(code).indexOf("-") > 0 ? " · " + String(code).split("-").slice(1).join(" ") : "";
+    return n + (t && n.toLowerCase() === String(plain).toLowerCase() ? " (" + t + ")" : "") + extra;
   }
 
   function shift(mins) {

@@ -359,7 +359,7 @@ function uptimeClean(text) {
 // `Bps` is bytes per second as a plain integer — raw mode does not humanise,
 // which is exactly what a sort wants.
 //
-// The three are normalised on the way in, because they are the same four
+// The three are normalized on the way in, because they are the same four
 // columns wearing different names: a thing, what it is bound to, and its two
 // rates. One row shape means one delegate and one sort.
 const NET_RE = {

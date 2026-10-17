@@ -61,7 +61,7 @@ def run(argv, cancel=None, stdin=None, env=None, timeout=60, check=False):
     """A CLI, its own session (so a cancel takes whatever it started too),
     output captured as text. → (code, out, err)"""
     e = dict(os.environ)
-    # never a terminal, never a pager, never colour: answers are parsed
+    # never a terminal, never a pager, never color: answers are parsed
     e.update({"NO_COLOR": "1", "TERM": "dumb", "PAGER": "cat", "LC_ALL": "C.UTF-8"})
     if env:
         e.update(env)

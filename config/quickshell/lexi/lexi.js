@@ -141,7 +141,7 @@ function hasContent(s) {
 }
 
 // Parse the "<code>: text" source-language prefix, mirroring translate.lua:
-// only a recognised code counts, so "no: way" isn't read as Norwegian.
+// only a recognized code counts, so "no: way" isn't read as Norwegian.
 function splitSourcePrefix(raw) {
   const m = String(raw).match(/^(\S+)\s*:\s*(\S.*)$/);
   if (m && KNOWN_CODES[m[1]] && hasContent(m[2])) {
@@ -589,7 +589,7 @@ function renderTemplate(inner) {
   if (name === "n-g" || name === "ngd" || name === "non-gloss"
       || name === "non-gloss definition" || name === "gloss" || name === "gl")
     return pos[pos.length - 1] || "";
-  // Inline qualifiers render parenthesised, as they do on the site
+  // Inline qualifiers render parenthesized, as they do on the site
   if (name === "q" || name === "qualifier" || name === "qual" || name === "i")
     return pos.length > 0 ? "(" + pos.join(", ") + ")" : "";
   // Everything else (quotes, references, categories) contributes nothing

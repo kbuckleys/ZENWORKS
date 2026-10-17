@@ -22,9 +22,9 @@ module.exports = {
     t.eq("down through actual size", V.stepZoom(1.25, -1), 1);
     t.eq("down from actual size", V.stepZoom(1, -1), 0.8);
 
-    t.eq("fitted is centred", V.fitView(2000, 1000, 1000, 1000),
+    t.eq("fitted is centered", V.fitView(2000, 1000, 1000, 1000),
       { z: 0.5, x: 0, y: 250 });
-    t.eq("a picture smaller than the stage stays centred",
+    t.eq("a picture smaller than the stage stays centered",
       V.clampView({ z: 1, x: -300, y: 40 }, 100, 100, 500, 500), { z: 1, x: 200, y: 200 });
     t.eq("an overflowing one cannot leave a gap",
       V.clampView({ z: 1, x: 50, y: -5000 }, 2000, 2000, 500, 500), { z: 1, x: 0, y: -1500 });
@@ -98,7 +98,7 @@ module.exports = {
 
     t.eq("filter: tags and words", V.splitFilter("  #red beach  #★ sun "),
       { tags: ["red", "favourite"], text: "beach sun", kinds: [] });
-    t.eq("a bare star is the favourite", V.splitFilter("★").tags, ["favourite"]);
+    t.eq("a bare star is the favorite", V.splitFilter("★").tags, ["favourite"]);
     t.eq("all tags carried", V.hasAllTags(["a", "b"], ["b"]), true);
     t.eq("one missing", V.hasAllTags(["a"], ["a", "b"]), false);
     t.eq("no tags wanted", V.hasAllTags(undefined, []), true);

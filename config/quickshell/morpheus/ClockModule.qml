@@ -30,7 +30,7 @@ Item {
     //
     // The ghost is built from the SAME shape as the reading — one more group
     // of eights when the seconds are showing — so the two cannot come out
-    // different widths and leave the live digits sitting off-centre on their
+    // different widths and leave the live digits sitting off-center on their
     // own unlit panel.
     Item {
       width: Math.max(ghost.implicitWidth, label.implicitWidth)

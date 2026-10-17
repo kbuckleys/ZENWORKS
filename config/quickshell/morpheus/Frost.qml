@@ -45,7 +45,7 @@ Item {
   property real saturation: -0.3
   // ── AND DARKER, FOR WHAT IS WRITTEN ON IT ─────────────────────────────
   // A bright picture blurred is still bright, and a bar's quieter labels
-  // (muted grey) vanished into it. The glass is dimmed (brightness), then
+  // (muted gray) vanished into it. The glass is dimmed (brightness), then
   // this much black goes over it — eased in only while there is something
   // under it, so a bar over nothing is exactly what it always was. The
   // same answer ScrollEdge's scrim gives the lists.
@@ -195,7 +195,7 @@ Item {
   Rectangle {
     anchors.fill: parent
     radius: frost.radius
-    // the theme's ground: a light theme frosts to paper, not to a grey veil
+    // the theme's ground: a light theme frosts to paper, not to a gray veil
     color: Zenon.ground
     opacity: frost.on ? frost.scrim : 0
     visible: opacity > 0.001

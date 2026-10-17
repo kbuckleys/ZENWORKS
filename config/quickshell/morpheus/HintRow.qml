@@ -74,7 +74,7 @@ Row {
       Text {
         anchors.verticalCenter: parent.verticalCenter
         text: pair.modelData[1]
-        color: Zenon.muted
+        color: Zenon.accentMuted
         font.family: Zenon.face
         font.weight: Zenon.weight
         font.pixelSize: Zenon.px(13)
@@ -88,7 +88,7 @@ Row {
     anchors.verticalCenter: parent.verticalCenter
     visible: hints.shown < hints.rows.length
     label: "?"
-    border.color: moreHov.hovered || hints.cardOpen ? Zenon.keyInk : Zenon.border
+    border.color: moreHov.hovered || hints.cardOpen ? Zenon.accentKey : Zenon.border
     HoverHandler { id: moreHov; cursorShape: Qt.PointingHandCursor }
     TapHandler { onTapped: hints.pinned = !hints.pinned }
 
@@ -124,7 +124,7 @@ Row {
             Text {
               anchors.verticalCenter: parent.verticalCenter
               text: parent.modelData[1]
-              color: Zenon.keyInk
+              color: Zenon.accentKey
               font.family: Zenon.face
               font.weight: Zenon.weight
               font.pixelSize: Zenon.px(13)

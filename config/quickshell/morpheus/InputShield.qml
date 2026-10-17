@@ -59,7 +59,7 @@ Item {
   //
   // ── A DRAG IS NOT A CLICK ──────────────────────────────────────────
   // MouseArea calls it clicked whenever the release lands inside it,
-  // however far the pointer travelled — so dragging across quick look
+  // however far the pointer traveled — so dragging across quick look
   // (to scroll, to pull the page strip, or just a hand that moved) and
   // letting go shut it. Only a press that stays put, and did not start
   // on the card, is the click that means "put this away".

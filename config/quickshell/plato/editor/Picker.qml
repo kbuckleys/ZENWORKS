@@ -46,7 +46,7 @@
 // the match, with its line lit. The list takes the top of the sheet and the file
 // under the cursor is shown below it — through terminus' own preview
 // (terminus.js previewCommand: plato's highlighter, plato/nvim/render.lua,
-// in plato's colours; bat when that is not there), and a picture as a
+// in plato's colors; bat when that is not there), and a picture as a
 // picture. Read a moment after the cursor settles, and kept for the next
 // time it lands there.
 //

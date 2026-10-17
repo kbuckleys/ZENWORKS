@@ -41,7 +41,7 @@ def natural(name):
 # Everything ends here: whatever came in, as an image file or as bytes on
 # stdin, scaled into the box and written as the pool's JPEG. The checkerboard
 # goes under anything with alpha — JPEG has none, and flattening onto a flat
-# colour would be wrong against one theme or the other.
+# color would be wrong against one theme or the other.
 def finish(src, out, px, data=None):
     cmd = ["magick", src, "-auto-orient", "-thumbnail", f"{px}x{px}",
            "(", "+clone", "-tile", "pattern:checkerboard",

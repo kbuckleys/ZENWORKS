@@ -53,7 +53,7 @@
 //   D (or shift+delete) deletes for good — it asks first, and there is no undo
 //   ctrl+c copy   ctrl+shift+c path   ctrl+v look at what the clipboard holds
 //   ctrl+s save the edit   ctrl+shift+s save it as new   esc back out (never closes — q does)
-//   y copies the colour under the pointer — zoomed past 400%, where each of
+//   y copies the color under the pointer — zoomed past 400%, where each of
 //     the picture's pixels is drawn sharp, and past 1200% gridded
 //
 // The gallery's tiles zoom as terminus' grid does: ctrl+wheel, + - 0 (ctrl
@@ -1558,7 +1558,7 @@ FloatingWindow {
     }
   }
 
-  // ── the neighbours, read ahead ────────────────────────────────────────
+  // ── the neighbors, read ahead ────────────────────────────────────────
   // The picture shown and the ones either side, decoded in the background
   // into Qt's pixmap cache and HELD there: the stage asks for the same url
   // at the same size and finds it waiting, so stepping through a directory of
@@ -1644,8 +1644,8 @@ FloatingWindow {
   // ── tags ──────────────────────────────────────────────────────────────
   // terminus' (tags.js): user.xdg.tags on the files themselves, so a picture
   // starred here is starred in terminus' tag pages too. Read for the directory
-  // after every listing; written back as they change. "favourite" is the
-  // star — V.FAVOURITE.
+  // after every listing; written back as they change. "favorite" is the
+  // star — V.FAVORITE.
   property var tags: ({})
   // .xmp files in the directory ({ path: true }), and what the ones beside the
   // pictures say ({ picture: { names, rating } }) — see tags.js' sidecars
@@ -1728,7 +1728,7 @@ FloatingWindow {
         const typed = Tags.splitTags(text);
         win.writeTags(ps.map((q) => ({ path: q,
           names: Tags.normalise(one ? typed : (win.tags[q] || []).concat(typed)) })), "tags saved");
-      }, "commas between them · red, green, blue … wear their colour · favourite is the star");
+      }, "commas between them · red, green, blue … wear their color · favorite is the star");
   }
 
   // Qt could not decode it: the one-off big render, as terminus' quick look
@@ -1759,7 +1759,7 @@ FloatingWindow {
   property var gps: null
   // red, green, blue and light, from a small copy — viewer.js histogram
   property var hist: null
-  // its most used colours, [{ n, hex }] — viewer.js parsePalette
+  // its most used colors, [{ n, hex }] — viewer.js parsePalette
   property var palette: []
   function askExif() {
     win.exif = [];
@@ -2738,7 +2738,7 @@ FloatingWindow {
 
   // ── the pixel under the pointer ───────────────────────────────────────
   // Zoomed in past 400% — where a picture's pixels are drawn sharp, one
-  // colour each — the one under the pointer is read off the picture itself
+  // color each — the one under the pointer is read off the picture itself
   // (see the probe on the stage) and shown beside it; y copies it.
   property var pixel: null
   readonly property bool pixelClose: win.loaded && win.vz >= 4 && !win.vector && !win.animated && !win.isVid
@@ -3058,7 +3058,7 @@ FloatingWindow {
         }
         TapHandler { onTapped: { tips.hide(searchPill); win.openFilter(); } }
 
-        // centred in the button, then at the field's left edge
+        // centered in the button, then at the field's left edge
         Text {
           id: pillGlyph
           x: searchPill.busy ? 12 : (34 - width) / 2
@@ -3484,7 +3484,7 @@ FloatingWindow {
         // in the cache, where the read-ahead put it — see holdPaths
         cache: true
         // Past 300% each of the picture's pixels is a square, sharp-edged,
-        // as a pixel is: blended into its neighbours it is only blur, and a
+        // as a pixel is: blended into its neighbors it is only blur, and a
         // screenshot zoomed into to read a detail is unreadable.
         smooth: win.vz < 3
         // A 6000px photo shown at 1400 shimmers without these: the drop is
@@ -3600,7 +3600,7 @@ FloatingWindow {
     }
 
     // ── the monitors' view of it ────────────────────────────────────────
-    // What each monitor would show as a background, filled and centred: the
+    // What each monitor would show as a background, filled and centered: the
     // background's own crop, outlined. Sand when the picture is smaller than
     // the monitor and would be blown up.
     property bool monitorsShown: false
@@ -4545,7 +4545,7 @@ FloatingWindow {
                                 easing.type: Easing.InOutSine }
             }
           }
-          // the star, and the tags that come with a colour, along its foot
+          // the star, and the tags that come with a color, along its foot
           Row {
             x: pic.x + 6
             y: pic.y + pic.height - height - 6
@@ -5229,104 +5229,48 @@ FloatingWindow {
       { edge: "right",  d: 1 },
       { edge: "bottom", d: 0 }
     ]
-    delegate: Rectangle {
+    // the tab itself is morpheus/EdgeTab — ceres' carousel and lightbox
+    // wear it too
+    delegate: EdgeTab {
       id: navTab
       required property var modelData
-      readonly property string edge: navTab.modelData.edge
-      readonly property bool side: navTab.edge !== "bottom"
-      readonly property bool hot: navMa.containsMouse
-      readonly property real depth: navTab.hot ? 22 : 17
+      edge: navTab.modelData.edge
       readonly property bool live: navTab.side
         ? win.index + navTab.modelData.d >= 0 && win.index + navTab.modelData.d < win.rows.length
         : true
-      readonly property bool shown: navTab.side
+      shown: navTab.side
         ? win.mode === "view" && navTab.live && (hoverWatch.hovered || navTab.hot) && !win.cropping
         : strip.can && !win.cropping && (!win.full || win.peekBottom)
       // Prev and next come up as the pointer nears their side, not anywhere
       // over the picture: full within 80px of the edge, gone past 240.
-      readonly property real near: {
+      near: {
         if (!navTab.side || navTab.hot) return 1;
         const px = hoverWatch.point.position.x;
         const dist = navTab.edge === "left" ? px : stage.width - px;
         return Math.max(0, Math.min(1, 1 - (dist - 80) / 160));
       }
-      readonly property string glyph: navTab.edge === "left" ? "\uf104"
+      glyph: navTab.edge === "left" ? "\uf104"
         : navTab.edge === "right" ? "\uf105"
         : (win.stripShown ? "\uf107" : "\uf106")
+      nudge: navTab.side ? navTab.modelData.d * 6 : (win.stripShown ? 4 : -4)
       z: 4
-      width: navTab.side ? navTab.depth : 52
-      height: navTab.side ? 52 : navTab.depth
       x: navTab.edge === "left" ? stage.x
         : navTab.edge === "right" ? stage.x + stage.width - width
         : strip.x + (strip.width - width) / 2
       // the strip's tab over its top line by one, so the two read as one
       y: navTab.side ? stage.y + (stage.height - height) / 2 : strip.y - height + 1
-      Behavior on width { enabled: navTab.side; NumberAnimation { duration: Zenon.fast; easing.type: Zenon.ease } }
-      Behavior on height { enabled: !navTab.side; NumberAnimation { duration: Zenon.fast; easing.type: Zenon.ease } }
-      // rounded only on the free side
-      topLeftRadius: navTab.edge === "left" ? 0 : 7
-      bottomLeftRadius: navTab.edge === "right" ? 7 : 0
-      topRightRadius: navTab.edge === "right" ? 0 : 7
-      bottomRightRadius: navTab.edge === "left" ? 7 : 0
-      // solid: the strip's colour, laid over black rather than over what
-      // is behind it
-      readonly property color base: Qt.tint(Qt.tint(Zenon.ground, Zenon.layerBg), Zenon.headBg)
-      color: navMa.pressed ? Qt.tint(navTab.base, Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b, 0.28))
-        : navTab.hot ? Qt.tint(navTab.base, Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b, 0.16))
-        : navTab.base
-      border.width: 1
-      border.color: Zenon.border
-      opacity: navTab.shown ? navTab.near : 0
-      visible: opacity > 0.01
-      Behavior on opacity { NumberAnimation { duration: Zenon.fast; easing.type: Zenon.ease } }
-      // a click leans it the way it goes, and it springs back
-      transform: Translate { id: navNudge }
-      SequentialAnimation {
-        id: navNudgeAnim
-        NumberAnimation { target: navNudge; property: navTab.side ? "x" : "y"
-                          to: navTab.side ? navTab.modelData.d * 6 : (win.stripShown ? 4 : -4)
-                          duration: Math.round(70 * Oracle.motionScale); easing.type: Easing.OutCubic }
-        NumberAnimation { target: navNudge; property: navTab.side ? "x" : "y"; to: 0
-                          duration: Math.round(260 * Oracle.motionScale); easing.type: Easing.OutBack; easing.overshoot: 2 }
+      onHotChanged: {
+        if (navTab.side) stage.navHovered = navTab.hot;
+        if (!navTab.hot) { tips.hide(navTab); return; }
+        if (navTab.edge === "left") tips.show(navTab, "Previous", "\u2190");
+        else if (navTab.edge === "right") tips.show(navTab, "Next", "\u2192");
+        else tips.show(navTab, win.stripShown ? "Put the strip away" : "Show the strip",
+                       "alt+s");
       }
-      // no line along the edge it grows out of
-      Rectangle {
-        color: navTab.color
-        x: navTab.edge === "left" ? 0 : navTab.edge === "right" ? parent.width - 1 : 1
-        y: navTab.side ? 1 : parent.height - 1
-        width: navTab.side ? 1 : parent.width - 2
-        height: navTab.side ? parent.height - 2 : 1
-      }
-      Text {
-        anchors.centerIn: parent
-        // nudged off the flush edge, into the middle of what shows
-        anchors.horizontalCenterOffset: navTab.edge === "left" ? -1 : navTab.edge === "right" ? 1 : 0
-        anchors.verticalCenterOffset: navTab.side ? 0 : 1
-        text: navTab.glyph
-        color: navTab.hot ? Zenon.cyan : Zenon.accentMuted
-        font.family: Zenon.face
-        font.weight: Zenon.weight
-        font.pixelSize: Zenon.px(navTab.side ? 16 : 14)
-      }
-      MouseArea {
-        id: navMa
-        anchors.fill: parent
-        anchors.margins: -4
-        hoverEnabled: true
-        onContainsMouseChanged: {
-          if (navTab.side) stage.navHovered = containsMouse;
-          if (!containsMouse) { tips.hide(navTab); return; }
-          if (navTab.edge === "left") tips.show(navTab, "Previous", "\u2190");
-          else if (navTab.edge === "right") tips.show(navTab, "Next", "\u2192");
-          else tips.show(navTab, win.stripShown ? "Put the strip away" : "Show the strip",
-                         "alt+s");
-        }
-        onClicked: {
-          keys.forceActiveFocus();
-          navNudgeAnim.restart();
-          if (navTab.side) win.step(navTab.modelData.d);
-          else win.toggleStrip();
-        }
+      onClicked: {
+        keys.forceActiveFocus();
+        if (navTab.side) win.step(navTab.modelData.d);
+        else win.toggleStrip();
       }
     }
   }
@@ -5592,7 +5536,7 @@ FloatingWindow {
           Item {
             width: parent.width
             height: tintHead.height
-            Head { id: tintHead; text: "Tint colour" }
+            Head { id: tintHead; text: "Tint color" }
             Text {
               anchors.right: parent.right
               text: "Done"
@@ -5807,7 +5751,7 @@ FloatingWindow {
             ctx.stroke();
           }
         }
-        // its own colours, the most used first — a click copies one
+        // its own colors, the most used first — a click copies one
         Row {
           visible: win.palette.length > 0
           spacing: 6
@@ -6074,7 +6018,7 @@ FloatingWindow {
         { text: "Copy without metadata", icon: "\uf070", act: "copyClean" },
         { text: "Copy the text in it", icon: "\uf031", act: "ocr" }
       ]).concat(pick ? [
-        { text: "Copy colour " + pick.hex, icon: "\uf1fb", act: "colour", hint: "y" },
+        { text: "Copy color " + pick.hex, icon: "\uf1fb", act: "colour", hint: "y" },
         { text: "Tint the picture " + pick.hex, icon: "\uf1fb", act: "tintPick" }
       ] : []);
 

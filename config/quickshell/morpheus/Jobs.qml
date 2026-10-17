@@ -15,7 +15,7 @@
 //
 // Terminus still BUILDS the commands — what rsync is told is a file manager's
 // business — and hands the argv over. What happens after that is this file's:
-// the process, the progress, cancelling, the receipt, the notification.
+// the process, the progress, canceling, the receipt, the notification.
 
 pragma Singleton
 

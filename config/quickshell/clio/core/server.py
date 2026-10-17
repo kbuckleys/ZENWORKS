@@ -66,6 +66,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(HERE)), "morpheu
 
 import lines  # noqa: E402
 import page  # noqa: E402
+import spell  # noqa: E402
 
 PROTOCOL = 1
 ROUNDS = 600000
@@ -332,6 +333,7 @@ class Server(lines.Service):
         self.ix = Index()
         # every page as this backend last read or wrote it: path → mtime
         self.known = {}
+        self.speller = spell.Speller()
 
     def mark(self, p, gone=False):
         if gone:
@@ -727,6 +729,17 @@ class Server(lines.Service):
             return {"path": p}
         if op == "changed":
             return self.changed()
+        # spelling: the words wrong, with suggestions; and the dictionaries
+        if op == "spell":
+            if not shutil.which("hunspell"):
+                raise ClioError("hunspell is not installed", "missing")
+            try:
+                return {"bad": self.speller.check(args.get("words") or [], args.get("langs") or [])}
+            except RuntimeError as e:
+                raise ClioError(str(e), "failed")
+        if op == "spellLangs":
+            return {"have": bool(shutil.which("hunspell")), "langs": [d["code"] for d in spell.available()],
+                    "default": spell.default_langs()}
         raise ClioError("No such request: " + op)
 
 

@@ -111,7 +111,7 @@ Item {
     anchors.fill: parent
     // little reach up and down: the bar is short, and the sheet's card
     // hanging under it covered the lower edge (user, 2026-10-15: "sunken")
-    anchors.margins: -2
+    anchors.margins: -4
     anchors.leftMargin: -7
     anchors.rightMargin: -7
     radius: 4

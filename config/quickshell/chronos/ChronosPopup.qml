@@ -62,7 +62,7 @@ LayerPopup {
   property int viewYear: 0
   property int viewMonth: 0
   // The selection carries its own y/m/d rather than an offset into the view:
-  // the grid's dim cells belong to the neighbouring months, so what is
+  // the grid's dim cells belong to the neighboring months, so what is
   // selected is not always inside the month on screen.
   property int selYear: 0
   property int selMonth: 0
@@ -615,7 +615,7 @@ LayerPopup {
                     }
 
                     // A day the forecast reaches wears a dot in its condition's
-                    // colour, so the week ahead is readable off the grid itself
+                    // color, so the week ahead is readable off the grid itself
                     // without clicking through it day by day.
                     Rectangle {
                       anchors.horizontalCenter: parent.horizontalCenter
@@ -1410,11 +1410,11 @@ LayerPopup {
       }
     }
 
-    // The countdown and its stepper travel together as one BODY, centred in the
+    // The countdown and its stepper travel together as one BODY, centered in the
     // cell — with a single timer the cell is the whole band, and a reading pinned
     // to its right edge looked like an afterthought.
     //
-    // Centred only while there is room. Below that the tools would reach across
+    // Centered only while there is room. Below that the tools would reach across
     // and sit on the stepper, so the body falls back to hanging off their left
     // edge. The test is on WIDTH, not on hover, so nothing moves under the
     // pointer — a narrow cell is simply laid out the other way round.
@@ -1647,10 +1647,10 @@ LayerPopup {
     // pair read as a single smudge
     spacing: 13
 
-    // Uncoloured. The glyph is a label for the number beside it, not a reading
+    // Uncolored. The glyph is a label for the number beside it, not a reading
     // of its own, and five different inks along one row turned the small print
     // into a paintbox. The condition glyph and the week strip still carry the
-    // palette, because there the colour IS the information.
+    // palette, because there the color IS the information.
     Text {
       anchors.verticalCenter: parent.verticalCenter
       text: reading.glyph

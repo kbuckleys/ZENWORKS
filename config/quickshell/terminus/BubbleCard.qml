@@ -276,8 +276,10 @@ Item {
     return w;
   }
   function refit() {
-    // never while it goes (see the spring): it leaves at the size it had
-    if (!face.opening) return;
+    // never while it goes (see the spring): it leaves at the size it had.
+    // Shut, it may: a bubble about to open again is fitted before it does
+    // (`opening` only turns once its fade has started)
+    if (!face.opening && (face.shade > 0.001 || face.grow > 0.001)) return;
     let w = 0;
     for (let i = 0; i < col.children.length; i++)
       w = Math.max(w, face.natural(col.children[i]));

@@ -5,7 +5,7 @@
 --
 -- Plato's engine. This nvim never draws anything: it runs headless, and the
 -- window you type into is quickshell's. Everything here is either editing
--- behaviour (kept from the terminal nvim config where it was about editing) or engine
+-- behavior (kept from the terminal nvim config where it was about editing) or engine
 -- setup that makes nvim's view of the screen match the one plato draws.
 --
 -- ISOLATED BY NVIM_APPNAME=quickshell/plato/nvim, set by the process that
@@ -119,9 +119,9 @@ vim.api.nvim_create_autocmd("BufReadPost", {
   end,
 })
 
--- ── colours ────────────────────────────────────────────────────────────
+-- ── colors ────────────────────────────────────────────────────────────
 require("plato.theme").apply()
--- filetypes nvim has none for, which hl.lua colours itself (*.log)
+-- filetypes nvim has none for, which hl.lua colors itself (*.log)
 require("plato.hl").filetypes()
 
 -- ── treesitter ─────────────────────────────────────────────────────────

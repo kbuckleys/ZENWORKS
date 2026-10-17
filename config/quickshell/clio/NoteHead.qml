@@ -66,7 +66,7 @@ Column {
       height: 30
       width: dateText.implicitWidth + 24
       radius: Zenon.windowRadius
-      color: datePress.pressed ? Zenon.wash(0.12) : Zenon.wash(0.05)
+      color: datePress.pressed ? Zenon.pressWash(0.12) : Zenon.wash(0.05)
       border.width: 1
       border.color: Zenon.border
       Text {
@@ -86,7 +86,7 @@ Column {
       width: moodText.implicitWidth + 24
       radius: Zenon.windowRadius
       readonly property var mood: nh.entry && nh.n.mood ? N.moodOf(nh.n.mood.v) : null
-      color: moodPress.pressed ? Zenon.wash(0.12) : mood ? Zenon.alpha(Zenon[mood.ink] || Zenon.accentMuted, 0.14) : Zenon.wash(0.05)
+      color: moodPress.pressed ? Zenon.pressWash(0.12) : mood ? Zenon.alpha(Zenon[mood.ink] || Zenon.accentMuted, 0.14) : Zenon.wash(0.05)
       border.width: 1
       border.color: mood ? Zenon.alpha(Zenon[mood.ink] || Zenon.accentMuted, 0.5) : Zenon.border
       Text {

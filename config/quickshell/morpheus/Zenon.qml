@@ -4,7 +4,7 @@
 // https://github.com/kbuckleys/
 // ZENON palette — single source of truth, mirrors ~/.config/nvim/lua/zenon.lua
 //
-// THE SHELL'S ZENON: zenon/ZenonBase.qml — every token, colour and helper,
+// THE SHELL'S ZENON: zenon/ZenonBase.qml — every token, color and helper,
 // and the reasons for each — fed what only the shell has: Oracle's settings
 // and the worn theme file.
 

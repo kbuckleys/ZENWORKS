@@ -3,21 +3,21 @@
 // └─┘└─┘┘└┘└┴┘└─┘┴└─┴ ┴└─┘
 // https://github.com/kbuckleys/
 //
-// NO NEW HARDCODED COLOURS. Every theming bug of 2026-10-08 was one: a
-// black floor written as Qt.rgba(0,0,0,a), a hex in a JS file, a colour
+// NO NEW HARDCODED COLORS. Every theming bug of 2026-10-08 was one: a
+// black floor written as Qt.rgba(0,0,0,a), a hex in a JS file, a color
 // copied onto a row, a darken-towards-black — each right for Zenon and
 // wrong for every other theme, found weeks later as a dark slab in Latte.
 //
-// So every file has a BUDGET: how many raw colour literals it holds — a
+// So every file has a BUDGET: how many raw color literals it holds — a
 // uniform white or black Qt.rgba, or a "#hex" string — counted when the
 // themes went in. The ones there are deliberate (drawn over pictures, alpha
-// masks, a shadow that is black in every theme, content colours). Fewer is
+// masks, a shadow that is black in every theme, content colors). Fewer is
 // fine; MORE fails, naming the lines. Reach for Zenon instead: floor/wash/
 // shade/darken/hud/alpha/mix, or a theme slot. If a new literal really is
 // one of the deliberate kind, raise its file's number here, on purpose.
 //
 // Zenon itself, the palette generators, the themes and the tests are not
-// counted: colours are what they are made of.
+// counted: colors are what they are made of.
 
 "use strict";
 
@@ -87,6 +87,6 @@ module.exports = {
         over.push(f + " has " + hits.length + " (budget " + (BUDGET[f] || 0) + "):\n      "
           + hits.join("\n      "));
     }
-    t.eq("no file holds more raw colour literals than its budget — use Zenon", over.join("\n    "), "");
+    t.eq("no file holds more raw color literals than its budget — use Zenon", over.join("\n    "), "");
   }
 };

@@ -14,7 +14,7 @@
 //     MenuShadow { panel: menuCard }
 //
 // IT IS A RING, NOT A BLOCK. RectangularShadow is a filled shape — like the
-// CSS box-shadow it is modelled on, it paints its own interior, not only the
+// CSS box-shadow it is modeled on, it paints its own interior, not only the
 // falloff outside it. Behind an opaque card that costs nothing, because the
 // card hides it. Behind a translucent one it reads straight through, the card
 // composites to near solid, and the menu's own opacity stops meaning

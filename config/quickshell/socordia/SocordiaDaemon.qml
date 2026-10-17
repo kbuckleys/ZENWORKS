@@ -37,7 +37,7 @@ Scope {
   //   respectInhibitors (below)  mpv publishes NO mpris at all here — there is
   //                              no mpv-mpris script installed — but it does
   //                              take a wayland idle inhibitor, and hyprland
-  //                              honours it. Verified: a monitor respecting
+  //                              honors it. Verified: a monitor respecting
   //                              inhibitors stayed awake through mpv playback
   //                              while one ignoring them went idle.
   //   mpris Playing              browsers and players that publish a media
@@ -318,7 +318,7 @@ Scope {
   Process {
     id: logind
     running: true
-    command: ["gdbus", "monitor", "--system", "--dest", "org.freedesktop.login1"]
+    command: Paths.tether(["gdbus", "monitor", "--system", "--dest", "org.freedesktop.login1"])
     stdout: SplitParser {
       splitMarker: "\n"
       onRead: (line) => root.onLogind(line)

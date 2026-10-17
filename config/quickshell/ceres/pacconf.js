@@ -30,8 +30,8 @@ const GROUPS = [
 ];
 
 const SCHEMA = [
-  { key: "Color", group: "general", type: "flag", label: "Colour",
-    help: "Colour in pacman's output, when it is going to a terminal.", def: "off" },
+  { key: "Color", group: "general", type: "flag", label: "Color",
+    help: "Color in pacman's output, when it is going to a terminal.", def: "off" },
   { key: "ILoveCandy", group: "general", type: "flag", label: "Pac-Man progress bar",
     help: "Draws progress bars as Pac-Man eating pellets. Undocumented, and harmless.", def: "off" },
   { key: "VerbosePkgLists", group: "general", type: "flag", label: "Package tables",

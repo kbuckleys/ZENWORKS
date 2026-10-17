@@ -315,7 +315,7 @@ Item {
     term.act.marked = {};
     term.act.sel = 0;
     // Already in hand: draw it now and let the refresh behind it agree. The
-    // seed is the exact bytes the refresh will return, so it recognises itself
+    // seed is the exact bytes the refresh will return, so it recognizes itself
     // and stops — the listing is never built twice.
     const seed = term.listingText[path];
     if (seed !== undefined) {
@@ -333,7 +333,7 @@ Item {
     term.arriving = false;
     if (term.viewMode === "columns") term.refreshPreview();
     // AND lastListing IS LEFT NULL ON PURPOSE. Marking the seed as the last
-    // listing made the confirming `find` recognise itself and return early —
+    // listing made the confirming `find` recognize itself and return early —
     // which skipped the whole of the handler behind that check, not just the
     // model write: landing the cursor where you asked for it, measuring the
     // directory when the usage mode is on, asking for thumbnails, putting the
@@ -390,7 +390,7 @@ Item {
     term.openPulse++;
     // A LINK GOES WHERE IT POINTS. Entering one by its own path walked you
     // into ".../proj link/" — a second address for the directory, with the
-    // link's parent above it in the crumbs and every path in it spelt
+    // link's parent above it in the crumbs and every path in it spelled
     // through the link — so a symlink felt like a copy rather than a way to
     // somewhere. It is resolved first, and you arrive at the real directory.
     if (r.isDir && r.isLink && !term.picking) { term.followLink(r.path); return; }

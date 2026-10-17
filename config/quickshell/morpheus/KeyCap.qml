@@ -24,7 +24,7 @@ Rectangle {
   implicitWidth: capText.implicitWidth + Math.round(cap.fontSize * 1.15)
   implicitHeight: cap.fontSize + 8
   radius: 5
-  color: Qt.rgba(Zenon.keyInk.r, Zenon.keyInk.g, Zenon.keyInk.b, 0.10)
+  color: Zenon.alpha(Zenon.accentKey, Zenon.light ? 0.12 : 0.10)
   border.width: 1
   border.color: Zenon.border
   visible: cap.label !== ""
@@ -33,7 +33,7 @@ Rectangle {
     id: capText
     anchors.centerIn: parent
     text: cap.label
-    color: Zenon.keyInk
+    color: Zenon.accentKey
     font.family: Zenon.face
     font.weight: Zenon.weight
     font.pixelSize: cap.fontSize

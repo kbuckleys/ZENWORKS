@@ -188,7 +188,7 @@ Rectangle {
 
         // ── MOUNTED SAYS SO DOWN THE EDGE ─────────────────────────
         // The same 3px cyan bar the sidebar puts against the row you are
-        // standing in. Saying it with the glyph's colour alone made two
+        // standing in. Saying it with the glyph's color alone made two
         // states of one mark, which is a difference you have to know to
         // look for; a bar is either there or it is not.
         Rectangle {

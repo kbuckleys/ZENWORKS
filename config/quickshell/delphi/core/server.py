@@ -13,7 +13,7 @@
 # and reads one line per message:
 #
 #   {"id": 7, "ok": true, "result": ...}            the answer, exactly once
-#   {"id": 7, "ok": false, "error": "...", "kind": "git"|"cancelled"|...}
+#   {"id": 7, "ok": false, "error": "...", "kind": "git"|"canceled"|...}
 #   {"id": 7, "event": {...}}                       progress, before the answer
 #   {"event": {"ask": 3, "prompt": "...", ...}}     not tied to a request
 #

@@ -96,6 +96,9 @@ Item {
     anchors.right: parent.right
     anchors.rightMargin: 12
     anchors.verticalCenter: parent.verticalCenter
+    // the search field's height, and square (user, 2026-10-17)
+    height: box.height
+    width: box.height
     glyph: true
     label: ""
     ink: Zenon.sand

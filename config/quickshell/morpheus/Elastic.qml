@@ -145,7 +145,7 @@ QtObject {
   // so what felt like momentum draining away was the band pushing back.
   //
   // A rubber band is a reply to "there is no more", and a reply is worth
-  // giving once. Spent after it settles, and only a notch travelling back
+  // giving once. Spent after it settles, and only a notch traveling back
   // INTO the content clears it — so the next time you arrive at that edge
   // you get the bounce again, and leaning on the wheel there is quiet.
   property bool spent: false
@@ -171,7 +171,7 @@ QtObject {
     return elastic.lo(v) + Math.max(0, room);
   }
 
-  // Forget anything in flight for this view — a notch still travelling, a
+  // Forget anything in flight for this view — a notch still traveling, a
   // band, a settle — so a caller that is about to reposition it outright is
   // not overruled a frame later by an ease aimed at the old content.
   function halt(v) {

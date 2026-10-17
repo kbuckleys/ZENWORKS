@@ -16,9 +16,9 @@
 #   · reads do not take locks. GIT_OPTIONAL_LOCKS=0 on anything that only
 #     looks, so a refresh in the background never fights the user's own git in
 #     a terminal over index.lock.
-#   · output is the machine's, not the user's: no colour, no pager, no quoted
+#   · output is the machine's, not the user's: no color, no pager, no quoted
 #     paths, C locale for the few messages parsed by text.
-#   · every process is its own session, so cancelling kills git AND whatever
+#   · every process is its own session, so canceling kills git AND whatever
 #     git started (ssh, a hook, a credential helper), not just git.
 
 import os

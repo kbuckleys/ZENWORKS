@@ -28,7 +28,7 @@ Rectangle {
   radius: 5
   opacity: seg.live ? 1 : 0.4
   // PRESSED, DARKENED as terminus' ClearChip and Segments are (user, 2026-10-15)
-  color: segMa.pressed ? Zenon.darken(0.35)
+  color: segMa.pressed ? Zenon.pressFill
     : seg.chosen
     ? Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b, 0.16)
     : (segMa.containsMouse ? Zenon.wash(0.08) : Zenon.wash(0.03))
@@ -44,7 +44,7 @@ Rectangle {
     visible: seg.label !== ""
     text: seg.label
     color: seg.ink
-    opacity: segMa.pressed ? 0.55 : 1
+    opacity: segMa.pressed ? Zenon.pressDim : 1
     font.family: Zenon.face
     font.weight: seg.chosen ? 600 : Font.Normal
     font.pixelSize: Zenon.px(13)

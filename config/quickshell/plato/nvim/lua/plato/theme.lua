@@ -3,17 +3,17 @@
 -- └─┘└─┘┘└┘└┴┘└─┘┴└─┴ ┴└─┘
 -- https://github.com/kbuckleys/
 --
--- The zenon colours, for an nvim that draws nothing.
+-- The zenon colors, for an nvim that draws nothing.
 --
--- The palette is plato/nvim/lua/plato/palette.lua, the same colours
+-- The palette is plato/nvim/lua/plato/palette.lua, the same colors
 -- morpheus/Zenon.qml holds on the QML side; the groups below say which
--- colour each kind of text is, as zenon.lua did for the terminal nvim.
+-- color each kind of text is, as zenon.lua did for the terminal nvim.
 
 local M = {}
 
 -- ── THE SHELL'S THEME ───────────────────────────────────────────────────
 -- palette.lua is Zenon. When the shell wears another theme, PlatoWindow
--- sends its resolved colours (Zenon's slot names, as hex) and `use` lays
+-- sends its resolved colors (Zenon's slot names, as hex) and `use` lays
 -- them over a copy of the palette: nothing here is a second theme format,
 -- and a slot the theme leaves out is still Zenon's because the shell has
 -- already filled it in. `mode` is the theme's dark/light.
@@ -66,7 +66,7 @@ function M.apply()
   set("Normal", { fg = p.white })
   -- SELECTIONS AND MATCHES ARE A WASH, NOT A BLOCK: their background is
   -- drawn translucent over the text (hl.lua's `wash`, EditorRow), and the
-  -- text keeps its own colours through it rather than turning black
+  -- text keeps its own colors through it rather than turning black
   set("Visual", { bg = p.magenta })
   set("CursorLine", { bg = p.lblack, nocombine = true })
   set("CurSearch", { bg = p.red, bold = true })
@@ -91,7 +91,7 @@ function M.apply()
   set("PlatoDiffOld", { fg = p.red, nocombine = true })
   -- and what it has now, the same in green
   set("PlatoDiffNew", { fg = p.green, nocombine = true })
-  -- rainbow brackets (brackets.lua), a colour a level, round and round
+  -- rainbow brackets (brackets.lua), a color a level, round and round
   for i, c in ipairs({ p.blue, p.magenta, p.yellow, p.cyan, p.green, p.bright_red }) do
     set("PlatoRainbow" .. i, { fg = c })
   end
@@ -101,7 +101,7 @@ function M.apply()
   end
   set("PlatoColQuoted", { fg = p.green })
   set("PlatoColEscape", { fg = p.cyan })
-  -- logs (hl.lineLocal), bat's colours for them
+  -- logs (hl.lineLocal), bat's colors for them
   set("PlatoLogNumber", { fg = p.yellow })
   set("PlatoLogSep", { fg = p.magenta })
   set("PlatoLogString", { fg = p.green })
@@ -110,11 +110,11 @@ function M.apply()
   set("PlatoHostAddr", { fg = p.yellow })
   set("PlatoHostName", { fg = p.green })
   -- rendered markdown (markdown.lua); EditorRow's heading bands take the
-  -- same colours, a level each
+  -- same colors, a level each
   for i, c in ipairs({ p.magenta, p.blue, p.cyan, p.green, p.yellow, p.bright_red }) do
     set("PlatoMdH" .. i, { fg = c, bold = true })
   end
-  -- a bullet's colour by how deep its list is
+  -- a bullet's color by how deep its list is
   for i, c in ipairs({ p.blue, p.magenta, p.cyan, p.green }) do
     set("PlatoMdBullet" .. i, { fg = c })
   end

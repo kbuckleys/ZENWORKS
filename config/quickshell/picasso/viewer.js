@@ -64,7 +64,7 @@ function stepZoom(z, dir) {
   return ZOOM_MIN;
 }
 
-// Where the picture sits once it can move no further: centred on an axis it
+// Where the picture sits once it can move no further: centered on an axis it
 // does not fill, and on one it overflows, no edge pulled in past the stage's.
 function clampView(v, iw, ih, sw, sh) {
   const dw = iw * v.z, dh = ih * v.z;
@@ -81,7 +81,7 @@ function zoomAbout(v, z, px, py, iw, ih, sw, sh) {
   return clampView({ z: nz, x: px - (px - v.x) * k, y: py - (py - v.y) * k }, iw, ih, sw, sh);
 }
 
-// The fitted view: the picture whole and centred.
+// The fitted view: the picture whole and centered.
 function fitView(iw, ih, sw, sh, max) {
   return clampView({ z: fitScale(iw, ih, sw, sh, max), x: 0, y: 0 }, iw, ih, sw, sh);
 }
@@ -124,7 +124,7 @@ function writable(path) {
 // it is the same box whatever the zoom. Its sides are moved with capture.js'
 // resizeRect; this is what keeps them to a ratio while they move.
 
-// The biggest box of `ratio` (width / height) that fits, centred.
+// The biggest box of `ratio` (width / height) that fits, centered.
 function centredCrop(w, h, ratio) {
   if (!(ratio > 0)) return { x: 0, y: 0, w: w, h: h };
   let cw = w, ch = w / ratio;
@@ -204,7 +204,7 @@ function ratioName(w, h) {
 
 // ── black borders ─────────────────────────────────────────────────────────
 // The strips a film frame, a screenshot of a video or a scan carries round
-// the picture. ImageMagick's trim keys on the corner colour, so the picture
+// the picture. ImageMagick's trim keys on the corner color, so the picture
 // is first given a one-pixel black border of its own: then only black (to
 // within `fuzz`) is trimmed, never a white sky. It is turned and mirrored
 // the way the stage is — mirror first, then turn, as Scene does — so the
@@ -377,7 +377,7 @@ function viewAt(z, fx, fy, w, h, sw, sh) {
 
 // ── the gallery's filter ──────────────────────────────────────────────────
 // What was typed, split: words starting # are tags the picture must carry
-// ("#★" is the favourite), and the rest is matched against the name.
+// ("#★" is the favorite), and the rest is matched against the name.
 const FAVOURITE = "favourite";
 
 // `is:` words narrow by kind instead: is:video, is:picture (or is:image),
@@ -465,9 +465,9 @@ function ocrCommand(png) {
 }
 
 // ── alike pictures ────────────────────────────────────────────────────────
-// A difference hash: the picture squeezed to 9×8 in grey, each pixel
+// A difference hash: the picture squeezed to 9×8 in gray, each pixel
 // compared with the one to its right — 64 bits that survive a resize, a
-// re-save and a little colour, which a checksum does not. Read from a plain
+// re-save and a little color, which a checksum does not. Read from a plain
 // (P2) pgm, so it is text all the way, as the histogram is. Hex, 16 digits;
 // "" for anything that is not a 9×8 pgm.
 function dhashFromPgm(text) {
@@ -916,9 +916,9 @@ function tileCommand() {
     + ' && mv -f "$f.part" "$f" && printf "%s" "$f"\n';
 }
 
-// ── a picture's own colours ───────────────────────────────────────────────
+// ── a picture's own colors ───────────────────────────────────────────────
 // `magick … -colors N -format %c histogram:info:-` — "  1234: (r,g,b) #RRGGBB …"
-// a line per colour; the most used first.
+// a line per color; the most used first.
 function parsePalette(text) {
   const out = [];
   for (const line of String(text || "").split("\n")) {
@@ -992,7 +992,7 @@ function enhanceCommand() {
 }
 
 // ── the background's view of it ───────────────────────────────────────────
-// The part of a w × h picture each monitor would show, filled and centred —
+// The part of a w × h picture each monitor would show, filled and centered —
 // as the background's own "fill" crops. [{ name, x, y, w, h }] in the
 // picture's pixels.
 function monitorCuts(w, h, screens) {

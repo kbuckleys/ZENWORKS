@@ -12,7 +12,7 @@
 // window tells what to redraw: a keystroke re-draws one line and leaves the
 // rest of the screen alone (see WindowView).
 //
-// NOT A ListModel. A row carries lists (its colour spans, its sign) and a
+// NOT A ListModel. A row carries lists (its color spans, its sign) and a
 // ListModel turns every nested list into a ListModel of its own, which is
 // both slow and awkward to read back. Rows are kept as the plain objects
 // nvim sent, and each row item pulls its own when told it changed.
@@ -69,18 +69,18 @@ QtObject {
 
   // style id → { fg, bg, sp, b, i, s, u, c }, from the frames that define them
   property var styles: ({})
-  // every style changed meaning (a new colourscheme): every row redraws
+  // every style changed meaning (a new colorscheme): every row redraws
   signal stylesReset()
 
-  // the UI's own colours, from nvim's highlight groups
+  // the UI's own colors, from nvim's highlight groups
   property color normalFg: "#dfdfdd"
   property color cursorLineBg: "#20242a"
   property color lineNrFg: "#6a707f"
   property color cursorLineNrFg: "#fab387"
-  // the colour the cursor's line number is drawn in: the settings' choice
+  // the color the cursor's line number is drawn in: the settings' choice
   // (PlatoWindow), nvim's CursorLineNr when nothing sets it
   property color numberHere: state.cursorLineNrFg
-  // the selection's colour, and how strongly it washes over the text
+  // the selection's color, and how strongly it washes over the text
   property color visualInk: "#c8a4e0"
   property real visualAlpha: 0.32
 

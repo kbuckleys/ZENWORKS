@@ -5,7 +5,7 @@
 //
 // The tabs: one per open buffer, drawn as terminus draws its own.
 //
-// TERMINUS' STRIP, ON PURPOSE. The same band in the same colour, divided
+// TERMINUS' STRIP, ON PURPOSE. The same band in the same color, divided
 // evenly across the window the way a browser does it; the active tab paints
 // nothing and is simply the strip showing through, the others are shaded
 // back, a hairline between each. A tab fades in as it arrives, the rest
@@ -36,7 +36,7 @@ Rectangle {
   property var seen: ({})
   property bool animate: true
   // ── A SHEET SPLICED OUT OF THIS BAR ──────────────────────────────
-  // While one hangs from here, the bar goes black — the glass's own colour
+  // While one hangs from here, the bar goes black — the glass's own color
   // at its seam (morpheus/Sheet, Frost.fade*) — and its hairline opens over
   // the card, so the two read as one piece. From the plato window; x in
   // this bar's own coordinates.
@@ -58,7 +58,7 @@ Rectangle {
   clip: true
   // TRANSPARENT: an inactive tab is the window's own body showing through
   // (black at the panel opacity, as every other surface), and the active
-  // tab paints the strip's grey itself — `hereBg`
+  // tab paints the strip's gray itself — `hereBg`
   color: "transparent"
   // untouched by a sheet, as terminus' (user, 2026-10-11): only the bars go
   // with one, never the tabs

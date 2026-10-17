@@ -38,7 +38,7 @@ Item {
   property string hint: ""
   property bool on: false
   // False mutes the row, as PrefAction does: a setting that means nothing
-  // where you are (group headings outside list view) greys out, refuses
+  // where you are (group headings outside list view) grays out, refuses
   // the click, and the cursor steps over it. The switch keeps showing the
   // stored state, which comes back with the view it belongs to.
   property bool enabled: true

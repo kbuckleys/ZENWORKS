@@ -4,10 +4,11 @@
 // https://github.com/kbuckleys/
 //
 // WHAT A ROW OF CLIO'S LIST SAYS — Apple's three lines: the title; the
-// date and the first words after it; the container it is in (in All Notes, a
-// tag, a search). The selected row has a fourth, before the container: when
-// it was last edited, in full — once over the open note (user, 2026-10-15). A pin, a lock, a checklist's progress; a picture's
-// thumbnail at the end. A sticky wears its colour.
+// first words; when it was last edited, in full; the container it is in.
+// Every row has all four, not just the selected one, and the snippet carries
+// no time of its own — the third line is the time (user, 2026-10-17). A pin,
+// a lock, a checklist's progress; a picture's thumbnail at the end. A sticky
+// wears its color.
 
 import QtQuick
 import Quickshell.Widgets
@@ -22,14 +23,11 @@ Item {
   readonly property var mgr: rb.win ? rb.win.mgr : null
   readonly property var d: rb.note && rb.note.d ? rb.note.d : ({ title: "", preview: "", images: [], checks: 0, done: 0 })
   readonly property bool sticky: !!rb.note && rb.note.kind === "sticky"
-  readonly property bool showFolder: !!rb.win && !rb.sticky && rb.note && rb.note.kind === "note"
-    && (rb.win.scope.shelf === "all" || rb.win.scope.shelf === "tag" || rb.win.scope.shelf === "smart" || rb.win.query !== "")
+  // the third line's time: when deleted in the Trash, else by the sort
+  readonly property real stamp: !rb.note || rb.sticky ? 0 : rb.note.deleted ? rb.note.deleted
+    : rb.mgr && rb.mgr.sort === "created" ? rb.note.created : rb.note.modified
 
-  // whether the selected row says when it was last edited (NoteList grows
-  // the row for it: hereH)
-  readonly property bool edited: !!rb.note && !rb.sticky && !rb.note.deleted && !!rb.note.modified
-
-  // a sticky's colour
+  // a sticky's color
   Rectangle {
     visible: rb.sticky
     x: 18
@@ -81,19 +79,7 @@ Item {
       width: parent.width
       spacing: 8
       Text {
-        id: when
-        visible: !rb.sticky
-        text: !rb.note ? "" : rb.note.deleted ? N.dateShort(rb.note.deleted, Date.now())
-          : N.dateShort(rb.mgr && rb.mgr.sort === "created" ? rb.note.created : rb.note.modified, Date.now())
-        color: rb.note && rb.note.deleted ? Zenon.red : Zenon.ink
-        opacity: 0.85
-        font.family: Zenon.face
-        font.weight: Font.DemiBold
-        font.pixelSize: Zenon.px(13)
-        font.features: { "tnum": 1 }
-      }
-      Text {
-        width: parent.width - (when.visible ? when.width + 8 : 0) - (checks.visible ? checks.width + 8 : 0)
+        width: parent.width - (checks.visible ? checks.width + 8 : 0)
         elide: Text.ElideRight
         text: !rb.note ? "" : rb.note.sealed ? "Locked" : rb.d.preview !== "" ? rb.d.preview : "No additional text"
         color: Zenon.accentMuted
@@ -112,24 +98,23 @@ Item {
         font.features: { "tnum": 1 }
       }
     }
-    // selected: when it was last edited, in full
+    // when: in full (a sticky has no dates — where it is instead)
     Text {
-      visible: rb.here && rb.edited
       width: parent.width
       elide: Text.ElideRight
-      text: rb.edited ? N.dateTime(rb.note.modified) : ""
-      color: Zenon.accentMuted
+      text: !rb.note ? "" : rb.sticky ? (Clio.shown ? "On the desktop" : "On the desktop · hidden")
+        : rb.stamp ? (rb.note.deleted ? "Deleted " : "") + N.dateTime(rb.stamp) : "No date"
+      color: rb.note && rb.note.deleted ? Zenon.red : Zenon.accentMuted
+      font.features: { "tnum": 1 }
       font.family: Zenon.face
       font.weight: Zenon.weight
       font.pixelSize: Zenon.px(12)
     }
     // where it is, and what it holds besides words
     Row {
-      visible: rb.showFolder || rowMarks.visible
       width: parent.width
       spacing: 10
       Text {
-        visible: rb.showFolder
         width: Math.min(implicitWidth, parent.width - (rowMarks.visible ? rowMarks.width + 10 : 0))
         elide: Text.ElideRight
         text: "  " + (rb.win ? rb.win.folderName(rb.note ? rb.note.folder : "") : "")
@@ -165,6 +150,9 @@ Item {
       sourceSize.width: 120
       fillMode: Image.PreserveAspectCrop
       asynchronous: true
+      // faded in as it arrives, not popped in (2026-10-17)
+      opacity: status === Image.Ready ? 1 : 0
+      Behavior on opacity { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
     }
   }
 }

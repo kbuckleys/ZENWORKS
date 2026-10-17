@@ -117,7 +117,7 @@ Item {
       if (term.tagGone[k] === name) return k;
     return "";
   }
-  // A STORED COLOUR FIRST, then the seven that come with one, then a
+  // A STORED COLOR FIRST, then the seven that come with one, then a
   // fallback. The middle step is what lets "red" be red without anything
   // having been written to the state file — and the last is not a default
   // so much as a refusal to draw nothing: a tag another program wrote, or
@@ -296,13 +296,13 @@ Item {
   // — a tag dropped from the sidebar that left itself on forty files would
   // come back the next time the index was rebuilt.
   // Renaming writes every file that carries it — there is no central
-  // record to edit — and then moves the definition so the colour follows.
+  // record to edit — and then moves the definition so the color follows.
   function renameTag(from, to) {
     const pairs = Tags.renamePairs(term.tagMarks, from, to);
     const want = Tags.normalise([to])[0] || "";
     if (from === "" || want === "" || want === from) return;
-    // Carried onto the new name below, so a preset keeps its colour.
-    // The NAME of the Zenon colour, not the colour: that is what a
+    // Carried onto the new name below, so a preset keeps its color.
+    // The NAME of the Zenon color, not the color: that is what a
     // definition stores and what tagInk resolves on the way out. Handing
     // it the resolved value made the lookup miss and every renamed preset
     // came out in the default cyan.
@@ -318,7 +318,7 @@ Item {
       for (let i = 0; i < st.defs.length; ++i) {
         if (st.defs[i].name !== from) continue;
         // Straight onto the new name unless something already answers to
-        // it, in which case the existing definition wins — the colour you
+        // it, in which case the existing definition wins — the color you
         // can see beside the tag you typed is the one you meant.
         const taken = st.defs.some((d) => d.name === want);
         if (taken) st.defs.splice(i, 1);
@@ -328,8 +328,8 @@ Item {
       }
       // `from` had no definition of its own — a preset that files are
       // carrying — and those files are about to answer to `want`. Define
-      // the new name with the colour they were wearing, or it arrives
-      // with no ink and the row goes grey.
+      // the new name with the color they were wearing, or it arrives
+      // with no ink and the row goes gray.
       if (!moved && !st.defs.some((d) => d.name === want))
         st.defs.push({ name: want, ink: ink });
 
@@ -351,10 +351,10 @@ Item {
       if (st.gone[want] !== undefined) delete st.gone[want];
 
       // A DEFINITION THAT ONLY RESTATES A PRESET IS NOT ONE. Coming home
-      // leaves the travelling definition behind under the preset's own
-      // name and its own colour, which records nothing — tagInk falls
+      // leaves the traveling definition behind under the preset's own
+      // name and its own color, which records nothing — tagInk falls
       // through to exactly that answer with no definition at all. A
-      // preset deliberately redefined in a DIFFERENT colour is a real
+      // preset deliberately redefined in a DIFFERENT color is a real
       // definition and stays.
       st.defs = st.defs.filter((d) => Tags.presetInk(d.name) !== d.ink);
     });
@@ -363,7 +363,7 @@ Item {
   }
   // The sidebar lists a tag exactly while something wears it, so taking it
   // off the sidebar is taking it off those files. The definition stays — a
-  // preset keeps its slot and its colour, a tag you made stays in the
+  // preset keeps its slot and its color, a tag you made stays in the
   // picker — and the files stay where they are. Asked first, because it is
   // one click that reaches every file the tag is on.
   function clearTag(name) {
@@ -384,7 +384,7 @@ Item {
     // ── THE LINEUP IS FIXED ───────────────────────────────────────────
     // The seven can be renamed — that is a change of wording, and the
     // slot stays. Removing one is a change to the lineup itself, and the
-    // lineup is not the user's to shorten: the colours are what a tag
+    // lineup is not the user's to shorten: the colors are what a tag
     // picker offers on a machine where nothing has been tagged yet, and
     // a picker that can be emptied has nothing to offer. Caught here as
     // well as in the sheet so no other caller can get round it.

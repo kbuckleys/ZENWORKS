@@ -164,7 +164,7 @@ const DIRS = {
   "workspace": "", "yay": "󰣇", "zen": "󰺕"
 };
 
-// By extension, which is what most files are recognised by.
+// By extension, which is what most files are recognized by.
 const EXTS = {
   "xbm": "",
   "qml": "",
@@ -675,7 +675,7 @@ function appGlyph(names) {
 // is right whether or not anyone has written a line for .crw.
 //
 // Which matters because EXTS is a list of extensions somebody thought of, and
-// the list of image formats is not. Forty-one of the ones terminus recognises
+// the list of image formats is not. Forty-one of the ones terminus recognizes
 // had no line here — the camera raws, the HEIF family, the old raster formats
 // — and every one of them drew the SAME blank page as a file type nothing has
 // ever heard of, sitting in a directory beside a .cr2 that drew a picture.

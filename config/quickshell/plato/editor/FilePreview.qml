@@ -33,7 +33,7 @@ Item {
   // the editor's weight too: a preview reads as the file will in plato
   property int codeWeight: Font.DemiBold
   property int pixelSize: 16
-  // drawn centred when not empty: the host's word for what is (not) here
+  // drawn centered when not empty: the host's word for what is (not) here
   property string message: ""
   // a moment's wait before looking, so walking a list does not run a
   // preview for every row passed
@@ -82,7 +82,7 @@ Item {
     fade.restart();
   }
   function forget() { fp._cache = ({}); fp._key = ""; fp._kind = ""; fp._rich = ""; fp._pic = ""; }
-  // a text preview carries the colours of the theme it was rendered in
+  // a text preview carries the colors of the theme it was rendered in
   Connections { target: Zenon; function onThemeEpochChanged() { fp.forget(); fp.load(); } }
 
   function load() {
@@ -150,7 +150,7 @@ Item {
         let kind, rich = "";
         if (what === "D") { rich = fp.listing(body); kind = rich === "" ? "empty" : "dir"; }
         else if (what === "F") {
-          // (an empty file through plato's renderer is still a colour reset,
+          // (an empty file through plato's renderer is still a color reset,
           // ESC[0m, and came out a blank card: escapes are not content)
           kind = Terminus.looksBinary(body) ? "binary"
             : body.replace(/\x1b\[[0-9;]*m/g, "").trim() === "" ? "empty" : "text";

@@ -389,6 +389,11 @@ Item {
       // under the title and blurb, which are declared before it
       z: -1
       view: flick
+      // terminus' glass, as the window's own edges (win.frostBlur)
+      fade: false
+      strength: 1
+      blurMax: 64
+      scrim: 0.6
       x: flick.x
       y: -16
       width: flick.width
@@ -559,7 +564,10 @@ Item {
     width: chipText.implicitWidth + 20
     height: 28
     radius: Zenon.windowRadius
-    color: chip.lit ? Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b, 0.2) : "transparent"
+    // pressed, darkened — the suite's press (user, 2026-10-17)
+    color: chipTap.pressed ? Zenon.pressFill
+      : chip.lit ? Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b, 0.2) : "transparent"
+    Behavior on color { ColorAnimation { duration: Zenon.fast } }
     border.width: 1
     border.color: chip.lit ? (chip.dim ? Zenon.border : Zenon.cyan) : Zenon.border
     Text {
@@ -571,7 +579,7 @@ Item {
       font.weight: Zenon.weight
       font.pixelSize: Zenon.px(15)
     }
-    TapHandler { onTapped: chip.picked() }
+    TapHandler { id: chipTap; onTapped: chip.picked() }
   }
 
   // ONE CHOICE, drawn as one bar: the options joined, the chosen one filled.

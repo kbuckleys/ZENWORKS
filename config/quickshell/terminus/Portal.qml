@@ -85,7 +85,7 @@ Item {
   function portalAnswer(paths) {
     if (!term.portal) return;
     const saving = term.portal.save;
-    // Recorded on the way out rather than on every step, so cancelling a
+    // Recorded on the way out rather than on every step, so canceling a
     // dialog does not teach it anything.
     if (term.portal.save && paths.length > 0 && term.mgr)
       term.mgr.noteSaveDir(Terminus.dirname(paths[0]));

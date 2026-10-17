@@ -28,6 +28,30 @@ Item {
 
   implicitHeight: col.implicitHeight
 
+  // ── ONE BUBBLE, HOPPING (user's bubble.mp4, 2026-10-17) ──────────────
+  // A bubble per card meant the pointer crossing the grid shut one popup
+  // (the compositor fading its ghost out) while the next opened beside it —
+  // two cards at once, and the text of the last one under the new. Now the
+  // grid has one, as ceres' package peek does: it opens after a short rest,
+  // moves straight to the next card the pointer reaches, and goes only once
+  // the pointer has been off the cards a moment.
+  property Item peekCell: null
+  property Item peekShown: null
+  // the card it last hung from: held while it goes, so it shuts in place
+  // with its words, rather than vanishing with its target
+  property Item peekLast: null
+  onPeekShownChanged: if (grid.peekShown) grid.peekLast = grid.peekShown
+  Timer { id: peekWait; interval: 300; onTriggered: grid.peekShown = grid.peekCell }
+  Timer { id: peekLeave; interval: 220; onTriggered: if (!grid.peekCell) grid.peekShown = null }
+  function peekAt(cell) {
+    grid.peekCell = cell && cell.info ? cell : null;
+    if (!grid.peekCell) { peekWait.stop(); peekLeave.restart(); return; }
+    peekLeave.stop();
+    if (grid.peekShown) { peekWait.stop(); grid.peekShown = grid.peekCell; }
+    else peekWait.restart();
+  }
+  onVisibleChanged: if (!visible) { grid.peekCell = null; grid.peekShown = null; }
+
   function key(e) {
     const n = grid.kinds.length;
     if (e.key === Qt.Key_Right) { grid.pick = (grid.pick + 1) % n; return true; }
@@ -62,7 +86,7 @@ Item {
           width: cells.cellW
           height: 124
           radius: Zenon.windowRadius + 6
-          color: press.pressed ? Zenon.wash(0.12) : cell.here ? Zenon.alpha(Zenon.cyan, 0.1) : Zenon.wash(0.04)
+          color: press.pressed ? Zenon.pressWash(0.12) : cell.here ? Zenon.alpha(Zenon.cyan, 0.1) : Zenon.wash(0.04)
           border.width: 1
           border.color: cell.here ? Zenon.alpha(Zenon.cyan, 0.5) : Zenon.border
           Behavior on color { ColorAnimation { duration: Zenon.fast } }
@@ -122,32 +146,9 @@ Item {
             anchors.fill: parent
             onClicked: { grid.pick = cell.index; grid.chosen(cell.modelData); }
           }
-          HoverHandler { id: cellHover }
-          Bubble {
-            window: grid.win
-            target: cell
-            shown: cellHover.hovered && !!cell.info
-            cardWidth: 340
-            Text {
-              width: 300
-              wrapMode: Text.Wrap
-              text: cell.info ? "<b>" + cell.info.cli + "</b> — from the " + (cell.info.aur ? "AUR" : "Arch repositories")
-                + ", package " + cell.info.pkg + (cell.info.installed ? ", installed." : ", installed through Ceres when you choose it.") : ""
-              textFormat: Text.StyledText
-              color: Zenon.ink
-              font.family: Zenon.face
-              font.weight: Zenon.weight
-              font.pixelSize: Zenon.px(13)
-            }
-            Text {
-              width: 300
-              wrapMode: Text.Wrap
-              text: cell.info ? cell.info.blurb.charAt(0).toUpperCase() + cell.info.blurb.slice(1) + "." : ""
-              color: Zenon.accentMuted
-              font.family: Zenon.face
-              font.weight: Zenon.weight
-              font.pixelSize: Zenon.px(12)
-            }
+          // resting on a card: the grid's one bubble hangs from it (below)
+          HoverHandler {
+            onHoveredChanged: hovered ? grid.peekAt(cell) : grid.peekCell === cell ? grid.peekAt(null) : undefined
           }
         }
       }
@@ -159,6 +160,35 @@ Item {
       horizontalAlignment: Text.AlignHCenter
       text: "NordPass and Enpass keep no command-line tool, so calypso cannot read them."
       color: Zenon.alpha(Zenon.accentMuted, 0.8)
+      font.family: Zenon.face
+      font.weight: Zenon.weight
+      font.pixelSize: Zenon.px(12)
+    }
+  }
+
+  Bubble {
+    id: peek
+    readonly property var info: grid.peekLast ? grid.peekLast.info : null
+    window: grid.win
+    target: grid.peekLast
+    shown: !!grid.peekShown && !!peek.info
+    cardWidth: 340
+    Text {
+      width: 300
+      wrapMode: Text.Wrap
+      text: peek.info ? "<b>" + peek.info.cli + "</b> — from the " + (peek.info.aur ? "AUR" : "Arch repositories")
+        + ", package " + peek.info.pkg + (peek.info.installed ? ", installed." : ", installed through Ceres when you choose it.") : ""
+      textFormat: Text.StyledText
+      color: Zenon.ink
+      font.family: Zenon.face
+      font.weight: Zenon.weight
+      font.pixelSize: Zenon.px(13)
+    }
+    Text {
+      width: 300
+      wrapMode: Text.Wrap
+      text: peek.info ? peek.info.blurb.charAt(0).toUpperCase() + peek.info.blurb.slice(1) + "." : ""
+      color: Zenon.accentMuted
       font.family: Zenon.face
       font.weight: Zenon.weight
       font.pixelSize: Zenon.px(12)

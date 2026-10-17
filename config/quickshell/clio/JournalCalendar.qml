@@ -7,7 +7,7 @@
 // rounded day cells, today filled), with what the journal knows laid on it,
 // as Apple's Journal does: a day written on with a picture wears that
 // picture, a day written on without one is tinted (more entries, more
-// tint), and a mood felt that day is a dot in its colour. A day clicked
+// tint), and a mood felt that day is a dot in its color. A day clicked
 // shows only its entries, clicked again all of them; an empty day starts an
 // entry on it. ‹ › and the wheel walk the months, « » and shift the years,
 // the month's name goes back to today.

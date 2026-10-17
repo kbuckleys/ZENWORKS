@@ -7,6 +7,11 @@
 // the pictures taken or saved on each of the last thirty days (the
 // Pictures directory), to write about with them in the entry; and a few
 // reflections to start from. Nothing leaves the machine.
+//
+// The tiles are drawn from the shell's one thumbnail pool (morpheus/thumbs.js),
+// as terminus' and picasso's are: the pool's index answers for a picture already
+// cached on the frame its tile is made, and the rest are made in one batch in the
+// background — never the 12MB original decoded for a 104px tile (user, 2026-10-17).
 
 import QtQuick
 import Quickshell
@@ -15,6 +20,7 @@ import Quickshell.Widgets
 import "../morpheus"
 import "../terminus"
 import "notes.js" as N
+import "../morpheus/thumbs.js" as Thumbs
 
 Item {
   id: mo
@@ -27,8 +33,76 @@ Item {
   property bool scanning: false
   onShownChanged: if (mo.shown) { mo.chosen = ({}); mo.scan(); }
 
+  // ── THE POOL ──
+  // path → its thumbnail, or "" for "use the original" (one with
+  // transparency, which the pool will not hold as JPEG; or one nothing came
+  // of). A path not in it yet is waiting.
+  property var thumbs: ({})
+  property var thumbIndex: ({})
+  FileView {
+    id: indexFile
+    path: Thumbs.indexPath()
+    blockLoading: true
+    printErrors: false
+    onTextChanged: {
+      let o = null;
+      try { o = JSON.parse(String(indexFile.text() || "{}")); } catch (e) { o = null; }
+      mo.thumbIndex = (o && typeof o === "object" && !Array.isArray(o)) ? o : ({});
+    }
+  }
+  function thumbOf(p) {
+    const t = mo.thumbs[p];
+    return t === undefined ? "" : "file://" + (t !== "" ? t : p);
+  }
+  // what the index already knows, at once; the rest asked of the pool
+  function pool(rows) {
+    const t = {}, miss = [];
+    for (const r of rows) {
+      const hit = Thumbs.indexHit(mo.thumbIndex, r.path, r.size, r.mtime);
+      if (hit === "") miss.push(r.path);
+      else t[r.path] = Thumbs.isNone(hit) ? "" : hit;
+    }
+    mo.thumbs = t;
+    maker.running = false;
+    maker.batch = miss;
+    if (miss.length === 0) return;
+    maker.command = ["sh", "-c", Thumbs.generate(miss.map((p) => ({ kind: "i", src: p })), false)];
+    maker.running = true;
+  }
+  property var landed: ({})
+  Process {
+    id: maker
+    property var batch: []
+    stdout: SplitParser {
+      splitMarker: "\n"
+      onRead: (line) => {
+        const cut = line.indexOf("\t");
+        if (cut <= 0) return;
+        mo.landed[line.slice(0, cut)] = line.slice(cut + 1);
+        if (!flush.running) flush.start();
+      }
+    }
+    onRunningChanged: {
+      if (running) return;
+      // not reported is not made: the original, then
+      for (const p of maker.batch) if (!(p in mo.landed) && !(p in mo.thumbs)) mo.landed[p] = "";
+      mo.take();
+    }
+  }
+  // handed over every few frames, not per line
+  Timer { id: flush; interval: 120; onTriggered: mo.take() }
+  function take() {
+    const keys = Object.keys(mo.landed);
+    if (keys.length === 0) return;
+    const t = Object.assign({}, mo.thumbs);
+    for (const k of keys) t[k] = Thumbs.isNone(mo.landed[k]) ? "" : mo.landed[k];
+    mo.landed = ({});
+    mo.thumbs = t;
+  }
+
   function scan() {
     mo.scanning = true;
+    indexFile.reload();
     finder.running = false;
     finder.running = true;
   }
@@ -36,21 +110,28 @@ Item {
     id: finder
     command: ["sh", "-c", "d=$(xdg-user-dir PICTURES 2>/dev/null); [ -d \"$d\" ] || d=\"$HOME/Pictures\"; "
       + "find \"$d\" -maxdepth 4 -type f \\( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.webp' -o -iname '*.heic' -o -iname '*.gif' \\) "
-      + "-newermt '-30 days' -not -path '*/.*' -printf '%T@\\t%p\\n' 2>/dev/null | sort -rn | head -n 400"]
+      + "-newermt '-30 days' -not -path '*/.*' -printf '%T@\\t%s\\t%p\\n' 2>/dev/null | sort -rn | head -n 400"]
     stdout: StdioCollector {
       id: found
       waitForEnd: true
       onStreamFinished: {
         const by = {};
         const order = [];
+        const rows = [];
         for (const line of found.text.split("\n")) {
-          const t = line.indexOf("\t");
-          if (t < 0) continue;
-          const ms = parseFloat(line.slice(0, t)) * 1000;
+          const f = line.split("\t");
+          if (f.length < 3) continue;
+          const mtime = parseFloat(f[0]);
+          const path = f.slice(2).join("\t");
+          const ms = mtime * 1000;
           const k = N.dayKey(ms);
           if (!by[k]) { by[k] = { day: k, ms: N.dayStart(ms) + 12 * 3600000, paths: [] }; order.push(k); }
-          if (by[k].paths.length < 12) by[k].paths.push(line.slice(t + 1));
+          if (by[k].paths.length < 12) {
+            by[k].paths.push(path);
+            rows.push({ path: path, size: Number(f[1]), mtime: mtime });
+          }
         }
+        mo.pool(rows);
         mo.days = order.map((k) => by[k]);
         mo.scanning = false;
       }
@@ -97,9 +178,12 @@ Item {
             width: Math.min(col.width, pt.implicitWidth + 28)
             height: pt.implicitHeight + 18
             radius: Zenon.windowRadius + 2
-            color: Zenon.alpha(Zenon.magenta, 0.08)
+            // pressed darkens, as every button's press does (user, 2026-10-17)
+            color: chipPress.pressed ? Zenon.alpha(Zenon.magenta, 0.24) : chipPress.containsMouse ? Zenon.alpha(Zenon.magenta, 0.14) : Zenon.alpha(Zenon.magenta, 0.08)
             border.width: 1
-            border.color: Zenon.alpha(Zenon.magenta, 0.28)
+            border.color: Zenon.alpha(Zenon.magenta, chipPress.pressed ? 0.5 : 0.28)
+            scale: chipPress.pressed ? 0.97 : 1
+            Behavior on scale { NumberAnimation { duration: 90 } }
             Text {
               id: pt
               x: 14
@@ -112,7 +196,7 @@ Item {
               font.weight: Font.DemiBold
               font.pixelSize: Zenon.px(14)
             }
-            MouseArea { anchors.fill: parent; onClicked: { mo.closed(); mo.win.newEntry(Date.now(), modelData); } }
+            MouseArea { id: chipPress; anchors.fill: parent; hoverEnabled: true; onClicked: { mo.closed(); mo.win.newEntry(Date.now(), modelData); } }
           }
         }
       }
@@ -168,10 +252,13 @@ Item {
                 color: Zenon.wash(0.05)
                 Image {
                   anchors.fill: parent
-                  source: "file://" + modelData
-                  sourceSize.width: 220
+                  source: mo.thumbOf(modelData)
+                  sourceSize.width: Thumbs.size()
                   fillMode: Image.PreserveAspectCrop
                   asynchronous: true
+                  // faded in as it arrives, not popped in (2026-10-17)
+                  opacity: status === Image.Ready ? 1 : 0
+                  Behavior on opacity { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
                 }
                 Rectangle {
                   anchors.fill: parent
@@ -191,7 +278,9 @@ Item {
                   color: Zenon.magenta
                   Text { anchors.centerIn: parent; text: ""; color: Zenon.onAccent; font.family: Zenon.glyphFace; font.pixelSize: Zenon.px(11) }
                 }
-                MouseArea { anchors.fill: parent; onClicked: mo.toggle(modelData) }
+                // pressed darkens
+                Rectangle { anchors.fill: parent; color: "black"; opacity: tilePress.pressed ? 0.22 : 0 }
+                MouseArea { id: tilePress; anchors.fill: parent; onClicked: mo.toggle(modelData) }
               }
             }
           }

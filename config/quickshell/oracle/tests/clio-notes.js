@@ -55,13 +55,36 @@ module.exports = {
     t.eq("toggled off, nothing left", N.toggleMark(bold, "b"), "x");
     t.eq("toggled on", N.toggleMark("x", "i"), "<i>x</i>");
     t.eq("strike", N.marked("<span style=\" text-decoration: line-through;\">s</span>", "s"), true);
-    t.eq("a colour, and off again", N.colour(N.colour("x", "color", "#01c100"), "color", ""), "x");
+    {
+    // ── the journal's last days, a resurfaced entry, the highlights ──
+    const now17 = new Date(2026, 9, 17, 15).getTime();
+    const ents = [{ date: now17 - 3600000, mood: { v: 2 } }, { date: now17 - 3600000 * 2, mood: { v: 1 } },
+                  { date: now17 - 86400000 * 2 }, { date: now17 - 86400000 * 40, id: "old" }];
+    const md = N.moodDays(ents, now17, 7);
+    t.eq("seven days, today last", [md.length, md[6].key], [7, N.dayKey(now17)]);
+    t.eq("today's mood, averaged", md[6].mood, 2);
+    t.eq("written with no mood", [md[4].wrote, md[4].mood], [true, null]);
+    t.eq("a day not written", md[5].wrote, false);
+    t.eq("an old one brought back", N.resurface(ents, now17).id, "old");
+    t.eq("none so old", N.resurface(ents.slice(0, 3), now17), null);
+    t.eq("a highlight found", N.highlights([{ id: "h", kind: "note", modified: 1,
+      blocks: [{ k: "body", h: "a " + N.colour("key", "background-color", N.sentinel("mark", 0)) + " b" }] }]).map((x) => [x.text, x.marker]), [["key", "sand"]]);
+    t.eq("a smart rule: edited this week", [N.passes({ modified: now17 - 86400000 }, "edited:week", now17), N.passes({ modified: now17 - 86400000 * 9 }, "edited:week", now17)], [true, false]);
 
-    // ── colours by name ──
+    }
+    // ── a face for a run ──
+    const serif = N.face("x <b>y</b>", "Noto Serif");
+    t.eq("a face kept through Qt's spacing", N.tidy(serif.replace("style=\"", "style=\" ")), "<span style=\" font-family:'Noto Serif','clio-face';\">x <b>y</b></span>");
+    t.eq("a paste's own font goes", N.tidy("<span style=\" font-family:'Arial';\">p</span>"), "p");
+    t.eq("which face", N.faceOf(serif), "Noto Serif");
+    t.eq("a face, and off again", N.face(serif, ""), "x <b>y</b>");
+    t.eq("a color, and off again", N.colour(N.colour("x", "color", "#01c100"), "color", ""), "x");
+
+    // ── colors by name ──
     const ink = (n) => ({ magenta: "#aa00aa", pink: "#ff88aa", yellow: "#ffaa00", green: "#00ff00", blue: "#0000ff", cyan: "#00ffff", red: "#ff0000" })[n];
     const mark = (n) => ({ sand: "#eedd99", pink: "#552233", green: "#225533", blue: "#223355", magenta: "#442244" })[n];
     const coloured = "<span style=\" color:" + N.sentinel("ink", 3) + ";\">g</span>";
-    t.eq("painted with the theme's colour", N.paint(coloured, ink, mark), "<span style=\" color:#00ff00;\">g</span>");
+    t.eq("painted with the theme's color", N.paint(coloured, ink, mark), "<span style=\" color:#00ff00;\">g</span>");
     t.eq("and kept by name", N.unpaint(N.paint(coloured, ink, mark), ink, mark), coloured);
 
     // ── back out ──

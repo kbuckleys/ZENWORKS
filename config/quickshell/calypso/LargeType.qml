@@ -5,7 +5,7 @@
 //
 // A PASSWORD IN LARGE TYPE — for reading it off the screen into another
 // device: each character large, numbered under it, digits and symbols in
-// their own colours (1Password's Large Type). On a sheet; any key or click
+// their own colors (1Password's Large Type). On a sheet; any key or click
 // puts it away, and the window forgets the value as it goes.
 
 import QtQuick

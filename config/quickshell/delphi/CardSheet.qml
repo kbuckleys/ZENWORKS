@@ -68,7 +68,7 @@ Item {
 
   function card_(c) {
     const id = ++deck.cardN;
-    // every answer speaks in a colour: one left without drew in Qt's default
+    // every answer speaks in a color: one left without drew in Qt's default
     // black, heavier than the rest (the sign-in card's Copy, 2026-10-10)
     const choices = (c.choices || []).map((ch) => Object.assign({ ink: Zenon.accentMuted }, ch));
     deck.sheetQueue = deck.sheetQueue.concat([Object.assign({ kind: "confirm", id: id }, c, { choices: choices })]);

@@ -13,7 +13,7 @@ import "metis.js" as Metis
 // the question after "how much is it". Faint where it has been, a dot where
 // it is; how far it has moved on the right, the weeks it covers on the left.
 // Up and down are neither good nor bad — it depends which way you are
-// changing — so the move is said, not coloured.
+// changing — so the move is said, not colored.
 Item {
   id: strip
 

@@ -42,7 +42,7 @@ Item {
   // Matched to the DATA cell this names, not assumed. The size column keeps
   // a 14px gutter before the modified column; the modified column is the
   // last one and sits flush. A single hard-coded pad here put MODIFIED 14px
-  // to the left of the times underneath it, which read as centred.
+  // to the left of the times underneath it, which read as centered.
   property real padRight: 14
   height: 22
 

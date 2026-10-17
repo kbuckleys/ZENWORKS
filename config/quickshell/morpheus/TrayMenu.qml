@@ -11,7 +11,7 @@ import "."
 // THE SYSTEM TRAY'S MENU, which is a CardMenu like every other menu here.
 //
 // It used to be its own PanelWindow with its own rows, and it drifted: the
-// label was centre-aligned where every other menu left-aligns, the type was a
+// label was center-aligned where every other menu left-aligns, the type was a
 // pixel small, the chevron was a glyph from a different font range, the tail
 // column never collapsed, the parent row went dark the moment a submenu
 // opened, and there was no open or close animation at all. None of that was
@@ -103,7 +103,7 @@ CardMenu {
   // either one into the screen, and flips a submenu that will not fit.
   // ── THE PILL'S EDGES, WHICH ARE NOT THE WINDOW'S ──────────────────────
   // What the menu has to clear is the PILL. srcPos.y is the ICON's top, and
-  // an icon is centred in the pill — so opening upward from there buried the
+  // an icon is centered in the pill — so opening upward from there buried the
   // menu's bottom edge inside the bar instead of standing it on top of it.
   //
   // It read the WINDOW's top edge instead, which was right only while the

@@ -381,6 +381,9 @@ Item {
     }
     // the farthest ghost goes first when the pool runs short
     ghosts.sort((a, b) => Math.abs(a.pos - h / 2) - Math.abs(b.pos - h / 2));
+    // the last row above that was already showing: an uncovered line comes
+    // down out of it (the fold's own line), as a branch in terminus does
+    let kept = -1;
     for (let i = 0; i < h; ++i) {
       let it = at[i];
       if (!it) {
@@ -389,8 +392,15 @@ Item {
         it.key = win.keyOf(rows[i], i);
         at[i] = it;
       }
-      // uncovered by a fold: in from nothing
-      if (win.settling && it.key !== "" && !wasAt.has(it)) it.arrive();
+      // uncovered by a fold: down out of the fold's line, fading in
+      // (user, 2026-10-17: it only faded in where it landed)
+      if (win.settling && it.key !== "" && !wasAt.has(it)) {
+        it.arrive();
+        it.snap = true;
+        it.pos = i;
+        it.snap = false;
+        if (kept >= 0) { it.under = true; it.slideFrom((kept - i) * win.cellH); }
+      } else kept = i;
       it.pos = i;
       it.ord = ords[i];
       // nvim diffs by screen position, so after a scroll it resends rows
@@ -554,7 +564,7 @@ Item {
   Component.onCompleted: { win.growPool(); win.place(); win.syncBar(); }
 
   // ── A MOVED LINE SLIDES ────────────────────────────────────────────
-  // Alt j/k (mini.move) moves a line, or a selection, past its neighbour.
+  // Alt j/k (mini.move) moves a line, or a selection, past its neighbor.
   // Rows are keyed by line number, so the drawing would only swap text in
   // place: instead the moved rows slide from where they were, and the rows
   // they passed slide the other way to fill the gap. nvim says where the
@@ -772,6 +782,8 @@ Item {
       rowH: Math.max(1, content.lineRows) * win.cellH
       animate: !content.barSnaps
       on: win.w.current && !win.ed.cmdlineShown && !win.ed.inFloat
+      // the sidebar's bar (morpheus/FileTree), so the two cursors match
+      color: Zenon.alpha(Zenon.cyan, 0.12)
     }
 
     // ── THE SELECTION, AS ONE SHAPE ──────────────────────────────────
@@ -863,14 +875,28 @@ Item {
         gapNew: win.igRow >= 0 && pos === win.igRow ? win.igNew : 0
         // a moved line sliding to its place (see A MOVED LINE SLIDES)
         property real slide: 0
-        NumberAnimation on slide { id: sliding; running: false; to: 0; duration: Zenon.normal; easing.type: Easing.OutCubic }
+        NumberAnimation on slide {
+          id: sliding
+          running: false
+          to: 0
+          duration: Zenon.normal
+          easing.type: Easing.OutCubic
+          onRunningChanged: if (!running) under = false
+        }
+        // a line coming out of a fold slides under the lines already there,
+        // not over the fold's own line
+        property bool under: false
+        z: under ? -1 : 0
+        // set for the one move that must land at once (an uncovered line put
+        // where it goes before its slide out of the fold starts)
+        property bool snap: false
         function slideFrom(dy) {
           sliding.stop();
           slide = dy;
           if (dy !== 0) { sliding.from = dy; sliding.start(); }
         }
         Behavior on y {
-          enabled: win.settling
+          enabled: win.settling && !snap
           NumberAnimation { duration: Zenon.normal; easing.type: Zenon.travelEase }
         }
         // a row a fold uncovered fades in where it lands (EditorRow.enter)
@@ -1120,7 +1146,7 @@ Item {
     z: 5
     // THE ACTIVE TAB'S GLASS (user, 2026-10-09). The plato window leaves its ground out under the bar (stickyHost.band)
     // so nothing doubles it. Hung in a lower split there is no tab to
-    // match, and the window's ground is under it: the layer's colour only.
+    // match, and the window's ground is under it: the layer's color only.
     // NOW THE WINDOW'S GROUND, ONE LAYER (2026-10-11): the active tab is
     // that (morpheus/TabGlass), so the bar under it is too.
     Rectangle {

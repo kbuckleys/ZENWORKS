@@ -160,7 +160,7 @@ module.exports = {
     t.has("the id is resolved to a real file name", launch, "htop.desktop");
     t.ok("and not left bare, which would match nothing",
       launch.indexOf("\"htop\"") === -1 && launch.indexOf("'htop'") === -1);
-    t.has("an app is launched with gio, which honours Terminal=true",
+    t.has("an app is launched with gio, which honors Terminal=true",
       launch, "gio launch");
     t.ok("gtk-launch is gone", launch.indexOf("gtk-launch") === -1);
     t.has("through the XDG search path", launch, "XDG_DATA_DIRS");

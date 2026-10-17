@@ -3,7 +3,7 @@
 -- └─┘└─┘┘└┘└┴┘└─┘┴└─┴ ┴└─┘
 -- https://github.com/kbuckleys/
 --
--- The editing behaviour plato's settings sheet controls, and the few things
+-- The editing behavior plato's settings sheet controls, and the few things
 -- the engine tells plato about edits as they happen.
 --
 --   options(p)      the sheet's editing settings, applied to this nvim

@@ -4,7 +4,7 @@
 // https://github.com/kbuckleys/
 //
 // One package moving: "name   from → to". The same three inks as the bar's
-// tooltip and the toast — the old version greyed, the arrow in the accent,
+// tooltip and the toast — the old version grayed, the arrow in the accent,
 // the new one plain — so a change reads the same wherever it is shown.
 
 import QtQuick

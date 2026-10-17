@@ -82,6 +82,52 @@ Item {
       }
     }
 
+    // ── THE LAST FOUR WEEKS, BY MOOD ── a dot a day: its mood's color, a
+    // plain dot for a day written with none, a ring for a day not written;
+    // a click shows that day
+    Item {
+      id: moods
+      readonly property var days: N.moodDays(jl.all, Date.now(), 28)
+      visible: jl.all.length > 0 && jl.win && jl.win.query === ""
+      x: 14
+      width: jl.width - 28
+      height: 30
+      readonly property real step: (moods.width - 10) / 28
+      Repeater {
+        model: moods.days
+        delegate: Item {
+          id: dot
+          required property var modelData
+          required property int index
+          readonly property var mood: dot.modelData.mood === null ? null : N.moodOf(dot.modelData.mood)
+          readonly property bool chosen: !!jl.win && jl.win.day === dot.modelData.key
+          x: 5 + dot.index * moods.step
+          width: moods.step
+          height: moods.height
+          Rectangle {
+            anchors.centerIn: parent
+            width: Math.min(14, moods.step - 3) * (dotMa.containsMouse || dot.chosen ? 1.2 : 1)
+            height: width
+            radius: width / 2
+            color: dot.mood ? (Zenon[dot.mood.ink] || Zenon.accentMuted) : dot.modelData.wrote ? Zenon.accentMuted : "transparent"
+            border.width: dot.modelData.wrote ? (dot.chosen ? 2 : 0) : 1
+            border.color: dot.chosen ? Zenon.ink : Zenon.border
+            opacity: dot.modelData.wrote ? 1 : 0.7
+            Behavior on width { NumberAnimation { duration: 120 } }
+          }
+          MouseArea {
+            id: dotMa
+            anchors.fill: parent
+            hoverEnabled: true
+            onClicked: if (dot.modelData.wrote) jl.win.day = dot.chosen ? "" : dot.modelData.key
+            onContainsMouseChanged: containsMouse
+              ? jl.win.tipsItem.show(dot, N.dateLong(dot.modelData.ms) + (dot.mood ? " · " + dot.mood.label : dot.modelData.wrote ? "" : " · nothing written"))
+              : jl.win.tipsItem.hide(dot)
+          }
+        }
+      }
+    }
+
     // today's reflection: write about it, or another
     Rectangle {
       x: 14
@@ -168,6 +214,53 @@ Item {
         cursorShape: Qt.PointingHandCursor
         // one: open it; more: the day shown, every year of it
         onClicked: past.hits.length === 1 ? jl.win.openNote(past.hits[0].n.id) : jl.win.choose(past.hits[0].n.id)
+      }
+    }
+
+    // ── FROM YOUR JOURNAL ── an older entry brought back (the same all day),
+    // when no year has one on this day
+    Rectangle {
+      id: back
+      readonly property var e: !past.visible && jl.win && jl.win.query === "" && jl.win.day === "" ? N.resurface(jl.all, Date.now()) : null
+      x: 14
+      width: jl.width - 28
+      height: backCol.implicitHeight + 20
+      visible: !!back.e
+      radius: Zenon.windowRadius + 4
+      color: backMa.pressed ? Zenon.alpha(Zenon.cyan, 0.18) : backMa.containsMouse ? Zenon.alpha(Zenon.cyan, 0.12) : Zenon.alpha(Zenon.cyan, 0.06)
+      border.width: 1
+      border.color: Zenon.alpha(Zenon.cyan, 0.28)
+      Column {
+        id: backCol
+        x: 14
+        y: 10
+        width: parent.width - 28
+        spacing: 4
+        Text {
+          text: "\u{F0B64}  FROM YOUR JOURNAL · " + (back.e ? N.dateLong(back.e.date).toUpperCase() : "")
+          color: Zenon.cyan
+          font.family: Zenon.face
+          font.weight: Font.DemiBold
+          font.pixelSize: Zenon.px(11)
+          font.letterSpacing: 0.8
+        }
+        Text {
+          width: parent.width
+          elide: Text.ElideRight
+          maximumLineCount: 2
+          wrapMode: Text.Wrap
+          text: back.e ? N.titleOf(back.e, N.dateLong(back.e.date)) + (back.e.d && back.e.d.preview ? " — " + back.e.d.preview : "") : ""
+          color: Zenon.ink
+          font.family: Zenon.face
+          font.weight: Font.DemiBold
+          font.pixelSize: Zenon.px(14)
+        }
+      }
+      MouseArea {
+        id: backMa
+        anchors.fill: parent
+        hoverEnabled: true
+        onClicked: jl.win.openNote(back.e.id)
       }
     }
 

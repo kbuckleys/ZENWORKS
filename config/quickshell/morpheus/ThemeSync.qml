@@ -57,7 +57,7 @@ Item {
   }
 
   // AFTER THE WRITE HAS LANDED. setText writes in the background, and the
-  // first version signalled straight after it: hyprland reloaded, read the
+  // first version signaled straight after it: hyprland reloaded, read the
   // theme.lua that was not there yet, and kept Zenon's borders (2026-10-08).
   // Oracle waits the same way before its own `hyprctl reload`.
   Timer {

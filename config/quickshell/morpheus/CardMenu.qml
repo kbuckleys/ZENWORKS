@@ -117,7 +117,8 @@ PanelWindow {
   // an owner needs to include this card in its focus grab.
   readonly property alias card: body.card
   function rowY(i) {
-    let y = 4;
+    // the rows start just inside the 1px border (CardBody: edge to edge)
+    let y = 1;
     for (let k = 0; k < i && k < root.model.length; ++k)
       y += root.rowHeight(root.model[k]);
     // where the row is NOW, in a card scrolled down its list
@@ -130,7 +131,7 @@ PanelWindow {
   }
 
   readonly property int contentH: {
-    let h = 8;
+    let h = 2;   // the border, top and bottom: the rows run edge to edge
     for (let i = 0; i < root.model.length; ++i) h += root.rowHeight(root.model[i]);
     return h;
   }
@@ -164,9 +165,12 @@ PanelWindow {
   anchors { top: true; left: true }
 
   implicitWidth: root.cardW + Zenon.menuShadowPad * 2
-  // no taller than Zenon.menuMaxHeight, nor than the screen; the rest scrolls
+  // no taller than Zenon.menuMaxHeight, nor than the screen; the rest scrolls.
+  // `whole`: every row shown, only the screen limiting it (a sticky's menu,
+  // whose spelling rows pushed it past the cap — user, 2026-10-17)
+  property bool whole: false
   implicitHeight: {
-    const cap = Math.min(root.contentH, Zenon.menuMaxHeight);
+    const cap = root.whole ? root.contentH : Math.min(root.contentH, Zenon.menuMaxHeight);
     if (!root.screen) return cap + Zenon.menuShadowPad * 2;
     const maxH = root.screen.height - Zenon.menuShadowPad * 2;
     return Math.min(cap, maxH) + Zenon.menuShadowPad * 2;
@@ -244,6 +248,9 @@ PanelWindow {
     hinged: root.hinged
     onRight: root.onRight
     squareEdge: root.squareEdge
+    // (a whole menu taller than the screen still scrolls, or its last rows
+    // could not be reached)
+    still: root.whole && (!root.screen || root.contentH <= root.screen.height - Zenon.menuShadowPad * 2)
     activeIndex: root.activeIndex
     onChosen: (i) => root.chosen(i)
     onHovered: (i) => root.hovered(i)

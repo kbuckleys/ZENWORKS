@@ -77,7 +77,7 @@ Scope {
 
   // ── WHAT IS KEPT ───────────────────────────────────────────────────
   property var accounts: []
-  // calypso's own favourites, by C.keyOf (1Password's come with its items)
+  // calypso's own favorites, by C.keyOf (1Password's come with its items)
   property var favs: ({})
   // the window's place: { shelf, kind, acct, folder, tag }
   property var scope: ({ shelf: "all" })

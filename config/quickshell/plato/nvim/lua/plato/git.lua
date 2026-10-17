@@ -29,7 +29,7 @@
 --                 makes room for them and scrolls over them), red; the lines
 --                 it brought, tinted green (opened()).
 --
--- mini.diff draws nothing itself here: its view is "number", which colours
+-- mini.diff draws nothing itself here: its view is "number", which colors
 -- nvim's number column — a column plato draws on its own — so its signs
 -- never compete with diagnostics' for the one sign cell.
 

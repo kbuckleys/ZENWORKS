@@ -36,7 +36,7 @@ function repoCommand(db, online) {
     + " 2>&1; echo \"" + EXIT_MARK + "$?\"";
 }
 
-// The AUR, through paru, so the count honours IgnorePkg, IgnoreGroup and
+// The AUR, through paru, so the count honors IgnorePkg, IgnoreGroup and
 // devel tracking exactly as `paru -Syu` will. stderr is folded in because it
 // is the only thing that tells "no AUR updates" from "no network": paru exits
 // 1 for both.
@@ -527,7 +527,23 @@ function txKindOf(steps) {
   if (ss.some(a => /^-S\w*u/.test(a[0] || "") || /^-S\w*y/.test(a[0] || ""))) return "update";
   if (ss.length && ss.every(a => /^-S/.test(a[0] || ""))) return "install";
   if (ss.length && ss.every(a => /^-R/.test(a[0] || ""))) return "remove";
-  return ss.length ? "update" : "other";
+  if (ss.length) return "update";
+  // nothing of paru's: a Flatpak update is still an update, the rest
+  // (services restarted, a cache swept) only "other"
+  return (steps || []).some(a => a && /\bflatpak\b.*\bupdate\b/.test(a.join(" "))) ? "update" : "other";
+}
+
+// A finished job that pacman.log heard nothing of, in its own label's
+// words, past tense: "restart a and b" → "Restarted a and b". The label is
+// what request() was given; "" when it said nothing (a full upgrade).
+const DONE_VERBS = { restart: "Restarted", update: "Updated", install: "Installed",
+  remove: "Removed", repair: "Repaired", drop: "Dropped", reinstall: "Reinstalled" };
+function doneLine(label) {
+  const l = String(label ?? "").trim();
+  const m = /^(\w+)\b\s*(.*)$/.exec(l);
+  if (!m) return "";
+  const v = DONE_VERBS[m[1].toLowerCase()];
+  return v ? (v + (m[2] ? " " + m[2] : "")) : "";
 }
 
 // The same steps, now answered. `choices` maps a provider menu's name to
@@ -694,7 +710,7 @@ function removeHeadline(err) {
 
 // ── what it cost ──────────────────────────────────────────────────────────
 // `expac -Q '%n %m'` → { name: bytes }. Per package, as ZENU does: a single
-// before/after total hides a big install cancelling a big removal.
+// before/after total hides a big install canceling a big removal.
 function parseSizes(text) {
   const out = {};
   for (const l of String(text ?? "").split("\n")) {
@@ -1242,7 +1258,7 @@ function isUpgrade(steps) {
 // is built from its AUR recipe (see setupSteps).
 //
 // A `file` in place of a `bin` is data rather than a program, there or not:
-// the Store's app catalogue is a directory archlinux-appstream-data fills.
+// the Store's app catalog is a directory archlinux-appstream-data fills.
 const DEPS = [
   { bin: "paru",              pkg: "paru",              aur: true, why: "installs and updates packages, the AUR included" },
   { bin: "checkupdates",      pkg: "pacman-contrib",    why: "checks for updates without root" },
@@ -1385,7 +1401,7 @@ function flatpakAddSteps() {
 //
 // AND NOTHING LEFT BEHIND (user, 2026-10-15: Ceres keeps the system clean).
 // After the package: Flatpak's own stores — the system's (/var/lib/flatpak:
-// its repository, the catalogue, the exports), yours (~/.local/share/flatpak)
+// its repository, the catalog, the exports), yours (~/.local/share/flatpak)
 // and its cache — and Ceres' own Flathub figures. `deleteData` takes what
 // the apps kept too (~/.var/app, Flatpak's alone): asked, ticked by default.
 function flatpakRemoveSteps(deleteData) {

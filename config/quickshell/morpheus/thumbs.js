@@ -59,7 +59,7 @@ const SIZE = 480;
 //
 // The pool was 133MB of PNG. The same pool in JPEG is about 20MB.
 //
-// WHAT JPEG CANNOT DO IS ALPHA, and rather than flatten it onto a colour
+// WHAT JPEG CANNOT DO IS ALPHA, and rather than flatten it onto a color
 // that would be wrong the moment the theme changed, a source that is not
 // opaque is simply not cached — see generate. Those are icons and logos
 // and cut-out screenshots: small files that Qt opens directly and quickly,

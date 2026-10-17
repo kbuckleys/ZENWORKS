@@ -3015,7 +3015,7 @@ function skyGlyph(min) {
   const k = skyAt(min);
   return k === "" ? "" : String.fromCodePoint(({ day: 0xF0599, low: 0xF059A, night: 0xF0594 })[k]);
 }
-// its colour, a Zenon name
+// its color, a Zenon name
 function skyInk(min) {
   return ({ day: "sand", low: "yellow", night: "keyInk" })[skyAt(min)] || "keyInk";
 }

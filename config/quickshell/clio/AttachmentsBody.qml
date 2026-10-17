@@ -72,6 +72,9 @@ Item {
           sourceSize.width: 300
           fillMode: Image.PreserveAspectCrop
           asynchronous: true
+          // faded in as it arrives, not popped in (2026-10-17)
+          opacity: status === Image.Ready ? 1 : 0
+          Behavior on opacity { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
         }
         Rectangle {
           anchors.bottom: parent.bottom

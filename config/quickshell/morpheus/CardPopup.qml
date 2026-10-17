@@ -88,7 +88,7 @@ PopupWindow {
   }
 
   readonly property int contentH: {
-    let h = 8;
+    let h = 2;   // the border, top and bottom: the rows run edge to edge
     const rows = root.model || [];
     for (let i = 0; i < rows.length; ++i) h += body.rowHeight(rows[i]);
     return h;
@@ -118,7 +118,7 @@ PopupWindow {
   property var child: null
 
   function rowY(i) {
-    let y = Zenon.menuCardPad;
+    let y = 1;   // just inside the border (CardBody: edge to edge)
     for (let k = 0; k < i && k < root.model.length; ++k) y += body.rowHeight(root.model[k]);
     // where the row is NOW, in a card scrolled down its list
     return y - body.scrollY;
@@ -131,7 +131,7 @@ PopupWindow {
     const comp = Qt.createComponent("CardPopup.qml");
     if (comp.status !== Component.Ready) return;
     const c = comp.createObject(root, {
-      window: root, parentCard: root, hingeY: root.rowY(i) - Zenon.menuCardPad,
+      window: root, parentCard: root, hingeY: root.rowY(i) - 1,
       fit: true, cardWidth: root.cardWidth, model: r.children
     });
     if (!c) return;

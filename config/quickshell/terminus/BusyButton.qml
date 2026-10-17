@@ -25,7 +25,7 @@ Item {
   property bool ready: true
   property bool busy: false
   property string busyText: ""
-  // the pill's colour; the button's own ink unless said
+  // the pill's color; the button's own ink unless said
   property color busyInk: Zenon.cyan
   signal clicked()
 

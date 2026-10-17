@@ -73,12 +73,12 @@ PanelWindow {
   // whole of what the transitions below need.
   readonly property var rows: Oracle.showNotifications ? Howler.live : null
 
-  // One lane, wide enough for the widest toast, with each card centred in
+  // One lane, wide enough for the widest toast, with each card centered in
   // it. The stack has to be a single item for the transitions below to have
   // anything to displace.
   // ── WHICH WAY A TOAST COMES IN ──────────────────────────────────────
   // From the edge it is pinned to, always: a stack in a corner slides in
-  // sideways from that corner, and a centred one slides along the axis it
+  // sideways from that corner, and a centered one slides along the axis it
   // hangs from — down from the top, up from the bottom. Nothing ever travels
   // across the screen to reach its place.
   readonly property bool sideways: toasts.side !== "center"
@@ -106,10 +106,10 @@ PanelWindow {
     toasts.anyCapture ? Howler.captureWidth : 0)
   // THE WIDTH IS WHAT GLIDES, NOT THE POSITION. The column's x used to
   // animate while the lane snapped to its new width, so for the length of
-  // the glide the lane's centre was off by half the change — and a capture
+  // the glide the lane's center was off by half the change — and a capture
   // arriving in that window slid down AND across: a diagonal swoop instead
   // of the vertical one. Animating the width with x bound straight to it
-  // keeps the two in step: a centred stack does not move at all, and a
+  // keeps the two in step: a centered stack does not move at all, and a
   // corner one moves sideways only.
   property real laneW: toasts.stackW
   Behavior on laneW {
@@ -165,7 +165,7 @@ PanelWindow {
 
 
       // GOING IS A FADE AND NOTHING ELSE. A toast that slid out would be
-      // travelling at the moment the stack closes the gap behind it, and two
+      // traveling at the moment the stack closes the gap behind it, and two
       // movements in opposite directions at once is the thing that reads as
       // broken rather than as motion.
       remove: Transition {
@@ -311,7 +311,7 @@ PanelWindow {
 
         // ONLY A PLAYER SPEAKS THAT PROTOCOL. Taking line two as "marks"
         // from every sender stole the update toast's first package and set
-        // it in a centred grey row of its own.
+        // it in a centered gray row of its own.
         readonly property bool musical: toast.player !== ""
         readonly property bool sentMarks: toast.musical && toast.bodyLines.length > 1
         readonly property string marks: !toast.musical ? ""
@@ -393,13 +393,13 @@ PanelWindow {
           + (toast.hasIcon
              ? Howler.iconPadding + Howler.iconSize + Howler.hPadding
              : Howler.hPadding)
-        // THE DELEGATE IS THE LANE, and the card is centred in it. Setting
+        // THE DELEGATE IS THE LANE, and the card is centered in it. Setting
         // the delegate's own `x` looked right and did nothing: a vertical
         // ListView positions its delegates on BOTH axes, so the view wrote
         // x back to 0 every time and every toast sat flush against the left
         // of the lane — measured at x=0 against the 48 the binding asked
         // for. What the view does not touch is what a child of the delegate
-        // does, so the centring moved one level in.
+        // does, so the centering moved one level in.
         width: toasts.laneW
         // ── AS WIDE AS WHAT IS IN IT ─────────────────────────────────
         // The content was only measured for a LIST; everything else took the
@@ -633,7 +633,7 @@ PanelWindow {
         }
 
         // ── WHAT A CRITICAL TOAST CASTS ──────────────────────────────
-        // Red is already the border's colour; the light is the same red put
+        // Red is already the border's color; the light is the same red put
         // where a border cannot reach. Cheap when it is off, because the
         // effect goes with it.
         MenuShadow {
@@ -766,8 +766,8 @@ PanelWindow {
               // ONLY WHEN THERE IS AN IMAGE. With none, the box is still an
               // anchor the text starts from, and pulling an empty box six
               // pixels left took six pixels off the text's left gutter and
-              // left them on its right — which a centred line shows as being
-              // three pixels off centre, on every toast without an icon.
+              // left them on its right — which a centered line shows as being
+              // three pixels off center, on every toast without an icon.
               anchors.leftMargin: toast.hasIcon
                 ? Howler.iconPadding - Howler.padding : 0
               anchors.verticalCenter: parent.verticalCenter

@@ -127,7 +127,7 @@ Item {
   property var prevAt: ({})
   function rowAt(p) { const r = col.index["k:" + p]; return r === undefined ? null : r; }
 
-  // COALESCED TO THE END OF THE TICK, and that is not an optimisation.
+  // COALESCED TO THE END OF THE TICK, and that is not an optimization.
   //
   // A step changes two things: which slot this column stands in, and what
   // each slot is about. QML re-evaluates a binding the instant one of its
@@ -198,13 +198,14 @@ Item {
   SelectBar {
     host: term
     view: colView
+    color: term.hiFill   // the sidebar's highlight (user, 2026-10-17)
     index: col.drawnSlot === 0 ? term.parentIndex : term.sel
     rowH: term.rowH
     on: (col.drawnSlot === 0 || col.isLive)
         && !term.cursorOutline(term.act)
     // Only the live column has a cursor that MOVES. The left-hand one marks
     // where you came from — it changes because the columns rotated, not
-    // because anything travelled — and during the rotation itself the live
+    // because anything traveled — and during the rotation itself the live
     // one is being handed a new directory, so neither should ease.
     animate: col.isLive && !term.millerAnimation.running && !term.visualOn
   }

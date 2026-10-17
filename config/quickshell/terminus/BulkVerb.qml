@@ -31,7 +31,7 @@ Rectangle {
   // No hover tint — the suite's buttons answer only at rest, lit and
   // pressed (user, 2026-10-11); pressed is the wash Segments presses with.
   color: verb.on ? Zenon.alpha(Zenon.cyan, 0.16)
-    : verbPress.pressed ? Zenon.wash(0.12) : Zenon.wash(0.04)
+    : verbPress.pressed ? Zenon.pressWash(0.12) : Zenon.wash(0.04)
   border.width: 1
   border.color: verb.on ? Zenon.cyan : Zenon.border
   Behavior on color { ColorAnimation { duration: Zenon.fast } }

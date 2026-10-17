@@ -9,7 +9,7 @@
 // turn every nine seconds unless the pointer is resting on it.
 //
 // `shots` is StoreView's url → file map; a feature whose picture has not
-// landed wears its colour instead, so the card is never an empty frame.
+// landed wears its color instead, so the card is never an empty frame.
 
 import QtQuick
 import Quickshell.Widgets
@@ -202,24 +202,16 @@ ClippingRectangle {
   }
 
   // ── turn by hand ────────────────────────────────────────────────────
+  // picasso's edge tabs (morpheus/EdgeTab), out of the carousel's sides
+  // (user, 2026-10-17: the bare ‹ › were hardly visible)
   Repeater {
     model: hero.apps.length > 1 ? [-1, 1] : []
-    delegate: Text {
+    delegate: EdgeTab {
       required property var modelData
+      edge: modelData < 0 ? "left" : "right"
       anchors.verticalCenter: parent.verticalCenter
-      x: modelData < 0 ? 12 : hero.width - width - 12
-      text: modelData < 0 ? "‹" : "›"
-      color: Zenon.white
-      opacity: 0.55
-      font.family: Zenon.face
-      font.pixelSize: Zenon.px(40)
-      MouseArea {
-        id: arrowMa
-        anchors.fill: parent
-        anchors.margins: -10
-        cursorShape: Qt.PointingHandCursor
-        onClicked: hero.turn(modelData)
-      }
+      x: modelData < 0 ? 0 : hero.width - width
+      onClicked: hero.turn(modelData)
     }
   }
 }

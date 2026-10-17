@@ -95,7 +95,7 @@ FloatingWindow {
   // moves the cursor there first. So this needs no target plumbing at all,
   // only somewhere to put the card.
   //
-  // The row has to be REALISED before the view will hand back its delegate, so
+  // The row has to be REALIZED before the view will hand back its delegate, so
   // the cursor is scrolled into view first and the placing waits a tick — the
   // same shape as positionSel's other callers.
   function openMenuAtCursor() {
@@ -128,7 +128,7 @@ FloatingWindow {
   }
   function setSaveName(n) { chrome.saveField.text = n; root.saveAimed = false; }
 
-  // Zenon.layerBg's colour at Zenon.layerBg's alpha, until the settings panel
+  // Zenon.layerBg's color at Zenon.layerBg's alpha, until the settings panel
   // says otherwise — see winAlpha.
   //
   // NOT PAINTED BY THE WINDOW ANY MORE (2026-10-09): the surface is clear and
@@ -143,7 +143,7 @@ FloatingWindow {
   readonly property real tabAwayAlpha: Zenon.tabAway(root.winAlpha)
   // ── HOW MUCH OF A SCROLLED VIEW SHOWS THROUGH THE BARS, BY MODE ──────
   // Rows of names frost to a quiet texture; a grid of pictures frosts to
-  // bright blocks of colour that shout through the bar (user, 2026-10-10:
+  // bright blocks of color that shout through the bar (user, 2026-10-10:
   // list and columns are right, the grid wants toning down).
   readonly property real frostRows: 0.75
   readonly property real frostGrid: 0.4
@@ -327,7 +327,7 @@ FloatingWindow {
   property string status: ""
   // ── and whether it is bad news ────────────────────────────────────────
   // The status line was drawn in red whatever it said, so "path copied",
-  // "background set" and "3 to copy" arrived in the colour of a failure and
+  // "background set" and "3 to copy" arrived in the color of a failure and
   // taught you to stop reading it. Red now means something went wrong or was
   // refused; everything else is an ordinary note.
   //
@@ -376,7 +376,7 @@ FloatingWindow {
 
   // Only while there is something on screen to be about. On the way out the
   // flag is reset and this deliberately does not follow it, so the chip fades
-  // in the colour it arrived in — see the chip's own note.
+  // in the color it arrived in — see the chip's own note.
   onStatusBadChanged: if (root.status !== "") chrome.statusChip.shownBad = root.statusBad;
 
   // ── watching the directory ──────────────────────────────────────────────
@@ -639,7 +639,7 @@ FloatingWindow {
   // coming back puts it the way you left it.
   //
   // A directory nobody has expressed an opinion about simply keeps whatever
-  // the last one used, which is the old behaviour — so this only ever adds a
+  // the last one used, which is the old behavior — so this only ever adds a
   // memory, never a surprise.
   //
   // Capped, and oldest-first, because this rides along in the preferences file
@@ -848,7 +848,7 @@ FloatingWindow {
   // pinning one pane to a width and giving every new pixel to the other.
   property real paneFrac: 0.5
   // Eased when the divider is SENT somewhere — a keyed step, the double-click
-  // back to even — and never while it is under the pointer. A behaviour left
+  // back to even — and never while it is under the pointer. A behavior left
   // running through a drag puts the split a frame behind the mouse, which
   // reads as the window resisting you rather than as smoothness. Exactly the
   // rule the sidebar's own Behavior follows; see `side`.
@@ -874,7 +874,7 @@ FloatingWindow {
 
   // ── THE DIRECTORY YOU ARE ABOUT TO OPEN ───────────────────
   // Everything above makes the cold path cheaper. This is the admission
-  // that the cold path is the wrong thing to optimise: Finder is not
+  // that the cold path is the wrong thing to optimize: Finder is not
   // quick at decoding, its cache is warm before you look, because the
   // system generated those thumbnails long ago and keeps them decoded.
   //
@@ -952,7 +952,7 @@ FloatingWindow {
   // Splitting a floating window widens it by one pane — each side keeps the
   // width the single pane had, as far as the monitor allows — and
   // unsplitting gives exactly that back, from the right edge — kept on the
-  // monitor, never recentred (see Terminus.splitRoom). Tiled, fullscreen
+  // monitor, never recentered (see Terminus.splitRoom). Tiled, fullscreen
   // or maximized, the layout owns the size and nothing happens: Terminus.splitRoom says so.
   //
   // Hyprland does the resize, because a mapped Quickshell window ignores a
@@ -1032,7 +1032,7 @@ FloatingWindow {
   // NOW THE BODY ITSELF (user, 2026-10-09): the sidebar, the path bar and
   // the column heads wear no shade of their own — hairlines alone divide
   // them. Ground at nought rather than "transparent", so the mix to solid
-  // behind a sheet goes through the theme's ground and not through grey.
+  // behind a sheet goes through the theme's ground and not through gray.
   readonly property color sidebarBg: Zenon.alpha(Zenon.ground, 0)
 
   readonly property real sidebarMin: 130
@@ -1189,7 +1189,7 @@ FloatingWindow {
   // Which directories seen are repositories (a .git in them), path → true:
   // the listings say, alongside their rows (Terminus.reposTail). Not git
   // mode's: always on, a stat per directory, and EntryRow gives such a
-  // directory git's glyph and the guides under it git's colour.
+  // directory git's glyph and the guides under it git's color.
   property var repoDirs: ({})
   // the repository this directory is in, git mode or not ("" when none):
   // the listing says (Terminus.parseRepoTop) — Delphi's entries go by it
@@ -1247,7 +1247,7 @@ FloatingWindow {
   //
   // Both panes drew their bars against usageMax, which is computed from the
   // ACTIVE listing — so walking through one half rescaled every bar in the
-  // other and moved the sand-coloured "biggest here" mark onto a row that is
+  // other and moved the sand-colored "biggest here" mark onto a row that is
   // not the biggest there. A bar is a proportion, and a proportion is only
   // meaningful against the things beside it: each half is measured against
   // what is IN that half.
@@ -1534,7 +1534,7 @@ FloatingWindow {
   //
   // NOT WRITTEN INTO THE COLLECTIONS FILE. Seeding a record into Buck's own
   // data would make it something he can half-delete and something a future
-  // seeding bug can duplicate; synthesised here it simply always exists and
+  // seeding bug can duplicate; synthesized here it simply always exists and
   // always says the same thing. The cost is that its view cannot ride on
   // the record like a real collection's does — see recentsView, which keeps
   // it in the view preferences instead, where view preferences live anyway.
@@ -1911,7 +1911,7 @@ FloatingWindow {
   // not, so the answer is kept.
   //
   // Two halves, and only one of them is derived. `index` is a cache and can
-  // always be rebuilt from disk. `defs` cannot: it is the colour and the
+  // always be rebuilt from disk. `defs` cannot: it is the color and the
   // ORDER a tag was given, which exist nowhere on the filesystem, and a tag
   // that has been made but not yet put on anything exists only here.
   property var tagDefs: []          // [{ name, ink }]
@@ -2019,7 +2019,7 @@ FloatingWindow {
   //   save   type a name for something that does not exist yet
   //
   // A `done` marker is written beside the output file whether the pick was
-  // confirmed or cancelled. Without it the wrapper cannot tell "still
+  // confirmed or canceled. Without it the wrapper cannot tell "still
   // choosing" from "chose nothing", and a cancel would hang the application
   // that asked until the wrapper's patience ran out.
   property var portal: null   // { multiple, directory, save, out }
@@ -2467,7 +2467,7 @@ FloatingWindow {
   //
   // Kept as TEXT rather than as parsed rows, so the seed is byte-identical to
   // what the refresh behind it will return: lastListing is set from the same
-  // string, so the confirming listing recognises itself and returns without
+  // string, so the confirming listing recognizes itself and returns without
   // touching the model at all. Arriving costs a parse instead of a process.
   //
   // Small and short: sixteen directories, nothing over 64KB. This is a way of
@@ -2480,7 +2480,7 @@ FloatingWindow {
   property var previewCache: ({})
   property var previewOrder: []
   // A text preview is rendered in the theme of its moment (render.lua's
-  // colours, baked into the markup), so a new theme empties the cache and
+  // colors, baked into the markup), so a new theme empties the cache and
   // renders the row under the cursor again.
   Connections {
     target: Zenon
@@ -2560,7 +2560,8 @@ FloatingWindow {
     ["act", [["y y", "copy"], ["y t", "copy to"],
              ["x x", "cut"], ["x t", "move to"], ["p", "paste"],
              ["d", "trash"], ["D", "delete for good"],
-             ["a", "create (end in / for a directory)"], ["r", "rename"],
+             ["a", "create (end in / for a directory)"],
+             ["A", "create inside the directory under the cursor"], ["r", "rename"],
              ["c m", "permissions"],
              ["u", "undo trash / move / rename"],
              ["z", "measure directory size"],
@@ -2603,7 +2604,7 @@ FloatingWindow {
               ["type", "filter, or name a new tag"],
               ["alt r", "rename the highlighted tag, in the row"],
               ["del", "remove a tag everywhere"],
-              ["menu", "the seven colours, on the row's own menu"]]],
+              ["menu", "the seven colors, on the row's own menu"]]],
     ["collections", [["c s", "new collection"],
                      ["click", "open one from the sidebar"],
                      ["right click", "edit one from the sidebar"],
@@ -2692,7 +2693,8 @@ FloatingWindow {
       }],
       ["collapse all",      "",        () => root.collapseAll()],
       ["paste",             "p",       () => root.paste()],
-      ["new file or directory", "a",      () => root.beginCreate()],
+      ["new file or directory", "a",      () => root.beginCreate(false)],
+      ["new file or directory inside", "A", () => root.beginCreate(true)],
       ["new directory with selection", "c g", () => root.gatherIntoFolder()],
       ["trash",             "d",       () => root.trash()],
       ["delete for good",   "D",       () => root.deleteForever()],
@@ -2826,7 +2828,7 @@ FloatingWindow {
     // Two kinds of row live in this list and they are different in kind: a
     // verb you can press return on, and a key the window already answers to.
     // Read in group order they were shuffled together, so the half you can
-    // act on was something you found by scanning for the colour.
+    // act on was something you found by scanning for the color.
     //
     // A STABLE PARTITION, not a sort: inside each half the groups keep their
     // order, so the keymap still reads as move, then select, then act — it is
@@ -2972,7 +2974,7 @@ FloatingWindow {
   //
   // THE WHOLE PIPELINE PAUSES, not just its answers. Holding only the settle
   // was the first try and it cost more than it bought: the clearing and the
-  // re-fetching still ran mid-slide, so a peek cancelled by one call and
+  // re-fetching still ran mid-slide, so a peek canceled by one call and
   // re-armed by another could land after the held one was replayed, and the
   // preview of the first row in a directory you had just opened became a coin
   // toss. Nothing is asked for while the columns move, and exactly one
@@ -3141,10 +3143,15 @@ FloatingWindow {
   function inkFor(e) { return listing.inkFor(e); }
 
   function nameInkFor(e) { return listing.nameInkFor(e); }
+  // the glyph's ink as the listing draws it: a repository's is git's magenta
+  // (EntryRow.repoInk), everything else its kind's
+  function glyphInkFor(e) {
+    return e && e.isDir && root.repoDirs[e.path] === true ? Zenon.magenta : root.inkFor(e);
+  }
 
   function nameInkOf(e) { return listing.nameInkOf(e); }
 
-  // Text previews in plato's colours, when plato is part of this shell — see
+  // Text previews in plato's colors, when plato is part of this shell — see
   // previewCommand in terminus.js. Markdown comes out rendered, as plato
   // draws it (headings, tables, boxes; plato's markdown settings apply).
   readonly property string platoRender: Quickshell.shellDir + "/plato/nvim/render.lua"
@@ -3320,7 +3327,7 @@ FloatingWindow {
   // This had two speeds once — a longer one for arriving in a directory, a
   // short one for walking the cursor down it. The long one was covering a pop
   // that came from the column being EMPTIED mid-navigation, and that stopped
-  // happening when syncPreviewRows learnt to leave a hidden column alone. A
+  // happening when syncPreviewRows learned to leave a hidden column alone. A
   // fade tuned to hide a bug should not outlive the bug.
   //
   // Render thread, so a directory heavy enough to be worth easing in is not
@@ -3413,7 +3420,7 @@ FloatingWindow {
 
   // The path to put the cursor on once the next listing arrives. A directory
   // is not in the list yet when you ask to leave it, so the wish is recorded
-  // and the listing honours it.
+  // and the listing honors it.
   property string wantSel: ""
 
   // The raw output the current rows were built from, for the comparison above.
@@ -3570,8 +3577,8 @@ FloatingWindow {
   // The ink the CURRENT path segment is written in. Named because the hint
   // bars use it too: a bind's description and the directory you are standing in
   // are both "the thing this window is about right now", and they were two
-  // hard-coded greys that happened to differ.
-  readonly property color crumbInk: Zenon.accentKey   // the chrome greys in the accent (user, 2026-10-15)
+  // hard-coded grays that happened to differ.
+  readonly property color crumbInk: Zenon.accentKey   // the chrome grays in the accent (user, 2026-10-15)
 
   // ── the mouse, as a glyph ─────────────────────────────────────────────
   // "middle click" is three syllables of hint sitting next to a two-word
@@ -3604,7 +3611,7 @@ FloatingWindow {
   // neither grows past that however wide the window is. A fraction of the
   // row cannot be right for either at more than one size — MODIFIED's 0.24
   // was 96px at the narrowest listing that shows metadata at all, and over
-  // 400 in a maximised window, three quarters of it empty.
+  // 400 in a maximized window, three quarters of it empty.
   //
   // SIZE IS NOT ONE OF THEM, and that is deliberate rather than an
   // oversight. The number is short but the column also carries the usage
@@ -3659,7 +3666,7 @@ FloatingWindow {
   // which is why the first stroke down the bar also picked the file up and
   // started carrying it. preventStealing holds off the Flickable but says
   // nothing to a handler. Arming on HOVER rather than on the drag closes the
-  // window entirely: by the time a drag is recognised the grab is long gone.
+  // window entirely: by the time a drag is recognized the grab is long gone.
   property bool railHover: false
 
   // How far one notch of the wheel moves the list. Rows are root.rowH tall, so
@@ -3710,11 +3717,11 @@ FloatingWindow {
   // job on its own, since there is no blur left to share it.
   // NOT DARKENED EITHER now (user, 2026-10-10): the card's glass and
   // shadow set it apart, and the window behind stays as it was. Kept as a
-  // colour, clear, so every overlay that wears it still catches its clicks.
+  // color, clear, so every overlay that wears it still catches its clicks.
   readonly property color cardScrim: Zenon.alpha(Zenon.ground, 0)
 
   // ── WHAT THE OPEN SHEET IS ABOUT, SAID ON THE BAR ──────────────────────
-  // Every one of these cards opened with a coloured caption band across its
+  // Every one of these cards opened with a colored caption band across its
   // own top — the same idea the send picker had before its header moved to
   // the chrome. A sheet hangs FROM the bar, so the bar is where it says what
   // it is: the band comes off the card, the breadcrumb steps aside, and the
@@ -3736,8 +3743,11 @@ FloatingWindow {
     // with" — on the reasoning that the choice outlives this one file, and
     // what that actually put on the bar was a string with a slash in it where
     // a filename was expected.
+    // asked as the question it is (user, 2026-10-17)
+    // the verb and "with…" are the bar's words around it (sheetLead,
+    // sheetTail), as copy and move's are
     if (appPick.open)
-      return appPick.paths.length > 1 ? "(multiple files)"
+      return appPick.paths.length > 1 ? appPick.paths.length + " files"
         : Terminus.basename(appPick.path);
     // The one sheet that is about the WINDOW rather than about a file, so it
     // is the one whose title is a word.
@@ -3777,7 +3787,7 @@ FloatingWindow {
     if (confirm.open)
       return confirm.choices.length > 0 ? confirm.verbGlyph(confirm.choices[0].label) : "";
     // The question's own mark — see confirm.verbGlyph, which keys it off the
-    // same word verbInk keys the colour off.
+    // same word verbInk keys the color off.
     // The file's own glyph when there is one file. The generic mark is for
     // the case that has no file to show — several of them at once.
     if (appPick.open)
@@ -3789,7 +3799,7 @@ FloatingWindow {
     // the card does instead.
     if (bulk.open) return "\uEC61";
     // The mark itself, the one the listing and the sidebar put beside a
-    // bookmarked row — so the sheet is labelled with the thing it holds.
+    // bookmarked row — so the sheet is labeled with the thing it holds.
     if (marks.open) return "\uF02E";
     // nf-fa-tag, the same mark the sidebar will list them under
     if (tagPick.open) return "\uF02B";
@@ -3814,6 +3824,11 @@ FloatingWindow {
   readonly property color sheetGlyphInk:
     confirm.open ? (confirm.choices.length > 0 ? confirm.choices[0].ink : Zenon.sand)
     : bulk.open ? root.crumbInk
+    // A FILE'S GLYPH WEARS THE GLYPH'S INK, its name the name's — as its row
+    // does (user, 2026-10-17: the info and open-with headers wore one ink
+    // for both, and a repository lost its magenta)
+    : (appPick.open && appPick.icon !== "") ? appPick.iconInk
+    : (props.open && !props.many && props.rows[0]) ? root.glyphInkFor(props.rows[0])
     // The tag under the cursor, on the mark only — see sheetTitleInk.
     : (tagPick.open && tagPick.chosen() !== "") ? root.tagInk(tagPick.chosen())
     : root.sheetTitleInk
@@ -3826,26 +3841,26 @@ FloatingWindow {
   // was titling everything cyan, which made a card about a tarball look like
   // a card about a directory.
   //
-  // Only where there IS one row. Several at once have no colour of their own
+  // Only where there IS one row. Several at once have no color of their own
   // — the title says "6 items", which is not a file and is not inked like one.
   //
   // The confirm card is the exception it always was: its band wore the
-  // PRIMARY choice's colour so the card read as dangerous exactly when what
+  // PRIMARY choice's color so the card read as dangerous exactly when what
   // it offered was, and that survives the move to the bar.
   readonly property color sheetTitleInk: {
-    // The question in white with its mark in the verb's colour, as the
+    // The question in white with its mark in the verb's color, as the
     // card wrote it: the mark carries the danger, the words are the words.
     if (confirm.open) return Zenon.white;
     if (diskTool.open) return diskTool.mode === "format" ? Zenon.red : Zenon.cyan;
-    if (appPick.open && appPick.icon !== "") return appPick.iconInk;
+    if (appPick.open && appPick.icon !== "") return appPick.nameInk;
     if (props.open && !props.many && props.rows[0])
       return root.nameInkFor(props.rows[0]);
     // SAND, which is what a bookmark is inked everywhere else in this window:
     // the ribbon on a listing row, the one in the sidebar, the one in the go
     // sheet. Cyan is the ink of a place you are going; this card is about the
-    // marks themselves, so it wears their colour.
+    // marks themselves, so it wears their color.
     if (marks.open) return Zenon.sand;
-    // The colour of the tag the cursor is on goes on the MARK, so the bar's
+    // The color of the tag the cursor is on goes on the MARK, so the bar's
     // tag IS the tag being chosen — and the words stay white, the way the
     // confirmation writes its question: "Tag 1 item" is not a tag, and in
     // red it read as a warning.
@@ -3855,7 +3870,7 @@ FloatingWindow {
 
   // ── NOTHING HANGS FROM THE BAR ANY MORE ─────────────────────────────────
   // The sheets float (see Sheet.floating), so the bar keeps its hairline
-  // whole, its own colour and its crumbs: a sheet no longer touches it and
+  // whole, its own color and its crumbs: a sheet no longer touches it and
   // carries its title on its own card. The splice the bar's edge used to
   // open for a sheet, and the tally of which sheet was "on" it, went with it.
 
@@ -3909,15 +3924,18 @@ FloatingWindow {
   // same veil. (`glassInk` is how much of it is in: all, now.)
   readonly property real glassInk: 1
   readonly property real glassVeil: 0.6
+  // THE CURSOR'S FILL, one tint for the sidebar and the listings (user,
+  // 2026-10-17: the lists' gray bar did not match the sidebar's)
+  readonly property color hiFill: Zenon.alpha(Zenon.cyan, 0.12)
   function edgeStrength(base) { return base * (1 - Math.max(root.sheetInk, root.glassInk)); }
   // The card's frost starts full at the seam (Sheet.seamFrost): above the
   // seam is stripFrost, the same glass, whenever a sheet is up at all.
   readonly property real sheetSeam: 1
 
   // ── THE BAND A SHEET HANGS FROM ────────────────────────────────────────
-  // Every strip of chrome above an open sheet goes the sheet's own colour, so
+  // Every strip of chrome above an open sheet goes the sheet's own color, so
   // the header and the card read as one piece with a seam in it rather than
-  // as a black card under a grey bar. Tinted rather than switched, off the
+  // as a black card under a gray bar. Tinted rather than switched, off the
   // sheet's arrival, so it darkens at exactly the rate the sheet does — and
   // at full strength the tint is opaque black, which is what Zenon.black is
   // and therefore what the card is.
@@ -3927,13 +3945,13 @@ FloatingWindow {
   //
   // THE SIDEBAR'S GROUND, now that the two sit side by side across the top
   // of the window: a bar in headBg beside a sidebar in sidebarBg was two
-  // greys meeting at the seam. sidebarBg is black at a quarter, so going
+  // grays meeting at the seam. sidebarBg is black at a quarter, so going
   // solid behind a sheet is that same black rising to full.
   // ── THE BAR IS THE SHEET'S TITLEBAR (2026-10-05) ────────────────────
   // Every sheet hangs from the path bar again with no header of its own,
   // and the bar BECOMES its header: the toggles, the crumbs, the filter and
   // the counts all stand down (crumbBar.chromeInk) and the sheet's name
-  // stands in their place, centred over the card — so with the sidebar out
+  // stands in their place, centered over the card — so with the sidebar out
   // or in, the title sits over what it names.
   //
   // LATCHED, as Sheet latches its own: sheetTitle empties the moment the
@@ -3942,6 +3960,13 @@ FloatingWindow {
   // confirmation, whose question is its card) does not wear the last one's —
   // and whenever a name arrives while one is up.
   property string barTitle: ""
+  // ── A SHEET THAT ASKS A QUESTION SAYS IT AS A SENTENCE (user, 2026-10-17)
+  // "Open <glyph> name with…", the way copy and move read "Copy <glyph>
+  // name to…": the words either side of the subject, muted, on the bar.
+  readonly property string sheetLead: appPick.open ? "Open" : ""
+  readonly property string sheetTail: appPick.open ? "with\u2026" : ""
+  property string barLead: ""
+  property string barTail: ""
   property string barGlyph: ""
   property color barTitleInk: Zenon.cyan
   property color barGlyphInk: Zenon.cyan
@@ -3953,7 +3978,7 @@ FloatingWindow {
   onSheetGlyphChanged: if (root.sheetTitle !== "") root.latchBar()
   onSheetTitleInkChanged: if (root.sheetTitle !== "") root.latchBar()
   // ITS OWN HANDLER. Latching only on the title's change read the glyph's
-  // ink before that binding had caught up, so the mark kept the colour of
+  // ink before that binding had caught up, so the mark kept the color of
   // the tag the cursor had just LEFT — or cyan, from when the sheet opened.
   onSheetGlyphInkChanged: if (root.sheetTitle !== "") root.latchBar()
   Connections {
@@ -3965,12 +3990,12 @@ FloatingWindow {
   // title strip while a sheet is up, the card and the active tab are all the
   // one glass — the window's ground at the window's alpha.
   readonly property color chromeBg: root.sidebarBg
-  // ── THE TAB STRIP KEEPS PLATO'S GREY ────────────────────────────────
+  // ── THE TAB STRIP KEEPS PLATO'S GRAY ────────────────────────────────
   // The strip wore chromeBg with the bar, and the tabs say which is which by
   // shading the inactive ones back over it — over black at a quarter that
   // shade is black on black, and every tab looked the same. So the strip is
   // headBg, as plato's is (plato/editor/TabBar.qml): the active tab is that
-  // grey showing through, the others darker. Untouched by a sheet (user,
+  // gray showing through, the others darker. Untouched by a sheet (user,
   // 2026-10-11): only the toolbar goes dark with one, never the tabs.
   readonly property color tabBg: Zenon.tabHere
 
@@ -4131,7 +4156,7 @@ FloatingWindow {
   // first is the file manager inventing a dependency that does not exist.
   //
   // So: one Process PER JOB, created when the job starts and destroyed when it
-  // exits. Nothing is serialised.
+  // exits. Nothing is serialized.
   //
   // THE RACE IS REAL AND IT IS NARROW. Two jobs landing in the same directory
   // can each be told a name is free, because the conflict scan that answered
@@ -4237,6 +4262,22 @@ FloatingWindow {
   // The sort strip over a single-pane list. Twenty-two pixels, and sorting is
   // reachable from this panel and from the `,` keys either way.
   property bool colHeadsOn: true
+
+  // ── WHICH BUTTONS THE BAR CARRIES (user, 2026-10-17) ────────────────
+  // Each one is a key and a menu row as well, so any can be put away from
+  // the settings. The hamburger stays: it is the way to the settings.
+  property bool barNav: true          // back and forward
+  property bool barSideToggle: true   // the sidebar's switch
+  property bool barSort: true
+  property bool barViews: true        // columns / list / grid
+  property bool barSplit: true
+  property bool barZoom: true         // the zoom meter
+
+  // ── THE VIEW A DIRECTORY GETS WHEN IT HAS NONE OF ITS OWN ─────────────
+  // "" keeps the old rule (whatever the last directory used); otherwise
+  // one of the ring, and "Reset views" in the settings puts every
+  // directory back to it (user, 2026-10-17).
+  property string defaultView: ""
 
   function trash() { return clipboard.trash(); }
   function askTrash(rows) { return clipboard.askTrash(rows); }
@@ -4356,11 +4397,11 @@ FloatingWindow {
       props.rows = [Object.assign({}, r, { name: name, path: Terminus.joinPath(Terminus.dirname(r.path), name) })];
   }
 
-  // `cancelled` is Escape rather than Return, and for something that was
+  // `canceled` is Escape rather than Return, and for something that was
   // created a moment ago that means "I did not want this after all" — so it
   // goes away again. Anything older is left exactly as it was.
   // ── WHETHER THE FRESH THING IS EMPTY ────────────────────────────────
-  // Cancelling the name of something just created UNDOES the creation, and
+  // Canceling the name of something just created UNDOES the creation, and
   // for a directory that is a recursive delete. That is exactly right for
   // `a`, which makes an empty directory and nothing else — and catastrophic
   // for the gather verb, whose directory arrives with the selection already
@@ -4765,7 +4806,7 @@ FloatingWindow {
   //
   // ── AND THEY EXPIRE ───────────────────────────────────────────────
   // Presence in a listing was the only thing that ever released a name,
-  // and plenty of creates never produce one: cancelled with Escape,
+  // and plenty of creates never produce one: canceled with Escape,
   // renamed into something else on the spot, or removed by something
   // outside this window. Each of those left its name reserved for the
   // rest of the session, so a directory worked in for a few minutes started
@@ -4786,10 +4827,10 @@ FloatingWindow {
 
   function rowsIn(dir) { return creating.rowsIn(dir); }
 
-  function beginCreate() { return creating.beginCreate(); }
-  function beginMkdir() { return creating.beginMkdir(); }
+  function beginCreate(inside) { return creating.beginCreate(inside); }
+  function beginMkdir(inside) { return creating.beginMkdir(inside); }
 
-  function startCreate(kind) { return creating.startCreate(kind); }
+  function startCreate(kind, inside) { return creating.startCreate(kind, inside); }
 
   // A create waiting for the directory it is aimed at to be read.
   // { kind, dir, cwd }, or null. Never survives its own landing: the kid
@@ -4870,7 +4911,9 @@ FloatingWindow {
 
   // Tight. One line of type, so 40 was leaving a band of air under the text
   // once the separator at the bottom was counted as part of the bar.
-  readonly property int headH: 34
+  // 42 again (user, 2026-10-17): taller bar, with room for the back and
+  // forward buttons and for the info sheet's rename ring.
+  readonly property int headH: 42
 
   // ── THE WARM ITSELF ─────────────────────────────────
   // Nothing is drawn here. Each Image exists to make Qt decode a file
@@ -4980,7 +5023,7 @@ FloatingWindow {
         ["/", "root",      () => root.goTo("/")],
         // THE SAME SHEET THAT SENDS, ASKED TO GO INSTEAD. Picking a place
         // out of a tree you can filter is the same act whether something is
-        // travelling with you or not, and it was already built — so this is
+        // traveling with you or not, and it was already built — so this is
         // the picker with its destination handed to goTo rather than to
         // paste, not a second picker that happens to look like it.
         [" ", "go to", () => sendTo.ask("go")]
@@ -5543,7 +5586,8 @@ FloatingWindow {
       case "d":  event.accepted = true; root.trash(); break;
       case "D":  event.accepted = true; root.deleteForever(); break;
       case "M":  event.accepted = true; disks.ask(); break;
-      case "a":  event.accepted = true; root.beginCreate(); break;
+      case "a":  event.accepted = true; root.beginCreate(false); break;
+      case "A":  event.accepted = true; root.beginCreate(true); break;
       // ONE KEY, and it does what the selection says. `r` on a row opens that
       // row's name; `r` on nine rows opens the card that renames nine. Having
       // it mean "rename the row under the cursor" while nine were ticked was
@@ -5604,7 +5648,7 @@ FloatingWindow {
       }
     }
 
-    // ── THE GROUND, less the tab strip (see the window's colour) ──────
+    // ── THE GROUND, less the tab strip (see the window's color) ──────
     // The sidebar's is an inactive tab's thinner glass (user, 2026-10-10;
     // plato's tree and alexandria's sidebar wear it too).
     Rectangle {
@@ -6116,16 +6160,16 @@ FloatingWindow {
       readonly property var entries:
         content.pending === "" ? [] : (content.sequences[content.pending] || [])
 
-      // ── laid out by hand, so it can WRAP AND STILL BE CENTRED ────────
+      // ── laid out by hand, so it can WRAP AND STILL BE CENTERED ────────
       //
       // This was a single Row that clipped at both ends when the set was wider
       // than the window — the reasoning being that a Flow can wrap but cannot
-      // centre the lines it wraps, so a narrow window would trade a clipped
+      // center the lines it wraps, so a narrow window would trade a clipped
       // strip for a ragged block. Both halves of that are true, and clipping
       // is still the worse of the two: a hint you cannot see is not a hint.
       //
       // So the break points are worked out here rather than left to a Flow,
-      // and each line is its own centred Row. FontMetrics measures the same
+      // and each line is its own centered Row. FontMetrics measures the same
       // two fonts the delegates draw with, so the widths it adds up are the
       // widths that get drawn — the chip's padding is the one constant that
       // has to agree with KeyCap (morpheus), and it is written down in both places.
@@ -6503,7 +6547,7 @@ FloatingWindow {
       property var choices: []
 
       // Red is reserved for what cannot be undone. Trash is recoverable, so it
-      // is a warning colour and not an alarm.
+      // is a warning color and not an alarm.
       function verbInk(verb) {
         if (verb === "Delete" || verb === "Format") return Zenon.red;
         if (verb === "Trash") return Zenon.yellow;
@@ -6976,13 +7020,15 @@ FloatingWindow {
       // glyph, and the title says so.
       property string icon: ""
       property color iconInk: Zenon.white
+      property color nameInk: Zenon.white
 
       function ask(paths, openFiles) {
         const list = (paths && paths.length !== undefined)
           ? paths : [String(paths || "")];
         const lead = list.length === 1 ? root.rowFor(list[0]) : null;
         appPick.icon = lead && lead.glyph !== undefined ? lead.glyph : "";
-        appPick.iconInk = lead ? root.inkFor(lead) : Zenon.white;
+        appPick.iconInk = lead ? root.glyphInkFor(lead) : Zenon.white;
+        appPick.nameInk = lead ? root.nameInkFor(lead) : Zenon.white;
         appPicker.ask(list, openFiles);
       }
 

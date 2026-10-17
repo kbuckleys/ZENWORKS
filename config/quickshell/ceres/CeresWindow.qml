@@ -116,7 +116,7 @@ FloatingWindow {
     win.typing = t === "packages";
     if (t === "packages" && win.found.length === 0) win.search();
     if (t === "store" && !storeView.loaded) storeView.load();
-    // the Store's catalogue too: a Flatpak since removed is named from it
+    // the Store's catalog too: a Flatpak since removed is named from it
     if (t === "history") { win.loadHistory(); if (!storeView.loaded) storeView.load(); }
     if (t === "maintenance") {
       win.loadMaint();
@@ -164,6 +164,9 @@ FloatingWindow {
   readonly property bool settleUp: txView.settling && Ceres.txState === "failed"
     && !win.settleAside && !win.authUp
   readonly property bool msgUp: win.quietJob && !win.authUp && !win.settleUp
+  // the frost under the head and foot — terminus' strip (see the edges)
+  readonly property int frostBlur: 64
+  readonly property real frostVeil: 0.6
   // how far in the sheets are, for the stage's blur
   readonly property real sheetInk: Math.max(passSheet.cardInk, msgSheet.cardInk,
                                             confirmSheet.cardInk, confSheet.cardInk, fpSheet.cardInk, fpGetSheet.cardInk,
@@ -171,7 +174,7 @@ FloatingWindow {
   // ONE SHEET AT A TIME. Go ahead on the confirm asks for the password, and
   // the password's sheet came up BEHIND the confirm's — the prompt was there
   // and could not be seen until the confirm was dismissed. The confirm steps
-  // aside while the password is asked for, and comes back if it is cancelled.
+  // aside while the password is asked for, and comes back if it is canceled.
   readonly property bool confirmUp: win.face === "confirm" && !win.authUp
   // WHAT THE PAGE IS, under whatever sheet is over it. The confirm is a
   // sheet, so the page beneath it is the one it came from — the list, still
@@ -316,6 +319,11 @@ FloatingWindow {
   function present(view) {
     win.visible = true;
     win.showTab(win.tabs.some(x => x[0] === view) ? view : win.tab);
+    // asked for with a query (Ceres.searchPackages)
+    if (view === "packages" && Ceres.askedQuery !== "") {
+      win.sharedQuery = Ceres.askedQuery;
+      Ceres.askedQuery = "";
+    }
   }
 
   // ── CLOSED BY THE COMPOSITOR ──────────────────────────────────────────
@@ -400,7 +408,7 @@ FloatingWindow {
   }
 
   // ctrl+a: every row on screen marked, or — when they all are already —
-  // none of them. What is on screen, not the whole catalogue: a search for
+  // none of them. What is on screen, not the whole catalog: a search for
   // "gst" and ctrl+a means those, and nothing else.
   function markAll() {
     const all = win.rows.every(r => !!win.marks[r.name]);
@@ -416,6 +424,42 @@ FloatingWindow {
     win.umarks = m;
   }
 
+  // ── CTRL AND SHIFT CLICKS (user, 2026-10-17) ────────────────────────────
+  // ctrl+click marks or unmarks one row, as a right click does; shift+click
+  // marks every row from the last one clicked to this one, as a file
+  // manager selects. The anchor is the last row clicked either way.
+  property int anchor: -1
+  property int uanchor: -1
+  function markRange(from, to) {
+    const a = Math.min(from, to), b = Math.max(from, to);
+    const m = Object.assign({}, win.marks);
+    for (let i = Math.max(0, a); i <= b && i < win.rows.length; ++i) m[win.rows[i].name] = win.rows[i];
+    win.marks = m;
+  }
+  function markUpdateRange(from, to) {
+    const a = Math.min(from, to), b = Math.max(from, to);
+    const m = Object.assign({}, win.umarks);
+    for (let i = Math.max(0, a); i <= b && i < win.updateRows.length; ++i) {
+      const r = win.updateRows[i];
+      if (!r.head && !r.flatpak) m[r.u.name] = r;
+    }
+    win.umarks = m;
+  }
+  function rowClick(i, mods) {
+    if (mods & Qt.ShiftModifier) win.markRange(win.anchor >= 0 ? win.anchor : win.sel, i);
+    else if (mods & Qt.ControlModifier) win.toggleMark(win.rows[i]);
+    if (!(mods & Qt.ShiftModifier)) win.anchor = i;
+    win.sel = i;
+    keys.forceActiveFocus();
+  }
+  function updateClick(i, mods) {
+    if (mods & Qt.ShiftModifier) win.markUpdateRange(win.uanchor >= 0 ? win.uanchor : win.usel, i);
+    else if (mods & Qt.ControlModifier) win.toggleUmark(win.updateRows[i]);
+    if (!(mods & Qt.ShiftModifier)) win.uanchor = i;
+    win.usel = i;
+    keys.forceActiveFocus();
+  }
+
   function toggleMark(r) {
     if (!r) return;
     const m = Object.assign({}, win.marks);
@@ -425,8 +469,9 @@ FloatingWindow {
   }
 
   // ── Updates: the pending list, with headings ────────────────────────────
-  // typed in the Updates tab; narrows the list by name, as the other tabs do
-  readonly property string uquery: win.sharedQuery
+  // Updates has no search (user, 2026-10-17: the shared query, typed in
+  // another tab, hid the one update under a count of 1)
+  readonly property string uquery: ""
   onUqueryChanged: { win.usel = 1; while (win.updateRows[win.usel] && win.updateRows[win.usel].head) win.usel++; }
   readonly property var updateRows: {
     const out = [];
@@ -464,7 +509,7 @@ FloatingWindow {
   property bool typing: false
   // the Store's search — see StoreView.query
   readonly property string squery: win.sharedQuery
-  readonly property bool filters: win.tab !== "maintenance" && win.tab !== "settings"
+  readonly property bool filters: win.tab !== "maintenance" && win.tab !== "settings" && win.tab !== "updates"
   readonly property string filterText:
     win.tab === "packages" ? win.query : win.tab === "history" ? win.hquery
     : win.tab === "updates" ? win.uquery : win.tab === "store" ? win.squery : ""
@@ -658,6 +703,55 @@ FloatingWindow {
       font.family: Zenon.face
       font.weight: Zenon.weight
       font.pixelSize: Zenon.px(13)
+    }
+  }
+
+  // ── WHAT IS MARKED, NAMED (user, 2026-10-17) ────────────────────────
+  // The head's +N / −N, rested on: the packages behind it, in the same
+  // inks — green in, red out, yellow for updates (with old → new) — in
+  // terminus' Bubble, as the rows' own peek.
+  readonly property int markShowMost: 16
+  readonly property var markLines: {
+    const out = [];
+    const ink = (c) => Zenon.hex(c);
+    if (win.tab === "updates") {
+      for (const n of Object.keys(win.umarks).sort()) {
+        const u = win.umarks[n].u;
+        out.push("<font color='" + ink(Zenon.yellow) + "'>\uF062</font>  " + Cer.esc(n)
+          + (u.from || u.to ? "  <font color='" + Ceres.ink.muted + "'>" + Cer.esc(u.from || "")
+            + " \u2192 " + Cer.esc(u.to || "") + "</font>" : ""));
+      }
+    } else {
+      const names = Object.keys(win.marks).sort();
+      // what goes in first, then what comes out
+      for (const pass of [false, true])
+        for (const n of names) {
+          const r = win.marks[n];
+          if (!!r.installed !== pass) continue;
+          out.push(pass ? "<font color='" + ink(Zenon.red) + "'>\u2212</font>  " + Cer.esc(n)
+                        : "<font color='" + ink(Zenon.green) + "'>+</font>  " + Cer.esc(n));
+        }
+    }
+    return out;
+  }
+  Term.Bubble {
+    id: markBubble
+    window: win
+    target: markTally
+    shown: markHov.hovered && markTally.visible && win.markLines.length > 0 && win.face === "browse"
+    cardWidth: 360
+    Text {
+      width: 332
+      textFormat: Text.StyledText
+      wrapMode: Text.Wrap
+      lineHeight: 1.15
+      text: win.markLines.slice(0, win.markShowMost).join("<br>")
+        + (win.markLines.length > win.markShowMost
+          ? "<br><font color='" + Ceres.ink.muted + "'>and " + (win.markLines.length - win.markShowMost) + " more</font>" : "")
+      color: Zenon.ink
+      font.family: Zenon.face
+      font.weight: Zenon.weight
+      font.pixelSize: Zenon.px(15)
     }
   }
 
@@ -971,7 +1065,7 @@ FloatingWindow {
 
   // headings and events in one model; typing narrows it to one package
   // A FLATPAK GONE has no name of its own any more (flatpak names only
-  // what is installed): the Store's catalogue knows it, once it has loaded
+  // what is installed): the Store's catalog knows it, once it has loaded
   readonly property var fpNames: {
     const m = {};
     for (const a of storeView.apps) {
@@ -1303,7 +1397,7 @@ FloatingWindow {
     const h = win.mirrors;
     if (!h) return [];
     // Each server's health as a dot — green in sync, yellow a few hours
-    // behind, red behind or not syncing, grey unknown to Arch — and only its
+    // behind, red behind or not syncing, gray unknown to Arch — and only its
     // age beside it: a column of "synced 1h ago" said "synced" a hundred times.
     return [{ head: true, name: "Your list, in the order pacman tries it" }].concat(h.servers.map((v, i) => {
       const s = v.status;
@@ -1776,6 +1870,22 @@ FloatingWindow {
         event.accepted = storeView.key(event) || win.filterKey(event);
         return;
       }
+      // shift+↑↓ marks as it goes, from where it started — shift+click's
+      // range, by keys
+      if ((event.modifiers & Qt.ShiftModifier) && (k === Qt.Key_Down || k === Qt.Key_Up)
+          && (win.tab === "packages" || win.tab === "updates")) {
+        event.accepted = true;
+        const pk = win.tab === "packages";
+        if ((pk ? win.anchor : win.uanchor) < 0) {
+          if (pk) win.anchor = win.sel; else win.uanchor = win.usel;
+        }
+        win.move(k === Qt.Key_Down ? 1 : -1);
+        if (pk) win.markRange(win.anchor >= 0 ? win.anchor : win.sel, win.sel);
+        else win.markUpdateRange(win.uanchor >= 0 ? win.uanchor : win.usel, win.usel);
+        return;
+      }
+      // a plain move drops the range's start: the next shift+↑↓ starts here
+      if (k === Qt.Key_Down || k === Qt.Key_Up || k === Qt.Key_PageDown || k === Qt.Key_PageUp) { win.anchor = -1; win.uanchor = -1; }
       if (k === Qt.Key_Down || (ctrl && k === Qt.Key_J)) { event.accepted = true; win.move(1); return; }
       if (k === Qt.Key_Up || (ctrl && k === Qt.Key_K)) { event.accepted = true; win.move(-1); return; }
       if (k === Qt.Key_PageDown) { event.accepted = true; win.move(12); return; }
@@ -1810,12 +1920,12 @@ FloatingWindow {
       }
       if (win.tab === "updates") {
         if (ctrl && k === Qt.Key_R) { event.accepted = true; Ceres.check(); }
-        else if (k === Qt.Key_Tab || (k === Qt.Key_Space && (!win.typing || (event.modifiers & Qt.ShiftModifier)))) {
+        else if (k === Qt.Key_Tab || k === Qt.Key_Space) {
           event.accepted = true;
           win.toggleUmark(win.updateRows[win.usel]);
           win.move(1);
         }
-        else if (!win.typing && (k === Qt.Key_J || k === Qt.Key_K)) { event.accepted = true; win.move(k === Qt.Key_J ? 1 : -1); }
+        else if (k === Qt.Key_J || k === Qt.Key_K) { event.accepted = true; win.move(k === Qt.Key_J ? 1 : -1); }
         else if (ctrl && k === Qt.Key_D) { event.accepted = true; win.umarks = ({}); }
         else if (ctrl && k === Qt.Key_A) { event.accepted = true; win.markAllUpdates(); }
         else if ((k === Qt.Key_Return || k === Qt.Key_Enter) && Ceres.total > 0) {
@@ -1823,7 +1933,7 @@ FloatingWindow {
           if (ctrl) Ceres.updateAll();
           else win.confirmUpdate();
         }
-        else event.accepted = win.filterKey(event);
+        else event.accepted = false;
         return;
       }
       // packages: typing is searching
@@ -1903,6 +2013,13 @@ FloatingWindow {
         required property var modelData
         view: modelData
         follow: true
+        // TERMINUS' GLASS (user, 2026-10-17): its strip frosts the rows
+        // whole — no fade, the card's 64 kernel, a 0.6 veil (stripFrost,
+        // glassVeil). Same numbers here, through the same ScrollEdge.
+        fade: false
+        strength: 1
+        blurMax: win.frostBlur
+        scrim: win.frostVeil
         // the notes strip, when it is up, is the chrome's lowest bar. Over
         // Packages there is no bar to name: the rows frost from the column
         // headings' hairline all the way up through the head, one material,
@@ -1922,6 +2039,10 @@ FloatingWindow {
         view: modelData
         below: true
         follow: true
+        fade: false
+        strength: 1
+        blurMax: win.frostBlur
+        scrim: win.frostVeil
         bar: foot
         // the .pacnew list stops short, over its diff — the same summary
         // rule as above, turned over: what follows it is not a gap
@@ -1954,6 +2075,10 @@ FloatingWindow {
         textSize: Zenon.px(16)
         ink: Zenon.accentKey
         options: win.tabs
+        // a restart or reboot still owed after an update: Updates wears the
+        // note's own ink (user, 2026-10-17) — NoteBar.inkOf
+        inks: Ceres.noteItems.some(n => n.level === "bad") ? { updates: Zenon.red }
+          : Ceres.noteItems.some(n => n.level === "warn") ? { updates: Zenon.yellow } : ({})
         current: win.tab
         onChose: (v) => win.showTab(v)
       }
@@ -1973,9 +2098,12 @@ FloatingWindow {
         // WHAT IS MARKED, up here with the filter it was chosen through. It
         // lived in the key strip and ran into the keys whenever both were long.
         Text {
+          id: markTally
           anchors.verticalCenter: parent.verticalCenter
           visible: (win.tab === "packages" && win.markCount > 0)
                 || (win.tab === "updates" && win.umarkCount > 0)
+          // resting on it: the marked packages, by name (markBubble)
+          HoverHandler { id: markHov }
           textFormat: Text.StyledText
           // +N and −N, in the colors the confirm sheet gives the same two
           // sides — a sign and a color say "install" and "remove" faster
@@ -2099,7 +2227,7 @@ FloatingWindow {
             height: 32
             radius: Zenon.windowRadius
             // PRESSED, DARKENED as terminus' ClearChip is (user, 2026-10-15)
-            color: onlyTap.pressed ? Zenon.darken(0.35)
+            color: onlyTap.pressed ? Zenon.pressFill
                  : win.installedOnly ? Zenon.alpha(Zenon.cyan, 0.2)
                  : onlyHov.hovered ? Zenon.wash(0.08) : Zenon.wash(0.05)
             border.width: 1
@@ -2108,7 +2236,7 @@ FloatingWindow {
               anchors.centerIn: parent
               text: "\uF0C7"
               color: win.installedOnly ? Zenon.cyan : onlyHov.hovered ? Zenon.white : Zenon.accentKey
-              opacity: onlyTap.pressed ? 0.55 : 1
+              opacity: onlyTap.pressed ? Zenon.pressDim : 1
               font.family: Zenon.face
               font.weight: Zenon.weight
               font.pixelSize: Zenon.px(16)
@@ -2130,7 +2258,7 @@ FloatingWindow {
             width: 32
             height: 32
             radius: Zenon.windowRadius
-            color: refreshTap.pressed ? Zenon.darken(0.35)
+            color: refreshTap.pressed ? Zenon.pressFill
                  : Ceres.checking ? Zenon.alpha(Zenon.cyan, 0.2)
                  : refreshHov.hovered ? Zenon.wash(0.08) : Zenon.wash(0.05)
             border.width: 1
@@ -2140,7 +2268,7 @@ FloatingWindow {
               anchors.centerIn: parent
               text: "\uF021"
               color: Ceres.checking ? Zenon.cyan : refreshHov.hovered ? Zenon.white : Zenon.accentKey
-              opacity: refreshTap.pressed ? 0.55 : 1
+              opacity: refreshTap.pressed ? Zenon.pressDim : 1
               font.family: Zenon.face
               font.weight: Zenon.weight
               font.pixelSize: Zenon.px(16)
@@ -2551,7 +2679,7 @@ FloatingWindow {
                 border.width: mrow.index === win.msel ? 1 : 0
                 border.color: Zenon.border
                 // every item says how it stands, not only the ones that want
-                // something: green, yellow, red — and grey until it is known
+                // something: green, yellow, red — and gray until it is known
                 readonly property string level: win.maintLevel(mrow.modelData.key)
                 Rectangle {
                   anchors.left: parent.left
@@ -3114,12 +3242,15 @@ FloatingWindow {
                 radius: Zenon.windowRadius
                 // the tint says what the mark will DO — green in, red out — the
                 // same inks as the + and − and the count in the head
+                // THE CURSOR ON A MARKED ROW (user, 2026-10-17: hard to see):
+                // terminus' rule — the fill deepens and a cyan outline says
+                // "you are here", whatever the mark (EntryRow.cursorOnly)
                 color: prow.mark ? (prow.modelData.installed
-                    ? Qt.rgba(Zenon.red.r, Zenon.red.g, Zenon.red.b, 0.12)
-                    : Qt.rgba(Zenon.green.r, Zenon.green.g, Zenon.green.b, 0.10))
+                    ? Qt.rgba(Zenon.red.r, Zenon.red.g, Zenon.red.b, prow.here ? 0.24 : 0.12)
+                    : Qt.rgba(Zenon.green.r, Zenon.green.g, Zenon.green.b, prow.here ? 0.22 : 0.10))
                   : prow.here ? Zenon.headBg : "transparent"
                 border.width: prow.here ? 1 : 0
-                border.color: Zenon.border
+                border.color: prow.mark ? Zenon.cyan : Zenon.border
               }
 
               // state, or what the mark will do to it
@@ -3164,7 +3295,7 @@ FloatingWindow {
                 font.weight: Zenon.weight
                 font.pixelSize: Zenon.px(15)
               }
-              // THE REPO AS A TINTED PILL: thirty rows of bold coloured
+              // THE REPO AS A TINTED PILL: thirty rows of bold colored
               // capitals were the loudest column in the list for the least
               // read fact in it. The ink is the same; it is carried by a
               // soft ground now, with the word in it smaller and plain.
@@ -3196,8 +3327,17 @@ FloatingWindow {
               }
 
               TapHandler {
-                onTapped: { win.sel = prow.index; keys.forceActiveFocus(); }
+                acceptedModifiers: Qt.NoModifier
+                onTapped: win.rowClick(prow.index, 0)
                 onDoubleTapped: { win.sel = prow.index; win.confirmOne(prow.modelData); }
+              }
+              TapHandler {
+                acceptedModifiers: Qt.ControlModifier
+                onTapped: win.rowClick(prow.index, Qt.ControlModifier)
+              }
+              TapHandler {
+                acceptedModifiers: Qt.ShiftModifier
+                onTapped: win.rowClick(prow.index, Qt.ShiftModifier)
               }
               // a right click marks, or unmarks — the pointer's shift+space
               TapHandler {
@@ -3249,10 +3389,12 @@ FloatingWindow {
                 anchors.fill: parent
                 radius: Zenon.windowRadius
                 visible: !urow.modelData.head
-                color: urow.marked ? Qt.rgba(Zenon.yellow.r, Zenon.yellow.g, Zenon.yellow.b, 0.10)
+                // see the packages' rows: a cursor on a marked row deepens
+                // it and rings it in cyan
+                color: urow.marked ? Qt.rgba(Zenon.yellow.r, Zenon.yellow.g, Zenon.yellow.b, urow.index === win.usel ? 0.22 : 0.10)
                   : urow.index === win.usel ? Zenon.headBg : "transparent"
                 border.width: urow.index === win.usel ? 1 : 0
-                border.color: Zenon.border
+                border.color: urow.marked ? Zenon.cyan : Zenon.border
               }
               Text {
                 visible: urow.modelData.head
@@ -3289,8 +3431,19 @@ FloatingWindow {
               }
               TapHandler {
                 enabled: !urow.modelData.head
-                onTapped: { win.usel = urow.index; keys.forceActiveFocus(); }
+                acceptedModifiers: Qt.NoModifier
+                onTapped: win.updateClick(urow.index, 0)
                 onDoubleTapped: { win.usel = urow.index; win.confirmUpdates([urow.modelData]); }
+              }
+              TapHandler {
+                enabled: !urow.modelData.head
+                acceptedModifiers: Qt.ControlModifier
+                onTapped: win.updateClick(urow.index, Qt.ControlModifier)
+              }
+              TapHandler {
+                enabled: !urow.modelData.head
+                acceptedModifiers: Qt.ShiftModifier
+                onTapped: win.updateClick(urow.index, Qt.ShiftModifier)
               }
               TapHandler {
                 enabled: !urow.modelData.head
@@ -3674,6 +3827,8 @@ FloatingWindow {
         .concat([["esc", "back"]]);
     }
     if (win.tab === "store") {
+      if (storeView.lightbox !== "")
+        return [["\u2190 \u2192", "screenshots"], ["esc", "close"]];
       if (storeView.view === "page")
         return [["return", storeView.app && storeView.app.installed ? "open" : "get"],
                 ["\u2191 \u2193", "scroll"], ["esc", "back"]];
@@ -3696,9 +3851,8 @@ FloatingWindow {
       return configView.hints.concat([["ctrl tab", "next"]]);
     if (win.tab === "updates")
       return Ceres.total === 0 ? [["ctrl r", "check"], ["ctrl tab", "next"]]
-        : [[win.typing ? "tab" : "space", "mark"]].concat(win.typing ? [] : [["/", "filter"]])
-          .concat([["ctrl a", "mark all"], ["return", win.umarkCount ? "update marked" : "update this"],
-           ["ctrl return", "update all"], ["ctrl r", "check"], ["ctrl tab", "next"]]);
+        : [["space", "mark"], ["ctrl a", "mark all"], ["return", win.umarkCount ? "update marked" : "update this"],
+           ["ctrl return", "update all"], ["ctrl r", "check"], ["ctrl tab", "next"]];
     return [[win.typing ? "tab" : "space", "mark"]]
       .concat(win.typing ? (win.query !== "" || win.markCount > 0 ? [["esc", "done typing"]] : []) : [["/", "search"]])
       .concat([["ctrl a", "mark all"], ["return", win.markCount > 0 ? "review" : "install / remove"]])
@@ -3721,7 +3875,7 @@ FloatingWindow {
     Rule { anchors.top: parent.top; anchors.left: parent.left; anchors.right: parent.right }
 
 
-    // The keys, centred on the window — at the left once a button joins
+    // The keys, centered on the window — at the left once a button joins
     // them, and never into it: what does not fit before the buttons is
     // dropped from the end of the list (see HintRow.maxWidth), which is why
     // hintRows puts the keys you need most first.
@@ -3729,9 +3883,9 @@ FloatingWindow {
       id: footHints
       rows: win.hintRows
       anchors.verticalCenter: parent.verticalCenter
-      // Centred when the strip is only keys; at the left the moment a button
+      // Centered when the strip is only keys; at the left the moment a button
       // joins it, so keys and buttons read as two ends of one strip rather
-      // than a row that shifts off-centre to make room. (A Row holding only
+      // than a row that shifts off-center to make room. (A Row holding only
       // hidden children is zero wide.)
       x: footBtns.width > 0 ? 16 : Math.round((foot.width - width) / 2)
       maxWidth: foot.width - 32 - (footBtns.width > 0 ? footBtns.width + 12 + 24 : 0)

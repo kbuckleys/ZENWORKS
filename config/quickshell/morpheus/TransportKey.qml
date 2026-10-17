@@ -5,7 +5,7 @@
 //
 // One transport button — previous, play/pause, next. Shared by the song
 // toast's hover row and the now-playing panel, which drew the same three
-// glyphs with the same hover behaviour twice.
+// glyphs with the same hover behavior twice.
 
 import QtQuick
 import "."

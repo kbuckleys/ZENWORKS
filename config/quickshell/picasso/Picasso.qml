@@ -68,7 +68,7 @@ Singleton {
   // do not, so stepping through it is stepping along a single axis rather
   // than shuffling a bag of words.
   // ── CAPTURE ──────────────────────────────────────────────────────────
-  // The screenshot, the colour picker and the annotation window are picasso's
+  // The screenshot, the color picker and the annotation window are picasso's
   // too — pictures of the screen, and a picture of one pixel of it. This
   // singleton only says they were asked for; PicassoCapture, PicassoPicker
   // and PicassoAnnotator each answer their own signal, so anything in the
@@ -87,7 +87,7 @@ Singleton {
   signal viewRequested(string paths)
   // And the way back: a picture from the viewer made a background goes
   // through the picker's own card — its monitors, span, fit and slideshow —
-  // carrying whatever look was dialled in the viewer, staged, not applied.
+  // carrying whatever look was dialed in the viewer, staged, not applied.
   // `adopt`, when given, says `path` is a scratch render (a selection) to be
   // written into adopt.dir as adopt.name only if the card is applied — see
   // PicassoPopup.focusAdopt.
@@ -125,7 +125,7 @@ Singleton {
   // One global fit is wrong the moment two monitors are different shapes,
   // which is the exact case picasso already handled for the image: this setup
   // pairs a 2560x1440 with a rotated 1080x1920, and an image that wants
-  // cropping on one wants centring on the other.
+  // cropping on one wants centering on the other.
   //
   // Two layers, and only two. `fits` holds the monitors that have been given
   // an answer of their own; everything else takes oracle's, which is the
@@ -232,7 +232,7 @@ Singleton {
   }
 
   // ── what each monitor is actually showing ────────────────────────────
-  // monitor name -> path (or colour) once it is decoded and on screen, as
+  // monitor name -> path (or color) once it is decoded and on screen, as
   // PicassoDaemon reports it. `assignment` changes the instant something is
   // applied; this changes when the picture arrives — what an Apply waits on.
   property var shown: ({})
@@ -325,7 +325,7 @@ Singleton {
 
   // ── THE LOOK ─────────────────────────────────────────────────────────
   // Everything past the picture and its fit — turned, mirrored, which part a
-  // crop keeps, what fills the space around it, dimmed, blurred, greyed,
+  // crop keeps, what fills the space around it, dimmed, blurred, grayed,
   // tinted. Per monitor, like the fit, and stored as only what differs from
   // the defaults (see picasso.js lookDefaults).
   property var looks: ({})
@@ -344,7 +344,7 @@ Singleton {
   }
 
   // A NEW PICTURE STARTS CLEAN: the filters the old one wore (dim, blur,
-  // colour, light, contrast, tint, vignette, its crop's anchor) are dropped;
+  // color, light, contrast, tint, vignette, its crop's anchor) are dropped;
   // the monitor's own turn, mirror and backdrop stay — see Art.freshLook.
   function freshLooks(names) {
     if (names.length === 0) return;
@@ -365,7 +365,7 @@ Singleton {
     return "";
   }
 
-  // ── the picture's own colour ─────────────────────────────────────────
+  // ── the picture's own color ─────────────────────────────────────────
   // For the backdrop and the tint that follow the image. The average of the
   // whole picture, read off its thumbnail — a 480px file answers in a few
   // milliseconds where the original would take half a second.
@@ -420,8 +420,8 @@ Singleton {
     onRunningChanged: if (!running) Qt.callLater(root.runAccents)
   }
 
-  // ── SAVED COLOURS ────────────────────────────────────────────────────
-  // The ones made in the picker's colour tab, after the presets.
+  // ── SAVED COLORS ────────────────────────────────────────────────────
+  // The ones made in the picker's color tab, after the presets.
   property var colors: []
 
   function addColor(hex) {
@@ -446,7 +446,7 @@ Singleton {
   // When the background animation now playing ends (Date.now() terms), on any
   // monitor: PicassoDaemon pushes it on at every flip to a new picture.
   // Follow Background holds a new theme until then — a theme change
-  // re-evaluates every colour in the shell, ~100 ms on the one thread the
+  // re-evaluates every color in the shell, ~100 ms on the one thread the
   // zoom also runs on, and landing inside the zoom stopped it dead.
   property real transitionUntil: 0
 

@@ -27,7 +27,7 @@ LayerPopup {
   readonly property color headColor: Zenon.cyan
   readonly property color dimColor: Zenon.accentMuted
   // WHAT YOU ARE TOUCHING, and what has been CHANGED, are two different
-  // facts and now wear two different colours.
+  // facts and now wear two different colors.
   //
   // Everything interactive used to light up in the pink — a focused field, an
   // open dropdown, a pressed button, a grabbed knob — and against the dark
@@ -49,12 +49,12 @@ LayerPopup {
 
   // ── what the grid shows ──────────────────────────────────────────────
   // Two kinds of background, two tabs in the strip: pictures from the
-  // background directory, and plain colours. A colour is assigned exactly like a
+  // background directory, and plain colors. A color is assigned exactly like a
   // picture (see picasso.js isColor), so everything past choosing one — the
   // card, the monitors, the tick on what is in use — is the same machinery.
   property string view: "backgrounds"
   property int colorSel: 0
-  // the colour being made in the colour tab's picker
+  // the color being made in the color tab's picker
   property string pickHex: "#7a8cff"
 
   // ── the focus card ───────────────────────────────────────────────────
@@ -91,7 +91,7 @@ LayerPopup {
 
   function colorName(hex) {
     for (const c of Art.presetColors) if (c.hex === hex) return c.name;
-    return "Custom colour";
+    return "Custom color";
   }
 
   // what the card browses: whichever list its subject came from
@@ -156,7 +156,7 @@ LayerPopup {
   readonly property int cellH: 150
 
   function gridHeight() {
-    // the colour tab is always full height: its picker needs the room
+    // the color tab is always full height: its picker needs the room
     if (popup.view === "colors") return popup.visibleRows * popup.cellH;
     if (popup.filtered.length === 0) return 90;
     const rows = Math.ceil(popup.filtered.length / popup.cols);
@@ -197,7 +197,7 @@ LayerPopup {
   // starts and ends.
   //
   // DRAWN AS A CHIP, not as a word. These were plain text the same weight and
-  // colour as the count beside them, so the two things that can be clicked in
+  // color as the count beside them, so the two things that can be clicked in
   // this strip looked exactly like the one thing that cannot — the only hint
   // was the cursor changing, and the cursor does not change here any more. A
   // bordered chip says "press me" without a hint bar having to say it.
@@ -368,7 +368,7 @@ LayerPopup {
   // FROM OUTSIDE THE PICKER — the viewer's "Set as background". The picture
   // need not be in the background directory: the card only needs a path, and
   // one that is not in the grid simply has nothing to browse to either side.
-  // The viewer's look arrives staged, so what was dialled there is what the
+  // The viewer's look arrives staged, so what was dialed there is what the
   // card shows and what Apply sets.
   //
   // A SCRATCH PICTURE, KEPT ONLY IF IT IS USED. The viewer's selection is
@@ -446,7 +446,7 @@ LayerPopup {
     popup.syncFocus();
   }
 
-  // The card BROWSES. Stepping to the neighbour keeps everything staged —
+  // The card BROWSES. Stepping to the neighbor keeps everything staged —
   // you are comparing backgrounds under one set of answers, not starting the
   // card over — and moves the grid's selection behind it, so closing the
   // card leaves you where you ended up.
@@ -555,7 +555,7 @@ LayerPopup {
       Keys.onEscapePressed: (event) => {
         event.accepted = true;
         // innermost first, the cascade every layer here uses: the card (which
-        // may have a colour open inside it), then the filter, and only then
+        // may have a color open inside it), then the filter, and only then
         // the panel
         if (popup.focusOpen) { if (!focusCard.cancel()) popup.closeFocus(); }
         else if (popup.query !== "") popup.query = "";
@@ -571,14 +571,14 @@ LayerPopup {
           return;
         }
 
-        // tab flips between pictures and colours
+        // tab flips between pictures and colors
         if (event.key === Qt.Key_Tab || event.key === Qt.Key_Backtab) {
           event.accepted = true;
           popup.setView(popup.view === "colors" ? "backgrounds" : "colors");
           return;
         }
 
-        // The colour tab has no filter to type into; the arrows walk the
+        // The color tab has no filter to type into; the arrows walk the
         // swatches and return lifts one into the card.
         if (popup.view === "colors") {
           const k = event.key;
@@ -600,7 +600,7 @@ LayerPopup {
           popup.followSelection();
         } else if (event.key === Qt.Key_F && (event.modifiers & Qt.AltModifier)) {
           // How the image is fitted to a monitor that is not its shape:
-          // cropped, fitted, stretched, centred, tiled. Alt, and beside the
+          // cropped, fitted, stretched, centered, tiled. Alt, and beside the
           // sort, because it is the same kind of thing — a ring you step
           // through that changes how the list you are looking at is applied
           // rather than which images are in it.
@@ -645,7 +645,7 @@ LayerPopup {
         }
       }
 
-      // the pictures (or colours) still below rise out of the bottom strip,
+      // the pictures (or colors) still below rise out of the bottom strip,
       // frosted — see morpheus/ScrollEdge. Before the column, so the strip
       // draws over them; follow runs each from its grid's bottom edge down.
       Repeater {
@@ -836,7 +836,7 @@ LayerPopup {
             }
           }
 
-          // ── the colour tab ────────────────────────────────────────────
+          // ── the color tab ────────────────────────────────────────────
           // The swatches on the left, the maker on the right. A swatch lifts
           // into the card like a picture does; the maker can either use what
           // it has made straight away or keep it as a swatch of its own.
@@ -910,7 +910,7 @@ LayerPopup {
                   }
                 }
 
-                // a made colour can be thrown away again; a preset cannot
+                // a made color can be thrown away again; a preset cannot
                 Rectangle {
                   anchors.left: chip.left
                   anchors.top: chip.top
@@ -986,7 +986,7 @@ LayerPopup {
                 anchors.left: parent.left
                 anchors.top: parent.top
                 anchors.margins: 18
-                text: "Make a colour"
+                text: "Make a color"
                 color: popup.dimColor
                 font.family: Zenon.face
                 font.weight: 600
@@ -1070,7 +1070,7 @@ LayerPopup {
             color: Zenon.border
           }
 
-          // PICTURES OR COLOURS, at the strip's left edge: terminus'
+          // PICTURES OR COLORS, at the strip's left edge: terminus'
           // Segments, as picasso's card switches its tabs (user,
           // 2026-10-12) — tab flips between them too.
           Term.Segments {
@@ -1079,7 +1079,7 @@ LayerPopup {
             anchors.verticalCenter: parent.verticalCenter
             z: 2
             textSize: Zenon.px(13)
-            options: [["backgrounds", "Pictures"], ["colors", "Colours"]]
+            options: [["backgrounds", "Pictures"], ["colors", "Colors"]]
             current: popup.view
             onChose: (v) => popup.setView(v)
           }
@@ -1205,14 +1205,14 @@ LayerPopup {
                   // shape howler uses. What you type lands here.
                   visible: !Picasso.scanning
                   text: popup.view === "colors"
-                    ? popup.colorItems.length + " Colours"
+                    ? popup.colorItems.length + " Colors"
                     : popup.query !== "" ? popup.query
                     : popup.filtered.length + (popup.filtered.length === 1
                         ? " Background" : " Backgrounds")
                   // MUTED WHEN IT IS A COUNT, bright when it is your query.
                   // The count is a fact about the grid you are already
                   // looking at; the query is the only thing on this line you
-                  // put there, and the two were the same colour.
+                  // put there, and the two were the same color.
                   color: popup.query === "" ? popup.dimColor
                     : (clearMa.containsMouse ? popup.highlight : popup.headColor)
                   font.bold: true

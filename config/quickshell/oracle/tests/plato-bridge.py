@@ -197,7 +197,7 @@ try:
     b.send("resize", rows=8, cols=40)
     b.send("open", path=lua); b.settle(0.3)
     check("treesitter: a keyword is magenta", b.style_at(0, 0).get("fg") == MAGENTA, b.rows[0])
-    check("treesitter: a comment is grey", b.style_at(0, 14).get("fg") == GREY, b.rows[0])
+    check("treesitter: a comment is gray", b.style_at(0, 14).get("fg") == GREY, b.rows[0])
     check("treesitter: a string is cyan", b.style_at(1, 8).get("fg") == CYAN, b.rows[1])
     check("plain Normal text carries no span", b.style_at(0, 5) == {}, b.rows[0])
 
@@ -217,7 +217,7 @@ try:
 
     b.keys("ggVj")
     sel = b.rows[1]["s"]
-    # a wash over the text (hl.lua's `wash`): the syntax colours stay, so a
+    # a wash over the text (hl.lua's `wash`): the syntax colors stay, so a
     # selected line may be several spans — every one of them selected
     check("a line-wise selection covers the whole line",
           sel and all(b.styles[x[2]].get("bg") == MAGENTA for x in sel)
@@ -412,7 +412,7 @@ try:
     ctx = [e["context"] for e in seen if e.get("context") is not None]
     check("sticky scroll: the function and the if the view is inside",
           ctx and [c["n"] for c in ctx[-1]] == [2, 3], ctx[-1:])
-    check("and coloured as the view colours them",
+    check("and colored as the view colors them",
           ctx and any(ch[1] for ch in ctx[-1][0]["chunks"]), ctx[-1:])
     b.keys("gg")
     for k in ":%s/print/PUT/": b.keys(k)
@@ -627,7 +627,7 @@ try:
     def ask6(method, **params): return ask(b6, method, **params)
 
     # indent guides: every shiftwidth inside the indent; a blank line takes
-    # the deeper of its neighbours
+    # the deeper of its neighbors
     gfile = os.path.join(tmp, "guides.txt")
     with open(gfile, "w") as fh: fh.write("fn a {\n    x\n        y\n\n    z\n}\n")
     b6.send("open", path=gfile); b6.settle(0.3)
@@ -730,7 +730,7 @@ try:
     st6 = [f["status"] for f in b6.frames if f.get("status")]
     check("large: marked in the status line", st6 and st6[-1].get("large") is True, st6[-1:] and st6[-1].get("large"))
     check("large: no treesitter", ask6("cmd", cmd="lua assert(not vim.treesitter.highlighter.active[vim.api.nvim_get_current_buf()])") is True)
-    check("large: no colour codes painted", not b6.style_at(0, 11).get("bg"), b6.rows[0])
+    check("large: no color codes painted", not b6.style_at(0, 11).get("bg"), b6.rows[0])
     # a slow request while nvim waits for the rest of a command (" then a
     # focus change's :checktime) must not wedge the keys behind it
     b6.send("input", keys='"'); b6.settle()
@@ -828,11 +828,11 @@ try:
     check("pair: and its partner three lines down", b9.rows[3].get("m") == [0], b9.rows[3].get("m"))
     b9.keys("0")
     check("pair: none off a bracket", not b9.rows[0].get("m") and not b9.rows[3].get("m"), (b9.rows[0].get("m"), b9.rows[3].get("m")))
-    # rainbow: a level deeper is another colour; a bracket in a string is not one
+    # rainbow: a level deeper is another color; a bracket in a string is not one
     outer = b9.style_at(0, cellOf(0, "{")).get("fg")
     inner = b9.style_at(1, cellOf(1, "(")).get("fg")
-    check("rainbow: nested brackets differ in colour", outer and inner and outer != inner, (outer, inner))
-    check("rainbow: a bracket in a string keeps the string's colour",
+    check("rainbow: nested brackets differ in color", outer and inner and outer != inner, (outer, inner))
+    check("rainbow: a bracket in a string keeps the string's color",
           b9.style_at(2, cellOf(2, "(")).get("fg") == b9.style_at(2, cellOf(2, "x")).get("fg"))
     b9.send("options", rainbowBrackets=False); b9.settle()
     check("rainbow: off, a bracket is punctuation again", b9.style_at(1, cellOf(1, "(")).get("fg") != inner)
@@ -1041,7 +1041,7 @@ try:
     frost_case("split", plain, ["gg", "<C-w>s", "10<C-e>", "<C-w>j", "G", "<C-w>k", "gg"])
     b13.send("quit"); b13.proc.wait(timeout=5)
 
-    # ── bat's formats, coloured as bat colours them (hl.lineLocal) ───────
+    # ── bat's formats, colored as bat colors them (hl.lineLocal) ───────
     # csv/tsv columns in bat's cycle of five, a log's dates/numbers/keys —
     # and a tsv too big for syntax (large.lua) still gets its columns
     b14 = Bridge(tmp, "formats")

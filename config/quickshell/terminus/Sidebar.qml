@@ -32,7 +32,7 @@ Rectangle {
   // the terminus window (`term`, never `root` — see terminus-split notes)
   property var term: null
   // the cursor's fill: delphi's hiFill (and alexandria's)
-  readonly property color hiFill: Zenon.alpha(Zenon.cyan, 0.12)
+  readonly property color hiFill: term ? term.hiFill : Zenon.alpha(Zenon.cyan, 0.12)
   // while Hyprland resizes the window for it, the sidebar is whatever
   // the window has gained (see sideKeepW); otherwise it slides on its own
   width: term.sideKeepW >= 0
@@ -244,7 +244,7 @@ Rectangle {
       // category sat noticeably lower than the rules under it.
       Item {
         width: 1
-        // The first heading's words share a centre line with the path
+        // The first heading's words share a center line with the path
         // bar beside them: the bar's inside is headH less its hairline,
         // and a heading's text sits airIn (7) below this spacer and is
         // about 17px tall.
@@ -264,7 +264,7 @@ Rectangle {
       // it, and that is a different heading depending on what you
       // have.
       SideHead { term: side.term; ruled: false; ink: Zenon.accentMuted
-        label: "BOOKMARKS"
+        label: "Bookmarks"
         visible: !!term && term.bookmarks.length > 0
         first: true
       }
@@ -324,11 +324,11 @@ Rectangle {
       // ── TAGS ──────────────────────────────────────────────
       // Only the ones that are actually ON something. A tag that
       // has been made but not yet used is real — it is in the
-      // picker, with its colour — but a sidebar entry that lists
+      // picker, with its color — but a sidebar entry that lists
       // nothing is a place you can go to find an empty room, and
       // the count beside each row is the promise this keeps.
       SideHead { term: side.term; ruled: false; ink: Zenon.accentMuted
-        label: "TAGS"
+        label: "Tags"
         visible: !!term && term.sideTags.length > 0
         first: !!term && term.bookmarks.length === 0
       }
@@ -372,7 +372,7 @@ Rectangle {
       // unlike the sections above this one has no hidden state —
       // see allCollections.
       SideHead { term: side.term; ruled: false; ink: Zenon.accentMuted
-        label: "COLLECTIONS"
+        label: "Collections"
         visible: !!term && term.sideCollections.length > 0
         first: !!term && term.bookmarks.length === 0 && term.sideTags.length === 0
       }
@@ -417,7 +417,7 @@ Rectangle {
       Item { width: 1; height: term.sideCollections.length === 0 ? 0 : 8 }
 
       SideHead { term: side.term; ruled: false; ink: Zenon.accentMuted
-        label: "DISKS"
+        label: "Disks"
         visible: !!term && term.disks.length > 0
         first: !!term && term.bookmarks.length === 0 && term.sideTags.length === 0
           && term.sideCollections.length === 0
@@ -533,6 +533,30 @@ Rectangle {
       onMenuAsked: (x, y) => term.trashMenu(trashRow, x, y)
       onChosen: term.goTo(Terminus.trashFilesDir())
       onTabbed: term.openInNewTab(Terminus.trashFilesDir())
+    }
+  }
+
+  // ── THE SIDEBAR'S SWITCH, IN THE SIDEBAR WHILE IT IS OPEN ───────────
+  // At its top right corner, on the first heading's row, whatever that
+  // heading is (user, 2026-10-17); the bar's sideToggle stands down. Held
+  // there rather than scrolled with the rows, and the same height as the
+  // bar's, so the glyph sits on the line the bar's sits on when it is shut.
+  Item {
+    id: sideToggleIn
+    z: 5
+    visible: !!term && term.barSideToggle && term.sidebar
+    anchors.top: parent.top
+    anchors.right: parent.right
+    anchors.rightMargin: 7
+    width: 32
+    height: term ? term.headH - 1 : 0
+    opacity: sideFlick.opacity
+    // the bar's chip, lit: the sidebar is out (user, 2026-10-17)
+    BarChip {
+      anchors.centerIn: parent
+      height: term ? term.chromeRef.crumbSegs.height : implicitHeight
+      parts: [{ glyph: "\uEC02", lit: true, size: Zenon.px(17) }]
+      onClicked: side.term.toggleSidebar()
     }
   }
 }

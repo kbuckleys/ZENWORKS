@@ -9,7 +9,7 @@
 // there, a thumb that went cyan when dragged), and terminus' ScrollRail (a
 // thin thumb, a track only under the pointer). Two designs are two ways of
 // saying the same thing, and the rail's was the one chosen for ceres. So this
-// is the rail's LOOK with both of their BEHAVIOURS, and ScrollRail is now a
+// is the rail's LOOK with both of their BEHAVIORS, and ScrollRail is now a
 // thin setting of this file rather than a second implementation.
 //
 //     Scrollbar { flick: list; anchors.right: parent.right
@@ -126,7 +126,7 @@ Item {
   // back. `wake` is the moment after the last movement it lingers for.
   readonly property bool awake: !Zenon.scrollAutohide || wake.running
     || ma.containsMouse || ma.pressed || ma.dragging
-    || (root.flick !== null && root.flick.moving)
+    || (!!root.flick && root.flick.moving)
   onPosChanged: if (Zenon.scrollAutohide) wake.restart()
   Timer { id: wake; interval: 900 }
   // In at once, with no ramp at all — the bar is there on the frame the
@@ -145,7 +145,7 @@ Item {
   }
   NumberAnimation { id: fade; target: root; property: "opacity"; easing.type: Easing.InOutQuad }
 
-  // the painted column's centre, against the right edge (the bottom one, on
+  // the painted column's center, against the right edge (the bottom one, on
   // its side)
   readonly property real lineX: root.horizontal ? root.height - root.thickness / 2
                                                 : root.width - root.thickness / 2
@@ -159,13 +159,14 @@ Item {
     height: root.horizontal ? across : root.height - 4
     radius: across / 2
     color: Zenon.border
-    opacity: ma.containsMouse || ma.dragging ? 0.30 : 0.0
+    opacity: ma.containsMouse || ma.dragging ? (Zenon.light ? 0.5 : 0.30) : 0.0
     Behavior on opacity { NumberAnimation { duration: Zenon.fast; easing.type: Zenon.ease } }
   }
 
   Rectangle {
     id: thumb
-    property real across: ma.containsMouse || ma.dragging ? 6 : 4
+    // a pixel wider than it started (user, 2026-10-17)
+    property real across: ma.containsMouse || ma.dragging ? 7 : 5
     // where it starts along the bar, whichever way the bar runs
     readonly property real along: root.horizontal ? thumb.x : thumb.y
     x: root.horizontal ? root.thumbY : root.lineX - across / 2
@@ -174,7 +175,10 @@ Item {
     height: root.horizontal ? across : root.thumbH
     radius: across / 2
     color: Zenon.accentKey
-    opacity: ma.dragging ? 0.90 : (ma.containsMouse ? 0.70 : 0.40)
+    // on paper the dark thumb at dark glass' strengths read as a faint
+    // pencil line (user, 2026-10-17): a light theme sets it a step deeper
+    opacity: Zenon.light ? (ma.dragging ? 0.95 : (ma.containsMouse ? 0.80 : 0.58))
+      : (ma.dragging ? 0.90 : (ma.containsMouse ? 0.70 : 0.40))
     Behavior on across { NumberAnimation { duration: Zenon.fast; easing.type: Zenon.ease } }
     Behavior on opacity { NumberAnimation { duration: Zenon.fast; easing.type: Zenon.ease } }
   }

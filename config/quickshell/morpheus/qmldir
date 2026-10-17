@@ -62,3 +62,4 @@ JobsModule 1.0 JobsModule.qml
 JobsPanel 1.0 JobsPanel.qml
 OpenFlare 1.0 OpenFlare.qml
 TitleName 1.0 TitleName.qml
+EdgeTab 1.0 EdgeTab.qml

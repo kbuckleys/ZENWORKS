@@ -48,7 +48,7 @@ local deadline = uv.new_timer()
 --
 -- So every grace carries a deadline that does NOT need the main loop. A
 -- libuv timer's own callback runs whatever nvim is stuck in; if the polite
--- exit has not happened ten seconds after it was due, nvim is signalled to
+-- exit has not happened ten seconds after it was due, nvim is signaled to
 -- stop (SIGTERM, which it handles by exiting), and killed outright if that
 -- is not enough either. A client arriving cancels both.
 -- nvim gone in `ms` whatever its main loop is doing: SIGTERM then, and
@@ -397,7 +397,7 @@ function methods.yanks() return require("plato.editing").yanks() end
 function methods.putYank(p) return require("plato.editing").putYank(p.index) end
 
 -- the settings sheet's editing settings (see editing.lua)
--- the shell's theme (PlatoWindow.pushTheme): Zenon's colours, resolved
+-- the shell's theme (PlatoWindow.pushTheme): Zenon's colors, resolved
 function methods.theme(p) return require("plato.theme").use(p) end
 
 function methods.options(p)
@@ -794,7 +794,7 @@ function M.start(path)
     c:read_start(onRead)
     vim.schedule(function()
       send({ event = "hello", pid = vim.fn.getpid() })
-      -- the colours before the first frame that uses them
+      -- the colors before the first frame that uses them
       view.reset()
       view.schedule(true)
       reask()

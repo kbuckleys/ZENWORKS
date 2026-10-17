@@ -264,6 +264,11 @@ module.exports = {
     t.eq("tx kind: an install", C.txKindOf([["-S", "--needed", "bitwarden-cli"]]), "install");
     t.eq("tx kind: an update", C.txKindOf([["-Syu"]]), "update");
     t.eq("tx kind: a removal", C.txKindOf([["-Rs", "x"]]), "remove");
+    t.eq("tx kind: a Flatpak update is an update", C.txKindOf([["@user", "flatpak update --user -y"]]), "update");
+    t.eq("tx kind: services restarted are other", C.txKindOf([["@user", "systemctl --user restart a"]]), "other");
+    t.eq("done line: restart", C.doneLine("restart spotify and 2 more"), "Restarted spotify and 2 more");
+    t.eq("done line: nothing said", C.doneLine(""), "");
+    t.eq("done line: an unknown verb", C.doneLine("rehearsal: reinstall x"), "");
     t.eq("tx kind: settled install is still one", C.txKindOf([["-S", "--useask", "x"], ["@sudo", "pacman", "-D", "--asdeps", "b"]]), "install");
     t.eq("settle: a conflict line without the refusal is not a question",
       C.settleOf([":: a-1-1 and b-2-1 are in conflict"]), null);
@@ -413,7 +418,7 @@ module.exports = {
     t.eq("the paru package is read", C.readDeps("fzf\n=paru-bin\n").paruPkg, "paru-bin");
     t.eq("and is no missing program", C.readDeps("=paru-git\n").missing.length, 0);
     t.eq("no paru, no package", C.readDeps("paru\n").paruPkg, "");
-    // the Store's catalogue is a directory, not a program
+    // the Store's catalog is a directory, not a program
     t.has("a data dependency is tested as a path", C.depsCommand(), "[ -e '/usr/share/swcatalog/xml' ]");
     t.eq("and named by its package", C.readDeps("/usr/share/swcatalog/xml\n").missing.map(m => m.pkg),
       ["archlinux-appstream-data"]);
@@ -605,7 +610,7 @@ module.exports = {
     t.eq("archive folder", C.archiveDir("less"), "https://archive.archlinux.org/packages/l/less/");
     const arc = C.readArchive("less", "less-1%3A563-1-x86_64.pkg.tar.zst\nless-1%3A563-1-x86_64.pkg.tar.zst.sig\n"
       + "lesspipe-2.0-1-any.pkg.tar.zst\n");
-    t.eq("archive: versions decoded, sigs and neighbours out", arc.map(a => a.version), ["1:563-1"]);
+    t.eq("archive: versions decoded, sigs and neighbors out", arc.map(a => a.version), ["1:563-1"]);
     t.eq("archive: the url re-encoded", arc[0].url,
       "https://archive.archlinux.org/packages/l/less/less-1%3A563-1-x86_64.pkg.tar.zst");
     t.has("archive listing sorts by version", C.archiveCommand("x"), "sort -V");

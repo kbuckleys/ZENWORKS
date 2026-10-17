@@ -139,7 +139,7 @@ Item {
   // came from. See dragProxy for the rest.
 
   // Resolved once per delegate. It was inkFor(entry) in two bindings — the
-  // glyph's colour and the name's — and a function call in a binding cannot
+  // glyph's color and the name's — and a function call in a binding cannot
   // be compiled, so every row paid for two interpreted calls on every
   // repaint. The value is already on the row; this just reads it.
   //
@@ -151,7 +151,7 @@ Item {
     : entryRow.entry.ink !== undefined ? entryRow.entry.ink : Zenon.accentMuted
   // ── A REPOSITORY, AND WHAT BELONGS TO ONE (user, 2026-10-11) ────────
   // A directory with a .git in it has its glyph in this ink (its own glyph
-  // still: the colour is the mark, user 2026-10-11), and the
+  // still: the color is the mark, user 2026-10-11), and the
   // guides that hang from it, or from anything under it, are drawn in it
   // too: what a repository holds reads as its branch of the tree. The host
   // says which directories are repositories (repoDirs: terminus' window,
@@ -201,7 +201,7 @@ Item {
   // what every OTHER ticked row is wearing. With things selected the
   // SelectBar stands down, so a cursor sitting on one of them had the
   // bar off and the outline suppressed, and the row was indistinguishable
-  // from its neighbours — select all and the cursor is simply not there.
+  // from its neighbors — select all and the cursor is simply not there.
   // (A 3px tick survives in the left gutter, outside the row, which is
   // not something anybody finds.)
   //
@@ -287,7 +287,7 @@ Item {
     //
     // EXCEPT WHERE THE CURSOR IS AMONG MARKS. With things selected the
     // SelectBar stands down, and an outline alone on a row the same tint
-    // as its neighbours was the cursor you could not find. So on the pane
+    // as its neighbors was the cursor you could not find. So on the pane
     // you are keying, the cursor's row is filled harder than the marks
     // around it — a ticked one at more than twice their tint, an unticked
     // one with a wash of its own — and ringed in cyan (below).
@@ -333,7 +333,7 @@ Item {
     // ── THE OUTLINE THAT REPLACES THE BAR ────────────────────
     // In the window's own cyan on the pane you are keying, because
     // that is what the SelectBar it stands in for is drawn in, and a
-    // muted grey over a cyan-tinted tick read as one more row
+    // muted gray over a cyan-tinted tick read as one more row
     // separator. On the PASSIVE pane it stays muted on purpose: that
     // cursor is a memory of where you were, not where you are.
     border.width: entryRow.cursorOnly ? 1 : 0
@@ -561,7 +561,7 @@ Item {
                 + Math.round(2 * host.zoom)
               : host.treeStep + Math.floor(host.treeArrowW / 2) + entryRow.twistGap
             // HALF A PIXEL, so a one-pixel stroke lands ON a pixel row
-            // instead of across two and comes out grey and two wide. The
+            // instead of across two and comes out gray and two wide. The
             // plain Rectangles beside it fill the same pixel, so a curve
             // and a straight line in one column meet exactly.
             readonly property real mid: Math.round(guideCol.height / 2) + 0.5
@@ -570,7 +570,7 @@ Item {
             readonly property real bend:
               Math.min(Math.round(3 * host.zoom), guideCol.arm,
                        guideCol.mid - 1)
-            // Centred on where a chevron at this depth would sit, so the
+            // Centered on where a chevron at this depth would sit, so the
             // line runs straight down through the parent's own triangle.
             x: guideCol.index * host.treeStep
                + Math.floor(host.treeArrowW / 2)
@@ -606,7 +606,7 @@ Item {
             // The only real corner in the drawing, and the one Buck
             // asked to round. A quadratic with its control point exactly
             // on the corner gives the turn a constant, even sweep — an
-            // arc of a circle would need its centre computed and looks
+            // arc of a circle would need its center computed and looks
             // no different at six pixels.
             //
             // Shapes rather than Rectangles ONLY here: everything else
@@ -678,7 +678,7 @@ Item {
             width: host.treeArrowW
             horizontalAlignment: Text.AlignHCenter
             text: entryRow.expanded ? "\uf111" : "\uf10c"
-            // ONE COLOUR. The fill is the state; brightening it as well
+            // ONE COLOR. The fill is the state; brightening it as well
             // said the same thing twice and made an open branch's
             // marker compete with the name beside it.
             color: Zenon.accentMuted
@@ -744,7 +744,7 @@ Item {
         // different places and the name followed — which made the gap read
         // as cramped after the wide ones and left the names ragged down the
         // list. A column of constant width fixes both: the icons sit on one
-        // centre line and every name starts at the same x.
+        // center line and every name starts at the same x.
         width: Math.round(24 * host.zoom)
         horizontalAlignment: Text.AlignHCenter
         text: entryRow.entry ? entryRow.entry.glyph : ""
@@ -781,7 +781,7 @@ Item {
       // Dots rather than words, and on the RIGHT, which is where Finder
       // puts them and where this row already keeps its bookmark: a tag is
       // a property OF the file, read after you have read which file it is.
-      // Words would cost the name its room on every tagged row; a colour
+      // Words would cost the name its room on every tagged row; a color
       // is the whole of what a tag says at a glance, and the sheet has
       // the names.
       Row {
@@ -798,7 +798,7 @@ Item {
 
         Repeater {
           model: entryRow.tagList
-          // THE SIDEBAR'S OWN MARK. A dot said "tagged, in this colour"
+          // THE SIDEBAR'S OWN MARK. A dot said "tagged, in this color"
           // and a label glyph says the same thing while also matching
           // what the row is listed under — one shape for one idea, in
           // the three places tags appear.
@@ -837,7 +837,7 @@ Item {
       Text {
         id: entryName
         anchors.left: entryBookmark.visible ? entryBookmark.right : entryGlyph.right
-        // The glyph column already centres the icon with air either side;
+        // The glyph column already centers the icon with air either side;
         // 12 on top of that left a gap wider than the icon (user, 2026-10-09)
         anchors.leftMargin: Math.round(6 * host.zoom)
         anchors.right: entryAside.visible ? entryAside.left
@@ -861,7 +861,9 @@ Item {
         font.family: Zenon.face
         // the same weight as every other name: the cursor's ground already
         // says which one it is, and bold only made the name jump wider
-        font.weight: Font.Medium
+        // the Font weight oracle sets, as every other label (user, 2026-10-17:
+        // the lists were the one thing that ignored it)
+        font.weight: Zenon.weight
         // 16, the same number the grid's tile labels and the preview pane's
         // metadata rows use. Three different places were showing the same
         // filename at three different sizes, and a window reads as one thing
@@ -922,7 +924,7 @@ Item {
         selectionColor: Zenon.alpha(Zenon.cyan, 0.22)
         selectedTextColor: Zenon.white
         font.family: Zenon.face
-        font.weight: Font.Bold
+        font.weight: Zenon.weight
         font.pixelSize: Math.round(16 * host.zoom)
         clip: true
 
@@ -982,7 +984,7 @@ Item {
         // Clicking away is not an answer either way, so it is a cancel — the
         // same as Escape, and never a silent rename you did not ask for. But
         // only once the field has actually HAD the keyboard, or the retry
-        // above would be cancelling the very edit it is trying to open; and
+        // above would be canceling the very edit it is trying to open; and
         // not when the whole window goes to the background (alt-tab), which
         // takes activeFocus too — the edit is waiting when you come back.
         onActiveFocusChanged: {
@@ -1125,13 +1127,13 @@ Item {
         frac: sizeCell.frac
         pending: sizeCell.pending
         accent: sizeCell.biggest ? Zenon.sand : Zenon.cyan
-        // Brighter in the usage view than the muted grey it uses elsewhere,
-        // because grey on a tinted band is the one place that colour stops
+        // Brighter in the usage view than the muted gray it uses elsewhere,
+        // because gray on a tinted band is the one place that color stops
         // being readable.
         ink: sizeCell.on
           ? (sizeCell.biggest ? Zenon.sand : Zenon.white) : Zenon.accentMuted
         fontSize: Math.round(14 * host.zoom)
-        fontWeight: sizeCell.on ? Font.Medium : Font.Normal
+        fontWeight: Zenon.weight
         label: {
           const e = entryRow.entry;
           if (!e) return "";

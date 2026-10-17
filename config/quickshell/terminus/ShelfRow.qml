@@ -34,7 +34,7 @@ Rectangle {
   property int indent: 10
   // and the count's alone, for rows indented by depth (clio's folders)
   property int countIndent: shelf.indent
-  // a glyph's own colour at rest (a journal's, a sticky's); unset, muted
+  // a glyph's own color at rest (a journal's, a sticky's); unset, muted
   property color glyphInk: "transparent"
   signal clicked()
 
@@ -51,6 +51,8 @@ Rectangle {
     text: shelf.glyph
     color: shelf.here ? Zenon.cyan : shelf.glyphInk.a > 0 ? shelf.glyphInk : Zenon.accentMuted
     font.family: Zenon.glyphFace
+    // the title's weight, glyph and name alike; the count is a reading
+    font.weight: Zenon.titleWeight
     font.pixelSize: Zenon.px(14)
   }
   Text {
@@ -63,7 +65,7 @@ Rectangle {
     text: shelf.label
     color: shelf.here ? Zenon.ink : Zenon.accentSoft
     font.family: Zenon.face
-    font.weight: Zenon.weight
+    font.weight: Zenon.titleWeight
     font.pixelSize: Zenon.px(14)
   }
   Text {

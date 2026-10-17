@@ -97,8 +97,13 @@ Item {
     if (first) first.claim();
     else catcher.forceActiveFocus();
   }
+  // a pair is any list, not only a JS Array: a form handed through a var
+  // property gets its inner [value, label] pairs back as sequences, which
+  // Array.isArray refuses — and the whole pair became the value ("green,Green":
+  // clio's journal Color did nothing, 2026-10-17)
   function optionsOf(f) {
-    return (f.options || []).map((o) => Array.isArray(o) ? o : [o, o])
+    return Array.from(f.options || []).map((o) => o !== null && typeof o === "object" && o.length !== undefined
+      ? [String(o[0]), String(o.length > 1 ? o[1] : o[0])] : [o, o])
       .concat(f.other ? [[fb.other, f.other]] : []);
   }
   // what a field answers: the dropdown's choice, or what was typed for "other"
@@ -109,7 +114,7 @@ Item {
   readonly property bool ready: fb.secret ? pw.pw !== ""
     : fb.fields.every((f) => f.optional || fb.valueOf(f).trim() !== "")
   // the fields still wanted, said once the verb was asked for without them
-  // — a Save that only stayed grey said nothing (user, 2026-10-11)
+  // — a Save that only stayed gray said nothing (user, 2026-10-11)
   property var missing: []
   onValuesChanged: if (fb.missing.length > 0)
     fb.missing = fb.missing.filter((k) => fb.valueOf(fb.fields.find((f) => f.key === k) || {}).trim() === "")

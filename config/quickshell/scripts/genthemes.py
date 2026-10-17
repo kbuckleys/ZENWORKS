@@ -10,7 +10,7 @@
 #
 #     scripts/genthemes.py
 #
-# A palette is the theme's own colours by what they ARE: ground (its
+# A palette is the theme's own colors by what they ARE: ground (its
 # darkest background), card, surface, ink (body text), muted (comments),
 # dim, border, and the accents red orange yellow green cyan blue magenta,
 # with pink, soft and keyInk optional. build() maps them onto Zenon's
@@ -55,7 +55,7 @@ THEMES = {
  # ── Zenon Light ── Zenon's own light side, and the default light theme
  # (Oracle's Day theme). Zenon dark is not a file — it is the table in
  # morpheus/Zenon.qml — but its light twin is an ordinary theme. Same
- # neutral greys and the same hues, deepened by hand rather than walked
+ # neutral grays and the same hues, deepened by hand rather than walked
  # towards black by legible(): Zenon's pastels darkened that way go muddy.
  "zenon-light": dict(name="Zenon Light", mode="light",
    ground="#f3f3f1", card="#e9eaec", surface="#dcdfe4", ink="#1d2025", soft="#474d58", keyInk="#3a3f4b",
@@ -256,7 +256,7 @@ def to_oklch(h):
     return L, math.hypot(A, B), math.degrees(math.atan2(B, A)) % 360
 
 def from_oklch(L, C, H):
-    # chroma given up until the colour is on screen, never the lightness
+    # chroma given up until the color is on screen, never the lightness
     while True:
         A, B = C * math.cos(math.radians(H)), C * math.sin(math.radians(H))
         l = (L + 0.3963377774*A + 0.2158037573*B) ** 3
@@ -270,7 +270,7 @@ def from_oklch(L, C, H):
         C -= 0.002
 
 # SAND IS ZENON'S PALE STRAW, NOT THE THEME'S GOLD. Zenon's is #e0d8a4 —
-# oklch .88 / .068 / 100: light, barely coloured, leaning green of yellow.
+# oklch .88 / .068 / 100: light, barely colored, leaning green of yellow.
 # Handed a palette's own yellow (chroma .11–.16, hue 70–90) it came out as
 # mustard on every theme but Zenon (user, 2026-10-09: "ugly"). Pulled only
 # HALFWAY to Zenon's hue it was still beige — hue 85–93 — and the user

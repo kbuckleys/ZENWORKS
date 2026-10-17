@@ -56,11 +56,11 @@ const tables = {
   ] },
   "[": { title: "[ (back to the previous…)", keys: [
     ["d", "diagnostic"], ["q", "quickfix entry"], ["b", "buffer"], ["h", "git change"],
-    ["(", "unclosed ("], ["{", "unclosed {"], ["s", "misspelt word"], ["<Space>", "blank line above"],
+    ["(", "unclosed ("], ["{", "unclosed {"], ["s", "misspelled word"], ["<Space>", "blank line above"],
   ] },
   "]": { title: "] (on to the next…)", keys: [
     ["d", "diagnostic"], ["q", "quickfix entry"], ["b", "buffer"], ["h", "git change"],
-    [")", "unclosed )"], ["}", "unclosed }"], ["s", "misspelt word"], ["<Space>", "blank line below"],
+    [")", "unclosed )"], ["}", "unclosed }"], ["s", "misspelled word"], ["<Space>", "blank line below"],
   ] },
   "<C-w>": { title: "ctrl w (windows)", keys: [
     ["v", "split beside"], ["s", "split below"], ["h j k l", "go left, down, up, right"],

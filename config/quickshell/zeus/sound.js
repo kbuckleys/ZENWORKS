@@ -216,7 +216,7 @@ function parseCards(text) {
       // any other top-level section of the block — Ports:, Formats:, …
       inProfiles = false;
     // The key is the whole non-space run up to the colon-space, and the label
-    // is everything before the LAST parenthesised group. Both matter, and both
+    // is everything before the LAST parenthesized group. Both matter, and both
     // were got wrong by the obvious pattern:
     //
     //   output:analog-stereo+input:analog-stereo: Analog Stereo Duplex (…)

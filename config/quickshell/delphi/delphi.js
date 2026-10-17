@@ -256,7 +256,7 @@ function diffStats(files) {
 }
 
 // ── HISTORY ─────────────────────────────────────────────────────────────
-// The graph's colours, by the daemon's colour number. Slot names, again.
+// The graph's colors, by the daemon's color number. Slot names, again.
 var LANES = ["cyan", "magenta", "green", "yellow", "blue", "red", "sand", "pink"];
 function laneInk(n) { return LANES[((n % LANES.length) + LANES.length) % LANES.length]; }
 
@@ -502,7 +502,7 @@ function hubOf(remotes, own) {
 
 // ── AT A GLANCE ─────────────────────────────────────────────────────────
 // What a repository's summary (delphi/core summaries) says needs doing, as
-// words for Repositories' rows, each with a Zenon colour's name; empty when
+// words for Repositories' rows, each with a Zenon color's name; empty when
 // there is nothing. ci: what its forge's checks said of its head, or null.
 function attentionOf(s, ci) {
   var out = [];
@@ -524,7 +524,7 @@ function secondsOf(iso) {
 }
 
 // What a pull request or an issue is, by its mark: { glyph, ink, word } —
-// ink a Zenon colour's name
+// ink a Zenon color's name
 function forgeMark(r) {
   if (!r) return { glyph: "", ink: "muted", word: "" };
   if (r.pull) {
@@ -552,7 +552,7 @@ function mdOf(text) {
 }
 
 // A release's markdown for MarkdownText with every line kept as written
-// (user, 2026-10-12: the preview did not honour blank lines). GitHub keeps
+// (user, 2026-10-12: the preview did not honor blank lines). GitHub keeps
 // a release's single newlines; Qt joined them, and spaced a paragraph no
 // more than a line. A text line before another becomes a hard break; a run
 // of blank lines between text, that many no-break-space lines (a line of
@@ -677,7 +677,7 @@ function ciWords(c) {
 }
 
 // A commit's signature, from git's %G? and %GG: null when unsigned.
-// { glyph, words, ink } — ink a Zenon colour's name. "Can't check" is a
+// { glyph, words, ink } — ink a Zenon color's name. "Can't check" is a
 // signature git has no key to check against here (not a bad one).
 function signatureOf(code, signer) {
   var c = String(code || "N");

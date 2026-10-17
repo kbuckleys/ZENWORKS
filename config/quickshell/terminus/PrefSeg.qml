@@ -3,7 +3,7 @@
 // └─┘└─┘┘└┘└┴┘└─┘┴└─┴ ┴└─┘
 // https://github.com/kbuckleys/
 //
-// A column label that sorts, which is the only header behaviour this window
+// A column label that sorts, which is the only header behavior this window
 // has. The caret marks the active column, the same way zeus' does.
 // ── the row of column headings ──────────────────────────────────────────
 // Both panes need one and neither can borrow the other's, because each is
@@ -16,7 +16,7 @@
 // they agreed on nothing: not the height, not the corner, not what "this is
 // the one Return takes" looks like.
 //
-// `ink` is the colour it answers in and `primary` says it is the default.
+// `ink` is the color it answers in and `primary` says it is the default.
 // The primary one BREATHES, because a card whose default action is the
 // dangerous one should say which is which without being read twice.
 // ── a row of exclusive choices in the settings panel ────────────────────
@@ -136,7 +136,7 @@ Item {
           || seg.allowed.indexOf(segBtn.modelData) >= 0
         readonly property bool on: seg.current === segBtn.modelData
         // PRESSED, DARKENED as ClearChip and Segments are (user, 2026-10-15)
-        color: segPress.pressed && segBtn.ok ? Zenon.darken(0.35)
+        color: segPress.pressed && segBtn.ok ? Zenon.pressFill
           : segBtn.on
           ? Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b, 0.18)
           : (segHov.hovered && segBtn.ok ? Zenon.surface : "transparent")
@@ -152,7 +152,7 @@ Item {
           text: segBtn.modelData
           elide: Text.ElideRight
           color: segBtn.on ? Zenon.cyan : Zenon.accentKey
-          opacity: segPress.pressed ? 0.55 : 1
+          opacity: segPress.pressed ? Zenon.pressDim : 1
           font.family: Zenon.face
           font.weight: Zenon.weight
           font.pixelSize: Zenon.px(14)

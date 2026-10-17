@@ -5,7 +5,7 @@
 //
 // ── a continuous setting in the settings panel ──────────────────────────
 // Opacity and zoom are both a narrow useful range where the difference
-// between two neighbouring values is something you judge by looking at the
+// between two neighboring values is something you judge by looking at the
 // window rather than by counting presses. Which is a slider, twice.
 //
 // Its own file since 2026-10-08, out of TerminusWindow.qml, where it was an
@@ -47,7 +47,7 @@ Item {
   // rather than as something you have changed
   property real neutral: -1
   // Wide enough for the longest label the panel actually uses. At 88 "Text
-  // size" came out as "Text s…", which is a slider labelled by a guess.
+  // size" came out as "Text s…", which is a slider labeled by a guess.
   property real labelW: 116
   // One notch of the wheel. A fraction of the span by default, so a slider
   // that says nothing still behaves; the zoom passes the same 0.1 its keys

@@ -387,7 +387,7 @@ LayerPopup {
 
   // ── THE KEYS, DRAWN AS KEYS ──────────────────────────────────────────
   // They were a run of rich text with the key in bold and the word after it
-  // in grey — which asks the reader to find where one hint ends and the next
+  // in gray — which asks the reader to find where one hint ends and the next
   // begins from weight alone. A chip says "this is a key you press" the way
   // the rest of this desktop says it, and a chip with its word beside it is
   // one object rather than two runs that happen to be adjacent.
@@ -648,7 +648,7 @@ LayerPopup {
             // the whole shell — see morpheus/Elastic.qml. Inside the view
             // rather than over it: it pins itself to the viewport.
             ElasticScroll { view: grid }
-            // CENTRED AT ITS OWN WIDTH, not filling the pane. The panel is a
+            // CENTERED AT ITS OWN WIDTH, not filling the pane. The panel is a
             // whole number of cells wide except when the footer's floor is
             // holding it open, and then the leftover belongs on both sides
             // of the pictures rather than all of it on the right.
@@ -727,7 +727,7 @@ LayerPopup {
           Column {
             anchors.fill: parent
 
-            // ONE LINE: the count, then the keys, centred together — it was
+            // ONE LINE: the count, then the keys, centered together — it was
             // the count over the keys, two rows of strip under a grid that
             // wants the height
             Row {

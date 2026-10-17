@@ -52,8 +52,8 @@ Variants {
       value: Picasso.accentFor(surface.want) || "transparent"
     }
 
-    // A colour is not a file: nothing is loaded for it, the scene's ground
-    // simply turns that colour and the picture frame fades out over it.
+    // A color is not a file: nothing is loaded for it, the scene's ground
+    // simply turns that color and the picture frame fades out over it.
     readonly property string solid: Art.colorOf(surface.want)
     property bool wasSolid: false
 
@@ -180,8 +180,8 @@ Variants {
       // Asked of `want` itself, not of `solid`: this runs from onWantChanged,
       // which can fire before the binding on `solid` has caught up.
       if (Art.isColor(surface.want)) { surface.wasSolid = true; return; }
-      // Coming back from a colour: what the frame was holding is a picture
-      // from before the colour, and letting it fade back in on its way to
+      // Coming back from a color: what the frame was holding is a picture
+      // from before the color, and letting it fade back in on its way to
       // the new one would show a background nobody asked for.
       if (surface.wasSolid) {
         surface.wasSolid = false;
@@ -190,7 +190,7 @@ Variants {
       // Compared by the PATH each frame was given, not by reading its URL
       // back: the URL is percent-encoded (see Strings.fileUrl), and one
       // stripped of "file://" no longer matched a path with a space or a #
-      // in it — so the double buffer never recognised its own picture.
+      // in it — so the double buffer never recognized its own picture.
       const frontSrc = surface.front.path;
       const backSrc = surface.back.path;
       if (surface.want === frontSrc)
@@ -304,7 +304,7 @@ Variants {
       // THIS surface's monitor, not a global. The Wall component is declared
       // inside the per-screen surface, so `surface.modelData` is the output
       // it is painting — which is the whole point of the fit being per
-      // monitor: the portrait screen can centre what the landscape one crops.
+      // monitor: the portrait screen can center what the landscape one crops.
       readonly property int fillMode: Picasso.fillModeFor(
         surface.modelData ? surface.modelData.name : "")
       anchors.fill: parent
@@ -425,7 +425,7 @@ Variants {
       // block exists for — is never re-decoded, because its natural size is
       // larger than the cover size and the clamp changes nothing. And if
       // magick is missing the sizes stay 0, the clamp is skipped, and the
-      // behaviour is simply the uncapped cover.
+      // behavior is simply the uncapped cover.
       property int _natW: 0
       property int _natH: 0
 
@@ -439,7 +439,7 @@ Variants {
       // area is made into a cover-sized jpeg by ImageMagick in its own
       // process — once, kept in the cache by path, time, size and screen
       // size — and that is what Qt decodes. The background on screen stays
-      // until it is ready. Not for "centred" and "tiled", which show the
+      // until it is ready. Not for "centered" and "tiled", which show the
       // picture at its own size, and not for an animation.
       //
       // `useFile` is what the still is given: "" while the probe is out.
@@ -527,7 +527,7 @@ Variants {
       on_CoverWChanged: regrow.restart()
       on_CoverHChanged: regrow.restart()
       Timer { id: sizeLater; interval: 50; onTriggered: wall._measure() }
-      // centred or tiled shows the picture at its own size: never the copy
+      // centered or tiled shows the picture at its own size: never the copy
       onNaturalChanged: wall._measure()
       Component.onCompleted: wall._measure()
 
@@ -594,8 +594,8 @@ Variants {
         accent: surface.accent
         thumb: surface.solid === "" ? Picasso.thumbFor(surface.want) : ""
 
-        // Both Walls live in one frame that fades out under a colour, so
-        // the double buffer below never has to know colours exist.
+        // Both Walls live in one frame that fades out under a color, so
+        // the double buffer below never has to know colors exist.
         Item {
           anchors.fill: parent
           opacity: surface.solid === "" ? 1 : 0

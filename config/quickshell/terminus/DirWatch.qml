@@ -337,12 +337,12 @@ Item {
     // unreadable and untraversable directories are dropped — and the shell
     // then execs into inotifywait, so stopping the Process stops the
     // watcher rather than orphaning it behind a pipe.
-    shutWatchProc.command = ["sh", "-c",
+    shutWatchProc.command = Paths.tether(["sh", "-c",
       'n=$#; while [ "$n" -gt 0 ]; do d=$1; shift; n=$((n-1)); '
       + 'if [ -d "$d" ] && [ -r "$d" ] && [ -x "$d" ]; then set -- "$@" "$d"; fi; done; '
       + '[ "$#" -gt 0 ] || exit 0; '
       + 'exec inotifywait -m -q -e create -e delete -e moved_to -e moved_from -- "$@"',
-      "sh"].concat(dirs);
+      "sh"].concat(dirs));
     shutWatchProc.running = true;
   }
   Process {

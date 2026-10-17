@@ -38,7 +38,7 @@
 // ── A PICTURE OVER EACH WORD (`art`, 2026-10-14) ───────────────────────
 // For a switch whose choices are shapes (picasso's Fit): `art` is a
 // Component made once per part, above its word, `artH` tall. It reads
-// `parent.value` (the part's value) and `parent.ink` (its word's colour).
+// `parent.value` (the part's value) and `parent.ink` (its word's color).
 //
 // terminus' PrefSeg is the settings panel's own (enrolled with its window
 // for the keyboard); this is the one for anywhere else.
@@ -65,10 +65,16 @@ Item {
   // (picasso's card: a look staged, a slideshow on)
   property var dotted: []
   property var faint: []
+  // { value: color } — a part that wears an ink of its own, lit or not
+  // (ceres' Updates while a restart is owed)
+  property var inks: ({})
   property string hot: ""
   property var heldAt: null
   property int buttons: Qt.LeftButton
   property int weight: Font.Bold
+  // the glyph before a label (glyphOf); terminus' crumbs set it with the
+  // label to the title weight
+  property int glyphWeight: Zenon.weight
   property real pad: 28
   property bool keys: false
   property var glyphOf: null
@@ -145,7 +151,7 @@ Item {
   // switch's parts are its width shared out, so where the chosen one is
   // needs no part to have been laid out; only a sized-by-words switch reads
   // its part. And it does not SLIDE until it has been seen at its size — its
-  // first place is taken, not travelled to from where an unsized, hidden
+  // first place is taken, not traveled to from where an unsized, hidden
   // switch would have put it.
   readonly property real partW: (segs.width - 2) / Math.max(1, segs.options.length)
   property bool settled: false
@@ -203,7 +209,7 @@ Item {
           width: parent.width - 4
           height: parent.height - 4
           radius: Math.max(0, Zenon.windowRadius - 2)
-          color: Zenon.darken(0.35)
+          color: Zenon.pressFill
           visible: press.pressed && one.ok
         }
         // a drag over it: lit as a directory about to take one
@@ -251,9 +257,10 @@ Item {
           anchors.verticalCenterOffset: segs.artRoom / 2 - segs.noteRoom / 2
           anchors.horizontalCenterOffset: mark.room / 2
           text: one.modelData[1]
-          color: one.on || segs.hot === one.modelData[0] ? Zenon.cyan : segs.ink
+          color: segs.inks[one.modelData[0]] !== undefined ? segs.inks[one.modelData[0]]
+            : one.on || segs.hot === one.modelData[0] ? Zenon.cyan : segs.ink
           opacity: !one.ok ? 0.35
-            : press.pressed ? 0.55
+            : press.pressed ? Zenon.pressDim
             : segs.faint.indexOf(one.modelData[0]) >= 0 && segs.hot !== one.modelData[0] ? 0.45 : 1
           Behavior on color { ColorAnimation { duration: Zenon.fast } }
           font.family: Zenon.face
@@ -263,7 +270,7 @@ Item {
         }
         // its glyph, before the word, in the word's ink. A step with no
         // word is its glyph alone (home in the crumbs), so the gap goes too
-        // and the glyph sits centred.
+        // and the glyph sits centered.
         Text {
           id: mark
           readonly property real gap: label.text !== "" ? 7 : 0
@@ -276,7 +283,7 @@ Item {
           color: label.color
           opacity: label.opacity
           font.family: Zenon.face
-          font.weight: Zenon.weight
+          font.weight: segs.glyphWeight
           font.pixelSize: Math.round(segs.textSize * 1.05)
         }
         Text {

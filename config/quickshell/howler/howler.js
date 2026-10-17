@@ -65,7 +65,7 @@ function capturePictures(row) {
 }
 
 // A body as StyledText may show it. A notification's body is whatever the
-// sender put there, and StyledText honours <img src=…> — a remote URL
+// sender put there, and StyledText honors <img src=…> — a remote URL
 // included, which is a tracking pixel fetched the moment the toast draws.
 // Images come in through the notification's own image field, which the
 // sender cannot point anywhere this shell does not already look.

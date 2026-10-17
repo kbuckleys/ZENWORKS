@@ -52,7 +52,7 @@ Item {
   // what it is about, one a line — the first `maxItems`, then how many more.
   // A string is a line as it is (a partition and its size); a FILE is an
   // object with a name — terminus' own rows, or { name, isDir } — and is
-  // drawn as a listing draws it: its glyph, in its colour, beside the name.
+  // drawn as a listing draws it: its glyph, in its color, beside the name.
   property var items: []
   property int maxItems: 8
   property var choices: []
@@ -112,7 +112,7 @@ Item {
     readonly property real room: cb.headless
       ? cb.width - 18 - 24 - answers.width - 14 : cb.width - 36
     x: 18
-    // headless, on the answers' line, centred against them
+    // headless, on the answers' line, centered against them
     y: cb.headless ? answers.y + Math.round((answers.height - height) / 2)
       : head.y + head.height + 8
     spacing: 7

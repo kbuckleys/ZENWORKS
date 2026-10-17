@@ -35,8 +35,8 @@ QtObject {
     return "'" + String(s ?? "").replace(/'/g, "'\\''") + "'";
   }
 
-  // The palette as plain 6-digit hex strings, for the places that need colour
-  // as TEXT rather than as a colour: rich-text markup, and terminus' translation
+  // The palette as plain 6-digit hex strings, for the places that need color
+  // as TEXT rather than as a color: rich-text markup, and terminus' translation
   // of bat's ANSI output. Zenon owns the values; this is only the form.
   function zenonHex() {
     return {

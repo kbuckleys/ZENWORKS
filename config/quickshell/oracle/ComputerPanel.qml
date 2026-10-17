@@ -104,7 +104,7 @@ Item {
         }
       }
 
-      // the inks, as fastfetch ends with its colour blocks
+      // the inks, as fastfetch ends with its color blocks
       Row {
         visible: pc.rows.length > 0
         topPadding: 8

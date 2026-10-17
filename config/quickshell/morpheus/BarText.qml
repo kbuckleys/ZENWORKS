@@ -25,7 +25,7 @@ Text {
   font.weight: Font.Bold
   font.pixelSize: root.numeric ? Zenon.clockSize : Zenon.textSize
   // TABULAR DIGITS: every digit the same width, so a reading that ticks
-  // from 9% to 10% or 1.1 to 0.9 MB/s does not shove its neighbours along.
+  // from 9% to 10% or 1.1 to 0.9 MB/s does not shove its neighbors along.
   // JetBrains Mono's digits are already even; the setting takes any Nerd
   // Font, and a proportional one made the bar breathe with every sample.
   font.features: { "tnum": 1 }

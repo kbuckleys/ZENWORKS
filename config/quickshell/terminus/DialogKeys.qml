@@ -346,7 +346,7 @@ Item {
       }
       if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
         // SHIFT GOES THERE WITHOUT LEAVING HERE — the same shift the
-        // listing's own open honours, and only for `go`: a copy has
+        // listing's own open honors, and only for `go`: a copy has
         // nowhere to arrive that a tab could show.
         term.sendToRef.choose((event.modifiers & Qt.ShiftModifier) !== 0);
         return;

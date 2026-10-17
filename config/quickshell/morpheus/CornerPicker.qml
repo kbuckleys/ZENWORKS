@@ -72,7 +72,7 @@ PopupWindow {
   readonly property int cellH: Math.round(root.cellW * 0.6)
   readonly property int gridH: root.rows * root.cellH + (root.rows - 1) * root.gap
   readonly property int cardH: root.gridH + root.pad * 2
-    + (root.autoShown ? Zenon.menuSepHeight + Zenon.menuRowHeight + Zenon.menuCardPad : 0)
+    + (root.autoShown ? Zenon.menuSepHeight + Zenon.menuRowHeight + 2 : 0)   // + the border: the row runs flush to it
 
   // ── the arrival, as every card on this desktop does it ───────────────
   property real shade: 0
@@ -216,13 +216,11 @@ PopupWindow {
 
       Rectangle {
         anchors.fill: parent
-        // across the card to just inside its border, as every menu's band
-        // (CardBody); the card's last row, so it rounds into its corners
-        anchors.leftMargin: 1 - Zenon.menuCardPad
-        anchors.rightMargin: 1 - Zenon.menuCardPad
-        bottomLeftRadius: Math.max(0, Zenon.menuRadius - Zenon.menuCardPad)
-        bottomRightRadius: Math.max(0, Zenon.menuRadius - Zenon.menuCardPad)
-        color: autoMa.containsMouse ? Zenon.border : "transparent"
+        // flush to the border, square, as every menu's band (CardBody);
+        // the card's last row, so its clip rounds it into the corners
+        anchors.leftMargin: -Zenon.menuCardPad
+        anchors.rightMargin: -Zenon.menuCardPad
+        color: autoMa.containsMouse ? Zenon.menuHi : "transparent"
       }
 
       Text {

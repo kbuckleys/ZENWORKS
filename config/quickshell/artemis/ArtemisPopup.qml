@@ -49,7 +49,7 @@ LayerPopup {
 
   // The query the DELEGATES highlight against, updated on the debounce
   // rather than on the keystroke. `query` still moves immediately (the field
-  // has to feel live), but every visible row re-runs highlightedPreview and
+  // has to feel live), but every visible row re-runs Artemis.rowLines and
   // a full RichText reparse whenever this changes, and doing that against
   // results that have not arrived yet was pure waste.
   property string highlightQuery: ""
@@ -103,7 +103,7 @@ LayerPopup {
 
   // ── THE KEYS, DRAWN AS KEYS ──────────────────────────────────────────
   // The hints were rich text with the key in bold and its word after it in
-  // grey, and the colours were hex literals inside artemis.js — the palette
+  // gray, and the colors were hex literals inside artemis.js — the palette
   // said twice. A chip says "this is a key you press" the way the rest of
   // this desktop says it, and takes its ink from Zenon like everything else.
   //
@@ -115,27 +115,31 @@ LayerPopup {
   // A thousand pixels was the answer to every search: three short paths got
   // the same panel as a screen full of deep ones, most of it empty. The row
   // face is monospaced for measuring purposes — the delegate already fits
-  // its path by counting characters against textMetrics — so the width a
+  // its path by counting characters against the metrics — so the width a
   // result wants is arithmetic, not a layout pass. 68 is the chrome the
   // delegate spends either side of the text: 16 margin, a 26 glyph, 10 of
   // gap, 16 margin.
   //
-  // The RAW preview is what is measured, never the fitted one: fitPath
-  // shortens to whatever the width allows, so measuring the result of that
-  // would be the width deciding itself.
-  readonly property int rowChars: {
-    let n = 0;
+  // Two lines now (see Artemis.rowLines), each in its own face, so a row
+  // wants the wider of its name and its directory. The RAW lines are what is
+  // measured, never the fitted ones: rowLines shortens the directory to
+  // whatever the width allows, so measuring the result of that would be the
+  // width deciding itself.
+  readonly property string home: Quickshell.env("HOME")
+  readonly property real rowWant: {
+    let w = 0;
     for (let i = 0; i < popup.rows.length; ++i) {
-      const p = popup.rows[i].preview;
-      if (p && p.length > n) n = p.length;
+      const s = Artemis.shownPath(popup.rows[i].path, popup.home);
+      const cut = Artemis.nameAt(s);
+      w = Math.max(w, (s.length - cut) * textMetrics.advanceWidth,
+                   cut * pathMetrics.advanceWidth);
     }
-    return n;
+    return w;
   }
-  readonly property int rowCellW:
-    Math.ceil(popup.rowChars * textMetrics.advanceWidth) + 68
+  readonly property int rowCellW: Math.ceil(popup.rowWant) + 68
 
   // NO NARROWER THAN ITS OWN FOOTER. The hint strip is a row of chips
-  // centred in the panel and its contents change with the mode (dirsOnly
+  // centered in the panel and its contents change with the mode (dirsOnly
   // reworks them), so the floor is measured off the row itself rather than
   // guessed at with a literal that would be wrong the day a hint is
   // reworded. No circle: what the row is wide is decided by the chips and
@@ -147,7 +151,7 @@ LayerPopup {
   // shell.qml reads this for the morphed pill's width; it used to be the
   // literal 1000 in both files, with nothing keeping them equal. 1000 is
   // still the ceiling, under whatever Zenon.layerMax currently is.
-  readonly property int panelWidth: popup.rowChars === 0
+  readonly property int panelWidth: popup.rows.length === 0
     ? popup.minW : Math.max(popup.minW, Math.min(1000, popup.rowCellW))
   readonly property int panelTarget: Zenon.layerWidth(popup.panelWidth)
 
@@ -164,8 +168,9 @@ LayerPopup {
     NumberAnimation { duration: Zenon.slow; easing.type: Zenon.ease }
   }
 
-  readonly property int textCellH: 32
-  readonly property int textRows: 12
+  // two lines, the same height as folio's (see Artemis.rowLines)
+  readonly property int textCellH: 52
+  readonly property int textRows: 8  // two-line rows are taller; 8 of them (user 2026-10-17)
   readonly property int msgH: 28
   readonly property int textColsUsed: 1
   readonly property int textRowsNeeded: Math.min(Math.max(1, Math.ceil(popup.rows.length / popup.textColsUsed)), popup.textRows)
@@ -180,6 +185,14 @@ LayerPopup {
     font.family: Zenon.face
     font.pixelSize: Zenon.px(16)
     font.weight: 600
+    text: "M"
+  }
+  // the second line's face — see the path Text in the delegate
+  TextMetrics {
+    id: pathMetrics
+    font.family: Zenon.face
+    font.pixelSize: Zenon.px(13)
+    font.weight: Zenon.weight
     text: "M"
   }
 
@@ -383,7 +396,7 @@ LayerPopup {
     searchProc.nextGen = popup.searchGen
     // Killing a process is asynchronous, so the old run is stopped and the
     // new one started from its exit. Setting `generation` and `running` on
-    // the spot relabelled the OLD run as the new one — its reply then passed
+    // the spot relabeled the OLD run as the new one — its reply then passed
     // the generation check — and the start itself was a no-op, so the new
     // search never ran and `searching` stayed up.
     if (searchProc.running) { searchProc.running = false; return }
@@ -737,7 +750,9 @@ LayerPopup {
               selectionColor: Zenon.magenta
               selectedTextColor: Zenon.onAccent
               font.family: Zenon.face
-              font.weight: Font.Bold
+              // the rows' weight, so what you type and what it found read as
+              // one hand (user 2026-10-17); it was Bold
+              font.weight: 600
               font.pixelSize: Zenon.px(18)
               verticalAlignment: Text.AlignVCenter
               focus: true
@@ -774,7 +789,7 @@ LayerPopup {
           height: parent.height - inputBar.height - msgBar.height
 
           // ── WHEN THERE ARE NO ROWS ─────────────────────────────────────
-          // Three different answers, and a line of grey text was all three.
+          // Three different answers, and a line of gray text was all three.
           // Nothing matched is terminus' mark — the same lens over the same
           // word — and the body grows to hold it (see emptyH). Still out is
           // the shell's dots. Nothing typed and nothing yet opened is the
@@ -831,8 +846,8 @@ LayerPopup {
             // ── THE CARET, AND NOTHING ELSE ────────────────────────────────
             // One selection for the whole list, sliding between rows rather
             // than jumping — a fill per delegate could only ever blink from
-            // one to the next. selBg is the suite's selection ground; the
-            // magenta edge ties it to the field you are typing into.
+            // one to the next. menuHi is the suite's menu cursor, flush and
+            // unmarked, the same band every menu slides.
             //
             // A row used to tint under the pointer as well, which said "this
             // is the one" about a row that was not — the selection is moved
@@ -855,16 +870,9 @@ LayerPopup {
               height: fileGrid.cellHeight
               y: Math.floor(popup.sel / popup.textColsUsed) * fileGrid.cellHeight
               visible: popup.rows.length > 0
-              color: Zenon.selBg
+              // the suite's menu cursor, no edge mark (user 2026-10-17)
+              color: Zenon.menuHi
               Behavior on y { NumberAnimation { duration: Zenon.fast; easing.type: Zenon.ease } }
-              Rectangle {
-                anchors.left: parent.left
-                anchors.verticalCenter: parent.verticalCenter
-                width: 2
-                height: parent.height - 12
-                radius: 1
-                color: popup.dirsOnly ? popup.dirColor : Zenon.magenta
-              }
             }
             // Each row carries a RichText, a glyph, a flash, an animation, a
             // Connections and a MouseArea. Handing the view a fresh array used to destroy and
@@ -997,35 +1005,52 @@ LayerPopup {
                   font.pixelSize: Zenon.px(22)
                 }
 
-                Text {
-                  anchors.fill: parent
+                // NAME OVER PATH, as folio's entries are (user 2026-10-17).
+                // Both lines come out of one rowLines call, so a query is
+                // matched once and lit wherever it landed. THE TARGET WIDTH,
+                // not the live one: the panel follows the pill while it
+                // morphs, so measuring against the view would re-fit and
+                // re-mark-up every row on every frame of the animation for an
+                // answer only correct at the end of it.
+                readonly property var lines: Artemis.rowLines(
+                  row.modelData.path, popup.highlightQuery, popup.home,
+                  Math.max(1, Math.floor((popup.panelTarget - 68) / pathMetrics.advanceWidth)),
+                  String(Zenon.magenta))
+
+                Column {
+                  anchors.left: parent.left
+                  anchors.right: parent.right
                   anchors.leftMargin: 16 + 26 + 10
                   anchors.rightMargin: 16
-                  text: {
-                    // THE TARGET WIDTH, not the live one. The panel follows the
-                    // pill while it morphs, so measuring against the view would
-                    // re-fit and re-mark-up every row on every frame of the
-                    // animation for an answer only correct at the end of it.
-                    const avail = Math.max(1, Math.floor(
-                      (popup.panelTarget - 32 - 36) / textMetrics.advanceWidth))
-                    // the parent path recedes, so the NAME is what reads down
-                  // the column; matched letters are lit in either part
-                  return Artemis.highlightedPreview(
-                      Artemis.fitPath(modelData.preview, avail), popup.highlightQuery,
-                      { match: String(Zenon.magenta), dim: String(popup.hintColor) })
+                  anchors.verticalCenter: parent.verticalCenter
+                  spacing: 2
+
+                  Text {
+                    width: parent.width
+                    text: face.lines.name
+                    color: row.modelData.isDir ? popup.dirColor : popup.fgColor
+                    textFormat: Text.RichText
+                    font.family: Zenon.face
+                    font.weight: 600
+                    font.pixelSize: Zenon.px(16)
+                    clip: true
+                    // No `elide` on either line: RichText is measured after
+                    // the markup is parsed, so eliding fights the manual fit
+                    // and the manual one always won anyway.
+                    wrapMode: Text.NoWrap
                   }
-                  color: modelData.isDir ? popup.dirColor : popup.fgColor
-                  textFormat: Text.RichText
-                  font.family: Zenon.face
-                  font.weight: 600
-                  font.pixelSize: Zenon.px(16)
-                  clip: true
-                  // No `elide` here: RichText is measured after the markup is
-                  // parsed, so eliding fights the manual fit above and the
-                  // manual one always won anyway.
-                  wrapMode: Text.NoWrap
-                  horizontalAlignment: Text.AlignLeft
-                  verticalAlignment: Text.AlignVCenter
+
+                  Text {
+                    width: parent.width
+                    text: face.lines.dir
+                    color: popup.hintColor
+                    textFormat: Text.RichText
+                    font.family: Zenon.face
+                    font.weight: Zenon.weight
+                    font.pixelSize: Zenon.px(13)
+                    clip: true
+                    wrapMode: Text.NoWrap
+                  }
                 }
               }
 

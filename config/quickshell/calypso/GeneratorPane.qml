@@ -122,7 +122,7 @@ Item {
         horizontalAlignment: Text.AlignHCenter
         wrapMode: Text.WrapAnywhere
         textFormat: Text.StyledText
-        // digits and symbols in their own colours, as 1Password sets them
+        // digits and symbols in their own colors, as 1Password sets them
         text: {
           let out = "";
           for (const ch of Array.from(gen.value)) {

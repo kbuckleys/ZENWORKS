@@ -9,7 +9,7 @@
 --                  outline both (nvim's matchparen marks them with window
 --                  matches, which a frame never reads — and it is off)
 --   rainbow(...)   every bracket on a line with its depth, for view.lua to
---                  colour by level (the settings' "Rainbow brackets")
+--                  color by level (the settings' "Rainbow brackets")
 --
 -- A LINE SCANNER, NOT A PARSER. Most of plato's languages have no compiled
 -- treesitter parser here, so brackets are found by reading the line: quoted

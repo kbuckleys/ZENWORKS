@@ -170,13 +170,13 @@ Item {
       id: card
       implicitWidth: content.implicitWidth + 56
       implicitHeight: content.height + 28
-      // NOT CENTRED IN ITS PARENT, and this was the whole of "the OSD has no
+      // NOT CENTERED IN ITS PARENT, and this was the whole of "the OSD has no
       // background": the card's implicit size is measured from `content`, so
       // anchoring `content` to the card is a size that depends on itself. QML
       // breaks that loop by calling it zero — a rectangle of no size paints no
-      // fill and no border, while the Row inside it, which is centred on that
+      // fill and no border, while the Row inside it, which is centered on that
       // zero, carries on drawing. The meter and the text with nothing behind
-      // them was a binding loop, not a missing colour.
+      // them was a binding loop, not a missing color.
       x: 0
       y: 0
 
@@ -198,7 +198,7 @@ Item {
         id: content
         x: 28
         y: 14
-        // AN EXPLICIT HEIGHT, for the same reason the card is not centred in.
+        // AN EXPLICIT HEIGHT, for the same reason the card is not centered in.
         // Its children anchor to this Row's verticalCenter, and a Row measures
         // itself FROM its children — so leaving the height implicit made the
         // children's position depend on a height that depended on them, and

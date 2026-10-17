@@ -28,12 +28,12 @@
 // A library now (2026-10-09): `Strings`, the QML singleton it needs, comes in
 // through qs.morpheus — see the header above.
 
-// THE SEVEN, and the Zenon colour each one means. A tag may be any string
-// at all; these are the names that come with a colour already, so "red"
+// THE SEVEN, and the Zenon color each one means. A tag may be any string
+// at all; these are the names that come with a color already, so "red"
 // is red the first time it is typed and nothing has to be seeded into the
 // state file for that to be true.
 //
-// Named for the COLOUR rather than mapped one-to-one onto Zenon's own
+// Named for the COLOR rather than mapped one-to-one onto Zenon's own
 // names, because the two vocabularies disagree: Zenon's `yellow` is
 // #fab387, which is orange, and the yellow a person means is `sand`.
 .pragma library
@@ -57,7 +57,7 @@ var PRESETS = [
   { name: "grey",   ink: "muted" }
 ];
 
-// The Zenon colour name for a tag, or "" if it is not one of the seven.
+// The Zenon color name for a tag, or "" if it is not one of the seven.
 function presetInk(name) {
   for (var i = 0; i < PRESETS.length; ++i)
     if (PRESETS[i].name === name) return PRESETS[i].ink;
@@ -197,7 +197,7 @@ function writeManyCommand(pairs) {
 // beside the picture. "photo.jpg.xmp" (darktable's and digiKam's name) is
 // what is written; "photo.xmp" (Lightroom's) is read too, and written to
 // when it is the one already there. The star is xmp:Rating 5 — a rating of
-// five reads as the favourite, and a picture starred here is rated five.
+// five reads as the favorite, and a picture starred here is rated five.
 // Kept alongside the attribute, never instead of it: the attribute is what
 // terminus' tag pages index.
 var FAVOURITE = "favourite";
@@ -253,7 +253,7 @@ function sidecarRating(starred, had) {
 
 // The writes, as one argv: for each of `pairs` ({ path, names, rating },
 // rating as sidecarRating answers it) its sidecar gets exactly these
-// subjects — the favourite goes as the rating, not as a word. Made from
+// subjects — the favorite goes as the rating, not as a word. Made from
 // nothing when it is not there yet. The words go through an argument file,
 // one a line, so no tag is ever shell text.
 function writeSidecarsArgv(pairs, present) {
@@ -341,7 +341,7 @@ function toggleAcross(current, paths, tag) {
 //
 // MERGING IS ALLOWED, and is the useful case as often as not: renaming
 // "recieve" to "receive" when "receive" already exists should end with one
-// tag on the union of both sets, not with a refusal. normalise dedupes, so
+// tag on the union of both sets, not with a refusal. normalize dedupes, so
 // a file carrying both ends up carrying it once.
 function renamePairs(index, from, to) {
   var want = normalise([to])[0] || "";

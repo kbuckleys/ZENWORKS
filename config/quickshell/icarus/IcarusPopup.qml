@@ -240,13 +240,13 @@ Item {
   // column instead reads as a ransom note. Nothing is wrong with any
   // individual glyph; the problem is only ever the mixture.
   //
-  // centred model for root: files, recent, apps, home, trash, then this
+  // centered model for root: files, recent, apps, home, trash, then this
   // shell — which is where backgrounds live now — and the session it is
   // running in.
   //
   // BUILT rather than written out, because three of these rows are switches in
   // oracle now. A literal list with `enabled: false` on a switched-off row
-  // would still DRAW it — greyed out and unreachable, which reads as "this is
+  // would still DRAW it — grayed out and unreachable, which reads as "this is
   // broken" where the truth is "you asked for it not to be here". So a row
   // that is off is not in the list at all, and the SEPARATORS are placed
   // around whatever survived rather than written between fixed rows:
@@ -331,7 +331,7 @@ Item {
   function openAt(pos, clickedScreen) {
     // clickedScreen is the monitor where the right-click landed. The spec
     // says "on focused monitor" — the click focuses that monitor, so by the
-    // time the handler fires focusedScreen === clickedScreen. Honour the
+    // time the handler fires focusedScreen === clickedScreen. Honor the
     // explicit screen to avoid a one-frame race where the binding hasn't
     // caught up yet.
     if (clickedScreen) root.screen = clickedScreen;
@@ -1179,7 +1179,7 @@ Item {
   // ── OPENING A BRANCH ON HOVER ─────────────────────────────────────────
   // A submenu that opened the instant the pointer crossed its row would
   // flicker open and shut all the way down a menu. It waits instead, and the
-  // wait is cancelled by moving onto anything else.
+  // wait is canceled by moving onto anything else.
   //
   // ONE timer. There were five, identical but for the kind they opened, and
   // every caller had to remember to stop the other four.
@@ -1460,7 +1460,7 @@ Item {
     implicitHeight: {
       if (!root.screen) return 300 + Zenon.menuShadowPad * 2;
       const maxBgH = root.screen.height - Zenon.menuShadowPad * 2;
-      return Math.min(appsContent.implicitHeight + 8, maxBgH) + Zenon.menuShadowPad * 2;
+      return Math.min(appsContent.implicitHeight + 2, maxBgH) + Zenon.menuShadowPad * 2;
     }
 
     margins.left: {
@@ -1491,7 +1491,9 @@ Item {
       Column {
         id: appsContent
         anchors.fill: parent
-        anchors.margins: Zenon.menuCardPad
+        // sideways only: the rows run flush to the border top and bottom
+        anchors.leftMargin: Zenon.menuCardPad
+        anchors.rightMargin: Zenon.menuCardPad
         spacing: 0
 
         // ── the scroll, and why it is an overlay ──────────────────────
@@ -1552,13 +1554,12 @@ Item {
 
                 Rectangle {
                   anchors.fill: parent
-                  // across the card to just inside its border (the column is
-                  // inset by menuCardPad), as every menu's band — CardBody
-                  anchors.leftMargin: 1 - Zenon.menuCardPad
-                  anchors.rightMargin: 1 - Zenon.menuCardPad
-                  topRightRadius: appEntry.index === 0 ? Math.max(0, Zenon.menuRadius - Zenon.menuCardPad) : 0
-                  bottomRightRadius: appEntry.index === appsRepeater.count - 1 ? Math.max(0, Zenon.menuRadius - Zenon.menuCardPad) : 0
-                  color: appHover.containsMouse ? Zenon.border : "transparent"
+                  // flush to the border (the column is inset by
+                  // menuCardPad), square, the card's clip rounding it at the
+                  // ends — every menu's band, CardBody
+                  anchors.leftMargin: -Zenon.menuCardPad
+                  anchors.rightMargin: -Zenon.menuCardPad
+                  color: appHover.containsMouse ? Zenon.menuHi : "transparent"
                 }
 
                 Item {
@@ -1794,7 +1795,7 @@ Item {
     implicitHeight: {
       if (!root.screen) return 160 + Zenon.menuShadowPad * 2;
       const maxBgH = root.screen.height - Zenon.menuShadowPad * 2;
-      return Math.min(confirmContent.implicitHeight + 8, maxBgH) + Zenon.menuShadowPad * 2;
+      return Math.min(confirmContent.implicitHeight + 2, maxBgH) + Zenon.menuShadowPad * 2;
     }
 
     property var pendingEntry: root.sessionEntryById(root.pendingConfirmId)
@@ -1814,7 +1815,7 @@ Item {
       for (let i = 0; i < root.sessionEntries.length; ++i) if (root.sessionEntries[i].id === root.pendingConfirmId) { idx = i; break; }
       const rowH = Zenon.menuRowHeight;
       const bgH = confirmMenu.implicitHeight - pad * 2;
-      let bgY = parentBgY + Zenon.menuCardPad + idx * rowH;
+      let bgY = parentBgY + 1 + idx * rowH;
       if (bgY + bgH > root.screen.height - pad) bgY = root.screen.height - bgH - pad;
       if (bgY < pad) bgY = pad;
       return bgY - pad;
@@ -1839,7 +1840,8 @@ Item {
       Column {
         id: confirmContent
         anchors.fill: parent
-        anchors.margins: Zenon.menuCardPad
+        anchors.leftMargin: Zenon.menuCardPad
+        anchors.rightMargin: Zenon.menuCardPad
         spacing: 0
 
         Item {
@@ -1847,12 +1849,10 @@ Item {
           height: Zenon.menuRowHeight
           Rectangle {
             anchors.fill: parent
-            // across the card to just inside its border, as every menu's band
-            anchors.leftMargin: 1 - Zenon.menuCardPad
-            anchors.rightMargin: 1 - Zenon.menuCardPad
-            topRightRadius: Math.max(0, Zenon.menuRadius - Zenon.menuCardPad)
-            bottomRightRadius: Math.max(0, Zenon.menuRadius - Zenon.menuCardPad)
-            color: confirmHover.containsMouse ? Zenon.border : "transparent"
+            // flush to the border, as every menu's band (CardBody)
+            anchors.leftMargin: -Zenon.menuCardPad
+            anchors.rightMargin: -Zenon.menuCardPad
+            color: confirmHover.containsMouse ? Zenon.menuHi : "transparent"
           }
           Text {
             id: confirmLabel
@@ -1883,8 +1883,9 @@ Item {
           height: Zenon.menuRowHeight
           Rectangle {
             anchors.fill: parent
-            radius: 0
-            color: cancelHover.containsMouse ? Zenon.headBg : "transparent"
+            anchors.leftMargin: -Zenon.menuCardPad
+            anchors.rightMargin: -Zenon.menuCardPad
+            color: cancelHover.containsMouse ? Zenon.menuHi : "transparent"
           }
           Text {
             id: cancelLabel

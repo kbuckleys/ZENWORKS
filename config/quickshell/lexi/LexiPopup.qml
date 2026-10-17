@@ -25,7 +25,7 @@ LayerPopup {
   readonly property color fgColor: Zenon.white
   readonly property color headColor: Zenon.cyan
   // A title strip's ink: terminus' active crumb (crumbInk), the same claim —
-  // this is where you are — in the same grey.
+  // this is where you are — in the same gray.
   readonly property color titleColor: Zenon.keyInk
   // ── ITS TEXT SIZE ──────────────────────────────────────────────────
   // The shell's (Zenon.px) plus `bump`: the shell's own size by default
@@ -98,7 +98,7 @@ LayerPopup {
   // spacers between them have to ask: a Row skips a child that is not
   // visible, spacing and all, but a spacer Item is visible by definition,
   // so the gaps kept standing where the things they separate were not.
-  // The row is centred, so every unused gap pushed the word left of centre
+  // The row is centered, so every unused gap pushed the word left of center
   // — most visible on an entry with no pronunciation at all.
   // A MESSAGE RATHER THAN A RESULT. The header stands down for this the
   // same way it does while the look-up is out: a titled strip over one red
@@ -273,7 +273,7 @@ LayerPopup {
   }
 
   // 60 is what the history delegate already holds back from its own elide,
-  // and it leaves the picker's centred rows the same room either side. 84 is
+  // and it leaves the picker's centered rows the same room either side. 84 is
   // the inset the definitions column already keeps, which is wider on
   // purpose — prose read too close to the edge to be a body of text.
   readonly property int hintPad: 24
@@ -394,7 +394,7 @@ LayerPopup {
 
   // ── THE KEYS, DRAWN AS KEYS ──────────────────────────────────────────
   // They were a run of rich text with the key set in bold and the word after
-  // it in grey — which asks the reader to work out where one hint ends and
+  // it in gray — which asks the reader to work out where one hint ends and
   // the next begins from weight alone. A chip says "this is a key you press"
   // the way the rest of this desktop says it, and a chip with its word beside
   // it is one object rather than two runs that happen to be adjacent.
@@ -1808,7 +1808,7 @@ LayerPopup {
                 font.pixelSize: popup.tpx(16)
               }
 
-              // The answer, and the romanisation under it. While a newer
+              // The answer, and the romanization under it. While a newer
               // one is out the old stays, faded, rather than blinking away.
               Column {
                 width: parent.width
@@ -2247,7 +2247,7 @@ LayerPopup {
                       anchors.leftMargin: -12
                       anchors.rightMargin: -12
                       radius: 5
-                      color: index === popup.sel ? Zenon.border : "transparent"
+                      color: index === popup.sel ? Zenon.menuHi : "transparent"
                     }
 
                     Text {
@@ -2483,7 +2483,7 @@ LayerPopup {
 
                 Rectangle {
                   anchors.fill: parent
-                  color: index === popup.sel ? Zenon.border : "transparent"
+                  color: index === popup.sel ? Zenon.menuHi : "transparent"
                 }
 
                 Text {
@@ -2621,7 +2621,7 @@ LayerPopup {
 
                 Rectangle {
                   anchors.fill: parent
-                  color: index === popup.sel ? Zenon.border : "transparent"
+                  color: index === popup.sel ? Zenon.menuHi : "transparent"
                 }
 
                 Text {

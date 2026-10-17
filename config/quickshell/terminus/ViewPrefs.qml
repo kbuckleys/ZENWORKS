@@ -112,7 +112,12 @@ Item {
     term.dirViews = ({});
     term.dirViewOrder = [];
     term.viewSaveRef.restart();
-    term.status = "remembered views cleared";
+    // and the one you are looking at goes to the default too, when there
+    // is one — that is what resetting views means (user, 2026-10-17)
+    if (term.defaultView !== "" && term.viewRing.indexOf(term.defaultView) >= 0) {
+      term.setView(term.defaultView);
+      term.status = "views reset to " + term.defaultView;
+    } else term.status = "remembered views cleared";
   }
   function applyDirView() {
     if (!term.perDirView) return;
@@ -127,7 +132,16 @@ Item {
       term.act.zoom = term.thumbZoomDefault;
       term.applyDepth--;
     }
-    if (!v) return;
+    if (!v) {
+      // a directory with no view of its own takes the default, when one
+      // is chosen (otherwise it keeps the last directory's)
+      if (term.defaultView !== "" && term.viewRing.indexOf(term.defaultView) >= 0) {
+        term.applyDepth++;
+        term.act.viewMode = term.defaultView;
+        term.applyDepth--;
+      }
+      return;
+    }
     term.applyDepth++;
     if (term.viewRing.indexOf(v.view) >= 0) term.act.viewMode = v.view;
     const z = Number(v.zoom);

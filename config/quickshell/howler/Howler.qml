@@ -70,11 +70,11 @@ Singleton {
   readonly property int glowReach:    Oracle.notifGlowReach
   readonly property bool glowOn:      Oracle.notifGlow
 
-  // ── A NAME OUT OF ORACLE, A COLOUR OUT OF ZENON ────────────────────────
+  // ── A NAME OUT OF ORACLE, A COLOR OUT OF ZENON ────────────────────────
   // Oracle offers the palette by name because it cannot import Zenon; this is
   // the other half of that. An unknown name falls back to white rather than
   // to nothing — a toast drawn in "transparent" would be a notification you
-  // could not read, which is a worse answer than the wrong colour.
+  // could not read, which is a worse answer than the wrong color.
   function ink(name) {
     switch (String(name)) {
       case "white":   return Zenon.white;
@@ -131,7 +131,7 @@ Singleton {
   readonly property int lift:         Oracle.notifLift
   readonly property bool markup:      Oracle.notifMarkup
 
-  // Named in oracle rather than numbered — "centre" is a thing a person can
+  // Named in oracle rather than numbered — "center" is a thing a person can
   // choose, Text.AlignHCenter is a flag that happens to be 4 — so the
   // translation happens here, where Text is already in scope.
   readonly property int textAlign: {

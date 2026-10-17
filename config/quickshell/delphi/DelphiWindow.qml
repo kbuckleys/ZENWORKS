@@ -839,7 +839,7 @@ FloatingWindow {
         // pressed, darker — and kept so while its menu is open (user,
         // 2026-10-11: no ring, the press itself held). The suite's shade
         // since 2026-10-15, the fill only: the words keep their ink (user)
-        color: repoPress.pressed || repoPop.isOpen ? Zenon.darken(0.35) : Zenon.wash(0.04)
+        color: repoPress.pressed || repoPop.isOpen ? Zenon.pressFill : Zenon.wash(0.04)
         border.width: 1
         border.color: Zenon.border
         Text {
@@ -1180,7 +1180,7 @@ FloatingWindow {
           width: chipRow.implicitWidth + 22
           height: Math.round(Zenon.px(14) * 2)
           radius: height / 2
-          color: chipPress.pressed ? Zenon.darken(0.35) : Zenon.wash(0.05)
+          color: chipPress.pressed ? Zenon.pressFill : Zenon.wash(0.05)
           border.width: 1
           border.color: Zenon.border
           Row {
@@ -1568,7 +1568,7 @@ FloatingWindow {
       HintRow {
         rows: win.hintRows
         anchors.verticalCenter: parent.verticalCenter
-        // centred while the strip is only keys; at the left once a button
+        // centered while the strip is only keys; at the left once a button
         // joins it (as ceres' foot) — a Row of hidden children is zero wide
         x: footBtns.width > 0 ? 16 : Math.round((foot.width - width) / 2)
         maxWidth: foot.width - 32 - (footBtns.width > 0 ? footBtns.width + 36 : 0)

@@ -3,14 +3,14 @@
 // └─┘└─┘┘└┘└┴┘└─┘┴└─┴ ┴└─┘
 // https://github.com/kbuckleys/
 //
-// A SKETCH — Apple's drawing in a note: pens in the theme's colours, three
+// A SKETCH — Apple's drawing in a note: pens in the theme's colors, three
 // widths, a highlighter, an eraser that takes whole strokes, undo and
-// redo. Kept as strokes by colour name (notes.js paintStrokes), so the
+// redo. Kept as strokes by color name (notes.js paintStrokes), so the
 // note draws it afresh in whatever theme is worn; a picture of it is saved
 // beside the note for exports and thumbnails.
 //
 //   ctrl+z / ctrl+shift+z   undo, redo       e  eraser     h  highlighter
-//   1–7  a pen's colour     [ ]  thinner, thicker          return  done
+//   1–7  a pen's color     [ ]  thinner, thicker          return  done
 
 import QtQuick
 import "../morpheus"

@@ -683,7 +683,7 @@ module.exports.themes = (t, T) => {
     ""].join("\n"));
   t.eq("zenon comes first, built in", opts[0].value, "zenon");
   t.eq("a file named zenon does not shadow it", opts.filter((o) => o.value === "zenon").length, 1);
-  t.eq("a theme is labelled with its own name", opts.find((o) => o.value === "nord").label, "Nord");
+  t.eq("a theme is labeled with its own name", opts.find((o) => o.value === "nord").label, "Nord");
   t.eq("a light one is marked", opts.find((o) => o.value === "paper").label, "Paper  \u{F19E2}");
   t.eq("a broken file is still offered", opts.find((o) => o.value === "half").label, "half \u00b7 broken");
   t.eq("follow background comes second", opts[1].value, "follow");

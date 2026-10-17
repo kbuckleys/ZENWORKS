@@ -36,7 +36,7 @@ Text {
   property string shown: name
   // A filter's text: what it matched in the name (terminus.js matchSpans —
   // the substring, or the letters a fuzzy match took) drawn in `markInk`.
-  // Colour only, so it takes no room and the fit below is unchanged.
+  // Color only, so it takes no room and the fit below is unchanged.
   property string mark: ""
   property color markInk: Zenon.yellow
 

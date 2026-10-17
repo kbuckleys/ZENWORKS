@@ -99,7 +99,7 @@ Singleton {
 
   // ── THE PALETTE, BY NAME ───────────────────────────────────────────────
   // clio.js knows which names exist; zenon knows what they look like. This is
-  // the join, and it is the only place in clio that a colour is a colour.
+  // the join, and it is the only place in clio that a color is a color.
   function ink(hue) {
     switch (String(hue)) {
       case "sand":    return Zenon.sand;
@@ -114,10 +114,10 @@ Singleton {
   }
 
   // The note's own ground: its hue laid into the theme's ground, faint
-  // enough that the theme's ink reads on it. A sticky note is identified by its colour from across
+  // enough that the theme's ink reads on it. A sticky note is identified by its color from across
   // the room, not read through it.
   function wash(hue) { return root.washOf(root.ink(hue)); }
-  // The same, from a colour already resolved — the board animates the ink
+  // The same, from a color already resolved — the board animates the ink
   // itself when a note changes hue, and washes whatever it has reached.
   function washOf(c) {
     // The hue laid INTO THE THEME'S GROUND, not darkened towards black:

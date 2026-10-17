@@ -12,7 +12,7 @@
 // silently, because the launch itself had succeeded. Every row under cynosure's
 // app list and icarus' desktop menu was quietly broken for those.
 //
-// `gio launch` honours Terminal=true and spawns the terminal. It wants the
+// `gio launch` honors Terminal=true and spawns the terminal. It wants the
 // desktop FILE rather than the id, which is the other half of this file: the
 // search path, written once so terminus, cynosure and icarus cannot disagree
 // about where an entry lives.

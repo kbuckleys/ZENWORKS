@@ -6,7 +6,7 @@
 -- A FILE TOO BIG FOR THE EXTRAS. A log of a hundred megabytes, a minified
 -- bundle, a dump: every extra plato draws walks the file somewhere — syntax,
 -- treesitter, a language server, git's diff, the minimap, sticky scroll,
--- the outline, colour codes, guides — and together they make moving through
+-- the outline, color codes, guides — and together they make moving through
 -- one slow. Past the settings' threshold (largeFileMB, 5 by default) a
 -- buffer is marked `b:plato_large` before it is read, and each of them
 -- checks the mark and stays out. The status line says so.

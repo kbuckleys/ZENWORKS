@@ -123,7 +123,7 @@ Item {
   readonly property int needy: (pg.win ? pg.win.mgr.recents : []).filter((r) => pg.attentionOfRow(r).length > 0).length
 
   // FETCH ALL: every one opened before, quietly (delphi/core fetch_quiet:
-  // nothing asked, a failure skipped), three at a time, then summarised
+  // nothing asked, a failure skipped), three at a time, then summarized
   property int fetchTotal: 0
   property int fetchDone: 0
   property int fetchFailed: 0
@@ -434,7 +434,7 @@ Item {
             font.weight: Zenon.weight
             font.pixelSize: Zenon.px(16)
           }
-          // what needs doing, each in its colour (or when it was last
+          // what needs doing, each in its color (or when it was last
           // opened, when nothing does), its branch, then where it is
           Text {
             width: parent.width

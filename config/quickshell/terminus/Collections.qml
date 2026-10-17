@@ -250,7 +250,7 @@ Item {
     });
   }
   // setsid, so the whole pipeline gets a process group of its own and
-  // cancelling it takes fd, rg and xargs down together. Signalling the
+  // canceling it takes fd, rg and xargs down together. Signalling the
   // Process alone would reach the shell and leave rg running over a home
   // directory, which is the one query here expensive enough to matter.
   Process {
@@ -527,7 +527,7 @@ Item {
       //
       // The bytes are still in listingText, so the directory can be put
       // back in the same frame the results leave. The refresh behind it
-      // returns the identical bytes and recognises itself.
+      // returns the identical bytes and recognizes itself.
       const seed = term.listingText[term.cwd];
       if (seed !== undefined) {
         term.act.raw = term.enrich(Terminus.parseListing(seed, term.cwd));

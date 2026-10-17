@@ -687,7 +687,7 @@ def tokens_kept_without_a_keyring():
 
 def continuous(rows):
     """Every line leaving a row's bottom arrives at the next row's top, in
-    the same column and colour — and nothing else arrives."""
+    the same column and color — and nothing else arrives."""
     for i in range(len(rows) - 1):
         # two lines may meet at one point on the boundary (a branch bending
         # into a line that runs on) — they arrive below as the one line
@@ -1146,7 +1146,7 @@ def daemon_askpass_round_trip():
         dm.call("answer", ask=q["ask"], text="s3cret")
         t.join(10)
         eq((out["r"].returncode, out["r"].stdout), (0, "s3cret\n"))
-        # a dismissed question is a cancelled one
+        # a dismissed question is a canceled one
         t = threading.Thread(target=ask); t.start()
         q = dm.wait(lambda m: "ask" in m.get("event", {}))["event"]
         dm.call("answer", ask=q["ask"], text=None)
@@ -1172,7 +1172,7 @@ def daemon_cancel():
         dm.call("cancel", id=i)
         r = dm.wait(lambda m: m.get("id") == i and "ok" in m)
         eq((r["ok"], r["kind"]), (False, "cancelled"))
-        eq(time.time() - t0 < 5, True, "cancelled promptly")
+        eq(time.time() - t0 < 5, True, "canceled promptly")
         # and the write lock was released: the next write runs
         os.remove(os.path.join(d, ".git/hooks/pre-commit"))
         lock = os.path.join(d, ".git", "index.lock")

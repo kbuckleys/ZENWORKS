@@ -39,7 +39,7 @@ local GH = "https://github.com/"
 M.core = {
   { src = GH .. "neovim/nvim-lspconfig" },
   -- for its queries only: nvim bundles a few parsers, and these are how every
-  -- other language gets coloured once a parser for it is installed
+  -- other language gets colored once a parser for it is installed
   { src = GH .. "nvim-treesitter/nvim-treesitter" },
   -- plato's git hunks are mini.diff's (git.lua), so mini.nvim is not yours to
   -- switch off; which of its other modules run is (config/mini.nvim.lua)

@@ -14,7 +14,7 @@
 #           with the request they belong to
 #
 # Reads are lock-free (lock=False → GIT_OPTIONAL_LOCKS=0). Writes are not
-# serialised here; the daemon runs a repository's writes one at a time.
+# serialized here; the daemon runs a repository's writes one at a time.
 
 import os
 import re

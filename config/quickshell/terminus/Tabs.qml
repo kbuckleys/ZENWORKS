@@ -65,7 +65,7 @@ Item {
       // to be carried deliberately or every switch lands you at the top.
       scroll: term.keepScroll(),
       // and the bytes they were parsed from, so the refresh that follows a
-      // switch can recognise an unchanged directory and leave the model alone.
+      // switch can recognize an unchanged directory and leave the model alone.
       // Restoring the rows without this only moved the flicker later: the
       // guard compares against the last listing THIS side read, which would
       // have been the other tab's, so every switch counted as a change and
@@ -422,7 +422,7 @@ Item {
     next[term.tab] = term.tabState();
     next.splice(i, 1);
     if (i === term.tab) {
-      // The one you are in: land on its neighbour, which is what `w` means.
+      // The one you are in: land on its neighbor, which is what `w` means.
       const land = Math.min(i, next.length - 1);
       term.tabs = next;
       term.tab = -1;          // force the load even when the index is the same

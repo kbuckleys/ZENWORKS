@@ -27,7 +27,7 @@
 // AND IT IS WHAT YOU SEE, the way hyprpicker shows its own. The live screen
 // used to show through instead, so a window that opened while the picker
 // was up was on screen but not in the copy being read — you pointed at it
-// and got the colour of whatever had been there before. Shown frozen, what
+// and got the color of whatever had been there before. Shown frozen, what
 // you see is always what you pick.
 
 import QtQuick
@@ -132,7 +132,7 @@ Scope {
         pane.aim(Math.floor(pane.mx) + 0.5 + dx, Math.floor(pane.my) + 0.5 + dy);
       }
       property var rgb: null
-      // the colour under the target, worn by the loupe's rim and the card's
+      // the color under the target, worn by the loupe's rim and the card's
       // edge alike
       readonly property color ink: pane.rgb
         ? Qt.rgba(pane.rgb.r / 255, pane.rgb.g / 255, pane.rgb.b / 255, 1) : Zenon.border
@@ -342,7 +342,7 @@ Scope {
 
       // ── the reading ─────────────────────────────────────────────────
       // ONE INSTRUMENT: a panel exactly as tall as the loupe, starting at the
-      // loupe's centre and running out to one side, with the circle laid over
+      // loupe's center and running out to one side, with the circle laid over
       // its near half — the lens, and the plate it is mounted on. Out to the
       // right, or mirrored to the left near the right edge of the screen.
       // Square where it meets the circle, which touches its top and bottom
@@ -373,8 +373,8 @@ Scope {
           x: pane.flipped ? 22 : loupe.width / 2 + 22
           spacing: 10
 
-          // THE COLOUR, as a chip you could lay against something — big
-          // enough to read as the colour rather than as a dot beside a
+          // THE COLOR, as a chip you could lay against something — big
+          // enough to read as the color rather than as a dot beside a
           // number — and what it is: the value you copy, and where it is.
           Row {
             spacing: 12
@@ -480,8 +480,8 @@ Scope {
       // where they meet it, and round the plate's far end. They were two
       // rims, and where the ring curved away from the plate's band each
       // stopped short of the other.
-      // The band is the colour itself, and a band of the colour on a field
-      // of that colour vanished — so it is drawn over a dark stroke two
+      // The band is the color itself, and a band of the color on a field
+      // of that color vanished — so it is drawn over a dark stroke two
       // pixels wider, a hairline either side. Its middle runs half a pixel
       // outside the lens, so it reaches 3 out: the plate's edge.
       readonly property string rimPath: {

@@ -11,7 +11,7 @@
 // on each would make three tags three trips.
 //
 // The list is the UNION of three things — the seven that come with a
-// colour, whatever has been made by hand, and whatever is actually on a
+// color, whatever has been made by hand, and whatever is actually on a
 // file. The third is not redundant: a tag written by another program, or
 // one whose definition was lost, is on the disk and has to be reachable.
 //
@@ -402,7 +402,7 @@ Rectangle {
           }
         }
 
-        // The colour IS the glyph. A tag has no icon of its own and a
+        // The color IS the glyph. A tag has no icon of its own and a
         // generic one on every row would be a column of identical
         // shapes where the one distinguishing mark already lives.
         Text {

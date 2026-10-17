@@ -40,7 +40,7 @@ QtObject {
   // preview and quick look read the same two from plato.json (codeFamily)
   property string fontFamily: "SF Mono"
   property string fontWeight: "semibold"
-  // the cursor's line number, in one of zenon's colours
+  // the cursor's line number, in one of zenon's colors
   property string lineNumberInk: "white"
 
   // ── the cursor and motion ──────────────────────────────────────────
@@ -132,7 +132,7 @@ QtObject {
                  { value: "semibold", label: "SemiBold" },
                  { value: "bold",     label: "Bold" } ],
       help: "How heavy the text is drawn. Bold syntax stays a step heavier." },
-    { key: "lineNumberInk", section: "text", label: "Current line number colour", type: "enum", pick: "color",
+    { key: "lineNumberInk", section: "text", label: "Current line number color", type: "enum", pick: "color",
       options: [ { value: "white",   label: "White" },
                  { value: "yellow",  label: "Peach" },
                  { value: "sand",    label: "Sand" },
@@ -142,7 +142,7 @@ QtObject {
                  { value: "blue",    label: "Blue" },
                  { value: "cyan",    label: "Cyan" },
                  { value: "green",   label: "Green" } ],
-      help: "The colour of the number beside the line the cursor is on." },
+      help: "The color of the number beside the line the cursor is on." },
 
     { key: "wrap", section: "editing", label: "Wrap long lines", type: "bool",
       help: "Off, a long line runs off the right and the view follows the cursor sideways." },
@@ -172,7 +172,7 @@ QtObject {
       help: "The first file opened in a window brings back the other files you had open in its project. Space R does it on demand." },
     { key: "largeFileMB", section: "editing", label: "Large file threshold", type: "int",
       min: 1, max: 200, step: 1, unit: "MB",
-      help: "A file bigger than this opens with syntax colour, language servers, git, the minimap, guides and the other extras off, so it stays quick to move through." },
+      help: "A file bigger than this opens with syntax color, language servers, git, the minimap, guides and the other extras off, so it stays quick to move through." },
     { key: "startCard", section: "editing", label: "Start card", type: "bool",
       help: "An empty window lists your recent files, pinned files and projects; 1 to 9 opens one." },
     { key: "captureFile", section: "editing", label: "Quick capture note", type: "text",
@@ -201,19 +201,19 @@ QtObject {
     { key: "dimInactive", section: "motion", label: "Dim the splits you are not in", type: "bool",
       help: "With the window split, the text of every split but the one you are typing in is drawn fainter." },
     { key: "rainbowBrackets", section: "motion", label: "Rainbow brackets", type: "bool",
-      help: "Brackets coloured by how deeply they are nested, a colour a level. Brackets in strings and comments keep their own colour." },
+      help: "Brackets colored by how deeply they are nested, a color a level. Brackets in strings and comments keep their own color." },
     { key: "typewriter", section: "motion", label: "Typewriter scrolling in zen", type: "bool",
       help: "In zen mode the cursor's line stays in the middle of the window and the text moves past it." },
     { key: "zenWidth", section: "motion", label: "Zen mode text width", type: "int",
       min: 60, max: 200, step: 4, unit: "",
-      help: "How many characters wide zen mode's centred column is (Space z)." },
+      help: "How many characters wide zen mode's centered column is (Space z)." },
 
     { key: "mdRender", section: "markdown", label: "Render markdown", type: "bool",
       help: "Markdown files are drawn as what they mean: headings on bands, no stars round bold, tables ruled and lined up, code on a panel, boxes to tick. The file itself is untouched. Space v shows one file as written." },
     { key: "mdRawLine", section: "markdown", label: "Cursor's line as written", type: "bool",
       help: "The line the cursor is on shows every #, * and | it really has, so you never edit a character you cannot see." },
     { key: "mdHeadings", section: "markdown", label: "Headings", type: "bool",
-      help: "# and ## become an icon, and the heading sits on a band in its level's colour." },
+      help: "# and ## become an icon, and the heading sits on a band in its level's color." },
     { key: "mdInline", section: "markdown", label: "Bold, italic, code and links", type: "bool",
       help: "The stars, backticks and brackets are hidden; links show their text alone." },
     { key: "mdLists", section: "markdown", label: "Bullets and checkboxes", type: "bool",
@@ -223,7 +223,7 @@ QtObject {
     { key: "mdTables", section: "markdown", label: "Tables", type: "bool",
       help: "Pipes become rules and the columns line up, aligned as the --- row asks." },
     { key: "mdQuotes", section: "markdown", label: "Quotes and callouts", type: "bool",
-      help: "> becomes a bar; > [!NOTE], [!TIP], [!WARNING] and the rest get their icon and colour." },
+      help: "> becomes a bar; > [!NOTE], [!TIP], [!WARNING] and the rest get their icon and color." },
     { key: "mdRules", section: "markdown", label: "Horizontal rules", type: "bool",
       help: "--- on a line of its own is drawn as a line across." },
 

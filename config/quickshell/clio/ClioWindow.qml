@@ -147,6 +147,10 @@ FloatingWindow {
     win.selId = id;
     pane.show(win.current);
     win.mgr.markSeen(id);
+    // opened from a search: its first word lit where it is, as Apple's
+    // search does (the title does not count — it is already in sight)
+    const words = N.terms(win.query).words;
+    if (words.length > 0 && id !== "") { flashWait.text = words[0]; flashWait.restart(); }
   }
   function move(d) {
     if (win.shown.length === 0) return;
@@ -163,7 +167,9 @@ FloatingWindow {
   function showUp() {
     if (win.selId === "" || !win.current) win.wantTop = true;
     Qt.callLater(win.reseat);
-    Qt.callLater(() => pane.focusEditor(false));
+    // opened to the list, the note shown but not being written in — a
+    // click or Return goes into it (user, 2026-10-17)
+    Qt.callLater(win.toList);
   }
   function newNote(blocks) {
     if (!win.mgr) return;
@@ -273,6 +279,13 @@ FloatingWindow {
     win.setScope({ shelf: "desktop" });
     win.pick(id, "end");
   }
+  // a note opened at words in it (a highlight): lit for a moment
+  function openAt(id, text) {
+    win.openNote(id);
+    flashWait.text = text;
+    flashWait.restart();
+  }
+  Timer { id: flashWait; property string text: ""; interval: 180; onTriggered: pane.editor.flashText(flashWait.text) }
   function openNote(id) {
     const n = win.mgr.noteOf(id);
     if (!n) { win.say("That note is gone", true); return; }
@@ -432,15 +445,31 @@ FloatingWindow {
         if (then) then(id); else win.setScope({ shelf: "folder", id: id });
       } });
   }
+  // a smart container: words and tokens typed, and two rules picked — when it
+  // was edited, and what it holds (notes.js passes); the rules are tokens in
+  // its query, read back out of it when it is edited
+  readonly property var smartWhen: [["", "Any time"], ["edited:today", "Edited today"], ["edited:week", "Edited this week"],
+    ["edited:month", "Edited this month"], ["edited:year", "Edited this year"], ["created:week", "Made this week"], ["created:month", "Made this month"]]
+  readonly property var smartHolds: [["", "Anything"], ["has:checklist", "A checklist"], ["is:todo", "Boxes still to tick"],
+    ["has:attachment", "Pictures or files"], ["has:picture", "Pictures"], ["has:table", "A table"], ["has:sketch", "A sketch"],
+    ["has:link", "A link"], ["has:highlight", "Highlighted words"], ["is:locked", "A lock"]]
   function askSmart(f) {
+    const q = f ? String(f.query || "").split(/\s+/) : [];
+    const pick = (opts) => { const hit = opts.find((o) => o[0] !== "" && q.indexOf(o[0]) >= 0); return hit ? hit[0] : ""; };
+    const when0 = pick(win.smartWhen), holds0 = pick(win.smartHolds);
+    const rest = q.filter((w) => w !== "" && w !== when0 && w !== holds0).join(" ");
     cards.ask({ title: f ? "Edit " + f.name : "New smart container", glyph: "\u{F0968}", ink: Zenon.magenta,
-      detail: "A container that gathers every note matching a search: words, #tags, and is:pinned, is:todo, is:done, is:locked, has:checklist, has:picture, has:file, has:table, has:sketch, has:link.",
-      fields: [{ key: "name", label: "Name", value: f ? f.name : "Smart Container" }, { key: "query", label: "Matching", value: f ? f.query : "", hint: "#work is:todo" }],
+      detail: "Every note that matches gathers here. Words and #tags are typed; is:pinned, is:todo, has:link and the like work too.",
+      fields: [{ key: "name", label: "Name", value: f ? f.name : "Smart Container" },
+               { key: "query", label: "Matching", value: rest, hint: "#work, or words", optional: true },
+               { key: "when", label: "When", options: win.smartWhen, value: when0, optional: true },
+               { key: "holds", label: "Holding", options: win.smartHolds, value: holds0, optional: true }],
       verb: f ? "Save" : "Make it",
       then: (v) => {
-        if (v.query.trim() === "") { win.say("A smart container needs something to match", true); return; }
-        if (f) { win.mgr.renameFolder(f.id, v.name.trim() || f.name); win.mgr.setFolderQuery(f.id, v.query.trim()); }
-        else win.setScope({ shelf: "smart", id: win.mgr.addFolder(v.name.trim() || "Smart Container", "", v.query.trim()) });
+        const query = [v.query.trim(), v.when, v.holds].filter((x) => x !== "").join(" ");
+        if (query === "") { win.say("A smart container needs something to match", true); return; }
+        if (f) { win.mgr.renameFolder(f.id, v.name.trim() || f.name); win.mgr.setFolderQuery(f.id, query); }
+        else win.setScope({ shelf: "smart", id: win.mgr.addFolder(v.name.trim() || "Smart Container", "", query) });
       } });
   }
   function renameFolder(f) {
@@ -457,7 +486,7 @@ FloatingWindow {
   function askJournal(j) {
     cards.ask({ title: j ? "Rename " + j.name : "New journal", glyph: "\u{F0B64}", ink: Zenon.cyan,
       fields: [{ key: "name", label: "Name", value: j ? j.name : N.freeName("New Journal", win.mgr.journals.map((x) => x.name)) },
-               { key: "hue", label: "Colour", options: [["cyan", "Cyan"], ["magenta", "Magenta"], ["yellow", "Orange"], ["green", "Green"], ["blue", "Blue"], ["pink", "Pink"], ["sand", "Sand"]], value: j ? j.hue : "cyan" }],
+               { key: "hue", label: "Color", options: [["cyan", "Cyan"], ["magenta", "Magenta"], ["yellow", "Orange"], ["green", "Green"], ["blue", "Blue"], ["pink", "Pink"], ["sand", "Sand"]], value: j ? j.hue : "cyan" }],
       verb: j ? "Save" : "Make it",
       then: (v) => {
         if (j) win.mgr.setJournal(j.id, { name: v.name.trim() || j.name, hue: v.hue });
@@ -645,7 +674,7 @@ FloatingWindow {
     if (n.kind === "sticky") {
       menu.open(x, y, [
         { text: "Move to a container…", icon: "", run: () => win.moveMenu(n, x, y) },
-        { text: "Colour", icon: "\u{F03D8}", run: () => win.hueMenu(n, x, y) },
+        { text: "Color", icon: "\u{F03D8}", run: () => win.hueMenu(n, x, y) },
         { text: Clio.notes.some((s) => s.id === n.sticky && s.above) ? "Back under windows" : "Keep above windows", icon: "\u{F0931}",
           run: () => Clio.set(n.sticky, "above", !Clio.notes.some((s) => s.id === n.sticky && s.above)) },
         { text: Clio.shown ? "Hide stickies" : "Show stickies", icon: Clio.shown ? "" : "", run: () => Clio.toggle() },
@@ -710,7 +739,7 @@ FloatingWindow {
     win.menuHeld = "j:" + j.id;
     menu.open(x, y, [
       { text: "New entry", icon: "", run: () => { win.setScope({ shelf: "journal", id: j.id }); win.newEntry(); } },
-      { text: "Rename and colour…", icon: "\u{F0455}", run: () => win.askJournal(j) },
+      { text: "Rename and color…", icon: "\u{F0455}", run: () => win.askJournal(j) },
       { text: j.locked ? "Unlock journal" : "Lock journal", icon: j.locked ? "" : "",
         run: () => win.withPassword(() => { win.mgr.setJournal(j.id, { locked: !j.locked }); win.say(j.locked ? "The journal is open to all" : "The journal asks for the password"); }) },
       { text: "Export entries as Markdown…", icon: "", run: () => win.exportJournal(j) },
@@ -793,13 +822,13 @@ FloatingWindow {
       else if (!menu.isOpen && !cards.carding && !win.sheetOpen) win.noteHad = false;
     }
   }
-  readonly property bool sheetOpen: win.sketching || win.moodOpen || win.setOpen || win.picsOpen || win.momentsOpen || win.linkOpen || win.dateOpen
+  readonly property bool sheetOpen: win.sketching || win.moodOpen || win.setOpen || win.picsOpen || win.momentsOpen || win.linkOpen || win.dateOpen || win.highlightsOpen
   function unwind() {
     if (pane.trayOpen) { pane.trayOpen = false; return; }
     if (pane.finding) { pane.closeFind(); return; }
     if (win.query !== "") { win.query = ""; search.clear(); return; }
     if (win.day !== "") { win.day = ""; return; }
-    win.visible = false;
+    // and nothing more: Esc never closes Clio (user, 2026-10-17)
   }
   // keys that are the window's whatever has the focus
   Shortcut { sequences: ["Ctrl+N"]; enabled: !win.sheetOpen && !cards.carding; onActivated: win.newNote() }
@@ -960,7 +989,7 @@ FloatingWindow {
       height: win.footH
       Rectangle { anchors.fill: parent; color: Zenon.hintFrostBg }
       Rectangle { anchors.top: parent.top; width: parent.width; height: 1; color: Zenon.border }
-      // the keys centred on the strip, as ceres' are
+      // the keys centered on the strip, as ceres' are
       HintRow {
         rows: win.hintRows
         anchors.verticalCenter: parent.verticalCenter
@@ -984,6 +1013,7 @@ FloatingWindow {
   property bool momentsOpen: false
   property bool linkOpen: false
   property bool dateOpen: false
+  property bool highlightsOpen: false
   onSheetOpenChanged: if (win.sheetOpen) sheetKeys.forceActiveFocus(); else Qt.callLater(win.refocus)
   Item {
     id: sheetKeys
@@ -992,7 +1022,7 @@ FloatingWindow {
       if (win.sketching && sketchPad.key(e)) { e.accepted = true; return; }
       if (e.key === Qt.Key_Escape) {
         if (win.sketching) win.sketchDone(null, false);
-        win.moodOpen = win.setOpen = win.picsOpen = win.momentsOpen = win.linkOpen = win.dateOpen = false;
+        win.moodOpen = win.setOpen = win.picsOpen = win.momentsOpen = win.linkOpen = win.dateOpen = win.highlightsOpen = false;
         e.accepted = true;
       }
     }
@@ -1029,8 +1059,10 @@ FloatingWindow {
   Sheet {
     shown: win.setOpen
     fromTop: win.headH
-    // centred on the window, not on what is right of the sidebar
+    // centered on the window, not on what is right of the sidebar
     leftInset: 0
+    // frosted over the window (user, 2026-10-17) — see morpheus/Sheet
+    backdrop: stage
     cardW: Math.min(1040, win.width - 80)
     cardH: setBody.implicitHeight
     SettingsBody { id: setBody; width: parent.width; win: win; onClosed: win.setOpen = false }
@@ -1051,7 +1083,19 @@ FloatingWindow {
     leftInset: side.width
     cardW: Math.min(win.width - side.width - 60, 900)
     cardH: Math.min(win.height - win.headH - 40, 660)
+    // frosted over the window (user, 2026-10-17) — see morpheus/Sheet
+    backdrop: stage
     MomentsBody { anchors.fill: parent; win: win; shown: win.momentsOpen; onClosed: win.momentsOpen = false }
+  }
+  InputShield { visible: win.highlightsOpen; onClicked: win.highlightsOpen = false }
+  Sheet {
+    shown: win.highlightsOpen
+    fromTop: win.headH
+    leftInset: side.width
+    cardW: Math.min(win.width - side.width - 60, 760)
+    cardH: Math.min(win.height - win.headH - 40, 640)
+    backdrop: stage
+    HighlightsBody { anchors.fill: parent; win: win; shown: win.highlightsOpen; onClosed: win.highlightsOpen = false }
   }
   InputShield { visible: win.linkOpen; onClicked: win.linkOpen = false }
   Sheet {

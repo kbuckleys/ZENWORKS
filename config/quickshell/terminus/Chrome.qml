@@ -57,6 +57,7 @@ Column {
   readonly property alias millerBox: millerBox
   readonly property alias previewBody: previewBody
   readonly property alias portalBar: portalBar
+  readonly property alias crumbSegs: crumbSegs
   readonly property alias previewPane: previewPane
   readonly property alias saveField: saveField
   readonly property alias sideGrip: sideGrip
@@ -82,22 +83,22 @@ Column {
     height: (term.alwaysTabs || term.tabs.length > 1) ? term.headH : 0
     visible: height > 0
     clip: true
-    // The path bar's own colour. Leaving the strip transparent removed the
+    // The path bar's own color. Leaving the strip transparent removed the
     // 1px separator but not the LINE: the transparent strip showed the
     // window's ground (layerBg) while the bar below was headBg, and two
-    // different colours meeting across the full width is a line whether or
+    // different colors meeting across the full width is a line whether or
     // not anyone drew one. With the strip painted the same as the bar, the
     // active tab is simply the strip showing through and the boundary
     // disappears; the inactive ones darken instead.
     //
     // And it goes black with the path bar under it while a sheet is open,
-    // or the band above the sheet would be grey on top of black.
+    // or the band above the sheet would be gray on top of black.
     // Since the bar took the sidebar's ground, the strip is headBg instead
     // — see root.tabBg.
     // NOW the body's black instead (2026-10-08, the user's call, as in
     // plato): the strip is see-through, so an inactive tab is the window
     // itself at the panel opacity, and the active tab paints tabBg —
-    // still the bar's colour, so the seam stays gone.
+    // still the bar's color, so the seam stays gone.
     // NOT BLACK BEHIND A SHEET ANY MORE (user, 2026-10-11): a sheet is the
     // toolbar's business, so the path bar goes dark with it and the tabs
     // stay as they are.
@@ -380,7 +381,7 @@ Column {
           // below without a seam — but a transparent thing cannot be
           // picked up: lifting it moved the label alone, sliding across
           // the tabs it passed over with no body of its own. In hand it
-          // takes the strip's own colour, the one it has been showing
+          // takes the strip's own color, the one it has been showing
           // through all along, and is a solid object for as long as it is
           // moving.
           // Every tab is the body now, the active one too (user,
@@ -443,7 +444,7 @@ Column {
             }
             // The active crumb's ink. The tab and the last path segment
             // are the same claim made twice — this is where you are — and
-            // they were two different greys saying it.
+            // they were two different grays saying it.
             color: term.crumbInk
             // the inactive ones held back, brought up a little under the
             // pointer to say they can be taken
@@ -546,7 +547,7 @@ Column {
                 Math.min(tabStrip.width - w, at - tabMouse.grabDx));
               // WHERE IT WOULD LAND: the slot its own left edge is nearest,
               // which is what makes the gap open when the tab is more than
-              // half way past its neighbour rather than the moment it
+              // half way past its neighbor rather than the moment it
               // touches it.
               tabStrip.dragTo = Math.max(0, Math.min(term.tabs.length - 1,
                 Math.round(tabStrip.dragX / w)));
@@ -612,7 +613,7 @@ Column {
     width: parent.width
     height: term.headH
     // BLACK WHILE THE SHEET IS UP. The send-to header is drawn on this
-    // same strip, and the bar's translucent grey let the column behind it
+    // same strip, and the bar's translucent gray let the column behind it
     // read straight through a header that is answering a question — so
     // the strip goes solid for as long as the sheet is, and comes back
     // with it — see root.chromeBg, which the tab strip above wears too.
@@ -639,7 +640,7 @@ Column {
 
     // ── THE INSIDE OF THE BAR, WHICH IS NOT THE WHOLE OF IT ──────
     // The last pixel of this strip is the hairline along its bottom edge.
-    // Everything on the bar used to be centred across the whole 34,
+    // Everything on the bar used to be centered across the whole 34,
     // hairline included, and then nudged a pixel DOWN to compensate — the
     // note on crumbStatus says "up by the separator's own pixel", which is
     // what was meant and the opposite of what +1 does. Between the two,
@@ -664,35 +665,51 @@ Column {
       id: sideToggle
       opacity: crumbBar.chromeInk
       enabled: crumbBar.chromeLive
+      // IN THE SIDEBAR WHILE IT IS OPEN — at its top right corner, see
+      // Sidebar's sideToggleIn (user, 2026-10-17) — and gone when the
+      // settings put it away
+      readonly property bool shown: term.barSideToggle && !term.sidebar
+      visible: sideToggle.shown
       anchors.left: parent.left
       // the same room either side of it (user, 2026-10-15: 8 here against
       // the trail's 12 read as a toggle pushed left; then tightened)
-      anchors.leftMargin: 6
+      anchors.leftMargin: sideToggle.shown ? 6 : 0
       anchors.verticalCenter: crumbInner.verticalCenter
-      // tight to its glyph (user, 2026-10-15: tighten it)
-      width: 26
+      width: sideToggle.shown ? 32 : 0
       height: crumbInner.height
 
-      Text {
+      // a chip, pressed darker, as the view switch (user, 2026-10-17)
+      BarChip {
         anchors.centerIn: parent
-        // Written as an escape, not as the character. Every literal nerd
-        // glyph in this batch arrived empty — they do not survive the trip
-        // through a shell heredoc — and an empty string renders as nothing
-        // at all, which is exactly what the toggle did.
-        text: "\uEC02"
-        color: term.sidebar ? Zenon.cyan
-          : (sideHov.hovered ? Zenon.white : Zenon.accentMuted)
-        // lit and unlit fade, as split's and the zoom's do (user, 2026-10-15)
-        Behavior on color { ColorAnimation { duration: Zenon.fast } }
-        font.family: Zenon.face
-        font.weight: Zenon.weight
-        font.pixelSize: Zenon.px(18)
-      }
-
-      HoverHandler { id: sideHov }
-      MouseArea {
-        anchors.fill: parent
+        // the breadcrumbs' height (user, 2026-10-17)
+        height: crumbSegs.height
+        parts: [{ glyph: "\uEC02", lit: term.sidebar, size: Zenon.px(17) }]
         onClicked: term.toggleSidebar()
+      }
+    }
+
+    // ── back and forward (user, 2026-10-17) ───────────────────────
+    // The window's own history, the same steps mouse 4/5 and the keys take;
+    // unlit when there is nowhere to go. Hidden from the settings.
+    Item {
+      id: navButtons
+      opacity: crumbBar.chromeInk
+      enabled: crumbBar.chromeLive
+      visible: term.barNav
+      anchors.left: sideToggle.right
+      anchors.leftMargin: visible ? (sideToggle.shown ? 4 : 6) : 0
+      anchors.verticalCenter: crumbInner.verticalCenter
+      width: visible ? navChip.width : 0
+      height: crumbInner.height
+      // one pill, two halves: nf-fa-chevron_left / right
+      BarChip {
+        id: navChip
+        anchors.centerIn: parent
+        height: crumbSegs.height
+        partW: 28
+        parts: [{ glyph: "\uF053", ok: term.canBack, size: Zenon.px(13) },
+                { glyph: "\uF054", ok: term.canForward, size: Zenon.px(13) }]
+        onClicked: (i) => i === 0 ? term.back() : term.forward()
       }
     }
 
@@ -709,12 +726,13 @@ Column {
       // needs both.
       visible: crumbBar.trailInk > 0.01
       enabled: crumbBar.chromeLive
-      anchors.left: sideToggle.right
+      anchors.left: navButtons.right
       // Clear of the toggle rather than touching it. The glyph is a
       // control and the trail is text; at 4px the first step read as a
       // label ON the button instead of the beginning of a path. Matches
-      // the toggle's own leftMargin, so it sits centred between the two.
-      anchors.leftMargin: 6
+      // the toggle's own leftMargin, so it sits centered between the two.
+      // 12 from the window's edge when there is no button before it.
+      anchors.leftMargin: (sideToggle.shown || navButtons.visible) ? 6 : 12
       anchors.right: filterInline.left
       anchors.rightMargin: 12
       anchors.verticalCenter: crumbInner.verticalCenter
@@ -726,16 +744,16 @@ Column {
       boundsBehavior: Flickable.StopAtBounds
 
       // ── the trail does not END at the edge, it FADES there ────────
-      // An ellipsis is a character: it has to be read, recognised as not
+      // An ellipsis is a character: it has to be read, recognized as not
       // being part of any directory's name, and then discounted. A fade
       // says "there is more this way" without asking for a word.
       //
-      // AN OPACITY MASK, not a wash of colour over the top. The obvious
-      // trick — a rectangle ramping from the bar's own colour to
+      // AN OPACITY MASK, not a wash of color over the top. The obvious
+      // trick — a rectangle ramping from the bar's own color to
       // transparent — cannot work here, and it took a screenshot to see
       // why: headBg is #66282f36, four tenths opaque, so painting it over
       // the crumbs veils them by four tenths and stops. What is actually
-      // behind this bar is the background, and there is no colour this
+      // behind this bar is the background, and there is no color this
       // window can paint that matches that. So the pixels lose their own
       // alpha towards the edge instead, and it reads the same whatever
       // happens to be behind them.
@@ -822,7 +840,9 @@ Column {
         anchors.verticalCenter: parent.verticalCenter
         height: Math.min(implicitHeight, crumbFlick.height - 6)
         textSize: Zenon.px(14)
-        weight: Font.Medium
+        // titles are Bold (user, 2026-10-17)
+        weight: Zenon.titleWeight
+        glyphWeight: Zenon.titleWeight
         pad: 22
         ink: Zenon.accentMuted
         // home is its glyph alone: the house already says "~" (user, 2026-10-15)
@@ -876,12 +896,12 @@ Column {
         // the crumb Segments' height beside it (user, 2026-10-14)
         height: crumbSegs.height
         radius: Zenon.windowRadius
-        // ── THE COLOUR OF THE THING, NOT OF "A SEARCH" ──────────
+        // ── THE COLOR OF THE THING, NOT OF "A SEARCH" ──────────
         // Sand was right while every chip was a search. A tag has a
-        // colour of its own — it is most of what a tag IS — and a
+        // color of its own — it is most of what a tag IS — and a
         // collection has one too, so the chip wears it and matches
         // the row in the sidebar it came from. A find or a grep has
-        // no colour to borrow and keeps the sand.
+        // no color to borrow and keeps the sand.
         readonly property color ink: {
           if (term.searchMode === "tag") return term.tagInk(term.searchQuery);
           if (term.searchMode === "collection" && !term.scratchOpen) {
@@ -906,7 +926,7 @@ Column {
           anchors.centerIn: parent
           // THE MARK OF THE THING IT IS SHOWING. A magnifier was right
           // while every chip was a search; a tag page and a collection
-          // are not searches, and labelling them with one made the
+          // are not searches, and labeling them with one made the
           // sidebar and the chip disagree about what you were looking
           // at. Each wears what it is listed under.
           text: (term.searchMode === "tag" ? "\uF02B"
@@ -1117,38 +1137,15 @@ Column {
       anchors.right: parent.right
       anchors.rightMargin: 8
       anchors.verticalCenter: crumbInner.verticalCenter
-      width: 30
+      width: 32
       height: crumbInner.height
 
-      Text {
+      BarChip {
         anchors.centerIn: parent
-        // nf-fa-bars, as an escape — a literal nerd glyph does not survive
-        // the trip through a shell heredoc, and arrives as nothing at all.
-        text: "\uF0C9"
-        color: (term.prefsRef.open || term.burgerOn) ? Zenon.cyan
-          : (prefsHov.hovered ? Zenon.white : Zenon.accentMuted)
-        // lit and unlit fade, as split's and the zoom's do (user, 2026-10-15)
-        Behavior on color { ColorAnimation { duration: Zenon.fast } }
-        font.family: Zenon.face
-        font.weight: Zenon.weight
-        font.pixelSize: Zenon.px(16)
-      }
-
-      HoverHandler { id: prefsHov }
-      MouseArea {
-        anchors.fill: parent
-        // ── THE WINDOW'S MENU, NOT A SECOND KEY FOR ONE SHEET ─────
-        // This opened the settings panel outright. A hamburger in the
-        // corner of a window is the place everything without a home
-        // goes, and spending it on one sheet — which the palette also
-        // opens, and which is mostly a written-down copy of keys that
-        // already work — left the most reachable control in the window
-        // doing the least. Settings is in the menu now, as a row.
-        //
-        // From the button's bottom edge, the way the row menu drops out
-        // of its row. It is at the right edge of the window, so the
-        // card has nowhere to go but left: the popup surface slides to
-        // fit, which is what Slide is for.
+        // the breadcrumbs' height (user, 2026-10-17)
+        height: crumbSegs.height
+        // held down while its menu is open (user, 2026-10-17)
+        parts: [{ glyph: "\uF0C9", lit: term.prefsRef.open, held: term.burgerOn, size: Zenon.px(15) }]
         onClicked: {
           if (term.menuPopRef.menu.open) { term.menuPopRef.menu.close(); return; }
           term.burgerOn = true;
@@ -1168,27 +1165,19 @@ Column {
       opacity: crumbBar.chromeInk
       enabled: crumbBar.chromeLive
       anchors.right: prefsToggle.left
+      anchors.rightMargin: visible ? 2 : 0
       anchors.verticalCenter: crumbInner.verticalCenter
-      // not in a file picker, which has one pane (see toggleDual)
-      width: term.picking ? 0 : 30
-      visible: !term.picking
+      // not in a file picker, which has one pane (see toggleDual), nor when
+      // the settings put it away
+      visible: !term.picking && term.barSplit
+      width: visible ? 32 : 0
       height: crumbInner.height
 
-      Text {
+      BarChip {
         anchors.centerIn: parent
-        // nf-fa-columns, as an escape (see the hamburger's note)
-        text: "\uF0DB"
-        color: term.dual ? Zenon.cyan
-          : (splitHov.hovered ? Zenon.white : Zenon.accentMuted)
-        font.family: Zenon.face
-        font.weight: Zenon.weight
-        font.pixelSize: Zenon.px(15)
-        Behavior on color { ColorAnimation { duration: Zenon.fast } }
-      }
-
-      HoverHandler { id: splitHov }
-      MouseArea {
-        anchors.fill: parent
+        // the breadcrumbs' height (user, 2026-10-17)
+        height: crumbSegs.height
+        parts: [{ glyph: "\uF0DB", lit: term.dual, size: Zenon.px(14) }]
         onClicked: term.toggleDual()
       }
     }
@@ -1206,10 +1195,12 @@ Column {
       anchors.right: splitToggle.left
       anchors.rightMargin: 4
       anchors.verticalCenter: crumbInner.verticalCenter
-      // not in a picker, whose layout pick() decides
-      visible: !term.picking
+      // not in a picker, whose layout pick() decides; the settings can
+      // put it away too
+      visible: !term.picking && term.barViews
       width: visible ? implicitWidth : 0
       textSize: Zenon.px(13)
+      height: crumbSegs.height   // the breadcrumbs' height
       options: [["columns", "\uDB85\uDC87"],   // nf-md-view_column_outline
                 ["list", "\uDB85\uDC8B"],      // nf-md-view_list_outline
                 ["grid", "\uDB84\uDDD9"]]      // nf-md-view_grid_outline
@@ -1227,26 +1218,20 @@ Column {
       opacity: crumbBar.chromeInk
       enabled: crumbBar.chromeLive
       anchors.right: viewSegs.left
-      anchors.rightMargin: viewSegs.visible ? 2 : 0
+      anchors.rightMargin: viewSegs.visible ? 4 : 0
       anchors.verticalCenter: crumbInner.verticalCenter
-      width: 30
+      visible: term.barSort
+      width: visible ? 32 : 0
       height: crumbInner.height
 
-      Text {
+      BarChip {
         anchors.centerIn: parent
-        // nf-fa-sort (U+F0DC), as an escape (see the hamburger's note)
-        text: "\uF0DC"
-        color: term.sortMenuOn || term.sortKey !== "name" || term.sortDesc ? Zenon.cyan
-          : (sortHov.hovered ? Zenon.white : Zenon.accentMuted)
-        font.family: Zenon.face
-        font.weight: Zenon.weight
-        font.pixelSize: Zenon.px(15)
-        Behavior on color { ColorAnimation { duration: Zenon.fast } }
-      }
-
-      HoverHandler { id: sortHov }
-      MouseArea {
-        anchors.fill: parent
+        // the breadcrumbs' height (user, 2026-10-17)
+        height: crumbSegs.height
+        // held down while its menu is open; lit while the order is not
+        // name ascending
+        parts: [{ glyph: "\uDB81\uDCBA", lit: term.sortKey !== "name" || term.sortDesc,
+                  held: term.sortMenuOn, size: Zenon.px(15) }]
         onClicked: {
           const m = term.menuPopRef.menu;
           if (m.open) { m.close(); return; }
@@ -1295,21 +1280,21 @@ Column {
       anchors.right: jobsToggle.left
       anchors.rightMargin: 10
       // up by the separator's own pixel: it is the bar's bottom EDGE, not
-      // part of the inside, and centring across it sat everything low
+      // part of the inside, and centering across it sat everything low
       anchors.verticalCenter: crumbInner.verticalCenter
       spacing: 14
 
       // ── the status, as a chip ──────────────────────────────────
-      // It was a bare line of red in a bar of greys: every note wore the
-      // colour of an alarm, and none of them looked like they belonged to
+      // It was a bare line of red in a bar of grays: every note wore the
+      // color of an alarm, and none of them looked like they belonged to
       // the bar they sat in. Same rounded shape as the search chip and the
-      // key caps, and the colour says which KIND of news it is rather than
+      // key caps, and the color says which KIND of news it is rather than
       // only that there is some — red for refused or failed, sand for an
       // ordinary note.
       Rectangle {
         id: statusChip
         anchors.verticalCenter: parent.verticalCenter
-        // THE COLOUR IS HELD THE SAME WAY THE WORDS ARE. Reading
+        // THE COLOR IS HELD THE SAME WAY THE WORDS ARE. Reading
         // root.statusBad live meant a failure turned sand the instant the
         // status cleared — because clearing resets the flag — and then
         // faded out yellow. It has to keep the tone it was shown in for as
@@ -1439,7 +1424,7 @@ Column {
       // Everything else in this window is one keystroke that does one
       // thing; visual mode changes what the arrow keys mean until it is
       // turned off, so it says so — a mark of its own in magenta, the
-      // colour no other state in this bar wears, rather than a word in
+      // color no other state in this bar wears, rather than a word in
       // the same ink as the count beside it.
       Text {
         anchors.verticalCenter: parent.verticalCenter
@@ -1491,10 +1476,10 @@ Column {
       // already showing.
       Text {
         anchors.verticalCenter: parent.verticalCenter
-        visible: term.searchMode !== ""
-        text: term.searchMode === "grep" ? "grep"
-          : (term.searchMode === "tag" ? "tag"
-             : (term.searchMode === "collection" ? "collection" : "find"))
+        // not for a tag or a collection: the sheet and the sidebar already
+        // say which one is open (user, 2026-10-17)
+        visible: term.searchMode === "grep" || term.searchMode === "find"
+        text: term.searchMode
         color: Zenon.sand
         font.family: Zenon.face
         font.weight: Zenon.weight
@@ -1507,6 +1492,7 @@ Column {
       // in. Its steps are the same 0.1 notch the keys and ctrl+wheel use.
       ZoomMeter {
         anchors.verticalCenter: parent.verticalCenter
+        visible: term.barZoom
         // across the whole travel, not out of some absolute maximum
         value: (term.activeZoom - term.zoomMin)
                / Math.max(0.0001, term.zoomMax - term.zoomMin)
@@ -1545,15 +1531,15 @@ Column {
     // exactly the speed the sheet arrives.
     //
     // Read as a sentence: this thing → that place. The verb and the arrow
-    // are punctuation and stay muted; the nouns carry the colour.
+    // are punctuation and stay muted; the nouns carry the color.
     // THE DIALOG SHEETS' HEADER, in the same place and for the same
     // reason as the send picker's. A glyph and a name: these cards are
     // about one thing and its name is the whole of what there is to say.
     //
-    // CENTRED OVER THE CARD, not over the bar — the card is the thing
-    // it titles — and kept inside the bar's ends. The card hangs centred
+    // CENTERED OVER THE CARD, not over the bar — the card is the thing
+    // it titles — and kept inside the bar's ends. The card hangs centered
     // under the bar, so the two agree; read off the splice rather than
-    // assumed, so a card that is not centred is still titled over it.
+    // assumed, so a card that is not centered is still titled over it.
     Item {
       id: barHead
       anchors.top: parent.top
@@ -1573,6 +1559,15 @@ Column {
         anchors.centerIn: parent
         spacing: 8
         Text {
+          anchors.verticalCenter: parent.verticalCenter
+          visible: term.barLead !== ""
+          text: term.barLead
+          color: term.crumbInk
+          font.family: Zenon.face
+          font.weight: Zenon.weight
+          font.pixelSize: Zenon.px(15)
+        }
+        Text {
           id: barHeadGlyph
           anchors.verticalCenter: parent.verticalCenter
           visible: term.barGlyph !== ""
@@ -1589,6 +1584,7 @@ Column {
           anchors.verticalCenter: parent.verticalCenter
           maxWidth: barHead.parent.width - 32
             - (barHeadGlyph.visible ? barHeadGlyph.implicitWidth + 8 : 0)
+            - (term.barLead !== "" ? 60 : 0) - (term.barTail !== "" ? 60 : 0)
           text: term.barTitle
           color: term.barTitleInk
           pixelSize: Zenon.px(15)
@@ -1596,6 +1592,15 @@ Column {
             && !term.confirmRef.open
           onRenamed: (n) => term.renameFromProps(n)
           onDone: term.prefsDialogKeys.forceActiveFocus()
+        }
+        Text {
+          anchors.verticalCenter: parent.verticalCenter
+          visible: term.barTail !== ""
+          text: term.barTail
+          color: term.crumbInk
+          font.family: Zenon.face
+          font.weight: Zenon.weight
+          font.pixelSize: Zenon.px(15)
         }
       }
 
@@ -1612,7 +1617,9 @@ Column {
           Text {
             anchors.verticalCenter: parent.verticalCenter
             visible: term.sendToRef.sending
-            text: term.sendToRef.op === "move" ? "\uDB80\uDD90" : "\uDB80\uDD8F"
+            // the verb as a word, the sentence read off the bar: "Copy
+            // <glyph> name to…" (user, 2026-10-17; it was the verb's glyph)
+            text: term.sendToRef.op === "move" ? "Move" : "Copy"
             // crumbInk, the ink the step you are standing on uses. The header
             // takes the bar's place while it is up, so its punctuation is the
             // bar's punctuation — muted put it a shade below the chrome it had
@@ -1652,8 +1659,8 @@ Column {
             text: (term.sendToRef.names.length === 1 ? term.sendToRef.names[0]
                 : term.sendToRef.names.length + " items") || ""
             // plain ink, as a row's name is (terminus.js nameKeyOf): the
-            // kind is the glyph's to say, and a name in its glyph's colour
-            // read as one coloured smear (user's colors.png, 2026-10-10)
+            // kind is the glyph's to say, and a name in its glyph's color
+            // read as one colored smear (user's colors.png, 2026-10-10)
             color: Zenon.white
             font.family: Zenon.face
             font.weight: Zenon.weight
@@ -1662,12 +1669,24 @@ Column {
 
           Item { width: 6; height: 1 }
 
+          // a copy or a move ends its sentence "to…": the place is the
+          // sheet's cursor, already lit in the list under it
           Text {
             anchors.verticalCenter: parent.verticalCenter
-            visible: !!term.sendToRef.current
+            visible: term.sendToRef.sending
+            text: "to\u2026"
+            color: term.crumbInk
+            font.family: Zenon.face
+            font.weight: Zenon.weight
+            font.pixelSize: Zenon.px(15)
+          }
+
+          Text {
+            anchors.verticalCenter: parent.verticalCenter
+            visible: !!term.sendToRef.current && !term.sendToRef.sending
             // A DIFFERENT ARROW FOR A DIFFERENT SENTENCE. Copy and move are
             // putting a thing somewhere, and the heavy arrow reads as
-            // delivery; `go` is you travelling, so it gets the plain one.
+            // delivery; `go` is you traveling, so it gets the plain one.
             text: term.sendToRef.op === "go" ? "\uF061" : "\uDB85\uDFB7"
             color: term.crumbInk
             font.family: Zenon.face
@@ -1675,11 +1694,11 @@ Column {
             font.pixelSize: Zenon.px(15)
           }
 
-          Item { width: 6; height: 1 }
+          Item { width: 6; height: 1; visible: !term.sendToRef.sending }
 
           Text {
             anchors.verticalCenter: parent.verticalCenter
-            visible: !!term.sendToRef.current
+            visible: !!term.sendToRef.current && !term.sendToRef.sending
             text: term.sendToRef.glyphOf(term.sendToRef.current) || ""
             rightPadding: 3
             color: term.sendToRef.blocked ? Zenon.accentMuted : Zenon.cyan
@@ -1690,11 +1709,11 @@ Column {
 
           Text {
             anchors.verticalCenter: parent.verticalCenter
-            visible: !!term.sendToRef.current
+            visible: !!term.sendToRef.current && !term.sendToRef.sending
             width: Math.min(implicitWidth, 260)
             elide: Text.ElideMiddle
             text: (term.sendToRef.current ? term.sendToRef.current.name : "") || ""
-            // and the place's name the same — its glyph carries the colour
+            // and the place's name the same — its glyph carries the color
             color: term.sendToRef.blocked ? Zenon.accentMuted : Zenon.white
             font.family: Zenon.face
             font.weight: Zenon.weight
@@ -1729,7 +1748,7 @@ Column {
   // ── column headers ────────────────────────────────────────────
   // Only the list view has columns to name. The miller layout's panes are
   // one column each and the grid has none, so the strip collapses rather
-  // than standing there labelling nothing.
+  // than standing there labeling nothing.
   // ── A SEARCH'S OWN BAR, on its results tab — see SearchBar.qml ──
   SearchBar {
     id: searchBar
@@ -1755,7 +1774,7 @@ Column {
 
     // Inset by the sidebar, because the columns name what is in the
     // LISTING and the sidebar is not the listing. Spanning the full width
-    // put "NAME" above the bookmarks, labelling a column that is not
+    // put "NAME" above the bookmarks, labeling a column that is not
     // there — and the label moved out from over the rows it belongs to.
     //
     // Over the ACTIVE pane, wherever that is; only when that pane is a
@@ -1925,6 +1944,8 @@ Column {
     SelectBar {
       host: term
       view: listA
+      // the sidebar's highlight (user, 2026-10-17)
+      color: term.hiFill
       index: term.paneLRef.sel
       rowH: term.rowH
       rowY: term.paneLRef.rowTop(term.paneLRef.sel)
@@ -1939,6 +1960,8 @@ Column {
     SelectBar {
       host: term
       view: listB
+      // the sidebar's highlight (user, 2026-10-17)
+      color: term.hiFill
       index: term.paneRRef.sel
       rowH: term.rowH
       rowY: term.paneRRef.rowTop(term.paneRRef.sel)
@@ -2134,7 +2157,7 @@ Column {
 
 
           // ── a picture or a film, and what it IS ────────────────────
-          // Anchored to the TOP of the pane rather than centred in it,
+          // Anchored to the TOP of the pane rather than centered in it,
           // because the facts underneath are part of the preview now. A
           // frame floating in the middle with a block of text below it reads
           // as two unrelated things, and worse, both of them move: every
@@ -2542,7 +2565,7 @@ Column {
                 // shape. Qt logged one "Unable to assign [undefined] to
                 // QString" per delegate per swap.
                 text: modelData.prefix || ""
-                // muted, not msgBorder: that is a hairline colour carrying
+                // muted, not msgBorder: that is a hairline color carrying
                 // 30% alpha and the guides came out as a suggestion of a
                 // tree. They are structure — meant to be seen at a glance
                 // and never read — which is exactly what muted is for.
@@ -2657,7 +2680,7 @@ Column {
               id: previewBody
               width: textScroll.width
               text: term.previewText
-              // RichText, because bat's colours arrive as ANSI and are
+              // RichText, because bat's colors arrive as ANSI and are
               // translated rather than thrown away — that is the syntax
               // highlighting, and markdown comes through the same path
               textFormat: Text.RichText
@@ -2812,6 +2835,7 @@ Column {
     SelectCell {
       host: term
       view: gridA
+      fill: term.hiFill   // the sidebar's highlight
       index: term.paneLRef.sel
       // to the tile's own content (its box starts 4px into the cell)
       fitH: gridA.curFit > 0 ? gridA.curFit - 4 : -1
@@ -2822,6 +2846,7 @@ Column {
     SelectCell {
       host: term
       view: gridB
+      fill: term.hiFill   // the sidebar's highlight
       index: term.paneRRef.sel
       // to the tile's own content (its box starts 4px into the cell)
       fitH: gridB.curFit > 0 ? gridB.curFit - 4 : -1
@@ -2900,7 +2925,7 @@ Column {
       anchors.topMargin: 2
       anchors.bottom: millerBox.bottom
       anchors.bottomMargin: 2
-      // The frame's coordinates, not the travelling Row's: a scrollbar
+      // The frame's coordinates, not the traveling Row's: a scrollbar
       // belongs to the pane, so it holds still while the columns move.
       x: millerBox.x + term.midCol.x + term.midCol.width - width - 2
     }
@@ -3366,15 +3391,15 @@ Column {
       }
     }
 
-    // Centred in the ACTIVE PANE, not in the body. With two panes open the
+    // Centered in the ACTIVE PANE, not in the body. With two panes open the
     // body is both of them, so an empty directory on one side put its
     // label in the middle of the window — half of it hanging over the
     // other pane's rows, saying "Empty" about a listing that was not.
-    // CENTRED ON THE LISTING, WHICH IS NOT ALWAYS THE PANE.
+    // CENTERED ON THE LISTING, WHICH IS NOT ALWAYS THE PANE.
     //
     // In list and grid the listing IS the pane, so the middle of one is
     // the middle of the other. Miller is three columns and only the middle
-    // one holds these rows — so "Empty" sat in the centre of all three,
+    // one holds these rows — so "Empty" sat in the center of all three,
     // which puts it over the preview of a directory that is not the empty
     // one and a third of a pane away from the column it is about.
     //
@@ -3397,7 +3422,7 @@ Column {
       // IT WAITS FOR THE COLUMNS, THEN ARRIVES ON ITS OWN.
       //
       // Riding miller's fade was close but not it: the label came in
-      // WITH the tree, while the tree was still travelling, and its x is
+      // WITH the tree, while the tree was still traveling, and its x is
       // measured off the middle column's resting place — so it sat still
       // in the middle of a pane that had not stopped moving yet.
       //
@@ -3592,7 +3617,7 @@ Column {
       }
 
       // Where it goes, as a pill: the directory is the other half of the
-      // answer, and "in Downloads" in the field's own grey read as part
+      // answer, and "in Downloads" in the field's own gray read as part
       // of the name.
       Rectangle {
         id: saveWhere
@@ -3612,6 +3637,7 @@ Column {
           spacing: 6
           // the directory's own glyph, as its crumb wears it
           Text {
+            anchors.verticalCenter: parent.verticalCenter
             text: Terminus.dirGlyph(term.saveDir, Icons)
             color: Zenon.cyan
             font.family: Zenon.face
@@ -3619,6 +3645,7 @@ Column {
             font.pixelSize: Zenon.px(12)
           }
           Text {
+            anchors.verticalCenter: parent.verticalCenter
             width: Math.min(implicitWidth, saveBox.width * 0.42 - 40)
             elide: Text.ElideLeft
             text: term.saveDir === "/" ? "/" : Terminus.basename(term.saveDir)
@@ -3708,7 +3735,7 @@ Column {
     // is invisible otherwise
     // ── WHAT CONFIRMING WOULD HAND BACK, AS CHIPS ─────────────────
     // Each chosen thing with its own glyph and name, as the listing draws
-    // it, three at most and then a count — a path in grey said the same
+    // it, three at most and then a count — a path in gray said the same
     // thing in a way nobody reads.
     Item {
       id: portalPicks
@@ -3760,6 +3787,7 @@ Column {
               anchors.verticalCenter: parent.verticalCenter
               spacing: 6
               Text {
+                anchors.verticalCenter: parent.verticalCenter
                 text: Icons.glyphFor({ name: pick.name, isDir: !!term.portal && (term.portal.directory || term.portalDirSet[String(pick.modelData)] === true) })
                 color: Zenon.cyan
                 font.family: Zenon.face
@@ -3767,6 +3795,7 @@ Column {
                 font.pixelSize: Zenon.px(13)
               }
               Text {
+                anchors.verticalCenter: parent.verticalCenter
                 width: Math.max(20, Math.min(implicitWidth, pick.most - 40))
                 elide: Text.ElideMiddle
                 text: pick.name

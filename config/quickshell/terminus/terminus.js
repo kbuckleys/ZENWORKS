@@ -127,11 +127,11 @@ function mergeRepos(known, dir, found) {
 // finished being written, or had its attributes (tags) changed. One
 // inotifywait over every directory given, run with -m so it stays. Terminus'
 // own watches and picasso's viewer arm theirs with this, so the two notice
-// the same things.
+// the same things. Tethered, so it dies with the shell (Paths.tether).
 function watchArgv(dirs) {
-  return ["inotifywait", "-m", "-q",
+  return Paths.tether(["inotifywait", "-m", "-q",
     "-e", "create", "-e", "delete", "-e", "moved_to", "-e", "moved_from",
-    "-e", "close_write", "-e", "attrib", "--"].concat(dirs);
+    "-e", "close_write", "-e", "attrib", "--"].concat(dirs));
 }
 
 function peekCommand(dir) {
@@ -349,14 +349,14 @@ function sortEntries(rows, key, desc, dirsFirst, natural, tags) {
   // already the whole truth about a file.
   const usage = key === "usage";
   // ── ORDERING BY TAG ──────────────────────────────────────────────────
-  // By the COLOUR WHEEL, not alphabetically. The seven presets are declared
-  // red -> orange -> yellow -> green -> blue -> purple -> grey, which is an
+  // By the COLOR WHEEL, not alphabetically. The seven presets are declared
+  // red -> orange -> yellow -> green -> blue -> purple -> gray, which is an
   // order the eye already knows; sorted by name they would come out blue,
-  // green, grey, orange, purple, red, yellow, which is an order nobody has
+  // green, gray, orange, purple, red, yellow, which is an order nobody has
   // ever wanted. A tag of your own has no place on that wheel, so those go
   // after the seven, among themselves by name.
   //
-  // A file carries its tags normalised — deduped and sorted — so names[0]
+  // A file carries its tags normalized — deduped and sorted — so names[0]
   // is a stable choice for "which tag is this filed under" when there are
   // several. Untagged sorts last in both directions: it is the absence of
   // an answer rather than a low one, and flipping the order should not
@@ -446,7 +446,7 @@ function sizeOf_(r) {
   return r.du !== undefined && r.du !== null ? r.du : -1;
 }
 
-// The seven presets in the order tags.js declares them, which is a colour
+// The seven presets in the order tags.js declares them, which is a color
 // wheel. Written out rather than imported: terminus.js is loaded by things
 // that have no reason to pull in the tag store, and this is seven strings.
 var TAG_WHEEL = ["red", "orange", "yellow", "green", "blue", "purple", "grey"];
@@ -791,7 +791,7 @@ function selectionSize(rows, sizes) {
   return { bytes: n, pending: pending };
 }
 
-// ── colour, as yazi decides it ────────────────────────────────────────────
+// ── color, as yazi decides it ────────────────────────────────────────────
 // Straight off the [filetype] rules in the ZENON flavor, in the order they are
 // listed there, because yazi takes the FIRST rule that matches:
 //
@@ -799,7 +799,7 @@ function selectionSize(rows, sizes) {
 //   {audio,video}/*               #e0d8a4   Zenon.sand
 //   archives                      #fab387   Zenon.yellow
 //   application/{pdf,doc,rtf}     #9bbfbf   Zenon.cyan
-//   inode/empty                   #a0a09b   grey
+//   inode/empty                   #a0a09b   gray
 //   orphan                        #e78284   Zenon.red
 //   link                          #c8a4e0   Zenon.magenta
 //   exec                          #fab387   Zenon.yellow
@@ -808,7 +808,7 @@ function selectionSize(rows, sizes) {
 //
 // Yazi asks a mime database; this asks the extension. That is a real
 // difference and it is the honest one to make here — a mime lookup is a
-// process per row, and the answer only ever changes the colour of a name.
+// process per row, and the answer only ever changes the color of a name.
 const CAT_EXTS = {
   media: {
     // every extension AUDIO_EXTS and VIDEO_EXTS know, so a file this
@@ -841,13 +841,13 @@ function categoryOf(name) {
 
 // ── what KIND of thing a name is ──────────────────────────────────────────
 // Broader than categoryOf, which lumps audio and video together as "media"
-// because that is all the colouring rules need. Sorting wants them apart: a
+// because that is all the coloring rules need. Sorting wants them apart: a
 // directory of downloads is far more useful with the music in one run and the
 // films in another.
 //
 // The order IS the sort order. Pictures first because a directory of them is the
 // commonest reason to reach for this, and the two nameless groups last —
-// "other" is a file with an extension nothing here recognises and "file" one
+// "other" is a file with an extension nothing here recognizes and "file" one
 // with no extension at all, which is usually a script or a README.
 const KIND_ORDER = ["image", "video", "audio", "document", "text", "archive",
                     "other", "file"];
@@ -969,7 +969,7 @@ function isVideo(name) {
 
 // ── WHAT QT CANNOT OPEN, WHATEVER IT IS CALLED ──────────────────────────
 // isImage answers "is this a picture", which is the right question for the
-// glyph, the colour, the sort and the kind column. It is the wrong question
+// glyph, the color, the sort and the kind column. It is the wrong question
 // for "can I point an Image at it": this Qt has decoders for about a quarter
 // of the formats in IMAGE_EXTS, and the rest — every camera raw, the whole
 // HEIF family, jxl, psd, xcf — fail on decode. A directory of phone photos
@@ -984,14 +984,14 @@ function isVideo(name) {
 // machine. Being wrong here costs nothing in either direction: a format
 // wrongly listed gets a thumbnail it did not need, and one wrongly missing
 // is caught when the Image fails and the caller remembers the extension —
-// see root.blindExt. It is an optimisation with a safety net under it, not
+// see root.blindExt. It is an optimization with a safety net under it, not
 // a source of truth, which is why it may be edited freely.
 var QT_BLIND_EXTS = {
   // camera raw, every one of them
   arw: 1, cr2: 1, cr3: 1, crw: 1, dcr: 1, dng: 1, erf: 1, kdc: 1, mef: 1,
   mos: 1, mrw: 1, nef: 1, nrw: 1, orf: 1, pef: 1, raf: 1, raw: 1, rw2: 1,
   sr2: 1, srf: 1, srw: 1, x3f: 1,
-  // the HEIF family and its neighbours
+  // the HEIF family and its neighbors
   avif: 1, avifs: 1, heif: 1, heic: 1, hif: 1, avci: 1, hej2: 1, jxl: 1,
   jxr: 1, hdp: 1, wdp: 1,
   // editor and exchange formats
@@ -1020,8 +1020,8 @@ function isImage(name) {
 // bat, not head, when bat is there: it syntax-highlights, it knows markdown,
 // and it stops at a line range so a huge file costs the same as a small one.
 // --color=always because it is not writing to a terminal and would otherwise
-// helpfully turn colour off.
-// ── AND IN PLATO'S COLOURS, WHEN PLATO IS THERE ────────────────────────
+// helpfully turn color off.
+// ── AND IN PLATO'S COLORS, WHEN PLATO IS THERE ────────────────────────
 // A text file previewed here and opened in plato should look the same in
 // both, and bat cannot promise that: its grammars and its idea of what is a
 // keyword are its own. plato/nvim/render.lua prints the file through plato's
@@ -1029,11 +1029,11 @@ function isImage(name) {
 // ANSI, which ansiToRich already reads — about as fast as bat, ~20ms.
 //
 // bat stays the answer when plato's renderer is not there, and for a file
-// over a few megabytes: nvim reads a whole file to colour its first ninety
+// over a few megabytes: nvim reads a whole file to color its first ninety
 // lines, where bat stops reading at the ninetieth.
 //
 // `from`: the line to start at, for a preview of the middle of a file (plato's
-// grep, centred on the match). Absent, the top.
+// grep, centered on the match). Absent, the top.
 //
 // `theme`: Zenon.nvimTheme() — the shell's theme for render.lua to wear,
 // null for Zenon. A preview is its own nvim, so it hears about the theme
@@ -1057,7 +1057,7 @@ function previewCommand(path, platoRender, from, theme) {
 
 function batCommand(path, from) {
   // --theme=ansi is the whole trick for keeping this in Zenon. It makes bat
-  // emit ONLY the sixteen base ANSI colours instead of a theme's own hexes,
+  // emit ONLY the sixteen base ANSI colors instead of a theme's own hexes,
   // and the sixteen are ours to define — see xterm256 below. The alternative
   // was writing a Zenon .tmTheme for bat, which is a second copy of the
   // palette living outside Zenon.qml.
@@ -1408,8 +1408,8 @@ function fsPackage(fstype) {
 // fsck.exfat): 1 is "found and fixed", 4 is "found and could not". pkexec's
 // own 126 and 127 are the password dialog dismissed and polkit refusing.
 function repairVerdict(tool, mode, code) {
-  if (code === 126) return { ok: false, line: "cancelled at the password prompt" };
-  if (code === 127) return { ok: false, line: "not authorised (is a polkit agent running?)" };
+  if (code === 126) return { ok: false, line: "canceled at the password prompt" };
+  if (code === 127) return { ok: false, line: "not authorized (is a polkit agent running?)" };
   const fsck = tool === "e2fsck" || tool === "fsck.fat" || tool === "fsck.exfat";
   if (code === 0) return { ok: true, line: mode === "check" ? "no problems found" : "repaired — nothing left to fix" };
   if (fsck && mode === "repair" && (code & 3) && !(code & 4)) return { ok: true, line: "problems found and fixed" };
@@ -1673,18 +1673,18 @@ function diskKey(disks) {
 // Nothing about them is terminus-specific, so nothing about them is here.
 
 // ── ANSI to rich text ─────────────────────────────────────────────────────
-// bat speaks SGR escapes and Qt's Text does not, so the colours have to be
+// bat speaks SGR escapes and Qt's Text does not, so the colors have to be
 // translated rather than stripped. Only the codes bat actually emits are
-// handled — 24-bit and 256-colour foregrounds, bold, and the resets — and
-// anything else is dropped, which loses a colour and never breaks the markup.
+// handled — 24-bit and 256-color foregrounds, bold, and the resets — and
+// anything else is dropped, which loses a color and never breaks the markup.
 //
-// The 256-colour cube is computed rather than tabled: 16-231 is a 6x6x6 cube
-// and 232-255 is a grey ramp, both of which are formulas.
+// The 256-color cube is computed rather than tabled: 16-231 is a 6x6x6 cube
+// and 232-255 is a gray ramp, both of which are formulas.
 function xterm256(n) {
   // The sixteen, as Zenon defines them — including its own names for the
   // bright three it actually differentiates: bright black is `muted`, bright
   // red is `pink`, bright yellow is `sand`. The rest of the brights are the
-  // base colour, because Zenon does not have a second one for them.
+  // base color, because Zenon does not have a second one for them.
   const Z = Strings.zenonHex();
   const basic = [Z.black, Z.red, Z.green, Z.yellow, Z.blue, Z.magenta,
                  Z.cyan, Z.white, Z.muted, Z.pink, Z.green, Z.sand,
@@ -2209,7 +2209,7 @@ function deleteCommand(paths) {
 // the process sits there forever. `ps` after a few attempts showed a pile of
 // headless `nvim <file>` children of xdg-open and not one surface on screen.
 //
-// GLib honours Terminal=true and spawns the entry through xdg-terminal-exec,
+// GLib honors Terminal=true and spawns the entry through xdg-terminal-exec,
 // which lands in foot. Verified both ways on the same text file: xdg-open gave
 // an orphan nvim, gio open gave `foot -e nvim <file>` and a window.
 //
@@ -2634,7 +2634,7 @@ function clipboardCopyCommand(paths, cut) {
 // Asking for the type list and then asking again for the payload is two
 // processes with a gap between them, and the clipboard can change in that gap
 // — the second answer would be about something the first never saw. The shell
-// decides and returns the answer already labelled.
+// decides and returns the answer already labeled.
 //
 // Three things can come back: a list of files, an image that exists only on
 // the clipboard, or nothing worth having.
@@ -3103,12 +3103,12 @@ function nonEmptyCommand(dirs) {
 // ROTATION IS IN PLACE, which is the one destructive thing here and is
 // deliberate: rotating a photo is correcting it, and a correction that
 // leaves the wrong version behind under a similar name has not corrected
-// anything. It is also the behaviour every other viewer has.
+// anything. It is also the behavior every other viewer has.
 //
 // -auto-orient FIRST, so a JPEG carrying an EXIF orientation is baked
 // upright before the turn is applied — otherwise the tag and the pixels
 // disagree afterwards and the picture appears to rotate by the wrong
-// amount in whichever programs honour it.
+// amount in whichever programs honor it.
 function rotateCommand(path, degrees) {
   return "magick mogrify -auto-orient -rotate "
     + Strings.shellQuote(String(degrees)) + " -- " + Strings.shellQuote(path);
@@ -3298,7 +3298,7 @@ function bulkNumber(names, start, pad, where, sep, stemOnly) {
 // The second of Finder's three modes, and the one find/replace cannot do at
 // all: there is no pattern to FIND when what you want is the same word in
 // front of every name. Literal always — a prefix is not an expression, and
-// honouring the regex switch here would only mean "\d" silently going in as
+// honoring the regex switch here would only mean "\d" silently going in as
 // two characters some of the time.
 function bulkAddText(names, text, where, stemOnly) {
   const t = String(text === undefined ? "" : text);
@@ -3628,7 +3628,7 @@ function removeAppCommand(desktopId, mime) {
     + "mkdir -p \"$(dirname \"$f\")\" || exit 1; "
     + "[ -e \"$f\" ] || : > \"$f\"; "
     // An immutable or read-only mimeapps.list is somebody else's deliberate
-    // configuration — the same judgement adoptAppCommand makes about it.
+    // configuration — the same judgment adoptAppCommand makes about it.
     + "[ -w \"$f\" ] || exit 1; "
     + "t=$(mktemp \"$f.XXXXXX\") || exit 1; "
     + "awk -v MIME=" + Strings.shellQuote(mime) + " -v ID=" + Strings.shellQuote(id) + " '"
@@ -4056,7 +4056,7 @@ function expandPath(text, home, cwd) {
 // would suggest something that does not exist. Tab takes the whole candidate
 // in that case; see the path bar.
 // How far every candidate agrees, so Tab can fill in the part that is not yet
-// a choice — the shell behaviour: two directories sharing six letters means
+// a choice — the shell behavior: two directories sharing six letters means
 // Tab types those six and stops rather than picking one for you.
 function commonPrefix(names) {
   if (!names || names.length === 0) return "";
@@ -4236,14 +4236,14 @@ function gitRollup(entries, cwd) {
 // legible in a 13px gutter, but being an outline it stays the lightest thing
 // in the column, which is what the mark is for. It was a middle dot, which is
 // a mid-height mark a couple of pixels across and could not be seen at all.
-// ── how a row of files is coloured and marked ──────────────────────────
+// ── how a row of files is colored and marked ──────────────────────────
 // What terminus' `enrich` puts on every entry it lists — the ink of its
 // glyph, the ink of its name, and the glyph itself — for every view of
 // files to agree on (terminus' listing, plato's tree). icons.js is handed in
 // rather than imported, so this file stays loadable on its own for the tests.
-// THE SLOT, NOT THE COLOUR. A row carries the Zenon slot its ink comes
-// from (inkKey, nameKey) beside the colour itself, and anything that draws a
-// row reads Zenon[row.inkKey]: a colour copied onto the row when its directory
+// THE SLOT, NOT THE COLOR. A row carries the Zenon slot its ink comes
+// from (inkKey, nameKey) beside the color itself, and anything that draws a
+// row reads Zenon[row.inkKey]: a color copied onto the row when its directory
 // was listed was the theme of that moment, and switching themes left every
 // listing in the old one (Buck's capture, Latte to Zenon).
 function inkKeyOf(e) {
@@ -4262,7 +4262,7 @@ function inkKeyOf(e) {
 }
 
 // Names are plain text: the kind is the glyph's to show, and a column of
-// cyan directories and yellow scripts read as coloured text, not as files.
+// cyan directories and yellow scripts read as colored text, not as files.
 function nameKeyOf(e) {
   return "white";
 }
@@ -4314,7 +4314,7 @@ function enrich(rows, icons) {
   return rows;
 }
 
-// The colour a git state is drawn in. Here rather than in the window so
+// The color a git state is drawn in. Here rather than in the window so
 // every view of a tree agrees — terminus' listing and plato's tree (see
 // morpheus/FileTree.qml) — and needs Zenon, which every caller imports.
 function gitInk(state) {
@@ -4469,7 +4469,7 @@ function jobSummary(op, names) {
 }
 
 // A progress record, or null for a line that is not one. The counting loop
-// emits nothing else on stdout, so anything unrecognised is simply ignored.
+// emits nothing else on stdout, so anything unrecognized is simply ignored.
 function parseArchiveProgress(line) {
   const s = String(line || "");
   if (s.indexOf(JOB_TOTAL) === 0) {
@@ -4498,12 +4498,12 @@ function parseArchiveProgress(line) {
 // `edge` is the side being added or taken away: "left" for a sidebar, which
 // moves the left edge and leaves the content where it was on screen;
 // "right" for the split, which opens beside it. The window used to be
-// centred after every resize, wherever you had put it. Now it stays put —
+// centered after every resize, wherever you had put it. Now it stays put —
 // unless growing would carry it past the monitor's usable area, and then it
 // is pushed back inward just as far as it must be. Shrinking never moves
 // what stays.
 //
-// Hyprland resizes a floating window about its CENTRE (its default floating
+// Hyprland resizes a floating window about its CENTER (its default floating
 // algorithm's resizeTarget), so the move makes up that half as well, and
 // overshot by it before. Both are offsets, so they add up the same whichever
 // lands first — the two dispatches are two requests, and an absolute move
@@ -4526,7 +4526,7 @@ function splitRoom(win, mons, wantW, margin, minW, edge) {
   // wider than that by hand is not shrunk by a grow either.
   let newW = Math.min(wantW, Math.max(right - left, w));
   newW = Math.round(Math.max(newW, minW || 0));
-  // EVEN, ALWAYS. Hyprland grows a floating window about its centre (Δ/2
+  // EVEN, ALWAYS. Hyprland grows a floating window about its center (Δ/2
   // each side) and the move that pins the edge is whole pixels: an odd Δ
   // left half a pixel over on every grow and every give-back, and a window
   // toggled a dozen times walked right across the screen (plato's tree did).

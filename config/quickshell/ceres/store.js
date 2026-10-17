@@ -5,7 +5,7 @@
 //
 // The pure half of the Store: which apps a section holds, what a search
 // finds, how the front page is laid out, and how the keys walk it. The
-// catalogue itself comes from ceres/bin/ceres-store; nothing here reads a
+// catalog itself comes from ceres/bin/ceres-store; nothing here reads a
 // file or runs anything, so every rule is pinned in oracle/tests/ceresstore.js.
 
 .pragma library
@@ -56,7 +56,7 @@ function inSection(app, key) {
 }
 
 // A section's apps: the polished ones first, each half by popularity — the
-// catalogue arrives sorted by it, and the sort is stable.
+// catalog arrives sorted by it, and the sort is stable.
 function sectionApps(apps, key) {
   const out = (apps || []).filter(a => inSection(a, key));
   if (key === "installed") return out.sort((a, b) => a.name.toLowerCase() < b.name.toLowerCase() ? -1 : 1);
@@ -229,7 +229,7 @@ function links(urls) {
   return out;
 }
 
-// A licence expression as people say it: "GPL-3.0+ AND LGPL-3.0+" stays as
+// A license expression as people say it: "GPL-3.0+ AND LGPL-3.0+" stays as
 // it is; LicenseRef-proprietary is "Proprietary".
 function licence(s) {
   const t = String(s || "").trim();

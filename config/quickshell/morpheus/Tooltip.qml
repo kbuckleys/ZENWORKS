@@ -21,10 +21,10 @@ CursorAnchor {
   property bool styled: false
   // Left by default, because most tooltips here are label/value lists and
   // ragged-right is what makes those scannable. A tooltip that is a couple of
-  // short standalone lines reads better centred, and says so.
+  // short standalone lines reads better centered, and says so.
   property int align: Text.AlignLeft
   // Zero or more sparklines under the text, each { values, line, fill }.
-  // A list rather than one series plus a colour pair: network has two
+  // A list rather than one series plus a color pair: network has two
   // channels to plot, and a second set of history/historyLineColor/... would
   // have been a parallel way of saying the same thing.
   property var series: []
@@ -115,7 +115,7 @@ CursorAnchor {
         anchors.horizontalCenter: parent.horizontalCenter
         spacing: 4
 
-        // Modelled on the COUNT, not on the list itself. The list is rebuilt
+        // Modeled on the COUNT, not on the list itself. The list is rebuilt
         // every time its data changes — four times a second for network — and
         // a Repeater handed a new array destroys and recreates every delegate,
         // which is what made the traces flicker. A count that stays 2 leaves
@@ -130,7 +130,7 @@ CursorAnchor {
             height: 32
             values: cfg ? cfg.values : []
             lineColor: cfg ? cfg.line : Zenon.cyan
-            // most callers want the fill to be the line's own colour
+            // most callers want the fill to be the line's own color
             fillColor: cfg ? (cfg.fill ?? cfg.line) : Zenon.cyan
             fillOpacity: 0.18
           }

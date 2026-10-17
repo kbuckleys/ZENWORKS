@@ -5,7 +5,7 @@
 //
 // The minimap: the file in miniature down the editor's right edge — every
 // line two pixels tall, every character under a pixel wide, in its syntax
-// colour — with the part on screen outlined. A click puts the view there;
+// color — with the part on screen outlined. A click puts the view there;
 // a drag carries it; the wheel scrolls the editor as it does over the text.
 //
 // nvim sends the lines (nvim/lua/plato/minimap.lua): as many as fit, and for
@@ -124,7 +124,7 @@ Item {
       ? Math.max(0, Math.min(map.height - height, drag.handY - height / 2))
       : map.scroll ? (map.scroll.top - map.first) * map.lineH : 0
     height: Math.max(8, map.viewRows * map.lineH)
-    // the shell's cursor colour, as every "you are here" in it
+    // the shell's cursor color, as every "you are here" in it
     color: Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b, drag.pressed ? 0.32 : hover.hovered ? 0.26 : 0.20)
     border.width: 1
     border.color: Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b, drag.pressed ? 0.85 : 0.60)
@@ -132,7 +132,7 @@ Item {
   }
   HoverHandler { id: hover; cursorShape: Qt.PointingHandCursor }
 
-  // a click or a drag: the view centred on the line under the pointer
+  // a click or a drag: the view centered on the line under the pointer
   MouseArea {
     id: drag
     anchors.fill: parent

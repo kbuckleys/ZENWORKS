@@ -310,9 +310,9 @@ LayerPopup {
 
       // Nothing to show is worth saying once, in the middle, rather than
       // leaving an empty card that reads as a panel that failed to load.
-      // CENTRED ON THE LIST, not on the card. The head is 44 tall and sits
-      // above it, so centring in the whole card pushed this down by half of
-      // that — which reads as "nearly centred", the worst kind.
+      // CENTERED ON THE LIST, not on the card. The head is 44 tall and sits
+      // above it, so centering in the whole card pushed this down by half of
+      // that — which reads as "nearly centered", the worst kind.
       Text {
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.top: chips.bottom

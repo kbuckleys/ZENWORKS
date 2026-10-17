@@ -282,7 +282,7 @@ module.exports = {
     t.eq("hex is one number", kinds("0xFF"), "BBBB");
     t.eq("an answer with no number is whole", kinds("Friday"), "BBBBBB");
     t.eq("grouped thousands stay one number", kinds("9,460 km"), "BBBBBsss");
-    t.eq("the sky's colour follows its glyph", [M.skyInk(12 * 60), M.skyInk(6 * 60), M.skyInk(23 * 60)].join(" "),
+    t.eq("the sky's color follows its glyph", [M.skyInk(12 * 60), M.skyInk(6 * 60), M.skyInk(23 * 60)].join(" "),
       "sand yellow keyInk");
     const ink = { num: "N", word: "W", joiner: "J", op: "O", bad: "B" };
     const hl = M.highlight("5 mtrs in miles * 2", ink, "mtrs");
@@ -344,7 +344,7 @@ module.exports = {
       "london,ontario");
     t.eq("another name is found but never offered", M.complete("3pm bomb"), "");
     t.eq("its own is", M.complete("time in onta"), "rio");
-    t.eq("a misspelt place is suggested", M.suggest("ontaria", [])[0], "ontario");
+    t.eq("a misspelled place is suggested", M.suggest("ontaria", [])[0], "ontario");
     M.setIndex("");
 
     // ── visual refinements ────────────────────────────────────────────────

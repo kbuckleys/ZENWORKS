@@ -8,7 +8,7 @@
 //
 // `c` is the shell's resolved palette — Zenon's slot names, as #rrggbb —
 // or null for Zenon itself. Null writes a file that says nothing, so
-// kitty's zenon.conf and base.lua's own colours stay the answer: Zenon is
+// kitty's zenon.conf and base.lua's own colors stay the answer: Zenon is
 // never generated, only ever left alone.
 
 const HEAD = ["┌─┐┌─┐┌┐┌┬ ┬┌─┐┬─┐┬┌─┌─┐", "┌─┘├┤ │││││││ │├┬┘├┴┐└─┐",
@@ -21,8 +21,8 @@ function rgb(h) { return String(h || "#000000").replace(/^#/, "").slice(-6).toLo
 // overrides Zenon's and a missing or empty file changes nothing.
 //
 // The ANSI slots follow the convention the terminal apps were written for:
-// colour 0 is "black" and 7 "white" whatever the ground is. On a dark
-// theme 0 is the ground and 7 the ink; on a light one 0 is a dark grey and
+// color 0 is "black" and 7 "white" whatever the ground is. On a dark
+// theme 0 is the ground and 7 the ink; on a light one 0 is a dark gray and
 // 7 a light one — Catppuccin Latte's own kitty theme does exactly this.
 function renderKitty(c, light) {
   const out = HEAD.map((l) => "# " + l);
@@ -74,7 +74,7 @@ function hypr(h, a) {
 function renderHyprTheme(c) {
   const out = HEAD.map((l) => "-- " + l);
   out.push("", "-- THEME", "-- Written by the shell (morpheus/ThemeSync.qml) whenever its theme",
-           "-- changes; base.lua lays it over its own colours. Empty is Zenon.", "");
+           "-- changes; base.lua lays it over its own colors. Empty is Zenon.", "");
   if (!c) {
     out.push("return {}", "");
     return out.join("\n");

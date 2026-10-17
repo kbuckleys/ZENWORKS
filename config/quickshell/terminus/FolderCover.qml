@@ -162,7 +162,7 @@ Item {
         id: piece
         required property string modelData
         required property int index
-        // A hairline of the frame's own colour between the pieces, so a
+        // A hairline of the frame's own color between the pieces, so a
         // mosaic reads as four pictures rather than one confused one.
         readonly property var r: cover.cell(piece.index, cover.pics.length)
         readonly property real gap: cover.pics.length > 1 ? 1 : 0

@@ -16,7 +16,7 @@
 local api = vim.api
 local M = {}
 
--- split "/pat/rep/flags" at its own delimiter, honouring backslashes
+-- split "/pat/rep/flags" at its own delimiter, honoring backslashes
 local function split(arg)
   local d = arg:sub(1, 1)
   if d == "" or d:match("[%w%s\\\"|]") then return nil end

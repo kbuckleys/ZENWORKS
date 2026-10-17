@@ -3,7 +3,7 @@
 -- └─┘└─┘┘└┘└┴┘└─┘┴└─┴ ┴└─┘
 -- https://github.com/kbuckleys/
 --
--- THE MINIMAP's text: the editor window's file as runs of colour, one row of
+-- THE MINIMAP's text: the editor window's file as runs of color, one row of
 -- runs per line, for plato to draw a pixel or two tall down the right edge
 -- (editor/Minimap.qml).
 --
@@ -14,7 +14,7 @@
 --
 -- NOT EVERY FRAME. A frame only notices that what the map would show has
 -- changed (another buffer, an edit, the map sliding) and asks for it a
--- moment later; the lines are coloured and sent as their own event, so
+-- moment later; the lines are colored and sent as their own event, so
 -- typing never waits on the map.
 --
 --   { event = "minimap", first, total, lines = { { {col, len, fg}, ... }, ... } }
@@ -28,7 +28,7 @@ local send = function() end
 local timer = vim.uv.new_timer()
 local key, wanted = "", nil
 
--- one line as runs of one colour, blanks left out, at most `cap` cells wide
+-- one line as runs of one color, blanks left out, at most `cap` cells wide
 local function runs(s, groupAt, ts, cap)
   local out, col, i = {}, 0, 1
   local cur, start, curFg = nil, 0, nil

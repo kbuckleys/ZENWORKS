@@ -84,7 +84,7 @@ LayerPopup {
   // are the same bytes counted three ways, and leaving two of them out made
   // this view quietly smaller than the tool it is showing.
   //
-  // The rows are normalised in zeus.js on the way in — a thing, what it is
+  // The rows are normalized in zeus.js on the way in — a thing, what it is
   // bound to, and its two rates — so all three tables share one delegate and
   // one sort.
   readonly property var netTableOrder: ["process", "remote", "connection"]
@@ -119,7 +119,7 @@ LayerPopup {
   function netGrant() {
     if (popup.netGranting) return;
     popup.netGranting = true;
-    popup.netError = "Waiting for authorisation\u2026";
+    popup.netError = "Waiting for authorization\u2026";
     grantProc.running = true;
   }
 
@@ -141,12 +141,12 @@ LayerPopup {
         return;
       }
       // pkexec's two own codes, which are not faults in this code and must not
-      // read like them. 126 is a dialog dismissed or an authorisation refused.
+      // read like them. 126 is a dialog dismissed or an authorization refused.
       // 127 is pkexec unable to ASK — no polkit agent registered for the
       // session, which happens when the agent lost its race with the display
       // at boot; there is nothing to click through then, so the command beside
       // the button is the way in.
-      if (code === 126) popup.netError = "Not authorised \u2014 the grant was dismissed.";
+      if (code === 126) popup.netError = "Not authorized \u2014 the grant was dismissed.";
       else if (code === 127) popup.netError = "No polkit agent answered \u2014 run it in a terminal:";
       else popup.netError = Zeus.firstProblem(String(grantProc.stderr.text || ""))
         || ("The grant failed (" + code + ").");
@@ -167,7 +167,7 @@ LayerPopup {
   // 9px at this size and weight. An even split therefore needs an inside of
   // 9 + 2n: 25. The band is that plus its separator.
   //
-  // The font metrics are not the problem and were checked: centring the cap
+  // The font metrics are not the problem and were checked: centering the cap
   // box exactly rather than the ascent/descent box moves it 0.06px. This is
   // rounding, and the only honest fix is a height the rounding divides.
   readonly property int netHeadH: 26
@@ -301,7 +301,7 @@ LayerPopup {
 
   // Which device a stream is currently reaching. Read off the live links
   // rather than off a target property: `target.object` is a REQUEST, and the
-  // session manager is free to honour it with a different device — the link is
+  // session manager is free to honor it with a different device — the link is
   // the only thing that says where the audio actually went. Playback nodes are
   // the source end of their link and capture nodes the target end, so the
   // answer is the other end of whichever it is.
@@ -495,7 +495,7 @@ LayerPopup {
   // continuously, which is what made the traces flicker. Tooltip.qml already
   // carries this scar; this is the same one.
   //
-  // Modelled on keys that never change, the delegates are created once and only
+  // Modeled on keys that never change, the delegates are created once and only
   // their leaf bindings update.
   readonly property var statKeys: ["cpu", "cores", "gpu", "ram", "net", "disk"]
 
@@ -744,7 +744,7 @@ LayerPopup {
 
   // ROUNDED, and that is not tidiness. A drag accumulates float deltas, so the
   // panel comes to rest on a fractional pixel — and every glyph in it is then
-  // rasterised half a pixel off its grid, which reads as the whole panel going
+  // rasterized half a pixel off its grid, which reads as the whole panel going
   // slightly soft the moment you tear it off. Landing on whole pixels is what
   // keeps the text as sharp pinned as it is on the pill.
   function clampPin() {
@@ -936,7 +936,7 @@ LayerPopup {
 
   // ── THE KEYS, DRAWN AS KEYS ──────────────────────────────────────────
   // They were a run of rich text with the key in bold and the word after it
-  // in grey — which asks the reader to find where one hint ends and the next
+  // in gray — which asks the reader to find where one hint ends and the next
   // begins from weight alone. A chip says "this is a key you press" the way
   // the rest of this desktop says it, and a chip with its word beside it is
   // one object rather than two runs that happen to be adjacent.
@@ -1358,7 +1358,7 @@ LayerPopup {
       if (m) fails.push(m[1]);
     }
     let note = "";
-    if (popup.lastAsRoot && code === 126) note = "Not authorised \u2014 the dialog was dismissed.";
+    if (popup.lastAsRoot && code === 126) note = "Not authorized \u2014 the dialog was dismissed.";
     else if (popup.lastAsRoot && code === 127) note = "No polkit agent answered.";
     if (fails.length === 0 && note === "") {
       // A fresh list, and nothing else. This used to call openPopup(), which
@@ -1441,7 +1441,7 @@ LayerPopup {
     Behavior on height { NumberAnimation { duration: Zenon.slow; easing.type: Zenon.ease } }
     // Anchors and x/y cannot both drive a position, and pinned it is x/y that
     // has to — so the unpinned case is written out rather than anchored. These
-    // two expressions ARE the anchors they replace: centred horizontally, and
+    // two expressions ARE the anchors they replace: centered horizontally, and
     // lifted off the bottom edge by exactly what every other layer uses.
     // Math.round for the same reason oracle's panel rounds: bgRoot clips
     // through a texture, and a texture at a half-pixel offset resamples —
@@ -1939,7 +1939,7 @@ LayerPopup {
       }
 
       // A Row would have had to be told the field's width as a number; anchored
-      // between its two neighbours instead, the field gives back exactly the room
+      // between its two neighbors instead, the field gives back exactly the room
       // the status line needs however long it gets.
       Item {
         anchors.left: filterGlyph.right
@@ -2073,7 +2073,7 @@ LayerPopup {
                     // caller's to say. Defaulted to what the kill list's cells
                     // were already doing, so none of them had to change.
                     property bool hot: index === popup.sel
-                    // and what colour "hot" IS, for the same reason: the kill
+                    // and what color "hot" IS, for the same reason: the kill
                     // list's selected row is red because return kills it, and
                     // the mixer's is not. Defaulted to the red, so the two
                     // older lists are untouched.
@@ -2088,7 +2088,7 @@ LayerPopup {
                     // six callers that set it were setting nothing. An
                     // over-long value is CLIPPED at the cell edge instead,
                     // which is what clip: true is doing. Cells that need to
-                    // read cleanly against a neighbour take the gap out of
+                    // read cleanly against a neighbor take the gap out of
                     // their own width; see the mixer's NAME column.
                     textFormat: Text.RichText
                     clip: true
@@ -2560,9 +2560,9 @@ LayerPopup {
                     Text {
                       anchors.left: parent.left
                       anchors.leftMargin: 22
-                      // Centred in the band MINUS its separator, not in the whole
+                      // Centered in the band MINUS its separator, not in the whole
                       // band — the line is the edge, not part of the inside, and
-                      // centring across it is what pushed the label up.
+                      // centering across it is what pushed the label up.
                       anchors.top: parent.top
                       anchors.bottom: parent.bottom
                       anchors.bottomMargin: 1
@@ -2716,7 +2716,7 @@ LayerPopup {
             FilterBar {
               id: soundBar
               width: parent.width
-              // green, the colour the pill's own volume meter is drawn in —
+              // green, the color the pill's own volume meter is drawn in —
               // the mixer is the same reading, larger
               ink: Zenon.green
               caretInk: Zenon.green
@@ -2826,10 +2826,10 @@ LayerPopup {
                     modelData.kind === "sink" || modelData.kind === "source"
                   readonly property bool muted: soundRow.audio ? soundRow.audio.muted : false
                   readonly property real level: soundRow.audio ? soundRow.audio.volume : 0
-                  // A stream's own colour is the sink it lands in; a device's
+                  // A stream's own color is the sink it lands in; a device's
                   // is whether it is the one everything lands in by default.
                   // Green throughout, muted included — this view is the pill's
-                  // volume meter at full size and wears its colour. Muted is
+                  // volume meter at full size and wears its color. Muted is
                   // still plain at a glance: the glyph changes to the struck
                   // speaker and the peak hairline stops reporting, which is
                   // what the red was carrying on its own.
@@ -3172,7 +3172,7 @@ LayerPopup {
                         !!modelData.card && modelData.card.profiles.length > 1
 
                       // It has to LOOK like a control. The first pass read
-                      // "3 profiles" in dim grey — a count, indistinguishable
+                      // "3 profiles" in dim gray — a count, indistinguishable
                       // from the detail text beside it — and a control nobody
                       // can see is a control that does not exist, which is
                       // exactly how it was reported. A chevron, a verb, and

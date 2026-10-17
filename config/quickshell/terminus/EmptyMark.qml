@@ -8,7 +8,7 @@
 //
 // The word alone, small in the middle of a whole pane, read as something that
 // had failed to load rather than as an answer. The glyph gives the page a
-// centre and says which answer it is — an open directory for "Empty", a lens for
+// center and says which answer it is — an open directory for "Empty", a lens for
 // "No matches" — before the word is read.
 //
 // One file because both panes draw it, and two panes saying the same thing

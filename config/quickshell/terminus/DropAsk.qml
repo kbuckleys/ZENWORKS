@@ -249,7 +249,7 @@ PanelWindow {
       y: Math.round(Math.min(Math.max(8, dropAsk.cy),
                              dropAsk.height - dropCard.height - 8))
       width: Zenon.menuWidth
-      height: dropCol.implicitHeight + 2 * Zenon.menuCardPad
+      height: dropCol.implicitHeight + 2   // the border: rows run flush to it
       color: Zenon.menuBg   // its own layer surface (dropAsk), so frosted like every menu
       radius: Zenon.menuRadius
       border.color: Zenon.border
@@ -263,7 +263,6 @@ PanelWindow {
       Column {
         id: dropCol
         x: Zenon.menuCardPad
-        y: Zenon.menuCardPad
         width: parent.width - 2 * Zenon.menuCardPad
 
         Repeater {
@@ -288,11 +287,13 @@ PanelWindow {
               color: Zenon.border
             }
 
-            // the lit row, the full width of the row as CardMenu's is
+            // the lit row, flush to the card's border as CardMenu's is
             Rectangle {
               visible: !modelData.sep && dropAsk.at === index
               anchors.fill: parent
-              color: Zenon.border
+              anchors.leftMargin: -Zenon.menuCardPad
+              anchors.rightMargin: -Zenon.menuCardPad
+              color: Zenon.menuHi
             }
 
             // and the flash on the one chosen
@@ -304,7 +305,7 @@ PanelWindow {
             }
 
             // FROM THE LEFT, as every shared menu's labels are. It was
-            // centred, after menu.openCustom's custom lists — but this is
+            // centered, after menu.openCustom's custom lists — but this is
             // a menu, and the shared ones set its type, size and edge.
             Text {
               visible: !modelData.sep

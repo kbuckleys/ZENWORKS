@@ -18,7 +18,7 @@
 // changed line (the backend pairs - and + lines and diffs them by word) are
 // lit stronger than the line.
 //
-// Colours are slots (green, red, muted…), read when drawn, so a theme change
+// Colors are slots (green, red, muted…), read when drawn, so a theme change
 // repaints a diff already on screen.
 
 import QtQuick
@@ -117,7 +117,7 @@ Item {
     const esc = (t) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
       .replace(/\t/g, "    ").replace(/ /g, "&nbsp;");
     // the word's tint MIXED into the ground, not laid over it: rich text
-    // takes a solid colour (Zenon.hex drops alpha), and the 0.32 meant as a
+    // takes a solid color (Zenon.hex drops alpha), and the 0.32 meant as a
     // wash came out full-strength red and green, the text unreadable on it
     // in either mode (user, 2026-10-11). Mixed, it is a wash in dark and in
     // light alike, the line's own ink reading on top.

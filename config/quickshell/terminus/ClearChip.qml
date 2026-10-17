@@ -32,15 +32,15 @@ Rectangle {
   width: Math.round(chip.size * 1.25)
   height: width
   radius: width / 2
-  // the ink's own colour, faint: a disc that reads on dark glass and on
+  // the ink's own color, faint: a disc that reads on dark glass and on
   // light alike (a wash, white over, vanished on a light theme)
   // PRESSED, DARKENED (user, 2026-10-14): the disc goes to shade and the
   // cross dims, as a button pressed in
-  color: chip.down ? Zenon.darken(0.35) : Zenon.alpha(Zenon.ink, 0.16)
+  color: chip.down ? Zenon.pressFill : Zenon.alpha(Zenon.ink, 0.16)
   // ── THE CROSS IS DRAWN, NOT TYPED (user, 2026-10-14) ──────────────
-  // The glyph (nf-fa-times) was centred by its line box, not its ink, so
+  // The glyph (nf-fa-times) was centered by its line box, not its ink, so
   // the × sat off the disc's middle — worst at the tabs' size. Two strokes
-  // crossing at the disc's centre cannot miss it.
+  // crossing at the disc's center cannot miss it.
   Repeater {
     model: [45, -45]
     Rectangle {
@@ -52,7 +52,7 @@ Rectangle {
       rotation: modelData
       antialiasing: true
       color: Zenon.ink
-      opacity: chip.down ? 0.55 : 0.8
+      opacity: chip.down ? Zenon.pressDim : 0.8
     }
   }
   MouseArea {

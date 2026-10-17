@@ -76,7 +76,7 @@ LayerPopup {
   // what the answer on screen was asked as, for deciding whether its
   // reading is worth a line (Metis.parseWorth)
   property var shownPrep: null
-  // the wash behind the answer — a Zenon colour name, or ""
+  // the wash behind the answer — a Zenon color name, or ""
   property string shownTint: ""
   readonly property color tintColor: popup.shownTint !== "" && popup.resultShown && !popup.shownBad
     ? Zenon[popup.shownTint] : "transparent"
@@ -102,7 +102,7 @@ LayerPopup {
     warn: String(Zenon.yellow)
   })
 
-  // the colours the field's text is tinted in — see Metis.highlight, which
+  // the colors the field's text is tinted in — see Metis.highlight, which
   // also says what counts as a number, a word and an operator
   readonly property var inkSet: ({
     num: String(Zenon.blue), word: String(Zenon.white), joiner: String(Zenon.muted),
@@ -1509,7 +1509,7 @@ LayerPopup {
           Behavior on height { NumberAnimation { duration: Zenon.normal; easing.type: Zenon.ease } }
           clip: true
 
-          // A wash of colour behind the answer, felt more than seen: warm or
+          // A wash of color behind the answer, felt more than seen: warm or
           // cool for a temperature by its value, green for money, violet for
           // time, blue for distance (Metis.tintFor).
           Rectangle {
@@ -1754,7 +1754,7 @@ LayerPopup {
 
           // scrolls sideways once they outgrow the panel, faded at whichever
           // end has more (ChipStrip)
-          // centred in its row: pinned to the top, the 26 px strip left all
+          // centered in its row: pinned to the top, the 26 px strip left all
           // of the row's 12 px of air under it
           ChipStrip {
             id: chipStrip

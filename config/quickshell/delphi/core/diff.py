@@ -187,7 +187,7 @@ def _spans(a, b):
     ta, tb = WORD.findall(a), WORD.findall(b)
     sm = difflib.SequenceMatcher(None, ta, tb, autojunk=False)
     if sm.ratio() < 0.3:
-        return None, None   # mostly different: whole-line colour says it
+        return None, None   # mostly different: whole-line color says it
     pa, pb = _offsets(ta), _offsets(tb)
     sa, sb = [], []
     for op, i1, i2, j1, j2 in sm.get_opcodes():

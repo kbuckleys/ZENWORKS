@@ -488,7 +488,7 @@ Rectangle {
             // Two switches rather than two more verbs: they change what
             // every button below MEANS rather than doing anything
             // themselves, and a thing that stays on has to look like it.
-            // Written out rather than symbolised: ".*" meaning "regular
+            // Written out rather than symbolized: ".*" meaning "regular
             // expression" is a thing you either already know or cannot
             // guess.
             BulkVerb {
@@ -953,7 +953,7 @@ Rectangle {
                 on: toName.activeFocus
               }
 
-              // WHY the row is red, on the row. A card that only greyed
+              // WHY the row is red, on the row. A card that only grayed
               // out its own button left you comparing thirty names by eye
               // to find the two that collided.
               Text {

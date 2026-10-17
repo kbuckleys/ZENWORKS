@@ -3,7 +3,7 @@
 -- └─┘└─┘┘└┘└┴┘└─┘┴└─┴ ┴└─┘
 -- https://github.com/kbuckleys/
 --
--- A file, coloured as plato colours it, printed as ANSI for anything that
+-- A file, colored as plato colors it, printed as ANSI for anything that
 -- reads ANSI: terminus' quick look, in place of bat.
 --
 --   NVIM_APPNAME=quickshell/plato/nvim nvim --headless -i NONE -n --clean \
@@ -14,12 +14,12 @@
 --
 -- ONE HIGHLIGHTER, NOT TWO. bat has its own grammars and its own idea of
 -- what a keyword is, so a file previewed in terminus and opened in plato came
--- out in two different sets of colours. This is plato's own engine — its
+-- out in two different sets of colors. This is plato's own engine — its
 -- theme (theme.lua, from the zenon palette), treesitter where plato has a
 -- parser and its queries, the regex engine where it has not (hl.lua) — so
 -- the two agree because they are the same code.
 --
--- 24-bit colour (38;2;r;g;b), which terminus' ansiToRich already reads.
+-- 24-bit color (38;2;r;g;b), which terminus' ansiToRich already reads.
 
 local here = vim.fs.dirname(debug.getinfo(1, "S").source:sub(2))
 vim.opt.runtimepath:prepend(here)
@@ -49,7 +49,7 @@ local ok = pcall(function()
   local ts = vim.bo[buf].tabstop
 
   -- A LONG MARKDOWN FILE IS CUT TO WHAT IS SHOWN. nvim parses every one of
-  -- its paragraphs' inline trees to colour any of them (300 ms for 8000
+  -- its paragraphs' inline trees to color any of them (300 ms for 8000
   -- lines); the lines past the preview change nothing in it, and a few
   -- hundred before it are context enough for a fence or a list
   if vim.bo[buf].filetype == "markdown" and api.nvim_buf_line_count(buf) > n + 50 then
@@ -109,7 +109,7 @@ local ok = pcall(function()
   local laid = {}
   for l = first, n - 1 do
     local s = lines[l + 1] or ""
-    -- per byte, the group that colours it
+    -- per byte, the group that colors it
     local group = hl.byteGroups(buf, l, s, paints)
     local ml = mdLines[l]
     if ml then
@@ -175,7 +175,7 @@ local ok = pcall(function()
     return sgr("PlatoMdTable") .. table.concat(s) .. "\27[0m"
   end
 
-  -- and out it goes, a colour change at a time
+  -- and out it goes, a color change at a time
   for _, L in ipairs(laid) do
     local isCode = L.blk and L.blk.k == "c"
     local bg = isCode and panel or nil
@@ -191,7 +191,7 @@ local ok = pcall(function()
     end
     emit(table.concat(piece) .. "\27[0m")
     if tb and tb.e and tb.e:find("b") then emit(border(tb, "\u{2514}", "\u{2534}", "\u{2518}")) end
-    -- a top-level heading is underlined in its colour, as the editor's is
+    -- a top-level heading is underlined in its color, as the editor's is
     -- banded and set larger
     if L.blk and L.blk.k == "h" and L.blk.n <= 2 and L.w > 0 then
       emit(sgr("PlatoMdH" .. L.blk.n) .. string.rep(L.blk.n == 1 and "\u{2501}" or "\u{2500}", L.w) .. "\27[0m")

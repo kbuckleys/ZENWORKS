@@ -110,7 +110,7 @@ Item {
   // Three rows claimed to be where you are at once: the bookmark for the
   // directory, and EVERY disk whose mount is a prefix of it — with / and
   // /home both mounted that is two disks for any path under home. Each drew
-  // its own bar, and the single travelling cursor went to whichever claimed
+  // its own bar, and the single traveling cursor went to whichever claimed
   // last. Leaving a collection flips them all back at the same moment, and
   // the last one is the bottom disk: the cursor went all the way to the
   // bottom of the sidebar.

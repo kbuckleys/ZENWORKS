@@ -297,18 +297,6 @@ Item {
           onToggled: term.toggleGit()
         }
 
-        // ACTION, not a switch. PrefRow draws a toggle because every other
-        // row in this panel is one; this is a thing you DO once, so it wears
-        // its verb where the switch would be and nothing is left lit
-        // afterwards to suggest a state.
-        PrefAction { term: prefs.term
-          label: "Reset remembered views"
-          verb: term.dirViewOrder.length > 0
-            ? term.dirViewOrder.length + " kept" : "none"
-          enabled: term.dirViewOrder.length > 0
-          onTriggered: term.forgetDirViews()
-        }
-
         // Beside the button that forgets them, because it is the same
         // fact said as a number: how many are kept at all.
         PrefSlider { term: prefs.term
@@ -335,6 +323,36 @@ Item {
             if (term.perDirView) { term.rememberView(); term.applyDirView(); }
             term.viewSaveRef.restart();
           }
+        }
+
+        // ── THE DEFAULT VIEW (user, 2026-10-17) ─────────────────────
+        // What a directory with no view of its own opens in. "Last" is the
+        // old rule: whatever the directory before it was using.
+        SideHead { term: prefs.term; label: "DEFAULT VIEW" }
+
+        PrefSeg { term: prefs.term
+          options: ["last", "columns", "list", "grid"]
+          segmented: true
+          labels: ({ last: "Last used", columns: "Columns", list: "List", grid: "Grid" })
+          current: term.defaultView === "" ? "last" : term.defaultView
+          onChose: (v) => {
+            term.defaultView = v === "last" ? "" : v;
+            term.viewSaveRef.restart();
+          }
+        }
+
+        // ACTION, not a switch. PrefRow draws a toggle because every other
+        // row in this panel is one; this is a thing you DO once, so it wears
+        // its verb where the switch would be and nothing is left lit
+        // afterwards to suggest a state.
+        PrefAction { term: prefs.term
+          label: "Reset views"
+          verb: term.dirViewOrder.length > 0
+            ? term.dirViewOrder.length + " kept" : "none"
+          // with a default chosen it also puts this directory back to it
+          enabled: term.dirViewOrder.length > 0
+            || (term.defaultView !== "" && term.viewMode !== term.defaultView)
+          onTriggered: term.forgetDirViews()
         }
 
         }
@@ -441,6 +459,25 @@ Item {
           hint: "\\"
           on: term.dual
           onToggled: term.toggleDual()
+        }
+
+        // ── WHAT THE BAR CARRIES (user, 2026-10-17) ─────────────────
+        SideHead { term: prefs.term; label: "BAR BUTTONS" }
+
+        Repeater {
+          model: [["barNav", "Back and forward"], ["barSideToggle", "Sidebar switch"],
+                  ["barSort", "Sort"], ["barViews", "View switch"],
+                  ["barSplit", "Split view"], ["barZoom", "Zoom"]]
+          delegate: PrefRow {
+            required property var modelData
+            term: prefs.term
+            label: modelData[1]
+            on: term[modelData[0]]
+            onToggled: {
+              term[modelData[0]] = !term[modelData[0]];
+              term.viewSaveRef.restart();
+            }
+          }
         }
 
         // Empty is the default and says so: xdg-terminal-exec is what

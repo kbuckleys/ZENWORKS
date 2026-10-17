@@ -201,6 +201,8 @@ Variants {
       screen: board.screen
       open: board.menuSlot !== null
       fit: true
+      // every row in sight, no scrolling (user, 2026-10-17)
+      whole: true
       cardWidth: 240
       model: board.menuItems.map((it) => it.isSeparator ? { isSeparator: true }
         : { text: it.text, icon: it.icon, hint: it.hint || "", enabled: it.enabled !== false })
@@ -331,8 +333,8 @@ Variants {
 
           readonly property var note: Clio.noteFor(slot.key)
           readonly property string noteId: slot.key
-          // Not readonly, so it can be animated: a note changing colour
-          // passes through the colours between rather than jumping, and the
+          // Not readonly, so it can be animated: a note changing color
+          // passes through the colors between rather than jumping, and the
           // ground, the edge and the head all follow it, being made of it.
           property color hue:
             slot.note ? Clio.ink(slot.note.hue) : Zenon.sand
@@ -422,10 +424,26 @@ Variants {
           // The edits a text field answers to, the head's own controls said
           // in words, and the note itself. Hints only for keys that do work
           // here: TextEdit's own, and the size steps (body.Keys).
+          // the wrong word right-clicked, for the menu's spelling items
+          property var spellHit: null
+          function spellItems() {
+            const sp = slot.spellHit;
+            if (!sp || !Clio.app) return [];
+            const fix = (w) => {
+              if (body.getText(sp.a, sp.b).replace(/\u2019/g, "'") !== sp.w) return;
+              body.remove(sp.a, sp.b);
+              body.insert(sp.a, w.replace(/&/g, "&amp;").replace(/</g, "&lt;"));
+              body.cursorPosition = sp.a + w.length;
+            };
+            return sp.sugs.slice(0, 5).map((w) => ({ text: w, icon: "\uF00C", run: () => fix(w) }))
+              .concat([{ text: "Learn spelling", icon: "\uF02D", run: () => Clio.app.learnWord(sp.w) },
+                       { text: "Ignore spelling", icon: "\uF070", run: () => Clio.app.ignoreWord(sp.w) },
+                       { isSeparator: true }]);
+          }
           function menuItems() {
             const sel = body.selectionStart !== body.selectionEnd;
             const size = slot.note ? slot.note.size : Scribe.DEFAULT_SIZE;
-            return [
+            return slot.spellItems().concat([
               { text: "Cut", icon: "\u{F0190}", hint: "ctrl x", enabled: sel, run: () => body.cut() },
               { text: "Copy", icon: "\u{F018F}", hint: "ctrl c", enabled: sel, run: () => body.copy() },
               { text: "Paste", icon: "\u{F0192}", hint: "ctrl v", enabled: body.canPaste, run: () => body.paste() },
@@ -452,7 +470,7 @@ Variants {
               { text: "Gather stickies", icon: "\u{F0044}", run: () => Clio.gather() },
               { text: "Hide notes", icon: "\uF070", run: () => Clio.toggle() },
               { text: "Delete note", icon: "\uF1F8", run: () => Clio.discard(slot.noteId) }
-            ];
+            ]);
           }
 
           // a list that arrives after the picker opened finds the face the
@@ -566,7 +584,7 @@ Variants {
 
           // The note a menu is open about (terminus/HeldRing.qml), as
           // everywhere a right click asks something. A step out from the
-          // card and hollow: the note's own wash is its colour.
+          // card and hollow: the note's own wash is its color.
           HeldRing {
             anchors.fill: parent
             anchors.margins: -4
@@ -586,10 +604,10 @@ Variants {
             bottomRightRadius: head.below ? card.joined : card.radius
             color: slot.note ? Clio.washOf(slot.hue) : "transparent"
             border.width: 1
-            // The note's own colour, not the shared rule: the edge is part of
+            // The note's own color, not the shared rule: the edge is part of
             // which note this is. Brighter under the pointer, which is the
             // only thing an idle note says about being something you can
-            // pick up — the edge is already its colour, so it is the edge
+            // pick up — the edge is already its color, so it is the edge
             // that answers.
             border.color: Qt.rgba(slot.hue.r, slot.hue.g, slot.hue.b,
               noteHov.hovered && !slot.active ? 0.85 : 0.55)
@@ -657,6 +675,8 @@ Variants {
                 font.pixelSize: slot.note ? slot.note.size : Scribe.DEFAULT_SIZE
 
                 cursorDelegate: Caret { field: body }
+                // the spelling, as a note's in the window (SpellMarks)
+                SpellMarks { id: bodySpell; field: body; mgr: Clio.app }
 
                 // Stored as the body's contents rather than as Qt's whole
                 // HTML document — see Scribe.fragment — and as nothing at
@@ -740,7 +760,7 @@ Variants {
             // becomes part of the scrolling content: it travels up with the
             // text and its anchors resolve against the content item, whose
             // height is the whole document — so the "thumb" was as long as
-            // the note and the whole thing read as one grey bar.
+            // the note and the whole thing read as one gray bar.
             // The track stops short of the corner grip (26px, below): run
             // to the bottom it lay over the grip, and the thumb at the end
             // of a long note sat on top of what you pull.
@@ -1002,6 +1022,9 @@ Variants {
                 Clio.raise(slot.noteId);
                 if (slot.picking) slot.closeFaces();
                 else if (!body.activeFocus) body.forceActiveFocus();
+                // a wrong word under the pointer: its suggestions head the menu
+                const bp = mapToItem(body, m.x, m.y);
+                slot.spellHit = bp.y >= 0 && bp.y <= body.height ? bodySpell.at(body.positionAt(bp.x, bp.y)) : null;
                 board.openMenu(slot, mapToItem(wall, m.x, m.y));
               }
             }
@@ -1284,7 +1307,7 @@ Variants {
               }
             }
 
-            // The colours, as the note's own hue repeated in every other.
+            // The colors, as the note's own hue repeated in every other.
             Row {
               id: swatchRow
               anchors.right: close.left
@@ -1319,9 +1342,9 @@ Variants {
 
                   // The one it wears is ringed rather than missing from the
                   // row: a gap would move every other swatch each time you
-                  // changed colour. A ring around the dot, not a border
+                  // changed color. A ring around the dot, not a border
                   // eating into it — at 13px a border left a speck of the
-                  // colour it was meant to be pointing out.
+                  // color it was meant to be pointing out.
                   Rectangle {
                     anchors.centerIn: parent
                     width: 19

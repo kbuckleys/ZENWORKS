@@ -2,7 +2,7 @@
 // ┌─┘├┤ │││││││ │├┬┘├┴┐└─┐
 // └─┘└─┘┘└┘└┴┘└─┘┴└─┴ ┴└─┘
 // https://github.com/kbuckleys/
-// The one horizontal gap between two neighbouring bar modules.
+// The one horizontal gap between two neighboring bar modules.
 
 import QtQuick
 import "."

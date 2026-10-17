@@ -23,7 +23,10 @@ Row {
     width: 18
     height: 18
     radius: Zenon.windowRadius - 1
-    color: ck.lit ? Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b, 0.2) : "transparent"
+    // pressed, darkened — the suite's press (user, 2026-10-17)
+    color: ckTap.pressed ? Zenon.pressFill
+      : ck.lit ? Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b, 0.2) : "transparent"
+    Behavior on color { ColorAnimation { duration: Zenon.fast } }
     border.width: 1
     border.color: ck.lit ? Zenon.cyan : Zenon.accentKey
     Text {
@@ -45,5 +48,5 @@ Row {
     font.weight: Zenon.weight
     font.pixelSize: Zenon.px(15)
   }
-  TapHandler { enabled: ck.enabled2; onTapped: ck.toggled() }
+  TapHandler { id: ckTap; enabled: ck.enabled2; onTapped: ck.toggled() }
 }

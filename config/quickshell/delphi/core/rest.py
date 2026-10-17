@@ -133,7 +133,7 @@ def request(method, url, headers, body=None, raw=False, again=False, waited=None
 # ── CI: WHAT A FORGE'S CHECKS SAY OF A COMMIT ─────────────────────────────
 # GitHub's check runs and statuses, GitLab's job statuses, Forgejo's commit
 # statuses — each forge's words for how a check went, said one way here:
-# pending, success, failure, or neutral (skipped, cancelled by a newer run's
+# pending, success, failure, or neutral (skipped, canceled by a newer run's
 # rule, nothing to say). A commit's state is its worst check's: any failure
 # fails it, else any still running keeps it pending; none at all is "none".
 _CI = {"success": "success", "passed": "success", "completed": "success",

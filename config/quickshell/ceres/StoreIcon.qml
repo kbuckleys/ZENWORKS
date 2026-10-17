@@ -5,7 +5,7 @@
 //
 // An app's icon, with its source's mark in the lower corner.
 //
-// Arch's catalogue ships its icons cut to size, as JPEG XL (kimageformats
+// Arch's catalog ships its icons cut to size, as JPEG XL (kimageformats
 // reads them — it is a dependency). Where it has none, the icon theme's
 // stock icon by the same name; where that has none either, the name's first
 // letter on a tile, never an empty square.

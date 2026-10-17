@@ -31,7 +31,7 @@ Item {
   // the last job gone: the holder puts its drawer away
   signal emptied()
   readonly property bool live: jobsToggle.jobs.model.count > 0
-  // ONE COLOUR, READ BY EVERYTHING. The glyph, the count, the glow and
+  // ONE COLOR, READ BY EVERYTHING. The glyph, the count, the glow and
   // the burst all wear it, so "something went wrong" is a single fact
   // about the drawer rather than four things that have to be kept in
   // step. Red is reserved for exactly this — the same rule the confirm
@@ -71,7 +71,7 @@ Item {
     opacity: jobsToggle.glow
     visible: opacity > 0.01
     // it swells with the burst, which is most of what makes a glow
-    // read as an event rather than as a colour
+    // read as an event rather than as a color
     scale: 1.0 + 0.55 * jobsToggle.glow
     layer.enabled: true
     layer.effect: MultiEffect {

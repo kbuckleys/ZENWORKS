@@ -26,7 +26,7 @@ Item {
 
   property string specialName: "special"
   // A window asking for attention lights its workspace in this ink until you
-  // go there. Handed in by shell.qml — howler's critical colour, the one ink
+  // go there. Handed in by shell.qml — howler's critical color, the one ink
   // the shell already uses for "look at this".
   property color urgentInk: Zenon.red
 
@@ -231,8 +231,8 @@ Item {
                 return btn.isActive ? Font.ExtraBold : Font.Bold
               }
             }
-            // Black on the lit wash. A plain Text over the label, not a colour
-            // change on it: BarText eases every colour over Zenon.normal, which
+            // Black on the lit wash. A plain Text over the label, not a color
+            // change on it: BarText eases every color over Zenon.normal, which
             // is longer than a flash, so the number never got to black.
             Text {
               anchors.fill: wsLabel

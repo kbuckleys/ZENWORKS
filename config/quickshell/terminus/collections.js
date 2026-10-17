@@ -263,7 +263,7 @@ function fdCommand(folder, rules, home) {
   if (!sawKind && !(folder && folder.anyKind)) args.push("-t f");
 
   // fd wants the pattern before the path, and an empty pattern means
-  // everything — which is spelt with an explicit "." rather than by leaving
+  // everything — which is spelled with an explicit "." rather than by leaving
   // it out, because leaving it out makes fd read the path as the pattern.
   for (var a = 1; a < patterns.length; ++a)
     args.push("--and " + Strings.shellQuote(patterns[a]));

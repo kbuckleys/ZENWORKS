@@ -3,7 +3,7 @@
 // └─┘└─┘┘└┘└┴┘└─┘┴└─┴ ┴└─┘
 // https://github.com/kbuckleys/
 //
-// PICASSO'S STORE: colours as assignments, the look a monitor wears, the
+// PICASSO'S STORE: colors as assignments, the look a monitor wears, the
 // geometry of a turned or spanned picture, the slideshow's next pick, and the
 // state file across all three of its versions.
 
@@ -12,11 +12,11 @@
 module.exports = {
   module: "picasso/picasso.js",
   cases: (A, t) => {
-    t.eq("a colour is not a path", A.isColor("color:#112233"), true);
-    t.eq("a path is not a colour", A.isColor("/home/a/color:x.png"), false);
+    t.eq("a color is not a path", A.isColor("color:#112233"), true);
+    t.eq("a path is not a color", A.isColor("/home/a/color:x.png"), false);
     t.eq("short hex widens", A.normHex("ABC"), "#aabbcc");
     t.eq("junk is refused", A.normHex("#12345"), "");
-    t.eq("colour round trip", A.colorOf(A.colorPath("#FF8800")), "#ff8800");
+    t.eq("color round trip", A.colorOf(A.colorPath("#FF8800")), "#ff8800");
 
     for (const hex of ["#000000", "#ffffff", "#9bbfbf", "#e78284", "#1b2a44"]) {
       const c = A.hexToHsv(hex);
@@ -42,7 +42,7 @@ module.exports = {
 
     const mon = { x: 0, y: 0, w: 2560, h: 1440 };
     t.eq("unturned is the target", A.frameRect(mon, 0), { x: 0, y: 0, w: 2560, h: 1440 });
-    t.eq("a quarter turn swaps and centres", A.frameRect(mon, 90),
+    t.eq("a quarter turn swaps and centers", A.frameRect(mon, 90),
       { x: 560, y: -560, w: 1440, h: 2560 });
     t.eq("the desk", A.boundsOf([{ x: 0, y: 0, w: 1080, h: 1920 }, { x: 1080, y: 0, w: 2560, h: 1440 }]),
       { x: 0, y: 0, w: 3640, h: 1920 });
@@ -64,6 +64,6 @@ module.exports = {
                  span: { path: "/p", screens: ["A", "B"] }, colors: ["#123456"],
                  slideshow: { minutes: 15, shuffle: true, query: "", screens: [], span: false } };
     t.eq("v3 round trip", A.parseState(A.serializeState(st)), st);
-    t.eq("bad saved colours dropped", A.parseState('{"v":3,"colors":["#12","#abcdef"]}').colors, ["#abcdef"]);
+    t.eq("bad saved colors dropped", A.parseState('{"v":3,"colors":["#12","#abcdef"]}').colors, ["#abcdef"]);
   }
 };

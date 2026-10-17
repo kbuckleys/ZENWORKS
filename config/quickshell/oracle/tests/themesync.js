@@ -25,11 +25,11 @@ module.exports = {
     const lk = S.renderKitty(LATTE, true);
     t.match("the ground is the background", lk, /^background\s+#eff1f5$/m);
     t.match("the ink is the foreground", lk, /^foreground\s+#4c4f69$/m);
-    t.match("light: colour 0 is a dark grey, not the ground", lk, /^color0\s+#5c5f77$/m);
-    t.match("light: colour 7 is a light grey, not the ink", lk, /^color7\s+#acb0be$/m);
+    t.match("light: color 0 is a dark gray, not the ground", lk, /^color0\s+#5c5f77$/m);
+    t.match("light: color 7 is a light gray, not the ink", lk, /^color7\s+#acb0be$/m);
     const dk = S.renderKitty(LATTE, false);
-    t.match("dark: colour 0 is the ground", dk, /^color0\s+#eff1f5$/m);
-    t.ok("all sixteen colours are written", [...Array(16).keys()]
+    t.match("dark: color 0 is the ground", dk, /^color0\s+#eff1f5$/m);
+    t.ok("all sixteen colors are written", [...Array(16).keys()]
       .every((i) => new RegExp("^color" + i + "\\s+#[0-9a-f]{6}$", "m").test(lk)));
     t.ok("no slot came out undefined", !/undefined|NaN/.test(lk));
 
@@ -46,8 +46,8 @@ module.exports = {
         return true;
       } catch (e) { return e.code === "ENOENT"; }
     })());
-    // 8-digit #aarrggbb (Zenon's border slot) still gives the colour
-    t.match("an alpha-carrying hex is read for its colour", S.renderHyprTheme(
+    // 8-digit #aarrggbb (Zenon's border slot) still gives the color
+    t.match("an alpha-carrying hex is read for its color", S.renderHyprTheme(
       Object.assign({}, LATTE, { border: "#4d45505c" })), /inactive_border\s+= "#45505c4d"/);
   }
 };

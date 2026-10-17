@@ -21,7 +21,7 @@ Item {
   property real fromTop: 0
   // How far in from the left the well starts — terminus' sidebar runs the
   // full height of its window, and a sheet hangs from the bar BESIDE it, so it
-  // is centred under that bar rather than across the whole window.
+  // is centered under that bar rather than across the whole window.
   property real leftInset: 0
 
   // ── OR RISING FROM THE FOOT ──────────────────────────────────────────
@@ -33,7 +33,7 @@ Item {
   // the tabs. Off, nothing here changes.
   property bool fromBottom: false
   // Set around a change of END on a hidden sheet (see PlatoSheet.setEnd):
-  // the card's y jumps to the new end instead of travelling there, so a
+  // the card's y jumps to the new end instead of traveling there, so a
   // sheet that last came from the top and now rises from the bottom does
   // not fly down the window on its way up.
   property bool noGlide: false
@@ -71,7 +71,7 @@ Item {
   readonly property bool renaming: headName.editing
   function beginRename() { headName.begin(); }
   // The least a floating card stands below the bar, when the window is too
-  // short to centre it.
+  // short to center it.
   property real gap: 18
   // LATCHED while the card is up: a caller's title is usually derived from
   // whichever sheet is open, and it empties the moment the sheet is told to
@@ -197,7 +197,7 @@ Item {
   // clip, and nothing else.
   //
   // NO AIR OF ITS OWN, and that is the whole of the rule. Every card's
-  // first row already carries its own — a field centred in a 46px row
+  // first row already carries its own — a field centered in a 46px row
   // leaves 11 above it, a line of text with a 12px margin leaves 12 — which
   // is what put the air under the caption band when there was one. Adding
   // more here does not replace that, it stacks on it: measured at 23px of
@@ -211,8 +211,8 @@ Item {
     id: well
     anchors.left: parent.left
     // Only a sheet hanging from the bar is inset to sit under it. A floating
-    // card is centred on the WHOLE window — a sidebar that is out is part of
-    // the window, and centring on the listing beside it put the card off to
+    // card is centered on the WHOLE window — a sidebar that is out is part of
+    // the window, and centering on the listing beside it put the card off to
     // one side.
     anchors.leftMargin: sheet.floating ? 0 : sheet.leftInset
     anchors.right: parent.right
@@ -260,7 +260,7 @@ Item {
       // ── AND THE BAR'S OWN MATERIAL ─────────────────────────────────
       // Over a hole the card is the same glass as the bar it hangs from,
       // so it frosts as the bar's rows do (ScrollEdge: no darkening, -0.2
-      // saturation). The card's darker, greyer frost met the bar's at a
+      // saturation). The card's darker, grayer frost met the bar's at a
       // visible line (user, 2026-10-11). Over live content it keeps the
       // darker one, which is what keeps its words legible there.
       brightness: sheet.holed ? 0 : -0.12
@@ -285,7 +285,7 @@ Item {
     RoundClip {
       id: sheetCard
       // ── ON WHOLE PIXELS ─────────────────────────────────────────────
-      // Centring is a halving, and half of an odd number is half a pixel:
+      // Centering is a halving, and half of an odd number is half a pixel:
       // a card at x.5 or y.5 has every glyph in it resampled across two
       // pixel columns, which is exactly what blurry text in a card is.
       // Position and size are rounded so the content lands on the grid.
@@ -322,16 +322,16 @@ Item {
       // so the rounded top corners are cut away and the sheet reads as
       // hanging FROM the bar rather than floating below it. Rounded at the
       // bottom, square at the top.
-      // floating: centred on the whole window, the bar included — the well
+      // floating: centered on the whole window, the bar included — the well
       // starts under the bar, so its own middle would sit low — and never
       // closer to the bar than `gap`. It rises the last few pixels in.
       readonly property real restY: Math.round(Math.max(sheet.gap,
         (well.height + sheet.fromTop - sheetCard.height) / 2 - sheet.fromTop))
       // ── THE RISE IS AN OFFSET, NOT A DESTINATION ──────────────────
-      // restY is a centring, so it moves whenever the card's height does —
+      // restY is a centering, so it moves whenever the card's height does —
       // and a Behavior on y aimed at it was retargeted mid-flight every time
       // the content settled, which is a hitch in the middle of the rise.
-      // The centre is followed exactly; only the 12px lift animates.
+      // The center is followed exactly; only the 12px lift animates.
       property real lift: sheet.shown ? 0 : 12
       Behavior on lift {
         NumberAnimation {

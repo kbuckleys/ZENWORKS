@@ -70,7 +70,7 @@ Item {
   // The rule is the head's last pixel and the row begins on the next
   // one, which is what makes the cursor's top edge and the rule a
   // single seam. The air between that seam and the glyph belongs to the
-  // row — it is what centres a 15px glyph in 32px — and is not the
+  // row — it is what centers a 15px glyph in 32px — and is not the
   // heading's to take.
 
   width: parent ? parent.width : 0
@@ -126,7 +126,7 @@ Item {
     // nothing at its margin and the whole panel drifting right.
     // ── ON THE ICONS, NOT ON THE COLUMN THEY SIT IN ───────────────
     // 15 rather than 12. The glyph column starts at 12 and is 20 wide
-    // with the glyph CENTRED in it, so no icon's ink actually begins at
+    // with the glyph CENTERED in it, so no icon's ink actually begins at
     // 12 — measured off the rendered rows, the home, directory and disk
     // glyphs all start at 15 or 16. Aligning to the column is the tidy
     // answer on paper and visibly wrong on screen: the heading hangs a
@@ -147,7 +147,7 @@ Item {
        : (sideHead.first ? 0 : sideHead.airAbove + sideHead.rule) + sideHead.airIn
     text: sideHead.label
     // ── A TITLE, NOT A FILING LABEL ─────────────────────────────────
-    // It was 11px grey caps with 1.8 of letter-spacing, which is the
+    // It was 11px gray caps with 1.8 of letter-spacing, which is the
     // shape of a label on a drawer — small, shouted, and needing an
     // ornament beside it to be worth looking at at all. Two ornaments
     // were tried and both read as arbitrary, which was the wrong
@@ -168,9 +168,9 @@ Item {
     // short cyan tick in the glyph column, the same column every row's icon
     // stands in, so the headings and the rows share one left edge and the
     // label starts where a row's label starts. It marks the group in the one
-    // place the eye is already travelling down.
+    // place the eye is already traveling down.
     // The ink the breadcrumb gives the step you are standing on. Cyan
-    // is this window's "chosen" colour — it marks the active pane, the
+    // is this window's "chosen" color — it marks the active pane, the
     // cursor and the current row — and spending it on four headings
     // that are never chosen and never change made the sidebar compete
     // with the one thing in it that IS selected.
@@ -183,7 +183,9 @@ Item {
     // Back with the capitals, and for them: tracking is what stops a run
     // of caps reading as one shape. It went when the headings stopped
     // being capitals and returns with them.
-    font.letterSpacing: 1.2
+    // Only for capitals: the sidebar's headings are sentence case now
+    // (user, 2026-10-17); the settings sheet's are still caps.
+    font.letterSpacing: sideHead.label === sideHead.label.toUpperCase() ? 1.2 : 0
   }
 
 }

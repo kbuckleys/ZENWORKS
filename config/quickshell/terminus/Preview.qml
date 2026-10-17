@@ -597,7 +597,7 @@ Item {
           term.previewShown = cur.path;
           if (cur) term.cachePreview(cur.path, { kind: "dir", rows: rows });
         } else if (term.previewKind === "archive") {
-          // Rows, not a block of text: the tree wants a glyph and a colour per
+          // Rows, not a block of text: the tree wants a glyph and a color per
           // entry, the same two a listing gives its rows, and those come from
           // the same enrichment the listing uses rather than from a second
           // idea of what a .rs file looks like. The "and more" marker is not a

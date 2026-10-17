@@ -8,7 +8,7 @@
 // home() had five identical definitions across the layers' .js files and
 // cacheDir() three. All eight were byte-for-byte the same, which is the
 // harmless end of duplication — but it is still eight places to edit the day
-// one of them should have honoured XDG_HOME, and eight places for the next
+// one of them should have honored XDG_HOME, and eight places for the next
 // reader to check before believing any of them.
 //
 // A SINGLETON for the same reason Strings is one: a layer's .js cannot import
@@ -60,5 +60,14 @@ QtObject {
   // singleton is deliberately nothing but string functions.
   function userDirsFile() {
     return Paths.configDir() + "/user-dirs.dirs";
+  }
+
+  // A long-running watcher's argv (inotifywait -m, udevadm monitor, gdbus
+  // monitor...), run through scripts/tether so it dies with this shell even
+  // when the shell is SIGKILLed; without it each shell that went left its
+  // watchers running under init. Every such Process takes its command from
+  // here; python backends use morpheus/py/tether.py.
+  function tether(argv) {
+    return [Quickshell.shellDir + "/scripts/tether"].concat(argv);
   }
 }

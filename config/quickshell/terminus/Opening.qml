@@ -184,6 +184,13 @@ Item {
         naturalSort: term.naturalSort,
         alwaysTabs: term.alwaysTabs,
         colHeadsOn: term.colHeadsOn,
+        barNav: term.barNav,
+        barSideToggle: term.barSideToggle,
+        barSort: term.barSort,
+        barViews: term.barViews,
+        barSplit: term.barSplit,
+        barZoom: term.barZoom,
+        defaultView: term.defaultView,
         confirmTrash: term.confirmTrash,
         cursorSlide: term.cursorSlide,
         termCmd: term.termCmd,
@@ -265,6 +272,11 @@ Item {
     if (typeof s.naturalSort === "boolean") term.naturalSort = s.naturalSort;
     if (typeof s.alwaysTabs === "boolean") term.alwaysTabs = s.alwaysTabs;
     if (typeof s.colHeadsOn === "boolean") term.colHeadsOn = s.colHeadsOn;
+    for (const k of ["barNav", "barSideToggle", "barSort", "barViews", "barSplit", "barZoom"])
+      if (typeof s[k] === "boolean") term[k] = s[k];
+    if (typeof s.defaultView === "string"
+        && (s.defaultView === "" || ["columns", "list", "grid"].indexOf(s.defaultView) >= 0))
+      term.defaultView = s.defaultView;
     if (typeof s.confirmTrash === "boolean") term.confirmTrash = s.confirmTrash;
     if (typeof s.cursorSlide === "boolean") term.cursorSlide = s.cursorSlide;
     if (typeof s.termCmd === "string") term.termCmd = s.termCmd;

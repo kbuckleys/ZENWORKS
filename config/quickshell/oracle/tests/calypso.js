@@ -22,7 +22,7 @@ module.exports = {
     const ids = (rows) => rows.map((r) => r.acct + r.id);
     t.eq("all, by name", ids(C.shelve(ITEMS, { shelf: "all" }, "", {}, "name")), ["b8", "a1", "a2", "b1", "b9"]);
     t.eq("recent first", ids(C.shelve(ITEMS, { shelf: "all" }, "", {}, "recent")), ["b8", "a1", "a2", "b1", "b9"]);
-    t.eq("favourites: the platform's and calypso's", ids(C.shelve(ITEMS, { shelf: "fav" }, "", { "a\u00011": true }, "name")), ["a1", "b1"]);
+    t.eq("favorites: the platform's and calypso's", ids(C.shelve(ITEMS, { shelf: "fav" }, "", { "a\u00011": true }, "name")), ["a1", "b1"]);
     t.eq("one-time passwords: known ones only", ids(C.shelve(ITEMS, { shelf: "totp" }, "", {}, "name")), ["a1"]);
     t.eq("one account", ids(C.shelve(ITEMS, { acct: "b" }, "", {}, "name")), ["b8", "b1", "b9"]);
     t.eq("a folder holds its subfolders", ids(C.shelve(ITEMS, { folder: "Work" }, "", {}, "name")), ["a1", "b1"]);

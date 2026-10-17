@@ -175,7 +175,7 @@ Collapsible {
   // false when the process exits, which would break a binding for good.
   Process {
     id: proc
-    command: [Helpers.script("status.sh"), "watch"]
+    command: Paths.tether([Helpers.script("status.sh"), "watch"])
     stdout: SplitParser {
       onRead: (line) => {
         try {

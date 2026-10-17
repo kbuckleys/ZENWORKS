@@ -4,7 +4,7 @@
 // https://github.com/kbuckleys/
 //
 // THE NOTE, OPEN — its toolbar (Apple's: Aa for formats, a checklist, a
-// table, things to put in, colours, the lock, sharing), then the editor;
+// table, things to put in, colors, the lock, sharing), then the editor;
 // a journal entry with its date, mood and bookmark over its words; a
 // locked note as its lock until the password is given; find (ctrl+f) as a
 // bar under the toolbar.
@@ -43,7 +43,7 @@ Item {
 
   function show(n) {
     pane.commit();
-    pane.closeFind();
+    pane.closeFind(true);
     pane.noteId = n ? n.id : "";
     pane.loadedOne = false;
     if (!n) { ed.load([]); return; }
@@ -101,7 +101,7 @@ Item {
     Rectangle { anchors.fill: parent; color: Zenon.headBg }
     Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Zenon.border }
 
-    // a note in the Trash says so, or the sticky's colours (where a note
+    // a note in the Trash says so, or the sticky's colors (where a note
     // lives is not said here: its row in the list says it — user, 2026-10-14)
     Text {
       x: 18
@@ -136,10 +136,10 @@ Item {
       }
     }
 
-    // centred on the note (user, 2026-10-14), the format bar under it too
+    // centered on the note (user, 2026-10-14), the format bar under it too
     Row {
       id: tools
-      // (never over a sticky's colours, nor off the pane's left edge)
+      // (never over a sticky's colors, nor off the pane's left edge)
       x: Math.max(swatches.visible ? swatches.x + swatches.width + 14 : 12, Math.round((parent.width - width) / 2))
       anchors.verticalCenter: parent.verticalCenter
       spacing: 4
@@ -160,9 +160,10 @@ Item {
           if (!pane.formatPinned) { pane.formatHush = true; formatLeave.stop(); pane.formatShown = false; }
         }
       }
+      ClioTool { pane: pane; glyph: "\uF0CA"; tip: "Outline — the note's headings"; menu: true; onPressed: (x, y) => pane.outlineMenu(x, y) }
       ClioTool { pane: pane; glyph: "\u{F0C52}"; tip: "Checklist"; keys: "ctrl shift l"; enabled: tools.writable; onPressed: ed.setKind("check") }
       ClioTool { pane: pane; glyph: ""; tip: "Table"; keys: "ctrl alt t"; enabled: tools.writable; onPressed: ed.insertTable() }
-      ClioTool { pane: pane; glyph: ""; tip: "Put in…"; enabled: tools.writable; onPressed: (x, y) => pane.attachMenu(x, y) }
+      ClioTool { pane: pane; glyph: ""; tip: "Put in…"; menu: true; enabled: tools.writable; onPressed: (x, y) => pane.attachMenu(x, y) }
       ClioTool {
         id: trayTool
         pane: pane
@@ -174,7 +175,16 @@ Item {
       }
       ClioTool { pane: pane; glyph: "\u{F03EB}"; tip: "Sketch"; enabled: tools.writable && !pane.isSticky; onPressed: pane.win.sketch(null) }
       ClioTool { pane: pane; glyph: ""; tip: "Link"; keys: "ctrl k"; enabled: tools.writable; onPressed: pane.askLink() }
-      ClioTool { pane: pane; glyph: "\u{F03D8}"; tip: "Colour and highlight"; enabled: tools.writable; onPressed: (x, y) => pane.inkMenu(x, y) }
+      // spelling, on or off for every note (on by default; user, 2026-10-17)
+      ClioTool {
+        pane: pane
+        glyph: "\u{F04C6}"
+        tip: pane.mgr && pane.mgr.spellOn ? "Spelling is checked — click to stop" : "Check spelling"
+        lit: !!pane.mgr && pane.mgr.spellOn
+        litInk: Zenon.cyan
+        onPressed: pane.mgr.setSpellOn(!pane.mgr.spellOn)
+      }
+      ClioTool { pane: pane; glyph: "\u{F03D8}"; tip: "Color and highlight"; menu: true; enabled: tools.writable; onPressed: (x, y) => pane.inkMenu(x, y) }
       Item { width: 8; height: 1 }
       ClioTool {
         pane: pane
@@ -182,10 +192,11 @@ Item {
         glyph: pane.note && pane.note.sealed ? "" : ""
         tip: pane.note && pane.note.sealed ? "Locked — opened until Lock Now" : "Lock this note"
         lit: !!pane.note && !!pane.note.sealed
+        menu: true
         onPressed: (x, y) => pane.lockMenu(x, y)
       }
-      ClioTool { pane: pane; glyph: ""; tip: "Share and export"; visible: !pane.isSticky; onPressed: (x, y) => pane.shareMenu(x, y) }
-      ClioTool { pane: pane; glyph: ""; tip: "More"; onPressed: (x, y) => pane.win.noteMenu(pane.note, x, y) }
+      ClioTool { pane: pane; glyph: ""; tip: "Share and export"; menu: true; visible: !pane.isSticky; onPressed: (x, y) => pane.shareMenu(x, y) }
+      ClioTool { pane: pane; glyph: ""; tip: "More"; menu: true; onPressed: (x, y) => pane.win.noteMenu(pane.note, x, y) }
     }
   }
 
@@ -194,6 +205,7 @@ Item {
   readonly property real findH: findBar.height
   function openFind() {
     if (!pane.note || pane.locked) return;
+    ed.flashing = false;
     pane.finding = true;
     const sel = ed.selectedText();
     if (sel !== "" && sel.indexOf("\n") < 0) findField.text = sel;
@@ -201,11 +213,12 @@ Item {
     findField.selectAll();
     ed.find(findField.text);
   }
-  function closeFind() {
+  // `quiet`: another note is coming in — nothing focused, only put away
+  function closeFind(quiet) {
     if (!pane.finding) return;
     pane.finding = false;
-    ed.find("");
-    pane.focusEditor(false);
+    if (quiet) { ed.find(""); return; }
+    if (!ed.endFind()) pane.focusEditor(false);
   }
   // ── THE FORMAT BAR ─────────────────────────────────────────────────────
   // Every format at once, in a second bar under the toolbar: shown while
@@ -250,6 +263,23 @@ Item {
     const f = it.te.cursorSelection.font;
     return { b: f.weight >= Font.Bold && it.te.font.weight < Font.DemiBold, i: f.italic, u: f.underline, s: f.strikeout };
   }
+  // the face the words in hand wear, when it is one chosen for them ("" for
+  // the note's own)
+  readonly property string faceHere: {
+    void ed.cursorKey; void ed.rev;
+    const it = ed.current();
+    if (!it || !it.isText || !it.te || !it.te.cursorSelection) return "";
+    void it.te.cursorPosition; void it.te.selectionStart; void it.te.selectionEnd; void it.te.length;
+    const f = it.te.cursorSelection.font.family;
+    return f && f !== it.te.font.family ? f : "";
+  }
+  // Alexandria opened for the words in hand (user, 2026-10-17: "change the
+  // font of one word while retaining a different font for the rest")
+  function chooseRunFace() {
+    if (!pane.mgr.fontBook || pane.inMono) return;
+    pane.mgr.fontBook.pick({ title: "Font for these words", family: pane.faceHere || pane.mgr.faceFor(pane.isEntry), weight: 400 },
+                           (family) => { ed.runFace(family === pane.mgr.faceFor(pane.isEntry) ? "" : family); pane.focusEditor(false); });
+  }
   readonly property string kindHere: { void ed.cursorKey; void ed.rev; const it = ed.current(); return it ? it.kind : ""; }
   // the caret (or every line chosen) in a Monostyled block: plain text,
   // so marks, alignment and clearing do nothing there — dimmed on the bar
@@ -285,7 +315,7 @@ Item {
       anchors.rightMargin: 4
       Row {
         id: fmtRow
-        // centred, under the toolbar it opens from
+        // centered, under the toolbar it opens from
         readonly property real fit: Math.min(1, fmtRoom.width / Math.max(1, width))
         scale: fit
         transformOrigin: Item.Center
@@ -335,7 +365,7 @@ Item {
         Item { width: 21; height: parent.height; Rectangle { anchors.centerIn: parent; width: 1; height: 18; color: Zenon.border } }
         // how the lines sit
         Repeater {
-          model: [["", "\uF036", "Along the left"], ["center", "\uF037", "Centred"], ["right", "\uF038", "Along the right"], ["justify", "\uF039", "Justified"]]
+          model: [["", "\uF036", "Along the left"], ["center", "\uF037", "Centered"], ["right", "\uF038", "Along the right"], ["justify", "\uF039", "Justified"]]
           delegate: ClioTool {
             required property var modelData
             anchors.verticalCenter: parent.verticalCenter
@@ -373,6 +403,24 @@ Item {
         ClioTool { anchors.verticalCenter: parent.verticalCenter; pane: formatBar.host; onHoveredChanged: formatBar.host.formatHover(); size: 26; glyph: ""; tip: "Outdent"; keys: "shift tab"; onPressed: ed.indent(-1) }
         ClioTool { anchors.verticalCenter: parent.verticalCenter; pane: formatBar.host; onHoveredChanged: formatBar.host.formatHover(); size: 26; glyph: ""; tip: "Indent"; keys: "tab"; onPressed: ed.indent(1) }
         Item { width: 21; height: parent.height; Rectangle { anchors.centerIn: parent; width: 1; height: 18; color: Zenon.border } }
+        // the words' own typeface: its name on the bar when one is chosen
+        ClioTool {
+          anchors.verticalCenter: parent.verticalCenter
+          visible: !!pane.mgr.fontBook && !pane.isSticky
+          pane: formatBar.host
+          onHoveredChanged: formatBar.host.formatHover()
+          size: 26
+          pad: 14
+          word: pane.faceHere !== "" ? pane.faceHere : "Font"
+          wordPx: Zenon.px(13)
+          wordWeight: Font.DemiBold
+          lit: pane.faceHere !== ""
+          litInk: Zenon.cyan
+          tip: pane.faceHere !== "" ? "Font for these words — right click for the note's own" : "Font for these words"
+          enabled: !pane.inMono
+          onPressed: pane.chooseRunFace()
+          MouseArea { anchors.fill: parent; acceptedButtons: Qt.RightButton; onClicked: ed.runFace("") }
+        }
         ClioTool { anchors.verticalCenter: parent.verticalCenter; pane: formatBar.host; onHoveredChanged: formatBar.host.formatHover(); size: 26; glyph: "\u{F0265}"; tip: "Clear formatting"; enabled: !pane.inMono; onPressed: ed.plainText() }
       }
     }
@@ -380,7 +428,7 @@ Item {
 
   // ── FIND IN NOTE ── at the foot of the note, over the hint strip and
   // dressed as it is (user, 2026-10-14): the note goes on under it frosted
-  // (the window's bottom edge, see ClioWindow), the fields centred
+  // (the window's bottom edge, see ClioWindow), the fields centered
   Item {
     id: findBar
     anchors.bottom: parent.bottom
@@ -633,15 +681,37 @@ Item {
       { text: "Indent", icon: "", mark: "tab", run: () => ed.indent(1) },
       { text: "Outdent", icon: "", mark: "shift tab", run: () => ed.indent(-1) },
       { text: "Clear formatting", enabled: !pane.inMono, icon: "\u{F0265}", run: () => ed.plainText() }]
-      .concat(!pane.mgr.fontBook ? [] : [{ isSeparator: true },
+      .concat(!pane.mgr.fontBook ? [] : [{ isSeparator: true }]
+      .concat(pane.isSticky ? [] : [
+        { text: "Font for these words…", enabled: !pane.inMono, icon: "\uF031", run: () => pane.chooseRunFace() },
+        { text: "The note's own font for these words", enabled: !pane.inMono && pane.faceHere !== "", icon: "\uF031", run: () => ed.runFace("") }]).concat([
         { text: pane.isSticky ? "Font for this sticky…" : pane.isEntry ? "Font for the journal…" : "Font for notes…", icon: "\uF031",
-          run: () => pane.mgr.chooseFace(pane.isEntry, pane.note) }]));
+          run: () => pane.mgr.chooseFace(pane.isEntry, pane.note) }])));
+  }
+  // ── THE OUTLINE ── the note's title, headings and subheadings, each a
+  // way to it (a folded heading over it is opened: ed.showHit's unfolding)
+  function outlineMenu(x, y) {
+    ed.flushTyping();
+    const lvl = { title: 0, heading: 1, subheading: 2 };
+    const items = [];
+    ed.blocks.forEach((b, i) => {
+      if (!(b.k in lvl)) return;
+      const t = N.plain(b.h).trim();
+      if (t === "") return;
+      items.push({ text: "\u2003".repeat(lvl[b.k]) + t, icon: N.KINDS[b.k].glyph,
+                   run: () => {
+                     if (ed._hidden[i]) for (let x = i - 1; x >= 0; x--) if (ed.blocks[x].fold) { ed.blocks[x].fold = false; ed.rev++; }
+                     Qt.callLater(() => ed.place(i, "start"));
+                   } });
+    });
+    if (items.length === 0) items.push({ text: "No headings yet", icon: "", enabled: false, run: () => {} });
+    pane.win.menuRef.open(x, y, items);
   }
   function inkMenu(x, y) {
     const names = { magenta: "Purple", pink: "Pink", yellow: "Orange", green: "Mint", blue: "Blue", cyan: "Cyan", red: "Red" };
     const marks = { sand: "Yellow", pink: "Pink", green: "Green", blue: "Blue", magenta: "Purple" };
     const items = N.INKS.map((n) => ({ text: names[n] + " text", icon: "", iconInk: Zenon[n], run: () => ed.ink(n) }));
-    items.push({ text: "Plain text colour", icon: "", run: () => ed.ink("") }, { isSeparator: true });
+    items.push({ text: "Plain text color", icon: "", run: () => ed.ink("") }, { isSeparator: true });
     for (const m of N.MARKERS) items.push({ text: marks[m] + " highlight", icon: "\u{F0652}", iconInk: Zenon[m], run: () => ed.highlight(m) });
     items.push({ text: "No highlight", icon: "\u{F0652}", run: () => ed.highlight("") });
     pane.win.menuRef.open(x, y, items);
@@ -748,12 +818,20 @@ Item {
     const ro = ed.readOnly;
     const it = ed.current();
     const hasSel = ed.cross !== null || !!it && it.isText && it.te.selectionStart !== it.te.selectionEnd;
-    const items = [
+    // the spelling's own items first, as every Mac menu has them
+    const sp = info.spell;
+    const spellItems = !sp ? [] : sp.sugs.slice(0, 6).map((w) => ({ text: w, icon: "\uF00C", enabled: !ro,
+                                                                     run: () => ed.respellWord(info.key, sp, w) }))
+      .concat(sp.sugs.length === 0 ? [{ text: "No guesses", icon: "", enabled: false, run: () => {} }] : [])
+      .concat([{ text: "Learn spelling", icon: "\uF02D", run: () => pane.mgr.learnWord(sp.w) },
+               { text: "Ignore spelling", icon: "\uF070", run: () => pane.mgr.ignoreWord(sp.w) },
+               { isSeparator: true }]);
+    const items = spellItems.concat([
       { text: "Cut", icon: "\u{F0190}", mark: "ctrl x", enabled: hasSel && !ro, run: () => { if (ed.cross) { ed.copyCross(); ed.deleteCross(); } else it.te.cut(); } },
       { text: "Copy", icon: "\u{F018F}", mark: "ctrl c", enabled: hasSel, run: () => { if (ed.cross) ed.copyCross(); else it.te.copy(); } },
       { text: "Paste", icon: "\u{F0192}", mark: "ctrl v", enabled: !ro, run: () => ed.pasteAsked() },
       { text: "Paste as plain text", icon: "\u{F0192}", mark: "ctrl shift v", enabled: !ro, run: () => pane.pastePlain() },
-      { text: "Select all", icon: "\u{F0486}", mark: "ctrl a", run: () => ed.selectAll() }];
+      { text: "Select all", icon: "\u{F0486}", mark: "ctrl a", run: () => ed.selectAll() }]);
     const c = info.control;
     if (info.link) items.push({ isSeparator: true },
       { text: N.noteLink(info.link) ? "Open the note" : "Open the link", icon: "", run: () => ed.linkClicked(info.link) },
@@ -803,12 +881,13 @@ Item {
     if (!ro && N.isText({ k: info.kind })) {
       items.push({ isSeparator: true },
         { text: "Formats…", icon: "\u{F0B34}", run: () => pane.formatMenu(x, y) },
-        { text: "Colour and highlight…", icon: "\u{F03D8}", run: () => pane.inkMenu(x, y) },
+        { text: "Color and highlight…", icon: "\u{F03D8}", run: () => pane.inkMenu(x, y) },
         { text: "Link…", icon: "", mark: "ctrl k", run: () => pane.askLink() });
       if (pane.note.d && pane.note.d.checks > 0) items.push(
         { text: "Tick every box", icon: "\u{F0C52}", run: () => ed.checkAll(true) },
         { text: "Untick every box", icon: "\u{F0130}", run: () => ed.checkAll(false) },
-        { text: "Move ticked items to the bottom", icon: "\u{F04BC}", run: () => ed.sinkChecked() });
+        { text: "Move ticked items to the bottom", icon: "\u{F04BC}", run: () => ed.sinkChecked() },
+        { text: "Delete ticked items", icon: "\uF1F8", danger: true, run: () => { const k = ed.deleteTicked(); if (k) pane.win.say(k + (k === 1 ? " ticked item deleted — ctrl z brings it back" : " ticked items deleted — ctrl z brings them back")); } });
     }
     items.push({ isSeparator: true }, { text: "Find in note", icon: "", mark: "ctrl f", run: () => pane.openFind() });
     pane.win.menuRef.open(x, y, items);

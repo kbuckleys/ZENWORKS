@@ -4,13 +4,13 @@
 -- https://github.com/kbuckleys/
 --
 -- Markdown, rendered in place: the file stays the file, but what marks it up
--- is drawn as what it means. "## Title" is a heading in its own colour on a
+-- is drawn as what it means. "## Title" is a heading in its own color on a
 -- band, **bold** is bold with no stars, a table is ruled and its columns line
 -- up, a code block sits on a panel, "- [ ]" is a box to tick.
 --
 -- NOTHING IS ADDED TO THE BUFFER. What this works out is the same kind of
 -- answer view.lua already draws for a hover's markdown: bytes to conceal (or
--- to show as something else), colours to paint, and per line a block it
+-- to show as something else), colors to paint, and per line a block it
 -- belongs to, for EditorRow to draw under the text.
 --   lines[l] = { cc = { {b0, b1, shown}, ... },   shown "" hides them
 --                paint = { {b0, b1, group}, ... }, in order, later wins
@@ -25,7 +25,7 @@
 --
 -- DRAWN, OR WRITTEN. The editor draws a quote's bars, a table's frame and a
 -- code block's language itself (EditorRow), so here they are only hidden.
--- A preview has nothing but text and colour (render.lua): compute(…, true)
+-- A preview has nothing but text and color (render.lua): compute(…, true)
 -- writes them as characters instead — ▎ for a bar, │ for a table's sides,
 -- the language after a code glyph.
 -- `shown` may be several cells wide: a table's padding rides on its pipes.
@@ -442,8 +442,8 @@ local function inline(out, buf, root, top, bot)
       paint(out, sr, sc, sr == er and ec or -1, "PlatoMdCode")
     elseif (t == "strong_emphasis" or t == "emphasis")
         and not (out[sr] and out[sr].blk and out[sr].blk.k == "h") then
-      -- (a heading is bold in its own colour already: a cell has one group,
-      -- and plain bold would take the heading's colour away)
+      -- (a heading is bold in its own color already: a cell has one group,
+      -- and plain bold would take the heading's color away)
       paint(out, sr, sc, sr == er and ec or -1, t == "emphasis" and "PlatoMdItalic" or "PlatoMdBold")
     elseif t == "strikethrough" then
       paint(out, sr, sc, sr == er and ec or -1, "PlatoMdStrike")

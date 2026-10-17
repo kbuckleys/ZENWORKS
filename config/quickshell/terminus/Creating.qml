@@ -104,12 +104,15 @@ Item {
     }
     return rows;
   }
-  function beginCreate() { term.startCreate("file"); }
-  function beginMkdir() { term.startCreate("dir"); }
-  function startCreate(kind) {
+  // `a` makes it in the listing itself, `A` inside the directory under the
+  // cursor (user, 2026-10-17: `a` on a directory row used to go inside it,
+  // which is the less common want)
+  function beginCreate(inside) { term.startCreate("file", !!inside); }
+  function beginMkdir(inside) { term.startCreate("dir", !!inside); }
+  function startCreate(kind, inside) {
     // A DIALOG IS A PLACE TO PUT THINGS, NOT JUST TO FIND THEM. This refused
     // outright in picker mode, which meant a save dialog could not make the
-    // directory you wanted to save into — you cancelled, opened a file manager,
+    // directory you wanted to save into — you canceled, opened a file manager,
     // made the directory, and started the save again.
     //
     // BOTH kinds are allowed, not just the directory that was actually asked
@@ -131,7 +134,7 @@ Item {
     // new thing would be visible immediately. Anything else goes beside
     // the row — which at the top level is cwd, so nothing about the flat
     // case changes.
-    const where = term.cursorDir();
+    const where = inside ? term.cursorDir() : term.cwd;
     const pane = term.act;
     // ── THE BRANCH IS OPENED FIRST, AND IT IS READ FIRST ──────────────
     // Two reasons, and the first one is a bug that hid behind the second.

@@ -44,6 +44,8 @@ Item {
     term.barSend = term.sendToRef.open;
     term.barTitle = term.sendToRef.open ? "" : term.sheetTitle;
     term.barGlyph = term.sendToRef.open ? "" : term.sheetGlyph;
+    term.barLead = term.sendToRef.open ? "" : term.sheetLead;
+    term.barTail = term.sendToRef.open ? "" : term.sheetTail;
     term.barTitleInk = term.sheetTitleInk;
     term.barGlyphInk = term.sheetGlyphInk;
   }

@@ -34,7 +34,7 @@ PlatoSheet {
 
   property var settings: null
   required property font face
-  // the window, for the colour dropdown's card (a popup of its own)
+  // the window, for the color dropdown's card (a popup of its own)
   property var window: null
 
   signal closed()
@@ -271,7 +271,7 @@ PlatoSheet {
             width: parent.width + 4
             height: parent.width + 4
             radius: 5
-            color: restoreMa.containsMouse ? Zenon.wash(restoreMa.pressed ? 0.14 : 0.08) : Zenon.wash(0)
+            color: restoreMa.containsMouse ? (restoreMa.pressed ? Zenon.pressWash(0.14) : Zenon.wash(0.08)) : Zenon.wash(0)
           }
           Text {
             id: restoreGlyph
@@ -605,8 +605,8 @@ PlatoSheet {
     }
   }
 
-  // ── A COLOUR: a swatch, and a dropdown of them ────────────────────
-  // The choice shown as itself — a dot in the colour and its name — and
+  // ── A COLOR: a swatch, and a dropdown of them ────────────────────
+  // The choice shown as itself — a dot in the color and its name — and
   // Enter, Space or a click opens the choices as the shell's menu card
   // (morpheus CardPopup) under the chip, each with its swatch and a tick on
   // the one in use. ↑/↓ move in it, Enter takes one, Esc puts it away;

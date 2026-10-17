@@ -120,11 +120,9 @@ Item {
   }
   function noteAt(i) { return nl.rows[i] ? nl.rows[i].n : null; }
 
-  readonly property int rowH: 66 + Zenon.px(4)
+  // four lines on every row (NoteRowBody)
+  readonly property int rowH: 68 + Zenon.px(20)
   readonly property int secH: 34
-  // the selected row's fourth line, when it was last edited (NoteRowBody)
-  readonly property int hereH: Zenon.px(16) + 2
-  function extraOf(n) { return n && n.kind !== "sticky" && !n.deleted && n.modified ? nl.hereH : 0; }
 
   // ── CARRYING ONE ── the window's (win.carry / win.land), shared with the
   // journal's cards
@@ -141,7 +139,7 @@ Item {
       readonly property var n: nl.noteAt(index) || ({ id: "", d: { title: "", preview: "", images: [], checks: 0, done: 0 } })
       readonly property bool here: nl.win && row.n.id === nl.win.selId
       width: ListView.view ? ListView.view.width : 300
-      readonly property int bodyH: nl.rowH + (row.here ? nl.extraOf(row.n) : 0)
+      readonly property int bodyH: nl.rowH
       height: row.bodyH + (row.head !== "" ? nl.secH : 0)
       Text {
         visible: row.head !== ""
@@ -210,8 +208,7 @@ Item {
       view: list
       host: nl.win
       index: nl.win ? nl.win.selIndex : -1
-      // the selected row, its fourth line with it (hereH)
-      rowH: nl.rowH + (nl.win ? nl.extraOf(nl.noteAt(nl.win.selIndex)) : 0)
+      rowH: nl.rowH
       // summed from the rows, not read off the delegate: a new sort rebuilds
       // every delegate, and one asked for before it is laid out left -1 —
       // index × rowH, blind to the date headings above it
@@ -278,6 +275,9 @@ Item {
           sourceSize.width: 360
           fillMode: Image.PreserveAspectCrop
           asynchronous: true
+          // faded in as it arrives, not popped in (2026-10-17)
+          opacity: status === Image.Ready ? 1 : 0
+          Behavior on opacity { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
         }
         Text {
           visible: tile.n.d.images.length === 0 || !!tile.n.sealed

@@ -6,7 +6,7 @@
 # SOURCED, NOT RUN — by scripts/launch.sh (the shell).
 #
 # NVIDIA's EGL only, ONLY ON A MACHINE THAT IS ALL NVIDIA. glvnd otherwise
-# loads Mesa's EGL as well, and Mesa brings its gallium/LLVM rasteriser into
+# loads Mesa's EGL as well, and Mesa brings its gallium/LLVM rasterizer into
 # the shell — ~108MB of RSS measured, for a driver an NVIDIA-only machine
 # never draws with. But pinned on anything else it is fatal: with no NVIDIA
 # driver there is then no EGL at all and nothing draws, and on a hybrid laptop

@@ -145,7 +145,36 @@ Item {
       width: flick.width
       spacing: 1
 
-      SideHead { first: true; ruled: false; label: "Notes" }
+      // making a container, or a note from a template: buttons on the
+      // heading's line (user, 2026-10-17)
+      SideHead {
+        first: true
+        ruled: false
+        label: "Notes"
+        Row {
+          anchors.right: parent.right
+          anchors.rightMargin: 10
+          anchors.verticalCenter: parent.verticalCenter
+          spacing: 2
+          HeadButton {
+            win: side.win
+            glyph: "\u{F0DC9}"
+            tip: "New from a template"
+            held: side.win.menuHeld === "templates"
+            onClicked: (x, y) => { side.win.templateMenu(x, y); side.win.menuHeld = "templates"; }
+            onMenu: (x, y) => { side.win.templateMenu(x, y); side.win.menuHeld = "templates"; }
+          }
+          HeadButton {
+            win: side.win
+            glyph: "\u{F0257}"
+            tip: "New container"
+            keys: "ctrl shift n"
+            onClicked: side.win.askFolder("")
+            onMenu: (x, y) => side.win.menuRef.open(x, y, [{ text: "New container…", icon: "\u{F0257}", run: () => side.win.askFolder("") },
+                                                          { text: "New smart container…", icon: "\u{F0968}", run: () => side.win.askSmart(null) }])
+          }
+        }
+      }
       ClioShelf {
         host: side
         glyph: "\u{F11D7}"
@@ -181,6 +210,16 @@ Item {
           MouseArea { anchors.fill: parent; anchors.margins: -6; onClicked: Clio.toggle() }
         }
       }
+      // every highlighted phrase, gathered (HighlightsBody)
+      ClioShelf {
+        host: side
+        visible: count !== "0"
+        glyph: "\u{F0652}"
+        glyphInk: Zenon.sand
+        label: "Highlights"
+        count: side.mgr ? String(N.highlights(side.mgr.notes).length) : "0"
+        onClicked: side.win.highlightsOpen = true
+      }
       // the containers, as a tree
       Repeater {
         model: side.mgr ? N.folderRows(side.mgr.folders, side.mgr.notes, side.mgr.shut) : []
@@ -205,30 +244,6 @@ Item {
           onMenu: (x, y) => side.win.folderMenu(side.mgr.folders.find((f) => f.id === modelData.id), x, y)
         }
       }
-      // making one, under the containers (as "New journal" under the journals)
-      ClioShelf {
-        host: side
-        glyph: ""
-        label: "New container"
-        muted: true
-        count: "ctrl shift n"
-        onClicked: side.win.askFolder("")
-        onMenu: (x, y) => side.win.menuRef.open(x, y, [{ text: "New container…", icon: "\u{F0257}", run: () => side.win.askFolder("") },
-                                                      { text: "New smart container…", icon: "\u{F0968}", run: () => side.win.askSmart(null) }])
-      }
-      // starting one from a template, and the templates kept (saving,
-      // importing, deleting them) — the compose button's right click, in sight
-      ClioShelf {
-        id: tplRow
-        host: side
-        glyph: "\u{F0DC9}"
-        label: "From a template"
-        muted: true
-        held: side.win.menuHeld === "templates"
-        onClicked: { const p = tplRow.mapToItem(side.win.stageItem, 12, tplRow.height); side.win.templateMenu(p.x, p.y); side.win.menuHeld = "templates"; }
-        onMenu: (x, y) => { side.win.templateMenu(x, y); side.win.menuHeld = "templates"; }
-      }
-
       SideHead { ruled: false; label: "Smart Containers"; visible: smartRep.count > 0 }
       Repeater {
         id: smartRep
@@ -285,7 +300,20 @@ Item {
         }
       }
 
-      SideHead { ruled: false; label: "Journal" }
+      SideHead {
+        ruled: false
+        label: "Journal"
+        HeadButton {
+          anchors.right: parent.right
+          anchors.rightMargin: 10
+          anchors.bottom: parent.bottom
+          anchors.bottomMargin: 2
+          win: side.win
+          glyph: "\u{F067}"
+          tip: "New journal"
+          onClicked: side.win.askJournal(null)
+        }
+      }
       Repeater {
         model: side.mgr ? side.mgr.journals : []
         delegate: ClioShelf {
@@ -301,13 +329,6 @@ Item {
           onClicked: side.win.setScope({ shelf: "journal", id: modelData.id })
           onMenu: (x, y) => side.win.journalMenu(modelData, x, y)
         }
-      }
-      ClioShelf {
-        host: side
-        glyph: ""
-        label: "New journal"
-        muted: true
-        onClicked: side.win.askJournal(null)
       }
 
       // ── RECENT: the notes and entries last written or opened ──

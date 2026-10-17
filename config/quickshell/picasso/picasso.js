@@ -77,14 +77,14 @@ function parse(text) {
   }
 }
 
-// ── solid colours ─────────────────────────────────────────────────────────
-// A colour is assigned exactly like a picture — the same maps, the same
+// ── solid colors ─────────────────────────────────────────────────────────
+// A color is assigned exactly like a picture — the same maps, the same
 // per-monitor keys — so it needs a spelling that can never be a path. No
 // path starts with "color:", which is the whole of the trick; everything that
 // reads an assignment asks isColor() before it treats one as a file.
 function isColor(p) { return String(p || "").indexOf("color:") === 0; }
 
-// "#rrggbb", or "" for anything that is not a colour assignment
+// "#rrggbb", or "" for anything that is not a color assignment
 function colorOf(p) {
   if (!isColor(p)) return "";
   const hex = normHex(String(p).slice(6));
@@ -134,7 +134,7 @@ const presetColors = [
   { hex: "#26262b", name: "Charcoal" }
 ];
 
-// ── colour arithmetic for the picker ─────────────────────────────────────
+// ── color arithmetic for the picker ─────────────────────────────────────
 // HSV in 0..1 each, because that is the shape of the square you drag in.
 function hexToHsv(hex) {
   const h = normHex(hex);
@@ -178,7 +178,7 @@ const lookDefaults = {
   dim: 0,             // 0 .. 0.8, black laid over the top
   vignette: 0,        // 0 .. 1, the edges darkened towards the corners
   blur: 0,            // 0 .. 1
-  saturation: 0,      // -1 (grey) .. 1
+  saturation: 0,      // -1 (gray) .. 1
   brightness: 0,      // -1 .. 1, lifted or lowered before the tint
   contrast: 0,        // -1 .. 1
   tint: "",           // "" none, "accent", or "#rrggbb"
@@ -204,8 +204,8 @@ function lookDiff(look) {
   return out;
 }
 
-// What fills the space around a picture, as a colour: the look's backdrop
-// colour, the picture's own (`accent`, when known), otherwise black — the
+// What fills the space around a picture, as a color: the look's backdrop
+// color, the picture's own (`accent`, when known), otherwise black — the
 // blurred backdrop is drawn over black. The focus card's preview asks it.
 function groundOf(look, accent) {
   const l = lookOf(look);
@@ -263,7 +263,7 @@ function alignInFrame(align, rotate, mirror) {
 // The box a picture is drawn into, in the monitor's own coordinates.
 // `target` is the region the picture covers — the monitor itself, or for a
 // span the whole desk moved into this monitor's frame. A quarter turn swaps
-// the box's sides, and the box is centred on the target so it turns in place.
+// the box's sides, and the box is centered on the target so it turns in place.
 function frameRect(target, rotate) {
   const q = rotate === 90 || rotate === 270;
   const w = q ? target.h : target.w, h = q ? target.w : target.h;
@@ -310,7 +310,7 @@ function nextSlide(pool, current, shuffle, rand) {
 // that corrupts somebody's config the day they buy that monitor.
 function isMap(v) { return !!v && typeof v === "object" && !Array.isArray(v); }
 
-// Version 3 adds the looks, the span, the saved colours and the slideshow.
+// Version 3 adds the looks, the span, the saved colors and the slideshow.
 // Each is optional on the way in, so a v2 file loads with all of them empty.
 function serializeState(st) {
   return JSON.stringify({

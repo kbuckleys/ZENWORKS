@@ -121,7 +121,7 @@ Item {
   function extractSelected() {
     const rows = term.acting().filter((r) => !r.isDir && Terminus.isArchive(r.name));
     if (rows.length === 0) { term.warn("not an archive"); return; }
-    // ONE JOB PER ARCHIVE, handed to the queue that already serialises work.
+    // ONE JOB PER ARCHIVE, handed to the queue that already serializes work.
     // A single script over all of them could only report one count across
     // archives of wildly different sizes, and the panel would step backwards
     // every time it reached the next one.
@@ -182,7 +182,7 @@ Item {
         // The paste's own three answers, minus the one that would be a second
         // Cancel: SKIP and CANCEL are the same act when there is a single
         // thing to skip, and two buttons that do nothing is not a choice.
-        // Overwrite wears the alarm colour here for the reason it does there.
+        // Overwrite wears the alarm color here for the reason it does there.
         term.confirmRef.askMany(
           "Archive over " + answer[0] + "?",
           "keep both \u2192 " + answer[1],

@@ -5,7 +5,7 @@
 //
 // SCENE — a monitor's picture as it is finally seen: laid in a frame that may
 // be turned, mirrored or stretched across a whole desk, over a backdrop, then
-// blurred, greyed, lit, tinted, vignetted and dimmed.
+// blurred, grayed, lit, tinted, vignetted and dimmed.
 //
 // THREE CALLERS NOW: the daemon's wall, the card's map, and the viewer —
 // which shows a photo through it while it is being edited, and grabs it at
@@ -42,10 +42,10 @@ Item {
   // card, so a blur of 40 pixels on the wall is a blur of 2 on a monitor
   // drawn 150 pixels wide rather than a smear across all of it.
   property real unit: 1
-  // For the backdrop: the picture's own colour, and a small copy of it
+  // For the backdrop: the picture's own color, and a small copy of it
   property string accent: ""
   property string thumb: ""
-  // A plain colour for the ground — a colour background, which has no
+  // A plain color for the ground — a color background, which has no
   // picture at all and is nothing but backdrop
   property string solid: ""
   // The ground under everything. A background always has one; a photo in the

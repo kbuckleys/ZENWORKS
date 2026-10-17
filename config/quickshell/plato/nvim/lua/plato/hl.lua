@@ -3,7 +3,7 @@
 -- └─┘└─┘┘└┘└┴┘└─┘┴└─┴ ┴└─┘
 -- https://github.com/kbuckleys/
 --
--- Highlighting: where each colour comes from, and how it reaches plato.
+-- Highlighting: where each color comes from, and how it reaches plato.
 --
 -- THREE LAYERS PER CELL, painted in this order and merged the way nvim
 -- combines them:
@@ -12,10 +12,10 @@
 --   over   what sits on top: search matches and the visual selection
 -- A cell's style is the merge of its three groups, and every distinct
 -- combination is registered once and given a number. Frames carry numbers;
--- the colours behind them are sent the first time a number is used.
+-- the colors behind them are sent the first time a number is used.
 --
--- WHY NOT JUST ASK NVIM. A grid UI would be sent every cell's final colour,
--- but a Lua UI cannot have a grid, and treesitter's colours in particular only
+-- WHY NOT JUST ASK NVIM. A grid UI would be sent every cell's final color,
+-- but a Lua UI cannot have a grid, and treesitter's colors in particular only
 -- exist in the middle of nvim's own redraw — which a headless nvim never
 -- does. So the captures are run here, over the visible lines only, the same
 -- way the highlighter would run them.
@@ -77,14 +77,14 @@ local function merge(into, a)
   for k, v in pairs(a) do into[k] = v end
 end
 
-local byLook = {}      -- the merged attributes, serialised → id
+local byLook = {}      -- the merged attributes, serialized → id
 
 -- The id for a cell painted with these three groups (any may be nil), or 0
--- when they add up to nothing — plain text in Normal's colour, which the
+-- when they add up to nothing — plain text in Normal's color, which the
 -- client needs no span to draw.
 --
 -- NUMBERED BY LOOK, NOT BY NAME. Under a selection, a keyword and a string
--- can come out the same (two groups linked to one colour): two names, one
+-- can come out the same (two groups linked to one color): two names, one
 -- look. Keyed by name they were two styles, and a line came out as a span
 -- per syntax group instead of one.
 function M.style(base, deco, over)
@@ -133,12 +133,12 @@ function M.all()
   return out
 end
 
--- the colours changed: every id means something else now
+-- the colors changed: every id means something else now
 function M.reset()
   resolved, ids, defs, fresh, byLook, nextId = {}, {}, {}, {}, {}, 1
 end
 
--- The UI's own colours — gutter, current line, folds — for QML to paint
+-- The UI's own colors — gutter, current line, folds — for QML to paint
 -- things nvim would have painted around the text.
 function M.ui()
   local function a(g) return M.attrs(g) or {} end
@@ -220,7 +220,7 @@ end
 -- For every language treesitter has no parser for — which on this machine is
 -- most of them. synID is the only question the regex engine answers, and it
 -- answers per character, so it is asked once per character on screen and the
--- answer kept: a line's colours are reused until an edit at or above it
+-- answer kept: a line's colors are reused until an edit at or above it
 -- (syntax state flows downward, so an edit can change every line below).
 local synCache = {}   -- buf → lnum(0-based) → { text, runs }
 local synCount = {}   -- buf → how many lines synCache holds for it
@@ -247,11 +247,11 @@ end
 function M.forget(buf) synCache[buf] = nil; synCount[buf] = nil; lineCache[buf] = nil end
 
 -- ── base: line-local Lua highlighters ──────────────────────────────────
--- Formats bat colours and nvim has no grammar for (or one too slow for a
+-- Formats bat colors and nvim has no grammar for (or one too slow for a
 -- big file): csv/tsv columns and logs. Each looks at one line alone — no
--- regex engine, no syncing — so it also colours a file too big for syntax
+-- regex engine, no syncing — so it also colors a file too big for syntax
 -- (large.lua turns that off; terminus hands bat anything past 4 MB, and the
--- two must agree). The colours are bat's under --theme=ansi, so the editor,
+-- two must agree). The colors are bat's under --theme=ansi, so the editor,
 -- plato's previews and bat's say the same thing.
 
 -- csv and tsv: a column at a time, bat's cycle of five (PlatoCol1-5,
@@ -312,7 +312,7 @@ local function logRuns(s)
       if ue then i = ue + 1; done = true end
     end
     -- a quoted string
-    -- (a double-quoted one's backslash escapes, \n \" \\, in the key's colour,
+    -- (a double-quoted one's backslash escapes, \n \" \\, in the key's color,
     -- as bat's; a single-quoted one has none)
     if (c == '"' or c == "'") and not isWord(prev) then
       local e, esc = i + 1, {}
@@ -335,7 +335,7 @@ local function logRuns(s)
         i = e + 1; done = true
       end
     end
-    -- key=, the key's colour whatever it is made of (2358734848=true)
+    -- key=, the key's color whatever it is made of (2358734848=true)
     if not done and isWord(c) and not isWord(prev) then
       local _, e = s:find("^[%w_]+", i)
       if s:sub(e + 1, e + 1) == "=" then
@@ -417,7 +417,7 @@ local function logRuns(s)
       end
     end
     if not done and isWord(c) then
-      -- a word: key= takes the key's colour; otherwise skipped whole, so
+      -- a word: key= takes the key's color; otherwise skipped whole, so
       -- its digits are never a number
       local _, e = s:find("^[%w_]+", i)
       if s:sub(e + 1, e + 1) == "=" then
@@ -433,7 +433,7 @@ local function logRuns(s)
 end
 
 -- /etc/hosts, as bat's "Hosts File": the address, then its names, then a
--- comment (nvim calls the file `conf` and colours the comment only)
+-- comment (nvim calls the file `conf` and colors the comment only)
 local function hostsRuns(s)
   local runs = {}
   local hash = s:find("#", 1, true)

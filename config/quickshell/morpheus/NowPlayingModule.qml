@@ -40,7 +40,7 @@ Collapsible {
       BarText {
         id: label
         anchors.centerIn: parent
-        // Centred on the line box, the caps land 9px under the pill's top
+        // Centered on the line box, the caps land 9px under the pill's top
         // stroke and 10px over its bottom one: 30px inside, 11px of capital,
         // and an odd 19 left over that cannot split evenly. The rounding fell
         // toward the top, and with the green wash lighting the space beneath
@@ -49,7 +49,7 @@ Collapsible {
         anchors.verticalCenterOffset: 1
         text: NowPlaying.title
         // Green either way now: against a half-strength fill there is enough
-        // dark showing through that the text can stay the accent colour, and
+        // dark showing through that the text can stay the accent color, and
         // the state is carried by the wash appearing rather than by the words
         // inverting.
         color: Zenon.green

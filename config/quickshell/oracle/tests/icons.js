@@ -136,7 +136,7 @@ module.exports = {
       + decls.map((n) => "try{globalThis." + n + "=" + n + "}catch(e){}").join(";"),
       tctx);
 
-    // ── EVERY RECOGNISED EXTENSION RESOLVES TO SOMETHING ──────────────
+    // ── EVERY RECOGNIZED EXTENSION RESOLVES TO SOMETHING ──────────────
     // It used to demand a line in EXTS for each one, which is a stricter
     // thing than the window needs and a list nobody finishes: forty-one
     // image formats failed it, all of them obscure, and adding forty-one
@@ -161,7 +161,7 @@ module.exports = {
                         "AUDIO_EXTS", "FONT_EXTS", "TEXT_EXTS"]) {
       t.eq("every extension in " + name + " draws as its kind", gap(name), []);
     }
-    // and the same for the kinds the listing colours rows by
+    // and the same for the kinds the listing colors rows by
     const cats = tctx.CAT_EXTS || {};
     for (const k of Object.keys(cats)) {
       const miss = Object.keys(cats[k])

@@ -9,7 +9,7 @@
 // a third of the width and want the name alone; the preview pane wants the
 // name and no interaction at all. Those are the same row with two switches
 // on it, not three delegates — and three delegates is how the glyph, the
-// colour rules and the tick end up drifting apart.
+// color rules and the tick end up drifting apart.
 // ── one tile of a thumbnail view ────────────────────────────────────────
 // Lifted out of the grid's delegate so the SECOND PANE can be a grid too.
 // Both panes draw the same tile; what differs is which state it is bound to
@@ -143,7 +143,32 @@ QtObject {
     pane.reflowing = true;
     pane.reflowOff.restart();
   }
-  property Timer reflowOff: Timer { interval: 450; onTriggered: pane.reflowing = false }
+  property Timer reflowOff: Timer {
+    interval: 450
+    onTriggered: { pane.reflowing = false; pane.branchPath = ""; }
+  }
+  // ── A BRANCH OPENING OR CLOSING SLIDES (user, 2026-10-17) ────────────
+  // The same glide, not the view's transitions (see PaneList's note on
+  // why those went): the rows below move to their new places from their
+  // old ones, and an opening branch's own rows come down out of the
+  // directory's row. `branchPath` is the directory, `branchAt` the index
+  // its row stood at, for the length of the change.
+  property string branchPath: ""
+  property int branchAt: -1
+  function branchMoved(path) {
+    if (term.applyDepth > 0) return;
+    pane.branchAt = -1;
+    for (let i = 0; i < pane.view.length; ++i)
+      if (pane.view[i].path === path) { pane.branchAt = i; break; }
+    if (pane.branchAt < 0) return;
+    pane.branchPath = path;
+    pane.reflow();
+  }
+  // whether a path is one of the branch's own rows (its kids, at any depth)
+  function inBranch(path) {
+    const b = pane.branchPath;
+    return b !== "" && String(path).indexOf(b === "/" ? "/" : b + "/") === 0;
+  }
   // the old place of a path, or -1
   function wasAt(path) {
     const i = pane.prevAt["k:" + String(path)];
@@ -175,6 +200,7 @@ QtObject {
   onCwdChanged: {
     // another directory is an arrival, never a reorder to glide
     pane.reflowing = false;
+    pane.branchPath = "";
     pane.reflowOff.stop();
     pane.lastListing = null;
     const c = pane.cwd, d = pane.crumbDeep;
@@ -395,6 +421,7 @@ QtObject {
       if (keep) term.wantSel = keep.path;
     }
 
+    if (pane.treed) pane.branchMoved(String(path));
     pane.writeOpen(next);
     // The watch list is the open branches plus cwd — see root.watch.
     // Also the moment to try the branches again after a fallback.
@@ -674,7 +701,7 @@ QtObject {
     // that is how three expanded directories under Projects vanished from
     // the saved tree between one start and the next. Rows carry their
     // real paths (find's %p), so a listing that is not of `dir` is
-    // recognisable, and it is not allowed to delete anything.
+    // recognizable, and it is not allowed to delete anything.
     const base = dir === "/" ? "/" : dir + "/";
     for (let i = 0; i < rows.length; ++i) {
       const p = String(rows[i].path || "");
@@ -908,7 +935,7 @@ QtObject {
     // it knew about — a directory re-read that came back shorter — and
     // nothing else did, although a tree has several other ways to lose
     // rows: a branch re-read after a delete, a directory collapsed, a
-    // filter typed, and a file made inside a branch then cancelled.
+    // filter typed, and a file made inside a branch then canceled.
     //
     // Left past the end the cursor draws as a highlight bar over empty
     // space with no name in it, on a row that cannot be opened, renamed
@@ -966,8 +993,9 @@ QtObject {
       let kept = 0;
       for (let i = 0; i < next.length; ++i) if (at["k:" + next[i].path] !== undefined) ++kept;
       // loosening a filter keeps every row it had, however many come back
+      // and a branch opening keeps every row there was, however big it is
       const reorder = kept >= next.length * 0.5
-        || (pane.widening && m.count > 0 && kept >= m.count * 0.5);
+        || ((pane.widening || pane.branchPath !== "") && m.count > 0 && kept >= m.count * 0.5);
       if (next.length === 0 || !reorder) {
         pane.reflowing = false;
         pane.reflowOff.stop();

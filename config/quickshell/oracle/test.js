@@ -45,7 +45,8 @@ function makeContext() {
     tmpDir: () => ENV.TMPDIR || "/tmp",
     runtimeDir: () => ENV.XDG_RUNTIME_DIR || Paths.tmpDir(),
     dataDir: () => ENV.XDG_DATA_HOME || Paths.home() + "/.local/share",
-    configDir: () => ENV.XDG_CONFIG_HOME || Paths.home() + "/.config"
+    configDir: () => ENV.XDG_CONFIG_HOME || Paths.home() + "/.config",
+    tether: (argv) => ["/shell/scripts/tether"].concat(argv)
   };
 
   const Strings = {

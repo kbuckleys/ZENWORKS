@@ -50,7 +50,9 @@ const exact = {
   "Paste as hard link": "\u{F1178}",         // file_link_outline
   "Make symlink": "\u{F0339}",
   "Duplicate": "\u{F0191}",                  // content_duplicate
-  "Rename": "\u{F0CB6}",                     // pencil_outline
+  // the batch rename card's own mark, so one rename reads as the same act
+  // as many (user, 2026-10-17)
+  "Rename": "\u{EC61}",
   "Trash": "\u{F0A7A}",                      // trash_can_outline
   "Empty the trash": "\u{F00E2}",            // broom
   "Empty trash…": "\u{F00E2}",
@@ -119,6 +121,7 @@ const exact = {
 // the rows whose words change with what they are about
 const prefixes = [
   ["Undo", "\u{F054C}"],                     // undo
+  ["Rename", "\u{EC61}"],                    // "Rename (9)"
   ["Background on", "\u{F02E9}"],
   ["Bookmark", "\u{F00C4}"],
   ["Remove bookmark", "\u{F137A}"],

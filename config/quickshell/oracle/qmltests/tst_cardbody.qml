@@ -33,7 +33,7 @@ Item {
 
   // the row the pointer would be over, at a y on the card's surface
   function rowAt(y) {
-    return Math.floor((y - card.pad - Zenon.menuCardPad + card.scrollY) / Zenon.menuRowHeight);
+    return Math.floor((y - card.pad - 1 + card.scrollY) / Zenon.menuRowHeight);
   }
 
   TestCase {
@@ -56,7 +56,7 @@ Item {
     function test_opens_on_its_answer() {
       verify(card.scrollY > 0, "scrolled down to the marked row");
       const top = 70 * Zenon.menuRowHeight;
-      const view = Zenon.menuMaxHeight - Zenon.menuCardPad * 2;
+      const view = Zenon.menuMaxHeight - 2;
       verify(top >= card.scrollY && top + Zenon.menuRowHeight <= card.scrollY + view,
              "the marked row is in view: " + card.scrollY);
     }
@@ -82,12 +82,12 @@ Item {
 
     function test_a_click_unscrolled() {
       load(99, -1);
-      mouseClick(card, 160, card.pad + Zenon.menuCardPad + Zenon.menuRowHeight * 2 + 10);
+      mouseClick(card, 160, card.pad + 1 + Zenon.menuRowHeight * 2 + 10);
       tryCompare(root, "picked", 2, 2000);
     }
 
     function test_a_click_after_scrolling_lands_on_its_row() {
-      // scrolled to row 70's neighbourhood by reveal; click the middle
+      // scrolled to row 70's neighborhood by reveal; click the middle
       const y = card.height / 2;
       const want = root.rowAt(y);
       verify(want > 18, "a row from past the first screenful: " + want);

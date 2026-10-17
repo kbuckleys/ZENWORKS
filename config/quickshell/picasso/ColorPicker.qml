@@ -5,7 +5,7 @@
 //
 // COLORPICKER — a square to drag saturation and brightness in, a bar for the
 // hue under it, and the hex beside a swatch of the result, which you can
-// also type into. Used twice: the picker's colour tab makes a background with
+// also type into. Used twice: the picker's color tab makes a background with
 // it, and the card's look tab makes a tint or a backdrop with it.
 //
 //     ColorPicker { hex: "#9bbfbf"; onEdited: (h) => … }
@@ -33,16 +33,16 @@ Item {
   implicitWidth: 260
   implicitHeight: 220
 
-  // Held separately from `hex` because a colour at zero saturation or zero
+  // Held separately from `hex` because a color at zero saturation or zero
   // brightness has no hue of its own, and deriving the knobs from the hex
-  // alone would throw the hue away the moment you dragged through grey.
+  // alone would throw the hue away the moment you dragged through gray.
   property real h: 0
   property real s: 0
   property real v: 0
 
   function pull(x) {
     const c = Art.hexToHsv(x);
-    // keep the hue where it was when the colour cannot say what it is
+    // keep the hue where it was when the color cannot say what it is
     if (c.s > 0 && c.v > 0) picker.h = c.h;
     picker.s = c.s;
     picker.v = c.v;
@@ -51,10 +51,10 @@ Item {
   Component.onCompleted: pull(picker.hex)
 
   // WHAT THE KNOBS SAY NOW, which is what everything in here draws. `hex`
-  // is the caller's — an input, bound by whoever holds the colour — and it is
+  // is the caller's — an input, bound by whoever holds the color — and it is
   // never written from inside: assigning it replaced that binding, so after a
   // single drag the card could switch between tint and backdrop and this
-  // went on showing the colour it was last dragged to.
+  // went on showing the color it was last dragged to.
   readonly property string shown: Art.hsvToHex(picker.h, picker.s, picker.v)
   // and the field follows it whenever you are not typing in it
   onShownChanged: if (!field.activeFocus) field.text = picker.shown

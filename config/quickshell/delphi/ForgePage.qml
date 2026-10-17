@@ -325,7 +325,7 @@ Item {
     // (wrapping under each other only when the column is that narrow)
     Flow {
       id: seg
-      // centred in the column; wrapping only when it is that narrow
+      // centered in the column; wrapping only when it is that narrow
       readonly property real want: openSeg.width + (whoSeg.visible ? 8 + whoSeg.width : 0)
       width: Math.min(parent.width - 24, want)
       x: Math.round((parent.width - width) / 2)
@@ -478,7 +478,7 @@ Item {
     onReset: pg.win.setSplit("forge", 0)
   }
 
-  // a pull request's or an issue's labels, as the forge colours them
+  // a pull request's or an issue's labels, as the forge colors them
   component Labels: Flow {
     id: labs
     property var labels: []
@@ -542,7 +542,7 @@ Item {
         font.weight: Zenon.weight
         font.pixelSize: Zenon.px(14)
       }
-      // a Text, not a TextEdit: only a Text colours its links (a TextEdit
+      // a Text, not a TextEdit: only a Text colors its links (a TextEdit
       // drew them in Qt's own blue)
       Text {
         width: parent.width

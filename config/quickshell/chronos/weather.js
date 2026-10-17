@@ -50,7 +50,7 @@ const GLYPH_REFRESH  = "";
 const GLYPH_UNKNOWN  = "";  // wi-na
 
 // code -> [day glyph, night glyph, label, palette role]
-// The role is a name, not a colour: Zenon owns the palette, and weather.js is
+// The role is a name, not a color: Zenon owns the palette, and weather.js is
 // plain script with no access to it.
 const CODES = {
   0:  [SUN, MOON, "Clear sky", "sun"],

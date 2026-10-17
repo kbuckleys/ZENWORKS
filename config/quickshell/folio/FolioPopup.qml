@@ -12,6 +12,7 @@ import Quickshell.Wayland
 import "../morpheus"
 import "../picasso"
 import "../terminus"
+import "../oracle"
 import "folio.js" as Folio
 
 LayerPopup {
@@ -26,7 +27,7 @@ LayerPopup {
   // ── DRAGGING ONE OF THESE SOMEWHERE ELSE ──────────────────────────────
   // Artemis' arrangement, wholesale, because the problem is identical: a
   // layer-shell popup that must let go of the pointer and of its own focus
-  // grab for as long as a drag is in flight, without cancelling the drag.
+  // grab for as long as a drag is in flight, without canceling the drag.
   //
   // Wayland's drag grab is separate from the surface input region, so
   // dropping the region mid-drag does not cancel anything — it only decides
@@ -52,16 +53,19 @@ LayerPopup {
 
   // ── THE KEYS, DRAWN AS KEYS ──────────────────────────────────────────
   // The hints were rich text with the key in bold and its word after it in
-  // grey, and the colours were hex literals inside folio.js — the palette
+  // gray, and the colors were hex literals inside folio.js — the palette
   // said twice. A chip says "this is a key you press" the way the rest of
   // this desktop says it, and takes its ink from Zenon like everything else.
   //
   // The recipe is terminus' KeyChip, which is an inline component of that
   // file and so cannot be imported.
 
-  readonly property int textCellH: 32
-  readonly property int textRows: 12
+  // Two lines a cell: the clip, and under it when it was copied.
+  readonly property int textCellH: 52
+  readonly property int textRows: 9
   readonly property int imgCell: 200
+  // The tile plus its own date line under the picture.
+  readonly property int imgCellH: popup.imgCell + 22
   readonly property int imgRowsVisible: 3
   readonly property int msgH: 28
 
@@ -73,20 +77,11 @@ LayerPopup {
   readonly property int imgPerRow: Math.max(1,
     Math.min(popup.imgRows.length, Math.floor(1000 / popup.imgCell)))
 
-  // TWO COLUMNS ONLY WHEN THERE IS SOMETHING TO PUT IN THE SECOND ONE.
-  //
-  // It used to be two whenever nothing was typed, so three entries were laid
-  // out as two and one — a second column holding a single line, and a first
-  // one cut to half the width for the privilege. One column holds twelve
-  // (textRows), so up to twelve it is one column at full width, and past
-  // that the entries are dealt across both.
-  //
-  // A query is always one column whatever it matches: a search result is
-  // read for its text, and the full panel width is how much of each entry
-  // you get to see (cellText measures against exactly this).
-  readonly property int textColsUsed:
-    (popup.query.length > 0 || popup.rows.length <= popup.textRows) ? 1 : 2
-  readonly property int textRowsNeeded: Math.min(Math.max(1, Math.ceil(popup.rows.length / popup.textColsUsed)), popup.textRows)
+  // ONE COLUMN, ALWAYS (user 2026-10-17). Past twelve entries they used to
+  // be dealt across two, each at half the width; an entry now carries its
+  // date on a second line, and one entry per line reads top to bottom.
+  readonly property int textRowsNeeded:
+    Math.min(Math.max(1, popup.rows.length), popup.textRows)
 
   // ── AS WIDE AS WHAT IS IN IT ──────────────────────────────────────────
   // A thousand pixels was the answer to every clipboard: three short clips
@@ -95,10 +90,8 @@ LayerPopup {
   // so the width the longest entry wants is arithmetic, not a layout pass —
   // the same advanceWidth, the same 32 of cell padding, read backwards.
   //
-  // Per COLUMN, so the two-column case asks for twice as much and each cell
-  // still ends up fitting the entry it was measured from.
   // NO NARROWER THAN ITS OWN FOOTER, in either mode. The hint strip is a row
-  // of chips centred in the panel and its contents change with the mode, so
+  // of chips centered in the panel and its contents change with the mode, so
   // the floor is measured off the row itself rather than guessed at with a
   // literal that would be wrong the day a hint is reworded.
   //
@@ -107,16 +100,19 @@ LayerPopup {
   readonly property int hintPad: 24
   readonly property int minW:
     Math.ceil(hintRow.implicitWidth) + popup.hintPad * 2
-  readonly property int textChars: {
-    let n = 0;
+  // MEASURED, NOT COUNTED. This was characters times the advance of an
+  // "M" — right for a monospaced face, and the shell's is proportional, so
+  // every line was cut at roughly two thirds of the room it had (user
+  // 2026-10-17: "truncate too early"). Only the first 240 characters are
+  // measured: past that the 1000px ceiling has long since won.
+  readonly property int textCellW: {
+    let w = 0;
     for (let i = 0; i < popup.rows.length; ++i) {
       const p = popup.rows[i].preview;
-      if (p && p.length > n) n = p.length;
+      if (p) w = Math.max(w, textMetrics.advanceWidth(p.slice(0, 240)));
     }
-    return n;
+    return Math.ceil(w) + 32;
   }
-  readonly property int textCellW:
-    Math.ceil(popup.textChars * textMetrics.advanceWidth) + 32
 
   // The bar OVERLAYS the right edge of the grid rather than sitting beside
   // it, so it is not part of a cell's width — it is a strip the panel has to
@@ -124,9 +120,8 @@ LayerPopup {
   // No circle: whether the grid scrolls is decided by how many entries there
   // are, never by how wide it is.
   readonly property int textBarW: textBar.visible ? textBar.width : 0
-  readonly property int textWant: popup.textChars === 0 ? popup.minW
-    : Math.max(popup.minW,
-        popup.textColsUsed * popup.textCellW + popup.textBarW)
+  readonly property int textWant: popup.rows.length === 0 ? popup.minW
+    : Math.max(popup.minW, popup.textCellW + popup.textBarW)
 
   // 1000 is folio's own ceiling, under whatever Zenon.layerMax currently is.
   // Image mode measures in whole tiles, which is the only width a grid of
@@ -155,9 +150,10 @@ LayerPopup {
     // it morphs, so measuring against it re-truncated and re-marked-up every
     // row on every frame of the animation for an answer that is only correct
     // at the end of it.
-    const cellW = (popup.panelTarget - popup.textBarW) / popup.textColsUsed;
-    const avail = Math.max(1, Math.floor((cellW - 32) / textMetrics.advanceWidth));
-    const p = preview.length > avail ? preview.slice(0, Math.max(0, avail - 1)) + "…" : preview;
+    // Elided by the face's own metrics, before the markup goes in — rich
+    // text cannot elide itself.
+    const avail = Math.max(1, popup.panelTarget - popup.textBarW - 32);
+    const p = textMetrics.elidedText(preview.slice(0, 2000), Qt.ElideRight, avail);
     return Folio.highlightedPreview(p, popup.query);
   }
   readonly property real textCellHeight: popup.textCellH
@@ -179,15 +175,14 @@ LayerPopup {
   readonly property real bodyH: popup.modeEmpty
     ? popup.textCellHeight + popup.msgH
     : (popup.mode === "image"
-        ? popup.imgRowsNeeded * popup.imgCell + popup.msgH
+        ? popup.imgRowsNeeded * popup.imgCellH + popup.msgH
         : popup.textRowsNeeded * popup.textCellHeight + popup.msgH)
 
-  TextMetrics {
+  FontMetrics {
     id: textMetrics
     font.family: Zenon.face
     font.pixelSize: Zenon.px(16)
     font.weight: 600
-    text: "M"
   }
 
   focusable: true
@@ -230,7 +225,95 @@ LayerPopup {
     onExited: popup.onActionDone()
   }
 
+  // ── THE LEDGER: WHEN EACH ENTRY ARRIVED ───────────────────────────────
+  // See Folio.reconcile. Kept running while the popup is shut, since that is
+  // when nearly everything is copied. Tethered like every -m watcher here.
+  property var stamps: ({})
+  property bool ledgerRead: false
+  // null: nothing re-copied; a number (0 included) is the original's stamp
+  property var carryStamp: null
+  property bool scanLive: false
+  property real openedAt: Date.now()
+
+  FileView {
+    id: ledgerFile
+    path: Folio.ledgerPath()
+    blockLoading: true
+    printErrors: false
+  }
+
+  Process {
+    id: ledgerWatch
+    command: Paths.tether(["sh", "-c",
+      "mkdir -p \"$1\" && exec inotifywait -m -q -e close_write,delete,moved_to --format %f \"$1\"",
+      "folio-ledger", Folio.thumbDir()])
+    stdout: SplitParser {
+      onRead: (line) => {
+        if (line.trim() !== "db") return;
+        popup.scanLive = true;
+        ledgerDebounce.restart();
+      }
+    }
+    // Ended means inotify-tools went missing or the directory did: try
+    // again later rather than spinning.
+    onExited: ledgerRetry.restart()
+  }
+
+  Timer {
+    id: ledgerRetry
+    interval: 30000
+    onTriggered: ledgerWatch.running = true
+  }
+
+  Timer {
+    id: ledgerDebounce
+    interval: 120
+    onTriggered: popup.ledgerScan()
+  }
+
+  Process {
+    id: ledgerProc
+    stdout: StdioCollector {
+      id: ledgerOut
+      waitForEnd: true
+      onStreamFinished: popup.onLedgerList(ledgerOut.text)
+    }
+  }
+
+  function ledgerScan() {
+    if (ledgerProc.running) { ledgerDebounce.restart(); return; }
+    ledgerProc.command = ["cliphist", "-preview-width", "1", "list"];
+    ledgerProc.running = true;
+  }
+
+  function onLedgerList(text) {
+    if (!popup.ledgerRead) {
+      ledgerFile.reload();
+      popup.stamps = Folio.parseLedger(ledgerFile.text()) || {};
+      popup.ledgerRead = true;
+    }
+    const live = popup.scanLive;
+    popup.scanLive = false;
+    const next = Folio.reconcile(popup.stamps, Folio.listIds(text), live,
+                                 Date.now(), live ? popup.carryStamp : null);
+    if (live) popup.carryStamp = null;
+    if (!next) return;
+    popup.stamps = next;
+    // setText never fires loaded — the state above is already the truth
+    ledgerFile.setText(JSON.stringify(next));
+  }
+
+  Component.onCompleted: {
+    ledgerWatch.running = true;
+    popup.ledgerScan();
+  }
+
+  function stampOf(id) {
+    return Folio.stampLabel(popup.stamps[id] || 0, popup.openedAt, Oracle.clock24h);
+  }
+
   function openPopup() {
+    popup.openedAt = Date.now();
     popup.shown = true;
     popup.collapsing = false;
     popup.mode = "text";
@@ -323,6 +406,7 @@ function onThumbsDone() {
     const id = popup.mode === "image"
       ? popup.imgRows[popup.sel].id
       : popup.rows[popup.sel].id;
+    popup.carryStamp = popup.stamps[id] !== undefined ? popup.stamps[id] : null;
     popup.runAction(Folio.copyCommand(id), "copy");
   }
 
@@ -368,7 +452,7 @@ function onThumbsDone() {
   function moveVert(delta) {
     const len = popup.rowCount();
     if (len === 0) return;
-    const cols = popup.mode === "image" ? popup.imgPerRow : popup.textColsUsed;
+    const cols = popup.mode === "image" ? popup.imgPerRow : 1;
     const rows = Math.ceil(len / cols);
     const row = Math.floor(popup.sel / cols);
     const col = popup.sel % cols;
@@ -383,7 +467,7 @@ function onThumbsDone() {
   function moveHoriz(delta) {
     const len = popup.rowCount();
     if (len === 0) return;
-    const cols = popup.mode === "image" ? popup.imgPerRow : popup.textColsUsed;
+    const cols = popup.mode === "image" ? popup.imgPerRow : 1;
     const row = Math.floor(popup.sel / cols);
     const col = popup.sel % cols;
     const rowStart = row * cols;
@@ -400,7 +484,7 @@ function onThumbsDone() {
 
     const page = popup.mode === "image"
       ? popup.imgPerRow * popup.imgRowsVisible
-      : popup.textRowsNeeded * popup.textColsUsed;
+      : popup.textRowsNeeded;
     popup.sel = Math.max(0, Math.min(len - 1, popup.sel + delta * page));
     popup.followSelection();
   }
@@ -613,7 +697,7 @@ function onThumbsDone() {
             anchors.fill: parent
             clip: true
             flow: GridView.FlowLeftToRight
-            cellWidth: textGrid.width / popup.textColsUsed
+            cellWidth: textGrid.width
             cellHeight: popup.textCellHeight
             model: popup.rows
             highlightMoveDuration: 120
@@ -686,24 +770,38 @@ function onThumbsDone() {
 
               Rectangle {
                 anchors.fill: parent
-                color: index === popup.sel ? Zenon.border : "transparent"
+                color: index === popup.sel ? Zenon.menuHi : "transparent"
               }
 
-              Text {
-                anchors.fill: parent
+              Column {
+                anchors.left: parent.left
+                anchors.right: parent.right
                 anchors.leftMargin: 16
                 anchors.rightMargin: 16
-                text: popup.cellText(modelData.preview)
-                color: popup.fgColor
-                textFormat: Text.RichText
-                font.family: Zenon.face
-                font.weight: 600
-                font.pixelSize: Zenon.px(16)
-                clip: true
-                elide: Text.ElideRight
-                wrapMode: Text.NoWrap
-                horizontalAlignment: Text.AlignLeft
-                verticalAlignment: Text.AlignVCenter
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: 2
+
+                Text {
+                  width: parent.width
+                  text: popup.cellText(modelData.preview)
+                  color: popup.fgColor
+                  textFormat: Text.RichText
+                  font.family: Zenon.face
+                  font.weight: 600
+                  font.pixelSize: Zenon.px(16)
+                  clip: true
+                  wrapMode: Text.NoWrap
+                }
+
+                Text {
+                  width: parent.width
+                  text: popup.stampOf(modelData.id)
+                  color: popup.hintColor
+                  font.family: Zenon.face
+                  font.weight: Zenon.weight
+                  font.pixelSize: Zenon.px(12)
+                  elide: Text.ElideRight
+                }
               }
 
               MouseArea {
@@ -751,7 +849,7 @@ function onThumbsDone() {
             // the whole shell — see morpheus/Elastic.qml. Inside the view
             // rather than over it: it pins itself to the viewport.
             ElasticScroll { view: imgGrid }
-            // CENTRED AT ITS OWN WIDTH, not filling the pane. The panel is a
+            // CENTERED AT ITS OWN WIDTH, not filling the pane. The panel is a
             // whole number of tiles wide except when the minimum floor is
             // holding it open — one or two pictures — and then the leftover
             // belongs on both sides of them rather than all of it on the
@@ -764,7 +862,7 @@ function onThumbsDone() {
             clip: true
             flow: GridView.FlowLeftToRight
             cellWidth: popup.imgCell
-            cellHeight: popup.imgCell
+            cellHeight: popup.imgCellH
             model: popup.imgRows
             highlightMoveDuration: 120
 
@@ -843,8 +941,12 @@ function onThumbsDone() {
               // The picture sits inside that box's 4px inset with room to
               // spare, so the box shows as a frame around it.
               Item {
-                anchors.fill: parent
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.top: parent.top
+                anchors.bottom: imgStamp.top
                 anchors.margins: 10
+                anchors.bottomMargin: 2
 
                 Image {
                   anchors.fill: parent
@@ -856,6 +958,21 @@ function onThumbsDone() {
                   sourceSize.width: popup.imgCell
                   sourceSize.height: popup.imgCell
                 }
+              }
+
+              Text {
+                id: imgStamp
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.bottom: parent.bottom
+                anchors.bottomMargin: 8
+                horizontalAlignment: Text.AlignHCenter
+                text: popup.stampOf(imgRow.modelData.id)
+                color: popup.hintColor
+                font.family: Zenon.face
+                font.weight: Zenon.weight
+                font.pixelSize: Zenon.px(12)
+                elide: Text.ElideRight
               }
 
               MouseArea {
@@ -881,6 +998,8 @@ function onThumbsDone() {
             view: imgGrid
             index: popup.sel
             on: popup.mode === "image"
+            // the menu cursor, in the theme's accent (Zenon.menuHi)
+            fill: Zenon.menuHi
           }
 
           // A SIBLING OF THE VIEW, never a child of it — inside, it becomes

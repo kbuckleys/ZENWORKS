@@ -8,7 +8,7 @@
 // `palette` property of its own, and an item's own property is found
 // before an id declared outside it — so inside the delegate `palette.sel`
 // read a QQuickPalette and came back undefined, which made `on` false on
-// every row forever. The rows were the right size and the colours were
+// every row forever. The rows were the right size and the colors were
 // right; the comparison was against nothing. Measured: sel=undefined,
 // size=558x30, selBg=#4d45505c.
 // A sheet over root.commands. It borrows the send picker's shape wholesale

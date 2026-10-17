@@ -97,14 +97,14 @@ Scope {
 
   //   input-field { font_color / check_color / fail_color = rgba(223,223,221,1) }
   readonly property color fg: Zenon.white
-  //   the date label's own colour = rgba(160,160,155,1)
+  //   the date label's own color = rgba(160,160,155,1)
   // THE LOCK SCREEN'S SECOND VOICE. The clock, the title and the play glyph
   // are the first — clockFg, white at 0.85. This is everything standing one
   // step behind them: the date, in both places it is drawn, and the artist
   // under the track. One value, because they are one role; it was a slightly
-  // different grey from the artist's until the two were asked to match, which
+  // different gray from the artist's until the two were asked to match, which
   // is the kind of difference nobody chooses on purpose.
-  // in a light theme the muted grey was too faint on the paper tint (user,
+  // in a light theme the muted gray was too faint on the paper tint (user,
   // 2026-10-08): most of the way to the ink, still a step behind the clock
   readonly property color dateFg: Zenon.light ? Zenon.mix(Zenon.ink, Zenon.muted, 0.3) : "#969daf"
   //   input-field { size = 20%, 10%; outline_thickness = 0; inner_color = transparent }
@@ -278,7 +278,7 @@ Scope {
   // When a track is active (playing or paused) the lock's footer splits:
   // time/date slide to the bottom-right (rtl) and the track's art +
   // metadata stay on the bottom-left (ltr). Otherwise the clock stays
-  // centred as before.
+  // centered as before.
   readonly property bool hasTrack: NowPlaying.active && NowPlaying.title !== ""
 
   // ── state ────────────────────────────────────────────────────────────
@@ -1023,9 +1023,9 @@ Scope {
           // far enough from the thing you are looking at to be missed.
           //
           // Under the lock rather than beside it, and measured off the field's
-          // centre rather than off any one of the three glyphs that live
+          // center rather than off any one of the three glyphs that live
           // there: the placeholder, the verdict and the dots all occupy that
-          // centre in turn, and anchoring to whichever happens to be showing
+          // center in turn, and anchoring to whichever happens to be showing
           // would move the warning as the phase changed.
           //
           // Red, which this shell reserves for what cannot be undone or what
@@ -1178,7 +1178,7 @@ Scope {
         }
 
         // Only on screen once the counter is spent. Zenon's orange, the same
-        // ink the bar's bell and updates count wear — the colour this shell
+        // ink the bar's bell and updates count wear — the color this shell
         // uses for "something needs you". A permanently visible "press this to
         // clear your failures" is an instruction to a stranger.
         Text {
@@ -1196,10 +1196,10 @@ Scope {
         //   label { text = $TIME, position = 0,47, valign = bottom }
         //   Seven-segment, with every unlit segment showing behind the live
         //   ones — which is what the panel of a real clock is doing.
-        //   Centred when no track; pushed to the bottom-right (rtl) when a
+        //   Centered when no track; pushed to the bottom-right (rtl) when a
         //   track is active so the bottom-left can host the now-playing.
-        // The clock and the uptime are centred AS A PAIR rather than the clock
-        // being centred with something hung off it — otherwise adding the
+        // The clock and the uptime are centered AS A PAIR rather than the clock
+        // being centered with something hung off it — otherwise adding the
         // second reading pushes the first off the middle of the screen, which
         // is the one thing its placement was about.
         Row {
@@ -1232,7 +1232,7 @@ Scope {
             visible: root.uptimeText !== ""
             text: root.uptimeSep
             // THE SAME INK AS THE DIGITS EITHER SIDE OF IT. It was drawn in
-            // ghostFg — the unlit-segment colour — which made the separator
+            // ghostFg — the unlit-segment color — which made the separator
             // read as part of the clock's backing rather than as a mark
             // between two readings.
             color: root.clockFg
@@ -1391,7 +1391,7 @@ Scope {
                 text: NowPlaying.artist
                 // Between the title's white and the album's muted, so the
                 // three rows read as a hierarchy rather than as two whites and
-                // a grey. The same ink the date is set in — see dateFg.
+                // a gray. The same ink the date is set in — see dateFg.
                 color: root.dateFg
                 font.family: root.fontFamily
                 font.pixelSize: Zenon.px(16)
@@ -1403,7 +1403,7 @@ Scope {
                 visible: NowPlaying.album !== ""
                 text: NowPlaying.album
                 // Muted read too faint over a light lock (user, 2026-10-09):
-                // there it is a step past the artist's ink, not the full grey.
+                // there it is a step past the artist's ink, not the full gray.
                 color: Zenon.light ? Zenon.mix(Zenon.ink, Zenon.muted, 0.6) : Zenon.muted
                 font.family: root.fontFamily
                 font.pixelSize: Zenon.px(14)
@@ -1431,7 +1431,7 @@ Scope {
             spacing: 12
 
             // The clock and the uptime as one right-aligned pair, the same way
-            // the centred layout treats them — this corner is the other place
+            // the centered layout treats them — this corner is the other place
             // the time lives, and a reading that only appears in one of them
             // is a reading you cannot rely on being there.
             Row {

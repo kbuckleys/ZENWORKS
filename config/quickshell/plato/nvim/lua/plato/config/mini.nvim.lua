@@ -15,7 +15,7 @@ require("mini.surround").setup()
 require("mini.ai").setup({ n_lines = 200 })
 
 -- Alt with h j k l moves the line, or the selection, as one piece: up and
--- down past its neighbours, left and right by an indent. Its indentation goes
+-- down past its neighbors, left and right by an indent. Its indentation goes
 -- with it as it was: mini.move's default re-indents a line it moves up or down
 -- (`=`), which rewrote it to whatever the filetype's indent rules guessed
 -- (user, 2026-10-11) — Alt h/l is the way to change it.
@@ -33,7 +33,7 @@ require("mini.align").setup()
 -- closing one is typed
 require("mini.pairs").setup({ modes = { insert = true, command = false, terminal = false } })
 
--- TODO, FIXME, HACK and NOTE picked out wherever they are written. (Colour
+-- TODO, FIXME, HACK and NOTE picked out wherever they are written. (Color
 -- codes — #rrggbb, Qt.rgba — are plato's own: view.lua paints them already.)
 local hp = require("mini.hipatterns")
 local p = require("plato.palette")

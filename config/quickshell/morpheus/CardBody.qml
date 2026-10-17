@@ -19,6 +19,10 @@ Item {
   id: root
 
   property var model: []
+  // `still`: the rows do not scroll at all — no wheel, no elastic pull —
+  // for a card that shows every row (CardMenu's `whole`; clio's sticky
+  // menu, user 2026-10-17)
+  property bool still: false
   // the room around the card for its shadow; the card is inset by it
   property int pad: Zenon.menuShadowPad
   property real shade: 1
@@ -87,25 +91,6 @@ Item {
     border.color: Zenon.border
     border.width: 1
     radius: Zenon.menuRadius
-    // the glass rim: light along the top edge, fading out before the
-    // corners turn — see Zenon.rim
-    Rectangle {
-      visible: Zenon.rimOn
-      z: 100
-      // by id: the clip hands its children an inner item, and
-      // that item has no radius
-      x: bg.radius
-      y: 1
-      width: Math.max(0, bg.width - 2 * bg.radius)
-      height: 1
-      gradient: Gradient {
-        orientation: Gradient.Horizontal
-        GradientStop { position: 0.0; color: Zenon.alpha(Zenon.rim, 0) }
-        GradientStop { position: 0.25; color: Zenon.rim }
-        GradientStop { position: 0.75; color: Zenon.rim }
-        GradientStop { position: 1.0; color: Zenon.alpha(Zenon.rim, 0) }
-      }
-    }
     // Square where it meets its parent, round everywhere else — so a submenu
     // reads as hinged off the row that opened it rather than as a second card
     // that happens to be touching. Only when there IS a parent: a root card
@@ -121,25 +106,22 @@ Item {
     // on the shell's one feel (morpheus Elastic). Not dragged: a press on a
     // row is a choice, and a menu that scrolled under it would be a menu
     // that picked the wrong row. A card that fits does not move at all.
-    // EDGE TO EDGE ACROSS, PADDED DOWN. The rows run the card's whole width,
-    // just inside its 1px border, so the highlight is a band across the menu
-    // rather than a pill floating in it (user, 2026-10-10); the padding is
-    // top and bottom only, and the labels keep their place by their own
-    // margins below.
+    // EDGE TO EDGE, ALL FOUR SIDES. The rows run flush to the card's 1px
+    // border, so the highlight is a band across the menu rather than a pill
+    // floating in it (user, 2026-10-10), and the first and last rows touch
+    // the top and bottom edges with the card's own round clip cutting the
+    // band's corners — folio's cursor, in every menu (user, 2026-10-17).
+    // The labels keep their place by their own margins below.
     Flickable {
       id: flick
       anchors.fill: parent
-      anchors.leftMargin: 1
-      anchors.rightMargin: 1
-      anchors.topMargin: Zenon.menuCardPad
-      anchors.bottomMargin: Zenon.menuCardPad
       contentWidth: width
       contentHeight: col.height
       interactive: false
       boundsBehavior: Flickable.StopAtBounds
       clip: true
 
-      ElasticScroll { view: flick }
+      ElasticScroll { view: flick; enabled: !root.still }
 
       Column {
         id: col
@@ -172,21 +154,12 @@ Item {
             readonly property bool lit: row.on
               && (hover.containsMouse || row.index === root.activeIndex)
 
-            // The first and last rows sit against the card's round corners
-            // (menuCardPad below the top edge, 1px in from the side), so
-            // their band is rounded to the same curve, inset — square, its
-            // corner would cross the border. A square card corner (a
-            // hinged submenu) gets a square band.
-            readonly property bool first: row.index === 0
-            readonly property bool last: row.index === root.model.length - 1
-            readonly property real inner: Math.max(0, bg.radius - Zenon.menuCardPad)
+            // Square: the first and last rows sit in the card's round
+            // corners and the card's clip (RoundClip, inside the border)
+            // rounds them, as folio's panel rounds its cursor.
             Rectangle {
               anchors.fill: parent
-              color: row.lit ? Zenon.border : "transparent"
-              topLeftRadius: row.first && bg.topLeftRadius > 0 ? row.inner : 0
-              topRightRadius: row.first && bg.topRightRadius > 0 ? row.inner : 0
-              bottomLeftRadius: row.last && bg.bottomLeftRadius > 0 ? row.inner : 0
-              bottomRightRadius: row.last && bg.bottomRightRadius > 0 ? row.inner : 0
+              color: row.lit ? Zenon.menuHi : "transparent"
             }
 
             Rectangle {
@@ -203,8 +176,8 @@ Item {
             Item {
               anchors.fill: parent
               // where they were when the column was inset by menuCardPad
-              anchors.leftMargin: 12 + Zenon.menuCardPad - 1
-              anchors.rightMargin: 10 + Zenon.menuCardPad - 1
+              anchors.leftMargin: 12 + Zenon.menuCardPad
+              anchors.rightMargin: 10 + Zenon.menuCardPad
               visible: !row.sep
 
               // A row's mark is EITHER a glyph or an image, never both. Most of
@@ -224,7 +197,7 @@ Item {
                   anchors.fill: parent
                   visible: icon.glyph !== ""
                   text: icon.glyph
-                  // a row may tint its glyph (`iconInk`): a colour's swatch
+                  // a row may tint its glyph (`iconInk`): a color's swatch
                   color: row.modelData.iconInk && row.on ? row.modelData.iconInk : row.ink
                   font.family: Zenon.face
                   font.weight: Zenon.weight
@@ -358,8 +331,6 @@ Item {
       anchors.right: parent.right
       anchors.top: parent.top
       anchors.bottom: parent.bottom
-      anchors.topMargin: Zenon.menuCardPad
-      anchors.bottomMargin: Zenon.menuCardPad
     }
   }
 

@@ -29,7 +29,7 @@
 // ── a key, drawn as a key ─────────────────────────────────────────────
 // The context menu and the F1 list are both answering the same question —
 // what do I press — and they were answering it in two different voices: one
-// in a border colour at 30% alpha that barely arrived on screen, the other
+// in a border color at 30% alpha that barely arrived on screen, the other
 // as plain bold text that read as a second label competing with the first.
 //
 // One shape for both. A chip says "this is a thing you type" without having
