@@ -684,9 +684,9 @@ Item {
       .concat(!pane.mgr.fontBook ? [] : [{ isSeparator: true }]
       .concat(pane.isSticky ? [] : [
         { text: "Font for these words…", enabled: !pane.inMono, icon: "\uF031", run: () => pane.chooseRunFace() },
-        { text: "The note's own font for these words", enabled: !pane.inMono && pane.faceHere !== "", icon: "\uF031", run: () => ed.runFace("") }]).concat([
-        { text: pane.isSticky ? "Font for this sticky…" : pane.isEntry ? "Font for the journal…" : "Font for notes…", icon: "\uF031",
-          run: () => pane.mgr.chooseFace(pane.isEntry, pane.note) }])));
+        { text: "The note's own font for these words", enabled: !pane.inMono && pane.faceHere !== "", icon: "\uF031", run: () => ed.runFace("") }]).concat(!pane.isSticky ? [] : [
+        { text: "Font for this sticky…", icon: "\uF031",
+          run: () => pane.mgr.chooseFace(false, pane.note) }])));
   }
   // ── THE OUTLINE ── the note's title, headings and subheadings, each a
   // way to it (a folded heading over it is opened: ed.showHit's unfolding)

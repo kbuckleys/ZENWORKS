@@ -96,3 +96,82 @@ function renderHyprTheme(c) {
   out.push("}", "");
   return out.join("\n");
 }
+
+// ── hyprland's font ────────────────────────────────────────────────────
+// lua/font.lua, read by base.lua like theme.lua: oracle's Font and its
+// weight, for the two places hyprland sets text — misc (its own notices)
+// and the groupbar. Unlike the theme, always written: base.lua's literals
+// are only what a machine that has never run the shell gets.
+//
+// Hyprland hands these to Pango, which reads a trailing weight word off a
+// family ("SF Pro Text SemiBold"); misc has no weight of its own, so its
+// weight rides in the name. The groupbar has two: the resting tabs wear
+// the shell's weight, the focused one two steps heavier so it still reads
+// as the one in front. `face` is Zenon's — a Nerd Font's Propo cut. The
+// groupbar's size is its own 14 scaled with oracle's Font size (Zenon.px).
+const PANGO_WEIGHT = { 100: "thin", 200: "ultralight", 300: "light", 400: "normal",
+                       500: "medium", 600: "semibold", 700: "bold", 800: "ultrabold",
+                       900: "heavy" };
+const WEIGHT_WORD = { 300: "Light", 500: "Medium", 600: "SemiBold", 700: "Bold" };
+
+function luaStr(s) { return "\"" + String(s).replace(/[\\"]/g, "\\$&").replace(/\n/g, " ") + "\""; }
+
+function renderHyprFont(face, weight, size) {
+  const w = Math.max(100, Math.min(900, Math.round((Number(weight) || 500) / 100) * 100));
+  const out = HEAD.map((l) => "-- " + l);
+  out.push("", "-- FONT", "-- Written by the shell (morpheus/ThemeSync.qml) whenever oracle's Font",
+           "-- changes; base.lua lays it over its own. Edits here are overwritten.", "");
+  if (!face) {
+    out.push("return {}", "");
+    return out.join("\n");
+  }
+  const t = [
+    ["family", (face + (WEIGHT_WORD[w] ? " " + WEIGHT_WORD[w] : ""))],
+    ["groupbar_family", face],
+    ["groupbar_weight", PANGO_WEIGHT[w]],
+    ["groupbar_weight_active", PANGO_WEIGHT[Math.min(900, w + 200)]],
+    ["groupbar_size", Math.max(6, Math.round(Number(size) || 14))],
+  ];
+  const n = Math.max.apply(null, t.map((l) => l[0].length));
+  out.push("return {");
+  for (const l of t) out.push("\t" + l[0] + " ".repeat(n - l[0].length) + " = " + (typeof l[1] === "number" ? l[1] : luaStr(l[1])) + ",");
+  out.push("}", "");
+  return out.join("\n");
+}
+
+// ── everything else's font ─────────────────────────────────────────────
+// GTK, gsettings (and so the portal, and every app asking it) and
+// fontconfig's generic families take the shell's two faces too; written by
+// scripts/fontsync.sh, which ThemeSync runs with these. Sizes are oracle's
+// px; GTK and kitty read points, three quarters of one.
+function pt(px) { return Math.round((Number(px) || 16) * 0.75 * 100) / 100; }
+
+// A Pango description, "SF Pro Text Medium 12": a trailing weight word and
+// a size, which Pango reads off the family. Regular adds no word.
+function pangoFont(face, weight, px) {
+  const w = Math.max(100, Math.min(900, Math.round((Number(weight) || 500) / 100) * 100));
+  return face + (WEIGHT_WORD[w] ? " " + WEIGHT_WORD[w] : "") + " " + pt(px);
+}
+
+function xmlEsc(s) {
+  return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+// conf.d/50-oracle-fonts.conf: sans-serif (and system-ui) is the shell's
+// face, monospace the Monospace font — what an app gets that asks for a
+// kind of face rather than a name. Prepended, so the rest of fontconfig's
+// list still stands behind for glyphs these lack.
+function renderFontconfig(face, mono) {
+  const alias = (fam, want) => [
+    "  <alias binding=\"strong\">",
+    "    <family>" + fam + "</family>",
+    "    <prefer><family>" + xmlEsc(want) + "</family></prefer>",
+    "  </alias>"];
+  return ["<?xml version=\"1.0\"?>",
+    "<!DOCTYPE fontconfig SYSTEM \"urn:fontconfig:fonts.dtd\">",
+    "<!-- Written by quickshell (morpheus/ThemeSync.qml) from oracle's Font and",
+    "     Monospace font. Edits here are overwritten. -->",
+    "<fontconfig>"]
+    .concat(alias("sans-serif", face), alias("system-ui", face), alias("monospace", mono))
+    .concat(["</fontconfig>", ""]).join("\n");
+}

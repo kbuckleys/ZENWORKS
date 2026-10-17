@@ -84,8 +84,20 @@ function chars(t) {
 // and EditorRow's path pills read the same words, so what is lit is what
 // the pointer shows.
 const stop = /[\s"'`()<>\[\]{},;|=]/;
+const runs = /[^\s"'`()<>\[\]{},;|=]+/g;
 function words(text) {
   const out = [];
+  // EVERY CHARACTER ONE CELL (nothing past U+02FF, so nothing wide, no
+  // combining mark, no surrogate): cells are string indices, and the words
+  // are one regex over the string — not a split and a test per character,
+  // which was a third of what a row cost to bring into view while scrolling
+  text = String(text || "");
+  if (/^[\x00-\u02FF]*$/.test(text)) {
+    runs.lastIndex = 0;
+    let m;
+    while ((m = runs.exec(text)) !== null) out.push({ w: m[0], a: m.index, b: m.index + m[0].length });
+    return out;
+  }
   let cell = 0, w = "", a = 0;
   for (const ch of chars(text)) {
     if (stop.test(ch)) {
@@ -119,6 +131,8 @@ function pathOf(word, loose) {
 // trimmed off the span too)
 function paths(text) {
   const out = [];
+  // a plain path is rooted or slashed: a line with neither has none
+  if (!/[\/~]/.test(text)) return out;
   for (const it of words(text)) {
     const p = pathOf(it.w, false);
     if (p === "") continue;

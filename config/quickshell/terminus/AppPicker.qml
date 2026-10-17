@@ -323,8 +323,8 @@ Item {
 
           Rectangle {
             anchors.fill: parent
-            color: handlerRow.target ? Zenon.border
-                 : (handlerHov.hovered ? Zenon.border : "transparent")
+            color: handlerRow.target ? Zenon.menuHi
+                 : (handlerHov.hovered ? Zenon.menuHi : "transparent")
           }
           HoverHandler { id: handlerHov }
 

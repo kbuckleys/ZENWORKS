@@ -976,7 +976,7 @@ Rectangle {
             target: bulkList
             anchors.top: bulkList.top
             anchors.bottom: bulkList.bottom
-            x: bulkList.x + bulkList.width - width - 2
+            anchors.right: parent.right
           }
         }
 

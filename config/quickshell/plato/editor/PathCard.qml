@@ -18,8 +18,8 @@ Item {
   id: card
 
   property string file: ""
-  property string codeFamily: Zenon.faceFixed
-  property int codeWeight: Font.DemiBold
+  property string codeFamily: Zenon.faceCode
+  property int codeWeight: Zenon.codeWeight
   property int pixelSize: 14
   property real maxW: 560
   property real maxH: 340

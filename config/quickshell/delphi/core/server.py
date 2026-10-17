@@ -380,7 +380,7 @@ WRITES = {"stowCopyIn", "resolveBlocks", "ignore", "untrack", "stage", "stageAll
           "stashPush", "stashApply", "stashDrop", "stashBranch",
           "worktreeAdd", "worktreeRemove", "worktreePrune", "merge",
           "cherryPick", "revert", "rebase", "rebaseInteractive", "sequence",
-          "reset", "take", "markResolved", "pullCheckout", "connect", "bringBack", "applyPatch"}
+          "reset", "take", "markResolved", "pullCheckout", "connect", "bringBack", "applyPatch", "sync", "mirrorAdd"}
 
 # Request op → Repo method, where the names differ.
 ALIAS = {"files": "files_in", "refs": "refs", "lastMessage": "last_message"}
@@ -495,6 +495,28 @@ class Server(lines.Service):
                     if len(parts) >= 2 and R.remote_key(parts[1]) == want:
                         return {"root": root}
             return {"root": None}
+        if op == "clonesOf":
+            # every repository here a forge's repositories are cloned in, and
+            # each one's remotes by repository name — the Accounts list's
+            # "on disk" marks, and the copies elsewhere a forge's repository
+            # of the same name may be (user, 2026-10-17: Codeberg's clone
+            # was a stranger to GitHub's repository of the same name)
+            at, names = {}, {}
+            for root in kw.get("roots", []):
+                try:
+                    out = gitrun.Git(root).run(["remote", "-v"], lock=False)
+                except (GitError, OSError):
+                    continue
+                for l in out.splitlines():
+                    parts = l.split()
+                    k = R.remote_key(parts[1]) if len(parts) >= 2 else None
+                    if not k:
+                        continue
+                    at.setdefault(k[0] + "/" + k[1], root)
+                    names.setdefault(k[1].rsplit("/", 1)[-1], [])
+                    if root not in names[k[1].rsplit("/", 1)[-1]]:
+                        names[k[1].rsplit("/", 1)[-1]].append(root)
+            return {"at": at, "names": names}
         if op == "signingStatus":
             return signing.status()
         if op == "signingSetup":

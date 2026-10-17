@@ -19,6 +19,14 @@
 // Kept to what the panel needs, and forgiving about the rest: a line this
 // does not know is skipped, so a newer nvim adding fields breaks nothing.
 
+// what vim.pack's own failures say, in words: its wait gives up after two
+// minutes with only "…/_async.lua:53: timeout"
+function errorText(t) {
+  const s = String(t).replace(/^.*?\/[\w.\/-]+\.lua:\d+: /, "").trim();
+  if (s === "timeout") return "GitHub took too long to answer. Try again in a while.";
+  return s;
+}
+
 function parse(text) {
   const out = { updates: [], errors: [], same: [], error: "" };
   const lines = String(text || "").split("\n");
@@ -26,7 +34,12 @@ function parse(text) {
   let cur = null;
   for (const raw of lines) {
     const line = raw.replace(/\s+$/, "");
-    if (line.indexOf("ERROR ") === 0 && section === "") { out.error = line.slice(6); continue; }
+    // anywhere on the line: like the sections below, an ERROR can land on
+    // the end of nvim's unterminated "Downloading updates" progress
+    // ("…mini.nvimERROR …: timeout"), and read as nothing it left the
+    // panel with no updates and no reason
+    const e = section === "" ? line.indexOf("ERROR ") : -1;
+    if (e >= 0) { out.error = errorText(line.slice(e + 6)); continue; }
     // A section starts a line — or ends one: nvim's own "Downloading
     // updates" progress has no newline after it, and anything that reads both
     // of nvim's outputs together gets "…nvim-autopairs# Update ───".

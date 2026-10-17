@@ -491,7 +491,7 @@ LayerPopup {
     if (!i) return;
     const where = i.where.length > 4 ? i.where.slice(0, 4).join(", ") + " and " + (i.where.length - 4) + " more"
       : i.where.join(", ");
-    const head = [{ text: i.name + (i.sym ? "   " + i.sym : ""), big: true },
+    const head = [{ text: i.name + (i.sym ? "   " + i.sym : ""), big: true, glyph: Metis.moneyGlyph(i.code) },
       { text: "“" + tip.word + "” is " + i.code + (where ? " · spent in " + where : ""), muted: true }];
     // the rates, kept from an earlier hover, or fetched before it opens
     if (i.code in popup.tipRates) {
@@ -1336,7 +1336,7 @@ LayerPopup {
               id: kindGlyph
               width: 22
               horizontalAlignment: Text.AlignHCenter
-              text: Metis.glyphFor(popup.resultShown && !popup.shownBad ? popup.shownKind : "calc")
+              text: Metis.glyphFor(popup.resultShown && !popup.shownBad ? popup.shownKind : "calc", popup.shownResult)
               color: popup.shownBad && !popup.shownWhich ? Zenon.red : popup.headColor
               Behavior on color { ColorAnimation { duration: Zenon.normal } }
               anchors.verticalCenter: parent.verticalCenter
@@ -1650,8 +1650,8 @@ LayerPopup {
                   hoverEnabled: true
                   acceptedButtons: Qt.NoButton
                   onContainsMouseChanged: containsMouse
-                    ? popup.bubbleAt(rateDot, [{ text: "Exchange rates", big: true },
-                        { text: Metis.ageText(popup.ratesAge) },
+                    ? popup.bubbleAt(rateDot, [{ text: "Exchange rates", big: true, glyph: "\u{F0162}" },
+                        { text: Metis.ageText(popup.ratesAge), glyph: "\u{F0150}" },
                         { text: "ctrl r fetches them now", muted: true }])
                     : popup.bubbleOff(rateDot)
                 }
@@ -1737,9 +1737,11 @@ LayerPopup {
               const t = trendStrip.sum;
               if (!trendStrip.hovered || !t) { popup.bubbleOff(trendStrip); return; }
               popup.bubbleAt(trendStrip, [
-                { text: "1 " + trendStrip.from + " in " + trendStrip.to + ", " + t.weeks + " weeks", big: true },
-                { text: Metis.rateText(t.first) + "  →  " + Metis.rateText(t.last) + "   (" + t.pctText + ")" },
-                { text: "low " + Metis.rateText(t.low) + "  ·  high " + Metis.rateText(t.high) },
+                { text: "1 " + trendStrip.from + " in " + trendStrip.to + ", " + t.weeks + " weeks", big: true,
+                  glyph: Metis.moneyGlyph(trendStrip.to) },
+                { text: Metis.rateText(t.first) + "  →  " + Metis.rateText(t.last) + "   (" + t.pctText + ")",
+                  glyph: t.pct > 0 ? "\u{F0535}" : t.pct < 0 ? "\u{F0533}" : "\u{F0534}" },
+                { text: "low " + Metis.rateText(t.low) + "  ·  high " + Metis.rateText(t.high), glyph: "\u{F084F}" },
                 { text: "a snapshot a week, the newest the one used here", muted: true }]);
             }
           }
@@ -1777,11 +1779,14 @@ LayerPopup {
                 label: popup.chipMode === "fix" ? modelData : Metis.group(modelData)
                 // "which dinar": Kuwait KWD, Jordan JOD …
                 sub: popup.shownWhich ? Metis.moneyShort(modelData) : ""
+                glyph: popup.shownWhich ? Metis.moneyGlyph(modelData)
+                  : popup.chipMode === "units" && popup.shownKind === "currency"
+                    ? Metis.glyphFor("currency", modelData) : ""
                 onHoveredChanged: {
                   if (!hovered) { popup.bubbleOff(unitChip); return; }
                   if (popup.shownWhich) {
                     const i = Metis.moneyInfo(modelData);
-                    if (i) popup.bubbleAt(unitChip, [{ text: i.name + (i.sym ? "   " + i.sym : ""), big: true },
+                    if (i) popup.bubbleAt(unitChip, [{ text: i.name + (i.sym ? "   " + i.sym : ""), big: true, glyph: Metis.moneyGlyph(i.code) },
                       { text: i.code + " · spent in " + i.where.slice(0, 4).join(", "), muted: true }]);
                     return;
                   }
@@ -1812,6 +1817,7 @@ LayerPopup {
                 label: Metis.group(modelData.result)
                 sub: modelData.expr
                 pinned: modelData.pin === true
+                glyph: Metis.glyphFor(modelData.kind || "calc", modelData.result)
                 // the whole question — the chip cuts it at 170 px
                 onHoveredChanged: hovered
                   ? popup.bubbleAt(recentChip, [{ text: modelData.expr, big: true },
@@ -1837,6 +1843,7 @@ LayerPopup {
                 order: index
                 sel: index === popup.chipIdx
                 label: modelData
+                glyph: Metis.glyphFor(Metis.EXAMPLE_KINDS[index] || "calc")
                 onClicked: popup.recall(modelData)
               }
             }
@@ -1941,16 +1948,31 @@ LayerPopup {
       spacing: 4
       Repeater {
         model: popup.bubbleLines
-        delegate: Text {
+        // a line may lead with a glyph (`glyph`): a currency's sign, a kind
+        delegate: Row {
+          id: bubLine
           required property var modelData
-          width: Math.min(implicitWidth, 312)
-          wrapMode: Text.Wrap
-          text: modelData.text
-          color: modelData.big ? Zenon.white : modelData.muted ? Zenon.muted : Zenon.keyInk
-          font.family: Zenon.face
-          font.weight: modelData.big ? Font.Bold : 500
-          font.pixelSize: Zenon.px(modelData.big ? 14 : 12)
-          font.features: { "tnum": 1 }
+          spacing: 7
+          Text {
+            id: bubGlyph
+            anchors.verticalCenter: parent.verticalCenter
+            visible: !!bubLine.modelData.glyph
+            text: bubLine.modelData.glyph || ""
+            color: Zenon.blue
+            font.family: Zenon.face
+            font.weight: 500
+            font.pixelSize: Zenon.px(bubLine.modelData.big ? 15 : 12)
+          }
+          Text {
+            width: Math.min(implicitWidth, 312 - (bubGlyph.visible ? bubGlyph.implicitWidth + 7 : 0))
+            wrapMode: Text.Wrap
+            text: bubLine.modelData.text
+            color: bubLine.modelData.big ? Zenon.white : bubLine.modelData.muted ? Zenon.muted : Zenon.keyInk
+            font.family: Zenon.face
+            font.weight: bubLine.modelData.big ? Font.Bold : 500
+            font.pixelSize: Zenon.px(bubLine.modelData.big ? 14 : 12)
+            font.features: { "tnum": 1 }
+          }
         }
       }
     }

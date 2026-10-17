@@ -597,6 +597,47 @@ def connect_adopts_existing_history():
 
 
 @test
+def sync_keeps_every_forge_in_step():
+    # three "forges": Codeberg has the history, GitHub is empty, GitLab got
+    # a commit Codeberg lacks (made on its web page, say)
+    forges = {}
+    for n in ("codeberg", "github", "gitlab"):
+        forges[n] = os.path.join(TMP, f"sync-{n}.git")
+        subprocess.run(["git", "init", "-q", "--bare", forges[n]], check=True)
+    d = fresh({"a.txt": "1\n"})
+    sh(d, "remote", "add", "origin", forges["codeberg"])
+    sh(d, "push", "-q", "-u", "origin", "main")
+    sh(d, "tag", "v1")
+    r = R.Repo(d)
+    eq(r.mirror_add("github", forges["github"]), {"remote": "github", "empty": True}, "empty forge")
+    other = os.path.join(TMP, "sync-other")
+    sh(TMP, "clone", "-q", forges["codeberg"], other)
+    write(other, "b.txt", "2\n"); sh(other, "add", "-A"); sh(other, "commit", "-qm", "web edit")
+    sh(other, "checkout", "-qb", "feature"); write(other, "f.txt", "f\n"); sh(other, "add", "-A"); sh(other, "commit", "-qm", "feat")
+    sh(other, "push", "-q", forges["gitlab"], "main", "feature")
+    eq(r.mirror_add("gitlab", forges["gitlab"])["related"], True, "same history")
+    sh(d, "branch", "mine")     # only here: stays here
+    got = r.sync()
+    eq(got["failed"], [], "no failures")
+    tip = sh(other, "rev-parse", "main").strip()
+    eq(sh(d, "rev-parse", "main").strip(), tip, "here fast-forwarded")
+    for n in forges:
+        eq(sh(forges[n], "rev-parse", "main").strip(), tip, n + " main")
+        eq(sh(forges[n], "rev-parse", "feature").strip(), sh(other, "rev-parse", "feature").strip(), n + " feature")
+        eq(sh(forges[n], "tag").split(), ["v1"], n + " tags")
+        eq(sh(forges[n], "branch", "--list", "mine").strip(), "", n + " local-only branch kept here")
+    # diverged: GitHub gets its own commit, the branch here another — nothing overwritten
+    write(other, "x.txt", "x\n"); sh(other, "checkout", "-q", "main"); sh(other, "add", "-A"); sh(other, "commit", "-qm", "gh only")
+    sh(other, "push", "-q", forges["github"], "main")
+    write(d, "y.txt", "y\n"); sh(d, "add", "-A"); sh(d, "commit", "-qm", "here only")
+    got = r.sync()
+    row = next(b for b in got["branches"] if b["name"] == "main")
+    eq(sorted(row["diverged"]), ["github"], "github diverged")
+    eq(sorted(row["pushed"]), ["gitlab", "origin"], "the others take ours")
+    eq(sh(forges["github"], "log", "-1", "--format=%s", "main").strip(), "gh only", "github untouched")
+
+
+@test
 def bring_back_what_a_commit_removed():
     d = fresh({"LICENSE": "mit\n", "README.md": "hi\n", "keep": "k\n"})
     sh(d, "rm", "-q", "LICENSE", "README.md")
@@ -681,6 +722,40 @@ def tokens_kept_without_a_keyring():
         eq(r.stdout.split(), ["username=me", "password=s3cret-token"], "git's helper")
         tokenstore.drop("forge.example")
         eq(tokenstore.get("forge.example"), {}, "forgotten")
+    finally:
+        rest.keyring = keep
+
+
+@test
+def several_accounts_on_a_token_forge():
+    # Codeberg (any token forge): a second token kept beside the first, one
+    # in use; switched, signed out of — git only ever meets the one in use
+    import rest
+    import tokenstore
+    keep = rest.keyring
+    rest.keyring = lambda action, fields: (rest.KEYRING.update(down=True), {})[1]
+    h = "two.example"
+    names = lambda: [(a["login"], a["active"]) for a in tokenstore.accounts(h, True)]
+    try:
+        tokenstore.add(h, "me", "tok-me")
+        tokenstore.add(h, "work", "tok-work")
+        eq(tokenstore.get(h)["password"], "tok-work", "the new one in use")
+        eq(names(), [("work", True), ("me", False)], "both kept")
+        tokenstore.add(h, "work", "tok-work-2")
+        eq(names(), [("work", True), ("me", False)], "the same account again: replaced, not doubled")
+        tokenstore.switch(h, "me")
+        eq(tokenstore.get(h)["password"], "tok-me", "switched")
+        eq(names(), [("me", True), ("work", False)], "swapped")
+        helper = os.path.join(ROOT, "delphi", "bin", "delphi-credential")
+        r = subprocess.run([helper, "get"], input=f"protocol=https\nhost={h}\n\n", text=True, capture_output=True)
+        eq(r.stdout.split(), ["username=me", "password=tok-me"], "git meets the one in use")
+        tokenstore.drop(h, "work")
+        eq(names(), [("me", True)], "a kept one signed out of")
+        tokenstore.add(h, "work", "tok-work")
+        tokenstore.drop(h)
+        eq(tokenstore.get(h)["password"], "tok-me", "signing out of the one in use: the other takes over")
+        tokenstore.drop(h)
+        eq((tokenstore.get(h), names()), ({}, []), "none left")
     finally:
         rest.keyring = keep
 

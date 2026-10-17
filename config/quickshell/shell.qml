@@ -721,12 +721,14 @@ ShellRoot {
       // on the monitor each time a layer opened.
       exclusionMode: Oracle.barReserveSpace
         ? ExclusionMode.Normal : ExclusionMode.Ignore
-      // The pill's own height, the gap it keeps under itself, and then
-      // whatever is asked for OVER it. The first two are where the pill
-      // physically is; the third is empty space nothing draws in, which is
-      // the only way to hold a tiled window off a bar that is already as tall
-      // as it is going to get.
-      exclusiveZone: root.barHeightCollapsed + Zenon.padScreen
+      // The pill's own height, the gap it keeps under itself, the same gap
+      // again over it, and then whatever more is asked for. Without the
+      // second padScreen a tiled window's border sat right on the pill's
+      // edge while the screen edge got the full pad (user, pill.png,
+      // 2026-10-17) — hyprland's gaps_out is 0, so nothing else spaces it.
+      // The rest is empty space nothing draws in, which is the only way to
+      // hold a tiled window off a bar that is already as tall as it gets.
+      exclusiveZone: root.barHeightCollapsed + Zenon.padScreen * 2
         + Oracle.barWindowGap
       color: "transparent"
       // No margins: the surface is the whole output, and where the pill sits
@@ -953,6 +955,23 @@ ShellRoot {
         radius: 0
         topLeftRadius: bg.leftHasContent ? 0 : Math.max(0, bg.radius - bg.border.width)
         bottomLeftRadius: bg.leftHasContent ? 0 : Math.max(0, bg.radius - bg.border.width)
+      }
+      // The special workspace's urgent blink, over the same span as its wash:
+      // it has no number to flash, so the area does (Workspaces.specialFlash).
+      Rectangle {
+        id: specialUrgentWash
+        visible: workspacesMod.visible && workspacesMod.specialUrgent && opacity > 0.01
+        opacity: root.pillRowFade * workspacesMod.specialFlash
+        color: Qt.rgba(workspacesMod.urgentInk.r, workspacesMod.urgentInk.g,
+                       workspacesMod.urgentInk.b, 0.45)
+        anchors.top: parent.top
+        anchors.bottom: parent.bottom
+        anchors.topMargin: bg.border.width
+        anchors.bottomMargin: bg.border.width
+        x: specialTakeover.x
+        width: specialTakeover.width
+        topLeftRadius: specialTakeover.topLeftRadius
+        bottomLeftRadius: specialTakeover.bottomLeftRadius
       }
 
       // tray sunrise wash — gap-to-gap like special, but warm and at bg level

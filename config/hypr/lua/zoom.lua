@@ -114,6 +114,26 @@ local function zoomIn()    setTargetZoom(target * ZOOM_STEP) end
 local function zoomOut()   setTargetZoom(target / ZOOM_STEP) end
 local function zoomReset() setTargetZoom(MIN_ZOOM) end
 
+-- The zoom magnifies the session lock too. Cerberus parks it as the lock comes
+-- in and hands it back as it goes, through `hyprctl eval` -- globals, since
+-- eval runs in this same Lua state. A level already parked is kept: a second
+-- park (a config reload under the lock) finds the zoom at MIN_ZOOM.
+local parked = nil
+
+function zoom_park()
+	if target > MIN_ZOOM then
+		parked = target
+		zoomReset()
+	end
+end
+
+function zoom_unpark()
+	if not parked then return end
+	local level = parked
+	parked = nil
+	setTargetZoom(level)
+end
+
 hl.bind("SUPER + CTRL + EQUAL",  zoomIn,  { repeating = true })
 hl.bind("SUPER + CTRL + PLUS",   zoomIn,  { repeating = true })
 hl.bind("SUPER + CTRL + MINUS",  zoomOut, { repeating = true })

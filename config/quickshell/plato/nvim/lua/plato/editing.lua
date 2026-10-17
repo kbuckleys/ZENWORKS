@@ -207,6 +207,20 @@ local function onSave()
       require("plato.view").schedule()
     end,
   })
+  -- A NEW FILE'S FIRST SAVE gives it a name, and the name is what says what
+  -- language it is: `:file x | write` (the save dialog, actions.saveAsCmd)
+  -- and `:w x` name the buffer without asking, so a blank tab saved as
+  -- foo.py stayed uncolored until it was opened again. Asked here, once
+  -- it has a name and still no type; FileType then starts treesitter, the
+  -- language server and a fresh frame (view.lua) like any opened file.
+  api.nvim_create_autocmd({ "BufWritePost", "BufFilePost" }, {
+    callback = function(ev)
+      local b = ev.buf
+      if not api.nvim_buf_is_valid(b) or vim.bo[b].buftype ~= "" then return end
+      if vim.bo[b].filetype ~= "" or api.nvim_buf_get_name(b) == "" then return end
+      api.nvim_buf_call(b, function() pcall(vim.cmd, "filetype detect") end)
+    end,
+  })
 end
 
 -- ── the flash ──────────────────────────────────────────────────────────

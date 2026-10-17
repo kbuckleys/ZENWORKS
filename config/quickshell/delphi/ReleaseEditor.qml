@@ -234,7 +234,7 @@ Item {
       }
     }
     ElasticScroll { anchors.fill: prev; view: prev }
-    Scrollbar { flick: prev; anchors.right: parent.right; anchors.rightMargin: 2; anchors.top: prev.top; anchors.bottom: prev.bottom }
+    Scrollbar { flick: prev; anchors.right: parent.right; anchors.top: prev.top; anchors.bottom: prev.bottom }
   }
 
   PopMenu {

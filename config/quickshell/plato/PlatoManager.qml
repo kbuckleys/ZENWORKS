@@ -83,11 +83,9 @@ Scope {
   // the chrome's own size: the shell's 16, whatever the editor's text is
   readonly property int chromeSize: 16
   readonly property int defaultSize: settings.fontSize
-  readonly property string fontFamily: settings.fontFamily !== "" ? settings.fontFamily
-    : Zenon.faceFixed
-  readonly property int fontWeight: ({
-    regular: Font.Normal, medium: Font.Medium, semibold: Font.DemiBold, bold: Font.Bold,
-  })[settings.fontWeight] || Font.DemiBold
+  // the text's face and weight are oracle's Monospace font (Zenon.faceCode)
+  readonly property string fontFamily: Zenon.faceCode
+  readonly property int fontWeight: Zenon.codeWeight
   readonly property bool treeShown: settings.treeShown
   readonly property int treeWidth: settings.treeWidth
 
@@ -264,8 +262,24 @@ Scope {
     });
   }
 
+  // ── THE WINDOW USED LAST ───────────────────────────────────────────
+  // There can be any number of plato windows (SUPER+…'s launcher, Space N,
+  // ctrl shift n — each is another, as terminus' are). What is aimed at
+  // "plato" rather than at one of them — a file from terminus, `plato f`,
+  // the ipc calls below — goes to the editor window that had the focus
+  // last, or the newest when none has had it yet.
+  property var lastFocused: null
+  function noteFocus(w) { mgr.lastFocused = w; }
+  function current(withCapture) {
+    const ok = (w) => w && mgr.wins.indexOf(w) >= 0 && (withCapture || !w.capture);
+    if (ok(mgr.lastFocused)) return mgr.lastFocused;
+    const pool = mgr.wins.filter((w) => withCapture || !w.capture);
+    return pool.length > 0 ? pool[pool.length - 1] : null;
+  }
+
   // called by a window on its way out
   function forget(w) {
+    if (mgr.lastFocused === w) mgr.lastFocused = null;
     mgr.wins = mgr.wins.filter((x) => x !== w);
     mgr._remember();
     // the last one: let the compiled type go with it
@@ -285,9 +299,10 @@ Scope {
     return p;
   }
 
-  // Open a file: in the newest window if there is one, a new window if not.
-  // Nothing to open, with a window up, means "show me plato" — not another
-  // empty window.
+  // Open a file: in the window used last if there is one, a new window if
+  // not. Nothing to open is the launcher (plato.desktop, a bare `plato`):
+  // another window, as SUPER+E is for terminus — the user wanted more than
+  // one plato window, and this had refused them, focusing the one there was.
   //
   // A WINDOW ON ITS WAY COUNTS. The first open compiles the window type
   // asynchronously, and `plato a b c` sends b and c while that is still
@@ -300,12 +315,15 @@ Scope {
       if (p !== "") mgr._queued.push(p);
       return;
     }
-    // the newest window that is an editor, not a capture note
-    const eds = mgr.wins.filter((w) => !w.capture);
-    if (eds.length > 0) {
-      if (p !== "") eds[eds.length - 1].openFile(p);
-      // in the lua dispatcher's words, as ceres and oracle focus theirs
-      Hyprland.dispatch('hl.dsp.focus({ window = "title:^(plato)$" })');
+    // the editor window used last, not a capture note
+    const w = mgr.current(false);
+    if (w && p !== "") {
+      w.openFile(p);
+      w.raise();
+      return;
+    }
+    if (w) {
+      mgr.spawn("");
       return;
     }
     mgr._queued = [];
@@ -400,17 +418,19 @@ Scope {
       for (const w of hit) w.finish(true);
       return hit.length + " closed";
     }
-    // keys, in nvim's notation, to the newest window's editor — for scripts
+    // keys, in nvim's notation, to the editor window used last — for scripts
     // and for testing plato without a keyboard: `qs ipc call Plato keys vjj`
     function keys(k: string): string {
-      if (mgr.wins.length === 0) return "no plato window is open";
-      mgr.wins[mgr.wins.length - 1].sendKeys(k);
+      const w = mgr.current(true);
+      if (!w) return "no plato window is open";
+      w.sendKeys(k);
       return "ok";
     }
-    // the plugin panel, in the newest window
+    // the plugin panel, in the window used last
     function plugins(): string {
-      if (mgr.wins.length === 0) return "no plato window is open";
-      mgr.wins[mgr.wins.length - 1].showPlugins();
+      const w = mgr.current(false);
+      if (!w) return "no plato window is open";
+      w.showPlugins();
       return "ok";
     }
     // one of plato's settings: `qs ipc call Plato setting fontSize 18`; with
@@ -424,10 +444,11 @@ Scope {
         : (s.type === "int" || s.type === "real") ? Number(value) : value);
       return key + " = " + String(mgr.settings.get(key));
     }
-    // the settings sheet, in the newest window
+    // the settings sheet, in the window used last
     function settings(): string {
-      if (mgr.wins.length === 0) return "no plato window is open";
-      mgr.wins[mgr.wins.length - 1].showSettings();
+      const w = mgr.current(false);
+      if (!w) return "no plato window is open";
+      w.showSettings();
       return "ok";
     }
     // the file tree in every window: shown, or put away

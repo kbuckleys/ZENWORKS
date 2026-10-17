@@ -283,12 +283,36 @@ PanelWindow {
           if (!p || !toast.modelData) return;
           if (String(p.trackTitle || "") !== String(toast.modelData.summary || "")) return;
           const a = String(p.trackArtUrl || "");
-          if (a !== "") toast.artUrl = a;
+          if (a === "" || a === toast.artUrl) return;
+          toast.artUrl = a;
+          Howler.rowArt(toast.modelData, a);
         }
+        // (the title too: a toast that came in ahead of the player gets its
+        // cover when the player reaches its track, and the art may have
+        // changed first — see Howler.artFor)
         Connections {
           target: toast.mpris
           ignoreUnknownSignals: true
           function onTrackArtUrlChanged() { toast.catchArt(); }
+          function onTrackTitleChanged() { toast.catchArt(); }
+        }
+        // A SKIP WHILE THIS TOAST IS UP REPLACES IT: Spotify sends the next
+        // track's toast with this one's id (replaces_id), so the same toast
+        // takes the new title — and the player had moved to that track
+        // ~100 ms BEFORE (dbus-monitor, 2026-10-17), while this still named
+        // the old one and catchArt turned the new cover away. So it is
+        // asked again when the toast's own title changes, and the marks
+        // with it — they were the last song's too.
+        Connections {
+          target: toast.modelData
+          ignoreUnknownSignals: true
+          function onSummaryChanged() {
+            if (dwell.running) dwell.restart();
+            toast.catchArt();
+            if (toast.mpris && !toast.sentMarks
+                && String(toast.mpris.trackTitle || "") === String(toast.modelData.summary || ""))
+              toast.factsKey = Howler.askFacts(toast.mpris);
+          }
         }
 
         // ── WHAT THE SENDER PUT IN THE BODY ──────────────────────────
@@ -455,7 +479,7 @@ PanelWindow {
           textFormat: Howler.markup ? Text.StyledText : Text.PlainText
           wrapMode: Text.NoWrap
           font.family: Zenon.face
-          font.weight: toast.titleless ? Font.Bold : Font.Normal
+          font.weight: Font.Bold
           font.pixelSize: toast.titleless
             ? Howler.fontSize : Howler.fontSize - 2
         }
@@ -489,9 +513,9 @@ PanelWindow {
             ? Howler.playerFor(toast.modelData) : "";
           toast.mpris = toast.modelData ? Howler.mprisFor(toast.modelData) : null;
           if (toast.mpris) {
-            // At arrival the player is on the track the toast is about,
-            // whichever way it matched; catchArt is stricter afterwards.
-            toast.artUrl = String(toast.mpris.trackArtUrl || "");
+            // Only if the player is on this toast's track already: matched
+            // by player name, it may still be on the last one (artFor).
+            toast.artUrl = Howler.artFor(toast.modelData);
             if (!toast.sentMarks) toast.factsKey = Howler.askFacts(toast.mpris);
           }
           // A CAPTURE ARRIVES ONCE ITS PICTURE IS IN. Until then the card
@@ -505,6 +529,12 @@ PanelWindow {
           // for at most `artWait`: a slow network gets the toast without its
           // picture rather than no toast.
           else if (toast.musical && toast.hasIcon && iconImg.status === Image.Loading) {
+            toast.waiting = true;
+            artWait.start();
+          }
+          // ahead of its player: held for the cover the same way, which
+          // catchArt brings in once the player gets to the track
+          else if (toast.musical && toast.mpris && toast.artUrl === "" && !(toast.modelData.image)) {
             toast.waiting = true;
             artWait.start();
           }
@@ -534,7 +564,9 @@ PanelWindow {
         // mako's per-urgency timeouts, straight out of oracle. Zero means it
         // stays until it is answered — that is what "critical" is for. Held
         // while the pointer is on it: a toast you are reading should not go.
+        // A replace (a skip, above) is a new arrival: its time starts again.
         Timer {
+          id: dwell
           running: !toast.closing && !toastHov.hovered
             && !!toast.modelData && Howler.timeoutFor(toast.modelData.urgency) > 0
           interval: Math.max(1, toast.modelData ? Howler.timeoutFor(toast.modelData.urgency) : 1)
@@ -846,7 +878,7 @@ PanelWindow {
                 textFormat: Howler.markup ? Text.StyledText : Text.PlainText
                 color: toast.titleless ? Howler.titleInk : Howler.bodyInk
                 font.family: Zenon.face
-                font.weight: toast.titleless ? Font.Bold : Font.Normal
+                font.weight: Font.Bold
                 font.pixelSize: toast.titleless
                   ? Howler.fontSize : Howler.fontSize - 2
               }

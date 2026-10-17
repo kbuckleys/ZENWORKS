@@ -2345,10 +2345,13 @@ FloatingWindow {
           cacheBuffer: 100000
           ScrollRail {
             target: histList
-            parent: histList
-            anchors.right: parent.right
-            anchors.top: parent.top
-            anchors.bottom: parent.bottom
+            // Against the divider, not the list 8 in from it. Placed by x:
+            // hdiv is declared after the list, and an anchor to it from in
+            // here is refused as not yet a sibling.
+            parent: historyView
+            x: hdiv.x - width
+            anchors.top: histList.top
+            anchors.bottom: histList.bottom
           }
           ElasticScroll { view: histList }
           anchors.left: parent.left
@@ -2434,7 +2437,7 @@ FloatingWindow {
               visible: !hrow.modelData.head
               anchors.fill: parent
               radius: Zenon.windowRadius
-              color: hrow.index === win.hsel ? Zenon.headBg : "transparent"
+              color: hrow.index === win.hsel ? Zenon.menuHi : "transparent"
               border.width: hrow.index === win.hsel ? 1 : 0
               border.color: Zenon.border
             }
@@ -2482,10 +2485,11 @@ FloatingWindow {
           id: hdetail
           ScrollRail {
             target: hdetail
-            parent: hdetail
+            // Against the window's edge, not the pane's 16 in from it.
+            parent: historyView
             anchors.right: parent.right
-            anchors.top: parent.top
-            anchors.bottom: parent.bottom
+            anchors.top: hdetail.top
+            anchors.bottom: hdetail.bottom
           }
           anchors.left: hdiv.right
           anchors.right: parent.right
@@ -2675,7 +2679,7 @@ FloatingWindow {
                 width: maintList.width
                 height: 56
                 radius: Zenon.windowRadius
-                color: mrow.index === win.msel ? Zenon.headBg : "transparent"
+                color: mrow.index === win.msel ? Zenon.menuHi : "transparent"
                 border.width: mrow.index === win.msel ? 1 : 0
                 border.color: Zenon.border
                 // every item says how it stands, not only the ones that want
@@ -2992,10 +2996,12 @@ FloatingWindow {
             readonly property bool framed: mdetail.key === "mirrors"
             ScrollRail {
               target: mdList
-              parent: mdList
+              // On the frame's edge when framed, else the window's; never the list's.
+              parent: mdetail
               anchors.right: parent.right
-              anchors.top: parent.top
-              anchors.bottom: parent.bottom
+              anchors.rightMargin: mdList.framed ? 0 : -mdetail.anchors.rightMargin
+              anchors.top: mdList.top
+              anchors.bottom: mdList.bottom
             }
             ElasticScroll { view: mdList }
             anchors.top: mirrorFacts.visible ? mirrorFacts.bottom : mdBtns.bottom
@@ -3058,7 +3064,7 @@ FloatingWindow {
               width: mdList.width - 14
               height: 28
               radius: Zenon.windowRadius
-              color: mitem.picked ? Zenon.headBg : "transparent"
+              color: mitem.picked ? Zenon.menuHi : "transparent"
               border.width: mitem.picked ? 1 : 0
               border.color: Zenon.border
               // a mirror's health — see mirrorRows
@@ -3110,10 +3116,12 @@ FloatingWindow {
             id: pnView
             ScrollRail {
               target: pnView
-              parent: pnView
+              // Against the window's edge, not the pane's 16 in from it.
+              parent: mdetail
               anchors.right: parent.right
-              anchors.top: parent.top
-              anchors.bottom: parent.bottom
+              anchors.rightMargin: -mdetail.anchors.rightMargin
+              anchors.top: pnView.top
+              anchors.bottom: pnView.bottom
             }
             ElasticScroll { view: pnView }
             visible: mdetail.key === "pacnew" && win.pnDiff.length > 0
@@ -3132,7 +3140,8 @@ FloatingWindow {
               text: modelData.text
               color: modelData.ink === "add" ? Zenon.green : modelData.ink === "del" ? Zenon.red
                 : modelData.ink === "hunk" ? Zenon.cyan : Zenon.accentKey
-              font.family: "monospace"
+              font.family: Zenon.faceCode
+              font.weight: Zenon.codeWeight
               font.pixelSize: Zenon.px(15)
             }
           }
@@ -3210,14 +3219,15 @@ FloatingWindow {
 
           ListView {
             id: pkgList
-            // terminus' scrollbar — see morpheus/ScrollRail. Parented to the view
-            // itself, so in a Flickable it stays put instead of scrolling away.
+            // terminus' scrollbar — see morpheus/ScrollRail. Parented out of the view
+            // (to the pane), so it stays put instead of scrolling away.
             ScrollRail {
               target: pkgList
-              parent: pkgList
+              // Against the pane's edge, not the list's 8 in from it.
+              parent: left
               anchors.right: parent.right
-              anchors.top: parent.top
-              anchors.bottom: parent.bottom
+              anchors.top: pkgList.top
+              anchors.bottom: pkgList.bottom
             }
             ElasticScroll { view: pkgList }
             visible: win.tab === "packages"
@@ -3248,7 +3258,7 @@ FloatingWindow {
                 color: prow.mark ? (prow.modelData.installed
                     ? Qt.rgba(Zenon.red.r, Zenon.red.g, Zenon.red.b, prow.here ? 0.24 : 0.12)
                     : Qt.rgba(Zenon.green.r, Zenon.green.g, Zenon.green.b, prow.here ? 0.22 : 0.10))
-                  : prow.here ? Zenon.headBg : "transparent"
+                  : prow.here ? Zenon.menuHi : "transparent"
                 border.width: prow.here ? 1 : 0
                 border.color: prow.mark ? Zenon.cyan : Zenon.border
               }
@@ -3366,10 +3376,11 @@ FloatingWindow {
             id: updList
             ScrollRail {
               target: updList
-              parent: updList
+              // Against the pane's edge, not the list's 8 in from it.
+              parent: left
               anchors.right: parent.right
-              anchors.top: parent.top
-              anchors.bottom: parent.bottom
+              anchors.top: updList.top
+              anchors.bottom: updList.bottom
             }
             ElasticScroll { view: updList }
             visible: win.tab === "updates"
@@ -3392,7 +3403,7 @@ FloatingWindow {
                 // see the packages' rows: a cursor on a marked row deepens
                 // it and rings it in cyan
                 color: urow.marked ? Qt.rgba(Zenon.yellow.r, Zenon.yellow.g, Zenon.yellow.b, urow.index === win.usel ? 0.22 : 0.10)
-                  : urow.index === win.usel ? Zenon.headBg : "transparent"
+                  : urow.index === win.usel ? Zenon.menuHi : "transparent"
                 border.width: urow.index === win.usel ? 1 : 0
                 border.color: urow.marked ? Zenon.cyan : Zenon.border
               }
@@ -3479,10 +3490,11 @@ FloatingWindow {
           id: infoPane
           ScrollRail {
             target: infoPane
-            parent: infoPane
+            // Against the window's edge, not the pane's 16 in from it.
+            parent: browse
             anchors.right: parent.right
-            anchors.top: parent.top
-            anchors.bottom: parent.bottom
+            anchors.top: infoPane.top
+            anchors.bottom: infoPane.bottom
           }
           visible: !left.alone
           anchors.left: divider.right
@@ -3725,10 +3737,12 @@ FloatingWindow {
           id: reviewList
           ScrollRail {
             target: reviewList
-            parent: reviewList
+            // Against the window's edge, not the page's 16 in from it.
+            parent: reviewList.parent
             anchors.right: parent.right
-            anchors.top: parent.top
-            anchors.bottom: parent.bottom
+            anchors.rightMargin: -parent.anchors.rightMargin
+            anchors.top: reviewList.top
+            anchors.bottom: reviewList.bottom
           }
           ElasticScroll { view: reviewList }
           anchors.top: reviewHead.bottom
@@ -3753,7 +3767,8 @@ FloatingWindow {
                 text: modelData.text
                 color: modelData.ink === "add" ? Zenon.green : modelData.ink === "del" ? Zenon.red
                   : modelData.ink === "hunk" ? Zenon.cyan : Zenon.accentKey
-                font.family: "monospace"
+                font.family: Zenon.faceCode
+                font.weight: Zenon.codeWeight
                 font.pixelSize: Zenon.px(15)
               }
             }
@@ -4359,7 +4374,8 @@ FloatingWindow {
               elide: Text.ElideRight
               text: modelData.replace(/config file [^,]*, /, "")
               color: Zenon.red
-              font.family: "monospace"
+              font.family: Zenon.faceCode
+              font.weight: Zenon.codeWeight
               font.pixelSize: Zenon.px(14)
             }
           }
@@ -4368,10 +4384,12 @@ FloatingWindow {
           id: confDiff
           ScrollRail {
             target: confDiff
-            parent: confDiff
+            // Against the card's edge, not the body's 16 in from it.
+            parent: confDiff.parent
             anchors.right: parent.right
-            anchors.top: parent.top
-            anchors.bottom: parent.bottom
+            anchors.rightMargin: -parent.anchors.rightMargin
+            anchors.top: confDiff.top
+            anchors.bottom: confDiff.bottom
           }
           ElasticScroll { view: confDiff }
           anchors.top: confProblems.bottom
@@ -4390,7 +4408,8 @@ FloatingWindow {
             text: modelData.text
             color: modelData.ink === "add" ? Zenon.green : modelData.ink === "del" ? Zenon.red
               : modelData.ink === "hunk" ? Zenon.cyan : Zenon.accentKey
-            font.family: "monospace"
+            font.family: Zenon.faceCode
+            font.weight: Zenon.codeWeight
             font.pixelSize: Zenon.px(15)
           }
         }
@@ -5006,10 +5025,11 @@ FloatingWindow {
             id: entryList
             ScrollRail {
               target: entryList
-              parent: entryList
+              // Against the card's edge, not the list's 12 in from it.
+              parent: card
               anchors.right: parent.right
-              anchors.top: parent.top
-              anchors.bottom: parent.bottom
+              anchors.top: entryList.top
+              anchors.bottom: entryList.bottom
             }
             ElasticScroll { view: entryList }
             anchors.top: banner.visible ? banner.bottom : cardTitle.bottom

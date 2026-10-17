@@ -274,7 +274,7 @@ Item {
           width: groupList.width
           height: 56
           radius: Zenon.windowRadius
-          color: grow.index === view.gsel ? Zenon.headBg : "transparent"
+          color: grow.index === view.gsel ? Zenon.menuHi : "transparent"
           border.width: grow.index === view.gsel ? 1 : 0
           border.color: Zenon.border
           Rectangle {
@@ -414,10 +414,12 @@ Item {
       ElasticScroll { view: flick }
       ScrollRail {
         target: flick
-        parent: flick
+        // Against the window's edge, not the pane's 16 in from it.
+        parent: detail
         anchors.right: parent.right
-        anchors.top: parent.top
-        anchors.bottom: parent.bottom
+        anchors.rightMargin: -detail.anchors.rightMargin
+        anchors.top: flick.top
+        anchors.bottom: flick.bottom
       }
       // the list scrolls back to the top when the group changes
       Connections { target: view; function onGselChanged() { flick.contentY = 0; } }

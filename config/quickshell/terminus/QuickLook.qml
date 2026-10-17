@@ -1160,7 +1160,6 @@ PanelWindow {
         anchors.bottom: parent.bottom
         anchors.bottomMargin: look.capH + 2
         anchors.right: parent.right
-        anchors.rightMargin: 2
       }
 
       // ── WHAT IS INSIDE AN ARCHIVE ───────────────────────────────
@@ -1263,7 +1262,6 @@ PanelWindow {
         anchors.bottom: parent.bottom
         anchors.bottomMargin: look.capH + 2
         anchors.right: parent.right
-        anchors.rightMargin: 2
       }
 
       // ── WHAT IS IN A DIRECTORY ─────────────────────────────────────
@@ -1533,7 +1531,8 @@ PanelWindow {
           on: lookDirPane.visible && lookDirPane.split
           anchors.top: lookDir.top
           anchors.bottom: lookDir.bottom
-          anchors.right: lookDir.right
+          // the card's edge, not the list's: lookDir sits 16 in from it
+          anchors.right: parent.right
         }
       }
 

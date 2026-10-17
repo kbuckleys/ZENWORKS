@@ -181,13 +181,66 @@ Scope {
     }
   }
 
+  // NEVER STUCK ON "checking". A Process' stdin is a pipe that never
+  // closes, so anything that stopped to ask — git for a password, ssh for a
+  // host key, nvim at a prompt — waited on it for good, and the panel said
+  // "checking for updates…" until the shell restarted. Now stdin is
+  // /dev/null and git may not ask, and a run that still overstays is
+  // stopped and said so. Each run is stamped (pack.lua prints `RUN n`
+  // first): stopping a Process still hands over its partial output, and
+  // that must not be read as the answer.
+  property int _run: 0
   function run(mode, names) {
+    plugins._run += 1;
+    worker.stamp = String(plugins._run);
     worker.mode = mode;
     worker.names = names || [];
-    worker.command = ["env", "NVIM_APPNAME=quickshell/plato/nvim", "PLATO_PACK=" + mode,
-      "PLATO_PACK_NAMES=" + (names || []).join(","),
-      "nvim", "--headless", "-i", "NONE", "--clean", "-c", "luafile " + plugins.script];
+    worker.command = ["sh", "-c", "exec \"$@\" </dev/null", "sh",
+      "env", "NVIM_APPNAME=quickshell/plato/nvim", "PLATO_PACK=" + mode,
+      "PLATO_PACK_NAMES=" + (names || []).join(","), "PLATO_PACK_RUN=" + worker.stamp,
+      "GIT_TERMINAL_PROMPT=0", "GIT_ASKPASS=true", "SSH_ASKPASS=true",
+      "GIT_SSH_COMMAND=ssh -o BatchMode=yes -o ConnectTimeout=20",
+      // A FETCH THAT STALLS gives up after 20 s at under 1 KB/s. GitHub
+      // now and then holds one open with nothing coming (seen: nvim-lspconfig,
+      // 2026-10-17), and vim.pack waited two minutes for it and then failed
+      // the whole check; now that plugin errors alone and the rest report.
+      "GIT_HTTP_LOW_SPEED_LIMIT=1000", "GIT_HTTP_LOW_SPEED_TIME=20",
+      // and out, whatever pack.lua did: a Lua error in it left a headless
+      // nvim running with nobody to quit it
+      "nvim", "--headless", "-i", "NONE", "--clean", "-c", "luafile " + plugins.script,
+      "-c", "qall!"];
+    worker.answered = false;
     worker.running = true;
+    // vim.pack gives up on its own after two minutes; a clone of a big
+    // plugin on a slow line may honestly take longer
+    overstay.interval = mode === "check" ? 180 * 1000 : 600 * 1000;
+    overstay.restart();
+  }
+  // the output is handed over around the exit, in either order
+  Timer {
+    id: unanswered
+    interval: 1000
+    onTriggered: {
+      if (worker.running || worker.answered || worker.stamp === "") return;
+      if (plugins.phase !== "checking" && plugins.phase !== "applying") return;
+      plugins.phase = "failed";
+      plugins.note = "nvim stopped without an answer.";
+    }
+  }
+  Timer {
+    id: overstay
+    onTriggered: {
+      if (!worker.running) return;
+      const mode = worker.mode;
+      worker.stamp = "";
+      worker.running = false;
+      if (mode === "install")
+        plugins._writeManifest(plugins.installed.filter((p) => p.name !== worker.names[0]));
+      plugins.phase = "failed";
+      plugins.note = mode === "check"
+        ? "The check for updates took too long and was stopped. Is the network up?"
+        : "That took too long and was stopped. Is the network up?";
+    }
   }
 
   function check() {
@@ -212,10 +265,23 @@ Scope {
     id: worker
     property string mode: ""
     property var names: []
+    // this run's stamp; "" once it was given up on
+    property string stamp: ""
+    // whether this run's output was read; gone without an answer (no
+    // stamp: it failed before pack.lua could say anything) is a failure,
+    // not a phase left on "checking" for good
+    property bool answered: false
+    onExited: {
+      overstay.stop();
+      if (worker.stamp !== "") unanswered.restart();
+    }
     stdout: StdioCollector {
       id: said
       onStreamFinished: {
-        const text = said.text;
+        const m = /^RUN (\S+)\n/.exec(said.text);
+        if (!m || m[1] !== worker.stamp) return;
+        const text = said.text.slice(m[0].length);
+        worker.answered = true;
         if (worker.mode === "check") {
           const r = Pack.parse(text);
           if (r.error !== "") {

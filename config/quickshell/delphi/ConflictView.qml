@@ -43,7 +43,7 @@ Item {
     ? D.sideNames(cv.win ? cv.win.state : null, (cv.blocks.find((b) => !!b.raw) || {}).oursLabel,
                   (cv.blocks.find((b) => !!b.raw) || {}).theirsLabel)
     : D.sideNames(cv.win ? cv.win.state : null)
-  readonly property string codeFace: cv.win && cv.win.mgr.editor && cv.win.mgr.editor.fontFamily ? cv.win.mgr.editor.fontFamily : Zenon.faceFixed
+  readonly property string codeFace: Zenon.faceCode
 
   function load() {
     cv.choices = ({});

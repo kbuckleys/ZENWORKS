@@ -1008,7 +1008,8 @@ function onThumbsDone() {
           // whole list. It hides itself when everything fits.
           Scrollbar {
             flick: imgGrid
-            anchors.right: imgGrid.right
+            // the pane's edge: the grid is centered at its own width
+            anchors.right: parent.right
             anchors.top: imgGrid.top
             anchors.bottom: imgGrid.bottom
           }

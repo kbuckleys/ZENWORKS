@@ -765,6 +765,25 @@ function moneyInfo(code) {
   const [name, sym, where] = row.split("|");
   return { code: c, name: name, sym: sym, where: where ? where.split(", ") : [] };
 }
+// ── a currency's own glyph ── € for EUR, ₹ for INR: the sign where the
+// icon font has one, the family's sign for the rest (a dollar is a $, a
+// riyal the rial's), and a note for a currency with neither
+const MONEY_GLYPHS = {
+  USD: 0xF01C1, EUR: 0xF01AD, GBP: 0xF01AE, JPY: 0xF07BC, CNY: 0xF07BA, INR: 0xF01AF,
+  KRW: 0xF07BD, RUB: 0xF01B1, TRY: 0xF01B2, ILS: 0xF0C61, NGN: 0xF01B0, PHP: 0xF09E6,
+  KZT: 0xF0865, MNT: 0xF1512, BDT: 0xF0864, BRL: 0xF0B85, TWD: 0xF07BF, BTC: 0xF01AC,
+  ETH: 0xF07BB, CHF: 0xF1A39, IRR: 0xF0E9C
+};
+const MONEY_FAMILY = [[/dollar/i, 0xF01C1], [/rupee/i, 0xF1976], [/ri[y]?al/i, 0xF0E9C],
+  [/pound/i, 0xF01AE], [/euro/i, 0xF01AD], [/peso/i, 0xF01C1]];
+function moneyGlyph(code) {
+  const c = String(code || "").toUpperCase();
+  let g = MONEY_GLYPHS[c];
+  const i = g ? null : moneyInfo(c);
+  if (i) for (const [re, cp] of MONEY_FAMILY) if (re.test(i.name)) { g = cp; break; }
+  return String.fromCodePoint(g || GLYPHS.currency);
+}
+
 // a code of any currency qalc knows, as countryMoney leaves it
 function hasMoneyCode(s) {
   return (String(s).match(/\b[A-Z]{3}\b/g) || []).some((c) => c in MONEY_INFO);
@@ -989,9 +1008,9 @@ function chipFacts(chip, result, kind) {
   if (kind === "currency") {
     const cc = moneyIn(c), rc = moneyIn(r);
     const ci = moneyInfo(cc);
-    if (ci) lines.push({ text: ci.name + (ci.sym ? "  " + ci.sym : ""), big: true });
+    if (ci) lines.push({ text: ci.name + (ci.sym ? "  " + ci.sym : ""), big: true, glyph: moneyGlyph(cc) });
     if (cc && rc && cc !== rc && isFinite(cv) && isFinite(rv) && cv > 0 && rv > 0) {
-      lines.push({ text: "1 " + rc + " = " + rateText(cv / rv) + " " + cc });
+      lines.push({ text: "1 " + rc + " = " + rateText(cv / rv) + " " + cc, glyph: "\u{F04E1}" });
       lines.push({ text: "1 " + cc + " = " + rateText(rv / cv) + " " + rc });
     }
     if (ci && ci.where.length > 0 && ci.where.length <= 3) lines.push({ text: "spent in " + ci.where.join(", "), muted: true });
@@ -999,7 +1018,7 @@ function chipFacts(chip, result, kind) {
   }
   const cu = unitOf(c), ru = unitOf(r);
   if (/°|\/(?:km|mi)$|:/.test(c + r) || !cu || !ru || !isFinite(cv) || !isFinite(rv) || rv === 0) return lines;
-  lines.push({ text: "1 " + ru + " = " + rateText(cv / rv) + " " + cu });
+  lines.push({ text: "1 " + ru + " = " + rateText(cv / rv) + " " + cu, glyph: "\u{F04E1}" });
   lines.push({ text: "1 " + cu + " = " + rateText(rv / cv) + " " + ru });
   return lines;
 }
@@ -2632,7 +2651,12 @@ function knownKind(kind) {
   return Object.prototype.hasOwnProperty.call(GLYPHS, kind);
 }
 
-function glyphFor(kind) {
+// (a money answer wears the sign of what it came out in: `result`)
+function glyphFor(kind, result) {
+  if (kind === "currency" && result) {
+    const c = moneyIn(result);
+    if (c) return moneyGlyph(c);
+  }
   return String.fromCodePoint(GLYPHS[kind] || GLYPHS.calc);
 }
 
@@ -3053,6 +3077,8 @@ function complete(text, names) {
 // ── for a first open, with nothing kept yet ───────────────────────────────
 const EXAMPLES = ["5 km in miles", "days until christmas", "3pm tokyo to london",
   "distance from cairo to london", "tip 15% on 80", "1.5 hours in hours and minutes"];
+// and what each is a measure of, for its chip's glyph
+const EXAMPLE_KINDS = ["length", "date", "tz", "geo", "percent", "time"];
 
 // what the trend run is: scripts/metis-trend.py, given qalc's own rates.json
 // for the newest point. $1 the script, $2 from, $3 to, $4 the cache.

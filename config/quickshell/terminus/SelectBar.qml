@@ -36,8 +36,8 @@ Item {
   property real rowY: -1
   property bool on: true
   property bool animate: true
-  // the bar's color: terminus' own, unless a caller says otherwise
-  property color color: Zenon.border
+  // the bar's color: the suite's cursor (Zenon.menuHi), unless a caller says otherwise
+  property color color: Zenon.menuHi
   // a rounded bar inset from the row's ends, for lists whose other
   // highlights are cards (alexandria); 0 and 0 is terminus' full-width bar
   property real radius: 0

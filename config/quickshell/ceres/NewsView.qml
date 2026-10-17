@@ -52,10 +52,12 @@ Item {
     model: Ceres.unreadNews
     ScrollRail {
       target: items
-      parent: items
+      // Against the edge the view is inset from (its host's margin), not the list's.
+      parent: view
       anchors.right: parent.right
-      anchors.top: parent.top
-      anchors.bottom: parent.bottom
+      anchors.rightMargin: -view.anchors.rightMargin
+      anchors.top: items.top
+      anchors.bottom: items.bottom
     }
     delegate: Rectangle {
       id: card

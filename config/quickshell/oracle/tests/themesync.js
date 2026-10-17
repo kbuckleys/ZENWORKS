@@ -49,5 +49,29 @@ module.exports = {
     // 8-digit #aarrggbb (Zenon's border slot) still gives the color
     t.match("an alpha-carrying hex is read for its color", S.renderHyprTheme(
       Object.assign({}, LATTE, { border: "#4d45505c" })), /inactive_border\s+= "#45505c4d"/);
+
+    const f = S.renderHyprFont("SF Pro Text", "600", 14);
+    t.match("the groupbar's size is a number", f, /groupbar_size\s+= 14,/);
+    t.eq("pango: weight word and points", S.pangoFont("SF Pro Text", 500, 16), "SF Pro Text Medium 12");
+    t.eq("pango: regular has no word", S.pangoFont("SF Mono", 400, 15), "SF Mono 11.25");
+    const fc = S.renderFontconfig("A&B", "SF Mono");
+    t.match("fontconfig: sans-serif prefers the face, escaped", fc, /sans-serif<\/family>\n\s*<prefer><family>A&amp;B</);
+    t.match("fontconfig: monospace prefers the mono face", fc, /monospace<\/family>\n\s*<prefer><family>SF Mono</);
+    t.match("misc's family carries the weight in its name", f, /^\tfamily\s+= "SF Pro Text SemiBold",$/m);
+    t.match("the groupbar's family is the face alone", f, /groupbar_family\s+= "SF Pro Text",/);
+    t.match("the resting tabs wear the shell's weight", f, /groupbar_weight\s+= "semibold",/);
+    t.match("the focused tab two steps heavier", f, /groupbar_weight_active\s+= "ultrabold",/);
+    t.match("regular adds no word", S.renderHyprFont("Inter", "400"), /^\tfamily\s+= "Inter",$/m);
+    t.match("heaviest stops at heavy", S.renderHyprFont("Inter", "700"), /groupbar_weight_active\s+= "heavy",/);
+    t.match("a Nerd Font's Propo cut", S.renderHyprFont("JetBrainsMono Nerd Font Propo", "500"),
+      /^\tfamily\s+= "JetBrainsMono Nerd Font Propo Medium",$/m);
+    t.match("a quote in a name is escaped", S.renderHyprFont("A\"B", "500"), /"A\\"B Medium"/);
+    t.match("no face is an empty table", S.renderHyprFont("", "500"), /^return \{\}$/m);
+    t.ok("the font lua parses", (() => {
+      try {
+        require("child_process").execFileSync("luac", ["-p", "-"], { input: f });
+        return true;
+      } catch (e) { return e.code === "ENOENT"; }
+    })());
   }
 };

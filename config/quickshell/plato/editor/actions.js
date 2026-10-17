@@ -18,6 +18,7 @@
 //   ctx.exec(argv)          start a program, detached
 //   ctx.choose(dir, save, reply)   terminus' open/save dialog
 //   ctx.toggleTree()        the file tree: show and go to it, or put it away
+//   ctx.newWindow()         another plato window, empty
 //   ctx.toggleWrap()        the settings' "Wrap long lines", for every window
 //   ctx.plugins()           the plugin manager (PluginPanel.qml)
 //   ctx.settings()          plato's settings sheet (SettingsSheet.qml)
@@ -68,6 +69,7 @@ const list = [
 
   // ── the buffer ────────────────────────────────────────────────────────
   { keys: "n", title: "New blank tab", run: (c) => c.client.cmd("enew") },
+  { keys: "N", title: "New window", hint: "ctrl shift n", run: (c) => c.newWindow() },
   // FOLDS, by name: z a / z R / z M are taught by the z hints, but only to
   // someone who already knows to press z. A closed fold's pill also opens
   // it with a click (EditorView).

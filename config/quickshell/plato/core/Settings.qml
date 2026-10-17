@@ -36,10 +36,8 @@ QtObject {
   // ── the text ───────────────────────────────────────────────────────
   // 17 by default (user, 2026-10-08)
   property int fontSize: 17
-  // SF Mono SemiBold by default (user, 2026-10-08) — terminus' column
-  // preview and quick look read the same two from plato.json (codeFamily)
-  property string fontFamily: "SF Mono"
-  property string fontWeight: "semibold"
+  // the face and its weight are oracle's Monospace font (Zenon.faceCode),
+  // since 2026-10-17: oracle is the one place a font is set
   // the cursor's line number, in one of zenon's colors
   property string lineNumberInk: "white"
 
@@ -124,16 +122,8 @@ QtObject {
     { key: "fontSize", section: "text", label: "Text size", type: "int",
       min: 10, max: 32, step: 1, unit: "px",
       help: "For every tab that has not been zoomed. Ctrl = and Ctrl - zoom the current tab only; Ctrl 0 brings it back to this." },
-    { key: "fontFamily", section: "text", label: "Typeface", type: "text", pick: "font",
-      help: "Any monospaced face installed: plato lays its text out on a grid of equal cells." },
-    { key: "fontWeight", section: "text", label: "Weight", type: "enum",
-      options: [ { value: "regular",  label: "Regular" },
-                 { value: "medium",   label: "Medium" },
-                 { value: "semibold", label: "SemiBold" },
-                 { value: "bold",     label: "Bold" } ],
-      help: "How heavy the text is drawn. Bold syntax stays a step heavier." },
     { key: "lineNumberInk", section: "text", label: "Current line number color", type: "enum", pick: "color",
-      options: [ { value: "white",   label: "White" },
+      options: [ { value: "white",   label: "Neutral" },
                  { value: "yellow",  label: "Peach" },
                  { value: "sand",    label: "Sand" },
                  { value: "pink",    label: "Pink" },
@@ -302,7 +292,7 @@ QtObject {
     printErrors: false
   }
   readonly property var _fromOracle: ({
-    platoFontSize: "fontSize", platoFontFamily: "fontFamily", platoFontWeight: "fontWeight",
+    platoFontSize: "fontSize",
     platoTreeShown: "treeShown", platoTreeWidth: "treeWidth", platoWrap: "wrap",
     platoRelativeNumbers: "relativeNumbers",
   })

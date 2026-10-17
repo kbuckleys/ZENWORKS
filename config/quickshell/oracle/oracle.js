@@ -385,7 +385,7 @@ function matches(spec, query) {
   const q = String(query || "").trim().toLowerCase();
   if (q === "") return true;
   // `alias` is search-only: the words someone would type that the prose has
-  // no natural reason to contain. "Bar opacity" is the pill's TRANSPARENCY
+  // no natural reason to contain. The bar's "Opacity" is the pill's TRANSPARENCY
   // control, but writing that noun into the help twice to make it findable
   // would be writing for the filter instead of for the reader.
   const hay = (String(spec.label || "") + " " + String(spec.help || "") + " "
@@ -1303,9 +1303,10 @@ function renderDefaultsLua(values) {
 // One flat table, each key hyprland's own name under input — touchpad_,
 // tablet_, tablettool_, touchdevice_ and virtualkeyboard_ for the ones under
 // those — so the file reads like the config it feeds. The defaults, ranges
-// and choices are hyprland's own (src/config/values/ConfigValues.cpp, 0.56):
-// a file with nothing changed is a machine as hyprland ships it, and nobody's
-// mouse is set up for them.
+// and choices are hyprland's own (src/config/values/ConfigValues.cpp, 0.56),
+// except five defaults that are the user's own settings (user, 2026-10-17):
+// repeat delay 200 and rate 35, a flat mouse at -0.6, and focus on close
+// going back to the last window used.
 //
 // `group` is the header a row sits under; a row's options that are facts
 // about this machine — the layouts xkb knows, the screens — are filled in
@@ -1354,10 +1355,10 @@ const INPUT_FIELDS = [
   { key: "kb_file", group: "keyboard", def: "", type: "text",
     label: "Keymap file", alias: "keyboard keymap file xkb custom",
     help: "A whole .xkb keymap of your own, by path. Set, it replaces the layout, variant, options, model and rules." },
-  { key: "repeat_delay", group: "keyboard", def: 600, type: "int", min: 0, max: 2000, step: 25, unit: "ms",
+  { key: "repeat_delay", group: "keyboard", def: 200, type: "int", min: 0, max: 2000, step: 25, unit: "ms",
     label: "Repeat delay", alias: "keyboard key repeat delay hold",
     help: "How long a key is held before it starts repeating." },
-  { key: "repeat_rate", group: "keyboard", def: 25, type: "int", min: 0, max: 200, step: 1, unit: "/s",
+  { key: "repeat_rate", group: "keyboard", def: 35, type: "int", min: 0, max: 200, step: 1, unit: "/s",
     label: "Repeat rate", alias: "keyboard key repeat rate speed",
     help: "How many times a second a held key repeats. 0 never repeats." },
   { key: "numlock_by_default", group: "keyboard", def: false, type: "bool",
@@ -1368,12 +1369,12 @@ const INPUT_FIELDS = [
     help: "With several layouts, a shortcut on a letter follows where that letter is in the layout you are typing in, not where it is on the first one." },
 
   // mouse
-  { key: "accel_profile", group: "mouse", def: "", type: "enum",
+  { key: "accel_profile", group: "mouse", def: "flat", type: "enum",
     options: [{ value: "", label: "Device default" }, { value: "adaptive", label: "Adaptive" },
               { value: "flat", label: "Flat" }, { value: "custom", label: "Custom" }],
     label: "Acceleration", alias: "mouse pointer acceleration accel profile flat adaptive",
     help: "Adaptive moves the pointer further the faster you move the mouse; Flat moves it the same distance however fast, the way most players want it. Custom takes its curve from Scroll curve." },
-  { key: "sensitivity", group: "mouse", def: 0, type: "real", min: -1, max: 1, step: 0.05,
+  { key: "sensitivity", group: "mouse", def: -0.6, type: "real", min: -1, max: 1, step: 0.05,
     label: "Pointer speed", alias: "mouse pointer speed sensitivity dpi",
     help: "Slower to the left, faster to the right. 0 leaves the device as it is." },
   { key: "force_no_accel", group: "mouse", def: false, type: "bool",
@@ -1428,7 +1429,7 @@ const INPUT_FIELDS = [
   { key: "mouse_refocus", group: "focus", def: true, type: "bool",
     label: "Refocus on any movement", alias: "focus mouse refocus hover",
     help: "Off, the pointer has to cross into another window to focus it; moving inside the one you are over does nothing." },
-  { key: "focus_on_close", group: "focus", def: 0, type: "enum",
+  { key: "focus_on_close", group: "focus", def: 2, type: "enum",
     options: [{ value: 0, label: "The next window" }, { value: 1, label: "Under the pointer" },
               { value: 2, label: "The last one used" }],
     label: "After a window closes", alias: "focus close window next mru",

@@ -136,5 +136,5 @@ Item {
     if (i >= 0) list.positionViewAtIndex(i, ListView.Contain);
   }
   ElasticScroll { anchors.fill: list; view: list }
-  Scrollbar { flick: list; anchors.right: list.right; anchors.top: list.top; anchors.bottom: list.bottom }
+  Scrollbar { flick: list; anchors.right: parent.right; anchors.top: list.top; anchors.bottom: list.bottom }
 }

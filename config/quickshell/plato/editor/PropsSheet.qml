@@ -50,7 +50,8 @@ PlatoSheet {
   readonly property var row: card.rows.length === 1 ? card.rows[0] : null
   title: card.many ? card.rows.length + " items" : (sheet.row ? sheet.row.name : "Info")
   glyph: card.many ? "\uf0c5" : (sheet.row ? sheet.row.glyph || "" : "")
-  glyphInk: sheet.row ? Terminus.inkOf(sheet.row) : Zenon.cyan
+  // a repository's in git's magenta, as the tree and terminus draw it
+  glyphInk: !sheet.row ? Zenon.cyan : host.isRepo(sheet.row) ? Zenon.magenta : Terminus.inkOf(sheet.row)
   renamable: !!sheet.row
   onRenamed: (n) => {
     if (!sheet.row) return;

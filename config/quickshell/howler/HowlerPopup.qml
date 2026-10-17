@@ -442,7 +442,7 @@ LayerPopup {
             anchors.leftMargin: 8
             anchors.rightMargin: 8
             radius: Howler.radius
-            color: rowHov.hovered ? Zenon.headBg : "transparent"
+            color: rowHov.hovered ? Zenon.menuHi : "transparent"
           }
           HoverHandler { id: rowHov }
 
@@ -516,7 +516,7 @@ LayerPopup {
             textFormat: Howler.markup ? Text.StyledText : Text.PlainText
             color: Zenon.muted
             font.family: Zenon.face
-            font.weight: Zenon.weight
+            font.weight: Font.Bold
             font.pixelSize: Zenon.px(13)
           }
 

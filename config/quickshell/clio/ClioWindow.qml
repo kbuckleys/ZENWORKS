@@ -56,7 +56,7 @@ FloatingWindow {
   onClosed: win.visible = false
   Component.onCompleted: if (win.mgr) win.mgr.hold()
 
-  readonly property color hiFill: Zenon.alpha(Zenon.cyan, 0.12)
+  readonly property color hiFill: Zenon.menuHi
   readonly property int headH: 50
   readonly property int footH: 40
   readonly property var tipsItem: tips

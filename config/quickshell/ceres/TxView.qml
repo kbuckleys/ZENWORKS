@@ -237,10 +237,9 @@ Item {
         selectionColor: Zenon.selBg
         selectedTextColor: Zenon.white
         color: Zenon.accentKey
-        // plato's font — the family and weight set in its settings
-        // (user, 2026-10-11); the fixed face when plato is not there
-        font.family: Ceres.editor && Ceres.editor.fontFamily ? Ceres.editor.fontFamily : Zenon.faceMono
-        font.weight: Ceres.editor && Ceres.editor.fontWeight ? Ceres.editor.fontWeight : Zenon.weight
+        // oracle's Monospace font, as plato wears it (user, 2026-10-11)
+        font.family: Zenon.faceCode
+        font.weight: Zenon.codeWeight
         font.pixelSize: 13 + view.grow
         text: "<div style='white-space:pre-wrap'>"
           + pane.lines.map(pane.lineHtml).join("<br>") + "</div>"
@@ -507,10 +506,12 @@ Item {
       id: changes
       ScrollRail {
         target: changes
-        parent: changes
+        // Against the edge the view is inset from (its host's margin), not the list's.
+        parent: changes.parent
         anchors.right: parent.right
-        anchors.top: parent.top
-        anchors.bottom: parent.bottom
+        anchors.rightMargin: -view.anchors.rightMargin
+        anchors.top: changes.top
+        anchors.bottom: changes.bottom
       }
       ElasticScroll { view: changes }
       visible: !view.failed && count > 0

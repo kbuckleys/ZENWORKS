@@ -202,7 +202,7 @@ FloatingWindow {
     win.setShelf(ids[(at + d + ids.length) % ids.length]);
   }
   readonly property string page: win.mgr ? win.mgr.page : "specimen"
-  readonly property var pages: [["specimen", "Specimen", ""], ["glyphs", "Glyphs", "\u{F0AEC}"], ["info", "Info", "\u{F064E}"]]
+  readonly property var pages: [["specimen", "Specimen", ""], ["glyphs", "Glyphs", "\u{F15FD}"], ["info", "Info", "\u{F064E}"]]
   function setPage(p) {
     if (win.mgr) win.mgr.set("page", p);
     if (p === "glyphs" && win.mgr) win.mgr.needNames();
@@ -215,7 +215,7 @@ FloatingWindow {
   }
   // THE highlight — the selected family, shelf, style, group and glyph all
   // wear this one fill, so "this one" reads the same everywhere
-  readonly property color hiFill: Zenon.alpha(Zenon.cyan, 0.12)
+  readonly property color hiFill: Zenon.menuHi
   readonly property bool fav: !!(win.fam && win.mgr && win.mgr.favs[win.fam.name])
   function toggleFav() { if (win.fam && win.mgr && !win.fam.loose) win.mgr.setFav(win.fam.name, !win.fav); }
 

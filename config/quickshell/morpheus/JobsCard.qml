@@ -113,7 +113,7 @@ Rectangle {
         // makes about matching the desktop menu.
         Rectangle {
           anchors.fill: parent
-          color: rowHov.hovered ? Zenon.border : "transparent"
+          color: rowHov.hovered ? Zenon.menuHi : "transparent"
         }
         HoverHandler { id: rowHov }
 

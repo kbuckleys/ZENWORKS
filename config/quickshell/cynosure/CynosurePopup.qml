@@ -640,7 +640,7 @@ property var statusbar: null
       bottomLeftRadius: sb.atLeft ? popup.innerCorner : 0
       topRightRadius: sb.atRight ? popup.innerCorner : 0
       bottomRightRadius: sb.atRight ? popup.innerCorner : 0
-      color: Zenon.alpha(Zenon.cyan, 0.3)
+      color: Zenon.menuHi
     }
   }
 

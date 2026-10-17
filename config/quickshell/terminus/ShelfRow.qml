@@ -28,7 +28,7 @@ Rectangle {
   property string count: ""
   property color countInk: Zenon.accentMuted
   property bool here: false
-  property color fill: Zenon.alpha(Zenon.cyan, 0.12)
+  property color fill: Zenon.menuHi
   // the glyph's way in from the left, and the count's from the right: more
   // when the row runs edge to edge (delphi's), so the words stay put
   property int indent: 10
@@ -51,8 +51,8 @@ Rectangle {
     text: shelf.glyph
     color: shelf.here ? Zenon.cyan : shelf.glyphInk.a > 0 ? shelf.glyphInk : Zenon.accentMuted
     font.family: Zenon.glyphFace
-    // the title's weight, glyph and name alike; the count is a reading
-    font.weight: Zenon.titleWeight
+    // listings at body weight; only the heads (SideHead) are bold
+    font.weight: Zenon.weight
     font.pixelSize: Zenon.px(14)
   }
   Text {
@@ -65,7 +65,7 @@ Rectangle {
     text: shelf.label
     color: shelf.here ? Zenon.ink : Zenon.accentSoft
     font.family: Zenon.face
-    font.weight: Zenon.titleWeight
+    font.weight: Zenon.weight
     font.pixelSize: Zenon.px(14)
   }
   Text {

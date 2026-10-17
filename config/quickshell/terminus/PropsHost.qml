@@ -29,7 +29,37 @@ Item {
 
   signal said(string text)
 
-  function enrich(rows) { return Terminus.enrich(rows, Icons); }
+  function enrich(rows) {
+    const out = Terminus.enrich(rows, Icons);
+    host.findRepos(out);
+    return out;
+  }
+
+  // ── A REPOSITORY'S GLYPH IS GIT'S MAGENTA ──────────────────────────────
+  // terminus knows its repositories from the listing (repoDirs); a host with
+  // no listing asks: the directories among the card's rows that hold a .git.
+  // The card's glyph (and a sheet's title glyph) read this.
+  property var repoDirs: ({})
+  function isRepo(r) { return !!r && r.isDir && host.repoDirs[r.path] === true; }
+  function findRepos(rows) {
+    const dirs = (rows || []).filter((r) => r.isDir).map((r) => r.path);
+    host.repoDirs = ({});
+    if (dirs.length === 0) return;
+    repos.running = false;
+    repos.command = ["sh", "-c", "for d; do [ -e \"$d/.git\" ] && printf '%s\\n' \"$d\"; done; true", "sh"].concat(dirs);
+    repos.running = true;
+  }
+  Process {
+    id: repos
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: {
+        const m = {};
+        for (const p of text.split("\n")) if (p !== "") m[p] = true;
+        host.repoDirs = m;
+      }
+    }
+  }
   function warn(t) { host.said(t); }
   function inkFor(r) { return Terminus.inkOf(r); }
 

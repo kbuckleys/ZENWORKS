@@ -85,8 +85,9 @@ def status():
 
 def set_token(tok):
     me = call("GET", "/user", tok=tok)
-    # kept where it will be found again — and said where (tokenstore.put)
-    where = tokenstore.put(HOST, me["login"], tok)
+    # kept where it will be found again — and said where (tokenstore.add);
+    # an account in use before stays, to switch back to
+    where = tokenstore.add(HOST, me["login"], tok)
     return {"login": me["login"], "where": where}
 
 
@@ -95,24 +96,22 @@ def forget_token():
 
 
 def login(emit, cancel):
-    raise ForgeError("Codeberg signs in with a token — paste one")
+    raise ForgeError(f"{NAME} signs in with a token — paste one")
 
 
-# ONE ACCOUNT here: glab keeps one per host, and a token in the keyring is
-# one per host too — so there is no second to switch to (accounts says so:
-# many is false, and the window does not offer it).
+# SEVERAL ACCOUNTS: every token pasted is kept, one in use
+# (tokenstore: the others on its shelf, a switch away)
 def accounts():
-    st = status()
-    return {"accounts": [{"login": st["login"], "source": st.get("source"), "active": True}]
-            if st.get("signedIn") else [], "many": False}
+    return {"accounts": tokenstore.accounts(HOST, True), "many": True}
 
 
 def switch_account(login):
-    raise ForgeError("one account at a time here — sign out, then in as the other")
+    tokenstore.switch(HOST, login)
+    return status()
 
 
 def logout(login=None):
-    forget_token()
+    tokenstore.drop(HOST, login)
     return {"ok": True}
 
 

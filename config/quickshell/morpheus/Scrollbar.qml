@@ -59,6 +59,9 @@ Item {
   property int thickness: 12
   property int grabPad: 14
   property int minThumb: 28
+  // the thumb's strength at rest — raised from 0.58/0.40, which over dark
+  // content read as a grey line on grey (user, 2026-10-17: everywhere)
+  property real rest: Zenon.light ? 0.70 : 0.60
   // panels: a wheel notch over the bar moves this far (0: a quarter view)
   property real wheelStep: 0
   property bool handleWheel: true
@@ -165,8 +168,8 @@ Item {
 
   Rectangle {
     id: thumb
-    // a pixel wider than it started (user, 2026-10-17)
-    property real across: ma.containsMouse || ma.dragging ? 7 : 5
+    // two pixels wider than it started (user, 2026-10-17, twice)
+    property real across: ma.containsMouse || ma.dragging ? 8 : 6
     // where it starts along the bar, whichever way the bar runs
     readonly property real along: root.horizontal ? thumb.x : thumb.y
     x: root.horizontal ? root.thumbY : root.lineX - across / 2
@@ -177,8 +180,9 @@ Item {
     color: Zenon.accentKey
     // on paper the dark thumb at dark glass' strengths read as a faint
     // pencil line (user, 2026-10-17): a light theme sets it a step deeper
-    opacity: Zenon.light ? (ma.dragging ? 0.95 : (ma.containsMouse ? 0.80 : 0.58))
-      : (ma.dragging ? 0.90 : (ma.containsMouse ? 0.70 : 0.40))
+    opacity: ma.dragging ? (Zenon.light ? 0.95 : 0.90)
+      : ma.containsMouse ? Math.max(root.rest, Zenon.light ? 0.85 : 0.80)
+      : root.rest
     Behavior on across { NumberAnimation { duration: Zenon.fast; easing.type: Zenon.ease } }
     Behavior on opacity { NumberAnimation { duration: Zenon.fast; easing.type: Zenon.ease } }
   }

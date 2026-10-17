@@ -19,7 +19,9 @@ hl.window_rule({ match = { class = "net.davidotek.pupgui2" },                   
 hl.window_rule({ match = { class = "mpv" },                                         float = true })
 
 -- GLOBAL BLUR
-hl.layer_rule({ match = { namespace = ".*" }, blur = true, ignore_alpha = 0.5 })
+-- blur_popups: a layer's own popups (metis' bubble, the bar's cards) are
+-- frosted too — decoration.blur.popups only reaches a window's popups
+hl.layer_rule({ match = { namespace = ".*" }, blur = true, blur_popups = true, ignore_alpha = 0.5 })
 hl.layer_rule({ match = { namespace = "morpheus-bar(-clear)?" }, animation = "none" })
 -- the pill with oracle's Blur behind off: after the global rule, so it wins
 hl.layer_rule({ match = { namespace = "morpheus-bar-clear" }, blur = false })

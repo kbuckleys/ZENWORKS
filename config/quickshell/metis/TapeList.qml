@@ -87,7 +87,7 @@ Item {
       readonly property bool sel: row.index === tape.idx
       width: list.width
       height: tape.rowH
-      color: row.sel ? Zenon.alpha(Zenon.blue, 0.12)
+      color: row.sel ? Zenon.menuHi
         : rowHover.containsMouse ? Zenon.alpha(Zenon.border, 0.35) : Zenon.alpha(Zenon.border, 0)
       Behavior on color { ColorAnimation { duration: Zenon.fast } }
 

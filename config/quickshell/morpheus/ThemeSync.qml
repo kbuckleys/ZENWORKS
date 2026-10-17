@@ -3,7 +3,11 @@
 // └─┘└─┘┘└┘└┴┘└─┘┴└─┴ ┴└─┘
 // https://github.com/kbuckleys/
 //
-// THE THEME, CARRIED OUT OF THE SHELL. kitty and hyprland paint with their
+// THE THEME AND THE FONTS, CARRIED OUT OF THE SHELL. Oracle is the one
+// place a font is set: hyprland gets lua/font.lua (below), and kitty, GTK,
+// gsettings and fontconfig's generic families scripts/fontsync.sh.
+//
+// THE THEME. kitty and hyprland paint with their
 // own config, so when the theme changes they are each written a file
 // (themesync.js) and told to read it: kitty reloads its config on SIGUSR1,
 // hyprland on `hyprctl reload`.
@@ -40,10 +44,27 @@ Item {
   }
   readonly property string kittyText: Sync.renderKitty(sync.colors, Zenon.light)
   readonly property string hyprText: Sync.renderHyprTheme(sync.colors)
+  // oracle's Font for hyprland's own text — always written, unlike the
+  // theme: base.lua's literals are only a first-boot font (themesync.js)
+  readonly property string fontText: Sync.renderHyprFont(Zenon.face, Zenon.weight, Zenon.px(14))
+  // everything else's, as fontsync.sh's arguments (themesync.js)
+  readonly property var fontArgs: [
+    Sync.pangoFont(Zenon.face, Zenon.weight, Number(Zenon.cfg.fontSize) || 16),
+    Sync.pangoFont(Zenon.faceCode, Zenon.codeWeight, Number(Zenon.cfg.monoSize) || 16),
+    Zenon.faceCode, String(Zenon.codeWeight), String(Sync.pt(Number(Zenon.cfg.monoSize) || 16)),
+    Sync.renderFontconfig(Zenon.face, Zenon.faceCode)]
+  onFontArgsChanged: fontSettle.restart()
+  Timer {
+    id: fontSettle
+    interval: 400
+    onTriggered: Quickshell.execDetached(
+      [Quickshell.shellDir + "/scripts/fontsync.sh"].concat(sync.fontArgs))
+  }
 
   onKittyTextChanged: settle.restart()
   onHyprTextChanged: settle.restart()
-  Component.onCompleted: settle.restart()
+  onFontTextChanged: settle.restart()
+  Component.onCompleted: { settle.restart(); fontSettle.restart(); }
 
   // a theme file being saved is several writes; the apps hear about the last
   Timer {
@@ -52,6 +73,7 @@ Item {
     onTriggered: {
       if (sync.put(kittyFile, sync.kittyText)) tell.kitty = true;
       if (sync.put(hyprFile, sync.hyprText)) tell.hypr = true;
+      if (sync.put(fontFile, sync.fontText, true)) tell.hypr = true;
       if (tell.kitty || tell.hypr) tell.restart();
     }
   }
@@ -73,13 +95,14 @@ Item {
     }
   }
 
-  // write `want` if the file says something else; true when it was written
-  function put(file, want) {
+  // write `want` if the file says something else; true when it was written.
+  // A theme file is never created for Zenon; `always` creates it regardless.
+  function put(file, want, always) {
     // what we last wrote, when we wrote it: FileView's own write is not
     // read back (no `loaded`), so text() may still be the old file
     const have = file.last !== "" ? file.last : file.exists ? String(file.text()) : "";
     if (have === want) return false;
-    if (!file.exists && !sync.colors) return false;
+    if (!file.exists && !sync.colors && !always) return false;
     file.setText(want);
     file.last = want;
     file.exists = true;
@@ -101,6 +124,16 @@ Item {
     property bool exists: true
     property string last: ""
     path: sync.configDir + "/hypr/lua/theme.lua"
+    blockLoading: true
+    printErrors: false
+    onLoadFailed: exists = false
+  }
+
+  FileView {
+    id: fontFile
+    property bool exists: true
+    property string last: ""
+    path: sync.configDir + "/hypr/lua/font.lua"
     blockLoading: true
     printErrors: false
     onLoadFailed: exists = false

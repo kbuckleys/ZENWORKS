@@ -29,9 +29,9 @@ Item {
   property string file: ""
   property int from: 1
   property int hit: -1
-  property string codeFamily: Zenon.faceFixed
+  property string codeFamily: Zenon.faceCode
   // the editor's weight too: a preview reads as the file will in plato
-  property int codeWeight: Font.DemiBold
+  property int codeWeight: Zenon.codeWeight
   property int pixelSize: 16
   // drawn centered when not empty: the host's word for what is (not) here
   property string message: ""

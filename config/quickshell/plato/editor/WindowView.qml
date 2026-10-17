@@ -216,6 +216,10 @@ Item {
   // the top line last frame, to tell which way a jump went
   property int lastTopLine: 0
 
+  // nvim's 'relativenumber' here: read once a frame for the window, not by
+  // every row of the pool (a hundred and fifty bindings a frame)
+  readonly property bool rnu: { win.ed.frame; return !!win.ed.scrollOf(win.w.id).rnu; }
+
   // the cursor's line, counted as the gutter counts (see EditorRow.ord)
   property int curOrd: 0
 
@@ -339,7 +343,7 @@ Item {
     if (shift === null) {
       // a jump: nothing drawn is anywhere near where it is going
       win.land();
-      for (const it of items) { it.key = ""; it.sig = ""; }
+      for (const it of items) { it.key = ""; it.sig = ""; it.owe = null; }
     } else if (shift !== 0) {
       for (const it of items) if (it.key !== "") it.pos -= shift;
       win.actual += shift;
@@ -348,6 +352,9 @@ Item {
         win.pos = win.actual - Math.sign(win.actual - win.pos) * h;
       if (edgeJump) win.throwIn(); else win.glide();
     }
+    // rows that come into view on this glide may wait for their text (see
+    // ROWS ARRIVE A FEW A FRAME)
+    const deferOk = shift !== null && shift !== 0 && (follow.running || thrown.running);
 
     // where each row was drawn, sliding included, before this frame
     const wasSlide = {};
@@ -373,6 +380,7 @@ Item {
       if (it.key === "" || (it.pos >= 0 && it.pos < h) || it.pos < -h || it.pos >= 2 * h) {
         it.key = "";
         it.sig = "";
+        it.owe = null;
         free.push(it);
       } else {
         it.ord = -1;
@@ -405,10 +413,7 @@ Item {
       it.ord = ords[i];
       // nvim diffs by screen position, so after a scroll it resends rows
       // that only moved: what they say is compared, not which object it is
-      if (it.info !== rows[i]) {
-        const sig = win.sigOf(rows[i]);
-        if (sig !== it.sig) { it.sig = sig; it.info = rows[i]; win.placeChanged.push(it); }
-      }
+      win.hand(it, rows[i], deferOk);
     }
     if (win.moveNext) {
       const mv = win.moveNext;
@@ -479,6 +484,7 @@ Item {
         if (gliding) return;
         occ.key = "";
         occ.sig = "";
+        occ.owe = null;
         ghosts.splice(ghosts.indexOf(occ), 1);
         free.push(occ);
       }
@@ -492,10 +498,7 @@ Item {
       taken.add(it);
       it.pos = p;
       it.ord = -1;
-      if (it.info !== r) {
-        const sig = win.sigOf(r);
-        if (sig !== it.sig) { it.sig = sig; it.info = r; win.placeChanged.push(it); }
-      }
+      win.hand(it, r, deferOk);
     };
     for (let i = 0; i < edges.above.length; ++i) edgeAt(edges.above[i], i - edges.above.length);
     for (let i = 0; i < edges.below.length; ++i) edgeAt(edges.below[i], h + i);
@@ -514,6 +517,69 @@ Item {
     win.lastTopLine = sc.top || 0;
   }
 
+  // ── ROWS ARRIVE A FEW A FRAME ──────────────────────────────────────
+  // A row given a new line lays its text out there and then (~0.4 ms: the
+  // markup, the styled text, its spans), and a wheel notch, accelerated,
+  // brings twenty to fifty of them in one frame — 20–40 ms on the main
+  // thread while the glide was meant to be moving: the stutter (lag.log
+  // "plato place N rows new"). But a scroll's new rows START off screen:
+  // the drawing is `lag` behind nvim, and the glide uncovers them over the
+  // next ~200 ms. So while it runs, a row that is still well clear of the
+  // view keeps its old text and `owe`s the new; `owing` hands it over the
+  // moment it comes near, and otherwise a couple of ms' worth a frame.
+  // Anything else (an edit, a jump, smooth scrolling off, the glide at
+  // rest) lays out at once, as before.
+  function hand(it, r, deferOk) {
+    if (it.info === r && it.owe === null) return;
+    const sig = win.sigOf(r);
+    const fresh = sig !== it.sig;
+    it.sig = sig;
+    // the same content in a new object: nothing to draw, nothing owed
+    if (!fresh && it.owe === null) return;
+    if (deferOk && !win.nearView(it.pos)) { it.owe = r; owing.running = true; return; }
+    it.owe = null;
+    it.info = r;
+    win.placeChanged.push(it);
+  }
+  // near: on screen, or close enough that the glide may bring it there
+  // within a frame or two, or under the frost of the bars (which captures
+  // rows past both edges)
+  function nearView(p) {
+    const y = win.lag + p * win.cellH;
+    const m = Math.max(6 * win.cellH, win.height * 0.3);
+    return y > -m - win.cellH && y < win.height + m;
+  }
+  FrameAnimation {
+    id: owing
+    running: false
+    onTriggered: {
+      const t0 = Date.now();
+      const gliding = follow.running || thrown.running;
+      const left = [];
+      for (let i = 0; i < pool.count; ++i) {
+        const it = pool.itemAt(i);
+        if (!it || it.owe === null) continue;
+        if (!gliding || win.nearView(it.pos)) win.payRow(it);
+        else left.push(it);
+      }
+      // the rest by nearness, while the frame has room
+      const mid = win.height / 2 - win.lag;
+      left.sort((a, b) => Math.abs(a.pos * win.cellH - mid) - Math.abs(b.pos * win.cellH - mid));
+      let n = 0;
+      for (const it of left) {
+        if (Date.now() - t0 >= 2) break;
+        win.payRow(it);
+        n++;
+      }
+      if (n === left.length) owing.running = false;
+    }
+  }
+  function payRow(it) {
+    const r = it.owe;
+    it.owe = null;
+    it.info = r;
+    try { it.layoutNow(); } catch (e) {}
+  }
 
   // ── THE JUMP TRAIL ─────────────────────────────────────────────────
   // gg, G, n, a definition: the cursor arrives somewhere far off, and the
@@ -783,7 +849,7 @@ Item {
       animate: !content.barSnaps
       on: win.w.current && !win.ed.cmdlineShown && !win.ed.inFloat
       // the sidebar's bar (morpheus/FileTree), so the two cursors match
-      color: Zenon.alpha(Zenon.cyan, 0.12)
+      color: Zenon.menuHi
     }
 
     // ── THE SELECTION, AS ONE SHAPE ──────────────────────────────────
@@ -866,6 +932,8 @@ Item {
         // row that just scrolled out is still being uncovered
         property string key: ""
         property string sig: ""
+        // the line's row, while its text waits (see ROWS ARRIVE A FEW A FRAME)
+        property var owe: null
         property real pos: 0
         visible: key !== ""
         y: pos * win.cellH + slide + win.gapAt(pos)
@@ -909,7 +977,7 @@ Item {
         gutterW: win.w.textoff * win.cellW
         textX: win.w.textoff * win.cellW
         curOrd: win.curOrd
-        relative: { win.ed.frame; return win.ed.scrollOf(win.w.id).rnu; }
+        relative: win.rnu
         gitGutter: win.gitGutter
         // the window draws the selection whole (Selection above)
         ownSelection: false

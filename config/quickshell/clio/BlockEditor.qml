@@ -1752,7 +1752,7 @@ Item {
           width: Math.max(152, tagWord.implicitWidth + 24)
           height: Zenon.menuRowHeight - 4
           radius: Zenon.windowRadius
-          color: index === ed.tagAt || tagRowMouse.containsMouse ? Zenon.alpha(Zenon.cyan, 0.16) : "transparent"
+          color: index === ed.tagAt || tagRowMouse.containsMouse ? Zenon.menuHi : "transparent"
           Text {
             id: tagWord
             anchors.verticalCenter: parent.verticalCenter

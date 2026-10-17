@@ -40,8 +40,8 @@ Item {
   // (user, 2026-10-11), so a diff reads as the file does in the editor;
   // the suite's fixed face when plato is not there to ask
   readonly property var editor: dv.host && dv.host.mgr ? dv.host.mgr.editor : null
-  readonly property string codeFace: dv.editor && dv.editor.fontFamily ? dv.editor.fontFamily : Zenon.faceFixed
-  readonly property int codeWeight: dv.editor && dv.editor.fontWeight ? dv.editor.fontWeight : Zenon.weight
+  readonly property string codeFace: Zenon.faceCode
+  readonly property int codeWeight: Zenon.codeWeight
   readonly property var rows: D.diffRows(dv.files || [])
   property int cursor: 0
   property int anchor: -1
@@ -143,7 +143,7 @@ Item {
     reuseItems: true
     readonly property real numW: Math.max(3, String(Math.max(1, ...dv.rows.map((r) => Math.max(r.old || 0, r.nu || 0)))).length) * Zenon.px(10) + 10
 
-    SelectBar { view: list; host: dv.host; index: dv.cursor; rowH: dv.rowH; color: Zenon.alpha(Zenon.cyan, 0.16) }
+    SelectBar { view: list; host: dv.host; index: dv.cursor; rowH: dv.rowH; color: Zenon.menuHi }
 
     delegate: Item {
       id: row

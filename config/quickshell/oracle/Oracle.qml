@@ -139,6 +139,14 @@ Singleton {
   // through. 16 is the size everything was drawn at before it existed, so
   // the default moves nothing.
   property int fontSize: 16
+  // THE MONOSPACED FACE: whatever lays text out on a grid — kitty, plato,
+  // code and file previews, logs, the system's "monospace". SF Mono SemiBold,
+  // which kitty and plato wore before oracle set them (2026-10-17). Its size
+  // is kitty's and the system's (in px; they read points, 3/4 of it), not
+  // plato's — the editor keeps a size and a zoom of its own.
+  property string monoFamily: "SF Mono"
+  property string monoWeight: "600"
+  property int monoSize: 16
   // lexi's text over the shell's, in pixels either way (lexi already draws
   // four larger) — its own size, as plato's editor and terminus' zoom have
   // theirs. Ctrl +/- in lexi, or here.
@@ -198,8 +206,11 @@ Singleton {
   // The Font row's families, from fontconfig (Ora.fontFamilies). Scanned at
   // startup and on entering the look section, like the themes.
   property var fontFamilies: []
+  // the Monospace font row's: fontconfig's fixed-width families only
+  property var monoFamilies: []
   function scanFonts() {
     if (!fontsProc.running) fontsProc.running = true;
+    if (!monoFontsProc.running) monoFontsProc.running = true;
   }
   // ── A FONT INSTALLED WHILE THE SHELL RUNS ────────────────────────────
   // fontconfig sees it at once (fc-list is a new process each time), but
@@ -252,7 +263,20 @@ Singleton {
       }
     }
   }
+  Process {
+    id: monoFontsProc
+    // 100 is mono, 90 dual-width (CJK-wide mono faces)
+    command: ["sh", "-c", "fc-list :spacing=100 family; fc-list :spacing=90 family"]
+    stdout: StdioCollector {
+      id: monoFontsOut
+      waitForEnd: true
+      onStreamFinished: root.monoFamilies = Ora.fontFamilies(monoFontsOut.text)
+    }
+  }
   onFontFamiliesChanged: if (root.defaultsTaken) root.buildSchema()
+  onMonoFamiliesChanged: if (root.defaultsTaken) root.buildSchema()
+  // a family row's weight, for the font book and a picked file's cut
+  readonly property var weightKeyOf: ({ fontFamily: "fontWeight", monoFamily: "monoWeight" })
 
   function scanThemes() {
     if (!themeProc.running) themeProc.running = true;
@@ -283,8 +307,8 @@ Singleton {
   // threshold — 0.5 on this machine — so a surface taken past that stops being
   // blurred and becomes a flat panel. That is a legitimate thing to want; it
   // is just worth knowing which side of the line you are on.
-  // fully opaque unless asked (user, 2026-10-15)
-  property real barOpacity: 1.0
+  // the user's own setting as the default (user, 2026-10-17)
+  property real barOpacity: 0.9
   property real panelOpacity: 0.90
   // How heavy a shadow a layer casts, and a menu. They are deliberately two
   // numbers: a layer sits near an edge and a shadow loud enough to lift it off
@@ -698,10 +722,13 @@ Singleton {
       help: "A module's own breathing room inside its slot." },
     { key: "barWindowGap", section: "bar", label: "Gap to windows", type: "int",
       min: 0, max: 64, step: 1, unit: "px",
-      help: "Extra room kept clear above the pill, on top of its own height. Nothing happens here if the bar is not reserving space." },
+      help: "Extra room kept clear above the pill, on top of its own height and the gap it keeps from the screen edge. Nothing happens here if the bar is not reserving space." },
+    { key: "barOpacity", section: "bar", alias: "bar opacity transparency translucency see-through morpheus pill background", label: "Opacity", type: "real",
+      min: 0.1, max: 1, step: 0.05,
+      help: "The morpheus pill's own background, and the small furniture painted to match it: tooltips, the now-playing card, chronos' day cells. Alpha over black, so lower is more transparent. With Blur behind on, in morpheus, it goes no lower than 0.52, where hyprland\u2019s blur stops." },
     { key: "barBlur", section: "bar", alias: "blur transparency frosted glass background hyprland",
       label: "Blur behind", type: "bool",
-      help: "The desktop behind the pill, frosted. Off, it shows through sharp at any Bar opacity. On, Bar opacity is held at 0.52 at the least — under that hyprland stops blurring." },
+      help: "The desktop behind the pill, frosted. Off, it shows through sharp at any Opacity. On, Opacity is held at 0.52 at the least — under that hyprland stops blurring." },
     { key: "showUpdates", section: "bar", label: "Pending updates", type: "bool",
       help: "The count of packages waiting, at the far left." },
     { key: "showNotifications", section: "bar", label: "Notification bell", type: "bool",
@@ -767,7 +794,23 @@ Singleton {
     { key: "fontFamily", section: "look", label: "Font", type: "enum",
       optionsFrom: "fontFamilies", also: ["fontWeight", "fontSize"], book: true, chipW: 230, open: true,
       alias: "font family typeface nerd weight bold semibold light regular medium thickness size alexandria book",
-      help: "The shell's typeface and how heavy its text is. Any installed family will do: the icons always come from JetBrainsMono Nerd Font (from the next shell start, the first time), and a Nerd Font gets the right cut of it per use. Bold labels stay bold whatever the weight." },
+      help: "The shell's typeface and how heavy its text is — and hyprland's, GTK's, and what every other application asks for as sans-serif. Any installed family will do: the icons always come from JetBrainsMono Nerd Font (from the next shell start, the first time), and a Nerd Font gets the right cut of it per use. Bold labels stay bold whatever the weight." },
+    // THE MONOSPACED FACE, one row like Font's: family, weight, size
+    { key: "monoWeight", section: "look", within: "monoFamily", alias: "monospace mono font weight bold semibold light regular medium",
+      label: "Monospace weight", type: "enum",
+      options: [ { value: "300", label: "Light" },
+                 { value: "400", label: "Regular" },
+                 { value: "500", label: "Medium" },
+                 { value: "600", label: "SemiBold" },
+                 { value: "700", label: "Bold" } ],
+      help: "How heavy fixed-width text is. Bold in a terminal stays a step heavier." },
+    { key: "monoSize", section: "look", within: "monoFamily", label: "Monospace size", type: "int",
+      min: 10, max: 32, step: 1, unit: "px",
+      help: "kitty's text and the system's monospace size. Plato keeps a size of its own." },
+    { key: "monoFamily", section: "look", label: "Monospace font", type: "enum",
+      optionsFrom: "monoFamilies", also: ["monoWeight", "monoSize"], book: true, chipW: 230, open: true,
+      alias: "monospace mono fixed width code terminal kitty plato editor typeface family weight size",
+      help: "The face for text laid out on a grid: kitty, plato, code and file previews, logs, and what every other application asks for as monospace. Only fixed-width families are listed." },
     { key: "lexiTextStep", section: "look", alias: "lexi dictionary translate translation font text size zoom",
       label: "Lexicon text", type: "int", min: -8, max: 12, step: 1, unit: "px",
       help: "Lexi's text, larger or smaller than where it starts. Ctrl + and Ctrl − in lexi do the same, and Ctrl 0 puts it back." },
@@ -783,9 +826,6 @@ Singleton {
     { key: "menuRadius", section: "look", label: "Menu corner radius", type: "int",
       min: 0, max: 16, step: 1, unit: "px",
       help: "Every menu on the desktop: icarus', the tray's, terminus' right-click menu, and the cards picasso and this panel open. Separate from the panels' radius — a small card over your work wants a different corner from a large surface at an edge." },
-    { key: "barOpacity", section: "look", alias: "transparency translucency see-through morpheus pill bar background", label: "Bar opacity", type: "real",
-      min: 0.1, max: 1, step: 0.05,
-      help: "The morpheus pill's own background, and the small furniture painted to match it: tooltips, the now-playing card, chronos' day cells. Alpha over black, so lower is more transparent. With Blur behind on, in morpheus, it goes no lower than 0.52, where hyprland\u2019s blur stops." },
     { key: "panelOpacity", section: "look", alias: "transparency translucency see-through panel layer background", label: "Panel opacity", type: "real",
       min: 0.1, max: 1, step: 0.05,
       help: "The ground every layer that opens out of the pill is painted on. Alpha over black, so lower is more transparent." },
@@ -1239,10 +1279,11 @@ Singleton {
       if (s.optionsFrom === "screens") c.options = root.screenOptionsFor(s);
       if (s.optionsFrom === "themes") c.options = root.themeOptions;
       if (s.optionsFrom === "themesNoSun") c.options = root.themeOptions.filter((o) => o.value !== "sun");
-      if (s.optionsFrom === "fontFamilies") {
+      if (s.optionsFrom === "fontFamilies" || s.optionsFrom === "monoFamilies") {
         // the one worn is listed even when fontconfig has not answered yet
-        const fams = root.fontFamilies.indexOf(root.fontFamily) < 0 && root.fontFamily !== ""
-          ? [root.fontFamily].concat(root.fontFamilies) : root.fontFamilies;
+        const all = root[s.optionsFrom];
+        const worn = root[s.key];
+        const fams = all.indexOf(worn) < 0 && worn !== "" ? [worn].concat(all) : all;
         c.options = fams.map((f) => ({ value: f, label: f.replace(/ Nerd Font$/, "") }));
       }
       if (Ora.stored(s)) {

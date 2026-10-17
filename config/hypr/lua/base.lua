@@ -96,7 +96,6 @@ hl.config({
 		use_nearest_neighbor = false,
 	},
 	misc = {
-        font_family = "SF Pro Text SemiBold",
 		allow_session_lock_restore = true,
 		-- cerberus' frost: the desktop keeps rendering under the lock and is
 		-- blurred live behind it (with decoration.blur below), instead of a
@@ -173,12 +172,9 @@ hl.config({
 				active = "#eebebe",
 				inactive = "#20242a",
 			},
-			font_family = "JetBrainsMono Nerd Font Propo",
 			text_color = "#000000",
-			font_weight_active = "bold",
 			indicator_height = 0,
 			gradients = true,
-			font_size = 14,
 			gaps_out = 0,
 			rounding = 0,
 			gaps_in = 0,
@@ -222,6 +218,28 @@ if okTheme and type(theme) == "table" and next(theme) ~= nil then
 					active = t.groupbar_active,
 					inactive = t.groupbar_inactive,
 				},
+			},
+		},
+	})
+end
+
+-- FONT: oracle's Font, weight and size, written to font.lua by quickshell's
+-- ThemeSync whenever they change (and `hyprctl reload` after). Oracle is the
+-- one place a font is set: nothing above names one, and with no file
+-- hyprland's own defaults stand.
+-- Guarded like theme.lua: a broken file costs the font and nothing else.
+local okFont, font = pcall(require, "lua.font")
+if okFont and type(font) == "table" and next(font) ~= nil then
+	hl.config({
+		misc = {
+			font_family = font.family,
+		},
+		group = {
+			groupbar = {
+				font_family = font.groupbar_family,
+				font_weight_inactive = font.groupbar_weight,
+				font_weight_active = font.groupbar_weight_active,
+				font_size = font.groupbar_size,
 			},
 		},
 	})

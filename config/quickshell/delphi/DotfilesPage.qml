@@ -401,7 +401,7 @@ Item {
               wrapMode: Text.WrapAnywhere
               text: pg.cmd(crow.modelData[0])
               color: crow.modelData[0] === "adopt" ? Zenon.yellow : Zenon.ink
-              font.family: pg.win && pg.win.mgr.editor && pg.win.mgr.editor.fontFamily ? pg.win.mgr.editor.fontFamily : Zenon.faceFixed
+              font.family: Zenon.faceCode
               font.pixelSize: Zenon.px(14)
             }
             DialogButton {

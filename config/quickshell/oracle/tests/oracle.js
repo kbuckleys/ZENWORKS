@@ -185,12 +185,12 @@ module.exports = {
       !T.matches(INT, "toasts wallpaper"));
 
     // `alias` carries the words someone types that the prose has no reason to
-    // contain. "Bar opacity" IS the pill's transparency control, and a
+    // contain. The bar's "Opacity" IS the pill's transparency control, and a
     // substring filter will not get there from "transparent" in the help —
     // "transparency" is the longer word, so it is not a substring of it.
-    const ALIASED = { key: "barOpacity", section: "look", type: "real",
+    const ALIASED = { key: "barOpacity", section: "bar", type: "real",
       alias: "transparency see-through morpheus",
-      label: "Bar opacity", help: "Alpha over black." };
+      label: "Opacity", help: "Alpha over black." };
     t.ok("an alias word finds a setting the prose never names",
       T.matches(ALIASED, "transparency"));
     t.ok("and so does another one", T.matches(ALIASED, "morpheus"));
@@ -572,14 +572,15 @@ module.exports.defaultApps = (t, T) => {
   t.eq("every input key once", keys.length, new Set(keys).size);
   t.ok("every field sits in a group that exists",
     T.inputFields().every((f) => T.inputGroups().some((g) => g.id === f.group)));
-  t.eq("hyprland's own defaults", [T.inputDefault("kb_layout"), T.inputDefault("repeat_rate"),
-    T.inputDefault("repeat_delay"), T.inputDefault("touchpad_tap_to_click"), T.inputDefault("follow_mouse")],
-    ["us", 25, 600, true, 1]);
-  const mine = { accel_profile: "flat", sensitivity: -0.6, focus_on_close: 2, by_hand: "kept" };
+  t.eq("the defaults", [T.inputDefault("kb_layout"), T.inputDefault("repeat_rate"),
+    T.inputDefault("repeat_delay"), T.inputDefault("touchpad_tap_to_click"), T.inputDefault("follow_mouse"),
+    T.inputDefault("accel_profile"), T.inputDefault("sensitivity"), T.inputDefault("focus_on_close")],
+    ["us", 35, 200, true, 1, "flat", -0.6, 2]);
+  const mine = { accel_profile: "adaptive", sensitivity: 0.25, focus_on_close: 1, by_hand: "kept" };
   const inBack = T.parseInputLua(T.renderInputLua(mine));
   t.eq("a value survives the file", [inBack.accel_profile, inBack.sensitivity, inBack.focus_on_close],
-    ["flat", -0.6, 2]);
-  t.eq("an unset one is written as its default", inBack.repeat_rate, 25);
+    ["adaptive", 0.25, 1]);
+  t.eq("an unset one is written as its default", inBack.repeat_rate, 35);
   t.eq("a hand-written key is kept", inBack.by_hand, "kept");
   t.eq("and nothing else is invented", Object.keys(inBack).length, keys.length + 1);
   t.ok("a float is written as it was chosen", T.renderInputLua({ sensitivity: 0.1 + 0.2 }).indexOf("= 0.3,") > 0);

@@ -4252,7 +4252,9 @@ FloatingWindow {
       Scale {
         id: zoomScale
         origin.x: grid.width / 2
-        origin.y: grid.contentY + grid.height / 2
+        // only while zooming: bound to contentY at rest it rewrote the
+        // content's transform on every frame of every scroll, at 1×
+        origin.y: win.zoomK === 1 ? 0 : grid.contentY + grid.height / 2
         xScale: win.zoomK
         yScale: win.zoomK
       }
@@ -4930,8 +4932,10 @@ FloatingWindow {
       target: grid
       on: win.mode === "gallery"
       HoverHandler { id: railHov }
-      anchors.right: grid.right
-      anchors.rightMargin: 2
+      // against the window's own edge (or the date column's rule), in the
+      // gutter past the last tile, not over the pictures: a thumb drawn
+      // across dark backgrounds was a grey line on grey (user, 2026-10-17)
+      anchors.right: scrub.visible ? scrub.left : parent.right
       anchors.top: grid.top
       anchors.topMargin: 2
       anchors.bottom: grid.bottom
@@ -5577,7 +5581,6 @@ FloatingWindow {
       ScrollRail {
         target: panelFlick
         anchors.right: parent.right
-        anchors.rightMargin: 4
         anchors.top: panelFlick.top
         anchors.bottom: panelFlick.bottom
       }

@@ -319,17 +319,43 @@ Singleton {
     if (gone.length > 0) Quickshell.execDetached(["rm", "-f", "--"].concat(gone));
   }
 
+  // THE COVER, ONLY ONCE THE PLAYER IS ON THIS TRACK. A toast can come in
+  // ahead of the player's metadata — skip quickly and Spotify's toast for
+  // the new song arrives while MPRIS still names the old one. mprisFor then
+  // matches by player name, and its trackArtUrl is the LAST song's cover,
+  // which the new toast and its row wore for good (user, 2026-10-17). So
+  // the art is taken only while the titles agree; the toast's catchArt
+  // takes it when they come to (and hands it to the row: rowArt).
+  function artFor(notif) {
+    const p = root.mprisFor(notif);
+    if (!p || String(p.trackTitle || "") !== String(notif.summary || "")) return "";
+    return String(p.trackArtUrl || "");
+  }
+  // the cover caught after arrival, into the history row that went without
+  function rowArt(notif, art) {
+    if (!notif || !art) return;
+    for (let i = 0; i < root.history.length; ++i) {
+      const r = root.history[i];
+      if (r.id !== notif.id || r.summary !== String(notif.summary || "")) continue;
+      if (r.image) return;
+      const h = root.history.slice();
+      h[i] = Object.assign({}, r, { image: art });
+      root.history = h;
+      saveTimer.restart();
+      return;
+    }
+  }
+
   function rowOf(notif) {
     // A track with no picture of its own keeps its player's cover, as the
     // toast draws it. A web address survives a restart (Wolf.localImage),
     // which a provider handle would not.
-    const p = root.mprisFor(notif);
     return {
       id: notif.id,
       time: Date.now(),
       appName: String(notif.appName || ""),
       appIcon: String(notif.appIcon || ""),
-      image: String(notif.image || "") || (p ? String(p.trackArtUrl || "") : ""),
+      image: String(notif.image || "") || root.artFor(notif),
       summary: String(notif.summary || ""),
       body: String(notif.body || ""),
       urgency: notif.urgency,

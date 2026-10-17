@@ -26,7 +26,8 @@
 -- prints that buffer and quits without confirming, and plato's panel reads
 -- it (editor/pack.js). Applying uses the fetch that checking just did.
 
-local function out(s) io.stdout:write(s .. "\n") end
+-- on a line of its own: vim.pack's progress before it ends without one
+local function out(s) io.stdout:write("\n" .. s .. "\n") end
 -- an error, without the Lua file and line it was raised at
 local function why(err) return (tostring(err):gsub("^.-:%d+: ", "")) end
 
@@ -35,6 +36,10 @@ local function why(err) return (tostring(err):gsub("^.-:%d+: ", "")) end
 -- plugin added in this session; without this every plugin reads as
 -- "(not active)" and up to date, whatever is waiting upstream. load = false:
 -- nothing is sourced, this nvim only asks.
+-- WHICH RUN this is, first: the panel ignores what a run it gave up on
+-- (or one before a restart of the worker) still says (core/Plugins.qml)
+if vim.env.PLATO_PACK_RUN then io.stdout:write("RUN " .. vim.env.PLATO_PACK_RUN .. "\n") end
+
 local here = vim.fs.dirname(debug.getinfo(1, "S").source:sub(2))
 vim.opt.runtimepath:prepend(here)
 local plugins = require("plato.plugins")

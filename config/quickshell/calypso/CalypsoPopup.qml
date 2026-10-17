@@ -500,7 +500,7 @@ LayerPopup {
               readonly property bool picked: at >= 0 && at === popup.sel
               width: list.cellWidth
               height: list.cellHeight
-              Rectangle { anchors.fill: parent; color: cell.picked ? Zenon.border : Zenon.alpha(Zenon.border, 0) }
+              Rectangle { anchors.fill: parent; color: cell.picked ? Zenon.menuHi : Zenon.alpha(Zenon.menuHi, 0) }
               ItemTile {
                 id: rowTile
                 x: 16
@@ -673,7 +673,7 @@ LayerPopup {
                       width: group.width
                       height: popup.cellH
                       opacity: ok ? 1 : 0.3
-                      Rectangle { anchors.fill: parent; color: act.picked ? Zenon.border : Zenon.alpha(Zenon.border, 0) }
+                      Rectangle { anchors.fill: parent; color: act.picked ? Zenon.menuHi : Zenon.alpha(Zenon.menuHi, 0) }
                       Text {
                         id: actIcon
                         x: 16

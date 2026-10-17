@@ -61,6 +61,9 @@ module.exports = {
     t.eq("summary: going back", P.summary(r.updates[1]), "1 commit back");
     t.eq("nothing to update is nothing", P.parse("").updates.length, 0);
     t.eq("a failure before any section", P.parse("ERROR no network").error, "no network");
+    t.eq("a failure on the end of the progress line",
+      P.parse("vim.pack:  80% Downloading updates (8/10) - mini.nvimERROR /usr/share/nvim/runtime/lua/vim/_async.lua:53: timeout").error,
+      "GitHub took too long to answer. Try again in a while.");
     // nvim's progress line has no newline after it: read with stderr mixed
     // in, the first header arrives glued onto its end
     const glued = P.parse("vim.pack: 100% Downloading updates (7/7) - nvim-autopairs# Update ─────\n\n## mini.nvim\n"

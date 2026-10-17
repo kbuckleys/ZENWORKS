@@ -75,7 +75,7 @@ FloatingWindow {
     function onFocusedWorkspaceChanged() { win.thawPulse++; }
   }
 
-  readonly property color hiFill: Zenon.alpha(Zenon.cyan, 0.12)
+  readonly property color hiFill: Zenon.menuHi
   readonly property int headH: 46
   readonly property int footH: 40
   // morpheus/WindowTip is a popup, not an Item

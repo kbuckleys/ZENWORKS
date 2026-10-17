@@ -595,6 +595,13 @@ QtObject {
   function px(n) { return Math.max(1, Math.round(n * textScale)); }
   readonly property string faceMono:  cfg.fontFamily + (nerdFace ? " Mono" : "")
   readonly property string faceFixed: cfg.fontFamily
+  // THE CODE FACE: oracle's Monospace font, not the shell's — plato, code
+  // and file previews, logs, kitty (ThemeSync). A Nerd Font's Mono cut, so
+  // its icons are one cell. faceFixed above is the shell's face without a
+  // cut, for chrome; this one is fixed-width whatever the shell wears.
+  readonly property string faceCode: (cfg.monoFamily || "SF Mono")
+    + (/Nerd Font$/.test(cfg.monoFamily || "") ? " Mono" : "")
+  readonly property int codeWeight: Number(cfg.monoWeight) || 600
   // THE BOX-DRAWING ART (oracle's mark, plato's start card) is set in one
   // face whatever the shell's is, as the icons are (GlyphFallback): its
   // strokes meet only in a strictly monospaced cut that has them, and in

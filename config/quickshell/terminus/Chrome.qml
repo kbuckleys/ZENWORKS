@@ -2621,7 +2621,6 @@ Column {
             anchors.bottom: archiveList.bottom
             anchors.bottomMargin: 2
             anchors.right: previewPane.right
-            anchors.rightMargin: 2
           }
 
           // SCROLLABLE, because a preview that only ever shows the first
@@ -2762,7 +2761,7 @@ Column {
             // textScroll — the flickable is inset 16px so that its text
             // does not run into the edges, and hanging the rail off that
             // put it 18px in from the pane while every other rail here
-            // sits 2px from its view. Its top follows the text, which no
+            // sits flush with its edge. Its top follows the text, which no
             // longer starts at the top of the pane.
             //
             // Its TOP AND BOTTOM are the view's, though, and the bottom
@@ -2775,7 +2774,6 @@ Column {
             anchors.bottom: textScroll.bottom
             anchors.bottomMargin: 2
             anchors.right: previewPane.right
-            anchors.rightMargin: 2
           }
 
           Image {
@@ -2863,7 +2861,6 @@ Column {
       target: gridA
       on: gridA.on
       anchors.right: gridA.right
-      anchors.rightMargin: 2
       anchors.top: gridA.top
       anchors.topMargin: 2
       anchors.bottom: gridA.bottom
@@ -2875,7 +2872,6 @@ Column {
       target: gridB
       on: gridB.on
       anchors.right: gridB.right
-      anchors.rightMargin: 2
       anchors.top: gridB.top
       anchors.topMargin: 2
       anchors.bottom: gridB.bottom
@@ -2887,7 +2883,6 @@ Column {
       target: listA
       on: listA.on
       anchors.right: listA.right
-      anchors.rightMargin: 2
       anchors.top: listA.top
       anchors.topMargin: 2
       anchors.bottom: listA.bottom
@@ -2899,7 +2894,6 @@ Column {
       target: listB
       on: listB.on
       anchors.right: listB.right
-      anchors.rightMargin: 2
       anchors.top: listB.top
       anchors.topMargin: 2
       anchors.bottom: listB.bottom
@@ -2927,7 +2921,7 @@ Column {
       anchors.bottomMargin: 2
       // The frame's coordinates, not the traveling Row's: a scrollbar
       // belongs to the pane, so it holds still while the columns move.
-      x: millerBox.x + term.midCol.x + term.midCol.width - width - 2
+      x: millerBox.x + term.midCol.x + term.midCol.width - width
     }
 
     // ── the second pane ─────────────────────────────────────────

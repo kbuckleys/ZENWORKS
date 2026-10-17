@@ -260,9 +260,18 @@ QtObject {
     for (let k = 0; k < list.length; ++k) state.styles[list[k].id] = list[k];
   }
 
+  // A NEW THEME'S STYLES COME A FRAME LATER. nvim's ColorScheme says
+  // "reset" with no styles, and the frame after brings them — with the same
+  // numbers in the same rows, so no row's signature changed and nothing
+  // re-laid: the rows had been redrawn once, against the emptied table, and
+  // stayed plain until a tab switch replaced them all. So an empty reset
+  // is owed, and paid by the frame that defines the new styles.
+  property bool _restyleOwed: false
+
   function applyTheme(ev) {
     if (ev.reset) state.styles = ({});
     state._defineStyles(ev.styles);
+    if (ev.reset && !(ev.styles && ev.styles.length > 0)) state._restyleOwed = true;
     const ui = ev.ui || {};
     if (ui.normal) state.normalFg = ui.normal;
     if (ui.cursorline) state.cursorLineBg = ui.cursorline;
@@ -270,12 +279,16 @@ QtObject {
     if (ui.cursorlinenr) state.cursorLineNrFg = ui.cursorlinenr;
     if (ui.visual) state.visualInk = ui.visual;
     if (ui.visualAlpha) state.visualAlpha = ui.visualAlpha;
-    state.stylesReset();
+    if (!state._restyleOwed) state.stylesReset();
   }
 
   function applyView(ev) {
     // styles first: the rows below may use the ones this frame defines
     state._defineStyles(ev.styles);
+    if (state._restyleOwed) {
+      state._restyleOwed = false;
+      state.stylesReset();
+    }
     state.gridRows = ev.grid.rows;
     state.gridCols = ev.grid.cols;
 

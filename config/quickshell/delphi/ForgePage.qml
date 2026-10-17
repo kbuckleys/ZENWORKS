@@ -54,7 +54,7 @@ Item {
       .concat([["r", "reply"], ["x", pg.open ? "close" : "reopen"], ["w", "web"], ["n", "new"], ["s", pg.showing === "open" ? "closed" : "open"]])
   readonly property bool open: !!pg.item && pg.item.state === "open"
   readonly property var buttons: !pg.hub ? [{ label: "Publish it", ink: Zenon.cyan, primary: true, run: () => pg.win.setPage("github") }]
-    : pg.signInNeeded ? [{ label: "Sign in to " + pg.site.name, ink: Zenon.cyan, primary: true, run: () => { pg.win.mgr.set("forge", pg.site.id); pg.win.setPage("github"); } }]
+    : pg.signInNeeded ? [{ label: "Sign in to " + pg.site.name, ink: Zenon.cyan, primary: true, run: () => pg.win.signInTo(pg.site.id) }]
     : [
       { label: pg.open ? "Close" : "Reopen", ink: pg.open ? Zenon.red : Zenon.accentMuted, visible: !!pg.item, run: () => pg.setOpen(!pg.open) },
       { label: "Merge", ink: Zenon.magenta, visible: pg.pulls && pg.open && !!pg.item && !pg.item.draft, run: () => pg.merge() },

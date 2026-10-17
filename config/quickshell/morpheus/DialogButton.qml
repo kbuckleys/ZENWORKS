@@ -55,7 +55,7 @@ Rectangle {
   // terminus' ClearChip and Segments — every button in the suite presses
   // the same way (it was its own ink, deeper)
   color: !btn.ready ? "transparent"
-    : btnArea.pressed ? Zenon.pressFill
+    : btnArea.pressed && !btn.primary ? Zenon.pressFill
     : btn.plain ? Zenon.buttonRest(btn.primary)
     : Qt.rgba(btn.ink.r, btn.ink.g, btn.ink.b, btn.primary ? 0.14 : 0.10)
   border.width: 1
@@ -160,12 +160,24 @@ Rectangle {
     }
   }
 
+  // A LIT BUTTON PRESSED IS SIMPLY DARKENED (user, 2026-10-17): its own
+  // resting color with black over it — no other color. The suite's gray
+  // press (pressFill) on a vibrant, glowing button read as a gray slab.
+  Rectangle {
+    anchors.fill: parent
+    radius: parent.radius
+    color: Zenon.shadowRgb
+    opacity: btnArea.pressed && btn.primary && btn.ready ? (Zenon.light ? 0.25 : 0.45) : 0
+    visible: opacity > 0
+  }
+
   Text {
     id: btnText
     anchors.centerIn: parent
     text: btn.label
+    // a lit button, darkened under the finger, keeps its word whole
     color: btn.ready ? btn.word : Zenon.muted
-    opacity: btnArea.pressed ? Zenon.pressDim : 1
+    opacity: btnArea.pressed && !btn.primary ? Zenon.pressDim : 1
     font.family: btn.glyph ? Zenon.glyphFace : Zenon.face
     font.weight: Font.Bold
     font.pixelSize: Zenon.px(15)

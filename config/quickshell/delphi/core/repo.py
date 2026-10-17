@@ -803,6 +803,115 @@ class Repo:
         a += [remote] if remote else ["--all"]
         self.git.stream_ok(a, _progress(emit), cancel, creds=True)
 
+    # ── KEPT IN STEP ON EVERY FORGE (user, 2026-10-17) ─────────────────────
+    # One repository on Codeberg, GitHub and GitLab at once, each a remote
+    # here. Sync fetches them all, then for every branch any of them has
+    # takes the newest tip — the one every other tip (and the branch here)
+    # is an ancestor of — moves the branch here to it when it is behind
+    # (fast-forward only), and pushes it to each remote that is behind or
+    # lacks it. Nothing is ever overwritten: a remote whose branch has
+    # commits the newest does not is left as it is (diverged), for a merge
+    # the user makes. A branch only here stays here; one deleted somewhere
+    # is not deleted elsewhere. Tags go to every remote too.
+    def sync(self, remotes=None, cancel=None, emit=None):
+        names = [r["name"] for r in self.remotes(cancel)]
+        rs = [n for n in (remotes or names) if n in names]
+        failed, fetched = [], []
+        for n in rs:
+            try:
+                self.git.stream_ok(["fetch", "--progress", "--prune", "--tags", n], _progress(emit), cancel, creds=True)
+                fetched.append(n)
+            except GitError as e:
+                if cancel and cancel.done:
+                    raise
+                failed.append({"remote": n, "error": str(e), "step": "fetch"})
+        out = self.git.run(["for-each-ref", "--format=%(refname)\t%(objectname)",
+                            "refs/heads"] + [f"refs/remotes/{n}" for n in fetched], lock=False)
+        local, tips = {}, {}
+        for l in out.splitlines():
+            ref, sha = (l.split("\t") + [""])[:2]
+            if ref.startswith("refs/heads/"):
+                local[ref[11:]] = sha
+                continue
+            rest = ref[len("refs/remotes/"):]
+            n, _, b = rest.partition("/")
+            if b and b != "HEAD":
+                tips.setdefault(b, {})[n] = sha
+        head = self.git.run(["symbolic-ref", "-q", "--short", "HEAD"], ok=(0, 1), lock=False).strip()
+        anc = lambda a, b: a == b or self.git.code(["merge-base", "--is-ancestor", a, b]) == 0
+        branches, sends = [], {n: [] for n in fetched}
+        for b in sorted(tips):
+            there = tips[b]
+            # the newest, starting from the branch here (else the first remote)
+            order = ([local[b]] if b in local else []) + [there[n] for n in fetched if n in there]
+            best = order[0]
+            for t in order[1:]:
+                if t != best and anc(best, t):
+                    best = t
+            row = {"name": b, "sha": best, "pushed": [], "diverged": [], "moved": False, "local": b in local}
+            if b in local and local[b] != best:
+                if anc(local[b], best):
+                    try:
+                        if b == head:
+                            self.git.run(["merge", "--ff-only", "-q", best], cancel=cancel)
+                        else:
+                            self.git.run(["update-ref", f"refs/heads/{b}", best, local[b]], cancel=cancel)
+                        row["moved"] = True
+                    except GitError as e:
+                        row["stuck"] = str(e)
+                else:
+                    row["diverged"].append("here")
+            for n in fetched:
+                t = there.get(n)
+                if t == best:
+                    continue
+                if t is None or anc(t, best):
+                    sends[n].append((b, best))
+                else:
+                    row["diverged"].append(n)
+            branches.append(row)
+        for n in fetched:
+            if cancel:
+                cancel.check()
+            specs = [f"{sha}:refs/heads/{b}" for b, sha in sends[n]]
+            if specs:
+                try:
+                    self.git.stream_ok(["push", "--progress", "--porcelain", n] + specs, _progress(emit), cancel, creds=True)
+                    for b, _ in sends[n]:
+                        next(r for r in branches if r["name"] == b)["pushed"].append(n)
+                except GitError as e:
+                    if cancel and cancel.done:
+                        raise
+                    failed.append({"remote": n, "error": str(e), "step": "push"})
+            # tags: one the remote has differently is refused, the rest go
+            try:
+                self.git.stream_ok(["push", "--progress", "--porcelain", "--tags", n], _progress(emit), cancel, creds=True)
+            except GitError as e:
+                if cancel and cancel.done:
+                    raise
+                failed.append({"remote": n, "error": str(e), "step": "tags"})
+        return {"remotes": fetched, "branches": branches, "failed": failed}
+
+    # a repository here put on another forge too: the remote added (named
+    # for the forge), fetched when there is anything there, and how its
+    # history and this one's stand — related (sync joins them), empty
+    # (sync fills it), or unrelated (nothing joins them by itself)
+    def mirror_add(self, name, url, cancel=None, emit=None):
+        names = [r["name"] for r in self.remotes(cancel)]
+        if name in names:
+            self.git.run(["remote", "set-url", name, url], cancel=cancel)
+        else:
+            self.git.run(["remote", "add", name, url], cancel=cancel)
+        self.git.stream_ok(["fetch", "--progress", name], _progress(emit), cancel, creds=True)
+        theirs = [l for l in self.git.run(["for-each-ref", "--format=%(objectname)", f"refs/remotes/{name}"],
+                                          lock=False).split() if l]
+        if not theirs:
+            return {"remote": name, "empty": True}
+        if self._unborn():
+            return {"remote": name, "related": False, "unborn": True}
+        related = any(self.git.code(["merge-base", "HEAD", t]) == 0 for t in theirs)
+        return {"remote": name, "related": related}
+
     def pull(self, mode="ff-only", cancel=None, emit=None):
         """mode: ff-only (never makes a commit the user did not ask for),
         rebase, or merge."""

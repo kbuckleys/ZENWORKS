@@ -404,9 +404,10 @@ Item {
     color: sideRow.ink.a > 0 ? sideRow.ink
       : (sideRow.active ? Zenon.cyan : Zenon.accentMuted)
     font.family: Zenon.face
-    font.weight: Zenon.titleWeight
+    font.weight: Zenon.weight
     // delphi's sidebar type (ShelfRow): 14, the label soft until it is
-    // the one you are on (user, 2026-10-11: the two sidebars look alike)
+    // the one you are on (user, 2026-10-11: the two sidebars look alike);
+    // body weight, only the heads are bold (user, 2026-10-17)
     font.pixelSize: Zenon.px(14)
   }
 
@@ -437,7 +438,7 @@ Item {
     color: sideRow.active
       ? (sideRow.ink.a > 0 ? sideRow.ink : Zenon.ink)
       : Zenon.accentSoft
-    font.weight: Zenon.titleWeight
+    font.weight: Zenon.weight
     font.family: Zenon.face
     font.pixelSize: Zenon.px(14)
   }

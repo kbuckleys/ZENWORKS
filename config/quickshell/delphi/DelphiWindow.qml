@@ -90,7 +90,7 @@ FloatingWindow {
   }
 
   // THE highlight, as alexandria's: the page, the file, the commit all wear it
-  readonly property color hiFill: Zenon.alpha(Zenon.cyan, 0.12)
+  readonly property color hiFill: Zenon.menuHi
   readonly property string home: Quickshell.env("HOME")
 
   // ── THE REPOSITORY ─────────────────────────────────────────────────────
@@ -385,6 +385,7 @@ FloatingWindow {
       if (win.page !== "changes") win.setPage("changes");
       return;
     }
+    if (win.syncing) { win.syncAll(); return; }
     if (win.pushNothing) { win.say("Nothing to push — every place it goes has this commit"); return; }
     if (win.pushTargets.length > 0) { win.pushMany(win.pushTargets); return; }
     if (!b.upstream) {
@@ -458,7 +459,7 @@ FloatingWindow {
     return f ? { forge: f.id, full: o.full, name: f.name } : null;
   }
   readonly property string headSha: win.branch && win.branch.oid ? win.branch.oid : ""
-  readonly property var pushNames: win.pushTargets.length > 0 ? win.pushTargets
+  readonly property var pushNames: win.syncing ? win.remotes.map((r) => r.name) : win.pushTargets.length > 0 ? win.pushTargets
     : win.branch && win.branch.upstream ? [win.branch.upstream.split("/")[0]] : []
   function headCiOf(name) {
     win.mgr.ci;
@@ -498,6 +499,14 @@ FloatingWindow {
         run: () => { tick(all ? [] : win.remotes.map((r) => r.name)); pushPop.setItems(win.pushItems()); } },
       { text: "Just the upstream", icon: t.length === 0 ? "\uF00C" : "\uF062", keep: true,
         run: () => { tick([]); pushPop.setItems(win.pushItems()); } });
+    if (win.remotes.length > 1) {
+      const on = !!win.mgr.syncs[win.root];
+      items.push({ isSeparator: true },
+        { text: "Keep them all in sync", icon: on ? "\uF00C" : "\uF46A", keep: true,
+          run: () => { win.mgr.setSync(win.root, !on); pushPop.setItems(win.pushItems()); } },
+        { text: "Sync now", icon: "\uF021", run: () => win.syncAll() });
+    }
+    items.push({ isSeparator: true }, { text: "Sync with other forges…", icon: "\uF46A", run: () => win.putOnForge() });
     return items;
   }
   function pushMenu(at) {
@@ -529,6 +538,190 @@ FloatingWindow {
         failed: (err) => { bad.push(r); win.fail("Push to " + r + " did not work", null, err); next(i + 1); } });
     };
     next(0);
+  }
+  // ── KEPT IN SYNC ON EVERY FORGE (user, 2026-10-17) ─────────────────────
+  // "Why can't I just keep the repo synced in all forges?" A repository
+  // here with a remote on each forge, and Sync in place of Push: every
+  // remote fetched, each branch any of them has brought to its newest tip
+  // here and there (fast-forward only — a remote with commits the others
+  // lack is said, never overwritten), tags everywhere (delphi/core
+  // repo.sync). Turned on per repository from the push menu (mgr.syncs),
+  // and by syncing a repository with other forges.
+  readonly property bool syncing: !!win.mgr && win.root !== "" && !!win.mgr.syncs[win.root] && win.remotes.length > 1
+  function syncAll() {
+    const root = win.root;
+    win.act("sync", {}, { label: "Syncing " + win.remotes.length + " remotes", network: true,
+      then: (res) => {
+        if (!win) return;
+        win.mgr.noteFetched(root);
+        win.watchCi();
+        const word = (n) => { const r = win.remotes.find((x) => x.name === n); return r ? win.remoteWord(r).where : n; };
+        const pushed = res.branches.filter((b) => b.pushed.length > 0);
+        const moved = res.branches.filter((b) => b.moved);
+        const split = res.branches.filter((b) => b.diverged.length > 0);
+        const parts = [];
+        if (moved.length > 0) parts.push("brought " + moved.map((b) => b.name).join(", ") + " up to date here");
+        if (pushed.length > 0) {
+          const where = [];
+          pushed.forEach((b) => b.pushed.forEach((n) => { if (where.indexOf(n) < 0) where.push(n); }));
+          parts.push("sent " + (pushed.length === 1 ? pushed[0].name : pushed.length + " branches") + " to " + where.map(word).join(", "));
+        }
+        if (split.length === 0 && res.failed.length === 0) {
+          win.say(parts.length > 0 ? "Synced — " + parts.join("; ") : "Synced — every remote already had everything");
+          return;
+        }
+        const items = split.map((b) => b.name + ":  " + b.diverged.map((n) => n === "here" ? "this copy" : word(n)).join(", ")
+                                    + (b.diverged.length === 1 ? " has" : " have") + " commits the newest one does not")
+          .concat(res.failed.map((f) => word(f.remote) + ":  " + (f.step === "fetch" ? "could not be fetched" : f.step === "tags" ? "refused some tags" : "refused the push")
+                                    + " — " + D.errorText(f.error).split("\n")[0]));
+        win.card_({ question: parts.length > 0 ? "Synced, mostly" : "Not everything could be synced", glyph: "", ink: Zenon.yellow,
+          detail: (parts.length > 0 ? "Delphi " + parts.join("; ") + ". " : "")
+            + (split.length > 0 ? "Where a branch went two ways, nothing was overwritten: merge or rebase it from Branches (its copy on each remote is there), then Sync again." : ""),
+          items: items,
+          choices: split.length > 0 ? [{ label: "Open Branches", ink: Zenon.cyan, run: () => win.setPage("branches") }, { label: "Close" }] : [{ label: "Close" }] });
+      } });
+  }
+  // the name a forge's remote takes here: its id (github, gitlab, codeberg)
+  // or, for a server of your own, its name — numbered if taken by another
+  function remoteNameFor(f, url, rs) {
+    const base = f.server ? String(f.name).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "forge" : f.id;
+    let name = base, n = 2;
+    const same = (r) => { const a = D.remoteOf(r.push || r.fetch || ""), b = D.remoteOf(url); return !!a && !!b && a.host === b.host && a.full.toLowerCase() === b.full.toLowerCase(); };
+    while (rs.some((r) => r.name === name && !same(r))) name = base + "-" + n++;
+    return name;
+  }
+  // SYNC WITH OTHER FORGES (user, 2026-10-17: a list to tick, the
+  // buttons only to confirm or cancel): the forges it is not on yet, each
+  // a tick, and nothing more asked — on each, its repository of the same
+  // name if there is one, else a new one made; added as a remote, checked
+  // to share this one's history (one that shares none is taken back out),
+  // then kept in sync and synced once at the end
+  function putOnForge(root0) {
+    const root = root0 || win.root;
+    if (root === "") return;
+    win.mgr.call("remotes", root, {}, (ok, rs0) => {
+      if (!win) return;
+      const rs = ok ? rs0 : [];
+      const on = rs.map((r) => { const o = D.remoteOf(r.push || r.fetch || ""); return o ? o.host : ""; });
+      const left = D.FORGE_ORDER.filter((id) => on.indexOf(D.FORGES[id].host) < 0);
+      if (left.length === 0) { win.say("It is on every forge Delphi knows already"); return; }
+      win.ask({ title: "Sync " + D.baseName(root) + " with other forges", glyph: "\uF46A",
+        detail: "On each forge ticked, it syncs with your repository of the same name — or with a new one, made for it if there is none. From then on Push is Sync: every forge kept at the same commits.",
+        toggles: left.map((id) => ({ key: "f:" + id, label: D.FORGES[id].name, value: true }))
+          .concat([{ key: "priv", label: "Make new ones private", value: true }]),
+        verb: "Sync",
+        then: (v) => {
+          const ids = left.filter((id) => v["f:" + id]);
+          if (ids.length === 0) { win.say("No forge ticked — nothing done"); return; }
+          win.putOnMany(root, ids, !!v.priv, rs);
+        } });
+    });
+  }
+  function putOnMany(root, ids, priv, rs0) {
+    const name = D.baseName(root), out = [];
+    let rs = rs0.slice();
+    const next = (i) => {
+      if (!win) return;
+      if (i >= ids.length) { win.putOnDone(root, out); return; }
+      const id = ids[i], f = D.FORGES[id];
+      const note = (word, ok) => { out.push({ f: f, word: word, ok: !!ok }); next(i + 1); };
+      const failed = (what) => (err) => note(what + " — " + D.errorText(err ? err.error : "").split("\n")[0]);
+      const join = (r, made) => {
+        const remote = win.remoteNameFor(f, r.https, rs);
+        win.act("mirrorAdd", { name: remote, url: r.https }, { repo: root, refresh: false, label: "Adding " + r.full, network: true,
+          failed: failed("could not reach " + r.full),
+          then: (res) => {
+            rs = rs.concat([{ name: remote, fetch: r.https, push: r.https }]);
+            if (res.empty || res.related) { note((made ? "new repository " + r.full : "your " + r.full) + " — synced", true); return; }
+            // a stranger of the same name: not joined, its remote gone again
+            win.mgr.call("remoteRemove", root, { name: remote }, () => {});
+            rs = rs.filter((x) => x.name !== remote);
+            note(res.unborn ? "left alone — " + name + " has no commits yet" : r.full + " is another repository (no history shared) — left alone");
+          } });
+      };
+      win.act(id + "Status", {}, { repo: null, refresh: false, label: "Asking " + f.name, network: true,
+        failed: failed("could not be asked"),
+        then: (st) => {
+          if (!st.signedIn) { note("not signed in — sign in on the Accounts page, then try again"); return; }
+          win.act(id + "Repos", {}, { repo: null, refresh: false, label: "Looking for " + name + " on " + f.name, network: true,
+            failed: failed("could not list your repositories"),
+            then: (repos) => {
+              const mine = repos.find((r) => r.name.toLowerCase() === name.toLowerCase());
+              if (mine) { join(mine, false); return; }
+              win.act(id + "Create", { name: name.replace(/[^A-Za-z0-9._-]+/g, "-"), private: priv, description: "" }, {
+                repo: null, refresh: false, label: "Creating " + name + " on " + f.name, network: true,
+                failed: failed("could not create " + name),
+                then: (r) => join(r, true) });
+            } });
+        } });
+    };
+    next(0);
+  }
+  // what happened on each, said once: all well, a toast and the sync;
+  // anything not, a card listing every forge
+  function putOnDone(root, out) {
+    const joined = out.filter((o) => o.ok);
+    if (joined.length > 0) {
+      win.mgr.setSync(root, true);
+      if (root !== win.root) win.openRepo(root);
+      Qt.callLater(() => { if (win && win.root === root) { win.refresh(); win.syncAll(); } });
+    }
+    if (joined.length === out.length) {
+      win.say("Syncing with " + joined.map((o) => o.f.name).join(", ") + " — Push is Sync from now on");
+      return;
+    }
+    win.card_({ question: joined.length > 0 ? "Synced with " + joined.map((o) => o.f.name).join(", ") : "Not synced anywhere", glyph: "\uF46A",
+      ink: joined.length > 0 ? Zenon.ink : Zenon.yellow,
+      detail: joined.length > 0 ? "Those are synced now, and Push is Sync from now on." : "",
+      items: out.map((o) => o.f.name + ":  " + o.word),
+      choices: [{ label: "Close" }] });
+  }
+  // the remote added and looked at: related or empty, synced at once and
+  // kept in sync; a history that shares nothing is said, the remote taken
+  // back out unless kept
+  function joinForge(root, f, r, rs0) {
+    const go = (rs) => {
+      const remote = win.remoteNameFor(f, r.https, rs);
+      win.act("mirrorAdd", { name: remote, url: r.https }, { repo: root, label: "Adding " + r.full, network: true,
+        then: (res) => {
+          if (!win) return;
+          if (res.empty || res.related) {
+            win.mgr.setSync(root, true);
+            if (root !== win.root) win.openRepo(root);
+            win.say((res.empty ? r.full + " is empty — " : "Same history as " + r.full + " — ") + "syncing; Push is Sync from now on");
+            Qt.callLater(() => { if (win && win.root === root) win.syncAll(); });
+            return;
+          }
+          win.card_({ question: r.full + " is another repository", glyph: f.glyph, ink: Zenon.yellow,
+            detail: res.unborn ? D.baseName(root) + " has no commits yet. Connect it from the Accounts page instead: it takes " + r.full + "'s history in."
+              : "Its history and " + D.baseName(root) + "'s share no commit, so syncing would only make a mess. The remote " + remote + " was added; take it back out?",
+            choices: [{ label: "Take it out", ink: Zenon.cyan, run: () => win.act("remoteRemove", { name: remote }, { repo: root, said: "Took " + remote + " back out" }) },
+                      { label: "Keep the remote" }] });
+        } });
+    };
+    if (rs0) go(rs0);
+    else win.mgr.call("remotes", root, {}, (ok, rs) => { if (win) go(ok ? rs : []); });
+  }
+  // WHICH FORGE: answers on the card while two fit beside Cancel (the
+  // card is a fixed width), else a dropdown on a form
+  function pickForge(question, ids, then, detail) {
+    if (ids.length <= 2) {
+      win.card_({ question: question, glyph: "\uF0C2", ink: Zenon.ink, detail: detail || "",
+        choices: ids.map((id) => ({ label: D.FORGES[id].name, ink: Zenon.cyan, run: () => then(id) }))
+          .concat([{ label: "Cancel", ink: Zenon.accentMuted }]) });
+      return;
+    }
+    win.ask({ title: question, glyph: "\uF0C2", detail: detail || "",
+      fields: [{ key: "forge", label: "Forge", options: ids.map((id) => D.FORGES[id].name) }],
+      verb: "Next",
+      then: (v) => { const id = ids.find((x) => D.FORGES[x].name === v.forge); if (id) then(id); } });
+  }
+  // the Accounts page, signing in to one forge (it asks once it is up)
+  property string wantSignIn: ""
+  function signInTo(id) {
+    win.wantSignIn = id;
+    win.setPage("github");
+    if (win.pageItem && win.pageItem.signInWanted) win.pageItem.signInWanted();
   }
   function forcePush() {
     win.confirm({ question: "Force-push " + win.branchName + "?", glyph: "", ink: Zenon.red,
@@ -775,7 +968,10 @@ FloatingWindow {
                { text: "All repositories", icon: "\uF03A", run: () => win.setPage("repos") });
     if (win.root !== "") {
       const name = D.baseName(win.root), root = win.root;
-      items.push({ isSeparator: true }, { text: "Apply a patch…", icon: "\uF0EA", run: () => win.applyPatch() });
+      items.push({ isSeparator: true }, { text: "Apply a patch…", icon: "\uF0EA", run: () => win.applyPatch() },
+                 { text: "Sync with other forges…", icon: "\uF46A", run: () => win.putOnForge(root) });
+      if (win.remotes.length > 1) items.push({ text: win.syncing ? "Stop keeping its remotes in sync" : "Keep its remotes in sync", icon: "\uF021",
+                                               run: () => win.mgr.setSync(root, !win.mgr.syncs[root]) });
       if (win.hub) items.push({ text: "Archive on " + (D.FORGES[win.hub.forge] ? D.FORGES[win.hub.forge].name : win.hub.host) + "…", icon: "\uF187",
                                 run: () => win.archiveOnForge(D.hubOf(win.remotes, true) || win.hub, { root: root, name: name }) });
       items.push({ isSeparator: true },
@@ -1170,9 +1366,9 @@ FloatingWindow {
         // opens the menu to tick them (pushItems).
         Rectangle {
           id: pushChip
-          readonly property var names: win.pushTargets.length > 0 ? win.pushTargets
+          readonly property var names: win.syncing ? win.remotes.map((r) => r.name) : win.pushTargets.length > 0 ? win.pushTargets
             : win.branch && win.branch.upstream ? [win.branch.upstream.split("/")[0]] : []
-          readonly property bool choice: win.remotes.length > 1
+          readonly property bool choice: win.remotes.length > 0
           visible: !!win.pageItem && !!win.pageItem.showsPush && win.root !== "" && win.remotes.length > 0
           anchors.left: headSub.right
           anchors.leftMargin: 12
@@ -1496,14 +1692,15 @@ FloatingWindow {
             id: pushBtn
             readonly property int n: win.pushTargets.length
             label: !win.branch ? "Push"
+              : win.syncing ? "Sync" + (win.branch.ahead > 0 ? "  ↑" + win.branch.ahead : "")
               : pushBtn.n > 1 ? (pushBtn.n === win.remotes.length ? "Push to all" : "Push to " + pushBtn.n)
                 + (win.branch.ahead > 0 ? "  ↑" + win.branch.ahead : "")
               : pushBtn.n === 1 ? "Push to " + win.pushTargets[0]
               : !win.branch.upstream && win.branch.head ? "Publish"
               : win.branch.ahead > 0 ? "Push  ↑" + win.branch.ahead : "Push"
-            ink: !win.pushNothing && win.branch && (win.branch.ahead > 0 || pushBtn.n > 0 || (!win.branch.upstream && win.branch.head)) ? Zenon.cyan : Zenon.accentMuted
-            ready: !win.pushNothing
-            primary: !win.pushNothing && !!win.branch && (win.branch.ahead > 0 || pushBtn.n > 0) && win.branch.behind === 0
+            ink: win.syncing ? Zenon.cyan : !win.pushNothing && win.branch && (win.branch.ahead > 0 || pushBtn.n > 0 || (!win.branch.upstream && win.branch.head)) ? Zenon.cyan : Zenon.accentMuted
+            ready: win.syncing || !win.pushNothing
+            primary: !win.syncing && !win.pushNothing && !!win.branch && (win.branch.ahead > 0 || pushBtn.n > 0) && win.branch.behind === 0
             onClicked: win.push()
           }
         }

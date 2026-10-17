@@ -24,14 +24,13 @@ Collapsible {
   openWidth: row.implicitWidth
 
   // Everything below is read off Ceres, which owns the checking, the
-  // announcing and the memory of both. This module only draws the count.
+  // announcing and the memory of both. This module only draws the icon.
   readonly property bool hasUpdates: Ceres.total > 0
   readonly property string countText: String(Ceres.total)
   // A reboot (kernel) or a service restart (user services on replaced code) is owed,
   // and the transaction that caused it has finished: the icon says so.
   readonly property bool owed: !Ceres.txBusy
     && (Ceres.restartNeeded || Ceres.staleServices.length > 0)
-  property bool hovered: false
   signal activated()
 
   Row {
@@ -42,8 +41,7 @@ Collapsible {
 
     Item {
       id: iconBox
-      width: (root.hovered && root.hasUpdates ? countBox.implicitWidth : iconGlyph.implicitWidth) + Zenon.padModule * 2
-      Behavior on width { NumberAnimation { duration: 150; easing.type: Easing.OutQuad } }
+      width: iconGlyph.implicitWidth + Zenon.padModule * 2
       height: Zenon.slot
       anchors.verticalCenter: parent.verticalCenter
 
@@ -62,37 +60,6 @@ Collapsible {
         color: Zenon.yellow
         numeric: true
         font.pixelSize: Zenon.clockSize
-        // stays up when there is no count to swap in — with only a restart
-        // pending, hovering used to empty the chip
-        opacity: !(root.hovered && root.hasUpdates) ? 1 : 0
-        Behavior on opacity { NumberAnimation { duration: 150; easing.type: Easing.OutQuad } }
-      }
-
-      Item {
-        id: countBox
-        anchors.centerIn: parent
-        implicitWidth: Math.max(countGhost.implicitWidth, countLabel.implicitWidth)
-        implicitHeight: Zenon.slot
-
-        BarText {
-          id: countGhost
-          anchors.centerIn: parent
-          text: "8".repeat(Math.max(1, String(root.countText).length))
-          numeric: true
-          color: Zenon.trough(Zenon.yellow)
-          opacity: root.hovered && root.hasUpdates ? 1 : 0
-          Behavior on opacity { NumberAnimation { duration: 150; easing.type: Easing.OutQuad } }
-        }
-
-        BarText {
-          id: countLabel
-          anchors.centerIn: parent
-          text: root.countText
-          numeric: true
-          color: Zenon.yellow
-          opacity: root.hovered && root.hasUpdates ? 1 : 0
-          Behavior on opacity { NumberAnimation { duration: 150; easing.type: Easing.OutQuad } }
-        }
       }
     }
   }
@@ -101,8 +68,6 @@ Collapsible {
     id: mouse
     anchors.fill: parent
     hoverEnabled: true
-    onEntered: root.hovered = true
-    onExited: root.hovered = false
     acceptedButtons: Qt.LeftButton | Qt.RightButton
     // Left is ceres' panel; right is its menu (the bell's, the tray's card).
     onClicked: (m) => {

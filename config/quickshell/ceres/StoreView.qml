@@ -34,6 +34,7 @@ import Quickshell.Widgets
 import QtQuick.Effects
 import "../morpheus"
 import "../terminus" as Term
+import "../oracle"
 import "."
 import "ceres.js" as Cer
 import "store.js" as St
@@ -293,8 +294,11 @@ Item {
   readonly property int lightboxAt: store.lightboxFiles.indexOf(store.lightbox)
   function lightboxStep(d) {
     const i = store.lightboxAt + d;
-    if (store.lightboxAt < 0 || i < 0 || i >= store.lightboxFiles.length) return false;
+    if (store.lightboxAt < 0) return false;
+    if (i < 0 || i >= store.lightboxFiles.length) { lightboxBox.bump(d); return false; }
+    lightboxBox.step(d);
     store.lightbox = store.lightboxFiles[i];
+    Qt.callLater(lightboxBox.enter);
     return true;
   }
   Process {
@@ -491,7 +495,7 @@ Item {
           width: parent.width
           height: 34
           radius: Zenon.windowRadius
-          color: srow.on ? Zenon.alpha(Zenon.cyan, 0.14) : "transparent"
+          color: srow.on ? Zenon.menuHi : "transparent"
           // Installed under a hairline: it is yours, not the catalog's
           Rectangle {
             visible: srow.modelData[0] === "installed"
@@ -524,7 +528,7 @@ Item {
             text: srow.modelData[1]
             color: srow.on ? Zenon.cyan : Zenon.white
             font.family: Zenon.face
-            font.weight: srow.on ? Font.Bold : Zenon.weight
+            font.weight: Zenon.weight
             font.pixelSize: Zenon.px(16)
           }
           Text {
@@ -1561,18 +1565,74 @@ Item {
   }
 
   // ── a screenshot, large ────────────────────────────────────────────────
+  // A step slides, as picasso's viewer does (ViewerWindow's enterK): the
+  // next shot comes in from the side it lies on once it is decoded, the
+  // last goes out the other way (`ghost`, the same url again, a cache hit),
+  // and stepping past either end pulls the shot that way and back.
   Rectangle {
+    id: lightboxBox
     anchors.fill: content
     visible: store.lightbox !== ""
     color: Zenon.alpha(Zenon.layerBg, 0.94)
+    clip: true
+    readonly property int slideMs: Math.round(200 * Oracle.motionScale)
+    property string ghost: ""
+    property int dir: 0
+    property real k: 1
+    property real bumpX: 0
+    property int bumpDir: 0
+    function step(d) {
+      enterAnim.stop();
+      lightboxBox.ghost = store.lightbox;
+      lightboxBox.dir = d;
+      lightboxBox.k = 0;
+    }
+    function enter() {
+      if (lightboxBox.k < 1 && !enterAnim.running && shownImg.status === Image.Ready) enterAnim.restart();
+    }
+    function bump(d) {
+      lightboxBox.bumpDir = d;
+      bumpAnim.restart();
+    }
+    onVisibleChanged: if (!visible) { enterAnim.stop(); lightboxBox.ghost = ""; lightboxBox.k = 1; }
+    NumberAnimation { id: enterAnim; target: lightboxBox; property: "k"; to: 1
+                      duration: lightboxBox.slideMs; easing.type: Easing.OutCubic
+                      onFinished: lightboxBox.ghost = "" }
+    SequentialAnimation {
+      id: bumpAnim
+      NumberAnimation { target: lightboxBox; property: "bumpX"; to: -lightboxBox.bumpDir * 28
+                        duration: Math.round(90 * Oracle.motionScale); easing.type: Easing.OutCubic }
+      NumberAnimation { target: lightboxBox; property: "bumpX"; to: 0
+                        duration: Math.round(320 * Oracle.motionScale); easing.type: Easing.OutBack; easing.overshoot: 2.2 }
+    }
+    // the shot stepped away from, sliding off as the next slides in
     Image {
+      anchors.fill: parent
+      anchors.margins: 28
+      visible: lightboxBox.ghost !== ""
+      source: lightboxBox.ghost !== "" ? "file://" + lightboxBox.ghost : ""
+      fillMode: Image.PreserveAspectFit
+      // a cache hit: asked exactly as the shown one was
+      asynchronous: false
+      cache: true
+      smooth: true
+      mipmap: true
+      transform: Translate { x: -lightboxBox.k * lightboxBox.dir * lightboxBox.width }
+    }
+    Image {
+      id: shownImg
       anchors.fill: parent
       anchors.margins: 28
       source: store.lightbox !== "" ? "file://" + store.lightbox : ""
       fillMode: Image.PreserveAspectFit
       asynchronous: true
+      cache: true
       smooth: true
       mipmap: true
+      // held off until decoded, so the last stays put meanwhile, never a gap
+      opacity: lightboxBox.k < 1 && status !== Image.Ready ? 0 : 1
+      onStatusChanged: if (status === Image.Ready) lightboxBox.enter()
+      transform: Translate { x: (1 - lightboxBox.k) * lightboxBox.dir * lightboxBox.width + lightboxBox.bumpX }
     }
     MouseArea {
       anchors.fill: parent

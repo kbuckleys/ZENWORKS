@@ -71,9 +71,15 @@ Singleton {
   property var oldCode: []
   readonly property var staleApps: root.oldCode.filter(g => !g.service)
   readonly property var staleServices: root.oldCode.filter(g => g.service)
-  function checkStale() { if (!staleProc.running) staleProc.running = true; }
+  // Asked while a look is out, it looks again once that one ends: the look
+  // already out may have started before what it should see.
+  function checkStale() {
+    if (staleProc.running) staleProc.again = true;
+    else staleProc.running = true;
+  }
   // the stale user services, restarted (Cer.restartServicesSteps): no
-  // password; the look after every job then finds them renewed
+  // password; the look after every job (finishSettle) then finds them
+  // renewed — not pacman's lock, which a job of only @user steps never takes
   function restartStaleServices() {
     const units = root.staleServices.map(g => g.unit);
     const steps = Cer.restartServicesSteps(units);
@@ -82,7 +88,9 @@ Singleton {
   }
   Process {
     id: staleProc
+    property bool again: false
     command: ["sh", "-c", Cer.staleCommand()]
+    onExited: if (staleProc.again) { staleProc.again = false; Qt.callLater(root.checkStale); }
     stdout: StdioCollector {
       id: staleOut
       onStreamFinished: root.oldCode = Cer.readStale(staleOut.text)
@@ -926,6 +934,10 @@ Singleton {
       root.txSettle = !cancelled && code !== 0 ? Cer.settleOf(root.txLog) : null;
       root.txState = cancelled || code !== 0 ? "failed" : "done";
       root.checkDeps();
+      // every job, not only pacman's: restarting stale services takes no
+      // lock, and without this their note and its button stayed up after
+      // the restart worked
+      root.checkStale();
       if (root._checkAfterSetup) { root._checkAfterSetup = false; if (code === 0) root.check(); }
       root.txPhase = "";
       root.measureSizes(true);

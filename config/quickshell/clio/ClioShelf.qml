@@ -27,7 +27,7 @@ ShelfRow {
   radius: 0
   indent: 18
   countIndent: 18
-  fill: row.host && row.host.win ? row.host.win.hiFill : Zenon.alpha(Zenon.cyan, 0.12)
+  fill: row.host && row.host.win ? row.host.win.hiFill : Zenon.menuHi
   opacity: row.muted ? 0.75 : 1
   readonly property bool hot: !!row.drop && !!row.host && row.host.dropHot === JSON.stringify(row.drop)
   Component.onCompleted: if (row.drop && row.host) row.host.register(row)

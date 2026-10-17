@@ -7,7 +7,9 @@
 // not: a region you can still change your mind about.
 //
 //   screen   the monitor you are on, whole
-//   window   the window that has the keyboard
+//   window   the window that has the keyboard, the way macOS takes one —
+//            alone, corners rounded, its drop shadow on transparency
+//            (window-plain: no shadow; SUPER+ALT+PRINT)
 //   region   a rectangle you draw, then ADJUST — slurp captured the moment
 //            the button came up, so a box a few pixels off was a box you
 //            drew again. Here it stays up with handles until you press Save
@@ -77,7 +79,10 @@ Scope {
   property string wantMode: ""
   Process {
     id: askProc
-    command: ["sh", "-c", "hyprctl -j monitors; echo '@@'; hyprctl -j clients; echo '@@'; hyprctl -j activewindow"]
+    // and the decoration settings a window shot draws its shadow from
+    command: ["sh", "-c", "hyprctl -j monitors; echo '@@'; hyprctl -j clients; echo '@@'; hyprctl -j activewindow; "
+      + "echo '@@'; printf '['; sep=; for o in " + Cap.SHADOW_OPTIONS.join(" ")
+      + "; do printf \"$sep\"; hyprctl -j getoption \"$o\"; sep=,; done; printf ']'"]
     stdout: StdioCollector {
       id: askOut
       onStreamFinished: cap.answered(String(askOut.text || ""))
@@ -93,25 +98,39 @@ Scope {
 
   function answered(text) {
     const parts = text.split("@@");
-    let mons = [], clients = [], active = null;
+    let mons = [], clients = [], active = null, opts = [];
     try { mons = JSON.parse(parts[0]); } catch (e) {}
     try { clients = JSON.parse(parts[1]); } catch (e) {}
     try { active = JSON.parse(parts[2]); } catch (e) {}
+    try { opts = JSON.parse(parts[3]); } catch (e) {}
     const scr = cap.focusedScreen();
     const mon = mons.find(m => m.focused) || mons.find(m => scr && m.name === scr.name);
     if (!mon || !scr) { cap.busy = false; return; }
-    const file = Picasso.shotDir + "/" + Cap.fileName(new Date(), cap.wantMode, mon.name);
+    const plain = cap.wantMode === "window-plain";
+    const mode = plain ? "window" : cap.wantMode;
+    const file = Picasso.shotDir + "/" + Cap.fileName(new Date(), mode, mon.name);
 
     if (cap.wantMode === "screen") {
       cap.run("mkdir -p " + cap.sh(Picasso.shotDir) + " && grim -o " + cap.sh(mon.name)
               + " " + cap.sh(file), file);
       return;
     }
-    if (cap.wantMode === "window") {
+    // The window with the keyboard, the way macOS takes one: alone, corners
+    // rounded, its drop shadow on transparency (capture.js shadowCommand).
+    // `window-plain` keeps the rounding and leaves the shadow out.
+    if (mode === "window") {
       if (!active || !active.at || !active.size) { cap.busy = false; return; }
-      const g = active.at[0] + "," + active.at[1] + " " + active.size[0] + "x" + active.size[1];
-      cap.run("mkdir -p " + cap.sh(Picasso.shotDir) + " && grim -g " + cap.sh(g)
-              + " " + cap.sh(file), file);
+      const wm = mons.find(m => m.id === active.monitor) || mon;
+      const s = wm.scale > 0 ? wm.scale : 1;
+      cap.run(Cap.windowShotCommand({
+        dir: Picasso.shotDir, file: file,
+        raw: Paths.runtimeDir() + "/picasso-window-" + Date.now() + ".png",
+        helper: Quickshell.shellDir + "/picasso/bin/toplevel.py",
+        address: String(active.address || ""),
+        geo: active.at[0] + "," + active.at[1] + " " + active.size[0] + "x" + active.size[1],
+        spec: Cap.shadowSpec(opts, s, plain, (active.fullscreen || 0) > 0),
+        w: active.size[0] * s, h: active.size[1] * s
+      }), file);
       return;
     }
     // region: straight to the overlay — nothing is captured until Save

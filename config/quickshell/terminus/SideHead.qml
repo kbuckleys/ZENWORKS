@@ -178,6 +178,8 @@ Item {
     // evaluates this once before `term` arrives
     color: sideHead.ink
     font.family: Zenon.face
+    // The ONLY bold in a sidebar: the rows under it (SideRow, ShelfRow) sit
+    // at body weight (user, 2026-10-17)
     font.weight: Font.Bold
     font.pixelSize: Zenon.px(13)
     // Back with the capitals, and for them: tracking is what stops a run

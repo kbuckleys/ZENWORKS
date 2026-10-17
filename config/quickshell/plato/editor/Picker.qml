@@ -82,8 +82,8 @@ PlatoSheet {
   // an index of its own
   property var finder: null
   // the editor's face, for the preview
-  property string codeFamily: Zenon.faceFixed
-  property int codeWeight: Font.DemiBold
+  property string codeFamily: Zenon.faceCode
+  property int codeWeight: Zenon.codeWeight
   // what the palette has been used for: PlatoManager's used() / usageScore()
   property var history: null
 
@@ -799,7 +799,6 @@ PlatoSheet {
   ScrollRail {
     target: list
     anchors.right: list.right
-    anchors.rightMargin: 2
     anchors.top: list.top
     anchors.bottom: list.bottom
   }

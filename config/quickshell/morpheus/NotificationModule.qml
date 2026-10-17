@@ -29,7 +29,6 @@ Collapsible {
   // the right-click menu, which asks for the other state through the signals
   property bool silent: false
   property bool trackMusic: false
-  property bool hovered: false
 
   signal activated()
   signal cleared()
@@ -45,8 +44,7 @@ Collapsible {
 
     Item {
       id: iconBox
-      width: (root.hovered && root.unread > 0 ? countBox.implicitWidth : iconGlyph.implicitWidth) + Zenon.padModule * 2
-      Behavior on width { NumberAnimation { duration: 150; easing.type: Easing.OutQuad } }
+      width: iconGlyph.implicitWidth + Zenon.padModule * 2
       height: Zenon.slot
       anchors.verticalCenter: parent.verticalCenter
 
@@ -65,36 +63,6 @@ Collapsible {
         color: root.silent ? Zenon.muted : Zenon.yellow
         numeric: true
         font.pixelSize: Zenon.clockSize
-        // a silenced bell with nothing to count keeps its glyph under the pointer
-        opacity: !(root.hovered && root.unread > 0) ? 1 : 0
-        Behavior on opacity { NumberAnimation { duration: 150; easing.type: Easing.OutQuad } }
-      }
-
-      Item {
-        id: countBox
-        anchors.centerIn: parent
-        implicitWidth: Math.max(countGhost.implicitWidth, countLabel.implicitWidth)
-        implicitHeight: Zenon.slot
-
-        BarText {
-          id: countGhost
-          anchors.centerIn: parent
-          text: "8".repeat(Math.max(1, String(root.unread).length))
-          numeric: true
-          color: Zenon.trough(Zenon.yellow)
-          opacity: root.hovered && root.unread > 0 ? 1 : 0
-          Behavior on opacity { NumberAnimation { duration: 150; easing.type: Easing.OutQuad } }
-        }
-
-        BarText {
-          id: countLabel
-          anchors.centerIn: parent
-          text: String(root.unread)
-          numeric: true
-          color: Zenon.yellow
-          opacity: root.hovered && root.unread > 0 ? 1 : 0
-          Behavior on opacity { NumberAnimation { duration: 150; easing.type: Easing.OutQuad } }
-        }
       }
     }
   }
@@ -104,8 +72,6 @@ Collapsible {
     anchors.fill: parent
     hoverEnabled: true
     acceptedButtons: Qt.LeftButton | Qt.MiddleButton | Qt.RightButton
-    onEntered: root.hovered = true
-    onExited: root.hovered = false
     onClicked: (e) => {
       if (e.button === Qt.MiddleButton) root.cleared();
       else if (e.button === Qt.RightButton) menu.show();

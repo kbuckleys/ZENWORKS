@@ -309,8 +309,8 @@ Rectangle {
     // ── A LIST THIS LONG NEEDS TO SAY HOW LONG ───────────────────
     // Ninety-odd rows through a fourteen-row window, and the only thing
     // saying so was that the rows kept coming. The shared rail, placed the
-    // way every other rail in this window is placed — 2px in from the
-    // view it reports on, hidden outright when everything already fits,
+    // way every other rail in this window is placed — flush with the
+    // edge of the view it reports on, hidden outright when everything already fits,
     // which is what it does the moment a filter cuts the list to a page.
     //
     // It clears the key chips: they stop 16px from the card's edge and the
@@ -319,7 +319,6 @@ Rectangle {
       owner: term
       target: paletteList
       anchors.right: paletteList.right
-      anchors.rightMargin: 2
       anchors.top: paletteList.top
       anchors.topMargin: 2
       anchors.bottom: paletteList.bottom

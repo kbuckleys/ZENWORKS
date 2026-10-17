@@ -1848,7 +1848,7 @@ LayerPopup {
 
                 Rectangle {
                   anchors.fill: parent
-                  color: index === popup.sel ? Zenon.border : "transparent"
+                  color: index === popup.sel ? Zenon.menuHi : "transparent"
                 }
 
                 Row {
@@ -2940,8 +2940,8 @@ LayerPopup {
                   Rectangle {
                     anchors.fill: parent
                     visible: !modelData.head
-                    color: soundRow.selected ? Zenon.border
-                      : (rowHov.hovered ? Zenon.border : "transparent")
+                    color: soundRow.selected ? Zenon.menuHi
+                      : (rowHov.hovered ? Zenon.menuHi : "transparent")
                   }
                   HoverHandler { id: rowHov; enabled: !modelData.head }
 
@@ -3830,7 +3830,7 @@ LayerPopup {
       anchors.leftMargin: 12
       anchors.rightMargin: 12
       radius: 6
-      color: rowHover.hovered ? Zenon.border : Zenon.alpha(Zenon.border, 0)
+      color: rowHover.hovered ? Zenon.menuHi : Zenon.alpha(Zenon.menuHi, 0)
       Behavior on color { ColorAnimation { duration: Zenon.fast } }
     }
     HoverHandler { id: rowHover }

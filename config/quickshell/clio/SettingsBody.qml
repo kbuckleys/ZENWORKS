@@ -61,17 +61,6 @@ Column {
           }
           SettingLine {
             width: sb.colW
-            label: "Font"
-            note: "Written in, as it is shown"
-            Row {
-              spacing: 8
-              Text { anchors.verticalCenter: parent.verticalCenter; text: sb.mgr ? sb.mgr.faceFor(false) : ""; color: Zenon.ink; font.family: text; font.pixelSize: Zenon.px(15) }
-              DialogButton { visible: !!sb.mgr && sb.mgr.noteFace !== ""; label: "Default"; onClicked: sb.mgr.set("noteFace", "") }
-              DialogButton { visible: !!sb.mgr && !!sb.mgr.fontBook; label: "Choose…"; onClicked: { sb.closed(); sb.mgr.chooseFace(false); } }
-            }
-          }
-          SettingLine {
-            width: sb.colW
             label: "Templates"
             note: !sb.mgr || sb.mgr.templates.length === 0 ? "None yet — save one from a note's menu, or import one" : sb.mgr.templates.map((t) => t.name).join(", ")
             DialogButton { visible: !!sb.mgr && !!sb.mgr.fileManager; label: "Import…"; onClicked: { sb.closed(); sb.win.importTemplate(); } }
@@ -101,17 +90,6 @@ Column {
       width: sb.colW
       spacing: 14
           SideHead { width: sb.colW; ruled: false; label: "Journal" }
-          SettingLine {
-            width: sb.colW
-            label: "Font"
-            note: "Written in, as it is shown"
-            Row {
-              spacing: 8
-              Text { anchors.verticalCenter: parent.verticalCenter; text: sb.mgr ? sb.mgr.faceFor(true) : ""; color: Zenon.ink; font.family: text; font.pixelSize: Zenon.px(15) }
-              DialogButton { visible: !!sb.mgr && sb.mgr.journalFace !== ""; label: "Default"; onClicked: sb.mgr.set("journalFace", "") }
-              DialogButton { visible: !!sb.mgr && !!sb.mgr.fontBook; label: "Choose…"; onClicked: { sb.closed(); sb.mgr.chooseFace(true); } }
-            }
-          }
           SettingLine {
             width: sb.colW
             label: "Today's entry starts from"

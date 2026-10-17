@@ -149,6 +149,16 @@ Scope {
     mgr.pushTo = o;
     mgr.keep_();
   }
+  // KEPT IN SYNC (user, 2026-10-17): the repositories, by root, whose Push
+  // is a Sync — every remote fetched, branches brought level, pushed to
+  // each one behind (delphi/core repo.sync)
+  property var syncs: ({})
+  function setSync(root, on) {
+    const o = Object.assign({}, mgr.syncs);
+    if (on) o[root] = true; else delete o[root];
+    mgr.syncs = o;
+    mgr.keep_();
+  }
   // servers of your own (a self-hosted GitLab, a Forgejo or Gitea):
   // [{ kind, host, name }], laid into delphi.js' FORGES (D.setServers)
   property var servers: []
@@ -191,6 +201,7 @@ Scope {
       if (D.FORGES[st.forge]) mgr.forge = st.forge;
       if (st.stowTargets && typeof st.stowTargets === "object") mgr.stowTargets = st.stowTargets;
       if (st.pushTo && typeof st.pushTo === "object") mgr.pushTo = st.pushTo;
+      if (st.syncs && typeof st.syncs === "object") mgr.syncs = st.syncs;
     } catch (e) {}
   }
   function keep_() { keepTimer.restart(); }
@@ -198,7 +209,7 @@ Scope {
     id: keepTimer
     interval: 400
     onTriggered: stateFile.setText(JSON.stringify({
-      recents: mgr.recents, hidden: mgr.hidden, splits: mgr.splits, page: mgr.page, scanRoots: mgr.scanRoots, pullMode: mgr.pullMode, autoFetch: mgr.autoFetch, forge: mgr.forge, stowTargets: mgr.stowTargets, servers: mgr.servers, pushTo: mgr.pushTo }, null, 1))
+      recents: mgr.recents, hidden: mgr.hidden, splits: mgr.splits, page: mgr.page, scanRoots: mgr.scanRoots, pullMode: mgr.pullMode, autoFetch: mgr.autoFetch, forge: mgr.forge, stowTargets: mgr.stowTargets, servers: mgr.servers, pushTo: mgr.pushTo, syncs: mgr.syncs }, null, 1))
   }
   function set(key, value) {
     if (mgr[key] === value) return;

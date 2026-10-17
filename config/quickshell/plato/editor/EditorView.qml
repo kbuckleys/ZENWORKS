@@ -32,7 +32,7 @@ Item {
   // the window this view is in: the change bubble hangs from it
   property var hostWindow: null
   property int fontSize: 17
-  property string fontFamily: Zenon.faceFixed
+  property string fontFamily: Zenon.faceCode
   property int fontWeight: Font.DemiBold
   // the settings sheet's motion settings (core/Settings.qml)
   property bool cursorBreathes: true
@@ -792,6 +792,7 @@ Item {
   // | in normal mode: the file tree, shown or put away, as | does in terminus
   signal treeToggleRequested()
   signal settingsRequested()
+  signal newWindowRequested()
   // a right click: plato's context menu, at this point in the editor
   signal contextRequested(real x, real y)
   // Alt and a letter answers a question card first, if one has that choice
@@ -828,6 +829,10 @@ Item {
     }
     if (ctrl && event.key === Qt.Key_Comma) {
       view.settingsRequested(); event.accepted = true; return;
+    }
+    // ctrl shift n: another plato window, as a browser's
+    if (event.key === Qt.Key_N && m === (Qt.ControlModifier | Qt.ShiftModifier)) {
+      view.newWindowRequested(); event.accepted = true; return;
     }
     if (event.key === Qt.Key_P && m === (Qt.ControlModifier | Qt.ShiftModifier)) {
       view.pickerRequested("commands"); event.accepted = true; return;

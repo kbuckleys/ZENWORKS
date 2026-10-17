@@ -766,7 +766,8 @@ Variants {
             // of a long note sat on top of what you pull.
             Scrollbar {
               flick: bodyScroll
-              anchors.right: bodyScroll.right
+              // the card's edge, not the text's 10 in from it
+              anchors.right: parent.right
               anchors.top: bodyScroll.top
               anchors.bottom: bodyScroll.bottom
               anchors.bottomMargin: 26
@@ -862,7 +863,7 @@ Variants {
                   view: faceList
                   index: slot.faceSel
                   rowH: 26
-                  color: Zenon.wash(0.14)
+                  color: Zenon.menuHi
                 }
 
                 delegate: Item {

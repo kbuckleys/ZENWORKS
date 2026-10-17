@@ -100,7 +100,6 @@ Rectangle {
   Scrollbar {
     flick: flick
     anchors.right: parent.right
-    anchors.rightMargin: 2
     anchors.top: flick.top
     anchors.bottom: flick.bottom
   }

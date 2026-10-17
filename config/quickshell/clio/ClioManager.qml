@@ -650,8 +650,6 @@ Scope {
   property real textScale: 1
   // the typeface notes and journal entries are written in; "" is the
   // shell's own (Zenon.face), and follows it
-  property string noteFace: ""
-  property string journalFace: ""
   // ── SPELLING ── on unless turned off (user, 2026-10-17); the dictionaries
   // used ([] = the one for this machine's language)
   property bool spellOn: true
@@ -684,7 +682,7 @@ Scope {
     printErrors: false
   }
   readonly property var _keys: ["sort", "view", "groupByDate", "sinkChecked", "scope", "shut", "journalFilter",
-                                "textScale", "noteFace", "journalFace", "remind", "remindAt", "remindDays", "remindedOn", "told", "startWith", "lockAfter", "seen", "spellOn", "spellLangs", "journalBlur", "smartPunct"]
+                                "textScale", "remind", "remindAt", "remindDays", "remindedOn", "told", "startWith", "lockAfter", "seen", "spellOn", "spellLangs", "journalBlur", "smartPunct"]
   property bool _ready: false
   Component.onDestruction: if (keepTimer.running) mgr.keepNow()
   function readState() {
@@ -788,21 +786,16 @@ Scope {
     Ceres.searchPackages("hunspell");
   }
 
-  // the face a note or an entry is written in; `journal` for entries
-  function faceFor(journal) { return (journal ? mgr.journalFace : mgr.noteFace) || Zenon.face; }
-  // alexandria opened to choose it: for every note, every entry, or the
-  // one sticky (`n`, a note of kind "sticky" — its own face, as the board's
-  // Typeface sets it)
+  // the face a note or an entry is written in: the shell's, oracle's Font
+  // (2026-10-17 — clio's own Font settings for notes and the journal went:
+  // oracle is the one place a font is set). `journal` kept for the callers.
+  function faceFor(journal) { return Zenon.face; }
+  // alexandria opened to choose one sticky's own face (`n`, a note of kind
+  // "sticky", as the board's Typeface sets it) — the note's content
   function chooseFace(journal, n) {
-    if (!mgr.fontBook) return;
-    if (n && n.kind === "sticky") {
-      mgr.fontBook.pick({ title: "Font for this sticky", family: Clio.faceOf(n), weight: 400 },
-                        (family) => Clio.set(n.sticky, "face", family));
-      return;
-    }
-    const key = journal ? "journalFace" : "noteFace";
-    mgr.fontBook.pick({ title: journal ? "Font for the journal" : "Font for notes", family: mgr.faceFor(journal), weight: 400 },
-                      (family) => mgr.set(key, family));
+    if (!mgr.fontBook || !n || n.kind !== "sticky") return;
+    mgr.fontBook.pick({ title: "Font for this sticky", family: Clio.faceOf(n), weight: 400 },
+                      (family) => Clio.set(n.sticky, "face", family));
   }
 
   // ── THE JOURNAL'S REMINDER ─────────────────────────────────────────────

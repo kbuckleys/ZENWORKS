@@ -134,6 +134,134 @@ function windowsOn(clients, monitor, ws) {
   return out;
 }
 
+// ── the window's shadow ──────────────────────────────────────────────────
+// A window shot the way macOS takes one: the window alone (grim -T, its own
+// buffer), its corners rounded off, over a transparent canvas with its drop
+// shadow. Hyprland draws that shadow in the compositor, so no capture has
+// it — it is drawn again here, from hyprland's own settings and with its
+// own shader's arithmetic (render/shaders/glsl/shadow.glsl), so the shot
+// looks the way the window did on screen.
+
+// `hyprctl -j getoption` answers with the value under its type's name.
+function optionValue(o) {
+  if (!o) return undefined;
+  for (const k of ["int", "float", "vec2", "gradient", "str", "custom"])
+    if (o[k] !== undefined) return o[k];
+  return undefined;
+}
+
+// "7a000000 0deg" — a gradient's first stop, AARRGGBB — as 0..1 parts.
+function argbOf(text) {
+  const m = /^(?:0x)?([0-9a-f]{8})\b/i.exec(String(text || "").trim());
+  if (!m) return { r: 0, g: 0, b: 0, a: 0x7a / 255 };
+  const n = parseInt(m[1], 16);
+  return { a: ((n >>> 24) & 255) / 255, r: ((n >>> 16) & 255) / 255,
+           g: ((n >>> 8) & 255) / 255, b: (n & 255) / 255 };
+}
+
+// The shadow as hyprland would draw it, in the capture's pixels. `opts` is
+// the getoption answers, `scale` the monitor's. `plain` (or shadows off in
+// hyprland, or a fullscreen window) keeps the rounding and drops the shadow.
+const SHADOW_OPTIONS = ["decoration:rounding", "decoration:shadow:enabled",
+  "decoration:shadow:range", "decoration:shadow:render_power",
+  "decoration:shadow:offset", "decoration:shadow:color", "decoration:shadow:scale"];
+function shadowSpec(opts, scale, plain, fullscreen) {
+  const v = {};
+  for (const o of opts || []) if (o && o.option) v[o.option] = optionValue(o);
+  const s = scale > 0 ? scale : 1;
+  const num = (k, d) => (typeof v[k] === "number" ? v[k] : d);
+  const off = Array.isArray(v["decoration:shadow:offset"]) ? v["decoration:shadow:offset"] : [0, 0];
+  const on = !plain && !fullscreen && num("decoration:shadow:enabled", 1) !== 0;
+  return {
+    rounding: fullscreen ? 0 : Math.round(num("decoration:rounding", 0) * s),
+    range: on ? Math.round(num("decoration:shadow:range", 0) * s) : 0,
+    power: Math.max(1, Math.min(4, num("decoration:shadow:render_power", 3))),
+    ox: on ? Math.round(off[0] * s) : 0,
+    oy: on ? Math.round(off[1] * s) : 0,
+    color: argbOf(v["decoration:shadow:color"])
+  };
+}
+
+// Where things go on the canvas: the window, and the shadow — the window's
+// box grown by `range` on every side, then moved by the offset — with the
+// canvas just big enough for both.
+function shadowLayout(spec, w, h) {
+  const R = spec.range;
+  const wx = Math.max(0, R - spec.ox), wy = Math.max(0, R - spec.oy);
+  const sx = wx - R + spec.ox, sy = wy - R + spec.oy;
+  return { wx: wx, wy: wy, sx: sx, sy: sy,
+           cw: Math.max(wx + w, sx + w + 2 * R), ch: Math.max(wy + h, sy + h + 2 * R) };
+}
+
+// The shell that does it, with ImageMagick: "$1" the raw capture, "$2" the
+// shot. The shader's falloff — ((range − d) / range)^power, d how far past
+// the window's rounded edge — is worked out by -fx on one small tile only (a
+// window just big enough for its rounded corners, with its shadow round
+// it), and the tile is then cut nine ways and stretched: along an edge the
+// shadow does not change, so stretching it is exact. The whole canvas
+// through -fx took over a second for a large window.
+//
+// The corners are an honest rounded rectangle's. The shader measures them
+// from the window's square corner less the rounding, which leaves a faint
+// step where corner meets edge — invisible on a background, plain on the
+// flat transparency of a shot.
+function shadowCommand(spec, w, h) {
+  w = Math.max(1, Math.round(w)); h = Math.max(1, Math.round(h));
+  const R = spec.range;
+  const r = Math.max(0, Math.min(spec.rounding, Math.floor((Math.min(w, h) - 1) / 2)));
+  const L = shadowLayout(spec, w, h);
+  const at = (x, y) => (x < 0 ? "" : "+") + x + (y < 0 ? "" : "+") + y;
+  const mask = "\\( -size " + w + "x" + h + " xc:none -fill white -draw "
+    + "'roundrectangle 0,0 " + (w - 1) + "," + (h - 1) + " " + r + "," + r + "' \\)";
+  // the window, its corners rounded off
+  let cmd = "magick \"$1\" -alpha set -resize " + w + "x" + h + "! " + mask
+    + " -compose DstIn -composite -compose Over -write mpr:win +delete ";
+  if (R <= 0)
+    return cmd + "mpr:win \"$2\"";
+  const c = spec.color, k = (n) => +n.toFixed(4);
+  // The tile's window runs from K - r to E + r: its corners' centers at K
+  // and E, two pixels of straight edge between them — the strip that is
+  // stretched.
+  const K = R + r, E = K + 2;
+  const fx = "qx=max(0,max(" + K + "-i-0.5,i+0.5-" + E + "));"
+    + "qy=max(0,max(" + K + "-j-0.5,j+0.5-" + E + "));"
+    + "qd=max(0,hypot(qx,qy)-" + r + ");"
+    + "qd>=" + R + "?0:" + k(c.a) + "*pow((" + R + "-qd)/" + R + "," + spec.power + ")";
+  const rgb = "rgb(" + Math.round(c.r * 255) + "," + Math.round(c.g * 255) + "," + Math.round(c.b * 255) + ")";
+  cmd += "-size " + (2 * K + 2) + "x" + (2 * K + 2) + " 'xc:" + rgb + "' -alpha set -channel A -fx '"
+    + fx + "' +channel -write mpr:tile +delete ";
+  // the nine pieces: crop from the tile, stretch the middles
+  const mw = w - 2 * r, mh = h - 2 * r;
+  const piece = (cw, ch, x, y, tw, th) => "\\( mpr:tile -crop " + cw + "x" + ch + at(x, y)
+    + " +repage" + (tw ? " -scale " + tw + "x" + th + "!" : "") + " \\)";
+  const row = (y, ch, th) => "\\( " + piece(K, ch, 0, y, th ? K : 0, th) + " "
+    + piece(2, ch, K, y, mw, th || K) + " " + piece(K, ch, E, y, th ? K : 0, th) + " +append \\)";
+  cmd += "\\( " + row(0, K, 0) + " " + row(K, 2, mh) + " " + row(E, K, 0) + " -append \\) "
+    + "-write mpr:shadow +delete ";
+  // the canvas: the shadow, none of it under the window (the shader leaves
+  // the window's own box clear — it shows through a translucent one
+  // otherwise), then the window
+  return cmd + "-size " + L.cw + "x" + L.ch + " xc:none "
+    + "mpr:shadow -geometry " + at(L.sx, L.sy) + " -composite "
+    + mask + " -geometry " + at(L.wx, L.wy) + " -compose DstOut -composite "
+    + "mpr:win -geometry " + at(L.wx, L.wy) + " -compose Over -composite \"$2\"";
+}
+
+// morpheus Strings.shellQuote's body — this file cannot reach the singleton
+function quote(s) { return "'" + String(s == null ? "" : s).replace(/'/g, "'\\''") + "'"; }
+
+// The whole window shot as one shell line. The window's own buffer through
+// grim -T, its identifier found by `helper` (bin/toplevel.py) from hyprctl's
+// address; if that fails, the screen's rectangle as before (`geo`), which
+// has whatever is behind and over the window in it but is still a shot.
+// Then the rounding and the shadow, into `file`, and the raw capture gone.
+function windowShotCommand(o) {
+  return "mkdir -p " + quote(o.dir) + " && { id=$(python3 -I " + quote(o.helper) + " " + quote(o.address)
+    + ") && grim -T \"$id\" " + quote(o.raw) + " || grim -g " + quote(o.geo) + " " + quote(o.raw) + "; } && "
+    + "sh -c " + quote(shadowCommand(o.spec, o.w, o.h)) + " sh " + quote(o.raw) + " " + quote(o.file)
+    + "; s=$?; rm -f " + quote(o.raw) + "; exit $s";
+}
+
 // ── the color picker ─────────────────────────────────────────────────────
 // The schemes it can speak, in the order the wheel walks them.
 const SCHEMES = ["hex", "rgb", "hsl", "hsv", "oklch", "cmyk"];

@@ -34,6 +34,40 @@ module.exports = {
     t.eq("windows on this monitor, in its coordinates",
       C.windowsOn(cl, { x: 1080, y: 0 }, [1]), [{ x: 0, y: 10, w: 300, h: 200, title: "a" }]);
 
+    // the window's shadow, from hyprland's getoption answers
+    const opts = [{ option: "decoration:rounding", int: 5, set: true },
+                  { option: "decoration:shadow:enabled", int: 1, set: true },
+                  { option: "decoration:shadow:range", int: 70, set: true },
+                  { option: "decoration:shadow:render_power", int: 2, set: true },
+                  { option: "decoration:shadow:offset", vec2: [0, 10], set: true },
+                  { option: "decoration:shadow:color", gradient: "7a000000 0deg", set: true }];
+    const spec = C.shadowSpec(opts, 1, false, false);
+    t.eq("the shadow as hyprland draws it", [spec.rounding, spec.range, spec.power, spec.ox, spec.oy],
+      [5, 70, 2, 0, 10]);
+    t.eq("its color, AARRGGBB", Math.round(spec.color.a * 255), 0x7a);
+    t.eq("in the capture's pixels", C.shadowSpec(opts, 2, false, false).range, 140);
+    t.eq("plain: rounded, no shadow", [C.shadowSpec(opts, 1, true, false).rounding,
+      C.shadowSpec(opts, 1, true, false).range], [5, 0]);
+    t.eq("fullscreen: neither", [C.shadowSpec(opts, 1, false, true).rounding,
+      C.shadowSpec(opts, 1, false, true).range], [0, 0]);
+    t.eq("shadows off in hyprland", C.shadowSpec(opts.concat([{ option: "decoration:shadow:enabled", int: 0 }]),
+      1, false, false).range, 0);
+    t.eq("a color that will not parse falls back", C.argbOf("rgba(oops)").a, 0x7a / 255);
+    t.eq("the canvas fits the shadow pushed down", C.shadowLayout(spec, 100, 50),
+      { wx: 70, wy: 60, sx: 0, sy: 0, cw: 240, ch: 190 });
+    t.eq("no shadow, no margin", C.shadowLayout(C.shadowSpec(opts, 1, true, false), 100, 50),
+      { wx: 0, wy: 0, sx: 0, sy: 0, cw: 100, ch: 50 });
+    const sc = C.shadowCommand(spec, 100, 50);
+    t.has("the tile is the rounded window and its shadow", sc, "-size 152x152 ");
+    t.has("the edge strips stretch to the window less its corners", sc, "-scale 90x75!");
+    t.has("the canvas", sc, "-size 240x190 xc:none");
+    t.eq("plain is the rounding alone", C.shadowCommand(C.shadowSpec(opts, 1, true, false), 100, 50).indexOf("mpr:tile"), -1);
+    const wc = C.windowShotCommand({ dir: "/s", file: "/s/a b.png", raw: "/r/raw.png", helper: "/h/toplevel.py",
+      address: "0x1", geo: "1,1 100x50", spec: spec, w: 100, h: 50 });
+    t.has("its own buffer first", wc, "grim -T \"$id\" '/r/raw.png'");
+    t.has("the screen's rectangle if not", wc, "|| grim -g '1,1 100x50' '/r/raw.png'");
+    t.has("the raw capture gone either way", wc, "; s=$?; rm -f '/r/raw.png'; exit $s");
+
     t.eq("hex", C.format(255, 128, 0, "hex"), "#ff8000");
     t.eq("rgb", C.format(255, 128, 0, "rgb"), "rgb(255, 128, 0)");
     t.eq("hsl", C.format(255, 128, 0, "hsl"), "hsl(30, 100%, 50%)");

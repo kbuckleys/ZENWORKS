@@ -775,7 +775,7 @@ FocusScope {
       rowH: treeHost.rowH
       on: list.held || tree.flat.some((r) => r.e.path === tree.shownPath)
       // the theme's accent, as terminus' sidebar wears it (user, 2026-10-14)
-      color: Zenon.alpha(Zenon.cyan, 0.12)
+      color: Zenon.menuHi
     }
 
     delegate: EntryRow {

@@ -144,7 +144,31 @@ FloatingWindow {
   // With the setting on, every modified file with a name is written as the
   // window loses focus (silently: a new buffer has nowhere to go).
   readonly property bool focused: editor.Window.active
+  // ── WHICH WINDOW IS WHICH, TO HYPRLAND ────────────────────────────
+  // Every plato window is titled "plato" (the window rules match on it), so
+  // a focus by title picked any of them. Each notes its own address while it
+  // has the focus, and files opened from outside go to the plato window
+  // used last and focus that one (PlatoManager.open).
+  property string hyprAddress: ""
+  function noteAddress() {
+    const t = Hyprland.activeToplevel;
+    if (!win.focused || !t || t.title !== win.title) return;
+    const a = String(t.address || "").replace(/^0x/, "");
+    if (a !== "") win.hyprAddress = "0x" + a;
+  }
+  Connections {
+    target: Hyprland
+    function onActiveToplevelChanged() { win.noteAddress(); }
+  }
+  function raise() {
+    const sel = win.hyprAddress !== "" ? "address:" + win.hyprAddress : "title:^(" + win.title + ")$";
+    Hyprland.dispatch('hl.dsp.focus({ window = "' + sel + '" })');
+  }
   onFocusedChanged: {
+    if (win.focused) {
+      win.noteAddress();
+      if (win.mgr) win.mgr.noteFocus(win);
+    }
     if (!win.focused && win.settings && (win.settings.saveOnBlur || win.capture) && nvim.ready)
       nvim.cmd("silent! wall");
     // back from another window: did anything change on disk meanwhile?
@@ -573,6 +597,8 @@ FloatingWindow {
     file: () => st.file.replace(/^~/, Quickshell.env("HOME")),
     exec: (argv) => Quickshell.execDetached(argv),
     toggleTree: () => win.toggleTree(),
+    // another plato window, empty, beside this one (as SUPER+E is for terminus)
+    newWindow: () => { if (win.mgr) win.mgr.spawn(""); },
     // the tree out, and the file being edited found in it
     revealInTree: () => {
       if (win.mgr && !win.mgr.treeShown) win.mgr.setTree(true);
@@ -651,6 +677,7 @@ FloatingWindow {
     // | : show the tree and go to it; go to it; (from in it) put it away
     onTreeToggleRequested: win.toggleTree()
     onSettingsRequested: settingsSheet.open()
+    onNewWindowRequested: win.ctx.newWindow()
     onContextRequested: (x, y) => contextMenu.open(x, y)
     anchors.left: sidebarBox.right
     anchors.right: parent.right
@@ -669,8 +696,8 @@ FloatingWindow {
     stickyLeft: tabs.x
     fileDir: win.ctx.here()
     fontSize: win.fontSize
-    fontFamily: win.mgr ? win.mgr.fontFamily : Zenon.faceFixed
-    fontWeight: win.mgr ? win.mgr.fontWeight : Font.DemiBold
+    fontFamily: win.mgr ? win.mgr.fontFamily : Zenon.faceCode
+    fontWeight: win.mgr ? win.mgr.fontWeight : Zenon.codeWeight
     cursorBreathes: win.settings ? win.settings.cursorBreathes : true
     cursorGlides: win.settings ? win.settings.cursorGlides : true
     smoothScroll: win.settings ? win.settings.smoothScroll : true
@@ -1115,8 +1142,8 @@ FloatingWindow {
     client: nvim
     ctx: win.ctx
     finder: win.mgr ? win.mgr.finder : null
-    codeFamily: win.mgr ? win.mgr.fontFamily : Zenon.faceFixed
-    codeWeight: win.mgr ? win.mgr.fontWeight : Font.DemiBold
+    codeFamily: win.mgr ? win.mgr.fontFamily : Zenon.faceCode
+    codeWeight: win.mgr ? win.mgr.fontWeight : Zenon.codeWeight
     history: win.mgr
     face.family: Zenon.faceFixed
     face.pixelSize: win.chromeSize

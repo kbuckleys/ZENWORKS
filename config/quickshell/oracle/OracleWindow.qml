@@ -218,7 +218,7 @@ FloatingWindow {
   function openEnumMenu(key, at) {
     // the Font list asks fontconfig again as it opens: a face installed a
     // moment ago is in it (Oracle.scanFonts registers it with Qt too)
-    if (key === "fontFamily") Oracle.scanFonts();
+    if (Oracle.weightKeyOf[key]) Oracle.scanFonts();
     popup.enumShown = key;
     popup.enumKey = key;
     popup.enumAt = at;
@@ -239,14 +239,14 @@ FloatingWindow {
     if (!popup.fontBook) return;
     // the answer goes to Oracle, which outlives this window
     popup.fontBook.pick({
-      title: "Font for the shell",
+      title: key === "monoFamily" ? "Monospace font" : "Font for the shell",
       family: String(Oracle.get(key) || ""),
-      weight: Number(Oracle.fontWeight) || 400
+      weight: Number(Oracle.get(Oracle.weightKeyOf[key] || "fontWeight")) || 400
     }, (family, fcWeight) => {
       // fontconfig's weight of the style chosen, snapped to oracle's five
       Oracle.set(key, Ora.familyOf(family));
-      const w = key === "fontFamily" ? Ora.cssWeightOf(String(fcWeight)) : "";
-      if (w !== "") Oracle.set("fontWeight", w);
+      const w = Oracle.weightKeyOf[key] ? Ora.cssWeightOf(String(fcWeight)) : "";
+      if (w !== "") Oracle.set(Oracle.weightKeyOf[key], w);
       Oracle.scanFonts();
     });
   }
@@ -319,13 +319,13 @@ FloatingWindow {
       onStreamFinished: {
         // A face other than the shell's is kept exactly as picked: " Mono"
         // is part of the name of most monospaced families.
-        const fam = popup.fontKey === "fontFamily" ? Ora.familyOf(fontFamilyOut.text)
+        const fam = Oracle.weightKeyOf[popup.fontKey] ? Ora.familyOf(fontFamilyOut.text)
           : (String(fontFamilyOut.text || "").split("\n").map((l) => l.trim())
               .filter((l) => l !== "")[0] || "");
         if (fam === "") return;
         Oracle.set(popup.fontKey, fam);
         // the cut picked is the weight wanted (Zenon.weight)
-        if (popup.fontKey === "fontFamily") fontWeightProc.running = true;
+        if (Oracle.weightKeyOf[popup.fontKey]) fontWeightProc.running = true;
       }
     }
   }
@@ -336,7 +336,7 @@ FloatingWindow {
       waitForEnd: true
       onStreamFinished: {
         const w = Ora.cssWeightOf(fontWeightOut.text);
-        if (w !== "") Oracle.set("fontWeight", w);
+        if (w !== "" && Oracle.weightKeyOf[popup.fontKey]) Oracle.set(Oracle.weightKeyOf[popup.fontKey], w);
       }
     }
   }
@@ -1873,9 +1873,12 @@ FloatingWindow {
             // over it: a control sitting at the right edge of a row would
             // otherwise be under the thumb, and the sliders reach almost to
             // that edge. It is only there when there is something to scroll,
-            // and the margin goes with it.
+            // and the margin goes with it. The list itself still runs to the
+            // window's edge — each row is narrowed instead — so a monitor's
+            // band can reach under the bar; z keeps the bar over it.
             Scrollbar {
               id: scroller
+              z: 1
               flick: list
               anchors.right: parent.right
               anchors.top: confirmBar.bottom
@@ -1893,7 +1896,7 @@ FloatingWindow {
               anchors.left: parent.left
               anchors.top: confirmBar.bottom
               anchors.bottom: parent.bottom
-              anchors.right: scroller.scrollable ? scroller.left : parent.right
+              anchors.right: parent.right
               clip: true
               model: popup.rows
               visible: popup.rows.length > 0
@@ -1913,7 +1916,7 @@ FloatingWindow {
                 id: settingRow
                 required property var modelData
                 required property int index
-                width: list.width
+                width: scroller.scrollable ? scroller.x - list.x : list.width
                 height: settingRow.arrange ? popup.arrangeH
                   : popup.rowH + (settingRow.open ? foldBody.height : 0)
                 Behavior on height { NumberAnimation { duration: Zenon.menuFade; easing.type: Easing.OutCubic } }
@@ -1961,8 +1964,11 @@ FloatingWindow {
                 readonly property color accent: settingRow.monitorRow
                   ? Zenon[Oracle.displayAccent(settingRow.spec.monitor)] : "transparent"
 
+                // the band runs past the row, under the scroll bar, to the
+                // window's edge
                 Rectangle {
-                  anchors.fill: parent
+                  width: list.width
+                  height: parent.height
                   visible: settingRow.monitorHead
                   color: Qt.rgba(settingRow.accent.r, settingRow.accent.g, settingRow.accent.b, 0.10)
                 }

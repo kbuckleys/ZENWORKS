@@ -281,9 +281,11 @@ LayerPopup {
 
     function toggle() { popup.toggle(); }
     function rescan(): string { Picasso.scan(); return "scanning"; }
-    // capture: `shot screen`, `shot window`, `shot region`
+    // capture: `shot screen`, `shot window`, `shot window-plain` (no
+    // shadow), `shot region`
     function shot(mode: string): string {
-      if (["screen", "window", "region"].indexOf(mode) < 0) return "shot screen|window|region";
+      if (["screen", "window", "window-plain", "region"].indexOf(mode) < 0)
+        return "shot screen|window|window-plain|region";
       Picasso.shoot(mode);
       return mode;
     }
@@ -761,7 +763,7 @@ LayerPopup {
                 anchors.fill: parent
                 anchors.margins: 6
                 radius: 6
-                color: cell.selected ? Zenon.border : "transparent"
+                color: cell.selected ? Zenon.menuHi : "transparent"
               }
 
               Thumb {
@@ -874,7 +876,7 @@ LayerPopup {
                   anchors.fill: parent
                   anchors.margins: 4
                   radius: 6
-                  color: swCell.selected ? Zenon.border : "transparent"
+                  color: swCell.selected ? Zenon.menuHi : "transparent"
                 }
 
                 Rectangle {

@@ -673,7 +673,7 @@ LayerPopup {
                 anchors.fill: parent
                 anchors.margins: 2
                 radius: 6
-                color: index === popup.sel ? Zenon.alpha(Zenon.red, 0.3) : "transparent"
+                color: index === popup.sel ? Zenon.menuHi : "transparent"
               }
 
               Text {
@@ -778,7 +778,7 @@ LayerPopup {
                   Rectangle {
                     anchors.fill: parent
                     color: popup.formatSel === index
-                      ? Zenon.alpha(Zenon.red, 0.3) : "transparent"
+                      ? Zenon.menuHi : "transparent"
                   }
 
                   Text {

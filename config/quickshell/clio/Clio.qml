@@ -139,15 +139,16 @@ Singleton {
   // restart. Held here rather than per note: one list for the whole wall,
   // not one per note per screen. Opened from the head's face mark or from
   // the note's right-click menu.
-  // A note's own default (user, 2026-10-08): SF Pro Display SemiBold, not
-  // the shell's face. A note set in a face of its own keeps that face at
-  // the weight it always had.
-  readonly property string defaultFace: "SF Pro Display"
+  // A note's default is the shell's face and weight — oracle's Font, the
+  // one place a font is set (user, 2026-10-17; it was SF Pro Display
+  // SemiBold of its own). A note set in a face of its own keeps that face
+  // at the weight it always had: that is the note's content, not a setting.
+  readonly property string defaultFace: Zenon.face
   function faceOf(note) {
     return note && note.face ? note.face : root.defaultFace;
   }
   function weightOf(note) {
-    return note && note.face ? Font.Normal : Font.DemiBold;
+    return note && note.face ? Font.Normal : Zenon.weight;
   }
 
   property var families: []

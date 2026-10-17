@@ -386,14 +386,15 @@ LayerPopup {
 
         ListView {
           id: list
-          // terminus' scrollbar — see morpheus/ScrollRail. Parented to the view
-          // itself, so in a Flickable it stays put instead of scrolling away.
+          // terminus' scrollbar — see morpheus/ScrollRail. Parented out of the view
+          // (to the body), so it stays put instead of scrolling away.
           ScrollRail {
             target: list
-            parent: list
+            // Against the card's edge, not the list's 16 in from it.
+            parent: body
             anchors.right: parent.right
-            anchors.top: parent.top
-            anchors.bottom: parent.bottom
+            anchors.top: list.top
+            anchors.bottom: list.bottom
           }
           ElasticScroll { view: list }
           anchors.fill: parent

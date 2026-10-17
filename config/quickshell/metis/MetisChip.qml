@@ -20,6 +20,9 @@ Rectangle {
   property bool sel: false
   // a kept answer pinned to the front of the row (ctrl+p)
   property bool pinned: false
+  // what it is, before what it says — a currency's sign, a kept answer's
+  // kind (metis.js glyphFor / moneyGlyph); none when empty
+  property string glyph: ""
   property int order: 0
   // the pointer is on it — for the bubble that says more (MetisPopup)
   readonly property bool hovered: hover.containsMouse
@@ -62,6 +65,17 @@ Rectangle {
       font.family: Zenon.face
       font.weight: Zenon.weight
       font.pixelSize: Zenon.px(12)
+    }
+
+    Text {
+      anchors.verticalCenter: parent.verticalCenter
+      visible: chip.glyph !== ""
+      text: chip.glyph
+      color: chip.sel ? Zenon.blue : Zenon.muted
+      Behavior on color { ColorAnimation { duration: Zenon.fast } }
+      font.family: Zenon.face
+      font.weight: 500
+      font.pixelSize: Zenon.px(14)
     }
 
     Text {

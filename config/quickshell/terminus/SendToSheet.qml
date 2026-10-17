@@ -974,7 +974,6 @@ Rectangle {
       owner: term
       target: sendToList
       anchors.right: sendToList.right
-      anchors.rightMargin: 2
       anchors.top: sendToList.top
       anchors.topMargin: 2
       anchors.bottom: sendToList.bottom

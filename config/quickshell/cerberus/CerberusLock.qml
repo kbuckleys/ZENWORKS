@@ -24,6 +24,7 @@ import QtQuick.Window
 import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
+import Quickshell.Hyprland
 import Quickshell.Services.Pam
 import Quickshell.Widgets
 import "../morpheus"
@@ -81,7 +82,12 @@ Scope {
       + ", passes = " + passes + " } } })\"";
   }
 
+  // whether the raise is owed: a `hyprctl reload` (ThemeSync's phase change,
+  // Oracle) puts base.lua's everyday blur back under a standing lock
+  property bool frosted: false
+
   function frost(on) {
+    root.frosted = on;
     const f = Strings.shellQuote(root.blurSave);
     const opt = (o) => "$(hyprctl getoption decoration:blur:" + o + " | awk 'NR==1{print $2}')";
     const script = on
@@ -93,7 +99,27 @@ Scope {
   }
 
   // the restore a lock that never finished still owes
-  Component.onCompleted: root.frost(false)
+  // (and the zoom it parked)
+  Component.onCompleted: {
+    root.frost(false);
+    root.zoom(false);
+  }
+
+  Connections {
+    target: Hyprland
+    function onRawEvent(ev) {
+      if (ev.name === "configreloaded" && root.frosted) root.frost(true);
+    }
+  }
+
+  // ── HYPR ZOOM PARKED WHILE LOCKED ─────────────────────────────────────
+  // cursor:zoom_factor magnifies the whole output, the lock with it. The
+  // lock parks it (zoom.lua remembers the level) as the veil comes in and
+  // hands it back as the veil goes out. Guarded: zoom.lua may not be loaded.
+  function zoom(park) {
+    const fn = park ? "zoom_park" : "zoom_unpark";
+    Quickshell.execDetached(["hyprctl", "-q", "eval", "if " + fn + " then " + fn + "() end"]);
+  }
 
   //   input-field { font_color / check_color / fail_color = rgba(223,223,221,1) }
   readonly property color fg: Zenon.white
@@ -233,6 +259,7 @@ Scope {
       root.veilPainted = ({});
       root.jump("veil", 1);
       root.frost(false);
+      root.zoom(false);
       handOff.restart();
     }
   }
@@ -479,6 +506,7 @@ Scope {
     // asked before the lock was even up: just bring the desktop back
     if (root.stage === "dimming") {
       dimDone.stop();
+      root.zoom(false);
       root.pollUptime = false;
       root.stage = "clearing";
       root.veil = 0;
@@ -715,6 +743,7 @@ Scope {
       handOff.stop();
       root.jump("veil", 0);
       root.frost(true);
+      root.zoom(true);
       root.phase = "input";
       root.stage = "up";
       root.curtain = 0;
@@ -729,6 +758,7 @@ Scope {
     root.covering = true;
     root.stage = "dimming";
     root.veil = 1;
+    root.zoom(true);
     dimDone.restart();
   }
 

@@ -30,7 +30,7 @@ Item {
   property var got: null
   property bool loading: false
   property string failed: ""
-  readonly property string codeFace: bv.win && bv.win.mgr.editor && bv.win.mgr.editor.fontFamily ? bv.win.mgr.editor.fontFamily : Zenon.faceFixed
+  readonly property string codeFace: Zenon.faceCode
   // the oldest and newest change in the file: the bar's brightness between
   readonly property var span: {
     if (!bv.got) return [0, 1];
@@ -115,7 +115,7 @@ Item {
       height: view.rowH
       Rectangle {
         anchors.fill: parent
-        color: ln.index === bv.line - 1 ? Zenon.alpha(Zenon.cyan, 0.12) : "transparent"
+        color: ln.index === bv.line - 1 ? Zenon.menuHi : "transparent"
       }
       // the bar: brighter the newer
       Rectangle {

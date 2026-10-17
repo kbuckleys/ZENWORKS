@@ -32,7 +32,7 @@ Rectangle {
   // the terminus window (`term`, never `root` — see terminus-split notes)
   property var term: null
   // the cursor's fill: delphi's hiFill (and alexandria's)
-  readonly property color hiFill: term ? term.hiFill : Zenon.alpha(Zenon.cyan, 0.12)
+  readonly property color hiFill: term ? term.hiFill : Zenon.menuHi
   // while Hyprland resizes the window for it, the sidebar is whatever
   // the window has gained (see sideKeepW); otherwise it slides on its own
   width: term.sideKeepW >= 0

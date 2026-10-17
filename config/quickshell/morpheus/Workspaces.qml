@@ -60,6 +60,24 @@ Item {
     return sw.focused === true;
   }
 
+  // A window in the special workspace asking for attention. It has no number
+  // to light, so the whole workspace area blinks instead — shell.qml paints
+  // it at bg level, over the special wash (specialUrgentWash), off this
+  // value. Same two flashes and rest as a numbered workspace's urgentWash.
+  readonly property bool specialUrgent: root.specialWorkspace !== null
+    && root.specialWorkspace.urgent === true && !root.specialFocused
+  property real specialFlash: 0
+  SequentialAnimation on specialFlash {
+    running: root.specialUrgent
+    loops: Animation.Infinite
+    NumberAnimation { to: 1; duration: 60; easing.type: Easing.OutQuad }
+    NumberAnimation { to: 0; duration: 120; easing.type: Easing.InQuad }
+    NumberAnimation { to: 1; duration: 60; easing.type: Easing.OutQuad }
+    NumberAnimation { to: 0; duration: 120; easing.type: Easing.InQuad }
+    PauseAnimation { duration: 640 }
+  }
+  onSpecialUrgentChanged: if (!root.specialUrgent) root.specialFlash = 0
+
   // ── tray ────────────────────────────────────────────────────────────────
   readonly property var trayItems: {
     const vals = SystemTray.items.values;

@@ -2909,29 +2909,13 @@ FloatingWindow {
   property var previewTree: []
 
   property string previewText: ""
-  // ── TEXT PREVIEWS ARE SET IN PLATO'S FACE ───────────────────────────
+  // ── TEXT PREVIEWS ARE SET IN THE CODE FACE ──────────────────────────
   // The column preview and quick look show a file's text as plato would:
-  // its typeface and weight (plato/core/Settings, kept in plato.json in
-  // this shell's state — plato itself is loaded only while open). Its
-  // defaults when plato has never saved one: SF Mono, SemiBold.
-  property string codeFamily: "SF Mono"
-  property int codeWeight: Font.DemiBold
+  // oracle's Monospace font and its weight (Zenon.faceCode).
+  readonly property string codeFamily: Zenon.faceCode
+  readonly property int codeWeight: Zenon.codeWeight
   // cached previews carry the face in their markup: a new one reads afresh
   onCodeFamilyChanged: root.previewCache = ({})
-  FileView {
-    path: Quickshell.statePath("plato.json")
-    watchChanges: true
-    blockLoading: true
-    printErrors: false
-    onFileChanged: reload()
-    onLoaded: {
-      let j = {};
-      try { j = JSON.parse(text()) || {}; } catch (e) {}
-      root.codeFamily = j.fontFamily || "SF Mono";
-      root.codeWeight = ({ regular: Font.Normal, medium: Font.Medium, semibold: Font.DemiBold,
-                           bold: Font.Bold })[j.fontWeight || "semibold"] || Font.DemiBold;
-    }
-  }
 
 
   // The cache is tried SYNCHRONOUSLY, before the debounce. A row you have
@@ -3926,7 +3910,7 @@ FloatingWindow {
   readonly property real glassVeil: 0.6
   // THE CURSOR'S FILL, one tint for the sidebar and the listings (user,
   // 2026-10-17: the lists' gray bar did not match the sidebar's)
-  readonly property color hiFill: Zenon.alpha(Zenon.cyan, 0.12)
+  readonly property color hiFill: Zenon.menuHi
   function edgeStrength(base) { return base * (1 - Math.max(root.sheetInk, root.glassInk)); }
   // The card's frost starts full at the seam (Sheet.seamFrost): above the
   // seam is stripFrost, the same glass, whenever a sheet is up at all.
