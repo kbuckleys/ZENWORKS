@@ -31,6 +31,7 @@
 import QtQuick
 import Quickshell
 import "../morpheus"
+import "../morpheus/undo"
 import "capture.js" as Cap
 import "viewer.js" as V
 
@@ -54,7 +55,7 @@ Item {
 
   // ── what is drawn ────────────────────────────────────────────────
   property var marks: []
-  property var undone: []
+  UndoStack { id: history }
   property var live: null
   property bool dirty: false
   property int nextNumber: 1
@@ -131,18 +132,14 @@ Item {
   Timer { id: glideOff; interval: Zenon.slow + 60; onTriggered: ann.glide = false }
 
   function commit(m) {
-    const next = ann.marks.slice();
-    next.push(m);
-    ann.marks = next;
-    ann.undone = [];
+    history.record(ann.marks);
+    ann.marks = ann.marks.concat([m]);
     ann.dirty = true;
     done.requestPaint();
   }
   function undo() {
-    if (ann.marks.length === 0) return;
-    const m = ann.marks.slice(), u = ann.undone.slice();
-    u.push(m.pop());
-    ann.marks = m; ann.undone = u; ann.dirty = true;
+    if (!history.canUndo) return;
+    ann.marks = history.undo(ann.marks); ann.dirty = true;
     ann.afterStep();
   }
   function afterStep() {
@@ -152,10 +149,8 @@ Item {
     done.requestPaint();
   }
   function redo() {
-    if (ann.undone.length === 0) return;
-    const m = ann.marks.slice(), u = ann.undone.slice();
-    m.push(u.pop());
-    ann.marks = m; ann.undone = u; ann.dirty = true;
+    if (!history.canRedo) return;
+    ann.marks = history.redo(ann.marks); ann.dirty = true;
     ann.afterStep();
   }
   function renumber() {
@@ -625,7 +620,7 @@ Item {
           model: [["", "undo"], ["", "redo"]]
           delegate: Rectangle {
             required property var modelData
-            readonly property bool can: modelData[1] === "undo" ? ann.marks.length > 0 : ann.undone.length > 0
+            readonly property bool can: modelData[1] === "undo" ? history.canUndo : history.canRedo
             width: 32; height: 32; radius: Zenon.windowRadius
             color: urMa.containsMouse && can ? Zenon.wash(0.06) : "transparent"
             Text {

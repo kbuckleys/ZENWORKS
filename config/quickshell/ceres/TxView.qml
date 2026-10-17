@@ -102,7 +102,7 @@ Item {
       return true;
     }
     function toClipboard(t) {
-      Quickshell.execDetached(["sh", "-c", "printf '%s' \"$1\" | wl-copy", "_", t]);
+      Strings.copy(t);
       copied.restart();
     }
 

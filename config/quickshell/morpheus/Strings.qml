@@ -3,7 +3,8 @@
 // └─┘└─┘┘└┘└┴┘└─┘┴└─┴ ┴└─┘
 // https://github.com/kbuckleys/
 //
-// STRINGS — the two string functions every layer needed a copy of.
+// STRINGS — the string functions every layer needed a copy of, and the
+// clipboard as text.
 //
 // shellQuote had ten identical definitions and escapeHtml nine, one per
 // layer's own .js. Nineteen copies of six lines, and two of them had already
@@ -25,6 +26,8 @@
 pragma Singleton
 
 import QtQuick
+import Quickshell
+import Quickshell.Io
 import "."
 
 QtObject {
@@ -63,5 +66,32 @@ QtObject {
   function escapeHtml(s) {
     return String(s ?? "")
       .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+
+  // THE CLIPBOARD, as text. copy hands it to wl-copy as an argument, never
+  // spliced into the shell line. paste asks Quickshell first; on Wayland that
+  // read can come back empty while another client owns the clipboard (a token
+  // copied in the browser, 2026-10-11) — then wl-paste is asked, and `done`
+  // gets its answer later. One read at a time: a second paste while wl-paste
+  // is out replaces the first one's `done`.
+  function copy(t) {
+    Quickshell.execDetached(["sh", "-c", "printf '%s' \"$1\" | wl-copy >/dev/null 2>&1", "_", String(t ?? "")]);
+  }
+  function paste(done) {
+    const t = String(Quickshell.clipboardText || "");
+    if (t !== "") { done(t); return; }
+    pasteProc.done = done;
+    if (!pasteProc.running) pasteProc.running = true;
+  }
+  property Process pasteProc: Process {
+    property var done: null
+    command: ["wl-paste", "--no-newline", "--type", "text/plain"]
+    stdout: StdioCollector {
+      onStreamFinished: {
+        const f = pasteProc.done;
+        pasteProc.done = null;
+        if (f && text !== "") f(String(text));
+      }
+    }
   }
 }

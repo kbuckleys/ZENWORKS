@@ -469,17 +469,32 @@ FloatingWindow {
     && (win.img.implicitWidth >= win.capPx || win.img.implicitHeight >= win.capPx)
   property var natDims: ({})
   readonly property var natNow: win.capped ? (win.natDims[win.path] || null) : null
-  onCappedChanged: if (win.capped && !(win.path in win.natDims)) win.askNat(win.path)
+  // Asked on the PATH too: two big pictures both decode exactly capPx wide,
+  // so a step from one to another already cached never changes `capped`,
+  // and the second waited for its size for ever — a blank stage, "random"
+  // as the read-ahead had or had not decoded it yet.
+  onCappedChanged: win.wantNat()
+  onPathChanged: win.wantNat()
+  function wantNat() {
+    if (win.capped && !(win.path in win.natDims)) win.askNat(win.path);
+  }
   function askNat(p) {
-    if (natProc.running) { natProc.again = true; return; }
+    // one at a time; the answer in flight asks again for a newer path
+    if (natProc.running) return;
     natProc.forPath = p;
+    natProc.heard = false;
     natProc.command = ["magick", "identify", "-ping", "-format", "%w %h %[EXIF:Orientation]\\n", p + "[0]"];
     natProc.running = true;
   }
   Process {
     id: natProc
     property string forPath: ""
-    property bool again: false
+    // the answer is kept (forPath names it till then); with the exit too,
+    // the next path may be asked
+    property bool heard: false
+    function follow() {
+      if (!natProc.running && natProc.heard && natProc.forPath !== win.path) win.wantNat();
+    }
     stdout: StdioCollector {
       waitForEnd: true
       onStreamFinished: {
@@ -494,9 +509,11 @@ FloatingWindow {
           next[natProc.forPath] = { w: win.img.implicitWidth, h: win.img.implicitHeight };
         }
         win.natDims = next;
+        natProc.heard = true;
+        Qt.callLater(natProc.follow);
       }
     }
-    onExited: if (natProc.again) { natProc.again = false; if (win.capped && !(win.path in win.natDims)) win.askNat(win.path); }
+    onExited: Qt.callLater(natProc.follow)
   }
   // Zoomed past what the decode holds: the whole file, over it. Latched for
   // the picture, so zooming back out does not throw the decode away.

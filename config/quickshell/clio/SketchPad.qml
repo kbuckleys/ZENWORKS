@@ -14,6 +14,7 @@
 
 import QtQuick
 import "../morpheus"
+import "../morpheus/undo"
 import "notes.js" as N
 
 Item {
@@ -22,7 +23,7 @@ Item {
   signal finished(var strokes, bool ok)
 
   property var strokes: []
-  property var undone: []
+  UndoStack { id: history }
   property var live: null
   property string pen: "ink"
   property real width_: 0.006
@@ -34,7 +35,7 @@ Item {
 
   function begin(strokes) {
     pad.strokes = (strokes || []).map((s) => Object.assign({}, s));
-    pad.undone = [];
+    history.clear();
     pad.live = null;
     pad.erasing = false;
     paper.requestPaint();
@@ -43,8 +44,11 @@ Item {
     paper.requestPaint();
     Qt.callLater(() => { paper.save(path); done(); });
   }
-  function undo() { if (pad.strokes.length === 0) return; pad.undone = pad.undone.concat([pad.strokes[pad.strokes.length - 1]]); pad.strokes = pad.strokes.slice(0, -1); paper.requestPaint(); }
-  function redo() { if (pad.undone.length === 0) return; pad.strokes = pad.strokes.concat([pad.undone[pad.undone.length - 1]]); pad.undone = pad.undone.slice(0, -1); paper.requestPaint(); }
+  // every change to the strokes is a step: a stroke, an erase, a clear
+  // (one drag of the eraser is one step, however many strokes it takes)
+  function change(next, joins) { history.record(pad.strokes, joins); pad.strokes = next; paper.requestPaint(); }
+  function undo() { if (!history.canUndo) return; pad.strokes = history.undo(pad.strokes); paper.requestPaint(); }
+  function redo() { if (!history.canRedo) return; pad.strokes = history.redo(pad.strokes); paper.requestPaint(); }
   function key(e) {
     const ctrl = e.modifiers & Qt.ControlModifier, shift = e.modifiers & Qt.ShiftModifier;
     if (ctrl && e.key === Qt.Key_Z && !shift) { pad.undo(); return true; }
@@ -98,9 +102,9 @@ Item {
     Item { width: 10; height: 1 }
     DialogButton { anchors.verticalCenter: parent.verticalCenter; glyph: true; label: "\u{F0652}"; ink: pad.marker ? Zenon.yellow : Zenon.accentMuted; onClicked: { pad.marker = !pad.marker; pad.erasing = false; } }
     DialogButton { anchors.verticalCenter: parent.verticalCenter; glyph: true; label: "\u{F01FE}"; ink: pad.erasing ? Zenon.red : Zenon.accentMuted; onClicked: pad.erasing = !pad.erasing }
-    DialogButton { anchors.verticalCenter: parent.verticalCenter; glyph: true; label: ""; ready: pad.strokes.length > 0; onClicked: pad.undo() }
-    DialogButton { anchors.verticalCenter: parent.verticalCenter; glyph: true; label: ""; ready: pad.undone.length > 0; onClicked: pad.redo() }
-    DialogButton { anchors.verticalCenter: parent.verticalCenter; label: "Clear"; ready: pad.strokes.length > 0; onClicked: { pad.undone = pad.strokes.slice().reverse(); pad.strokes = []; paper.requestPaint(); } }
+    DialogButton { anchors.verticalCenter: parent.verticalCenter; glyph: true; label: ""; ready: history.canUndo; onClicked: pad.undo() }
+    DialogButton { anchors.verticalCenter: parent.verticalCenter; glyph: true; label: ""; ready: history.canRedo; onClicked: pad.redo() }
+    DialogButton { anchors.verticalCenter: parent.verticalCenter; label: "Clear"; ready: pad.strokes.length > 0; onClicked: pad.change([]) }
   }
   Row {
     anchors.right: parent.right
@@ -147,12 +151,16 @@ Item {
       cursorShape: pad.erasing ? Qt.PointingHandCursor : Qt.CrossCursor
       preventStealing: true
       function at(m) { return [m.x / board.width, m.y / board.width]; }
+      property bool erasedThisDrag: false
       function erase(m) {
         const p = at(m), r = 10 / board.width;
         const keep = pad.strokes.filter((s) => !(s.p || []).some((q) => Math.abs(q[0] - p[0]) < r && Math.abs(q[1] - p[1]) < r));
-        if (keep.length !== pad.strokes.length) { pad.undone = []; pad.strokes = keep; paper.requestPaint(); }
+        if (keep.length === pad.strokes.length) return;
+        pad.change(keep, erasedThisDrag);
+        erasedThisDrag = true;
       }
       onPressed: (m) => {
+        erasedThisDrag = false;
         if (pad.erasing) { erase(m); return; }
         pad.live = { c: pad.pen, w: pad.marker ? Math.max(0.02, pad.width_ * 3) : pad.width_, hl: pad.marker, p: [at(m)] };
         paper.requestPaint();
@@ -168,9 +176,7 @@ Item {
         const s = pad.live;
         s.p = N.thin(s.p, 1.5 / board.width);
         pad.live = null;
-        pad.strokes = pad.strokes.concat([s]);
-        pad.undone = [];
-        paper.requestPaint();
+        pad.change(pad.strokes.concat([s]));
       }
     }
   }

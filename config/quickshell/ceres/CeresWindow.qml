@@ -26,6 +26,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import "../morpheus"
+import "../morpheus/undo"
 import "../terminus" as Term
 import "."
 import "ceres.js" as Cer
@@ -501,8 +502,9 @@ FloatingWindow {
   // anywhere, always — so there was no "in" to step out of, and Esc had to
   // pick between the text and the marks. It picked the marks, and a filter
   // you only meant to change cost everything chosen through it. Now Esc
-  // leaves the field first, text kept; out of it space marks, j k move and
-  // `/` goes back in; and only then does Esc clear the text, then the marks.
+  // clears the text first and keeps you in the field, then the marks, then
+  // leaves the field (escStep); out of it space marks, j k move and `/` goes
+  // back in.
   property bool typing: false
   // the Store's search — see StoreView.query
   readonly property string squery: win.sharedQuery
@@ -515,8 +517,89 @@ FloatingWindow {
   }
   // One place typing is understood, for every tab that filters. Returns
   // whether the key was a filter key.
+  // THE FIELD'S CLIPBOARD (user, 2026-10-18): cut, copy, paste and select
+  // all, for the keys and for the field's right-click menu alike. There is no
+  // caret to place, so a selection is all or nothing: ctrl+a takes the whole
+  // text, and what is typed or pasted next replaces it. Anything else that
+  // changes the text, or leaving the field, lets it go.
+  property bool allSelected: false
+  onFilterTextChanged: win.allSelected = false
+  onTypingChanged: if (!win.typing) win.allSelected = false
+  function fieldSelectAll() {
+    win.typing = true;
+    win.allSelected = win.filterText !== "";
+  }
+  function fieldCopy() {
+    if (win.filterText !== "") Strings.copy(win.filterText);
+  }
+  function fieldCut() {
+    if (win.filterText === "") return;
+    Strings.copy(win.filterText);
+    win.typing = true;
+    win.setFilter("");
+  }
+  // one line of it, as typing would have left it — printable, single-spaced
+  function fieldPaste() {
+    const base = win.allSelected ? "" : win.filterText;
+    Strings.paste(t => {
+      const add = t.replace(/[^\x20-\x7e]+/g, " ");
+      win.typing = true;
+      win.setFilter((base + add).replace(/^ +/, "").replace(/ {2,}/g, " "));
+    });
+  }
+  // UNDO AND REDO (user, 2026-10-18), morpheus' UndoStack: every change to
+  // the text is a step — typed, pasted, cut, cleared, or set by Ceres itself
+  // (a name looked up) — except that letters typed one after another are one
+  // step, as in any text field, ended by a space or any other change.
+  UndoStack { id: fieldHistory; limit: 100 }
+  property string fieldLast: ""
+  property bool fieldReplaying: false
+  onSharedQueryChanged: {
+    const now = win.sharedQuery, was = win.fieldLast;
+    win.fieldLast = now;
+    if (win.fieldReplaying) return;
+    fieldHistory.record(was, now.length === was.length + 1 && now.startsWith(was) && !now.endsWith(" "));
+  }
+  function fieldReplay(t) {
+    if (t === undefined) return;
+    win.fieldReplaying = true;
+    win.typing = true;
+    win.setFilter(t);
+    win.fieldReplaying = false;
+  }
+  function fieldUndo() { win.fieldReplay(fieldHistory.undo(win.sharedQuery)); }
+  function fieldRedo() { win.fieldReplay(fieldHistory.redo(win.sharedQuery)); }
+
+  function openFieldMenu(x, y) {
+    win.typing = true;
+    fieldMenu.open(x, y, [
+      { text: "Undo", icon: "\u{F054C}", mark: "ctrl z", enabled: fieldHistory.canUndo, run: win.fieldUndo },
+      { text: "Redo", icon: "\u{F044E}", mark: "ctrl y", enabled: fieldHistory.canRedo, run: win.fieldRedo },
+      { isSeparator: true },
+      { text: "Cut", icon: "\u{F0190}", mark: "ctrl x", enabled: win.filterText !== "", run: win.fieldCut },
+      { text: "Copy", icon: "\u{F018F}", mark: "ctrl c", enabled: win.filterText !== "", run: win.fieldCopy },
+      { text: "Paste", icon: "\u{F0192}", mark: "ctrl v", run: win.fieldPaste },
+      { text: "Select all", icon: "\u{F0486}", mark: "ctrl a", enabled: win.filterText !== "", run: win.fieldSelectAll }
+    ]);
+  }
+
   function filterKey(event) {
     const k = event.key, ctrl = event.modifiers & Qt.ControlModifier;
+    // from in or out of the field (a job's log has its own ctrl+c)
+    if (event.matches(StandardKey.Paste)) { win.fieldPaste(); return true; }
+    if (event.matches(StandardKey.Copy)) { win.fieldCopy(); return true; }
+    if (event.matches(StandardKey.Cut)) { win.fieldCut(); return true; }
+    // ctrl+y and ctrl+shift+z both redo, whatever the platform's own says
+    if (ctrl && (k === Qt.Key_Y || (k === Qt.Key_Z && (event.modifiers & Qt.ShiftModifier)))) { win.fieldRedo(); return true; }
+    if (ctrl && k === Qt.Key_Z) { win.fieldUndo(); return true; }
+    if (win.typing && event.matches(StandardKey.SelectAll)) { win.fieldSelectAll(); return true; }
+    // the whole text selected: backspace takes it, a letter replaces it
+    if (win.allSelected) {
+      win.allSelected = false;
+      if (k === Qt.Key_Backspace) { win.setFilter(""); return true; }
+      if (event.text && !ctrl && !(event.modifiers & Qt.MetaModifier)
+          && /^[\x21-\x7e]$/.test(event.text)) { win.setFilter(event.text); return true; }
+    }
     if (!win.typing) {
       // terminus' "go to the filter" — and backspace, which can only mean
       // the text, goes back in to take a letter off it
@@ -1701,19 +1784,26 @@ FloatingWindow {
     if (win.face === "fpoff" || win.face === "fpget") { win.overlay = ""; return true; }
     // off an app's page, back to the shelf or the results it was opened from
     if (win.tab === "store" && storeView.back()) return true;
-    // Out of the field, then the text, then the marks, then the window — the
-    // cheapest thing to redo goes first. Esc with nothing to step out of does
-    // nothing: it never closes the window (user, 2026-10-15).
-    const marked = (win.tab === "packages" && win.markCount > 0)
-      || (win.tab === "updates" && win.umarkCount > 0);
-    if (win.typing) {
-      win.typing = false;
-      if (win.filterText !== "" || marked) return true;
+    switch (win.escStep()) {
+      case "text": win.setFilter(""); return true;
+      case "marks": if (win.tab === "updates") win.umarks = ({}); else win.marks = ({}); return true;
+      case "field": win.typing = false; return true;
     }
-    if (win.filterText !== "") { win.setFilter(""); return true; }
-    if (win.tab === "packages" && win.markCount > 0) { win.marks = ({}); return true; }
-    if (win.tab === "updates" && win.umarkCount > 0) { win.umarks = ({}); return true; }
     return false;
+  }
+  // WHAT ESC TAKES NEXT, on a list: the text first (you stay in the field),
+  // then the marks, then the field itself (user, 2026-10-18). Esc with
+  // nothing left does nothing: it never closes the window (user, 2026-10-15).
+  // One answer for back() and for the key strip's esc hint (escHint).
+  function escStep() {
+    if (win.filterText !== "") return "text";
+    if ((win.tab === "packages" && win.markCount > 0) || (win.tab === "updates" && win.umarkCount > 0)) return "marks";
+    if (win.typing) return "field";
+    return "";
+  }
+  function escHint() {
+    const label = ({ text: "clear", marks: "clear marks", field: "done typing" })[win.escStep()];
+    return label ? [["esc", label]] : [];
   }
 
   function move(d) {
@@ -1894,7 +1984,8 @@ FloatingWindow {
       if (win.tab === "history") {
         event.accepted = true;
         if (k === Qt.Key_Return || k === Qt.Key_Enter) win.installCached(win.wayBack);
-        else if (ctrl && k === Qt.Key_Z) {
+        // in the field ctrl+z is the text's (filterKey); out of it, the transaction's
+        else if (ctrl && k === Qt.Key_Z && !win.typing) {
           const r = win.historyRows[win.hsel];
           if (r && r.tx !== undefined) win.undoTransaction(r.tx);
         }
@@ -1947,7 +2038,8 @@ FloatingWindow {
       else if (!win.typing && k === Qt.Key_K) win.move(-1);
       else if (ctrl && k === Qt.Key_S) win.installedOnly = !win.installedOnly;
       else if (ctrl && k === Qt.Key_D) win.marks = ({});
-      else if (ctrl && k === Qt.Key_A) win.markAll();
+      // in the field ctrl+a is the text's (filterKey); out of it, every row
+      else if (ctrl && k === Qt.Key_A && !win.typing) win.markAll();
       else event.accepted = win.filterKey(event);
     }
   }
@@ -2168,10 +2260,19 @@ FloatingWindow {
               Text {
                 visible: win.filterText !== ""
                 text: win.filterText
-                color: win.typing ? Zenon.white : Zenon.accentKey
+                color: win.allSelected ? Zenon.onAccent : win.typing ? Zenon.white : Zenon.accentKey
                 font.family: Zenon.face
                 font.weight: Zenon.weight
                 font.pixelSize: Zenon.px(15)
+                // ctrl+a's selection, the whole text
+                Rectangle {
+                  z: -1
+                  visible: win.allSelected
+                  anchors.fill: parent
+                  anchors.margins: -1
+                  radius: 3
+                  color: Zenon.cyan
+                }
               }
               Rectangle {
                 id: sfCaret
@@ -2211,6 +2312,13 @@ FloatingWindow {
               onClicked: { win.setFilter(""); win.typing = true; keys.forceActiveFocus(); }
             }
             TapHandler { onTapped: { win.typing = true; keys.forceActiveFocus(); } }
+            TapHandler {
+              acceptedButtons: Qt.RightButton
+              onTapped: (ev) => {
+                const p = searchField.mapToItem(fieldMenu, ev.position.x, ev.position.y);
+                win.openFieldMenu(p.x, p.y);
+              }
+            }
           }
 
           // A TOGGLE CHIP (user, 2026-10-15; the glyph U+F0C7 theirs): a condition on the search, on or
@@ -3849,14 +3957,14 @@ FloatingWindow {
         ? [["\u2190 \u2192", "featured"], ["\u2191 \u2193", "scroll"], ["return", "open featured"]]
         : [["\u2190 \u2192 \u2191 \u2193", "move"], ["return", "app page"], ["ctrl return", "get / open"]])
         .concat([["alt \u2191 \u2193", "sections"]])
-        .concat(win.typing ? (win.squery !== "" ? [["esc", "done typing"]] : []) : [["/", "search"]])
+        .concat(win.typing ? [] : [["/", "search"]]).concat(win.escHint())
         .concat([["ctrl tab", "next"]]);
     }
     if (win.tab === "history")
       return (win.wayBack ? [["return", "go back to " + win.wayBack.version]] : [])
         .concat(win.hevent && !win.hevent.flatpak ? [["ctrl z", "undo this transaction"]] : [])
         .concat(win.typing ? [] : [["j k", "move"], ["/", "filter"]])
-        .concat([["ctrl tab", "next"]]).concat(win.hquery === "" ? [] : [["esc", win.typing ? "done" : "clear"]]);
+        .concat([["ctrl tab", "next"]]).concat(win.escHint());
     if (win.tab === "maintenance")
       return [["j k", "choose"], ["return", "do it"], ["r", "recheck"], ["ctrl tab", "next"]];
     if (win.tab === "settings")
@@ -3866,7 +3974,7 @@ FloatingWindow {
         : [["space", "mark"], ["ctrl a", "mark all"], ["return", win.umarkCount ? "update marked" : "update this"],
            ["ctrl return", "update all"], ["ctrl r", "check"], ["ctrl tab", "next"]];
     return [[win.typing ? "tab" : "space", "mark"]]
-      .concat(win.typing ? (win.query !== "" || win.markCount > 0 ? [["esc", "done typing"]] : []) : [["/", "search"]])
+      .concat(win.typing ? [] : [["/", "search"]]).concat(win.escHint())
       .concat([["ctrl a", "mark all"], ["return", win.markCount > 0 ? "review" : "install / remove"]])
       .concat(win.markCount > 0 ? [["ctrl d", "clear"]] : [])
       .concat([["ctrl s", "installed"], ["ctrl tab", "updates"]]);
@@ -5236,5 +5344,15 @@ FloatingWindow {
         }
       }
     }
+  }
+
+  // the search field's right-click menu (openFieldMenu)
+  Term.PopMenu {
+    id: fieldMenu
+    parent: stage
+    anchors.fill: parent
+    window: win
+    cardWidth: 220
+    onClosed: keys.forceActiveFocus()
   }
 }

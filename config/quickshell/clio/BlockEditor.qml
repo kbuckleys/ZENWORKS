@@ -23,6 +23,7 @@
 import QtQuick
 import Quickshell
 import "../morpheus"
+import "../morpheus/undo"
 import "notes.js" as N
 
 Item {
@@ -108,8 +109,8 @@ Item {
     keys.clear();
     for (const b of list) keys.append({ key: b._key });
     ed.rev++;
-    ed._undo = [];
-    ed._redo = [];
+    // a note loaded is a fresh history; an undo's own reload keeps it
+    if (!opts.keepUndo) history.clear();
     ed._lastSnap = 0;
     // (an undo keeps the page where it was: from the top, the caret was
     // only revealed at the window's edge, and the note seemed to jump)
@@ -1234,8 +1235,7 @@ Item {
   // ── UNDO ───────────────────────────────────────────────────────────────
   // Whole snapshots of the page: a structural change takes one before it
   // happens; typing takes one when it starts again after a pause.
-  property var _undo: []
-  property var _redo: []
+  UndoStack { id: history }
   property real _lastSnap: 0
   function state() {
     const it = ed.current();
@@ -1253,33 +1253,24 @@ Item {
       ed._dirtyKeys = ({});
       for (const k in d) { const b = ed.blockOf(k), it = d[k]; if (b && it) { b.h = b.k === "mono" ? it.te.text : ed.keep(N.inline(it.te.text)); it.shown = b.h; } }
     }
-    ed._undo = ed._undo.concat([ed.state()]).slice(-200);
-    ed._redo = [];
+    history.record(ed.state());
   }
   function restore(st) {
     const y = view.contentY;
-    ed.load(st.blocks, { keepY: true });
+    ed.load(st.blocks, { keepY: true, keepUndo: true });
     view.contentY = Math.max(0, Math.min(y, view.contentHeight - view.height));
     Qt.callLater(() => { view.contentY = Math.max(0, Math.min(y, view.contentHeight - view.height)); ed.place(st.at, st.pos); });
     ed.edited();
   }
   function undo() {
     ed.flushTyping();
-    if (ed._undo.length === 0) return;
-    const st = ed._undo[ed._undo.length - 1];
-    const undo = ed._undo.slice(0, -1), redo = ed._redo.concat([ed.state()]);
-    ed.restore(st);
-    ed._undo = undo;
-    ed._redo = redo;
+    if (!history.canUndo) return;
+    ed.restore(history.undo(ed.state()));
     ed._lastSnap = 0;
   }
   function redo() {
-    if (ed._redo.length === 0) return;
-    const st = ed._redo[ed._redo.length - 1];
-    const undo = ed._undo.concat([ed.state()]), redo = ed._redo.slice(0, -1);
-    ed.restore(st);
-    ed._undo = undo;
-    ed._redo = redo;
+    if (!history.canRedo) return;
+    ed.restore(history.redo(ed.state()));
     ed._lastSnap = 0;
   }
 
