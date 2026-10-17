@@ -206,6 +206,10 @@ QtObject {
   // own accent gray (buttonRest), pushed well down toward the ink
   readonly property color pressFill: light ? alpha(mix(ink, cyan, 0.35), 0.46) : shade(0.35)
   readonly property real pressDim: light ? 0.9 : 0.55
+  // a LIT button (vibrant, tinted) pressed: shadowRgb over it at this
+  // opacity — its own color darkened, never a gray slab (DialogButton
+  // primary, Delphi's network pill)
+  readonly property real pressShade: light ? 0.25 : 0.45
   // a plain button at rest: a wash of the ink on dark glass; on paper the
   // window's accent gray (accentMuted), as every other gray in a window
   // leans to the accent — a black wash read as a neutral gray slab beside

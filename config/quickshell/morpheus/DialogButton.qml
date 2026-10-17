@@ -167,7 +167,7 @@ Rectangle {
     anchors.fill: parent
     radius: parent.radius
     color: Zenon.shadowRgb
-    opacity: btnArea.pressed && btn.primary && btn.ready ? (Zenon.light ? 0.25 : 0.45) : 0
+    opacity: btnArea.pressed && btn.primary && btn.ready ? Zenon.pressShade : 0
     visible: opacity > 0
   }
 

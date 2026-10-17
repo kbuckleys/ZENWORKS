@@ -1649,7 +1649,16 @@ FloatingWindow {
               font.pixelSize: Zenon.px(15)
             }
           }
+          // it is also the stop button: pressed, darkened as a lit button is
+          Rectangle {
+            anchors.fill: parent
+            radius: parent.radius
+            color: Zenon.shadowRgb
+            opacity: netPress.pressed ? Zenon.pressShade : 0
+            visible: opacity > 0
+          }
           MouseArea {
+            id: netPress
             anchors.fill: parent
             hoverEnabled: true
             onClicked: if (win.netJob) win.stop(win.netJob.id)
