@@ -657,6 +657,7 @@ PlatoSheet {
     property var spec: null
     window: sheet.window
     cardWidth: 190
+    fit: true   // as wide as its longest choice, as every menu
     activeIndex: sheet.dropSel
     model: {
       if (!drop.spec) return [];

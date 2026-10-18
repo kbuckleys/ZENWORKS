@@ -44,6 +44,9 @@ Item {
   property real labelPad: 8
   property real barRadius: 4
   property int fontSize: 14
+  // through the shell's Font size (Zenon.px); the listing hands over a size
+  // already zoomed, and says `scaled: false`
+  property bool scaled: true
   property int fontWeight: Font.Medium
   readonly property real span: Math.max(0, Math.min(1, bar.frac))
   // Does the fill's edge land on the written figure? A couple of pixels
@@ -143,7 +146,7 @@ Item {
     color: bar.ink
     elide: Text.ElideRight
     font.family: Zenon.face
-    font.pixelSize: bar.fontSize
+    font.pixelSize: bar.scaled ? Zenon.px(bar.fontSize) : bar.fontSize
     // enough weight to stay one word where the fill's edge crosses it
     font.weight: bar.fontWeight
   }

@@ -1264,6 +1264,7 @@ Item {
     screen: root.screen
     model: root.rootModel
     cardWidth: Zenon.menuWidth
+    fit: true   // as wide as its longest row, as every menu (CardMenu.fit)
     open: root.shown
 
     // OPENED AT THE POINTER, so it flips around it rather than clamping: a
@@ -1274,7 +1275,7 @@ Item {
       if (!root.screen) return Qt.point(0, 0);
       const gap = Zenon.padScreen;
       return Qt.point(
-        root.chooseX(root.anchorPos.x, Zenon.menuWidth, root.screen.width, gap),
+        root.chooseX(root.anchorPos.x, rootMenu.cardW, root.screen.width, gap),
         root.chooseY(root.anchorPos.y, rootMenu.contentH, root.screen.height, gap));
     }
 
@@ -1371,9 +1372,10 @@ Item {
     id: trashMenu
     screen: root.screen
     cardWidth: 180
+    fit: true   // as wide as its longest row, as every menu (CardMenu.fit)
     open: root.shown && root.childMenu === "trash"
     hinged: true
-    flipFrom: rootMenu.margins.left + Zenon.menuShadowPad + Zenon.menuWidth
+    flipFrom: rootMenu.cardX + rootMenu.cardW   // its drawn width: it fits its rows
     flipParentLeft: rootMenu.margins.left + Zenon.menuShadowPad
     at: Qt.point(0, root.submenuTop("trash", trashMenu.contentH)
                     + Zenon.menuShadowPad)
@@ -1413,7 +1415,7 @@ Item {
       text: e.text, icon: Icons.glyphFor({ name: e.text, isDir: e.isDir })
     }))
     hinged: true
-    flipFrom: rootMenu.margins.left + Zenon.menuShadowPad + Zenon.menuWidth
+    flipFrom: rootMenu.cardX + rootMenu.cardW   // its drawn width: it fits its rows
     flipParentLeft: rootMenu.margins.left + Zenon.menuShadowPad
     at: Qt.point(0, root.submenuTop("recent", recentMenu.contentH)
                     + Zenon.menuShadowPad)
@@ -1466,7 +1468,7 @@ Item {
     margins.left: {
       if (!root.screen || !rootMenu.visible) return 0;
       return Math.round(Zenon.hingeX(
-        rootMenu.cardX, Zenon.menuWidth, 300,
+        rootMenu.cardX, rootMenu.cardW, 300,
         root.screen.width, Zenon.padScreen)) - Zenon.menuShadowPad;
     }
     margins.top: root.submenuTop("apps",
@@ -1696,9 +1698,10 @@ Item {
     id: sessionMenu
     screen: root.screen
     cardWidth: Zenon.menuWidth
+    fit: true   // as wide as its longest row, as every menu (CardMenu.fit)
     open: root.shown && root.childMenu === "session"
     hinged: true
-    flipFrom: rootMenu.margins.left + Zenon.menuShadowPad + Zenon.menuWidth
+    flipFrom: rootMenu.cardX + rootMenu.cardW   // its drawn width: it fits its rows
     flipParentLeft: rootMenu.margins.left + Zenon.menuShadowPad
     at: Qt.point(0, root.submenuTop("session", sessionMenu.contentH)
                     + Zenon.menuShadowPad)
@@ -1740,12 +1743,13 @@ Item {
     screen: root.screen
     model: root.shellOnlyEntries
     cardWidth: 200
+    fit: true   // as wide as its longest row, as every menu (CardMenu.fit)
     open: root.shown && root.childMenu === "shell"
 
     // Hinged off the root menu: to its right where there is room, to its left
     // otherwise, squaring whichever corner ends up against it.
     hinged: true
-    flipFrom: rootMenu.margins.left + Zenon.menuShadowPad + Zenon.menuWidth
+    flipFrom: rootMenu.cardX + rootMenu.cardW   // its drawn width: it fits its rows
     flipParentLeft: rootMenu.margins.left + Zenon.menuShadowPad
 
     // Against its own ROW rather than a fixed offset down the root menu: the
@@ -1803,7 +1807,7 @@ Item {
     margins.left: {
       if (!root.screen || !sessionMenu.visible) return 0;
       return Math.round(Zenon.hingeX(
-        sessionMenu.cardX, sessionMenu.cardWidth, 160,
+        sessionMenu.cardX, sessionMenu.cardW, 160,
         root.screen.width, Zenon.padScreen)) - Zenon.menuShadowPad;
     }
     margins.top: {

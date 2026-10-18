@@ -56,6 +56,8 @@ Item {
 
   readonly property int cardW: {
     if (!core.fit) return core.cardWidth;
+    core.open;   // measured again on every opening (see CardMenu.fitWidth)
+    rowMetrics.height;
     let most = 0;
     const rows = core.model || [];
     for (let i = 0; i < rows.length; ++i) {

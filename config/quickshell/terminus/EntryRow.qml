@@ -1125,6 +1125,7 @@ Item {
         ink: sizeCell.on
           ? (sizeCell.biggest ? Zenon.sand : Zenon.white) : Zenon.accentMuted
         fontSize: Math.round(14 * host.zoom)
+        scaled: false
         fontWeight: Zenon.weight
         label: {
           const e = entryRow.entry;

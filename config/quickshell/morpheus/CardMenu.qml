@@ -85,6 +85,12 @@ PanelWindow {
   // chevron) and its gap when there is one, and the card's padding.
   readonly property int fitWidth: {
     if (!root.fit) return 0;
+    // measured again on every opening: icarus' root menu was seen live at the
+    // width of its rows from before the shell's own entries joined them
+    // (user, 2026-10-19 — "Set backg…", "Display se…"), and the card is only
+    // ever seen open
+    root.open;
+    rowMetrics.height;   // and when the face resolves (advanceWidth is a call)
     let most = 0;
     const rows = root.model || [];
     for (let i = 0; i < rows.length; ++i) {
