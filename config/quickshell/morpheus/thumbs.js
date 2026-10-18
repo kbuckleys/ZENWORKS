@@ -194,14 +194,6 @@ function generate(jobs, big) {
     + "' 2>/dev/null";
 }
 
-// The same key, for a caller that already has its own `find` running and wants
-// the thumbnail named inside it — Picasso scans and thumbnails in one pass.
-// `$1` must be the path when this is spliced in.
-function keyExpr() {
-  return keyScript() + 'out=' + Strings.shellQuote(dir())
-    + '/$key.' + EXT + '; ';
-}
-
 // ── AND WHAT IT REPORTED, REMEMBERED ───────────────────────
 // Naming a thumbnail costs a `stat` and an `md5sum` PER FILE even when
 // every one of them is already on disk — measured at 0.49s for a directory of

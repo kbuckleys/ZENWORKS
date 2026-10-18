@@ -12,6 +12,7 @@ import "."
 // qualified, for HeldRing alone
 import "../terminus" as Term
 import "offspecial.js" as Off
+import "hypr.js" as Hypr
 
 Item {
   id: root
@@ -146,7 +147,7 @@ Item {
           ? root.specialWorkspace.name.replace(/^special:/, "")
           : root.specialName;
       // asked for: OffSpecial leaves a show it was told about alone
-      Quickshell.execDetached(Off.wanted('hl.dsp.workspace.toggle_special("' + sp + '")'));
+      Quickshell.execDetached(Off.wanted(Hypr.toggleSpecial(sp)));
     }
   }
 
@@ -269,7 +270,7 @@ Item {
             anchors.fill: parent
             enabled: !root.showTray
             onClicked: {
-              Hyprland.dispatch('hl.dsp.focus({ workspace = "' + modelData.name + '" })');
+              Hyprland.dispatch(Hypr.focusWorkspace(modelData.name));
             }
           }
         }

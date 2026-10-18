@@ -540,14 +540,14 @@ def upload_batches_and_rides_out_github():
         if path.endswith("/commits/base"): return Answer({"tree": {"sha": "t0"}})
         return Answer({"sha": "s"})
 
-    keep = (github.urllib.request.urlopen, github.token, github.time.sleep)
-    github.urllib.request.urlopen, github.token = fake, (lambda: ("t", "gh"))
-    github.time.sleep = lambda s: None
+    keep = (github.rest.urllib.request.urlopen, github.token, github.rest.time.sleep)
+    github.rest.urllib.request.urlopen, github.token = fake, (lambda: ("t", "gh"))
+    github.rest.time.sleep = lambda s: None
     try:
         ev = []
         github.upload("me/r", [{"local": os.path.join(d, "dir"), "path": "dir"}], "m", None, ev.append)
     finally:
-        github.urllib.request.urlopen, github.token, github.time.sleep = keep
+        github.rest.urllib.request.urlopen, github.token, github.rest.time.sleep = keep
     writes = [c for c in calls if c[0] != "GET"]
     # three batches (100, 100, 31 — the picture last, a blob of its own);
     # the first tree asked twice (slowed down), the commit twice (stalled)
@@ -1381,13 +1381,13 @@ def forges_archive():
                      J.loads(req.data) if req.data else None))
         return Answer({"archived": True})
 
-    keep = (github.urllib.request.urlopen, gitlab.rest.urllib.request.urlopen, github.token, gitlab.token, forgejo.token)
-    github.urllib.request.urlopen = gitlab.rest.urllib.request.urlopen = fake
+    keep = (github.rest.urllib.request.urlopen, gitlab.rest.urllib.request.urlopen, github.token, gitlab.token, forgejo.token)
+    github.rest.urllib.request.urlopen = gitlab.rest.urllib.request.urlopen = fake
     github.token = gitlab.token = forgejo.token = lambda: ("t", "keyring")
     try:
         github.archive("me/r"); gitlab.archive("me/r", False); forgejo.archive("me/r")
     finally:
-        (github.urllib.request.urlopen, gitlab.rest.urllib.request.urlopen,
+        (github.rest.urllib.request.urlopen, gitlab.rest.urllib.request.urlopen,
          github.token, gitlab.token, forgejo.token) = keep
     eq([(m, b) for m, _, b in sent], [("PATCH", {"archived": True}), ("POST", None), ("PATCH", {"archived": True})])
     eq(sent[1][1].endswith("/projects/me%2Fr/unarchive"), True, sent[1][1])

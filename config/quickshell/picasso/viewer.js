@@ -967,11 +967,15 @@ function restoreCommand() {
 
 // ── the extra tools, when they are installed ─────────────────────────────
 // Which of them this machine has — one `command -v` for all, so a menu row
-// for a tool that is not there is never offered.
+// for a tool that is not there is never offered. The cut-out's own script
+// (bin/cutout.py) needs python3 to import onnxruntime: "onnxruntime".
 const EXTRA_TOOLS = ["rembg", "realesrgan-ncnn-vulkan", "upscayl-bin", "tesseract", "exiftool"];
 function toolsCommand() {
-  return 'for t in ' + EXTRA_TOOLS.join(" ") + '; do command -v "$t" >/dev/null 2>&1 && printf "%s\\n" "$t"; done; exit 0\n';
+  return 'for t in ' + EXTRA_TOOLS.join(" ") + '; do command -v "$t" >/dev/null 2>&1 && printf "%s\\n" "$t"; done\n'
+    + 'python3 -c "import onnxruntime, numpy, PIL, scipy" >/dev/null 2>&1 && echo onnxruntime; exit 0\n';
 }
+// the cut-out can be made: its own script, or rembg when only that is there
+function canCutout(tools) { return !!(tools && (tools.onnxruntime || tools.rembg)); }
 function parseTools(text) {
   const out = {};
   for (const l of String(text || "").split("\n")) if (l.trim() !== "") out[l.trim()] = true;
@@ -979,7 +983,22 @@ function parseTools(text) {
 }
 
 // What each tool is asked: the input $1, the output $2.
-function cutoutCommand() { return 'rembg i -- "$1" "$2"\n'; }
+// The cut-out: bin/cutout.py (`script`), rembg's models on the repos'
+// onnxruntime; rembg itself only when the script's modules are missing.
+function cutoutCommand(script) {
+  return 'if python3 -c "import onnxruntime, numpy, PIL, scipy" >/dev/null 2>&1; then exec python3 -I '
+    + "'" + String(script || "").replace(/'/g, "'\\''") + "'" + ' --progress -- "$1" "$2"; fi\n'
+    + 'command -v rembg >/dev/null 2>&1 && exec rembg i -- "$1" "$2"\n'
+    + 'echo "cutout: needs python-onnxruntime-cpu" >&2; exit 127\n';
+}
+// cutout.py --progress: "@ 0.420 following its edges" as each step ends ->
+// { frac, what }; anything else (rembg's own output) is null
+function parseCutoutProgress(line) {
+  const m = /^@ ([0-9.]+) (.*)$/.exec(String(line || "").trim());
+  if (!m) return null;
+  const f = parseFloat(m[1]);
+  return isFinite(f) ? { frac: Math.max(0, Math.min(1, f)), what: m[2] } : null;
+}
 function upscaleCommand(bin) {
   return bin === "upscayl-bin"
     ? 'upscayl-bin -i "$1" -o "$2" -s 4 -n realesrgan-x4plus -f png\n'

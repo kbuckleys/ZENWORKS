@@ -44,6 +44,7 @@ import time
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(HERE)), "morpheus", "py"))
 
+import zenpaths  # noqa: E402
 import lines  # noqa: E402
 import audit  # noqa: E402
 import generate  # noqa: E402
@@ -339,11 +340,7 @@ class Server(lines.Service):
 # when its bridge goes only while lingering; otherwise it locks (closes)
 # and exits exactly as the old stdin daemon did.
 def runtime_dir():
-    base = os.environ.get("XDG_RUNTIME_DIR") or "/tmp"
-    d = os.path.join(base, "calypso")
-    os.makedirs(d, mode=0o700, exist_ok=True)
-    os.chmod(d, 0o700)
-    return d
+    return zenpaths.runtime_dir("calypso")   # morpheus/py/zenpaths.py
 
 
 def sock_path():

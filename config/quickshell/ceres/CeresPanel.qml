@@ -119,6 +119,23 @@ LayerPopup {
     popup.playClose();
   }
 
+  // ── CARRIED ON IN THE WINDOW (user, 2026-10-18) ──────────────────────
+  // The head's last button: the same moment, in the full window — a job's
+  // log, the news, the password card. Put away WITHOUT closePopup's
+  // forgetting: the request is still wanted, only asked for elsewhere. A
+  // password card is asked again once the window is up (it answers then —
+  // see answersAuth in shell.qml); the typed half of one is not carried.
+  function continueInWindow() {
+    const asked = popup.asking || Ceres.txState === "authfail";
+    Ceres.openWindow("updates");
+    field.pw = "";
+    field.failed = false;
+    popup.asking = false;
+    popup.collapsing = true;
+    popup.playClose();
+    if (asked) Qt.callLater(() => { if (Ceres.windowShown) Ceres.authRequested(); });
+  }
+
   function toggle() {
     if (popup.shown && !popup.collapsing) popup.closePopup();
     else popup.openPopup();
@@ -279,8 +296,8 @@ LayerPopup {
 
         // How fresh the list is, and the way to make it fresher.
         Row {
-          anchors.right: parent.right
-          anchors.rightMargin: 16
+          anchors.right: toWindow.left
+          anchors.rightMargin: 14
           anchors.verticalCenter: parent.verticalCenter
           spacing: 10
           visible: popup.face === "list"
@@ -312,6 +329,20 @@ LayerPopup {
             HoverHandler { id: refreshHov }
             TapHandler { onTapped: Ceres.check() }
           }
+        }
+
+        // on in the full window, whatever the panel is showing
+        Text {
+          id: toWindow
+          anchors.right: parent.right
+          anchors.rightMargin: 16
+          anchors.verticalCenter: parent.verticalCenter
+          text: "\u{F03CC}"
+          color: toWindowHov.hovered ? Zenon.white : Zenon.accentKey
+          font.family: Zenon.glyphFace
+          font.pixelSize: Zenon.px(15)
+          HoverHandler { id: toWindowHov }
+          TapHandler { onTapped: popup.continueInWindow() }
         }
 
         Rule { anchors.bottom: parent.bottom }
@@ -366,6 +397,10 @@ LayerPopup {
             target: list
             // Against the card's edge, not the list's 16 in from it.
             parent: body
+            // Parented out, it no longer hid with the list: during a job the
+            // list's thumb stood beside the log's, scrolling nothing (user,
+            // 2026-10-18)
+            on: list.visible
             anchors.right: parent.right
             anchors.top: list.top
             anchors.bottom: list.bottom

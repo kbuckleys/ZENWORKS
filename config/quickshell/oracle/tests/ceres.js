@@ -752,5 +752,50 @@ module.exports = {
     const ML = C.mirrorlistText(RK.ranked, "2026-09-24");
     t.has("the list says where it came from", ML, "# Ranked by ceres on 2026-09-24");
     t.has("and is pacman's format", ML, "Server = https://b/$repo/os/$arch");
+
+    // ── stopping a job, through a real shell and real processes ──────────
+    // No password (""): nothing goes through sudo here, and a job that
+    // needed none is stopped exactly this way.
+    {
+      const cp = require("child_process"), fs = require("fs"), os = require("os"), path = require("path");
+      const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "ceres-stop-"));
+      const clone = path.join(tmp, "clone");
+      fs.mkdirSync(path.join(clone, "old"), { recursive: true });
+      fs.utimesSync(path.join(clone, "old"), 1000, 1000);
+      // a "job": a shell with a child, both deaf to what `deaf` lists
+      // started in the background of a shell that exits at once, so it is
+      // init's to reap, not this test's (which cannot while it waits)
+      const job = (deaf) => {
+        const trap = deaf ? "trap \"\" " + deaf + "; " : "";
+        const pid = Number(cp.execFileSync("sh", ["-c",
+          "sh -c '" + trap + "sleep 30 & wait' >/dev/null 2>&1 & echo $!"], { encoding: "utf8" }).trim());
+        cp.execSync("sleep 0.3");
+        return pid;
+      };
+      // as ceres runs it: the script as `sh -c`, the password on stdin
+      const stop = (pid, committing, since) => cp.execFileSync("sh", ["-c", C.stopCommand(pid, committing, since, clone)], {
+        input: "\n", encoding: "utf8", timeout: 20000 }).trim();
+      const alive = (pid) => { try { process.kill(pid, 0); return true; } catch (e) { return false; } };
+
+      const a = job("");
+      t.eq("an interrupt that is heard stops it", stop(a, false, 0), "@@stopped 1");
+      t.ok("and it is gone", !alive(a));
+
+      const b = job("INT TERM");
+      const since = Math.floor(Date.now() / 1000) - 1;
+      fs.mkdirSync(path.join(clone, "built", "src"), { recursive: true });
+      const t0 = Date.now();
+      t.eq("deaf to INT and TERM, it is killed", stop(b, false, since), "@@stopped 1");
+      t.ok("after the INT and TERM waits", Date.now() - t0 >= 4500);
+      t.ok("and it is gone", !alive(b));
+      t.ok("the build this job touched is cleared", !fs.existsSync(path.join(clone, "built")));
+      t.ok("an older one is kept", fs.existsSync(path.join(clone, "old")));
+
+      const c = job("INT");
+      t.eq("while pacman writes, it is only asked", stop(c, true, 0), "@@stopped 0");
+      t.ok("and left to finish", alive(c));
+      cp.execSync("pkill -KILL -P " + c + "; kill -KILL " + c + " 2>/dev/null; true");
+      fs.rmSync(tmp, { recursive: true, force: true });
+    }
   }
 };

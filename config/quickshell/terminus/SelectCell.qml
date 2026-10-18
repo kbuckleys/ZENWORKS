@@ -45,12 +45,10 @@ Item {
   // Picasso's justified tiles hide all but its rim, so it wears the accent
   // there (user, 2026-10-14: "hardly visible")
   property color ink: "transparent"
-  readonly property bool inked: cell.ink.a > 0
   // or a fill of its own: terminus' grid wears the sidebar's highlight
   // (user, 2026-10-17), ringed in the same tint so it still shows over a
   // picture
   property color fill: "transparent"
-  readonly property bool filledIn: cell.fill.a > 0
   property int index: 0
   property bool on: true
   property bool animate: true
@@ -103,8 +101,11 @@ Item {
     // having disappeared.
     y: -(cell.view ? cell.view.contentY - cell.view.originY : 0)
 
-    Rectangle {
+    // the look is MarkRing's, which a marked tile wears too
+    MarkRing {
       id: box
+      ink: cell.ink
+      fill: cell.fill
       // a plain Flickable (rect-placed) has no cells
       readonly property real cw: cell.view && cell.view.cellWidth !== undefined ? cell.view.cellWidth : 0
       readonly property real ch: cell.view && cell.view.cellHeight !== undefined ? cell.view.cellHeight : 0
@@ -167,16 +168,8 @@ Item {
         enabled: cell.animate && cell.slides
         NumberAnimation { duration: Zenon.fast; easing.type: Zenon.travelEase }
       }
-      radius: 6
-      color: cell.inked ? Qt.rgba(cell.ink.r, cell.ink.g, cell.ink.b, 0.55)
-        : cell.filledIn ? cell.fill : Zenon.border
-      // See the note on Tile's border: over a thumbnail the fill is
-      // hidden by the picture, so the outline is what says "here" —
-      // and it has to be on the thing that travels.
-      border.width: 1
-      border.color: cell.inked ? cell.ink
-        : cell.filledIn ? Qt.rgba(cell.fill.r, cell.fill.g, cell.fill.b, Math.min(1, cell.fill.a * 3))
-        : Zenon.border
+      // shown and hidden outright, not MarkRing's fade
+      opacity: 1
       visible: cell.on && cell.filled
     }
   }

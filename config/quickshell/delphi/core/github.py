@@ -19,13 +19,9 @@
 # with the same functions; the daemon picks by host.
 
 import base64
-import json
 import os
 import re
 import subprocess
-import time
-import urllib.error
-import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 
 import rest

@@ -15,6 +15,7 @@
 import QtQuick
 import "oracle.js" as Ora
 import "../morpheus"
+import "../morpheus/controls" as Controls
 import "../ceres"
 
 Item {
@@ -29,13 +30,25 @@ Item {
   readonly property bool reading: (Oracle.revision, Oracle.computerReading)
   readonly property var rows: pc.c && pc.c.ok ? pc.c.rows : []
 
-  implicitHeight: body.implicitHeight + 28
+  implicitHeight: frame.height + 24
 
-  Row {
-    id: body
+  // in the list frame, as the Tools fold's packages are: what a row folds
+  // open is a box under it, not loose text on the panel
+  Item {
+    id: frame
     x: 24
     y: 6
     width: pc.width - 48
+    height: body.implicitHeight + 32
+    Controls.ListFrame { anchors.fill: parent }
+  }
+
+  Row {
+    id: body
+    parent: frame
+    x: 18
+    y: 16
+    width: frame.width - 36
     spacing: 28
 
     // the logo, as fastfetch puts its ascii art beside the facts
@@ -125,14 +138,18 @@ Item {
         }
       }
 
-      // nothing to show: still reading, or why not
+      // nothing to show: still reading (the dots), or why not
+      Working {
+        running: pc.rows.length === 0 && pc.reading
+        height: Zenon.px(20)
+      }
       Text {
-        visible: pc.rows.length === 0
+        visible: pc.rows.length === 0 && !pc.reading
         width: facts.width
         wrapMode: Text.Wrap
-        text: pc.reading ? "Reading…"
-          : pc.c && pc.c.missing ? "fastfetch is not installed — it is what reads the machine for this."
-          : pc.c ? pc.c.why : ""
+        text: pc.c && pc.c.missing ? "fastfetch is not installed — it is what reads the machine for this."
+          // no `why` before the first read, or when a read came back empty
+          : pc.c && pc.c.why ? pc.c.why : ""
         color: pc.dimColor
         font.family: pc.face
         font.weight: Zenon.weight

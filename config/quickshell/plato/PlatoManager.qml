@@ -28,6 +28,7 @@ import Quickshell.Hyprland
 import "../morpheus"
 import "../morpheus/lagnotes.js" as LagNotes
 import "core"
+import "../morpheus/hypr.js" as Hypr
 
 Scope {
   id: mgr
@@ -362,7 +363,7 @@ Scope {
   function capture() {
     const open = mgr.wins.filter((w) => w.capture);
     if (open.length > 0) {
-      Hyprland.dispatch('hl.dsp.focus({ window = "title:^(plato-capture)$" })');
+      Hyprland.dispatch(Hypr.focusTitle("plato-capture"));
       return;
     }
     const p = mgr._expand(mgr.strftime(settings.captureFile || "~/.local/share/quickshell/plato/scratch.md", new Date()));

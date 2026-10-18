@@ -120,10 +120,10 @@ Item {
     // 2026-10-17: still "sunken"). Centered on the cap band instead, the
     // same reach above the caps as below the baseline.
     readonly property real inkMid: (tn.height - inkFm.height) / 2
-      + inkFm.ascent - inkFm.capHeight / 2
+      + inkFm.ascent - inkFm.capitalHeight / 2
     x: -7
     width: tn.width + 14
-    height: Math.round(inkFm.capHeight + 2 * 8)
+    height: Math.round(inkFm.capitalHeight + 2 * 8)
     y: Math.round(inkMid - height / 2)
     radius: 4
     color: "transparent"

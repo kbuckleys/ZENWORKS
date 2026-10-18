@@ -775,6 +775,19 @@ function moneyInfo(code) {
   const [name, sym, where] = row.split("|");
   return { code: c, name: name, sym: sym, where: where ? where.split(", ") : [] };
 }
+// ── how an answer looks ───────────────────────────────────────────────────
+// The glyph in the field, for what the answer is a measure of: you see how
+// the question was taken before you read a word of it.
+const GLYPHS = {
+  length: 0xF046D, area: 0xF0FE6, volume: 0xF01AB, speed: 0xF04C5, accel: 0xF04C5,
+  temp: 0xF050F, mass: 0xF05A2, time: 0xF051B, data: 0xF01BC, rate: 0xF06F4,
+  energy: 0xF140B, power: 0xF0241, force: 0xF089B, pressure: 0xF029A, freq: 0xF095B,
+  pace: 0xF070E, fuel: 0xF0298, currency: 0xF0114, angle: 0xF0937, percent: 0xF03F0,
+  date: 0xF0E17, clock: 0xF0150, tz: 0xF01E7, tzdiff: 0xF0D1E, cooking: 0xF0B7C,
+  geo: 0xF08F0,
+  calc: 0xF00EC
+};
+
 // ── a currency's own glyph ── € for EUR, ₹ for INR: the sign where the
 // icon font has one, the family's sign for the rest (a dollar is a $, a
 // riyal the rial's), and a note for a currency with neither
@@ -2643,19 +2656,6 @@ function ratesScript() {
     + "fi\n"
     + "if [ -f \"$f\" ]; then echo $(( $(date +%s) - $(stat -c %Y \"$f\") )); else echo -1; fi\n";
 }
-
-// ── how an answer looks ───────────────────────────────────────────────────
-// The glyph in the field, for what the answer is a measure of: you see how
-// the question was taken before you read a word of it.
-const GLYPHS = {
-  length: 0xF046D, area: 0xF0FE6, volume: 0xF01AB, speed: 0xF04C5, accel: 0xF04C5,
-  temp: 0xF050F, mass: 0xF05A2, time: 0xF051B, data: 0xF01BC, rate: 0xF06F4,
-  energy: 0xF140B, power: 0xF0241, force: 0xF089B, pressure: 0xF029A, freq: 0xF095B,
-  pace: 0xF070E, fuel: 0xF0298, currency: 0xF0114, angle: 0xF0937, percent: 0xF03F0,
-  date: 0xF0E17, clock: 0xF0150, tz: 0xF01E7, tzdiff: 0xF0D1E, cooking: 0xF0B7C,
-  geo: 0xF08F0,
-  calc: 0xF00EC
-};
 
 function knownKind(kind) {
   return Object.prototype.hasOwnProperty.call(GLYPHS, kind);

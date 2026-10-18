@@ -47,7 +47,6 @@ Item {
   // length over a busy grid, and it is where the decisions are.
   readonly property int ts: 14          // body
   readonly property int tsSmall: 13     // labels under controls
-  readonly property int tsHead: 13      // section heads
   readonly property int tsName: 18      // the picture's name
 
   readonly property string path: card.picker.focusPath

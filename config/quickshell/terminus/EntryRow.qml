@@ -172,7 +172,7 @@ Item {
     }
     return from;
   }
-  // and the name's, which leaves the kind to the glyph — see nameInkOf
+  // and the name's, which leaves the kind to the glyph — see nameKeyOf
   readonly property color nameInk: !entryRow.entry ? entryRow.rowInk
     : entryRow.entry.nameKey ? Zenon[entryRow.entry.nameKey]
     : entryRow.entry.nameInk !== undefined ? entryRow.entry.nameInk : entryRow.rowInk
@@ -286,15 +286,11 @@ Item {
     // rather than of where the cursor happens to be, so it stays with it.
     //
     // EXCEPT WHERE THE CURSOR IS AMONG MARKS. With things selected the
-    // SelectBar stands down, and an outline alone on a row the same tint
-    // as its neighbors was the cursor you could not find. So on the pane
-    // you are keying, the cursor's row is filled harder than the marks
-    // around it — a ticked one at more than twice their tint, an unticked
-    // one with a wash of its own — and ringed in cyan (below).
-    readonly property bool cursorHere: entryRow.cursorOnly && !entryRow.passive
+    // SelectBar stands down and the cursor's row wears a HeldRing (below)
+    // instead — hollow, no fill of its own (user, 2026-10-18).
     color: entryRow.ticked
-      ? Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b, cursorHere ? 0.24 : 0.10)
-      : (cursorHere ? Zenon.wash(0.07) : "transparent")
+      ? Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b, 0.10)
+      : "transparent"
 
     Rectangle {
       anchors.fill: parent
@@ -330,15 +326,11 @@ Item {
       easing.type: Easing.OutCubic
     }
 
-    // ── THE OUTLINE THAT REPLACES THE BAR ────────────────────
-    // In the window's own cyan on the pane you are keying, because
-    // that is what the SelectBar it stands in for is drawn in, and a
-    // muted gray over a cyan-tinted tick read as one more row
-    // separator. On the PASSIVE pane it stays muted on purpose: that
-    // cursor is a memory of where you were, not where you are.
-    border.width: entryRow.cursorOnly ? 1 : 0
-    border.color: entryRow.passive ? Zenon.border : Zenon.cyan
   }
+
+  // ── THE OUTLINE THAT REPLACES THE BAR ────────────────────
+  // The HeldRing itself, unchanged (user, 2026-10-18).
+  HeldRing { anchors.fill: parent; on: entryRow.cursorOnly }
 
   // Still tracked, for the drag box: whether the pointer is ON a row is what
   // decides whether a drag moves that row or draws a selection rectangle.

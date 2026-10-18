@@ -608,8 +608,6 @@ PanelWindow {
       function onPreviewRowsChanged() { look.syncDir(); }
     }
 
-    readonly property bool faceReady: lookSpec.ready
-    readonly property string faceName: lookSpec.face
     // The one path a FontLoader is ever allowed — see lookSpec below.
     readonly property string facePath:
       (look.face && look.row) ? look.row.path : ""

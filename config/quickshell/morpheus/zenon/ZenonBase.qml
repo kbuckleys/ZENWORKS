@@ -344,6 +344,12 @@ QtObject {
   readonly property int menuRadius:    cfg.menuRadius
   readonly property int menuWidth:     cfg.menuWidth
   readonly property int menuRowHeight: cfg.menuRowHeight
+  // A WINDOW'S TOOLBAR — terminus' bar (its headH). 42 since the user's
+  // 2026-10-17 call, room for back/forward and a rename ring.
+  readonly property int toolbarH: 42
+  // and the tab strip above it, every morpheus/TabStrip's (terminus' and
+  // plato's): a little lower than the bar (user, 2026-10-18)
+  readonly property int tabH: 38
   readonly property int menuSepHeight: 7
   // the labels' inset from the card's sides. Sideways only: the rows run
   // flush to the border top and bottom, the card's round clip cutting the

@@ -1109,22 +1109,20 @@ FloatingWindow {
     width: popup.controlW + 60
     height: 28
 
-    // a row that folds open says so, and which way it is (see `fold`)
-    Text {
-      id: foldMark
-      visible: !!(nfo.spec && nfo.spec.fold)
+    // out and not back yet: dots, not "checking…" — see morpheus/Working
+    readonly property bool busy: !!nfo.spec && (nfo.spec.health ? Oracle.checking
+      : nfo.spec.key === "infoComputer" ? Oracle.computerReading && !Oracle.computer : false)
+    Working {
       anchors.right: parent.right
+      anchors.rightMargin: 4
       anchors.verticalCenter: parent.verticalCenter
-      text: "\uF054"
-      rotation: popup.unfolded === (nfo.spec ? nfo.spec.key : "") ? 90 : 0
-      Behavior on rotation { NumberAnimation { duration: Zenon.menuFade; easing.type: Easing.OutCubic } }
-      color: popup.fgColor
-      font.family: Zenon.glyphFace
-      font.pixelSize: Zenon.px(12)
+      running: nfo.busy
     }
+    // a row that folds open says so beside its name (see foldMark in the
+    // row's labels), not out here by the readout
     Text {
       anchors.fill: parent
-      anchors.rightMargin: foldMark.visible ? foldMark.implicitWidth + 12 : 0
+      visible: !nfo.busy
       verticalAlignment: Text.AlignVCenter
       // LEFT, like every control beside it. It was right-aligned against the
       // panel edge, which put a column of facts and a column of buttons on
@@ -1154,9 +1152,12 @@ FloatingWindow {
     // rest — see controlSlot, which measures this
     width: btn.width
     height: 28
+    readonly property bool busy: !!ac.spec && Oracle.actionBusy(ac.spec.key)
 
     Rectangle {
       id: btn
+      opacity: ac.busy ? 0.45 : 1
+      Behavior on opacity { NumberAnimation { duration: Zenon.fast; easing.type: Zenon.ease } }
       anchors.right: parent.right
       anchors.verticalCenter: parent.verticalCenter
       width: Math.max(110, verb.implicitWidth + 28)
@@ -1193,6 +1194,7 @@ FloatingWindow {
       MouseArea {
         id: btnMa
         anchors.fill: parent
+        enabled: !ac.busy
         onClicked: Oracle.run(ac.spec.key, popup.lastRealSection)
       }
     }
@@ -1769,8 +1771,16 @@ FloatingWindow {
                 }
               }
 
-              // no rule under the credits — the settings panel draws no
-              // horizontal separators, see the rows below
+              // a rule under the credits, the toolbar's own (user,
+              // 2026-10-18): the mark and its byline are the panel's
+              // heading, and the rows under it were reading as part of it
+              Rectangle {
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.bottom: parent.bottom
+                height: 1
+                color: Zenon.border
+              }
             }
 
             // ── KEEP THESE DISPLAY SETTINGS? ──────────────────────────
@@ -1903,8 +1913,18 @@ FloatingWindow {
               // Elastic measures both edges from them, so the rubber band
               // flickered between two ends. With it in the list, everything
               // is kept built: the extent is then measured, not guessed.
-              cacheBuffer: popup.rows.some((r) => r.type === "arrange")
-                ? popup.rows.length * popup.rowH + popup.arrangeH : 320
+              //
+              // AND NEITHER IS AN OPEN FOLD. About this computer unfolded is
+              // a 577px row among 64px ones. Banded past the top, the cache
+              // window rises with the band, a short row at the far end drops
+              // out and back in, the guessed contentHeight jumps (1347 ↔
+              // 1501), and the view's fixup snaps the banded contentY back to
+              // the top on that frame: the band sawed instead of easing back
+              // once (2026-10-18 capture). `foldH` is the open fold's body,
+              // measured by its own row.
+              property real foldH: 0
+              cacheBuffer: popup.rows.some((r) => r.type === "arrange") || list.foldH > 0
+                ? popup.rows.length * popup.rowH + popup.arrangeH + list.foldH : 320
 
               delegate: Item {
                 id: settingRow
@@ -1928,6 +1948,14 @@ FloatingWindow {
                 readonly property bool fold: !!settingRow.spec.fold
                 readonly property bool open: settingRow.fold && popup.unfolded === settingRow.spec.key
                 Item { id: rowHead; width: parent.width; height: popup.rowH }
+                // what this row adds while open, for the list's cacheBuffer
+                Binding {
+                  target: list
+                  property: "foldH"
+                  value: foldBody.height
+                  when: settingRow.open
+                  restoreMode: Binding.RestoreValue
+                }
                 MouseArea {
                   anchors.fill: rowHead
                   visible: settingRow.fold
@@ -1940,7 +1968,7 @@ FloatingWindow {
                   width: parent.width
                   height: item ? item.implicitHeight : 0
                   active: settingRow.fold && (settingRow.open || settingRow.height > popup.rowH)
-                  source: settingRow.spec.fold === "computer" ? "ComputerPanel.qml" : ""
+                  source: ({ computer: "ComputerPanel.qml", tools: "ToolsPanel.qml" })[settingRow.spec.fold] || ""
                   onLoaded: {
                     item.face = Qt.binding(() => popup.face);
                     item.fgColor = Qt.binding(() => popup.fgColor);
@@ -2070,6 +2098,21 @@ FloatingWindow {
                         }
                       }
 
+                    }
+
+                    // a row that folds open says so, and which way it is,
+                    // next to its name (user, 2026-10-18) — it sat at the far
+                    // end of the readout, a long way from the thing it opens
+                    Text {
+                      id: foldMark
+                      visible: settingRow.fold
+                      anchors.verticalCenter: rowLabel.verticalCenter
+                      text: "\uF054"
+                      rotation: settingRow.open ? 90 : 0
+                      Behavior on rotation { NumberAnimation { duration: Zenon.menuFade; easing.type: Easing.OutCubic } }
+                      color: popup.dimColor
+                      font.family: Zenon.glyphFace
+                      font.pixelSize: Zenon.px(12)
                     }
 
                     // RESTORE DEFAULT, said with a glyph beside the name

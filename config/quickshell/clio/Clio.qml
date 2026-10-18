@@ -177,7 +177,7 @@ Singleton {
   // ── MAKING ONE ─────────────────────────────────────────────────────────
   // Placed where it was asked for, and cascaded when it was not: a stack of
   // notes all at the same coordinate is one note as far as anyone can tell.
-  function add(x, y) {
+  function add(x, y, edit) {
     const n = root.notes.length;
     const cascade = (n % 8) * 26;
     const note = Scribe.blank(Scribe.newId(),
@@ -185,6 +185,8 @@ Singleton {
       y !== undefined ? y : 120 + cascade,
       Scribe.nextHue(root.notes));
     root.notes = root.notes.concat([note]);
+    // before the row: its slot is made by the append and asks at once
+    if (edit) root.editNext = note.id;
     keyModel.append({ key: note.id });
     root.shown = true;
     root.save();
@@ -243,6 +245,10 @@ Singleton {
   //
   // Offset so the note lands UNDER the pointer rather than hanging off it:
   // the head is what you reach for, so the pointer starts on the head.
+  // A note made at the pointer is made to be written in: the board whose
+  // screen it lands on takes it straight into editing and clears this.
+  // (One made from the window is the window's to edit, so not those.)
+  property string editNext: ""
   function addHere() {
     cursorProc.running = false;
     cursorProc.running = true;
@@ -259,8 +265,8 @@ Singleton {
         const m = String(cursorOut.text).trim().match(/(-?\d+)\s*,\s*(-?\d+)/);
         // No answer is not a reason to lose the note — it simply lands where
         // it used to.
-        if (!m) { root.add(); return; }
-        root.add(parseInt(m[1], 10) - 40, parseInt(m[2], 10) - 13);
+        if (!m) { root.add(undefined, undefined, true); return; }
+        root.add(parseInt(m[1], 10) - 40, parseInt(m[2], 10) - 13, true);
       }
     }
   }

@@ -83,10 +83,6 @@ Item {
     if (!r || !dv.files[r.fi]) return "";
     return dv.files[r.fi].new || dv.files[r.fi].old || "";
   }
-  readonly property int lineAtCursor: {
-    const r = dv.rows[dv.cursor];
-    return r && r.kind === "line" ? (r.nu || r.old || 1) : 1;
-  }
 
   function move(d, extend) {
     if (dv.rows.length === 0) return;

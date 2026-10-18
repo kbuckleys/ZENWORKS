@@ -25,7 +25,6 @@
 import json
 import re
 import threading
-import time
 
 from base import (Fifo, Locked, Provider, VaultError, detail, field, first_line, host_of,
                   item, iso_time, run, section)

@@ -20,6 +20,7 @@ import Quickshell.Services.Mpris
 import Quickshell.Services.Pipewire
 import "../morpheus"
 import "../oracle"
+import "../morpheus/hypr.js" as Hypr
 
 Scope {
   id: root
@@ -279,8 +280,7 @@ Scope {
   // is a syntax error here, and the lua form is the one that answers "ok".
   // hypridle.conf had it both ways; only this one ever worked.
   function dpms(on) {
-    root.run(["hyprctl", "dispatch",
-      "hl.dsp.dpms({ action = \"" + (on ? "enable" : "disable") + "\" })"]);
+    root.run(["hyprctl", "dispatch", Hypr.dpms(on)]);
   }
 
   // One IdleMonitor per ported listener. ext-idle-notify does the counting,

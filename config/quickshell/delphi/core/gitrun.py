@@ -22,7 +22,6 @@
 #     git started (ssh, a hook, a credential helper), not just git.
 
 import os
-import signal
 import subprocess
 import sys
 import threading

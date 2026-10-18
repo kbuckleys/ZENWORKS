@@ -90,19 +90,27 @@ Item {
   Component.onCompleted: {
     const t = Hyprland.activeToplevel;
     if (t && t.title) lag.focusedIn = t.title;
+    // a live reload builds this again long after the launch: only a real
+    // start can say what the shell settles at
+    const at = Quickshell.launchTime ? Quickshell.launchTime.getTime() : 0;
+    if (at > 0 && Date.now() - at < 20000) settleTimer.start();
   }
   property var recent: []
   function saw(text) {
     const now = Date.now();
     lag.recent = lag.recent.filter((e) => now - e.at < 5000).concat([{ at: now, text: text }]);
   }
-  onOpenLayerChanged: lag.saw(lag.openLayer !== "" ? "open " + lag.openLayer : "close")
+  onOpenLayerChanged: {
+    if (lag.openLayer !== "") lag.touched = true;
+    lag.saw(lag.openLayer !== "" ? "open " + lag.openLayer : "close");
+  }
   Connections {
     target: Hyprland
     function onRawEvent(ev) {
       if (ev.name === "openwindow") {
         // ADDRESS,WORKSPACE,CLASS,TITLE — the class is enough to know it
         const parts = String(ev.data).split(",");
+        if (parts[2] === "org.quickshell") lag.touched = true;
         lag.saw("window " + (parts[2] || "?"));
       } else if (ev.name === "activewindow") {
         // CLASS,TITLE — the shell's own windows are all org.quickshell, and
@@ -111,12 +119,43 @@ Item {
         const cut = d.indexOf(",");
         const cls = cut < 0 ? d : d.slice(0, cut);
         const title = cut < 0 ? "" : d.slice(cut + 1);
+        if (cls === "org.quickshell") lag.touched = true;
         lag.focusedIn = cls === "org.quickshell" ? (title || "shell") : cls;
       } else if (ev.name === "openlayer" && String(ev.data) !== "quickshell") {
         // the popups all share the default namespace; activeLayer names them
         lag.saw("layer " + ev.data);
       }
     }
+  }
+
+  // ── what a fresh start settles at ────────────────────────────────────
+  // Two minutes after a real start, with none of the shell's own popups or
+  // windows opened in between, the resident size is written to
+  // settle.json (the last 8). Oracle's Health reads memory against their
+  // median, so the baseline follows the suite as it grows rather than being
+  // a number someone has to remember to measure again (it was a constant
+  // from 2026-09-23 until 2026-10-18).
+  property bool touched: false
+  Timer {
+    id: settleTimer
+    interval: 120000
+    onTriggered: lag.noteSettled()
+  }
+  function noteSettled() {
+    if (lag.touched) return;
+    statusFile.reload();
+    const m = /VmRSS:\s+(\d+)/.exec(String(statusFile.text()));
+    if (!m) return;
+    let list = [];
+    try { list = JSON.parse(settleFile.text()).kb || []; } catch (e) {}
+    list = list.concat([{ at: Date.now(), kb: Number(m[1]) }]).slice(-8);
+    settleFile.setText(JSON.stringify({ kb: list }) + "\n");
+  }
+  FileView {
+    id: settleFile
+    path: (Quickshell.env("XDG_CACHE_HOME") || (Quickshell.env("HOME") + "/.cache")) + "/quickshell/settle.json"
+    blockLoading: true
+    printErrors: false
   }
 
   // ── the frames ───────────────────────────────────────────────────────

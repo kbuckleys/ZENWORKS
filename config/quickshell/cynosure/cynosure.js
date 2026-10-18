@@ -183,10 +183,6 @@ function actionFace(a, states) {
   return a.state && a.on && (states || {})[a.state] ? a.on : a;
 }
 
-function actionLabel(a, states) {
-  return actionFace(a, states).name;
-}
-
 // "glyph  label" split at its first double space — the history lines and the
 // picker labels are stored that way. Drawn as two pieces: in rich text the
 // double space collapses to one and the glyph sits on the word.

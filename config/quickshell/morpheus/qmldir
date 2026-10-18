@@ -37,6 +37,7 @@ Scrollbar 1.0 Scrollbar.qml
 CardMenu 1.0 CardMenu.qml
 CardBody 1.0 CardBody.qml
 CardPopup 1.0 CardPopup.qml
+MenuCore 1.0 MenuCore.qml
 CornerPicker 1.0 CornerPicker.qml
 Elastic 1.0 Elastic.qml
 ElasticScroll 1.0 ElasticScroll.qml
@@ -68,3 +69,4 @@ JobsPanel 1.0 JobsPanel.qml
 OpenFlare 1.0 OpenFlare.qml
 TitleName 1.0 TitleName.qml
 EdgeTab 1.0 EdgeTab.qml
+TabStrip 1.0 TabStrip.qml

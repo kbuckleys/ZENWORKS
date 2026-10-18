@@ -689,8 +689,9 @@ Singleton {
   // chosen, not up front. Through here, so the app never runs pacman or asks
   // for a password itself — Ceres' own password card, its own log.
   //
-  //   install(pkg, why, done) → whether Ceres took it; done(ok) once it ends
-  //                              (pkg: a name, or a list of them)
+  //   install(pkg, why, done) → whether Ceres took it; done(ok, why) once
+  //                              it ends (pkg: a name, or a list of them;
+  //                              why "cancelled" when nobody confirmed it)
   //   installing               { pkg, pkgs } while one is out, else null
   //
   // Lifted out of delphi/DelphiManager (installTool, 2026-10-11) when
@@ -732,7 +733,9 @@ Singleton {
   Timer {
     id: pwExpiry
     interval: 5 * 60 * 1000
-    onTriggered: root.forgetPassword()
+    // not mid-job: the job's own password server holds it until the end
+    // anyway, and Shift+Esc needs it to stop what runs as root
+    onTriggered: { if (root.txBusy) pwExpiry.restart(); else root.forgetPassword(); }
   }
   function forgetPassword() {
     root._pw = "";
@@ -748,6 +751,20 @@ Singleton {
     root.nextExpected = -1;
     root.nextLabel = "";
     root.nextFlat = 0;
+    // AN INSTALL NOBODY CONFIRMED ENDS HERE TOO (user, 2026-10-18): asked
+    // for by Oracle's Tools, then the password card closed unanswered —
+    // `installing` stayed set, and every app waiting on it (Oracle, delphi,
+    // calypso) showed "Installing…" until a restart. Every way out of the
+    // request (the card cancelled, the window or panel closed, the news held
+    // back) comes through here; sudo taking the password does too, but then
+    // the job is under way (txBusy) and finishes through onTxStateChanged.
+    if (root.installing && !root.txBusy) root.dropInstall();
+  }
+  function dropInstall() {
+    const done = root._installDone;
+    root.installing = null;
+    root._installDone = null;
+    if (done) done(false, "cancelled");
   }
 
   function upgradeAll(password, noAuth) {
@@ -765,6 +782,7 @@ Singleton {
     root.txLive = null;
     root.txTotal = null;
     root.txCancelling = false;
+    root.txStartedAt = Date.now();
     // pacman.log hears of the system's updates only — never Flatpak's
     root.txExpected = root.nextExpected >= 0 ? root.nextExpected : root.repo.length + root.aur.length;
     root._trying = password;
@@ -817,20 +835,38 @@ Singleton {
   }
 
   // ── CANCELING ────────────────────────────────────────────────────────
-  // SIGINT to everything the run started — pacman's own ctrl+c, delivered
-  // through sudo, which relays it. pacman decides what that means: a download
-  // or a check stops there, and a transaction already writing to the disk
-  // finishes the package in hand and stops cleanly after it. Nothing is cut
-  // off half-installed.
+  // Shift+Esc. It was SIGINT and a wait — pacman's ctrl+c through sudo —
+  // and a long AUR build ran on to its end regardless (user, 2026-10-18:
+  // "waits for the job to complete"). Now Cer.stopCommand: SIGINT, then
+  // TERM, then KILL, root's processes through sudo with the job's own
+  // password, and afterwards the lock, the partial downloads and the build
+  // directories this job left. Never while pacman is writing packages
+  // (Installing, hooks): it is asked, and stops after the package in hand —
+  // killed there, a package would be left half on the disk.
+  property double txStartedAt: 0
+  readonly property bool txCommitting: root.txPhase === "Installing" || root.txPhase === "Running hooks"
   function cancel() {
     if (!root.txBusy || root.txCancelling) return;
     const pid = runProc.processId;
     if (!pid) return;
     root.txCancelling = true;
-    root.txPhase = "Canceling";
-    Quickshell.execDetached(["sh", "-c",
-      "kids() { for c in $(pgrep -P \"$1\"); do kids \"$c\"; echo \"$c\"; done; }; "
-      + "kill -INT $(kids \"$0\") \"$0\" 2>/dev/null", String(pid)]);
+    const committing = root.txCommitting;
+    root.txPhase = committing ? "Stopping after this package" : "Canceling";
+    stopProc.command = ["sh", "-c", Cer.stopCommand(pid, committing,
+      Math.floor(root.txStartedAt / 1000), Paths.cacheDir() + "/paru/clone")];
+    stopProc.running = true;
+    stopProc.write((root._pw || root._trying || "") + "\n");
+  }
+  Process {
+    id: stopProc
+    stdinEnabled: true
+    stdout: SplitParser {
+      onRead: (line) => {
+        // left to finish the package in hand: said, and the job's own end
+        // (runProc) reports it once pacman stops
+        if (line.trim() === "@@stopped 0" && root.txBusy) root.txPhase = "Stopping after this package";
+      }
+    }
   }
 
   function txLine(raw) {

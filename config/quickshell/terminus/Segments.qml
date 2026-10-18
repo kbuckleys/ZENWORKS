@@ -145,7 +145,13 @@ Item {
   }
 
   // the one highlight, under the words, sliding to the chosen option
-  readonly property Item litItem: segs.index >= 0 && rep.count > segs.index ? rep.itemAt(segs.index) : null
+  // READ AGAIN AS EACH PART IS BUILT (`built`, bumped by the Repeater):
+  // itemAt() is a call, not a binding, so this was read only when the index
+  // or the count changed — and a count that moved before the chosen part
+  // existed left the highlight on nothing until the next change of view
+  // (terminus' view switch, blank now and then, user 2026-10-18)
+  property int built: 0
+  readonly property Item litItem: (segs.built, segs.index >= 0 && rep.count > segs.index ? rep.itemAt(segs.index) : null)
   // THE HIGHLIGHT FROM NUMBERS, NOT FROM A PART (user, 2026-10-15: a switch
   // in a sheet, and Ceres' Channels, first showed nothing chosen). An even
   // switch's parts are its width shared out, so where the chosen one is
@@ -182,6 +188,8 @@ Item {
     Repeater {
       id: rep
       model: segs.options
+      onItemAdded: segs.built++
+      onItemRemoved: segs.built++
       delegate: Item {
         id: one
         required property var modelData

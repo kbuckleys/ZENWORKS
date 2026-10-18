@@ -92,20 +92,6 @@ function liveCpu(cur, prev) {
   return true;
 }
 
-// Backwards-compatible: the old single-command shape, which the tests and
-// anything else reading `ps -eo pid=,user=,pcpu=,rss=,args=` still use.
-function parseProcesses(text) {
-  const rows = [];
-  for (const line of String(text).split("\n")) {
-    const m = line.match(/^\s*(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(.*)$/);
-    if (m && m[1] && m[5] !== "") {
-      rows.push({ pid: m[1], user: m[2], cpu: m[3], mem: formatMemKb(m[4]),
-                  memKb: parseInt(m[4], 10) || 0, args: m[5] });
-    }
-  }
-  return rows;
-}
-
 // The command's own name, for sorting by it. `args` is the whole command
 // line, so this is the basename of argv[0] — and kernel threads arrive
 // already bracketed, which is a name too, just not a path.

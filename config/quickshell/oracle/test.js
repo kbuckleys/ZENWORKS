@@ -85,8 +85,14 @@ function makeContext() {
     }
   };
 
+  // morpheus/hypr.js itself, not a stub: it has no imports, and a .js that
+  // builds dispatches (terminus.js) reaches it as Hypr
+  const Hypr = vm.createContext({});
+  vm.runInContext(fs.readFileSync(path.join(ROOT, "morpheus/hypr.js"), "utf8")
+    .replace(/^\.(pragma|import)\b.*$/gm, ""), Hypr);
+
   const ctx = {
-    Paths, Strings, Desktop, console,
+    Paths, Strings, Desktop, Hypr, console,
     Quickshell: { env: (k) => ENV[k] ?? "" },
     Qt: {
       // enough of Qt for the odd formatting helper that reaches for it

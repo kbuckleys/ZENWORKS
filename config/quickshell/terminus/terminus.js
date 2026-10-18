@@ -29,6 +29,7 @@
 // way to tell a lone \037 from a stray space.
 .pragma library
 .import qs.morpheus as Morpheus
+.import "../morpheus/hypr.js" as Hypr
 // ONE COPY FOR THE WHOLE SHELL. Without the pragma every component instance
 // that imports this file — every row, tile, card and sheet — evaluated all of
 // it again; a profile caught terminus.js and icons.js costing hundreds of ms
@@ -4268,7 +4269,6 @@ function nameKeyOf(e) {
 }
 
 function inkOf(e) { return Zenon[inkKeyOf(e)]; }
-function nameInkOf(e) { return Zenon[nameKeyOf(e)]; }
 
 // a row's ink as of NOW, from its slot when it carries one
 function rowInk(e) {
@@ -4543,8 +4543,8 @@ function splitRoom(win, mons, wantW, margin, minW, edge) {
 }
 
 function splitRoomDispatches(address, room) {
-  const sel = 'window = "address:' + address + '"';
-  const out = ["hl.dsp.window.resize({ x = " + room.dw + ", y = 0, relative = true, " + sel + " })"];
-  if (room.dx) out.push("hl.dsp.window.move({ x = " + room.dx + ", y = 0, relative = true, " + sel + " })");
+  const sel = "address:" + address;
+  const out = [Hypr.resizeBy(room.dw, 0, sel)];
+  if (room.dx) out.push(Hypr.moveBy(room.dx, 0, sel));
   return out;
 }

@@ -29,6 +29,7 @@ import Quickshell.Io
 import "../morpheus"
 import "../morpheus/lagnotes.js" as LagNotes
 import "viewer.js" as V
+import "../morpheus/hypr.js" as Hypr
 
 Scope {
   id: mgr
@@ -206,10 +207,12 @@ Scope {
     stdout: StdioCollector { waitForEnd: true; onStreamFinished: mgr.tools = V.parseTools(text) }
   }
   // The copies made before a file is written over (see the viewer's undo),
+  // and Make's unsaved results a closed window left (the viewer's `made`),
   // a day after they were made, are gone.
   Process {
     running: true
-    command: ["sh", "-c", 'find "$1" -type f -mmin +1440 -delete 2>/dev/null; exit 0', "sh", Paths.cacheDir() + "/picasso/undo"]
+    command: ["sh", "-c", 'find "$@" -type f -mmin +1440 -delete 2>/dev/null; exit 0', "sh",
+      Paths.cacheDir() + "/picasso/undo", Paths.cacheDir() + "/picasso/made"]
   }
 
   // Written once a burst of zoom steps has settled, not per step.
@@ -257,7 +260,7 @@ Scope {
     const last = views.length > 0 ? views[views.length - 1] : null;
     if (last && !last.busy) {
       last.load(list, mode);
-      Hyprland.dispatch('hl.dsp.focus({ window = "title:^(picasso-view)$" })');
+      Hyprland.dispatch(Hypr.focusTitle("picasso-view"));
       return;
     }
     mgr.spawn(list, mode, false);

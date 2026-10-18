@@ -64,6 +64,7 @@ import threading
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(HERE)), "morpheus", "py"))
 
+import zenpaths  # noqa: E402
 import lines  # noqa: E402
 import page  # noqa: E402
 import spell  # noqa: E402
@@ -262,14 +263,7 @@ def safe_id(i):
     return i
 
 
-def write_atomic(path, data):
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    tmp = path + ".part"
-    with open(tmp, "wb") as f:
-        f.write(data if isinstance(data, bytes) else data.encode("utf-8"))
-        f.flush()
-        os.fsync(f.fileno())
-    os.replace(tmp, path)
+write_atomic = zenpaths.write_atomic   # morpheus/py/zenpaths.py
 
 
 def read_json(path, fallback):

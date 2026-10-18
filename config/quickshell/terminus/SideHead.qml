@@ -70,7 +70,7 @@ Item {
   // beside it — measured from the text it was a few pixels short, and the
   // two hairlines stepped at the seam (user, 2026-10-09).
   height: !visible ? 0
-    : sideHead.first && term ? term.headH
+    : sideHead.first && term ? term.topBandH
     : Math.round((sideHead.first ? 0 : sideHead.airAbove + sideHead.rule)
       + sideHead.airIn + sideHeadText.height + sideHead.airIn + sideHead.rule)
 

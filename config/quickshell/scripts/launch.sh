@@ -24,6 +24,29 @@
 # screen-sized copies first.
 export QT_IMAGEIO_MAXALLOC=2048
 
+# Qt's Wayland text-input-v3 warns at every window open that its idea of the
+# focused surface lags the compositor's ("Trying to disable … but … is
+# focused"). Qt's bookkeeping, nothing the shell can act on: it was the
+# whole of Health's warning count after a clean start (2026-10-18). Kept in
+# scripts/lognoise.txt too, for a shell started some other way.
+export QT_LOGGING_RULES="${QT_LOGGING_RULES:+$QT_LOGGING_RULES;}qt.qpa.wayland.textinput.warning=false"
+
+# THE COMPILED-QML CACHE (~/.cache/quickshell/qmlcache). Qt writes a .qmlc
+# for every version of every file it compiles and never deletes one: 95 MB
+# on 2026-10-17, 200 MB and 5615 files a day later. Stale ones are only
+# skipped, never harmful, so this is upkeep: after Qt, quickshell or
+# Hyprland change (scripts/stack.sh) the whole cache goes — none of it
+# matches the new Qt anyway — and otherwise anything not read in two weeks.
+cache="${XDG_CACHE_HOME:-$HOME/.cache}/quickshell"
+stack=$(sh "$(dirname "$(readlink -f "$0")")/stack.sh" 2>/dev/null)
+if [ -n "$stack" ] && [ "$(cat "$cache/qmlcache.stack" 2>/dev/null)" != "$stack" ]; then
+  rm -rf "$cache/qmlcache"
+  mkdir -p "$cache" && printf '%s\n' "$stack" > "$cache/qmlcache.stack"
+elif [ -d "$cache/qmlcache" ]; then
+  find "$cache/qmlcache" -type f -atime +14 -delete 2>/dev/null
+fi
+
+
 # FLATPAK'S APPS IN THE LAUNCHER. Flatpak exports their desktop entries under
 # its own share directories; /etc/profile.d/flatpak.sh adds them for a login
 # shell, and a session that never ran one — this one — never saw them. Set

@@ -27,9 +27,18 @@ const SECTIONS = [
   ["installed", "Installed",      "", []]
 ];
 
+// A section by its key, and each category's sections, looked up rather than
+// walked: inSection runs for every app against every section each time the
+// front page is laid out, and the walk was most of a 600 ms stall the first
+// time the Store was shown (profiled 2026-10-18).
+const BY_KEY = {};
+const CAT_IN = {};
+for (const s of SECTIONS) {
+  BY_KEY[s[0]] = s;
+  for (const c of s[3]) (CAT_IN[c] = CAT_IN[c] || {})[s[0]] = true;
+}
 function section(key) {
-  for (const s of SECTIONS) if (s[0] === key) return s;
-  return SECTIONS[0];
+  return BY_KEY[key] || SECTIONS[0];
 }
 
 // The source's mark and name: the glyph on a card, the words on a page —
@@ -49,9 +58,13 @@ function sourceLabel(app) {
 
 function inSection(app, key) {
   if (key === "installed") return !!app.installed;
-  const cats = section(key)[3];
-  if (!cats.length) return true;
-  for (const c of app.cats || []) if (cats.indexOf(c) >= 0) return true;
+  if (!section(key)[3].length) return true;
+  const cats = app.cats;
+  if (!cats) return false;
+  for (let i = 0; i < cats.length; i++) {
+    const in_ = CAT_IN[cats[i]];
+    if (in_ && in_[key]) return true;
+  }
   return false;
 }
 
@@ -181,10 +194,23 @@ function shelves(apps, cols, taken, rows, artCols) {
   const tr = take(rising, per);
   const trWhole = tr.length - tr.length % Math.max(1, cols);
   if (trWhole > 0) out.push({ key: "", title: "Trending on Flathub", apps: keep(tr.slice(0, trWhole)), art: false });
+  // each section's polished apps in one pass, in catalog order — not one
+  // pass over the catalog per section
+  const bySection = {};
+  for (const s of SECTIONS) bySection[s[0]] = [];
+  for (const a of polished) {
+    const cats = a.cats || [];
+    const hit = {};
+    for (let i = 0; i < cats.length; i++) {
+      const in_ = CAT_IN[cats[i]];
+      if (!in_) continue;
+      for (const k in in_) if (!hit[k]) { hit[k] = true; bySection[k].push(a); }
+    }
+  }
   for (const s of SECTIONS) {
     if (!s[3].length) continue;
     const art = ART.indexOf(s[0]) >= 0;
-    const list = polished.filter(a => inSection(a, s[0]) && (!art || a.shot));
+    const list = art ? bySection[s[0]].filter(a => a.shot) : bySection[s[0]];
     const got = take(list, art ? artCols : per);
     const n = art ? (got.length === artCols ? artCols : 0) : got.length - got.length % Math.max(1, cols);
     if (n <= 0) continue;

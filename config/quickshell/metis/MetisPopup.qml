@@ -1585,16 +1585,19 @@ LayerPopup {
                 width: 14
                 height: 14
                 Rectangle {
+                  id: ratesDot
                   anchors.centerIn: parent
                   width: 8
                   height: 8
                   radius: 4
                   color: Zenon[Metis.ageInk(popup.ratesAge)]
                   Behavior on color { ColorAnimation { duration: Zenon.slow } }
+                  // by id: an animation has no parent of its own, so a bare
+                  // `parent` here was the popup's, and the dot stayed dim
                   SequentialAnimation on opacity {
                     running: popup.ratesRefreshing
                     loops: Animation.Infinite
-                    onRunningChanged: if (!running) parent.opacity = 1
+                    onRunningChanged: if (!running) ratesDot.opacity = 1
                     NumberAnimation { to: 0.25; duration: 420; easing.type: Easing.InOutSine }
                     NumberAnimation { to: 1; duration: 420; easing.type: Easing.InOutSine }
                   }

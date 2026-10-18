@@ -40,6 +40,7 @@ PACKAGES=(
   pipewire pipewire-pulse wireplumber libpulse alsa-utils pamixer playerctl
   gst-plugins-good gst-plugins-bad gst-plugins-ugly
   ffmpeg mpv imagemagick perl-image-exiftool poppler ghostscript djvulibre
+  python-onnxruntime-cpu
   tesseract tesseract-data-eng hunspell hunspell-en_us
   # wayland utilities
   wl-clipboard wl-clip-persist cliphist grim slurp wf-recorder wtype libnotify
@@ -187,6 +188,15 @@ install_files() {
   done
 }
 
+# Picasso's cut-out model (isnet-general-use, 178 MB) fetched now rather than
+# on the first "Cut out the subject"; it would fetch itself then anyway, so a
+# failure here is only a note.
+fetch_models() {
+  say "Fetching Picasso's cut-out model"
+  python3 "$CONFIG/quickshell/picasso/bin/cutout.py" --fetch \
+    || note "not fetched now; the first cut-out fetches it"
+}
+
 # ── 5. finishing touches ────────────────────────────────────────────────────
 finish() {
   if [[ "$(getent passwd "$USER" | cut -d: -f7)" != "$(command -v zsh)" ]]; then
@@ -212,4 +222,5 @@ install_paru
 install_pacman_conf
 install_packages
 install_files
+fetch_models
 finish

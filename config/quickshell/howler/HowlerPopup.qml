@@ -521,7 +521,39 @@ LayerPopup {
             font.pixelSize: Zenon.px(11)
           }
 
-          TapHandler { onTapped: Howler.forget(row.modelData) }
+          // As a toast answers (user, 2026-10-18): left opens where it came
+          // from — Howler.openRow — and closes the panel on the flare's
+          // tail; right is "I have seen it", and forgets the row.
+          TapHandler {
+            acceptedButtons: Qt.LeftButton
+            onTapped: {
+              if (rowOpen.running || popup.collapsing) return;
+              rowFlare.fire();
+              rowOpen.start();
+            }
+          }
+          TapHandler {
+            acceptedButtons: Qt.RightButton
+            onTapped: Howler.forget(row.modelData)
+          }
+          Timer {
+            id: rowOpen
+            interval: rowFlare.rise
+            onTriggered: {
+              const r = row.modelData;
+              popup.closePopup();
+              Howler.openRow(r);
+            }
+          }
+          OpenFlare {
+            id: rowFlare
+            anchors.fill: parent
+            anchors.leftMargin: 8
+            anchors.rightMargin: 8
+            radius: Howler.radius
+            wash: false
+            z: 10
+          }
         }
       }
     }

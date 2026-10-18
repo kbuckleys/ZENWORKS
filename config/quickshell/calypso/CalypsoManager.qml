@@ -43,6 +43,7 @@ import "../ceres"
 import "../terminus"
 import "../morpheus/lagnotes.js" as LagNotes
 import "calypso.js" as C
+import "../morpheus/hypr.js" as Hypr
 
 Scope {
   id: mgr
@@ -511,9 +512,9 @@ Scope {
     const p = mgr.platformInfo(kind);
     if (!p) { if (done) done(false); return false; }
     if (Ceres.txBusy || Ceres.installing) { mgr.tell("Ceres is busy with another job — try again once it is done", true); return false; }
-    const asked = Ceres.install(p.pkg, "for " + p.name + " in Calypso", (ok) => {
+    const asked = Ceres.install(p.pkg, "for " + p.name + " in Calypso", (ok, how) => {
       if (ok) mgr.tell("Installed " + p.pkg);
-      else mgr.tell(p.pkg + " was not installed" + (Ceres.txError ? ": " + Ceres.txError : ""), true);
+      else mgr.tell(p.pkg + " was not installed" + (how === "cancelled" ? "" : Ceres.txError ? ": " + Ceres.txError : ""), how !== "cancelled");
       mgr.loadPlatforms(() => {
         if (ok) mgr.refreshAll();
         if (done) done(ok);
@@ -549,9 +550,14 @@ Scope {
         if (!mgr.win) return;
         fresh = true;
       }
+      // Raised only when it was ON SCREEN already: a kept window that was
+      // hidden is mapped by the line below, and Hyprland focuses a window
+      // it maps; asked in the same tick, it had no such window yet
+      // ("hl.focus: window not found", 2026-10-18).
+      const was = !fresh && mgr.win.visible;
       fn(mgr.win, fresh);
       mgr.win.visible = true;
-      if (!fresh) Hyprland.dispatch('hl.dsp.focus({ window = "title:^(calypso)$" })');
+      if (was) Hyprland.dispatch(Hypr.focusTitle("calypso"));
     });
   }
   function open() {

@@ -538,7 +538,7 @@ Rectangle {
     anchors.right: parent.right
     anchors.rightMargin: 7
     width: 32
-    height: term ? term.headH - 1 : 0
+    height: term ? term.topBandH - 1 : 0
     opacity: sideFlick.opacity
     // the bar's chip, lit: the sidebar is out (user, 2026-10-17)
     BarChip {

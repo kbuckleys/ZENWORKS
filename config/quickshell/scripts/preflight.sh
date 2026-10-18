@@ -17,8 +17,12 @@
 #   3. EVERY .qml compiled. The shell builds most windows lazily, so a file
 #      that no longer compiles stays silent until the day it is opened —
 #      plato was broken that way on 2026-10-08 and nothing said so.
-#   4. what the running shell has warned about since it last reloaded —
+#   4. qmllint against its baseline (scripts/lintgate.py) — what is new
+#   5. what the running shell has warned about since it last reloaded —
 #      runtime errors no compile can see
+#
+# All clear, it stamps what it ran on (scripts/stack.sh --stamp); Health
+# warns once Qt, quickshell or Hyprland have moved on from that.
 #
 # The compile pass runs a throwaway quickshell config that only calls
 # Qt.createComponent on each file: nothing is instantiated, no window opens,
@@ -90,17 +94,27 @@ out=$(timeout 900 qs -p "$tmp/shell.qml" 2>&1 | grep 'PREFLIGHT' | sed 's/^.*PRE
 printf '%s\n' "$out"
 printf '%s' "$out" | grep -q ' 0 failed' || fail=1
 
+# 3b. qmllint, against the baseline (scripts/lintgate.py): only what is NEW
+#     is shown, and new warnings of the kinds an update underneath causes
+#     (a property of ours now overriding one Qt or quickshell added) fail.
+echo "── qmllint, new since the baseline"
+python3 "$here/lintgate.py" || fail=1
+
 # 4. what the RUNNING shell has said since its last reload. Errors that only
 #    happen while things run (a null at startup, a recycled delegate) never
 #    reach a compile; they are only ever in this log, and only for windows
-#    that were open. The known noise is left out — a socket's peer closing
-#    its line included: that is the other end quitting.
+#    that were open. The known noise is left out — scripts/lognoise.txt,
+#    which Health's Log row reads too.
 echo "── the live shell's warnings since its last reload"
+sed '/^#/d; /^[[:space:]]*$/d' "$here/lognoise.txt" > "$tmp/noise"
 qs log 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g' \
   | awk '/Reloading configuration/{buf=""} {buf=buf"\n"$0} END{print buf}' \
   | grep -E 'WARN|ERROR' \
-  | grep -vE 'textinput|grabToImage|usedbeforedeclared|was built against Qt|quickshell.io.socket.*PeerClosedError' \
+  | grep -vEf "$tmp/noise" \
   | sed 's/^/   /' | tail -15 || true
 
+# all clear: what it ran on is stamped, and Oracle's Health says when Qt,
+# quickshell or Hyprland move on from it (scripts/stack.sh)
+[ $fail -eq 0 ] && sh "$here/stack.sh" --stamp >/dev/null
 [ $fail -eq 0 ] && echo "── all clear" || echo "── SOMETHING FAILED (above)"
 exit $fail

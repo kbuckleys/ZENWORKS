@@ -3,50 +3,13 @@
 // └─┘└─┘┘└┘└┴┘└─┘┴└─┴ ┴└─┘
 // https://github.com/kbuckleys/
 //
-// The Installed checkbox's look: a box with a tick, cyan when on. Settings'
-// flags and repos, and setup's "Also add Flatpak apps" — out of ConfigView,
-// where it was an inline component, so setup could have the same box.
+// THE CHECKBOX MOVED to morpheus/controls/Check.qml (2026-10-18), where
+// Oracle's Tools can use it too. This file only forwards to it, because
+// ceres/qmldir still names it and a qmldir change waits for a restart.
+// After one: drop the `Check` line from ceres/qmldir and this file, and add
+// `import "../morpheus/controls"` to ConfigView, SetupView, CeresWindow and
+// StoreView.
 
-import QtQuick
-import "../morpheus"
+import "../morpheus/controls" as Controls
 
-Row {
-  id: ck
-  property bool lit: false
-  property string label: ""
-  property bool enabled2: true
-  signal toggled()
-  spacing: 8
-  opacity: ck.enabled2 ? 1 : 0.4
-  Rectangle {
-    anchors.verticalCenter: parent.verticalCenter
-    width: 18
-    height: 18
-    radius: Zenon.windowRadius - 1
-    // pressed, darkened — the suite's press (user, 2026-10-17)
-    color: ckTap.pressed ? Zenon.pressFill
-      : ck.lit ? Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b, 0.2) : "transparent"
-    Behavior on color { ColorAnimation { duration: Zenon.fast } }
-    border.width: 1
-    border.color: ck.lit ? Zenon.cyan : Zenon.accentKey
-    Text {
-      anchors.centerIn: parent
-      visible: ck.lit
-      text: ""
-      color: Zenon.cyan
-      font.family: Zenon.face
-      font.weight: Zenon.weight
-      font.pixelSize: Zenon.px(11)
-    }
-  }
-  Text {
-    visible: ck.label !== ""
-    anchors.verticalCenter: parent.verticalCenter
-    text: ck.label
-    color: ck.lit ? Zenon.white : Zenon.accentKey
-    font.family: Zenon.face
-    font.weight: Zenon.weight
-    font.pixelSize: Zenon.px(15)
-  }
-  TapHandler { id: ckTap; enabled: ck.enabled2; onTapped: ck.toggled() }
-}
+Controls.Check {}

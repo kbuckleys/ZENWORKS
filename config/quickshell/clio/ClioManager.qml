@@ -28,6 +28,7 @@ import "../ceres"
 import "../morpheus/lagnotes.js" as LagNotes
 import "notes.js" as N
 import "../metis/metis.js" as Metis
+import "../morpheus/hypr.js" as Hypr
 
 Scope {
   id: mgr
@@ -891,9 +892,14 @@ Scope {
         fresh = true;
       }
       const go = () => {
+        // Raised only when it was ON SCREEN already: a kept window that was
+        // hidden is mapped by the line below, and Hyprland focuses a window
+        // it maps; asked in the same tick, it had no such window yet
+        // ("hl.focus: window not found", 2026-10-18).
+        const was = !fresh && mgr.win.visible;
         fn(mgr.win, fresh);
         mgr.win.visible = true;
-        if (!fresh) Hyprland.dispatch('hl.dsp.focus({ window = "title:^(clio)$" })');
+        if (was) Hyprland.dispatch(Hypr.focusTitle("clio"));
       };
       // A window opened afresh reads the notebook again, from where it is
       // written: what was copied in from another machine since shows up.

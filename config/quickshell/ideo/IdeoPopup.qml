@@ -31,6 +31,14 @@ LayerPopup {
   property int sel: 0
   property bool nerdLoading: false
   property bool nerdFailed: false
+  // nothing to show yet and nothing has gone wrong: from the open, through
+  // the deferred load and the fetch, until the set lands. nerdLoading alone
+  // left the gap before the fetch starts, which read as "No matches found"
+  readonly property bool nerdPending: popup.appMode === "nerd"
+    && popup.nerdCache.length === 0 && !popup.nerdFailed
+  // what the last copy put on the clipboard; nerd mode stays open after a
+  // copy, so the count line says it for a moment instead of the close
+  property string copiedNote: ""
 
   // nerd format strip state
   property bool formatMode: false
@@ -122,19 +130,41 @@ LayerPopup {
 
   // ---------------------------------------------------------- actions --
 
-  function copyText(t) {
-    popup.closePopup();
-    popup.detach("sleep 0.25 && printf '%s' " + Strings.shellQuote(t) +
+  // emoji copies close the picker, as they always have; nerd copies keep
+  // it open — picking icons tends to come in runs — and say so in the
+  // count line instead
+  function copyText(t, what) {
+    if (popup.appMode === "emoji") {
+      popup.closePopup();
+      popup.detach("sleep 0.25 && printf '%s' " + Strings.shellQuote(t) +
+        " | wl-copy >/dev/null 2>&1");
+      return;
+    }
+    popup.detach("printf '%s' " + Strings.shellQuote(t) +
       " | wl-copy >/dev/null 2>&1");
+    // a short word, not the copied text: the count line sets the floor of
+    // the panel width, and a long class name would jolt it wider
+    popup.copiedNote = "Copied " + (what || "icon");
+    copiedTimer.restart();
+    if (popup.formatMode) {
+      popup.formatMode = false;
+      popup.syncFocus();
+    }
+  }
+
+  Timer {
+    id: copiedTimer
+    interval: 1400
+    onTriggered: popup.copiedNote = ""
   }
 
   function copyFormat() {
     const e = currentRow();
     if (!e) return;
     const f = popup.formats[popup.formatSel];
-    if (f === "icon") popup.copyText(e.char);
-    else if (f === "class") popup.copyText(e.cls);
-    else popup.copyText("U+" + e.code.toUpperCase());
+    if (f === "icon") popup.copyText(e.char, "icon");
+    else if (f === "class") popup.copyText(e.cls, "class");
+    else popup.copyText("U+" + e.code.toUpperCase(), "codepoint");
   }
 
   function detach(script) {
@@ -182,7 +212,11 @@ LayerPopup {
       popup.filtered = [];
       popup.sel = 0;
       popup.query = "";
-      if (cache.length === 0) loadDeferred.restart();
+      if (cache.length === 0) {
+        // a fresh try: the last failure is not this one
+        if (popup.appMode === "nerd") popup.nerdFailed = false;
+        loadDeferred.restart();
+      }
     }
 
     filterInput.text = popup.query;
@@ -334,7 +368,7 @@ LayerPopup {
       if (copyOnly) popup.copyText(e.char);
       else popup.copyPaste(e.char);
     } else {
-      if (copyOnly) { popup.copyText(e.char); return; }
+      if (copyOnly) { popup.copyText(e.char, "icon"); return; }
       popup.formatMode = true;
       popup.formatSel = 0;
     }
@@ -585,17 +619,25 @@ LayerPopup {
             anchors.centerIn: parent
             anchors.horizontalCenterOffset: -popup.previewW / 2
             visible: popup.shown && popup.filtered.length === 0 &&
-                     (popup.appMode !== "nerd" || !popup.nerdLoading)
+                     !popup.nerdPending
             text: popup.nerdFailed && popup.appMode === "nerd"
               ? "failed to fetch icons from nerdfonts.com"
-              : popup.appMode === "nerd" && popup.nerdLoading
-                ? "fetching icons…"
-                : "No matches found"
+              : "No matches found"
             color: popup.nerdFailed && popup.appMode === "nerd"
               ? popup.errColor : popup.dimColor
             font.family: Zenon.face
             font.weight: 600
             font.pixelSize: Zenon.px(15)
+          }
+
+          // the nerd set is fetched from nerdfonts.com, which is sometimes
+          // slow: dots, not an empty grid, until it lands
+          Working {
+            anchors.centerIn: parent
+            anchors.horizontalCenterOffset: -popup.previewW / 2
+            running: popup.shown && popup.nerdPending
+            dot: 6
+            gap: 6
           }
 
           // How far down the set goes, and something to drag: the picasso
@@ -713,10 +755,11 @@ LayerPopup {
 
               Text {
                 anchors.verticalCenter: parent.verticalCenter
+                visible: !(popup.nerdPending && popup.copiedNote === "")
                 text: {
+                  if (popup.copiedNote !== "") return popup.copiedNote;
                   if (popup.appMode === "nerd")
-                    return popup.nerdLoading ? "loading…" :
-                      popup.filtered.length + " Icons";
+                    return popup.filtered.length + " Icons";
                   return popup.filtered.length + " Emojis";
                 }
                 // muted, as the picasso picker's count is: a fact about the

@@ -333,6 +333,49 @@ function runCommand(fifo, askpass, steps, tag, noAuth) {
     + "printf '\\n" + mark + "%s\\n' \"$s\"";
 }
 
+// ── STOPPING A JOB, FOR REAL (user, 2026-10-18) ──────────────────────────
+// Shift+Esc used to send SIGINT and wait. pacman decides for itself what an
+// interrupt means, paru carries on to its next package after a build is
+// interrupted, and a user's kill cannot reach what runs as root at all — so
+// a long AUR build "cancelled" ran on to its end. This escalates:
+//
+//   1. SIGINT to the whole tree (pacman's own ctrl+c) — 3 s to go
+//   2. SIGTERM, 2 s;  3. SIGKILL
+//   root's processes the same way through `sudo -S`, with the password the
+//   job was started with (read from stdin; none for a job that needed none)
+//
+// EXCEPT WHILE PACMAN WRITES TO THE DISK (`committing`: the Installing and
+// hooks phases). Killed there, a package is left half on the disk; it stays
+// at step 1, and pacman stops cleanly after the package in hand.
+//
+// Once nothing of the job is left: pacman's lock if no pacman holds it, the
+// partial downloads, and paru's build directories this job touched (newer
+// than `since`, epoch seconds) — an interrupted build leaves gigabytes.
+// Prints "@@stopped 1" when the job is gone, "@@stopped 0" when it was left
+// to finish the package in hand.
+function stopCommand(pid, committing, since, cloneDir) {
+  return "IFS= read -r pw\n"
+    + "root=" + Number(pid) + "; committing=" + (committing ? 1 : 0) + "; since=" + Number(since || 0) + "\n"
+    + "clone=" + q(cloneDir) + "\n"
+    + "tree() { for c in $(pgrep -P \"$1\"); do tree \"$c\"; echo \"$c\"; done; }\n"
+    // a zombie is gone: dead, only not yet reaped by whoever started it
+    + "alive() { kill -0 \"$root\" 2>/dev/null && ! grep -q ') Z ' /proc/$root/stat 2>/dev/null; }\n"
+    + "asroot() { [ -n \"$pw\" ] && printf '%s\\n' \"$pw\" | sudo -S -p '' \"$@\" >/dev/null 2>&1; }\n"
+    + "sig() { p=\"$(tree \"$root\") $root\"; kill -\"$1\" $p 2>/dev/null; asroot kill -\"$1\" $p; }\n"
+    + "gone() { n=0; while alive && [ $n -lt \"$1\" ]; do sleep 0.1; n=$((n+1)); done; ! alive; }\n"
+    + "sig INT\n"
+    + "if [ $committing = 0 ]; then\n"
+    + "  gone 30 || { sig TERM; gone 20; } || { sig KILL; gone 20; }\n"
+    + "fi\n"
+    + "if alive; then echo '@@stopped 0'; exit 0; fi\n"
+    + "echo '@@stopped 1'\n"
+    + "pgrep -x pacman >/dev/null || asroot sh -c 'rm -f /var/lib/pacman/db.lck; "
+    + "find /var/cache/pacman/pkg -maxdepth 1 -name \"*.part\" -delete'\n"
+    + "[ \"$since\" -gt 0 ] && [ -d \"$clone\" ] && "
+    + "find \"$clone\" -mindepth 1 -maxdepth 1 -type d -newermt \"@$since\" -exec rm -rf {} + 2>/dev/null\n"
+    + "exit 0";
+}
+
 // Whether any step needs root: a pacman/paru step, an @sudo, or an @user
 // shell line that calls sudo itself. One that does not runs with no password.
 function needsRoot(steps) {

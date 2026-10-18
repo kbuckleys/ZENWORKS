@@ -32,6 +32,7 @@ import "../morpheus/lagnotes.js" as LagNotes
 import "../oracle"
 import "alexandria.js" as A
 import "../oracle/oracle.js" as Ora
+import "../morpheus/hypr.js" as Hypr
 
 Scope {
   id: mgr
@@ -288,9 +289,14 @@ Scope {
         if (!mgr.win) return;
         fresh = true;
       }
+      // Raised only when it was ON SCREEN already: a kept window that was
+      // hidden is mapped by the line below, and Hyprland focuses a window
+      // it maps; asked in the same tick, it had no such window yet
+      // ("hl.focus: window not found", 2026-10-18).
+      const was = !fresh && mgr.win.visible;
       fn(mgr.win, fresh);
       mgr.win.visible = true;
-      if (!fresh) Hyprland.dispatch('hl.dsp.focus({ window = "title:^(alexandria)$" })');
+      if (was) Hyprland.dispatch(Hypr.focusTitle("alexandria"));
     });
   }
   // its window closed: the type goes with it

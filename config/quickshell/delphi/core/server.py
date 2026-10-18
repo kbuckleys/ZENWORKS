@@ -32,13 +32,10 @@ import json
 import os
 import re
 import shutil
-import signal
 import socket
 import subprocess
-import sys
 import tempfile
 import threading
-import time
 
 import forgejo
 import github
@@ -47,7 +44,7 @@ import gitrun
 import repo as R
 import signing
 from graph import Lanes
-from gitrun import Cancel, Cancelled, GitError
+from gitrun import GitError
 from rest import ForgeError
 from stow import StowError
 from lines import send

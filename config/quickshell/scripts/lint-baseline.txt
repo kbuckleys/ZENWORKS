@@ -1,0 +1,308 @@
+# scripts/lintgate.py --accept — count, file, kind, message
+1	calypso/CalypsoPopup.qml	unused-imports	Unused import
+1	calypso/ItemDetail.qml	id-shadows-member	Id for object Flickable shadows property "flick". Rename one or the other.
+1	calypso/ItemDetail.qml	id-shadows-member	Note: Id defined here
+1	calypso/ItemDetail.qml	missing-property	Member "atts" not found on type "QQuickItem"
+3	calypso/ItemDetail.qml	missing-property	Member "pr" not found on type "QQuickItem"
+1	calypso/PlatformGrid.qml	missing-property	Member "info" not found on type "QQuickItem"
+1	calypso/WatchPane.qml	id-shadows-member	Id for object Flickable shadows property "flick". Rename one or the other.
+1	calypso/WatchPane.qml	id-shadows-member	Note: Id defined here
+4	cerberus/CerberusLock.qml	missing-property	Member "name" not found on type "QuickshellScreenInfo"
+1	cerberus/CerberusLock.qml	uncreatable-type	Type PanelWindow is not creatable.
+1	ceres/CeresPanel.qml	unused-imports	Unused import
+1	ceres/ConfigView.qml	id-shadows-member	Id for object Flickable shadows property "flick". Rename one or the other.
+1	ceres/ConfigView.qml	id-shadows-member	Id for object Rectangle shadows property "add". Rename one or the other.
+2	ceres/ConfigView.qml	id-shadows-member	Note: Id defined here
+1	ceres/ConfigView.qml	unused-imports	Unused import
+2	ceres/PasswordField.qml	unused-imports	Unused import
+1	ceres/StoreCard.qml	unused-imports	Unused import
+1	ceres/StoreView.qml	missing-property	Member "waiting" not found on type "Process"
+1	ceres/StoreView.qml	missing-property	Member "waiting" not found on type conversion to Process
+1	ceres/StoreView.qml	property-override	Property "rows" already exists in base type "QQuickGrid", use a different name.
+1	ceres/StoreView.qml	unused-imports	Unused import
+1	ceres/TxView.qml	id-shadows-member	Id for object Flickable shadows property "flick". Rename one or the other.
+1	ceres/TxView.qml	id-shadows-member	Note: Id defined here
+1	ceres/TxView.qml	unused-imports	Unused import
+1	chronos/ChronosPopup.qml	unused-imports	Unused import
+2	clio/Block.qml	id-shadows-member	Id for object TextEdit shadows property "text". Rename one or the other.
+2	clio/Block.qml	id-shadows-member	Note: Id defined here
+1	clio/Block.qml	missing-property	Member "control" not found on type "QObject"
+1	clio/Block.qml	missing-property	Member "height" not found on type "QObject"
+1	clio/Block.qml	unused-imports	Unused import
+1	clio/BlockEditor.qml	property-override	Property "state" already exists in base type "QQuickItem", use a different name.
+1	clio/BlockEditor.qml	unused-imports	Unused import
+1	clio/ClioBoard.qml	uncreatable-type	Type PanelWindow is not creatable.
+1	clio/ClioCapture.qml	uncreatable-type	Type PanelWindow is not creatable.
+1	clio/ClioManager.qml	confusing-pluses	Confusing pluses.
+1	clio/DateBody.qml	missing-property	Member "chosen" not found on type "QQuickItem"
+1	clio/MomentsBody.qml	id-shadows-member	Id for object Flickable shadows property "flick". Rename one or the other.
+1	clio/MomentsBody.qml	id-shadows-member	Note: Id defined here
+1	clio/MomentsBody.qml	unused-imports	Unused import
+1	clio/SettingsBody.qml	missing-property	Member "toLowerCase" not found on type "QJSPrimitiveValue"
+2	clio/TableBlock.qml	missing-property	Member "cellAt" not found on type "QQuickItem"
+1	cynosure/CynosurePopup.qml	missing-property	Could not find property "bottom".
+1	cynosure/CynosurePopup.qml	missing-property	Could not find property "top".
+1	cynosure/CynosurePopup.qml	missing-property	Member "atLeftEdge" not found on type "QQuickItem"
+1	cynosure/CynosurePopup.qml	missing-property	Member "atRightEdge" not found on type "QQuickItem"
+1	cynosure/CynosurePopup.qml	uncreatable-type	Type PanelWindow is not creatable.
+1	delphi/BlameView.qml	id-shadows-member	Id for object ListView shadows property "view". Rename one or the other.
+1	delphi/BlameView.qml	id-shadows-member	Note: Id defined here
+1	delphi/ConflictView.qml	id-shadows-member	Id for object ListView shadows property "view". Rename one or the other.
+1	delphi/ConflictView.qml	id-shadows-member	Note: Id defined here
+1	delphi/HistoryPage.qml	unused-imports	Unused import
+1	delphi/MessageWell.qml	id-shadows-member	Id for object Flickable shadows property "flick". Rename one or the other.
+1	delphi/MessageWell.qml	id-shadows-member	Id for object TextEdit shadows property "edit". Rename one or the other.
+2	delphi/MessageWell.qml	id-shadows-member	Note: Id defined here
+1	delphi/ReleaseEditor.qml	id-shadows-member	Id for object Column shadows property "top". Rename one or the other.
+1	delphi/ReleaseEditor.qml	id-shadows-member	Note: Id defined here
+3	howler/Howler.qml	missing-property	Member "ink" not found on type "Howler"
+1	howler/Howler.qml	missing-property	Member "slideBy" not found on type "Howler"
+2	howler/Howler.qml	missing-property	Member "values" not found on type "UntypedObjectModel"
+1	howler/HowlerOsd.qml	missing-property	Member "bg" not found on type "Howler"
+1	howler/HowlerOsd.qml	missing-property	Member "borderSize" not found on type "Howler"
+2	howler/HowlerOsd.qml	missing-property	Member "closeMs" not found on type "Howler"
+2	howler/HowlerOsd.qml	missing-property	Member "openMs" not found on type "Howler"
+1	howler/HowlerOsd.qml	missing-property	Member "radius" not found on type "Howler"
+2	howler/HowlerPopup.qml	missing-property	Member "clearHistory" not found on type "Howler"
+3	howler/HowlerPopup.qml	missing-property	Member "dismissAll" not found on type "Howler"
+1	howler/HowlerPopup.qml	missing-property	Member "forget" not found on type "Howler"
+8	howler/HowlerPopup.qml	missing-property	Member "history" not found on type "Howler"
+1	howler/HowlerPopup.qml	missing-property	Member "iconRadius" not found on type "Howler"
+3	howler/HowlerPopup.qml	missing-property	Member "iconsEnabled" not found on type "Howler"
+4	howler/HowlerPopup.qml	missing-property	Member "live" not found on type "Howler"
+1	howler/HowlerPopup.qml	missing-property	Member "markRead" not found on type "Howler"
+1	howler/HowlerPopup.qml	missing-property	Member "markup" not found on type "Howler"
+1	howler/HowlerPopup.qml	missing-property	Member "openRow" not found on type "Howler"
+2	howler/HowlerPopup.qml	missing-property	Member "radius" not found on type "Howler"
+4	howler/HowlerPopup.qml	missing-property	Member "silent" not found on type "Howler"
+1	howler/HowlerPopup.qml	missing-property	Member "toggleMusicTracking" not found on type "Howler"
+2	howler/HowlerPopup.qml	missing-property	Member "toggleSilent" not found on type "Howler"
+3	howler/HowlerPopup.qml	missing-property	Member "trackMusic" not found on type "Howler"
+1	howler/HowlerPopup.qml	missing-property	Member "unread" not found on type "Howler"
+1	howler/HowlerPopup.qml	unused-imports	Unused import
+1	howler/HowlerToasts.qml	missing-property	Member "borderSize" not found on type "Howler"
+1	howler/HowlerToasts.qml	missing-property	Member "captureWidth" not found on type "Howler"
+2	howler/HowlerToasts.qml	missing-property	Member "closeMs" not found on type "Howler"
+1	howler/HowlerToasts.qml	missing-property	Member "height" not found on type "QuickshellScreenInfo"
+1	howler/HowlerToasts.qml	missing-property	Member "iconSize" not found on type "Howler"
+1	howler/HowlerToasts.qml	missing-property	Member "lift" not found on type "Howler"
+1	howler/HowlerToasts.qml	missing-property	Member "live" not found on type "Howler"
+2	howler/HowlerToasts.qml	missing-property	Member "margin" not found on type "Howler"
+1	howler/HowlerToasts.qml	missing-property	Member "maxWidth" not found on type "Howler"
+2	howler/HowlerToasts.qml	missing-property	Member "openMs" not found on type "Howler"
+1	howler/HowlerToasts.qml	missing-property	Member "padding" not found on type "Howler"
+2	howler/HowlerToasts.qml	missing-property	Member "slideBy" not found on type "Howler"
+2	howler/HowlerToasts.qml	missing-property	Member "slideByV" not found on type "Howler"
+1	howler/HowlerToasts.qml	missing-property	Member "width" not found on type "Howler"
+1	howler/HowlerToasts.qml	uncreatable-type	Type PanelWindow is not creatable.
+1	icarus/HomeCard.qml	missing-property	Could not find property "left".
+1	icarus/HomeCard.qml	missing-property	Could not find property "top".
+1	icarus/HomeCard.qml	missing-property	Member "fire" not found on type "QQuickItem"
+3	icarus/HomeCard.qml	missing-property	Member "height" not found on type "QuickshellScreenInfo"
+1	icarus/HomeCard.qml	missing-property	Member "width" not found on type "QuickshellScreenInfo"
+1	icarus/HomeCard.qml	uncreatable-type	Type PanelWindow is not creatable.
+1	icarus/IcarusDesktop.qml	uncreatable-type	Type PanelWindow is not creatable.
+2	icarus/IcarusPopup.qml	missing-property	Could not find property "left".
+2	icarus/IcarusPopup.qml	missing-property	Could not find property "top".
+3	icarus/IcarusPopup.qml	uncreatable-type	Type PanelWindow is not creatable.
+1	morpheus/CardBody.qml	id-shadows-member	Id for object Flickable shadows property "flick". Rename one or the other.
+1	morpheus/CardBody.qml	id-shadows-member	Note: Id defined here
+1	morpheus/CardMenu.qml	missing-property	Could not find property "left".
+1	morpheus/CardMenu.qml	missing-property	Could not find property "top".
+3	morpheus/CardMenu.qml	missing-property	Member "height" not found on type "QuickshellScreenInfo"
+1	morpheus/CardMenu.qml	missing-property	Member "left" not found on type "Margins"
+1	morpheus/CardMenu.qml	missing-property	Member "top" not found on type "Margins"
+3	morpheus/CardMenu.qml	missing-property	Member "width" not found on type "QuickshellScreenInfo"
+1	morpheus/CardMenu.qml	uncreatable-type	Type PanelWindow is not creatable.
+1	morpheus/CardPopup.qml	missing-property	Could not find property "adjustment".
+1	morpheus/CardPopup.qml	missing-property	Could not find property "edges".
+1	morpheus/CardPopup.qml	missing-property	Could not find property "gravity".
+1	morpheus/CardPopup.qml	missing-property	Could not find property "window".
+1	morpheus/CardPopup.qml	unresolved-type	Type rect is used but it is not resolved
+1	morpheus/CornerPicker.qml	missing-property	Could not find property "adjustment".
+1	morpheus/CornerPicker.qml	missing-property	Could not find property "window".
+1	morpheus/CornerPicker.qml	unresolved-type	Type rect is used but it is not resolved
+1	morpheus/CursorAnchor.qml	missing-property	Could not find property "left".
+1	morpheus/CursorAnchor.qml	missing-property	Could not find property "top".
+1	morpheus/CursorAnchor.qml	missing-property	Member "anchors" not found on type "QObject"
+1	morpheus/CursorAnchor.qml	missing-property	Member "height" not found on type "QuickshellScreenInfo"
+1	morpheus/CursorAnchor.qml	missing-property	Member "width" not found on type "QuickshellScreenInfo"
+1	morpheus/CursorAnchor.qml	uncreatable-type	Type PanelWindow is not creatable.
+1	morpheus/Desktop.qml	unused-imports	Unused import
+1	morpheus/Elastic.qml	missing-property	Member "grow" not found on type "QObject"
+1	morpheus/Elastic.qml	missing-property	Member "hold" not found on type "QObject"
+1	morpheus/InputShield.qml	unused-imports	Unused import
+1	morpheus/LayerPopup.qml	uncreatable-type	Type PanelWindow is not creatable.
+1	morpheus/NowPlaying.qml	missing-property	Member "values" not found on type "UntypedObjectModel"
+1	morpheus/Strings.qml	missing-property	Member "done" not found on type Strings::pasteProc with type Process
+3	morpheus/Sysmon.qml	missing-property	Member "reload" not found on type "QObject"
+3	morpheus/Sysmon.qml	missing-property	Member "text" not found on type "QObject"
+1	morpheus/UpdateModule.qml	unused-imports	Unused import
+1	morpheus/WindowTip.qml	missing-property	Could not find property "adjustment".
+1	morpheus/WindowTip.qml	missing-property	Could not find property "edges".
+1	morpheus/WindowTip.qml	missing-property	Could not find property "gravity".
+1	morpheus/WindowTip.qml	missing-property	Could not find property "window".
+1	morpheus/WindowTip.qml	unresolved-type	Type rect is used but it is not resolved
+1	morpheus/Workspaces.qml	block-scope-var-declaration	var declaration in block scope is hoisted to function scope
+1	morpheus/Workspaces.qml	missing-property	Member "values" not found on type "UntypedObjectModel"
+1	oracle/ComputerPanel.qml	unused-imports	Unused import
+1	oracle/OracleWindow.qml	unused-imports	Unused import
+1	picasso/Annotator.qml	unused-imports	Unused import
+1	picasso/FocusCard.qml	missing-property	Member "ink" not found on type "QQuickItem"
+1	picasso/FocusCard.qml	missing-property	Member "value" not found on type "QQuickItem"
+1	picasso/MapView.qml	missing-property	Member "running" not found on type call to method createObject, returning QObject
+1	picasso/MapView.qml	unused-imports	Unused import
+1	picasso/PicassoCapture.qml	uncreatable-type	Type PanelWindow is not creatable.
+5	picasso/PicassoDaemon.qml	missing-property	Member "path" not found on type "QQuickItem"
+3	picasso/PicassoDaemon.qml	missing-property	Member "showing" not found on type "QQuickItem"
+2	picasso/PicassoDaemon.qml	missing-property	Member "status" not found on type "QQuickItem"
+1	picasso/PicassoDaemon.qml	uncreatable-type	Type PanelWindow is not creatable.
+1	picasso/PicassoPicker.qml	uncreatable-type	Type PanelWindow is not creatable.
+1	picasso/PicassoPopup.qml	missing-property	Member "name" not found on type "QuickshellScreenInfo"
+1	picasso/ViewerWindow.qml	missing-property	Could not find property "adjustment".
+1	picasso/ViewerWindow.qml	missing-property	Could not find property "window".
+1	picasso/ViewerWindow.qml	syntax.duplicate-ids	Found a duplicated id. id chipRow was first declared at N:N
+1	picasso/ViewerWindow.qml	syntax.duplicate-ids	Found a duplicated id. id pic was first declared at N:N
+1	picasso/ViewerWindow.qml	unresolved-type	Type rect is used but it is not resolved
+1	plato/PlatoWindow.qml	required	Component is missing required property face from LeaderCard
+1	plato/PlatoWindow.qml	required	Component is missing required property face from Picker
+1	plato/PlatoWindow.qml	required	Component is missing required property face from PluginPanel
+1	plato/PlatoWindow.qml	required	Component is missing required property face from SettingsSheet
+1	plato/editor/ContextMenu.qml	unused-imports	Unused import
+1	plato/editor/EditorView.qml	id-shadows-member	Id for object Item shadows property "view". Rename one or the other.
+1	plato/editor/EditorView.qml	id-shadows-member	Note: Id defined here
+2	plato/editor/EditorView.qml	missing-property	Member "atRight" not found on type "QQuickItem"
+1	plato/editor/EditorView.qml	missing-property	Member "edgeAboveOn" not found on type "QQuickItem"
+1	plato/editor/EditorView.qml	missing-property	Member "edgeBelowOn" not found on type "QQuickItem"
+1	plato/editor/EditorView.qml	missing-property	Member "moreAbove" not found on type "QQuickItem"
+1	plato/editor/EditorView.qml	missing-property	Member "moreBelow" not found on type "QQuickItem"
+1	plato/editor/EditorView.qml	missing-property	Member "railDragging" not found on type "QQuickItem"
+4	plato/editor/EditorView.qml	missing-property	Member "w" not found on type "QQuickItem"
+1	plato/editor/KeyHints.qml	id-shadows-member	Id for object PlatoSheet shadows property "hints". Rename one or the other.
+1	plato/editor/KeyHints.qml	id-shadows-member	Note: Id defined here
+1	plato/editor/Minimap.qml	id-shadows-member	Id for object MouseArea shadows property "drag". Rename one or the other.
+1	plato/editor/Minimap.qml	id-shadows-member	Note: Id defined here
+1	plato/editor/Picker.qml	property-override	Property "glyph" already exists in base type "PlatoSheet", use a different name.
+1	plato/editor/PlatoSheet.qml	id-shadows-member	Id for object Item shadows property "layer". Rename one or the other.
+1	plato/editor/PlatoSheet.qml	id-shadows-member	Note: Id defined here
+1	plato/editor/PluginPanel.qml	id-shadows-member	Id for object Text shadows property "right". Rename one or the other.
+1	plato/editor/PluginPanel.qml	id-shadows-member	Note: Id defined here
+1	plato/editor/PluginPanel.qml	unused-imports	Unused import
+1	plato/editor/PropsSheet.qml	id-shadows-member	Id for object Term.PropsHost shadows property "host". Rename one or the other.
+1	plato/editor/PropsSheet.qml	id-shadows-member	Note: Id defined here
+1	plato/editor/SettingsSheet.qml	unused-imports	Unused import
+1	shell.qml	uncreatable-type	Type PanelWindow is not creatable.
+1	socordia/SocordiaDaemon.qml	missing-property	Member "isIdle" not found on type "QObject"
+1	socordia/SocordiaDaemon.qml	missing-property	Member "timeout" not found on type "QObject"
+3	socordia/SocordiaDaemon.qml	missing-property	Member "values" not found on type "UntypedObjectModel"
+1	terminus/Bubble.qml	missing-property	Could not find property "adjustment".
+1	terminus/Bubble.qml	missing-property	Could not find property "edges".
+1	terminus/Bubble.qml	missing-property	Could not find property "gravity".
+1	terminus/Bubble.qml	missing-property	Could not find property "window".
+1	terminus/Bubble.qml	unresolved-type	Type rect is used but it is not resolved
+1	terminus/BubbleCard.qml	id-shadows-member	Id for object Item shadows property "card". Rename one or the other.
+1	terminus/BubbleCard.qml	id-shadows-member	Note: Id defined here
+1	terminus/BulkRename.qml	id-shadows-member	Id for object BulkField shadows property "fmtStart". Rename one or the other.
+1	terminus/BulkRename.qml	id-shadows-member	Id for object Segments shadows property "addWhere". Rename one or the other.
+1	terminus/BulkRename.qml	id-shadows-member	Id for object Segments shadows property "fmtKind". Rename one or the other.
+1	terminus/BulkRename.qml	id-shadows-member	Id for object Segments shadows property "fmtWhere". Rename one or the other.
+4	terminus/BulkRename.qml	id-shadows-member	Note: Id defined here
+2	terminus/Cards.qml	unused-imports	Unused import
+3	terminus/Chrome.qml	unused-imports	Unused import
+1	terminus/Clipboard.qml	unused-imports	Unused import
+1	terminus/ColHead.qml	unused-imports	Unused import
+1	terminus/ColHeadBar.qml	unused-imports	Unused import
+2	terminus/CollEditSheet.qml	missing-property	Member "kindCtl" not found on type "QQuickItem"
+2	terminus/CollEditSheet.qml	missing-property	Member "opCtl" not found on type "QQuickItem"
+2	terminus/CollEditSheet.qml	missing-property	Member "valCtl" not found on type "QQuickItem"
+1	terminus/CollEditSheet.qml	unused-imports	Unused import
+1	terminus/CommandPalette.qml	unused-imports	Unused import
+1	terminus/Creating.qml	unused-imports	Unused import
+1	terminus/DialogKeys.qml	unused-imports	Unused import
+1	terminus/DirCounts.qml	unused-imports	Unused import
+1	terminus/DirWatch.qml	id-shadows-member	Id for object Process shadows property "otherWatchProc". Rename one or the other.
+1	terminus/DirWatch.qml	id-shadows-member	Id for object Process shadows property "peekWatchProc". Rename one or the other.
+1	terminus/DirWatch.qml	id-shadows-member	Id for object Process shadows property "watchProc". Rename one or the other.
+3	terminus/DirWatch.qml	id-shadows-member	Note: Id defined here
+1	terminus/DirWatch.qml	unused-imports	Unused import
+1	terminus/DiskInfoSheet.qml	unused-imports	Unused import
+1	terminus/DisksSheet.qml	unused-imports	Unused import
+1	terminus/DropAsk.qml	uncreatable-type	Type PanelWindow is not creatable.
+2	terminus/EditRing.qml	missing-property	Member "item" not found on type "QQuickItem"
+1	terminus/EntryRow.qml	property-override	Property "state" already exists in base type "QQuickItem", use a different name.
+1	terminus/FileOps.qml	id-shadows-member	Id for object Timer shadows property "rescanTick". Rename one or the other.
+1	terminus/FileOps.qml	id-shadows-member	Note: Id defined here
+2	terminus/FontSpecimen.qml	missing-property	Member "font" not found on type "QObject"
+2	terminus/FontSpecimen.qml	missing-property	Member "status" not found on type "QObject"
+1	terminus/LayoutProbe.qml	unused-imports	Unused import
+1	terminus/Listing.qml	id-shadows-member	Id for object Process shadows property "listProc". Rename one or the other.
+1	terminus/Listing.qml	id-shadows-member	Note: Id defined here
+1	terminus/Listing.qml	unused-imports	Unused import
+1	terminus/MarksSheet.qml	unused-imports	Unused import
+1	terminus/Measure.qml	unused-imports	Unused import
+1	terminus/MillerColumn.qml	unused-imports	Unused import
+1	terminus/OpenWithLayer.qml	id-shadows-member	Id for object Item shadows property "layer". Rename one or the other.
+1	terminus/OpenWithLayer.qml	id-shadows-member	Note: Id defined here
+1	terminus/Opening.qml	id-shadows-member	Id for object Timer shadows property "pickerSave". Rename one or the other.
+1	terminus/Opening.qml	id-shadows-member	Id for object Timer shadows property "viewSave". Rename one or the other.
+2	terminus/Opening.qml	id-shadows-member	Note: Id defined here
+2	terminus/Pane.qml	unused-imports	Unused import
+2	terminus/PaneGrid.qml	unused-imports	Unused import
+1	terminus/PaneList.qml	unused-imports	Unused import
+1	terminus/Portal.qml	unused-imports	Unused import
+1	terminus/PrefAction.qml	property-override	Member "enabled" shadows member "enabled" from base type "QQuickItem", use a different name or add a final or override specifier.
+1	terminus/PrefAction.qml	unused-imports	Unused import
+1	terminus/PrefRow.qml	property-override	Member "enabled" shadows member "enabled" from base type "QQuickItem", use a different name or add a final or override specifier.
+1	terminus/PrefRow.qml	unused-imports	Unused import
+1	terminus/PrefSeg.qml	unused-imports	Unused import
+1	terminus/PrefSlider.qml	unused-imports	Unused import
+1	terminus/PrefText.qml	unused-imports	Unused import
+1	terminus/PrefsSheet.qml	unused-imports	Unused import
+1	terminus/Preview.qml	unused-imports	Unused import
+1	terminus/PropsCard.qml	missing-property	Member "on" not found on type "QQuickItem"
+1	terminus/PropsCard.qml	missing-property	Member "shown" not found on type "QQuickItem"
+1	terminus/PropsCard.qml	unused-imports	Unused import
+1	terminus/PropsHost.qml	unused-imports	Unused import
+2	terminus/QuickLook.qml	equality-type-coercion	== and != may perform type coercion, use === or !== to avoid it.
+1	terminus/QuickLook.qml	id-shadows-member	Id for object Rectangle shadows property "look". Rename one or the other.
+1	terminus/QuickLook.qml	id-shadows-member	Note: Id defined here
+1	terminus/QuickLook.qml	uncreatable-type	Type PanelWindow is not creatable.
+1	terminus/RowMenu.qml	id-shadows-member	Id for object ClippingRectangle shadows property "menuCard". Rename one or the other.
+1	terminus/RowMenu.qml	id-shadows-member	Id for object Item shadows property "menu". Rename one or the other.
+2	terminus/RowMenu.qml	id-shadows-member	Note: Id defined here
+2	terminus/RowMenu.qml	missing-property	Could not find property "adjustment".
+1	terminus/RowMenu.qml	missing-property	Could not find property "edges".
+1	terminus/RowMenu.qml	missing-property	Could not find property "gravity".
+2	terminus/RowMenu.qml	missing-property	Could not find property "window".
+2	terminus/RowMenu.qml	unresolved-type	Type rect is used but it is not resolved
+1	terminus/Searching.qml	unused-imports	Unused import
+2	terminus/SelectBar.qml	missing-property	Member "count" not found on type "QQuickFlickable"
+2	terminus/SelectCell.qml	missing-property	Member "cellHeight" not found on type "QQuickFlickable"
+4	terminus/SelectCell.qml	missing-property	Member "cellWidth" not found on type "QQuickFlickable"
+1	terminus/SelectCell.qml	missing-property	Member "count" not found on type "QQuickFlickable"
+1	terminus/Selecting.qml	unused-imports	Unused import
+1	terminus/SendToSheet.qml	unused-imports	Unused import
+2	terminus/SideHead.qml	unused-imports	Unused import
+1	terminus/SideMarks.qml	unused-imports	Unused import
+2	terminus/SideRow.qml	unused-imports	Unused import
+3	terminus/Sidebar.qml	unused-imports	Unused import
+1	terminus/SlideMotion.qml	unused-imports	Unused import
+1	terminus/SplitPane.qml	unused-imports	Unused import
+2	terminus/Tabs.qml	unused-imports	Unused import
+1	terminus/TagPickSheet.qml	unused-imports	Unused import
+1	terminus/Tagging.qml	unused-imports	Unused import
+2	terminus/TerminusWindow.qml	unused-imports	Unused import
+1	terminus/Thumbnails.qml	id-shadows-member	Id for object Timer shadows property "thumbIndexSave". Rename one or the other.
+1	terminus/Thumbnails.qml	id-shadows-member	Note: Id defined here
+2	terminus/Tile.qml	equality-type-coercion	== and != may perform type coercion, use === or !== to avoid it.
+2	terminus/Tile.qml	unused-imports	Unused import
+2	terminus/ViewPrefs.qml	unused-imports	Unused import
+2	terminus/Zoom.qml	unused-imports	Unused import
+1	zeus/Sound.qml	missing-property	Member "values" not found on type "UntypedObjectModel"
+1	zeus/Sound.qml	unused-imports	Unused import
+1	zeus/ZeusPopup.qml	incompatible-type	Cannot assign binding of type Sound to QObject
+1	zeus/ZeusPopup.qml	missing-property	Member "cellW" not found on type "Repeater"
+1	zeus/ZeusPopup.qml	missing-property	Member "text" not found on type "DataStreamParser"
+1	zeus/ZeusPopup.qml	missing-property	Member "values" not found on type "UntypedObjectModel"
+1	zeus/ZeusPopup.qml	uncreatable-type	Type Sound is not creatable.
+1	zeus/ZeusPopup.qml	unresolved-type	Type Sound is used but it is not resolved

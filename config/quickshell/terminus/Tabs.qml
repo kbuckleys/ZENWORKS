@@ -26,7 +26,11 @@ Item {
   // well, because a tab is meant to be a separate window — split in one and a
   // single pane in the next, neither disturbing the other.
   function tabState() {
+    const cur = term.tabs[term.tab];
     return {
+      // the strip's id for this tab (see Chrome's tabStrip.uidOf): the
+      // record is made afresh here, the tab it describes is the same one
+      uid: cur ? cur.uid : undefined,
       cwd: term.cwd,
       sel: term.sel,
       // A tab is a place you were, which means it is also the places you were
@@ -304,6 +308,9 @@ Item {
     const t = term.tabState();
     t.cwd = (path && path !== "") ? path : Paths.home();
     t.sel = 0;
+    // a tab of its own, not a second copy of this one (the strip gives it
+    // an id when it first sees it)
+    t.uid = undefined;
     // A NEW TAB HAS NOT BEEN ANYWHERE. The state was copied off the tab you
     // are standing in, and its trail came with it — so `H` in a brand new tab
     // would have walked back through somewhere else's history.
@@ -397,8 +404,6 @@ Item {
   function closeTabAt(i) {
     if (term.tabs.length < 2) return;   // the last tab is just the window
     if (i < 0 || i >= term.tabs.length) return;
-    // the strip shrinks this one out and closes the rest up over it
-    term.chromeRef.tabStrip.noteClose(i);
     // The tab you are STANDING IN lives in the window rather than in the
     // array, so its record is written back before anything is removed.
     // Without this, closing a background tab rolled the current one back to

@@ -63,7 +63,6 @@ Item {
     font.pixelSize: view.fontSize
     font.weight: view.fontWeight
   }
-  readonly property font cellFont: fm.font
   // ONE CELL IS MEASURED OFF A RUN OF A HUNDRED, BY TextMetrics — never
   // FontMetrics.advanceWidth. Under quickshell that said 10.875px for this
   // face at 16px, while every Text actually lays a character out in 9.594:

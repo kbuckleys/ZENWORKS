@@ -94,6 +94,7 @@ import "../morpheus/icons.js" as Icons
 import "capture.js" as Cap
 import "picasso.js" as Art
 import "viewer.js" as V
+import "../morpheus/hypr.js" as Hypr
 
 FloatingWindow {
   id: win
@@ -331,6 +332,11 @@ FloatingWindow {
   // the gallery's cursor, over directories and pictures both; on a picture it
   // is the picture shown
   property int gidx: 0
+  // a ctrl+click marks and moves the cursor there, but hides it until it
+  // next moves, so the tile reads as marked alone, as space leaves it
+  // (user, 2026-10-18)
+  property bool cursorAway: false
+  onGidxChanged: win.cursorAway = false
   property string dir: ""
   // the paths asked for, when there were several — a gallery of just those
   property var picked: []
@@ -456,10 +462,16 @@ FloatingWindow {
   // The picture's real size then comes from the file's header (`natDims`,
   // magick identify -ping) rather than the decode, so zoom, crop, the pixel
   // probe and every saved edit stay in the picture's own pixels.
+  //
+  // 1.5× the longest screen side, not 2×: three of these are held while
+  // browsing (the read-ahead), and at 2560 px that was ~203 MB of decodes
+  // against ~113 MB now (offscreen, 24 MP photos, 2026-10-18), with no
+  // slower step. Fitted, a picture never needs more; zoomed past it, `sharp`
+  // takes over a little sooner.
   readonly property int capPx: {
     let m = 0;
     for (const sc of Quickshell.screens) m = Math.max(m, sc.width, sc.height);
-    return Math.max(4096, Math.ceil(m * 2));
+    return Math.max(2048, Math.ceil(m * 1.5));
   }
   readonly property size stillAsk: win.vector ? Qt.size(Math.max(stage.width, stage.height) * 2, 0)
     : Qt.size(win.capPx, win.capPx)
@@ -474,7 +486,7 @@ FloatingWindow {
   // and the second waited for its size for ever — a blank stage, "random"
   // as the read-ahead had or had not decoded it yet.
   onCappedChanged: win.wantNat()
-  onPathChanged: win.wantNat()
+  onPathChanged: { win.wantNat(); if (win.made && win.path !== win.made.src) win.dropMade(); }
   function wantNat() {
     if (win.capped && !(win.path in win.natDims)) win.askNat(win.path);
   }
@@ -539,6 +551,9 @@ FloatingWindow {
   // ImageMagick and that is shown instead — looked at, not edited: saving
   // an edit of the copy would save a smaller picture than the one opened.
   property string fallback: ""
+  // the picture neither Qt nor the fallback render could open: the loading
+  // dots stop for it rather than promising something that will not come
+  property string failedPath: ""
   property int reloadTick: 0
   readonly property string stageUrl: win.path === "" ? ""
     : (win.fallback !== "" ? "file://" + win.fallback : win.urlOf(win.path))
@@ -673,7 +688,6 @@ FloatingWindow {
   }
   property string want: ""
   property string startMode: "view"
-  property string compareAfter: ""
   property string cameFrom: ""
 
   // ── back and forward, as terminus has them ──────────────────────────
@@ -768,6 +782,7 @@ FloatingWindow {
   function gallerySel(i) {
     const n = win.galleryItems.length;
     if (n === 0) return;
+    win.cursorAway = false;
     win.gidx = Math.max(0, Math.min(n - 1, i));
     const ri = win.rowOfItem(win.gidx);
     if (ri >= 0) win.go(ri);
@@ -1055,13 +1070,6 @@ FloatingWindow {
         win.startMode = "view";
         if (rows.length === 0 && dirs.length === 0) win.say("no pictures here");
         if (d !== "" && win.mgr) win.mgr.noteRecent(d);
-        // a copy just made beside the picture — enhanced, cut out, upscaled —
-        // shown beside it
-        if (win.compareAfter !== "") {
-          const c = win.compareAfter;
-          win.compareAfter = "";
-          if (V.indexOfPath(rows, c) >= 0) Qt.callLater(() => win.startCompare(c));
-        }
       }
     }
   }
@@ -1183,7 +1191,7 @@ FloatingWindow {
     const at = V.indexOfPath(win.rows, win.path);
     if (at >= 0) win.index = at;
     else win.go(Math.min(Math.max(0, win.index), win.rows.length - 1), true);
-    if (win.cmpPath !== "" && V.indexOfPath(win.rows, win.cmpPath) < 0) win.compare = false;
+    if (win.cmpPath !== "" && !win.showsMade && V.indexOfPath(win.rows, win.cmpPath) < 0) win.compare = false;
     const n = win.galleryItems.length;
     const on = win.galleryItems[win.gidx];
     if (win.mode !== "gallery" || !on || !on.isDir) {
@@ -1589,8 +1597,16 @@ FloatingWindow {
     return !!r && !/\.(gif|webp|apng|mng|svgz?)$/i.test(r.path) && !Terminus.qtBlind(r.name) && !Terminus.isVideo(r.name)
       && (r.size || 0) < 60000000;
   }
+  // THE PICTURE YOU ARE LOOKING AT FIRST. Qt decodes asynchronous images
+  // on one reader thread, and the neighbors asked in the same breath could
+  // be decoded ahead of it: a big PNG cannot be scaled while it decodes
+  // (400–600 ms for 6–8K, measured 2026-10-18), so opening one next to two
+  // others was a blank stage for up to three decodes. The neighbors are
+  // asked once this one has landed (or has failed).
+  readonly property bool readAheadOk: win.loaded || win.failedPath === win.path || win.fallback !== ""
+  onReadAheadOkChanged: if (win.readAheadOk) win.rehold()
   function rehold() {
-    const want = [win.index, win.index + 1, win.index - 1]
+    const want = (win.readAheadOk ? [win.index, win.index + 1, win.index - 1] : [win.index])
       .filter((i) => i >= 0 && i < win.rows.length && win.holdable(win.rows[i]))
       .map((i) => win.rows[i].path);
     const next = win.holdPaths.map((p) => want.indexOf(p) >= 0 ? p : "");
@@ -1764,7 +1780,7 @@ FloatingWindow {
         const made = Thumbs.parseMade(text)[bigProc.forPath] || "";
         if (bigProc.forPath !== win.path) return;
         if (made !== "") { win.fallback = made; win.say("shown from a 1600px copy — Qt cannot open this format"); }
-        else win.say("this picture cannot be opened");
+        else { win.failedPath = win.path; win.say("this picture cannot be opened"); }
       }
     }
   }
@@ -1830,12 +1846,6 @@ FloatingWindow {
       onStreamFinished: if (paletteProc.forPath === win.path) win.palette = V.parsePalette(text).slice(0, 8)
     }
   }
-  function copyPalette() {
-    if (win.palette.length === 0) return;
-    const t = win.palette.map((c) => c.hex).join(" ");
-    Quickshell.execDetached(["sh", "-c", "printf '%s' \"$1\" | wl-copy", "sh", t]);
-    win.say("the palette is on the clipboard  \u00b7  " + t);
-  }
   onInfoShownChanged: if (win.infoShown) win.askExif()
 
   // ── things done to the file ───────────────────────────────────────────
@@ -1850,6 +1860,31 @@ FloatingWindow {
       onExited: (code) => { if (then) then(code); destroy(); }
     }
   }
+
+  // As run(), each line it prints handed to onLine as it comes.
+  function runLines(argv, onLine, then) {
+    const p = lineComp.createObject(win, { command: argv, onLine: onLine, then: then || null });
+    if (p) p.running = true;
+  }
+  Component {
+    id: lineComp
+    Process {
+      id: lp
+      property var onLine: null
+      property var then: null
+      stdout: SplitParser { onRead: (l) => { if (lp.onLine) lp.onLine(l); } }
+      onExited: (code) => { if (lp.then) lp.then(code); lp.destroy(); }
+    }
+  }
+
+  // A Make job at work (the overlay on the picture it is made from):
+  // whether one runs, what it is doing now, and how far it has got (0..1,
+  // -1 when it does not say). Only what reports its steps (bin/cutout.py)
+  // sets the fraction — never a guess.
+  property bool makeRunning: false
+  property string makeSrc: ""
+  property string makeWhat: ""
+  property real makeFrac: -1
 
   // As run(), with what it printed: then(text), once it has finished.
   function capture(argv, then) {
@@ -1960,7 +1995,6 @@ FloatingWindow {
       then();
     });
   }
-  function untrash() { win.undo(); }
   function undo() {
     const e = win.undoStack[win.undoStack.length - 1];
     if (!e) { win.say("nothing to undo"); return; }
@@ -2203,7 +2237,7 @@ FloatingWindow {
 
   // ── made from it, beside it ───────────────────────────────────────────
   // A new file next to the picture, never over it — enhanced (ImageMagick),
-  // the subject cut out (rembg), or four times the size (Real-ESRGAN) — and
+  // the subject cut out (bin/cutout.py), or four times the size (Real-ESRGAN) — and
   // then shown beside the original, to judge. The one not wanted goes to the
   // trash like any other.
   function makeBeside(kind) {
@@ -2212,24 +2246,75 @@ FloatingWindow {
     const up = tools["realesrgan-ncnn-vulkan"] ? "realesrgan-ncnn-vulkan" : (tools["upscayl-bin"] ? "upscayl-bin" : "");
     const k = {
       enhance: { tag: "enhanced", cmd: V.enhanceCommand(), keep: V.writable(src), said: "enhancing…" },
-      cutout:  { tag: "cutout", cmd: V.cutoutCommand(), keep: false, said: "cutting out the subject — the first time fetches its model…" },
+      cutout:  { tag: "cutout", cmd: V.cutoutCommand(Quickshell.shellDir + "/picasso/bin/cutout.py"), keep: false, said: "cutting out the subject…", steps: true },
       upscale: { tag: "x4", cmd: V.upscaleCommand(up), keep: false, said: "upscaling — a minute, for a big picture…" }
     }[kind];
     if (!k) return;
     let name = V.editedName(src, k.tag);
     if (!k.keep) name = name.replace(/\.[^.]+$/, ".png");
     name = Terminus.freeNameKeeping(win.allRows, name);
-    const dest = Terminus.joinPath(Terminus.dirname(src), name);
-    win.say(k.said, 600000);
-    win.run(["sh", "-c", k.cmd, "sh", src, dest], (code) => {
+    // made in the cache, not the directory: nothing lands in the gallery
+    // until it is saved where the picker says (win.made)
+    const dest = win.madeDir + "/" + Date.now() + "-" + name;
+    win.makeWhat = k.said.replace(/\u2026$/, "");
+    win.makeFrac = k.steps ? 0 : -1;
+    win.makeSrc = src;
+    win.makeRunning = true;
+    const step = (line) => {
+      const p = k.steps ? V.parseCutoutProgress(line) : null;
+      if (!p) return;
+      win.makeFrac = p.frac;
+      if (p.frac < 1) win.makeWhat = p.what;
+    };
+    win.runLines(["sh", "-c", 'mkdir -p -- "${2%/*}" || exit 1\n' + k.cmd, "sh", src, dest], step, (code) => {
+      win.makeRunning = false;
       if (code !== 0) { win.say("could not make it  \u00b7  " + kind + " failed"); return; }
-      win.say(name + " beside it  \u00b7  shown on the right", 6000);
-      if (win.picked.length > 0) win.picked = win.picked.concat([dest]);
-      win.compareAfter = dest;
-      win.want = src;
-      win.startMode = "view";
-      win.list();
+      if (win.path !== src) { win.run(["rm", "-f", "--", dest]); return; }
+      win.dropMade();
+      win.made = { src: src, tmp: dest, name: name, dir: Terminus.dirname(src) };
+      win.cmpPath = dest;
+      win.compare = true;
+      win.mode = "view";
+      win.say(name + " on the right, not saved  \u00b7  ctrl+s saves it  \u00b7  esc lets it go", 8000);
     });
+  }
+
+  // ── an unsaved result ─────────────────────────────────────────────────
+  // What Make made (user, 2026-10-18: nothing written into the directory by
+  // itself — it messed up the gallery): { src, tmp, name, dir }, the right
+  // half of a comparison. Save (ctrl+s) asks terminus' picker where it goes,
+  // as the contact sheet does; leaving the comparison or the picture lets it
+  // go. PicassoViewer clears what a closed window left after a day.
+  property var made: null
+  readonly property string madeDir: Paths.cacheDir() + "/picasso/made"
+  readonly property bool showsMade: win.made !== null && win.compare && win.cmpPath === win.made.tmp
+  function dropMade() {
+    const m = win.made;
+    if (!m) return;
+    win.made = null;
+    if (win.cmpPath === m.tmp) { win.compare = false; win.cmpPath = ""; }
+    win.run(["rm", "-f", "--", m.tmp]);
+  }
+  function saveMade() {
+    const m = win.made;
+    if (!m) return;
+    const fm = win.fileManager;
+    if (!fm) { win.say("no file manager to ask"); return; }
+    const ok = fm.choose(false, m.dir, (paths) => {
+      if (paths.length === 0) return;
+      let out = String(paths[0]);
+      const ext = (n) => { const i = n.lastIndexOf("."); return i > 0 ? n.slice(i).toLowerCase() : ""; };
+      if (ext(Terminus.basename(out)) === "") out += ext(m.name);
+      // another extension typed: ImageMagick writes that format
+      const argv = ext(out) === ext(m.tmp) ? ["cp", "--", m.tmp, out] : ["magick", "--", m.tmp, out];
+      win.run(argv, (code) => {
+        if (code !== 0) { win.say("could not save it"); return; }
+        win.say("saved  \u00b7  " + out.replace(Paths.home(), "~"), 6000);
+        if (win.made && win.made.tmp === m.tmp) win.made = Object.assign({}, win.made, { saved: out });
+        if (Terminus.dirname(out) === win.dir) win.refresh();
+      });
+    }, m.name);
+    if (!ok) win.say("the file picker is busy with another request");
   }
 
   // ── for sending ───────────────────────────────────────────────────────
@@ -2357,9 +2442,11 @@ FloatingWindow {
   readonly property bool peekBottom: win.full && strip.can
     && (stripHover.hovered || navTabs.itemAt(2) !== null && navTabs.itemAt(2).hot
         || edgeHover.hovered && edgeHover.point.position.y > canvas.height - win.peekZone)
-  function fullscreen() { if (win.mode === "view") win.full = !win.full; }
+  // not `fullscreen`: quickshell's FloatingWindow has a property by that
+  // name now, and a function of ours would quietly stand over it
+  function toggleFullscreen() { if (win.mode === "view") win.full = !win.full; }
   onFullChanged: {
-    Hyprland.dispatch("hl.dsp.window.fullscreen()");
+    Hyprland.dispatch(Hypr.fullscreen());
     if (win.full) {
       win.chromeBefore = win.chrome;
       win.chrome = false;
@@ -2514,6 +2601,7 @@ FloatingWindow {
     win.say("comparing  \u00b7  shift+\u2190 \u2192 the right one, tab swaps, v ends it", 5000);
   }
   function stepCompare(d) {
+    if (win.showsMade) return;      // the unsaved result is not in the row
     const n = win.rows.length;
     let i = win.cmpIndex;
     for (let k = 0; k < n; ++k) {
@@ -2523,12 +2611,13 @@ FloatingWindow {
     if (i >= 0 && i !== win.index) win.cmpPath = win.rows[i].path;
   }
   function swapCompare() {
+    if (win.showsMade) return;
     const b = win.cmpPath;
     if (b === "") return;
     const a = win.path;
     win.leave(() => { win.go(V.indexOfPath(win.rows, b), true); win.cmpPath = a; });
   }
-  onCompareChanged: Qt.callLater(() => win.refit(true))
+  onCompareChanged: { if (!win.compare && win.made) win.dropMade(); Qt.callLater(() => win.refit(true)); }
 
   DragCard { id: dragCard }
 
@@ -2593,7 +2682,7 @@ FloatingWindow {
       if (ctrl && k === Qt.Key_A) { win.markAll(); return; }
       if (ctrl && k === Qt.Key_F) { win.openFilter(); return; }
       if (ctrl && k === Qt.Key_Z) { win.undo(); return; }
-      if (ctrl && k === Qt.Key_S) { shift ? win.saveNew() : win.save(); return; }
+      if (ctrl && k === Qt.Key_S) { win.made ? win.saveMade() : (shift ? win.saveNew() : win.save()); return; }
       // ctrl + - 0: the zoom, as terminus has them — the tiles' in the
       // gallery, the picture's on a picture
       if (ctrl && (k === Qt.Key_Plus || k === Qt.Key_Equal || k === Qt.Key_Minus || k === Qt.Key_0)) {
@@ -2721,7 +2810,7 @@ FloatingWindow {
       else if (k === Qt.Key_Y) win.copyColour();
       else if (k === Qt.Key_I) { if (win.mode === "view") win.infoShown = !win.infoShown; }
       else if (k === Qt.Key_B) win.chrome = !win.chrome;
-      else if (k === Qt.Key_F) win.fullscreen();
+      else if (k === Qt.Key_F) win.toggleFullscreen();
       else if (k === Qt.Key_O) win.reveal();
       else e.accepted = false;
     }
@@ -3179,7 +3268,7 @@ FloatingWindow {
              onHit: win.toBackground() }
       Sep {}
       Tool { glyph: "\uf065"; name: "Fullscreen"; key: "f"; live: win.mode === "view" && win.loaded
-             onHit: win.fullscreen() }
+             onHit: win.toggleFullscreen() }
       Tool { glyph: "\u{F01C6}"; name: "Details"; key: "i"; on: win.infoShown && win.mode === "view"
              live: win.mode === "view"; onHit: win.infoShown = !win.infoShown }
       Tool { glyph: ""; name: "Copy the picture"; key: "ctrl+c"; live: win.path !== ""; onHit: win.copyImage() }
@@ -3437,6 +3526,75 @@ FloatingWindow {
       Rectangle { anchors.fill: parent; radius: win.picRadius; color: "#000000" }
     }
 
+    // ── a Make job at work, over the picture it is made from ──────────────
+    // The picture veiled, and the veil drawn back from the bottom up as the
+    // steps cutout.py reports are done — a soft sand light at its edge — so
+    // the picture comes back as it is worked through (user, 2026-10-18:
+    // "overlay one vertically over the image"). What it is doing now sits in
+    // a pill in the middle, with the suite's breathing dots. A job that does
+    // not say how far it is (enhance, upscale) keeps the whole veil.
+    Item {
+      id: making
+      readonly property bool on: win.makeRunning && win.path === win.makeSrc
+      // how much of it is done, eased; a job that does not say stays at 0
+      property real shown: Math.max(0, win.makeFrac)
+      Behavior on shown { NumberAnimation { duration: Zenon.slow; easing.type: Zenon.ease } }
+      x: pic.x
+      y: pic.y
+      width: pic.width
+      height: pic.height
+      z: 5
+      opacity: making.on ? 1 : 0
+      visible: opacity > 0.01
+      Behavior on opacity { NumberAnimation { duration: Zenon.normal; easing.type: Zenon.ease } }
+      ClippingRectangle {
+        anchors.fill: parent
+        radius: win.fitted ? win.picRadius : 0
+        color: "transparent"
+        // the veil over what is still to come, down to the rising edge, and
+        // a soft sand light just under that edge, fading away below it
+        Rectangle {
+          id: veil
+          width: parent.width
+          height: parent.height * (1 - making.shown)
+          color: Zenon.hud(0.5)
+        }
+        Rectangle {
+          visible: win.makeFrac >= 0 && making.shown > 0 && making.shown < 1
+          y: veil.height
+          width: parent.width
+          height: Math.min(56, parent.height * 0.12)
+          gradient: Gradient {
+            GradientStop { position: 0.0; color: Qt.rgba(Zenon.sand.r, Zenon.sand.g, Zenon.sand.b, 0.30) }
+            GradientStop { position: 1.0; color: Qt.rgba(Zenon.sand.r, Zenon.sand.g, Zenon.sand.b, 0) }
+          }
+        }
+      }
+      Rectangle {
+        anchors.centerIn: parent
+        width: makingRow.implicitWidth + 32
+        height: 36
+        radius: 18
+        color: Zenon.hud(0.82)
+        border.width: 1
+        border.color: Zenon.border
+        Row {
+          id: makingRow
+          anchors.centerIn: parent
+          spacing: 12
+          Working { anchors.verticalCenter: parent.verticalCenter; running: making.on; ink: Zenon.sand }
+          Text {
+            anchors.verticalCenter: parent.verticalCenter
+            text: win.makeWhat
+            color: Zenon.white
+            font.family: Zenon.face
+            font.weight: Zenon.weight
+            font.pixelSize: Zenon.px(13)
+          }
+        }
+      }
+    }
+
     // the zoom asked for, said large over the picture for a moment
     Rectangle {
       anchors.horizontalCenter: parent.horizontalCenter
@@ -3524,6 +3682,27 @@ FloatingWindow {
         paused: win.gifPaused
         onStatusChanged: if (status === Image.Error) win.renderFallback()
       }
+    }
+
+    // ── STILL DECODING ──────────────────────────────────────────────────
+    // A big picture can take a while, and the stage was blank meanwhile —
+    // which reads as broken. The dots (morpheus/Working) after a moment, so
+    // the everyday picture that decodes at once never flickers them.
+    Timer {
+      id: slowLoad
+      property string forPath: win.path
+      property bool slow: false
+      interval: 220
+      onForPathChanged: { slowLoad.slow = false; slowLoad.restart(); }
+      onTriggered: slowLoad.slow = true
+    }
+    Working {
+      anchors.centerIn: parent
+      z: 5
+      running: slowLoad.slow && win.path !== "" && !win.loaded
+        && win.failedPath !== win.path
+      dot: 7
+      gap: 7
     }
 
     // The wheel zooms, towards the pointer; a drag pans once there is
@@ -3943,7 +4122,8 @@ FloatingWindow {
     width: win.compare && win.mode === "view" ? Math.floor((win.width - panel.width) / 2) : 0
     visible: width > 0
     clip: true
-    readonly property var crow: win.cmpIndex >= 0 ? win.rows[win.cmpIndex] : null
+    readonly property var crow: win.showsMade ? { path: win.made.tmp, name: win.made.name }
+      : (win.cmpIndex >= 0 ? win.rows[win.cmpIndex] : null)
     readonly property real bw: twinImg.status === Image.Ready ? twinImg.implicitWidth : 0
     readonly property real bh: twinImg.status === Image.Ready ? twinImg.implicitHeight : 0
     readonly property var view: {
@@ -3967,11 +4147,28 @@ FloatingWindow {
       fillMode: Image.Stretch
       autoTransform: true
       asynchronous: true
-      cache: true
+      // as the stage's own picture: a screen-sized decode (capPx), never
+      // kept in Qt's cache — it was the whole file, cached: a cut-out of a
+      // 36 MP photo is ~145 MB of RGBA, kept past the comparison
+      cache: false
       mipmap: true
       smooth: twin.view.z < 3
-      sourceSize.width: 0
+      sourceSize: Qt.size(win.capPx, win.capPx)
       opacity: status === Image.Ready ? 1 : 0
+      readonly property bool capped: status === Image.Ready
+        && (implicitWidth >= win.capPx || implicitHeight >= win.capPx)
+      // zoomed past that decode: the whole file over it, as `sharpImg` is
+      // on the left — not latched, so zooming back out lets it go
+      Image {
+        anchors.fill: parent
+        source: twinImg.capped && twin.view.z > 1.05 ? twinImg.source : ""
+        visible: status === Image.Ready
+        fillMode: Image.Stretch
+        autoTransform: true
+        asynchronous: true
+        cache: false
+        smooth: twin.view.z < 3
+      }
     }
     MouseArea {
       anchors.fill: parent
@@ -3996,7 +4193,7 @@ FloatingWindow {
       anchors.left: parent.left
       anchors.bottom: parent.bottom
       anchors.margins: 10
-      width: Math.min(parent.width - 20, bName.implicitWidth + 16)
+      width: Math.min(parent.width - 20 - (madeCard.visible ? madeCard.width + 10 : 0), bName.implicitWidth + 16)
       height: 24
       radius: 5
       color: Zenon.hud(0.8)
@@ -4006,12 +4203,37 @@ FloatingWindow {
         anchors.leftMargin: 8
         anchors.rightMargin: 8
         verticalAlignment: Text.AlignVCenter
-        text: twin.crow ? twin.crow.name + "   \u00b7   shift+\u2190 \u2192   tab swaps" : ""
+        text: !twin.crow ? "" : win.showsMade
+          ? twin.crow.name + "   \u00b7   " + (win.made.saved ? "saved to " + Terminus.dirname(win.made.saved).replace(Paths.home(), "~") : "not saved")
+          : twin.crow.name + "   \u00b7   shift+\u2190 \u2192   tab swaps"
         color: Zenon.sand
         font.family: Zenon.face
         font.weight: Zenon.weight
         font.pixelSize: Zenon.px(12)
         elide: Text.ElideMiddle
+      }
+    }
+    // What Make made, not saved yet: let it go, or save it where terminus'
+    // picker says (win.saveMade, ctrl+s). A frosted card in the corner, so
+    // the buttons read over any picture.
+    Rectangle {
+      id: madeCard
+      visible: win.showsMade
+      anchors.right: parent.right
+      anchors.bottom: parent.bottom
+      anchors.margins: 10
+      width: madeRow.implicitWidth + 16
+      height: madeRow.implicitHeight + 16
+      radius: 8
+      color: Zenon.hud(0.82)
+      border.width: 1
+      border.color: Zenon.border
+      Row {
+        id: madeRow
+        anchors.centerIn: parent
+        spacing: 8
+        DialogButton { label: "Let it go"; onClicked: win.dropMade() }
+        DialogButton { label: win.made && win.made.saved ? "Save again\u2026" : "Save\u2026"; ink: Zenon.cyan; primary: !(win.made && win.made.saved); onClicked: win.saveMade() }
       }
     }
   }
@@ -4261,9 +4483,22 @@ FloatingWindow {
           anchors.horizontalCenter: parent.horizontalCenter
           width: parent.width
           height: parent.height
-          // marked, the picture steps back a little inside its ring
-          scale: cell.marked ? 0.9 : 1
+          // marked, the picture steps back a little inside the mark: the
+          // justified rows sit too close for the mark alone to tell the
+          // marked ones apart (user, 2026-10-18 — terminus' grid doesn't)
+          scale: cell.marked ? 0.78 : 1
           Behavior on scale { NumberAnimation { duration: win.stepMs; easing.type: Easing.OutBack; easing.overshoot: 1.6 } }
+
+          // MARKED, A TILE WEARS THE CURSOR (user, 2026-10-18): MarkRing in
+          // the cursor's ink, 4px out, behind the picture. Inside this box,
+          // so it shrinks WITH the picture and hugs it rather than the
+          // tile's place (user: "the cursor autofitting them").
+          MarkRing {
+            anchors.fill: parent
+            anchors.margins: -4
+            ink: Zenon.cyan
+            on: cell.marked
+          }
 
           // a directory with no pictures in it: its glyph on a tile of its own
           Rectangle {
@@ -4373,9 +4608,6 @@ FloatingWindow {
             font.weight: Zenon.weight
             font.pixelSize: Zenon.px(30)
           }
-          // marked: terminus' MarkRing — a ring a little out from the picture,
-          // which has stepped back inside it (thumbBox.scale), and a tick
-          MarkRing { anchors.fill: pic; on: cell.marked && pic.visible }
           // the open flare — see win.flare; terminus' tile wears the same
           Rectangle {
             id: cellFlare
@@ -4548,9 +4780,11 @@ FloatingWindow {
           // ctrl marks one, shift marks the run from the cursor
           onClicked: (m) => {
             keys.forceActiveFocus();
-            if (!cell.directory && (m.modifiers & Qt.ControlModifier)) win.toggleMark(cell.modelData.path);
+            const ctrl = !cell.directory && (m.modifiers & Qt.ControlModifier);
+            if (ctrl) win.toggleMark(cell.modelData.path);
             else if (!cell.directory && (m.modifiers & Qt.ShiftModifier)) win.markRange(win.gidx, cell.gi);
             win.gallerySel(cell.gi);
+            if (ctrl) win.cursorAway = true;
           }
           onDoubleClicked: win.galleryOpen(cell.gi)
         }
@@ -4562,7 +4796,11 @@ FloatingWindow {
       // the accent: only its rim shows round a full-bleed tile
       ink: Zenon.cyan
       // not while the tiles are scaled between two layouts (see zoomK)
+      // nor with more than one marked: the marks are the selection then,
+      // and a cursor over one of them read as a second kind of mark
+      // (user, 2026-10-18)
       on: win.mode === "gallery" && Math.abs(win.zoomK - 1) < 0.001
+        && win.markCount < 2 && !win.cursorAway
       // the tile's own place, a little out from it, as the rows are justified
       rect: { const r = win.glay.rects[win.gidx]; return r ? { x: r.x - 4, y: r.y - 4, w: r.w + 8, h: r.h + 8 } : null; }
     }
@@ -5827,7 +6065,7 @@ FloatingWindow {
       ]);
 
     case "picture":
-      return [
+      return (win.showsMade ? [{ text: "Save the result\u2026", icon: "\uf0c7", act: "saveMade", hint: "ctrl+s" }, sep] : []).concat([
         { text: "Copy picture", icon: "\uf0c5", act: "copy", hint: "ctrl+c" },
         branch("Copy", "\uf0c1", "copy"),
         sep,
@@ -5852,13 +6090,13 @@ FloatingWindow {
         { text: "Info", icon: "\u{F064E}", act: "props", hint: "alt+enter" },
         { text: "Move to trash", icon: "\uf1f8", act: "trash", hint: "d" },
         { text: "Delete permanently…", icon: "\uf00d", act: "deleteP", hint: "D", asks: true }
-      ]);
+      ]));
 
     case "improve":
       return [
         { text: "Enhanced copy", icon: "\uf0d0", act: "make", kind: "enhance", hint: "levels, tone, sharpness" }
-      ].concat(tools.rembg ? [{ text: "Cut out the subject", icon: "\uf0c4", act: "make", kind: "cutout", hint: "rembg" }]
-                           : [{ text: "Cut out the subject", icon: "\uf0c4", enabled: false, hint: "needs rembg" }])
+      ].concat(V.canCutout(tools) ? [{ text: "Cut out the subject", icon: "\uf0c4", act: "make", kind: "cutout", hint: "IS-Net" }]
+                                  : [{ text: "Cut out the subject", icon: "\uf0c4", enabled: false, hint: "needs python-onnxruntime-cpu" }])
        .concat(tools["realesrgan-ncnn-vulkan"] || tools["upscayl-bin"]
          ? [{ text: "Four times the size", icon: "\uf065", act: "make", kind: "upscale", hint: "Real-ESRGAN" }]
          : [{ text: "Four times the size", icon: "\uf065", enabled: false, hint: "needs realesrgan-ncnn-vulkan" }]);
@@ -6078,6 +6316,7 @@ FloatingWindow {
     case "unmarkAll": win.marks = ({}); break;
     case "compare": win.startCompare(); break;
     case "compareWith": win.mode = "view"; win.startCompare(p); break;
+    case "saveMade": win.saveMade(); break;
     case "zoomLock": win.zoomLock = !win.zoomLock; break;
     case "play":
       win.playing = !win.playing;
@@ -6087,7 +6326,7 @@ FloatingWindow {
     case "shuffle": win.setShuffle(!win.shuffle); break;
     case "slower": win.pace(1); break;
     case "faster": win.pace(-1); break;
-    case "full": win.fullscreen(); break;
+    case "full": win.toggleFullscreen(); break;
     case "info": win.infoShown = !win.infoShown; break;
     case "strip": win.toggleStrip(); break;
     case "monitors": stage.monitorsShown = !stage.monitorsShown; break;

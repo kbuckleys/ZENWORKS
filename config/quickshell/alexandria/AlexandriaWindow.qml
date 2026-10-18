@@ -65,7 +65,6 @@ FloatingWindow {
   // installed (the manager's scan) and opened (files handed in, read with
   // fc-query, not folded: a file is what it says it is)
   property var loose: []
-  readonly property var allFams: win.loose.concat(win.mgr ? win.mgr.families : [])
   property string query: ""
   readonly property string shelf: win.loose.length > 0 && win.shelfOpened ? "opened"
     : (win.mgr ? win.mgr.shelf : "all")

@@ -30,6 +30,7 @@ import "../oracle"
 import "../morpheus"
 import "howler.js" as Wolf
 import "../morpheus/offspecial.js" as Off
+import "../morpheus/hypr.js" as Hypr
 
 Singleton {
   id: root
@@ -271,7 +272,7 @@ Singleton {
     if (entry !== "")
       // the player may live in the special: showing it is wanted here
       // (OffSpecial)
-      Quickshell.execDetached(Off.wanted('hl.dsp.focus({ window = "class:(?i)^(' + entry + ')$" })'));
+      Quickshell.execDetached(Off.wanted(Hypr.focusWindow(Hypr.byClass(entry))));
   }
 
   // ── A RECORDING'S FRAME, KEPT ───────────────────────────────────────────
@@ -507,6 +508,54 @@ Singleton {
   }
   function captureAnnotate(file) {
     if (file !== "") Quickshell.execDetached(["qs", "ipc", "call", "Picasso", "annotate", file]);
+  }
+
+  // ── OPENING A HISTORY ROW ───────────────────────────────────────────────
+  // What a click on a toast opens, for a row of the bell's panel — which no
+  // longer has the toast, and usually not the notification either. In order:
+  // a capture opens its file; a notification still on the server answers as
+  // its toast would (its `default`, else its first action); a track raises
+  // its player; anything else brings its application's window forward, or
+  // starts it when there is none. Returns whether it found anything to open.
+  function openRow(row) {
+    if (!row) return false;
+    if (row.capture !== "" && row.captureFile !== "") {
+      root.captureOpen(row.capture, row.captureFile);
+      return true;
+    }
+    const v = root.live ? root.live.values : [];
+    for (let i = 0; i < v.length; ++i) {
+      const n = v[i];
+      if (!n || n.id !== row.id || String(n.summary || "") !== row.summary) continue;
+      const acts = n.actions || [];
+      let a = null;
+      for (let j = 0; j < acts.length; ++j)
+        if (String(acts[j].identifier || "") === "default") a = acts[j];
+      if (!a && acts.length > 0 && row.mprisPlayer === "") a = acts[0];
+      if (a) { a.invoke(); return true; }
+    }
+    if (row.mprisPlayer && row.mprisPlayer !== "") {
+      const ps = Mpris.players ? Mpris.players.values : [];
+      for (let i = 0; i < ps.length; ++i)
+        if (ps[i] && String(ps[i].identity || "") === row.mprisPlayer) {
+          root.raisePlayer(ps[i]);
+          return true;
+        }
+    }
+    return root.focusOrLaunch(row.desktopEntry || String(row.appName || "").toLowerCase());
+  }
+
+  // its window forward if it has one (class, any case), else its .desktop
+  function focusOrLaunch(entry) {
+    const e = String(entry || "").replace(/[^A-Za-z0-9._-]/g, "");
+    if (e === "") return false;
+    const focus = Off.wanted(Hypr.focusWindow(Hypr.byClass(e))).map(Strings.shellQuote).join(" ");
+    Quickshell.execDetached(["sh", "-c",
+      "if hyprctl clients -j | jq -e --arg c \"$1\" "
+      + "'any(.[]; (.class | ascii_downcase) == ($c | ascii_downcase))' >/dev/null 2>&1; then "
+      + focus + "; else\n" + Desktop.launchCommand(e, "") + "fi",
+      "sh", e]);
+    return true;
   }
 
   // ONE row. A notification id is the server's, and the server numbers from

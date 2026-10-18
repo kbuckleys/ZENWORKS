@@ -31,6 +31,7 @@ import "../terminus" as Term
 import "."
 import "ceres.js" as Cer
 import "store.js" as St
+import "../morpheus/controls" as Controls
 
 FloatingWindow {
   id: win
@@ -3085,14 +3086,11 @@ FloatingWindow {
           // THE MIRRORS' LIST, FRAMED: a hundred-odd servers under a summary
           // read as part of it with nothing between them — boxed as a job's
           // log is (TxView's LogPane), so the list is plainly its own thing.
-          Rectangle {
+          // morpheus/controls/ListFrame, shared with Oracle's Tools.
+          Controls.ListFrame {
             visible: mdList.framed
             anchors.fill: mdList
             anchors.margins: -6
-            radius: Zenon.windowRadius
-            color: Zenon.darken(0.25)
-            border.width: 1
-            border.color: Zenon.border
           }
 
           // the list behind the summary

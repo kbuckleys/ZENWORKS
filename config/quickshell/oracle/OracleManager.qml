@@ -9,12 +9,12 @@
 // window is built hidden as soon as it is ready so the first open does not pay
 // for building it.
 //
-// ON THE MONITOR YOU ARE ON. A quickshell window cannot be moved to another
-// screen once it exists — quickshell segfaults in setScreen — so a hidden
-// window on the wrong monitor is thrown away and a new one built where you are
-// looking. The section you were in, and the size you left it at, are kept here,
-// so the new one is the old one on a different screen. Its sibling types
-// (ArrangeView) come in through the window's own `import "."`.
+// ON THE MONITOR YOU ARE ON. A hidden window on the wrong monitor is moved
+// to the one you are looking at before it is shown — never while it is on
+// screen, where quickshell's setScreen hides and reshows it and crashed.
+// See open(). The section you were in, and the size you left it at, are kept
+// here, for the window the watchdog rebuilds. Its sibling types (ArrangeView)
+// come in through the window's own `import "."`.
 import QtQuick
 import Quickshell
 import Quickshell.Hyprland
@@ -168,13 +168,17 @@ Scope {
     }
     const scr = Oracle.focusedScreen();
     if (!mgr.alive()) mgr.win = null;
-    if (mgr.win && !mgr.win.visible && (!mgr.win.screen || (scr && mgr.win.screen !== scr))) {
-      mgr.win.destroy();
-      mgr.win = null;
-    }
     if (!mgr.win) mgr.build();
     // says shown, is not: closed by the compositor without `visible` hearing
     if (mgr.win.visible && !mgr.win.backingWindowVisible) mgr.win.visible = false;
+    // On the wrong monitor, or on none (a screen that went away): MOVED, not
+    // rebuilt — ceres' fix (see CeresManager.open). It used to be destroyed and
+    // built again, one of the 110–280 ms "in oracle" stalls in lag.log
+    // (2026-10-18). Only while hidden: there quickshell's setScreen is
+    // QWindow::setScreen alone, and Wayland's outputs are virtual siblings, so
+    // nothing is recreated. Its hide-and-reshow path for a window on screen is
+    // the one that crashed.
+    if (scr && !mgr.win.visible && mgr.win.screen !== scr) mgr.win.screen = scr;
     const was = mgr.win.visible;
     mgr.win.openPopup(section || "");
     // already open is not the same as in front of you — it may be on

@@ -17,7 +17,10 @@
 //     }
 //
 // The row format is CardMenu's, and one more: a row with `children` opens
-// them in a card of their own beside it, on hover — see BRANCHES.
+// them in a card of their own beside it, on hover — see MenuCore's BRANCHES.
+//
+// THE SURFACE ONLY. The menu itself — sizing, fade, branches, the card — is
+// morpheus/MenuCore (2026-10-18), so any other surface can hang the same core.
 import QtQuick
 import Quickshell
 import "."
@@ -29,17 +32,25 @@ PopupWindow {
   property var window: null
   property point at: Qt.point(0, 0)
 
-  property var model: []
-  property bool open: false
-  property int cardWidth: 220
+  property alias model: core.model
+  property alias open: core.open
+  property alias cardWidth: core.cardWidth
   // as wide as its longest row, and never narrower than cardWidth
-  property bool fit: false
-  property int activeIndex: -1
+  property alias fit: core.fit
+  property alias activeIndex: core.activeIndex
+  readonly property alias pad: core.pad
+  readonly property alias cardW: core.cardW
+  readonly property alias contentH: core.contentH
+  readonly property alias shade: core.shade
+  readonly property alias branch: core.branch
+  readonly property alias child: core.child
 
   signal chosen(int index)
   signal hovered(int index)
   signal unhovered(int index)
   signal secondary(int index)
+  // a row picked in a branch's card
+  signal subChosen(int branch, int index)
 
   // A key pressed while the card's own surface has the keyboard. Whether a
   // popup or the window under it gets the keys is the compositor's call, so
@@ -52,118 +63,19 @@ PopupWindow {
     Keys.onPressed: (event) => root.keyPressed(event)
   }
 
-  // A third of a layer card's shadow room, as terminus' menus have it: the
-  // compositor fits the SURFACE, not the card, so every pixel of padding is a
-  // pixel the card can be shoved by near a screen edge.
-  readonly property int pad: 36
-
-  FontMetrics {
-    id: rowMetrics
-    font.family: Zenon.face
-    font.weight: Zenon.weight
-    font.pixelSize: Zenon.px(16)
-  }
-
-  FontMetrics {
-    id: hintMetrics
-    font.family: Zenon.face
-    font.weight: Zenon.weight
-    font.pixelSize: Zenon.px(13)
-  }
-
-  readonly property int cardW: {
-    if (!root.fit) return root.cardWidth;
-    let most = 0;
-    const rows = root.model || [];
-    for (let i = 0; i < rows.length; ++i) {
-      const r = rows[i];
-      if (!r || r.isSeparator) continue;
-      let w = rowMetrics.advanceWidth(String(r.text || "")) + 12 + 10;
-      if (r.icon || r.image) w += 16 + Zenon.menuIconGap;
-      if (r.hasChildren || r.children || r.mark !== undefined) w += 16 + 8;
-      if (r.hint) w += hintMetrics.advanceWidth(String(r.hint)) + 12;
-      most = Math.max(most, w);
-    }
-    return Math.max(root.cardWidth, Math.ceil(most + Zenon.menuCardPad * 2 + 2));
-  }
-
-  readonly property int contentH: {
-    let h = 2;   // the border, top and bottom: the rows run edge to edge
-    const rows = root.model || [];
-    for (let i = 0; i < rows.length; ++i) h += body.rowHeight(rows[i]);
-    return h;
-  }
-
-  property real shade: 0
-  onOpenChanged: {
-    root.shade = root.open ? 1 : 0;
-    if (!root.open) root.closeBranch();
-    // on its current answer, once the card has its height (CardBody.reveal)
-    else Qt.callLater(body.reveal);
-  }
-
-  // ── BRANCHES ──────────────────────────────────────────────────────────
-  // A row carrying `children` (rows of its own) is a branch: pointed at, its
-  // card opens beside it — another CardPopup, its own surface, hinged on the
-  // row as terminus' submenu is (subPop): anchored to THIS surface across the
-  // card's width, so FlipX mirrors it to the card's left where the screen
-  // runs out, rather than onto the card. Pointing at any other row puts it
-  // away. A row picked in it comes out as subChosen(branch, index).
-  signal subChosen(int branch, int index)
   // set on a branch's card: the card it hangs off, and how far down that
   // card the row is
   property var parentCard: null
   property real hingeY: 0
-  property int branch: -1
-  property var child: null
 
-  function rowY(i) {
-    let y = 1;   // just inside the border (CardBody: edge to edge)
-    for (let k = 0; k < i && k < root.model.length; ++k) y += body.rowHeight(root.model[k]);
-    // where the row is NOW, in a card scrolled down its list
-    return y - body.scrollY;
-  }
-  function openBranch(i) {
-    const r = root.model[i];
-    if (!r || !r.children || r.enabled === false) { root.closeBranch(); return; }
-    if (root.branch === i && root.child) return;
-    root.closeBranch();
-    const comp = Qt.createComponent("CardPopup.qml");
-    if (comp.status !== Component.Ready) return;
-    const c = comp.createObject(root, {
-      window: root, parentCard: root, hingeY: root.rowY(i) - 1,
-      fit: true, cardWidth: root.cardWidth, model: r.children
-    });
-    if (!c) return;
-    root.branch = i;
-    root.child = c;
-    c.chosen.connect((k) => root.subChosen(i, k));
-    c.open = true;
-  }
-  function closeBranch() {
-    const c = root.child;
-    root.child = null;
-    root.branch = -1;
-    if (c) { c.open = false; c.destroy(); }
-  }
-  // The rows given again while a branch is open — an owner's model is often a
-  // binding, re-made whenever anything it reads changes: the branch keeps its
-  // card with its new rows, or loses it if that row is a branch no more.
-  onModelChanged: {
-    if (!root.child) return;
-    const r = root.model[root.branch];
-    if (r && r.children) root.child.model = r.children;
-    else root.closeBranch();
-  }
-  Behavior on shade {
-    NumberAnimation { duration: Zenon.menuFade; easing.type: Easing.OutCubic }
-  }
+  function rowY(i) { return core.rowY(i); }
+  function openBranch(i) { core.openBranch(i); }
+  function closeBranch() { core.closeBranch(); }
 
-  visible: root.window !== null && (root.open || root.shade > 0.01)
+  visible: root.window !== null && core.showing
   color: "transparent"
-  implicitWidth: root.cardW + root.pad * 2
-  // no taller than Zenon.menuMaxHeight; the rest scrolls (CardBody)
-  implicitHeight: Math.min(root.contentH, Zenon.menuMaxHeight) + root.pad * 2
+  implicitWidth: core.implicitWidth
+  implicitHeight: core.implicitHeight
 
   anchor {
     window: root.window
@@ -184,21 +96,23 @@ PopupWindow {
                                 : (PopupAdjustment.Flip | PopupAdjustment.Slide)
   }
 
-  CardBody {
-    id: body
+  MenuCore {
+    id: core
     anchors.fill: parent
-    pad: root.pad
-    model: root.model
-    shade: root.shade
-    // the branch whose card is open stays lit while the pointer is in it
-    activeIndex: root.branch >= 0 ? root.branch : root.activeIndex
-    onChosen: (i) => {
-      const r = root.model[i];
-      if (r && r.children) { root.openBranch(i); return; }
-      root.chosen(i);
+    // a branch's card: another CardPopup, its own surface, hinged on the row
+    // as terminus' submenu is — anchored to THIS surface across the card's
+    // width, so FlipX mirrors it to the card's left where the screen runs out
+    makeBranch: (rows, from, hingeY) => {
+      const c = Qt.createComponent("CardPopup.qml");
+      return c.status === Component.Ready
+        ? c.createObject(root, { window: root, parentCard: root, hingeY: hingeY, fit: true,
+                                 cardWidth: core.cardWidth, model: rows })
+        : null;
     }
-    onHovered: (i) => { root.openBranch(i); root.hovered(i); }
+    onChosen: (i) => root.chosen(i)
+    onHovered: (i) => root.hovered(i)
     onUnhovered: (i) => root.unhovered(i)
     onSecondary: (i) => root.secondary(i)
+    onSubChosen: (b, i) => root.subChosen(b, i)
   }
 }

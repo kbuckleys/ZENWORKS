@@ -60,7 +60,6 @@ Item {
   signal chose(int i)
   signal picked(int i)
 
-  readonly property int shownItems: Math.min(cb.items.length, cb.maxItems)
   implicitHeight: cb.headless
     ? (cb.items.length > 0 ? 14 + list.height : 0) + 14 + answers.height + 14
     : 18 + head.height

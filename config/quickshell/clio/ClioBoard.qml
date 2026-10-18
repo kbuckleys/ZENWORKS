@@ -513,7 +513,22 @@ Variants {
           // set only while the delegate is being made: a new note pops at
           // once, the stagger is for a wall coming back
           property bool fresh: false
-          Component.onCompleted: { slot.fresh = true; slot.arrived = true; slot.fresh = false; }
+          Component.onCompleted: {
+            slot.fresh = true; slot.arrived = true; slot.fresh = false;
+            if (Clio.editNext === slot.key) Qt.callLater(slot.editFresh);
+          }
+          // a note just made at the pointer opens in editing, on the board
+          // of the screen it landed on (every screen has a copy of it)
+          function editFresh() {
+            const n = slot.note;
+            if (!n || Clio.editNext !== slot.key || !board.mine(n) || !board.screen) return;
+            const cx = n.x + Math.min(n.w, 120) / 2, cy = n.y + 15;
+            if (cx < board.originX || cx >= board.originX + board.screen.width
+                || cy < board.originY || cy >= board.originY + board.screen.height) return;
+            Clio.editNext = "";
+            board.editing = slot.noteId;
+            body.forceActiveFocus();
+          }
           onHereChanged: {
             popIn.stop();
             popOut.stop();
@@ -675,8 +690,9 @@ Variants {
                 font.pixelSize: slot.note ? slot.note.size : Scribe.DEFAULT_SIZE
 
                 cursorDelegate: Caret { field: body }
-                // the spelling, as a note's in the window (SpellMarks)
-                SpellMarks { id: bodySpell; field: body; mgr: Clio.app }
+                // the spelling, as a note's in the window (SpellMarks); shown only
+                // while the note is being written in
+                SpellMarks { id: bodySpell; field: body; mgr: Clio.app; visible: slot.active }
 
                 // Stored as the body's contents rather than as Qt's whole
                 // HTML document — see Scribe.fragment — and as nothing at

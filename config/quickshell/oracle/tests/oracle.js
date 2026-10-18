@@ -362,7 +362,8 @@ module.exports = {
 
     // ── the checkup ───────────────────────────────────────────────────────
     const good = "tests\t920 checks pass\ntestfail\t\nprobes\t\nstale\t\nrss\t1054396\n"
-      + "held\tinotifywait,gdbus\nspawned\tgpu.sh\nerrors\t0\nwarnings\t1\nlasterror\t\n";
+      + "held\tinotifywait,gdbus\nspawned\tgpu.sh\nerrors\t0\nwarnings\t1\nlasterror\t\n"
+      + "stack\tquickshell 0.3.2-1\nstamp\tquickshell 0.3.2-1\ntools\tfd:1,fzf:1\n";
     const G = T.readCheckup(good, 1054396);
     t.eq("a clean run is all ok",
       Object.keys(G).filter((k) => G[k].level !== "ok").length, 0);
@@ -380,6 +381,65 @@ module.exports = {
     t.has("repeats are counted, not listed", B.pollers.text, "hyprctl \u00d75");
     t.eq("errors are bad", B.log.level, "bad");
     t.eq("no output at all did not run", T.readCheckup("", 1).tests.text, "did not run");
+    const st = "quickshell 0.3.2-1, qt6-base 6.12.0-3, hyprland 0.56.2-4, jemalloc 1:5.4.0-1";
+    const S = (now, then) => T.readCheckup("stack\t" + now + "\nstamp\t" + then + "\n", 1).stack;
+    t.eq("the same stack is ok", S(st, st).level, "ok");
+    t.eq("and names the three that matter", S(st, st).text,
+      "quickshell 0.3.2 \u00b7 qt6-base 6.12.0 \u00b7 hyprland 0.56.2 \u00b7 preflight passed on these");
+    t.eq("no stamp asks for a preflight", S(st, "").level, "warn");
+    const up = S(st.replace("qt6-base 6.12.0-3", "qt6-base 6.12.1-1"), st);
+    t.eq("an update is a warning", up.level, "warn");
+    t.has("naming what moved", up.text, "qt6-base 6.12.0 \u2192 6.12.1");
+    t.eq("an epoch is not the version", S(st.replace("1:5.4.0-1", "1:5.4.1-1"), st).text.indexOf("jemalloc 5.4.0 \u2192 5.4.1") >= 0, true);
+    t.has("a new package says so", S(st + ", qt6-svg 6.12.0-1", st).text, "qt6-svg (new)");
+    const tl = (have) => T.readCheckup("tools\t" + have + "\n", 1).tools;
+    const allOn = T.toolNames().split(" ").map((n) => n.replace(/^(py|pkg):/, "") + ":1").join(",");
+    const off = (...names) => allOn.split(",").map((x) => names.indexOf(x.split(":")[0]) >= 0 ? x.replace(":1", ":0") : x).join(",");
+    t.eq("all tools there", tl(allOn).text, "all 24 present");
+    t.eq("is ok", tl(allOn).level, "ok");
+    t.eq("nothing to install", tl(allOn).install, []);
+    t.eq("optional ones missing stay ok", tl(off("tesseract", "bw")).level, "ok");
+    t.has("but are counted", tl(off("tesseract", "bw")).text, "2 optional not installed");
+    t.eq("and listed first", tl(off("tesseract", "bw")).list.slice(0, 2).map((x) => x.name), ["tesseract", "bw"]);
+    t.eq("with paru, one line for all", tl(off("tesseract", "bw")).install, ["paru -S tesseract bitwarden-cli"]);
+    t.eq("a core one missing is bad", tl(off("fzf")).level, "bad");
+    t.eq("and named", tl(off("fzf", "qalc")).text, "missing: fzf, qalc");
+    t.eq("repo packages through paru too", tl(off("fzf", "qalc")).install, ["paru -S fzf libqalculate"]);
+    t.eq("required before optional", tl(off("op", "fzf")).list.slice(0, 2).map((x) => x.name), ["fzf", "op"]);
+    t.eq("one package once", tl(off("wl-copy", "wl-paste")).install, ["paru -S wl-clipboard"]);
+    t.eq("no paru: pacman, then paru, then the AUR", tl(off("paru", "op", "fzf")).install, ["sudo pacman -S fzf",
+      "git clone https://aur.archlinux.org/paru.git && cd paru && makepkg -si", "paru -S 1password-cli"]);
+    t.eq("no paru and nothing else from the AUR", tl(off("paru")).install.length, 1);
+    t.eq("a row knows what each is for", tl(off("qalc")).list[0].why, "metis, the calculator");
+    t.eq("not run, not checked", T.readCheckup("", 1).tools.text, "not checked");
+    const pk = T.toolPackages(tl(off("wl-copy", "ffprobe")).list);
+    t.eq("one row a package", pk.filter((p) => p.pkg === "wl-clipboard").length, 1);
+    t.eq("naming every tool in it", pk.find((p) => p.pkg === "wl-clipboard").names, ["wl-copy", "wl-paste"]);
+    t.eq("missing if one of its tools is", pk.find((p) => p.pkg === "ffmpeg").have, false);
+    t.eq("needed if one of its tools is", pk.find((p) => p.pkg === "wl-clipboard").core, true);
+    t.eq("its reasons joined, each once", pk.find((p) => p.pkg === "wl-clipboard").why, "copying; pasting");
+    t.eq("paru is its author's own package", T.TOOLS.find((x) => x.name === "paru").pkg, "paru");
+    t.eq("so does the upscaler", T.TOOLS.find((x) => x.name === "realesrgan-ncnn-vulkan").pkg, "realesrgan-ncnn-vulkan-bin");
+    t.eq("nothing has to build", T.TOOLS.filter((x) => x.builds).map((x) => x.name), []);
+    t.eq("the cut-out is the repos' onnxruntime", T.TOOLS.find((x) => x.name === "onnxruntime").pkg, "python-onnxruntime-cpu");
+    t.eq("and not from the AUR", !!T.TOOLS.find((x) => x.name === "onnxruntime").aur, false);
+    t.eq("and needed, not optional", T.TOOLS.find((x) => x.name === "onnxruntime").core, true);
+    t.eq("so missing it is red", tl(off("onnxruntime")).level, "bad");
+    t.has("doctor.sh is asked to import it", T.toolNames().split(" "), "py:onnxruntime");
+    t.eq("and only it", T.toolNames().split(" ").filter((n) => /^py:/.test(n)), ["py:onnxruntime"]);
+    t.has("a package with no command is asked of pacman", T.toolNames().split(" "), "pkg:proton-wineland-bin");
+    t.eq("and is optional", !!T.TOOLS.find((x) => x.name === "proton-wineland-bin").core, false);
+    t.eq("as many rows as packages", pk.length, new Set(T.TOOLS.map((x) => x.pkg)).size);
+    t.eq("no settle file falls back", T.settledBaseline("", 921600), 921600);
+    t.eq("a broken one falls back", T.settledBaseline("{kb:", 921600), 921600);
+    t.eq("one start is the baseline",
+      T.settledBaseline(JSON.stringify({ kb: [{ at: 1, kb: 900000 }] }), 1), 900000);
+    t.eq("the median of an odd count", T.settledBaseline(JSON.stringify({ kb: [
+      { kb: 950000 }, { kb: 880000 }, { kb: 2000000 }] }), 1), 950000);
+    t.eq("the middle two of an even count", T.settledBaseline(JSON.stringify({ kb: [
+      { kb: 900000 }, { kb: 800000 }, { kb: 1000000 }, { kb: 3000000 }] }), 1), 950000);
+    t.eq("junk entries are skipped",
+      T.settledBaseline(JSON.stringify({ kb: [null, { kb: "x" }, { kb: 870000 }] }), 1), 870000);
 
     // ── about this computer ───────────────────────────────────────────────
     const ff = JSON.stringify([
@@ -392,7 +452,8 @@ module.exports = {
       { type: "CPU", result: { cpu: "Intel(R) Core(TM) i5-9400F", cores: { logical: 6 }, frequency: { max: 4100 } } },
       { type: "GPU", result: [{ vendor: "NVIDIA", name: "GeForce RTX 5060 Ti", type: "Discrete" }] },
       { type: "Memory", result: { total: 33568792576, used: 4401385472 } },
-      { type: "Disk", result: [{ mountpoint: "/", filesystem: "ext4", bytes: { used: 18326032384, total: 48890621952 } }] },
+      { type: "Disk", result: [{ mountpoint: "/", filesystem: "ext4", bytes: { used: 18326032384, total: 48890621952 } },
+                                { mountpoint: "/home", filesystem: "ext4", bytes: { free: 1121262149632, total: 1917657247744 } }] },
       { type: "Battery", error: "No batteries found" },
       { type: "Locale", result: "en_US.UTF-8" }
     ]);
@@ -407,6 +468,7 @@ module.exports = {
     t.eq("cpu with threads and clock", pcv("CPU"), "Intel(R) Core(TM) i5-9400F (6) @ 4.10 GHz");
     t.eq("memory as used of total", pcv("Memory"), "4.1 GiB / 31.3 GiB (13%)");
     t.eq("a disk is named by its mount", pcv("Disk (/)"), "17.1 GiB / 45.5 GiB (37%) \u00b7 ext4");
+    t.eq("a disk given only free space is used of total, not NaN", pcv("Disk (/home)"), "742 GiB / 1.7 TiB (42%) \u00b7 ext4");
     t.eq("a module that failed is left out", pcv("Battery"), undefined);
     t.eq("garbage reads as nothing", T.readComputer("not json", "").ok, false);
     t.eq("a derivative borrows its parent's logo",

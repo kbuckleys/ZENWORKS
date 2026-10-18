@@ -15,6 +15,9 @@
 // A part may say `ok: false` — drawn faint and not answering — `size`
 // for its glyph's pixel size, and `held: true` to stay pressed for as long
 // as what it opened is open (the hamburger's menu, the sort menu).
+// `heavy: true` thickens a glyph the font only has in one weight (back |
+// forward's chevrons): a hairline outline in its own ink, since the symbol
+// face ignores font.weight.
 
 import QtQuick
 import "../morpheus"
@@ -92,6 +95,8 @@ Item {
           font.family: Zenon.face
           font.weight: Zenon.weight
           font.pixelSize: part.modelData.size || Zenon.px(15)
+          style: part.modelData.heavy ? Text.Outline : Text.Normal
+          styleColor: color
         }
         HoverHandler { id: hov; enabled: part.ok }
         MouseArea {

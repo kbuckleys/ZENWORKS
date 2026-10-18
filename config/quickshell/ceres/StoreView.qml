@@ -168,12 +168,27 @@ Item {
 
   // ── what each view shows ───────────────────────────────────────────────
   readonly property int today: Math.floor(Date.now() / 86400000)
-  readonly property var features: St.features(store.apps, store.today, 5)
   // the artwork row, four across when there is room
   readonly property int artCols: Math.max(2, Math.min(4, Math.floor((content.width - store.pad * 2) / 230)))
   readonly property real artW: (content.width - store.pad * 2 - (store.artCols - 1) * 20) / store.artCols
-  readonly property var stories: St.stories(store.apps, store.features, store.artCols)
-  readonly property var shelves: St.shelves(store.apps, store.cols, store.features.concat(store.stories), 3, store.artCols)
+  // THE FRONT PAGE IN ONE BINDING. As three, a new catalog laid the shelves
+  // out three times over — once for the catalog, again when the features
+  // caught up, again for the artwork — and every pass rebuilt every shelf's
+  // cards: ~120 ms of a ~220 ms stall the first time the Store was shown
+  // (profiled offscreen, 2026-10-18). The features are handed on only when
+  // they are other apps, so a resize does not turn the carousel back.
+  readonly property var front: {
+    const f = St.features(store.apps, store.today, 5);
+    const s = St.stories(store.apps, f, store.artCols);
+    return { features: f, stories: s, shelves: St.shelves(store.apps, store.cols, f.concat(s), 3, store.artCols) };
+  }
+  property var features: []
+  onFrontChanged: {
+    const f = store.front.features;
+    if (f.length !== store.features.length || f.some((a, i) => a !== store.features[i])) store.features = f;
+  }
+  readonly property var stories: store.front.stories
+  readonly property var shelves: store.front.shelves
   // THE KEYS WALK A SECTION'S GRID, OR A SEARCH'S. Discover had a cursor of
   // its own across the carousel, artwork and shelves — not really useful
   // (user, 2026-10-15), and gone: there the arrows scroll the page.
@@ -284,8 +299,6 @@ Item {
       infoProc.running = true;
     }
   }
-  // the page's Esc: a step back, as mouse 4 is
-  function closePage() { store.stepBack(); store.released(); }
   // a screenshot, large, over the page; Esc or a click puts it back
   property string lightbox: ""
   // the page's screenshots, in order, for ← → and the lightbox's own
@@ -658,7 +671,6 @@ Item {
             id: shelf
             required property var modelData
             required property int index
-            readonly property real gridY: shelfHead.height + shelf.spacing
             width: discCol.width
             spacing: 10
             // the heading is the way in: "Create ›" opens the section
@@ -779,9 +791,11 @@ Item {
           app: modelData
           busy: store.busy
           here: index === store.sel
+          removable: true
           onOpened: { store.sel = index; store.open(modelData); }
           onGot: store.get(modelData)
           onLaunched: store.launch(modelData)
+          onRemoved: store.remove(modelData)
         }
       }
 
@@ -950,16 +964,14 @@ Item {
                   onGot: store.get(page.a)
                   onLaunched: store.launch(page.a)
                 }
-                DialogButton {
+                // Remove as the trash glyph, after Open (user, 2026-10-18);
+                // Get's own height beside it
+                StoreRemove {
                   visible: !!page.a && page.a.installed
                   anchors.verticalCenter: parent.verticalCenter
-                  label: "Remove"
-                  // Get's own size beside it (user, 2026-10-17)
-                  height: 32
-                  width: Math.max(92, implicitWidth)
-                  ink: Zenon.red
-                  ready: !store.busy
-                  onClicked: store.remove(page.a)
+                  big: true
+                  busy: store.busy
+                  onRemoved: store.remove(page.a)
                 }
                 // where it comes from, said in words beside the mark (one
                 // source; with more, the switch below says it)
@@ -1297,7 +1309,7 @@ Item {
                 anchors.bottom: parent.bottom
                 label: "Reset to defaults"
                 ink: Zenon.accentMuted
-                ready: !(store.busy && page.a.scope !== "user")
+                ready: !(store.busy && !!page.a && page.a.scope !== "user")
                 onClicked: store.resetPerms()
               }
             }

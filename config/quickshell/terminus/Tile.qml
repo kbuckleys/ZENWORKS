@@ -129,7 +129,17 @@ Item {
     }
   }
 
+  // TICKED, A TILE WEARS THE CURSOR (user, 2026-10-18): what a drag box or
+  // a shift/ctrl pick took is lit as SelectCell lights the tile under the
+  // cursor, in the same box — MarkRing is that look, shared with it.
+  MarkRing {
+    anchors.fill: tileBox
+    fill: term.hiFill
+    on: tile.ticked
+  }
+
   Rectangle {
+    id: tileBox
     // THE CURSOR'S SHAPE (user, 2026-10-12): SelectCell is fitted to what
     // the tile holds — a name on two lines, or three with the detail —
     // and the flare and the ring are the same box, not the whole cell.
@@ -143,8 +153,7 @@ Item {
     // between tiles. The tick stays, because a tick is a property of the
     // FILE rather than of where the cursor happens to be — and the border
     // below stays too, because a tile has always carried one.
-    // A tick is marked on the picture itself now (MarkRing, in thumbBox),
-    // not washed over the whole cell.
+    // A tick is MarkRing, just above — the cursor's own look.
     color: "transparent"
     // ── THE OUTLINE MOVED TO THE CURSOR ITSELF ────────────────
     // The sliding bar is BEHIND the tiles, which is right for a
@@ -187,9 +196,6 @@ Item {
     anchors.topMargin: 12
     anchors.horizontalCenter: parent.horizontalCenter
     width: parent.width - 24
-    // ticked, the picture steps back a little inside its ring (MarkRing)
-    scale: tile.ticked ? 0.9 : 1
-    Behavior on scale { NumberAnimation { duration: Zenon.slow; easing.type: Easing.OutBack; easing.overshoot: 1.6 } }
     // 68, not 62. The reserve has to hold the 8px gap, two lines of
     // label and the 4px the highlight is inset by — and the label
     // went from 15px to 16px, which is exactly enough for a name
@@ -450,20 +456,6 @@ Item {
       font.family: Zenon.face
       font.weight: Zenon.weight
       font.pixelSize: Math.round(64 * tile.tileZoom)
-    }
-
-    // Ticked: round the picture when there is one, the directory's cover
-    // when it has one (3:2, not square — a square cut through the mosaic's
-    // sides), else a square about the glyph.
-    MarkRing {
-      readonly property bool pic: thumbClip.visible
-      readonly property bool dir: !pic && tileCover.shown
-      readonly property real sq: Math.min(thumbBox.width, thumbBox.height)
-      width: pic ? thumbClip.width : dir ? Math.round(tileCover.coverW) : sq
-      height: pic ? thumbClip.height : dir ? Math.round(tileCover.coverH) : sq
-      x: pic ? thumbClip.x : Math.round((thumbBox.width - width) / 2)
-      y: pic ? thumbClip.y : Math.round((thumbBox.height - height) / 2)
-      on: tile.ticked
     }
 
     // THE TAGS ARE NOT HERE ANY MORE — they ride in the name's lead, beside

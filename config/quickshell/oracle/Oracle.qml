@@ -1144,8 +1144,10 @@ Singleton {
     // ── the checkup ──
     // Readouts like the About rows, filled by oracle/doctor.sh — see
     // runCheckup. `health` names the row of Ora.readCheckup each one shows.
+    // `fold: "tools"` unfolds into ToolsPanel: what is missing, and its package
+    // (prebuilt, from the repos or an AUR binary — see Ora.TOOLS).
     { key: "actionCheckup", section: "health", label: "Checkup", type: "action",
-      verb: "Run again",
+      verb: "Rerun",
       help: "Runs by itself when you open this section. Read-only: it looks, it never changes anything." },
     { key: "infoHealthTests", section: "health", label: "Tests", type: "info", health: "tests",
       help: "The shell's own test suite, the same one run after every script change." },
@@ -1154,7 +1156,12 @@ Singleton {
     { key: "infoHealthStale", section: "health", label: "Changed scripts", type: "info", health: "stale",
       help: "Scripts edited since the shell started. A reload can keep the old copy; a restart cannot." },
     { key: "infoHealthMemory", section: "health", label: "Memory", type: "info", health: "memory",
-      help: "Resident size, against what a clean restart settles at." },
+      help: "Resident size, against what a fresh start settles at — measured two minutes after each restart with nothing opened." },
+    { key: "infoHealthStack", section: "health", label: "Qt and Hyprland", type: "info", health: "stack",
+      help: "Qt, quickshell and Hyprland now, against what the last clean preflight ran on. After an update, run scripts/preflight.sh." },
+    { key: "infoHealthTools", section: "health", label: "Tools", type: "info", health: "tools",
+      fold: "tools",
+      help: "The programs the shell calls out to, and the packages they come from. Click to unfold." },
     { key: "infoHealthPollers", section: "health", label: "Child processes", type: "info", health: "pollers",
       help: "Watched for two seconds: what stays open, and what gets spawned while nothing is happening." },
     { key: "infoHealthLog", section: "health", label: "Log", type: "info", health: "log",
@@ -1398,9 +1405,17 @@ Singleton {
   }
 
   // ── THE CHECKUP ───────────────────────────────────────────────────────
-  // What a clean restart settles at (2026-09-23, after ceres). Memory is
-  // read as a drift from this, not as a number to remember.
-  readonly property int rssBaselineKb: 1054396
+  // Memory is read as a drift from what a fresh start settles at, measured
+  // by morpheus/LagWatch into settle.json (see Ora.settledBaseline). This
+  // constant is only the stand-in until the first measurement: the idle
+  // size in lag.log after the restarts of 2026-10-18 (~900 MiB).
+  readonly property int rssFallbackKb: 921600
+  FileView {
+    id: settleFile
+    path: (Quickshell.env("XDG_CACHE_HOME") || (Quickshell.env("HOME") + "/.cache")) + "/quickshell/settle.json"
+    blockLoading: true
+    printErrors: false
+  }
   property var checkup: ({})
   property bool checking: false
   property double checkedAt: 0
@@ -1413,7 +1428,7 @@ Singleton {
     // The pid is left to the script: it is started straight from here, so
     // its $PPID is this shell.
     doctorProc.command = ["bash", Quickshell.shellDir + "/oracle/doctor.sh",
-      Quickshell.shellDir, "", String(since)];
+      Quickshell.shellDir, "", String(since), Ora.toolNames()];
     doctorProc.running = true;
   }
 
@@ -1460,7 +1475,9 @@ Singleton {
     stdout: StdioCollector {
       id: doctorOut
       onStreamFinished: {
-        root.checkup = Ora.readCheckup(doctorOut.text, root.rssBaselineKb);
+        settleFile.reload();
+        root.checkup = Ora.readCheckup(doctorOut.text,
+          Ora.settledBaseline(settleFile.text(), root.rssFallbackKb));
         root.checkedAt = Date.now();
         root.checking = false;
         root.revision++;
@@ -1572,6 +1589,11 @@ Singleton {
   // so "reset a section" can mean the one you are looking at without the
   // action needing a second control beside it.
   signal updateAsked()
+  // An action still out from its last press: its button dims and ignores
+  // another (the panel's ActionControl reads this).
+  function actionBusy(key) {
+    return key === "actionCheckup" ? root.checking : false;
+  }
   function run(key, context) {
     if (key === "actionCheckup") { root.runCheckup(); return; }
     if (key === "actionDisplayScan") { root.scanDisplays(); return; }

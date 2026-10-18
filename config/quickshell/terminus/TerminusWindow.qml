@@ -3966,15 +3966,6 @@ FloatingWindow {
   // title strip while a sheet is up, the card and the active tab are all the
   // one glass — the window's ground at the window's alpha.
   readonly property color chromeBg: root.sidebarBg
-  // ── THE TAB STRIP KEEPS PLATO'S GRAY ────────────────────────────────
-  // The strip wore chromeBg with the bar, and the tabs say which is which by
-  // shading the inactive ones back over it — over black at a quarter that
-  // shade is black on black, and every tab looked the same. So the strip is
-  // headBg, as plato's is (plato/editor/TabBar.qml): the active tab is that
-  // gray showing through, the others darker. Untouched by a sheet (user,
-  // 2026-10-11): only the toolbar goes dark with one, never the tabs.
-  readonly property color tabBg: Zenon.tabHere
-
 
   readonly property bool modal: root.looking || cmdPalette.open || marks.open
     || disks.open || plug.open || diskInfo.open || tagPick.open || collEdit.open
@@ -4294,8 +4285,6 @@ FloatingWindow {
   readonly property alias propsRef: props
   readonly property alias sideGripRef: chrome.sideGrip
   readonly property alias springGraceRef: renameDrag.springGrace
-  readonly property alias labelFmRef: labelFm
-  readonly property alias jobsDrawerRef: jobsDrawer
   readonly property alias millerAnimRef: millerAnim
   readonly property alias statusClearRef: statusClear
   readonly property alias cmdPaletteRef: cmdPalette
@@ -4889,7 +4878,11 @@ FloatingWindow {
   // once the separator at the bottom was counted as part of the bar.
   // 42 again (user, 2026-10-17): taller bar, with room for the back and
   // forward buttons and for the info sheet's rename ring.
-  readonly property int headH: 42
+  readonly property int headH: Zenon.toolbarH
+  // THE TOP BAND beside the sidebar's first heading: the tab strip while it
+  // shows (Zenon.tabH, lower than the bar since 2026-10-18), else the bar —
+  // the heading and its toggle chip line up with whichever it is
+  readonly property int topBandH: tabStripRef && tabStripRef.visible ? tabStripRef.height : headH
 
   // ── THE WARM ITSELF ─────────────────────────────────
   // Nothing is drawn here. Each Image exists to make Qt decode a file
@@ -5241,10 +5234,13 @@ FloatingWindow {
       // blocked on that answer, so escape means "no" and is handled above.
       if (event.key === Qt.Key_Escape) {
         event.accepted = true;
-        if (root.searchMode !== "") root.clearSearch();
-        else if (root.query !== "") { chrome.filterField.text = ""; root.act.query = ""; }
-        else if (root.visualOn) root.endVisual();
+        // A SELECTION GOES BEFORE THE VIEW IT WAS MADE IN. Marks picked out
+        // of a search, a collection or a tag are work in progress; the first
+        // escape lets go of them and only the next one leaves the view.
+        if (root.visualOn) root.endVisual();
         else if (Object.keys(root.marked).length > 0) root.act.marked = {};
+        else if (root.searchMode !== "") root.clearSearch();
+        else if (root.query !== "") { chrome.filterField.text = ""; root.act.query = ""; }
         return;
       }
 

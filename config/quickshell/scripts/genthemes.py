@@ -25,7 +25,7 @@
 # opaque page; on light glass a pale accent washes out, so any accent under
 # 3:1 against ground is darkened just to 3:1 — and the script says which.
 # Every theme is also checked for ink, keyInk, soft and muted contrast.
-import json, math, os, sys
+import json, math, os
 
 OUT = os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "themes")
 

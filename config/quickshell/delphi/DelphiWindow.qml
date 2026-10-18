@@ -408,10 +408,14 @@ FloatingWindow {
       failed: (err) => {
         const t = String(err && err.error || "");
         if (/rejected|non-fast-forward|fetch first/.test(t)) {
-          win.ask({ title: "The remote has commits you do not", glyph: "", ink: Zenon.yellow,
+          // both ways the detail names: overwriting goes through forcePush,
+          // which asks once more and pushes with a lease
+          win.card_({ question: "The remote has commits you do not", glyph: "", ink: Zenon.yellow,
             detail: "Pull them in first, or overwrite them — only if no one else's work is there.",
             items: D.errorText(t).split("\n"),
-            verb: "Pull first", verbInk: Zenon.cyan, then: () => win.pull() });
+            choices: [{ label: "Pull first", ink: Zenon.cyan, run: () => win.pull() },
+                      { label: "Overwrite…", ink: Zenon.red, run: () => win.forcePush() },
+                      { label: "Cancel", ink: Zenon.accentMuted }] });
         } else win.fail("Push did not work", null, err);
       } });
   }
@@ -728,7 +732,7 @@ FloatingWindow {
       detail: "Replaces the remote branch with yours. With a lease: refused if it moved since you last fetched.",
       verb: "Force-push", then: () => {
         if (win.branch && win.branch.upstream) win.pushShow([win.branch.upstream.split("/")[0]]);
-        win.act("push", { force: true }, { label: "Pushing", network: true, said: "Pushed", stopped: () => win.pushEnd(false, true), done: (ok) => win.pushEnd(ok) });
+        win.act("push", { force: true }, { label: "Pushing", network: true, said: "Pushed", then: () => win.watchCi(), stopped: () => win.pushEnd(false, true), done: (ok) => win.pushEnd(ok) });
       } });
   }
 

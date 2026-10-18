@@ -35,6 +35,7 @@ import "../ceres"
 import "../terminus"
 import "../morpheus/lagnotes.js" as LagNotes
 import "delphi.js" as D
+import "../morpheus/hypr.js" as Hypr
 
 Scope {
   id: mgr
@@ -101,7 +102,6 @@ Scope {
   }
   // the forge the Accounts page shows: github | gitlab | codeberg
   property string forge: "github"
-  property bool showIgnored: false
   // where each dotfiles repository's packages go, by its root — chosen on
   // the Dotfiles page when it is not the .stowrc's or home
   property var stowTargets: ({})
@@ -344,9 +344,9 @@ Scope {
   readonly property var installing: Ceres.installing      // { pkg }
   function installTool(pkg, why, done) {
     if (Ceres.txBusy || Ceres.installing) { mgr.tell("Ceres is busy with another job — try again once it is done", true); return false; }
-    const asked = Ceres.install(pkg, why, (ok) => {
+    const asked = Ceres.install(pkg, why, (ok, how) => {
       if (ok) mgr.tell("Installed " + pkg);
-      else mgr.tell(pkg + " was not installed" + (Ceres.txError ? ": " + Ceres.txError : ""), true);
+      else mgr.tell(pkg + " was not installed" + (how === "cancelled" ? "" : Ceres.txError ? ": " + Ceres.txError : ""), how !== "cancelled");
       if (done) done(ok);
     });
     if (!asked) mgr.tell("Ceres could not take the install of " + pkg + " — open Ceres to see why", true);
@@ -396,9 +396,14 @@ Scope {
         if (!mgr.win) return;
         fresh = true;
       }
+      // Raised only when it was ON SCREEN already: a kept window that was
+      // hidden is mapped by the line below, and Hyprland focuses a window
+      // it maps; asked in the same tick, it had no such window yet
+      // ("hl.focus: window not found", 2026-10-18).
+      const was = !fresh && mgr.win.visible;
       fn(mgr.win, fresh);
       mgr.win.visible = true;
-      if (!fresh) Hyprland.dispatch('hl.dsp.focus({ window = "title:^(delphi)$" })');
+      if (was) Hyprland.dispatch(Hypr.focusTitle("delphi"));
     });
   }
   function retire(w) {

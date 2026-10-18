@@ -210,6 +210,20 @@ module.exports = {
     t.eq("sheet columns", [V.contactCols(1), V.contactCols(10), V.contactCols(200)], [1, 4, 8]);
     t.eq("backup name", V.backupName("/u", "/p/a.jpg", "123"), "/u/123-a.jpg");
     t.eq("tools found", V.parseTools("rembg\n\ntesseract\n"), { rembg: true, tesseract: true });
+    t.has("the cut-out's own script asks python for onnxruntime", V.toolsCommand(), 'python3 -c "import onnxruntime');
+    t.eq("which offers it", V.canCutout(V.parseTools("onnxruntime\n")), true);
+    t.eq("as rembg alone still does", V.canCutout({ rembg: true }), true);
+    t.eq("and neither does not", V.canCutout({ tesseract: true }), false);
+    const cut = V.cutoutCommand("/s/it's/cutout.py");
+    t.has("the script, quoted", cut, "exec python3 -I '/s/it'\\''s/cutout.py' --progress -- \"$1\" \"$2\"");
+    t.eq("before rembg", cut.indexOf("cutout.py") < cut.indexOf("rembg i"), true);
+    t.has("which is only the fallback", cut, 'command -v rembg >/dev/null 2>&1 && exec rembg i -- "$1" "$2"');
+    t.has("and neither fails", cut, "exit 127");
+    t.eq("a step", V.parseCutoutProgress("@ 0.420 following its edges\n"), { frac: 0.42, what: "following its edges" });
+    t.eq("a fetch", V.parseCutoutProgress("@ 0.070 fetching its model, once \u00b7 50%").what, "fetching its model, once \u00b7 50%");
+    t.eq("kept in 0..1", V.parseCutoutProgress("@ 1.5 done").frac, 1);
+    t.eq("other output is not a step", V.parseCutoutProgress("cutout: fetching u2net.onnx (once)"), null);
+    t.eq("nor nothing", V.parseCutoutProgress(""), null);
     t.eq("monitor cuts", V.monitorCuts(4000, 3000, [{ name: "A", width: 1600, height: 900 }]),
       [{ name: "A", x: 0, y: 375, w: 4000, h: 2250, short: false }]);
     t.eq("small for the monitor", V.monitorCuts(800, 600, [{ name: "A", width: 2560, height: 1440 }])[0].short, true);

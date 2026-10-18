@@ -23,9 +23,14 @@ Item {
   property var app: null
   property bool here: false        // the keys' cursor
   property bool busy: false        // a job is running: Get waits
+  // a Remove beside Open, for an installed app (the category lists; user,
+  // 2026-10-18) — the trash glyph, as terminus' menus wear it
+  property bool removable: false
+  readonly property bool canRemove: card.removable && !!card.app && !!card.app.installed
   signal opened()
   signal got()
   signal launched()
+  signal removed()
 
   implicitHeight: 84
 
@@ -85,14 +90,25 @@ Item {
     }
   }
 
+  // Open, then the trash after it, as on the app's page
   StoreGet {
     id: getBtn
-    anchors.right: parent.right
-    anchors.rightMargin: 12
+    anchors.right: card.canRemove ? removeBtn.left : parent.right
+    anchors.rightMargin: card.canRemove ? 8 : 12
     anchors.verticalCenter: parent.verticalCenter
     app: card.app
     busy: card.busy
     onGot: card.got()
     onLaunched: card.launched()
+  }
+
+  StoreRemove {
+    id: removeBtn
+    visible: card.canRemove
+    anchors.right: parent.right
+    anchors.rightMargin: 12
+    anchors.verticalCenter: parent.verticalCenter
+    busy: card.busy
+    onRemoved: card.removed()
   }
 }

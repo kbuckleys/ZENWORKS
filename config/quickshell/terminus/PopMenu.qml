@@ -20,14 +20,15 @@
 // still up (a list of things to tick, delphi's push targets), and the
 // holder hands the menu its items again to show the new ticks (setItems).
 // `held` is whatever the holder says the menu is about,
-// until it closes — for a HeldRing on that row.
+// until it closes — for a HeldRing on that row. An item with `children`
+// (items of its own) opens them in a card beside it (CardPopup's branches);
+// a child's `run` is called as a top item's is.
 //
 // Out of plato's editor menu (plato/editor/ContextMenu.qml, 2026-10-10),
 // when delphi's lists wanted the same; plato's menu is now its items and
 // this.
 
 import QtQuick
-import Quickshell
 import "../morpheus"
 
 Item {
@@ -55,6 +56,13 @@ Item {
     menu.closed();
   }
 
+  function row(it) {
+    return it.isSeparator ? { isSeparator: true }
+      : { text: it.text, icon: it.icon, hint: it.mark || "", enabled: it.enabled !== false,
+          danger: !!it.danger, iconInk: it.iconInk,
+          children: it.children ? it.children.map(menu.row) : undefined };
+  }
+
   InputShield {
     parent: menu.window ? menu.window.contentItem : menu
     anchors.fill: parent
@@ -75,12 +83,15 @@ Item {
     window: menu.window
     fit: true
     cardWidth: menu.cardWidth
-    model: menu.items.map((it) => it.isSeparator ? { isSeparator: true }
-      : { text: it.text, icon: it.icon, hint: it.mark || "", enabled: it.enabled !== false,
-          danger: !!it.danger, iconInk: it.iconInk })
+    model: menu.items.map(menu.row)
     onChosen: (i) => {
       const it = menu.items[i];
       if (it && it.keep && it.run && it.enabled !== false) { it.run(); return; }
+      menu.close();
+      if (it && it.run && it.enabled !== false) it.run();
+    }
+    onSubChosen: (b, i) => {
+      const it = menu.items[b] && menu.items[b].children ? menu.items[b].children[i] : null;
       menu.close();
       if (it && it.run && it.enabled !== false) it.run();
     }

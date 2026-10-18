@@ -12,10 +12,10 @@
 // standing by costs nothing until it is on screen and the first open should
 // not be the one that pays for building it.
 //
-// ON THE MONITOR YOU ARE ON. A quickshell window cannot be moved to another
-// screen once it exists — quickshell segfaults in setScreen — so a hidden
-// window sitting on the wrong monitor is thrown away and a new one is built
-// where you are looking. It is cheap: the type is already compiled.
+// ON THE MONITOR YOU ARE ON. A hidden window on the wrong monitor is moved
+// to the one you are looking at before it is shown — never while it is on
+// screen, where quickshell's setScreen hides and reshows it and crashed.
+// See open().
 
 import QtQuick
 import Quickshell
@@ -24,6 +24,7 @@ import Quickshell.Hyprland
 import Quickshell.Io
 import "../morpheus/lagnotes.js" as LagNotes
 import "../oracle"
+import "../morpheus/hypr.js" as Hypr
 
 Scope {
   id: mgr
@@ -158,17 +159,19 @@ Scope {
     }
     const scr = Oracle.focusedScreen();
     if (!mgr.alive()) mgr.win = null;
-    // on the wrong monitor, or on none — a screen that went away leaves the
-    // window holding nothing to be drawn on
-    if (mgr.win && !mgr.win.visible && (!mgr.win.screen || (scr && mgr.win.screen !== scr))) {
-      mgr.win.destroy();
-      mgr.win = null;
-    }
     if (!mgr.win) mgr.build();
     // SAYS SHOWN, IS NOT: the compositor closed it and `visible` never heard
     // (see onClosed in the window, which is the real fix — this is the
     // backstop). Put down first, so being shown is a change again.
     if (mgr.win.visible && !mgr.win.backingWindowVisible) mgr.win.visible = false;
+    // On the wrong monitor, or on none (a screen that went away): MOVED, not
+    // rebuilt. It used to be destroyed and built again, and the new window
+    // then paid for the Store's catalog and front page all over — one of the
+    // 550–1400 ms stalls in lag.log (2026-10-18). Only while hidden: there
+    // quickshell's setScreen is QWindow::setScreen alone, and Wayland's
+    // outputs are virtual siblings, so nothing is recreated. Its hide-and-
+    // reshow path for a window on screen is the one that crashed.
+    if (scr && !mgr.win.visible && mgr.win.screen !== scr) mgr.win.screen = scr;
     const was = mgr.win.visible;
     mgr.win.present(view || "");
     // Already open is not the same as in front of you: it may be on another
@@ -213,7 +216,7 @@ Scope {
   }
 
   function raise() {
-    Hyprland.dispatch('hl.dsp.focus({ window = "title:^(ceres)$" })');
+    Hyprland.dispatch(Hypr.focusTitle("ceres"));
   }
 
   // The window ceres is in has the keyboard: the one case where a toggle

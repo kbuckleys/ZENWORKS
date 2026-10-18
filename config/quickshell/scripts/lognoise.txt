@@ -1,0 +1,21 @@
+# ┌─┐┌─┐┌┐┌┬ ┬┌─┐┬─┐┬┌─┌─┐
+# ┌─┘├┤ │││││││ │├┬┘├┴┐└─┐
+# └─┘└─┘┘└┘└┴┘└─┘┴└─┴ ┴└─┘
+# https://github.com/kbuckleys/
+#
+# LOG LINES THAT ARE NOT NEWS — one extended regex a line, read by both
+# scripts/preflight.sh (the live-log section) and oracle/doctor.sh (Health's
+# Log row), so the two count the same warnings. Each one is here because it
+# was looked into and is not the shell's to fix; say why beside it.
+#
+# Qt's Wayland text-input-v3: its own idea of which of the shell's surfaces
+# has the keyboard lags the compositor's for a frame as a window opens
+# (seen at every Oracle open, 2026-10-18). Also silenced at the source by
+# QT_LOGGING_RULES in scripts/launch.sh; kept for a shell started otherwise.
+qt\.qpa\.wayland\.textinput
+# a grab asked of an item that has not been drawn yet: answered next frame
+grabToImage
+# a plugin built against an older Qt patch release; harmless within a minor
+was built against Qt
+# a socket whose other end quit
+quickshell\.io\.socket.*PeerClosedError

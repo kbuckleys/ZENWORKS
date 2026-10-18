@@ -104,7 +104,6 @@ Item {
   }
   // where (x, y) in the block is, in the TextEdit
   // ── SPELLING ── its marks (SpellMarks, a child of the text)
-  readonly property var spellRuns: spell.runs
   function spellAt(pos) { return spell.at(pos); }
   function textPoint(x, y) { return Qt.point(x - text.x, y - body.y - text.y); }
   function posAt(x, y) {
@@ -112,11 +111,6 @@ Item {
     if (p.y < 0) return 0;
     if (p.y > text.height) return text.length;
     return text.positionAt(p.x, p.y);
-  }
-  // the caret, in the editor's column (for a find, a ghost, the scroll)
-  function caretRect(pos) {
-    const r = text.positionToRectangle(pos === undefined ? text.cursorPosition : pos);
-    return Qt.rect(r.x + text.x, r.y + text.y + body.y, r.width, r.height);
   }
 
   // ── THE TEXT, KEPT IN STEP ─────────────────────────────────────────────
@@ -506,7 +500,6 @@ Item {
   }
 
   // ── THE TEXT'S OWN WORK, ASKED BY THE EDITOR ───────────────────────────
-  function htmlNow() { return blk.kind === "mono" ? text.text : N.inline(text.text); }
   function range(a, b) {
     if (blk.kind === "mono") return N.escape(text.getText(a, b));
     return N.inline(text.getFormattedText(a, b));

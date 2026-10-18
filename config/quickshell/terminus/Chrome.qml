@@ -61,59 +61,82 @@ Column {
   anchors.leftMargin: side.width
 
   // ── tabs ──────────────────────────────────────────────────────
+  // The suite's strip (morpheus/TabStrip, 2026-10-18), fed terminus' tabs:
+  // the look, the arrivals, the carry, the ghosts and the × are all its.
   // Hidden while there is one, because a single tab is just the window and
-  // a strip saying so is a strip of nothing.
-  Rectangle {
+  // a strip saying so is a strip of nothing — unless "always show tabs".
+  //
+  // What is terminus' own stays here: a tab's name, the drop onto a tab
+  // and the spring into it, and that a sheet locks it.
+  TabStrip {
     id: tabStrip
     width: parent.width
-    // the path bar's height, so the two strips stack as one band of chrome
-    // rather than two of slightly different depths
-    // two under the path bar's (user, 2026-10-13: every strip 2px lower),
-    // then the tabs 2px back up (user, 2026-10-14): the bar's own height
-    height: (term.alwaysTabs || term.tabs.length > 1) ? term.headH : 0
-    visible: height > 0
-    clip: true
-    // The path bar's own color. Leaving the strip transparent removed the
-    // 1px separator but not the LINE: the transparent strip showed the
-    // window's ground (layerBg) while the bar below was headBg, and two
-    // different colors meeting across the full width is a line whether or
-    // not anyone drew one. With the strip painted the same as the bar, the
-    // active tab is simply the strip showing through and the boundary
-    // disappears; the inactive ones darken instead.
-    //
-    // And it goes black with the path bar under it while a sheet is open,
-    // or the band above the sheet would be gray on top of black.
-    // Since the bar took the sidebar's ground, the strip is headBg instead
-    // — see root.tabBg.
-    // NOW the body's black instead (2026-10-08, the user's call, as in
-    // plato): the strip is see-through, so an inactive tab is the window
-    // itself at the panel opacity, and the active tab paints tabBg —
-    // still the bar's color, so the seam stays gone.
-    // NOT BLACK BEHIND A SHEET ANY MORE (user, 2026-10-11): a sheet is the
-    // toolbar's business, so the path bar goes dark with it and the tabs
-    // stay as they are.
-    color: "transparent"
+    hideSingle: !term.alwaysTabs
+    // THE TABS' GLASS IS LAID BY THE WINDOW, UNDER THE FROST (2026-10-10):
+    // painted here it lay OVER the rows scrolled up under the strip, so the
+    // active tab (at the window's alpha) hid them while the bar beside it,
+    // whose ground is under them, showed them — user's frost.png. The
+    // window's tabGlass mirrors the strip below its ScrollEdges and reads
+    // the active tab from hereCell.
+    groundBelow: true
+    // terminus' new tabs only fade in, and no × or carrying under a sheet
+    arriveScale: 1
+    locked: term.modal
+    // the body's row size, written the same way rather than as a number
+    // that happens to match — zoom then moves both together
+    face.pixelSize: Math.round(16 * term.zoom)
 
-    // ── dragging one along the strip ────────────────────────────
-    // Which tab is being carried, and where it would land. -1 for neither,
-    // which is nearly always.
-    //
-    // The ORDER IS NOT TOUCHED UNTIL YOU LET GO. It is tempting to shuffle
-    // `root.tabs` as the pointer crosses each boundary, and it does not
-    // work: the Repeater's model is a plain array, so replacing it destroys
-    // and rebuilds every delegate — including the one under the pointer,
-    // mid-gesture. So the drag moves PIXELS, the other tabs slide into the
-    // gap it leaves, and the array is rewritten exactly once, on release,
-    // by which time every tab is already sitting where it will end up.
-    property int dragFrom: -1
-    property int dragTo: -1
-    // where the carried tab's left edge is, in strip coordinates
-    property real dragX: 0
-
-    function endDrag() {
-      tabStrip.dragFrom = -1;
-      tabStrip.dragTo = -1;
+    // ── A TAB'S NAME ──────────────────────────────────────────────
+    // Its directory, as the crumbs write it — and A SEARCH'S TAB IS NAMED
+    // FOR THE SEARCH, as Finder names its window: "fx" twice across the
+    // strip said nothing about which one held the results (2026-10-13).
+    // The magnifier, as the crumb chip wears it. The tab you are in lives
+    // in the window, not in its record, so it is read from there.
+    function nameOf(t, here) {
+      const sr = here ? (term.searchPage ? term.searchSpec : null)
+        : (t.search && t.search.spec ? t.search.spec : null);
+      if (sr && sr.query !== "") return sr.query;
+      return Terminus.basename(term.shownPath(here ? term.cwd : t.cwd));
     }
+    // ── ITS GLYPH ─────────────────────────────────────────────────
+    // The directory's, as the crumbs draw it (Terminus.dirGlyph), in the
+    // listing's directory ink; a search's, the magnifier the crumb chip
+    // wears (it used to lead the name).
+    function glyphOf(t, here) {
+      const sr = here ? (term.searchPage ? term.searchSpec : null)
+        : (t.search && t.search.spec ? t.search.spec : null);
+      if (sr && sr.query !== "") return "\uF002";
+      return Terminus.dirGlyph(term.shownPath(here ? term.cwd : t.cwd), Icons);
+    }
+    // ── WHICH TAB IS WHICH ────────────────────────────────────────
+    // The strip follows tabs by id (who is new, who closed, who moved), and
+    // a terminus tab is a plain record with none. The first time one is
+    // seen it is given one, in the record, so it travels with it through
+    // every copy (tabState carries the current tab's; newTab clears its
+    // copy). A counter in an object, not a property: written from inside
+    // the `tabs` binding, a property would loop it.
+    readonly property var uids: ({ next: 0 })
+    function uidOf(t) {
+      if (t.uid === undefined) t.uid = ++tabStrip.uids.next;
+      return t.uid;
+    }
+    function indexOf(id) {
+      for (let i = 0; i < term.tabs.length; ++i)
+        if (term.tabs[i] && term.tabs[i].uid === id) return i;
+      return -1;
+    }
+    tabs: term.tabs.map((t, i) => ({
+      id: tabStrip.uidOf(t),
+      name: tabStrip.nameOf(t, i === term.tab),
+      glyph: tabStrip.glyphOf(t, i === term.tab),
+      glyphInk: Zenon.cyan,
+      current: i === term.tab
+    }))
+    onPicked: (id) => term.switchTab(tabStrip.indexOf(id))
+    // already deferred by the strip: closing replaces the model its cell
+    // belongs to
+    onClosed: (id) => term.closeTabAt(tabStrip.indexOf(id))
+    onMoved: (from, to) => term.moveTab(from, to)
 
     // A tab opened or closed while one is being carried leaves dragFrom
     // pointing into a list that no longer has that shape. Nothing good
@@ -122,49 +145,6 @@ Column {
       target: term
       function onTabsChanged() { tabStrip.endDrag(); }
     }
-
-    // ── A TAB CLOSED SHRINKS OUT, AND THE REST CLOSE UP ─────────
-    // As plato's strip (plato/editor/TabBar.qml). The model is a plain
-    // array and a close rebuilds every cell at its new place, so
-    // closeTabAt says first which tab is going (noteClose): the cells
-    // made again start where they were and slide over, already there
-    // rather than fading in afresh, and the closed one leaves a ghost
-    // in its slot that narrows to nothing beneath them.
-    property int closedAt: -1
-    // How many tabs the strip had last time it settled. saveTab() replaces
-    // term.tabs on every switch, which rebuilds every cell, and every cell
-    // faded in from nothing: the whole strip blinked out at each switch
-    // (user's capture, 2026-10-09). Only a cell the count did not have
-    // before — a tab really opened — fades in now.
-    property int seenCount: 0
-    Connections {
-      target: term
-      function onTabsChanged() { Qt.callLater(() => { tabStrip.seenCount = term.tabs.length; tabStrip.dropAt = -1; }); }
-    }
-    // ── A DROPPED TAB SETTLES FROM WHERE IT WAS LET GO (2026-10-14) ────
-    // The release rebuilds every cell at its new slot; the carried one
-    // starts at the pointer's place and slides the last few pixels home.
-    property int dropAt: -1
-    property real dropX: 0
-    Component.onCompleted: tabStrip.seenCount = term.tabs.length
-    // THE TABS' GLASS IS LAID BY THE WINDOW, UNDER THE FROST (2026-10-10):
-    // painted here it lay OVER the rows scrolled up under the strip, so the
-    // active tab (at the window's alpha) hid them while the bar beside it,
-    // whose ground is under them, showed them — user's frost.png. The
-    // window's tabGlass mirrors the strip below its ScrollEdges; the cells
-    // here paint nothing unless carried. `hereCell` is where it reads the
-    // active tab from.
-    property Item hereCell: null
-    property real closedCellW: 0
-    function noteClose(i) {
-      if (term.tabs.length < 3 && !term.alwaysTabs) return;
-      tabStrip.closedAt = i;
-      tabStrip.closedCellW = tabStrip.width / Math.max(1, term.tabs.length);
-      ghosts.append({ gx: i * tabStrip.closedCellW, gw: tabStrip.closedCellW,
-        name: Terminus.basename(term.shownPath(i === term.tab ? term.cwd : term.tabs[i].cwd)) });
-      Qt.callLater(() => { tabStrip.closedAt = -1; });
-    }
-    ListModel { id: ghosts }
 
     // ── A TAB IS A PLACE TO DROP, AND A DOOR WHILE DRAGGING ─────────
     // The crumbs and the directories in the listing already take a drop and
@@ -225,376 +205,6 @@ Column {
       border.color: Zenon.cyan
       Behavior on x { NumberAnimation { duration: Zenon.fast; easing.type: Zenon.ease } }
     }
-
-    // The strip spans the window and the tabs divide it, the way a browser
-    // does it: a tab's position stops moving every time a directory with a
-    // longer name is opened in one of them.
-    //
-    // An Item and not a Row, because a Row positions its children and the
-    // whole point here is that one of them follows the pointer while the
-    // others animate around it. The arithmetic a Row was doing is one line.
-    Item {
-      anchors.fill: parent
-      anchors.bottomMargin: 1
-
-      Repeater {
-        model: ghosts
-        delegate: Item {
-          id: ghost
-          required property int index
-          required property real gx
-          required property real gw
-          required property string name
-          x: ghost.gx
-          width: ghost.gw
-          height: parent.height
-          clip: true
-          z: -1
-          Text {
-            anchors.centerIn: parent
-            width: Math.max(0, ghost.gw - 16)
-            horizontalAlignment: Text.AlignHCenter
-            elide: Text.ElideMiddle
-            text: ghost.name
-            color: Zenon.accentMuted
-            font.family: Zenon.face
-            font.weight: Zenon.weight
-            font.pixelSize: Math.round(16 * term.zoom)
-          }
-          ParallelAnimation {
-            running: true
-            onFinished: ghosts.remove(ghost.index)
-            NumberAnimation { target: ghost; property: "opacity"; from: 1; to: 0; duration: Zenon.normal; easing.type: Easing.OutCubic }
-            NumberAnimation { target: ghost; property: "width"; to: 0; duration: Zenon.normal; easing.type: Zenon.travelEase }
-            NumberAnimation { target: ghost; property: "x"; to: ghost.gx + ghost.gw / 2; duration: Zenon.normal; easing.type: Zenon.travelEase }
-          }
-        }
-      }
-
-      Repeater {
-        model: term.tabs
-
-        delegate: Rectangle {
-          id: tabCell
-          required property var modelData
-          required property int index
-          readonly property bool here: index === term.tab
-          onHereChanged: if (here) tabStrip.hereCell = tabCell
-          readonly property bool lifted: tabStrip.dragFrom === tabCell.index
-            && tabStrip.dragFrom < term.tabs.length
-
-          // WHERE THIS TAB SITS WHILE ANOTHER IS BEING CARRIED. Everything
-          // between the tab's old place and the pointer's shifts one step
-          // the other way, which is what opens the gap the carried tab
-          // will drop into.
-          readonly property int slot: {
-            const f = tabStrip.dragFrom, t = tabStrip.dragTo;
-            if (f < 0 || tabCell.index === f) return tabCell.index;
-            if (f < t) return (tabCell.index > f && tabCell.index <= t)
-              ? tabCell.index - 1 : tabCell.index;
-            return (tabCell.index >= t && tabCell.index < f)
-              ? tabCell.index + 1 : tabCell.index;
-          }
-
-          // from where it was before a close rebuilt the strip
-          property real shiftX: 0
-          property real shiftW: 0
-          x: tabCell.lifted ? tabStrip.dragX
-            : tabCell.slot * (tabStrip.width / Math.max(1, term.tabs.length)) + tabCell.shiftX
-          // the carried one rides over the rest
-          z: tabCell.lifted ? 2 : 0
-          // The slide. Switched off for the tab under the pointer: that one
-          // is following a finger, and an animation between the finger and
-          // the tab is lag with a curve on it.
-          Behavior on x {
-            enabled: !tabCell.lifted && !closeUp.running
-            NumberAnimation { duration: Zenon.normal; easing.type: Easing.OutCubic }
-          }
-          ParallelAnimation {
-            id: closeUp
-            NumberAnimation { target: tabCell; property: "shiftX"; to: 0; duration: Zenon.normal; easing.type: Zenon.travelEase }
-            NumberAnimation { target: tabCell; property: "shiftW"; to: 0; duration: Zenon.normal; easing.type: Zenon.travelEase }
-          }
-
-          // A new tab grows into place rather than appearing, and the
-          // active one lifts a little — the strip is the one part of the
-          // chrome that changes while you are looking straight at it.
-          opacity: 0
-          Component.onCompleted: {
-            if (tabCell.here) tabStrip.hereCell = tabCell;
-            const c = tabStrip.closedAt;
-            if (c < 0) {
-              const grew = term.tabs.length > tabStrip.seenCount;
-              if (grew && (tabCell.index === term.tab || tabCell.index >= tabStrip.seenCount))
-                tabIn.start();
-              else tabCell.opacity = 1;
-              if (tabCell.index === tabStrip.dropAt) {
-                const dw = tabStrip.width / Math.max(1, term.tabs.length);
-                tabCell.shiftX = tabStrip.dropX - tabCell.index * dw;
-                if (Math.abs(tabCell.shiftX) > 0.5) closeUp.start();
-                else tabCell.shiftX = 0;
-              }
-              return;
-            }
-            // a survivor of a close: there already, sliding from its old place
-            tabCell.opacity = 1;
-            const was = tabCell.index >= c ? tabCell.index + 1 : tabCell.index;
-            const w = tabStrip.width / Math.max(1, term.tabs.length);
-            tabCell.shiftX = was * tabStrip.closedCellW - tabCell.index * w;
-            tabCell.shiftW = tabStrip.closedCellW - w;
-            closeUp.start();
-          }
-          NumberAnimation {
-            id: tabIn
-            target: tabCell
-            property: "opacity"
-            to: 1
-            duration: Zenon.normal
-            easing.type: Easing.OutCubic
-          }
-          Behavior on color {
-            ColorAnimation { duration: Zenon.fast; easing.type: Zenon.ease }
-          }
-          width: tabStrip.width / Math.max(1, term.tabs.length) + tabCell.shiftW
-          height: parent.height
-          // The active tab paints nothing — it is the strip, which is the
-          // bar — so it runs into the path bar with no seam at all. The
-          // inactive ones are shaded back, which is what separates them.
-          //
-          // A tab being CARRIED looks exactly like a tab. It was given a
-          // ground and a cyan edge while dragging, on the theory that a
-          // lifted thing should look lifted; it read as a different tab
-          // rather than as the one you had hold of. The movement is the
-          // feedback — nothing else is needed to say which one is moving.
-          // AND A CARRIED ONE HAS TO BE OPAQUE. The active tab paints
-          // nothing on purpose — being the strip is how it joins the bar
-          // below without a seam — but a transparent thing cannot be
-          // picked up: lifting it moved the label alone, sliding across
-          // the tabs it passed over with no body of its own. In hand it
-          // takes the strip's own color, the one it has been showing
-          // through all along, and is a solid object for as long as it is
-          // moving.
-          // Every tab is the body now, the active one too (user,
-          // 2026-10-09): which is which is said by the label's strength
-          // (tabLabel's opacity), not by a fill. Only a carried tab
-          // takes a ground, to be a solid thing while it moves.
-          //
-          // NOW EACH TAB IS ITS OWN GLASS (user, 2026-10-09): the window
-          // lays no ground under the strip, so the active tab wears the
-          // window's and an inactive one a much thinner one — the desktop
-          // shows through it, and the difference reads at a glance.
-          // (the glass itself is the window's tabGlass, under the frost)
-          color: Zenon.alpha(Zenon.tabAwayInk, 0)
-          // (carried, it looks as it did — user, 2026-10-13: no ground)
-
-          Rectangle {
-            anchors.right: parent.right
-            width: 1
-            height: parent.height
-            // by the tab's PLACE, not its index — mid-drag those differ,
-            // and a separator drawn by index lands inside the gap
-            visible: !tabCell.lifted && tabCell.slot < term.tabs.length - 1
-            color: Zenon.border
-          }
-          // ── THE LINE UNDER THE STRIP, per tab ─────────────────────
-          // Every tab but the active one: there it is left out, so the
-          // active tab runs straight on into the path bar (user,
-          // 2026-10-09). Carried with its tab, so a drag takes it along.
-          // In the 1px row the cells leave free under them, over the
-          // tab's own glass — left empty, that row was a dark seam.
-          Rectangle {
-            y: tabCell.height
-            width: parent.width
-            height: 1
-            color: tabCell.color
-            Rectangle {
-              anchors.fill: parent
-              visible: !here
-              color: Zenon.border
-            }
-          }
-
-          Text {
-            id: tabLabel
-            anchors.centerIn: parent
-            // never more than four fifths of the tab (user, 2026-10-13: every
-            // strip in the suite), the rest elided; the close chip lies over its end
-            width: Math.min(parent.width * 0.8, parent.width - 16)
-            horizontalAlignment: Text.AlignHCenter
-            elide: Text.ElideMiddle
-            // A SEARCH'S TAB IS NAMED FOR THE SEARCH, as Finder names its
-            // window — "fx" twice across the strip said nothing about which
-            // one held the results (2026-10-13). The magnifier, as the crumb
-            // chip wears it.
-            text: {
-              const sr = here ? (term.searchPage ? term.searchSpec : null)
-                : (modelData.search && modelData.search.spec ? modelData.search.spec : null);
-              if (sr && sr.query !== "") return "\uF002  " + sr.query;
-              return Terminus.basename(term.shownPath(here ? term.cwd : modelData.cwd));
-            }
-            // The active crumb's ink. The tab and the last path segment
-            // are the same claim made twice — this is where you are — and
-            // they were two different grays saying it.
-            color: term.crumbInk
-            // the inactive ones held back, brought up a little under the
-            // pointer to say they can be taken
-            opacity: here || tabCell.lifted ? 1 : (tabHov.hovered ? 0.9 : 0.7)
-            Behavior on opacity { NumberAnimation { duration: Zenon.fast } }
-            font.family: Zenon.face
-            font.weight: Zenon.weight
-            // the body's row size, written the same way rather than as a
-            // number that happens to match — zoom then moves both together
-            font.pixelSize: Math.round(16 * term.zoom)
-          }
-
-          // ── CLOSE, UNDER THE POINTER ───────────────────────────
-          // A × at the tab's right end while the pointer is on it, as
-          // plato's tabs have; a middle click still closes too.
-          // the search fields' clear chip, laid OVER the label's end
-          // rather than making room beside it (user, 2026-10-13): the name
-          // stays where it is as the pointer comes and goes
-          ClearChip {
-            id: closeX
-            anchors.right: parent.right
-            anchors.rightMargin: 8
-            anchors.verticalCenter: parent.verticalCenter
-            size: Math.round(16 * term.zoom)
-            held: tabMouse.pressed && tabMouse.overClose && !tabMouse.dragging
-            // shown and hidden outright, no fade (user, 2026-10-14)
-            opacity: tabHov.hovered && !tabMouse.dragging && tabCell.width > 70 && !term.modal ? 1 : 0
-            visible: opacity > 0
-          }
-
-          HoverHandler { id: tabHov }
-          MouseArea {
-            id: tabMouse
-            anchors.fill: parent
-            acceptedButtons: Qt.LeftButton | Qt.MiddleButton
-            hoverEnabled: true
-            // the pointer is on the close button
-            property bool overClose: false
-            onContainsMouseChanged: if (!tabMouse.containsMouse) tabMouse.overClose = false
-            function onClose(m) {
-              if (!closeX.visible) return false;
-              const p = tabMouse.mapToItem(closeX, m.x, m.y);
-              return p.x >= -4 && p.x <= closeX.width + 4 && p.y >= -4 && p.y <= closeX.height + 4;
-            }
-
-            // How far into the tab you took hold of it, so the tab does not
-            // jump its own width the moment the drag begins.
-            property real grabDx: 0
-            property bool dragging: false
-
-            // ── THE STRIP, HELD RATHER THAN LOOKED UP ────────────────
-            // A press outlives its delegate: on a config reload the tab
-            // is torn down with the button still held, and the release
-            // and the cancel are both delivered to what is left of it. By
-            // then `tabStrip` cannot be named — a QML id resolves through
-            // the component's context and not through JS scope, so once
-            // that context is gone the name does not evaluate to null, it
-            // fails to evaluate at all. Which is why guarding it did not
-            // work: `!tabStrip` threw the error it was testing for, and
-            // `typeof tabStrip` threw it too. typeof only forgives a name
-            // JS itself has never heard of, and this one is not that.
-            //
-            // So the reference is taken ONCE, while the context is
-            // certainly alive, and read as a plain property afterwards.
-            // Reading a property of a half-dead object is allowed; naming
-            // a dead id is not.
-            property var strip: null
-            Component.onCompleted: tabMouse.strip = tabStrip
-
-            // MEASURED IN THE STRIP, never in the tab. `m.x` is relative to
-            // this MouseArea, and this MouseArea moves with the tab while
-            // the tab follows the pointer — reading the pointer off a thing
-            // that the pointer is moving is a feedback loop, and the tab
-            // shivers. mapToItem asks the strip instead, which holds still.
-            function stripX(m) {
-              return tabCell.mapToItem(tabStrip, m.x, 0).x;
-            }
-
-            onPressed: (m) => {
-              tabMouse.overClose = tabMouse.onClose(m);
-              if (m.button !== Qt.LeftButton) return;
-              tabMouse.grabDx = tabMouse.stripX(m) - tabCell.x;
-              tabMouse.dragging = false;
-            }
-
-            onPositionChanged: (m) => {
-              tabMouse.overClose = tabMouse.onClose(m);
-              if (!tabMouse.pressed || term.tabs.length < 2 || term.modal) return;
-              const at = tabMouse.stripX(m);
-              if (!tabMouse.dragging) {
-                // a threshold, so a click that wobbles two pixels is still
-                // a click and still switches tab
-                if (Math.abs(at - tabCell.x - tabMouse.grabDx) < 5) return;
-                tabMouse.dragging = true;
-                tabStrip.dragFrom = tabCell.index;
-                tabStrip.dragTo = tabCell.index;
-              }
-              const w = tabCell.width;
-              tabStrip.dragX = Math.max(0,
-                Math.min(tabStrip.width - w, at - tabMouse.grabDx));
-              // WHERE IT WOULD LAND: the slot its own left edge is nearest,
-              // which is what makes the gap open when the tab is more than
-              // half way past its neighbor rather than the moment it
-              // touches it.
-              tabStrip.dragTo = Math.max(0, Math.min(term.tabs.length - 1,
-                Math.round(tabStrip.dragX / w)));
-            }
-
-            // CLEARED WHETHER OR NOT THIS WAS A DRAG. An early return here
-            // left `dragFrom` pointing at a tab whose gesture had ended — a
-            // press that became a drag and then lost its release froze that
-            // tab where it stood, and nothing afterwards put it back.
-            onReleased: {
-              const was = tabMouse.dragging;
-              tabMouse.dragging = false;
-              // Through the held reference — see `strip` above. A drag
-              // that died with its component has nothing left to put back.
-              const st = tabMouse.strip;
-              if (!st) return;
-              if (was && st.dragFrom !== st.dragTo) {
-                st.dropAt = st.dragTo;
-                st.dropX = st.dragX;
-              }
-              if (was) term.moveTab(st.dragFrom, st.dragTo);
-              st.endDrag();
-            }
-
-            // A grab taken away mid-drag puts everything back rather than
-            // committing a move nobody finished asking for.
-            onCanceled: {
-              tabMouse.dragging = false;
-              // Through the held reference like the release above: a
-              // cancel is exactly what a torn-down delegate delivers.
-              if (tabMouse.strip) tabMouse.strip.endDrag();
-            }
-
-            onClicked: (m) => {
-              // a gesture that became a drag is not also a click — the same
-              // rule the listing's rows follow
-              if (tabMouse.dragging) return;
-              if (m.button === Qt.MiddleButton || tabMouse.onClose(m)) {
-                // DEFERRED, because this handler is about to lose the
-                // ground it is standing on: closing a tab replaces
-                // `root.tabs`, which is this Repeater's model, so the
-                // delegate running this very line is destroyed inside the
-                // call and everything after it throws instead of running.
-                // Handing root an index and letting it do the work in its
-                // own scope — which nothing here can tear down — is the
-                // whole of the fix.
-                Qt.callLater(term.closeTabAt, tabCell.index);
-                return;
-              }
-              term.switchTab(tabCell.index);
-            }
-          }
-        }
-      }
-    }
-
-    // the line under the strip is drawn by each tab — see tabCell
   }
 
   // ── the crumbs ────────────────────────────────────────────────
@@ -697,8 +307,8 @@ Column {
         anchors.centerIn: parent
         height: crumbSegs.height
         partW: 28
-        parts: [{ glyph: "\uF053", ok: term.canBack, size: Zenon.px(13) },
-                { glyph: "\uF054", ok: term.canForward, size: Zenon.px(13) }]
+        parts: [{ glyph: "\uF053", ok: term.canBack, size: Zenon.px(14), heavy: true },
+                { glyph: "\uF054", ok: term.canForward, size: Zenon.px(14), heavy: true }]
         onClicked: (i) => i === 0 ? term.back() : term.forward()
       }
     }
@@ -1458,24 +1068,6 @@ Column {
         font.pixelSize: Zenon.px(14)
       }
 
-      // WHAT IT IS SEARCHING, and nothing else — before the zoom meter,
-      // not between it and the sort (user, 2026-10-14). The view mode used to
-      // share this slot as its fallback — a word that named what you were
-      // already looking at, beside a menu that is one click away and says
-      // the same thing. Nothing was read off it that the window was not
-      // already showing.
-      Text {
-        anchors.verticalCenter: parent.verticalCenter
-        // not for a tag or a collection: the sheet and the sidebar already
-        // say which one is open (user, 2026-10-17)
-        visible: term.searchMode === "grep" || term.searchMode === "find"
-        text: term.searchMode
-        color: Zenon.sand
-        font.family: Zenon.face
-        font.weight: Zenon.weight
-        font.pixelSize: Zenon.px(14)
-      }
-
       // What the zoom is at, and a control for it — the shared meter
       // (ZoomMeter.qml, picasso's bar has it too). Thumbs and the two list
       // layouts scale independently, so it follows whichever view you are
@@ -1927,7 +1519,7 @@ Column {
     // NOT WHILE THE ROW IS cursorOnly. With things ticked, or on the pane
     // the keyboard is not in, the cursor is drawn as an OUTLINE rather
     // than a fill so it cannot be mistaken for a selection; the bar stands
-    // down for that and the row draws its own border, as before.
+    // down for that and the row wears a HeldRing (EntryRow.qml).
     // SelectBar and EntryRow are files of their own beside this one
     // (terminus/SelectBar.qml, terminus/EntryRow.qml), shared with plato:
     // each is handed this window as its `host`.

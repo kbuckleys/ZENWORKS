@@ -21,6 +21,7 @@ import "editor"
 import "../terminus/terminus.js" as Terminus
 import "editor/actions.js" as Actions
 import "../morpheus/icons.js" as Icons
+import "../morpheus/hypr.js" as Hypr
 
 FloatingWindow {
   id: win
@@ -162,7 +163,7 @@ FloatingWindow {
   }
   function raise() {
     const sel = win.hyprAddress !== "" ? "address:" + win.hyprAddress : "title:^(" + win.title + ")$";
-    Hyprland.dispatch('hl.dsp.focus({ window = "' + sel + '" })');
+    Hyprland.dispatch(Hypr.focusWindow(sel));
   }
   onFocusedChanged: {
     if (win.focused) {

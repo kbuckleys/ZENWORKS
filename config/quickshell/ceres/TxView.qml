@@ -29,6 +29,7 @@ import "../morpheus"
 import "../terminus" as Term
 import "."
 import "ceres.js" as Cer
+import "../morpheus/controls" as Controls
 
 Item {
   id: view
@@ -88,6 +89,30 @@ Item {
   component LogPane: Rectangle {
     id: pane
     property var lines: []
+    // ── THE CURSOR GOES BACK FIRST ─────────────────────────────────────
+    // The log is a selectable TextEdit, and its cursor and selection
+    // outlived a log being swapped for a new, shorter one: setting the text
+    // then put them past its end, and Qt said so three at a time
+    // ("QTextCursor::setPosition: Position N out of range"). So the text is
+    // set here rather than bound, and just before it is, a log that is not
+    // simply the last one grown drops its selection and puts the cursor at
+    // 0. A log that only grew keeps a selection made while it ran.
+    readonly property string html: "<div style='white-space:pre-wrap'>"
+      + pane.lines.map(pane.lineHtml).join("<br>") + "</div>"
+    property var shownLines: []
+    function showLog() {
+      const old = pane.shownLines, now = pane.lines || [];
+      const grew = now.length >= old.length && (old.length === 0
+        || (now[0] === old[0] && now[old.length - 1] === old[old.length - 1]));
+      if (!grew || logText.selectionStart === logText.selectionEnd) {
+        logText.deselect();
+        logText.cursorPosition = 0;
+      }
+      logText.text = pane.html;
+      pane.shownLines = now;
+    }
+    onHtmlChanged: pane.showLog()
+    Component.onCompleted: pane.showLog()
     radius: Zenon.windowRadius
     color: Zenon.darken(0.25)
     border.width: 1
@@ -241,8 +266,7 @@ Item {
         font.family: Zenon.faceCode
         font.weight: Zenon.codeWeight
         font.pixelSize: 13 + view.grow
-        text: "<div style='white-space:pre-wrap'>"
-          + pane.lines.map(pane.lineHtml).join("<br>") + "</div>"
+        // set by pane.showLog, never bound — see there
       }
     }
 
@@ -274,15 +298,12 @@ Item {
     // counters while installing (see Cer.overallOf), and between those the
     // packages pacman.log has recorded against the number expected. The
     // fill is translucent so the words on it stay the loudest thing in it.
-    Rectangle {
+    Controls.ListFrame {
       id: track
       anchors.left: parent.left
       anchors.right: parent.right
       anchors.top: parent.top
       height: 36
-      radius: Zenon.windowRadius
-      color: Zenon.darken(0.25)
-      border.width: 1
       border.color: Ceres.txCancelling ? Zenon.red : Zenon.border
       clip: true
 

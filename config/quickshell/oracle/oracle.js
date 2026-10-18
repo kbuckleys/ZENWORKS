@@ -483,6 +483,110 @@ function changedIn(schema, values, defaults, section) {
   return n;
 }
 
+// ── THE TOOLS THE SHELL CALLS OUT TO ──────────────────────────────────────
+// Health's Tools row, and its fold-out. CORE: missing, something you use
+// every day breaks (red). The rest are one feature each, or installed the
+// first time a feature asks (calypso's backends, picasso's Make, ceres'
+// flatpak) — listed, never red. `pkg` is the Arch package; `aur` marks one
+// pacman cannot install. oracle/doctor.sh only answers which are on PATH.
+//
+// PREBUILT, ALWAYS (user, 2026-10-18: "speed and convenience are key"):
+// the official repos, or an AUR package that repacks an upstream binary
+// (-bin, 1password-cli). The one exception is paru itself: its author's own
+// package builds from source, and paru-bin (another maintainer) lags it and
+// was flagged out of date (2026-10-18) — a stale binary against a newer
+// libalpm is a broken package manager. Building realesrgan and rembg's dependencies took
+// far too long, so picasso's cut-out is its own (picasso/bin/cutout.py) on the
+// repos' onnxruntime. `builds` says why a tool has no prebuilt package at all
+// — none now, and the panel says so before one is ticked. `module` is a
+// python module, not a command: doctor.sh asks python3 to import it.
+// `installed` is a package with no command at all (a Proton build lands in
+// steam's compatibility tools): doctor.sh asks pacman whether it is there.
+const TOOLS = [
+  { name: "hyprctl", pkg: "hyprland", core: true, why: "the compositor: windows, monitors, dispatches" },
+  { name: "fd", pkg: "fd", core: true, why: "artemis' index, plato's finder" },
+  { name: "fzf", pkg: "fzf", core: true, why: "artemis and plato search" },
+  { name: "rg", pkg: "ripgrep", core: true, why: "content search" },
+  { name: "jq", pkg: "jq", core: true, why: "JSON from helper scripts" },
+  { name: "qalc", pkg: "libqalculate", core: true, why: "metis, the calculator" },
+  { name: "magick", pkg: "imagemagick", core: true, why: "picasso edits, thumbnails, window shots" },
+  { name: "grim", pkg: "grim", core: true, why: "screenshots" },
+  { name: "slurp", pkg: "slurp", core: true, why: "picking a region to capture" },
+  { name: "wl-copy", pkg: "wl-clipboard", core: true, why: "copying" },
+  { name: "wl-paste", pkg: "wl-clipboard", core: true, why: "pasting" },
+  { name: "cliphist", pkg: "cliphist", core: true, why: "folio, the clipboard history" },
+  { name: "inotifywait", pkg: "inotify-tools", core: true, why: "watching files and directories" },
+  { name: "playerctl", pkg: "playerctl", core: true, why: "media keys and now playing" },
+  { name: "pactl", pkg: "libpulse", core: true, why: "volume and audio devices" },
+  { name: "wpctl", pkg: "wireplumber", core: true, why: "audio streams" },
+  { name: "python3", pkg: "python", core: true, why: "helper scripts, delphi and calypso backends" },
+  { name: "nvim", pkg: "neovim", core: true, why: "plato's editor" },
+  // core since 2026-10-18 (user: "make this run out of the box"); the
+  // installer also fetches its model
+  { name: "onnxruntime", pkg: "python-onnxruntime-cpu", module: true, core: true, why: "picasso: cut out the subject" },
+  { name: "kitty", pkg: "kitty", core: true, why: "the terminal everything opens in" },
+  { name: "git", pkg: "git", core: true, why: "delphi" },
+  { name: "fc-list", pkg: "fontconfig", core: true, why: "alexandria and the font pickers" },
+  { name: "gio", pkg: "glib2", core: true, why: "opening files, the trash" },
+  { name: "udisksctl", pkg: "udisks2", core: true, why: "mounting disks in terminus" },
+  { name: "paru", pkg: "paru", aur: true, why: "ceres: AUR packages and updates" },
+  { name: "flatpak", pkg: "flatpak", why: "ceres' store, once opted in" },
+  { name: "node", pkg: "nodejs", why: "the test suite (Health's Tests row)" },
+  { name: "exiftool", pkg: "perl-image-exiftool", why: "picture details in picasso" },
+  { name: "ffprobe", pkg: "ffmpeg", why: "video details" },
+  { name: "ffmpeg", pkg: "ffmpeg", why: "video frames and covers" },
+  { name: "tesseract", pkg: "tesseract", why: "copying text out of a picture" },
+  { name: "fastfetch", pkg: "fastfetch", why: "About this computer" },
+  { name: "gh", pkg: "github-cli", why: "delphi's GitHub sign-in" },
+  { name: "bw", pkg: "bitwarden-cli", why: "calypso's Bitwarden backend" },
+  { name: "op", pkg: "1password-cli", aur: true, why: "calypso's 1Password backend" },
+  { name: "realesrgan-ncnn-vulkan", pkg: "realesrgan-ncnn-vulkan-bin", aur: true, why: "picasso: upscale" },
+  { name: "bandwhich", pkg: "bandwhich", why: "zeus' network view" },
+  { name: "pkexec", pkg: "polkit", why: "anything that asks for your password" },
+  { name: "proton-wineland-bin", pkg: "proton-wineland-bin", installed: true, aur: true, why: "Proton for Steam, with Wayland" },
+];
+
+// doctor.sh's list: a module as py:NAME, a package as pkg:NAME, answered
+// as NAME
+function toolNames() { return TOOLS.map((t) => (t.module ? "py:" : t.installed ? "pkg:" : "") + t.name).join(" "); }
+
+// The tools as PACKAGES, one each: wl-copy and wl-paste are one
+// wl-clipboard, ffmpeg and ffprobe one ffmpeg — a box to tick per package,
+// never two for the same install. Needed if any of its tools is; there if
+// all of them are. In the order the tools come.
+function toolPackages(tools) {
+  const out = [], at = {};
+  for (const t of tools || []) {
+    let p = at[t.pkg];
+    if (!p) {
+      p = at[t.pkg] = { pkg: t.pkg, aur: !!t.aur, builds: t.builds || "", core: false, have: true, names: [], whys: [] };
+      out.push(p);
+    }
+    p.core = p.core || !!t.core;
+    p.have = p.have && t.have !== false;
+    p.names.push(t.name);
+    if (p.whys.indexOf(t.why) < 0) p.whys.push(t.why);
+  }
+  for (const p of out) { p.why = p.whys.join("; "); delete p.whys; }
+  return out;
+}
+
+// the commands that install what is missing, one per line. With paru there,
+// one line: it takes repo and AUR packages alike. Without it, pacman for the
+// repo ones, then paru itself (it is in the AUR, so makepkg), then the rest.
+function installLines(missing) {
+  const uniq = (ts) => ts.map((t) => t.pkg).filter((p, i, a) => a.indexOf(p) === i);
+  const ms = missing || [];
+  if (!ms.length) return [];
+  if (!ms.some((t) => t.name === "paru")) return ["paru -S " + uniq(ms).join(" ")];
+  const repo = uniq(ms.filter((t) => !t.aur)), aur = uniq(ms.filter((t) => t.aur && t.name !== "paru"));
+  const out = [];
+  if (repo.length) out.push("sudo pacman -S " + repo.join(" "));
+  out.push("git clone https://aur.archlinux.org/paru.git && cd paru && makepkg -si");
+  if (aur.length) out.push("paru -S " + aur.join(" "));
+  return out;
+}
+
 // ── THE CHECKUP ───────────────────────────────────────────────────────────
 // oracle/doctor.sh prints `key<TAB>value` lines; this turns them into the
 // Health section's rows, each a short line and a level: "ok" reads green,
@@ -541,6 +645,43 @@ function readCheckup(text, baselineKb) {
     detail: counted(held),
   };
 
+  // Qt, quickshell and Hyprland as they are now, against the stamp the last
+  // clean preflight left (scripts/stack.sh). An update is when this shell
+  // breaks — a Qt from [testing] ahead of quickshell, Hyprland's Lua — so a
+  // change since the stamp asks for a preflight before anything is opened.
+  const parts = (k) => (f[k] || "").split(",").map((x) => x.trim()).filter((x) => x !== "");
+  const now = parts("stack"), then = parts("stamp");
+  const short = (p) => p.replace(/^(\S+) (?:\d+:)?([^-\s]+).*$/, "$1 $2");
+  if (!now.length) rows.stack = { text: "unreadable", level: "warn" };
+  else if (!then.length) rows.stack = { text: "no clean preflight on record \u2014 run scripts/preflight.sh", level: "warn" };
+  else {
+    const was = {};
+    for (const p of then) was[p.split(" ")[0]] = p;
+    const moved = now.filter((p) => was[p.split(" ")[0]] !== p)
+      .map((p) => { const o = was[p.split(" ")[0]]; return (o ? short(o) : p.split(" ")[0] + " (new)") + " \u2192 " + short(p).split(" ")[1]; });
+    rows.stack = moved.length
+      ? { text: "updated since the last clean preflight: " + moved.join(", ") + " \u2014 run scripts/preflight.sh", level: "warn" }
+      : { text: now.filter((p) => /^(quickshell|qt6-base|hyprland) /.test(p)).map(short).join(" \u00b7 ") + " \u00b7 preflight passed on these", level: "ok" };
+  }
+
+  // name:1/0 per tool, in TOOLS' order; the row carries the whole list for
+  // its fold-out (ToolsPanel), missing ones first
+  const have = {};
+  for (const x of list("tools")) { const k = x.lastIndexOf(":"); if (k > 0) have[x.slice(0, k)] = x.slice(k + 1) === "1"; }
+  if (!Object.keys(have).length) rows.tools = { text: "not checked", level: "warn", list: [] };
+  else {
+    const all = TOOLS.filter((t) => t.name in have).map((t) => Object.assign({ have: have[t.name] }, t));
+    const gone = all.filter((t) => t.core && !t.have), extras = all.filter((t) => !t.core && !t.have);
+    const core = all.filter((t) => t.core).length;
+    rows.tools = {
+      text: gone.length ? "missing: " + gone.map((t) => t.name).join(", ")
+        : "all " + core + " present" + (extras.length ? " \u00b7 " + extras.length + " optional not installed" : ""),
+      level: gone.length ? "bad" : "ok",
+      list: gone.concat(extras, all.filter((t) => t.have)),
+      install: installLines(gone.concat(extras)),
+    };
+  }
+
   const errors = parseInt(f.errors, 10) || 0;
   const warnings = parseInt(f.warnings, 10) || 0;
   rows.log = {
@@ -549,6 +690,20 @@ function readCheckup(text, baselineKb) {
     detail: f.lasterror || "",
   };
   return rows;
+}
+
+// What the checkup reads memory against: the median of the sizes fresh
+// starts settled at (morpheus/LagWatch writes settle.json two minutes after
+// a start with nothing of the shell's own opened), or `fallback` until there
+// is one. The median, so one start that happened to load a big font or a
+// background change does not move the line.
+function settledBaseline(text, fallback) {
+  let list = [];
+  try { list = JSON.parse(String(text || "")).kb || []; } catch (e) { return fallback; }
+  const kb = list.map((e) => Number(e && e.kb)).filter((n) => n > 0).sort((a, b) => a - b);
+  if (!kb.length) return fallback;
+  const mid = kb.length >> 1;
+  return kb.length % 2 ? kb[mid] : Math.round((kb[mid - 1] + kb[mid]) / 2);
 }
 
 // ── DISPLAYS ──────────────────────────────────────────────────────────────
@@ -1771,7 +1926,7 @@ function bytes(n) {
 }
 
 function usage(used, total) {
-  if (!total) return "";
+  if (!total || typeof used !== "number" || isNaN(used)) return "";
   return bytes(used) + " / " + bytes(total) + " (" + Math.round(used / total * 100) + "%)";
 }
 
@@ -1831,8 +1986,13 @@ function readComputer(json, qsVersion) {
   if (by.Memory) put("Memory", usage(by.Memory.used, by.Memory.total));
   for (const s of (Array.isArray(by.Swap) ? by.Swap : []))
     put("Swap", usage(s.used, s.total) + (s.name ? "  " + s.name.replace(/^\/dev\//, "") : ""));
-  for (const d of (Array.isArray(by.Disk) ? by.Disk : []))
-    put("Disk (" + d.mountpoint + ")", usage((d.bytes || {}).used, (d.bytes || {}).total) + (d.filesystem ? " · " + d.filesystem : ""));
+  // a newer fastfetch gives a disk's `free` and no `used` — which drew
+  // "0 B / 45.5 GiB (NaN%)" — so used is what free leaves of total
+  for (const d of (Array.isArray(by.Disk) ? by.Disk : [])) {
+    const b = d.bytes || {};
+    const used = b.used !== undefined ? b.used : b.free !== undefined ? b.total - b.free : undefined;
+    put("Disk (" + d.mountpoint + ")", usage(used, b.total) + (d.filesystem ? " · " + d.filesystem : ""));
+  }
   for (const n of (Array.isArray(by.LocalIp) ? by.LocalIp : []))
     put("Local IP (" + n.name + ")", n.ipv4 || n.ipv6 || "");
   for (const b of (Array.isArray(by.Battery) ? by.Battery : []))

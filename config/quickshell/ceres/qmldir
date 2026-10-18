@@ -13,6 +13,7 @@ StoreView 1.0 StoreView.qml
 StoreCard 1.0 StoreCard.qml
 StoreIcon 1.0 StoreIcon.qml
 StoreGet 1.0 StoreGet.qml
+StoreRemove 1.0 StoreRemove.qml
 StoreBlocks 1.0 StoreBlocks.qml
 StoreArt 1.0 StoreArt.qml
 StoreHero 1.0 StoreHero.qml
