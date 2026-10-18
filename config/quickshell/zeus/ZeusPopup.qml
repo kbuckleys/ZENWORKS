@@ -478,7 +478,7 @@ LayerPopup {
   readonly property int headerH: 44
   // The footer is the hints and nothing else now, so it is sized for one row
   // instead of two — 58px of strip under a 28px row read as a mistake.
-  readonly property int hintH: 40
+  readonly property int hintH: Zenon.hintBarH
 
   // What the machine is, in one line. Both views show it, so it is written
   // once: in the graphs' header beside the title, and in the kill list's input
@@ -564,18 +564,18 @@ LayerPopup {
   function statFacts(key) {
     const gib = (kb) => Helpers.format1f(Helpers.giB(kb)) + " GiB";
     if (key === "cpu") return [
-      { label: "clock", value: Sysmon.cpuFreq === null ? "--"
+      { label: "Clock", value: Sysmon.cpuFreq === null ? "--"
           : (Sysmon.cpuFreq / 1000).toFixed(2) + " GHz" },
-      { label: "temp", value: Sysmon.cpuTemp === null ? "--" : Sysmon.cpuTemp + "°C" },
-      { label: "load", value: Sysmon.cpuLoad === null ? "--" : Sysmon.cpuLoad.toFixed(2) }
+      { label: "Temp", value: Sysmon.cpuTemp === null ? "--" : Sysmon.cpuTemp + "°C" },
+      { label: "Load", value: Sysmon.cpuLoad === null ? "--" : Sysmon.cpuLoad.toFixed(2) }
     ];
     if (key === "cores") {
       let hot = 0;
       for (const v of Sysmon.cpuPerCore) if (v >= 50) ++hot;
       return [
-        { label: "busiest", value: popup.busiestCore >= 0 ? "#" + popup.busiestCore : "--" },
-        { label: "over half", value: String(hot) },
-        { label: "layout", value: (Sysmon.cpuCores || "?") + "c / " + (Sysmon.cpuThreads || "?") + "t" }
+        { label: "Busiest", value: popup.busiestCore >= 0 ? "#" + popup.busiestCore : "--" },
+        { label: "Over half", value: String(hot) },
+        { label: "Layout", value: (Sysmon.cpuCores || "?") + "c / " + (Sysmon.cpuThreads || "?") + "t" }
       ];
     }
     if (key === "gpu") {
@@ -586,37 +586,37 @@ LayerPopup {
       const power = Sysmon.gpuPower === null ? ""
         : Sysmon.gpuPower + (Sysmon.gpuPowerLimit !== null ? " / " + Sysmon.gpuPowerLimit : "") + " W";
       return [
-        { label: "temp", value: Sysmon.gpuTemp > 0 ? Sysmon.gpuTemp + "°C" : "--" },
-        { label: "vram", value: vram },
-        { label: "power", value: power },
-        { label: "clock", value: Sysmon.gpuClock === null ? "" : Sysmon.gpuClock + " MHz" },
-        { label: "fan", value: Sysmon.gpuFan === null ? "" : Sysmon.gpuFan + "%" }
+        { label: "Temp", value: Sysmon.gpuTemp > 0 ? Sysmon.gpuTemp + "°C" : "--" },
+        { label: "Vram", value: vram },
+        { label: "Power", value: power },
+        { label: "Clock", value: Sysmon.gpuClock === null ? "" : Sysmon.gpuClock + " MHz" },
+        { label: "Fan", value: Sysmon.gpuFan === null ? "" : Sysmon.gpuFan + "%" }
       ];
     }
     // used is what a program cannot have back; cache is what the kernel will
     // hand back the moment one asks — available counts it, free does not
     if (key === "ram") return [
-      { label: "used", value: Helpers.format1f(Sysmon.memUsed) + " GiB" },
-      { label: "cache", value: gib(Sysmon.memCached) },
-      { label: "available", value: gib(Sysmon.memAvail) },
-      { label: "free", value: gib(Sysmon.memFree) },
-      { label: "swap", value: Sysmon.swapTotal > 0
+      { label: "Used", value: Helpers.format1f(Sysmon.memUsed) + " GiB" },
+      { label: "Cache", value: gib(Sysmon.memCached) },
+      { label: "Available", value: gib(Sysmon.memAvail) },
+      { label: "Free", value: gib(Sysmon.memFree) },
+      { label: "Swap", value: Sysmon.swapTotal > 0
           ? Helpers.format1f(Sysmon.swapUsed) + " / " + Helpers.format1f(Helpers.giB(Sysmon.swapTotal)) + " GiB"
           : "none" }
     ];
     if (key === "net") return [
-      { label: "up", value: Sysmon.netUpText, ink: Sysmon.netUpInk },
+      { label: "Up", value: Sysmon.netUpText, ink: Sysmon.netUpInk },
       // the interface's counters since it came up, as in the connections view
-      { label: "received", value: Helpers.sizeFormat(Sysmon.netRxTotal), ink: Sysmon.netDownInk },
-      { label: "sent", value: Helpers.sizeFormat(Sysmon.netTxTotal), ink: Sysmon.netUpInk },
-      { label: "link", value: Sysmon.netConnected
+      { label: "Received", value: Helpers.sizeFormat(Sysmon.netRxTotal), ink: Sysmon.netDownInk },
+      { label: "Sent", value: Helpers.sizeFormat(Sysmon.netTxTotal), ink: Sysmon.netUpInk },
+      { label: "Link", value: Sysmon.netConnected
           ? (Sysmon.netIface !== "" ? Sysmon.netIface : "up") : "down" },
-      { label: "address", value: Sysmon.netIp !== "" ? Sysmon.netIp : "--" }
+      { label: "Address", value: Sysmon.netIp !== "" ? Sysmon.netIp : "--" }
     ];
     return [
-      { label: "write", value: Sysmon.diskWriteText, ink: Sysmon.diskWriteInk },
-      { label: "used", value: Sysmon.diskUsedPct + "%" },
-      { label: "capacity",
+      { label: "Write", value: Sysmon.diskWriteText, ink: Sysmon.diskWriteInk },
+      { label: "Used", value: Sysmon.diskUsedPct + "%" },
+      { label: "Capacity",
         value: Helpers.format1f(Sysmon.diskTotal / 1073741824) + " GiB" }
     ];
   }
@@ -945,16 +945,7 @@ LayerPopup {
   // The recipe is terminus' KeyChip, which is an inline component of that
   // file and so cannot be imported.
 
-  component HintBar: Item {
-    id: hintBarRoot
-    height: 28
-    property var rows: popup.hints()
-    HintRow {
-      anchors.centerIn: parent
-      // the row itself, caps and spacing, is morpheus/HintRow
-      rows: hintBarRoot.rows
-    }
-  }
+
 
   // What Tab reaches next, named rather than restated — the ring is in
   // `views`, so a hint cannot promise a view Tab does not actually go to.
@@ -1240,21 +1231,21 @@ LayerPopup {
     const kb = (v) => (v === undefined || isNaN(v)) ? "--" : Zeus.formatBytes(v * 1024);
     const rate = popup.detailIoRate;
     return [
-      { label: "pid", value: r.pid },
-      { label: "parent", value: r.ppid ?? "--" },
-      { label: "state", value: Zeus.stateName(r.stat) },
-      { label: "nice", value: String(r.nice ?? "--") },
-      { label: "threads", value: String(r.threads ?? "--") },
-      { label: "running", value: Zeus.formatDuration(r.etimes) },
-      { label: "cpu time", value: ticks === undefined ? "--"
+      { label: "Pid", value: r.pid },
+      { label: "Parent", value: r.ppid ?? "--" },
+      { label: "State", value: Zeus.stateName(r.stat) },
+      { label: "Nice", value: String(r.nice ?? "--") },
+      { label: "Threads", value: String(r.threads ?? "--") },
+      { label: "Running", value: Zeus.formatDuration(r.etimes) },
+      { label: "Cpu time", value: ticks === undefined ? "--"
           : Zeus.formatDuration(ticks / (sample.hz || 100)) },
-      { label: "memory", value: kb(r.memKb) },
-      { label: "peak", value: d ? kb(d.peakKb) : "--" },
-      { label: "swap", value: d ? kb(d.swapKb) : "--" },
-      { label: "read", value: d && d.io
+      { label: "Memory", value: kb(r.memKb) },
+      { label: "Peak", value: d ? kb(d.peakKb) : "--" },
+      { label: "Swap", value: d ? kb(d.swapKb) : "--" },
+      { label: "Read", value: d && d.io
           ? Zeus.formatBytes(d.io.read) + (rate ? " \u00b7 " + Zeus.formatBytes(rate.read) + "/s" : "")
           : "--", ink: Sysmon.diskReadInk },
-      { label: "written", value: d && d.io
+      { label: "Written", value: d && d.io
           ? Zeus.formatBytes(d.io.write) + (rate ? " \u00b7 " + Zeus.formatBytes(rate.write) + "/s" : "")
           : "--", ink: Sysmon.diskWriteInk }
     ];
@@ -1794,7 +1785,7 @@ LayerPopup {
               Text {
                 anchors.centerIn: parent
                 visible: popup.filtered.length === 0
-                text: "No matches found"
+                text: "Nothing matches \u201C" + popup.query + "\u201D"
                 color: popup.dimColor
                 font.family: Zenon.face
                 font.weight: 600
@@ -1808,6 +1799,8 @@ LayerPopup {
               // the whole shell — see morpheus/Elastic.qml. Inside the view
               // rather than over it: it pins itself to the viewport.
               ElasticScroll { view: grid }
+              // the chosen one slides (morpheus/CursorBand), rather than each row lighting
+              CursorBand { follows: grid; index: popup.sel }
               width: parent.width
               height: popup.gridHeight()
               clip: true
@@ -1825,7 +1818,7 @@ LayerPopup {
 
                 Rectangle {
                   anchors.fill: parent
-                  color: index === popup.sel ? Zenon.menuHi : "transparent"
+                  color: "transparent"
                 }
 
                 Row {
@@ -2002,7 +1995,7 @@ LayerPopup {
           ? head.label + (head.desc ? " \u25BE" : " \u25B4")
           : head.label
         color: head.active ? popup.headColor
-          : (headMa.containsMouse ? popup.keyColor : popup.dimColor)
+          : (headMa.pressed ? popup.keyColor : popup.dimColor)
         font.family: Zenon.faceFixed
         font.weight: Zenon.weight
         font.pixelSize: Zenon.px(12)
@@ -2285,24 +2278,10 @@ LayerPopup {
 
             // hint strip — bottom, per the rasi mainbox order. The count and the
             // uptime moved up into the input bar, so this is the hints alone.
-            Rectangle {
+            HintBar {
               id: listHints
               width: parent.width
-              height: popup.hintH
-              color: Zenon.hintFrostBg   // the list rises out of it — see the ScrollEdge
-
-              Rectangle {
-                anchors.top: parent.top
-                anchors.left: parent.left
-                anchors.right: parent.right
-                height: 1
-                color: Zenon.border
-              }
-
-              HintBar {
-                width: parent.width
-                anchors.verticalCenter: parent.verticalCenter
-              }
+              rows: popup.hints()
             }
           }
         }
@@ -2415,7 +2394,7 @@ LayerPopup {
                 Text {
                   anchors.horizontalCenter: parent.horizontalCenter
                   text: popup.netError !== "" ? Zeus.firstProblem(popup.netError)
-                    : (popup.netQuery !== "" ? "No matches found"
+                    : (popup.netQuery !== "" ? "Nothing matches \u201C" + popup.netQuery + "\u201D"
                                              : "Nothing on the wire")
                   color: popup.netError !== "" ? popup.errColor : popup.dimColor
                   font.family: Zenon.face
@@ -2437,7 +2416,7 @@ LayerPopup {
                   Rectangle {
                     anchors.fill: parent
                     radius: 5
-                    color: grantMa.containsMouse
+                    color: grantMa.pressed
                       ? Qt.rgba(Zenon.green.r, Zenon.green.g, Zenon.green.b, 0.14)
                       : "transparent"
                     border.width: 1
@@ -2454,7 +2433,7 @@ LayerPopup {
                     Text {
                       anchors.verticalCenter: parent.verticalCenter
                       text: "\uF023  grant access"
-                      color: grantMa.containsMouse ? Zenon.green : popup.keyColor
+                      color: grantMa.pressed ? Zenon.green : popup.keyColor
                       font.family: Zenon.face
                       font.weight: Font.Bold
                       font.pixelSize: Zenon.px(12)
@@ -2463,7 +2442,7 @@ LayerPopup {
 
                     Text {
                       anchors.verticalCenter: parent.verticalCenter
-                      text: "or  " + popup.netFixHint
+                      text: "Or  " + popup.netFixHint
                       color: popup.dimColor
                       font.family: Zenon.face
                       font.weight: Zenon.weight
@@ -2624,24 +2603,10 @@ LayerPopup {
             }
 
             // hint strip — the same one the other views carry
-            Rectangle {
+            HintBar {
               id: netHints
               width: parent.width
-              height: popup.hintH
-              color: Zenon.hintFrostBg   // the list rises out of it — see the ScrollEdge
-
-              Rectangle {
-                anchors.top: parent.top
-                anchors.left: parent.left
-                anchors.right: parent.right
-                height: 1
-                color: Zenon.border
-              }
-
-              HintBar {
-                width: parent.width
-                anchors.verticalCenter: parent.verticalCenter
-              }
+              rows: popup.hints()
             }
           }
         }
@@ -2752,7 +2717,7 @@ LayerPopup {
               Text {
                 anchors.centerIn: parent
                 visible: popup.soundEmpty
-                text: "No matches found"
+                text: popup.soundQuery !== "" ? "Nothing matches \u201C" + popup.soundQuery + "\u201D" : "Nothing here"
                 color: popup.dimColor
                 font.family: Zenon.face
                 font.weight: 600
@@ -2770,6 +2735,8 @@ LayerPopup {
                 // the whole shell — see morpheus/Elastic.qml. Inside the view
                 // rather than over it: it pins itself to the viewport.
                 ElasticScroll { view: soundList }
+                // the chosen one slides (morpheus/CursorBand), rather than each row lighting
+                CursorBand { follows: soundList; index: popup.soundSel }
                 // a dropdown hangs off its row; once the row moves, it is
                 // hanging off nothing
                 onContentYChanged: popup.closeProfileMenu()
@@ -2917,8 +2884,7 @@ LayerPopup {
                   Rectangle {
                     anchors.fill: parent
                     visible: !modelData.head
-                    color: soundRow.selected ? Zenon.menuHi
-                      : (rowHov.hovered ? Zenon.menuHi : "transparent")
+                    color: rowHov.hovered && !soundRow.selected ? Zenon.menuHi : "transparent"
                   }
                   HoverHandler { id: rowHov; enabled: !modelData.head }
 
@@ -3009,7 +2975,7 @@ LayerPopup {
                           : (soundRow.isDevice && sound.isDefault(soundRow.node)
                             ? "default" : "")
                         color: soundRow.isStream
-                          ? (routeHov.hovered ? Zenon.green : popup.dimColor)
+                          ? (routePress.pressed ? Zenon.green : popup.dimColor)
                           : Zenon.green
                         font.family: Zenon.face
                         font.weight: soundRow.isDevice ? Font.Bold : Font.Medium
@@ -3019,6 +2985,7 @@ LayerPopup {
                       HoverHandler { id: routeHov; enabled: soundRow.isStream }
 
                       MouseArea {
+                        id: routePress
                         anchors.fill: parent
                         enabled: soundRow.isStream || soundRow.isDevice
                         onClicked: {
@@ -3210,7 +3177,7 @@ LayerPopup {
                         anchors.left: parent.left
                         anchors.verticalCenter: parent.verticalCenter
                         visible: !profCell.switchable
-                        text: modelData.card ? "no other profile" : ""
+                        text: modelData.card ? "No other profile" : ""
                         color: popup.dimColor
                         font.family: Zenon.face
                         font.weight: Zenon.weight
@@ -3249,7 +3216,7 @@ LayerPopup {
                         visible: !soundRow.isCard
                         text: soundRow.muted ? "" : ""
                         color: soundRow.muted ? Zenon.green
-                          : (muteHov.hovered ? popup.fgColor : popup.dimColor)
+                          : (mutePress.pressed ? popup.fgColor : popup.dimColor)
                         font.family: Zenon.face
                         font.weight: Zenon.weight
                         font.pixelSize: Zenon.px(14)
@@ -3258,6 +3225,7 @@ LayerPopup {
                       HoverHandler { id: muteHov; enabled: !soundRow.isCard }
 
                       MouseArea {
+                        id: mutePress
                         anchors.fill: parent
                         enabled: !soundRow.isCard
                         onClicked: {
@@ -3280,7 +3248,7 @@ LayerPopup {
                         visible: soundRow.isDevice
                         text: sound.isDefault(soundRow.node) ? "" : ""
                         color: sound.isDefault(soundRow.node) ? Zenon.green
-                          : (defHov.hovered ? popup.fgColor : popup.dimColor)
+                          : (defPress.pressed ? popup.fgColor : popup.dimColor)
                         font.family: Zenon.face
                         font.weight: Zenon.weight
                         font.pixelSize: Zenon.px(13)
@@ -3289,6 +3257,7 @@ LayerPopup {
                       HoverHandler { id: defHov; enabled: soundRow.isDevice }
 
                       MouseArea {
+                        id: defPress
                         anchors.fill: parent
                         enabled: soundRow.isDevice
                         onClicked: {
@@ -3320,24 +3289,10 @@ LayerPopup {
             }
 
             // hint strip — the same one the other views carry
-            Rectangle {
+            HintBar {
               id: soundHints
               width: parent.width
-              height: popup.hintH
-              color: Zenon.hintFrostBg   // the list rises out of it — see the ScrollEdge
-
-              Rectangle {
-                anchors.top: parent.top
-                anchors.left: parent.left
-                anchors.right: parent.right
-                height: 1
-                color: Zenon.border
-              }
-
-              HintBar {
-                width: parent.width
-                anchors.verticalCenter: parent.verticalCenter
-              }
+              rows: popup.hints()
             }
           }
         }
@@ -3426,23 +3381,9 @@ LayerPopup {
               }
             }
 
-            Rectangle {
+            HintBar {
               width: parent.width
-              height: popup.hintH
-              color: Zenon.hintBg
-
-              Rectangle {
-                anchors.top: parent.top
-                anchors.left: parent.left
-                anchors.right: parent.right
-                height: 1
-                color: Zenon.border
-              }
-
-              HintBar {
-                width: parent.width
-                anchors.verticalCenter: parent.verticalCenter
-              }
+              rows: popup.hints()
             }
           }
         }
@@ -3626,7 +3567,7 @@ LayerPopup {
                 Text {
                   anchors.verticalCenter: parent.verticalCenter
                   text: "\u25C0"
-                  color: niceDown.containsMouse ? popup.fgColor : popup.dimColor
+                  color: niceDown.pressed ? popup.fgColor : popup.dimColor
                   font.pixelSize: Zenon.px(16)
                   MouseArea {
                     id: niceDown
@@ -3649,7 +3590,7 @@ LayerPopup {
                 Text {
                   anchors.verticalCenter: parent.verticalCenter
                   text: "\u25B6"
-                  color: niceUp.containsMouse ? popup.fgColor : popup.dimColor
+                  color: niceUp.pressed ? popup.fgColor : popup.dimColor
                   font.pixelSize: Zenon.px(16)
                   MouseArea {
                     id: niceUp

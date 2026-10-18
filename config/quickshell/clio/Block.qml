@@ -99,8 +99,10 @@ Item {
     if (c.act === "resize") return Qt.SizeFDiagCursor;
     if (c.act === "cell") return Qt.IBeamCursor;
     if (c.act === "grip") return Qt.OpenHandCursor;
-    if (c.act === "beside") return Qt.ArrowCursor;
-    return Qt.PointingHandCursor;
+    // a hand for a web link only (user, 2026-10-19); a link to a note, a
+    // tick, a fold or a picture is a control, under the plain arrow
+    if (c.act === "link" && /^https?:\/\//i.test(String(c.href || ""))) return Qt.PointingHandCursor;
+    return Qt.ArrowCursor;
   }
   // where (x, y) in the block is, in the TextEdit
   // ── SPELLING ── its marks (SpellMarks, a child of the text)

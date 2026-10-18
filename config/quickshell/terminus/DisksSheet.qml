@@ -225,7 +225,7 @@ Rectangle {
           anchors.rightMargin: 12
           anchors.verticalCenter: parent.verticalCenter
           elide: Text.ElideMiddle
-          text: diskRow.mounted ? diskRow.modelData.mount : "not mounted"
+          text: diskRow.mounted ? diskRow.modelData.mount : "Not mounted"
           color: diskRow.mounted ? Zenon.accentKey : Zenon.accentMuted
           font.family: Zenon.faceMono
           font.weight: Zenon.weight
@@ -290,60 +290,23 @@ Rectangle {
       }
     }
 
-    Rectangle {
-      anchors.bottom: disksFoot.top
-      anchors.left: parent.left
-      anchors.right: parent.right
-      height: 1
-      color: Zenon.border
-    }
 
-    Item {
+    // morpheus/HintBar, as every strip (ceres' height, ground and rule)
+    HintBar {
       id: disksFoot
       anchors.bottom: parent.bottom
       anchors.left: parent.left
       anchors.right: parent.right
-      height: 34
-
-      Row {
-        anchors.centerIn: parent
-        spacing: 12
-
-        Text {
-          anchors.verticalCenter: parent.verticalCenter
-          rightPadding: 2
-          text: disks.rows.length === 0 ? "no disks" : ""
-          visible: disks.rows.length === 0
-          color: Zenon.accentMuted
-          font.family: Zenon.face
-          font.weight: Zenon.weight
-          font.pixelSize: Zenon.px(14)
-        }
-
-        Repeater {
-          model: [["\u2191\u2193", "move"], ["\u21b5", "go"],
-                  ["m", "mount / eject"], ["esc", "close"]]
-
-          delegate: Row {
-            id: dfPair
-            required property var modelData
-            spacing: 5
-
-            KeyCap {
-              anchors.verticalCenter: parent.verticalCenter
-              label: dfPair.modelData[0]
-              fontSize: 11
-            }
-            Text {
-              anchors.verticalCenter: parent.verticalCenter
-              text: dfPair.modelData[1]
-              color: Zenon.accentMuted
-              font.family: Zenon.face
-              font.weight: Zenon.weight
-              font.pixelSize: Zenon.px(13)
-            }
-          }
-        }
+      rows: [["\u2191\u2193", "move"], ["\u21b5", "go"],
+              ["m", "mount / eject"], ["esc", "close"]]
+      leading: Text {
+        anchors.verticalCenter: parent.verticalCenter
+        text: disks.rows.length === 0 ? "No disks" : ""
+        visible: disks.rows.length === 0
+        color: Zenon.accentMuted
+        font.family: Zenon.face
+        font.weight: Zenon.weight
+        font.pixelSize: Zenon.px(14)
       }
     }
   }

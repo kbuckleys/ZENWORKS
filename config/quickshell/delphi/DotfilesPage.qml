@@ -99,11 +99,11 @@ Item {
   // ── WHAT EACH STATE IS CALLED ──────────────────────────────────────────
   function stateWord(p) {
     if (!p) return "";
-    if (p.state === "linked") return "linked";
+    if (p.state === "linked") return "Linked";
     if (p.state === "tolink") return p.links.length === 1 ? "1 link to make" : p.links.length + " links to make";
     if (p.state === "conflicts") return p.conflicts.length === 1 ? "1 file in the way" : p.conflicts.length + " files in the way";
-    if (p.state === "empty") return "empty";
-    if (p.state === "error") return p.error || "stow said no";
+    if (p.state === "empty") return "Empty";
+    if (p.state === "error") return p.error || "Stow said no";
     return "";
   }
   function stateInk(p) {
@@ -348,9 +348,9 @@ Item {
         fontSize: Zenon.px(14)
         noteWidth: 110
         noteOf: (e) => e.isDir ? null
-          : e.state === "linked" ? { text: "linked", ink: Zenon.green }
-          : e.state === "inTheWay" ? { text: "in the way", ink: Zenon.red }
-          : { text: "to link", ink: Zenon.cyan }
+          : e.state === "linked" ? { text: "Linked", ink: Zenon.green }
+          : e.state === "inTheWay" ? { text: "In the way", ink: Zenon.red }
+          : { text: "To link", ink: Zenon.cyan }
       }
     }
 

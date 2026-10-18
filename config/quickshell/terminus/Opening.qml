@@ -177,7 +177,6 @@ Item {
         barZoom: term.barZoom,
         defaultView: term.defaultView,
         confirmTrash: term.confirmTrash,
-        cursorSlide: term.cursorSlide,
         termCmd: term.termCmd,
         previewOn: term.previewOn,
         dirViewCap: term.dirViewCap,
@@ -263,7 +262,6 @@ Item {
         && (s.defaultView === "" || ["columns", "list", "grid"].indexOf(s.defaultView) >= 0))
       term.defaultView = s.defaultView;
     if (typeof s.confirmTrash === "boolean") term.confirmTrash = s.confirmTrash;
-    if (typeof s.cursorSlide === "boolean") term.cursorSlide = s.cursorSlide;
     if (typeof s.termCmd === "string") term.termCmd = s.termCmd;
     if (typeof s.previewOn === "boolean") term.previewOn = s.previewOn;
     if (typeof s.dirViewCap === "number" && s.dirViewCap > 0)

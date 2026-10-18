@@ -166,7 +166,7 @@ Item {
         color: Zenon.accentMuted
         font.family: Zenon.face
         font.weight: Font.Bold
-        font.pixelSize: 13 + view.grow
+        font.pixelSize: Zenon.px(13) + view.grow
       }
 
       Row {
@@ -179,10 +179,10 @@ Item {
         Text {
           visible: !pane.follow
           text: "  latest"
-          color: latestMa.containsMouse ? Zenon.white : Zenon.accentKey
+          color: latestMa.pressed ? Zenon.white : Zenon.accentKey
           font.family: Zenon.face
           font.weight: Zenon.weight
-          font.pixelSize: 13 + view.grow
+          font.pixelSize: Zenon.px(13) + view.grow
           MouseArea {
             id: latestMa
             anchors.fill: parent
@@ -196,10 +196,10 @@ Item {
           text: copied.running ? "  copied"
             : (logText.selectedText !== "" ? "  copy selection" : "  copy log")
           color: copied.running ? Zenon.green
-            : (copyMa.containsMouse ? Zenon.white : Zenon.accentKey)
+            : (copyMa.pressed ? Zenon.white : Zenon.accentKey)
           font.family: Zenon.face
           font.weight: Zenon.weight
-          font.pixelSize: 13 + view.grow
+          font.pixelSize: Zenon.px(13) + view.grow
           MouseArea {
             id: copyMa
             anchors.fill: parent
@@ -265,7 +265,7 @@ Item {
         // oracle's Monospace font, as plato wears it (user, 2026-10-11)
         font.family: Zenon.faceCode
         font.weight: Zenon.codeWeight
-        font.pixelSize: 13 + view.grow
+        font.pixelSize: Zenon.px(13) + view.grow
         // set by pane.showLog, never bound — see there
       }
     }
@@ -331,7 +331,7 @@ Item {
         color: Ceres.txCancelling ? Zenon.red : Zenon.white
         font.family: Zenon.face
         font.weight: Font.Bold
-        font.pixelSize: 15 + view.grow
+        font.pixelSize: Zenon.px(15) + view.grow
       }
 
       // ── WHAT PACMAN HAS IN HAND, ON THE BAND ────────────────────────────
@@ -358,7 +358,7 @@ Item {
         color: Zenon.accentKey
         font.family: Zenon.face
         font.weight: Zenon.weight
-        font.pixelSize: 14 + view.grow
+        font.pixelSize: Zenon.px(14) + view.grow
       }
 
       // the readings, then the percentage — or, before pacman has drawn a
@@ -379,7 +379,7 @@ Item {
           color: Zenon.accentKey
           font.family: Zenon.faceMono
           font.weight: Zenon.weight
-          font.pixelSize: 13 + view.grow
+          font.pixelSize: Zenon.px(13) + view.grow
         }
         Text {
           anchors.verticalCenter: parent.verticalCenter
@@ -388,7 +388,7 @@ Item {
           color: track.total ? Zenon.white : Zenon.accentKey
           font.family: Zenon.face
           font.weight: track.total ? Font.Bold : Font.Normal
-          font.pixelSize: 14 + view.grow
+          font.pixelSize: Zenon.px(14) + view.grow
         }
       }
     }
@@ -433,7 +433,7 @@ Item {
       color: view.cancelled ? Zenon.yellow : view.failed ? Zenon.red : Zenon.white
       font.family: Zenon.face
       font.weight: Font.Bold
-      font.pixelSize: 15 + view.grow
+      font.pixelSize: Zenon.px(15) + view.grow
     }
 
     // ── THE QUESTION, ASKED HERE ─────────────────────────────────────
@@ -462,7 +462,7 @@ Item {
             color: Zenon.accentKey
             font.family: Zenon.face
             font.weight: Zenon.weight
-            font.pixelSize: 14 + view.grow
+            font.pixelSize: Zenon.px(14) + view.grow
           }
           Repeater {
             model: provRow.modelData.options
@@ -474,7 +474,7 @@ Item {
               height: chipText.implicitHeight + 8
               radius: 5
               color: chip.on ? Zenon.alpha(Zenon.cyan, 0.16)
-                : chipHov.hovered ? Zenon.wash(0.06) : Zenon.wash(0)
+                : Zenon.wash(0)
               border.width: 1
               border.color: chip.on ? Zenon.cyan : Zenon.border
               Behavior on color { ColorAnimation { duration: Zenon.fast } }
@@ -485,9 +485,9 @@ Item {
                 color: chip.on ? Zenon.cyan : Zenon.ink
                 font.family: Zenon.face
                 font.weight: Zenon.weight
-                font.pixelSize: 14 + view.grow
+                font.pixelSize: Zenon.px(14) + view.grow
               }
-              HoverHandler { id: chipHov; cursorShape: Qt.PointingHandCursor }
+              HoverHandler { id: chipHov }
               TapHandler { onTapped: view.pick(provRow.modelData.name, chip.modelData) }
             }
           }
@@ -511,7 +511,7 @@ Item {
           color: Zenon.ink
           font.family: Zenon.face
           font.weight: Zenon.weight
-          font.pixelSize: 14 + view.grow
+          font.pixelSize: Zenon.px(14) + view.grow
         }
       }
     }

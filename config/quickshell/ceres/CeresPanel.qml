@@ -52,7 +52,7 @@ LayerPopup {
 
   readonly property int rowH: 32
   readonly property int headH: 44
-  readonly property int footH: 48
+  readonly property int footH: Zenon.hintBarH   // morpheus/HintBar's strip
 
   // Headings and packages in one model, so the list scrolls as one thing.
   readonly property var rows: {
@@ -304,7 +304,7 @@ LayerPopup {
 
           Text {
             anchors.verticalCenter: parent.verticalCenter
-            text: Ceres.checking ? "checking…"
+            text: Ceres.checking ? "Checking…"
               : Ceres.lastOk > 0 ? "checked " + Cer.age(Ceres.now - Ceres.lastOk) : ""
             color: Zenon.accentMuted
             font.family: Zenon.face
@@ -316,7 +316,7 @@ LayerPopup {
             id: refresh
             anchors.verticalCenter: parent.verticalCenter
             text: ""
-            color: refreshHov.hovered ? Zenon.white : Zenon.accentKey
+            color: refreshPress.pressed ? Zenon.white : Zenon.accentKey
             font.family: Zenon.face
             font.weight: Zenon.weight
             font.pixelSize: Zenon.px(14)
@@ -327,7 +327,7 @@ LayerPopup {
               onRunningChanged: if (!running) refresh.rotation = 0
             }
             HoverHandler { id: refreshHov }
-            TapHandler { onTapped: Ceres.check() }
+            TapHandler { id: refreshPress; onTapped: Ceres.check() }
           }
         }
 
@@ -338,11 +338,11 @@ LayerPopup {
           anchors.rightMargin: 16
           anchors.verticalCenter: parent.verticalCenter
           text: "\u{F03CC}"
-          color: toWindowHov.hovered ? Zenon.white : Zenon.accentKey
+          color: toWindowPress.pressed ? Zenon.white : Zenon.accentKey
           font.family: Zenon.glyphFace
           font.pixelSize: Zenon.px(15)
           HoverHandler { id: toWindowHov }
-          TapHandler { onTapped: popup.continueInWindow() }
+          TapHandler { id: toWindowPress; onTapped: popup.continueInWindow() }
         }
 
         Rule { anchors.bottom: parent.bottom }
@@ -382,7 +382,7 @@ LayerPopup {
         Text {
           anchors.centerIn: parent
           visible: popup.face === "list" && popup.rows.length === 0
-          text: Ceres.lastOk > 0 ? "nothing to update" : "not checked yet"
+          text: Ceres.lastOk > 0 ? "Nothing to update" : "Not checked yet"
           color: Zenon.accentMuted
           font.family: Zenon.face
           font.weight: Font.Bold
@@ -481,93 +481,72 @@ LayerPopup {
       }
 
       // ── the foot ────────────────────────────────────────────────────
-      Item {
+      // morpheus/HintBar, as every strip (ceres' height, ground and rule);
+      // the buttons stand at its right end
+      HintBar {
         id: foot
         anchors.bottom: parent.bottom
         anchors.left: parent.left
         anchors.right: parent.right
-        height: popup.footH
-
-        // see-through: the list rises out of it — see the ScrollEdge above
-        Rectangle { anchors.fill: parent; color: Zenon.hintFrostBg }
-        Rule { anchors.top: parent.top }
-
-        HintRow {
-          // at the left: this strip always carries at least one button on the
-          // right, so centering only ever pushed the keys into it
-          anchors.left: parent.left
-          anchors.leftMargin: 16
-          anchors.verticalCenter: parent.verticalCenter
-          // and never into those buttons — see HintRow.maxWidth
-          maxWidth: foot.width - 16 - panelBtns.width - 12 - 24
-          rows: {
-            switch (popup.face) {
-            case "list":
-              return (Ceres.total > 0 ? [["return", "update all"]] : [])
-                .concat([["r", "check"], ["o", "manage packages"]]);
-            case "auth": return [["return", "confirm"], ["esc", "back"]];
-            case "progress": return [["esc", "hide — it keeps going"], ["shift esc", "cancel"]];
-            case "news": return [["return", "continue"], ["esc", "back"]];
-            }
-            if (tx.settleable) return [["y", "resolve"], ["t", "open in terminal"], ["return", "back"]];
-            return Ceres.txState === "failed"
-              ? [["t", "open in terminal"], ["return", "back"]]
-              : [["return", "back"]];
+        rows: {
+          switch (popup.face) {
+          case "list":
+            return (Ceres.total > 0 ? [["return", "update all"]] : [])
+              .concat([["r", "check"], ["o", "manage packages"]]);
+          case "auth": return [["return", "confirm"], ["esc", "back"]];
+          case "progress": return [["esc", "hide — it keeps going"], ["shift esc", "cancel"]];
+          case "news": return [["return", "continue"], ["esc", "back"]];
           }
+          if (tx.settleable) return [["y", "resolve"], ["t", "open in terminal"], ["return", "back"]];
+          return Ceres.txState === "failed"
+            ? [["t", "open in terminal"], ["return", "back"]]
+            : [["return", "back"]];
         }
 
-        Row {
-          id: panelBtns
-          anchors.right: parent.right
-          anchors.rightMargin: 12
-          anchors.verticalCenter: parent.verticalCenter
-          spacing: 8
-
-          DialogButton {
-            visible: popup.face === "news"
-            label: "Back"
-            ink: Zenon.accentMuted
-            onClicked: Ceres.holdBack()
-          }
-          DialogButton {
-            visible: popup.face === "news"
-            label: "Continue"
-            ink: Zenon.cyan
-            primary: true
-            onClicked: Ceres.passNews()
-          }
-          DialogButton {
-            visible: popup.face === "result" && tx.settleable
-            label: tx.settling && tx.settleInfo.conflicts.length ? "Replace and install" : "Install"
-            ink: Zenon.cyan
-            primary: true
-            onClicked: tx.settle()
-          }
-          DialogButton {
-            visible: popup.face === "result" && Ceres.txState === "failed"
-            label: "Open in terminal"
-            ink: Zenon.yellow
-            onClicked: { Ceres.txInTerminal(); popup.closePopup(); }
-          }
-          DialogButton {
-            visible: popup.face === "list"
-            label: "Manage packages"
-            ink: Zenon.accentMuted
-            onClicked: { popup.closePopup(); Ceres.openWindow("updates"); }
-          }
-          DialogButton {
-            visible: popup.face === "list" && Ceres.total > 0
-            label: "Update all"
-            ink: Zenon.cyan
-            primary: true
-            onClicked: popup.startAuth()
-          }
-          DialogButton {
-            visible: popup.face === "result"
-            label: "Back"
-            ink: Zenon.accentMuted
-            onClicked: Ceres.txClear()
-          }
+        DialogButton {
+          visible: popup.face === "news"
+          label: "Back"
+          ink: Zenon.accentMuted
+          onClicked: Ceres.holdBack()
+        }
+        DialogButton {
+          visible: popup.face === "news"
+          label: "Continue"
+          ink: Zenon.cyan
+          primary: true
+          onClicked: Ceres.passNews()
+        }
+        DialogButton {
+          visible: popup.face === "result" && tx.settleable
+          label: tx.settling && tx.settleInfo.conflicts.length ? "Replace and install" : "Install"
+          ink: Zenon.cyan
+          primary: true
+          onClicked: tx.settle()
+        }
+        DialogButton {
+          visible: popup.face === "result" && Ceres.txState === "failed"
+          label: "Open in terminal"
+          ink: Zenon.yellow
+          onClicked: { Ceres.txInTerminal(); popup.closePopup(); }
+        }
+        DialogButton {
+          visible: popup.face === "list"
+          label: "Manage packages"
+          ink: Zenon.accentMuted
+          onClicked: { popup.closePopup(); Ceres.openWindow("updates"); }
+        }
+        DialogButton {
+          visible: popup.face === "list" && Ceres.total > 0
+          label: "Update all"
+          ink: Zenon.cyan
+          primary: true
+          onClicked: popup.startAuth()
+        }
+        DialogButton {
+          visible: popup.face === "result"
+          label: "Back"
+          ink: Zenon.accentMuted
+          onClicked: Ceres.txClear()
         }
       }
     }

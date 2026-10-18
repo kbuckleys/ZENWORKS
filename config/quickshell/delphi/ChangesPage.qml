@@ -591,7 +591,7 @@ Item {
             anchors.verticalCenterOffset: 4
             text: pg.query !== "" ? (frow.r.id === "staged" ? "Unstage these" : "Stage these")
               : frow.r.id === "staged" ? "Unstage all" : "Stage all"
-            color: headMa.containsMouse ? Zenon.cyan : Zenon.accentMuted
+            color: headMa.pressed ? Zenon.cyan : Zenon.accentMuted
             font.family: Zenon.face
             font.weight: Zenon.weight
             font.pixelSize: Zenon.px(13)

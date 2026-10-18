@@ -152,7 +152,6 @@ Item {
               id: press
               anchors.fill: parent
               enabled: card.n > 0
-              cursorShape: card.n > 0 ? Qt.PointingHandCursor : Qt.ArrowCursor
               onClicked: watch.win.setScope({ shelf: "watch", audit: card.modelData.id, acct: watch.win.scope.acct })
             }
           }

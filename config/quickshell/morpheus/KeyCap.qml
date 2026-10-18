@@ -12,6 +12,9 @@
 //
 // Sized by its type: `fontSize` 11 is the panels' strip (19 tall), terminus
 // passes 12 for its context menu and F1 list. The padding scales with it.
+// Both through the shell's Font size (Zenon.px, user 2026-10-19): a caller
+// handing over a size already scaled (one read off the text beside it)
+// says `scaled: false`.
 
 import QtQuick
 import "."
@@ -20,9 +23,11 @@ Rectangle {
   id: cap
   property string label: ""
   property int fontSize: 11
+  property bool scaled: true
+  readonly property int px: cap.scaled ? Zenon.px(cap.fontSize) : cap.fontSize
 
-  implicitWidth: capText.implicitWidth + Math.round(cap.fontSize * 1.15)
-  implicitHeight: cap.fontSize + 8
+  implicitWidth: capText.implicitWidth + Math.round(cap.px * 1.15)
+  implicitHeight: cap.px + 8
   radius: 5
   color: Zenon.alpha(Zenon.accentKey, Zenon.light ? 0.12 : 0.10)
   border.width: 1
@@ -36,6 +41,6 @@ Rectangle {
     color: Zenon.accentKey
     font.family: Zenon.face
     font.weight: Zenon.weight
-    font.pixelSize: cap.fontSize
+    font.pixelSize: cap.px
   }
 }

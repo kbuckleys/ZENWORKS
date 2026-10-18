@@ -365,75 +365,33 @@ Rectangle {
     Text {
       anchors.centerIn: marksList
       visible: marks.all.length === 0
-      text: "nothing bookmarked yet \u2014 b a adds this directory"
+      text: "Nothing bookmarked yet \u2014 b a adds this directory"
       color: Zenon.accentMuted
       font.family: Zenon.face
       font.weight: Zenon.weight
       font.pixelSize: Zenon.px(14)
     }
 
-    Rectangle {
-      anchors.bottom: marksFoot.top
-      anchors.left: parent.left
-      anchors.right: parent.right
-      height: 1
-      color: Zenon.border
-    }
 
-    Item {
+    // morpheus/HintBar, as every strip (ceres' height, ground and rule)
+    HintBar {
       id: marksFoot
       anchors.bottom: parent.bottom
       anchors.left: parent.left
       anchors.right: parent.right
-      height: 34
-
-      Row {
-        anchors.centerIn: parent
-        spacing: 12
-
-        Text {
-          anchors.verticalCenter: parent.verticalCenter
-          rightPadding: 2
-          text: marks.query !== "" ? marks.query
-            : (marks.rows.length === 0 ? "nothing matches"
-                                       : "type to filter")
-          color: marks.query !== "" ? Zenon.sand : Zenon.accentMuted
-          font.family: Zenon.face
-          font.weight: Zenon.weight
-          font.pixelSize: Zenon.px(14)
-        }
-
-        Repeater {
-          // SHORT WORDS, because there are seven of them now. The chip
-          // carries the key and the word only has to disambiguate it —
-          // "tab" after a return glyph cannot mean anything but a new one,
-          // and "order" after alt-arrows cannot mean sorting.
-          model: [["\u2191\u2193", "move"], ["\u21b5", "go"],
-                  ["\u21e7\u21b5", "tab"], ["alt \u2191\u2193", "order"],
-                  ["ctrl a", "add"], ["del", "remove"],
-                  ["esc", "close"]]
-
-          delegate: Row {
-            id: mfPair
-            required property var modelData
-            spacing: 5
-
-            KeyCap {
-              anchors.verticalCenter: parent.verticalCenter
-              label: mfPair.modelData[0]
-              fontSize: 12
-            }
-
-            Text {
-              anchors.verticalCenter: parent.verticalCenter
-              text: mfPair.modelData[1]
-              color: Zenon.accentMuted
-              font.family: Zenon.face
-              font.weight: Zenon.weight
-              font.pixelSize: Zenon.px(14)
-            }
-          }
-        }
+      rows: [["\u2191\u2193", "move"], ["\u21b5", "go"],
+              ["\u21e7\u21b5", "tab"], ["alt \u2191\u2193", "order"],
+              ["ctrl a", "add"], ["del", "remove"],
+              ["esc", "close"]]
+      leading: Text {
+        anchors.verticalCenter: parent.verticalCenter
+        text: marks.query !== "" ? marks.query
+          : (marks.rows.length === 0 ? "nothing matches"
+                                     : "type to filter")
+        color: marks.query !== "" ? Zenon.sand : Zenon.accentMuted
+        font.family: Zenon.face
+        font.weight: Zenon.weight
+        font.pixelSize: Zenon.px(14)
       }
     }
   }

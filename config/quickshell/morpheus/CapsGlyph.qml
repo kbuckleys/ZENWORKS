@@ -26,5 +26,5 @@ Text {
   font.pixelSize: glyph.size
   opacity: glyph.shown && CapsLock.on ? 1 : 0
   visible: opacity > 0.01
-  Behavior on opacity { NumberAnimation { duration: 180; easing.type: Easing.OutQuint } }
+  Behavior on opacity { NumberAnimation { duration: Zenon.ms(180); easing.type: Easing.OutQuint } }
 }

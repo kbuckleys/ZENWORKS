@@ -333,6 +333,10 @@ Singleton {
   // morpheus/Elastic's rubber band past a list's ends (user, 2026-10-14):
   // on by default; off, the wheel and the fingers stop dead at the edge
   property bool elasticScroll: true
+  // the cursor glides from row to row in every list (morpheus/CursorBand,
+  // terminus' SelectBar); off, it jumps. One switch for the shell, not one
+  // per app (user, 2026-10-19); on by default
+  property bool cursorSlide: true
   // Zenon.rim: a hairline of light along the top edge of glass surfaces
   property bool glassRim: true
   // how much of the background's accent the glass is laid in (Zenon.glassBase)
@@ -380,6 +384,9 @@ Singleton {
   // whether a music player's track change earns a row in the bell's history.
   // Off by default: the track name is already in the bar.
   property bool notifTrackMusic: false
+  // the bell with nothing in its history: kept on the bar (the default), or
+  // folded away until something arrives. Also in the bell's right-click menu.
+  property bool notifBellAlways: true
   // Do not disturb: toasts are held back (a critical one still shows) and
   // everything still lands in the bell's history, unread.
   property bool notifSilent: false
@@ -845,6 +852,9 @@ Singleton {
     { key: "elasticScroll", section: "look", alias: "elastic rubber band bounce overscroll scroll edge stretch",
       label: "Elastic scrolling", type: "bool",
       help: "Scrolling past the end of a list stretches it a little and springs back, as macOS does, and a fling bounces off the end. Off, every list stops dead at its edge." },
+    { key: "cursorSlide", section: "motion", alias: "sliding cursor glide selection highlight row move jump",
+      label: "Sliding cursor", type: "bool",
+      help: "The highlight on a list's chosen row glides to the next one as you move, in every app and panel. Off, it jumps straight there." },
     { key: "glassRim", section: "look", alias: "rim highlight edge glass light shine border top",
       label: "Glass rim", type: "bool",
       help: "A hairline of light along the top edge of the pill, its panels, menus and tooltips, the way the edge of a pane of glass catches the light." },
@@ -893,6 +903,8 @@ Singleton {
       help: "How far the toasts stand off the bar, on whichever edge it is." },
     { key: "notifTrackMusic", section: "notify", label: "Keep track changes", type: "bool",
       help: "Whether a music player's notifications earn a row in the bell's history." },
+    { key: "notifBellAlways", section: "notify", alias: "bell hide empty history visible", label: "Bell with no history", type: "bool",
+      help: "On, the bell stays on the bar when its history is empty. Off, it folds away until a notification arrives (or Do not disturb is on). Also in the bell's right-click menu." },
     { key: "notifSilent", section: "notify", alias: "dnd do not disturb quiet silence mute toasts howler", label: "Do not disturb", type: "bool",
       help: "Hold back toasts; they still count on the bell and wait in its history. A critical one still shows. Also in the bell's right-click menu." },
     { key: "notifHistoryCap", section: "notify", label: "History kept", type: "int",

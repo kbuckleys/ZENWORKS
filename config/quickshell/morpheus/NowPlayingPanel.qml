@@ -346,7 +346,7 @@ CursorAnchor {
           anchors.verticalCenter: parent.verticalCenter
           width: 46
           horizontalAlignment: Text.AlignRight
-          text: Volume.muted ? "muted" : Volume.percent + "%"
+          text: Volume.muted ? "Muted" : Volume.percent + "%"
           color: Volume.muted ? Zenon.red : Zenon.white
           font.family: Zenon.face
           font.weight: Font.Bold

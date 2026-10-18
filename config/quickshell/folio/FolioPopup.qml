@@ -67,7 +67,7 @@ LayerPopup {
   // The tile plus its own date line under the picture.
   readonly property int imgCellH: popup.imgCell + 22
   readonly property int imgRowsVisible: 3
-  readonly property int msgH: 28
+  readonly property int msgH: Zenon.hintBarH   // morpheus/HintBar's strip
 
   // AS MANY AS THERE ARE, up to as many as fit. Five was the answer whether
   // the clipboard held two pictures or twenty, so two pictures sat in the
@@ -99,7 +99,7 @@ LayerPopup {
   // chips and their labels, and not one of them looks at the panel.
   readonly property int hintPad: 24
   readonly property int minW:
-    Math.ceil(hintRow.implicitWidth) + popup.hintPad * 2
+    Math.ceil(msgBar.hintRow.implicitWidth) + popup.hintPad * 2
   // MEASURED, NOT COUNTED. This was characters times the advance of an
   // "M" — right for a monospaced face, and the shell's is proportional, so
   // every line was cut at roughly two thirds of the room it had (user
@@ -626,7 +626,7 @@ function onThumbsDone() {
 
           Text {
             anchors.centerIn: parent
-            text: "No matches found"
+            text: popup.query !== "" ? "Nothing matches \u201C" + popup.query + "\u201D" : "Nothing here"
             color: popup.hintColor
             font.family: Zenon.face
             font.weight: 600
@@ -649,6 +649,8 @@ function onThumbsDone() {
             // the whole shell — see morpheus/Elastic.qml. Inside the view
             // rather than over it: it pins itself to the viewport.
             ElasticScroll { view: textGrid }
+            // the chosen one slides (morpheus/CursorBand), rather than each row lighting (user, 2026-10-19: text mode jumped)
+            CursorBand { follows: textGrid; index: popup.sel }
             anchors.fill: parent
             clip: true
             flow: GridView.FlowLeftToRight
@@ -723,10 +725,6 @@ function onThumbsDone() {
                 }
               }
 
-              Rectangle {
-                anchors.fill: parent
-                color: index === popup.sel ? Zenon.menuHi : "transparent"
-              }
 
               Column {
                 anchors.left: parent.left
@@ -971,51 +969,11 @@ function onThumbsDone() {
         }
       }
 
-      Rectangle {
+      // morpheus/HintBar, as every strip (ceres' height, ground and rule)
+      HintBar {
         id: msgBar
         width: parent.width
-        height: popup.msgH
-        color: Zenon.hintFrostBg   // see the ScrollEdges before the column
-
-        Rectangle {
-          anchors.top: parent.top
-          anchors.left: parent.left
-          anchors.right: parent.right
-          height: 1
-          color: Zenon.border
-        }
-
-        Row {
-          id: hintRow
-          anchors.centerIn: parent
-          // Tighter than the old 32, because a chip already draws its own
-          // boundary — the space was doing that job.
-          spacing: 14
-
-          Repeater {
-            model: Folio.hintText(popup.mode)
-
-            delegate: Row {
-              id: hintPair
-              required property var modelData
-              spacing: 5
-
-              KeyCap {
-                anchors.verticalCenter: parent.verticalCenter
-                label: hintPair.modelData[0]
-              }
-
-              Text {
-                anchors.verticalCenter: parent.verticalCenter
-                text: hintPair.modelData[1]
-                color: popup.hintColor
-                font.family: Zenon.face
-                font.weight: Zenon.weight
-                font.pixelSize: Zenon.px(13)
-              }
-            }
-          }
-        }
+        rows: Folio.hintText(popup.mode)
       }
     }
 

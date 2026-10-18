@@ -310,67 +310,26 @@ Rectangle {
       anchors.bottomMargin: 2
     }
 
-    Rectangle {
-      anchors.bottom: paletteFoot.top
-      anchors.left: parent.left
-      anchors.right: parent.right
-      height: 1
-      color: Zenon.border
-    }
 
-    Item {
+    // morpheus/HintBar, as every strip (ceres' height, ground and rule)
+    HintBar {
       id: paletteFoot
       anchors.bottom: parent.bottom
       anchors.left: parent.left
       anchors.right: parent.right
-      height: 34
-
-      Row {
-        anchors.centerIn: parent
-        spacing: 12
-
-        Text {
-          anchors.verticalCenter: parent.verticalCenter
-          rightPadding: 2
-          text: cmdPalette.query !== "" ? cmdPalette.query
-            : (cmdPalette.shown.length === 0 ? "nothing matches"
-                                          : "type to filter")
-          color: cmdPalette.query !== "" ? Zenon.sand : Zenon.accentMuted
-          font.family: Zenon.face
-          font.weight: Zenon.weight
-          font.pixelSize: Zenon.px(13)
-        }
-
-        // THE RUN CHIP ONLY WHEN THERE IS SOMETHING TO RUN. This list is
-        // half keymap now, and a return chip standing over a row that is
-        // the cursor key would have been an offer the palette cannot keep.
-        Repeater {
-          model: cmdPalette.runnable
-            ? [["\u2191\u2193", "move"], ["\u21b5", "run"],
-               ["esc", "close"]]
-            : [["\u2191\u2193", "move"], ["esc", "close"]]
-
-          delegate: Row {
-            id: pfPair
-            required property var modelData
-            spacing: 5
-
-            KeyCap {
-              anchors.verticalCenter: parent.verticalCenter
-              label: pfPair.modelData[0]
-              fontSize: 11
-            }
-
-            Text {
-              anchors.verticalCenter: parent.verticalCenter
-              text: pfPair.modelData[1]
-              color: Zenon.accentMuted
-              font.family: Zenon.face
-              font.weight: Zenon.weight
-              font.pixelSize: Zenon.px(13)
-            }
-          }
-        }
+      rows: cmdPalette.runnable
+        ? [["\u2191\u2193", "move"], ["\u21b5", "run"],
+           ["esc", "close"]]
+        : [["\u2191\u2193", "move"], ["esc", "close"]]
+      leading: Text {
+        anchors.verticalCenter: parent.verticalCenter
+        text: cmdPalette.query !== "" ? cmdPalette.query
+          : (cmdPalette.shown.length === 0 ? "nothing matches"
+                                        : "type to filter")
+        color: cmdPalette.query !== "" ? Zenon.sand : Zenon.accentMuted
+        font.family: Zenon.face
+        font.weight: Zenon.weight
+        font.pixelSize: Zenon.px(13)
       }
     }
   }

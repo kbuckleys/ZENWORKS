@@ -240,15 +240,15 @@ Item {
       // an escape, not the character: literal nerd glyphs do not survive
       // every editor and tool on their way into this file
       text: "\uEC02"
-      color: bar.treeShown ? Zenon.cyan : (treeHover.hovered ? Zenon.white : Zenon.accentMuted)
+      color: bar.treeShown ? Zenon.cyan : (treePress.pressed ? Zenon.white : Zenon.accentMuted)
       font.family: Zenon.face
       font.weight: Zenon.weight
       font.pixelSize: bar.glyphSize
     }
     // a target wider than the glyph, as a button's is
-    HoverHandler { id: treeHover; margin: 8; cursorShape: Qt.PointingHandCursor
+    HoverHandler { id: treeHover; margin: 8
       onHoveredChanged: bar.tip(parent, hovered, bar.treeShown ? "Hide the file tree" : "Show the file tree", "|") }
-    TapHandler { margin: 8; onTapped: bar.treeToggled() }
+    TapHandler { id: treePress; margin: 8; onTapped: bar.treeToggled() }
   }
 
   // ── the mode, by name ──────────────────────────────────────────────
@@ -314,7 +314,7 @@ Item {
         font: bar.font
         color: Zenon.white
         textFormat: Text.PlainText
-        text: parent.path === "" ? "untitled" : parent.path.slice(parent.cut + 1)
+        text: parent.path === "" ? "Untitled" : parent.path.slice(parent.cut + 1)
       }
       Text {
         anchors.verticalCenter: parent.verticalCenter
@@ -346,7 +346,7 @@ Item {
           id: savedFlash
           NumberAnimation { target: savedTick; property: "opacity"; to: 1; duration: Zenon.fast }
           PauseAnimation { duration: 900 }
-          NumberAnimation { target: savedTick; property: "opacity"; to: 0; duration: 600; easing.type: Easing.InQuad }
+          NumberAnimation { target: savedTick; property: "opacity"; to: 0; duration: Zenon.ms(600); easing.type: Easing.InQuad }
         }
         // Every status nvim sends is looked at, not only a change of the
         // count: a buffer never written counts 0, and a 0 that never
@@ -386,7 +386,7 @@ Item {
         font: bar.font
         color: Zenon.sand
         leftPadding: bar.markGap
-        text: "large file · extras off"
+        text: "Large file · extras off"
       }
       // WHERE THE CURSOR IS INSIDE THE FILE: class › function (symbols.lua),
       // each with its kind's glyph (kinds.js, the outline picker's), and a
@@ -413,19 +413,20 @@ Item {
             font.family: Zenon.faceMono
             font.weight: Zenon.weight
             font.pixelSize: bar.font.pixelSize
-            color: crumbHover.hovered ? Zenon.white : Zenon.accentMuted
+            color: crumbPress.pressed ? Zenon.white : Zenon.accentMuted
             text: Kinds.glyph(crumb.modelData.kind)
           }
           Text {
             anchors.verticalCenter: parent.verticalCenter
             font: bar.font
-            color: crumbHover.hovered ? Zenon.white : Zenon.accentMuted
+            color: crumbPress.pressed ? Zenon.white : Zenon.accentMuted
             textFormat: Text.PlainText
             text: crumb.modelData.name
           }
-          HoverHandler { id: crumbHover; cursorShape: Qt.PointingHandCursor
+          HoverHandler { id: crumbHover
             onHoveredChanged: bar.tip(crumb, hovered, "Go to " + String(crumb.modelData.kind || "symbol").toLowerCase() + " " + crumb.modelData.name, "") }
           TapHandler {
+            id: crumbPress
             onTapped: if (bar.client) bar.client.cmd("normal! m'\ncall cursor(" + crumb.modelData.line
               + ", " + (crumb.modelData.col || 1) + ")\nnormal! zz")
           }
@@ -456,6 +457,7 @@ Item {
           anchors.verticalCenter: parent ? parent.verticalCenter : undefined
           label: modelData
           fontSize: Math.max(10, bar.font.pixelSize - 3)
+          scaled: false   // the bar's font is already the shell's size
         }
       }
     }
@@ -493,7 +495,7 @@ Item {
       visible: names.length > 0
       spacing: 6
       anchors.verticalCenter: parent.verticalCenter
-      opacity: lspHover.hovered ? 1 : 0.85
+      opacity: lspPress.pressed ? 1 : 0.85
       Text {
         anchors.verticalCenter: parent.verticalCenter
         font.family: Zenon.faceMono
@@ -511,9 +513,9 @@ Item {
         width: Math.min(implicitWidth, 260)
         text: parent.lsp.busy || parent.names.join(" ")
       }
-      HoverHandler { id: lspHover; cursorShape: Qt.PointingHandCursor
+      HoverHandler { id: lspHover
         onHoveredChanged: bar.tip(parent, hovered, "Language servers", "") }
-      TapHandler { onTapped: bar.lspClicked() }
+      TapHandler { id: lspPress; onTapped: bar.lspClicked() }
     }
     // ── what is wrong ───────────────────────────────────────────────
     // errors and warnings counted, in their inks; info and hints only when
@@ -523,14 +525,14 @@ Item {
       visible: d.e + d.w + d.i + d.h > 0
       spacing: 10
       anchors.verticalCenter: parent.verticalCenter
-      opacity: diagHover.hovered ? 1 : 0.9
+      opacity: diagPress.pressed ? 1 : 0.9
       DiagCount { font: bar.font; glyphSize: bar.iconSize; n: parent.d.e; glyph: "\u{F0159}"; ink: Zenon.red }
       DiagCount { font: bar.font; glyphSize: bar.iconSize; n: parent.d.w; glyph: "\u{F0026}"; ink: Zenon.yellow }
       DiagCount { font: bar.font; glyphSize: bar.iconSize; n: parent.d.e + parent.d.w > 0 ? 0 : parent.d.i; glyph: "\u{F064E}"; ink: Zenon.blue }
       DiagCount { font: bar.font; glyphSize: bar.iconSize; n: parent.d.e + parent.d.w > 0 ? 0 : parent.d.h; glyph: "\u{F0335}"; ink: Zenon.cyan }
-      HoverHandler { id: diagHover; cursorShape: Qt.PointingHandCursor
+      HoverHandler { id: diagHover
         onHoveredChanged: bar.tip(parent, hovered, "Diagnostics", "space d d") }
-      TapHandler { onTapped: bar.diagnosticsClicked() }
+      TapHandler { id: diagPress; onTapped: bar.diagnosticsClicked() }
     }
     // ── git: the branch, and this file's changes ────────────────────
     // as the gutter colors them: added green, changed yellow, removed red.
@@ -540,7 +542,7 @@ Item {
       visible: (bar.st.branch || "") !== ""
       spacing: 8
       anchors.verticalCenter: parent.verticalCenter
-      opacity: gitHover.hovered ? 1 : 0.85
+      opacity: gitPress.pressed ? 1 : 0.85
       Text {
         anchors.verticalCenter: parent.verticalCenter
         font.family: Zenon.faceMono
@@ -561,9 +563,9 @@ Item {
       Text { anchors.verticalCenter: parent.verticalCenter; visible: !!parent.df && parent.df.a > 0; font: bar.font; color: Zenon.green; text: parent.df ? "+" + parent.df.a : "" }
       Text { anchors.verticalCenter: parent.verticalCenter; visible: !!parent.df && parent.df.c > 0; font: bar.font; color: Zenon.yellow; text: parent.df ? "~" + parent.df.c : "" }
       Text { anchors.verticalCenter: parent.verticalCenter; visible: !!parent.df && parent.df.d > 0; font: bar.font; color: Zenon.red; text: parent.df ? "-" + parent.df.d : "" }
-      HoverHandler { id: gitHover; cursorShape: Qt.PointingHandCursor
+      HoverHandler { id: gitHover
         onHoveredChanged: bar.tip(parent, hovered, "Git status", "space g s") }
-      TapHandler { onTapped: bar.gitClicked() }
+      TapHandler { id: gitPress; onTapped: bar.gitClicked() }
     }
     // several cursors (multicursor.nvim): how many, in the cursor's cyan
     Row {
@@ -582,14 +584,14 @@ Item {
       readonly property var ind: bar.st.indent || { tabs: false, width: 4 }
       font: bar.font
       // white outside normal mode, as the line count beside the position is
-      color: fmtHover.hovered || bar.tinted ? Zenon.white : Zenon.accentMuted
+      color: fmtPress.pressed || bar.tinted ? Zenon.white : Zenon.accentMuted
       textFormat: Text.PlainText
-      text: (ind.tabs ? "tabs " : "spaces ") + ind.width
+      text: (ind.tabs ? "Tabs " : "Spaces ") + ind.width
         + (bar.st.eol && bar.st.eol !== "unix" ? " · " + (bar.st.eol === "dos" ? "CRLF" : "CR") : "")
         + (bar.st.enc && bar.st.enc !== "utf-8" ? " · " + bar.st.enc : "")
-      HoverHandler { id: fmtHover; cursorShape: Qt.PointingHandCursor
+      HoverHandler { id: fmtHover
         onHoveredChanged: bar.tip(parent, hovered, "Indentation and line endings", "") }
-      TapHandler { onTapped: bar.formatClicked() }
+      TapHandler { id: fmtPress; onTapped: bar.formatClicked() }
     }
     Text {
       anchors.verticalCenter: parent.verticalCenter
@@ -640,7 +642,7 @@ Item {
       visible: bar.pluginUpdates > 0
       spacing: 6
       anchors.verticalCenter: parent.verticalCenter
-      opacity: pluginHover.hovered ? 1 : 0.85
+      opacity: pluginPress.pressed ? 1 : 0.85
       Text {
         font.family: Zenon.faceMono
         font.weight: Zenon.weight
@@ -655,9 +657,9 @@ Item {
         color: Zenon.yellow
         text: String(bar.pluginUpdates)
       }
-      HoverHandler { id: pluginHover; cursorShape: Qt.PointingHandCursor
+      HoverHandler { id: pluginHover
         onHoveredChanged: bar.tip(parent, hovered, "Plugin updates", "space U") }
-      TapHandler { onTapped: bar.pluginsClicked() }
+      TapHandler { id: pluginPress; onTapped: bar.pluginsClicked() }
     }
   }
 

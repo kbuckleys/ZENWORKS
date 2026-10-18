@@ -488,9 +488,15 @@ FloatingWindow {
   onCappedChanged: win.wantNat()
   onPathChanged: { win.wantNat(); if (win.made && win.path !== win.made.src) win.dropMade(); }
   function wantNat() {
-    if (win.capped && !(win.path in win.natDims)) win.askNat(win.path);
+    if (win.capped && win.path !== "" && !(win.path in win.natDims)) win.askNat(win.path);
   }
   function askNat(p) {
+    // NEVER FOR NO PATH (found by natWatch, 2026-10-19: `asked ""`, running
+    // 6–9 s). Between pictures the path can be empty while the stage still
+    // holds a capped decode, and `magick identify "[0]"` with no file waits
+    // on its input for ever — and one lookup at a time meant every big
+    // picture after it waited behind it, blank.
+    if (!p) return;
     // one at a time; the answer in flight asks again for a newer path
     if (natProc.running) return;
     natProc.forPath = p;
@@ -510,6 +516,9 @@ FloatingWindow {
     stdout: StdioCollector {
       waitForEnd: true
       onStreamFinished: {
+        // a run natWatch killed: its partial text is no answer (and the
+        // decode's size kept here would stop the retry ever asking)
+        if (natProc.retry) return;
         const m = String(text || "").trim().split("\n")[0].match(/^(\d+)\s+(\d+)\s*(\d*)/);
         const next = Object.assign({}, win.natDims);
         if (m) {
@@ -525,7 +534,48 @@ FloatingWindow {
         Qt.callLater(natProc.follow);
       }
     }
-    onExited: Qt.callLater(natProc.follow)
+    onExited: {
+      if (natProc.retry) { natProc.retry = false; Qt.callLater(win.wantNat); return; }
+      Qt.callLater(natProc.follow);
+    }
+    // set by natWatch when it kills a lookup that never answered
+    property bool retry: false
+    property double startedAt: 0
+    onRunningChanged: if (natProc.running) natProc.startedAt = Date.now()
+  }
+  // ── A SIZE THAT NEVER CAME (user, 2026-10-19: "some images still don't
+  // load") ── a capped picture waits for natDims before it is shown, so a
+  // lookup that was never asked, or never answered, left the stage blank —
+  // or the last picture still up under a new title — for good. Not seen
+  // offscreen in any order or pace of steps; so this says what it found in
+  // the live log (grep "picasso: no size") and puts it right: asks, or kills
+  // the stuck lookup and asks again.
+  Timer {
+    id: natWatch
+    interval: 2500
+    repeat: true
+    running: win.capped && !win.natNow && win.path !== ""
+    // the path it has already retried once
+    property string tried: ""
+    onTriggered: {
+      console.warn("picasso: no size for " + win.path + " after " + natWatch.interval + "ms"
+        + " | asked " + JSON.stringify(natProc.forPath) + " running " + natProc.running
+        + " (" + (natProc.running ? Date.now() - natProc.startedAt : 0) + "ms)"
+        + " heard " + natProc.heard + " known " + (win.path in win.natDims)
+        + " img " + (win.img ? win.img.status + " " + win.img.implicitWidth + "x" + win.img.implicitHeight : "none"));
+      if (win.path in win.natDims) return;
+      // twice without an answer: shown at the decode's size, as a lookup
+      // with no answer already does, rather than not at all
+      if (natWatch.tried === win.path && win.img) {
+        const next = Object.assign({}, win.natDims);
+        next[win.path] = { w: win.img.implicitWidth, h: win.img.implicitHeight };
+        win.natDims = next;
+        return;
+      }
+      natWatch.tried = win.path;
+      if (natProc.running) { natProc.retry = true; natProc.running = false; }
+      else win.wantNat();
+    }
   }
   // Zoomed past what the decode holds: the whole file, over it. Latched for
   // the picture, so zooming back out does not throw the decode away.
@@ -2894,7 +2944,7 @@ FloatingWindow {
     width: 34; height: 34; radius: Zenon.windowRadius
     opacity: tool.live ? 1 : 0.35
     color: tool.on ? Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b, 0.20)
-      : (toolMa.containsMouse ? Zenon.wash(0.06) : "transparent")
+      : (toolMa.pressed ? Zenon.wash(0.06) : "transparent")
     border.width: tool.on ? 1 : 0
     border.color: Zenon.cyan
     Text {
@@ -3149,7 +3199,7 @@ FloatingWindow {
         height: 34
         radius: Zenon.windowRadius
         clip: true
-        color: searchPill.busy ? Zenon.wash(0.07) : (pillHover.hovered ? Zenon.wash(0.06) : Zenon.wash(0))
+        color: searchPill.busy ? Zenon.wash(0.07) : (pillPress.pressed ? Zenon.wash(0.06) : Zenon.wash(0))
         Behavior on color { ColorAnimation { duration: Zenon.fast } }
         border.width: searchPill.busy ? 1 : 0
         border.color: Zenon.border
@@ -3161,7 +3211,7 @@ FloatingWindow {
             ? tips.show(searchPill, "Search and filter  \u00b7  words, #tag, \u2605, is:video", "/")
             : tips.hide(searchPill)
         }
-        TapHandler { onTapped: { tips.hide(searchPill); win.openFilter(); } }
+        TapHandler { id: pillPress; onTapped: { tips.hide(searchPill); win.openFilter(); } }
 
         // centered in the button, then at the field's left edge
         Text {
@@ -3237,12 +3287,12 @@ FloatingWindow {
           anchors.verticalCenter: parent.verticalCenter
           visible: searchPill.busy && win.filterText !== ""
           text: "\uf00d"
-          color: clearHover.hovered ? Zenon.white : Zenon.accentMuted
+          color: clearPress.pressed ? Zenon.white : Zenon.accentMuted
           font.family: Zenon.face
           font.weight: Zenon.weight
           font.pixelSize: Zenon.px(12)
-          HoverHandler { id: clearHover; cursorShape: Qt.PointingHandCursor }
-          TapHandler { onTapped: { win.setFilter(""); keys.forceActiveFocus(); } }
+          HoverHandler { id: clearHover }
+          TapHandler { id: clearPress; onTapped: { win.setFilter(""); keys.forceActiveFocus(); } }
         }
         // focused for typing: terminus' held ring (user, 2026-10-11 — every
         // text field wears it, its own border staying neutral)
@@ -3613,7 +3663,7 @@ FloatingWindow {
       Text {
         id: zoomSaidText
         anchors.centerIn: parent
-        text: (win.fitted ? "fit  ·  " : "") + Math.round(win.shownZoom) + "%"
+        text: (win.fitted ? "Fit  ·  " : "") + Math.round(win.shownZoom) + "%"
         color: Zenon.white
         font.family: Zenon.face
         font.weight: 600
@@ -4023,7 +4073,7 @@ FloatingWindow {
         anchors.leftMargin: 14
         anchors.verticalCenter: parent.verticalCenter
         text: win.vid && win.vid.going ? "\uf04c" : "\uf04b"
-        color: vplayMa.containsMouse ? Zenon.cyan : Zenon.white
+        color: vplayMa.pressed ? Zenon.cyan : Zenon.white
         font.family: Zenon.face
         font.weight: Zenon.weight
         font.pixelSize: Zenon.px(15)
@@ -4047,7 +4097,7 @@ FloatingWindow {
         anchors.rightMargin: 14
         anchors.verticalCenter: parent.verticalCenter
         text: win.muted ? "\uf6a9" : "\uf028"
-        color: vmuteMa.containsMouse ? Zenon.cyan : Zenon.white
+        color: vmuteMa.pressed ? Zenon.cyan : Zenon.white
         font.family: Zenon.face
         font.weight: Zenon.weight
         font.pixelSize: Zenon.px(15)
@@ -4460,7 +4510,7 @@ FloatingWindow {
           if (!was) { cell.opacity = 0; glideFade.start(); return; }
           glide.from(was.x - cell.x, was.y - cell.y);
         }
-        NumberAnimation { id: glideFade; target: cell; property: "opacity"; to: 1; duration: 260; easing.type: Easing.OutCubic }
+        NumberAnimation { id: glideFade; target: cell; property: "opacity"; to: 1; duration: Zenon.ms(260); easing.type: Easing.OutCubic }
 
 
         // out of the window, as a file — see win.dragOut
@@ -4628,9 +4678,9 @@ FloatingWindow {
             }
             SequentialAnimation {
               id: cellFlareAnim
-              NumberAnimation { target: cellFlare; property: "glow"; to: 1; duration: 140;
+              NumberAnimation { target: cellFlare; property: "glow"; to: 1; duration: Zenon.ms(140);
                                 easing.type: Easing.OutCubic }
-              NumberAnimation { target: cellFlare; property: "glow"; to: 0; duration: 620;
+              NumberAnimation { target: cellFlare; property: "glow"; to: 0; duration: Zenon.ms(620);
                                 easing.type: Easing.InOutSine }
             }
           }
@@ -4705,7 +4755,7 @@ FloatingWindow {
             Text { text: "\uf24d"; color: Zenon.sand; font.family: Zenon.face; font.pixelSize: Zenon.px(11) }
             Text { text: cell.burst ? cell.burst.n : ""; color: Zenon.sand; font.family: Zenon.face; font.weight: 600; font.pixelSize: Zenon.px(12) }
           }
-          MouseArea { anchors.fill: parent; anchors.margins: -4; cursorShape: Qt.PointingHandCursor
+          MouseArea { anchors.fill: parent; anchors.margins: -4
                       onClicked: { keys.forceActiveFocus(); win.foldBurst(cell.burst.key, false); } }
         }
         // the one of an alike group worth keeping
@@ -4764,8 +4814,8 @@ FloatingWindow {
             }
             Text {
               visible: !!cell.chip && !!cell.chip.burst
-              text: "fold \uf068"
-              color: foldMa.containsMouse ? Zenon.cyan : Zenon.accentMuted
+              text: "Fold \uf068"
+              color: foldMa.pressed ? Zenon.cyan : Zenon.accentMuted
               font.family: Zenon.face
               font.weight: Zenon.weight
               font.pixelSize: Zenon.px(12)
@@ -4874,7 +4924,6 @@ FloatingWindow {
         // a click goes back up to where the section begins
         MouseArea {
           anchors.fill: parent
-          cursorShape: Qt.PointingHandCursor
           onClicked: { keys.forceActiveFocus(); win.galleryReveal(pinned.cur, true); }
         }
       }
@@ -4942,7 +4991,7 @@ FloatingWindow {
     Rectangle {
       visible: opacity > 0.01 && gband.held.width > 2 && gband.held.height > 2
       opacity: gband.active ? 1 : 0
-      Behavior on opacity { NumberAnimation { duration: 260; easing.type: Easing.OutCubic } }
+      Behavior on opacity { NumberAnimation { duration: Zenon.ms(260); easing.type: Easing.OutCubic } }
       x: gband.held.x
       y: gband.held.y
       width: gband.held.width
@@ -4990,7 +5039,7 @@ FloatingWindow {
           height: 22
           verticalAlignment: Text.AlignVCenter
           text: modelData.short
-          color: index === scrub.here ? Zenon.cyan : (scrubMa.containsMouse ? Zenon.white : Zenon.accentMuted)
+          color: index === scrub.here ? Zenon.cyan : (scrubMa.pressed ? Zenon.white : Zenon.accentMuted)
           font.family: Zenon.face
           font.weight: index === scrub.here ? 600 : 400
           font.pixelSize: Zenon.px(12)
@@ -5208,7 +5257,7 @@ FloatingWindow {
           wait: !(tile.modelData.path in win.thumbs) && known === ""
           spinner: false
           fade: false
-          opacity: tile.current || tileMa.containsMouse ? 1 : 0.6
+          opacity: tile.current || tileMa.pressed ? 1 : 0.6
         }
         Rectangle {
           anchors.fill: parent
@@ -5441,7 +5490,7 @@ FloatingWindow {
               anchors.right: parent.right
               visible: win.crop !== null
               text: "Clear"
-              color: clearMa.containsMouse ? Zenon.cyan : Zenon.accentSoft
+              color: clearMa.pressed ? Zenon.cyan : Zenon.accentSoft
               font.family: Zenon.face
               font.weight: 600
               font.pixelSize: Zenon.px(13)
@@ -5488,7 +5537,7 @@ FloatingWindow {
           Text {
             width: parent.width
             visible: win.cropping
-            text: "drag the box or its edges, or draw a new one · right-drag resizes from anywhere · esc when done"
+            text: "Drag the box or its edges, or draw a new one · right-drag resizes from anywhere · esc when done"
             color: Zenon.accentSoft
             font.family: Zenon.face
             font.weight: Zenon.weight
@@ -5637,7 +5686,7 @@ FloatingWindow {
             Text {
               anchors.right: parent.right
               text: "Done"
-              color: doneMa.containsMouse ? Zenon.cyan : Zenon.white
+              color: doneMa.pressed ? Zenon.cyan : Zenon.white
               font.family: Zenon.face
               font.weight: 600
               font.pixelSize: Zenon.px(14)
@@ -5800,7 +5849,8 @@ FloatingWindow {
                 anchors.fill: parent
                 enabled: !!modelData.url || !!modelData.mapAt
                 hoverEnabled: true
-                cursorShape: Qt.PointingHandCursor
+                // a hand only for the web (user, 2026-10-19): the map is here
+                cursorShape: modelData.url && !modelData.mapAt ? Qt.PointingHandCursor : Qt.ArrowCursor
                 onClicked: modelData.mapAt ? win.openMap(win.gps) : Qt.openUrlExternally(modelData.url)
               }
             }
@@ -5861,12 +5911,11 @@ FloatingWindow {
               radius: 5
               color: sw.modelData.hex
               border.width: 1
-              border.color: swMa.containsMouse ? Zenon.white : Zenon.wash(0.25)
+              border.color: swMa.pressed ? Zenon.white : Zenon.wash(0.25)
               MouseArea {
                 id: swMa
                 anchors.fill: parent
                 hoverEnabled: true
-                cursorShape: Qt.PointingHandCursor
                 onClicked: {
                   Quickshell.execDetached(["sh", "-c", "printf '%s' \"$1\" | wl-copy", "sh", sw.modelData.hex]);
                   win.say(sw.modelData.hex + " copied");

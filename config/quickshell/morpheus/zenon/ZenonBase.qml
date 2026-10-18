@@ -350,6 +350,9 @@ QtObject {
   // and the tab strip above it, every morpheus/TabStrip's (terminus' and
   // plato's): a little lower than the bar (user, 2026-10-18)
   readonly property int tabH: 38
+  // the hint strip at a window's or a panel's foot (morpheus/HintBar):
+  // ceres' 40, every strip's since 2026-10-19 (user: "bar height included")
+  readonly property int hintBarH: 40
   readonly property int menuSepHeight: 7
   // the labels' inset from the card's sides. Sideways only: the rows run
   // flush to the border top and bottom, the card's round clip cutting the
@@ -365,6 +368,13 @@ QtObject {
   // and most Font Awesome glyphs do not fill it, so the gap reads narrower
   // than the number suggests — 8 had the two touching on the wider marks.
   readonly property int menuIconGap:   12
+  // A FITTED MENU (fit: true) is as wide as its longest row and no wider
+  // (user, 2026-10-18: a card held at its old fixed width showed a gutter
+  // of nothing); this is only the least it may be, so a one-word menu is
+  // still a card. menuFitSlack is the rounding a label must not lose to:
+  // measured to the pixel, the longest one elided.
+  readonly property int menuMinWidth:  120
+  readonly property int menuFitSlack:  6
 
   // A MENU INSIDE A WINDOW, which cannot be frosted and so is not translucent.
   //
@@ -758,6 +768,10 @@ QtObject {
   readonly property int normal: Math.round(140 * cfg.motionScale)
   readonly property int slow:   Math.round(170 * cfg.motionScale)
   readonly property int ease:   Easing.OutQuint
+  // any other one-off duration, times the same multiplier — so Animation
+  // speed reaches a shake or a flash too, and 0 means none. Not for loops
+  // (a breath or a spinner at 0 ms would spin) nor a PauseAnimation's hold.
+  function ms(n) { return Math.round(n * cfg.motionScale); }
 
   // whether morpheus/Scrollbar fades out between scrolls — read here so the
   // scrollbar's own test stub can stand in for it without importing oracle
@@ -767,6 +781,8 @@ QtObject {
   // oracle's "Elastic scrolling": the rubber band past a list's ends
   // (morpheus/Elastic). Off, a list stops at its edge.
   readonly property bool elasticScroll: cfg.elasticScroll !== false
+  // Oracle's "Sliding cursor": CursorBand and terminus' SelectBar glide, or jump
+  readonly property bool cursorSlide: cfg.cursorSlide !== false
 
   // THE CURVE FOR SOMETHING THAT TRAVELS, as opposed to something that
   // appears. `ease` above is quintic, which is right for a panel arriving:

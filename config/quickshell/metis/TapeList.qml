@@ -44,7 +44,7 @@ Item {
 
     Text {
       anchors.verticalCenter: parent.verticalCenter
-      text: "names"
+      text: "Names"
       color: Zenon.muted
       font.family: Zenon.face
       font.weight: Font.Bold
@@ -60,7 +60,6 @@ Item {
         to: Metis.group(modelData.shown)
         MouseArea {
           anchors.fill: parent
-          cursorShape: Qt.PointingHandCursor
           onClicked: tape.nameClicked(modelData.name)
         }
       }
@@ -69,6 +68,8 @@ Item {
 
   ListView {
     id: list
+    // the chosen one slides (morpheus/CursorBand), rather than each row lighting
+    CursorBand { follows: list; index: tape.idx }
     y: tape.namesH
     width: parent.width
     height: tape.listH
@@ -87,8 +88,7 @@ Item {
       readonly property bool sel: row.index === tape.idx
       width: list.width
       height: tape.rowH
-      color: row.sel ? Zenon.menuHi
-        : rowHover.containsMouse ? Zenon.alpha(Zenon.border, 0.35) : Zenon.alpha(Zenon.border, 0)
+      color: rowHover.pressed ? Zenon.alpha(Zenon.border, 0.35) : Zenon.alpha(Zenon.border, 0)
       Behavior on color { ColorAnimation { duration: Zenon.fast } }
 
       // the marked rows' tick, in the gutter
@@ -128,7 +128,6 @@ Item {
         id: rowHover
         anchors.fill: parent
         hoverEnabled: true
-        cursorShape: Qt.PointingHandCursor
         // a click marks; a double click brings the question back
         onClicked: tape.toggled(row.index)
         onDoubleClicked: tape.picked(row.index)
@@ -162,7 +161,7 @@ Item {
       anchors.right: parent.right
       anchors.rightMargin: 16
       anchors.verticalCenter: parent.verticalCenter
-      text: tape.sumBad ? "these don't add up" : Metis.group(tape.sum)
+      text: tape.sumBad ? "These don't add up" : Metis.group(tape.sum)
       color: tape.sumBad ? Zenon.red : Zenon.green
       font.family: Zenon.face
       font.weight: Font.Bold

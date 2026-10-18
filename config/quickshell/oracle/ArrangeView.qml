@@ -103,7 +103,7 @@ Item {
         // the monitor's own ink, the same one its rows below wear
         readonly property color ink: Zenon[Oracle.displayAccent(box.modelData.name)]
         color: Qt.rgba(box.ink.r, box.ink.g, box.ink.b, boxMa.drag.active ? 0.30 : 0.14)
-        border.width: boxMa.drag.active || boxMa.containsMouse ? 2 : 1
+        border.width: boxMa.drag.active || boxMa.pressed ? 2 : 1
         border.color: box.ink
 
         Column {

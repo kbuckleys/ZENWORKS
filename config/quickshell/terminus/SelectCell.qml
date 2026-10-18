@@ -54,7 +54,7 @@ Item {
   property bool animate: true
   // how tall the cursor's content is, from the cell's top; -1 for the cell
   property real fitH: -1
-  readonly property bool slides: !cell.host || cell.host.cursorSlide !== false
+  readonly property bool slides: Zenon.cursorSlide && (!cell.host || cell.host.cursorSlide !== false)
 
   readonly property int cols: (cell.view && cell.view.cellWidth > 0)
     ? Math.max(1, Math.floor(cell.view.width / cell.view.cellWidth)) : 1

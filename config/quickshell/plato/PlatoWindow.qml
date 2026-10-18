@@ -252,7 +252,7 @@ FloatingWindow {
     return t ? "buf:" + t.id : "";
   }
   readonly property int fontSize: win.mgr ? (win.mgr.zooms, win.mgr.sizeFor(win.tabKey)) : 17
-  readonly property int chromeSize: win.mgr ? win.mgr.chromeSize : 16
+  readonly property int chromeSize: win.mgr ? win.mgr.chromeSize : Zenon.px(16)
 
   // ── the file tree ──────────────────────────────────────────────────
   // morpheus' FileTree, which is terminus' tree standing on its own. Shown
@@ -549,7 +549,7 @@ FloatingWindow {
       // terminus' sheet's — see WindowView's stripGlass
       opacity: tabs.visible ? 0.6 : 0
       visible: opacity > 0.001
-      Behavior on opacity { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+      Behavior on opacity { NumberAnimation { duration: Zenon.ms(180); easing.type: Easing.OutCubic } }
     }
     Rectangle {
       z: 1
@@ -560,7 +560,7 @@ FloatingWindow {
       color: Zenon.ground
       opacity: status.visible && editor.edgesBelow ? 0.35 : 0
       visible: opacity > 0.001
-      Behavior on opacity { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+      Behavior on opacity { NumberAnimation { duration: Zenon.ms(180); easing.type: Easing.OutCubic } }
     }
   }
 
@@ -805,7 +805,7 @@ FloatingWindow {
     // A SHORT WINDOW: the card gives way rather than spill past the text —
     // the name goes first, then the hints, then rows off the longest list,
     // the recent files (the ones 1 to 9 open) held onto longest
-    FontMetrics { id: headMetrics; font.family: Zenon.face; font.pixelSize: 12 }
+    FontMetrics { id: headMetrics; font.family: Zenon.face; font.pixelSize: Zenon.px(12) }
     readonly property var fit: {
       const d = win.startData;
       const avail = win.startRect.height - 32;
@@ -844,7 +844,7 @@ FloatingWindow {
         // the art's own face, whatever the shell's (Zenon.artFace)
         font.family: Zenon.artFace
         font.weight: Zenon.weight
-        font.pixelSize: 22
+        font.pixelSize: Zenon.px(22)
         color: Zenon.white
         textFormat: Text.PlainText
         text: "┌─┐┬  ┌─┐┌┬┐┌─┐\n├─┘│  ├─┤ │ │ │\n┴  ┴─┘┴ ┴ ┴ └─┘"
@@ -868,7 +868,7 @@ FloatingWindow {
           Text {
             font.family: Zenon.face
             font.weight: Zenon.weight
-            font.pixelSize: 12
+            font.pixelSize: Zenon.px(12)
             font.letterSpacing: 1
             color: Zenon.accentMuted
             text: section.modelData.title.toUpperCase()
@@ -890,7 +890,7 @@ FloatingWindow {
                 anchors.leftMargin: -10
                 anchors.rightMargin: -10
                 radius: 5
-                color: entryHover.hovered ? Zenon.wash(0.05) : "transparent"
+                color: entryPress.pressed ? Zenon.wash(0.05) : "transparent"
               }
               Row {
                 anchors.verticalCenter: parent.verticalCenter
@@ -901,14 +901,14 @@ FloatingWindow {
                   anchors.verticalCenter: parent.verticalCenter
                   font.family: Zenon.faceMono
                   font.weight: Zenon.weight
-                  font.pixelSize: 17
+                  font.pixelSize: Zenon.px(17)
                   color: entry.project ? Zenon.blue : Zenon.white
                   text: entry.project ? "\u{F024B}" : Icons.glyphFor({ name: entry.name, isDir: false })
                 }
                 Text {
                   anchors.verticalCenter: parent.verticalCenter
                   font.family: Zenon.face
-                  font.pixelSize: 15
+                  font.pixelSize: Zenon.px(15)
                   font.weight: 600
                   color: Zenon.white
                   text: entry.name
@@ -919,7 +919,7 @@ FloatingWindow {
                   elide: Text.ElideMiddle
                   font.family: Zenon.face
                   font.weight: Zenon.weight
-                  font.pixelSize: 13
+                  font.pixelSize: Zenon.px(13)
                   color: Zenon.accentMuted
                   text: entry.project
                     ? win.tidyPath(entry.path) + "  ·  " + entry.modelData.files
@@ -934,8 +934,9 @@ FloatingWindow {
                 label: String(entry.index + 1)
                 fontSize: 12
               }
-              HoverHandler { id: entryHover; cursorShape: Qt.PointingHandCursor }
+              HoverHandler { id: entryHover }
               TapHandler {
+                id: entryPress
                 onTapped: {
                   if (entry.project) nvim.request("openProject", { root: entry.path });
                   else nvim.openAt(entry.path);
@@ -947,28 +948,14 @@ FloatingWindow {
         }
       }
       // what else gets you somewhere
-      Flow {
+      // the shared hint strip (morpheus/HintRow), as every panel's; what
+      // does not fit the card waits behind its `?`
+      HintRow {
         id: startHints
         visible: startCard.fit.hints
-        width: startCol.width
-        spacing: 18
+        maxWidth: startCol.width
         topPadding: 6
-        Repeater {
-          model: [["space f", "find a file"], ["space space", "open…"], ["space n", "blank tab"], ["space /", "search"], ["i", "just type"]]
-          Row {
-            required property var modelData
-            spacing: 6
-            KeyCap { anchors.verticalCenter: parent.verticalCenter; label: modelData[0]; fontSize: 11 }
-            Text {
-              anchors.verticalCenter: parent.verticalCenter
-              font.family: Zenon.face
-              font.weight: Zenon.weight
-              font.pixelSize: 12
-              color: Zenon.accentMuted
-              text: modelData[1]
-            }
-          }
-        }
+        rows: [["space f", "find a file"], ["space space", "open…"], ["space n", "blank tab"], ["space /", "search"], ["i", "just type"]]
       }
     }
   }

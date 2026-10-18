@@ -109,7 +109,7 @@ Item {
         width: parent.width
         horizontalAlignment: Text.AlignHCenter
         wrapMode: Text.Wrap
-        text: hb.all.length === 0 ? "Nothing highlighted yet — select words and choose a highlight from the color menu" : "Nothing matches"
+        text: hb.all.length === 0 ? "Nothing highlighted yet — select words and choose a highlight from the color menu" : "Nothing matches \u201C" + hb.filter + "\u201D"
         color: Zenon.accentMuted
         font.family: Zenon.face
         font.weight: Zenon.weight
@@ -123,7 +123,7 @@ Item {
           width: col.width
           height: words.implicitHeight + where.implicitHeight + 26
           radius: Zenon.windowRadius
-          color: press.pressed ? Zenon.pressWash(0.12) : press.containsMouse ? Zenon.wash(0.07) : Zenon.wash(0.04)
+          color: press.pressed ? Zenon.pressWash(0.12) : Zenon.wash(0.04)
           border.width: 1
           border.color: Zenon.border
           Rectangle { x: 0; y: 8; width: 4; height: parent.height - 16; radius: 2; color: Zenon[card.modelData.marker] || Zenon.sand }

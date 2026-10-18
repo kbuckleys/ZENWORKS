@@ -41,7 +41,7 @@ Item {
     width: 44
     horizontalAlignment: Text.AlignRight
     text: sl.valueText
-    color: slValMa.containsMouse ? Zenon.cyan : Zenon.accentSoft
+    color: slValMa.pressed ? Zenon.cyan : Zenon.accentSoft
     font.family: Zenon.face
     font.weight: Zenon.weight
     font.pixelSize: Zenon.px(13)
@@ -84,7 +84,7 @@ Item {
       width: 14
       height: 14
       radius: 7
-      color: slMa.pressed || slMa.containsMouse ? Zenon.cyan : Zenon.white
+      color: slMa.pressed ? Zenon.cyan : Zenon.white
     }
     MouseArea {
       id: slMa

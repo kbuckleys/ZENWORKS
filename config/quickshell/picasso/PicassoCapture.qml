@@ -307,10 +307,10 @@ Scope {
     }
     ParallelAnimation {
       id: litGlide
-      NumberAnimation { id: gx; target: region; property: "lx"; duration: 160; easing.type: Easing.OutCubic }
-      NumberAnimation { id: gy; target: region; property: "ly"; duration: 160; easing.type: Easing.OutCubic }
-      NumberAnimation { id: gw; target: region; property: "lw"; duration: 160; easing.type: Easing.OutCubic }
-      NumberAnimation { id: gh; target: region; property: "lh"; duration: 160; easing.type: Easing.OutCubic }
+      NumberAnimation { id: gx; target: region; property: "lx"; duration: Zenon.ms(160); easing.type: Easing.OutCubic }
+      NumberAnimation { id: gy; target: region; property: "ly"; duration: Zenon.ms(160); easing.type: Easing.OutCubic }
+      NumberAnimation { id: gw; target: region; property: "lw"; duration: Zenon.ms(160); easing.type: Easing.OutCubic }
+      NumberAnimation { id: gh; target: region; property: "lh"; duration: Zenon.ms(160); easing.type: Easing.OutCubic }
     }
 
     // the dim, fading in as the overlay comes up rather than dropping over
@@ -318,7 +318,7 @@ Scope {
     Item {
       anchors.fill: parent
       opacity: region.active ? 1 : 0
-      Behavior on opacity { enabled: region.active; NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+      Behavior on opacity { enabled: region.active; NumberAnimation { duration: Zenon.ms(180); easing.type: Easing.OutCubic } }
       readonly property bool on: !!region.lit
       Rectangle { color: region.shade; x: 0; y: 0; width: parent.width
         height: parent.on ? region.ly : parent.height }
@@ -484,14 +484,14 @@ Scope {
             anchors.verticalCenter: parent.verticalCenter
             rightPadding: 6
             Text {
-              text: "right-drag to resize  ·  drag inside to move"
+              text: "Right-drag to resize  ·  drag inside to move"
               color: Zenon.accentKey
               font.family: Zenon.face
               font.weight: Zenon.weight
               font.pixelSize: Zenon.px(12)
             }
             Text {
-              text: "arrows move  ·  ctrl+arrows size  ·  t copy text  ·  ↵ save  ·  esc abort"
+              text: "Arrows move  ·  ctrl+arrows size  ·  t copy text  ·  ↵ save  ·  esc abort"
               color: Zenon.accentMuted
               font.family: Zenon.face
               font.weight: Zenon.weight
@@ -537,7 +537,7 @@ Scope {
             width: chipRow.implicitWidth + 16
             height: 26
             radius: Zenon.windowRadius
-            color: chipMa.containsMouse && chip.live ? Zenon.wash(0.08) : "transparent"
+            color: chipMa.pressed && chip.live ? Zenon.wash(0.08) : "transparent"
             opacity: chip.live ? 1 : 0.4
             Row {
               id: chipRow
@@ -565,7 +565,6 @@ Scope {
               anchors.fill: parent
               hoverEnabled: true
               enabled: chip.live
-              cursorShape: Qt.PointingHandCursor
               onClicked: chip.modelData.last ? region.useLast() : region.preset(chip.modelData)
             }
           }
@@ -588,7 +587,7 @@ Scope {
       Text {
         id: hint
         anchors.centerIn: parent
-        text: "drag to select  ·  click a window to take it  ·  1–7 a preset  ·  esc to abort"
+        text: "Drag to select  ·  click a window to take it  ·  1–7 a preset  ·  esc to abort"
         color: Zenon.accentKey
         font.family: Zenon.face
         font.weight: Zenon.weight

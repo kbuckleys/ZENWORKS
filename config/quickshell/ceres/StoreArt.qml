@@ -56,7 +56,7 @@ Item {
       smooth: true
       mipmap: true
       opacity: status === Image.Ready ? 1 : 0
-      Behavior on opacity { NumberAnimation { duration: 220 } }
+      Behavior on opacity { NumberAnimation { duration: Zenon.ms(220) } }
     }
   }
 
@@ -98,7 +98,6 @@ Item {
   MouseArea {
     id: artMa
     anchors.fill: parent
-    cursorShape: Qt.PointingHandCursor
     onClicked: art.opened()
   }
 }

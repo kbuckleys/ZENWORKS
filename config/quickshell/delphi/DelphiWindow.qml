@@ -1422,7 +1422,7 @@ FloatingWindow {
                 Text {
                   anchors.verticalCenter: parent.verticalCenter
                   // the forge's name where it is one delphi knows, else the remote's
-                  text: !parent.r ? "not published"
+                  text: !parent.r ? "Not published"
                     : parent.w && D.forgeOfHost((D.remoteOf(parent.r.push || parent.r.fetch || "") || {}).host) ? parent.w.where : modelData
                   color: Zenon.ink
                   font.family: Zenon.face
@@ -1516,7 +1516,7 @@ FloatingWindow {
           Rectangle {
             anchors.fill: parent
             radius: height / 2
-            color: Zenon.alpha(upPill.ink, upHover.hovered ? 0.14 : 0.08)
+            color: Zenon.alpha(upPill.ink, upPress.pressed ? 0.14 : 0.08)
             border.width: 1
             border.color: Zenon.alpha(upPill.ink, 0.4)
             Behavior on color { ColorAnimation { duration: Zenon.fast } }
@@ -1570,7 +1570,7 @@ FloatingWindow {
           HoverHandler { id: upHover; onHoveredChanged: win.mgr.uploadLooked = hovered || upBubble.over }
           // stopping is asked first: a click meant for the bubble must not
           // throw an upload away
-          TapHandler { onTapped: if (win.mgr.uploading) win.confirm({ question: "Stop the upload?", glyph: "\uF093", ink: Zenon.red,
+          TapHandler { id: upPress; onTapped: if (win.mgr.uploading) win.confirm({ question: "Stop the upload?", glyph: "\uF093", ink: Zenon.red,
             detail: "Nothing is committed: what was sent so far is left unused on " + upPill.site.name + ".", verb: "Stop", then: () => win.mgr.stopUpload() }) }
           Bubble {
             id: upBubble
@@ -1764,42 +1764,25 @@ FloatingWindow {
     }
 
     // ── the foot ─────────────────────────────────────────────────────────
-    Item {
+    // morpheus/HintBar, as every strip (ceres' height, ground and rule);
+    // the buttons stand at its right end
+    HintBar {
       id: foot
       anchors.bottom: parent.bottom
       anchors.left: side.right
       anchors.right: parent.right
-      // slimmer, as the head (user, 2026-10-11)
-      height: 40
-      // the head's translucent ground: the rows under it (the foot's
-      // ScrollEdges) show through frosted, as under the head
-      Rectangle { anchors.fill: parent; color: Zenon.headBg }
-      Rectangle { anchors.top: parent.top; width: parent.width; height: 1; color: Zenon.border }
-      HintRow {
-        rows: win.hintRows
-        anchors.verticalCenter: parent.verticalCenter
-        // centered while the strip is only keys; at the left once a button
-        // joins it (as ceres' foot) — a Row of hidden children is zero wide
-        x: footBtns.width > 0 ? 16 : Math.round((foot.width - width) / 2)
-        maxWidth: foot.width - 32 - (footBtns.width > 0 ? footBtns.width + 36 : 0)
-      }
-      Row {
-        id: footBtns
-        anchors.right: parent.right
-        anchors.rightMargin: 12
-        anchors.verticalCenter: parent.verticalCenter
-        spacing: 8
-        Repeater {
-          model: win.pageItem && win.pageItem.buttons ? win.pageItem.buttons : []
-          delegate: DialogButton {
-            required property var modelData
-            visible: modelData.visible !== false
-            label: modelData.label
-            ink: modelData.ink || Zenon.accentMuted
-            primary: !!modelData.primary
-            ready: modelData.ready !== false
-            onClicked: modelData.run()
-          }
+      rows: win.hintRows
+
+      Repeater {
+        model: win.pageItem && win.pageItem.buttons ? win.pageItem.buttons : []
+        delegate: DialogButton {
+          required property var modelData
+          visible: modelData.visible !== false
+          label: modelData.label
+          ink: modelData.ink || Zenon.accentMuted
+          primary: !!modelData.primary
+          ready: modelData.ready !== false
+          onClicked: modelData.run()
         }
       }
     }
@@ -1891,7 +1874,7 @@ FloatingWindow {
       if (!win || !ok) return;
       if (!st.keygen) {
         win.card_({ question: "Signing needs openssh", glyph: "\uF084", ink: Zenon.ink,
-          detail: "git signs with ssh-keygen, which comes with openssh — not installed. Ceres can install it (it asks for your password).",
+          detail: "Git signs with ssh-keygen, which comes with openssh — not installed. Ceres can install it (it asks for your password).",
           choices: [{ label: "Install openssh", ink: Zenon.cyan, run: () => win.mgr.installTool("openssh", "for signing your commits", (done) => { if (done && win) win.askSigning(email); }) },
                     { label: "Cancel", ink: Zenon.accentMuted }] });
         return;

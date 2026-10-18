@@ -975,11 +975,11 @@ Scope {
 
           SequentialAnimation {
             id: shakeAnim
-            NumberAnimation { target: shake; property: "x"; to:  11; duration: 55; easing.type: Easing.OutSine }
-            NumberAnimation { target: shake; property: "x"; to: -11; duration: 90; easing.type: Easing.InOutSine }
-            NumberAnimation { target: shake; property: "x"; to:   7; duration: 80; easing.type: Easing.InOutSine }
-            NumberAnimation { target: shake; property: "x"; to:  -4; duration: 70; easing.type: Easing.InOutSine }
-            NumberAnimation { target: shake; property: "x"; to:   0; duration: 60; easing.type: Easing.OutSine }
+            NumberAnimation { target: shake; property: "x"; to:  11; duration: Zenon.ms(55); easing.type: Easing.OutSine }
+            NumberAnimation { target: shake; property: "x"; to: -11; duration: Zenon.ms(90); easing.type: Easing.InOutSine }
+            NumberAnimation { target: shake; property: "x"; to:   7; duration: Zenon.ms(80); easing.type: Easing.InOutSine }
+            NumberAnimation { target: shake; property: "x"; to:  -4; duration: Zenon.ms(70); easing.type: Easing.InOutSine }
+            NumberAnimation { target: shake; property: "x"; to:   0; duration: Zenon.ms(60); easing.type: Easing.OutSine }
           }
 
           Connections {
@@ -1008,8 +1008,8 @@ Scope {
             visible: opacity > 0.01
             scale: (root.phase === "input" || root.phase === "checking") ? 0.7 : 1
 
-            Behavior on opacity { NumberAnimation { duration: 150; easing.type: Easing.OutQuint } }
-            Behavior on scale { NumberAnimation { duration: 220; easing.type: Easing.OutBack } }
+            Behavior on opacity { NumberAnimation { duration: Zenon.ms(150); easing.type: Easing.OutQuint } }
+            Behavior on scale { NumberAnimation { duration: Zenon.ms(220); easing.type: Easing.OutBack } }
           }
 
           // ── the wait, as THREE DOTS ─────────────────────────────────
@@ -1098,9 +1098,9 @@ Scope {
             visible: opacity > 0.01
             scale: opacity > 0.5 ? 1 : 0.7
             Behavior on opacity {
-              NumberAnimation { duration: 180; easing.type: Easing.OutQuint }
+              NumberAnimation { duration: Zenon.ms(180); easing.type: Easing.OutQuint }
             }
-            Behavior on scale { NumberAnimation { duration: 220; easing.type: Easing.OutBack } }
+            Behavior on scale { NumberAnimation { duration: Zenon.ms(220); easing.type: Easing.OutBack } }
             font.family: root.fontFamily
             font.weight: root.fontWeight
             // Under two thirds of the lock above it: large enough to read at a
@@ -1125,8 +1125,8 @@ Scope {
               && !root.fadeOnEmpty && content.k > 0.6) ? 1 : 0
             visible: opacity > 0.01
             scale: opacity > 0.5 ? 1 : 0.7
-            Behavior on opacity { NumberAnimation { duration: 150; easing.type: Easing.OutQuint } }
-            Behavior on scale { NumberAnimation { duration: 220; easing.type: Easing.OutBack } }
+            Behavior on opacity { NumberAnimation { duration: Zenon.ms(150); easing.type: Easing.OutQuint } }
+            Behavior on scale { NumberAnimation { duration: Zenon.ms(220); easing.type: Easing.OutBack } }
             font.family: root.fontFamily
             font.weight: root.fontWeight
             // the same size the check and fail glyphs use; all three are the
@@ -1139,7 +1139,7 @@ Scope {
             anchors.centerIn: parent
             opacity: (root.phase === "input" && root.pw.length > 0) ? 1 : 0
             visible: opacity > 0.01
-            Behavior on opacity { NumberAnimation { duration: 140; easing.type: Easing.OutQuint } }
+            Behavior on opacity { NumberAnimation { duration: Zenon.ms(140); easing.type: Easing.OutQuint } }
 
             // The whole row breathes on each keystroke — a quick swell and
             // settle so feedback carries even when the row is long and one
@@ -1151,8 +1151,8 @@ Scope {
 
             SequentialAnimation {
               id: kickAnim
-              NumberAnimation { target: dots; property: "kick"; to: 1.10; duration: 85; easing.type: Easing.OutQuad }
-              NumberAnimation { target: dots; property: "kick"; to: 1.0;  duration: 260; easing.type: Easing.OutBack; easing.overshoot: 1.6 }
+              NumberAnimation { target: dots; property: "kick"; to: 1.10; duration: Zenon.ms(85); easing.type: Easing.OutQuad }
+              NumberAnimation { target: dots; property: "kick"; to: 1.0;  duration: Zenon.ms(260); easing.type: Easing.OutBack; easing.overshoot: 1.6 }
             }
 
             Connections {
@@ -1195,11 +1195,11 @@ Scope {
                   });
                 }
                 Behavior on scale {
-                  NumberAnimation { duration: 300; easing.type: Easing.OutBack; easing.overshoot: 1.4 }
+                  NumberAnimation { duration: Zenon.ms(300); easing.type: Easing.OutBack; easing.overshoot: 1.4 }
                 }
-                Behavior on opacity { NumberAnimation { duration: 150; easing.type: Easing.OutQuad } }
+                Behavior on opacity { NumberAnimation { duration: Zenon.ms(150); easing.type: Easing.OutQuad } }
                 Behavior on tx {
-                  NumberAnimation { duration: 320; easing.type: Easing.OutBack; easing.overshoot: 1.3 }
+                  NumberAnimation { duration: Zenon.ms(320); easing.type: Easing.OutBack; easing.overshoot: 1.3 }
                 }
               }
             }
@@ -1215,7 +1215,7 @@ Scope {
           anchors.horizontalCenter: parent.horizontalCenter
           anchors.top: field.bottom
           anchors.topMargin: 8
-          text: "too many attempts  \u00b7  super + r  clears the counter"
+          text: "Too many attempts  \u00b7  super + r  clears the counter"
           color: Zenon.yellow
           font.family: root.fontFamily
           font.weight: root.fontWeight

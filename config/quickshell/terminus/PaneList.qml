@@ -148,7 +148,7 @@ ListView {
       property: "opacity"
       from: 0
       to: 1
-      duration: 220
+      duration: Zenon.ms(220)
       easing.type: Easing.OutCubic
     }
     ListView.onReused: { cellFade.stop(); cell.opacity = 1; cell.glideCheck(); }

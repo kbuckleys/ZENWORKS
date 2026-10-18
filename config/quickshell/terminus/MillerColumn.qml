@@ -300,11 +300,19 @@ Item {
     // what the rows leave below them
     readonly property bool room: colView.contentHeight + colFoot.implicitH + 24
       <= col.height
-    readonly property real implicitH: colCover.height + 10 + colSum.height
+    readonly property real implicitH: colCover.height + (colCover.shown ? 10 : 0) + colSum.height
+    // LEVEL WITH TRASH (user, 2026-10-18): the summary is centered in the
+    // band the sidebar's foot is (Sidebar.qml sideFoot — 41, or the portal
+    // bar's height while picking), so the two lines at the window's foot
+    // read as one. It sat 14px higher: a 16px margin, plus the 10 of air
+    // kept for a cover that was not there.
+    readonly property real footBand: term.picking ? term.chromeRef.portalBar.height : 41
     anchors.left: parent.left
     anchors.right: parent.right
     anchors.bottom: parent.bottom
-    anchors.margins: 16
+    anchors.leftMargin: 16
+    anchors.rightMargin: 16
+    anchors.bottomMargin: Math.floor((colFoot.footBand - colSum.height) / 2)
     height: colFoot.implicitH
     opacity: (!!colFoot.dir && colFoot.room && (colCover.shown || colSum.text !== ""))
       ? 1 : 0

@@ -201,7 +201,7 @@ Item {
         width: listCol.width
         height: 22
         verticalAlignment: Text.AlignVCenter
-        text: "and " + (cb.items.length - cb.maxItems) + " more"
+        text: "And " + (cb.items.length - cb.maxItems) + " more"
         color: Zenon.accentMuted
         font.family: Zenon.face
         font.weight: Zenon.weight

@@ -106,7 +106,7 @@ Rectangle {
       anchors.horizontalCenter: parent.horizontalCenter
       anchors.bottom: parent.bottom
       anchors.bottomMargin: 14
-      text: "drop to bookmark"
+      text: "Drop to bookmark"
       color: Zenon.accentMuted
       font.family: Zenon.face
       font.weight: Zenon.weight
@@ -513,7 +513,7 @@ Rectangle {
       label: "Trash"
       glyph: term.trashCount > 0 ? "\uF1F8" : "\uF014"
       ink: term.inTrash && term.searchMode === "" ? Zenon.cyan : "transparent"
-      detail: term.trashCount === 0 ? "empty"
+      detail: term.trashCount === 0 ? "Empty"
         : term.trashCount + (term.trashSize !== "" ? " · " + term.trashSize : "")
       // orange (Zenon's yellow) while there is something in it
       detailInk: term.trashCount > 0 ? Zenon.yellow : Zenon.accentMuted

@@ -297,7 +297,7 @@ Item {
 
       Text {
         x: 14
-        text: "opens with"
+        text: "Opens with"
         color: Zenon.accentMuted
         font.family: Zenon.face
         font.weight: Zenon.weight
@@ -363,7 +363,7 @@ Item {
             anchors.rightMargin: 8
             anchors.verticalCenter: parent.verticalCenter
             visible: handlerRow.isDefault
-            label: "default"
+            label: "Default"
           }
 
           Text {
@@ -372,13 +372,14 @@ Item {
             anchors.rightMargin: 12
             anchors.verticalCenter: parent.verticalCenter
             text: ""   // nf-fa-times, as the row menu uses
-            color: handlerXHov.hovered ? Zenon.red : Zenon.accentMuted
+            color: handlerXPress.pressed ? Zenon.red : Zenon.accentMuted
             font.family: Zenon.faceMono
             font.weight: Zenon.weight
             font.pixelSize: Zenon.px(14)
 
             HoverHandler { id: handlerXHov }
             MouseArea {
+              id: handlerXPress
               anchors.fill: parent
               anchors.margins: -7
               onClicked: picker.removeRequested(handlerRow.modelData.id)
@@ -523,7 +524,7 @@ Item {
         anchors.left: parent.left
         anchors.leftMargin: 43
         anchors.verticalCenter: parent.verticalCenter
-        text: "nothing matches"
+        text: picker.query !== "" ? "Nothing matches \u201C" + picker.query + "\u201D" : "nothing matches"
         color: Zenon.accentMuted
         font.family: Zenon.face
         font.weight: Zenon.weight
@@ -531,58 +532,21 @@ Item {
       }
     }
 
-    Rectangle {
-      width: parent.width
-      height: 1
-      color: Zenon.border
-    }
-
     // ── THE HINT IS THE FIELD ──────────────────────────────────────────
     // The send picker's footer, verbatim in shape: what you typed on the
     // left where the instruction was, and the keys as chips on the right.
-    Item {
+    // morpheus/HintBar, as every strip (ceres' height, ground and rule)
+    HintBar {
       width: parent.width
-      height: 34
-
-      Row {
-        anchors.centerIn: parent
-        spacing: 12
-
-        Text {
-          anchors.verticalCenter: parent.verticalCenter
-          rightPadding: 2
-          text: picker.query !== "" ? picker.query : "type to filter"
-          color: picker.query !== "" ? Zenon.sand : Zenon.accentMuted
-          font.family: Zenon.face
-          font.weight: Zenon.weight
-          font.pixelSize: Zenon.px(13)
-        }
-
-        Repeater {
-          model: [["↑↓", "move"], ["↵", "open"],
-                  ["del", "remove"], ["esc", "close"]]
-
-          delegate: Row {
-            id: appHintPair
-            required property var modelData
-            spacing: 5
-
-            KeyCap {
-              anchors.verticalCenter: parent.verticalCenter
-              label: appHintPair.modelData[0]
-              fontSize: 11
-            }
-
-            Text {
-              anchors.verticalCenter: parent.verticalCenter
-              text: appHintPair.modelData[1]
-              color: Zenon.accentMuted
-              font.family: Zenon.face
-              font.weight: Zenon.weight
-              font.pixelSize: Zenon.px(13)
-            }
-          }
-        }
+      rows: [["↑↓", "move"], ["↵", "open"],
+              ["del", "remove"], ["esc", "close"]]
+      leading: Text {
+        anchors.verticalCenter: parent.verticalCenter
+        text: picker.query !== "" ? picker.query : "Type to filter"
+        color: picker.query !== "" ? Zenon.sand : Zenon.accentMuted
+        font.family: Zenon.face
+        font.weight: Zenon.weight
+        font.pixelSize: Zenon.px(13)
       }
     }
   }

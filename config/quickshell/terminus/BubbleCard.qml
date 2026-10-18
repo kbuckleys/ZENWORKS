@@ -172,7 +172,7 @@ Item {
     target: face
     property: "grow"
     to: 0
-    duration: 160
+    duration: Zenon.ms(160)
     easing.type: Easing.InCubic
   }
   readonly property real pop: Math.max(0, face.grow)
@@ -316,8 +316,8 @@ Item {
     // shuts must not shrink the card under its own outline
     width: face.opening ? face.wantW : face.heldW
     height: face.opening ? face.wantH : face.heldH
-    Behavior on width { enabled: face.glide; NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
-    Behavior on height { enabled: face.glide; NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
+    Behavior on width { enabled: face.glide; NumberAnimation { duration: Zenon.ms(160); easing.type: Easing.OutCubic } }
+    Behavior on height { enabled: face.glide; NumberAnimation { duration: Zenon.ms(160); easing.type: Easing.OutCubic } }
     readonly property real radius: Zenon.windowRadius
     // what is in it never shows past its edge, gliding or not
     clip: true

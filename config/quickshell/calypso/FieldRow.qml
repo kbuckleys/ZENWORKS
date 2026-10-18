@@ -92,7 +92,6 @@ Item {
   MouseArea {
     anchors.fill: col
     acceptedButtons: Qt.LeftButton | Qt.RightButton
-    cursorShape: Qt.PointingHandCursor
     onClicked: (m) => {
       if (m.button === Qt.RightButton) {
         const p = mapToItem(row.win.stageItem, m.x, m.y);

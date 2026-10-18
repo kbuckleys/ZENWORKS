@@ -238,7 +238,7 @@ Item {
         anchors.rightMargin: 12
         height: parent.height
         verticalAlignment: Text.AlignVCenter
-        text: "no newline at end"
+        text: "No newline at end"
         color: Zenon.muted
         font.family: Zenon.face
         font.italic: true

@@ -147,7 +147,7 @@ Item {
         visible: pc.rows.length === 0 && !pc.reading
         width: facts.width
         wrapMode: Text.Wrap
-        text: pc.c && pc.c.missing ? "fastfetch is not installed — it is what reads the machine for this."
+        text: pc.c && pc.c.missing ? "Fastfetch is not installed — it is what reads the machine for this."
           // no `why` before the first read, or when a read came back empty
           : pc.c && pc.c.why ? pc.c.why : ""
         color: pc.dimColor
@@ -170,7 +170,7 @@ Item {
         }
         DialogButton {
           visible: !pc.c || !pc.c.missing
-          label: pc.reading ? "Reading…" : "Read again"
+          label: pc.reading ? "Reading…" : "Reread"
           ink: pc.fgColor
           ready: !pc.reading
           onClicked: Oracle.readComputer(true)

@@ -1621,20 +1621,20 @@ function diskFacts(d) {
   const via = { usb: "USB", nvme: "NVMe", sata: "SATA", ata: "ATA", scsi: "SCSI",
                 mmc: "SD / MMC", virtio: "virtio" }[d.transport] || d.transport;
   const rows = [
-    ["label", d.name],
-    ["device", d.path],
-    ["part of", d.device],
-    ["hardware", [d.vendor, d.model].filter(x => x).join(" ")],
-    ["connected by", via],
-    ["filesystem", d.fstype + (d.fsVer ? " " + d.fsVer : "")],
-    ["size", d.fsSize || d.size],
-    ["used", d.fsUsed],
-    ["free", d.avail],
-    ["mounted at", d.mount || "not mounted"],
-    ["partition name", d.partLabel],
+    ["Label", d.name],
+    ["Device", d.path],
+    ["Part of", d.device],
+    ["Hardware", [d.vendor, d.model].filter(x => x).join(" ")],
+    ["Connected by", via],
+    ["Filesystem", d.fstype + (d.fsVer ? " " + d.fsVer : "")],
+    ["Size", d.fsSize || d.size],
+    ["Used", d.fsUsed],
+    ["Free", d.avail],
+    ["Mounted at", d.mount || "not mounted"],
+    ["Partition name", d.partLabel],
     ["UUID", d.uuid],
-    ["access", d.readOnly ? "read-only" : "read and write"],
-    ["removable", d.removable || d.hotplug ? "yes" : "no"]
+    ["Access", d.readOnly ? "read-only" : "read and write"],
+    ["Removable", d.removable || d.hotplug ? "yes" : "no"]
   ];
   return rows.filter(r => String(r[1] || "").trim() !== "");
 }

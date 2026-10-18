@@ -269,9 +269,9 @@ Item {
   SequentialAnimation {
     id: rowBorn
     NumberAnimation { target: entryRow; property: "bornGlow"; to: 1;
-                      duration: 110; easing.type: Easing.OutQuad }
+                      duration: Zenon.ms(110); easing.type: Easing.OutQuad }
     NumberAnimation { target: entryRow; property: "bornGlow"; to: 0;
-                      duration: 520; easing.type: Easing.InQuad }
+                      duration: Zenon.ms(520); easing.type: Easing.InQuad }
   }
 
   Rectangle {
@@ -322,7 +322,7 @@ Item {
       property: "x"
       from: -rowSweepBar.width
       to: rowSweepBar.parent ? rowSweepBar.parent.width : 0
-      duration: 340
+      duration: Zenon.ms(340)
       easing.type: Easing.OutCubic
     }
 

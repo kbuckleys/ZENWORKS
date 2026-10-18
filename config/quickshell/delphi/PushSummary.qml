@@ -108,7 +108,7 @@ Column {
     }
     Text {
       visible: ps.q.more > 0
-      text: "and " + ps.q.more + " more"
+      text: "And " + ps.q.more + " more"
       color: Zenon.accentMuted
       font.family: Zenon.face
       font.weight: Zenon.weight

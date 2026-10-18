@@ -6,7 +6,7 @@
 // A SHELF IN A SIDEBAR — a glyph, a word and a count, one of a short column
 // of places to look: alexandria's shelves (all, bookmarks, mono, yours…),
 // delphi's pages (changes, history, branches…). The one here wears the
-// window's highlight fill and lights its glyph cyan. No hover wash: a
+// window's highlight fill; its glyph keeps its own color (user, 2026-10-18). No hover wash: a
 // sidebar row does not light under the pointer, as terminus' do not
 // (user, 2026-10-10).
 //
@@ -49,7 +49,9 @@ Rectangle {
     anchors.verticalCenter: parent.verticalCenter
     width: 20
     text: shelf.glyph
-    color: shelf.here ? Zenon.cyan : shelf.glyphInk.a > 0 ? shelf.glyphInk : Zenon.accentMuted
+    // the cursor does not recolor it: the fill alone says where you are
+    // (user, 2026-10-18)
+    color: shelf.glyphInk.a > 0 ? shelf.glyphInk : Zenon.accentMuted
     font.family: Zenon.glyphFace
     // listings at body weight; only the heads (SideHead) are bold
     font.weight: Zenon.weight

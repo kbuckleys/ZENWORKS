@@ -499,7 +499,7 @@ Rectangle {
             anchors.leftMargin: 16
             anchors.verticalCenter: parent.verticalCenter
             width: (parent.width - 44) * 0.38
-            ghost: "name"
+            ghost: "Name"
             onTextChanged: collEdit.nameRev = collEdit.nameRev + 1
             onTabbed: collEdit.focusFrom(collName, 1)
             onBackTabbed: collEdit.focusFrom(collName, -1)
@@ -517,12 +517,12 @@ Rectangle {
             anchors.verticalCenter: parent.verticalCenter
             spacing: 6
             BulkVerb {
-              label: "names"
+              label: "Names"
               on: collEdit.searchKind === "find"
               onClicked: { collEdit.searchKind = "find"; collEdit.nameRev++; }
             }
             BulkVerb {
-              label: "contents"
+              label: "Contents"
               on: collEdit.searchKind === "grep"
               onClicked: { collEdit.searchKind = "grep"; collEdit.nameRev++; }
             }
@@ -536,7 +536,7 @@ Rectangle {
             anchors.leftMargin: 12
             anchors.verticalCenter: parent.verticalCenter
             width: (parent.width - 44) * 0.62 - searchKinds.width - 12
-            ghost: collEdit.searchKind === "grep" ? "text inside files" : "part of a name"
+            ghost: collEdit.searchKind === "grep" ? "Text inside files" : "Part of a name"
             onTextChanged: collEdit.nameRev = collEdit.nameRev + 1
             onTabbed: collEdit.focusFrom(searchQ, 1)
             onBackTabbed: collEdit.focusFrom(searchQ, -1)
@@ -552,7 +552,7 @@ Rectangle {
             anchors.right: placesVerb.left
             anchors.rightMargin: 8
             anchors.verticalCenter: parent.verticalCenter
-            ghost: "where to look"
+            ghost: "Where to look"
             elide: Text.ElideLeft
             onTextChanged: collEdit.nameRev = collEdit.nameRev + 1
             onTabbed: collEdit.focusFrom(collRoot, 1)
@@ -567,7 +567,7 @@ Rectangle {
             anchors.right: parent.right
             anchors.rightMargin: 16
             anchors.verticalCenter: parent.verticalCenter
-            label: "places \u25BE"
+            label: "Places \u25BE"
             on: placesMenu.isOpen
             onClicked: collEdit.askPlace(placesVerb)
           }
@@ -587,7 +587,7 @@ Rectangle {
             anchors.left: parent.left
             anchors.leftMargin: 16
             anchors.verticalCenter: saveName.verticalCenter
-            text: "save as"
+            text: "Save as"
             color: Zenon.accentMuted
             font.family: Zenon.face
             font.weight: Zenon.weight
@@ -602,7 +602,7 @@ Rectangle {
             anchors.right: parent.right
             anchors.rightMargin: 16
             anchors.top: parent.top
-            ghost: "collection name"
+            ghost: "Collection name"
             onTextChanged: collEdit.nameRev = collEdit.nameRev + 1
             onTabbed: collEdit.focusFrom(saveName, 1)
             onBackTabbed: collEdit.focusFrom(saveName, -1)
@@ -813,7 +813,7 @@ Rectangle {
               onClicked: collEdit.addRule()
             }
             BulkVerb {
-              label: "delete"
+              label: "Delete"
               visible: !collEdit.searching
               dim: collEdit.making
               onClicked: {
@@ -825,7 +825,7 @@ Rectangle {
             // The search's way out to a collection, and back again.
             BulkVerb {
               visible: collEdit.searching
-              label: collEdit.naming ? "just search" : "save as collection"
+              label: collEdit.naming ? "Just search" : "Save as collection"
               onClicked: {
                 if (collEdit.naming) { collEdit.naming = false; searchQ.claim(); }
                 else collEdit.beginNaming();

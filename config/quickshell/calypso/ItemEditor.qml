@@ -130,7 +130,7 @@ Item {
               id: folderBox
               width: 260
               textSize: Zenon.px(13)
-              ghost: ed.acct.kind === "onepassword" || ed.acct.kind === "proton" ? "vault" : "no folder"
+              ghost: ed.acct.kind === "onepassword" || ed.acct.kind === "proton" ? "Vault" : "No folder"
               onTextChanged: if (ed.st && ed.st.folder !== text) { ed.st.folder = text; ed.touch(); }
             }
             FieldAct {
@@ -220,7 +220,7 @@ Item {
                 width: urlCol.width
                 win: ed.win
                 ruled: index > 0
-                label: "website"
+                label: "Website"
                 hint: "https://example.com"
                 removable: true
                 Component.onCompleted: text = ed.st.urls[index] || ""
@@ -237,7 +237,7 @@ Item {
           font.family: Zenon.face
           font.weight: Zenon.weight
           font.pixelSize: Zenon.px(13)
-          MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: { ed.st.urls.push(""); ed.rebuild(); } }
+          MouseArea { anchors.fill: parent; onClicked: { ed.st.urls.push(""); ed.rebuild(); } }
         }
       }
 
@@ -299,7 +299,7 @@ Item {
             font.family: Zenon.face
             font.weight: Zenon.weight
             font.pixelSize: Zenon.px(13)
-            MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor
+            MouseArea { anchors.fill: parent
               onClicked: { ed.st.custom.push({ ref: "", label: "", value: "", known: true, hidden: false }); ed.rebuild(); } }
           }
           Text {
@@ -308,7 +308,7 @@ Item {
             font.family: Zenon.face
             font.weight: Zenon.weight
             font.pixelSize: Zenon.px(13)
-            MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor
+            MouseArea { anchors.fill: parent
               onClicked: { ed.st.custom.push({ ref: "", label: "", value: "", known: true, hidden: true }); ed.rebuild(); } }
           }
         }
@@ -356,7 +356,7 @@ Item {
           id: tagsBox
           width: parent.width
           textSize: Zenon.px(14)
-          ghost: "work, banking — separated by commas"
+          ghost: "Work, banking — separated by commas"
           onTextChanged: if (ed.st && ed.st.tags !== text) { ed.st.tags = text; ed.touch(); }
         }
       }

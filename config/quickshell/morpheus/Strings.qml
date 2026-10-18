@@ -59,6 +59,16 @@ QtObject {
   // as a URL, so a # in a filename started a fragment, a ? a query, and a %
   // an escape: the image never loaded and the dropped file was a different
   // name. encodeURI leaves # and ? alone, which is the same bug.
+  // SENTENCE CASE, the suite's one rule for words a person reads: the first
+  // letter up, the rest as written (user, 2026-10-19 — hint words, chips,
+  // badges and tooltips too). Leading spaces, glyphs and punctuation are
+  // stepped over to the first letter; a word that already starts with a
+  // capital, a digit or a key name in a chip is left as it is.
+  function sentence(s) {
+    const t = String(s === undefined || s === null ? "" : s);
+    const m = t.match(/^([^A-Za-z]*)([a-z])/);
+    return m ? m[1] + m[2].toUpperCase() + t.slice(m[0].length) : t;
+  }
   function fileUrl(p) {
     return "file://" + String(p ?? "").split("/").map(encodeURIComponent).join("/");
   }

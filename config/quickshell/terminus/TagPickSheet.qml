@@ -290,7 +290,7 @@ Rectangle {
     fromTop: term.tabStripRef.height + term.crumbBarRef.height
     // As wide as the key hints along its foot need, which is the widest
     // thing in it — a fixed 720 left seven short names in a wide card.
-    cardW: Math.max(460, tagHints.implicitWidth + 48)
+    cardW: Math.max(460, tagFoot.needW + 16)
     readonly property int rowH: 32
     readonly property int pageRows: 12
     cardH: 12 + Math.max(1, Math.min(tagSheet.pageRows,
@@ -343,7 +343,7 @@ Rectangle {
         anchors.left: parent.left
         anchors.leftMargin: 46
         anchors.verticalCenter: parent.verticalCenter
-        text: "make \u201c" + tagPick.fresh + "\u201d"
+        text: "Make \u201c" + tagPick.fresh + "\u201d"
         color: Zenon.white
         font.family: Zenon.face
         font.weight: Zenon.weight
@@ -470,71 +470,31 @@ Rectangle {
       }
     }
 
-    Rectangle {
-      anchors.bottom: tagFoot.top
-      anchors.left: parent.left
-      anchors.right: parent.right
-      height: 1
-      color: Zenon.border
-    }
-
-    Item {
+    // morpheus/HintBar, as every strip (ceres' height, ground and rule); a
+    // complaint takes the keys' place, in red
+    HintBar {
       id: tagFoot
       anchors.bottom: parent.bottom
       anchors.left: parent.left
       anchors.right: parent.right
-      height: 34
-
-      Text {
-        anchors.centerIn: parent
-        visible: tagPick.gripe !== ""
-        text: tagPick.gripe
-        color: Zenon.red
+      note: tagPick.gripe
+      noteInk: Zenon.red
+      // The keys that are actually bound. `x` was advertised here while
+      // Delete was what the router listened for — a hint bar is
+      // documentation and documentation that lies is worse than none.
+      rows: [["\u21b5", "tag"], ["\u21e7\u21b5", "tag & close"],
+             ["alt r", "rename"], ["\u2191\u2193", "move"],
+             ["del", "remove"], ["esc", "close"]]
+      leading: Text {
+        anchors.verticalCenter: parent.verticalCenter
+        visible: tagPick.gripe === ""
+        text: tagPick.query !== "" ? tagPick.query
+          : (tagPick.targets.length === 1 ? "1 item"
+             : tagPick.targets.length + " items")
+        color: tagPick.query !== "" ? Zenon.sand : Zenon.accentMuted
         font.family: Zenon.face
         font.weight: Zenon.weight
         font.pixelSize: Zenon.px(14)
-      }
-
-      Row {
-        id: tagHints
-        anchors.centerIn: parent
-        spacing: 12
-        visible: tagPick.gripe === ""
-
-        Text {
-          anchors.verticalCenter: parent.verticalCenter
-          rightPadding: 2
-          text: tagPick.query !== "" ? tagPick.query
-            : (tagPick.targets.length === 1 ? "1 item"
-               : tagPick.targets.length + " items")
-          color: tagPick.query !== "" ? Zenon.sand : Zenon.accentMuted
-          font.family: Zenon.face
-          font.weight: Zenon.weight
-          font.pixelSize: Zenon.px(14)
-        }
-
-        Repeater {
-          // The keys that are actually bound. `x` was advertised here
-          // while Delete was what the router listened for — a hint bar
-          // is documentation and documentation that lies is worse than
-          // none.
-          model: [["\u21b5", "tag"], ["\u21e7\u21b5", "tag & close"],
-                  ["alt r", "rename"], ["\u2191\u2193", "move"],
-                  ["del", "remove"], ["esc", "close"]]
-          delegate: Row {
-            required property var modelData
-            spacing: 5
-            KeyCap { label: modelData[0] }
-            Text {
-              anchors.verticalCenter: parent.verticalCenter
-              text: modelData[1]
-              color: Zenon.accentMuted
-              font.family: Zenon.face
-              font.weight: Zenon.weight
-              font.pixelSize: Zenon.px(13)
-            }
-          }
-        }
       }
     }
   }

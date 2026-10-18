@@ -77,7 +77,7 @@ FloatingWindow {
 
   readonly property color hiFill: Zenon.menuHi
   readonly property int headH: 46
-  readonly property int footH: 40
+  readonly property int footH: Zenon.hintBarH   // morpheus/HintBar's strip
   // morpheus/WindowTip is a popup, not an Item
   readonly property var tipsItem: tips
   readonly property Item stageItem: stage
@@ -392,7 +392,7 @@ FloatingWindow {
   function fieldMenu(f, x, y) {
     if (!f) return;
     win.menuHeld = "f:" + f.ref;
-    const items = [{ text: "Copy " + f.label, icon: "\u{F018F}", run: () => win.copyField(f) }];
+    const items = [{ text: "Copy " + String(f.label).charAt(0).toLowerCase() + String(f.label).slice(1), icon: "\u{F018F}", run: () => win.copyField(f) }];
     if (f.secret && f.kind !== "totp")
       items.push({ text: win.revealed[f.ref] !== undefined ? "Hide" : "Reveal", icon: "", run: () => win.revealField(f) });
     if (f.kind === "url") items.push({ text: "Open in the browser", icon: "", run: () => win.openUrl(f.value) });
@@ -1683,21 +1683,13 @@ FloatingWindow {
     }
 
     // ── the foot ─────────────────────────────────────────────────────────
-    Item {
+    // morpheus/HintBar, as every strip (ceres' height, ground and rule)
+    HintBar {
       id: foot
       anchors.bottom: parent.bottom
       anchors.left: side.right
       anchors.right: parent.right
-      height: win.footH
-      Rectangle { anchors.fill: parent; color: Zenon.headBg }
-      Rectangle { anchors.top: parent.top; width: parent.width; height: 1; color: Zenon.border }
-      HintRow {
-        rows: win.hintRows
-        anchors.verticalCenter: parent.verticalCenter
-        // only keys in this strip: centered (no button ever joins it)
-        x: Math.round((foot.width - width) / 2)
-        maxWidth: foot.width - 32
-      }
+      rows: win.hintRows
     }
   }
 

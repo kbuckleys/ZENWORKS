@@ -37,7 +37,7 @@ Item {
     rightPadding: head.rightAlign ? head.padRight : 0
     text: head.lit ? head.label + (head.pane.sortDesc ? " ▾" : " ▴") : head.label
     color: head.lit ? Zenon.cyan
-      : (headMa.containsMouse ? Zenon.accentKey : Zenon.accentMuted)
+      : (headMa.pressed ? Zenon.accentKey : Zenon.accentMuted)
     font.family: Zenon.faceFixed
     font.weight: Zenon.weight
     font.pixelSize: Zenon.px(12)

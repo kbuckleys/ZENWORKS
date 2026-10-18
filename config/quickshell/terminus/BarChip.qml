@@ -89,7 +89,7 @@ Item {
           anchors.centerIn: parent
           text: part.modelData.glyph || ""
           color: part.lit ? Zenon.cyan
-            : (hov.hovered && part.ok ? Zenon.white : Zenon.accentMuted)
+            : (Zenon.accentMuted)
           opacity: !part.ok ? 0.35 : part.down ? Zenon.pressDim : 1
           Behavior on color { ColorAnimation { duration: Zenon.fast } }
           font.family: Zenon.face

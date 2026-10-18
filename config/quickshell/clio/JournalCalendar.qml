@@ -80,7 +80,7 @@ Column {
           Text {
             anchors.verticalCenter: parent.verticalCenter
             text: N.MONTHS[cal.month]
-            color: headMa.containsMouse ? Zenon.ink : Zenon.cyan
+            color: headMa.pressed ? Zenon.ink : Zenon.cyan
             font.family: Zenon.face
             font.weight: Font.Bold
             font.pixelSize: Zenon.px(17)
@@ -144,7 +144,7 @@ Column {
           radius: 8
           color: cell.isToday ? Zenon.cyan
             : cell.count > 0 ? Zenon.alpha(Zenon.cyan, Math.min(0.34, 0.12 + 0.08 * cell.count))
-            : dayMa.containsMouse ? Zenon.wash(0.08) : "transparent"
+            : dayMa.pressed ? Zenon.wash(0.08) : "transparent"
           // the day's picture, darkened under its number
           Image {
             anchors.fill: parent
@@ -229,7 +229,7 @@ Column {
     Text {
       anchors.centerIn: parent
       text: chev.glyph
-      color: chevMa.containsMouse ? Zenon.cyan : Zenon.accentMuted
+      color: chevMa.pressed ? Zenon.cyan : Zenon.accentMuted
       font.family: Zenon.face
       font.weight: Font.Bold
       font.pixelSize: Zenon.px(17)

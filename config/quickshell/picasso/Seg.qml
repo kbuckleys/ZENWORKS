@@ -31,7 +31,7 @@ Rectangle {
   color: segMa.pressed ? Zenon.pressFill
     : seg.chosen
     ? Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b, 0.16)
-    : (segMa.containsMouse ? Zenon.wash(0.08) : Zenon.wash(0.03))
+    : (Zenon.wash(0.03))
   border.width: 1
   border.color: seg.chosen ? Zenon.cyan
     : (seg.current ? Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b, 0.4)

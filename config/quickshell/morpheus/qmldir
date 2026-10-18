@@ -70,3 +70,5 @@ OpenFlare 1.0 OpenFlare.qml
 TitleName 1.0 TitleName.qml
 EdgeTab 1.0 EdgeTab.qml
 TabStrip 1.0 TabStrip.qml
+CursorBand 1.0 CursorBand.qml
+HintBar 1.0 HintBar.qml

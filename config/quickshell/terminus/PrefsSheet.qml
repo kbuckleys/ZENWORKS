@@ -425,12 +425,6 @@ Item {
         }
 
         PrefRow { term: prefs.term
-          label: "Sliding cursor"
-          on: term.cursorSlide
-          onToggled: term.cursorSlide = !term.cursorSlide
-        }
-
-        PrefRow { term: prefs.term
           label: "Restore session"
           on: term.sessionReplay
           onToggled: {
@@ -450,7 +444,7 @@ Item {
         SideHead { term: prefs.term; label: "BAR BUTTONS" }
 
         Repeater {
-          model: [["barNav", "Back and forward"], ["barSideToggle", "Sidebar switch"],
+          model: [["barNav", "Navigation"], ["barSideToggle", "Sidebar toggle"],
                   ["barSort", "Sort"], ["barViews", "View switch"],
                   ["barSplit", "Split view"], ["barZoom", "Zoom"]]
           delegate: PrefRow {

@@ -85,7 +85,7 @@ Column {
     Text {
       width: parent.width
       elide: Text.ElideRight
-      text: spec.ready ? spec.face : spec.failed ? "could not read this font" : "…"
+      text: spec.ready ? spec.face : spec.failed ? "Could not read this font" : "…"
       color: spec.ready ? spec.ink : spec.failed ? Zenon.red : spec.quiet
       font.family: Zenon.face
       font.weight: Font.Bold
@@ -95,7 +95,7 @@ Column {
       visible: spec.ready
       width: parent.width
       elide: Text.ElideRight
-      text: [spec.weightName, spec.mono ? "monospaced" : "proportional"]
+      text: [spec.weightName, spec.mono ? "Monospaced" : "Proportional"]
         .filter((x) => x !== "").join("  ·  ")
       color: spec.quiet
       font.family: Zenon.face

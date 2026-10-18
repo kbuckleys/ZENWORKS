@@ -25,6 +25,7 @@
 // slides in from just past the edge rather than across the whole list.
 
 import QtQuick
+import "../morpheus"
 
 Item {
   id: glide
@@ -39,7 +40,7 @@ Item {
     t.push(glide.shift);
     glide.parent.transform = t;
   }
-  property int duration: 320
+  property int duration: Zenon.ms(320)
   property real limit: 600
 
   function from(dx, dy) {

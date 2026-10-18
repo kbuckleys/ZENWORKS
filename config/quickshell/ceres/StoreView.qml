@@ -559,7 +559,6 @@ Item {
           MouseArea {
             id: sMa
             anchors.fill: parent
-            cursorShape: Qt.PointingHandCursor
             onClicked: {
               if (store.searching) store.searchLeft();
               store.showSection(srow.modelData[0]);
@@ -645,6 +644,7 @@ Item {
           onOpened: (a) => store.open(a)
           onGot: (a) => store.get(a)
           onLaunched: (a) => store.launch(a)
+          onRemoved: (a) => store.remove(a)
         }
 
         // ── the artwork row ───────────────────────────────────────────
@@ -705,7 +705,6 @@ Item {
                 id: headMa
                 anchors.fill: parent
                 enabled: shelf.modelData.key !== ""
-                cursorShape: Qt.PointingHandCursor
                 onClicked: store.showSection(shelf.modelData.key)
               }
             }
@@ -722,9 +721,11 @@ Item {
                   height: 92
                   app: modelData
                   busy: store.busy
+                  removable: true
                   onOpened: store.open(modelData)
                   onGot: store.get(modelData)
                   onLaunched: store.launch(modelData)
+                  onRemoved: store.remove(modelData)
                 }
               }
             }
@@ -1374,7 +1375,6 @@ Item {
               MouseArea {
                 anchors.fill: parent
                 enabled: shot.file !== ""
-                cursorShape: Qt.PointingHandCursor
                 onClicked: {
                   store.lightboxFiles = shotList.list.map(x => store.shots[x.url] || "").filter(f => f !== "");
                   store.lightbox = shot.file;
@@ -1464,7 +1464,7 @@ Item {
               text: "\uF078"
               color: Zenon.cyan
               rotation: about.open ? 180 : 0
-              Behavior on rotation { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
+              Behavior on rotation { NumberAnimation { duration: Zenon.ms(220); easing.type: Easing.OutCubic } }
               font.family: Zenon.face
               font.weight: Zenon.weight
               font.pixelSize: Zenon.px(12)
@@ -1473,7 +1473,6 @@ Item {
               id: moreMa
               anchors.fill: parent
               anchors.margins: -6
-              cursorShape: Qt.PointingHandCursor
               onClicked: about.open = !about.open
             }
           }
@@ -1648,7 +1647,6 @@ Item {
     }
     MouseArea {
       anchors.fill: parent
-      cursorShape: Qt.PointingHandCursor
       onClicked: store.lightbox = ""
     }
     // previous and next, picasso's edge tabs (morpheus/EdgeTab)

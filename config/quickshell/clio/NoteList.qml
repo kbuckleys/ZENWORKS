@@ -276,7 +276,7 @@ Item {
           asynchronous: true
           // faded in as it arrives, not popped in (2026-10-17)
           opacity: status === Image.Ready ? 1 : 0
-          Behavior on opacity { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+          Behavior on opacity { NumberAnimation { duration: Zenon.ms(180); easing.type: Easing.OutCubic } }
         }
         Text {
           visible: tile.n.d.images.length === 0 || !!tile.n.sealed

@@ -24,11 +24,11 @@ Rectangle {
   width: 26
   height: 24
   radius: Zenon.windowRadius
-  color: press.pressed ? Zenon.pressWash(0.16) : press.containsMouse || hb.held ? Zenon.wash(0.08) : "transparent"
+  color: press.pressed ? Zenon.pressWash(0.16) : hb.held ? Zenon.wash(0.08) : "transparent"
   Text {
     anchors.centerIn: parent
     text: hb.glyph
-    color: press.pressed ? Zenon.accentSoft : press.containsMouse || hb.held ? Zenon.ink : Zenon.accentMuted
+    color: press.pressed ? Zenon.accentSoft : hb.held ? Zenon.ink : Zenon.accentMuted
     font.family: Zenon.glyphFace
     font.pixelSize: Zenon.px(14)
   }

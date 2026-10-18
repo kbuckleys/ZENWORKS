@@ -309,48 +309,48 @@ Item {
                 let dirs = 0;
                 for (const x of props.rows) if (x.isDir) dirs++;
                 return [
-                  ["items", props.rows.length + " (" + dirs + " directories)"],
-                  ["total size", props.walked < 0
+                  ["Items", props.rows.length + " (" + dirs + " directories)"],
+                  ["Total size", props.walked < 0
                     ? (dirs > 0 ? "measuring\u2026"
                         : Terminus.formatSize(props.total) + "  ·  " + props.total + " bytes")
                     : Terminus.formatSize(props.walked) + "  ·  " + props.walked + " bytes"],
-                  ["location", Terminus.dirname(r.path)]
-                ].concat(dirs > 0 ? [["contains", props.countText()]] : []);
+                  ["Location", Terminus.dirname(r.path)]
+                ].concat(dirs > 0 ? [["Contains", props.countText()]] : []);
               }
               // no "name" row: it is the card's own title now
               return [
-                ["location", Terminus.dirname(r.path)],
-                ["type", r.isDir ? "directory"
+                ["Location", Terminus.dirname(r.path)],
+                ["Type", r.isDir ? "directory"
                   : (r.isLink ? "symbolic link"
                     : (Terminus.categoryOf(r.name) || (r.isExec ? "executable" : "file")))],
-                ["size", r.isDir
+                ["Size", r.isDir
                   ? (props.walked < 0 ? "measuring\u2026"
                       : Terminus.formatSize(props.walked) + "  ·  " + props.walked + " bytes")
                   : Terminus.formatSize(r.size) + "  ·  " + r.size + " bytes"],
-                ["modified", Terminus.formatTime(r.mtime)],
-                ["owner", props.owner === "" ? "…" : props.owner],
+                ["Modified", Terminus.formatTime(r.mtime)],
+                ["Owner", props.owner === "" ? "…" : props.owner],
                 // ── AND THE WAY TO THE GRID ──────────────────────
                 // It reads as a fact and acts as a door. Both
                 // spellings, the same pair the grid itself shows, so
                 // the page you arrive at is recognizably the row you
                 // clicked rather than a different subject.
-                ["permissions",
+                ["Permissions",
                   ("000" + (props.permMode & 511).toString(8)).slice(-3)
                   + "  \u00b7  " + Terminus.modeString(props.permMode)]
               ].concat(
                 // What is inside it, for a directory — the natural companion
                 // to the size two rows up, and the one thing this card could
                 // not tell you about a directory.
-                r.isDir ? [["contains", props.countText()]] : [],
+                r.isDir ? [["Contains", props.countText()]] : [],
                 props.imageInfo
-                  ? [["image", props.imageInfo.dims + "  \u00b7  "
+                  ? [["Image", props.imageInfo.dims + "  \u00b7  "
                       + props.imageInfo.format + "  \u00b7  "
                       + props.imageInfo.depth + "  \u00b7  "
                       + props.imageInfo.colorspace]]
                   : [],
-                r.isDir ? [] : [["open with", props.openWithLabel]],
+                r.isDir ? [] : [["Open with", props.openWithLabel]],
                 r.isDir ? []
-                  : [["sha256", props.checksum === "" ? "click to compute"
+                  : [["SHA-256", props.checksum === "" ? "click to compute"
                       : props.checksum]]);
   }
 
@@ -576,7 +576,7 @@ Item {
             height: parent.height
             horizontalAlignment: Text.AlignRight
             verticalAlignment: Text.AlignVCenter
-            text: "tags"
+            text: "Tags"
             color: Zenon.accentMuted
             font.family: Zenon.face
             font.weight: Zenon.weight
@@ -648,15 +648,15 @@ Item {
               // The one row you can act on says so by looking like a link
               // until it has an answer.
               readonly property bool askable:
-                modelData[0] === "sha256" && props.checksum === ""
+                modelData[0] === "SHA-256" && props.checksum === ""
               // The other row you can act on. Same treatment, so "this one
               // does something" is one idea in this card rather than two.
               readonly property bool pickable:
-                modelData[0] === "open with" && props.host.appsScanned
+                modelData[0] === "Open with" && props.host.appsScanned
               // The third. A mixed selection has no single mode, so it
               // has no row to open and nothing to open it onto.
               readonly property bool opensPerms:
-                modelData[0] === "permissions" && !props.many
+                modelData[0] === "Permissions" && !props.many
               readonly property bool acts: propValue.askable
                 || propValue.pickable || propValue.opensPerms
               color: propValue.acts
@@ -868,7 +868,7 @@ Item {
 
         Item { width: permGrid.labelW; height: 1 }
         Repeater {
-          model: ["read", "write", "exec"]
+          model: ["Read", "Write", "Exec"]
           delegate: Text {
             required property var modelData
             width: permGrid.cellW
@@ -887,7 +887,7 @@ Item {
 
       // three rows of three, in the order chmod writes them
       Repeater {
-        model: [["owner", 6], ["group", 3], ["other", 0]]
+        model: [["Owner", 6], ["Group", 3], ["Other", 0]]
 
         delegate: Row {
           id: permRow

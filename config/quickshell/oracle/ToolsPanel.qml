@@ -219,7 +219,7 @@ Item {
       visible: tp.paruGone && !!tp.row && !!tp.row.install
       spacing: 2
       Text {
-        text: "paru is missing, so ceres cannot install these yet. In a terminal:"
+        text: "Paru is missing, so ceres cannot install these yet. In a terminal:"
         color: tp.dimColor
         font.family: tp.face
         font.weight: Zenon.weight

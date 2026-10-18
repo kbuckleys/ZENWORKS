@@ -287,17 +287,7 @@ LayerPopup {
     NumberAnimation { duration: Zenon.slow; easing.type: Zenon.ease }
   }
 
-  component HintBar: Item {
-    id: hintBarRoot
-    height: 20
-    property var rows: popup.hintRows
-    // Keys as caps, like every other panel's — it was the one strip that
-    // wrote them as bold text. See morpheus/HintRow.
-    HintRow {
-      anchors.centerIn: parent
-      rows: hintBarRoot.rows
-    }
-  }
+
 
   focusable: true
 
@@ -1273,11 +1263,11 @@ LayerPopup {
           transform: Translate { id: shakeX }
           SequentialAnimation {
             id: shake
-            NumberAnimation { target: shakeX; property: "x"; to: -7; duration: 45; easing.type: Easing.OutQuad }
-            NumberAnimation { target: shakeX; property: "x"; to: 6; duration: 70; easing.type: Easing.InOutQuad }
-            NumberAnimation { target: shakeX; property: "x"; to: -4; duration: 60; easing.type: Easing.InOutQuad }
-            NumberAnimation { target: shakeX; property: "x"; to: 2; duration: 50; easing.type: Easing.InOutQuad }
-            NumberAnimation { target: shakeX; property: "x"; to: 0; duration: 45; easing.type: Easing.OutQuad }
+            NumberAnimation { target: shakeX; property: "x"; to: -7; duration: Zenon.ms(45); easing.type: Easing.OutQuad }
+            NumberAnimation { target: shakeX; property: "x"; to: 6; duration: Zenon.ms(70); easing.type: Easing.InOutQuad }
+            NumberAnimation { target: shakeX; property: "x"; to: -4; duration: Zenon.ms(60); easing.type: Easing.InOutQuad }
+            NumberAnimation { target: shakeX; property: "x"; to: 2; duration: Zenon.ms(50); easing.type: Easing.InOutQuad }
+            NumberAnimation { target: shakeX; property: "x"; to: 0; duration: Zenon.ms(45); easing.type: Easing.OutQuad }
           }
 
           Row {
@@ -1291,7 +1281,7 @@ LayerPopup {
               id: kindGlyph
               width: 22
               horizontalAlignment: Text.AlignHCenter
-              text: Metis.glyphFor(popup.resultShown && !popup.shownBad ? popup.shownKind : "calc", popup.shownResult)
+              text: Metis.glyphFor(popup.resultShown && !popup.shownBad ? popup.shownKind : "Calc", popup.shownResult)
               color: popup.shownBad && !popup.shownWhich ? Zenon.red : popup.headColor
               Behavior on color { ColorAnimation { duration: Zenon.normal } }
               anchors.verticalCenter: parent.verticalCenter
@@ -1500,7 +1490,6 @@ LayerPopup {
               MouseArea {
                 anchors.fill: parent
                 enabled: popup.readings.length > 1
-                cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
                 onClicked: popup.readingIdx = (popup.readingIdx + 1) % popup.readings.length
               }
               color: popup.dimColor
@@ -1525,7 +1514,7 @@ LayerPopup {
 
               Text {
                 anchors.verticalCenter: parent.verticalCenter
-                text: popup.shownWhich ? "which" : popup.badWord !== "" ? "can't read" : "can't make sense of that"
+                text: popup.shownWhich ? "Which" : popup.badWord !== "" ? "Can't read" : "Can't make sense of that"
                 color: popup.shownWhich ? Zenon.keyInk : Zenon.red
                 font.family: Zenon.face
                 font.weight: Font.Bold
@@ -1636,7 +1625,6 @@ LayerPopup {
                 // a click copies it — and the panel stays
                 MouseArea {
                   anchors.fill: parent
-                  cursorShape: Qt.PointingHandCursor
                   onClicked: popup.copyStay(popup.pickText)
                 }
               }
@@ -1699,8 +1687,8 @@ LayerPopup {
                   glyph: Metis.moneyGlyph(trendStrip.to) },
                 { text: Metis.rateText(t.first) + "  →  " + Metis.rateText(t.last) + "   (" + t.pctText + ")",
                   glyph: t.pct > 0 ? "\u{F0535}" : t.pct < 0 ? "\u{F0533}" : "\u{F0534}" },
-                { text: "low " + Metis.rateText(t.low) + "  ·  high " + Metis.rateText(t.high), glyph: "\u{F084F}" },
-                { text: "a snapshot a week, the newest the one used here", muted: true }]);
+                { text: "Low " + Metis.rateText(t.low) + "  ·  high " + Metis.rateText(t.high), glyph: "\u{F084F}" },
+                { text: "A snapshot a week, the newest the one used here", muted: true }]);
             }
           }
         }
@@ -1750,7 +1738,7 @@ LayerPopup {
                   }
                   if (popup.chipMode !== "units") return;
                   popup.bubbleAt(unitChip, Metis.chipFacts(modelData, popup.shownResult, popup.shownKind)
-                    .concat([{ text: "click copies · tab, then return, copies", muted: true }]));
+                    .concat([{ text: "Click copies · tab, then return, copies", muted: true }]));
                 }
                 // A CLICK COPIES, as a click on the answer does; it never
                 // types. It used to close the panel and wtype the value into
@@ -1835,39 +1823,12 @@ LayerPopup {
         }
 
         // --------------------------------------------- hint strip --
-        Rectangle {
+        // morpheus/HintBar, as every strip; a copy's flash takes the keys' place
+        HintBar {
           width: parent.width
-          height: 34
-          // black, like every other layer's hint strip — see Zenon.hintBg
-          color: Zenon.hintBg
-
-          Rectangle {
-            anchors.top: parent.top
-            anchors.left: parent.left
-            anchors.right: parent.right
-            height: 1
-            color: Zenon.border
-          }
-
-          HintBar {
-            width: parent.width
-            anchors.centerIn: parent
-            opacity: popup.copied ? 0 : 1
-            Behavior on opacity { NumberAnimation { duration: Zenon.fast } }
-          }
-
-          Text {
-            anchors.centerIn: parent
-            text: "\uF00C  " + popup.flashText
-            color: Zenon.green
-            opacity: popup.copied ? 1 : 0
-            scale: popup.copied ? 1 : 0.85
-            Behavior on opacity { NumberAnimation { duration: Zenon.fast } }
-            Behavior on scale { NumberAnimation { duration: Zenon.normal; easing.type: Easing.OutBack } }
-            font.family: Zenon.face
-            font.weight: Font.Bold
-            font.pixelSize: Zenon.px(13)
-          }
+          rows: popup.hintRows
+          note: popup.copied ? "\uF00C  " + popup.flashText : ""
+          noteInk: Zenon.green
         }
       }
     }
@@ -1886,8 +1847,8 @@ LayerPopup {
     : popup.shownTrend.length > 0 ? 46 : 0
 
   function calcHeight() {
-    if (popup.tapeMode) return 46 + tapeList.implicitHeight + 34;
-    return 46 + (popup.resultShown ? popup.resultH : 0) + popup.visualH + popup.chipRowH + 34;
+    if (popup.tapeMode) return 46 + tapeList.implicitHeight + Zenon.hintBarH;
+    return 46 + (popup.resultShown ? popup.resultH : 0) + popup.visualH + popup.chipRowH + Zenon.hintBarH;
   }
 
   // ── the bubble ── hung from whatever bubbleAt was handed

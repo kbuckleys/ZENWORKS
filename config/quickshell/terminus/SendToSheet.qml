@@ -710,7 +710,7 @@ Rectangle {
     // grew a pair and ran off both edges of a 560 card; the footer's
     // margins are 14 a side.
     width: Math.max(
-      Math.min(Math.max(560, sendToHints.implicitWidth + 28), sendToWell.width),
+      Math.min(Math.max(560, sendToFoot.needW), sendToWell.width),
       Math.min(sendToWell.width, sendTo.wantWidth))
     Behavior on width {
       NumberAnimation { duration: Zenon.fast; easing.type: Zenon.travelEase }
@@ -734,17 +734,13 @@ Rectangle {
     // EVERY PIXEL THAT IS NOT A ROW, EACH ONE NAMED. dialogRadius is the
     // list's top margin, and the height the card's top sits above the clip
     // — the same number for the same reason. 12 is the list's bottom
-    // margin. The footer is the footer. And 14 is the footer's OWN margin
-    // against the bottom of the card, which is written on sendToFoot as
-    // `anchors.margins`.
-    //
-    // That last one reads as slack and is not: taken out, the card came up
-    // 14 short and the bottom row was sliced by the frame. Measured, with
-    // four roots in the sheet — 106 pixels of list for 120 pixels of rows.
-    // The whole point of adding it up from the parts is that every term
-    // has to be one of them.
+    // margin. The footer is the footer: morpheus/HintBar, flush to the
+    // card's bottom since 2026-10-19, so the 14 of margin it used to keep
+    // there is gone from the sum too. The whole point of adding it up from
+    // the parts is that every term has to be one of them (taken out of
+    // step, the card came up short and the bottom row was sliced).
     readonly property real chromeH:
-      Zenon.dialogRadius + sendToHead.height + 12 + sendToFoot.height + 14
+      Zenon.dialogRadius + sendToHead.height + 12 + sendToFoot.height
     // the listing's own row height, now that the rows are its rows
     readonly property int rowH: term.rowH
     // WHAT IS VISIBLE, not what is loaded. Bound to the tree instead, a
@@ -967,99 +963,49 @@ Rectangle {
       anchors.bottomMargin: 2
     }
 
-    Column {
+    // morpheus/HintBar, as every strip (ceres' height, ground and rule).
+    // THE HINT IS THE FIELD: what you typed stands before the keys where
+    // "type to filter" was, so the sheet gets a filter field without a box
+    // for one; while the crawl is out "searching…" takes the KEYS' place,
+    // never the query's — a query that blinked out every time you stopped
+    // typing would be the one thing you wanted to read.
+    HintBar {
       id: sendToFoot
       anchors.bottom: parent.bottom
       anchors.left: parent.left
       anchors.right: parent.right
-      anchors.margins: 14
-      spacing: 4
-
-      // NO PATH ROW. It was here because a tree shows you a leaf and the
-      // question is about the whole path — but a crawl result IS its
-      // path, so under a filter the line restated the row above it, and
-      // the filter is how most destinations get found.
-      //
-      // THE HINT IS THE FIELD. "type to filter" is an instruction you need
-      // once, and the moment you follow it the same line can show what you
-      // typed instead — so the sheet gets a filter field without carrying
-      // a box for one, in the place your eyes already are while the
-      // results move. The second half stays the keys, and says "searching"
-      // there while the crawl is out rather than taking the line over: a
-      // query that disappeared for a tenth of a second every time you
-      // stopped typing would be the one thing you wanted to read.
-      // ── THE KEYS ARE DRAWN AS KEYS ────────────────────────────
-      // They were one run of text with the glyphs spaced into it, which
-      // made this the only list of keys in the window not wearing the
-      // chip every other one wears — the context menu and F1 are both
-      // KeyCap, and this is the third list. Spelled out as chip-and-word
-      // pairs so a key and what it does stay together.
-      Row {
-        id: sendToHints
-        anchors.horizontalCenter: parent.horizontalCenter
-        spacing: 12
-
+      rows: {
+        if (sendTo.crawling) return [];
+        if (sendTo.blocked && sendTo.current) return [];
+        const out = [["\u2191\u2193", "move"], ["\u2192", "open"],
+                     [term.mouseKey(2), "fold"]];
+        // The verb is the op's own, and `go` has a second one.
+        out.push(["\u21b5", sendTo.op === "go" ? "go" : "send"]);
+        if (sendTo.op === "go") out.push(["\u21e7\u21b5", "new tab"]);
+        out.push(["esc", "close"]);
+        return out;
+      }
+      leading: [
         Text {
           anchors.verticalCenter: parent.verticalCenter
-          rightPadding: 2
-          text: sendTo.blocked && sendTo.current ? "cannot go there"
+          text: sendTo.blocked && sendTo.current ? "Cannot go there"
               : (sendTo.query !== "" ? sendTo.query : "type to filter")
           color: sendTo.query !== "" && !sendTo.blocked
             ? Zenon.sand : Zenon.accentMuted
           font.family: Zenon.face
           font.weight: Zenon.weight
           font.pixelSize: Zenon.px(13)
-        }
-
-        // While the crawl is out this takes the KEYS' place and not the
-        // query's: a query that disappeared for a tenth of a second every
-        // time you stopped typing would be the one thing you wanted to
-        // read.
+        },
         Text {
           anchors.verticalCenter: parent.verticalCenter
           visible: sendTo.crawling && !(sendTo.blocked && sendTo.current)
-          text: "searching\u2026"
+          text: "Searching\u2026"
           color: Zenon.accentMuted
           font.family: Zenon.face
           font.weight: Zenon.weight
           font.pixelSize: Zenon.px(13)
         }
-
-        Repeater {
-          model: {
-            if (sendTo.crawling) return [];
-            if (sendTo.blocked && sendTo.current) return [];
-            const out = [["\u2191\u2193", "move"], ["\u2192", "open"],
-                         [term.mouseKey(2), "fold"]];
-            // The verb is the op's own, and `go` has a second one.
-            out.push(["\u21b5", sendTo.op === "go" ? "go" : "send"]);
-            if (sendTo.op === "go") out.push(["\u21e7\u21b5", "new tab"]);
-            out.push(["esc", "close"]);
-            return out;
-          }
-
-          delegate: Row {
-            id: hintPair
-            required property var modelData
-            spacing: 5
-
-            KeyCap {
-              anchors.verticalCenter: parent.verticalCenter
-              label: hintPair.modelData[0]
-              fontSize: 11
-            }
-
-            Text {
-              anchors.verticalCenter: parent.verticalCenter
-              text: hintPair.modelData[1]
-              color: Zenon.accentMuted
-              font.family: Zenon.face
-              font.weight: Zenon.weight
-              font.pixelSize: Zenon.px(13)
-            }
-          }
-        }
-      }
+      ]
     }
   }
   }

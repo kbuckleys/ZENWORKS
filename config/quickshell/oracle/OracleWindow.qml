@@ -378,7 +378,7 @@ FloatingWindow {
   }
 
   // the hint strip along the bottom, as tall as every other layer's
-  readonly property int hintH: 30
+  readonly property int hintH: Zenon.hintBarH   // morpheus/HintBar's strip
   readonly property int bodyH: 460
   // the section toolbar across the top of the body
   readonly property int tabsH: 72
@@ -1338,60 +1338,38 @@ FloatingWindow {
       // the keys in the middle, what you have typed on the left, and how much of the shell is off its defaults on the
       // right. It also holds the search field, which is never seen — what
       // you type goes to it wherever the pointer is.
-      Rectangle {
+      // morpheus/HintBar, as every strip (ceres' height, ground and rule):
+      // what you typed before the keys, how many changed at the right end, and
+      // the search field (never seen) over it all
+      HintBar {
         id: hintBar
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.bottom: parent.bottom
-        height: popup.hintH
-        // see-through: the settings rise out of it — see the body's ScrollEdges
-        color: Zenon.hintFrostBg
         z: 2
-
-        Rectangle {
-          anchors.top: parent.top
-          width: parent.width
-          height: 1
-          color: Zenon.border
-        }
-
-        Text {
-          anchors.left: parent.left
-          anchors.leftMargin: 14
-          anchors.right: hintKeys.left
-          anchors.rightMargin: 14
+        rows: popup.searching
+          ? [["ctrl tab", "narrow"], ["esc", "clear"]]
+          : [["type", "filter"], ["ctrl tab", "section"], ["esc", "close"]]
+        leading: Text {
           anchors.verticalCenter: parent.verticalCenter
+          width: Math.min(implicitWidth, hintBar.width / 3)
           elide: Text.ElideRight
           textFormat: Text.StyledText
+          // what you typed, which is otherwise shown nowhere; no section
+          // description — the settings say what they are
           text: {
-            if (popup.searching) {
-              const n = popup.rows.length;
-              const q = String(popup.query).replace(/&/g, "&amp;").replace(/</g, "&lt;");
-              return "<font color='" + popup.highlight + "'>" + q + "</font>  "
-                + n + (n === 1 ? " match" : " matches");
-            }
-            // no section description: the settings say what they are, and
-            // the strip is for what you are doing — here, what you typed,
-            // which is otherwise shown nowhere
-            return "";
+            if (!popup.searching) return "";
+            const n = popup.rows.length;
+            const q = String(popup.query).replace(/&/g, "&amp;").replace(/</g, "&lt;");
+            return "<font color='" + popup.highlight + "'>" + q + "</font>  "
+              + n + (n === 1 ? " match" : " matches");
           }
           color: popup.dimColor
           font.family: popup.face
           font.weight: Zenon.weight
           font.pixelSize: Zenon.px(13)
         }
-
-        HintRow {
-          id: hintKeys
-          anchors.centerIn: parent
-          rows: popup.searching
-            ? [["ctrl tab", "narrow"], ["esc", "clear"]]
-            : [["type", "filter"], ["ctrl tab", "section"], ["esc", "close"]]
-        }
-
         Text {
-          anchors.right: parent.right
-          anchors.rightMargin: 14
           anchors.verticalCenter: parent.verticalCenter
           visible: popup.totalChanged > 0
           text: popup.totalChanged + " changed"
@@ -1400,28 +1378,27 @@ FloatingWindow {
           font.weight: Font.Medium
           font.pixelSize: Zenon.px(13)
         }
+        overlay: TextInput {
+        id: filterInput
 
-        TextInput {
-          id: filterInput
+        cursorDelegate: Caret { field: filterInput }
+        width: 1
+        height: 1
+        opacity: 0
+        activeFocusOnTab: false
+        // so escape reaches the one handler that decides what it means
+        Keys.forwardTo: bgRoot
 
-          cursorDelegate: Caret { field: filterInput }
-          width: 1
-          height: 1
-          opacity: 0
-          activeFocusOnTab: false
-          // so escape reaches the one handler that decides what it means
-          Keys.forwardTo: bgRoot
-
-          onTextChanged: {
-            popup.query = filterInput.text;
-            Qt.callLater(() => list.positionViewAtBeginning());
-          }
-
-          function clear() {
-            filterInput.text = "";
-            popup.query = "";
-          }
+        onTextChanged: {
+          popup.query = filterInput.text;
+          Qt.callLater(() => list.positionViewAtBeginning());
         }
+
+        function clear() {
+          filterInput.text = "";
+          popup.query = "";
+        }
+      }
       }
 
       Column {
@@ -1865,7 +1842,7 @@ FloatingWindow {
             Text {
               anchors.centerIn: parent
               visible: popup.rows.length === 0
-              text: popup.searching ? "nothing matches “" + popup.query + "”"
+              text: popup.searching ? "Nothing matches “" + popup.query + "”"
                                     : "nothing to set here"
               color: popup.dimColor
               font.family: popup.face
@@ -1959,7 +1936,6 @@ FloatingWindow {
                 MouseArea {
                   anchors.fill: rowHead
                   visible: settingRow.fold
-                  cursorShape: Qt.PointingHandCursor
                   onClicked: popup.unfolded = settingRow.open ? "" : settingRow.spec.key
                 }
                 Loader {
@@ -2128,13 +2104,13 @@ FloatingWindow {
                         width: parent.width + 4
                         height: parent.width + 4
                         radius: 5
-                        color: restoreMa.containsMouse ? (restoreMa.pressed ? Zenon.pressWash(0.14) : Zenon.wash(0.08)) : "transparent"
+                        color: restoreMa.pressed ? Zenon.pressWash(0.14) : "transparent"
                       }
                       Text {
                         id: restoreGlyph
                         anchors.centerIn: parent
                         text: "\uE612"
-                        color: restoreMa.containsMouse ? Zenon.ink : popup.changedColor
+                        color: restoreMa.pressed ? Zenon.ink : popup.changedColor
                         font.family: Zenon.faceMono
                         font.weight: Zenon.weight
                         font.pixelSize: Zenon.px(15)
@@ -2144,7 +2120,6 @@ FloatingWindow {
                         anchors.fill: parent
                         anchors.margins: -3
                         hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
                         onClicked: {
                           popup.hideTip();
                           Oracle.reset(settingRow.spec.key);
@@ -2259,14 +2234,14 @@ FloatingWindow {
                         anchors.verticalCenter: parent.verticalCenter
                         color: bookMa.pressed
                           ? Qt.rgba(popup.highlight.r, popup.highlight.g, popup.highlight.b, 0.18)
-                          : Zenon.wash(bookMa.containsMouse ? 0.10 : 0.06)
+                          : Zenon.wash(0.06)
                         border.width: 1
                         border.color: Zenon.border
                         Behavior on color { ColorAnimation { duration: Zenon.fast; easing.type: Zenon.ease } }
                         Text {
                           anchors.centerIn: parent
                           text: "\uF031"
-                          color: bookMa.containsMouse ? popup.highlight : popup.fgColor
+                          color: bookMa.pressed ? popup.highlight : popup.fgColor
                           font.family: Zenon.glyphFace
                           font.pixelSize: Zenon.px(14)
                         }
@@ -2274,7 +2249,6 @@ FloatingWindow {
                           id: bookMa
                           anchors.fill: parent
                           hoverEnabled: true
-                          cursorShape: Qt.PointingHandCursor
                           onContainsMouseChanged: containsMouse ? popup.showTip("Choose in Alexandria", bookBtn)
                                                                 : popup.hideTip()
                           onClicked: { popup.hideTip(); popup.openFontBook(settingRow.spec.key); }
@@ -2332,10 +2306,10 @@ FloatingWindow {
                                 anchors.centerIn: parent
                                 text: stepEnd.modelData < 0 ? "\u2212" : "+"
                                 color: !stepEnd.can ? popup.dimColor
-                                  : stepMa.containsMouse ? popup.highlight : popup.fgColor
+                                  : stepMa.pressed ? popup.highlight : popup.fgColor
                                 font.family: popup.face
                                 font.weight: Font.Medium
-                                font.pixelSize: 15
+                                font.pixelSize: Zenon.px(15)
                               }
                               MouseArea {
                                 id: stepMa
@@ -2353,7 +2327,7 @@ FloatingWindow {
                             font.family: popup.face
                             font.weight: Font.Medium
                             font.features: { "tnum": 1 }
-                            font.pixelSize: 15
+                            font.pixelSize: Zenon.px(15)
                           }
                           WheelHandler {
                             acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad

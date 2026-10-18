@@ -1592,7 +1592,7 @@ PanelWindow {
                  && !look.arc && !look.face && !look.folder
         horizontalAlignment: Text.AlignHCenter
         verticalAlignment: Text.AlignVCenter
-        text: "no preview available"
+        text: "No preview available"
         color: Zenon.yellow
         font.family: Zenon.face
         font.weight: Zenon.weight
@@ -1773,7 +1773,7 @@ PanelWindow {
             visible: look.pic
             leftPadding: 3
             rightPadding: 8
-            text: "rotate"
+            text: "Rotate"
             color: Zenon.accentMuted
             font.family: Zenon.face
             font.weight: Zenon.weight
@@ -1790,7 +1790,7 @@ PanelWindow {
             visible: look.vid
             leftPadding: 3
             rightPadding: 8
-            text: "audio"
+            text: "Audio"
             color: Zenon.accentMuted
             font.family: Zenon.face
             font.weight: Zenon.weight
@@ -1810,7 +1810,7 @@ PanelWindow {
             anchors.verticalCenter: parent.verticalCenter
             leftPadding: 3
             rightPadding: 8
-            text: "prev / next"
+            text: "Prev / next"
             color: Zenon.accentMuted
             font.family: Zenon.face
             font.weight: Zenon.weight
@@ -1829,7 +1829,7 @@ PanelWindow {
             visible: look.docPages > 1
             leftPadding: 3
             rightPadding: 8
-            text: "page"
+            text: "Page"
             color: Zenon.accentMuted
             font.family: Zenon.face
             font.weight: Zenon.weight
@@ -1846,7 +1846,7 @@ PanelWindow {
             visible: look.docPages > 1
             leftPadding: 3
             rightPadding: 8
-            text: "first / last"
+            text: "First / last"
             color: Zenon.accentMuted
             font.family: Zenon.face
             font.weight: Zenon.weight
@@ -1873,7 +1873,7 @@ PanelWindow {
             anchors.verticalCenter: parent.verticalCenter
             visible: look.scrollable
             leftPadding: 3
-            text: "scroll"
+            text: "Scroll"
             color: Zenon.accentMuted
             font.family: Zenon.face
             font.weight: Zenon.weight

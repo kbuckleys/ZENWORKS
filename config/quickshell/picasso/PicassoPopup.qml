@@ -216,9 +216,9 @@ LayerPopup {
       radius: 4
       color: ringMa.pressed
         ? Qt.rgba(popup.highlight.r, popup.highlight.g, popup.highlight.b, 0.26)
-        : (ringMa.containsMouse ? Zenon.wash(0.12) : Zenon.wash(0.06))
+        : (Zenon.wash(0.06))
       border.width: 1
-      border.color: ringMa.containsMouse ? popup.highlight : Zenon.border
+      border.color: ringMa.pressed ? popup.highlight : Zenon.border
       Behavior on color {
         ColorAnimation { duration: Zenon.fast; easing.type: Zenon.ease }
       }
@@ -644,7 +644,7 @@ LayerPopup {
             anchors.centerIn: parent
             visible: popup.view === "backgrounds" && popup.filtered.length === 0 && !Picasso.scanning
             text: Picasso.files.length === 0
-              ? "no backgrounds in " + Picasso.dir : "no match"
+              ? "no backgrounds in " + Picasso.dir : popup.query !== "" ? "nothing matches \u201C" + popup.query + "\u201D" : "nothing here"
             color: popup.dimColor
             font.family: Zenon.face
             font.weight: Font.Bold
@@ -692,6 +692,8 @@ LayerPopup {
 
           GridView {
             id: grid
+            // the chosen one slides (morpheus/CursorBand), rather than each row lighting
+            CursorBand { follows: grid; index: popup.sel; insetX: 6; insetY: 6; radius: 6 }
             // Finder's rubber band and the smooth wheel notch, one rule for
             // the whole shell — see morpheus/Elastic.qml. Inside the view
             // rather than over it: it pins itself to the viewport.
@@ -733,7 +735,7 @@ LayerPopup {
                 anchors.fill: parent
                 anchors.margins: 6
                 radius: 6
-                color: cell.selected ? Zenon.menuHi : "transparent"
+                color: "transparent"
               }
 
               Thumb {
@@ -822,6 +824,8 @@ LayerPopup {
             GridView {
               id: colorGrid
               ElasticScroll { view: colorGrid; step: popup.colorCellH }
+              // the chosen one slides (morpheus/CursorBand), rather than each row lighting
+              CursorBand { follows: colorGrid; index: popup.colorSel; insetX: 4; insetY: 4; radius: 6 }
               anchors.left: parent.left
               anchors.top: parent.top
               anchors.bottom: parent.bottom
@@ -846,7 +850,7 @@ LayerPopup {
                   anchors.fill: parent
                   anchors.margins: 4
                   radius: 6
-                  color: swCell.selected ? Zenon.menuHi : "transparent"
+                  color: "transparent"
                 }
 
                 Rectangle {
@@ -859,7 +863,7 @@ LayerPopup {
                   radius: 6
                   color: swCell.modelData.hex
                   border.width: 1
-                  border.color: swMa.containsMouse ? Zenon.wash(0.5) : Zenon.wash(0.12)
+                  border.color: swMa.pressed ? Zenon.wash(0.5) : Zenon.wash(0.12)
                 }
 
                 // in use, the same pink tick the pictures wear
@@ -891,11 +895,11 @@ LayerPopup {
                   height: 18
                   radius: 9
                   visible: swCell.modelData.custom && swMa.containsMouse
-                  color: delMa.containsMouse ? Zenon.red : Zenon.hud(0.65)
+                  color: delMa.pressed ? Zenon.red : Zenon.hud(0.65)
                   Text {
                     anchors.centerIn: parent
                     text: ""
-                    color: delMa.containsMouse ? Zenon.onAccent : Zenon.ink
+                    color: delMa.pressed ? Zenon.onAccent : Zenon.ink
                     font.family: Zenon.face
                     font.weight: Zenon.weight
                     font.pixelSize: Zenon.px(10)
@@ -1093,7 +1097,7 @@ LayerPopup {
                 }
                 Text {
                   text: ""
-                  color: nextMa.containsMouse ? popup.highlight : popup.fgColor
+                  color: nextMa.pressed ? popup.highlight : popup.fgColor
                   font.family: Zenon.face
                   font.weight: Zenon.weight
                   font.pixelSize: Zenon.px(13)
@@ -1101,7 +1105,7 @@ LayerPopup {
                 }
                 Text {
                   text: ""
-                  color: stopMa.containsMouse ? Zenon.red : popup.fgColor
+                  color: stopMa.pressed ? Zenon.red : popup.fgColor
                   font.family: Zenon.face
                   font.weight: Zenon.weight
                   font.pixelSize: Zenon.px(13)
@@ -1184,7 +1188,7 @@ LayerPopup {
                   // looking at; the query is the only thing on this line you
                   // put there, and the two were the same color.
                   color: popup.query === "" ? popup.dimColor
-                    : (clearMa.containsMouse ? popup.highlight : popup.headColor)
+                    : (clearMa.pressed ? popup.highlight : popup.headColor)
                   font.bold: true
                   font.family: Zenon.face
                   font.weight: 600

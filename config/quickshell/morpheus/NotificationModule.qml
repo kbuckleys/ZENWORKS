@@ -17,7 +17,10 @@ Collapsible {
   id: root
   // Silenced, it stays even with nothing unread: the struck bell is the only
   // place do not disturb is visible, and the right click that ends it.
-  active: Oracle.showNotifications && (root.unread > 0 || root.silent)
+  // with nothing in the history, only when asked to stay (Oracle's
+  // notifBellAlways, on by default; also in the menu below)
+  active: Oracle.showNotifications
+    && (Oracle.notifBellAlways || root.total > 0 || root.unread > 0 || root.silent)
   openWidth: row.implicitWidth
 
   // arrived since the history panel was last opened
@@ -91,6 +94,7 @@ Collapsible {
       { isSeparator: true },
       { text: "Do not disturb", icon: "󰂛", mark: root.silent },
       { text: "Keep track changes", icon: "\uF001", mark: root.trackMusic },
+      { text: "Show with no history", icon: "󰂜", mark: Oracle.notifBellAlways },
       { isSeparator: true },
       { text: "Clear all", icon: "󰎟", enabled: root.total > 0 || root.unread > 0 }
     ]
@@ -98,7 +102,8 @@ Collapsible {
       if (i === 0) root.activated();
       else if (i === 2) root.silenceToggled();
       else if (i === 3) root.trackMusicToggled();
-      else if (i === 5) root.cleared();
+      else if (i === 4) Oracle.set("notifBellAlways", !Oracle.notifBellAlways);
+      else if (i === 6) root.cleared();
     }
   }
 

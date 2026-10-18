@@ -43,7 +43,17 @@ Item {
     return out;
   }
   readonly property string kittyText: Sync.renderKitty(sync.colors, Zenon.light)
-  readonly property string hyprText: Sync.renderHyprTheme(sync.colors)
+  // hyprland's borders follow the theme Zenon included (user, 2026-10-19):
+  // kitty keeps its own zenon.conf for Zenon, but base.lua's literals were
+  // another palette's, so hyprland is always handed the colors
+  readonly property var hyprColors: {
+    const out = { name: Zenon.theme.name || Zenon.themeName };
+    for (const s of ["surface", "ink", "red", "blue", "magenta", "cyan", "pink", "sand",
+                     "border", "onAccent"])
+      out[s] = Zenon.hex(Zenon[s]);
+    return out;
+  }
+  readonly property string hyprText: Sync.renderHyprTheme(sync.hyprColors)
   // oracle's Font for hyprland's own text — always written, unlike the
   // theme: base.lua's literals are only a first-boot font (themesync.js)
   readonly property string fontText: Sync.renderHyprFont(Zenon.face, Zenon.weight, Zenon.px(14))

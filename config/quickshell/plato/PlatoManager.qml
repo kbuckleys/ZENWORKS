@@ -80,7 +80,7 @@ Scope {
   readonly property alias settings: settings
   Settings { id: settings }
   // the chrome's own size: the shell's 16, whatever the editor's text is
-  readonly property int chromeSize: 16
+  readonly property int chromeSize: Zenon.px(16)
   readonly property int defaultSize: settings.fontSize
   // the text's face and weight are oracle's Monospace font (Zenon.faceCode)
   readonly property string fontFamily: Zenon.faceCode

@@ -26,7 +26,8 @@ import "."
 Row {
   id: hints
   property var rows: []
-  spacing: 14
+  // between one key-and-word and the next (14 read as one run; user, 2026-10-19)
+  spacing: 20
   property real maxWidth: -1
   // how many of `rows` are showing
   property int shown: 0
@@ -66,18 +67,21 @@ Row {
       visible: pair.index < hints.shown
       onImplicitWidthChanged: hints.refit()
 
+      // 2px over KeyCap's 11, with the words (user, 2026-10-19)
       KeyCap {
         anchors.verticalCenter: parent.verticalCenter
+        fontSize: 13
         label: pair.modelData[0]
       }
 
       Text {
         anchors.verticalCenter: parent.verticalCenter
-        text: pair.modelData[1]
+        // sentence case, as every word a person reads (Strings.sentence)
+        text: Strings.sentence(pair.modelData[1])
         color: Zenon.accentMuted
         font.family: Zenon.face
         font.weight: Zenon.weight
-        font.pixelSize: Zenon.px(13)
+        font.pixelSize: Zenon.px(15)
       }
     }
   }
@@ -87,10 +91,11 @@ Row {
     id: more
     anchors.verticalCenter: parent.verticalCenter
     visible: hints.shown < hints.rows.length
+    fontSize: 13
     label: "?"
-    border.color: moreHov.hovered || hints.cardOpen ? Zenon.accentKey : Zenon.border
-    HoverHandler { id: moreHov; cursorShape: Qt.PointingHandCursor }
-    TapHandler { onTapped: hints.pinned = !hints.pinned }
+    border.color: morePress.pressed || hints.cardOpen ? Zenon.accentKey : Zenon.border
+    HoverHandler { id: moreHov }
+    TapHandler { id: morePress; onTapped: hints.pinned = !hints.pinned }
 
     Rectangle {
       id: card
@@ -119,15 +124,16 @@ Row {
             spacing: 8
             KeyCap {
               anchors.verticalCenter: parent.verticalCenter
+              fontSize: 13
               label: parent.modelData[0]
             }
             Text {
               anchors.verticalCenter: parent.verticalCenter
-              text: parent.modelData[1]
+              text: Strings.sentence(parent.modelData[1])
               color: Zenon.accentKey
               font.family: Zenon.face
               font.weight: Zenon.weight
-              font.pixelSize: Zenon.px(13)
+              font.pixelSize: Zenon.px(15)
             }
           }
         }

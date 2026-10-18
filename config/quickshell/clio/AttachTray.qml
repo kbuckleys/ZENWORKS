@@ -107,7 +107,7 @@ Bubble {
             radius: 8
             color: Zenon.wash(0.06)
             border.width: 1
-            border.color: tileMa.containsMouse ? Zenon.alpha(Zenon.cyan, 0.7) : Zenon.border
+            border.color: tileMa.pressed ? Zenon.alpha(Zenon.cyan, 0.7) : Zenon.border
             Image {
               anchors.fill: parent
               visible: tile.modelData.pic
@@ -117,7 +117,7 @@ Bubble {
               asynchronous: true
               // faded in as it arrives, not popped in (2026-10-17)
               opacity: status === Image.Ready ? 1 : 0
-              Behavior on opacity { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+              Behavior on opacity { NumberAnimation { duration: Zenon.ms(180); easing.type: Easing.OutCubic } }
             }
             Column {
               visible: !tile.modelData.pic

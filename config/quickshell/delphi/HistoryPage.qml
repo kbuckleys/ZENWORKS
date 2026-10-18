@@ -810,7 +810,7 @@ Item {
           anchors.rightMargin: 8
           anchors.bottomMargin: 6
           radius: Zenon.windowRadius
-          color: pg.whole ? (pg.area === "commits" ? pg.win.hiFill : Zenon.wash(0.05)) : wholeHover.hovered ? Zenon.wash(0.04) : "transparent"
+          color: pg.whole ? (pg.area === "commits" ? pg.win.hiFill : Zenon.wash(0.05)) : wholePress.pressed ? Zenon.wash(0.04) : "transparent"
           border.width: 1
           border.color: Zenon.border
           Text {
@@ -825,7 +825,7 @@ Item {
             font.pixelSize: Zenon.px(15)
           }
           HoverHandler { id: wholeHover }
-          MouseArea { anchors.fill: parent; onClicked: { pg.area = "commits"; pg.whole = true; pg.win.focusKeys(); } }
+          MouseArea { id: wholePress; anchors.fill: parent; onClicked: { pg.area = "commits"; pg.whole = true; pg.win.focusKeys(); } }
         }
       }
       delegate: Item {

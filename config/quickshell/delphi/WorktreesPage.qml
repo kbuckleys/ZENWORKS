@@ -124,7 +124,7 @@ Item {
         Text {
           width: parent.width
           elide: Text.ElideRight
-          text: (trow.t.branch || (trow.t.detached ? "detached at " + D.short(trow.t.sha) : trow.t.bare ? "bare" : ""))
+          text: (trow.t.branch || (trow.t.detached ? "Detached at " + D.short(trow.t.sha) : trow.t.bare ? "bare" : ""))
             + (trow.t.main ? "   ·   main checkout" : "") + (trow.t.current ? "   ·   this window" : "")
           color: trow.t.current ? Zenon.cyan : Zenon.ink
           font.family: Zenon.face

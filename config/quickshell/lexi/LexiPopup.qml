@@ -349,10 +349,10 @@ LayerPopup {
     height: chipRow.implicitHeight + 4
     radius: 5
     color: Qt.rgba(chip.ink.r, chip.ink.g, chip.ink.b,
-                   chipMa.pressed ? 0.24 : chipMa.containsMouse ? 0.16 : 0.08)
+                   chipMa.pressed ? 0.24 : 0.08)
     border.width: 1
     border.color: Qt.rgba(chip.ink.r, chip.ink.g, chip.ink.b,
-                          chipMa.containsMouse ? 0.45 : 0.28)
+                          0.28)
     Behavior on color { ColorAnimation { duration: Zenon.fast } }
 
     Row {
@@ -387,7 +387,6 @@ LayerPopup {
       anchors.fill: parent
       enabled: chip.clickable
       hoverEnabled: chip.clickable
-      cursorShape: chip.clickable ? Qt.PointingHandCursor : Qt.ArrowCursor
       onClicked: chip.clicked()
     }
   }
@@ -404,60 +403,7 @@ LayerPopup {
   // the alternative was a shared component that nine other popups would then
   // be half-using.
 
-  component HintBar: Item {
-    id: hintBarRoot
-    height: 30
-    property var rows: popup.hints()
-    // What the strip would LIKE to be, for whoever is sizing the panel it
-    // sits in. The chips decide it and not one of them looks at the panel,
-    // so reading it back to set that width closes no circle.
-    readonly property real needW: hintRowInner.implicitWidth
-    // a page whose list rises out of this strip (a ScrollEdge under it)
-    property bool frosted: false
 
-    // The same strip ideo, zeus and folio stand theirs on. These used to sit
-    // inside a header that had its own ground; anchored to the bottom they
-    // had none, and a row of keys floating on the panel reads as content.
-    Rectangle {
-      anchors.fill: parent
-      // see-through only where a page has a ScrollEdge under it
-      color: hintBarRoot.frosted ? Zenon.hintFrostBg : Zenon.hintBg
-
-      // And the hairline along its top edge, which is what the other three
-      // already draw — the strip is translucent, so without a line the body
-      // above it simply gets darker rather than ending.
-      Rectangle {
-        anchors.top: parent.top
-        anchors.left: parent.left
-        anchors.right: parent.right
-        height: 1
-        color: Zenon.border
-      }
-    }
-
-    // WHAT JUST HAPPENED, over the top of what you could do next. A copy
-    // is silent and instant, which between them mean there is no way to
-    // tell it from a chord that did nothing at all — so the strip stops
-    // advertising for a moment and reports instead.
-    Text {
-      anchors.centerIn: parent
-      visible: popup.copied
-      text: "copied"
-      color: popup.headColor
-      font.family: Zenon.face
-      font.weight: 600
-      font.pixelSize: Zenon.px(13)
-    }
-
-    HintRow {
-      id: hintRowInner
-      opacity: popup.copied ? 0 : 1
-      Behavior on opacity { NumberAnimation { duration: Zenon.fast } }
-      anchors.centerIn: parent
-      // the row itself, caps and spacing, is morpheus/HintRow
-      rows: hintBarRoot.rows
-    }
-  }
 
   focusable: true
 
@@ -1572,7 +1518,7 @@ LayerPopup {
                 Text {
                   anchors.verticalCenter: parent.verticalCenter
                   text: recentPair.modelData
-                  color: recentMa.containsMouse ? popup.headColor : popup.dimColor
+                  color: recentMa.pressed ? popup.headColor : popup.dimColor
                   font.family: Zenon.face
                   font.weight: 500
                   font.pixelSize: popup.tpx(14)
@@ -1604,6 +1550,8 @@ LayerPopup {
         // belongs. Anchored rather than laid out: what is above it is already
         // sized so this 30 is exactly what is left over.
         HintBar {
+          rows: popup.hints()
+          note: popup.copied ? "Copied" : ""
           anchors.left: parent.left
           anchors.right: parent.right
           anchors.bottom: parent.bottom
@@ -1653,7 +1601,7 @@ LayerPopup {
               color: popup.headColor
               selectionColor: popup.headColor
               selectedTextColor: Zenon.onAccent
-              placeholderText: "text to translate…"
+              placeholderText: "Text to translate…"
               placeholderTextColor: popup.dimColor
               font.family: Zenon.face
               font.weight: 600
@@ -1779,7 +1727,6 @@ LayerPopup {
                   MouseArea {
                     anchors.fill: parent
                     enabled: popup.clipCmd !== ""
-                    cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
                     onClicked: popup.copyCurrent()
                   }
                 }
@@ -1833,7 +1780,7 @@ LayerPopup {
                   Text {
                     anchors.verticalCenter: parent.verticalCenter
                     text: Lexicon.ICON_SWAP
-                    color: swapMa.containsMouse ? popup.headColor : popup.dimColor
+                    color: swapMa.pressed ? popup.headColor : popup.dimColor
                     font.family: Zenon.face
                     font.weight: Zenon.weight
                     font.pixelSize: popup.tpx(16)
@@ -1842,7 +1789,6 @@ LayerPopup {
                       anchors.fill: parent
                       anchors.margins: -4
                       hoverEnabled: true
-                      cursorShape: Qt.PointingHandCursor
                       onClicked: popup.toggleSwap()
                     }
                   }
@@ -1874,7 +1820,7 @@ LayerPopup {
                     anchors.verticalCenter: parent.verticalCenter
                     visible: popup.clipCmd !== ""
                     glyph: Lexicon.ICON_COPY
-                    label: popup.copied ? "copied" : "copy"
+                    label: popup.copied ? "Copied" : "Copy"
                     ink: popup.dimColor
                     onClicked: popup.copyCurrent()
                   }
@@ -1892,6 +1838,8 @@ LayerPopup {
         // belongs. Anchored rather than laid out: what is above it is already
         // sized so this 30 is exactly what is left over.
         HintBar {
+          rows: popup.hints()
+          note: popup.copied ? "Copied" : ""
           anchors.left: parent.left
           anchors.right: parent.right
           anchors.bottom: parent.bottom
@@ -2112,6 +2060,9 @@ LayerPopup {
                 }
               }
 
+              // the chosen one slides (morpheus/CursorBand), rather than each row lighting
+              CursorBand { repeater: dictSuggestRep; index: popup.sel; insetX: -12; radius: 5
+                           shown: popup.dictSuggest.length > 0 }
               Column {
                 id: dictCol
                 // wider side inset than the translate panes: definitions wrap to
@@ -2178,6 +2129,7 @@ LayerPopup {
                 }
 
                 Repeater {
+                  id: dictSuggestRep
                   model: popup.dictSuggest
 
                   delegate: Item {
@@ -2191,7 +2143,7 @@ LayerPopup {
                       anchors.leftMargin: -12
                       anchors.rightMargin: -12
                       radius: 5
-                      color: index === popup.sel ? Zenon.menuHi : "transparent"
+                      color: "transparent"
                     }
 
                     Text {
@@ -2289,7 +2241,7 @@ LayerPopup {
                       Text {
                         anchors.verticalCenter: parent.verticalCenter
                         text: alsoPair.modelData
-                        color: alsoMa.containsMouse ? popup.headColor : popup.dimColor
+                        color: alsoMa.pressed ? popup.headColor : popup.dimColor
                         font.family: Zenon.face
                         font.weight: 500
                         font.pixelSize: popup.tpx(14)
@@ -2338,8 +2290,11 @@ LayerPopup {
         }
 
         HintBar {
+
+          rows: popup.hints()
+
+          note: popup.copied ? "Copied" : ""
           id: dictHints
-          frosted: true
           anchors.left: parent.left
           anchors.right: parent.right
           anchors.bottom: parent.bottom
@@ -2415,6 +2370,8 @@ LayerPopup {
               // the whole shell — see morpheus/Elastic.qml. Inside the view
               // rather than over it: it pins itself to the viewport.
               ElasticScroll { view: pickerList }
+              // the chosen one slides (morpheus/CursorBand), rather than each row lighting
+              CursorBand { follows: pickerList; index: popup.sel }
               clip: true
               model: popup.langFiltered
               highlightMoveDuration: 120
@@ -2427,7 +2384,7 @@ LayerPopup {
 
                 Rectangle {
                   anchors.fill: parent
-                  color: index === popup.sel ? Zenon.menuHi : "transparent"
+                  color: "transparent"
                 }
 
                 Text {
@@ -2478,7 +2435,10 @@ LayerPopup {
         }
 
         HintBar {
-          frosted: true
+
+          rows: popup.hints()
+
+          note: popup.copied ? "Copied" : ""
           id: hintsProbe
           anchors.left: parent.left
           anchors.right: parent.right
@@ -2553,6 +2513,8 @@ LayerPopup {
               // the whole shell — see morpheus/Elastic.qml. Inside the view
               // rather than over it: it pins itself to the viewport.
               ElasticScroll { view: histList }
+              // the chosen one slides (morpheus/CursorBand), rather than each row lighting
+              CursorBand { follows: histList; index: popup.sel }
               clip: true
               model: popup.historyModel()
               highlightMoveDuration: 120
@@ -2565,7 +2527,7 @@ LayerPopup {
 
                 Rectangle {
                   anchors.fill: parent
-                  color: index === popup.sel ? Zenon.menuHi : "transparent"
+                  color: "transparent"
                 }
 
                 Text {
@@ -2617,8 +2579,11 @@ LayerPopup {
         }
 
         HintBar {
+
+          rows: popup.hints()
+
+          note: popup.copied ? "Copied" : ""
           id: histHints
-          frosted: true
           anchors.left: parent.left
           anchors.right: parent.right
           anchors.bottom: parent.bottom
@@ -2753,23 +2718,23 @@ LayerPopup {
   function calcHeight() {
     if (popup.view === "input") {
       if (popup.appMode === "dict")
-        return 134 + popup.bump + (wordInput.text === "" && popup.recents.length > 0 ? 26 : 0);
+        return 134 + (Zenon.hintBarH - 30) + popup.bump + (wordInput.text === "" && popup.recents.length > 0 ? 26 : 0);
       // With a result showing this is the content to the pixel: the 38 of
-      // the icon row, the input, the rule, the result and the 30 of the
-      // hints. It used to keep the empty-input allowance as well, which
+      // the icon row, the input, the rule, the result and the hint strip
+      // (Zenon.hintBarH). It used to keep the empty-input allowance as well, which
       // left a 36px band under the translation.
       if (popup.liveShown)
-        return Math.min(38 + popup.tAreaH() + 1 + liveCol.height + 30, 500);
-      return Math.min(36 + 30 + popup.tAreaH() + 30, 500);
+        return Math.min(38 + popup.tAreaH() + 1 + liveCol.height + Zenon.hintBarH, 500);
+      return Math.min(36 + 30 + popup.tAreaH() + Zenon.hintBarH, 500);
     }
-    // The title strip plus the 30 of the hint strip; while the
+    // The title strip plus the hint strip (Zenon.hintBarH); while the
     // look-up is out the header is not there to pay for.
     if (popup.view === "results")
-      return (popup.dictLoading || popup.dictMessage ? 30 : popup.titleH + 30)
+      return (popup.dictLoading || popup.dictMessage ? Zenon.hintBarH : popup.titleH + Zenon.hintBarH)
         + popup.dictBodyH();
     if (popup.view === "picker")
-      return popup.titleH + 30 + popup.listBodyH(popup.langFiltered.length);
-    return popup.titleH + 30 + popup.listBodyH(popup.historyModel().length);
+      return popup.titleH + Zenon.hintBarH + popup.listBodyH(popup.langFiltered.length);
+    return popup.titleH + Zenon.hintBarH + popup.listBodyH(popup.historyModel().length);
   }
 
   function tAreaH() {

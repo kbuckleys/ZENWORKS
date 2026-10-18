@@ -178,8 +178,8 @@ Item {
         ParallelAnimation {
           NumberAnimation { target: fx; property: "opacity"; to: 0; duration: fx.del ? 300 : 460; easing.type: Easing.InOutQuad }
           // a line folds shut; a few characters lift away
-          NumberAnimation { target: fold; property: "yScale"; to: fx.del && fx.linewise ? 0.15 : 1; duration: 300; easing.type: Easing.InQuad }
-          NumberAnimation { target: fx; property: "y"; to: fx.gy - (fx.del && !fx.linewise ? root.cellH * 0.35 : 0); duration: 300; easing.type: Easing.OutQuad }
+          NumberAnimation { target: fold; property: "yScale"; to: fx.del && fx.linewise ? 0.15 : 1; duration: Zenon.ms(300); easing.type: Easing.InQuad }
+          NumberAnimation { target: fx; property: "y"; to: fx.gy - (fx.del && !fx.linewise ? root.cellH * 0.35 : 0); duration: Zenon.ms(300); easing.type: Easing.OutQuad }
         }
       }
     }
@@ -222,12 +222,12 @@ Item {
       SequentialAnimation {
         running: true
         onFinished: root.swept(sw.uid)
-        NumberAnimation { target: wash; property: "width"; from: 0; to: sw.gw; duration: 240; easing.type: Easing.OutCubic }
+        NumberAnimation { target: wash; property: "width"; from: 0; to: sw.gw; duration: Zenon.ms(240); easing.type: Easing.OutCubic }
         ParallelAnimation {
-          NumberAnimation { target: edge; property: "opacity"; to: 0; duration: 160; easing.type: Easing.OutQuad }
+          NumberAnimation { target: edge; property: "opacity"; to: 0; duration: Zenon.ms(160); easing.type: Easing.OutQuad }
           SequentialAnimation {
             PauseAnimation { duration: 90 }
-            NumberAnimation { target: sw; property: "opacity"; to: 0; duration: 380; easing.type: Easing.InOutQuad }
+            NumberAnimation { target: sw; property: "opacity"; to: 0; duration: Zenon.ms(380); easing.type: Easing.InOutQuad }
           }
         }
       }

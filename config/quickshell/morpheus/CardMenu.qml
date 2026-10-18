@@ -66,8 +66,8 @@ PanelWindow {
   property int cardWidth: 220
 
   // ── OR AS WIDE AS ITS LONGEST ROW ─────────────────────────────────────
-  // Off by default, and cardWidth is then the width. On, cardWidth is the
-  // NARROWEST the card may be, and it grows until no label is elided —
+  // Off by default, and cardWidth is then the width. On, the card is as wide
+  // as its longest label and no wider (Zenon.menuMinWidth the least) —
   // capped at the screen, less the gap at each edge. Opt-in rather than a
   // rule because some menus list things of no fixed length (recent files)
   // and those are better elided than as wide as a path.
@@ -95,14 +95,14 @@ PanelWindow {
       if (r.hasChildren || r.mark !== undefined) w += 16 + 8;
       most = Math.max(most, w);
     }
-    return Math.ceil(most + Zenon.menuCardPad * 2 + 2);
+    return Math.ceil(most + Zenon.menuCardPad * 2 + 2 + Zenon.menuFitSlack);
   }
 
   // The width everything below uses.
   readonly property int cardW: {
     if (!root.fit) return root.cardWidth;
     const cap = root.screen ? root.screen.width - root.edgeGap * 2 : 100000;
-    return Math.min(cap, Math.max(root.cardWidth, root.fitWidth));
+    return Math.min(cap, Math.max(Zenon.menuMinWidth, root.fitWidth));
   }
 
   // A choice is reported, not acted on: a caller usually wants to put the

@@ -109,6 +109,7 @@ LayerPopup {
     // nothing here to click through to.
     Howler.markRead();
     popup.playOpen();
+    Qt.callLater(() => { if (popup.shown) bgRoot.forceActiveFocus(); });
   }
 
   function closePopup() {
@@ -144,6 +145,14 @@ LayerPopup {
       border.color: Zenon.border
       border.width: 1
       radius: Zenon.pillRadius
+      focus: true
+
+      // Escape closes, as chronos' does: the layer holds the focus grab, so
+      // it has to give the keys back somehow (user, 2026-10-19)
+      Keys.onEscapePressed: (event) => {
+        event.accepted = true;
+        popup.closePopup();
+      }
 
       // Rows scrolled up past the list's top carry on under the head and the
       // chips, frosted — morpheus/ScrollEdge, as every other list here does.
@@ -205,7 +214,7 @@ LayerPopup {
             radius: 11
             color: Howler.trackMusic
               ? Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b, 0.18)
-              : (musicHov.hovered ? Zenon.wash(0.08) : "transparent")
+              : (musicPress.pressed ? Zenon.wash(0.08) : "transparent")
             border.width: 1
             border.color: Howler.trackMusic ? Zenon.cyan : Zenon.border
             Behavior on color { ColorAnimation { duration: Zenon.fast } }
@@ -215,7 +224,7 @@ LayerPopup {
               anchors.centerIn: parent
               text: "\uF001"
               color: Howler.trackMusic ? Zenon.cyan
-                : (musicHov.hovered ? Zenon.white : Zenon.keyInk)
+                : (musicPress.pressed ? Zenon.white : Zenon.keyInk)
               font.family: Zenon.face
               font.weight: Zenon.weight
               font.pixelSize: Zenon.px(12)
@@ -223,7 +232,7 @@ LayerPopup {
             }
 
             HoverHandler { id: musicHov }
-            TapHandler { onTapped: Howler.toggleMusicTracking() }
+            TapHandler { id: musicPress; onTapped: Howler.toggleMusicTracking() }
           }
 
           // ── DO NOT DISTURB ─────────────────────────────────────────
@@ -237,7 +246,7 @@ LayerPopup {
             radius: 11
             color: Howler.silent
               ? Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b, 0.18)
-              : (silentHov.hovered ? Zenon.wash(0.08) : "transparent")
+              : (silentPress.pressed ? Zenon.wash(0.08) : "transparent")
             border.width: 1
             border.color: Howler.silent ? Zenon.cyan : Zenon.border
             Behavior on color { ColorAnimation { duration: Zenon.fast } }
@@ -247,7 +256,7 @@ LayerPopup {
               anchors.centerIn: parent
               text: "󰂛"
               color: Howler.silent ? Zenon.cyan
-                : (silentHov.hovered ? Zenon.white : Zenon.keyInk)
+                : (silentPress.pressed ? Zenon.white : Zenon.keyInk)
               font.family: Zenon.face
               font.weight: Zenon.weight
               font.pixelSize: Zenon.px(13)
@@ -255,20 +264,21 @@ LayerPopup {
             }
 
             HoverHandler { id: silentHov }
-            TapHandler { onTapped: Howler.toggleSilent() }
+            TapHandler { id: silentPress; onTapped: Howler.toggleSilent() }
           }
 
           Text {
             id: clearBtn
             anchors.verticalCenter: parent.verticalCenter
             visible: popup.rows.length > 0
-            text: "clear"
-            color: clearHov.hovered ? Zenon.red : Zenon.muted
+            text: "Clear"
+            color: clearPress.pressed ? Zenon.red : Zenon.muted
             font.family: Zenon.face
             font.weight: Zenon.weight
             font.pixelSize: Zenon.px(13)
             HoverHandler { id: clearHov }
             TapHandler {
+              id: clearPress
               onTapped: { Howler.dismissAll(); Howler.clearHistory(); }
             }
           }
@@ -294,7 +304,7 @@ LayerPopup {
         anchors.bottom: parent.bottom
         verticalAlignment: Text.AlignVCenter
         visible: popup.rows.length === 0
-        text: "nothing yet"
+        text: "Nothing yet"
         color: Zenon.muted
         font.family: Zenon.face
         font.weight: Font.Bold
@@ -359,7 +369,7 @@ LayerPopup {
 
           Chip {
             visible: popup.appFilter !== ""
-            label: "all"
+            label: "All"
             on: false
             onPicked: popup.appFilter = ""
           }

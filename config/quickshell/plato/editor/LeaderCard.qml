@@ -83,7 +83,7 @@ PlatoSheet {
           textFormat: Text.PlainText
           font.family: Zenon.face
           font.weight: Zenon.weight
-          font.pixelSize: 16
+          font.pixelSize: Zenon.px(16)
           color: Zenon.white
           text: (entry.modelData.group ? "+" : "") + entry.modelData.title
         }

@@ -78,7 +78,7 @@ LayerPopup {
     { kind: "copytotp", col: 1, glyph: "\u{F097F}", label: "one-time code" },
   ]
 
-  readonly property int msgH: 28
+  readonly property int msgH: Zenon.hintBarH   // morpheus/HintBar's strip
   readonly property int searchH: 36
   readonly property int emptyH: 64
   readonly property int lockH: 132
@@ -346,26 +346,7 @@ LayerPopup {
   }
 
   // The strip every view ends on: artemis' and folio's, with the keys as caps.
-  component HintBar: Rectangle {
-    id: hintBarRoot
-    height: popup.msgH
-    property bool frosted: false
-    color: hintBarRoot.frosted ? Zenon.hintFrostBg : Zenon.hintBg
-    property string note: ""
-    Rectangle { anchors.top: parent.top; width: parent.width; height: 1; color: Zenon.border }
-    HintRow { anchors.centerIn: parent; rows: popup.hints() }
-    Text {
-      anchors.right: parent.right
-      anchors.rightMargin: 14
-      anchors.verticalCenter: parent.verticalCenter
-      visible: hintBarRoot.note !== ""
-      text: hintBarRoot.note
-      color: popup.dimColor
-      font.family: Zenon.face
-      font.weight: Zenon.weight
-      font.pixelSize: Zenon.px(12)
-    }
-  }
+
 
   // ── the panel ──────────────────────────────────────────────────────────
   MouseArea { anchors.fill: parent; z: 0; onClicked: popup.closePopup() }
@@ -460,7 +441,7 @@ LayerPopup {
             Text {
               anchors.centerIn: parent
               visible: popup.filtered.length === 0
-              text: popup.query === "" ? (popup.mgr && popup.mgr.loading ? "reading the vaults…" : "nothing in the open vaults") : "No matches found"
+              text: popup.query === "" ? (popup.mgr && popup.mgr.loading ? "Reading the vaults…" : "Nothing in the open vaults") : "Nothing matches \u201C" + popup.query + "\u201D"
               color: popup.dimColor
               font.family: Zenon.face
               font.weight: 600
@@ -537,8 +518,16 @@ LayerPopup {
           HintBar {
             id: listHints
             width: parent.width
-            frosted: true
-            note: popup.filtered.length + (popup.filtered.length === 1 ? " item" : " items")
+            rows: popup.hints()
+            // how many, at the right end, where ceres stands its buttons
+            Text {
+              anchors.verticalCenter: parent.verticalCenter
+              text: popup.filtered.length + (popup.filtered.length === 1 ? " item" : " items")
+              color: popup.dimColor
+              font.family: Zenon.face
+              font.weight: Zenon.weight
+              font.pixelSize: Zenon.px(13)
+            }
           }
         }
       }
@@ -704,7 +693,7 @@ LayerPopup {
               }
             }
           }
-          HintBar { width: parent.width }
+          HintBar { width: parent.width; rows: popup.hints() }
         }
       }
 
@@ -769,7 +758,7 @@ LayerPopup {
               Text {
                 anchors.horizontalCenter: parent.horizontalCenter
                 visible: !popup.lockAsks
-                text: popup.unlocking ? "opening…" : "return opens it"
+                text: popup.unlocking ? "Opening…" : "return opens it"
                 color: popup.dimColor
                 font.family: Zenon.face
                 font.weight: Zenon.weight
@@ -777,7 +766,7 @@ LayerPopup {
               }
             }
           }
-          HintBar { width: parent.width }
+          HintBar { width: parent.width; rows: popup.hints() }
         }
       }
 
@@ -804,7 +793,7 @@ LayerPopup {
               }
               Text {
                 anchors.verticalCenter: parent.verticalCenter
-                text: popup.mode === "error" ? popup.errorMsg : "no accounts yet — add one in calypso"
+                text: popup.mode === "error" ? popup.errorMsg : "No accounts yet — add one in calypso"
                 color: popup.mode === "error" ? Zenon.red : popup.dimColor
                 font.family: Zenon.face
                 font.weight: 600
@@ -812,7 +801,7 @@ LayerPopup {
               }
             }
           }
-          HintBar { width: parent.width }
+          HintBar { width: parent.width; rows: popup.hints() }
         }
       }
 

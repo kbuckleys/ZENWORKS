@@ -90,7 +90,7 @@ Item {
       visible: ed.showBackdrop && ed.fills
       width: parent.width
       wrapMode: Text.WordWrap
-      text: "cropped or stretched, it fills the screen — this shows once it is fitted, centered or tiled"
+      text: "Cropped or stretched, it fills the screen — this shows once it is fitted, centered or tiled"
       color: Zenon.accentSoft
       font.family: Zenon.face
       font.weight: Zenon.weight
@@ -98,7 +98,7 @@ Item {
     }
     Text {
       visible: ed.showBackdrop && ed.look.backdrop === "color"
-      text: "click Color again to choose it"
+      text: "Click Color again to choose it"
       color: Zenon.accentSoft
       font.family: Zenon.face
       font.weight: Zenon.weight
@@ -230,7 +230,7 @@ Item {
 
     Text {
       text: "Reset look"
-      color: resetMa.containsMouse || ed.kbRow === "reset" ? Zenon.cyan : Zenon.accentSoft
+      color: resetMa.pressed || ed.kbRow === "reset" ? Zenon.cyan : Zenon.accentSoft
       font.family: Zenon.face
       font.weight: 600
       font.pixelSize: Zenon.px(14)

@@ -280,7 +280,7 @@ Item {
               width: choiceRow.implicitWidth + 20
               height: 28
               radius: 5
-              color: choiceHover.hovered ? Zenon.wash(0.1) : Zenon.wash(0.05)
+              color: choicePress.pressed ? Zenon.wash(0.1) : Zenon.wash(0.05)
               border.width: 1
               border.color: Zenon.border
               Row {
@@ -301,8 +301,8 @@ Item {
                   fontSize: 11
                 }
               }
-              HoverHandler { id: choiceHover; cursorShape: Qt.PointingHandCursor }
-              TapHandler { onTapped: root.answer(card.ask, choice.modelData.key) }
+              HoverHandler { id: choiceHover }
+              TapHandler { id: choicePress; onTapped: root.answer(card.ask, choice.modelData.key) }
             }
           }
           Text {
@@ -311,11 +311,11 @@ Item {
             leftPadding: 4
             font.family: Zenon.face
             font.weight: Zenon.weight
-            font.pixelSize: 12
-            color: dismissHover.hovered ? Zenon.white : Zenon.accentMuted
-            text: "dismiss"
-            HoverHandler { id: dismissHover; cursorShape: Qt.PointingHandCursor }
-            TapHandler { onTapped: root.answer(card.ask, "") }
+            font.pixelSize: Zenon.px(12)
+            color: dismissPress.pressed ? Zenon.white : Zenon.accentMuted
+            text: "Dismiss"
+            HoverHandler { id: dismissHover }
+            TapHandler { id: dismissPress; onTapped: root.answer(card.ask, "") }
           }
         }
         // waiting for a key says so
@@ -327,9 +327,9 @@ Item {
           anchors.bottomMargin: 6
           font.family: Zenon.face
           font.weight: Zenon.weight
-          font.pixelSize: 11
+          font.pixelSize: Zenon.px(11)
           color: Zenon.accentMuted
-          text: "any key"
+          text: "Any key"
         }
         HoverHandler { id: hover }
         // a question is put away by answering it, not by a stray click

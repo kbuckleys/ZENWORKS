@@ -1335,7 +1335,7 @@ FloatingWindow {
       anchors.right: parent.right
       anchors.rightMargin: 12
       anchors.verticalCenter: parent.verticalCenter
-      text: vrow.current ? "installed" : vrow.back ? "\u21b5 go back"
+      text: vrow.current ? "Installed" : vrow.back ? "\u21b5 go back"
         : (vrow.v && vrow.v.url ? "download" : "install")
       color: vrow.current ? Zenon.accentMuted : vrow.back ? Zenon.yellow : Zenon.accentKey
       font.family: Zenon.face
@@ -2335,13 +2335,13 @@ FloatingWindow {
             // PRESSED, DARKENED as terminus' ClearChip is (user, 2026-10-15)
             color: onlyTap.pressed ? Zenon.pressFill
                  : win.installedOnly ? Zenon.alpha(Zenon.cyan, 0.2)
-                 : onlyHov.hovered ? Zenon.wash(0.08) : Zenon.wash(0.05)
+                 : Zenon.wash(0.05)
             border.width: 1
             border.color: win.installedOnly ? Zenon.alpha(Zenon.cyan, 0.7) : Zenon.border
             Text {
               anchors.centerIn: parent
               text: "\uF0C7"
-              color: win.installedOnly ? Zenon.cyan : onlyHov.hovered ? Zenon.white : Zenon.accentKey
+              color: win.installedOnly ? Zenon.cyan : Zenon.accentKey
               opacity: onlyTap.pressed ? Zenon.pressDim : 1
               font.family: Zenon.face
               font.weight: Zenon.weight
@@ -2366,14 +2366,14 @@ FloatingWindow {
             radius: Zenon.windowRadius
             color: refreshTap.pressed ? Zenon.pressFill
                  : Ceres.checking ? Zenon.alpha(Zenon.cyan, 0.2)
-                 : refreshHov.hovered ? Zenon.wash(0.08) : Zenon.wash(0.05)
+                 : Zenon.wash(0.05)
             border.width: 1
             border.color: Ceres.checking ? Zenon.alpha(Zenon.cyan, 0.7) : Zenon.border
             Text {
               id: refresh
               anchors.centerIn: parent
               text: "\uF021"
-              color: Ceres.checking ? Zenon.cyan : refreshHov.hovered ? Zenon.white : Zenon.accentKey
+              color: Ceres.checking ? Zenon.cyan : Zenon.accentKey
               opacity: refreshTap.pressed ? Zenon.pressDim : 1
               font.family: Zenon.face
               font.weight: Zenon.weight
@@ -2460,6 +2460,8 @@ FloatingWindow {
             anchors.bottom: histList.bottom
           }
           ElasticScroll { view: histList }
+          // the chosen one slides (morpheus/CursorBand), rather than each row lighting
+          CursorBand { follows: histList; index: win.hsel; radius: Zenon.windowRadius; border.width: 1; border.color: Zenon.border }
           anchors.left: parent.left
           anchors.top: parent.top
           anchors.bottom: parent.bottom
@@ -2543,8 +2545,8 @@ FloatingWindow {
               visible: !hrow.modelData.head
               anchors.fill: parent
               radius: Zenon.windowRadius
-              color: hrow.index === win.hsel ? Zenon.menuHi : "transparent"
-              border.width: hrow.index === win.hsel ? 1 : 0
+              color: "transparent"
+              border.width: 0
               border.color: Zenon.border
             }
             ChangeRow {
@@ -2569,7 +2571,7 @@ FloatingWindow {
           Text {
             anchors.centerIn: parent
             visible: win.historyRows.length === 0 && !historyProc.running
-            text: win.hquery !== "" ? "nothing matches" : "no history"
+            text: win.hquery !== "" ? "Nothing matches \u201C" + win.hquery + "\u201D" : "no history"
             color: Zenon.accentMuted
             font.family: Zenon.face
             font.weight: Font.Bold
@@ -2770,6 +2772,8 @@ FloatingWindow {
             function onMselChanged() { win.keepInView(maintSide, 8 + win.msel * 60, 56); }
           }
 
+          // the chosen one slides (morpheus/CursorBand), rather than each row lighting
+          CursorBand { repeater: maintRep; index: win.msel; radius: Zenon.windowRadius; border.width: 1; border.color: Zenon.border }
           Column {
             id: maintList
             x: 8
@@ -2777,6 +2781,7 @@ FloatingWindow {
             width: maintView.sideW
             spacing: 4
             Repeater {
+              id: maintRep
               model: win.maintItems
               delegate: Rectangle {
                 id: mrow
@@ -2785,8 +2790,8 @@ FloatingWindow {
                 width: maintList.width
                 height: 56
                 radius: Zenon.windowRadius
-                color: mrow.index === win.msel ? Zenon.menuHi : "transparent"
-                border.width: mrow.index === win.msel ? 1 : 0
+                color: "transparent"
+                border.width: 0
                 border.color: Zenon.border
                 // every item says how it stands, not only the ones that want
                 // something: green, yellow, red — and gray until it is known
@@ -2798,7 +2803,7 @@ FloatingWindow {
                   width: 6; height: 6; radius: 3
                   color: win.levelInk(mrow.level)
                   opacity: mrow.level === "ok" ? 0.7 : 1
-                  Behavior on color { ColorAnimation { duration: 180 } }
+                  Behavior on color { ColorAnimation { duration: Zenon.ms(180) } }
                 }
                 Column {
                   anchors.left: parent.left
@@ -3020,7 +3025,7 @@ FloatingWindow {
                   font.pixelSize: Zenon.px(16)
                 }
                 Text {
-                  text: modelData[1].n === 0 ? "none"
+                  text: modelData[1].n === 0 ? "None"
                     : modelData[1].n + (modelData[1].n === 1 ? " file" : " files")
                       + (modelData[1].size ? " · " + modelData[1].size : "")
                   color: modelData[1].n === 0 ? Zenon.accentMuted : Zenon.yellow
@@ -3128,12 +3133,12 @@ FloatingWindow {
                 PropertyAction { property: "opacity"; value: 0 }
                 PauseAnimation { duration: Math.min(rankIn.ViewTransition.index, 12) * 35 }
                 ParallelAnimation {
-                  NumberAnimation { property: "opacity"; to: 1; duration: 240; easing.type: Easing.OutCubic }
+                  NumberAnimation { property: "opacity"; to: 1; duration: Zenon.ms(240); easing.type: Easing.OutCubic }
                   NumberAnimation {
                     property: "y"
                     from: rankIn.ViewTransition.destination.y - 8
                     to: rankIn.ViewTransition.destination.y
-                    duration: 300; easing.type: Easing.OutCubic
+                    duration: Zenon.ms(300); easing.type: Easing.OutCubic
                   }
                 }
               }
@@ -3303,13 +3308,13 @@ FloatingWindow {
                 verticalAlignment: Text.AlignVCenter
                 horizontalAlignment: ch.rightAlign ? Text.AlignRight : Text.AlignLeft
                 text: ch.on ? ch.label + (win.sortDesc ? " \u25BE" : " \u25B4") : ch.label
-                color: ch.on ? Zenon.cyan : (chHov.hovered ? Zenon.accentKey : Zenon.accentMuted)
+                color: ch.on ? Zenon.cyan : (chPress.pressed ? Zenon.accentKey : Zenon.accentMuted)
                 font.family: Zenon.faceFixed
                 font.weight: Zenon.weight
                 font.pixelSize: Zenon.px(12)
               }
-              HoverHandler { id: chHov; cursorShape: Qt.PointingHandCursor }
-              TapHandler { onTapped: { win.sortBy(ch.key); keys.forceActiveFocus(); } }
+              HoverHandler { id: chHov }
+              TapHandler { id: chPress; onTapped: { win.sortBy(ch.key); keys.forceActiveFocus(); } }
             }
 
             // on the rows' own columns: the list is inset 8 and its rows 14
@@ -3333,6 +3338,8 @@ FloatingWindow {
               anchors.bottom: pkgList.bottom
             }
             ElasticScroll { view: pkgList }
+            // the chosen one slides (morpheus/CursorBand), rather than each row lighting
+            CursorBand { follows: pkgList; index: win.sel; radius: Zenon.windowRadius; border.width: 1; border.color: Zenon.border }
             visible: win.tab === "packages"
             anchors.fill: parent
             anchors.margins: 8
@@ -3359,10 +3366,10 @@ FloatingWindow {
                 // terminus' rule — the fill deepens and a cyan outline says
                 // "you are here", whatever the mark (EntryRow.cursorOnly)
                 color: prow.mark ? (prow.modelData.installed
-                    ? Qt.rgba(Zenon.red.r, Zenon.red.g, Zenon.red.b, prow.here ? 0.24 : 0.12)
-                    : Qt.rgba(Zenon.green.r, Zenon.green.g, Zenon.green.b, prow.here ? 0.22 : 0.10))
-                  : prow.here ? Zenon.menuHi : "transparent"
-                border.width: prow.here ? 1 : 0
+                    ? Qt.rgba(Zenon.red.r, Zenon.red.g, Zenon.red.b, 0.12)
+                    : Qt.rgba(Zenon.green.r, Zenon.green.g, Zenon.green.b, 0.10))
+                  : "transparent"
+                border.width: prow.here && prow.mark ? 1 : 0
                 border.color: prow.mark ? Zenon.cyan : Zenon.border
               }
 
@@ -3467,7 +3474,7 @@ FloatingWindow {
             Text {
               anchors.centerIn: parent
               visible: pkgList.count === 0 && !searchProc.running
-              text: win.query !== "" ? "nothing matches" : "nothing here"
+              text: win.query !== "" ? "Nothing matches \u201C" + win.query + "\u201D" : "nothing here"
               color: Zenon.accentMuted
               font.family: Zenon.face
               font.weight: Font.Bold
@@ -3486,6 +3493,8 @@ FloatingWindow {
               anchors.bottom: updList.bottom
             }
             ElasticScroll { view: updList }
+            // the chosen one slides (morpheus/CursorBand), rather than each row lighting
+            CursorBand { follows: updList; index: win.usel; radius: Zenon.windowRadius; border.width: 1; border.color: Zenon.border }
             visible: win.tab === "updates"
             anchors.fill: parent
             anchors.margins: 8
@@ -3505,9 +3514,9 @@ FloatingWindow {
                 visible: !urow.modelData.head
                 // see the packages' rows: a cursor on a marked row deepens
                 // it and rings it in cyan
-                color: urow.marked ? Qt.rgba(Zenon.yellow.r, Zenon.yellow.g, Zenon.yellow.b, urow.index === win.usel ? 0.22 : 0.10)
-                  : urow.index === win.usel ? Zenon.menuHi : "transparent"
-                border.width: urow.index === win.usel ? 1 : 0
+                color: urow.marked ? Qt.rgba(Zenon.yellow.r, Zenon.yellow.g, Zenon.yellow.b, 0.10)
+                  : "transparent"
+                border.width: urow.index === win.usel && urow.marked ? 1 : 0
                 border.color: urow.marked ? Zenon.cyan : Zenon.border
               }
               Text {
@@ -3569,7 +3578,7 @@ FloatingWindow {
             Text {
               anchors.centerIn: parent
               visible: win.updateRows.length === 0
-              text: Ceres.lastOk > 0 ? "up to date" : "not checked yet"
+              text: Ceres.lastOk > 0 ? "Up to date" : "Not checked yet"
               color: Zenon.accentMuted
               font.family: Zenon.face
               font.weight: Font.Bold
@@ -3690,7 +3699,7 @@ FloatingWindow {
                 Text {
                   anchors.verticalCenter: parent.verticalCenter
                   text: ih.label
-                  color: ih.foldable && ihHov.hovered ? Zenon.white : Zenon.accentKey
+                  color: ih.foldable && ihPress.pressed ? Zenon.white : Zenon.accentKey
                   font.family: Zenon.face
                   font.weight: Font.Bold
                   font.pixelSize: Zenon.px(15)
@@ -3700,13 +3709,13 @@ FloatingWindow {
                   anchors.verticalCenter: parent.verticalCenter
                   visible: ih.foldable
                   text: ih.open ? "\uF078" : "\uF054"
-                  color: ihHov.hovered ? Zenon.white : Zenon.cyan
+                  color: ihPress.pressed ? Zenon.white : Zenon.cyan
                   font.family: Zenon.face
                   font.weight: Zenon.weight
                   font.pixelSize: Zenon.px(12)
                 }
-                HoverHandler { id: ihHov; enabled: ih.foldable; cursorShape: Qt.PointingHandCursor }
-                TapHandler { enabled: ih.foldable; onTapped: ih.toggle() }
+                HoverHandler { id: ihHov; enabled: ih.foldable }
+                TapHandler { id: ihPress; enabled: ih.foldable; onTapped: ih.toggle() }
               }
             }
             InfoHead {
@@ -3729,27 +3738,27 @@ FloatingWindow {
                   width: chipWord.implicitWidth + 16
                   height: 24
                   radius: 12
-                  color: chipHov.hovered ? Zenon.headBg : "transparent"
+                  color: chipPress.pressed ? Zenon.headBg : "transparent"
                   border.width: 1
-                  border.color: chipHov.hovered ? Zenon.accentKey : Zenon.border
+                  border.color: chipPress.pressed ? Zenon.accentKey : Zenon.border
                   Text {
                     id: chipWord
                     anchors.centerIn: parent
                     text: chip.modelData
-                    color: chipHov.hovered ? Zenon.white : Zenon.accentKey
+                    color: chipPress.pressed ? Zenon.white : Zenon.accentKey
                     font.family: Zenon.face
                     font.weight: Zenon.weight
                     font.pixelSize: Zenon.px(14)
                   }
-                  HoverHandler { id: chipHov; cursorShape: Qt.PointingHandCursor }
-                  TapHandler { onTapped: win.jumpTo(chip.modelData) }
+                  HoverHandler { id: chipHov }
+                  TapHandler { id: chipPress; onTapped: win.jumpTo(chip.modelData) }
                 }
               }
               Text {
                 visible: !!win.extras && win.extras.rdeps.length > 40
                 height: 24
                 verticalAlignment: Text.AlignVCenter
-                text: win.extras ? "and " + (win.extras.rdeps.length - 40) + " more" : ""
+                text: win.extras ? "And " + (win.extras.rdeps.length - 40) + " more" : ""
                 color: Zenon.accentMuted
                 font.family: Zenon.face
                 font.weight: Zenon.weight
@@ -3981,101 +3990,73 @@ FloatingWindow {
   // ── the foot ────────────────────────────────────────────────────────────
   // On the hint strip's ground, with its hairline — the same strip lexi,
   // ideo, zeus and folio stand their keys on.
-  Item {
+  // morpheus/HintBar: this strip was ceres' and is every window's now
+  HintBar {
     id: foot
     anchors.bottom: parent.bottom
     anchors.left: parent.left
     anchors.right: parent.right
-    height: 40   // the window feet's height (clio, calypso, delphi); 50 stood too tall, 2026-10-17
+    rows: win.hintRows
 
-    // see-through: the lists rise out of it — see the stage's ScrollEdges
-    Rectangle { anchors.fill: parent; color: Zenon.hintFrostBg }
-    Rule { anchors.top: parent.top; anchors.left: parent.left; anchors.right: parent.right }
-
-
-    // The keys, centered on the window — at the left once a button joins
-    // them, and never into it: what does not fit before the buttons is
-    // dropped from the end of the list (see HintRow.maxWidth), which is why
-    // hintRows puts the keys you need most first.
-    HintRow {
-      id: footHints
-      rows: win.hintRows
-      anchors.verticalCenter: parent.verticalCenter
-      // Centered when the strip is only keys; at the left the moment a button
-      // joins it, so keys and buttons read as two ends of one strip rather
-      // than a row that shifts off-center to make room. (A Row holding only
-      // hidden children is zero wide.)
-      x: footBtns.width > 0 ? 16 : Math.round((foot.width - width) / 2)
-      maxWidth: foot.width - 32 - (footBtns.width > 0 ? footBtns.width + 12 + 24 : 0)
+    DialogButton {
+      visible: win.face === "setup"
+      // only the Flatpak question left, answered no: nothing to install
+      label: Ceres.deps.missing.length || setupView.flatpak ? "Install" : "Done"
+      ink: Zenon.cyan
+      primary: true
+      onClicked: Ceres.setup(setupView.choice, setupView.flatpak)
     }
-
-    Row {
-      id: footBtns
-      anchors.right: parent.right
-      anchors.rightMargin: 12
-      anchors.verticalCenter: parent.verticalCenter
-      spacing: 8
-
-      DialogButton {
-        visible: win.face === "setup"
-        // only the Flatpak question left, answered no: nothing to install
-        label: Ceres.deps.missing.length || setupView.flatpak ? "Install" : "Done"
-        ink: Zenon.cyan
-        primary: true
-        onClicked: Ceres.setup(setupView.choice, setupView.flatpak)
-      }
-      DialogButton {
-        visible: win.face === "browse" && Ceres.setupNeeded
-        label: "Set up"
-        ink: Zenon.yellow
-        onClicked: win.showSetup = true
-      }
-      DialogButton {
-        visible: win.face === "news"
-        label: "Back"
-        ink: Zenon.accentMuted
-        onClicked: Ceres.holdBack()
-      }
-      DialogButton {
-        visible: win.face === "news"
-        label: "Continue"
-        ink: Zenon.cyan
-        primary: true
-        onClicked: Ceres.passNews()
-      }
-      DialogButton {
-        visible: win.face === "tx" && txView.settleable && !win.settleUp
-        label: txView.settling && txView.settleInfo.conflicts.length ? "Replace and install" : "Install"
-        ink: Zenon.cyan
-        primary: true
-        onClicked: txView.settle()
-      }
-      DialogButton {
-        visible: win.face === "tx" && Ceres.txState === "failed"
-        label: "Open in terminal"
-        ink: Zenon.yellow
-        onClicked: Ceres.txInTerminal()
-      }
-      DialogButton {
-        visible: win.face === "tx" && !Ceres.txBusy
-        label: "Back"
-        ink: Zenon.accentMuted
-        onClicked: Ceres.txClear()
-      }
-      DialogButton {
-        visible: win.face === "browse" && win.tab === "packages" && win.markCount > 0
-        label: "Review " + win.markCount
-        ink: Zenon.cyan
-        primary: true
-        onClicked: win.confirm()
-      }
-      DialogButton {
-        visible: win.face === "browse" && win.tab === "updates" && Ceres.total > 0
-        label: "Update all"
-        ink: Zenon.cyan
-        primary: true
-        onClicked: Ceres.updateAll()
-      }
+    DialogButton {
+      visible: win.face === "browse" && Ceres.setupNeeded
+      label: "Set up"
+      ink: Zenon.yellow
+      onClicked: win.showSetup = true
+    }
+    DialogButton {
+      visible: win.face === "news"
+      label: "Back"
+      ink: Zenon.accentMuted
+      onClicked: Ceres.holdBack()
+    }
+    DialogButton {
+      visible: win.face === "news"
+      label: "Continue"
+      ink: Zenon.cyan
+      primary: true
+      onClicked: Ceres.passNews()
+    }
+    DialogButton {
+      visible: win.face === "tx" && txView.settleable && !win.settleUp
+      label: txView.settling && txView.settleInfo.conflicts.length ? "Replace and install" : "Install"
+      ink: Zenon.cyan
+      primary: true
+      onClicked: txView.settle()
+    }
+    DialogButton {
+      visible: win.face === "tx" && Ceres.txState === "failed"
+      label: "Open in terminal"
+      ink: Zenon.yellow
+      onClicked: Ceres.txInTerminal()
+    }
+    DialogButton {
+      visible: win.face === "tx" && !Ceres.txBusy
+      label: "Back"
+      ink: Zenon.accentMuted
+      onClicked: Ceres.txClear()
+    }
+    DialogButton {
+      visible: win.face === "browse" && win.tab === "packages" && win.markCount > 0
+      label: "Review " + win.markCount
+      ink: Zenon.cyan
+      primary: true
+      onClicked: win.confirm()
+    }
+    DialogButton {
+      visible: win.face === "browse" && win.tab === "updates" && Ceres.total > 0
+      label: "Update all"
+      ink: Zenon.cyan
+      primary: true
+      onClicked: Ceres.updateAll()
     }
   }
 
@@ -4760,7 +4741,7 @@ FloatingWindow {
               }
               Text {
                 anchors.verticalCenter: parent.verticalCenter
-                text: modelData.scope === "user" ? "just you" : "everyone"
+                text: modelData.scope === "user" ? "Just you" : "Everyone"
                 color: Zenon.accentMuted
                 font.family: Zenon.face
                 font.weight: Zenon.weight
@@ -4770,7 +4751,7 @@ FloatingWindow {
           }
           Text {
             visible: fpSheet.apps.length > 12
-            text: "and " + (fpSheet.apps.length - 12) + " more"
+            text: "And " + (fpSheet.apps.length - 12) + " more"
             color: Zenon.accentMuted
             font.family: Zenon.face
             font.weight: Zenon.weight
@@ -5214,9 +5195,9 @@ FloatingWindow {
                 width: aurText.implicitWidth + 16
                 height: 22
                 radius: Zenon.windowRadius
-                color: aurHov.hovered ? Qt.rgba(Zenon.magenta.r, Zenon.magenta.g, Zenon.magenta.b, 0.18) : "transparent"
+                color: aurPress.pressed ? Qt.rgba(Zenon.magenta.r, Zenon.magenta.g, Zenon.magenta.b, 0.18) : "transparent"
                 border.width: 1
-                border.color: aurHov.hovered ? Zenon.magenta : Zenon.border
+                border.color: aurPress.pressed ? Zenon.magenta : Zenon.border
                 Text {
                   id: aurText
                   anchors.centerIn: parent
@@ -5227,7 +5208,7 @@ FloatingWindow {
                   font.pixelSize: Zenon.px(14)
                 }
                 HoverHandler { id: aurHov }
-                TapHandler { onTapped: win.openReview(win.aurTargets.indexOf(ent.modelData.name)) }
+                TapHandler { id: aurPress; onTapped: win.openReview(win.aurTargets.indexOf(ent.modelData.name)) }
               }
               Text {
                 id: entSize

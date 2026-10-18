@@ -25,7 +25,7 @@ Item {
   property var model: []
   property bool open: false
   property int cardWidth: 220
-  // as wide as its longest row, and never narrower than cardWidth
+  // as wide as its longest row (cardWidth is then ignored; see Zenon.menuMinWidth)
   property bool fit: false
   property int activeIndex: -1
   // A third of a layer card's shadow room, as terminus' menus have it: the
@@ -67,7 +67,7 @@ Item {
       if (r.hint) w += hintMetrics.advanceWidth(String(r.hint)) + 12;
       most = Math.max(most, w);
     }
-    return Math.max(core.cardWidth, Math.ceil(most + Zenon.menuCardPad * 2 + 2));
+    return Math.max(Zenon.menuMinWidth, Math.ceil(most + Zenon.menuCardPad * 2 + 2 + Zenon.menuFitSlack));
   }
 
   readonly property int contentH: {

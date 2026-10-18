@@ -148,7 +148,7 @@ Item {
     }
     MouseArea {
       anchors.fill: parent
-      cursorShape: pad.erasing ? Qt.PointingHandCursor : Qt.CrossCursor
+      cursorShape: pad.erasing ? Qt.ArrowCursor : Qt.CrossCursor
       preventStealing: true
       function at(m) { return [m.x / board.width, m.y / board.width]; }
       property bool erasedThisDrag: false

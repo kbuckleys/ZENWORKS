@@ -28,7 +28,7 @@ Rectangle {
     : Zenon.mix(Zenon.ground, Zenon.red, rm.big ? 0.22 : 0.16)
   border.width: 1
   border.color: rm.ready ? Zenon.alpha(Zenon.red, 0.5) : Zenon.border
-  Behavior on color { ColorAnimation { duration: 110 } }
+  Behavior on color { ColorAnimation { duration: Zenon.ms(110) } }
 
   Text {
     anchors.centerIn: parent
@@ -42,7 +42,6 @@ Rectangle {
     id: rmMa
     anchors.fill: parent
     enabled: rm.ready
-    cursorShape: rm.ready ? Qt.PointingHandCursor : Qt.ArrowCursor
     onClicked: rm.removed()
   }
 }

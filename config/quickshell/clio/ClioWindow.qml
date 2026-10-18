@@ -57,7 +57,7 @@ FloatingWindow {
 
   readonly property color hiFill: Zenon.menuHi
   readonly property int headH: 50
-  readonly property int footH: 40
+  readonly property int footH: Zenon.hintBarH   // morpheus/HintBar's strip
   readonly property var tipsItem: tips
   readonly property Item stageItem: stage
 
@@ -980,21 +980,13 @@ FloatingWindow {
     }
 
     // ── the foot ──
-    Item {
+    // morpheus/HintBar, as every strip (ceres' height, ground and rule)
+    HintBar {
       id: foot
       anchors.bottom: parent.bottom
       anchors.left: side.right
       anchors.right: parent.right
-      height: win.footH
-      Rectangle { anchors.fill: parent; color: Zenon.hintFrostBg }
-      Rectangle { anchors.top: parent.top; width: parent.width; height: 1; color: Zenon.border }
-      // the keys centered on the strip, as ceres' are
-      HintRow {
-        rows: win.hintRows
-        anchors.verticalCenter: parent.verticalCenter
-        x: Math.round((foot.width - width) / 2)
-        maxWidth: foot.width - 32
-      }
+      rows: win.hintRows
     }
   }
 

@@ -399,7 +399,7 @@ Item {
           font.family: Zenon.face
           font.weight: Zenon.weight
           font.pixelSize: Zenon.px(13)
-          MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: pane.win.addAttachment() }
+          MouseArea { anchors.fill: parent; onClicked: pane.win.addAttachment() }
         }
       }
 

@@ -68,9 +68,11 @@ function renderKitty(c, light) {
 // ── hyprland ───────────────────────────────────────────────────────────
 // lua/theme.lua, read by base.lua (pcall, like defaults.lua): the window
 // borders and the groupbar. The border is the shell's own hairline — the
-// slate Zenon calls `border` — at 30% resting and 80% on the focused
-// window, the two alphas base.lua has always used. Hyprland takes
-// #RRGGBBAA. Shadows are not here: a shadow is black in every theme.
+// slate Zenon calls `border` — at 30% resting and 65% on the focused
+// window (it was 80%; user, 2026-10-19: "a little more faint"); floating, zoomed, pinned,
+// grouped and no-group windows take the theme's hues (below). Written for
+// Zenon too, so base.lua's own literals are only a first boot's. Hyprland
+// takes #RRGGBBAA. Shadows are not here: a shadow is black in every theme.
 function hypr(h, a) {
   return "#" + rgb(h) + (a === undefined ? "" : Math.round(a * 255).toString(16).padStart(2, "0"));
 }
@@ -83,11 +85,28 @@ function renderHyprTheme(c) {
     out.push("return {}", "");
     return out.join("\n");
   }
+  // EVERY STATE A WINDOW CAN BE IN, in the theme's own colors (user,
+  // 2026-10-19). A tiled window keeps the hairline; the others take a hue,
+  // full-ish on the focused window and faint on the rest, so which window
+  // has the keys still reads at a glance whatever it is:
+  //   floating   the accent (cyan)      zoomed     blue (maximized)
+  //   pinned     sand (on every desk)   grouped    pink, red once locked
+  //   no-group   magenta (a window that will not join a group)
+  // The per-state pairs are "<focused> <unfocused>": base.lua hands them to
+  // window rules (border_color), which take exactly that.
+  const pair = (h, on, off) => hypr(h, on) + " " + hypr(h, off);
   const t = [
     ["inactive_border", hypr(c.border, 0.3)],
-    ["active_border", hypr(c.border, 0.8)],
+    ["active_border", hypr(c.border, 0.65)],
+    ["float_border", hypr(c.cyan, 0.45) + " " + hypr(c.border, 0.3)],
+    ["zoom_border", pair(c.blue, 0.55, 0.3)],
+    ["pin_border", pair(c.sand, 0.55, 0.3)],
+    ["nogroup_border_active", hypr(c.magenta, 0.55)],
+    ["nogroup_border", hypr(c.magenta, 0.3)],
     ["group_border_locked", hypr(c.red)],
+    ["group_border_locked_inactive", hypr(c.red, 0.45)],
     ["group_border", hypr(c.pink)],
+    ["group_border_inactive", hypr(c.pink, 0.45)],
     ["groupbar_text", hypr(c.onAccent)],
     ["groupbar_text_inactive", hypr(c.ink)],
     ["groupbar_locked_active", hypr(c.red)],

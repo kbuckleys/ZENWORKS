@@ -483,7 +483,7 @@ Item {
     // click on.
     visible: sideRow.showRemove && sideHover.hovered
     text: "\uf00d"   // nf-fa-times
-    color: removeHov.hovered ? Zenon.red : Zenon.accentMuted
+    color: Zenon.accentMuted
     font.family: Zenon.faceMono
     font.weight: Zenon.weight
     font.pixelSize: Zenon.px(13)
@@ -508,14 +508,14 @@ Item {
     // The eject wears the crumb bar's "where you are" gray rather than
     // green: it is a verb sitting on every mounted disk at once, and a
     // column of green marks down the sidebar was louder than the disks.
-    color: mountHov.hovered ? Zenon.cyan
+    color: mountPress.pressed ? Zenon.cyan
       : (sideRow.mounted ? term.crumbInk : Zenon.accentMuted)
     font.family: Zenon.face
     font.weight: Zenon.weight
     font.pixelSize: Zenon.px(14)
 
-    HoverHandler { id: mountHov }
     MouseArea {
+      id: mountPress
       anchors.fill: parent
       anchors.margins: -6
       onClicked: sideRow.toggledMount()

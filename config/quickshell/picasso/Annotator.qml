@@ -469,11 +469,11 @@ Item {
       Rectangle {
         anchors.verticalCenter: parent.verticalCenter
         width: 34; height: 34; radius: Zenon.windowRadius
-        color: backMa.containsMouse ? Zenon.wash(0.06) : "transparent"
+        color: backMa.pressed ? Zenon.wash(0.06) : "transparent"
         Text {
           anchors.centerIn: parent
           text: ""
-          color: backMa.containsMouse ? Zenon.cyan : Zenon.white
+          color: backMa.pressed ? Zenon.cyan : Zenon.white
           font.family: Zenon.face
           font.weight: Zenon.weight
           font.pixelSize: Zenon.px(16)
@@ -502,7 +502,7 @@ Item {
             readonly property bool on: ann.tool === modelData[0]
             width: 34; height: 34; radius: Zenon.windowRadius
             color: on ? Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b, 0.20)
-              : (toolMa.containsMouse ? Zenon.wash(0.06) : "transparent")
+              : (toolMa.pressed ? Zenon.wash(0.06) : "transparent")
             border.width: on ? 1 : 0
             border.color: Zenon.cyan
             Text {
@@ -590,7 +590,7 @@ Item {
         id: roundBtn
         anchors.verticalCenter: parent.verticalCenter
         width: 30; height: 30; radius: Zenon.windowRadius
-        color: ann.rounded ? Zenon.wash(0.10) : (roundMa.containsMouse ? Zenon.wash(0.06) : "transparent")
+        color: ann.rounded ? Zenon.wash(0.10) : (roundMa.pressed ? Zenon.wash(0.06) : "transparent")
         Rectangle {
           anchors.centerIn: parent
           width: 14; height: 11
@@ -622,7 +622,7 @@ Item {
             required property var modelData
             readonly property bool can: modelData[1] === "undo" ? history.canUndo : history.canRedo
             width: 32; height: 32; radius: Zenon.windowRadius
-            color: urMa.containsMouse && can ? Zenon.wash(0.06) : "transparent"
+            color: urMa.pressed && can ? Zenon.wash(0.06) : "transparent"
             Text {
               anchors.centerIn: parent
               text: modelData[0]
@@ -690,7 +690,7 @@ Item {
         delegate: Rectangle {
           required property var modelData
           width: 34; height: 34; radius: Zenon.windowRadius
-          color: verbMa.containsMouse && modelData.live ? Zenon.wash(0.06) : "transparent"
+          color: verbMa.pressed && modelData.live ? Zenon.wash(0.06) : "transparent"
           Text {
             anchors.centerIn: parent
             text: modelData.g

@@ -441,7 +441,7 @@ PanelWindow {
                 width: crumb.last ? Math.min(implicitWidth, crumbRow.availW) : implicitWidth
                 elide: Text.ElideMiddle
                 text: crumb.modelData.label
-                color: crumb.last || crumbHover.containsMouse ? Zenon.white : Zenon.muted
+                color: crumb.last || crumbHover.pressed ? Zenon.white : Zenon.muted
                 font.family: Zenon.face
                 font.weight: Font.Medium
                 font.pixelSize: Zenon.px(15)
@@ -452,7 +452,6 @@ PanelWindow {
                   anchors.fill: parent
                   hoverEnabled: !crumb.last
                   enabled: !crumb.last
-                  cursorShape: Qt.PointingHandCursor
                   onClicked: card.owner.homeReroot(crumb.modelData.path)
                 }
               }

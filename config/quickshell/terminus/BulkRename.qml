@@ -492,12 +492,12 @@ Rectangle {
             // expression" is a thing you either already know or cannot
             // guess.
             BulkVerb {
-              label: "keep .ext"
+              label: "Keep .ext"
               on: bulk.stemOnly
               onClicked: bulk.stemOnly = !bulk.stemOnly
             }
             BulkVerb {
-              label: "regex"
+              label: "Regex"
               on: bulk.regex
               // only find and replace reads a pattern
               dim: bulk.mode !== "replace"
@@ -536,7 +536,7 @@ Rectangle {
               anchors.left: parent.left
               anchors.verticalCenter: parent.verticalCenter
               width: parent.cell
-              ghost: bulk.regex ? "find (regular expression)" : "find"
+              ghost: bulk.regex ? "Find (regular expression)" : "Find"
               onAccepted: bulk.applyReplace(findField.text, replField.text)
               onTabbed: bulk.focusFrom(findField, 1)
               onBackTabbed: bulk.focusFrom(findField, -1)
@@ -560,7 +560,7 @@ Rectangle {
               anchors.left: patArrow.right
               anchors.verticalCenter: parent.verticalCenter
               width: parent.cell
-              ghost: "replace with"
+              ghost: "Replace with"
               onAccepted: bulk.applyReplace(findField.text, replField.text)
               onTabbed: bulk.focusFrom(replField, 1)
               onBackTabbed: bulk.focusFrom(replField, -1)
@@ -579,7 +579,7 @@ Rectangle {
               anchors.left: parent.left
               anchors.verticalCenter: parent.verticalCenter
               width: Math.max(60, parent.width - addWhere.width - 10)
-              ghost: "text to add"
+              ghost: "Text to add"
               onAccepted: bulk.applyAdd(addField.text, bulk.addWhere)
               onTabbed: bulk.focusFrom(addField, 1)
               onBackTabbed: bulk.focusFrom(addField, -1)
@@ -633,7 +633,7 @@ Rectangle {
               width: Math.max(50, parent.width - fmtKind.width
                       - fmtWhere.width - (fmtStart.visible ? fmtStart.width + 8 : 0)
                       - 16)
-              ghost: "name"
+              ghost: "Name"
               onAccepted: bulk.applyFormat(fmtField.text)
               onTabbed: bulk.focusFrom(fmtField, 1)
               onBackTabbed: bulk.focusFrom(fmtField, -1)
@@ -661,7 +661,7 @@ Rectangle {
               width: 64
               // A date has nothing to count from.
               visible: bulk.fmtKind !== "date"
-              ghost: "from 1"
+              ghost: "From 1"
               // NOT bound to bulkFmtStart, written to it: a two-way
               // binding on a field you are typing in fights the caret.
               onTextChanged: bulk.fmtStart = fmtStart.text
@@ -731,14 +731,14 @@ Rectangle {
             anchors.verticalCenter: parent.verticalCenter
             spacing: 6
             BulkVerb {
-              label: "undo"
+              label: "Undo"
               // Dimmed rather than hidden when there is nothing to undo:
               // a button that comes and goes moves the one beside it.
               dim: bulk.history.length === 0
               onClicked: bulk.undoEdit()
             }
             BulkVerb {
-              label: "reset"
+              label: "Reset"
               dim: bulk.edits.join("\u0000") === bulk.names.join("\u0000")
               onClicked: bulk.resetEdits()
             }
@@ -995,7 +995,7 @@ Rectangle {
             anchors.left: parent.left
             anchors.leftMargin: 18
             anchors.verticalCenter: parent.verticalCenter
-            text: !bulk.sound ? "fix the marked names"
+            text: !bulk.sound ? "Fix the marked names"
               : (bulk.changes === 0 ? "nothing changed"
                 : bulk.changes + (bulk.changes === 1
                     ? " name will change" : " names will change"))

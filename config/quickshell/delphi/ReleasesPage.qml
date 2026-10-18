@@ -252,7 +252,7 @@ Item {
           Text {
             width: parent.width
             elide: Text.ElideRight
-            text: [rrow.r.draft ? "draft" : rrow.r.prerelease ? "pre-release" : rrow.index === 0 ? "latest" : "",
+            text: [rrow.r.draft ? "Draft" : rrow.r.prerelease ? "Pre-release" : rrow.index === 0 ? "Latest" : "",
                    rrow.r.author, rrow.r.when ? D.ago(D.secondsOf(rrow.r.when), Date.now()) : "",
                    rrow.r.assets.length > 0 ? rrow.r.assets.length + (rrow.r.assets.length === 1 ? " file" : " files") : ""]
               .filter((x) => x !== "").join("  ·  ")

@@ -63,9 +63,9 @@ PanelWindow {
   SequentialAnimation {
     id: dropFlash
     NumberAnimation { target: dropAsk; property: "flash"; to: 1;
-                      duration: 60; easing.type: Easing.OutQuad }
+                      duration: Zenon.ms(60); easing.type: Easing.OutQuad }
     NumberAnimation { target: dropAsk; property: "flash"; to: 0;
-                      duration: 130; easing.type: Easing.InQuad }
+                      duration: Zenon.ms(130); easing.type: Easing.InQuad }
     ScriptAction {
       script: {
         const act = dropAsk.pendingAct;

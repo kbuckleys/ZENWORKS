@@ -44,6 +44,9 @@ CardMenu {
   signal menuClosed
 
   cardWidth: Zenon.menuWidth
+  // as wide as its longest row, as the suite's menus are (CardMenu.fit):
+  // menuWidth is now the least it is, not the most (user, 2026-10-18)
+  fit: true
 
   QsMenuOpener {
     id: opener
@@ -128,7 +131,7 @@ CardMenu {
     root.pillTop + ((root.srcWin && root.srcWin.pillHeight) || 0)
 
   at: root.isSubMenu
-    ? Qt.point(root.parentMenu.cardX + root.parentMenu.cardWidth,
+    ? Qt.point(root.parentMenu.cardX + root.parentMenu.cardW,
                root.parentMenu.cardY + root.parentMenu.rowY(root.parentRow))
     // Left edge on the ICON it came from, near edge on the PILL it stands
     // on. Anything else and the menu belongs to the bar rather than to the
@@ -147,7 +150,7 @@ CardMenu {
   // way a submenu is square against its parent. Which edge follows the bar.
   squareEdge: root.isSubMenu ? "" : (Zenon.barTop ? "top" : "bottom")
   flipFrom: root.isSubMenu
-    ? root.parentMenu.cardX + root.parentMenu.cardWidth : 0
+    ? root.parentMenu.cardX + root.parentMenu.cardW : 0
   flipParentLeft: root.isSubMenu ? root.parentMenu.cardX : 0
 
   // The row whose submenu is open stays lit while you are inside it.

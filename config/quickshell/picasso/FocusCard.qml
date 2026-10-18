@@ -595,9 +595,9 @@ Item {
     height: 36
     radius: 18
     color: stepMa.pressed ? Qt.rgba(card.highlight.r, card.highlight.g, card.highlight.b, 0.35)
-      : Zenon.hud(stepMa.containsMouse ? 0.75 : 0.55)
+      : Zenon.hud(0.55)
     border.width: 1
-    border.color: stepMa.containsMouse ? card.highlight : Zenon.border
+    border.color: stepMa.pressed ? card.highlight : Zenon.border
     opacity: stepBtn.live && stepBtn.shown ? 1 : 0
     visible: opacity > 0.01
     Behavior on opacity { NumberAnimation { duration: Zenon.fast; easing.type: Zenon.ease } }
@@ -605,7 +605,7 @@ Item {
       anchors.centerIn: parent
       anchors.horizontalCenterOffset: stepBtn.dir < 0 ? -1 : 1
       text: stepBtn.dir < 0 ? "" : ""
-      color: stepMa.containsMouse ? card.highlight : Zenon.white
+      color: stepMa.pressed ? card.highlight : Zenon.white
       font.family: Zenon.face
       font.weight: Zenon.weight
       font.pixelSize: Zenon.px(15)
@@ -1011,8 +1011,8 @@ Item {
             anchors.right: parent.right
             anchors.verticalCenter: dispHead.verticalCenter
             visible: card.multi
-            text: card.allStaged ? "none" : "all"
-            color: allMa.containsMouse ? card.highlight : card.dimColor
+            text: card.allStaged ? "None" : "All"
+            color: allMa.pressed ? card.highlight : card.dimColor
             font.family: Zenon.face
             font.weight: 600
             font.pixelSize: card.ts
@@ -1086,7 +1086,7 @@ Item {
                   color: Zenon.mix(Zenon.ground, Zenon.card, 0.4)
                   border.width: mon.staged ? 2 : 1
                   border.color: mon.staged ? card.highlight
-                    : (monMa.containsMouse ? Qt.rgba(1, 1, 1, 0.35) : Zenon.border)
+                    : (monMa.pressed ? Qt.rgba(1, 1, 1, 0.35) : Zenon.border)
                   Behavior on border.color {
                     ColorAnimation { duration: Zenon.fast; easing.type: Zenon.ease }
                   }
@@ -1215,7 +1215,7 @@ Item {
             Text {
               anchors.right: parent.right
               anchors.verticalCenter: fitHead.verticalCenter
-              text: card.stageFit !== "" ? "changing"
+              text: card.stageFit !== "" ? "Changing"
                 : (card.sharedFit !== "" ? "keeping " + Picasso.fitLabels[card.sharedFit]
                                          : "keeping each display's")
               color: card.stageFit !== "" ? card.highlight : card.dimColor
@@ -1282,7 +1282,7 @@ Item {
                   height: 14
                   radius: 3
                   color: cell.on ? card.highlight
-                    : (cellMa.containsMouse ? Zenon.wash(0.22) : Zenon.wash(0.07))
+                    : (cellMa.pressed ? Zenon.wash(0.22) : Zenon.wash(0.07))
                   border.width: 1
                   border.color: cell.on ? card.highlight : Zenon.border
                   MouseArea {
@@ -1418,7 +1418,7 @@ Item {
             anchors.right: parent.right
             anchors.verticalCenter: edHead.verticalCenter
             text: "Done"
-            color: doneMa.containsMouse ? card.highlight : card.fgColor
+            color: doneMa.pressed ? card.highlight : card.fgColor
             font.family: Zenon.face
             font.weight: 600
             font.pixelSize: card.ts
@@ -1492,7 +1492,7 @@ Item {
                 anchors.rightMargin: 12
                 anchors.verticalCenter: parent.verticalCenter
                 text: "Stop"
-                color: stopMa.containsMouse ? card.highlight : card.fgColor
+                color: stopMa.pressed ? card.highlight : card.fgColor
                 font.family: Zenon.face
                 font.weight: 600
                 font.pixelSize: card.ts

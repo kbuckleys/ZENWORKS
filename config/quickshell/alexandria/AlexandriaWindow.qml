@@ -1050,7 +1050,7 @@ FloatingWindow {
           height: 32
           radius: Zenon.windowRadius
           visible: !!win.fam && !win.fam.loose
-          color: favMa.containsMouse ? Zenon.wash(0.08) : Zenon.wash(0.03)
+          color: favMa.pressed ? Zenon.wash(0.08) : Zenon.wash(0.03)
           border.width: 1
           border.color: Zenon.border
           Text {
@@ -1187,13 +1187,13 @@ FloatingWindow {
                   id: tool
                   required property var modelData
                   width: 30; height: 30; radius: Zenon.windowRadius
-                  color: toolMa.containsMouse ? Zenon.wash(0.08) : Zenon.wash(0.03)
+                  color: toolMa.pressed ? Zenon.wash(0.08) : Zenon.wash(0.03)
                   border.width: 1
                   border.color: Zenon.border
                   Text {
                     anchors.centerIn: parent
                     text: tool.modelData[0]
-                    color: toolMa.containsMouse ? Zenon.cyan : Zenon.accentMuted
+                    color: toolMa.pressed ? Zenon.cyan : Zenon.accentMuted
                     font.family: Zenon.glyphFace
                     font.pixelSize: Zenon.px(13)
                   }
@@ -1237,7 +1237,7 @@ FloatingWindow {
                   width: langText.implicitWidth + 24
                   height: Math.max(30, langText.implicitHeight + 8)
                   radius: Zenon.windowRadius
-                  color: langChip.here ? win.hiFill : langMa.containsMouse ? Zenon.wash(0.08) : Zenon.wash(0.03)
+                  color: langChip.here ? win.hiFill : langMa.pressed ? Zenon.wash(0.08) : Zenon.wash(0.03)
                   border.width: 1
                   border.color: langChip.here ? Zenon.alpha(Zenon.cyan, 0.5) : Zenon.border
                   Behavior on color { ColorAnimation { duration: Zenon.fast } }
@@ -1299,7 +1299,7 @@ FloatingWindow {
                   else win.askFace(styleRow);
                 }
                 radius: Zenon.windowRadius
-                color: styleRow.here ? win.hiFill : styleMa.containsMouse ? Zenon.wash(0.05) : Zenon.alpha(Zenon.cyan, 0)
+                color: styleRow.here ? win.hiFill : styleMa.pressed ? Zenon.wash(0.05) : Zenon.alpha(Zenon.cyan, 0)
                 Behavior on color { ColorAnimation { duration: Zenon.fast } }
                 Text {
                   id: styleName
@@ -1553,7 +1553,7 @@ FloatingWindow {
               anchors.fill: parent
               anchors.margins: 3
               radius: Zenon.windowRadius
-              color: gcell.here ? win.hiFill : gMa.containsMouse ? Zenon.wash(0.06) : Zenon.wash(0.02)
+              color: gcell.here ? win.hiFill : gMa.pressed ? Zenon.wash(0.06) : Zenon.wash(0.02)
               border.width: gcell.here ? 1 : 0
               border.color: Zenon.alpha(Zenon.cyan, 0.7)
             }
@@ -1664,7 +1664,7 @@ FloatingWindow {
                 width: card.width
                 height: 28
                 radius: Zenon.windowRadius
-                color: spellMa.containsMouse ? Zenon.wash(0.08) : Zenon.wash(0.03)
+                color: spellMa.pressed ? Zenon.wash(0.08) : Zenon.wash(0.03)
                 Text {
                   anchors.left: parent.left
                   anchors.leftMargin: 10
@@ -1694,7 +1694,7 @@ FloatingWindow {
                   anchors.rightMargin: 10
                   anchors.verticalCenter: parent.verticalCenter
                   text: ""
-                  color: spellMa.containsMouse ? Zenon.cyan : Zenon.accentMuted
+                  color: spellMa.pressed ? Zenon.cyan : Zenon.accentMuted
                   font.family: Zenon.glyphFace
                   font.pixelSize: Zenon.px(11)
                 }
@@ -1740,7 +1740,7 @@ FloatingWindow {
               width: groupList.width
               height: 28
               radius: Zenon.windowRadius
-              color: grow.here ? win.hiFill : growMa.containsMouse ? Zenon.wash(0.06) : Zenon.alpha(Zenon.cyan, 0)
+              color: grow.here ? win.hiFill : growMa.pressed ? Zenon.wash(0.06) : Zenon.alpha(Zenon.cyan, 0)
               Text {
                 anchors.left: parent.left
                 anchors.leftMargin: 10
@@ -1881,7 +1881,7 @@ FloatingWindow {
                 width: infoCol.width
                 height: 28
                 radius: Zenon.windowRadius
-                color: fileMa.containsMouse ? Zenon.wash(0.06) : Zenon.alpha(Zenon.cyan, 0)
+                color: fileMa.pressed ? Zenon.wash(0.06) : Zenon.alpha(Zenon.cyan, 0)
                 Text {
                   anchors.left: parent.left
                   anchors.leftMargin: 10
@@ -1900,7 +1900,7 @@ FloatingWindow {
                   anchors.rightMargin: 10
                   anchors.verticalCenter: parent.verticalCenter
                   text: ""
-                  color: fileMa.containsMouse ? Zenon.cyan : Zenon.accentMuted
+                  color: fileMa.pressed ? Zenon.cyan : Zenon.accentMuted
                   font.family: Zenon.glyphFace
                   font.pixelSize: Zenon.px(12)
                 }
@@ -1966,73 +1966,55 @@ FloatingWindow {
     }
 
     // ── the foot ─────────────────────────────────────────────────────────
-    Item {
+    // morpheus/HintBar, as every strip (ceres' height, ground and rule);
+    // the buttons stand at its right end
+    HintBar {
       id: foot
       anchors.bottom: parent.bottom
       anchors.left: side.right
       anchors.right: parent.right
-      // 40, as delphi's (user, 2026-10-11)
-      height: 40
-      // the head's translucent ground, as delphi's: hintFrostBg let so
-      // little through that the frost under it did not read (user, 2026-10-11)
-      Rectangle { anchors.fill: parent; color: Zenon.headBg }
-      Rectangle { anchors.top: parent.top; width: parent.width; height: 1; color: Zenon.border }
-      HintRow {
-        id: footHints
-        rows: win.hintRows
+      rows: win.hintRows
+
+      // ── OPEN A FONT, OR THE WORK UNDER WAY ──
+      // An install is not instant (fc-cache is most of it), so while one
+      // is out the button becomes the shell's working dots and what is
+      // going on — "Installing 4 families…" — and grows or shrinks to fit
+      // it, one shape turning into the other rather than a swap.
+      BusyButton {
+        id: openSlot
+        visible: !win.picking
         anchors.verticalCenter: parent.verticalCenter
-        // centered while the strip is only keys; at the left once a button
-        // joins it (as ceres' foot) — a Row of hidden children is zero wide
-        x: footBtns.width > 0 ? 16 : Math.round((foot.width - width) / 2)
-        maxWidth: foot.width - 32 - (footBtns.width > 0 ? footBtns.width + 36 : 0)
+        label: "Open a font\u2026"
+        busy: win.installing
+        busyText: win.busyShown
+        busyInk: win.mgr && win.mgr.busyKind === "remove" ? Zenon.red : Zenon.cyan
+        onClicked: win.chooseFile()
       }
-      Row {
-        id: footBtns
-        anchors.right: parent.right
-        anchors.rightMargin: 12
-        anchors.verticalCenter: parent.verticalCenter
-        spacing: 8
-        // ── OPEN A FONT, OR THE WORK UNDER WAY ──
-        // An install is not instant (fc-cache is most of it), so while one
-        // is out the button becomes the shell's working dots and what is
-        // going on — "Installing 4 families…" — and grows or shrinks to fit
-        // it, one shape turning into the other rather than a swap.
-        BusyButton {
-          id: openSlot
-          visible: !win.picking
-          anchors.verticalCenter: parent.verticalCenter
-          label: "Open a font\u2026"
-          busy: win.installing
-          busyText: win.busyShown
-          busyInk: win.mgr && win.mgr.busyKind === "remove" ? Zenon.red : Zenon.cyan
-          onClicked: win.chooseFile()
-        }
-        DialogButton {
-          visible: win.removable.length > 0 && !win.picking && !win.installing
-          label: win.removeFams.length > 1 ? "Remove " + win.removeFams.length : "Remove"
-          ink: Zenon.red
-          onClicked: win.askRemove()
-        }
-        DialogButton {
-          visible: win.installable.length > 0 && !win.installing
-          label: win.installable.length > 1 ? "Install " + win.installable.length : "Install"
-          ink: Zenon.cyan
-          primary: true
-          onClicked: win.installOpened()
-        }
-        DialogButton {
-          visible: !!win.picking
-          label: "Cancel"
-          onClicked: win.cancelPick()
-        }
-        DialogButton {
-          visible: !!win.picking
-          label: win.fam ? "Use " + win.fam.name : "Use"
-          ink: Zenon.cyan
-          primary: true
-          ready: !!win.fam && !win.fam.loose
-          onClicked: win.usePick()
-        }
+      DialogButton {
+        visible: win.removable.length > 0 && !win.picking && !win.installing
+        label: win.removeFams.length > 1 ? "Remove " + win.removeFams.length : "Remove"
+        ink: Zenon.red
+        onClicked: win.askRemove()
+      }
+      DialogButton {
+        visible: win.installable.length > 0 && !win.installing
+        label: win.installable.length > 1 ? "Install " + win.installable.length : "Install"
+        ink: Zenon.cyan
+        primary: true
+        onClicked: win.installOpened()
+      }
+      DialogButton {
+        visible: !!win.picking
+        label: "Cancel"
+        onClicked: win.cancelPick()
+      }
+      DialogButton {
+        visible: !!win.picking
+        label: win.fam ? "Use " + win.fam.name : "Use"
+        ink: Zenon.cyan
+        primary: true
+        ready: !!win.fam && !win.fam.loose
+        onClicked: win.usePick()
       }
     }
   }

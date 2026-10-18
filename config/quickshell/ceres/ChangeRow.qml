@@ -31,7 +31,7 @@ Item {
     color: ch.glyphInk
     font.family: Zenon.face
     font.weight: Zenon.weight
-    font.pixelSize: 13 + ch.grow
+    font.pixelSize: Zenon.px(13) + ch.grow
   }
 
   // THE NAME IS WHAT THE ROW IS (user, 2026-10-14): a long version pair —
@@ -52,7 +52,7 @@ Item {
     color: Zenon.white
     font.family: Zenon.face
     font.weight: Zenon.weight
-    font.pixelSize: 15 + ch.grow
+    font.pixelSize: Zenon.px(15) + ch.grow
   }
 
   Text {
@@ -78,6 +78,6 @@ Item {
     color: Zenon.white
     font.family: Zenon.face
     font.weight: Zenon.weight
-    font.pixelSize: 14 + ch.grow
+    font.pixelSize: Zenon.px(14) + ch.grow
   }
 }

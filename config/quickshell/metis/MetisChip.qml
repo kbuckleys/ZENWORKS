@@ -33,7 +33,7 @@ Rectangle {
   radius: 5
   // selected: blue, outlined — a gray fill alone was too quiet to find
   color: chip.sel ? Qt.rgba(Zenon.blue.r, Zenon.blue.g, Zenon.blue.b, 0.14)
-    : hover.containsMouse ? Qt.rgba(Zenon.border.r, Zenon.border.g, Zenon.border.b, 0.45)
+    : hover.pressed ? Qt.rgba(Zenon.border.r, Zenon.border.g, Zenon.border.b, 0.45)
     : Zenon.alpha(Zenon.border, 0)
   Behavior on color { ColorAnimation { duration: Zenon.fast } }
   border.width: 1
@@ -107,7 +107,6 @@ Rectangle {
     id: hover
     anchors.fill: parent
     hoverEnabled: true
-    cursorShape: Qt.PointingHandCursor
     onClicked: chip.clicked()
   }
 }

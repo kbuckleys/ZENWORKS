@@ -295,7 +295,7 @@ function chips(refs) {
   return rs.map(function (r) {
     if (r.kind === "tag") return { label: r.name, ink: "sand", glyph: "" };
     if (r.kind === "remote") return { label: r.name, ink: "blue", glyph: "" };
-    if (r.kind === "stash") return { label: "stash", ink: "magenta", glyph: "" };
+    if (r.kind === "stash") return { label: "Stash", ink: "magenta", glyph: "" };
     if (r.kind === "head") return { label: "HEAD", ink: "red", glyph: "" };
     return { label: r.name, ink: r.head ? "cyan" : "green", glyph: "", here: !!r.head };
   });

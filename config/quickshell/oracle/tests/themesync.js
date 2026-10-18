@@ -37,7 +37,7 @@ module.exports = {
     t.match("zenon hands hyprland an empty table", zh, /^return \{\}$/m);
     const lh = S.renderHyprTheme(LATTE);
     t.match("the resting border is the hairline at 30%", lh, /inactive_border\s+= "#9ca0b04d"/);
-    t.match("the focused border at 80%", lh, /\bactive_border\s+= "#9ca0b0cc"/);
+    t.match("the focused border at 65%", lh, /\bactive_border\s+= "#9ca0b0a6"/);
     t.match("the groupbar's text is the ink on an accent", lh, /groupbar_text\s+= "#eff1f5"/);
     t.ok("no slot came out undefined", !/undefined|NaN/.test(lh));
     t.ok("the lua parses", (() => {

@@ -219,7 +219,6 @@ Item {
       }
       MouseArea {
         anchors.fill: parent
-        cursorShape: Qt.PointingHandCursor
         onClicked: {
           if (pin.modelData.n === 1 || map.iz >= 18) { map.opened(pin.first); return; }
           map.centreOnWorld(pin.modelData.x, pin.modelData.y);
@@ -270,7 +269,7 @@ Item {
           horizontalAlignment: Text.AlignHCenter
           verticalAlignment: Text.AlignVCenter
           text: modelData.t
-          color: zma.containsMouse ? Zenon.cyan : Zenon.white
+          color: zma.pressed ? Zenon.cyan : Zenon.white
           font.family: Zenon.face
           font.weight: Zenon.weight
           font.pixelSize: Zenon.px(16)

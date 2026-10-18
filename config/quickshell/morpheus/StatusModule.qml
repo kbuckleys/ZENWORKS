@@ -131,7 +131,6 @@ Collapsible {
     // The cup, the mic and the recording light take a click — each is a
     // switch you would otherwise go hunting for. Screen sharing and the
     // camera only report: what to stop is the application's to say.
-    cursorShape: root.hit(mouseX) !== "" ? Qt.PointingHandCursor : Qt.ArrowCursor
     onClicked: (e) => {
       const what = root.hit(e.x);
       if (what === "awake") root.awakeToggled();

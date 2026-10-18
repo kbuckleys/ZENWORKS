@@ -35,7 +35,7 @@ PopupWindow {
   property alias model: core.model
   property alias open: core.open
   property alias cardWidth: core.cardWidth
-  // as wide as its longest row, and never narrower than cardWidth
+  // as wide as its longest row (cardWidth is then ignored; see Zenon.menuMinWidth)
   property alias fit: core.fit
   property alias activeIndex: core.activeIndex
   readonly property alias pad: core.pad

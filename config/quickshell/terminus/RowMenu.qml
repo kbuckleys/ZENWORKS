@@ -1234,13 +1234,14 @@ PopupWindow {
               anchors.verticalCenter: parent.verticalCenter
               visible: !modelData.sep && !modelData.swatch && !!modelData.strike
               text: "\uf00d"   // nf-fa-times
-              color: strikeHov.hovered ? Zenon.red : Zenon.accentMuted
+              color: strikePress.pressed ? Zenon.red : Zenon.accentMuted
               font.family: Zenon.faceMono
               font.weight: Zenon.weight
               font.pixelSize: Zenon.px(14)
 
               HoverHandler { id: strikeHov }
               MouseArea {
+                id: strikePress
                 anchors.fill: parent
                 // a target you can hit without aiming — the glyph is 14px
                 anchors.margins: -7
@@ -1279,9 +1280,9 @@ PopupWindow {
             SequentialAnimation {
               id: chosenAnim
               NumberAnimation { target: menuRow; property: "chosen"; to: 1;
-                                duration: 60; easing.type: Easing.OutQuad }
+                                duration: Zenon.ms(60); easing.type: Easing.OutQuad }
               NumberAnimation { target: menuRow; property: "chosen"; to: 0;
-                                duration: 130; easing.type: Easing.InQuad }
+                                duration: Zenon.ms(130); easing.type: Easing.InQuad }
               ScriptAction {
                 script: {
                   const act = menuRow.pending;
@@ -1483,9 +1484,9 @@ PopupWindow {
               SequentialAnimation {
                 id: subChosenAnim
                 NumberAnimation { target: subRow; property: "chosen"; to: 1;
-                                  duration: 60; easing.type: Easing.OutQuad }
+                                  duration: Zenon.ms(60); easing.type: Easing.OutQuad }
                 NumberAnimation { target: subRow; property: "chosen"; to: 0;
-                                  duration: 130; easing.type: Easing.InQuad }
+                                  duration: Zenon.ms(130); easing.type: Easing.InQuad }
                 ScriptAction {
                   script: {
                     const act = subRow.pending;

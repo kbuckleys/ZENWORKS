@@ -1060,8 +1060,8 @@ module.exports = {
     t.eq("a new unmounted disk is an arrival", T.arrivals([dk[1]], dk).map(d => d.path), ["/dev/sda1"]);
     t.eq("a disk already mounted is not asked about", T.arrivals([], dk).map(d => d.path), ["/dev/sda1"]);
     const facts = T.diskFacts(dk[0]);
-    t.has("facts say how it is connected", JSON.stringify(facts), "\"connected by\",\"USB\"");
-    t.eq("an unknown fact is left out", facts.some(r => r[0] === "used"), false);
+    t.has("facts say how it is connected", JSON.stringify(facts), "\"Connected by\",\"USB\"");
+    t.eq("an unknown fact is left out", facts.some(r => r[0] === "Used"), false);
     }
 
     {

@@ -672,7 +672,7 @@ Item {
   function openNext(row, n) { win.gapPending = { row: row, n: n, at: Date.now(), open: true }; }
   SequentialAnimation {
     id: gapOpen
-    NumberAnimation { target: win; property: "gapH"; to: 0; duration: 260; easing.type: Easing.OutCubic }
+    NumberAnimation { target: win; property: "gapH"; to: 0; duration: Zenon.ms(260); easing.type: Easing.OutCubic }
     ScriptAction { script: win.gapRow = -1 }
   }
   function gapAt(row) { return win.gapRow >= 0 && row >= win.gapRow ? win.gapH : 0; }
@@ -680,7 +680,7 @@ Item {
     id: gapClose
     // the ghost's strike-through (Flashes: 110 + 40) first
     PauseAnimation { duration: 150 }
-    NumberAnimation { target: win; property: "gapH"; to: 0; duration: 300; easing.type: Easing.InOutCubic }
+    NumberAnimation { target: win; property: "gapH"; to: 0; duration: Zenon.ms(300); easing.type: Easing.InOutCubic }
     ScriptAction { script: win.gapRow = -1 }
   }
 
@@ -702,14 +702,14 @@ Item {
   function inlineOpenNext(row, col, n) { win.igPending = { row: row, col: col, n: n, at: Date.now(), open: true }; }
   SequentialAnimation {
     id: igOpen
-    NumberAnimation { target: win; property: "igW"; to: 0; duration: 220; easing.type: Easing.OutCubic }
+    NumberAnimation { target: win; property: "igW"; to: 0; duration: Zenon.ms(220); easing.type: Easing.OutCubic }
     ScriptAction { script: { win.igRow = -1; win.igCol = -1; win.igNew = 0; } }
   }
   function gapXAt(row, col) { return row === win.igRow && col >= win.igCol ? win.igW : 0; }
   SequentialAnimation {
     id: igClose
     PauseAnimation { duration: 150 }
-    NumberAnimation { target: win; property: "igW"; to: 0; duration: 260; easing.type: Easing.InOutCubic }
+    NumberAnimation { target: win; property: "igW"; to: 0; duration: Zenon.ms(260); easing.type: Easing.InOutCubic }
     ScriptAction { script: { win.igRow = -1; win.igCol = -1; win.igNew = 0; } }
   }
 
@@ -815,7 +815,7 @@ Item {
         trail.fromRow = fr; trail.fromCol = fc; trail.toRow = tr; trail.toCol = tc;
         trailRun.restart();
       }
-      NumberAnimation on t { id: trailRun; running: false; from: 0; to: 1; duration: 420; easing.type: Easing.OutCubic }
+      NumberAnimation on t { id: trailRun; running: false; from: 0; to: 1; duration: Zenon.ms(420); easing.type: Easing.OutCubic }
       Rectangle {
         readonly property bool down: trail.yTo > trail.yFrom
         x: trail.x0 + win.cellW / 2 - 1
@@ -902,11 +902,11 @@ Item {
         id: pulseRun
         PropertyAction { target: pulse; property: "visible"; value: true }
         ParallelAnimation {
-          NumberAnimation { target: pulse; property: "grow"; from: 7; to: 0; duration: 180; easing.type: Easing.OutCubic }
-          NumberAnimation { target: pulse; property: "opacity"; from: 0; to: 1; duration: 120; easing.type: Easing.OutQuad }
+          NumberAnimation { target: pulse; property: "grow"; from: 7; to: 0; duration: Zenon.ms(180); easing.type: Easing.OutCubic }
+          NumberAnimation { target: pulse; property: "opacity"; from: 0; to: 1; duration: Zenon.ms(120); easing.type: Easing.OutQuad }
         }
         PauseAnimation { duration: 260 }
-        NumberAnimation { target: pulse; property: "opacity"; to: 0; duration: 420; easing.type: Easing.InOutQuad }
+        NumberAnimation { target: pulse; property: "opacity"; to: 0; duration: Zenon.ms(420); easing.type: Easing.InOutQuad }
         PropertyAction { target: pulse; property: "visible"; value: false }
       }
     }
@@ -1291,7 +1291,6 @@ Item {
     // a click anywhere on a line's band goes to it, the inset included
     MouseArea {
       anchors.fill: parent
-      cursorShape: Qt.PointingHandCursor
       onClicked: (m) => {
         const i = Math.floor((m.y - sticky.lead) / win.cellH);
         const l = sticky.lines[Math.max(0, Math.min(sticky.lines.length - 1, i))];

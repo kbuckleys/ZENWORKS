@@ -140,12 +140,12 @@ PopupWindow {
           radius: 3
           color: cell.chosen
             ? Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b, 0.30)
-            : (cellMa.containsMouse ? Zenon.wash(0.12)
+            : (cellMa.pressed ? Zenon.wash(0.12)
                                     : Zenon.wash(0.05))
           border.width: 1
           border.color: cell.chosen ? Zenon.cyan
             : cell.followed ? Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b, 0.55)
-            : (cellMa.containsMouse ? Zenon.keyInk : Zenon.border)
+            : (cellMa.pressed ? Zenon.keyInk : Zenon.border)
           Behavior on color {
             ColorAnimation { duration: Zenon.fast; easing.type: Zenon.ease }
           }

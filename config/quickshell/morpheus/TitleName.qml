@@ -29,6 +29,9 @@ Item {
   // the most it may take before the name elides (the field scrolls instead)
   property real maxWidth: 400
   property bool editable: false
+  // the band the name sits in (a bar, a card's head): given, the ring is
+  // centered in it rather than on the letters — see the ring below
+  property Item ringBox: null
   readonly property bool editing: field.visible
   readonly property Item input: field
   signal renamed(string name)
@@ -124,7 +127,17 @@ Item {
     x: -7
     width: tn.width + 14
     height: Math.round(inkFm.capitalHeight + 2 * 8)
-    y: Math.round(inkMid - height / 2)
+    // IN THE BAND, WHEN THERE IS ONE (user, 2026-10-18: still sunken on
+    // the Info sheet's bar). On the caps it was 8px from the bar's top and
+    // 6 from its foot: the title's row rounds half a pixel low under a
+    // taller glyph, and the ring's own rounding added the other half. A
+    // ring in a band reads against the band's edges, so it is centered
+    // between them; the letters then sit within half a pixel of its middle.
+    // tn.y and the row's y are read so a move re-places it.
+    y: tn.ringBox && tn.editing
+      ? Math.round(tn.ringBox.mapToItem(tn, 0, 0 * (tn.y + tn.parent.y)).y
+                   + (tn.ringBox.height - height) / 2)
+      : Math.round(inkMid - height / 2)
     radius: 4
     color: "transparent"
     border.width: 2

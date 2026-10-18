@@ -18,6 +18,7 @@
 // had looked exactly alike.
 
 import QtQuick
+import "."
 
 Rectangle {
   id: flare
@@ -46,7 +47,7 @@ Rectangle {
     id: run
     NumberAnimation { target: flare; property: "glow"; to: 1; duration: flare.rise;
                       easing.type: Easing.OutCubic }
-    NumberAnimation { target: flare; property: "glow"; to: 0; duration: 620;
+    NumberAnimation { target: flare; property: "glow"; to: 0; duration: Zenon.ms(620);
                       easing.type: Easing.InOutSine }
   }
 }

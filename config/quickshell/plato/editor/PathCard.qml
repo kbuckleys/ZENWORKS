@@ -93,7 +93,7 @@ Item {
     textFormat: Text.PlainText
     font.family: Zenon.face
     font.weight: Zenon.weight
-    font.pixelSize: 13
+    font.pixelSize: Zenon.px(13)
     color: Zenon.accentMuted
     readonly property string home: Quickshell.env("HOME")
     text: (card.file.startsWith(caption.home + "/") ? "~" + card.file.slice(caption.home.length) : card.file)

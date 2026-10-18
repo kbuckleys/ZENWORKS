@@ -88,6 +88,8 @@ Item {
 
   ListView {
     id: view
+    // the chosen one slides (morpheus/CursorBand), rather than each row lighting
+    CursorBand { follows: view; index: bv.line - 1 }
     anchors.top: bar.bottom
     anchors.left: parent.left
     anchors.right: parent.right
@@ -114,7 +116,7 @@ Item {
       height: view.rowH
       Rectangle {
         anchors.fill: parent
-        color: ln.index === bv.line - 1 ? Zenon.menuHi : "transparent"
+        color: "transparent"
       }
       // the bar: brighter the newer
       Rectangle {

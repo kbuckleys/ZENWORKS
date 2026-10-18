@@ -211,13 +211,13 @@ PlatoSheet {
         Text {
           font.family: Zenon.faceMono
           font.weight: Zenon.weight
-          font.pixelSize: 15
+          font.pixelSize: Zenon.px(15)
           color: Zenon.blue
           text: row.modelData.icon || ""
         }
         Text {
           font.family: Zenon.face
-          font.pixelSize: 14
+          font.pixelSize: Zenon.px(14)
           font.weight: Font.DemiBold
           font.letterSpacing: 1.1
           color: Zenon.blue
@@ -245,7 +245,7 @@ PlatoSheet {
           elide: Text.ElideRight
           font.family: Zenon.face
           font.weight: Zenon.weight
-          font.pixelSize: 16
+          font.pixelSize: Zenon.px(16)
           color: row.changed ? Zenon.yellow
             : row.gi === sheet.sel ? Zenon.white : Zenon.alpha(Zenon.ink, 0.9)
           text: row.spec ? row.spec.label : ""
@@ -260,23 +260,22 @@ PlatoSheet {
             width: parent.width + 4
             height: parent.width + 4
             radius: 5
-            color: restoreMa.containsMouse ? (restoreMa.pressed ? Zenon.pressWash(0.14) : Zenon.wash(0.08)) : Zenon.wash(0)
+            color: restoreMa.pressed ? Zenon.pressWash(0.14) : Zenon.wash(0)
           }
           Text {
             id: restoreGlyph
             anchors.centerIn: parent
             text: "\uE612"
-            color: restoreMa.containsMouse ? Zenon.ink : Zenon.yellow
+            color: restoreMa.pressed ? Zenon.ink : Zenon.yellow
             font.family: Zenon.glyphMono
             font.weight: Zenon.weight
-            font.pixelSize: 15
+            font.pixelSize: Zenon.px(15)
           }
           MouseArea {
             id: restoreMa
             anchors.fill: parent
             anchors.margins: -3
             hoverEnabled: true
-            cursorShape: Qt.PointingHandCursor
             onClicked: { if (row.spec) sheet.settings.reset(row.spec.key); query.forceActiveFocus(); }
           }
         }
@@ -380,7 +379,7 @@ PlatoSheet {
     elide: Text.ElideRight
     font.family: Zenon.face
     font.weight: Zenon.weight
-    font.pixelSize: 14
+    font.pixelSize: Zenon.px(14)
     color: Zenon.accentMuted
     text: sheet.editing !== "" ? "" : sheet.cur ? (sheet.cur.help || "") : ""
   }
@@ -403,7 +402,7 @@ PlatoSheet {
       verticalAlignment: TextInput.AlignVCenter
       font.family: Zenon.faceFixed
       font.weight: Zenon.weight
-      font.pixelSize: 15
+      font.pixelSize: Zenon.px(15)
       color: Zenon.white
       selectionColor: Qt.rgba(Zenon.magenta.r, Zenon.magenta.g, Zenon.magenta.b, 0.5)
       cursorDelegate: Caret { field: textField }
@@ -495,7 +494,7 @@ PlatoSheet {
       horizontalAlignment: Text.AlignRight
       font.family: Zenon.face
       font.weight: Font.Medium
-      font.pixelSize: 16
+      font.pixelSize: Zenon.px(16)
       color: Zenon.white
       text: sl.spec ? Ora.display(sl.spec, sl.value) : ""
     }
@@ -534,7 +533,7 @@ PlatoSheet {
       anchors.verticalCenter: parent.verticalCenter
       font.family: Zenon.faceMono
       font.weight: Zenon.weight
-      font.pixelSize: 13
+      font.pixelSize: Zenon.px(13)
       color: Zenon.accentMuted
       text: "\u{F0141}"
     }
@@ -548,7 +547,7 @@ PlatoSheet {
       elide: Text.ElideRight
       font.family: Zenon.face
       font.weight: Font.Medium
-      font.pixelSize: 15
+      font.pixelSize: Zenon.px(15)
       color: Zenon.white
       text: chip.shown
     }
@@ -558,7 +557,7 @@ PlatoSheet {
       anchors.verticalCenter: parent.verticalCenter
       font.family: Zenon.faceMono
       font.weight: Zenon.weight
-      font.pixelSize: 13
+      font.pixelSize: Zenon.px(13)
       color: Zenon.accentMuted
       text: "\u{F0142}"
     }
@@ -617,7 +616,7 @@ PlatoSheet {
         elide: Text.ElideRight
         font.family: Zenon.face
         font.weight: Font.Medium
-        font.pixelSize: 15
+        font.pixelSize: Zenon.px(15)
         color: Zenon.white
         text: cc.spec ? Ora.display(cc.spec, cc.value) : ""
       }
@@ -628,7 +627,7 @@ PlatoSheet {
         anchors.verticalCenter: parent.verticalCenter
         font.family: Zenon.faceMono
         font.weight: Zenon.weight
-        font.pixelSize: 13
+        font.pixelSize: Zenon.px(13)
         color: Zenon.accentMuted
         text: "\u{F0140}"
       }
@@ -725,7 +724,7 @@ PlatoSheet {
     anchors.verticalCenterOffset: -sheet.helpH / 2
     font.family: Zenon.face
     font.weight: Zenon.weight
-    font.pixelSize: 16
+    font.pixelSize: Zenon.px(16)
     color: Zenon.accentMuted
     text: "No setting matches “" + query.text + "”"
   }

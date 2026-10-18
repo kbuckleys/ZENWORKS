@@ -43,7 +43,7 @@ Rectangle {
     : Zenon.mix(Zenon.ground, Zenon.cyan, get.big ? 0.22 : 0.16)
   border.width: 1
   border.color: get.ready ? Zenon.alpha(Zenon.cyan, 0.5) : Zenon.border
-  Behavior on color { ColorAnimation { duration: 110 } }
+  Behavior on color { ColorAnimation { duration: Zenon.ms(110) } }
 
   Text {
     id: getText
@@ -59,7 +59,6 @@ Rectangle {
     id: getMa
     anchors.fill: parent
     enabled: get.ready
-    cursorShape: get.ready ? Qt.PointingHandCursor : Qt.ArrowCursor
     onClicked: get.have ? get.launched() : get.got()
   }
 }

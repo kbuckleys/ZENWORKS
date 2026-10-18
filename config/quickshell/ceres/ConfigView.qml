@@ -259,6 +259,8 @@ Item {
       }
     }
 
+    // the chosen one slides (morpheus/CursorBand), rather than each row lighting
+    CursorBand { repeater: groupRep; index: view.gsel; radius: Zenon.windowRadius; border.width: 1; border.color: Zenon.border }
     Column {
       id: groupList
       x: 8
@@ -266,6 +268,7 @@ Item {
       width: view.sideW
       spacing: 4
       Repeater {
+        id: groupRep
         model: view.groups
         delegate: Rectangle {
           id: grow
@@ -274,8 +277,8 @@ Item {
           width: groupList.width
           height: 56
           radius: Zenon.windowRadius
-          color: grow.index === view.gsel ? Zenon.menuHi : "transparent"
-          border.width: grow.index === view.gsel ? 1 : 0
+          color: "transparent"
+          border.width: 0
           border.color: Zenon.border
           Rectangle {
             visible: view.groupDirty(grow.modelData.id)
@@ -461,7 +464,7 @@ Item {
             visible: view.paruHere !== "" && view.paruHere !== "paru" && view.paruHere !== "paru-git"
             width: parent.width
             wrapMode: Text.Wrap
-            text: "paru here comes from " + view.paruHere + ". Building either one replaces it."
+            text: "Paru here comes from " + view.paruHere + ". Building either one replaces it."
             color: Zenon.accentKey
             font.family: Zenon.face
             font.weight: Zenon.weight
@@ -887,7 +890,7 @@ Item {
           topPadding: 10
           spacing: 12
           Text {
-            text: orow.now.set ? "set in pacman.conf"
+            text: orow.now.set ? "Set in pacman.conf"
               : orow.spec.key === "SigLevel" ? "pacman's default" : "as Everything"
             color: Zenon.accentMuted
             font.family: Zenon.face
@@ -897,13 +900,13 @@ Item {
           Text {
             visible: orow.now.set
             text: "Reset"
-            color: wideResetHov.hovered ? Zenon.white : Zenon.cyan
+            color: wideResetPress.pressed ? Zenon.white : Zenon.cyan
             font.family: Zenon.face
             font.weight: Zenon.weight
             font.pixelSize: Zenon.px(13)
             font.underline: true
-            HoverHandler { id: wideResetHov; cursorShape: Qt.PointingHandCursor }
-            TapHandler { onTapped: view.setOpt(orow.spec.key, "") }
+            HoverHandler { id: wideResetHov }
+            TapHandler { id: wideResetPress; onTapped: view.setOpt(orow.spec.key, "") }
           }
         }
       }
@@ -964,7 +967,7 @@ Item {
             spacing: 12
             Text {
               anchors.verticalCenter: parent.verticalCenter
-              text: orow.now.set ? "set in pacman.conf"
+              text: orow.now.set ? "Set in pacman.conf"
                 : orow.spec.key === "SigLevel" ? "pacman's default" : "as Everything"
               color: Zenon.accentMuted
               font.family: Zenon.face
@@ -975,13 +978,13 @@ Item {
               anchors.verticalCenter: parent.verticalCenter
               visible: orow.now.set
               text: "Reset"
-              color: resetHov.hovered ? Zenon.white : Zenon.cyan
+              color: resetPress.pressed ? Zenon.white : Zenon.cyan
               font.family: Zenon.face
               font.weight: Zenon.weight
               font.pixelSize: Zenon.px(14)
               font.underline: true
-              HoverHandler { id: resetHov; cursorShape: Qt.PointingHandCursor }
-              TapHandler { onTapped: view.setOpt(orow.spec.key, "") }
+              HoverHandler { id: resetHov }
+              TapHandler { id: resetPress; onTapped: view.setOpt(orow.spec.key, "") }
             }
           }
           Check {
@@ -1082,7 +1085,7 @@ Item {
         visible: orow.spec.type !== "sig"
         spacing: 12
         Text {
-          text: orow.now.set ? "set in the file" : "unset · pacman uses: " + orow.spec.def
+          text: orow.now.set ? "Set in the file" : "Unset · pacman uses: " + orow.spec.def
           color: Zenon.accentMuted
           font.family: Zenon.face
           font.weight: Zenon.weight
@@ -1090,7 +1093,7 @@ Item {
         }
         Text {
           visible: orow.now.set && orow.spec.type !== "flag"
-          text: "unset"
+          text: "Unset"
           color: Zenon.cyan
           font.family: Zenon.face
           font.weight: Zenon.weight
@@ -1213,7 +1216,7 @@ Item {
               width: Math.max(0, Math.min(implicitWidth, titleRow.width - repoName.width - 44))
               visible: width > 30
               elide: Text.ElideRight
-              text: !card.repo.official ? "third party"
+              text: !card.repo.official ? "Third party"
                 : /testing|unstable/.test(card.repo.name) ? "pre-release" : "Arch"
               color: !card.repo.official ? Zenon.magenta : /testing|unstable/.test(card.repo.name) ? Zenon.yellow : Zenon.accentMuted
               font.family: Zenon.face
@@ -1303,7 +1306,7 @@ Item {
             Row {
               spacing: 8
               Text {
-                text: card.repo.SigLevel === "" ? "inherited from [options]" : "this repository's own"
+                text: card.repo.SigLevel === "" ? "Inherited from [options]" : "This repository's own"
                 color: Zenon.accentMuted
                 font.family: Zenon.face
                 font.weight: Zenon.weight
@@ -1311,7 +1314,7 @@ Item {
               }
               Text {
                 visible: card.repo.SigLevel !== ""
-                text: "use [options]"
+                text: "Use [options]"
                 color: Zenon.cyan
                 font.family: Zenon.face
                 font.weight: Zenon.weight

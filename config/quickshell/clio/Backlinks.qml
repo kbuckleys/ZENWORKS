@@ -37,7 +37,7 @@ Column {
       width: bl.width
       height: 34
       radius: Zenon.windowRadius
-      color: rowMa.containsMouse ? Zenon.wash(0.06) : "transparent"
+      color: rowMa.pressed ? Zenon.wash(0.06) : "transparent"
       Row {
         x: 8
         anchors.verticalCenter: parent.verticalCenter
@@ -68,7 +68,7 @@ Column {
           font.pixelSize: Zenon.px(12)
         }
       }
-      MouseArea { id: rowMa; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: bl.pane.win.openNote(row.modelData.id) }
+      MouseArea { id: rowMa; anchors.fill: parent; hoverEnabled: true; onClicked: bl.pane.win.openNote(row.modelData.id) }
     }
   }
 }

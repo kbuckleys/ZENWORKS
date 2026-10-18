@@ -170,7 +170,7 @@ Column {
           SettingLine {
             width: sb.colW
             label: "Check spelling"
-            note: sb.mgr && !sb.mgr.spellInfo.have ? "hunspell is not installed" : "A red line under a word it does not know; right click for guesses"
+            note: sb.mgr && !sb.mgr.spellInfo.have ? "Hunspell is not installed" : "A red line under a word it does not know; right click for guesses"
             Segments { options: [[true, "On"], [false, "Off"]]; current: sb.mgr ? sb.mgr.spellOn : true; textSize: Zenon.px(12); onChose: (v) => sb.mgr.setSpellOn(v) }
           }
           SettingLine {

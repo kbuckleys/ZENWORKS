@@ -616,22 +616,21 @@ FocusScope {
     Rectangle {
       anchors.fill: parent
       radius: 4
-      color: tgHover.hovered ? Zenon.wash(0.07) : "transparent"
+      color: "transparent"
     }
     Text {
       anchors.centerIn: parent
       font.family: Zenon.faceMono
       font.weight: Zenon.weight
       font.pixelSize: tree.toolbarGlyphSize
-      color: tg.on ? Zenon.cyan : tgHover.hovered ? Zenon.white : Zenon.muted
+      color: tg.on ? Zenon.cyan : tgPress.pressed ? Zenon.white : Zenon.muted
       text: tg.glyph
     }
     HoverHandler {
       id: tgHover
-      cursorShape: Qt.PointingHandCursor
       onHoveredChanged: hovered ? tips.show(tg, tg.tip, tg.key) : tips.hide(tg)
     }
-    TapHandler { onTapped: tg.hit() }
+    TapHandler { id: tgPress; onTapped: tg.hit() }
   }
   WindowTip { id: tips; window: tree.window }
   // a name the sidebar's width cut short, shown whole (terminus/NamePeek)
@@ -802,7 +801,7 @@ FocusScope {
       passive: false
       onToggled: { tree.sel = row.index; tree.toggle(row.modelData.e.path); }
       // the slide, as it is built — see branchMoved
-      Glide { id: rowGlide; limit: list.height; duration: 220 }
+      Glide { id: rowGlide; limit: list.height; duration: Zenon.ms(220) }
       z: tree.inBranch(row.modelData.e.path) ? -1 : 0
       NumberAnimation {
         id: rowFade
@@ -810,7 +809,7 @@ FocusScope {
         property: "opacity"
         from: 0
         to: 1
-        duration: 220
+        duration: Zenon.ms(220)
         easing.type: Easing.OutCubic
       }
       Component.onCompleted: {
@@ -905,7 +904,7 @@ FocusScope {
       font.weight: Zenon.weight
       font.pixelSize: tree.fontSize
       color: Zenon.muted
-      text: tree.editDirectory ? "directory name" : "name — end with / for a directory"
+      text: tree.editDirectory ? "Directory name" : "Name — end with / for a directory"
     }
     // focused for typing: terminus' held ring (user, 2026-10-11 — every
     // text field wears it, its own border staying neutral)

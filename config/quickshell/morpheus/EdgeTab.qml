@@ -93,7 +93,6 @@ Rectangle {
     anchors.fill: parent
     anchors.margins: -4
     hoverEnabled: true
-    cursorShape: Qt.PointingHandCursor
     onClicked: { tabNudgeAnim.restart(); tab.clicked(); }
   }
 }

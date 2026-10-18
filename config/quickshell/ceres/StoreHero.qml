@@ -25,6 +25,7 @@ ClippingRectangle {
   signal opened(var app)
   signal got(var app)
   signal launched(var app)
+  signal removed(var app)
 
   readonly property var app: hero.apps.length ? hero.apps[Math.min(hero.at, hero.apps.length - 1)] : null
   function turn(d) {
@@ -59,7 +60,7 @@ ClippingRectangle {
       anchors.fill: parent
       opacity: slide.index === hero.at ? 1 : 0
       visible: opacity > 0
-      Behavior on opacity { NumberAnimation { duration: 520; easing.type: Easing.InOutQuad } }
+      Behavior on opacity { NumberAnimation { duration: Zenon.ms(520); easing.type: Easing.InOutQuad } }
       Rectangle {
         anchors.fill: parent
         gradient: Gradient {
@@ -78,7 +79,7 @@ ClippingRectangle {
         smooth: true
         mipmap: true
         opacity: status === Image.Ready ? 1 : 0
-        Behavior on opacity { NumberAnimation { duration: 300 } }
+        Behavior on opacity { NumberAnimation { duration: Zenon.ms(300) } }
       }
     }
   }
@@ -105,7 +106,6 @@ ClippingRectangle {
     id: heroMa
     anchors.fill: parent
     hoverEnabled: true
-    cursorShape: Qt.PointingHandCursor
     onClicked: if (hero.app) hero.opened(hero.app)
   }
 
@@ -155,12 +155,23 @@ ClippingRectangle {
         font.pixelSize: Zenon.px(16)
       }
       Item { width: 1; height: 6 }
-      StoreGet {
-        big: true
-        app: hero.app
-        busy: hero.busy
-        onGot: hero.got(hero.app)
-        onLaunched: hero.launched(hero.app)
+      // Open, then the trash after it, as on the app's page and the cards
+      Row {
+        spacing: 12
+        StoreGet {
+          big: true
+          app: hero.app
+          busy: hero.busy
+          onGot: hero.got(hero.app)
+          onLaunched: hero.launched(hero.app)
+        }
+        StoreRemove {
+          visible: !!hero.app && !!hero.app.installed
+          anchors.verticalCenter: parent.verticalCenter
+          big: true
+          busy: hero.busy
+          onRemoved: hero.removed(hero.app)
+        }
       }
     }
   }
@@ -189,11 +200,10 @@ ClippingRectangle {
           radius: 3
           color: Zenon.white
           opacity: index === hero.at ? 0.95 : 0.4
-          Behavior on width { NumberAnimation { duration: 260; easing.type: Easing.OutCubic } }
+          Behavior on width { NumberAnimation { duration: Zenon.ms(260); easing.type: Easing.OutCubic } }
           MouseArea {
             anchors.fill: parent
             anchors.margins: -5
-            cursorShape: Qt.PointingHandCursor
             onClicked: { hero.at = index; turner.restart(); }
           }
         }

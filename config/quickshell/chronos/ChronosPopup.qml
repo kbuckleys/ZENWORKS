@@ -491,7 +491,7 @@ LayerPopup {
                     Text {
                       anchors.verticalCenter: parent.verticalCenter
                       text: Chr.monthName(popup.viewMonth)
-                      color: headMa.containsMouse ? Zenon.white : Zenon.cyan
+                      color: headMa.pressed ? Zenon.white : Zenon.cyan
                       Behavior on color { ColorAnimation { duration: Zenon.fast } }
                       font.family: popup.face
                       font.weight: Font.Bold
@@ -571,7 +571,7 @@ LayerPopup {
                       color: dayCell.isToday ? Zenon.cyan
                         : (dayCell.isSel
                             ? Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b, 0.16)
-                            : (dayMa.containsMouse ? Zenon.border : Zenon.alpha(Zenon.border, 0)))
+                            : (dayMa.pressed ? Zenon.border : Zenon.alpha(Zenon.border, 0)))
                       border.color: (dayCell.isSel && !dayCell.isToday) ? Zenon.cyan : "transparent"
                       border.width: 1
                       Behavior on color { ColorAnimation { duration: Zenon.fast } }
@@ -637,7 +637,7 @@ LayerPopup {
                   anchors.rightMargin: 12
                   anchors.verticalCenter: parent.verticalCenter
                   glyph: popup.glyphToday
-                  label: "today"
+                  label: "Today"
                   accent: Zenon.cyan
                   dimmed: popup.selIsToday && popup.viewMonth === popup.today.getMonth()
                     && popup.viewYear === popup.today.getFullYear()
@@ -684,7 +684,7 @@ LayerPopup {
                 // "try again" would be blaming the network for a choice made
                 // in the settings panel, and the button below would go on
                 // failing silently for as long as it was pressed.
-                text: Weather.disabled ? "the forecast is switched off"
+                text: Weather.disabled ? "The forecast is switched off"
                   : (Weather.loading ? "fetching the forecast…"
                   : (Weather.error !== "" ? Weather.error : "no forecast yet"))
                 color: Zenon.muted
@@ -696,7 +696,7 @@ LayerPopup {
                 anchors.horizontalCenter: parent.horizontalCenter
                 glyph: Wx.icon("refresh")
                 visible: !Weather.disabled
-                label: Weather.located ? "try again" : "find me"
+                label: Weather.located ? "Try again" : "Find me"
                 accent: Zenon.cyan
                 dimmed: Weather.loading
                 onActivated: if (!Weather.loading) Weather.refresh()
@@ -729,7 +729,7 @@ LayerPopup {
 
                   Text {
                     anchors.verticalCenter: parent.verticalCenter
-                    text: Weather.place !== "" ? Weather.place : "here"
+                    text: Weather.place !== "" ? Weather.place : "Here"
                     color: Zenon.cyan
                     font.family: popup.face
                     font.weight: Font.Bold
@@ -754,13 +754,13 @@ LayerPopup {
 
                   PillButton {
                     glyph: Weather.fahrenheit ? popup.glyphCelsius : popup.glyphFahren
-                    label: Weather.fahrenheit ? "to °C" : "to °F"
+                    label: Weather.fahrenheit ? "To °C" : "To °F"
                     accent: Zenon.sand
                     onActivated: Weather.toggleUnits()
                   }
                   PillButton {
                     glyph: Wx.icon("refresh")
-                    label: Weather.loading ? "fetching" : "refresh"
+                    label: Weather.loading ? "Fetching" : "Refresh"
                     accent: Weather.error !== "" ? Zenon.red : Zenon.cyan
                     dimmed: Weather.loading
                     onActivated: if (!Weather.loading) Weather.refresh()
@@ -960,7 +960,7 @@ LayerPopup {
                 Text {
                   anchors.horizontalCenter: parent.horizontalCenter
                   anchors.bottom: parent.bottom
-                  text: "next 12 hours"
+                  text: "Next 12 hours"
                   color: Zenon.muted
                   font.family: popup.face
                   font.weight: Zenon.weight
@@ -1005,7 +1005,7 @@ LayerPopup {
                     radius: 6
                     color: dayStrip.isSel
                       ? Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b, 0.16)
-                      : (stripMa.containsMouse ? Zenon.border : Zenon.alpha(Zenon.border, 0))
+                      : (stripMa.pressed ? Zenon.border : Zenon.alpha(Zenon.border, 0))
                     border.color: dayStrip.isSel ? Zenon.cyan : "transparent"
                     border.width: 1
                     Behavior on color { ColorAnimation { duration: Zenon.fast } }
@@ -1018,7 +1018,7 @@ LayerPopup {
 
                     Text {
                       anchors.horizontalCenter: parent.horizontalCenter
-                      text: dayStrip.isToday ? "now"
+                      text: dayStrip.isToday ? "Now"
                         : Chr.dayShort(Chr.weekIndex(dayStrip.when))
                       color: dayStrip.isToday ? Zenon.cyan : Zenon.muted
                       font.family: popup.face
@@ -1099,7 +1099,7 @@ LayerPopup {
                 width: parent.width
                 height: popup.emptyH
                 radius: 8
-                color: emptyMa.containsMouse ? Zenon.border : "transparent"
+                color: emptyMa.pressed ? Zenon.border : "transparent"
                 border.color: Zenon.border
                 border.width: 1
                 Behavior on color { ColorAnimation { duration: Zenon.fast } }
@@ -1112,7 +1112,7 @@ LayerPopup {
                   Text {
                     anchors.verticalCenter: parent.verticalCenter
                     text: popup.glyphTimer
-                    color: emptyMa.containsMouse ? Zenon.cyan : Zenon.muted
+                    color: emptyMa.pressed ? Zenon.cyan : Zenon.muted
                     Behavior on color { ColorAnimation { duration: Zenon.fast } }
                     font.family: popup.face
                     font.weight: Zenon.weight
@@ -1120,7 +1120,7 @@ LayerPopup {
                   }
                   Text {
                     anchors.verticalCenter: parent.verticalCenter
-                    text: "no timers — click to start one"
+                    text: "No timers — click to start one"
                     color: Zenon.muted
                     font.family: popup.face
                     font.weight: Font.Bold
@@ -1257,14 +1257,14 @@ LayerPopup {
                 anchors.verticalCenter: parent.verticalCenter
                 glyph: popup.glyphOk
                 accent: Zenon.green
-                label: popup.nameTarget < 0 ? "create" : "rename"
+                label: popup.nameTarget < 0 ? "Create" : "Rename"
                 onActivated: popup.commitName()
               }
               PillButton {
                 anchors.verticalCenter: parent.verticalCenter
                 glyph: popup.glyphRemove
                 accent: Zenon.red
-                label: "cancel"
+                label: "Cancel"
                 onActivated: popup.cancelName()
               }
             }
@@ -1302,7 +1302,7 @@ LayerPopup {
       : (cell.armed ? Zenon.sand : Zenon.cyan)
 
     radius: 8
-    color: cellHover.hovered ? Zenon.selBg : Zenon.panelBg
+    color: cellMa.pressed ? Zenon.selBg : Zenon.panelBg
     border.color: cell.running
       ? Qt.rgba(cell.accent.r, cell.accent.g, cell.accent.b, 0.55) : Zenon.surface
     border.width: 1
@@ -1447,7 +1447,7 @@ LayerPopup {
           width: 30
           horizontalAlignment: Text.AlignHCenter
           text: (cell.t !== null ? cell.t.minutes : 0) + "m"
-          color: cellHover.hovered ? Zenon.keyInk : Zenon.muted
+          color: cellMa.pressed ? Zenon.keyInk : Zenon.muted
           Behavior on color { ColorAnimation { duration: Zenon.fast } }
           font.family: popup.face
           font.weight: Font.Bold
@@ -1669,7 +1669,7 @@ LayerPopup {
     Text {
       anchors.centerIn: parent
       text: chev.glyph
-      color: chevMa.containsMouse ? Zenon.cyan : Zenon.muted
+      color: chevMa.pressed ? Zenon.cyan : Zenon.muted
       Behavior on color { ColorAnimation { duration: Zenon.fast } }
       font.family: popup.face
       font.weight: Font.Bold

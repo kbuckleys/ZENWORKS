@@ -125,12 +125,12 @@ Item {
       : map.scroll ? (map.scroll.top - map.first) * map.lineH : 0
     height: Math.max(8, map.viewRows * map.lineH)
     // the shell's cursor color, as every "you are here" in it
-    color: Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b, drag.pressed ? 0.32 : hover.hovered ? 0.26 : 0.20)
+    color: Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b, drag.pressed ? 0.32 : 0.20)
     border.width: 1
     border.color: Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b, drag.pressed ? 0.85 : 0.60)
     Behavior on y { enabled: !drag.pressed; NumberAnimation { duration: Zenon.brisk; easing.type: Zenon.travelEase } }
   }
-  HoverHandler { id: hover; cursorShape: Qt.PointingHandCursor }
+  HoverHandler { id: hover }
 
   // a click or a drag: the view centered on the line under the pointer
   MouseArea {

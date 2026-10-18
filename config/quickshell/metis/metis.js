@@ -1036,7 +1036,7 @@ function chipFacts(chip, result, kind) {
       lines.push({ text: "1 " + rc + " = " + rateText(cv / rv) + " " + cc, glyph: "\u{F04E1}" });
       lines.push({ text: "1 " + cc + " = " + rateText(rv / cv) + " " + rc });
     }
-    if (ci && ci.where.length > 0 && ci.where.length <= 3) lines.push({ text: "spent in " + ci.where.join(", "), muted: true });
+    if (ci && ci.where.length > 0 && ci.where.length <= 3) lines.push({ text: "Spent in " + ci.where.join(", "), muted: true });
     return lines;
   }
   const cu = unitOf(c), ru = unitOf(r);

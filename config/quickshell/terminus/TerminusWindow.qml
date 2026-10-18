@@ -2535,87 +2535,87 @@ FloatingWindow {
   readonly property var keyGroups: [
     // No back/forward row: they are verbs, so the palette lists them itself
     // rather than this writing the same pair down a second time.
-    ["move", [["j / k  ↓ ↑", "down / up"],
-              ["←  backspace", "parent"], ["→", "enter a directory"],
+    ["move", [["j / k  ↓ ↑", "Down / up"],
+              ["←  backspace", "Parent"], ["→", "Enter a directory"],
               // What h / l and the horizontal arrows do depends on the
               // view, so the hint has to as well — see root.treeKeys.
               [root.treeKeys ? "h / l  ← / →" : "h / l",
-               root.treeKeys ? "collapse / expand" : "back / forward"],
-              ["↵", "open"], ["space", "quick look"],
-              ["g g", "top"], ["G", "bottom"],
-              ["ctrl u / d", "half page"], ["ctrl b / f", "page"],
+               root.treeKeys ? "Collapse / expand" : "Back / forward"],
+              ["↵", "Open"], ["space", "Quick look"],
+              ["g g", "Top"], ["G", "Bottom"],
+              ["ctrl u / d", "Half page"], ["ctrl b / f", "Page"],
               [root.mouseKey(4) + " / " + root.mouseKey(5),
-               "back / forward"]]],
-    ["select", [["shift space", "toggle and move on"],
-                ["v", "visual select"],
-                ["ctrl a", "select all"],
-                ["ctrl r", "invert selection"],
-                ["esc", "leave visual, then clear"]]],
-    ["act", [["y y", "copy"], ["y t", "copy to"],
-             ["x x", "cut"], ["x t", "move to"], ["p", "paste"],
-             ["d", "trash"], ["D", "delete for good"],
-             ["a", "create (end in / for a directory)"],
-             ["A", "create inside the directory under the cursor"], ["r", "rename"],
-             ["c m", "permissions"],
-             ["u", "undo trash / move / rename"],
-             ["z", "measure directory size"],
-             ["c a", "archive selection"],
-             ["c x", "extract archive"]]],
-    ["look", [["f  /", "filter"], ["s", "search names"],
-              ["S", "search contents"], [".", "hidden"],
-              [", n / s / m / k", "sort name / size / time / kind"],
-              [", !", "reverse"],
-              ["V", "view: columns · list · grid"], ["+ / -", "zoom"],
-              ["ctrl 0", "reset zoom"]]],
-    ["go", [["g r", "the directory a row actually lives in"],
-            ["g space", "go to\u2026 (tab completes)"],
+               "Back / forward"]]],
+    ["select", [["shift space", "Toggle and move on"],
+                ["v", "Visual select"],
+                ["ctrl a", "Select all"],
+                ["ctrl r", "Invert selection"],
+                ["esc", "Leave visual, then clear"]]],
+    ["act", [["y y", "Copy"], ["y t", "Copy to"],
+             ["x x", "Cut"], ["x t", "Move to"], ["p", "Paste"],
+             ["d", "Trash"], ["D", "Delete for good"],
+             ["a", "Create (end in / for a directory)"],
+             ["A", "Create inside the directory under the cursor"], ["r", "Rename"],
+             ["c m", "Permissions"],
+             ["u", "Undo trash / move / rename"],
+             ["z", "Measure directory size"],
+             ["c a", "Archive selection"],
+             ["c x", "Extract archive"]]],
+    ["look", [["f  /", "Filter"], ["s", "Search names"],
+              ["S", "Search contents"], [".", "Hidden"],
+              [", n / s / m / k", "Sort name / size / time / kind"],
+              [", !", "Reverse"],
+              ["V", "View: columns · list · grid"], ["+ / -", "Zoom"],
+              ["ctrl 0", "Reset zoom"]]],
+    ["go", [["g r", "The directory a row actually lives in"],
+            ["g space", "Go to\u2026 (tab completes)"],
             // The sheet's own footer says this, and F1 did not — the one
             // place the chord was not written down. `false` because it
             // claims no verb: the palette's shift+return is the listing's,
             // which hands a FILE to open-with. See the note in the builder.
-            ["shift return", "go to\u2026 landing in a new tab", false],
-            ["g h", "home"], ["g c", "config"], ["g d", "downloads"],
-            ["g D", "documents"], ["g p", "pictures"], ["g v", "videos"],
-            ["g t", "the trash"], ["g m", "media"], ["g /", "root"]]],
-    ["copy", [["c c", "full path"], ["c d", "directory"],
-              ["c f", "filename"], ["c n", "name without extension"]]],
-    ["tabs", [["t", "new"], ["w", "close"], ["1 - 9", "switch"],
-              ["shift return", "open a directory in a new tab", false],
-              [root.mouseKey(3), "open a directory in a new tab"],
-              ["[  ]", "previous / next"]]],
-    ["panes", [["\\", "second pane on / off"],
-               ["tab  o", "step into the other side"],
-               ["alt \u2190 \u2192", "resize the split"],
-               ["|", "sidebar on / off"],
-               ["alt shift \u2190 \u2192", "resize the sidebar"],
-               ["f5", "copy to the other side"],
-               ["f6", "move to the other side"],
-               [root.mouseKey(1), "step into the other side"]]],
-    ["marks", [["b a", "bookmark this directory"],
-               ["b b", "bookmark the item under the cursor"]]],
-    ["tags", [["c t", "tag the selection"],
-              ["\u21b5", "put the tag on / take it off"],
-              ["type", "filter, or name a new tag"],
-              ["alt r", "rename the highlighted tag, in the row"],
-              ["del", "remove a tag everywhere"],
-              ["menu", "the seven colors, on the row's own menu"]]],
-    ["collections", [["c s", "new collection"],
-                     ["click", "open one from the sidebar"],
-                     ["right click", "edit one from the sidebar"],
-                     ["middle click", "remove one from the sidebar"],
-                     ["esc", "leave it and go back"]]],
-    ["dialogs", [["esc", "close"], ["return", "accept"],
-                 ["\u2190 \u2192 \u2191 \u2193", "move (permissions)"],
-                 ["space", "toggle a bit"],
-                 ["s", "checksum (info)"]]],
-    ["menu", [["menu key", "actions for the row"],
-              [root.mouseKey(2), "actions for the row"],
-              ["\u2014", "archive · open with"],
-              ["\u2014", "bulk rename · links · restore"],
-              ["\u2014", "sort, as a submenu"]]],
+            ["shift return", "Go to\u2026 landing in a new tab", false],
+            ["g h", "Home"], ["g c", "Config"], ["g d", "Downloads"],
+            ["g D", "Documents"], ["g p", "Pictures"], ["g v", "Videos"],
+            ["g t", "The trash"], ["g m", "Media"], ["g /", "Root"]]],
+    ["copy", [["c c", "Full path"], ["c d", "Directory"],
+              ["c f", "Filename"], ["c n", "Name without extension"]]],
+    ["tabs", [["t", "New"], ["w", "Close"], ["1 - 9", "Switch"],
+              ["shift return", "Open a directory in a new tab", false],
+              [root.mouseKey(3), "Open a directory in a new tab"],
+              ["[  ]", "Previous / next"]]],
+    ["panes", [["\\", "Second pane on / off"],
+               ["tab  o", "Step into the other side"],
+               ["alt \u2190 \u2192", "Resize the split"],
+               ["|", "Sidebar on / off"],
+               ["alt shift \u2190 \u2192", "Resize the sidebar"],
+               ["f5", "Copy to the other side"],
+               ["f6", "Move to the other side"],
+               [root.mouseKey(1), "Step into the other side"]]],
+    ["marks", [["b a", "Bookmark this directory"],
+               ["b b", "Bookmark the item under the cursor"]]],
+    ["tags", [["c t", "Tag the selection"],
+              ["\u21b5", "Put the tag on / take it off"],
+              ["type", "Filter, or name a new tag"],
+              ["alt r", "Rename the highlighted tag, in the row"],
+              ["del", "Remove a tag everywhere"],
+              ["menu", "The seven colors, on the row's own menu"]]],
+    ["collections", [["c s", "New collection"],
+                     ["click", "Open one from the sidebar"],
+                     ["right click", "Edit one from the sidebar"],
+                     ["middle click", "Remove one from the sidebar"],
+                     ["esc", "Leave it and go back"]]],
+    ["dialogs", [["esc", "Close"], ["return", "Accept"],
+                 ["\u2190 \u2192 \u2191 \u2193", "Move (permissions)"],
+                 ["space", "Toggle a bit"],
+                 ["s", "Checksum (info)"]]],
+    ["menu", [["menu key", "Actions for the row"],
+              [root.mouseKey(2), "Actions for the row"],
+              ["\u2014", "Archive · open with"],
+              ["\u2014", "Bulk rename · links · restore"],
+              ["\u2014", "Sort, as a submenu"]]],
     // (the mouse's back / forward is under move, once)
-    ["window", [["q", "close"],
-                ["esc", "clear filter / selection"]]],
+    ["window", [["q", "Close"],
+                ["esc", "Clear filter / selection"]]],
     // THE LIST DESCRIBING ITSELF, which is not as odd as it looks: it is the
     // keymap, and the keys that drive it are keys. They were the one set that
     // was only ever printed along its own footer, where a hint strip is read
@@ -2624,11 +2624,11 @@ FloatingWindow {
     // F1 is not among them any more. It opened a separate keymap page, that
     // page is this list, and a second key to the same door is a key to
     // remember for nothing.
-    ["palette", [["F1 / ~ / ctrl p", "open this list"],
-                 ["\u2014", "type to filter"],
-                 ["\u2191 \u2193", "move"],
-                 ["\u21b5", "run the highlighted verb"],
-                 ["esc", "close"]]]
+    ["palette", [["F1 / ~ / ctrl p", "Open this list"],
+                 ["\u2014", "Type to filter"],
+                 ["\u2191 \u2193", "Move"],
+                 ["\u21b5", "Run the highlighted verb"],
+                 ["esc", "Close"]]]
   ]
 
   // ── EVERY VERB, BY NAME ────────────────────────────────────────────────
@@ -2660,77 +2660,77 @@ FloatingWindow {
       }
     }
     const one = [
-      ["open",              "\u21b5", () => root.activate()],
-      ["open with",         "\udb81\ude36 \u21b5", () => root.beginOpenWith(
+      ["Open",              "\u21b5", () => root.activate()],
+      ["Open with",         "\udb81\ude36 \u21b5", () => root.beginOpenWith(
                                               root.currentRow()
                                                 ? root.currentRow().path : "")],
-      ["quick look",        "space",   () => root.quickLook()],
+      ["Quick look",        "space",   () => root.quickLook()],
       // BOTH KEYS ON THE VERB, not a verb keyed `h` and a keymap row saying
       // `h / l  ← →` beside it. They were the same two things listed twice —
       // once as something you could run and once as something to read — and
       // the palette drew them as two rows a few lines apart.
-      ["back",              "h",       () => root.back()],
-      ["forward",           "l",       () => root.forward()],
-      ["up a directory",    "h",       () => root.goUp()],
-      ["rename",            "r",       () => root.beginRename()],
-      ["bulk rename",       "r",       () => root.beginBulkRename()],
-      ["duplicate",         "y d",     () => root.duplicate()],
-      ["make symlink",      "y l",     () => root.linkHere()],
-      ["rotate left",       "[",       () => root.rotateLook(-90)],
-      ["rotate right",      "]",       () => root.rotateLook(90)],
-      ["extract audio",     "e",       () => root.extractAudio()],
-      ["sort by tag",       ", t",     () => root.setSort("tag")],
-      ["group headings",    ", h",     () => root.toggleGrouped()],
-      ["expand in place",   "l",       () => {
+      ["Back",              "h",       () => root.back()],
+      ["Forward",           "l",       () => root.forward()],
+      ["Up a directory",    "h",       () => root.goUp()],
+      ["Rename",            "r",       () => root.beginRename()],
+      ["Bulk rename",       "r",       () => root.beginBulkRename()],
+      ["Duplicate",         "y d",     () => root.duplicate()],
+      ["Make symlink",      "y l",     () => root.linkHere()],
+      ["Rotate left",       "[",       () => root.rotateLook(-90)],
+      ["Rotate right",      "]",       () => root.rotateLook(90)],
+      ["Extract audio",     "e",       () => root.extractAudio()],
+      ["Sort by tag",       ", t",     () => root.setSort("tag")],
+      ["Group headings",    ", h",     () => root.toggleGrouped()],
+      ["Expand in place",   "l",       () => {
         const r = root.currentRow();
         if (r && r.isDir) root.act.setOpen(r.path, true);
       }],
-      ["collapse all",      "",        () => root.collapseAll()],
-      ["paste",             "p",       () => root.paste()],
-      ["new file or directory", "a",      () => root.beginCreate(false)],
-      ["new file or directory inside", "A", () => root.beginCreate(true)],
-      ["new directory with selection", "c g", () => root.gatherIntoFolder()],
-      ["trash",             "d",       () => root.trash()],
-      ["delete for good",   "D",       () => root.deleteForever()],
-      ["undo",              "u",       () => root.undo()],
-      ["select all",        "ctrl a",  () => root.selectAll()],
-      ["invert selection",  "ctrl r",  () => root.invertSelection()],
-      ["search names",      "s",       () => root.beginSearch("find")],
-      ["search contents",   "S",       () => root.beginSearch("grep")],
+      ["Collapse all",      "",        () => root.collapseAll()],
+      ["Paste",             "p",       () => root.paste()],
+      ["New file or directory", "a",      () => root.beginCreate(false)],
+      ["New file or directory inside", "A", () => root.beginCreate(true)],
+      ["New directory with selection", "c g", () => root.gatherIntoFolder()],
+      ["Trash",             "d",       () => root.trash()],
+      ["Delete for good",   "D",       () => root.deleteForever()],
+      ["Undo",              "u",       () => root.undo()],
+      ["Select all",        "ctrl a",  () => root.selectAll()],
+      ["Invert selection",  "ctrl r",  () => root.invertSelection()],
+      ["Search names",      "s",       () => root.beginSearch("find")],
+      ["Search contents",   "S",       () => root.beginSearch("grep")],
       // alt return, which is the key it has always answered to and the only
       // verb here listed with no key at all — the palette drew it with an
       // empty chip while the keymap wrote the key down separately, so neither
       // half said the whole thing.
-      ["info",              "alt \u21b5",  () => props.ask()],
-      ["permissions",       "c m",     () => root.openProperties(1)],
-      ["disks",             "M",       () => disks.ask()],
-      ["tags",              "c t",     () => tagPick.ask()],
-      ["new collection",  "c s",     () => collEdit.ask(-1)],
+      ["Info",              "alt \u21b5",  () => props.ask()],
+      ["Permissions",       "c m",     () => root.openProperties(1)],
+      ["Disks",             "M",       () => disks.ask()],
+      ["Tags",              "c t",     () => tagPick.ask()],
+      ["New collection",  "c s",     () => collEdit.ask(-1)],
       // Editing one is only offered while you are looking at it, which is
       // also the only time you know which one you mean.
-      ["edit collection", "",        () => {
+      ["Edit collection", "",        () => {
         if (root.collOpenId >= 0) collEdit.ask(root.collOpenId);
         else root.warn("open a collection first");
       }],
-      ["go to containing directory", "g r", () => root.reveal()],
-      ["reindex tags",      "",        () => root.rebuildTagIndex()],
-      ["new tab",           "t",       () => root.newTab()],
-      ["close tab",         "ctrl c",  () => root.closeTab()],
-      ["split view",        "\\",      () => root.toggleDual()],
-      ["step to other pane", "o",      () => root.stepOver()],
-      ["sidebar",           "|",       () => root.toggleSidebar()],
-      ["cycle view",        "V",       () => root.cycleView()],
-      ["hidden files",      ".",       () => root.showHidden = !root.showHidden],
-      ["disk usage",        ", u",     () => root.toggleUsage()],
-      ["git status",        ", g",     () => root.toggleGit()],
+      ["Go to containing directory", "g r", () => root.reveal()],
+      ["Reindex tags",      "",        () => root.rebuildTagIndex()],
+      ["New tab",           "t",       () => root.newTab()],
+      ["Close tab",         "ctrl c",  () => root.closeTab()],
+      ["Split view",        "\\",      () => root.toggleDual()],
+      ["Step to other pane", "o",      () => root.stepOver()],
+      ["Sidebar",           "|",       () => root.toggleSidebar()],
+      ["Cycle view",        "V",       () => root.cycleView()],
+      ["Hidden files",      ".",       () => root.showHidden = !root.showHidden],
+      ["Disk usage",        ", u",     () => root.toggleUsage()],
+      ["Git status",        ", g",     () => root.toggleGit()],
       // the directory under the cursor, not the one you are standing in —
       // the same thing ctrl return and the row menu's entry do
-      ["open terminal here", "ctrl \u21b5", () => {
+      ["Open terminal here", "ctrl \u21b5", () => {
         const r = root.currentRow();
         if (r && r.isDir) root.run(Terminus.shellCommand(r.path, root.termCmd));
         else root.openShell();
       }],
-      ["settings",          "",        () => prefs.open = true]
+      ["Settings",          "",        () => prefs.open = true]
     ];
     for (let i = 0; i < one.length; i++)
       verbs.push({ label: one[i][0], key: one[i][1], act: one[i][2],
@@ -4218,8 +4218,9 @@ FloatingWindow {
   //
   // NOT a motion-scale setting: Zenon already has one of those and turning the
   // whole desktop's motion down to nothing is a different request from wanting
-  // this one thing to stop sliding.
-  property bool cursorSlide: true
+  // this one thing to stop sliding. Oracle's now, for every list in the shell
+  // (Zenon.cursorSlide; user, 2026-10-19) — no longer a terminus preference.
+  readonly property bool cursorSlide: Zenon.cursorSlide
 
   // The strip comes and goes with the second tab, so the body jumps by its
   // height the moment one is opened and again when it is closed. On, it is
@@ -4978,45 +4979,45 @@ FloatingWindow {
     // is two chances to disagree.
     readonly property var sequences: ({
       g: [
-        ["g", "top",       () => { root.act.sel = 0; root.positionSel(); }],
-        ["h", "home",      () => root.goTo(Paths.home())],
-        ["c", "config",    () => root.goTo(Paths.configDir())],
-        ["d", "downloads", () => root.goTo(UserDirs.downloads)],
-        ["D", "documents", () => root.goTo(UserDirs.documents)],
-        ["p", "pictures",  () => root.goTo(UserDirs.pictures)],
-        ["v", "videos",    () => root.goTo(UserDirs.videos)],
-        ["t", "trash",     () => root.goTo(Terminus.trashFilesDir())],
-        ["b", "bookmarks", () => marks.ask()],
-        ["r", "containing dir", () => root.reveal()],
-        ["m", "media",     () => root.goTo("/run/media")],
-        ["/", "root",      () => root.goTo("/")],
+        ["g", "Top",       () => { root.act.sel = 0; root.positionSel(); }],
+        ["h", "Home",      () => root.goTo(Paths.home())],
+        ["c", "Config",    () => root.goTo(Paths.configDir())],
+        ["d", "Downloads", () => root.goTo(UserDirs.downloads)],
+        ["D", "Documents", () => root.goTo(UserDirs.documents)],
+        ["p", "Pictures",  () => root.goTo(UserDirs.pictures)],
+        ["v", "Videos",    () => root.goTo(UserDirs.videos)],
+        ["t", "Trash",     () => root.goTo(Terminus.trashFilesDir())],
+        ["b", "Bookmarks", () => marks.ask()],
+        ["r", "Containing dir", () => root.reveal()],
+        ["m", "Media",     () => root.goTo("/run/media")],
+        ["/", "Root",      () => root.goTo("/")],
         // THE SAME SHEET THAT SENDS, ASKED TO GO INSTEAD. Picking a place
         // out of a tree you can filter is the same act whether something is
         // traveling with you or not, and it was already built — so this is
         // the picker with its destination handed to goTo rather than to
         // paste, not a second picker that happens to look like it.
-        [" ", "go to", () => sendTo.ask("go")]
+        [" ", "Go to", () => sendTo.ask("go")]
       ],
       c: [
-        ["c", "copy path",     () => { const r = root.currentRow();
+        ["c", "Copy path",     () => { const r = root.currentRow();
                                        if (r) root.copyText(r.path, "path copied"); }],
-        ["d", "copy dirname",  () => { const r = root.currentRow();
+        ["d", "Copy dirname",  () => { const r = root.currentRow();
                                        if (r) root.copyText(Terminus.dirname(r.path), "dirname copied"); }],
-        ["f", "copy filename", () => { const r = root.currentRow();
+        ["f", "Copy filename", () => { const r = root.currentRow();
                                        if (r) root.copyText(r.name, "filename copied"); }],
-        ["n", "copy name",     () => { const r = root.currentRow();
+        ["n", "Copy name",     () => { const r = root.currentRow();
                                        if (r) root.copyText(Terminus.stem(r.name), "name copied"); }],
-        ["m", "permissions",   () => root.openProperties(1)],
-        ["t", "tags",          () => tagPick.ask()],
-        ["s", "collection",  () => collEdit.ask(-1)],
-        ["a", "archive",       () => root.beginArchive("")],
+        ["m", "Permissions",   () => root.openProperties(1)],
+        ["t", "Tags",          () => tagPick.ask()],
+        ["s", "Collection",  () => collEdit.ask(-1)],
+        ["a", "Archive",       () => root.beginArchive("")],
         // The other half of `c a`, beside it: an archive is unpacked next to
         // itself, the same as the menu's Extract here.
-        ["x", "extract",       () => root.extractSelected()],
-        ["g", "directory with these", () => root.gatherIntoFolder()]
+        ["x", "Extract",       () => root.extractSelected()],
+        ["g", "Directory with these", () => root.gatherIntoFolder()]
       ],
       b: [
-        ["a", "bookmark here",   () => root.toggleBookmark()],
+        ["a", "Bookmark here",   () => root.toggleBookmark()],
         // ONE key that goes both ways, on whatever the cursor is on. `b d`
         // used to sit beside `b a` as "remove bookmark" and called exactly the
         // same function — two entries in the hint bar for one toggle, neither
@@ -5035,29 +5036,29 @@ FloatingWindow {
       // prefixes are shaped the same way, so knowing one is knowing the
       // other.
       y: [
-        ["y", "copy",    () => root.yank("copy")],
-        ["t", "copy to", () => sendTo.ask("copy")],
+        ["y", "Copy",    () => root.yank("copy")],
+        ["t", "Copy to", () => sendTo.ask("copy")],
         // Under the copy prefix because that is what it is: a copy whose
         // destination is where you already are.
-        ["d", "duplicate", () => root.duplicate()],
+        ["d", "Duplicate", () => root.duplicate()],
         // Also under copy, and next to duplicate for the same reason: both
         // put a second thing here that stands for the first.
-        ["l", "symlink here", () => root.linkHere()]
+        ["l", "Symlink here", () => root.linkHere()]
       ],
       x: [
-        ["x", "cut",     () => root.yank("move")],
-        ["t", "move to", () => sendTo.ask("move")]
+        ["x", "Cut",     () => root.yank("move")],
+        ["t", "Move to", () => sendTo.ask("move")]
       ],
       ",": [
-        ["u", "disk usage",  () => root.toggleUsage()],
-        ["g", "git status",  () => root.toggleGit()],
-        ["n", "by name",     () => root.setSort("name")],
-        ["s", "by size",     () => root.setSort("size")],
-        ["m", "by modified", () => root.setSort("time")],
-        ["k", "by kind",     () => root.setSort("kind")],
-        ["t", "by tag",      () => root.setSort("tag")],
-        ["h", "headings",    () => root.toggleGrouped()],
-        ["!", "reverse",     () => root.sortDesc = !root.sortDesc]
+        ["u", "Disk usage",  () => root.toggleUsage()],
+        ["g", "Git status",  () => root.toggleGit()],
+        ["n", "By name",     () => root.setSort("name")],
+        ["s", "By size",     () => root.setSort("size")],
+        ["m", "By modified", () => root.setSort("time")],
+        ["k", "By kind",     () => root.setSort("kind")],
+        ["t", "By tag",      () => root.setSort("tag")],
+        ["h", "Headings",    () => root.toggleGrouped()],
+        ["!", "Reverse",     () => root.sortDesc = !root.sortDesc]
       ]
     })
 
@@ -5822,7 +5823,7 @@ FloatingWindow {
       Behavior on opacity {
         // the sheet's ink is already a curve: easing after it only lags it
         enabled: !root.sheetGlass
-        NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
+        NumberAnimation { duration: Zenon.ms(180); easing.type: Easing.OutCubic }
       }
     }
     Rectangle {
@@ -5838,7 +5839,7 @@ FloatingWindow {
       opacity: root.picking && (content.edgesOn(footEdges)
         || (chrome.millerBox.visible && content.edgesOn(footMillerEdges))) ? 0.62 : 0
       visible: opacity > 0.001
-      Behavior on opacity { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+      Behavior on opacity { NumberAnimation { duration: Zenon.ms(180); easing.type: Easing.OutCubic } }
     }
 
     // ── WHAT A SHEET FROSTS — see sheetBackdrop ──────────────────────
@@ -5989,14 +5990,27 @@ FloatingWindow {
       height: chrome.height
       visible: false
       layer.enabled: chrome.layer.enabled
-      Rectangle {
-        x: root.spliceX - chrome.x
-        y: root.spliceY - chrome.y
-        width: root.spliceW
-        height: root.spliceH
-        radius: Zenon.dialogRadius
-        opacity: root.sheetInk
-        color: "white"
+      // CUT OFF AT THE BAR'S FOOT (user, 2026-10-19: the Info sheet's rename
+      // ring "sunken"). A hanging card's box starts a corner radius above
+      // the seam, hidden behind the bar — and the hole followed it up there,
+      // cutting the bottom 10px out of the bar itself: the ring round the
+      // title lost its lower edge. Clipped here, the hole stops at the seam
+      // and keeps the box's square top (no listing in the corners).
+      Item {
+        readonly property real seam: chrome.tabStrip.height + chrome.crumbBar.height
+        y: seam
+        width: parent.width
+        height: Math.max(0, parent.height - seam)
+        clip: true
+        Rectangle {
+          x: root.spliceX - chrome.x
+          y: root.spliceY - chrome.y - parent.seam
+          width: root.spliceW
+          height: root.spliceH
+          radius: Zenon.dialogRadius
+          opacity: root.sheetInk
+          color: "white"
+        }
       }
     }
 

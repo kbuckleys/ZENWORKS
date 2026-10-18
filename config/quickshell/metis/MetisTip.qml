@@ -22,7 +22,7 @@ Rectangle {
   width: row.implicitWidth + 14
   height: 24
   radius: 5
-  color: tip.hovered ? Zenon.alpha(Zenon.border, 0.45) : Zenon.alpha(Zenon.border, 0)
+  color: Zenon.alpha(Zenon.border, 0)
   Behavior on color { ColorAnimation { duration: Zenon.fast } }
   border.width: 1
   border.color: Zenon.alpha(Zenon.border, 0.8)

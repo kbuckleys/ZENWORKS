@@ -419,6 +419,7 @@ Item {
           }
           TitleName {
             id: headName
+            ringBox: sheetHead
             anchors.verticalCenter: parent.verticalCenter
             maxWidth: sheetHead.width - 80
             text: sheet.heldTitle

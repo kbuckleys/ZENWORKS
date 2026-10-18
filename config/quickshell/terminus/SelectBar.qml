@@ -43,7 +43,7 @@ Item {
   property real radius: 0
   property real inset: 0
 
-  readonly property bool slides: bar.animate && (!bar.host || bar.host.cursorSlide !== false)
+  readonly property bool slides: bar.animate && Zenon.cursorSlide && (!bar.host || bar.host.cursorSlide !== false)
   readonly property bool filled: !bar.view || bar.view.count === undefined || bar.view.count > 0
 
   // A BAR COMING BACK LANDS, IT DOES NOT FLY IN. While it has no row (index

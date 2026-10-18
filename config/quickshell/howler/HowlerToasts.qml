@@ -961,7 +961,7 @@ PanelWindow {
                       : verb === "next" ? "\uF04E"
                       : ((toast.mpris ? toast.mpris.isPlaying : NowPlaying.playing)
                          ? "\uF04C" : "\uF04B")
-                  color: btnHov.hovered ? Howler.titleInk : Howler.bodyInk
+                  color: btnPress.pressed ? Howler.titleInk : Howler.bodyInk
                   font.family: Zenon.face
                   font.weight: Zenon.weight
                   font.pixelSize: Howler.fontSize
@@ -971,6 +971,7 @@ PanelWindow {
                   // skipping back. A MouseArea consumes it.
                   HoverHandler { id: btnHov }
                   MouseArea {
+                    id: btnPress
                     anchors.fill: parent
                     anchors.margins: -6
                     // THE ACTION SAYS WHICH BUTTONS EXIST; it does not get

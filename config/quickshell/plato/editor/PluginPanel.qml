@@ -447,7 +447,7 @@ PlatoSheet {
       x: 12
       font: panel.face
       color: Zenon.accentMuted
-      text: panel.filtering ? "type to filter languages" : "owner/repo, or a git URL"
+      text: panel.filtering ? "Type to filter languages" : "Owner/repo, or a git URL"
     }
     // focused for typing: terminus' held ring (user, 2026-10-11 — every
     // text field wears it, its own border staying neutral)

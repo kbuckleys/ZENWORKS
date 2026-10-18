@@ -290,7 +290,7 @@ FocusScope {
         Text {
           width: 110
           anchors.verticalCenter: parent.verticalCenter
-          text: "erase"
+          text: "Erase"
           color: Zenon.accentMuted
           font.family: Zenon.face
           font.weight: Zenon.weight
@@ -315,7 +315,7 @@ FocusScope {
         Text {
           width: 110
           anchors.verticalCenter: parent.verticalCenter
-          text: "format"
+          text: "Format"
           color: Zenon.accentMuted
           font.family: Zenon.face
           font.weight: Zenon.weight
@@ -355,7 +355,7 @@ FocusScope {
         Text {
           width: 110
           anchors.verticalCenter: parent.verticalCenter
-          text: "label"
+          text: "Label"
           color: Zenon.accentMuted
           font.family: Zenon.face
           font.weight: Zenon.weight
@@ -364,7 +364,7 @@ FocusScope {
         BulkField {
           id: label
           width: 260
-          ghost: "none"
+          ghost: "None"
           onAccepted: tool.go()
         }
         Text {
@@ -388,7 +388,7 @@ FocusScope {
         Text {
           width: 110
           anchors.verticalCenter: parent.verticalCenter
-          text: tool.target === "ext4" || tool.target === "xfs" ? "block size" : "cluster size"
+          text: tool.target === "ext4" || tool.target === "xfs" ? "Block size" : "Cluster size"
           color: Zenon.accentMuted
           font.family: Zenon.face
           font.weight: Zenon.weight
@@ -403,7 +403,7 @@ FocusScope {
               required property var modelData
               width: modelData === 0 ? 92 : 68
               height: 28
-              label: modelData === 0 ? "auto ✓" : Terminus.blockLabel(modelData)
+              label: modelData === 0 ? "Auto ✓" : Terminus.blockLabel(modelData)
               chosen: tool.block === modelData
               live: !tool.running
               onHit: tool.block = modelData
@@ -418,7 +418,7 @@ FocusScope {
         Text {
           width: 110
           anchors.verticalCenter: parent.verticalCenter
-          text: "kept for root"
+          text: "Kept for root"
           color: Zenon.accentMuted
           font.family: Zenon.face
           font.weight: Zenon.weight
@@ -501,7 +501,7 @@ FocusScope {
         anchors.verticalCenter: parent.verticalCenter
         width: body.width - 40
         wrapMode: Text.WordWrap
-        text: tool.running ? (tool.mode === "format" ? "formatting…" : "running " + (tool.can ? tool.can.tool : "") + "…")
+        text: tool.running ? (tool.mode === "format" ? "Formatting…" : "Running " + (tool.can ? tool.can.tool : "") + "…")
           : (tool.verdict ? tool.verdict.line : "")
         color: tool.running ? Zenon.accentSoft : (tool.verdict && tool.verdict.ok ? Zenon.green : Zenon.red)
         font.family: Zenon.face

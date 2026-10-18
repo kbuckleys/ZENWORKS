@@ -88,7 +88,7 @@ Item {
       visible: row.labelEditable
       width: Math.min(parent.width, 260)
       textSize: Zenon.px(12)
-      ghost: "label"
+      ghost: "Label"
       onTextChanged: row.labelEdited(text)
       onTabbed: box.claim()
     }
@@ -96,7 +96,7 @@ Item {
       id: box
       width: parent.width
       textSize: Zenon.px(15)
-      ghost: !row.known ? "kept as it is — type to replace it" : row.hint
+      ghost: !row.known ? "Kept as it is — type to replace it" : row.hint
       masked: row.secret && !row.showing
       mono: row.secret || row.totp
       copyHook: row.secret && row.win ? (t) => row.win.copyText(t, true) : null

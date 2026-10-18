@@ -33,7 +33,7 @@ Item {
     color: Zenon.yellow
     font.family: Zenon.face
     font.weight: Font.Bold
-    font.pixelSize: 15 + view.grow
+    font.pixelSize: Zenon.px(15) + view.grow
   }
 
   ListView {
@@ -82,14 +82,14 @@ Item {
           color: Zenon.white
           font.family: Zenon.face
           font.weight: Font.Bold
-          font.pixelSize: 15 + view.grow
+          font.pixelSize: Zenon.px(15) + view.grow
         }
         Text {
           text: Qt.formatDate(new Date(card.modelData.date), "ddd d MMM yyyy")
           color: Zenon.accentMuted
           font.family: Zenon.face
           font.weight: Zenon.weight
-          font.pixelSize: 12 + view.grow
+          font.pixelSize: Zenon.px(12) + view.grow
         }
         Text {
           width: parent.width
@@ -100,14 +100,14 @@ Item {
           color: Zenon.accentKey
           font.family: Zenon.face
           font.weight: Zenon.weight
-          font.pixelSize: 13 + view.grow
+          font.pixelSize: Zenon.px(13) + view.grow
         }
         Text {
           text: "Read the post →"
           color: readHov.hovered ? Zenon.white : Zenon.cyan
           font.family: Zenon.face
           font.weight: Zenon.weight
-          font.pixelSize: 13 + view.grow
+          font.pixelSize: Zenon.px(13) + view.grow
           HoverHandler { id: readHov; cursorShape: Qt.PointingHandCursor }
           TapHandler { onTapped: Quickshell.execDetached(["xdg-open", card.modelData.link]) }
         }

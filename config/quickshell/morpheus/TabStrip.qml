@@ -331,7 +331,7 @@ Rectangle {
           anchors.centerIn: parent
           width: Math.min(implicitWidth, tabCell.width - 16)
           spacing: 6
-          opacity: tabCell.here || tabCell.lifted ? 1 : (tabMouse.containsMouse ? 0.9 : 0.7)
+          opacity: tabCell.here || tabCell.lifted ? 1 : (tabMouse.pressed ? 0.9 : 0.7)
           Behavior on opacity { NumberAnimation { duration: Zenon.fast } }
           // what the tab holds, as a glyph before its name (terminus: the
           // directory's, as its crumbs wear it; plato: the file's kind, as a

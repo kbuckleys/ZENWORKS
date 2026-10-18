@@ -102,8 +102,7 @@ Item {
     // nothing at all. The browser's own sign for "things are coming
     // in", which is what this is.
     text: "\uF019"
-    color: jobsHov.hovered && jobsToggle.jobs.faults === 0
-      ? Zenon.white : jobsToggle.tone
+    color: jobsToggle.tone
     font.family: Zenon.face
     font.weight: Zenon.weight
     font.pixelSize: jobsToggle.size
@@ -139,17 +138,17 @@ Item {
   SequentialAnimation {
     id: jobsGlowBurst
     NumberAnimation { target: jobsToggle; property: "glow"; to: 1.0;
-                      duration: 140; easing.type: Easing.OutQuad }
+                      duration: Zenon.ms(140); easing.type: Easing.OutQuad }
     NumberAnimation { target: jobsToggle; property: "glow"; to: 0.5;
-                      duration: 460; easing.type: Easing.InQuad }
+                      duration: Zenon.ms(460); easing.type: Easing.InQuad }
   }
 
   SequentialAnimation {
     id: jobsFaultBurst
     NumberAnimation { target: jobsToggle; property: "glow"; to: 1.0;
-                      duration: 110; easing.type: Easing.OutQuad }
+                      duration: Zenon.ms(110); easing.type: Easing.OutQuad }
     NumberAnimation { target: jobsToggle; property: "glow"; to: 0.62;
-                      duration: 320; easing.type: Easing.InQuad }
+                      duration: Zenon.ms(320); easing.type: Easing.InQuad }
   }
 
   // FINISHING IS NEWS TOO. It bursts like a start and a fault do,
@@ -159,9 +158,9 @@ Item {
   SequentialAnimation {
     id: jobsDoneBurst
     NumberAnimation { target: jobsToggle; property: "glow"; to: 1.0;
-                      duration: 130; easing.type: Easing.OutQuad }
+                      duration: Zenon.ms(130); easing.type: Easing.OutQuad }
     NumberAnimation { target: jobsToggle; property: "glow"; to: 0.55;
-                      duration: 420; easing.type: Easing.InQuad }
+                      duration: Zenon.ms(420); easing.type: Easing.InQuad }
   }
 
   SequentialAnimation {

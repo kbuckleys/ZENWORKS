@@ -63,7 +63,7 @@ Item {
     elide: Text.ElideMiddle
     font.family: Zenon.face
     font.weight: Zenon.weight
-    font.pixelSize: 13
+    font.pixelSize: Zenon.px(13)
     color: Zenon.accentMuted
     text: card.title + (card.f.cursor ? "    q close · \u21b5 open" : "")
   }

@@ -105,14 +105,14 @@ Item {
           height: moods.height
           Rectangle {
             anchors.centerIn: parent
-            width: Math.min(14, moods.step - 3) * (dotMa.containsMouse || dot.chosen ? 1.2 : 1)
+            width: Math.min(14, moods.step - 3) * (dotMa.pressed || dot.chosen ? 1.2 : 1)
             height: width
             radius: width / 2
             color: dot.mood ? (Zenon[dot.mood.ink] || Zenon.accentMuted) : dot.modelData.wrote ? Zenon.accentMuted : "transparent"
             border.width: dot.modelData.wrote ? (dot.chosen ? 2 : 0) : 1
             border.color: dot.chosen ? Zenon.ink : Zenon.border
             opacity: dot.modelData.wrote ? 1 : 0.7
-            Behavior on width { NumberAnimation { duration: 120 } }
+            Behavior on width { NumberAnimation { duration: Zenon.ms(120) } }
           }
           MouseArea {
             id: dotMa
@@ -178,7 +178,7 @@ Item {
       height: pastCol.implicitHeight + 20
       visible: past.hits.length > 0
       radius: Zenon.windowRadius + 4
-      color: pastMa.containsMouse ? Zenon.alpha(Zenon.yellow, 0.14) : Zenon.alpha(Zenon.yellow, 0.08)
+      color: pastMa.pressed ? Zenon.alpha(Zenon.yellow, 0.14) : Zenon.alpha(Zenon.yellow, 0.08)
       border.width: 1
       border.color: Zenon.alpha(Zenon.yellow, 0.3)
       Column {
@@ -210,7 +210,6 @@ Item {
         id: pastMa
         anchors.fill: parent
         hoverEnabled: true
-        cursorShape: Qt.PointingHandCursor
         // one: open it; more: the day shown, every year of it
         onClicked: past.hits.length === 1 ? jl.win.openNote(past.hits[0].n.id) : jl.win.choose(past.hits[0].n.id)
       }
@@ -226,7 +225,7 @@ Item {
       height: backCol.implicitHeight + 20
       visible: !!back.e
       radius: Zenon.windowRadius + 4
-      color: backMa.pressed ? Zenon.alpha(Zenon.cyan, 0.18) : backMa.containsMouse ? Zenon.alpha(Zenon.cyan, 0.12) : Zenon.alpha(Zenon.cyan, 0.06)
+      color: backMa.pressed ? Zenon.alpha(Zenon.cyan, 0.18) : Zenon.alpha(Zenon.cyan, 0.06)
       border.width: 1
       border.color: Zenon.alpha(Zenon.cyan, 0.28)
       Column {

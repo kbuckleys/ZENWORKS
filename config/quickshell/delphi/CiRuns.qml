@@ -50,7 +50,7 @@ Column {
   }
   Text {
     visible: cr.runs.length > cr.most
-    text: "and " + (cr.runs.length - cr.most) + " more"
+    text: "And " + (cr.runs.length - cr.most) + " more"
     color: Zenon.accentMuted
     font.family: Zenon.face
     font.weight: Zenon.weight

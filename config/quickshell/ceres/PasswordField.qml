@@ -106,7 +106,7 @@ Item {
   // ask for a token, a key's passphrase, a host's password
   property string prompt: "input your password"
 
-  FontMetrics { id: dotFm; font.family: Zenon.face; font.weight: Zenon.weight; font.pixelSize: 15 + field.grow }
+  FontMetrics { id: dotFm; font.family: Zenon.face; font.weight: Zenon.weight; font.pixelSize: Zenon.px(15) + field.grow }
   readonly property int maxDots: Math.max(8, Math.floor((field.width - 48) / (dotFm.advanceWidth("\u{F09DE}") + 5)))
 
   Item {
@@ -185,11 +185,11 @@ Item {
           id: fieldMsg
           anchors.verticalCenter: parent.verticalCenter
           visible: field.pw.length === 0 && !field.busy
-          text: field.failed ? "wrong password" : field.prompt
+          text: field.failed ? "Wrong password" : field.prompt
           color: field.failed ? Zenon.red : Zenon.accentMuted
           font.family: Zenon.face
           font.weight: Zenon.weight
-          font.pixelSize: 14 + field.grow
+          font.pixelSize: Zenon.px(14) + field.grow
         }
 
         // As many dots as fit the field, never more: a long passphrase ran
@@ -204,7 +204,7 @@ Item {
             color: Zenon.pink
             font.family: Zenon.face
             font.weight: Zenon.weight
-            font.pixelSize: 15 + field.grow
+            font.pixelSize: Zenon.px(15) + field.grow
           }
         }
 
@@ -239,7 +239,7 @@ Item {
         color: Zenon.accentKey
         font.family: Zenon.face
         font.weight: Zenon.weight
-        font.pixelSize: 12 + field.grow
+        font.pixelSize: Zenon.px(12) + field.grow
       }
     }
 
@@ -254,10 +254,10 @@ Item {
 
     SequentialAnimation {
       running: field.failed
-      NumberAnimation { target: entry; property: "x"; to:  9; duration: 55 }
-      NumberAnimation { target: entry; property: "x"; to: -7; duration: 90 }
-      NumberAnimation { target: entry; property: "x"; to:  4; duration: 80 }
-      NumberAnimation { target: entry; property: "x"; to:  0; duration: 70 }
+      NumberAnimation { target: entry; property: "x"; to:  9; duration: Zenon.ms(55) }
+      NumberAnimation { target: entry; property: "x"; to: -7; duration: Zenon.ms(90) }
+      NumberAnimation { target: entry; property: "x"; to:  4; duration: Zenon.ms(80) }
+      NumberAnimation { target: entry; property: "x"; to:  0; duration: Zenon.ms(70) }
     }
   }
 }

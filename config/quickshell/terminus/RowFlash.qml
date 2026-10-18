@@ -10,6 +10,7 @@
 // left that file and took its flash with it: artemis draws the same card.
 
 import QtQuick
+import "../morpheus"
 
 // ── A ROW LIGHTS UP BEFORE IT ACTS ──────────────────────────────────────
 // Return used to act with the sheet vanishing on the keystroke, which leaves
@@ -54,9 +55,9 @@ Item {
   SequentialAnimation {
     id: flashRun
     NumberAnimation { target: flash; property: "ink"; to: 1;
-                      duration: 60; easing.type: Easing.OutQuad }
+                      duration: Zenon.ms(60); easing.type: Easing.OutQuad }
     NumberAnimation { target: flash; property: "ink"; to: 0;
-                      duration: 130; easing.type: Easing.InQuad }
+                      duration: Zenon.ms(130); easing.type: Easing.InQuad }
     ScriptAction {
       script: {
         const f = flash.onDone;

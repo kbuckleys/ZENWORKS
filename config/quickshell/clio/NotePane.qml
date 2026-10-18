@@ -478,7 +478,7 @@ Item {
       }
       Text {
         anchors.verticalCenter: parent.verticalCenter
-        text: findField.text === "" ? "" : ed.findHits.length === 0 ? "none" : (ed.findAt + 1) + " of " + ed.findHits.length
+        text: findField.text === "" ? "" : ed.findHits.length === 0 ? "None" : (ed.findAt + 1) + " of " + ed.findHits.length
         color: ed.findHits.length === 0 && findField.text !== "" ? Zenon.red : Zenon.accentMuted
         font.family: Zenon.face
         font.weight: Zenon.weight

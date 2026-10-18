@@ -41,13 +41,12 @@ Item {
     color: card.here ? Zenon.alpha(Zenon.cyan, 0.10) : Zenon.wash(0.035)
     border.width: card.here ? 1 : 0
     border.color: Zenon.alpha(Zenon.cyan, 0.6)
-    Behavior on color { ColorAnimation { duration: 120 } }
+    Behavior on color { ColorAnimation { duration: Zenon.ms(120) } }
   }
 
   MouseArea {
     id: cardMa
     anchors.fill: parent
-    cursorShape: Qt.PointingHandCursor
     onClicked: card.opened()
   }
 

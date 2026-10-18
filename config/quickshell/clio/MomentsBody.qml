@@ -178,11 +178,11 @@ Item {
             height: pt.implicitHeight + 18
             radius: Zenon.windowRadius + 2
             // pressed darkens, as every button's press does (user, 2026-10-17)
-            color: chipPress.pressed ? Zenon.alpha(Zenon.magenta, 0.24) : chipPress.containsMouse ? Zenon.alpha(Zenon.magenta, 0.14) : Zenon.alpha(Zenon.magenta, 0.08)
+            color: chipPress.pressed ? Zenon.alpha(Zenon.magenta, 0.24) : Zenon.alpha(Zenon.magenta, 0.08)
             border.width: 1
             border.color: Zenon.alpha(Zenon.magenta, chipPress.pressed ? 0.5 : 0.28)
             scale: chipPress.pressed ? 0.97 : 1
-            Behavior on scale { NumberAnimation { duration: 90 } }
+            Behavior on scale { NumberAnimation { duration: Zenon.ms(90) } }
             Text {
               id: pt
               x: 14
@@ -257,7 +257,7 @@ Item {
                   asynchronous: true
                   // faded in as it arrives, not popped in (2026-10-17)
                   opacity: status === Image.Ready ? 1 : 0
-                  Behavior on opacity { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+                  Behavior on opacity { NumberAnimation { duration: Zenon.ms(180); easing.type: Easing.OutCubic } }
                 }
                 Rectangle {
                   anchors.fill: parent

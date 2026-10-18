@@ -146,7 +146,7 @@ LayerPopup {
   // their labels, and not one of them looks at the panel.
   readonly property int hintPad: 24
   readonly property int minW:
-    Math.ceil(hintRow.implicitWidth) + popup.hintPad * 2
+    Math.ceil(msgBar.hintRow.implicitWidth) + popup.hintPad * 2
 
   // shell.qml reads this for the morphed pill's width; it used to be the
   // literal 1000 in both files, with nothing keeping them equal. 1000 is
@@ -171,7 +171,7 @@ LayerPopup {
   // two lines, the same height as folio's (see Artemis.rowLines)
   readonly property int textCellH: 52
   readonly property int textRows: 8  // two-line rows are taller; 8 of them (user 2026-10-17)
-  readonly property int msgH: 28
+  readonly property int msgH: Zenon.hintBarH   // morpheus/HintBar's strip
   readonly property int textColsUsed: 1
   readonly property int textRowsNeeded: Math.min(Math.max(1, Math.ceil(popup.rows.length / popup.textColsUsed)), popup.textRows)
   readonly property real textCellHeight: popup.textCellH
@@ -765,7 +765,7 @@ LayerPopup {
 
           Text {
             anchors.centerIn: parent
-            text: "type to search"
+            text: "Type to search"
             color: popup.hintColor
             font.family: Zenon.face
             font.weight: 600
@@ -811,25 +811,10 @@ LayerPopup {
             // second highlight following the mouse was a second answer to the
             // only question this list asks.
             //
-            // PARENTED BY HAND. A child declared inside a GridView lands on
-            // the view itself, NOT its contentItem (measured — see the note in
-            // morpheus/ElasticScroll), so the mark sat still in viewport
-            // coordinates while the rows scrolled: once the caret passed the
-            // last visible row it sank out of the bottom and every row after
-            // it went unmarked. In the contentItem it scrolls with the rows;
-            // z 0 is under the delegates' 1.
-            Rectangle {
-              id: selMark
-              parent: fileGrid.contentItem
-              z: 0
-              width: fileGrid.cellWidth
-              height: fileGrid.cellHeight
-              y: Math.floor(popup.sel / popup.textColsUsed) * fileGrid.cellHeight
-              visible: popup.rows.length > 0
-              // the suite's menu cursor, no edge mark (user 2026-10-17)
-              color: Zenon.menuHi
-              Behavior on y { NumberAnimation { duration: Zenon.fast; easing.type: Zenon.ease } }
-            }
+            // It began here as selMark and is every list's now: morpheus/
+            // CursorBand (it parents itself into the contentItem, which is
+            // what kept it from sinking out of view once the rows scrolled).
+            CursorBand { follows: fileGrid; index: popup.sel; shown: popup.rows.length > 0 }
             // Each row carries a RichText, a glyph, a flash, an animation, a
             // Connections and a MouseArea. Handing the view a fresh array used to destroy and
             // rebuild every one of them on every search — the same trap
@@ -1092,24 +1077,11 @@ LayerPopup {
           }
         }
 
-        Rectangle {
+        // morpheus/HintBar, as every strip (ceres' height, ground and rule)
+        HintBar {
           id: msgBar
           width: parent.width
-          height: popup.msgH
-          color: Zenon.hintFrostBg   // the results rise out of it — see the ScrollEdges
-          Rectangle {
-            anchors.top: parent.top
-            anchors.left: parent.left
-            anchors.right: parent.right
-            height: 1
-            color: Zenon.border
-          }
-          // the suite's hint strip — morpheus/HintRow, as every layer has it
-          HintRow {
-            id: hintRow
-            anchors.centerIn: parent
-            rows: Artemis.hintText(popup.dirsOnly)
-          }
+          rows: Artemis.hintText(popup.dirsOnly)
         }
       }
 

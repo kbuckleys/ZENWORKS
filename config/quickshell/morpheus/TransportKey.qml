@@ -25,7 +25,7 @@ Text {
   font.pixelSize: key.size
   // dim until pointed at, so a row of three reads as three targets rather
   // than three decorations
-  opacity: keyArea.containsMouse ? 1 : 0.55
+  opacity: keyArea.pressed ? 1 : 0.55
   Behavior on opacity { NumberAnimation { duration: Zenon.fast; easing.type: Zenon.ease } }
 
   MouseArea {

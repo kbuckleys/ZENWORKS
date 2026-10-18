@@ -295,7 +295,7 @@ Rectangle {
         anchors.rightMargin: 24
         anchors.verticalCenter: parent.verticalCenter
         elide: Text.ElideRight
-        text: "click a value to copy it"
+        text: "Click a value to copy it"
         color: Zenon.accentMuted
         font.family: Zenon.face
         font.weight: Zenon.weight

@@ -288,7 +288,7 @@ LayerPopup {
   // a literal that would be wrong the day a hint is reworded.
   readonly property int hintPad: 24
   // the count and the hints share the one line now, so both are owed room
-  readonly property int minW: Math.ceil(hintLine.implicitWidth) + popup.hintPad * 2
+  readonly property int minW: Math.ceil(msgStrip.needW) + popup.hintPad * 2
 
   readonly property int panelWidth:
     Math.max(popup.minW, popup.colsUsed * popup.cellW + popup.previewW)
@@ -428,21 +428,7 @@ LayerPopup {
   // The recipe is terminus' KeyChip, which is an inline component of that
   // file and so cannot be imported.
 
-  component HintBar: Item {
-    id: hintBarRoot
-    height: 26
-    property var rows: popup.hints()
-    // What the strip would LIKE to be, for whoever is sizing the panel it
-    // sits in. The chips decide it and not one of them looks at the panel,
-    // so reading it back to set that width closes no circle.
-    readonly property real needW: hintRowInner.implicitWidth
-    HintRow {
-      id: hintRowInner
-      anchors.centerIn: parent
-      // the row itself, caps and spacing, is morpheus/HintRow
-      rows: hintBarRoot.rows
-    }
-  }
+
 
   // ----------------------------------------------------------- keys --
 
@@ -622,7 +608,7 @@ LayerPopup {
                      !popup.nerdPending
             text: popup.nerdFailed && popup.appMode === "nerd"
               ? "failed to fetch icons from nerdfonts.com"
-              : "No matches found"
+              : popup.query !== "" ? "Nothing matches \u201C" + popup.query + "\u201D" : "Nothing here"
             color: popup.nerdFailed && popup.appMode === "nerd"
               ? popup.errColor : popup.dimColor
             font.family: Zenon.face
@@ -664,6 +650,8 @@ LayerPopup {
             // the whole shell — see morpheus/Elastic.qml. Inside the view
             // rather than over it: it pins itself to the viewport.
             ElasticScroll { view: grid }
+            // the chosen one slides (morpheus/CursorBand), rather than each row lighting
+            CursorBand { follows: grid; index: popup.sel; insetX: 2; insetY: 2; radius: 6 }
             // CENTERED AT ITS OWN WIDTH, not filling the pane. The panel is a
             // whole number of cells wide except when the footer's floor is
             // holding it open, and then the leftover belongs on both sides
@@ -689,7 +677,7 @@ LayerPopup {
                 anchors.fill: parent
                 anchors.margins: 2
                 radius: 6
-                color: index === popup.sel ? Zenon.menuHi : "transparent"
+                color: "transparent"
               }
 
               Text {
@@ -725,95 +713,65 @@ LayerPopup {
         }
 
         // -------------------------------------------- message strip --
-        Rectangle {
+        // morpheus/HintBar, as every strip: the count before the keys, and
+        // while a format is being chosen the chooser over the whole strip
+        HintBar {
           id: msgStrip
           width: parent.width
-          height: popup.formatMode ? 26 : 32
-          // frosted: the rows below the grid rise out of it — see msgEdge
-          color: Zenon.hintFrostBg
-
-          Rectangle {
-            anchors.top: parent.top
-            anchors.left: parent.left
-            anchors.right: parent.right
-            height: 1
-            color: Zenon.border
-          }
-
-          Column {
-            anchors.fill: parent
-
-            // ONE LINE: the count, then the keys, centered together — it was
-            // the count over the keys, two rows of strip under a grid that
-            // wants the height
-            Row {
-              id: hintLine
-              anchors.horizontalCenter: parent.horizontalCenter
-              height: msgStrip.height
-              spacing: 14
-              visible: !popup.formatMode
-
-              Text {
-                anchors.verticalCenter: parent.verticalCenter
-                visible: !(popup.nerdPending && popup.copiedNote === "")
-                text: {
-                  if (popup.copiedNote !== "") return popup.copiedNote;
-                  if (popup.appMode === "nerd")
-                    return popup.filtered.length + " Icons";
-                  return popup.filtered.length + " Emojis";
-                }
-                // muted, as the picasso picker's count is: a fact about the
-                // grid you are already looking at
-                color: Zenon.muted
-                font.bold: true
-                font.family: Zenon.face
-                font.weight: 600
-                font.pixelSize: Zenon.px(15)
-              }
-
-              HintBar {
-                id: hintBar
-                anchors.verticalCenter: parent.verticalCenter
-                width: hintBar.needW
-              }
+          rows: popup.formatMode ? [] : popup.hints()
+          leading: Text {
+            anchors.verticalCenter: parent.verticalCenter
+            visible: !popup.formatMode && !(popup.nerdPending && popup.copiedNote === "")
+            text: {
+              if (popup.copiedNote !== "") return popup.copiedNote;
+              if (popup.appMode === "nerd")
+                return popup.filtered.length + " Icons";
+              return popup.filtered.length + " Emojis";
             }
+            // muted, as the picasso picker's count is: a fact about the
+            // grid you are already looking at
+            color: Zenon.muted
+            font.bold: true
+            font.family: Zenon.face
+            font.weight: 600
+            font.pixelSize: Zenon.px(15)
+          }
+          overlay: Row {
+            id: formatRow
+            width: parent.width
+            height: parent.height
+            visible: popup.formatMode
 
-            Row {
-              id: formatRow
-              width: parent.width
-              visible: popup.formatMode
+            Repeater {
+              model: ["Icon", "Class", "UTF"]
 
-              Repeater {
-                model: ["Icon", "Class", "UTF"]
+              delegate: Item {
+                required property var modelData
+                required property int index
+                width: formatRow.width / 3
+                height: formatRow.height
 
-                delegate: Item {
-                  required property var modelData
-                  required property int index
-                  width: formatRow.width / 3
-                  height: 26
+                Rectangle {
+                  anchors.fill: parent
+                  color: popup.formatSel === index
+                    ? Zenon.menuHi : "transparent"
+                }
 
-                  Rectangle {
-                    anchors.fill: parent
-                    color: popup.formatSel === index
-                      ? Zenon.menuHi : "transparent"
-                  }
+                Text {
+                  anchors.centerIn: parent
+                  text: modelData
+                  color: popup.formatSel === index
+                    ? popup.entryColor : popup.dimColor
+                  font.bold: popup.formatSel === index
+                  font.family: Zenon.face
+                  font.pixelSize: Zenon.px(14)
+                }
 
-                  Text {
-                    anchors.centerIn: parent
-                    text: modelData
-                    color: popup.formatSel === index
-                      ? popup.entryColor : popup.dimColor
-                    font.bold: popup.formatSel === index
-                    font.family: Zenon.face
-                    font.pixelSize: Zenon.px(14)
-                  }
-
-                  MouseArea {
-                    anchors.fill: parent
-                    onClicked: {
-                      popup.formatSel = index;
-                      popup.copyFormat();
-                    }
+                MouseArea {
+                  anchors.fill: parent
+                  onClicked: {
+                    popup.formatSel = index;
+                    popup.copyFormat();
                   }
                 }
               }
@@ -883,7 +841,7 @@ LayerPopup {
 
   function calcHeight() {
     return (popup.query.length > 0 ? 50 : 0) +
-      popup.gridHeight() + (popup.formatMode ? 26 : 32);
+      popup.gridHeight() + Zenon.hintBarH;
   }
 
   FocusRetry {

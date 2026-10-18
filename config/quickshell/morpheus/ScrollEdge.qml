@@ -318,6 +318,6 @@ Item {
     color: Zenon.ground
     opacity: edge.on ? edge.scrim : 0
     visible: opacity > 0.001
-    Behavior on opacity { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+    Behavior on opacity { NumberAnimation { duration: Zenon.ms(180); easing.type: Easing.OutCubic } }
   }
 }

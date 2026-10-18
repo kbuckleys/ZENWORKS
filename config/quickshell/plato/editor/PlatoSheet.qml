@@ -54,7 +54,7 @@ Item {
   property var hints: []
   // no footer at all (the leader menu): no hairline, no chips
   property bool foot: true
-  readonly property real footH: layer.foot ? 34 : 0
+  readonly property real footH: layer.foot ? Zenon.hintBarH : 0
   // HOW MANY COLUMNS FIT. A sheet of columns (the leader menu, the key
   // hints) asks for `want` of them `colW` wide; a window too narrow for
   // that many gets fewer, down to one — the card's own 20 of padding and
@@ -134,67 +134,33 @@ Item {
     fromBottom: layer.fromBottom
     toBottom: layer.toBottom
     cardW: layer.cardW
-    cardH: layer.cardH + layer.footH + (layer.foot ? 1 : 0)
+    cardH: layer.cardH + layer.footH
 
     Item {
       id: content
       anchors.left: parent.left
       anchors.right: parent.right
       anchors.top: parent.top
-      anchors.bottom: layer.foot ? rule.top : parent.bottom
+      anchors.bottom: layer.foot ? foot.top : parent.bottom
     }
-    Rectangle {
-      id: rule
-      visible: layer.foot
-      anchors.bottom: foot.top
-      anchors.left: parent.left
-      anchors.right: parent.right
-      height: 1
-      color: Zenon.border
-    }
-    Item {
+    // morpheus/HintBar, as every strip (ceres' height, ground and rule)
+    HintBar {
       id: foot
       visible: layer.foot
       anchors.bottom: parent.bottom
       anchors.left: parent.left
       anchors.right: parent.right
-      height: layer.footH
-      Row {
-        anchors.centerIn: parent
-        spacing: 12
-        Text {
-          visible: text !== ""
-          anchors.verticalCenter: parent.verticalCenter
-          rightPadding: 2
-          text: layer.footText
-          color: layer.footInk
-          font.family: Zenon.face
-          font.weight: Zenon.weight
-          font.pixelSize: 13
-          elide: Text.ElideRight
-          width: Math.min(implicitWidth, layer.cardW * 0.5)
-        }
-        Repeater {
-          model: layer.hints
-          delegate: Row {
-            id: pair
-            required property var modelData
-            spacing: 5
-            KeyCap {
-              anchors.verticalCenter: parent.verticalCenter
-              label: pair.modelData[0]
-              fontSize: 11
-            }
-            Text {
-              anchors.verticalCenter: parent.verticalCenter
-              text: pair.modelData[1]
-              color: Zenon.accentMuted
-              font.family: Zenon.face
-              font.weight: Zenon.weight
-              font.pixelSize: 13
-            }
-          }
-        }
+      rows: layer.hints
+      leading: Text {
+        anchors.verticalCenter: parent.verticalCenter
+        visible: text !== ""
+        text: layer.footText
+        color: layer.footInk
+        font.family: Zenon.face
+        font.weight: Zenon.weight
+        font.pixelSize: Zenon.px(13)
+        elide: Text.ElideRight
+        width: Math.min(implicitWidth, layer.cardW * 0.5)
       }
     }
   }

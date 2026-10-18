@@ -246,7 +246,7 @@ Item {
     anchors.centerIn: parent
     font.family: Zenon.face
     font.weight: Zenon.weight
-    font.pixelSize: 14
+    font.pixelSize: Zenon.px(14)
     color: Zenon.accentMuted
     text: fp.message
   }

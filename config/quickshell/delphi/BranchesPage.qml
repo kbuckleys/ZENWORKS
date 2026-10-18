@@ -289,7 +289,7 @@ Item {
           anchors.left: bname.right
           anchors.leftMargin: 10
           anchors.verticalCenter: parent.verticalCenter
-          text: brow.b.kind !== "local" ? "" : brow.b.gone ? "upstream gone"
+          text: brow.b.kind !== "local" ? "" : brow.b.gone ? "Upstream gone"
             : (brow.b.ahead > 0 ? "↑" + brow.b.ahead + " " : "") + (brow.b.behind > 0 ? "↓" + brow.b.behind : "")
               + (brow.b.worktree && !brow.b.current ? "   " + D.baseName(brow.b.worktree) : "")
           color: brow.b.gone ? Zenon.red : Zenon.yellow

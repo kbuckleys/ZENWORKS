@@ -26,6 +26,7 @@
 //     }
 
 import QtQuick
+import "../morpheus"
 import QtQuick.Effects
 import "picasso.js" as Art
 
@@ -126,7 +127,7 @@ Item {
       visible: scene.ground
       color: scene.groundInk
       Behavior on color {
-        ColorAnimation { duration: 400; easing.type: Easing.OutCubic }
+        ColorAnimation { duration: Zenon.ms(400); easing.type: Easing.OutCubic }
       }
     }
 
@@ -188,7 +189,7 @@ Item {
     color: "#000000"
     opacity: scene.look.dim
     Behavior on opacity {
-      NumberAnimation { duration: 300; easing.type: Easing.OutCubic }
+      NumberAnimation { duration: Zenon.ms(300); easing.type: Easing.OutCubic }
     }
   }
 }

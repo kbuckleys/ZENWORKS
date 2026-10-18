@@ -109,7 +109,7 @@ Item {
       border.color: Zenon.alpha(Zenon.red, 0.42)
       opacity: 0
       Component.onCompleted: { if (sm.fresh[sq.modelData.a + ":" + sq.modelData.w]) fadeIn.start(); else sq.opacity = 1; }
-      NumberAnimation on opacity { id: fadeIn; running: false; from: 0; to: 1; duration: 220; easing.type: Easing.OutCubic }
+      NumberAnimation on opacity { id: fadeIn; running: false; from: 0; to: 1; duration: Zenon.ms(220); easing.type: Easing.OutCubic }
     }
   }
 }

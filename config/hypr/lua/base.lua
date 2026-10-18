@@ -200,13 +200,15 @@ if okTheme and type(theme) == "table" and next(theme) ~= nil then
 			col = {
 				inactive_border = t.inactive_border,
 				active_border = t.active_border,
+				nogroup_border = t.nogroup_border,
+				nogroup_border_active = t.nogroup_border_active,
 			},
 		},
 		group = {
 			col = {
-				border_locked_inactive = t.group_border_locked,
+				border_locked_inactive = t.group_border_locked_inactive or t.group_border_locked,
 				border_locked_active = t.group_border_locked,
-				border_inactive = t.group_border,
+				border_inactive = t.group_border_inactive or t.group_border,
 				border_active = t.group_border,
 			},
 			groupbar = {
@@ -221,6 +223,19 @@ if okTheme and type(theme) == "table" and next(theme) ~= nil then
 			},
 		},
 	})
+	-- THE STATES A WINDOW CAN BE IN, each in the theme's own color (themesync.js
+	-- says which): "<focused> <unfocused>" pairs, as border_color takes them.
+	-- Dynamic rules, so a window re-colors the moment it floats, maximizes or
+	-- is pinned, and back. Later rules win where two match (a pinned window is
+	-- floating too); a grouped window is left to the group's own colors.
+	local function stateBorder(match, colors)
+		if type(colors) ~= "string" or colors == "" then return end
+		match.group = false
+		hl.window_rule({ match = match, border_color = colors })
+	end
+	stateBorder({ float = true }, t.float_border)
+	stateBorder({ fullscreen_state_internal = 1 }, t.zoom_border)
+	stateBorder({ pin = true }, t.pin_border)
 end
 
 -- FONT: oracle's Font, weight and size, written to font.lua by quickshell's

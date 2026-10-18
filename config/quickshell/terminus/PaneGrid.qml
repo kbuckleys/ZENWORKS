@@ -178,7 +178,7 @@ GridView {
       tileGlide.from(((was % cols) - (tileItem.index % cols)) * pgrid.cellWidth,
                      (Math.floor(was / cols) - Math.floor(tileItem.index / cols)) * pgrid.cellHeight);
     }
-    NumberAnimation { id: tileFade; target: tileItem; property: "opacity"; to: 1; duration: 260; easing.type: Easing.OutCubic }
+    NumberAnimation { id: tileFade; target: tileItem; property: "opacity"; to: 1; duration: Zenon.ms(260); easing.type: Easing.OutCubic }
     onPathChanged: tileItem.glideCheck()
     onIndexChanged: tileItem.glideCheck()
     Component.onCompleted: { tileItem.glideCheck(); if (tileItem.current) pgrid.curFit = tileItem.usedH; }

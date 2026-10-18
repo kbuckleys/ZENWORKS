@@ -970,7 +970,6 @@ Column {
           id: statusChipMa
           anchors.fill: parent
           hoverEnabled: true
-          cursorShape: statusChip.cut ? Qt.PointingHandCursor : Qt.ArrowCursor
           // Held while you read; let go and it counts down afresh.
           onContainsMouseChanged: {
             if (statusChipMa.containsMouse) term.statusClearRef.stop();
@@ -995,7 +994,7 @@ Column {
         Behavior on opacity { NumberAnimation { duration: Zenon.normal; easing.type: Zenon.ease } }
         Behavior on width { NumberAnimation { duration: Zenon.fast; easing.type: Zenon.ease } }
         color: Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b,
-                       undoMa.pressed ? 0.28 : (undoMa.containsMouse ? 0.18 : 0.10))
+                       undoMa.pressed ? 0.28 : (0.10))
         border.width: 1
         border.color: Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b, 0.40)
         clip: true
@@ -1163,6 +1162,7 @@ Column {
         // 2026-10-15) — click it, or F2; see renameFromProps
         TitleName {
           id: barName
+          ringBox: barHead
           anchors.verticalCenter: parent.verticalCenter
           maxWidth: barHead.parent.width - 32
             - (barHeadGlyph.visible ? barHeadGlyph.implicitWidth + 8 : 0)
@@ -1256,7 +1256,7 @@ Column {
           Text {
             anchors.verticalCenter: parent.verticalCenter
             visible: term.sendToRef.sending
-            text: "to\u2026"
+            text: "To\u2026"
             color: term.crumbInk
             font.family: Zenon.face
             font.weight: Zenon.weight
@@ -1904,7 +1904,7 @@ Column {
               font.family: Zenon.face
               font.weight: Zenon.weight
               font.pixelSize: Zenon.px(16)
-              text: "longest line"
+              text: "Longest line"
             }
 
             // PLACED, NOT ANCHORED EITHER WAY ROUND.
@@ -2300,7 +2300,7 @@ Column {
             height: previewPane.height - facts.y
             opacity: previewPane.factsUnder ? 1 : 0
             visible: opacity > 0.001
-            Behavior on opacity { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+            Behavior on opacity { NumberAnimation { duration: Zenon.ms(180); easing.type: Easing.OutCubic } }
             Frost {
               x: textScroll.x
               width: textScroll.width
@@ -2386,7 +2386,7 @@ Column {
           Text {
             anchors.centerIn: parent
             visible: term.previewKind === "binary" || term.previewKind === "none"
-            text: term.previewKind === "binary" ? "binary" : ""
+            text: term.previewKind === "binary" ? "Binary" : ""
             color: Zenon.accentMuted
             font.family: Zenon.face
             font.weight: Zenon.weight
@@ -2833,7 +2833,7 @@ Column {
       // dismissed rather than moved, and a 140ms disappearance reads as a
       // cut rather than a fade.
       Behavior on opacity {
-        NumberAnimation { duration: 260; easing.type: Easing.OutCubic }
+        NumberAnimation { duration: Zenon.ms(260); easing.type: Easing.OutCubic }
       }
       x: band.held.x
       y: band.held.y
@@ -3248,7 +3248,7 @@ Column {
         radius: 5
         clip: true
         color: Zenon.alpha(Zenon.yellow, saveNumberMa.pressed ? 0.34
-          : saveNumberMa.containsMouse ? 0.24 : 0.14)
+          : 0.14)
         Behavior on width { NumberAnimation { duration: Zenon.fast; easing.type: Zenon.ease } }
         Text {
           id: saveNumberText
@@ -3269,7 +3269,6 @@ Column {
           id: saveNumberMa
           anchors.fill: parent
           hoverEnabled: true
-          cursorShape: Qt.PointingHandCursor
           onClicked: term.saveNumbered()
         }
       }
@@ -3330,7 +3329,7 @@ Column {
       Text {
         anchors.verticalCenter: parent.verticalCenter
         visible: portalPicks.picks.length === 0
-        text: "nothing selected"
+        text: "Nothing selected"
         color: Zenon.accentMuted
         font.family: Zenon.face
         font.weight: Zenon.weight

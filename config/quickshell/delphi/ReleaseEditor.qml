@@ -166,7 +166,7 @@ Item {
         Text {
           anchors.verticalCenter: parent.verticalCenter
           visible: !!ed.e && ed.e.by !== ""
-          text: ed.e && ed.e.by === "github" ? "written by GitHub, from what was merged" : ed.e && ed.e.by === "commits" ? "written from the commits since " + (ed.e.prev || "the start") : ""
+          text: ed.e && ed.e.by === "github" ? "Written by GitHub, from what was merged" : ed.e && ed.e.by === "commits" ? "Written from the commits since " + (ed.e.prev || "the start") : ""
           color: Zenon.accentMuted
           font.family: Zenon.face
           font.weight: Zenon.weight

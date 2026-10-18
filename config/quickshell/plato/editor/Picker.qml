@@ -592,7 +592,7 @@ PlatoSheet {
       anchors.verticalCenter: parent.verticalCenter
       font.family: Zenon.faceMono
       font.weight: Zenon.weight
-      font.pixelSize: 17
+      font.pixelSize: Zenon.px(17)
       color: Zenon.cyan
       text: picker.glyph
     }
@@ -605,9 +605,9 @@ PlatoSheet {
       visible: picker.mode === "grep" && input.text.trim().length >= 2
       font.family: Zenon.face
       font.weight: Zenon.weight
-      font.pixelSize: 14
+      font.pixelSize: Zenon.px(14)
       color: picker.grepBusy ? Zenon.cyan : Zenon.accentMuted
-      text: picker.grepBusy ? "searching\u2026 " + (picker.results.length || "")
+      text: picker.grepBusy ? "Searching\u2026 " + (picker.results.length || "")
         : picker.results.length >= 300 ? "first 300"
         : picker.results.length === 0 ? "no matches"
         : picker.results.length + (picker.results.length === 1 ? " match" : " matches")
@@ -621,7 +621,7 @@ PlatoSheet {
       anchors.verticalCenter: parent.verticalCenter
       font.family: Zenon.face
       font.weight: Zenon.weight
-      font.pixelSize: 16
+      font.pixelSize: Zenon.px(16)
       color: Zenon.white
       selectionColor: Qt.rgba(Zenon.magenta.r, Zenon.magenta.g, Zenon.magenta.b, 0.5)
       cursorDelegate: Caret { field: input }
@@ -656,7 +656,7 @@ PlatoSheet {
       anchors.verticalCenter: parent.verticalCenter
       font.family: Zenon.face
       font.weight: Zenon.weight
-      font.pixelSize: 16
+      font.pixelSize: Zenon.px(16)
       color: Zenon.accentMuted
       text: picker.mode === "menu" ? picker.menuTitle
         : picker.mode === "grep" && picker.root !== "" ? "Search in " + picker.tidy(picker.root)
@@ -709,7 +709,7 @@ PlatoSheet {
         horizontalAlignment: Text.AlignHCenter
         font.family: Zenon.faceMono
         font.weight: Zenon.weight
-        font.pixelSize: 18
+        font.pixelSize: Zenon.px(18)
         color: Zenon.white
         text: {
           if (picker.mode !== "files") return "";
@@ -727,7 +727,7 @@ PlatoSheet {
         textFormat: Text.RichText
         font.family: Zenon.face
         font.weight: 600
-        font.pixelSize: 16
+        font.pixelSize: Zenon.px(16)
         color: Zenon.white
         text: {
           if (picker.mode !== "files") return "";
@@ -785,7 +785,7 @@ PlatoSheet {
         textFormat: Text.PlainText
         font.family: Zenon.face
         font.weight: Zenon.weight
-        font.pixelSize: 13
+        font.pixelSize: Zenon.px(13)
         color: Zenon.accentMuted
         text: item.modelData.detail || ""
       }

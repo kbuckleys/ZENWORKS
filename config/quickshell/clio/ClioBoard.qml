@@ -625,7 +625,7 @@ Variants {
             // pick up — the edge is already its color, so it is the edge
             // that answers.
             border.color: Qt.rgba(slot.hue.r, slot.hue.g, slot.hue.b,
-              noteHov.hovered && !slot.active ? 0.85 : 0.55)
+              0.55)
             Behavior on border.color { ColorAnimation { duration: Zenon.fast } }
 
             HoverHandler { id: noteHov }
@@ -820,7 +820,7 @@ Variants {
                 Text {
                   anchors.verticalCenter: parent.verticalCenter
                   visible: faceQuery.text === ""
-                  text: "typeface…"
+                  text: "Typeface…"
                   color: Zenon.wash(0.35)
                   font: faceQuery.font
                 }
@@ -917,7 +917,7 @@ Variants {
               anchors.topMargin: 10
               anchors.leftMargin: 10
               visible: body.length === 0 && !body.activeFocus && !slot.picking
-              text: "note\u2026"
+              text: "Note\u2026"
               color: Zenon.wash(0.35)
               font.family: Clio.faceOf(slot.note)
               font.weight: Clio.weightOf(slot.note)
@@ -1217,10 +1217,8 @@ Variants {
                   width: 26
                   height: 22
                   radius: 4
-                  color: fmtHov.hovered
-                    ? Zenon.wash(0.16) : "transparent"
-
-                  HoverHandler { id: fmtHov }
+                  // lit while pressed, not under the pointer (the suite's rule)
+                  color: fmtPress.pressed ? Zenon.wash(0.16) : "transparent"
 
                   Text {
                     anchors.centerIn: parent
@@ -1232,6 +1230,7 @@ Variants {
                   }
 
                   MouseArea {
+                    id: fmtPress
                     anchors.fill: parent
                     onClicked: card.mark(fmt.modelData[1])
                   }
@@ -1270,10 +1269,7 @@ Variants {
                   width: 26
                   height: 22
                   radius: 4
-                  color: stepHov.hovered && (step.isMark || step.canGo)
-                    ? Zenon.wash(0.16) : "transparent"
-
-                  HoverHandler { id: stepHov }
+                  color: stepPress.pressed ? Zenon.wash(0.16) : "transparent"
 
                   // ── A NUDGE WHEN IT TOOK ───────────────────────────
                   // The text resizing is the answer, but on a long note
@@ -1312,6 +1308,7 @@ Variants {
                   }
 
                   MouseArea {
+                    id: stepPress
                     anchors.fill: parent
                     enabled: step.isMark || step.canGo
                     onClicked: {
@@ -1349,8 +1346,8 @@ Variants {
                   color: Clio.ink(swatch.modelData)
                   readonly property bool worn: !!slot.note
                     && slot.note.hue === swatch.modelData
-                  opacity: swatchHov.hovered || swatch.worn ? 1 : 0.55
-                  scale: swatchHov.hovered ? 1.15 : 1
+                  opacity: swatch.worn ? 1 : 0.55
+                  scale: 1
                   Behavior on scale {
                     NumberAnimation { duration: Zenon.fast; easing.type: Zenon.ease }
                   }

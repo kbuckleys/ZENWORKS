@@ -75,14 +75,15 @@ Rectangle {
         anchors.rightMargin: 12
         anchors.verticalCenter: parent.verticalCenter
         visible: jobsCard.jobs.model.count - jobsCard.jobs.faults > 1
-        text: "stop all"
-        color: stopAllHov.hovered ? Zenon.red : Zenon.muted
+        text: "Stop all"
+        color: stopAllPress.pressed ? Zenon.red : Zenon.muted
         font.family: Zenon.face
         font.weight: Zenon.weight
         font.pixelSize: Zenon.px(12)
 
         HoverHandler { id: stopAllHov }
         MouseArea {
+          id: stopAllPress
           anchors.fill: parent
           onClicked: jobsCard.jobs.cancelAll()
         }
@@ -232,7 +233,7 @@ Rectangle {
           // The speed and the time left ahead of the percentage, once
           // rsync has said them: "how far" is half the question, and
           // "how long" is the half you were actually wondering about.
-          text: jobRow.model.state === "done" ? "done"
+          text: jobRow.model.state === "done" ? "Done"
             : jobRow.ended ? ""
             : jobRow.model.cancelled ? "stopping"
             // An archive has a time left but no speed, so each half is said
@@ -262,7 +263,7 @@ Rectangle {
           Text {
             anchors.centerIn: parent
             text: "\uF00D"   // nf-fa-times
-            color: jobStopHov.hovered ? Zenon.red : Zenon.muted
+            color: jobStopPress.pressed ? Zenon.red : Zenon.muted
             font.family: Zenon.faceMono
             font.weight: Zenon.weight
             font.pixelSize: Zenon.px(14)
@@ -270,6 +271,7 @@ Rectangle {
 
           HoverHandler { id: jobStopHov }
           MouseArea {
+            id: jobStopPress
             anchors.fill: parent
             // The same glyph does both jobs because it is the same
             // gesture: make this row go away. On one that is running
@@ -339,7 +341,7 @@ Rectangle {
           // easing it a second time turns it to soup.
           Behavior on value {
             enabled: jobBar.counting
-            NumberAnimation { duration: 300; easing.type: Zenon.ease }
+            NumberAnimation { duration: Zenon.ms(300); easing.type: Zenon.ease }
           }
         }
       }
