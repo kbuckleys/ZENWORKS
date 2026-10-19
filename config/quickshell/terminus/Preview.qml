@@ -300,6 +300,25 @@ Item {
     }
     term.prefCursor = i;
   }
+  // ── ←/→: THE ROW BESIDE THIS ONE, IN THE OTHER COLUMN ────────────
+  // The nearest reachable row by height on that side; nothing there (the
+  // first column going left) and the cursor stays put.
+  function prefAcross(d) {
+    const cur = term.prefAt();
+    if (!cur) return;
+    const col = term.prefsRef.prefsCol;
+    const pc = cur.mapToItem(col, 0, cur.height / 2);
+    let best = -1, gap = Infinity;
+    for (let i = 0; i < term.prefRows.length; i++) {
+      const r = term.prefRows[i];
+      if (!r.reachable) continue;
+      const p = r.mapToItem(col, 0, r.height / 2);
+      if ((p.x - pc.x) * d <= 1) continue;
+      const g = Math.abs(p.y - pc.y);
+      if (g < gap) { gap = g; best = i; }
+    }
+    if (best >= 0) term.prefCursor = best;
+  }
   function quickLook() {
     const r = term.currentRow();
     // ── A DIRECTORY IS WORTH LOOKING AT TOO ──────────────────────────────

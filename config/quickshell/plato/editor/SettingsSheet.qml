@@ -17,10 +17,10 @@
 // and only the settings whose name or section match it stay, under their
 // section's heading. Esc clears the query first and closes the sheet once
 // it is empty. So the keys are the arrows: ↑/↓ (or ctrl j/k) move, ←/→
-// change the value (a switch flips, a number steps, a choice cycles),
-// ctrl ←/→ jump across the columns, Enter (or Space, with nothing typed)
-// flips a switch or opens a color's dropdown, ctrl r puts the setting back
-// to its default.
+// jump across the columns, Enter (or Space, with nothing typed) flips a
+// switch, holds a number for ←/→ to slide (Esc lets go) or opens a color's
+// dropdown, ctrl ←/→ change the
+// value either way, ctrl r puts the setting back to its default.
 
 import QtQuick
 import Quickshell
@@ -109,6 +109,12 @@ PlatoSheet {
   readonly property var allRows: sheet.allShaped.rows
   onRowsChanged: sheet.sel = Math.max(0, sheet.firstRow())
   property int sel: 0
+  // ── A NUMBER IS HELD TO BE SLID (user, 2026-10-19): Enter on its row
+  // rings it, ←/→ then move it, Esc or Enter lets go. Leaving the row lets
+  // go too.
+  property string sliding: ""
+  onSelChanged: sheet.sliding = ""
+  onShownChanged: sheet.sliding = ""
   function firstRow() { return sheet.rows.findIndex((r) => !r.header); }
   function step(dir) {
     let i = sheet.sel;
@@ -140,14 +146,14 @@ PlatoSheet {
     if (!spec || !sheet.settings) return;
     if (spec.type === "text" && !spec.pick) { sheet.editText(spec); return; }
     if (spec.pick === "color") sheet.openDrop(spec);
-    else if (spec.type === "bool") sheet.settings.nudge(spec.key, 1);
+    else if (spec.type === "int" || spec.type === "real") sheet.sliding = spec.key;
     else sheet.settings.nudge(spec.key, 1);
   }
 
   // ── the sheet ──────────────────────────────────────────────────────
   // TWO COLUMNS: the sections split where the rows come out most even, the
   // first half down the left and the rest down the right. The keys still
-  // walk every setting in order (↑/↓), and ctrl ←/→ jump across.
+  // walk every setting in order (↑/↓), and ←/→ jump across.
   readonly property real roomH: Math.max(300, sheet.height - sheet.fromTop - sheet.footH - 40)
   readonly property int helpH: 52
   // THE CARD FITS WHAT IS LEFT. Filtered down to what one column of the
@@ -167,8 +173,9 @@ PlatoSheet {
   footText: query.text === "" ? "type to filter settings" : query.text
   footInk: query.text !== "" ? Zenon.white : Zenon.accentMuted
   hints: drop.open ? [["↑↓", "move"], ["↵", "use"], ["esc", "back"]]
-    : [["↑↓", "move"], ["←→", "change"]].concat(sheet.twoCols ? [["ctrl ←→", "column"]] : [])
-      .concat([["ctrl r", "default"], ["esc", query.text !== "" ? "clear" : "close"]])
+    : sheet.sliding !== "" ? [["←→", "slide"], ["esc", "done"]]
+    : [[sheet.twoCols ? "↑↓←→" : "↑↓", "move"], ["↵", "toggle"], ["ctrl ←→", "change"],
+       ["ctrl r", "default"], ["esc", query.text !== "" ? "clear" : "close"]]
 
   // across: the row at the same height in the other column
   function across(dir) {
@@ -279,6 +286,17 @@ PlatoSheet {
             onClicked: { if (row.spec) sheet.settings.reset(row.spec.key); query.forceActiveFocus(); }
           }
         }
+      }
+
+      // held to be slid (see sliding)
+      HeldRing {
+        anchors.fill: parent
+        anchors.leftMargin: 6
+        anchors.rightMargin: 6
+        anchors.topMargin: 2
+        anchors.bottomMargin: 2
+        z: 5
+        on: row.spec !== null && sheet.sliding === row.spec.key
       }
 
       // ── the control ──────────────────────────────────────────────────
@@ -580,7 +598,7 @@ PlatoSheet {
   // Enter, Space or a click opens the choices as the shell's menu card
   // (morpheus CardPopup) under the chip, each with its swatch and a tick on
   // the one in use. ↑/↓ move in it, Enter takes one, Esc puts it away;
-  // ←/→ on the row still step through them without it.
+  // ctrl ←/→ on the row still step through them without it.
   property var chips: ({})
   Component {
     id: colorChip
@@ -707,15 +725,24 @@ PlatoSheet {
         else if (k === Qt.Key_Return || k === Qt.Key_Enter || k === Qt.Key_Space) sheet.takeDrop(sheet.dropSel);
         return;
       }
+      if (sheet.sliding !== "") {
+        if (k === Qt.Key_Left || k === Qt.Key_Right) sheet.nudge(sheet.cur, k === Qt.Key_Right ? 1 : -1);
+        else if (k === Qt.Key_Escape || k === Qt.Key_Return || k === Qt.Key_Enter
+                 || k === Qt.Key_Space) sheet.sliding = "";
+        return;
+      }
       if (k === Qt.Key_Escape) sheet.back();
       else if (k === Qt.Key_Down || (k === Qt.Key_Tab && !(event.modifiers & Qt.ShiftModifier))
                || (ctrl && (k === Qt.Key_J || k === Qt.Key_N))) sheet.step(1);
       else if (k === Qt.Key_Up || k === Qt.Key_Backtab || (ctrl && (k === Qt.Key_K || k === Qt.Key_P))) sheet.step(-1);
-      else if (ctrl && k === Qt.Key_Left) sheet.across(-1);
-      else if (ctrl && k === Qt.Key_Right) sheet.across(1);
+      // ←/→ ARE MOVEMENT, ACROSS THE COLUMNS (user, 2026-10-19): they
+      // used to step the value, which flipped whatever switch the cursor
+      // sat on when you only meant to change column. The value is ctrl's.
+      else if (ctrl && k === Qt.Key_Left) sheet.nudge(sheet.cur, -1);
+      else if (ctrl && k === Qt.Key_Right) sheet.nudge(sheet.cur, 1);
       else if (ctrl && k === Qt.Key_R) { if (sheet.cur) sheet.settings.reset(sheet.cur.key); }
-      else if (k === Qt.Key_Right) sheet.nudge(sheet.cur, 1);
-      else if (k === Qt.Key_Left) sheet.nudge(sheet.cur, -1);
+      else if (k === Qt.Key_Right) sheet.across(1);
+      else if (k === Qt.Key_Left) sheet.across(-1);
       else if (k === Qt.Key_Return || k === Qt.Key_Enter
                || (k === Qt.Key_Space && query.text === "")) sheet.activate(sheet.cur);
       else event.accepted = false;

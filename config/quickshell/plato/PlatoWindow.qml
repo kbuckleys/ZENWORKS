@@ -1149,7 +1149,9 @@ FloatingWindow {
     fromTop: tabs.height
     plugins: win.mgr ? win.mgr.plugins : null
     filetype: st.filetype
-    face.family: Zenon.faceFixed
+    // Oracle's Font row: its family (with the Nerd cut) and weight
+    face.family: Zenon.face
+    face.weight: Zenon.weight
     face.pixelSize: win.chromeSize
     onClosed: editor.forceActiveFocus()
     onConfigure: (path) => nvim.openAt(path)

@@ -381,6 +381,21 @@ Item {
       return;
     }
 
+    // A slider held to be slid (PrefSlider.held) has the arrows to itself,
+    // and escape lets go of it before it closes anything.
+    if (term.prefsRef.open && term.prefAt() && term.prefAt().held) {
+      const held = term.prefAt();
+      switch (event.key) {
+      case Qt.Key_Right:    held.nudge(1); return;
+      case Qt.Key_Left:     held.nudge(-1); return;
+      case Qt.Key_Escape:
+      case Qt.Key_Space:
+      case Qt.Key_Return:
+      case Qt.Key_Enter:    held.held = false; return;
+      }
+      return;
+    }
+
     if (event.key === Qt.Key_Escape) {
       term.propsRef.open = false;
       term.prefsRef.open = false;
@@ -389,8 +404,12 @@ Item {
     }
 
     // ── THE SETTINGS PANEL, FROM THE KEYBOARD ──────────────────
-    // Tab and the arrows walk the rows; space or return works the one
-    // under the cursor; left and right move a slider or a segment along.
+    // Tab and up/down walk the rows, left and right jump to the other
+    // column; space or return works the one under the cursor (a switch
+    // flips, a segment steps on, an action runs, a slider is held for the
+    // arrows — see above). Ctrl left/right move a
+    // slider or a segment along — bare, they used to, and the column you
+    // reached for was a setting changed instead (user, 2026-10-19).
     // Everything else is swallowed, which is why this branch was here in
     // the first place: `d` behind an open panel was a file in the trash
     // you never asked to send there.
@@ -403,8 +422,13 @@ Item {
       case Qt.Key_Down:     term.prefStep(1); return;
       case Qt.Key_Backtab:
       case Qt.Key_Up:       term.prefStep(-1); return;
-      case Qt.Key_Right:    if (cur) cur.nudge(1); return;
-      case Qt.Key_Left:     if (cur) cur.nudge(-1); return;
+      case Qt.Key_Right:
+      case Qt.Key_Left: {
+        const d = event.key === Qt.Key_Right ? 1 : -1;
+        if (event.modifiers & Qt.ControlModifier) { if (cur) cur.nudge(d); }
+        else term.prefAcross(d);
+        return;
+      }
       case Qt.Key_Space:
       case Qt.Key_Return:
       case Qt.Key_Enter:    if (cur) cur.activate(); return;

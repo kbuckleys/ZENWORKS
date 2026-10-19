@@ -540,6 +540,9 @@ QtObject {
   readonly property color accentMuted: mix(muted, cyan, accentGreyMix)
   readonly property color accentSoft:  mix(soft, cyan, accentGreyMix)
   readonly property color accentKey:   mix(keyInk, cyan, accentGreyMix)
+  // and the ink itself, for the one fact a strip of accent grays leads with
+  // (plato's cursor line): louder than them, still in the accent
+  readonly property color accentInk:   mix(white, cyan, accentGreyMix)
   // THE MENU CURSOR: the lit row of every menu — CardBody, icarus, folio,
   // terminus' right-click and drop menus — in the theme's accent, as the
   // windows' rows already are (their hiFill, the same cyan at 0.12), not

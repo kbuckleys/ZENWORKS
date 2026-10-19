@@ -55,7 +55,7 @@ Item {
   signal chose(string value)
 
   // ── WALKED ALONG RATHER THAN FLIPPED ────────────────────────────────
-  // A segment is a row of buttons, so the arrows step between them and
+  // A segment is a row of buttons, so ctrl ←/→ step between them and
   // return takes the next one — skipping any the panel is currently
   // refusing, because landing on a button that will not be pressed is the
   // same dead end the action row avoids.

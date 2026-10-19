@@ -44,7 +44,13 @@ Item {
   // keys that already step the zoom all move it by the same amount. Nothing
   // to activate: a slider has no state to flip.
   readonly property bool reachable: true
-  function activate() {}
+  // ── HELD TO BE SLID (user, 2026-10-19): return rings it, the arrows
+  // then move it, escape or return lets go — see DialogKeys. Moving off
+  // the row, or the panel closing, lets go too.
+  property bool held: false
+  readonly property bool atCursor: !!sl.term && sl.term.prefAt() === sl
+  onAtCursorChanged: if (!sl.atCursor) sl.held = false
+  function activate() { sl.held = !sl.held; }
   function nudge(d) {
     const v = Math.max(sl.from,
                        Math.min(sl.to, sl.value + d * sl.wheelStep));
@@ -56,6 +62,13 @@ Item {
 
   width: parent ? parent.width : 0
   height: 34
+
+  HeldRing {
+    anchors.fill: parent
+    anchors.margins: 2
+    z: 5
+    on: sl.held
+  }
 
   readonly property real span: sl.to - sl.from
   readonly property real frac: sl.span > 0

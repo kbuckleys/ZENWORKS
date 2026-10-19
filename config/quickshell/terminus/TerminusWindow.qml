@@ -2515,6 +2515,7 @@ FloatingWindow {
   function prefAt() { return preview.prefAt(); }
 
   function prefStep(d) { return preview.prefStep(d); }
+  function prefAcross(d) { return preview.prefAcross(d); }
 
   // ── THE KEYMAP ─────────────────────────────────────────────────────────
   // This was the F1 page's own table and it is the only copy of it now. The
