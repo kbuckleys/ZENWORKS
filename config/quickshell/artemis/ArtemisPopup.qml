@@ -109,7 +109,9 @@ LayerPopup {
   //
   // The recipe is terminus' KeyChip, which is an inline component of that
   // file and so cannot be imported.
-  readonly property color dirColor: Zenon.blue
+  // terminus' directory ink (terminus.js inkKeyOf): the theme's accent slot,
+  // so a directory reads the same color in both and follows the theme
+  readonly property color dirColor: Zenon.cyan
 
   // ── AS WIDE AS THE LONGEST RESULT ─────────────────────────────────────
   // A thousand pixels was the answer to every search: three short paths got

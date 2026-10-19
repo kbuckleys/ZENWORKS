@@ -105,7 +105,15 @@ Rectangle {
   y: band.at.y + band.insetY
   width: Math.max(0, (band.target ? band.target.width : band.heldSize.width) - 2 * band.insetX)
   height: Math.max(0, (band.target ? band.target.height : band.heldSize.height) - 2 * band.insetY)
-  visible: band.shown && band.index >= 0 && (band.target !== null || band.placed)
+  // nothing past the end: a list emptied under it (every update installed,
+  // the last match filtered out) left the band holding the last row's box
+  readonly property int rows: {
+    band.tick;
+    if (band.repeater) return band.repeater.count;
+    if (band.follows && band.follows.count !== undefined) return band.follows.count;
+    return -1;
+  }
+  visible: band.shown && band.index >= 0 && (band.rows < 0 || band.index < band.rows) && (band.target !== null || band.placed)
 
   Behavior on x { enabled: band.placed && Zenon.cursorSlide; NumberAnimation { duration: Zenon.fast; easing.type: Zenon.ease } }
   Behavior on y { enabled: band.placed && Zenon.cursorSlide; NumberAnimation { duration: Zenon.fast; easing.type: Zenon.ease } }
