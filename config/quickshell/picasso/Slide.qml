@@ -66,7 +66,7 @@ Item {
       anchors.verticalCenter: parent.verticalCenter
       width: parent.width
       height: 4
-      radius: 2
+      radius: height / 2
       color: Zenon.wash(0.1)
     }
     // filled from the resting value, so a signed slider fills both ways
@@ -75,7 +75,7 @@ Item {
       x: Math.min(track.t, track.t0) * track.width
       width: Math.abs(track.t - track.t0) * track.width
       height: 4
-      radius: 2
+      radius: height / 2
       color: Zenon.cyan
     }
     Rectangle {
@@ -83,7 +83,7 @@ Item {
       anchors.verticalCenter: parent.verticalCenter
       width: 14
       height: 14
-      radius: 7
+      radius: height / 2
       color: slMa.pressed ? Zenon.cyan : Zenon.white
     }
     MouseArea {

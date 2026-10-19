@@ -23,6 +23,10 @@ hl.window_rule({ match = { class = "mpv" },                                     
 -- frosted too — decoration.blur.popups only reaches a window's popups
 hl.layer_rule({ match = { namespace = ".*" }, blur = true, blur_popups = true, ignore_alpha = 0.5 })
 hl.layer_rule({ match = { namespace = "morpheus-bar(-clear)?" }, animation = "none" })
+-- menus that are layer surfaces (morpheus/CardMenu: icarus, the tray, the bell)
+-- animate themselves, as the popup menus do; hyprland's layer animation on top
+-- made them move differently
+hl.layer_rule({ match = { namespace = "morpheus-menu" }, animation = "none" })
 -- the pill with oracle's Blur behind off: after the global rule, so it wins
 hl.layer_rule({ match = { namespace = "morpheus-bar-clear" }, blur = false })
 -- cerberus' black veil, faded in before the lock and out after it: no map

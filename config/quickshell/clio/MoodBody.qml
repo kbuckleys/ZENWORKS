@@ -59,7 +59,7 @@ Column {
       x: 20
       width: parent.width - 40
       height: 4
-      radius: 2
+      radius: height / 2
       gradient: Gradient {
         orientation: Gradient.Horizontal
         GradientStop { position: 0; color: Zenon.magenta }

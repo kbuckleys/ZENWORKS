@@ -140,7 +140,7 @@ Item {
     anchors.rightMargin: 4
     visible: sideRow.lift > 0.01
     opacity: sideRow.lift
-    radius: 4
+    radius: Zenon.radiusControl
     color: Qt.rgba(Zenon.layerBg.r, Zenon.layerBg.g, Zenon.layerBg.b, 1)
     border.width: 1
     border.color: Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b, 0.55)
@@ -261,7 +261,7 @@ Item {
     color: Qt.rgba(sideRow.dropInk.r, sideRow.dropInk.g, sideRow.dropInk.b, 0.14)
     border.width: 1
     border.color: Qt.rgba(sideRow.dropInk.r, sideRow.dropInk.g, sideRow.dropInk.b, sideRow.breath)
-    radius: 4
+    radius: Zenon.radiusControl
   }
 
   // ── THE ROW A MENU WAS ASKED OF ─────────────────────────────────────

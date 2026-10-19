@@ -23,9 +23,9 @@
 //       leading: Text { text: query; … }
 //     }
 //
-// The keys are centered when they are alone, and start at the left the
-// moment anything stands beside them, so keys and buttons read as the two
-// ends of one strip rather than a row shifting off-center to make room.
+// The keys (with whatever stands before them) are centered, and start at
+// the left the moment buttons stand at the right end, so keys and buttons
+// read as the two ends of one strip rather than a row shifting off-center.
 // What does not fit is dropped from the END of the list (HintRow.maxWidth),
 // which is why every holder lists the keys you need most first.
 //
@@ -69,21 +69,25 @@ Item {
     color: Zenon.border
   }
 
+  // CENTERED AS ONE GROUP — what stands before the keys and the keys —
+  // unless something stands at the right end, when they start at the left
+  // so the two ends read as one strip (user, 2026-10-19: center the hints
+  // in terminus' sheets and plato's settings, which put a word first)
+  readonly property bool flanked: trail.width > 0
+  readonly property real groupW: (lead.width > 0 ? lead.width + 16 : 0) + hints.width
   Row {
     id: lead
-    anchors.left: parent.left
-    anchors.leftMargin: 16
+    x: bar.flanked ? 16 : Math.max(16, Math.round((bar.width - bar.groupW) / 2))
     anchors.verticalCenter: parent.verticalCenter
     spacing: 8
   }
 
-  readonly property bool flanked: lead.width > 0 || trail.width > 0
   HintRow {
     id: hints
     rows: bar.rows
     anchors.verticalCenter: parent.verticalCenter
-    x: !bar.flanked ? Math.round((bar.width - width) / 2)
-      : (lead.width > 0 ? lead.x + lead.width + 16 : 16)
+    x: lead.width > 0 ? lead.x + lead.width + 16
+      : (bar.flanked ? 16 : Math.round((bar.width - width) / 2))
     maxWidth: bar.width - 32
       - (lead.width > 0 ? lead.width + 16 : 0)
       - (trail.width > 0 ? trail.width + 12 + 24 : 0)

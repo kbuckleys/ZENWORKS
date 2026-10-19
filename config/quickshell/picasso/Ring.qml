@@ -13,7 +13,7 @@ Rectangle {
   property bool on: false
   anchors.fill: parent
   anchors.margins: -3
-  radius: 7
+  radius: Zenon.radiusCard
   color: "transparent"
   border.width: 2
   border.color: Zenon.cyan

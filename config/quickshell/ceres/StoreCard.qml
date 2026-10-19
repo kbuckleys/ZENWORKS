@@ -43,6 +43,14 @@ Item {
     border.color: Zenon.alpha(Zenon.cyan, 0.6)
     Behavior on color { ColorAnimation { duration: Zenon.ms(120) } }
   }
+  // PRESSED, IT DARKENS (user, 2026-10-19: the packages, not their sections)
+  Rectangle {
+    anchors.fill: parent
+    anchors.margins: 3
+    radius: Zenon.windowRadius
+    visible: cardMa.pressed
+    color: Zenon.pressTile(card.here)
+  }
 
   MouseArea {
     id: cardMa

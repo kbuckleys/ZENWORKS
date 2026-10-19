@@ -347,7 +347,7 @@ LayerPopup {
 
     width: chipRow.implicitWidth + 14
     height: chipRow.implicitHeight + 4
-    radius: 5
+    radius: Zenon.windowRadius
     color: Qt.rgba(chip.ink.r, chip.ink.g, chip.ink.b,
                    chipMa.pressed ? 0.24 : 0.08)
     border.width: 1
@@ -2096,7 +2096,7 @@ LayerPopup {
                     visible: popup.dictErrorWord !== ""
                     width: badWord.implicitWidth + 16
                     height: badWord.implicitHeight + 6
-                    radius: 5
+                    radius: Zenon.windowRadius
                     color: Qt.rgba(popup.errColor.r, popup.errColor.g,
                                    popup.errColor.b, 0.10)
                     border.width: 1
@@ -2142,7 +2142,7 @@ LayerPopup {
                       anchors.fill: parent
                       anchors.leftMargin: -12
                       anchors.rightMargin: -12
-                      radius: 5
+                      radius: Zenon.windowRadius
                       color: "transparent"
                     }
 

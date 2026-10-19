@@ -245,7 +245,7 @@ Item {
           readonly property bool lit: modelData === 0 ? seams.aboveCurrent : seams.hereCurrent
           width: 14
           height: 2
-          radius: 1
+          radius: height / 2
           x: seams.g.x + (seams.g.w - width) / 2
           y: modelData === 0 ? seams.g.hy - 4 : seams.g.hy + 3
           color: lit ? Zenon.cyan : Zenon.accentMuted

@@ -90,7 +90,7 @@ Item {
     anchors.verticalCenter: parent.verticalCenter
     width: 30
     height: 16
-    radius: 8
+    radius: height / 2
     color: pref.on
       ? Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b, 0.32)
       : Qt.rgba(Zenon.white.r, Zenon.white.g, Zenon.white.b, 0.07)

@@ -245,7 +245,7 @@ Item {
           anchors.margins: 6
           width: 6
           height: 6
-          radius: 3
+          radius: height / 2
           color: Zenon.cyan
           visible: segs.dotted.indexOf(one.modelData[0]) >= 0
         }

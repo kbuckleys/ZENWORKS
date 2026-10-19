@@ -413,7 +413,7 @@ PlatoSheet {
     x: 8
     width: parent.width - 16
     height: panel.rowH
-    radius: 4
+    radius: Zenon.radiusControl
     color: Zenon.alpha(Zenon.card, 0.98)
     border.width: 1
     border.color: Zenon.border

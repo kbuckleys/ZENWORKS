@@ -35,7 +35,7 @@ Item {
     anchors.verticalCenter: parent.verticalCenter
     width: 10
     height: 10
-    radius: 5
+    radius: height / 2
     color: rb.sticky ? Clio.ink(rb.note.hue) : "transparent"
   }
 
@@ -144,7 +144,7 @@ Item {
     anchors.verticalCenter: parent.verticalCenter
     width: 46
     height: 46
-    radius: 6
+    radius: Zenon.windowRadius
     color: Zenon.wash(0.05)
     Image {
       anchors.fill: parent

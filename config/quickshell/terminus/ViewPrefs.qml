@@ -10,6 +10,7 @@
 import QtQuick
 import Quickshell
 import "terminus.js" as Terminus
+import "../morpheus/lru.js" as Lru
 
 Item {
   id: viewPrefs
@@ -46,8 +47,6 @@ Item {
     if (term.applyingDirView || term.cwd === ""
         || term.picking || term.isPicker) return;
     const m = term.dirViews;
-    const o = term.dirViewOrder.slice();
-    if (m[term.cwd] === undefined) o.push(term.cwd);
     // The SORT travels with the view, and for the same reason the view does:
     // how a directory wants to be read is a fact about the directory. A source tree
     // sorts by name and a downloads directory sorts by date, and having to say so
@@ -65,10 +64,10 @@ Item {
                   sort: term.sortKey, desc: term.sortDesc };
     if (term.viewMode === "grid") rec.thumbZoom = term.thumbZoom;
     else if (was && was.thumbZoom !== undefined) rec.thumbZoom = was.thumbZoom;
-    m[term.cwd] = rec;
-    while (o.length > term.dirViewCap) delete m[o.shift()];
-    term.dirViews = m;
-    term.dirViewOrder = o;
+    // kept, and the oldest let go past the cap: morpheus/lru.js, picasso's too
+    const r = Lru.remember(m, term.dirViewOrder, term.cwd, rec, term.dirViewCap);
+    term.dirViews = r.map;
+    term.dirViewOrder = r.order;
     term.viewSaveRef.restart();
   }
   // Every directory's remembered view, sort and zoom, forgotten at once.
@@ -85,11 +84,9 @@ Item {
   // slider left recorded a smaller number and kept every entry already over
   // it — the setting would only bite on the next directory visited.
   function trimDirViews() {
-    const m = term.dirViews;
-    const o = term.dirViewOrder.slice();
-    while (o.length > term.dirViewCap) delete m[o.shift()];
-    term.dirViews = m;
-    term.dirViewOrder = o;
+    const r = Lru.trim(term.dirViews, term.dirViewOrder, term.dirViewCap);
+    term.dirViews = r.map;
+    term.dirViewOrder = r.order;
     term.viewSaveRef.restart();
   }
   function forgetDirViews() {

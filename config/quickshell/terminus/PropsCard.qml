@@ -61,8 +61,13 @@ Item {
     }
     return 18 + 118 + 12 + w + 18;
   }
-  readonly property real wantW: Math.max(420, Math.min(760,
-    (props.many ? 0 : 18 + propShotBox.width + 10) + props.factsW))
+  // AS WIDE AS THE PAGE ON SHOW, and no ceiling of its own (user,
+  // 2026-10-19: "i'd rather have the sheets autofit than truncate paths"):
+  // a long path widens the facts page, the Sheet holding the card stops it
+  // at the window, and the permissions page — a grid that never needs more
+  // — goes back to the floor instead of keeping the facts' width.
+  readonly property real wantW: props.tab === 1 ? 420
+    : Math.max(420, (props.many ? 0 : 18 + propShotBox.width + 10) + props.factsW)
 
   // Each show() is a generation, which the probes below answer only for —
   // see PropProc.qml.
@@ -818,7 +823,7 @@ Item {
             readonly property bool on: (props.permMode & 511) === modelData[1]
             width: 62
             height: 24
-            radius: 4
+            radius: Zenon.radiusControl
             // PRESSED, DARKENED as every button in the suite (user, 2026-10-17)
             color: presetPress.pressed ? Zenon.pressFill
               : on ? Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b, 0.20)
@@ -926,7 +931,7 @@ Item {
                 anchors.centerIn: parent
                 width: 50
                 height: 26
-                radius: 4
+                radius: Zenon.radiusControl
                 color: bitPress.pressed ? Zenon.pressFill
                   : parent.on
                   ? Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b, 0.20)

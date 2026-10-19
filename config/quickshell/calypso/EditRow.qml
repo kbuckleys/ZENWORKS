@@ -111,7 +111,7 @@ Item {
         anchors.verticalCenter: parent.verticalCenter
         width: 140
         height: 4
-        radius: 2
+        radius: height / 2
         color: Zenon.wash(0.08)
         Rectangle {
           readonly property var s: row.strength || { score: 0 }

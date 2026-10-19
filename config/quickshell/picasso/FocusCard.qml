@@ -593,7 +593,7 @@ Item {
       && card.picker.focusIndex + stepBtn.dir < card.picker.focusList.length
     width: 36
     height: 36
-    radius: 18
+    radius: height / 2
     color: stepMa.pressed ? Qt.rgba(card.highlight.r, card.highlight.g, card.highlight.b, 0.35)
       : Zenon.hud(0.55)
     border.width: 1
@@ -717,7 +717,7 @@ Item {
         y: card.pad
         width: card.previewW
         height: card.previewH
-        radius: 7
+        radius: Zenon.radiusCard
         // the letterbox wears the look's "Around it" (user, 2026-10-15: the
         // options showed nothing here) — black, a color, its own color,
         // or itself blurred (bdBlur, below)
@@ -853,7 +853,7 @@ Item {
           visible: card.picker.focusIndex >= 0
           width: countLabel.implicitWidth + 16
           height: 22
-          radius: 4
+          radius: Zenon.radiusControl
           color: Zenon.hud(0.6)
           Text {
             id: countLabel
@@ -875,7 +875,7 @@ Item {
           visible: card.picker.focusOn.length > 0
           width: onLabel.implicitWidth + 18
           height: 22
-          radius: 11
+          radius: height / 2
           color: card.entryColor
           Text {
             id: onLabel
@@ -1033,7 +1033,7 @@ Item {
             anchors.topMargin: 8
             width: parent.width
             height: 140
-            radius: 7
+            radius: Zenon.radiusCard
             color: Zenon.wash(0.025)
             border.width: 1
             border.color: Zenon.border
@@ -1082,7 +1082,7 @@ Item {
                   id: glass
                   anchors.fill: parent
                   anchors.margins: 2
-                  radius: 4
+                  radius: Zenon.radiusControl
                   color: Zenon.mix(Zenon.ground, Zenon.card, 0.4)
                   border.width: mon.staged ? 2 : 1
                   border.color: mon.staged ? card.highlight
@@ -1156,7 +1156,7 @@ Item {
                   anchors.margins: 4
                   width: 16
                   height: 16
-                  radius: 8
+                  radius: height / 2
                   visible: card.multi
                   color: mon.staged ? card.highlight : Zenon.hud(0.6)
                   border.width: mon.staged ? 0 : 1
@@ -1465,7 +1465,7 @@ Item {
               visible: Picasso.slideshow !== null
               width: parent.width
               height: 40
-              radius: 6
+              radius: Zenon.windowRadius
               color: Qt.rgba(card.entryColor.r, card.entryColor.g, card.entryColor.b, 0.1)
               border.width: 1
               border.color: Qt.rgba(card.entryColor.r, card.entryColor.g, card.entryColor.b, 0.4)

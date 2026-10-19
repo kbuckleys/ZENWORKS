@@ -199,7 +199,7 @@ Column {
       width: tabStrip.width / Math.max(1, term.tabs.length) - 4
       y: 2
       height: tabStrip.height - 4
-      radius: 5
+      radius: Zenon.windowRadius
       color: Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b, 0.10)
       border.width: 1
       border.color: Zenon.cyan
@@ -3165,7 +3165,7 @@ Column {
       anchors.rightMargin: 14
       anchors.verticalCenter: parent.verticalCenter
       height: 30
-      radius: 8
+      radius: Zenon.radiusCard
       visible: !!term.portal && term.portal.save
       // A CLASH LIGHTS THE FIELD — its ring and a wash of the same yellow
       // the button turns — so "this name is taken" is said where the name is.
@@ -3201,7 +3201,7 @@ Column {
         anchors.rightMargin: 5
         anchors.verticalCenter: parent.verticalCenter
         height: 24
-        radius: 6
+        radius: Zenon.windowRadius
         width: Math.min(saveWhereRow.implicitWidth + 16, saveBox.width * 0.42)
         color: Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b, 0.10)
         clip: true
@@ -3245,7 +3245,7 @@ Column {
         height: 22
         width: term.saveClash ? saveNumberText.implicitWidth + 14 : 0
         visible: width > 0.5
-        radius: 5
+        radius: Zenon.windowRadius
         clip: true
         color: Zenon.alpha(Zenon.yellow, saveNumberMa.pressed ? 0.34
           : 0.14)
@@ -3346,7 +3346,7 @@ Column {
             required property var modelData
             readonly property string name: Terminus.basename(String(modelData)) || String(modelData)
             height: 26
-            radius: 6
+            radius: Zenon.windowRadius
             // sized by its contents, which are capped below — never the
             // other way round, or the Row and the chip polish each other
             readonly property real most: (portalPicks.width - 70) / Math.max(1, portalPicks.shown)

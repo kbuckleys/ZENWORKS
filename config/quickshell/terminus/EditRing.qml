@@ -53,7 +53,7 @@ Rectangle {
   // HeldRing's look (user, 2026-10-11): hollow, 2px, the accent at 60% —
   // the ring that marks the row a menu is about, and every text field
   // being typed in. Its own pop and its hug of the text stay.
-  radius: 4
+  radius: Zenon.radiusControl
   color: "transparent"
   border.width: 2
   border.color: Zenon.alpha(Zenon.cyan, 0.6)

@@ -60,7 +60,7 @@ ClippingRectangle {
   // a new thumbnail is a new chance
   onThumbChanged: img.thumbFailed = false
 
-  radius: 5
+  radius: Zenon.windowRadius
   color: Zenon.surface
 
   Image {

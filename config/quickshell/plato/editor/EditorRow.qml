@@ -194,7 +194,7 @@ Item {
     height: row.cellH
     Rectangle {
       anchors.fill: parent
-      radius: 4
+      radius: Zenon.radiusControl
       gradient: Gradient {
         orientation: Gradient.Horizontal
         GradientStop { position: 0; color: Qt.rgba(headBand.ink.r, headBand.ink.g, headBand.ink.b, headBand.strength) }
@@ -225,7 +225,7 @@ Item {
       y: codePanel.atTop ? 1 : -8
       width: parent.width
       height: parent.height + (codePanel.atTop ? -1 : 8) + (codePanel.atBottom ? -1 : 8)
-      radius: 6
+      radius: Zenon.windowRadius
       color: Zenon.wash(0.04)
       border.width: 1
       border.color: Zenon.border
@@ -271,7 +271,7 @@ Item {
       y: callout.atTop ? 1 : -8
       width: parent.width
       height: parent.height + (callout.atTop ? -1 : 8) + (callout.atBottom ? -1 : 8)
-      radius: 6
+      radius: Zenon.windowRadius
       color: Qt.rgba(callout.ink.r, callout.ink.g, callout.ink.b, 0.08)
     }
   }
@@ -307,7 +307,7 @@ Item {
       y: tableFrame.atTop ? 0 : -8
       width: parent.width
       height: parent.height + (tableFrame.atTop ? 0 : 8) + (tableFrame.atBottom ? 0 : 8)
-      radius: 6
+      radius: Zenon.windowRadius
       color: !tableFrame.visible ? "transparent" : row.mdT.h ? Zenon.wash(0.07)
         : row.mdT.z ? Zenon.wash(0.035) : Zenon.wash(0.012)
       border.width: 1
@@ -393,7 +393,7 @@ Item {
       width: (modelData.b - modelData.a) * row.cellW + 6
       y: 1
       height: row.cellH - 2
-      radius: 5
+      radius: Zenon.windowRadius
       color: Qt.rgba(Zenon.blue.r, Zenon.blue.g, Zenon.blue.b, 0.10)
       border.width: 1
       border.color: Qt.rgba(Zenon.blue.r, Zenon.blue.g, Zenon.blue.b, 0.40)

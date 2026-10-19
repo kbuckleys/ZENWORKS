@@ -615,7 +615,7 @@ FloatingWindow {
       Rectangle {
         width: 16
         height: 16
-        radius: 8
+        radius: height / 2
         y: 3
         x: sw.value ? track.width - width - 3 : 3
         color: sw.value ? popup.highlight : popup.dimColor
@@ -654,7 +654,7 @@ FloatingWindow {
       anchors.verticalCenter: parent.verticalCenter
       width: 168
       height: 4
-      radius: 2
+      radius: height / 2
       color: Zenon.wash(0.10)
 
       Rectangle {
@@ -667,7 +667,7 @@ FloatingWindow {
       Rectangle {
         width: 12
         height: 12
-        radius: 6
+        radius: height / 2
         y: -4
         x: Math.round(bar.width * sl.frac) - 6
         color: drag.pressed ? popup.highlight : popup.headColor
@@ -745,7 +745,7 @@ FloatingWindow {
       anchors.verticalCenter: parent.verticalCenter
       width: en.chipW
       height: 26
-      radius: 4
+      radius: Zenon.radiusControl
       color: (en.open || chipMa.pressed)
         ? Qt.rgba(popup.highlight.r, popup.highlight.g, popup.highlight.b, 0.18)
         : Zenon.wash(0.06)
@@ -864,7 +864,7 @@ FloatingWindow {
       anchors.verticalCenter: parent.verticalCenter
       width: 164
       height: 26
-      radius: 4
+      radius: Zenon.radiusControl
       color: (dv.open || dvMa.pressed)
         ? Qt.rgba(popup.highlight.r, popup.highlight.g, popup.highlight.b, 0.18)
         : Zenon.wash(0.06)
@@ -938,7 +938,7 @@ FloatingWindow {
 
     Rectangle {
       anchors.fill: parent
-      radius: 4
+      radius: Zenon.radiusControl
       color: tx.editing ? Zenon.wash(0.08) : "transparent"
       border.width: 1
       border.color: Zenon.border
@@ -1032,7 +1032,7 @@ FloatingWindow {
     Rectangle {
       id: pkBox
       anchors.fill: parent
-      radius: 4
+      radius: Zenon.radiusControl
       color: (pk.busy || pkMa.pressed)
         ? Qt.rgba(popup.highlight.r, popup.highlight.g, popup.highlight.b, 0.18)
         : Zenon.wash(0.06)
@@ -1162,7 +1162,7 @@ FloatingWindow {
       anchors.verticalCenter: parent.verticalCenter
       width: Math.max(110, verb.implicitWidth + 28)
       height: 28
-      radius: 4
+      radius: Zenon.radiusControl
       // PRESSED, not hovered. A button has to answer when you use it; it does
       // not have to announce itself when you pass by.
       color: btnMa.pressed
@@ -1529,8 +1529,19 @@ FloatingWindow {
                     // of the toolbar, not a chip floating inside it.
                     Rectangle {
                       anchors.fill: parent
-                      color: tab.here ? Zenon.border : Zenon.alpha(Zenon.border, 0)
+                      // the pane you are in, in the menu band (swapped with the press,
+                      // user 2026-10-19)
+                      color: tab.here ? Zenon.menuHi : Zenon.alpha(Zenon.menuHi, 0)
                       Behavior on color { ColorAnimation { duration: Zenon.fast; easing.type: Zenon.ease } }
+                    }
+                    // PRESSED, IT DARKENS (user, 2026-10-19), the suite's press:
+                    // the lit tab under the shadow ink, an unlit one the press fill
+                    Rectangle {
+                      anchors.fill: parent
+                      visible: tabPress.pressed
+                      // PRESSED: the slate the pane you are in used to wear (Zenon.border),
+                      // swapped with it (user, 2026-10-19)
+                      color: Zenon.border
                     }
 
                     // The icon over the name, as one group centered in the tile.
@@ -1593,6 +1604,7 @@ FloatingWindow {
                     }
 
                     MouseArea {
+                      id: tabPress
                       anchors.fill: parent
                       onClicked: popup.goToSection(tab.modelData.id)
                     }
@@ -1724,7 +1736,7 @@ FloatingWindow {
                   text: "a desktop suite by <a href=\"" + popup.authorUrl
                     + "\">" + popup.authorName + "</a>"
                   color: popup.dimColor
-                  linkColor: popup.headColor
+                  linkColor: Zenon.link
                   font.family: popup.face
                   font.weight: Zenon.weight
                   font.pixelSize: Zenon.px(14)
@@ -1811,7 +1823,7 @@ FloatingWindow {
                     required property var modelData
                     width: cbText.implicitWidth + 28
                     height: 28
-                    radius: 4
+                    radius: Zenon.radiusControl
                     color: cbMa.pressed
                       ? Qt.rgba(popup.highlight.r, popup.highlight.g, popup.highlight.b, 0.25)
                       : cb.modelData.keep ? Qt.rgba(popup.highlight.r, popup.highlight.g, popup.highlight.b, 0.14)
@@ -2103,7 +2115,7 @@ FloatingWindow {
                         anchors.centerIn: parent
                         width: parent.width + 4
                         height: parent.width + 4
-                        radius: 5
+                        radius: Zenon.windowRadius
                         color: restoreMa.pressed ? Zenon.pressWash(0.14) : "transparent"
                       }
                       Text {
@@ -2230,7 +2242,7 @@ FloatingWindow {
                         visible: !!settingRow.spec.book && !!popup.fontBook
                         width: 26
                         height: 26
-                        radius: 4
+                        radius: Zenon.radiusControl
                         anchors.verticalCenter: parent.verticalCenter
                         color: bookMa.pressed
                           ? Qt.rgba(popup.highlight.r, popup.highlight.g, popup.highlight.b, 0.18)
@@ -2281,7 +2293,7 @@ FloatingWindow {
                           readonly property real val: (Oracle.revision, Number(Oracle.get(stepChip.sp.key)))
                           width: 92
                           height: 26
-                          radius: 4
+                          radius: Zenon.radiusControl
                           color: Zenon.wash(0.06)
                           border.width: 1
                           border.color: Zenon.border

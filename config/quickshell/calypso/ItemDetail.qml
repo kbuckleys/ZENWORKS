@@ -453,7 +453,7 @@ Item {
             required property var modelData
             height: 26
             width: tagText.implicitWidth + 22
-            radius: 13
+            radius: height / 2
             color: tagPress.pressed ? Zenon.pressWash(0.14) : Zenon.alpha(Zenon.magenta, 0.1)
             border.width: 1
             border.color: Zenon.alpha(Zenon.magenta, 0.35)

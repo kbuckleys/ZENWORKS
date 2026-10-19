@@ -212,7 +212,7 @@ Item {
     width: bar.pillRect.width + 16
     y: 4
     height: bar.height - 8
-    radius: 5
+    radius: Zenon.windowRadius
     color: Zenon.wash(0.07)
     opacity: hoverPill.on ? 1 : 0
     visible: opacity > 0.01

@@ -30,7 +30,7 @@ Rectangle {
 
   implicitWidth: btn.glyph ? Math.max(36, btnText.implicitWidth + 20) : Math.max(96, btnText.implicitWidth + 34)
   implicitHeight: 28
-  radius: 4
+  radius: Zenon.radiusControl
   // at rest, and pressed — the pressed one is the point: a button that
   // looks the same under the finger as at rest has not confirmed anything.
   // NO HOVER TINT (user, 2026-10-11): the suite's buttons do not light up

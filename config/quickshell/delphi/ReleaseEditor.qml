@@ -218,6 +218,7 @@ Item {
       contentHeight: prevText.implicitHeight
       boundsBehavior: Flickable.StopAtBounds
       TextEdit {
+        palette.link: Zenon.link   // the theme's, not the system's blue
         id: prevText
         width: prev.width
         readOnly: true

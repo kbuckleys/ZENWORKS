@@ -258,6 +258,7 @@ Item {
     }
 
     TextEdit {
+      palette.link: Zenon.link   // the theme's, not the system's blue
       id: text
       visible: blk.isText
       x: blk.textX
@@ -402,7 +403,7 @@ Item {
         anchors.margins: 5
         width: 14
         height: 14
-        radius: 4
+        radius: Zenon.radiusControl
         color: Zenon.hud(0.8)
         border.width: 1
         border.color: Zenon.border

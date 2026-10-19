@@ -121,7 +121,7 @@ Rectangle {
       anchors.verticalCenter: parent.verticalCenter
       width: addRow.implicitWidth + 22
       height: 28
-      radius: 4
+      radius: Zenon.radiusControl
       // no hover tint, as DialogButton (user, 2026-10-11)
       color: addMa.pressed ? Zenon.pressWash(0.24) : Zenon.wash(0.12)
       border.width: 1
@@ -142,7 +142,7 @@ Rectangle {
               anchors.centerIn: parent
               width: 11
               height: 2
-              radius: 1
+              radius: height / 2
               rotation: modelData
               color: Zenon.cyan
             }

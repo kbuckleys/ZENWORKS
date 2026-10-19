@@ -74,7 +74,7 @@ Item {
     anchors.right: parent.right
     anchors.top: parent.top
     height: parent.height - picker.barH - picker.rowH - picker.gap * 2
-    radius: 6
+    radius: Zenon.windowRadius
     color: Qt.hsva(picker.h, 1, 1, 1)
 
     Rectangle {
@@ -98,7 +98,7 @@ Item {
       y: (1 - picker.v) * sv.height - height / 2
       width: 14
       height: 14
-      radius: 7
+      radius: height / 2
       color: picker.shown
       border.width: 2
       border.color: picker.v > 0.55 && picker.s < 0.5 ? "#000000" : "#ffffff"
@@ -142,7 +142,7 @@ Item {
       anchors.verticalCenter: parent.verticalCenter
       width: 16
       height: 16
-      radius: 8
+      radius: height / 2
       color: Qt.hsva(picker.h, 1, 1, 1)
       border.width: 2
       border.color: "#ffffff"
@@ -171,7 +171,7 @@ Item {
     Rectangle {
       width: picker.rowH
       height: picker.rowH
-      radius: 5
+      radius: Zenon.windowRadius
       color: picker.shown
       border.width: 1
       border.color: Zenon.border
@@ -180,7 +180,7 @@ Item {
     Rectangle {
       width: 110
       height: picker.rowH
-      radius: 5
+      radius: Zenon.windowRadius
       color: Zenon.wash(0.05)
       border.width: 1
       border.color: Zenon.border

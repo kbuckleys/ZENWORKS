@@ -1437,6 +1437,7 @@ Item {
     // behind it. Within a layer the last surface mapped is the top one, and
     // a menu maps when you open it, so this puts it where it belongs.
     WlrLayershell.layer: WlrLayer.Overlay
+    WlrLayershell.namespace: "morpheus-menu"   // its own motion only (CardMenu)
     id: appsMenu
     property bool wanted: root.shown && root.childMenu === "apps"
     property real shade: 0
@@ -1774,6 +1775,7 @@ Item {
     // behind it. Within a layer the last surface mapped is the top one, and
     // a menu maps when you open it, so this puts it where it belongs.
     WlrLayershell.layer: WlrLayer.Overlay
+    WlrLayershell.namespace: "morpheus-menu"
     id: confirmMenu
     property bool wanted: root.shown && root.childMenu === "session" && root.pendingConfirmId !== ""
     property real shade: 0

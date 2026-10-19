@@ -945,6 +945,7 @@ Item {
           anchors.verticalCenter: parent.verticalCenter
           text: orow.spec.label + "  <font color='" + Zenon.accentMuted + "'>" + orow.spec.key + "</font>"
           textFormat: Text.StyledText
+          linkColor: Zenon.link   // a link in it is the theme's (Zenon.link)
           color: Zenon.white
           font.family: Zenon.face
           font.weight: Font.Bold

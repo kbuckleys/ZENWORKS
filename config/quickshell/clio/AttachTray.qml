@@ -104,7 +104,7 @@ Bubble {
           ClippingRectangle {
             id: face
             anchors.fill: parent
-            radius: 8
+            radius: Zenon.radiusCard
             color: Zenon.wash(0.06)
             border.width: 1
             border.color: tileMa.pressed ? Zenon.alpha(Zenon.cyan, 0.7) : Zenon.border

@@ -25,7 +25,7 @@ Rectangle {
   color: Zenon.tipBg
   border.color: Zenon.border
   border.width: 1
-  radius: 6
+  radius: Zenon.windowRadius
   // the glass rim, as Tooltip's card has it — see Zenon.rim
   Rectangle {
     visible: Zenon.rimOn

@@ -62,8 +62,11 @@ Collapsible {
       BarText {
         id: iconGlyph
         anchors.centerIn: parent
-        text: root.silent ? "󰂛" : "󰂜"
-        color: root.silent ? Zenon.muted : Zenon.yellow
+        // all caught up: the bell in the clock's ink (Zenon.cyan), quiet
+        // beside it; something unread: the bell with its badge (U+F0D59) in
+        // the yellow that says so (user, 2026-10-19)
+        text: root.silent ? "󰂛" : root.unread > 0 ? "\u{F0D59}" : "󰂜"
+        color: root.silent ? Zenon.muted : root.unread > 0 ? Zenon.yellow : Zenon.cyan
         numeric: true
         font.pixelSize: Zenon.clockSize
       }

@@ -167,7 +167,7 @@ Rectangle {
           anchors.verticalCenter: parent.verticalCenter
           width: moodWord.implicitWidth + 16
           height: 22
-          radius: 11
+          radius: height / 2
           color: card.mood ? Zenon.alpha(Zenon[card.mood.ink] || Zenon.accentMuted, 0.16) : "transparent"
           Text {
             id: moodWord

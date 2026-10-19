@@ -16,7 +16,7 @@ Rectangle {
   signal clicked()
   width: label.implicitWidth + 22
   height: 28
-  radius: 14
+  radius: height / 2
   color: chip.on ? Zenon.alpha(chip.ink, 0.2) : Zenon.wash(0.05)
   border.width: 1
   border.color: chip.on ? Zenon.alpha(chip.ink, 0.7) : Zenon.border

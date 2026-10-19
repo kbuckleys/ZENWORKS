@@ -259,6 +259,7 @@ Item {
         persistentSelection: true
         wrapMode: TextEdit.WrapAnywhere
         textFormat: TextEdit.RichText
+        palette.link: Zenon.link   // a link in it is the theme's (Zenon.link)
         selectionColor: Zenon.selBg
         selectedTextColor: Zenon.white
         color: Zenon.accentKey
@@ -472,7 +473,7 @@ Item {
               readonly property bool on: view.pickOf(provRow.modelData) === chip.modelData
               width: chipText.implicitWidth + 20
               height: chipText.implicitHeight + 8
-              radius: 5
+              radius: Zenon.windowRadius
               color: chip.on ? Zenon.alpha(Zenon.cyan, 0.16)
                 : Zenon.wash(0)
               border.width: 1
@@ -501,6 +502,7 @@ Item {
           width: settleBox.width
           wrapMode: Text.Wrap
           textFormat: Text.StyledText
+          linkColor: Zenon.link   // a link in it is the theme's (Zenon.link)
           text: "<font color='" + Zenon.green + "'>+ " + modelData.pkg + "</font>"
             + (modelData.inner
               ? "  <font color='" + Zenon.accentMuted + "'>conflicts with</font>  "

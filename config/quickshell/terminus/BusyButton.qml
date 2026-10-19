@@ -58,7 +58,7 @@ Item {
     implicitWidth: busyRow.implicitWidth + 34
     width: parent.width
     height: 28
-    radius: 4
+    radius: Zenon.radiusControl
     clip: true
     color: Zenon.alpha(bb.busyInk, 0.08)
     border.width: 1

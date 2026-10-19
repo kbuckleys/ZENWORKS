@@ -206,7 +206,7 @@ Item {
     y: Math.max(6, cropBox.y - height - 6)
     width: cropSize.implicitWidth + 12
     height: 22
-    radius: 4
+    radius: Zenon.radiusControl
     color: Zenon.hud(0.8)
     Text {
       id: cropSize

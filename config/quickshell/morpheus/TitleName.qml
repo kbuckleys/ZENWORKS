@@ -138,7 +138,7 @@ Item {
       ? Math.round(tn.ringBox.mapToItem(tn, 0, 0 * (tn.y + tn.parent.y)).y
                    + (tn.ringBox.height - height) / 2)
       : Math.round(inkMid - height / 2)
-    radius: 4
+    radius: Zenon.radiusControl
     color: "transparent"
     border.width: 2
     border.color: Zenon.alpha(Zenon.cyan, 0.6)

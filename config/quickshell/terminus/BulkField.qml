@@ -52,7 +52,7 @@ Rectangle {
   readonly property alias focused: fldIn.activeFocus
 
   height: Math.max(26, fld.textSize + 12)
-  radius: 4
+  radius: Zenon.radiusControl
   color: Qt.rgba(Zenon.white.r, Zenon.white.g, Zenon.white.b, 0.05)
   border.width: 1
   border.color: Zenon.border

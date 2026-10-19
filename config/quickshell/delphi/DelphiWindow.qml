@@ -1633,7 +1633,7 @@ FloatingWindow {
           anchors.verticalCenter: parent.verticalCenter
           width: netRow.implicitWidth + 30
           height: 28
-          radius: 4
+          radius: Zenon.radiusControl
           color: Zenon.alpha(Zenon.cyan, 0.08)
           border.width: 1
           border.color: Zenon.alpha(Zenon.cyan, 0.4)

@@ -456,7 +456,7 @@ Item {
     color: Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b, 0.12)
     border.width: 1
     border.color: Zenon.border
-    radius: 4
+    radius: Zenon.radiusControl
   }
 
   // NO SEPARATE CURSOR TICK IN THE GUTTER. A 3px bar used to sit here to

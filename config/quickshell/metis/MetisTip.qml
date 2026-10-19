@@ -21,7 +21,7 @@ Rectangle {
 
   width: row.implicitWidth + 14
   height: 24
-  radius: 5
+  radius: Zenon.windowRadius
   color: Zenon.alpha(Zenon.border, 0)
   Behavior on color { ColorAnimation { duration: Zenon.fast } }
   border.width: 1

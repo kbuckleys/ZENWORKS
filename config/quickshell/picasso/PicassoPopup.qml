@@ -213,7 +213,7 @@ LayerPopup {
       anchors.verticalCenter: parent.verticalCenter
       width: ringWord.implicitWidth + 18
       height: 22
-      radius: 4
+      radius: Zenon.radiusControl
       color: ringMa.pressed
         ? Qt.rgba(popup.highlight.r, popup.highlight.g, popup.highlight.b, 0.26)
         : (Zenon.wash(0.06))
@@ -734,7 +734,7 @@ LayerPopup {
               Rectangle {
                 anchors.fill: parent
                 anchors.margins: 6
-                radius: 6
+                radius: Zenon.windowRadius
                 color: "transparent"
               }
 
@@ -757,7 +757,7 @@ LayerPopup {
                 anchors.margins: 4
                 width: 18
                 height: 18
-                radius: 9
+                radius: height / 2
                 visible: popup.inUse(cell.modelData.path)
                 color: popup.entryColor
                 Text {
@@ -849,7 +849,7 @@ LayerPopup {
                 Rectangle {
                   anchors.fill: parent
                   anchors.margins: 4
-                  radius: 6
+                  radius: Zenon.windowRadius
                   color: "transparent"
                 }
 
@@ -860,7 +860,7 @@ LayerPopup {
                   anchors.horizontalCenter: parent.horizontalCenter
                   width: parent.width - 24
                   height: parent.height - 44
-                  radius: 6
+                  radius: Zenon.windowRadius
                   color: swCell.modelData.hex
                   border.width: 1
                   border.color: swMa.pressed ? Zenon.wash(0.5) : Zenon.wash(0.12)
@@ -873,7 +873,7 @@ LayerPopup {
                   anchors.margins: 4
                   width: 18
                   height: 18
-                  radius: 9
+                  radius: height / 2
                   visible: popup.inUse(swCell.modelData.path)
                   color: popup.entryColor
                   Text {
@@ -893,7 +893,7 @@ LayerPopup {
                   anchors.margins: 4
                   width: 18
                   height: 18
-                  radius: 9
+                  radius: height / 2
                   visible: swCell.modelData.custom && swMa.containsMouse
                   color: delMa.pressed ? Zenon.red : Zenon.hud(0.65)
                   Text {
@@ -1078,7 +1078,7 @@ LayerPopup {
               visible: Picasso.slideshow !== null
               width: ssRow.implicitWidth + 16
               height: 22
-              radius: 11
+              radius: height / 2
               color: Qt.rgba(popup.entryColor.r, popup.entryColor.g, popup.entryColor.b, 0.12)
               border.width: 1
               border.color: Qt.rgba(popup.entryColor.r, popup.entryColor.g, popup.entryColor.b, 0.45)

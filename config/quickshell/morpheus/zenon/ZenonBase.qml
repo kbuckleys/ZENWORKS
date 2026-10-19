@@ -210,6 +210,14 @@ QtObject {
   // opacity — its own color darkened, never a gray slab (DialogButton
   // primary, Delphi's network pill)
   readonly property real pressShade: light ? 0.25 : 0.45
+  // A PRESSED TILE — a tab, a card, a row: a large surface, where the
+  // button's press (pressFill, pressShade) reads as a hole. A lighter shadow,
+  // set for each mode (user, 2026-10-19: "too dark in dark mode — we must
+  // always account for both theme modes"); `lit` for one already showing
+  // its highlight, which needs a touch more to show the press over it.
+  // dark glass needs more shadow than paper for a press to read at all (0.16
+  // vanished on oracle's dark toolbar)
+  function pressTile(lit) { return shade(light ? (lit ? 0.12 : 0.08) : (lit ? 0.34 : 0.30)); }
   // a plain button at rest: a wash of the ink on dark glass; on paper the
   // window's accent gray (accentMuted), as every other gray in a window
   // leans to the accent — a black wash read as a neutral gray slab beside
@@ -274,6 +282,10 @@ QtObject {
   readonly property color green:   pick("green")
   readonly property color yellow:  pick("yellow")
   readonly property color blue:    pick("blue")
+  // A WEB LINK's ink: the theme's ACCENT (user, 2026-10-19 — its blue was
+  // not it), everywhere one is shown — Text's linkColor, a TextEdit's
+  // palette.link (else the system's #0000ff)
+  readonly property color link: cyan
   readonly property color magenta: pick("magenta")
   readonly property color cyan:    pick("cyan")
   readonly property color pink:    pick("pink")   // bright_red
@@ -429,6 +441,14 @@ QtObject {
   // ceres read it for every chip, button, field and clip in their windows,
   // so the rounding is one number to change, here and in base.lua.
   readonly property int windowRadius: 5
+  // ── THE RADIUS SCALE (user, 2026-10-19) ──────────────────────────────
+  // Every corner in the suite is one of these, or `height / 2` for a capsule
+  // or a circle (chips, badges, knobs, switches, thin meter bars), or 0 where
+  // the square is meant. windowRadius above is the ROW: list bands, cells,
+  // fields, inner panels. Menus and the bar keep their own (Oracle's
+  // menuRadius and pillRadius, which are the user's to set).
+  readonly property int radiusControl: 4   // buttons, key-like boxes, small swatches
+  readonly property int radiusCard: 8      // a card inside a window: a sticky, a timer, a preview
 
   // WHERE A CARD THAT HANGS OFF ANOTHER ONE GOES: its parent's right side if
   // there is room, its left if not, and clamped only when neither side fits.

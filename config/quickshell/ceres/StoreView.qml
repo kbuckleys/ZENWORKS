@@ -137,7 +137,7 @@ Item {
     store.place(st.section, st.app ? store.apps.find(x => x.key === st.app) || null : null);
   }
   function stepBack() {
-    if (store.lightbox !== "") { store.lightbox = ""; return true; }
+    if (store.lightbox !== "") { store.closeShot(); return true; }
     if (!store.trail.length) {
       if (!store.app) return false;
       store.ahead = store.ahead.concat([store.here()]);
@@ -304,12 +304,26 @@ Item {
   // the page's screenshots, in order, for ← → and the lightbox's own
   // previous / next (user, 2026-10-17: no closing one to open the next)
   property var lightboxFiles: []
+  // A SCREENSHOT OPENS OUT OF ITS THUMBNAIL AND GOES BACK INTO IT (user,
+  // 2026-10-19: "zoom previews in and out when i open them"): where the
+  // thumbnail is, handed to the lightbox, which grows the picture from there
+  function openShot(item, file, files) {
+    store.lightboxFiles = files;
+    const r = item.mapToItem(lightboxBox, 0, 0, item.width, item.height);
+    store.lightbox = file;
+    lightboxBox.zoomIn(r);
+  }
+  function closeShot() { lightboxBox.zoomOut(); }
   readonly property int lightboxAt: store.lightboxFiles.indexOf(store.lightbox)
   function lightboxStep(d) {
     const i = store.lightboxAt + d;
     if (store.lightboxAt < 0) return false;
     if (i < 0 || i >= store.lightboxFiles.length) { lightboxBox.bump(d); return false; }
     lightboxBox.step(d);
+    // the thumbnail it came out of is not this one: it closes shrinking
+    // toward the middle instead of into another picture's box
+    const f = lightboxBox.full;
+    lightboxBox.from = Qt.rect(f.x + f.width * 0.1, f.y + f.height * 0.1, f.width * 0.8, f.height * 0.8);
     store.lightbox = store.lightboxFiles[i];
     Qt.callLater(lightboxBox.enter);
     return true;
@@ -477,7 +491,7 @@ Item {
   // Esc: off the page first; then the window's own steps
   // Esc: off the lightbox, off the page; the window's own steps after that
   function back() {
-    if (store.lightbox !== "") { store.lightbox = ""; return true; }
+    if (store.lightbox !== "") { store.closeShot(); return true; }
     if (store.app) { store.stepBack(); return true; }
     return false;
   }
@@ -500,16 +514,23 @@ Item {
 
       Repeater {
         model: St.SECTIONS
-        delegate: Rectangle {
+        // terminus/ShelfRow, the suite's sidebar row (it was a copy of it),
+        // with its press; the line over Installed rides on top
+        delegate: Term.ShelfRow {
           id: srow
           required property var modelData
           required property int index
-          readonly property bool on: store.section === srow.modelData[0] && !store.searching
           width: parent.width
-          height: 34
-          radius: Zenon.windowRadius
-          color: srow.on ? Zenon.menuHi : "transparent"
-          // Installed under a hairline: it is yours, not the catalog's
+          glyph: srow.modelData[2]
+          label: srow.modelData[1]
+          here: store.section === srow.modelData[0] && !store.searching
+          count: srow.modelData[0] === "installed" && store.loaded
+            ? String(store.apps.filter(a => a.installed).length) : ""
+          onClicked: {
+            if (store.searching) store.searchLeft();
+            store.showSection(srow.modelData[0]);
+            store.released();
+          }
           Rectangle {
             visible: srow.modelData[0] === "installed"
             anchors.bottom: parent.top
@@ -518,52 +539,6 @@ Item {
             anchors.right: parent.right
             height: 1
             color: Zenon.border
-          }
-          Text {
-            id: sGlyph
-            anchors.left: parent.left
-            anchors.leftMargin: 10
-            anchors.verticalCenter: parent.verticalCenter
-            width: 22
-            horizontalAlignment: Text.AlignHCenter
-            text: srow.modelData[2]
-            color: srow.on ? Zenon.cyan : Zenon.accentKey
-            font.family: Zenon.face
-            font.weight: Zenon.weight
-            font.pixelSize: Zenon.px(15)
-          }
-          Text {
-            anchors.left: sGlyph.right
-            anchors.leftMargin: 10
-            anchors.right: sCount.left
-            anchors.verticalCenter: parent.verticalCenter
-            elide: Text.ElideRight
-            text: srow.modelData[1]
-            color: srow.on ? Zenon.cyan : Zenon.white
-            font.family: Zenon.face
-            font.weight: Zenon.weight
-            font.pixelSize: Zenon.px(16)
-          }
-          Text {
-            id: sCount
-            anchors.right: parent.right
-            anchors.rightMargin: 10
-            anchors.verticalCenter: parent.verticalCenter
-            visible: srow.modelData[0] === "installed" && store.loaded
-            text: visible ? String(store.apps.filter(a => a.installed).length) : ""
-            color: Zenon.accentMuted
-            font.family: Zenon.face
-            font.weight: Zenon.weight
-            font.pixelSize: Zenon.px(14)
-          }
-          MouseArea {
-            id: sMa
-            anchors.fill: parent
-            onClicked: {
-              if (store.searching) store.searchLeft();
-              store.showSection(srow.modelData[0]);
-              store.released();
-            }
           }
         }
       }
@@ -1201,6 +1176,7 @@ Item {
               width: parent.width - 40
               wrapMode: Text.Wrap
               textFormat: Text.StyledText
+              linkColor: Zenon.link   // a link in it is the theme's (Zenon.link)
               readonly property var d: store.detail || {}
               text: "<b>From the AUR.</b> Built on this computer from a recipe its users maintain"
                 + (d.maintainer ? " \u2014 this one by " + d.maintainer : "") + "; you can read the PKGBUILD "
@@ -1247,6 +1223,7 @@ Item {
                 width: permCol.width - 40
                 wrapMode: Text.Wrap
                 textFormat: Text.StyledText
+                linkColor: Zenon.link   // a link in it is the theme's (Zenon.link)
                 text: !store.perms || store.perms.length === 0
                   ? "<b>Sealed.</b> Runs in Flatpak's sandbox and asks for nothing beyond drawing its window and playing sound."
                   : page.permsLive
@@ -1289,6 +1266,7 @@ Item {
                   x: page.permsLive ? 30 + permCheck.width + 10 : 47
                   anchors.verticalCenter: parent.verticalCenter
                   textFormat: Text.StyledText
+                  linkColor: Zenon.link   // a link in it is the theme's (Zenon.link)
                   text: Cer.esc(permRow.modelData.text)
                     + (permRow.modelData.changed ? "  <font color='" + Zenon.hex(Zenon.cyan) + "'>"
                       + (permRow.modelData.on ? "given by you" : "taken away") + "</font>" : "")
@@ -1375,10 +1353,8 @@ Item {
               MouseArea {
                 anchors.fill: parent
                 enabled: shot.file !== ""
-                onClicked: {
-                  store.lightboxFiles = shotList.list.map(x => store.shots[x.url] || "").filter(f => f !== "");
-                  store.lightbox = shot.file;
-                }
+                onClicked: store.openShot(shotImg, shot.file,
+                  shotList.list.map(x => store.shots[x.url] || "").filter(f => f !== ""))
               }
               Working {
                 anchors.centerIn: parent
@@ -1584,9 +1560,34 @@ Item {
     id: lightboxBox
     anchors.fill: content
     visible: store.lightbox !== ""
-    color: Zenon.alpha(Zenon.layerBg, 0.94)
+    color: Zenon.alpha(Zenon.layerBg, 0.94 * lightboxBox.zk)
     clip: true
     readonly property int slideMs: Math.round(200 * Oracle.motionScale)
+    // ── IN FROM THE THUMBNAIL, OUT TO IT ────────────────────────────────
+    // zk 0 is the thumbnail's own box (`from`), 1 the whole view; the picture
+    // is laid between the two, the backdrop fades with it, and a close waits
+    // for the way back before the lightbox goes
+    property rect from: Qt.rect(0, 0, 0, 0)
+    property real zk: 1
+    readonly property rect full: Qt.rect(28, 28, Math.max(0, width - 56), Math.max(0, height - 56))
+    function zoomIn(r) {
+      lightboxBox.from = r;
+      zoomAnim.stop();
+      lightboxBox.zk = r.width > 0 ? 0 : 1;
+      zoomAnim.to = 1;
+      zoomAnim.restart();
+    }
+    function zoomOut() {
+      if (lightboxBox.from.width <= 0 || lightboxBox.k < 1) { store.lightbox = ""; return; }
+      zoomAnim.to = 0;
+      zoomAnim.restart();
+    }
+    NumberAnimation {
+      id: zoomAnim
+      target: lightboxBox; property: "zk"
+      duration: Zenon.ms(170); easing.type: Easing.OutCubic   // brisker (user, 2026-10-19)
+      onFinished: if (lightboxBox.zk <= 0.001) { store.lightbox = ""; lightboxBox.zk = 1; }
+    }
     property string ghost: ""
     property int dir: 0
     property real k: 1
@@ -1632,8 +1633,10 @@ Item {
     }
     Image {
       id: shownImg
-      anchors.fill: parent
-      anchors.margins: 28
+      x: lightboxBox.from.x + (lightboxBox.full.x - lightboxBox.from.x) * lightboxBox.zk
+      y: lightboxBox.from.y + (lightboxBox.full.y - lightboxBox.from.y) * lightboxBox.zk
+      width: lightboxBox.from.width + (lightboxBox.full.width - lightboxBox.from.width) * lightboxBox.zk
+      height: lightboxBox.from.height + (lightboxBox.full.height - lightboxBox.from.height) * lightboxBox.zk
       source: store.lightbox !== "" ? "file://" + store.lightbox : ""
       fillMode: Image.PreserveAspectFit
       asynchronous: true
@@ -1647,21 +1650,21 @@ Item {
     }
     MouseArea {
       anchors.fill: parent
-      onClicked: store.lightbox = ""
+      onClicked: store.closeShot()
     }
     // previous and next, picasso's edge tabs (morpheus/EdgeTab)
     EdgeTab {
       edge: "left"
       anchors.left: parent.left
       anchors.verticalCenter: parent.verticalCenter
-      shown: store.lightboxAt > 0
+      shown: store.lightboxAt > 0 && lightboxBox.zk > 0.99
       onClicked: { store.lightboxStep(-1); store.released(); }
     }
     EdgeTab {
       edge: "right"
       anchors.right: parent.right
       anchors.verticalCenter: parent.verticalCenter
-      shown: store.lightboxAt >= 0 && store.lightboxAt < store.lightboxFiles.length - 1
+      shown: store.lightboxAt >= 0 && store.lightboxAt < store.lightboxFiles.length - 1 && lightboxBox.zk > 0.99
       onClicked: { store.lightboxStep(1); store.released(); }
     }
   }

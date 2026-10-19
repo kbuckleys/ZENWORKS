@@ -855,7 +855,7 @@ Item {
               required property var modelData
               height: Zenon.px(19)
               width: chipText.implicitWidth + 14
-              radius: 4
+              radius: Zenon.radiusControl
               color: Zenon.alpha(Zenon[modelData.ink], modelData.here ? 0.22 : 0.12)
               border.width: modelData.here ? 1 : 0
               border.color: Zenon[modelData.ink]

@@ -197,7 +197,7 @@ ClippingRectangle {
           required property int index
           width: index === hero.at ? 18 : 6
           height: 6
-          radius: 3
+          radius: height / 2
           color: Zenon.white
           opacity: index === hero.at ? 0.95 : 0.4
           Behavior on width { NumberAnimation { duration: Zenon.ms(260); easing.type: Easing.OutCubic } }

@@ -440,7 +440,6 @@ Rectangle {
     // The mounted disks are back — see below.
     add(Paths.home(), "Home");
     if (term.dual && term.pas) add(term.pas.cwd);
-    for (let i = 0; i < term.bookmarks.length; i++) add(term.bookmarks[i]);
     // ── AND THE DISKS, AFTER ALL ──────────────────────────────────
     // Left out once for repeating the root. A drive you plugged in is
     // not something the root says, though — it is somewhere you are
@@ -454,6 +453,9 @@ Rectangle {
           d.removable ? "\uF0A0" : "\uF1C0");
     }
     add("/", "/");
+    // THE BOOKMARKS LAST, as rows the cursor reaches like any other (user,
+    // 2026-10-19): where the empty band under the list used to be
+    for (let i = 0; i < term.bookmarks.length; i++) add(term.bookmarks[i]);
     return out;
   }
 
@@ -733,14 +735,14 @@ Rectangle {
     // rule and the footer.
     // EVERY PIXEL THAT IS NOT A ROW, EACH ONE NAMED. dialogRadius is the
     // list's top margin, and the height the card's top sits above the clip
-    // — the same number for the same reason. 12 is the list's bottom
-    // margin. The footer is the footer: morpheus/HintBar, flush to the
-    // card's bottom since 2026-10-19, so the 14 of margin it used to keep
-    // there is gone from the sum too. The whole point of adding it up from
+    // — the same number for the same reason. The list runs flush to the
+    // footer (morpheus/HintBar, flush to the card's bottom), so neither
+    // the list's old 12 of bottom margin nor the footer's 14 is in the sum
+    // any more (2026-10-19). The whole point of adding it up from
     // the parts is that every term has to be one of them (taken out of
     // step, the card came up short and the bottom row was sliced).
     readonly property real chromeH:
-      Zenon.dialogRadius + sendToHead.height + 12 + sendToFoot.height
+      Zenon.dialogRadius + sendToHead.height + sendToFoot.height
     // the listing's own row height, now that the rows are its rows
     readonly property int rowH: term.rowH
     // WHAT IS VISIBLE, not what is loaded. Bound to the tree instead, a
@@ -840,14 +842,6 @@ Rectangle {
     // Hairlines, the same ink the menu separates with. The list scrolls
     // under both of them, so a row cut in half at the bottom reads as
     // more to come rather than as a row drawn wrong.
-    Rectangle {
-      anchors.bottom: sendToFoot.top
-      anchors.bottomMargin: 10
-      anchors.left: parent.left
-      anchors.right: parent.right
-      height: 1
-      color: Zenon.border
-    }
 
     SelectBar {
 
@@ -870,7 +864,9 @@ Rectangle {
       // with the bar's own bottom edge, which is where the sheet begins
       // as far as the eye is concerned.
       anchors.topMargin: Zenon.dialogRadius + sendToHead.height
-      anchors.bottomMargin: 12
+      // flush to the keys' strip, which draws its own hairline: the band of
+      // nothing that used to sit here is gone (user, 2026-10-19)
+      anchors.bottomMargin: 0
       clip: true
       model: sendTo.shown
       boundsBehavior: Flickable.DragAndOvershootBounds

@@ -463,7 +463,7 @@ FocusScope {
       visible: tool.running || tool.log.length > 0
       width: parent.width
       height: Math.min(200, Math.max(60, logView.contentHeight + 16))
-      radius: 6
+      radius: Zenon.windowRadius
       color: Zenon.darken(0.35)
       border.width: 1
       border.color: Zenon.border

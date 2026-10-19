@@ -1336,7 +1336,7 @@ Scope {
               id: npArtBox
               width: 84
               height: 84
-              radius: 6
+              radius: Zenon.windowRadius
               color: Zenon.surface
               border.color: Zenon.border
               border.width: 1

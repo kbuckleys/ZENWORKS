@@ -889,7 +889,7 @@ FloatingWindow {
                 anchors.fill: parent
                 anchors.leftMargin: -10
                 anchors.rightMargin: -10
-                radius: 5
+                radius: Zenon.windowRadius
                 color: entryPress.pressed ? Zenon.wash(0.05) : "transparent"
               }
               Row {
@@ -1005,7 +1005,7 @@ FloatingWindow {
       color: Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b, 0.05)
       border.width: 1
       border.color: Zenon.cyan
-      radius: 4
+      radius: Zenon.radiusControl
     }
     // held over the strip: where the tabs will go
     Rectangle {

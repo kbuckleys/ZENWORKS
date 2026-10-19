@@ -333,6 +333,7 @@ Item {
       }
       Rectangle { width: parent.width; height: 1; color: Zenon.border }
       TextEdit {
+        palette.link: Zenon.link   // the theme's, not the system's blue
         width: parent.width
         readOnly: true
         selectByMouse: true

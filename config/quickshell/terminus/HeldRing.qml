@@ -22,7 +22,7 @@ Rectangle {
   id: held
   property bool on: false
 
-  radius: 4
+  radius: Zenon.radiusControl
   // hollow: only the ring (user, 2026-10-09 — no tint inside it)
   color: "transparent"
   border.width: 2   // user, 2026-10-09

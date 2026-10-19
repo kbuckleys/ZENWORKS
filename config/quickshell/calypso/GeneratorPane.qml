@@ -170,7 +170,7 @@ Item {
         anchors.rightMargin: 12
         anchors.verticalCenter: parent.verticalCenter
         height: 4
-        radius: 2
+        radius: height / 2
         color: Zenon.wash(0.08)
         Rectangle {
           height: parent.height

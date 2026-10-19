@@ -676,7 +676,7 @@ LayerPopup {
               Rectangle {
                 anchors.fill: parent
                 anchors.margins: 2
-                radius: 6
+                radius: Zenon.windowRadius
                 color: "transparent"
               }
 

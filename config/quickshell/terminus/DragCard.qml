@@ -62,7 +62,7 @@ Item {
 
   Rectangle {
     anchors.fill: parent
-    radius: 6
+    radius: Zenon.windowRadius
     color: Zenon.layerBg
     border.width: 1
     border.color: Zenon.border
@@ -125,7 +125,7 @@ Item {
     visible: card.count > 1
     width: countText.implicitWidth + 12
     height: 20
-    radius: 10
+    radius: height / 2
     color: Zenon.cyan
 
     Text {

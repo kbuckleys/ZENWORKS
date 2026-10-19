@@ -104,7 +104,7 @@ Item {
         }
         Text {
           text: "Read the post →"
-          color: readHov.hovered ? Zenon.white : Zenon.cyan
+          color: Zenon.link   // a web link: the theme's link ink
           font.family: Zenon.face
           font.weight: Zenon.weight
           font.pixelSize: Zenon.px(13) + view.grow

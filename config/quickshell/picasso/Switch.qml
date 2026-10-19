@@ -25,7 +25,7 @@ Item {
     anchors.verticalCenter: parent.verticalCenter
     width: 34
     height: 18
-    radius: 9
+    radius: height / 2
     color: sw.on ? Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b, 0.35)
                  : Zenon.wash(0.08)
     border.width: 1
@@ -35,7 +35,7 @@ Item {
       anchors.verticalCenter: parent.verticalCenter
       width: 12
       height: 12
-      radius: 6
+      radius: height / 2
       color: sw.on ? Zenon.cyan : Zenon.accentMuted
       Behavior on x { NumberAnimation { duration: Zenon.fast; easing.type: Zenon.ease } }
     }

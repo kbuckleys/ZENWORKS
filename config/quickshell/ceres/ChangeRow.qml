@@ -64,6 +64,7 @@ Item {
     elide: Text.ElideLeft
     horizontalAlignment: Text.AlignRight
     textFormat: Text.StyledText
+    linkColor: Zenon.link   // a link in it is the theme's (Zenon.link)
     // WHAT MOVED, LIT: the new version's part that differs from the old,
     // from the separator before the first difference on, in full white and
     // bold; what stayed the same in the quieter ink. 3.130-1 → 3.131-1 reads

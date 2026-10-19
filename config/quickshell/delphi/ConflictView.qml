@@ -224,7 +224,7 @@ Item {
                 width: parent.width
                 height: sideText.implicitHeight + 10
                 visible: side.modelData[3].length > 0
-                radius: 4
+                radius: Zenon.radiusControl
                 color: Zenon.alpha(side.modelData[0] === "ours" ? Zenon.cyan : Zenon.magenta, 0.08)
                 Text {
                   id: sideText

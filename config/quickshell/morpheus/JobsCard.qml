@@ -28,7 +28,7 @@ Rectangle {
   color: jobsCard.bare ? "transparent" : Zenon.black
   border.color: Zenon.border
   border.width: jobsCard.bare ? 0 : 1
-  radius: 8
+  radius: Zenon.radiusCard
   // How far in the card is, 0..1 — the holder's fade, which the card
   // grows with from its top right corner (where it hangs from).
   property real shown: 1

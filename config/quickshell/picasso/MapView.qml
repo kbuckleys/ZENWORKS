@@ -212,7 +212,7 @@ Item {
         x: 34; y: -4
         width: Math.max(22, countText.implicitWidth + 10)
         height: 22
-        radius: 11
+        radius: height / 2
         color: Zenon.sand
         Text { id: countText; anchors.centerIn: parent; text: pin.modelData.n; color: Zenon.black
                font.family: Zenon.face; font.weight: 600; font.pixelSize: Zenon.px(12) }
@@ -254,7 +254,7 @@ Item {
     anchors.margins: 12
     width: zoomCol.implicitWidth + 8
     height: zoomCol.implicitHeight + 8
-    radius: 6
+    radius: Zenon.windowRadius
     color: Zenon.hud(0.8)
     border.width: 1
     border.color: Zenon.border

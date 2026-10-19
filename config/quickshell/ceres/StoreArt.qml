@@ -95,6 +95,13 @@ Item {
     }
   }
 
+  // pressed, the picture darkens, as a package card does (Zenon.pressTile)
+  Rectangle {
+    x: pic.x; y: pic.y; width: pic.width; height: pic.height
+    radius: pic.radius
+    visible: artMa.pressed
+    color: Zenon.pressTile(false)
+  }
   MouseArea {
     id: artMa
     anchors.fill: parent

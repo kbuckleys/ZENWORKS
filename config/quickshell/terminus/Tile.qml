@@ -148,7 +148,7 @@ Item {
     y: 4
     width: Math.max(0, parent.width - 8)
     height: Math.max(0, Math.min(parent.height - 8, tile.usedH - 4))
-    radius: 6
+    radius: Zenon.windowRadius
     // NO CURSOR FILL: that is SelectCell, one rectangle the view slides
     // between tiles. The tick stays, because a tick is a property of the
     // FILE rather than of where the cursor happens to be — and the border
@@ -668,7 +668,7 @@ Item {
     width: Math.max(0, parent.width - 8)
     height: Math.max(0, Math.min(parent.height - 8, tile.usedH - 4))
     z: 5
-    radius: 6
+    radius: Zenon.windowRadius
     on: !!tile.term && tile.term.sideMenuAt === tile
   }
 
@@ -684,7 +684,7 @@ Item {
     color: Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b, 0.12)
     border.width: 1
     border.color: Zenon.border
-    radius: 6
+    radius: Zenon.windowRadius
   }
 
   MouseArea {

@@ -67,7 +67,7 @@ Item {
     anchors.rightMargin: 14
     anchors.verticalCenter: parent.verticalCenter
     height: 24
-    radius: 4
+    radius: Zenon.radiusControl
     color: Qt.rgba(Zenon.white.r, Zenon.white.g, Zenon.white.b, 0.05)
     border.width: 1
     border.color: Zenon.border

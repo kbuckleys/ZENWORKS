@@ -743,6 +743,7 @@ FloatingWindow {
       width: 412
       elide: Text.ElideRight
       textFormat: Text.StyledText
+      linkColor: Zenon.link   // a link in it is the theme's (Zenon.link)
       text: peekBubble.pkg ? "<b>" + Cer.esc(peekBubble.pkg.name) + "</b>  <font color='" + Ceres.ink.muted + "'>"
         + Cer.esc(peekBubble.m["Version"] || peekBubble.pkg.version || "") + "</font>" : ""
       color: Zenon.ink
@@ -824,6 +825,7 @@ FloatingWindow {
     Text {
       width: 332
       textFormat: Text.StyledText
+      linkColor: Zenon.link   // a link in it is the theme's (Zenon.link)
       wrapMode: Text.Wrap
       lineHeight: 1.15
       text: win.markLines.slice(0, win.markShowMost).join("<br>")
@@ -2195,6 +2197,7 @@ FloatingWindow {
           // resting on it: the marked packages, by name (markBubble)
           HoverHandler { id: markHov }
           textFormat: Text.StyledText
+          linkColor: Zenon.link   // a link in it is the theme's (Zenon.link)
           // +N and −N, in the colors the confirm sheet gives the same two
           // sides — a sign and a color say "install" and "remove" faster
           // than the words did. Updates are a +N too, in the yellow their marked
@@ -2630,6 +2633,7 @@ FloatingWindow {
               width: parent.width
               wrapMode: Text.Wrap
               textFormat: Text.StyledText
+              linkColor: Zenon.link   // a link in it is the theme's (Zenon.link)
               readonly property var tx: win.hevent ? win.history[win.historyRows[win.hsel].tx] : null
               text: !win.hevent || !win.hevent.flatpak ? ""
                 : (win.hevent.runtime
@@ -2645,6 +2649,7 @@ FloatingWindow {
             Text {
               visible: !win.hevent || !win.hevent.flatpak
               textFormat: Text.StyledText
+              linkColor: Zenon.link   // a link in it is the theme's (Zenon.link)
               text: !win.hevent ? "" : (win.installedNow !== ""
                 ? "<font color='" + Zenon.accentMuted + "'>installed now</font>  " + Cer.esc(win.installedNow)
                 : "<font color='" + Zenon.accentMuted + "'>not installed</font>")
@@ -3190,6 +3195,7 @@ FloatingWindow {
                 anchors.leftMargin: mitem.modelData.dot !== undefined ? 24 : 10
                 anchors.verticalCenter: parent.verticalCenter
                 textFormat: Text.StyledText
+                linkColor: Zenon.link   // a link in it is the theme's (Zenon.link)
                 font.weight: mitem.modelData.head ? Font.Bold : Font.Normal
                 text: mitem.modelData.head ? "<font color='" + Zenon.accentMuted + "'>" + Cer.esc(mitem.modelData.name) + "</font>"
                   : Cer.esc(mitem.modelData.name) + (mitem.modelData.version
@@ -3397,6 +3403,7 @@ FloatingWindow {
                 anchors.verticalCenter: parent.verticalCenter
                 elide: Text.ElideRight
                 textFormat: Text.StyledText
+                linkColor: Zenon.link   // a link in it is the theme's (Zenon.link)
                 text: Cer.esc(modelData.name) + (modelData.version
                   ? "  <font color='" + Ceres.ink.muted + "'>" + Cer.esc(modelData.version) + "</font>" : "")
                 color: Zenon.white
@@ -3432,7 +3439,7 @@ FloatingWindow {
                   anchors.verticalCenter: parent.verticalCenter
                   width: repoWord.implicitWidth + 14
                   height: 18
-                  radius: 9
+                  radius: height / 2
                   color: Qt.rgba(ink.r, ink.g, ink.b, 0.13)
                   Text {
                     id: repoWord
@@ -3666,7 +3673,7 @@ FloatingWindow {
                   width: frow.width - 162
                   wrapMode: Text.Wrap
                   text: frow.modelData[1]
-                  color: frow.link ? (linkHov.hovered ? Zenon.white : Zenon.blue) : Zenon.white
+                  color: frow.link ? Zenon.link : Zenon.white
                   font.family: Zenon.face
                   font.weight: Zenon.weight
                   font.pixelSize: Zenon.px(16)
@@ -3737,7 +3744,7 @@ FloatingWindow {
                   required property string modelData
                   width: chipWord.implicitWidth + 16
                   height: 24
-                  radius: 12
+                  radius: height / 2
                   color: chipPress.pressed ? Zenon.headBg : "transparent"
                   border.width: 1
                   border.color: chipPress.pressed ? Zenon.accentKey : Zenon.border
@@ -4313,6 +4320,7 @@ FloatingWindow {
             width: settleCol.width
             wrapMode: Text.Wrap
             textFormat: Text.StyledText
+            linkColor: Zenon.link   // a link in it is the theme's (Zenon.link)
             text: "<font color='" + Zenon.green + "'>+ " + modelData.pkg + "</font>"
               + (modelData.inner
                 ? "  <font color='" + Zenon.accentMuted + "'>conflicts with</font>  "
@@ -4428,6 +4436,7 @@ FloatingWindow {
           text: "pacman.conf  <font color='" + Zenon.accentMuted + "'>"
             + configView.changes + (configView.changes === 1 ? " line changed" : " lines changed") + "</font>"
           textFormat: Text.StyledText
+          linkColor: Zenon.link   // a link in it is the theme's (Zenon.link)
           color: Zenon.white
           font.family: Zenon.face
           font.weight: Font.Bold
@@ -4599,6 +4608,7 @@ FloatingWindow {
           width: parent.width
           wrapMode: Text.Wrap
           textFormat: Text.StyledText
+          linkColor: Zenon.link   // a link in it is the theme's (Zenon.link)
           text: !win.fpRuntime ? "" : "<b>First, its runtime:</b> " + Cer.esc(win.fpRuntime.name || "the libraries it is built on")
             + " \u2014 " + win.fpRuntime.download + " more to download"
             + (win.fpRuntime.installed ? ", " + win.fpRuntime.installed + " on disk" : "")
@@ -4907,6 +4917,7 @@ FloatingWindow {
             }
             Text {
               textFormat: Text.StyledText
+              linkColor: Zenon.link   // a link in it is the theme's (Zenon.link)
               text: stat.value
               color: stat.ink
               font.family: Zenon.face
@@ -5056,6 +5067,7 @@ FloatingWindow {
                   width: bannerCol.width
                   wrapMode: Text.Wrap
                   textFormat: Text.StyledText
+                  linkColor: Zenon.link   // a link in it is the theme's (Zenon.link)
                   // escaped: a dependency is written with its version bound,
                   // "foo<2" or "bar>=1", and StyledText read those as tags
                   text: "<b><font color='" + Zenon.white + "'>" + Strings.escapeHtml(modelData.by) + "</font></b>"

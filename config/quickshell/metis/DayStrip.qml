@@ -28,7 +28,7 @@ Item {
     anchors.right: parent.right
     anchors.verticalCenter: parent.verticalCenter
     height: 6
-    radius: 3
+    radius: height / 2
     gradient: Gradient {
       orientation: Gradient.Horizontal
       GradientStop { position: 0.00; color: strip.night }

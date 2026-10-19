@@ -567,7 +567,7 @@ LayerPopup {
                       anchors.centerIn: parent
                       width: popup.cellW - 6
                       height: popup.cellH - 4
-                      radius: 6
+                      radius: Zenon.windowRadius
                       color: dayCell.isToday ? Zenon.cyan
                         : (dayCell.isSel
                             ? Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b, 0.16)
@@ -598,7 +598,7 @@ LayerPopup {
                       anchors.bottomMargin: 5
                       width: 4
                       height: 4
-                      radius: 2
+                      radius: height / 2
                       visible: dayCell.forecast !== null
                       color: dayCell.isToday ? Zenon.black
                         : popup.roleColor(dayCell.forecast ? dayCell.forecast.code : 0)
@@ -1002,7 +1002,7 @@ LayerPopup {
                   Rectangle {
                     anchors.fill: parent
                     anchors.margins: 2
-                    radius: 6
+                    radius: Zenon.windowRadius
                     color: dayStrip.isSel
                       ? Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b, 0.16)
                       : (stripMa.pressed ? Zenon.border : Zenon.alpha(Zenon.border, 0))
@@ -1098,7 +1098,7 @@ LayerPopup {
                 visible: !popup.hasTimers
                 width: parent.width
                 height: popup.emptyH
-                radius: 8
+                radius: Zenon.radiusCard
                 color: emptyMa.pressed ? Zenon.border : "transparent"
                 border.color: Zenon.border
                 border.width: 1
@@ -1200,7 +1200,7 @@ LayerPopup {
                 anchors.verticalCenter: parent.verticalCenter
                 width: parent.width - 220
                 height: 34
-                radius: 6
+                radius: Zenon.windowRadius
                 color: Zenon.selBg
                 border.color: Zenon.border
                 border.width: 1
@@ -1301,7 +1301,7 @@ LayerPopup {
     readonly property color accent: cell.running ? Zenon.green
       : (cell.armed ? Zenon.sand : Zenon.cyan)
 
-    radius: 8
+    radius: Zenon.radiusCard
     color: cellMa.pressed ? Zenon.selBg : Zenon.panelBg
     border.color: cell.running
       ? Qt.rgba(cell.accent.r, cell.accent.g, cell.accent.b, 0.55) : Zenon.surface
@@ -1517,7 +1517,7 @@ LayerPopup {
 
     width: 20
     height: 20
-    radius: 5
+    radius: Zenon.windowRadius
     color: tiny.lit
       ? Qt.rgba(tiny.accent.r, tiny.accent.g, tiny.accent.b, 0.20) : Zenon.alpha(tiny.accent, 0)
     opacity: tiny.dimmed ? 0.4 : 1
@@ -1558,7 +1558,7 @@ LayerPopup {
     implicitHeight: 24
     width: pill.implicitWidth
     height: pill.implicitHeight
-    radius: 6
+    radius: Zenon.windowRadius
     color: pill.lit
       ? Qt.rgba(pill.accent.r, pill.accent.g, pill.accent.b, 0.18) : "transparent"
     border.color: pill.lit ? pill.accent : Zenon.border

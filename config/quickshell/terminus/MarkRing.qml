@@ -28,7 +28,7 @@ Rectangle {
   property color fill: "transparent"
   readonly property bool filledIn: mark.fill.a > 0
 
-  radius: 6
+  radius: Zenon.windowRadius
   color: mark.inked ? Qt.rgba(mark.ink.r, mark.ink.g, mark.ink.b, 0.55)
     : mark.filledIn ? mark.fill : Zenon.border
   border.width: 1

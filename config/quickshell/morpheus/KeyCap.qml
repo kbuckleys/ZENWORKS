@@ -28,7 +28,7 @@ Rectangle {
 
   implicitWidth: capText.implicitWidth + Math.round(cap.px * 1.15)
   implicitHeight: cap.px + 8
-  radius: 5
+  radius: Zenon.windowRadius
   color: Zenon.alpha(Zenon.accentKey, Zenon.light ? 0.12 : 0.10)
   border.width: 1
   border.color: Zenon.border

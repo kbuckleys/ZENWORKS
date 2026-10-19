@@ -127,7 +127,7 @@ Item {
           required property string modelData
           width: 18
           height: 18
-          radius: 9
+          radius: height / 2
           color: Clio.ink(modelData)
           border.width: pane.note && pane.note.hue === modelData ? 2 : 0
           border.color: Zenon.ink

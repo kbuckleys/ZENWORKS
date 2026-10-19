@@ -57,6 +57,10 @@ PanelWindow {
   // layer wlroots stacks by creation order, and a card's surface is created
   // when it first opens, which is always after whatever opened it.
   WlrLayershell.layer: WlrLayer.Overlay
+  // a menu animates itself (shade: fade + scale, as CardPopup's do); the
+  // namespace lets hyprland's rules turn its own layer animation off, which
+  // ran on top and made these cards move unlike terminus' (user, 2026-10-19)
+  WlrLayershell.namespace: "morpheus-menu"
 
   property var model: []
   property bool open: false

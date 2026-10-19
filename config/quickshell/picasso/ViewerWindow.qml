@@ -365,7 +365,8 @@ FloatingWindow {
   // an animation stopped on a frame
   property bool gifPaused: false
   // the manager's, shared by every window and kept — see PicassoViewer
-  readonly property string sortKey: win.mgr ? win.mgr.sortKey : "name"
+  // this directory's own order, remembered as terminus remembers (PicassoViewer.sortFor)
+  readonly property string sortKey: win.mgr ? win.mgr.sortFor(win.picked.length === 0 ? win.dir : "") : "name"
   onSortKeyChanged: win.resort()
   // the file a solo annotation was last saved to — where Back lands
   property string soloFile: ""
@@ -1131,7 +1132,7 @@ FloatingWindow {
                                          || String(a.name).localeCompare(String(b.name)));
     return Terminus.sortEntries(rows, win.sortKey, win.sortKey !== "name", false, true, null);
   }
-  function sortBy(key) { if (win.mgr) win.mgr.setSort(key); }
+  function sortBy(key) { if (win.mgr) win.mgr.setSort(key, win.picked.length === 0 ? win.dir : ""); }
 
   // ── THE DIRECTORIES IN THE SAME ORDER ─────────────────────────────────
   // They kept to their names whatever the order said (user, 2026-10-11).
@@ -3624,7 +3625,7 @@ FloatingWindow {
         anchors.centerIn: parent
         width: makingRow.implicitWidth + 32
         height: 36
-        radius: 18
+        radius: height / 2
         color: Zenon.hud(0.82)
         border.width: 1
         border.color: Zenon.border
@@ -3653,7 +3654,7 @@ FloatingWindow {
       z: 6
       width: zoomSaidText.implicitWidth + 28
       height: 34
-      radius: 17
+      radius: height / 2
       color: Zenon.hud(0.8)
       border.width: 1
       border.color: Zenon.border
@@ -3867,7 +3868,7 @@ FloatingWindow {
             x: 6; y: 6 + index * 26
             width: monName.implicitWidth + 14
             height: 22
-            radius: 4
+            radius: Zenon.radiusControl
             color: Zenon.hud(0.8)
             Text {
               id: monName
@@ -4018,7 +4019,7 @@ FloatingWindow {
       y: Math.min(stage.height - height - 8, hoverWatch.point.position.y + 18)
       width: chipRow.implicitWidth + 16
       height: 28
-      radius: 6
+      radius: Zenon.windowRadius
       color: Zenon.hud(0.867)
       border.width: 1
       border.color: Zenon.border
@@ -4061,7 +4062,7 @@ FloatingWindow {
       anchors.bottomMargin: 14
       width: Math.min(parent.width - 40, 640)
       height: 40
-      radius: 8
+      radius: Zenon.radiusCard
       color: Zenon.hud(0.8)
       border.width: 1
       border.color: Zenon.border
@@ -4131,7 +4132,7 @@ FloatingWindow {
       anchors.margins: 10
       width: Math.min(parent.width - 20, aName.implicitWidth + 16)
       height: 24
-      radius: 5
+      radius: Zenon.windowRadius
       color: Zenon.hud(0.8)
       Text {
         id: aName
@@ -4245,7 +4246,7 @@ FloatingWindow {
       anchors.margins: 10
       width: Math.min(parent.width - 20 - (madeCard.visible ? madeCard.width + 10 : 0), bName.implicitWidth + 16)
       height: 24
-      radius: 5
+      radius: Zenon.windowRadius
       color: Zenon.hud(0.8)
       Text {
         id: bName
@@ -4274,7 +4275,7 @@ FloatingWindow {
       anchors.margins: 10
       width: madeRow.implicitWidth + 16
       height: madeRow.implicitHeight + 16
-      radius: 8
+      radius: Zenon.radiusCard
       color: Zenon.hud(0.82)
       border.width: 1
       border.color: Zenon.border
@@ -4497,7 +4498,7 @@ FloatingWindow {
           anchors.fill: parent
           anchors.margins: 4
           z: 5
-          radius: 6
+          radius: Zenon.windowRadius
           on: menu.open && !cell.fill && menu.subject === cell.modelData.path
             && (menu.kind === "cell" || menu.kind === "directory" || menu.kind === "marked")
         }
@@ -4708,7 +4709,7 @@ FloatingWindow {
                 anchors.verticalCenter: parent.verticalCenter
                 width: 10
                 height: 10
-                radius: 5
+                radius: height / 2
                 color: Zenon[Tags.presetInk(modelData)]
                 border.width: 1
                 border.color: "#99000000"
@@ -4744,7 +4745,7 @@ FloatingWindow {
           z: 2
           width: burstRow.implicitWidth + 12
           height: 22
-          radius: 11
+          radius: height / 2
           color: Zenon.hud(0.867)
           border.width: 1
           border.color: Zenon.sand
@@ -4766,7 +4767,7 @@ FloatingWindow {
           z: 2
           width: bestText.implicitWidth + 14
           height: 20
-          radius: 10
+          radius: height / 2
           color: Zenon.green
           Text { id: bestText; anchors.centerIn: parent; text: "best"; color: Zenon.black
                  font.family: Zenon.face; font.weight: 600; font.pixelSize: Zenon.px(11) }
@@ -4789,7 +4790,7 @@ FloatingWindow {
           z: 4
           width: chipRow.implicitWidth + 18
           height: 22
-          radius: 11
+          radius: height / 2
           color: Zenon.headBg
           border.width: 1
           border.color: cell.chip && cell.chip.kind === "dupe" ? Zenon.sand : Zenon.border
@@ -4897,7 +4898,7 @@ FloatingWindow {
         x: 10
         width: pinRow.implicitWidth + 18
         height: 22
-        radius: 11
+        radius: height / 2
         color: Zenon.headBg
         border.width: 1
         border.color: pinned.chip && pinned.chip.kind === "dupe" ? Zenon.sand : Zenon.border
@@ -5228,7 +5229,7 @@ FloatingWindow {
           visible: tile.current
           anchors.fill: parent
           anchors.topMargin: 3
-          radius: 5
+          radius: Zenon.windowRadius
           blur: 14
           spread: 1
           color: "#cc000000"
@@ -5261,7 +5262,7 @@ FloatingWindow {
         }
         Rectangle {
           anchors.fill: parent
-          radius: 5
+          radius: Zenon.windowRadius
           color: "transparent"
           border.width: 2
           border.color: Zenon.cyan
@@ -5270,7 +5271,7 @@ FloatingWindow {
         // the other half of a comparison
         Rectangle {
           anchors.fill: parent
-          radius: 5
+          radius: Zenon.windowRadius
           color: "transparent"
           border.width: 2
           border.color: Zenon.sand
@@ -5283,7 +5284,7 @@ FloatingWindow {
           anchors.margins: 6
           width: 15
           height: 15
-          radius: 8
+          radius: height / 2
           color: Zenon.cyan
           Text { anchors.centerIn: parent; text: "\uf00c"; color: Zenon.black; font.family: Zenon.face; font.pixelSize: Zenon.px(8) }
         }
@@ -5837,7 +5838,7 @@ FloatingWindow {
             Text {
               width: infoCol.width - 116
               text: modelData.v
-              color: modelData.url || modelData.mapAt ? (linkMa.containsMouse ? Zenon.cyan : Zenon.blue)
+              color: modelData.url || modelData.mapAt ? (linkMa.containsMouse ? Zenon.cyan : Zenon.link)
                 : (modelData.note ? Zenon.accentMuted : Zenon.white)
               font.family: Zenon.face
               font.weight: Zenon.weight
@@ -5908,7 +5909,7 @@ FloatingWindow {
               required property var modelData
               width: Math.floor((infoCol.width - 6 * 7) / 8)
               height: 26
-              radius: 5
+              radius: Zenon.windowRadius
               color: sw.modelData.hex
               border.width: 1
               border.color: swMa.pressed ? Zenon.white : Zenon.wash(0.25)

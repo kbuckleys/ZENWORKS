@@ -75,7 +75,7 @@ Item {
         required property string modelData
         width: 26
         height: 26
-        radius: 13
+        radius: height / 2
         anchors.verticalCenter: parent.verticalCenter
         color: Zenon[modelData] || Zenon.ink
         border.width: pad.pen === modelData && !pad.erasing ? 3 : 1

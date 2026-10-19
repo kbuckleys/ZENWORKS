@@ -615,7 +615,7 @@ FocusScope {
     height: tree.toolbarHeight - 8
     Rectangle {
       anchors.fill: parent
-      radius: 4
+      radius: Zenon.radiusControl
       color: "transparent"
     }
     Text {
@@ -873,7 +873,7 @@ FocusScope {
     width: tree.width - 12
     height: tree.rowH
     y: list.y + Math.max(0, Math.min(list.height - height, (tree.sel + 1) * tree.rowH - list.contentY))
-    radius: 4
+    radius: Zenon.radiusControl
     color: Zenon.alpha(Zenon.card, 0.98)
     border.width: 1
     border.color: Zenon.border

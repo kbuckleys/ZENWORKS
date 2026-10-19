@@ -65,6 +65,7 @@ Item {
           Text {
             width: view.nameW
             textFormat: Text.StyledText
+            linkColor: Zenon.link   // a link in it is the theme's (Zenon.link)
             text: modelData.pkg + (modelData.aur ? "  <font color='" + Zenon.magenta + "'>AUR</font>" : "")
             color: Zenon.white
             font.family: Zenon.face

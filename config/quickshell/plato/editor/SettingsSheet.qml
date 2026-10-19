@@ -259,7 +259,7 @@ PlatoSheet {
             anchors.centerIn: parent
             width: parent.width + 4
             height: parent.width + 4
-            radius: 5
+            radius: Zenon.windowRadius
             color: restoreMa.pressed ? Zenon.pressWash(0.14) : Zenon.wash(0)
           }
           Text {
@@ -374,6 +374,8 @@ PlatoSheet {
     anchors.rightMargin: 18
     height: sheet.helpH
     verticalAlignment: Text.AlignVCenter
+    // centered, over the centered keys below (user, 2026-10-19)
+    horizontalAlignment: Text.AlignHCenter
     wrapMode: Text.Wrap
     maximumLineCount: 2
     elide: Text.ElideRight
@@ -390,7 +392,7 @@ PlatoSheet {
     anchors.bottomMargin: 10
     anchors.leftMargin: -8
     anchors.rightMargin: -8
-    radius: 4
+    radius: Zenon.radiusControl
     color: Zenon.alpha(Zenon.card, 0.98)
     border.width: 1
     border.color: Zenon.border
@@ -434,7 +436,7 @@ PlatoSheet {
       Rectangle {
         width: 14
         height: 14
-        radius: 7
+        radius: height / 2
         y: 3
         x: sw.on ? track.width - width - 3 : 3
         color: sw.on ? Zenon.cyan : Zenon.accentMuted
@@ -466,7 +468,7 @@ PlatoSheet {
       anchors.verticalCenter: parent.verticalCenter
       width: 150
       height: 4
-      radius: 2
+      radius: height / 2
       color: Zenon.wash(0.10)
       Rectangle {
         width: Math.round(bar.width * sl.frac)
@@ -478,7 +480,7 @@ PlatoSheet {
       Rectangle {
         width: 12
         height: 12
-        radius: 6
+        radius: height / 2
         y: -4
         x: Math.round(bar.width * sl.frac) - 6
         color: drag.pressed ? Zenon.white : Zenon.cyan
@@ -523,7 +525,7 @@ PlatoSheet {
     property string shown: chip.spec ? Ora.display(chip.spec, chip.value) : ""
     width: 190
     height: 26
-    radius: 4
+    radius: Zenon.radiusControl
     color: Zenon.wash(0.06)
     border.width: 1
     border.color: Zenon.border
@@ -589,7 +591,7 @@ PlatoSheet {
       readonly property color ink: { const c = Zenon[String(cc.value)]; return c !== undefined ? c : Zenon.white; }
       width: 190
       height: 26
-      radius: 4
+      radius: Zenon.radiusControl
       color: Zenon.wash(0.06)
       border.width: 1
       border.color: drop.open && drop.spec === cc.spec ? Zenon.cyan : Zenon.border
@@ -602,7 +604,7 @@ PlatoSheet {
         anchors.verticalCenter: parent.verticalCenter
         width: 12
         height: 12
-        radius: 6
+        radius: height / 2
         color: cc.ink
         border.width: 1
         border.color: Qt.rgba(0, 0, 0, 0.4)

@@ -273,7 +273,7 @@ Item {
                   anchors.margins: 6
                   width: 20
                   height: 20
-                  radius: 10
+                  radius: height / 2
                   color: Zenon.magenta
                   Text { anchors.centerIn: parent; text: ""; color: Zenon.onAccent; font.family: Zenon.glyphFace; font.pixelSize: Zenon.px(11) }
                 }

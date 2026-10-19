@@ -54,7 +54,7 @@ Item {
         readonly property bool on: hb.marker === modelData
         width: modelData === "" ? allWord.implicitWidth + 20 : 26
         height: 26
-        radius: 13
+        radius: height / 2
         color: modelData === "" ? (on ? Zenon.wash(0.14) : Zenon.wash(0.05)) : Zenon.alpha(Zenon[modelData], on ? 0.75 : 0.35)
         border.width: on ? 2 : 1
         border.color: on ? Zenon.ink : Zenon.border

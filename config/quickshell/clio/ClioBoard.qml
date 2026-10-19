@@ -610,7 +610,7 @@ Variants {
           ClippingRectangle {
             id: card
             anchors.fill: parent
-            radius: 8
+            radius: Zenon.radiusCard
             // squared on the side the head joins, while it is there
             readonly property real joined: slot.active ? 0 : card.radius
             topLeftRadius: head.below ? card.radius : card.joined
@@ -1216,7 +1216,7 @@ Variants {
                   required property var modelData
                   width: 26
                   height: 22
-                  radius: 4
+                  radius: Zenon.radiusControl
                   // lit while pressed, not under the pointer (the suite's rule)
                   color: fmtPress.pressed ? Zenon.wash(0.16) : "transparent"
 
@@ -1268,7 +1268,7 @@ Variants {
                        !== slot.note.size
                   width: 26
                   height: 22
-                  radius: 4
+                  radius: Zenon.radiusControl
                   color: stepPress.pressed ? Zenon.wash(0.16) : "transparent"
 
                   // ── A NUDGE WHEN IT TOOK ───────────────────────────

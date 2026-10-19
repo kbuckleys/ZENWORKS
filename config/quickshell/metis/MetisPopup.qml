@@ -1353,7 +1353,7 @@ LayerPopup {
                 }
                 y: parent.height / 2 + 12
                 height: 2
-                radius: 1
+                radius: height / 2
                 color: popup.shownWhich ? Zenon.blue : Zenon.red
               }
 
@@ -1526,7 +1526,7 @@ LayerPopup {
                 visible: popup.badWord !== ""
                 width: badWordText.implicitWidth + 16
                 height: badWordText.implicitHeight + 6
-                radius: 5
+                radius: Zenon.windowRadius
                 readonly property color ink: popup.shownWhich ? Zenon.blue : Zenon.red
                 color: Zenon.alpha(ink, 0.10)
                 border.width: 1
@@ -1578,7 +1578,7 @@ LayerPopup {
                   anchors.centerIn: parent
                   width: 8
                   height: 8
-                  radius: 4
+                  radius: height / 2
                   color: Zenon[Metis.ageInk(popup.ratesAge)]
                   Behavior on color { ColorAnimation { duration: Zenon.slow } }
                   // by id: an animation has no parent of its own, so a bare

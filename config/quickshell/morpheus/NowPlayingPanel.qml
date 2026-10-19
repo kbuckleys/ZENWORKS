@@ -69,7 +69,7 @@ CursorAnchor {
     color: Zenon.panelBg
     border.color: Zenon.border
     border.width: 1
-    radius: 6
+    radius: Zenon.windowRadius
 
     // Handlers, not a filling MouseArea. A MouseArea reports containsMouse
     // false the moment the pointer crosses onto a CHILD MouseArea, so putting
@@ -110,7 +110,7 @@ CursorAnchor {
         ClippingRectangle {
           width: 76
           height: 76
-          radius: 5
+          radius: Zenon.windowRadius
           color: Zenon.surface
 
           Image {
@@ -251,7 +251,7 @@ CursorAnchor {
             anchors.verticalCenter: parent.verticalCenter
             width: parent.width
             height: 4
-            radius: 2
+            radius: height / 2
             color: Zenon.surface
           }
 
@@ -260,7 +260,7 @@ CursorAnchor {
             anchors.verticalCenter: parent.verticalCenter
             width: parent.width * seekBar.frac
             height: 4
-            radius: 2
+            radius: height / 2
             color: Zenon.green
           }
 
@@ -270,7 +270,7 @@ CursorAnchor {
             anchors.verticalCenter: parent.verticalCenter
             width: 10
             height: 10
-            radius: 5
+            radius: height / 2
             color: Zenon.green
             border.color: Zenon.border
             border.width: 1

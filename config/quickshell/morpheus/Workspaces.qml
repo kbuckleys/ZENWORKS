@@ -323,12 +323,28 @@ Item {
             // not loaded yet, an app mid-restart — never came back when the
             // app published a good one.
             source: modelData.icon
-            visible: trayIcon.status !== Image.Error
+            // drawn through the effect below, never as it comes
+            visible: false
             fillMode: Image.PreserveAspectFit
             sourceSize.width: Zenon.textSize
             sourceSize.height: Zenon.textSize
             smooth: true
             mipmap: true
+          }
+          // ONE INK FOR THE WHOLE TRAY (user, 2026-10-19: "color-neutral and
+          // theme-adherent"), the DETAIL KEPT: the clock's ink at the
+          // opacity of each pixel's brightness (shaders/inktint.frag). Not a
+          // stencil — steam's lines filled in — nor MultiEffect's
+          // colorization, which keeps lightness and swaps only hue, so the
+          // white and gray icons every tray is full of came out unchanged.
+          ShaderEffect {
+            anchors.fill: parent
+            visible: trayIcon.status === Image.Ready
+            property var source: trayIcon
+            // the clock's ink (ClockModule: Zenon.cyan), as the bell's when caught up
+            property color ink: Zenon.cyan
+            property real floorAlpha: 0.25
+            fragmentShader: Qt.resolvedUrl("shaders/inktint.frag.qsb")
           }
 
           TrayMenu {

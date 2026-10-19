@@ -29,6 +29,7 @@ import Quickshell.Io
 import "../morpheus"
 import "../morpheus/lagnotes.js" as LagNotes
 import "viewer.js" as V
+import "../morpheus/lru.js" as Lru
 import "../morpheus/hypr.js" as Hypr
 
 Scope {
@@ -76,6 +77,15 @@ Scope {
   // its shuffle. A window reads them and writes them back through setSort
   // and setSlides.
   property string sortKey: "name"
+  // AND EACH DIRECTORY ITS OWN, as terminus remembers (user, 2026-10-19):
+  // a record per directory, the last 300 touched (morpheus/lru.js); one
+  // with no record takes the last order chosen anywhere (sortKey)
+  property var dirSorts: ({})
+  property var dirSortOrder: []
+  function sortFor(dir) {
+    const s = dir ? mgr.dirSorts[dir] : undefined;
+    return s !== undefined ? s : mgr.sortKey;
+  }
   property int slideSecs: 4
   property bool shuffle: false
   // the strip of the directory under a picture — up and down, or its handle
@@ -102,6 +112,11 @@ Scope {
     try {
       const st = JSON.parse(stateFile.text() || "{}");
       if (["name", "time", "size", "taken"].indexOf(st.sort) >= 0) mgr.sortKey = st.sort;
+      if (st.dirSorts && typeof st.dirSorts === "object" && Array.isArray(st.dirSortOrder)) {
+        const r = Lru.trim(st.dirSorts, st.dirSortOrder.filter((d) => typeof d === "string"), 300);
+        mgr.dirSorts = r.map;
+        mgr.dirSortOrder = r.order;
+      }
       if (V.SLIDE_SECS.indexOf(st.slideSecs) >= 0) mgr.slideSecs = st.slideSecs;
       mgr.shuffle = st.shuffle === true;
       mgr.stripShown = st.strip !== false;
@@ -115,10 +130,16 @@ Scope {
     stateFile.setText(JSON.stringify({ sort: mgr.sortKey, slideSecs: mgr.slideSecs, shuffle: mgr.shuffle,
                                      strip: mgr.stripShown, bursts: mgr.groupBursts, xmp: mgr.xmpSidecars,
                                      galleryZoom: mgr.galleryZoom,
+                                     dirSorts: mgr.dirSorts, dirSortOrder: mgr.dirSortOrder,
                                      recent: mgr.recent }));
   }
-  function setSort(key) {
-    if (mgr.sortKey === key) return;
+  // `dir`, when given, is the directory being sorted: it keeps the order
+  function setSort(key, dir) {
+    if (dir) {
+      const r = Lru.remember(mgr.dirSorts, mgr.dirSortOrder, dir, key, 300);
+      mgr.dirSorts = r.map;
+      mgr.dirSortOrder = r.order;
+    }
     mgr.sortKey = key;
     mgr.keep_();
   }

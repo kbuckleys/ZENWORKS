@@ -2415,7 +2415,7 @@ LayerPopup {
 
                   Rectangle {
                     anchors.fill: parent
-                    radius: 5
+                    radius: Zenon.windowRadius
                     color: grantMa.pressed
                       ? Qt.rgba(Zenon.green.r, Zenon.green.g, Zenon.green.b, 0.14)
                       : "transparent"
@@ -3027,7 +3027,7 @@ LayerPopup {
                         anchors.verticalCenterOffset: -2
                         width: volCell.barW
                         height: 6
-                        radius: 3
+                        radius: height / 2
                         color: Zenon.trough(soundRow.ink)
 
                         Rectangle {
@@ -3058,7 +3058,7 @@ LayerPopup {
                         anchors.topMargin: 2
                         width: volCell.barW
                         height: 2
-                        radius: 1
+                        radius: height / 2
                         // hidden rather than left empty on a node with no
                         // usable channel map: an always-zero meter reads as
                         // silence, which is a different claim from "not
@@ -3135,7 +3135,7 @@ LayerPopup {
                         anchors.verticalCenter: parent.verticalCenter
                         width: Math.min(parent.width - 12, profLabel.implicitWidth + profChev.implicitWidth + 26)
                         height: 20
-                        radius: 4
+                        radius: Zenon.radiusControl
                         visible: profCell.switchable
                         color: profCell.lit
                           ? Qt.rgba(Zenon.green.r, Zenon.green.g, Zenon.green.b, 0.14)
@@ -3486,7 +3486,7 @@ LayerPopup {
           color: popup.bgColor
           border.color: Zenon.border
           border.width: 1
-          radius: 10
+          radius: Zenon.dialogRadius
           // arrives with the dim and a touch behind it, rising the last few
           // pixels into place, so it reads as coming forward out of the panel
           transform: Translate { y: (1 - confirmLayer.opacity) * 10 }
@@ -3536,7 +3536,7 @@ LayerPopup {
                     readonly property bool on: index === popup.sigIdx
                     width: sigText.implicitWidth + 16
                     height: 26
-                    radius: 6
+                    radius: Zenon.windowRadius
                     color: on ? popup.errColor : "transparent"
                     border.color: on ? popup.errColor : Zenon.border
                     border.width: 1
@@ -3737,7 +3737,7 @@ LayerPopup {
       anchors.margins: 4
       anchors.leftMargin: 12
       anchors.rightMargin: 12
-      radius: 6
+      radius: Zenon.windowRadius
       color: rowHover.hovered ? Zenon.menuHi : Zenon.alpha(Zenon.menuHi, 0)
       Behavior on color { ColorAnimation { duration: Zenon.fast } }
     }

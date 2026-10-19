@@ -181,7 +181,7 @@ Item {
             : ed.look.tint === sw.modelData
           width: 30
           height: 30
-          radius: 15
+          radius: height / 2
           color: sw.modelData === "" ? "transparent" : sw.ink
           border.width: sw.on ? 2 : 1
           border.color: sw.on ? Zenon.white : Zenon.wash(0.25)

@@ -98,7 +98,7 @@ Item {
     anchors.rightMargin: 10
     anchors.verticalCenter: parent.verticalCenter
     height: 4
-    radius: 2
+    radius: height / 2
     color: Qt.rgba(Zenon.white.r, Zenon.white.g, Zenon.white.b, 0.10)
 
     Rectangle {
@@ -115,7 +115,7 @@ Item {
       anchors.verticalCenter: parent.verticalCenter
       width: 12
       height: 12
-      radius: 6
+      radius: height / 2
       color: slArea.pressed ? Zenon.white : Zenon.cyan
       border.width: 1
       border.color: Zenon.border

@@ -551,7 +551,7 @@ Item {
         textFormat: post.body.trim() === "" ? Text.PlainText : Text.MarkdownText
         text: post.body.trim() === "" ? "No description" : D.mdOf(post.body)
         color: post.body.trim() === "" ? Zenon.accentMuted : Zenon.accentSoft
-        linkColor: Zenon.cyan
+        linkColor: Zenon.link
         font.family: Zenon.face
         font.weight: Zenon.weight
         font.pixelSize: Zenon.px(15)

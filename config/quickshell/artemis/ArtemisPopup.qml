@@ -912,7 +912,7 @@ LayerPopup {
                 anchors.verticalCenter: parent.verticalCenter
                 width: 4
                 height: 4
-                radius: 2
+                radius: height / 2
                 color: Zenon.magenta
                 opacity: 0.2 + 0.8 * hits / Math.max(1, popup.freqMax)
               }

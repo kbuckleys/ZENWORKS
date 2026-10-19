@@ -141,7 +141,7 @@ Column {
           id: face
           anchors.fill: parent
           anchors.margins: 2
-          radius: 8
+          radius: Zenon.radiusCard
           color: cell.isToday ? Zenon.cyan
             : cell.count > 0 ? Zenon.alpha(Zenon.cyan, Math.min(0.34, 0.12 + 0.08 * cell.count))
             : dayMa.pressed ? Zenon.wash(0.08) : "transparent"

@@ -64,7 +64,7 @@ CursorAnchor {
     color: Zenon.tipBg
     border.color: Zenon.border
     border.width: 1
-    radius: 6
+    radius: Zenon.windowRadius
     // the glass rim: light along the top edge, fading out before the
     // corners turn — see Zenon.rim
     Rectangle {

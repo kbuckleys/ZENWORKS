@@ -61,7 +61,7 @@ Item {
     anchors.rightMargin: 18
     anchors.verticalCenter: parent.verticalCenter
     height: 8
-    radius: 4
+    radius: height / 2
     color: Zenon.trough(diskRow.ink)
 
     Rectangle {
@@ -69,7 +69,7 @@ Item {
       anchors.top: parent.top
       anchors.bottom: parent.bottom
       width: parent.width * Math.min(1, (diskRow.disk.pct ?? 0) / 100)
-      radius: 4
+      radius: Zenon.radiusControl
       color: diskRow.ink
       Behavior on width { NumberAnimation { duration: Zenon.normal; easing.type: Zenon.ease } }
     }

@@ -80,7 +80,7 @@ Column {
           anchors.centerIn: parent
           width: 32
           height: 32
-          radius: 16
+          radius: height / 2
           color: parent.chosen ? Zenon.cyan : "transparent"
           border.width: N.dayKey(modelData.ms) === N.dayKey(Date.now()) ? 1.5 : 0
           border.color: Zenon.sand

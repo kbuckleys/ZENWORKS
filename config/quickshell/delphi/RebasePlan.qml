@@ -187,7 +187,7 @@ Item {
             readonly property bool on: srow.modelData.action === modelData.id
             width: Zenon.px(22)
             height: Zenon.px(22)
-            radius: 4
+            radius: Zenon.radiusControl
             color: on ? Zenon.alpha(Zenon[modelData.ink], 0.25) : Zenon.wash(0.04)
             border.width: on ? 1 : 0
             border.color: Zenon[modelData.ink]

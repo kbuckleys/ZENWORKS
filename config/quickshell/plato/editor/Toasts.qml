@@ -279,7 +279,7 @@ Item {
               required property var modelData
               width: choiceRow.implicitWidth + 20
               height: 28
-              radius: 5
+              radius: Zenon.windowRadius
               color: choicePress.pressed ? Zenon.wash(0.1) : Zenon.wash(0.05)
               border.width: 1
               border.color: Zenon.border
