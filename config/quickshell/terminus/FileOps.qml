@@ -37,7 +37,7 @@ Item {
   }
   function undo() {
     term.undoOffer = false;
-    if (term.undoStack.length === 0) { term.warn("nothing to undo"); return; }
+    if (term.undoStack.length === 0) { term.warn("Nothing to undo"); return; }
     const next = term.undoStack.slice();
     const e = next.pop();
     term.undoStack = next;
@@ -47,7 +47,7 @@ Item {
       // when the name is already taken there, so the two are not the same
       // string and only the path is something we actually know.
       term.run(Terminus.restoreCommand(e.paths, "path"));
-      term.status = "restored " + e.paths.length;
+      term.status = "Restored " + e.paths.length;
       return;
     }
     if (e.kind === "move") {
@@ -59,11 +59,11 @@ Item {
           + Strings.shellQuote(to) + "\n";
       }
       term.run(cmd);
-      term.status = "moved back " + e.pairs.length;
+      term.status = "Moved back " + e.pairs.length;
       return;
     }
     term.run(Terminus.renameCommand(e.to, Terminus.basename(e.from)));
-    term.status = "rename undone";
+    term.status = "Rename undone";
   }
   Process {
     id: trashSizeProc
@@ -94,7 +94,7 @@ Item {
       "Delete", () => {
         term.run(Terminus.emptyTrashCommand());
         term.act.marked = {};
-        term.status = "trash emptied";
+        term.status = "Trash emptied";
       });
   }
   function restoreSelected() {
@@ -102,11 +102,11 @@ Item {
     if (rows.length === 0) return;
     term.run(Terminus.restoreCommand(rows.map((r) => r.name), "name"));
     term.act.marked = {};
-    term.status = "restoring " + rows.length;
+    term.status = "Restoring " + rows.length;
   }
   function extractSelected() {
     const rows = term.acting().filter((r) => !r.isDir && Terminus.isArchive(r.name));
-    if (rows.length === 0) { term.warn("not an archive"); return; }
+    if (rows.length === 0) { term.warn("Not an archive"); return; }
     // ONE JOB PER ARCHIVE, handed to the queue that already serializes work.
     // A single script over all of them could only report one count across
     // archives of wildly different sizes, and the panel would step backwards
@@ -139,7 +139,7 @@ Item {
     // the first — the archive looked fine and was missing files.
     const from = Terminus.dirname(rows[0].path);
     if (rows.some((r) => Terminus.dirname(r.path) !== from)) {
-      term.warn("archive what is in one directory at a time");
+      term.warn("Archive what is in one directory at a time");
       return;
     }
     const e = (ext && ext !== "") ? ext : ".tar.zst";
@@ -206,13 +206,13 @@ Item {
     rotateProc.path = r.path;
     rotateProc.command = ["sh", "-c", Terminus.rotateCommand(r.path, degrees)];
     rotateProc.running = true;
-    term.status = "rotating\u2026";
+    term.status = "Rotating\u2026";
   }
   Process {
     id: rotateProc
     property string path: ""
     onExited: (code) => {
-      if (code !== 0) { term.status = "rotate failed"; return; }
+      if (code !== 0) { term.status = "Rotate failed"; return; }
       // The thumbnail is now a picture of the old orientation, and every
       // view that shows one reads it from this map — so it goes, and the
       // grid asks for a new one the next time it needs it.
@@ -231,7 +231,7 @@ Item {
       }
       term.imgStamp++;
       term.makeThumbs();
-      term.status = "rotated";
+      term.status = "Rotated";
     }
   }
   function convertLook(ext) {
@@ -239,7 +239,7 @@ Item {
     const pics = rows.filter((r) => !r.isDir && Terminus.isImage(r.name));
     if (pics.length === 0) return;
     term.run(Terminus.convertCommand(pics.map((r) => r.path), ext));
-    term.status = "converted to " + ext;
+    term.status = "Converted to " + ext;
   }
   function extractAudio() {
     const rows = term.acting();
@@ -308,7 +308,7 @@ Item {
   function setDefaultApp(id) {
     if (!id || term.openWithMime === "") return;
     term.run(Terminus.setDefaultAppCommand(id, term.openWithMime));
-    term.status = "default set";
+    term.status = "Default set";
     rescanTick.restart();
   }
   function removeApp(id) {
@@ -326,7 +326,7 @@ Item {
         + Terminus.setDefaultAppCommand(next.id, term.openWithMime);
     }
     term.run(cmd);
-    term.status = "handler removed";
+    term.status = "Handler removed";
     rescanTick.restart();
   }
   // A beat, because `run` is a process and the scan that follows reads what

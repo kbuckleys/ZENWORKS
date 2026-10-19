@@ -418,11 +418,11 @@ Item {
   // pointed at the other side rather than at where you are standing.
   function sendToOther(op) {
     if (!term.dual || term.otherCwd === "") {
-      term.warn("no second pane");
+      term.warn("No second pane");
       return;
     }
     if (term.otherCwd === term.cwd) {
-      term.warn("both panes are here");
+      term.warn("Both panes are here");
       return;
     }
     const rows = term.acting();

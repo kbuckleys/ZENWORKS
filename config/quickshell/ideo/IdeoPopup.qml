@@ -607,7 +607,7 @@ LayerPopup {
             visible: popup.shown && popup.filtered.length === 0 &&
                      !popup.nerdPending
             text: popup.nerdFailed && popup.appMode === "nerd"
-              ? "failed to fetch icons from nerdfonts.com"
+              ? "Failed to fetch icons from nerdfonts.com"
               : popup.query !== "" ? "Nothing matches \u201C" + popup.query + "\u201D" : "Nothing here"
             color: popup.nerdFailed && popup.appMode === "nerd"
               ? popup.errColor : popup.dimColor

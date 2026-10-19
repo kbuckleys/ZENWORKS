@@ -48,7 +48,7 @@ Item {
           Qt.callLater(term.measureMarked);
         } else {
           // only the nothing-measured case is bad news; the others are counts
-          if (n === 0) term.warn("could not measure");
+          if (n === 0) term.warn("Could not measure");
           else term.status = (n === 1 ? "measured" : "measured " + n);
           // marks made while this ran are still waiting for their total
           Qt.callLater(term.measureMarked);
@@ -169,7 +169,7 @@ Item {
     const next = Object.assign({}, tried);
     for (const r of todo) next[r.path] = true;
     term.duTried = next;
-    term.status = "measuring " + todo.length
+    term.status = "Measuring " + todo.length
       + (todo.length === 1 ? " directory\u2026" : " directories\u2026");
     duProc.command = Terminus.shArgv(
       Terminus.dirSizeCommand(todo.map((r) => r.path)));
@@ -196,9 +196,9 @@ Item {
   }
   function measureDirs() {
     const dirs = term.acting().filter((r) => r.isDir);
-    if (dirs.length === 0) { term.warn("no directory to measure"); return; }
-    if (duProc.running) { term.status = "still measuring\u2026"; return; }
-    term.status = "measuring " + (dirs.length === 1 ? dirs[0].name
+    if (dirs.length === 0) { term.warn("No directory to measure"); return; }
+    if (duProc.running) { term.status = "Still measuring\u2026"; return; }
+    term.status = "Measuring " + (dirs.length === 1 ? dirs[0].name
       : dirs.length + " directories") + "\u2026";
     duProc.command = Terminus.shArgv(
       Terminus.dirSizeCommand(dirs.map((r) => r.path)));

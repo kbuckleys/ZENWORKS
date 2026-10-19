@@ -224,7 +224,7 @@ Scope {
       if (worker.running || worker.answered || worker.stamp === "") return;
       if (plugins.phase !== "checking" && plugins.phase !== "applying") return;
       plugins.phase = "failed";
-      plugins.note = "nvim stopped without an answer.";
+      plugins.note = "Nvim stopped without an answer.";
     }
   }
   Timer {

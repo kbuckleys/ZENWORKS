@@ -61,7 +61,7 @@ Item {
         if (kind === "wrote") {
           const name = parts[1] || "";
           term.wantSel = Terminus.joinPath(term.destDir, name);
-          term.status = "pasted " + name;
+          term.status = "Pasted " + name;
           // Nothing is handed to commitPaste on this branch — the script
           // has already written the file — so the latch is released here
           // or the next paste inherits this one's destination.
@@ -89,7 +89,7 @@ Item {
           return;
         }
         term.pasteDest = "";
-        term.warn("nothing to paste");
+        term.warn("Nothing to paste");
       }
     }
   }
@@ -170,7 +170,7 @@ Item {
     if (term.pasteDest === "") term.pasteDest = term.cursorDir();
     if (!term.pending || term.pending.paths.length === 0) {
       term.pasteDest = "";
-      term.warn("nothing to paste");
+      term.warn("Nothing to paste");
       return;
     }
     // ── NOTHING IS MOVED ONTO ITSELF ──────────────────────────────────
@@ -204,7 +204,7 @@ Item {
         : op === "extract"
           ? { script: Terminus.extractJobCommand(paths[0], dest), args: [] }
         : Terminus.transferCommand(paths, dest, op === "move", clash)));
-    if (Jobs.start(op, paths, dest, argv) < 0) term.warn("could not start");
+    if (Jobs.start(op, paths, dest, argv) < 0) term.warn("Could not start");
   }
   function clearEndedJobs() { Jobs.clearEnded(); }
   // cwd was a safe answer for as long as every row on screen was in it.

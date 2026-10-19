@@ -325,7 +325,7 @@ Rectangle {
         anchors.verticalCenter: parent.verticalCenter
         text: cmdPalette.query !== "" ? cmdPalette.query
           : (cmdPalette.shown.length === 0 ? "nothing matches"
-                                        : "type to filter")
+                                        : "Type to filter")
         color: cmdPalette.query !== "" ? Zenon.sand : Zenon.accentMuted
         font.family: Zenon.face
         font.weight: Zenon.weight

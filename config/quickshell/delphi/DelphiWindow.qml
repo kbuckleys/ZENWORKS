@@ -633,7 +633,7 @@ FloatingWindow {
       const join = (r, made) => {
         const remote = win.remoteNameFor(f, r.https, rs);
         win.act("mirrorAdd", { name: remote, url: r.https }, { repo: root, refresh: false, label: "Adding " + r.full, network: true,
-          failed: failed("could not reach " + r.full),
+          failed: failed("Could not reach " + r.full),
           then: (res) => {
             rs = rs.concat([{ name: remote, fetch: r.https, push: r.https }]);
             if (res.empty || res.related) { note((made ? "new repository " + r.full : "your " + r.full) + " — synced", true); return; }
@@ -644,17 +644,17 @@ FloatingWindow {
           } });
       };
       win.act(id + "Status", {}, { repo: null, refresh: false, label: "Asking " + f.name, network: true,
-        failed: failed("could not be asked"),
+        failed: failed("Could not be asked"),
         then: (st) => {
           if (!st.signedIn) { note("not signed in — sign in on the Accounts page, then try again"); return; }
           win.act(id + "Repos", {}, { repo: null, refresh: false, label: "Looking for " + name + " on " + f.name, network: true,
-            failed: failed("could not list your repositories"),
+            failed: failed("Could not list your repositories"),
             then: (repos) => {
               const mine = repos.find((r) => r.name.toLowerCase() === name.toLowerCase());
               if (mine) { join(mine, false); return; }
               win.act(id + "Create", { name: name.replace(/[^A-Za-z0-9._-]+/g, "-"), private: priv, description: "" }, {
                 repo: null, refresh: false, label: "Creating " + name + " on " + f.name, network: true,
-                failed: failed("could not create " + name),
+                failed: failed("Could not create " + name),
                 then: (r) => join(r, true) });
             } });
         } });

@@ -282,7 +282,7 @@ Item {
       // spent — see reCollect. Nothing to land on, so let them go.
       term.wantSel = "";
       term.reAt = -1;
-      term.status = "nothing matches";
+      term.status = "Nothing matches";
       return;
     }
     term.runStat(paths, paths);
@@ -321,8 +321,8 @@ Item {
     }
 
     const cmd = Coll.command(f, Paths.home());
-    if (cmd === "") { term.status = "no rules yet"; return; }
-    term.status = "searching\u2026";
+    if (cmd === "") { term.status = "No rules yet"; return; }
+    term.status = "Searching\u2026";
     collProc.folder = f;
     collProc.running = false;
     collProc.command = ["setsid", "sh", "-c", cmd];
@@ -430,7 +430,7 @@ Item {
       term.applyPendingRealm();
       term.act.raw = [];
       term.act.sel = 0;
-      term.status = "nothing tagged " + name;
+      term.status = "Nothing tagged " + name;
       term.wantSel = "";
       term.reAt = -1;
       return;

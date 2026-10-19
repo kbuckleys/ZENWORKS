@@ -97,8 +97,8 @@ Item {
     // is one — that is what resetting views means (user, 2026-10-17)
     if (term.defaultView !== "" && term.viewRing.indexOf(term.defaultView) >= 0) {
       term.setView(term.defaultView);
-      term.status = "views reset to " + term.defaultView;
-    } else term.status = "remembered views cleared";
+      term.status = "Views reset to " + term.defaultView;
+    } else term.status = "Remembered views cleared";
   }
   function applyDirView() {
     if (!term.perDirView) return;

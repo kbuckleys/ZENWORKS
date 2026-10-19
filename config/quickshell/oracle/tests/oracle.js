@@ -395,7 +395,7 @@ module.exports = {
     const tl = (have) => T.readCheckup("tools\t" + have + "\n", 1).tools;
     const allOn = T.toolNames().split(" ").map((n) => n.replace(/^(py|pkg):/, "") + ":1").join(",");
     const off = (...names) => allOn.split(",").map((x) => names.indexOf(x.split(":")[0]) >= 0 ? x.replace(":1", ":0") : x).join(",");
-    t.eq("all tools there", tl(allOn).text, "all 24 present");
+    t.eq("all tools there", tl(allOn).text, "All 24 present");
     t.eq("is ok", tl(allOn).level, "ok");
     t.eq("nothing to install", tl(allOn).install, []);
     t.eq("optional ones missing stay ok", tl(off("tesseract", "bw")).level, "ok");

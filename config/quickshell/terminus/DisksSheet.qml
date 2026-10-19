@@ -102,7 +102,7 @@ Rectangle {
     const d = disks.cur;
     if (!d) return;
     if (Terminus.isSystemMount(d.mount)) {
-      term.warn("the system is standing on " + d.mount);
+      term.warn("The system is standing on " + d.mount);
       return;
     }
     term.mountDisk(d);

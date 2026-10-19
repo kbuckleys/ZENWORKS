@@ -203,7 +203,7 @@ Item {
         // would otherwise sit on "Mounting…" for good
         if (!/^(Mounted|Unmounted|Safe to remove)\b/.test(t.split("\n").pop())) term.plugRef.goAfter = "";
         // an unmount chain says each step; the last line is the verdict
-        if (/Safe to remove$/.test(t)) term.status = "safe to remove";
+        if (/Safe to remove$/.test(t)) term.status = "Safe to remove";
         if (/^Mounted .*\(read-only/.test(last)) term.warn(last.replace(/^Mounted \S+ at /, ""));
         // re-read straight away rather than waiting for the next tick, so the
         // row stops saying "mount" the instant it is mounted

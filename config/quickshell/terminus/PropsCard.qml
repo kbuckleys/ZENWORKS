@@ -184,7 +184,7 @@ Item {
       onStreamFinished: {
         const rows = props.host.enrich(Terminus.parseStat(hereOut.text));
         if (rows.length === 0) {
-          props.host.warn("could not read " + Terminus.basename(props.wantPath));
+          props.host.warn("Could not read " + Terminus.basename(props.wantPath));
           return;
         }
         props.show(rows);
@@ -290,7 +290,7 @@ Item {
     if (!props.permDirty) return;
     props.host.run(Terminus.chmodCommand(props.permPaths, props.permMode));
     props.permWas = props.permMode;
-    props.host.status = "permissions set";
+    props.host.status = "Permissions set";
   }
 
   // Every tag on the selection, once each. One file's own list, or the

@@ -443,7 +443,7 @@ function setupForm(kind, how) {
   if (kind === "pass" || kind === "gopass") return Object.assign(base, {
     detail: kind === "pass"
       ? "The password store's directory (PASSWORD_STORE_DIR, ~/.password-store when unset). It is read with gpg."
-      : "gopass' store is found by gopass itself; another can be named here. It is read with gpg.",
+      : "Gopass' store is found by gopass itself; another can be named here. It is read with gpg.",
     fields: [{ key: "store", label: "Store", hint: kind === "pass" ? "~/.password-store" : "gopass' own", optional: true, path: true },
              { key: "name", label: "Name", hint: p.name, optional: true }],
     secret: null, then2: "unlock" });

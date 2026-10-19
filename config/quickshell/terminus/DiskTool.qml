@@ -373,7 +373,7 @@ FocusScope {
             if (!tool.fmt) return "";
             const c = Terminus.cleanLabel(tool.target, label.text);
             return c !== label.text.trim() && label.text.trim() !== ""
-              ? "saved as “" + c + "”" : "up to " + tool.fmt.labelMax;
+              ? "Saved as “" + c + "”" : "up to " + tool.fmt.labelMax;
           }
           color: Zenon.accentMuted
           font.family: Zenon.face

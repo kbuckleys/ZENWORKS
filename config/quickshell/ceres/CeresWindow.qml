@@ -3840,7 +3840,7 @@ FloatingWindow {
               : win.review.kind === "same" ? "unchanged since it was last built here"
               : win.review.kind === "new" ? "never built here — the whole PKGBUILD"
               : win.review.kind === "none" ? "the AUR has no such package"
-              : "changes since it was last built here")
+              : "Changes since it was last built here")
           color: Zenon.magenta
           font.family: Zenon.face
           font.weight: Font.Bold
@@ -4448,7 +4448,7 @@ FloatingWindow {
           anchors.topMargin: 6
           text: !confSheet.rv ? "Checking with pacman-conf\u2026"
             : confSheet.rv.ok ? "pacman-conf reads it cleanly. The file you have now is kept as pacman.conf.ceres-bak."
-            : "pacman-conf objects \u2014 fix these before saving:"
+            : "Pacman-conf objects \u2014 fix these before saving:"
           color: !confSheet.rv ? Zenon.accentMuted : confSheet.rv.ok ? Zenon.green : Zenon.red
           font.family: Zenon.face
           font.weight: Zenon.weight

@@ -1240,7 +1240,7 @@ LayerPopup {
                     anchors.fill: parent
                     visible: nameInput.text === ""
                     text: popup.nameTarget < 0
-                      ? "name it, or just take the default" : "new name"
+                      ? "Name it, or just take the default" : "new name"
                     color: Zenon.muted
                     font: nameInput.font
                     verticalAlignment: Text.AlignVCenter

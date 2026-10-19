@@ -179,10 +179,10 @@ Item {
   }
   function write_(file) {
     if (ann.cropping || done.stale) { ann.whenPainted(() => ann.write_(file)); return true; }
-    if (!done.save(file)) { ann.say("could not save to " + file); return false; }
+    if (!done.save(file)) { ann.say("Could not save to " + file); return false; }
     ann.dirty = false;
     ann.saved(file);
-    ann.say("saved · " + file.replace(Quickshell.env("HOME"), "~"));
+    ann.say("Saved · " + file.replace(Quickshell.env("HOME"), "~"));
     return true;
   }
   function copy() {
@@ -191,17 +191,17 @@ Item {
     // subdirectory was made by a detached mkdir that had not run yet when
     // save() did, so the first Copy of every session failed.
     const tmp = Paths.runtimeDir() + "/picasso-annotated-" + Date.now() + ".png";
-    if (!done.save(tmp)) { ann.say("could not copy"); return; }
+    if (!done.save(tmp)) { ann.say("Could not copy"); return; }
     Quickshell.execDetached(["sh", "-c", "wl-copy --type image/png < "
       + Strings.shellQuote(tmp) + "; rm -f " + Strings.shellQuote(tmp)]);
-    ann.say("copied to the clipboard");
+    ann.say("Copied to the clipboard");
   }
 
   // Save New asks terminus' picker for a path — its save dialog, the
   // one applications get — and writes the canvas there when it answers.
   function saveNew() {
     const fm = ann.fileManager;
-    if (!fm) { ann.say("no file manager to ask"); return; }
+    if (!fm) { ann.say("No file manager to ask"); return; }
     const here = ann.path.replace(/\/[^\/]*$/, "");
     const ok = fm.choose(false, here !== "" ? here : Picasso.shotDir, (paths) => {
       if (paths.length === 0) return;
@@ -209,7 +209,7 @@ Item {
       if (!/\.(png|jpe?g|webp|bmp)$/i.test(f)) f += ".png";
       ann.saveTo(f);
     }, Cap.annotatedName(ann.path));
-    if (!ok) ann.say("the file picker is busy with another request");
+    if (!ok) ann.say("The file picker is busy with another request");
   }
 
   function close() {

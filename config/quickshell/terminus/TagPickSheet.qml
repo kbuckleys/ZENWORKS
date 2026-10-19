@@ -169,7 +169,7 @@ Rectangle {
   function apply() {
     const name = tagPick.chosen();
     if (name === "") return;
-    if (tagPick.targets.length === 0) { term.warn("nothing to tag"); return; }
+    if (tagPick.targets.length === 0) { term.warn("Nothing to tag"); return; }
     // A brand new name is DEFINED as well as applied, so it keeps its
     // place in the list after the filter is cleared.
     if (name === tagPick.fresh) {

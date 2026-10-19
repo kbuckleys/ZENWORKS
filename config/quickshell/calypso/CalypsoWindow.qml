@@ -304,7 +304,7 @@ FloatingWindow {
     };
     if (f.kind === "totp") {
       win.mgr.call("copy", win.acctOf(it), { item: it.id, ref: f.ref, totp: true }, (ok, r, err) => {
-        if (ok) said("the one-time code", false); else win.failed(err, () => win.copyField(f));
+        if (ok) said("The one-time code", false); else win.failed(err, () => win.copyField(f));
       });
     } else if (f.secret) {
       win.mgr.call("copy", win.acctOf(it), { item: it.id, ref: f.ref, clear: win.mgr.clearAfter }, (ok, r, err) => {

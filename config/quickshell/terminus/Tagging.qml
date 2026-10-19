@@ -200,7 +200,7 @@ Item {
     }
     onExited: (code) => {
       if (code !== 0) {
-        term.warn("could not tag");
+        term.warn("Could not tag");
         tagWriteProc.pending = [];
         tagWriteProc.homing = "";
         term.drainTagWrites();
@@ -346,7 +346,7 @@ Item {
       st.defs = st.defs.filter((d) => Tags.presetInk(d.name) !== d.ink);
     });
     if (pairs.length > 0) term.applyTagPairs(pairs);
-    term.status = "renamed " + from + " \u2192 " + want;
+    term.status = "Renamed " + from + " \u2192 " + want;
   }
   // The sidebar lists a tag exactly while something wears it, so taking it
   // off the sidebar is taking it off those files. The definition stays — a
@@ -364,7 +364,7 @@ Item {
           path: p,
           names: (term.tagMarks[p] || []).filter((t) => t !== name)
         })));
-        term.status = "cleared " + name;
+        term.status = "Cleared " + name;
       });
   }
   function dropTag(name) {
@@ -405,15 +405,15 @@ Item {
         const found = Tags.parseTagDump(tagScanOut.text);
         const under = tagScanProc.root;
         term.editTags((st) => { st.index = Tags.mergeScan(st.index, found, under); });
-        term.status = "indexed " + Object.keys(found).length + " tagged";
+        term.status = "Indexed " + Object.keys(found).length + " tagged";
       }
     }
   }
   function rebuildTagIndex(where) {
     // one sweep at a time: a second one started mid-run would be a no-op
     // restart, and its directory would be merged with the first one's answer
-    if (tagScanProc.running) { term.status = "already indexing tags\u2026"; return; }
-    term.status = "indexing tags\u2026";
+    if (tagScanProc.running) { term.status = "Already indexing tags\u2026"; return; }
+    term.status = "Indexing tags\u2026";
     tagScanProc.root = where || Paths.home();
     tagScanProc.command = ["sh", "-c", Tags.scanTagsCommand(tagScanProc.root)];
     tagScanProc.running = true;

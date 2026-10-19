@@ -122,7 +122,7 @@ Item {
   function bookmarkDropped(urls) {
     const paths = term.localPaths(urls).filter((p) => term.bookmarks.indexOf(p) < 0);
     if (paths.length === 0) {
-      if (term.localPaths(urls).length > 0) term.status = "already bookmarked";
+      if (term.localPaths(urls).length > 0) term.status = "Already bookmarked";
       return;
     }
     if (bookmarkProbe.running) return;
@@ -141,7 +141,7 @@ Item {
         const dirs = String(bookmarkProbeOut.text).split("\n").filter((l) => l !== "");
         const skipped = bookmarkProbe.asked - dirs.length;
         if (dirs.length === 0) {
-          term.status = "only directories can be bookmarked";
+          term.status = "Only directories can be bookmarked";
           return;
         }
         term.editBookmarks((list) => {
@@ -174,14 +174,14 @@ Item {
       list.splice(t, 0, item);
     });
     // a drag says it by the row landing where you put it
-    if (!quiet) term.status = "bookmark moved";
+    if (!quiet) term.status = "Bookmark moved";
   }
   function removeBookmark(path) {
     term.editBookmarks((list) => {
       const at = list.indexOf(path);
       if (at >= 0) list.splice(at, 1);
     });
-    term.status = "bookmark removed";
+    term.status = "Bookmark removed";
   }
   function toggleBookmark() { term.toggleBookmarkFor(term.cwd); }
   // What the hint bar should CALL that toggle, which depends on which way it

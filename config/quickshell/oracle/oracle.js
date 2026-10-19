@@ -675,7 +675,7 @@ function readCheckup(text, baselineKb) {
     const core = all.filter((t) => t.core).length;
     rows.tools = {
       text: gone.length ? "missing: " + gone.map((t) => t.name).join(", ")
-        : "all " + core + " present" + (extras.length ? " \u00b7 " + extras.length + " optional not installed" : ""),
+        : "All " + core + " present" + (extras.length ? " \u00b7 " + extras.length + " optional not installed" : ""),
       level: gone.length ? "bad" : "ok",
       list: gone.concat(extras, all.filter((t) => t.have)),
       install: installLines(gone.concat(extras)),

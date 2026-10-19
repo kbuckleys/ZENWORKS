@@ -27,7 +27,7 @@ Item {
     property bool sawExit: false
     onRunningChanged: {
       if (actProc.running || actProc.sawExit) return;
-      term.warn("could not start that");
+      term.warn("Could not start that");
       term.drain();
     }
     stderr: StdioCollector {

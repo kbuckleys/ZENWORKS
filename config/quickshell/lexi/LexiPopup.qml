@@ -1693,7 +1693,7 @@ LayerPopup {
                 visible: popup.live !== null && popup.live.error === true
                 horizontalAlignment: Text.AlignHCenter
                 text: popup.live && popup.live.error
-                  ? "no translation — check connection" : ""
+                  ? "No translation — check connection" : ""
                 color: popup.errColor
                 font.family: Zenon.face
                 font.weight: 500

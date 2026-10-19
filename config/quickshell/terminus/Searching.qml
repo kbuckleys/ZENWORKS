@@ -44,7 +44,7 @@ Item {
         if (paths.length === 0) {
           term.applyPendingRealm();
           term.act.raw = [];
-          term.status = "no matches";
+          term.status = "No matches";
           // a re-ask that found nothing: its aim must not be taken by
           // whatever listing arrives next
           term.wantSel = "";
@@ -202,7 +202,7 @@ Item {
     // Held, for the reason openCollection gives: an empty listing between
     // two full ones is a flash, and the header already says what is going
     // on. The results replace these when they land.
-    term.status = "searching…";
+    term.status = "Searching…";
     term.runSearch();
   }
   // One search at a time, for the question as it stands NOW. A re-search

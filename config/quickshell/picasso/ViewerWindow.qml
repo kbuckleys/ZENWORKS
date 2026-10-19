@@ -856,14 +856,14 @@ FloatingWindow {
     const rows = win.allRows.filter((r) => { const m = win.meta[r.path]; return !m || m.sig !== win.mgr.sigOf(r); });
     if (rows.length === 0) return;
     if (!win.exiftool) {
-      if (!win.metaWarned) win.say("dates from the files themselves — exiftool reads the camera's own", 6000);
+      if (!win.metaWarned) win.say("Dates from the files themselves — exiftool reads the camera's own", 6000);
       win.metaWarned = true;
       return;
     }
     if (then) win.metaWaiters = win.metaWaiters.concat([then]);
     if (win.metaBusy) return;
     win.metaBusy = true;
-    if (rows.length > 40) win.say("reading when " + rows.length + " pictures were taken…", 60000);
+    if (rows.length > 40) win.say("Reading when " + rows.length + " pictures were taken…", 60000);
     win.capture(V.metaArgv(rows.map((r) => r.path)), (text) => {
       win.mgr.noteMeta(V.parseMeta(text), rows);
       win.metaBusy = false;
@@ -968,7 +968,7 @@ FloatingWindow {
     win.dupeGot = ({});
     dupeProc.rows = need;
     dupeProc.done = 0;
-    win.say("comparing " + rows.length + " pictures…", 600000);
+    win.say("Comparing " + rows.length + " pictures…", 600000);
     dupeProc.command = ["sh", "-c", V.dhashCommand(), "sh"].concat(need.map((r) => r.path));
     dupeProc.running = true;
   }
@@ -982,7 +982,7 @@ FloatingWindow {
         const got = V.parseHashes(line);
         for (const k in got) win.dupeGot[k] = got[k];
         dupeProc.done++;
-        if (dupeProc.done % 20 === 0) win.say("comparing  \u00b7  " + dupeProc.done + " of " + dupeProc.rows.length + " read", 600000);
+        if (dupeProc.done % 20 === 0) win.say("Comparing  \u00b7  " + dupeProc.done + " of " + dupeProc.rows.length + " read", 600000);
       }
     }
     onExited: {
@@ -997,7 +997,7 @@ FloatingWindow {
       return { path: r.path, size: r.size, mtime: r.mtime, hash: h.hash || "", w: h.w || 0, h: h.h || 0 };
     });
     const groups = V.alikeGroups(items);
-    if (groups.length === 0) { win.say("no alike pictures here"); return; }
+    if (groups.length === 0) { win.say("No alike pictures here"); return; }
     const keep = {}, groupOf = {};
     groups.forEach((g, i) => { keep[V.keeperOf(g).path] = true; for (const x of g) groupOf[x.path] = i; });
     win.dupes = { groups: groups.map((g) => g.map((x) => x.path)), keep: keep, groupOf: groupOf };
@@ -1119,7 +1119,7 @@ FloatingWindow {
         win.gidx = came >= 0 ? came : (atPic >= 0 ? atPic : 0);
         win.cameFrom = "";
         win.startMode = "view";
-        if (rows.length === 0 && dirs.length === 0) win.say("no pictures here");
+        if (rows.length === 0 && dirs.length === 0) win.say("No pictures here");
         if (d !== "" && win.mgr) win.mgr.noteRecent(d);
       }
     }
@@ -1777,7 +1777,7 @@ FloatingWindow {
     win.run(Tags.writeSidecarsArgv(want.map((e) => ({
       path: e.path, names: e.names,
       rating: Tags.sidecarRating(e.names.indexOf(V.FAVOURITE) >= 0, (win.sideInfo[e.path] || {}).rating || 0)
-    })), win.sidecars), (code) => { if (code !== 0) win.say("the tags are saved, but an .xmp beside them could not be written"); });
+    })), win.sidecars), (code) => { if (code !== 0) win.say("The tags are saved, but an .xmp beside them could not be written"); });
   }
 
   function writeTags(pairs, said) {
@@ -1790,7 +1790,7 @@ FloatingWindow {
     win.tags = next;
     if (V.splitFilter(win.filterText).tags.length > 0) win.applyFilter();
     win.run(["sh", "-c", Tags.writeManyCommand(pairs)], (code) => {
-      if (code !== 0) { win.say("could not write the tags — this filesystem may not keep them"); win.readTags(); return; }
+      if (code !== 0) { win.say("Could not write the tags — this filesystem may not keep them"); win.readTags(); return; }
       win.writeSidecars(pairs);
       if (said) win.say(said);
     });
@@ -1830,8 +1830,8 @@ FloatingWindow {
       onStreamFinished: {
         const made = Thumbs.parseMade(text)[bigProc.forPath] || "";
         if (bigProc.forPath !== win.path) return;
-        if (made !== "") { win.fallback = made; win.say("shown from a 1600px copy — Qt cannot open this format"); }
-        else { win.failedPath = win.path; win.say("this picture cannot be opened"); }
+        if (made !== "") { win.fallback = made; win.say("Shown from a 1600px copy — Qt cannot open this format"); }
+        else { win.failedPath = win.path; win.say("This picture cannot be opened"); }
       }
     }
   }
@@ -1957,12 +1957,12 @@ FloatingWindow {
   function copyImage() {
     if (win.path === "") return;
     win.run(["sh", "-c", "wl-copy < \"$1\"", "sh", win.path]);
-    win.say("copied to the clipboard");
+    win.say("Copied to the clipboard");
   }
   function copyPath() {
     if (win.path === "") return;
     Quickshell.execDetached(["sh", "-c", "printf '%s' \"$1\" | wl-copy", "sh", win.path]);
-    win.say("path copied");
+    win.say("Path copied");
   }
   // In the image editor oracle's Default Apps names, by its desktop id —
   // Desktop.launchCommand, so a stale user entry falls through to the
@@ -1999,7 +1999,7 @@ FloatingWindow {
   function listed(ps) { return ps.length > 1 ? ps.map((q) => ({ name: Terminus.basename(q), isDir: false })) : []; }
   function trashNow(ps) {
     win.run(Terminus.shArgv(Terminus.trashCommand(ps)), (code) => {
-      if (code !== 0) { win.say("could not move " + win.some(ps) + " to the trash"); win.refresh(); return; }
+      if (code !== 0) { win.say("Could not move " + win.some(ps) + " to the trash"); win.refresh(); return; }
       win.pushUndo({ kind: "trash", paths: ps });
       win.dropRows(ps);
       win.say((ps.length === 1 ? "moved to the trash" : ps.length + " moved to the trash")
@@ -2041,14 +2041,14 @@ FloatingWindow {
     const args = [win.undoDir];
     for (const q of pairs) args.push(q[0], q[1]);
     win.run(["sh", "-c", V.backupCommand(), "sh"].concat(args), (code) => {
-      if (code !== 0) { win.say("could not keep a copy of the original first — nothing was written"); return; }
+      if (code !== 0) { win.say("Could not keep a copy of the original first — nothing was written"); return; }
       win.pushUndo({ kind: "over", pairs: pairs.map((q) => [q[1], q[0]]) });
       then();
     });
   }
   function undo() {
     const e = win.undoStack[win.undoStack.length - 1];
-    if (!e) { win.say("nothing to undo"); return; }
+    if (!e) { win.say("Nothing to undo"); return; }
     win.undoStack = win.undoStack.slice(0, -1);
     if (e.kind === "trash") { win.untrashPaths(e.paths); return; }
     const args = [];
@@ -2103,7 +2103,7 @@ FloatingWindow {
     const err = Terminus.nameError(n);
     if (err !== "") { win.say(err); return; }
     win.run(["sh", "-c", Terminus.renameCommand(p, n)], (code) => {
-      if (code !== 0) { win.say("could not rename it — is " + n + " taken?"); return; }
+      if (code !== 0) { win.say("Could not rename it — is " + n + " taken?"); return; }
       const to = Terminus.joinPath(Terminus.dirname(p), n);
       // the properties card, if it is about this file, follows it
       if (propsCard.rows.length === 1 && propsCard.rows[0].path === p)
@@ -2119,7 +2119,7 @@ FloatingWindow {
       if (win.picked.length === 0) win.allRows = win.sorted(win.allRows);
       if (win.path === p) win.path = to;
       win.setRows(win.filtered(win.allRows));
-      win.say("renamed to " + n);
+      win.say("Renamed to " + n);
     });
   }
 
@@ -2134,7 +2134,7 @@ FloatingWindow {
     bulkCard.begin(ps.map((q) => Terminus.basename(q)), ps);
   }
   function renamedMany(moves) {
-    if (moves.length === 0) { win.say("no names changed"); return; }
+    if (moves.length === 0) { win.say("No names changed"); return; }
     win.run(Terminus.shArgv(Terminus.bulkRenameApply(moves)), (code) => {
       const to = {};
       for (const m of moves) to[m[0]] = m[1];
@@ -2160,11 +2160,11 @@ FloatingWindow {
   function sendTo(ps, move) {
     if (ps.length === 0) return;
     const fm = win.fileManager;
-    if (!fm) { win.say("no file manager to ask"); return; }
+    if (!fm) { win.say("No file manager to ask"); return; }
     const ok = fm.choose(true, win.dir, (paths) => {
       if (paths.length === 0) return;
       const dest = String(paths[0]);
-      if (dest === win.dir) { win.say("they are already here"); return; }
+      if (dest === win.dir) { win.say("They are already here"); return; }
       win.say((move ? "moving " : "copying ") + win.some(ps) + "…", 60000);
       win.run(Terminus.shArgv(Terminus.transferCommand(ps, dest, move, Terminus.CLASH.keep)), (code) => {
         win.say(code !== 0 ? "could not " + (move ? "move " : "copy ") + win.some(ps)
@@ -2172,7 +2172,7 @@ FloatingWindow {
         if (move && code === 0) win.dropRows(ps);
       });
     });
-    if (!ok) win.say("the file picker is busy with another request");
+    if (!ok) win.say("The file picker is busy with another request");
   }
 
   // ── turning the files themselves ──────────────────────────────────────
@@ -2181,15 +2181,15 @@ FloatingWindow {
   // the edit, so that one is left to the edit's own turn.
   function rotateFiles(ps, deg) {
     const ok = ps.filter((p) => V.writable(p) && !Terminus.isVideo(Terminus.basename(p)) && !(p === win.path && win.edited));
-    if (ok.length === 0) { win.say("these cannot be turned in place"); return; }
+    if (ok.length === 0) { win.say("These cannot be turned in place"); return; }
     win.keepCopies(ok, () => win.run(["sh", "-c", ok.map((p) => Terminus.rotateCommand(p, deg)).join(" && ")], (code) => {
-      if (code !== 0) { win.say("could not turn " + win.some(ok)); return; }
+      if (code !== 0) { win.say("Could not turn " + win.some(ok)); return; }
       const next = Object.assign({}, win.thumbs);
       for (const p of ok) delete next[p];
       win.thumbs = next;
       for (const p of ok) win.wantThumb(p);
       if (ok.indexOf(win.path) >= 0) win.reloadTick++;
-      win.say("turned " + win.some(ok) + "  \u00b7  u turns " + (ok.length === 1 ? "it" : "them") + " back");
+      win.say("Turned " + win.some(ok) + "  \u00b7  u turns " + (ok.length === 1 ? "it" : "them") + " back");
     }));
   }
   function convertFiles(ps, ext) {
@@ -2218,17 +2218,17 @@ FloatingWindow {
   function openMap(at) {
     if (win.rows.length === 0 || !win.mgr) return;
     const go = () => {
-      if (win.mapPoints.length === 0 && !at) { win.say("none of these say where they were taken"); return; }
+      if (win.mapPoints.length === 0 && !at) { win.say("None of these say where they were taken"); return; }
       if (win.mode !== "map") win.mapFrom = win.mode;
       win.mapFocus = at || null;
       win.mode = "map";
     };
     if (!win.exiftool) {
-      if (at) go(); else win.say("the map reads where they were taken with exiftool — pacman -S perl-image-exiftool", 8000);
+      if (at) go(); else win.say("The map reads where they were taken with exiftool — pacman -S perl-image-exiftool", 8000);
       return;
     }
     const missing = win.allRows.some((r) => { const m = win.meta[r.path]; return !m || m.sig !== win.mgr.sigOf(r); });
-    if (missing) { win.say("reading where they were taken…", 60000); win.needMeta(() => { win.say(""); go(); }); }
+    if (missing) { win.say("Reading where they were taken…", 60000); win.needMeta(() => { win.say(""); go(); }); }
     else go();
   }
 
@@ -2242,9 +2242,9 @@ FloatingWindow {
     win.capture(["sh", "-c", V.clipboardLookCommand(stem), "sh", stem], (text) => {
       const got = V.parseClipboardLook(text);
       const pics = got.paths.filter((p) => Terminus.isImage(Terminus.basename(p)));
-      if (pics.length === 0) { win.say("no picture on the clipboard"); return; }
+      if (pics.length === 0) { win.say("No picture on the clipboard"); return; }
       win.load(pics, "view");
-      if (got.kind === "image") win.say("from the clipboard — ctrl+shift+s keeps it", 6000);
+      if (got.kind === "image") win.say("From the clipboard — ctrl+shift+s keeps it", 6000);
     });
   }
   // The gallery's Paste: into the directory shown, as terminus pastes — files
@@ -2254,8 +2254,8 @@ FloatingWindow {
     const d = win.dir;
     win.capture(["sh", "-c", Terminus.clipboardPasteCommand(d)], (text) => {
       const got = V.parseClipboardLook(text);
-      if (got.kind === "wrote") { win.want = Terminus.joinPath(d, got.paths[0]); win.say("pasted"); win.refresh(); return; }
-      if (got.kind !== "uris") { win.say("nothing on the clipboard to paste"); return; }
+      if (got.kind === "wrote") { win.want = Terminus.joinPath(d, got.paths[0]); win.say("Pasted"); win.refresh(); return; }
+      if (got.kind !== "uris") { win.say("Nothing on the clipboard to paste"); return; }
       win.run(Terminus.shArgv(Terminus.transferCommand(got.paths, d, false, Terminus.CLASH.keep)), (code) => {
         win.say(code === 0 ? "pasted " + win.some(got.paths) : "could not paste");
         win.refresh();
@@ -2319,7 +2319,7 @@ FloatingWindow {
     };
     win.runLines(["sh", "-c", 'mkdir -p -- "${2%/*}" || exit 1\n' + k.cmd, "sh", src, dest], step, (code) => {
       win.makeRunning = false;
-      if (code !== 0) { win.say("could not make it  \u00b7  " + kind + " failed"); return; }
+      if (code !== 0) { win.say("Could not make it  \u00b7  " + kind + " failed"); return; }
       if (win.path !== src) { win.run(["rm", "-f", "--", dest]); return; }
       win.dropMade();
       win.made = { src: src, tmp: dest, name: name, dir: Terminus.dirname(src) };
@@ -2350,7 +2350,7 @@ FloatingWindow {
     const m = win.made;
     if (!m) return;
     const fm = win.fileManager;
-    if (!fm) { win.say("no file manager to ask"); return; }
+    if (!fm) { win.say("No file manager to ask"); return; }
     const ok = fm.choose(false, m.dir, (paths) => {
       if (paths.length === 0) return;
       let out = String(paths[0]);
@@ -2359,13 +2359,13 @@ FloatingWindow {
       // another extension typed: ImageMagick writes that format
       const argv = ext(out) === ext(m.tmp) ? ["cp", "--", m.tmp, out] : ["magick", "--", m.tmp, out];
       win.run(argv, (code) => {
-        if (code !== 0) { win.say("could not save it"); return; }
-        win.say("saved  \u00b7  " + out.replace(Paths.home(), "~"), 6000);
+        if (code !== 0) { win.say("Could not save it"); return; }
+        win.say("Saved  \u00b7  " + out.replace(Paths.home(), "~"), 6000);
         if (win.made && win.made.tmp === m.tmp) win.made = Object.assign({}, win.made, { saved: out });
         if (Terminus.dirname(out) === win.dir) win.refresh();
       });
     }, m.name);
-    if (!ok) win.say("the file picker is busy with another request");
+    if (!ok) win.say("The file picker is busy with another request");
   }
 
   // ── for sending ───────────────────────────────────────────────────────
@@ -2375,7 +2375,7 @@ FloatingWindow {
     ps = ps.filter((p) => !Terminus.isVideo(Terminus.basename(p)));
     if (ps.length === 0) return;
     const go = (dest) => {
-      win.say("exporting " + win.some(ps) + "…", 600000);
+      win.say("Exporting " + win.some(ps) + "…", 600000);
       win.run(Terminus.shArgv(Terminus.exportCommand(ps, dest, preset.ext, preset.edge, preset.q, dest === "" ? "web" : "")), (code) => {
         win.say(code === 0 ? win.some(ps) + " exported" + (dest === "" ? " beside " + (ps.length === 1 ? "it" : "them")
                                                        : " to " + dest.replace(Paths.home(), "~"))
@@ -2385,9 +2385,9 @@ FloatingWindow {
     };
     if (!ask) { go(""); return; }
     const fm = win.fileManager;
-    if (!fm) { win.say("no file manager to ask"); return; }
+    if (!fm) { win.say("No file manager to ask"); return; }
     if (!fm.choose(true, win.dir, (paths) => { if (paths.length > 0) go(String(paths[0])); }))
-      win.say("the file picker is busy with another request");
+      win.say("The file picker is busy with another request");
   }
 
   // ── a contact sheet ───────────────────────────────────────────────────
@@ -2397,19 +2397,19 @@ FloatingWindow {
     const pics = ps.filter((p) => !Terminus.isVideo(Terminus.basename(p)));
     if (pics.length === 0) return;
     const fm = win.fileManager;
-    if (!fm) { win.say("no file manager to ask"); return; }
+    if (!fm) { win.say("No file manager to ask"); return; }
     const base = (win.picked.length > 0 ? "Picked" : (Terminus.basename(win.dir) || "Pictures")) + " contact sheet.jpg";
     const ok = fm.choose(false, win.dir, (paths) => {
       if (paths.length === 0) return;
       let out = String(paths[0]);
       if (!/\.(png|jpe?g|webp|pdf)$/i.test(out)) out += ".jpg";
-      win.say("laying out " + pics.length + " pictures…", 600000);
+      win.say("Laying out " + pics.length + " pictures…", 600000);
       win.run(["sh", "-c", V.contactSheetCommand(V.contactCols(pics.length), 360, true), "sh", out].concat(pics), (code) => {
         win.say(code === 0 ? "contact sheet saved  \u00b7  " + out.replace(Paths.home(), "~") : "could not make the contact sheet");
         win.refresh();
       });
     }, Terminus.freeNameKeeping(win.allRows, base));
-    if (!ok) win.say("the file picker is busy with another request");
+    if (!ok) win.say("The file picker is busy with another request");
   }
 
   // ── places ────────────────────────────────────────────────────────────
@@ -2445,15 +2445,15 @@ FloatingWindow {
       : code === 127 ? "reading text needs tesseract — pacman -S tesseract tesseract-data-eng"
       : code === 3 ? "no text found" : "could not read it", code === 127 ? 9000 : 3000);
     const ocr = (png) => win.run(["sh", "-c", V.ocrCommand(png), "sh", png], done);
-    win.say("reading…", 30000);
+    win.say("Reading…", 30000);
     if (win.crop && win.fallback === "") {
-      win.grabEdit((tmp) => { if (tmp === "") win.say("could not render the selection"); else ocr(tmp); });
+      win.grabEdit((tmp) => { if (tmp === "") win.say("Could not render the selection"); else ocr(tmp); });
       return;
     }
     const tmp = Paths.runtimeDir() + "/picasso-view-ocr-" + Date.now() + ".png";
     const src = win.fallback !== "" ? win.fallback : win.path + "[0]";
     win.run(["sh", "-c", 'magick -- "$2" "$1"', "sh", tmp, src], (code) => {
-      if (code !== 0) { win.say("could not read it"); return; }
+      if (code !== 0) { win.say("Could not read it"); return; }
       ocr(tmp);
     });
   }
@@ -2515,9 +2515,9 @@ FloatingWindow {
   function toBackground() {
     if (win.path === "" || !win.loaded || !win.stillOnly()) return;
     if (win.crop) {
-      if (win.fallback !== "") { win.say("this is a preview copy — the original cannot be edited here"); return; }
+      if (win.fallback !== "") { win.say("This is a preview copy — the original cannot be edited here"); return; }
       win.grabEdit((tmp) => {
-        if (tmp === "") { win.say("could not render the selection"); return; }
+        if (tmp === "") { win.say("Could not render the selection"); return; }
         Picasso.setAsWallpaper(tmp, {}, {
           dir: Picasso.dir,
           name: V.editedName(win.path, "background").replace(/\.[^.]+$/, ".png")
@@ -2549,7 +2549,7 @@ FloatingWindow {
   // working dots (terminus/BusyButton)
   property bool saving: false
   function bake(dest, then) {
-    if (win.fallback !== "") { win.say("this is a preview copy — the original cannot be edited here"); return; }
+    if (win.fallback !== "") { win.say("This is a preview copy — the original cannot be edited here"); return; }
     if (bakeLoader.active) return;
     win.bakeDest = dest;
     win.bakeThen = then;
@@ -2566,11 +2566,11 @@ FloatingWindow {
     }
     const dest = win.bakeDest, then = win.bakeThen;
     bakeLoader.active = false;
-    if (tmp === "") { win.saving = false; win.say("could not render the edit"); if (then) then(false); return; }
+    if (tmp === "") { win.saving = false; win.say("Could not render the edit"); if (then) then(false); return; }
     win.run(["sh", "-c", 'magick "$1" -quality 92 "$2" && rm -f "$1"', "sh", tmp, dest], (code) => {
       win.saving = false;
-      if (code !== 0) { win.say("could not save to " + dest); if (then) then(false); return; }
-      win.say("saved · " + dest.replace(Paths.home(), "~"));
+      if (code !== 0) { win.say("Could not save to " + dest); if (then) then(false); return; }
+      win.say("Saved · " + dest.replace(Paths.home(), "~"));
       win.afterSave(dest);
       if (then) then(true);
     });
@@ -2580,20 +2580,20 @@ FloatingWindow {
     if (!win.edited || !win.stillOnly()) return;
     const dest = V.writable(win.path) ? win.path
       : Terminus.dirname(win.path) + "/" + V.editedName(win.path).replace(/\.[^.]+$/, ".png");
-    const go = () => win.bake(dest, (ok) => { if (ok) { win.resetEdit(); if (dest === win.path) win.say("saved  \u00b7  u puts the original back", 6000); } });
+    const go = () => win.bake(dest, (ok) => { if (ok) { win.resetEdit(); if (dest === win.path) win.say("Saved  \u00b7  u puts the original back", 6000); } });
     if (dest === win.path) win.keepCopies([dest], go); else go();
   }
   function saveNew() {
     if ((!win.edited && !win.scratch) || !win.stillOnly()) return;
     const fm = win.fileManager;
-    if (!fm) { win.say("no file manager to ask"); return; }
+    if (!fm) { win.say("No file manager to ask"); return; }
     const ok = fm.choose(false, win.dir, (paths) => {
       if (paths.length === 0) return;
       let f = String(paths[0]);
       if (!/\.(png|jpe?g|webp|bmp|tiff?)$/i.test(f)) f += ".png";
       win.bake(f, (done) => { if (done) win.resetEdit(); });
     }, win.scratch ? "Pasted image.png" : V.editedName(win.path));
-    if (!ok) win.say("the file picker is busy with another request");
+    if (!ok) win.say("The file picker is busy with another request");
   }
 
   // A file was written — by a save or by the annotator. Its thumbnail is
@@ -2617,13 +2617,13 @@ FloatingWindow {
     running: win.playing && win.mode === "view" && !win.edited && !win.isVid
     onTriggered: win.step(1)
   }
-  onPlayingChanged: if (win.playing) win.say("slideshow, every " + win.slideSecs + " s"
+  onPlayingChanged: if (win.playing) win.say("Slideshow, every " + win.slideSecs + " s"
                                             + (win.shuffle ? ", shuffled" : "") + "  \u00b7  [ ] slower, faster")
   function pace(d) {
     const at = V.SLIDE_SECS.indexOf(win.slideSecs);
     const to = V.SLIDE_SECS[Math.max(0, Math.min(V.SLIDE_SECS.length - 1, (at < 0 ? 1 : at) + d))];
     if (win.mgr) win.mgr.setSlides(to, win.shuffle);
-    win.say("slideshow, every " + to + " s");
+    win.say("Slideshow, every " + to + " s");
   }
   function setShuffle(on) {
     if (win.mgr) win.mgr.setSlides(win.slideSecs, on);
@@ -2639,17 +2639,17 @@ FloatingWindow {
   readonly property int cmpIndex: win.compare ? V.indexOfPath(win.rows, win.cmpPath) : -1
   function startCompare(other) {
     if (win.compare && !other) { win.compare = false; return; }
-    if (win.rows.length < 2) { win.say("nothing to compare it with"); return; }
+    if (win.rows.length < 2) { win.say("Nothing to compare it with"); return; }
     const m = win.markedPaths().filter((p) => V.indexOfPath(win.rows, p) >= 0);
     if (other) win.cmpPath = other;
     else if (m.length === 2) {
       if (m[0] !== win.path) win.go(V.indexOfPath(win.rows, m[0]));
       win.cmpPath = m[1];
     } else win.cmpPath = win.rows[win.index + 1 < win.rows.length ? win.index + 1 : win.index - 1].path;
-    if (win.cmpPath === win.path) { win.say("that is the same picture"); return; }
+    if (win.cmpPath === win.path) { win.say("That is the same picture"); return; }
     win.compare = true;
     win.mode = "view";
-    win.say("comparing  \u00b7  shift+\u2190 \u2192 the right one, tab swaps, v ends it", 5000);
+    win.say("Comparing  \u00b7  shift+\u2190 \u2192 the right one, tab swaps, v ends it", 5000);
   }
   function stepCompare(d) {
     if (win.showsMade) return;      // the unsaved result is not in the row
@@ -2908,7 +2908,7 @@ FloatingWindow {
 
   function annotate() {
     if (win.path === "" || win.fallback !== "" || !win.stillOnly()) return;
-    if (win.edited) { win.say("save or reset the edit first — marks go on the saved picture"); return; }
+    if (win.edited) { win.say("Save or reset the edit first — marks go on the saved picture"); return; }
     win.playing = false;
     win.mode = "annotate";
   }
@@ -3109,7 +3109,7 @@ FloatingWindow {
           anchors.fill: parent
           // while the search is typed in, what it understands
           text: filterField.activeFocus && win.note === ""
-            ? "words, #tag, \u2605, is:video is:picture is:marked is:directory  \u00b7  enter keeps it, esc clears it"
+            ? "Words, #tag, \u2605, is:video is:picture is:marked is:directory  \u00b7  enter keeps it, esc clears it"
             : win.note !== "" ? win.note
             : win.mode === "map" ? win.mapPoints.length + " of " + win.rows.length + " say where  \u00b7  a pin opens its picture  \u00b7  esc goes back"
             : (win.mode === "gallery" ? win.where : win.facts)
@@ -3692,7 +3692,7 @@ FloatingWindow {
           videoOutput: vout
           audioOutput: AudioOutput { muted: win.muted }
           onMediaStatusChanged: if (mp.mediaStatus === MediaPlayer.EndOfMedia && win.playing) win.step(1)
-          onErrorOccurred: (err, msg) => win.say("this video cannot be played  \u00b7  " + msg)
+          onErrorOccurred: (err, msg) => win.say("This video cannot be played  \u00b7  " + msg)
           Component.onCompleted: mp.play()
         }
         VideoOutput { id: vout; anchors.fill: parent; fillMode: VideoOutput.Stretch }
@@ -6008,9 +6008,9 @@ FloatingWindow {
 
   function copySelection() {
     win.grabEdit((tmp) => {
-      if (tmp === "") { win.say("could not copy the selection"); return; }
+      if (tmp === "") { win.say("Could not copy the selection"); return; }
       win.run(["sh", "-c", 'wl-copy --type image/png < "$1"; rm -f "$1"', "sh", tmp]);
-      win.say("selection copied to the clipboard");
+      win.say("Selection copied to the clipboard");
     });
   }
 
@@ -6031,11 +6031,11 @@ FloatingWindow {
       return;
     }
     win.grabEdit((tmp) => {
-      if (tmp === "") { win.say("could not render the edit"); return; }
+      if (tmp === "") { win.say("Could not render the edit"); return; }
       const name = V.editedName(win.path, win.crop ? "crop" : "edited").replace(/\.[^.]+$/, "." + ext);
       win.run(Terminus.shArgv(Terminus.convertIntoCommand(tmp, win.dir, name)), (code) => {
         win.run(["rm", "-f", tmp]);
-        if (code !== 0) { win.say("could not convert it"); return; }
+        if (code !== 0) { win.say("Could not convert it"); return; }
         win.say((win.crop ? "selection" : "edit") + " saved as " + ext + " beside it");
         win.resetEdit();
         win.want = win.path; win.startMode = win.mode; win.list();
@@ -6059,8 +6059,8 @@ FloatingWindow {
     win.capture(["sh", "-c", V.trimCommand(win.look.rotate, win.look.mirror) + " 2>/dev/null", "sh", file], (out) => {
       if (win.path !== at) return;
       const r = V.parseTrim(out, w, h);
-      if (!r) { win.say("could not find the picture's edges"); return; }
-      if (r.none) { win.say("no black borders to trim"); return; }
+      if (!r) { win.say("Could not find the picture's edges"); return; }
+      if (r.none) { win.say("No black borders to trim"); return; }
       win.panelShown = true;
       win.cropRatio = "free";
       win.cropStaged = true;
@@ -6068,7 +6068,7 @@ FloatingWindow {
       win.cropping = true;
       win.fitted = true;
       win.refit(true);
-      win.say("black borders trimmed  \u00b7  " + r.w + " \u00d7 " + r.h + "  \u00b7  ctrl+s saves");
+      win.say("Black borders trimmed  \u00b7  " + r.w + " \u00d7 " + r.h + "  \u00b7  ctrl+s saves");
     });
   }
 
@@ -6326,11 +6326,11 @@ FloatingWindow {
     case "zoomSel": win.zoomToCrop(); break;
     case "clearSel": win.crop = null; win.cropping = false; break;
     case "copy": win.copyImage(); break;
-    case "copyP": win.run(["sh", "-c", "wl-copy < \"$1\"", "sh", p]); win.say("copied to the clipboard"); break;
+    case "copyP": win.run(["sh", "-c", "wl-copy < \"$1\"", "sh", p]); win.say("Copied to the clipboard"); break;
     case "copyPath": win.copyPath(); break;
     case "copyPathP":
       Quickshell.execDetached(["sh", "-c", "printf '%s' \"$1\" | wl-copy", "sh", p]);
-      win.say("path copied");
+      win.say("Path copied");
       break;
     case "copyFiles": win.copyFiles(ps); break;
     case "copyClean": win.copyClean(); break;
@@ -6372,7 +6372,7 @@ FloatingWindow {
       win.playing = !win.playing;
       if (win.playing && win.mode === "gallery" && win.rows.length > 0) win.mode = "view";
       break;
-    case "secs": if (win.mgr) win.mgr.setSlides(row.secs, win.shuffle); win.say("slideshow, every " + row.secs + " s"); break;
+    case "secs": if (win.mgr) win.mgr.setSlides(row.secs, win.shuffle); win.say("Slideshow, every " + row.secs + " s"); break;
     case "shuffle": win.setShuffle(!win.shuffle); break;
     case "slower": win.pace(1); break;
     case "faster": win.pace(-1); break;
@@ -6489,7 +6489,7 @@ FloatingWindow {
     function warn(t) { win.say(t); }
     function run(cmd) {
       win.run(typeof cmd === "string" ? ["sh", "-c", cmd] : Terminus.shArgv(cmd), (code) => {
-        if (code !== 0) win.say("that did not work");
+        if (code !== 0) win.say("That did not work");
         propsHost.rescan();
       });
     }
@@ -6531,7 +6531,7 @@ FloatingWindow {
     function setDefaultApp(id) {
       if (!id || propsHost.openWithMime === "") return;
       propsHost.run(Terminus.setDefaultAppCommand(id, propsHost.openWithMime));
-      win.say("default set");
+      win.say("Default set");
     }
     Process {
       id: propsApps

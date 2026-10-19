@@ -82,7 +82,7 @@ Item {
   Process {
     id: runner
     onExited: (code) => {
-      if (code !== 0) host.said("that did not work");
+      if (code !== 0) host.said("That did not work");
       host._next();
     }
   }
@@ -117,7 +117,7 @@ Item {
   function setDefaultApp(id) {
     if (!id || host.openWithMime === "") return;
     host.run(Terminus.setDefaultAppCommand(id, host.openWithMime));
-    host.said("default set");
+    host.said("Default set");
   }
   function removeApp(id) {
     if (!id || host.openWithMime === "") return;

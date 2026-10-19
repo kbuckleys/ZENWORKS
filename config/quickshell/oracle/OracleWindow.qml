@@ -1855,7 +1855,7 @@ FloatingWindow {
               anchors.centerIn: parent
               visible: popup.rows.length === 0
               text: popup.searching ? "Nothing matches “" + popup.query + "”"
-                                    : "nothing to set here"
+                                    : "Nothing to set here"
               color: popup.dimColor
               font.family: popup.face
               font.weight: Font.Medium

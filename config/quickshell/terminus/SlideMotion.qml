@@ -166,10 +166,10 @@ Item {
   // tree shows a file three levels down without ever having gone there.
   function reveal() {
     const r = term.currentRow();
-    if (!r) { term.warn("nothing to reveal"); return; }
+    if (!r) { term.warn("Nothing to reveal"); return; }
     const dir = Terminus.dirname(r.path);
     if (dir === "" || dir === r.path) {
-      term.warn("no enclosing directory");
+      term.warn("No enclosing directory");
       return;
     }
     // ORDER MATTERS. A results page is drawn over a directory, and putting
@@ -239,7 +239,7 @@ Item {
     term.openCollection(term.collById(id) !== null ? id : Number(id));
   }
   function back() {
-    if (!term.canBack) { term.warn("nothing to go back to"); return; }
+    if (!term.canBack) { term.warn("Nothing to go back to"); return; }
     const p = term.act;
     term.markTrailSel();
     p.trailAt -= 1;
@@ -250,7 +250,7 @@ Item {
     term.travelTo(p.trail[p.trailAt]);
   }
   function forward() {
-    if (!term.canForward) { term.warn("nothing to go forward to"); return; }
+    if (!term.canForward) { term.warn("Nothing to go forward to"); return; }
     const p = term.act;
     term.markTrailSel();
     p.trailAt += 1;
@@ -444,7 +444,7 @@ Item {
     archMountProc.command = ["sh", "-c", Terminus.mountArchiveCommand(r.path, mnt,
       Terminus.terminusCacheDir() + "/archive-index")];
     archMountProc.running = true;
-    term.status = "opening " + r.name + "\u2026";
+    term.status = "Opening " + r.name + "\u2026";
   }
   Process {
     id: archMountProc
@@ -456,7 +456,7 @@ Item {
         // Not something ratarmount can read — a format it has no backend
         // for, or a damaged file. The old answer still stands: hand it to
         // whatever opens it.
-        term.status = "could not open " + Terminus.basename(archMountProc.archive)
+        term.status = "Could not open " + Terminus.basename(archMountProc.archive)
           + " as a directory";
         if (!archMountProc.kept) term.openFile(archMountProc.archive);
         return;

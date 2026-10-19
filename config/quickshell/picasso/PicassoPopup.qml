@@ -644,7 +644,7 @@ LayerPopup {
             anchors.centerIn: parent
             visible: popup.view === "backgrounds" && popup.filtered.length === 0 && !Picasso.scanning
             text: Picasso.files.length === 0
-              ? "no backgrounds in " + Picasso.dir : popup.query !== "" ? "nothing matches \u201C" + popup.query + "\u201D" : "nothing here"
+              ? "No backgrounds in " + Picasso.dir : popup.query !== "" ? "Nothing matches \u201C" + popup.query + "\u201D" : "Nothing here"
             color: popup.dimColor
             font.family: Zenon.face
             font.weight: Font.Bold

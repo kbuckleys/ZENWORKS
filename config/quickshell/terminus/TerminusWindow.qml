@@ -2710,7 +2710,7 @@ FloatingWindow {
       // also the only time you know which one you mean.
       ["Edit collection", "",        () => {
         if (root.collOpenId >= 0) collEdit.ask(root.collOpenId);
-        else root.warn("open a collection first");
+        else root.warn("Open a collection first");
       }],
       ["Go to containing directory", "g r", () => root.reveal()],
       ["Reindex tags",      "",        () => root.rebuildTagIndex()],
@@ -3466,7 +3466,7 @@ FloatingWindow {
       property string path: ""
       onExited: (code) => {
         if (code === Terminus.NO_HANDLER) root.beginOpenWith(path, true, true);
-        else if (code !== 0) root.status = "could not open " + Terminus.basename(path);
+        else if (code !== 0) root.status = "Could not open " + Terminus.basename(path);
         destroy();
       }
     }
@@ -4395,12 +4395,12 @@ FloatingWindow {
   function installFonts() {
     const book = root.mgr ? root.mgr.fontBook : null;
     const files = root.acting().filter((r) => !r.isDir && Terminus.isFont(r.name)).map((r) => r.path);
-    if (!book || files.length === 0) { root.warn("not a font"); return; }
+    if (!book || files.length === 0) { root.warn("Not a font"); return; }
     const what = files.length === 1 ? Terminus.basename(files[0]) : files.length + " fonts";
-    root.status = "installing " + what + "\u2026";
+    root.status = "Installing " + what + "\u2026";
     book.install(files, (ok) => {
-      if (ok) root.status = "installed " + what;
-      else root.warn("could not install " + what);
+      if (ok) root.status = "Installed " + what;
+      else root.warn("Could not install " + what);
     }, files.length === 1 ? "Installing\u2026" : "Installing " + files.length + " fonts\u2026");
     root.act.marked = {};
   }
@@ -6478,9 +6478,9 @@ FloatingWindow {
       titleInk: root.sheetTitleInk
       glyphInk: root.sheetGlyphInk
       onRenamed: (moves) => {
-        if (moves.length === 0) { root.status = "no names changed"; return; }
+        if (moves.length === 0) { root.status = "No names changed"; return; }
         root.run(Terminus.bulkRenameApply(moves));
-        root.status = "renamed " + moves.length;
+        root.status = "Renamed " + moves.length;
       }
       onClosed: content.forceActiveFocus()
     }

@@ -94,7 +94,7 @@ Rectangle {
   function toggle() {
     const d = diskInfo.cur;
     if (!d) return;
-    if (diskInfo.system) { term.warn("the system is standing on " + d.mount); return; }
+    if (diskInfo.system) { term.warn("The system is standing on " + d.mount); return; }
     term.mountDisk(d);
   }
 

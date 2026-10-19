@@ -68,7 +68,7 @@ Item {
   // panel and the menu's entry are muted there too.
   function toggleGrouped() {
     if (term.viewMode !== "list") {
-      term.status = "headings: list view only";
+      term.status = "Headings: list view only";
       return;
     }
     term.grouped = !term.grouped;
@@ -123,7 +123,7 @@ Item {
   function collapseAll() {
     let any = false;
     for (const k in term.act.openDirs) { any = true; break; }
-    if (!any) { term.status = "nothing expanded"; return; }
+    if (!any) { term.status = "Nothing expanded"; return; }
     // The cursor may be standing inside one of them — put it on the row
     // that is about to become the deepest thing still on screen.
     // The cursor may be standing inside one of them. Ask for the row it was
@@ -138,7 +138,7 @@ Item {
     }
     term.wantSel = "";
     term.positionSel();
-    term.status = "collapsed";
+    term.status = "Collapsed";
   }
   // originY is where a view reckons its first row lives, and it DRIFTS:
   // syncView replaces rows in place rather than clearing — deliberately,

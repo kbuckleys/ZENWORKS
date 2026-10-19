@@ -942,13 +942,13 @@ LayerPopup {
     if (!popup.shownBad && p && p.assign && popup.shownRaw && !popup.stale) {
       popup.keepShown();
       popup.saveVars(Metis.setName(popup.vars, p.assign, popup.shownRaw, popup.shownResult));
-      popup.flash("saved " + p.assign);
+      popup.flash("Saved " + p.assign);
       filterInput.clear();
       return;
     }
     if (!popup.shownBad && p && p.forget) {
       popup.saveVars(Metis.dropName(popup.vars, p.forget));
-      popup.flash("forgot " + p.forget);
+      popup.flash("Forgot " + p.forget);
       filterInput.clear();
       return;
     }
@@ -1010,7 +1010,7 @@ LayerPopup {
     if (!text) return;
     popup.keepShown();
     popup.detach("printf '%s' " + Strings.shellQuote(text) + " | wl-copy >/dev/null 2>&1");
-    popup.flash("copied");
+    popup.flash("Copied");
   }
 
   // a word in the strip for a moment: "copied", "saved rent"

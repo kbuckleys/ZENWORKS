@@ -223,7 +223,7 @@ Item {
   // into a directory that was not made.
   function gatherIntoFolder() {
     const rows = term.acting();
-    if (rows.length === 0) { term.warn("nothing to gather"); return; }
+    if (rows.length === 0) { term.warn("Nothing to gather"); return; }
     const where = term.cwd;
     // The rows have to be in the directory the directory is being made in, or
     // the move is a move ACROSS directories wearing a tidy-up's clothes.
@@ -231,7 +231,7 @@ Item {
     // a results page is the case that is not, and there is no one
     // directory to gather into there.
     if (term.searchMode !== "") {
-      term.warn("not on a results page");
+      term.warn("Not on a results page");
       return;
     }
     const paths = rows.map((r) => r.path);

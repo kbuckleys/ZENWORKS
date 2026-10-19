@@ -2973,7 +2973,7 @@ LayerPopup {
                         text: soundRow.isStream
                           ? (soundRow.route ? Sound.nodeLabel(soundRow.route) : "—")
                           : (soundRow.isDevice && sound.isDefault(soundRow.node)
-                            ? "default" : "")
+                            ? "Default" : "")
                         color: soundRow.isStream
                           ? (routePress.pressed ? Zenon.green : popup.dimColor)
                           : Zenon.green

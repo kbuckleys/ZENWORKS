@@ -882,7 +882,7 @@ Item {
             anchors.centerIn: parent
             text: "  " + (!card.multi ? "current"
               : card.picker.focusOn.length === card.screenNames.length
-                ? "on every display" : "on " + card.picker.focusOn.join(", "))
+                ? "On every display" : "On " + card.picker.focusOn.join(", "))
             color: Zenon.onAccent
             font.family: Zenon.face
             font.weight: 600
@@ -1217,7 +1217,7 @@ Item {
               anchors.verticalCenter: fitHead.verticalCenter
               text: card.stageFit !== "" ? "Changing"
                 : (card.sharedFit !== "" ? "keeping " + Picasso.fitLabels[card.sharedFit]
-                                         : "keeping each display's")
+                                         : "Keeping each display's")
               color: card.stageFit !== "" ? card.highlight : card.dimColor
               font.family: Zenon.face
               font.weight: Zenon.weight

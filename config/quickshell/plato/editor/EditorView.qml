@@ -977,7 +977,7 @@ Item {
       readonly property var i: hunkTip.info
       text: !i ? "" : (i.kind === "add" ? i.new.length + (i.new.length === 1 ? " line added" : " lines added")
         : i.kind === "delete" ? i.old.length + (i.old.length === 1 ? " line removed" : " lines removed")
-        : "changed: " + i.old.length + " → " + i.new.length + (i.new.length === 1 ? " line" : " lines"))
+        : "Changed: " + i.old.length + " → " + i.new.length + (i.new.length === 1 ? " line" : " lines"))
         + (i.open ? "  ·  click to shut" : "  ·  click to open in place")
       color: Zenon.accentMuted
       font.family: Zenon.face

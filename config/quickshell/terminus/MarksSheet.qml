@@ -134,7 +134,7 @@ Rectangle {
   // file — swapping by what you can see would shuffle what you cannot.
   function shift(d) {
     if (marks.query !== "") {
-      term.warn("clear the filter to reorder");
+      term.warn("Clear the filter to reorder");
       return;
     }
     const from = marks.sel;
@@ -149,11 +149,11 @@ Rectangle {
   function addHere() {
     const at = term.cwd;
     if (term.bookmarks.indexOf(at) >= 0) {
-      term.warn("already bookmarked");
+      term.warn("Already bookmarked");
       return;
     }
     term.editBookmarks((list) => list.push(at));
-    term.status = "bookmarked " + Terminus.basename(at);
+    term.status = "Bookmarked " + Terminus.basename(at);
     marks.query = "";
     marks.sel = Math.max(0, marks.rows.length - 1);
   }
@@ -387,7 +387,7 @@ Rectangle {
         anchors.verticalCenter: parent.verticalCenter
         text: marks.query !== "" ? marks.query
           : (marks.rows.length === 0 ? "nothing matches"
-                                     : "type to filter")
+                                     : "Type to filter")
         color: marks.query !== "" ? Zenon.sand : Zenon.accentMuted
         font.family: Zenon.face
         font.weight: Zenon.weight
