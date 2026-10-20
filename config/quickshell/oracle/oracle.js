@@ -89,6 +89,8 @@ function coerce(spec, v) {
     return spec.fallback;
   }
   if (spec.type === "text") return String(v === null || v === undefined ? "" : v);
+  // a key chord, spelled one way: see normChord
+  if (spec.type === "chord") return normChord(v);
   // A SET OF DEVICE NAMES, kept as one string — "auto", "" for none, or the
   // names one per line — so the file, the compare and the reset all go on
   // handling a plain value. A list here would have needed every one of them
@@ -311,6 +313,7 @@ function display(spec, v) {
     return String(v);
   }
   if (spec.type === "text") return String(v) === "" ? "—" : String(v);
+  if (spec.type === "chord") return normChord(v) === "" ? "off" : chordCaps(v).join(" ");
   // Without what solaar found, which only the panel has — see displayDevices.
   if (spec.type === "devices") return displayDevices(v, [], false);
   if (spec.unit === "ms") return v === 0 ? "never" : (v / 1000) + "s";
@@ -2011,4 +2014,195 @@ function readComputer(json, qsVersion) {
     rows: rows,
     summary: [os.prettyName || os.name, cpu, gpu, by.Memory ? bytes(by.Memory.total) : ""].filter((x) => !!x).join(" · ")
   };
+}
+
+// ── SHORTCUTS ─────────────────────────────────────────────────────────────
+// hypr/lua/binds.lua is the list: one `bind(id, keys, label, action, opts)` a
+// line, under `-- NAME` headings, the keys written there being each one's
+// default. hypr/lua/keys.lua — written here, read back — names only the ones
+// moved off their default (`id = "SUPER + K"`), "" for one turned off; it
+// reads like defaults.lua, so parseDefaultsLua reads it.
+
+// the binds, in the file's order: { id, chord, label, group }
+function parseBindsLua(text) {
+  const out = [];
+  let group = "";
+  const re = /^\s*bind\(\s*"([A-Za-z_]\w*)"\s*,\s*"([^"]*)"\s*,\s*"((?:[^"\\]|\\.)*)"/;
+  for (const line of String(text || "").split("\n")) {
+    const h = /^--\s*([A-Z][A-Z &]+)\s*$/.exec(line);
+    if (h) { group = h[1].trim(); continue; }
+    const m = re.exec(line);
+    if (m) out.push({ id: m[1], chord: normChord(m[2]), label: m[3].replace(/\\(.)/g, "$1"), group: group });
+  }
+  return out;
+}
+
+// "MISC" → "Misc", "QS" stays an initialism
+function bindGroupLabel(g) {
+  const named = { QS: "Shell", MISC: "General" };
+  if (named[g]) return named[g];
+  return g.charAt(0) + g.slice(1).toLowerCase();
+}
+
+// only what differs from binds.lua, in its order; ids the list no longer has
+// are dropped, so a bind taken out of binds.lua takes its override with it
+function renderKeysLua(values, binds) {
+  const lines = [
+    "-- ┌─┐┌─┐┌┐┌┬ ┬┌─┐┬─┐┬┌─┌─┐",
+    "-- ┌─┘├┤ │││││││ │├┬┘├┴┐└─┐",
+    "-- └─┘└─┘┘└┘└┴┘└─┘┴└─┴ ┴└─┘",
+    "-- https://github.com/kbuckleys/",
+    "",
+    "-- KEYS",
+    "-- Written by oracle's Shortcuts section, and read back by it: change one",
+    "-- there or here, either way works. Only the binds moved off the keys",
+    "-- binds.lua gives them are named; \"\" turns one off.",
+    "",
+    "return {"
+  ];
+  const v = values || ({});
+  const moved = binds.filter((b) => b.id in v && normChord(v[b.id]) !== b.chord);
+  const w = Math.max(0, ...moved.map((b) => b.id.length));
+  for (const b of moved)
+    lines.push("\t" + b.id + " ".repeat(w - b.id.length) + " = " + luaString(normChord(v[b.id])) + ",");
+  lines.push("}");
+  return lines.join("\n") + "\n";
+}
+
+const CHORD_MODS = ["SUPER", "SHIFT", "CONTROL", "ALT"];
+const MOD_ALIAS = { CTRL: "CONTROL", WIN: "SUPER", LOGO: "SUPER", META: "SUPER", MOD4: "SUPER", MOD1: "ALT" };
+const MOD_MASK = { SHIFT: 1, CONTROL: 4, ALT: 8, SUPER: 64 };
+
+// one spelling for a chord: the modifiers in CHORD_MODS' order, upper case,
+// then the key — "ctrl + super + k" and "SUPER + CONTROL + K" are one chord.
+// A mouse button keeps hyprland's own spelling, mouse:272.
+function normChord(c) {
+  const parts = String(c === null || c === undefined ? "" : c).split("+")
+    .map((p) => p.trim()).filter((p) => p !== "");
+  if (!parts.length) return "";
+  let key = parts.pop();
+  const mods = ({});
+  for (const p of parts) mods[MOD_ALIAS[p.toUpperCase()] || p.toUpperCase()] = true;
+  // a bare modifier names itself as the key
+  if (MOD_ALIAS[key.toUpperCase()] || CHORD_MODS.indexOf(key.toUpperCase()) >= 0) {
+    mods[MOD_ALIAS[key.toUpperCase()] || key.toUpperCase()] = true;
+    key = "";
+  }
+  key = /^(mouse|code):/i.test(key) ? key.toLowerCase() : key.toUpperCase();
+  const out = CHORD_MODS.filter((m) => mods[m]);
+  if (key !== "") out.push(key);
+  return out.join(" + ");
+}
+
+// what hyprctl binds -j calls it: { mask, key }, the key upper case
+function chordMask(c) {
+  const parts = normChord(c).split(" + ");
+  const key = parts.pop() || "";
+  let mask = 0;
+  for (const p of parts) mask |= MOD_MASK[p] || 0;
+  return { mask: mask, key: key.toUpperCase() };
+}
+
+// the caps a chord is drawn on: Super, Shift, Ctrl, Alt, then the key
+const KEY_LABELS = {
+  RETURN: "Return", ESCAPE: "Esc", SPACE: "Space", TAB: "Tab", PRINT: "Print",
+  GRAVE: "`", MINUS: "-", EQUAL: "=", PLUS: "+", COMMA: ",", PERIOD: ".", SLASH: "/",
+  BACKSLASH: "\\", SEMICOLON: ";", APOSTROPHE: "'", BRACKETLEFT: "[", BRACKETRIGHT: "]",
+  LEFT: "←", RIGHT: "→", UP: "↑", DOWN: "↓",
+  BACKSPACE: "Backspace", DELETE: "Delete", INSERT: "Insert", HOME: "Home", END: "End",
+  PRIOR: "Page Up", NEXT: "Page Down", PAGE_UP: "Page Up", PAGE_DOWN: "Page Down",
+  "mouse:272": "Left click", "mouse:273": "Right click", "mouse:274": "Middle click",
+  "mouse:275": "Back button", "mouse:276": "Forward button",
+  MOUSE_UP: "Wheel up", MOUSE_DOWN: "Wheel down",
+  XF86AUDIORAISEVOLUME: "Volume up", XF86AUDIOLOWERVOLUME: "Volume down",
+  XF86AUDIOMUTE: "Mute", XF86AUDIOPLAY: "Play", XF86AUDIONEXT: "Next", XF86AUDIOPREV: "Previous"
+};
+function chordCaps(c) {
+  const n = normChord(c);
+  if (n === "") return [];
+  const mods = { SUPER: "Super", SHIFT: "Shift", CONTROL: "Ctrl", ALT: "Alt" };
+  return n.split(" + ").map((p) => mods[p] || KEY_LABELS[p]
+    || (p.length === 1 ? p : p.charAt(0) + p.slice(1).toLowerCase()));
+}
+
+// ── a key pressed, as hyprland names it ──
+// `key` is Qt's (Qt.Key_*), `mods` Qt's modifier flags, `text` what the
+// press typed. Hyprland matches the UNSHIFTED key — Super+Shift+1, not
+// Super+! — so a shifted symbol is put back on its key (a US keyboard's
+// pairs: the layouts this shell is set up with). "" for a press that is
+// only a modifier, or one there is no name for.
+const QT_KEYS = {
+  0x01000000: "ESCAPE", 0x01000001: "TAB", 0x01000002: "TAB", 0x01000003: "BACKSPACE",
+  0x01000004: "RETURN", 0x01000005: "RETURN", 0x01000006: "INSERT", 0x01000007: "DELETE",
+  0x01000009: "PRINT", 0x01000010: "HOME", 0x01000011: "END",
+  0x01000012: "LEFT", 0x01000013: "UP", 0x01000014: "RIGHT", 0x01000015: "DOWN",
+  0x01000016: "PRIOR", 0x01000017: "NEXT", 0x20: "SPACE",
+  0x01000070: "XF86AudioLowerVolume", 0x01000071: "XF86AudioMute",
+  0x01000072: "XF86AudioRaiseVolume", 0x01000080: "XF86AudioPlay",
+  0x01000082: "XF86AudioPrev", 0x01000083: "XF86AudioNext"
+};
+const SYMBOL_KEYS = {
+  "`": "GRAVE", "~": "GRAVE", "-": "MINUS", "_": "MINUS", "=": "EQUAL", "+": "EQUAL",
+  "[": "BRACKETLEFT", "{": "BRACKETLEFT", "]": "BRACKETRIGHT", "}": "BRACKETRIGHT",
+  "\\": "BACKSLASH", "|": "BACKSLASH", ";": "SEMICOLON", ":": "SEMICOLON",
+  "'": "APOSTROPHE", "\"": "APOSTROPHE", ",": "COMMA", "<": "COMMA",
+  ".": "PERIOD", ">": "PERIOD", "/": "SLASH", "?": "SLASH",
+  "!": "1", "@": "2", "#": "3", "$": "4", "%": "5", "^": "6", "&": "7", "*": "8", "(": "9", ")": "0"
+};
+function chordFromKey(key, mods, text) {
+  let name = QT_KEYS[key] || "";
+  if (name === "" && key >= 0x01000030 && key <= 0x01000052) name = "F" + (key - 0x01000030 + 1);
+  if (name === "" && ((key >= 0x30 && key <= 0x39) || (key >= 0x41 && key <= 0x5a)))
+    name = String.fromCharCode(key);
+  if (name === "") {
+    const ch = key > 0x20 && key < 0x7f ? String.fromCharCode(key) : String(text || "");
+    name = SYMBOL_KEYS[ch] || "";
+  }
+  if (name === "") return "";
+  const out = [];
+  if (mods & 0x10000000) out.push("SUPER");     // Qt.MetaModifier
+  if (mods & 0x02000000) out.push("SHIFT");
+  if (mods & 0x04000000) out.push("CONTROL");
+  if (mods & 0x08000000) out.push("ALT");
+  out.push(name);
+  return normChord(out.join(" + "));
+}
+
+// a mouse button pressed on the capture chip: Qt's button → mouse:27x
+function chordFromButton(button, mods) {
+  const code = { 1: 272, 2: 273, 4: 274, 8: 275, 16: 276 }[button];
+  if (!code) return "";
+  const out = [];
+  if (mods & 0x10000000) out.push("SUPER");
+  if (mods & 0x02000000) out.push("SHIFT");
+  if (mods & 0x04000000) out.push("CONTROL");
+  if (mods & 0x08000000) out.push("ALT");
+  // a bare click is every click: hyprland would take the pointer away
+  if (!out.length) return "";
+  out.push("mouse:" + code);
+  return normChord(out.join(" + "));
+}
+
+// ── NO TWO BINDS ON ONE CHORD ──
+// Which bind already answers `chord`, as words for the refusal, or "".
+// `values` is id → chord now; `live` is hyprctl binds -j, for the binds the
+// other files make (smart-move, zoom, the recorder) — ours carry their label
+// as the description, and are told apart by it.
+function chordTaken(chord, id, binds, values, live) {
+  const n = normChord(chord);
+  if (n === "") return "";
+  for (const b of binds) {
+    if (b.id === id) continue;
+    const v = values && b.id in values ? normChord(values[b.id]) : b.chord;
+    if (v === n) return b.label;
+  }
+  const ours = ({});
+  for (const b of binds) ours[b.label] = true;
+  const m = chordMask(n);
+  for (const l of (Array.isArray(live) ? live : [])) {
+    if (l.submap || ours[l.description]) continue;
+    if (Number(l.modmask) === m.mask && String(l.key).toUpperCase() === m.key)
+      return l.description || "another hyprland bind";
+  }
+  return "";
 }

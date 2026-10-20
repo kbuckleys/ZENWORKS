@@ -21,7 +21,13 @@
 //   - grounds and text take the seed's hue at low chroma — tinted, not
 //     colored; a gray picture gives an all but neutral theme;
 //   - cyan, the shell's own accent (selection, focus, the clock), BECOMES
-//     the seed, so the highlight is the background's color;
+//     the seed, so the highlight is the background's color — AS IT IS: its
+//     lightness is where the walk starts and its chroma is kept, so a dusty
+//     blue stays dusty and a beige stays beige;
+//   - a black and white picture gives a GRAY accent, not Zenon's cyan. The
+//     accent's chroma follows the picture's down to none at all; there is no
+//     cliff where a faint tint falls back to a stock color (user, 2026-10-20:
+//     a third of the backgrounds tried came out the one Zenon cyan);
 //   - every other accent keeps its meaning (red is still the error) and is
 //     only turned up to 15 degrees towards the seed — harmonized.
 // Then every slot is pushed lighter (dark) or darker (light) until it reads
@@ -156,10 +162,21 @@ function palette(colors, opts) {
     const score = Math.sqrt(c.n) * c.C;
     if (score > best) { best = score; seed = c; }
   }
-  const neutral = !seed || seed.C < 0.035;
+  // A FAINT SEED'S HUE IS NOISE. Below .05 chroma the hue is the picture's
+  // cast instead: every color's tint, weighted by its share, averaged.
+  let castA = 0, castB = 0;
+  for (const c of lch) {
+    if (c.L < 0.1 || c.L > 0.97) continue;
+    castA += c.n * c.C * Math.cos(c.h * Math.PI / 180);
+    castB += c.n * c.C * Math.sin(c.h * Math.PI / 180);
+  }
+  const castC = Math.sqrt(castA * castA + castB * castB);
+  const castH = (Math.atan2(castB, castA) * 180 / Math.PI + 360) % 360;
+  const seedC = seed ? seed.C : 0;
+  const neutral = seedC < 0.012;
   const most = lch.slice().sort((a, b) => b.n - a.n)[0];
-  const seedH = seed && !neutral ? seed.h : (most.C > 0.01 ? most.h : 250);
-  const seedC = neutral ? 0 : seed.C;
+  const seedH = !neutral && seedC >= 0.05 ? seed.h
+    : castC > 0.003 ? castH : (most.C > 0.01 ? most.h : 250);
 
   const bgC = neutral ? 0.006 : Math.min(seedC, 0.012 + 0.05 * v);
   const txC = neutral ? 0.004 : Math.min(seedC, 0.008 + 0.02 * v);
@@ -185,7 +202,11 @@ function palette(colors, opts) {
     keyInk: text(lv.keyInk, 4.5),
     soft: text(lv.soft, need.soft),
     muted: text(lv.muted, need.muted),
-    cyan: accent(neutral ? 210 : seedH, need.acc, lv.acc, neutral ? accC * 0.7 : Math.max(accC, Math.min(seedC, 0.2))),
+    // the seed's own tone, clamped to where an accent can live, then walked
+    // to read; vividness only scales the chroma it already has
+    cyan: accent(seedH, need.acc,
+      neutral ? lv.acc : Math.max(light ? 0.5 : 0.62, Math.min(light ? 0.8 : 0.86, seed.L)),
+      neutral ? 0 : Math.min(0.22, seedC * (0.85 + 0.6 * v))),
     pink: accent(hueToward(10, seedH, neutral), need.acc, lv.pink, accC * (light ? 0.75 : 0.55)),
     sand: light ? accent(88, need.acc, 0.8, 0.16) : accent(100, need.acc, 0.88, 0.09),
   };

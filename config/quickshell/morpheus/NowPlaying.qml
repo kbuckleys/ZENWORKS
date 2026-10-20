@@ -16,6 +16,7 @@ pragma Singleton
 
 import QtQuick
 import Quickshell
+import Quickshell.Io
 import Quickshell.Services.Mpris
 
 Singleton {
@@ -25,7 +26,10 @@ Singleton {
   property string title: ""
   property string artist: ""
   property string album: ""
-  property string artUrl: ""
+  // The cover as a LOCAL file — see art() below. trackArt is what the
+  // player said.
+  property string trackArt: ""
+  readonly property string artUrl: root.art(root.trackArt)
 
   readonly property bool active: root.player !== null
   readonly property bool playing: root.player ? root.player.isPlaying : false
@@ -111,7 +115,7 @@ Singleton {
     root.title  = p ? p.trackTitle  : "";
     root.artist = p ? p.trackArtist : "";
     root.album  = p ? p.trackAlbum  : "";
-    root.artUrl = p ? p.trackArtUrl : "";
+    root.trackArt = p ? p.trackArtUrl : "";
   }
 
   // Rescanned when something about a player changes, not on a clock: which
@@ -133,6 +137,63 @@ Singleton {
     }
     onObjectAdded: root.rescan()
     onObjectRemoved: root.rescan()
+  }
+
+  // ── COVERS NEVER GO THROUGH QT'S NETWORK ───────────────────────────
+  // Spotify's art is https on HTTP/2, and Qt 6.12.0's HTTP/2 reader took the
+  // whole shell down mid-response (2026-10-20: SIGSEGV in
+  // QHttp2Stream::handleHEADERS as the lock opened, its cover uncached) — and
+  // with it the session lock, and Hyprland after it. So an http(s) cover is
+  // fetched once by curl into the cache and every Image is handed the file.
+  // art(url): a file:// for a fetched cover, "" while it is coming (and on a
+  // failure — no cover beats a crash), anything not http(s) as it is. A
+  // binding calling it re-runs when the fetch lands, because it reads _art.
+  property var _art: ({})
+  property var _artQueue: []
+  readonly property string artDir: Paths.cacheDir() + "/quickshell/art"
+
+  function art(u) {
+    u = String(u || "");
+    if (!/^https?:\/\//i.test(u)) return u;
+    const got = root._art[u];
+    if (got !== undefined) return got;
+    // queued LATER: art() runs inside bindings, and writing the queue from
+    // one was a binding loop on artUrl
+    Qt.callLater(root._artWant, u);
+    return "";
+  }
+
+  function _artWant(u) {
+    if (root._art[u] !== undefined || root._artQueue.indexOf(u) >= 0) return;
+    root._artQueue = root._artQueue.concat([u]);
+    root._artNext();
+  }
+
+  function _artNext() {
+    if (artFetch.running || root._artQueue.length === 0) return;
+    const u = root._artQueue[0];
+    artFetch.url = u;
+    artFetch.file = root.artDir + "/" + Qt.md5(u);
+    artFetch.running = true;
+  }
+
+  Process {
+    id: artFetch
+    property string url: ""
+    property string file: ""
+    // already there from an earlier session: no fetch at all
+    command: ["sh", "-c",
+      'f=$1; [ -s "$f" ] && exit 0; mkdir -p "${f%/*}" || exit 1; '
+      + 'curl -fsSL --max-time 15 --max-filesize 20000000 -o "$f.part" "$2" '
+      + '&& [ -s "$f.part" ] && mv -f "$f.part" "$f" || { rm -f "$f.part"; exit 1; }',
+      "sh", artFetch.file, artFetch.url]
+    onExited: code => {
+      const m = Object.assign({}, root._art);
+      m[artFetch.url] = code === 0 ? "file://" + artFetch.file : "";
+      root._art = m;
+      root._artQueue = root._artQueue.filter(x => x !== artFetch.url);
+      Qt.callLater(root._artNext);
+    }
   }
 
   // A safety net for a player that changes without saying so; it was the

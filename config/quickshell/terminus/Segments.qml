@@ -72,6 +72,9 @@ Item {
   property var heldAt: null
   property int buttons: Qt.LeftButton
   property int weight: Font.Bold
+  // the words' family, "" for the suite's (alexandria's languages, each
+  // named in the face it is looking at)
+  property string face: ""
   // the glyph before a label (glyphOf); terminus' crumbs set it with the
   // label to the title weight
   property int glyphWeight: Zenon.weight
@@ -271,7 +274,7 @@ Item {
             : press.pressed ? Zenon.pressDim
             : segs.faint.indexOf(one.modelData[0]) >= 0 && segs.hot !== one.modelData[0] ? 0.45 : 1
           Behavior on color { ColorAnimation { duration: Zenon.fast } }
-          font.family: Zenon.face
+          font.family: segs.face !== "" ? segs.face : Zenon.face
           font.weight: segs.weight
           font.features: { "tnum": 1 }
           font.pixelSize: segs.textSize

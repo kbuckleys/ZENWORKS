@@ -205,6 +205,52 @@ Item {
   // is this 12 plus that 11.
   readonly property real cut: sheet.hangs ? Zenon.dialogRadius : 0
 
+  // ── THE WINDOW BEHIND IS SET BACK ────────────────────────────────────
+  // Every sheet dims what it is over (morpheus/SheetDim, user 2026-10-20),
+  // so no window lays a scrim of its own. A sheet HANGING from a bar leaves
+  // that bar lit — it is the sheet's titlebar — and dims the rest, the
+  // sidebar beside the bar included; a floating one dims the whole of it.
+  // `dim` off is a card that does not take the window over (plato's key
+  // hints). `dimLeft` leaves a column at the left as it is (plato's tree);
+  // `dimBox` dims that item's box instead of the sheet's — a popup's panel,
+  // so the clear surface around it is not darkened.
+  property bool dim: true
+  property real dimLeft: 0
+  property Item dimBox: null
+  property real dimRadius: 0
+  // the card as drawn, scale counted in, in the sheet's own frame
+  readonly property real holeX: sheet.drawnX + sheet.drawnW * (1 - sheetCard.scale) / 2
+  readonly property real holeY: sheet.drawnY + sheet.drawnH * (1 - sheetCard.scale) / 2
+  readonly property real holeW: sheet.drawnW * sheetCard.scale
+  readonly property real holeH: sheet.drawnH * sheetCard.scale
+  // A HANGING sheet keeps the bars lit — the one it hangs from and, rising
+  // from the foot, the strip along the top too (plato's tabs stay as they
+  // are under the leader card) — but not the sidebar the well is inset
+  // past, which is dimmed top to bottom.
+  readonly property real litTop: sheet.hangs ? sheet.fromTop : 0
+  readonly property real litFoot: sheet.hangs && sheet.fromBottom ? sheet.toBottom : 0
+  readonly property real litLeft: sheet.hangs ? Math.max(sheet.dimLeft, sheet.leftInset) : sheet.dimLeft
+
+  SheetDim {
+    ink: sheet.dim ? sheet.cardInk : 0
+    x: sheet.dimBox ? sheet.dimBox.x : sheet.litLeft
+    y: sheet.dimBox ? sheet.dimBox.y : sheet.litTop
+    width: sheet.dimBox ? sheet.dimBox.width : sheet.width - sheet.litLeft
+    height: sheet.dimBox ? sheet.dimBox.height : sheet.height - sheet.litTop - sheet.litFoot
+    radius: sheet.dimBox ? sheet.dimRadius : 0
+    holeX: sheet.holeX
+    holeY: sheet.holeY
+    holeW: sheet.holeW
+    holeH: sheet.holeH
+  }
+  // the sidebar beside the lit bars
+  SheetDim {
+    ink: sheet.dim && !sheet.dimBox ? sheet.cardInk : 0
+    x: sheet.dimLeft
+    width: sheet.litLeft - sheet.dimLeft
+    height: sheet.height
+  }
+
   // The well is everything BELOW the chrome and it clips, so the sheet is
   // genuinely hidden behind the bar rather than fading out on top of it.
   Item {

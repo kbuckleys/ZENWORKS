@@ -42,6 +42,7 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Hyprland
 import "oracle.js" as Ora
+import "../morpheus/hypr.js" as Hypr
 
 Singleton {
   id: root
@@ -639,6 +640,8 @@ Singleton {
       blurb: "hyprland's monitors \u2014 resolution, refresh, scale, rotation" },
     { id: "input",  label: "Input",         icon: "\uF11C",
       blurb: "hyprland's keyboard, mouse, touchpad and tablet \u2014 layout, speed, focus" },
+    { id: "keys",   label: "Shortcuts",     icon: "\uDB81\uDE33",
+      blurb: "hyprland's key binds \u2014 what each chord does, and which chord it is" },
     { id: "bar",    label: "Bar",           icon: "",
       blurb: "morpheus — the pill and what it carries" },
     { id: "motion", label: "Motion",        icon: "",
@@ -1153,6 +1156,12 @@ Singleton {
       elideLeft: true,
       help: "A plain lua file the binds read, read back on every change — editing it by hand works too." },
 
+    // ── shortcuts ──
+    // The fixed row. The binds' own are read out of binds.lua — see keysSpecs.
+    { key: "infoKeysPath", section: "keys", label: "Written to", type: "info",
+      elideLeft: true,
+      help: "Only the chords moved off binds.lua's own, read back on every change — editing either by hand works too. Click a chord, then press the new one: Esc keeps it, Backspace turns it off. No two binds may share a chord." },
+
     // ── the checkup ──
     // Readouts like the About rows, filled by oracle/doctor.sh — see
     // runCheckup. `health` names the row of Ora.readCheckup each one shows.
@@ -1348,6 +1357,15 @@ Singleton {
       }
       out.push(is[i]);
     }
+    // The binds' rows. Their defaults are binds.lua's own chords.
+    const ks = root.keysSpecs();
+    for (let i = 0; i < ks.length; ++i) {
+      if (Ora.stored(ks[i])) {
+        d[ks[i].key] = ks[i].bindDefault;
+        ks[i].fallback = d[ks[i].key];
+      }
+      out.push(ks[i]);
+    }
     root.defaults = d;
     root.defaultsTaken = true;
     root.schema = out;
@@ -1383,6 +1401,13 @@ Singleton {
     if (key === "infoMonitorsPath") return root.monitorsPath;
     if (key === "infoDefaultsPath") return root.defaultsPath;
     if (key === "infoInputPath") return root.inputPath;
+    if (key === "infoKeysPath") return root.keysPath;
+    // a group's head: how many it holds, and how many of those you moved
+    if (key.indexOf("keysHead:") === 0) {
+      const g = root.bindList.filter((b) => b.group === key.slice(9));
+      const moved = g.filter((b) => root.keyValues["bind:" + b.id] !== b.chord).length;
+      return g.length + (g.length === 1 ? " bind" : " binds") + (moved ? " \u00b7 " + moved + " changed" : "");
+    }
     if (key.indexOf("inputHead:") === 0) return Ora.inputDeviceText(root.inputDevices, key.slice(10));
     if (key.indexOf("display:") === 0) {
       const m = root.displayByName(key.split(":")[1]);
@@ -1510,6 +1535,7 @@ Singleton {
     if (String(key).indexOf("display:") === 0) return root.displayValues[key];
     if (String(key).indexOf("default:") === 0) return root.appDefaults[key];
     if (String(key).indexOf("input:") === 0) return root.inputValues[key];
+    if (String(key).indexOf("bind:") === 0) return root.keyValues[key];
     return root[key];
   }
 
@@ -1519,6 +1545,7 @@ Singleton {
     if (s.display) { root.setDisplay(s, value); return; }
     if (s.appDefault) { root.setAppDefault(s, value); return; }
     if (s.input) { root.setInput(s, value); return; }
+    if (s.bindKey) { root.setBind(s, value); return; }
     const v = Ora.coerce(s, value);
     if (Ora.same(root[key], v)) return;
     root[key] = v;
@@ -1563,7 +1590,7 @@ Singleton {
   function resetAll() {
     for (let i = 0; i < root.schema.length; ++i) {
       const s = root.schema[i];
-      if (Ora.stored(s) && !s.display && !s.appDefault && !s.input) root.reset(s.key);
+      if (Ora.stored(s) && !s.display && !s.appDefault && !s.input && !s.bindKey) root.reset(s.key);
     }
   }
 
@@ -1923,6 +1950,175 @@ Singleton {
     function onScreensChanged() { root.scanDisplays(); }
   }
 
+
+  // ── SHORTCUTS ─────────────────────────────────────────────────────────
+  // hyprland's binds. binds.lua is the list — ids, labels, groups and the
+  // default chords — and keys.lua, written here, the chords moved off them.
+  // See Ora's SHORTCUTS for both files' shape.
+  readonly property string hyprLuaDir:
+    (Quickshell.env("XDG_CONFIG_HOME") || (Quickshell.env("HOME") + "/.config")) + "/hypr/lua"
+  readonly property string keysPath: root.hyprLuaDir + "/keys.lua"
+  // what binds.lua declares: [{ id, chord, label, group }]
+  property var bindList: []
+  // "bind:<id>" -> the chord in force ("" off)
+  property var keyValues: ({})
+  // what keys.lua holds, by id
+  property var keysRaw: ({})
+  // hyprctl binds -j, for the binds other files make — see Ora.chordTaken
+  property var liveBinds: []
+  // the row waiting for a chord, while hyprland sits in the empty submap
+  property string capturing: ""
+
+  function keysSpecs() {
+    const out = [];
+    let group = null;
+    for (const b of root.bindList) {
+      if (b.group !== group) {
+        group = b.group;
+        // a head the group's binds fold under, each group in its own frame —
+        // see the panel's foldGroup
+        out.push({ key: "keysHead:" + group, section: "keys", type: "info", foldGroup: group,
+          label: Ora.bindGroupLabel(group), help: "", alias: group.toLowerCase() });
+      }
+      out.push({ key: "bind:" + b.id, section: "keys", type: "chord", bindKey: true, inGroup: b.group,
+        bindId: b.id, bindDefault: b.chord, label: b.label,
+        alias: "shortcut keybind key bind chord " + Ora.bindGroupLabel(b.group) + " " + b.chord.toLowerCase() });
+    }
+    return out;
+  }
+
+  // the two files, folded into one chord per bind
+  function syncKeyValues() {
+    const vals = ({});
+    for (const b of root.bindList) {
+      const v = root.keysRaw[b.id];
+      vals["bind:" + b.id] = typeof v === "string" ? Ora.normChord(v) : b.chord;
+    }
+    root.keyValues = vals;
+    root.revision++;
+  }
+
+  // id -> chord, for Ora.chordTaken
+  function bindChords() {
+    const out = ({});
+    for (const b of root.bindList) out[b.id] = root.keyValues["bind:" + b.id];
+    return out;
+  }
+
+  // NO DUPES: a chord another bind answers to is refused, and says whose
+  function setBind(s, value) {
+    const v = Ora.normChord(value);
+    if (Ora.same(root.keyValues[s.key], v)) return;
+    const who = Ora.chordTaken(v, s.bindId, root.bindList, root.bindChords(), root.liveBinds);
+    if (who !== "") {
+      Quickshell.execDetached(["notify-send", "-a", "oracle", "Shortcuts",
+        Ora.chordCaps(v).join(" ") + " is already " + who + ". Nothing was changed."]);
+      root.revision++;
+      return;
+    }
+    const next = ({});
+    for (const k in root.keyValues) next[k] = root.keyValues[k];
+    next[s.key] = v;
+    root.keyValues = next;
+    root.revision++;
+    keysSaveTimer.restart();
+  }
+
+  function writeKeys() {
+    const out = ({});
+    for (const b of root.bindList) out[b.id] = root.keyValues["bind:" + b.id];
+    keysFile.setText(Ora.renderKeysLua(out, root.bindList));
+    // FileView's own write never fires loaded: what it now says, by hand
+    const raw = ({});
+    for (const b of root.bindList) if (out[b.id] !== b.chord) raw[b.id] = out[b.id];
+    root.keysRaw = raw;
+    reloadHypr.restart();
+    liveBindsTimer.restart();
+  }
+
+  Timer {
+    id: keysSaveTimer
+    interval: 300
+    onTriggered: root.writeKeys()
+  }
+
+  // ── WAITING FOR A CHORD ──
+  // Hyprland acts on Super+K before any window sees it, so while a row waits
+  // it is held in binds.lua's "oracle-keys" submap, which binds nothing, and
+  // put back the moment the chord lands, the wait is called off, or ten
+  // seconds pass — a submap left on would leave every bind dead.
+  function beginCapture(key) {
+    if (root.capturing === "") Hyprland.dispatch(Hypr.submap("oracle-keys"));
+    root.capturing = key;
+    captureTimeout.restart();
+  }
+  function endCapture(chord) {
+    if (root.capturing === "") return;
+    const key = root.capturing;
+    root.capturing = "";
+    captureTimeout.stop();
+    Hyprland.dispatch(Hypr.submap("reset"));
+    if (chord !== undefined && chord !== null) root.set(key, chord);
+  }
+  Timer {
+    id: captureTimeout
+    interval: 10000
+    onTriggered: root.endCapture()
+  }
+
+  function scanLiveBinds() {
+    if (!liveBindsProc.running) liveBindsProc.running = true;
+  }
+  Timer {
+    id: liveBindsTimer
+    // after hyprland's reload has made the new binds
+    interval: 1200
+    onTriggered: root.scanLiveBinds()
+  }
+  Process {
+    id: liveBindsProc
+    command: ["hyprctl", "binds", "-j"]
+    stdout: StdioCollector {
+      id: liveBindsOut
+      onStreamFinished: {
+        try { root.liveBinds = JSON.parse(liveBindsOut.text); } catch (e) { root.liveBinds = []; }
+      }
+    }
+  }
+
+  FileView {
+    id: bindsFile
+    path: root.hyprLuaDir + "/binds.lua"
+    blockLoading: true
+    printErrors: false
+    watchChanges: true
+    onFileChanged: reload()
+    onLoaded: {
+      root.bindList = Ora.parseBindsLua(bindsFile.text());
+      root.syncKeyValues();
+      if (root.defaultsTaken) root.buildSchema();
+      liveBindsTimer.restart();
+    }
+  }
+
+  FileView {
+    id: keysFile
+    path: root.keysPath
+    blockLoading: true
+    printErrors: false
+    watchChanges: true
+    onFileChanged: reload()
+    onLoaded: {
+      const raw = Ora.parseDefaultsLua(keysFile.text());
+      const before = JSON.stringify(root.keysRaw);
+      root.keysRaw = raw;
+      root.syncKeyValues();
+      // a hand edit lands without waiting for a login; our own write, read
+      // back, is what keysRaw already said
+      if (JSON.stringify(raw) !== before) reloadHypr.restart();
+    }
+    onLoadFailed: { root.keysRaw = ({}); root.syncKeyValues(); }
+  }
 
   // ── INPUT ─────────────────────────────────────────────────────────────
   // Every input setting hyprland has. The values are kept in
@@ -2392,7 +2588,7 @@ Singleton {
 
   function save() {
     const vals = ({});
-    const own = root.schema.filter((s) => !s.display && !s.appDefault && !s.input);
+    const own = root.schema.filter((s) => !s.display && !s.appDefault && !s.input && !s.bindKey);
     for (let i = 0; i < own.length; ++i) {
       const s = own[i];
       if (Ora.stored(s)) vals[s.key] = root[s.key];
@@ -2468,7 +2664,7 @@ Singleton {
       const out = [];
       for (let i = 0; i < root.schema.length; ++i) {
         const s = root.schema[i];
-        if (!Ora.stored(s) || s.display || s.appDefault || s.input || root.isDefault(s.key)) continue;
+        if (!Ora.stored(s) || s.display || s.appDefault || s.input || s.bindKey || root.isDefault(s.key)) continue;
         out.push(s.key + " = " + String(root[s.key])
           + "  (default " + String(root.defaults[s.key]) + ")");
       }

@@ -95,15 +95,6 @@ Item {
   z: 300
   visible: layer.shown || sheet.cardInk > 0.01
 
-  Rectangle {
-    anchors.fill: parent
-    anchors.topMargin: layer.fromTop
-    anchors.leftMargin: layer.dimLeft
-    anchors.bottomMargin: layer.fromBottom ? layer.toBottom : 0
-    color: Zenon.darken(0.32)
-    visible: layer.modal
-    opacity: sheet.cardInk
-  }
   InputShield {
     visible: layer.shown && layer.modal
     keepTop: layer.fromTop
@@ -121,6 +112,9 @@ Item {
     blur: 30
     gain: 3
     id: sheet
+    // the window behind dimmed by the sheet itself (morpheus/SheetDim)
+    dim: layer.modal
+    dimLeft: layer.dimLeft
     floating: layer.title !== ""
     splice: true
     title: layer.title

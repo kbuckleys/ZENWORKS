@@ -37,6 +37,8 @@ module.exports = {
       'hl.dsp.workspace.toggle_special("magic")');
     t.eq("dpms on, as socordia wrote it", H.dpms(true), 'hl.dsp.dpms({ action = "enable" })');
     t.eq("dpms off", H.dpms(false), 'hl.dsp.dpms({ action = "disable" })');
+    t.eq("a submap", H.submap("oracle-keys"), 'hl.dsp.submap("oracle-keys")');
+    t.eq("none is the default one", H.submap(""), 'hl.dsp.submap("reset")');
     t.eq("quotes cannot end the Lua string", H.lua('a"b\\c'), '"a\\"b\\\\c"');
     t.eq("nor can a newline", H.lua("a\nb"), '"a\\nb"');
   }

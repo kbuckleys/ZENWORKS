@@ -132,7 +132,7 @@ const SHELVES = [
   { id: "fav",  label: "Bookmarks",    glyph: "\uF02E" },
   { id: "mono", label: "Monospaced",   glyph: "" },
   { id: "nerd", label: "Nerd Fonts",   glyph: "\u{F0AEC}" },
-  { id: "user", label: "Installed by you", glyph: "" },
+  { id: "user", label: "Imported",     glyph: "" },
   { id: "system", label: "System",     glyph: "" },
 ];
 

@@ -501,7 +501,12 @@ QtObject {
     const away = tabAway(a);
     return away >= 1 ? 0 : Math.max(0, 1 - (1 - a) / (1 - away));
   }
+  // The navy lift is Zenon's (user's pick, 2026-10-09). Under Follow
+  // Background it lifts by about as much in the PICTURE's tint — ground
+  // towards surface, which carry its hue — so a black and white background
+  // gets gray glass, not blue (user, 2026-10-20).
   readonly property color tabAwayInk: light ? layerBg
+    : themeName === "follow" ? mix(ground, surface, 0.55)
     : Qt.rgba(Math.min(1, ground.r + 10 / 255), Math.min(1, ground.g + 18 / 255),
               Math.min(1, ground.b + 40 / 255), 1)
 
@@ -831,6 +836,10 @@ QtObject {
   readonly property int sheetOut: sheetIn
   readonly property int sheetInEase: Easing.OutCubic
   readonly property int sheetOutEase: Easing.OutCubic
+  // HOW FAR THE WINDOW BEHIND A SHEET IS SET BACK (morpheus/SheetDim): one
+  // number for every sheet in the suite — plato's, which was the only one
+  // that dimmed at all (user, 2026-10-20: all sheets dim their window).
+  readonly property real sheetDim: 0.32
 
   // ── THE CURVE FOR A THING THAT GROWS INTO PLACE ──────────────────────
   // Material's STANDARD easing, cubic-bezier(0.4, 0, 0.2, 1): a real

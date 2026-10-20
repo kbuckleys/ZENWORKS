@@ -243,11 +243,12 @@ PanelWindow {
         readonly property string source: {
           const r = toast.modelData;
           if (!r) return "";
-          if (r.image && r.image !== "") return r.image;
+          if (r.image && r.image !== "") return NowPlaying.art(r.image);
           // A TRACK WITH NO PICTURE OF ITS OWN wears its player's cover.
           // Spotify's client sends none at all — the bar's panel had the
           // art all along because it reads MPRIS, and now so does this.
-          if (toast.artUrl !== "") return toast.artUrl;
+          // (http covers as NowPlaying's cached file: Qt's HTTP/2 crashed)
+          if (toast.artUrl !== "") return NowPlaying.art(toast.artUrl);
           if (r.appIcon && r.appIcon !== "")
             return String(r.appIcon).indexOf("/") === 0
               ? "file://" + r.appIcon : "image://icon/" + r.appIcon;

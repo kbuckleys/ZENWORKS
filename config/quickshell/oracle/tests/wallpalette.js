@@ -40,6 +40,22 @@ module.exports = {
     t.ok("gray gives an all but neutral ground",
       W.rgbToOklch(W.hexToRgb(grey.colors.ground)).C < 0.01);
 
+    // black and white: a gray accent, never the stock cyan (user, 2026-10-20)
+    const lchOf = (x) => W.rgbToOklch(W.hexToRgb(x));
+    for (const mode of ["dark", "light"]) {
+      const bw = W.palette([{ hex: "#000000", n: 50 }, { hex: "#fefefe", n: 30 }, { hex: "#5f5f5f", n: 20 }], { mode: mode });
+      t.ok("black and white gives a gray accent (" + mode + ", " + bw.colors.cyan + ")", lchOf(bw.colors.cyan).C < 0.01);
+    }
+
+    // a beige picture: a muted warm accent, not a loud one or a cyan
+    const beige = lchOf(W.palette([{ hex: "#e6ddd5", n: 50 }, { hex: "#d1b8a2", n: 30 }], { mode: "dark" }).colors.cyan);
+    t.ok("beige gives a warm accent", beige.h > 30 && beige.h < 100);
+    t.ok("beige gives a muted accent", beige.C < 0.08);
+
+    // a faint slate cast: its hue, not a stock one
+    const slate = lchOf(W.palette([{ hex: "#121720", n: 50 }, { hex: "#2f3748", n: 30 }, { hex: "#525c69", n: 20 }], { mode: "dark" }).colors.cyan);
+    t.ok("a slate picture gives a slate-blue accent", slate.h > 220 && slate.h < 280 && slate.C < 0.06);
+
     // auto: a bright picture is a light theme, a dark one dark
     t.eq("auto on a bright picture", W.palette([{ hex: "#f0eee8", n: 9 }, { hex: "#88aacc", n: 1 }], { mode: "auto" }).mode, "light");
     t.eq("auto on a dark picture", W.palette([{ hex: "#101418", n: 9 }, { hex: "#4060a0", n: 1 }], { mode: "auto" }).mode, "dark");

@@ -32,29 +32,29 @@ Rectangle {
   property var term: null
   anchors.fill: parent
   z: 11
-  // NO DIM. A sheet is a picker, not a warning — and the listing behind
-  // it is what the choice is ABOUT, so darkening it hid the thing you
-  // were looking at to decide. The card has the menus' shadow to sit
-  // against the window on, which is separation enough.
+  // DIMMED like every sheet (morpheus/SheetDim, user 2026-10-20 — it was
+  // the one sheet left clear): under the bar it hangs from, which stays lit,
+  // and the sidebar beside it, the card cut out. Its own card rather than
+  // morpheus/Sheet, so it lays the two itself, as Sheet does.
   //
   // The overlay stays, because it is what catches every click that misses
-  // the card — see the MouseArea below. It simply paints nothing now.
-  // Darkened under the bar only — the bar it hangs from stays lit, as
-  // the search's does. Faded in with the card itself.
+  // the card — see the MouseArea below. It paints nothing itself.
   color: "transparent"
-  Rectangle {
-    anchors.fill: parent
-    anchors.topMargin: term.tabStripRef.height + term.crumbBarRef.height
-    color: Qt.rgba(term.cardScrim.r, term.cardScrim.g, term.cardScrim.b,
-                   term.cardScrim.a * sendToCard.opacity)
+  SheetDim {
+    ink: sendToCard.opacity
+    x: sendToWell.x
+    y: sendToWell.y
+    width: sendToWell.width
+    height: sendToWell.height
+    holeX: sendToWell.x + sendToCard.x
+    holeY: sendToWell.y + sendToCard.y
+    holeW: sendToCard.width
+    holeH: sendToCard.height
   }
-  // and the sidebar beside the bar, which is not the titlebar: the
-  // scrim stops at the bar, not at the sidebar's first heading
-  Rectangle {
-    width: term.sideRef.width
-    height: term.tabStripRef.height + term.crumbBarRef.height
-    color: Qt.rgba(term.cardScrim.r, term.cardScrim.g, term.cardScrim.b,
-                   term.cardScrim.a * sendToCard.opacity)
+  SheetDim {
+    ink: sendToCard.opacity
+    width: sendToWell.x
+    height: sendTo.height
   }
   opacity: 1
   // Held up by the sheet rather than by a fade of its own: with nothing

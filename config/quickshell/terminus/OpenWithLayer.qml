@@ -39,7 +39,8 @@ Item {
   visible: layer.active
 
   // An item to darken, in its own shape, while the card is up — the thing the
-  // card was raised over. Null darkens nothing.
+  // card was raised over (the sheet's dimBox). Null darkens nothing:
+  // icarus' layer is the whole screen, with no window of its own under it.
   property Item dim: null
   property real dimRadius: Zenon.pillRadius
 
@@ -106,22 +107,15 @@ Item {
     onExited: if (picker.open) layer.scan(picker.path)
   }
 
-  Rectangle {
-    visible: !!layer.dim
-    x: layer.dim ? layer.dim.x : 0
-    y: layer.dim ? layer.dim.y : 0
-    width: layer.dim ? layer.dim.width : 0
-    height: layer.dim ? layer.dim.height : 0
-    radius: layer.dimRadius
-    color: Zenon.darken(0.55)
-    opacity: sheet.cardInk
-  }
-
   InputShield { onClicked: picker.dismiss() }
 
   Sheet {
     id: sheet
     floating: true
+    // only the item it was raised over, in its own shape (see `dim`)
+    dim: !!layer.dim
+    dimBox: layer.dim
+    dimRadius: layer.dimRadius
     shown: picker.open
     cardW: 560
     cardH: picker.implicitHeight

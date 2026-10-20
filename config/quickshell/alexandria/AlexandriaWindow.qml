@@ -4,7 +4,7 @@
 // https://github.com/kbuckleys/
 //
 // ALEXANDRIA'S WINDOW. The families down the left, each name set in itself,
-// on shelves (all, bookmarks, monospaced, Nerd Fonts, yours, the system's);
+// on shelves (all, bookmarks, monospaced, Nerd Fonts, imported, the system's);
 // the one chosen on the right, three ways:
 //
 //   Specimen   your own line, large; every style of the family; a waterfall
@@ -33,7 +33,7 @@
 //   ctrl+l (shift: back)   the specimen's language, among the face's own
 //   return  Use (picking) · install (Opened) · copy the character (Glyphs;
 //           shift: its codepoint)
-//   ctrl+o  a font file to look at and install    delete  remove (yours)
+//   ctrl+o  a font file to look at and install    delete  remove (imported)
 //   esc     unwinds, then closes
 
 import QtQuick
@@ -329,8 +329,8 @@ FloatingWindow {
     }, undefined, true);
   }
 
-  // ── REMOVING (yours only) ──────────────────────────────────────────────
-  // yours among what Remove acts on, and their files
+  // ── REMOVING (imported only) ──────────────────────────────────────────────
+  // the imported among what Remove acts on, and their files
   readonly property var removeFams: win.acting.filter((f) => !f.loose && f.user)
   readonly property var removable: win.removeFams.reduce((acc, f) =>
     acc.concat(f.files.filter((x) => A.isUserFile(x, Paths.home()) && acc.indexOf(x) < 0)), [])
@@ -893,7 +893,7 @@ FloatingWindow {
               const bits = [f.styles.length === 1 ? "1 style" : f.styles.length + " styles"];
               if (f.mono) bits.push("mono");
               if (f.loose) bits.push(win.installedLike(f.styles[0]) !== "" ? "installed" : "not installed");
-              else if (f.user) bits.push("yours");
+              else if (f.user) bits.push("imported");
               return bits.join("  ·  ");
             }
             color: Zenon.accentMuted
@@ -921,10 +921,10 @@ FloatingWindow {
               font.family: Zenon.glyphFace
               font.pixelSize: Zenon.px(12)
             }
-            // installed by you (~/.local/share/fonts): the shelf's own glyph
+            // imported (~/.local/share/fonts): the shelf's own glyph
             Text {
               visible: !!famRow.modelData.user
-              text: "\uF007"
+              text: A.SHELVES.find((s) => s.id === "user").glyph
               color: Zenon.green
               font.family: Zenon.glyphFace
               font.pixelSize: Zenon.px(12)
@@ -1145,33 +1145,45 @@ FloatingWindow {
           width: specFlick.width - 56
           spacing: 18
 
-          // your line, at its size — click to write your own
+          // the specimen's bar: the languages it can be set in, each named in
+          // itself, in this face (the suite's switch, terminus/Segments, user
+          // 2026-10-20) — in rows of equal parts when there are more than one
+          // row holds, a short last row keeping the parts' width — and, on the
+          // same row, the sample's own tools
           Item {
             width: parent.width
-            height: Math.max(sampleField.contentHeight, win.size * 1.3)
-            TextInput {
-              id: sampleField
-              // the breathing caret, grown with the line it is in
-              cursorDelegate: Caret { field: sampleField; width: Math.max(2, Math.round(win.size / 24)) }
+            height: Math.max(langRows.visible ? langRows.implicitHeight : 0, sampleTools.height)
+            Column {
+              id: langRows
               anchors.left: parent.left
-              anchors.right: sampleTools.left
-              anchors.rightMargin: 12
-              text: win.sample
-              wrapMode: TextInput.Wrap
-              color: Zenon.ink
-              selectionColor: Zenon.alpha(Zenon.cyan, 0.35)
-              font.family: win.style ? win.style.family : Zenon.face
-              font.styleName: win.style ? win.style.style : ""
-              font.pixelSize: win.size
-              onTextEdited: if (win.mgr) { win.mgr.set("lang", win.script.id); win.mgr.set("sample", text); }
-              Keys.onPressed: (e) => {
-                if (e.key === Qt.Key_Escape || e.key === Qt.Key_Return || e.key === Qt.Key_Enter) {
-                  e.accepted = true;
-                  win.refocus();
-                  famField.forceActiveFocus();
-                } else if ((e.modifiers & Qt.ControlModifier) && e.key !== Qt.Key_A && e.key !== Qt.Key_C
-                           && e.key !== Qt.Key_V && e.key !== Qt.Key_X && e.key !== Qt.Key_Z) {
-                  if (win.navKey(e)) e.accepted = true;
+              anchors.top: parent.top
+              width: Math.min(parent.width - sampleTools.width - 12, langRows.perRow * 140)
+              spacing: 6
+              visible: !!win.style && win.langs.length > 0
+              readonly property int perRow: Math.max(1, Math.floor((langRows.parent.width - sampleTools.width - 12) / 140))
+              Repeater {
+                model: {
+                  const out = [];
+                  for (let i = 0; i < win.langs.length; i += langRows.perRow)
+                    out.push(win.langs.slice(i, i + langRows.perRow).map((l) => [l.id, l.label]));
+                  return out;
+                }
+                delegate: Segments {
+                  required property var modelData
+                  even: true
+                  height: 30
+                  width: langRows.width * modelData.length / langRows.perRow
+                  textSize: Zenon.px(14)
+                  face: win.style ? win.style.family : ""
+                  ink: Zenon.accentSoft
+                  options: modelData
+                  current: win.script.id
+                  onChose: (v) => { win.setLang(v); win.refocus(); }
+                  onPointed: (v, at, inside) => {
+                    const l = win.langs.find((q) => q.id === v);
+                    if (inside && l) tips.show(at, l.label, "ctrl l");
+                    else tips.hide(at);
+                  }
                 }
               }
             }
@@ -1209,54 +1221,32 @@ FloatingWindow {
             }
           }
 
-          // the languages it can be set in, each named in itself, in this face
-          Column {
+          // your line, at its size — click to write your own
+          Item {
             width: parent.width
-            spacing: 2
-            visible: !!win.style && win.langs.length > 0
-            Text {
-              text: win.langs.length === 1 ? "1 LANGUAGE  ·  " + win.langs[0].label.toUpperCase()
-                : win.langs.length + " LANGUAGES"
-              color: Zenon.accentMuted
-              font.family: Zenon.face
-              font.weight: Font.Bold
-              font.letterSpacing: 1.2
-              font.pixelSize: Zenon.px(11)
-              bottomPadding: 6
-            }
-            Flow {
-              width: parent.width
-              spacing: 6
-              visible: win.langs.length > 1
-              Repeater {
-                model: win.langs
-                delegate: Rectangle {
-                  id: langChip
-                  required property var modelData
-                  readonly property bool here: langChip.modelData.id === win.script.id
-                  width: langText.implicitWidth + 24
-                  height: Math.max(30, langText.implicitHeight + 8)
-                  radius: Zenon.windowRadius
-                  color: langChip.here ? win.hiFill : langMa.pressed ? Zenon.wash(0.08) : Zenon.wash(0.03)
-                  border.width: 1
-                  border.color: langChip.here ? Zenon.alpha(Zenon.cyan, 0.5) : Zenon.border
-                  Behavior on color { ColorAnimation { duration: Zenon.fast } }
-                  Text {
-                    id: langText
-                    anchors.centerIn: parent
-                    text: langChip.modelData.label
-                    color: langChip.here ? Zenon.cyan : Zenon.accentSoft
-                    font.family: win.style ? win.style.family : Zenon.face
-                    font.styleName: win.style ? win.style.style : ""
-                    font.pixelSize: Zenon.px(14)
-                  }
-                  MouseArea {
-                    id: langMa
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    onClicked: { win.setLang(langChip.modelData.id); win.refocus(); }
-                    onContainsMouseChanged: containsMouse ? tips.show(langChip, langChip.modelData.label, "ctrl l") : tips.hide(langChip)
-                  }
+            height: Math.max(sampleField.contentHeight, win.size * 1.3)
+            TextInput {
+              id: sampleField
+              // the breathing caret, grown with the line it is in
+              cursorDelegate: Caret { field: sampleField; width: Math.max(2, Math.round(win.size / 24)) }
+              anchors.left: parent.left
+              anchors.right: parent.right
+              text: win.sample
+              wrapMode: TextInput.Wrap
+              color: Zenon.ink
+              selectionColor: Zenon.alpha(Zenon.cyan, 0.35)
+              font.family: win.style ? win.style.family : Zenon.face
+              font.styleName: win.style ? win.style.style : ""
+              font.pixelSize: win.size
+              onTextEdited: if (win.mgr) { win.mgr.set("lang", win.script.id); win.mgr.set("sample", text); }
+              Keys.onPressed: (e) => {
+                if (e.key === Qt.Key_Escape || e.key === Qt.Key_Return || e.key === Qt.Key_Enter) {
+                  e.accepted = true;
+                  win.refocus();
+                  famField.forceActiveFocus();
+                } else if ((e.modifiers & Qt.ControlModifier) && e.key !== Qt.Key_A && e.key !== Qt.Key_C
+                           && e.key !== Qt.Key_V && e.key !== Qt.Key_X && e.key !== Qt.Key_Z) {
+                  if (win.navKey(e)) e.accepted = true;
                 }
               }
             }
@@ -1830,7 +1820,7 @@ FloatingWindow {
                   ["Scripts", f.features || ""],
                   ["Spacing", win.style.mono ? "monospaced" : "proportional"],
                   ["From", win.fam.loose ? (win.looseInstalled ? "a file — installed" : "a file — not installed")
-                    : f.pkg ? "pacman package " + f.pkg : win.fam.user ? "installed by you" : "the system"],
+                    : f.pkg ? "pacman package " + f.pkg : win.fam.user ? "imported" : "the system"],
                   ["File size", f.size || ""],
                 ].filter((r) => r[1] !== "");
               }

@@ -61,6 +61,11 @@ function moveOrResize_(verb, dx, dy, selector) {
 function resizeBy(dx, dy, selector) { return moveOrResize_("resize", dx, dy, selector); }
 function moveBy(dx, dy, selector) { return moveOrResize_("move", dx, dy, selector); }
 
+// ── submaps ───────────────────────────────────────────────────────────────
+// "reset" is the default one. Oracle's Shortcuts holds hyprland in
+// "oracle-keys" (binds.lua: next to no binds) while it waits for a chord.
+function submap(name) { return "hl.dsp.submap(" + lua(name || "reset") + ")"; }
+
 // ── screens ───────────────────────────────────────────────────────────────
 // `hyprctl dispatch dpms on` is a Lua syntax error on this Hyprland; this is
 // the form that answers "ok"

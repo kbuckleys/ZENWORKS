@@ -59,6 +59,10 @@ PanelWindow {
   // picker is the confirm: it already is the second step for a typed
   // command, so a verb that must ask reuses it rather than growing a third.
   property var pending: null
+  // A session verb asking "Reboot?" sets the question on red — one rule for
+  // every `confirm` verb, keyed off the flag, never a color per verb.
+  readonly property bool alarm: popup.mode === "picker" && !popup.choices
+    && !!popup.pending && !!popup.pending.confirm
   // socordia's switch, handed in by shell.qml so the Caffeinate row can say
   // which way it is — rebuilt the moment it flips.
   property bool keepAwake: false
@@ -891,7 +895,12 @@ property var statusbar: null
           // than pushing the buttons off the end.
           width: Math.min(420, msgText.implicitWidth + 24)
           height: parent.height
-          color: "transparent"
+          // the confirm's red, the question's own ground only; it holds the
+          // pill's left end, so it takes the pill's corners there
+          color: popup.alarm ? Zenon.red : "transparent"
+          topLeftRadius: bg.radius
+          bottomLeftRadius: bg.radius
+          Behavior on color { ColorAnimation { duration: Zenon.normal; easing.type: Zenon.ease } }
 
           Text {
             id: msgText
@@ -899,7 +908,7 @@ property var statusbar: null
             anchors.leftMargin: 12
             anchors.rightMargin: 12
             text: popup.pending ? popup.pending.name + "?" : popup.query
-            color: Zenon.white
+            color: popup.alarm ? Zenon.onAccent : Zenon.white
             font.family: Zenon.face
             font.weight: Font.Bold
             font.pixelSize: Zenon.px(16)

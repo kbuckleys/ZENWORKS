@@ -44,6 +44,7 @@ import Quickshell.Hyprland
 import "."
 import "oracle.js" as Ora
 import "../morpheus"
+import "../morpheus/controls" as Controls
 import "../terminus"
 
 FloatingWindow {
@@ -116,6 +117,15 @@ FloatingWindow {
   property string section: "bar"
   // the key of the row folded open (About this computer), or ""
   property string unfolded: ""
+  // the groups of rows opened under their heads (Shortcuts' Shell, Audio…):
+  // group -> true. All shut to begin with, as About this computer is.
+  property var openGroups: ({})
+  function toggleGroup(g) {
+    const next = ({});
+    for (const k in popup.openGroups) next[k] = popup.openGroups[k];
+    next[g] = !next[g];
+    popup.openGroups = next;
+  }
   // The last section that actually HAS settings in it. "Reset one section"
   // lives in the about section, so `section` at the moment it is clicked is
   // always "about" — which holds nothing but actions, so the reset would be a
@@ -384,6 +394,8 @@ FloatingWindow {
   readonly property int tabsH: 72
   readonly property int tabsTop: 0
   readonly property int rowH: 64
+  // a row inside a group's frame
+  readonly property int frameRowH: 44
   // the Arrangement's picture of the desk
   readonly property int arrangeH: 240
   // ── CONTROLS HANG OFF THE RIGHT EDGE ──────────────────────────────────
@@ -404,6 +416,9 @@ FloatingWindow {
   // The widest control decides nothing about the others — see controlSlot,
   // which measures the one it actually loaded.
   readonly property int controlW: 260
+  // how much of a row a label and its description may run across, whatever
+  // room the control leaves: the rest is the controls' column
+  readonly property real textFrac: 0.62
 
   function calcHeight() {
     return popup.tabsTop + popup.tabsH + 1 + popup.bodyH + popup.hintH;
@@ -480,6 +495,7 @@ FloatingWindow {
   }
 
   function closePopup() {
+    Oracle.endCapture();
     popup.editingKey = "";
     popup.closeEnumMenu();
     popup.shown = false;
@@ -1145,6 +1161,107 @@ FloatingWindow {
     }
   }
 
+  // ── A KEY CHORD ───────────────────────────────────────────────────────
+  // The chord as KeyCaps, in a chip as wide as it needs. A click and it
+  // waits: hyprland is held off its binds (Oracle.beginCapture) and the next
+  // press is the new chord — Esc keeps the old one, Backspace or Delete
+  // alone turns the bind off, and a modifier held with a click on the chip is
+  // a mouse bind. Oracle refuses a chord another bind has.
+  component ChordControl: Item {
+    id: ch
+    property var spec: null
+    property var value: null
+    readonly property bool waiting: !!ch.spec && Oracle.capturing === ch.spec.key
+    width: chordChip.width
+    height: 28
+
+    Rectangle {
+      id: chordChip
+      anchors.right: parent.right
+      anchors.verticalCenter: parent.verticalCenter
+      width: Math.max(110, (ch.waiting ? waitText.implicitWidth : chordCaps.implicitWidth) + 20)
+      height: 28
+      radius: Zenon.radiusControl
+      color: (ch.waiting || chordMa.pressed)
+        ? Qt.rgba(popup.highlight.r, popup.highlight.g, popup.highlight.b, 0.18)
+        : Zenon.wash(0.06)
+      border.width: 1
+      border.color: ch.waiting ? popup.highlight : Zenon.border
+      Behavior on color { ColorAnimation { duration: Zenon.fast; easing.type: Zenon.ease } }
+      Behavior on border.color { ColorAnimation { duration: Zenon.fast; easing.type: Zenon.ease } }
+
+      Row {
+        id: chordCaps
+        visible: !ch.waiting
+        anchors.centerIn: parent
+        spacing: 4
+        Repeater {
+          model: ch.spec ? Ora.chordCaps(ch.value) : []
+          KeyCap { required property var modelData; label: modelData; fontSize: 12 }
+        }
+        Text {
+          visible: ch.spec && Ora.normChord(ch.value) === ""
+          text: "off"
+          color: popup.dimColor
+          font.family: popup.face
+          font.weight: Font.Medium
+          font.pixelSize: Zenon.px(14)
+        }
+      }
+      Text {
+        id: waitText
+        visible: ch.waiting
+        anchors.centerIn: parent
+        text: "press a chord"
+        color: popup.highlight
+        font.family: popup.face
+        font.weight: Font.Medium
+        font.pixelSize: Zenon.px(14)
+      }
+
+      MouseArea {
+        id: chordMa
+        anchors.fill: parent
+        acceptedButtons: Qt.AllButtons
+        onPressed: (m) => {
+          if (!ch.waiting) return;
+          // a modifier held: a mouse bind; a plain click calls the wait off
+          const c = Ora.chordFromButton(m.button, m.modifiers);
+          Oracle.endCapture(c !== "" ? c : undefined);
+          popup.syncFocus();
+        }
+        onClicked: (m) => {
+          if (ch.waiting || m.button !== Qt.LeftButton) return;
+          Oracle.beginCapture(ch.spec.key);
+          catcher.forceActiveFocus();
+        }
+      }
+    }
+
+    // the keyboard, while it waits
+    Item {
+      id: catcher
+      Keys.onShortcutOverride: (e) => { e.accepted = ch.waiting; }
+      Keys.onPressed: (e) => {
+        if (!ch.waiting) return;
+        e.accepted = true;
+        const bare = (e.modifiers & (Qt.ShiftModifier | Qt.ControlModifier | Qt.AltModifier | Qt.MetaModifier)) === 0;
+        if (bare && e.key === Qt.Key_Escape) { Oracle.endCapture(); popup.syncFocus(); return; }
+        if (bare && (e.key === Qt.Key_Backspace || e.key === Qt.Key_Delete)) {
+          Oracle.endCapture("");
+          popup.syncFocus();
+          return;
+        }
+        const c = Ora.chordFromKey(e.key, e.modifiers, e.text);
+        if (c === "") return;   // a modifier on its own: keep waiting
+        Oracle.endCapture(c);
+        popup.syncFocus();
+      }
+      // the window let go of the keyboard: the wait is over too
+      onActiveFocusChanged: if (!activeFocus && ch.waiting) Oracle.endCapture()
+    }
+  }
+
   component ActionControl: Item {
     id: ac
     property var spec: null
@@ -1335,12 +1452,11 @@ FloatingWindow {
 
       // ── the hint strip ─────────────────────────────────────────────
       // Along the bottom, as every other component in this suite has it:
-      // the keys in the middle, what you have typed on the left, and how much of the shell is off its defaults on the
-      // right. It also holds the search field, which is never seen — what
-      // you type goes to it wherever the pointer is.
-      // morpheus/HintBar, as every strip (ceres' height, ground and rule):
-      // what you typed before the keys, how many changed at the right end, and
-      // the search field (never seen) over it all
+      // morpheus/HintBar (ceres' height, ground and rule), the keys centered,
+      // what you typed before them. Nothing at the right end — the changed
+      // count went (user, 2026-10-20): each tab's count says it already. It
+      // also holds the search field, which is never seen — what you type
+      // goes to it wherever the pointer is.
       HintBar {
         id: hintBar
         anchors.left: parent.left
@@ -1349,7 +1465,7 @@ FloatingWindow {
         z: 2
         rows: popup.searching
           ? [["ctrl tab", "narrow"], ["esc", "clear"]]
-          : [["type", "filter"], ["ctrl tab", "section"], ["esc", "close"]]
+          : [["type", "filter"], ["ctrl tab", "section"]]
         leading: Text {
           anchors.verticalCenter: parent.verticalCenter
           width: Math.min(implicitWidth, hintBar.width / 3)
@@ -1367,15 +1483,6 @@ FloatingWindow {
           color: popup.dimColor
           font.family: popup.face
           font.weight: Zenon.weight
-          font.pixelSize: Zenon.px(13)
-        }
-        Text {
-          anchors.verticalCenter: parent.verticalCenter
-          visible: popup.totalChanged > 0
-          text: popup.totalChanged + " changed"
-          color: popup.changedColor
-          font.family: popup.face
-          font.weight: Font.Medium
           font.pixelSize: Zenon.px(13)
         }
         overlay: TextInput {
@@ -1911,19 +2018,30 @@ FloatingWindow {
               // the top on that frame: the band sawed instead of easing back
               // once (2026-10-18 capture). `foldH` is the open fold's body,
               // measured by its own row.
+              //
+              // AND NOW NO ROW AT ALL (2026-10-20): a description wraps, so
+              // rows are 64, 84, 104 tall, and every guess would be wrong.
+              // Every row stays built — 170 at the most, on a search.
               property real foldH: 0
-              cacheBuffer: popup.rows.some((r) => r.type === "arrange") || list.foldH > 0
-                ? popup.rows.length * popup.rowH + popup.arrangeH + list.foldH : 320
+              cacheBuffer: popup.rows.length * (popup.rowH + 60) + popup.arrangeH + list.foldH
 
               delegate: Item {
                 id: settingRow
                 required property var modelData
                 required property int index
-                width: scroller.scrollable ? scroller.x - list.x : list.width
-                height: settingRow.arrange ? popup.arrangeH
-                  : popup.rowH + (settingRow.open ? foldBody.height : 0)
+                // THE WHOLE LIST WIDE, the scroll bar's strip included, so a
+                // frame (a group's, About this computer's) is centered in
+                // what you see (user, 2026-10-20: its right side was wider
+                // by the bar). Only the controls keep clear of the bar.
+                width: list.width
+                readonly property real gutter: scroller.scrollable ? list.width - (scroller.x - list.x) : 0
+                height: settingRow.tucked ? 0
+                  : settingRow.arrange ? popup.arrangeH
+                  : rowHead.y + rowHead.height + settingRow.frameBelow
+                    + (settingRow.open ? foldBody.height : 0)
                 Behavior on height { NumberAnimation { duration: Zenon.menuFade; easing.type: Easing.OutCubic } }
-                clip: settingRow.fold
+                clip: settingRow.fold || settingRow.inGroup
+                visible: height > 0
 
                 readonly property var spec: settingRow.modelData
                 readonly property bool arrange: settingRow.spec.type === "arrange"
@@ -1936,7 +2054,54 @@ FloatingWindow {
                 // band (rowHead), not in the grown row.
                 readonly property bool fold: !!settingRow.spec.fold
                 readonly property bool open: settingRow.fold && popup.unfolded === settingRow.spec.key
-                Item { id: rowHead; width: parent.width; height: popup.rowH }
+                // ── A GROUP THAT FOLDS ───────────────────────────────────
+                // `foldGroup` heads a run of rows (`inGroup`) the way a
+                // fold row heads its panel: a click on it opens them, again
+                // shuts them. They are ordinary rows of the list, folded to
+                // nothing under a shut head — and all shown mid-search, where
+                // a match hidden under its head would be no match at all.
+                readonly property bool groupHead: !!settingRow.spec.foldGroup
+                readonly property bool groupOpen: settingRow.groupHead
+                  && popup.openGroups[settingRow.spec.foldGroup] === true
+                readonly property bool inGroup: !!settingRow.spec.inGroup
+                readonly property bool tucked: settingRow.inGroup && !popup.searching
+                  && popup.openGroups[settingRow.spec.inGroup] !== true
+
+                // ── EACH GROUP IN ITS OWN FRAME ──────────────────────────
+                // morpheus' ListFrame, as About this computer's fastfetch
+                // stands in (user, 2026-10-20), one per group. The rows are
+                // separate delegates, so each draws its slice of the one
+                // frame: the first its rounded top, the last its bottom, the
+                // ones between only the sides — the frame runs past their
+                // clipped edges. First and last are read off the neighbors,
+                // so a search's short run is framed as a whole too.
+                readonly property bool groupFirst: settingRow.inGroup && (settingRow.index === 0
+                  || popup.rows[settingRow.index - 1].inGroup !== settingRow.spec.inGroup)
+                readonly property bool groupLast: settingRow.inGroup && (settingRow.index === popup.rows.length - 1
+                  || popup.rows[settingRow.index + 1].inGroup !== settingRow.spec.inGroup)
+                // the gap under the head, then the frame's own inset
+                readonly property int frameAbove: settingRow.groupFirst ? 10 : 0
+                // the frame's inset, then the gap before the next head
+                readonly property int frameBelow: settingRow.groupLast ? 22 : 0
+                Controls.ListFrame {
+                  visible: settingRow.inGroup
+                  z: -1
+                  x: 24
+                  width: parent.width - 48
+                  y: settingRow.groupFirst ? 4 : -40
+                  height: (settingRow.groupLast ? parent.height - 18 : parent.height + 40) - y
+                }
+                // as tall as the label and its wrapped description, 64 at least
+                Item {
+                  id: rowHead
+                  y: settingRow.frameAbove
+                  width: parent.width
+                  // tighter inside a frame (user, 2026-10-20): the frame
+                  // already sets them apart, as fastfetch's lines are
+                  height: settingRow.arrange ? popup.rowH
+                    : settingRow.inGroup ? Math.max(popup.frameRowH, Math.ceil(labels.implicitHeight) + 12)
+                    : Math.max(popup.rowH, Math.ceil(labels.implicitHeight) + 22)
+                }
                 // what this row adds while open, for the list's cacheBuffer
                 Binding {
                   target: list
@@ -1947,15 +2112,18 @@ FloatingWindow {
                 }
                 MouseArea {
                   anchors.fill: rowHead
-                  visible: settingRow.fold
-                  onClicked: popup.unfolded = settingRow.open ? "" : settingRow.spec.key
+                  visible: settingRow.fold || settingRow.groupHead
+                  onClicked: {
+                    if (settingRow.groupHead) popup.toggleGroup(settingRow.spec.foldGroup);
+                    else popup.unfolded = settingRow.open ? "" : settingRow.spec.key;
+                  }
                 }
                 Loader {
                   id: foldBody
-                  y: popup.rowH
+                  y: rowHead.height
                   width: parent.width
                   height: item ? item.implicitHeight : 0
-                  active: settingRow.fold && (settingRow.open || settingRow.height > popup.rowH)
+                  active: settingRow.fold && (settingRow.open || settingRow.height > rowHead.height)
                   source: ({ computer: "ComputerPanel.qml", tools: "ToolsPanel.qml" })[settingRow.spec.fold] || ""
                   onLoaded: {
                     item.face = Qt.binding(() => popup.face);
@@ -1994,6 +2162,7 @@ FloatingWindow {
 
                 ArrangeView {
                   anchors.fill: parent
+                  anchors.rightMargin: settingRow.gutter
                   visible: settingRow.arrange
                   face: popup.face
                   fgColor: popup.fgColor
@@ -2027,10 +2196,16 @@ FloatingWindow {
                   id: labels
                   visible: !settingRow.arrange
                   anchors.left: parent.left
-                  // a monitor's settings step in under its name
-                  anchors.leftMargin: settingRow.monitorRow && !settingRow.monitorHead ? 36 : 24
-                  anchors.right: controlSlot.left
-                  anchors.rightMargin: 18
+                  // a monitor's settings step in under its name, a group's
+                  // into its frame
+                  anchors.leftMargin: settingRow.inGroup ? 42
+                    : settingRow.monitorRow && !settingRow.monitorHead ? 36 : 24
+                  // A READING MEASURE, not the row (user, 2026-10-20): the
+                  // text stops at popup.textFrac of the row, so it grows with
+                  // the window, and a switch's row wraps at the same edge as
+                  // a slider's — or sooner, where a wide control starts.
+                  width: Math.min(controlSlot.x - 18,
+                    Math.round(parent.width * popup.textFrac)) - anchors.leftMargin
                   anchors.verticalCenter: rowHead.verticalCenter
                   spacing: 2
 
@@ -2093,10 +2268,10 @@ FloatingWindow {
                     // end of the readout, a long way from the thing it opens
                     Text {
                       id: foldMark
-                      visible: settingRow.fold
+                      visible: settingRow.fold || settingRow.groupHead
                       anchors.verticalCenter: rowLabel.verticalCenter
                       text: "\uF054"
-                      rotation: settingRow.open ? 90 : 0
+                      rotation: settingRow.open || settingRow.groupOpen ? 90 : 0
                       Behavior on rotation { NumberAnimation { duration: Zenon.menuFade; easing.type: Easing.OutCubic } }
                       color: popup.dimColor
                       font.family: Zenon.glyphFace
@@ -2178,7 +2353,9 @@ FloatingWindow {
                     text: popup.searching
                       ? Ora.markMatch(settingRow.spec.help, popup.query, popup.highlight)
                       : (settingRow.spec.help || "")
-                    elide: Text.ElideRight
+                    // wrapped, never cut (user, 2026-10-20); the row grows
+                    wrapMode: Text.Wrap
+                    lineHeight: 1.1
                     // The help line is not a footnote — it is the half of the
                     // row that says what the setting actually does, and at 12
                     // against a 17px label it read as one.
@@ -2193,8 +2370,14 @@ FloatingWindow {
                   id: controlSlot
                   visible: !settingRow.arrange
                   anchors.right: parent.right
-                  anchors.rightMargin: 20
-                  anchors.verticalCenter: rowHead.verticalCenter
+                  // inside a frame, as far in from its right side as the
+                  // labels are from its left; elsewhere clear of the bar
+                  anchors.rightMargin: settingRow.inGroup ? 42 : 20 + settingRow.gutter
+                  // LEVEL WITH THE NAME, not the row (user, 2026-10-20): a
+                  // wrapped description made the row tall, and a control
+                  // centered in it sat down beside the help, away from the
+                  // label it belongs to
+                  y: labels.y + rowLabel.y + rowLabel.height / 2 - height / 2
                   // WHAT THE CONTROL ACTUALLY NEEDS, measured off the one
                   // that got loaded rather than reserved for the widest kind
                   // there is. This is what hands a bool row's 200 spare
@@ -2214,6 +2397,7 @@ FloatingWindow {
                       if (t === "text")
                         return settingRow.spec.pick ? pickComp : textComp;
                       if (t === "action") return actionComp;
+                      if (t === "chord") return chordComp;
                       if (t === "info") return infoComp;
                       return numComp;
                     }
@@ -2359,6 +2543,8 @@ FloatingWindow {
                                   value: String(settingRow.live) } }
                   Component { id: actionComp
                     ActionControl { spec: settingRow.spec } }
+                  Component { id: chordComp
+                    ChordControl { spec: settingRow.spec; value: settingRow.live } }
                   Component { id: infoComp
                     InfoControl { spec: settingRow.spec
                                   // revision AND shown: the first catches a
@@ -2375,12 +2561,9 @@ FloatingWindow {
         }
       }
 
-      // ── the one key ──────────────────────────────────────────────────
-      // Escape, and nothing else. Everything this panel does is a click, and
-      // a strip of chords along the bottom would have been teaching a
-      // keyboard interface that is no longer here — but escape closing a
-      // panel is not a chord, it is what escape does everywhere, and taking
-      // it away would be its own surprise.
+      // ── the keys ─────────────────────────────────────────────────────
+      // Few. Everything this panel does is a click: ctrl+tab steps sections,
+      // and Escape puts away a menu, an edit or a search — never the window.
       Keys.onPressed: (event) => {
         // Delete over a theme you saved, in the open Theme list
         if (event.key === Qt.Key_Delete && popup.deleteHoveredTheme()) { event.accepted = true; return; }
@@ -2396,8 +2579,9 @@ FloatingWindow {
 
       Keys.onEscapePressed: (event) => {
         event.accepted = true;
-        // innermost first: put away what you have built up, and only close
-        // once there is nothing left — the same cascade every layer uses
+        // innermost first: put away what you have built up. With nothing
+        // left it does nothing — Oracle is a window, and Esc never closes it
+        // (user, 2026-10-20); super+q or the close button does
         if (popup.enumKey !== "") {
           popup.closeEnumMenu();
         } else if (popup.editingKey !== "") {
@@ -2405,8 +2589,6 @@ FloatingWindow {
           popup.syncFocus();
         } else if (popup.searching) {
           filterInput.clear();
-        } else {
-          popup.closePopup();
         }
       }
     }

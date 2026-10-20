@@ -3299,7 +3299,7 @@ FloatingWindow {
         // text field wears it, its own border staying neutral)
         HeldRing { anchors.fill: parent; radius: parent.radius; z: 10; on: filterField.activeFocus }
       }
-      Tool { id: placesTool; glyph: "\uf07c"; name: "Places"; key: "'"
+      Tool { id: placesTool; glyph: "\ueb83"; name: "Places"; key: "'"
              onHit: win.showMenu(placesTool.mapToItem(null, 0, placesTool.height + 4), "places", "") }
       Tool { glyph: win.mode === "gallery" ? "" : ""; name: win.mode === "gallery" ? "Picture" : "Gallery"; key: "g"
              on: win.mode === "gallery"; live: win.mode !== "gallery" || win.rows.length > 0
@@ -3320,7 +3320,7 @@ FloatingWindow {
       Sep {}
       Tool { glyph: "\uf065"; name: "Fullscreen"; key: "f"; live: win.mode === "view" && win.loaded
              onHit: win.toggleFullscreen() }
-      Tool { glyph: "\u{F01C6}"; name: "Details"; key: "i"; on: win.infoShown && win.mode === "view"
+      Tool { glyph: "\u{F02FD}"; name: "Details"; key: "i"; on: win.infoShown && win.mode === "view"
              live: win.mode === "view"; onHit: win.infoShown = !win.infoShown }
       Tool { glyph: ""; name: "Copy the picture"; key: "ctrl+c"; live: win.path !== ""; onHit: win.copyImage() }
       Tool { glyph: ""; name: "Show in terminus"; key: "o"; live: win.dir !== ""; onHit: win.reveal() }
@@ -6861,7 +6861,6 @@ FloatingWindow {
     // clear: the picture is cut away under it (see sheetUp)
     ground: win.sheetGround
     backdrop: win.sheetBackdrop   // the picture, frosted under the card
-    scrim: Zenon.alpha(Zenon.ground, 0)
     id: bulkCard
     z: 12
     host: win

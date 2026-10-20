@@ -774,6 +774,13 @@ Scope {
     mgr.spellIgnored = o;
     mgr.spellEpoch++;
   }
+  // the two items under a wrong word's guesses, in every Clio menu that has
+  // them (the editor's and the board's)
+  function spellTail(w) {
+    return [{ text: "Learn spelling", icon: "\uF02D", run: () => mgr.learnWord(w) },
+            { text: "Ignore spelling", icon: "\uF474", run: () => mgr.ignoreWord(w) },
+            { isSeparator: true }];
+  }
   function setSpellOn(on) { mgr.set("spellOn", !!on); mgr.spellEpoch++; }
   function setSpellLangs(langs) {
     mgr.set("spellLangs", langs);

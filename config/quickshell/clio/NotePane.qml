@@ -823,9 +823,7 @@ Item {
     const spellItems = !sp ? [] : sp.sugs.slice(0, 6).map((w) => ({ text: w, icon: "\uF00C", enabled: !ro,
                                                                      run: () => ed.respellWord(info.key, sp, w) }))
       .concat(sp.sugs.length === 0 ? [{ text: "No guesses", icon: "", enabled: false, run: () => {} }] : [])
-      .concat([{ text: "Learn spelling", icon: "\uF02D", run: () => pane.mgr.learnWord(sp.w) },
-               { text: "Ignore spelling", icon: "\uF070", run: () => pane.mgr.ignoreWord(sp.w) },
-               { isSeparator: true }]);
+      .concat(pane.mgr.spellTail(sp.w));
     const items = spellItems.concat([
       { text: "Cut", icon: "\u{F0190}", mark: "ctrl x", enabled: hasSel && !ro, run: () => { if (ed.cross) { ed.copyCross(); ed.deleteCross(); } else it.te.cut(); } },
       { text: "Copy", icon: "\u{F018F}", mark: "ctrl c", enabled: hasSel, run: () => { if (ed.cross) ed.copyCross(); else it.te.copy(); } },

@@ -765,6 +765,54 @@ module.exports.themes = (t, T) => {
   t.eq("then the two follows", withLight[2].value, "follow");
 };
 
+// Shortcuts: binds.lua read, keys.lua written, a key press named, no dupes.
+module.exports.shortcuts = (t, T) => {
+  const src = [
+    "-- MISC",
+    'bind("terminal",  "SUPER + RETURN",  "Open the terminal",  hl.dsp.exec_cmd(term))',
+    "-- QS",
+    'bind("zeus", "super + k", "Zeus, the \\"monitor\\"", hl.dsp.exec_cmd("x"))',
+    '-- bind("gone", "SUPER + G", "commented", x) is not a bind',
+    'hl.bind("SUPER + L", x)',
+    'bind("drag", "SUPER + mouse:272", "Drag a window", hl.dsp.window.drag(), { mouse = true })'
+  ].join("\n");
+  const b = T.parseBindsLua(src);
+  t.eq("three binds", b.length, 3);
+  t.eq("its group", b[1].group, "QS");
+  t.eq("a chord spelled one way", b[1].chord, "SUPER + K");
+  t.eq("escapes in a label", b[1].label, 'Zeus, the "monitor"');
+  t.eq("a mouse button keeps its spelling", b[2].chord, "SUPER + mouse:272");
+  t.eq("QS reads as Shell", T.bindGroupLabel("QS"), "Shell");
+  t.eq("modifiers in one order, ctrl as CONTROL", T.normChord("alt+ctrl + super+ shift + x"),
+    "SUPER + SHIFT + CONTROL + ALT + X");
+  t.eq("nothing is off", T.normChord(""), "");
+  t.eq("the caps", T.chordCaps("SUPER + SHIFT + GRAVE").join("|"), "Super|Shift|`");
+  t.eq("a mask as hyprctl gives it", T.chordMask("SUPER + SHIFT + K").mask, 65);
+  // Qt: Meta 0x10000000, Shift 0x02000000; Key_K 0x4b; Key_Exclam 0x21
+  t.eq("super+k pressed", T.chordFromKey(0x4b, 0x10000000, "k"), "SUPER + K");
+  t.eq("super+shift+1 is not super+shift+!", T.chordFromKey(0x21, 0x12000000, "!"), "SUPER + SHIFT + 1");
+  t.eq("F5", T.chordFromKey(0x01000034, 0, ""), "F5");
+  t.eq("a bare modifier names nothing", T.chordFromKey(0x01000022, 0x10000000, ""), "");
+  t.eq("a bare click binds nothing", T.chordFromButton(1, 0), "");
+  t.eq("super+right click", T.chordFromButton(2, 0x10000000), "SUPER + mouse:273");
+  const lua = T.renderKeysLua({ zeus: "SUPER + SHIFT + K", terminal: "SUPER + RETURN", drag: "", old: "X" }, b);
+  const back = T.parseDefaultsLua(lua);
+  t.eq("only what moved is written", Object.keys(back).sort().join(","), "drag,zeus");
+  t.eq("off is kept as off", back.drag, "");
+  t.eq("read back as written", back.zeus, "SUPER + SHIFT + K");
+  t.eq("taken by another of ours", T.chordTaken("super + return", "zeus", b, {}, []), "Open the terminal");
+  t.eq("its own chord is not a clash", T.chordTaken("SUPER + K", "zeus", b, {}, []), "");
+  t.eq("a moved bind frees its default", T.chordTaken("SUPER + K", "terminal", b, { zeus: "SUPER + J" }, []), "");
+  const live = [{ modmask: 64, key: "L", description: "", submap: "" },
+                { modmask: 64, key: "K", description: 'Zeus, the "monitor"', submap: "" },
+                { modmask: 0, key: "F24", description: "", submap: "oracle-keys" }];
+  t.eq("taken by another file's bind", T.chordTaken("SUPER + L", "zeus", b, {}, live), "another hyprland bind");
+  t.eq("ours in the live list are not counted twice", T.chordTaken("SUPER + K", "zeus", b, {}, live), "");
+  t.eq("nor the capture submap's", T.chordTaken("F24", "zeus", b, {}, live), "");
+  t.eq("a chord coerced", T.coerce({ type: "chord" }, "ctrl+super+p"), "SUPER + CONTROL + P");
+  t.eq("off displayed", T.display({ type: "chord" }, ""), "off");
+};
+
 // The harness runs `cases` and nothing else, so the named cases above were
 // never being run at all. They are run from here, after the rest.
 {

@@ -26,7 +26,9 @@ function openDir() {
 
 const THUMB = 256;
 
-function highlightedPreview(text, query) {
+// `ink`: the match's color, a 6-digit hex (Zenon.hex) — the theme's, so
+// it follows a theme change
+function highlightedPreview(text, query, ink) {
   const q = (query || "").trim().toLowerCase();
   if (!q) return Strings.escapeHtml(text);
   const lower = text.toLowerCase();
@@ -39,7 +41,7 @@ function highlightedPreview(text, query) {
       break;
     }
     if (idx > i) out.push(Strings.escapeHtml(text.slice(i, idx)));
-    out.push("<span style=\"color:#eebebe;font-weight:700;\">" + Strings.escapeHtml(text.slice(idx, idx + q.length)) + "</span>");
+    out.push("<span style=\"color:" + ink + ";font-weight:700;\">" + Strings.escapeHtml(text.slice(idx, idx + q.length)) + "</span>");
     i = idx + q.length;
   }
   return out.join("");

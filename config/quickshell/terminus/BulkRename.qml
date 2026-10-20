@@ -44,11 +44,10 @@ Rectangle {
   // ── WHAT THE HOLDER SAYS ──────────────────────────────────────────────
   // The window it is in: SelectBar's and the rail's host. Where the card
   // hangs from (the top bars' height) and how far in it starts (a sidebar),
-  // the scrim, the wheel's step, and what the bar above it says.
+  // the wheel's step, and what the bar above it says.
   property var host: null
   property real topInset: 0
   property real leftInset: 0
-  property color scrim: Zenon.darken(0.55)
   property real wheelStep: 120
   // what a thing being renamed is called — "item", "picture"
   property string noun: "item"
@@ -243,21 +242,9 @@ Rectangle {
   z: 15
   visible: opacity > 0.01
   opacity: bulk.open ? 1 : 0
-  // hung from a bar, the bar stays lit — it is the sheet's titlebar
-  color: bulk.hangs ? "transparent" : bulk.scrim
-  Rectangle {
-    visible: bulk.hangs
-    anchors.fill: parent
-    anchors.topMargin: bulk.topInset
-    color: bulk.scrim
-  }
-  // the sidebar beside the bar is not the titlebar, so it dims too
-  Rectangle {
-    visible: bulk.hangs
-    width: bulk.leftInset
-    height: bulk.topInset
-    color: bulk.scrim
-  }
+  // the window behind is dimmed by the sheet itself (morpheus/SheetDim):
+  // hung from a bar, the bar stays lit and the sidebar beside it dims
+  color: "transparent"
   Behavior on opacity { NumberAnimation { duration: bulk.open ? bulkSheet.slideIn : bulkSheet.slideOut; easing.type: Zenon.ease } }
 
   property bool open: false

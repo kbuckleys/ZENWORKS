@@ -979,7 +979,7 @@ FloatingWindow {
         id: sideFlick
         anchors.top: acctChip.bottom
         anchors.topMargin: 4
-        anchors.bottom: addRow.top
+        anchors.bottom: parent.bottom
         anchors.left: parent.left
         anchors.right: parent.right
         contentHeight: sideCol.implicitHeight + 12
@@ -1145,23 +1145,6 @@ FloatingWindow {
       }
       ElasticScroll { anchors.fill: sideFlick; view: sideFlick }
 
-      // adding one, at the sidebar's foot (as 1Password's "New Vault")
-      ShelfRow {
-        id: addRow
-        anchors.left: parent.left
-        anchors.right: parent.right
-        anchors.bottom: parent.bottom
-        anchors.bottomMargin: 6
-        radius: 0
-        indent: 18
-        glyph: ""
-        label: "Add an account"
-        countInk: Zenon.accentMuted
-        count: "ctrl n"
-        here: win.adding
-        fill: win.hiFill
-        onClicked: win.addAccount()
-      }
     }
 
     // ── the list ─────────────────────────────────────────────────────────

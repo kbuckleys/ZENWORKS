@@ -436,9 +436,7 @@ Variants {
               body.cursorPosition = sp.a + w.length;
             };
             return sp.sugs.slice(0, 5).map((w) => ({ text: w, icon: "\uF00C", run: () => fix(w) }))
-              .concat([{ text: "Learn spelling", icon: "\uF02D", run: () => Clio.app.learnWord(sp.w) },
-                       { text: "Ignore spelling", icon: "\uF070", run: () => Clio.app.ignoreWord(sp.w) },
-                       { isSeparator: true }]);
+              .concat(Clio.app.spellTail(sp.w));
           }
           function menuItems() {
             const sel = body.selectionStart !== body.selectionEnd;

@@ -18,6 +18,10 @@ Scrollbar {
   id: rail
   required property Flickable target
   flick: rail.target
+  // Parented out of the view (to the pane, so it hugs the edge), a rail no
+  // longer hides with it: ceres' packages bar stood on the updates tab. It
+  // goes when its view goes.
+  on: rail.target.visible
   thickness: 10
   grabPad: 0
   handleWheel: false

@@ -733,7 +733,7 @@ PlatoSheet {
           if (picker.mode !== "files") return "";
           const avail = Math.max(8, Math.floor(width / (16 * 0.55)));
           return Artemis.highlightedPreview(Artemis.fitPath(item.modelData.preview, avail),
-            search.query);
+            search.query, { match: Zenon.hex(Zenon.magenta) });
         }
       }
 

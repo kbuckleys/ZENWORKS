@@ -6472,7 +6472,6 @@ FloatingWindow {
       onDrawnHChanged: root.noteSheet("bulk", cardInk, drawnX, drawnW, drawnY, drawnH)
       topInset: chrome.tabStrip.height + chrome.crumbBar.height
       leftInset: side.width
-      scrim: root.cardScrim
       wheelStep: root.wheelStep
       title: root.sheetTitle
       glyph: root.sheetGlyph

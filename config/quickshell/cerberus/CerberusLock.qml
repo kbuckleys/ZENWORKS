@@ -121,7 +121,10 @@ Scope {
   }
 
   //   input-field { font_color / check_color / fail_color = rgba(223,223,221,1) }
-  readonly property color fg: Zenon.white
+  // ...in the CLOCK's color (user, 2026-10-20, after a turn in the accent):
+  // the lock glyph, the dots, the check and the wait ripple are the clock's
+  // own voice, so they wear clockFg, whatever the theme.
+  readonly property color fg: clockFg
   //   the date label's own color = rgba(160,160,155,1)
   // THE LOCK SCREEN'S SECOND VOICE. The clock, the title and the play glyph
   // are the first — clockFg, white at 0.85. This is everything standing one
@@ -131,7 +134,14 @@ Scope {
   // is the kind of difference nobody chooses on purpose.
   // in a light theme the muted gray was too faint on the paper tint (user,
   // 2026-10-08): most of the way to the ink, still a step behind the clock
-  readonly property color dateFg: Zenon.light ? Zenon.mix(Zenon.ink, Zenon.muted, 0.3) : "#969daf"
+  // in a dark theme it was a fixed "#969daf" — Zenon's soft a fifth of the way
+  // to muted, written out, so every other theme got Zenon's gray. Now the same
+  // mix of the worn theme's slots (2026-10-20, user: the lock follows the palette)
+  // The grays are the ACCENT grays (2026-10-20, user): under Follow
+  // Background the plain ones are nearly colorless, so the lock read the
+  // same in every theme. The windows' chrome already wears these.
+  readonly property color dateFg: Zenon.light ? Zenon.mix(Zenon.ink, Zenon.accentMuted, 0.3)
+    : Zenon.mix(Zenon.accentSoft, Zenon.accentMuted, 0.2)
   //   input-field { size = 20%, 10%; outline_thickness = 0; inner_color = transparent }
   readonly property real fieldWidthFrac: Oracle.lockFieldWidth
   readonly property real fieldHeightFrac: 0.10
@@ -164,8 +174,8 @@ Scope {
   // The bar's clock face, worn here too. Named from Zenon rather than restated,
   // so there is one answer to "what does a clock look like in this shell".
   // Only the time takes it — DSEG has no month names in it.
-  readonly property color ghostFg:
-    Qt.rgba(root.clockFg.r, root.clockFg.g, root.clockFg.b, 0.13)
+  // The unlit segments are the accent's (2026-10-20): the lit ones stay ink.
+  readonly property color ghostFg: Zenon.alpha(Zenon.cyan, 0.13)
   //   ...lifted from hyprlock's 47 to open the gap between the segments and
   //   the date under them, which the larger clock had closed up.
   readonly property int clockBottom: 64
@@ -945,10 +955,12 @@ Scope {
         //   background { color = rgba(0,0,0,0.6) } — over the blur, not instead
         // In a light theme the tint is the theme's paper, not black: the
         // clock and the field are drawn in its dark ink and stand on it (the
-        // user asked, 2026-10-08). The same strength either way.
+        // user asked, 2026-10-08). The same strength either way. Dark themes
+        // wear their own ground too (2026-10-20) — black only in Zenon, whose
+        // ground it is; Nord's lock is Nord's night, not a black film over it.
         Rectangle {
           anchors.fill: parent
-          color: Zenon.light ? Zenon.alpha(Zenon.ground, root.shadeAlpha) : Qt.rgba(0, 0, 0, root.shadeAlpha)
+          color: Zenon.alpha(Zenon.ground, root.shadeAlpha)
         }
 
 
@@ -1433,7 +1445,7 @@ Scope {
                 text: NowPlaying.album
                 // Muted read too faint over a light lock (user, 2026-10-09):
                 // there it is a step past the artist's ink, not the full gray.
-                color: Zenon.light ? Zenon.mix(Zenon.ink, Zenon.muted, 0.6) : Zenon.muted
+                color: Zenon.light ? Zenon.mix(Zenon.ink, Zenon.accentMuted, 0.6) : Zenon.accentMuted
                 font.family: root.fontFamily
                 font.pixelSize: Zenon.px(14)
                 elide: Text.ElideRight

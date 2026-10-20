@@ -48,6 +48,7 @@ Working 1.0 Working.qml
 DialogButton 1.0 DialogButton.qml
 ScrollRail 1.0 ScrollRail.qml
 Sheet 1.0 Sheet.qml
+SheetDim 1.0 SheetDim.qml
 LayerPopup 1.0 LayerPopup.qml
 LayerPanel 1.0 LayerPanel.qml
 FocusRetry 1.0 FocusRetry.qml

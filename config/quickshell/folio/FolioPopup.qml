@@ -154,7 +154,7 @@ LayerPopup {
     // text cannot elide itself.
     const avail = Math.max(1, popup.panelTarget - popup.textBarW - 32);
     const p = textMetrics.elidedText(preview.slice(0, 2000), Qt.ElideRight, avail);
-    return Folio.highlightedPreview(p, popup.query);
+    return Folio.highlightedPreview(p, popup.query, Zenon.hex(Zenon.pink));
   }
   readonly property real textCellHeight: popup.textCellH
 
