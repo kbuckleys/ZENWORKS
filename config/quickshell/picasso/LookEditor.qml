@@ -44,9 +44,26 @@ Item {
     return k;
   }
 
+  // THE SHELL'S ACCENT (Oracle's Accent color), on the background card only
+  // (user, 2026-10-20) — not part of the look, and not staged with it: a
+  // choice here is the setting itself. `accent` is its value, "" the theme's.
+  property bool showAccent: false
+  property string accent: ""
+  // the accent's swatch ON: "" theme's, "accent" the picture's, "custom"
+  readonly property string accentKind: {
+    if (ed.accent === "") return "";
+    const own = Picasso.accentFor(ed.path);
+    return own && own.toLowerCase() === ed.accent ? "accent" : "custom";
+  }
+  // what the custom accent swatch holds when the accent is not one
+  property string customAccent: ""
+  signal accentChosen(string hex)
+  // the screen picker, for the accent
+  signal pickAccent()
+
   signal touched(string key, var value)
   signal resetLook()
-  // the color picker, for "tint" or "backdrop" — the owner shows it
+  // the color picker, for "tint", "backdrop" or "accent" — the owner shows it
   signal editColor(string which)
 
   readonly property bool tintIsCustom:
@@ -86,25 +103,6 @@ Item {
       }
       Ring { on: ed.kbRow === "backdrop" }
     }
-    Text {
-      visible: ed.showBackdrop && ed.fills
-      width: parent.width
-      wrapMode: Text.WordWrap
-      text: "Cropped or stretched, it fills the screen — this shows once it is fitted, centered or tiled"
-      color: Zenon.accentSoft
-      font.family: Zenon.face
-      font.weight: Zenon.weight
-      font.pixelSize: Zenon.px(13)
-    }
-    Text {
-      visible: ed.showBackdrop && ed.look.backdrop === "color"
-      text: "Click Color again to choose it"
-      color: Zenon.accentSoft
-      font.family: Zenon.face
-      font.weight: Zenon.weight
-      font.pixelSize: Zenon.px(13)
-    }
-
     Item { width: 1; height: ed.showBackdrop ? 6 : 0 }
 
     Slide {
@@ -227,6 +225,112 @@ Item {
       kbOn: ed.kbRow === "tintAmount"
       onMoved: (v) => ed.touched("tintAmount", v)
     }
+
+    // ── the shell's accent ──
+    // Laid out as the tint above it: a head, then a row of 30px swatches.
+    // The head's right end says what is worn — the hex, or the theme's.
+    // Choices are the theme's own, the picture's own color, one of your
+    // own (chosen again, it opens the picker), and, set apart as a tool
+    // rather than a color, a pixel off the screen. "Shell" says it is not
+    // the picture's: set at once, never staged with the look.
+    Item { width: 1; height: ed.showAccent ? 4 : 0 }
+    Item {
+      visible: ed.showAccent
+      width: parent.width
+      height: acHead.height
+      Head { id: acHead; text: "Shell accent" }
+      Text {
+        anchors.right: parent.right
+        anchors.verticalCenter: acHead.verticalCenter
+        text: ed.accent === "" ? "theme's own" : ed.accent
+        color: Zenon.accentSoft
+        font.family: ed.accent === "" ? Zenon.face : Zenon.faceMono
+        font.weight: Zenon.weight
+        font.pixelSize: Zenon.px(12)
+      }
+    }
+    Row {
+      visible: ed.showAccent
+      spacing: 6
+
+      Repeater {
+        model: ["", "accent", "custom"]
+        delegate: Rectangle {
+          id: ac
+          required property string modelData
+          readonly property string ink: ac.modelData === "" ? Zenon.hex(Zenon.themeAccent)
+            : ac.modelData === "accent" ? (Picasso.accentFor(ed.path) || "#777777")
+            : (ed.customAccent || Zenon.hex(Zenon.cyan))
+          readonly property bool on: ed.accentKind === ac.modelData
+          width: 30
+          height: 30
+          radius: height / 2
+          color: ac.ink
+          border.width: ac.on ? 2 : 1
+          border.color: ac.on ? Zenon.white : Zenon.wash(0.25)
+          // what each one is: the theme's (restore), the picture's (an
+          // image), yours (a palette — the picker opens on it)
+          Text {
+            anchors.centerIn: parent
+            text: ac.modelData === "" ? "\u{F099B}" : ac.modelData === "accent" ? "\u{F02E9}" : "\u{F03D8}"
+            color: Art.hexToHsv(ac.ink).v > 0.6 ? "#000000" : "#ffffff"
+            opacity: 0.85
+            font.family: Zenon.glyphFace
+            font.pixelSize: Zenon.px(14)
+          }
+          MouseArea {
+            anchors.fill: parent
+            hoverEnabled: ed.tips !== null
+            onContainsMouseChanged: if (ed.tips) containsMouse
+              ? ed.tips.show(ac, ({ "": "The theme's own",
+                                    accent: "This picture's color",
+                                    custom: ed.accentKind === "custom" ? "Choose the color" : "A color of your own" })[ac.modelData])
+              : ed.tips.hide(ac)
+            onClicked: {
+              if (ac.modelData === "custom" && ed.accentKind === "custom") ed.editColor("accent");
+              else ed.accentChosen(ac.modelData === "" ? "" : ac.ink);
+            }
+          }
+          Ring { on: ed.kbRow === "accent" && ac.on; radius: 18 }
+        }
+      }
+
+      // a hairline between the colors and the tool
+      Rectangle {
+        anchors.verticalCenter: parent.verticalCenter
+        width: 1
+        height: 18
+        color: Zenon.border
+      }
+
+      // off the screen: a tool, not a swatch — a ring with the eyedropper
+      Rectangle {
+        id: dropper
+        width: 30
+        height: 30
+        radius: height / 2
+        color: dropMa.pressed ? Zenon.pressWash(0.14) : dropMa.containsMouse ? Zenon.wash(0.1) : "transparent"
+        border.width: 1
+        border.color: Zenon.wash(0.25)
+        Behavior on color { ColorAnimation { duration: Zenon.fast; easing.type: Zenon.ease } }
+        Text {
+          anchors.centerIn: parent
+          text: "\u{F020A}"
+          color: Zenon.accentSoft
+          font.family: Zenon.glyphFace
+          font.pixelSize: Zenon.px(15)
+        }
+        MouseArea {
+          id: dropMa
+          anchors.fill: parent
+          hoverEnabled: true
+          onContainsMouseChanged: if (ed.tips) containsMouse
+            ? ed.tips.show(dropper, "Picker") : ed.tips.hide(dropper)
+          onClicked: ed.pickAccent()
+        }
+      }
+    }
+    Item { width: 1; height: ed.showAccent ? 2 : 0 }
 
     Text {
       text: "Reset look"

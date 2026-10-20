@@ -36,6 +36,20 @@ Item {
   readonly property string screenName: follow.screen ? follow.screen.name : ""
   readonly property string wallpaper: follow.screenName !== "" ? Picasso.wallpaperFor(follow.screenName) : ""
 
+  // ── RESET WITH BACKGROUND (Oracle's Accent color checkbox) ───────────
+  // A new picture on that monitor puts a custom accent back to the theme's.
+  // Not the first one seen (the shell starting), and not the picture the
+  // background card chose the accent for (Picasso.accentChosenFor).
+  property string lastWall: ""
+  onWallpaperChanged: {
+    const was = follow.lastWall;
+    follow.lastWall = follow.wallpaper;
+    if (was === "" || follow.wallpaper === "" || was === follow.wallpaper) return;
+    if (!Oracle.accentResetOnBackground || Oracle.accentColor === "") return;
+    if (Picasso.accentChosenFor === follow.wallpaper) return;
+    Oracle.reset("accentColor");
+  }
+
   // ── THE SLIDESHOW, IF IT IS NOT TO BE FOLLOWED ────────────────────────
   // With Follow the slideshow off, the picture showing when a slideshow on
   // this monitor began stays the one the theme is made from.

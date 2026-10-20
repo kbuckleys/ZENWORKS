@@ -187,7 +187,8 @@ Item {
   // the pictures rather than clipped by them: in a grid that is mostly
   // photographs, a mosaic could otherwise pass for one more photograph, and
   // the ring says "this holds things" at a glance, before the badge is read.
-  // Magenta because nothing else in either grid wears it.
+  // The ACCENT (user, 2026-10-20, after trying magenta again: "accent
+  // color is better") — it follows the theme and Oracle's Accent color.
   Rectangle {
     visible: cover.shown
     opacity: cover.dim
@@ -195,7 +196,7 @@ Item {
     radius: frame.radius
     color: "transparent"
     border.width: 2
-    border.color: Zenon.magenta
+    border.color: Zenon.cyan
   }
 
   // The badge: the directory's glyph on a dark disc in the corner, so a cover

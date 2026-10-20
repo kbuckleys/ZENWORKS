@@ -25,6 +25,7 @@
 import QtQuick
 import Quickshell
 import "../../morpheus"
+import "../../morpheus/controls" as Controls
 import "../../terminus"
 import "../../oracle/oracle.js" as Ora
 
@@ -437,30 +438,17 @@ PlatoSheet {
   }
 
   // ── controls (oracle's, at a sheet's size) ─────────────────────────
+  // the suite's one on/off, a tick (user, 2026-10-20: "scrap toggle")
   component SwitchBox: Item {
     id: sw
     property var spec: null
     property bool on: false
-    width: 40
+    width: 20
     height: 20
-    Rectangle {
-      id: track
-      anchors.fill: parent
-      radius: height / 2
-      color: sw.on ? Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b, 0.30) : Zenon.wash(0.07)
-      border.width: 1
-      border.color: sw.on ? Zenon.cyan : Zenon.border
-      Behavior on color { ColorAnimation { duration: Zenon.fast; easing.type: Zenon.ease } }
-      Rectangle {
-        width: 14
-        height: 14
-        radius: height / 2
-        y: 3
-        x: sw.on ? track.width - width - 3 : 3
-        color: sw.on ? Zenon.cyan : Zenon.accentMuted
-        Behavior on x { NumberAnimation { duration: Zenon.fast; easing.type: Zenon.ease } }
-        Behavior on color { ColorAnimation { duration: Zenon.fast; easing.type: Zenon.ease } }
-      }
+    Controls.Check {
+      anchors.centerIn: parent
+      enabled: false
+      lit: sw.on
     }
     MouseArea {
       anchors.fill: parent

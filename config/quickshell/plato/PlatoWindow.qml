@@ -447,6 +447,10 @@ FloatingWindow {
       if (win.treeGrew > 0) return;
       win.treeWant = win.width + Math.round(win.treeTarget);
     } else if (win.treeGrew > 0) win.treeWant = win.width - win.treeGrew;
+    // a tree that was already out when the window floated (it opened tiled,
+    // or with the tree on) never grew it, but hiding it must still give its
+    // width back, as terminus' does (user, 2026-10-20)
+    else if (sidebarBox.width > 0.5) win.treeWant = win.width - Math.round(sidebarBox.width);
     else return;
     win.following = true;
     win.keepW = win.width - sidebarBox.width;

@@ -14,7 +14,6 @@ Ring 1.0 Ring.qml
 Head 1.0 Head.qml
 Seg 1.0 Seg.qml
 Slide 1.0 Slide.qml
-Switch 1.0 Switch.qml
 LookEditor 1.0 LookEditor.qml
 Thumb 1.0 Thumb.qml
 CropBox 1.0 CropBox.qml

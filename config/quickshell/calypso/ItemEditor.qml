@@ -22,6 +22,7 @@
 
 import QtQuick
 import "../morpheus"
+import "../morpheus/controls" as Controls
 import "../terminus"
 import "../picasso"
 import "../delphi"
@@ -340,12 +341,13 @@ Item {
           onTextChanged: if (ed.st && ed.st.tags !== text) { ed.st.tags = text; ed.touch(); }
         }
       }
-      Switch {
+      Controls.Check {
+        height: 28
         visible: C.can(ed.info, "fav")
         width: parent.width
         label: "A favorite, in " + C.platform(ed.acct.kind).name + " too"
-        on: !!ed.st && ed.st.fav
-        onToggled: { ed.st.fav = !ed.st.fav; on = ed.st.fav; ed.touch(); }
+        lit: !!ed.st && ed.st.fav
+        onToggled: { ed.st.fav = !ed.st.fav; lit = ed.st.fav; ed.touch(); }
       }
     }
   }

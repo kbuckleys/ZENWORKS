@@ -63,6 +63,10 @@ Item {
     picker.edited(picker.shown);
   }
 
+  // the swatch and hex row under the bars; off where the caller shows the
+  // color and its hex itself (oracle's ColorFold), the square takes the room
+  property bool showField: true
+
   readonly property int barH: 14
   readonly property int rowH: 30
   readonly property int gap: 10
@@ -73,7 +77,8 @@ Item {
     anchors.left: parent.left
     anchors.right: parent.right
     anchors.top: parent.top
-    height: parent.height - picker.barH - picker.rowH - picker.gap * 2
+    height: parent.height - picker.barH - picker.gap
+      - (picker.showField ? picker.rowH + picker.gap : 0)
     radius: Zenon.windowRadius
     color: Qt.hsva(picker.h, 1, 1, 1)
 
@@ -163,6 +168,7 @@ Item {
 
   // ── the result, and its name ──────────────────────────────────────────
   Row {
+    visible: picker.showField
     anchors.left: parent.left
     anchors.bottom: parent.bottom
     height: picker.rowH

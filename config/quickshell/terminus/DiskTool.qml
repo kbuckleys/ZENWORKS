@@ -23,6 +23,7 @@
 import QtQuick
 import Quickshell.Io
 import "../morpheus"
+import "../morpheus/controls" as Controls
 import "../picasso"
 import "terminus.js" as Terminus
 
@@ -442,17 +443,19 @@ FocusScope {
         visible: !!tool.fmt
         x: 118
         spacing: 24
-        Switch {
+        Controls.Check {
+          height: 28
           width: 150
           visible: tool.target === "ntfs"
           label: "Quick format"
-          on: tool.quick
+          lit: tool.quick
           onToggled: tool.quick = !tool.quick
         }
-        Switch {
+        Controls.Check {
+          height: 28
           width: 170
           label: "Mount when done"
-          on: tool.mountAfter
+          lit: tool.mountAfter
           onToggled: tool.mountAfter = !tool.mountAfter
         }
       }

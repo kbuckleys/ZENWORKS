@@ -10,6 +10,7 @@
 import QtQuick
 import Quickshell
 import "../morpheus"
+import "../morpheus/controls" as Controls
 
 Item {
   // the terminus window — passed in by whoever makes one. NOT `root`:
@@ -80,36 +81,16 @@ Item {
     label: pref.hint
   }
 
-  // A SWITCH, not a tick. A tick says "chosen from a list" and these are not
-  // a list — they are four things that are each either on or off, and the
-  // knob moving is what makes flipping one feel like flipping a switch.
-  Rectangle {
+  // A TICK, the suite's one on/off (user, 2026-10-20: "scrap toggle") —
+  // it was a switch here, a second control for the same job. The row's
+  // MouseArea flips it; `enabled: false` keeps the box's own tap out of it,
+  // so one click is one flip (enabled2 is what dims a box).
+  Controls.Check {
     id: prefSwitch
     anchors.right: parent.right
     anchors.rightMargin: 14
     anchors.verticalCenter: parent.verticalCenter
-    width: 30
-    height: 16
-    radius: height / 2
-    color: pref.on
-      ? Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b, 0.32)
-      : Qt.rgba(Zenon.white.r, Zenon.white.g, Zenon.white.b, 0.07)
-    border.width: 1
-    border.color: pref.on ? Zenon.cyan : Zenon.border
-    Behavior on color { ColorAnimation { duration: Zenon.fast } }
-    Behavior on border.color { ColorAnimation { duration: Zenon.fast } }
-
-    Rectangle {
-      y: 3
-      x: pref.on ? parent.width - width - 3 : 3
-      width: 10
-      height: 10
-      radius: width / 2   // a knob: round whatever the window is
-      color: pref.on ? Zenon.cyan : Zenon.accentMuted
-      Behavior on x {
-        NumberAnimation { duration: Zenon.fast; easing.type: Zenon.ease }
-      }
-      Behavior on color { ColorAnimation { duration: Zenon.fast } }
-    }
+    enabled: false
+    lit: pref.on
   }
 }

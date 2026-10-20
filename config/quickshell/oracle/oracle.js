@@ -89,6 +89,11 @@ function coerce(spec, v) {
     return spec.fallback;
   }
   if (spec.type === "text") return String(v === null || v === undefined ? "" : v);
+  // a color: "#rrggbb", lower case, or "" for none of its own (the theme's)
+  if (spec.type === "color") {
+    const c = String(v === null || v === undefined ? "" : v).trim().toLowerCase();
+    return /^#[0-9a-f]{6}$/.test(c) ? c : "";
+  }
   // a key chord, spelled one way: see normChord
   if (spec.type === "chord") return normChord(v);
   // A SET OF DEVICE NAMES, kept as one string — "auto", "" for none, or the
@@ -258,6 +263,8 @@ function lightDevices(value, found) {
 function nudge(spec, v, dir) {
   if (!spec) return v;
   if (spec.type === "bool") return !v;
+  // nothing to step through: a color is picked, not nudged
+  if (spec.type === "color") return v;
   if (spec.type === "enum") {
     const opts = spec.options || [];
     if (opts.length === 0) return v;
@@ -313,6 +320,7 @@ function display(spec, v) {
     return String(v);
   }
   if (spec.type === "text") return String(v) === "" ? "—" : String(v);
+  if (spec.type === "color") return String(v) === "" ? (spec.none || "none") : String(v);
   if (spec.type === "chord") return normChord(v) === "" ? "off" : chordCaps(v).join(" ");
   // Without what solaar found, which only the panel has — see displayDevices.
   if (spec.type === "devices") return displayDevices(v, [], false);
@@ -419,8 +427,16 @@ function alsoShown(spec, get) {
 function filterSchema(schema, section, query) {
   const out = [];
   const q = String(query || "").trim();
+  // `alsoIn`: a second section shows the same row (Accent color, under
+  // Theme and again under Background) — one setting, counted in its own.
+  // There it stands after the row `alsoAfter` names, or last.
+  const guests = [];
   for (let i = 0; i < schema.length; ++i) {
     const s = schema[i];
+    if (q === "" && s.section !== section && s.alsoIn === section && !s.within) {
+      guests.push(s);
+      continue;
+    }
     // A query searches the WHOLE panel, not the section you happen to be
     // standing in. Looking for a setting is the case where you do not know
     // which section it is filed under — that is why you are typing.
@@ -429,6 +445,10 @@ function filterSchema(schema, section, query) {
     if (s.within) continue;
     if (!matches(s, q)) continue;
     out.push(s);
+  }
+  for (const g of guests) {
+    const at = out.findIndex((r) => r.key === g.alsoAfter);
+    if (at < 0) out.push(g); else out.splice(at + 1, 0, g);
   }
   return out;
 }
@@ -2053,6 +2073,34 @@ function bindGroupLabel(g) {
 
 // only what differs from binds.lua, in its order; ids the list no longer has
 // are dropped, so a bind taken out of binds.lua takes its override with it
+// ── WAKE ──
+// What brings screens turned off back: hypr/lua/wake.lua, `wake = "key"`
+// (any key) or "mouse" (a mouse move too), shown inline on binds.lua's
+// screensOff row ("Wake by", user 2026-10-20). base.lua reads it, so it
+// holds from login; key wake is always on.
+function wakeChoices() { return [["key", "key press"], ["mouse", "mouse or key press"]]; }
+function parseWakeLua(text) {
+  return parseDefaultsLua(text).wake === "mouse" ? "mouse" : "key";
+}
+function renderWakeLua(by) {
+  return [
+    "-- ┌─┐┌─┐┌┐┌┬ ┬┌─┐┬─┐┬┌─┌─┐",
+    "-- ┌─┘├┤ │││││││ │├┬┘├┴┐└─┐",
+    "-- └─┘└─┘┘└┘└┴┘└─┘┴└─┴ ┴└─┘",
+    "-- https://github.com/kbuckleys/",
+    "",
+    "-- WAKE",
+    "-- Written by oracle's Shortcuts section (Wake by, on Lock and suspend",
+    "-- screen), and read back by it. What turns screens that were turned off",
+    "-- back on: \"key\" any key press, \"mouse\" a mouse move or a key press.",
+    "",
+    "return {",
+    "\twake = " + luaString(by === "mouse" ? "mouse" : "key") + ",",
+    "}",
+    "",
+  ].join("\n");
+}
+
 function renderKeysLua(values, binds) {
   const lines = [
     "-- ┌─┐┌─┐┌┐┌┬ ┬┌─┐┬─┐┬┌─┌─┐",

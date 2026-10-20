@@ -44,13 +44,19 @@ hl.define_submap("oracle-keys", function()
 end)
 
 -- SYSTEM
-bind("shutdown",    "SUPER + SHIFT + ESCAPE",  "Shut down",               hl.dsp.exec_cmd("hyprshutdown"), { locked = true })
+bind("lock",        "SUPER + ESCAPE",          "Lock the screen",         hl.dsp.exec_cmd("qs ipc call Cerberus lock"))
+-- locks, then the screens go off a second late: base.lua wakes them on any
+-- key event (a mouse move too, by wake.lua), and letting go of these keys
+-- is one, so off at once would not last. Woken, they show the lock.
+bind("screensOff",  "SUPER + SHIFT + ESCAPE",  "Lock and suspend screen", hl.dsp.exec_cmd([[qs ipc call Cerberus lock; sleep 1; hyprctl dispatch 'hl.dsp.dpms({ action = "disable" })']]))
 
 -- off until given a chord in oracle's Shortcuts
-bind("lock",        "",                        "Lock the screen",         hl.dsp.exec_cmd("qs ipc call Cerberus lock"))
-bind("screensOff",  "",                        "Turn the screens off",    hl.dsp.dpms({ action = "disable" }))
+bind("shutdown",    "",                        "Shutdown",                hl.dsp.exec_cmd("hyprshutdown -p 'systemctl poweroff'"))
 bind("awake",       "",                        "Keep the machine awake",  hl.dsp.exec_cmd("qs ipc call Socordia awake"))
 bind("logout",      "",                        "Log out of hyprland",     hl.dsp.exit())
+
+-- hyprshutdown closes every app and then hyprland itself
+bind("terminate",   "SUPER + SHIFT + F1",      "Terminate hyprland",      hl.dsp.exec_cmd("hyprshutdown"), { locked = true })
 
 -- APPS
 bind("terminal",       "SUPER + RETURN",     "Open the terminal",              hl.dsp.exec_cmd(term))

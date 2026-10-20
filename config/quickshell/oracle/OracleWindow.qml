@@ -100,6 +100,10 @@ FloatingWindow {
   // to lose the dot entirely.
   readonly property color highlight: Zenon.cyan
   readonly property color changedColor: Zenon.yellow
+  // a row's name wears the accent, drawn from ink as the chrome's grays are
+  // (accentGreyMix); its description stays a plain gray of the same weight
+  readonly property color titleColor: Zenon.accentInk
+  readonly property color helpColor: Zenon.mix(Zenon.muted, Zenon.soft, Zenon.accentGreyMix)
   readonly property color errColor: Zenon.red
 
   readonly property string face: Zenon.face
@@ -600,49 +604,29 @@ FloatingWindow {
   // already know; the reply that matters is the value moving, and every one of
   // these gives you that on the frame you click.
 
-  // A track and a knob. The whole control is the hit area, because a switch
-  // that only answers to its own 18 pixels is a switch you miss.
+  // A TICK, the suite's one on/off (user, 2026-10-20: "scrap toggle") — it
+  // was a track and a knob, a second control for the same job. In the
+  // highlight, as every other lit control here. Its MouseArea reaches past
+  // the 18px box, which on its own is a box you miss; `enabled: false`
+  // keeps the box's own tap out of it, so one click is one flip.
   component BoolControl: Item {
     id: sw
     property var spec: null
     property bool value: false
-    width: 44
+    width: 24
     height: 24
 
-    Rectangle {
-      id: track
+    Controls.Check {
+      id: box
       anchors.right: parent.right
       anchors.verticalCenter: parent.verticalCenter
-      width: 44
-      height: 22
-      radius: height / 2
-      // ON is the same fact every other lit control reports — the thing in
-      // hand — so it wears the same cyan rather than a green of its own. A
-      // second accent that appears only on switches makes a column of them
-      // read as a different kind of control from everything beside it.
-      color: sw.value
-        ? Qt.rgba(popup.highlight.r, popup.highlight.g, popup.highlight.b, 0.30)
-                      : Zenon.wash(0.07)
-      border.width: 1
-      border.color: sw.value ? popup.highlight : Zenon.border
-      Behavior on color { ColorAnimation { duration: Zenon.fast; easing.type: Zenon.ease } }
-      Behavior on border.color { ColorAnimation { duration: Zenon.fast; easing.type: Zenon.ease } }
-
-      Rectangle {
-        width: 16
-        height: 16
-        radius: height / 2
-        y: 3
-        x: sw.value ? track.width - width - 3 : 3
-        color: sw.value ? popup.highlight : popup.dimColor
-        Behavior on x { NumberAnimation { duration: Zenon.fast; easing.type: Zenon.ease } }
-        Behavior on color { ColorAnimation { duration: Zenon.fast; easing.type: Zenon.ease } }
-      }
+      enabled: false
+      lit: sw.value
+      ink: popup.highlight
     }
 
-    // only over the switch itself, not the whole empty column beside it
     MouseArea {
-      anchors.fill: track
+      anchors.fill: box
       anchors.margins: -10
       onClicked: Oracle.set(sw.spec.key, !sw.value)
     }
@@ -1166,14 +1150,42 @@ FloatingWindow {
   // waits: hyprland is held off its binds (Oracle.beginCapture) and the next
   // press is the new chord — Esc keeps the old one, Backspace or Delete
   // alone turns the bind off, and a modifier held with a click on the chip is
-  // a mouse bind. Oracle refuses a chord another bind has.
+  // a mouse bind. Oracle refuses a chord another bind has, and says whose
+  // under the row's name (Oracle.bindRefusal).
   component ChordControl: Item {
     id: ch
     property var spec: null
     property var value: null
     readonly property bool waiting: !!ch.spec && Oracle.capturing === ch.spec.key
-    width: chordChip.width
+    width: chordChip.width + (wakeRow.visible ? wakeRow.width + 16 : 0)
     height: 28
+
+    // WAKE BY (user, 2026-10-20), on the screens-off bind only: what brings
+    // them back, beside the chord that puts them out — see Ora's WAKE
+    Row {
+      id: wakeRow
+      visible: !!ch.spec && !!ch.spec.wake
+      anchors.right: chordChip.left
+      anchors.rightMargin: 16
+      anchors.verticalCenter: parent.verticalCenter
+      spacing: 10
+      Text {
+        anchors.verticalCenter: parent.verticalCenter
+        text: "Wake by"
+        color: popup.dimColor
+        font.family: popup.face
+        font.weight: Font.Medium
+        font.pixelSize: Zenon.px(14)
+      }
+      Segments {
+        anchors.verticalCenter: parent.verticalCenter
+        textSize: Zenon.px(13)
+        pad: 20
+        options: Ora.wakeChoices()
+        current: Oracle.wakeBy
+        onChose: (v) => Oracle.setWakeBy(v)
+      }
+    }
 
     Rectangle {
       id: chordChip
@@ -1186,7 +1198,9 @@ FloatingWindow {
         ? Qt.rgba(popup.highlight.r, popup.highlight.g, popup.highlight.b, 0.18)
         : Zenon.wash(0.06)
       border.width: 1
-      border.color: ch.waiting ? popup.highlight : Zenon.border
+      border.color: ch.waiting ? popup.highlight
+        : (Oracle.bindRefusal && ch.spec && Oracle.bindRefusal.key === ch.spec.key) ? popup.errColor
+        : Zenon.border
       Behavior on color { ColorAnimation { duration: Zenon.fast; easing.type: Zenon.ease } }
       Behavior on border.color { ColorAnimation { duration: Zenon.fast; easing.type: Zenon.ease } }
 
@@ -1259,6 +1273,70 @@ FloatingWindow {
       }
       // the window let go of the keyboard: the wait is over too
       onActiveFocusChanged: if (!activeFocus && ch.waiting) Oracle.endCapture()
+    }
+  }
+
+  // ── A COLOR ──────────────────────────────────────────────────────────
+  // A swatch of what is worn and its hex — the theme's own, said so, when
+  // the setting is empty. A click folds the row open on its picker
+  // (ColorFold), as a click anywhere on the row does.
+  component ColorControl: Item {
+    id: cc
+    property var spec: null
+    property string value: ""
+    property bool open: false
+    // as wide as what it says (user, 2026-10-20: the control's full width
+    // was far too wide for a hex), and its `also` checkbox before it
+    width: ccChip.x + ccChip.width
+    height: 28
+    // the spec's `also` bool (Accent color's "Reset with background"): a
+    // checkbox beside the chip, labeled with its own spec's label
+    readonly property var alsoSpec: {
+      const k = cc.spec ? Ora.alsoKeys(Oracle.spec(cc.spec.key) || cc.spec) : [];
+      const sp = k.length ? Oracle.spec(k[0]) : null;
+      return sp && sp.type === "bool" ? sp : null;
+    }
+    Controls.Check {
+      id: ccCheck
+      visible: cc.alsoSpec !== null
+      anchors.verticalCenter: parent.verticalCenter
+      label: cc.alsoSpec ? cc.alsoSpec.label : ""
+      lit: (Oracle.revision, cc.alsoSpec ? Oracle.get(cc.alsoSpec.key) === true : false)
+      onToggled: Oracle.set(cc.alsoSpec.key, !ccCheck.lit)
+    }
+    // the color it stands for now: yours, or the theme's (the accent is the
+    // only color setting there is; another would name its own fallback)
+    readonly property color swatch: cc.value !== "" ? cc.value : Zenon.themeAccent
+
+    // no dot: the outline IS the swatch, always in the color (user)
+    Rectangle {
+      id: ccChip
+      x: ccCheck.visible ? ccCheck.width + 24 : 0
+      width: Math.max(96, ccText.implicitWidth + 28)
+      height: parent.height
+      radius: Zenon.radiusControl
+      color: (cc.open || ccMa.pressed)
+        ? Qt.rgba(cc.swatch.r, cc.swatch.g, cc.swatch.b, 0.18)
+        : Zenon.wash(0.06)
+      border.width: 1
+      border.color: cc.swatch
+      Behavior on color { ColorAnimation { duration: Zenon.fast; easing.type: Zenon.ease } }
+      Behavior on border.color { ColorAnimation { duration: Zenon.fast; easing.type: Zenon.ease } }
+
+      Text {
+        id: ccText
+        anchors.centerIn: parent
+        text: cc.value !== "" ? cc.value : Ora.display(cc.spec, "")
+        color: cc.value === "" ? popup.dimColor : popup.fgColor
+        font.family: popup.face
+        font.weight: Font.Medium
+        font.pixelSize: Zenon.px(15)
+      }
+      MouseArea {
+        id: ccMa
+        anchors.fill: parent
+        onClicked: popup.unfolded = cc.open ? "" : cc.spec.key
+      }
     }
   }
 
@@ -2120,8 +2198,10 @@ FloatingWindow {
                   width: parent.width
                   height: item ? item.implicitHeight : 0
                   active: settingRow.fold && (settingRow.open || settingRow.height > rowHead.height)
-                  source: ({ computer: "ComputerPanel.qml", tools: "ToolsPanel.qml" })[settingRow.spec.fold] || ""
+                  source: ({ computer: "ComputerPanel.qml", tools: "ToolsPanel.qml",
+                             color: "ColorFold.qml" })[settingRow.spec.fold] || ""
                   onLoaded: {
+                    if (settingRow.spec.fold === "color") item.key = settingRow.spec.key;
                     item.face = Qt.binding(() => popup.face);
                     item.fgColor = Qt.binding(() => popup.fgColor);
                     item.dimColor = Qt.binding(() => popup.dimColor);
@@ -2222,7 +2302,7 @@ FloatingWindow {
                         ? Ora.markMatch(settingRow.spec.label, popup.query, popup.highlight)
                         : settingRow.spec.label
                       color: settingRow.moved ? popup.changedColor
-                        : settingRow.monitorHead ? settingRow.accent : Zenon.white
+                        : settingRow.monitorHead ? settingRow.accent : popup.titleColor
                       font.family: popup.face
                       font.weight: settingRow.monitorHead ? Font.DemiBold : Font.Medium
                       font.pixelSize: Zenon.px(17)
@@ -2231,7 +2311,10 @@ FloatingWindow {
                         id: resetMa
                         anchors.fill: parent
                         anchors.margins: -4
-                        enabled: settingRow.moved
+                        // not on a row that folds: there the name opens it
+                        // (user, 2026-10-20 — a click to open the Accent
+                        // color reset it), and the restore glyph resets
+                        enabled: settingRow.moved && !settingRow.fold && !settingRow.groupHead
                         hoverEnabled: enabled
                         onClicked: {
                           popup.hideTip();
@@ -2277,6 +2360,12 @@ FloatingWindow {
                     // RESTORE DEFAULT, said with a glyph beside the name
                     // (U+E612, the user's pick): the colored name is a way
                     // back too, but nothing on it says so. Only while moved.
+                    // clear of a fold's chevron, so the two read as two
+                    Item {
+                      visible: settingRow.moved && (settingRow.fold || settingRow.groupHead)
+                      width: 6
+                      height: 1
+                    }
                     Item {
                       visible: settingRow.moved
                       width: restoreGlyph.implicitWidth + 8
@@ -2354,10 +2443,27 @@ FloatingWindow {
                     lineHeight: 1.1
                     // The help line is not a footnote — it is the half of the
                     // row that says what the setting actually does, and at 12
-                    // against a 17px label it read as one.
-                    color: popup.dimColor
+                    // against a 17px label it read as one. A plain gray: the
+                    // accent is the TITLE's (user, 2026-10-20 — a green accent
+                    // turned every description green)
+                    color: popup.helpColor
                     font.family: popup.face
                     font.weight: Zenon.weight
+                    font.pixelSize: Zenon.px(14)
+                  }
+
+                  // A CHORD REFUSED AS A DUPE, said here rather than in a
+                  // toast (user, 2026-10-20): whose it is, under the name
+                  Text {
+                    width: parent.width
+                    readonly property var refusal: Oracle.bindRefusal
+                    visible: !!refusal && refusal.key === settingRow.spec.key
+                    text: visible ? refusal.text : ""
+                    wrapMode: Text.Wrap
+                    lineHeight: 1.1
+                    color: popup.errColor
+                    font.family: popup.face
+                    font.weight: Font.Medium
                     font.pixelSize: Zenon.px(14)
                   }
                 }
@@ -2395,6 +2501,7 @@ FloatingWindow {
                       if (t === "action") return actionComp;
                       if (t === "chord") return chordComp;
                       if (t === "info") return infoComp;
+                      if (t === "color") return colorComp;
                       return numComp;
                     }
                   }
@@ -2539,6 +2646,10 @@ FloatingWindow {
                                   value: String(settingRow.live) } }
                   Component { id: actionComp
                     ActionControl { spec: settingRow.spec } }
+                  Component { id: colorComp
+                    ColorControl { spec: settingRow.spec
+                                   value: String(settingRow.live || "")
+                                   open: settingRow.open } }
                   Component { id: chordComp
                     ChordControl { spec: settingRow.spec; value: settingRow.live } }
                   Component { id: infoComp

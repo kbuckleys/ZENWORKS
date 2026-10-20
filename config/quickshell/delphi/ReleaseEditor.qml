@@ -17,6 +17,7 @@
 import QtQuick
 import Quickshell
 import "../morpheus"
+import "../morpheus/controls" as Controls
 import "../terminus"
 import "../picasso"
 import "delphi.js" as D
@@ -124,18 +125,18 @@ Item {
     Row {
       visible: ed.page && ed.page.drafts
       spacing: 28
-      Switch {
+      Controls.Check {
         width: 300
         height: 26
         label: "A draft — only you see it, until published"
-        on: !!ed.e && ed.e.draft
+        lit: !!ed.e && ed.e.draft
         onToggled: ed.page.setEdit("draft", !ed.e.draft)
       }
-      Switch {
+      Controls.Check {
         width: 200
         height: 26
         label: "A pre-release"
-        on: !!ed.e && ed.e.prerelease
+        lit: !!ed.e && ed.e.prerelease
         onToggled: ed.page.setEdit("prerelease", !ed.e.prerelease)
       }
     }

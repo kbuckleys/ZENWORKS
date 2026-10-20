@@ -180,6 +180,15 @@ Singleton {
   // without one, 07:00 and 19:00.
   property string themeDay: "zenon-light"
   property string themeNight: "zenon"
+
+  // ── ACCENT COLOR ──────────────────────────────────────────────────
+  // "#rrggbb" laid over whatever theme is worn — Zenon, a file, Follow
+  // Background, Follow Daytime's day and night alike — as its accent (the
+  // cyan slot; Zenon.cyan). "" is the theme's own.
+  property string accentColor: ""
+  // a new background (the main monitor's, as Follow Background reads it)
+  // puts the accent back to the theme's — picasso/FollowBackground
+  property bool accentResetOnBackground: false
   // The Save button: the window asks for a name (nameFollowRequested, a
   // sheet pre-filled with followSuggest — the picture's name, which
   // picasso/FollowBackground keeps here), then saveFollowRequested carries
@@ -780,6 +789,19 @@ Singleton {
     { key: "themeNight", section: "look", alias: "follow daytime the sun night dark theme sunset",
       label: "Follow Daytime by night", type: "enum", optionsFrom: "themesNoSun", open: true, chipW: 208,
       help: "Only while the theme is Follow Daytime: what it wears from sunset to sunrise." },
+    // A color of your own for the accent, over any theme (user, 2026-10-20).
+    // Folds open on a color picker (ColorFold); shown again under Background
+    // (`alsoIn`), beside Follow Background, whose accent it also replaces.
+    { key: "accentColor", section: "look", alsoIn: "paper", alsoAfter: "followVivid", fold: "color",
+      also: ["accentResetOnBackground"],
+      alias: "accent colour color highlight custom manual picker tint theme",
+      label: "Accent color", type: "color", none: "Theme's own",
+      help: "The color the shell highlights with, whatever theme is worn, Follow Background and Follow Daytime included. Click to pick one; put it back and the theme's own returns." },
+    // drawn as the Accent color row's checkbox (`within`), not a row of its own
+    { key: "accentResetOnBackground", section: "look", within: "accentColor",
+      alias: "accent colour color reset background wallpaper change",
+      label: "Reset with background", type: "bool",
+      help: "A new background puts the accent back to the theme's own." },
     // with the other theme rows, not under Background (user, 2026-10-12):
     // what it makes is a theme, and it lands in the Theme list above
     // (marked there with U+F2C0, its light mark kept — Ora.themeOptions)
@@ -1958,6 +1980,15 @@ Singleton {
   readonly property string hyprLuaDir:
     (Quickshell.env("XDG_CONFIG_HOME") || (Quickshell.env("HOME") + "/.config")) + "/hypr/lua"
   readonly property string keysPath: root.hyprLuaDir + "/keys.lua"
+  // hypr/lua/wake.lua: "key" or "mouse" — see Ora's WAKE
+  property string wakeBy: "key"
+  function setWakeBy(v) {
+    const by = v === "mouse" ? "mouse" : "key";
+    if (by === root.wakeBy) return;
+    root.wakeBy = by;
+    wakeFile.setText(Ora.renderWakeLua(by));
+    reloadHypr.restart();
+  }
   // what binds.lua declares: [{ id, chord, label, group }]
   property var bindList: []
   // "bind:<id>" -> the chord in force ("" off)
@@ -1968,6 +1999,14 @@ Singleton {
   property var liveBinds: []
   // the row waiting for a chord, while hyprland sits in the empty submap
   property string capturing: ""
+  // a chord refused as a dupe: { key, text } for the row to show inline,
+  // until the next try or six seconds pass
+  property var bindRefusal: null
+  Timer {
+    id: refusalTimer
+    interval: 6000
+    onTriggered: root.bindRefusal = null
+  }
 
   function keysSpecs() {
     const out = [];
@@ -1982,7 +2021,10 @@ Singleton {
       }
       out.push({ key: "bind:" + b.id, section: "keys", type: "chord", bindKey: true, inGroup: b.group,
         bindId: b.id, bindDefault: b.chord, label: b.label,
-        alias: "shortcut keybind key bind chord " + Ora.bindGroupLabel(b.group) + " " + b.chord.toLowerCase() });
+        // screens turned off wear their wake choice beside the chord
+        wake: b.id === "screensOff",
+        alias: "shortcut keybind key bind chord " + Ora.bindGroupLabel(b.group) + " " + b.chord.toLowerCase()
+          + (b.id === "screensOff" ? " wake mouse dpms" : "") });
     }
     return out;
   }
@@ -2011,11 +2053,14 @@ Singleton {
     if (Ora.same(root.keyValues[s.key], v)) return;
     const who = Ora.chordTaken(v, s.bindId, root.bindList, root.bindChords(), root.liveBinds);
     if (who !== "") {
-      Quickshell.execDetached(["notify-send", "-a", "oracle", "Shortcuts",
-        Ora.chordCaps(v).join(" ") + " is already " + who + ". Nothing was changed."]);
+      // said in the row itself, under its name — see OracleWindow's labels
+      root.bindRefusal = { key: s.key,
+        text: Ora.chordCaps(v).join(" ") + " is already " + who + ". Nothing was changed." };
+      refusalTimer.restart();
       root.revision++;
       return;
     }
+    root.bindRefusal = null;
     const next = ({});
     for (const k in root.keyValues) next[k] = root.keyValues[k];
     next[s.key] = v;
@@ -2050,6 +2095,7 @@ Singleton {
   function beginCapture(key) {
     if (root.capturing === "") Hyprland.dispatch(Hypr.submap("oracle-keys"));
     root.capturing = key;
+    root.bindRefusal = null;
     captureTimeout.restart();
   }
   function endCapture(chord) {
@@ -2099,6 +2145,21 @@ Singleton {
       if (root.defaultsTaken) root.buildSchema();
       liveBindsTimer.restart();
     }
+  }
+
+  FileView {
+    id: wakeFile
+    path: root.hyprLuaDir + "/wake.lua"
+    blockLoading: true
+    printErrors: false
+    watchChanges: true
+    onFileChanged: reload()
+    // FileView's own write never fires loaded: setWakeBy sets wakeBy itself
+    onLoaded: {
+      const by = Ora.parseWakeLua(wakeFile.text());
+      if (by !== root.wakeBy) { root.wakeBy = by; reloadHypr.restart(); }
+    }
+    onLoadFailed: root.wakeBy = "key"
   }
 
   FileView {

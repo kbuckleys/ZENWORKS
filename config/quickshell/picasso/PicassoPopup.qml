@@ -256,7 +256,9 @@ LayerPopup {
   // dismisses this popup — the compositor takes the focus grab away, and the
   // backdrop area is sitting there waiting for a click. The list would stop
   // dead halfway down with the picker gone.
-  readonly property bool capturing: gridScroll.dragging
+  // and while the screen picker is choosing the card's accent: its overlay
+  // takes the focus, and the card must still be there when it hands back
+  readonly property bool capturing: gridScroll.dragging || Picasso.pickInto === "card:accent"
 
   // A clear that arrived mid-gesture was SWALLOWED, and a swallowed grab is
   // still a lost one: it has to be taken again when the gesture ends, or
@@ -1233,10 +1235,13 @@ LayerPopup {
     }
   }
 
-  // is this file currently painted on any monitor
+  // is this file currently painted on any monitor. Asked per CONNECTED
+  // monitor, not of every value in the assignment: the "*" fallback outlives
+  // the moment every monitor got an override of its own, and an unplugged
+  // monitor's key stays too — both used to mark old backgrounds as current.
   function inUse(path) {
-    const a = Picasso.assignment;
-    for (const k in a) if (a[k] === path) return true;
+    for (let i = 0; i < popup.screenNames.length; ++i)
+      if (Picasso.wallpaperFor(popup.screenNames[i]) === path) return true;
     return false;
   }
 

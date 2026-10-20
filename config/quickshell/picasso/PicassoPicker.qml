@@ -54,7 +54,16 @@ Scope {
   onActiveChanged: {
     Picasso.showCursor(!picker.active);
     if (picker.active) { picker.startAt = Qt.point(-1, -1); cursorProc.running = true; }
+    else Picasso.pickInto = "";
   }
+
+  // a click's color: back to whoever asked (Picasso.pickFor), or copied
+  function take(r, g, b) {
+    if (Picasso.pickInto !== "") Picasso.colorPicked(Picasso.pickInto, Cap.format(r, g, b, "hex"));
+    else picker.copy(r, g, b);
+  }
+  // a caller wants one color: shift's "and stay" is for the clipboard
+  readonly property bool forCaller: Picasso.pickInto !== ""
 
   Process {
     id: cursorProc
@@ -235,8 +244,8 @@ Scope {
         onClicked: (m) => {
           if (m.button === Qt.RightButton) { picker.active = false; return; }
           if (!pane.rgb) return;
-          picker.copy(pane.rgb.r, pane.rgb.g, pane.rgb.b);
-          if (!(m.modifiers & Qt.ShiftModifier)) picker.active = false;
+          picker.take(pane.rgb.r, pane.rgb.g, pane.rgb.b);
+          if (picker.forCaller || !(m.modifiers & Qt.ShiftModifier)) picker.active = false;
         }
         onWheel: (w) => {
           picker.stepScheme(w.angleDelta.y > 0 ? -1 : 1);
@@ -259,7 +268,7 @@ Scope {
           else if (e.key === Qt.Key_Down)  { e.accepted = true; pane.nudge(0, 1); }
           else if ((e.key === Qt.Key_Return || e.key === Qt.Key_Enter) && pane.rgb) {
             e.accepted = true;
-            picker.copy(pane.rgb.r, pane.rgb.g, pane.rgb.b);
+            picker.take(pane.rgb.r, pane.rgb.g, pane.rgb.b);
             picker.active = false;
           }
         }

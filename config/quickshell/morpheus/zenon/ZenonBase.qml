@@ -94,6 +94,7 @@ QtObject {
   // waits for this.
   property int themeEpoch: 0
   onThemeChanged: themeSettle.restart()
+  onAccentOwnChanged: themeSettle.restart()
   readonly property Timer themeSettle: Timer { interval: 300; onTriggered: root.themeEpoch++ }
   readonly property bool light: theme.mode === "light"
 
@@ -130,14 +131,27 @@ QtObject {
   // the type set ON an accent fill — a selected row's cyan, a kill
   // button's red, the selection in a field. Black on Zenon's pastels; a
   // theme with deep accents wants it light.
-  readonly property color onAccent:  pick("onAccent")
+  // Under an accent of your own (below) the theme's onAccent was chosen for
+  // ITS accent, not yours: the type goes to the theme's darker or lighter
+  // end, whichever stands out on the color picked.
+  readonly property color onAccent: {
+    if (accentOwn === "") return pick("onAccent");
+    const g = pick("ground"), k = pick("ink");
+    const dk = lum(g) <= lum(k) ? g : k, lt = dk === g ? k : g;
+    return (lum(cyan) + 0.05) / (lum(dk) + 0.05) >= (lum(lt) + 0.05) / (lum(cyan) + 0.05) ? dk : lt;
+  }
+  // relative luminance (WCAG), for the choice above
+  function lum(c) {
+    const f = (v) => v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+    return 0.2126 * f(c.r) + 0.7152 * f(c.g) + 0.0722 * f(c.b);
+  }
   // ── THE THEME AS PLATO'S NVIM TAKES IT ───────────────────────────────
   // The resolved colors under Zenon's slot names, as #rrggbb (nvim's have
   // no alpha), or null for Zenon itself, which nvim already is. One answer
   // for the live editor (PlatoWindow) and for every preview rendered by
   // plato/nvim/render.lua — terminus' pane, quick look, plato's file cards.
   function nvimTheme() {
-    if (themeName === "zenon" || !theme.colors) return null;
+    if (accentOwn === "" && (themeName === "zenon" || !theme.colors)) return null;
     const slots = ["ground", "surface", "ink", "muted", "soft", "red", "green", "yellow",
                    "blue", "magenta", "cyan", "pink", "sand", "border"];
     const colors = {};
@@ -287,7 +301,15 @@ QtObject {
   // palette.link (else the system's #0000ff)
   readonly property color link: cyan
   readonly property color magenta: pick("magenta")
-  readonly property color cyan:    pick("cyan")
+  // ACCENT COLOR (Oracle, user 2026-10-20): a color of your own over any
+  // theme's accent — Follow Background's too. "" is the theme's own.
+  readonly property string accentOwn: {
+    const v = cfg.accentColor;
+    return typeof v === "string" && /^#[0-9a-fA-F]{6}$/.test(v) ? v : "";
+  }
+  readonly property color cyan:    accentOwn !== "" ? accentOwn : themeAccent
+  // the worn theme's accent, whatever Accent color says
+  readonly property color themeAccent: pick("cyan")
   readonly property color pink:    pick("pink")   // bright_red
   readonly property color sand:    pick("sand")   // bright_yellow
 
@@ -318,7 +340,7 @@ QtObject {
   // all but unreadable (user, colors.png, 2026-10-08): there it is muted.
   readonly property color dimInk: light ? muted : dim
 
-  readonly property color sparkFill: pick("sparkFill")
+  readonly property color sparkFill: accentOwn !== "" ? alpha(cyan, 0.2) : pick("sparkFill")
 
   // ── a layer's own furniture ──────────────────────────────────────────
   // Every popup layer was carrying its own copy of these four hexes. They are

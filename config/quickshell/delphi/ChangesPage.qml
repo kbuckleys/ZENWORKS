@@ -29,6 +29,7 @@
 import QtQuick
 import Quickshell
 import "../morpheus"
+import "../morpheus/controls" as Controls
 import "../terminus"
 import "../picasso"
 import "delphi.js" as D
@@ -699,7 +700,7 @@ Item {
         onEscaped: pg.area = "list"
         onTabbed: pg.area = "list"
       }
-      Switch {
+      Controls.Check {
         anchors.left: msgWell.left
         anchors.top: msgWell.bottom
         anchors.topMargin: 16
@@ -707,7 +708,7 @@ Item {
         height: 28
         // short: the undo glyph and Commit share the row (2026-10-14)
         label: "Amend last"
-        on: pg.amend
+        lit: pg.amend
         onToggled: pg.amend = !pg.amend
       }
       // UNDO THE LAST COMMIT (user, 2026-10-14): what it changed staged

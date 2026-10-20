@@ -6,7 +6,7 @@
 // A QUESTION THAT WANTS SOMETHING TYPED — delphi's, inside its Sheet. Not a
 // card of its own: it is the suite's confirmation card (terminus/ConfirmBody)
 // with the fields in its slot — terminus' BulkField for a line of text,
-// ceres' PasswordField for a secret, picasso's Switch for a yes/no — so a
+// ceres' PasswordField for a secret, morpheus' Check for a yes/no — so a
 // branch name is asked for the way a deletion is confirmed.
 //
 //     form = { title, glyph, ink, detail,
@@ -33,6 +33,7 @@
 
 import QtQuick
 import "../morpheus"
+import "../morpheus/controls" as Controls
 import "../terminus"
 import "../picasso"
 import "../ceres"
@@ -340,16 +341,16 @@ Item {
     }
     Repeater {
       model: fb.toggles
-      delegate: Switch {
+      delegate: Controls.Check {
         id: sw
         required property var modelData
         width: body.width - 36
         height: 26
         label: sw.modelData.label
-        on: !!fb.flags[sw.modelData.key]
+        lit: !!fb.flags[sw.modelData.key]
         onToggled: {
           const t = Object.assign({}, fb.flags);
-          t[sw.modelData.key] = !sw.on;
+          t[sw.modelData.key] = !sw.lit;
           fb.flags = t;
         }
       }

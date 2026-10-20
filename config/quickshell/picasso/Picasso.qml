@@ -76,6 +76,15 @@ Singleton {
   // an annotation straight from its context menu).
   signal shotRequested(string mode)
   signal pickRequested()
+  // THE PICKER FOR A CALLER (oracle's Accent color, 2026-10-20): asked
+  // through pickFor(into), a click hands the color back as colorPicked(into,
+  // "#rrggbb") instead of copying it. `into` names who asked, so only they
+  // take it; "" is the plain picker, which copies.
+  property string pickInto: ""
+  // the picture the background card chose an accent FOR: applying it must
+  // not undo that accent (Oracle's "Reset with background")
+  property string accentChosenFor: ""
+  signal colorPicked(string into, string hex)
   signal annotateRequested(string path)
   // ── THE VIEWER ───────────────────────────────────────────────────────
   // Every picture on the machine, not only the backgrounds: PicassoViewer
@@ -107,7 +116,8 @@ Singleton {
   function showCursor(visible) { Quickshell.execDetached(["sh", "-c", root.cursorCmd(visible)]); }
 
   function shoot(mode) { root.shotRequested(mode || "region"); }
-  function pick() { root.pickRequested(); }
+  function pick() { root.pickInto = ""; root.pickRequested(); }
+  function pickFor(into) { root.pickInto = into || ""; root.pickRequested(); }
   function annotate(path) { if (path && path !== "") root.annotateRequested(path); }
   // "" is the viewer opened on its own: the pictures directory, as a gallery
   function view(paths) { root.viewRequested(paths || ""); }

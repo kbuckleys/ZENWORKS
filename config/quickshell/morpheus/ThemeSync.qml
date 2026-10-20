@@ -37,7 +37,8 @@ Item {
 
   // the palette as plain hex, or null when Zenon is worn
   readonly property var colors: {
-    if (Zenon.themeName === "zenon" || !Zenon.theme.colors) return null;
+    // an Accent color of its own makes even Zenon a palette to hand on
+    if (Zenon.accentOwn === "" && (Zenon.themeName === "zenon" || !Zenon.theme.colors)) return null;
     const out = { name: Zenon.theme.name || Zenon.themeName };
     for (const s of ["ground", "card", "surface", "ink", "muted", "soft", "keyInk", "dim", "red",
                      "green", "yellow", "blue", "magenta", "cyan", "pink", "sand",

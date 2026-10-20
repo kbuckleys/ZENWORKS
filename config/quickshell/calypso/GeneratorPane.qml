@@ -14,6 +14,7 @@
 
 import QtQuick
 import "../morpheus"
+import "../morpheus/controls" as Controls
 import "../terminus"
 import "../picasso"
 import "../ceres"
@@ -218,11 +219,11 @@ Item {
       columns: 2
       rowSpacing: 4
       columnSpacing: 20
-      Switch { width: (col.width - 20) / 2; label: "Capital letters"; on: gen.opts.upper; onToggled: gen.set("upper", !gen.opts.upper) }
-      Switch { width: (col.width - 20) / 2; label: "Small letters"; on: gen.opts.lower; onToggled: gen.set("lower", !gen.opts.lower) }
-      Switch { width: (col.width - 20) / 2; label: "Digits"; on: gen.opts.digits; onToggled: gen.set("digits", !gen.opts.digits) }
-      Switch { width: (col.width - 20) / 2; label: "Symbols"; on: gen.opts.symbols; onToggled: gen.set("symbols", !gen.opts.symbols) }
-      Switch { width: (col.width - 20) / 2; label: "Look-alikes (l 1 I O 0)"; on: gen.opts.ambiguous; onToggled: gen.set("ambiguous", !gen.opts.ambiguous) }
+      Controls.Check { width: (col.width - 20) / 2; height: 28; label: "Capital letters"; lit: gen.opts.upper; onToggled: gen.set("upper", !gen.opts.upper) }
+      Controls.Check { width: (col.width - 20) / 2; height: 28; label: "Small letters"; lit: gen.opts.lower; onToggled: gen.set("lower", !gen.opts.lower) }
+      Controls.Check { width: (col.width - 20) / 2; height: 28; label: "Digits"; lit: gen.opts.digits; onToggled: gen.set("digits", !gen.opts.digits) }
+      Controls.Check { width: (col.width - 20) / 2; height: 28; label: "Symbols"; lit: gen.opts.symbols; onToggled: gen.set("symbols", !gen.opts.symbols) }
+      Controls.Check { width: (col.width - 20) / 2; height: 28; label: "Look-alikes (l 1 I O 0)"; lit: gen.opts.ambiguous; onToggled: gen.set("ambiguous", !gen.opts.ambiguous) }
     }
     Column {
       visible: gen.opts.mode === "words"
@@ -232,8 +233,8 @@ Item {
         width: parent.width
         columns: 2
         columnSpacing: 20
-        Switch { width: (col.width - 20) / 2; label: "Capitalise"; on: gen.opts.capitalize; onToggled: gen.set("capitalize", !gen.opts.capitalize) }
-        Switch { width: (col.width - 20) / 2; label: "A digit in one"; on: gen.opts.number; onToggled: gen.set("number", !gen.opts.number) }
+        Controls.Check { width: (col.width - 20) / 2; height: 28; label: "Capitalize"; lit: gen.opts.capitalize; onToggled: gen.set("capitalize", !gen.opts.capitalize) }
+        Controls.Check { width: (col.width - 20) / 2; height: 28; label: "A digit in one"; lit: gen.opts.number; onToggled: gen.set("number", !gen.opts.number) }
       }
       Row {
         spacing: 12

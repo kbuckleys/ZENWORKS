@@ -27,6 +27,8 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Widgets
 import "../morpheus"
+import "../morpheus/controls" as Controls
+import "../oracle"
 import "picasso.js" as Art
 import "../terminus/terminus.js" as Terminus
 import "../terminus" as Term
@@ -371,6 +373,54 @@ Item {
   readonly property bool tintIsCustom:
     card.look.tint !== "" && card.tints.indexOf(card.look.tint) < 0
 
+  // ── THE SHELL'S ACCENT (Oracle's Accent color) ────────────────────────
+  // On the Look tab, but not part of the look: set at once, not staged.
+  readonly property string accentNow: (Oracle.revision, String(Oracle.accentColor || ""))
+  property string customAccent: card.accentNow
+  onAccentNowChanged: {
+    const own = Picasso.accentFor(card.path);
+    if (card.accentNow !== "" && (!own || own.toLowerCase() !== card.accentNow))
+      card.customAccent = card.accentNow;
+  }
+  // a drag in the picker settles before the shell re-colors (ColorFold)
+  property string accentPending: ""
+  Timer {
+    id: accentSettle
+    interval: 180
+    onTriggered: { if (card.accentPending !== "") Oracle.set("accentColor", card.accentPending); card.accentPending = ""; }
+  }
+  function setAccent(hex) {
+    Picasso.accentChosenFor = hex === "" ? "" : card.path;
+    accentSettle.stop();
+    card.accentPending = "";
+    if (hex === "") Oracle.reset("accentColor"); else Oracle.set("accentColor", hex);
+  }
+  function dragAccent(hex) {
+    Picasso.accentChosenFor = card.path;
+    card.customAccent = hex;
+    card.accentPending = hex;
+    accentSettle.restart();
+  }
+  Connections {
+    target: Picasso
+    function onColorPicked(into, hex) {
+      if (into !== "card:accent") return;
+      card.customAccent = hex;
+      card.setAccent(hex);
+    }
+  }
+  readonly property var accentKinds: ["", "accent", "custom"]
+  readonly property string accentKind: {
+    if (card.accentNow === "") return "";
+    const own = Picasso.accentFor(card.path);
+    return own && own.toLowerCase() === card.accentNow ? "accent" : "custom";
+  }
+  function chooseAccentKind(k) {
+    if (k === "") card.setAccent("");
+    else if (k === "accent") card.setAccent((Picasso.accentFor(card.path) || "").toLowerCase());
+    else card.setAccent(card.customAccent || Zenon.hex(Zenon.cyan));
+  }
+
   function rows() {
     const out = ["browse", "tabs"];
     if (card.editing !== "") return out.concat(["buttons"]);
@@ -380,7 +430,7 @@ Item {
     } else if (card.tab === "look") {
       if (!card.isColor) out.push("backdrop");
       out.push("dim", "vignette", "blur", "saturation", "brightness", "contrast",
-               "tint", "tintAmount", "reset");
+               "tint", "tintAmount", "accent", "reset");
     } else {
       out.push("slideOn", "interval", "order");
       if (card.picker.query !== "") out.push("pool");
@@ -435,6 +485,7 @@ Item {
       break;
     }
     case "tintAmount": card.nudge("tintAmount", d * 0.05, 0, 1); break;
+    case "accent": card.chooseAccentKind(card.step(card.accentKinds, card.accentKind, d)); break;
     case "slideOn": card.slideOn = !card.slideOn; break;
     case "interval": card.slideMinutes = card.step(card.intervals, card.slideMinutes, d); break;
     case "order": card.slideShuffle = d > 0; break;
@@ -455,6 +506,7 @@ Item {
       break;
     case "backdrop": if (card.look.backdrop === "color") card.editing = "backdrop"; break;
     case "tint": if (card.tintIsCustom) card.editing = "tint"; break;
+    case "accent": if (card.accentKind === "custom") card.editing = "accent"; break;
     case "reset": card.resetLook(); break;
     case "slideOn": card.slideOn = !card.slideOn; break;
     case "buttons": if (card.kbCol === 0) card.picker.closeFocus(); else card.apply(); break;
@@ -987,14 +1039,6 @@ Item {
           Ring { on: card.kb("tabs") }
         }
 
-        Rectangle {
-          anchors.top: tabRow.bottom
-          anchors.topMargin: 10
-          width: parent.width
-          height: 1
-          color: Zenon.border
-        }
-
         // ── PLACE ────────────────────────────────────────────────────
         Item {
           id: placeTab
@@ -1187,7 +1231,8 @@ Item {
           // ONE PICTURE ACROSS THE DESK. Each monitor shows the slice that
           // falls where it actually sits, so a line in the picture carries
           // on straight from one screen onto the next.
-          Switch {
+          Controls.Check {
+            height: 28
             id: spanSwitch
             anchors.top: map.bottom
             anchors.topMargin: 10
@@ -1196,7 +1241,7 @@ Item {
             label: card.stageScreens.length < 2 ? "Span (pick two displays)"
               : "Span across " + (card.allStaged ? "all displays"
                                   : card.stageScreens.length + " displays")
-            on: card.stageSpan
+            lit: card.stageSpan
             opacity: card.stageScreens.length < 2 ? 0.5 : 1
             kbOn: card.kb("span")
             onToggled: card.stageSpan = !card.stageSpan
@@ -1399,6 +1444,11 @@ Item {
             onTouched: (key, value) => card.setLook(key, value)
             onResetLook: card.resetLook()
             onEditColor: (which) => card.editing = which
+            showAccent: true
+            accent: card.accentNow
+            customAccent: card.customAccent
+            onAccentChosen: (h) => card.setAccent(h)
+            onPickAccent: Picasso.pickFor("card:accent")
           }
         }
 
@@ -1412,7 +1462,8 @@ Item {
 
           Head {
             id: edHead
-            text: card.editing === "tint" ? "Tint color" : "Color around it"
+            text: card.editing === "tint" ? "Tint color"
+              : card.editing === "accent" ? "Accent color" : "Color around it"
           }
           Text {
             anchors.right: parent.right
@@ -1438,9 +1489,11 @@ Item {
             textSize: card.ts
             hex: card.editing === "tint"
               ? (card.tintIsCustom ? card.look.tint : card.customTint)
+              : card.editing === "accent" ? (card.accentPending || card.accentNow || Zenon.hex(Zenon.cyan))
               : card.look.backdropColor
             onEdited: (h) => {
               if (card.editing === "tint") { card.customTint = h; card.setLook("tint", h); }
+              else if (card.editing === "accent") card.dragAccent(h);
               else card.setLook("backdropColor", h);
             }
             onAccepted: card.editing = ""
@@ -1506,10 +1559,11 @@ Item {
               }
             }
 
-            Switch {
+            Controls.Check {
+              height: 28
               width: parent.width
               label: "Change the picture on a timer"
-              on: card.slideOn
+              lit: card.slideOn
               kbOn: card.kb("slideOn")
               onToggled: card.slideOn = !card.slideOn
             }
