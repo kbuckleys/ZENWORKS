@@ -116,8 +116,8 @@ hl.config({
 		disable_hyprland_logo = true,
 		background_color = 0x000000,
 		middle_click_paste = false,
-		-- screens turned off (binds.lua's screensOff) come back on any key;
-		-- a mouse move too when wake.lua says so (below)
+		-- screens turned off (idle, or binds.lua's screensOff) come back on
+		-- any key; a mouse move too when wake.lua says so (below)
 		key_press_enables_dpms = true,
 		mouse_move_enables_dpms = false,
 	},
@@ -201,9 +201,9 @@ hl.config({
 })
 
 -- WAKE
--- wake.lua, which oracle's Shortcuts section writes ("Wake by" on Lock and
--- suspend screen): "mouse" wakes screens turned off on a mouse move as well
--- as a key press. Guarded like defaults.lua.
+-- wake.lua, which oracle's Display section writes ("Wake by"): "mouse"
+-- wakes screens turned off, idle or by a bind, on a mouse move as well as
+-- a key press. Guarded like defaults.lua.
 local okWake, wake = pcall(require, "lua.wake")
 if okWake and type(wake) == "table" and wake.wake == "mouse" then
 	pcall(hl.config, { misc = { mouse_move_enables_dpms = true } })

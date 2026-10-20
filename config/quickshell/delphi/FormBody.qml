@@ -35,7 +35,6 @@ import QtQuick
 import "../morpheus"
 import "../morpheus/controls" as Controls
 import "../terminus"
-import "../picasso"
 import "../ceres"
 
 Item {

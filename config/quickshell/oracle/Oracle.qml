@@ -708,6 +708,16 @@ Singleton {
       optionsFrom: "screens", open: true, chipW: 208, plainAuto: true,
       alias: "default first primary monitor screen display output",
       help: "The monitor the shell means by Automatic: the pill, Follow Background, the lock screen's clock and field, and windows opened with no monitor in focus go here unless their own setting names another. Automatic is the leftmost screen. Unplugged, it falls back to the leftmost until it is back." },
+    // the screens going off, and what brings them back — here rather than
+    // on a shortcut (user, 2026-10-20), so idle and the bind share them
+    { key: "idleScreenOffSecs", section: "display", label: "Screens off after", type: "int",
+      min: 0, max: 7200, step: 30, unit: "s", alias: "idle dpms sleep blank",
+      help: "Idle this long and every output is switched off. 0 leaves them on. Needs Idle timers, under Idle & Lock." },
+    { key: "wakeBy", section: "display", label: "Wake by", type: "enum", segments: true, hyprFile: true,
+      hyprDefault: "key", alias: "wake screens dpms mouse key press",
+      options: [ { value: "key",   label: "key press" },
+                 { value: "mouse", label: "mouse or key press" } ],
+      help: "What turns the screens back on, after idle or Lock and suspend screen. Kept in hypr/lua/wake.lua." },
     // ── input ──
     // The fixed rows; the devices' own are built in inputSpecs, where the
     // layouts and the screens this machine has are on hand.
@@ -1049,9 +1059,6 @@ Singleton {
     { key: "idleLockSecs", section: "idle", label: "Lock after", type: "int",
       min: 0, max: 3600, step: 30, unit: "s",
       help: "Idle this long and the lock comes up. 0 never locks on its own." },
-    { key: "idleScreenOffSecs", section: "idle", label: "Screens off after", type: "int",
-      min: 0, max: 7200, step: 30, unit: "s",
-      help: "Idle this long and every output is switched off; any input brings them back. 0 leaves them on." },
     { key: "idleKeyboardSecs", section: "idle", label: "Device lighting off after", type: "int",
       min: 0, max: 3600, step: 30, unit: "s",
       help: "How long before the lighting on the devices below goes dark. 0 leaves it on." },
@@ -1347,7 +1354,8 @@ Singleton {
         c.options = fams.map((f) => ({ value: f, label: f.replace(/ Nerd Font$/, "") }));
       }
       if (Ora.stored(s)) {
-        if (!root.defaultsTaken) d[s.key] = root[s.key];
+        // a hypr file's setting may already hold the file's value here
+        if (!root.defaultsTaken) d[s.key] = s.hyprFile ? s.hyprDefault : root[s.key];
         c.fallback = d[s.key];
       }
       out.push(c);
@@ -1568,6 +1576,7 @@ Singleton {
     if (s.appDefault) { root.setAppDefault(s, value); return; }
     if (s.input) { root.setInput(s, value); return; }
     if (s.bindKey) { root.setBind(s, value); return; }
+    if (s.hyprFile) { root.setWakeBy(value); return; }
     const v = Ora.coerce(s, value);
     if (Ora.same(root[key], v)) return;
     root[key] = v;
@@ -1612,7 +1621,7 @@ Singleton {
   function resetAll() {
     for (let i = 0; i < root.schema.length; ++i) {
       const s = root.schema[i];
-      if (Ora.stored(s) && !s.display && !s.appDefault && !s.input && !s.bindKey) root.reset(s.key);
+      if (Ora.stored(s) && !s.display && !s.appDefault && !s.input && !s.bindKey && !s.hyprFile) root.reset(s.key);
     }
   }
 
@@ -1986,6 +1995,7 @@ Singleton {
     const by = v === "mouse" ? "mouse" : "key";
     if (by === root.wakeBy) return;
     root.wakeBy = by;
+    root.revision++;
     wakeFile.setText(Ora.renderWakeLua(by));
     reloadHypr.restart();
   }
@@ -2021,10 +2031,7 @@ Singleton {
       }
       out.push({ key: "bind:" + b.id, section: "keys", type: "chord", bindKey: true, inGroup: b.group,
         bindId: b.id, bindDefault: b.chord, label: b.label,
-        // screens turned off wear their wake choice beside the chord
-        wake: b.id === "screensOff",
-        alias: "shortcut keybind key bind chord " + Ora.bindGroupLabel(b.group) + " " + b.chord.toLowerCase()
-          + (b.id === "screensOff" ? " wake mouse dpms" : "") });
+        alias: "shortcut keybind key bind chord " + Ora.bindGroupLabel(b.group) + " " + b.chord.toLowerCase() });
     }
     return out;
   }
@@ -2157,7 +2164,7 @@ Singleton {
     // FileView's own write never fires loaded: setWakeBy sets wakeBy itself
     onLoaded: {
       const by = Ora.parseWakeLua(wakeFile.text());
-      if (by !== root.wakeBy) { root.wakeBy = by; reloadHypr.restart(); }
+      if (by !== root.wakeBy) { root.wakeBy = by; root.revision++; reloadHypr.restart(); }
     }
     onLoadFailed: root.wakeBy = "key"
   }
@@ -2649,7 +2656,7 @@ Singleton {
 
   function save() {
     const vals = ({});
-    const own = root.schema.filter((s) => !s.display && !s.appDefault && !s.input && !s.bindKey);
+    const own = root.schema.filter((s) => !s.display && !s.appDefault && !s.input && !s.bindKey && !s.hyprFile);
     for (let i = 0; i < own.length; ++i) {
       const s = own[i];
       if (Ora.stored(s)) vals[s.key] = root[s.key];
@@ -2725,7 +2732,7 @@ Singleton {
       const out = [];
       for (let i = 0; i < root.schema.length; ++i) {
         const s = root.schema[i];
-        if (!Ora.stored(s) || s.display || s.appDefault || s.input || s.bindKey || root.isDefault(s.key)) continue;
+        if (!Ora.stored(s) || s.display || s.appDefault || s.input || s.bindKey || s.hyprFile || root.isDefault(s.key)) continue;
         out.push(s.key + " = " + String(root[s.key])
           + "  (default " + String(root.defaults[s.key]) + ")");
       }

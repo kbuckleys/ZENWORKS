@@ -16,7 +16,6 @@ import QtQuick
 import "../morpheus"
 import "../morpheus/controls" as Controls
 import "../terminus"
-import "../picasso"
 import "../ceres"
 import "calypso.js" as C
 

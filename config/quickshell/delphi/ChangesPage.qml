@@ -31,7 +31,6 @@ import Quickshell
 import "../morpheus"
 import "../morpheus/controls" as Controls
 import "../terminus"
-import "../picasso"
 import "delphi.js" as D
 import "../terminus/terminus.js" as Terminus
 import "../morpheus/icons.js" as Icons

@@ -193,10 +193,15 @@ Scope {
     });
     //   listener { timeout = 600
     //              on-timeout = dpms disable / on-resume = dpms enable }
+    //
+    // BACK ON ONLY BY WHAT ORACLE'S "WAKE BY" SAYS (user, 2026-10-20). A
+    // resume is any input, a mouse move too, so with "key press" this one
+    // has none: hyprland's key_press_enables_dpms (base.lua) brings them
+    // back on a key, and a nudged mouse leaves them off.
     if (Oracle.idleScreenOffSecs > 0) out.push({
       timeout: Oracle.idleScreenOffSecs,
       onTimeout: () => root.dpms(false),
-      onResume: () => root.dpms(true)
+      onResume: Oracle.wakeBy === "mouse" ? () => root.dpms(true) : null
     });
     return out;
   }

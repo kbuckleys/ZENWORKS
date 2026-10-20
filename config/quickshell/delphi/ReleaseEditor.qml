@@ -19,7 +19,6 @@ import Quickshell
 import "../morpheus"
 import "../morpheus/controls" as Controls
 import "../terminus"
-import "../picasso"
 import "delphi.js" as D
 
 Item {

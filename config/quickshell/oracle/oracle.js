@@ -2075,9 +2075,9 @@ function bindGroupLabel(g) {
 // are dropped, so a bind taken out of binds.lua takes its override with it
 // ── WAKE ──
 // What brings screens turned off back: hypr/lua/wake.lua, `wake = "key"`
-// (any key) or "mouse" (a mouse move too), shown inline on binds.lua's
-// screensOff row ("Wake by", user 2026-10-20). base.lua reads it, so it
-// holds from login; key wake is always on.
+// (any key) or "mouse" (a mouse move too): Display's "Wake by" (user,
+// 2026-10-20), for idle and binds.lua's screensOff alike. base.lua reads
+// it, so it holds from login; socordia follows it; key wake is always on.
 function wakeChoices() { return [["key", "key press"], ["mouse", "mouse or key press"]]; }
 function parseWakeLua(text) {
   return parseDefaultsLua(text).wake === "mouse" ? "mouse" : "key";
@@ -2090,9 +2090,9 @@ function renderWakeLua(by) {
     "-- https://github.com/kbuckleys/",
     "",
     "-- WAKE",
-    "-- Written by oracle's Shortcuts section (Wake by, on Lock and suspend",
-    "-- screen), and read back by it. What turns screens that were turned off",
-    "-- back on: \"key\" any key press, \"mouse\" a mouse move or a key press.",
+    "-- Written by oracle's Display section (Wake by), and read back by it.",
+    "-- What turns screens that were turned off, idle or by a bind, back on:",
+    "-- \"key\" any key press, \"mouse\" a mouse move or a key press.",
     "",
     "return {",
     "\twake = " + luaString(by === "mouse" ? "mouse" : "key") + ",",

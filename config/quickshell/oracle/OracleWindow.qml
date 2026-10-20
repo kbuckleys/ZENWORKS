@@ -1157,35 +1157,8 @@ FloatingWindow {
     property var spec: null
     property var value: null
     readonly property bool waiting: !!ch.spec && Oracle.capturing === ch.spec.key
-    width: chordChip.width + (wakeRow.visible ? wakeRow.width + 16 : 0)
+    width: chordChip.width
     height: 28
-
-    // WAKE BY (user, 2026-10-20), on the screens-off bind only: what brings
-    // them back, beside the chord that puts them out — see Ora's WAKE
-    Row {
-      id: wakeRow
-      visible: !!ch.spec && !!ch.spec.wake
-      anchors.right: chordChip.left
-      anchors.rightMargin: 16
-      anchors.verticalCenter: parent.verticalCenter
-      spacing: 10
-      Text {
-        anchors.verticalCenter: parent.verticalCenter
-        text: "Wake by"
-        color: popup.dimColor
-        font.family: popup.face
-        font.weight: Font.Medium
-        font.pixelSize: Zenon.px(14)
-      }
-      Segments {
-        anchors.verticalCenter: parent.verticalCenter
-        textSize: Zenon.px(13)
-        pad: 20
-        options: Ora.wakeChoices()
-        current: Oracle.wakeBy
-        onChose: (v) => Oracle.setWakeBy(v)
-      }
-    }
 
     Rectangle {
       id: chordChip
@@ -1214,8 +1187,9 @@ FloatingWindow {
           KeyCap { required property var modelData; label: modelData; fontSize: 12 }
         }
         Text {
+          // a bind with no chord: a dimmed dash, not a word (user, 2026-10-20)
           visible: ch.spec && Ora.normChord(ch.value) === ""
-          text: "off"
+          text: "---"
           color: popup.dimColor
           font.family: popup.face
           font.weight: Font.Medium
@@ -2494,7 +2468,7 @@ FloatingWindow {
                     sourceComponent: {
                       const t = settingRow.spec.type;
                       if (t === "bool") return boolComp;
-                      if (t === "enum") return enumComp;
+                      if (t === "enum") return settingRow.spec.segments ? segComp : enumComp;
                       if (t === "devices") return devicesComp;
                       if (t === "text")
                         return settingRow.spec.pick ? pickComp : textComp;
@@ -2515,6 +2489,17 @@ FloatingWindow {
                   // a spec with `also` draws those settings beside its own,
                   // in one row (Font: the book, the family, its weight, its
                   // size) — a dropdown for an enum, a stepper for a number
+                  // A FEW CHOICES SIDE BY SIDE (`segments`), for an enum whose
+                  // options read on from its name: "Wake by [key press | …]"
+                  Component { id: segComp
+                    Segments {
+                      textSize: Zenon.px(13)
+                      pad: 20
+                      options: (settingRow.spec.options || []).map((o) => [o.value, o.label])
+                      current: String(settingRow.live)
+                      onChose: (v) => Oracle.set(settingRow.spec.key, v)
+                    }
+                  }
                   Component { id: enumComp
                     Row {
                       id: enumRow
