@@ -147,7 +147,7 @@ Item {
   property Item peekRow: null
   property var peek: null
   property bool peeking: false
-  Timer { id: peekWait; interval: 450; onTriggered: pg.peeking = !!pg.peekRow }
+  Timer { id: peekWait; interval: Zenon.hoverWait; onTriggered: pg.peeking = !!pg.peekRow }
   onSelChanged: pg.peeking = false
 
   // ── the one chosen ─────────────────────────────────────────────────────

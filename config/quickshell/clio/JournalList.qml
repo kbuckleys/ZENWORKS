@@ -147,9 +147,9 @@ Item {
           text: "\u{F0336}  REFLECTION"
           color: Zenon.magenta
           font.family: Zenon.face
-          font.weight: Font.DemiBold
+          font.weight: Zenon.titleWeight
           font.pixelSize: Zenon.px(11)
-          font.letterSpacing: 0.8
+          font.letterSpacing: Zenon.labelSpacing
         }
         Text {
           width: parent.width
@@ -192,9 +192,9 @@ Item {
             + (past.hits.length > 1 ? "  +" + (past.hits.length - 1) : "")
           color: Zenon.yellow
           font.family: Zenon.face
-          font.weight: Font.DemiBold
+          font.weight: Zenon.titleWeight
           font.pixelSize: Zenon.px(11)
-          font.letterSpacing: 0.8
+          font.letterSpacing: Zenon.labelSpacing
         }
         Text {
           width: parent.width
@@ -238,9 +238,9 @@ Item {
           text: "\u{F0B64}  FROM YOUR JOURNAL · " + (back.e ? N.dateLong(back.e.date).toUpperCase() : "")
           color: Zenon.cyan
           font.family: Zenon.face
-          font.weight: Font.DemiBold
+          font.weight: Zenon.titleWeight
           font.pixelSize: Zenon.px(11)
-          font.letterSpacing: 0.8
+          font.letterSpacing: Zenon.labelSpacing
         }
         Text {
           width: parent.width

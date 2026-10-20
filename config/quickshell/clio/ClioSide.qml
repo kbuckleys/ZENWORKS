@@ -68,8 +68,8 @@ Item {
     else peekLeave.restart();
   }
   // off a row: gone unless the pointer is on another a beat later
-  Timer { id: peekLeave; interval: 120; onTriggered: { peekWait.stop(); side.peekNote = null; } }
-  Timer { id: peekWait; interval: 450; onTriggered: side.peekShown = !!side.peekNote }
+  Timer { id: peekLeave; interval: Zenon.hoverLeave; onTriggered: { peekWait.stop(); side.peekNote = null; } }
+  Timer { id: peekWait; interval: Zenon.hoverWait; onTriggered: side.peekShown = !!side.peekNote }
   property bool peekShown: false
   onPeekNoteChanged: if (!side.peekNote) side.peekShown = false
   NotePeek {
@@ -406,9 +406,9 @@ Item {
         const items = [{ text: "Open", icon: "\uF07C", run: () => side.win.setScope({ shelf: "trash" }) }];
         if (trashFoot.count > 0) items.push({ isSeparator: true },
           { text: "Put everything back", icon: "\u{F0A51}", run: () => side.mgr.restoreAll() },
-          { text: "Empty Trash…", icon: "\uF1F8", danger: true,
+          { text: "Empty trash…", icon: "\uF1F8", danger: true,
             run: () => side.win.cardsRef.confirm({ question: "Empty the Trash?", glyph: "\uF1F8", ink: Zenon.red,
-              detail: "Everything in it goes for good, with its pictures and files.", verb: "Empty Trash", then: () => side.mgr.emptyTrash() }) });
+              detail: "Everything in it goes for good, with its pictures and files.", verb: "Empty trash", then: () => side.mgr.emptyTrash() }) });
         side.win.menuRef.open(x, y, items);
       }
     }

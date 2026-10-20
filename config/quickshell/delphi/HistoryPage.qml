@@ -401,7 +401,7 @@ Item {
   property var peekC: null
   property var peekMsg: null
   property int peekFiles: -1
-  Timer { id: peekWait; interval: 500; onTriggered: pg.loadPeek() }
+  Timer { id: peekWait; interval: Zenon.hoverWait; onTriggered: pg.loadPeek() }
   function peekAt(row, c) {
     pg.peekRow = row;
     pg.peekC = c;

@@ -419,7 +419,7 @@ Scope {
   // ── THE LOCK ───────────────────────────────────────────────────────────
   // A locked note is sealed on disk; unlocked (one password for every
   // note, as Apple's), its blocks are opened into `opened` and live only
-  // in memory until Lock Now, the window closing, or the screen locking.
+  // in memory until Lock now, the window closing, or the screen locking.
   function setPassword(pw, hint, old, done) {
     mgr.call("password", { password: pw, hint: hint || "", old: old || "" }, (ok, r, err) => {
       if (ok) { mgr.hasPassword = true; mgr.hint = hint || ""; mgr.unlocked = true; }

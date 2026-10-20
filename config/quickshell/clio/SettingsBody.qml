@@ -154,7 +154,7 @@ Column {
             note: !sb.mgr ? "" : sb.mgr.hasPassword ? (sb.mgr.unlocked ? "Set, and open now" : "Set") : "Not set yet — asked the first time something is locked"
             Row {
               spacing: 8
-              DialogButton { visible: !!sb.mgr && sb.mgr.unlocked; label: "Lock Now"; ink: Zenon.yellow; onClicked: sb.win.lockNow() }
+              DialogButton { visible: !!sb.mgr && sb.mgr.unlocked; label: "Lock now"; ink: Zenon.yellow; onClicked: sb.win.lockNow() }
               DialogButton { label: sb.mgr && sb.mgr.hasPassword ? "Change…" : "Set…"; onClicked: { sb.closed(); sb.win.changePassword(); } }
             }
           }

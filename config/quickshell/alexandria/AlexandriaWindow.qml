@@ -573,7 +573,7 @@ FloatingWindow {
       else if (glyphs && win.group >= 0) win.group = -1;
       else if (win.query !== "") win.query = "";
       else if (win.picking) win.cancelPick();
-      else win.visible = false;
+      // outside the picker esc never closes the library
       return true;
     }
     if (ctrl && (k === Qt.Key_Equal || k === Qt.Key_Plus)) { win.zoom(1); return true; }
@@ -650,7 +650,8 @@ FloatingWindow {
     }
     out.push(["ctrl wheel", "size"], ["ctrl s", "bookmark"], ["tab", "shelf"], ["ctrl tab", "page"]);
     if (win.removable.length > 0) out.push(["delete", "remove"]);
-    out.push(["ctrl o", "open a file"], ["esc", win.picking ? "cancel" : "close"]);
+    out.push(["ctrl o", "open a file"]);
+    if (win.picking) out.push(["esc", "cancel"]);
     return out;
   }
 
@@ -1257,13 +1258,8 @@ FloatingWindow {
             width: parent.width
             spacing: 2
             visible: !!win.fam
-            Text {
+            SectionLabel {
               text: win.fam ? (win.fam.styles.length === 1 ? "1 STYLE" : win.fam.styles.length + " STYLES") : ""
-              color: Zenon.accentMuted
-              font.family: Zenon.face
-              font.weight: Font.Bold
-              font.letterSpacing: 1.2
-              font.pixelSize: Zenon.px(11)
               bottomPadding: 6
             }
             Repeater {
@@ -1335,13 +1331,8 @@ FloatingWindow {
             width: parent.width
             spacing: 6
             visible: !!win.style
-            Text {
+            SectionLabel {
               text: "SIZES"
-              color: Zenon.accentMuted
-              font.family: Zenon.face
-              font.weight: Font.Bold
-              font.letterSpacing: 1.2
-              font.pixelSize: Zenon.px(11)
               bottomPadding: 4
             }
             Repeater {
@@ -1381,13 +1372,8 @@ FloatingWindow {
             width: parent.width
             spacing: 10
             visible: !!win.style
-            Text {
+            SectionLabel {
               text: "TEXT"
-              color: Zenon.accentMuted
-              font.family: Zenon.face
-              font.weight: Font.Bold
-              font.letterSpacing: 1.2
-              font.pixelSize: Zenon.px(11)
             }
             Text {
               width: parent.width
@@ -1698,17 +1684,12 @@ FloatingWindow {
             }
           }
 
-          Text {
+          SectionLabel {
             id: groupHead
             anchors.top: card.visible ? card.bottom : parent.top
             anchors.topMargin: 18
             x: 18
             text: "GROUPS"
-            color: Zenon.accentMuted
-            font.family: Zenon.face
-            font.weight: Font.Bold
-            font.letterSpacing: 1.2
-            font.pixelSize: Zenon.px(11)
           }
           ListView {
             id: groupList
@@ -1854,13 +1835,8 @@ FloatingWindow {
             width: parent.width
             spacing: 2
             visible: !!win.fam
-            Text {
+            SectionLabel {
               text: win.fam ? (win.fam.files.length === 1 ? "1 FILE" : win.fam.files.length + " FILES") : ""
-              color: Zenon.accentMuted
-              font.family: Zenon.face
-              font.weight: Font.Bold
-              font.letterSpacing: 1.2
-              font.pixelSize: Zenon.px(11)
               bottomPadding: 6
             }
             Repeater {

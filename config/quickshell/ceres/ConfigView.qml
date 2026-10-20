@@ -697,13 +697,8 @@ Item {
           id: sc
           required property var modelData
           spacing: 8
-          Text {
+          SectionLabel {
             text: sc.modelData[1]
-            color: Zenon.accentMuted
-            font.family: Zenon.face
-            font.weight: Zenon.weight
-            font.pixelSize: Zenon.px(12)
-            font.letterSpacing: 1
           }
           Segmented {
             options: [["Never", "Never"], ["Optional", "Optional"], ["Required", "Required"]]
@@ -732,21 +727,11 @@ Item {
       rowSpacing: 8
       verticalItemAlignment: Grid.AlignVCenter
       Item { width: 96; height: 18 }
-      Text {
+      SectionLabel {
         text: "SIGNATURE CHECK"
-        color: Zenon.accentMuted
-        font.family: Zenon.face
-        font.weight: Zenon.weight
-        font.pixelSize: Zenon.px(12)
-        font.letterSpacing: 1
       }
-      Text {
+      SectionLabel {
         text: "KEY TRUST"
-        color: Zenon.accentMuted
-        font.family: Zenon.face
-        font.weight: Zenon.weight
-        font.pixelSize: Zenon.px(12)
-        font.letterSpacing: 1
       }
       // row by row, as a Grid fills: the label, its check, its trust
       Text { width: 96; text: "Packages"; color: Zenon.accentKey; font.family: Zenon.face; font.pixelSize: Zenon.px(15) }

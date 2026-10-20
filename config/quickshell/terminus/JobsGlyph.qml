@@ -173,10 +173,10 @@ Item {
     loops: Animation.Infinite
     NumberAnimation { target: jobsToggle; property: "glow"
                       to: jobsToggle.jobs.faults > 0 ? 0.95 : 0.78
-                      duration: 880; easing.type: Easing.InOutQuad }
+                      duration: Zenon.glow; easing.type: Zenon.breathEase }
     NumberAnimation { target: jobsToggle; property: "glow"
                       to: jobsToggle.jobs.faults > 0 ? 0.45 : 0.28
-                      duration: 880; easing.type: Easing.InOutQuad }
+                      duration: Zenon.glow; easing.type: Zenon.breathEase }
   }
 
   // and out when the last one finishes, rather than freezing at

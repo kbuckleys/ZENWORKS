@@ -39,6 +39,10 @@ module.exports = {
     const grey = W.palette([{ hex: "#808080", n: 10 }, { hex: "#303030", n: 10 }], { mode: "dark" });
     t.ok("gray gives an all but neutral ground",
       W.rgbToOklch(W.hexToRgb(grey.colors.ground)).C < 0.01);
+    for (const k of ["ground", "card", "surface", "ink", "muted"]) {
+      const [r, g, b] = W.hexToRgb(grey.colors[k]);
+      t.ok("gray picture, gray " + k + " (" + grey.colors[k] + ")", r === g && g === b);
+    }
 
     // black and white: a gray accent, never the stock cyan (user, 2026-10-20)
     const lchOf = (x) => W.rgbToOklch(W.hexToRgb(x));

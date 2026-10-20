@@ -285,15 +285,10 @@ Item {
           required property var modelData
           width: body.width
           spacing: 6
-          Text {
+          SectionLabel {
             visible: sec.modelData.title !== ""
             leftPadding: 4
             text: sec.modelData.title.toUpperCase()
-            color: Zenon.accentMuted
-            font.family: Zenon.face
-            font.weight: Font.DemiBold
-            font.pixelSize: Zenon.px(11)
-            font.letterSpacing: 1.2
           }
           Rectangle {
             width: sec.width
@@ -327,14 +322,9 @@ Item {
         visible: !!pane.d && !pane.d.reprompt && (atts.length > 0 || (!!pane.win && pane.win.canAttach(pane.it)))
         width: parent.width
         spacing: 6
-        Text {
+        SectionLabel {
           leftPadding: 4
           text: "ATTACHMENTS"
-          color: Zenon.accentMuted
-          font.family: Zenon.face
-          font.weight: Font.DemiBold
-          font.pixelSize: Zenon.px(11)
-          font.letterSpacing: 1.2
         }
         Rectangle {
           visible: parent.atts.length > 0
@@ -408,14 +398,9 @@ Item {
         visible: !!pane.d && pane.d.notes !== ""
         width: parent.width
         spacing: 6
-        Text {
+        SectionLabel {
           leftPadding: 4
           text: "NOTES"
-          color: Zenon.accentMuted
-          font.family: Zenon.face
-          font.weight: Font.DemiBold
-          font.pixelSize: Zenon.px(11)
-          font.letterSpacing: 1.2
         }
         Rectangle {
           width: parent.width

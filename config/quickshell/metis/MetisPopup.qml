@@ -1405,8 +1405,8 @@ LayerPopup {
                   SequentialAnimation on opacity {
                     running: filterInput.activeFocus
                     loops: Animation.Infinite
-                    NumberAnimation { to: 1; duration: 550; easing.type: Easing.InOutSine }
-                    NumberAnimation { to: 0.25; duration: 550; easing.type: Easing.InOutSine }
+                    NumberAnimation { to: 1; duration: Zenon.breath; easing.type: Zenon.breathEase }
+                    NumberAnimation { to: 0.25; duration: Zenon.breath; easing.type: Zenon.breathEase }
                   }
                 }
 
@@ -1587,8 +1587,8 @@ LayerPopup {
                     running: popup.ratesRefreshing
                     loops: Animation.Infinite
                     onRunningChanged: if (!running) ratesDot.opacity = 1
-                    NumberAnimation { to: 0.25; duration: 420; easing.type: Easing.InOutSine }
-                    NumberAnimation { to: 1; duration: 420; easing.type: Easing.InOutSine }
+                    NumberAnimation { to: 0.25; duration: Zenon.breath; easing.type: Zenon.breathEase }
+                    NumberAnimation { to: 1; duration: Zenon.breath; easing.type: Zenon.breathEase }
                   }
                 }
                 MouseArea {

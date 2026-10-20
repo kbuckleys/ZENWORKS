@@ -551,7 +551,7 @@ FloatingWindow {
     win.withPassword(() => {
       win.commit();
       win.mgr.lockNote(n.id);
-      win.say("Locked — closed when you Lock Now, or close the window");
+      win.say("Locked — closed when you Lock now, or close the window");
     });
   }
   function removeLock(n) {

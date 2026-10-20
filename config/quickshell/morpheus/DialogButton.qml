@@ -155,8 +155,8 @@ Rectangle {
       running: btn.primary && btn.ready && btn.visible
         && btn.Window.visibility !== Window.Hidden
       loops: Animation.Infinite
-      NumberAnimation { to: 0.15; duration: 900; easing.type: Easing.InOutQuad }
-      NumberAnimation { to: 0.85; duration: 900; easing.type: Easing.InOutQuad }
+      NumberAnimation { to: 0.15; duration: Zenon.glow; easing.type: Zenon.breathEase }
+      NumberAnimation { to: 0.85; duration: Zenon.glow; easing.type: Zenon.breathEase }
     }
   }
 

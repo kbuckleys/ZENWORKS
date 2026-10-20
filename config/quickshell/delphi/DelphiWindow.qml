@@ -1550,7 +1550,7 @@ FloatingWindow {
               RotationAnimation on rotation {
                 running: upPill.phase === "committing"
                 loops: Animation.Infinite
-                from: 0; to: 360; duration: 1100
+                from: 0; to: 360; duration: Zenon.spin
               }
             }
             Text {

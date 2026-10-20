@@ -85,7 +85,7 @@ Column {
           color: Zenon[modelData.ink] || Zenon.accentMuted
           border.width: parent.on ? 3 : 0
           border.color: Zenon.ink
-          Behavior on width { NumberAnimation { duration: Zenon.fast; easing.type: Easing.OutBack } }
+          Behavior on width { NumberAnimation { duration: Zenon.fast; easing.type: Easing.OutCubic } }
         }
         MouseArea { anchors.fill: parent; onClicked: { if (mb.v !== modelData.v) mb.words = []; mb.v = modelData.v; mb.chosen = true; } }
       }

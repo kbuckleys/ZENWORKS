@@ -224,7 +224,17 @@ PlatoSheet {
         panel.focusPage();
       }
     }
+    // working, beside the words that say on what — every other wait in the
+    // suite moves while it lasts, and this one only spoke (2026-10-20)
+    Working {
+      anchors.right: panelStatus.left
+      anchors.rightMargin: 10
+      anchors.verticalCenter: panelStatus.verticalCenter
+      running: panel.busy || panel.pbusy
+      visible: running
+    }
     Text {
+      id: panelStatus
       anchors.right: parent.right
       anchors.rightMargin: 16
       anchors.verticalCenter: parent.verticalCenter

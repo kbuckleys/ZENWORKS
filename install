@@ -52,6 +52,10 @@ PACKAGES=(
   kitty zsh zoxide neovim git curl fastfetch stow
   # system & packages
   pacman-contrib expac gawk bandwhich iotop solaar glib2 gtk3 nodejs
+  # GTK 3 in the shell's colors (morpheus/ThemeSync, scripts/gtkscheme.sh)
+  adw-gtk-theme
+  # Qt apps in the shell's colors (morpheus/ThemeSync, QT_QPA_PLATFORMTHEME)
+  qt6ct
   # fonts
   noto-fonts noto-fonts-cjk noto-fonts-extra noto-fonts-emoji
   ttf-jetbrains-mono-nerd ttf-dseg unicode-emoji

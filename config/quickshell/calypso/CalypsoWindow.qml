@@ -1219,9 +1219,9 @@ FloatingWindow {
             text: rowItem.head
             color: Zenon.accentMuted
             font.family: Zenon.face
-            font.weight: Font.DemiBold
+            font.weight: Zenon.titleWeight
             font.pixelSize: Zenon.px(12)
-            font.letterSpacing: 0.6
+            font.letterSpacing: Zenon.labelSpacing
           }
           Item {
             id: rowBody

@@ -167,7 +167,7 @@ Item {
           running: bar.lspBusy
           loops: Animation.Infinite
           from: -sweep.width; to: sweep.parent.width
-          duration: 1400
+          duration: Zenon.sweep
           easing.type: Easing.InOutQuad
         }
       }
@@ -182,8 +182,8 @@ Item {
       SequentialAnimation on opacity {
         running: (bar.st.rec || "") !== ""
         loops: Animation.Infinite
-        NumberAnimation { to: 0.35; duration: 700; easing.type: Easing.InOutQuad }
-        NumberAnimation { to: 1.0; duration: 700; easing.type: Easing.InOutQuad }
+        NumberAnimation { to: 0.35; duration: Zenon.beacon; easing.type: Zenon.breathEase }
+        NumberAnimation { to: 1.0; duration: Zenon.beacon; easing.type: Zenon.breathEase }
       }
     }
   }
@@ -478,8 +478,8 @@ Item {
         SequentialAnimation on opacity {
           running: (bar.st.rec || "") !== ""
           loops: Animation.Infinite
-          NumberAnimation { to: 0.35; duration: 700; easing.type: Easing.InOutQuad }
-          NumberAnimation { to: 1.0; duration: 700; easing.type: Easing.InOutQuad }
+          NumberAnimation { to: 0.35; duration: Zenon.beacon; easing.type: Zenon.breathEase }
+          NumberAnimation { to: 1.0; duration: Zenon.beacon; easing.type: Zenon.breathEase }
         }
       }
       Text { anchors.verticalCenter: parent.verticalCenter; font: bar.font; color: Zenon.red; text: "REC @" + (bar.st.rec || "") }
@@ -793,8 +793,8 @@ Item {
           running: bar.cmd
           loops: Animation.Infinite
           PauseAnimation { duration: 500 }
-          NumberAnimation { to: 0.2; duration: 620; easing.type: Easing.InOutQuad }
-          NumberAnimation { to: 1.0; duration: 620; easing.type: Easing.InOutQuad }
+          NumberAnimation { to: 0.2; duration: Zenon.breath; easing.type: Zenon.breathEase }
+          NumberAnimation { to: 1.0; duration: Zenon.breath; easing.type: Zenon.breathEase }
         }
         Connections {
           target: bar.ed

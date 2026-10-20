@@ -68,7 +68,7 @@ Item {
   }
   Connections {
     target: pane.mgr
-    // locked again from elsewhere (Lock Now, the timer): put away
+    // locked again from elsewhere (Lock now, the timer): put away
     function onUnlockedChanged() { if (!pane.mgr.unlocked && pane.note && (pane.note.sealed || pane.isEntry)) pane.show(pane.note); }
   }
 
@@ -190,7 +190,7 @@ Item {
         pane: pane
         visible: !pane.isSticky
         glyph: pane.note && pane.note.sealed ? "" : ""
-        tip: pane.note && pane.note.sealed ? "Locked — opened until Lock Now" : "Lock this note"
+        tip: pane.note && pane.note.sealed ? "Locked — opened until Lock now" : "Lock this note"
         lit: !!pane.note && !!pane.note.sealed
         menu: true
         onPressed: (x, y) => pane.lockMenu(x, y)
@@ -599,7 +599,7 @@ Item {
   readonly property var linkNote: { const id = N.noteLink(ed.hoverLink); return id && pane.mgr ? pane.mgr.noteOf(id) : null; }
   property bool linkPeek: false
   onLinkNoteChanged: { pane.linkPeek = false; if (pane.linkNote) linkWait.restart(); else linkWait.stop(); }
-  Timer { id: linkWait; interval: 450; onTriggered: pane.linkPeek = !!pane.linkNote }
+  Timer { id: linkWait; interval: Zenon.hoverWait; onTriggered: pane.linkPeek = !!pane.linkNote }
   NotePeek {
     win: pane.win
     target: ed.linkSpotItem
@@ -640,7 +640,7 @@ Item {
       width: parent.width
       horizontalAlignment: Text.AlignHCenter
       wrapMode: Text.Wrap
-      text: pane.isEntry ? "Enter the Clio password to read and write in it." : "Enter the Clio password to view it. Every locked note opens with it, until you Lock Now or close Clio."
+      text: pane.isEntry ? "Enter the Clio password to read and write in it." : "Enter the Clio password to view it. Every locked note opens with it, until you Lock now or close Clio."
       color: Zenon.accentMuted
       font.family: Zenon.face
       font.weight: Zenon.weight
@@ -774,7 +774,7 @@ Item {
     const items = [];
     if (n.sealed) items.push({ text: "Remove lock", icon: "", run: () => pane.win.removeLock(n) });
     else items.push({ text: "Lock this " + (pane.isEntry ? "entry" : "note"), icon: "", run: () => pane.win.lockNote(n) });
-    if (pane.mgr.unlocked) items.push({ text: "Lock Now", icon: "", mark: "ctrl alt l", run: () => pane.win.lockNow() });
+    if (pane.mgr.unlocked) items.push({ text: "Lock now", icon: "", mark: "ctrl alt l", run: () => pane.win.lockNow() });
     items.push({ isSeparator: true }, { text: pane.mgr.hasPassword ? "Change the password…" : "Set a password…", icon: "", run: () => pane.win.changePassword() });
     pane.win.menuRef.open(x, y, items);
   }

@@ -249,8 +249,8 @@ Item {
   SequentialAnimation on breath {
     running: rowDrop.containsDrag
     loops: Animation.Infinite
-    NumberAnimation { to: 1; duration: 520; easing.type: Easing.InOutSine }
-    NumberAnimation { to: 0.35; duration: 520; easing.type: Easing.InOutSine }
+    NumberAnimation { to: 1; duration: Zenon.breath; easing.type: Zenon.breathEase }
+    NumberAnimation { to: 0.35; duration: Zenon.breath; easing.type: Zenon.breathEase }
   }
   Rectangle {
     anchors.fill: parent

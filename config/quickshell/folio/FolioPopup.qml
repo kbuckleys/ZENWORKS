@@ -608,14 +608,10 @@ function onThumbsDone() {
         width: parent.width
         height: parent.height - msgBar.height
 
-          Text {
+          EmptyState {
             id: emptyLabel
             anchors.centerIn: parent
             text: "No clipboard entries"
-            color: popup.hintColor
-            font.family: Zenon.face
-            font.weight: 600
-            font.pixelSize: Zenon.px(13)
             // THE MODE ON SCREEN, not the clipboard as a whole. This asked
             // whether BOTH sides were empty, so an image mode emptied down
             // to nothing said nothing at all while text entries existed one

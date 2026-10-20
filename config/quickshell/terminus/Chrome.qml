@@ -3326,14 +3326,10 @@ Column {
       readonly property int fit: Math.max(1, Math.floor(portalPicks.width / 170))
       readonly property int shown: Math.min(portalPicks.picks.length, 3, portalPicks.fit)
 
-      Text {
+      EmptyState {
         anchors.verticalCenter: parent.verticalCenter
         visible: portalPicks.picks.length === 0
         text: "Nothing selected"
-        color: Zenon.accentMuted
-        font.family: Zenon.face
-        font.weight: Zenon.weight
-        font.pixelSize: Zenon.px(13)
       }
 
       Row {

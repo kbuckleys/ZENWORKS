@@ -41,6 +41,9 @@ font_size        $monopt
 put "$cfg/kitty/font.conf" "$kconf" && pkill -USR1 -x kitty
 
 # ── GTK 3 and 4: settings.ini's gtk-font-name ──
+# gtkscheme.sh rewrites the same files, and both run as the shell starts
+exec 9>"${XDG_RUNTIME_DIR:-/tmp}/zen-gtk-settings.lock"
+flock 9 2>/dev/null
 for f in "$cfg/gtk-3.0/settings.ini" "$cfg/gtk-4.0/settings.ini"; do
 	[ -f "$f" ] || continue
 	grep -qxF "gtk-font-name=$gtk" "$f" && continue

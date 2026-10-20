@@ -325,7 +325,7 @@ Rectangle {
             running: !jobBar.counting && !jobRow.model.cancelled
             loops: Animation.Infinite
             from: 0; to: 1
-            duration: 1150
+            duration: Zenon.sweep
             easing.type: Easing.InOutQuad
           }
 

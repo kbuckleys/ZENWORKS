@@ -519,33 +519,84 @@ FloatingWindow {
   // One place typing is understood, for every tab that filters. Returns
   // whether the key was a filter key.
   // THE FIELD'S CLIPBOARD (user, 2026-10-18): cut, copy, paste and select
-  // all, for the keys and for the field's right-click menu alike. There is no
-  // caret to place, so a selection is all or nothing: ctrl+a takes the whole
-  // text, and what is typed or pasted next replaces it. Anything else that
-  // changes the text, or leaving the field, lets it go.
-  property bool allSelected: false
-  onFilterTextChanged: win.allSelected = false
-  onTypingChanged: if (!win.typing) win.allSelected = false
+  // all, for the keys and for the field's right-click menu alike — the
+  // selection's, or with none the whole text's.
+  //
+  // THE CARET AND THE SELECTION (user, 2026-10-20): ← → and home/end move
+  // it, ctrl a word at a time, shift selects as it goes; double click takes a
+  // word, triple the whole text. The field's TextInput (sfInput) holds both —
+  // read-only and never focused, the keys still come here — so its
+  // cursorPosition and selection are the truth, and every edit below puts the
+  // text and the caret back together (fieldPut). Leaving the field drops the
+  // selection.
+  onTypingChanged: if (!win.typing) sfInput.deselect()
+  function fieldHasSel() { return sfInput.selectionStart !== sfInput.selectionEnd; }
+  // the text with the caret at `at`, tidied as typing would have left it:
+  // no leading space, never two in a row
+  function fieldPut(t, at) {
+    let pre = t.slice(0, at).replace(/^ +/, "").replace(/ {2,}/g, " ");
+    let post = t.slice(at).replace(/ {2,}/g, " ");
+    if (pre === "" || pre.endsWith(" ")) post = post.replace(/^ +/, "");
+    win.setFilter(pre + post);
+    sfInput.cursorPosition = Math.min(pre.length, sfInput.text.length);
+  }
+  // `s` at the caret, over the selection if there is one
+  function fieldInsert(s) {
+    const t = win.filterText, a = sfInput.selectionStart, b = sfInput.selectionEnd;
+    win.fieldPut(t.slice(0, a) + s + t.slice(b), a + s.length);
+  }
+  // the selection, or else one character (or word) back or forward
+  function fieldErase(dir, word) {
+    const t = win.filterText;
+    let a = sfInput.selectionStart, b = sfInput.selectionEnd;
+    if (a === b) {
+      const to = word ? win.wordStop(t, a, dir) : Math.max(0, Math.min(t.length, a + dir));
+      a = Math.min(a, to); b = Math.max(b, to);
+    }
+    if (a !== b) win.fieldPut(t.slice(0, a) + t.slice(b), a);
+  }
+  // ctrl's stop: past the gap, then to the far end of the word
+  function wordStop(t, c, dir) {
+    const w = ch => /\w/.test(ch);
+    let i = c;
+    if (dir < 0) { while (i > 0 && !w(t[i - 1])) i--; while (i > 0 && w(t[i - 1])) i--; }
+    else { while (i < t.length && !w(t[i])) i++; while (i < t.length && w(t[i])) i++; }
+    return i;
+  }
+  // the run of one kind (word, space, punctuation) holding character i
+  function wordAt(t, i) {
+    if (t === "") return [0, 0];
+    i = Math.max(0, Math.min(i, t.length - 1));
+    const kind = /\w/.test(t[i]) ? /\w/ : /\s/.test(t[i]) ? /\s/ : /[^\w\s]/;
+    let a = i, b = i + 1;
+    while (a > 0 && kind.test(t[a - 1])) a--;
+    while (b < t.length && kind.test(t[b])) b++;
+    return [a, b];
+  }
+  function fieldMove(to, extend) {
+    if (extend) sfInput.moveCursorSelection(to, TextInput.SelectCharacters);
+    else sfInput.cursorPosition = to;
+  }
   function fieldSelectAll() {
     win.typing = true;
-    win.allSelected = win.filterText !== "";
+    sfInput.selectAll();
   }
   function fieldCopy() {
-    if (win.filterText !== "") Strings.copy(win.filterText);
+    const s = sfInput.selectedText || win.filterText;
+    if (s !== "") Strings.copy(s);
   }
   function fieldCut() {
     if (win.filterText === "") return;
-    Strings.copy(win.filterText);
+    if (!win.fieldHasSel()) sfInput.selectAll();
+    Strings.copy(sfInput.selectedText);
     win.typing = true;
-    win.setFilter("");
+    win.fieldErase(-1, false);
   }
-  // one line of it, as typing would have left it — printable, single-spaced
+  // one line of it, printable, at the caret
   function fieldPaste() {
-    const base = win.allSelected ? "" : win.filterText;
     Strings.paste(t => {
-      const add = t.replace(/[^\x20-\x7e]+/g, " ");
       win.typing = true;
-      win.setFilter((base + add).replace(/^ +/, "").replace(/ {2,}/g, " "));
+      win.fieldInsert(t.replace(/[^\x20-\x7e]+/g, " "));
     });
   }
   // UNDO AND REDO (user, 2026-10-18), morpheus' UndoStack: every change to
@@ -594,30 +645,52 @@ FloatingWindow {
     if (ctrl && (k === Qt.Key_Y || (k === Qt.Key_Z && (event.modifiers & Qt.ShiftModifier)))) { win.fieldRedo(); return true; }
     if (ctrl && k === Qt.Key_Z) { win.fieldUndo(); return true; }
     if (win.typing && event.matches(StandardKey.SelectAll)) { win.fieldSelectAll(); return true; }
-    // the whole text selected: backspace takes it, a letter replaces it
-    if (win.allSelected) {
-      win.allSelected = false;
-      if (k === Qt.Key_Backspace) { win.setFilter(""); return true; }
-      if (event.text && !ctrl && !(event.modifiers & Qt.MetaModifier)
-          && /^[\x21-\x7e]$/.test(event.text)) { win.setFilter(event.text); return true; }
-    }
     if (!win.typing) {
       // terminus' "go to the filter" — and backspace, which can only mean
-      // the text, goes back in to take a letter off it
+      // the text, goes back in to take a letter off its end
       if (k === Qt.Key_Slash) { win.typing = true; return true; }
-      if (k === Qt.Key_Backspace) { win.typing = true; win.setFilter(win.filterText.slice(0, -1)); return true; }
+      if (k === Qt.Key_Backspace) {
+        win.typing = true;
+        sfInput.cursorPosition = sfInput.text.length;
+        win.fieldErase(-1, false);
+        return true;
+      }
       return false;
     }
+    const shift = event.modifiers & Qt.ShiftModifier, t = win.filterText;
+    if (k === Qt.Key_Left || k === Qt.Key_Right) {
+      const dir = k === Qt.Key_Left ? -1 : 1;
+      // a plain arrow over a selection lands on its edge, that side
+      if (!shift && !ctrl && win.fieldHasSel())
+        win.fieldMove(dir < 0 ? sfInput.selectionStart : sfInput.selectionEnd, false);
+      else {
+        const c = sfInput.cursorPosition;
+        win.fieldMove(ctrl ? win.wordStop(t, c, dir) : Math.max(0, Math.min(t.length, c + dir)), shift);
+      }
+      return true;
+    }
+    if (k === Qt.Key_Home) { win.fieldMove(0, shift); return true; }
+    if (k === Qt.Key_End) { win.fieldMove(t.length, shift); return true; }
     if (ctrl && k === Qt.Key_U) { win.setFilter(""); return true; }
-    if (ctrl && k === Qt.Key_W) { win.setFilter(win.filterText.replace(/\S*\s*$/, "")); return true; }
-    if (k === Qt.Key_Backspace) { win.setFilter(win.filterText.slice(0, -1)); return true; }
+    // readline's: back to the last space (ctrl+backspace stops at punctuation too)
+    if (ctrl && k === Qt.Key_W) {
+      if (win.fieldHasSel()) { win.fieldErase(-1, false); return true; }
+      const c = sfInput.cursorPosition, pre = t.slice(0, c).replace(/\S*\s*$/, "");
+      win.fieldPut(pre + t.slice(c), pre.length);
+      return true;
+    }
+    if (k === Qt.Key_Backspace) { win.fieldErase(-1, ctrl); return true; }
+    if (k === Qt.Key_Delete) { win.fieldErase(1, ctrl); return true; }
     // already in it; no package name holds a slash, so the habit costs nothing
     if (k === Qt.Key_Slash) return true;
     if (event.text && event.text.length > 0 && !ctrl && !(event.modifiers & Qt.MetaModifier)
         && /^[\x20-\x7e]$/.test(event.text)) {
       // a space starts a new word, never the filter, and never two in a row
-      if (event.text === " " && (win.filterText === "" || / $/.test(win.filterText))) return true;
-      win.setFilter(win.filterText + event.text);
+      if (event.text === " ") {
+        const pre = t.slice(0, sfInput.selectionStart), post = t.slice(sfInput.selectionEnd);
+        if (pre === "" || pre.endsWith(" ") || post.startsWith(" ")) return true;
+      }
+      win.fieldInsert(event.text);
       return true;
     }
     return false;
@@ -697,8 +770,8 @@ FloatingWindow {
   property var peekInfo: null
   property var peekShown: null
   onSelChanged: { win.peekInfo = null; win.peekShown = null; }
-  Timer { id: peekWait; interval: 450; onTriggered: win.startPeek() }
-  Timer { id: peekLeave; interval: 220; onTriggered: if (!win.peekPkg) win.peekShown = null }
+  Timer { id: peekWait; interval: Zenon.hoverWait; onTriggered: win.startPeek() }
+  Timer { id: peekLeave; interval: Zenon.hoverLeave; onTriggered: if (!win.peekPkg) win.peekShown = null }
   function peekAt(row, pkg) {
     win.peekRow = row;
     win.peekPkg = pkg;
@@ -1957,6 +2030,10 @@ FloatingWindow {
       if (win.tab === "store") {
         if (!win.typing && !ctrl && !(event.modifiers & Qt.AltModifier) && event.text
             && /^[A-Za-z0-9]$/.test(event.text)) win.typing = true;
+        // in the field ← → home end are the caret's, not the grid's — but
+        // a screenshot open still steps through the shots
+        const caretKey = k === Qt.Key_Left || k === Qt.Key_Right || k === Qt.Key_Home || k === Qt.Key_End;
+        if (win.typing && caretKey && storeView.lightbox === "") { event.accepted = win.filterKey(event); return; }
         event.accepted = storeView.key(event) || win.filterKey(event);
         return;
       }
@@ -2223,7 +2300,8 @@ FloatingWindow {
           // 2026-10-14): the Store's first, then every tab that filters — it
           // used to be the query said as a line. Still not a text box: the keys
           // never leave the window (see `typing`); it shows what is typed, with
-          // a caret while you are in it, and a click puts you back in.
+          // a caret and a selection while you are in it (fieldPut), and a click
+          // puts you back in.
           Rectangle {
             id: searchField
             visible: win.filters
@@ -2253,34 +2331,40 @@ FloatingWindow {
               font.weight: Zenon.weight
               font.pixelSize: Zenon.px(13)
             }
-            Row {
+            Item {
+              id: sfText
               anchors.left: sfGlyph.right
               anchors.leftMargin: 9
               anchors.right: sfClear.visible ? sfClear.left : parent.right
               anchors.rightMargin: 10
-              anchors.verticalCenter: parent.verticalCenter
-              spacing: 1
+              anchors.top: parent.top
+              anchors.bottom: parent.bottom
               clip: true
-              Text {
-                visible: win.filterText !== ""
+              // the text, with the caret and the selection it holds (see
+              // fieldPut): drawn by a TextInput that never takes focus or a
+              // key — the window's keys edit it, sfMouse places it
+              TextInput {
+                id: sfInput
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.verticalCenter: parent.verticalCenter
                 text: win.filterText
-                color: win.allSelected ? Zenon.onAccent : win.typing ? Zenon.white : Zenon.accentKey
+                readOnly: true
+                enabled: false
+                activeFocusOnTab: false
+                cursorVisible: false
+                cursorDelegate: Item {}
+                color: win.typing ? Zenon.white : Zenon.accentKey
+                selectionColor: Zenon.cyan
+                selectedTextColor: Zenon.onAccent
                 font.family: Zenon.face
                 font.weight: Zenon.weight
                 font.pixelSize: Zenon.px(15)
-                // ctrl+a's selection, the whole text
-                Rectangle {
-                  z: -1
-                  visible: win.allSelected
-                  anchors.fill: parent
-                  anchors.margins: -1
-                  radius: 3
-                  color: Zenon.cyan
-                }
               }
               Rectangle {
                 id: sfCaret
                 visible: win.face === "browse" && win.typing
+                x: Math.max(0, sfInput.x + sfInput.cursorRectangle.x)
                 anchors.verticalCenter: parent.verticalCenter
                 width: 2
                 height: 15
@@ -2289,17 +2373,71 @@ FloatingWindow {
                 SequentialAnimation on opacity {
                   running: sfCaret.visible
                   loops: Animation.Infinite
-                  NumberAnimation { to: 1; duration: 550; easing.type: Easing.InOutSine }
-                  NumberAnimation { to: 0.3; duration: 550; easing.type: Easing.InOutSine }
+                  NumberAnimation { to: 1; duration: Zenon.breath; easing.type: Zenon.breathEase }
+                  NumberAnimation { to: 0.3; duration: Zenon.breath; easing.type: Zenon.breathEase }
                 }
               }
               Text {
                 visible: win.filterText === ""
+                anchors.left: parent.left
+                anchors.leftMargin: 3
+                anchors.verticalCenter: parent.verticalCenter
                 text: "Search"
                 color: Zenon.accentMuted
                 font.family: Zenon.face
                 font.weight: Zenon.weight
                 font.pixelSize: Zenon.px(15)
+              }
+            }
+            // A click puts you in and the caret where it landed; shift+click
+            // selects to there, a double click takes the word, a triple the
+            // whole text, and a drag selects by the grain it started with.
+            MouseArea {
+              id: sfMouse
+              anchors.fill: parent
+              acceptedButtons: Qt.LeftButton
+              property int clicks: 0
+              property real lastAt: 0
+              // what the press picked, kept while the drag grows from it
+              property int pinA: 0
+              property int pinB: 0
+              function at(x, y, onChar) {
+                const p = sfMouse.mapToItem(sfInput, x, y);
+                return sfInput.positionAt(p.x, p.y, onChar ? TextInput.CursorOnCharacter : TextInput.CursorBetweenCharacters);
+              }
+              onPressed: (m) => {
+                const now = Date.now();
+                sfMouse.clicks = now - sfMouse.lastAt < Qt.styleHints.mouseDoubleClickInterval ? sfMouse.clicks % 3 + 1 : 1;
+                sfMouse.lastAt = now;
+                win.typing = true;
+                keys.forceActiveFocus();
+                if (sfMouse.clicks === 3) {
+                  sfInput.selectAll();
+                  sfMouse.pinA = 0; sfMouse.pinB = sfInput.text.length;
+                } else if (sfMouse.clicks === 2) {
+                  const r = win.wordAt(sfInput.text, sfMouse.at(m.x, m.y, true));
+                  sfInput.select(r[0], r[1]);
+                  sfMouse.pinA = r[0]; sfMouse.pinB = r[1];
+                } else if (m.modifiers & Qt.ShiftModifier) {
+                  const anchor = sfInput.cursorPosition === sfInput.selectionEnd ? sfInput.selectionStart : sfInput.selectionEnd;
+                  win.fieldMove(sfMouse.at(m.x, m.y, false), true);
+                  sfMouse.pinA = sfMouse.pinB = anchor;
+                } else {
+                  sfInput.cursorPosition = sfMouse.at(m.x, m.y, false);
+                  sfMouse.pinA = sfMouse.pinB = sfInput.cursorPosition;
+                }
+              }
+              onPositionChanged: (m) => {
+                if (!sfMouse.pressed || sfMouse.clicks === 3) return;
+                let to = sfMouse.at(m.x, m.y, false);
+                if (sfMouse.clicks === 2) {
+                  const r = win.wordAt(sfInput.text, sfMouse.at(m.x, m.y, true));
+                  if (r[0] < sfMouse.pinA) to = r[0];
+                  else if (r[1] > sfMouse.pinB) to = r[1];
+                  else { sfInput.select(sfMouse.pinA, sfMouse.pinB); return; }
+                }
+                sfInput.cursorPosition = to < sfMouse.pinA ? sfMouse.pinB : sfMouse.pinA;
+                sfInput.moveCursorSelection(to, TextInput.SelectCharacters);
               }
             }
             // THE TEXT, CLEARED (user, 2026-10-15): a × at the end while there
@@ -2315,7 +2453,6 @@ FloatingWindow {
               z: 1
               onClicked: { win.setFilter(""); win.typing = true; keys.forceActiveFocus(); }
             }
-            TapHandler { onTapped: { win.typing = true; keys.forceActiveFocus(); } }
             TapHandler {
               acceptedButtons: Qt.RightButton
               onTapped: (ev) => {
@@ -2384,7 +2521,7 @@ FloatingWindow {
               RotationAnimation on rotation {
                 running: Ceres.checking
                 loops: Animation.Infinite
-                from: 0; to: 360; duration: 900
+                from: 0; to: 360; duration: Zenon.spin
                 onRunningChanged: if (!running) refresh.rotation = 0
               }
             }

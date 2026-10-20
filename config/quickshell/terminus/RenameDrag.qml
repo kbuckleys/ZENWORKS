@@ -145,7 +145,7 @@ Item {
   function setWallpaper(screenName) {
     const r = term.currentRow();
     if (!r || r.isDir || !Terminus.isImage(r.name)) return;
-    if (screenName) { Picasso.setFor(screenName, r.path); term.status = "Background set"; return; }
+    if (screenName) { Picasso.setFor(screenName, r.path); return; }
     // ACROSS EVERY MONITOR, as one picture (user, 2026-10-10): picasso's
     // span, each monitor showing the slice that falls where it sits. One
     // monitor is just the background, as before.
@@ -153,7 +153,6 @@ Item {
     for (let i = 0; i < Quickshell.screens.length; ++i) names.push(Quickshell.screens[i].name);
     if (names.length > 1) Picasso.setSpan(r.path, names);
     else Picasso.setAll(r.path);
-    term.status = "Background set";
   }
   // Which rows a rubber band covers. Worked out from the geometry rather than
   // by asking each delegate whether it intersects: a ListView only realizes

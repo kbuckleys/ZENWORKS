@@ -73,3 +73,5 @@ EdgeTab 1.0 EdgeTab.qml
 TabStrip 1.0 TabStrip.qml
 CursorBand 1.0 CursorBand.qml
 HintBar 1.0 HintBar.qml
+SectionLabel 1.0 SectionLabel.qml
+EmptyState 1.0 EmptyState.qml

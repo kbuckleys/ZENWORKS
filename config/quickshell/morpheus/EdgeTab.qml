@@ -60,14 +60,15 @@ Rectangle {
   visible: opacity > 0.01
   Behavior on opacity { NumberAnimation { duration: Zenon.fast; easing.type: Zenon.ease } }
 
-  // a click leans it the way it goes, and it springs back
+  // a click leans it the way it goes, and it eases back (no overshoot:
+  // the bounce is kept for things arriving, 2026-10-20)
   transform: Translate { id: tabNudge }
   SequentialAnimation {
     id: tabNudgeAnim
     NumberAnimation { target: tabNudge; property: tab.side ? "x" : "y"; to: tab.nudge
                       duration: Math.round(70 * Zenon.cfg.motionScale); easing.type: Easing.OutCubic }
     NumberAnimation { target: tabNudge; property: tab.side ? "x" : "y"; to: 0
-                      duration: Math.round(260 * Zenon.cfg.motionScale); easing.type: Easing.OutBack; easing.overshoot: 2 }
+                      duration: Math.round(260 * Zenon.cfg.motionScale); easing.type: Easing.OutCubic }
   }
   // no line along the edge it grows out of
   Rectangle {

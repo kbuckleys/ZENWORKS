@@ -965,10 +965,10 @@ LayerPopup {
                 text: "Make a color"
                 color: popup.dimColor
                 font.family: Zenon.face
-                font.weight: 600
+                font.weight: Zenon.titleWeight
                 font.pixelSize: Zenon.px(12)
                 font.capitalization: Font.AllUppercase
-                font.letterSpacing: 1.2
+                font.letterSpacing: Zenon.labelSpacing
               }
 
               ColorPicker {

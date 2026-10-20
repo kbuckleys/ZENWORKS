@@ -181,9 +181,9 @@ ListView {
         text: cell.head
         color: Zenon.accentMuted
         font.family: Zenon.face
-        font.weight: Font.Bold
+        font.weight: Zenon.titleWeight
         font.pixelSize: Math.round(11 * term.zoom)
-        font.letterSpacing: 0.6
+        font.letterSpacing: Zenon.labelSpacing
       }
 
       // The rule runs from the end of the words to the far edge, so the

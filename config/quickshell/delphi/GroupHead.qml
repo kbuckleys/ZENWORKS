@@ -30,8 +30,8 @@ Row {
     text: head.title.toUpperCase()
     color: head.ink
     font.family: Zenon.face
-    font.weight: Font.Bold
-    font.letterSpacing: 1
+    font.weight: Zenon.titleWeight
+    font.letterSpacing: Zenon.labelSpacing
     font.pixelSize: Zenon.px(12)
   }
   Text {

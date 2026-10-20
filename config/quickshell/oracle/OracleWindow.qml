@@ -1958,15 +1958,11 @@ FloatingWindow {
               }
             }
 
-            Text {
+            EmptyState {
               anchors.centerIn: parent
               visible: popup.rows.length === 0
               text: popup.searching ? "Nothing matches “" + popup.query + "”"
                                     : "Nothing to set here"
-              color: popup.dimColor
-              font.family: popup.face
-              font.weight: Font.Medium
-              font.pixelSize: Zenon.px(16)
             }
 
             // The bar takes its width out of the list rather than floating

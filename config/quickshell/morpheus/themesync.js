@@ -50,7 +50,10 @@ function renderKitty(c, light) {
     ["selection_foreground", h("onAccent")], ["selection_background", h("magenta")],
     ["url_color", h("blue")],
     ["active_border_color", h("muted")], ["inactive_border_color", h("surface")],
-    ["bell_border_color", h("red")],
+    ["bell_border_color", h("red")], ["visual_bell_color", h("red")],
+    // kitty.conf writes these two as Zenon's literals (2026-10-20, user:
+    // nothing may keep Zenon's colors under another theme)
+    ["cursor_trail_color", h("magenta")],
     ["active_tab_foreground", h("ink")], ["active_tab_background", h("ground")],
     ["inactive_tab_foreground", h("muted")], ["inactive_tab_background", h("surface")],
     ["tab_bar_background", h("surface")],
@@ -197,4 +200,196 @@ function renderFontconfig(face, mono) {
     "<fontconfig>"]
     .concat(alias("sans-serif", face), alias("system-ui", face), alias("monospace", mono))
     .concat(["</fontconfig>", ""]).join("\n");
+}
+
+// ── GTK ────────────────────────────────────────────────────────────────
+// gtk-4.0/colors.css and gtk-3.0/colors.css, which each directory's
+// gtk.css @imports. A user gtk.css is read over the theme, so these win.
+//
+// libadwaita (1.6 on) paints with CSS variables — `--window-bg-color` —
+// that its own :root sets from its named colors, resolved inside its own
+// stylesheet: a user @define-color alone no longer reaches them. So GTK 4
+// gets both, the variables for libadwaita and the names for anything that
+// still looks them up. GTK 3 has no variables; adw-gtk3 (the libadwaita
+// look ported to GTK 3) reads the same names, and the old theme_* names
+// are for the rest. `--accent-color` is left to libadwaita: it derives it
+// from the accent's background, darker on a light theme so it still reads
+// as text.
+//
+// The ladder is the theme's own: ground (views, the window) under card
+// (bars, sidebars, popovers, cards) under surface (thumbnails). Shades
+// are black in every theme, like the shell's own shadows.
+function gtkColors(c, light) {
+  const h = (k) => "#" + rgb(c[k]);
+  const shade = (a) => "rgba(0, 0, 0, " + a + ")";
+  return [
+    ["window_bg_color", h("ground")], ["window_fg_color", h("ink")],
+    ["view_bg_color", h("ground")], ["view_fg_color", h("ink")],
+    ["headerbar_bg_color", h("card")], ["headerbar_fg_color", h("ink")],
+    ["headerbar_border_color", h("ink")], ["headerbar_backdrop_color", h("ground")],
+    ["headerbar_shade_color", shade(light ? 0.12 : 0.36)],
+    ["headerbar_darker_shade_color", shade(light ? 0.12 : 0.9)],
+    ["sidebar_bg_color", h("card")], ["sidebar_fg_color", h("ink")],
+    ["sidebar_backdrop_color", h("ground")], ["sidebar_border_color", h("border")],
+    ["sidebar_shade_color", shade(light ? 0.07 : 0.25)],
+    ["secondary_sidebar_bg_color", h("card")], ["secondary_sidebar_fg_color", h("ink")],
+    ["secondary_sidebar_backdrop_color", h("ground")],
+    ["secondary_sidebar_border_color", h("border")],
+    ["secondary_sidebar_shade_color", shade(light ? 0.07 : 0.25)],
+    ["card_bg_color", h("card")], ["card_fg_color", h("ink")],
+    ["card_shade_color", shade(light ? 0.07 : 0.36)],
+    ["dialog_bg_color", h("card")], ["dialog_fg_color", h("ink")],
+    ["popover_bg_color", h("card")], ["popover_fg_color", h("ink")],
+    ["popover_shade_color", shade(light ? 0.07 : 0.25)],
+    ["thumbnail_bg_color", h("surface")], ["thumbnail_fg_color", h("ink")],
+    ["overview_bg_color", h("card")], ["overview_fg_color", h("ink")],
+    ["shade_color", shade(light ? 0.07 : 0.25)],
+    ["scrollbar_outline_color", light ? "#ffffff" : shade(0.5)],
+    ["accent_bg_color", h("cyan")], ["accent_fg_color", h("onAccent")],
+    ["destructive_bg_color", h("red")], ["destructive_fg_color", h("onAccent")],
+    ["success_bg_color", h("green")], ["success_fg_color", h("onAccent")],
+    ["warning_bg_color", h("yellow")], ["warning_fg_color", h("onAccent")],
+    ["error_bg_color", h("red")], ["error_fg_color", h("onAccent")],
+  ];
+}
+
+function gtkHead(file) {
+  const out = HEAD.map((l) => "/* " + l + " */");
+  out.push("", "/* Written by the shell (morpheus/ThemeSync.qml) whenever its theme",
+           " * changes; " + file + " @imports it. Edits here are overwritten. */", "");
+  return out;
+}
+
+function renderGtk4(c, light) {
+  const out = gtkHead("gtk-4.0/gtk.css");
+  if (!c) {
+    out.push("/* Zenon is worn: nothing to override. */", "");
+    return out.join("\n");
+  }
+  const t = gtkColors(c, light);
+  out.push("/* " + (c.name || "theme") + " */", "");
+  for (const l of t) out.push("@define-color " + l[0] + " " + l[1] + ";");
+  out.push("", ":root {");
+  for (const l of t) out.push("  --" + l[0].replace(/_/g, "-") + ": " + l[1] + ";");
+  out.push("}", "");
+  return out.join("\n");
+}
+
+function renderGtk3(c, light) {
+  const out = gtkHead("gtk-3.0/gtk.css");
+  if (!c) {
+    out.push("/* Zenon is worn: nothing to override. */", "");
+    return out.join("\n");
+  }
+  const h = (k) => "#" + rgb(c[k]);
+  const t = gtkColors(c, light).filter((l) => !/^overview_/.test(l[0])).concat([
+    ["accent_color", h("cyan")],
+    ["destructive_color", h("red")], ["success_color", h("green")],
+    ["warning_color", h("yellow")], ["error_color", h("red")],
+    // the names GTK 3's own themes (and old apps) look up
+    ["theme_bg_color", h("ground")], ["theme_fg_color", h("ink")],
+    ["theme_base_color", h("ground")], ["theme_text_color", h("ink")],
+    ["theme_selected_bg_color", h("cyan")], ["theme_selected_fg_color", h("onAccent")],
+    ["theme_unfocused_bg_color", h("ground")], ["theme_unfocused_fg_color", h("ink")],
+    ["theme_unfocused_base_color", h("ground")], ["theme_unfocused_text_color", h("ink")],
+    ["theme_unfocused_selected_bg_color", h("cyan")],
+    ["theme_unfocused_selected_fg_color", h("onAccent")],
+    ["borders", h("border")], ["unfocused_borders", h("border")],
+  ]);
+  out.push("/* " + (c.name || "theme") + " */", "");
+  for (const l of t) out.push("@define-color " + l[0] + " " + l[1] + ";");
+  out.push("");
+  return out.join("\n");
+}
+
+// gsettings' color-scheme, which libadwaita reads through the portal
+function colorScheme(light) { return light ? "prefer-light" : "prefer-dark"; }
+
+// ── Qt ─────────────────────────────────────────────────────────────────
+// qt6ct/colors/zenworks.conf, a qt6ct color scheme, and qt6ct/qt6ct.conf,
+// which points qt6ct at it. base.lua sets QT_QPA_PLATFORMTHEME=qt6ct, so
+// every Qt app Hyprland starts — the screen-share picker, the polkit agent —
+// paints with this palette. Written for Zenon too: Qt has no Zenon of its
+// own, only Fusion's stock grays.
+//
+// A scheme is QPalette's roles in Qt's own order, one #aarrggbb each, for
+// each of the three groups. Qt 6.6 added Accent at the end; a qt6ct that
+// reads fewer roles leaves the rest at Fusion's.
+//
+// The ladder is the GTK one: windows are the ground, views and fields
+// (Base) the card, alternate rows the surface. Fusion draws bevels from
+// Light/Midlight/Mid/Dark/Shadow, so those are steps around the card.
+function mix(a, b, t) {
+  const x = parseInt(rgb(a), 16), y = parseInt(rgb(b), 16);
+  const ch = (v, s) => (v >> s) & 255;
+  let out = "";
+  for (const s of [16, 8, 0])
+    out += Math.round(ch(x, s) + (ch(y, s) - ch(x, s)) * t).toString(16).padStart(2, "0");
+  return out;
+}
+
+const QT_ROLES = ["WindowText", "Button", "Light", "Midlight", "Dark", "Mid", "Text",
+                  "BrightText", "ButtonText", "Base", "Window", "Shadow", "Highlight",
+                  "HighlightedText", "Link", "LinkVisited", "AlternateBase", "NoRole",
+                  "ToolTipBase", "ToolTipText", "PlaceholderText", "Accent"];
+
+function qtPalette(c, light) {
+  const k = (s) => rgb(c[s]);
+  const active = {
+    WindowText: k("ink"), Button: k("card"), Light: light ? "ffffff" : k("surface"),
+    Midlight: light ? mix(c.card, "#ffffff", 0.5) : mix(c.card, c.surface, 0.5),
+    Dark: light ? k("border") : mix(c.ground, "#000000", 0.3),
+    Mid: light ? mix(c.card, c.border, 0.5) : k("border"),
+    Text: k("ink"), BrightText: k("red"), ButtonText: k("ink"),
+    Base: k("card"), Window: k("ground"), Shadow: "000000",
+    Highlight: k("cyan"), HighlightedText: k("onAccent"),
+    Link: k("blue"), LinkVisited: k("magenta"), AlternateBase: k("surface"),
+    NoRole: "000000", ToolTipBase: k("card"), ToolTipText: k("ink"),
+    PlaceholderText: k("muted"), Accent: k("cyan"),
+  };
+  // disabled: the type goes muted and a selection loses its color
+  const disabled = Object.assign({}, active, {
+    WindowText: k("muted"), Text: k("muted"), ButtonText: k("muted"),
+    BrightText: k("muted"), Highlight: k("surface"), HighlightedText: k("muted"),
+    PlaceholderText: mix(c.muted, c.card, 0.4), Accent: k("surface"),
+  });
+  const row = (p) => QT_ROLES.map((r) => "#ff" + p[r]).join(", ");
+  // inactive (a window without the keys) is active: Fusion's own does that
+  return { active: row(active), inactive: row(active), disabled: row(disabled) };
+}
+
+function renderQtColors(c, light) {
+  const p = qtPalette(c, light);
+  const out = HEAD.map((l) => "# " + l);
+  out.push("", "# Written by the shell (morpheus/ThemeSync.qml) whenever its theme",
+           "# changes; qt6ct.conf points here. Edits here are overwritten.",
+           "# " + (c.name || "theme"), "",
+           "[ColorScheme]",
+           "active_colors=" + p.active,
+           "disabled_colors=" + p.disabled,
+           "inactive_colors=" + p.inactive, "");
+  return out.join("\n");
+}
+
+// qt6ct.conf. Fonts and the icon theme are left out: qt6ct then falls back
+// to the desktop's font, which is oracle's Font as fontsync.sh hands it to
+// GTK (measured 2026-10-20: "SF Pro Text" 12 under qt6ct, Qt's stock "Sans
+// Serif" 9 without).
+//
+// QUICKSHELL READS THIS TOO: it is started by Hyprland, so it has the
+// variable, and everything it launches inherits it from it (which is why
+// it is not stripped there). Measured 2026-10-20, it changes nothing the
+// shell draws: no color comes from the palette (every TextArea/TextInput
+// selection color is set), and only hidden TextInputs/TextEdits keep the
+// default font. A visible Text with no font.pixelSize would now be 16px,
+// not 12.
+function renderQt6ct(schemePath) {
+  const out = HEAD.map((l) => "# " + l);
+  out.push("", "# Written by the shell (morpheus/ThemeSync.qml). Edits here are overwritten.", "",
+           "[Appearance]",
+           "color_scheme_path=" + schemePath,
+           "custom_palette=true",
+           "standard_dialogs=default",
+           "style=Fusion", "");
+  return out.join("\n");
 }

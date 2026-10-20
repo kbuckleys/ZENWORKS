@@ -43,8 +43,8 @@ Rectangle {
     running: caret.visible
     loops: Animation.Infinite
     PauseAnimation { duration: caret.steady ? 500 : 0 }
-    NumberAnimation { to: caret.low; duration: 620; easing.type: Easing.InOutQuad }
-    NumberAnimation { to: 1.0; duration: 620; easing.type: Easing.InOutQuad }
+    NumberAnimation { to: caret.low; duration: Zenon.breath; easing.type: Zenon.breathEase }
+    NumberAnimation { to: 1.0; duration: Zenon.breath; easing.type: Zenon.breathEase }
   }
   Connections {
     target: caret.steady ? caret.field : null

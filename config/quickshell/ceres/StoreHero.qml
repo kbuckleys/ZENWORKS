@@ -131,9 +131,9 @@ ClippingRectangle {
         color: Zenon.white
         opacity: 0.8
         font.family: Zenon.face
-        font.weight: Font.Bold
+        font.weight: Zenon.titleWeight
         font.pixelSize: Zenon.px(12)
-        font.letterSpacing: 1.2
+        font.letterSpacing: Zenon.labelSpacing
       }
       Text {
         width: parent.width

@@ -166,7 +166,7 @@ Item {
       spacing: 14
 
       // reflections
-      Text { text: "REFLECTIONS"; color: Zenon.accentMuted; font.family: Zenon.face; font.weight: Font.DemiBold; font.pixelSize: Zenon.px(11); font.letterSpacing: 0.8 }
+      SectionLabel { text: "REFLECTIONS" }
       Flow {
         width: parent.width
         spacing: 8
@@ -201,15 +201,11 @@ Item {
       }
 
       // the days, and their pictures
-      Text { text: "PICTURES"; color: Zenon.accentMuted; font.family: Zenon.face; font.weight: Font.DemiBold; font.pixelSize: Zenon.px(11); font.letterSpacing: 0.8 }
+      SectionLabel { text: "PICTURES" }
       Working { running: mo.scanning; visible: running }
-      Text {
+      EmptyState {
         visible: !mo.scanning && mo.days.length === 0
         text: "No pictures in the last 30 days"
-        color: Zenon.accentMuted
-        font.family: Zenon.face
-        font.weight: Zenon.weight
-        font.pixelSize: Zenon.px(14)
       }
       Repeater {
         model: mo.days

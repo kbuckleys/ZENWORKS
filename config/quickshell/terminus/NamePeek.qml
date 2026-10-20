@@ -30,7 +30,7 @@ Item {
     np.entry = entry;
     if (row) wait.restart(); else wait.stop();
   }
-  Timer { id: wait; interval: 550; onTriggered: np.ready = !!np.row }
+  Timer { id: wait; interval: Zenon.hoverWait; onTriggered: np.ready = !!np.row }
 
   Bubble {
     window: np.window

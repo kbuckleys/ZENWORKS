@@ -775,15 +775,11 @@ Item {
         }
       }
 
-      Text {
+      EmptyState {
         anchors.centerIn: parent
         visible: store.gridApps.length === 0
         text: store.searching ? "No apps for \u201C" + store.query.trim() + "\u201D"
           : store.section === "installed" ? "No apps from the catalog are installed" : "Nothing here yet"
-        color: Zenon.accentMuted
-        font.family: Zenon.face
-        font.weight: Font.Bold
-        font.pixelSize: Zenon.px(16)
       }
     }
 
@@ -1115,9 +1111,9 @@ Item {
                   text: modelData[0]
                   color: Zenon.accentMuted
                   font.family: Zenon.face
-                  font.weight: Font.Bold
+                  font.weight: Zenon.titleWeight
                   font.pixelSize: Zenon.px(11)
-                  font.letterSpacing: 0.9
+                  font.letterSpacing: Zenon.labelSpacing
                 }
                 Text {
                   width: parent.width
@@ -1615,7 +1611,7 @@ Item {
       NumberAnimation { target: lightboxBox; property: "bumpX"; to: -lightboxBox.bumpDir * 28
                         duration: Math.round(90 * Oracle.motionScale); easing.type: Easing.OutCubic }
       NumberAnimation { target: lightboxBox; property: "bumpX"; to: 0
-                        duration: Math.round(320 * Oracle.motionScale); easing.type: Easing.OutBack; easing.overshoot: 2.2 }
+                        duration: Math.round(320 * Oracle.motionScale); easing.type: Easing.OutCubic }
     }
     // the shot stepped away from, sliding off as the next slides in
     Image {

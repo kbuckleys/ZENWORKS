@@ -3,7 +3,7 @@
 // └─┘└─┘┘└┘└┴┘└─┘┴└─┴ ┴└─┘
 // https://github.com/kbuckleys/
 //
-// THE THEME FOR KITTY AND HYPRLAND: what ThemeSync writes. Zenon must write
+// THE THEME FOR KITTY, HYPRLAND, GTK AND QT: what ThemeSync writes. Zenon must write
 // nothing that overrides anything, and a theme must reach every line.
 
 "use strict";
@@ -13,7 +13,7 @@ const LATTE = {
   muted: "#7c7f93", soft: "#6c6f85", keyInk: "#5c5f77", dim: "#acb0be",
   red: "#d20f39", green: "#40a02b", yellow: "#fe640b", blue: "#1e66f5",
   magenta: "#8839ef", cyan: "#179299", pink: "#ea76cb", sand: "#df8e1d",
-  border: "#9ca0b0", onAccent: "#eff1f5"
+  border: "#9ca0b0", onAccent: "#eff1f5", card: "#e6e9ef"
 };
 
 module.exports = {
@@ -32,6 +32,65 @@ module.exports = {
     t.ok("all sixteen colors are written", [...Array(16).keys()]
       .every((i) => new RegExp("^color" + i + "\\s+#[0-9a-f]{6}$", "m").test(lk)));
     t.ok("no slot came out undefined", !/undefined|NaN/.test(lk));
+
+    const comment = (txt) => txt.replace(/\/\*[\s\S]*?\*\//g, "").trim();
+    t.ok("zenon overrides nothing in GTK 4", comment(S.renderGtk4(null, false)) === "");
+    t.ok("zenon overrides nothing in GTK 3", comment(S.renderGtk3(null, false)) === "");
+    const g4 = S.renderGtk4(LATTE, true);
+    t.match("gtk4: the window is the ground", g4, /^@define-color window_bg_color #eff1f5;$/m);
+    t.match("gtk4: libadwaita's variable too", g4, /^  --window-bg-color: #eff1f5;$/m);
+    t.match("gtk4: the accent is cyan", g4, /^  --accent-bg-color: #179299;$/m);
+    t.match("gtk4: type on the accent is onAccent", g4, /^  --accent-fg-color: #eff1f5;$/m);
+    t.match("gtk4: bars are the card", g4, /^  --headerbar-bg-color: #e6e9ef;$/m);
+    t.match("gtk4: popovers are the card", g4, /^@define-color popover_bg_color #e6e9ef;$/m);
+    t.match("gtk4: errors are red", g4, /^  --error-bg-color: #d20f39;$/m);
+    t.match("gtk4: success is green", g4, /^  --success-bg-color: #40a02b;$/m);
+    t.match("gtk4: warnings are yellow", g4, /^  --warning-bg-color: #fe640b;$/m);
+    t.match("gtk4: sidebars keep the hairline", g4, /^  --sidebar-border-color: #9ca0b0;$/m);
+    t.ok("gtk4: --accent-color is left to libadwaita", !/--accent-color:/.test(g4));
+    t.ok("gtk4: every name has its variable", (g4.match(/^@define-color /mg) || []).length ===
+      (g4.match(/^  --[a-z-]+: /mg) || []).length);
+    t.ok("gtk4: no slot came out undefined", !/undefined|NaN/.test(g4));
+    t.ok("gtk4: braces balance", (g4.match(/\{/g) || []).length === (g4.match(/\}/g) || []).length);
+    t.match("gtk4: dark shades are deeper", S.renderGtk4(LATTE, false),
+      /^  --headerbar-shade-color: rgba\(0, 0, 0, 0\.36\);$/m);
+    const g3 = S.renderGtk3(LATTE, true);
+    t.match("gtk3: libadwaita names for adw-gtk3", g3, /^@define-color view_bg_color #eff1f5;$/m);
+    t.match("gtk3: the accent as text too", g3, /^@define-color accent_color #179299;$/m);
+    t.match("gtk3: the old theme_ names", g3, /^@define-color theme_selected_bg_color #179299;$/m);
+    t.ok("gtk3: no variables (GTK 3 has none)", !/--[a-z]/.test(comment(g3)));
+    t.ok("gtk3: no slot came out undefined", !/undefined|NaN/.test(g3));
+    t.ok("gtk3: every line is a definition", comment(g3).split("\n")
+      .every((l) => l === "" || /^@define-color [a-z_]+ (#[0-9a-f]{6}|rgba\([0-9., ]+\));$/.test(l)));
+    t.ok("gtk4: every definition is well formed", g4.split("\n").filter((l) => l.startsWith("@define"))
+      .every((l) => /^@define-color [a-z_]+ (#[0-9a-f]{6}|rgba\([0-9., ]+\));$/.test(l)));
+    t.ok("light asks GTK for light", S.colorScheme(true) === "prefer-light");
+    t.ok("dark asks GTK for dark", S.colorScheme(false) === "prefer-dark");
+
+    const qc = S.renderQtColors(LATTE, true);
+    const roles = (txt, group) => (txt.match(new RegExp("^" + group + "_colors=(.*)$", "m")) || [, ""])[1].split(", ");
+    t.ok("qt: three groups", ["active", "inactive", "disabled"].every((g) => roles(qc, g).length === 22));
+    t.ok("qt: every role is #aarrggbb", ["active", "inactive", "disabled"]
+      .every((g) => roles(qc, g).every((r) => /^#ff[0-9a-f]{6}$/.test(r))));
+    t.match("qt: the scheme is a qt6ct ColorScheme", qc, /^\[ColorScheme\]$/m);
+    const qa = roles(qc, "active");
+    t.eq("qt: window text is the ink", qa[0], "#ff4c4f69");
+    t.eq("qt: windows are the ground", qa[10], "#ffeff1f5");
+    t.eq("qt: fields are the card", qa[9], "#ffe6e9ef");
+    t.eq("qt: the selection is the accent", qa[12], "#ff179299");
+    t.eq("qt: type on it is onAccent", qa[13], "#ffeff1f5");
+    t.eq("qt: placeholders are muted", qa[20], "#ff7c7f93");
+    t.eq("qt: Accent is the accent", qa[21], "#ff179299");
+    t.eq("qt: disabled type is muted", roles(qc, "disabled")[6], "#ff7c7f93");
+    t.ok("qt: inactive is active", roles(qc, "inactive").join() === qa.join());
+    t.ok("qt: dark differs from light", S.renderQtColors(LATTE, false) !== qc);
+    t.ok("qt: no slot came out undefined", !/undefined|NaN/.test(qc));
+    t.ok("qt: an alpha-carrying border still gives a color", /^#ff[0-9a-f]{6}$/.test(roles(S.renderQtColors(
+      Object.assign({}, LATTE, { border: "#4d45505c" }), false), "active")[5]));
+    const q6 = S.renderQt6ct("/h/.config/qt6ct/colors/zenworks.conf");
+    t.match("qt6ct: points at the scheme", q6, /^color_scheme_path=\/h\/.config\/qt6ct\/colors\/zenworks\.conf$/m);
+    t.match("qt6ct: the palette is used", q6, /^custom_palette=true$/m);
+    t.ok("qt6ct: fonts and icons are left to Qt", !/^\[Fonts\]|^icon_theme=/m.test(q6));
 
     const zh = S.renderHyprTheme(null);
     t.match("zenon hands hyprland an empty table", zh, /^return \{\}$/m);

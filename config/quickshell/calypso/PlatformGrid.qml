@@ -41,8 +41,8 @@ Item {
   // with its words, rather than vanishing with its target
   property Item peekLast: null
   onPeekShownChanged: if (grid.peekShown) grid.peekLast = grid.peekShown
-  Timer { id: peekWait; interval: 300; onTriggered: grid.peekShown = grid.peekCell }
-  Timer { id: peekLeave; interval: 220; onTriggered: if (!grid.peekCell) grid.peekShown = null }
+  Timer { id: peekWait; interval: Zenon.hoverWait; onTriggered: grid.peekShown = grid.peekCell }
+  Timer { id: peekLeave; interval: Zenon.hoverLeave; onTriggered: if (!grid.peekCell) grid.peekShown = null }
   function peekAt(cell) {
     grid.peekCell = cell && cell.info ? cell : null;
     if (!grid.peekCell) { peekWait.stop(); peekLeave.restart(); return; }

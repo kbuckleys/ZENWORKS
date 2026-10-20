@@ -60,7 +60,7 @@ PopupWindow {
 
   property rect at: Qt.rect(0, 0, 1, 1)
 
-  Timer { id: wait; interval: 450; onTriggered: tip.wanted = true }
+  Timer { id: wait; interval: Zenon.hoverWait; onTriggered: tip.wanted = true }
 
   property real shade: tip.wanted ? 1 : 0
   Behavior on shade { NumberAnimation { duration: Zenon.menuFade; easing.type: Easing.OutCubic } }

@@ -11,8 +11,8 @@ import "../morpheus"
 Text {
   color: Zenon.accentSoft
   font.family: Zenon.face
-  font.weight: 600
+  font.weight: Zenon.titleWeight
   font.pixelSize: Zenon.px(13)
   font.capitalization: Font.AllUppercase
-  font.letterSpacing: 1.2
+  font.letterSpacing: Zenon.labelSpacing
 }

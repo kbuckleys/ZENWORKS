@@ -192,7 +192,7 @@ Item {
     // waits for it to be gone, then relaunches with `-n -d`: `-n` still
     // declines if somehow a shell is left, rather than two fighting over the
     // same layer surfaces and state files.
-    { id: "restart", text: "Reload Shell", icon: "\uF01E",
+    { id: "restart", text: "Reload shell", icon: "\uF01E",
       cmd: Strings.shellQuote(Quickshell.shellDir) + "/scripts/restart.sh" }
   ]
 
@@ -1385,7 +1385,7 @@ Item {
     // an event, so it does not flash; the row going red is the reply.
     model: [
       { text: "Open" },
-      { text: "Empty Trash", danger: root.trashArmed, asks: !root.trashArmed }
+      { text: "Empty trash", danger: root.trashArmed, asks: !root.trashArmed }
     ]
 
     onChosen: index => {

@@ -1340,7 +1340,7 @@ FloatingWindow {
     NumberAnimation { target: win; property: "bumpX"; to: -win.bumpDir * 28
                       duration: Math.round(90 * Oracle.motionScale); easing.type: Easing.OutCubic }
     NumberAnimation { target: win; property: "bumpX"; to: 0
-                      duration: Math.round(320 * Oracle.motionScale); easing.type: Easing.OutBack; easing.overshoot: 2.2 }
+                      duration: Math.round(320 * Oracle.motionScale); easing.type: Easing.OutCubic }
   }
 
   // a directory just listed: its first tiles rise in turn
@@ -4538,7 +4538,7 @@ FloatingWindow {
           // justified rows sit too close for the mark alone to tell the
           // marked ones apart (user, 2026-10-18 — terminus' grid doesn't)
           scale: cell.marked ? 0.78 : 1
-          Behavior on scale { NumberAnimation { duration: win.stepMs; easing.type: Easing.OutBack; easing.overshoot: 1.6 } }
+          Behavior on scale { NumberAnimation { duration: win.stepMs; easing.type: Easing.OutCubic } }
 
           // MARKED, A TILE WEARS THE CURSOR (user, 2026-10-18): MarkRing in
           // the cursor's ink, 4px out, behind the picture. Inside this box,

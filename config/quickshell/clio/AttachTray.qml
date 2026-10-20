@@ -67,16 +67,10 @@ Bubble {
     }
   }
 
-  Text {
+  EmptyState {
     visible: tray.items.length === 0
     width: 424
-    wrapMode: Text.WordWrap
     text: "Nothing put in a note yet — add some from Terminus, or drop them on the note."
-    horizontalAlignment: Text.AlignHCenter
-    color: Zenon.accentMuted
-    font.family: Zenon.face
-    font.weight: Zenon.weight
-    font.pixelSize: Zenon.px(13)
   }
 
   Flickable {

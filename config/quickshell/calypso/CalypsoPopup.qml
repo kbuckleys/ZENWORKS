@@ -629,9 +629,9 @@ LayerPopup {
                         text: group.modelData.title
                         color: Zenon.cyan
                         font.family: Zenon.face
-                        font.weight: 600
+                        font.weight: Zenon.titleWeight
                         font.pixelSize: Zenon.px(13)
-                        font.letterSpacing: 1
+                        font.letterSpacing: Zenon.labelSpacing
                       }
                     }
                   }

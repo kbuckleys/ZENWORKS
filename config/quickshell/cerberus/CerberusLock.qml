@@ -1094,8 +1094,8 @@ Scope {
             SequentialAnimation on breath {
               running: capsGlow.visible
               loops: Animation.Infinite
-              NumberAnimation { to: 0.45; duration: 1400; easing.type: Easing.InOutSine }
-              NumberAnimation { to: 0.85; duration: 1400; easing.type: Easing.InOutSine }
+              NumberAnimation { to: 0.45; duration: Zenon.glowSlow; easing.type: Easing.InOutSine }
+              NumberAnimation { to: 0.85; duration: Zenon.glowSlow; easing.type: Easing.InOutSine }
             }
           }
           Text {
@@ -1164,7 +1164,7 @@ Scope {
             SequentialAnimation {
               id: kickAnim
               NumberAnimation { target: dots; property: "kick"; to: 1.10; duration: Zenon.ms(85); easing.type: Easing.OutQuad }
-              NumberAnimation { target: dots; property: "kick"; to: 1.0;  duration: Zenon.ms(260); easing.type: Easing.OutBack; easing.overshoot: 1.6 }
+              NumberAnimation { target: dots; property: "kick"; to: 1.0;  duration: Zenon.ms(260); easing.type: Easing.OutCubic }
             }
 
             Connections {

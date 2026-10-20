@@ -1782,14 +1782,10 @@ LayerPopup {
               width: parent.width
               height: popup.filtered.length === 0 ? 40 : 0
 
-              Text {
+              EmptyState {
                 anchors.centerIn: parent
                 visible: popup.filtered.length === 0
                 text: "Nothing matches \u201C" + popup.query + "\u201D"
-                color: popup.dimColor
-                font.family: Zenon.face
-                font.weight: 600
-                font.pixelSize: Zenon.px(15)
               }
             }
 
@@ -1955,8 +1951,8 @@ LayerPopup {
             SequentialAnimation on opacity {
               running: field.activeFocus
               loops: Animation.Infinite
-              NumberAnimation { to: 1; duration: 550; easing.type: Easing.InOutSine }
-              NumberAnimation { to: 0.25; duration: 550; easing.type: Easing.InOutSine }
+              NumberAnimation { to: 1; duration: Zenon.breath; easing.type: Zenon.breathEase }
+              NumberAnimation { to: 0.25; duration: Zenon.breath; easing.type: Zenon.breathEase }
             }
           }
 
@@ -2141,14 +2137,10 @@ LayerPopup {
                 color: Zenon.border
               }
 
-              Text {
+              EmptyState {
                 visible: !detailPane.row
                 anchors.centerIn: parent
                 text: "Nothing selected"
-                color: popup.dimColor
-                font.family: Zenon.face
-                font.weight: Zenon.weight
-                font.pixelSize: Zenon.px(14)
               }
 
               // name and state, then the whole command line under it — the

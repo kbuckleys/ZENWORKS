@@ -194,14 +194,9 @@ Item {
         visible: !!ed.st && (ed.st.kind === "login" || ed.st.urls.length > 0)
         width: parent.width
         spacing: 6
-        Text {
+        SectionLabel {
           leftPadding: 4
           text: "WEBSITES"
-          color: Zenon.accentMuted
-          font.family: Zenon.face
-          font.weight: Font.DemiBold
-          font.pixelSize: Zenon.px(11)
-          font.letterSpacing: 1.2
         }
         Rectangle {
           width: parent.width
@@ -246,14 +241,9 @@ Item {
         visible: C.can(ed.info, "custom")
         width: parent.width
         spacing: 6
-        Text {
+        SectionLabel {
           leftPadding: 4
           text: "MORE"
-          color: Zenon.accentMuted
-          font.family: Zenon.face
-          font.weight: Font.DemiBold
-          font.pixelSize: Zenon.px(11)
-          font.letterSpacing: 1.2
         }
         Rectangle {
           visible: !!ed.st && (void ed.shape, ed.st.custom.length > 0)
@@ -318,14 +308,9 @@ Item {
       Column {
         width: parent.width
         spacing: 6
-        Text {
+        SectionLabel {
           leftPadding: 4
           text: "NOTES"
-          color: Zenon.accentMuted
-          font.family: Zenon.face
-          font.weight: Font.DemiBold
-          font.pixelSize: Zenon.px(11)
-          font.letterSpacing: 1.2
         }
         MessageWell {
           id: notesWell
@@ -343,14 +328,9 @@ Item {
         visible: C.can(ed.info, "tags")
         width: parent.width
         spacing: 6
-        Text {
+        SectionLabel {
           leftPadding: 4
           text: "TAGS"
-          color: Zenon.accentMuted
-          font.family: Zenon.face
-          font.weight: Font.DemiBold
-          font.pixelSize: Zenon.px(11)
-          font.letterSpacing: 1.2
         }
         BulkField {
           id: tagsBox

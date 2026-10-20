@@ -632,6 +632,13 @@ QtObject {
   // glyph before it, terminus' breadcrumbs — the name only, never its
   // reading (a count, a size). Bold, whatever the family (user, 2026-10-17).
   readonly property int titleWeight: Font.Bold
+  // A SECTION'S LABEL: the small spaced capitals over what it heads
+  // (morpheus/SectionLabel) and a list's group heads. They had drifted over
+  // six spacings, three weights and three greys (2026-10-20). Size is px()'d
+  // by the caller — `labelPx` for a section, a list's heads one up. Weight is
+  // titleWeight: a section's name is a title.
+  readonly property int  labelPx: 11
+  readonly property real labelSpacing: 1.2
   // ── THE SHELL'S TEXT SIZE ──────────────────────────────────────────────
   // Oracle's Font size (the Font row's stepper), as a factor over the 16 px
   // every label was sized against. A label's size goes through px(): its own
@@ -800,6 +807,37 @@ QtObject {
   // speed reaches a shake or a flash too, and 0 means none. Not for loops
   // (a breath or a spinner at 0 ms would spin) nor a PauseAnimation's hold.
   function ms(n) { return Math.round(n * cfg.motionScale); }
+
+  // ── HOVER INTENT (2026-10-20) ───────────────────────────────────────
+  // How long the pointer rests on a thing before its tip or peek opens, and
+  // how long it may be off one before the peek goes (so crossing a gap to
+  // the next row does not shut it). One pair for WindowTip and every Bubble
+  // peek, which had drifted to 300, 450, 500 and 550 and to 120 and 220.
+  // Not times the multiplier: a wait for intent, not motion.
+  readonly property int hoverWait: 450
+  readonly property int hoverLeave: 220
+  // ── A BREATH: half of one cycle of something that breathes, dim to
+  // bright or back — morpheus/Caret, the launchers' own drawn carets, a
+  // drop target on offer. They had drifted to 520, 550 and 620 on two
+  // curves, so a launcher's caret breathed out of step with a window's
+  // (2026-10-20); Caret's own 620 on InOutQuad is the one kept. How dim it
+  // goes stays each caller's. A loop, so off the multiplier for the reason
+  // ms() is.
+  readonly property int breath: 620
+  readonly property int breathEase: Easing.InOutQuad
+  // a recording light: slower than a breath, so "live" never reads as
+  // "waiting for you to type" (plato's macro REC, the bar's screen record)
+  readonly property int beacon: 700
+  // one turn of something spinning while it works — morpheus/Working's
+  // period, a refresh glyph, a ring (they were 900 and 1100)
+  readonly property int spin: 900
+  // one pass of an indeterminate sweep along a bar: a job without a
+  // percent, plato's language servers busy (1150 and 1400)
+  readonly property int sweep: 1150
+  // an ambient glow, half a cycle — the default button, the jobs glyph —
+  // and the slower one a password field idles on (lock screen, Ceres)
+  readonly property int glow: 900
+  readonly property int glowSlow: 1400
 
   // whether morpheus/Scrollbar fades out between scrolls — read here so the
   // scrollbar's own test stub can stand in for it without importing oracle

@@ -546,6 +546,13 @@ const TOOLS = [
   { name: "realesrgan-ncnn-vulkan", pkg: "realesrgan-ncnn-vulkan-bin", aur: true, why: "picasso: upscale" },
   { name: "bandwhich", pkg: "bandwhich", why: "zeus' network view" },
   { name: "pkexec", pkg: "polkit", why: "anything that asks for your password" },
+  // no command: a theme. GTK 3 takes the shell's colors only through it
+  // (morpheus/ThemeSync, scripts/gtkscheme.sh)
+  { name: "adw-gtk-theme", pkg: "adw-gtk-theme", installed: true, why: "GTK 3 apps in the shell's colors" },
+  // qt6ct's platform theme is how Qt apps (the screen-share picker, the
+  // polkit agent) wear the shell's colors: ThemeSync writes its scheme,
+  // base.lua sets QT_QPA_PLATFORMTHEME
+  { name: "qt6ct", pkg: "qt6ct", why: "Qt apps in the shell's colors" },
   { name: "proton-wineland-bin", pkg: "proton-wineland-bin", installed: true, aur: true, why: "Proton for Steam, with Wayland" },
 ];
 

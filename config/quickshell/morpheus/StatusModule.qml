@@ -117,8 +117,8 @@ Collapsible {
         SequentialAnimation on opacity {
           running: root.recording
           loops: Animation.Infinite
-          NumberAnimation { to: 0.35; duration: 700; easing.type: Easing.InOutSine }
-          NumberAnimation { to: 1.0; duration: 700; easing.type: Easing.InOutSine }
+          NumberAnimation { to: 0.35; duration: Zenon.beacon; easing.type: Zenon.breathEase }
+          NumberAnimation { to: 1.0; duration: Zenon.beacon; easing.type: Zenon.breathEase }
         }
       }
     }

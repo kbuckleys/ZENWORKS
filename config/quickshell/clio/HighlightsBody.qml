@@ -10,6 +10,7 @@
 
 import QtQuick
 import "../morpheus"
+import "../terminus"
 import "notes.js" as N
 
 Item {
@@ -87,6 +88,9 @@ Item {
       onTextChanged: hb.filter = text
       Text { visible: field.text === ""; anchors.verticalCenter: parent.verticalCenter; text: "Filter"; color: Zenon.accentMuted; font: field.font }
     }
+    // focused for typing: terminus' held ring (user, 2026-10-11 — every
+    // text field wears it, its own border staying neutral)
+    HeldRing { anchors.fill: parent; radius: parent.radius; z: 10; on: field.activeFocus }
   }
 
   Flickable {
@@ -103,17 +107,11 @@ Item {
       id: col
       width: flick.width
       spacing: 8
-      Text {
+      EmptyState {
         visible: hb.rows.length === 0
         topPadding: 30
         width: parent.width
-        horizontalAlignment: Text.AlignHCenter
-        wrapMode: Text.Wrap
         text: hb.all.length === 0 ? "Nothing highlighted yet — select words and choose a highlight from the color menu" : "Nothing matches \u201C" + hb.filter + "\u201D"
-        color: Zenon.accentMuted
-        font.family: Zenon.face
-        font.weight: Zenon.weight
-        font.pixelSize: Zenon.px(14)
       }
       Repeater {
         model: hb.rows

@@ -581,8 +581,8 @@ LayerPopup {
                   SequentialAnimation on opacity {
                     running: filterInput.activeFocus
                     loops: Animation.Infinite
-                    NumberAnimation { to: 1; duration: 550; easing.type: Easing.InOutSine }
-                    NumberAnimation { to: 0.25; duration: 550; easing.type: Easing.InOutSine }
+                    NumberAnimation { to: 1; duration: Zenon.breath; easing.type: Zenon.breathEase }
+                    NumberAnimation { to: 0.25; duration: Zenon.breath; easing.type: Zenon.breathEase }
                   }
                 }
 

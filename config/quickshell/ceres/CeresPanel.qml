@@ -323,7 +323,7 @@ LayerPopup {
             RotationAnimation on rotation {
               running: Ceres.checking
               loops: Animation.Infinite
-              from: 0; to: 360; duration: 900
+              from: 0; to: 360; duration: Zenon.spin
               onRunningChanged: if (!running) refresh.rotation = 0
             }
             HoverHandler { id: refreshHov }

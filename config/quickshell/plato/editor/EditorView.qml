@@ -359,8 +359,8 @@ Item {
       SequentialAnimation on opacity {
         running: caret.visible && !view.moving && view.cursorBreathes
         loops: Animation.Infinite
-        NumberAnimation { to: 0.2; duration: 620; easing.type: Easing.InOutQuad }
-        NumberAnimation { to: 1.0; duration: 620; easing.type: Easing.InOutQuad }
+        NumberAnimation { to: 0.2; duration: Zenon.breath; easing.type: Zenon.breathEase }
+        NumberAnimation { to: 1.0; duration: Zenon.breath; easing.type: Zenon.breathEase }
       }
       // back to solid the moment it moves
       Connections {
@@ -598,7 +598,7 @@ Item {
         }
       }
     }
-    Timer { id: hoverWait; interval: 450; onTriggered: peek.look() }
+    Timer { id: hoverWait; interval: Zenon.hoverWait; onTriggered: peek.look() }
     Connections {
       target: view.ed
       function onFileChanged() { peek.hide(); }

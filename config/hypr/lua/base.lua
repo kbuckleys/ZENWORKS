@@ -88,6 +88,14 @@ hl.env("XCURSOR_THEME", "XCursor-Pro-Hyprcursor-Dark")
 hl.env("HYPRCURSOR_SIZE", "24")
 hl.env("XCURSOR_SIZE", "24")
 
+-- QT APPS IN THE SHELL'S COLORS: qt6ct reads the scheme quickshell's
+-- ThemeSync writes (qt6ct/colors/zenworks.conf). Imported into systemd's
+-- environment by autostart.lua, so the portal's screen-share picker and the
+-- polkit agent get it too. Without qt6ct installed Qt ignores it.
+-- quickshell inherits it and draws the same with it (morpheus/themesync.js,
+-- renderQt6ct); apps it launches inherit it from it.
+hl.env("QT_QPA_PLATFORMTHEME", "qt6ct")
+
 hl.config({
 	render = {
 		expand_undersized_textures = false,

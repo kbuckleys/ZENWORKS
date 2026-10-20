@@ -19,7 +19,7 @@
 // THE BACKGROUND LENDS A HUE, NOT A LOOK:
 //   - the seed is its most colorful color that is also really there;
 //   - grounds and text take the seed's hue at low chroma — tinted, not
-//     colored; a gray picture gives an all but neutral theme;
+//     colored; a gray picture gives a neutral theme, chroma 0;
 //   - cyan, the shell's own accent (selection, focus, the clock), BECOMES
 //     the seed, so the highlight is the background's color — AS IT IS: its
 //     lightness is where the walk starts and its chroma is kept, so a dusty
@@ -178,8 +178,10 @@ function palette(colors, opts) {
   const seedH = !neutral && seedC >= 0.05 ? seed.h
     : castC > 0.003 ? castH : (most.C > 0.01 ? most.h : 250);
 
-  const bgC = neutral ? 0.006 : Math.min(seedC, 0.012 + 0.05 * v);
-  const txC = neutral ? 0.004 : Math.min(seedC, 0.008 + 0.02 * v);
+  // A GRAY PICTURE GIVES GRAY: no chroma at all. It was .006 at the stock
+  // hue 250 — a blue cast on every dark window (user, 2026-10-20).
+  const bgC = neutral ? 0 : Math.min(seedC, 0.012 + 0.05 * v);
+  const txC = neutral ? 0 : Math.min(seedC, 0.008 + 0.02 * v);
   const lv = light
     ? { ground: 0.975, card: 0.95, surface: 0.9, dim: 0.82, border: 0.74,
         ink: 0.32, keyInk: 0.42, soft: 0.48, muted: 0.6, acc: 0.74, pink: 0.76 }

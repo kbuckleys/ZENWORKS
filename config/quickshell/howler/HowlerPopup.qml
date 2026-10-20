@@ -298,17 +298,13 @@ LayerPopup {
       // CENTERED ON THE LIST, not on the card. The head is 44 tall and sits
       // above it, so centering in the whole card pushed this down by half of
       // that — which reads as "nearly centered", the worst kind.
-      Text {
+      EmptyState {
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.top: chips.bottom
         anchors.bottom: parent.bottom
         verticalAlignment: Text.AlignVCenter
         visible: popup.rows.length === 0
         text: "Nothing yet"
-        color: Zenon.muted
-        font.family: Zenon.face
-        font.weight: Font.Bold
-        font.pixelSize: Zenon.px(15)
       }
 
       // ── THE CHIP ──────────────────────────────────────────────────

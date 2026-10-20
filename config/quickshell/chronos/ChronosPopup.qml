@@ -1112,19 +1112,15 @@ LayerPopup {
                   Text {
                     anchors.verticalCenter: parent.verticalCenter
                     text: popup.glyphTimer
-                    color: emptyMa.pressed ? Zenon.cyan : Zenon.muted
+                    color: emptyMa.pressed ? Zenon.cyan : Zenon.accentMuted
                     Behavior on color { ColorAnimation { duration: Zenon.fast } }
                     font.family: popup.face
                     font.weight: Zenon.weight
                     font.pixelSize: Zenon.px(20)
                   }
-                  Text {
+                  EmptyState {
                     anchors.verticalCenter: parent.verticalCenter
                     text: "No timers — click to start one"
-                    color: Zenon.muted
-                    font.family: popup.face
-                    font.weight: Font.Bold
-                    font.pixelSize: Zenon.px(14)
                   }
                 }
 

@@ -260,7 +260,7 @@ Item {
               onEntered: root.hovered(row.index)
               // ONLY A POINTER THAT LEFT. Disabling a hovered MouseArea makes
               // Qt report an exit too — and the flash disables this one for its
-              // whole length. So confirming an armed row ("Empty Trash", second
+              // whole length. So confirming an armed row ("Empty trash", second
               // click) reported the pointer as gone, the owner disarmed it, and
               // the flash then ended in `chosen` on a row that was no longer
               // armed: it armed again instead of acting, every time.

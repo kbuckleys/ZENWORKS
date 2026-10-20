@@ -299,14 +299,10 @@ Rectangle {
       anchors.right: parent.right
       rows: [["\u2191\u2193", "move"], ["\u21b5", "go"],
               ["m", "mount / eject"], ["esc", "close"]]
-      leading: Text {
+      leading: EmptyState {
         anchors.verticalCenter: parent.verticalCenter
         text: disks.rows.length === 0 ? "No disks" : ""
         visible: disks.rows.length === 0
-        color: Zenon.accentMuted
-        font.family: Zenon.face
-        font.weight: Zenon.weight
-        font.pixelSize: Zenon.px(14)
       }
     }
   }

@@ -38,7 +38,7 @@ Item {
   property int dot: 4
   property int gap: 5
   // one dot's whole cycle; the three are a third of it apart
-  property int period: 900
+  property int period: Zenon.spin
   readonly property real lowest: 0.18
 
   readonly property int count: 3

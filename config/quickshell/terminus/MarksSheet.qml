@@ -362,14 +362,10 @@ Rectangle {
 
     // Nothing bookmarked yet, said where the rows would be rather than as
     // an empty card that looks like something failed to load.
-    Text {
+    EmptyState {
       anchors.centerIn: marksList
       visible: marks.all.length === 0
       text: "Nothing bookmarked yet \u2014 b a adds this directory"
-      color: Zenon.accentMuted
-      font.family: Zenon.face
-      font.weight: Zenon.weight
-      font.pixelSize: Zenon.px(14)
     }
 
 

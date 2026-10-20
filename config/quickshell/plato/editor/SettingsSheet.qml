@@ -748,14 +748,10 @@ PlatoSheet {
       else event.accepted = false;
     }
   }
-  Text {
+  EmptyState {
     visible: sheet.rows.length === 0
     anchors.centerIn: parent
     anchors.verticalCenterOffset: -sheet.helpH / 2
-    font.family: Zenon.face
-    font.weight: Zenon.weight
-    font.pixelSize: Zenon.px(16)
-    color: Zenon.accentMuted
     text: "No setting matches “" + query.text + "”"
   }
 }

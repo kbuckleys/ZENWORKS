@@ -99,6 +99,15 @@ FloatingWindow {
 
   EditorState {
     id: st
+    // until nvim's own highlight groups arrive, the theme's — core keeps
+    // dark-theme literals (it imports nothing), which flashed a pale
+    // text on a light theme's first frame (2026-10-20). nvim's first
+    // colors replace these bindings for good.
+    normalFg: Zenon.ink
+    cursorLineBg: Zenon.wash(0.06)
+    lineNrFg: Zenon.muted
+    cursorLineNrFg: Zenon.sand
+    visualInk: Zenon.magenta
     // the settings' "Current line number color", one of zenon's
     numberHere: {
       const k = win.settings ? win.settings.lineNumberInk : "white";
@@ -865,12 +874,7 @@ FloatingWindow {
           visible: section.items.length > 0
           width: startCol.width
           bottomPadding: 12
-          Text {
-            font.family: Zenon.face
-            font.weight: Zenon.weight
-            font.pixelSize: Zenon.px(12)
-            font.letterSpacing: 1
-            color: Zenon.accentMuted
+          SectionLabel {
             text: section.modelData.title.toUpperCase()
             bottomPadding: 4
           }
