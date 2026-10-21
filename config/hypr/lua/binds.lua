@@ -95,6 +95,14 @@ bind("alexandria",     "",                   "Alexandria, the glyphs",         h
 bind("ceresCheck",     "",                   "Ceres, check for updates",       hl.dsp.exec_cmd("qs ipc call Ceres check"))
 bind("pomodoro",       "",                   "Chronos, start a pomodoro",      hl.dsp.exec_cmd("qs ipc call Chronos pomodoro 0"))
 bind("timersStop",     "",                   "Chronos, stop the timers",       hl.dsp.exec_cmd("qs ipc call Chronos halt"))
+bind("minerva",        "",                   "Minerva, the library",           hl.dsp.exec_cmd("qs ipc call Minerva library"))
+bind("hestia",         "",                   "Hestia, services and logs",      hl.dsp.exec_cmd("qs ipc call Hestia open ''"))
+bind("hestiaJournal",  "",                   "Hestia, the journal",            hl.dsp.exec_cmd("qs ipc call Hestia journal ''"))
+bind("hermes",         "",                   "Hermes, the quick panel",        hl.dsp.exec_cmd("qs ipc call Hermes toggle"))
+bind("hermesWin",      "",                   "Hermes, the window",             hl.dsp.exec_cmd("qs ipc call Hermes window ''"))
+bind("nightLight",     "",                   "Night light, on or off",         hl.dsp.exec_cmd("qs ipc call Hermes night"))
+bind("wifiToggle",     "",                   "Wi-Fi, on or off",               hl.dsp.exec_cmd("qs ipc call Hermes wifi"))
+bind("btToggle",       "",                   "Bluetooth, on or off",           hl.dsp.exec_cmd("qs ipc call Hermes bluetooth"))
 
 -- NOTIFICATIONS
 -- off until given a chord in oracle's Shortcuts
@@ -109,7 +117,18 @@ bind("shotWindow",  "SUPER + PRINT",          "Screenshot, a window",           
 bind("shotPlain",   "SUPER + ALT + PRINT",    "Screenshot, a window, plain",         hl.dsp.exec_cmd("qs ipc call Picasso shot window-plain"))
 bind("shotRegion",  "SUPER + SHIFT + PRINT",  "Screenshot, a region",                hl.dsp.exec_cmd("qs ipc call Picasso shot region"))
 
+-- Argus, the recorder (quickshell/argus/argus.lua): the same keys start a
+-- recording and stop the one running
+local function record(mode)
+	return function() if ZenRecord then ZenRecord(mode) end end
+end
+bind("recScreen",   "SUPER + R",              "Record, the screen, or stop",         record("full"))
+bind("recWindow",   "SUPER + SHIFT + R",      "Record, a window, or stop",           record("window"))
+bind("recRegion",   "SUPER + CONTROL + R",    "Record, a region, or stop",           record("region"))
+
 -- off until given a chord in oracle's Shortcuts
+bind("recStop",     "",                       "Stop recording",                      record("stop"))
+bind("recEdit",     "",                       "Argus, cut the last recording",       hl.dsp.exec_cmd("qs ipc call Argus last"))
 bind("slideNext",   "",                       "Background slideshow, the next one",  hl.dsp.exec_cmd("qs ipc call Picasso next"))
 bind("picker",      "SUPER + CONTROL + P",    "Pick a color",                        hl.dsp.exec_cmd("qs ipc call Picasso pick"))
 
@@ -250,6 +269,10 @@ bind("mute",       "SUPER + 0",              "Mute",                 hl.dsp.exec
 bind("next",       "SUPER + SHIFT + EQUAL",  "Next track",           hl.dsp.exec_cmd("playerctl next"))
 bind("playPause",  "SUPER + SHIFT + MINUS",  "Play or pause",        hl.dsp.exec_cmd("playerctl play-pause"))
 bind("previous",   "SUPER + SHIFT + 0",      "Previous track",       hl.dsp.exec_cmd("playerctl previous"))
+
+-- through hermes, so every screen it can dim moves and the OSD shows it
+bind("brightUp",   "XF86MonBrightnessUp",    "Brightness up",        hl.dsp.exec_cmd("qs ipc call Hermes brightness 5"), { repeating = true })
+bind("brightDown", "XF86MonBrightnessDown",  "Brightness down",      hl.dsp.exec_cmd("qs ipc call Hermes brightness -5"), { repeating = true })
 
 -- off until given a chord in oracle's Shortcuts
 bind("micMute",    "",                       "Mute the microphone",  hl.dsp.exec_cmd("pamixer --default-source -t"))

@@ -643,7 +643,15 @@ const APPS = {
   // U+E678, the notebook (its desktop id is clio)
   "clio": "\uE678",
   // U+F114, the file manager \u2014 the glyph icarus' Files entry wears
-  "terminus": "\uF114"
+  "terminus": "\uF114",
+  // U+F1542, network and display (its desktop id is hermes; the user's pick)
+  "hermes": "\uDB85\uDD42",
+  // U+F16FF, the recording editor (its desktop id is argus)
+  "argus": "\uDB85\uDEFF",
+  // U+F03D2, the owl: the reader (its desktop id is minerva)
+  "minerva": "\uDB80\uDFD2",
+  // U+F0E2E, the hearth: services and logs (its desktop id is hestia)
+  "hestia": "\uDB83\uDE2E"
 };
 
 // The glyph for a launcher entry, or "" when nothing claims it. `names` is

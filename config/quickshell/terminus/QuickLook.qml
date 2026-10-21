@@ -298,6 +298,10 @@ PanelWindow {
     readonly property bool face:
       look.isFile && Terminus.isFont(look.row.name)
     readonly property bool folder: !!look.row && look.row.isDir
+    // A format that can move — the same test Picasso's Wall makes. A
+    // still webp or png among them costs one extra decode, nothing more.
+    readonly property bool moving:
+      look.pic && /\.(gif|webp|apng|mng)$/i.test(look.row.name)
     // ── WHOSE TEXT ─────────────────────────────────────────────────
     // previewText is the PANE's, and it holds whatever the pane last read
     // until something replaces it. Quick look drew it whenever no picture
@@ -914,6 +918,32 @@ PanelWindow {
         sourceSize.width: Math.round(look.width * 0.8)
         sourceSize.height: Math.round(look.height * 0.86)
         source: look.src
+        // Still SIZES the card (its visible drives the layout), only
+        // hidden from sight once the moving copy is in hand — otherwise a
+        // transparent frame would show frame one through it.
+        opacity: lookAnim.status === AnimatedImage.Ready ? 0 : 1
+      }
+
+      // ── A GIF THAT PLAYS ─────────────────────────────────────────────
+      // Over lookShot, in exactly its box, which is already aspect-correct,
+      // so both axes of sourceSize can be given without the stretch that
+      // AnimatedImage makes of a box of another shape (see PicassoDaemon's
+      // Wall). Empty source when closed or on anything else: a stopped
+      // player, nothing to remember to stop.
+      AnimatedImage {
+        id: lookAnim
+        x: lookFrame.shotX
+        y: 0
+        width: look.shotW
+        height: look.shotH
+        visible: lookShot.visible && status === AnimatedImage.Ready
+        fillMode: Image.PreserveAspectFit
+        asynchronous: true
+        cache: false
+        sourceSize.width: look.shotW
+        sourceSize.height: look.shotH
+        source: (root.looking && look.moving && look.shotW > 0) ? look.src : ""
+        playing: true
       }
 
       // ── THE PAGE BEING READ, OVER PAGE ONE ───────────────────────────

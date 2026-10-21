@@ -102,3 +102,32 @@ function parse(text) {
     if (j[i] && typeof j[i] === "object") out.push(keepable(j[i]));
   return out;
 }
+
+// ── FOCUS: QUIET WITHOUT BEING ASKED ─────────────────────────────────────
+// Do not disturb is the switch you flip; focus is the two times it flips
+// itself (2026-10-21): while a chronos timer counts, and in quiet hours.
+// A critical notification comes through all three, as it always has.
+//
+// Quiet hours run from `fromH` to `toH` (whole hours, 0–23) and may cross
+// midnight (22 → 7). Equal is "never": a span of no hours, not all day.
+function inQuietHours(fromH, toH, minutesOfDay) {
+  const f = ((Number(fromH) | 0) % 24 + 24) % 24 * 60;
+  const t = ((Number(toH) | 0) % 24 + 24) % 24 * 60;
+  const m = ((Number(minutesOfDay) | 0) % 1440 + 1440) % 1440;
+  if (f === t) return false;
+  return f < t ? m >= f && m < t : m >= f || m < t;
+}
+function hourWords(h) {
+  const v = ((Number(h) | 0) % 24 + 24) % 24;
+  return (v < 10 ? "0" : "") + v + ":00";
+}
+// s: { dnd, timers, timerRunning, hours, fromH, toH, minutesOfDay }
+// → { quiet, why } — why in the bell's own words, "" when not quiet
+function focus(s) {
+  s = s || {};
+  if (s.dnd) return { quiet: true, why: "Do not disturb" };
+  if (s.timers && s.timerRunning) return { quiet: true, why: "Quiet while a timer runs" };
+  if (s.hours && inQuietHours(s.fromH, s.toH, s.minutesOfDay))
+    return { quiet: true, why: "Quiet hours, until " + hourWords(s.toH) };
+  return { quiet: false, why: "" };
+}

@@ -16,18 +16,27 @@
 // and a notification arrive in the same place rather than in two overlays
 // that drift apart by a few pixels.
 //
+// AND BRIGHTNESS (2026-10-20). Hermes announces every brightness change it
+// makes — its sliders, the brightness keys (`qs ipc call Hermes brightness`)
+// — and the same card shows it: the sun in yellow, the meter, the figure,
+// and the screen's name when there is more than one. Whichever changed last
+// is the one on the card.
+//
 // IT DOES NOT SHOW ON THE FIRST BINDING. Volume.level arrives once when
 // Pipewire is first read, and an OSD that took that for a change would greet
 // every login with a volume bar nobody asked for.
 
 import QtQuick
 import "../morpheus"
+import "../hermes"
 
 Item {
   id: osd
 
   property bool atTop: false
   property bool active: false
+  // "volume" or "bright": what the card is showing
+  property string kind: "volume"
   // Where it comes in from, handed down by the stack so the OSD and a toast
   // travel the same way for the same corner.
   property real slideX: 0
@@ -110,9 +119,22 @@ Item {
       return;
     osd.seenLevel = Volume.level;
     osd.seenMuted = Volume.muted;
+    osd.kind = "volume";
     osd.active = true;
     hold.restart();
   }
+
+  // Hermes says so only when something actually moved it, so there is no
+  // startup value to settle past
+  Connections {
+    target: Hermes
+    function onBrightnessBumped() {
+      osd.kind = "bright";
+      osd.active = true;
+      hold.restart();
+    }
+  }
+  readonly property bool bright: osd.kind === "bright"
 
   Component.onCompleted: if (Volume.ready) settle.restart()
 
@@ -212,8 +234,8 @@ Item {
         // than as the characters themselves, which is how they went missing.
         Text {
           anchors.verticalCenter: parent.verticalCenter
-          text: Volume.muted ? "\uF466" : "\uF028"
-          color: Volume.muted ? Zenon.red : Zenon.green
+          text: osd.bright ? "\u{F00DF}" : Volume.muted ? "\uF466" : "\uF028"
+          color: osd.bright ? Zenon.yellow : Volume.muted ? Zenon.red : Zenon.green
           font.family: Zenon.face
           font.weight: Font.Bold
           font.pixelSize: Zenon.px(18)
@@ -225,30 +247,40 @@ Item {
         // rather than standing beside it drawn empty and red.
         Meter {
           anchors.verticalCenter: parent.verticalCenter
-          visible: !Volume.muted
+          visible: osd.bright || !Volume.muted
           vertical: false
           segCount: 14
           thickness: 9
           segLength: 6
           segGap: 2
-          value: Volume.level
-          accent: Zenon.green
+          value: osd.bright ? Hermes.osdBright.pct / 100 : Volume.level
+          accent: osd.bright ? Zenon.yellow : Zenon.green
         }
 
         // And the figure goes with it: "muted" was the word doing the glyph's
         // job, which is why there was no glyph to see.
         Text {
           anchors.verticalCenter: parent.verticalCenter
-          visible: !Volume.muted
+          visible: osd.bright || !Volume.muted
           width: 52
           horizontalAlignment: Text.AlignRight
-          text: Volume.percent + "%"
+          text: (osd.bright ? Hermes.osdBright.pct : Volume.percent) + "%"
           // tabular, so dragging the volume does not jiggle the bar beside it
           font.features: { "tnum": 1 }
           color: Zenon.white
           font.family: Zenon.face
           font.weight: Font.Bold
           font.pixelSize: Zenon.px(17)
+        }
+        // which screen, when there is more than one to tell apart
+        Text {
+          anchors.verticalCenter: parent.verticalCenter
+          visible: osd.bright && Hermes.osdBright.label !== ""
+          text: Hermes.osdBright.label
+          color: Zenon.accentMuted
+          font.family: Zenon.face
+          font.weight: Zenon.weight
+          font.pixelSize: Zenon.px(14)
         }
       }
     }

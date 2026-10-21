@@ -211,7 +211,28 @@ LayerPopup {
   readonly property int paneInner: 34 + 22 + popup.cellH * 6 + 26 + 24 + 14
   readonly property int bodyHeight: popup.panePad * 2 + popup.paneInner
 
-  function calcHeight() { return popup.bandHeight + 1 + popup.bodyHeight; }
+  function calcHeight() { return popup.bandHeight + 1 + popup.bodyHeight + 1 + popup.agendaH; }
+
+  // ── the day's events (khal; 2026-10-21) ──────────────────────────────
+  // A strip under the calendar: the chosen day's events, one line each, and
+  // a line to type a new one into. Before khal is set up, the one button
+  // that sets it up.
+  readonly property var dayEvents: Chronos.byDay[popup.selIso] || []
+  readonly property int agendaRowH: 32
+  readonly property int agendaRows: Math.min(5, popup.dayEvents.length)
+  // a day with nothing on it is the one line that says so, and the field
+  // (user, 2026-10-21: the empty row under it was padding for nothing)
+  readonly property int agendaH: !Chronos.calReady ? 52
+    : popup.agendaRows === 0 ? 46 : 46 + popup.agendaRows * popup.agendaRowH + 10
+  property string agendaNote: ""
+  property bool agendaNoteBad: false
+  function agendaSay(t, bad) { popup.agendaNote = t; popup.agendaNoteBad = !!bad; agendaNoteTimer.restart(); }
+  Timer { id: agendaNoteTimer; interval: 2600; onTriggered: popup.agendaNote = "" }
+  // the month in view, read as it changes (a beat after, so paging through
+  // months asks for the one landed on)
+  Timer { id: monthLoad; interval: 200; onTriggered: Chronos.loadMonth(popup.viewYear, popup.viewMonth) }
+  onViewMonthChanged: monthLoad.restart()
+  onViewYearChanged: monthLoad.restart()
 
   // ── the forecast the right pane is showing ───────────────────────────
   // The selected day if there is one in range, otherwise nothing — and with
@@ -384,6 +405,7 @@ LayerPopup {
     // opening is the moment someone actually wants to know, so this is where a
     // stale forecast gets replaced — the fifteen-minute poll is the background
     Weather.refreshIfStale();
+    Chronos.calCheck(() => Chronos.loadMonth(popup.viewYear, popup.viewMonth));
     popup.playOpen();
     Qt.callLater(() => { if (popup.shown) bgRoot.forceActiveFocus(); });
   }
@@ -602,6 +624,19 @@ LayerPopup {
                       visible: dayCell.forecast !== null
                       color: dayCell.isToday ? Zenon.black
                         : popup.roleColor(dayCell.forecast ? dayCell.forecast.code : 0)
+                    }
+
+                    // a day with something on it: a dot in the corner
+                    Rectangle {
+                      anchors.top: parent.top
+                      anchors.right: parent.right
+                      anchors.topMargin: 6
+                      anchors.rightMargin: 8
+                      width: 5
+                      height: 5
+                      radius: height / 2
+                      visible: !!Chronos.byDay[dayCell.iso]
+                      color: dayCell.isToday ? Zenon.black : Zenon.yellow
                     }
 
                     MouseArea {
@@ -1057,6 +1092,178 @@ LayerPopup {
                     hoverEnabled: true
                     onClicked: popup.pick(dayStrip.when.getFullYear(),
                       dayStrip.when.getMonth(), dayStrip.when.getDate())
+                  }
+                }
+              }
+            }
+          }
+        }
+        Rectangle {
+          width: parent.width
+          height: 1
+          color: Zenon.border
+        }
+
+        // ── the day's events ────────────────────────────────────────
+        Item {
+          id: agenda
+          width: parent.width
+          height: popup.agendaH
+
+          // not set up: what it takes, and the button
+          Row {
+            visible: !Chronos.calReady
+            // centered in the strip (user, 2026-10-21)
+            anchors.centerIn: parent
+            spacing: 12
+            Text {
+              anchors.verticalCenter: parent.verticalCenter
+              text: "\u{F00F0}"
+              color: Zenon.muted
+              font.family: popup.face
+              font.pixelSize: Zenon.px(16)
+            }
+            Text {
+              anchors.verticalCenter: parent.verticalCenter
+              text: Chronos.calStatus.khal ? "Your calendars are kept by khal \u2014 it needs one to show"
+                : "Calendars and reminders come from khal, installed through Ceres"
+              color: Zenon.muted
+              font.family: popup.face
+              font.weight: Zenon.weight
+              font.pixelSize: Zenon.px(13)
+            }
+            PillButton {
+              anchors.verticalCenter: parent.verticalCenter
+              glyph: "\u{F0415}"
+              label: Chronos.calStatus.khal ? "Make a calendar" : "Set up calendars"
+              onActivated: if (!Chronos.setupCalendar((ok) => popup.agendaSay(ok ? "Your calendar is ready" : "Not set up", !ok)))
+                popup.agendaSay("Ceres is busy \u2014 try again in a moment", true)
+            }
+          }
+
+          // set up: the day's events, and a line for a new one
+          Item {
+            visible: Chronos.calReady
+            anchors.fill: parent
+            anchors.leftMargin: popup.sideMargin
+            anchors.rightMargin: popup.sideMargin
+
+            Text {
+              id: agendaHead
+              x: 4
+              y: 14
+              text: popup.agendaNote !== "" ? popup.agendaNote
+                : popup.dayEvents.length === 0 ? "Nothing on " + Chr.longDay(popup.selDate)
+                : popup.dayEvents.length + (popup.dayEvents.length === 1 ? " event" : " events") + " on " + Chr.longDay(popup.selDate)
+              color: popup.agendaNote !== "" ? (popup.agendaNoteBad ? Zenon.red : Zenon.cyan) : Zenon.keyInk
+              font.family: popup.face
+              font.weight: Font.Bold
+              font.pixelSize: Zenon.px(13)
+            }
+            // the line a new event is typed into
+            Rectangle {
+              anchors.right: parent.right
+              anchors.verticalCenter: agendaHead.verticalCenter
+              width: Math.min(440, parent.width * 0.55)
+              height: 28
+              radius: Zenon.windowRadius
+              color: Zenon.wash(0.05)
+              border.width: 1
+              border.color: addField.activeFocus ? Zenon.cyan : Zenon.border
+              TextInput {
+                id: addField
+                anchors.fill: parent
+                anchors.leftMargin: 10
+                anchors.rightMargin: 10
+                verticalAlignment: TextInput.AlignVCenter
+                clip: true
+                color: Zenon.white
+                selectionColor: Zenon.cyan
+                selectedTextColor: Zenon.onAccent
+                font.family: popup.face
+                font.pixelSize: Zenon.px(13)
+                cursorDelegate: Caret { field: addField }
+                enabled: !Chronos.calBusy
+                Text {
+                  anchors.fill: parent
+                  verticalAlignment: Text.AlignVCenter
+                  visible: addField.text === ""
+                  text: "Add \u2014 14:00 Dentist @ Clinic, or a title for all day"
+                  color: Zenon.muted
+                  font: addField.font
+                  elide: Text.ElideRight
+                }
+                function add() {
+                  Chronos.addQuick(addField.text, popup.selIso, (ok, w) => { popup.agendaSay(w, !ok); if (ok) addField.text = ""; });
+                }
+                Keys.onReturnPressed: (e) => { e.accepted = true; addField.add(); }
+                Keys.onEnterPressed: (e) => { e.accepted = true; addField.add(); }
+                Keys.onEscapePressed: (e) => {
+                  e.accepted = true;
+                  if (addField.text !== "") addField.text = "";
+                  else bgRoot.forceActiveFocus();
+                }
+              }
+            }
+
+            ListView {
+              id: eventList
+              anchors.top: agendaHead.bottom
+              anchors.topMargin: 12
+              width: parent.width
+              height: popup.agendaRows * popup.agendaRowH
+              clip: true
+              model: popup.dayEvents.length
+              ElasticScroll { view: eventList }
+              delegate: Item {
+                id: evRow
+                required property int index
+                readonly property var e: popup.dayEvents[index] || null
+                width: eventList.width
+                height: popup.agendaRowH
+                Text {
+                  id: evTime
+                  x: 4
+                  width: 120
+                  anchors.verticalCenter: parent.verticalCenter
+                  text: Chr.eventTime(evRow.e)
+                  color: Zenon.cyan
+                  font.family: popup.face
+                  font.weight: Font.Bold
+                  font.pixelSize: Zenon.px(13)
+                }
+                Text {
+                  anchors.left: evTime.right
+                  anchors.right: evRemove.left
+                  anchors.rightMargin: 12
+                  anchors.verticalCenter: parent.verticalCenter
+                  elide: Text.ElideRight
+                  textFormat: Text.StyledText
+                  text: !evRow.e ? "" : Strings.escapeHtml(evRow.e.title)
+                    + (evRow.e.location ? '  <font color="' + Zenon.hex(Zenon.muted) + '">' + Strings.escapeHtml(evRow.e.location) + "</font>" : "")
+                    + (evRow.e.repeats ? '  <font color="' + Zenon.hex(Zenon.muted) + '">\u{F0456}</font>' : "")
+                  color: Zenon.white
+                  font.family: popup.face
+                  font.weight: Zenon.weight
+                  font.pixelSize: Zenon.px(14)
+                }
+                // removing a repeating event would take every one of them:
+                // that is khal's own editor's job, not a stray click's
+                Text {
+                  id: evRemove
+                  anchors.right: parent.right
+                  anchors.rightMargin: 4
+                  anchors.verticalCenter: parent.verticalCenter
+                  visible: !!evRow.e && !evRow.e.repeats
+                  text: "\u{F0156}"
+                  color: rmMa.pressed ? Zenon.red : Zenon.muted
+                  font.family: popup.face
+                  font.pixelSize: Zenon.px(13)
+                  MouseArea {
+                    id: rmMa
+                    anchors.fill: parent
+                    anchors.margins: -8
+                    onClicked: Chronos.removeEvent(evRow.e.uid, (ok, w) => popup.agendaSay(ok ? "Removed \u201C" + evRow.e.title + "\u201D" : w, !ok))
                   }
                 }
               }

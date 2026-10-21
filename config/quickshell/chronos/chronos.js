@@ -130,3 +130,93 @@ function parse(text) {
     return [];
   }
 }
+
+// ── THE CALENDAR'S EVENTS (khal, 2026-10-21) ────────────────────────────
+// chronos/core/cal.py hands back { uid, title, date, start, endDate, end,
+// allDay, location, calendar, repeats }: dates ISO, times "HH:MM".
+
+// iso → that day's events, all-day first, then by start
+function eventsByDay(events) {
+  const out = {};
+  for (const e of events || []) {
+    if (!e || !e.date) continue;
+    (out[e.date] = out[e.date] || []).push(e);
+  }
+  for (const k in out) out[k].sort((a, b) => (a.allDay === b.allDay ? 0 : a.allDay ? -1 : 1)
+    || String(a.start).localeCompare(String(b.start)) || String(a.title).localeCompare(String(b.title)));
+  return out;
+}
+// "14:00 – 15:30", "All day", "From 14:00"
+function eventTime(e) {
+  if (!e) return "";
+  if (e.allDay) return "All day";
+  if (e.end && e.endDate === e.date && e.end !== e.start) return e.start + " – " + e.end;
+  return e.start;
+}
+
+// One line, typed, for a new event on the chosen day:
+//   "14:00 Dentist"                 an hour from 14:00
+//   "14:00-15:30 Dentist @ Clinic"  that span, and where
+//   "9 Standup", "9:30 Standup"     hours alone are fine
+//   "Holiday"                       all day
+// → { allDay, start, end, title, location } or { error }
+function parseQuick(text, iso) {
+  let s = String(text || "").trim();
+  if (s === "") return { error: "Type what it is" };
+  let location = "";
+  const at = s.lastIndexOf(" @ ");
+  if (at > 0) { location = s.slice(at + 3).trim(); s = s.slice(0, at).trim(); }
+  const m = /^(\d{1,2})(?::(\d{2}))?(?:\s*[-–]\s*(\d{1,2})(?::(\d{2}))?)?\s+(.+)$/.exec(s);
+  if (!m) return { allDay: true, start: iso, end: "", title: s, location: location };
+  const h = Number(m[1]), mi = Number(m[2] || 0);
+  if (h > 23 || mi > 59) return { error: "That is not a time of day" };
+  const two = (n) => (n < 10 ? "0" : "") + n;
+  const start = two(h) + ":" + two(mi);
+  let end;
+  if (m[3] !== undefined) {
+    const h2 = Number(m[3]), m2 = Number(m[4] || 0);
+    if (h2 > 23 || m2 > 59) return { error: "That is not a time of day" };
+    if (h2 * 60 + m2 <= h * 60 + mi) return { error: "It ends before it starts" };
+    end = two(h2) + ":" + two(m2);
+  } else {
+    const e = Math.min(23 * 60 + 59, h * 60 + mi + 60);
+    end = two(Math.floor(e / 60)) + ":" + two(e % 60);
+  }
+  return { allDay: false, start: iso + " " + start, end: iso + " " + end, title: m[5].trim(), location: location };
+}
+// cal.py new's arguments for it
+function newArgs(q, cal) {
+  if (q.allDay) return [cal || "", q.start, "", q.title, q.location || ""];
+  return [cal || "", q.start, q.end, q.title, q.location || ""];
+}
+
+// ── REMINDERS ────────────────────────────────────────────────────────────
+// An event's moment, as epoch ms (local time)
+function eventMs(e) {
+  if (!e || !e.date) return NaN;
+  const p = e.date.split("-").map(Number);
+  const t = e.allDay ? [9, 0] : String(e.start || "00:00").split(":").map(Number);
+  return new Date(p[0], p[1] - 1, p[2], t[0] || 0, t[1] || 0).getTime();
+}
+// The events whose reminder falls in (lastMs, nowMs]: `lead` minutes before
+// a timed one, 09:00 on the day for an all-day one. `fired` is the keys
+// already said (uid + date + start), so a restart never says one twice.
+function remindersDue(events, lastMs, nowMs, leadMin, fired) {
+  const out = [];
+  if (leadMin < 0) return out;
+  for (const e of events || []) {
+    const t = eventMs(e);
+    if (isNaN(t)) continue;
+    const at = e.allDay ? t : t - leadMin * 60000;
+    const key = remindKey(e);
+    if (at > lastMs && at <= nowMs && !(fired || {})[key]) out.push(e);
+  }
+  return out;
+}
+function remindKey(e) { return (e.uid || e.title) + "|" + e.date + "|" + (e.start || ""); }
+function remindWords(e, nowMs) {
+  if (e.allDay) return "Today";
+  const mins = Math.round((eventMs(e) - nowMs) / 60000);
+  return mins <= 0 ? "Now" + (e.location ? " · " + e.location : "")
+    : "In " + mins + " min, at " + e.start + (e.location ? " · " + e.location : "");
+}

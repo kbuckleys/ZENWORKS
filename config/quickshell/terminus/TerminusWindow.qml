@@ -1212,6 +1212,8 @@ FloatingWindow {
   // directories looked like the sort did nothing (user, 2026-10-13). Under
   // a size sort they are measured with du, as the usage mode measures them.
   readonly property bool sizing: root.usage || root.act.sortBy === "size"
+    // and the space map, which is the same question drawn as a picture
+    || space.open
   onSizingChanged: if (root.sizing) Qt.callLater(root.measureAll)
   // What the mode overrides, so leaving it puts things back rather than
   // leaving you in an order and a view you did not choose.
@@ -2723,6 +2725,7 @@ FloatingWindow {
       ["Cycle view",        "V",       () => root.cycleView()],
       ["Hidden files",      ".",       () => root.showHidden = !root.showHidden],
       ["Disk usage",        ", u",     () => root.toggleUsage()],
+      ["Space map",         ", U",     () => space.ask()],
       ["Git status",        ", g",     () => root.toggleGit()],
       // the directory under the cursor, not the one you are standing in —
       // the same thing ctrl return and the row menu's entry do
@@ -3732,6 +3735,7 @@ FloatingWindow {
     if (cmdPalette.open) return "Commands";
     if (marks.open) return "Bookmarks";
     if (disks.open) return "Disks";
+    if (space.open) return "Space";
     if (plug.open) return plug.rows.length > 1 ? plug.rows.length + " new disks" : "New disk";
     if (diskInfo.open) return diskInfo.cur ? diskInfo.title : "Disk";
     if (diskTool.open)
@@ -3788,6 +3792,7 @@ FloatingWindow {
       return diskInfo.cur && (diskInfo.cur.removable || diskInfo.cur.hotplug)
         ? "\uF0A0" : "\uF1C0";
     if (disks.open) return "\uF1C0";
+    if (space.open) return "\u{F0574}";
     if (plug.open) return "\uF0A0";
     if (diskTool.open) return diskTool.mode === "format" ? "\uF1C0" : "\uF0AD";
     return "";
@@ -3969,7 +3974,7 @@ FloatingWindow {
   readonly property color chromeBg: root.sidebarBg
 
   readonly property bool modal: root.looking || cmdPalette.open || marks.open
-    || disks.open || plug.open || diskInfo.open || tagPick.open || collEdit.open
+    || disks.open || space.open || plug.open || diskInfo.open || tagPick.open || collEdit.open
     || props.open || confirm.open || diskTool.open
     || sendTo.open
     || bulk.open || prefs.open
@@ -4281,6 +4286,7 @@ FloatingWindow {
   readonly property alias contentRef: content
   readonly property alias dropLayerRef: dropLayer
   readonly property alias plugRef: plug
+  readonly property alias spaceRef: space
   readonly property alias viewSaveRef: opening.viewSave
   readonly property alias confirmRef: confirm
   readonly property alias lookLayerRef: lookLayer
@@ -4884,7 +4890,9 @@ FloatingWindow {
   // THE TOP BAND beside the sidebar's first heading: the tab strip while it
   // shows (Zenon.tabH, lower than the bar since 2026-10-18), else the bar —
   // the heading and its toggle chip line up with whichever it is
-  readonly property int topBandH: tabStripRef && tabStripRef.visible ? tabStripRef.height : headH
+  // — and while the strip glides open or shut, the way between the two
+  readonly property int topBandH: !tabStripRef ? headH
+    : Math.round(headH + (tabStripRef.stripHeight - headH) * (tabStripRef.shownH / Math.max(1, tabStripRef.stripHeight)))
 
   // ── THE WARM ITSELF ─────────────────────────────────
   // Nothing is drawn here. Each Image exists to make Qt decode a file
@@ -5052,6 +5060,7 @@ FloatingWindow {
       ],
       ",": [
         ["u", "Disk usage",  () => root.toggleUsage()],
+        ["U", "Space map",   () => space.ask()],
         ["g", "Git status",  () => root.toggleGit()],
         ["n", "By name",     () => root.setSort("name")],
         ["s", "By size",     () => root.setSort("size")],
@@ -6938,6 +6947,10 @@ FloatingWindow {
 
     // disks, in its own file — see terminus/DisksSheet.qml
     DisksSheet { id: disks; term: root }
+
+    // the space map: this directory as rectangles as big as what each takes
+    // up — see terminus/SpaceSheet.qml (2026-10-21)
+    SpaceSheet { id: space; term: root }
 
     // collEdit, in its own file — see terminus/CollEditSheet.qml
     CollEditSheet { id: collEdit; term: root }

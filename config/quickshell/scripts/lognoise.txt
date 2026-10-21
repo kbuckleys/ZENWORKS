@@ -19,3 +19,8 @@ grabToImage
 was built against Qt
 # a socket whose other end quit
 quickshell\.io\.socket.*PeerClosedError
+# Qt PDF reading a PDF whose own link annotations point at no page (a
+# broken link inside the file, not minerva's): it skips the link and says so
+qt\.pdf\.links: skipping link with invalid page number
+# …and an outline entry with no position in it (the file's again)
+qt\.pdf\.bookmarks: bookmark with invalid location

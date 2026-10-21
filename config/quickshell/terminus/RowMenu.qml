@@ -811,6 +811,11 @@ PopupWindow {
         out.push({ label: "Move to other pane" + many, key: "f6",
                    act: () => term.sendToOther("move") });
       }
+      // argus' trim/export window on this video, as Annotate is
+      // picasso's on a picture
+      if (!t.isDir && Terminus.isVideo(t.name))
+        out.push({ label: "Quick Edit",
+                   act: () => Quickshell.execDetached(["qs", "ipc", "call", "Argus", "edit", t.path]) });
       if (!t.isDir && Terminus.isVideo(t.name))
         out.push({ label: "Extract audio" + many, key: "e",
                    act: () => term.extractAudio() });

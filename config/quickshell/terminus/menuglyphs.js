@@ -99,6 +99,7 @@ const exact = {
   "Convert to": "\u{F0B33}",                 // file_replace_outline
   "Set as background": "\u{F02E9}",          // image
   "Annotate": "\u{F090C}",                   // square_edit_outline
+  "Quick Edit": "\u{F0190}",                 // content_cut
   "Rotate left": "\u{F0465}",                // rotate_left
   "Rotate right": "\u{F0467}",               // rotate_right
   "Install font": "\u{F06D6}",               // format_font

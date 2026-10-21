@@ -235,6 +235,11 @@ module.exports = {
     t.eq("chmod takes the octal", chm.args[0], "755");
     t.eq("and the paths as arguments", chm.args.slice(1), ["/d/x"]);
     t.has("keeping each file's own setuid/setgid/sticky digit", chm.script, "/ 01000");
+    const chb = T.chmodBitsCommand(["/d/x", "/d/y"], 0o640, 0o060);
+    t.eq("chmod bits takes mode and the touched mask", chb.args.slice(0, 2), ["640", "060"]);
+    t.eq("and every path", chb.args.slice(2), ["/d/x", "/d/y"]);
+    t.eq("mixed bits read ?", T.modeStringMixed(0o644, 0o022), "rw-r?-r?-");
+    t.eq("mixed octal digits read ?", T.octalMixed(0o644, 0o002), "64?");
 
     // ── THE RESTORED BRANCHES, SIEVED ─────────────────────────────────────
     // A list of open branches off disk is a list of guesses. It is capped,

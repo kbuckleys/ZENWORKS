@@ -1,0 +1,11 @@
+singleton Hermes 1.0 Hermes.qml
+HermesPopup 1.0 HermesPopup.qml
+HermesTile 1.0 HermesTile.qml
+HermesRow 1.0 HermesRow.qml
+HermesCard 1.0 HermesCard.qml
+HermesFact 1.0 HermesFact.qml
+HermesSetup 1.0 HermesSetup.qml
+HermesNetwork 1.0 HermesNetwork.qml
+HermesBluetooth 1.0 HermesBluetooth.qml
+HermesVpn 1.0 HermesVpn.qml
+HermesDisplay 1.0 HermesDisplay.qml

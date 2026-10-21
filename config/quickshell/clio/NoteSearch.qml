@@ -101,7 +101,8 @@ Item {
     width: box.height
     glyph: true
     label: ""
-    ink: Zenon.sand
+    // the theme's accent, as the other windows' primary actions (user, 10-21)
+    ink: Zenon.cyan
     onClicked: bar.win.inJournal ? bar.win.newEntry() : bar.win.newNote()
     // a right click: from a template
     MouseArea {

@@ -66,7 +66,20 @@ Rectangle {
   property bool hideSingle: true
   // Zenon.tabH, the suite's tab height (plato's and terminus' alike)
   property int stripHeight: Zenon.tabH
-  implicitHeight: !tabStrip.hideSingle || tabStrip.tabs.length > 1 ? tabStrip.stripHeight : 0
+  // THE STRIP GLIDES OPEN (user, 2026-10-21, tabs.mp4): a second tab used to
+  // put the whole strip in on one frame and push everything under it down
+  // by a tab's height at once. The height now eases, the cells ride its
+  // bottom edge down into view, and whatever hangs off its height follows.
+  readonly property bool wanted: !tabStrip.hideSingle || tabStrip.tabs.length > 1
+  property real shownH: tabStrip.wanted ? tabStrip.stripHeight : 0
+  Behavior on shownH {
+    enabled: tabStrip.animate && tabStrip.ready
+    NumberAnimation { duration: Zenon.normal; easing.type: Zenon.ease }
+  }
+  // not on the window's first frame: a restored session arrives with its tabs
+  property bool ready: false
+  Component.onCompleted: Qt.callLater(() => { tabStrip.ready = true; })
+  implicitHeight: Math.round(tabStrip.shownH)
   visible: implicitHeight > 0
   clip: true
   // TRANSPARENT: an inactive tab is the window's own body showing through
@@ -156,8 +169,12 @@ Rectangle {
   ListModel { id: ghosts }
 
   Item {
-    anchors.fill: parent
+    // its full height, on the strip's bottom edge, while the strip glides
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.bottom: parent.bottom
     anchors.bottomMargin: 1
+    height: tabStrip.stripHeight - 1
 
     Repeater {
       model: ghosts

@@ -18,6 +18,8 @@ PulseAudioModule 1.0 PulseAudioModule.qml
 ClockModule 1.0 ClockModule.qml
 Sparkline 1.0 Sparkline.qml
 NotificationModule 1.0 NotificationModule.qml
+HermesModule 1.0 HermesModule.qml
+VideoClip 1.0 VideoClip.qml
 Meter 1.0 Meter.qml
 LayerShadow 1.0 LayerShadow.qml
 singleton Volume 1.0 Volume.qml

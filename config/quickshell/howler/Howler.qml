@@ -28,6 +28,7 @@ import Quickshell.Services.Notifications
 import Qt.labs.folderlistmodel
 import "../oracle"
 import "../morpheus"
+import "../chronos"
 import "howler.js" as Wolf
 import "../morpheus/offspecial.js" as Off
 import "../morpheus/hypr.js" as Hypr
@@ -403,7 +404,7 @@ Singleton {
       // and closing it inside this handler would hand the model a dead one.
       // The stack draws a hushed toast as nothing for that one turn. A
       // critical one is the exception, as it is everywhere else.
-      if (Oracle.notifSilent && notif.urgency !== NotificationUrgency.Critical) {
+      if (root.quiet && notif.urgency !== NotificationUrgency.Critical) {
         const h = Object.assign({}, root.hushed);
         h[notif.id] = true;
         root.hushed = h;
@@ -475,6 +476,30 @@ Singleton {
   // setting.
   readonly property bool silent: Oracle.notifSilent
   function toggleSilent() { Oracle.set("notifSilent", !Oracle.notifSilent); }
+
+  // ── focus: quiet without being asked ────────────────────────────────────
+  // Do not disturb above is the switch you flip; these are the two times
+  // the bell goes quiet by itself (2026-10-21) — while a chronos timer
+  // counts (Oracle's notifFocusTimers) and in quiet hours. `quiet` is what
+  // holds a toast back; `quietWhy` says which, for the bell's tooltip.
+  property int minuteOfDay: 0
+  Timer {
+    interval: 30000
+    repeat: true
+    running: Oracle.notifQuietHours
+    triggeredOnStart: true
+    onTriggered: { const d = new Date(); root.minuteOfDay = d.getHours() * 60 + d.getMinutes(); }
+  }
+  readonly property var focusState: Wolf.focus({
+    dnd: Oracle.notifSilent,
+    timers: Oracle.notifFocusTimers, timerRunning: Chronos.anyRunning,
+    hours: Oracle.notifQuietHours, fromH: Oracle.notifQuietFrom, toH: Oracle.notifQuietTo,
+    minutesOfDay: root.minuteOfDay
+  })
+  readonly property bool quiet: root.focusState.quiet
+  readonly property string quietWhy: root.focusState.why
+  function toggleFocusTimers() { Oracle.set("notifFocusTimers", !Oracle.notifFocusTimers); }
+  function toggleQuietHours() { Oracle.set("notifQuietHours", !Oracle.notifQuietHours); }
   // Ids held back this session, so the stack can draw them as nothing for the
   // one turn they are in its model. Ids restart every session, and so does
   // this.
@@ -505,6 +530,10 @@ Singleton {
   }
   function captureReveal(file) {
     if (file !== "") Quickshell.execDetached(["qs", "ipc", "call", "Terminus", "reveal", file]);
+  }
+  // a recording, cut in argus' editor
+  function captureEdit(file) {
+    if (file !== "") Quickshell.execDetached(["qs", "ipc", "call", "Argus", "edit", file]);
   }
   function captureAnnotate(file) {
     if (file !== "") Quickshell.execDetached(["qs", "ipc", "call", "Picasso", "annotate", file]);

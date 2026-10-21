@@ -20,6 +20,7 @@ import "../morpheus"
 import "../morpheus/gridnav.js" as Nav
 import "../chronos"
 import "../oracle"
+import "../hermes"
 
 PanelWindow {
   id: popup
@@ -259,10 +260,19 @@ property var statusbar: null
     popup.rebuild();
   }
 
+  // the live flags the verbs read: `state` picks a row's face, `needs`
+  // whether it is offered at all (control hub's switches)
+  readonly property var actionStates: ({
+    awake: popup.keepAwake,
+    night: Hermes.nightWanted, nightReady: Hermes.probe.display.hyprsunset,
+    wifiOff: !Hermes.wifiOn, wifiReady: Hermes.wifiReady,
+    btOff: !Hermes.btOn, btReady: Hermes.btReady
+  })
+  onActionStatesChanged: if (popup.shown) popup.rebuild()
   function rebuild() {
     const apps = Cynosure.getApps(popup.appsSnapshot);
     popup.rows = Cynosure.buildRows(apps, popup.histLines || [], popup.freqMap || {},
-      Cynosure.SHELL_ACTIONS, { awake: popup.keepAwake }, Icons.appGlyph);
+      Cynosure.SHELL_ACTIONS, popup.actionStates, Icons.appGlyph);
     popup.applyFilter();
   }
 
@@ -301,8 +311,30 @@ property var statusbar: null
     popup.closeCynosure();
   }
 
+  // THE ROW FLASHES, THEN IT RUNS (user, 2026-10-21) — the suite's menus'
+  // ChosenFlash, on the sliding cursor. Not for a row that only opens the
+  // picker: nothing has happened yet (ChosenFlash's own rule).
   function confirm() {
     const idx = popup.sel;
+    // the views' own highlight items: an id inside `highlight:` is in the
+    // component's context, not this file's
+    const bar = popup.mode === "picker" ? pickerList.highlightItem : list.highlightItem;
+    if (bar && bar.flash.running) return;
+    if (!bar || !bar.cur || !popup.acts(idx)) { popup.confirmAt(idx); return; }
+    bar.flash.fire(() => popup.confirmAt(idx));
+  }
+  function acts(idx) {
+    if (popup.mode === "picker") {
+      const r = popup.pickerRows[idx];
+      return !!r && (r.key.startsWith("timer:") || r.key === "Confirm" || r.key === "Terminal" || r.key === "Process");
+    }
+    const row = popup.filtered[idx];
+    if (!row) return false;
+    if (row.kind !== "shell") return true;
+    if (row.action.confirm) return false;
+    return !(row.action.choose === "timer" && Cynosure.timerChoices(Chronos.timers).length > 1);
+  }
+  function confirmAt(idx) {
     if (popup.mode === "picker") {
       const choice = popup.pickerRows[idx].key;
       if (choice.startsWith("timer:")) popup.runAction(popup.pending, "Chronos startAt " + choice.slice(6));
@@ -588,6 +620,7 @@ property var statusbar: null
   component SelBar: Item {
     id: sb
     property Item cur: null
+    readonly property alias flash: sbFlash
     x: sb.cur ? sb.cur.x : 0
     y: 0
     width: sb.cur ? sb.cur.width : 0
@@ -608,7 +641,11 @@ property var statusbar: null
       bottomLeftRadius: sb.atLeft ? popup.innerCorner : 0
       topRightRadius: sb.atRight ? popup.innerCorner : 0
       bottomRightRadius: sb.atRight ? popup.innerCorner : 0
-      color: Zenon.menuHi
+      // stronger than the menus' menuHi: over this bar's deep, frosted
+      // ground .16 read faint in both modes (user, 2026-10-21)
+      // the flash rides this fill, so it keeps the band's corners
+      color: Zenon.alpha(Zenon.cyan, (Zenon.light ? 0.30 : 0.28) + 0.4 * sbFlash.chosen)
+      ChosenFlash { id: sbFlash; painted: false }
     }
   }
 

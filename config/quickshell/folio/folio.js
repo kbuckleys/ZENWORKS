@@ -239,9 +239,66 @@ function stampLabel(ms, now, h24) {
 // hint could only ever be drawn one way. The popup draws these as chips now;
 // what belongs here is which key and what it does.
 function hintText(mode) {
-  const tab = ["tab", "toggle mode"];
+  const tab = ["tab", "next mode"];
   const del = ["delete", "remove entry"];
   const open = ["shift return", "annotate"];
   if (mode === "image") return [tab, open, del];
-  return [tab, del];
+  if (mode === "snip") return [tab, ["return", "paste"], ["ctrl n", "new"], ["ctrl e", "edit"], ["delete", "remove"]];
+  return [tab, ["ctrl s", "keep as snippet"], del];
+}
+
+// ── SNIPPETS (2026-10-21) ────────────────────────────────────────────────
+// Text you paste again and again, kept: one plain .txt file each in the
+// snippets directory, named by its file name, edited in plato. Folio's third
+// mode lists them; return pastes one with its placeholders filled in.
+//
+//   {date} 2026-10-21   {time} 14:05   {datetime} 2026-10-21 14:05
+//   {weekday} Tuesday   {year} {month} {day}   {clipboard} what was copied
+//   last — and {{ }} for a literal brace
+function snippetDir() {
+  return Paths.dataDir() + "/folio/snippets";
+}
+// the listing command's JSON: [{ name, path, text }]
+function parseSnippets(text) {
+  let j;
+  try { j = JSON.parse(String(text || "")); } catch (e) { return []; }
+  if (!Array.isArray(j)) return [];
+  return j.filter((s) => s && s.name && s.path).map((s) => ({
+    name: String(s.name), path: String(s.path), text: String(s.text || "")
+  })).sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
+}
+// the rows the text pane draws: the name, and the text under it
+function snippetRows(snips, query) {
+  const q = String(query || "").trim().toLowerCase();
+  return (snips || []).filter((s) => q === "" || (s.name + " " + s.text).toLowerCase().includes(q))
+    .map((s) => ({ id: "snip:" + s.name, snip: true, path: s.path, content: s.text,
+                   preview: s.name, sub: preview(s.text) }));
+}
+const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+function expandSnippet(text, now, clipboard) {
+  const d = now || new Date();
+  const two = (n) => (n < 10 ? "0" : "") + n;
+  const date = d.getFullYear() + "-" + two(d.getMonth() + 1) + "-" + two(d.getDate());
+  const time = two(d.getHours()) + ":" + two(d.getMinutes());
+  const vals = {
+    date: date, time: time, datetime: date + " " + time, weekday: WEEKDAYS[d.getDay()],
+    year: String(d.getFullYear()), month: two(d.getMonth() + 1), day: two(d.getDate()),
+    clipboard: String(clipboard || "")
+  };
+  return String(text || "")
+    .replace(/\{\{/g, "\u0001").replace(/\}\}/g, "\u0002")
+    .replace(/\{([a-z]+)\}/g, (m, k) => vals[k] !== undefined ? vals[k] : m)
+    .replace(/\u0001/g, "{").replace(/\u0002/g, "}");
+}
+// a name for a clip kept as a snippet: its first few words, safe as a file
+// name, and not one already taken ("…", "… 2", "… 3")
+function snippetName(text, taken) {
+  let base = cleanText(text).split(/\s+/).filter((w) => w !== "").slice(0, 5).join(" ")
+    .replace(/[\/\\:*?"<>|]/g, "").slice(0, 48).trim();
+  if (base === "") base = "Snippet";
+  const used = {};
+  (taken || []).forEach((n) => used[n.toLowerCase()] = true);
+  let name = base;
+  for (let i = 2; used[name.toLowerCase()] && i < 1000; ++i) name = base + " " + i;
+  return name;
 }

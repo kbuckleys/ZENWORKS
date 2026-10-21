@@ -129,7 +129,8 @@ function windowsOn(clients, monitor, ws) {
     if (!c || !c.mapped || c.hidden) continue;
     if (!c.workspace || ws.indexOf(c.workspace.id) < 0) continue;
     out.push({ x: c.at[0] - monitor.x, y: c.at[1] - monitor.y,
-               w: c.size[0], h: c.size[1], title: String(c.title || "") });
+               w: c.size[0], h: c.size[1], title: String(c.title || ""),
+               address: String(c.address || "") });
   }
   return out;
 }

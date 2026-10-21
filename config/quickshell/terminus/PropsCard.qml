@@ -139,9 +139,13 @@ Item {
     props.walked = -1;
     props.files = -1;
     props.dirs = -1;
-    // The cursor row's mode, as the permissions card used: a mixed set
-    // has no single answer and picking one is more honest than zero.
-    props.permMode = (sel[0] && sel[0].mode) || 0;
+    // The bits every row agrees on; those they do not are "mixed" and show
+    // as "?" until a box is clicked (2026-10-21: a selection can be chmodded).
+    let all = 511, any = 0;
+    for (const r of sel) { all &= (r.mode || 0); any |= (r.mode || 0); }
+    props.permMode = all | (((sel[0] && sel[0].mode) || 0) & ~511);
+    props.permMixed = (all ^ any) & 511;
+    props.permTouched = 0;
     props.permWas = props.permMode;
     props.permCursor = 0;
     // Always opens on properties, whichever page you left it on.
@@ -268,27 +272,53 @@ Item {
   // 0 is properties, 1 is permissions. Not a tab index any more — the
   // strip is gone — but still the page the card is showing.
   property int tab: 0
-  // Whether there is a second page at all. A mixed selection has no
-  // single mode to edit, so it has no permissions row to open and no
-  // page to open onto.
-  readonly property bool hasPerms: !props.many
+  // Whether there is a second page at all — always, since a selection
+  // can be changed together (2026-10-21).
+  readonly property bool hasPerms: props.rows.length > 0
 
   property int permMode: 0
   property int permWas: 0
+  // the bits the selection disagrees on, and those the grid has set since
+  // (a mixed bit still untouched reads "?" and is left as each file has it)
+  property int permMixed: 0
+  property int permTouched: 0
+  readonly property int permShownMixed: props.permMixed & ~props.permTouched
+  // a box clicked: a mixed one becomes on, any other flips
+  function flipPermBit(bit) {
+    if (props.permShownMixed & bit) props.permMode = props.permMode | bit;
+    else props.permMode = props.permMode ^ bit;
+    props.permTouched = props.permTouched | bit;
+  }
+  // a whole mode, typed or a preset: every box is decided
+  function setPermBits(v) {
+    props.permMode = (props.permMode & ~511) | (v & 511);
+    props.permTouched = 511;
+  }
+  function revertPerms() {
+    props.permMode = props.permWas;
+    props.permTouched = 0;
+  }
   property int permCursor: 0
   readonly property int permCursorBit:
     [4, 2, 1][props.permCursor % 3] << (6 - Math.floor(props.permCursor / 3) * 3)
   readonly property bool permDirty:
-    (props.permMode & 511) !== (props.permWas & 511)
+    ((props.permMode ^ props.permWas) & 511) !== 0
+    || (props.permMixed & props.permTouched) !== 0
   readonly property var permPaths: props.rows.map((r) => r.path)
 
   function togglePermBit() {
-    props.permMode = props.permMode ^ props.permCursorBit;
+    props.flipPermBit(props.permCursorBit);
   }
 
   function applyPerms() {
     if (!props.permDirty) return;
-    props.host.run(Terminus.chmodCommand(props.permPaths, props.permMode));
+    // only the boxes touched, where the selection's modes differ: the
+    // "?" ones stay as each file has them
+    props.host.run(props.permMixed === 0 || props.permTouched === 511
+      ? Terminus.chmodCommand(props.permPaths, props.permMode)
+      : Terminus.chmodBitsCommand(props.permPaths, props.permMode, props.permTouched));
+    props.permMixed = props.permMixed & ~props.permTouched;
+    props.permTouched = 0;
     props.permWas = props.permMode;
     props.host.status = "Permissions set";
   }
@@ -319,7 +349,10 @@ Item {
                     ? (dirs > 0 ? "measuring\u2026"
                         : Terminus.formatSize(props.total) + "  ·  " + props.total + " bytes")
                     : Terminus.formatSize(props.walked) + "  ·  " + props.walked + " bytes"],
-                  ["Location", Terminus.dirname(r.path)]
+                  ["Location", Terminus.dirname(r.path)],
+                  ["Permissions",
+                    Terminus.octalMixed(props.permMode, props.permShownMixed)
+                    + "  \u00b7  " + Terminus.modeStringMixed(props.permMode, props.permShownMixed)]
                 ].concat(dirs > 0 ? [["Contains", props.countText()]] : []);
               }
               // no "name" row: it is the card's own title now
@@ -658,10 +691,9 @@ Item {
               // does something" is one idea in this card rather than two.
               readonly property bool pickable:
                 modelData[0] === "Open with" && props.host.appsScanned
-              // The third. A mixed selection has no single mode, so it
-              // has no row to open and nothing to open it onto.
+              // The third: the grid, for one file or the whole selection.
               readonly property bool opensPerms:
-                modelData[0] === "Permissions" && !props.many
+                modelData[0] === "Permissions"
               readonly property bool acts: propValue.askable
                 || propValue.pickable || propValue.opensPerms
               color: propValue.acts
@@ -707,9 +739,8 @@ Item {
         readonly property int labelW: 78
         readonly property int cellW: 62
         readonly property int octW: 40
-        // The tab AND something to show one for: a mixed selection has
-        // no tab to reach this page with, so it can never be on it.
-        visible: props.tab === 1 && props.rows.length > 0 && !props.many
+        // The tab AND something to show one for
+        visible: props.tab === 1 && props.rows.length > 0
 
 
       // ONE RHYTHM. Everything below the title is 12px apart and the grid
@@ -740,7 +771,7 @@ Item {
           anchors.verticalCenter: parent.verticalCenter
           width: permOctal.contentWidth + 4
           height: permOctal.contentHeight
-          readonly property string shown: ("000" + (props.permMode & 511).toString(8)).slice(-3)
+          readonly property string shown: Terminus.octalMixed(props.permMode, props.permShownMixed)
 
           TextInput {
             id: permOctal
@@ -759,14 +790,14 @@ Item {
             // valid as you go: octal digits, or the rwx spelling
             readonly property int parsed: Terminus.parseModeText(permOctal.text)
             onTextEdited: if (permOctal.parsed >= 0)
-              props.permMode = (props.permMode & ~511) | permOctal.parsed
+              props.setPermBits(permOctal.parsed)
             onActiveFocusChanged: {
               if (permOctal.activeFocus) { permOctal.selectAll(); return; }
               permOctal.text = Qt.binding(() => permOctal.parent.shown);
             }
             onAccepted: props.keysBack()
             Keys.onEscapePressed: {
-              props.permMode = props.permWas;
+              props.revertPerms();
               props.keysBack();
             }
           }
@@ -796,7 +827,7 @@ Item {
 
         Text {
           anchors.verticalCenter: parent.verticalCenter
-          text: Terminus.modeString(props.permMode)
+          text: Terminus.modeStringMixed(props.permMode, props.permShownMixed)
           color: Zenon.sand
           font.family: Zenon.faceMono
           font.weight: Font.Bold
@@ -820,7 +851,7 @@ Item {
 
           delegate: Rectangle {
             required property var modelData
-            readonly property bool on: (props.permMode & 511) === modelData[1]
+            readonly property bool on: (props.permMode & 511) === modelData[1] && props.permShownMixed === 0
             width: 62
             height: 24
             radius: Zenon.radiusControl
@@ -849,7 +880,7 @@ Item {
               anchors.fill: parent
               // the high bits — setuid and friends — are left alone: this
               // is a shortcut for the nine, not a reset of the whole mode
-              onClicked: props.permMode = (props.permMode & ~511) | modelData[1]
+              onClicked: props.setPermBits(modelData[1])
             }
           }
         }
@@ -923,7 +954,8 @@ Item {
               height: parent.height
 
               readonly property int bit: modelData[1] << permRow.shift
-              readonly property bool on: (props.permMode & bit) !== 0
+              readonly property bool mixed: (props.permShownMixed & bit) !== 0
+              readonly property bool on: !mixed && (props.permMode & bit) !== 0
               readonly property bool here:
                 props.permCursor === permRow.index * 3 + index
 
@@ -944,7 +976,8 @@ Item {
 
                 Text {
                   anchors.centerIn: parent
-                  text: modelData[0]
+                  // a box the selection disagrees on: neither, until clicked
+                  text: parent.parent.mixed ? "?" : modelData[0]
                   color: parent.parent.on ? Zenon.cyan : Zenon.accentMuted
                   opacity: bitPress.pressed ? Zenon.pressDim : 1
                   font.family: Zenon.faceMono
@@ -958,7 +991,7 @@ Item {
                 anchors.fill: parent
                 onClicked: {
                   props.permCursor = permRow.index * 3 + parent.index;
-                  props.permMode = props.permMode ^ parent.bit;
+                  props.flipPermBit(parent.bit);
                 }
               }
             }
@@ -971,7 +1004,7 @@ Item {
             height: parent.height
             horizontalAlignment: Text.AlignHCenter
             verticalAlignment: Text.AlignVCenter
-            text: String((props.permMode >> permRow.shift) & 7)
+            text: ((props.permShownMixed >> permRow.shift) & 7) ? "?" : String((props.permMode >> permRow.shift) & 7)
             color: Zenon.accentMuted
             font.family: Zenon.faceMono
             font.weight: Zenon.weight
@@ -1007,7 +1040,7 @@ Item {
           DialogButton {
             label: "Revert"
             ink: Zenon.accentMuted
-            onClicked: props.permMode = props.permWas
+            onClicked: props.revertPerms()
           }
 
           DialogButton {

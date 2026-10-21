@@ -29,10 +29,10 @@ module.exports = {
     const wins = [{ x: 0, y: 0, w: 100, h: 100 }, { x: 20, y: 20, w: 30, h: 30 }];
     t.eq("the smallest window under the point", C.windowAt(wins, 25, 25), wins[1]);
     t.eq("none under a gap", C.windowAt(wins, 200, 200), null);
-    const cl = [{ mapped: true, hidden: false, workspace: { id: 1 }, at: [1080, 10], size: [300, 200], title: "a" },
+    const cl = [{ mapped: true, hidden: false, workspace: { id: 1 }, at: [1080, 10], size: [300, 200], title: "a", address: "0xa" },
                 { mapped: true, hidden: false, workspace: { id: 2 }, at: [0, 0], size: [5, 5], title: "b" }];
     t.eq("windows on this monitor, in its coordinates",
-      C.windowsOn(cl, { x: 1080, y: 0 }, [1]), [{ x: 0, y: 10, w: 300, h: 200, title: "a" }]);
+      C.windowsOn(cl, { x: 1080, y: 0 }, [1]), [{ x: 0, y: 10, w: 300, h: 200, title: "a", address: "0xa" }]);
 
     // the window's shadow, from hyprland's getoption answers
     const opts = [{ option: "decoration:rounding", int: 5, set: true },

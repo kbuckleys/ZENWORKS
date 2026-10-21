@@ -285,6 +285,41 @@ Scope {
     mgr.write(n);
     return n.id;
   }
+  // ── A QUOTE FROM ELSEWHERE ─────────────────────────────────────────────
+  // Minerva's highlights (2026-10-20): one note per book, "Highlights ·
+  // <book>", made the first time and appended to after — each quote a
+  // block quote, where it came from on the line beneath. Asked of a
+  // notebook that may not be read yet: read first, then filed. done(id).
+  function appendQuote(book, quote, where, done) {
+    const go = () => {
+      const title = "Highlights · " + book;
+      const n = mgr.notes.find((x) => !(x.deleted > 0) && x.kind === "note" && !x.sealed && N.titleOf(x, "") === title);
+      const add = [N.block("quote", N.escape(quote))].concat(where ? [N.block("body", N.escape(where))] : []);
+      let id;
+      if (n) {
+        id = n.id;
+        mgr.setBlocks(id, n.blocks.concat(add));
+      } else {
+        id = mgr.newNote("", [N.block("title", N.escape(title))].concat(add));
+      }
+      if (done) done(id);
+    };
+    if (mgr.loaded) go();
+    else if (!mgr.loading) mgr.load(go);
+    else quoteRetry.later(go);
+  }
+  Timer {
+    id: quoteRetry
+    interval: 300
+    property var waiting: []
+    function later(fn) { quoteRetry.waiting.push(fn); quoteRetry.restart(); }
+    onTriggered: {
+      if (mgr.loading) { quoteRetry.restart(); return; }
+      const fns = quoteRetry.waiting;
+      quoteRetry.waiting = [];
+      for (const fn of fns) { if (mgr.loaded) fn(); else mgr.load(fn); }
+    }
+  }
   function newEntry(journal, date, prompt, blocks) {
     const n = N.blankEntry(journal || (mgr.journals[0] || {}).id || "journal", date, prompt);
     if (blocks && blocks.length) n.blocks = blocks;
@@ -970,6 +1005,8 @@ Scope {
     return id;
   }
   function note() { mgr.withWindow((w) => w.newNote()); }
+  // a note at words in it, lit for a moment: minerva's "Show in Clio"
+  function openAt(id, text) { mgr.withWindow((w) => w.openAt(id, text || "")); }
   // the stickies' own "Open in Clio": the Stickies shelf, on that one
   function openSticky(id) { mgr.withWindow((w) => w.openSticky("s:" + id)); }
 }

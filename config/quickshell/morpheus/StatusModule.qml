@@ -40,7 +40,7 @@ Collapsible {
   readonly property bool micMuted: root.micAudio ? root.micAudio.muted : false
   function toggleMic() { if (root.micAudio) root.micAudio.muted = !root.micAudio.muted; }
 
-  // Through hyprland's own recorder (hypr/lua/wf-recorder.lua) rather than a
+  // Through argus, the recorder (argus/argus.lua, loaded by hyprland) rather than a
   // pkill here, so the file is finished and announced the way Super+R does it.
   function stopRecording() {
     Quickshell.execDetached(["hyprctl", "repl", 'ZenRecord("stop")']);

@@ -116,6 +116,15 @@ Singleton {
   function showCursor(visible) { Quickshell.execDetached(["sh", "-c", root.cursorCmd(visible)]); }
 
   function shoot(mode) { root.shotRequested(mode || "region"); }
+  // THE PICKER FOR A RECORDING (argus, 10-20): the region screenshot's own
+  // overlay, but Save hands the rectangle back instead of taking a picture.
+  // `kind` is "region" (draw it, the same as a shot) or "window" (click the
+  // one to record; Return takes the window with the keyboard). The answer is
+  // written to the file `reply` in slurp's "X,Y WxH" form, layout
+  // coordinates — what wf-recorder -g takes — and an empty file is "never
+  // mind". See PicassoCapture.pickFor.
+  signal geometryRequested(string kind, string reply)
+  function pickGeometry(kind, reply) { if (reply && reply !== "") root.geometryRequested(kind || "region", reply); }
   function pick() { root.pickInto = ""; root.pickRequested(); }
   function pickFor(into) { root.pickInto = into || ""; root.pickRequested(); }
   function annotate(path) { if (path && path !== "") root.annotateRequested(path); }

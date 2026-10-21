@@ -88,5 +88,19 @@ module.exports = {
     t.eq("empty text is an empty history", H.parse("").length, 0);
     t.eq("so is nonsense", H.parse("{{{").length, 0);
     t.eq("and so is a non-array", H.parse('{"a":1}').length, 0);
+
+    // ── focus ─────────────────────────────────────────────────────────────
+    t.eq("quiet hours across midnight, late", H.inQuietHours(22, 7, 23 * 60), true);
+    t.eq("…early", H.inQuietHours(22, 7, 6 * 60 + 59), true);
+    t.eq("…not at seven", H.inQuietHours(22, 7, 7 * 60), false);
+    t.eq("…not at noon", H.inQuietHours(22, 7, 12 * 60), false);
+    t.eq("within a day", H.inQuietHours(13, 15, 14 * 60), true);
+    t.eq("equal hours are never", H.inQuietHours(8, 8, 8 * 60), false);
+    t.eq("hour words", H.hourWords(7), "07:00");
+    t.eq("do not disturb wins", H.focus({ dnd: true, timers: true, timerRunning: true }).why, "Do not disturb");
+    t.eq("a timer", H.focus({ timers: true, timerRunning: true }), { quiet: true, why: "Quiet while a timer runs" });
+    t.eq("a timer, but the switch is off", H.focus({ timers: false, timerRunning: true }).quiet, false);
+    t.eq("quiet hours say until when", H.focus({ hours: true, fromH: 22, toH: 7, minutesOfDay: 23 * 60 }).why, "Quiet hours, until 07:00");
+    t.eq("nothing", H.focus({}), { quiet: false, why: "" });
   }
 };

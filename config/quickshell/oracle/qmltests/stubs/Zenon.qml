@@ -33,4 +33,11 @@ QtObject {
   readonly property int menuShadowDrop: 6
   readonly property int menuShadowPad: menuShadowGrow + menuShadowBlur + menuShadowDrop
   function menuScale(t) { return 1; }
+  // what the real CardBody and ChosenFlash ask of Zenon since the 10-19/10-20
+  // polish (type through px, motion through ms, the accent grey): missing
+  // here, every QML test run wrote TypeErrors into the journal (Hestia showed
+  // them, 2026-10-21) though the tests themselves passed
+  function px(n) { return Math.max(1, Math.round(n)); }
+  function ms(n) { return Math.round(n); }
+  readonly property color accentMuted: muted
 }

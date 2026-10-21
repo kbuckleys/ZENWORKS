@@ -168,8 +168,9 @@ Item {
 
   Rectangle {
     id: thumb
-    // two pixels wider than it started (user, 2026-10-17, twice)
-    property real across: ma.containsMouse || ma.dragging ? 8 : 6
+    // two pixels wider than it started (user, 2026-10-17, twice), then a
+    // pixel back (user, 2026-10-21)
+    property real across: ma.containsMouse || ma.dragging ? 7 : 5
     // where it starts along the bar, whichever way the bar runs
     readonly property real along: root.horizontal ? thumb.x : thumb.y
     x: root.horizontal ? root.thumbY : root.lineX - across / 2

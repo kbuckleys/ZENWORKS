@@ -2880,6 +2880,33 @@ function chmodCommand(paths, mode) {
     + "exit $s\n", [oct].concat(paths));
 }
 
+// Only the bits in `touched` (of the nine), each file keeping the rest of
+// its own mode — a selection whose modes differ, where the Info sheet's
+// grid changed some boxes and left the "?" ones alone (2026-10-21).
+function chmodBitsCommand(paths, mode, touched) {
+  const oct = (v) => ("000" + (v & 511).toString(8)).slice(-3);
+  return withArgs("m=$1; t=$2; shift 2; s=0\n"
+    + "for p; do\n"
+    + "  h=$(stat -c %a -- \"$p\" 2>/dev/null) || h=0\n"
+    + "  chmod \"$(printf %o $(( (0$h & ~0$t) | (0$m & 0$t) )))\" -- \"$p\" || s=1\n"
+    + "done\n"
+    + "exit $s\n", [oct(mode), oct(touched)].concat(paths));
+}
+
+// The same, with the bits the selection disagrees on as "?"
+function modeStringMixed(mode, mixed) {
+  const s = modeString(mode);
+  let out = "";
+  for (let i = 0; i < 9; ++i) out += ((mixed >> (8 - i)) & 1) ? "?" : s[i];
+  return out;
+}
+// the octal, a digit the selection disagrees on as "?"
+function octalMixed(mode, mixed) {
+  let out = "";
+  for (let sh = 6; sh >= 0; sh -= 3) out += ((mixed >> sh) & 7) ? "?" : String((mode >> sh) & 7);
+  return out;
+}
+
 // The mode as the rwxrwxrwx string every listing shows, so the editor can be
 // checked against `ls -l` without translating in your head.
 function modeString(mode) {

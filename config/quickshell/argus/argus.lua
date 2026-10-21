@@ -2,6 +2,12 @@
 -- ┌─┘├┤ │││││││ │├┬┘├┴┐└─┐
 -- └─┘└─┘┘└┘└┴┘└─┘┴└─┴ ┴└─┘
 -- https://github.com/kbuckleys/
+--
+-- ARGUS — the recorder. The hundred-eyed watchman: it keeps an eye on the
+-- screen while you work. Moved here from hypr/lua/wf-recorder.lua (10-20) so
+-- the video capture lives with the rest of the shell; hyprland.lua loads it
+-- from here, and its binds are in hypr/lua/binds.lua under CAPTURE, where
+-- oracle's Shortcuts lists them.
 
 local function record(mode)
 	-- The videos directory from user-dirs.dirs. xdg-user-dir answers $HOME
@@ -63,22 +69,60 @@ base=(-D -r 60)
 audio=$(pactl list short sources 2>/dev/null | awk '$2 ~ /\.monitor$/ {print $2; exit}')
 [ -n "$audio" ] && base+=(--audio="$audio")
 
+# ── THE AREA, FROM PICASSO'S PICKER ─────────────────────────────────────
+# Region and window recordings are picked in the region screenshot's own
+# overlay (picasso/PicassoCapture.qml), not slurp: the box can be adjusted
+# before it is taken, the presets and "the last region" are there, and a
+# window is clicked, lit as the pointer crosses it. The ipc call answers at
+# once — "picking" — and the rectangle comes later, written to $reply in
+# slurp's own "X,Y WxH"; an empty file is Escape. Anything but "picking" is a
+# shell that is not running, or one too old to know the call (reloaded
+# without picasso's change), and that is the only time slurp is asked.
+# The wait has a ceiling, and gives up the moment the shell is gone, so a
+# shell that dies with the overlay up cannot leave this script behind.
+pick() {
+  reply="${XDG_RUNTIME_DIR:-/tmp}/argus-pick-$$"
+  rm -f "$reply" "$reply.part"
+  [ "$(qs ipc call Picasso "$1" "$reply" 2>/dev/null)" = picking ] || return 2
+  for i in $(seq 6000); do
+    [ -e "$reply" ] && break
+    [ $((i % 10)) = 0 ] && ! pgrep -x qs >/dev/null && break
+    sleep 0.1
+  done
+  geometry=$(cat "$reply" 2>/dev/null)
+  rm -f "$reply"
+  [ -n "$geometry" ] || return 1
+  # the overlay goes the moment it answers; a beat more makes sure its last
+  # frame is off the screen before the first one is recorded
+  sleep 0.15
+}
+
 case "${1}" in
   full)
     target=(-o "$monitor")
     label="󰑋 Full Screen"; detail="$monitor"
     ;;
   region)
-    geometry=$(slurp -d) || exit 0
-    [ -n "$geometry" ] || exit 0
+    pick pickRegion; r=$?
+    [ "$r" = 1 ] && exit 0
+    if [ "$r" = 2 ]; then
+      geometry=$(slurp -d) || exit 0
+      [ -n "$geometry" ] || exit 0
+    fi
     target=(-g "$geometry")
     label=" Region Recording"; detail=""
     ;;
   window)
-    geometry=$(hyprctl -j activewindow | jq -r '"\(.at[0]),\(.at[1]) \(.size[0])x\(.size[1])"')
-    # jq prints the literal "null,null nullxnull" when nothing is focused, which
-    # is non-empty and would sail past a -n test into a wf-recorder parse error
-    [ "$geometry" != "null,null nullxnull" ] || { notify-send " No window"; exit 1; }
+    # the picker starts with the focused window lit, so Return alone records
+    # what this bind used to take without asking
+    pick pickWindow; r=$?
+    [ "$r" = 1 ] && exit 0
+    if [ "$r" = 2 ]; then
+      geometry=$(hyprctl -j activewindow | jq -r '"\(.at[0]),\(.at[1]) \(.size[0])x\(.size[1])"')
+      # jq prints the literal "null,null nullxnull" when nothing is focused, which
+      # is non-empty and would sail past a -n test into a wf-recorder parse error
+      [ "$geometry" != "null,null nullxnull" ] || { notify-send " No window"; exit 1; }
+    fi
     target=(-g "$geometry")
     label=" Window Recording"; detail=""
     ;;
@@ -147,8 +191,3 @@ end
 -- The bar's recording dot stops a recording through this, so it says the
 -- same "Recording Stopped" the binds do: `hyprctl repl 'ZenRecord("stop")'`.
 ZenRecord = record
-
--- BINDS
-hl.bind("SUPER + R",            function() record("full") end)
-hl.bind("SUPER + SHIFT + R",    function() record("window") end)
-hl.bind("SUPER + CONTROL + R",  function() record("region") end)

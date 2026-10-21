@@ -18,6 +18,20 @@
 //            reshape it, and Copy text (t) reads it with tesseract instead —
 //            the viewer's OCR — and puts the words on the clipboard.
 //
+// THE SAME OVERLAY PICKS FOR A RECORDING (argus, 10-20). Argus' region and
+// window recordings used to ask slurp, a crosshair that took the box the
+// moment the button came up and knew nothing of windows. Now they ask here,
+// through `qs ipc call Picasso pickRegion|pickWindow <file>`: the overlay
+// comes up exactly as it does for a shot, but Save (Record, there) captures
+// nothing — the rectangle is written to <file> in slurp's own "X,Y WxH" and
+// argus hands it to wf-recorder. `cap.purpose` is which of the three the
+// session is: "shot", "region" (draw a box, every tool a shot has but Copy
+// text), or "window" (no box at all: the windows light under the pointer,
+// starting with the one that has the keyboard, and a click — or Return —
+// records the lit one). Whatever ends the session, it answers: an aborted
+// one, or one the shell could not start, writes an empty file, so argus is
+// never left waiting.
+//
 // Every one of them is saved to ~/Pictures/Screenshots (XDG's pictures
 // directory, as picasso finds it), copied to the clipboard, and announced by
 // a toast. CLICKING THAT TOAST is what opens the annotation window — it
@@ -52,6 +66,11 @@ Scope {
   // the last region saved, for `l` — in the coordinates of the screen it was on
   property var lastSel: null
   property string lastScreen: ""
+  // "shot", or what a recording asked for — "region" or "window" — and the
+  // file its answer goes to (see the header)
+  property string purpose: "shot"
+  property string reply: ""
+  readonly property bool recording: cap.purpose !== "shot"
 
 
   Connections {
@@ -59,8 +78,35 @@ Scope {
     // asked again while a region is up: that is "never mind"
     function onShotRequested(mode) {
       if (region.active) { region.finish(false); return; }
+      if (cap.busy) return;
+      cap.purpose = "shot";
       cap.shoot(mode);
     }
+    // and a recording's pick: asked again while the overlay is up is the
+    // same "never mind" (the second Super+Ctrl+R puts it away), and asked
+    // while a shot is still being taken is told no at once — either way the
+    // asker hears back, empty.
+    function onGeometryRequested(kind, reply) {
+      if (region.active) { region.finish(false); cap.say(reply, ""); return; }
+      if (cap.busy) { cap.say(reply, ""); return; }
+      cap.purpose = kind === "window" ? "window" : "region";
+      cap.reply = reply;
+      cap.shoot("pick");
+    }
+  }
+
+  // A recording's answer, written whole: to a temporary name and then moved,
+  // so argus, waiting for the file to appear, never reads half of it.
+  function say(path, geo) {
+    Quickshell.execDetached(["sh", "-c", "printf '%s' \"$1\" > \"$2.part\" && mv -f \"$2.part\" \"$2\"",
+      "sh", geo, path]);
+  }
+  // the end of a recording's session: its answer, and the overlay free again
+  function answer(geo) {
+    cap.say(cap.reply, geo);
+    cap.reply = "";
+    cap.purpose = "shot";
+    cap.busy = false;
   }
 
   function sh(s) { return Strings.shellQuote(s); }
@@ -97,7 +143,10 @@ Scope {
     try { opts = JSON.parse(parts[3]); } catch (e) {}
     const scr = Oracle.focusedScreen();
     const mon = mons.find(m => m.focused) || mons.find(m => scr && m.name === scr.name);
-    if (!mon || !scr) { cap.busy = false; return; }
+    if (!mon || !scr) {
+      if (cap.recording) cap.answer(""); else cap.busy = false;
+      return;
+    }
     const plain = cap.wantMode === "window-plain";
     const mode = plain ? "window" : cap.wantMode;
     const file = Picasso.shotDir + "/" + Cap.fileName(new Date(), mode, mon.name);
@@ -133,6 +182,14 @@ Scope {
     region.target = file;
     cap.regionScreen = scr;
     region.begin();
+    // EVERY SESSION STARTS WITH THE WINDOW THAT HAS THE KEYBOARD LIT (10-21)
+    // — a shot, a region recording and a window recording alike — so
+    // Return alone takes it, and dragging draws a box instead, the way it
+    // always did. Before, nothing was lit until the pointer moved; the
+    // window under it lit then, which is usually but not always this one.
+    // Moving the pointer still hands the light to whatever is under it.
+    if (active && active.address)
+      region.hoverWin = cap.wins.find(w => w.address === active.address) || null;
   }
 
   // The capture itself, then the part every mode shares.
@@ -249,9 +306,22 @@ Scope {
 
     // `text`: read it rather than keep it — see cap.readText
     function finish(save, text) {
-      const s = region.sel;
+      // with no box drawn, what is taken is the lit window — the focused one
+      // the session started with, or the one the pointer last crossed
+      // (kept to the screen, the way a clicked window is: one hanging off
+      // the edge would be a geometry grim and wf-recorder refuse)
+      const h = region.hoverWin;
+      const s = !region.has && h
+        ? Cap.rectOf(h.x, h.y, h.x + h.w, h.y + h.h, region.width, region.height) : region.sel;
+      const ok = save && s.w > 2 && s.h > 2;
       region.active = false;
-      if (!save || !region.has) { cap.busy = false; return; }
+      if (cap.recording) {
+        if (ok && cap.purpose === "region") { cap.lastSel = s; cap.lastScreen = cap.monitor ? cap.monitor.name : ""; }
+        const m = cap.monitor;
+        cap.answer(ok ? (m.x + s.x) + "," + (m.y + s.y) + " " + s.w + "x" + s.h : "");
+        return;
+      }
+      if (!ok) { cap.busy = false; return; }
       cap.lastSel = s;
       cap.lastScreen = cap.monitor ? cap.monitor.name : "";
       // In the layout's coordinates, which is what grim -g takes: the
@@ -431,6 +501,8 @@ Scope {
       onPressed: (m) => {
         ptr.px = m.x; ptr.py = m.y;
         ptr.start = region.sel;
+        // a window recording draws nothing: the release takes the window
+        if (cap.purpose === "window") return;
         // RIGHT-DRAG RESIZES from wherever you are: the corner nearest the
         // pointer follows it, so the box can be adjusted without first
         // finding an eight-pixel handle.
@@ -444,6 +516,14 @@ Scope {
         ptr.grab = e !== "" ? e : "new";
       }
       onReleased: (m) => {
+        if (cap.purpose === "window") {
+          if (m.button !== Qt.LeftButton) return;
+          const w = Cap.windowAt(cap.wins, m.x, m.y);
+          if (!w) return;
+          region.hoverWin = w;
+          region.finish(true);
+          return;
+        }
         if (m.button === Qt.RightButton) { ptr.grab = ""; return; }
         const drew = ptr.grab === "new";
         ptr.grab = "";
@@ -491,7 +571,8 @@ Scope {
               font.pixelSize: Zenon.px(12)
             }
             Text {
-              text: "Arrows move  ·  ctrl+arrows size  ·  t copy text  ·  ↵ save  ·  esc abort"
+              text: cap.recording ? "Arrows move  ·  ctrl+arrows size  ·  ↵ record  ·  esc abort"
+                : "Arrows move  ·  ctrl+arrows size  ·  t copy text  ·  ↵ save  ·  esc abort"
               color: Zenon.accentMuted
               font.family: Zenon.face
               font.weight: Zenon.weight
@@ -499,8 +580,8 @@ Scope {
             }
           }
           DialogButton { label: "Abort"; ink: Zenon.accentMuted; onClicked: region.finish(false) }
-          DialogButton { label: "Copy text"; ink: Zenon.sand; onClicked: region.finish(true, true) }
-          DialogButton { label: "Save"; ink: Zenon.cyan; primary: true; onClicked: region.finish(true) }
+          DialogButton { visible: !cap.recording; label: "Copy text"; ink: Zenon.sand; onClicked: region.finish(true, true) }
+          DialogButton { label: cap.recording ? "Record" : "Save"; ink: Zenon.cyan; primary: true; onClicked: region.finish(true) }
         }
       }
     }
@@ -512,7 +593,8 @@ Scope {
     // hint when there is not.
     Rectangle {
       id: presetBar
-      visible: region.active && ptr.grab === ""
+      // (a window recording has no box to shape)
+      visible: region.active && ptr.grab === "" && cap.purpose !== "window"
       width: presetRow.implicitWidth + 12
       height: presetRow.implicitHeight + 10
       radius: Zenon.menuRadius
@@ -587,7 +669,9 @@ Scope {
       Text {
         id: hint
         anchors.centerIn: parent
-        text: "Drag to select  ·  click a window to take it  ·  1–7 a preset  ·  esc to abort"
+        text: cap.purpose === "window" ? "Click a window to record it  ·  ↵ the lit one  ·  esc to abort"
+          : cap.purpose === "region" ? "Drag to select the area to record  ·  click a window or ↵ the lit one  ·  1–7 a preset  ·  esc to abort"
+          : "Drag to select  ·  click a window or ↵ the lit one  ·  1–7 a preset  ·  esc to abort"
         color: Zenon.accentKey
         font.family: Zenon.face
         font.weight: Zenon.weight
@@ -602,7 +686,14 @@ Scope {
       Keys.onPressed: (e) => {
         e.accepted = true;
         if (e.key === Qt.Key_Escape) { region.finish(false); return; }
-        if (e.key === Qt.Key_Return || e.key === Qt.Key_Enter) { region.finish(true); return; }
+        if (e.key === Qt.Key_Return || e.key === Qt.Key_Enter) {
+          // (nothing drawn and nothing lit is nothing to take yet)
+          if (!region.has && !region.hoverWin) return;
+          region.finish(true);
+          return;
+        }
+        // a window recording answers only to those two and the pointer
+        if (cap.purpose === "window") return;
         if (e.key >= Qt.Key_1 && e.key <= Qt.Key_9) {
           const p = Cap.PRESETS.find((q) => q.key === String(e.key - Qt.Key_0));
           if (p) region.preset(p);
@@ -610,7 +701,7 @@ Scope {
         }
         if (e.key === Qt.Key_L) { region.useLast(); return; }
         if (!region.has) return;
-        if (e.key === Qt.Key_T) { region.finish(true, true); return; }
+        if (e.key === Qt.Key_T) { if (!cap.recording) region.finish(true, true); return; }
         const n = (e.modifiers & Qt.ShiftModifier) ? 10 : 1;
         let dx = 0, dy = 0;
         if (e.key === Qt.Key_Left) dx = -n;

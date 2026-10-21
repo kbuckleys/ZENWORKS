@@ -19,7 +19,7 @@ Item {
   z: 20
   readonly property bool anyOpen:
     term.confirmRef.open || term.propsRef.open || prefs.open || sendTo.open
-    || cmdPalette.open || marks.open || disks.open || tagPick.open
+    || cmdPalette.open || marks.open || disks.open || term.spaceRef.open || tagPick.open
     || term.plugRef.open || diskInfo.open
     || term.looking
   enabled: dialogKeys.anyOpen
@@ -74,6 +74,15 @@ Item {
       if (event.key === Qt.Key_Up || event.text === "k") { term.plugRef.step(-1); return; }
       if (event.text === "m" || event.text === "M") { term.plugRef.mountOne(term.plugRef.sel); return; }
       if (event.text === "i") { term.plugRef.inspect(term.plugRef.sel); return; }
+      return;
+    }
+    if (term.spaceRef.open && !term.confirmRef.open) {
+      const sp = term.spaceRef;
+      if (event.key === Qt.Key_Escape) { sp.dismiss(); return; }
+      if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) { sp.enter(null); return; }
+      if (event.key === Qt.Key_Backspace || event.text === "h") { sp.up(); return; }
+      if (event.key === Qt.Key_Right || event.key === Qt.Key_Down || event.text === "j" || event.text === "l") { sp.step(1); return; }
+      if (event.key === Qt.Key_Left || event.key === Qt.Key_Up || event.text === "k") { sp.step(-1); return; }
       return;
     }
     if (term.disks.open && !term.confirmRef.open) {
@@ -335,8 +344,8 @@ Item {
         term.sendToRef.choose((event.modifiers & Qt.ShiftModifier) !== 0);
         return;
       }
-      if (event.key === Qt.Key_Down) { term.sendToRef.step(1); return; }
-      if (event.key === Qt.Key_Up) { term.sendToRef.step(-1); return; }
+      if (event.key === Qt.Key_Down) { term.sendToRef.step(1, !event.isAutoRepeat); return; }
+      if (event.key === Qt.Key_Up) { term.sendToRef.step(-1, !event.isAutoRepeat); return; }
       if (event.key === Qt.Key_Right) { term.sendToRef.expandCurrent(); return; }
       if (event.key === Qt.Key_Left) { term.sendToRef.outward(); return; }
       if (event.key === Qt.Key_Backspace) {

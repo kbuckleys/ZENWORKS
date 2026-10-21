@@ -139,6 +139,11 @@ PanelWindow {
 
     HowlerOsd {
       id: osd
+      // aligned in the lane as the stack is on the screen: at x 0 it sat on
+      // the lane's left once a toast made the lane wider (user, 2026-10-21)
+      x: toasts.side === "left" ? 0
+       : toasts.side === "right" ? column.width - width
+       : Math.round((column.width - width) / 2)
       atTop: toasts.atTop
       slideX: toasts.slideX
       slideY: toasts.slideY
@@ -748,8 +753,11 @@ PanelWindow {
               Repeater {
                 model: [
                   { glyph: "\uF07C", act: "reveal" },
-                  { glyph: "\uF040", act: "annotate" }
-                ].filter(b => b.act !== "annotate" || toast.captureKind === "shot")
+                  { glyph: "\uF040", act: "annotate" },
+                  // a recording: argus' editor, to cut it (U+F0190)
+                  { glyph: "\u{F0190}", act: "edit" }
+                ].filter(b => (b.act !== "annotate" || toast.captureKind === "shot")
+                           && (b.act !== "edit" || toast.captureKind === "video"))
 
                 delegate: Item {
                   required property var modelData
@@ -769,6 +777,7 @@ PanelWindow {
                     onClicked: {
                       const a = parent.modelData.act;
                       if (a === "reveal") Howler.captureReveal(toast.captureFile);
+                      else if (a === "edit") Howler.captureEdit(toast.captureFile);
                       else Howler.captureAnnotate(toast.captureFile);
                       toast.goAway();
                     }
@@ -1030,6 +1039,11 @@ PanelWindow {
 
     HowlerOsd {
       id: osdLow
+      // aligned in the lane as the stack is on the screen: at x 0 it sat on
+      // the lane's left once a toast made the lane wider (user, 2026-10-21)
+      x: toasts.side === "left" ? 0
+       : toasts.side === "right" ? column.width - width
+       : Math.round((column.width - width) / 2)
       atTop: toasts.atTop
       slideX: toasts.slideX
       slideY: toasts.slideY

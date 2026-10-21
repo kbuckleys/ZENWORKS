@@ -1,0 +1,18 @@
+#!/bin/sh
+# ┌─┐┌─┐┌┐┌┬ ┬┌─┐┬─┐┬┌─┌─┐
+# ┌─┘├┤ │││││││ │├┬┘├┴┐└─┐
+# └─┘└─┘┘└┘└┴┘└─┘┴└─┴ ┴└─┘
+# https://github.com/kbuckleys/
+#
+# minerva [file…]   the reader, from a terminal, a keybind, or minerva.desktop
+#                   (how terminus opens a PDF or an EPUB); none is the library.
+# Paths are made absolute here and sent in one call, newline-separated.
+[ $# -eq 0 ] && exec qs ipc call Minerva library >/dev/null
+paths=""
+for f in "$@"; do
+  case $f in file://*) f=$(printf '%s' "${f#file://}" | sed 's/%\([0-9A-Fa-f][0-9A-Fa-f]\)/\\x\1/g' | xargs -0 printf '%b');; esac
+  p=$(realpath -m -- "$f")
+  paths="${paths:+$paths
+}$p"
+done
+exec qs ipc call Minerva open "$paths" >/dev/null

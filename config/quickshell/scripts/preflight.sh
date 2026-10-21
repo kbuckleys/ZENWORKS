@@ -55,6 +55,10 @@ printf '%s\n' "$out" | grep -vE '^  ok ' || true
 # and clio's notebook (oracle/tests/clio-core.py): a throwaway CLIO_DIR
 out=$(python3 "$root/oracle/tests/clio-core.py" 2>&1) || fail=1
 printf '%s\n' "$out" | grep -vE '^  ok ' || true
+# and minerva's EPUB unpacker (oracle/tests/minerva-epub.py): books made
+# in a throwaway directory, EPUB 3 and 2, and a broken one
+out=$(python3 "$root/oracle/tests/minerva-epub.py" 2>&1) || fail=1
+printf '%s\n' "$out" | grep -vE '^  ok ' || true
 
 echo "── compiling every .qml"
 tmp=$(mktemp -d)

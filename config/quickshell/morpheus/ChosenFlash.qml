@@ -29,6 +29,9 @@ Item {
   property var pending: null
   property real chosen: 0
   readonly property bool running: flashAnim.running
+  // false: the holder paints `chosen` into its own fill (cynosure's rounded
+  // cursor band), and this only keeps the time
+  property bool painted: true
 
   function fire(act) {
     flash.pending = act;
@@ -52,7 +55,7 @@ Item {
 
   Rectangle {
     anchors.fill: parent
-    visible: flash.chosen > 0
+    visible: flash.painted && flash.chosen > 0
     color: Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b,
                    0.55 * flash.chosen)
   }

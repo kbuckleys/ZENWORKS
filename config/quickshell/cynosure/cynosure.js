@@ -43,6 +43,10 @@ const ICON_B = "\uEE23";
 // `sh` is a shell line; `{dir}` in it is the shell's own directory, already
 // quoted — write it bare — and `{session}` the logind session this shell runs
 // in.
+//
+// `needs` names a live flag the popup passes in (as `state` does): while it
+// is not set the row is not offered at all — Wi-Fi on a machine without it
+// is a row that can only fail (2026-10-21).
 const SHELL_ACTIONS = [
   { name: "Lock screen", glyph: "\uF456", keys: "lock cerberus", sh: "sleep 0.35 && qs ipc call Cerberus lock" },
   { name: "Log out", glyph: "\uDB81\uDF43", keys: "logout session exit quit", sh: "hyprshutdown -p 'loginctl terminate-session {session}'", confirm: true },
@@ -88,6 +92,30 @@ const SHELL_ACTIONS = [
   { name: "Caffeinate", glyph: "\u{F06CA}", keys: "socordia keep awake idle inhibit caffeine coffee decaf sleep",
     ipc: "Socordia awake", state: "awake", on: { name: "Decaffeinate", glyph: "\u{F0FAB}" } },
   { name: "Reload shell", glyph: "\uF01E", keys: "quickshell restart qs", sh: "{dir}/scripts/restart.sh" },
+
+  // ── the 10-20 apps ──
+  // control hub (hermes): the window, and its switches where there is one
+  { name: "Control Hub", glyph: "\u{F1542}", keys: "hermes network wifi wi-fi ethernet bluetooth vpn display brightness settings", ipc: "Hermes window ''" },
+  { name: "Night light", glyph: "\u{F0594}", keys: "hermes hyprsunset warm blue light evening", ipc: "Hermes night",
+    needs: "nightReady", state: "night", on: { name: "Night light off", glyph: "\u{F00DF}" } },
+  { name: "Wi-Fi off", glyph: "\u{F05AA}", keys: "hermes wireless network radio", ipc: "Hermes wifi",
+    needs: "wifiReady", state: "wifiOff", on: { name: "Wi-Fi on", glyph: "\u{F05A9}" } },
+  { name: "Bluetooth off", glyph: "\u{F00B2}", keys: "hermes radio headphones", ipc: "Hermes bluetooth",
+    needs: "btReady", state: "btOff", on: { name: "Bluetooth on", glyph: "\u{F00AF}" } },
+  // argus: recording, through the same ZenRecord the binds use; after the
+  // launcher has gone, so it is not in the picture
+  { name: "Record the screen", glyph: "\u{F044B}", keys: "argus recording video capture screencast", sh: "sleep 0.35 && hyprctl repl 'ZenRecord(\"full\")'" },
+  { name: "Record a region", glyph: "\u{F0A6D}", keys: "argus recording video capture area selection", sh: "sleep 0.35 && hyprctl repl 'ZenRecord(\"region\")'" },
+  { name: "Record a window", glyph: "\u{F0614}", keys: "argus recording video capture", sh: "sleep 0.35 && hyprctl repl 'ZenRecord(\"window\")'" },
+  { name: "Stop recording", glyph: "\u{F0667}", keys: "argus recording end finish", sh: "hyprctl repl 'ZenRecord(\"stop\")'" },
+  { name: "Cut the last recording", glyph: "\u{F0190}", keys: "argus trim edit gif webm mp4 video", ipc: "Argus last" },
+  // minerva
+  { name: "Continue reading", glyph: "\u{F05DA}", keys: "minerva book ebook pdf epub reader", ipc: "Minerva last" },
+  { name: "Library", glyph: "\u{F03D2}", keys: "minerva books reading pdf epub", ipc: "Minerva library" },
+  // hestia
+  { name: "Services", glyph: "\u{F08D6}", keys: "hestia systemd systemctl daemons units", ipc: "Hestia open system" },
+  { name: "System journal", glyph: "\u{F09EE}", keys: "hestia logs journalctl errors", ipc: "Hestia journal ''" },
+  { name: "What's wrong", glyph: "\u{F05D6}", keys: "hestia failed services errors broken overview health", ipc: "Hestia open overview" },
 ];
 
 // The frecency key, kept apart from app names: an app called "Files" and the
@@ -205,6 +233,7 @@ function buildRows(apps, histLines, freq, actions, states, glyphOf) {
       glyph: g || "", label: a.name, displayText: g ? g + "  " + a.name : a.name });
   }
   for (const a of actions || []) {
+    if (a.needs && !(states || {})[a.needs]) continue;
     const f = actionFace(a, states);
     rows.push({ kind: "shell", key: actionKey(a), text: f.name, exec: "", keys: a.keys, action: a,
       glyph: f.glyph, label: f.name, displayText: f.glyph + "  " + f.name });

@@ -35,6 +35,10 @@ import "ceres"
 import "plato"
 import "alexandria"
 import "delphi"
+import "hermes"
+import "argus"
+import "minerva"
+import "hestia"
 
 ShellRoot {
   id: root
@@ -158,6 +162,20 @@ ShellRoot {
   }
   PicassoPopup { id: picasso; statusbar: bar; screen: root.focusedScreen; morphMode: root.morphedFor("picasso") && root.morphOnPill; morphFade: root.layerFade }
   ChronosPopup { id: chronos; statusbar: bar; screen: root.focusedScreen; morphMode: root.morphedFor("chronos") && root.morphOnPill; morphFade: root.layerFade }
+  // network, bluetooth, vpn and the display's light — the quick panel the
+  // bar's connection icon opens; the window is built on first use (Hermes)
+  HermesPopup { id: hermes; statusbar: bar; screen: root.focusedScreen; morphMode: root.morphedFor("hermes") && root.morphOnPill; morphFade: root.layerFade }
+  Binding { target: Hermes; property: "fileManager"; value: terminus }
+  // a recording, cut and kept as MP4, GIF or WebM — argus' editor (the
+  // recording itself is argus/argus.lua, in hyprland); built on first use,
+  // and reached from howler's recording card (its scissors) or Argus last
+  ArgusManager { id: argusEditor; fileManager: terminus }
+  // PDFs and EPUBs, and the library of what you have read — minerva;
+  // highlights go to clio. The window is built on first use.
+  MinervaManager { id: minerva; fileManager: terminus; notebook: clioApp }
+  // services, timers and the journal — hestia; asks systemd only while
+  // its window is open (its pages frost up under its head: ScrollEdge)
+  HestiaManager { id: hestia }
   // A disk plugged in, asked about by the pill — terminus' new-disk card,
   // with Mount & open. Nobody opens it: it opens itself, so it lives on the
   // pill's own monitor and always morphs (see beginMorph), and it waits
@@ -513,7 +531,7 @@ ShellRoot {
     cynosure: cynosure, folio: folio, artemis: artemis, lexi: lexi,
     zeus: zeus, ideo: ideo, calypso: calypso, metis: metis,
     howler: howler, ceres: ceres, picasso: picasso, chronos: chronos,
-    disks: plugPanel
+    hermes: hermes, disks: plugPanel
   })
   // The few that are not sized by their content.
   readonly property var fixedLayerWidth: ({ zeus: 1000, picasso: 1000, howler: 800 })
@@ -1047,17 +1065,47 @@ ShellRoot {
             tooltipText: root.notifTooltip
             onActivated: howler.toggle()
             onCleared: { Howler.dismissAll(); Howler.clearHistory(); }
-            silent: Howler.silent
+            // quiet for any reason strikes the bell; the switch is its own tick
+            silent: Howler.quiet
+            dnd: Howler.silent
+            quietWhy: Howler.quietWhy
+            focusTimers: Oracle.notifFocusTimers
+            quietHours: Oracle.notifQuietHours
+            onFocusTimersToggled: Howler.toggleFocusTimers()
+            onQuietHoursToggled: Howler.toggleQuietHours()
             onSilenceToggled: Howler.toggleSilent()
             trackMusic: Howler.trackMusic
             onTrackMusicToggled: Howler.toggleMusicTracking()
+          }
+          // what this machine is connected to — hermes. Knows nothing about
+          // it, like the bell: handed the glyphs and states, clicks back;
+          // its tooltip is centered (HermesModule).
+          // Beside the bell (user, 2026-10-20: "all tucked in nicely
+          // together"): the things waiting on you and what you are connected
+          // through, in one group at the left end.
+          HermesModule {
+            id: hermesMod
+            implicitHeight: Zenon.slot
+            glyphs: Hermes.barGlyphs
+            tooltipText: Hermes.barTip
+            wifiOn: Hermes.wifiOn
+            wifiReady: Hermes.wifiReady
+            btOn: Hermes.btOn
+            btReady: Hermes.btReady
+            nightOn: Hermes.nightWanted
+            nightReady: Hermes.probe.display.hyprsunset
+            onActivated: hermes.toggle()
+            onWindowWanted: Hermes.open("")
+            onWifiToggled: Hermes.setWifi(!Hermes.wifiOn)
+            onBtToggled: Hermes.setBluetooth(!Hermes.btOn)
+            onNightToggled: Hermes.toggleNight()
           }
           // tray lives inside workspaces now — hover to reveal, crossfades and autofits
           Collapsible {
             // and the rule this divider has always followed — something on the
             // left of it — now has a second half, because there is a switch
             // that can empty its right.
-            active: (notifMod.active || updateMod.active) && Oracle.showWorkspaces
+            active: (notifMod.active || updateMod.active || hermesMod.active) && Oracle.showWorkspaces
             openWidth: Zenon.gap * 2 + 1
             Divider { implicitHeight: Zenon.slot }
           }
@@ -1122,6 +1170,7 @@ ShellRoot {
             onActivated: zeus.toggleAt("graphs")
           }
           Gap { visible: root.meterGap(4) }
+
 
           // Volume and the track name are one group with one panel between
           // them. They show the SAME panel, so hovering across from one to the

@@ -694,17 +694,26 @@ Singleton {
   //                              why "cancelled" when nobody confirmed it)
   //   installing               { pkg, pkgs } while one is out, else null
   //
+  // `after`, optional: root steps (["@sudo", …]) run once the packages are
+  // in, in the same job under the same password — hermes' "bluez, then its
+  // service on" (2026-10-20). With no packages, the job is only those steps.
+  //
   // Lifted out of delphi/DelphiManager (installTool, 2026-10-11) when
   // calypso wanted the same.
   property var installing: null
   property var _installDone: null
-  function install(pkg, why, done) {
+  function install(pkg, why, done, after) {
     if (root.txBusy || root.installing) return false;
     // one package, or several at once (calypso's QR scan: zbar grim slurp)
-    const pkgs = Array.isArray(pkg) ? pkg : [pkg];
+    const pkgs = (Array.isArray(pkg) ? pkg : [pkg]).filter((p) => !!p);
+    const extra = Array.isArray(after) ? after : [];
+    if (pkgs.length === 0 && extra.length === 0) return false;
     root.installing = { pkg: pkgs.join(" "), pkgs: pkgs };
     root._installDone = done || null;
-    const asked = root.request([["-S", "--needed"].concat(pkgs)], "Install " + pkgs.join(", ") + (why ? " — " + why : ""), pkgs.length);
+    const steps = (pkgs.length > 0 ? [["-S", "--needed"].concat(pkgs)] : []).concat(extra);
+    const what = pkgs.length > 0 ? "Install " + pkgs.join(", ") + (why ? " — " + why : "")
+      : (why ? why.charAt(0).toUpperCase() + why.slice(1) : "Set up");
+    const asked = root.request(steps, what, pkgs.length);
     if (!asked) { root.installing = null; root._installDone = null; }
     return asked;
   }

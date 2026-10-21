@@ -79,7 +79,6 @@
 
 import QtQuick
 import QtQuick.Effects
-import QtMultimedia
 import Quickshell
 import Quickshell.Io
 import Quickshell.Hyprland
@@ -3676,26 +3675,12 @@ FloatingWindow {
     // the zoom and the fit go by as they go by a picture's.
     Component {
       id: vidComp
-      Item {
-        id: vbox
-        readonly property real vw: vout.sourceRect.width
-        readonly property real vh: vout.sourceRect.height
-        readonly property int position: mp.position
-        readonly property int duration: mp.duration
-        readonly property bool going: mp.playbackState === MediaPlayer.PlayingState
-        function toggle() { if (vbox.going) mp.pause(); else mp.play(); }
-        function seekBy(ms) { mp.position = Math.max(0, Math.min(mp.duration, mp.position + ms)); }
-        function seekTo(f) { mp.position = Math.max(0, Math.min(1, f)) * mp.duration; }
-        MediaPlayer {
-          id: mp
-          source: Strings.fileUrl(win.path)
-          videoOutput: vout
-          audioOutput: AudioOutput { muted: win.muted }
-          onMediaStatusChanged: if (mp.mediaStatus === MediaPlayer.EndOfMedia && win.playing) win.step(1)
-          onErrorOccurred: (err, msg) => win.say("This video cannot be played  \u00b7  " + msg)
-          Component.onCompleted: mp.play()
-        }
-        VideoOutput { id: vout; anchors.fill: parent; fillMode: VideoOutput.Stretch }
+      // morpheus/VideoClip, shared with argus' editor since 2026-10-20
+      VideoClip {
+        source: Strings.fileUrl(win.path)
+        muted: win.muted
+        onEnded: if (win.playing) win.step(1)
+        onFailed: (msg) => win.say("This video cannot be played  \u00b7  " + msg)
       }
     }
 

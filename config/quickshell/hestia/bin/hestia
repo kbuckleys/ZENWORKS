@@ -1,0 +1,10 @@
+#!/bin/sh
+# ┌─┐┌─┐┌┐┌┬ ┬┌─┐┬─┐┬┌─┌─┐
+# ┌─┘├┤ │││││││ │├┬┘├┴┐└─┐
+# └─┘└─┘┘└┘└┴┘└─┘┴└─┴ ┴└─┘
+# https://github.com/kbuckleys/
+#
+# hestia [unit]   the window, from a terminal, a keybind, or hestia.desktop;
+#                 a unit's name opens on that service
+[ $# -eq 0 ] && exec qs ipc call Hestia open "" >/dev/null
+exec qs ipc call Hestia unit "$1" >/dev/null

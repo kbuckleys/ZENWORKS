@@ -34,7 +34,10 @@ LayerPopup {
   // who the drop resolves to, which has to be the application underneath.
   property bool dragging: false
 
+  // text · image · snip (snippets, 2026-10-21: kept text, pasted with its
+  // placeholders filled — see Folio.expandSnippet)
   property string mode: "text"
+  property var snippets: []
   property string query: ""
   property var entries: []
   property var imageIds: []
@@ -162,7 +165,7 @@ LayerPopup {
   // same question as whether the clipboard does. Deleting the last image
   // leaves hasText true, and every test here asked about the clipboard.
   readonly property bool modeEmpty:
-    popup.mode === "image" ? !popup.hasImg : !popup.hasText
+    popup.mode === "image" ? !popup.hasImg : popup.mode === "snip" ? popup.snippets.length === 0 : !popup.hasText
 
   // AN EMPTY MODE STILL HAS SOMETHING TO SAY. The text side has always kept
   // a row back for its message — that is what the Math.max(1, ...) in
@@ -321,10 +324,70 @@ LayerPopup {
     filter.text = "";
     popup.sel = 0;
     popup.reload();
+    popup.loadSnippets();
     focusRetry.begin();
     popup.playOpen();
   }
 
+  // ── SNIPPETS ───────────────────────────────────────────────────────────
+  // One .txt each in Folio.snippetDir(), read whole when the panel opens:
+  // a handful of small files, not worth watching.
+  function loadSnippets() {
+    snipList.command = ["python3", "-I", "-c",
+      "import json,os,sys\n"
+      + "d=sys.argv[1]; out=[]\n"
+      + "if os.path.isdir(d):\n"
+      + "  for f in sorted(os.listdir(d)):\n"
+      + "    p=os.path.join(d,f)\n"
+      + "    if f.endswith('.txt') and os.path.isfile(p):\n"
+      + "      out.append({'name':f[:-4],'path':p,'text':open(p,encoding='utf-8',errors='replace').read().rstrip('\\n')})\n"
+      + "print(json.dumps(out))", Folio.snippetDir()];
+    snipList.running = true;
+  }
+  Process {
+    id: snipList
+    stdout: StdioCollector {
+      id: snipOut
+      waitForEnd: true
+      onStreamFinished: {
+        popup.snippets = Folio.parseSnippets(snipOut.text);
+        if (popup.mode === "snip") popup.applyFilter();
+      }
+    }
+  }
+  // what was copied last, for {clipboard}
+  function lastClip() { return popup.entries.length > 0 ? String(popup.entries[0].content || "") : ""; }
+  // a file written, then opened in plato to be written in
+  function writeSnippet(name, text, thenEdit) {
+    const path = Folio.snippetDir() + "/" + name + ".txt";
+    Quickshell.execDetached(["sh", "-c", "mkdir -p \"$(dirname \"$1\")\" && printf '%s\\n' \"$2\" > \"$1\""
+      + (thenEdit ? " && qs ipc call Plato open \"$1\" >/dev/null" : ""), "sh", path, text]);
+    snipReload.restart();
+    return path;
+  }
+  Timer { id: snipReload; interval: 300; onTriggered: popup.loadSnippets() }
+  // a word in the hint strip's place for a moment (HintBar's note)
+  property string note: ""
+  function flash(t) { popup.note = t; noteTimer.restart(); }
+  Timer { id: noteTimer; interval: 2400; onTriggered: popup.note = "" }
+  function newSnippet() {
+    const name = Folio.snippetName("New snippet", popup.snippets.map((s) => s.name));
+    popup.writeSnippet(name, "Hello {clipboard} — {date}", true);
+    popup.closePopup();
+  }
+  // the text clip under the cursor, kept
+  function keepAsSnippet() {
+    if (popup.mode !== "text" || popup.rows.length === 0) return;
+    const text = String(popup.rows[popup.sel].content || "");
+    const name = Folio.snippetName(text, popup.snippets.map((s) => s.name));
+    popup.writeSnippet(name, text, false);
+    popup.flash("Kept as \u201C" + name + "\u201D \u2014 tab to snippets");
+  }
+  function editSnippet() {
+    if (popup.mode !== "snip" || popup.rows.length === 0) return;
+    Quickshell.execDetached(["qs", "ipc", "call", "Plato", "open", popup.rows[popup.sel].path]);
+    popup.closePopup();
+  }
   function closePopup() {
     popup.collapsing = true;
     popup.playClose();
@@ -349,6 +412,7 @@ LayerPopup {
 
     if (popup.mode === "text" && !popup.hasText && popup.hasImg) popup.mode = "image";
     else if (popup.mode === "image" && !popup.hasImg && popup.hasText) popup.mode = "text";
+    else if (popup.mode !== "snip" && !popup.hasText && !popup.hasImg && popup.snippets.length > 0) popup.mode = "snip";
 
     popup.rebuildImageRows();
     popup.applyFilter();
@@ -366,7 +430,8 @@ LayerPopup {
   }
 
   function applyFilter() {
-    popup.rows = Folio.filterEntries(popup.entries, popup.query);
+    popup.rows = popup.mode === "snip" ? Folio.snippetRows(popup.snippets, popup.query)
+      : Folio.filterEntries(popup.entries, popup.query);
     popup.clampSel();
   }
 
@@ -402,6 +467,13 @@ function onThumbsDone() {
   function confirm() {
     const len = popup.mode === "image" ? popup.imgRows.length : popup.rows.length;
     if (len === 0) return;
+    if (popup.mode === "snip") {
+      // filled in now, onto the clipboard as any copy is (and into its
+      // history), and the panel goes as a copy closes it
+      const text = Folio.expandSnippet(popup.rows[popup.sel].content, new Date(), popup.lastClip());
+      popup.runAction("printf '%s' " + Strings.shellQuote(text) + " | wl-copy", "copy");
+      return;
+    }
     const id = popup.mode === "image"
       ? popup.imgRows[popup.sel].id
       : popup.rows[popup.sel].id;
@@ -425,6 +497,12 @@ function onThumbsDone() {
   function deleteSelected() {
     const len = popup.mode === "image" ? popup.imgRows.length : popup.rows.length;
     if (len === 0) return;
+    if (popup.mode === "snip") {
+      // to the trash, not gone: a snippet is something you wrote
+      Quickshell.execDetached(["gio", "trash", popup.rows[popup.sel].path]);
+      snipReload.restart();
+      return;
+    }
     const id = popup.mode === "image"
       ? popup.imgRows[popup.sel].id
       : popup.rows[popup.sel].id;
@@ -432,9 +510,11 @@ function onThumbsDone() {
   }
 
   function toggleMode() {
-    const target = popup.mode === "image" ? "text" : "image";
-    const avail = target === "text" ? popup.hasText : popup.hasImg;
-    if (!avail || popup.mode === target) return;
+    // text → pictures → snippets, skipping a side with nothing on it;
+    // snippets are always there to go to (to make the first one)
+    const order = ["text", "image", "snip"].filter((m) => m === "snip" || (m === "text" ? popup.hasText : popup.hasImg));
+    const target = order[(order.indexOf(popup.mode) + 1) % order.length];
+    if (!target || popup.mode === target) return;
     popup.mode = target;
     popup.query = "";
     filter.text = "";
@@ -611,7 +691,8 @@ function onThumbsDone() {
           EmptyState {
             id: emptyLabel
             anchors.centerIn: parent
-            text: "No clipboard entries"
+            text: popup.mode === "snip" ? "No snippets yet \u2014 ctrl n writes one, ctrl s keeps a copied text as one"
+              : "No clipboard entries"
             // THE MODE ON SCREEN, not the clipboard as a whole. This asked
             // whether BOTH sides were empty, so an image mode emptied down
             // to nothing said nothing at all while text entries existed one
@@ -627,15 +708,16 @@ function onThumbsDone() {
             font.family: Zenon.face
             font.weight: 600
             font.pixelSize: Zenon.px(15)
-            visible: popup.shown && popup.mode === "text" && popup.rows.length === 0 && popup.hasText
+            visible: popup.shown && popup.rows.length === 0
+              && ((popup.mode === "text" && popup.hasText) || (popup.mode === "snip" && popup.snippets.length > 0))
           }
 
         Item {
           id: textPane
           anchors.fill: parent
           visible: opacity > 0.01
-          opacity: popup.mode === "text" ? 1 : 0
-          x: popup.mode === "text" ? 0 : -24
+          opacity: popup.mode === "text" || popup.mode === "snip" ? 1 : 0
+          x: popup.mode === "text" || popup.mode === "snip" ? 0 : -24
           Behavior on opacity { NumberAnimation { duration: Zenon.normal; easing.type: Zenon.ease } }
           Behavior on x { NumberAnimation { duration: Zenon.normal; easing.type: Zenon.ease } }
 
@@ -744,7 +826,8 @@ function onThumbsDone() {
 
                 Text {
                   width: parent.width
-                  text: popup.stampOf(modelData.id)
+                  // a snippet's own text under its name; a clip's time
+                  text: modelData.snip ? modelData.sub : popup.stampOf(modelData.id)
                   color: popup.hintColor
                   font.family: Zenon.face
                   font.weight: Zenon.weight
@@ -970,6 +1053,7 @@ function onThumbsDone() {
         id: msgBar
         width: parent.width
         rows: Folio.hintText(popup.mode)
+        note: popup.note
       }
     }
 
@@ -986,7 +1070,7 @@ function onThumbsDone() {
       color: "transparent"
       Keys.forwardTo: bg
       onTextChanged: {
-        if (popup.mode === "text") {
+        if (popup.mode === "text" || popup.mode === "snip") {
           popup.query = filter.text;
           popup.sel = 0;
           popup.applyFilter();
@@ -1026,6 +1110,10 @@ function onThumbsDone() {
     Keys.onDownPressed: (event) => { event.accepted = true; popup.moveVert(1); }
 
     Keys.onPressed: (event) => {
+      const ctrl = event.modifiers & Qt.ControlModifier;
+      if (ctrl && event.key === Qt.Key_N) { event.accepted = true; popup.newSnippet(); return; }
+      if (ctrl && event.key === Qt.Key_S) { event.accepted = true; popup.keepAsSnippet(); return; }
+      if (ctrl && event.key === Qt.Key_E) { event.accepted = true; popup.editSnippet(); return; }
       if (event.key === Qt.Key_Delete) {
         event.accepted = true;
         popup.deleteSelected();

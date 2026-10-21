@@ -77,7 +77,16 @@ module.exports = {
     // ── filtering ─────────────────────────────────────────────────────────
     // ── the shell's verbs ─────────────────────────────────────────────────
     const acts = C.buildRows(apps, [], {}, C.SHELL_ACTIONS);
-    t.eq("every verb is a row", acts.filter((r) => r.kind === "shell").length, C.SHELL_ACTIONS.length);
+    t.eq("every verb not waiting on something is a row", acts.filter((r) => r.kind === "shell").length,
+      C.SHELL_ACTIONS.filter((a) => !a.needs).length);
+    const ready = { wifiReady: true, btReady: true, nightReady: true };
+    t.eq("every verb is a row once what it needs is there",
+      C.buildRows(apps, [], {}, C.SHELL_ACTIONS, ready).filter((r) => r.kind === "shell").length, C.SHELL_ACTIONS.length);
+    t.eq("wi-fi is not offered without it", C.filterRows(acts, "wireless").filter((r) => r.kind === "shell").length, 0);
+    t.eq("…and says what pressing it does", C.filterRows(C.buildRows(apps, [], {}, C.SHELL_ACTIONS, Object.assign({ wifiOff: true }, ready)), "wireless")
+      .map((r) => r.text).join(), "Wi-Fi on");
+    t.eq("the night light, by the sun's word", C.filterRows(C.buildRows(apps, [], {}, C.SHELL_ACTIONS, Object.assign({ night: true }, ready)), "hyprsunset")
+      .map((r) => r.text).join(), "Night light off");
     t.eq("found by a key, not only its name",
       C.filterRows(acts, "poweroff").map((r) => r.text).join(), "Shutdown");
     t.ok("nothing ends a session without a confirm",

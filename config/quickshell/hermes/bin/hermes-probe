@@ -1,0 +1,268 @@
+#!/usr/bin/env python3
+# ┌─┐┌─┐┌┐┌┬ ┬┌─┐┬─┐┬┌─┌─┐
+# ┌─┘├┤ │││││││ │├┬┘├┴┐└─┐
+# └─┘└─┘┘└┘└┴┘└─┘┴└─┴ ┴└─┘
+# https://github.com/kbuckleys/
+#
+# hermes-probe — what this machine has to connect with, as one JSON object.
+#
+# Hermes' live controls are quickshell's own (Quickshell.Networking over
+# NetworkManager, Quickshell.Bluetooth over BlueZ). This is the part neither
+# can answer: which stack runs the network when it is NOT NetworkManager
+# (systemd-networkd on a wired desktop), whether there is Wi-Fi or Bluetooth
+# hardware at all, whether the pieces Hermes would install are installed,
+# and the wired link's own facts. Asked when Hermes opens and every few
+# seconds while it is open; never while it is shut.
+#
+#   { stack: "nm" | "networkd" | "iwd" | "",   who runs the network (first)
+#     stacks: ["networkd", "nm"],             every one running a link
+#     nm: { installed, running },
+#     links: [{ name, kind: wired|wifi, up, carrier, speed, mac,
+#               ipv4: [], ipv6: [], gateway, managedBy: networkd|nm|"" }],
+#     dns: [],
+#     wifiHw, bt: { hw, installed, running, controllers },
+#     rfkill: { wifi: { soft, hard } | null, bt: … },
+#     vpn: [{ name, uuid, type, active, managed }],
+#     display: { backlight: [{ name, cur, max }], ddcutil, i2c,
+#                hyprsunset, sunsetRunning } }
+#
+# Standard library only, every command on a short timeout: a probe that
+# hangs is a panel that never fills.
+
+import json
+import os
+import shutil
+import subprocess
+
+SYS = "/sys/class"
+
+
+def run(argv, timeout=1.5):
+    try:
+        r = subprocess.run(argv, capture_output=True, text=True, timeout=timeout)
+        return r.stdout if r.returncode == 0 else ""
+    except (OSError, subprocess.SubprocessError):
+        return ""
+
+
+def read(path, default=""):
+    try:
+        with open(path) as f:
+            return f.read().strip()
+    except OSError:
+        return default
+
+
+def active(units):
+    # one systemctl for all of them: is-active prints a line per unit, in order
+    out = run(["systemctl", "is-active"] + units).splitlines()
+    out += [""] * (len(units) - len(out))
+    return {u: out[i].strip() == "active" for i, u in enumerate(units)}
+
+
+def ip_json(*args):
+    try:
+        return json.loads(run(["ip", "-j"] + list(args)) or "[]")
+    except ValueError:
+        return []
+
+
+def owners(nm_running):
+    # Who runs each link: networkd says per link (AdministrativeState), and so
+    # does NetworkManager (a device it does not manage is "unmanaged"). A
+    # machine can be both at once — wired on networkd, Wi-Fi on
+    # NetworkManager (hermes-sim sets exactly that up) — so it is per link.
+    out = {}
+    try:
+        nd = json.loads(run(["networkctl", "list", "--json=short"]) or "{}")
+    except ValueError:
+        nd = {}
+    for i in nd.get("Interfaces") or []:
+        if i.get("AdministrativeState") in ("configured", "configuring", "failed", "pending", "initialized"):
+            if i.get("AdministrativeState") != "initialized":
+                out[i.get("Name")] = "networkd"
+    if nm_running:
+        for line in run(["nmcli", "-t", "-f", "DEVICE,STATE", "device"]).splitlines():
+            dev, _, state = line.partition(":")
+            if dev and state and state != "unmanaged":
+                out[dev] = "nm"
+    return out
+
+
+def links(own):
+    addrs = {a.get("ifname"): a for a in ip_json("addr", "show")}
+    kinds = {}
+    for l in ip_json("-d", "link", "show"):
+        kinds[l.get("ifname")] = (l.get("linkinfo") or {}).get("info_kind", "")
+    gw = {}
+    for r in ip_json("route", "show", "default"):
+        if r.get("dev") and r.get("gateway"):
+            gw.setdefault(r["dev"], r["gateway"])
+    out = []
+    try:
+        names = sorted(os.listdir(SYS + "/net"))
+    except OSError:
+        names = []
+    for name in names:
+        base = SYS + "/net/" + name
+        # real hardware only: a virtual link (docker, veth, a bridge, the
+        # wireguard tunnel itself) has no device behind it
+        if name == "lo" or not os.path.exists(base + "/device"):
+            continue
+        wifi = os.path.isdir(base + "/wireless") or os.path.exists(base + "/phy80211")
+        if not wifi and read(base + "/type") != "1":
+            continue
+        if kinds.get(name):
+            continue
+        a = addrs.get(name, {})
+        info = a.get("addr_info") or []
+        speed = read(base + "/speed", "-1")
+        out.append({
+            "name": name,
+            "kind": "wifi" if wifi else "wired",
+            "up": read(base + "/operstate") == "up",
+            "carrier": read(base + "/carrier", "0") == "1",
+            "speed": int(speed) if speed.lstrip("-").isdigit() and int(speed) > 0 else 0,
+            "mac": read(base + "/address"),
+            "ipv4": [i["local"] + "/" + str(i.get("prefixlen", "")) for i in info
+                     if i.get("family") == "inet" and i.get("scope") == "global"],
+            "ipv6": [i["local"] + "/" + str(i.get("prefixlen", "")) for i in info
+                     if i.get("family") == "inet6" and i.get("scope") == "global"],
+            "gateway": gw.get(name, ""),
+            "managedBy": own.get(name, ""),
+        })
+    return out, kinds
+
+
+def dns():
+    # resolved's view: "Global: 1.1.1.1" and "Link 2 (enp7s0): 192.168.1.1 …"
+    seen = []
+    for line in run(["resolvectl", "dns"]).splitlines():
+        _, _, rest = line.partition(":")
+        for s in rest.split():
+            if s not in seen:
+                seen.append(s)
+    if seen:
+        return seen
+    for line in read("/etc/resolv.conf").splitlines():
+        p = line.split()
+        if len(p) >= 2 and p[0] == "nameserver" and p[1] not in seen:
+            seen.append(p[1])
+    return seen
+
+
+def rfkill():
+    out = {"wifi": None, "bt": None}
+    try:
+        names = os.listdir(SYS + "/rfkill")
+    except OSError:
+        return out
+    for n in names:
+        base = SYS + "/rfkill/" + n
+        t = read(base + "/type")
+        key = "wifi" if t == "wlan" else "bt" if t == "bluetooth" else ""
+        if not key:
+            continue
+        cur = out[key] or {"soft": False, "hard": False}
+        cur["soft"] = cur["soft"] or read(base + "/soft") == "1"
+        cur["hard"] = cur["hard"] or read(base + "/hard") == "1"
+        out[key] = cur
+    return out
+
+
+def vpns(nm_running, kinds, up):
+    out = []
+    if nm_running:
+        for line in run(["nmcli", "-t", "-f", "NAME,UUID,TYPE,ACTIVE", "connection", "show"]).splitlines():
+            # nmcli -t escapes a colon inside a field as "\:"
+            parts, cur, esc = [], "", False
+            for ch in line:
+                if esc:
+                    cur += ch
+                    esc = False
+                elif ch == "\\":
+                    esc = True
+                elif ch == ":":
+                    parts.append(cur)
+                    cur = ""
+                else:
+                    cur += ch
+            parts.append(cur)
+            if len(parts) >= 4 and parts[2] in ("vpn", "wireguard"):
+                out.append({"name": parts[0], "uuid": parts[1], "type": parts[2],
+                            "active": parts[3] == "yes", "managed": True})
+        return out
+    # without NetworkManager: the tunnels that are up, to look at
+    for name, kind in sorted(kinds.items()):
+        if kind == "wireguard":
+            out.append({"name": name, "uuid": "", "type": "wireguard",
+                        "active": name in up, "managed": False})
+    return out
+
+
+def backlights():
+    out = []
+    try:
+        names = sorted(os.listdir(SYS + "/backlight"))
+    except OSError:
+        return out
+    for n in names:
+        base = SYS + "/backlight/" + n
+        cur, mx = read(base + "/brightness", "0"), read(base + "/max_brightness", "0")
+        if cur.isdigit() and mx.isdigit() and int(mx) > 0:
+            out.append({"name": n, "cur": int(cur), "max": int(mx)})
+    return out
+
+
+def main():
+    units = active(["NetworkManager", "systemd-networkd", "iwd", "bluetooth"])
+    stack = ("nm" if units["NetworkManager"] else "networkd" if units["systemd-networkd"]
+             else "iwd" if units["iwd"] else "")
+    ls, kinds = links(owners(units["NetworkManager"]))
+    stacks = sorted({l["managedBy"] for l in ls if l["managedBy"]}, key=lambda x: (x != stack, x))
+    up = {l.get("ifname") for l in ip_json("link", "show") if "UP" in (l.get("flags") or [])}
+    try:
+        bt_hw = any(n.startswith("hci") for n in os.listdir(SYS + "/bluetooth"))
+    except OSError:
+        bt_hw = False
+    # How many adapters BlueZ actually took. An adapter the kernel sees can
+    # still fail its reset and never reach BlueZ (a CSR-clone dongle did,
+    # 2026-10-20: hci0 there, "Index list with 0 items"); -1 when unknown.
+    controllers = -1
+    if bt_hw and units["bluetooth"] and shutil.which("btmgmt"):
+        for line in run(["btmgmt", "info"], timeout=1.0).splitlines():
+            if line.startswith("Index list with"):
+                parts = line.split()
+                if len(parts) > 3 and parts[3].isdigit():
+                    controllers = int(parts[3])
+                break
+    try:
+        i2c = any(n.startswith("i2c-") for n in os.listdir("/dev"))
+    except OSError:
+        i2c = False
+    print(json.dumps({
+        "stack": stack,
+        "stacks": stacks,
+        "nm": {"installed": shutil.which("nmcli") is not None, "running": units["NetworkManager"]},
+        "links": ls,
+        "dns": dns(),
+        "wifiHw": any(l["kind"] == "wifi" for l in ls),
+        "bt": {"hw": bt_hw,
+               "installed": shutil.which("bluetoothctl") is not None
+                            or os.path.exists("/usr/lib/bluetooth/bluetoothd"),
+               "running": units["bluetooth"],
+               "controllers": controllers},
+        "rfkill": rfkill(),
+        "vpn": vpns(units["NetworkManager"], kinds, up),
+        "display": {
+            "backlight": backlights(),
+            "ddcutil": shutil.which("ddcutil") is not None,
+            "i2c": i2c,
+            "hyprsunset": shutil.which("hyprsunset") is not None,
+            "sunsetRunning": run(["pgrep", "-x", "hyprsunset"]) != "",
+        },
+    }))
+
+
+if __name__ == "__main__":
+    main()

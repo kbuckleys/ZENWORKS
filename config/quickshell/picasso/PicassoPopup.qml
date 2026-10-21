@@ -290,6 +290,12 @@ LayerPopup {
       return mode;
     }
     function pick(): string { Picasso.pick(); return "picking"; }
+    // for argus' recordings: the region overlay, the rectangle written to
+    // `reply` ("X,Y WxH", empty when aborted) rather than captured. The
+    // call itself answers at once; the file is the answer. `pickRegion` draws
+    // a box, `pickWindow` clicks a window.
+    function pickRegion(reply: string): string { Picasso.pickGeometry("region", reply); return "picking"; }
+    function pickWindow(reply: string): string { Picasso.pickGeometry("window", reply); return "picking"; }
     // the slideshow, from a keybind: `next`, `stop`
     function next(): string { Picasso.nextSlide(); return Picasso.slideshow ? "next" : "no slideshow"; }
     function stop(): string { Picasso.stopSlideshow(); return "stopped"; }

@@ -111,6 +111,8 @@ Singleton {
   property bool showVolume: true
   property bool showNowPlaying: true
   property bool showStatus: true
+  // hermes' connection icon; also turned off from the icon's own menu
+  property bool showHermes: true
   // The system tray, which lives inside the workspace row and is revealed by
   // hovering it. Off, tray applications keep running and simply have nowhere
   // to appear.
@@ -400,6 +402,13 @@ Singleton {
   // Do not disturb: toasts are held back (a critical one still shows) and
   // everything still lands in the bell's history, unread.
   property bool notifSilent: false
+  // FOCUS (2026-10-21): quiet without being asked — while a chronos timer
+  // counts, and in quiet hours (whole hours, crossing midnight as 22 → 7).
+  // Critical notifications come through, as through Do not disturb.
+  property bool notifFocusTimers: false
+  property bool notifQuietHours: false
+  property int notifQuietFrom: 22
+  property int notifQuietTo: 7
   property int notifHistoryCap: 200
   property int notifRadius: 5
   // The card's gutter on every side, and the icon's from the text. Five put
@@ -588,6 +597,11 @@ Singleton {
   // Off, nothing is fetched and nothing is geolocated — the forecast pane says
   // it is switched off rather than sitting empty and blaming the network.
   property bool weatherEnabled: true
+  // CALENDAR REMINDERS (chronos, khal; 2026-10-21): this many minutes before
+  // a timed event its notification comes (all-day ones at 09:00 on the
+  // day); -1 is none
+  property int calRemindLead: 10
+  property int calSyncMins: 15
   // How stale a forecast may get before opening the pane re-fetches it.
   property int weatherStaleMins: 10
 
@@ -777,6 +791,9 @@ Singleton {
       help: "The track name, and the green wash the pill takes on with it." },
     { key: "showStatus", section: "bar", label: "Microphone & recording", type: "bool",
       help: "The privacy indicators at the right end." },
+    { key: "showHermes", section: "bar", alias: "hermes network wifi wi-fi ethernet bluetooth vpn connection icon",
+      label: "Connections", type: "bool",
+      help: "Hermes' icon: the network, and Bluetooth and the VPN while they are connected. A click opens its quick panel. Its right-click menu can hide it too; this brings it back." },
     { key: "barTooltips", section: "bar", label: "Hover tooltips", type: "bool",
       help: "The hover text on the bar's modules." },
     { key: "showTray", section: "bar", label: "System tray", type: "bool",
@@ -942,6 +959,18 @@ Singleton {
       help: "On, the bell stays on the bar when its history is empty. Off, it folds away until a notification arrives (or Do not disturb is on). Also in the bell's right-click menu." },
     { key: "notifSilent", section: "notify", alias: "dnd do not disturb quiet silence mute toasts howler", label: "Do not disturb", type: "bool",
       help: "Hold back toasts; they still count on the bell and wait in its history. A critical one still shows. Also in the bell's right-click menu." },
+    { key: "notifFocusTimers", section: "notify", alias: "focus pomodoro timer quiet dnd do not disturb chronos",
+      label: "Quiet while a timer runs", type: "bool",
+      help: "Do not disturb, on by itself while a Chronos timer counts down, and off again when none does. A timer finishing still shows. Also in the bell's right-click menu." },
+    { key: "notifQuietHours", section: "notify", alias: "focus night sleep quiet hours schedule dnd do not disturb",
+      label: "Quiet hours", type: "bool",
+      help: "Do not disturb every day between the two hours below; past midnight works (22 to 7). Critical notifications still show." },
+    { key: "notifQuietFrom", section: "notify", alias: "quiet hours start from evening", label: "Quiet from", type: "int",
+      min: 0, max: 23, step: 1, unit: ":00",
+      help: "The hour quiet hours begin, when they are on." },
+    { key: "notifQuietTo", section: "notify", alias: "quiet hours end until morning", label: "Quiet until", type: "int",
+      min: 0, max: 23, step: 1, unit: ":00",
+      help: "The hour they end. The same as the start is never." },
     { key: "notifHistoryCap", section: "notify", label: "History kept", type: "int",
       min: 10, max: 1000, step: 10,
       help: "How many notifications the bell remembers across restarts." },
@@ -1111,6 +1140,12 @@ Singleton {
     { key: "weatherStaleMins", section: "time", label: "Refetch when older than", type: "int",
       min: 1, max: 120, step: 1, unit: "min",
       help: "Opening the forecast re-fetches it if what is cached is older than this." },
+    { key: "calRemindLead", section: "time", alias: "calendar reminder alarm notify khal event before minutes",
+      label: "Remind me before", type: "int", min: -1, max: 120, step: 5, unit: "min",
+      help: "How long before a calendar event its reminder comes (all-day events at 09:00 on the day). -1 is no reminders." },
+    { key: "calSyncMins", section: "time", alias: "calendar sync vdirsyncer caldav online google nextcloud",
+      label: "Calendar sync", type: "int", min: 5, max: 240, step: 5, unit: "min",
+      help: "How often an online calendar set up through vdirsyncer is synced. Nothing happens without one." },
 
     // ── system ──
     { key: "sysmonInterval", section: "system", label: "Sample rate", type: "int",

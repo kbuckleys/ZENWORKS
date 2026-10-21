@@ -32,11 +32,21 @@ Collapsible {
   // the right-click menu, which asks for the other state through the signals
   property bool silent: false
   property bool trackMusic: false
+  // Do not disturb, the switch itself (silent above is "quiet for any
+  // reason" — the switch, a timer running, quiet hours — which is what the
+  // struck bell says); why it is quiet, for the tooltip; focus's two
+  // switches, as ticks (2026-10-21)
+  property bool dnd: false
+  property string quietWhy: ""
+  property bool focusTimers: false
+  property bool quietHours: false
 
   signal activated()
   signal cleared()
   signal silenceToggled()
   signal trackMusicToggled()
+  signal focusTimersToggled()
+  signal quietHoursToggled()
 
   Row {
     id: row
@@ -95,7 +105,9 @@ Collapsible {
     items: [
       { text: "Open history", icon: "󰂚" },
       { isSeparator: true },
-      { text: "Do not disturb", icon: "󰂛", mark: root.silent },
+      { text: "Do not disturb", icon: "󰂛", mark: root.dnd },
+      { text: "Quiet while a timer runs", icon: "\u{F051B}", mark: root.focusTimers },
+      { text: "Quiet hours", icon: "\u{F0594}", mark: root.quietHours },
       { text: "Keep track changes", icon: "\uF001", mark: root.trackMusic },
       { text: "Show with no history", icon: "󰂜", mark: Oracle.notifBellAlways },
       { isSeparator: true },
@@ -104,9 +116,11 @@ Collapsible {
     onPicked: (i) => {
       if (i === 0) root.activated();
       else if (i === 2) root.silenceToggled();
-      else if (i === 3) root.trackMusicToggled();
-      else if (i === 4) Oracle.set("notifBellAlways", !Oracle.notifBellAlways);
-      else if (i === 6) root.cleared();
+      else if (i === 3) root.focusTimersToggled();
+      else if (i === 4) root.quietHoursToggled();
+      else if (i === 5) root.trackMusicToggled();
+      else if (i === 6) Oracle.set("notifBellAlways", !Oracle.notifBellAlways);
+      else if (i === 8) root.cleared();
     }
   }
 
@@ -115,7 +129,7 @@ Collapsible {
     cursorArea: mouse
     styled: true
     text: root.silent
-      ? "<b>Do not disturb</b>" + (root.unread > 0 && root.tooltipText !== "" ? "\n" + root.tooltipText : "")
+      ? "<b>" + (root.quietWhy !== "" ? root.quietWhy : "Do not disturb") + "</b>" + (root.unread > 0 && root.tooltipText !== "" ? "\n" + root.tooltipText : "")
       : root.tooltipText
     show: mouse.containsMouse && !menu.open && (root.silent || (root.unread > 0 && root.tooltipText !== ""))
   }

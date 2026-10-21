@@ -537,10 +537,16 @@ Rectangle {
       if (sendTo.shown[i].depth < n.depth) { sendTo.sel = i; return; }
   }
 
-  function step(d) {
-    if (sendTo.shown.length === 0) return;
-    sendTo.sel = Math.max(0,
-      Math.min(sendTo.shown.length - 1, sendTo.sel + d));
+  // OFF ONE END ONTO THE OTHER (user, 10-20): Up on the first row lands
+  // on the last, Down on the last lands on the first. Only a fresh press
+  // wraps — a held arrow stops at the edge, so holding Down to the bottom
+  // does not fly round to the top and keep going.
+  function step(d, wrap) {
+    const n = sendTo.shown.length;
+    if (n === 0) return;
+    const to = sendTo.sel + d;
+    if (wrap && (to < 0 || to > n - 1)) sendTo.sel = to < 0 ? n - 1 : 0;
+    else sendTo.sel = Math.max(0, Math.min(n - 1, to));
   }
 
   // ── THE ROW FLASHES, THEN THE SHEET GOES, THEN IT HAPPENS ────────
