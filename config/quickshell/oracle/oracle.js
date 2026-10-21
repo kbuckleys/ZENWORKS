@@ -1169,10 +1169,12 @@ const APP_KINDS = [
     types: ["x-scheme-handler/mailto"],
     help: "What a mailto: link opens." },
   // `preferred` (optional): what the row holds before anybody chooses,
-  // pinned. None is, since 2026-10-11 (user): every kind starts at System,
-  // and for directories, archives, text, images and fonts the system's
-  // answer is this shell's own — terminus, plato, picasso and alexandria
-  // write .desktop entries claiming those types.
+  // pinned, when it is installed. Since 2026-10-11 (user) every kind starts
+  // at System — for directories, archives, text, images and fonts the
+  // system's answer is this shell's own: terminus, plato, picasso and
+  // alexandria write .desktop entries claiming those types. Video is the
+  // one exception (2026-10-21, user): argus claims video too, so it could
+  // be the system's answer, and it is an editor, not a player — mpv is.
   { id: "files", label: "Directories", probe: "inode/directory",
     alias: "file manager folder directory terminus",
     types: ["inode/directory"],
@@ -1192,7 +1194,7 @@ const APP_KINDS = [
     prefixes: ["image/"],
     except: ["image/vnd.djvu", "image/vnd.djvu+multipage"] },
   { id: "video", label: "Video", probe: "video/mp4",
-    alias: "movies player video",
+    alias: "movies player video mpv", preferred: "mpv.desktop",
     types: ["video/mp4", "video/x-matroska", "video/webm", "video/quicktime",
             "video/x-msvideo", "video/mpeg", "video/ogg", "video/x-flv"],
     prefixes: ["video/"] },

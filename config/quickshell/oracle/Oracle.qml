@@ -2397,8 +2397,10 @@ Singleton {
     if (key === "terminal") return Ora.terminalFallback(root.appScan.apps);
     if (key === "editor") return Ora.editorFallback(root.appScan.apps, root.appScan.bins);
     if (key === "sysmon") return "zeus";
+    // a kind's pinned app, if this machine has it; System if not
     const k = Ora.appKind(key);
-    return (k && k.preferred) || "";
+    const p = (k && k.preferred) || "";
+    return p !== "" && Ora.appById(root.appScan.apps, p) ? p : "";
   }
 
   readonly property string defaultsPath:
