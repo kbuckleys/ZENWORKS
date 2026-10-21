@@ -37,10 +37,10 @@ FORGE_ID = "gitlab"
 NAME = "GitLab"
 
 
-def _glab(*args, timeout=20):
+def _glab(*args, timeout=20, err=subprocess.STDOUT):
     try:
         return subprocess.run(["glab"] + list(args), text=True,
-                              stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                              stdout=subprocess.PIPE, stderr=err,
                               stdin=subprocess.DEVNULL, timeout=timeout)
     except (FileNotFoundError, subprocess.TimeoutExpired):
         return None
@@ -52,12 +52,23 @@ def have_cli():
 
 def token():
     """(token, source) or (None, None)."""
-    r = _glab("config", "get", "token", "--host", HOST)
+    # a token pasted into delphi wins over glab's sign-in once chosen
+    # (tokenstore "_use", set by set_token, cleared by login) — before, it was
+    # kept and never used while glab was signed in (2026-10-21)
+    if tokenstore.prefer(HOST) == "store":
+        c = tokenstore.get(HOST)
+        if c:
+            return c["password"], c["where"]
+    # stdout alone: glab's notices (a new version, the keyring) go to stderr,
+    # and one merged in read as "no token" — so git was never handed glab's
+    # helper and a push to gitlab.com asked for a password (2026-10-21)
+    r = _glab("config", "get", "token", "--host", HOST, err=subprocess.DEVNULL)
     if r is not None and r.returncode == 0 and r.stdout.strip() and "\n" not in r.stdout.strip():
         return r.stdout.strip(), "glab"
     r = _glab("auth", "status", "--hostname", HOST, "--show-token")
     if r is not None:
-        m = re.search(r"Token(?: found)?:\s*(\S{12,})", r.stdout)
+        # "Token: …" or "Token found in configuration file (plaintext): …"
+        m = re.search(r"Token(?: found[^:\n]*)?:\s*(\S{12,})", r.stdout)
         if m and "*" not in m.group(1):
             return m.group(1), "glab"
     # the keyring, or delphi's own file where there is no keyring (tokenstore)
@@ -134,6 +145,7 @@ def set_token(tok):
     me = call("GET", "/user", tok=tok)
     # kept where it will be found again — and said where (tokenstore.put)
     where = tokenstore.put(HOST, me["username"], tok)
+    tokenstore.set_prefer(HOST, "store")
     return {"login": me["username"], "where": where}
 
 
@@ -185,6 +197,7 @@ def login(emit, cancel):
         # glab's own last words, not a bare "did not finish"
         why = [l for l in said if l and l not in ("ERROR",)][-2:]
         raise ForgeError("sign-in did not finish" + (": " + " ".join(why) if why else ""))
+    tokenstore.set_prefer(HOST, "")   # glab's own sign-in is the one in use
     return status()
 
 
@@ -202,6 +215,11 @@ def switch_account(login):
 
 
 def logout(login=None):
+    # whichever is in use: a pasted token is forgotten, glab signed out — a
+    # pasted one used to outlive "sign out" and keep the forge signed in
+    if token()[1] not in (None, "glab"):
+        tokenstore.drop(HOST)
+        return {"ok": True}
     r = _glab("auth", "logout", "--hostname", HOST)
     return {"ok": r is not None and r.returncode == 0}
 

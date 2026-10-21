@@ -25,6 +25,7 @@ import os
 import subprocess
 import sys
 import threading
+import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 # the suite's shared backend pieces (JSON lines, Cancel)
@@ -56,24 +57,49 @@ HELPER = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))
 
 
 class Creds:
+    # PER HOST, not per tool: github.com and gitlab.com, and any self-hosted
+    # GitLab glab signs in to, each have their own yes — a self-hosted one's
+    # Status once switched gitlab.com's on or off (2026-10-21).
+    RECHECK = 15   # seconds between asking a "no" again
+
     def __init__(self):
         self.user_helper = None   # None = not looked up yet
-        self.gh_ok = False
-        self.glab_ok = False
+        self.lock = threading.Lock()
+        self.tool = {}    # host → (cli, check): check() says it answers for host
+        self.ok = {}      # host → whether its cli's helper is git's for host
+        self.asked = {}   # host → when a "no" was last checked
 
-    def refresh(self, gh_ok=None, glab_ok=None):
+    def watch(self, host, cli, check):
+        with self.lock:
+            self.tool[host] = (cli, check)
+
+    def set(self, host, ok):
+        with self.lock:
+            self.ok[host] = bool(ok)
+            self.asked[host] = time.monotonic()
+
+    def refresh(self):
         r = subprocess.run(["git", "config", "--get-all", "credential.helper"],
                            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
                            text=True)
         self.user_helper = r.stdout.strip()
-        if gh_ok is not None:
-            self.gh_ok = gh_ok
-        if glab_ok is not None:
-            self.glab_ok = glab_ok
 
     def args(self):
         if self.user_helper is None:
             self.refresh()
+        # a "no" is asked again (at most every RECHECK s) before a network
+        # call, so one bad answer — at start, or before a sign-in made in a
+        # terminal — never leaves git asking for a password (2026-10-21)
+        with self.lock:
+            tools = list(self.tool.items())
+        now = time.monotonic()
+        for host, (cli, check) in tools:
+            if not self.ok.get(host) and now - self.asked.get(host, -1e9) > self.RECHECK:
+                try:
+                    yes = check()
+                except Exception:
+                    yes = False
+                self.set(host, yes)
         a = []
         if not self.user_helper and os.path.exists(
                 "/usr/lib/git-core/git-credential-libsecret"):
@@ -81,14 +107,12 @@ class Creds:
         # delphi's own token file, where there is no keyring (core/tokenstore.py):
         # its helper answers a host it holds a token for, and no other
         a += ["-c", "credential.helper=!" + HELPER]
-        if self.gh_ok:
-            # The empty value clears the helpers collected so far for this
-            # host, so a stale keyring entry cannot answer before gh does.
-            a += ["-c", "credential.https://github.com.helper=",
-                  "-c", "credential.https://github.com.helper=!gh auth git-credential"]
-        if self.glab_ok:
-            a += ["-c", "credential.https://gitlab.com.helper=",
-                  "-c", "credential.https://gitlab.com.helper=!glab auth git-credential"]
+        for host, (cli, _) in tools:
+            if self.ok.get(host):
+                # The empty value clears the helpers collected so far for this
+                # host, so a stale keyring entry cannot answer before gh does.
+                a += ["-c", f"credential.https://{host}.helper=",
+                      "-c", f"credential.https://{host}.helper=!{cli} auth git-credential"]
         return a
 
 

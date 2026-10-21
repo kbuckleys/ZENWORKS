@@ -70,7 +70,7 @@ audio=$(pactl list short sources 2>/dev/null | awk '$2 ~ /\.monitor$/ {print $2;
 [ -n "$audio" ] && base+=(--audio="$audio")
 
 # ── THE AREA, FROM PICASSO'S PICKER ─────────────────────────────────────
-# Region and window recordings are picked in the region screenshot's own
+# Region recordings are picked in the region screenshot's own
 # overlay (picasso/PicassoCapture.qml), not slurp: the box can be adjusted
 # before it is taken, the presets and "the last region" are there, and a
 # window is clicked, lit as the pointer crosses it. The ipc call answers at
@@ -113,16 +113,13 @@ case "${1}" in
     label=" Region Recording"; detail=""
     ;;
   window)
-    # the picker starts with the focused window lit, so Return alone records
-    # what this bind used to take without asking
-    pick pickWindow; r=$?
-    [ "$r" = 1 ] && exit 0
-    if [ "$r" = 2 ]; then
-      geometry=$(hyprctl -j activewindow | jq -r '"\(.at[0]),\(.at[1]) \(.size[0])x\(.size[1])"')
-      # jq prints the literal "null,null nullxnull" when nothing is focused, which
-      # is non-empty and would sail past a -n test into a wf-recorder parse error
-      [ "$geometry" != "null,null nullxnull" ] || { notify-send " No window"; exit 1; }
-    fi
+    # the window with the keyboard, at once — the way SUPER+PRINT takes a
+    # window shot, no picker (10-21). Picasso's pickWindow is still there
+    # for anything that wants to ask.
+    geometry=$(hyprctl -j activewindow | jq -r '"\(.at[0]),\(.at[1]) \(.size[0])x\(.size[1])"')
+    # jq prints the literal "null,null nullxnull" when nothing is focused, which
+    # is non-empty and would sail past a -n test into a wf-recorder parse error
+    [ "$geometry" != "null,null nullxnull" ] || { notify-send " No window"; exit 1; }
     target=(-g "$geometry")
     label=" Window Recording"; detail=""
     ;;

@@ -581,31 +581,34 @@ class Server(lines.Service):
         """A forge's request — `f` its module (github, gitlab, forgejo),
         every one answering to the same names."""
         cli = {"github": "gh", "gitlab": "glab"}.get(f.__name__.split("@")[0])
+        if cli:
+            # git's helper for this forge's own host — a self-hosted GitLab's
+            # sign-in says nothing of gitlab.com's
+            gitrun.CREDS.watch(f.HOST, cli, lambda: f.token()[1] == cli)
         if op == "Status":
             st = f.status()
             if cli:
-                gitrun.CREDS.refresh(**{cli + "_ok": st.get("source") == cli})
+                gitrun.CREDS.set(f.HOST, st.get("source") == cli)
             return st
-        if op == "Login":
-            st = f.login(emit, cancel)
-            if cli:
-                gitrun.CREDS.refresh(**{cli + "_ok": True})
-            return st
-        if op == "Logout":
-            if cli:
-                gitrun.CREDS.refresh(**{cli + "_ok": False})
-            return f.logout(kw.get("login"))
+        # every other change of who is signed in: asked again after, of what
+        # token() now finds — a pasted token in use over gh's or glab's
+        # sign-in means git must not be handed theirs
+        if op in ("Login", "Logout", "Switch", "SetToken", "ForgetToken"):
+            try:
+                if op == "Login":
+                    return f.login(emit, cancel)
+                if op == "Logout":
+                    return f.logout(kw.get("login"))
+                if op == "Switch":
+                    return f.switch_account(kw["login"])
+                if op == "SetToken":
+                    return f.set_token(kw["token"])
+                return f.forget_token()
+            finally:
+                if cli:
+                    gitrun.CREDS.set(f.HOST, f.token()[1] == cli)
         if op == "Accounts":
             return f.accounts()
-        if op == "Switch":
-            st = f.switch_account(kw["login"])
-            if cli:
-                gitrun.CREDS.refresh(**{cli + "_ok": st.get("source") == cli})
-            return st
-        if op == "SetToken":
-            return f.set_token(kw["token"])
-        if op == "ForgetToken":
-            return f.forget_token()
         if op == "Repos":
             return f.repos(cancel)
         if op == "Create":
@@ -668,9 +671,15 @@ class Server(lines.Service):
 
 def main():
     srv = Server()
-    # Whether gh can answer for github.com, and glab for gitlab.com, decides
-    # the credential helpers every network call gets; asked once at start,
-    # then by each forge's Status.
-    threading.Thread(target=lambda: gitrun.CREDS.refresh(
-        gh_ok=github.token()[1] == "gh", glab_ok=gitlab.token()[1] == "glab"), daemon=True).start()
+    # Whether gh can answer for github.com, and glab for gitlab.com (and for a
+    # self-hosted GitLab once the window asks after it), decides the credential
+    # helpers every network call gets; asked at start, then by each forge's
+    # Status and sign-in changes — and again before a network call while "no".
+    gitrun.CREDS.watch(github.HOST, "gh", lambda: github.token()[1] == "gh")
+    gitrun.CREDS.watch(gitlab.HOST, "glab", lambda: gitlab.token()[1] == "glab")
+
+    def first():
+        gitrun.CREDS.refresh()
+        gitrun.CREDS.args()
+    threading.Thread(target=first, daemon=True).start()
     lines.serve(srv, PROTOCOL)

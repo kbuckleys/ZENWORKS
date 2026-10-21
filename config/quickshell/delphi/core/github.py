@@ -57,6 +57,13 @@ def have_gh():
 
 def token():
     """(token, source) or (None, None)."""
+    # a token pasted into delphi wins over gh's sign-in once chosen
+    # (tokenstore "_use", set by set_token/switch, cleared by gh's own sign-in
+    # or switch) — before, it was kept and never used while gh was signed in
+    if tokenstore.prefer(HOST) == "store":
+        c = tokenstore.get(HOST)
+        if c:
+            return c["password"], c["where"]
     r = _gh("auth", "token", "-h", HOST)
     if r is not None and r.returncode == 0 and r.stdout.strip():
         return r.stdout.strip(), "gh"
@@ -89,8 +96,9 @@ def set_token(tok):
     """Check a personal access token against the API, then keep it in the
     keyring under the account it belongs to."""
     me = call("GET", "/user", tok=tok)
-    # kept where it will be found again — and said where (tokenstore.put)
-    where = tokenstore.put(HOST, me["login"], tok)
+    # kept where it will be found again — and said where (tokenstore.add); an
+    # account kept before stays, to switch back to, and this one is in use
+    where = tokenstore.add(HOST, me["login"], tok)
     return {"login": me["login"], "where": where}
 
 
@@ -131,6 +139,7 @@ def login(emit, cancel):
     cancel.check()
     if p.returncode != 0:
         raise ForgeError("sign-in did not finish")
+    tokenstore.set_prefer(HOST, "")   # gh's own sign-in is the one in use
     return status()
 
 
@@ -144,7 +153,7 @@ ACCOUNT = re.compile(r"account\s+(\S+)")
 ACTIVE = re.compile(r"Active account:\s*(true|false)")
 
 
-def accounts():
+def _gh_accounts():
     out, cur = [], None
     r = _gh("auth", "status", "-h", HOST)
     for line in (r.stdout + r.stderr if r is not None else "").splitlines():
@@ -156,22 +165,52 @@ def accounts():
         a = ACTIVE.search(line)
         if a and cur is not None:
             cur["active"] = a.group(1) == "true"
-    if not out:
-        c = tokenstore.get(HOST)
-        if c.get("username"):
-            out.append({"login": c["username"], "source": c["where"], "active": True})
+    return out
+
+
+def _kept(login):
+    """Whether `login` is a token kept here (in use or shelved), not gh's."""
+    names = [tokenstore.get(HOST).get("username", "")] + tokenstore.shelved(HOST)
+    return bool(login) and login.lower() in (n.lower() for n in names if n)
+
+
+def accounts():
+    # gh's and the kept tokens side by side; the one token() uses is active
+    store = token()[1] not in (None, "gh")
+    out = _gh_accounts()
+    if store:
+        for a in out:
+            a["active"] = False
+    # one row per login: the same account in gh and kept here is gh's row,
+    # marked in use (and from where) when the kept token is the one used
+    rows = {a["login"].lower(): a for a in out}
+    for k in tokenstore.accounts(HOST, store):
+        same = rows.get(k["login"].lower())
+        if same is None:
+            out.append(k)
+        elif k["active"]:
+            same.update(active=True, source=k["source"])
     return {"accounts": out, "many": True}
 
 
 def switch_account(login):
+    if _kept(login) and login.lower() not in (a["login"].lower() for a in _gh_accounts()):
+        tokenstore.switch(HOST, login)
+        return status()
     r = _gh("auth", "switch", "-h", HOST, "-u", login)
     if r is None or r.returncode != 0:
         raise ForgeError((r.stderr or r.stdout).strip() if r is not None else "gh is not there")
+    tokenstore.set_prefer(HOST, "")   # gh's account is the one in use now
     return status()
 
 
 def logout(login=None):
-    # the account named, or the active one
+    # the account named, or the one in use — a kept token is forgotten,
+    # a gh account signed out of gh
+    if (login and _kept(login) and login.lower() not in (a["login"].lower() for a in _gh_accounts())) \
+            or (not login and token()[1] not in (None, "gh")):
+        tokenstore.drop(HOST, login)
+        return {"ok": True}
     r = _gh("auth", "logout", "-h", HOST, *(["-u", login] if login else []))
     return {"ok": r is not None and r.returncode == 0}
 
