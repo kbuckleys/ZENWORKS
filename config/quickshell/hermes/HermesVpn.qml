@@ -53,6 +53,8 @@ Column {
             height: 42
             kind: "vpn"
             row: modelData
+            flash: page.win ? page.win.rowFlash : null
+            at: index
             picked: index === page.sel
             onClicked: { page.sel = index; if (page.win) page.win.activate(); }
           }

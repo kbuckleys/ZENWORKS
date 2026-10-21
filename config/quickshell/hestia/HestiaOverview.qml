@@ -33,6 +33,8 @@ Item {
   // the first page is visible from the start, so no change ever says so
   Component.onCompleted: Qt.callLater(() => { if (ov.visible) ov.load(); })
 
+  // a failing service clicked flashes, then opens (morpheus/RowFlash)
+  RowFlash { id: rowFlash }
   Flickable {
     id: pageFlick
     anchors.fill: parent
@@ -49,8 +51,11 @@ Item {
 
       // ── all well, said plainly ───────────────────────────────────────────
       HermesCard {
-        glyph: ov.failed.length + ov.looping.length === 0 ? "\u{F05E0}" : "\u{F0028}"
-        glyphInk: ov.failed.length + ov.looping.length === 0 ? Zenon.green : Zenon.red
+        // all well: centered, the accent's check (U+F05D; user, 2026-10-21 —
+        // the green one went)
+        centered: ov.failed.length + ov.looping.length === 0
+        glyph: ov.failed.length + ov.looping.length === 0 ? "\uF05D" : "\u{F0028}"
+        glyphInk: ov.failed.length + ov.looping.length === 0 ? Zenon.cyan : Zenon.red
         title: ov.failed.length + ov.looping.length === 0 ? "Everything is running as it should"
           : ov.failed.length > 0 && ov.looping.length > 0 ? ov.failed.length + " failed, " + ov.looping.length + " restarting over and over"
           : ov.failed.length > 0 ? (ov.failed.length === 1 ? "1 service failed" : ov.failed.length + " services failed")
@@ -66,6 +71,7 @@ Item {
             width: parent ? parent.width : 0
             height: 50
             Rectangle { anchors.fill: parent; color: rowPress.pressed ? Zenon.pressTile(false) : "transparent" }
+            FlashOver { flash: rowFlash; index: parent.index }
             Column {
               anchors.left: parent.left
               anchors.leftMargin: 18
@@ -103,7 +109,7 @@ Item {
               font.weight: 600
               font.pixelSize: Zenon.px(13)
             }
-            MouseArea { id: rowPress; anchors.fill: parent; onClicked: if (ov.win) ov.win.showUnit(u.unit, u.scope) }
+            MouseArea { id: rowPress; anchors.fill: parent; onClicked: { const x = parent.u; if (ov.win) rowFlash.flashThen(parent.index, () => ov.win.showUnit(x.unit, x.scope)); } }
           }
         }
       }
@@ -141,7 +147,8 @@ Item {
               y: 4
               text: H.clock(r.t)
               color: Zenon.accentMuted
-              font.family: Zenon.faceMono
+              font.family: Zenon.faceCode
+              font.weight: Zenon.codeWeight
               font.pixelSize: Zenon.px(12)
             }
             Text {
@@ -152,8 +159,8 @@ Item {
               elide: Text.ElideRight
               text: r.ident || H.shortName(r.unit)
               color: Zenon.red
-              font.family: Zenon.faceMono
-              font.weight: 600
+              font.family: Zenon.faceCode
+              font.weight: Math.min(900, Zenon.codeWeight + 100)
               font.pixelSize: Zenon.px(12)
             }
             Text {
@@ -166,7 +173,8 @@ Item {
               elide: Text.ElideRight
               text: r.msg
               color: Zenon.ink
-              font.family: Zenon.faceMono
+              font.family: Zenon.faceCode
+              font.weight: Zenon.codeWeight
               font.pixelSize: Zenon.px(12)
             }
           }

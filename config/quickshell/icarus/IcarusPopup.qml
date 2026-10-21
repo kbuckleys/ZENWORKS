@@ -395,8 +395,39 @@ Item {
     // Desktop.launchCommand, for the Terminal=true entries gtk-launch drops on
     // the floor — and because quoting a shell argument by hand here was a
     // fourth copy of the function Strings exists to be.
-    Quickshell.execDetached(["sh", "-c", Desktop.launchCommand(entry.id, "")]);
+    root.afterGone(() =>
+      Quickshell.execDetached(["sh", "-c", Desktop.launchCommand(entry.id, "")]));
     root.closeAll();
+  }
+
+  // ── WHAT A MENU STARTS, IT STARTS ONCE THE MENU HAS GONE ──────────────
+  // Most of what these rows open is this same shell (alexandria, terminus,
+  // clio…), and its window is built on the thread that is animating the
+  // menu out. Launched on the click, the build landed mid-fade: the menu
+  // froze half-dimmed for a quarter of a second and the window crossfaded
+  // over it (user's capture, 2026-10-21; lag.log "stall 307ms … after layer
+  // morpheus-menu … alexandria window"). Sequenced instead (memory: sequence,
+  // not warm): held until the root card has really unmapped, with a timer
+  // only as the fallback. Decided after this tick, so a caller may launch
+  // first and closeAll() second; a launch with no menu closing runs at once.
+  property var goneQueue: []
+  function afterGone(fn) {
+    Qt.callLater(() => {
+      if (!rootMenu.visible || root.shown) { fn(); return; }
+      root.goneQueue = root.goneQueue.concat([fn]);
+      goneFallback.restart();
+    });
+  }
+  function flushGone() {
+    goneFallback.stop();
+    const q = root.goneQueue;
+    root.goneQueue = [];
+    for (const f of q) f();
+  }
+  Timer { id: goneFallback; interval: Zenon.menuFade + 120; onTriggered: root.flushGone() }
+  Connections {
+    target: rootMenu
+    function onVisibleChanged() { if (!rootMenu.visible) root.flushGone(); }
   }
 
   function closeAll() {
@@ -408,7 +439,7 @@ Item {
   }
 
   function execCmd(cmd) {
-    Quickshell.execDetached(["sh", "-c", cmd + " >/dev/null 2>&1 &"]);
+    root.afterGone(() => Quickshell.execDetached(["sh", "-c", cmd + " >/dev/null 2>&1 &"]));
   }
 
   // ── OPENING A FILE, AND ASKING WHEN NOTHING WILL ──────────────────────
@@ -430,10 +461,12 @@ Item {
   }
 
   function openFile(path) {
-    const p = openerProc.createObject(root, {
-      path: path, command: ["sh", "-c", Terminus.openOrAskCommand(path)]
+    root.afterGone(() => {
+      const p = openerProc.createObject(root, {
+        path: path, command: ["sh", "-c", Terminus.openOrAskCommand(path)]
+      });
+      if (p) p.running = true;
     });
-    if (p) p.running = true;
   }
 
   // ── THE CARD, FOR A FILE NOTHING OPENS ────────────────────────────────
@@ -1556,6 +1589,7 @@ Item {
                 height: Zenon.menuRowHeight
 
                 Rectangle {
+                  id: appBand
                   anchors.fill: parent
                   // flush to the border (the column is inset by
                   // menuCardPad), square, the card's clip rounding it at the
@@ -1606,7 +1640,7 @@ Item {
                   }
                 }
 
-                ChosenFlash { id: appFlash }
+                ChosenFlash { id: appFlash; band: appBand }
 
                 MouseArea {
                   id: appHover
@@ -1854,6 +1888,7 @@ Item {
           width: parent.width
           height: Zenon.menuRowHeight
           Rectangle {
+            id: confirmBand
             anchors.fill: parent
             // flush to the border, as every menu's band (CardBody)
             anchors.leftMargin: -Zenon.menuCardPad
@@ -1869,7 +1904,7 @@ Item {
             font.weight: Zenon.weight
             font.pixelSize: Zenon.px(16)
           }
-          ChosenFlash { id: confirmFlash }
+          ChosenFlash { id: confirmFlash; band: confirmBand }
 
           MouseArea {
             id: confirmHover
@@ -1888,6 +1923,7 @@ Item {
           width: parent.width
           height: Zenon.menuRowHeight
           Rectangle {
+            id: cancelBand
             anchors.fill: parent
             anchors.leftMargin: -Zenon.menuCardPad
             anchors.rightMargin: -Zenon.menuCardPad
@@ -1902,7 +1938,7 @@ Item {
             font.weight: Zenon.weight
             font.pixelSize: Zenon.px(16)
           }
-          ChosenFlash { id: cancelFlash }
+          ChosenFlash { id: cancelFlash; band: cancelBand }
 
           MouseArea {
             id: cancelHover

@@ -65,6 +65,9 @@ Item {
     Oracle.reset(cf.key);
   }
 
+  // what is shown is the theme's own accent, set or not
+  readonly property bool isTheme: cf.shown.toLowerCase() === Zenon.hex(Zenon.themeAccent).toLowerCase()
+
   // the theme's own hues, as places to start from: its accent first
   readonly property var swatches: [Zenon.themeAccent, Zenon.blue, Zenon.magenta, Zenon.pink,
                                    Zenon.red, Zenon.yellow, Zenon.sand, Zenon.green]
@@ -118,7 +121,7 @@ Item {
       Rectangle {
         id: big
         width: parent.width
-        height: parent.height - startHead.height - starts.height - tools.height - side.spacing * 3
+        height: parent.height - starts.height - tools.height - side.spacing * 2
         radius: Zenon.windowRadius
         color: cf.shown
         border.width: 1
@@ -174,14 +177,6 @@ Item {
         Term.HeldRing { anchors.fill: parent; radius: parent.radius; z: 10; on: hexField.activeFocus }
       }
 
-      Text {
-        id: startHead
-        text: "The theme's colors"
-        color: cf.dimColor
-        font.family: cf.face
-        font.weight: Zenon.weight
-        font.pixelSize: Zenon.px(13)
-      }
       // spread edge to edge across the swatch's width
       Row {
         id: starts
@@ -223,11 +218,13 @@ Item {
           label: "\u{F020A}  Picker"
           onClicked: Pic.Picasso.pickFor("oracle:" + cf.key)
         }
+        // back to the theme's accent; dimmed while the color already is it
+        // (user, 2026-10-21) — a custom hex that happens to match counts too
         DialogButton {
           width: (tools.width - tools.spacing) / 2
-          label: "Theme's own"
-          ready: cf.value !== "" || cf.pending !== ""
-          onClicked: cf.useTheme()
+          label: "\u{F0450}  Reset"
+          ready: !cf.isTheme
+          onClicked: if (!cf.isTheme) cf.useTheme()
         }
       }
     }

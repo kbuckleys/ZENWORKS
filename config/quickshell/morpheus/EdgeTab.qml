@@ -44,10 +44,10 @@ Rectangle {
   Behavior on width { enabled: tab.side; NumberAnimation { duration: Zenon.fast; easing.type: Zenon.ease } }
   Behavior on height { enabled: !tab.side; NumberAnimation { duration: Zenon.fast; easing.type: Zenon.ease } }
   // rounded only on the free side
-  topLeftRadius: tab.edge === "left" ? 0 : 7
-  bottomLeftRadius: tab.edge === "right" ? 7 : 0
-  topRightRadius: tab.edge === "right" ? 0 : 7
-  bottomRightRadius: tab.edge === "left" ? 7 : 0
+  topLeftRadius: tab.edge === "left" ? 0 : Zenon.rad(7)
+  bottomLeftRadius: tab.edge === "right" ? Zenon.rad(7) : 0
+  topRightRadius: tab.edge === "right" ? 0 : Zenon.rad(7)
+  bottomRightRadius: tab.edge === "left" ? Zenon.rad(7) : 0
   // solid: the strip's color, laid over black rather than over what is
   // behind it
   readonly property color base: Qt.tint(Qt.tint(Zenon.ground, Zenon.layerBg), Zenon.headBg)

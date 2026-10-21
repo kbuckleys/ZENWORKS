@@ -337,7 +337,6 @@ Item {
   // the top, faded at its ends, broken where the tail rises
   Item {
     id: rim
-    visible: Zenon.rimOn
     x: card.x + card.radius
     y: card.y + 1
     width: Math.max(0, card.width - 2 * card.radius)

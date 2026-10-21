@@ -71,7 +71,7 @@ PanelWindow {
     y: Math.round(cap.height * 0.22) - (1 - cap.cardK) * 14
     opacity: cap.cardK
     scale: 0.96 + 0.04 * cap.cardK
-    radius: Zenon.windowRadius + 6
+    radius: Zenon.rad(11)
     color: Zenon.panelBg
     border.width: 1
     border.color: Zenon.border

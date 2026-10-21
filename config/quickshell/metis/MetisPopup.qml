@@ -1063,12 +1063,11 @@ LayerPopup {
     if (copyOnly) {
       const marked = Object.keys(popup.tapeMarks).length > 0;
       if (marked && !popup.tapeTotalBad && popup.tapeTotal !== "…") popup.copyOnly(popup.tapeTotal);
-      else if (row) popup.copyOnly(row.result);
+      else if (row) tapeList.flashThen(popup.tapeIdx, () => popup.copyOnly(row.result));
       return;
     }
     if (!row) return;
-    popup.tapeMode = false;
-    popup.recall(row.expr);
+    tapeList.flashThen(popup.tapeIdx, () => { popup.tapeMode = false; popup.recall(row.expr); });
   }
 
   Process {

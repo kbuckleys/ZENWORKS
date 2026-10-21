@@ -128,7 +128,7 @@ Item {
         anchors.fill: parent
         anchors.leftMargin: 2
         anchors.rightMargin: 2
-        radius: 3
+        radius: Zenon.rad(3)
         visible: item.chosen
         color: Qt.rgba(Zenon.green.r, Zenon.green.g, Zenon.green.b, 0.22)
       }

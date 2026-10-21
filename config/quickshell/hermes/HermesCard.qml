@@ -25,9 +25,14 @@ Rectangle {
   default property alias content: body.data
   // padding inside the card, either side of the body
   property real inset: 18
+  // the glyph and title as one line in the card's middle (a card that only
+  // says something: hestia's "Everything is running as it should")
+  property bool centered: false
 
   width: parent ? parent.width : 0
-  height: head.height + body.implicitHeight + (body.implicitHeight > 0 ? 14 : 4)
+  // nothing below the heading: the card is the heading's own height, so its
+  // line sits in the middle (it had 4px under it — user, 2026-10-21)
+  height: head.height + body.implicitHeight + (body.implicitHeight > 0 ? 14 : 0)
   radius: Zenon.radiusCard
   color: Zenon.wash(0.04)
   border.width: 1
@@ -39,7 +44,7 @@ Rectangle {
     height: 50
     Text {
       id: headGlyph
-      x: card.inset
+      x: card.centered ? Math.round((card.width - headGlyph.implicitWidth - 12 - headTitle.implicitWidth) / 2) : card.inset
       anchors.verticalCenter: parent.verticalCenter
       text: card.glyph
       color: card.glyphInk

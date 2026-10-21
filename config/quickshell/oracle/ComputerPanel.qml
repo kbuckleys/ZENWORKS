@@ -130,10 +130,10 @@ Item {
             width: 26
             height: 14
             color: Zenon[modelData]
-            topLeftRadius: index === 0 ? 3 : 0
-            bottomLeftRadius: index === 0 ? 3 : 0
-            topRightRadius: index === 7 ? 3 : 0
-            bottomRightRadius: index === 7 ? 3 : 0
+            topLeftRadius: index === 0 ? Zenon.rad(3) : 0
+            bottomLeftRadius: index === 0 ? Zenon.rad(3) : 0
+            topRightRadius: index === 7 ? Zenon.rad(3) : 0
+            bottomRightRadius: index === 7 ? Zenon.rad(3) : 0
           }
         }
       }

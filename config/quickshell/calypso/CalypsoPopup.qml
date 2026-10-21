@@ -172,6 +172,7 @@ LayerPopup {
     popup.syncFocus();
   }
   function closePopup() {
+    actFlash.cancel();
     popup.collapsing = true;
     popup.playClose();
     if (popup.mgr) popup.mgr.release("quick");
@@ -248,6 +249,14 @@ LayerPopup {
   }
   // Typed: the popup goes first, so the keyboard is back with the window the
   // text is for before the daemon types (it waits a moment itself).
+  // the action's row flashes, then it types or copies (morpheus/RowFlash,
+  // user 2026-10-21); the row is keyed by its action's number
+  property Item pickedAct: null
+  RowFlash { id: actFlash }
+  function executeSel() {
+    const i = popup.actionSel, kind = popup.actionTypes[i].kind;
+    actFlash.flashThen(i, () => popup.execute(kind), () => popup.actionSel);
+  }
   function execute(kind) {
     const e = popup.activeEntry;
     if (!e || !popup.mgr) return;
@@ -459,6 +468,10 @@ LayerPopup {
             cellWidth: width / popup.effCols
             cellHeight: popup.cellH
             model: cellModel
+            // the chosen one slides (morpheus/CursorBand), rather than each
+            // cell lighting itself (user, 2026-10-21); cellOf: the grid runs
+            // down its columns
+            CursorBand { follows: list; index: popup.filtered.length > 0 ? popup.cellOf(popup.sel) : -1 }
             delegate: Item {
               id: cell
               required property int at
@@ -466,7 +479,6 @@ LayerPopup {
               readonly property bool picked: at >= 0 && at === popup.sel
               width: list.cellWidth
               height: list.cellHeight
-              Rectangle { anchors.fill: parent; color: cell.picked ? Zenon.menuHi : Zenon.alpha(Zenon.menuHi, 0) }
               ItemTile {
                 id: rowTile
                 x: 16
@@ -542,6 +554,9 @@ LayerPopup {
         Behavior on opacity { NumberAnimation { duration: Zenon.normal; easing.type: Zenon.ease } }
         Behavior on x { NumberAnimation { duration: Zenon.normal; easing.type: Zenon.ease } }
 
+        // the sliding cursor over both columns of actions (morpheus/
+        // CursorBand following the chosen row itself: two Repeaters)
+        CursorBand { item: popup.mode === "actions" ? popup.pickedAct : null }
         Column {
           anchors.fill: parent
           // the item, as its row was, larger
@@ -647,7 +662,11 @@ LayerPopup {
                       width: group.width
                       height: popup.cellH
                       opacity: ok ? 1 : 0.3
-                      Rectangle { anchors.fill: parent; color: act.picked ? Zenon.menuHi : Zenon.alpha(Zenon.menuHi, 0) }
+                      // the cursor is actionsView's CursorBand, told which row
+                      onPickedChanged: if (act.picked) popup.pickedAct = act
+                      Component.onCompleted: if (act.picked) popup.pickedAct = act
+                      Component.onDestruction: if (popup.pickedAct === act) popup.pickedAct = null
+                      FlashOver { flash: actFlash; index: act.modelData }
                       Text {
                         id: actIcon
                         x: 16
@@ -685,7 +704,7 @@ LayerPopup {
                       MouseArea {
                         anchors.fill: parent
                         enabled: act.ok
-                        onClicked: { popup.actionSel = act.modelData; popup.execute(act.action.kind); }
+                        onClicked: { popup.actionSel = act.modelData; popup.executeSel(); }
                       }
                     }
                   }
@@ -844,7 +863,7 @@ LayerPopup {
           if (event.key === Qt.Key_Escape || event.key === Qt.Key_Backspace) { popup.mode = "list"; popup.syncFocus(); return; }
           if (alt && event.key === Qt.Key_O) { popup.openWindow(popup.activeEntry); return; }
           if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-            if (popup.actionOk(popup.actionSel)) popup.execute(popup.actionTypes[popup.actionSel].kind);
+            if (popup.actionOk(popup.actionSel)) popup.executeSel();
             return;
           }
           if (event.key === Qt.Key_Up || event.key === Qt.Key_Down) { popup.moveAction(0, event.key === Qt.Key_Up ? -1 : 1); return; }

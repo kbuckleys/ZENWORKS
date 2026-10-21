@@ -318,7 +318,7 @@ property var statusbar: null
     const idx = popup.sel;
     // the views' own highlight items: an id inside `highlight:` is in the
     // component's context, not this file's
-    const bar = popup.mode === "picker" ? pickerList.highlightItem : list.highlightItem;
+    const bar = (popup.mode === "picker" ? pickerList.highlightItem : list.highlightItem) as SelBar;
     if (bar && bar.flash.running) return;
     if (!bar || !bar.cur || !popup.acts(idx)) { popup.confirmAt(idx); return; }
     bar.flash.fire(() => popup.confirmAt(idx));

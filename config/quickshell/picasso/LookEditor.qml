@@ -212,7 +212,7 @@ Item {
               } else ed.touched("tint", sw.modelData);
             }
           }
-          Ring { on: ed.kbRow === "tint" && sw.on; radius: 18 }
+          Ring { on: ed.kbRow === "tint" && sw.on; radius: width / 2 }
         }
       }
     }
@@ -291,7 +291,7 @@ Item {
               else ed.accentChosen(ac.modelData === "" ? "" : ac.ink);
             }
           }
-          Ring { on: ed.kbRow === "accent" && ac.on; radius: 18 }
+          Ring { on: ed.kbRow === "accent" && ac.on; radius: width / 2 }
         }
       }
 

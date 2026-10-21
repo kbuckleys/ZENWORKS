@@ -468,6 +468,7 @@ PanelWindow {
           anchors.bottom: parent.bottom
           width: 30
           Rectangle {
+            id: openBand
             anchors.fill: parent
             // out to the border, as every band
             anchors.rightMargin: -Zenon.menuCardPad
@@ -481,7 +482,7 @@ PanelWindow {
             font.weight: Zenon.weight
             font.pixelSize: Zenon.px(15)
           }
-          ChosenFlash { id: openFlash }
+          ChosenFlash { id: openFlash; band: openBand }
           MouseArea {
             id: openHover
             anchors.fill: parent
@@ -573,6 +574,7 @@ PanelWindow {
                 }
 
                 Rectangle {
+                  id: entryBand
                   anchors.fill: parent
                   // flush to the border, square, the card's clip rounding
                   // the last row into its free corner — every menu's band
@@ -685,7 +687,7 @@ PanelWindow {
                   }
                 }
 
-                ChosenFlash { id: entryFlash }
+                ChosenFlash { id: entryFlash; band: entryBand }
 
                 // the entry a menu is open about, outlined (HeldRing.qml)
                 Term.HeldRing {

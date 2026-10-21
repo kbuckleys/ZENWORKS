@@ -87,6 +87,10 @@ module.exports = {
       .map((r) => r.text).join(), "Wi-Fi on");
     t.eq("the night light, by the sun's word", C.filterRows(C.buildRows(apps, [], {}, C.SHELL_ACTIONS, Object.assign({ night: true }, ready)), "hyprsunset")
       .map((r) => r.text).join(), "Night light off");
+    // the shell's own .desktop and its verb share a name: one row
+    const hub = C.buildRows([{ name: "Control Hub", exec: "qs ipc call Hermes window", id: "hermes" }], [], {}, C.SHELL_ACTIONS);
+    t.eq("an app and a verb of one name are one row", hub.filter((r) => r.text === "Control Hub").length, 1);
+    t.eq("…found by the verb's words", C.filterRows(hub, "bluetooth vpn").length > 0 ? C.filterRows(hub, "brightness").filter((r) => r.text === "Control Hub").length : 1, 1);
     t.eq("found by a key, not only its name",
       C.filterRows(acts, "poweroff").map((r) => r.text).join(), "Shutdown");
     t.ok("nothing ends a session without a confirm",

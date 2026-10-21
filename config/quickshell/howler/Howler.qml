@@ -57,8 +57,9 @@ Singleton {
   readonly property int maxVisible:   Oracle.notifMaxVisible
   readonly property bool iconsEnabled: Oracle.notifIcons
   readonly property int iconSize:     Oracle.notifIconSize
-  readonly property int iconRadius:   Oracle.notifIconRadius
-  readonly property int radius:       Oracle.notifRadius
+  // Oracle's one Corner rounding, through Zenon's scale: a toast is a row
+  readonly property int iconRadius:   Zenon.windowRadius
+  readonly property int radius:       Zenon.windowRadius
   readonly property int padding:      Oracle.notifPadding
   // THE SIDES GET TWICE THE TOP. A card is wider than it is tall and a
   // gutter that reads as generous above a line of text reads as none at

@@ -33,6 +33,10 @@ Row {
   property bool enabled2: true
   property color ink: Zenon.cyan
   property bool kbOn: false
+  // pressed from outside: a holder that takes the tap itself (a whole
+  // settings row, a wider hit area) and turns this one's off says so here
+  property bool held: false
+  readonly property bool down: ckTap.pressed || ck.held
   signal toggled()
   spacing: 8
   opacity: ck.enabled2 ? 1 : 0.4
@@ -41,20 +45,22 @@ Row {
     anchors.verticalCenter: parent.verticalCenter
     width: 18
     height: 18
-    radius: Zenon.windowRadius - 1
-    // pressed, darkened — the suite's press (user, 2026-10-17)
-    color: ckTap.pressed ? Zenon.pressFill
-      : ck.lit ? Qt.rgba(ck.ink.r, ck.ink.g, ck.ink.b, 0.2) : "transparent"
+    radius: Zenon.rad(4)
+    // pressed, darkened — the suite's press (user, 2026-10-17). No tint
+    // when on: the ringed border and tick say it (user, 2026-10-21)
+    color: ck.down ? Zenon.pressFill : "transparent"
     Behavior on color { ColorAnimation { duration: Zenon.fast } }
-    border.width: 1
+    // a touch heavier than a hairline (user, 2026-10-21)
+    border.width: 1.5
     border.color: ck.lit ? ck.ink : Zenon.accentKey
     Text {
       anchors.centerIn: parent
       visible: ck.lit
       text: ""
       color: ck.ink
+      opacity: ck.down ? Zenon.pressDim : 1
       font.family: Zenon.face
-      font.weight: Zenon.weight
+      font.weight: Font.Bold
       font.pixelSize: Zenon.px(11)
     }
     // the keyboard is here
@@ -73,6 +79,7 @@ Row {
     anchors.verticalCenter: parent.verticalCenter
     text: ck.label
     color: ck.lit ? Zenon.white : Zenon.accentKey
+    opacity: ck.down ? Zenon.pressDim : 1
     font.family: Zenon.face
     font.weight: Zenon.weight
     font.pixelSize: Zenon.px(15)

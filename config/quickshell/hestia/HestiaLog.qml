@@ -78,30 +78,31 @@ Item {
       readonly property color ink: line.role === "bad" ? Zenon.red : line.role === "warn" ? Zenon.yellow
         : line.role === "note" ? Zenon.cyan : Zenon.ink
       width: list.width
-      height: Math.max(24, msgText.contentHeight + 8)
+      height: Math.max(28, msgText.contentHeight + 8)
       Text {
         id: timeText
         x: 16
         y: 4
         // today's lines say only the time; older ones the day too
-        width: Math.max(72, implicitWidth)
+        width: Math.max(84, implicitWidth)
         text: H.clock(line.t)
         color: Zenon.accentMuted
-        font.family: Zenon.faceMono
-        font.pixelSize: Zenon.px(12)
+        font.family: Zenon.faceCode
+        font.weight: Zenon.codeWeight
+        font.pixelSize: Zenon.px(14)
         font.features: { "tnum": 1 }
       }
       Text {
         id: identText
         x: timeText.x + timeText.width + 10
         y: 4
-        width: 150
+        width: 170
         elide: Text.ElideRight
         text: line.ident !== "" ? line.ident : (lg.showUnit ? H.shortName(line.unit) : "")
         color: line.role === "plain" ? Zenon.accentSoft : line.ink
-        font.family: Zenon.faceMono
-        font.weight: 600
-        font.pixelSize: Zenon.px(12)
+        font.family: Zenon.faceCode
+        font.weight: Math.min(900, Zenon.codeWeight + 100)
+        font.pixelSize: Zenon.px(14)
       }
       Text {
         id: msgText
@@ -111,8 +112,9 @@ Item {
         wrapMode: Text.WrapAnywhere
         text: line.msg
         color: line.ink
-        font.family: Zenon.faceMono
-        font.pixelSize: Zenon.px(12)
+        font.family: Zenon.faceCode
+        font.weight: Zenon.codeWeight
+        font.pixelSize: Zenon.px(14)
       }
       MouseArea { anchors.fill: parent; onClicked: lg.sel = line.index }
     }

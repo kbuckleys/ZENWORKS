@@ -124,7 +124,7 @@ Item {
       visible: lock.asks
       width: parent.width
       height: 76
-      radius: Zenon.windowRadius + 4
+      radius: Zenon.rad(9)
       color: Zenon.wash(0.04)
       border.width: 1
       border.color: Zenon.border
@@ -132,7 +132,7 @@ Item {
         id: field
         anchors.fill: parent
         grow: 2
-        washRadius: Zenon.windowRadius + 4
+        washRadius: Zenon.rad(9)
         busy: lock.busy
         prompt: C.unlockPrompt(lock.info ? lock.info.asks : "password")
         purpose: lock.busy ? "unlocking…" : "unlocks " + (lock.acct ? lock.acct.name : "the vault")

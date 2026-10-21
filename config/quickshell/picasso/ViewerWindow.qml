@@ -1460,7 +1460,7 @@ FloatingWindow {
   }
 
   // the fitted picture's corners, rounded while there is room round it
-  readonly property real picRadius: win.chrome ? 4 : 0
+  readonly property real picRadius: win.chrome ? Zenon.radiusControl : 0
   // a picture that may have see-through parts sits on a checkerboard
   readonly property bool mayAlpha: /\.(png|webp|gif|apng|svgz?|avif|tiff?|ico|jxl|qoi|tga)$/i.test(win.path)
 
@@ -4014,7 +4014,7 @@ FloatingWindow {
         spacing: 8
         Rectangle {
           anchors.verticalCenter: parent.verticalCenter
-          width: 14; height: 14; radius: 3
+          width: 14; height: 14; radius: Zenon.rad(3)
           color: win.pixel ? win.pixel.hex : "transparent"
           border.width: 1
           border.color: Zenon.wash(0.45)
@@ -4540,7 +4540,7 @@ FloatingWindow {
           Rectangle {
             anchors.fill: parent
             visible: cell.directory && !dirCover.shown
-            radius: Zenon.windowRadius + 2
+            radius: Zenon.rad(7)
             color: Zenon.wash(0.05)
             border.width: 1
             border.color: Zenon.border
@@ -4618,7 +4618,7 @@ FloatingWindow {
             // a picture flying back in lands here; until it does, it is the flyer
             opacity: win.flyTarget !== "" && win.flyTarget === cell.modelData.path ? 0 : 1
             anchors.fill: parent
-            radius: Zenon.windowRadius + 2
+            radius: Zenon.rad(7)
             color: "transparent"
             // decoded, it says its shape, for what the headers could not
             onMeasuredChanged: if (pic.measured && cell.tile) win.reportShape(cell.modelData.path, pic.ratio)
@@ -4650,7 +4650,7 @@ FloatingWindow {
             property real glow: 0
             anchors.fill: cell.directory ? parent : pic
             anchors.margins: cell.directory ? 4 : -3
-            radius: Zenon.windowRadius + 2
+            radius: Zenon.rad(7)
             visible: cellFlare.glow > 0.003
             opacity: cellFlare.glow
             color: Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b, 0.18)

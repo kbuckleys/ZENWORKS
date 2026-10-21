@@ -68,7 +68,6 @@ CursorAnchor {
     // the glass rim: light along the top edge, fading out before the
     // corners turn — see Zenon.rim
     Rectangle {
-      visible: Zenon.rimOn
       z: 100
       x: parent.radius
       y: 1

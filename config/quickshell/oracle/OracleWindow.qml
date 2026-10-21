@@ -621,11 +621,13 @@ FloatingWindow {
       anchors.right: parent.right
       anchors.verticalCenter: parent.verticalCenter
       enabled: false
+      held: swTap.pressed
       lit: sw.value
       ink: popup.highlight
     }
 
     MouseArea {
+      id: swTap
       anchors.fill: box
       anchors.margins: -10
       onClicked: Oracle.set(sw.spec.key, !sw.value)
@@ -769,7 +771,7 @@ FloatingWindow {
 
         Rectangle {
           anchors.fill: parent
-          radius: 2
+          radius: Zenon.rad(2)
           color: "transparent"
           border.width: 1
           border.color: Zenon.border
@@ -2390,7 +2392,7 @@ FloatingWindow {
                       visible: popup.searching
                       width: sectionBadge.implicitWidth + 12
                       height: 19
-                      radius: 3
+                      radius: Zenon.rad(3)
                       anchors.verticalCenter: parent.verticalCenter
                       color: Zenon.wash(0.07)
                       Text {
@@ -2490,7 +2492,8 @@ FloatingWindow {
                   // in one row (Font: the book, the family, its weight, its
                   // size) — a dropdown for an enum, a stepper for a number
                   // A FEW CHOICES SIDE BY SIDE (`segments`), for an enum whose
-                  // options read on from its name: "Wake by [key press | …]"
+                  // options read on from its name: "Wake by [Key press | …]",
+                  // each in sentence case (user, 2026-10-21)
                   Component { id: segComp
                     Segments {
                       textSize: Zenon.px(13)
@@ -2582,7 +2585,7 @@ FloatingWindow {
                               Rectangle {
                                 anchors.fill: parent
                                 anchors.margins: 1
-                                radius: 3
+                                radius: Zenon.rad(3)
                                 color: Qt.rgba(popup.highlight.r, popup.highlight.g, popup.highlight.b,
                                                stepMa.pressed ? 0.22 : 0)
                               }

@@ -374,7 +374,7 @@ Item {
       x: row.textX + modelData.x * row.cellW
       width: modelData.w * row.cellW
       height: row.cellH
-      radius: 3
+      radius: Zenon.rad(3)
       color: modelData.c
     }
   }
@@ -420,7 +420,7 @@ Item {
     width: row.vt ? (row.vt[1] - row.vt[0] + (row.vt[3] ? 0.5 : commit ? 0 : 1)) * row.cellW + (commit ? 6 : 0) : 0
     y: 1
     height: row.cellH - 2
-    radius: commit ? 5 : height / 2
+    radius: commit ? Zenon.windowRadius : height / 2
     // the commit's chip is filled: its text is in the ground's ink (theme.lua)
     color: commit ? ink : Qt.rgba(ink.r, ink.g, ink.b, 0.13)
     border.width: 0
@@ -466,7 +466,7 @@ Item {
     x: row.sl ? row.textX + row.sl[0] * row.cellW : 0
     width: row.sl ? (row.sl[1] - row.sl[0]) * row.cellW : 0
     height: row.cellH
-    radius: 3
+    radius: Zenon.rad(3)
     color: Qt.rgba(row.ed.visualInk.r, row.ed.visualInk.g, row.ed.visualInk.b, row.ed.visualAlpha)
   }
 
@@ -642,7 +642,7 @@ Item {
       x: row.textX + modelData * row.cellW
       width: row.cellW
       height: row.cellH
-      radius: 2
+      radius: Zenon.rad(2)
       color: Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b, 0.12)
       border.width: 1
       border.color: Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b, 0.8)

@@ -43,3 +43,15 @@ function horiz(sel, delta, len, cols) {
   return start + wrap(sel % cols, delta, rowLen);
 }
 
+
+// THE CHOSEN CELL FLASHES, THEN `act` RUNS — a grid's flash is the cell's
+// own ChosenFlash, exposed by the delegate as `flash` (ideo, folio's
+// pictures, minerva's library, hermes' tiles, terminus' space map). A cell
+// not built (scrolled far off) acts at once; one already flashing ignores
+// the second ask. Here rather than in each grid: they all did these lines.
+function fireCell(cell, act) {
+  if (!cell || !cell.flash) { act(); return true; }
+  if (cell.flash.running) return false;
+  cell.flash.fire(act);
+  return true;
+}

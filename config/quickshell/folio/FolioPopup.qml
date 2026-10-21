@@ -389,6 +389,7 @@ LayerPopup {
     popup.closePopup();
   }
   function closePopup() {
+    rowFlash.cancel();
     popup.collapsing = true;
     popup.playClose();
   }
@@ -464,7 +465,22 @@ function onThumbsDone() {
     popup.lastAction = "";
   }
 
+  // ── THE ROW FLASHES, THEN IT PASTES (user, 2026-10-21) ────────────────
+  // The suite's two flashes: terminus' RowFlash on the text and snippet
+  // rows (a list), ChosenFlash in the picture's own cell (a grid, as
+  // icarus' Home cards). The choice is taken now, not read at the tail.
+  RowFlash { id: rowFlash }
   function confirm() {
+    if (popup.rowCount() === 0 || rowFlash.running) return;
+    const i = popup.sel, mode = popup.mode;
+    const act = () => { if (popup.mode === mode && popup.sel === i) popup.confirmNow(); };
+    if (mode === "image") {
+      Nav.fireCell(imgGrid.itemAtIndex(i), act);
+      return;
+    }
+    rowFlash.flashThen(i, act);
+  }
+  function confirmNow() {
     const len = popup.mode === "image" ? popup.imgRows.length : popup.rows.length;
     if (len === 0) return;
     if (popup.mode === "snip") {
@@ -743,6 +759,7 @@ function onThumbsDone() {
               required property int index
               width: textGrid.cellWidth
               height: textGrid.cellHeight
+              FlashOver { flash: rowFlash; index: textRow.index }
 
               // ── ARRIVING ONE AFTER ANOTHER ─────────────────────────────
               // When the panel opens, each of the first eight rows fades in
@@ -904,6 +921,9 @@ function onThumbsDone() {
               required property int index
               width: imgGrid.cellWidth
               height: imgGrid.cellHeight
+              // inside SelectCell's 4px inset, so it lights the cursor's box
+              readonly property alias flash: cellFlash
+              ChosenFlash { id: cellFlash; anchors.margins: 4 }
 
               // ── ARRIVING ONE AFTER ANOTHER ─────────────────────────────
               // When the panel opens, each of the first eight rows fades in

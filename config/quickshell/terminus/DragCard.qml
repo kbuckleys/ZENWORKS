@@ -92,7 +92,7 @@ Item {
     anchors.verticalCenter: parent.verticalCenter
     width: card.height - 10
     height: card.height - 10
-    radius: 3
+    radius: Zenon.rad(3)
     color: Zenon.black
     Image {
       anchors.fill: parent

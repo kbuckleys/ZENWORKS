@@ -21,6 +21,10 @@ Item {
   property string kind: "wifi"
   property var row: null
   property bool picked: false
+  // the list's RowFlash (morpheus), and this row's place in it: the row
+  // lights before it joins, connects or brings a VPN up
+  property var flash: null
+  property int at: -1
   signal clicked()
 
   readonly property bool live: !!r.row && (r.kind === "vpn" ? r.row.active : r.row.connected)
@@ -90,5 +94,6 @@ Item {
     font.weight: Zenon.weight
     font.pixelSize: Zenon.px(13)
   }
+  FlashOver { flash: r.flash; index: r.at }
   MouseArea { anchors.fill: parent; onClicked: r.clicked() }
 }

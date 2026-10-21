@@ -126,6 +126,22 @@ module.exports = {
       /^\tfamily\s+= "JetBrainsMono Nerd Font Propo Medium",$/m);
     t.match("a quote in a name is escaped", S.renderHyprFont("A\"B", "500"), /"A\\"B Medium"/);
     t.match("no face is an empty table", S.renderHyprFont("", "500"), /^return \{\}$/m);
+    const base = "decoration = {\n\tdim_special = 0.8,\n        rounding = 5,\n\tblur = {\n\t\trounding = 9,\n\t},\n},\n"
+      + "group = {\n\tgroupbar = {\n\t\trounding = 0,\n\t},\n},\n";
+    const r12 = S.setHyprRounding(base, 12);
+    t.match("the window corner is rewritten in place", r12, /^        rounding = 12,$/m);
+    t.match("a rounding nested in decoration is not it", r12, /^\t\trounding = 9,$/m);
+    t.match("the group bar keeps its own", r12, /groupbar = \{\n\t\trounding = 0,/);
+    t.eq("nothing else moves", r12.replace("rounding = 12", "rounding = 5"), base);
+    t.eq("the same number is the same text", S.setHyprRounding(base, 5), base);
+    t.match("0 is square", S.setHyprRounding(base, 0), /^        rounding = 0,$/m);
+    t.eq("no decoration block, no change", S.setHyprRounding("general = {}\n", 3), "general = {}\n");
+    t.eq("a commented-out line is not it",
+      S.setHyprRounding("decoration = {\n-- rounding = 5,\n}\n", 8), "decoration = {\n-- rounding = 5,\n}\n");
+    t.match("the live base.lua has the line", (() => {
+      const live = require("fs").readFileSync(require("os").homedir() + "/.config/hypr/lua/base.lua", "utf8");
+      return S.setHyprRounding(live, 77);
+    })(), /rounding = 77,/);
     t.ok("the font lua parses", (() => {
       try {
         require("child_process").execFileSync("luac", ["-p", "-"], { input: f });

@@ -5,7 +5,8 @@
 //
 // THE THEME AND THE FONTS, CARRIED OUT OF THE SHELL. Oracle is the one
 // place a font is set: hyprland gets lua/font.lua (below), and kitty, GTK,
-// gsettings and fontconfig's generic families scripts/fontsync.sh.
+// gsettings and fontconfig's generic families scripts/fontsync.sh. Oracle's
+// Corner rounding reaches hyprland's windows through base.lua's own line.
 //
 // THE THEME. kitty, hyprland, GTK and Qt paint with their
 // own config, so when the theme changes they are each written a file
@@ -96,6 +97,12 @@ Item {
       [Quickshell.shellDir + "/scripts/fontsync.sh"].concat(sync.fontArgs))
   }
 
+  // Oracle's Corner rounding for hyprland's windows: base.lua's own
+  // `rounding = N` line, rewritten in place (themesync.js) — there is no file
+  // of its own for one number base.lua already holds
+  readonly property int windowCorner: Zenon.windowRadius
+  onWindowCornerChanged: settle.restart()
+
   onKittyTextChanged: settle.restart()
   onGtk4TextChanged: settle.restart()
   onGtk3TextChanged: settle.restart()
@@ -112,6 +119,7 @@ Item {
       if (sync.put(kittyFile, sync.kittyText)) tell.kitty = true;
       if (sync.put(hyprFile, sync.hyprText)) tell.hypr = true;
       if (sync.put(fontFile, sync.fontText, true)) tell.hypr = true;
+      if (sync.corner()) tell.hypr = true;
       // nothing to tell: a GTK app reads its gtk.css as it starts
       sync.put(gtk4File, sync.gtk4Text);
       sync.put(gtk3File, sync.gtk3Text);
@@ -151,6 +159,31 @@ Item {
     file.last = want;
     file.exists = true;
     return true;
+  }
+
+  // base.lua with its window corner set to Oracle's; true when it was written.
+  // Never created: no base.lua is a hyprland this shell does not configure.
+  function corner() {
+    if (!baseFile.exists) return false;
+    const have = baseFile.last !== "" ? baseFile.last : String(baseFile.text());
+    const want = Sync.setHyprRounding(have, sync.windowCorner);
+    if (have === want) return false;
+    baseFile.setText(want);
+    baseFile.last = want;
+    return true;
+  }
+
+  FileView {
+    id: baseFile
+    property bool exists: true
+    property string last: ""
+    path: sync.configDir + "/hypr/lua/base.lua"
+    blockLoading: true
+    printErrors: false
+    // a hand edit to base.lua is read fresh before the next write
+    watchChanges: true
+    onFileChanged: { last = ""; reload(); }
+    onLoadFailed: exists = false
   }
 
   FileView {

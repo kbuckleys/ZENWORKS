@@ -48,7 +48,7 @@ Item {
           required property var modelData
           width: Math.floor((jl.width - 28 - 16) / 3)
           height: 58
-          radius: Zenon.windowRadius + 2
+          radius: Zenon.rad(7)
           color: Zenon.alpha(Zenon[modelData.ink], 0.08)
           border.width: 1
           border.color: Zenon.alpha(Zenon[modelData.ink], 0.3)
@@ -132,7 +132,7 @@ Item {
       x: 14
       width: jl.width - 28
       height: refl.implicitHeight + 24
-      radius: Zenon.windowRadius + 2
+      radius: Zenon.rad(7)
       color: Zenon.alpha(Zenon.magenta, 0.07)
       border.width: 1
       border.color: Zenon.alpha(Zenon.magenta, 0.28)
@@ -177,7 +177,7 @@ Item {
       width: jl.width - 28
       height: pastCol.implicitHeight + 20
       visible: past.hits.length > 0
-      radius: Zenon.windowRadius + 4
+      radius: Zenon.rad(9)
       color: pastMa.pressed ? Zenon.alpha(Zenon.yellow, 0.14) : Zenon.alpha(Zenon.yellow, 0.08)
       border.width: 1
       border.color: Zenon.alpha(Zenon.yellow, 0.3)
@@ -224,7 +224,7 @@ Item {
       width: jl.width - 28
       height: backCol.implicitHeight + 20
       visible: !!back.e
-      radius: Zenon.windowRadius + 4
+      radius: Zenon.rad(9)
       color: backMa.pressed ? Zenon.alpha(Zenon.cyan, 0.18) : Zenon.alpha(Zenon.cyan, 0.06)
       border.width: 1
       border.color: Zenon.alpha(Zenon.cyan, 0.28)

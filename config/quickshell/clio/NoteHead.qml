@@ -39,7 +39,7 @@ Column {
     visible: nh.entry && nh.n.prompt !== ""
     width: parent.width
     height: promptText.implicitHeight + 24
-    radius: Zenon.windowRadius + 2
+    radius: Zenon.rad(7)
     color: Zenon.alpha(Zenon.magenta, 0.08)
     border.width: 1
     border.color: Zenon.alpha(Zenon.magenta, 0.3)

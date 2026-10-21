@@ -57,9 +57,10 @@ Item {
   // values that can be picked; null for all. One left out is shown faint
   // and does not answer (terminus' settings: columns while split)
   property var allowed: null
-  // Parts of one width, sharing whatever width the holder gives it (set
-  // `width`), rather than each as wide as its words — for a switch that
-  // spans a card (picasso's tabs, fits, intervals).
+  // Parts that share whatever width the holder gives it (set `width`) —
+  // each its words plus an equal share of the rest (partWs) — rather than
+  // each only as wide as its words: for a switch that spans a card
+  // (picasso's tabs, fits, intervals).
   property bool even: false
   // values that wear a small dot — something set under that choice
   // (picasso's card: a look staged, a slideshow on)
@@ -162,7 +163,38 @@ Item {
   // its part. And it does not SLIDE until it has been seen at its size — its
   // first place is taken, not traveled to from where an unsized, hidden
   // switch would have put it.
-  readonly property real partW: (segs.width - 2) / Math.max(1, segs.options.length)
+  // ── SHARED BY WORDS, NOT CUT EVEN (user, 2026-10-21: "Last used" barely
+  // fit beside "List" in terminus' settings) — each part takes its words'
+  // room, then an equal share of what is left; a switch too narrow for
+  // its words shrinks every part by the same fraction. Measured with
+  // FontMetrics rather than read off the parts, so the highlight still
+  // needs no part to have been laid out (the rule above).
+  FontMetrics {
+    id: wordFm
+    font.family: segs.face !== "" ? segs.face : Zenon.face
+    font.weight: segs.weight
+    font.pixelSize: segs.textSize
+  }
+  FontMetrics {
+    id: glyphFm
+    font.family: Zenon.face
+    font.weight: segs.glyphWeight
+    font.pixelSize: Math.round(segs.textSize * 1.05)
+  }
+  readonly property var partWs: {
+    const n = segs.options.length;
+    if (!segs.even || n === 0) return [];
+    const need = segs.options.map((o) => {
+      const g = segs.glyphOf ? String(segs.glyphOf(String(o[0])) || "") : "";
+      const word = String(o[1] || "");
+      return wordFm.advanceWidth(word) + (g !== "" ? glyphFm.advanceWidth(g) + (word !== "" ? 7 : 0) : 0) + segs.pad;
+    });
+    const total = need.reduce((a, b) => a + b, 0);
+    const room = segs.width - 2;
+    if (room >= total) return need.map((w) => w + (room - total) / n);
+    return need.map((w) => w * room / Math.max(1, total));
+  }
+  function partX(i) { let x = 0; for (let k = 0; k < i; ++k) x += segs.partWs[k] || 0; return x; }
   property bool settled: false
   function settle() { if (!segs.settled && segs.visible && segs.width > 0) Qt.callLater(() => { segs.settled = true; }); }
   onVisibleChanged: segs.settle()
@@ -171,11 +203,11 @@ Item {
   Rectangle {
     id: lit
     visible: segs.index >= 0 && (segs.even || !!segs.litItem)
-    x: segs.even ? row.x + segs.index * segs.partW + 2 : segs.litItem ? row.x + segs.litItem.x + 2 : 0
+    x: segs.even ? row.x + segs.partX(segs.index) + 2 : segs.litItem ? row.x + segs.litItem.x + 2 : 0
     y: 3
-    width: Math.max(0, segs.even ? segs.partW - 4 : segs.litItem ? segs.litItem.width - 4 : 0)
+    width: Math.max(0, segs.even ? (segs.partWs[segs.index] || 0) - 4 : segs.litItem ? segs.litItem.width - 4 : 0)
     height: segs.height - 6
-    radius: Math.max(0, Zenon.windowRadius - 2)
+    radius: Zenon.rad(3)
     color: Zenon.alpha(Zenon.cyan, segs.strong ? 0.28 : 0.16)
     border.width: segs.strong ? 1 : 0
     border.color: Zenon.alpha(Zenon.cyan, 0.75)
@@ -199,7 +231,7 @@ Item {
         required property int index
         readonly property bool on: segs.current === one.modelData[0]
         readonly property bool ok: segs.allowed === null || segs.allowed.indexOf(one.modelData[0]) >= 0
-        width: segs.even ? (segs.width - 2) / Math.max(1, segs.options.length)
+        width: segs.even ? (segs.partWs[one.index] || 0)
           : label.implicitWidth + mark.room + segs.pad
         height: row.height
         // between two options, a hairline
@@ -219,7 +251,7 @@ Item {
           y: 2
           width: parent.width - 4
           height: parent.height - 4
-          radius: Math.max(0, Zenon.windowRadius - 2)
+          radius: Zenon.rad(3)
           color: Zenon.pressFill
           visible: press.pressed && one.ok
         }
@@ -229,7 +261,7 @@ Item {
           y: 2
           width: parent.width - 4
           height: parent.height - 4
-          radius: Math.max(0, Zenon.windowRadius - 2)
+          radius: Zenon.rad(3)
           color: Zenon.alpha(Zenon.cyan, 0.12)
           visible: segs.hot !== "" && segs.hot === one.modelData[0]
         }
@@ -239,7 +271,7 @@ Item {
           y: 1
           width: parent.width - 2
           height: parent.height - 2
-          radius: Math.max(0, Zenon.windowRadius - 1)
+          radius: Zenon.rad(4)
           on: segs.heldAt !== null && segs.heldAt === one
         }
         Rectangle {

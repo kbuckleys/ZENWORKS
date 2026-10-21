@@ -24,6 +24,10 @@ Rectangle {
   property bool ready: true
   // the label is a glyph (a Nerd icon), the button square-ish round it
   property bool glyph: false
+  // pressed for as long as what it opened is up (a menu): the press look,
+  // held — terminus' BarChip `held`, for this button (minerva, 2026-10-21)
+  property bool held: false
+  readonly property bool down: btnArea.pressed || btn.held
   signal clicked()
   // so a card can keep its keyboard highlight and the pointer in step
   signal hovered()
@@ -55,7 +59,7 @@ Rectangle {
   // terminus' ClearChip and Segments — every button in the suite presses
   // the same way (it was its own ink, deeper)
   color: !btn.ready ? "transparent"
-    : btnArea.pressed && !btn.primary ? Zenon.pressFill
+    : btn.down && !btn.primary ? Zenon.pressFill
     : btn.plain ? Zenon.buttonRest(btn.primary)
     : Qt.rgba(btn.ink.r, btn.ink.g, btn.ink.b, btn.primary ? 0.14 : 0.10)
   border.width: 1
@@ -80,7 +84,7 @@ Rectangle {
     blur: 14
     spread: 1
     color: Qt.rgba(btn.ink.r, btn.ink.g, btn.ink.b, 0.55)
-    visible: pulseRing.visible && !btnArea.pressed
+    visible: pulseRing.visible && !btn.down
     opacity: pulseRing.opacity
   }
   // PRESSED, THE GLOW OUTSIDE ONLY (user, 2026-10-15): the darkened fill is
@@ -93,7 +97,7 @@ Rectangle {
     anchors.fill: parent
     anchors.margins: -room
     z: -1
-    visible: pulseRing.visible && btnArea.pressed
+    visible: pulseRing.visible && btn.down
     Item {
       id: glowSrc
       anchors.fill: parent
@@ -167,7 +171,7 @@ Rectangle {
     anchors.fill: parent
     radius: parent.radius
     color: Zenon.shadowRgb
-    opacity: btnArea.pressed && btn.primary && btn.ready ? Zenon.pressShade : 0
+    opacity: btn.down && btn.primary && btn.ready ? Zenon.pressShade : 0
     visible: opacity > 0
   }
 
@@ -177,7 +181,7 @@ Rectangle {
     text: btn.label
     // a lit button, darkened under the finger, keeps its word whole
     color: btn.ready ? btn.word : Zenon.muted
-    opacity: btnArea.pressed && !btn.primary ? Zenon.pressDim : 1
+    opacity: btn.down && !btn.primary ? Zenon.pressDim : 1
     font.family: btn.glyph ? Zenon.glyphFace : Zenon.face
     font.weight: Font.Bold
     font.pixelSize: Zenon.px(15)

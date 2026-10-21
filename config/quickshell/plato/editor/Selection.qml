@@ -27,7 +27,7 @@ Shape {
   property color ink: "transparent"
   property var parts: []
   property string key: ""
-  readonly property real radius: 4
+  readonly property real radius: Zenon.radiusControl
 
   preferredRendererType: Shape.CurveRenderer
   visible: sel.parts.length > 0

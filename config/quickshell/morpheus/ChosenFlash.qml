@@ -24,7 +24,13 @@ import "."
 
 Item {
   id: flash
-  anchors.fill: parent
+  // THE BAND'S RECTANGLE, when the row has one wider than itself. A row in a
+  // card inset by menuCardPad draws its cursor back out to the border with
+  // negative margins; a flash filling the row stopped that far short of both
+  // edges (user, 2026-10-21). Name the band (a sibling) and the flash lights
+  // exactly what the cursor lit.
+  property Item band: null
+  anchors.fill: flash.band || parent
   z: 3
   property var pending: null
   property real chosen: 0
@@ -32,6 +38,8 @@ Item {
   // false: the holder paints `chosen` into its own fill (cynosure's rounded
   // cursor band), and this only keeps the time
   property bool painted: true
+  // a grid cell's cursor is rounded (ideo, picasso): the flash takes its shape
+  property alias radius: ink.radius
 
   function fire(act) {
     flash.pending = act;
@@ -54,6 +62,7 @@ Item {
   }
 
   Rectangle {
+    id: ink
     anchors.fill: parent
     visible: flash.painted && flash.chosen > 0
     color: Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b,

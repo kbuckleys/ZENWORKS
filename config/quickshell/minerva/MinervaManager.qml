@@ -3,7 +3,8 @@
 // └─┘└─┘┘└┘└┴┘└─┘┴└─┴ ┴└─┘
 // https://github.com/kbuckleys/
 //
-// MINERVA — the reader: PDFs and EPUBs, and the library of what you have
+// MINERVA — the reader: PDFs, EPUBs, comics and plain texts (TXT and
+// Markdown), and the library of what you have
 // opened, each where you left it, with its bookmarks and highlights. The
 // owl of Minerva, who reads by lamplight.
 //
@@ -29,6 +30,7 @@ import "../morpheus"
 import "../morpheus/lagnotes.js" as LagNotes
 import "../morpheus/hypr.js" as Hypr
 import "../ceres"
+import "../lexi/lexi.js" as Lexicon
 import "minerva.js" as M
 
 Scope {
@@ -41,13 +43,14 @@ Scope {
   // ── THE LIBRARY ────────────────────────────────────────────────────
   property var books: []
   property var settings: M.defaults()
+  property var stats: M.cleanStats(null)
   FileView {
     id: libFile
     path: Quickshell.statePath("minerva.json")
     blockLoading: true
     printErrors: false
   }
-  Timer { id: saveTimer; interval: 600; onTriggered: libFile.setText(M.serializeLibrary({ books: mgr.books, settings: mgr.settings })) }
+  Timer { id: saveTimer; interval: 600; onTriggered: libFile.setText(M.serializeLibrary({ books: mgr.books, settings: mgr.settings, stats: mgr.stats })) }
   function save() { saveTimer.restart(); }
   function bookOf(path) { return M.bookOf(mgr.books, path); }
   function touch(path, fields) { mgr.books = M.upsert(mgr.books, path, fields); mgr.save(); }
@@ -58,6 +61,62 @@ Scope {
     s[key] = value;
     mgr.settings = M.cleanSettings(s);
     mgr.save();
+    if (key === "watch") mgr.scan();
+  }
+  // the minutes a book was read, its own and the library's day
+  function spent(path, ms) {
+    if (ms <= 0) return;
+    const b = mgr.bookOf(path);
+    if (b) mgr.books = M.update(mgr.books, path, { readMs: b.readMs + ms });
+    mgr.stats = M.addTime(mgr.stats, ms, Date.now());
+    mgr.save();
+  }
+
+  // ── SHELVES ────────────────────────────────────────────────────────
+  function addShelf(name) {
+    name = String(name || "").trim();
+    if (name === "") return "";
+    const have = mgr.settings.shelves.find((s) => s.toLowerCase() === name.toLowerCase());
+    if (have) return have;
+    mgr.setSetting("shelves", mgr.settings.shelves.concat([name]));
+    return name;
+  }
+  function dropShelf(name) {
+    mgr.books = mgr.books.map((b) => b.shelves.indexOf(name) >= 0 ? M.cleanBook(Object.assign({}, b, { shelves: b.shelves.filter((x) => x !== name) })) : b);
+    mgr.setSetting("shelves", mgr.settings.shelves.filter((s) => s !== name));
+  }
+  function toggleShelf(path, name) {
+    const b = mgr.bookOf(path);
+    if (b) mgr.change(path, { shelves: M.toggleShelf(b.shelves, name) });
+  }
+
+  // ── WATCHED DIRECTORIES ────────────────────────────────────────────
+  // every PDF, EPUB and comic under them joins the library (unread), at
+  // the start and whenever the library is shown; nothing is ever taken
+  // out by a scan — a book moved away stays until you remove it
+  property bool scanning: false
+  function scan() {
+    if (mgr.settings.watch.length === 0 || scanProc.running) return;
+    mgr.scanning = true;
+    scanProc.command = ["python3", "-I", Quickshell.shellDir + "/minerva/core/books.py", "scan"].concat(mgr.settings.watch);
+    scanProc.running = true;
+  }
+  Process {
+    id: scanProc
+    stdout: StdioCollector {
+      id: scanOut
+      waitForEnd: true
+      onStreamFinished: {
+        let j = [];
+        try { j = JSON.parse(scanOut.text); } catch (e) {}
+        if (Array.isArray(j) && j.length > 0) {
+          const before = mgr.books.length;
+          mgr.books = M.addFound(mgr.books, j, Date.now());
+          if (mgr.books.length !== before) mgr.save();
+        }
+      }
+    }
+    onExited: mgr.scanning = false
   }
 
   // ── THE SERIF ──────────────────────────────────────────────────────
@@ -101,7 +160,7 @@ Scope {
   // one-off helpers, made per ask and destroyed when answered
   Component { id: procComp; Process {} }
   Component { id: collComp; StdioCollector { waitForEnd: true } }
-  function openEpub(path, fn) {
+  function ask(command, fn) {
     const p = procComp.createObject(mgr);
     const out = collComp.createObject(p);
     p.stdout = out;
@@ -111,9 +170,22 @@ Scope {
       if (j && !j.error) fn(j, ""); else fn(null, j && j.error ? j.error : "This book could not be read");
       p.destroy();
     });
-    p.command = ["python3", "-I", Quickshell.shellDir + "/minerva/core/epub.py", "open", path,
-                 mgr.cacheDir + "/epub/" + Qt.md5(path)];
+    p.command = command;
     p.running = true;
+  }
+  function openEpub(path, fn) {
+    mgr.ask(["python3", "-I", Quickshell.shellDir + "/minerva/core/epub.py", "open", path,
+             mgr.cacheDir + "/epub/" + Qt.md5(path)], fn);
+  }
+  // a plain text or Markdown, set as a book (the same book.json)
+  function openText(path, fn) {
+    mgr.ask(["python3", "-I", Quickshell.shellDir + "/minerva/core/epub.py", "text", path,
+             mgr.cacheDir + "/text/" + Qt.md5(path)], fn);
+  }
+  // a comic's pages, unpacked: { title, pages: [{ file, width, height }] }
+  function openComic(path, fn) {
+    mgr.ask(["python3", "-I", Quickshell.shellDir + "/minerva/core/books.py", "comic", path,
+             mgr.cacheDir + "/comic/" + Qt.md5(path)], fn);
   }
   function findInBook(dir, words, fn) {
     findProc.fn = fn;
@@ -146,10 +218,42 @@ Scope {
   }
 
   // ── HIGHLIGHTS INTO CLIO ───────────────────────────────────────────
-  function toClio(book, text, where, done) {
-    if (!mgr.notebook || !text) return false;
-    mgr.notebook.appendQuote(book, text, where, done);
+  function toClio(book, text, where, done, comment) {
+    if (!mgr.notebook || (!text && !comment)) return false;
+    mgr.notebook.appendQuote(book, text, where, done, comment || "");
     return true;
+  }
+  readonly property bool hasClio: !!mgr.notebook
+
+  // ── A WORD LOOKED UP, WORDS TRANSLATED — Lexi's ────────────────────
+  // lexi.js does both (user, 2026-10-21: "word lookup can use lexi");
+  // here they are asked from minerva's own card, and "Open in Lexi"
+  // carries the word over. done(result | null, why)
+  function define(word, done) {
+    Lexicon.resolveWord(word, "English").then(
+      (res) => done(Lexicon.entryToResult(res), ""),
+      (err) => done(null, err === "network" ? "No connection — Lexi looks words up in Wiktionary" : "No entry for “" + word + "”"));
+  }
+  function translate(text, code, done) {
+    const rq = Lexicon.translateRequest(text, code, "");
+    const req = new XMLHttpRequest();
+    req.open("POST", rq.url);
+    req.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+    req.onreadystatechange = () => {
+      if (req.readyState !== XMLHttpRequest.DONE) return;
+      const parsed = req.status === 200 ? Lexicon.parseTranslateResponse(req.responseText) : null;
+      done(parsed, parsed ? "" : req.status === 0 ? "No connection" : "The translation did not come back");
+    };
+    req.send(rq.body);
+  }
+  // the languages to translate into, the ones used most in Lexi first
+  function languages() {
+    return Lexicon.rankedLangs(Lexicon.parseUsage(usageFile.text())).slice(0, 14);
+  }
+  function languageName(code) { return Lexicon.sourceName(code); }
+  FileView { id: usageFile; path: Lexicon.usagePath(); blockLoading: true; printErrors: false }
+  function openInLexi(word, translating) {
+    Quickshell.execDetached(["qs", "ipc", "call", "Lexi", translating ? "translateText" : "define", word]);
   }
   function showInClio(id, text) { if (mgr.notebook) mgr.notebook.openAt(id, text); }
 
@@ -157,17 +261,21 @@ Scope {
   // What opens a PDF and an EPUB (user, 2026-10-20) — but on a machine
   // where something else was CHOSEN for them, only where nothing was, as
   // alexandria does for fonts: a choice made in Oracle stays made.
-  readonly property var mimes: ["application/pdf", "application/epub+zip", "application/x-pdf"]
+  // comics too (2026-10-21); texts are only opened from here — the
+  // editor keeps them
+  readonly property var mimes: ["application/pdf", "application/epub+zip", "application/x-pdf",
+                                "application/vnd.comicbook+zip", "application/vnd.comicbook-rar",
+                                "application/x-cbz", "application/x-cbr"]
   Process {
     running: true
     command: ["sh", "-c", Desktop.installCommand("minerva", {
       Type: "Application",
       Name: "Minerva",
       GenericName: "Reader",
-      Comment: "Read PDFs and EPUBs, with bookmarks and highlights, in ZENWORKS",
+      Comment: "Read PDFs, EPUBs and comics, with bookmarks and highlights, in ZENWORKS",
       Icon: "accessories-ebook-reader",
       Categories: ["Office", "Viewer", "Literature"],
-      Keywords: ["pdf", "epub", "ebook", "book", "reader", "document", "read"],
+      Keywords: ["pdf", "epub", "ebook", "book", "reader", "document", "read", "comic", "cbz", "cbr"],
       Exec: Desktop.execLine(Quickshell.shellDir + "/minerva/bin/minerva", "%F"),
       Terminal: "false",
       StartupNotify: "false",
@@ -232,5 +340,7 @@ Scope {
     const lib = M.parseLibrary(libFile.text());
     mgr.books = lib.books;
     mgr.settings = lib.settings;
+    mgr.stats = lib.stats;
+    mgr.scan();
   }
 }

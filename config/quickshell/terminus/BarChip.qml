@@ -69,7 +69,7 @@ Item {
           y: 2
           width: parent.width - 2
           height: parent.height - 4
-          radius: Math.max(0, Zenon.windowRadius - 2)
+          radius: Zenon.rad(3)
           color: Zenon.alpha(Zenon.cyan, 0.16)
           opacity: part.lit ? 1 : 0
           visible: opacity > 0.01
@@ -81,7 +81,7 @@ Item {
           y: 2
           width: parent.width - 2
           height: parent.height - 4
-          radius: Math.max(0, Zenon.windowRadius - 2)
+          radius: Zenon.rad(3)
           color: Zenon.pressFill
           visible: part.down
         }

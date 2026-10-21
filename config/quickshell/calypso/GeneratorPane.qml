@@ -111,7 +111,7 @@ Item {
     Rectangle {
       width: parent.width
       height: Math.max(78, shown.implicitHeight + 34)
-      radius: Zenon.windowRadius + 4
+      radius: Zenon.rad(9)
       color: Zenon.wash(0.04)
       border.width: 1
       border.color: Zenon.border

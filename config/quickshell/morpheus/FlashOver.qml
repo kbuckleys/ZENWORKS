@@ -6,7 +6,7 @@
 // FLASHOVER — the row RowFlash lights. See RowFlash.qml.
 
 import QtQuick
-import "../morpheus"
+import "."
 
 // The lit row itself. Over everything else on it, so the whole row lights
 // rather than the gaps between a glyph, a label and a key chip.

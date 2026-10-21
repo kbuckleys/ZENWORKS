@@ -594,7 +594,7 @@ Item {
         Rectangle {
           anchors.centerIn: parent
           width: 14; height: 11
-          radius: ann.rounded ? 4 : 0
+          radius: ann.rounded ? 4 : 0   // shape: the tool's icon, a rounded box
           color: "transparent"
           border.width: 1.5
           border.color: ann.rounded ? Zenon.white : Zenon.accentMuted

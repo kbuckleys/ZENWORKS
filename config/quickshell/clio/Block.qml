@@ -349,7 +349,7 @@ Item {
       onFileChanged: media.askClear()
       onMgrChanged: media.askClear()
       Component.onCompleted: media.askClear()
-      radius: media.seeThrough ? 0 : 8
+      radius: media.seeThrough ? 0 : Zenon.radiusCard
       color: blk.kind === "sketch" ? Zenon.wash(0.04) : "transparent"
       Image {
         id: pic

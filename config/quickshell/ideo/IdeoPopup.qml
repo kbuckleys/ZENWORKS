@@ -361,9 +361,16 @@ LayerPopup {
     return popup.filtered[popup.sel] || null;
   }
 
+  // THE CELL FLASHES, THEN IT COPIES (user, 2026-10-21) — the grids'
+  // flash, ChosenFlash, in the chosen cell. Not for a nerd glyph's Return:
+  // that only opens the formats, and nothing has happened yet.
   function activateCurrent(copyOnly) {
     const e = currentRow();
     if (!e) return;
+    if (popup.appMode !== "emoji" && !copyOnly) { popup.activateNow(e, copyOnly); return; }
+    Nav.fireCell(grid.itemAtIndex(popup.sel), () => popup.activateNow(e, copyOnly));
+  }
+  function activateNow(e, copyOnly) {
     if (popup.appMode === "emoji") {
       if (copyOnly) popup.copyText(e.char);
       else popup.copyPaste(e.char);
@@ -651,7 +658,7 @@ LayerPopup {
             // rather than over it: it pins itself to the viewport.
             ElasticScroll { view: grid }
             // the chosen one slides (morpheus/CursorBand), rather than each row lighting
-            CursorBand { follows: grid; index: popup.sel; insetX: 2; insetY: 2; radius: 6 }
+            CursorBand { follows: grid; index: popup.sel; insetX: 2; insetY: 2; radius: Zenon.menuRadius }
             // CENTERED AT ITS OWN WIDTH, not filling the pane. The panel is a
             // whole number of cells wide except when the footer's floor is
             // holding it open, and then the leftover belongs on both sides
@@ -672,13 +679,9 @@ LayerPopup {
               required property int index
               width: grid.cellWidth
               height: grid.cellHeight
-
-              Rectangle {
-                anchors.fill: parent
-                anchors.margins: 2
-                radius: Zenon.windowRadius
-                color: "transparent"
-              }
+              // in the cursor's own box (its inset and corners)
+              readonly property alias flash: cellFlash
+              ChosenFlash { id: cellFlash; anchors.margins: 2; radius: Zenon.menuRadius }
 
               Text {
                 anchors.centerIn: parent

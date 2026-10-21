@@ -38,6 +38,10 @@ Rectangle {
   property var follows: null
   property var repeater: null
   property int index: -1
+  // or the chosen item itself, for a list one view or Repeater cannot name
+  // (calypso's actions, two columns of their own): set it and `index` is
+  // not read
+  property Item item: null
   property bool shown: true
   // drawn this far inside the row on each side (a list whose rows have air
   // between them, or a rounded card's band)
@@ -75,6 +79,7 @@ Rectangle {
 
   readonly property Item target: {
     band.tick;
+    if (band.item) return band.item;
     if (band.index < 0) return null;
     if (band.repeater) return band.repeater.itemAt(band.index);
     if (band.follows && typeof band.follows.itemAtIndex === "function") return band.follows.itemAtIndex(band.index);
@@ -113,7 +118,8 @@ Rectangle {
     if (band.follows && band.follows.count !== undefined) return band.follows.count;
     return -1;
   }
-  visible: band.shown && band.index >= 0 && (band.rows < 0 || band.index < band.rows) && (band.target !== null || band.placed)
+  visible: band.shown && (band.item !== null
+    || (band.index >= 0 && (band.rows < 0 || band.index < band.rows) && (band.target !== null || band.placed)))
 
   Behavior on x { enabled: band.placed && Zenon.cursorSlide; NumberAnimation { duration: Zenon.fast; easing.type: Zenon.ease } }
   Behavior on y { enabled: band.placed && Zenon.cursorSlide; NumberAnimation { duration: Zenon.fast; easing.type: Zenon.ease } }

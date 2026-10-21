@@ -57,6 +57,8 @@ FocusRetry 1.0 FocusRetry.qml
 LazyComponent 1.0 LazyComponent.qml
 AtomicWriter 1.0 AtomicWriter.qml
 ChosenFlash 1.0 ChosenFlash.qml
+RowFlash 1.0 RowFlash.qml
+FlashOver 1.0 FlashOver.qml
 Caret 1.0 Caret.qml
 InputShield 1.0 InputShield.qml
 KeyCap 1.0 KeyCap.qml

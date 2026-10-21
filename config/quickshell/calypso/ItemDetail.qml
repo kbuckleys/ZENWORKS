@@ -181,7 +181,7 @@ Item {
           readonly property var pr: C.problem(modelData)
           width: body.width
           height: 44
-          radius: Zenon.windowRadius + 2
+          radius: Zenon.rad(7)
           color: Zenon.alpha(Zenon[pr.ink] || Zenon.accentMuted, 0.1)
           border.width: 1
           border.color: Zenon.alpha(Zenon[pr.ink] || Zenon.accentMuted, 0.4)
@@ -214,7 +214,7 @@ Item {
         visible: !!pane.win && pane.win.inTrash && !!pane.it
         width: parent.width
         height: visible ? trashCol.implicitHeight + 32 : 0
-        radius: Zenon.windowRadius + 4
+        radius: Zenon.rad(9)
         color: Zenon.wash(0.04)
         border.width: 1
         border.color: Zenon.border
@@ -246,7 +246,7 @@ Item {
         visible: !!pane.d && !!pane.d.reprompt
         width: parent.width
         height: visible ? reCol.implicitHeight + 32 : 0
-        radius: Zenon.windowRadius + 4
+        radius: Zenon.rad(9)
         color: Zenon.wash(0.04)
         border.width: 1
         border.color: Zenon.border
@@ -293,7 +293,7 @@ Item {
           Rectangle {
             width: sec.width
             height: rows.implicitHeight
-            radius: Zenon.windowRadius + 4
+            radius: Zenon.rad(9)
             color: Zenon.wash(0.04)
             border.width: 1
             border.color: Zenon.border
@@ -330,7 +330,7 @@ Item {
           visible: parent.atts.length > 0
           width: parent.width
           height: attCol.implicitHeight
-          radius: Zenon.windowRadius + 4
+          radius: Zenon.rad(9)
           color: Zenon.wash(0.04)
           border.width: 1
           border.color: Zenon.border
@@ -405,7 +405,7 @@ Item {
         Rectangle {
           width: parent.width
           height: notes.implicitHeight + 28
-          radius: Zenon.windowRadius + 4
+          radius: Zenon.rad(9)
           color: Zenon.wash(0.04)
           border.width: 1
           border.color: Zenon.border

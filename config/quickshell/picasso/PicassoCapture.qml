@@ -428,7 +428,7 @@ Scope {
         y: hy - 5
         width: 10
         height: 10
-        radius: 2
+        radius: Zenon.rad(2)
         color: Zenon.white
         border.width: 1
         border.color: Zenon.cyan

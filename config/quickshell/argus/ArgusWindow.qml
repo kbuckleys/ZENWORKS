@@ -27,6 +27,7 @@ import QtMultimedia
 import "../morpheus"
 import "../morpheus/controls" as Ctl
 import "../terminus"
+import "../picasso" as Pic
 import "argus.js" as A
 
 FloatingWindow {
@@ -64,6 +65,10 @@ FloatingWindow {
     aw.frames = [];
     aw.facts = "";
     aw.savedTo = "";
+    aw.crop = null;
+    aw.cropping = false;
+    aw.probeW = 0;
+    aw.probeH = 0;
     player.source = Strings.fileUrl(p);
     factsProc.command = ["ffprobe", "-v", "error", "-select_streams", "v:0",
       "-show_entries", "stream=width,height,r_frame_rate:format=size,duration", "-of", "json", p];
@@ -105,6 +110,8 @@ FloatingWindow {
         try {
           const j = JSON.parse(factsOut.text);
           const st = (j.streams || [])[0] || {};
+          aw.probeW = Number(st.width) || 0;
+          aw.probeH = Number(st.height) || 0;
           const fr = String(st.r_frame_rate || "").split("/");
           const fps = fr.length === 2 && Number(fr[1]) > 0 ? Math.round(Number(fr[0]) / Number(fr[1])) : 0;
           const mb = (Number((j.format || {}).size) || 0) / 1048576;
@@ -151,9 +158,45 @@ FloatingWindow {
   function say(t, bad) { aw.said = t; aw.saidBad = !!bad; sayTimer.restart(); }
   Timer { id: sayTimer; interval: 3200; onTriggered: aw.said = "" }
 
+  // ── THE CROP (user, 2026-10-21: "so many memes on the fly") ─────────
+  // picasso's crop box over the picture; `crop` in the video's pixels, null
+  // for all of it. While `cropping` the box takes the drags; after, the cut
+  // is drawn as a frame with the rest dimmed, and the save crops to it.
+  property bool cropping: false
+  property var crop: null
+  property string cropRatio: "free"
+  // the frame's size as the player draws it, else ffprobe's (known before
+  // a frame has been shown)
+  property real probeW: 0
+  property real probeH: 0
+  readonly property real vw: player.vw > 0 ? player.vw : aw.probeW
+  readonly property real vh: player.vh > 0 ? player.vh : aw.probeH
+  readonly property var cropNow: A.cropOf(aw.crop, aw.vw, aw.vh)
+  // the largest box of the ratio, centered (or the box as it is, free)
+  function ratioBox(id) {
+    const v = A.ratioValue(id);
+    if (!(v > 0)) return aw.crop || { x: 0, y: 0, w: aw.vw, h: aw.vh };
+    let w = aw.vw, h = w / v;
+    if (h > aw.vh) { h = aw.vh; w = h * v; }
+    return { x: Math.round((aw.vw - w) / 2), y: Math.round((aw.vh - h) / 2), w: Math.round(w), h: Math.round(h) };
+  }
+  function cropWith(id) {
+    if (aw.vw <= 0) return;
+    if (id === "off") { aw.crop = null; aw.cropping = false; return; }
+    aw.cropRatio = id;
+    aw.crop = aw.ratioBox(id);
+    aw.cropping = true;
+  }
+  function toggleCrop() {
+    if (aw.vw <= 0) return;
+    if (aw.cropping) { aw.cropping = false; return; }
+    if (!aw.crop) aw.crop = aw.ratioBox(aw.cropRatio);
+    aw.cropping = true;
+  }
+
   function save(to) {
     if (aw.saving || aw.path === "" || aw.dur <= 0) return;
-    const o = Object.assign({}, aw.opts, { inMs: aw.inMs, outMs: aw.outMs });
+    aw.cropping = false;
     const out = to || "";
     aw.savingTo = out;
     aw.progress = 0;
@@ -188,7 +231,7 @@ FloatingWindow {
   }
   function runSave(out) {
     aw.savingTo = out;
-    const o = Object.assign({}, aw.opts, { inMs: aw.inMs, outMs: aw.outMs });
+    const o = Object.assign({}, aw.opts, { inMs: aw.inMs, outMs: aw.outMs, crop: aw.cropNow });
     saveProc.lenMs = aw.lenMs;
     saveProc.command = A.ffmpegArgs(aw.path, out, o);
     saveProc.running = true;
@@ -255,7 +298,9 @@ FloatingWindow {
     Keys.onPressed: (e) => {
       const ctrl = e.modifiers & Qt.ControlModifier, shift = e.modifiers & Qt.ShiftModifier;
       e.accepted = true;
-      if (e.key === Qt.Key_Escape) { if (aw.saving) aw.stopSave(); else aw.visible = false; return; }
+      if (e.key === Qt.Key_Escape) { if (aw.saving) aw.stopSave(); else if (aw.cropping) aw.cropping = false; else aw.visible = false; return; }
+      if (e.key === Qt.Key_C && !ctrl) { aw.toggleCrop(); return; }
+      if (aw.cropping && (e.key === Qt.Key_Return || e.key === Qt.Key_Enter)) { aw.cropping = false; return; }
       if (ctrl && e.key === Qt.Key_O) { aw.openAsk(); return; }
       if (ctrl && e.key === Qt.Key_S) { if (shift) aw.saveAs(); else aw.save(""); return; }
       if (e.key === Qt.Key_Space) { aw.toggle(); return; }
@@ -372,9 +417,48 @@ FloatingWindow {
         onFailed: (msg) => aw.say("This video cannot be played  ·  " + msg, true)
       }
       MouseArea { anchors.fill: parent; onClicked: aw.toggle() }
+
+      // the picture's own rectangle inside the player (fitted, centered)
+      Item {
+        id: pic
+        readonly property real k: aw.vw > 0 ? Math.min(player.width / aw.vw, player.height / aw.vh) : 1
+        x: player.x + (player.width - aw.vw * k) / 2
+        y: player.y + (player.height - aw.vh * k) / 2
+        width: aw.vw * k
+        height: aw.vh * k
+        visible: aw.vw > 0
+      }
+      // the crop once set: the rest dimmed, the cut framed
+      Item {
+        visible: !aw.cropping && !!aw.cropNow
+        x: pic.x; y: pic.y; width: pic.width; height: pic.height
+        readonly property var c: aw.cropNow || { x: 0, y: 0, w: aw.vw, h: aw.vh }
+        readonly property real cx: c.x * pic.k
+        readonly property real cy: c.y * pic.k
+        readonly property real cw: c.w * pic.k
+        readonly property real ch: c.h * pic.k
+        Rectangle { width: parent.width; height: parent.cy; color: Zenon.shade(0.55) }
+        Rectangle { y: parent.cy + parent.ch; width: parent.width; height: parent.height - y; color: Zenon.shade(0.55) }
+        Rectangle { y: parent.cy; width: parent.cx; height: parent.ch; color: Zenon.shade(0.55) }
+        Rectangle { x: parent.cx + parent.cw; y: parent.cy; width: parent.width - x; height: parent.ch; color: Zenon.shade(0.55) }
+        Rectangle { x: parent.cx; y: parent.cy; width: parent.cw; height: parent.ch; color: "transparent"; border.width: 1; border.color: Zenon.yellow }
+      }
+      Pic.CropBox {
+        x: pic.x; y: pic.y; width: pic.width; height: pic.height
+        visible: aw.cropping && aw.vw > 0
+        k: pic.k
+        r: aw.crop || { x: 0, y: 0, w: aw.vw, h: aw.vh }
+        tw: aw.vw
+        th: aw.vh
+        ratio: A.ratioValue(aw.cropRatio)
+        shiftSquare: true
+        onDrawn: (r) => aw.crop = r
+        onTouched: keys.forceActiveFocus()
+        onBodyDoubleClicked: aw.cropping = false
+      }
       Text {
         anchors.centerIn: parent
-        visible: aw.dur > 0 && !player.going
+        visible: aw.dur > 0 && !player.going && !aw.cropping
         text: ""
         color: Zenon.white
         opacity: 0.8
@@ -601,6 +685,45 @@ FloatingWindow {
           text: "VP9 with Opus sound — small, and plays in every browser."
         }
 
+        // ── the crop ──────────────────────────────────────────────────
+        SectionLabel { text: "Crop" }
+        Flow {
+          width: parent.width
+          spacing: 6
+          Repeater {
+            model: [{ id: "off", label: "Off" }].concat(A.CROP_RATIOS)
+            delegate: Rectangle {
+              required property var modelData
+              readonly property bool on: modelData.id === "off" ? !aw.crop && !aw.cropping
+                : (!!aw.crop || aw.cropping) && aw.cropRatio === modelData.id
+              width: (aw.sideW - 40 - 12) / 3
+              height: 30
+              radius: Zenon.radiusControl
+              opacity: aw.vw > 0 ? 1 : 0.4
+              color: cropPress.pressed ? Zenon.pressTile(on) : on ? Zenon.alpha(Zenon.yellow, 0.18) : Zenon.wash(0.05)
+              border.width: 1
+              border.color: on ? Zenon.alpha(Zenon.yellow, 0.6) : Zenon.border
+              Text {
+                anchors.centerIn: parent
+                text: modelData.label
+                color: parent.on ? Zenon.yellow : Zenon.ink
+                font.family: Zenon.face
+                font.weight: Zenon.weight
+                font.pixelSize: Zenon.px(14)
+              }
+              MouseArea { id: cropPress; anchors.fill: parent; onClicked: aw.cropWith(modelData.id) }
+            }
+          }
+        }
+        EmptyState {
+          width: parent.width
+          horizontalAlignment: Text.AlignLeft
+          text: aw.cropping ? "Drag the box or its corners; return or c when it is right"
+            : aw.cropNow ? aw.cropNow.w + " × " + aw.cropNow.h + "  ·  c changes it"
+              + (aw.opts.format === "mp4" && !aw.opts.exact ? "  ·  cropping re-encodes" : "")
+            : "c crops the picture"
+        }
+
         Item { width: 1; height: 6 }
         SectionLabel { text: "Saves as" }
         Text {
@@ -679,7 +802,8 @@ FloatingWindow {
       anchors.left: parent.left
       anchors.right: parent.right
       rows: aw.saving ? [["esc", "stop saving"]]
-        : [["space", "play"], ["i o", "in, out"], ["← →", "seek"], ["[ ]", "to in, out"], ["1 2 3", "format"],
+        : aw.cropping ? [["drag", "the box"], ["shift", "square"], ["return", "done"], ["esc", "done"]]
+        : [["space", "play"], ["i o", "in, out"], ["c", "crop"], ["← →", "seek"], ["[ ]", "to in, out"], ["1 2 3", "format"],
            ["ctrl s", "save"], ["ctrl shift s", "save as"], ["esc", "close"]]
     }
   }

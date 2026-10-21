@@ -150,6 +150,7 @@ hl.config({
 	},
 	decoration = {
 		dim_special = 0.8,
+        -- oracle's Corner rounding writes this number (morpheus/ThemeSync.qml)
         rounding = 5,
 		blur = {
             passes = 2,
@@ -203,9 +204,11 @@ hl.config({
 -- WAKE
 -- wake.lua, which oracle's Display section writes ("Wake by"): "mouse"
 -- wakes screens turned off, idle or by a bind, on a mouse move as well as
--- a key press. Guarded like defaults.lua.
+-- a key press. The default: only `wake = "key"` turns it off, so no file,
+-- or a broken one, wakes on the mouse too (2026-10-21). Guarded like
+-- defaults.lua.
 local okWake, wake = pcall(require, "lua.wake")
-if okWake and type(wake) == "table" and wake.wake == "mouse" then
+if not (okWake and type(wake) == "table" and wake.wake == "key") then
 	pcall(hl.config, { misc = { mouse_move_enables_dpms = true } })
 end
 

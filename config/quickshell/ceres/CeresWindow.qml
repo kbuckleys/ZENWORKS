@@ -3254,6 +3254,8 @@ FloatingWindow {
               anchors.bottom: mdList.bottom
             }
             ElasticScroll { view: mdList }
+            // the chosen .pacnew slides (morpheus/CursorBand), as every ceres list's
+            CursorBand { follows: mdList; index: mdetail.key === "pacnew" ? win.pnsel : -1; radius: Zenon.windowRadius; border.width: 1; border.color: Zenon.border }
             anchors.top: mirrorFacts.visible ? mirrorFacts.bottom : mdBtns.bottom
             anchors.topMargin: mdList.framed ? 14 + 6 : 14
             anchors.left: parent.left
@@ -3310,13 +3312,10 @@ FloatingWindow {
               id: mitem
               required property var modelData
               required property int index
-              readonly property bool picked: mdetail.key === "pacnew" && mitem.index === win.pnsel
               width: mdList.width - 14
               height: 28
               radius: Zenon.windowRadius
-              color: mitem.picked ? Zenon.menuHi : "transparent"
-              border.width: mitem.picked ? 1 : 0
-              border.color: Zenon.border
+              color: "transparent"
               // a mirror's health — see mirrorRows
               Rectangle {
                 visible: mitem.modelData.dot !== undefined && mitem.modelData.dot !== ""
@@ -4317,7 +4316,7 @@ FloatingWindow {
           Term.ProgressFill {
             anchors.fill: parent
             anchors.margins: 1
-            radius: Zenon.windowRadius - 1
+            radius: Zenon.rad(4)
             frac: Ceres.txTotal ? Ceres.txTotal.frac : 0
             ink: Zenon.cyan
           }

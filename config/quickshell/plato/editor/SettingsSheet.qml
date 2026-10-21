@@ -220,7 +220,7 @@ PlatoSheet {
           font.family: Zenon.faceMono
           font.weight: Zenon.weight
           font.pixelSize: Zenon.px(15)
-          color: Zenon.blue
+          color: Zenon.accentKey   // terminus' heading ink (SideHead via crumbInk)
           text: row.modelData.icon || ""
         }
         Text {
@@ -228,7 +228,7 @@ PlatoSheet {
           font.pixelSize: Zenon.px(14)
           font.weight: Font.DemiBold
           font.letterSpacing: 1.1
-          color: Zenon.blue
+          color: Zenon.accentKey
           text: String(row.modelData.label || "").toUpperCase()
         }
       }
@@ -448,9 +448,11 @@ PlatoSheet {
     Controls.Check {
       anchors.centerIn: parent
       enabled: false
+      held: swTap.pressed
       lit: sw.on
     }
     MouseArea {
+      id: swTap
       anchors.fill: parent
       anchors.margins: -8
       onClicked: sheet.settings.nudge(sw.spec.key, 1)

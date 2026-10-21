@@ -90,26 +90,54 @@ function withExt(path, format) {
 // o: { inMs, outMs, format, exact, audio, gifWidth, gifFps, loop }
 // Seeking BEFORE -i (fast, on keyframes for a copy; exact for a re-encode,
 // which decodes from the keyframe before and drops what precedes `in`).
+// ── THE CROP (2026-10-21) ────────────────────────────────────────────────
+// { x, y, w, h } in the video's pixels, or null for all of it. Even numbers:
+// yuv420p (MP4, WebM) halves the color planes and refuses an odd size.
+var CROP_RATIOS = [
+  { id: "free", label: "Free", value: 0 },
+  { id: "1:1", label: "1:1", value: 1 },
+  { id: "4:5", label: "4:5", value: 4 / 5 },
+  { id: "16:9", label: "16:9", value: 16 / 9 },
+  { id: "9:16", label: "9:16", value: 9 / 16 }
+];
+function ratioValue(id) {
+  for (var i = 0; i < CROP_RATIOS.length; i++) if (CROP_RATIOS[i].id === id) return CROP_RATIOS[i].value;
+  return 0;
+}
+function even(v) { return Math.max(0, Math.floor(Number(v) / 2) * 2); }
+// null when the box is (near enough) the whole picture
+function cropOf(r, vw, vh) {
+  if (!r || !(vw > 0) || !(vh > 0)) return null;
+  var x = even(Math.max(0, Math.min(vw - 2, r.x))), y = even(Math.max(0, Math.min(vh - 2, r.y)));
+  var w = even(Math.max(2, Math.min(vw - x, r.w))), h = even(Math.max(2, Math.min(vh - y, r.h)));
+  if (x === 0 && y === 0 && w >= even(vw) && h >= even(vh)) return null;
+  return { x: x, y: y, w: w, h: h };
+}
+function cropFilter(c) { return c ? "crop=" + c.w + ":" + c.h + ":" + c.x + ":" + c.y : ""; }
+
 function ffmpegArgs(src, out, o) {
   var len = Math.max(MIN_LEN, o.outMs - o.inMs);
   var head = ["ffmpeg", "-hide_banner", "-nostdin", "-y", "-progress", "pipe:1", "-nostats"];
   var cut = ["-ss", secs(o.inMs), "-t", secs(len), "-i", src];
   var audio = function (codec) { return o.audio ? codec : ["-an"]; };
+  var crop = cropFilter(o.crop || null);
+  var vf = crop ? ["-vf", crop] : [];
   if (o.format === "gif") {
     var w = o.gifWidth > 0 ? String(o.gifWidth) : "iw";
-    var graph = "fps=" + o.gifFps + ",scale='min(" + w + ",iw)':-1:flags=lanczos,split[a][b];"
+    var graph = (crop ? crop + "," : "") + "fps=" + o.gifFps + ",scale='min(" + w + ",iw)':-1:flags=lanczos,split[a][b];"
       + "[a]palettegen=stats_mode=diff[p];[b][p]paletteuse=dither=bayer:bayer_scale=4:diff_mode=rectangle";
     return head.concat(cut, ["-filter_complex", graph, "-loop", o.loop ? "0" : "-1", out]);
   }
   if (o.format === "webm")
-    return head.concat(cut, ["-c:v", "libvpx-vp9", "-b:v", "0", "-crf", "33", "-row-mt", "1",
+    return head.concat(cut, vf, ["-c:v", "libvpx-vp9", "-b:v", "0", "-crf", "33", "-row-mt", "1",
                              "-deadline", "good", "-cpu-used", "4", "-pix_fmt", "yuv420p"],
                        audio(["-c:a", "libopus", "-b:a", "128k"]), [out]);
-  // mp4: copied as it is (instant, cuts on the nearest keyframe), or exact
-  if (!o.exact)
+  // mp4: copied as it is (instant, cuts on the nearest keyframe), or exact —
+  // and a crop is always an encode: a copied stream cannot be cut down
+  if (!o.exact && !crop)
     return head.concat(cut, ["-c:v", "copy"], audio(["-c:a", "copy"]),
                        ["-avoid_negative_ts", "make_zero", "-movflags", "+faststart", out]);
-  return head.concat(cut, ["-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-pix_fmt", "yuv420p"],
+  return head.concat(cut, vf, ["-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-pix_fmt", "yuv420p"],
                      audio(["-c:a", "aac", "-b:a", "160k"]), ["-movflags", "+faststart", out]);
 }
 

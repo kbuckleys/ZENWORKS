@@ -13,6 +13,7 @@
 
 import QtQuick
 import "../morpheus"
+import "../terminus"
 
 Row {
   id: tools
@@ -20,8 +21,9 @@ Row {
   signal done()
 
   readonly property var page: tools.win ? tools.win.page : null
-  readonly property bool pdf: !!tools.win && tools.win.kind === "pdf"
-  readonly property int at: !tools.page ? 0 : tools.pdf ? tools.page.where.page : tools.page.where.chapter
+  // pages (a PDF's or a comic's), or an EPUB's or a text's chapters
+  readonly property bool pdf: !!tools.win && tools.win.paged
+  readonly property int at: !tools.page ? 0 : (tools.pdf ? tools.page.where.page : tools.page.where.chapter) || 0
   readonly property int count: tools.page ? tools.page.pageCount : 0
 
   spacing: 6
@@ -133,21 +135,23 @@ Row {
     label: "\u{F06ED}"
     onClicked: if (tools.page) tools.page.zoomBy(1.15)
   }
-  // width, or the whole page; lit for the one it is fitting
+  // ONE TOGGLE (user, 2026-10-21; it was two buttons): the fit it is in —
+  // the page's width, or the whole page — and a click is the other one; a
+  // size of your own shows it unlit, and a click fits the width again
+  readonly property string fitting: tools.page && tools.page.fitting !== undefined ? tools.page.fitting : ""
   DialogButton {
+    id: fitBtn
     implicitHeight: 30
     visible: tools.pdf
     glyph: true
-    label: "\u{F084E}"
-    ink: tools.page && tools.page.fitting === "width" ? Zenon.cyan : Zenon.muted
-    onClicked: if (tools.page) tools.page.fit("width")
-  }
-  DialogButton {
-    implicitHeight: 30
-    visible: tools.pdf
-    glyph: true
-    label: "\u{F0EF6}"
-    ink: tools.page && tools.page.fitting === "page" ? Zenon.cyan : Zenon.muted
-    onClicked: if (tools.page) tools.page.fit("page")
+    label: tools.fitting === "page" ? "\u{F0EF6}" : "\u{F084E}"
+    ink: tools.fitting !== "" ? Zenon.cyan : Zenon.muted
+    onClicked: if (tools.page) tools.page.fit(tools.fitting === "width" ? "page" : "width")
+    HoverHandler {
+      onHoveredChanged: if (tools.win && tools.win.tipRef) {
+        if (hovered) tools.win.tipRef.show(fitBtn, tools.fitting === "width" ? "Fit the whole page" : "Fit the width");
+        else tools.win.tipRef.hide(fitBtn);
+      }
+    }
   }
 }

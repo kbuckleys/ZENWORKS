@@ -701,7 +701,7 @@ LayerPopup {
           GridView {
             id: grid
             // the chosen one slides (morpheus/CursorBand), rather than each row lighting
-            CursorBand { follows: grid; index: popup.sel; insetX: 6; insetY: 6; radius: 6 }
+            CursorBand { follows: grid; index: popup.sel; insetX: 6; insetY: 6; radius: Zenon.menuRadius }
             // Finder's rubber band and the smooth wheel notch, one rule for
             // the whole shell — see morpheus/Elastic.qml. Inside the view
             // rather than over it: it pins itself to the viewport.
@@ -833,7 +833,7 @@ LayerPopup {
               id: colorGrid
               ElasticScroll { view: colorGrid; step: popup.colorCellH }
               // the chosen one slides (morpheus/CursorBand), rather than each row lighting
-              CursorBand { follows: colorGrid; index: popup.colorSel; insetX: 4; insetY: 4; radius: 6 }
+              CursorBand { follows: colorGrid; index: popup.colorSel; insetX: 4; insetY: 4; radius: Zenon.menuRadius }
               anchors.left: parent.left
               anchors.top: parent.top
               anchors.bottom: parent.bottom

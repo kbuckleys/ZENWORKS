@@ -112,7 +112,7 @@ Item {
             readonly property bool open: modelData.id !== "pwned" || watch.breachChecked
             width: grid.cellW
             height: 128
-            radius: Zenon.windowRadius + 6
+            radius: Zenon.rad(11)
             color: press.pressed ? Zenon.pressWash(0.12) : Zenon.wash(0.04)
             border.width: 1
             border.color: card.n > 0 ? Zenon.alpha(Zenon[modelData.ink] || Zenon.accentMuted, 0.5) : Zenon.border
@@ -162,7 +162,7 @@ Item {
       Rectangle {
         width: parent.width
         height: breachCol.implicitHeight + 32
-        radius: Zenon.windowRadius + 6
+        radius: Zenon.rad(11)
         color: Zenon.wash(0.04)
         border.width: 1
         border.color: Zenon.border

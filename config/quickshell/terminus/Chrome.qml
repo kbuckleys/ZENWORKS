@@ -283,7 +283,9 @@ Column {
         anchors.centerIn: parent
         // the breadcrumbs' height (user, 2026-10-17)
         height: crumbSegs.height
-        parts: [{ glyph: "\uEC02", lit: term.sidebar, size: Zenon.px(17) }]
+        // shown: cod-layout_sidebar_left_off, hidden: cod-layout_sidebar_left
+        // (user, 2026-10-21; minerva's, flipped — this sidebar is on the left)
+        parts: [{ glyph: term.sidebar ? "\uEC02" : "\uEBF3", lit: term.sidebar, size: Zenon.px(17) }]
         onClicked: term.toggleSidebar()
       }
     }

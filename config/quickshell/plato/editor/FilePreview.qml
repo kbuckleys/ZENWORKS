@@ -205,7 +205,7 @@ Item {
     width: parent.width - 16
     y: textBox.y + fp.hitRect.y
     height: fp.hitRect.height
-    radius: 3
+    radius: Zenon.rad(3)
     color: Qt.rgba(Zenon.sand.r, Zenon.sand.g, Zenon.sand.b, 0.14)
     Behavior on y { NumberAnimation { duration: Zenon.brisk; easing.type: Zenon.travelEase } }
   }

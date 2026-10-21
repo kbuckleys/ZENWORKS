@@ -3,8 +3,9 @@
 // └─┘└─┘┘└┘└┴┘└─┘┴└─┴ ┴└─┘
 // https://github.com/kbuckleys/
 //
-// HERMES' WINDOW — the four sections in a sidebar, as Calypso and Ceres lay
-// theirs out, and the section on the right:
+// HERMES' WINDOW — the four sections chosen in the head, as System Journal
+// (hestia) lays its pages out (user, 2026-10-21), the section full width
+// under it:
 //
 //   Network     the wired links and their facts; Wi-Fi's networks
 //   Bluetooth   the adapter, your devices, the ones nearby
@@ -32,7 +33,9 @@ FloatingWindow {
   id: hw
   title: "hermes"
   color: Zenon.alpha(Zenon.layerBg, 0)
-  implicitWidth: 1080
+  // the size the user keeps it at (2026-10-21: 820 × 720, read off the
+  // open window) — narrower since the sidebar went into the head
+  implicitWidth: 820
   implicitHeight: 720
   minimumSize: Qt.size(820, 520)
 
@@ -65,9 +68,16 @@ FloatingWindow {
     if (p === vpnPage) return vpnPage.rows[p.sel] || null;
     return null;
   }
+  // the row flashes, then it acts (user, 2026-10-21: morpheus/RowFlash)
+  RowFlash { id: listFlash }
+  readonly property alias rowFlash: listFlash
   function activate() {
-    const r = hw.rowNow();
+    const r = hw.rowNow(), p = hw.page;
     if (!r) return;
+    hw.listFocus = true;
+    listFlash.flashThen(p.sel, () => hw.activateNow(r), () => hw.page === p ? p.sel : -1);
+  }
+  function activateNow(r) {
     // a row clicked is a row chosen: its cursor and its Forget show
     hw.listFocus = true;
     if (hw.page === netPage) {
@@ -84,7 +94,20 @@ FloatingWindow {
     if (hw.page === netPage) Hermes.forget(r);
     else if (hw.page === btPage && r.paired) Hermes.forgetDevice(r);
   }
+  // what a section says beside its name in the head (the sidebar's counts)
+  function sectionCount(id) {
+    let c = "";
+    if (id === "network") c = Hermes.wifiNet ? Hermes.wifiNet.name
+      : Hermes.wired && Hermes.wired.carrier ? H.speedWords(Hermes.wired.speed) : "";
+    else if (id === "bluetooth") c = Hermes.btConnected > 0 ? String(Hermes.btConnected) : "";
+    else if (id === "vpn") c = Hermes.vpnActive !== "" ? "On" : "";
+    else c = Hermes.nightActive ? "Night" : "";
+    // a long network name would push the segments into the name and buttons
+    if (c.length > 16) c = c.slice(0, 15) + "\u2026";
+    return c !== "" ? "  " + c : "";
+  }
   function setSection(id) {
+    listFlash.cancel();
     Hermes.setSection(id);
     hw.listFocus = false;
     pageFlick.contentY = 0;
@@ -151,128 +174,52 @@ FloatingWindow {
     id: stage
     anchors.fill: parent
 
-    Rectangle { z: -1; x: side.width; width: parent.width - x; height: parent.height; color: Zenon.layerBg }
-
-    // ── the sidebar ──────────────────────────────────────────────────────
-    Item {
-      id: side
-      anchors.left: parent.left
-      anchors.top: parent.top
-      anchors.bottom: parent.bottom
-      width: 240
-
-      // terminus' and calypso's two layers: an inactive tab's glass, then
-      // the sheet's veil over it
-      Rectangle { anchors.fill: parent; color: Zenon.alpha(Zenon.tabAwayInk, Zenon.tabAway(Zenon.layerBg.a)) }
-      Rectangle { anchors.fill: parent; color: Zenon.ground; opacity: 0.6 }
-      Rectangle { anchors.right: parent.right; width: 1; height: parent.height; color: Zenon.border }
-
-      Item {
-        id: brand
-        width: parent.width
-        height: hw.headH
-        Text {
-          id: brandGlyph
-          x: 20
-          anchors.verticalCenter: parent.verticalCenter
-          // hermes' own glyph, U+F1542, as cynosure and icarus show it
-          text: "\u{F1542}"
-          color: Zenon.cyan
-          font.family: Zenon.glyphFace
-          font.pixelSize: Zenon.px(20)
-        }
-        Column {
-          anchors.left: brandGlyph.right
-          anchors.leftMargin: 12
-          anchors.right: parent.right
-          anchors.rightMargin: 12
-          anchors.verticalCenter: parent.verticalCenter
-          spacing: 1
-          Text {
-            // the window's own name (user, 2026-10-20); the app is still hermes
-            text: "Control Hub"
-            color: Zenon.ink
-            font.family: Zenon.face
-            font.weight: Zenon.titleWeight
-            font.pixelSize: Zenon.px(17)
-          }
-          Text {
-            width: parent.width
-            elide: Text.ElideRight
-            text: Hermes.probe.known ? "Network by " + H.stacksShort(Hermes.probe) : "Looking…"
-            color: Zenon.accentMuted
-            font.family: Zenon.face
-            font.weight: Zenon.weight
-            font.pixelSize: Zenon.px(12)
-          }
-        }
-      }
-
-      Column {
-        anchors.top: brand.bottom
-        anchors.topMargin: 4
-        width: parent.width
-        spacing: 1
-        Repeater {
-          model: H.SECTIONS
-          delegate: ShelfRow {
-            required property var modelData
-            width: parent.width
-            radius: 0
-            indent: 18
-            glyph: modelData.glyph
-            label: modelData.label
-            here: hw.section === modelData.id
-            count: {
-              const id = modelData.id;
-              if (id === "network") return Hermes.wifiNet ? Hermes.wifiNet.name
-                : Hermes.wired && Hermes.wired.carrier ? H.speedWords(Hermes.wired.speed) : "";
-              if (id === "bluetooth") return Hermes.btConnected > 0 ? String(Hermes.btConnected) : "";
-              if (id === "vpn") return Hermes.vpnActive !== "" ? "On" : "";
-              return Hermes.nightActive ? "Night" : "";
-            }
-            countInk: Zenon.accentMuted
-            onClicked: hw.setSection(modelData.id)
-          }
-        }
-      }
-    }
+    Rectangle { z: -1; anchors.fill: parent; color: Zenon.layerBg }
 
     // ── the head ─────────────────────────────────────────────────────────
+    // System Journal's head (user, 2026-10-21: "control hub gets the same
+    // layout"): the name on the left, the four sections as Segments in the
+    // middle with what each has to say beside it, the page's buttons on the
+    // right — no sidebar, the page full width under it
     Item {
       id: head
-      anchors.left: side.right
+      z: 3
+      anchors.left: parent.left
       anchors.right: parent.right
       anchors.top: parent.top
       height: hw.headH
       Rectangle { anchors.fill: parent; color: Zenon.headBg }
       Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Zenon.border }
-      Text {
-        id: headTitle
-        anchors.left: parent.left
-        anchors.leftMargin: 24
+      Column {
+        id: brandWords
+        x: 20
         anchors.verticalCenter: parent.verticalCenter
-        text: (H.SECTIONS.find((s) => s.id === hw.section) || H.SECTIONS[0]).label
-        color: Zenon.ink
-        font.family: Zenon.face
-        font.weight: Zenon.titleWeight
-        font.pixelSize: Zenon.px(19)
+        width: Math.max(0, sections.x - x - 16)
+        spacing: 1
+        Text {
+          // the window's own name (user, 2026-10-20); the app is still hermes
+          text: "Control Hub"
+          color: Zenon.ink
+          font.family: Zenon.face
+          font.weight: Zenon.titleWeight
+          font.pixelSize: Zenon.px(17)
+        }
+        Text {
+          width: parent.width
+          elide: Text.ElideRight
+          text: Hermes.probe.known ? "Network by " + H.stacksShort(Hermes.probe) : "Looking…"
+          color: Zenon.accentMuted
+          font.family: Zenon.face
+          font.weight: Zenon.weight
+          font.pixelSize: Zenon.px(12)
+        }
       }
-      Text {
-        anchors.left: headTitle.right
-        anchors.leftMargin: 12
-        anchors.baseline: headTitle.baseline
-        anchors.right: headBtns.left
-        anchors.rightMargin: 16
-        elide: Text.ElideRight
-        text: hw.section === "network" ? (Hermes.wired ? Hermes.wired.name : Hermes.wifiDevice ? Hermes.wifiDevice.name : "")
-          : hw.section === "bluetooth" ? (Hermes.btReady && Hermes.btOn ? Hermes.btConnected + " connected" : "")
-          : hw.section === "vpn" ? (Hermes.vpnActive !== "" ? Hermes.vpnActive : "")
-          : Hermes.screens.length === 1 ? "1 screen" : Hermes.screens.length > 1 ? Hermes.screens.length + " screens" : ""
-        color: Zenon.accentMuted
-        font.family: Zenon.face
-        font.weight: Zenon.weight
-        font.pixelSize: Zenon.px(14)
+      Segments {
+        id: sections
+        anchors.centerIn: parent
+        options: H.SECTIONS.map((s) => [s.id, s.label + hw.sectionCount(s.id)])
+        current: hw.section
+        onChose: (v) => hw.setSection(v)
       }
       Row {
         id: headBtns
@@ -310,7 +257,7 @@ FloatingWindow {
     // ── the page ─────────────────────────────────────────────────────────
     Flickable {
       id: pageFlick
-      anchors.left: side.right
+      anchors.left: parent.left
       anchors.right: parent.right
       anchors.top: head.bottom
       anchors.bottom: foot.top
@@ -367,7 +314,7 @@ FloatingWindow {
     HintBar {
       id: foot
       anchors.bottom: parent.bottom
-      anchors.left: side.right
+      anchors.left: parent.left
       anchors.right: parent.right
       rows: hw.hintRows
     }
@@ -385,8 +332,7 @@ FloatingWindow {
   Sheet {
     shown: !!hw.pskNet
     fromTop: hw.headH
-    leftInset: side.width
-    cardW: Math.min(hw.width - side.width - 80, 560)
+    cardW: Math.min(hw.width - 80, 560)
     cardH: pskCol.implicitHeight + 40
     Column {
       id: pskCol
@@ -431,8 +377,7 @@ FloatingWindow {
   Sheet {
     shown: hw.askSwitch
     fromTop: hw.headH
-    leftInset: side.width
-    cardW: Math.min(hw.width - side.width - 80, 600)
+    cardW: Math.min(hw.width - 80, 600)
     cardH: switchCol.implicitHeight + 40
     Column {
       id: switchCol

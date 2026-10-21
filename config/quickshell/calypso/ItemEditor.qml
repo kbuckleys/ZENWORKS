@@ -156,7 +156,7 @@ Item {
         visible: !!ed.st && C.fieldsOf(ed.st.kind).length > 0
         width: parent.width
         height: stdCol.implicitHeight
-        radius: Zenon.windowRadius + 4
+        radius: Zenon.rad(9)
         color: Zenon.wash(0.04)
         border.width: 1
         border.color: Zenon.border
@@ -201,7 +201,7 @@ Item {
         Rectangle {
           width: parent.width
           height: urlCol.implicitHeight
-          radius: Zenon.windowRadius + 4
+          radius: Zenon.rad(9)
           color: Zenon.wash(0.04)
           border.width: 1
           border.color: Zenon.border
@@ -249,7 +249,7 @@ Item {
           visible: !!ed.st && (void ed.shape, ed.st.custom.length > 0)
           width: parent.width
           height: customCol.implicitHeight
-          radius: Zenon.windowRadius + 4
+          radius: Zenon.rad(9)
           color: Zenon.wash(0.04)
           border.width: 1
           border.color: Zenon.border

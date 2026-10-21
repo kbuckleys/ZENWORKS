@@ -9,5 +9,5 @@
 -- "key" any key press, "mouse" a mouse move or a key press.
 
 return {
-	wake = "key",
+	wake = "mouse",
 }

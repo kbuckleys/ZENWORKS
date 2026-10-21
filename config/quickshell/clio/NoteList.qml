@@ -263,7 +263,7 @@ Item {
         y: 8
         width: parent.width - 12
         height: Math.round(width * 1.15) - 8
-        radius: Zenon.windowRadius + 2
+        radius: Zenon.rad(7)
         color: Zenon.wash(0.05)
         border.width: tile.here ? 2 : 1
         border.color: tile.here ? Zenon.sand : Zenon.border

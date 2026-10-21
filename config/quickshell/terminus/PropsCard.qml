@@ -672,8 +672,28 @@ Item {
               text: modelData[0]
               color: Zenon.accentMuted
               font.family: Zenon.face
-              font.weight: Zenon.weight
+              // the row's name in bold (user, 2026-10-21)
+              font.weight: Zenon.titleWeight
               font.pixelSize: Zenon.px(16)
+
+              // a mark before "Permissions" that says the row is a way
+              // through to the grid (user, 2026-10-21)
+              Text {
+                id: permMark
+                visible: modelData[0] === "Permissions"
+                x: parent.width - parent.paintedWidth - 8 - permMark.width
+                anchors.verticalCenter: parent.verticalCenter
+                text: "\u{F0BAB}"
+                color: Zenon.accentKey
+                font.family: Zenon.face
+                font.weight: Zenon.weight
+                font.pixelSize: Zenon.px(16)
+                MouseArea {
+                  anchors.fill: parent
+                  anchors.margins: -4
+                  onClicked: props.tab = 1
+                }
+              }
             }
 
             Text {
@@ -711,6 +731,7 @@ Item {
                   else props.computeChecksum();
                 }
               }
+
             }
           }
         }
@@ -948,6 +969,7 @@ Item {
             model: [["r", 4], ["w", 2], ["x", 1]]
 
             delegate: Item {
+              id: bitCell
               required property var modelData
               required property int index
               width: permGrid.cellW
@@ -977,8 +999,8 @@ Item {
                 Text {
                   anchors.centerIn: parent
                   // a box the selection disagrees on: neither, until clicked
-                  text: parent.parent.mixed ? "?" : modelData[0]
-                  color: parent.parent.on ? Zenon.cyan : Zenon.accentMuted
+                  text: bitCell.mixed ? "?" : modelData[0]
+                  color: bitCell.on ? Zenon.cyan : Zenon.accentMuted
                   opacity: bitPress.pressed ? Zenon.pressDim : 1
                   font.family: Zenon.faceMono
                   font.weight: Font.Bold

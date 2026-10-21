@@ -23,6 +23,7 @@ QtObject {
   readonly property color menuBg: "#000000"
   readonly property color menuShadowInk: "#000000"
   readonly property int menuRadius: 6
+  function rad(n) { return n; }
   readonly property int menuRowHeight: 30
   readonly property int menuSepHeight: 7
   readonly property int menuCardPad: 4

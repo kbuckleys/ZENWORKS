@@ -32,6 +32,7 @@ const BUDGET = {
   "clio/JournalCalendar.qml": 2,
   "clio/Paper.qml": 2,             // white paper and its ink, in every theme   // a day's number and mood dot over its picture
   "metis/ChipStrip.qml": 6,
+  "minerva/minerva.js": 9,         // the page's own tones (paper, sepia, night): content colors, the same in every theme
   "morpheus/Frost.qml": 6,
   "morpheus/ScrollEdge.qml": 5,
   "picasso/Annotator.qml": 3,

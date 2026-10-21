@@ -176,7 +176,7 @@ Item {
             required property string modelData
             width: Math.min(col.width, pt.implicitWidth + 28)
             height: pt.implicitHeight + 18
-            radius: Zenon.windowRadius + 2
+            radius: Zenon.rad(7)
             // pressed darkens, as every button's press does (user, 2026-10-17)
             color: chipPress.pressed ? Zenon.alpha(Zenon.magenta, 0.24) : Zenon.alpha(Zenon.magenta, 0.08)
             border.width: 1

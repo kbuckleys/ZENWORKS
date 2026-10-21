@@ -2078,9 +2078,10 @@ function bindGroupLabel(g) {
 // (any key) or "mouse" (a mouse move too): Display's "Wake by" (user,
 // 2026-10-20), for idle and binds.lua's screensOff alike. base.lua reads
 // it, so it holds from login; socordia follows it; key wake is always on.
-function wakeChoices() { return [["key", "key press"], ["mouse", "mouse or key press"]]; }
+// "mouse" unless the file says "key" (the default since 2026-10-21).
+function wakeChoices() { return [["key", "Key press"], ["mouse", "Mouse or key press"]]; }
 function parseWakeLua(text) {
-  return parseDefaultsLua(text).wake === "mouse" ? "mouse" : "key";
+  return parseDefaultsLua(text).wake === "key" ? "key" : "mouse";
 }
 function renderWakeLua(by) {
   return [
@@ -2095,7 +2096,7 @@ function renderWakeLua(by) {
     "-- \"key\" any key press, \"mouse\" a mouse move or a key press.",
     "",
     "return {",
-    "\twake = " + luaString(by === "mouse" ? "mouse" : "key") + ",",
+    "\twake = " + luaString(by === "key" ? "key" : "mouse") + ",",
     "}",
     "",
   ].join("\n");

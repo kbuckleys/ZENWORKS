@@ -227,14 +227,22 @@ function buildRows(apps, histLines, freq, actions, states, glyphOf) {
   for (const a of apps) appNames[a.name.toLowerCase()] = true;
 
   const rows = [];
+  const appRow = {};
   for (const a of apps) {
     const g = glyphOf ? glyphOf([a.id, a.exec, a.name]) : "";
-    rows.push({ kind: "app", key: a.name, text: a.name, exec: a.exec, id: a.id, icon: a.icon, words: a.words || "",
-      glyph: g || "", label: a.name, displayText: g ? g + "  " + a.name : a.name });
+    const r = { kind: "app", key: a.name, text: a.name, exec: a.exec, id: a.id, icon: a.icon, words: a.words || "",
+      glyph: g || "", label: a.name, displayText: g ? g + "  " + a.name : a.name };
+    appRow[a.name.toLowerCase()] = r;
+    rows.push(r);
   }
   for (const a of actions || []) {
     if (a.needs && !(states || {})[a.needs]) continue;
     const f = actionFace(a, states);
+    // ONE ROW PER NAME (user, 2026-10-21: "two control hub entries"): the
+    // shell writes .desktop files for its own windows, so an app and a verb
+    // can share a name. The app stays and finds by the verb's words too.
+    const twin = appRow[f.name.toLowerCase()];
+    if (twin) { twin.words = (twin.words + " " + (a.keys || "")).trim(); continue; }
     rows.push({ kind: "shell", key: actionKey(a), text: f.name, exec: "", keys: a.keys, action: a,
       glyph: f.glyph, label: f.name, displayText: f.glyph + "  " + f.name });
   }

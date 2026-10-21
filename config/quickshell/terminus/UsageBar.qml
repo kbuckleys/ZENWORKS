@@ -42,7 +42,7 @@ Item {
   // A disk fills from the left, the way every gauge does.
   property bool fromRight: false
   property real labelPad: 8
-  property real barRadius: 4
+  property real barRadius: Zenon.radiusControl
   property int fontSize: 14
   // through the shell's Font size (Zenon.px); the listing hands over a size
   // already zoomed, and says `scaled: false`

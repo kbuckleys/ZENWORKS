@@ -420,6 +420,14 @@ LayerPopup {
 
     function translate() { popup.openPopup("trans"); }
 
+    // the translator, onto words already chosen (minerva's look-up card)
+    function translateText(text: string): string {
+      const t = String(text || "").trim();
+      popup.openPopup("trans");
+      if (t !== "") popup.seedLookup(t);
+      return t === "" ? "empty" : "translating";
+    }
+
     // Open onto a word without typing it — for a script, a menu entry, or
     // anything else that already knows what it wants defined.
     function define(word: string): string {
@@ -669,6 +677,7 @@ LayerPopup {
   }
 
   function closePopup() {
+    rowFlash.cancel();
     popup.stopAudio();
     popup.collapsing = true;
     popup.playClose();
@@ -1043,7 +1052,14 @@ LayerPopup {
   // Return with input: pick a language, then refresh the live output half
   // in that language. No separate results screen — auto-translate is always
   // visible under the input.
-  function confirmLanguage() {
+  // ── THE ROW FLASHES, THEN IT ACTS (user, 2026-10-21) ──────────────────
+  // The suite's list flash (morpheus/RowFlash) on the chosen row of the
+  // three lists here — a language, a past look-up, an offer after a miss.
+  // The row is the one chosen when it was asked; moved off it, nothing runs.
+  RowFlash { id: rowFlash }
+  function flashThen(act) { rowFlash.flashThen(popup.sel, act, () => popup.sel); }
+  function confirmLanguage() { popup.flashThen(() => popup.confirmLanguageNow()); }
+  function confirmLanguageNow() {
     if (popup.langFiltered.length === 0) return;
     const lang = popup.langFiltered[Math.min(popup.sel, popup.langFiltered.length - 1)];
     popup.bumpUsage(lang.code);
@@ -1245,7 +1261,8 @@ LayerPopup {
     popup.clampSel();
   }
 
-  function activateHistory() {
+  function activateHistory() { popup.flashThen(() => popup.activateHistoryNow()); }
+  function activateHistoryNow() {
     if (popup.appMode === "dict") {
       const filtered = popup.historyModel();
       if (popup.sel >= filtered.length) return;
@@ -1327,7 +1344,8 @@ LayerPopup {
     } else if (popup.view === "results" && popup.dictSuggest.length > 0) {
       // a miss turned the results into a list of offers; Return takes the
       // one under the caret rather than leaving for the history
-      popup.takeOffer(popup.dictSuggest[popup.sel]);
+      const offer = popup.dictSuggest[popup.sel];
+      popup.flashThen(() => popup.takeOffer(offer));
     } else {
       // dict results: Return opens the look-up history
       popup.stopAudio();
@@ -2061,7 +2079,7 @@ LayerPopup {
               }
 
               // the chosen one slides (morpheus/CursorBand), rather than each row lighting
-              CursorBand { repeater: dictSuggestRep; index: popup.sel; insetX: -12; radius: 5
+              CursorBand { repeater: dictSuggestRep; index: popup.sel; insetX: -12; radius: Zenon.windowRadius
                            shown: popup.dictSuggest.length > 0 }
               Column {
                 id: dictCol
@@ -2138,14 +2156,6 @@ LayerPopup {
                     width: dictCol.width
                     height: popup.dictSuggest.length > 0 ? 30 : 0
 
-                    Rectangle {
-                      anchors.fill: parent
-                      anchors.leftMargin: -12
-                      anchors.rightMargin: -12
-                      radius: Zenon.windowRadius
-                      color: "transparent"
-                    }
-
                     Text {
                       anchors.centerIn: parent
                       text: modelData.text
@@ -2156,9 +2166,10 @@ LayerPopup {
                       font.pixelSize: popup.tpx(17)
                     }
 
+                    FlashOver { flash: rowFlash; index: parent.index; anchors.leftMargin: -12; anchors.rightMargin: -12; radius: Zenon.windowRadius }
                     MouseArea {
                       anchors.fill: parent
-                      onClicked: popup.takeOffer(modelData)
+                      onClicked: { popup.sel = parent.index; const o = parent.modelData; popup.flashThen(() => popup.takeOffer(o)); }
                     }
                   }
                 }
@@ -2381,11 +2392,7 @@ LayerPopup {
                 required property int index
                 width: pickerList.width
                 height: 32 + popup.bump
-
-                Rectangle {
-                  anchors.fill: parent
-                  color: "transparent"
-                }
+                FlashOver { flash: rowFlash; index: parent.index }
 
                 Text {
                   anchors.centerIn: parent
@@ -2524,11 +2531,7 @@ LayerPopup {
                 required property int index
                 width: histList.width
                 height: 32 + popup.bump
-
-                Rectangle {
-                  anchors.fill: parent
-                  color: "transparent"
-                }
+                FlashOver { flash: rowFlash; index: parent.index }
 
                 Text {
                   anchors.centerIn: parent

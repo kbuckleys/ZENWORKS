@@ -318,7 +318,7 @@ Item {
       Term.ProgressFill {
         anchors.fill: parent
         anchors.margins: 1
-        radius: Zenon.windowRadius - 1
+        radius: Zenon.rad(4)
         frac: track.frac
         ink: Ceres.txCancelling ? Zenon.red : Zenon.cyan
       }

@@ -628,7 +628,7 @@ Item {
     }
     Rectangle {
       anchors.fill: parent
-      radius: 2
+      radius: Zenon.rad(2)
       color: "transparent"
       border.width: 1
       border.color: glyph.ink
@@ -1179,7 +1179,7 @@ Item {
                   anchors.margins: 4
                   width: Math.min(tag.implicitWidth + 10, glass.width - 8)
                   height: 18
-                  radius: 3
+                  radius: Zenon.rad(3)
                   color: Zenon.hud(0.7)
                   Text {
                     id: tag
@@ -1325,7 +1325,7 @@ Item {
                   readonly property bool on: card.look.align === cell.modelData
                   width: 22
                   height: 14
-                  radius: 3
+                  radius: Zenon.rad(3)
                   color: cell.on ? card.highlight
                     : (cellMa.pressed ? Zenon.wash(0.22) : Zenon.wash(0.07))
                   border.width: 1

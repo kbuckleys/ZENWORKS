@@ -191,7 +191,7 @@ Item {
         Rectangle {
           visible: !grip.body
           anchors.centerIn: parent
-          width: 10; height: 10; radius: 2
+          width: 10; height: 10; radius: Zenon.rad(2)
           color: Zenon.cyan
           border.width: 1
           border.color: "#000000"

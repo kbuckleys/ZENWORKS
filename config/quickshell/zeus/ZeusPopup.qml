@@ -236,9 +236,16 @@ LayerPopup {
   // What return does, which depends on what the row is: a device becomes the
   // default, a stream moves to the next device that could carry it, and a card
   // steps to its next available profile.
+  // The row flashes, then it is made the default (user, 2026-10-21: the
+  // suite's list flash, morpheus/RowFlash). The process list does not: its
+  // Return asks first, and a row that asks does not flash.
+  RowFlash { id: rowFlash }
   function soundActivate() {
     const r = popup.soundRow();
     if (!r) return;
+    rowFlash.flashThen(popup.soundSel, () => popup.soundActivateNow(r), () => popup.soundSel);
+  }
+  function soundActivateNow(r) {
     if (r.kind === "sink" || r.kind === "source") sound.setDefault(r.node);
     else if (r.kind === "card") sound.cycleProfile(r.card, 1);
     else sound.cycleRoute(r.node, popup.routeOf(r.node), 1);
@@ -2581,7 +2588,7 @@ LayerPopup {
                 anchors.right: parent.right
                 anchors.rightMargin: 3
                 width: 3
-                radius: 2
+                radius: 1.5
                 color: popup.keyColor
                 opacity: 0.35
                 visible: netList.contentHeight > netList.height
@@ -2750,6 +2757,7 @@ LayerPopup {
                   required property int index
                   width: soundList.width
                   height: modelData.head ? popup.netHeadH : popup.cellH
+                  FlashOver { flash: rowFlash; index: soundRow.index }
 
                   readonly property var node: modelData.head ? null : modelData.node
                   readonly property var audio: soundRow.node ? soundRow.node.audio : null
@@ -3267,7 +3275,7 @@ LayerPopup {
                 anchors.right: parent.right
                 anchors.rightMargin: 3
                 width: 3
-                radius: 2
+                radius: 1.5
                 color: popup.keyColor
                 opacity: 0.35
                 visible: soundList.contentHeight > soundList.height
@@ -3859,14 +3867,14 @@ LayerPopup {
             required property int index
             width: (coreBars.width - coreBars.spacing * (coreBars.n - 1)) / coreBars.n
             height: coreBars.height
-            radius: 2
+            radius: Zenon.rad(2)
             color: Zenon.trough(statRow.ink)
 
             Rectangle {
               anchors.left: parent.left
               anchors.right: parent.right
               anchors.bottom: parent.bottom
-              radius: 2
+              radius: Zenon.rad(2)
               height: Math.max(1, parent.height * (Sysmon.cpuPerCore[index] ?? 0) / 100)
               color: statRow.ink
               opacity: index === popup.busiestCore ? 1 : 0.75

@@ -33,6 +33,10 @@ Item {
   implicitHeight: tape.namesH + tape.listH + tape.sumH + 8
 
   function reveal(i) { list.positionViewAtIndex(i, ListView.Contain); }
+  // a row taken (brought back, or its answer copied) flashes first — the
+  // suite's list flash (user, 2026-10-21); the act runs on its tail
+  RowFlash { id: rowFlash }
+  function flashThen(i, act) { rowFlash.flashThen(i, act, () => tape.idx); }
 
   // the names, as quiet tags; a click puts one in the field
   Row {
@@ -88,6 +92,7 @@ Item {
       readonly property bool sel: row.index === tape.idx
       width: list.width
       height: tape.rowH
+      FlashOver { flash: rowFlash; index: row.index }
       color: rowHover.pressed ? Zenon.alpha(Zenon.border, 0.35) : Zenon.alpha(Zenon.border, 0)
       Behavior on color { ColorAnimation { duration: Zenon.fast } }
 

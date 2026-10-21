@@ -135,7 +135,7 @@ Item {
         anchors.fill: parent
         anchors.topMargin: -1
         anchors.bottomMargin: -1
-        radius: 3
+        radius: Zenon.rad(3)
         readonly property color ink: fx.arrive ? Zenon.green : Zenon.yellow
         color: Qt.rgba(ink.r, ink.g, ink.b, fx.arrive ? 0.30 : 0.38)
       }
@@ -147,7 +147,7 @@ Item {
         color: Zenon.layerBg
         Rectangle {
           anchors.fill: parent
-          radius: 2
+          radius: Zenon.rad(2)
           color: Qt.rgba(Zenon.red.r, Zenon.red.g, Zenon.red.b, 0.20)
         }
         Text {
@@ -207,7 +207,7 @@ Item {
         width: 0
         height: parent.height
         x: sw.back ? parent.width - width : 0
-        radius: 2
+        radius: Zenon.rad(2)
         color: Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b, 0.28)
       }
       // its leading edge

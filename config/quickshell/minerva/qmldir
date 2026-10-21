@@ -2,3 +2,7 @@ MinervaManager 1.0 MinervaManager.qml
 MinervaBook 1.0 MinervaBook.qml
 MinervaLibrary 1.0 MinervaLibrary.qml
 MinervaSide 1.0 MinervaSide.qml
+MinervaComic 1.0 MinervaComic.qml
+MinervaLookup 1.0 MinervaLookup.qml
+MinervaVoice 1.0 MinervaVoice.qml
+MinervaInfo 1.0 MinervaInfo.qml

@@ -127,24 +127,16 @@ FloatingWindow {
       height: hw.headH
       Rectangle { anchors.fill: parent; color: Zenon.headBg }
       Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Zenon.border }
-      Text {
-        id: brandGlyph
-        x: 20
-        anchors.verticalCenter: parent.verticalCenter
-        text: "\u{F0E2E}"
-        color: Zenon.yellow
-        font.family: Zenon.glyphFace
-        font.pixelSize: Zenon.px(20)
-      }
       Column {
         id: brandWords
-        anchors.left: brandGlyph.right
-        anchors.leftMargin: 12
+        // no glyph before the name (user, 2026-10-21: the big yellow one went)
+        x: 20
         anchors.verticalCenter: parent.verticalCenter
         spacing: 1
         Text {
-          // the UI name (user, 2026-10-21); code, IPC and directory stay "hestia"
-          text: "System Log"
+          // the UI name (user, 2026-10-21: "System Journal" again, after a
+          // day as "System Log"); code, IPC and directory stay "hestia"
+          text: "System Journal"
           color: Zenon.ink
           font.family: Zenon.face
           font.weight: Zenon.titleWeight

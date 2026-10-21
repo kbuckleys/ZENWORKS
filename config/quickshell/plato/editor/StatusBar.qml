@@ -239,7 +239,9 @@ Item {
       anchors.centerIn: parent
       // an escape, not the character: literal nerd glyphs do not survive
       // every editor and tool on their way into this file
-      text: "\uEC02"
+      // shown: cod-layout_sidebar_left_off, hidden: cod-layout_sidebar_left
+      // (user, 2026-10-21; minerva's, flipped — the tree is on the left)
+      text: bar.treeShown ? "\uEC02" : "\uEBF3"
       color: bar.treeShown ? Zenon.cyan : (treePress.pressed ? Zenon.white : Zenon.accentMuted)
       font.family: Zenon.face
       font.weight: Zenon.weight
@@ -872,7 +874,7 @@ Item {
           anchors.fill: parent
           anchors.leftMargin: 4
           anchors.rightMargin: 4
-          radius: 3
+          radius: Zenon.rad(3)
           visible: wi.chosen
           color: Qt.rgba(Zenon.yellow.r, Zenon.yellow.g, Zenon.yellow.b, 0.16)
         }

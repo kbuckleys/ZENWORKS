@@ -8,6 +8,13 @@
 #
 #   epub.py open <book.epub> <cache dir>     → book.json on stdout
 #   epub.py find <cache dir> <words>         → [{ chapter, at, snippet }]
+#   epub.py text <book.txt|.md> <cache dir>  → book.json, the same shape
+#
+# A plain text or a Markdown file is read as a book too (user, 2026-10-21):
+# Markdown's headings make its chapters (# and ##, when there are two or
+# more), a text's "Chapter …" lines make its, and a text with none is cut
+# into parts of about 4000 words at a blank line, so no chapter is a
+# scroll the length of the book.
 #
 # An EPUB is a zip of XHTML chapters, a manifest and a reading order (the
 # OPF), a table of contents (nav.xhtml or toc.ncx) and pictures. Qt's
@@ -307,6 +314,172 @@ def open_book(src, dest):
     return book
 
 
+# ── A TEXT, OR MARKDOWN ─────────────────────────────────────────────────
+
+def inline_md(t):
+    """Markdown's inline marks, on text already escaped."""
+    t = re.sub(r"`([^`]+)`", r"<code>\1</code>", t)
+    t = re.sub(r"!\[([^\]]*)\]\(([^)\s]+)[^)]*\)", r"\1", t)
+    t = re.sub(r"\[([^\]]+)\]\(((?:https?|mailto):[^)\s]+)[^)]*\)", r'<a href="\2">\1</a>', t)
+    t = re.sub(r"\[([^\]]+)\]\([^)]*\)", r"\1", t)
+    t = re.sub(r"(\*\*|__)(?=\S)(.+?)(?<=\S)\1", r"<strong>\2</strong>", t)
+    t = re.sub(r"(?<![\w*])\*(?=\S)(.+?)(?<=\S)\*(?!\*)", r"<em>\1</em>", t)
+    t = re.sub(r"(?<![\w_])_(?=\S)(.+?)(?<=\S)_(?![\w_])", r"<em>\1</em>", t)
+    t = re.sub(r"~~(.+?)~~", r"<s>\1</s>", t)
+    return t
+
+
+def md_blocks(src):
+    """Markdown → [(level, heading) | (0, html)]: the blocks Qt can set."""
+    out = []
+    lines = src.split("\n")
+    para, i = [], 0
+
+    def flush():
+        if para:
+            out.append((0, "<p>%s</p>" % inline_md(html.escape(" ".join(para), quote=False))))
+            para.clear()
+    while i < len(lines):
+        ln = lines[i]
+        fence = re.match(r"^\s*(```|~~~)", ln)
+        if fence:
+            flush()
+            code = []
+            i += 1
+            while i < len(lines) and not lines[i].strip().startswith(fence.group(1)):
+                code.append(lines[i])
+                i += 1
+            out.append((0, "<pre>%s</pre>" % html.escape("\n".join(code), quote=False)))
+            i += 1
+            continue
+        h = re.match(r"^(#{1,6})\s+(.*?)\s*#*\s*$", ln)
+        if h:
+            flush()
+            out.append((len(h.group(1)), h.group(2)))
+            i += 1
+            continue
+        if re.match(r"^\s*([-*_])(\s*\1){2,}\s*$", ln):
+            flush()
+            out.append((0, "<hr>"))
+            i += 1
+            continue
+        if ln.startswith(">"):
+            flush()
+            q = []
+            while i < len(lines) and lines[i].startswith(">"):
+                q.append(lines[i].lstrip(">").strip())
+                i += 1
+            out.append((0, "<blockquote>%s</blockquote>" % inline_md(html.escape(" ".join(q), quote=False))))
+            continue
+        li = re.match(r"^\s*([-*+]|\d+[.)])\s+(.*)", ln)
+        if li:
+            flush()
+            tag = "ol" if li.group(1)[0].isdigit() else "ul"
+            items = []
+            while i < len(lines):
+                m = re.match(r"^\s*([-*+]|\d+[.)])\s+(.*)", lines[i])
+                if m:
+                    items.append(m.group(2))
+                elif lines[i].strip() and items and lines[i].startswith(("  ", "\t")):
+                    items[-1] += " " + lines[i].strip()
+                else:
+                    break
+                i += 1
+            out.append((0, "<%s>%s</%s>" % (tag, "".join("<li>%s</li>" % inline_md(html.escape(t, quote=False))
+                                                          for t in items), tag)))
+            continue
+        if not ln.strip():
+            flush()
+        else:
+            para.append(ln.strip())
+        i += 1
+    flush()
+    return out
+
+
+CHAPTER_LINE = re.compile(r"^\s*(chapter|part|book|act|prologue|epilogue)\b[\w .:'-]{0,60}$", re.I)
+
+
+def text_book(src, dest):
+    src, dest = os.path.abspath(src), os.path.abspath(dest)
+    os.makedirs(os.path.join(dest, "ch"), exist_ok=True)
+    stamp = "t%d:%d:%d" % (VERSION, os.path.getmtime(src), os.path.getsize(src))
+    meta_path = os.path.join(dest, "book.json")
+    try:
+        with open(meta_path) as f:
+            old = json.load(f)
+        if old.get("stamp") == stamp and all(
+                os.path.exists(os.path.join(dest, "ch", c["file"])) for c in old.get("chapters", [])):
+            return old
+    except (OSError, ValueError):
+        pass
+    with open(src, "rb") as f:
+        raw = f.read()
+    try:
+        body = raw.decode("utf-8")
+    except UnicodeDecodeError:
+        body = raw.decode("latin-1")
+    body = body.replace("\r\n", "\n").replace("\r", "\n")
+    name = os.path.splitext(os.path.basename(src))[0]
+    title = name
+    parts = []  # [(title, [html])]
+    if src.lower().endswith((".md", ".markdown")):
+        blocks = md_blocks(body)
+        heads = [b for b in blocks if b[0] in (1, 2)]
+        if heads and heads[0][0] == 1 and sum(1 for b in blocks if b[0] == 1) == 1:
+            title = re.sub(r"<[^>]+>", "", inline_md(html.escape(heads[0][1], quote=False)))
+        split = len(heads) >= 2
+        cur = ("", [])
+        for lv, h in blocks:
+            if lv:
+                head = inline_md(html.escape(h, quote=False))
+                if split and lv <= 2 and cur[1]:
+                    parts.append(cur)
+                    cur = ("", [])
+                if split and lv <= 2 and not cur[0]:
+                    cur = (html.unescape(re.sub(r"<[^>]+>", "", head)), cur[1])
+                cur[1].append("<h%d>%s</h%d>" % (min(lv, 3), head, min(lv, 3)))
+            else:
+                cur[1].append(h)
+        if cur[1]:
+            parts.append(cur)
+    else:
+        paras = [p.strip() for p in re.split(r"\n\s*\n", body) if p.strip()]
+        marked = any(CHAPTER_LINE.match(p) for p in paras)
+        cur, words = ("", []), 0
+        for p in paras:
+            if marked and CHAPTER_LINE.match(p):
+                if cur[1]:
+                    parts.append(cur)
+                cur, words = (p, ["<h2>%s</h2>" % html.escape(p, quote=False)]), 0
+                continue
+            if not marked and words > 4000:
+                parts.append(cur)
+                cur, words = ("", []), 0
+            words += len(p.split())
+            cur[1].append("<p>%s</p>" % html.escape(re.sub(r"\s*\n\s*", " ", p), quote=False))
+        if cur[1]:
+            parts.append(cur)
+    if not parts:
+        parts = [("", ["<p></p>"])]
+    chapters, toc = [], []
+    for n, (ct, hs) in enumerate(parts):
+        fname = "%04d.html" % n
+        html_text = "".join(hs)
+        with open(os.path.join(dest, "ch", fname), "w") as f:
+            f.write(html_text)
+        words = len(re.sub(r"<[^>]+>", " ", html_text).split())
+        chapters.append({"file": fname, "title": ct, "words": words, "spine": n})
+        if ct:
+            toc.append({"label": ct, "chapter": n, "anchor": "", "depth": 0})
+    book = {"stamp": stamp, "title": title, "author": "", "cover": "", "dir": dest,
+            "chapters": chapters, "toc": toc}
+    with open(meta_path + ".part", "w") as f:
+        json.dump(book, f)
+    os.replace(meta_path + ".part", meta_path)
+    return book
+
+
 def find(dest, words):
     """Every chapter's hits for the words, a snippet around each."""
     with open(os.path.join(dest, "book.json")) as f:
@@ -336,12 +509,14 @@ def main():
     try:
         if len(sys.argv) >= 4 and sys.argv[1] == "open":
             print(json.dumps(open_book(sys.argv[2], sys.argv[3])))
+        elif len(sys.argv) >= 4 and sys.argv[1] == "text":
+            print(json.dumps(text_book(sys.argv[2], sys.argv[3])))
         elif len(sys.argv) >= 4 and sys.argv[1] == "find":
             print(json.dumps(find(sys.argv[2], " ".join(sys.argv[3:]))))
         else:
-            print(json.dumps({"error": "usage: epub.py open <book> <dir> | find <dir> <words>"}))
+            print(json.dumps({"error": "usage: epub.py open|text <book> <dir> | find <dir> <words>"}))
             sys.exit(2)
-    except (zipfile.BadZipFile, KeyError, ValueError, ET.ParseError, OSError) as e:
+    except (zipfile.BadZipFile, KeyError, ValueError, ET.ParseError, OSError, UnicodeError) as e:
         print(json.dumps({"error": "%s: %s" % (type(e).__name__, e)}))
         sys.exit(1)
 

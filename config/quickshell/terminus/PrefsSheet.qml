@@ -364,6 +364,9 @@ Item {
             if (term.anyTagged) o.push("tag");
             return o;
           }
+          // one switch, as VIEW is (user, 2026-10-21)
+          segmented: true
+          labels: ({ name: "Name", kind: "Kind", size: "Size", time: "Time", usage: "Usage", tag: "Tag" })
           current: term.sortKey
           onChose: (v) => {
             // a second press on the key already in force turns it round,

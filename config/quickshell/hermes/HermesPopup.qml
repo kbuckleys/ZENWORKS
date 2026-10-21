@@ -29,6 +29,7 @@ import Quickshell.Io
 import Quickshell.Widgets
 import Quickshell.Hyprland
 import "../morpheus"
+import "../morpheus/gridnav.js" as Nav
 import "../terminus"
 import "../morpheus/controls" as Ctl
 import "../ceres" as Cer
@@ -149,9 +150,19 @@ LayerPopup {
     : popup.mode === "vpn" ? Hermes.vpns.filter((v) => v.managed) : []
   onRowsChanged: if (popup.sel >= popup.rows.length) popup.sel = Math.max(0, popup.rows.length - 1)
 
+  // ── THE CHOSEN ONE FLASHES, THEN IT ACTS (user, 2026-10-21) ──────────
+  // morpheus/RowFlash on the rows, ChosenFlash in the tiles (a grid)
+  RowFlash { id: rowFlash }
   function activateRow() {
-    const r = popup.rows[popup.sel];
+    const r = popup.rows[popup.sel], mode = popup.mode;
     if (!r) return;
+    rowFlash.flashThen(popup.sel, () => { if (popup.mode === mode) popup.activateRowNow(r); }, () => popup.sel);
+  }
+  function pressTileAt(i) {
+    const t = popup.tiles[i];
+    if (t) Nav.fireCell(tileRep.itemAt(i), () => popup.pressTile(t));
+  }
+  function activateRowNow(r) {
     if (popup.mode === "wifi") {
       const how = Hermes.join(r, "");
       if (how === "ask") { popup.pskNet = r; popup.mode = "psk"; popup.syncFocus(); }
@@ -200,6 +211,7 @@ LayerPopup {
 
   function closePopup() {
     if (!popup.shown || popup.collapsing) return;
+    rowFlash.cancel();
     popup.collapsing = true;
     popup.playClose();
     Hermes.release();
@@ -343,7 +355,7 @@ LayerPopup {
                 width: (tileGrid.width - tileGrid.spacing) / 2
                 height: popup.tileH
                 tile: popup.tiles[index] || null
-                onPressed: { popup.tileSel = index; popup.pressTile(popup.tiles[index]); }
+                onPressed: { popup.tileSel = index; popup.pressTileAt(index); }
                 onListed: { popup.tileSel = index; popup.openList(popup.tiles[index].list); }
               }
             }
@@ -494,6 +506,8 @@ LayerPopup {
             kind: popup.mode
             row: modelData
             picked: index === popup.sel
+            flash: rowFlash
+            at: index
             onClicked: { popup.sel = index; popup.activateRow(); }
           }
         }
@@ -558,7 +572,7 @@ LayerPopup {
           else if (event.key === Qt.Key_Right) popup.tileSel = (popup.tileSel + 1) % n;
           else if (event.key === Qt.Key_Up || event.key === Qt.Key_Down) popup.tileSel = (popup.tileSel + 2) % n;
           else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter || event.key === Qt.Key_Space)
-            popup.pressTile(popup.tiles[popup.tileSel]);
+            popup.pressTileAt(popup.tileSel);
           else if (event.key === Qt.Key_Tab) {
             const t = popup.tiles[popup.tileSel];
             if (t && t.list) popup.openList(t.list);

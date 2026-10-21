@@ -157,6 +157,8 @@ Column {
             height: 42
             kind: "bt"
             row: modelData
+            flash: page.win ? page.win.rowFlash : null
+            at: index
             picked: index === page.sel
             onClicked: { page.sel = index; if (page.win) page.win.activate(); }
           }
@@ -201,6 +203,8 @@ Column {
             height: 42
             kind: "bt"
             row: modelData
+            flash: page.win ? page.win.rowFlash : null
+            at: index + page.mine.length
             picked: index + page.mine.length === page.sel
             onClicked: { page.sel = index + page.mine.length; if (page.win) page.win.activate(); }
           }

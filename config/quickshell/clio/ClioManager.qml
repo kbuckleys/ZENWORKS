@@ -290,11 +290,15 @@ Scope {
   // <book>", made the first time and appended to after — each quote a
   // block quote, where it came from on the line beneath. Asked of a
   // notebook that may not be read yet: read first, then filed. done(id).
-  function appendQuote(book, quote, where, done) {
+  // `comment` (2026-10-21): what the reader wrote on it, under its place —
+  // and a note of their own is the same call with no quote
+  function appendQuote(book, quote, where, done, comment) {
     const go = () => {
       const title = "Highlights · " + book;
       const n = mgr.notes.find((x) => !(x.deleted > 0) && x.kind === "note" && !x.sealed && N.titleOf(x, "") === title);
-      const add = [N.block("quote", N.escape(quote))].concat(where ? [N.block("body", N.escape(where))] : []);
+      const add = (quote ? [N.block("quote", N.escape(quote))] : [])
+        .concat(where ? [N.block(quote ? "body" : "subheading", N.escape(where))] : [])
+        .concat(comment ? [N.block("body", N.escape(comment))] : []);
       let id;
       if (n) {
         id = n.id;

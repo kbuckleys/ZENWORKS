@@ -25,6 +25,7 @@
 
 import QtQuick
 import "../morpheus"
+import "../morpheus/gridnav.js" as Nav
 import "terminus.js" as Terminus
 import "treemap.js" as Tree
 
@@ -99,9 +100,14 @@ Rectangle {
     if (n === 0) return;
     space.sel = (space.sel + d + n) % n;
   }
+  // the chosen tile flashes (the grids' flash, morpheus/ChosenFlash), then
+  // it is gone into or chosen (user, 2026-10-21)
   function enter(t) {
     const q = t || space.cur;
     if (!q || !q.it || q.it.rest) return;
+    Nav.fireCell(tileRep.itemAt(space.tiles.indexOf(q)), () => space.enterNow(q));
+  }
+  function enterNow(q) {
     const r = q.it.row;
     if (r.isDir) { term.goTo(r.path); space.sel = 0; return; }
     // a file: chosen in the listing, which is where something is done to it
@@ -192,7 +198,25 @@ Rectangle {
         text: space.rows.length === 0 ? "Nothing here" : space.unmeasured > 0 ? "Measuring…" : "Everything here is empty"
       }
 
+      // the sliding cursor (morpheus/CursorBand), a ring OVER the tiles: they
+      // are coloured by kind, and a fill under them would not show. It
+      // slides and resizes from tile to tile; the tiles no longer light
+      // themselves (user, 2026-10-21)
+      CursorBand {
+        repeater: tileRep
+        index: space.sel
+        shown: space.tiles.length > 0
+        z: 2
+        insetX: 1
+        insetY: 1
+        radius: Zenon.radiusControl
+        color: "transparent"
+        border.width: 2
+        border.color: Zenon.cyan
+      }
+
       Repeater {
+        id: tileRep
         model: space.tiles.length
         delegate: Item {
           id: tile
@@ -202,7 +226,6 @@ Rectangle {
           readonly property var row: it && !it.rest ? it.row : null
           readonly property color ink: !it ? Zenon.muted : it.rest ? Zenon.muted : Terminus.inkOf(row)
           readonly property int say: q ? Tree.labelFit(q.w, q.h) : 0
-          readonly property bool here: index === space.sel
           x: q ? q.x : 0
           y: q ? q.y : 0
           width: q ? q.w : 0
@@ -214,10 +237,12 @@ Rectangle {
             anchors.margins: 1
             radius: Zenon.radiusControl
             color: tilePress.pressed ? Zenon.alpha(tile.ink, 0.42)
-              : Zenon.alpha(tile.ink, tile.here ? 0.34 : (tile.row && tile.row.isDir ? 0.22 : 0.16))
-            border.width: tile.here ? 2 : 1
-            border.color: tile.here ? tile.ink : Zenon.alpha(tile.ink, 0.35)
+              : Zenon.alpha(tile.ink, tile.row && tile.row.isDir ? 0.22 : 0.16)
+            border.width: 1
+            border.color: Zenon.alpha(tile.ink, 0.35)
           }
+          readonly property alias flash: tileFlash
+          ChosenFlash { id: tileFlash; anchors.margins: 1; radius: Zenon.radiusControl }
           Column {
             x: 8
             y: 6

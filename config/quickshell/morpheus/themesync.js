@@ -165,6 +165,36 @@ function renderHyprFont(face, weight, size) {
   return out.join("\n");
 }
 
+// ── hyprland's window corner ───────────────────────────────────────────
+// Oracle's Corner rounding, written into base.lua itself: the one line
+// `rounding = N` that sits directly in `decoration = { … }`. Every other
+// line is left as the user wrote it, and a `rounding` deeper in (blur's,
+// the group bar's) is not this one. The text back unchanged when there is
+// no such line to change.
+function setHyprRounding(text, n) {
+  const src = String(text || "");
+  const start = src.search(/\bdecoration\s*=\s*\{/);
+  if (start < 0) return src;
+  let i = src.indexOf("{", start) + 1;
+  let depth = 1;
+  const re = /^([ \t]*)rounding(\s*=\s*)-?[0-9.]+/;
+  while (i < src.length && depth > 0) {
+    const c = src[i];
+    if (c === "{") depth++;
+    else if (c === "}") depth--;
+    else if (c === "-" && src[i + 1] === "-") { i = src.indexOf("\n", i); if (i < 0) break; continue; }
+    else if (c === "\n" && depth === 1) {
+      const m = re.exec(src.slice(i + 1));
+      if (m) {
+        const v = Math.max(0, Math.round(Number(n) || 0));
+        return src.slice(0, i + 1) + m[1] + "rounding" + m[2] + v + src.slice(i + 1 + m[0].length);
+      }
+    }
+    i++;
+  }
+  return src;
+}
+
 // ── everything else's font ─────────────────────────────────────────────
 // GTK, gsettings (and so the portal, and every app asking it) and
 // fontconfig's generic families take the shell's two faces too; written by

@@ -62,7 +62,6 @@ Singleton {
   // The pill will not grow past this however much a layer asks for. 1000 is
   // what every layer was written against.
   property int barMaxWidth: 1000
-  property int barRadius: 8
   property int barTextSize: 18
 
   property int barSlot: 32
@@ -310,10 +309,13 @@ Singleton {
   }
   onThemeOptionsChanged: if (root.defaultsTaken) root.buildSchema()
 
-  // The corner a MENU is cut with. Deliberately not the panels' radius: a
-  // menu is a small card over your work and a panel is a large surface at an
-  // edge, and the corner that suits one looks wrong on the other.
-  property int menuRadius: 6
+  // THE ONE CORNER (user, 2026-10-21). Every rounded thing in the suite —
+  // buttons, rows, cards, dialogs, menus, the pill, toasts, the OSD, scroll
+  // thumbs — and hyprland's own windows take their radius from this. It is a
+  // window's corner; Zenon's radius scale keeps each size's proportion to it,
+  // so 5 is the look the suite had before, and 0 is square everywhere. There
+  // used to be four (bar, menu, toast, toast icon) and none reached a window.
+  property int cornerRadius: 5
 
   // ── how it is painted ─────────────────────────────────────────────────
   // Alpha over black, both of them. Hyprland's blur has an `ignore_alpha`
@@ -349,8 +351,6 @@ Singleton {
   // terminus' SelectBar); off, it jumps. One switch for the shell, not one
   // per app (user, 2026-10-19); on by default
   property bool cursorSlide: true
-  // Zenon.rim: a hairline of light along the top edge of glass surfaces
-  property bool glassRim: true
   // how much of the background's accent the glass is laid in (Zenon.glassBase)
   property real wallpaperTint: 0
 
@@ -410,7 +410,6 @@ Singleton {
   property int notifQuietFrom: 22
   property int notifQuietTo: 7
   property int notifHistoryCap: 200
-  property int notifRadius: 5
   // The card's gutter on every side, and the icon's from the text. Five put
   // the longest line of a list six pixels off the border; a toast is a panel
   // and reads like one at a dozen.
@@ -423,7 +422,6 @@ Singleton {
   // nothing shorter than this, so a one-word notification still reads as a
   // panel rather than as a strip
   property int notifMinHeight: 64
-  property int notifIconRadius: 5
   // mako: markup=1 — whether an application's <b> and <i> are honored or
   // shown as the characters they are
   property bool notifMarkup: true
@@ -728,9 +726,9 @@ Singleton {
       min: 0, max: 7200, step: 30, unit: "s", alias: "idle dpms sleep blank",
       help: "Idle this long and every output is switched off. 0 leaves them on. Needs Idle timers, under Idle & Lock." },
     { key: "wakeBy", section: "display", label: "Wake by", type: "enum", segments: true, hyprFile: true,
-      hyprDefault: "key", alias: "wake screens dpms mouse key press",
-      options: [ { value: "key",   label: "key press" },
-                 { value: "mouse", label: "mouse or key press" } ],
+      hyprDefault: "mouse", alias: "wake screens dpms mouse key press",
+      options: [ { value: "key",   label: "Key press" },
+                 { value: "mouse", label: "Mouse or key press" } ],
       help: "What turns the screens back on, after idle or Lock and suspend screen. Kept in hypr/lua/wake.lua." },
     // ── input ──
     // The fixed rows; the devices' own are built in inputSpecs, where the
@@ -874,18 +872,16 @@ Singleton {
     { key: "lexiTextStep", section: "look", alias: "lexi dictionary translate translation font text size zoom",
       label: "Lexicon text", type: "int", min: -8, max: 12, step: 1, unit: "px",
       help: "Lexi's text, larger or smaller than where it starts. Ctrl + and Ctrl − in lexi do the same, and Ctrl 0 puts it back." },
-    { key: "barRadius", section: "look", label: "Corner radius", type: "int",
-      min: 0, max: 20, step: 1, unit: "px",
-      help: "The pill, and every panel that opens out of it." },
+    { key: "cornerRadius", section: "look", label: "Corner rounding", type: "int",
+      min: 0, max: 16, step: 1, unit: "px",
+      alias: "corner radius rounding round rounded square button scrollbar thumb menu pill bar panel dialog card toast notification osd window hyprland",
+      help: "Every rounded corner: hyprland's windows, and in the shell every button, row, card, dialog, menu, scroll thumb, the pill and its panels, toasts and the OSD. This is a window's corner; the rest keep their proportion to it, so a dialog stays rounder than a button. 0 is square everywhere; pills and circles stay round." },
     { key: "barMaxWidth", section: "look", label: "Maximum panel width", type: "int",
       min: 400, max: 2400, step: 20, unit: "px",
       help: "How wide any panel may grow. Always rounded down to an even number, so centering it lands on a whole pixel." },
     { key: "barScreenPad", section: "look", label: "Gap to screen edge", type: "int",
       min: 0, max: 48, step: 1, unit: "px",
       help: "How far the pill floats off whichever edge it lives on. Every layer that opens out of it follows, or they would not line up with it." },
-    { key: "menuRadius", section: "look", label: "Menu corner radius", type: "int",
-      min: 0, max: 16, step: 1, unit: "px",
-      help: "Every menu on the desktop: icarus', the tray's, terminus' right-click menu, and the cards picasso and this panel open. Separate from the panels' radius — a small card over your work wants a different corner from a large surface at an edge." },
     { key: "panelOpacity", section: "look", alias: "transparency translucency see-through panel layer background", label: "Panel opacity", type: "real",
       min: 0.1, max: 1, step: 0.05,
       help: "The ground every layer that opens out of the pill is painted on. Alpha over black, so lower is more transparent." },
@@ -907,9 +903,6 @@ Singleton {
     { key: "cursorSlide", section: "motion", alias: "sliding cursor glide selection highlight row move jump",
       label: "Sliding cursor", type: "bool",
       help: "The highlight on a list's chosen row glides to the next one as you move, in every app and panel. Off, it jumps straight there." },
-    { key: "glassRim", section: "look", alias: "rim highlight edge glass light shine border top",
-      label: "Glass rim", type: "bool",
-      help: "A hairline of light along the top edge of the pill, its panels, menus and tooltips, the way the edge of a pane of glass catches the light." },
     { key: "scrollbarAutohide", section: "look", alias: "scrollbar scroll bar hide overlay thumb", label: "Autohide scrollbars", type: "bool",
       help: "Every scrollbar in the shell fades away once the list stops moving, and comes back when you scroll or put the pointer on it. Off, the thumb is always there." },
     { key: "motionScale", section: "motion", label: "Animation speed", type: "real",
@@ -980,14 +973,10 @@ Singleton {
       options: [ { value: "left",   label: "Left" },
                  { value: "center", label: "Center" },
                  { value: "right",  label: "Right" } ] },
-    { key: "notifRadius", section: "notify", label: "Corner radius", type: "int",
-      min: 0, max: 24, step: 1, unit: "px" },
     { key: "notifPadding", section: "notify", label: "Padding", type: "int",
       min: 0, max: 24, step: 1, unit: "px" },
     { key: "notifSpacing", section: "notify", label: "Gap between toasts", type: "int",
       min: 0, max: 24, step: 1, unit: "px" },
-    { key: "notifIconRadius", section: "notify", label: "Icon corner radius", type: "int",
-      min: 0, max: 40, step: 1, unit: "px" },
     { key: "notifMarkup", section: "notify", label: "Honor markup", type: "bool",
       help: "Whether an application's bold and italic are rendered, or shown as the characters they are." },
 
@@ -2025,9 +2014,10 @@ Singleton {
     (Quickshell.env("XDG_CONFIG_HOME") || (Quickshell.env("HOME") + "/.config")) + "/hypr/lua"
   readonly property string keysPath: root.hyprLuaDir + "/keys.lua"
   // hypr/lua/wake.lua: "key" or "mouse" — see Ora's WAKE
-  property string wakeBy: "key"
+  // "mouse" by default (user, 2026-10-21)
+  property string wakeBy: "mouse"
   function setWakeBy(v) {
-    const by = v === "mouse" ? "mouse" : "key";
+    const by = v === "key" ? "key" : "mouse";
     if (by === root.wakeBy) return;
     root.wakeBy = by;
     root.revision++;
@@ -2201,7 +2191,7 @@ Singleton {
       const by = Ora.parseWakeLua(wakeFile.text());
       if (by !== root.wakeBy) { root.wakeBy = by; root.revision++; reloadHypr.restart(); }
     }
-    onLoadFailed: root.wakeBy = "key"
+    onLoadFailed: root.wakeBy = "mouse"
   }
 
   FileView {
@@ -2742,7 +2732,7 @@ Singleton {
     }
 
     // and the write, which takes the same coercion every other path does — so
-    // `set barRadius 999` lands at the slider's own maximum rather than at 999.
+    // `set cornerRadius 999` lands at the slider's own maximum rather than at 999.
     function set(key: string, value: string): string {
       const s = root.spec(key);
       if (!s || !Ora.stored(s)) return "no such setting: " + key;

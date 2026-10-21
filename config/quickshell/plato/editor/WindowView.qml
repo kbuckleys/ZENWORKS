@@ -836,7 +836,7 @@ Item {
         y: trail.fromRow * win.cellH
         width: win.cellW
         height: win.cellH
-        radius: 2
+        radius: Zenon.rad(2)
         color: "transparent"
         border.width: 1
         border.color: Zenon.cyan

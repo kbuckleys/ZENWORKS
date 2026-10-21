@@ -160,7 +160,8 @@ Item {
     y: root.horizontal ? root.lineX - across / 2 : 2
     width: root.horizontal ? root.width - 4 : across
     height: root.horizontal ? across : root.height - 4
-    radius: across / 2
+    // a capsule at the default corner, square at 0 (Oracle's Corner rounding)
+    radius: Zenon.rad(across / 2)
     color: Zenon.border
     opacity: ma.containsMouse || ma.dragging ? (Zenon.light ? 0.5 : 0.30) : 0.0
     Behavior on opacity { NumberAnimation { duration: Zenon.fast; easing.type: Zenon.ease } }
@@ -177,7 +178,7 @@ Item {
     y: root.horizontal ? root.lineX - across / 2 : root.thumbY
     width: root.horizontal ? root.thumbH : across
     height: root.horizontal ? across : root.thumbH
-    radius: across / 2
+    radius: Zenon.rad(across / 2)
     color: Zenon.accentKey
     // on paper the dark thumb at dark glass' strengths read as a faint
     // pencil line (user, 2026-10-17): a light theme sets it a step deeper

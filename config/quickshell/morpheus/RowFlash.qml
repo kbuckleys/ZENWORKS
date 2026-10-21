@@ -8,9 +8,11 @@
 //
 // An inline component of TerminusWindow until the open-with card (AppPicker)
 // left that file and took its flash with it: artemis draws the same card.
+// In morpheus since 2026-10-21, when every list in the suite took it: THE
+// list flash (a grid cell's is ChosenFlash, in the cell).
 
 import QtQuick
-import "../morpheus"
+import "."
 
 // ── A ROW LIGHTS UP BEFORE IT ACTS ──────────────────────────────────────
 // Return used to act with the sheet vanishing on the keystroke, which leaves
@@ -41,6 +43,16 @@ Item {
     flash.at = index;
     flashRun.restart();
     return true;
+  }
+
+  // fire(), with what runs on its tail, in one call — what every list in
+  // the suite does, so none of them keeps its own copy of these two lines.
+  // `act` runs only if the cursor is still on `index` when it lands, when
+  // `still` (a function returning the cursor now) is given.
+  function flashThen(index, act, still) {
+    if (flashRun.running) return false;
+    flash.onDone = still ? () => { if (still() === index) act(); } : act;
+    return flash.fire(index);
   }
 
   // Stopped, so the ScriptAction on the end never runs: leaving is a

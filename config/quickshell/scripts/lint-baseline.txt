@@ -105,6 +105,7 @@
 2	icarus/IcarusPopup.qml	missing-property	Could not find property "left".
 2	icarus/IcarusPopup.qml	missing-property	Could not find property "top".
 3	icarus/IcarusPopup.qml	uncreatable-type	Type PanelWindow is not creatable.
+1	minerva/MinervaSide.qml	missing-property	Member "pageIx" not found on type (component in /home/buck/.config/quickshell/minerva/MinervaSide.qml)::item with type QObject
 1	morpheus/CardBody.qml	id-shadows-member	Id for object Flickable shadows property "flick". Rename one or the other.
 1	morpheus/CardBody.qml	id-shadows-member	Note: Id defined here
 1	morpheus/CardMenu.qml	missing-property	Could not find property "left".
@@ -247,7 +248,7 @@
 1	terminus/Opening.qml	id-shadows-member	Id for object Timer shadows property "viewSave". Rename one or the other.
 2	terminus/Opening.qml	id-shadows-member	Note: Id defined here
 2	terminus/Pane.qml	unused-imports	Unused import
-2	terminus/PaneGrid.qml	unused-imports	Unused import
+1	terminus/PaneGrid.qml	unused-imports	Unused import
 1	terminus/PaneList.qml	unused-imports	Unused import
 1	terminus/Portal.qml	unused-imports	Unused import
 1	terminus/PrefAction.qml	property-override	Member "enabled" shadows member "enabled" from base type "QQuickItem", use a different name or add a final or override specifier.
@@ -259,7 +260,6 @@
 1	terminus/PrefText.qml	unused-imports	Unused import
 1	terminus/PrefsSheet.qml	unused-imports	Unused import
 1	terminus/Preview.qml	unused-imports	Unused import
-1	terminus/PropsCard.qml	missing-property	Member "on" not found on type "QQuickItem"
 1	terminus/PropsCard.qml	missing-property	Member "shown" not found on type "QQuickItem"
 1	terminus/PropsCard.qml	unused-imports	Unused import
 1	terminus/PropsHost.qml	unused-imports	Unused import

@@ -170,7 +170,6 @@ QtObject {
     if (typeof c === "string" && /^#([0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(c)) return c;
     return light ? Qt.rgba(1, 1, 1, 0.7) : Qt.rgba(1, 1, 1, 0.09);
   }
-  readonly property bool rimOn: cfg.glassRim
 
   // the near-black of a card floating inside a window rather than on the
   // desktop — plato's completion menu, its floats, its toasts, the file
@@ -375,15 +374,16 @@ QtObject {
   // Routed through Zenon rather than read from Oracle directly, because
   // terminus does not import oracle and should not have to: a token is what
   // Zenon is for.
-  readonly property int menuRadius:    cfg.menuRadius
+  readonly property int menuRadius:    Math.round(corner * 1.2)
   readonly property int menuWidth:     cfg.menuWidth
   readonly property int menuRowHeight: cfg.menuRowHeight
   // A WINDOW'S TOOLBAR — terminus' bar (its headH). 42 since the user's
   // 2026-10-17 call, room for back/forward and a rename ring.
   readonly property int toolbarH: 42
   // and the tab strip above it, every morpheus/TabStrip's (terminus' and
-  // plato's): a little lower than the bar (user, 2026-10-18)
-  readonly property int tabH: 38
+  // plato's): a little lower than the bar (user, 2026-10-18); 34 since
+  // the user's 2026-10-21 call
+  readonly property int tabH: 34
   // the hint strip at a window's or a panel's foot (morpheus/HintBar):
   // ceres' 40, every strip's since 2026-10-19 (user: "bar height included")
   readonly property int hintBarH: 40
@@ -455,22 +455,28 @@ QtObject {
   // 10 where a menu uses 6. Written out seven times, and their shadows were
   // told 6 regardless: with a hollow shadow that cuts the hole SMALLER than
   // the card at each corner, leaving four dark slivers inside them.
-  readonly property int dialogRadius: 10
-  // Hyprland's own window corner (decoration.rounding in hypr/lua/base.lua).
-  // The controls inside a real window round to the window they sit in, so a
-  // button never looks softer than the frame around it. Kept in step with
-  // base.lua by hand: this file cannot read hyprland's config. Terminus and
-  // ceres read it for every chip, button, field and clip in their windows,
-  // so the rounding is one number to change, here and in base.lua.
-  readonly property int windowRadius: 5
-  // ── THE RADIUS SCALE (user, 2026-10-19) ──────────────────────────────
+  readonly property int dialogRadius: corner * 2
+  // Hyprland's own window corner (decoration.rounding in hypr/lua/base.lua,
+  // which ThemeSync writes from this). The controls inside a real window
+  // round to the window they sit in, so a button never looks softer than the
+  // frame around it.
+  readonly property int windowRadius: corner
+  // ── THE RADIUS SCALE (user, 2026-10-19; one setting 2026-10-21) ──────
   // Every corner in the suite is one of these, or `height / 2` for a capsule
   // or a circle (chips, badges, knobs, switches, thin meter bars), or 0 where
-  // the square is meant. windowRadius above is the ROW: list bands, cells,
-  // fields, inner panels. Menus and the bar keep their own (Oracle's
-  // menuRadius and pillRadius, which are the user's to set).
-  readonly property int radiusControl: 4   // buttons, key-like boxes, small swatches
-  readonly property int radiusCard: 8      // a card inside a window: a sticky, a timer, a preview
+  // the square is meant. All of them are Oracle's Corner rounding times the
+  // proportion they had when it was 5, so moving it moves everything and 0
+  // squares everything. windowRadius above is the ROW: list bands, cells,
+  // fields, inner panels; menuRadius and pillRadius are with the menus and
+  // the bar. Toasts are rows (windowRadius), the OSD a dialog.
+  readonly property int corner: Math.max(0, cfg.cornerRadius === undefined ? 5 : Number(cfg.cornerRadius) || 0)
+  readonly property int radiusControl: Math.round(corner * 0.8)   // buttons, key-like boxes, small swatches
+  readonly property int radiusCard: Math.round(corner * 1.6)      // a card inside a window: a sticky, a timer, a preview
+  // ANY OTHER CORNER, written as it looks at the default (5): rad(7) is 7
+  // there and follows the setting like every token above. For the odd sizes
+  // the scale has no name for — a toolbar chip, a cell, a wash — so no corner
+  // is a bare number that stays put when everything else moves.
+  function rad(n) { return n * corner / 5; }
 
   // WHERE A CARD THAT HANGS OFF ANOTHER ONE GOES: its parent's right side if
   // there is room, its left if not, and clamped only when neither side fits.
@@ -596,7 +602,7 @@ QtObject {
   // the pill and every layer's corner radius — uniform on all four corners, no
   // morph. A single token so the bar, cynosure, and all other layers stay even
   // without duped literals, and one setting moves all of them together.
-  readonly property int pillRadius: cfg.barRadius
+  readonly property int pillRadius: Math.round(corner * 1.6)
 
   // ── how wide a layer may be ──────────────────────────────────────────
   // Every layer used to write 1000 into its own panel, and shell.qml wrote it

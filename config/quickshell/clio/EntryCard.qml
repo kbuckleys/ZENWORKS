@@ -30,7 +30,7 @@ Rectangle {
 
   // a page's air: a little more round the words than a list row has
   height: col.implicitHeight + 32
-  radius: Zenon.windowRadius + 4
+  radius: Zenon.rad(9)
   color: card.here ? Zenon.alpha(Zenon.cyan, 0.10) : Zenon.wash(0.04)
   border.width: card.here ? 2 : 1
   border.color: card.here ? Zenon.alpha(Zenon.cyan, 0.55) : Zenon.border

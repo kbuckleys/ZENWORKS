@@ -58,6 +58,17 @@ module.exports = {
     const webm = A.ffmpegArgs(src, "/o.webm", Object.assign({}, o, { format: "webm" }));
     t.has("webm is vp9", webm.join(" "), "libvpx-vp9");
     t.has("…with opus", webm.join(" "), "libopus");
+    // the crop: even, clamped, null for the whole picture; MP4 copy turns into an encode
+    t.eq("crop rounds to even", A.cropOf({ x: 11, y: 7, w: 301, h: 201 }, 1920, 1080), { x: 10, y: 6, w: 300, h: 200 });
+    t.eq("crop of everything is none", A.cropOf({ x: 0, y: 0, w: 1920, h: 1080 }, 1920, 1080), null);
+    t.eq("crop clamped inside", A.cropOf({ x: 1900, y: 0, w: 400, h: 100 }, 1920, 1080), { x: 1900, y: 0, w: 20, h: 100 });
+    const c = { x: 10, y: 6, w: 300, h: 200 };
+    const cc = A.ffmpegArgs(src, "/o.mp4", Object.assign({}, o, { crop: c }));
+    t.has("a cropped mp4 is encoded", cc.join(" "), "libx264");
+    t.has("…through the crop filter", cc.join(" "), "-vf crop=300:200:10:6");
+    t.has("a cropped gif crops first", A.ffmpegArgs(src, "/o.gif", Object.assign({}, o, { format: "gif", crop: c })).join(" "), "crop=300:200:10:6,fps=");
+    t.has("a cropped webm", A.ffmpegArgs(src, "/o.webm", Object.assign({}, o, { format: "webm", crop: c })).join(" "), "-vf crop=300:200:10:6");
+    t.eq("ratio of 1:1", A.ratioValue("1:1"), 1);
     // every argument a plain string, so Process gets it untouched
     t.eq("all strings", [copy, exact, gif, webm].every((a) => a.every((x) => typeof x === "string")), true);
 

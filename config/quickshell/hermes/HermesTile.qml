@@ -82,6 +82,10 @@ Item {
     anchors.fill: parent
     onClicked: t.pressed()
   }
+  // the grids' flash (morpheus/ChosenFlash), in the tile's own corners:
+  // the popup fires it, then the switch is thrown
+  readonly property alias flash: tileFlash
+  ChosenFlash { id: tileFlash; radius: Zenon.radiusCard }
 
   // the list, past the tile's own switch: on top of it, so it wins
   Item {

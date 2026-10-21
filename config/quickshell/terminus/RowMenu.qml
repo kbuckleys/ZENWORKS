@@ -685,6 +685,9 @@ PopupWindow {
         out.push({ sep: true });
         // THIS directory, not whatever the cursor is resting on. Last, where
         // every other file manager puts it.
+        // the space map of THIS directory, right before Info (user, 2026-10-21)
+        out.push({ label: "Space map", glyph: "\u{F0574}", key: ", U",
+                   act: () => term.spaceRef.ask() });
         out.push({ label: "Info", glyph: "\u{F064E}",
                    act: () => term.propsRef.askPath(term.cwd) });
         return out;
@@ -917,6 +920,11 @@ PopupWindow {
       // menu entries opening the same card one tab apart is the menu
       // being longer to say the same thing. c m still goes straight to
       // that tab for anyone who reaches for it.
+      // a directory's space map: gone into, then mapped, as its own
+      // tile in the map does (user, 2026-10-21: right before Info)
+      if (t.isDir && n === 1)
+        out.push({ label: "Space map", glyph: "\u{F0574}",
+                   act: () => { term.goTo(t.path); term.spaceRef.ask(); } });
       out.push({ label: "Info", glyph: "\u{F064E}", key: "alt return", act: () => term.propsRef.ask() });
       if (menu.isImage) {
         out.push({ sep: true });

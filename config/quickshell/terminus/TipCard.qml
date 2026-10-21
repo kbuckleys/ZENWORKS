@@ -28,7 +28,6 @@ Rectangle {
   radius: Zenon.windowRadius
   // the glass rim, as Tooltip's card has it — see Zenon.rim
   Rectangle {
-    visible: Zenon.rimOn
     z: 100
     x: parent.radius
     y: 1

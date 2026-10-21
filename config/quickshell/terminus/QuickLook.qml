@@ -1017,7 +1017,7 @@ PanelWindow {
               : Zenon.wash(0.04)
             border.width: 1
             border.color: pageCell.here ? Zenon.cyan : Zenon.border
-            radius: 2
+            radius: Zenon.rad(2)
 
             Image {
               anchors.fill: parent
@@ -1058,6 +1058,20 @@ PanelWindow {
         height: lookFrame.height - look.capH
         visible: look.sideW > 0
         color: Zenon.border
+      }
+      // the strip's own thumb (user, 2026-10-21): a long PDF's pages run
+      // far past the card, and nothing said how far down the strip you were.
+      // Against the card's right edge, which the strip is pinned to, as the
+      // text view's rail is
+      ScrollRail {
+        owner: root
+        target: lookPages
+        on: lookPages.visible
+        anchors.top: parent.top
+        anchors.topMargin: 2
+        anchors.bottom: parent.bottom
+        anchors.bottomMargin: look.capH + 2
+        anchors.right: parent.right
       }
 
       // ── THE FILM ITSELF, OVER THE FRAME PULLED OUT OF IT ─────────────

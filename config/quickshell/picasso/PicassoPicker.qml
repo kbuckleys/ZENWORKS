@@ -370,7 +370,7 @@ Scope {
         x: pane.flipped ? loupe.x + loupe.width / 2 - card.width : loupe.x + loupe.width / 2
         color: Zenon.menuBgSolid
         // no edge of its own: the rim below runs round lens and plate as one
-        readonly property int rad: Zenon.menuRadius + 4
+        readonly property int rad: Zenon.rad(10)
         topLeftRadius: pane.flipped ? card.rad : 0
         bottomLeftRadius: pane.flipped ? card.rad : 0
         topRightRadius: pane.flipped ? 0 : card.rad
@@ -388,7 +388,7 @@ Scope {
           Row {
             spacing: 12
             Rectangle {
-              width: 42; height: 42; radius: 8
+              width: 42; height: 42; radius: Zenon.radiusCard
               anchors.verticalCenter: parent.verticalCenter
               color: pane.rgb ? Qt.rgba(pane.rgb.r / 255, pane.rgb.g / 255, pane.rgb.b / 255, 1) : "transparent"
               border.width: 1

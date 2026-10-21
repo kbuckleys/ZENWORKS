@@ -17,6 +17,7 @@ import zipfile
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "..", "minerva", "core"))
 import epub  # noqa: E402
+import books  # noqa: E402
 
 TMP = tempfile.mkdtemp(prefix="minerva-test-")
 fails, count = [], 0
@@ -120,6 +121,55 @@ try:
         eq("a broken book raises", "no error", "BadZipFile")
     except zipfile.BadZipFile:
         eq("a broken book raises", "BadZipFile", "BadZipFile")
+
+    # ── markdown and text ─────────────────────────────────────────────────
+    md = os.path.join(TMP, "notes.md")
+    open(md, "w").write("# The Owl\n\nIntro *soft* and **loud**, `code` [web](https://x.y).\n\n"
+                        "## One\n\n- a\n- b\n\n> quoted\n\n## Two\n\n```\n<raw>\n```\n")
+    bm = epub.text_book(md, os.path.join(TMP, "md"))
+    eq("one h1 is the title", bm["title"], "The Owl")
+    eq("chapters at the headings", [c["title"] for c in bm["chapters"]], ["The Owl", "One", "Two"])
+    c0 = open(os.path.join(TMP, "md", "ch", bm["chapters"][0]["file"])).read()
+    has("emphasis", c0, "<em>soft</em>")
+    has("strong", c0, "<strong>loud</strong>")
+    has("a web link", c0, '<a href="https://x.y">web</a>')
+    c1 = open(os.path.join(TMP, "md", "ch", bm["chapters"][1]["file"])).read()
+    has("a list", c1, "<ul><li>a</li><li>b</li></ul>")
+    has("a quote", c1, "<blockquote>quoted</blockquote>")
+    c2 = open(os.path.join(TMP, "md", "ch", bm["chapters"][2]["file"])).read()
+    has("code kept escaped", c2, "<pre>&lt;raw&gt;</pre>")
+    eq("contents", [t["label"] for t in bm["toc"]], ["The Owl", "One", "Two"])
+    tx = os.path.join(TMP, "story.txt")
+    open(tx, "w").write("Front matter.\n\nChapter 1\n\nIt began\nhere.\n\nChapter 2\n\nThe end.\n")
+    bt = epub.text_book(tx, os.path.join(TMP, "tx"))
+    eq("a text's chapter lines", [c["title"] for c in bt["chapters"]], ["", "Chapter 1", "Chapter 2"])
+    has("lines joined in a paragraph", open(os.path.join(TMP, "tx", "ch", bt["chapters"][1]["file"])).read(), "<p>It began here.</p>")
+    long = os.path.join(TMP, "long.txt")
+    open(long, "w").write("\n\n".join(["word " * 500] * 20))
+    eq("a long text without chapters is cut in parts", len(epub.text_book(long, os.path.join(TMP, "lg"))["chapters"]), 3)
+
+    # ── comics ────────────────────────────────────────────────────────────
+    import struct as _st
+    import zlib as _z
+
+    def png(w, h):
+        raw = b"".join(b"\x00" + b"\x00" * (w * 3) for _ in range(h))
+        chunk = lambda t, d: _st.pack(">I", len(d)) + t + d + _st.pack(">I", _z.crc32(t + d) & 0xFFFFFFFF)
+        return b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", _st.pack(">IIBBBBB", w, h, 8, 2, 0, 0, 0)) + chunk(b"IDAT", _z.compress(raw)) + chunk(b"IEND", b"")
+    cbz = os.path.join(TMP, "c.cbz")
+    with zipfile.ZipFile(cbz, "w") as z:
+        z.writestr("p10.png", png(4, 6))
+        z.writestr("p2.png", png(3, 5))
+        z.writestr("notes.txt", "x")
+    cb = books.comic(cbz, os.path.join(TMP, "cbz"))
+    eq("pages in natural order", [os.path.basename(p["file"]) for p in cb["pages"]], ["p2.png", "p10.png"])
+    eq("sizes from the headers", [(p["width"], p["height"]) for p in cb["pages"]], [(3, 5), (4, 6)])
+    eq("read back unchanged", books.comic(cbz, os.path.join(TMP, "cbz"))["stamp"], cb["stamp"])
+    lib = os.path.join(TMP, "lib")
+    os.makedirs(os.path.join(lib, "a", ".hidden"))
+    for f in ["a/x.pdf", "a/.hidden/y.pdf", "z.epub", "n.txt", "q.CBZ"]:
+        open(os.path.join(lib, f), "w").write("")
+    eq("a scan finds books, not hidden ones or texts", sorted(os.path.relpath(p, lib) for p in books.scan([lib])), ["a/x.pdf", "q.CBZ", "z.epub"])
 finally:
     shutil.rmtree(TMP, ignore_errors=True)
 

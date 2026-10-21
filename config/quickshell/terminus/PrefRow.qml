@@ -49,6 +49,7 @@ Item {
   // highlight that follows the pointer made the panel twitch as the mouse
   // crossed it.
   MouseArea {
+    id: prefTap
     anchors.fill: parent
     enabled: pref.enabled
     onClicked: pref.toggled()
@@ -91,6 +92,7 @@ Item {
     anchors.rightMargin: 14
     anchors.verticalCenter: parent.verticalCenter
     enabled: false
+    held: prefTap.pressed
     lit: pref.on
   }
 }

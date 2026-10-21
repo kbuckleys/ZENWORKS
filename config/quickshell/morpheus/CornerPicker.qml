@@ -137,7 +137,7 @@ PopupWindow {
 
           width: root.cellW
           height: root.cellH
-          radius: 3
+          radius: Zenon.rad(3)
           color: cell.chosen
             ? Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b, 0.30)
             : (cellMa.pressed ? Zenon.wash(0.12)
@@ -160,7 +160,7 @@ PopupWindow {
           Rectangle {
             width: Math.round(parent.width * 0.45)
             height: 6
-            radius: 2
+            radius: Zenon.rad(2)
             x: cell.c === 0 ? 5
              : cell.c === 2 ? parent.width - width - 5
              : Math.round((parent.width - width) / 2)

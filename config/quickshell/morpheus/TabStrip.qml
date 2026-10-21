@@ -291,9 +291,13 @@ Rectangle {
         // reads this cell's place): the window's ground with the thin glass
         // cut away under it, as terminus' (2026-10-11). Only a carried tab
         // paints its own.
-        // carried, it looks as it did (user, 2026-10-13): the movement says
-        // which one is in hand, no ground of its own
-        color: Zenon.alpha(Zenon.tabAwayInk, 0)
+        // carried, it looks as it did (user, 2026-10-13) but OPAQUE (user,
+        // 2026-10-21): clear, it let the glass it passed over show through,
+        // the active tab's ground mixing into an inactive one. Its own look
+        // laid on the window's ground made solid.
+        readonly property color solidGround: Zenon.alpha(Zenon.layerBg, 1)
+        color: !tabCell.lifted ? Zenon.alpha(Zenon.tabAwayInk, 0)
+          : tabCell.here ? tabCell.solidGround : Qt.tint(tabCell.solidGround, tabStrip.awayGlass)
         onHereChanged: if (here) tabStrip.hereCell = tabCell
         // a tab's own hue (plato's visual-mode magenta,
         // as their bar wears it), over its glass; plato's tabs have none
@@ -302,6 +306,14 @@ Rectangle {
           anchors.bottomMargin: -1
           visible: !!tabCell.modelData.tint
           color: tabCell.modelData.tint ? Zenon.alpha(tabCell.modelData.tint, 0.17) : "transparent"
+        }
+        // an inactive tab held down: the suite's tile press (Zenon.pressTile),
+        // not while carried or while the × takes the press (user, 2026-10-21)
+        Rectangle {
+          anchors.fill: parent
+          visible: !tabCell.here && tabMouse.pressed && tabMouse.pressedButtons & Qt.LeftButton
+            && !tabMouse.overClose && !tabMouse.dragging
+          color: Zenon.pressTile(false)
         }
 
         Rectangle {
@@ -316,18 +328,31 @@ Rectangle {
         // with no edge (user, 2026-10-09). Just under the cell, in the 1px
         // the cells leave free; cut where a sheet is spliced out of it
         // (spliceX/spliceW are strip coordinates, as the cell's x is).
+        //
+        // A CARRIED tab leaves its line behind (user, 2026-10-21): riding with
+        // the cell it ran on under the active tab and left a gap where the
+        // tab had been. It lies under the slot the tab will land in instead,
+        // gliding there as the others make room.
+        property real landX: Math.max(0, tabStrip.dragTo) * (tabStrip.width / Math.max(1, tabStrip.tabs.length))
+        Behavior on landX {
+          enabled: tabCell.lifted
+          NumberAnimation { duration: Zenon.normal; easing.type: Easing.OutCubic }
+        }
         Item {
+          id: underLine
+          x: tabCell.lifted ? tabCell.landX - tabCell.x : 0
           y: tabCell.height
           width: tabCell.width
           height: 1
+          readonly property real atX: tabCell.x + underLine.x
           readonly property bool cut: tabStrip.spliceInk > 0.01
-          readonly property real cutL: Math.max(0, Math.min(width, tabStrip.spliceX - tabCell.x))
-          readonly property real cutR: Math.max(0, Math.min(width, tabStrip.spliceX + tabStrip.spliceW - tabCell.x))
+          readonly property real cutL: Math.max(0, Math.min(width, tabStrip.spliceX - underLine.atX))
+          readonly property real cutR: Math.max(0, Math.min(width, tabStrip.spliceX + tabStrip.spliceW - underLine.atX))
           // the tab's own glass under its line, or the 1px row the cells
           // leave free would be a clear seam
           Rectangle {
             anchors.fill: parent
-            color: tabCell.color
+            color: tabCell.lifted ? "transparent" : tabCell.color
           }
           Rectangle {
             width: parent.cut ? parent.cutL : parent.width

@@ -29,6 +29,8 @@ Item {
     visible: tp.rows.length === 0
     text: "No timers"
   }
+  // a timer clicked flashes, then its service opens (morpheus/RowFlash)
+  RowFlash { id: rowFlash }
   ListView {
     id: list
     anchors.fill: parent
@@ -43,6 +45,7 @@ Item {
       readonly property var r: tp.rows[index] || null
       width: list.width
       height: 54
+      FlashOver { flash: rowFlash; index: trow.index }
       Text {
         id: tglyph
         x: 24
@@ -106,7 +109,11 @@ Item {
       }
       MouseArea {
         anchors.fill: parent
-        onClicked: { tp.sel = trow.index; if (trow.r && trow.r.activates && tp.win) tp.win.showUnit(trow.r.activates, trow.r.scope); }
+        onClicked: {
+          tp.sel = trow.index;
+          const r = trow.r;
+          if (r && r.activates && tp.win) rowFlash.flashThen(trow.index, () => tp.win.showUnit(r.activates, r.scope));
+        }
       }
     }
   }
