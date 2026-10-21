@@ -15,8 +15,9 @@
 //            drew again. Here it stays up with handles until you press Save
 //            (or Return), and Abort (or Escape) walks away. Quick presets
 //            (1–7: shapes, exact sizes, the screen; l the last region)
-//            reshape it, and Copy text (t) reads it with tesseract instead —
-//            the viewer's OCR — and puts the words on the clipboard.
+//            reshape it, Copy text (t) reads it with tesseract instead —
+//            the viewer's OCR — and puts the words on the clipboard, and
+//            Snap (s) puts the picture on the clipboard and saves nothing.
 //
 // THE SAME OVERLAY PICKS FOR A RECORDING (argus, 10-20). Argus' region and
 // window recordings used to ask slurp, a crosshair that took the box the
@@ -233,12 +234,22 @@ Scope {
     }
   }
 
+  // ── a snap ────────────────────────────────────────────────────────────
+  // The rectangle straight to the clipboard, through the same pointer-hiding
+  // run() a shot uses, and nothing written to the screenshots. No file means
+  // no capture card either — a plain toast says it is there.
+  function snap(geo) {
+    cap.run("grim -g " + cap.sh(geo) + " - | wl-copy --type image/png", "");
+  }
+
   Process {
     id: shotProc
     property string file: ""
     onExited: (code) => {
       cap.busy = false;
-      if (code === 0) cap.announce(shotProc.file);
+      if (code !== 0) return;
+      if (shotProc.file) cap.announce(shotProc.file);
+      else Quickshell.execDetached(["notify-send", "-a", "picasso", "Snapped", "the region is on the clipboard"]);
     }
   }
 
@@ -304,8 +315,9 @@ Scope {
       claim.restart();
     }
 
-    // `text`: read it rather than keep it — see cap.readText
-    function finish(save, text) {
+    // `how`: "text" reads it rather than keep it (see cap.readText);
+    // "snap" puts it on the clipboard and keeps no file (see cap.snap)
+    function finish(save, how) {
       // with no box drawn, what is taken is the lit window — the focused one
       // the session started with, or the one the pointer last crossed
       // (kept to the screen, the way a clicked window is: one hanging off
@@ -328,7 +340,8 @@ Scope {
       // monitor's own origin plus the box.
       const m = cap.monitor;
       cap.pendingGeo = (m.x + s.x) + "," + (m.y + s.y) + " " + s.w + "x" + s.h;
-      if (text) { cap.readText(cap.pendingGeo); return; }
+      if (how === "text") { cap.readText(cap.pendingGeo); return; }
+      if (how === "snap") { cap.snap(cap.pendingGeo); return; }
       // after the overlay has left the screen (run() waits a beat for the
       // pointer anyway, which is also long enough for that)
       cap.run("mkdir -p " + cap.sh(Picasso.shotDir) + " && grim -g "
@@ -572,7 +585,7 @@ Scope {
             }
             Text {
               text: cap.recording ? "Arrows move  ·  ctrl+arrows size  ·  ↵ record  ·  esc abort"
-                : "Arrows move  ·  ctrl+arrows size  ·  t copy text  ·  ↵ save  ·  esc abort"
+                : "Arrows move  ·  ctrl+arrows size  ·  t copy text  ·  s snap  ·  ↵ save  ·  esc abort"
               color: Zenon.accentMuted
               font.family: Zenon.face
               font.weight: Zenon.weight
@@ -580,7 +593,8 @@ Scope {
             }
           }
           DialogButton { label: "Abort"; ink: Zenon.accentMuted; onClicked: region.finish(false) }
-          DialogButton { visible: !cap.recording; label: "Copy text"; ink: Zenon.sand; onClicked: region.finish(true, true) }
+          DialogButton { visible: !cap.recording; label: "Copy text"; onClicked: region.finish(true, "text") }
+          DialogButton { visible: !cap.recording; label: "Snap"; onClicked: region.finish(true, "snap") }
           DialogButton { label: cap.recording ? "Record" : "Save"; ink: Zenon.cyan; primary: true; onClicked: region.finish(true) }
         }
       }
@@ -701,7 +715,8 @@ Scope {
         }
         if (e.key === Qt.Key_L) { region.useLast(); return; }
         if (!region.has) return;
-        if (e.key === Qt.Key_T) { if (!cap.recording) region.finish(true, true); return; }
+        if (e.key === Qt.Key_T) { if (!cap.recording) region.finish(true, "text"); return; }
+        if (e.key === Qt.Key_S) { if (!cap.recording) region.finish(true, "snap"); return; }
         const n = (e.modifiers & Qt.ShiftModifier) ? 10 : 1;
         let dx = 0, dy = 0;
         if (e.key === Qt.Key_Left) dx = -n;

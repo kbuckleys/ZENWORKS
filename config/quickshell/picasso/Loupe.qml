@@ -80,7 +80,7 @@ Item {
     anchors.bottomMargin: 14
     width: magText.implicitWidth + 12
     height: 18
-    radius: height / 2
+    radius: Zenon.radiusControl
     color: Zenon.hud(0.8)
     Text {
       id: magText

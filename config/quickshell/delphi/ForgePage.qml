@@ -490,7 +490,7 @@ Item {
         required property var modelData
         width: lab.implicitWidth + 18
         height: 22
-        radius: height / 2
+        radius: Zenon.radiusControl
         color: Zenon.alpha(Qt.color(modelData.color), 0.18)
         border.width: 1
         border.color: Zenon.alpha(Qt.color(modelData.color), 0.6)
@@ -603,7 +603,7 @@ Item {
             readonly property var mark: D.forgeMark(pg.item)
             width: markRow.implicitWidth + 22
             height: 26
-            radius: height / 2
+            radius: Zenon.radiusControl
             color: Zenon.alpha(Zenon[mark.ink], 0.14)
             border.width: 1
             border.color: Zenon.alpha(Zenon[mark.ink], 0.45)

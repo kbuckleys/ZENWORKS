@@ -211,7 +211,7 @@ LayerPopup {
             anchors.verticalCenter: parent.verticalCenter
             width: 30
             height: 22
-            radius: height / 2
+            radius: Zenon.radiusControl
             color: Howler.trackMusic
               ? Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b, 0.18)
               : (musicPress.pressed ? Zenon.wash(0.08) : "transparent")
@@ -243,7 +243,7 @@ LayerPopup {
             anchors.verticalCenter: parent.verticalCenter
             width: 30
             height: 22
-            radius: height / 2
+            radius: Zenon.radiusControl
             color: Howler.silent
               ? Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b, 0.18)
               : (silentPress.pressed ? Zenon.wash(0.08) : "transparent")
@@ -319,7 +319,7 @@ LayerPopup {
 
         width: chipText.implicitWidth + 20
         height: 24
-        radius: height / 2
+        radius: Zenon.radiusControl
         color: chip.on ? Qt.rgba(Zenon.sand.r, Zenon.sand.g, Zenon.sand.b, 0.20)
                        : "transparent"
         border.color: chip.on ? Zenon.sand : Zenon.border

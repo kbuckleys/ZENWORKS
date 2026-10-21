@@ -3575,7 +3575,7 @@ FloatingWindow {
                   anchors.verticalCenter: parent.verticalCenter
                   width: repoWord.implicitWidth + 14
                   height: 18
-                  radius: height / 2
+                  radius: Zenon.radiusControl
                   color: Qt.rgba(ink.r, ink.g, ink.b, 0.13)
                   Text {
                     id: repoWord
@@ -3880,7 +3880,7 @@ FloatingWindow {
                   required property string modelData
                   width: chipWord.implicitWidth + 16
                   height: 24
-                  radius: height / 2
+                  radius: Zenon.radiusControl
                   color: chipPress.pressed ? Zenon.headBg : "transparent"
                   border.width: 1
                   border.color: chipPress.pressed ? Zenon.accentKey : Zenon.border

@@ -428,7 +428,7 @@ Item {
           anchors.margins: 8
           width: cell.state_ === "finished" ? 26 : badge.implicitWidth + 14
           height: 22
-          radius: 11
+          radius: Zenon.radiusControl
           color: cell.state_ === "finished" ? Zenon.green : Zenon.cyan
           Text {
             id: badge

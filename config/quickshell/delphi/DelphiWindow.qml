@@ -1379,7 +1379,7 @@ FloatingWindow {
           anchors.verticalCenter: headTitle.verticalCenter
           width: chipRow.implicitWidth + 22
           height: Math.round(Zenon.px(14) * 2)
-          radius: height / 2
+          radius: Zenon.radiusControl
           color: chipPress.pressed ? Zenon.pressFill : Zenon.wash(0.05)
           border.width: 1
           border.color: Zenon.border
@@ -1515,7 +1515,7 @@ FloatingWindow {
           readonly property color ink: upPill.phase === "failed" ? Zenon.red : upPill.phase === "done" ? Zenon.green : Zenon.cyan
           Rectangle {
             anchors.fill: parent
-            radius: height / 2
+            radius: Zenon.radiusControl
             color: Zenon.alpha(upPill.ink, upPress.pressed ? 0.14 : 0.08)
             border.width: 1
             border.color: Zenon.alpha(upPill.ink, 0.4)

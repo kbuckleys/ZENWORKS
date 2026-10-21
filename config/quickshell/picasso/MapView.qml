@@ -212,7 +212,7 @@ Item {
         x: 34; y: -4
         width: Math.max(22, countText.implicitWidth + 10)
         height: 22
-        radius: height / 2
+        radius: height / 2   // shape: the pin's count, round like the pin
         color: Zenon.sand
         Text { id: countText; anchors.centerIn: parent; text: pin.modelData.n; color: Zenon.black
                font.family: Zenon.face; font.weight: 600; font.pixelSize: Zenon.px(12) }

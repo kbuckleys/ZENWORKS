@@ -125,7 +125,7 @@ Item {
     visible: card.count > 1
     width: countText.implicitWidth + 12
     height: 20
-    radius: height / 2
+    radius: Zenon.radiusControl
     color: Zenon.cyan
 
     Text {

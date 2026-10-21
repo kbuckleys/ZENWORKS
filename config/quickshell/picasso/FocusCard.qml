@@ -927,7 +927,7 @@ Item {
           visible: card.picker.focusOn.length > 0
           width: onLabel.implicitWidth + 18
           height: 22
-          radius: height / 2
+          radius: Zenon.radiusControl
           color: card.entryColor
           Text {
             id: onLabel

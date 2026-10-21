@@ -995,7 +995,7 @@ Item {
       visible: ann.cropping
       width: cropHint.implicitWidth + 20
       height: 26
-      radius: height / 2
+      radius: Zenon.radiusControl
       color: Zenon.hud(0.8)
       Text {
         id: cropHint

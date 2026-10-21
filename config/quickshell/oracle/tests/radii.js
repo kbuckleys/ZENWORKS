@@ -16,6 +16,11 @@
 //                         as `height / 2` or as the number
 //   `// shape`            on the line: a shape the user draws or picks
 //                         (picasso's rounded-rectangle tool), not chrome
+//
+// AND NO PILLS (user, 2026-10-21). Something sized to its words — a chip, a
+// tag, a label, a badge, a button — has a button's corner (radiusControl),
+// never `height / 2`. Round stays for what is round: dots, knobs, tracks,
+// circles. So `radius: height / 2` beside `width: x.implicitWidth + n` fails.
 
 "use strict";
 
@@ -63,6 +68,17 @@ module.exports = {
         }
       });
     }
+    const pills = [];
+    for (const f of walk(root, "", [])) {
+      const lines = fs.readFileSync(path.join(root, f), "utf8").split("\n");
+      lines.forEach((line, i) => {
+        if (!/^\s*radius\s*:\s*(height|width)\s*\/\s*2\s*$/.test(line)) return;
+        const near = lines.slice(Math.max(0, i - 6), i + 3).join("\n");
+        if (/\bwidth\s*:[^\n]*\.implicitWidth\s*\+/.test(near))
+          pills.push(f + ":" + (i + 1) + "  " + line.trim());
+      });
+    }
+    t.eq("nothing sized to its words is a pill — radius: Zenon.radiusControl", pills.join("\n    "), "");
     t.eq("every corner follows Corner rounding — a Zenon radius token or Zenon.rad(n)",
       bad.join("\n    "), "");
   }

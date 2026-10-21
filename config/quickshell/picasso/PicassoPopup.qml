@@ -1086,7 +1086,7 @@ LayerPopup {
               visible: Picasso.slideshow !== null
               width: ssRow.implicitWidth + 16
               height: 22
-              radius: height / 2
+              radius: Zenon.radiusControl
               color: Qt.rgba(popup.entryColor.r, popup.entryColor.g, popup.entryColor.b, 0.12)
               border.width: 1
               border.color: Qt.rgba(popup.entryColor.r, popup.entryColor.g, popup.entryColor.b, 0.45)

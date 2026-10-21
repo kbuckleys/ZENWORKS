@@ -3624,7 +3624,7 @@ FloatingWindow {
         anchors.centerIn: parent
         width: makingRow.implicitWidth + 32
         height: 36
-        radius: height / 2
+        radius: Zenon.radiusControl
         color: Zenon.hud(0.82)
         border.width: 1
         border.color: Zenon.border
@@ -3653,7 +3653,7 @@ FloatingWindow {
       z: 6
       width: zoomSaidText.implicitWidth + 28
       height: 34
-      radius: height / 2
+      radius: Zenon.radiusControl
       color: Zenon.hud(0.8)
       border.width: 1
       border.color: Zenon.border
@@ -4730,7 +4730,7 @@ FloatingWindow {
           z: 2
           width: burstRow.implicitWidth + 12
           height: 22
-          radius: height / 2
+          radius: Zenon.radiusControl
           color: Zenon.hud(0.867)
           border.width: 1
           border.color: Zenon.sand
@@ -4752,7 +4752,7 @@ FloatingWindow {
           z: 2
           width: bestText.implicitWidth + 14
           height: 20
-          radius: height / 2
+          radius: Zenon.radiusControl
           color: Zenon.green
           Text { id: bestText; anchors.centerIn: parent; text: "best"; color: Zenon.black
                  font.family: Zenon.face; font.weight: 600; font.pixelSize: Zenon.px(11) }
@@ -4775,7 +4775,7 @@ FloatingWindow {
           z: 4
           width: chipRow.implicitWidth + 18
           height: 22
-          radius: height / 2
+          radius: Zenon.radiusControl
           color: Zenon.headBg
           border.width: 1
           border.color: cell.chip && cell.chip.kind === "dupe" ? Zenon.sand : Zenon.border
@@ -4883,7 +4883,7 @@ FloatingWindow {
         x: 10
         width: pinRow.implicitWidth + 18
         height: 22
-        radius: height / 2
+        radius: Zenon.radiusControl
         color: Zenon.headBg
         border.width: 1
         border.color: pinned.chip && pinned.chip.kind === "dupe" ? Zenon.sand : Zenon.border
