@@ -129,7 +129,7 @@ Item {
                 selectedTextColor: color
                 font.family: tbl.editor ? tbl.editor.face : Zenon.face
                 font.weight: rowItem.r === 0 ? Font.DemiBold : Zenon.weight
-                font.pixelSize: tbl.editor ? Math.round(tbl.editor.textSize * 0.94) : 15
+                font.pixelSize: tbl.editor ? Math.round(tbl.editor.textSize * 0.94) : Zenon.px(15)
                 cursorDelegate: Caret { field: cellText; thick: 3; low: 0.45; steady: true }
                 onTextChanged: {
                   if (cellItem.syncing || !tbl.editor) return;

@@ -467,11 +467,11 @@ Item {
     }
     footer: Item { width: list.width; height: pg.scanning && pg.rows.length > 0 ? 50 : 0; Working { anchors.centerIn: parent; running: pg.scanning && pg.rows.length > 0 } }
     Working { anchors.centerIn: parent; running: pg.scanning && pg.rows.length === 0; visible: running }
-    EmptyMark {
+    EmptyState {
       anchors.centerIn: parent
       visible: pg.rows.length === 0 && !pg.scanning
       filtered: pg.query !== ""
-      word: pg.query !== "" ? "" : "No repositories yet — open, clone or start one"
+      text: pg.query !== "" ? "No matches" : "No repositories yet — open, clone or start one"
     }
   }
   ElasticScroll { anchors.fill: list; view: list }

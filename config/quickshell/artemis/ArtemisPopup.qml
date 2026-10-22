@@ -752,7 +752,7 @@ LayerPopup {
           // word — and the body grows to hold it (see emptyH). Still out is
           // the shell's dots. Nothing typed and nothing yet opened is the
           // one place a word is still the right thing.
-          EmptyMark {
+          EmptyState {
             anchors.centerIn: parent
             filtered: true
             visible: popup.shown && popup.showNoMatch

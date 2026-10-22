@@ -1106,8 +1106,8 @@ FloatingWindow {
             }
           }
 
-          // the folders (vaults, groups) of what is in view
-          SideHead { ruled: false; label: "Folders"; visible: folderRep.count > 0 }
+          // the containers (folders, vaults, groups) of what is in view
+          SideHead { ruled: false; label: "Containers"; visible: folderRep.count > 0 }
           Repeater {
             id: folderRep
             model: win.mgr ? C.folders(win.mgr.items.filter((i) => !win.scope.acct || i.acct === win.scope.acct)).slice(0, 60) : []
@@ -1307,11 +1307,11 @@ FloatingWindow {
                        radius: Zenon.windowRadius; on: menu.isOpen && win.menuHeld === "i:" + C.keyOf(rowItem.it) }
           }
         }
-        EmptyMark {
+        EmptyState {
           anchors.centerIn: parent
           visible: list.count === 0 && !!win.mgr && !win.mgr.loading
           filtered: win.query !== ""
-          word: win.query !== "" ? "" : win.mgr && !win.mgr.anyOpen ? "Locked" : "Nothing here"
+          text: win.query !== "" ? "No matches" : win.mgr && !win.mgr.anyOpen ? "Locked" : "Nothing here"
         }
         Working {
           anchors.centerIn: parent

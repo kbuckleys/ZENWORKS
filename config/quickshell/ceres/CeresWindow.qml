@@ -88,14 +88,27 @@ FloatingWindow {
   property string tab: "store"
   // The views, in switch order: [name, label].
   readonly property var tabs: [
-    ["store", "Store"],
-    ["packages", "Packages"],
+    // GLYPHS, NOT WORDS, every tab (user, 2026-10-22): each says its name
+    // on the pointer (tabNames); a count stays beside its glyph
+    ["store", ""],
+    ["packages", ""],
     // after Packages (user, 2026-10-14): find, then keep current
-    ["updates", Ceres.total > 0 ? "Updates  " + Ceres.total : "Updates"],
-    ["history", "History"],
-    ["maintenance", win.maint && win.maintCount > 0 ? "Maintenance  " + win.maintCount : "Maintenance"],
-    ["settings", configView.changes > 0 ? "Settings  " + configView.changes : "Settings"]
+    ["updates", Ceres.total > 0 ? String(Ceres.total) : ""],
+    ["history", ""],
+    ["maintenance", win.maint && win.maintCount > 0 ? String(win.maintCount) : ""],
+    ["settings", configView.changes > 0 ? String(configView.changes) : ""],
+    // Arch's news on demand (user, 2026-10-22): its glyph alone, at the end
+    ["news", ""]
   ]
+  // the glyphs those tabs wear: the Store the one it has in Icarus,
+  // Packages the bar's update menu's, News the feed's
+  readonly property var tabGlyphs: ({ store: "\u{F0D68}", packages: "\uF487",
+                                      updates: "\u{F06B0}", history: "\uEAB0",
+                                      maintenance: "\u{F08EA}", settings: "\uEB52", news: "\uF09E" })
+  readonly property var tabNames: ({ store: "Store", packages: "Packages", updates: "Updates", history: "History",
+                                     maintenance: "Maintenance", settings: "Settings", news: "Arch news" })
+  // a fresh read when the tab opens, unless the last is this recent
+  readonly property int newsFresh: 15 * 60 * 1000
   // The label column of a list of [label, value, ...] fact rows (the cache's
   // and the mirrors'): as wide as the longest label, never narrower than the
   // 250 the rows used to be fixed at, so short lists keep their alignment.
@@ -123,6 +136,8 @@ FloatingWindow {
     }
     // read once; after that the edits in hand are what the tab shows
     if (t === "settings" && !configView.loaded) configView.load();
+    if (t === "news" && (Ceres.news.length === 0 || Date.now() - Ceres.newsFetched > win.newsFresh))
+      Ceres.fetchNews(true);
     keys.forceActiveFocus();
   }
   function cycleTab(d) {
@@ -1894,6 +1909,7 @@ FloatingWindow {
       win.msel = Math.max(0, Math.min(win.maintItems.length - 1, win.msel + d));
       return;
     }
+    if (win.tab === "news") { newsTab.scroll(d); return; }
     if (win.tab === "settings") {
       configView.gsel = Math.max(0, Math.min(configView.groups.length - 1, configView.gsel + (d > 0 ? 1 : -1)));
       return;
@@ -2021,7 +2037,7 @@ FloatingWindow {
         win.cycleTab(k === Qt.Key_Backtab || (event.modifiers & Qt.ShiftModifier) ? -1 : 1);
         return;
       }
-      if (ctrl && k >= Qt.Key_1 && k <= Qt.Key_6) {
+      if (ctrl && k >= Qt.Key_1 && k < Qt.Key_1 + win.tabs.length) {
         event.accepted = true;
         win.showTab(win.tabs[k - Qt.Key_1][0]);
         return;
@@ -2083,6 +2099,13 @@ FloatingWindow {
           win.loadMaint(); Ceres.checkStale(); Ceres.checkAurHealth(true);
           if (win.maintItems[win.msel].key === "mirrors") { win.ranked = null; win.loadMirrors(); }
         }
+        else event.accepted = false;
+        return;
+      }
+      if (win.tab === "news") {
+        event.accepted = true;
+        if (ctrl && k === Qt.Key_R) Ceres.fetchNews(true);
+        else if (k === Qt.Key_J || k === Qt.Key_K) win.move(k === Qt.Key_J ? 1 : -1);
         else event.accepted = false;
         return;
       }
@@ -2244,6 +2267,20 @@ FloatingWindow {
         textSize: Zenon.px(16)
         ink: Zenon.accentKey
         options: win.tabs
+        glyphOf: (v) => win.tabGlyphs[v] || ""
+        // unread news: the News tab's dot
+        dotted: Ceres.unreadNews.length > 0 ? ["news"] : []
+        // a glyph says its name on the pointer, with its key
+        onPointed: (v, at, inside) => {
+          const i = win.tabs.findIndex((t) => t[0] === v);
+          if (inside && win.tabNames[v]) headTip.show(at, win.tabNames[v]
+            + (v === "news" && Ceres.unreadNews.length > 0 ? "  ·  " + Ceres.unreadNews.length + " new" : "")
+            + (v === "updates" && Ceres.total > 0 ? "  ·  " + Ceres.total : "")
+            + (v === "maintenance" && win.maint && win.maintCount > 0 ? "  ·  " + win.maintCount : "")
+            + (v === "settings" && configView.changes > 0 ? "  ·  " + configView.changes + " unsaved" : "")
+            + "  ·  ctrl " + (i + 1));
+          else headTip.hide(at);
+        }
         // a restart or reboot still owed after an update: Updates wears the
         // note's own ink (user, 2026-10-17) — NoteBar.inkOf
         inks: Ceres.noteItems.some(n => n.level === "bad") ? { updates: Zenon.red }
@@ -2352,30 +2389,19 @@ FloatingWindow {
                 readOnly: true
                 enabled: false
                 activeFocusOnTab: false
-                cursorVisible: false
-                cursorDelegate: Item {}
+                cursorVisible: win.face === "browse" && win.typing
+                cursorDelegate: Caret {
+                  field: sfInput
+                  active: win.face === "browse" && win.typing
+                  color: Zenon.white
+                  low: 0.3
+                }
                 color: win.typing ? Zenon.white : Zenon.accentKey
                 selectionColor: Zenon.cyan
                 selectedTextColor: Zenon.onAccent
                 font.family: Zenon.face
                 font.weight: Zenon.weight
                 font.pixelSize: Zenon.px(15)
-              }
-              Rectangle {
-                id: sfCaret
-                visible: win.face === "browse" && win.typing
-                x: Math.max(0, sfInput.x + sfInput.cursorRectangle.x)
-                anchors.verticalCenter: parent.verticalCenter
-                width: 2
-                height: 15
-                color: Zenon.white
-                opacity: 0.3
-                SequentialAnimation on opacity {
-                  running: sfCaret.visible
-                  loops: Animation.Infinite
-                  NumberAnimation { to: 1; duration: Zenon.breath; easing.type: Zenon.breathEase }
-                  NumberAnimation { to: 0.3; duration: Zenon.breath; easing.type: Zenon.breathEase }
-                }
               }
               Text {
                 visible: win.filterText === ""
@@ -2443,7 +2469,7 @@ FloatingWindow {
             // THE TEXT, CLEARED (user, 2026-10-15): a × at the end while there
             // is any — ctrl+u's own, for the pointer; you stay in the field.
             // Terminus' tab close chip, the suite's one × (user, 2026-10-15)
-            Term.ClearChip {
+            ClearChip {
               id: sfClear
               shown: win.filterText !== ""
               anchors.right: parent.right
@@ -2574,6 +2600,16 @@ FloatingWindow {
       anchors.left: parent.left
       anchors.right: parent.right
       anchors.bottom: parent.bottom
+
+      // ── News: the whole feed, on demand ───────────────────────────────
+      NewsView {
+        id: newsTab
+        all: true
+        grow: 2
+        visible: win.page === "browse" && win.tab === "news"
+        anchors.fill: parent
+        anchors.margins: 20
+      }
 
       // ── History ─────────────────────────────────────────────────────
       // Transactions on the left, newest first, each under its date, what it
@@ -4115,6 +4151,8 @@ FloatingWindow {
         .concat(win.hevent && !win.hevent.flatpak ? [["ctrl z", "undo this transaction"]] : [])
         .concat(win.typing ? [] : [["j k", "move"], ["/", "filter"]])
         .concat([["ctrl tab", "next"]]).concat(win.escHint());
+    if (win.tab === "news")
+      return [["j k", "scroll"], ["ctrl r", "refresh"], ["ctrl tab", "next"]];
     if (win.tab === "maintenance")
       return [["j k", "choose"], ["return", "do it"], ["r", "recheck"], ["ctrl tab", "next"]];
     if (win.tab === "settings")

@@ -16,7 +16,7 @@
 // size it happened to be on screen.
 //
 //   Save       over the picture it opened
-//   Save New   a new file, through terminus' own save dialog — opened in
+//   Save new   a new file, through terminus' own save dialog — opened in
 //              the picture's own directory with a name already in it, so Return
 //              takes the default and anywhere else is a walk through directories
 //   Copy       the annotated picture to the clipboard
@@ -39,7 +39,7 @@ Item {
   id: ann
 
   property string path: ""
-  // terminus, for Save New's dialog — the viewer's, handed down
+  // terminus, for Save new's dialog — the viewer's, handed down
   property var fileManager: null
 
   // Done with: the marks are saved, or discarded, or there were none.
@@ -197,7 +197,7 @@ Item {
     ann.say("Copied to the clipboard");
   }
 
-  // Save New asks terminus' picker for a path — its save dialog, the
+  // Save new asks terminus' picker for a path — its save dialog, the
   // one applications get — and writes the canvas there when it answers.
   function saveNew() {
     const fm = ann.fileManager;
@@ -668,7 +668,7 @@ Item {
         rightPadding: 6
       }
       DialogButton { label: "Copy"; ink: Zenon.accentMuted; onClicked: ann.copy() }
-      DialogButton { label: "Save New"; ink: Zenon.white; onClicked: ann.saveNew() }
+      DialogButton { label: "Save new"; ink: Zenon.white; onClicked: ann.saveNew() }
       DialogButton { label: "Save"; ink: Zenon.cyan; primary: true; ready: ann.dirty
                      onClicked: ann.saveTo(ann.path) }
     }
@@ -684,7 +684,7 @@ Item {
       Repeater {
         model: [
           { g: "\uf0c5", name: "Copy", key: "", ink: Zenon.accentMuted, live: true, act: () => ann.copy() },
-          { g: "\uf0c7", name: "Save New", key: "", ink: Zenon.white, live: true, act: () => ann.saveNew() },
+          { g: "\uf0c7", name: "Save new", key: "", ink: Zenon.white, live: true, act: () => ann.saveNew() },
           { g: "\uf00c", name: "Save", key: "", ink: Zenon.cyan, live: ann.dirty, act: () => ann.saveTo(ann.path) }
         ]
         delegate: Rectangle {
@@ -695,7 +695,7 @@ Item {
             anchors.centerIn: parent
             text: modelData.g
             color: modelData.live ? modelData.ink : Zenon.accentMuted
-            opacity: modelData.live ? 1 : 0.5
+            opacity: modelData.live ? 1 : Zenon.disabledDim
             font.family: Zenon.face
             font.weight: Zenon.weight
             font.pixelSize: Zenon.px(15)
@@ -933,6 +933,7 @@ Item {
       TextEdit {
         id: textEdit
         visible: false
+        cursorDelegate: Caret { field: textEdit }
         property point at: Qt.point(0, 0)
         x: at.x
         y: at.y

@@ -2,3 +2,5 @@ singleton Oracle 1.0 Oracle.qml
 OracleManager 1.0 OracleManager.qml
 OracleWindow 1.0 OracleWindow.qml
 ArrangeView 1.0 ArrangeView.qml
+KeysSheet 1.0 KeysSheet.qml
+SettingsMove 1.0 SettingsMove.qml

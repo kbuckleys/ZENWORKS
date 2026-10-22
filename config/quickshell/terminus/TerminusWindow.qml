@@ -38,6 +38,7 @@ import "terminus.js" as Terminus
 import "../morpheus/thumbs.js" as Thumbs
 import "tags.js" as Tags
 import "collections.js" as Coll
+import "network.js" as Net
 
 FloatingWindow {
   id: root
@@ -946,8 +947,8 @@ FloatingWindow {
   // Splitting a floating window widens it by one pane — each side keeps the
   // width the single pane had, as far as the monitor allows — and
   // unsplitting gives exactly that back, from the right edge — kept on the
-  // monitor, never recentered (see Terminus.splitRoom). Tiled, fullscreen
-  // or maximized, the layout owns the size and nothing happens: Terminus.splitRoom says so.
+  // monitor, never recentered (see morpheus/room.js). Tiled, fullscreen
+  // or maximized, the layout owns the size and nothing happens: morpheus/room.js says so.
   //
   // Hyprland does the resize, because a mapped Quickshell window ignores a
   // new implicitWidth. `splitGrew` is what was added, and it is remembered
@@ -1809,6 +1810,8 @@ FloatingWindow {
   // the functions of this section live in terminus/Bookmarks.qml; these
   // forward to it, so every caller is unchanged
   Bookmarks { id: bookmarks; term: root }
+  // network places (the sidebar's Network): terminus/Network.qml
+  Network { id: network; term: root }
   // Kept in the shell's own state directory, not next to the config: it is
   // something you accumulate by using terminus, not something you write by hand.
   property var bookmarks: []
@@ -2707,6 +2710,7 @@ FloatingWindow {
       ["Info",              "alt \u21b5",  () => props.ask()],
       ["Permissions",       "c m",     () => root.openProperties(1)],
       ["Disks",             "M",       () => disks.ask()],
+      ["Connect to server", "",        () => connect.ask(null, null)],
       ["Tags",              "c t",     () => tagPick.ask()],
       ["New collection",  "c s",     () => collEdit.ask(-1)],
       // Editing one is only offered while you are looking at it, which is
@@ -3735,6 +3739,7 @@ FloatingWindow {
     if (cmdPalette.open) return "Commands";
     if (marks.open) return "Bookmarks";
     if (disks.open) return "Disks";
+    if (connect.open) return connect.place ? "Connect to " + Net.label(connect.place) : "Connect to Server";
     if (space.open) return "Space";
     if (plug.open) return plug.rows.length > 1 ? plug.rows.length + " new disks" : "New disk";
     if (diskInfo.open) return diskInfo.cur ? diskInfo.title : "Disk";
@@ -3792,6 +3797,8 @@ FloatingWindow {
       return diskInfo.cur && (diskInfo.cur.removable || diskInfo.cur.hotplug)
         ? "\uF0A0" : "\uF1C0";
     if (disks.open) return "\uF1C0";
+    // md-folder_network, as the sidebar's Network rows wear it
+    if (connect.open) return "\uDB82\uDC70";
     if (space.open) return "\u{F0574}";
     if (plug.open) return "\uF0A0";
     if (diskTool.open) return diskTool.mode === "format" ? "\uF1C0" : "\uF0AD";
@@ -3975,7 +3982,7 @@ FloatingWindow {
 
   readonly property bool modal: root.looking || cmdPalette.open || marks.open
     || disks.open || space.open || plug.open || diskInfo.open || tagPick.open || collEdit.open
-    || props.open || confirm.open || diskTool.open
+    || connect.open || props.open || confirm.open || diskTool.open
     || sendTo.open
     || bulk.open || prefs.open
     || appPick.open
@@ -4287,6 +4294,8 @@ FloatingWindow {
   readonly property alias dropLayerRef: dropLayer
   readonly property alias plugRef: plug
   readonly property alias spaceRef: space
+  readonly property alias networkRef: network
+  readonly property alias connectRef: connect
   readonly property alias viewSaveRef: opening.viewSave
   readonly property alias confirmRef: confirm
   readonly property alias lookLayerRef: lookLayer
@@ -6947,6 +6956,8 @@ FloatingWindow {
 
     // disks, in its own file — see terminus/DisksSheet.qml
     DisksSheet { id: disks; term: root }
+    // connecting to a server, in its own file — see terminus/ConnectSheet.qml
+    ConnectSheet { id: connect; term: root }
 
     // the space map: this directory as rectangles as big as what each takes
     // up — see terminus/SpaceSheet.qml (2026-10-21)

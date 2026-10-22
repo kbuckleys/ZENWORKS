@@ -13,6 +13,7 @@ import Quickshell.Io
 import Quickshell.Hyprland
 import "../morpheus"
 import "terminus.js" as Terminus
+import "../morpheus/room.js" as Room
 
 Item {
   id: splitPane
@@ -306,8 +307,8 @@ Item {
         // else answering here is not ours to resize.
         if (!win || win.class !== "org.quickshell" || win.title !== term.title) return;
         term.fitPending = false;
-        const room = Terminus.splitRoom(win, mons, term.splitWant, 16, 560, "right");
-        if (room) Terminus.splitRoomDispatches(win.address, room).forEach((d) => Hyprland.dispatch(d));
+        const room = Room.make(win, mons, term.splitWant, 16, 560, "right");
+        if (room) Room.dispatches(win.address, room).forEach((d) => Hyprland.dispatch(d));
         term.splitGrew = grow && room ? room.dw : 0;
         term.viewSaveRef.restart();
       }

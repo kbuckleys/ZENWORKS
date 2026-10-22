@@ -634,7 +634,7 @@ Scope {
             height: 26
             radius: Zenon.windowRadius
             color: chipMa.pressed && chip.live ? Zenon.wash(0.08) : "transparent"
-            opacity: chip.live ? 1 : 0.4
+            opacity: chip.live ? 1 : Zenon.disabledDim
             Row {
               id: chipRow
               anchors.centerIn: parent

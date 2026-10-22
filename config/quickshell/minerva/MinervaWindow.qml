@@ -39,19 +39,19 @@
 import QtQuick
 import Quickshell
 import Quickshell.Hyprland
+import Quickshell.Io
 import "../morpheus"
 import "../morpheus/undo"
 import "../morpheus/hypr.js" as Hypr
 import "../morpheus/controls" as Ctl
 import "../terminus"
 import "minerva.js" as M
+import "../morpheus/room.js" as Room
 
 FloatingWindow {
   id: mw
   title: "minerva"
   color: Zenon.alpha(Zenon.layerBg, 0)
-  implicitWidth: 1280
-  implicitHeight: 880
   minimumSize: Qt.size(820, 560)
 
   property var mgr: null
@@ -61,8 +61,24 @@ FloatingWindow {
   readonly property Item footItem: foot
   readonly property bool sideOpen: mw.mode === "reading" && mw.settings.sidebar && !mw.focusMode
 
-  onVisibleChanged: if (!mw.visible) Qt.callLater(() => { mw.keep(); voice.stop(); if (mw.focusMode) mw.setFocus(false); if (mw.mgr) mw.mgr.retire(mw); mw.destroy(); })
+  onVisibleChanged: if (!mw.visible) Qt.callLater(() => { mw.keepSize(); mw.keep(); voice.stop(); if (mw.focusMode) mw.setFocus(false); if (mw.mgr) mw.mgr.retire(mw); mw.destroy(); })
   onClosed: mw.visible = false
+
+  // ── ITS OWN SIZE, LESS THE SIDEBAR (user, 2026-10-21) ──────────────────
+  // Minerva opens on the library, where there is no sidebar, so the size to
+  // come back at is the window's less the room the sidebar took. Hyprland's
+  // persistent_size could not be told that: it kept the size of the window
+  // as it closed, and giving the room back first did not help (the close
+  // landed mid-animation and the wide size was kept anyway). So Minerva
+  // keeps its own (settings.winSize) and hypr/lua/rules.lua no longer keeps
+  // one for it. Only a floating window's: a tiled, maximized or fullscreen
+  // one is the layout's size, not ours.
+  implicitWidth: mw.settings.winSize ? mw.settings.winSize[0] : 1280
+  implicitHeight: mw.settings.winSize ? mw.settings.winSize[1] : 880
+  function keepSize() {
+    if (!mw.mgr || sideLayout.laidOut || mw.focusMode) return;
+    mw.mgr.setSetting("winSize", [Math.round(mw.width - Math.max(0, mw.sideGrew)), Math.round(mw.height)]);
+  }
 
   // lower (user, 2026-10-21): the tools sit in it now, not under it
   readonly property int headH: 48
@@ -83,7 +99,13 @@ FloatingWindow {
   readonly property var chapters: mw.epub ? mw.epub.chapters : []
 
   // the page's colours, and the highlights' by name
-  readonly property var look: M.themeOf(mw.settings.theme, mw.kind, { bg: Zenon.layerBg, ink: Zenon.ink, link: Zenon.link })
+  // NIGHT IS THE THEME'S DARK SIDE (user, 2026-10-22: it should follow the
+  // theme's tone): a dark theme's own ground, ink and link; a light theme's
+  // ink and ground the other way round, so night stays dark in its tones
+  readonly property var nightTone: Zenon.light
+    ? { bg: Zenon.alpha(Zenon.ink, 1), ink: Zenon.alpha(Zenon.ground, 1), link: Qt.lighter(Zenon.link, 1.6) }
+    : { bg: Zenon.alpha(Zenon.ground, 1), ink: Zenon.ink, link: Zenon.link }
+  readonly property var look: M.themeOf(mw.settings.theme, mw.kind, { bg: Zenon.layerBg, ink: Zenon.ink, link: Zenon.link, night: mw.nightTone })
   readonly property var inks: ({ yellow: Zenon.yellow, green: Zenon.green, blue: Zenon.blue, pink: Zenon.pink, magenta: Zenon.magenta })
   readonly property var colorNames: ({ yellow: "Yellow", green: "Green", blue: "Blue", pink: "Pink", magenta: "Purple" })
   property string hiColor: "yellow"
@@ -380,6 +402,86 @@ FloatingWindow {
   Timer { id: sayTimer; interval: 2800; onTriggered: mw.said = "" }
 
   function setSidebar(on) { if (mw.mgr) mw.mgr.setSetting("sidebar", on); }
+
+  // ── THE WINDOW MAKES ROOM FOR ITS SIDEBAR, AS TERMINUS' AND PLATO'S DO ──
+  // The same logic through the same functions (morpheus/room.js;
+  // see plato's makeRoom for the whole story): a
+  // floating window widens by the sidebar, to the right since that is where
+  // it stands, so the page holds still; closing gives exactly that back.
+  // Tiled, fullscreen or maximized, the layout owns the size and the
+  // sidebar just slides. While Hyprland resizes, the page keeps its width
+  // (sideKeepW) and the sidebar is what the window has gained.
+  //
+  // Focus mode is not a toggle of the sidebar: it hides it inside a
+  // fullscreen window, and nothing is resized for it (`roomOpen`).
+  readonly property bool roomOpen: mw.mode === "reading" && mw.settings.sidebar
+  onRoomOpenChanged: mw.sideRoom(mw.roomOpen)
+  property int sideGrew: 0
+  property int sideWant: 0
+  property bool sideFor: false
+  property bool sidePending: false
+  property real sideKeepW: -1
+  property bool sideFollowing: false
+  property int sideTarget: 0
+  function releaseSideFollow() {
+    mw.sideFollowing = false;
+    mw.sideKeepW = -1;
+    sideCeiling.stop();
+  }
+  LayoutProbe { id: sideLayout; title: mw.title }
+  Timer { id: sideCeiling; interval: 1500; onTriggered: mw.releaseSideFollow() }
+  // landed: the slide stays off until the sidebar has taken the width the
+  // window just gained (plato's onWidthChanged, the other order)
+  onWidthChanged: if (mw.sideKeepW >= 0 && mw.sideTarget > 0 && Math.abs(mw.width - mw.sideTarget) < 1) {
+    mw.sideKeepW = -1;
+    mw.sideFollowing = false;
+    sideCeiling.stop();
+  }
+  function sideRoom(shown) {
+    if (!keys.Window.active || mw.focusMode) return;
+    if (sideLayout.laidOut) { mw.sideGrew = 0; return; }
+    if (shown) {
+      if (mw.sideGrew > 0) return;
+      mw.sideWant = mw.width + mw.sideW;
+    } else if (mw.sideGrew > 0) mw.sideWant = mw.width - mw.sideGrew;
+    // already out when the window floated: closing still gives it back
+    else if (sideBox.width > 0.5) mw.sideWant = mw.width - Math.round(sideBox.width);
+    else return;
+    mw.sideFollowing = true;
+    mw.sideKeepW = mw.width - sideBox.width;
+    mw.sideTarget = 0;
+    sideCeiling.restart();
+    mw.sideFor = shown;
+    mw.sidePending = true;
+    sideFitProc.running = false;
+    sideFitProc.running = true;
+  }
+  Process {
+    id: sideFitProc
+    command: ["sh", "-c", "hyprctl -j activewindow; echo '@@mons'; hyprctl -j monitors"]
+    stdout: StdioCollector {
+      id: sideFitOut
+      onStreamFinished: {
+        if (!mw.sidePending) return;
+        // asked for a state we have since toggled out of
+        if (mw.sideFor !== mw.roomOpen) { mw.sidePending = false; return; }
+        const parts = sideFitOut.text.split("@@mons");
+        let w = null, mons = null;
+        try { w = JSON.parse(parts[0]); mons = JSON.parse(parts[1]); } catch (e) { mw.releaseSideFollow(); return; }
+        // the focused window is the one toggled; anything else is not ours
+        if (!w || w.class !== "org.quickshell" || w.title !== mw.title) { mw.releaseSideFollow(); return; }
+        mw.sidePending = false;
+        sideLayout.note(w);
+        const room = Room.make(w, mons, mw.sideWant, 16, 820, "right");
+        if (!room) mw.releaseSideFollow();
+        else {
+          mw.sideTarget = w.size[0] + room.dw;
+          Room.dispatches(w.address, room).forEach((d) => Hyprland.dispatch(d));
+        }
+        mw.sideGrew = mw.sideFor && room ? room.dw : 0;
+      }
+    }
+  }
   function openFile() {
     if (!mw.mgr || !mw.mgr.fileManager) return;
     mw.mgr.fileManager.choose(false, mw.path !== "" ? mw.path.replace(/\/[^/]*$/, "") : Quickshell.env("HOME"), (paths) => {
@@ -430,7 +532,7 @@ FloatingWindow {
   function rowMenu(r, list, x, y) {
     const items = [{ text: "Go there", icon: mw.glyphs.go, run: () => mw.page && (list === "find" ? mw.page.showHit(r) : mw.page.goTo(r.anchor ? Object.assign({}, r.where, { anchor: r.anchor }) : r.where)) }];
     if (list === "highlights") {
-      items.push({ text: "Colour", icon: mw.glyphs.marker, children: mw.colorRows((c) => mw.setMark(r.id, list, { color: c })) });
+      items.push({ text: "Color", icon: mw.glyphs.marker, children: mw.colorRows((c) => mw.setMark(r.id, list, { color: c })) });
       items.push({ text: r.comment ? "Edit the note…" : "Add a note…", icon: mw.glyphs.note, run: () => mw.askNote({ id: r.id, list: list }) });
       items.push({ text: "Copy the words", icon: mw.glyphs.copy, run: () => mw.copyText(r.text) });
       items.push({ text: "Look up", icon: mw.glyphs.lookup, enabled: r.text.split(" ").length <= 3, run: () => lookup.ask(r.text, "define") });
@@ -579,7 +681,7 @@ FloatingWindow {
     ]);
   }
   function copyText(t) { copier.text = t; copier.selectAll(); copier.copy(); mw.say("Copied"); }
-  TextEdit { id: copier; visible: false }
+  TextEdit { id: copier; visible: false; cursorDelegate: Caret { field: copier } }
 
   // ── INFO ───────────────────────────────────────────────────────────────
   property string infoPath: ""
@@ -658,7 +760,9 @@ FloatingWindow {
   Item {
     id: stage
     anchors.fill: parent
-    Rectangle { anchors.fill: parent; color: Zenon.layerBg }
+    // the window's ground, less the sidebar: laid under it too, the sidebar
+    // came out solid, with no frost through it (user, 2026-10-21)
+    Rectangle { width: parent.width - sideBox.width; height: parent.height; color: Zenon.layerBg }
 
     // ── the head ─────────────────────────────────────────────────────────
     Item {
@@ -684,9 +788,20 @@ FloatingWindow {
         anchors.verticalCenter: parent.verticalCenter
         // back to the library: md-chevron_left, bolder (user, 2026-10-21)
         text: mw.mode === "reading" ? "\u{F0141}" : "\u{F03D2}"
-        color: mw.mode === "reading" ? (owlPress.pressed ? Zenon.accentMuted : Zenon.white) : Zenon.cyan
+        color: mw.mode === "reading" ? Zenon.white : Zenon.cyan
+        opacity: owlPress.pressed ? Zenon.pressDim : 1
         font.family: Zenon.glyphFace
         font.pixelSize: Zenon.px(mw.mode === "reading" ? 26 : 20)
+        // the suite's press: a pressFill tile under the chevron
+        Rectangle {
+          anchors.centerIn: parent
+          width: parent.height + 4
+          height: width
+          z: -1
+          radius: Zenon.windowRadius
+          visible: owlPress.pressed
+          color: Zenon.pressFill
+        }
         MouseArea { id: owlPress; anchors.fill: parent; anchors.margins: -10; enabled: mw.mode === "reading"; onClicked: mw.toLibrary() }
         HoverHandler { enabled: mw.mode === "reading"; onHoveredChanged: hovered ? tip.show(owl, "Library", "ctrl l") : tip.hide(owl) }
       }
@@ -736,7 +851,7 @@ FloatingWindow {
         onLoaded: { navTools.item.win = mw; navTools.item.done.connect(() => keys.forceActiveFocus()); }
       }
       // THE FIVE BUTTONS ONE WIDTH (user, 2026-10-21: "the Aa button is too
-      // wide"): Aa, bookmark, read aloud, sidebar, more — together as wide as
+      // wide"): Aa, bookmark, read aloud, more, sidebar — together as wide as
       // the sidebar they stand in, less its margins either side
       readonly property real toolW: Math.floor((mw.sideW - 2 * 14 - 4 * 8) / 5)
       Row {
@@ -878,13 +993,25 @@ FloatingWindow {
       anchors.top: parent.top
       anchors.right: parent.right
       anchors.bottom: parent.bottom
-      width: mw.sideOpen ? mw.sideW : 0
+      // while Hyprland resizes the window for it, the sidebar is whatever
+      // the window has gained (see sideKeepW); otherwise it slides on its own
+      width: mw.sideKeepW >= 0 ? Math.max(0, Math.min(mw.sideW, mw.width - mw.sideKeepW))
+        : mw.sideOpen ? mw.sideW : 0
       visible: width > 0
-      Behavior on width { NumberAnimation { duration: Zenon.normal; easing.type: Zenon.ease } }
+      // terminus' sidebar's slide
+      Behavior on width {
+        enabled: !mw.sideFollowing
+        NumberAnimation { duration: Math.round(Zenon.normal * 1.4); easing.type: Zenon.travelEase }
+      }
       clip: true
       z: 2
-      // an inactive tab's thinner glass, as terminus' sidebar wears it
+      // an inactive tab's thinner glass and the sheet's veil, as plato's
+      // tree and terminus' sidebar wear them, over the window's blur
+      // and what of the page runs on under it, frosted beneath both
+      Frost { anchors.fill: parent; z: -1; source: readBox; active: mw.mode === "reading" && !!mw.page && !mw.focusMode
+        visible: active; scrim: 0; track: [sideBox.x, sideBox.width] }
       Rectangle { anchors.fill: parent; color: Zenon.alpha(Zenon.tabAwayInk, Zenon.tabAway(Zenon.layerBg.a)) }
+      Rectangle { anchors.fill: parent; color: Zenon.ground; opacity: 0.6 }
       Rectangle { anchors.left: parent.left; width: 1; height: parent.height; color: Zenon.border; z: 5 }
       Item {
         id: sideTools
@@ -932,10 +1059,13 @@ FloatingWindow {
       clip: true
       anchors.top: head.bottom
       anchors.left: parent.left
-      anchors.right: sideBox.left
+      anchors.right: parent.right
       anchors.bottom: foot.top
       readonly property real insetTop: 0
-      readonly property real insetRight: 0
+      // ON UNDER THE SIDEBAR (user, 2026-10-21): a page zoomed past the view
+      // carries on under it, frosted there (sideBox's Frost), and sits clear
+      // of it at rest
+      readonly property real insetRight: sideBox.width
       readonly property real insetBottom: 0
       // the middle of what shows between them
       readonly property real midX: -readBox.insetRight / 2
@@ -1135,7 +1265,7 @@ FloatingWindow {
         ink: mw.typeOpen ? Zenon.cyan : Zenon.muted
         held: mw.typeOpen
         onClicked: mw.typeOpen = !mw.typeOpen
-        HoverHandler { onHoveredChanged: hovered ? tip.show(aaBtn, "The page: its colours and layout") : tip.hide(aaBtn) }
+        HoverHandler { onHoveredChanged: hovered ? tip.show(aaBtn, "The page: its colors and layout") : tip.hide(aaBtn) }
       }
       DialogButton {
         id: markBtn
@@ -1160,6 +1290,17 @@ FloatingWindow {
         HoverHandler { onHoveredChanged: hovered ? tip.show(voiceBtn, voice.on ? "Stop reading aloud" : "Read aloud", "ctrl r") : tip.hide(voiceBtn) }
       }
       DialogButton {
+        id: moreBtn
+        implicitWidth: head.toolW
+        implicitHeight: 30
+        visible: mw.mode === "reading"
+        glyph: true
+        label: mw.glyphs.more
+        held: mw.heldBy(moreBtn)
+        onClicked: mw.moreMenu(moreBtn)
+        HoverHandler { onHoveredChanged: hovered ? tip.show(moreBtn, "More") : tip.hide(moreBtn) }
+      }
+      DialogButton {
         id: sideBtn
         implicitWidth: head.toolW
         implicitHeight: 30
@@ -1170,17 +1311,6 @@ FloatingWindow {
         ink: mw.settings.sidebar ? Zenon.cyan : Zenon.muted
         onClicked: mw.setSidebar(!mw.settings.sidebar)
         HoverHandler { onHoveredChanged: hovered ? tip.show(sideBtn, "Sidebar", "ctrl b") : tip.hide(sideBtn) }
-      }
-      DialogButton {
-        id: moreBtn
-        implicitWidth: head.toolW
-        implicitHeight: 30
-        visible: mw.mode === "reading"
-        glyph: true
-        label: mw.glyphs.more
-        held: mw.heldBy(moreBtn)
-        onClicked: mw.moreMenu(moreBtn)
-        HoverHandler { onHoveredChanged: hovered ? tip.show(moreBtn, "More") : tip.hide(moreBtn) }
       }
     }
 
@@ -1200,16 +1330,20 @@ FloatingWindow {
       width: 330
       height: typeCol.implicitHeight + 28
       radius: Zenon.radiusCard
-      // frosted (user, 2026-10-21): the page it is over, blurred under it
-      color: Zenon.headBg
+      // frosted (user, 2026-10-21): the page it is over, blurred under it,
+      // in the sidebar's glass (user, 2026-10-22: in the head's, it washed
+      // out over a white page) — an inactive tab's thinner glass, then the
+      // sheet's veil, as sideBox wears them
+      color: Zenon.alpha(Zenon.tabAwayInk, Zenon.tabAway(Zenon.layerBg.a))
       border.width: 1
       border.color: Zenon.border
       z: 5
-      // a sheet's card over live content (morpheus/Sheet's cardFrost), and
       // tracked: it moves with the sidebar, and a stale mapping frosted the
       // wrong strip of the page (the scroll thumb, user 2026-10-21)
       Frost { anchors.fill: parent; z: -1; source: readBox; active: parent.visible; visible: active; radius: parent.radius
-        base: Zenon.black; brightness: -0.12; saturation: -0.3; blurMax: 32; scrim: 0; track: [parent.x, parent.y, parent.width] }
+        scrim: 0; track: [parent.x, parent.y, parent.width] }
+      // inside the border, which it would otherwise dim
+      Rectangle { anchors.fill: parent; anchors.margins: 1; radius: parent.radius - 1; color: Zenon.ground; opacity: 0.6 }
       // its clicks are its own, not the shield's under it
       MouseArea { anchors.fill: parent; z: -0.5 }
       Column {
@@ -1218,7 +1352,7 @@ FloatingWindow {
         y: 14
         width: parent.width - 12
         spacing: 6
-        SectionLabel { x: 14; text: "Colours" }
+        SectionLabel { x: 14; text: "Colors" }
         Segments {
           x: 14
           options: [["auto", "Auto"], ["paper", "Paper"], ["sepia", "Sepia"], ["night", "Night"]]
@@ -1230,7 +1364,7 @@ FloatingWindow {
           width: parent.width - 28
           wrapMode: Text.WordWrap
           text: mw.kind === "comic" ? "A comic stays as it was drawn"
-            : mw.settings.theme === "auto" ? (mw.paged ? "As printed" : "In the shell's own colours") : ""
+            : mw.settings.theme === "auto" ? (mw.paged ? "As printed" : "In the shell's own colors") : ""
           visible: text !== ""
           color: Zenon.accentMuted
           font.family: Zenon.face
@@ -1360,12 +1494,16 @@ FloatingWindow {
 
     // ── WHAT SCROLLS GOES UNDER THE BARS, FROSTED ──────────────────────
     // the page's view carries on under the head and the hint bar as
-    // terminus' rows do (ScrollEdge: laid under the bars, over nothing else)
+    // terminus' rows do (ScrollEdge: laid under the bars, over nothing else).
+    // UNDER THE SIDEBAR TOO (z 1.5, below sideBox's 2): the view runs on
+    // under it, so these span it, and over it they washed out its toolbar
+    // and drew a seam above its tabs (user, 2026-10-21); the sidebar frosts
+    // its own stretch
     ScrollEdge {
       view: mw.page && mw.page.view ? mw.page.view : null
       follow: true
       chromeTop: 0
-      z: 2.5
+      z: 1.5
       visible: mw.mode === "reading" && !mw.focusMode && !!mw.page
     }
     ScrollEdge {
@@ -1373,7 +1511,7 @@ FloatingWindow {
       below: true
       follow: true
       bar: foot
-      z: 2.5
+      z: 1.5
       visible: mw.mode === "reading" && !mw.focusMode && !!mw.page
     }
     HintBar {

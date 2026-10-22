@@ -25,6 +25,11 @@ module.exports = {
     t.eq("width on a 20px step", M.cleanSettings({ width: 731 }).width, 740);
     t.eq("a zoom number kept", M.cleanSettings({ zoom: 1.5 }).zoom, 1.5);
     t.eq("an unknown zoom is width", M.cleanSettings({ zoom: "huge" }).zoom, "width");
+    // the window's own size (MinervaWindow keepSize): none until it closes once
+    t.eq("no size kept by default", M.cleanSettings({}).winSize, undefined);
+    t.eq("a size kept, rounded", M.cleanSettings({ winSize: [1300.4, 900.6] }).winSize, [1300, 901]);
+    t.eq("never under the window's minimum", M.cleanSettings({ winSize: [100, 100] }).winSize, [820, 560]);
+    t.eq("a broken size is dropped", M.cleanSettings({ winSize: [1300, "x"] }).winSize, undefined);
 
     // library
     const lib = M.parseLibrary(JSON.stringify({ books: [
@@ -143,6 +148,13 @@ module.exports = {
     t.eq("auto: a pdf as printed", M.themeOf("auto", "pdf", sh).tone, false);
     t.eq("sepia toned for a pdf", M.themeOf("sepia", "pdf", sh).tone, true);
     t.eq("a comic is never toned", M.themeOf("night", "comic", sh).tone, false);
+    // night follows the shell theme when it is given one (MinervaWindow nightTone)
+    const nt = Object.assign({}, sh, { night: { bg: "#1a120c", ink: "#e8dccb", link: "#d08a4a" } });
+    t.eq("night in the theme's tone", M.themeOf("night", "epub", nt).bg, "#1a120c");
+    t.eq("its ink too", M.themeOf("night", "pdf", nt).ink, "#e8dccb");
+    t.eq("still toned for a pdf", M.themeOf("night", "pdf", nt).tone, true);
+    t.eq("no theme given: the fixed night", M.themeOf("night", "epub", sh).bg, "#151517");
+    t.eq("sepia stays sepia", M.themeOf("sepia", "epub", nt).bg, "#f4ecd8");
 
     // layout
     const sizes = [{ width: 100, height: 200 }, { width: 100, height: 200 }, { width: 200, height: 100 }];

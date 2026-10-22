@@ -435,10 +435,10 @@ Item {
           }
         }
       }
-      EmptyMark {
+      EmptyState {
         anchors.centerIn: parent
         visible: pg.rows.length === 0 && !pg.loading && pg.listError === "" && !!pg.hub
-        word: "No " + pg.showing + " " + pg.noun + "s"
+        text: "No " + pg.showing + " " + pg.noun + "s"
       }
     }
     ElasticScroll { anchors.fill: list; view: list }

@@ -340,11 +340,11 @@ Item {
         }
       }
     }
-    EmptyMark {
+    EmptyState {
       anchors.centerIn: parent
       visible: pg.rows.length === 0
       filtered: pg.query !== ""
-      word: pg.query !== "" ? "" : "No branches yet — make the first commit"
+      text: pg.query !== "" ? "No matches" : "No branches yet — make the first commit"
     }
   }
   ElasticScroll { anchors.fill: list; view: list }

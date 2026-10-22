@@ -20,7 +20,7 @@
 # touched.
 #
 # KEPT GENERIC (the package's copy wins):
-#   hypr/lua/defaults.lua   oracle's Default Apps — renderDefaultsLua's stock
+#   hypr/lua/defaults.lua   oracle's Default apps — renderDefaultsLua's stock
 #   hypr/lua/monitors.lua   the catch-all rule only
 #   hypr/lua/input.lua      hyprland's stock input
 #   xdg-desktop-portal-termfilechooser/config   the @CONFIG@ placeholder

@@ -5,7 +5,7 @@
 //
 // WHETHER HYPRLAND'S LAYOUT OWNS A WINDOW'S SIZE — tiled, maximized or
 // fullscreen — for the windows that widen themselves to make room for a
-// panel (terminus' sidebar, plato's tree; see terminus.js splitRoom, which
+// panel (terminus' sidebar, plato's tree, minerva's sidebar; see morpheus/room.js, which
 // declines exactly these three).
 //
 // Known BEFORE a toggle rather than asked at it. Asking at the toggle held

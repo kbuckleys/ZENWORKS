@@ -574,7 +574,7 @@ Item {
       }
       Text {
         anchors.horizontalCenter: parent.horizontalCenter
-        text: store.failed ? "The app catalog could not be read" : "Reading the app catalog"
+        text: store.failed ? "The app catalog could not be read" : "Reading the app catalog…"
         color: store.failed ? Zenon.red : Zenon.accentMuted
         font.family: Zenon.face
         font.weight: Font.Bold
@@ -1079,7 +1079,7 @@ Item {
             if (sec) out.push(["CATEGORY", sec[2], sec[1]]);
             if (a.dev) out.push(["DEVELOPER", "\uF2BD", a.dev]);
             const lic = St.licence(d.license || i["Licenses"] || "");
-            if (lic) out.push(["LICENSE", lic.split(/[ (]/)[0].replace(/-or-later$/, "+"), lic === "Proprietary" ? "proprietary" : "licence"]);
+            if (lic) out.push(["LICENSE", lic.split(/[ (]/)[0].replace(/-or-later$/, "+"), lic === "Proprietary" ? "proprietary" : "license"]);
             const sz = St.sizeParts(i["Installed Size"] || i["Download Size"] || "");
             if (sz[0]) out.push(["SIZE", sz[0], sz[1]]);
             return out;

@@ -137,7 +137,7 @@ Singleton {
   readonly property var fitModes: ["crop", "fit", "stretch", "pad", "tile"]
   readonly property var fitLabels: ({
     crop: "cropped", fit: "fitted", stretch: "stretched",
-    pad: "centred", tile: "tiled"
+    pad: "centered", tile: "tiled"
   })
 
   // ── PER MONITOR, like the image itself ───────────────────────────────

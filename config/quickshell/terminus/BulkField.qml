@@ -31,6 +31,9 @@ Rectangle {
   // shows it; `mono`: in the monospaced face (a key, a code).
   property bool masked: false
   property bool mono: false
+  // room kept clear at the right end for something laid over the field
+  // (ConnectSheet's kind words) — typed text and the ghost stop short of it
+  property int trailRoom: 0
   // A field holding a secret hands its copies to the holder instead of the
   // clipboard: calypso's go out marked sensitive, so the clipboard history
   // never keeps them (user, 2026-10-12). function(text) or null.
@@ -70,7 +73,7 @@ Rectangle {
   Text {
     anchors.fill: parent
     anchors.leftMargin: 8
-    anchors.rightMargin: 8
+    anchors.rightMargin: 8 + fld.trailRoom
     verticalAlignment: Text.AlignVCenter
     elide: Text.ElideRight
     visible: fldIn.text === ""
@@ -108,7 +111,7 @@ Rectangle {
     cursorDelegate: Caret { field: fldIn }
     anchors.fill: parent
     anchors.leftMargin: 8
-    anchors.rightMargin: clearChip.visible ? clearChip.width + 12 : 8
+    anchors.rightMargin: (clearChip.visible ? clearChip.width + 12 : 8) + fld.trailRoom
     verticalAlignment: Text.AlignVCenter
     color: Zenon.white
     selectionColor: Zenon.selBg

@@ -291,9 +291,9 @@ Item {
 
   readonly property color caretInk: Zenon.light ? Qt.darker(Zenon.cyan, 1.35) : Qt.lighter(Zenon.cyan, 1.3)
 
-  property bool moving: false
-  Timer { id: still; interval: 500; onTriggered: view.moving = false }
-  function wake() { view.moving = true; still.restart(); }
+  // solid the moment it moves, breathing once it has sat still: the
+  // shared Caret's `steady`
+  function wake() { caret.wake(true); }
   Connections {
     target: view.ed
     function onCursorRowChanged() { view.wake(); }
@@ -339,9 +339,12 @@ Item {
     // bar widens back, and replace's underline settles from the block —
     // briskly, so it reads as the same cursor changing rather than a swap.
     // Clipped, so the block's letter never spills out of a bar.
-    Rectangle {
+    Caret {
       id: caret
-      visible: view.activeFocus
+      field: view
+      active: view.activeFocus
+      steady: true
+      breathes: view.cursorBreathes
       clip: true
       // r waiting for its character: a thicker underline in peach, the
       // character above it left readable — what will be replaced
@@ -355,19 +358,6 @@ Item {
       Behavior on y { NumberAnimation { duration: Zenon.brisk; easing.type: Zenon.travelEase } }
       color: view.ed.replacePending ? Zenon.yellow : view.caretInk
       Behavior on color { ColorAnimation { duration: Zenon.brisk } }
-      opacity: 1
-      SequentialAnimation on opacity {
-        running: caret.visible && !view.moving && view.cursorBreathes
-        loops: Animation.Infinite
-        NumberAnimation { to: 0.2; duration: Zenon.breath; easing.type: Zenon.breathEase }
-        NumberAnimation { to: 1.0; duration: Zenon.breath; easing.type: Zenon.breathEase }
-      }
-      // back to solid the moment it moves
-      Connections {
-        target: view
-        function onMovingChanged() { if (view.moving) caret.opacity = 1; }
-        function onCursorBreathesChanged() { if (!view.cursorBreathes) caret.opacity = 1; }
-      }
 
       // a block covers its character, so the character is drawn again on
       // top of it in the background's color — the terminal's reverse video

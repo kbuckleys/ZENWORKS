@@ -18,6 +18,7 @@ import Quickshell
 import Quickshell.Io
 import "../oracle"
 import "../ceres"
+import "../kairos"
 import "chronos.js" as Chr
 
 Singleton {
@@ -155,10 +156,14 @@ Singleton {
   //
   // Critical urgency, which howler's ported mako config gives a timeout of 0:
   // it stays on screen until dismissed, which is the whole point of a timer.
+  // With screen time on, a timer of ten minutes or more also says what its
+  // time went to (Kairos, from the last few hours it keeps tick by tick).
   function fire(t) {
+    const went = Oracle.screenTime && t.minutes >= 10
+      ? Kairos.summarySince(Date.now() - t.minutes * 60000) : "";
     Quickshell.execDetached([
       "notify-send", "-u", "critical", "-a", "chronos",
-      t.label, t.minutes + " minute timer finished"
+      t.label, t.minutes + " minute timer finished" + (went !== "" ? "\n" + went : "")
     ]);
   }
 

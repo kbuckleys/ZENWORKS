@@ -608,10 +608,10 @@ Item {
   }
 
   // ── NOTHING CHOSEN ─────────────────────────────────────────────────────
-  EmptyMark {
+  EmptyState {
     anchors.centerIn: parent
     visible: !pane.note && !!pane.mgr && pane.mgr.loaded
-    word: pane.win && pane.win.inJournal ? "No entry chosen" : "No note chosen"
+    text: pane.win && pane.win.inJournal ? "No entry chosen" : "No note chosen"
   }
 
   // ── LOCKED ─────────────────────────────────────────────────────────────

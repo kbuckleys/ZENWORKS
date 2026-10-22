@@ -500,6 +500,20 @@ function hubOf(remotes, own) {
   return null;
 }
 
+// Every remote on a forge, the hub (hubOf) first, each forge repository
+// once — for what one of them may have turned off (Releases, 2026-10-21:
+// spoot's origin on Codeberg has releases off; its releases are on GitHub)
+function hubsOf(remotes) {
+  var rs = remotes || [], out = [], seen = {};
+  var first = hubOf(rs);
+  if (first) { out.push(first); seen[first.forge + " " + first.full] = true; }
+  for (var i = 0; i < rs.length; i++) {
+    var h = hubOf([rs[i]]);
+    if (h && !seen[h.forge + " " + h.full]) { out.push(h); seen[h.forge + " " + h.full] = true; }
+  }
+  return out;
+}
+
 // ── AT A GLANCE ─────────────────────────────────────────────────────────
 // What a repository's summary (delphi/core summaries) says needs doing, as
 // words for Repositories' rows, each with a Zenon color's name; empty when

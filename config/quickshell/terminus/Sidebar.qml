@@ -15,6 +15,7 @@ import "../morpheus"
 import "terminus.js" as Terminus
 import "../morpheus/icons.js" as Icons
 import "tags.js" as Tags
+import "network.js" as Net
 
 Rectangle {
   id: side
@@ -452,7 +453,51 @@ Rectangle {
         }
       }
 
-      // room to scroll the last disk clear of the foot's frost
+      // ── NETWORK ─────────────────────────────────────────────
+      // Kept places and whatever else is mounted (terminus/Network.qml),
+      // and the heading's "+" is the way to a new one (user, 2026-10-22:
+      // no "Connect to server…" row). The heading is always shown.
+      Item { width: 1; height: term.disks.length === 0 ? 0 : 8 }
+
+      SideHead { term: side.term; ruled: false; ink: Zenon.accentMuted
+        label: "Network"
+        action: true
+        onActed: term.connectRef.ask(null, null)
+        first: !!term && term.bookmarks.length === 0 && term.sideTags.length === 0
+          && term.sideCollections.length === 0 && term.disks.length === 0
+      }
+
+      Repeater {
+        model: term.networkRef.rows
+
+        delegate: SideRow { term: side.term
+          id: netSide
+          required property var modelData
+          width: sideCol.width
+          hasMenu: true
+          onMenuAsked: (x, y) => term.networkRef.menu(netSide, x, y, netSide.modelData)
+          label: Net.label(modelData)
+          readonly property bool busy: term.networkRef.busy !== ""
+            && Net.sameUri(term.networkRef.busy, modelData.uri)
+          detail: netSide.busy ? "\u2026" : Net.kindWords(modelData.uri)
+          // md-folder_network
+          glyph: "\uDB82\uDC70"
+          active: modelData.path !== "" && term.searchMode === ""
+            && (term.cwd === modelData.path || term.cwd.startsWith(modelData.path + "/"))
+          mounted: modelData.path !== ""
+          showMount: true
+          dropPath: modelData.path
+          onChosen: term.networkRef.open(modelData)
+          onTabbed: if (modelData.path !== "") term.openInNewTab(modelData.path)
+          onToggledMount: {
+            if (modelData.path !== "") term.networkRef.disconnect(modelData);
+            else term.networkRef.open(modelData);
+          }
+        }
+      }
+
+
+      // room to scroll the last row clear of the foot's frost
       Item { width: 1; height: 6 }
     }
   }

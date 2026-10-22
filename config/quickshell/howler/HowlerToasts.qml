@@ -728,7 +728,7 @@ PanelWindow {
               style: Text.Outline
               styleColor: Howler.bg
               font.family: Zenon.glyphFace
-              font.pixelSize: 40
+              font.pixelSize: Zenon.px(40)
             }
 
             // ── AND WHAT YOU CAN DO WITH IT ────────────────────────────

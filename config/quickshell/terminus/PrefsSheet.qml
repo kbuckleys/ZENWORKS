@@ -463,13 +463,13 @@ Item {
         }
 
         // Empty is the default and says so: xdg-terminal-exec is what
-        // runs when nothing is typed here, and oracle's Default Apps
+        // runs when nothing is typed here, and oracle's Default apps
         // keeps its list on the terminal chosen there — so the ghost
         // names that one rather than the mechanism.
         PrefText { term: prefs.term
           label: "Terminal"
           value: term.termCmd
-          ghost: Oracle.terminal + " (Default Apps)"
+          ghost: Oracle.terminal + " (Default apps)"
           onCommitted: (v) => {
             term.termCmd = v.trim();
             term.viewSaveRef.restart();

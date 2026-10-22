@@ -39,7 +39,7 @@ Row {
   readonly property bool down: ckTap.pressed || ck.held
   signal toggled()
   spacing: 8
-  opacity: ck.enabled2 ? 1 : 0.4
+  opacity: ck.enabled2 ? 1 : Zenon.disabledDim
   Rectangle {
     id: ckBox
     anchors.verticalCenter: parent.verticalCenter

@@ -99,13 +99,12 @@
 1	icarus/HomeCard.qml	missing-property	Could not find property "top".
 1	icarus/HomeCard.qml	missing-property	Member "fire" not found on type "QQuickItem"
 3	icarus/HomeCard.qml	missing-property	Member "height" not found on type "QuickshellScreenInfo"
-1	icarus/HomeCard.qml	missing-property	Member "width" not found on type "QuickshellScreenInfo"
+2	icarus/HomeCard.qml	missing-property	Member "width" not found on type "QuickshellScreenInfo"
 1	icarus/HomeCard.qml	uncreatable-type	Type PanelWindow is not creatable.
 1	icarus/IcarusDesktop.qml	uncreatable-type	Type PanelWindow is not creatable.
 2	icarus/IcarusPopup.qml	missing-property	Could not find property "left".
 2	icarus/IcarusPopup.qml	missing-property	Could not find property "top".
 3	icarus/IcarusPopup.qml	uncreatable-type	Type PanelWindow is not creatable.
-1	minerva/MinervaSide.qml	missing-property	Member "pageIx" not found on type (component in /home/buck/.config/quickshell/minerva/MinervaSide.qml)::item with type QObject
 1	morpheus/CardBody.qml	id-shadows-member	Id for object Flickable shadows property "flick". Rename one or the other.
 1	morpheus/CardBody.qml	id-shadows-member	Note: Id defined here
 1	morpheus/CardMenu.qml	missing-property	Could not find property "left".
@@ -147,6 +146,7 @@
 1	morpheus/Workspaces.qml	block-scope-var-declaration	var declaration in block scope is hoisted to function scope
 1	morpheus/Workspaces.qml	missing-property	Member "values" not found on type "UntypedObjectModel"
 1	oracle/ComputerPanel.qml	unused-imports	Unused import
+1	oracle/KeysSheet.qml	uncreatable-type	Type PanelWindow is not creatable.
 1	oracle/OracleWindow.qml	unused-imports	Unused import
 1	picasso/Annotator.qml	unused-imports	Unused import
 1	picasso/FocusCard.qml	missing-property	Member "ink" not found on type "QQuickItem"

@@ -1450,7 +1450,7 @@ function renderDefaultsLua(values) {
     "-- https://github.com/kbuckleys/",
     "",
     "-- DEFAULTS",
-    "-- Written by oracle's Default Apps section, and read back by it: change",
+    "-- Written by oracle's Default apps section, and read back by it: change",
     "-- one there or here, either way works.",
     "--",
     "-- terminal   the command the binds run; oracle also puts its entry first",
@@ -2263,4 +2263,48 @@ function chordTaken(chord, id, binds, values, live) {
       return l.description || "another hyprland bind";
   }
   return "";
+}
+
+// ── SETTINGS, CARRIED ELSEWHERE ───────────────────────────────────────────
+// Export / Import in About (2026-10-21): one JSON file holding oracle.json,
+// the hypr files Oracle writes (keys, wake, default apps, input, screens)
+// and the themes you saved — for a reinstall or another machine. Settings
+// only: no notes, no screen time, no passwords. A bundle names its files
+// by these relative paths, and nothing outside them is ever written back.
+const BUNDLE_FIXED = ["oracle.json", "hypr/keys.lua", "hypr/wake.lua", "hypr/defaults.lua",
+                      "hypr/input.lua", "hypr/monitors.lua"];
+const BUNDLE_WORDS = { "oracle.json": "Settings", "hypr/keys.lua": "Shortcuts", "hypr/wake.lua": "Wake by",
+                       "hypr/defaults.lua": "Default apps", "hypr/input.lua": "Keyboard and mouse",
+                       "hypr/monitors.lua": "Screen arrangement" };
+function bundlePathOk(rel) {
+  const r = String(rel || "");
+  return BUNDLE_FIXED.indexOf(r) >= 0 || /^themes\/[A-Za-z0-9][A-Za-z0-9_-]*\.json$/.test(r);
+}
+function makeBundle(files, made) {
+  const keep = {};
+  for (const rel of Object.keys(files).sort()) if (bundlePathOk(rel) && typeof files[rel] === "string") keep[rel] = files[rel];
+  return JSON.stringify({ zenworks: "settings", v: 1, made: made, files: keep }, null, 1) + "\n";
+}
+// { ok, why, made, files: { rel: text }, skipped }
+function readBundle(text) {
+  let j = null;
+  try { j = JSON.parse(text); } catch (e) {}
+  if (!j || j.zenworks !== "settings" || !j.files || typeof j.files !== "object")
+    return { ok: false, why: "Not a ZENWORKS settings file", made: "", files: {}, skipped: 0 };
+  const files = {};
+  let skipped = 0;
+  for (const rel in j.files) {
+    if (bundlePathOk(rel) && typeof j.files[rel] === "string") files[rel] = j.files[rel];
+    else skipped++;
+  }
+  if (!Object.keys(files).length) return { ok: false, why: "There are no settings in it", made: "", files: {}, skipped: skipped };
+  return { ok: true, why: "", made: String(j.made || ""), files: files, skipped: skipped };
+}
+// what a bundle holds, a line each, in BUNDLE_FIXED's order, themes last
+function bundleWords(files) {
+  const out = [];
+  for (const rel of BUNDLE_FIXED) if (rel in files) out.push(BUNDLE_WORDS[rel]);
+  const themes = Object.keys(files).filter((r) => r.startsWith("themes/")).sort();
+  for (const r of themes) out.push("Theme " + r.slice(7, -5));
+  return out;
 }

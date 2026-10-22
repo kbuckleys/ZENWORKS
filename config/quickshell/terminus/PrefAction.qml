@@ -33,7 +33,7 @@ Item {
 
   width: parent ? parent.width : 0
   height: 32
-  opacity: act.enabled ? 1 : 0.45
+  opacity: act.enabled ? 1 : Zenon.disabledDim
 
   // NO HOVER TINT in the sheets (user, 2026-10-17): the verb no longer goes
   // cyan under the pointer. The cursor itself is prefBar; see its note.

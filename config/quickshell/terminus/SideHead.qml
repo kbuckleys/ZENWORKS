@@ -37,6 +37,11 @@ Item {
   property bool ruled: true
   // the word's ink: the breadcrumb's in a terminus panel, muted elsewhere
   property color ink: term ? term.crumbInk : Zenon.accentMuted
+  // ── A + ON THE HEADING'S FAR END ────────────────────────────────
+  // An AddChip at the right edge, level with the word. Network's replaced
+  // its "Connect to server…" row (user, 2026-10-22).
+  property bool action: false
+  signal acted()
 
   readonly property int rule: 1
   // Over the top rule, and it belongs to the group that just ended.
@@ -175,4 +180,13 @@ Item {
     font.letterSpacing: sideHead.label === sideHead.label.toUpperCase() ? 1.2 : 0
   }
 
+
+  AddChip {
+    shown: sideHead.action
+    size: Zenon.px(13)
+    anchors.right: parent.right
+    anchors.rightMargin: 12
+    anchors.verticalCenter: sideHeadText.verticalCenter
+    onClicked: sideHead.acted()
+  }
 }

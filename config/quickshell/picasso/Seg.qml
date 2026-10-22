@@ -26,7 +26,7 @@ Rectangle {
     : (segMa.containsMouse || seg.current ? Zenon.white : Zenon.accentSoft)
   height: 34
   radius: Zenon.windowRadius
-  opacity: seg.live ? 1 : 0.4
+  opacity: seg.live ? 1 : Zenon.disabledDim
   // PRESSED, DARKENED as terminus' ClearChip and Segments are (user, 2026-10-15)
   color: segMa.pressed ? Zenon.pressFill
     : seg.chosen

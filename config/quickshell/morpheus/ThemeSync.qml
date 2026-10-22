@@ -15,6 +15,7 @@
 // gtk-3.0/colors.css (each gtk.css @imports its own) as an app starts, and
 // scripts/gtkscheme.sh sets dark or light, which libadwaita hears live.
 // Qt apps read qt6ct/qt6ct.conf and its color scheme, also as they start.
+// hyprtoolkit apps (hyprshutdown) read hypr/hyprtoolkit.conf, and watch it.
 //
 // ONLY WHEN THE FILE WOULD CHANGE. Every start of the shell lands here with
 // the theme it was wearing, and a reload of hyprland on every login — or on
@@ -80,6 +81,18 @@ Item {
   }
   readonly property string qtText: Sync.renderQtColors(sync.qtColors, Zenon.light)
   readonly property string qt6ctText: Sync.renderQt6ct(qtFile.path)
+  // hyprtoolkit's (hyprshutdown's screen), Zenon included, with oracle's
+  // Font and Corner rounding: its stock look is no theme of ours
+  readonly property var toolkitColors: {
+    const out = { name: Zenon.theme.name || Zenon.themeName };
+    for (const s of ["ground", "card", "surface", "ink", "blue", "cyan", "magenta"])
+      out[s] = Zenon.hex(Zenon[s]);
+    return out;
+  }
+  readonly property string toolkitText: Sync.renderHyprtoolkit(sync.toolkitColors, Zenon.light, {
+    face: Zenon.face, mono: Zenon.faceCode,
+    px: { text: Zenon.px(16), small: Zenon.px(13), h3: Zenon.px(17), h2: Zenon.px(20), h1: Zenon.px(25) },
+    large: Zenon.dialogRadius, small: Zenon.radiusControl })
   // oracle's Font for hyprland's own text — always written, unlike the
   // theme: base.lua's literals are only a first-boot font (themesync.js)
   readonly property string fontText: Sync.renderHyprFont(Zenon.face, Zenon.weight, Zenon.px(14))
@@ -109,6 +122,7 @@ Item {
   onHyprTextChanged: settle.restart()
   onFontTextChanged: settle.restart()
   onQtTextChanged: settle.restart()
+  onToolkitTextChanged: settle.restart()
   Component.onCompleted: { settle.restart(); fontSettle.restart(); schemeSettle.restart(); }
 
   // a theme file being saved is several writes; the apps hear about the last
@@ -126,6 +140,8 @@ Item {
       // nor for Qt: qt6ct reads its files as an app starts
       sync.put(qtFile, sync.qtText, true);
       sync.put(qt6ctFile, sync.qt6ctText, true);
+      // nor for hyprtoolkit: its apps watch the file themselves
+      sync.put(toolkitFile, sync.toolkitText, true);
       if (tell.kitty || tell.hypr) tell.restart();
     }
   }
@@ -251,6 +267,16 @@ Item {
     property bool exists: true
     property string last: ""
     path: sync.configDir + "/qt6ct/qt6ct.conf"
+    blockLoading: true
+    printErrors: false
+    onLoadFailed: exists = false
+  }
+
+  FileView {
+    id: toolkitFile
+    property bool exists: true
+    property string last: ""
+    path: sync.configDir + "/hypr/hyprtoolkit.conf"
     blockLoading: true
     printErrors: false
     onLoadFailed: exists = false

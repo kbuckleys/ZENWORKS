@@ -141,6 +141,7 @@ Item {
           spacing: 2
           TextInput {
             id: hexField
+            cursorDelegate: Caret { field: hexField }
             width: parent.width
             color: big.type
             selectionColor: Zenon.alpha(big.type, 0.25)

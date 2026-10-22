@@ -69,7 +69,7 @@ Item {
   function show(p) {
     if (cm.sizes.length === 0) return;
     p = Math.max(0, Math.min(cm.sizes.length - 1, p));
-    strip.elastic.halt(flick);
+    strip.elastic.halt(strip);
     strip.contentY = Math.max(0, Math.min(strip.contentHeight - strip.height, cm.lay.tops[cm.rowOf(p)] - cm.pad - cm.insetTop));
   }
   function goTo(w) { if (w && w.page !== undefined) cm.show(w.page); }
@@ -81,7 +81,7 @@ Item {
   function setZoom(z) {
     z = Math.max(0.05, Math.min(6, z));
     const p = cm.currentPage;
-    strip.elastic.halt(flick);
+    strip.elastic.halt(strip);
     cm.zoom = z;
     cm.show(p);
   }
@@ -114,7 +114,9 @@ Item {
   function aspectOf(i) { const s = cm.sizes[i]; return s ? s.height / Math.max(1, s.width) : 1.5; }
   readonly property Component thumb: Component {
     Image {
-      readonly property int pageIx: parent ? parent.pageIx || 0 : 0
+      // the host that loads it says which page: any Item, so looked up untyped
+      readonly property var host: parent
+      readonly property int pageIx: host ? host.pageIx || 0 : 0
       source: cm.book && cm.book.pages[pageIx] ? "file://" + cm.book.pages[pageIx].file : ""
       asynchronous: true
       fillMode: Image.PreserveAspectFit
@@ -122,7 +124,9 @@ Item {
     }
   }
 
-  Rectangle { anchors.fill: parent; color: Zenon.ground }
+  // stops at the sidebar: only the pages themselves run on under it, for
+  // its frost (MinervaWindow's sideBox)
+  Rectangle { anchors.fill: parent; anchors.rightMargin: cm.insetRight; color: Zenon.ground }
   Flickable {
     id: strip
     anchors.fill: parent
@@ -131,6 +135,8 @@ Item {
     contentWidth: cm.lay.contentW + cm.insetRight
     contentHeight: cm.lay.contentH + cm.insetBottom
     readonly property Elastic elastic: wheel.elastic
+    // zoomed in past the view, dragged about by hand (user, 2026-10-21)
+    DragPan { flick: strip; on: strip.contentWidth > strip.width + 1 }
     Repeater {
       model: cm.pageCount
       delegate: Item {

@@ -3,7 +3,7 @@
 // └─┘└─┘┘└┘└┴┘└─┘┴└─┴ ┴└─┘
 // https://github.com/kbuckleys/
 //
-// CLIO'S SIDEBAR — where to look: All Notes, Stickies (the desktop's),
+// CLIO'S SIDEBAR — where to look: All notes, Stickies (the desktop's),
 // the containers as a tree and a row to make one, the smart containers; the
 // tags, as chips to tap; the journals; and the Trash, pinned at the foot.
 // Rows are the suite's ShelfRow, the heads its SideHead; a right click is
@@ -178,7 +178,7 @@ Item {
       ClioShelf {
         host: side
         glyph: "\u{F11D7}"
-        label: "All Notes"
+        label: "All notes"
         here: side.scope.shelf === "all"
         count: side.mgr ? String(side.mgr.notes.filter((n) => n.kind === "note" && !n.deleted).length) : ""
         drop: ({ shelf: "folder", id: "" })
@@ -244,7 +244,7 @@ Item {
           onMenu: (x, y) => side.win.folderMenu(side.mgr.folders.find((f) => f.id === modelData.id), x, y)
         }
       }
-      SideHead { ruled: false; label: "Smart Containers"; visible: smartRep.count > 0 }
+      SideHead { ruled: false; label: "Smart containers"; visible: smartRep.count > 0 }
       Repeater {
         id: smartRep
         model: side.mgr ? side.mgr.folders.filter((f) => !!f.query) : []
@@ -303,16 +303,9 @@ Item {
       SideHead {
         ruled: false
         label: "Journal"
-        HeadButton {
-          anchors.right: parent.right
-          anchors.rightMargin: 10
-          anchors.bottom: parent.bottom
-          anchors.bottomMargin: 2
-          win: side.win
-          glyph: "\u{F067}"
-          tip: "New journal"
-          onClicked: side.win.askJournal(null)
-        }
+        // the suite's small + (morpheus/AddChip), as Terminus' Network
+        action: true
+        onActed: side.win.askJournal(null)
       }
       Repeater {
         model: side.mgr ? side.mgr.journals : []

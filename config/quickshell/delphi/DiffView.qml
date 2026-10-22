@@ -326,9 +326,9 @@ Item {
   ElasticScroll { anchors.fill: list; view: list }
   Scrollbar { flick: list; anchors.right: list.right; anchors.top: list.top; anchors.bottom: list.bottom }
 
-  EmptyMark {
+  EmptyState {
     anchors.centerIn: parent
     visible: dv.rows.length === 0 && dv.empty !== ""
-    word: dv.empty
+    text: dv.empty
   }
 }

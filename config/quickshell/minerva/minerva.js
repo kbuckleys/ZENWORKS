@@ -84,6 +84,10 @@ function cleanSettings(s) {
   d.watch = names(s.watch).filter(function (p) { return p.charAt(0) === "/"; });
   if (typeof s.translateTo === "string" && /^[a-z]{2,3}(-[A-Za-z]{2,4})?$/.test(s.translateTo)) d.translateTo = s.translateTo;
   if (typeof s.speakRate === "number") d.speakRate = Math.max(0.5, Math.min(2, Math.round(s.speakRate * 10) / 10));
+  // the window's own size, less the sidebar's room (MinervaWindow keepSize);
+  // none until it has closed once
+  if (Array.isArray(s.winSize) && s.winSize.length === 2 && s.winSize.every(function (n) { return typeof n === "number" && isFinite(n); }))
+    d.winSize = [Math.max(820, Math.min(8000, Math.round(s.winSize[0]))), Math.max(560, Math.min(8000, Math.round(s.winSize[1])))];
   return d;
 }
 
@@ -374,8 +378,11 @@ var TONES = {
   sepia: { bg: "#f4ecd8", ink: "#3d3022", link: "#8a5524" },
   night: { bg: "#151517", ink: "#d4d4d8", link: "#7fb0ff" }
 };
+// `shell`: { bg, ink, link } the shell's own colours, for auto, and
+// `night`, the shell theme's dark side (user, 2026-10-22: night follows the
+// theme's tone) — TONES.night only when none is given
 function themeOf(theme, kind, shell) {
-  var t = TONES[theme];
+  var t = theme === "night" && shell && shell.night ? shell.night : TONES[theme];
   if (!t) return paged(kind) ? { bg: TONES.paper.bg, ink: TONES.paper.ink, link: "", tone: false }
     : { bg: shell.bg, ink: shell.ink, link: shell.link, tone: false };
   return { bg: t.bg, ink: t.ink, link: t.link, tone: kind === "pdf" && theme !== "paper" };

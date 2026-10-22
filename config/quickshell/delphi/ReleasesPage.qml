@@ -31,8 +31,15 @@ Item {
   readonly property var edgeViews: pg.edit ? [] : [list, body]
   readonly property var footViews: pg.edit ? [] : [list, body]
 
-  readonly property var hub: pg.win ? pg.win.hub : null
+  // the window's hub, unless it has releases turned off (a 404): then the
+  // next of the repository's forge remotes that has them (D.hubsOf)
+  readonly property var hubs: { pg.win && pg.win.mgr ? pg.win.mgr.servers : null; return pg.win ? D.hubsOf(pg.win.remotes) : []; }
+  readonly property string hubsKey: pg.hubs.map((h) => h.forge + " " + h.full).join("\n")
+  onHubsKeyChanged: pg.hubAt = 0
+  property int hubAt: 0
+  readonly property var hub: pg.hubs.length > 0 ? pg.hubs[Math.min(pg.hubAt, pg.hubs.length - 1)] : null
   readonly property string hubFull: pg.hub ? pg.hub.full : ""
+  readonly property string hubKey: pg.hub ? pg.hub.forge + " " + pg.hub.full : ""
   readonly property var site: D.FORGES[pg.hub ? pg.hub.forge : "github"] || D.FORGES.github
   function op(name) { return (D.FORGES[pg.hub ? pg.hub.forge : "github"] || D.FORGES.github).id + name; }
   // GitLab (gitlab.com or a server of your own) has no drafts or pre-releases
@@ -42,7 +49,7 @@ Item {
   readonly property string subtitle: pg.edit ? pg.hubFull
     : !pg.hub ? "Not on GitHub, GitLab or Codeberg"
     : pg.loading ? pg.hubFull + "  ·  asking " + pg.site.name + "…"
-    : pg.hubFull + "  ·  " + (pg.rels.length === 0 ? "none yet" : pg.rels.length + (pg.rels.length === 1 ? " release" : " releases"))
+    : pg.hubFull + (pg.hubs.length > 1 ? " on " + pg.site.name : "") + "  ·  " + (pg.rels.length === 0 ? "none yet" : pg.rels.length + (pg.rels.length === 1 ? " release" : " releases"))
   readonly property var hints: pg.edit ? [["ctrl return", pg.edit.mode === "new" ? "publish" : "save"], ["esc", "back"], ["tab", "next field"]]
     : [["↑↓", "releases"], ["n", "new"], ["e", "edit"], ["w", "web"], ["r", "refresh"]]
   readonly property var buttons: pg.edit ? [
@@ -67,10 +74,12 @@ Item {
   readonly property var rel: pg.sel >= 0 && pg.sel < pg.rels.length ? pg.rels[pg.sel] : null
   function reload() {
     if (!pg || !pg.win || !pg.hub) return;
-    const asked = pg.hubFull, keep = pg.rel ? pg.rel.tag : "";
+    const asked = pg.hubKey, keep = pg.rel ? pg.rel.tag : "";
     pg.loading = true;
-    pg.win.mgr.call(pg.op("Releases"), null, { full: asked }, (ok, res, err) => { if (!pg || asked !== pg.hubFull) return;
+    pg.win.mgr.call(pg.op("Releases"), null, { full: pg.hubFull }, (ok, res, err) => { if (!pg || asked !== pg.hubKey) return;
       pg.loading = false;
+      // releases off on this forge: on to the next remote's
+      if (!ok && err && err.status === 404 && pg.hubAt + 1 < pg.hubs.length) { pg.hubAt++; return; }
       pg.listError = ok ? "" : D.errorText(err ? err.error : "");
       if (!ok) { pg.rels = []; return; }
       // one just made or changed here, which the forge's list may not have
@@ -83,7 +92,7 @@ Item {
     });
   }
   Component.onCompleted: Qt.callLater(pg.reload)
-  onHubFullChanged: { pg.rels = []; pg.edit = null; pg.reload(); }
+  onHubKeyChanged: { pg.rels = []; pg.edit = null; pg.reload(); }
   function web() { if (pg.rel && pg.rel.url) Quickshell.execDetached(["xdg-open", pg.rel.url]); }
   function moveTo(i) {
     if (pg.rels.length === 0) return;
@@ -269,10 +278,10 @@ Item {
           onDoubleClicked: pg.web()
         }
       }
-      EmptyMark {
+      EmptyState {
         anchors.centerIn: parent
         visible: pg.rels.length === 0 && !pg.loading && pg.listError === "" && !!pg.hub
-        word: "No releases yet"
+        text: "No releases yet"
       }
     }
     ElasticScroll { anchors.fill: list; view: list }

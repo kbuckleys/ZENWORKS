@@ -36,7 +36,7 @@ Item {
   property int pad: 18
   width: tool.word !== "" ? Math.max(tool.size, label.implicitWidth + tool.pad) : tool.size
   height: 30
-  opacity: tool.enabled ? 1 : 0.35
+  opacity: tool.enabled ? 1 : Zenon.disabledDim
   Rectangle {
     anchors.fill: parent
     radius: Zenon.windowRadius

@@ -473,7 +473,7 @@ FloatingWindow {
       // devices row is the one place that shows it — asked again on every
       // open rather than trusted from startup. See Oracle.scanSolaar.
       Oracle.scanSolaar();
-      // reopened standing in Default Apps, which scans on arrival
+      // reopened standing in Default apps, which scans on arrival
       if (popup.section === "defaults") Oracle.scanApps();
       if (popup.section === "input") Oracle.scanInputDevices();
       // A settings window is not a launcher: it opens where it was left, so
@@ -2692,6 +2692,9 @@ FloatingWindow {
     // Follow Background's Save asks for a name here first (Oracle's
     // nameFollowRequested), the picture's own name to start from. Return
     // keeps it, Escape or a click beside the card does not.
+    // About's Export settings / Import settings — oracle/SettingsMove.qml
+    SettingsMove { z: 20; fileManager: popup.fileManager }
+
     InputShield { visible: popup.naming; onClicked: popup.endNaming(false) }
     Sheet {
       id: nameSheet

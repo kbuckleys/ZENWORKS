@@ -118,7 +118,18 @@ Item {
   }
 
   // the tokens, offered while the search is empty and has the keys
+  //
+  // A MENU INSIDE A WINDOW (2026-10-22): it was tipBg, a frosted ground, but
+  // nothing frosts what is behind an item in Clio's own window — the list's
+  // heading, its day label and the first note showed sharp through the
+  // chips. Solid and shadowed, as terminus' right-click menu is.
+  MenuShadow {
+    panel: tokenCard
+    visible: tokenCard.visible
+    z: 19
+  }
   Rectangle {
+    id: tokenCard
     visible: searchField.activeFocus && searchField.text === "" && !bar.win.onDesktop
     z: 20
     anchors.top: box.bottom
@@ -126,8 +137,8 @@ Item {
     anchors.left: box.left
     width: box.width + 44
     height: tokens.implicitHeight + 20
-    radius: Zenon.windowRadius
-    color: Zenon.tipBg
+    radius: Zenon.menuRadius
+    color: Zenon.menuBgSolid
     border.width: 1
     border.color: Zenon.border
     Flow {

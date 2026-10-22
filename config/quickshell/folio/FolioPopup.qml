@@ -13,6 +13,7 @@ import "../morpheus/gridnav.js" as Nav
 import "../picasso"
 import "../terminus"
 import "../oracle"
+import "../clio"
 import "folio.js" as Folio
 
 LayerPopup {
@@ -49,6 +50,16 @@ LayerPopup {
   property bool hasText: false
   property bool hasImg: false
   property string lastAction: ""
+
+  // ── THE PAGE A SNIPPET IS WRITTEN ON (user, 2026-10-21) ───────────────
+  // ctrl n and ctrl e no longer hand the snippet to plato: the panel itself
+  // turns into a sticky's page (clio/NoteField, plain text), its name on a
+  // line above, Cancel and Save under it. `editPath` is the file being
+  // changed, "" for a new one.
+  property bool editing: false
+  property string editPath: ""
+  readonly property int editW: 640
+  readonly property int editH: 340
 
   readonly property color bgColor: Zenon.layerBg
   readonly property color fgColor: Zenon.white
@@ -129,7 +140,8 @@ LayerPopup {
   // 1000 is folio's own ceiling, under whatever Zenon.layerMax currently is.
   // Image mode measures in whole tiles, which is the only width a grid of
   // fixed 200px cells can honestly be.
-  readonly property int panelWidth: popup.mode === "image"
+  readonly property int panelWidth: popup.editing ? Math.max(popup.minW, popup.editW)
+    : popup.mode === "image"
     ? Math.max(popup.minW, popup.imgPerRow * popup.imgCell)
     : Math.min(1000, popup.textWant)
   readonly property int panelTarget: Zenon.layerWidth(popup.panelWidth)
@@ -175,7 +187,8 @@ LayerPopup {
   //
   // One row's worth either way, and the text row's height for both, so the
   // two empty states are the same object rather than two sizes of nothing.
-  readonly property real bodyH: popup.modeEmpty
+  readonly property real bodyH: popup.editing ? popup.editH + popup.msgH
+    : popup.modeEmpty
     ? popup.textCellHeight + popup.msgH
     : (popup.mode === "image"
         ? popup.imgRowsNeeded * popup.imgCellH + popup.msgH
@@ -320,6 +333,7 @@ LayerPopup {
     popup.shown = true;
     popup.collapsing = false;
     popup.mode = "text";
+    popup.editing = false;
     popup.query = "";
     filter.text = "";
     popup.sel = 0;
@@ -334,14 +348,21 @@ LayerPopup {
   // a handful of small files, not worth watching.
   function loadSnippets() {
     snipList.command = ["python3", "-I", "-c",
-      "import json,os,sys\n"
-      + "d=sys.argv[1]; out=[]\n"
+      "import json,os,shutil,sys\n"
+      + "d=sys.argv[1]; old=sys.argv[2]; out=[]\n"
+      // the old place (folio's data directory) emptied into the new once
+      + "if os.path.isdir(old):\n"
+      + "  os.makedirs(d,exist_ok=True)\n"
+      + "  for f in os.listdir(old):\n"
+      + "    if not os.path.exists(os.path.join(d,f)): shutil.move(os.path.join(old,f),os.path.join(d,f))\n"
+      + "  try: os.rmdir(old)\n"
+      + "  except OSError: pass\n"
       + "if os.path.isdir(d):\n"
       + "  for f in sorted(os.listdir(d)):\n"
       + "    p=os.path.join(d,f)\n"
       + "    if f.endswith('.txt') and os.path.isfile(p):\n"
       + "      out.append({'name':f[:-4],'path':p,'text':open(p,encoding='utf-8',errors='replace').read().rstrip('\\n')})\n"
-      + "print(json.dumps(out))", Folio.snippetDir()];
+      + "print(json.dumps(out))", Folio.snippetDir(), Folio.oldSnippetDir()];
     snipList.running = true;
   }
   Process {
@@ -352,16 +373,23 @@ LayerPopup {
       onStreamFinished: {
         popup.snippets = Folio.parseSnippets(snipOut.text);
         if (popup.mode === "snip") popup.applyFilter();
+        if (popup.selectAfterLoad !== "") {
+          const at = popup.rows.findIndex((r) => r.snip && r.preview === popup.selectAfterLoad);
+          popup.selectAfterLoad = "";
+          if (at >= 0) { popup.sel = at; popup.followSelection(); }
+        }
       }
     }
   }
   // what was copied last, for {clipboard}
   function lastClip() { return popup.entries.length > 0 ? String(popup.entries[0].content || "") : ""; }
-  // a file written, then opened in plato to be written in
-  function writeSnippet(name, text, thenEdit) {
+  // a file written whole (beside it, then moved over it); `was`, when it is
+  // another path, is the old name of a snippet renamed, and goes
+  function writeSnippet(name, text, was) {
     const path = Folio.snippetDir() + "/" + name + ".txt";
-    Quickshell.execDetached(["sh", "-c", "mkdir -p \"$(dirname \"$1\")\" && printf '%s\\n' \"$2\" > \"$1\""
-      + (thenEdit ? " && qs ipc call Plato open \"$1\" >/dev/null" : ""), "sh", path, text]);
+    Quickshell.execDetached(["sh", "-c", "mkdir -p \"$(dirname \"$1\")\" && printf '%s\\n' \"$2\" > \"$1.part\""
+      + " && mv -f \"$1.part\" \"$1\" && { [ -z \"$3\" ] || [ \"$3\" = \"$1\" ] || rm -f \"$3\"; }",
+      "sh", path, text, was || ""]);
     snipReload.restart();
     return path;
   }
@@ -371,22 +399,70 @@ LayerPopup {
   function flash(t) { popup.note = t; noteTimer.restart(); }
   Timer { id: noteTimer; interval: 2400; onTriggered: popup.note = "" }
   function newSnippet() {
-    const name = Folio.snippetName("New snippet", popup.snippets.map((s) => s.name));
-    popup.writeSnippet(name, "Hello {clipboard} — {date}", true);
-    popup.closePopup();
+    if (popup.editing) return;
+    popup.beginEdit("", "", "");
   }
   // the text clip under the cursor, kept
   function keepAsSnippet() {
     if (popup.mode !== "text" || popup.rows.length === 0) return;
     const text = String(popup.rows[popup.sel].content || "");
     const name = Folio.snippetName(text, popup.snippets.map((s) => s.name));
-    popup.writeSnippet(name, text, false);
+    popup.writeSnippet(name, text, "");
     popup.flash("Kept as \u201C" + name + "\u201D \u2014 tab to snippets");
   }
   function editSnippet() {
-    if (popup.mode !== "snip" || popup.rows.length === 0) return;
-    Quickshell.execDetached(["qs", "ipc", "call", "Plato", "open", popup.rows[popup.sel].path]);
-    popup.closePopup();
+    if (popup.editing || popup.mode !== "snip" || popup.rows.length === 0) return;
+    const r = popup.rows[popup.sel];
+    popup.beginEdit(r.path, r.preview, r.content);
+  }
+  // ── THE PAGE ──────────────────────────────────────────────────────────
+  // Into the page: the list fades out under it and the panel takes the
+  // page's size, as it takes any mode's. The caret goes to the text, or to
+  // the name when there is none yet to keep.
+  function beginEdit(path, name, text) {
+    rowFlash.cancel();
+    popup.editPath = path;
+    snipName.text = name;
+    page.edit.text = text;
+    popup.mode = "snip";
+    popup.editing = true;
+    Qt.callLater(() => {
+      page.edit.cursorPosition = page.edit.length;
+      page.edit.forceActiveFocus();
+    });
+  }
+  // back to the list, the filter holding the keyboard again
+  function endEdit() {
+    popup.editing = false;
+    popup.editPath = "";
+    filter.forceActiveFocus();
+  }
+  // Saved under the name typed, or under its first words when none was.
+  // A name another snippet already has is refused in the hint strip's
+  // place rather than written over it.
+  function saveEdit() {
+    const text = page.edit.text.replace(/\n+$/, "");
+    const was = popup.editPath;
+    const others = popup.snippets.filter((x) => x.path !== was).map((x) => x.name);
+    const name = Folio.snippetFileName(snipName.text) || Folio.snippetName(text, others);
+    if (others.some((n) => n.toLowerCase() === name.toLowerCase())) {
+      popup.flash("A snippet is already called \u201C" + name + "\u201D");
+      snipName.forceActiveFocus();
+      return;
+    }
+    popup.writeSnippet(name, text, was);
+    popup.endEdit();
+    popup.flash(was === "" ? "Saved \u201C" + name + "\u201D" : "Saved");
+    // the cursor on it once the listing is back
+    popup.selectAfterLoad = name;
+  }
+  function cancelEdit() { popup.endEdit(); }
+  property string selectAfterLoad: ""
+  // the keys both of the page's fields answer the same way
+  function editKey(e) {
+    const ctrl = (e.modifiers & Qt.ControlModifier) !== 0;
+    if (e.key === Qt.Key_Escape) { e.accepted = true; popup.cancelEdit(); }
+    else if (ctrl && e.key === Qt.Key_S) { e.accepted = true; popup.saveEdit(); }
   }
   function closePopup() {
     rowFlash.cancel();
@@ -679,6 +755,9 @@ function onThumbsDone() {
       bottomRightRadius: Zenon.pillRadius
       border.color: Zenon.border
       border.width: 1
+      // the list's keys, not the page's: a key the page's text did not
+      // take climbs up to here, and ctrl n or delete would act on the list
+      Keys.enabled: !popup.editing
 
       // the entries still below rise out of the hint strip, frosted — see
       // morpheus/ScrollEdge. One per pane, sliding and fading with it.
@@ -714,7 +793,7 @@ function onThumbsDone() {
             // to nothing said nothing at all while text entries existed one
             // Tab away — and the panel that had just answered `delete` went
             // blank rather than telling you it was done.
-            visible: popup.shown && popup.modeEmpty
+            visible: popup.shown && popup.modeEmpty && !popup.editing
           }
 
           Text {
@@ -724,7 +803,7 @@ function onThumbsDone() {
             font.family: Zenon.face
             font.weight: 600
             font.pixelSize: Zenon.px(15)
-            visible: popup.shown && popup.rows.length === 0
+            visible: popup.shown && popup.rows.length === 0 && !popup.editing
               && ((popup.mode === "text" && popup.hasText) || (popup.mode === "snip" && popup.snippets.length > 0))
           }
 
@@ -732,8 +811,8 @@ function onThumbsDone() {
           id: textPane
           anchors.fill: parent
           visible: opacity > 0.01
-          opacity: popup.mode === "text" || popup.mode === "snip" ? 1 : 0
-          x: popup.mode === "text" || popup.mode === "snip" ? 0 : -24
+          opacity: !popup.editing && (popup.mode === "text" || popup.mode === "snip") ? 1 : 0
+          x: popup.editing ? -24 : popup.mode === "text" || popup.mode === "snip" ? 0 : -24
           Behavior on opacity { NumberAnimation { duration: Zenon.normal; easing.type: Zenon.ease } }
           Behavior on x { NumberAnimation { duration: Zenon.normal; easing.type: Zenon.ease } }
 
@@ -887,8 +966,8 @@ function onThumbsDone() {
           id: imgPane
           anchors.fill: parent
           visible: opacity > 0.01
-          opacity: popup.mode === "image" ? 1 : 0
-          x: popup.mode === "image" ? 0 : 24
+          opacity: !popup.editing && popup.mode === "image" ? 1 : 0
+          x: !popup.editing && popup.mode === "image" ? 0 : 24
           Behavior on opacity { NumberAnimation { duration: Zenon.normal; easing.type: Zenon.ease } }
           Behavior on x { NumberAnimation { duration: Zenon.normal; easing.type: Zenon.ease } }
 
@@ -1066,13 +1145,113 @@ function onThumbsDone() {
             anchors.bottom: imgGrid.bottom
           }
         }
+
+        // ── THE PAGE (see beginEdit) ──────────────────────────────────
+        // The name on a line of its own, the sticky's page under it, and
+        // Cancel and Save at the bottom right, Cancel left of the verb.
+        Item {
+          id: editPane
+          anchors.fill: parent
+          visible: opacity > 0.01
+          opacity: popup.editing ? 1 : 0
+          x: popup.editing ? 0 : 24
+          Behavior on opacity { NumberAnimation { duration: Zenon.normal; easing.type: Zenon.ease } }
+          Behavior on x { NumberAnimation { duration: Zenon.normal; easing.type: Zenon.ease } }
+
+          TextInput {
+            id: snipName
+            anchors.top: parent.top
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.topMargin: 12
+            anchors.leftMargin: 16
+            anchors.rightMargin: 16
+            height: 28
+            verticalAlignment: TextInput.AlignVCenter
+            enabled: popup.editing
+            color: popup.fgColor
+            selectionColor: Zenon.wash(0.25)
+            selectByMouse: true
+            clip: true
+            font.family: Zenon.face
+            font.weight: 600
+            font.pixelSize: Zenon.px(16)
+            cursorDelegate: Caret { field: snipName }
+            Keys.onPressed: (e) => {
+              popup.editKey(e);
+              if (e.accepted) return;
+              if (e.key === Qt.Key_Return || e.key === Qt.Key_Enter || e.key === Qt.Key_Tab
+                  || e.key === Qt.Key_Down) {
+                e.accepted = true;
+                page.edit.forceActiveFocus();
+              }
+            }
+
+            Text {
+              anchors.verticalCenter: parent.verticalCenter
+              visible: snipName.text === ""
+              text: "Name \u2014 its first words if left blank"
+              color: Zenon.wash(0.35)
+              font: snipName.font
+            }
+          }
+
+          Rectangle {
+            id: nameRule
+            anchors.top: snipName.bottom
+            anchors.topMargin: 6
+            anchors.left: parent.left
+            anchors.right: parent.right
+            height: 1
+            color: Zenon.border
+          }
+
+          Item {
+            anchors.top: nameRule.bottom
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.bottom: editButtons.top
+            anchors.bottomMargin: 6
+
+            NoteField {
+              id: page
+              rich: false
+              ground: popup.bgColor
+              inset: 16
+              ghostFocused: true
+              placeholder: "Text to paste again \u2014 {date} {time} {weekday} {clipboard} are filled in"
+              mgr: Clio.app
+              spelling: popup.editing
+              onKeyPressed: (e) => {
+                popup.editKey(e);
+                if (e.accepted) return;
+                // up out of the first line, to the name
+                if (e.key === Qt.Key_Backtab) {
+                  e.accepted = true;
+                  snipName.forceActiveFocus();
+                }
+              }
+            }
+          }
+
+          Row {
+            id: editButtons
+            anchors.right: parent.right
+            anchors.bottom: parent.bottom
+            anchors.rightMargin: 16
+            anchors.bottomMargin: 12
+            spacing: 8
+            DialogButton { label: "Cancel"; onClicked: popup.cancelEdit() }
+            DialogButton { label: "Save"; primary: true; onClicked: popup.saveEdit() }
+          }
+        }
       }
 
       // morpheus/HintBar, as every strip (ceres' height, ground and rule)
       HintBar {
         id: msgBar
         width: parent.width
-        rows: Folio.hintText(popup.mode)
+        rows: Folio.hintText(popup.editing ? "edit" : popup.mode)
         note: popup.note
       }
     }

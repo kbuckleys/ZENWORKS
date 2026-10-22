@@ -1,0 +1,8 @@
+#!/bin/sh
+# ┌─┐┌─┐┌┐┌┬ ┬┌─┐┬─┐┬┌─┌─┐
+# ┌─┘├┤ │││││││ │├┬┘├┴┐└─┐
+# └─┘└─┘┘└┘└┴┘└─┘┴└─┴ ┴└─┘
+# https://github.com/kbuckleys/
+#
+# kairos [day|week]   Screen Time, from a terminal, a keybind, or kairos.desktop
+exec qs ipc call Kairos open "${1:-}" >/dev/null

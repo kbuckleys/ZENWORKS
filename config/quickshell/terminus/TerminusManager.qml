@@ -29,7 +29,7 @@ Scope {
   // picasso's arrangement (see PicassoViewer): written into
   // ~/.local/share/applications on startup when missing, with this
   // machine's path to bin/terminus. It is what makes terminus a file
-  // manager the rest of the desktop can name — oracle's Default Apps hands
+  // manager the rest of the desktop can name — oracle's Default apps hands
   // it inode/directory, so another application's "show in directory" lands
   // here. One already there is left alone.
   Process {
@@ -46,7 +46,7 @@ Scope {
       Terminal: "false",
       StartupNotify: "false",
       // and archives, which it opens as directories (openArchive) — so
-      // oracle's Default Apps can offer it for them
+      // oracle's Default apps can offer it for them
       MimeType: ["inode/directory", "application/zip", "application/x-tar",
                  "application/x-compressed-tar", "application/x-xz-compressed-tar",
                  "application/x-zstd-compressed-tar", "application/x-bzip2-compressed-tar",
@@ -565,7 +565,7 @@ Scope {
   // answer that is never coming.
   //
   // `saveName`, when given, makes it a SAVE dialog — a name field filled with
-  // it, in `start` — for picasso's Save New. The answer is the full path the
+  // it, in `start` — for picasso's Save new. The answer is the full path the
   // file should be written to; nothing is created here, the caller writes it.
   //
   // `multiple` lets the answer be every file marked, not just the first —

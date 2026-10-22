@@ -795,7 +795,7 @@ LayerPopup {
                   }
                   PillButton {
                     glyph: Wx.icon("refresh")
-                    label: Weather.loading ? "Fetching" : "Refresh"
+                    label: Weather.loading ? "Fetching…" : "Refresh"
                     accent: Weather.error !== "" ? Zenon.red : Zenon.cyan
                     dimmed: Weather.loading
                     onActivated: if (!Weather.loading) Weather.refresh()

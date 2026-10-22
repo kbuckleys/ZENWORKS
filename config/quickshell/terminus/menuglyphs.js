@@ -23,7 +23,7 @@ const exact = {
   "Close tab": "\u{F0156}",                  // close
   "Close": "\u{F0156}",
   "Open with": "\u{F003B}",                  // apps
-  "Choose Program": "\u{F003B}",
+  "Choose program": "\u{F003B}",
   "Add another…": "\u{F0614}",          // application_outline
   "Open terminal here": "\u{F018D}",         // console
   "Quick look": "\u{F0208}",                 // eye
@@ -99,7 +99,7 @@ const exact = {
   "Convert to": "\u{F0B33}",                 // file_replace_outline
   "Set as background": "\u{F02E9}",          // image
   "Annotate": "\u{F090C}",                   // square_edit_outline
-  "Quick Edit": "\u{F0190}",                 // content_cut
+  "Quick edit": "\u{F0190}",                 // content_cut
   "Rotate left": "\u{F0465}",                // rotate_left
   "Rotate right": "\u{F0467}",               // rotate_right
   "Install font": "\u{F06D6}",               // format_font

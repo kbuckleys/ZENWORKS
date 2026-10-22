@@ -5,7 +5,7 @@
 //
 // CLIO'S WINDOW — three columns, as Apple's Notes lays its own out:
 //
-//   the sidebar   All Notes, Stickies (the desktop's), the containers and
+//   the sidebar   All notes, Stickies (the desktop's), the containers and
 //                 smart containers, the Trash, the tags; the journals
 //   the list      a search, then the notes under their date headings —
 //                 pinned first — as rows or a gallery; in a journal, the

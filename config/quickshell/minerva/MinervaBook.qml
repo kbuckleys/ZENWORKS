@@ -236,7 +236,9 @@ Item {
   Timer { id: movedSoon; interval: 400; onTriggered: bk.moved(bk.where) }
 
   // ── THE PAGE ───────────────────────────────────────────────────────────
-  Rectangle { anchors.fill: parent; color: bk.look.bg }
+  // stops at the sidebar: only the pages themselves run on under it, for
+  // its frost (MinervaWindow's sideBox)
+  Rectangle { anchors.fill: parent; anchors.rightMargin: bk.insetRight; color: bk.look.bg }
   Flickable {
     id: flick
     anchors.fill: parent

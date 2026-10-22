@@ -32,7 +32,7 @@ Item {
   property string codeFamily: Zenon.faceCode
   // the editor's weight too: a preview reads as the file will in plato
   property int codeWeight: Zenon.codeWeight
-  property int pixelSize: 16
+  property int pixelSize: Zenon.px(16)
   // drawn centered when not empty: the host's word for what is (not) here
   property string message: ""
   // a moment's wait before looking, so walking a list does not run a

@@ -1218,7 +1218,7 @@ Item {
   }
   // the copy's go-between: a TextEdit puts html and plain text on the
   // clipboard together, which is what a paste elsewhere wants
-  TextEdit { id: clip; visible: false; textFormat: TextEdit.RichText }
+  TextEdit { id: clip; visible: false; textFormat: TextEdit.RichText; cursorDelegate: Caret { field: clip } }
   Item {
     id: crossSink
     Keys.onPressed: (e) => { if (ed.cross && ed.crossKey(e)) e.accepted = true; }

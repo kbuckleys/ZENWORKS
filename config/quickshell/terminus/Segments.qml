@@ -243,7 +243,7 @@ Item {
           color: Zenon.border
         }
         // PRESSED, DARKENED (user, 2026-10-15): the shade and dimmed ink of
-        // terminus' ClearChip, in the highlight's own shape — every switch in
+        // morpheus' ClearChip, in the highlight's own shape — every switch in
         // the suite presses the same way the × does (it was a lighter wash,
         // delphi's repository chip, 2026-10-11)
         Rectangle {

@@ -699,6 +699,7 @@ PlatoSheet {
   // for the query is caught here first.
   TextInput {
     id: query
+    cursorDelegate: Caret { field: query }
     width: 0
     height: 0
     opacity: 0

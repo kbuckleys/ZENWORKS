@@ -20,7 +20,7 @@ Item {
   property string file: ""
   property string codeFamily: Zenon.faceCode
   property int codeWeight: Zenon.codeWeight
-  property int pixelSize: 14
+  property int pixelSize: Zenon.px(14)
   property real maxW: 560
   property real maxH: 340
   // a word after the path ("gf opens it in Picasso")

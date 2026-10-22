@@ -64,7 +64,7 @@ Item {
           ghost: "v1.0.0"
           // a release there is keeps its tag on GitLab, which knows it by it
           enabled: !!ed.e && (ed.e.mode === "new" || !/^gitlab/.test(ed.page.hub ? ed.page.hub.forge : ""))
-          opacity: enabled ? 1 : 0.6
+          opacity: enabled ? 1 : Zenon.disabledDim
           onTextChanged: if (ed.e && text !== ed.e.tag) ed.page.setEdit("tag", text)
           onTabbed: titleField.claim()
           onAccepted: titleField.claim()

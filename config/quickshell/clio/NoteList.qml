@@ -48,7 +48,7 @@ Item {
         if (s.shelf === "trash") return "Trash";
         if (s.shelf === "tag") return "#" + s.id;
         if (s.shelf === "folder" || s.shelf === "smart") return (nl.mgr.folders.find((f) => f.id === s.id) || { name: "Notes" }).name;
-        return "All Notes";
+        return "All notes";
       }
       color: Zenon.ink
       font.family: Zenon.face
@@ -224,11 +224,11 @@ Item {
       radius: Zenon.windowRadius
       inset: 8
     }
-    EmptyMark {
+    EmptyState {
       anchors.centerIn: parent
       visible: list.count === 0 && !!nl.mgr && nl.mgr.loaded
       filtered: !!nl.win && nl.win.query !== ""
-      word: !nl.win || nl.win.query !== "" ? "" : nl.win.onDesktop ? "No stickies" : nl.win.inTrash ? "Nothing deleted" : "No notes"
+      text: !nl.win ? "Empty" : nl.win.query !== "" ? "No matches" : nl.win.onDesktop ? "No stickies" : nl.win.inTrash ? "Nothing deleted" : "No notes"
     }
     Working { anchors.centerIn: parent; running: !!nl.mgr && nl.mgr.loading; visible: running }
   }

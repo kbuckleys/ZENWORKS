@@ -208,22 +208,21 @@ Item {
           }
         }
 
-        Rectangle {
+        // the shared caret, drawn after the dots. Told from out here: inside
+        // a Caret, `field` is the Caret's own property, not this field
+        readonly property bool caretOn: field.pw.length > 0 && !field.busy
+        Connections {
+          target: field
+          function onPwChanged() { caret.wake(false); }
+        }
+        Caret {
           id: caret
-          readonly property bool on: field.pw.length > 0 && !field.busy
+          field: parent
+          active: parent.caretOn
           anchors.verticalCenter: parent.verticalCenter
-          width: 3
+          thick: 3; low: 0.25; radius: 1
           height: 20
-          radius: 1
           color: Zenon.pink
-          opacity: 0.25
-          visible: caret.on
-          SequentialAnimation on opacity {
-            running: caret.on
-            loops: Animation.Infinite
-            NumberAnimation { to: 1; duration: Zenon.breath; easing.type: Zenon.breathEase }
-            NumberAnimation { to: 0.25; duration: Zenon.breath; easing.type: Zenon.breathEase }
-          }
         }
       }
 

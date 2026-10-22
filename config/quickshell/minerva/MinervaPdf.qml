@@ -324,17 +324,23 @@ Item {
   function clearSelection() { if (pg.selOwner) pg.selOwner.clearSel(); pg.selected = ""; }
 
   // ── THE VIEW ───────────────────────────────────────────────────────────
-  Rectangle { anchors.fill: parent; color: pg.look.tone ? Qt.darker(pg.look.bg, 1.25) : Zenon.ground }
+  // stops at the sidebar: only the pages themselves run on under it, for
+  // its frost (MinervaWindow's sideBox)
+  Rectangle { anchors.fill: parent; anchors.rightMargin: pg.insetRight; color: pg.look.tone ? Qt.darker(pg.look.bg, 1.25) : Zenon.ground }
   Flickable {
     id: flick
     anchors.fill: parent
-    // the wheel is ElasticScroll's, a drag is a selection's
+    // the wheel is ElasticScroll's; a drag is a selection's, or, zoomed in
+    // past the view, a pan's and shift+drag the selection's (user,
+    // 2026-10-21)
     interactive: false
     boundsBehavior: Flickable.StopAtBounds
     contentWidth: pg.lay.contentW + pg.insetRight
     contentHeight: pg.lay.contentH + pg.insetBottom
     readonly property Elastic elastic: wheel.elastic
+    readonly property bool wide: flick.contentWidth > flick.width + 1
 
+    DragPan { flick: flick; on: flick.wide }
     Repeater {
       model: pg.pageCount
       delegate: Item {
@@ -453,8 +459,9 @@ Item {
 
       DragHandler {
         id: drag
-        acceptedDevices: PointerDevice.Mouse | PointerDevice.Stylus
+        acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad | PointerDevice.Stylus
         target: null
+        acceptedModifiers: flick.wide ? Qt.ShiftModifier : Qt.KeyboardModifierMask
         onActiveChanged: if (drag.active) {
           if (pg.selOwner && pg.selOwner !== paper) pg.selOwner.clearSel();
           pg.selOwner = paper;
@@ -462,7 +469,7 @@ Item {
       }
       TapHandler {
         id: tap
-        acceptedDevices: PointerDevice.Mouse | PointerDevice.Stylus
+        acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad | PointerDevice.Stylus
         onTapped: if (pg.selOwner === paper) { sel.clear(); pg.selected = ""; }
       }
       TapHandler {

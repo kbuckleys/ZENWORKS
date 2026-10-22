@@ -840,28 +840,18 @@ Item {
         MouseArea { id: chipPress; anchors.fill: parent; onClicked: { pg.accountMenu(chip.fid, chip); menu.held = "chip:" + chip.fid; } }
       }
     }
-    // a new account: another forge, another account on one, a server
-    Rectangle {
-      id: addChip
-      width: 28
+    // a new account: another forge, another account on one, a server —
+    // the suite's small + (AddChip), centered on the chips' line
+    Item {
+      width: addChip.width + 8
       height: 28
-      radius: Zenon.windowRadius
-      color: addPress.pressed ? Zenon.pressFill : Zenon.wash(0.04)
-      border.width: 1
-      border.color: menu.isOpen && menu.held === "add" ? Zenon.cyan : Zenon.border
-      Text {
+      AddChip {
+        id: addChip
         anchors.centerIn: parent
-        text: "\uF067"
-        color: Zenon.ink
-        font.family: Zenon.glyphFace
-        font.pixelSize: Zenon.px(12)
-      }
-      MouseArea {
-        id: addPress
-        anchors.fill: parent
-        hoverEnabled: true
+        size: Zenon.px(15)
+        held: menu.isOpen && menu.held === "add"
         onClicked: pg.addAccount(addChip)
-        onContainsMouseChanged: containsMouse ? pg.win.tip(addChip, "Add an account") : pg.win.untip(addChip)
+        HoverHandler { onHoveredChanged: hovered ? pg.win.tip(addChip, "Add an account") : pg.win.untip(addChip) }
       }
     }
   }
@@ -1051,11 +1041,11 @@ Item {
     // coming after rows are there, under them
     footer: Item { width: list.width; height: pg.loadingRepos && pg.shown.length > 0 ? 50 : 0; Working { anchors.centerIn: parent; running: pg.loadingRepos && pg.shown.length > 0 } }
     Working { anchors.centerIn: parent; running: pg.loadingRepos && pg.shown.length === 0; visible: running }
-    EmptyMark {
+    EmptyState {
       anchors.centerIn: parent
       visible: pg.shown.length === 0 && !pg.loadingRepos && pg.listErrors.length === 0
       filtered: pg.query !== ""
-      word: pg.query !== "" ? "" : "No repositories yet"
+      text: pg.query !== "" ? "No matches" : "No repositories yet"
     }
   }
   ElasticScroll { anchors.fill: list; view: list; visible: pg.signedIn }

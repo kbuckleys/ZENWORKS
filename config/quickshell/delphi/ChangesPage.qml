@@ -660,11 +660,11 @@ Item {
           }
         }
       }
-      EmptyMark {
+      EmptyState {
         anchors.centerIn: parent
         visible: pg.clean
         filtered: pg.query !== ""
-        word: pg.query !== "" ? "" : "Nothing to commit"
+        text: pg.query !== "" ? "No matches" : "Nothing to commit"
       }
     }
     ElasticScroll { anchors.fill: list; view: list }
@@ -684,12 +684,10 @@ Item {
         x: 12
         y: 12
         width: parent.width - 24
-        height: 112
+        height: parent.height - 24
+        footRoom: commitBtn.height + 8
         ghost: pg.stagedCount > 0 ? "Left empty, it says “" + pg.autoMsg + "” — or say what it does: a short first line, then more after a blank line"
           : "Stage something to commit, then say what it does"
-        // the subject's length, as it is typed: 50 is the habit, 72 the wall
-        note: pg.note.text
-        noteInk: Zenon[pg.note.ink]
         passKeys: (e) => pg.win.key(e)
         // the draft lives on the window: a trip to History and back keeps it
         Component.onCompleted: msgWell.text = pg.win ? pg.win.draft : ""
@@ -698,47 +696,64 @@ Item {
         onSubmitted: pg.commit()
         onEscaped: pg.area = "list"
         onTabbed: pg.area = "list"
-      }
-      Controls.Check {
-        anchors.left: msgWell.left
-        anchors.top: msgWell.bottom
-        anchors.topMargin: 16
-        width: 200
-        height: 28
-        // short: the undo glyph and Commit share the row (2026-10-14)
-        label: "Amend last"
-        lit: pg.amend
-        onToggled: pg.amend = !pg.amend
-      }
-      // UNDO THE LAST COMMIT (user, 2026-10-14): what it changed staged
-      // again and its message back in the box — undoCommit
-      DialogButton {
-        id: undoBtn
-        visible: pg.canUndo
-        anchors.right: commitBtn.left
-        anchors.rightMargin: 8
-        anchors.top: commitBtn.top
-        // U+F054D (user, 2026-10-14): a word overlapped the Amend switch
-        label: "\u{F054D}"
-        glyph: true
-        ink: Zenon.accentMuted
-        onClicked: pg.undoCommit()
-        HoverHandler {
-          onHoveredChanged: if (pg.win) hovered
-            ? pg.win.tip(undoBtn, "Take back “" + pg.lastSubject + "” — its changes stay staged", "ctrl z")
-            : pg.win.untip(undoBtn)
+
+        // inside the well's foot, a part of the field like ForgePage's Send
+        // (user, 2026-10-21): Amend at the left, the length, undo and
+        // Commit at the right
+        Controls.Check {
+          anchors.left: parent.left
+          anchors.leftMargin: 8
+          anchors.verticalCenter: commitBtn.verticalCenter
+          width: 200
+          height: 28
+          // short: the undo glyph and Commit share the row (2026-10-14)
+          label: "Amend last"
+          lit: pg.amend
+          onToggled: pg.amend = !pg.amend
         }
-      }
-      DialogButton {
-        id: commitBtn
-        anchors.right: msgWell.right
-        anchors.top: msgWell.bottom
-        anchors.topMargin: 14
-        label: pg.amend ? "Amend" : pg.stagedCount > 0 ? "Commit " + pg.stagedCount : "Commit"
-        ink: Zenon.cyan
-        primary: pg.canCommit
-        ready: pg.canCommit
-        onClicked: pg.commit()
+        // the subject's length, as it is typed: 50 is the habit, 72 the wall
+        Text {
+          anchors.right: undoBtn.visible ? undoBtn.left : commitBtn.left
+          anchors.rightMargin: 10
+          anchors.verticalCenter: commitBtn.verticalCenter
+          visible: text !== ""
+          text: pg.note.text
+          color: Zenon[pg.note.ink]
+          font.family: Zenon.face
+          font.weight: Zenon.weight
+          font.features: { "tnum": 1 }
+          font.pixelSize: Zenon.px(13)
+        }
+        // UNDO THE LAST COMMIT (user, 2026-10-14): what it changed staged
+        // again and its message back in the box — undoCommit
+        DialogButton {
+          id: undoBtn
+          visible: pg.canUndo
+          anchors.right: commitBtn.left
+          anchors.rightMargin: 8
+          anchors.top: commitBtn.top
+          // U+F054D (user, 2026-10-14): a word overlapped the Amend switch
+          label: "\u{F054D}"
+          glyph: true
+          ink: Zenon.accentMuted
+          onClicked: pg.undoCommit()
+          HoverHandler {
+            onHoveredChanged: if (pg.win) hovered
+              ? pg.win.tip(undoBtn, "Take back “" + pg.lastSubject + "” — its changes stay staged", "ctrl z")
+              : pg.win.untip(undoBtn)
+          }
+        }
+        DialogButton {
+          id: commitBtn
+          anchors.right: parent.right
+          anchors.bottom: parent.bottom
+          anchors.margins: 8
+          label: pg.amend ? "Amend" : pg.stagedCount > 0 ? "Commit " + pg.stagedCount : "Commit"
+          ink: Zenon.cyan
+          primary: pg.canCommit
+          ready: pg.canCommit
+          onClicked: pg.commit()
+        }
       }
     }
   }

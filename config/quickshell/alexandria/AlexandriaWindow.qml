@@ -943,7 +943,7 @@ FloatingWindow {
             onDoubleClicked: if (win.picking) win.usePick()
           }
         }
-        EmptyMark {
+        EmptyState {
           anchors.centerIn: parent
           visible: famList.count === 0 && !!win.mgr && !win.mgr.scanning
           filtered: win.query !== ""
@@ -1511,7 +1511,8 @@ FloatingWindow {
           readonly property int cols: Math.max(1, Math.floor((width - pad) / win.cell))
           readonly property real cw: Math.max(1, (width - pad) / cols)
           cellWidth: cw
-          cellHeight: win.cell + 16
+          // the glyph, and its codepoint line under it at the Font size
+          cellHeight: win.cell + 6 + Zenon.px(10)
           cacheBuffer: 600
           // only on its own page: the pages are hidden, not unloaded, and a
           // hidden grid still built a screenful of cells in every family
@@ -1552,7 +1553,7 @@ FloatingWindow {
               color: gcell.here ? Zenon.cyan : Zenon.accentMuted
               font.family: Zenon.faceMono
               font.weight: Zenon.weight
-              font.pixelSize: 10
+              font.pixelSize: Zenon.px(10)
             }
             MouseArea {
               id: gMa
@@ -1565,7 +1566,7 @@ FloatingWindow {
               }
             }
           }
-          EmptyMark {
+          EmptyState {
             anchors.centerIn: parent
             visible: glyphGrid.count === 0 && !csProc.running
             filtered: win.gquery !== ""
@@ -1885,7 +1886,7 @@ FloatingWindow {
       ElasticScroll { anchors.fill: infoFlick; view: infoFlick; visible: infoFlick.visible }
       Scrollbar { flick: infoFlick; visible: infoFlick.visible; anchors.right: infoFlick.right; anchors.top: infoFlick.top; anchors.bottom: infoFlick.bottom }
 
-      EmptyMark {
+      EmptyState {
         anchors.centerIn: parent
         visible: !win.fam && !!win.mgr && !win.mgr.scanning
         filtered: true

@@ -53,7 +53,60 @@ PanelWindow {
   // the row of the parent card that opened this one
   readonly property int from: card.step ? card.step.from : -1
 
-  readonly property int cardW: 300
+  // ── AS WIDE AS ITS LONGEST ROW ─────────────────────────────────────
+  // Every menu fits its rows (CardMenu.fit); this card did not, and stood at
+  // 300 whatever it listed. A row is measured the way its delegate lays it
+  // out: insets, glyph and gap, name, the muted detail, the chevron. A
+  // directory whose count has not come back yet keeps room for three digits,
+  // so the card does not widen when it does. The header needs room for the
+  // directory's own name and the open button; the crumbs before it give way.
+  FontMetrics {
+    id: nameMetrics
+    font.family: Zenon.face
+    font.weight: Font.Medium
+    font.pixelSize: Zenon.px(16)
+  }
+  FontMetrics {
+    id: detailMetrics
+    font.family: Zenon.face
+    font.weight: Zenon.weight
+    font.pixelSize: Zenon.px(12)
+  }
+  FontMetrics {
+    id: headMetrics
+    font.family: Zenon.face
+    font.weight: Font.Medium
+    font.pixelSize: Zenon.px(15)
+  }
+  readonly property int fitWidth: {
+    nameMetrics.height;   // again when the face resolves (advanceWidth is a call)
+    let most = 0;
+    for (let i = 0; i < card.rows.length; ++i) {
+      const r = card.rows[i];
+      if (!r || r.kind === "sep") continue;
+      let w = 12 + 16 + 8 + nameMetrics.advanceWidth(String(r.name || "")) + 10;
+      if (r.kind === "entry") {
+        let d = "";
+        if (r.isDir) {
+          const n = card.counts[r.path];
+          d = n === undefined ? "999" : String(n);
+        } else if (!r.broken) d = Icarus.shortSize(r.size);
+        if (d !== "") w += 8 + detailMetrics.advanceWidth(d);
+      }
+      if (card.isBranch(i) || (r.kind === "entry" && r.isDir)) w += 6 + 16;
+      most = Math.max(most, w);
+    }
+    if (card.level === 0) {
+      const cr = card.owner.homeCrumbs(card.dir);
+      const last = cr.length > 0 ? String(cr[cr.length - 1].label || "") : "";
+      most = Math.max(most, 12 + headMetrics.advanceWidth(last) + 16 + 30);
+    }
+    return Math.ceil(most + Zenon.menuCardPad * 2 + 2 + Zenon.menuFitSlack);
+  }
+  readonly property int cardW: {
+    const cap = card.screen ? card.screen.width - Zenon.padScreen * 2 : 100000;
+    return Math.min(cap, Math.max(Zenon.menuMinWidth, card.fitWidth));
+  }
   // A card of thousands of rows is thousands of delegates built before it can
   // draw; past this the rest are one row that opens terminus.
   readonly property int cap: 250

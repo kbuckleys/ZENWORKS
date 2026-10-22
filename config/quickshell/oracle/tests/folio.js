@@ -42,9 +42,12 @@ module.exports = {
     t.eq("not a taken one", F.snippetName("hello", ["Hello"]), "hello 2");
     t.eq("no file-name trouble", F.snippetName("a/b: c?", []), "ab c");
     t.eq("nothing to name it by", F.snippetName("   ", []), "Snippet");
+    t.eq("a typed name made safe", F.snippetFileName("  To: Bob/Alice?\n"), "To BobAlice");
+    t.eq("a name of nothing", F.snippetFileName(" / "), "");
 
     // hints
     t.has("snippet hints", JSON.stringify(F.hintText("snip")), "ctrl n");
+    t.has("the page saves", JSON.stringify(F.hintText("edit")), "save");
     t.has("text keeps a clip", JSON.stringify(F.hintText("text")), "keep as snippet");
   }
 };

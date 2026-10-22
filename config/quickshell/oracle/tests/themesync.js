@@ -142,6 +142,22 @@ module.exports = {
       const live = require("fs").readFileSync(require("os").homedir() + "/.config/hypr/lua/base.lua", "utf8");
       return S.setHyprRounding(live, 77);
     })(), /rounding = 77,/);
+    const fk = { face: "SF Pro Text", mono: "SF Mono", large: 10, small: 4,
+                 px: { text: 16, small: 13, h3: 17, h2: 20, h1: 25 } };
+    const hk = S.renderHyprtoolkit(LATTE, true, fk);
+    t.match("toolkit: the background is the ground", hk, /^background\s+= 0xffeff1f5$/m);
+    t.match("toolkit: buttons are the card", hk, /^base\s+= 0xffe6e9ef$/m);
+    t.match("toolkit: the accent is cyan", hk, /^accent\s+= 0xff179299$/m);
+    t.match("toolkit: light: bright text is the ground", hk, /^bright_text\s+= 0xffeff1f5$/m);
+    t.match("toolkit: dark: bright text is the ink", S.renderHyprtoolkit(LATTE, false, fk),
+      /^bright_text\s+= 0xff4c4f69$/m);
+    t.match("toolkit: sizes are whole points", hk, /^font_size\s+= 12$/m);
+    t.match("toolkit: h1 at points too", hk, /^h1_size\s+= 19$/m);
+    t.match("toolkit: the dialog corner", hk, /^rounding_large\s+= 10$/m);
+    t.match("toolkit: the face alone", hk, /^font_family\s+= SF Pro Text$/m);
+    t.ok("toolkit: every line is a comment or key = value", hk.split("\n")
+      .every((l) => l === "" || l.startsWith("#") || /^[a-z0-9_]+ += \S/.test(l)));
+    t.ok("toolkit: no slot came out undefined", !/undefined|NaN/.test(hk));
     t.ok("the font lua parses", (() => {
       try {
         require("child_process").execFileSync("luac", ["-p", "-"], { input: f });

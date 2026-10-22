@@ -18,7 +18,7 @@ import "../morpheus"
 import "../terminus"
 import "core"
 import "editor"
-import "../terminus/terminus.js" as Terminus
+import "../morpheus/room.js" as Room
 import "editor/actions.js" as Actions
 import "../morpheus/icons.js" as Icons
 import "../morpheus/hypr.js" as Hypr
@@ -378,8 +378,8 @@ FloatingWindow {
   }
 
   // ── THE WINDOW MAKES ROOM FOR ITS TREE, AS TERMINUS' DOES FOR ITS SPLIT
-  // The same logic, through the same functions (terminus.js splitRoom and
-  // splitRoomDispatches — see the notes on `fitSplit` in TerminusWindow):
+  // The same logic, through the same functions (morpheus/room.js,
+  // see the notes on `fitSplit` in TerminusWindow):
   // showing the tree in a floating window widens it by the tree, as far as
   // the monitor allows, and hiding it gives exactly that back, from the left
   // edge so the editor holds still — pushed inward only if the monitor's
@@ -478,12 +478,12 @@ FloatingWindow {
         if (!w || w.class !== "org.quickshell" || w.title !== win.title) { win.releaseFollow(); return; }
         win.fitPending = false;
         layout.note(w);
-        const room = Terminus.splitRoom(w, mons, win.treeWant, 16, 480, "left");
+        const room = Room.make(w, mons, win.treeWant, 16, 480, "left");
         // no resize coming (tiled, or no room): the tree slides as before
         if (!room) win.releaseFollow();
         else {
           win.fitTarget = w.size[0] + room.dw;
-          Terminus.splitRoomDispatches(w.address, room).forEach((d) => Hyprland.dispatch(d));
+          Room.dispatches(w.address, room).forEach((d) => Hyprland.dispatch(d));
         }
         win.treeGrew = win.fitFor && room ? room.dw : 0;
       }

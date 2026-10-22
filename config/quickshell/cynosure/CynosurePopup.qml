@@ -779,7 +779,12 @@ property var statusbar: null
               selectedTextColor: Zenon.white
               cursorVisible: true
 
-              cursorDelegate: Item {}
+              cursorDelegate: Caret {
+                field: input
+                active: input.activeFocus && popup.mode === "search" && inputBar.showInput
+                thick: 3; low: 0.25; radius: 1
+                color: Zenon.white
+              }
               clip: true
               font.family: Zenon.face
               font.weight: Font.Bold
@@ -790,25 +795,6 @@ property var statusbar: null
                 popup.query = input.text;
                 popup.sel = 0;
                 popup.applyFilter();
-              }
-
-              Rectangle {
-                id: pulseCursor
-                anchors.left: parent.left
-                anchors.leftMargin: Math.min(input.contentWidth, input.width - pulseCursor.width)
-                anchors.verticalCenter: input.verticalCenter
-                width: 3
-                height: 20
-                radius: 1
-                color: Zenon.white
-                opacity: 0.25
-                visible: inputBar.showInput
-                SequentialAnimation on opacity {
-                  running: input.activeFocus && popup.mode === "search" && inputBar.showInput
-                  loops: Animation.Infinite
-                  NumberAnimation { to: 1; duration: Zenon.breath; easing.type: Zenon.breathEase }
-                  NumberAnimation { to: 0.25; duration: Zenon.breath; easing.type: Zenon.breathEase }
-                }
               }
             }
           }

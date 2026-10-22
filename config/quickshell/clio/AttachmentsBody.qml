@@ -132,5 +132,5 @@ Item {
       }
     }
   }
-  EmptyMark { anchors.centerIn: parent; visible: ab.items.length === 0; word: ab.kind === "pictures" ? "No pictures" : "No files" }
+  EmptyState { anchors.centerIn: parent; visible: ab.items.length === 0; text: ab.kind === "pictures" ? "No pictures" : "No files" }
 }

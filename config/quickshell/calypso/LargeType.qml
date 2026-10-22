@@ -38,8 +38,9 @@ Item {
         delegate: Rectangle {
           required property var modelData
           required property int index
-          width: 44
-          height: 66
+          width: Zenon.px(44)
+          // the character, and its place under it at the Font size
+          height: Zenon.px(56) + Zenon.px(10)
           radius: Zenon.windowRadius
           color: index % 2 ? Zenon.wash(0.06) : Zenon.wash(0.02)
           Text {
@@ -49,7 +50,7 @@ Item {
             color: /[0-9]/.test(modelData) ? Zenon.blue : /[A-Za-z]/.test(modelData) ? Zenon.ink : Zenon.pink
             font.family: Zenon.faceMono
             font.weight: Font.DemiBold
-            font.pixelSize: 34
+            font.pixelSize: Zenon.px(34)
           }
           Text {
             anchors.horizontalCenter: parent.horizontalCenter
@@ -58,7 +59,7 @@ Item {
             text: index + 1
             color: Zenon.accentMuted
             font.family: Zenon.face
-            font.pixelSize: 10
+            font.pixelSize: Zenon.px(10)
           }
         }
       }

@@ -41,6 +41,7 @@ CardBody 1.0 CardBody.qml
 CardPopup 1.0 CardPopup.qml
 MenuCore 1.0 MenuCore.qml
 CornerPicker 1.0 CornerPicker.qml
+DragPan 1.0 DragPan.qml
 Elastic 1.0 Elastic.qml
 ElasticScroll 1.0 ElasticScroll.qml
 ScrollEdge 1.0 ScrollEdge.qml
@@ -79,3 +80,6 @@ CursorBand 1.0 CursorBand.qml
 HintBar 1.0 HintBar.qml
 SectionLabel 1.0 SectionLabel.qml
 EmptyState 1.0 EmptyState.qml
+singleton Share 1.0 Share.qml
+ClearChip 1.0 ClearChip.qml
+AddChip 1.0 AddChip.qml

@@ -600,6 +600,10 @@ Singleton {
   // day); -1 is none
   property int calRemindLead: 10
   property int calSyncMins: 15
+  // SCREEN TIME (kairos, 2026-10-21): how long each app had you, counted on
+  // this machine only; idle past this many minutes stops the count
+  property bool screenTime: true
+  property int screenTimeIdleMins: 3
   // How stale a forecast may get before opening the pane re-fetches it.
   property int weatherStaleMins: 10
 
@@ -671,15 +675,15 @@ Singleton {
       blurb: "howler — toasts, and what the bell remembers" },
     { id: "paper",  label: "Background",    icon: "",
       blurb: "picasso — the background, screenshots and the color picker" },
-    { id: "idle",   label: "Idle & Lock",   icon: "",
+    { id: "idle",   label: "Idle & lock",   icon: "",
       blurb: "socordia and cerberus — being away from the machine" },
-    { id: "time",   label: "Time & Weather", icon: "",
+    { id: "time",   label: "Time & weather", icon: "",
       blurb: "chronos — the clock, the calendar, the forecast" },
     { id: "system", label: "System",        icon: "",
       blurb: "zeus and the update count — what is measured, how often" },
-    { id: "menu",   label: "Desktop Menu",  icon: "",
+    { id: "menu",   label: "Desktop menu",  icon: "",
       blurb: "icarus — what right-clicking the desktop offers" },
-    { id: "defaults", label: "Default Apps", icon: "\uF009",
+    { id: "defaults", label: "Default apps", icon: "\uF009",
       blurb: "what opens what \u2014 the terminal, the browser, every kind of file" },
     { id: "health", label: "Health",        icon: "\uF0F1",
       blurb: "a checkup of this shell \u2014 what an audit looks for" },
@@ -724,7 +728,7 @@ Singleton {
     // on a shortcut (user, 2026-10-20), so idle and the bind share them
     { key: "idleScreenOffSecs", section: "display", label: "Screens off after", type: "int",
       min: 0, max: 7200, step: 30, unit: "s", alias: "idle dpms sleep blank",
-      help: "Idle this long and every output is switched off. 0 leaves them on. Needs Idle timers, under Idle & Lock." },
+      help: "Idle this long and every output is switched off. 0 leaves them on. Needs Idle timers, under Idle & lock." },
     { key: "wakeBy", section: "display", label: "Wake by", type: "enum", segments: true, hyprFile: true,
       hyprDefault: "mouse", alias: "wake screens dpms mouse key press",
       options: [ { value: "key",   label: "Key press" },
@@ -1135,6 +1139,12 @@ Singleton {
     { key: "calSyncMins", section: "time", alias: "calendar sync vdirsyncer caldav online google nextcloud",
       label: "Calendar sync", type: "int", min: 5, max: 240, step: 5, unit: "min",
       help: "How often an online calendar set up through vdirsyncer is synced. Nothing happens without one." },
+    { key: "screenTime", section: "time", alias: "screen time kairos usage apps focus tracking privacy",
+      label: "Screen time", type: "bool",
+      help: "Count how long each app is in front of you, kept on this machine only. Shown in Screen Time; a finished Chronos timer says what its time went to." },
+    { key: "screenTimeIdleMins", section: "time", alias: "screen time idle away kairos",
+      label: "Stop counting after idle", type: "int", min: 1, max: 30, step: 1, unit: "min",
+      help: "No key or mouse for this long and screen time stops counting. A playing video holds it off." },
 
     // ── system ──
     { key: "sysmonInterval", section: "system", label: "Sample rate", type: "int",
@@ -1262,7 +1272,7 @@ Singleton {
     // in a field in a settings panel, is the panel's failure rather than
     // yours.
     { key: "infoOutputs", section: "about", label: "Outputs", type: "info",
-      help: "What the monitor pickers under Bar and Idle & Lock offer, as Quickshell sees them right now." },
+      help: "What the monitor pickers under Bar and Idle & lock offer, as Quickshell sees them right now." },
     { key: "infoLaunched", section: "about", label: "Running since", type: "info",
       help: "When this shell last started." },
     { key: "actionReload", section: "about", label: "Reload from disk", type: "action",
@@ -1271,6 +1281,14 @@ Singleton {
     // `context: true` — this one acts on the section you came here FROM, and
     // says which on its own button rather than making you remember. See
     // ActionControl, which is where that name is appended.
+    // the window does the files (Oracle cannot reach morpheus or terminus'
+    // picker): exportAsked / importAsked, see OracleWindow
+    { key: "actionExport", section: "about", alias: "export backup save settings file move another machine",
+      label: "Export settings", type: "action", verb: "Export\u2026",
+      help: "Every setting, your shortcuts, default apps, input and screen setup, and the themes you saved, in one file. No notes, screen time or passwords." },
+    { key: "actionImport", section: "about", alias: "import restore load settings file backup",
+      label: "Import settings", type: "action", verb: "Import\u2026",
+      help: "Settings from an exported file, shown before anything changes. What is here now is kept first, so an import can be undone by importing that." },
     { key: "actionResetSection", section: "about", label: "Reset one section",
       type: "action", verb: "Reset", context: true,
       help: "Put every setting in the section you were last in back to its default." },
@@ -1683,6 +1701,8 @@ Singleton {
   // so "reset a section" can mean the one you are looking at without the
   // action needing a second control beside it.
   signal updateAsked()
+  signal exportAsked()
+  signal importAsked()
   // An action still out from its last press: its button dims and ignores
   // another (the panel's ActionControl reads this).
   function actionBusy(key) {
@@ -1699,6 +1719,8 @@ Singleton {
     if (key === "actionResetAll") { root.resetAll(); return; }
     // the shell's side starts it, as a job in the drawer (OracleManager)
     if (key === "actionUpdate") { root.updateAsked(); return; }
+    if (key === "actionExport") { root.exportAsked(); return; }
+    if (key === "actionImport") { root.importAsked(); return; }
     if (key === "actionRestart") {
       // Through scripts/restart.sh, in a shell that has already been
       // detached, so the replacement is never a child of the instance it

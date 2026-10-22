@@ -271,10 +271,16 @@ Singleton {
     root.save();
   }
 
-  function fetchNews() {
-    if (!Oracle.ceresNews || newsProc.running) return;
+  // `asked`: the News tab, opened — reading the feed then is what was asked
+  // for, whether or not Oracle's Arch news (the upgrade's stop) is on
+  function fetchNews(asked) {
+    if ((!Oracle.ceresNews && !asked) || newsProc.running) return;
+    root.newsFailed = false;
     newsProc.running = true;
   }
+  readonly property bool newsLoading: newsProc.running
+  // the last read failed (offline): what was had is kept, and said so
+  property bool newsFailed: false
   Process {
     id: newsProc
     command: ["sh", "-c", Cer.newsCommand()]
@@ -282,7 +288,7 @@ Singleton {
       id: newsOut
       onStreamFinished: {
         const r = Cer.readNews(newsOut.text);
-        if (!r.ok) return;          // offline: keep what we had
+        if (!r.ok) { root.newsFailed = true; return; }   // offline: keep what we had
         root.news = r.items;
         root.newsFetched = Date.now();
         root.save();

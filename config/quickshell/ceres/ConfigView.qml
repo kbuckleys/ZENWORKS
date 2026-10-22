@@ -621,6 +621,7 @@ Item {
     border.color: Zenon.border
     TextInput {
       id: input
+      cursorDelegate: Caret { field: input }
       anchors.fill: parent
       anchors.leftMargin: 10
       anchors.rightMargin: 10
@@ -1222,12 +1223,12 @@ Item {
           spacing: 6
           Chip {
             label: ""
-            opacity: card.at > 0 ? 1 : 0.3
+            opacity: card.at > 0 ? 1 : Zenon.disabledDim
             onPicked: if (card.at > 0) view.cur = Pac.moveRepo(view.cur, card.repo.name, -1)
           }
           Chip {
             label: ""
-            opacity: card.at < view.reposNow.length - 1 ? 1 : 0.3
+            opacity: card.at < view.reposNow.length - 1 ? 1 : Zenon.disabledDim
             onPicked: if (card.at < view.reposNow.length - 1) view.cur = Pac.moveRepo(view.cur, card.repo.name, 1)
           }
           Chip {

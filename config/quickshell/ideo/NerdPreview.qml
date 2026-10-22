@@ -58,14 +58,14 @@ Item {
     // the glyph on its own, no chip round it (user, 2026-10-14)
     Item {
       anchors.horizontalCenter: parent.horizontalCenter
-      width: 96
-      height: 88
+      width: Zenon.px(96)
+      height: Zenon.px(88)
       Text {
         anchors.centerIn: parent
         text: pv.entry ? pv.entry.char : ""
         color: Zenon.white
         font.family: "Symbols Nerd Font"
-        font.pixelSize: 64
+        font.pixelSize: Zenon.px(64)
       }
     }
 

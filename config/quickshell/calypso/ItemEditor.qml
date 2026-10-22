@@ -130,14 +130,14 @@ Item {
               id: folderBox
               width: 260
               textSize: Zenon.px(13)
-              ghost: ed.acct.kind === "onepassword" || ed.acct.kind === "proton" ? "Vault" : "No folder"
+              ghost: ed.acct.kind === "onepassword" || ed.acct.kind === "proton" ? "Vault" : "No container"
               onTextChanged: if (ed.st && ed.st.folder !== text) { ed.st.folder = text; ed.touch(); }
             }
             FieldAct {
               id: folderPick
               anchors.verticalCenter: parent.verticalCenter
               glyph: ""
-              tip: "Folders there are"
+              tip: "Containers there are"
               tips: ed.win ? ed.win.tipsItem : null
               onClicked: ed.win.mgr.call("folders", ed.acct, {}, (ok, list) => {
                 if (!ok) return;

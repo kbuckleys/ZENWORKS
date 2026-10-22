@@ -198,11 +198,11 @@ Item {
 
   property var sessionEntries: [
     { id: "lockscreen", text: "Lock",  icon: "\uF023", cmd: "sleep 0.35 && qs ipc call Cerberus lock", confirm: false },
-    { id: "logout",     text: "Logout",      icon: "\uF08B", cmd: "hyprshutdown -p " + Strings.shellQuote("loginctl terminate-session "
+    { id: "logout",     text: "Logout",      icon: "\uF08B", cmd: "hyprshutdown -t 'Logging out…' -p " + Strings.shellQuote("loginctl terminate-session "
         + Strings.shellQuote(Quickshell.env("XDG_SESSION_ID") || "")), confirm: true },
     { id: "suspend",    text: "Suspend",     icon: "\uF186", cmd: "systemctl suspend", confirm: true },
-    { id: "reboot",     text: "Reboot",      icon: "\uF021", cmd: "hyprshutdown -p 'systemctl reboot'", confirm: true },
-    { id: "shutdown",   text: "Shutdown",    icon: "\uF011", cmd: "hyprshutdown -p 'systemctl poweroff'", confirm: true }
+    { id: "reboot",     text: "Reboot",      icon: "\uF021", cmd: "hyprshutdown -t 'Rebooting…' -p 'systemctl reboot'", confirm: true },
+    { id: "shutdown",   text: "Shutdown",    icon: "\uF011", cmd: "hyprshutdown -t 'Shutting down…' -p 'systemctl poweroff'", confirm: true }
   ]
 
   // for grab
@@ -1440,6 +1440,7 @@ Item {
     id: recentMenu
     screen: root.screen
     cardWidth: 300
+    fit: true   // as wide as its longest row, as every menu (CardMenu.fit)
     open: root.shown && root.childMenu === "recent"
     // recentEntries carry a path and a name but no glyph — so they are given
     // the shared map's (morpheus/icons.js), the one terminus draws the same
@@ -1475,6 +1476,29 @@ Item {
     property bool wanted: root.shown && root.childMenu === "apps"
     property real shade: 0
     onWantedChanged: appsMenu.shade = appsMenu.wanted ? 1 : 0
+
+    // As wide as its longest name, as every menu (CardMenu.fit): the row's
+    // insets, the glyph and its gap, the name, and the card's padding.
+    FontMetrics {
+      id: appMetrics
+      font.family: Zenon.face
+      font.weight: Zenon.weight
+      font.pixelSize: Zenon.px(16)
+    }
+    // sorted and deduplicated — see Icarus.appRows
+    readonly property var rows: Icarus.appRows(DesktopEntries.applications.values, Icons.appGlyph)
+    readonly property int cardW: {
+      appsMenu.wanted;      // measured again on every opening
+      appMetrics.height;    // and when the face resolves
+      let most = 0;
+      const rows = appsMenu.rows;
+      for (let i = 0; i < rows.length; ++i)
+        most = Math.max(most, appMetrics.advanceWidth(String(rows[i].name || "")));
+      const w = Math.ceil(12 + 16 + Zenon.menuIconGap + most + 8 + 10
+        + Zenon.menuCardPad * 2 + 2 + Zenon.menuFitSlack);
+      const cap = root.screen ? root.screen.width - Zenon.padScreen * 2 : 100000;
+      return Math.min(cap, Math.max(Zenon.menuMinWidth, w));
+    }
     Behavior on shade {
       NumberAnimation { duration: Zenon.menuFade; easing.type: Easing.OutCubic }
     }
@@ -1492,7 +1516,7 @@ Item {
     mask: Region { x: appsBg.x; y: appsBg.y; width: appsBg.width; height: appsBg.height }
     anchors { top: true; left: true }
     screen: root.screen
-    implicitWidth: 300 + Zenon.menuShadowPad * 2
+    implicitWidth: appsMenu.cardW + Zenon.menuShadowPad * 2
     implicitHeight: {
       if (!root.screen) return 300 + Zenon.menuShadowPad * 2;
       const maxBgH = root.screen.height - Zenon.menuShadowPad * 2;
@@ -1502,7 +1526,7 @@ Item {
     margins.left: {
       if (!root.screen || !rootMenu.visible) return 0;
       return Math.round(Zenon.hingeX(
-        rootMenu.cardX, rootMenu.cardW, 300,
+        rootMenu.cardX, rootMenu.cardW, appsMenu.cardW,
         root.screen.width, Zenon.padScreen)) - Zenon.menuShadowPad;
     }
     margins.top: root.submenuTop("apps",
@@ -1578,8 +1602,7 @@ Item {
 
             Repeater {
               id: appsRepeater
-              // sorted and deduplicated — see Icarus.appRows
-              model: Icarus.appRows(DesktopEntries.applications.values, Icons.appGlyph)
+              model: appsMenu.rows
 
               delegate: Item {
                 id: appEntry
@@ -1814,6 +1837,22 @@ Item {
     property bool wanted: root.shown && root.childMenu === "session" && root.pendingConfirmId !== ""
     property real shade: 0
     onWantedChanged: confirmMenu.shade = confirmMenu.wanted ? 1 : 0
+
+    // As wide as its longer label, as every menu (CardMenu.fit). The labels
+    // are centered, so it is the label and the row's insets each side.
+    FontMetrics {
+      id: confirmMetrics
+      font.family: Zenon.face
+      font.weight: Zenon.weight
+      font.pixelSize: Zenon.px(16)
+    }
+    readonly property int cardW: {
+      confirmMetrics.height;   // again when the face resolves
+      const most = Math.max(confirmMetrics.advanceWidth(confirmLabel.text),
+                            confirmMetrics.advanceWidth(cancelLabel.text));
+      return Math.max(Zenon.menuMinWidth, Math.ceil(most + 12 * 2
+        + Zenon.menuCardPad * 2 + 2 + Zenon.menuFitSlack));
+    }
     Behavior on shade {
       NumberAnimation { duration: Zenon.menuFade; easing.type: Easing.OutCubic }
     }
@@ -1831,7 +1870,7 @@ Item {
     mask: Region { x: confirmBg.x; y: confirmBg.y; width: confirmBg.width; height: confirmBg.height }
     anchors { top: true; left: true }
     screen: root.screen
-    implicitWidth: 160 + Zenon.menuShadowPad * 2
+    implicitWidth: confirmMenu.cardW + Zenon.menuShadowPad * 2
     implicitHeight: {
       if (!root.screen) return 160 + Zenon.menuShadowPad * 2;
       const maxBgH = root.screen.height - Zenon.menuShadowPad * 2;
@@ -1843,7 +1882,7 @@ Item {
     margins.left: {
       if (!root.screen || !sessionMenu.visible) return 0;
       return Math.round(Zenon.hingeX(
-        sessionMenu.cardX, sessionMenu.cardW, 160,
+        sessionMenu.cardX, sessionMenu.cardW, confirmMenu.cardW,
         root.screen.width, Zenon.padScreen)) - Zenon.menuShadowPad;
     }
     margins.top: {

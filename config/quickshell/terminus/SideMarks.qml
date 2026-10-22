@@ -13,6 +13,7 @@ import Quickshell.Io
 import Quickshell.Hyprland
 import "../morpheus"
 import "terminus.js" as Terminus
+import "../morpheus/room.js" as Room
 
 Item {
   id: sideMarks
@@ -82,12 +83,12 @@ Item {
         if (!w || w.class !== "org.quickshell" || w.title !== term.title) { term.releaseSideFollow(); return; }
         term.sidePending = false;
         term.sideLayoutRef.note(w);
-        const room = Terminus.splitRoom(w, mons, term.sideWant, 16, 560, "left");
+        const room = Room.make(w, mons, term.sideWant, 16, 560, "left");
         // no resize coming (tiled, or no room): the sidebar slides as before
         if (!room) term.releaseSideFollow();
         else {
           term.sideTarget = w.size[0] + room.dw;
-          Terminus.splitRoomDispatches(w.address, room).forEach((d) => Hyprland.dispatch(d));
+          Room.dispatches(w.address, room).forEach((d) => Hyprland.dispatch(d));
         }
         term.sideGrew = term.sideFor && room ? room.dw : 0;
         term.saveSide();

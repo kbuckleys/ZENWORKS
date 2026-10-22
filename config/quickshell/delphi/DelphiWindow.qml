@@ -582,7 +582,7 @@ FloatingWindow {
           detail: (parts.length > 0 ? "Delphi " + parts.join("; ") + ". " : "")
             + (split.length > 0 ? "Where a branch went two ways, nothing was overwritten: merge or rebase it from Branches (its copy on each remote is there), then Sync again." : ""),
           items: items,
-          choices: split.length > 0 ? [{ label: "Open Branches", ink: Zenon.cyan, run: () => win.setPage("branches") }, { label: "Close" }] : [{ label: "Close" }] });
+          choices: split.length > 0 ? [{ label: "Open branches", ink: Zenon.cyan, run: () => win.setPage("branches") }, { label: "Close" }] : [{ label: "Close" }] });
       } });
   }
   // the name a forge's remote takes here: its id (github, gitlab, codeberg)

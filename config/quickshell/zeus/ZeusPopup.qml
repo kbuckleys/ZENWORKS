@@ -1934,7 +1934,11 @@ LayerPopup {
           font.weight: 500
           font.pixelSize: Zenon.px(17)
           cursorVisible: activeFocus
-          cursorDelegate: Item {}
+          cursorDelegate: Caret {
+            field: field
+            thick: 3; low: 0.25; radius: 1
+            color: bar.caretInk
+          }
           clip: true
           Keys.forwardTo: bgRoot
 
@@ -1943,24 +1947,6 @@ LayerPopup {
           Keys.onTabPressed: (event) => {
             event.accepted = true;
             popup.toggleView();
-          }
-
-          Rectangle {
-            anchors.left: parent.left
-            anchors.leftMargin: Math.min(field.contentWidth + 2, field.width - 5)
-            anchors.verticalCenter: parent.verticalCenter
-            width: 3
-            height: 20
-            radius: 1
-            color: bar.caretInk
-            opacity: 0.25
-            visible: field.activeFocus
-            SequentialAnimation on opacity {
-              running: field.activeFocus
-              loops: Animation.Infinite
-              NumberAnimation { to: 1; duration: Zenon.breath; easing.type: Zenon.breathEase }
-              NumberAnimation { to: 0.25; duration: Zenon.breath; easing.type: Zenon.breathEase }
-            }
           }
 
           onTextChanged: bar.edited(field.text)

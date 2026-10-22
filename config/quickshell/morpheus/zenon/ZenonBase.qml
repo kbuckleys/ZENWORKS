@@ -223,6 +223,11 @@ QtObject {
   // opacity — its own color darkened, never a gray slab (DialogButton
   // primary, Delphi's network pill)
   readonly property real pressShade: light ? 0.25 : 0.45
+  // A control that cannot act right now — off, not ready, nothing to work
+  // on — fades to this, and only this. Seventeen had settled on five
+  // values from 0.3 to 0.6 one by one (2026-10-22); 0.4 is Controls.Check's,
+  // the one on/off. oracle/tests/disabled.js keeps new ones from drifting.
+  readonly property real disabledDim: 0.4
   // A PRESSED TILE — a tab, a card, a row: a large surface, where the
   // button's press (pressFill, pressShade) reads as a hole. A lighter shadow,
   // set for each mode (user, 2026-10-19: "too dark in dark mode — we must
@@ -844,13 +849,15 @@ QtObject {
   // Not times the multiplier: a wait for intent, not motion.
   readonly property int hoverWait: 450
   readonly property int hoverLeave: 220
-  // ── A BREATH: half of one cycle of something that breathes, dim to
-  // bright or back — morpheus/Caret, the launchers' own drawn carets, a
-  // drop target on offer. They had drifted to 520, 550 and 620 on two
-  // curves, so a launcher's caret breathed out of step with a window's
-  // (2026-10-20); Caret's own 620 on InOutQuad is the one kept. How dim it
-  // goes stays each caller's. A loop, so off the multiplier for the reason
-  // ms() is.
+  // ── A BREATH: half of one cycle of the caret's breath, dim to bright or
+  // back. They had drifted to 520, 550 and 620 on two curves, so a
+  // launcher's caret breathed out of step with a window's (2026-10-20);
+  // Caret's own 620 on InOutQuad is the one kept. Since 2026-10-22 every
+  // caret IS morpheus/Caret (stepped at 30 Hz, resting when idle); besides
+  // it only a drop on offer (terminus' sidebar, clio's shelf) and metis'
+  // refreshing rates dot read this, briefly. oracle/tests/caret.js fails
+  // any other reader as a caret drawn by hand. How dim it goes stays each
+  // caller's. A loop, so off the multiplier for the reason ms() is.
   readonly property int breath: 620
   readonly property int breathEase: Easing.InOutQuad
   // a recording light: slower than a breath, so "live" never reads as

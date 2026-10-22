@@ -457,6 +457,15 @@ Singleton {
     function status(): string {
       return root.count + " notes, " + (root.shown ? "shown" : "hidden");
     }
+
+    // a new note holding these files (one path a line) — the Share menu's
+    function files(paths: string): string {
+      if (!root.app) return "no notebook";
+      const list = paths.split("\n").map((p) => p.trim()).filter((p) => p !== "");
+      if (!list.length) return "no files";
+      root.app.noteFromFiles(list, null);
+      return "ok";
+    }
   }
 
   // where they were kept before, read once if the new place has none yet:

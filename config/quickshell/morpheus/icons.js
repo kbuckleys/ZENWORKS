@@ -149,7 +149,7 @@ const DIRS = {
   "root": "", "ruby": "", "run": "",
   "rust": "", "sbin": "", "schema": "",
   "screenshots": "󰹑", "scripts": "󰑷", "secrets": "",
-  "services": "", "sounds": "󰎅", "spec": "󰙨",
+  "services": "", "snippets": "\uEB66", "sounds": "󰎅", "spec": "󰙨",
   "spicetify": "", "spoot": "", "spotify": "",
   "spotify-player": "", "spotifyd": "", "spring boot": "",
   "sql": "", "src": "󰅩", "srv": "",
@@ -651,7 +651,9 @@ const APPS = {
   // U+F03D2, the owl: the reader (its desktop id is minerva)
   "minerva": "\uDB80\uDFD2",
   // U+F0E2E, the hearth: services and logs (its desktop id is hestia)
-  "hestia": "\uDB83\uDE2E"
+  "hestia": "\uDB83\uDE2E",
+  // U+F0996, md-progress_clock: screen time (its desktop id is kairos)
+  "kairos": "\uDB82\uDD96"
 };
 
 // The glyph for a launcher entry, or "" when nothing claims it. `names` is

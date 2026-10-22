@@ -356,7 +356,7 @@ PopupWindow {
       if (!t) return [];
       const out = menu.appItems.slice();
       if (out.length > 0) out.push({ sep: true });
-      out.push({ label: "Choose Program",
+      out.push({ label: "Choose program",
                  act: () => term.beginOpenWith(t.path) });
       return out;
     }
@@ -817,7 +817,7 @@ PopupWindow {
       // argus' trim/export window on this video, as Annotate is
       // picasso's on a picture
       if (!t.isDir && Terminus.isVideo(t.name))
-        out.push({ label: "Quick Edit",
+        out.push({ label: "Quick edit",
                    act: () => Quickshell.execDetached(["qs", "ipc", "call", "Argus", "edit", t.path]) });
       if (!t.isDir && Terminus.isVideo(t.name))
         out.push({ label: "Extract audio" + many, key: "e",
@@ -830,6 +830,16 @@ PopupWindow {
         out.push({ label: "Install font" + many,
                    act: () => term.installFonts() });
       out.push({ label: "Archive" + many, key: "c a", sub: menu.formatItems });
+      // out to something else (morpheus/Share): not Send to, which is another
+      // directory. Nothing in the trash goes anywhere but back, and a
+      // directory has no way out there, so no row for it.
+      if (!term.inTrash) {
+        const marked = term.heldRow && !term.marked[term.heldRow.path] ? [term.heldRow]
+          : term.markedCount > 0 ? term.markedRows() : [t];
+        const shareSub = Share.items(() => term.acting().map((r) => r.path), marked.some((r) => r.isDir), n);
+        if (shareSub.length > 0)
+          out.push({ label: "Share" + many, glyph: Share.glyph, sub: shareSub });
+      }
       if (term.inTrash) {
         out.push({ label: "Restore" + many, act: () => term.restoreSelected() });
         out.push({ label: "Empty the trash", danger: true,

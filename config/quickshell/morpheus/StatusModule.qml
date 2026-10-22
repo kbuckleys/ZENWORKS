@@ -111,7 +111,7 @@ Collapsible {
         anchors.centerIn: parent
         text: ""
         color: Zenon.red
-        font.pixelSize: 13
+        font.pixelSize: Zenon.clockSize
 
         // a recording light should read as live, not as a static glyph
         SequentialAnimation on opacity {

@@ -748,7 +748,7 @@ PlatoSheet {
         textFormat: Text.PlainText
         // grep's results are code, and read as code
         font.family: picker.mode === "grep" || picker.mode === "yanks" || picker.mode === "refs" ? picker.face.family : Zenon.face
-        font.pixelSize: picker.mode === "grep" || picker.mode === "yanks" || picker.mode === "refs" ? picker.face.pixelSize - 1 : 16
+        font.pixelSize: picker.mode === "grep" || picker.mode === "yanks" || picker.mode === "refs" ? picker.face.pixelSize - 1 : Zenon.px(16)
         // a verb you can run in white (the user's call, 2026-10-05: terminus'
         // yellow read as a warning here); a diagnostic in its severity's;
         // where the undo history is now, in cyan

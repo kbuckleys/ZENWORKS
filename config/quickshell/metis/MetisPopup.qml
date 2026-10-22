@@ -1383,31 +1383,13 @@ LayerPopup {
                 font.weight: Font.Bold
                 font.pixelSize: Zenon.px(20)
                 cursorVisible: activeFocus
-                cursorDelegate: Item {}
+                cursorDelegate: Caret {
+                  field: filterInput
+                  thick: 3; low: 0.25; radius: 1
+                  color: popup.headColor
+                }
                 clip: true
                 Keys.forwardTo: bgRoot
-
-                Rectangle {
-                  id: pulseCursor
-                  // where the cursor is, not the end of the text: it was drawn
-                  // at the end wherever the cursor had been moved to
-                  anchors.left: parent.left
-                  anchors.leftMargin: Math.min(filterInput.cursorRectangle.x + 1,
-                                               filterInput.width - 5)
-                  anchors.verticalCenter: parent.verticalCenter
-                  width: 3
-                  height: 24
-                  radius: 1
-                  color: popup.headColor
-                  opacity: 0.25
-                  visible: filterInput.activeFocus
-                  SequentialAnimation on opacity {
-                    running: filterInput.activeFocus
-                    loops: Animation.Infinite
-                    NumberAnimation { to: 1; duration: Zenon.breath; easing.type: Zenon.breathEase }
-                    NumberAnimation { to: 0.25; duration: Zenon.breath; easing.type: Zenon.breathEase }
-                  }
-                }
 
                 onTextChanged: {
                   popup.tapeMode = false;

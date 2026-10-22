@@ -195,6 +195,44 @@ function setHyprRounding(text, n) {
   return src;
 }
 
+// ── hyprtoolkit ────────────────────────────────────────────────────────
+// hypr/hyprtoolkit.conf, read by every hyprtoolkit app — hyprshutdown's
+// "Shutting down" screen, hyprpolkitagent — as it starts, and again on any
+// write (it watches the file). Written for Zenon too: hyprtoolkit's own is a
+// mint-on-gray of its own, not Zenon.
+//
+// The ladder is the GTK one: background the ground (hyprshutdown lays it
+// over the screen, translucent), base the card (buttons), alternate_base the
+// surface (a resting button's border). bright_text is the type on an accent
+// button too dark for the background to read on it, so it is always the
+// light end: the ink on a dark theme, the ground on a light one. Hyprlang
+// takes 0xAARRGGBB; the sizes are points, each an oracle px scaled with Font
+// size (`f.px`), and the font is a family alone — no weight word.
+function renderHyprtoolkit(c, light, f) {
+  const k = (s) => "0xff" + rgb(c[s]);
+  const n = (v, d) => Math.max(1, Math.round(Number(v) || d));
+  const out = HEAD.map((l) => "# " + l);
+  out.push("", "# Written by the shell (morpheus/ThemeSync.qml) whenever its theme or",
+           "# oracle's Font changes. Edits here are overwritten.",
+           "# " + (c.name || "theme"), "");
+  const t = [
+    ["background", k("ground")], ["base", k("card")], ["alternate_base", k("surface")],
+    ["text", k("ink")], ["bright_text", light ? k("ground") : k("ink")],
+    ["link_text", k("blue")], ["accent", k("cyan")], ["accent_secondary", k("magenta")],
+    ["rounding_large", Math.max(0, Math.round(Number(f.large) || 0))],
+    ["rounding_small", Math.max(0, Math.round(Number(f.small) || 0))],
+    ["h1_size", n(pt(f.px.h1), 19)], ["h2_size", n(pt(f.px.h2), 15)],
+    ["h3_size", n(pt(f.px.h3), 13)], ["font_size", n(pt(f.px.text), 11)],
+    ["small_font_size", n(pt(f.px.small), 10)],
+  ];
+  if (f.face) t.push(["font_family", String(f.face).replace(/\n/g, " ")]);
+  if (f.mono) t.push(["font_family_monospace", String(f.mono).replace(/\n/g, " ")]);
+  const w = Math.max.apply(null, t.map((l) => l[0].length));
+  for (const l of t) out.push(l[0] + " ".repeat(w - l[0].length) + " = " + l[1]);
+  out.push("");
+  return out.join("\n");
+}
+
 // ── everything else's font ─────────────────────────────────────────────
 // GTK, gsettings (and so the portal, and every app asking it) and
 // fontconfig's generic families take the shell's two faces too; written by

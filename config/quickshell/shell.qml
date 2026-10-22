@@ -39,6 +39,7 @@ import "hermes"
 import "argus"
 import "minerva"
 import "hestia"
+import "kairos"
 
 ShellRoot {
   id: root
@@ -140,6 +141,8 @@ ShellRoot {
   // Access (the popup) asks through it
   CalypsoManager { id: calypsoMgr; fileManager: terminus; quick: calypso }
   CalypsoPopup { id: calypso; mgr: calypsoMgr; statusbar: bar; screen: root.focusedScreen; morphMode: root.morphedFor("calypso") && root.morphOnPill; morphFade: root.layerFade }
+  // every shortcut on one sheet, held or tapped on binds.lua's keysSheet
+  KeysSheet { screen: root.focusedScreen }
   MetisPopup { id: metis; statusbar: bar; screen: root.focusedScreen; morphMode: root.morphedFor("metis") && root.morphOnPill; morphFade: root.layerFade }
   HowlerPopup { id: howler; statusbar: bar; screen: root.focusedScreen; morphMode: root.morphedFor("howler") && root.morphOnPill; morphFade: root.layerFade }
   // what is waiting to be installed, out of the update count the way howler
@@ -176,6 +179,8 @@ ShellRoot {
   // services, timers and the journal — hestia; asks systemd only while
   // its window is open (its pages frost up under its head: ScrollEdge)
   HestiaManager { id: hestia }
+  // screen time — kairos; counts the focused app, never while locked
+  KairosManager { id: kairos; lockscreen: cerberus }
   // A disk plugged in, asked about by the pill — terminus' new-disk card,
   // with Mount & open. Nobody opens it: it opens itself, so it lives on the
   // pill's own monitor and always morphs (see beginMorph), and it waits

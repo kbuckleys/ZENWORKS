@@ -661,7 +661,7 @@ LayerPopup {
                       readonly property bool isTotp: action.kind === "totp" || action.kind === "copytotp"
                       width: group.width
                       height: popup.cellH
-                      opacity: ok ? 1 : 0.3
+                      opacity: ok ? 1 : Zenon.disabledDim
                       // the cursor is actionsView's CursorBand, told which row
                       onPickedChanged: if (act.picked) popup.pickedAct = act
                       Component.onCompleted: if (act.picked) popup.pickedAct = act

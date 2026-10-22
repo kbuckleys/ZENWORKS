@@ -219,7 +219,7 @@ Item {
     Slide {
       width: parent.width
       label: "Strength"
-      opacity: ed.look.tint !== "" ? 1 : 0.4
+      opacity: ed.look.tint !== "" ? 1 : Zenon.disabledDim
       value: ed.look.tintAmount; from: 0; to: 1; rest: 0.5
       valueText: ed.pct(ed.look.tintAmount)
       kbOn: ed.kbRow === "tintAmount"

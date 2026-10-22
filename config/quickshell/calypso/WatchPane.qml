@@ -73,7 +73,7 @@ Item {
           text: watch.total === 0 && watch.checked ? "\u{F0565}" : "\u{F0ECC}"
           color: watch.total === 0 && watch.checked ? Zenon.green : Zenon.yellow
           font.family: Zenon.glyphFace
-          font.pixelSize: 54
+          font.pixelSize: Zenon.px(54)
         }
         Column {
           anchors.verticalCenter: parent.verticalCenter

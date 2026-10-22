@@ -1344,7 +1344,7 @@ Item {
               anchors.leftMargin: 12
               anchors.verticalCenter: posGrid.verticalCenter
               width: 80
-              text: ({ tl: "top left", t: "top", tr: "top right", l: "left", c: "centre",
+              text: ({ tl: "top left", t: "top", tr: "top right", l: "left", c: "center",
                        r: "right", bl: "bottom left", b: "bottom", br: "bottom right" })[card.look.align]
               color: card.look.align !== "c" ? card.fgColor : card.dimColor
               font.family: Zenon.face

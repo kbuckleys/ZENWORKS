@@ -24,7 +24,6 @@
 // bar under it, spliceInk / spliceX / spliceW (see below).
 
 import QtQuick
-import "../terminus" as Term
 
 Rectangle {
   id: tabStrip
@@ -443,10 +442,10 @@ Rectangle {
         // A × at the tab's right end while the pointer is on it (a middle
         // click still closes too). Closing a tab with unsaved changes is
         // refused by nvim, as ever.
-        // the search fields' clear chip (terminus/ClearChip), laid OVER the
+        // the search fields' clear chip (morpheus/ClearChip), laid OVER the
         // label's end rather than making room beside it (user, 2026-10-13):
         // the name stays where it is as the pointer comes and goes
-        Term.ClearChip {
+        ClearChip {
           id: closeX
           anchors.right: parent.right
           anchors.rightMargin: 8

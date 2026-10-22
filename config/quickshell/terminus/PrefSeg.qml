@@ -126,7 +126,7 @@ Item {
           : "transparent"
         border.width: 1
         border.color: segBtn.on ? Zenon.cyan : Zenon.border
-        opacity: segBtn.ok ? 1 : 0.35
+        opacity: segBtn.ok ? 1 : Zenon.disabledDim
         Behavior on color { ColorAnimation { duration: Zenon.fast } }
 
         Text {

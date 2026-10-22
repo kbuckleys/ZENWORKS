@@ -949,11 +949,11 @@ Item {
         height: pg.ended && !pg.lostLoading ? 0 : 40
         Working { anchors.centerIn: parent; running: pg.paging || pg.lostLoading }
       }
-      EmptyMark {
+      EmptyState {
         anchors.centerIn: parent
         visible: pg.commits.length === 0 && pg.ended && !pg.lostLoading
         filtered: pg.query !== ""
-        word: pg.query !== "" ? ""
+        text: pg.query !== "" ? "No matches"
           : pg.scope === "lost" ? "Nothing lost — every commit is on a branch"
           : pg.scope === "compare" ? (pg.cmpReady ? pg.cmpTo + " has nothing " + pg.cmpFrom + " lacks" : "Choose two branches or tags")
           : pg.scope === "incoming" ? "Nothing incoming"
@@ -1023,7 +1023,7 @@ Item {
         }
       }
       Working { anchors.centerIn: parent; running: pg.acrossLoading; visible: pg.acrossLoading }
-      EmptyMark { anchors.centerIn: parent; visible: !pg.acrossLoading && pg.acrossRows.length === 0; word: "No repositories opened yet" }
+      EmptyState { anchors.centerIn: parent; visible: !pg.acrossLoading && pg.acrossRows.length === 0; text: "No repositories opened yet" }
     }
     ElasticScroll { anchors.fill: acrossList; view: acrossList; visible: pg.scope === "all" }
     Scrollbar { flick: acrossList; visible: pg.scope === "all"; anchors.right: acrossList.right; anchors.top: acrossList.top; anchors.bottom: acrossList.bottom }

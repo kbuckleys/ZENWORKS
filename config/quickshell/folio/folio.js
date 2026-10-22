@@ -10,6 +10,7 @@
 // The shell's singletons come in through the imports above (the same
 // instances); the node tests hand in stubs of their own.
 var Paths = typeof Morpheus !== "undefined" ? Morpheus.Paths : globalThis.Paths;
+var UserDirs = typeof Morpheus !== "undefined" ? Morpheus.UserDirs : globalThis.UserDirs;
 var Strings = typeof Morpheus !== "undefined" ? Morpheus.Strings : globalThis.Strings;
 
 function thumbDir() {
@@ -244,19 +245,30 @@ function hintText(mode) {
   const open = ["shift return", "annotate"];
   if (mode === "image") return [tab, open, del];
   if (mode === "snip") return [tab, ["return", "paste"], ["ctrl n", "new"], ["ctrl e", "edit"], ["delete", "remove"]];
+  if (mode === "edit") return [["ctrl s", "save"], ["esc", "cancel"]];
   return [tab, ["ctrl s", "keep as snippet"], del];
 }
 
 // ── SNIPPETS (2026-10-21) ────────────────────────────────────────────────
 // Text you paste again and again, kept: one plain .txt file each in the
-// snippets directory, named by its file name, edited in plato. Folio's third
-// mode lists them; return pastes one with its placeholders filled in.
+// snippets directory, named by its file name. Folio's third mode lists them;
+// return pastes one with its placeholders filled in, and ctrl n / ctrl e turn
+// the panel itself into the page they are written on (a sticky's, plain).
 //
 //   {date} 2026-10-21   {time} 14:05   {datetime} 2026-10-21 14:05
 //   {weekday} Tuesday   {year} {month} {day}   {clipboard} what was copied
 //   last — and {{ }} for a literal brace
+// ~/Documents/Snippets (user, 2026-10-21): something you wrote, kept where
+// your documents are. The old place is emptied into it on the first listing.
 function snippetDir() {
+  return UserDirs.documents + "/Snippets";
+}
+function oldSnippetDir() {
   return Paths.dataDir() + "/folio/snippets";
+}
+// a name as typed, made safe as a file name; "" when nothing is left
+function snippetFileName(name) {
+  return String(name || "").replace(/[\/\\:*?"<>|\n\r\t]/g, "").trim().slice(0, 80);
 }
 // the listing command's JSON: [{ name, path, text }]
 function parseSnippets(text) {

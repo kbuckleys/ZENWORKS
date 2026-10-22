@@ -614,7 +614,7 @@ FloatingWindow {
   // with the stage's — mipmapped, the tile's not — is a fight over filtering.
   function urlOf(p) { return Strings.fileUrl(p) + "?" + win.reloadTick; }
   // A picture pasted from the clipboard lives in the runtime directory until
-  // somebody saves it — Save New works on it unedited.
+  // somebody saves it — Save new works on it unedited.
   readonly property bool scratch: win.path.indexOf(Paths.runtimeDir() + "/picasso-view/") === 0
   readonly property bool animated: /\.(gif|webp|apng|mng)$/i.test(win.path)
   readonly property bool vector: /\.svgz?$/i.test(win.path)
@@ -1963,7 +1963,7 @@ FloatingWindow {
     Quickshell.execDetached(["sh", "-c", "printf '%s' \"$1\" | wl-copy", "sh", win.path]);
     win.say("Path copied");
   }
-  // In the image editor oracle's Default Apps names, by its desktop id —
+  // In the image editor oracle's Default apps names, by its desktop id —
   // Desktop.launchCommand, so a stale user entry falls through to the
   // system's copy rather than doing nothing.
   function editIn() {
@@ -2234,7 +2234,7 @@ FloatingWindow {
   // ── the clipboard ─────────────────────────────────────────────────────
   // ctrl+v: whatever it holds, looked at. Files copied anywhere open as a
   // picked set; a picture with no file (a screenshot, a browser's copy) is
-  // written to the runtime directory and opened from there, for Save New
+  // written to the runtime directory and opened from there, for Save new
   // to keep — nothing lands in a directory of yours unasked.
   function pasteLook() {
     const stem = Paths.runtimeDir() + "/picasso-view/clipboard-" + Date.now();
@@ -2942,7 +2942,7 @@ FloatingWindow {
     // a right click — the slideshow's pace and shuffle
     signal alt()
     width: 34; height: 34; radius: Zenon.windowRadius
-    opacity: tool.live ? 1 : 0.35
+    opacity: tool.live ? 1 : Zenon.disabledDim
     color: tool.on ? Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b, 0.20)
       : (toolMa.pressed ? Zenon.wash(0.06) : "transparent")
     border.width: tool.on ? 1 : 0
@@ -5569,6 +5569,7 @@ FloatingWindow {
               border.color: Zenon.border
               TextInput {
                 id: sizeField
+                cursorDelegate: Caret { field: sizeField }
                 anchors.fill: parent
                 anchors.leftMargin: 10
                 anchors.rightMargin: 10
@@ -5698,7 +5699,7 @@ FloatingWindow {
         anchors.margins: 18
         spacing: 8
         DialogButton { label: "Reset"; ink: Zenon.accentMuted; ready: win.edited && !win.saving; onClicked: win.resetEdit() }
-        DialogButton { label: "Save New"; ink: Zenon.white; ready: (win.edited || win.scratch) && !win.saving; onClicked: win.saveNew() }
+        DialogButton { label: "Save new"; ink: Zenon.white; ready: (win.edited || win.scratch) && !win.saving; onClicked: win.saveNew() }
         // the save under way, as alexandria's install is shown
         BusyButton { label: "Save"; ink: Zenon.cyan; primary: true; ready: win.edited
                      busy: win.saving; busyText: "Saving\u2026"; onClicked: win.save() }
@@ -6064,7 +6065,7 @@ FloatingWindow {
     const ps = kind === "marked" || kind === "convertFiles" ? win.targets(p) : (p ? [p] : []);
     const branch = (text, icon, sub) => ({ text: text, icon: icon, children: win.menuRows(sub, p) });
     const editIn = Oracle.imageEditor === "" ? [] : [
-      // oracle's Default Apps image editor, for what picasso's own edit
+      // oracle's Default apps image editor, for what picasso's own edit
       // does not reach — layers, painting, a raw file's development
       { text: "Edit in " + Oracle.imageEditorName, icon: "\uf1de", act: "editIn" }];
     const tagRows = [
@@ -6100,8 +6101,8 @@ FloatingWindow {
       ]);
 
     case "picture":
-      return (win.showsMade ? [{ text: "Save the result\u2026", icon: "\uf0c7", act: "saveMade", hint: "ctrl+s" }, sep] : []).concat([
-        { text: "Copy picture", icon: "\uf0c5", act: "copy", hint: "ctrl+c" },
+      return (win.showsMade ? [{ text: "Save the result\u2026", icon: "\uf0c7", act: "saveMade", hint: "ctrl s" }, sep] : []).concat([
+        { text: "Copy picture", icon: "\uf0c5", act: "copy", hint: "ctrl c" },
         branch("Copy", "\uf0c1", "copy"),
         sep,
         { text: "Annotate", icon: "\uf040", act: "annotate", hint: "a", enabled: win.fallback === "" },
@@ -6120,9 +6121,10 @@ FloatingWindow {
         branch("Save as", "\uf0ec", "convert"),
         branch("Make from it", "\uf0d0", "improve"),
         branch("Export for the web", "\uf1d8", "export"),
+        branch("Share", Share.glyph, "share"),
         sep,
         { text: "Show in terminus", icon: "\uf07c", act: "reveal", hint: "o" },
-        { text: "Info", icon: "\u{F064E}", act: "props", hint: "alt+enter" },
+        { text: "Info", icon: "\u{F064E}", act: "props", hint: "alt enter" },
         { text: "Move to trash", icon: "\uf1f8", act: "trash", hint: "d" },
         { text: "Delete permanently…", icon: "\uf00d", act: "deleteP", hint: "D", asks: true }
       ]));
@@ -6144,7 +6146,7 @@ FloatingWindow {
 
     case "copy":
       return ([
-        { text: "Copy path", icon: "\uf0c1", act: "copyPath", hint: "ctrl+shift+c" },
+        { text: "Copy path", icon: "\uf0c1", act: "copyPath", hint: "ctrl shift c" },
         { text: "Copy as a file", icon: "\uf15b", act: "copyFiles" },
         { text: "Copy without metadata", icon: "\uf070", act: "copyClean" },
         { text: "Copy the text in it", icon: "\uf031", act: "ocr" }
@@ -6162,7 +6164,7 @@ FloatingWindow {
         { text: "Slideshow faster", icon: "\uf017", act: "faster", hint: "]" },
         { text: "Shuffle the slideshow", icon: "\uf074", act: "shuffle", mark: win.shuffle },
         { text: "Fullscreen", icon: "\uf065", act: "full", hint: "f" },
-        { text: "The strip", icon: "\uf00a", act: "strip", hint: "alt+s", mark: win.stripShown },
+        { text: "The strip", icon: "\uf00a", act: "strip", hint: "alt s", mark: win.stripShown },
         { text: "Monitor outlines", icon: "\uf108", act: "monitors", hint: "W", mark: stage.monitorsShown },
         { text: "Map of the directory", icon: "\uf279", act: "map", enabled: win.rows.length > 0 },
         { text: "Details", icon: "\u{F01C6}", act: "info", hint: "i", mark: win.infoShown }
@@ -6195,11 +6197,12 @@ FloatingWindow {
         { text: win.marks[p] ? "Unmark" : "Mark", icon: "\uf00c", act: "mark", hint: "x" },
         sep,
         branch("Copy", "\uf0c5", "copyCell"),
-        branch("Export for the web", "\uf1d8", "export")
+        branch("Export for the web", "\uf1d8", "export"),
+        branch("Share", Share.glyph, "share")
       ]).concat(fileRows()).concat(editIn).concat([
         sep,
         { text: "Show in terminus", icon: "\uf07c", act: "reveal" },
-        { text: "Info", icon: "\u{F064E}", act: "props", hint: "alt+enter" },
+        { text: "Info", icon: "\u{F064E}", act: "props", hint: "alt enter" },
         { text: "Move to trash", icon: "\uf1f8", act: "trashP", hint: "d" },
         { text: "Delete permanently…", icon: "\uf00d", act: "deleteP", hint: "D", asks: true }
       ]));
@@ -6209,7 +6212,7 @@ FloatingWindow {
       return ([
         { text: "Copy picture", icon: "\uf0c5", act: "copyP" },
         { text: "Copy path", icon: "\uf0c1", act: "copyPathP" },
-        { text: "Copy as a file", icon: "\uf15b", act: "copyFiles", hint: "ctrl+c" },
+        { text: "Copy as a file", icon: "\uf15b", act: "copyFiles", hint: "ctrl c" },
         { text: "Copy without metadata", icon: "\uf070", act: "copyCleanP" }
       ]);
 
@@ -6222,14 +6225,14 @@ FloatingWindow {
       ].concat(ps.length === 2 ? [{ text: "Compare the two", icon: "\uf0db", act: "compare", hint: "v" }] : []).concat([
         sep
       ]).concat(tagRows).concat([
-        { text: "Copy as files", icon: "\uf15b", act: "copyFiles", hint: "ctrl+c" },
+        { text: "Copy as files", icon: "\uf15b", act: "copyFiles", hint: "ctrl c" },
         branch("Export for the web", "\uf1d8", "export"),
         { text: "Contact sheet…", icon: "\uf00a", act: "sheet", asks: true },
         { text: "Rename (" + ps.length + ")", icon: "\uf246", act: "bulkRename", hint: "F2", asks: true }
       ]).concat(fileRows()).concat([
         sep,
         { text: "Unmark all", icon: "\uf00d", act: "unmarkAll", hint: "esc" },
-        { text: "Info", icon: "\u{F064E}", act: "props", hint: "alt+enter" },
+        { text: "Info", icon: "\u{F064E}", act: "props", hint: "alt enter" },
         { text: "Move " + ps.length + " to trash", icon: "\uf1f8", act: "trashP", hint: "d" },
         { text: "Delete " + ps.length + " permanently…", icon: "\uf00d", act: "deleteP", hint: "D", asks: true }
       ]);
@@ -6241,7 +6244,7 @@ FloatingWindow {
         { text: "Show in terminus", icon: "\uf07c", act: "revealDirectory" },
         { text: "Copy path", icon: "\uf0c1", act: "copyPathP" },
         sep,
-        { text: "Info", icon: "\u{F064E}", act: "props", hint: "alt+enter" }
+        { text: "Info", icon: "\u{F064E}", act: "props", hint: "alt enter" }
       ];
 
     case "gallery": {
@@ -6252,9 +6255,9 @@ FloatingWindow {
         sep
       ] : []).concat([
         { text: "Paste into this directory", icon: "\uf0ea", act: "paste", enabled: win.picked.length === 0 && win.dir !== "" },
-        { text: "Look at the clipboard", icon: "\uf03e", act: "pasteLook", hint: "ctrl+v" },
+        { text: "Look at the clipboard", icon: "\uf03e", act: "pasteLook", hint: "ctrl v" },
         sep,
-        { text: "Mark all", icon: "\uf00c", act: "markAll", hint: "ctrl+a", enabled: win.rows.length > 0 }
+        { text: "Mark all", icon: "\uf00c", act: "markAll", hint: "ctrl a", enabled: win.rows.length > 0 }
       ].concat(win.markCount > 0 ? [{ text: "Unmark all", icon: "\uf00d", act: "unmarkAll", hint: "esc" }] : []).concat([
         { text: "Filter…", icon: "\uf0b0", act: "filter", hint: "/" },
         { text: "Only the starred", icon: "\uf005", act: "starredOnly", mark: starOnly },
@@ -6283,6 +6286,12 @@ FloatingWindow {
       return ([{ k: "name", t: "Name" }, { k: "time", t: "Newest" }, { k: "size", t: "Largest" },
                { k: "taken", t: "Taken, by date" }]
         .map((o) => ({ text: o.t, act: "sort", key: o.k, mark: win.sortKey === o.k, enabled: win.picked.length === 0 })));
+
+    // out to something else (morpheus/Share), for what the card acts on
+    case "share": {
+      const ps = win.targets(p);
+      return Share.items(ps, false, ps.length).map((t) => ({ text: t.label, icon: t.glyph, act: "fn", fn: t.act }));
+    }
 
     case "slides":
       return [

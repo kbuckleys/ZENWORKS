@@ -496,7 +496,7 @@ Item {
       text: ""
       color: Zenon.alpha(Zenon.accentMuted, 0.35)
       font.family: Zenon.glyphFace
-      font.pixelSize: 72
+      font.pixelSize: Zenon.px(72)
     }
     Text {
       anchors.horizontalCenter: parent.horizontalCenter

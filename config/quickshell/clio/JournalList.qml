@@ -378,11 +378,11 @@ Item {
         here: row.here
       }
     }
-    EmptyMark {
+    EmptyState {
       anchors.centerIn: parent
       visible: list.count === 0 && !!jl.mgr && jl.mgr.loaded
       filtered: !!jl.win && (jl.win.query !== "" || jl.win.day !== "" || jl.mgr.journalFilter !== "")
-      word: "No entries yet"
+      text: "No entries yet"
     }
   }
   ElasticScroll { id: wheel; anchors.fill: list; view: list }

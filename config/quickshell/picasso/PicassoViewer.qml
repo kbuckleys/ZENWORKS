@@ -35,7 +35,7 @@ import "../morpheus/hypr.js" as Hypr
 Scope {
   id: mgr
 
-  // terminus, handed in by shell.qml, for Save New's dialog and "show in
+  // terminus, handed in by shell.qml, for Save new's dialog and "show in
   // directory"
   property var fileManager: null
 

@@ -41,7 +41,7 @@ Item {
 
   width: parent ? parent.width : 0
   height: 32
-  opacity: pref.enabled ? 1 : 0.45
+  opacity: pref.enabled ? 1 : Zenon.disabledDim
 
   // NO GROUND OF ITS OWN. The cursor is prefBar, one rectangle the panel
   // slides between rows; a fill here would be a second mark that can only

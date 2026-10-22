@@ -781,27 +781,24 @@ Item {
         color: Zenon.white
         text: bar.ed.cmdlineText
       }
-      Rectangle {
+      // `parent` (the command line's field) and not `field`, which inside
+      // a Caret is the Caret's own property
+      Caret {
         id: caret
-        x: field.shift + field.caretX
+        field: parent
+        active: bar.cmd
+        steady: true
+        x: parent.shift + parent.caretX
         width: 2
         height: fm.height
         anchors.verticalCenter: parent.verticalCenter
         color: Zenon.yellow
         Behavior on x { NumberAnimation { duration: Zenon.brisk; easing.type: Zenon.travelEase } }
         // breathing, as the editor's caret does, and solid while typing
-        SequentialAnimation on opacity {
-          id: breathe
-          running: bar.cmd
-          loops: Animation.Infinite
-          PauseAnimation { duration: 500 }
-          NumberAnimation { to: 0.2; duration: Zenon.breath; easing.type: Zenon.breathEase }
-          NumberAnimation { to: 1.0; duration: Zenon.breath; easing.type: Zenon.breathEase }
-        }
         Connections {
           target: bar.ed
-          function onCmdlineTextChanged() { caret.opacity = 1; breathe.restart(); }
-          function onCmdlinePosChanged() { caret.opacity = 1; breathe.restart(); }
+          function onCmdlineTextChanged() { caret.wake(true); }
+          function onCmdlinePosChanged() { caret.wake(true); }
         }
       }
     }

@@ -31,7 +31,11 @@ local function bind(id, chord, label, action, opts)
 	if chord == "" then return end
 	opts = opts or {}
 	opts.description = label
+	-- a second action for the same keys coming up (the cheat sheet's peek)
+	local up = opts.onRelease
+	opts.onRelease = nil
 	hl.bind(chord, action, opts)
+	if up then hl.bind(chord, up, { release = true, description = label }) end
 end
 
 -- While oracle waits for a new chord, hyprland is in this submap. It binds
@@ -51,17 +55,19 @@ bind("lock",        "SUPER + ESCAPE",          "Lock the screen",         hl.dsp
 bind("screensOff",  "SUPER + SHIFT + ESCAPE",  "Lock and suspend screen", hl.dsp.exec_cmd([[qs ipc call Cerberus lock; sleep 1; hyprctl dispatch 'hl.dsp.dpms({ action = "disable" })']]))
 
 -- off until given a chord in oracle's Shortcuts
-bind("shutdown",    "",                        "Shutdown",                hl.dsp.exec_cmd("hyprshutdown -p 'systemctl poweroff'"))
+bind("shutdown",    "",                        "Shutdown",                hl.dsp.exec_cmd("hyprshutdown -t 'Shutting down…' -p 'systemctl poweroff'"))
 bind("awake",       "",                        "Keep the machine awake",  hl.dsp.exec_cmd("qs ipc call Socordia awake"))
 bind("logout",      "",                        "Log out of hyprland",     hl.dsp.exit())
 
 -- hyprshutdown closes every app and then hyprland itself
-bind("terminate",   "SUPER + SHIFT + F1",      "Terminate hyprland",      hl.dsp.exec_cmd("hyprshutdown"), { locked = true })
+bind("terminate",   "SUPER + SHIFT + F1",      "Terminate hyprland",      hl.dsp.exec_cmd("hyprshutdown -t 'Leaving Hyprland…'"), { locked = true })
 
 -- APPS
 bind("terminal",       "SUPER + RETURN",     "Open the terminal",              hl.dsp.exec_cmd(term))
 bind("browser",        "SUPER + B",          "Open the browser",               hl.dsp.exec_cmd(web))
 bind("cynosure",       "SUPER + SPACE",      "Cynosure, the launcher",         hl.dsp.exec_cmd("qs ipc call Cynosure toggle"))
+-- held, the sheet shows until the keys come up; tapped, it stays open
+bind("keysSheet",      "SUPER + SLASH",      "Shortcuts cheat sheet",          hl.dsp.exec_cmd("qs ipc call Keys hold"), { onRelease = hl.dsp.exec_cmd("qs ipc call Keys release") })
 bind("terminus",       "SUPER + E",          "Terminus, a new window",         hl.dsp.exec_cmd("qs ipc call Terminus spawn ''"))
 bind("folio",          "SUPER + C",          "Folio, the clipboard",           hl.dsp.exec_cmd("qs ipc call Folio toggle"))
 bind("metis",          "SUPER + SHIFT + C",  "Metis, the calculator",          hl.dsp.exec_cmd("qs ipc call Metis toggle"))
@@ -98,6 +104,7 @@ bind("timersStop",     "",                   "Chronos, stop the timers",       h
 bind("minerva",        "",                   "Minerva, the library",           hl.dsp.exec_cmd("qs ipc call Minerva library"))
 bind("hestia",         "",                   "Hestia, services and logs",      hl.dsp.exec_cmd("qs ipc call Hestia open ''"))
 bind("hestiaJournal",  "",                   "Hestia, the journal",            hl.dsp.exec_cmd("qs ipc call Hestia journal ''"))
+bind("kairos",         "",                   "Screen Time",                    hl.dsp.exec_cmd("qs ipc call Kairos open ''"))
 bind("hermes",         "",                   "Hermes, the quick panel",        hl.dsp.exec_cmd("qs ipc call Hermes toggle"))
 bind("hermesWin",      "",                   "Hermes, the window",             hl.dsp.exec_cmd("qs ipc call Hermes window ''"))
 bind("nightLight",     "",                   "Night light, on or off",         hl.dsp.exec_cmd("qs ipc call Hermes night"))

@@ -324,6 +324,32 @@ Scope {
       for (const fn of fns) { if (mgr.loaded) fn(); else mgr.load(fn); }
     }
   }
+  // ── FILES FROM ELSEWHERE ───────────────────────────────────────────────
+  // The suite's Share menu (2026-10-21): a new note, "Shared · <date>",
+  // holding a copy of each file in the order given, then opened on it.
+  // Read first if the notebook is not yet. done(id), "" when none.
+  function noteFromFiles(paths, done) {
+    const go = () => {
+      const when = Qt.formatDateTime(new Date(), "d MMM yyyy, hh:mm");
+      const id = mgr.newNote("", [N.block("title", N.escape("Shared \u00b7 " + when))]);
+      const got = new Array(paths.length);
+      let left = paths.length;
+      const finish = () => {
+        const n = mgr.notes.find((x) => x.id === id);
+        if (n) mgr.setBlocks(id, n.blocks.concat(got.filter((g) => !!g)));
+        mgr.openAt(id, "");
+        if (done) done(id);
+      };
+      if (left === 0) { finish(); return; }
+      paths.forEach((p, x) => mgr.attach(id, p, (b) => {
+        got[x] = b ? N.block(b.k, "", { src: b.src, name: b.name, size: b.size }) : null;
+        if (--left === 0) finish();
+      }));
+    };
+    if (mgr.loaded) go();
+    else if (!mgr.loading) mgr.load(go);
+    else quoteRetry.later(go);
+  }
   function newEntry(journal, date, prompt, blocks) {
     const n = N.blankEntry(journal || (mgr.journals[0] || {}).id || "journal", date, prompt);
     if (blocks && blocks.length) n.blocks = blocks;

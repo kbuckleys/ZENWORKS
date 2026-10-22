@@ -4,7 +4,7 @@
 // https://github.com/kbuckleys/
 //
 // A SEARCH'S CLEAR CHIP — a small round × inside a field's right end, there
-// while the field holds text, that empties it (user, 2026-10-11). BulkField
+// while the field holds text, that empties it (user, 2026-10-11). terminus' BulkField
 // wears it when `clearable`; a field of its own (alexandria's searches)
 // places one the same way and makes room for it:
 //
@@ -16,7 +16,6 @@
 // Pressed, it darkens; no hover, as the suite's controls answer none.
 
 import QtQuick
-import "../morpheus"
 
 Rectangle {
   id: chip
@@ -26,10 +25,14 @@ Rectangle {
   // pressed from outside: a tab's own MouseArea takes the press over its ×
   property bool held: false
   readonly property bool down: press.pressed || chip.held
+  // the disc against the size, and the strokes' angles — AddChip turns
+  // the × into a + on a tighter disc
+  property real disc: 1.25
+  property var strokes: [45, -45]
   signal clicked()
 
   visible: chip.shown
-  width: Math.round(chip.size * 1.25)
+  width: Math.round(chip.size * chip.disc)
   height: width
   radius: width / 2
   // the ink's own color, faint: a disc that reads on dark glass and on
@@ -42,11 +45,11 @@ Rectangle {
   // the × sat off the disc's middle — worst at the tabs' size. Two strokes
   // crossing at the disc's center cannot miss it.
   Repeater {
-    model: [45, -45]
+    model: chip.strokes
     Rectangle {
       required property var modelData
       anchors.centerIn: parent
-      width: Math.round(chip.width * 0.46)
+      width: Math.round(chip.size * 0.575)
       height: Math.max(1.5, chip.size / 10)
       radius: height / 2
       rotation: modelData

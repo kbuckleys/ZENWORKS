@@ -103,6 +103,6 @@ Item {
       }
       MouseArea { anchors.fill: parent; onClicked: np.picked(modelData) }
     }
-    EmptyMark { anchors.centerIn: parent; visible: list.count === 0; filtered: pickField.text !== ""; word: "No other notes" }
+    EmptyState { anchors.centerIn: parent; visible: list.count === 0; filtered: pickField.text !== ""; text: "No other notes" }
   }
 }

@@ -1473,29 +1473,13 @@ LayerPopup {
               font.weight: 600
               font.pixelSize: popup.tpx(18)
               cursorVisible: activeFocus
-              cursorDelegate: Item {}
+              cursorDelegate: Caret {
+                field: wordInput
+                thick: 3; low: 0.25; radius: 1
+                color: popup.headColor
+              }
               clip: true
               Keys.forwardTo: bgRoot
-
-              Rectangle {
-                id: dictPulse
-                anchors.left: parent.left
-                anchors.leftMargin: Math.min((parent.width + parent.contentWidth) / 2 + 2,
-                                             parent.width - 5)
-                anchors.verticalCenter: parent.verticalCenter
-                width: 3
-                height: 20
-                radius: 1
-                color: popup.headColor
-                opacity: 0.25
-                visible: wordInput.activeFocus
-                SequentialAnimation on opacity {
-                  running: wordInput.activeFocus
-                  loops: Animation.Infinite
-                  NumberAnimation { to: 1; duration: Zenon.breath; easing.type: Zenon.breathEase }
-                  NumberAnimation { to: 0.25; duration: Zenon.breath; easing.type: Zenon.breathEase }
-                }
-              }
             }
           }
 
@@ -1626,27 +1610,13 @@ LayerPopup {
               font.pixelSize: popup.tpx(18)
               background: null
               cursorVisible: activeFocus
-              cursorDelegate: Item {}
+              cursorDelegate: Caret {
+                field: tArea
+                thick: 3; low: 0.25; radius: 1
+                color: popup.headColor
+              }
               clip: true
               Keys.forwardTo: bgRoot
-
-              Rectangle {
-                id: transPulse
-                x: parent.cursorRectangle.x
-                y: parent.cursorRectangle.y
-                width: 3
-                height: parent.cursorRectangle.height > 0 ? parent.cursorRectangle.height : 18
-                radius: 1
-                color: popup.headColor
-                opacity: 0.25
-                visible: tArea.activeFocus
-                SequentialAnimation on opacity {
-                  running: tArea.activeFocus
-                  loops: Animation.Infinite
-                  NumberAnimation { to: 1; duration: Zenon.breath; easing.type: Zenon.breathEase }
-                  NumberAnimation { to: 0.25; duration: Zenon.breath; easing.type: Zenon.breathEase }
-                }
-              }
               Keys.priority: Keys.BeforeItem
               Keys.onPressed: (event) => {
                 if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter)) {

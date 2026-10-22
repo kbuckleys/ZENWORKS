@@ -555,7 +555,11 @@ LayerPopup {
                 font.weight: 500
                 font.pixelSize: Zenon.px(17)
                 cursorVisible: activeFocus
-                cursorDelegate: Item {}
+                cursorDelegate: Caret {
+                  field: filterInput
+                  thick: 3; low: 0.25; radius: 1
+                  color: popup.entryColor
+                }
                 clip: true
                 Keys.forwardTo: bgRoot
 
@@ -570,26 +574,6 @@ LayerPopup {
                   } else if (event.key === Qt.Key_Tab) {
                     event.accepted = true;
                     popup.toggleMode();
-                  }
-                }
-
-                Rectangle {
-                  id: pulseCursor
-                  anchors.left: parent.left
-                  anchors.leftMargin: Math.min(filterInput.contentWidth + 2,
-                                               filterInput.width - 5)
-                  anchors.verticalCenter: parent.verticalCenter
-                  width: 3
-                  height: 22
-                  radius: 1
-                  color: popup.entryColor
-                  opacity: 0.25
-                  visible: filterInput.activeFocus
-                  SequentialAnimation on opacity {
-                    running: filterInput.activeFocus
-                    loops: Animation.Infinite
-                    NumberAnimation { to: 1; duration: Zenon.breath; easing.type: Zenon.breathEase }
-                    NumberAnimation { to: 0.25; duration: Zenon.breath; easing.type: Zenon.breathEase }
                   }
                 }
 

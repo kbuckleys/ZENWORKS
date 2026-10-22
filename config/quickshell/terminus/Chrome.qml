@@ -2020,7 +2020,7 @@ Column {
                   add("encoding", info.encoding);
                 } else if (info) {
                   add("format", info.format);
-                  add("colour", [info.depth, info.colorspace]
+                  add("color", [info.depth, info.colorspace]
                     .filter((x) => !!x).join(dot));
                 }
                 out.push(["size", Terminus.formatSize(r.size)]);
@@ -2617,7 +2617,7 @@ Column {
       // The same word at the same size as the active pane's — see the
       // note there. Two panes saying the same thing two different ways
       // reads as two different states.
-      EmptyMark {
+      EmptyState {
         anchors.centerIn: parent
         visible: term.dual && term.otherRows.length === 0
       }
@@ -2984,7 +2984,7 @@ Column {
     // It travels with the columns too: miller.x is the step animation, so
     // the label slides in with the column it belongs to rather than
     // sitting still while that column moves out from under it.
-    EmptyMark {
+    EmptyState {
       id: emptyLabel
       x: term.viewMode === "columns"
         // NOT miller.x. That is written by an XAnimator on the render
@@ -3059,7 +3059,7 @@ Column {
     // preview that had not loaded. Only once the peek has answered for
     // the row under the cursor (previewShown, nothing in flight), at the
     // column's resting place, eased in like the label above.
-    EmptyMark {
+    EmptyState {
       id: previewEmpty
       x: millerBox.x + miller.slotX(2) + (miller.slotW(2) - width) / 2
       y: (parent.height - height) / 2

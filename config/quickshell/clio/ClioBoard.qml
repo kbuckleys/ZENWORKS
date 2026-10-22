@@ -341,7 +341,81 @@ Variants {
           Behavior on hue { ColorAnimation { duration: Zenon.normal; easing.type: Zenon.ease } }
           // The body, or the typeface picker standing in for it: choosing a
           // face is still being on the note, so the head stays out.
-          readonly property bool active: body.activeFocus || slot.pickFocus
+          readonly property bool active: slot.body.activeFocus || slot.pickFocus
+          // the note's text (NoteField's TextEdit)
+          readonly property TextEdit body: field.edit
+
+          // SET ONCE, NEVER BOUND. Assigning text to a TextEdit puts the
+          // caret at the start, so a binding would have moved it there on
+          // every keystroke.
+          //
+          // ...EXCEPT ON THE OTHER SCREENS. Every screen draws its own copy
+          // of every note, and only the copy being typed in wrote anything;
+          // the rest kept the text they were made with. Drag a note across
+          // and it showed stale text, and typing into that copy saved stale
+          // text plus the edit over the real note. So a copy that does NOT
+          // have the keyboard follows the model — the one that does is the
+          // model's source, and resetting it is exactly the caret jump the
+          // line above avoids.
+          readonly property string modelText: slot.note ? slot.note.text : ""
+          property bool syncing: false
+          onModelTextChanged: {
+            if (slot.body.activeFocus) return;
+            const mine = slot.body.length === 0 ? "" : Scribe.fragment(slot.body.text);
+            if (mine === slot.modelText) return;
+            slot.syncing = true;
+            slot.body.text = slot.modelText;
+            slot.syncing = false;
+          }
+          Connections {
+            target: field.edit
+            // Stored as the body's contents rather than as Qt's whole HTML
+            // document — see Scribe.fragment — and as nothing at all when
+            // the note is empty, which is otherwise six hundred bytes of
+            // boilerplate saying so.
+            function onTextChanged() {
+              if (!slot.note || slot.syncing) return;
+              const t = slot.body.length === 0 ? "" : Scribe.fragment(slot.body.text);
+              if (t !== slot.note.text)
+                Clio.set(slot.noteId, "text", t);
+            }
+            function onActiveFocusChanged() {
+              if (slot.body.activeFocus) {
+                board.editing = slot.noteId;
+                Clio.raise(slot.noteId);
+              } else {
+                Qt.callLater(slot.settle);
+              }
+            }
+          }
+
+          // BACK TO NORMAL on escape. Giving the focus up is the whole of
+          // it: the head, the buttons and the card's own handle all read
+          // `slot.active`, which is the body having the keyboard.
+          // ctrl+= and ctrl+-, the zoom every editor has, onto the same
+          // steps as the head's minus and plus — see Scribe.stepSize.
+          // Plus as well as equals: with shift held, the key says Plus.
+          function bodyKey(e) {
+            if (e.key === Qt.Key_Escape) {
+              e.accepted = true;
+              slot.body.deselect();
+              slot.body.focus = false;
+              wall.forceActiveFocus();
+              return;
+            }
+            if (board.menuSlot !== null) {
+              board.closeMenu();
+              e.accepted = true;
+              return;
+            }
+            if (!(e.modifiers & Qt.ControlModifier) || !slot.note) return;
+            const by = e.key === Qt.Key_Equal || e.key === Qt.Key_Plus ? 1
+              : e.key === Qt.Key_Minus ? -1 : 0;
+            if (by === 0) return;
+            e.accepted = true;
+            const next = Scribe.stepSize(slot.note.size, by);
+            if (next !== slot.note.size) Clio.set(slot.noteId, "size", next);
+          }
           readonly property bool leaving: Clio.isLeaving(slot.key)
           // Being carried, as distinct from being pressed: set by the drags
           // once the pointer has really moved, so a click does not bob.
@@ -352,8 +426,8 @@ Variants {
           // A deleted note's keyboard is given up before it fades, not left
           // to be lost when its row goes — a focus that dies with its item
           // never says so, and the board's grab would stay up holding it.
-          onLeavingChanged: if (slot.leaving && (body.activeFocus || slot.pickFocus)) {
-            body.focus = false;
+          onLeavingChanged: if (slot.leaving && (slot.body.activeFocus || slot.pickFocus)) {
+            slot.body.focus = false;
             slot.picking = false;
             board.editing = "";
             wall.forceActiveFocus();
@@ -406,7 +480,7 @@ Variants {
           // takes no keyboard — so the board lost it, and the list closed
           // the moment it opened.
           function settle() {
-            if (!body.activeFocus && !slot.pickFocus && board.editing === slot.noteId)
+            if (!slot.body.activeFocus && !slot.pickFocus && board.editing === slot.noteId)
               board.editing = "";
           }
           // Put down: the end of every gesture, released or taken away.
@@ -418,34 +492,34 @@ Variants {
           function closeFaces(face) {
             if (face !== undefined && slot.note) Clio.set(slot.noteId, "face", face);
             slot.picking = false;
-            body.forceActiveFocus();
+            slot.body.forceActiveFocus();
           }
           // ── WHAT ITS MENU OFFERS ─────────────────────────────────────
           // The edits a text field answers to, the head's own controls said
           // in words, and the note itself. Hints only for keys that do work
-          // here: TextEdit's own, and the size steps (body.Keys).
+          // here: TextEdit's own, and the size steps (slot.bodyKey).
           // the wrong word right-clicked, for the menu's spelling items
           property var spellHit: null
           function spellItems() {
             const sp = slot.spellHit;
             if (!sp || !Clio.app) return [];
             const fix = (w) => {
-              if (body.getText(sp.a, sp.b).replace(/\u2019/g, "'") !== sp.w) return;
-              body.remove(sp.a, sp.b);
-              body.insert(sp.a, w.replace(/&/g, "&amp;").replace(/</g, "&lt;"));
-              body.cursorPosition = sp.a + w.length;
+              if (slot.body.getText(sp.a, sp.b).replace(/\u2019/g, "'") !== sp.w) return;
+              slot.body.remove(sp.a, sp.b);
+              slot.body.insert(sp.a, w.replace(/&/g, "&amp;").replace(/</g, "&lt;"));
+              slot.body.cursorPosition = sp.a + w.length;
             };
             return sp.sugs.slice(0, 5).map((w) => ({ text: w, icon: "\uF00C", run: () => fix(w) }))
               .concat(Clio.app.spellTail(sp.w));
           }
           function menuItems() {
-            const sel = body.selectionStart !== body.selectionEnd;
+            const sel = slot.body.selectionStart !== slot.body.selectionEnd;
             const size = slot.note ? slot.note.size : Scribe.DEFAULT_SIZE;
             return slot.spellItems().concat([
-              { text: "Cut", icon: "\u{F0190}", hint: "ctrl x", enabled: sel, run: () => body.cut() },
-              { text: "Copy", icon: "\u{F018F}", hint: "ctrl c", enabled: sel, run: () => body.copy() },
-              { text: "Paste", icon: "\u{F0192}", hint: "ctrl v", enabled: body.canPaste, run: () => body.paste() },
-              { text: "Select all", icon: "\u{F0486}", hint: "ctrl a", run: () => body.selectAll() },
+              { text: "Cut", icon: "\u{F0190}", hint: "ctrl x", enabled: sel, run: () => slot.body.cut() },
+              { text: "Copy", icon: "\u{F018F}", hint: "ctrl c", enabled: sel, run: () => slot.body.copy() },
+              { text: "Paste", icon: "\u{F0192}", hint: "ctrl v", enabled: slot.body.canPaste, run: () => slot.body.paste() },
+              { text: "Select all", icon: "\u{F0486}", hint: "ctrl a", run: () => slot.body.selectAll() },
               { isSeparator: true },
               { text: "Bold", icon: "\uF032", run: () => card.mark("b") },
               { text: "Italic", icon: "\uF033", run: () => card.mark("i") },
@@ -512,6 +586,7 @@ Variants {
           // once, the stagger is for a wall coming back
           property bool fresh: false
           Component.onCompleted: {
+            slot.body.text = slot.modelText;
             slot.fresh = true; slot.arrived = true; slot.fresh = false;
             if (Clio.editNext === slot.key) Qt.callLater(slot.editFresh);
           }
@@ -525,7 +600,7 @@ Variants {
                 || cy < board.originY || cy >= board.originY + board.screen.height) return;
             Clio.editNext = "";
             board.editing = slot.noteId;
-            body.forceActiveFocus();
+            slot.body.forceActiveFocus();
           }
           onHereChanged: {
             popIn.stop();
@@ -629,162 +704,25 @@ Variants {
             HoverHandler { id: noteHov }
 
             // ── AND THE NOTE ITSELF ──────────────────────────────────
-            Flickable {
-              id: bodyScroll
-              visible: !slot.picking
-              // Finder's rubber band and the smooth wheel notch, one rule for
-              // the whole shell — see morpheus/Elastic.qml. Inside the view
-              // rather than over it: it pins itself to the viewport.
-              ElasticScroll { view: bodyScroll }
-              anchors.top: parent.top
-              anchors.left: parent.left
-              anchors.right: parent.right
-              anchors.bottom: parent.bottom
-              anchors.margins: 10
-              clip: true
-              contentWidth: width
-              contentHeight: body.implicitHeight
-              boundsBehavior: Flickable.StopAtBounds
-
-              TextEdit {
-                id: body
-                width: parent.width
-                // RICH TEXT, because the formatting buttons are edits rather
-                // than properties — see card.mark. Plain text would render
-                // the tags they insert as the characters they are made of.
-                textFormat: TextEdit.RichText
-                wrapMode: TextEdit.Wrap
-                selectByMouse: true
-                persistentSelection: true
-                // SET ONCE, NEVER BOUND. Assigning text to a TextEdit puts
-                // the caret at the start, so a binding would have moved it
-                // there on every keystroke. The model is written TO from here
-                // and read back only when this slot takes on another note.
-                Component.onCompleted: body.text = slot.note ? slot.note.text : ""
-
-                // ...EXCEPT ON THE OTHER SCREENS. Every screen draws its own
-                // copy of every note, and only the copy being typed in wrote
-                // anything; the rest kept the text they were made with. Drag a
-                // note across and it showed stale text, and typing into that
-                // copy saved stale text plus the edit over the real note.
-                // So a copy that does NOT have the keyboard follows the model
-                // — the one that does is the model's source, and resetting it
-                // is exactly the caret jump the note above avoids.
-                readonly property string modelText: slot.note ? slot.note.text : ""
-                property bool syncing: false
-                onModelTextChanged: {
-                  if (body.activeFocus) return;
-                  const mine = body.length === 0 ? "" : Scribe.fragment(body.text);
-                  if (mine === body.modelText) return;
-                  body.syncing = true;
-                  body.text = body.modelText;
-                  body.syncing = false;
-                }
-                color: Zenon.white
-                selectionColor: Zenon.wash(0.25)
-                selectedTextColor: Zenon.white
-                font.family: Clio.faceOf(slot.note)
-                font.weight: Clio.weightOf(slot.note)
-                font.pixelSize: slot.note ? slot.note.size : Scribe.DEFAULT_SIZE
-
-                cursorDelegate: Caret { field: body }
-                // the spelling, as a note's in the window (SpellMarks); shown only
-                // while the note is being written in
-                SpellMarks { id: bodySpell; field: body; mgr: Clio.app; visible: slot.active }
-
-                // Stored as the body's contents rather than as Qt's whole
-                // HTML document — see Scribe.fragment — and as nothing at
-                // all when the note is empty, which is otherwise six hundred
-                // bytes of boilerplate saying so.
-                onTextChanged: {
-                  if (!slot.note || body.syncing) return;
-                  const t = body.length === 0 ? "" : Scribe.fragment(body.text);
-                  if (t !== slot.note.text)
-                    Clio.set(slot.noteId, "text", t);
-                }
-                onActiveFocusChanged: {
-                  if (activeFocus) {
-                    board.editing = slot.noteId;
-                    Clio.raise(slot.noteId);
-                  } else {
-                    Qt.callLater(slot.settle);
-                  }
-                }
-
-                // BACK TO NORMAL. Giving the focus up is the whole of it:
-                // the head, the buttons and the card's own handle all read
-                // `slot.active`, which is this having the keyboard.
-                // ctrl+= and ctrl+-, the zoom every editor has, onto the same
-                // steps as the head's minus and plus — see Scribe.stepSize.
-                // Plus as well as equals: with shift held, the key says Plus.
-                Keys.onPressed: (e) => {
-                  if (board.menuSlot !== null) {
-                    board.closeMenu();
-                    e.accepted = true;
-                    return;
-                  }
-                  if (!(e.modifiers & Qt.ControlModifier) || !slot.note) return;
-                  const by = e.key === Qt.Key_Equal || e.key === Qt.Key_Plus ? 1
-                    : e.key === Qt.Key_Minus ? -1 : 0;
-                  if (by === 0) return;
-                  e.accepted = true;
-                  const next = Scribe.stepSize(slot.note.size, by);
-                  if (next !== slot.note.size) Clio.set(slot.noteId, "size", next);
-                }
-
-                Keys.onEscapePressed: (e) => {
-                  e.accepted = true;
-                  body.deselect();
-                  body.focus = false;
-                  wall.forceActiveFocus();
-                }
-              }
-            }
-
-            // ── WHERE THE TEXT RUNS ON ──────────────────────────────
-            // A long note was cut off by a hard edge mid-line. Now the last
-            // few pixels melt into the note's ground, and only while there
-            // is more past them — at the end of the text the edge is clean.
-            // The first edge does the same once the text has been scrolled.
-            Rectangle {
-              visible: bodyScroll.visible && bodyScroll.contentY > 1
-              anchors.top: bodyScroll.top
-              anchors.left: bodyScroll.left
-              anchors.right: bodyScroll.right
-              height: 14
-              gradient: Gradient {
-                GradientStop { position: 0; color: card.color }
-                GradientStop { position: 1; color: Qt.rgba(card.color.r, card.color.g, card.color.b, 0) }
-              }
-            }
-            Rectangle {
-              visible: bodyScroll.visible
-                && bodyScroll.contentY + bodyScroll.height < bodyScroll.contentHeight - 1
-              anchors.bottom: bodyScroll.bottom
-              anchors.left: bodyScroll.left
-              anchors.right: bodyScroll.right
-              height: 22
-              gradient: Gradient {
-                GradientStop { position: 0; color: Qt.rgba(card.color.r, card.color.g, card.color.b, 0) }
-                GradientStop { position: 1; color: card.color }
-              }
-            }
-
-            // A SIBLING OF THE FLICKABLE, NEVER A CHILD OF IT. Inside, it
-            // becomes part of the scrolling content: it travels up with the
-            // text and its anchors resolve against the content item, whose
-            // height is the whole document — so the "thumb" was as long as
-            // the note and the whole thing read as one gray bar.
-            // The track stops short of the corner grip (26px, below): run
-            // to the bottom it lay over the grip, and the thumb at the end
-            // of a long note sat on top of what you pull.
-            Scrollbar {
-              flick: bodyScroll
-              // the card's edge, not the text's 10 in from it
-              anchors.right: parent.right
-              anchors.top: bodyScroll.top
-              anchors.bottom: bodyScroll.bottom
-              anchors.bottomMargin: 26
+            // The page (NoteField), shared with folio's snippets. Written
+            // TO the model from here (onTextChanged below) and read back
+            // only when this slot takes on another note.
+            NoteField {
+              id: field
+              ground: card.color
+              placeholder: "Note\u2026"
+              face: Clio.faceOf(slot.note)
+              weight: Clio.weightOf(slot.note)
+              size: slot.note ? slot.note.size : Scribe.DEFAULT_SIZE
+              // the corner grip (26px, below): run to the bottom the track
+              // lay over it, and the thumb at the end of a long note sat on
+              // top of what you pull
+              barRoom: 26
+              mgr: Clio.app
+              // shown only while the note is being written in
+              spelling: slot.active
+              hidden: slot.picking
+              onKeyPressed: (e) => slot.bodyKey(e)
             }
 
             // ── THE TYPEFACE LIST ────────────────────────────────────
@@ -906,22 +844,6 @@ Variants {
               }
             }
 
-            // The placeholder, which is not the TextEdit's own: a rich-text
-            // edit has no ghost, and an empty note that says nothing at all
-            // looks broken rather than blank.
-            Text {
-              anchors.top: parent.top
-              anchors.left: parent.left
-              anchors.topMargin: 10
-              anchors.leftMargin: 10
-              visible: body.length === 0 && !body.activeFocus && !slot.picking
-              text: "Note\u2026"
-              color: Zenon.wash(0.35)
-              font.family: Clio.faceOf(slot.note)
-              font.weight: Clio.weightOf(slot.note)
-              font.pixelSize: slot.note ? slot.note.size : Scribe.DEFAULT_SIZE
-            }
-
             // ── NORMAL MODE ──────────────────────────────────────────
             // A note you have not clicked into is an editor in normal mode:
             // no edits, only motion. So the whole card is the handle and the
@@ -962,7 +884,7 @@ Variants {
               }
               onReleased: {
                 slot.drop();
-                if (!moved) body.forceActiveFocus();
+                if (!moved) slot.body.forceActiveFocus();
               }
               onCanceled: slot.drop()
             }
@@ -1036,10 +958,10 @@ Variants {
               onPressed: (m) => {
                 Clio.raise(slot.noteId);
                 if (slot.picking) slot.closeFaces();
-                else if (!body.activeFocus) body.forceActiveFocus();
+                else if (!slot.body.activeFocus) slot.body.forceActiveFocus();
                 // a wrong word under the pointer: its suggestions head the menu
-                const bp = mapToItem(body, m.x, m.y);
-                slot.spellHit = bp.y >= 0 && bp.y <= body.height ? bodySpell.at(body.positionAt(bp.x, bp.y)) : null;
+                const bp = mapToItem(slot.body, m.x, m.y);
+                slot.spellHit = bp.y >= 0 && bp.y <= slot.body.height ? field.spell.at(slot.body.positionAt(bp.x, bp.y)) : null;
                 board.openMenu(slot, mapToItem(wall, m.x, m.y));
               }
             }
@@ -1058,13 +980,13 @@ Variants {
             // exactly as they were. Reduced to the run of inline markup
             // inside it, the tag lands on the text.
             function mark(tag) {
-              const from = body.selectionStart;
-              const to = body.selectionEnd;
+              const from = slot.body.selectionStart;
+              const to = slot.body.selectionEnd;
               const had = from !== to;
               const a = had ? from : 0;
-              const b = had ? to : body.length;
+              const b = had ? to : slot.body.length;
               if (b <= a) return;
-              const run = Scribe.inline(body.getFormattedText(a, b));
+              const run = Scribe.inline(slot.body.getFormattedText(a, b));
               if (run === "") return;
               // A TOGGLE, NOT A STAMP. Pressing bold on bold text is how you
               // ask for it not to be bold — a one-shot left the only way back
@@ -1073,12 +995,12 @@ Variants {
               const next = Scribe.marked(run, tag)
                 ? Scribe.unmark(run, tag)
                 : "<" + tag + ">" + run + "</" + tag + ">";
-              body.remove(a, b);
-              body.insert(a, next);
+              slot.body.remove(a, b);
+              slot.body.insert(a, next);
               // The selection is put back so the next button acts on the same
               // words — bold then italic is one thought, not two selections.
-              if (had) body.select(a, body.selectionEnd);
-              body.forceActiveFocus();
+              if (had) slot.body.select(a, slot.body.selectionEnd);
+              slot.body.forceActiveFocus();
             }
           }
 
@@ -1151,7 +1073,7 @@ Variants {
                 // is shown by the body having focus, and a press on the
                 // head is not a press on the body.
                 slot.busy = true;
-                body.forceActiveFocus();
+                slot.body.forceActiveFocus();
                 Clio.raise(slot.noteId);
               }
               onPositionChanged: (m) => {
@@ -1188,8 +1110,12 @@ Variants {
               head.width - fmtRow.width - close.width - 34
             readonly property bool roomForSwatches:
               head.freeForSwatches >= swatchRow.implicitWidth
+            // against the row WITH the size controls (fmtRow.whole): its
+            // implicitWidth drops when they hide, so measuring that said
+            // "room" again and they flickered back, a polish loop every
+            // frame on a narrow note (2026-10-22)
             readonly property bool roomForSize:
-              head.width - close.width - 34 >= fmtRow.implicitWidth
+              head.width - close.width - 34 >= fmtRow.whole
 
             Row {
               id: fmtRow
@@ -1197,6 +1123,9 @@ Variants {
               anchors.leftMargin: 6
               anchors.verticalCenter: parent.verticalCenter
               spacing: 2
+              // its width with every control shown: six 26px buttons, the
+              // 5px gap, and the spacing between all seven
+              readonly property real whole: 6 * 26 + 5 + 6 * fmtRow.spacing
               opacity: head.armed ? 1 : 0
               visible: opacity > 0.01
               Behavior on opacity {
@@ -1292,7 +1221,7 @@ Variants {
                     text: step.modelData[0]
                     color: step.isMark && slot.note && slot.note.face
                       ? slot.hue : Zenon.white
-                    opacity: step.isMark ? 1 : (step.canGo ? 1 : 0.3)
+                    opacity: step.isMark ? 1 : (step.canGo ? 1 : Zenon.disabledDim)
                     font.family: Zenon.face
                     font.weight: Zenon.weight
                     font.pixelSize: Zenon.px(step.isMark ? 14 : 12)

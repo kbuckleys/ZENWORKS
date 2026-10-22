@@ -49,10 +49,10 @@ const ICON_B = "\uEE23";
 // is a row that can only fail (2026-10-21).
 const SHELL_ACTIONS = [
   { name: "Lock screen", glyph: "\uF456", keys: "lock cerberus", sh: "sleep 0.35 && qs ipc call Cerberus lock" },
-  { name: "Log out", glyph: "\uDB81\uDF43", keys: "logout session exit quit", sh: "hyprshutdown -p 'loginctl terminate-session {session}'", confirm: true },
+  { name: "Log out", glyph: "\uDB81\uDF43", keys: "logout session exit quit", sh: "hyprshutdown -t 'Logging out…' -p 'loginctl terminate-session {session}'", confirm: true },
   { name: "Suspend", glyph: "\uDB82\uDD04", keys: "sleep standby", sh: "systemctl suspend", confirm: true },
-  { name: "Reboot", glyph: "\uF021", keys: "restart", sh: "hyprshutdown -p 'systemctl reboot'", confirm: true },
-  { name: "Shutdown", glyph: "\u23FB", keys: "shutdown power off poweroff halt", sh: "hyprshutdown -p 'systemctl poweroff'", confirm: true },
+  { name: "Reboot", glyph: "\uF021", keys: "restart", sh: "hyprshutdown -t 'Rebooting…' -p 'systemctl reboot'", confirm: true },
+  { name: "Shutdown", glyph: "\u23FB", keys: "shutdown power off poweroff halt", sh: "hyprshutdown -t 'Shutting down…' -p 'systemctl poweroff'", confirm: true },
   { name: "Settings", glyph: "\uF013", keys: "oracle preferences options config", ipc: "Oracle open" },
   { name: "Check for updates", glyph: "\uF2F1", keys: "ceres upgrade refresh sync", ipc: "Ceres check" },
   { name: "Store", glyph: "\uDB83\uDD68", keys: "ceres store apps app store packages install remove paru pacman aur flatpak flathub", ipc: "Ceres window store" },
@@ -116,6 +116,9 @@ const SHELL_ACTIONS = [
   { name: "Services", glyph: "\u{F08D6}", keys: "hestia systemd systemctl daemons units", ipc: "Hestia open system" },
   { name: "System journal", glyph: "\u{F09EE}", keys: "hestia logs journalctl errors", ipc: "Hestia journal ''" },
   { name: "What's wrong", glyph: "\u{F05D6}", keys: "hestia failed services errors broken overview health", ipc: "Hestia open overview" },
+  // kairos
+  { name: "This week's screen time", glyph: "\u{F0128}", keys: "kairos screen time usage week apps hours", ipc: "Kairos open week" },
+  { name: "Keyboard shortcuts", glyph: "\u{F030C}", keys: "keys keybinds binds cheat sheet hotkeys shortcuts", sh: "sleep 0.3 && qs ipc call Keys open" },
 ];
 
 // The frecency key, kept apart from app names: an app called "Files" and the
@@ -302,7 +305,7 @@ function serializeFreq(map) {
   return parts.length ? parts.join("\n") + "\n" : "";
 }
 
-// `term` is oracle's Default Apps terminal. Empty is the old guess below.
+// `term` is oracle's Default apps terminal. Empty is the old guess below.
 function terminalCommand(cmd, term) {
   const t = String(cmd).trim().toLowerCase();
   if (t === "kitty") {

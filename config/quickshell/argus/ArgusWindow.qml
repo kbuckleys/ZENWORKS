@@ -377,6 +377,17 @@ FloatingWindow {
           label: "Show in Terminus"
           onClicked: Quickshell.execDetached(["qs", "ipc", "call", "Terminus", "reveal", aw.savedTo])
         }
+        // the cut just saved, out to something else (morpheus/Share)
+        DialogButton {
+          id: shareBtn
+          visible: aw.savedTo !== ""
+          label: "Share \u25BE"
+          onClicked: {
+            const at = shareBtn.mapToItem(shareMenu, 0, shareBtn.height + 4);
+            shareMenu.open(at.x, at.y, Share.items([aw.savedTo], false, 1)
+              .map((t) => ({ text: t.label, icon: t.glyph, run: t.act })));
+          }
+        }
         DialogButton {
           label: "Open…"
           ready: !aw.saving && !!aw.mgr && !!aw.mgr.fileManager
@@ -465,12 +476,12 @@ FloatingWindow {
         style: Text.Outline
         styleColor: Zenon.shade(0.6)
         font.family: Zenon.glyphFace
-        font.pixelSize: 44
+        font.pixelSize: Zenon.px(44)
       }
       EmptyState {
         anchors.centerIn: parent
         visible: aw.path === ""
-        text: "No video open — ctrl o opens one, Super+R records the screen"
+        text: "No video open — ctrl o opens one, super r records the screen"
       }
     }
 
@@ -699,7 +710,7 @@ FloatingWindow {
               width: (aw.sideW - 40 - 12) / 3
               height: 30
               radius: Zenon.radiusControl
-              opacity: aw.vw > 0 ? 1 : 0.4
+              opacity: aw.vw > 0 ? 1 : Zenon.disabledDim
               color: cropPress.pressed ? Zenon.pressTile(on) : on ? Zenon.alpha(Zenon.yellow, 0.18) : Zenon.wash(0.05)
               border.width: 1
               border.color: on ? Zenon.alpha(Zenon.yellow, 0.6) : Zenon.border
@@ -807,4 +818,6 @@ FloatingWindow {
            ["ctrl s", "save"], ["ctrl shift s", "save as"], ["esc", "close"]]
     }
   }
+
+  PopMenu { id: shareMenu; anchors.fill: parent; window: aw; onClosed: keys.forceActiveFocus() }
 }

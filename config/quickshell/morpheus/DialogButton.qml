@@ -56,7 +56,7 @@ Rectangle {
   readonly property bool plain: Qt.colorEqual(btn.ink, Zenon.muted) || Qt.colorEqual(btn.ink, Zenon.accentMuted)
   readonly property color word: btn.plain ? Zenon.white : btn.ink
   // PRESSED, DARKENED (user, 2026-10-15): the shade and dimmed word of
-  // terminus' ClearChip and Segments — every button in the suite presses
+  // ClearChip and terminus' Segments — every button in the suite presses
   // the same way (it was its own ink, deeper)
   color: !btn.ready ? "transparent"
     : btn.down && !btn.primary ? Zenon.pressFill
@@ -64,7 +64,7 @@ Rectangle {
     : Qt.rgba(btn.ink.r, btn.ink.g, btn.ink.b, btn.primary ? 0.14 : 0.10)
   border.width: 1
   border.color: Zenon.border
-  opacity: btn.ready ? 1 : 0.55
+  opacity: btn.ready ? 1 : Zenon.disabledDim
 
   Behavior on color {
     ColorAnimation { duration: Zenon.fast; easing.type: Zenon.ease }

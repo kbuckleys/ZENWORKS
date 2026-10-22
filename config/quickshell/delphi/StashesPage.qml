@@ -161,7 +161,7 @@ Item {
         onDoubleClicked: pg.apply(false)
       }
     }
-    EmptyMark { anchors.centerIn: parent; visible: pg.stashes.length === 0; word: "Nothing stashed" }
+    EmptyState { anchors.centerIn: parent; visible: pg.stashes.length === 0; text: "Nothing stashed" }
   }
   ElasticScroll { anchors.fill: list; view: list }
   Scrollbar { flick: list; anchors.right: list.right; anchors.top: list.top; anchors.bottom: list.bottom }
