@@ -217,6 +217,8 @@ Item {
               anchors.centerIn: parent
               text: "8"
               numeric: true
+              // the unlit segments match the lit ones' thickness
+              font.weight: wsLabel.font.weight
               color: Zenon.trough(Zenon.cyan)
             }
 
@@ -244,11 +246,28 @@ Item {
                 return btn.isActive ? Zenon.cyan
                   : Zenon.light ? Zenon.dimInk : Zenon.mix(Zenon.dimInk, Zenon.cyan, 0.5)
               }
-              font.weight: {
-                if (root.specialWorkspace !== null && btn.isActive)
-                  return Font.Black
-                return btn.isActive ? Font.ExtraBold : Font.Bold
-              }
+              // DSEG7 Classic ships Light, Regular and Bold only — ExtraBold
+              // and Black fell back to the same Bold file, so active and
+              // inactive drew identically. Regular against Bold is a single
+              // pixel at bar size, Light read too thin and a 1px outline far
+              // too heavy (user, 2026-10-22), so the active number is Bold
+              // with a copy one pixel right (wsThick) widening its uprights.
+              font.weight: btn.isActive ? Font.Bold : Font.Normal
+            }
+            // the active number's second pass; urgent is never active, so it
+            // never needs the black copy's treatment
+            Text {
+              id: wsThick
+              anchors.fill: wsLabel
+              anchors.leftMargin: 1
+              anchors.rightMargin: -1
+              visible: btn.isActive
+              text: wsLabel.text
+              font: wsLabel.font
+              verticalAlignment: wsLabel.verticalAlignment
+              horizontalAlignment: wsLabel.horizontalAlignment
+              renderType: wsLabel.renderType
+              color: wsLabel.color
             }
             // Black on the lit wash. A plain Text over the label, not a color
             // change on it: BarText eases every color over Zenon.normal, which
