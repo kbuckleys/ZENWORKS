@@ -29,15 +29,18 @@ Scope {
   property string tag: "write"
 
   property var queue: []
+  property var current: null
 
-  function write(path, content) {
-    root.queue.push({ path: path, content: content });
+  // `done(ok)`, if given, once the file is in place (or the write failed)
+  function write(path, content, done) {
+    root.queue.push({ path: path, content: content, done: done || null });
     root.drain();
   }
 
   function drain() {
     if (root.queue.length === 0 || proc.running) return;
     const job = root.queue.shift();
+    root.current = job;
     proc.command = ["sh", "-c",
       "cat > \"$1.tmp.$$\" && mv -f \"$1.tmp.$$\" \"$1\" || rm -f \"$1.tmp.$$\"",
       root.tag, job.path];
@@ -49,6 +52,11 @@ Scope {
 
   Process {
     id: proc
-    onExited: root.drain()
+    onExited: (code) => {
+      const job = root.current;
+      root.current = null;
+      if (job && job.done) job.done(code === 0);
+      root.drain();
+    }
   }
 }

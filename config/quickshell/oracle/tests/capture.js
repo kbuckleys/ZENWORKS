@@ -79,5 +79,22 @@ module.exports = {
     t.eq("the wheel walks the schemes", C.stepScheme("hex", 1), "rgb");
     t.eq("and wraps", C.stepScheme("hex", -1), "cmyk");
     t.eq("ink on white is black", C.inkOn(255, 255, 255), "#000000");
+
+    // ── colors read back, the ruler, the palette (2026-10-22) ──────────
+    t.eq("color of text", ["#9BBFBF", "#abc", "rgb(255, 0, 0)", "hsl(120, 100%, 50%)", "hsv(240, 100%, 100%)",
+                            "cmyk(0%, 100%, 100%, 0%)", "facade", "c0ffee1", "#12345678", "hello", "ff8800"].map(C.colorOfText),
+      ["#9bbfbf", "#aabbcc", "#ff0000", "#00ff00", "#0000ff", "#ff0000", "", "", "#123456", "", "#ff8800"]);
+    // within the rounding the formats do (whole percents, whole degrees)
+    const near = (h) => { const n = parseInt(h.slice(1), 16); return Math.max(Math.abs((n >> 16) - 18), Math.abs(((n >> 8) & 255) - 52), Math.abs((n & 255) - 86)) <= 3; };
+    t.eq("every picker format reads back", ["hex", "rgb", "hsl", "hsv", "cmyk"].map((f) => near(C.colorOfText(C.format(18, 52, 86, f)))),
+      [true, true, true, true, true]);
+    const line = new Uint8Array([0,0,0,255, 9,9,9,255, 200,200,200,255, 201,200,200,255, 199,201,200,255, 0,0,0,255]);
+    t.eq("edge span", [C.edgeSpan(line, 3, 2), C.edgeSpan(line, 0, 10), C.edgeSpan(line, 0, 0), C.edgeSpan(line, 9, 0)],
+      [{ from: 2, to: 4 }, { from: 0, to: 1 }, { from: 0, to: 0 }, { from: 9, to: 9 }]);
+    t.eq("measure text", [C.measureText(320, 48), C.measureText(12)], ["320 \u00d7 48", "12"]);
+    t.eq("palette", [C.paletteAdd(["#111111", "#222222"], "#222222", 10), C.paletteAdd(["#111111"], "nope", 10),
+                     C.paletteAdd(["#1", "#2", "#3"].map((x) => x.padEnd(7, "0")), "#ffffff", 2)],
+      [["#222222", "#111111"], ["#111111"], ["#ffffff", "#100000"]]);
+    t.eq("palette file", C.parsePalette("[\"#aabbcc\", 3, \"red\"]"), ["#aabbcc"]);
   }
 };

@@ -143,4 +143,39 @@ Column {
       text: "The times are the weather's; with the weather off, 19:00 to 07:00"
     }
   }
+
+  HermesCard {
+    glyph: H.G.filter
+    glyphInk: Hermes.filterWorn !== "" ? Zenon.cyan : Zenon.accentMuted
+    title: "Color filter"
+    note: Hermes.filterWorn === "" ? "Off"
+      : H.filterLabel(Hermes.filterWorn) + (Hermes.filter === "" ? " while quiet" : "")
+    Item {
+      width: parent.width
+      height: 44
+      Segments {
+        x: 18
+        anchors.verticalCenter: parent.verticalCenter
+        options: H.FILTERS.map((f) => [f.id, f.label])
+        current: Hermes.filter
+        onChose: (v) => Hermes.setFilter(v)
+      }
+    }
+    Item {
+      width: parent.width
+      height: 40
+      Ctl.Check {
+        x: 18
+        anchors.verticalCenter: parent.verticalCenter
+        label: "Grayscale while notifications are quiet"
+        lit: Hermes.filterFocus
+        onToggled: Hermes.setFilterFocus(!Hermes.filterFocus)
+      }
+    }
+    EmptyState {
+      width: parent.width
+      height: 30
+      text: "Red-, green- and blue-weak move the colors those eyes lose into ones they can tell apart"
+    }
+  }
 }

@@ -125,8 +125,11 @@ Singleton {
   // mind". See PicassoCapture.pickFor.
   signal geometryRequested(string kind, string reply)
   function pickGeometry(kind, reply) { if (reply && reply !== "") root.geometryRequested(kind || "region", reply); }
-  function pick() { root.pickInto = ""; root.pickRequested(); }
-  function pickFor(into) { root.pickInto = into || ""; root.pickRequested(); }
+  // `ruler` opens it measuring (the picker's m) — see PicassoPicker's RULER
+  property bool pickRuler: false
+  function pick() { root.pickInto = ""; root.pickRuler = false; root.pickRequested(); }
+  function measure() { root.pickInto = ""; root.pickRuler = true; root.pickRequested(); }
+  function pickFor(into) { root.pickInto = into || ""; root.pickRuler = false; root.pickRequested(); }
   function annotate(path) { if (path && path !== "") root.annotateRequested(path); }
   // "" is the viewer opened on its own: the pictures directory, as a gallery
   function view(paths) { root.viewRequested(paths || ""); }

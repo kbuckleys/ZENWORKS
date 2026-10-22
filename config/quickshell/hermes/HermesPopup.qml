@@ -241,6 +241,12 @@ LayerPopup {
     function toggle(): string { popup.toggle(); return "ok"; }
     function window(section: string): string { Hermes.open(section); return "ok"; }
     function night(): string { Hermes.toggleNight(); return Hermes.nightWanted ? "on" : "off"; }
+    // a color filter by id (gray invert protan deutan tritan); the one worn
+    // again, or "", turns it off
+    function filter(id: string): string {
+      Hermes.setFilter(id === Hermes.filter || !H.filterKnown(id) ? "" : id);
+      return Hermes.filter === "" ? "off" : Hermes.filter;
+    }
     function wifi(): string {
       if (!Hermes.wifiReady) return "no wi-fi";
       Hermes.setWifi(!Hermes.wifiOn);

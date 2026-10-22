@@ -25,11 +25,15 @@ generic   hypr/lua/input.lua
 generic   hypr/lua/keys.lua
 generic   hypr/lua/wake.lua
 generic   hypr/lua/effects.lua
+generic   hypr/lua/windows.lua
+generic   hypr/lua/startup.lua
 generic   xdg-desktop-portal-termfilechooser/config
 
 generated hypr/lua/theme.lua
 generated hypr/lua/font.lua
 generated hypr/hyprtoolkit.conf
+generated hypr/lua/filter.lua
+generated hypr/shaders/filter-*.frag
 generated kitty/theme.conf
 generated kitty/font.conf
 

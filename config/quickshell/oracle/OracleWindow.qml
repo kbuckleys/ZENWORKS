@@ -2175,7 +2175,8 @@ FloatingWindow {
                   height: item ? item.implicitHeight : 0
                   active: settingRow.fold && (settingRow.open || settingRow.height > rowHead.height)
                   source: ({ computer: "ComputerPanel.qml", tools: "ToolsPanel.qml",
-                             color: "ColorFold.qml" })[settingRow.spec.fold] || ""
+                             color: "ColorFold.qml", rules: "WindowRules.qml",
+                             startup: "StartupApps.qml" })[settingRow.spec.fold] || ""
                   onLoaded: {
                     if (settingRow.spec.fold === "color") item.key = settingRow.spec.key;
                     item.face = Qt.binding(() => popup.face);

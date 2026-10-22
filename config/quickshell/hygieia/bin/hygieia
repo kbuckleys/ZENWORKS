@@ -1,0 +1,8 @@
+#!/bin/sh
+# ┌─┐┌─┐┌┐┌┬ ┬┌─┐┬─┐┬┌─┌─┐
+# ┌─┘├┤ │││││││ │├┬┘├┴┐└─┐
+# └─┘└─┘┘└┘└┴┘└─┘┴└─┴ ┴└─┘
+# https://github.com/kbuckleys/
+#
+# hygieia   Tidy's window, from a terminal, a keybind, or hygieia.desktop
+exec qs ipc call Hygieia open >/dev/null

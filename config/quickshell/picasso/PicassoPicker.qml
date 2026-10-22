@@ -12,7 +12,16 @@
 //   ctrl (held)    the target moves at a fifth of the pointer's pace
 //   arrows         move the target one pixel
 //   wheel / tab    change the format: HEX, RGB, HSL, HSV, OKLCH, CMYK
+//   1 … 9, 0       copy one of the palette: the last ten colors copied here
+//   m              the ruler, and back
 //   right / esc    close without copying
+//
+// THE RULER (2026-10-22, Pixel tools): the same frozen frame and loupe,
+// measuring instead. Under the target, a line out along its row and its
+// column to where the picture changes (Cap.edgeSpan, PowerToys' Screen
+// Ruler); drag for a box instead. A click or Return copies what it says,
+// "320 × 48", in the screen's own pixels. Opened straight into it by
+// Picasso.measure (ipc `Picasso measure`, Shortcuts' "Measure on screen").
 //
 // The format is oracle's (Picker format, under Background), so the wheel
 // changes a setting rather than a passing state: the format you copied in
@@ -53,8 +62,37 @@ Scope {
   // arrow in it — see Picasso.cursorCmd.
   onActiveChanged: {
     Picasso.showCursor(!picker.active);
-    if (picker.active) { picker.startAt = Qt.point(-1, -1); cursorProc.running = true; }
-    else Picasso.pickInto = "";
+    if (picker.active) { picker.ruler = Picasso.pickRuler && !picker.forCaller; picker.startAt = Qt.point(-1, -1); cursorProc.running = true; }
+    else { Picasso.pickInto = ""; Picasso.pickRuler = false; }
+  }
+  property bool ruler: false
+
+  // ── THE PALETTE ────────────────────────────────────────────────────────
+  // The last ten colors copied here, newest first (Cap.paletteAdd), kept
+  // across sessions; 1 … 9 and 0 copy one again in the format worn now.
+  property var palette: []
+  FileView {
+    id: paletteFile
+    path: Quickshell.statePath("picker-palette.json")
+    blockLoading: true
+    printErrors: false
+    onLoaded: picker.palette = Cap.parsePalette(paletteFile.text())
+  }
+  function remember(hex) {
+    picker.palette = Cap.paletteAdd(picker.palette, hex, 10);
+    // FileView's own write never fires loaded: the list is already set
+    paletteFile.setText(JSON.stringify(picker.palette) + "\n");
+  }
+  function copyPalette(i) {
+    const h = picker.palette[i];
+    if (!h) return false;
+    const n = parseInt(h.slice(1), 16);
+    picker.copy((n >> 16) & 255, (n >> 8) & 255, n & 255);
+    return true;
+  }
+  function copyMeasure(text) {
+    Quickshell.execDetached(["sh", "-c", "printf '%s' " + picker.sh(text) + " | wl-copy; "
+      + "notify-send -a picasso -u low " + picker.sh("Measurement copied") + " " + picker.sh(text + " px")]);
   }
 
   // a click's color: back to whoever asked (Picasso.pickFor), or copied
@@ -97,6 +135,7 @@ Scope {
   function copy(r, g, b) {
     const text = Cap.format(r, g, b, picker.scheme);
     const hex = Cap.format(r, g, b, "hex");
+    picker.remember(hex);
     const dir = Paths.runtimeDir() + "/picasso";
     const sw = dir + "/swatch-" + hex.slice(1) + ".png";
     Quickshell.execDetached(["sh", "-c",
@@ -168,7 +207,43 @@ Scope {
           Math.min(reader.width - 1, Math.floor(pane.mx * k)),
           Math.min(reader.height - 1, Math.floor(pane.my * k)), 1, 1).data;
         pane.rgb = { r: d[0], g: d[1], b: d[2] };
+        if (picker.ruler) pane.measure();
       }
+
+      // ── the ruler's readings ──────────────────────────────────────────
+      // In the frame's own pixels (the canvas is the capture's size); drawn
+      // in this window's, through k.
+      readonly property real k: reader.width / Math.max(1, pane.width)
+      readonly property int tol: 10
+      property var spanX: null
+      property var spanY: null
+      // a dragged box: where the press was, in the frame's pixels; null none
+      property point boxFrom: Qt.point(-1, -1)
+      property point boxTo: Qt.point(-1, -1)
+      property bool boxing: false
+      // the press a box may start from, and whether this press drew one
+      property point pressPt: Qt.point(-1, -1)
+      property bool drew: false
+      readonly property bool hasBox: pane.boxFrom.x >= 0 && (pane.boxFrom.x !== pane.boxTo.x || pane.boxFrom.y !== pane.boxTo.y)
+      function framePt() {
+        return Qt.point(Math.min(reader.width - 1, Math.floor(pane.mx * pane.k)),
+                        Math.min(reader.height - 1, Math.floor(pane.my * pane.k)));
+      }
+      function measure() {
+        if (pane.mx < 0 || !reader.ready) { pane.spanX = null; pane.spanY = null; return; }
+        const p = pane.framePt();
+        const ctx = reader.getContext("2d");
+        pane.spanX = Cap.edgeSpan(ctx.getImageData(0, p.y, reader.width, 1).data, p.x, pane.tol);
+        pane.spanY = Cap.edgeSpan(ctx.getImageData(p.x, 0, 1, reader.height).data, p.y, pane.tol);
+        if (pane.boxing && (pane.drew || Math.abs(p.x - pane.pressPt.x) + Math.abs(p.y - pane.pressPt.y) > 2)) {
+          if (!pane.drew) { pane.drew = true; pane.boxFrom = pane.pressPt; }
+          pane.boxTo = p;
+        }
+      }
+      readonly property int boxW: Math.abs(pane.boxTo.x - pane.boxFrom.x) + 1
+      readonly property int boxH: Math.abs(pane.boxTo.y - pane.boxFrom.y) + 1
+      readonly property string measured: pane.hasBox ? Cap.measureText(pane.boxW, pane.boxH)
+        : pane.spanX && pane.spanY ? Cap.measureText(pane.spanX.to - pane.spanX.from + 1, pane.spanY.to - pane.spanY.from + 1) : ""
 
       // ── the copy of the screen ─────────────────────────────────────────
       // One frame, taken as this surface appears and while it is still
@@ -241,8 +316,24 @@ Scope {
         }
         onEntered: keys.forceActiveFocus()
         onExited: { pane.mx = -1; pane.px = -1; pane.rgb = null; }
+        // A drag draws a box, which stays when let go; a click (no drag)
+        // copies what the card says — the box if there is one, else the
+        // spans — and a drag again replaces the box.
+        onPressed: (m) => {
+          if (!picker.ruler || m.button !== Qt.LeftButton || pane.mx < 0) return;
+          pane.pressPt = pane.framePt();
+          pane.drew = false;
+          pane.boxing = true;
+        }
+        onReleased: pane.boxing = false
         onClicked: (m) => {
           if (m.button === Qt.RightButton) { picker.active = false; return; }
+          if (picker.ruler) {
+            if (pane.drew) { pane.drew = false; return; }
+            if (pane.measured !== "") picker.copyMeasure(pane.measured);
+            if (!(m.modifiers & Qt.ShiftModifier)) picker.active = false;
+            return;
+          }
           if (!pane.rgb) return;
           picker.take(pane.rgb.r, pane.rgb.g, pane.rgb.b);
           if (picker.forCaller || !(m.modifiers & Qt.ShiftModifier)) picker.active = false;
@@ -258,7 +349,12 @@ Scope {
         anchors.fill: parent
         focus: true
         Keys.onPressed: (e) => {
-          if (e.key === Qt.Key_Escape) { e.accepted = true; picker.active = false; }
+          // a box first, then the picker
+          if (e.key === Qt.Key_Escape) {
+            e.accepted = true;
+            if (picker.ruler && pane.hasBox) pane.boxFrom = Qt.point(-1, -1);
+            else picker.active = false;
+          }
           else if (e.key === Qt.Key_Tab) { e.accepted = true; picker.stepScheme(1); }
           else if (e.key === Qt.Key_Backtab) { e.accepted = true; picker.stepScheme(-1); }
           // a pixel at a time
@@ -266,10 +362,27 @@ Scope {
           else if (e.key === Qt.Key_Right) { e.accepted = true; pane.nudge(1, 0); }
           else if (e.key === Qt.Key_Up)    { e.accepted = true; pane.nudge(0, -1); }
           else if (e.key === Qt.Key_Down)  { e.accepted = true; pane.nudge(0, 1); }
+          else if (e.key === Qt.Key_M && !picker.forCaller) {
+            e.accepted = true;
+            picker.ruler = !picker.ruler;
+            pane.boxFrom = Qt.point(-1, -1);
+            pane.sample();
+          }
+          else if (picker.ruler && (e.key === Qt.Key_Return || e.key === Qt.Key_Enter) && pane.measured !== "") {
+            e.accepted = true;
+            picker.copyMeasure(pane.measured);
+            picker.active = false;
+          }
           else if ((e.key === Qt.Key_Return || e.key === Qt.Key_Enter) && pane.rgb) {
             e.accepted = true;
             picker.take(pane.rgb.r, pane.rgb.g, pane.rgb.b);
             picker.active = false;
+          }
+          // the palette: 1 … 9, then 0 for the tenth
+          else if (!picker.ruler && !picker.forCaller && e.key >= Qt.Key_0 && e.key <= Qt.Key_9) {
+            e.accepted = true;
+            if (picker.copyPalette(e.key === Qt.Key_0 ? 9 : e.key - Qt.Key_1) && !(e.modifiers & Qt.ShiftModifier))
+              picker.active = false;
           }
         }
       }
@@ -282,10 +395,69 @@ Scope {
       // an odd number of pixels across, so one sits exactly in the middle,
       // each drawn a WHOLE number of pixels wide — at 11.2 the grid lines
       // could not land on the pixel edges, and drifted across the loupe
-      // 17 across: two more than it was, room for the card's three bands
-      readonly property int span: 17
+      // 17 across: two more than it was, room for the card's three bands;
+      // 19 since the palette is a fourth (2026-10-22)
+      readonly property int span: 19
       readonly property int zoom: 11
       readonly property int loupeSize: pane.span * pane.zoom
+
+      // ── the ruler's lines ─────────────────────────────────────────────
+      // Under the card and the loupe: a line edge to edge along the row and
+      // the column, with a tick at each end — or the dragged box. The accent
+      // over a dark line a pixel wider either side, to read on any picture.
+      Item {
+        id: rulerMarks
+        z: 0.5
+        anchors.fill: parent
+        visible: picker.ruler && pane.mx >= 0 && reader.ready
+        readonly property color ink: Zenon.cyan
+        readonly property color under: Zenon.shade(0.6)
+        readonly property real cy: Math.floor(pane.my) + 0.5
+        readonly property real cx: Math.floor(pane.mx) + 0.5
+        readonly property real x0: pane.spanX ? pane.spanX.from / pane.k : 0
+        readonly property real x1: pane.spanX ? (pane.spanX.to + 1) / pane.k : 0
+        readonly property real y0: pane.spanY ? pane.spanY.from / pane.k : 0
+        readonly property real y1: pane.spanY ? (pane.spanY.to + 1) / pane.k : 0
+        Repeater {
+          // [x, y, w, h] for each piece: the two lines and four ticks
+          model: pane.hasBox || !pane.spanX || !pane.spanY ? [] : [
+            [rulerMarks.x0, rulerMarks.cy - 0.5, rulerMarks.x1 - rulerMarks.x0, 1],
+            [rulerMarks.cx - 0.5, rulerMarks.y0, 1, rulerMarks.y1 - rulerMarks.y0],
+            [rulerMarks.x0, rulerMarks.cy - 5, 1, 10], [rulerMarks.x1 - 1, rulerMarks.cy - 5, 1, 10],
+            [rulerMarks.cx - 5, rulerMarks.y0, 10, 1], [rulerMarks.cx - 5, rulerMarks.y1 - 1, 10, 1]
+          ]
+          delegate: Rectangle {
+            required property var modelData
+            x: modelData[0]; y: modelData[1]; width: modelData[2]; height: modelData[3]
+            color: rulerMarks.ink
+            border.width: 0
+            Rectangle {
+              z: -1
+              anchors.fill: parent
+              anchors.margins: -1
+              color: rulerMarks.under
+            }
+          }
+        }
+        Rectangle {
+          visible: pane.hasBox
+          x: Math.min(pane.boxFrom.x, pane.boxTo.x) / pane.k
+          y: Math.min(pane.boxFrom.y, pane.boxTo.y) / pane.k
+          width: pane.boxW / pane.k
+          height: pane.boxH / pane.k
+          color: Qt.rgba(rulerMarks.ink.r, rulerMarks.ink.g, rulerMarks.ink.b, 0.12)
+          border.width: 1
+          border.color: rulerMarks.ink
+          Rectangle {
+            z: -1
+            anchors.fill: parent
+            anchors.margins: -1
+            color: "transparent"
+            border.width: 3
+            border.color: rulerMarks.under
+          }
+        }
+      }
 
       ClippingRectangle {
         id: loupe
@@ -385,7 +557,28 @@ Scope {
           // THE COLOR, as a chip you could lay against something — big
           // enough to read as the color rather than as a dot beside a
           // number — and what it is: the value you copy, and where it is.
+          // THE RULER'S READING, in place of the color
+          Column {
+            visible: picker.ruler
+            spacing: 3
+            Text {
+              text: pane.measured === "" ? "—" : pane.measured + " px"
+              color: Zenon.white
+              font.family: Zenon.faceMono
+              font.weight: Font.Bold
+              font.pixelSize: Zenon.px(22)
+            }
+            Text {
+              text: pane.hasBox ? "the box" : "edge to edge"
+              color: Zenon.accentMuted
+              font.family: Zenon.face
+              font.weight: Zenon.weight
+              font.pixelSize: Zenon.px(12)
+            }
+          }
+
           Row {
+            visible: !picker.ruler
             spacing: 12
             Rectangle {
               width: 42; height: 42; radius: Zenon.radiusCard
@@ -417,6 +610,7 @@ Scope {
           // the formats the wheel walks through, this one lit — picasso's
           // own answer buttons, as the focus card and the viewer wear them
           Row {
+            visible: !picker.ruler
             spacing: 4
             Repeater {
               model: Cap.SCHEMES
@@ -437,6 +631,32 @@ Scope {
             }
           }
 
+          // the palette: the last colors copied here, each under its key
+          Row {
+            visible: !picker.ruler && !picker.forCaller && picker.palette.length > 0
+            spacing: 4
+            Repeater {
+              model: picker.palette
+              delegate: Rectangle {
+                required property string modelData
+                required property int index
+                width: 22; height: 22
+                radius: Zenon.rad(4)
+                color: modelData
+                border.width: 1
+                border.color: Zenon.wash(0.14)
+                Text {
+                  anchors.centerIn: parent
+                  text: String((parent.index + 1) % 10)
+                  color: { const n = parseInt(parent.modelData.slice(1), 16); return Cap.inkOn((n >> 16) & 255, (n >> 8) & 255, n & 255); }
+                  font.family: Zenon.faceMono
+                  font.weight: Font.Bold
+                  font.pixelSize: Zenon.px(11)
+                }
+              }
+            }
+          }
+
           Rectangle {
             width: parent.width
             height: 1
@@ -446,20 +666,25 @@ Scope {
           // the gestures, as keys — the cap every hint in the shell is
           // written on — two to a row so the card stays the lens' height
           Grid {
-            columns: 4
+            // three pairs a row, so the card stays the lens' height
+            columns: 6
             columnSpacing: 8
             rowSpacing: 6
             verticalItemAlignment: Grid.AlignVCenter
             Repeater {
-              model: ["click", "copy", "shift click", "copy, keep going",
-                      "ctrl", "slow", "arrows", "one pixel",
-                      "wheel", "format", "esc", "close"]
+              model: picker.ruler
+                ? ["drag", "a box", "click", "copy", "shift click", "copy, keep going",
+                   "ctrl", "slow", "arrows", "one pixel", "m", "colors", "esc", "close"]
+                : ["click", "copy", "shift click", "copy, keep going",
+                   "ctrl", "slow", "arrows", "one pixel",
+                   "wheel", "format", "1 … 0", "palette",
+                   "m", "ruler", "esc", "close"]
               delegate: Item {
                 id: hintCell
                 required property string modelData
                 required property int index
                 readonly property bool isKey: index % 2 === 0
-                implicitWidth: hintCell.isKey ? hintCap.implicitWidth : hintText.implicitWidth + (index % 4 === 1 ? 10 : 0)
+                implicitWidth: hintCell.isKey ? hintCap.implicitWidth : hintText.implicitWidth + (index % 6 !== 5 ? 10 : 0)
                 implicitHeight: 19
                 KeyCap {
                   id: hintCap

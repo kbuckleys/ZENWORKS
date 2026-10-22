@@ -680,6 +680,8 @@ Singleton {
       blurb: "hyprland's keyboard, mouse, touchpad and tablet \u2014 layout, speed, focus" },
     { id: "keys",   label: "Shortcuts",     icon: "\uDB81\uDE33",
       blurb: "hyprland's key binds \u2014 what each chord does, and which chord it is" },
+    { id: "windows", label: "Windows",      icon: "\uF2D2",
+      blurb: "hyprland's window rules \u2014 how each app's windows open \u2014 and what starts at login" },
     { id: "bar",    label: "Bar",           icon: "",
       blurb: "morpheus — the pill and what it carries" },
     { id: "motion", label: "Motion",        icon: "",
@@ -1274,6 +1276,19 @@ Singleton {
       elideLeft: true,
       help: "Only the chords moved off binds.lua's own, read back on every change — editing either by hand works too. Click a chord, then press the new one: Esc keeps it, Backspace turns it off. No two binds may share a chord." },
 
+    // ── windows ──
+    // Two rows that fold open into their lists: WindowRules.qml and
+    // StartupApps.qml (fold "rules", "startup"). The lists live in hypr
+    // files Oracle writes and reads back — see Ora's WINDOW RULES, STARTUP.
+    { key: "infoWindowRules", section: "windows", label: "Window rules", type: "info",
+      fold: "rules",
+      alias: "window rule rules float floating size workspace opacity transparent pin blur maximize fullscreen idle inhibit app class",
+      help: "How an app's windows open: floating and at what size, centered, on which workspace, how opaque, pinned, without blur, kept awake. Click to unfold. Kept in hypr/lua/windows.lua." },
+    { key: "infoStartup", section: "windows", label: "Startup apps", type: "info",
+      fold: "startup",
+      alias: "startup autostart login boot launch start exec apps programs",
+      help: "What starts when you log in, besides the shell's own. Click to unfold. Kept in hypr/lua/startup.lua; a change counts from the next login." },
+
     // ── the checkup ──
     // Readouts like the About rows, filled by oracle/doctor.sh — see
     // runCheckup. `health` names the row of Ora.readCheckup each one shows.
@@ -1517,6 +1532,11 @@ Singleton {
       if (root.computerReading && !root.computer) return "reading\u2026";
       if (!root.computer) return "";
       return root.computer.ok ? root.computer.summary : root.computer.why;
+    }
+    if (key === "infoWindowRules") return Ora.windowRulesSummary(root.windowRules);
+    if (key === "infoStartup") {
+      const n = root.startupApps.length, on = root.startupApps.filter((a) => a.on).length;
+      return n === 0 ? "the shell's own" : on + " of " + n + (n === 1 ? " app" : " apps") + " on";
     }
     if (key === "infoStatePath") return root.statePath;
     if (key === "infoMonitorsPath") return root.monitorsPath;
@@ -2107,6 +2127,25 @@ Singleton {
     effectsFile.setText(Ora.renderEffectsLua({ shadows: root.hyprShadows, animations: root.hyprAnimations }));
     reloadHypr.restart();
   }
+  // hypr/lua/windows.lua: your window rules, in order — see Ora's WINDOW RULES
+  property var windowRules: []
+  readonly property string windowsPath: root.hyprLuaDir + "/windows.lua"
+  // every change is the whole list; the panel edits a copy and hands it back
+  function setWindowRules(list) {
+    root.windowRules = (list || []).map(Ora.normWindowRule);
+    root.revision++;
+    windowsFile.setText(Ora.renderWindowsLua(root.windowRules));
+    reloadHypr.restart();
+  }
+  // hypr/lua/startup.lua: your startup apps — see Ora's STARTUP. Read at
+  // login only, so no reload: a change counts from the next one.
+  property var startupApps: []
+  readonly property string startupPath: root.hyprLuaDir + "/startup.lua"
+  function setStartupApps(list) {
+    root.startupApps = (list || []).map(Ora.normStartup);
+    root.revision++;
+    startupFile.setText(Ora.renderStartupLua(root.startupApps));
+  }
   // what binds.lua declares: [{ id, chord, label, group }]
   property var bindList: []
   // "bind:<id>" -> the chord in force ("" off)
@@ -2294,6 +2333,39 @@ Singleton {
       reloadHypr.restart();
     }
     onLoadFailed: { root.hyprShadows = true; root.hyprAnimations = true; }
+  }
+
+  // FileView's own write never fires loaded: the setters set the list themselves
+  FileView {
+    id: windowsFile
+    path: root.windowsPath
+    blockLoading: true
+    printErrors: false
+    watchChanges: true
+    onFileChanged: reload()
+    onLoaded: {
+      const rules = Ora.parseWindowsLua(windowsFile.text());
+      if (JSON.stringify(rules) === JSON.stringify(root.windowRules)) return;
+      root.windowRules = rules;
+      root.revision++;
+      reloadHypr.restart();
+    }
+    onLoadFailed: root.windowRules = []
+  }
+  FileView {
+    id: startupFile
+    path: root.startupPath
+    blockLoading: true
+    printErrors: false
+    watchChanges: true
+    onFileChanged: reload()
+    onLoaded: {
+      const apps = Ora.parseStartupLua(startupFile.text());
+      if (JSON.stringify(apps) === JSON.stringify(root.startupApps)) return;
+      root.startupApps = apps;
+      root.revision++;
+    }
+    onLoadFailed: root.startupApps = []
   }
 
   FileView {

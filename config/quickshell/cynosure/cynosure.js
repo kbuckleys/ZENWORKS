@@ -62,6 +62,8 @@ const SHELL_ACTIONS = [
   { name: "Files", glyph: "\uF114", keys: "terminus file manager directories folders", ipc: "Terminus toggle" },
   { name: "Find files", glyph: "\uF002", keys: "artemis search finder locate", ipc: "Artemis toggle" },
   { name: "Background", glyph: "\uF03E", keys: "picasso background wallpaper", ipc: "Picasso toggle" },
+  { name: "Pick a color", glyph: "\u{F020A}", keys: "picasso color colour picker eyedropper hex palette", sh: "sleep 0.35 && qs ipc call Picasso pick" },
+  { name: "Measure on screen", glyph: "\u{F046D}", keys: "picasso ruler measure pixels distance size", sh: "sleep 0.35 && qs ipc call Picasso measure" },
   { name: "New note", glyph: "\uF24A", keys: "clio sticky desktop", ipc: "Clio add" },
   { name: "New journal entry", glyph: "\u{F0B64}", keys: "clio journal diary write reflect mood", ipc: "Clio journal" },
   { name: "Today's journal entry", glyph: "\u{F00F6}", keys: "clio journal today daily diary", ipc: "Clio today" },
@@ -95,6 +97,7 @@ const SHELL_ACTIONS = [
 
   // ── the 10-20 apps ──
   // control hub (hermes): the window, and its switches where there is one
+  { name: "Grayscale screen", glyph: "\u{F0301}", keys: "hermes color filter grayscale greyscale monochrome focus", ipc: "Hermes filter gray" },
   { name: "Control Hub", glyph: "\u{F1542}", keys: "hermes network wifi wi-fi ethernet bluetooth vpn display brightness settings", ipc: "Hermes window ''" },
   { name: "Printers & scanners", glyph: "\u{F042A}", keys: "hermes printer printing print scanner scan cups", ipc: "Hermes window printers" },
   { name: "Night light", glyph: "\u{F0594}", keys: "hermes hyprsunset warm blue light evening", ipc: "Hermes night",

@@ -365,3 +365,87 @@ function inkOn(r, g, b) {
   const lum = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
   return lum > 0.55 ? "#000000" : "#ffffff";
 }
+
+// ── A COLOR, READ BACK ─────────────────────────────────────────────────────
+// What a copied piece of text is as a color — any of the picker's formats
+// but OKLCH, and #rgb / #rrggbbaa — as "#rrggbb", or "" when it is not one.
+// Folio wears it as a swatch beside the clip, so every color copied, from
+// the picker or anywhere, is a palette to pick from again (2026-10-22).
+function colorOfText(text) {
+  const s = String(text == null ? "" : text).trim().toLowerCase();
+  if (s.length > 48) return "";
+  const hx = (r, g, b) => "#" + hex2(clamp8(r)) + hex2(clamp8(g)) + hex2(clamp8(b));
+  let m = /^#?([0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/.exec(s);
+  // a bare 3- or 6-letter word like "add" or "facade" is not a color: only
+  // with the # unless it has a digit in it
+  if (m && (s[0] === "#" || /\d/.test(m[1]))) {
+    let h = m[1];
+    if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
+    return "#" + h.slice(0, 6);
+  }
+  const nums = (body) => body.split(/[\s,\/]+/).filter((x) => x !== "").map((x) => ({ n: parseFloat(x), pct: /%$/.test(x) }));
+  m = /^rgba?\(([^)]*)\)$/.exec(s);
+  if (m) {
+    const v = nums(m[1]);
+    if (v.length < 3 || v.slice(0, 3).some((x) => isNaN(x.n))) return "";
+    const ch = (x) => x.pct ? x.n * 2.55 : x.n;
+    return hx(ch(v[0]), ch(v[1]), ch(v[2]));
+  }
+  m = /^(hsla?|hsv)\(([^)]*)\)$/.exec(s);
+  if (m) {
+    const v = nums(m[2]);
+    if (v.length < 3 || v.slice(0, 3).some((x) => isNaN(x.n))) return "";
+    const h = ((v[0].n % 360) + 360) % 360, a = v[1].n / 100, b = v[2].n / 100;
+    let c, x0, base;
+    if (m[1] === "hsv") { c = b * a; base = b - c; }
+    else { c = (1 - Math.abs(2 * b - 1)) * a; base = b - c / 2; }
+    x0 = c * (1 - Math.abs((h / 60) % 2 - 1));
+    const seg = [[c, x0, 0], [x0, c, 0], [0, c, x0], [0, x0, c], [x0, 0, c], [c, 0, x0]][Math.floor(h / 60) % 6];
+    return hx((seg[0] + base) * 255, (seg[1] + base) * 255, (seg[2] + base) * 255);
+  }
+  m = /^cmyk\(([^)]*)\)$/.exec(s);
+  if (m) {
+    const v = nums(m[1]);
+    if (v.length < 4 || v.some((x) => isNaN(x.n))) return "";
+    const k = 1 - v[3].n / 100;
+    return hx(255 * (1 - v[0].n / 100) * k, 255 * (1 - v[1].n / 100) * k, 255 * (1 - v[2].n / 100) * k);
+  }
+  return "";
+}
+function clamp8(v) { return Math.max(0, Math.min(255, Math.round(v))); }
+
+// ── THE RULER ──────────────────────────────────────────────────────────────
+// The picker's ruler (m, 2026-10-22): from the pixel under the target, out
+// along its row and its column to where the picture changes — PowerToys'
+// Screen Ruler. `line` is RGBA bytes, `at` the pixel's index in it; the
+// span is the run of pixels within `tol` (0-255, per channel) of that one:
+// { from, to } inclusive, so its length is to - from + 1.
+function edgeSpan(line, at, tol) {
+  const n = Math.floor(line.length / 4);
+  if (at < 0 || at >= n) return { from: at, to: at };
+  const r = line[at * 4], g = line[at * 4 + 1], b = line[at * 4 + 2];
+  const same = (i) => Math.abs(line[i * 4] - r) <= tol && Math.abs(line[i * 4 + 1] - g) <= tol
+    && Math.abs(line[i * 4 + 2] - b) <= tol;
+  let from = at, to = at;
+  while (from > 0 && same(from - 1)) from--;
+  while (to < n - 1 && same(to + 1)) to++;
+  return { from: from, to: to };
+}
+// a measurement, as copied: "320 × 48" (a box) or "320" (one span)
+function measureText(w, h) {
+  return h === undefined || h === null ? String(w) : w + " × " + h;
+}
+
+// ── THE PALETTE ────────────────────────────────────────────────────────────
+// The picker's last colors, newest first, as hex: the one copied moves to the
+// front, and the list keeps `max`.
+function paletteAdd(list, hex, max) {
+  const h = String(hex || "").toLowerCase();
+  if (!/^#[0-9a-f]{6}$/.test(h)) return (list || []).slice(0, max);
+  return [h].concat((list || []).filter((x) => x !== h)).slice(0, max);
+}
+function parsePalette(text) {
+  let j = null;
+  try { j = JSON.parse(text); } catch (e) {}
+  return Array.isArray(j) ? j.filter((x) => typeof x === "string" && /^#[0-9a-f]{6}$/.test(x)).slice(0, 10) : [];
+}

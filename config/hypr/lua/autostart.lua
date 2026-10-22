@@ -26,4 +26,22 @@ hl.on("hyprland.start", function()
         .. "systemctl --user start hyprpolkitagent'")
     hl.exec_cmd("wl-paste --type text --watch cliphist store")
     hl.exec_cmd("wl-paste --type image --watch cliphist store")
+
+    -- YOURS: startup.lua, which oracle's Windows section writes (Startup
+    -- apps). The ones that are on, each `delay` seconds after this. Guarded
+    -- like defaults.lua: a broken file costs only your own.
+    local ok, apps = pcall(require, "lua.startup")
+    if not ok or type(apps) ~= "table" then return end
+    for _, a in ipairs(apps) do
+        pcall(function()
+            if type(a) ~= "table" or a.on == false or type(a.command) ~= "string" or a.command == "" then return end
+            local d = tonumber(a.delay) or 0
+            if d > 0 then
+                local q = "'" .. a.command:gsub("'", "'\\''") .. "'"
+                hl.exec_cmd("sh -c 'sleep " .. math.floor(d) .. "; exec sh -c \"$0\"' " .. q)
+            else
+                hl.exec_cmd(a.command)
+            end
+        end)
+    end
 end)

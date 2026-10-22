@@ -15,6 +15,7 @@ import "../terminus"
 import "../oracle"
 import "../clio"
 import "folio.js" as Folio
+import "../picasso/capture.js" as Cap
 
 LayerPopup {
   id: popup
@@ -900,10 +901,28 @@ function onThumbsDone() {
               }
 
 
+              // A clip that is a color wears it (2026-10-22): every color
+              // copied, the picker's included, is a palette to take again
+              readonly property string swatch: textRow.modelData.snip ? ""
+                : Cap.colorOfText(textRow.modelData.content)
+              Rectangle {
+                id: swatchChip
+                visible: textRow.swatch !== ""
+                anchors.left: parent.left
+                anchors.leftMargin: 16
+                anchors.verticalCenter: parent.verticalCenter
+                width: 26
+                height: 26
+                radius: Zenon.radiusControl
+                color: textRow.swatch !== "" ? textRow.swatch : "transparent"
+                border.width: 1
+                border.color: Zenon.wash(0.14)
+              }
+
               Column {
                 anchors.left: parent.left
                 anchors.right: parent.right
-                anchors.leftMargin: 16
+                anchors.leftMargin: swatchChip.visible ? 16 + swatchChip.width + 12 : 16
                 anchors.rightMargin: 16
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: 2

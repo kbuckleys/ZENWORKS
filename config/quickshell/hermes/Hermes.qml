@@ -510,6 +510,49 @@ Singleton {
     onTriggered: Quickshell.execDetached(["hyprctl", "hyprsunset", "temperature", String(root.kelvin)])
   }
 
+  // ── COLOR FILTER ───────────────────────────────────────────────────────
+  // See H's COLOR FILTERS. `filter` is the one chosen, `filterFocus` asks for
+  // grayscale while the bell is quiet (focusQuiet, Howler.quiet, handed in by
+  // shell.qml); `filterWorn` is what the screen wears. Each change writes the
+  // shader made from zoom.frag, then filter.lua, then tells zoom.lua.
+  property string filter: ""
+  property bool filterFocus: false
+  property bool focusQuiet: false
+  readonly property string filterWorn: H.filterWorn(root.filter, root.filterFocus, root.focusQuiet)
+  readonly property string hyprDir: (Quickshell.env("XDG_CONFIG_HOME") || (Quickshell.env("HOME") + "/.config")) + "/hypr"
+  function setFilter(id) { root.filter = id; root.save(); }
+  function setFilterFocus(on) { root.filterFocus = on; root.save(); }
+  property string _filterApplied: "?"
+  onFilterWornChanged: filterApply.restart()
+  // a beat, so a quiet that flickers with a timer is one change
+  Timer {
+    id: filterApply
+    interval: 250
+    onTriggered: root.applyFilter()
+  }
+  FileView {
+    id: zoomFrag
+    path: root.hyprDir + "/shaders/zoom.frag"
+    blockLoading: true
+    printErrors: false
+  }
+  AtomicWriter { id: filterWriter; tag: "hermes-filter" }
+  function applyFilter() {
+    const id = root.filterWorn;
+    if (id === root._filterApplied || root.sim) return;
+    root._filterApplied = id;
+    const lua = root.hyprDir + "/lua/filter.lua";
+    const tell = (path) => filterWriter.write(lua, H.filterLua(path), () =>
+      Quickshell.execDetached(["hyprctl", "-q", "eval", H.filterEval(path)]));
+    if (id === "") { tell(""); return; }
+    zoomFrag.reload();
+    const src = H.filterShader(zoomFrag.text(), id);
+    // zoom.frag missing or reshaped: no filter rather than a broken screen
+    if (src === "") { console.warn("hermes: zoom.frag has no shape to filter; color filter not applied"); tell(""); return; }
+    const path = H.filterShaderPath(root.hyprDir, id);
+    filterWriter.write(path, src, (ok) => { if (ok) tell(path); });
+  }
+
   // ── SETTINGS ───────────────────────────────────────────────────────────
   property string section: "network"
   function setSection(s) { root.section = s; root.save(); }
@@ -525,7 +568,8 @@ Singleton {
     id: saveTimer
     interval: 400
     onTriggered: {
-      const text = H.serializeSettings({ nightOn: root.nightOn, nightSun: root.nightSun, kelvin: root.kelvin, section: root.section });
+      const text = H.serializeSettings({ nightOn: root.nightOn, nightSun: root.nightSun, kelvin: root.kelvin, section: root.section,
+                                         filter: root.filter, filterFocus: root.filterFocus });
       if (text === root._saved) return;
       root._saved = text;
       settingsFile.setText(text);
@@ -610,10 +654,14 @@ Singleton {
     root.nightSun = s.nightSun;
     root.kelvin = s.kelvin;
     root.section = s.section;
+    root.filter = s.filter;
+    root.filterFocus = s.filterFocus;
     // seeded from what was read, so the first change is the first write
     // (FileView never re-reads its own setText — see fileview-own-write)
     root._saved = H.serializeSettings(s);
     if (root.sim) root.probe = root.sim.probe;
     root.reprobe();
+    // filter.lua may still name what the last session wore
+    filterApply.restart();
   }
 }

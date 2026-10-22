@@ -138,6 +138,7 @@ bind("recStop",     "",                       "Stop recording",                 
 bind("recEdit",     "",                       "Argus, cut the last recording",       hl.dsp.exec_cmd("qs ipc call Argus last"))
 bind("slideNext",   "",                       "Background slideshow, the next one",  hl.dsp.exec_cmd("qs ipc call Picasso next"))
 bind("picker",      "SUPER + CONTROL + P",    "Pick a color",                        hl.dsp.exec_cmd("qs ipc call Picasso pick"))
+bind("ruler",       "",                       "Measure on screen",                   hl.dsp.exec_cmd("qs ipc call Picasso measure"))
 
 -- WORKSPACES
 bind("special",    "SUPER + GRAVE",          "Show or hide the special workspace",                hl.dsp.workspace.toggle_special("special"))

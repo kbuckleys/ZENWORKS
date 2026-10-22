@@ -189,5 +189,18 @@ module.exports = {
     t.eq("section kept", s.section, "vpn");
     t.eq("an unknown section is the default", H.parseSettings('{"section":"x"}').section, "network");
     t.eq("round trip", H.parseSettings(H.serializeSettings(s)), s);
+
+    // ── color filters ────────────────────────────────────────────────────
+    const zoom = "precision highp float;\nvoid main() {\n  if (x) { gl_FragColor = texture2D(tex, a); return; }\n  gl_FragColor = texture2D(tex, b);\n}\n";
+    const gray = H.filterShader(zoom, "gray");
+    t.eq("filter wraps every write", (gray.match(/zenFilter\(texture2D/g) || []).length, 2);
+    t.eq("filter function before main", gray.indexOf("vec4 zenFilter") < gray.indexOf("void main"), true);
+    t.eq("filter on an odd shader is nothing", H.filterShader("void foo() {}", "gray"), "");
+    t.eq("filter worn", [H.filterWorn("invert", true, true), H.filterWorn("", true, true), H.filterWorn("", true, false), H.filterWorn("bogus", false, true)],
+      ["invert", "gray", "", ""]);
+    t.eq("filter settings round trip", H.parseSettings(H.serializeSettings({ filter: "deutan", filterFocus: true })).filter, "deutan");
+    t.eq("filter unknown dropped", H.parseSettings(JSON.stringify({ filter: "x" })).filter, "");
+    t.eq("filter eval", H.filterEval("/a/b\"c.frag"), "if zen_filter then zen_filter(\"/a/b\\\"c.frag\") end");
+    t.eq("filter lua", H.filterLua(""), "-- Written by hermes (Control Hub \u203a Display \u203a Color filter); zoom.lua reads it.\nreturn { shader = \"\" }\n");
   }
 };

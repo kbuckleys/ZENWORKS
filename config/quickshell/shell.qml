@@ -40,6 +40,7 @@ import "argus"
 import "minerva"
 import "hestia"
 import "kairos"
+import "hygieia"
 
 ShellRoot {
   id: root
@@ -169,6 +170,8 @@ ShellRoot {
   // bar's connection icon opens; the window is built on first use (Hermes)
   HermesPopup { id: hermes; statusbar: bar; screen: root.focusedScreen; morphMode: root.morphedFor("hermes") && root.morphOnPill; morphFade: root.layerFade }
   Binding { target: Hermes; property: "fileManager"; value: terminus }
+  // the color filter's "Grayscale while quiet" reads the bell's focus
+  Binding { target: Hermes; property: "focusQuiet"; value: Howler.quiet }
   // a recording, cut and kept as MP4, GIF or WebM — argus' editor (the
   // recording itself is argus/argus.lua, in hyprland); built on first use,
   // and reached from howler's recording card (its scissors) or Argus last
@@ -179,6 +182,8 @@ ShellRoot {
   // services, timers and the journal — hestia; asks systemd only while
   // its window is open (its pages frost up under its head: ScrollEdge)
   HestiaManager { id: hestia }
+  // tidy: what takes room that could be given back (window built on first use)
+  HygieiaManager { id: hygieia }
   // screen time — kairos; counts the focused app, never while locked
   KairosManager { id: kairos; lockscreen: cerberus }
   // A disk plugged in, asked about by the pill — terminus' new-disk card,

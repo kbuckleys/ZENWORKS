@@ -28,6 +28,7 @@ var G = {
   vpnOn: "\u{F099D}",          // md-shield_lock
   sun: "\u{F00DF}",            // md-brightness_6
   night: "\u{F0594}",          // md-weather_night
+  filter: "\u{F0301}",         // md-invert_colors
   monitor: "\u{F0379}",
   lock: "\u{F033E}",
   check: "\u{F012C}",
@@ -465,7 +466,8 @@ function escapeHtml(s) {
 
 // ── PERSISTED SETTINGS ───────────────────────────────────────────────────
 function defaults() {
-  return { nightOn: false, nightSun: false, kelvin: KELVIN_DEFAULT, section: "network" };
+  return { nightOn: false, nightSun: false, kelvin: KELVIN_DEFAULT, section: "network",
+           filter: "", filterFocus: false };
 }
 function parseSettings(text) {
   var d = defaults();
@@ -476,6 +478,8 @@ function parseSettings(text) {
   if (typeof j.nightSun === "boolean") d.nightSun = j.nightSun;
   if (j.kelvin !== undefined) d.kelvin = clampKelvin(j.kelvin);
   if (SECTIONS.some(function (s) { return s.id === j.section; })) d.section = j.section;
+  if (filterKnown(j.filter)) d.filter = j.filter;
+  if (typeof j.filterFocus === "boolean") d.filterFocus = j.filterFocus;
   return d;
 }
 function serializeSettings(s) {
@@ -484,6 +488,91 @@ function serializeSettings(s) {
     nightOn: s && typeof s.nightOn === "boolean" ? s.nightOn : d.nightOn,
     nightSun: s && typeof s.nightSun === "boolean" ? s.nightSun : d.nightSun,
     kelvin: clampKelvin(s ? s.kelvin : d.kelvin),
-    section: s && s.section ? s.section : d.section
+    section: s && s.section ? s.section : d.section,
+    filter: s && filterKnown(s.filter) ? s.filter : d.filter,
+    filterFocus: s && typeof s.filterFocus === "boolean" ? s.filterFocus : d.filterFocus
   }, null, 2) + "\n";
+}
+
+// ── COLOR FILTERS ──────────────────────────────────────────────────────────
+// Display's "Color filter" (2026-10-22): the whole screen in grayscale,
+// inverted, or corrected for a color-vision deficiency, as hyprland's screen
+// shader. Hyprland has ONE screen shader and the zoom (hypr/lua/zoom.lua)
+// already wears it while zoomed, so a filter is the zoom's own shader with
+// the filter applied to what it samples: zoom.frag read, each
+// `gl_FragColor = X;` made `gl_FragColor = zenFilter(X);`. The zoom shader
+// passes an unzoomed screen through untouched, so the one file serves
+// zoomed and not. It is written to hypr/shaders/filter-<id>.frag, its path
+// to hypr/lua/filter.lua (read by zoom.lua at every start and reload), and
+// handed to the running zoom.lua through `hyprctl eval` (zen_filter).
+//
+// The corrections are daltonization (Fidaner, Lin and Ozguven): simulate
+// what the deficiency sees in LMS space, and move what is lost into the
+// channels that are still told apart.
+var FILTERS = [
+  { id: "", label: "None" },
+  { id: "gray", label: "Grayscale" },
+  { id: "invert", label: "Inverted" },
+  { id: "protan", label: "Red-weak" },
+  { id: "deutan", label: "Green-weak" },
+  { id: "tritan", label: "Blue-weak" }
+];
+function filterKnown(id) {
+  return typeof id === "string" && FILTERS.some(function (f) { return f.id === id; });
+}
+function filterLabel(id) {
+  for (var i = 0; i < FILTERS.length; ++i) if (FILTERS[i].id === id) return FILTERS[i].label;
+  return "None";
+}
+// what is worn: the one chosen, or grayscale while notifications are quiet
+// (Howler's focus) when that is asked for
+function filterWorn(chosen, onFocus, quiet) {
+  if (filterKnown(chosen) && chosen !== "") return chosen;
+  return onFocus && quiet ? "gray" : "";
+}
+var DALTON_SIM = {
+  protan: "l = 2.02344 * m - 2.52581 * s;",
+  deutan: "m = 0.494207 * l + 1.24827 * s;",
+  tritan: "s = -0.395913 * l + 0.801109 * m;"
+};
+function filterBody(id) {
+  if (id === "gray") return "  float y = dot(c.rgb, vec3(0.2126, 0.7152, 0.0722));\n  return vec4(vec3(y), c.a);";
+  if (id === "invert") return "  return vec4(vec3(1.0) - c.rgb, c.a);";
+  var sim = DALTON_SIM[id];
+  if (!sim) return "  return c;";
+  return [
+    "  float l = dot(c.rgb, vec3(17.8824, 43.5161, 4.11935));",
+    "  float m = dot(c.rgb, vec3(3.45565, 27.1554, 3.86714));",
+    "  float s = dot(c.rgb, vec3(0.0299566, 0.184309, 1.46709));",
+    "  " + sim,
+    "  vec3 seen = vec3(",
+    "    dot(vec3(l, m, s), vec3(0.0809444479, -0.130504409, 0.116721066)),",
+    "    dot(vec3(l, m, s), vec3(-0.0102485335, 0.0540193266, -0.113614708)),",
+    "    dot(vec3(l, m, s), vec3(-0.000365296938, -0.00412161469, 0.693511405)));",
+    "  vec3 lost = c.rgb - seen;",
+    "  vec3 moved = vec3(0.0, 0.7 * lost.r + lost.g, 0.7 * lost.r + lost.b);",
+    "  return vec4(clamp(c.rgb + moved, 0.0, 1.0), c.a);"
+  ].join("\n");
+}
+// zoom.frag's text with `id`'s filter on every color it writes; "" when the
+// shader does not have the shape this expects (no main, no gl_FragColor)
+function filterShader(zoomSrc, id) {
+  var src = String(zoomSrc || "");
+  var at = src.indexOf("void main");
+  if (at < 0 || src.indexOf("gl_FragColor") < 0) return "";
+  var fn = "// " + filterLabel(id) + ", written by hermes (Control Hub › Display › Color filter)\n"
+    + "vec4 zenFilter(vec4 c) {\n" + filterBody(id) + "\n}\n\n";
+  var body = src.slice(at).replace(/gl_FragColor\s*=\s*([^;]+);/g, "gl_FragColor = zenFilter($1);");
+  return src.slice(0, at) + fn + body;
+}
+function filterShaderPath(hyprDir, id) { return hyprDir + "/shaders/filter-" + id + ".frag"; }
+// hypr/lua/filter.lua: the shader worn, or "" for none
+function filterLua(path) {
+  return "-- Written by hermes (Control Hub \u203a Display \u203a Color filter); zoom.lua reads it.\n"
+    + "return { shader = " + luaStr(path || "") + " }\n";
+}
+function luaStr(s) { return "\"" + String(s).replace(/\\/g, "\\\\").replace(/"/g, "\\\"") + "\""; }
+// the eval that hands it to the running zoom.lua
+function filterEval(path) {
+  return "if zen_filter then zen_filter(" + luaStr(path || "") + ") end";
 }

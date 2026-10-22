@@ -653,7 +653,9 @@ const APPS = {
   // U+F0E2E, the hearth: services and logs (its desktop id is hestia)
   "hestia": "\uDB83\uDE2E",
   // U+F0996, md-progress_clock: screen time (its desktop id is kairos)
-  "kairos": "\uDB82\uDD96"
+  "kairos": "\uDB82\uDD96",
+  // U+F00E2, md-broom: Tidy, giving room back (its desktop id is hygieia)
+  "hygieia": "\uDB80\uDCE2"
 };
 
 // The glyph for a launcher entry, or "" when nothing claims it. `names` is

@@ -290,6 +290,7 @@ LayerPopup {
       return mode;
     }
     function pick(): string { Picasso.pick(); return "picking"; }
+    function measure(): string { Picasso.measure(); return "measuring"; }
     // for argus' recordings: the region overlay, the rectangle written to
     // `reply` ("X,Y WxH", empty when aborted) rather than captured. The
     // call itself answers at once; the file is the answer. `pickRegion` draws

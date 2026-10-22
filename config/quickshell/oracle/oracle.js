@@ -2135,6 +2135,188 @@ function renderEffectsLua(fx) {
   ].join("\n");
 }
 
+// ── RECORDS ──
+// windows.lua and startup.lua are each a list of flat tables — strings,
+// numbers, true/false, nothing nested — so they read like the config they
+// feed and a hand edit shows here too. A table that will not read is left
+// out rather than guessed at.
+function parseLuaRecords(text) {
+  const src = stripLuaComments(String(text || ""));
+  const at = src.search(/\breturn\s*\{/);
+  if (at < 0) return [];
+  const body = src.slice(src.indexOf("{", at) + 1);
+  const out = [];
+  const tre = /\{([^{}]*)\}/g;
+  let t;
+  while ((t = tre.exec(body)) !== null) {
+    const rec = {};
+    const fre = /([A-Za-z_]\w*)\s*=\s*("(?:[^"\\]|\\.)*"|-?\d+(?:\.\d+)?|true|false)/g;
+    let f;
+    while ((f = fre.exec(t[1])) !== null) {
+      const v = f[2];
+      rec[f[1]] = v === "true" ? true : v === "false" ? false
+        : v[0] === "\"" ? v.slice(1, -1).replace(/\\(.)/g, "$1") : Number(v);
+    }
+    out.push(rec);
+  }
+  return out;
+}
+function luaRecord(rec, order) {
+  const parts = [];
+  for (const k of order) {
+    const v = rec[k];
+    if (v === undefined || v === null) continue;
+    parts.push(k + " = " + (typeof v === "string" ? luaString(v) : typeof v === "boolean" ? String(v) : String(Number(v) || 0)));
+  }
+  return "\t{ " + parts.join(", ") + " },";
+}
+function luaRecordsFile(head, records, order) {
+  return head.concat(["", "return {"], records.map((r) => luaRecord(r, order)), ["}", ""]).join("\n");
+}
+const ZEN_HEAD = [
+  "-- ┌─┐┌─┐┌┐┌┬ ┬┌─┐┬─┐┬┌─┌─┐",
+  "-- ┌─┘├┤ │││││││ │├┬┘├┴┐└─┐",
+  "-- └─┘└─┘┘└┘└┴┘└─┘┴└─┴ ┴└─┘",
+  "-- https://github.com/kbuckleys/",
+  "",
+];
+
+// ── WINDOW RULES ──
+// Windows' "Window rules" (2026-10-22): how an app's windows open — float,
+// size, centered, workspace, opacity, pinned, no blur, keep awake, open
+// maximized or full screen, without focus. hypr/lua/windows.lua, one table a
+// rule; rules.lua turns each into an hl.window_rule after the suite's own,
+// so yours win. `class` is the app's window class as it is (rules.lua
+// escapes it: hyprland matches the WHOLE class as a regex), `title` a piece
+// of the title, or "" for every window of the app.
+const RULE_ORDER = ["name", "class", "title", "on", "float", "size", "center", "workspace", "silent",
+                    "opacity", "pin", "no_blur", "idle_inhibit", "open", "no_initial_focus"];
+function blankWindowRule(cls, name) {
+  return { name: String(name || cls || ""), class: String(cls || ""), title: "", on: true,
+           float: false, size: "", center: false, workspace: "", silent: false, opacity: 100,
+           pin: false, no_blur: false, idle_inhibit: "", open: "", no_initial_focus: false };
+}
+// a rule as read, with every field there and in range
+function normWindowRule(r) {
+  const b = blankWindowRule();
+  const o = {};
+  for (const k of RULE_ORDER) o[k] = (r && r[k] !== undefined && typeof r[k] === typeof b[k]) ? r[k] : b[k];
+  o.opacity = Math.max(10, Math.min(100, Math.round(o.opacity)));
+  if (!/^\d+ \d+$/.test(o.size)) o.size = "";
+  if (["", "focus", "fullscreen", "always"].indexOf(o.idle_inhibit) < 0) o.idle_inhibit = "";
+  if (["", "maximize", "fullscreen"].indexOf(o.open) < 0) o.open = "";
+  if (!/^(\d+|special(:\w+)?|name:\S+)?$/.test(o.workspace)) o.workspace = "";
+  return o;
+}
+function parseWindowsLua(text) {
+  return parseLuaRecords(text).filter((r) => typeof r.class === "string" && r.class !== "").map(normWindowRule);
+}
+function renderWindowsLua(rules) {
+  return luaRecordsFile(ZEN_HEAD.concat([
+    "-- WINDOWS",
+    "-- Written by oracle's Windows section (Window rules), and read back by it.",
+    "-- A rule a line; rules.lua hands each to hl.window_rule after its own.",
+    "-- class    the app's window class, as it is",
+    "-- title    a piece of the window's title, or \"\" for all its windows",
+    "-- size     \"width height\" (floating only), opacity 10-100",
+    "-- workspace  \"3\", \"special\" or \"\"; silent keeps you where you are",
+    "-- idle_inhibit  \"focus\", \"fullscreen\", \"always\" or \"\"",
+    "-- open     \"maximize\", \"fullscreen\" or \"\"",
+  ]), (rules || []).map(normWindowRule), RULE_ORDER);
+}
+// what the rule does, for its row: "Floats · 1200×800 · centered"
+function windowRuleWords(r) {
+  const w = [];
+  if (r.float) w.push("floats" + (r.size ? " " + r.size.replace(" ", "×") : "") + (r.center ? ", centered" : ""));
+  else if (r.center) w.push("centered");
+  if (r.open) w.push(r.open === "maximize" ? "maximized" : "full screen");
+  if (r.workspace) w.push((r.workspace === "special" ? "special workspace" : "workspace " + r.workspace.replace(/^name:/, "")) + (r.silent ? ", quietly" : ""));
+  if (r.opacity < 100) w.push(r.opacity + "% opaque");
+  if (r.pin) w.push("pinned");
+  if (r.no_blur) w.push("no blur");
+  if (r.idle_inhibit) w.push("keeps awake" + (r.idle_inhibit === "always" ? "" : r.idle_inhibit === "focus" ? " while focused" : " in full screen"));
+  if (r.no_initial_focus) w.push("opens unfocused");
+  if (!w.length) return "does nothing yet";
+  const s = w.join(" · ");
+  return s[0].toUpperCase() + s.slice(1);
+}
+function windowRulesSummary(rules) {
+  const n = (rules || []).length;
+  const off = (rules || []).filter((r) => !r.on).length;
+  return n === 0 ? "none" : n + (n === 1 ? " rule" : " rules") + (off ? " · " + off + " off" : "");
+}
+
+// ── STARTUP ──
+// Windows' "Startup apps" (2026-10-22): what hyprland starts at login
+// besides the suite's own. hypr/lua/startup.lua, one table an app;
+// autostart.lua runs the ones that are on, `delay` seconds after the start.
+// The suite's own lines in autostart.lua stay there: STARTUP_OWN names
+// them for the list, each with the process that says it is up.
+const STARTUP_ORDER = ["name", "command", "on", "delay"];
+const STARTUP_OWN = [
+  { name: "This shell", look: "quickshell" },
+  { name: "Clipboard keeper", look: "wl-clip-persist" },
+  { name: "Clipboard history · text", look: "wl-paste --type text --watch" },
+  { name: "Clipboard history · images", look: "wl-paste --type image --watch" },
+  { name: "Password prompts (polkit)", look: "hyprpolkitagent" },
+];
+function startupOwn() { return STARTUP_OWN; }
+function normStartup(r) {
+  return { name: String(r && typeof r.name === "string" ? r.name : ""),
+           command: String(r && typeof r.command === "string" ? r.command : ""),
+           on: !(r && r.on === false),
+           delay: Math.max(0, Math.min(600, Math.round(Number(r && r.delay) || 0))) };
+}
+function parseStartupLua(text) {
+  return parseLuaRecords(text).filter((r) => typeof r.command === "string" && r.command.trim() !== "").map(normStartup);
+}
+function renderStartupLua(apps) {
+  return luaRecordsFile(ZEN_HEAD.concat([
+    "-- STARTUP",
+    "-- Written by oracle's Windows section (Startup apps), and read back by it.",
+    "-- What starts at login besides the shell's own (those are autostart.lua's).",
+    "-- command  run as it is; on = false keeps it from starting",
+    "-- delay    seconds after hyprland starts, 0-600",
+  ]), (apps || []).map(normStartup), STARTUP_ORDER);
+}
+// The process an entry starts: its first word that is not an env setting or
+// a wrapper, by name — what `ps -eo args` is searched for.
+function startupLook(command) {
+  const words = String(command || "").trim().split(/\s+/);
+  let i = 0;
+  while (i < words.length && (/^\w+=/.test(words[i]) || ["env", "sh", "-c", "exec", "nice", "uwsm", "app", "--", "gtk-launch", "flatpak", "run"].indexOf(words[i]) >= 0)) i++;
+  const w = (words[i] || "").replace(/^['"]|['"]$/g, "");
+  return w.slice(w.lastIndexOf("/") + 1);
+}
+// is `look` in one of `ps -eo args=`'s lines (not ps' own, not a grep)?
+function startupRunning(psText, look) {
+  if (!look) return false;
+  const lines = String(psText || "").split("\n");
+  for (const l of lines) {
+    if (l.indexOf(look) < 0) continue;
+    if (/^(ps|pgrep|grep) /.test(l)) continue;
+    return true;
+  }
+  return false;
+}
+// What a desktop entry's Exec runs at login: its field codes (%U, --uri=%u)
+// gone, and the options that only led up to them ("--url --") with them.
+function execForStartup(exec) {
+  const words = String(exec || "").trim().split(/\s+/).filter((w) => w !== "");
+  const code = (w) => /%[a-zA-Z]/.test(w);
+  // from the end: a code, and the options that led up to it
+  while (words.length > 1 && code(words[words.length - 1])) {
+    words.pop();
+    while (words.length > 1 && /^-/.test(words[words.length - 1])) words.pop();
+  }
+  return words.filter((w) => !code(w)).join(" ");
+}
+// "Discord" from "discord --start-minimized", for a command added by hand
+function startupName(command) {
+  const w = startupLook(command);
+  return w ? w[0].toUpperCase() + w.slice(1) : "";
+}
+
 function renderKeysLua(values, binds) {
   const lines = [
     "-- ┌─┐┌─┐┌┐┌┬ ┬┌─┐┬─┐┬┌─┌─┐",
@@ -2303,10 +2485,11 @@ function chordTaken(chord, id, binds, values, live) {
 // only: no notes, no screen time, no passwords. A bundle names its files
 // by these relative paths, and nothing outside them is ever written back.
 const BUNDLE_FIXED = ["oracle.json", "hypr/keys.lua", "hypr/wake.lua", "hypr/effects.lua", "hypr/defaults.lua",
-                      "hypr/input.lua", "hypr/monitors.lua"];
+                      "hypr/input.lua", "hypr/windows.lua", "hypr/startup.lua", "hypr/monitors.lua"];
 const BUNDLE_WORDS = { "oracle.json": "Settings", "hypr/keys.lua": "Shortcuts", "hypr/wake.lua": "Wake by",
                        "hypr/effects.lua": "Window shadows and animations",
                        "hypr/defaults.lua": "Default apps", "hypr/input.lua": "Keyboard and mouse",
+                       "hypr/windows.lua": "Window rules", "hypr/startup.lua": "Startup apps",
                        "hypr/monitors.lua": "Screen arrangement" };
 function bundlePathOk(rel) {
   const r = String(rel || "");
