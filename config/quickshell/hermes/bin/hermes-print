@@ -1,0 +1,195 @@
+#!/usr/bin/env python3
+# ┌─┐┌─┐┌┐┌┬ ┬┌─┐┬─┐┬┌─┌─┐
+# ┌─┘├┤ │││││││ │├┬┘├┴┐└─┐
+# └─┘└─┘┘└┘└┴┘└─┘┴└─┴ ┴└─┘
+# https://github.com/kbuckleys/
+#
+# hermes-print — printers and scanners for Control Hub, one JSON object per
+# call on stdout. CUPS' own tools (lpstat, lpoptions, lpinfo, lpadmin, lp,
+# cancel, cupsenable) and SANE's scanimage do the work; this only asks them
+# and says what they said.
+#
+#   status                  { cups: { installed, running }, sane: { installed,
+#                             airscan }, printers: [{ name, info, model, uri,
+#                             state: idle|printing|stopped, reasons, default,
+#                             jobs }], jobs: [{ id, printer, title, size }] }
+#   nearby                  { ok, devices: [{ uri, name, kind: network|usb }] }
+#   add <uri> <name>        driverless (IPP Everywhere) — every printer made
+#                           this decade, and USB ones through ipp-usb
+#   remove|pause|resume <name>     default <name>     test <name>
+#   cancel <job id>
+#   scanners                { ok, devices: [{ id, name }] }
+#   scan <device> <out> <png|pdf> <dpi> <Color|Gray>
+#
+# Every action answers { ok, error, admin }: admin is true when CUPS refused
+# for want of an administrator, so Hermes can ask again through Ceres.
+# Standard library only, every command on a timeout.
+
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+import urllib.parse
+
+
+def run(argv, timeout=4.0):
+    try:
+        r = subprocess.run(argv, capture_output=True, text=True, timeout=timeout)
+        return r.returncode, r.stdout, r.stderr.strip()
+    except subprocess.TimeoutExpired:
+        return 124, "", "timed out"
+    except OSError as e:
+        return 127, "", str(e)
+
+
+def out(obj):
+    print(json.dumps(obj))
+
+
+def act(argv, timeout=10.0):
+    code, _, err = run(argv, timeout)
+    last = err.splitlines()[-1] if err else ""
+    admin = bool(re.search(r"forbidden|not authorized|unauthorized|authentication", err, re.I))
+    out({"ok": code == 0, "error": "" if code == 0 else (last or argv[0] + " failed"), "admin": admin})
+
+
+def units_active(units):
+    code, o, _ = run(["systemctl", "is-active"] + units, 1.5)
+    lines = o.splitlines() + [""] * len(units)
+    return any(lines[i].strip() == "active" for i in range(len(units)))
+
+
+def options(name):
+    # lpoptions -p prints one line of key=value pairs, values quoted with ''
+    # when they hold a space
+    code, o, _ = run(["lpoptions", "-p", name], 2.0)
+    d = {}
+    for m in re.finditer(r"([\w-]+)=('(?:[^'\\]|\\.)*'|\S*)", o):
+        v = m.group(2)
+        if v.startswith("'") and v.endswith("'"):
+            v = v[1:-1].replace("\\'", "'")
+        d[m.group(1)] = v
+    return d
+
+
+def status():
+    cups = shutil.which("lpstat") is not None
+    running = cups and units_active(["cups.service", "cups.socket"])
+    res = {
+        "cups": {"installed": cups, "running": running},
+        "sane": {"installed": shutil.which("scanimage") is not None,
+                 "airscan": os.path.exists("/etc/sane.d/airscan.conf")},
+        "printers": [],
+        "jobs": [],
+    }
+    if not running:
+        return res
+    _, d, _ = run(["lpstat", "-d"], 2.0)
+    m = re.search(r":\s*(\S+)\s*$", d.strip())
+    default = m.group(1) if m and "no system default" not in d else ""
+    _, names, _ = run(["lpstat", "-e"], 2.0)
+    jobs = []
+    _, jo, _ = run(["lpstat", "-W", "not-completed", "-o"], 2.0)
+    for line in jo.splitlines():
+        # "Brother-HL-12  buck  12288  Wed 22 Oct 2026 10:00:00"
+        p = line.split()
+        if len(p) >= 3 and "-" in p[0]:
+            printer, _, num = p[0].rpartition("-")
+            jobs.append({"id": p[0], "printer": printer, "user": p[1],
+                         "size": int(p[2]) if p[2].isdigit() else 0, "title": ""})
+    for name in [n.strip() for n in names.splitlines() if n.strip()]:
+        o = options(name)
+        st = o.get("printer-state", "3")
+        res["printers"].append({
+            "name": name,
+            "info": o.get("printer-info", name),
+            "model": o.get("printer-make-and-model", ""),
+            "uri": o.get("device-uri", ""),
+            "state": {"4": "printing", "5": "stopped"}.get(st, "idle"),
+            "reasons": [r for r in o.get("printer-state-reasons", "none").split(",") if r and r != "none"],
+            "default": name == default,
+            "jobs": sum(1 for j in jobs if j["printer"] == name),
+        })
+    res["jobs"] = jobs
+    return res
+
+
+def nice_name(uri):
+    # dnssd://Brother%20HL-L2350DW%20series._ipp._tcp.local/?uuid=…
+    # usb://Brother/HL-L2350DW%20series?serial=…
+    u = urllib.parse.urlsplit(uri)
+    if u.scheme == "dnssd":
+        return urllib.parse.unquote(u.netloc).split("._")[0]
+    if u.scheme == "usb":
+        return urllib.parse.unquote(u.netloc + " " + u.path.strip("/")).strip()
+    return urllib.parse.unquote(u.netloc or uri)
+
+
+def queue_name(name):
+    q = re.sub(r"[^A-Za-z0-9_-]+", "-", name).strip("-")
+    return (q or "Printer")[:120]
+
+
+def nearby():
+    code, o, err = run(["lpinfo", "--include-schemes", "dnssd,usb,ipp,ipps", "-v"], 20.0)
+    devs, seen = [], set()
+    for line in o.splitlines():
+        kind, _, uri = line.strip().partition(" ")
+        if not uri or uri in ("usb", "dnssd", "ipp", "ipps") or "://" not in uri:
+            continue
+        name = nice_name(uri)
+        if name in seen:
+            continue
+        seen.add(name)
+        devs.append({"uri": uri, "name": name, "queue": queue_name(name),
+                     "kind": "usb" if uri.startswith("usb:") else "network"})
+    out({"ok": code == 0 or bool(devs), "error": "" if code == 0 else err, "devices": devs})
+
+
+def scanners():
+    code, o, err = run(["scanimage", "-L"], 25.0)
+    devs = []
+    # device `airscan:e0:Brother MFC' is a eSCL Brother MFC ip=192.168.1.20
+    for m in re.finditer(r"device [`'](.+?)' is a (.+)", o):
+        devs.append({"id": m.group(1), "name": m.group(2).strip()})
+    out({"ok": code == 0, "error": "" if code == 0 else err, "devices": devs})
+
+
+def scan(dev, path, fmt, dpi, mode):
+    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+    act(["scanimage", "-d", dev, "--format=" + fmt, "--resolution", dpi, "--mode", mode, "-o", path], 180.0)
+
+
+def main(a):
+    cmd = a[0] if a else "status"
+    if cmd == "status":
+        out(status())
+    elif cmd == "nearby":
+        nearby()
+    elif cmd == "add" and len(a) >= 3:
+        act(["lpadmin", "-p", queue_name(a[2]), "-E", "-v", a[1], "-m", "everywhere"], 60.0)
+    elif cmd == "remove" and len(a) >= 2:
+        act(["lpadmin", "-x", a[1]])
+    elif cmd == "default" and len(a) >= 2:
+        act(["lpoptions", "-d", a[1]])
+    elif cmd == "pause" and len(a) >= 2:
+        act(["cupsdisable", a[1]])
+    elif cmd == "resume" and len(a) >= 2:
+        act(["cupsenable", a[1]])
+    elif cmd == "test" and len(a) >= 2:
+        page = "/usr/share/cups/data/testprint"
+        act(["lp", "-d", a[1], "-t", "Test page", page])
+    elif cmd == "cancel" and len(a) >= 2:
+        act(["cancel", a[1]])
+    elif cmd == "scanners":
+        scanners()
+    elif cmd == "scan" and len(a) >= 6:
+        scan(a[1], a[2], a[3], a[4], a[5])
+    else:
+        out({"ok": False, "error": "usage: hermes-print status|nearby|add|remove|default|pause|resume|test|cancel|scanners|scan", "admin": False})
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])

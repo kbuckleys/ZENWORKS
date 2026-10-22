@@ -15,6 +15,12 @@
 //
 // A Chronos timer that finishes says what its time went to
 // (summarySince), the one place this reaches into another app's words.
+//
+// LIMITS AND BREAKS (2026-10-22). A daily limit per app, set in the
+// window, said once a day by a notification when it is reached; and, with
+// Oracle's screenBreaks, a reminder to look away after screenBreakMins at
+// the screen without a break. Both through notify-send, so Howler's Focus
+// holds them back like any other notification.
 
 pragma Singleton
 
@@ -95,9 +101,47 @@ Singleton {
       root.ticks = K.pushTick(root.ticks, now, root.lastKey, secs, 3 * 3600000);
       root.revision++;
     }
+    // the stretch since the last break: idle and the lock end it
+    if (root.counting) root.stretch += Math.max(0, secs);
+    else if (root.locked || root.idle) root.stretch = 0;
+    if (root.lastCounting && root.lastKey !== "") root.checkLimit(root.lastKey, new Date(now));
+    if (Oracle.screenBreaks && K.breakDue(root.stretch, Oracle.screenBreakMins)) {
+      root.stretch = 0;
+      root.say("Time for a break", "You've been at the screen for " + K.limitWords(Oracle.screenBreakMins)
+        + ". Look at something far away for 20 seconds.", "normal");
+    }
     root.lastAt = now;
     root.lastKey = root.current;
     root.lastCounting = root.counting;
+  }
+
+  // ── LIMITS AND BREAKS ──
+  property real stretch: 0
+  property var limits: ({})
+  property var told: ({ day: "", keys: {} })
+  FileView { id: limitsFile; path: Quickshell.statePath("kairos.json"); blockLoading: true; printErrors: false }
+  function saveLimits() {
+    // FileView never re-reads its own setText: the state above is the truth
+    limitsFile.setText(K.serializeLimits({ limits: root.limits, told: root.told }));
+  }
+  function setLimit(key, mins) {
+    root.limits = K.withLimit(root.limits, key, mins);
+    root.saveLimits();
+    root.revision++;
+  }
+  function limitOf(key) { return root.limits[key] || 0; }
+  function checkLimit(key, at) {
+    const dk = K.dayKey(at);
+    const d = K.dayOf(root.months, dk);
+    const secs = d && d.apps[key] ? d.apps[key] : 0;
+    if (!K.limitDue(root.limits, root.told, dk, key, secs)) return;
+    root.told = K.markTold(root.told, dk, key);
+    root.saveLimits();
+    root.say("Your limit for " + root.nameOf(key), K.limitWords(root.limitOf(key))
+      + " today, the limit you set in Screen Time.", "normal");
+  }
+  function say(title, body, urgency) {
+    Quickshell.execDetached(["notify-send", "-u", urgency, "-a", "Screen Time", "-i", "preferences-system-time", title, body]);
   }
   onCurrentChanged: root.tick()
   onCountingChanged: root.tick()
@@ -179,5 +223,10 @@ Singleton {
     return Icons.appGlyph([key, root.nameOf(key)]) || "󰗄";
   }
 
+  Component.onCompleted: {
+    const l = K.parseLimits(limitsFile.text());
+    root.limits = l.limits;
+    root.told = l.told;
+  }
   Component.onDestruction: { root.tick(); root.flush(); }
 }

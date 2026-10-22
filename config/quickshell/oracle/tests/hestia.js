@@ -77,5 +77,29 @@ module.exports = {
     t.eq("never", H.relUs(0, now), "");
     t.eq("today's clock has no date", H.clock(now - 1000, now).length, 8);
     t.eq("another day's has one", H.clock(now - 3 * 86400e3, now).length, 19);
+
+    // ── drives ────────────────────────────────────────────────────────────
+    const nv = { kind: "nvme", smart: true, warnings: [], tempK: 310, hours: 28060, usedPct: 5, spareLeft: 100, spareThresh: 5,
+                 written: 53274297856000, read: 1, mediaErrors: 0, unsafe: 114, badSectors: -1, attrsFailing: -1, wcTempK: 343,
+                 devs: ["/dev/nvme0n1", "/dev/nvme0n1p2"] };
+    t.eq("a healthy drive", H.diskVerdict(nv).level, "good");
+    t.eq("…in a line", H.diskLine(nv), "Good · 37 °C · 5% worn");
+    t.eq("a critical warning is bad", H.diskVerdict(Object.assign({}, nv, { warnings: ["spare"] })).words, "Spare blocks nearly used up");
+    t.eq("spare at its threshold is bad", H.diskVerdict(Object.assign({}, nv, { spareLeft: 5 })).level, "bad");
+    t.eq("nearly worn is a warning", H.diskVerdict(Object.assign({}, nv, { usedPct: 93 })).words, "Nearly worn out (93%)");
+    t.eq("media errors warn", H.diskVerdict(Object.assign({}, nv, { mediaErrors: 2 })).words, "2 media errors");
+    t.eq("hot warns", H.diskVerdict(Object.assign({}, nv, { tempK: 350 })).words, "Running hot");
+    t.eq("an ATA drive failing", H.diskVerdict({ kind: "ata", smart: true, failing: true, badSectors: 3 }).why.length, 2);
+    t.eq("SMART off says so", H.diskVerdict({ kind: "ata", smart: false }).level, "unknown");
+    t.eq("no data", H.diskVerdict({ kind: "" }).level, "unknown");
+    t.eq("hours in words", H.hoursWords(28060), "3 years 74 days (28,060 h)");
+    t.eq("a few hours", H.hoursWords(5), "5 h (5 h)");
+    t.eq("bytes as drives are sold", H.driveBytes(53274297856000), "53.3 TB");
+    t.eq("small bytes", H.driveBytes(512), "512 B");
+    t.eq("facts start with health", H.diskHealthFacts(nv)[0], ["Health", "Good", ""]);
+    t.eq("a partition finds its drive", H.driveOf([nv], "/dev/nvme0n1p2") === nv, true);
+    t.eq("an unknown device has none", H.driveOf([nv], "/dev/sdz"), null);
+    t.eq("firmware without fwupd", H.parseFirmware('{"installed":false,"devices":[]}').installed, false);
+    t.eq("a broken firmware answer", H.parseFirmware("x").known, false);
   }
 };

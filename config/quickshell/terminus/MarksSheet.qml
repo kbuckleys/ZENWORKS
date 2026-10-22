@@ -359,6 +359,7 @@ Rectangle {
         }
       }
     }
+    ScrollRail { owner: term; target: marksList; visible: marksList.visible; anchors.right: parent.right; anchors.top: marksList.top; anchors.bottom: marksList.bottom }
 
     // Nothing bookmarked yet, said where the rows would be rather than as
     // an empty card that looks like something failed to load.

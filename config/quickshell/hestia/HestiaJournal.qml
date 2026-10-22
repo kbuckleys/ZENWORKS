@@ -77,7 +77,9 @@ Item {
     y: 14
     width: parent.width - 40
     spacing: 10
+    // centered over the fields (user, 2026-10-22)
     Row {
+      anchors.horizontalCenter: parent.horizontalCenter
       spacing: 10
       Segments {
         options: [["system", "The machine"], ["user", "Your session"]]

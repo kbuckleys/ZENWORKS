@@ -9,3 +9,4 @@ HermesNetwork 1.0 HermesNetwork.qml
 HermesBluetooth 1.0 HermesBluetooth.qml
 HermesVpn 1.0 HermesVpn.qml
 HermesDisplay 1.0 HermesDisplay.qml
+HermesPrint 1.0 HermesPrint.qml

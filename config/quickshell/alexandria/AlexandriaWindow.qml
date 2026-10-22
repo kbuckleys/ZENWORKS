@@ -1753,6 +1753,7 @@ FloatingWindow {
             }
           }
           ElasticScroll { anchors.fill: groupList; view: groupList }
+          Scrollbar { flick: groupList; visible: groupList.visible; anchors.right: parent.right; anchors.top: groupList.top; anchors.bottom: groupList.bottom }
         }
       }
 

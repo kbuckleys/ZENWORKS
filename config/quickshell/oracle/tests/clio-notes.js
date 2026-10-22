@@ -235,5 +235,25 @@ module.exports = {
     // ── backlinks ──
     const ln = [{ id: "a", modified: 1, d: { links: ["c"] } }, { id: "b", modified: 2, d: { links: ["c"] } }, { id: "c", modified: 3, d: { links: [] } }];
     t.eq("linked from", N.linksTo(ln, "c").map((n) => n.id), ["b", "a"]);
+
+    // ── tasks ──
+    const tNow = new Date(2026, 9, 22, 12).getTime();
+    const tn = [
+      { id: "a", kind: "note", modified: 5, blocks: [{ k: "title", h: "Errands" }, { k: "check", h: "milk" },
+        { k: "check", h: "dentist", due: new Date(2026, 9, 22, 15).getTime() }, { k: "check", h: "done", c: true },
+        { k: "check", h: "rent", due: new Date(2026, 9, 21, 9).getTime() }, { k: "check", h: "  " }] },
+      { id: "b", kind: "entry", modified: 9, blocks: [{ k: "check", h: "trip", due: new Date(2026, 10, 30, 9).getTime() },
+        { k: "check", h: "call mum", due: new Date(2026, 9, 24, 9).getTime() }] },
+      { id: "c", kind: "note", deleted: true, blocks: [{ k: "check", h: "binned" }] },
+      { id: "d", kind: "sticky", blocks: [{ k: "check", h: "on the desk" }] }
+    ];
+    const ts = N.tasks(tn, tNow);
+    t.eq("open tasks, by when", ts.map((x) => x.h), ["rent", "dentist", "call mum", "trip", "milk"]);
+    t.eq("their groups", ts.map((x) => x.group), ["overdue", "today", "week", "later", "someday"]);
+    t.eq("a task knows its block", ts[1].at, 2);
+    t.eq("tasks on a day", N.tasksOn(tn, "2026-10-22", tNow).map((x) => x.h), ["dentist"]);
+    t.eq("ticked in place", N.tickedAt(tn[0].blocks, 1, "milk")[1].c, true);
+    t.eq("…the rest untouched", N.tickedAt(tn[0].blocks, 1, "milk")[2], tn[0].blocks[2]);
+    t.eq("a changed note is not ticked blind", N.tickedAt(tn[0].blocks, 1, "eggs"), null);
   }
 };

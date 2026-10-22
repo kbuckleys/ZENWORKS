@@ -15,3 +15,5 @@ git clone https://github.com/kbuckleys/ZENWORKS/
 cd ZENWORKS
 bash install
 ```
+
+> Simpley run ```bas uninstall```` if you wish to remove the suite

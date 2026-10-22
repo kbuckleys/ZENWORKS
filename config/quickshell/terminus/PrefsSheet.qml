@@ -480,5 +480,6 @@ Item {
       }
     }
     }
+    ScrollRail { owner: term; target: prefsScroll; visible: prefsScroll.visible; anchors.right: parent.right; anchors.top: prefsScroll.top; anchors.bottom: prefsScroll.bottom }
   }
 }

@@ -19,6 +19,13 @@ vids=$(xdg-user-dir VIDEOS 2>/dev/null || true)
 output_dir="$vids/Captures"
 mkdir -p "$output_dir"
 
+# The sound mixed for "Both" (below) is a null sink and two loopbacks,
+# loaded for the one recording; their ids are kept here and unloaded after.
+unmix() {
+  for m in $(cat "$output_dir/.active-modules" 2>/dev/null); do pactl unload-module "$m" 2>/dev/null; done
+  rm -f "$output_dir/.active-modules"
+}
+
 if pgrep -x wf-recorder >/dev/null; then
   pkill -SIGINT -x wf-recorder
   # wait for it to finalize the file before notifying
@@ -48,6 +55,8 @@ if pgrep -x wf-recorder >/dev/null; then
     notify-send "󰕧 Recording Stopped"
   fi
   rm -f "$output_dir/.active-recording"
+  unmix
+  qs ipc call Argus recording false >/dev/null 2>&1
   exit 0
 fi
 # "stop" with nothing recording does nothing — never starts one
@@ -64,9 +73,45 @@ log=$(mktemp)
 # sync drops them all, leaving an audio-only file.
 base=(-D -r 60)
 
+# ── WHAT ORACLE SAYS (2026-10-22) ───────────────────────────────────────
+# `qs ipc call Argus recPrefs` answers one line of key=value words; a shell
+# that is not running (or too old to know the call) answers nothing, and
+# everything stays as it recorded before these existed.
+countdown=0; audiomode=system
+for kv in $(qs ipc call Argus recPrefs 2>/dev/null); do
+  case "$kv" in
+    countdown=[0-9]|countdown=10) countdown=${kv#*=} ;;
+    audio=none|audio=system|audio=mic|audio=both) audiomode=${kv#*=} ;;
+  esac
+done
+
 # An empty --audio= aborts inside libpulse and leaves a truncated file behind,
-# so only ask for audio once a monitor source is actually known to exist
-audio=$(pactl list short sources 2>/dev/null | awk '$2 ~ /\.monitor$/ {print $2; exit}')
+# so only ask for audio once a source is actually known to exist. What the
+# machine plays is its default output's monitor (else the first monitor
+# there is); the microphone is the default input, never a monitor.
+sink=$(pactl get-default-sink 2>/dev/null)
+system=""
+[ -n "$sink" ] && pactl list short sources 2>/dev/null | awk '{print $2}' | grep -qx "$sink.monitor" && system="$sink.monitor"
+[ -n "$system" ] || system=$(pactl list short sources 2>/dev/null | awk '$2 ~ /\.monitor$/ {print $2; exit}')
+mic=$(pactl get-default-source 2>/dev/null)
+case "$mic" in *.monitor) mic="" ;; esac
+audio=""
+case "$audiomode" in
+  system) audio="$system" ;;
+  mic) audio="$mic" ;;
+  both)
+    if [ -n "$system" ] && [ -n "$mic" ]; then
+      # one source wf-recorder can take: a null sink both are looped into
+      mods=$(pactl load-module module-null-sink sink_name=argus_mix sink_properties=device.description=Argus-mix)
+      mods="$mods $(pactl load-module module-loopback source="$system" sink=argus_mix latency_msec=30)"
+      mods="$mods $(pactl load-module module-loopback source="$mic" sink=argus_mix latency_msec=30)"
+      echo "$mods" > "$output_dir/.active-modules"
+      audio=argus_mix.monitor
+    else
+      audio="${system:-$mic}"
+    fi
+    ;;
+esac
 [ -n "$audio" ] && base+=(--audio="$audio")
 
 # ── THE AREA, FROM PICASSO'S PICKER ─────────────────────────────────────
@@ -129,6 +174,13 @@ case "${1}" in
     ;;
 esac
 
+# ── THE COUNTDOWN ───────────────────────────────────────────────────────
+# Shown by the shell in the middle of the screen; waited out here, and a
+# beat more so its last frame is gone before the first one is recorded.
+if [ "$countdown" -gt 0 ] 2>/dev/null; then
+  qs ipc call Argus countdown "$countdown" >/dev/null 2>&1 && sleep "$countdown" && sleep 0.3
+fi
+
 # ── THE ENCODER, FROM THE HARDWARE THAT IS THERE ────────────────────────
 # NVENC on NVIDIA, VA-API on an AMD or Intel GPU's own render node (found by
 # vendor, so a hybrid laptop does not guess at renderD128), and x264 in
@@ -171,6 +223,7 @@ for e in "${encoders[@]}"; do
     rm -f "$log"
     echo "$filename" > "$output_dir/.active-recording"
     notify-send "$label" "${detail:+$detail · }$e"
+    qs ipc call Argus recording true >/dev/null 2>&1
     exit 0
   fi
   # a failed start can leave a stub behind, and wf-recorder asks before
@@ -180,6 +233,7 @@ done
 
 notify-send -u critical " Recording failed" "$(tail -n 3 "$log")"
 rm -f "$log"
+unmix
 exit 1
 ]]
 	hl.exec_cmd("bash -c '" .. script:gsub("'", "'\"'\"'") .. "' -- " .. mode)

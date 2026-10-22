@@ -948,6 +948,7 @@ LayerPopup {
                 }
               }
             }
+            Scrollbar { flick: colorGrid; visible: colorGrid.visible; anchors.right: colorGrid.right; anchors.top: colorGrid.top; anchors.bottom: colorGrid.bottom }
 
             Rectangle {
               id: maker

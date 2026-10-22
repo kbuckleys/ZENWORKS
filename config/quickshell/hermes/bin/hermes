@@ -4,7 +4,7 @@
 # └─┘└─┘┘└┘└┴┘└─┘┴└─┴ ┴└─┘
 # https://github.com/kbuckleys/
 #
-# hermes [network|bluetooth|vpn|display]   the window, from a terminal, a
+# hermes [network|bluetooth|vpn|display|printers]  the window, from a terminal, a
 #                                          keybind, or hermes.desktop; on
 #                                          that section when one is named
 exec qs ipc call Hermes window "${1:-}" >/dev/null

@@ -469,6 +469,7 @@ Rectangle {
         }
       }
     }
+    ScrollRail { owner: term; target: tagList; visible: tagList.visible; anchors.right: parent.right; anchors.top: tagList.top; anchors.bottom: tagList.bottom }
 
     // morpheus/HintBar, as every strip (ceres' height, ground and rule); a
     // complaint takes the keys' place, in red

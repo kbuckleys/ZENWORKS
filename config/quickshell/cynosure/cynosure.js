@@ -96,6 +96,7 @@ const SHELL_ACTIONS = [
   // ── the 10-20 apps ──
   // control hub (hermes): the window, and its switches where there is one
   { name: "Control Hub", glyph: "\u{F1542}", keys: "hermes network wifi wi-fi ethernet bluetooth vpn display brightness settings", ipc: "Hermes window ''" },
+  { name: "Printers & scanners", glyph: "\u{F042A}", keys: "hermes printer printing print scanner scan cups", ipc: "Hermes window printers" },
   { name: "Night light", glyph: "\u{F0594}", keys: "hermes hyprsunset warm blue light evening", ipc: "Hermes night",
     needs: "nightReady", state: "night", on: { name: "Night light off", glyph: "\u{F00DF}" } },
   { name: "Wi-Fi off", glyph: "\u{F05AA}", keys: "hermes wireless network radio", ipc: "Hermes wifi",

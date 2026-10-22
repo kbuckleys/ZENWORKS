@@ -139,6 +139,8 @@ Item {
       }
     }
   }
+  ElasticScroll { anchors.fill: list; view: list }
+  Scrollbar { flick: list; anchors.right: list.right; anchors.top: list.top; anchors.bottom: list.bottom }
 
   // the sum of what is marked, ruled off like a till's total
   Item {

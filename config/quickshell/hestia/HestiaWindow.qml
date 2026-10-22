@@ -165,9 +165,10 @@ FloatingWindow {
         anchors.rightMargin: 14
         anchors.verticalCenter: parent.verticalCenter
         implicitHeight: 32
-        label: "Look again"
+        // the refresh glyph, not words (user, 2026-10-22)
+        glyph: true
+        label: "\u{F0450}"
         busy: !!hw.mgr && hw.mgr.loadingUnits
-        busyText: "Asking\u2026"
         onClicked: hw.lookAgain()
       }
     }
@@ -219,8 +220,8 @@ FloatingWindow {
       anchors.bottom: parent.bottom
       anchors.left: parent.left
       anchors.right: parent.right
-      rows: hw.page ? [["↑↓", "service"], ["ctrl f", "filter"], ["ctrl 1-5", "page"], ["ctrl r", "look again"], ["esc", "close"]]
-        : [["ctrl 1-5", "page"], ["ctrl r", "look again"], ["esc", "close"]]
+      rows: hw.page ? [["↑↓", "service"], ["ctrl f", "filter"], ["ctrl 1-5", "page"], ["ctrl r", "refresh"], ["esc", "close"]]
+        : [["ctrl 1-5", "page"], ["ctrl r", "refresh"], ["esc", "close"]]
     }
   }
 }

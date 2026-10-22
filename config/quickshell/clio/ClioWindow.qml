@@ -821,7 +821,7 @@ FloatingWindow {
       else if (!menu.isOpen && !cards.carding && !win.sheetOpen) win.noteHad = false;
     }
   }
-  readonly property bool sheetOpen: win.sketching || win.moodOpen || win.setOpen || win.picsOpen || win.momentsOpen || win.linkOpen || win.dateOpen || win.highlightsOpen
+  readonly property bool sheetOpen: win.sketching || win.moodOpen || win.setOpen || win.picsOpen || win.momentsOpen || win.linkOpen || win.dateOpen || win.highlightsOpen || win.tasksOpen
   function unwind() {
     if (pane.trayOpen) { pane.trayOpen = false; return; }
     if (pane.finding) { pane.closeFind(); return; }
@@ -1005,6 +1005,7 @@ FloatingWindow {
   property bool linkOpen: false
   property bool dateOpen: false
   property bool highlightsOpen: false
+  property bool tasksOpen: false
   onSheetOpenChanged: if (win.sheetOpen) sheetKeys.forceActiveFocus(); else Qt.callLater(win.refocus)
   Item {
     id: sheetKeys
@@ -1013,7 +1014,7 @@ FloatingWindow {
       if (win.sketching && sketchPad.key(e)) { e.accepted = true; return; }
       if (e.key === Qt.Key_Escape) {
         if (win.sketching) win.sketchDone(null, false);
-        win.moodOpen = win.setOpen = win.picsOpen = win.momentsOpen = win.linkOpen = win.dateOpen = win.highlightsOpen = false;
+        win.moodOpen = win.setOpen = win.picsOpen = win.momentsOpen = win.linkOpen = win.dateOpen = win.highlightsOpen = win.tasksOpen = false;
         e.accepted = true;
       }
     }
@@ -1088,6 +1089,24 @@ FloatingWindow {
     backdrop: stage
     HighlightsBody { anchors.fill: parent; win: win; shown: win.highlightsOpen; onClosed: win.highlightsOpen = false }
   }
+  InputShield { visible: win.tasksOpen; onClicked: win.tasksOpen = false }
+  Sheet {
+    shown: win.tasksOpen
+    fromTop: win.headH
+    leftInset: side.width
+    cardW: Math.min(win.width - side.width - 60, 760)
+    cardH: Math.min(win.height - win.headH - 40, 640)
+    backdrop: stage
+    // by file, so it needs no shell restart (a new qmldir type does)
+    Loader {
+      id: tasksLoader
+      anchors.fill: parent
+      active: win.tasksOpen || !!item
+      source: "TasksBody.qml"
+      onLoaded: { item.win = win; item.closed.connect(() => win.tasksOpen = false); }
+    }
+  }
+  Binding { target: tasksLoader.item; property: "shown"; value: win.tasksOpen; when: !!tasksLoader.item }
   InputShield { visible: win.linkOpen; onClicked: win.linkOpen = false }
   Sheet {
     shown: win.linkOpen

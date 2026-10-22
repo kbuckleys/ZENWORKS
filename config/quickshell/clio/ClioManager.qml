@@ -994,6 +994,26 @@ Scope {
   function journal() { mgr.withWindow((w) => w.newEntry()); }
   function today() { mgr.withWindow((w) => w.today()); }
 
+  // ── TASKS ──────────────────────────────────────────────────────────────
+  // Every open checklist item (N.tasks), gathered in the window's Tasks
+  // sheet and on chronos' days. Ticked from there: what the window has typed
+  // and not yet kept is kept first, then the note gets the item ticked —
+  // only if it is still that item — and the window shows it afresh.
+  function tasksNow() { return N.tasks(mgr.notes, Date.now()); }
+  function tickTask(t) {
+    if (!t) return false;
+    if (mgr.win) mgr.win.commit();
+    const n = mgr.noteOf(t.id);
+    const bs = n ? N.tickedAt(n.blocks, t.at, t.h) : null;
+    if (!bs) { mgr.said("That item has changed — open the note to tick it"); return false; }
+    mgr.setBlocks(t.id, bs);
+    mgr.changedHere(t.id);
+    return true;
+  }
+  function tasks() { mgr.withWindow((w) => { w.showUp(); w.tasksOpen = true; }); }
+  // a task's note, opened at the item (chronos' agenda)
+  function openTask(id, h) { mgr.withWindow((w) => { w.showUp(); w.openAt(id, h); }); }
+
   // ── QUICK NOTE ─────────────────────────────────────────────────────────
   // ClioCapture, made the first time it is asked for
   // (its component read then, not at the shell's start)

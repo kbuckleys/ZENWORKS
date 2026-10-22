@@ -501,6 +501,7 @@ Rectangle {
       Item { width: 1; height: 6 }
     }
   }
+  ScrollRail { owner: term; target: sideFlick; visible: sideFlick.visible; anchors.right: parent.right; anchors.top: sideFlick.top; anchors.bottom: sideFlick.bottom }
 
   // the top fade's mask: clear at the edge, solid a row down
   Rectangle {

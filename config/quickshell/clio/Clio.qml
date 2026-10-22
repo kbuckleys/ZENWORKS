@@ -454,6 +454,13 @@ Singleton {
       return "ok";
     }
 
+    // every open checklist item, gathered
+    function tasks(): string {
+      if (!root.app) return "no notebook";
+      root.app.tasks();
+      return "ok";
+    }
+
     function status(): string {
       return root.count + " notes, " + (root.shown ? "shown" : "hidden");
     }

@@ -210,6 +210,17 @@ Item {
           MouseArea { anchors.fill: parent; anchors.margins: -6; onClicked: Clio.toggle() }
         }
       }
+      // every open checklist item, gathered (TasksBody); yellow with one overdue
+      ClioShelf {
+        host: side
+        readonly property var open: side.mgr ? N.tasks(side.mgr.notes, Date.now()) : []
+        visible: open.length > 0
+        glyph: "\u{F0756}"
+        glyphInk: open.some((t) => t.group === "overdue") ? Zenon.yellow : Zenon.cyan
+        label: "Tasks"
+        count: String(open.length)
+        onClicked: side.win.tasksOpen = true
+      }
       // every highlighted phrase, gathered (HighlightsBody)
       ClioShelf {
         host: side

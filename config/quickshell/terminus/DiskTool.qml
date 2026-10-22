@@ -489,6 +489,8 @@ FocusScope {
           font.pixelSize: Zenon.px(12)
         }
       }
+      ElasticScroll { anchors.fill: logView; view: logView }
+      ScrollRail { target: logView; anchors.right: parent.right; anchors.top: logView.top; anchors.bottom: logView.bottom }
     }
 
     Row {

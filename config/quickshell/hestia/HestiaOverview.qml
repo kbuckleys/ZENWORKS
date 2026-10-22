@@ -6,11 +6,16 @@
 // Hestia's overview: what wants looking at. Services that failed, services
 // restarting over and over (one that keeps dying and being started again
 // looks fine from a list — it is "running" most of the time), this boot's
-// errors, and how long the boot took and what took it.
+// errors, how long the boot took and what took it, and the drives' health
+// and the firmware updates waiting (core/health.py, fwupd).
 
 import QtQuick
+import Quickshell
+import Quickshell.Io
 import "../morpheus"
 import "../hermes"
+import "../ceres"
+import "../terminus"
 import "hestia.js" as H
 
 Item {
@@ -28,6 +33,43 @@ Item {
     if (!ov.mgr) return;
     ov.mgr.refreshBoot();
     ov.mgr.ask(["logs"].concat(H.logArgs({ prio: "3", boot: "0", n: 40 })), (rows) => { if (rows) ov.errors = rows.reverse(); });
+    if (!drivesProc.running) drivesProc.running = true;
+    if (!fwProc.running) fwProc.running = true;
+  }
+
+  // ── DRIVES AND FIRMWARE ──────────────────────────────────────────────
+  property var drives: []
+  property var firmware: ({ known: false, installed: false, devices: [] })
+  readonly property var sickDrives: ov.drives.filter((d) => H.diskVerdict(d).level === "bad" || H.diskVerdict(d).level === "warn")
+  readonly property string health: Quickshell.shellDir + "/hestia/core/health.py"
+  Process {
+    id: drivesProc
+    command: ["python3", ov.health, "disks"]
+    stdout: StdioCollector { id: drivesOut; waitForEnd: true; onStreamFinished: ov.drives = H.parseDrives(drivesOut.text) }
+  }
+  Process {
+    id: fwProc
+    command: ["python3", ov.health, "firmware"]
+    stdout: StdioCollector { id: fwOut; waitForEnd: true; onStreamFinished: { const f = H.parseFirmware(fwOut.text); if (f.known) ov.firmware = f; } }
+  }
+  // Every firmware step is root's, through Ceres' password card: fwupd
+  // installed with its daily metadata timer; the metadata fetched now; one
+  // device updated. Asked again once each is done.
+  property string fwBusy: ""
+  function fwStep(kind, pkgs, why, steps) {
+    if (ov.fwBusy !== "") return;
+    ov.fwBusy = kind;
+    const ok = Ceres.install(pkgs, why, (done) => { ov.fwBusy = ""; ov.load(); }, steps);
+    if (!ok) { ov.fwBusy = ""; if (ov.win) ov.win.say("Ceres is busy — try again once it is done", true); }
+  }
+  function fwSetup() {
+    ov.fwStep("setup", ["fwupd"], "for firmware updates in System Journal",
+              [["@sudo", "systemctl", "enable", "--now", "fwupd-refresh.timer"], ["@sudo", "fwupdmgr", "refresh", "--force"]]);
+  }
+  function fwRefresh() { ov.fwStep("refresh", [], "look for firmware updates", [["@sudo", "fwupdmgr", "refresh", "--force"]]); }
+  function fwUpdate(d) {
+    ov.fwStep(d.id, [], "update the firmware of " + d.name,
+              [["@sudo", "fwupdmgr", "update", d.id, "-y", "--no-reboot-check"]]);
   }
   onVisibleChanged: if (ov.visible) ov.load()
   // the first page is visible from the start, so no change ever says so
@@ -203,6 +245,113 @@ Item {
             readonly property var b: ov.mgr.bootInfo.blame[index]
             label: index === 0 ? "Slowest" : ""
             value: b.took + "  ·  " + b.unit
+          }
+        }
+        Item { width: 1; height: 8 }
+      }
+
+      // ── the drives ───────────────────────────────────────────────────────
+      HermesCard {
+        glyph: "\u{F02CA}"
+        glyphInk: ov.sickDrives.length > 0 ? Zenon.yellow : Zenon.cyan
+        title: ov.sickDrives.length > 0 ? "A drive wants looking at" : "Drives"
+        note: ov.drives.length > 0 ? ov.drives.length + (ov.drives.length === 1 ? " drive" : " drives") : ""
+        EmptyState {
+          width: parent ? parent.width : 0
+          height: 40
+          verticalAlignment: Text.AlignVCenter
+          visible: ov.drives.length === 0
+          text: drivesProc.running ? "Asking udisks\u2026" : "udisks reported no drives"
+        }
+        Repeater {
+          model: ov.drives.length
+          delegate: HermesFact {
+            required property int index
+            readonly property var d: ov.drives[index]
+            label: d.model || d.dev
+            value: H.diskLine(d) + (H.diskVerdict(d).why.length > 1 ? "  ·  " + H.diskVerdict(d).why.slice(1).join(", ") : "")
+            labelW: 220
+          }
+        }
+        Item { width: 1; height: 8 }
+      }
+
+      // ── firmware ─────────────────────────────────────────────────────────
+      HermesCard {
+        glyph: "\u{F061A}"
+        glyphInk: ov.firmware.devices.length > 0 ? Zenon.yellow : Zenon.accentMuted
+        title: ov.firmware.devices.length > 0 ? "Firmware updates" : "Firmware"
+        note: ov.firmware.installed ? (ov.firmware.devices.length > 0 ? ov.firmware.devices.length + " waiting" : "Up to date") : ""
+        trailing: [
+          BusyButton {
+            visible: ov.firmware.installed
+            glyph: true
+            label: "\u{F0450}"
+            busy: ov.fwBusy === "refresh"
+            onClicked: ov.fwRefresh()
+          }
+        ]
+        HermesSetup {
+          width: parent ? parent.width : 0
+          topPadding: 6
+          bottomPadding: 22
+          visible: ov.firmware.known && !ov.firmware.installed
+          glyph: "\u{F061A}"
+          title: "Firmware updates need fwupd"
+          body: "fwupd updates the firmware of drives, docks, mice, keyboards and the board itself from LVFS, where the makers publish it. Installed through Ceres; it looks for updates once a day."
+          action: "Install fwupd"
+          busy: ov.fwBusy === "setup"
+          onGo: ov.fwSetup()
+        }
+        EmptyState {
+          width: parent ? parent.width : 0
+          height: 40
+          verticalAlignment: Text.AlignVCenter
+          visible: ov.firmware.installed && ov.firmware.devices.length === 0
+          text: "Nothing to update"
+        }
+        Repeater {
+          model: ov.firmware.devices.length
+          delegate: Item {
+            id: fwRow
+            required property int index
+            readonly property var d: ov.firmware.devices[index]
+            width: parent ? parent.width : 0
+            height: 48
+            Column {
+              x: 18
+              anchors.verticalCenter: parent.verticalCenter
+              width: parent.width - fwBtn.width - 50
+              Text {
+                width: parent.width
+                elide: Text.ElideRight
+                text: fwRow.d.name + "  ·  " + fwRow.d.version + " \u2192 " + fwRow.d.update
+                color: Zenon.ink
+                font.family: Zenon.face
+                font.weight: 600
+                font.pixelSize: Zenon.px(14)
+              }
+              Text {
+                width: parent.width
+                elide: Text.ElideRight
+                text: (fwRow.d.reboot ? "Restart needed afterwards  ·  " : "") + fwRow.d.summary
+                color: Zenon.accentMuted
+                font.family: Zenon.face
+                font.weight: Zenon.weight
+                font.pixelSize: Zenon.px(12)
+              }
+            }
+            BusyButton {
+              id: fwBtn
+              anchors.right: parent.right
+              anchors.rightMargin: 14
+              anchors.verticalCenter: parent.verticalCenter
+              label: "Update"
+              ink: Zenon.green
+              busy: ov.fwBusy === fwRow.d.id
+              busyText: "Updating\u2026"
+              onClicked: ov.fwUpdate(fwRow.d)
+            }
           }
         }
         Item { width: 1; height: 8 }

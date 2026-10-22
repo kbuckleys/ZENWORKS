@@ -1075,12 +1075,16 @@ Item {
         font.pixelSize: Zenon.px(13)
         MouseArea { anchors.fill: parent; onClicked: if (pg.commit && !pg.commit.range) pg.win.copy(pg.commit.sha, D.short(pg.commit.sha)) }
       }
-      // the body, when there is more than the subject
+      // the body, when there is more than the subject; in a room of its own
+      // so the wheel and the bar can lie over it
+      Item {
+      width: parent.width
+      height: bodyFlick.height
+      visible: bodyText.text !== ""
       Flickable {
         id: bodyFlick
         width: parent.width
         height: Math.min(bodyText.implicitHeight, 120)
-        visible: bodyText.text !== ""
         clip: true
         contentHeight: bodyText.implicitHeight
         boundsBehavior: Flickable.StopAtBounds
@@ -1100,6 +1104,9 @@ Item {
           font.weight: Zenon.weight
           font.pixelSize: Zenon.px(14)
         }
+      }
+      ElasticScroll { anchors.fill: bodyFlick; view: bodyFlick }
+      Scrollbar { flick: bodyFlick; anchors.right: bodyFlick.right; anchors.top: bodyFlick.top; anchors.bottom: bodyFlick.bottom }
       }
       // signed, and whether git could check it (D.signatureOf)
       Text {

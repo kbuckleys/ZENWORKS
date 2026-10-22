@@ -1850,7 +1850,7 @@ LayerPopup {
     // rather than a second copy of a field, a cursor and a Tab claim.
     component FilterBar: Item {
       id: bar
-      property alias text: field.text
+      property alias text: filterField.text
       property string status: ""
       // The bar's own accent — its glyph and the selection behind typed text.
       // Told rather than fixed: the kill list and the connections list are red
@@ -1865,9 +1865,9 @@ LayerPopup {
       property color caretInk: popup.entryColor
       signal edited(string text)
 
-      function takeFocus() { field.forceActiveFocus(); }
-      function clear() { field.clear(); }
-      readonly property bool typing: field.activeFocus
+      function takeFocus() { filterField.forceActiveFocus(); }
+      function clear() { filterField.clear(); }
+      readonly property bool typing: filterField.activeFocus
 
       // The graphs' header height, not a number of its own. The two strips sit
       // in the same place at the top of the same panel and carry the same status
@@ -1924,7 +1924,7 @@ LayerPopup {
         visible: bar.height > 2
 
         TextInput {
-          id: field
+          id: filterField
           anchors.fill: parent
           verticalAlignment: TextInput.AlignVCenter
           color: bar.caretInk
@@ -1935,7 +1935,7 @@ LayerPopup {
           font.pixelSize: Zenon.px(17)
           cursorVisible: activeFocus
           cursorDelegate: Caret {
-            field: field
+            field: filterField
             thick: 3; low: 0.25; radius: 1
             color: bar.caretInk
           }
@@ -1949,7 +1949,7 @@ LayerPopup {
             popup.toggleView();
           }
 
-          onTextChanged: bar.edited(field.text)
+          onTextChanged: bar.edited(filterField.text)
         }
       }
     }
@@ -2566,6 +2566,7 @@ LayerPopup {
                   }
                 }
               }
+              Scrollbar { flick: netList; visible: netList.visible; anchors.right: parent.right; anchors.top: netList.top; anchors.bottom: netList.bottom }
 
               // A thumb rather than a full scrollbar: it is a position report,
               // and the wheel is what does the scrolling. Same one howler's
@@ -3255,6 +3256,7 @@ LayerPopup {
                   }
                 }
               }
+              Scrollbar { flick: soundList; visible: soundList.visible; anchors.right: parent.right; anchors.top: soundList.top; anchors.bottom: soundList.bottom }
 
               // the same position report the connections view wears
               Rectangle {

@@ -353,6 +353,14 @@ Singleton {
   property bool cursorSlide: true
   // how much of the background's accent the glass is laid in (Zenon.glassBase)
   property real wallpaperTint: 0
+  // RECORDING (argus.lua asks for these through `qs ipc call Argus
+  // recPrefs`, 2026-10-22): a countdown first; which sound goes in; a
+  // bigger pointer and the camera in a corner while it records
+  property int recCountdown: 3
+  property string recAudio: "system"
+  property bool recBigPointer: false
+  property bool recCamera: false
+  property string recCameraCorner: "bottomRight"
 
   // ── motion ────────────────────────────────────────────────────────────
   // One multiplier over Zenon's three durations, so the whole shell speeds up
@@ -604,6 +612,10 @@ Singleton {
   // this machine only; idle past this many minutes stops the count
   property bool screenTime: true
   property int screenTimeIdleMins: 3
+  // BREAKS (kairos, 2026-10-22): after this many minutes at the screen
+  // without one, a notification says to look away; idle or the lock is a break
+  property bool screenBreaks: false
+  property int screenBreakMins: 20
   // How stale a forecast may get before opening the pane re-fetches it.
   property int weatherStaleMins: 10
 
@@ -674,7 +686,7 @@ Singleton {
     { id: "notify", label: "Notifications", icon: "",
       blurb: "howler — toasts, and what the bell remembers" },
     { id: "paper",  label: "Background",    icon: "",
-      blurb: "picasso — the background, screenshots and the color picker" },
+      blurb: "picasso and argus — the background, screenshots, recordings and the color picker" },
     { id: "idle",   label: "Idle & lock",   icon: "",
       blurb: "socordia and cerberus — being away from the machine" },
     { id: "time",   label: "Time & weather", icon: "",
@@ -1075,6 +1087,26 @@ Singleton {
     { key: "wallpaperTint", section: "paper", alias: "tint wallpaper accent colour color glass background",
       label: "Background tint", type: "real", min: 0, max: 0.3, step: 0.02,
       help: "Lays the glass in a little of the background's own color, so the pill and its panels read as lit by what is behind them. Zero is the theme's plain ground." },
+    // ── recording (argus) ──
+    { key: "recCountdown", section: "paper", alias: "record recording screen video countdown delay argus wf-recorder",
+      label: "Recording countdown", type: "int", min: 0, max: 10, step: 1, unit: "s",
+      help: "Seconds counted down in the middle of the screen before a recording starts, so it does not open on the shortcut being pressed. 0 starts at once." },
+    { key: "recAudio", section: "paper", alias: "record recording sound audio microphone mic voice argus",
+      label: "Recording sound", type: "enum", segments: true,
+      options: [ { value: "none", label: "None" }, { value: "system", label: "System" },
+                 { value: "mic", label: "Microphone" }, { value: "both", label: "Both" } ],
+      help: "What is heard in a recording: what the machine plays, your microphone (the default input), both mixed, or silence." },
+    { key: "recBigPointer", section: "paper", alias: "record recording cursor pointer highlight bigger argus",
+      label: "Bigger pointer while recording", type: "bool",
+      help: "The pointer at twice its size while a recording runs, so it is easy to follow in the video; back to normal when it stops." },
+    { key: "recCamera", section: "paper", alias: "record recording webcam camera face bubble argus",
+      label: "Camera while recording", type: "bool",
+      help: "Your webcam in a round bubble in a corner of the screen while a recording runs, so it is in the video. Needs a camera." },
+    { key: "recCameraCorner", section: "paper", alias: "record recording webcam camera corner argus",
+      label: "Camera corner", type: "enum", segments: true,
+      options: [ { value: "topLeft", label: "Top left" }, { value: "topRight", label: "Top right" },
+                 { value: "bottomLeft", label: "Bottom left" }, { value: "bottomRight", label: "Bottom right" } ],
+      help: "Where the camera bubble sits." },
     // ── idle & lock ──
     { key: "idleEnabled", section: "idle", label: "Idle timers", type: "bool",
       help: "Off, nothing happens however long you are away. The lock still works by hand." },
@@ -1145,6 +1177,12 @@ Singleton {
     { key: "screenTimeIdleMins", section: "time", alias: "screen time idle away kairos",
       label: "Stop counting after idle", type: "int", min: 1, max: 30, step: 1, unit: "min",
       help: "No key or mouse for this long and screen time stops counting. A playing video holds it off." },
+    { key: "screenBreaks", section: "time", alias: "break rest eyes 20 20 20 look away reminder kairos screen time",
+      label: "Remind me to take breaks", type: "bool",
+      help: "After a stretch at the screen, a notification says to look at something far away for 20 seconds. Stepping away past the idle time above counts as a break. Quiet while Focus is on." },
+    { key: "screenBreakMins", section: "time", alias: "break rest eyes interval kairos",
+      label: "Break every", type: "int", min: 10, max: 120, step: 5, unit: "min",
+      help: "How long at the screen before the break reminder. Per-app daily limits are set in Screen Time." },
 
     // ── system ──
     { key: "sysmonInterval", section: "system", label: "Sample rate", type: "int",

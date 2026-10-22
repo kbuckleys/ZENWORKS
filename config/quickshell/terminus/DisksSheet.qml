@@ -289,6 +289,7 @@ Rectangle {
         }
       }
     }
+    ScrollRail { owner: term; target: disksList; visible: disksList.visible; anchors.right: parent.right; anchors.top: disksList.top; anchors.bottom: disksList.bottom }
 
 
     // morpheus/HintBar, as every strip (ceres' height, ground and rule)

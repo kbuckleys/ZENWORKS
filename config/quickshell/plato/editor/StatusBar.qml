@@ -891,5 +891,6 @@ Item {
         }
       }
     }
+    Scrollbar { flick: wildList; visible: wildList.visible; anchors.right: wildList.right; anchors.top: wildList.top; anchors.bottom: wildList.bottom }
   }
 }

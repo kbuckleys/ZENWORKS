@@ -308,6 +308,7 @@ collect_shell_writes() {
   local docs pics vids
   docs="$(user_dir DOCUMENTS Documents)"; pics="$(user_dir PICTURES Pictures)"; vids="$(user_dir VIDEOS Videos)"
   for f in "$docs/Clio:notes" "$docs/Snippets:snippets" "$pics/Screenshots:screenshots" \
+           "$pics/Scans:scans" \
            "$vids/Captures:recordings" "$DATA/kairos:screen time" \
            "$DATA/folio:older snippets" "$CONFIG/delphi:git sign-ins" \
            "$CONFIG/khal:Chronos' calendar settings" "$DATA/khal:your calendars" \
@@ -354,6 +355,9 @@ collect_system() {
     LEFT+=("NetworkManager  on (Hermes may have swapped it in for systemd-networkd; left, to keep you online)")
   fi
   systemctl is-enabled -q bluetooth.service 2>/dev/null && LEFT+=("bluetooth.service  enabled")
+  systemctl is-enabled -q cups.socket 2>/dev/null && LEFT+=("cups.socket  enabled (Hermes' printing), and your printers")
+  systemctl is-enabled -q avahi-daemon.service 2>/dev/null && LEFT+=("avahi-daemon.service  enabled (finding printers on the network)")
+  systemctl is-enabled -q fwupd-refresh.timer 2>/dev/null && LEFT+=("fwupd-refresh.timer  enabled (Hestia's firmware updates)")
   [[ -e /etc/modules-load.d/i2c-dev.conf ]] && LEFT+=("/etc/modules-load.d/i2c-dev.conf  monitor brightness (ddcutil)")
   flatpak remotes --system 2>/dev/null | grep -q '^flathub' && LEFT+=("flathub  Flatpak's system remote")
   return 0
@@ -363,16 +367,25 @@ collect_system() {
 PKGS=()
 PKG_NOTE=""
 
-# Everything ZENWORKS can put on a machine: the installer's list, the pieces
-# Hermes sets up and the tools Oracle installs, and paru when install built
-# it. Offered only when it was not there before install ran.
+# Everything ZENWORKS can put on a machine: the installer's list, what the
+# shell installed for itself through Ceres (noted in added.txt since
+# 2026-10-22), the package names its code asks for (for installs from before
+# that), and paru when install built it. Offered only when it was not there
+# before install ran.
 collect_packages() {
   local wanted p
   wanted="$(sed -n '/^PACKAGES=(/,/^)/p' "$REPO/install" | sed 's/#.*//' | tr -s ' \t' '\n' \
             | grep -v -e '^PACKAGES=($' -e '^)$' -e '^$' || true)"
+  [[ -f "$STATE/added.txt" ]] && wanted+=$'\n'"$(cat "$STATE/added.txt")"
   if [[ -d "$QS" ]]; then
-    wanted+=$'\n'"$(grep -ohE 'pkgs: \[[^]]*\]' "$QS/hermes/hermes.js" 2>/dev/null | grep -oE '"[^"]+"' | tr -d '"' || true)"
-    wanted+=$'\n'"$(grep -ohE 'pkg: "[^"]+"' "$QS/oracle/oracle.js" 2>/dev/null | sed 's/pkg: "//; s/"$//' || true)"
+    # pkgs: ["a", "b"], pkg: "a", Ceres.install(["a"]) / ("a"), fwStep(…, ["a"]
+    wanted+=$'\n'"$(grep -rhoE --include='*.qml' --include='*.js' --exclude-dir=tests \
+        -e 'pkgs?: *(\[[^]]*\]|"[^"]+")' -e 'Ceres\.install\( *(\[[^]]*\]|"[^"]+")' \
+        -e 'fwStep\("[^"]*", *\[[^]]*\]' "$QS" 2>/dev/null \
+      | sed 's/^fwStep("[^"]*", *//; s/^[^(["]*[(]*//' | grep -oE '"[a-z0-9][a-z0-9@._+-]*"' | tr -d '"' || true)"
+    # and the Python backends' own (Calypso's PKG = "…", return "…-bin", …)
+    wanted+=$'\n'"$(grep -rhoE --include='*.py' --exclude-dir=tests -e '^ *PKG = "[^"]+"' \
+        -e 'return "[a-z0-9._+-]+", (True|False)' "$QS" 2>/dev/null | grep -oE '"[^"]+"' | tr -d '"' || true)"
   fi
   if [[ "$(noted paru)" == built ]]; then wanted+=$'\n'"$(pacman -Qqo "$(command -v paru)" 2>/dev/null || true)"; fi
 

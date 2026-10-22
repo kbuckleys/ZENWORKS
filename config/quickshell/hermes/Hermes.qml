@@ -593,11 +593,11 @@ Singleton {
       // keyword, so either name finds it
       Name: "Control Hub",
       GenericName: "Network and Display",
-      Comment: "Wi-Fi, Bluetooth, VPN, brightness and night light, in ZENWORKS",
+      Comment: "Wi-Fi, Bluetooth, VPN, brightness, night light, printers and scanners, in ZENWORKS",
       Icon: "preferences-system-network",
       Categories: ["Settings", "Network", "HardwareSettings"],
       Keywords: ["hermes", "control", "hub", "wifi", "wi-fi", "wireless", "network", "ethernet", "bluetooth", "vpn", "wireguard",
-                 "brightness", "night light", "display", "monitor"],
+                 "brightness", "night light", "display", "monitor", "printer", "printing", "scanner", "scan", "cups"],
       Exec: Desktop.execLine(Quickshell.shellDir + "/hermes/bin/hermes", ""),
       Terminal: "false",
       StartupNotify: "false",

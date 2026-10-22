@@ -54,5 +54,23 @@ module.exports = {
     t.eq("pretty keys", [K.prettyKey("org.gnome.Nautilus"), K.prettyKey("brave-browser"), K.prettyKey("zenworks")],
       ["Nautilus", "Brave browser", "ZENWORKS"]);
     t.eq("broken file", K.parseMonth("{nope").days, {});
+
+    // ── limits and breaks ──
+    t.eq("no file, no limits", K.parseLimits(""), K.emptyLimits());
+    const L = K.parseLimits(JSON.stringify({ limits: { firefox: 60, bad: "x", zero: 0 }, told: { day: "2026-10-22", keys: { firefox: true } } }));
+    t.eq("only real limits are kept", L.limits, { firefox: 60 });
+    t.eq("round trip", K.parseLimits(K.serializeLimits(L)), L);
+    t.eq("a limit set", K.withLimit({}, "kitty", 30), { kitty: 30 });
+    t.eq("…and taken off", K.withLimit({ kitty: 30 }, "kitty", 0), {});
+    t.eq("under the limit", K.limitDue(L.limits, K.emptyLimits().told, "2026-10-23", "firefox", 59 * 60), false);
+    t.eq("reached", K.limitDue(L.limits, K.emptyLimits().told, "2026-10-23", "firefox", 3600), true);
+    t.eq("already said today", K.limitDue(L.limits, L.told, "2026-10-22", "firefox", 4000), false);
+    t.eq("said yesterday, due again", K.limitDue(L.limits, L.told, "2026-10-23", "firefox", 4000), true);
+    t.eq("no limit, never due", K.limitDue(L.limits, L.told, "2026-10-23", "kitty", 99999), false);
+    t.eq("a new day clears what was said", K.markTold(L.told, "2026-10-23", "kitty"), { day: "2026-10-23", keys: { kitty: true } });
+    t.eq("the same day adds to it", Object.keys(K.markTold(L.told, "2026-10-22", "kitty").keys).length, 2);
+    t.eq("limit words", [K.limitWords(0), K.limitWords(30), K.limitWords(60), K.limitWords(90)], ["No limit", "30 min", "1 h", "1 h 30 min"]);
+    t.eq("time against a limit", K.againstLimit(3900, 60), "1h 05m of 1 h");
+    t.eq("a break due", [K.breakDue(1199, 20), K.breakDue(1200, 20), K.breakDue(99999, 0)], [false, true, false]);
   }
 };

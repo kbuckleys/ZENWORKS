@@ -36,7 +36,12 @@ var G = {
   info: "\u{F02FD}",
   forget: "\u{F0A7A}",
   dns: "\u{F01D6}",
-  network: "\u{F0317}"         // md-lan
+  network: "\u{F0317}",        // md-lan
+  printer: "\u{F042A}",        // md-printer
+  printerOff: "\u{F0E5D}",     // md-printer_off
+  printerAlert: "\u{F042C}",   // md-printer_alert
+  printerSearch: "\u{F1457}",  // md-printer_search
+  scanner: "\u{F06AB}"         // md-scanner
 };
 
 // The sections, in the order the window's sidebar and the quick panel's
@@ -45,7 +50,8 @@ var SECTIONS = [
   { id: "network", label: "Network", glyph: "\u{F0317}" },
   { id: "bluetooth", label: "Bluetooth", glyph: "\u{F00AF}" },
   { id: "vpn", label: "VPN", glyph: "\u{F0582}" },
-  { id: "display", label: "Display", glyph: "\u{F0379}" }
+  { id: "display", label: "Display", glyph: "\u{F0379}" },
+  { id: "printers", label: "Printers", glyph: "\u{F042A}" }
 ];
 
 // ── THE PROBE ────────────────────────────────────────────────────────────
@@ -317,7 +323,105 @@ var SETUP = {
     why: "to manage Wi-Fi and VPNs in Hermes (replaces systemd-networkd)"
   }
 };
+// Printing: CUPS with its filters, ipp-usb (a USB printer or scanner as a
+// driverless network one) and avahi to find network printers; the socket
+// and avahi started now and at boot. Scanning: SANE and its driverless
+// eSCL/WSD backend.
+SETUP.printing = {
+  pkgs: ["cups", "cups-filters", "ipp-usb", "avahi"],
+  after: [["@sudo", "systemctl", "enable", "--now", "cups.socket", "avahi-daemon.service"]],
+  why: "for printers in Control Hub"
+};
+SETUP.printingStart = {
+  pkgs: [],
+  after: [["@sudo", "systemctl", "enable", "--now", "cups.socket", "avahi-daemon.service"]],
+  why: "start printing"
+};
+SETUP.scanning = {
+  pkgs: ["sane", "sane-airscan", "ipp-usb"],
+  after: [],
+  why: "for scanners in Control Hub"
+};
 function setupOf(kind) { return SETUP[kind] || null; }
+
+// ── PRINTERS AND SCANNERS ────────────────────────────────────────────────
+// bin/hermes-print's answers, with every field there whatever it said
+function emptyPrint() {
+  return { known: false, cups: { installed: false, running: false }, sane: { installed: false, airscan: false },
+           printers: [], jobs: [] };
+}
+function parsePrint(text) {
+  var d = emptyPrint();
+  var j;
+  try { j = JSON.parse(String(text || "")); } catch (e) { return d; }
+  if (!j || typeof j !== "object") return d;
+  d.known = true;
+  if (j.cups) d.cups = { installed: !!j.cups.installed, running: !!j.cups.running };
+  if (j.sane) d.sane = { installed: !!j.sane.installed, airscan: !!j.sane.airscan };
+  d.printers = (Array.isArray(j.printers) ? j.printers : []).filter(function (p) { return p && p.name; }).map(function (p) {
+    return { name: String(p.name), info: String(p.info || p.name), model: String(p.model || ""), uri: String(p.uri || ""),
+             state: p.state === "printing" || p.state === "stopped" ? p.state : "idle",
+             reasons: Array.isArray(p.reasons) ? p.reasons.map(String) : [],
+             default: !!p.default, jobs: Number(p.jobs) || 0 };
+  });
+  // the default first, then by name
+  d.printers.sort(function (a, b) { return (b.default - a.default) || a.info.localeCompare(b.info); });
+  d.jobs = (Array.isArray(j.jobs) ? j.jobs : []).filter(function (x) { return x && x.id; }).map(function (x) {
+    return { id: String(x.id), printer: String(x.printer || ""), size: Number(x.size) || 0, user: String(x.user || "") };
+  });
+  return d;
+}
+// an action's answer: { ok, error, admin }
+function parseAct(text) {
+  var j;
+  try { j = JSON.parse(String(text || "")); } catch (e) { return { ok: false, error: "no answer", admin: false }; }
+  return { ok: !!(j && j.ok), error: j && j.error ? String(j.error) : "", admin: !!(j && j.admin) };
+}
+function parseDevices(text) {
+  var j;
+  try { j = JSON.parse(String(text || "")); } catch (e) { return { ok: false, error: "no answer", devices: [] }; }
+  return { ok: !!(j && j.ok), error: j && j.error ? String(j.error) : "",
+           devices: (j && Array.isArray(j.devices) ? j.devices : []).filter(function (x) { return x && (x.uri || x.id); }) };
+}
+// CUPS' state reasons that are worth saying, in words
+var REASONS = {
+  "media-empty": "Out of paper", "media-needed": "Out of paper", "media-jam": "Paper jam",
+  "toner-low": "Toner low", "toner-empty": "Out of toner", "marker-supply-low": "Ink low",
+  "marker-supply-empty": "Out of ink", "door-open": "A door is open", "cover-open": "The cover is open",
+  "offline": "Offline", "paused": "Paused", "connecting-to-device": "Connecting…"
+};
+function reasonWords(reasons) {
+  var out = [];
+  (reasons || []).forEach(function (r) {
+    var k = String(r).replace(/-(report|warning|error)$/, "");
+    if (REASONS[k] && out.indexOf(REASONS[k]) < 0) out.push(REASONS[k]);
+  });
+  return out.join(" · ");
+}
+function printerWords(p) {
+  if (!p) return "";
+  var why = reasonWords(p.reasons);
+  var st = p.state === "stopped" ? "Paused" : p.state === "printing" ? "Printing" : "Ready";
+  if (why === "Paused") why = "";
+  var jobs = p.jobs > 0 ? p.jobs + (p.jobs === 1 ? " job" : " jobs") : "";
+  return [st, why, jobs].filter(function (x) { return x; }).join(" · ");
+}
+function printerGlyph(p) {
+  if (!p) return G.printer;
+  if (p.state === "stopped") return G.printerOff;
+  return reasonWords(p.reasons) !== "" ? G.printerAlert : G.printer;
+}
+// a scan's file: "Scan 2026-10-22 14.03.05.png" — sorts by when, and says it
+function scanFileName(date, fmt) {
+  function two(n) { return (n < 10 ? "0" : "") + n; }
+  var d = date;
+  return "Scan " + d.getFullYear() + "-" + two(d.getMonth() + 1) + "-" + two(d.getDate()) + " "
+    + two(d.getHours()) + "." + two(d.getMinutes()) + "." + two(d.getSeconds()) + "." + (fmt === "pdf" ? "pdf" : "png");
+}
+// a printer found nearby that is already set up (same address)
+function alreadyAdded(dev, printers) {
+  return (printers || []).some(function (p) { return p.uri === dev.uri; });
+}
 
 // ── THE BAR ──────────────────────────────────────────────────────────────
 // Hermes' own glyph, the one cynosure and icarus show (user, 2026-10-20:

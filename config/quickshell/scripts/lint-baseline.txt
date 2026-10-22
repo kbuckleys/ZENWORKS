@@ -1,4 +1,9 @@
 # scripts/lintgate.py --accept — count, file, kind, message
+1	argus/ArgusOverlay.qml	missing-property	Could not find property "bottom".
+1	argus/ArgusOverlay.qml	missing-property	Could not find property "left".
+1	argus/ArgusOverlay.qml	missing-property	Could not find property "right".
+1	argus/ArgusOverlay.qml	missing-property	Could not find property "top".
+2	argus/ArgusOverlay.qml	uncreatable-type	Type PanelWindow is not creatable.
 1	calypso/CalypsoPopup.qml	unused-imports	Unused import
 1	calypso/ItemDetail.qml	id-shadows-member	Id for object Flickable shadows property "flick". Rename one or the other.
 1	calypso/ItemDetail.qml	id-shadows-member	Note: Id defined here
@@ -226,7 +231,6 @@
 1	terminus/DirWatch.qml	id-shadows-member	Id for object Process shadows property "watchProc". Rename one or the other.
 3	terminus/DirWatch.qml	id-shadows-member	Note: Id defined here
 1	terminus/DirWatch.qml	unused-imports	Unused import
-1	terminus/DiskInfoSheet.qml	unused-imports	Unused import
 1	terminus/DisksSheet.qml	unused-imports	Unused import
 1	terminus/DropAsk.qml	uncreatable-type	Type PanelWindow is not creatable.
 2	terminus/EditRing.qml	missing-property	Member "item" not found on type "QQuickItem"

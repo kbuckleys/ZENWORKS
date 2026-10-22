@@ -161,3 +161,19 @@ function stripArgs(src, dir, durMs, count) {
           "-vf", "fps=" + rate.toFixed(4) + ",scale=-2:96", "-frames:v", String(n), "-q:v", "5",
           dir + "/f%02d.jpg"];
 }
+
+// ── RECORDING PREFERENCES ────────────────────────────────────────────────
+// What argus.lua asks for before it records (`qs ipc call Argus recPrefs`):
+// one line of key=value words its shell reads with a case, nothing quoted.
+// Anything odd falls back to how it recorded before these existed.
+var REC_AUDIO = ["none", "system", "mic", "both"];
+function recPrefsLine(o) {
+  var cd = Math.max(0, Math.min(10, Math.round(Number(o && o.recCountdown) || 0)));
+  var au = REC_AUDIO.indexOf(o && o.recAudio) >= 0 ? o.recAudio : "system";
+  return "countdown=" + cd + " audio=" + au + " pointer=" + (o && o.recBigPointer ? 1 : 0) + " camera=" + (o && o.recCamera ? 1 : 0);
+}
+// the camera bubble's anchors for a corner
+function cornerAnchors(c) {
+  return { top: c === "topLeft" || c === "topRight", bottom: c !== "topLeft" && c !== "topRight",
+           left: c === "topLeft" || c === "bottomLeft", right: c !== "topLeft" && c !== "bottomLeft" };
+}

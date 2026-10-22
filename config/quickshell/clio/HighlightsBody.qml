@@ -94,7 +94,7 @@ Item {
   }
 
   Flickable {
-    id: flick
+    id: hlFlick
     anchors.fill: parent
     anchors.topMargin: 100
     anchors.leftMargin: 18
@@ -105,7 +105,7 @@ Item {
     boundsBehavior: Flickable.StopAtBounds
     Column {
       id: col
-      width: flick.width
+      width: hlFlick.width
       spacing: 8
       EmptyState {
         visible: hb.rows.length === 0
@@ -163,5 +163,6 @@ Item {
       }
     }
   }
-  ElasticScroll { anchors.fill: flick; view: flick }
+  ElasticScroll { anchors.fill: hlFlick; view: hlFlick }
+  Scrollbar { flick: hlFlick; anchors.right: parent.right; anchors.top: hlFlick.top; anchors.bottom: hlFlick.bottom }
 }

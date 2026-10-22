@@ -132,5 +132,10 @@ Item {
       }
     }
   }
+  // the wheel and the bar, as every list has them; the bar on the card's edge
+  ElasticScroll { anchors.fill: grid; view: grid; visible: grid.visible }
+  ElasticScroll { anchors.fill: files; view: files; visible: files.visible }
+  Scrollbar { flick: grid; visible: grid.visible; anchors.right: parent.right; anchors.top: grid.top; anchors.bottom: grid.bottom }
+  Scrollbar { flick: files; visible: files.visible; anchors.right: parent.right; anchors.top: files.top; anchors.bottom: files.bottom }
   EmptyState { anchors.centerIn: parent; visible: ab.items.length === 0; text: ab.kind === "pictures" ? "No pictures" : "No files" }
 }

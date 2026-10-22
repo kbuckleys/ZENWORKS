@@ -137,6 +137,36 @@ module.exports = {
     t.has("networkmanager turns networkd off", H.setupOf("networkmanager").after[0][3], "disable --now systemd-networkd");
     t.has("…and NetworkManager on", H.setupOf("networkmanager").after[0][3], "enable --now NetworkManager");
     t.eq("an unknown setup", H.setupOf("nope"), null);
+    t.eq("printing installs cups and finds printers", H.setupOf("printing").pkgs.slice(0, 2), ["cups", "cups-filters"]);
+    t.has("…and starts the socket as root", H.setupOf("printing").after[0].join(" "), "enable --now cups.socket");
+    t.eq("scanning installs sane-airscan", H.setupOf("scanning").pkgs.indexOf("sane-airscan") >= 0, true);
+
+    // ── printers ──────────────────────────────────────────────────────────
+    t.eq("a broken print answer is the empty one", H.parsePrint("x").known, false);
+    const pr = H.parsePrint(JSON.stringify({
+      cups: { installed: true, running: true }, sane: { installed: false },
+      printers: [
+        { name: "Zed", info: "Zed office", state: "idle", reasons: [], default: false, jobs: 0, uri: "ipp://z" },
+        { name: "Brother", info: "Brother HL", state: "printing", reasons: ["toner-low-report"], default: true, jobs: 2 },
+        { info: "nameless" }
+      ],
+      jobs: [{ id: "Brother-12", printer: "Brother", size: 1024 }, { printer: "x" }]
+    }));
+    t.eq("a nameless printer is dropped", pr.printers.length, 2);
+    t.eq("the default printer first", pr.printers[0].name, "Brother");
+    t.eq("a nameless job is dropped", pr.jobs.length, 1);
+    t.eq("a printer in words", H.printerWords(pr.printers[0]), "Printing · Toner low · 2 jobs");
+    t.eq("an idle printer in words", H.printerWords(pr.printers[1]), "Ready");
+    t.eq("a paused one says so once", H.printerWords({ state: "stopped", reasons: ["paused"], jobs: 0 }), "Paused");
+    t.eq("a printer wanting something wears the alert", H.printerGlyph(pr.printers[0]), H.G.printerAlert);
+    t.eq("an unknown reason is not said", H.reasonWords(["other", "none"]), "");
+    t.eq("a scan's name sorts by when", H.scanFileName(new Date(2026, 9, 2, 9, 5, 7), "png"), "Scan 2026-10-02 09.05.07.png");
+    t.eq("…as a PDF", H.scanFileName(new Date(2026, 9, 2, 9, 5, 7), "pdf").slice(-4), ".pdf");
+    t.eq("an action that worked", H.parseAct('{"ok":true,"error":"","admin":false}').ok, true);
+    t.eq("an action CUPS refused for want of root", H.parseAct('{"ok":false,"error":"Forbidden","admin":true}').admin, true);
+    t.eq("no answer is a failure", H.parseAct("").ok, false);
+    t.eq("found devices keep only those with an address", H.parseDevices('{"ok":true,"devices":[{"uri":"a"},{}]}').devices.length, 1);
+    t.eq("a nearby printer already added", H.alreadyAdded({ uri: "ipp://z" }, pr.printers), true);
 
     // ── the bar ───────────────────────────────────────────────────────────
     t.eq("the bar wears hermes' own glyph", H.barGlyphs(p, {})[0].glyph, "\u{F1542}");

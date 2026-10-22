@@ -73,9 +73,14 @@ Bubble {
     text: "Nothing put in a note yet — add some from Terminus, or drop them on the note."
   }
 
+  // in a room of its own, so the wheel and the bar can lie over it (the
+  // bubble stacks what it is given)
+  Item {
+  visible: tray.items.length > 0
+  width: 424
+  height: trayFlick.height
   Flickable {
-    id: flick
-    visible: tray.items.length > 0
+    id: trayFlick
     width: 424
     height: Math.min(grid.height, 340)
     contentHeight: grid.height
@@ -85,7 +90,7 @@ Bubble {
     Grid {
       id: grid
       // centered: a row of fewer than four sits in the middle, not to the left
-      x: Math.max(0, Math.round((flick.width - grid.width) / 2))
+      x: Math.max(0, Math.round((trayFlick.width - grid.width) / 2))
       columns: 4
       spacing: 8
       Repeater {
@@ -156,6 +161,9 @@ Bubble {
         }
       }
     }
+  }
+  ElasticScroll { anchors.fill: trayFlick; view: trayFlick }
+  Scrollbar { flick: trayFlick; anchors.right: trayFlick.right; anchors.top: trayFlick.top; anchors.bottom: trayFlick.bottom }
   }
 
   // how to use what is shown, under it (the head is the title and the button)

@@ -18,8 +18,10 @@
 
 import QtQuick
 import Quickshell
+import Quickshell.Io
 import "../morpheus"
 import "terminus.js" as Terminus
+import "../hestia/hestia.js" as Health
 
 Rectangle {
   id: diskInfo
@@ -69,7 +71,25 @@ Rectangle {
     if (d.model) return d.model;
     return Terminus.basename(d.path);
   }
-  readonly property var facts: Terminus.diskFacts(diskInfo.cur)
+  // ── ITS HEALTH ────────────────────────────────────────────────────────
+  // The drive's SMART, as udisks reads it for everyone (hestia's
+  // core/health.py, the same one System Journal's overview asks): asked
+  // each time the card opens, and its rows go under the disk's own facts.
+  property var drives: []
+  readonly property var drive: diskInfo.cur
+    ? Health.driveOf(diskInfo.drives, diskInfo.cur.device || diskInfo.cur.path) || Health.driveOf(diskInfo.drives, diskInfo.cur.path)
+    : null
+  onOpenChanged: if (diskInfo.open && !healthProc.running) healthProc.running = true
+  Process {
+    id: healthProc
+    command: ["python3", Quickshell.shellDir + "/hestia/core/health.py", "disks"]
+    stdout: StdioCollector {
+      id: healthOut
+      waitForEnd: true
+      onStreamFinished: diskInfo.drives = Health.parseDrives(healthOut.text)
+    }
+  }
+  readonly property var facts: Terminus.diskFacts(diskInfo.cur).concat(Health.diskHealthFacts(diskInfo.drive))
   readonly property real used: diskInfo.cur
     ? Terminus.usedFraction(diskInfo.cur.avail, diskInfo.cur.fsSize) : -1
   readonly property bool system: !!diskInfo.cur && Terminus.isSystemMount(diskInfo.cur.mount)
@@ -251,7 +271,8 @@ Rectangle {
             anchors.verticalCenter: parent.verticalCenter
             elide: Text.ElideMiddle
             text: factRow.modelData[1]
-            color: Zenon.white
+            // a health row that wants looking at is inked so
+            color: factRow.modelData[2] === "bad" ? Zenon.red : factRow.modelData[2] === "warn" ? Zenon.yellow : Zenon.white
             font.family: Zenon.faceMono
             font.weight: Zenon.weight
             font.pixelSize: Zenon.px(14)

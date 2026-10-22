@@ -25,6 +25,8 @@ import Quickshell.Widgets
 import "../morpheus"
 import "../terminus"
 import "../morpheus/helpers.js" as Helpers
+import "../clio"
+import "../clio/notes.js" as N
 import "chronos.js" as Chr
 import "weather.js" as Wx
 
@@ -211,18 +213,34 @@ LayerPopup {
   readonly property int paneInner: 34 + 22 + popup.cellH * 6 + 26 + 24 + 14
   readonly property int bodyHeight: popup.panePad * 2 + popup.paneInner
 
+  // "2 events · 1 task"
+  function agendaCount() {
+    const t = popup.dayTasks.length, e = popup.dayEvents.length - t;
+    return [e > 0 ? e + (e === 1 ? " event" : " events") : "", t > 0 ? t + (t === 1 ? " task" : " tasks") : ""]
+      .filter((x) => x).join(" \u00B7 ");
+  }
   function calcHeight() { return popup.bandHeight + 1 + popup.bodyHeight + 1 + popup.agendaH; }
 
   // ── the day's events (khal; 2026-10-21) ──────────────────────────────
   // A strip under the calendar: the chosen day's events, one line each, and
   // a line to type a new one into. Before khal is set up, the one button
   // that sets it up.
-  readonly property var dayEvents: Chronos.byDay[popup.selIso] || []
+  // Clio's open checklist items with a due date (2026-10-22): on their day
+  // beside the events, khal or not — a click opens the note at the item
+  readonly property var openTasks: Clio.app ? N.tasks(Clio.app.notes, Date.now()).filter((t) => t.due > 0) : []
+  readonly property var taskDays: {
+    const out = {};
+    for (const t of popup.openTasks) out[Chr.isoOf(new Date(t.due))] = true;
+    return out;
+  }
+  readonly property var dayTasks: popup.openTasks.filter((t) => Chr.isoOf(new Date(t.due)) === popup.selIso)
+    .map((t) => ({ title: t.h, start: N.clock(t.due), allDay: false, task: t }))
+  readonly property var dayEvents: (Chronos.calReady ? (Chronos.byDay[popup.selIso] || []) : []).concat(popup.dayTasks)
   readonly property int agendaRowH: 32
   readonly property int agendaRows: Math.min(5, popup.dayEvents.length)
   // a day with nothing on it is the one line that says so, and the field
   // (user, 2026-10-21: the empty row under it was padding for nothing)
-  readonly property int agendaH: !Chronos.calReady ? 52
+  readonly property int agendaH: !Chronos.calReady && popup.dayTasks.length === 0 ? 52
     : popup.agendaRows === 0 ? 46 : 46 + popup.agendaRows * popup.agendaRowH + 10
   property string agendaNote: ""
   property bool agendaNoteBad: false
@@ -635,7 +653,7 @@ LayerPopup {
                       width: 5
                       height: 5
                       radius: height / 2
-                      visible: !!Chronos.byDay[dayCell.iso]
+                      visible: !!Chronos.byDay[dayCell.iso] || !!popup.taskDays[dayCell.iso]
                       color: dayCell.isToday ? Zenon.black : Zenon.yellow
                     }
 
@@ -1112,7 +1130,7 @@ LayerPopup {
 
           // not set up: what it takes, and the button
           Row {
-            visible: !Chronos.calReady
+            visible: !Chronos.calReady && popup.dayTasks.length === 0
             // centered in the strip (user, 2026-10-21)
             anchors.centerIn: parent
             spacing: 12
@@ -1141,9 +1159,10 @@ LayerPopup {
             }
           }
 
-          // set up: the day's events, and a line for a new one
+          // set up: the day's events, and a line for a new one (and, set
+          // up or not, the day's tasks from Clio)
           Item {
-            visible: Chronos.calReady
+            visible: Chronos.calReady || popup.dayTasks.length > 0
             anchors.fill: parent
             anchors.leftMargin: popup.sideMargin
             anchors.rightMargin: popup.sideMargin
@@ -1154,7 +1173,7 @@ LayerPopup {
               y: 14
               text: popup.agendaNote !== "" ? popup.agendaNote
                 : popup.dayEvents.length === 0 ? "Nothing on " + Chr.longDay(popup.selDate)
-                : popup.dayEvents.length + (popup.dayEvents.length === 1 ? " event" : " events") + " on " + Chr.longDay(popup.selDate)
+                : popup.agendaCount() + " on " + Chr.longDay(popup.selDate)
               color: popup.agendaNote !== "" ? (popup.agendaNoteBad ? Zenon.red : Zenon.cyan) : Zenon.keyInk
               font.family: popup.face
               font.weight: Font.Bold
@@ -1162,6 +1181,7 @@ LayerPopup {
             }
             // the line a new event is typed into
             Rectangle {
+              visible: Chronos.calReady
               anchors.right: parent.right
               anchors.verticalCenter: agendaHead.verticalCenter
               width: Math.min(440, parent.width * 0.55)
@@ -1239,7 +1259,7 @@ LayerPopup {
                   anchors.verticalCenter: parent.verticalCenter
                   elide: Text.ElideRight
                   textFormat: Text.StyledText
-                  text: !evRow.e ? "" : Strings.escapeHtml(evRow.e.title)
+                  text: !evRow.e ? "" : (evRow.e.task ? "\u{F0131}  " : "") + Strings.escapeHtml(evRow.e.title)
                     + (evRow.e.location ? '  <font color="' + Zenon.hex(Zenon.muted) + '">' + Strings.escapeHtml(evRow.e.location) + "</font>" : "")
                     + (evRow.e.repeats ? '  <font color="' + Zenon.hex(Zenon.muted) + '">\u{F0456}</font>' : "")
                   color: Zenon.white
@@ -1254,7 +1274,7 @@ LayerPopup {
                   anchors.right: parent.right
                   anchors.rightMargin: 4
                   anchors.verticalCenter: parent.verticalCenter
-                  visible: !!evRow.e && !evRow.e.repeats
+                  visible: !!evRow.e && !evRow.e.repeats && !evRow.e.task
                   text: "\u{F0156}"
                   color: rmMa.pressed ? Zenon.red : Zenon.muted
                   font.family: popup.face
@@ -1266,8 +1286,15 @@ LayerPopup {
                     onClicked: Chronos.removeEvent(evRow.e.uid, (ok, w) => popup.agendaSay(ok ? "Removed \u201C" + evRow.e.title + "\u201D" : w, !ok))
                   }
                 }
+                // a task: its note, opened at it
+                MouseArea {
+                  anchors.fill: parent
+                  visible: !!evRow.e && !!evRow.e.task
+                  onClicked: if (Clio.app) Clio.app.openTask(evRow.e.task.id, evRow.e.task.h)
+                }
               }
             }
+            Scrollbar { flick: eventList; visible: eventList.visible; anchors.right: eventList.right; anchors.top: eventList.top; anchors.bottom: eventList.bottom }
           }
         }
         Rectangle {

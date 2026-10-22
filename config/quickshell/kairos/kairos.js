@@ -172,3 +172,51 @@ function prettyKey(key) {
   k = k.replace(/[-_]+/g, " ").trim();
   return k.charAt(0).toUpperCase() + k.slice(1);
 }
+
+// ── LIMITS AND BREAKS ────────────────────────────────────────────────────
+// A daily limit per app (minutes; none is 0), said once a day when it is
+// reached; and a break, said after this long at the screen without one
+// (idle past Oracle's screenTimeIdleMins, or the lock, is a break).
+// Kept in $XDG_STATE_HOME/quickshell/kairos.json:
+//   { limits: { key: minutes }, told: { day: "2026-10-22", keys: { key: true } } }
+var LIMIT_CHOICES = [0, 15, 30, 60, 120, 180, 240];
+function emptyLimits() { return { limits: {}, told: { day: "", keys: {} } }; }
+function parseLimits(text) {
+  const d = emptyLimits();
+  let j;
+  try { j = JSON.parse(String(text || "")); } catch (e) { return d; }
+  if (!j || typeof j !== "object") return d;
+  if (j.limits && typeof j.limits === "object")
+    for (const k in j.limits) { const m = Math.round(Number(j.limits[k])); if (m > 0) d.limits[k] = m; }
+  if (j.told && typeof j.told.day === "string" && j.told.keys && typeof j.told.keys === "object") {
+    d.told.day = j.told.day;
+    for (const k in j.told.keys) if (j.told.keys[k]) d.told.keys[k] = true;
+  }
+  return d;
+}
+function serializeLimits(s) { return JSON.stringify({ limits: s.limits || {}, told: s.told || { day: "", keys: {} } }, null, 2) + "\n"; }
+// the limits with one changed (0 takes it off)
+function withLimit(limits, key, mins) {
+  const out = Object.assign({}, limits || {});
+  if (mins > 0) out[key] = Math.round(mins); else delete out[key];
+  return out;
+}
+// reached today and not yet said today
+function limitDue(limits, told, day, key, secsToday) {
+  const m = (limits || {})[key] || 0;
+  if (m <= 0 || secsToday < m * 60) return false;
+  return !(told && told.day === day && told.keys[key]);
+}
+// said: a new day starts the list again
+function markTold(told, day, key) {
+  const keys = told && told.day === day ? Object.assign({}, told.keys) : {};
+  keys[key] = true;
+  return { day: day, keys: keys };
+}
+function limitWords(mins) {
+  if (!(mins > 0)) return "No limit";
+  return mins % 60 === 0 ? (mins / 60) + " h" : mins > 60 ? Math.floor(mins / 60) + " h " + (mins % 60) + " min" : mins + " min";
+}
+// time against a limit: "1h 05m of 1 h"
+function againstLimit(secs, mins) { return fmt(secs) + (mins > 0 ? " of " + limitWords(mins) : ""); }
+function breakDue(stretchSecs, everyMins) { return everyMins > 0 && stretchSecs >= everyMins * 60; }

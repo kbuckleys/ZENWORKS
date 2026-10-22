@@ -27,6 +27,8 @@ Item {
   property string busyText: ""
   // the pill's color; the button's own ink unless said
   property color busyInk: Zenon.cyan
+  // the label is a glyph (DialogButton's glyph), e.g. a refresh mark
+  property bool glyph: false
   signal clicked()
 
   // The words stay while the pill fades out, so it does not shrink empty.
@@ -44,6 +46,7 @@ Item {
     id: btn
     anchors.right: parent.right
     label: bb.label
+    glyph: bb.glyph
     ink: bb.ink
     primary: bb.primary
     ready: bb.ready && !bb.busy

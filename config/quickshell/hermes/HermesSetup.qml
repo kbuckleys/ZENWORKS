@@ -61,7 +61,6 @@ Column {
     }
     BusyButton {
       label: s.action
-      ink: s.ink
       primary: true
       busy: s.busy
       busyText: "Setting up…"

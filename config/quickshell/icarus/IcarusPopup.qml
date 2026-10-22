@@ -1676,6 +1676,7 @@ Item {
             }
           }
         }
+        Scrollbar { flick: appsFlick; visible: appsFlick.visible; anchors.right: parent.right; anchors.top: appsFlick.top; anchors.bottom: appsFlick.bottom }
 
         }
       }

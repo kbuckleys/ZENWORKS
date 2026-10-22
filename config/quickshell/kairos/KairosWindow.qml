@@ -11,7 +11,8 @@
 //   d  w     day · week                     esc closes
 //
 // A week's bar is a way into that day. "Forget" (the foot) empties every
-// file, asked first.
+// file, asked first. An app clicked sets its daily limit (Kairos says when
+// it is reached); on a day, its time reads against that limit.
 
 import QtQuick
 import Quickshell
@@ -80,6 +81,10 @@ FloatingWindow {
     focus: true
     Keys.onPressed: (e) => {
       e.accepted = true;
+      if (limitSheet.shown) {
+        if (e.key === Qt.Key_Escape) limitSheet.shown = false;
+        return;
+      }
       if (forget.shown) {
         if (e.key === Qt.Key_Escape) forget.shown = false;
         else if (e.key === Qt.Key_Return || e.key === Qt.Key_Enter) forget.answer(forget.pick);
@@ -278,6 +283,21 @@ FloatingWindow {
               required property var modelData
               width: col.width
               height: Zenon.px(15) + 26
+              readonly property int limit: { Kairos.revision; return Kairos.limitOf(row.modelData.key); }
+              // over its limit, on a day (a limit is a day's)
+              readonly property bool over: kw.view === "day" && row.limit > 0 && row.modelData.secs >= row.limit * 60
+              MouseArea {
+                anchors.fill: parent
+                hoverEnabled: true
+                onClicked: { limitSheet.key = row.modelData.key; limitSheet.shown = true; }
+                Rectangle {
+                  anchors.fill: parent
+                  anchors.leftMargin: -10
+                  anchors.rightMargin: -10
+                  radius: Zenon.windowRadius
+                  color: Zenon.wash(parent.containsMouse ? 0.04 : 0)
+                }
+              }
               Text {
                 id: glyph
                 anchors.verticalCenter: parent.verticalCenter
@@ -313,14 +333,14 @@ FloatingWindow {
                   width: Math.max(6, track.width * row.modelData.share)
                   height: parent.height
                   radius: 3
-                  color: Zenon.alpha(Zenon.cyan, 0.7)
+                  color: Zenon.alpha(row.over ? Zenon.yellow : Zenon.cyan, 0.7)
                 }
               }
               Text {
                 anchors.right: parent.right
                 anchors.verticalCenter: parent.verticalCenter
-                text: K.fmt(row.modelData.secs)
-                color: Zenon.ink
+                text: kw.view === "day" ? K.againstLimit(row.modelData.secs, row.limit) : K.fmt(row.modelData.secs)
+                color: row.over ? Zenon.yellow : Zenon.ink
                 font.family: Zenon.face
                 font.weight: Zenon.weight
                 font.pixelSize: Zenon.px(15)
@@ -330,6 +350,13 @@ FloatingWindow {
         }
       }
     }
+
+    // what scrolls goes up under the head and down under the hints, frosted
+    // (morpheus/ScrollEdge), as System Journal's pages do
+    ElasticScroll { anchors.fill: page; view: page }
+    ScrollEdge { z: 2; view: page; follow: true; chromeTop: 0 }
+    ScrollEdge { z: 2; view: page; below: true; follow: true; bar: foot }
+    Scrollbar { z: 4; flick: page; anchors.right: page.right; anchors.top: page.top; anchors.bottom: page.bottom }
 
     EmptyState {
       anchors.horizontalCenter: page.horizontalCenter
@@ -347,12 +374,108 @@ FloatingWindow {
       anchors.bottom: parent.bottom
       anchors.left: parent.left
       anchors.right: parent.right
-      rows: [["← →", kw.view === "week" ? "week" : "day"], ["d w", "day · week"], ["t", "today"], ["esc", "close"]]
+      rows: [["← →", kw.view === "week" ? "week" : "day"], ["d w", "day · week"], ["t", "today"], ["click an app", "limit"], ["esc", "close"]]
       DialogButton {
         anchors.verticalCenter: parent.verticalCenter
         label: "Forget"
         implicitHeight: 28
         onClicked: { forget.pick = 1; forget.shown = true; }
+      }
+    }
+
+    // ── an app's daily limit ──
+    InputShield { visible: limitSheet.shown; onClicked: limitSheet.shown = false }
+    Sheet {
+      id: limitSheet
+      fromTop: kw.headH
+      cardW: 560
+      cardH: limitCol.implicitHeight + 48
+      property string key: ""
+      // what it has had of you today, against the limit
+      readonly property real todaySecs: {
+        Kairos.revision;
+        const d = Kairos.day(K.dayKey(new Date()));
+        return d && d.apps[limitSheet.key] ? d.apps[limitSheet.key] : 0;
+      }
+      readonly property int limit: { Kairos.revision; return Kairos.limitOf(limitSheet.key); }
+      Column {
+        id: limitCol
+        x: 24
+        y: 24
+        width: parent.width - 48
+        spacing: 18
+
+        // the app, as its row in the list wears it, and today's time
+        Item {
+          width: parent.width
+          height: Math.max(limGlyph.height, limName.height)
+          Text {
+            id: limGlyph
+            width: Zenon.px(40)
+            horizontalAlignment: Text.AlignHCenter
+            text: limitSheet.key !== "" ? Kairos.glyphOf(limitSheet.key) : ""
+            color: Zenon.cyan
+            font.family: Zenon.face
+            font.pixelSize: Zenon.px(36)
+          }
+          Column {
+            id: limName
+            anchors.left: limGlyph.right
+            anchors.leftMargin: 14
+            anchors.right: parent.right
+            anchors.verticalCenter: limGlyph.verticalCenter
+            spacing: 2
+            Text {
+              width: parent.width
+              elide: Text.ElideRight
+              text: limitSheet.key !== "" ? Kairos.nameOf(limitSheet.key) : ""
+              color: Zenon.ink
+              font.family: Zenon.face
+              font.weight: Zenon.titleWeight
+              font.pixelSize: Zenon.px(18)
+            }
+            Text {
+              width: parent.width
+              elide: Text.ElideRight
+              text: K.againstLimit(limitSheet.todaySecs, limitSheet.limit) + " today"
+              color: limitSheet.limit > 0 && limitSheet.todaySecs >= limitSheet.limit * 60 ? Zenon.yellow : Zenon.accentMuted
+              font.family: Zenon.face
+              font.weight: Zenon.weight
+              font.pixelSize: Zenon.px(13)
+            }
+          }
+        }
+
+        SectionLabel { text: "Daily limit" }
+        Segments {
+          width: parent.width
+          even: true
+          options: K.LIMIT_CHOICES.map((m) => [String(m), m === 0 ? "None" : K.limitWords(m)])
+          current: String(limitSheet.limit)
+          onChose: (v) => { Kairos.setLimit(limitSheet.key, Number(v)); limitSheet.shown = false; }
+        }
+        Text {
+          width: parent.width
+          wrapMode: Text.WordWrap
+          text: "When it is reached, a notification says so, once a day. Nothing is closed or blocked."
+          color: Zenon.accentMuted
+          font.family: Zenon.face
+          font.weight: Zenon.weight
+          font.pixelSize: Zenon.px(13)
+        }
+
+        // the foot: a rule, and the way out
+        Rectangle { width: parent.width; height: 1; color: Zenon.border }
+        Item {
+          width: parent.width
+          height: limCancel.height
+          DialogButton {
+            id: limCancel
+            anchors.right: parent.right
+            label: "Close"
+            onClicked: limitSheet.shown = false
+          }
+        }
       }
     }
 

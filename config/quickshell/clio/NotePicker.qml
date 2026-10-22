@@ -105,4 +105,6 @@ Item {
     }
     EmptyState { anchors.centerIn: parent; visible: list.count === 0; filtered: pickField.text !== ""; text: "No other notes" }
   }
+  ElasticScroll { anchors.fill: list; view: list }
+  Scrollbar { flick: list; anchors.right: parent.right; anchors.top: list.top; anchors.bottom: list.bottom }
 }

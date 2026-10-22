@@ -228,3 +228,78 @@ function clock(ms, nowMs) {
   if (d.toDateString() === n.toDateString()) return time;
   return d.getFullYear() + "-" + two(d.getMonth() + 1) + "-" + two(d.getDate()) + " " + time;
 }
+
+// ── DRIVES ───────────────────────────────────────────────────────────────
+// core/health.py's numbers, read: whether a drive is fine, and the facts
+// worth saying. Used by Hestia's overview and terminus' disk card alike.
+// NVMe's critical-warning bits, in words
+var NVME_WARN = {
+  spare: "Spare blocks nearly used up", temperature: "Too hot", degraded: "Reliability degraded",
+  readonly: "Gone read-only", volatile_mem: "Backup memory failed", pmr_readonly: "Memory gone read-only"
+};
+function kToC(k) { return k > 0 ? Math.round(k - 273.15) : null; }
+// { level: good|warn|bad|unknown, words, why: [] }
+function diskVerdict(d) {
+  if (!d || !d.kind) return { level: "unknown", words: "No health data", why: [] };
+  if (d.kind === "ata" && !d.smart) return { level: "unknown", words: "SMART is off", why: [] };
+  var bad = [], warn = [];
+  if (d.failing) bad.push("The drive predicts it will fail");
+  (d.warnings || []).forEach(function (w) { bad.push(NVME_WARN[w] || cap(String(w).replace(/_/g, " "))); });
+  if (d.spareLeft >= 0 && d.spareThresh > 0 && d.spareLeft <= d.spareThresh) bad.push("Spare blocks used up");
+  if (d.usedPct >= 100) bad.push("Past its rated wear");
+  else if (d.usedPct >= 90) warn.push("Nearly worn out (" + d.usedPct + "%)");
+  if (d.mediaErrors > 0) warn.push(d.mediaErrors + (d.mediaErrors === 1 ? " media error" : " media errors"));
+  if (d.badSectors > 0) warn.push(d.badSectors + (d.badSectors === 1 ? " bad sector" : " bad sectors"));
+  if (d.attrsFailing > 0) warn.push(d.attrsFailing + " SMART " + (d.attrsFailing === 1 ? "value" : "values") + " past the limit");
+  if (d.wcTempK > 0 && d.tempK >= d.wcTempK && bad.indexOf(NVME_WARN.temperature) < 0) warn.push("Running hot");
+  if (bad.length) return { level: "bad", words: bad[0], why: bad.concat(warn) };
+  if (warn.length) return { level: "warn", words: warn[0], why: warn };
+  return { level: "good", words: "Good", why: [] };
+}
+function hoursWords(h) {
+  if (!(h >= 0)) return "";
+  var d = Math.floor(h / 24), y = Math.floor(d / 365);
+  var span = y > 0 ? y + (y === 1 ? " year " : " years ") + (d % 365) + " days" : d > 0 ? d + (d === 1 ? " day" : " days") : h + " h";
+  return span + " (" + String(h).replace(/\B(?=(\d{3})+(?!\d))/g, ",") + " h)";
+}
+// decimal, as drives are sold: 53 TB written, not 48 TiB
+function driveBytes(n) {
+  if (!(n >= 0)) return "";
+  var u = ["B", "kB", "MB", "GB", "TB", "PB"], i = 0;
+  while (n >= 1000 && i < u.length - 1) { n /= 1000; i++; }
+  return (i === 0 ? n : n.toFixed(n < 10 ? 2 : 1)) + " " + u[i];
+}
+// one line for a list: "Good · 37 °C · 5% worn"
+function diskLine(d) {
+  var v = diskVerdict(d), c = kToC(d ? d.tempK : 0);
+  return [v.words, c !== null ? c + " °C" : "", d && d.usedPct >= 0 ? d.usedPct + "% worn" : ""]
+    .filter(function (x) { return x; }).join(" · ");
+}
+// [label, value, role] rows for a fact list; role "bad"/"warn" inks it
+function diskHealthFacts(d) {
+  if (!d) return [];
+  var v = diskVerdict(d), c = kToC(d.tempK), rows = [];
+  rows.push(["Health", v.why.length > 1 ? v.why.join(" · ") : v.words, v.level === "bad" ? "bad" : v.level === "warn" ? "warn" : ""]);
+  if (c !== null) rows.push(["Temperature", c + " °C", d.wcTempK > 0 && d.tempK >= d.wcTempK ? "warn" : ""]);
+  if (d.usedPct >= 0) rows.push(["Wear", d.usedPct + "% of its rated life" + (d.spareLeft >= 0 ? " · " + d.spareLeft + "% spare left" : ""), ""]);
+  if (d.hours >= 0) rows.push(["Powered on", hoursWords(d.hours), ""]);
+  if (d.written >= 0) rows.push(["Written", driveBytes(d.written), ""]);
+  if (d.read >= 0) rows.push(["Read", driveBytes(d.read), ""]);
+  if (d.mediaErrors >= 0) rows.push(["Media errors", String(d.mediaErrors), d.mediaErrors > 0 ? "warn" : ""]);
+  if (d.badSectors >= 0) rows.push(["Bad sectors", String(d.badSectors), d.badSectors > 0 ? "warn" : ""]);
+  if (d.unsafe >= 0) rows.push(["Unsafe shutdowns", String(d.unsafe), ""]);
+  return rows;
+}
+// the drive a device (a partition or the disk itself) is on
+function driveOf(drives, dev) {
+  return (drives || []).find(function (d) { return (d.devs || []).indexOf(dev) >= 0; }) || null;
+}
+function parseDrives(text) {
+  try { var j = JSON.parse(String(text || "")); return Array.isArray(j) ? j : []; } catch (e) { return []; }
+}
+function parseFirmware(text) {
+  try {
+    var j = JSON.parse(String(text || ""));
+    return { known: true, installed: !!j.installed, devices: Array.isArray(j.devices) ? j.devices : [] };
+  } catch (e) { return { known: false, installed: false, devices: [] }; }
+}

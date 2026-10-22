@@ -35,3 +35,4 @@ HeadButton 1.0 HeadButton.qml
 SpellMarks 1.0 SpellMarks.qml
 HighlightsBody 1.0 HighlightsBody.qml
 NoteField 1.0 NoteField.qml
+TasksBody 1.0 TasksBody.qml

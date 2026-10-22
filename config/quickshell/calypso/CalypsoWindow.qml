@@ -1144,6 +1144,7 @@ FloatingWindow {
         }
       }
       ElasticScroll { anchors.fill: sideFlick; view: sideFlick }
+      Scrollbar { flick: sideFlick; visible: sideFlick.visible; anchors.right: parent.right; anchors.top: sideFlick.top; anchors.bottom: sideFlick.bottom }
 
     }
 

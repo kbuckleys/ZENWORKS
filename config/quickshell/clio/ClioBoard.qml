@@ -842,6 +842,7 @@ Variants {
                   }
                 }
               }
+              Scrollbar { flick: faceList; visible: faceList.visible; anchors.right: parent.right; anchors.top: faceList.top; anchors.bottom: faceList.bottom }
             }
 
             // ── NORMAL MODE ──────────────────────────────────────────

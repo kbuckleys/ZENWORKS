@@ -86,5 +86,13 @@ module.exports = {
     const strip = A.stripArgs(src, "/tmp/s", 12000, 12);
     t.has("one frame a second for 12 in 12 s", strip.join(" "), "fps=1.0000,scale=-2:96");
     t.has("into the dir", strip.join(" "), "/tmp/s/f%02d.jpg");
+
+    // ── recording preferences ──
+    t.eq("the line argus.lua reads", A.recPrefsLine({ recCountdown: 3, recAudio: "both", recBigPointer: true, recCamera: false }),
+      "countdown=3 audio=both pointer=1 camera=0");
+    t.eq("odd values fall back", A.recPrefsLine({ recCountdown: 99, recAudio: "loud" }), "countdown=10 audio=system pointer=0 camera=0");
+    t.eq("nothing is how it was", A.recPrefsLine(null), "countdown=0 audio=system pointer=0 camera=0");
+    t.eq("bottom right", A.cornerAnchors("bottomRight"), { top: false, bottom: true, left: false, right: true });
+    t.eq("top left", A.cornerAnchors("topLeft"), { top: true, bottom: false, left: true, right: false });
   }
 };

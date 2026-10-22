@@ -109,7 +109,7 @@ PanelWindow {
         border.width: 1
         border.color: Zenon.border
         Flickable {
-          id: flick
+          id: capFlick
           anchors.fill: parent
           anchors.margins: 12
           contentHeight: field.implicitHeight
@@ -117,7 +117,7 @@ PanelWindow {
           boundsBehavior: Flickable.StopAtBounds
           TextEdit {
             id: field
-            width: flick.width
+            width: capFlick.width
             wrapMode: TextEdit.Wrap
             color: Zenon.ink
             selectionColor: Zenon.alpha(Zenon.cyan, 0.32)
@@ -127,8 +127,8 @@ PanelWindow {
             cursorDelegate: Caret { field: field }
             onCursorRectangleChanged: {
               const r = field.cursorRectangle;
-              if (r.y < flick.contentY) flick.contentY = r.y;
-              else if (r.y + r.height > flick.contentY + flick.height) flick.contentY = r.y + r.height - flick.height;
+              if (r.y < capFlick.contentY) capFlick.contentY = r.y;
+              else if (r.y + r.height > capFlick.contentY + capFlick.height) capFlick.contentY = r.y + r.height - capFlick.height;
             }
             Keys.onPressed: (e) => {
               if (e.key === Qt.Key_Escape) { cap.hide(); e.accepted = true; return; }
@@ -143,6 +143,8 @@ PanelWindow {
             }
           }
         }
+        ElasticScroll { anchors.fill: capFlick; view: capFlick }
+        Scrollbar { flick: capFlick; anchors.right: parent.right; anchors.top: capFlick.top; anchors.bottom: capFlick.bottom }
         HeldRing { anchors.fill: parent; radius: parent.radius; z: 10; on: field.activeFocus }
       }
       Item {

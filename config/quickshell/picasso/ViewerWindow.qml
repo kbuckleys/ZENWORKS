@@ -5043,6 +5043,7 @@ FloatingWindow {
           }
         }
       }
+      ElasticScroll { anchors.fill: scrubList; view: scrubList }
     }
 
     // Right click, anywhere over the grid: the tile's menu — or the marked

@@ -1599,3 +1599,56 @@ function linksTo(notes, id) {
   return (notes || []).filter(function (n) { return !n.deleted && n.id !== id && n.d && n.d.links && n.d.links.indexOf(id) >= 0; })
     .sort(function (a, b) { return b.modified - a.modified; });
 }
+
+// ── TASKS ────────────────────────────────────────────────────────────────
+// Every checklist item not ticked, across the notebook (not the Trash, not
+// a locked note, not a sticky), grouped by when it is due:
+//   [{ id, at, h, due, title, kind, group }]   `at` is the block's index
+var TASK_GROUPS = [
+  { id: "overdue", label: "Overdue" }, { id: "today", label: "Today" }, { id: "week", label: "This week" },
+  { id: "later", label: "Later" }, { id: "someday", label: "No date" }
+];
+function taskGroup(due, now) {
+  if (!due) return "someday";
+  if (due < now) return "overdue";
+  var days = daysBetween(now, due);
+  return days === 0 ? "today" : days < 7 ? "week" : "later";
+}
+function tasks(notes, now) {
+  var out = [];
+  for (var i = 0; i < (notes || []).length; i++) {
+    var n = notes[i];
+    if (n.deleted || n.sealed || n.kind === "sticky" || !n.blocks) continue;
+    for (var j = 0; j < n.blocks.length; j++) {
+      var b = n.blocks[j];
+      if (b.k !== "check" || b.c) continue;
+      var h = plain(b.h).trim();
+      if (h === "") continue;
+      out.push({ id: n.id, at: j, h: h, due: b.due || 0, title: titleOf(n), kind: n.kind,
+                 modified: n.modified || 0, group: taskGroup(b.due || 0, now) });
+    }
+  }
+  var order = TASK_GROUPS.map(function (g) { return g.id; });
+  out.sort(function (a, b) {
+    return (order.indexOf(a.group) - order.indexOf(b.group))
+      || (a.due && b.due ? a.due - b.due : 0) || (b.modified - a.modified) || (a.at - b.at);
+  });
+  return out;
+}
+// the open tasks due on a day ("2026-10-22", as chronos keys its days)
+function tasksOn(notes, iso, now) {
+  return tasks(notes, now).filter(function (t) {
+    if (!t.due) return false;
+    var d = new Date(t.due);
+    return d.getFullYear() + "-" + two(d.getMonth() + 1) + "-" + two(d.getDate()) === iso;
+  });
+}
+// the note's blocks with item `at` ticked — only if it is still that item
+// (the note may have changed since the list was drawn): else null
+function tickedAt(blocks, at, h) {
+  var b = (blocks || [])[at];
+  if (!b || b.k !== "check" || b.c || plain(b.h).trim() !== h) return null;
+  var out = blocks.slice();
+  out[at] = Object.assign({}, b, { c: true });
+  return out;
+}

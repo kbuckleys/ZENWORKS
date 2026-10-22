@@ -22,6 +22,7 @@ import Quickshell.Hyprland
 import "../morpheus"
 import "../morpheus/lagnotes.js" as LagNotes
 import "../morpheus/hypr.js" as Hypr
+import "../oracle"
 import "argus.js" as A
 
 Scope {
@@ -118,10 +119,53 @@ Scope {
   }
   function last() { lastProc.running = true; }
 
+  // ── AROUND A RECORDING (2026-10-22) ────────────────────────────────
+  // argus.lua asks for Oracle's recording settings, has the countdown
+  // shown, and says when it starts and stops; the countdown and the camera
+  // bubble are ArgusOverlay's, made the first time either is wanted.
+  property var overlay: null
+  function withOverlay() {
+    if (!mgr.overlay) {
+      const c = Qt.createComponent(Qt.resolvedUrl("ArgusOverlay.qml"));
+      if (c.status !== Component.Ready) { console.warn("argus:", c.errorString()); return null; }
+      mgr.overlay = c.createObject(mgr, {});
+    }
+    return mgr.overlay;
+  }
+  property bool recording: false
+  onRecordingChanged: {
+    if (mgr.recording && Oracle.recCamera) { const o = mgr.withOverlay(); if (o) o.recording = true; }
+    else if (mgr.overlay) mgr.overlay.recording = mgr.recording;
+    mgr.bigPointer(mgr.recording && Oracle.recBigPointer);
+  }
+  // the pointer at twice its size while it records: hyprctl setcursor with
+  // the session's own theme, and back to its own size after
+  readonly property string cursorTheme: Quickshell.env("XCURSOR_THEME") || "default"
+  readonly property int cursorSize: Number(Quickshell.env("XCURSOR_SIZE")) || 24
+  property bool pointerBig: false
+  function bigPointer(on) {
+    if (on === mgr.pointerBig) return;
+    mgr.pointerBig = on;
+    Quickshell.execDetached(["hyprctl", "setcursor", mgr.cursorTheme, String(on ? mgr.cursorSize * 2 : mgr.cursorSize)]);
+  }
+  // a reload mid-recording: still recording, as far as the overlay goes
+  Process {
+    running: true
+    command: ["pgrep", "-x", "wf-recorder"]
+    onExited: (code) => { if (code === 0) mgr.recording = true; }
+  }
+
   IpcHandler {
     target: "Argus"
     function edit(path: string): string { mgr.edit(path); return "ok"; }
     function last(): string { mgr.last(); return "ok"; }
+    // for argus.lua: "countdown=3 audio=system pointer=0 camera=0"
+    function recPrefs(): string {
+      return A.recPrefsLine({ recCountdown: Oracle.recCountdown, recAudio: Oracle.recAudio,
+                              recBigPointer: Oracle.recBigPointer, recCamera: Oracle.recCamera });
+    }
+    function countdown(secs: int): string { const o = mgr.withOverlay(); if (o) o.countdown(secs); return "ok"; }
+    function recording(on: bool): string { mgr.recording = on; return "ok"; }
   }
 
   Component.onCompleted: mgr.settings = A.parseSettings(settingsFile.text())

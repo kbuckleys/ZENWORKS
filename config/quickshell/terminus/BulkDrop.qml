@@ -328,5 +328,6 @@ Item {
         }
       }
     }
+    ScrollRail { target: dropView; visible: dropView.visible; anchors.right: parent.right; anchors.top: dropView.top; anchors.bottom: dropView.bottom }
   }
 }

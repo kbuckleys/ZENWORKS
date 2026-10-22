@@ -241,6 +241,8 @@ PanelWindow {
         }
       }
     }
+    ElasticScroll { anchors.fill: scroller; view: scroller }
+    Scrollbar { flick: scroller; anchors.right: parent.right; anchors.top: scroller.top; anchors.bottom: scroller.bottom }
 
     EmptyState {
       anchors.centerIn: scroller

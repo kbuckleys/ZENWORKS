@@ -11,6 +11,7 @@
 //   Bluetooth   the adapter, your devices, the ones nearby
 //   VPN         the connections, up and down; Import…
 //   Display     brightness per screen; the night light
+//   Printers    CUPS' printers and jobs, adding one; SANE's scanners
 //
 // Every piece that is missing is set up from its own page (HermesSetup,
 // through Ceres). A passphrase is asked for on a sheet, and so is the one
@@ -18,7 +19,7 @@
 // systemd-networkd for NetworkManager.
 //
 //   ↑ ↓  the list           return  join, connect, up or down
-//   ctrl+1…4  section       delete  forget
+//   ctrl+1…5  section       delete  forget (a printer: remove)
 //   ctrl+r    look again    s       search (Bluetooth)
 //   esc       closes
 
@@ -51,7 +52,9 @@ FloatingWindow {
   Component.onCompleted: Hermes.hold()
 
   // ── THE PAGE IN VIEW, AND ITS CURSOR ───────────────────────────────────
-  readonly property var page: ({ network: netPage, bluetooth: btPage, vpn: vpnPage, display: dispPage })[hw.section] || netPage
+  // the Printers page, loaded by file (see printPage)
+  readonly property var printItem: printPage.item
+  readonly property var page: ({ network: netPage, bluetooth: btPage, vpn: vpnPage, display: dispPage, printers: hw.printItem })[hw.section] || netPage
   // the cursor shows once the keys have been used, as terminus' does
   property bool listFocus: false
   function move(d) {
@@ -66,6 +69,7 @@ FloatingWindow {
     if (p === netPage) return Hermes.networks[p.sel] || null;
     if (p === btPage) return btPage.rowAt(p.sel);
     if (p === vpnPage) return vpnPage.rows[p.sel] || null;
+    if (p === hw.printItem) return p.rows[p.sel] || null;
     return null;
   }
   // the row flashes, then it acts (user, 2026-10-21: morpheus/RowFlash)
@@ -93,6 +97,7 @@ FloatingWindow {
     if (!r) return;
     if (hw.page === netPage) Hermes.forget(r);
     else if (hw.page === btPage && r.paired) Hermes.forgetDevice(r);
+    else if (hw.page === hw.printItem) hw.page.remove(r);
   }
   // what a section says beside its name in the head (the sidebar's counts)
   function sectionCount(id) {
@@ -101,6 +106,7 @@ FloatingWindow {
       : Hermes.wired && Hermes.wired.carrier ? H.speedWords(Hermes.wired.speed) : "";
     else if (id === "bluetooth") c = Hermes.btConnected > 0 ? String(Hermes.btConnected) : "";
     else if (id === "vpn") c = Hermes.vpnActive !== "" ? "On" : "";
+    else if (id === "printers") c = hw.printItem && hw.printItem.info.jobs.length > 0 ? String(hw.printItem.info.jobs.length) : "";
     else c = Hermes.nightActive ? "Night" : "";
     // a long network name would push the segments into the name and buttons
     if (c.length > 16) c = c.slice(0, 15) + "\u2026";
@@ -153,10 +159,11 @@ FloatingWindow {
         return;
       }
       if (e.key === Qt.Key_Escape) { hw.visible = false; return; }
-      if (ctrl && e.key >= Qt.Key_1 && e.key <= Qt.Key_4) { hw.setSection(H.SECTIONS[e.key - Qt.Key_1].id); return; }
+      if (ctrl && e.key >= Qt.Key_1 && e.key < Qt.Key_1 + H.SECTIONS.length) { hw.setSection(H.SECTIONS[e.key - Qt.Key_1].id); return; }
       if (ctrl && e.key === Qt.Key_R) {
         Hermes.reprobe();
         if (hw.section === "display") Hermes.readDdc();
+        if (hw.section === "printers" && hw.printItem) hw.printItem.look();
         return;
       }
       if (e.key === Qt.Key_S && hw.section === "bluetooth" && Hermes.btReady) { Hermes.scan(!Hermes.btScanning); return; }
@@ -214,9 +221,12 @@ FloatingWindow {
           font.pixelSize: Zenon.px(12)
         }
       }
+      // on the right, before the page's own buttons (user, 2026-10-22)
       Segments {
         id: sections
-        anchors.centerIn: parent
+        anchors.verticalCenter: parent.verticalCenter
+        anchors.right: headBtns.left
+        anchors.rightMargin: headBtns.width > 0 ? 12 : 0
         options: H.SECTIONS.map((s) => [s.id, s.label + hw.sectionCount(s.id)])
         current: hw.section
         onChose: (v) => hw.setSection(v)
@@ -230,7 +240,6 @@ FloatingWindow {
         BusyButton {
           visible: hw.section === "bluetooth" && Hermes.btReady && Hermes.btOn
           label: "Search"
-          ink: Zenon.blue
           busy: Hermes.btScanning
           busyText: "Searching…"
           onClicked: Hermes.scan(!Hermes.btScanning)
@@ -238,7 +247,6 @@ FloatingWindow {
         DialogButton {
           visible: hw.section === "vpn" && Hermes.nmRunning
           label: "Import…"
-          ink: Zenon.green
           onClicked: Hermes.chooseVpnFile()
         }
         DialogButton {
@@ -276,6 +284,15 @@ FloatingWindow {
         HermesBluetooth { id: btPage; width: parent.width; win: hw; visible: hw.section === "bluetooth" }
         HermesVpn { id: vpnPage; width: parent.width; win: hw; visible: hw.section === "vpn" }
         HermesDisplay { id: dispPage; width: parent.width; win: hw; visible: hw.section === "display" }
+        // by file, so a new page needs no shell restart (a qmldir type does)
+        Loader {
+          id: printPage
+          width: parent.width
+          active: hw.section === "printers" || !!printPage.item
+          visible: hw.section === "printers"
+          source: "HermesPrint.qml"
+          onLoaded: hw.printItem.win = hw
+        }
       }
     }
     ElasticScroll { anchors.fill: pageFlick; view: pageFlick }
@@ -322,10 +339,11 @@ FloatingWindow {
 
   readonly property var hintRows: hw.pskNet ? [["return", "join"], ["esc", "back"]]
     : hw.askSwitch ? [["return", "switch"], ["esc", "cancel"]]
-    : hw.section === "network" && Hermes.wifiReady ? [["↑↓", "network"], ["return", "join, leave"], ["delete", "forget"], ["ctrl 1-4", "section"], ["esc", "close"]]
-    : hw.section === "bluetooth" && Hermes.btReady ? [["↑↓", "device"], ["return", "connect"], ["s", "search"], ["delete", "forget"], ["ctrl 1-4", "section"], ["esc", "close"]]
-    : hw.section === "vpn" && Hermes.vpns.length > 0 ? [["↑↓", "connection"], ["return", "up, down"], ["ctrl 1-4", "section"], ["esc", "close"]]
-    : [["ctrl 1-4", "section"], ["ctrl r", "look again"], ["esc", "close"]]
+    : hw.section === "network" && Hermes.wifiReady ? [["↑↓", "network"], ["return", "join, leave"], ["delete", "forget"], ["ctrl 1-5", "section"], ["esc", "close"]]
+    : hw.section === "bluetooth" && Hermes.btReady ? [["↑↓", "device"], ["return", "connect"], ["s", "search"], ["delete", "forget"], ["ctrl 1-5", "section"], ["esc", "close"]]
+    : hw.section === "printers" && hw.page && hw.page.count > 0 ? [["↑↓", "printer"], ["delete", "remove"], ["ctrl 1-5", "section"], ["ctrl r", "look again"], ["esc", "close"]]
+    : hw.section === "vpn" && Hermes.vpns.length > 0 ? [["↑↓", "connection"], ["return", "up, down"], ["ctrl 1-5", "section"], ["esc", "close"]]
+    : [["ctrl 1-5", "section"], ["ctrl r", "look again"], ["esc", "close"]]
 
   // ── the passphrase, on a sheet ─────────────────────────────────────────
   InputShield { visible: !!hw.pskNet; onClicked: { hw.pskNet = null; hw.refocus(); } }
@@ -408,7 +426,6 @@ FloatingWindow {
         DialogButton { label: "Cancel"; onClicked: { hw.askSwitch = false; hw.refocus(); } }
         DialogButton {
           label: "Switch"
-          ink: Zenon.yellow
           primary: true
           onClicked: { hw.askSwitch = false; Hermes.setup("networkmanager"); hw.refocus(); }
         }

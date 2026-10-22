@@ -550,4 +550,7 @@ Item {
       }
     }
   }
+  // the list's rail, on the card's edge (the list sits in the column, so it
+  // is placed by the list's y rather than anchored to it)
+  ScrollRail { target: appList; anchors.right: parent.right; y: appCol.y + appList.y; height: appList.height }
 }
