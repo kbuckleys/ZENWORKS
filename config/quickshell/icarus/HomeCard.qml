@@ -770,6 +770,7 @@ PanelWindow {
 
   MenuShadow {
     panel: bg
+    visible: Zenon.menuShadows
     opacity: card.shade
     transformOrigin: Item.TopLeft
     scale: bg.scale

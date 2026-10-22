@@ -123,7 +123,7 @@ for p in $(userfiles 'generated|saved'); do
     set +f; for f in "$pkg"/config/$p; do [ -e "$f" ] && problem "shipped though it is this machine's: ${f#"$pkg/"}"; done; set -f
 done
 for p in $(userfiles generic); do
-    [ -f "$pkg/config/$p" ] || problem "the generic copy is missing: config/$p"
+    [ -f "$pkg/config/$p" ] || problem "the generic copy is missing: config/$p (add the stock one: what Oracle writes at its defaults)"
 done
 grep -q '@CONFIG@' "$pkg/config/xdg-desktop-portal-termfilechooser/config" 2>/dev/null \
     || problem "config/xdg-desktop-portal-termfilechooser/config lost its @CONFIG@ placeholder"

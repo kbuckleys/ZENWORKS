@@ -261,6 +261,7 @@ PopupWindow {
 
   MenuShadow {
     panel: bg
+    visible: Zenon.menuShadows
     reach: root.shadowPad
     opacity: root.shade
     transformOrigin: Item.TopLeft

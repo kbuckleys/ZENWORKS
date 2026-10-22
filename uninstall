@@ -450,10 +450,22 @@ export_settings() {
   local out n=2
   out="$HOME/zenworks-settings-$(date +%F).json"
   while [[ -e "$out" ]]; do out="$HOME/zenworks-settings-$(date +%F)-$n.json"; n=$((n + 1)); done
-  python3 -I - "$out" "$STATE_HOME/quickshell/by-shell/$SHELL_ID/oracle.json" "$CONFIG/hypr/lua" "$QS/themes" <<'PY'
+  python3 -I - "$out" "$STATE_HOME/quickshell/by-shell/$SHELL_ID/oracle.json" "$CONFIG/hypr/lua" "$QS/themes" \
+    "$QS/oracle/oracle.js" <<'PY'
 import datetime, glob, json, os, re, sys
-out, oracle, lua, themes = sys.argv[1:]
+out, oracle, lua, themes, ora_js = sys.argv[1:]
 files = {}
+# the hypr files a bundle holds: oracle.js' own BUNDLE_FIXED, so a file
+# Oracle starts writing is carried without this list being touched
+fixed = ["hypr/keys.lua", "hypr/wake.lua", "hypr/effects.lua", "hypr/defaults.lua",
+         "hypr/input.lua", "hypr/monitors.lua"]
+try:
+    with open(ora_js, encoding="utf-8") as f:
+        m = re.search(r"const BUNDLE_FIXED = \[([^\]]*)\]", f.read())
+    if m:
+        fixed = [r for r in re.findall(r'"([^"]+)"', m.group(1)) if r.startswith("hypr/")]
+except OSError:
+    pass
 def take(rel, path):
     try:
         with open(path, encoding="utf-8") as f:
@@ -463,8 +475,8 @@ def take(rel, path):
     if t:
         files[rel] = t
 take("oracle.json", oracle)
-for n in ("keys", "wake", "defaults", "input", "monitors"):
-    take("hypr/%s.lua" % n, os.path.join(lua, n + ".lua"))
+for rel in fixed:
+    take(rel, os.path.join(lua, rel[len("hypr/"):]))
 for p in glob.glob(os.path.join(themes, "*.json")):
     b = os.path.basename(p)
     if re.match(r"^(custom|wallpaper)-[A-Za-z0-9_-]*\.json$", b):

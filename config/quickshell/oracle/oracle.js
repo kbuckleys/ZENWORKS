@@ -2104,6 +2104,37 @@ function renderWakeLua(by) {
   ].join("\n");
 }
 
+// ── EFFECTS ──
+// hyprland's window shadows and animations: hypr/lua/effects.lua,
+// `shadows = false` / `animations = false`, Look's "Window shadows" and
+// Motion's "Window animations" (user, 2026-10-22). base.lua reads it, so it
+// holds from login. Both on unless the file says false: no file, or a broken
+// one, leaves hyprland as base.lua sets it.
+function parseEffectsLua(text) {
+  const src = stripLuaComments(String(text || ""));
+  const off = (k) => new RegExp("\\b" + k + "\\s*=\\s*false\\b").test(src);
+  return { shadows: !off("shadows"), animations: !off("animations") };
+}
+function renderEffectsLua(fx) {
+  const on = (v) => v === false ? "false" : "true";
+  return [
+    "-- ┌─┐┌─┐┌┐┌┬ ┬┌─┐┬─┐┬┌─┌─┐",
+    "-- ┌─┘├┤ │││││││ │├┬┘├┴┐└─┐",
+    "-- └─┘└─┘┘└┘└┴┘└─┘┴└─┴ ┴└─┘",
+    "-- https://github.com/kbuckleys/",
+    "",
+    "-- EFFECTS",
+    "-- Written by oracle (Look's Window shadows, Motion's Window animations),",
+    "-- and read back by it. false turns that one off; base.lua reads it.",
+    "",
+    "return {",
+    "\tshadows    = " + on(fx && fx.shadows) + ",",
+    "\tanimations = " + on(fx && fx.animations) + ",",
+    "}",
+    "",
+  ].join("\n");
+}
+
 function renderKeysLua(values, binds) {
   const lines = [
     "-- ┌─┐┌─┐┌┐┌┬ ┬┌─┐┬─┐┬┌─┌─┐",
@@ -2267,13 +2298,14 @@ function chordTaken(chord, id, binds, values, live) {
 
 // ── SETTINGS, CARRIED ELSEWHERE ───────────────────────────────────────────
 // Export / Import in About (2026-10-21): one JSON file holding oracle.json,
-// the hypr files Oracle writes (keys, wake, default apps, input, screens)
+// the hypr files Oracle writes (keys, wake, effects, default apps, input, screens)
 // and the themes you saved — for a reinstall or another machine. Settings
 // only: no notes, no screen time, no passwords. A bundle names its files
 // by these relative paths, and nothing outside them is ever written back.
-const BUNDLE_FIXED = ["oracle.json", "hypr/keys.lua", "hypr/wake.lua", "hypr/defaults.lua",
+const BUNDLE_FIXED = ["oracle.json", "hypr/keys.lua", "hypr/wake.lua", "hypr/effects.lua", "hypr/defaults.lua",
                       "hypr/input.lua", "hypr/monitors.lua"];
 const BUNDLE_WORDS = { "oracle.json": "Settings", "hypr/keys.lua": "Shortcuts", "hypr/wake.lua": "Wake by",
+                       "hypr/effects.lua": "Window shadows and animations",
                        "hypr/defaults.lua": "Default apps", "hypr/input.lua": "Keyboard and mouse",
                        "hypr/monitors.lua": "Screen arrangement" };
 function bundlePathOk(rel) {

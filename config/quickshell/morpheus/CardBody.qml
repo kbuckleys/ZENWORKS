@@ -352,6 +352,7 @@ Item {
 
   MenuShadow {
     panel: bg
+    visible: Zenon.menuShadows
     reach: root.pad
     grow: Math.round(Zenon.menuShadowGrow * root.shadowScale)
     softness: Math.round(Zenon.menuShadowBlur * root.shadowScale)

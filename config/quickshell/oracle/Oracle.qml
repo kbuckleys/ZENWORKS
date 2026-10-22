@@ -344,6 +344,7 @@ Singleton {
   // ScrollEdge: rows past a list's edge, frosted under the bar over them.
   // Off, every list stops at its edge and nothing is captured or blurred.
   property bool scrollFrost: true
+  property bool menuShadows: true
   // morpheus/Elastic's rubber band past a list's ends (user, 2026-10-14):
   // on by default; off, the wheel and the fingers stop dead at the edge
   property bool elasticScroll: true
@@ -741,7 +742,7 @@ Singleton {
     { key: "idleScreenOffSecs", section: "display", label: "Screens off after", type: "int",
       min: 0, max: 7200, step: 30, unit: "s", alias: "idle dpms sleep blank",
       help: "Idle this long and every output is switched off. 0 leaves them on. Needs Idle timers, under Idle & lock." },
-    { key: "wakeBy", section: "display", label: "Wake by", type: "enum", segments: true, hyprFile: true,
+    { key: "wakeBy", section: "display", label: "Wake by", type: "enum", segments: true, hyprFile: "wake",
       hyprDefault: "mouse", alias: "wake screens dpms mouse key press",
       options: [ { value: "key",   label: "Key press" },
                  { value: "mouse", label: "Mouse or key press" } ],
@@ -910,6 +911,13 @@ Singleton {
     { key: "shadowStrength", section: "look", label: "Panel shadow", type: "real",
       min: 0, max: 1, step: 0.05,
       help: "How far a layer lifts off the desktop. A layer sits near an edge, so too much of this reads as a black halo." },
+    { key: "menuShadows", section: "look", label: "Menu and sheet shadows", type: "bool",
+      alias: "menu sheet dialog dropdown context right-click shadow drop shadow",
+      help: "The shadow every menu and sheet casts: icarus', the tray's, terminus' right-click menu, the dropdowns in here, and the sheets that drop over a window. Off, they sit flat on what is behind them." },
+    // hyprland's own, kept in hypr/lua/effects.lua — see Ora's EFFECTS
+    { key: "hyprShadows", section: "look", label: "Window shadows", type: "bool",
+      hyprFile: "effects", hyprDefault: true, alias: "hyprland window shadow drop shadow decoration",
+      help: "The soft shadow hyprland draws under every window. Kept in hypr/lua/effects.lua." },
     { key: "scrollFrost", section: "look", alias: "scroll edge frost blur ghost rows under bar toolbar fade",
       label: "Frost under bars", type: "bool",
       help: "Rows scrolled past a list's edge carry on under the bar above it (or below it), blurred and fading out. Off, a list simply stops at its edge." },
@@ -924,6 +932,9 @@ Singleton {
     { key: "motionScale", section: "motion", label: "Animation speed", type: "real",
       min: 0, max: 2.5, step: 0.05, unit: "x",
       help: "Multiplies every duration in the shell. Zero means no animation at all." },
+    { key: "hyprAnimations", section: "motion", label: "Window animations", type: "bool",
+      hyprFile: "effects", hyprDefault: true, alias: "hyprland window workspace animation slide fade popin motion",
+      help: "Hyprland's windows popping in and out, workspaces sliding, and the shell's layers fading as they open and close. Off, all of it is instant. Kept in hypr/lua/effects.lua." },
     { key: "arrivalEnabled", section: "motion", label: "Play the arrival", type: "bool",
       help: "The pill's slide and the background's zoom, once, when the session starts." },
     { key: "arrivalDuration", section: "motion", label: "Arrival length", type: "int",
@@ -1656,6 +1667,7 @@ Singleton {
     if (s.appDefault) { root.setAppDefault(s, value); return; }
     if (s.input) { root.setInput(s, value); return; }
     if (s.bindKey) { root.setBind(s, value); return; }
+    if (s.hyprFile === "effects") { root.setEffect(key, value); return; }
     if (s.hyprFile) { root.setWakeBy(value); return; }
     const v = Ora.coerce(s, value);
     if (Ora.same(root[key], v)) return;
@@ -2084,6 +2096,17 @@ Singleton {
     wakeFile.setText(Ora.renderWakeLua(by));
     reloadHypr.restart();
   }
+  // hypr/lua/effects.lua: hyprland's shadows and animations — see Ora's EFFECTS
+  property bool hyprShadows: true
+  property bool hyprAnimations: true
+  function setEffect(key, v) {
+    const on = !!v;
+    if (on === root[key]) return;
+    root[key] = on;
+    root.revision++;
+    effectsFile.setText(Ora.renderEffectsLua({ shadows: root.hyprShadows, animations: root.hyprAnimations }));
+    reloadHypr.restart();
+  }
   // what binds.lua declares: [{ id, chord, label, group }]
   property var bindList: []
   // "bind:<id>" -> the chord in force ("" off)
@@ -2252,6 +2275,25 @@ Singleton {
       if (by !== root.wakeBy) { root.wakeBy = by; root.revision++; reloadHypr.restart(); }
     }
     onLoadFailed: root.wakeBy = "mouse"
+  }
+
+  FileView {
+    id: effectsFile
+    path: root.hyprLuaDir + "/effects.lua"
+    blockLoading: true
+    printErrors: false
+    watchChanges: true
+    onFileChanged: reload()
+    // FileView's own write never fires loaded: setEffect sets the pair itself
+    onLoaded: {
+      const fx = Ora.parseEffectsLua(effectsFile.text());
+      if (fx.shadows === root.hyprShadows && fx.animations === root.hyprAnimations) return;
+      root.hyprShadows = fx.shadows;
+      root.hyprAnimations = fx.animations;
+      root.revision++;
+      reloadHypr.restart();
+    }
+    onLoadFailed: { root.hyprShadows = true; root.hyprAnimations = true; }
   }
 
   FileView {

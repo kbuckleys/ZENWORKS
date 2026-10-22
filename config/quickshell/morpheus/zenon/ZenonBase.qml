@@ -781,6 +781,9 @@ QtObject {
   // middle is hidden under an opaque panel and only the falloff shows. A
   // ring has no middle to hide in: what you see IS the dense part, which
   // is why this one, and only this one, has to stay under the line.
+  // oracle's "Menu and sheet shadows": off, every menu's and sheet's
+  // MenuShadow hides (they wear `visible: Zenon.menuShadows`)
+  readonly property bool  menuShadows: cfg.menuShadows !== false
   readonly property real  menuShadowMax:  0.48
   readonly property color menuShadowInk:
     shade(Math.min(root.menuShadowMax, cfg.shadowStrength))

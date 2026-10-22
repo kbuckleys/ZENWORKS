@@ -212,6 +212,19 @@ if not (okWake and type(wake) == "table" and wake.wake == "key") then
 	pcall(hl.config, { misc = { mouse_move_enables_dpms = true } })
 end
 
+-- EFFECTS
+-- effects.lua, which oracle writes (Look's "Window shadows", Motion's
+-- "Window animations"): `false` turns hyprland's shadows or its animations
+-- off. Only false does; no file, or a broken one, keeps both. Guarded like
+-- defaults.lua.
+local okFx, fx = pcall(require, "lua.effects")
+if okFx and type(fx) == "table" then
+	pcall(hl.config, {
+		decoration = { shadow = { enabled = fx.shadows ~= false } },
+		animations = { enabled = fx.animations ~= false },
+	})
+end
+
 -- THEME: the shell's theme, written to theme.lua by quickshell's ThemeSync
 -- whenever it changes (and `hyprctl reload` after). The colours above are
 -- Zenon's; an empty table — Zenon worn, or no file at all — leaves them.

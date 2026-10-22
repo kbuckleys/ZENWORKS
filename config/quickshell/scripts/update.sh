@@ -16,12 +16,13 @@
 #
 # What is YOURS is never touched — scripts/userfiles.txt, the same list
 # sync-package.sh keeps out of the package: your default apps, monitors,
-# input, shortcuts and Wake by (hypr/lua/defaults, monitors, input, keys,
-# wake), the theme files made from your theme (hypr/lua/theme.lua,
-# kitty/theme.conf), themes saved from Follow Background, Plato's plugins
-# and their settings, and the file chooser's config. The published release's list is read when it has one,
-# so a file it newly counts as yours is kept by this very update. Dotfiles (~/.zshrc, ~/.p10k.zsh) are left alone too:
-# they are often edited by hand. Everything else in the suite's config
+# input, shortcuts, Wake by and window effects (hypr/lua/defaults,
+# monitors, input, keys, wake, effects), the files made from your theme and
+# fonts, themes saved from Follow Background, Plato's plugins and their
+# settings, and the file chooser's config. Both the published release's
+# list and this machine's are read, so a file either counts as yours is
+# kept by this very update. Dotfiles (~/.zshrc, ~/.p10k.zsh) are left alone
+# too: they are often edited by hand. Everything else in the suite's config
 # directories is made exactly the published one.
 #
 # NOT THE CONFIG ON THE MAINTAINER'S MACHINE: there the live config is AHEAD
@@ -79,9 +80,13 @@ git clone --quiet --depth 1 -- "$REPO" "$tmp/zenworks" || { said "could not fetc
 rev="$(git -C "$tmp/zenworks" log -1 --format='%h %cs %s' 2>/dev/null || true)"
 echo "update: published version: ${rev:-unknown}"
 
-userfiles="$tmp/zenworks/config/quickshell/scripts/userfiles.txt"
-[[ -f "$userfiles" ]] || userfiles="$(dirname -- "$(readlink -f -- "$0")")/userfiles.txt"
-[[ -f "$userfiles" ]] || { said "no userfiles.txt: nothing would be known to be yours"; exit 6; }
+# what is yours by either list: the release's (a file it newly counts as
+# yours) and this machine's (one this machine counts as yours before the
+# release does, which would otherwise be deleted as not the release's)
+userfiles="$tmp/userfiles.txt"
+cat -- "$tmp/zenworks/config/quickshell/scripts/userfiles.txt" \
+       "$(dirname -- "$(readlink -f -- "$0")")/userfiles.txt" > "$userfiles" 2>/dev/null || true
+grep -q '^[a-z]' "$userfiles" || { said "no userfiles.txt: nothing would be known to be yours"; exit 6; }
 
 changed=0
 n=0

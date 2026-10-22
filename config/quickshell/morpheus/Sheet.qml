@@ -273,6 +273,7 @@ Item {
     // off with it: a sheet hanging from the chrome does not cast upwards.
     MenuShadow {
       panel: sheetCard
+      visible: Zenon.menuShadows
       cornerRadius: Zenon.dialogRadius
       opacity: sheetCard.opacity
     }

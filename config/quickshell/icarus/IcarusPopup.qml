@@ -1684,6 +1684,7 @@ Item {
 
     MenuShadow {
       panel: appsBg
+      visible: Zenon.menuShadows
       opacity: appsMenu.shade
       transformOrigin: Item.TopLeft
       scale: appsBg.scale
@@ -1993,6 +1994,7 @@ Item {
 
     MenuShadow {
       panel: confirmBg
+      visible: Zenon.menuShadows
       opacity: confirmMenu.shade
       transformOrigin: Item.TopLeft
       scale: confirmBg.scale

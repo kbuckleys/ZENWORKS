@@ -24,6 +24,7 @@ generic   hypr/lua/monitors.lua
 generic   hypr/lua/input.lua
 generic   hypr/lua/keys.lua
 generic   hypr/lua/wake.lua
+generic   hypr/lua/effects.lua
 generic   xdg-desktop-portal-termfilechooser/config
 
 generated hypr/lua/theme.lua

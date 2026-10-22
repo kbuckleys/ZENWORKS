@@ -984,6 +984,7 @@ PopupWindow {
     // desktop cast one shadow rather than three opinions about one.
     MenuShadow {
       panel: menuCard
+      visible: Zenon.menuShadows
       // ── THE FALLOFF HAS TO FIT THE ROOM, or it is not a falloff ─────
       // The defaults are sized for menuShadowPad: 20 spread + 50 blur +
       // 10 offset, 80 in total. Given 36px of surface to live in, the
@@ -1400,7 +1401,7 @@ PopupWindow {
         softness: Math.round(subPop.pad * 0.62)
         drop: Math.round(subPop.pad * 0.18)
         cornerRadius: Zenon.menuRadius
-        visible: subCard.visible
+        visible: subCard.visible && Zenon.menuShadows
         opacity: subCard.shade
         transformOrigin: Item.TopLeft
         scale: subCard.scale
