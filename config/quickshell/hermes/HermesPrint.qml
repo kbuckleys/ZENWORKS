@@ -6,7 +6,8 @@
 // HERMES' PRINTERS PAGE — the printers CUPS has, what they are doing and
 // the jobs waiting; finding one on the network or USB and adding it
 // driverless (IPP Everywhere); and the scanners SANE sees, a scan saved to
-// ~/Pictures/Scans and opened. Where CUPS or SANE is missing, the button
+// Scans in the pictures directory (UserDirs, as Picasso's screenshots) and
+// opened. Where CUPS or SANE is missing, the button
 // that sets it up through Ceres.
 //
 // Unlike the other pages its state is its own (bin/hermes-print, asked
@@ -186,7 +187,10 @@ Column {
       }
     }
   }
-  readonly property string scanDir: (Quickshell.env("XDG_PICTURES_DIR") || (Quickshell.env("HOME") + "/Pictures")) + "/Scans"
+  // the pictures directory user-dirs.dirs names (UserDirs), as Picasso's
+  // screenshots: XDG_PICTURES_DIR is that file's key, not an environment
+  // variable, so reading the environment missed a renamed one
+  readonly property string scanDir: UserDirs.pictures + "/Scans"
   function scan() {
     const s = page.scanners[page.scanSel];
     if (!s || page.scanning) return;
@@ -613,7 +617,7 @@ Column {
         width: parent.width
         height: 40
         verticalAlignment: Text.AlignVCenter
-        text: "Saved to ~/Pictures/Scans, then opened"
+        text: "Saved to " + page.scanDir.replace(Paths.home(), "~") + ", then opened"
       }
     }
   }

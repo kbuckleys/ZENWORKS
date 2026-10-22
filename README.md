@@ -16,4 +16,4 @@ cd ZENWORKS
 bash install
 ```
 
-> Simpley run ```bas uninstall```` if you wish to remove the suite
+> Simply run `bash uninstall` if you wish to remove the suite
