@@ -1,0 +1,40 @@
+# ┌─┐┌─┐┌┐┌┬ ┬┌─┐┬─┐┬┌─┌─┐
+# ┌─┘├┤ │││││││ │├┬┘├┴┐└─┐
+# └─┘└─┘┘└┘└┴┘└─┘┴└─┴ ┴└─┘
+# https://github.com/kbuckleys/
+#
+# THE FILES IN THE SUITE'S CONFIG DIRECTORIES THAT ARE THIS MACHINE'S, not
+# the package's. One list, read by sync-package.sh (kept out of the
+# package), update.sh (never laid over) and the package's uninstall (saved,
+# or removed when they are only generated). Paths are relative to
+# $XDG_CONFIG_HOME; * matches within a name.
+#
+#   generic    the package ships a stock copy; this machine's own choice
+#              lives here and is never shipped, updated over or lost
+#   generated  written here from a choice made elsewhere (the theme, the
+#              fonts) by ThemeSync and fontsync.sh on every start; never
+#              shipped (absent is the default) and safe to remove
+#   saved      made here by the user; never shipped, always kept
+#   seed       shipped as they are on the maintainer's machine, a starting
+#              point; after that the user's: never updated over, and kept
+#              by uninstall when they differ from the package's
+
+generic   hypr/lua/defaults.lua
+generic   hypr/lua/monitors.lua
+generic   hypr/lua/input.lua
+generic   hypr/lua/keys.lua
+generic   hypr/lua/wake.lua
+generic   xdg-desktop-portal-termfilechooser/config
+
+generated hypr/lua/theme.lua
+generated hypr/lua/font.lua
+generated hypr/hyprtoolkit.conf
+generated kitty/theme.conf
+generated kitty/font.conf
+
+saved     quickshell/themes/custom-*.json
+saved     quickshell/themes/wallpaper-*.json
+
+seed      quickshell/plato/nvim/plugins.json
+seed      quickshell/plato/nvim/nvim-pack-lock.json
+seed      quickshell/plato/nvim/lua/plato/config/*

@@ -5,23 +5,30 @@
 # https://github.com/kbuckleys/
 #
 # ZENWORKS installer, for Arch. Run it from a clone of this repo as your normal
-# user (it asks for sudo when it needs it):  ./install.sh
+# user (it asks for sudo when it needs it):  ./install
+# (./uninstall takes it all off again, keeping what you made.)
 #
 #   1. paru or paru-git, built from the AUR
 #   2. etc/pacman.conf put in place (core, extra and multilib; the -testing
 #      repos are there but commented out), then a full sync
 #   3. every package the suite needs, and the few it builds itself
 #   4. configs to $XDG_CONFIG_HOME and dotfiles to ~. Anything already there is
-#      moved to <name>.bak-<timestamp> first; nothing is overwritten. The
-#      .desktop entries for plato, picasso and terminus are not shipped: the
-#      shell writes them on first start, with this machine's paths.
+#      moved to <name>.bak-<timestamp> first; nothing is overwritten. No
+#      .desktop entries are shipped: the shell writes each app's on first
+#      start, with this machine's paths.
 #   5. zsh as the login shell
+#
+# What the machine was like before is noted in ~/.local/state/zenworks (the
+# packages it had, its login shell, where pacman.conf was kept), so
+# ./uninstall can put it back. A second run keeps the first run's notes.
 
 set -euo pipefail
 
 REPO="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 CONFIG="${XDG_CONFIG_HOME:-$HOME/.config}"
+STATE="${XDG_STATE_HOME:-$HOME/.local/state}/zenworks"
 STAMP="$(date +%Y%m%d-%H%M%S)"
+ME="${USER:-$(id -un)}"
 
 CONFIGS=(
   fastfetch hypr kitty quickshell xdg-desktop-portal xdg-desktop-portal-termfilechooser
@@ -32,10 +39,12 @@ PACKAGES=(
   # compositor & session
   hyprland hyprshutdown hyprpolkitagent xcursor-pro-hyprcursor
   xdg-desktop-portal-hyprland xdg-desktop-portal-gtk xdg-desktop-portal-termfilechooser
-  xdg-utils xdg-terminal-exec
+  xdg-utils xdg-terminal-exec xdg-user-dirs
   # shell (quickshell & qt)
   quickshell qt6-declarative qt6-imageformats qt6-multimedia qt6-multimedia-ffmpeg
   kimageformats libqalculate
+  # the suite's Python side (terminus' network places, picasso's cut-out)
+  python python-gobject python-numpy python-pillow python-scipy
   # audio & media
   pipewire pipewire-pulse wireplumber libpulse alsa-utils pamixer playerctl
   gst-plugins-good gst-plugins-bad gst-plugins-ugly
@@ -45,7 +54,7 @@ PACKAGES=(
   # wayland utilities
   wl-clipboard wl-clip-persist cliphist grim slurp wf-recorder wtype libnotify
   # files, archives & mounts
-  fd fzf ripgrep bat jq file attr inotify-tools rsync
+  fd fzf ripgrep bat jq file attr inotify-tools rsync diffutils
   7zip zip unzip unrar libarchive ratarmount fuse3 ntfs-3g ntfsprogs udisks2
   exfatprogs dosfstools btrfs-progs xfsprogs f2fs-tools
   # terminal & shell
@@ -57,7 +66,7 @@ PACKAGES=(
   # Qt apps in the shell's colors (morpheus/ThemeSync, QT_QPA_PLATFORMTHEME)
   qt6ct
   # fonts
-  noto-fonts noto-fonts-cjk noto-fonts-extra noto-fonts-emoji
+  fontconfig noto-fonts noto-fonts-cjk noto-fonts-extra noto-fonts-emoji
   ttf-jetbrains-mono-nerd ttf-dseg unicode-emoji
   otf-san-francisco otf-san-francisco-mono
 )
@@ -98,8 +107,28 @@ preflight() {
   for d in "${CONFIGS[@]}"; do
     [[ -d "$REPO/config/$d" ]] || die "missing config/$d; run this from the ZENWORKS repo"
   done
+  for f in "${DOTFILES[@]}"; do
+    [[ -f "$REPO/home/$f" ]] || die "missing home/$f; run this from the ZENWORKS repo"
+  done
+  [[ -f "$REPO/etc/pacman.conf" ]] || die "missing etc/pacman.conf; run this from the ZENWORKS repo"
   sudo -v
 }
+
+# ── notes for ./uninstall ───────────────────────────────────────────────────
+# Taken once, before anything is installed: what was here is what uninstall
+# never offers to remove. key=value lines, read, never sourced.
+note_before() {
+  mkdir -p -- "$STATE"
+  [[ -f "$STATE/before-install.txt" ]] || pacman -Qq > "$STATE/before-install.txt"
+  if [[ ! -f "$STATE/install.txt" ]]; then
+    {
+      printf 'stamp=%s\n' "$STAMP"
+      printf 'shell=%s\n' "$(getent passwd "$ME" | cut -d: -f7)"
+      command -v paru >/dev/null || printf 'paru=built\n'
+    } > "$STATE/install.txt"
+  fi
+}
+remember() { printf '%s=%s\n' "$1" "$2" >> "$STATE/install.txt"; }
 
 # ── 1. paru ─────────────────────────────────────────────────────────────────
 install_paru() {
@@ -136,6 +165,7 @@ install_pacman_conf() {
   if ! cmp -s "$REPO/etc/pacman.conf" /etc/pacman.conf; then
     sudo cp -- /etc/pacman.conf "/etc/pacman.conf.bak-$STAMP"
     note "kept the old one as /etc/pacman.conf.bak-$STAMP"
+    grep -q '^pacman_conf=' "$STATE/install.txt" || remember pacman_conf "/etc/pacman.conf.bak-$STAMP"
     sudo install -m 644 -- "$REPO/etc/pacman.conf" /etc/pacman.conf
   fi
   say "Syncing repositories"
@@ -180,9 +210,18 @@ install_files() {
   # The portal does not expand ~ or $HOME in cmd=, so write the real path.
   sed -i "s|@CONFIG@|$CONFIG|g" "$CONFIG/xdg-desktop-portal-termfilechooser/config"
   # A repo uploaded through the GitHub web page loses its executable bits, so
-  # set them again: the scripts, and the launchers the .desktop entries run.
+  # set them again: the scripts, the launchers the .desktop entries run, and
+  # anything else that starts with #! (scripts/tether, which every watcher
+  # runs through, has no extension)
   find "$CONFIG/quickshell" "$CONFIG/hypr" "$CONFIG/xdg-desktop-portal-termfilechooser" \
-    -type f \( -name '*.sh' -o -name '*.py' -o -path '*/bin/*' \) -exec chmod +x {} +
+    -type f -not -path '*/__pycache__/*' -exec sh -c 'for f; do
+      case "$f" in *.sh|*.py|*/bin/*) chmod +x "$f" ;;
+        *) [ "$(head -c2 "$f" | tr -d '\''\0'\'')" = "#!" ] && chmod +x "$f" ;; esac
+    done; exit 0' sh {} +
+
+  # ~/Pictures, ~/Videos and the rest, named in user-dirs.dirs: where
+  # screenshots, recordings and notes go
+  xdg-user-dirs-update 2>/dev/null || note "xdg-user-dirs-update failed; the shell falls back to ~/Pictures and the like"
 
   say "Installing dotfiles to $HOME"
   for f in "${DOTFILES[@]}"; do
@@ -203,7 +242,7 @@ fetch_models() {
 
 # ── 5. finishing touches ────────────────────────────────────────────────────
 finish() {
-  if [[ "$(getent passwd "$USER" | cut -d: -f7)" != "$(command -v zsh)" ]]; then
+  if [[ "$(getent passwd "$ME" | cut -d: -f7)" != "$(command -v zsh)" ]]; then
     say "Setting zsh as your login shell"
     chsh -s "$(command -v zsh)" || note "chsh failed; run: chsh -s $(command -v zsh)"
   fi
@@ -222,6 +261,7 @@ finish() {
 
 banner
 preflight
+note_before
 install_paru
 install_pacman_conf
 install_packages

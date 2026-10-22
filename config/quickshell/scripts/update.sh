@@ -14,11 +14,13 @@
 #   -n        say what would change, change nothing
 #   --force   run even where the package is maintained (see below)
 #
-# What is YOURS is never touched — the same files sync-package.sh keeps out
-# of the package: your default apps, monitors and input (hypr/lua/defaults,
-# monitors, input), the theme files made from your theme (hypr/lua/theme.lua,
-# kitty/theme.conf), themes saved from Follow Background, and the file
-# chooser's config. Dotfiles (~/.zshrc, ~/.p10k.zsh) are left alone too:
+# What is YOURS is never touched — scripts/userfiles.txt, the same list
+# sync-package.sh keeps out of the package: your default apps, monitors,
+# input, shortcuts and Wake by (hypr/lua/defaults, monitors, input, keys,
+# wake), the theme files made from your theme (hypr/lua/theme.lua,
+# kitty/theme.conf), themes saved from Follow Background, Plato's plugins
+# and their settings, and the file chooser's config. The published release's list is read when it has one,
+# so a file it newly counts as yours is kept by this very update. Dotfiles (~/.zshrc, ~/.p10k.zsh) are left alone too:
 # they are often edited by hand. Everything else in the suite's config
 # directories is made exactly the published one.
 #
@@ -77,6 +79,10 @@ git clone --quiet --depth 1 -- "$REPO" "$tmp/zenworks" || { said "could not fetc
 rev="$(git -C "$tmp/zenworks" log -1 --format='%h %cs %s' 2>/dev/null || true)"
 echo "update: published version: ${rev:-unknown}"
 
+userfiles="$tmp/zenworks/config/quickshell/scripts/userfiles.txt"
+[[ -f "$userfiles" ]] || userfiles="$(dirname -- "$(readlink -f -- "$0")")/userfiles.txt"
+[[ -f "$userfiles" ]] || { said "no userfiles.txt: nothing would be known to be yours"; exit 6; }
+
 changed=0
 n=0
 for d in "${CONFIGS[@]}"; do
@@ -85,15 +91,12 @@ for d in "${CONFIGS[@]}"; do
   src="$tmp/zenworks/config/$d"
   [[ -d "$src" ]] || continue
   ex=(--exclude=__pycache__ --exclude='*.pyc')
-  case $d in
-    hypr) ex+=(--exclude=/lua/defaults.lua --exclude=/lua/monitors.lua
-               --exclude=/lua/input.lua --exclude=/lua/theme.lua) ;;
-    kitty) ex+=(--exclude=/theme.conf) ;;
-    xdg-desktop-portal-termfilechooser) ex+=(--exclude=/config) ;;
-    quickshell) ex+=(--exclude='/themes/custom-*.json' --exclude='/themes/wallpaper-*.json') ;;
-  esac
+  while read -r p; do ex+=("--exclude=$p"); done < <(sed 's/#.*//' "$userfiles" | awk 'NF == 2 { print $2 }' | sed -n "s|^$d/|/|p")
   mkdir -p -- "$CONFIG/$d"
-  count=$(rsync -ai --delete ${dry:+-n} "${ex[@]}" "$src/" "$CONFIG/$d/" | grep -cv '^\.d\.\.t' || true)
+  # rsync's own failure is not the count's: said, and the update stops
+  out=$(rsync -ai --delete ${dry:+-n} "${ex[@]}" "$src/" "$CONFIG/$d/") \
+    || { said "could not lay $d (rsync exit $?)"; exit 7; }
+  count=$(printf '%s\n' "$out" | grep -cv -e '^\.d\.\.t' -e '^$' || true)
   changed=$((changed + count))
   echo "update: ($n/${#CONFIGS[@]}) $d — $count change(s)"
   # run as a job (no terminal): how far along, as the drawer reads it
@@ -102,9 +105,13 @@ done
 
 if [[ -z "$dry" && -z "$maintained" ]]; then
   # a repository uploaded through GitHub's web page loses its executable
-  # bits: the scripts and the launchers, set again (as the installer does)
+  # bits: the scripts, the launchers and anything else starting with #!
+  # (scripts/tether has no extension), set again as the installer does
   find "$CONFIG/quickshell" "$CONFIG/hypr" "$CONFIG/xdg-desktop-portal-termfilechooser" \
-    -type f \( -name '*.sh' -o -name '*.py' -o -path '*/bin/*' \) -exec chmod +x {} + 2>/dev/null || true
+    -type f -not -path '*/__pycache__/*' -exec sh -c 'for f; do
+      case "$f" in *.sh|*.py|*/bin/*) chmod +x "$f" ;;
+        *) [ "$(head -c2 "$f" | tr -d '\''\0'\'')" = "#!" ] && chmod +x "$f" ;; esac
+    done; exit 0' sh {} + 2>/dev/null || true
 fi
 
 # what the new version installs that this machine does not have
