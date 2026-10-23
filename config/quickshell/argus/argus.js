@@ -80,6 +80,17 @@ function outPath(src, format, taken) {
   for (var n = 2; taken && taken(p) && n < 1000; ++n) p = stem + "-" + n + f.ext;
   return p;
 }
+// A path and the names that follow it, for when it is taken: "a.mp4",
+// "a-2.mp4" … "a-59.mp4". For a name the file picker never asked about —
+// Save as's, once withExt has changed its extension (2026-10-23: "clip.mov"
+// as MP4 overwrote an existing "clip.mp4" without a word).
+function variants(path) {
+  const s = String(path || "");
+  const m = /^(.*?)(\.[A-Za-z0-9]{2,5})?$/.exec(s);
+  const out = [s];
+  for (let n = 2; n < 60; ++n) out.push(m[1] + "-" + n + (m[2] || ""));
+  return out;
+}
 // whatever was typed into Save as, with this format's extension
 function withExt(path, format) {
   var f = formatOf(format), s = String(path || "");

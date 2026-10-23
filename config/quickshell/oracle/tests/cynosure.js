@@ -73,6 +73,10 @@ module.exports = {
     // %% is a literal percent and not a field code, and neither is a bare %.
     t.eq("an ordinary argument survives",
       C.stripFieldCodes("sh -c 'x 100%'"), "sh -c 'x 100%'");
+    t.eq("%% is the % it stands for, not two",
+      C.stripFieldCodes("date +%%H:%%M %u"), "date +%H:%M");
+    t.eq("%%f is a literal %f, not a field code",
+      C.stripFieldCodes("printf %%f"), "printf %f");
 
     // ── filtering ─────────────────────────────────────────────────────────
     // ── the shell's verbs ─────────────────────────────────────────────────

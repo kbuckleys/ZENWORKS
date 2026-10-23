@@ -110,6 +110,22 @@ function editedName(path, tag) {
   return stem + "-" + (tag || "edited") + ext;
 }
 
+// A path and the names after it, when it is taken: "a-edited.png",
+// "a-edited-2.png" … — for a name nobody was asked about: the edited copy
+// beside a picture that cannot be written back (2026-10-23: a second edit
+// of a HEIC replaced the first), or Save as's once ".png" was added.
+function variants(path) {
+  const s = String(path || "");
+  const m = /^(.*?)(\.[A-Za-z0-9]{2,5})?$/.exec(s);
+  const out = [s];
+  for (let n = 2; n < 100; ++n) out.push(m[1] + "-" + n + (m[2] || ""));
+  return out;
+}
+// the first of $@ that does not exist, on a line; nothing when all do
+function firstFreeCommand() {
+  return 'for p in "$@"; do [ -e "$p" ] || { printf \'%s\\n\' "$p"; exit 0; }; done; exit 1';
+}
+
 // Formats a picture can be written back to. Anything else — a raw, a psd, a
 // heic — is saved beside itself as a png instead of being overwritten in a
 // format the writer would have to guess at.

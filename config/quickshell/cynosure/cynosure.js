@@ -190,8 +190,11 @@ function parseFreq(text) {
   return map;
 }
 
+// the Exec line's field codes gone, and %% the literal % it stands for —
+// in one pass, so "%%f" is "%f" and not nothing (2026-10-23: a date format
+// like `date +%%H` reached the shell as `+%%H`)
 function stripFieldCodes(exec) {
-  return exec.replace(/%[fFuUdDnNickvm]/g, "").replace(/\s+$/, "");
+  return exec.replace(/%([%fFuUdDnNickvm])/g, (m, c) => (c === "%" ? "%" : "")).replace(/\s+$/, "");
 }
 
 function getApps(modelValues) {

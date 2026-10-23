@@ -435,6 +435,36 @@ ShellRoot {
   // layers spawned elsewhere float independently and leave the morpheus row alone
   readonly property bool pillMorphed: layerOpen && morphOnPill
 
+  // ── AUTOHIDE ─────────────────────────────────────────────────────────
+  // Oracle's barAutohide: the pill slides off its edge and leaves a strip
+  // there (see bar.mask) that brings it back under the pointer. It stays out
+  // while it is hovered, while a layer is wearing it or is on its way out of
+  // it (morphOnPill holds through the close), and while a menu hung off it is
+  // open (bar.menuHolds, counted by TrayMenu). Leaving waits a beat, so a
+  // pointer brushing past the edge does not send it in and out.
+  readonly property bool barWanted: !Oracle.barAutohide || barHover.hovered
+    || root.morphOnPill || bar.menuHolds > 0
+  property bool barTucked: false
+  onBarWantedChanged: { if (root.barWanted) root.barTucked = false; }
+  // running as a binding, so a shell that starts with autohide on tucks too
+  Timer {
+    interval: 450
+    running: !root.barWanted
+    onTriggered: root.barTucked = true
+  }
+  // 0 at rest, 1 tucked away. THE ARRIVAL'S MOVE, both ways (user,
+  // 2026-10-23): the same fade and 22px lift barIntro plays, on its curve
+  // and for its length, so coming back reads as the pill arriving again and
+  // going as that played out. Oracle's Arrival length, not Arrival.duration,
+  // which is 0 with the login arrival off and would make this a cut.
+  property real barTuck: root.barTucked ? 1 : 0
+  Behavior on barTuck {
+    NumberAnimation { duration: Oracle.arrivalDuration; easing.type: Easing.OutQuint }
+  }
+  // what the pill, its rings and its shadow are shown at: the arrival
+  // and the tuck, one over the other
+  readonly property real barShown: root.barIntro * (1 - root.barTuck)
+
   // ── startup slide + fade ─────────────────────────────────────────────
   // The pill rises from just below its rested position while fading in, so
   // the shell's first paint reads as an arrival rather than a pop-in.
@@ -742,12 +772,31 @@ ShellRoot {
       // there until the first morph resized bg and forced a re-read: only
       // the bottom half of the pill took clicks after every launch. The
       // plain rectangle has no transform in it to go stale.
-      mask: Region { x: bg.x; y: bg.y; width: bg.width; height: bg.height }
+      //
+      // AUTOHIDING, IT IS THE EDGE TOO. Tucked away, the region is a strip
+      // along the screen edge under where the pill rests, which is what you
+      // touch to bring it back; out, it runs from that edge to the pill's
+      // far side, so crossing the gap under the pill does not count as
+      // leaving it.
+      mask: Region {
+        x: bg.x
+        width: bg.width
+        y: !Oracle.barAutohide ? bg.y
+          : Zenon.barTop ? 0
+          : root.barTucked ? bar.height - bar.tuckStrip : bg.y
+        height: !Oracle.barAutohide ? bg.height
+          : root.barTucked ? bar.tuckStrip
+          : bg.height + Zenon.padScreen
+      }
+      readonly property int tuckStrip: 3
+      // menus hung off the pill that are open now — see TrayMenu.hold
+      property int menuHolds: 0
       // Reserving space is a setting; off, the pill floats over tiled
       // windows. On, the reservation is pinned to the COLLAPSED pill (see
       // exclusiveZone) — following its live height resized every tiled window
       // on the monitor each time a layer opened.
-      exclusionMode: Oracle.barReserveSpace
+      // Autohide reserves nothing whatever this says: the pill overlays.
+      exclusionMode: Oracle.barReserveSpace && !Oracle.barAutohide
         ? ExclusionMode.Normal : ExclusionMode.Ignore
       // The pill's own height, the gap it keeps under itself, the same gap
       // again over it, and then whatever more is asked for. Without the
@@ -788,6 +837,9 @@ ShellRoot {
     // never played for that session. Gated this way it simply tries again on
     // the next frame, and the lock states are in the condition so nothing runs
     // at 180Hz through a long lock.
+    // the pointer over the pill — or, tucked away, over its strip (see mask)
+    HoverHandler { id: barHover }
+
     Connections {
       target: bg.Window.window
       enabled: !root.barIntroArmed && !cerberus.locked && !cerberus.covering
@@ -810,7 +862,7 @@ ShellRoot {
     LayerShadow {
       panel: bg
       cornerRadius: root.pillRadius
-      fade: root.barIntro
+      fade: root.barShown
       transform: Translate { y: pillLift.y }
       // A whisper, not the menus' full drop: the pill is always on screen,
       // so it only needs to lift off the desktop, not cast across it. But
@@ -913,13 +965,14 @@ ShellRoot {
       // single uniform radius so all four corners stay even during morph
       radius: root.pillRadius
       clip: true
-      opacity: root.barIntro
+      opacity: root.barShown
       // Rises INTO the screen from whichever edge it lives on: up from below
       // at the bottom, down from above at the top. A pill at the top that
       // still slid upwards would arrive by leaving.
       transform: Translate {
         id: pillLift
-        y: (Zenon.barTop ? -1 : 1) * (1 - root.barIntro) * 22
+        y: (Zenon.barTop ? -1 : 1)
+          * (1 - root.barShown) * 22
       }
 
       // The now-playing takeover. Drawn at pill level and not inside the
@@ -1079,6 +1132,61 @@ ShellRoot {
         }
       }
 
+      // ── THE BAR'S OWN MENU ──────────────────────────────────────────
+      // A right click anywhere on the pill that no module answers itself:
+      // it sits UNDER the module row, so a module that takes the right
+      // button (the bell, hermes, the tray) keeps its own menu, and one that
+      // does not lets the click fall through to here. Not while the pill is
+      // wearing a layer — then it is that layer.
+      MouseArea {
+        anchors.fill: parent
+        enabled: !root.pillMorphed
+        acceptedButtons: Qt.RightButton
+        onClicked: (e) => { barMenuAnchor.x = e.x; barMenu.show(); }
+      }
+      Item { id: barMenuAnchor; width: 1; height: parent.height }
+      TrayMenu {
+        id: barMenu
+        anchorItem: barMenuAnchor
+        readonly property var rows: {
+          const screens = Quickshell.screens;
+          const out = [
+            { id: "autohide", text: "Autohide", icon: "\u{F06D1}", mark: Oracle.barAutohide },
+            { id: "reserve", text: "Reserve space", icon: "\u{F0BCB}",
+              mark: Oracle.barReserveSpace && !Oracle.barAutohide, enabled: !Oracle.barAutohide },
+            { isSeparator: true },
+            Zenon.barTop
+              ? { id: "bottom", text: "Move to bottom", icon: "\u{F0621}" }
+              : { id: "top", text: "Move to top", icon: "\u{F0623}" }
+          ];
+          // a monitor to move to only when there is another one
+          if (screens.length > 1) {
+            const auto = Oracle.pickScreen(Quickshell.env("QS_STATUS_SCREEN"));
+            const kids = [{ text: "Automatic" + (auto ? " \u00b7 " + auto.name : ""),
+                            mark: Oracle.barMonitor === "", screen: "" }];
+            for (let i = 0; i < screens.length; ++i)
+              kids.push({ text: screens[i].name, icon: "\u{F0379}",
+                          mark: Oracle.barMonitor === screens[i].name, screen: screens[i].name });
+            out.push({ id: "monitor", text: "Move to monitor", icon: "\u{F037A}", children: kids });
+          }
+          out.push({ isSeparator: true },
+                   { id: "settings", text: "Bar settings", icon: "\u{F08BB}" });
+          return out;
+        }
+        items: rows
+        onPicked: (i) => {
+          const id = barMenu.rows[i].id;
+          if (id === "autohide") Oracle.set("barAutohide", !Oracle.barAutohide);
+          else if (id === "reserve") Oracle.set("barReserveSpace", !Oracle.barReserveSpace);
+          else if (id === "top" || id === "bottom") Oracle.set("barPosition", id);
+          else if (id === "settings") oracle.open("bar");
+        }
+        onSubPicked: (row, i) => {
+          const r = barMenu.rows[row];
+          if (r.id === "monitor") Oracle.set("barMonitor", r.children[i].screen);
+        }
+      }
+
       // morpheus content - slides out only when a layer morphs ON THIS MONITOR;
       // foreign-monitor layers leave the morpheus row fully intact
       Item {
@@ -1104,7 +1212,7 @@ ShellRoot {
 
           // The updates count leads, then the bell, then the tray: the same
           // kind of thing three times over — a count of something waiting for
-          // you — and the first two now wear the same orange. The bell knows
+          // you — and the first two wear the theme's accent, as hermes does. The bell knows
           // nothing about howler; it is handed the numbers and reports the
           // click back, like every other module in this bar.
           UpdateModule {

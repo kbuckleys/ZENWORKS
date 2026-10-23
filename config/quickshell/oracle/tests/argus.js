@@ -33,6 +33,9 @@ module.exports = {
     t.eq("taken names are stepped past", A.outPath(src, "webm", (p) => taken.has(p)), "/home/u/Videos/Captures/2026-10-20-232145-DP-1-cut-3.webm");
     t.eq("save as keeps the format's extension", A.withExt("/tmp/clip.mp4", "gif"), "/tmp/clip.gif");
     t.eq("…and adds one", A.withExt("/tmp/clip", "webm"), "/tmp/clip.webm");
+    t.eq("a name the picker never asked about has free ones after it", A.variants("/tmp/clip-cut.mp4").slice(0, 3),
+      ["/tmp/clip-cut.mp4", "/tmp/clip-cut-2.mp4", "/tmp/clip-cut-3.mp4"]);
+    t.eq("…with no extension too", A.variants("/tmp/clip").slice(1, 2), ["/tmp/clip-2"]);
 
     // commands
     const o = { inMs: 1500, outMs: 4000, format: "mp4", exact: false, audio: true, gifWidth: 720, gifFps: 15, loop: true };

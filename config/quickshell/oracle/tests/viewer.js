@@ -229,5 +229,19 @@ module.exports = {
     t.eq("small for the monitor", V.monitorCuts(800, 600, [{ name: "A", width: 2560, height: 1440 }])[0].short, true);
     t.eq("recent: newest first, no twice", V.noteRecent(["/a", "/b", "/c"], "/b", 3), ["/b", "/a", "/c"]);
     t.eq("clock", [V.clock(7000), V.clock(62000), V.clock(3723000)], ["0:07", "1:02", "1:02:03"]);
+
+    // an edited copy nobody was asked about is never written over (2026-10-23)
+    t.eq("free names after a taken one", V.variants("/p/a-edited.png").slice(0, 3),
+      ["/p/a-edited.png", "/p/a-edited-2.png", "/p/a-edited-3.png"]);
+    const fs = require("fs"), os = require("os"), path = require("path"), cp = require("child_process");
+    const d = fs.mkdtempSync(path.join(os.tmpdir(), "viewer-free-"));
+    try {
+      fs.writeFileSync(path.join(d, "a-edited.png"), "");
+      const first = (names) => cp.spawnSync("sh", ["-c", V.firstFreeCommand(), "sh"].concat(names)).stdout.toString();
+      t.eq("the first not on disk", first(V.variants(path.join(d, "a-edited.png"))), path.join(d, "a-edited-2.png") + "\n");
+      t.eq("none when all are", first([path.join(d, "a-edited.png")]), "");
+    } finally {
+      fs.rmSync(d, { recursive: true, force: true });
+    }
   }
 };

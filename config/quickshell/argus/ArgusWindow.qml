@@ -194,18 +194,21 @@ FloatingWindow {
     aw.cropping = true;
   }
 
-  function save(to) {
+  // `fresh`: `to` is not the name the picker showed, so not one you agreed to replace
+  function save(to, fresh) {
     if (aw.saving || aw.path === "" || aw.dur <= 0) return;
     aw.cropping = false;
     const out = to || "";
     aw.savingTo = out;
     aw.progress = 0;
     aw.saving = true;
-    // beside the original, under the first name not taken (asked of the
-    // file system, which the pure half cannot)
-    if (out === "") {
+    // beside the original, or a name the picker never asked about (see
+    // saveAs): under the first one not taken (asked of the file system,
+    // which the pure half cannot)
+    const free = out === "" ? aw.candidates() : fresh ? A.variants(out) : null;
+    if (free) {
       nameProc.command = ["sh", "-c", "for p in \"$@\"; do [ -e \"$p\" ] || { printf '%s' \"$p\"; exit 0; }; done",
-        "sh"].concat(aw.candidates());
+        "sh"].concat(free);
       nameProc.running = true;
       return;
     }
@@ -224,7 +227,7 @@ FloatingWindow {
       waitForEnd: true
       onStreamFinished: {
         const p = nameOut.text.trim();
-        if (p === "") { aw.saving = false; aw.say("No free name beside the original — use Save as…", true); return; }
+        if (p === "") { aw.saving = false; aw.say(out === "" ? "No free name beside the original — use Save as…" : "No free name for it — pick another in Save as…", true); return; }
         aw.runSave(p);
       }
     }
@@ -240,7 +243,11 @@ FloatingWindow {
     if (aw.saving || !aw.mgr || !aw.mgr.fileManager) return;
     const suggested = A.outPath(aw.path, aw.opts.format).replace(/.*\//, "");
     aw.mgr.fileManager.choose(false, A.dirOf(aw.path), (paths) => {
-      if (paths && paths.length > 0) aw.save(A.withExt(paths[0], aw.opts.format));
+      if (!paths || paths.length === 0) return;
+      // the picker asked about the name typed; a changed extension is a
+      // different file, which it did not
+      const want = A.withExt(paths[0], aw.opts.format);
+      aw.save(want, want !== paths[0]);
     }, suggested);
   }
   // any video, from anywhere — not only the captures directory

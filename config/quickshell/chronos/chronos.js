@@ -184,9 +184,11 @@ function parseQuick(text, iso) {
   }
   return { allDay: false, start: iso + " " + start, end: iso + " " + end, title: m[5].trim(), location: location };
 }
-// cal.py new's arguments for it
+// cal.py new's arguments for it. An all-day event ends the day it starts,
+// said: given a start alone, khal read the title's first word as the end
+// when it could be one ("Friday drinks" ran to Friday, titled "drinks").
 function newArgs(q, cal) {
-  if (q.allDay) return [cal || "", q.start, "", q.title, q.location || ""];
+  if (q.allDay) return [cal || "", q.start, q.start, q.title, q.location || ""];
   return [cal || "", q.start, q.end, q.title, q.location || ""];
 }
 

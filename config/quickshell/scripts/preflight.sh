@@ -59,6 +59,10 @@ printf '%s\n' "$out" | grep -vE '^  ok ' || true
 # in a throwaway directory, EPUB 3 and 2, and a broken one
 out=$(python3 "$root/oracle/tests/minerva-epub.py" 2>&1) || fail=1
 printf '%s\n' "$out" | grep -vE '^  ok ' || true
+# and chronos' calendar backend (oracle/tests/chronos-core.py): delete by
+# exact UID, never a shared file, never for good; khal and gio stood in for
+out=$(python3 "$root/oracle/tests/chronos-core.py" 2>&1) || fail=1
+printf '%s\n' "$out" | grep -vE '^  ok ' || true
 
 echo "── compiling every .qml"
 tmp=$(mktemp -d)

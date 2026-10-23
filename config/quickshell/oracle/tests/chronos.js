@@ -40,7 +40,9 @@ module.exports = {
     t.has("not a time", C.parseQuick("25:00 x", "2026-10-22").error, "time of day");
     t.has("backwards", C.parseQuick("15-14 x", "2026-10-22").error, "ends before");
     t.has("nothing", C.parseQuick("  ", "2026-10-22").error, "Type");
-    t.eq("cal.py's arguments", C.newArgs(C.parseQuick("Holiday", "2026-10-22"), "personal"), ["personal", "2026-10-22", "", "Holiday", ""]);
+    t.eq("cal.py's arguments", C.newArgs(C.parseQuick("Holiday", "2026-10-22"), "personal"), ["personal", "2026-10-22", "2026-10-22", "Holiday", ""]);
+    t.eq("all day ends the day it starts, so a weekday is title", C.newArgs(C.parseQuick("Friday drinks", "2026-10-23"), ""),
+      ["", "2026-10-23", "2026-10-23", "Friday drinks", ""]);
 
     // reminders
     const dentist = ev[2];

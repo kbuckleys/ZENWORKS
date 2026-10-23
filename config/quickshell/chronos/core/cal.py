@@ -24,6 +24,7 @@
 import glob
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -166,11 +167,24 @@ def new(cal, start, end, title, location=""):
         args += ["-a", cal]
     if location:
         args += ["-l", location]
-    args += [start] + ([end] if end else []) + [title]
+    # -- first: a title like "-5 kg" is the event's, not an option
+    args += ["--", start] + ([end] if end else []) + [title]
     code, out, err = run(args)
     if code != 0:
         return {"error": (err.strip().splitlines() or ["khal could not add it"])[-1]}
     return {"ok": True}
+
+
+def uids_of(text):
+    """Every UID an .ics holds, by its own line (RFC 5545 folds a long line
+    onto ones that start with a space; unfolded first). Not a substring:
+    "UID:abc" is in "UID:abcdef" too."""
+    out = set()
+    for line in re.sub(r"\r?\n[ \t]", "", text).splitlines():
+        m = re.match(r"UID(?:;[^:]*)?:(.*)$", line.strip(), re.I)
+        if m:
+            out.add(m.group(1).strip())
+    return out
 
 
 def delete(uid):
@@ -178,13 +192,20 @@ def delete(uid):
         for p in glob.glob(os.path.join(c["path"], "*.ics")):
             try:
                 with open(p, errors="replace") as f:
-                    if ("UID:" + uid) in f.read():
-                        code, _, err = run(["gio", "trash", p])
-                        if code != 0:
-                            os.remove(p)
-                        return {"ok": True}
+                    uids = uids_of(f.read())
             except OSError:
                 continue
+            if uid not in uids:
+                continue
+            # the file goes whole: one holding other events too would take
+            # them with it (an imported calendar is often one file)
+            if len(uids) > 1:
+                return {"error": "That event shares its file with others — remove it in your calendar app"}
+            code, _, err = run(["gio", "trash", "--", p])
+            if code != 0:
+                # never for good without asking: said, and left where it is
+                return {"error": (err.strip().splitlines() or ["It could not be moved to the trash"])[-1]}
+            return {"ok": True}
     return {"error": "That event was not found in any calendar"}
 
 

@@ -2580,7 +2580,18 @@ FloatingWindow {
     const dest = V.writable(win.path) ? win.path
       : Terminus.dirname(win.path) + "/" + V.editedName(win.path).replace(/\.[^.]+$/, ".png");
     const go = () => win.bake(dest, (ok) => { if (ok) { win.resetEdit(); if (dest === win.path) win.say("Saved  \u00b7  u puts the original back", 6000); } });
-    if (dest === win.path) win.keepCopies([dest], go); else go();
+    if (dest === win.path) win.keepCopies([dest], go);
+    // beside it, under a name not taken: the edited copy is not backed up
+    // the way the original is, so it is never written over
+    else win.bakeFree(V.variants(dest), (done) => { if (done) win.resetEdit(); });
+  }
+  // baked to the first of `names` nothing is at yet
+  function bakeFree(names, then) {
+    let free = "";
+    win.runLines(["sh", "-c", V.firstFreeCommand(), "sh"].concat(names), (line) => { if (free === "") free = line; }, () => {
+      if (free === "") { win.say("No free name beside it — use Save as"); return; }
+      win.bake(free, then);
+    });
   }
   function saveNew() {
     if ((!win.edited && !win.scratch) || !win.stillOnly()) return;
@@ -2589,8 +2600,11 @@ FloatingWindow {
     const ok = fm.choose(false, win.dir, (paths) => {
       if (paths.length === 0) return;
       let f = String(paths[0]);
-      if (!/\.(png|jpe?g|webp|bmp|tiff?)$/i.test(f)) f += ".png";
-      win.bake(f, (done) => { if (done) win.resetEdit(); });
+      const then = (done) => { if (done) win.resetEdit(); };
+      // the picker asked about the name typed; with ".png" added it is a
+      // different file, which it did not — so never one written over
+      if (!/\.(png|jpe?g|webp|bmp|tiff?)$/i.test(f)) win.bakeFree(V.variants(f + ".png"), then);
+      else win.bake(f, then);
     }, win.scratch ? "Pasted image.png" : V.editedName(win.path));
     if (!ok) win.say("The file picker is busy with another request");
   }

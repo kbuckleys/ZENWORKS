@@ -193,9 +193,12 @@ Item {
       ? root.streamCeiling : 1.0;
   }
 
+  // The ceiling is ours, not the device's: one already above it (120% set
+  // in pavucontrol) is never pulled down to it — volume up there dropped it
+  // to 100% (2026-10-23). It goes no higher, and down from where it is.
   function setVolume(node, v) {
     if (!node || !node.audio) return;
-    node.audio.volume = Math.max(0, Math.min(root.ceilingFor(node), v));
+    node.audio.volume = Sound.clampVolume(v, node.audio.volume, root.ceilingFor(node));
   }
 
   function nudge(node, delta) {

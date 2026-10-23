@@ -73,7 +73,11 @@ done
 
 # the scratch directory, and the promise that it goes whatever happens
 tmp="$(mktemp -d "${TMPDIR:-/tmp}/zenworks-update.XXXXXX")"
-trap 'rm -rf -- "$tmp"' EXIT INT TERM
+# EXIT cleans up; INT and TERM only end the script, which runs EXIT. A trap
+# that cleaned up on INT/TERM itself carried on afterwards, and an rsync
+# --delete still running could read the half-gone copy as the release.
+trap 'rm -rf -- "$tmp"' EXIT
+trap 'exit 130' INT TERM
 
 echo "update: fetching $REPO"
 git clone --quiet --depth 1 -- "$REPO" "$tmp/zenworks" || { said "could not fetch $REPO"; exit 5; }

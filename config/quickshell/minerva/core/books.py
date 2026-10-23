@@ -82,6 +82,17 @@ def size_of(path):
     return 0, 0
 
 
+def free_name(d, name):
+    """`name` in directory `d`, or "name-2.ext", "name-3.ext"… when a page
+    is already there: flattening folders into names can make two pages one
+    ("a/1.jpg" and "a_1.jpg"), and the second used to replace the first."""
+    stem, ext = os.path.splitext(name)
+    out, n = name, 2
+    while os.path.exists(os.path.join(d, out)):
+        out, n = "%s-%d%s" % (stem, n, ext), n + 1
+    return os.path.join(d, out)
+
+
 def comic(src, dest):
     src, dest = os.path.abspath(src), os.path.abspath(dest)
     stamp = "%d:%d:%d" % (VERSION, os.path.getmtime(src), os.path.getsize(src))
@@ -100,7 +111,7 @@ def comic(src, dest):
         with zipfile.ZipFile(src) as z:
             for n in z.namelist():
                 if n.lower().endswith(PICTURES) and not os.path.basename(n).startswith("."):
-                    out = os.path.join(pages_dir, n.replace("/", "_").lstrip("._"))
+                    out = free_name(pages_dir, n.replace("/", "_").lstrip("._"))
                     with open(out, "wb") as f:
                         f.write(z.read(n))
     else:
@@ -119,7 +130,7 @@ def comic(src, dest):
                 continue
             rel = os.path.relpath(root, pages_dir).replace(os.sep, "_")
             for fn in files:
-                os.replace(os.path.join(root, fn), os.path.join(pages_dir, rel + "_" + fn))
+                os.replace(os.path.join(root, fn), free_name(pages_dir, rel + "_" + fn))
         for root, dirs, files in os.walk(pages_dir, topdown=False):
             if root != pages_dir:
                 shutil.rmtree(root, ignore_errors=True)

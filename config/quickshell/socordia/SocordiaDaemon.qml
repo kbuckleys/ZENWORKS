@@ -346,8 +346,26 @@ Scope {
       else root.afterSleep();
       return;
     }
-    // `loginctl lock-session`, and whatever else asks the session to lock
-    if (line.indexOf("Session.Lock") >= 0) root.lock();
+    // `loginctl lock-session`, and whatever else asks the session to lock —
+    // THIS session: logind signals Lock on the session object it is for, and
+    // one run inside an ssh login locked the desktop too (2026-10-23).
+    // `lock-sessions` signals every session, this one included.
+    if (line.indexOf("Session.Lock") >= 0
+        && (root.sessionPath === "" || line.indexOf(root.sessionPath + ":") >= 0)) root.lock();
+  }
+  // logind's object path for our session ("3" → …/session/_33): sd-bus
+  // escapes anything not a letter or digit, and a leading digit, as _xx.
+  // No XDG_SESSION_ID (started outside a logind session): every Lock counts.
+  readonly property string sessionPath: {
+    const id = String(Quickshell.env("XDG_SESSION_ID") || "");
+    if (id === "") return "";
+    let out = "";
+    for (let i = 0; i < id.length; ++i) {
+      const c = id[i];
+      out += /[A-Za-z0-9]/.test(c) && !(i === 0 && /[0-9]/.test(c))
+        ? c : "_" + c.charCodeAt(0).toString(16).padStart(2, "0");
+    }
+    return "/org/freedesktop/login1/session/" + out;
   }
 
   // A *delay* inhibitor, not a block one: logind holds the suspend while we

@@ -165,6 +165,13 @@ try:
     eq("pages in natural order", [os.path.basename(p["file"]) for p in cb["pages"]], ["p2.png", "p10.png"])
     eq("sizes from the headers", [(p["width"], p["height"]) for p in cb["pages"]], [(3, 5), (4, 6)])
     eq("read back unchanged", books.comic(cbz, os.path.join(TMP, "cbz"))["stamp"], cb["stamp"])
+    # folders flattened into names can make two pages one: both kept (2026-10-23)
+    clash = os.path.join(TMP, "clash.cbz")
+    with zipfile.ZipFile(clash, "w") as z:
+        z.writestr("a/p1.png", png(2, 2))
+        z.writestr("a_p1.png", png(5, 5))
+    cc = books.comic(clash, os.path.join(TMP, "clash"))
+    eq("a page whose flattened name is taken is kept too", sorted((p["width"], p["height"]) for p in cc["pages"]), [(2, 2), (5, 5)])
     lib = os.path.join(TMP, "lib")
     os.makedirs(os.path.join(lib, "a", ".hidden"))
     for f in ["a/x.pdf", "a/.hidden/y.pdf", "z.epub", "n.txt", "q.CBZ"]:

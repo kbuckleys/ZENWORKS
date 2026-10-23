@@ -158,6 +158,12 @@ function filterSound(rows, query) {
 // Volume as a percentage of the pipewire scale. Pipewire's own volume is
 // linear 0..1 over the same range pulse calls 0..100%, so this is a scaling
 // and not a cube-root conversion — wiremix shows the same number.
+// a new volume, kept to [0, ceiling] — or to where it already is, when
+// something else put it above the ceiling: never raised past either
+function clampVolume(v, current, ceiling) {
+  return Math.max(0, Math.min(v, Math.max(ceiling, Number(current) || 0)));
+}
+
 function percent(v) {
   return Math.round((Number(v) || 0) * 100);
 }

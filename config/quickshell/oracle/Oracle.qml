@@ -94,6 +94,10 @@ Singleton {
   // Whether tiled windows are kept clear of the pill. Off, the pill floats
   // over whatever is underneath it and nothing on the desktop moves for it.
   property bool barReserveSpace: true
+  // Autohide: the pill slides off its edge until the pointer touches that
+  // edge (or a layer opens out of it), and while it is set nothing is
+  // reserved for it — windows run under it, whatever Reserve space says.
+  property bool barAutohide: false
 
   // What the pill actually shows. Each of these is the module's own `active`
   // ANDed with the switch, so turning one off is the same motion the module
@@ -816,7 +820,10 @@ Singleton {
     { key: "showTray", section: "bar", label: "System tray", type: "bool",
       help: "Hidden inside the workspace row until you hover it. Off, tray applications keep running with nowhere to appear." },
     { key: "barReserveSpace", section: "bar", label: "Reserve space", type: "bool",
-      help: "Keep tiled windows clear of the pill. Off, it floats over them and nothing on the desktop moves for it." },
+      help: "Keep tiled windows clear of the pill. Off, it floats over them and nothing on the desktop moves for it. Autohide overrides it." },
+    { key: "barAutohide", section: "bar", alias: "autohide auto hide hidden reveal slide away dock overlay",
+      label: "Autohide", type: "bool",
+      help: "The pill slides off the screen edge and comes back when the pointer touches that edge, or when something opens out of it. Nothing is reserved for it while it is set: windows run under it. Also in the bar's right-click menu." },
 
     // ── appearance ──
     // `pick` makes a text setting a button that opens terminus' picker
