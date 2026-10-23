@@ -10,6 +10,8 @@
 module.exports = {
   module: "oracle/oracle.js",
   cases: (O, t) => {
+    t.eq("a theme lands only over nothing or your own", [null, "", "{\"custom\":true}", "{\"name\":\"Dracula\"}", "not json"].map(O.bundleThemeWritable),
+      [true, true, true, false, false]);
     t.eq("allowed", ["oracle.json", "hypr/keys.lua", "themes/my-theme.json"].map(O.bundlePathOk), [true, true, true]);
     t.eq("refused", ["hypr/binds.lua", "themes/../x.json", "/etc/passwd", "themes/.hidden.json", "../oracle.json"].map(O.bundlePathOk),
       [false, false, false, false, false]);

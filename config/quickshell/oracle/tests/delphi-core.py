@@ -320,6 +320,23 @@ def unstage_in_unborn_repo():
     eq([e["path"] for e in r.status()["untracked"]], ["a"])
 
 
+@test
+def paths_are_names_not_patterns():
+    # "photo [1].jpg" read as a pattern also matched "photo 1.jpg": Clean
+    # deleted both, Discard reverted both (2026-10-23)
+    d = fresh({"a [1].txt": "a\n", "a 1.txt": "b\n"})
+    write(d, "a [1].txt", "A\n"); write(d, "a 1.txt", "B\n")
+    write(d, "n [1].txt", "x\n"); write(d, "n 1.txt", "y\n")
+    r = R.Repo(d)
+    r.discard(["a [1].txt"])
+    eq([read(d, "a [1].txt"), read(d, "a 1.txt")], ["a\n", "B\n"], "discard touches only the named file")
+    r.clean(["n [1].txt"])
+    eq(sorted(f for f in os.listdir(d) if f.startswith("n ")), ["n 1.txt"], "clean deletes only the named file")
+    r.unstage_all()
+    r.stage(["a [1].txt"])
+    eq(sh(d, "diff", "--cached", "--name-only"), "", "nothing to stage: the named file is clean again")
+
+
 # ── commits, refs, stash, worktrees ─────────────────────────────────────
 @test
 def commit_and_amend():

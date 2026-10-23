@@ -1680,7 +1680,9 @@ FloatingWindow {
                       return Oracle.changedIn(tab.modelData.id);
                     }
 
-                    onHereChanged: if (here) Qt.callLater(() => tabFlick.reveal(tab))
+                    // held now: by the later call a reload may have torn the
+                    // window down, and the id no longer resolves (null if so)
+                    onHereChanged: if (here) { const f = tabFlick; Qt.callLater(() => { if (f) f.reveal(tab); }); }
 
                     // Only where you ARE. Nothing lights up under the pointer:
                     // the section you are standing in is a fact about the

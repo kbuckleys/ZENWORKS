@@ -27,7 +27,8 @@ function parseOverview(text) {
       .filter((x) => x && typeof x.path === "string").map((x) => ({ name: String(x.name || ""), path: x.path, bytes: num(x.bytes) })) },
     pkgcache: { bytes: num(p.bytes), tool: p.tool === true,
                 old: { count: num(p.old && p.old.count), bytes: num(p.old && p.old.bytes) },
-                gone: { count: num(p.gone && p.gone.count), bytes: num(p.gone && p.gone.bytes) } },
+                gone: { count: num(p.gone && p.gone.count), bytes: num(p.gone && p.gone.bytes) },
+                both: { count: num(p.both && p.both.count), bytes: num(p.both && p.both.bytes) } },
     orphans: (Array.isArray(o.orphans) ? o.orphans : []).filter((x) => x && typeof x.name === "string")
       .map((x) => ({ name: x.name, bytes: num(x.bytes) })),
     journal: { bytes: num(jr.bytes) },
@@ -45,8 +46,16 @@ function orphanBytes(list) { return (list || []).reduce((a, x) => a + num(x.byte
 // judge, so they are not in it.
 function reclaimable(ov) {
   if (!ov || !ov.known) return 0;
-  return ov.pkgcache.old.bytes + ov.pkgcache.gone.bytes + orphanBytes(ov.orphans) + journalSpare(ov.journal.bytes);
+  // a removed package's older versions are in both old (-k1 keeps one of
+  // every package) and gone (-uk0 keeps none of a removed one)
+  return pkgcacheBytes(ov.pkgcache) + orphanBytes(ov.orphans) + journalSpare(ov.journal.bytes);
 }
+// the package cache's two parts, apart: older versions of what is still
+// installed (old less both), and every version of what is not (gone)
+function pkgcacheOld(p) {
+  return { count: Math.max(0, p.old.count - p.both.count), bytes: Math.max(0, p.old.bytes - p.both.bytes) };
+}
+function pkgcacheBytes(p) { return pkgcacheOld(p).bytes + p.gone.bytes; }
 
 // ── DUPLICATES ─────────────────────────────────────────────────────────────
 function parseDupes(text) {

@@ -173,18 +173,19 @@ function wifiGlyph(s) { return G.wifi[wifiBars(s)]; }
 function securityWords(t) {
   var s = String(t || "");
   if (s === "Open" || s === "Owe" || s === "") return s === "Owe" ? "Open, encrypted" : "Open";
-  if (s === "Sae" || s === "Wpa3SuiteB192") return "WPA3";
+  if (s === "Sae") return "WPA3";
   if (s === "Wpa2Psk") return "WPA2";
   if (s === "WpaPsk") return "WPA";
-  if (s === "Wpa2Eap" || s === "WpaEap" || s === "Leap") return "Enterprise";
+  // Suite B 192 is WPA3-Enterprise: a sign-in, not a passphrase
+  if (s === "Wpa2Eap" || s === "WpaEap" || s === "Leap" || s === "Wpa3SuiteB192") return "Enterprise";
   if (s === "StaticWep" || s === "DynamicWep") return "WEP";
   return "Secured";
 }
 function securityOpen(t) { var s = String(t || ""); return s === "Open" || s === "Owe"; }
 function needsPassphrase(t) {
-  return ["Sae", "Wpa2Psk", "WpaPsk", "StaticWep", "Wpa3SuiteB192"].indexOf(String(t || "")) >= 0;
+  return ["Sae", "Wpa2Psk", "WpaPsk", "StaticWep"].indexOf(String(t || "")) >= 0;
 }
-function enterprise(t) { return ["Wpa2Eap", "WpaEap", "Leap", "DynamicWep"].indexOf(String(t || "")) >= 0; }
+function enterprise(t) { return ["Wpa2Eap", "WpaEap", "Leap", "DynamicWep", "Wpa3SuiteB192"].indexOf(String(t || "")) >= 0; }
 
 // The networks as listed: connected first, then saved ones, then by signal;
 // one row per name (an access point per band shows up as two)

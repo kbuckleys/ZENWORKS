@@ -23,6 +23,8 @@ module.exports = {
     }));
     t.eq("read", [ov.known, ov.caches.dirs.length, ov.pkgcache.old.count, ov.downloads.files[0].path], [true, 1, 3, "/d/f"]);
     t.eq("reclaimable", H.reclaimable(ov), 300 + 100 + 50 + 7);
+    const both = H.parseOverview(JSON.stringify({ pkgcache: { tool: true, old: { count: 5, bytes: 500 }, gone: { count: 3, bytes: 300 }, both: { count: 2, bytes: 200 } } }));
+    t.eq("removed packages' old versions counted once", [H.pkgcacheBytes(both.pkgcache), H.pkgcacheOld(both.pkgcache)], [600, { count: 3, bytes: 300 }]);
     t.eq("journal kept", [H.journalSpare(5), H.journalSpare(200 * 1024 * 1024 + 1)], [0, 1]);
 
     const g = H.parseDupes(JSON.stringify([

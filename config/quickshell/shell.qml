@@ -817,8 +817,14 @@ ShellRoot {
       // this same shadow is what a quick access panel casts once it has
       // morphed out of the pill, so it eases back to the full one over the
       // morph — the panels keep exactly the shadow every menu has.
-      readonly property real m: root.morphProgress
-      ink: Qt.rgba(0, 0, 0, Zenon.menuShadowInk.a * (0.55 + 0.45 * m))
+      // Except cynosure: it is the one panel built like the pill, a strip,
+      // so wearing it the pill keeps its own light shadow — and cynosure
+      // standalone casts that same one. Eased, so handing the pill between
+      // cynosure and another panel cannot snap the shadow.
+      property real heavy: root.morphSource === "cynosure" ? 0 : 1
+      Behavior on heavy { NumberAnimation { duration: root.morphMs; easing.type: Zenon.ease } }
+      readonly property real m: root.morphProgress * heavy
+      ink: Zenon.alpha(Zenon.menuShadowInk, Zenon.menuShadowInk.a * (0.55 + 0.45 * m))
       grow: 4 + (Zenon.menuShadowGrow - 4) * m
       softness: 16 + (Zenon.menuShadowBlur - 16) * m
       drop: 2 + (Zenon.menuShadowDrop - 2) * m

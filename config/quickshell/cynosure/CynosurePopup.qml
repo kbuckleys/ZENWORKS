@@ -695,6 +695,40 @@ property var statusbar: null
     morphed: popup.morphMode
     fade: popup.showFactor
     transform: Translate { y: spawnT.y }
+    // The pill's resting shadow, not a menu's: standalone, cynosure is the
+    // one panel built like the bar — a strip off a screen edge — so it is
+    // lit the same. Keep these in step with the bar's LayerShadow in
+    // shell.qml (its values at morphProgress 0).
+    ink: Zenon.alpha(Zenon.menuShadowInk, Zenon.menuShadowInk.a * 0.55)
+    grow: 4
+    softness: 16
+    drop: 2
+  }
+
+  // ── AND THE PILL'S TWO OUTER RINGS ────────────────────────────────
+  // Same as the bar's in shell.qml: bg's border is the firmest, innermost
+  // line, and each ring out is fainter. Siblings because bg's content
+  // clips; they ride bg's fade and slide. Morphed, the pill draws its own
+  // three, so these go.
+  Repeater {
+    // [how far out, strength against the theme's border]
+    model: [[1, 1.2], [2, 0.7]]
+    Rectangle {
+      required property var modelData
+      readonly property int out: modelData[0]
+      x: bg.x - out
+      y: bg.y - out
+      width: bg.width + out * 2
+      height: bg.height + out * 2
+      radius: bg.radius + out
+      color: "transparent"
+      border.width: 1
+      border.color: Qt.rgba(Zenon.border.r, Zenon.border.g, Zenon.border.b,
+                            Zenon.border.a * modelData[1])
+      visible: !popup.morphMode
+      opacity: popup.showFactor
+      transform: Translate { y: spawnT.y }
+    }
   }
 
   Rectangle {
@@ -702,7 +736,10 @@ property var statusbar: null
     anchors.fill: strip
     radius: popup.edgeCorner
     color: popup.morphMode ? "transparent" : Zenon.panelBgDeep
-    border.color: (popup.morphMode) ? "transparent" : Zenon.border
+    // the firmer inner of the pill's three rings, as the bar has it
+    border.color: (popup.morphMode) ? "transparent"
+      : Qt.rgba(Zenon.border.r, Zenon.border.g, Zenon.border.b,
+                Math.min(1, Zenon.border.a * 2.5))
     border.width: 1
 
     opacity: popup.morphMode ? 1 : popup.showFactor
@@ -916,7 +953,7 @@ property var statusbar: null
           // than they needed and the last one was cut off by the ListView clip.
           // The cap is the point past which a very long command elides rather
           // than pushing the buttons off the end.
-          width: Math.min(420, msgText.implicitWidth + 24)
+          width: Math.min(420, msgFace.implicitWidth + 24)
           height: parent.height
           // the confirm's red, the question's own ground only; it holds the
           // pill's left end, so it takes the pill's corners there
@@ -925,19 +962,37 @@ property var statusbar: null
           bottomLeftRadius: bg.radius
           Behavior on color { ColorAnimation { duration: Zenon.normal; easing.type: Zenon.ease } }
 
-          Text {
-            id: msgText
-            anchors.fill: parent
-            anchors.leftMargin: 12
-            anchors.rightMargin: 12
-            text: popup.pending ? popup.pending.name + "?" : popup.query
-            color: popup.alarm ? Zenon.onAccent : Zenon.white
-            font.family: Zenon.face
-            font.weight: Font.Bold
-            font.pixelSize: Zenon.px(16)
-            horizontalAlignment: Text.AlignHCenter
-            verticalAlignment: Text.AlignVCenter
-            elide: Text.ElideMiddle
+          // The verb's own glyph ahead of its question, as its row had it in
+          // the list: "⏻  Shutdown?". Its own Text for the same reason the
+          // rows' is — one rich-text run collapses the gap.
+          Row {
+            id: msgFace
+            anchors.centerIn: parent
+            spacing: Zenon.px(9)
+
+            Text {
+              id: msgGlyph
+              visible: text !== ""
+              anchors.verticalCenter: parent.verticalCenter
+              text: popup.pending && popup.pending.glyph ? popup.pending.glyph : ""
+              color: msgText.color
+              font.family: Zenon.face
+              font.pixelSize: Zenon.px(17)
+            }
+
+            Text {
+              id: msgText
+              anchors.verticalCenter: parent.verticalCenter
+              // capped so a long command still elides inside the area's 420
+              width: Math.min(implicitWidth,
+                420 - 24 - (msgGlyph.visible ? msgGlyph.width + msgFace.spacing : 0))
+              text: popup.pending ? popup.pending.name + "?" : popup.query
+              color: popup.alarm ? Zenon.onAccent : Zenon.white
+              font.family: Zenon.face
+              font.weight: Font.Bold
+              font.pixelSize: Zenon.px(16)
+              elide: Text.ElideMiddle
+            }
           }
         }
 

@@ -66,6 +66,8 @@ module.exports = {
     t.eq("WPA3 by its name", H.securityWords("Sae"), "WPA3");
     t.eq("an open network", H.securityWords("Open"), "Open");
     t.eq("enterprise", H.securityWords("Wpa2Eap"), "Enterprise");
+    t.eq("WPA3 Suite B is a sign-in", [H.securityWords("Wpa3SuiteB192"), H.enterprise("Wpa3SuiteB192"), H.needsPassphrase("Wpa3SuiteB192")],
+      ["Enterprise", true, false]);
     t.eq("WPA2 asks for a passphrase", H.needsPassphrase("Wpa2Psk"), true);
     t.eq("enterprise does not (its own dialog)", H.needsPassphrase("Wpa2Eap"), false);
     t.eq("open does not", H.needsPassphrase("Open"), false);

@@ -73,7 +73,7 @@ Item {
         try { list = JSON.parse(this.text); } catch (e) {}
         const seen = {}, out = [];
         for (const c of list) {
-          const cls = String(c.class || c.initialClass || "");
+          const cls = Ora.stableClass(c.class || c.initialClass || "");
           if (!cls || seen[cls]) continue;
           seen[cls] = true;
           out.push({ cls: cls, title: String(c.title || ""), name: wr.appName(cls) });

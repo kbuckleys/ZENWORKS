@@ -2146,13 +2146,30 @@ function parseLuaRecords(text) {
   if (at < 0) return [];
   const body = src.slice(src.indexOf("{", at) + 1);
   const out = [];
-  const tre = /\{([^{}]*)\}/g;
-  let t;
-  while ((t = tre.exec(body)) !== null) {
+  // a table's braces counted outside its strings only: a command's
+  // `{1..3}` or a title's "{draft}" is text, not a table (it used to end
+  // the record there, and the entry was gone on the next save)
+  const tables = [];
+  let depth = 0, start = -1;
+  for (let i = 0; i < body.length; i++) {
+    const ch = body[i];
+    if (ch === "\"") {
+      for (i++; i < body.length && body[i] !== "\""; i++) if (body[i] === "\\") i++;
+    } else if (ch === "{") {
+      if (depth++ === 0) start = i + 1;
+    } else if (ch === "}") {
+      if (depth === 0) break;          // the list's own closing brace
+      if (--depth === 0) tables.push(body.slice(start, i));
+    }
+  }
+  for (const t of tables) {
     const rec = {};
-    const fre = /([A-Za-z_]\w*)\s*=\s*("(?:[^"\\]|\\.)*"|-?\d+(?:\.\d+)?|true|false)/g;
+    // a bare string is matched (and skipped) whole, so `on=false` inside a
+    // command is never read as the field
+    const fre = /"(?:[^"\\]|\\.)*"|([A-Za-z_]\w*)\s*=\s*("(?:[^"\\]|\\.)*"|-?\d+(?:\.\d+)?|true|false)/g;
     let f;
-    while ((f = fre.exec(t[1])) !== null) {
+    while ((f = fre.exec(t)) !== null) {
+      if (f[1] === undefined) continue;
       const v = f[2];
       rec[f[1]] = v === "true" ? true : v === "false" ? false
         : v[0] === "\"" ? v.slice(1, -1).replace(/\\(.)/g, "$1") : Number(v);
@@ -2191,8 +2208,13 @@ const ZEN_HEAD = [
 // of the title, or "" for every window of the app.
 const RULE_ORDER = ["name", "class", "title", "on", "float", "size", "center", "workspace", "silent",
                     "opacity", "pin", "no_blur", "idle_inhibit", "open", "no_initial_focus"];
+// A class some apps make new at every launch — transmission-gtk's is
+// "com.transmissionbt.transmission_<pid>_<random>" — kept without that
+// tail, or the rule would only ever match the one window it was picked
+// from; rules.lua lets any such tail match again.
+function stableClass(cls) { return String(cls || "").replace(/_\d+_\d+$/, ""); }
 function blankWindowRule(cls, name) {
-  return { name: String(name || cls || ""), class: String(cls || ""), title: "", on: true,
+  return { name: String(name || cls || ""), class: stableClass(cls), title: "", on: true,
            float: false, size: "", center: false, workspace: "", silent: false, opacity: 100,
            pin: false, no_blur: false, idle_inhibit: "", open: "", no_initial_focus: false };
 }
@@ -2201,6 +2223,9 @@ function normWindowRule(r) {
   const b = blankWindowRule();
   const o = {};
   for (const k of RULE_ORDER) o[k] = (r && r[k] !== undefined && typeof r[k] === typeof b[k]) ? r[k] : b[k];
+  const raw = o.class;
+  o.class = stableClass(raw);
+  if (o.name === raw) o.name = o.class;
   o.opacity = Math.max(10, Math.min(100, Math.round(o.opacity)));
   if (!/^\d+ \d+$/.test(o.size)) o.size = "";
   if (["", "focus", "fullscreen", "always"].indexOf(o.idle_inhibit) < 0) o.idle_inhibit = "";
@@ -2232,7 +2257,7 @@ function windowRuleWords(r) {
   if (r.open) w.push(r.open === "maximize" ? "maximized" : "full screen");
   if (r.workspace) w.push((r.workspace === "special" ? "special workspace" : "workspace " + r.workspace.replace(/^name:/, "")) + (r.silent ? ", quietly" : ""));
   if (r.opacity < 100) w.push(r.opacity + "% opaque");
-  if (r.pin) w.push("pinned");
+  if (r.pin && r.float) w.push("pinned");     // rules.lua pins floating windows only
   if (r.no_blur) w.push("no blur");
   if (r.idle_inhibit) w.push("keeps awake" + (r.idle_inhibit === "always" ? "" : r.idle_inhibit === "focus" ? " while focused" : " in full screen"));
   if (r.no_initial_focus) w.push("opens unfocused");
@@ -2286,6 +2311,9 @@ function startupLook(command) {
   let i = 0;
   while (i < words.length && (/^\w+=/.test(words[i]) || ["env", "sh", "-c", "exec", "nice", "uwsm", "app", "--", "gtk-launch", "flatpak", "run"].indexOf(words[i]) >= 0)) i++;
   const w = (words[i] || "").replace(/^['"]|['"]$/g, "");
+  // a shell script's first word is the shell's, not a program to look for
+  // ("for" would be found in nearly every line ps prints)
+  if (["for", "while", "until", "if", "case", "{", "(", "!"].indexOf(w) >= 0) return "";
   return w.slice(w.lastIndexOf("/") + 1);
 }
 // is `look` in one of `ps -eo args=`'s lines (not ps' own, not a grep)?
@@ -2514,6 +2542,13 @@ function readBundle(text) {
   }
   if (!Object.keys(files).length) return { ok: false, why: "There are no settings in it", made: "", files: {}, skipped: skipped };
   return { ok: true, why: "", made: String(j.made || ""), files: files, skipped: skipped };
+}
+// May an imported theme land where `existing` (that file's text here, or
+// null) is? Only over nothing or over one of your own: a bundle naming a
+// shipped theme ("themes/dracula.json") would otherwise replace it.
+function bundleThemeWritable(existing) {
+  if (existing === null || existing === undefined || existing === "") return true;
+  try { const t = JSON.parse(existing); return !!(t && t.custom === true); } catch (e) { return false; }
 }
 // what a bundle holds, a line each, in BUNDLE_FIXED's order, themes last
 function bundleWords(files) {

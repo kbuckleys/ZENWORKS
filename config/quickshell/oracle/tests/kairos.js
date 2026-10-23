@@ -14,6 +14,7 @@ module.exports = {
     const own = ["terminus", "hestia", "kairos"];
     t.eq("a class", K.appKey("Kitty", "zsh", own), "kitty");
     t.eq("one of ours", K.appKey("org.quickshell", "hestia", own), "hestia");
+    t.eq("Tidy is ours", [K.appKey("org.quickshell", "hygieia"), K.isOwn("hygieia"), K.prettyKey("hygieia")], ["hygieia", true, "Tidy"]);
     t.eq("ours, unknown title", K.appKey("org.quickshell", "something", own), "zenworks");
     t.eq("no window", K.appKey("", "x", own), "");
     t.eq("a picker title", K.appKey("org.quickshell", "terminus-picker"), "terminus");

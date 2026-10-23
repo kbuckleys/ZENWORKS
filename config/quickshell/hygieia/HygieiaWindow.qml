@@ -172,14 +172,14 @@ FloatingWindow {
           // ── the package cache ───────────────────────────────────────
           HermesCard {
             glyph: "\u{F03D6}"
-            glyphInk: tw.ov.pkgcache.old.bytes + tw.ov.pkgcache.gone.bytes > 0 ? Zenon.cyan : Zenon.accentMuted
+            glyphInk: H.pkgcacheBytes(tw.ov.pkgcache) > 0 ? Zenon.cyan : Zenon.accentMuted
             title: "Package cache"
             note: tw.ov.known ? tw.size(tw.ov.pkgcache.bytes) + " in /var/cache/pacman/pkg" : ""
             Words {
               text: !tw.ov.pkgcache.tool
                 ? "Every package pacman ever downloaded is kept, every version of it. paccache (pacman-contrib) clears the old ones."
-                : tw.ov.pkgcache.old.count + tw.ov.pkgcache.gone.count === 0 ? "Only the newest version of each package is kept. Nothing to clear."
-                : [tw.ov.pkgcache.old.count ? tw.ov.pkgcache.old.count + " older versions of installed packages (" + tw.size(tw.ov.pkgcache.old.bytes) + ")" : "",
+                : H.pkgcacheOld(tw.ov.pkgcache).count + tw.ov.pkgcache.gone.count === 0 ? "Only the newest version of each package is kept. Nothing to clear."
+                : [H.pkgcacheOld(tw.ov.pkgcache).count ? H.pkgcacheOld(tw.ov.pkgcache).count + " older versions of installed packages (" + tw.size(H.pkgcacheOld(tw.ov.pkgcache).bytes) + ")" : "",
                    tw.ov.pkgcache.gone.count ? tw.ov.pkgcache.gone.count + " of packages no longer installed (" + tw.size(tw.ov.pkgcache.gone.bytes) + ")" : ""]
                   .filter((x) => x).join(", and ") + ". The newest of each stays, to go back to."
             }
@@ -193,8 +193,8 @@ FloatingWindow {
                 onClicked: tw.mgr.asRoot("pkg", ["pacman-contrib"], "for Tidy's package cache", [])
               }
               DialogButton {
-                visible: tw.ov.pkgcache.tool && tw.ov.pkgcache.old.count + tw.ov.pkgcache.gone.count > 0
-                label: "Clear " + tw.size(tw.ov.pkgcache.old.bytes + tw.ov.pkgcache.gone.bytes)
+                visible: tw.ov.pkgcache.tool && H.pkgcacheOld(tw.ov.pkgcache).count + tw.ov.pkgcache.gone.count > 0
+                label: "Clear " + tw.size(H.pkgcacheBytes(tw.ov.pkgcache))
                 ink: Zenon.cyan
                 primary: true
                 ready: !tw.busy

@@ -37,6 +37,15 @@ module.exports = {
                              O.startupRunning("grep discord", "discord"), O.startupRunning("", "")], [true, false, false]);
     t.eq("exec field codes", ["/usr/bin/discord --url -- %U", "spotify --uri=%U", "mpv --player-operation-mode=pseudo-gui -- %U", "kitty", "steam %U --silent"].map(O.execForStartup),
       ["/usr/bin/discord", "spotify", "mpv", "kitty", "steam --silent"]);
+    t.eq("braces in a string are text", O.parseStartupLua(O.renderStartupLua([{ name: "Loop", command: "sh -c 'for i in {1..3}; do x; done'", on: true, delay: 0 }]))[0].command,
+      "sh -c 'for i in {1..3}; do x; done'");
+    t.eq("a title with braces survives", O.parseWindowsLua(O.renderWindowsLua([Object.assign(O.blankWindowRule("a"), { title: "{draft} }{" })]))[0].title, "{draft} }{");
+    t.eq("a field inside a string is not the field", O.parseStartupLua("return { { command = \"x on = false\" } }")[0].on, true);
+    t.eq("per-launch class tail dropped", [O.stableClass("com.transmissionbt.transmission_66307_44306163"), O.stableClass("steam"), O.stableClass("app_2")],
+      ["com.transmissionbt.transmission", "steam", "app_2"]);
+    t.eq("a read rule loses the tail, its name too", (() => { const x = O.parseWindowsLua("return { { name = \"t_1_2\", class = \"t_1_2\" } }")[0]; return [x.name, x.class]; })(), ["t", "t"]);
+    t.eq("pinned only when floating", O.windowRuleWords(Object.assign(O.blankWindowRule("a"), { pin: true })), "does nothing yet");
+    t.eq("a shell keyword is not looked for", O.startupLook("sh -c 'for i in 1 2; do foo; done'"), "");
     t.eq("startup name", O.startupName("discord --start-minimized"), "Discord");
   }
 };

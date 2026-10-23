@@ -19,8 +19,8 @@ const QS_CLASS = "org.quickshell";
 // this shell's own windows, by the first word of their titles, and what each
 // is called where its UI name is not its id
 const OWN = ["alexandria", "argus", "calypso", "ceres", "clio", "delphi", "hermes", "hestia",
-  "kairos", "minerva", "oracle", "picasso", "plato", "terminus"];
-const OWN_NAMES = { hermes: "Control Hub", hestia: "System Journal", kairos: "Screen Time",
+  "hygieia", "kairos", "minerva", "oracle", "picasso", "plato", "terminus"];
+const OWN_NAMES = { hermes: "Control Hub", hestia: "System Journal", hygieia: "Tidy", kairos: "Screen Time",
   oracle: "Settings", zenworks: "ZENWORKS" };
 
 function pad2(n) { return (n < 10 ? "0" : "") + n; }

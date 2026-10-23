@@ -9,11 +9,13 @@
 #   overview          { trash, caches, pkgcache, orphans, journal, downloads }
 #     trash           { bytes, items, dir }
 #     caches          { bytes, dirs: [{ name, path, bytes }] }   ~/.cache, biggest first
-#     pkgcache        { bytes, tool, old: { count, bytes }, gone: { count, bytes } }
+#     pkgcache        { bytes, tool, old: { count, bytes }, gone: { count, bytes }, both: { count, bytes } }
 #                     old = all but the newest version of each package
 #                     (paccache -k1), gone = every version of packages no
 #                     longer installed (paccache -uk0); tool false without
-#                     pacman-contrib
+#                     pacman-contrib; both = the room old and gone each
+#                     count (a removed package's older versions, -uk1),
+#                     so a total of the two is not counted twice
 #     orphans         [{ name, bytes }]   installed as a dependency, needed by nothing
 #     journal         { bytes }
 #     downloads       { dir, files: [{ path, bytes, mtime }] }  big, or old and not small
@@ -130,10 +132,12 @@ def paccache_dry(args):
 def pkgcache():
     have = shutil.which("paccache") is not None
     res = {"bytes": tree_bytes("/var/cache/pacman/pkg"), "tool": have,
-           "old": {"count": 0, "bytes": 0}, "gone": {"count": 0, "bytes": 0}}
+           "old": {"count": 0, "bytes": 0}, "gone": {"count": 0, "bytes": 0},
+           "both": {"count": 0, "bytes": 0}}
     if have:
         res["old"] = paccache_dry(["-k1"])
         res["gone"] = paccache_dry(["-uk0"])
+        res["both"] = paccache_dry(["-uk1"])
     return res
 
 

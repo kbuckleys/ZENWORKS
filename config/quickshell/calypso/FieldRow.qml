@@ -123,7 +123,9 @@ Item {
     }
     FieldAct {
       glyph: row.justCopied ? "" : "\u{F018F}"
-      tip: row.secret || row.isTotp ? "Copy — cleared from the clipboard in 30 s" : "Copy"
+      // the delay is Settings' "Clear a copied secret after", 0 for never
+      readonly property int clears: row.win && row.win.mgr ? row.win.mgr.clearAfter : 30
+      tip: (row.secret || row.isTotp) && clears > 0 ? "Copy — cleared from the clipboard in " + clears + " s" : "Copy"
       on: row.justCopied
       tips: row.win ? row.win.tipsItem : null
       onClicked: row.win.copyField(row.field)

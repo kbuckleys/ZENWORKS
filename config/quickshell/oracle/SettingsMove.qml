@@ -66,8 +66,8 @@ Item {
     move.fileManager.choose(false, Paths.home(), (paths) => {
       if (!paths || !paths.length) return;
       const out = /\.json$/i.test(paths[0]) ? paths[0] : paths[0] + ".json";
-      writer.write(out, Ora.makeBundle(move.current(), new Date().toISOString()));
-      move.tell("Settings exported to " + out.replace(/.*\//, ""));
+      writer.write(out, Ora.makeBundle(move.current(), new Date().toISOString()), (ok) =>
+        move.tell(ok ? "Settings exported to " + out.replace(/.*\//, "") : "Settings could not be written to " + out));
     }, "zenworks-settings-" + day + ".json");
   }
 
@@ -81,6 +81,14 @@ Item {
       if (!paths || !paths.length) return;
       const b = Ora.readBundle(move.readText(paths[0]) || "");
       if (!b.ok) { move.tell(b.why); return; }
+      // a shipped theme of the same name is never replaced (see Ora.bundleThemeWritable)
+      for (const rel of Object.keys(b.files)) {
+        if (rel.startsWith("themes/") && !Ora.bundleThemeWritable(move.readText(move.absOf(rel)))) {
+          delete b.files[rel];
+          b.skipped++;
+        }
+      }
+      if (!Object.keys(b.files).length) { move.tell("There are no settings in it to bring here"); return; }
       move.withScreens = false;
       move.pick = 0;
       move.pending = b;
@@ -93,21 +101,23 @@ Item {
     Oracle.save();
     // what is here now, first
     writer.write(move.stateDir + "/settings-before-import.json", Ora.makeBundle(move.current(), new Date().toISOString()));
-    let n = 0;
+    const jobs = [];
     for (const rel in b.files) {
       if (rel === "hypr/monitors.lua" && !move.withScreens) continue;
       const to = move.absOf(rel);
-      if (to === "") continue;
-      writer.write(to, b.files[rel]);
-      n++;
+      if (to !== "") jobs.push([to, b.files[rel]]);
     }
-    // once the writes have landed: the settings read back, hyprland told
-    after.restart();
+    const n = jobs.length;
+    // once the LAST write has landed (the writer goes one at a time, so a
+    // fixed wait could read half of them): the settings read back, hyprland told
+    let left = n;
+    for (const j of jobs) writer.write(j[0], j[1], () => { if (--left === 0) after.restart(); });
+    if (n === 0) after.restart();
     move.tell(n + (n === 1 ? " file imported" : " files imported") + " · the old ones kept in settings-before-import.json");
   }
   Timer {
     id: after
-    interval: 600
+    interval: 50
     onTriggered: {
       Oracle.reloadFromDisk();
       Oracle.scanThemes();

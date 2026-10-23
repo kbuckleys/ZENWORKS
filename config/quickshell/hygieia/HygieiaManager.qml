@@ -82,7 +82,7 @@ Scope {
       let j = null;
       try { j = JSON.parse(t); } catch (e) {}
       const moved = j && j.moved ? j.moved.length : 0, failed = j && j.failed ? j.failed : [];
-      if (failed.length) mgr.said(moved + " moved; " + failed.length + " could not be: " + failed[0].why, true);
+      if (failed.length) mgr.said(moved + " " + done + "; " + failed.length + " could not be: " + failed[0].why, true);
       else mgr.said(words + " " + done, false);
       mgr.scan();
       if (mgr.dupesAsked) mgr.scanDupes();

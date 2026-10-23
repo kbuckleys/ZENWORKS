@@ -25,6 +25,18 @@ import stow as ST
 import status as S
 from gitrun import Git, GitError, progress_of
 
+
+# A file the user picked, to git: by its NAME. A bare path is a pattern to
+# git, so "photo [1].jpg" also matched "photo 1.jpg" — Clean deleted both
+# and Discard reverted both (2026-10-23). Not GIT_LITERAL_PATHSPECS for
+# everything: git's own stash -u then stops clearing what it has stashed.
+def lit1(path):
+    return ":(literal)" + path
+
+
+def lit(paths):
+    return [lit1(p) for p in paths]
+
 US = "\x1f"   # unit separator between fields of one record
 RS = "\x1e"   # record separator — commit subjects may hold anything else
 
@@ -212,7 +224,7 @@ class Repo:
         return {"added": new, "file": path}
 
     def untrack(self, paths, ignore=True, where="gitignore", cancel=None):
-        self.git.run(["rm", "--cached", "-r", "-q", "--"] + list(paths), cancel=cancel)
+        self.git.run(["rm", "--cached", "-r", "-q", "--"] + lit(paths), cancel=cancel)
         if ignore:
             self.ignore(["/" + p.strip("/") + ("/" if os.path.isdir(os.path.join(self.root, p)) else "")
                          for p in paths], where, cancel)
@@ -276,7 +288,7 @@ class Repo:
             if staged:
                 a.append("--cached")
             if path:
-                a += ["--", path]
+                a += ["--", lit1(path)]
             out = self.git.run(a, cancel=cancel, lock=False)
         files = D.parse(out)
         files, more = D.page(files, start, budget)
@@ -288,7 +300,7 @@ class Repo:
         a = ["show", "--format=", "--no-ext-diff", f"-U{context}",
              "--find-renames", "--diff-merges=first-parent", rev]
         if path:
-            a += ["--", path]
+            a += ["--", lit1(path)]
         files = D.parse(self.git.run(a, cancel=cancel, lock=False))
         files, more = D.page(files, start, budget)
         return {"files": files, "more": more}
@@ -298,7 +310,7 @@ class Repo:
         args = ["diff", "--no-ext-diff", f"-U{context}", "--find-renames",
                 f"{a}...{b}"]
         if path:
-            args += ["--", path]
+            args += ["--", lit1(path)]
         files = D.parse(self.git.run(args, cancel=cancel, lock=False))
         files, more = D.page(files, start, budget)
         return {"files": files, "more": more}
@@ -306,17 +318,17 @@ class Repo:
     # ── staging ─────────────────────────────────────────────────────────
     def stage(self, paths, cancel=None):
         # -A so a deleted file is staged as a deletion, not refused.
-        self.git.run(["add", "-A", "--"] + list(paths), cancel=cancel)
+        self.git.run(["add", "-A", "--"] + lit(paths), cancel=cancel)
 
     def stage_all(self, cancel=None):
         self.git.run(["add", "-A"], cancel=cancel)
 
     def unstage(self, paths, cancel=None):
         if self._unborn():
-            self.git.run(["rm", "--cached", "-r", "-q", "--"] + list(paths),
+            self.git.run(["rm", "--cached", "-r", "-q", "--"] + lit(paths),
                          cancel=cancel)
         else:
-            self.git.run(["restore", "--staged", "--"] + list(paths),
+            self.git.run(["restore", "--staged", "--"] + lit(paths),
                          cancel=cancel)
 
     def unstage_all(self, cancel=None):
@@ -328,11 +340,11 @@ class Repo:
     def discard(self, paths, cancel=None):
         """Throw away working-tree changes to tracked files. The caller has
         asked the user; this does not."""
-        self.git.run(["restore", "--worktree", "--"] + list(paths), cancel=cancel)
+        self.git.run(["restore", "--worktree", "--"] + lit(paths), cancel=cancel)
 
     def clean(self, paths, cancel=None):
         """Delete untracked files — again, asked about before this runs."""
-        self.git.run(["clean", "-f", "-d", "-q", "--"] + list(paths), cancel=cancel)
+        self.git.run(["clean", "-f", "-d", "-q", "--"] + lit(paths), cancel=cancel)
 
     def stage_lines(self, path, chosen, cancel=None, untracked=False):
         """Stage part of a file's working-tree diff. chosen = {hunk: None |
@@ -340,8 +352,8 @@ class Repo:
         if untracked:
             # Partial staging of a new file: git add -N gives it an empty
             # index entry, and the chosen lines go onto that.
-            self.git.run(["add", "-N", "--", path], cancel=cancel)
-        files = D.parse(self.git.run(["diff", "--no-ext-diff", "-U3", "--", path],
+            self.git.run(["add", "-N", "--", lit1(path)], cancel=cancel)
+        files = D.parse(self.git.run(["diff", "--no-ext-diff", "-U3", "--", lit1(path)],
                                      cancel=cancel, lock=False))
         f = self._one(files, path)
         if f["status"] == "added":
@@ -350,7 +362,7 @@ class Repo:
 
     def unstage_lines(self, path, chosen, cancel=None):
         files = D.parse(self.git.run(["diff", "--cached", "--no-ext-diff", "-U3",
-                                      "--", path], cancel=cancel, lock=False))
+                                      "--", lit1(path)], cancel=cancel, lock=False))
         f = self._one(files, path)
         if f["status"] == "added":
             f = D.as_modification(f)
@@ -360,7 +372,7 @@ class Repo:
         self._apply(D.build(f, _keys(chosen), reverse=True), ["--cached", "-R"], cancel)
 
     def discard_lines(self, path, chosen, cancel=None):
-        files = D.parse(self.git.run(["diff", "--no-ext-diff", "-U3", "--", path],
+        files = D.parse(self.git.run(["diff", "--no-ext-diff", "-U3", "--", lit1(path)],
                                      cancel=cancel, lock=False))
         f = self._one(files, path)
         self._apply(D.build(f, _keys(chosen), reverse=True), ["-R"], cancel)
@@ -460,7 +472,7 @@ class Repo:
             # the nearest ones that touched it, or the graph's lines would run
             # off to commits that are not in the list
             a.insert(1, "--parents")
-            a += ["--", path]
+            a += ["--", lit1(path)]
         return a
 
     def message(self, sha, cancel=None):
@@ -521,7 +533,7 @@ class Repo:
         first parent; a first commit has none, so nothing to bring back."""
         if self.git.code(["rev-parse", "-q", "--verify", f"{sha}^"]) != 0:
             raise GitError(["checkout"], 1, "the first commit removed nothing — there is nothing before it")
-        self.git.run(["checkout", f"{sha}^", "--"] + list(paths), cancel=cancel)
+        self.git.run(["checkout", f"{sha}^", "--"] + lit(paths), cancel=cancel)
         return {"paths": list(paths)}
 
     def count_between(self, a, b, cancel=None):
@@ -988,7 +1000,7 @@ class Repo:
         elif untracked:
             a.append("--include-untracked")
         if paths:
-            a += ["--"] + list(paths)
+            a += ["--"] + lit(paths)
         self.git.run(a, cancel=cancel)
 
     def stash_apply(self, ref, pop=False, index=True, cancel=None):
@@ -1140,10 +1152,10 @@ class Repo:
         try:
             self.git.run(["cat-file", "-e", f":{n}:{path}"], cancel=cancel, lock=False)
         except GitError:
-            self.git.run(["rm", "-q", "--", path], cancel=cancel)
+            self.git.run(["rm", "-q", "--", lit1(path)], cancel=cancel)
             return {"removed": True}
-        self.git.run(["checkout", f"--{side}", "--", path], cancel=cancel)
-        self.git.run(["add", "--", path], cancel=cancel)
+        self.git.run(["checkout", f"--{side}", "--", lit1(path)], cancel=cancel)
+        self.git.run(["add", "--", lit1(path)], cancel=cancel)
         return {"removed": False}
 
     # ── one conflict at a time ──────────────────────────────────────────
@@ -1195,11 +1207,11 @@ class Repo:
         with open(full, "w", encoding="utf-8", newline="") as f:
             f.write("".join(out))
         if left == 0 and mark:
-            self.git.run(["add", "--", path], cancel=cancel)
+            self.git.run(["add", "--", lit1(path)], cancel=cancel)
         return {"left": left, "marked": left == 0 and mark}
 
     def mark_resolved(self, paths, cancel=None):
-        self.git.run(["add", "--"] + list(paths), cancel=cancel)
+        self.git.run(["add", "--"] + lit(paths), cancel=cancel)
 
     def conflict_versions(self, path, cancel=None):
         """The three sides of a conflicted file — base, ours, theirs — written

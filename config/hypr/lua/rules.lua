@@ -54,7 +54,11 @@ if okWin and type(yours) == "table" then
 	for _, r in ipairs(yours) do
 		pcall(function()
 			if type(r) ~= "table" or r.on == false or type(r.class) ~= "string" or r.class == "" then return end
-			local spec = { match = { class = esc(r.class) } }
+			-- a class an app makes new at every launch (transmission-gtk's
+			-- "…_<pid>_<random>") is matched with any such tail, not just the
+			-- one it had when the rule was picked
+			local cls = r.class:gsub("_%d+_%d+$", "")
+			local spec = { match = { class = esc(cls) .. "(_\\d+_\\d+)?" } }
 			if type(r.title) == "string" and r.title ~= "" then spec.match.title = ".*" .. esc(r.title) .. ".*" end
 			if r.float then
 				spec.float = true
