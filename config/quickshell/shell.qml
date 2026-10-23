@@ -812,6 +812,43 @@ ShellRoot {
       cornerRadius: root.pillRadius
       fade: root.barIntro
       transform: Translate { y: pillLift.y }
+      // A whisper, not the menus' full drop: the pill is always on screen,
+      // so it only needs to lift off the desktop, not cast across it. But
+      // this same shadow is what a quick access panel casts once it has
+      // morphed out of the pill, so it eases back to the full one over the
+      // morph — the panels keep exactly the shadow every menu has.
+      readonly property real m: root.morphProgress
+      ink: Qt.rgba(0, 0, 0, Zenon.menuShadowInk.a * (0.55 + 0.45 * m))
+      grow: 4 + (Zenon.menuShadowGrow - 4) * m
+      softness: 16 + (Zenon.menuShadowBlur - 16) * m
+      drop: 2 + (Zenon.menuShadowDrop - 2) * m
+    }
+
+    // ── TWO MORE RINGS, OUTSIDE THE FIRST ─────────────────────────────
+    // So the pill reads as a set edge rather than a flat cut-out: bg's own
+    // border is the firmest, innermost line, and each ring out from it is
+    // fainter than the last. Siblings, not children, because bg clips and
+    // would cut them away; and they ride bg's intro fade and lift so all
+    // three arrive as one. Every ink is the theme's border at a different
+    // strength, so every theme keeps its own colour.
+    Repeater {
+      // [how far out, strength against the theme's border]
+      model: [[1, 1.2], [2, 0.7]]
+      Rectangle {
+        required property var modelData
+        readonly property int out: modelData[0]
+        x: bg.x - out
+        y: bg.y - out
+        width: bg.width + out * 2
+        height: bg.height + out * 2
+        radius: bg.radius + out
+        color: "transparent"
+        border.width: 1
+        border.color: Qt.rgba(Zenon.border.r, Zenon.border.g, Zenon.border.b,
+                              Zenon.border.a * modelData[1])
+        opacity: bg.opacity
+        transform: Translate { y: pillLift.y }
+      }
     }
 
     Rectangle {
@@ -863,7 +900,9 @@ ShellRoot {
         }
       }
       color: Zenon.panelBg
-      border.color: Zenon.border
+      // the firmer inner of the pill's two rings — see the outer one above
+      border.color: Qt.rgba(Zenon.border.r, Zenon.border.g, Zenon.border.b,
+                            Math.min(1, Zenon.border.a * 2.5))
       border.width: 1
       // single uniform radius so all four corners stay even during morph
       radius: root.pillRadius
