@@ -271,6 +271,15 @@ Item {
                     ink: wr.highlight
                     onToggled: ed.set({ pin: !ed.r.pin })
                   }
+                  // hyprland's persistent_size: reopens at the size it was
+                  // left at, which a size above is only the first of
+                  Controls.Check {
+                    visible: ed.r.float
+                    label: "Remember size"
+                    lit: ed.r.persistent_size
+                    ink: wr.highlight
+                    onToggled: ed.set({ persistent_size: !ed.r.persistent_size })
+                  }
                 }
                 // both numbers or neither: half a size is no size
                 function setSize() {

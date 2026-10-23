@@ -2201,13 +2201,16 @@ const ZEN_HEAD = [
 // ── WINDOW RULES ──
 // Windows' "Window rules" (2026-10-22): how an app's windows open — float,
 // size, centered, workspace, opacity, pinned, no blur, keep awake, open
-// maximized or full screen, without focus. hypr/lua/windows.lua, one table a
+// maximized or full screen, without focus; remember size (hyprland's
+// persistent_size, 2026-10-23: a floating window reopens at the size you
+// last left it). hypr/lua/windows.lua, one table a
 // rule; rules.lua turns each into an hl.window_rule after the suite's own,
 // so yours win. `class` is the app's window class as it is (rules.lua
 // escapes it: hyprland matches the WHOLE class as a regex), `title` a piece
 // of the title, or "" for every window of the app.
 const RULE_ORDER = ["name", "class", "title", "on", "float", "size", "center", "workspace", "silent",
-                    "opacity", "pin", "no_blur", "idle_inhibit", "open", "no_initial_focus"];
+                    "opacity", "pin", "no_blur", "idle_inhibit", "open", "no_initial_focus",
+                    "persistent_size"];
 // A class some apps make new at every launch — transmission-gtk's is
 // "com.transmissionbt.transmission_<pid>_<random>" — kept without that
 // tail, or the rule would only ever match the one window it was picked
@@ -2216,7 +2219,8 @@ function stableClass(cls) { return String(cls || "").replace(/_\d+_\d+$/, ""); }
 function blankWindowRule(cls, name) {
   return { name: String(name || cls || ""), class: stableClass(cls), title: "", on: true,
            float: false, size: "", center: false, workspace: "", silent: false, opacity: 100,
-           pin: false, no_blur: false, idle_inhibit: "", open: "", no_initial_focus: false };
+           pin: false, no_blur: false, idle_inhibit: "", open: "", no_initial_focus: false,
+           persistent_size: false };
 }
 // a rule as read, with every field there and in range
 function normWindowRule(r) {
@@ -2244,6 +2248,7 @@ function renderWindowsLua(rules) {
     "-- class    the app's window class, as it is",
     "-- title    a piece of the window's title, or \"\" for all its windows",
     "-- size     \"width height\" (floating only), opacity 10-100",
+    "-- persistent_size  floating only: reopens at the size it was left at",
     "-- workspace  \"3\", \"special\" or \"\"; silent keeps you where you are",
     "-- idle_inhibit  \"focus\", \"fullscreen\", \"always\" or \"\"",
     "-- open     \"maximize\", \"fullscreen\" or \"\"",
@@ -2258,6 +2263,7 @@ function windowRuleWords(r) {
   if (r.workspace) w.push((r.workspace === "special" ? "special workspace" : "workspace " + r.workspace.replace(/^name:/, "")) + (r.silent ? ", quietly" : ""));
   if (r.opacity < 100) w.push(r.opacity + "% opaque");
   if (r.pin && r.float) w.push("pinned");     // rules.lua pins floating windows only
+  if (r.persistent_size && r.float) w.push("remembers its size");
   if (r.no_blur) w.push("no blur");
   if (r.idle_inhibit) w.push("keeps awake" + (r.idle_inhibit === "always" ? "" : r.idle_inhibit === "focus" ? " while focused" : " in full screen"));
   if (r.no_initial_focus) w.push("opens unfocused");

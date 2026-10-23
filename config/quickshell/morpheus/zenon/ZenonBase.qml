@@ -839,6 +839,12 @@ QtObject {
   readonly property int normal: Math.round(140 * cfg.motionScale)
   readonly property int slow:   Math.round(170 * cfg.motionScale)
   readonly property int ease:   Easing.OutQuint
+  // THE ARRIVAL'S MOVE, PLAYED QUICKLY: the fade and 22px lift the pill
+  // arrives with (Oracle's Arrival length, its own), for the things that do
+  // it again and again — the bar autohiding, a cynosure not on the pill's
+  // monitor (user, 2026-10-23). On Animation speed, not Arrival length.
+  readonly property int tuck:   Math.round(300 * cfg.motionScale)
+  readonly property int tuckLift: 22
   // any other one-off duration, times the same multiplier — so Animation
   // speed reaches a shake or a flash too, and 0 means none. Not for loops
   // (a breath or a spinner at 0 ms would spin) nor a PauseAnimation's hold.

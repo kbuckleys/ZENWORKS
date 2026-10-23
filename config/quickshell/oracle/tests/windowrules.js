@@ -45,6 +45,10 @@ module.exports = {
       ["com.transmissionbt.transmission", "steam", "app_2"]);
     t.eq("a read rule loses the tail, its name too", (() => { const x = O.parseWindowsLua("return { { name = \"t_1_2\", class = \"t_1_2\" } }")[0]; return [x.name, x.class]; })(), ["t", "t"]);
     t.eq("pinned only when floating", O.windowRuleWords(Object.assign(O.blankWindowRule("a"), { pin: true })), "does nothing yet");
+    t.eq("remembered size only when floating", O.windowRuleWords(Object.assign(O.blankWindowRule("a"), { persistent_size: true })), "does nothing yet");
+    t.eq("remembered size floating", O.windowRuleWords(Object.assign(O.blankWindowRule("a"), { float: true, persistent_size: true })), "Floats · remembers its size");
+    t.eq("persistent_size round-trips", O.parseWindowsLua(O.renderWindowsLua([Object.assign(O.blankWindowRule("a"), { float: true, persistent_size: true })]))[0].persistent_size, true);
+    t.eq("an old rule without it reads false", O.normWindowRule({ class: "a" }).persistent_size, false);
     t.eq("a shell keyword is not looked for", O.startupLook("sh -c 'for i in 1 2; do foo; done'"), "");
     t.eq("startup name", O.startupName("discord --start-minimized"), "Discord");
   }

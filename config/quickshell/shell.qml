@@ -453,13 +453,13 @@ ShellRoot {
     onTriggered: root.barTucked = true
   }
   // 0 at rest, 1 tucked away. THE ARRIVAL'S MOVE, both ways (user,
-  // 2026-10-23): the same fade and 22px lift barIntro plays, on its curve
-  // and for its length, so coming back reads as the pill arriving again and
-  // going as that played out. Oracle's Arrival length, not Arrival.duration,
-  // which is 0 with the login arrival off and would make this a cut.
+  // 2026-10-23): the same fade and lift barIntro plays, on its curve, so
+  // coming back reads as the pill arriving again and going as that played
+  // out — but quicker (Zenon.tuck), and apart from Arrival length, which
+  // stays the login arrival's alone.
   property real barTuck: root.barTucked ? 1 : 0
   Behavior on barTuck {
-    NumberAnimation { duration: Oracle.arrivalDuration; easing.type: Easing.OutQuint }
+    NumberAnimation { duration: Zenon.tuck; easing.type: Easing.OutQuint }
   }
   // what the pill, its rings and its shadow are shown at: the arrival
   // and the tuck, one over the other
@@ -972,7 +972,7 @@ ShellRoot {
       transform: Translate {
         id: pillLift
         y: (Zenon.barTop ? -1 : 1)
-          * (1 - root.barShown) * 22
+          * (1 - root.barShown) * Zenon.tuckLift
       }
 
       // The now-playing takeover. Drawn at pill level and not inside the

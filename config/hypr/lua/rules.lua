@@ -64,6 +64,7 @@ if okWin and type(yours) == "table" then
 				spec.float = true
 				if type(r.size) == "string" and r.size:match("^%d+ %d+$") then spec.size = r.size end
 				if r.pin then spec.pin = true end
+				if r.persistent_size then spec.persistent_size = true end
 			end
 			if r.center then spec.center = true end
 			if type(r.workspace) == "string" and r.workspace ~= "" then

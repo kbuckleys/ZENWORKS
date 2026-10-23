@@ -36,6 +36,12 @@ PanelWindow {
 
   property real showFactor: popup.shown ? 1 : 0
   Behavior on showFactor { NumberAnimation { duration: Zenon.slow; easing.type: Zenon.ease } }
+  // Standalone — off the pill's monitor — it comes and goes as the pill
+  // does when it autohides: the arrival's fade and short lift, quickly
+  // (Zenon.tuck), rather than sliding its whole height out of the edge.
+  // Its own clock, since showFactor also times the morph's content fade.
+  property real spawnFactor: popup.shown ? 1 : 0
+  Behavior on spawnFactor { NumberAnimation { duration: Zenon.tuck; easing.type: Easing.OutQuint } }
   // Morphed, the handover is timed off the PILL's progress rather than this
   // window's own showFactor, so the rows can't fade up over a morpheus row
   // that is still on screen.
@@ -86,6 +92,7 @@ PanelWindow {
   // closeCynosure() drops `shown` on frame one so the pill can start
   // collapsing, but the rows still have to fade out on the way down
   visible: popup.shown || popup.contentFade > 0.01 || popup.showFactor > 0.01
+    || (!popup.morphMode && popup.spawnFactor > 0.01)
   color: "transparent"
   // Fixed-size surface, spanning the screen. The strip inside it is what
   // changes width. Cynosure used to animate the WINDOW: implicitWidth and both
@@ -438,7 +445,8 @@ property var statusbar: null
   property bool _isClosing: false
   Timer {
     id: closeResetTimer
-    interval: Zenon.slow + 40
+    // standalone, the fade out is spawnFactor's, which runs longer
+    interval: (popup.morphMode ? Zenon.slow : Math.max(Zenon.slow, Zenon.tuck)) + 40
     onTriggered: {
       popup.query = "";
       popup.mode = "search";
@@ -456,7 +464,7 @@ property var statusbar: null
     if (popup._isClosing) return;
     popup._isClosing = true;
     popup.shown = false;
-    // keep query/mode/sel until the slide/fade (showFactor) finishes
+    // keep query/mode/sel until the fade (showFactor/spawnFactor) finishes
     // so fittedListW/contentWidth/list stay at the selected width
     closeResetTimer.restart();
   }
@@ -693,7 +701,7 @@ property var statusbar: null
     // `fade`, not `opacity` — see LayerShadow on why a curve bound to its
     // opacity froze the shadow for the whole entrance.
     morphed: popup.morphMode
-    fade: popup.showFactor
+    fade: popup.morphMode ? popup.showFactor : popup.spawnFactor
     transform: Translate { y: spawnT.y }
     // The pill's resting shadow, not a menu's: standalone, cynosure is the
     // one panel built like the bar — a strip off a screen edge — so it is
@@ -726,7 +734,7 @@ property var statusbar: null
       border.color: Qt.rgba(Zenon.border.r, Zenon.border.g, Zenon.border.b,
                             Zenon.border.a * modelData[1])
       visible: !popup.morphMode
-      opacity: popup.showFactor
+      opacity: popup.spawnFactor
       transform: Translate { y: spawnT.y }
     }
   }
@@ -742,14 +750,14 @@ property var statusbar: null
                 Math.min(1, Zenon.border.a * 2.5))
     border.width: 1
 
-    opacity: popup.morphMode ? 1 : popup.showFactor
+    opacity: popup.morphMode ? 1 : popup.spawnFactor
     transform: Translate {
       id: spawnT
-      // the slide is the standalone entrance, out of whichever edge the bar
+      // the lift is the standalone entrance, in from whichever edge the bar
       // is on. Morphed, the pill has already traveled that distance and the
-      // panel IS the pill, so a second slide reads as the two coming apart.
+      // panel IS the pill, so a second move reads as the two coming apart.
       y: popup.morphMode ? 0
-        : (Zenon.barTop ? -1 : 1) * bg.height * (1 - popup.showFactor)
+        : (Zenon.barTop ? -1 : 1) * Zenon.tuckLift * (1 - popup.spawnFactor)
     }
 
     Item {
