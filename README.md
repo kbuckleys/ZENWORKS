@@ -8,3 +8,8 @@ A zen Arch-based ecosystem in Quickshell
 
 ---
 
+Installation
+-
+```
+paru -S zenworks
+```
