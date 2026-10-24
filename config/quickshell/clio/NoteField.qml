@@ -79,7 +79,9 @@ Item {
       font.weight: nf.weight
       font.pixelSize: nf.size
 
-      cursorDelegate: Caret { field: body }
+      // a hair wider than the default: on a sticky's tinted face a 2px
+      // line in the text's own white all but vanishes
+      cursorDelegate: Caret { field: body; thick: 3 }
       // the spelling, as a note's in the window (SpellMarks)
       SpellMarks { id: bodySpell; field: body; mgr: nf.mgr; visible: nf.spelling }
 

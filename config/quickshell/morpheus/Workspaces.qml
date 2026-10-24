@@ -234,9 +234,12 @@ Item {
               color: {
                 if (btn.isUrgent) return root.urgentInk
                 if (root.specialWorkspace !== null && root.specialFocused)
-                  // a meter's faint notch is too faint for a number on paper
+                  // a meter's faint notch is too faint for a number — on
+                  // paper or on the dark wash (user, 2026-10-24): inactive
+                  // takes the same halfway step toward the lit ink as the
+                  // cyan numbers do below
                   return btn.isActive ? Zenon.pink
-                    : Zenon.light ? Zenon.alpha(Zenon.pink, 0.6) : Zenon.trough(Zenon.pink)
+                    : Zenon.light ? Zenon.alpha(Zenon.pink, 0.75) : Zenon.mix(Zenon.dimInk, Zenon.pink, 0.5)
                 // Inactive in a dark theme: halfway from dim to the lit
                 // cyan. Plain dim sat barely above the unlit "8" behind it
                 // (wsGhost, trough cyan) and the numbers all but vanished

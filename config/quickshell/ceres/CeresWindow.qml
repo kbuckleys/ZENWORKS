@@ -3884,14 +3884,13 @@ FloatingWindow {
                   font.pixelSize: Zenon.px(15)
                   font.letterSpacing: 1.2
                 }
-                Text {
+                ChevronChip {
                   anchors.verticalCenter: parent.verticalCenter
                   visible: ih.foldable
-                  text: ih.open ? "\uF078" : "\uF054"
-                  color: ihPress.pressed ? Zenon.white : Zenon.cyan
-                  font.family: Zenon.face
-                  font.weight: Zenon.weight
-                  font.pixelSize: Zenon.px(12)
+                  size: Zenon.px(13)
+                  open: ih.open
+                  passive: true
+                  held: ihPress.pressed
                 }
                 HoverHandler { id: ihHov; enabled: ih.foldable }
                 TapHandler { id: ihPress; enabled: ih.foldable; onTapped: ih.toggle() }

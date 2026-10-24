@@ -400,6 +400,8 @@ FloatingWindow {
   readonly property int rowH: 64
   // a row inside a group's frame
   readonly property int frameRowH: 44
+  // a group's head (Shortcuts' Shell, Audio…), between the two
+  readonly property int groupHeadH: 48
   // the Arrangement's picture of the desk
   readonly property int arrangeH: 240
   // ── CONTROLS HANG OFF THE RIGHT EDGE ──────────────────────────────────
@@ -2134,14 +2136,14 @@ FloatingWindow {
                 // the gap under the head, then the frame's own inset
                 readonly property int frameAbove: settingRow.groupFirst ? 10 : 0
                 // the frame's inset, then the gap before the next head
-                readonly property int frameBelow: settingRow.groupLast ? 22 : 0
+                readonly property int frameBelow: settingRow.groupLast ? 14 : 0
                 Controls.ListFrame {
                   visible: settingRow.inGroup
                   z: -1
                   x: 24
                   width: parent.width - 48
                   y: settingRow.groupFirst ? 4 : -40
-                  height: (settingRow.groupLast ? parent.height - 18 : parent.height + 40) - y
+                  height: (settingRow.groupLast ? parent.height - 10 : parent.height + 40) - y
                 }
                 // as tall as the label and its wrapped description, 64 at least
                 Item {
@@ -2152,6 +2154,10 @@ FloatingWindow {
                   // already sets them apart, as fastfetch's lines are
                   height: settingRow.arrange ? popup.rowH
                     : settingRow.inGroup ? Math.max(popup.frameRowH, Math.ceil(labels.implicitHeight) + 12)
+                    // a group's head is a name, not a setting with a line of
+                    // help under it: at a full row's 64 the heads stood
+                    // apart like sections of their own (user, 2026-10-24)
+                    : settingRow.groupHead ? Math.max(popup.groupHeadH, Math.ceil(labels.implicitHeight) + 16)
                     : Math.max(popup.rowH, Math.ceil(labels.implicitHeight) + 22)
                 }
                 // what this row adds while open, for the list's cacheBuffer
@@ -2324,16 +2330,15 @@ FloatingWindow {
                     // a row that folds open says so, and which way it is,
                     // next to its name (user, 2026-10-18) — it sat at the far
                     // end of the readout, a long way from the thing it opens
-                    Text {
+                    // on a disc, as the × and + are (user, 2026-10-24); the
+                    // row takes the click, so the chip only shows it
+                    ChevronChip {
                       id: foldMark
                       visible: settingRow.fold || settingRow.groupHead
                       anchors.verticalCenter: rowLabel.verticalCenter
-                      text: "\uF054"
-                      rotation: settingRow.open || settingRow.groupOpen ? 90 : 0
-                      Behavior on rotation { NumberAnimation { duration: Zenon.menuFade; easing.type: Easing.OutCubic } }
-                      color: popup.dimColor
-                      font.family: Zenon.glyphFace
-                      font.pixelSize: Zenon.px(12)
+                      size: Zenon.px(13)
+                      open: settingRow.open || settingRow.groupOpen
+                      passive: true
                     }
 
                     // RESTORE DEFAULT, said with a glyph beside the name

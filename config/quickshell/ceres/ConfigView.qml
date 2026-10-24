@@ -1177,14 +1177,12 @@ Item {
             anchors.verticalCenter: parent.verticalCenter
             width: parent.width
             spacing: 10
-            Text {
+            ChevronChip {
               anchors.verticalCenter: parent.verticalCenter
               visible: card.repo.enabled
-              text: card.open ? "" : ""
-              color: Zenon.accentMuted
-              font.family: Zenon.face
-              font.weight: Zenon.weight
-              font.pixelSize: Zenon.px(12)
+              size: Zenon.px(13)
+              open: card.open
+              passive: true
             }
             Text {
               id: repoName

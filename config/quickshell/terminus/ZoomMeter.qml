@@ -9,7 +9,7 @@
 // notched bar answers that at a glance, and it is the same instrument the
 // shell bar's own meters are.
 //
-// AN INSTRUMENT YOU CAN ALSO TURN: press or drag along it to set the zoom,
+// AN INSTRUMENT YOU CAN ALSO TURN: press or drag up and down it to set the zoom,
 // the wheel steps it, a middle click resets it. The holder owns the zoom and
 // its scale — this only reports where along the travel the pointer was.
 //
@@ -35,10 +35,13 @@ Item {
   Meter {
     id: zoomMeter
     anchors.centerIn: parent
-    vertical: false
+    // standing up, like the shell bar's own meters: it fills from the
+    // bottom, so "more zoom" reads as "higher", and it takes a sliver of the
+    // row's width instead of a stretch of it
+    vertical: true
     segCount: 8
-    segLength: 3
-    segGap: 2
+    segLength: 2
+    segGap: 1
     thickness: 7
     accent: zoomMa.containsMouse || zoomMa.pressed ? Zenon.white : Zenon.cyan
     Behavior on accent {
@@ -50,34 +53,34 @@ Item {
     deadZone: -1
   }
 
-  // The hit area is the wrapper, not the meter: the notches are 7px tall and
-  // a 7px target is not a target. Twelve pixels of padding top and bottom,
-  // taken inside the row's own height so nothing moves.
+  // The hit area is the wrapper, not the meter: the notches are 7px wide and
+  // a 7px target is not a target. Twelve pixels of padding either side,
+  // taken inside the row's own spacing so nothing moves.
   MouseArea {
     id: zoomMa
     anchors.fill: parent
-    anchors.topMargin: -12
-    anchors.bottomMargin: -12
-    anchors.leftMargin: -4
-    anchors.rightMargin: -4
+    anchors.topMargin: -4
+    anchors.bottomMargin: -4
+    anchors.leftMargin: -12
+    anchors.rightMargin: -12
     hoverEnabled: true
     acceptedButtons: Qt.LeftButton | Qt.MiddleButton
 
     // the fraction of the METER the pointer is over, with the padding taken
-    // back off
-    function seekAt(x) {
-      const w = zoomMeter.width;
-      if (w <= 0) return;
-      zm.seek(Math.max(0, Math.min(1, (x - 4) / w)));
+    // back off — counted up from the bottom, the way it fills
+    function seekAt(y) {
+      const h = zoomMeter.height;
+      if (h <= 0) return;
+      zm.seek(Math.max(0, Math.min(1, 1 - (y - 4) / h)));
     }
 
     onPressed: (m) => {
       // middle click is the reset every other meter-shaped thing on this
       // desktop uses
       if (m.button === Qt.MiddleButton) { zm.reset(); return; }
-      zoomMa.seekAt(m.x);
+      zoomMa.seekAt(m.y);
     }
-    onPositionChanged: (m) => { if (zoomMa.pressed) zoomMa.seekAt(m.x); }
+    onPositionChanged: (m) => { if (zoomMa.pressed) zoomMa.seekAt(m.y); }
     onWheel: (w) => {
       zm.step(w.angleDelta.y > 0 ? 1 : -1);
       w.accepted = true;

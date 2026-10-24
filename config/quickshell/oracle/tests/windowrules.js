@@ -25,6 +25,7 @@ module.exports = {
     t.eq("words, nothing", O.windowRuleWords(O.blankWindowRule("a")), "does nothing yet");
     t.eq("summary", [O.windowRulesSummary([]), O.windowRulesSummary([r, Object.assign({}, r, { on: false })])],
       ["none", "2 rules · 1 off"]);
+    t.eq("summary with shipped", O.windowRulesSummary([], [O.blankWindowRule("a")].map((d) => Object.assign(d, { shipped: "a" }))), "1 shipped");
 
     const s = [{ name: "Discord", command: "discord --start-minimized", on: true, delay: 5 },
                { name: "Syncthing", command: "syncthing serve --no-browser", on: false, delay: 0 }];
@@ -51,5 +52,23 @@ module.exports = {
     t.eq("an old rule without it reads false", O.normWindowRule({ class: "a" }).persistent_size, false);
     t.eq("a shell keyword is not looked for", O.startupLook("sh -c 'for i in 1 2; do foo; done'"), "");
     t.eq("startup name", O.startupName("discord --start-minimized"), "Discord");
+
+    // the suite's own rules, listed beside yours (2026-10-24)
+    const ship = O.parseWindowDefaults("-- x\nreturn {\n\t{ shipped = \"mpv\", name = \"mpv\", class = \"mpv\", float = true },\n\t{ name = \"no id\", class = \"x\" },\n}");
+    t.eq("a default needs its shipped name", ship.map((d) => d.shipped), ["mpv"]);
+    const mine = [O.blankWindowRule("steam", "Steam")];
+    t.eq("yours first, then shipped", O.windowRuleRows(ship, mine).map((w) => [w.rule.class, w.shipped, w.changed]),
+      [["steam", "", false], ["mpv", "mpv", false]]);
+    const changed = O.windowRulesPatched(ship, mine, 1, { on: false });
+    t.eq("changing a shipped rule adds a stand-in", changed.map((r) => [r.class, r.shipped, r.on]),
+      [["steam", "", true], ["mpv", "mpv", false]]);
+    t.eq("the stand-in shows in its place", O.windowRuleRows(ship, changed).map((w) => [w.shipped, w.changed, w.rule.on]),
+      [["", false, true], ["mpv", true, false]]);
+    t.eq("changed back, the stand-in goes", O.windowRulesPatched(ship, changed, 1, { on: true }).length, 1);
+    t.eq("removing a shipped rule resets it", O.windowRulesRemoved(ship, changed, 1).map((r) => r.class), ["steam"]);
+    t.eq("removing yours deletes it", O.windowRulesRemoved(ship, changed, 0).map((r) => r.shipped), ["mpv"]);
+    t.eq("a stand-in round-trips", O.parseWindowsLua(O.renderWindowsLua(changed)).map((r) => r.shipped), ["", "mpv"]);
+    t.eq("yours write no empty shipped", O.renderWindowsLua(mine).indexOf("shipped"), -1);
+    t.eq("an orphan stand-in is yours", O.windowRuleRows([], changed).map((w) => w.shipped), ["", ""]);
   }
 };

@@ -2210,7 +2210,7 @@ const ZEN_HEAD = [
 // of the title, or "" for every window of the app.
 const RULE_ORDER = ["name", "class", "title", "on", "float", "size", "center", "workspace", "silent",
                     "opacity", "pin", "no_blur", "idle_inhibit", "open", "no_initial_focus",
-                    "persistent_size"];
+                    "persistent_size", "shipped"];
 // A class some apps make new at every launch — transmission-gtk's is
 // "com.transmissionbt.transmission_<pid>_<random>" — kept without that
 // tail, or the rule would only ever match the one window it was picked
@@ -2220,7 +2220,7 @@ function blankWindowRule(cls, name) {
   return { name: String(name || cls || ""), class: stableClass(cls), title: "", on: true,
            float: false, size: "", center: false, workspace: "", silent: false, opacity: 100,
            pin: false, no_blur: false, idle_inhibit: "", open: "", no_initial_focus: false,
-           persistent_size: false };
+           persistent_size: false, shipped: "" };
 }
 // a rule as read, with every field there and in range
 function normWindowRule(r) {
@@ -2252,7 +2252,61 @@ function renderWindowsLua(rules) {
     "-- workspace  \"3\", \"special\" or \"\"; silent keeps you where you are",
     "-- idle_inhibit  \"focus\", \"fullscreen\", \"always\" or \"\"",
     "-- open     \"maximize\", \"fullscreen\" or \"\"",
-  ]), (rules || []).map(normWindowRule), RULE_ORDER);
+  ]), (rules || []).map(normWindowRule).map((r) => {
+    // only a stand-in for a shipped rule says which one
+    if (r.shipped === "") delete r.shipped;
+    return r;
+  }), RULE_ORDER);
+}
+// The suite's own rules (2026-10-24): hypr/lua/windowdefaults.lua, which
+// oracle reads and never writes. Each has a `shipped` name; a rule in
+// windows.lua with the same name stands in for it, so a shipped rule is
+// changed, or turned off, like one of yours, and put back by dropping the
+// stand-in. rules.lua reads both files the same way.
+function parseWindowDefaults(text) {
+  return parseLuaRecords(text)
+    .filter((r) => typeof r.shipped === "string" && r.shipped !== "" && typeof r.class === "string" && r.class !== "")
+    .map(normWindowRule);
+}
+// The list the section shows: yours first, then every shipped rule — your
+// stand-in where you changed it. A row is { rule, shipped, base, changed, at }:
+// `shipped` its name ("" for one of yours), `base` the shipped rule as it
+// ships, `at` its index in yours (-1 for a shipped rule left as it ships).
+// A stand-in whose shipped rule is gone is one of yours.
+function windowRuleRows(shipped, yours) {
+  shipped = shipped || []; yours = yours || [];
+  const ids = {};
+  for (const d of shipped) ids[d.shipped] = true;
+  const rows = [];
+  yours.forEach((r, i) => {
+    if (!r.shipped || !ids[r.shipped]) rows.push({ rule: r, shipped: "", base: null, changed: false, at: i });
+  });
+  for (const d of shipped) {
+    const at = yours.findIndex((r) => r.shipped === d.shipped);
+    rows.push({ rule: at >= 0 ? yours[at] : d, shipped: d.shipped, base: d, changed: at >= 0, at: at });
+  }
+  return rows;
+}
+// yours, with row `i` of windowRuleRows changed. A shipped rule changed back
+// to just what ships needs no stand-in, so it loses it.
+function windowRulesPatched(shipped, yours, i, change) {
+  const w = windowRuleRows(shipped, yours)[i];
+  const next = (yours || []).map((r) => Object.assign({}, r));
+  if (!w) return next;
+  if (!w.shipped) { Object.assign(next[w.at], change); return next; }
+  const r = normWindowRule(Object.assign({}, w.rule, change, { shipped: w.shipped }));
+  if (JSON.stringify(r) === JSON.stringify(w.base)) { if (w.at >= 0) next.splice(w.at, 1); }
+  else if (w.at >= 0) next[w.at] = r;
+  else next.push(r);
+  return next;
+}
+// yours, with row `i` gone: one of yours is deleted, a shipped rule goes
+// back to what ships (to be rid of one, turn it off)
+function windowRulesRemoved(shipped, yours, i) {
+  const w = windowRuleRows(shipped, yours)[i];
+  const next = (yours || []).slice();
+  if (w && w.at >= 0) next.splice(w.at, 1);
+  return next;
 }
 // what the rule does, for its row: "Floats · 1200×800 · centered"
 function windowRuleWords(r) {
@@ -2271,10 +2325,16 @@ function windowRuleWords(r) {
   const s = w.join(" · ");
   return s[0].toUpperCase() + s.slice(1);
 }
-function windowRulesSummary(rules) {
-  const n = (rules || []).length;
-  const off = (rules || []).filter((r) => !r.on).length;
-  return n === 0 ? "none" : n + (n === 1 ? " rule" : " rules") + (off ? " · " + off + " off" : "");
+function windowRulesSummary(rules, shipped) {
+  const rows = windowRuleRows(shipped, rules);
+  const n = rows.filter((w) => !w.shipped).length;
+  const s = rows.length - n;
+  const off = rows.filter((w) => !w.rule.on).length;
+  const parts = [];
+  if (n) parts.push(n + (n === 1 ? " rule" : " rules"));
+  if (s) parts.push(s + " shipped");
+  if (off) parts.push(off + " off");
+  return parts.length ? parts.join(" · ") : "none";
 }
 
 // ── STARTUP ──

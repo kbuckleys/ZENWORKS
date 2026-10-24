@@ -1099,7 +1099,7 @@ FloatingWindow {
           id: zoomBox
           anchors.verticalCenter: parent.verticalCenter
           visible: win.page !== "info"
-          width: zoomMeter.implicitWidth + 8
+          width: zoomMeter.implicitWidth + 20
           height: 32
           ZoomMeter {
             id: zoomMeter

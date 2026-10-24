@@ -1540,7 +1540,7 @@ Singleton {
       if (!root.computer) return "";
       return root.computer.ok ? root.computer.summary : root.computer.why;
     }
-    if (key === "infoWindowRules") return Ora.windowRulesSummary(root.windowRules);
+    if (key === "infoWindowRules") return Ora.windowRulesSummary(root.windowRules, root.shippedRules);
     if (key === "infoStartup") {
       const n = root.startupApps.length, on = root.startupApps.filter((a) => a.on).length;
       return n === 0 ? "the shell's own" : on + " of " + n + (n === 1 ? " app" : " apps") + " on";
@@ -2137,6 +2137,9 @@ Singleton {
   // hypr/lua/windows.lua: your window rules, in order — see Ora's WINDOW RULES
   property var windowRules: []
   readonly property string windowsPath: root.hyprLuaDir + "/windows.lua"
+  // hypr/lua/windowdefaults.lua: the suite's own rules, read, never written —
+  // a change to one is a stand-in in windowRules (Ora.windowRulesPatched)
+  property var shippedRules: []
   // every change is the whole list; the panel edits a copy and hands it back
   function setWindowRules(list) {
     root.windowRules = (list || []).map(Ora.normWindowRule);
@@ -2358,6 +2361,16 @@ Singleton {
       reloadHypr.restart();
     }
     onLoadFailed: root.windowRules = []
+  }
+  FileView {
+    id: shippedFile
+    path: root.hyprLuaDir + "/windowdefaults.lua"
+    blockLoading: true
+    printErrors: false
+    watchChanges: true
+    onFileChanged: reload()
+    onLoaded: { root.shippedRules = Ora.parseWindowDefaults(shippedFile.text()); root.revision++; }
+    onLoadFailed: root.shippedRules = []
   }
   FileView {
     id: startupFile

@@ -1058,7 +1058,9 @@ ShellRoot {
       // special workspace wash — gap-to-gap, but when update+notifications are
       // collapsed the left gap would leave a 4px strip before the pill's
       // rounded edge. Extend to the pill's edge with inner radius in that case.
-      readonly property bool leftHasContent: notifMod.active || updateMod.active
+      // hermes' icons count too: without them here the wash (and the tray
+      // glow) ran from the pill's edge across them (user, 2026-10-24)
+      readonly property bool leftHasContent: notifMod.active || updateMod.active || hermesMod.active
       readonly property real specialX: bg.leftHasContent ? Zenon.padBar + workspacesMod.x - Zenon.gap : bg.border.width
       readonly property real specialW: bg.leftHasContent ? workspacesMod.width + Zenon.gap * 2 : Zenon.padBar + workspacesMod.x + workspacesMod.width + Zenon.gap - bg.border.width
       Rectangle {

@@ -13,6 +13,11 @@
 // hypr/lua/windows.lua and reloads hyprland: rules.lua makes each an
 // hl.window_rule after the suite's own. See Ora's WINDOW RULES.
 //
+// The suite's own rules are listed under yours (user, 2026-10-24), from
+// hypr/lua/windowdefaults.lua, and change the same way: a change is kept as
+// a stand-in in windows.lua, and the × on a changed one puts it back as it
+// ships. A shipped rule is not deleted — turn it off instead.
+//
 // Loaded by URL from OracleWindow, not named as a type (see ComputerPanel).
 
 import QtQuick
@@ -33,7 +38,10 @@ Item {
   property color highlight: Zenon.cyan
 
   readonly property var rules: (Oracle.revision, Oracle.windowRules)
-  // the rule whose editor is open, by index; -1 none
+  readonly property var shipped: (Oracle.revision, Oracle.shippedRules)
+  // what is listed: yours, then the shipped ones (Ora.windowRuleRows)
+  readonly property var rows: Ora.windowRuleRows(wr.shipped, wr.rules)
+  // the row whose editor is open, by index; -1 none
   property int open: -1
   // the open-window picker is up
   property bool picking: false
@@ -41,22 +49,22 @@ Item {
   property var apps: []
 
   function patch(i, change) {
-    const next = wr.rules.map((r) => Object.assign({}, r));
-    Object.assign(next[i], change);
-    Oracle.setWindowRules(next);
+    Oracle.setWindowRules(Ora.windowRulesPatched(wr.shipped, wr.rules, i, change));
   }
   function remove(i) {
-    const next = wr.rules.slice();
-    next.splice(i, 1);
-    if (wr.open === i) wr.open = -1;
-    else if (wr.open > i) wr.open--;
-    Oracle.setWindowRules(next);
+    // a shipped row stays where it is, put back; one of yours goes
+    if (!wr.rows[i].shipped) {
+      if (wr.open === i) wr.open = -1;
+      else if (wr.open > i) wr.open--;
+    }
+    Oracle.setWindowRules(Ora.windowRulesRemoved(wr.shipped, wr.rules, i));
   }
   function add(cls, name) {
     const next = wr.rules.concat([Ora.blankWindowRule(cls, name)]);
     Oracle.setWindowRules(next);
     wr.picking = false;
-    wr.open = next.length - 1;
+    // the last of yours, which come before the shipped ones
+    wr.open = Ora.windowRuleRows(wr.shipped, next).filter((w) => !w.shipped).length - 1;
   }
   // an app's own name, from its desktop entry when there is one
   function appName(cls) {
@@ -98,7 +106,7 @@ Item {
     spacing: 10
 
     Text {
-      visible: wr.rules.length === 0 && !wr.picking
+      visible: wr.rows.length === 0 && !wr.picking
       text: "No rules yet. Add one from a window that is open now."
       color: wr.dimColor
       font.family: wr.face
@@ -108,7 +116,7 @@ Item {
 
     // ── THE RULES ─────────────────────────────────────────────────────
     Item {
-      visible: wr.rules.length > 0
+      visible: wr.rows.length > 0
       width: body.width
       height: list.implicitHeight + 12
       Controls.ListFrame { anchors.fill: parent }
@@ -120,13 +128,24 @@ Item {
         Repeater {
           // count-keyed: an array model rebuilt on every change would make
           // the open editor (and its field's focus) start over
-          model: wr.rules.length
+          model: wr.rows.length
           delegate: Column {
             id: ruleRow
             required property int index
-            readonly property var r: wr.rules[ruleRow.index] || Ora.blankWindowRule("")
+            readonly property var w: wr.rows[ruleRow.index] || null
+            readonly property var r: ruleRow.w ? ruleRow.w.rule : Ora.blankWindowRule("")
+            readonly property bool isShipped: !!ruleRow.w && ruleRow.w.shipped !== ""
             readonly property bool isOpen: wr.open === ruleRow.index
             width: list.width
+
+            // the shipped ones under a heading of their own, after yours
+            SectionLabel {
+              visible: ruleRow.isShipped && (ruleRow.index === 0 || !wr.rows[ruleRow.index - 1].shipped)
+              leftPadding: 10
+              topPadding: ruleRow.index === 0 ? 4 : 14
+              bottomPadding: 6
+              text: "Shipped"
+            }
 
             Rectangle {
               width: parent.width
@@ -171,12 +190,16 @@ Item {
                 font.weight: Zenon.weight
                 font.pixelSize: Zenon.px(14)
               }
+              // deletes one of yours; on a shipped rule you changed, puts it
+              // back as it ships; hidden on one left as it ships, its room
+              // kept so the words do not shift when it comes
               ClearChip {
                 id: drop
                 anchors.right: parent.right
                 anchors.rightMargin: 8
                 anchors.verticalCenter: parent.verticalCenter
                 size: Zenon.px(14)
+                shown: !ruleRow.isShipped || ruleRow.w.changed
                 onClicked: wr.remove(ruleRow.index)
               }
               // between the box and the ×, so neither of theirs counts twice

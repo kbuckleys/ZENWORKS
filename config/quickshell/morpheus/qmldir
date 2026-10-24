@@ -83,3 +83,4 @@ EmptyState 1.0 EmptyState.qml
 singleton Share 1.0 Share.qml
 ClearChip 1.0 ClearChip.qml
 AddChip 1.0 AddChip.qml
+ChevronChip 1.0 ChevronChip.qml
