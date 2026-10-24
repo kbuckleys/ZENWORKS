@@ -156,6 +156,16 @@ Scope {
     mgr.syncs = o;
     mgr.keep_();
   }
+  // OVER SSH (user, 2026-10-25): the forges, by id, whose clones and new
+  // remotes take the ssh address — turned on from an account's chip once
+  // ssh gets in there; HTTPS everywhere else
+  property var sshFor: ({})
+  function setSshFor(id, on) {
+    const o = Object.assign({}, mgr.sshFor);
+    if (on) o[id] = true; else delete o[id];
+    mgr.sshFor = o;
+    mgr.keep_();
+  }
   // servers of your own (a self-hosted GitLab, a Forgejo or Gitea):
   // [{ kind, host, name }], laid into delphi.js' FORGES (D.setServers)
   property var servers: []
@@ -193,6 +203,7 @@ Scope {
       if (D.FORGES[st.forge]) mgr.forge = st.forge;
       if (st.pushTo && typeof st.pushTo === "object") mgr.pushTo = st.pushTo;
       if (st.syncs && typeof st.syncs === "object") mgr.syncs = st.syncs;
+      if (st.sshFor && typeof st.sshFor === "object") mgr.sshFor = st.sshFor;
     } catch (e) {}
   }
   function keep_() { keepTimer.restart(); }
@@ -200,7 +211,7 @@ Scope {
     id: keepTimer
     interval: 400
     onTriggered: stateFile.setText(JSON.stringify({
-      recents: mgr.recents, hidden: mgr.hidden, splits: mgr.splits, page: mgr.page, scanRoots: mgr.scanRoots, pullMode: mgr.pullMode, autoFetch: mgr.autoFetch, forge: mgr.forge, servers: mgr.servers, pushTo: mgr.pushTo, syncs: mgr.syncs }, null, 1))
+      recents: mgr.recents, hidden: mgr.hidden, splits: mgr.splits, page: mgr.page, scanRoots: mgr.scanRoots, pullMode: mgr.pullMode, autoFetch: mgr.autoFetch, forge: mgr.forge, servers: mgr.servers, pushTo: mgr.pushTo, syncs: mgr.syncs, sshFor: mgr.sshFor }, null, 1))
   }
   function set(key, value) {
     if (mgr[key] === value) return;

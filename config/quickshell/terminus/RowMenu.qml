@@ -1197,7 +1197,7 @@ PopupWindow {
               visible: menu.cardGlyphs && !modelData.sep && !modelData.swatch
               text: MenuGlyphs.of(modelData)
               horizontalAlignment: Text.AlignHCenter
-              color: MenuGlyphs.accented(modelData) ? Zenon.cyan : Zenon.white
+              color: Zenon.white
               font.family: Zenon.face
               font.weight: Zenon.weight
               font.pixelSize: Zenon.px(15)
@@ -1557,7 +1557,7 @@ PopupWindow {
                 visible: menu.subGlyphs && !modelData.sep
                 text: MenuGlyphs.of(modelData)
                 horizontalAlignment: Text.AlignHCenter
-                color: MenuGlyphs.accented(modelData) ? Zenon.cyan : Zenon.white
+                color: Zenon.white
                 font.family: Zenon.face
                 font.weight: Zenon.weight
                 font.pixelSize: Zenon.px(15)

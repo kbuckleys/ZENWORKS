@@ -503,7 +503,7 @@ Singleton {
 
   // ── the background ────────────────────────────────────────────────────
   // EMPTY BY DEFAULT, and that is the point. A default of
-  // "$HOME/Pictures/Wallpapers" is a path that happens to be true on the
+  // "$HOME/Pictures/Backgrounds" is a path that happens to be true on the
   // machine this was written on: the directory name is in no specification, so a
   // default naming it would be wrong on every machine that spells it
   // differently — while still being written into everyone's settings as
@@ -1062,7 +1062,7 @@ Singleton {
 
     // ── background ──
     { key: "backgroundDir", section: "paper", label: "Location", type: "text",
-      pick: "directory", placeholder: "your pictures directory, then /Wallpapers",
+      pick: "directory", placeholder: "your pictures directory, then /Backgrounds",
       help: "Where picasso looks for backgrounds, chosen in terminus. Rescanned when this changes. Empty asks XDG for your pictures directory." },
     { key: "backgroundFit", section: "paper", label: "Fit", type: "enum",
       options: [ { value: "crop",    label: "Crop" },
@@ -1328,12 +1328,13 @@ Singleton {
     // reading the source — so the panel says it. `info` rows hold nothing, are
     // never written, and never count as changed; see Ora.stored.
     // ABOUT THIS COMPUTER (user, 2026-10-12: "something like fastfetch"):
-    // a readout that folds open (`fold`) into fastfetch's facts — the
-    // summary on the row, the lot underneath. See readComputer.
+    // a readout that folds open (`fold`) into the machine's facts — the
+    // summary on the row, the lot underneath. Read by oracle/machine.py
+    // since 2026-10-25 (fastfetch knew less). See readComputer.
     { key: "infoComputer", section: "about", label: "About this computer", type: "info",
       fold: "computer",
-      alias: "fastfetch neofetch system hardware cpu gpu memory kernel distro os host uptime packages specs",
-      help: "The machine under the shell, as fastfetch reads it. Click to unfold." },
+      alias: "fastfetch neofetch system hardware cpu gpu memory ram kernel distro os host uptime packages specs firmware bios drives storage displays battery",
+      help: "The machine under the shell: hardware, firmware, drives, displays. Click to unfold." },
     { key: "infoStatePath", section: "about", label: "Kept in", type: "info",
       // a path identifies itself by its END, so this one elides from the left
       elideLeft: true,
@@ -1618,7 +1619,7 @@ Singleton {
   }
 
   // ── ABOUT THIS COMPUTER ───────────────────────────────────────────────
-  // fastfetch's JSON and quickshell's version, read once on the first visit
+  // machine.py's JSON and quickshell's version, read once on the first visit
   // to About and again after five minutes (uptime, memory and disks move).
   property var computer: null
   property bool computerReading: false
@@ -1633,21 +1634,16 @@ Singleton {
   Process {
     id: computerProc
     command: ["bash", "-c",
-      "command -v fastfetch >/dev/null || { echo NOFASTFETCH; exit 0; }; "
-      + "fastfetch --format json -s '" + Ora.computerModules() + "' 2>/dev/null; "
-      + "printf '\\n@@QS@@\\n'; qs --version 2>/dev/null | head -1"]
+      "python3 -I \"$1\" 2>/dev/null; printf '\\n@@QS@@\\n'; qs --version 2>/dev/null | head -1",
+      "_", Quickshell.shellDir + "/oracle/machine.py"]
     stdout: StdioCollector {
       id: computerOut
       onStreamFinished: {
         const t = computerOut.text;
         const cut = t.indexOf("@@QS@@");
-        if (t.indexOf("NOFASTFETCH") === 0) {
-          root.computer = { ok: false, rows: [], why: "fastfetch is not installed", missing: true };
-        } else {
-          const c = Ora.readComputer(cut >= 0 ? t.slice(0, cut) : t, cut >= 0 ? t.slice(cut + 6).trim() : "");
-          if (!c.ok) c.why = "fastfetch said nothing";
-          root.computer = c;
-        }
+        const c = Ora.readComputer(cut >= 0 ? t.slice(0, cut) : t, cut >= 0 ? t.slice(cut + 6).trim() : "");
+        if (!c.ok) c.why = "The machine could not be read.";
+        root.computer = c;
         root.computerAt = Date.now();
         root.computerReading = false;
         root.revision++;

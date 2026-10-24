@@ -728,8 +728,20 @@ class Repo:
     def remote_remove(self, name, cancel=None):
         self.git.run(["remote", "remove", name], cancel=cancel)
 
-    def remote_set_url(self, name, url, cancel=None):
+    def remote_set_url(self, name, url, push=None, cancel=None):
+        """Where `name` fetches from (and pushes to, unless it has a push
+        address of its own). `push`: that address set, "" taken away so
+        pushes go to `url` again, None left as it is."""
         self.git.run(["remote", "set-url", name, url], cancel=cancel)
+        if push == "":
+            self.git.run(["config", "--unset-all", f"remote.{name}.pushurl"], cancel=cancel, ok=(0, 5))
+        elif push:
+            self.git.run(["config", "--replace-all", f"remote.{name}.pushurl", push], cancel=cancel)
+
+    def remote_rename(self, old, new, cancel=None):
+        # git moves the branches that follow it (branch.*.remote) and its
+        # remote-tracking refs along
+        self.git.run(["remote", "rename", old, new], cancel=cancel)
 
     def connect(self, url, branch=None, remote="origin", onto=False, cancel=None, emit=None):
         """This repository joined to one that already exists elsewhere (a

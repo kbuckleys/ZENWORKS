@@ -367,6 +367,55 @@ function remoteOf(url) {
   return { host: m[1].toLowerCase(), full: m[2], web: "https://" + m[1].toLowerCase() + "/" + m[2] };
 }
 
+// HOW A REMOTE IS REACHED: "HTTPS", "SSH", or "" (a path, git://). The
+// Remotes page's badge, and which way `s` switches it.
+function protocolOf(url) {
+  var u = String(url || "").trim();
+  if (/^https?:\/\//.test(u)) return "HTTPS";
+  if (/^ssh:\/\//.test(u) || /^[^@\/:\s]+@[^:\/\s]+:/.test(u)) return "SSH";
+  return "";
+}
+// The same repository the other way: https ↔ ssh. A forge's ssh address
+// is git@host:owner/name.git; the AUR's is ssh://aur@aur.archlinux.org/
+// name.git (aur.archlinux.org/<pkg>.git over https only clones). "" when
+// it cannot be said (a path, git://).
+function otherUrl(url) {
+  var p = protocolOf(url), r = remoteOf(url);
+  if (!p || !r) return "";
+  var full = r.full.replace(/\.git$/, "");
+  if (p === "SSH") return "https://" + r.host + "/" + full + ".git";
+  if (r.host === "aur.archlinux.org") return "ssh://aur@aur.archlinux.org/" + full + ".git";
+  return "git@" + r.host + ":" + full + ".git";
+}
+// who ssh logs in as, and where — what sshTest is asked about an ssh
+// remote ("git@github.com:o/n" → { user: "git", host: "github.com" })
+function sshTarget(url) {
+  var u = String(url || "").trim();
+  var m = u.match(/^ssh:\/\/(?:([^@\/]+)@)?([^\/:]+)/) || u.match(/^([^@\/:\s]+)@([^:\/\s]+):/);
+  return m ? { user: m[1] || "git", host: m[2].toLowerCase() } : null;
+}
+
+// What an ssh test that did not get in means (core/sshkeys.read_test's why)
+var SSH_WHY = {
+  refused: "The host does not know any key offered to it — add the public key there.",
+  hostkey: "The host's key was not trusted, so ssh stopped before signing in.",
+  network: "The host could not be reached — the network, or the address.",
+  error: "ssh stopped with an error."
+};
+// The hosts a new key can be for: the three forges, the AUR, and servers of
+// your own — each with whether Delphi can hand it the key itself (`api`:
+// a forge id) or it is pasted on the host's own page (`page`)
+function keyHosts() {
+  var out = [];
+  for (var i = 0; i < FORGE_ORDER.length; i++) {
+    var f = FORGES[FORGE_ORDER[i]];
+    out.push({ host: f.host, name: f.name, glyph: f.glyph, api: f.id, page: "" });
+  }
+  out.push({ host: "aur.archlinux.org", name: "AUR", glyph: "", api: "",
+             page: "https://aur.archlinux.org/login", where: "My Account → SSH Public Key" });
+  return out;
+}
+
 // A repository's name for a clone directory, from its URL.
 function cloneName(url) {
   var r = remoteOf(url);

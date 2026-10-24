@@ -1359,9 +1359,156 @@ def forges_archive():
     eq(sent[1][1].endswith("/projects/me%2Fr/unarchive"), True, sent[1][1])
 
 
+# ── SSH keys and remotes (core/sshkeys.py, Repo.remote_*) ─────────────────
+class Skip(Exception):
+    pass
+
+
+@test
+def ssh_config_plans():
+    import sshkeys as K
+    home = K.HOME
+    mine = [
+        "Include ~/.ssh/extra",
+        "",
+        "Host work",
+        "    HostName git.work.example",
+        "    IdentityFile ~/.ssh/work",
+        "",
+        "Host *",
+        "    ServerAliveInterval 30",
+    ]
+    # a new host goes BEFORE `Host *`, marked, the rest untouched
+    p = K.plan_host(mine, "aur.archlinux.org", "aur", home + "/.ssh/aur")
+    eq(p["state"], "added")
+    at = p["lines"].index(K.MARK)
+    eq(p["lines"][at:at + 6], [K.MARK, "Host aur.archlinux.org", "  User aur", "  IdentityFile ~/.ssh/aur",
+                               "  IdentitiesOnly yes", "  AddKeysToAgent yes"])
+    eq(p["lines"].index("Host *") > at, True, "after Host *")
+    eq([l for l in p["lines"] if l not in mine and l.strip()][:2], [K.MARK, "Host aur.archlinux.org"])
+    for l in mine:
+        eq(l in p["lines"], True, l)
+    # again: nothing to do
+    eq(K.plan_host(p["lines"], "aur.archlinux.org", "aur", "~/.ssh/aur")["state"], "same")
+    eq(K.hosts_of(p["lines"], home + "/.ssh/aur"), ["aur.archlinux.org"])
+    # a host with a block of its own and another key: shown, not touched
+    d = K.plan_host(mine, "work", "git", "~/.ssh/new")
+    eq((d["state"], d["lines"]), ("differs", mine))
+    eq(d["block"].splitlines()[0], "Host work")
+    # ...unless replaced: that one line, in its own indent, IdentitiesOnly added
+    u = K.plan_host(mine, "work", "git", "~/.ssh/new", replace=True)
+    eq(u["state"], "updated")
+    eq(u["lines"][2:6], ["Host work", "    IdentitiesOnly yes", "    HostName git.work.example", "    IdentityFile ~/.ssh/new"])
+    # an empty file gets the block alone; unlinking Delphi's block takes it whole
+    e = K.plan_host([], "github.com", "git", "~/.ssh/id_ed25519")["lines"]
+    eq(e[0], K.MARK)
+    eq(K.plan_unlink(e, home + "/.ssh/id_ed25519"), [])
+    back = K.plan_unlink(p["lines"], home + "/.ssh/aur")
+    eq(back, mine)
+    # a block that is the user's own only loses the key's line
+    eq(K.plan_unlink(mine, home + "/.ssh/work"), [l for l in mine if "IdentityFile" not in l])
+
+
+@test
+def ssh_test_reading():
+    import sshkeys as K
+    eq(K.read_test(1, "Hi kbuckleys! You've successfully authenticated, but GitHub does not provide shell access.\n"),
+       {"ok": True, "why": "", "login": "kbuckleys",
+        "line": "Hi kbuckleys! You've successfully authenticated, but GitHub does not provide shell access."})
+    eq(K.read_test(0, "Welcome to GitLab, @kb!\n")["login"], "kb")
+    eq(K.read_test(1, "Hi there, kb! You've successfully authenticated with the key named x\n")["login"], "kb")
+    eq(K.read_test(255, "aur@aur.archlinux.org: Permission denied (publickey).\n")["why"], "refused")
+    eq(K.read_test(255, "Host key verification failed.\n")["why"], "hostkey")
+    eq(K.read_test(255, "ssh: Could not resolve hostname x: Name or service not known\n")["why"], "network")
+    # the AUR lets you in and says only that a shell is not offered
+    eq(K.read_test(1, "Interactive shell is disabled.\nTry `ssh aur@aur.archlinux.org help` for a list of commands.\n")["ok"], True)
+
+
+@test
+def ssh_keys_made_used_removed():
+    import sshkeys as K
+    if not shutil.which("ssh-keygen"):
+        raise Skip("ssh-keygen is not installed (openssh)")
+    # with a passphrase: through the private askpass socket, and it holds
+    k = K.create("aur", "aur key", "correct horse")
+    eq(K._has_passphrase(k["path"]), True)
+    eq(k["public"].startswith("ssh-ed25519 "), True)
+    r = subprocess.run(["ssh-keygen", "-y", "-P", "correct horse", "-f", k["path"]], capture_output=True, text=True)
+    eq(r.returncode, 0, r.stderr)
+    # without one
+    n = K.create("plain")
+    eq(K._has_passphrase(n["path"]), False)
+    try:
+        K.create("plain")
+        raise AssertionError("made a second key of the same name")
+    except gitrun.GitError:
+        pass
+    eq(K.use("aur.archlinux.org", k["path"])["state"], "added")
+    eq(K.use("aur.archlinux.org", k["path"])["state"], "same")
+    st = K.status()
+    by = {x["name"]: x for x in st["keys"]}
+    eq((by["aur"]["passphrase"], by["aur"]["hosts"], by["plain"]["passphrase"]), (True, ["aur.archlinux.org"], False))
+    eq(oct(os.stat(K.CONFIG).st_mode & 0o777), "0o600")
+    if shutil.which("gio"):
+        K.remove(k["path"])
+        eq(os.path.exists(k["path"]), False)
+        eq(K._read_config(), [])
+
+
+@test
+def remotes_renamed_and_push_address():
+    d = fresh({"a": "1\n"})
+    up = os.path.join(TMP, "up-rr.git")
+    subprocess.run(["git", "init", "-q", "--bare", up], check=True)
+    sh(d, "remote", "add", "origin", up)
+    sh(d, "push", "-q", "-u", "origin", "main")
+    r = R.Repo(d)
+    r.remote_rename("origin", "github")
+    eq([x["name"] for x in r.remotes()], ["github"])
+    eq(sh(d, "config", "branch.main.remote").strip(), "github", "the branch follows the new name")
+    r.remote_set_url("github", up, push="/elsewhere.git")
+    eq(r.remotes(), [{"name": "github", "fetch": up, "push": "/elsewhere.git"}])
+    r.remote_set_url("github", up, push="")
+    eq(r.remotes(), [{"name": "github", "fetch": up, "push": up}])
+    r.remote_set_url("github", up, push="")   # nothing to take away: no error
+
+
+@test
+def forges_ssh_keys():
+    import json as J
+    import github, gitlab, forgejo
+    sent = []
+
+    class Answer:
+        def __init__(self, v): self.v, self.headers = v, {}
+        def read(self): return J.dumps(self.v).encode() if self.v is not None else b""
+        def __enter__(self): return self
+        def __exit__(self, *a): pass
+
+    def fake(req, timeout):
+        url = req.full_url
+        sent.append((req.get_method(), url.split("?")[0].rsplit("/user/", 1)[-1], J.loads(req.data) if req.data else None))
+        if req.get_method() == "GET":
+            return Answer([{"id": 7, "title": "t", "key": "ssh-ed25519 AAAA comment"}])
+        return Answer(None if req.get_method() == "DELETE" else {"id": 9})
+
+    keep = (github.rest.urllib.request.urlopen, github.token, gitlab.token, forgejo.token)
+    github.rest.urllib.request.urlopen = fake
+    github.token = gitlab.token = forgejo.token = lambda: ("t", "keyring")
+    try:
+        for f in (github, gitlab, forgejo):
+            eq(f.ssh_keys()[0]["key"], "ssh-ed25519 AAAA")
+            eq(f.add_ssh_key("ssh-ed25519 AAAA", "aur")["added"], True)
+            f.delete_ssh_key(7)
+    finally:
+        (github.rest.urllib.request.urlopen, github.token, gitlab.token, forgejo.token) = keep
+    eq([(m, p) for m, p, _ in sent], [("GET", "keys"), ("POST", "keys"), ("DELETE", "keys/7")] * 3)
+    eq(sent[4][2], {"title": "aur", "key": "ssh-ed25519 AAAA", "usage_type": "auth"}, "GitLab: a key for signing in")
+
+
 def main():
     want = sys.argv[1] if len(sys.argv) > 1 else ""
-    ok = bad = 0
+    ok = bad = skipped = 0
     for t in TESTS:
         if want not in t.__name__:
             continue
@@ -1369,10 +1516,13 @@ def main():
             t()
             print(f"  ok   {t.__name__}")
             ok += 1
+        except Skip as e:
+            print(f"  skip {t.__name__}: {e}")
+            skipped += 1
         except Exception as e:
             print(f"  FAIL {t.__name__}: {type(e).__name__}: {e}")
             bad += 1
-    print(f"delphi core: {ok} passed, {bad} failed")
+    print(f"delphi core: {ok} passed, {bad} failed" + (f", {skipped} skipped" if skipped else ""))
     shutil.rmtree(TMP, ignore_errors=True)
     sys.exit(1 if bad else 0)
 

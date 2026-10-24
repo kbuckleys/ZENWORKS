@@ -36,7 +36,7 @@ Singleton {
   // of its own, and "~/Walls//a.png" is a different string from
   // "~/Walls/a.png" — which matters, because that string is the key the
   // per-monitor assignment is stored under.
-  readonly property string defaultDir: root.picturesDir + "/Wallpapers"
+  readonly property string defaultDir: root.picturesDir + "/Backgrounds"
 
   readonly property string dir: {
     const d = String(Oracle.backgroundDir || "").replace(/\/+$/, "");
@@ -623,7 +623,26 @@ Singleton {
   // two writes is still one scan.
   onDirChanged: rescanDebounce.restart()
 
+  // ── first run ────────────────────────────────────────────────────────
+  // No picasso.json at all means nothing was ever chosen: a fresh install.
+  // The ZENWORKS background (picasso/zenworks.png, the logo's Z tiled) is
+  // copied into a Zenworks directory of the backgrounds directory, where it
+  // is a picture like any other to keep or delete, and set everywhere. Set only once the copy has
+  // landed, or the daemon would load a file that is not there yet; setAll
+  // writes picasso.json, so this never runs twice. One already there (a
+  // reinstall) is not copied over.
+  readonly property string firstBackground: root.dir + "/Zenworks/zenworks.png"
+  Process {
+    id: firstRunProc
+    onExited: (code) => {
+      if (code !== 0) return;
+      root.setAll(root.firstBackground);
+      rescanDebounce.restart();
+    }
+  }
+
   Component.onCompleted: {
+    const fresh = stateFile.text() === "";
     // parseState reads the old bare-map file as well as the current one, so
     // an install that predates per-monitor fit loads with its backgrounds
     // intact and no fits set — which is exactly what it had.
@@ -635,5 +654,11 @@ Singleton {
     root.colors = st.colors;
     root.slideshow = st.slideshow;
     root.scan();
+    if (fresh) {
+      firstRunProc.command = ["sh", "-c",
+        'mkdir -p -- "${1%/*}" && { [ -e "$1" ] || cp -- "$0" "$1"; }',
+        Quickshell.shellDir + "/picasso/zenworks.png", root.firstBackground];
+      firstRunProc.running = true;
+    }
   }
 }

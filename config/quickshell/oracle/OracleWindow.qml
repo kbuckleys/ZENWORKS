@@ -2121,7 +2121,7 @@ FloatingWindow {
                   && popup.openGroups[settingRow.spec.inGroup] !== true
 
                 // ── EACH GROUP IN ITS OWN FRAME ──────────────────────────
-                // morpheus' ListFrame, as About this computer's fastfetch
+                // morpheus' ListFrame, as About this computer's facts
                 // stands in (user, 2026-10-20), one per group. The rows are
                 // separate delegates, so each draws its slice of the one
                 // frame: the first its rounded top, the last its bottom, the
@@ -2150,7 +2150,7 @@ FloatingWindow {
                   y: settingRow.frameAbove
                   width: parent.width
                   // tighter inside a frame (user, 2026-10-20): the frame
-                  // already sets them apart, as fastfetch's lines are
+                  // already sets them apart, as About this computer's lines are
                   height: settingRow.arrange ? popup.rowH
                     : settingRow.inGroup ? Math.max(popup.frameRowH, Math.ceil(labels.implicitHeight) + 12)
                     // a group's head is a name, not a setting with a line of

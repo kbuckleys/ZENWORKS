@@ -148,6 +148,14 @@ def env(sock=None, lock=True, editor=None, seq_editor=None, extra=None):
         e["SSH_ASKPASS_REQUIRE"] = "force"
     # ssh cannot fall back to a terminal either: every process starts in a
     # session of its own, which has no controlling tty to open.
+    #
+    # The session's ssh-agent, where quickshell started before there was one
+    # (openssh installed later): the usual socket, when something listens
+    # there — a key's passphrase, once given, is not asked again.
+    if not e.get("SSH_AUTH_SOCK"):
+        agent = os.path.join(os.environ.get("XDG_RUNTIME_DIR") or "/tmp", "ssh-agent.socket")
+        if os.path.exists(agent):
+            e["SSH_AUTH_SOCK"] = agent
     if extra:
         e.update(extra)
     return e

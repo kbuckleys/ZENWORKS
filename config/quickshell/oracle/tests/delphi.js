@@ -101,6 +101,15 @@ module.exports = {
     t.eq("remote scp-like", D.remoteOf("git@github.com:o/n.git").full, "o/n");
     t.eq("remote ssh url with port", D.remoteOf("ssh://git@codeberg.org:22/o/n").host, "codeberg.org");
     t.eq("remote nonsense", D.remoteOf(""), null);
+    t.eq("protocols", ["https://github.com/o/n", "git@github.com:o/n.git", "ssh://aur@aur.archlinux.org/z.git", "/srv/x.git"].map(D.protocolOf),
+      ["HTTPS", "SSH", "SSH", ""]);
+    t.eq("https to ssh: a forge", D.otherUrl("https://github.com/kbuckleys/ZENWORKS.git"), "git@github.com:kbuckleys/ZENWORKS.git");
+    t.eq("https to ssh: the AUR", D.otherUrl("https://aur.archlinux.org/zenworks.git"), "ssh://aur@aur.archlinux.org/zenworks.git");
+    t.eq("ssh to https", D.otherUrl("git@codeberg.org:kb/z"), "https://codeberg.org/kb/z.git");
+    t.eq("and back again", D.otherUrl(D.otherUrl("https://gitlab.com/g/sub/p.git")), "https://gitlab.com/g/sub/p.git");
+    t.eq("a path has no other way", D.otherUrl("/srv/x.git"), "");
+    t.eq("ssh target", [D.sshTarget("git@github.com:o/n"), D.sshTarget("ssh://aur@aur.archlinux.org/z.git"), D.sshTarget("https://x/y")],
+      [{ user: "git", host: "github.com" }, { user: "aur", host: "aur.archlinux.org" }, null]);
     t.eq("clone name", D.cloneName("git@github.com:o/my-repo.git"), "my-repo");
 
     t.eq("ask password", D.askCard({ prompt: "Password for 'https://me@github.com': ", secret: true }),

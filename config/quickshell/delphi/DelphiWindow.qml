@@ -11,6 +11,8 @@
 //   Branches     local, remote, tags: switch, create, merge, rebase, delete
 //   Stashes      work put aside, and brought back
 //   Worktrees    the other checkouts of this repository
+//   Remotes      where it fetches from and pushes to: add, rename, edit,
+//                HTTPS ↔ SSH (RemotesPage)
 //   Releases     the forge repository's releases, and a new one with its
 //                notes written for you (ReleasesPage)
 //   Pull requests, Issues   the forge repository's — GitHub, GitLab,
@@ -19,6 +21,8 @@
 //   Accounts     GitHub, GitLab, Codeberg: sign in, your repositories —
 //                clone, create, upload files (GitHubPage)
 //   Repositories the ones opened before, the ones found on disk, clone, init
+//   SSH keys     the keys in ~/.ssh: made, given to hosts and forges,
+//                tested (KeysPage)
 //
 // The head says where you are and carries Fetch, Pull and Push (with how
 // far ahead and behind) on the pages about commits (syncPages); a network
@@ -584,6 +588,9 @@ FloatingWindow {
           choices: split.length > 0 ? [{ label: "Open branches", ink: Zenon.cyan, run: () => win.setPage("branches") }, { label: "Close" }] : [{ label: "Close" }] });
       } });
   }
+  // the address a forge's repository is cloned or added by: ssh where its
+  // account chip says so (mgr.sshFor), else https
+  function urlFor(id, r) { return win.mgr.sshFor[id] && r.ssh ? r.ssh : r.https; }
   // the name a forge's remote takes here: its id (github, gitlab, codeberg)
   // or, for a server of your own, its name — numbered if taken by another
   function remoteNameFor(f, url, rs) {
@@ -630,11 +637,12 @@ FloatingWindow {
       const note = (word, ok) => { out.push({ f: f, word: word, ok: !!ok }); next(i + 1); };
       const failed = (what) => (err) => note(what + " — " + D.errorText(err ? err.error : "").split("\n")[0]);
       const join = (r, made) => {
-        const remote = win.remoteNameFor(f, r.https, rs);
-        win.act("mirrorAdd", { name: remote, url: r.https }, { repo: root, refresh: false, label: "Adding " + r.full, network: true,
+        const url = win.urlFor(f.id, r);
+        const remote = win.remoteNameFor(f, url, rs);
+        win.act("mirrorAdd", { name: remote, url: url }, { repo: root, refresh: false, label: "Adding " + r.full, network: true,
           failed: failed("Could not reach " + r.full),
           then: (res) => {
-            rs = rs.concat([{ name: remote, fetch: r.https, push: r.https }]);
+            rs = rs.concat([{ name: remote, fetch: url, push: url }]);
             if (res.empty || res.related) { note((made ? "new repository " + r.full : "your " + r.full) + " — synced", true); return; }
             // a stranger of the same name: not joined, its remote gone again
             win.mgr.call("remoteRemove", root, { name: remote }, () => {});
@@ -684,8 +692,9 @@ FloatingWindow {
   // back out unless kept
   function joinForge(root, f, r, rs0) {
     const go = (rs) => {
-      const remote = win.remoteNameFor(f, r.https, rs);
-      win.act("mirrorAdd", { name: remote, url: r.https }, { repo: root, label: "Adding " + r.full, network: true,
+      const url = win.urlFor(f.id, r);
+      const remote = win.remoteNameFor(f, url, rs);
+      win.act("mirrorAdd", { name: remote, url: url }, { repo: root, label: "Adding " + r.full, network: true,
         then: (res) => {
           if (!win) return;
           if (res.empty || res.related) {
@@ -875,6 +884,7 @@ FloatingWindow {
     { id: "changes", label: "Changes", glyph: "", group: "repo" },
     { id: "history", label: "History", glyph: "", group: "repo" },
     { id: "branches", label: "Branches", glyph: "", group: "repo" },
+    { id: "remotes", label: "Remotes", glyph: "\uEB3A", group: "repo" },
     { id: "stashes", label: "Stashes", glyph: "", group: "repo" },
     { id: "worktrees", label: "Worktrees", glyph: "", group: "repo" },
     { id: "pulls", label: win.hub && D.FORGES[win.hub.forge] ? D.FORGES[win.hub.forge].pulls : "Pull requests", glyph: "\uF407", group: "forge" },
@@ -882,6 +892,7 @@ FloatingWindow {
     { id: "releases", label: "Releases", glyph: "\uF412", group: "forge" },
     { id: "repos", label: "Repositories", glyph: "", group: "all" },
     { id: "github", label: "Accounts", glyph: "\uF0C2", group: "all" },
+    { id: "keys", label: "SSH keys", glyph: "\uF43D", group: "all" },
   ]
   function groupWord(g) {
     return g === "repo" ? "Repository"
@@ -904,6 +915,7 @@ FloatingWindow {
     }
     if (id === "branches") return win.refs.local.length > 0 ? String(win.refs.local.length) : "";
     if (id === "stashes") return win.stashCount > 0 ? String(win.stashCount) : "";
+    if (id === "remotes") return win.remotes.length > 0 ? String(win.remotes.length) : "";
     return "";
   }
   readonly property var pageItem: pageLoader.item
@@ -984,6 +996,11 @@ FloatingWindow {
     }
     const p = repoChip.mapToItem(stage, 0, repoChip.height + 4);
     repoPop.open(p.x, p.y, items);
+  }
+  // the SSH keys page, a new key's form open with these hosts ticked
+  function newKeyFor(host) {
+    win.setPage("keys");
+    Qt.callLater(() => { if (win && win.pageItem && win.pageItem.newKey) win.pageItem.newKey(host ? [host] : []); });
   }
   function chooseRepo() {
     if (!win.mgr.fileManager) return;
@@ -1135,7 +1152,7 @@ FloatingWindow {
             countInk: pageRow.modelData.id === "changes" && win.st && win.st.conflicts.length > 0 ? Zenon.red : Zenon.accentMuted
             here: win.page === pageRow.modelData.id
             fill: win.hiFill
-            opacity: win.root === "" && ["github", "repos"].indexOf(pageRow.modelData.id) < 0 ? 0.4 : 1
+            opacity: win.root === "" && ["github", "repos", "keys"].indexOf(pageRow.modelData.id) < 0 ? 0.4 : 1
             onClicked: win.setPage(pageRow.modelData.id)
           }
           }
@@ -1726,9 +1743,9 @@ FloatingWindow {
       anchors.right: parent.right
       anchors.top: head.bottom
       anchors.bottom: foot.top
-      source: win.root === "" && ["github", "repos"].indexOf(win.page) < 0 ? "ReposPage.qml"
+      source: win.root === "" && ["github", "repos", "keys"].indexOf(win.page) < 0 ? "ReposPage.qml"
         : ({ changes: "ChangesPage.qml", history: "HistoryPage.qml", branches: "BranchesPage.qml",
-             stashes: "StashesPage.qml", worktrees: "WorktreesPage.qml", releases: "ReleasesPage.qml", github: "GitHubPage.qml",
+             stashes: "StashesPage.qml", worktrees: "WorktreesPage.qml", remotes: "RemotesPage.qml", keys: "KeysPage.qml", releases: "ReleasesPage.qml", github: "GitHubPage.qml",
              pulls: "ForgePage.qml", issues: "ForgePage.qml",
              repos: "ReposPage.qml" })[win.page] || "ChangesPage.qml"
       onLoaded: { item.win = win; Qt.callLater(win.refocus); }

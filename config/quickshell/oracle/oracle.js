@@ -559,7 +559,6 @@ const TOOLS = [
   { name: "ffprobe", pkg: "ffmpeg", why: "video details" },
   { name: "ffmpeg", pkg: "ffmpeg", why: "video frames and covers" },
   { name: "tesseract", pkg: "tesseract", why: "copying text out of a picture" },
-  { name: "fastfetch", pkg: "fastfetch", why: "About this computer" },
   { name: "gh", pkg: "github-cli", why: "delphi's GitHub sign-in" },
   { name: "bw", pkg: "bitwarden-cli", why: "calypso's Bitwarden backend" },
   { name: "op", pkg: "1password-cli", aur: true, why: "calypso's 1Password backend" },
@@ -1930,16 +1929,11 @@ function inputCheck(xkb, field, value, layout) {
 }
 
 // ── ABOUT THIS COMPUTER ───────────────────────────────────────────────────
-// fastfetch's --format json, read into the About section's fold-out: a
-// line for the row itself (`summary`), the distro's logo glyph and the
-// facts, one `{ k, v }` per line, in fastfetch's own order. `qs` is the
-// first line of `qs --version`, which fastfetch does not know about.
-// A module fastfetch could not read comes back with an `error` and no
-// `result`; it is left out, as fastfetch leaves it out of its own print.
-// (a function: a library's top-level const is not reachable from QML)
-function computerModules() {
-  return "OS:Host:Kernel:Uptime:Packages:WM:Display:CPU:GPU:Memory:Swap:Disk:LocalIp:Battery:Locale";
-}
+// oracle/machine.py's JSON, read into the About section's fold-out: the
+// sections as it gives them ({ name, rows: [{ k, v, frac?, note? }] }),
+// the distro's logo glyph, a line for the row itself (`summary`) and the
+// model under the title. `qs` is the first line of `qs --version`, which
+// goes into Desktop ahead of Qt. machine.py replaced fastfetch 2026-10-25.
 
 // Nerd Font logos (nf-linux-*), by os-release ID — and ID_LIKE after it, so
 // an Arch derivative without a logo of its own wears Arch's
@@ -1953,99 +1947,47 @@ const DISTRO_GLYPHS = {
   alpine: "", slackware: "", kali: "", zorin: ""
 };
 
-function bytes(n) {
-  const units = ["B", "KiB", "MiB", "GiB", "TiB"];
-  let v = Number(n) || 0, i = 0;
-  while (v >= 1024 && i < units.length - 1) { v /= 1024; ++i; }
-  return (i === 0 ? String(v) : v.toFixed(v >= 100 ? 0 : 1)) + " " + units[i];
-}
-
-function usage(used, total) {
-  if (!total || typeof used !== "number" || isNaN(used)) return "";
-  return bytes(used) + " / " + bytes(total) + " (" + Math.round(used / total * 100) + "%)";
-}
-
-function span(ms) {
-  let s = Math.floor((Number(ms) || 0) / 1000);
-  const d = Math.floor(s / 86400); s -= d * 86400;
-  const h = Math.floor(s / 3600); s -= h * 3600;
-  const m = Math.floor(s / 60);
-  const out = [];
-  if (d) out.push(d + (d === 1 ? " day" : " days"));
-  if (h) out.push(h + (h === 1 ? " hour" : " hours"));
-  if (m || out.length === 0) out.push(m + (m === 1 ? " min" : " mins"));
-  return out.join(", ");
-}
-
-function ghz(mhz) {
-  return mhz ? (mhz / 1000).toFixed(2) + " GHz" : "";
-}
-
 function readComputer(json, qsVersion) {
-  let list = [];
-  try { list = JSON.parse(String(json || "")); } catch (e) { list = []; }
-  if (!Array.isArray(list)) list = [];
-  const by = {};
-  for (const m of list) if (m && m.type && m.result !== undefined && m.result !== null) by[m.type] = m.result;
-  const rows = [];
-  const put = (k, v) => { if (v !== undefined && v !== null && String(v).trim() !== "") rows.push({ k: k, v: String(v).trim() }); };
-  const os = by.OS || {}, kern = by.Kernel || {};
-  put("OS", [os.prettyName || os.name, kern.architecture].filter((x) => !!x).join(" "));
-  const host = by.Host || {};
-  put("Host", [host.vendor, host.name || host.family, host.version].filter((x) => !!x && !/to be filled|default string/i.test(x)).join(" "));
-  put("Kernel", [kern.name, kern.release].filter((x) => !!x).join(" "));
-  if (by.Uptime) put("Uptime", span(by.Uptime.uptime));
-  if (by.Packages) {
-    const p = by.Packages;
-    const parts = Object.keys(p).filter((k) => k !== "all" && Number(p[k]) > 0).map((k) => p[k] + " (" + k + ")");
-    put("Packages", parts.join(", "));
+  let d = null;
+  try { d = JSON.parse(String(json || "")); } catch (e) { d = null; }
+  if (!d || typeof d !== "object" || !Array.isArray(d.sections)) return { ok: false, sections: [], rows: [] };
+  const sections = d.sections
+    .filter((s) => s && s.name && Array.isArray(s.rows))
+    .map((s) => ({ name: String(s.name), rows: s.rows.filter((r) => r && r.k && String(r.v || "").trim() !== "") }))
+    .filter((s) => s.rows.length > 0);
+  const qs = String(qsVersion || "").replace(/^Quickshell\s+/, "").replace(/\s*\(.*$/, "").trim();
+  if (qs) {
+    let desk = sections.find((s) => s.name === "Desktop");
+    if (!desk) { desk = { name: "Desktop", rows: [] }; sections.splice(Math.min(1, sections.length), 0, desk); }
+    const at = desk.rows.findIndex((r) => r.k === "Qt");
+    desk.rows.splice(at < 0 ? desk.rows.length : at, 0, { k: "Quickshell", v: qs });
   }
-  if (by.WM) put("WM", [by.WM.prettyName || by.WM.processName, by.WM.version].filter((x) => !!x).join(" ")
-    + (by.WM.protocolName ? " (" + by.WM.protocolName + ")" : ""));
-  put("Quickshell", String(qsVersion || "").replace(/^Quickshell\s+/, "").replace(/\s*\(.*$/, ""));
-  for (const d of (Array.isArray(by.Display) ? by.Display : [])) {
-    const o = d.output || {};
-    put("Display", (d.name ? d.name + "  " : "") + o.width + "×" + o.height
-      + (o.refreshRate ? " @ " + Math.round(o.refreshRate) + " Hz" : "")
-      + (d.scaled && d.scaled.width && d.scaled.width !== o.width && d.scaled.width !== o.height
-        ? " (as " + d.scaled.width + "×" + d.scaled.height + ")" : ""));
-  }
-  if (by.CPU) {
-    const c = by.CPU, cores = c.cores || {};
-    put("CPU", c.cpu + (cores.logical ? " (" + cores.logical + ")" : "")
-      + ((c.frequency || {}).max ? " @ " + ghz(c.frequency.max) : ""));
-  }
-  for (const g of (Array.isArray(by.GPU) ? by.GPU : []))
-    put("GPU", [g.vendor, g.name].filter((x) => !!x && !(g.name || "").startsWith(x + " ")).join(" ")
-      + (g.type ? " [" + g.type + "]" : ""));
-  if (by.Memory) put("Memory", usage(by.Memory.used, by.Memory.total));
-  for (const s of (Array.isArray(by.Swap) ? by.Swap : []))
-    put("Swap", usage(s.used, s.total) + (s.name ? "  " + s.name.replace(/^\/dev\//, "") : ""));
-  // a newer fastfetch gives a disk's `free` and no `used` — which drew
-  // "0 B / 45.5 GiB (NaN%)" — so used is what free leaves of total
-  for (const d of (Array.isArray(by.Disk) ? by.Disk : [])) {
-    const b = d.bytes || {};
-    const used = b.used !== undefined ? b.used : b.free !== undefined ? b.total - b.free : undefined;
-    put("Disk (" + d.mountpoint + ")", usage(used, b.total) + (d.filesystem ? " · " + d.filesystem : ""));
-  }
-  for (const n of (Array.isArray(by.LocalIp) ? by.LocalIp : []))
-    put("Local IP (" + n.name + ")", n.ipv4 || n.ipv6 || "");
-  for (const b of (Array.isArray(by.Battery) ? by.Battery : []))
-    put("Battery", Math.round(b.capacity) + "%" + (b.status ? " · " + String(b.status).toLowerCase() : ""));
-  if (typeof by.Locale === "string") put("Locale", by.Locale);
-
+  const os = d.os || {};
   const ids = [os.id].concat(String(os.idLike || "").split(/\s+/)).filter((x) => !!x);
-  let glyph = "";
+  let glyph = "";
   for (const id of ids) if (DISTRO_GLYPHS[id]) { glyph = DISTRO_GLYPHS[id]; break; }
-  const cpu = by.CPU ? String(by.CPU.cpu || "").replace(/\((R|TM)\)/g, "").replace(/\s+/g, " ").replace(/ CPU| Processor/g, "") : "";
-  const gpu = Array.isArray(by.GPU) && by.GPU.length ? by.GPU[0].name : "";
+  const rows = [];
+  for (const s of sections) for (const r of s.rows) rows.push(r);
   return {
     ok: rows.length > 0,
     glyph: glyph,
-    title: os.prettyName || os.name || "",
+    title: os.name || "",
+    model: String(d.model || ""),
+    sections: sections,
     rows: rows,
-    summary: [os.prettyName || os.name, cpu, gpu, by.Memory ? bytes(by.Memory.total) : ""].filter((x) => !!x).join(" · ")
+    summary: String(d.summary || "")
   };
+}
+
+// the lot as plain text, for Copy: what a bug report or a forum post wants
+function computerText(c) {
+  if (!c || !c.ok) return "";
+  const out = [c.title + (c.model ? " \u2014 " + c.model : "")];
+  for (const s of c.sections) {
+    out.push("", s.name);
+    for (const r of s.rows) out.push("  " + r.k + ": " + r.v + (r.note ? " (" + r.note + ")" : ""));
+  }
+  return out.join("\n");
 }
 
 // ── SHORTCUTS ─────────────────────────────────────────────────────────────

@@ -145,7 +145,10 @@ Item {
       if (x.error) items.push({ isSeparator: true },
         { text: "Could not list its repositories", icon: "", enabled: false },
         { text: "Try again", icon: "", run: () => pg.loadRepos(id) });
+      const ssh = !!pg.win.mgr.sshFor[id];
       items.push({ isSeparator: true },
+                 { text: "Clone and connect over SSH", icon: ssh ? "\uF00C" : "", run: () => pg.useSsh(id, !ssh) },
+                 { isSeparator: true },
                  { text: "Open " + s.host, icon: "", run: () => Quickshell.execDetached(["xdg-open", "https://" + s.host + "/" + me]) },
                  { text: "Sign out of " + me, icon: "", danger: true, run: () => pg.signOut(id) });
     } else if (was !== "") {
@@ -158,6 +161,22 @@ Item {
     if (s.server) items.push({ isSeparator: true }, { text: "Remove " + s.name, icon: "", danger: true, run: () => pg.removeServer(id) });
     const p = chip.mapToItem(pg, 0, chip.height + 4);
     menu.open(p.x, p.y, items);
+  }
+  // OVER SSH for this forge's clones and new remotes: turned on only once
+  // ssh gets in there — else the way to a key that does
+  function useSsh(id, on) {
+    const s = pg.siteOf(id);
+    if (!on) { pg.win.mgr.setSshFor(id, false); pg.win.say(s.name + ": HTTPS for clones and new remotes"); return; }
+    pg.win.act("sshTest", { host: s.host.split(":")[0] }, { repo: null, refresh: false, network: true, label: "Trying ssh to " + s.host,
+      failed: (err) => pg.win.fail("ssh did not run", null, err),
+      then: (res) => {
+        if (res.ok) { pg.win.mgr.setSshFor(id, true); pg.win.say(s.name + ": SSH for clones and new remotes" + (res.login ? " — in as " + res.login : "")); return; }
+        pg.win.card_({ question: "No key gets you into " + s.name, glyph: "\uF43D", ink: Zenon.yellow,
+          detail: (D.SSH_WHY[res.why] || "ssh could not get in.") + " Clones stay on HTTPS until one does.",
+          items: res.line ? [res.line] : [],
+          choices: [{ label: "Make a key for it", ink: Zenon.cyan, run: () => pg.win.newKeyFor(s.host.split(":")[0]) },
+                    { label: "Cancel", ink: Zenon.accentMuted }] });
+      } });
   }
   function switchAccount(id, login) {
     const s = pg.siteOf(id);
@@ -417,7 +436,7 @@ Item {
     pg.win.mgr.fileManager.choose(true, pg.win.home, (paths) => {
       if (!paths || paths.length === 0) return;
       const dest = paths[0].replace(/\/$/, "") + "/" + r.name;
-      pg.win.act("clone", { url: r.https, dest: dest }, { repo: null, label: "Cloning " + r.name, network: true, refresh: false,
+      pg.win.act("clone", { url: pg.win.urlFor(r.forge, r), dest: dest }, { repo: null, label: "Cloning " + r.name, network: true, refresh: false,
         said: "Cloned " + r.full, then: () => pg.win.openRepo(dest) });
     });
   }
@@ -650,7 +669,7 @@ Item {
     // `onto`: the second asking, for a branch with commits of its own — the
     // card says what that does differently
     if (onto) {
-      pg.win.act("connect", { url: r.https, branch: r.branch || null, onto: true }, { repo: here,
+      pg.win.act("connect", { url: pg.win.urlFor(r.forge, r), branch: r.branch || null, onto: true }, { repo: here,
         label: "Putting " + D.baseName(here) + " on " + r.full, network: true,
         then: (res) => {
           pg.win.say("On " + r.full + "'s history — yours is kept on " + res.backup + "; Changes shows what differs");
@@ -664,7 +683,7 @@ Item {
         + ", to commit and push on top. Nothing on " + s.name + " is replaced.",
       items: [D.tilde(here, pg.win.home) + "  →  " + r.full + " (" + (r.branch || "main") + ")"],
       verb: "Connect",
-      then: () => pg.win.act("connect", { url: r.https, branch: r.branch || null, onto: !!onto }, { repo: here,
+      then: () => pg.win.act("connect", { url: pg.win.urlFor(r.forge, r), branch: r.branch || null, onto: !!onto }, { repo: here,
         label: "Connecting to " + r.full, network: true,
         then: (res) => {
           if (res.adopted && res.backup) pg.win.say("On " + r.full + "'s history — yours is kept on " + res.backup + "; Changes shows what differs");
@@ -688,8 +707,8 @@ Item {
   function publish(dir, r) {
     pg.win.mgr.call("remotes", dir, {}, (ok, rs) => {
       if (!pg) return;
-      const name = ok && rs.some((x) => x.name === "origin") ? pg.win.remoteNameFor(pg.siteOf(r.forge), r.https, rs) : "origin";
-      pg.win.act("remoteAdd", { name: name, url: r.https }, { repo: dir, refresh: false, then: () => {
+      const name = ok && rs.some((x) => x.name === "origin") ? pg.win.remoteNameFor(pg.siteOf(r.forge), pg.win.urlFor(r.forge, r), rs) : "origin";
+      pg.win.act("remoteAdd", { name: name, url: pg.win.urlFor(r.forge, r) }, { repo: dir, refresh: false, then: () => {
         pg.win.mgr.call("status", dir, {}, (ok2, s) => {
           if (!pg) return;
           const b = ok2 && s.branch ? s.branch.head : "";

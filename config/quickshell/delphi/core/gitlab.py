@@ -520,3 +520,25 @@ def update_release(full, id, tag, name, body="", draft=False, prerelease=False):
 def delete_release(full, id, tag=""):
     call("DELETE", f"/projects/{_pid(full)}/releases/{urllib.parse.quote(tag or id, safe='')}")
     return {}
+
+
+# ── SSH keys for signing in (core/sshkeys.py makes them) ──────────────
+def ssh_keys():
+    return [{"id": k["id"], "title": k.get("title") or "", "key": " ".join((k.get("key") or "").split()[:2]),
+             "usage": k.get("usage_type") or "auth_and_signing"}
+            for k in _paged("/user/keys", token()[0])]
+
+
+def add_ssh_key(key, title="delphi"):
+    try:
+        r = call("POST", "/user/keys", {"title": title, "key": key, "usage_type": "auth"})
+    except ForgeError as e:
+        if e.status in (400, 422) and "taken" in str(e).lower():
+            return {"added": False, "already": True}
+        raise
+    return {"added": True, "id": r.get("id")}
+
+
+def delete_ssh_key(id):
+    call("DELETE", f"/user/keys/{id}")
+    return {}

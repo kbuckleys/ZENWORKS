@@ -45,7 +45,7 @@ set -euo pipefail
 
 REPO="${ZENWORKS_REPO:-https://github.com/kbuckleys/ZENWORKS}"
 CONFIG="${XDG_CONFIG_HOME:-$HOME/.config}"
-CONFIGS=(fastfetch hypr kitty quickshell xdg-desktop-portal xdg-desktop-portal-termfilechooser)
+CONFIGS=(hypr kitty quickshell xdg-desktop-portal xdg-desktop-portal-termfilechooser)
 
 dry=""
 force=""

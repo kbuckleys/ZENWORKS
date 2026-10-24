@@ -423,3 +423,25 @@ def update_release(full, id, tag, name, body="", draft=False, prerelease=False):
 def delete_release(full, id, tag=""):
     call("DELETE", f"/repos/{full}/releases/{id}")
     return {}
+
+
+# ── SSH keys for signing in (core/sshkeys.py makes them) ──────────────
+# Forgejo's keys are one kind: a key added for signing signs in as well
+def ssh_keys():
+    return [{"id": k["id"], "title": k.get("title") or "", "key": " ".join((k.get("key") or "").split()[:2])}
+            for k in _paged("/user/keys", token()[0])]
+
+
+def add_ssh_key(key, title="delphi"):
+    try:
+        r = call("POST", "/user/keys", {"title": title, "key": key})
+    except ForgeError as e:
+        if e.status == 422 and ("exist" in str(e).lower() or "used" in str(e).lower()):
+            return {"added": False, "already": True}
+        raise
+    return {"added": True, "id": r.get("id"), "verify": f"https://{HOST}/user/settings/keys"}
+
+
+def delete_ssh_key(id):
+    call("DELETE", f"/user/keys/{id}")
+    return {}

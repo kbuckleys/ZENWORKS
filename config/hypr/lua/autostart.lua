@@ -24,6 +24,12 @@ hl.on("hyprland.start", function()
     hl.exec_cmd("sh -c 'dbus-update-activation-environment --systemd --all; "
         .. "systemctl --user reset-failed hyprpolkitagent 2>/dev/null; "
         .. "systemctl --user start hyprpolkitagent'")
+    -- the session's ssh-agent, where base.lua points SSH_AUTH_SOCK: only when
+    -- it points there (another agent is someone else's), openssh is
+    -- installed, and nothing listens there yet
+    hl.exec_cmd("sh -c '[ \"$SSH_AUTH_SOCK\" = \"$XDG_RUNTIME_DIR/ssh-agent.socket\" ] "
+        .. "&& command -v ssh-agent >/dev/null && [ ! -S \"$SSH_AUTH_SOCK\" ] "
+        .. "&& exec ssh-agent -D -a \"$SSH_AUTH_SOCK\"'")
     hl.exec_cmd("wl-paste --type text --watch cliphist store")
     hl.exec_cmd("wl-paste --type image --watch cliphist store")
 

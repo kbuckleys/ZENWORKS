@@ -463,7 +463,7 @@ FloatingWindow {
       items.push({ text: "Translate", icon: mw.glyphs.translate, mark: "ctrl t", run: () => mw.lookUp("translate") });
       items.push({ isSeparator: true });
     }
-    items.push({ text: mw.hereMark ? "Remove the bookmark" : "Bookmark this page", icon: mw.hereMark ? mw.glyphs.bookmarked : mw.glyphs.bookmark, iconInk: Zenon.cyan, mark: "ctrl d", run: () => mw.toggleBookmark() });
+    items.push({ text: mw.hereMark ? "Remove the bookmark" : "Bookmark this page", icon: mw.hereMark ? mw.glyphs.bookmarked : mw.glyphs.bookmark, mark: "ctrl d", run: () => mw.toggleBookmark() });
     items.push({ text: "A note on this page…", icon: mw.glyphs.note, mark: "ctrl n", run: () => mw.askNote(null) });
     if (mw.kind !== "comic") items.push({ text: voice.on ? "Stop reading aloud" : "Read aloud from here", icon: mw.glyphs.voice, mark: "ctrl r", run: () => voice.toggle() });
     mw.menuAt(item, x, y, items);

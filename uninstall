@@ -46,9 +46,13 @@ ME="${USER:-$(id -un)}"
 KEPT="$HOME/ZENWORKS-kept-$STAMP"
 
 CONFIGS=(
-  fastfetch hypr kitty quickshell xdg-desktop-portal xdg-desktop-portal-termfilechooser
+  hypr kitty quickshell xdg-desktop-portal xdg-desktop-portal-termfilechooser
 )
 DOTFILES=(.zshrc .p10k.zsh)
+# config directories an older install laid down that this one no longer
+# ships (fastfetch, dropped 2026-10-25): with nothing to compare them to,
+# moved whole under $KEPT, never deleted
+RETIRED_CONFIGS=(fastfetch)
 QS="$CONFIG/quickshell"
 # quickshell keeps a shell's state, data and cache under by-shell/<md5 of its
 # shell.qml path>: this config's, and no other config's or test copy's
@@ -173,6 +177,23 @@ collect_files() {
     [[ -n "$bak" ]] && RESTORE+=("$bak")
     later_backups "$CONFIG/$d" "$bak"
   done
+
+  # only on a machine install noted, so a directory of your own made after
+  # it is not taken for one of ours
+  if [[ -n "$stamp" ]]; then
+    for d in "${RETIRED_CONFIGS[@]}"; do
+      [[ -d "$CONFIG/$d" ]] || continue
+      if [[ -L "$CONFIG/$d" ]]; then
+        LEFT+=("$(short "$CONFIG/$d")  a link to $(short "$(readlink -f -- "$CONFIG/$d")"); remove it where you made it")
+        continue
+      fi
+      while IFS= read -r -d '' f; do KEEP+=("$f"); done < <(find "$CONFIG/$d" -type f -print0)
+      REMOVE+=("$CONFIG/$d")
+      bak="$(original_backup "$CONFIG/$d" "$stamp")"
+      [[ -n "$bak" ]] && RESTORE+=("$bak")
+      later_backups "$CONFIG/$d" "$bak"
+    done
+  fi
 
   # the dotfiles: kept when you have changed them since
   for f in "${DOTFILES[@]}"; do
@@ -308,7 +329,7 @@ collect_shell_writes() {
   local docs pics vids
   docs="$(user_dir DOCUMENTS Documents)"; pics="$(user_dir PICTURES Pictures)"; vids="$(user_dir VIDEOS Videos)"
   for f in "$docs/Clio:notes" "$docs/Snippets:snippets" "$pics/Screenshots:screenshots" \
-           "$pics/Scans:scans" \
+           "$pics/Scans:scans" "$pics/Backgrounds/Zenworks:the ZENWORKS background" \
            "$vids/Captures:recordings" "$DATA/kairos:screen time" \
            "$DATA/folio:older snippets" "$CONFIG/delphi:git sign-ins" \
            "$CONFIG/khal:Chronos' calendar settings" "$DATA/khal:your calendars" \
@@ -368,8 +389,9 @@ PKGS=()
 PKG_NOTE=""
 
 # what an older install put on a machine that this one no longer lists
-# (stow: Delphi's Stow page, scrapped 2026-10-24)
-RETIRED=(stow)
+# (stow: Delphi's Stow page, scrapped 2026-10-24; fastfetch: About this
+# computer reads the machine itself since 2026-10-25)
+RETIRED=(stow fastfetch)
 
 # Everything ZENWORKS can put on a machine: the installer's list, the ones it
 # no longer lists (RETIRED), what the shell installed for itself through Ceres

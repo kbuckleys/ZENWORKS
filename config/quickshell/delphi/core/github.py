@@ -636,3 +636,39 @@ def update_release(full, id, tag, name, body="", draft=False, prerelease=False):
 def delete_release(full, id, tag=""):
     call("DELETE", f"/repos/{full}/releases/{id}")
     return {}
+
+
+# ── SSH keys for signing in (core/sshkeys.py makes them) ──────────────
+# gh's sign-in does not carry the permission by default: asked for once,
+# with the exact command (as signing keys are).
+def _key_scope(e, verb):
+    if e.status in (403, 404):
+        raise ForgeError(f"GitHub refused to {verb} your SSH keys: the sign-in needs the admin:public_key permission — "
+                         "run `gh auth refresh -s admin:public_key`, or use github.com → Settings → SSH and GPG keys", e.status)
+    raise e
+
+
+def ssh_keys():
+    try:
+        return [{"id": k["id"], "title": k.get("title") or "", "key": " ".join((k.get("key") or "").split()[:2])}
+                for k in _paged("/user/keys", token()[0])]
+    except ForgeError as e:
+        _key_scope(e, "list")
+
+
+def add_ssh_key(key, title="delphi"):
+    try:
+        r = call("POST", "/user/keys", {"title": title, "key": key})
+    except ForgeError as e:
+        if e.status == 422 and "already" in str(e).lower():
+            return {"added": False, "already": True}
+        _key_scope(e, "add to")
+    return {"added": True, "id": r.get("id")}
+
+
+def delete_ssh_key(id):
+    try:
+        call("DELETE", f"/user/keys/{id}")
+    except ForgeError as e:
+        _key_scope(e, "remove")
+    return {}

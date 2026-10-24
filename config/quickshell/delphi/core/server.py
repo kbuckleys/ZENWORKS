@@ -43,6 +43,7 @@ import gitlab
 import gitrun
 import repo as R
 import signing
+import sshkeys
 from graph import Lanes
 from gitrun import GitError
 from rest import ForgeError
@@ -372,7 +373,7 @@ WRITES = {"resolveBlocks", "ignore", "untrack", "stage", "stageAll", "unstage", 
           "stageLines", "unstageLines", "discardLines", "commit", "undoCommit",
           "branchCreate", "branchTrack", "switch", "branchDelete",
           "branchRename", "setUpstream", "tagCreate", "tagDelete",
-          "remoteAdd", "remoteRemove", "remoteSetUrl", "fetch", "pull", "push",
+          "remoteAdd", "remoteRemove", "remoteSetUrl", "remoteRename", "fetch", "pull", "push",
           "stashPush", "stashApply", "stashDrop", "stashBranch",
           "worktreeAdd", "worktreeRemove", "worktreePrune", "merge",
           "cherryPick", "revert", "rebase", "rebaseInteractive", "sequence",
@@ -517,6 +518,21 @@ class Server(lines.Service):
             return signing.setup(kw.get("key", ""), kw.get("create", False), kw.get("email", ""), cancel)
         if op == "signingOff":
             return signing.off()
+        # ── SSH keys for signing in (core/sshkeys.py) ──
+        if op == "sshStatus":
+            return sshkeys.status()
+        if op == "sshCreate":
+            return sshkeys.create(kw["name"], kw.get("comment", ""), kw.get("passphrase", ""), cancel)
+        if op == "sshUse":
+            return sshkeys.use(kw["host"], kw["key"], kw.get("user"), kw.get("replace", False), kw.get("agent", True))
+        if op == "sshTest":
+            # the host's questions (its key, first time; the passphrase)
+            # come up as cards like git's
+            return sshkeys.test(kw["host"], kw.get("user"), self.asker.path, cancel)
+        if op == "sshRemove":
+            return sshkeys.remove(kw["key"])
+        if op == "sshAgentStart":
+            return {"agent": sshkeys.agent_start()}
         if op == "identitySet":
             # global unless a repository is named — the first-run question
             # "who are you" is asked once, for every repository
@@ -641,6 +657,12 @@ class Server(lines.Service):
             return f.checks_many(kw["full"], kw["shas"])
         if op == "AddSigningKey":
             return f.add_signing_key(kw["key"], kw.get("title", "delphi"))
+        if op == "SshKeys":
+            return f.ssh_keys()
+        if op == "AddSshKey":
+            return f.add_ssh_key(kw["key"], kw.get("title", "delphi"))
+        if op == "DeleteSshKey":
+            return f.delete_ssh_key(kw["id"])
         if op == "UpdateRelease":
             return f.update_release(kw["full"], kw["id"], kw["tag"], kw.get("name", ""), kw.get("body", ""),
                                     kw.get("draft", False), kw.get("prerelease", False))

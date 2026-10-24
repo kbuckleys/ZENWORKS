@@ -442,37 +442,36 @@ module.exports = {
       T.settledBaseline(JSON.stringify({ kb: [null, { kb: "x" }, { kb: 870000 }] }), 1), 870000);
 
     // ── about this computer ───────────────────────────────────────────────
-    const ff = JSON.stringify([
-      { type: "OS", result: { id: "arch", idLike: "", name: "Arch Linux", prettyName: "Arch Linux" } },
-      { type: "Host", result: { vendor: "Gigabyte Technology Co., Ltd.", name: "B365M H", version: "" } },
-      { type: "Kernel", result: { architecture: "x86_64", name: "Linux", release: "7.2.9-arch1-1" } },
-      { type: "Uptime", result: { uptime: 90061000 } },
-      { type: "Packages", result: { all: 941, pacman: 941, flatpakSystem: 0 } },
-      { type: "WM", result: { prettyName: "Hyprland", protocolName: "Wayland", version: "0.56.2" } },
-      { type: "CPU", result: { cpu: "Intel(R) Core(TM) i5-9400F", cores: { logical: 6 }, frequency: { max: 4100 } } },
-      { type: "GPU", result: [{ vendor: "NVIDIA", name: "GeForce RTX 5060 Ti", type: "Discrete" }] },
-      { type: "Memory", result: { total: 33568792576, used: 4401385472 } },
-      { type: "Disk", result: [{ mountpoint: "/", filesystem: "ext4", bytes: { used: 18326032384, total: 48890621952 } },
-                                { mountpoint: "/home", filesystem: "ext4", bytes: { free: 1121262149632, total: 1917657247744 } }] },
-      { type: "Battery", error: "No batteries found" },
-      { type: "Locale", result: "en_US.UTF-8" }
-    ]);
-    const PC = T.readComputer(ff, "Quickshell 0.3.2 (revision , distributed by Arch Linux)");
-    const pcv = (k) => (PC.rows.find((r) => r.k === k) || {}).v;
+    const mj = JSON.stringify({
+      os: { id: "arch", idLike: "", name: "Arch Linux" },
+      model: "Gigabyte B365M H",
+      summary: "Arch Linux \u00b7 Intel Core i5-9400F \u00b7 GeForce RTX 5060 Ti \u00b7 32 GiB",
+      sections: [
+        { name: "System", rows: [{ k: "OS", v: "Arch Linux x86_64" }, { k: "Kernel", v: "7.2.11-arch1-1" }] },
+        { name: "Desktop", rows: [{ k: "Hyprland", v: "0.56.2" }, { k: "Qt", v: "6.12.0" }] },
+        { name: "Memory", rows: [{ k: "In use", v: "5.6 GiB of 31.3 GiB (18%)", frac: 0.18 },
+                                 { k: "Module", v: "16 GiB DDR4 \u00b7 Crucial", note: "ChannelA-DIMM0" },
+                                 { k: "Empty", v: "  " }] },
+        { name: "Power", rows: [] }
+      ]
+    });
+    const PC = T.readComputer(mj, "Quickshell 0.3.2 (revision , distributed by Arch Linux)");
+    const sec = (n) => PC.sections.find((s) => s.name === n);
     t.eq("arch wears its logo", PC.glyph, "\uF303");
-    t.eq("the summary line", PC.summary, "Arch Linux \u00b7 Intel Core i5-9400F \u00b7 GeForce RTX 5060 Ti \u00b7 31.3 GiB");
-    t.eq("os carries the arch", pcv("OS"), "Arch Linux x86_64");
-    t.eq("uptime in words", pcv("Uptime"), "1 day, 1 hour, 1 min");
-    t.eq("empty package managers are left out", pcv("Packages"), "941 (pacman)");
-    t.eq("quickshell is its version", pcv("Quickshell"), "0.3.2");
-    t.eq("cpu with threads and clock", pcv("CPU"), "Intel(R) Core(TM) i5-9400F (6) @ 4.10 GHz");
-    t.eq("memory as used of total", pcv("Memory"), "4.1 GiB / 31.3 GiB (13%)");
-    t.eq("a disk is named by its mount", pcv("Disk (/)"), "17.1 GiB / 45.5 GiB (37%) \u00b7 ext4");
-    t.eq("a disk given only free space is used of total, not NaN", pcv("Disk (/home)"), "742 GiB / 1.7 TiB (42%) \u00b7 ext4");
-    t.eq("a module that failed is left out", pcv("Battery"), undefined);
+    t.eq("the summary line is machine.py's", PC.summary, "Arch Linux \u00b7 Intel Core i5-9400F \u00b7 GeForce RTX 5060 Ti \u00b7 32 GiB");
+    t.eq("the model rides under the title", PC.model, "Gigabyte B365M H");
+    t.eq("quickshell goes in ahead of qt", sec("Desktop").rows.map((r) => r.k).join(","), "Hyprland,Quickshell,Qt");
+    t.eq("quickshell is its version", sec("Desktop").rows[1].v, "0.3.2");
+    t.eq("a share keeps its fraction", sec("Memory").rows[0].frac, 0.18);
+    t.eq("a blank value is left out", sec("Memory").rows.length, 2);
+    t.eq("an empty section is left out", sec("Power"), undefined);
+    t.eq("copied as text", T.computerText(PC).split("\n").slice(0, 4).join("|"),
+      "Arch Linux \u2014 Gigabyte B365M H||System|  OS: Arch Linux x86_64");
+    t.eq("a note goes in brackets", T.computerText(PC).indexOf("Module: 16 GiB DDR4 \u00b7 Crucial (ChannelA-DIMM0)") > 0, true);
     t.eq("garbage reads as nothing", T.readComputer("not json", "").ok, false);
     t.eq("a derivative borrows its parent's logo",
-      T.readComputer(JSON.stringify([{ type: "OS", result: { id: "mystery", idLike: "arch", name: "X" } }]), "").glyph, "\uF303");
+      T.readComputer(JSON.stringify({ os: { id: "mystery", idLike: "arch", name: "X" },
+        sections: [{ name: "System", rows: [{ k: "OS", v: "X" }] }] }), "").glyph, "\uF303");
   },
 
   // The Font row stores a FAMILY and the picker hands back a FILE; whichever

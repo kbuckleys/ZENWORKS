@@ -45,7 +45,7 @@ dry=""
 if [ "${1:-}" = "-n" ]; then dry="-n"; shift; fi
 pkg="${1:-$HOME/Projects/ZENWORKS}"
 cfg="${XDG_CONFIG_HOME:-$HOME/.config}"
-dirs="fastfetch hypr kitty quickshell xdg-desktop-portal xdg-desktop-portal-termfilechooser"
+dirs="hypr kitty quickshell xdg-desktop-portal xdg-desktop-portal-termfilechooser"
 
 [ -d "$pkg/config" ] || { echo "no package at $pkg (expected $pkg/config)" >&2; exit 1; }
 

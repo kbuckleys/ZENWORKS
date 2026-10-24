@@ -138,10 +138,3 @@ function of(item) {
   for (const p of prefixes) if (l.startsWith(p[0])) return p[1];
   return "";
 }
-
-// the bookmark wears the theme's accent wherever it is drawn (user,
-// 2026-10-24); the menus ask this for the color of a row's glyph
-function accented(item) {
-  const g = of(item);
-  return g === "\uF461" || g === "\uF47A";
-}

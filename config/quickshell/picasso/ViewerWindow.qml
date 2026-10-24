@@ -2472,7 +2472,7 @@ FloatingWindow {
     const sep = { isSeparator: true };
     const own = [Picasso.picturesDir, Picasso.shotDir, Picasso.dir].filter((d, i, a) => d !== "" && a.indexOf(d) === i);
     let out = own.map((d) => row(d, "\uf03e"));
-    if (marks.length > 0) out = out.concat([sep, { text: "Bookmarks", enabled: false }]).concat(marks.map((d) => Object.assign(row(d, "\uF47A"), { iconInk: Zenon.cyan })));
+    if (marks.length > 0) out = out.concat([sep, { text: "Bookmarks", enabled: false }]).concat(marks.map((d) => row(d, "\uF47A")));
     const rec = (win.mgr ? win.mgr.recent : []).filter((d) => own.indexOf(d) < 0 && marks.indexOf(d) < 0);
     if (rec.length > 0) out = out.concat([sep, { text: "Lately", enabled: false }]).concat(rec.map((d) => row(d, "\uf1da")));
     return out;
@@ -3388,7 +3388,7 @@ FloatingWindow {
     }
   }
 
-  // "~/Pictures/Wallpapers · 7 directories · 31 pictures"
+  // "~/Pictures/Backgrounds · 7 directories · 31 pictures"
   readonly property string where: {
     const out = [];
     if (win.picked.length === 0 && win.dir !== "") out.push(win.dir.replace(Paths.home(), "~"));
