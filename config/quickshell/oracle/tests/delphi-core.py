@@ -1410,6 +1410,29 @@ def ssh_config_plans():
 
 
 @test
+def ssh_passphrase_remembered():
+    import sshkeys as K
+    key = K.HOME + "/.ssh/aur"
+    # made without remembering: the line added at the block's end, in its
+    # indent, before the blank line and the next block
+    lines = K.plan_host(["Host *", "    ServerAliveInterval 30"], "aur.archlinux.org", "aur", key, agent=False)["lines"]
+    eq(K.remembered(lines, key), False)
+    on = K.plan_remember(lines, key, True)
+    eq(K.remembered(on, key), True)
+    at = on.index("Host aur.archlinux.org")
+    eq(on[at + 1:at + 6], ["  User aur", "  IdentityFile ~/.ssh/aur", "  IdentitiesOnly yes", "  AddKeysToAgent yes", ""])
+    eq(on[-2:], ["Host *", "    ServerAliveInterval 30"], "the next block untouched")
+    eq(K.plan_remember(on, key, True), on, "twice is once")
+    # off: the line taken out, the file as before
+    eq(K.plan_remember(on, key, False), lines)
+    # a `no` of the user's own is turned to yes where it stands
+    mine = ["Host aur.archlinux.org", "\tIdentityFile ~/.ssh/aur", "\tAddKeysToAgent no", "\tUser aur"]
+    eq(K.plan_remember(mine, key, True), ["Host aur.archlinux.org", "\tIdentityFile ~/.ssh/aur", "\tAddKeysToAgent yes", "\tUser aur"])
+    # a key no block gives: nothing to remember, nothing changed
+    eq((K.remembered(mine, K.HOME + "/.ssh/other"), K.plan_remember(mine, K.HOME + "/.ssh/other", True)), (False, mine))
+
+
+@test
 def ssh_test_reading():
     import sshkeys as K
     eq(K.read_test(1, "Hi kbuckleys! You've successfully authenticated, but GitHub does not provide shell access.\n"),

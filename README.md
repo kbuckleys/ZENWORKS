@@ -8,12 +8,3 @@ A zen Arch-based ecosystem in Quickshell
 
 ---
 
-Installation
--
-```
-git clone https://github.com/kbuckleys/ZENWORKS/
-cd ZENWORKS
-bash install
-```
-
-> Simply run `bash uninstall` if you wish to remove the suite

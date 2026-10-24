@@ -529,6 +529,8 @@ class Server(lines.Service):
             # the host's questions (its key, first time; the passphrase)
             # come up as cards like git's
             return sshkeys.test(kw["host"], kw.get("user"), self.asker.path, cancel)
+        if op == "sshRemember":
+            return sshkeys.remember(kw["key"], kw.get("on", True))
         if op == "sshRemove":
             return sshkeys.remove(kw["key"])
         if op == "sshAgentStart":

@@ -11,6 +11,7 @@
 //     told, the forges handed it (GitHub, GitLab, Codeberg — asked first),
 //     the AUR's page opened to paste it, and every host tested
 //   return/t test it · u give it to a host · a add it to a forge
+//   m the agent remembers its passphrase, or no longer
 //   c copy the public key · d to the trash (asked twice)
 //
 // Not tied to a repository: it is on the "Everywhere" side, like Accounts.
@@ -30,7 +31,7 @@ Item {
   readonly property string subtitle: !pg.st ? "" : !pg.st.ssh ? "openssh is not installed"
     : (pg.keys.length === 0 ? "No keys yet" : pg.keys.length + (pg.keys.length === 1 ? " key" : " keys"))
       + (pg.st.agent ? "  ·  the agent keeps passphrases" : "")
-  readonly property var hints: [["n", "new"], ["t", "test"], ["u", "use for a host"], ["a", "add to a forge"], ["c", "copy"], ["d", "delete"]]
+  readonly property var hints: [["n", "new"], ["t", "test"], ["u", "use for a host"], ["a", "add to a forge"], ["m", "remember"], ["c", "copy"], ["d", "delete"]]
   readonly property var buttons: [
     { label: "Delete", ink: Zenon.red, visible: !!pg.key_ && !!pg.st && pg.st.ssh, run: () => pg.remove(pg.key_) },
     { label: "Test", visible: !!pg.key_ && pg.key_.hosts.length > 0, run: () => pg.test(pg.key_) },
@@ -278,6 +279,22 @@ Item {
       verb: "Add",
       then: (v) => { const pick = ids.filter((id) => v["f:" + id]); if (pick.length > 0) pg.addTo(k, pick, null); } });
   }
+  // REMEMBERED: the agent keeps the passphrase after the key's first use
+  // in a login (AddKeysToAgent in its ~/.ssh/config blocks), or forgets it
+  // now and asks every time (user, 2026-10-25)
+  function toggleRemember(k) {
+    if (!k) return;
+    if (k.passphrase === false) { pg.win.say(k.name + " has no passphrase — nothing to remember"); return; }
+    if (k.hosts.length === 0) { pg.win.say("Use " + k.name + " for a host first (u)"); return; }
+    const on = !k.remember;
+    pg.win.act("sshRemember", { key: k.path, on: on }, { repo: null, refresh: false, label: on ? "Remembering" : "Forgetting",
+      then: (r) => {
+        pg.reload();
+        pg.win.say(!on ? "Its passphrase is asked every time now"
+          : r.agent ? "Remembered after you type it once — until you log out"
+          : "Set — but no agent runs to keep it: it starts at your next login");
+      } });
+  }
   // to the trash — asked twice, the second time naming what stops working
   function remove(k) {
     if (!k) return;
@@ -311,6 +328,8 @@ Item {
       { text: "Test it", icon: "", mark: "t", enabled: k.hosts.length > 0, run: () => pg.test(k) },
       { text: "Use it for a host…", icon: "", mark: "u", run: () => pg.useFor(k) },
       { text: "Add it to a forge…", icon: "", mark: "a", run: () => pg.addToForge(k) },
+      { text: "Remember the passphrase", icon: k.remember ? "" : "", mark: "m",
+        enabled: k.passphrase !== false && k.hosts.length > 0, run: () => pg.toggleRemember(k) },
       { text: "Copy the public key", icon: "", mark: "c", run: () => pg.win.copy(k.public, "the public key") },
       { isSeparator: true },
       { text: "Delete", icon: "", mark: "d", danger: true, run: () => pg.remove(k) },
@@ -327,6 +346,7 @@ Item {
     if (k === Qt.Key_Return || k === Qt.Key_Enter || k === Qt.Key_T) { pg.test(pg.key_); return true; }
     if (k === Qt.Key_U) { pg.useFor(pg.key_); return true; }
     if (k === Qt.Key_A) { pg.addToForge(pg.key_); return true; }
+    if (k === Qt.Key_M) { pg.toggleRemember(pg.key_); return true; }
     if (k === Qt.Key_C) { pg.win.copy(pg.key_.public, "the public key"); return true; }
     if (k === Qt.Key_D || k === Qt.Key_Delete) { pg.remove(pg.key_); return true; }
     if (k === Qt.Key_Menu) { menu.open(list.width / 2, (pg.sel + 1) * list.rowH - list.contentY, pg.menuFor(pg.key_), pg.sel); return true; }
@@ -380,7 +400,8 @@ Item {
           width: parent.width
           elide: Text.ElideRight
           text: [krow.k.type,
-                 krow.k.passphrase === true ? "passphrase" : krow.k.passphrase === false ? "no passphrase" : "",
+                 krow.k.passphrase === true ? (krow.k.remember ? "passphrase, remembered" : "passphrase, asked every time")
+                   : krow.k.passphrase === false ? "no passphrase" : "",
                  krow.k.loaded ? "in the agent" : "",
                  krow.k.private ? "" : "public half only",
                  krow.k.fingerprint].filter((x) => x !== "").join("  ·  ")

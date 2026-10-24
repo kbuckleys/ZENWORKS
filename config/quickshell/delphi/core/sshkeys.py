@@ -17,6 +17,8 @@
 #                   was asked for is deleted again, not handed back
 #   use(...)        ~/.ssh/config: a block for a host, naming the key — added,
 #                   never the file rewritten (see plan_host)
+#   remember(...)   the agent keeping a key's passphrase after its first use
+#                   (AddKeysToAgent in the key's blocks), or no longer
 #   test(...)       ssh -T user@host: in, refused, or why not
 #   remove(...)     the key pair to the trash, its config lines taken out
 #
@@ -184,6 +186,51 @@ def plan_host(lines, host, user, key, agent=True, replace=False):
     return {"lines": new, "state": "added"}
 
 
+def remembered(lines, key):
+    """Whether every block that gives ssh this key says AddKeysToAgent yes
+    (False when no block gives it)."""
+    want = _full(key)
+    mine = [b for b in blocks(lines) if b["kind"] == "host"
+            and any(_full(_value(lines[i])) == want for i in b["ids"])]
+    if not mine:
+        return False
+    for b in mine:
+        vals = [kv[1].lower() for kv in (_split(l) for l in lines[b["at"] + 1:b["end"]]) if kv and kv[0] == "addkeystoagent"]
+        if not vals or vals[0] != "yes":
+            return False
+    return True
+
+
+def plan_remember(lines, key, on):
+    """The config with the key's passphrase kept by the agent (on) or not:
+    in each block that gives ssh this key, its AddKeysToAgent line set to
+    yes in place or added at the block's end — or, off, taken out."""
+    want = _full(key)
+    new = list(lines)
+    # last block first: the lines added or taken out shift only what follows
+    for b in reversed(blocks(lines)):
+        if b["kind"] != "host" or not any(_full(_value(lines[i])) == want for i in b["ids"]):
+            continue
+        at = [i for i in range(b["at"] + 1, b["end"]) if (_split(lines[i]) or ("",))[0] == "addkeystoagent"]
+        if not on:
+            for i in reversed(at):
+                del new[i]
+            continue
+        if at:
+            l = new[at[0]]
+            new[at[0]] = l[:len(l) - len(l.lstrip())] + "AddKeysToAgent yes"
+            continue
+        body = [i for i in range(b["at"] + 1, b["end"]) if lines[i].strip()]
+        last = body[-1] if body else b["at"]
+        indent = "  "
+        for i in body:
+            if _split(lines[i]):
+                indent = lines[i][:len(lines[i]) - len(lines[i].lstrip())] or "  "
+                break
+        new.insert(last + 1, indent + "AddKeysToAgent yes")
+    return new
+
+
 def plan_unlink(lines, key):
     """The config with `key` taken out: its IdentityFile lines gone, and a
     block Delphi added that is left with none removed whole."""
@@ -276,6 +323,7 @@ def status():
                          "fingerprint": fp, "private": os.path.exists(priv),
                          "passphrase": _has_passphrase(priv),
                          "hosts": hosts_of(lines, priv), "signing": sign in (pub, priv),
+                         "remember": remembered(lines, priv),
                          "loaded": bool(fp) and fp in loaded})
     return {"ssh": bool(shutil.which("ssh")), "keygen": bool(shutil.which("ssh-keygen")),
             "agent": sock, "agentBin": bool(shutil.which("ssh-agent")), "dir": SSH,
@@ -374,6 +422,23 @@ def use(host, key, user=None, replace=False, agent=True):
     if p["state"] in ("added", "updated"):
         _write_config(p["lines"])
     return {"state": p["state"], "block": p.get("block", "")}
+
+
+def remember(key, on):
+    """The key's passphrase kept by the agent from its next use (on), or no
+    longer — and, off, the agent told to forget it now as well."""
+    priv = _full(key)
+    lines = _read_config()
+    if not hosts_of(lines, priv):
+        raise GitError(["ssh"], 1, "no host is given this key yet — use it for one first")
+    new = plan_remember(lines, priv, on)
+    if new != lines:
+        _write_config(new)
+    sock = agent_start() if on else agent_sock()
+    if not on and sock and shutil.which("ssh-add") and os.path.exists(priv + ".pub"):
+        subprocess.run(["ssh-add", "-d", priv + ".pub"], capture_output=True, stdin=subprocess.DEVNULL,
+                       env=dict(os.environ, SSH_AUTH_SOCK=sock), timeout=5)
+    return {"remember": remembered(_read_config(), priv), "agent": sock}
 
 
 # ssh's own failures (exit 255), worded by what they mean
