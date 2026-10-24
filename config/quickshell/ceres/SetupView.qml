@@ -18,6 +18,7 @@
 
 import QtQuick
 import "../morpheus"
+import "../morpheus/controls" as Controls
 import "."
 
 Item {
@@ -144,7 +145,7 @@ Item {
         color: view.flatpak ? Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b, 0.2) : "transparent"
         border.width: 1
         border.color: view.flatpak ? Zenon.cyan : Zenon.border
-        Check {
+        Controls.Check {
           id: fpBox
           anchors.left: parent.left
           anchors.leftMargin: 12

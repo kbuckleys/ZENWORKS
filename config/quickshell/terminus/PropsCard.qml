@@ -27,7 +27,6 @@
 //   findApps(path) setDefaultApp(id) removeApp(id) beginOpenWith(path, launch)
 
 import QtQuick
-import Quickshell
 import Quickshell.Io
 import Quickshell.Widgets
 import "../morpheus"
@@ -677,18 +676,29 @@ Item {
               font.pixelSize: Zenon.px(16)
 
               // a mark before "Permissions" that says the row is a way
-              // through to the grid (user, 2026-10-21)
-              Text {
+              // through to the grid (user, 2026-10-21), on ChevronChip's
+              // disc so it reads as a control (user, 2026-10-24)
+              Rectangle {
                 id: permMark
                 visible: modelData[0] === "Permissions"
+                width: Math.round(Zenon.px(16) * 1.35)
+                height: width
+                radius: width / 2
                 x: parent.width - parent.paintedWidth - 8 - permMark.width
                 anchors.verticalCenter: parent.verticalCenter
-                text: "\u{F0BAB}"
-                color: Zenon.accentKey
-                font.family: Zenon.face
-                font.weight: Zenon.weight
-                font.pixelSize: Zenon.px(16)
+                color: permPress.pressed
+                  ? Zenon.pressFill : Zenon.alpha(Zenon.ink, 0.16)
+                Text {
+                  anchors.centerIn: parent
+                  text: "\u{F0BAB}"
+                  color: Zenon.accentKey
+                  opacity: permPress.pressed ? Zenon.pressDim : 1
+                  font.family: Zenon.face
+                  font.weight: Zenon.weight
+                  font.pixelSize: Zenon.px(14)
+                }
                 MouseArea {
+                  id: permPress
                   anchors.fill: parent
                   anchors.margins: -4
                   onClicked: props.tab = 1

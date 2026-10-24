@@ -17,7 +17,6 @@
 // word once something is done.
 
 import QtQuick
-import Quickshell
 import Quickshell.Io
 import "../morpheus"
 import "../morpheus/icons.js" as Icons

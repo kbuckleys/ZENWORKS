@@ -19,7 +19,6 @@
 // daemon types and copies them itself.
 
 import QtQuick
-import Quickshell
 import Quickshell.Widgets
 import Quickshell.Hyprland
 import "../morpheus"

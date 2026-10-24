@@ -1816,7 +1816,11 @@ FloatingWindow {
   // Qt could not decode it: the one-off big render, as terminus' quick look
   // makes for the same files.
   function renderFallback() {
-    if (win.fallback !== "" || bigProc.running || win.path === "") return;
+    if (win.fallback !== "" || win.path === "") return;
+    // one at a time: a step while it runs asks again once it is done
+    // (onExited), or the picture stepped to was never rendered at all
+    bigProc.want = win.path;
+    if (bigProc.running) return;
     bigProc.forPath = win.path;
     bigProc.command = ["sh", "-c", Thumbs.generate([{ kind: "i", src: win.path }], true)];
     bigProc.running = true;
@@ -1824,6 +1828,8 @@ FloatingWindow {
   Process {
     id: bigProc
     property string forPath: ""
+    property string want: ""
+    onExited: if (bigProc.want === win.path && bigProc.want !== bigProc.forPath) win.renderFallback()
     stdout: StdioCollector {
       waitForEnd: true
       onStreamFinished: {
@@ -1849,29 +1855,50 @@ FloatingWindow {
     win.hist = null;
     win.palette = [];
     if (win.path === "" || win.isVid) return;
-    paletteProc.forPath = win.path;
-    paletteProc.command = ["magick", "-define", "jpeg:size=256x256", win.path + "[0]", "-resize", "160x160",
-      "+dither", "-colors", "8", "-format", "%c", "histogram:info:-"];
-    paletteProc.running = true;
-    exifProc.forPath = win.path;
-    exifProc.command = ["magick", "identify", "-format",
-      "Model=%[EXIF:Model]\\nLensModel=%[EXIF:LensModel]\\nDateTimeOriginal=%[EXIF:DateTimeOriginal]\\n"
-      + "ExposureTime=%[EXIF:ExposureTime]\\nFNumber=%[EXIF:FNumber]\\n"
-      + "PhotographicSensitivity=%[EXIF:PhotographicSensitivity]\\nFocalLength=%[EXIF:FocalLength]\\n"
-      + "GPSLatitude=%[EXIF:GPSLatitude]\\nGPSLatitudeRef=%[EXIF:GPSLatitudeRef]\\n"
-      + "GPSLongitude=%[EXIF:GPSLongitude]\\nGPSLongitudeRef=%[EXIF:GPSLongitudeRef]\\n",
-      win.path + "[0]"];
-    exifProc.running = true;
-    // jpeg:size lets the decoder hand back a small picture to begin with —
-    // a tenth of a second for a 40-megapixel photo
-    histProc.forPath = win.path;
-    histProc.command = ["magick", "-define", "jpeg:size=256x256", win.path + "[0]",
-      "-sample", "128x128>", "-depth", "8", "-compress", "none", "ppm:-"];
-    histProc.running = true;
+    win.probe(paletteProc);
+    win.probe(exifProc);
+    win.probe(histProc);
+  }
+  // One picture's ask at a time. Stepping on while one still runs leaves
+  // it to finish — its answer is for the picture before, and dropped — and
+  // its onExited asks again for the one shown by then. Setting forPath and
+  // the command under a running process used to pass the old picture's
+  // answer off as the new one's, and never ask for the new one at all.
+  function probe(proc) {
+    if (proc.running) return;
+    proc.forPath = win.path;
+    proc.command = proc.build(win.path);
+    proc.running = true;
+  }
+  function probeAgain(proc) {
+    if (proc.forPath !== win.path && win.infoShown && win.path !== "" && !win.isVid) win.probe(proc);
+  }
+  Process {
+    id: paletteProc
+    property string forPath: ""
+    function build(p) {
+      return ["magick", "-define", "jpeg:size=256x256", p + "[0]", "-resize", "160x160",
+        "+dither", "-colors", "8", "-format", "%c", "histogram:info:-"];
+    }
+    onExited: win.probeAgain(paletteProc)
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: if (paletteProc.forPath === win.path) win.palette = V.parsePalette(text).slice(0, 8)
+    }
   }
   Process {
     id: exifProc
     property string forPath: ""
+    function build(p) {
+      return ["magick", "identify", "-format",
+        "Model=%[EXIF:Model]\\nLensModel=%[EXIF:LensModel]\\nDateTimeOriginal=%[EXIF:DateTimeOriginal]\\n"
+        + "ExposureTime=%[EXIF:ExposureTime]\\nFNumber=%[EXIF:FNumber]\\n"
+        + "PhotographicSensitivity=%[EXIF:PhotographicSensitivity]\\nFocalLength=%[EXIF:FocalLength]\\n"
+        + "GPSLatitude=%[EXIF:GPSLatitude]\\nGPSLatitudeRef=%[EXIF:GPSLatitudeRef]\\n"
+        + "GPSLongitude=%[EXIF:GPSLongitude]\\nGPSLongitudeRef=%[EXIF:GPSLongitudeRef]\\n",
+        p + "[0]"];
+    }
+    onExited: win.probeAgain(exifProc)
     stdout: StdioCollector {
       waitForEnd: true
       onStreamFinished: if (exifProc.forPath === win.path) {
@@ -1883,17 +1910,16 @@ FloatingWindow {
   Process {
     id: histProc
     property string forPath: ""
+    // jpeg:size lets the decoder hand back a small picture to begin with —
+    // a tenth of a second for a 40-megapixel photo
+    function build(p) {
+      return ["magick", "-define", "jpeg:size=256x256", p + "[0]",
+        "-sample", "128x128>", "-depth", "8", "-compress", "none", "ppm:-"];
+    }
+    onExited: win.probeAgain(histProc)
     stdout: StdioCollector {
       waitForEnd: true
       onStreamFinished: if (histProc.forPath === win.path) win.hist = V.histogram(text, 64)
-    }
-  }
-  Process {
-    id: paletteProc
-    property string forPath: ""
-    stdout: StdioCollector {
-      waitForEnd: true
-      onStreamFinished: if (paletteProc.forPath === win.path) win.palette = V.parsePalette(text).slice(0, 8)
     }
   }
   onInfoShownChanged: if (win.infoShown) win.askExif()
@@ -2289,15 +2315,19 @@ FloatingWindow {
   // A new file next to the picture, never over it — enhanced (ImageMagick),
   // the subject cut out (bin/cutout.py), or four times the size (Real-ESRGAN) — and
   // then shown beside the original, to judge. The one not wanted goes to the
-  // trash like any other.
-  function makeBeside(kind) {
+  // trash like any other. Pixel and ASCII art too, from the edit panel
+  // (user, 2026-10-24: "let me compare before i export"): `opts` is a
+  // V.PIXELS or V.ASCIIS row, and `art` on the result says which is shown.
+  function makeBeside(kind, opts) {
     if (win.path === "" || !win.stillOnly()) return;
     const src = win.path, tools = win.mgr ? win.mgr.tools : {};
     const up = tools["realesrgan-ncnn-vulkan"] ? "realesrgan-ncnn-vulkan" : (tools["upscayl-bin"] ? "upscayl-bin" : "");
     const k = {
       enhance: { tag: "enhanced", cmd: V.enhanceCommand(), keep: V.writable(src), said: "enhancing…" },
       cutout:  { tag: "cutout", cmd: V.cutoutCommand(Quickshell.shellDir + "/picasso/bin/cutout.py"), keep: false, said: "cutting out the subject…", steps: true },
-      upscale: { tag: "x4", cmd: V.upscaleCommand(up), keep: false, said: "upscaling — a minute, for a big picture…" }
+      upscale: { tag: "x4", cmd: V.upscaleCommand(up), keep: false, said: "upscaling — a minute, for a big picture…" },
+      pixel:   { tag: "pixel", cmd: Terminus.artScript("pixel", opts), keep: false, said: "making pixel art…" },
+      ascii:   { tag: "ascii", cmd: Terminus.artScript("ascii", opts), keep: false, said: "making ASCII art…" }
     }[kind];
     if (!k) return;
     let name = V.editedName(src, k.tag);
@@ -2321,7 +2351,7 @@ FloatingWindow {
       if (code !== 0) { win.say("Could not make it  \u00b7  " + kind + " failed"); return; }
       if (win.path !== src) { win.run(["rm", "-f", "--", dest]); return; }
       win.dropMade();
-      win.made = { src: src, tmp: dest, name: name, dir: Terminus.dirname(src) };
+      win.made = { src: src, tmp: dest, name: name, dir: Terminus.dirname(src), art: V.artKey(kind, opts) };
       win.cmpPath = dest;
       win.compare = true;
       win.mode = "view";
@@ -2387,6 +2417,19 @@ FloatingWindow {
     if (!fm) { win.say("No file manager to ask"); return; }
     if (!fm.choose(true, win.dir, (paths) => { if (paths.length > 0) go(String(paths[0])); }))
       win.say("The file picker is busy with another request");
+  }
+
+  // and as art — pixel or ASCII, beside each one (terminus.js
+  // artExportCommand)
+  function exportArt(ps, kind, opts) {
+    ps = ps.filter((p) => !Terminus.isVideo(Terminus.basename(p)));
+    if (ps.length === 0) return;
+    win.say("Exporting " + win.some(ps) + "…", 600000);
+    win.run(Terminus.shArgv(Terminus.artExportCommand(ps, "", kind, opts)), (code) => {
+      win.say(code === 0 ? win.some(ps) + " exported beside " + (ps.length === 1 ? "it" : "them")
+                         : "could not export every one");
+      win.refresh();
+    });
   }
 
   // ── a contact sheet ───────────────────────────────────────────────────
@@ -5660,6 +5703,74 @@ FloatingWindow {
             wrapMode: Text.WordWrap
           }
 
+          // ── as art ────────────────────────────────────────────
+          // Each choice is made at once and shown beside the original;
+          // another choice replaces it, ctrl+s (or Save in the compare
+          // bar) keeps it (user, 2026-10-24: "let me compare before i
+          // export"). From the file as it is, not the edit above.
+          Item { width: 1; height: 8 }
+          Head { text: "Pixel art" }
+          Row {
+            spacing: 4
+            Repeater {
+              model: V.PIXELS
+              delegate: Seg {
+                required property var modelData
+                width: (panelCol.width - 12) / 4
+                height: 42
+                chosen: win.showsMade && win.made.art === V.artKey("pixel", modelData)
+                onHit: win.makeBeside("pixel", modelData)
+                Column {
+                  anchors.centerIn: parent
+                  spacing: 1
+                  Text {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    text: modelData.t.split("  \u00b7  ")[0]
+                    color: Zenon.white
+                    font.family: Zenon.face
+                    font.weight: 600
+                    font.pixelSize: Zenon.px(13)
+                  }
+                  Text {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    text: modelData.blocks + " blocks"
+                    color: Zenon.accentSoft
+                    font.family: Zenon.face
+                    font.weight: Zenon.weight
+                    font.pixelSize: Zenon.px(11)
+                  }
+                }
+              }
+            }
+          }
+          Item { width: 1; height: 8 }
+          Head { text: "ASCII art" }
+          Row {
+            spacing: 4
+            Repeater {
+              // the text kind has no picture to compare: Export has it
+              model: V.ASCIIS.filter((x) => x.kind === "ascii")
+              delegate: Seg {
+                required property var modelData
+                width: (panelCol.width - 4) / 2
+                height: 30
+                label: modelData.t.split("  \u00b7  ")[0]
+                chosen: win.showsMade && win.made.art === V.artKey("ascii", modelData)
+                onHit: win.makeBeside("ascii", modelData)
+              }
+            }
+          }
+          Text {
+            width: parent.width
+            text: win.showsMade && win.made.art !== "" ? "on the right, not saved  \u00b7  ctrl+s saves it  \u00b7  esc lets it go"
+                                                       : "shown beside the original to compare, before it is saved"
+            color: Zenon.accentSoft
+            font.family: Zenon.face
+            font.weight: Zenon.weight
+            font.pixelSize: Zenon.px(12)
+            wrapMode: Text.WordWrap
+          }
+
           Item { width: 1; height: 8 }
           Head { text: "Look" }
           LookEditor {
@@ -6096,7 +6207,9 @@ FloatingWindow {
     const pick = menu.pixel;
     const tools = win.mgr ? win.mgr.tools : {};
     const exportRows = () => V.EXPORTS.map((x, i) => ({ text: x.t, icon: "\uf1d8", act: "export", preset: i }))
-      .concat([{ isSeparator: true }, { text: "Into a directory…  \u00b7  2048 px WebP", icon: "\uf07c", act: "exportTo", asks: true }]);
+      .concat([{ isSeparator: true }, { text: "Into a directory…  \u00b7  2048 px WebP", icon: "\uf07c", act: "exportTo", asks: true },
+               { isSeparator: true }, branch("Pixel art", "\u{F013A}", "exportPixel"),
+               branch("ASCII art", "\uf031", "exportAscii")]);
 
     switch (kind) {
     case "selection":
@@ -6135,7 +6248,7 @@ FloatingWindow {
         branch("View", "\uf06e", "view"),
         branch("Save as", "\uf0ec", "convert"),
         branch("Make from it", "\uf0d0", "improve"),
-        branch("Export for the web", "\uf1d8", "export"),
+        branch("Export", "\uf1d8", "export"),
         branch("Share", Share.glyph, "share"),
         sep,
         { text: "Show in terminus", icon: "\uf07c", act: "reveal", hint: "o" },
@@ -6155,6 +6268,11 @@ FloatingWindow {
 
     case "export":
       return exportRows();
+    case "exportPixel":
+      return V.PIXELS.map((x) => ({ text: x.t, icon: "\u{F013A}", act: "exportArt", kind: "pixel", opts: x }));
+    case "exportAscii":
+      return V.ASCIIS.map((x) => ({ text: x.t, icon: x.kind === "text" ? "\uf15c" : "\uf031", act: "exportArt",
+                                    kind: x.kind, opts: x }));
 
     case "places":
       return win.placeRows();
@@ -6212,7 +6330,7 @@ FloatingWindow {
         { text: win.marks[p] ? "Unmark" : "Mark", icon: "\uf00c", act: "mark", hint: "x" },
         sep,
         branch("Copy", "\uf0c5", "copyCell"),
-        branch("Export for the web", "\uf1d8", "export"),
+        branch("Export", "\uf1d8", "export"),
         branch("Share", Share.glyph, "share")
       ]).concat(fileRows()).concat(editIn).concat([
         sep,
@@ -6241,7 +6359,7 @@ FloatingWindow {
         sep
       ]).concat(tagRows).concat([
         { text: "Copy as files", icon: "\uf15b", act: "copyFiles", hint: "ctrl c" },
-        branch("Export for the web", "\uf1d8", "export"),
+        branch("Export", "\uf1d8", "export"),
         { text: "Contact sheet…", icon: "\uf00a", act: "sheet", asks: true },
         { text: "Rename (" + ps.length + ")", icon: "\uf246", act: "bulkRename", hint: "F2", asks: true }
       ]).concat(fileRows()).concat([
@@ -6424,6 +6542,7 @@ FloatingWindow {
     case "export": win.exportFor(p === win.path && win.mode === "view" && win.markCount === 0 ? [p] : ps, V.EXPORTS[row.preset], false); break;
     case "exportTo": win.exportFor(p === win.path && win.mode === "view" && win.markCount === 0 ? [p] : ps,
                                    { edge: 2048, ext: "webp", q: 85 }, true); break;
+    case "exportArt": win.exportArt(p === win.path && win.mode === "view" && win.markCount === 0 ? [p] : ps, row.kind, row.opts); break;
     case "sheet": win.contactSheet(ps); break;
     case "sheetAll": win.contactSheet(win.markCount > 0 ? win.markedPaths() : win.rows.map((r) => r.path)); break;
     case "go": win.openDirectory(row.dir); break;

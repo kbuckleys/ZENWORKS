@@ -19,7 +19,6 @@
 //   drag  pan        wheel  zoom, about the pointer      + - 0  zoom, fit
 
 import QtQuick
-import Quickshell
 import Quickshell.Io
 import "../morpheus"
 import "viewer.js" as V

@@ -35,6 +35,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Hyprland
 import "../morpheus"
+import "../morpheus/controls" as Ctl
 import "../terminus"
 import "../delphi"
 import "../ceres"
@@ -1640,30 +1641,12 @@ FloatingWindow {
     }
 
     // ── what was just done, said once ────────────────────────────────────
-    Rectangle {
+    Ctl.Said {
       anchors.horizontalCenter: detailPane.visible ? detailPane.horizontalCenter : head.horizontalCenter
       anchors.bottom: foot.top
       anchors.bottomMargin: 18
-      width: Math.min(saidText.implicitWidth + 32, 560)
-      height: 34
-      radius: Zenon.windowRadius
-      color: Zenon.hud(0.85)
-      border.width: 1
-      border.color: win.saidBad ? Zenon.alpha(Zenon.red, 0.6) : Zenon.border
-      opacity: win.said !== "" ? 1 : 0
-      visible: opacity > 0
-      Behavior on opacity { NumberAnimation { duration: Zenon.normal; easing.type: Easing.OutCubic } }
-      Text {
-        id: saidText
-        anchors.centerIn: parent
-        width: Math.min(implicitWidth, parent.width - 32)
-        elide: Text.ElideRight
-        text: win.said
-        color: win.saidBad ? Zenon.red : Zenon.ink
-        font.family: Zenon.face
-        font.weight: Zenon.weight
-        font.pixelSize: Zenon.px(15)
-      }
+      text: win.said
+      bad: win.saidBad
     }
 
     // ── the foot ─────────────────────────────────────────────────────────

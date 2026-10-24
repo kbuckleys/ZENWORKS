@@ -1464,32 +1464,16 @@ FloatingWindow {
     }
 
     // ── what was just done, said once ────────────────────────────────────
-    Rectangle {
+    Ctl.Said {
       anchors.horizontalCenter: parent.horizontalCenter
       anchors.horizontalCenterOffset: readBox.visible ? readBox.midX : 0
       anchors.top: head.bottom
       anchors.topMargin: 14
-      width: Math.min(saidText.implicitWidth + 32, 620)
-      height: 34
-      radius: Zenon.windowRadius
-      color: Zenon.hud(0.9)
-      border.width: 1
-      border.color: mw.saidBad ? Zenon.alpha(Zenon.red, 0.6) : Zenon.border
-      opacity: mw.said !== "" ? 1 : 0
-      visible: opacity > 0
       z: 7
-      Behavior on opacity { NumberAnimation { duration: Zenon.normal; easing.type: Easing.OutCubic } }
-      Text {
-        id: saidText
-        anchors.centerIn: parent
-        width: Math.min(implicitWidth, parent.width - 32)
-        elide: Text.ElideRight
-        text: mw.said
-        color: mw.saidBad ? Zenon.red : Zenon.ink
-        font.family: Zenon.face
-        font.weight: Zenon.weight
-        font.pixelSize: Zenon.px(15)
-      }
+      maxWidth: 620
+      text: mw.said
+      bad: mw.saidBad
+      ground: 0.9
     }
 
     // ── WHAT SCROLLS GOES UNDER THE BARS, FROSTED ──────────────────────

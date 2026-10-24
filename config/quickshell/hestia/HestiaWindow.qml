@@ -19,6 +19,7 @@
 import QtQuick
 import Quickshell
 import "../morpheus"
+import "../morpheus/controls" as Ctl
 import "../terminus"
 import "hestia.js" as H
 
@@ -187,31 +188,14 @@ FloatingWindow {
       HestiaJournal { id: journalPage; anchors.fill: parent; mgr: hw.mgr; win: hw; visible: hw.section === "journal" }
     }
 
-    Rectangle {
+    Ctl.Said {
       anchors.horizontalCenter: body.horizontalCenter
       anchors.bottom: foot.top
       anchors.bottomMargin: 18
-      width: Math.min(saidText.implicitWidth + 32, 620)
-      height: 34
-      radius: Zenon.windowRadius
-      color: Zenon.hud(0.85)
-      border.width: 1
-      border.color: hw.saidBad ? Zenon.alpha(Zenon.red, 0.6) : Zenon.border
-      opacity: hw.said !== "" ? 1 : 0
-      visible: opacity > 0
       z: 5
-      Behavior on opacity { NumberAnimation { duration: Zenon.normal; easing.type: Easing.OutCubic } }
-      Text {
-        id: saidText
-        anchors.centerIn: parent
-        width: Math.min(implicitWidth, parent.width - 32)
-        elide: Text.ElideRight
-        text: hw.said
-        color: hw.saidBad ? Zenon.red : Zenon.ink
-        font.family: Zenon.face
-        font.weight: Zenon.weight
-        font.pixelSize: Zenon.px(15)
-      }
+      maxWidth: 620
+      text: hw.said
+      bad: hw.saidBad
     }
 
     HintBar {

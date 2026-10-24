@@ -39,7 +39,6 @@
 // other card in plato.
 
 import QtQuick
-import Quickshell
 import "../../morpheus"
 import "../../terminus"
 import "pack.js" as Pack

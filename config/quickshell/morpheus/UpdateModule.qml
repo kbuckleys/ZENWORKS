@@ -4,7 +4,6 @@
 // https://github.com/kbuckleys/
 
 import QtQuick
-import Quickshell
 import "../oracle"
 import "../ceres"
 import "."

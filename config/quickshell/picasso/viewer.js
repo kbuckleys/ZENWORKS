@@ -1061,7 +1061,7 @@ function clock(ms) {
 }
 
 // ── for sending ──────────────────────────────────────────────────────────
-// The sizes Export for the web offers: the longest side, the format, how
+// The sizes Export offers for the web: the longest side, the format, how
 // hard it is squeezed.
 const EXPORTS = [
   { t: "1600 px  ·  WebP", edge: 1600, ext: "webp", q: 82 },
@@ -1069,3 +1069,26 @@ const EXPORTS = [
   { t: "1600 px  ·  JPEG", edge: 1600, ext: "jpg", q: 85 },
   { t: "2048 px  ·  AVIF", edge: 2048, ext: "avif", q: 60 }
 ];
+// and as art (terminus.js artExportCommand says what each makes): pixel
+// art at four block sizes, each blown up by a whole number to about 1600 px
+// so every block stays square and sharp (user, 2026-10-24: "options to
+// change the pixel scale"), and ASCII art in color, in grays, or as text
+const PIXELS = [
+  { t: "Fine  ·  160 blocks", blocks: 160, by: 10 },
+  { t: "Medium  ·  96 blocks", blocks: 96, by: 16 },
+  { t: "Coarse  ·  48 blocks", blocks: 48, by: 32 },
+  { t: "Chunky  ·  24 blocks", blocks: 24, by: 64 }
+];
+const ASCIIS = [
+  { t: "In color  ·  PNG", kind: "ascii", gray: false },
+  { t: "In grays  ·  PNG", kind: "ascii", gray: true },
+  { t: "As text  ·  TXT", kind: "text", gray: false }
+];
+// which of those a made result is, to light its button: "pixel:96",
+// "ascii:gray"; "" for what is not art (enhance, cutout, upscale)
+function artKey(kind, opts) {
+  const o = opts || {};
+  if (kind === "pixel") return "pixel:" + (o.blocks || 96);
+  if (kind === "ascii") return "ascii:" + (o.gray ? "gray" : "color");
+  return "";
+}

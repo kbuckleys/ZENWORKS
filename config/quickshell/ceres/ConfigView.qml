@@ -16,9 +16,9 @@
 // setting and nothing else. See it for why the file stays yours.
 
 import QtQuick
-import Quickshell
 import Quickshell.Io
 import "../morpheus"
+import "../morpheus/controls" as Controls
 import "../terminus"
 import "."
 import "pacconf.js" as Pac
@@ -974,7 +974,7 @@ Item {
               TapHandler { id: resetPress; onTapped: view.setOpt(orow.spec.key, "") }
             }
           }
-          Check {
+          Controls.Check {
             visible: orow.spec.type === "flag"
             lit: orow.now.set
             onToggled: view.setOpt(orow.spec.key, !orow.now.set)
@@ -1009,7 +1009,7 @@ Item {
             spacing: 14
             Repeater {
               model: ["KeepInstalled", "KeepCurrent"]
-              delegate: Check {
+              delegate: Controls.Check {
                 required property string modelData
                 label: modelData
                 // every row builds these, hidden; only CleanMethod's value is words
@@ -1157,7 +1157,7 @@ Item {
       Item {
         width: parent.width
         height: 32
-        Check {
+        Controls.Check {
           id: onBox
           anchors.left: parent.left
           anchors.verticalCenter: parent.verticalCenter
@@ -1319,7 +1319,7 @@ Item {
             Repeater {
               // All, or unset, is every one; switching one off writes the rest
               model: Pac.USAGE
-              delegate: Check {
+              delegate: Controls.Check {
                 required property string modelData
                 readonly property var words: card.repo.Usage === "" || /\bAll\b/.test(card.repo.Usage)
                   ? Pac.USAGE : card.repo.Usage.split(/\s+/)

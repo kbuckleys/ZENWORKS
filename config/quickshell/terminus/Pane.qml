@@ -42,10 +42,8 @@
 // one passes it (`term: root`).
 
 import QtQuick
-import Quickshell
 import Quickshell.Io
 import "../morpheus"
-import "../picasso"
 import "terminus.js" as Terminus
 
 QtObject {

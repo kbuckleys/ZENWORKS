@@ -41,6 +41,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Hyprland
 import "../morpheus"
+import "../morpheus/controls" as Ctl
 import "../terminus"
 import "delphi.js" as D
 import "../terminus/terminus.js" as Terminus
@@ -1737,30 +1738,13 @@ FloatingWindow {
     Rectangle { anchors.left: side.right; anchors.right: parent.right; y: head.height; height: 1; color: Zenon.border }
 
     // ── what was just done, said once ────────────────────────────────────
-    Rectangle {
+    Ctl.Said {
       anchors.horizontalCenter: pageLoader.horizontalCenter
       anchors.bottom: foot.top
       anchors.bottomMargin: 18
-      width: Math.min(saidText.implicitWidth + 32, pageLoader.width - 40)
-      height: 34
-      radius: Zenon.windowRadius
-      color: Zenon.hud(0.85)
-      border.width: 1
-      border.color: win.saidBad ? Zenon.alpha(Zenon.red, 0.6) : Zenon.border
-      opacity: win.said !== "" ? 1 : 0
-      visible: opacity > 0
-      Behavior on opacity { NumberAnimation { duration: Zenon.normal; easing.type: Easing.OutCubic } }
-      Text {
-        id: saidText
-        anchors.centerIn: parent
-        width: Math.min(implicitWidth, parent.width - 32)
-        elide: Text.ElideRight
-        text: win.said
-        color: win.saidBad ? Zenon.red : Zenon.ink
-        font.family: Zenon.face
-        font.weight: Zenon.weight
-        font.pixelSize: Zenon.px(15)
-      }
+      maxWidth: pageLoader.width - 40
+      text: win.said
+      bad: win.saidBad
     }
 
     // ── the foot ─────────────────────────────────────────────────────────

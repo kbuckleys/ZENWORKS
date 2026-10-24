@@ -13,7 +13,6 @@
 // suite's rule — just the chip, and the keys' cursor in the accent.
 
 import QtQuick
-import Quickshell
 import "../morpheus"
 import "."
 

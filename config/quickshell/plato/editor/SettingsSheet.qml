@@ -23,7 +23,6 @@
 // value either way, ctrl r puts the setting back to its default.
 
 import QtQuick
-import Quickshell
 import "../../morpheus"
 import "../../morpheus/controls" as Controls
 import "../../terminus"

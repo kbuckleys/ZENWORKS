@@ -24,7 +24,6 @@
 // end — scroll up and it stays where you put it.
 
 import QtQuick
-import Quickshell
 import "../morpheus"
 import "../terminus" as Term
 import "."

@@ -963,8 +963,11 @@ function isDefaultDisplay(v) {
 }
 
 // ── monitors.lua, written ──
+// a line break escaped too: raw inside "…" it is a Lua syntax error, and the
+// whole file (an imported one, say) failed to load
 function luaString(s) {
-  return "\"" + String(s).replace(/\\/g, "\\\\").replace(/"/g, "\\\"") + "\"";
+  return "\"" + String(s).replace(/\\/g, "\\\\").replace(/"/g, "\\\"")
+    .replace(/\n/g, "\\n").replace(/\r/g, "\\r") + "\"";
 }
 
 function ruleLine(output, fields) {
@@ -2073,15 +2076,12 @@ function bindGroupLabel(g) {
   return g.charAt(0) + g.slice(1).toLowerCase();
 }
 
-// only what differs from binds.lua, in its order; ids the list no longer has
-// are dropped, so a bind taken out of binds.lua takes its override with it
 // ── WAKE ──
 // What brings screens turned off back: hypr/lua/wake.lua, `wake = "key"`
 // (any key) or "mouse" (a mouse move too): Display's "Wake by" (user,
 // 2026-10-20), for idle and binds.lua's screensOff alike. base.lua reads
 // it, so it holds from login; socordia follows it; key wake is always on.
 // "mouse" unless the file says "key" (the default since 2026-10-21).
-function wakeChoices() { return [["key", "Key press"], ["mouse", "Mouse or key press"]]; }
 function parseWakeLua(text) {
   return parseDefaultsLua(text).wake === "key" ? "key" : "mouse";
 }
@@ -2411,6 +2411,8 @@ function startupName(command) {
   return w ? w[0].toUpperCase() + w.slice(1) : "";
 }
 
+// only what differs from binds.lua, in its order; ids the list no longer has
+// are dropped, so a bind taken out of binds.lua takes its override with it
 function renderKeysLua(values, binds) {
   const lines = [
     "-- ┌─┐┌─┐┌┐┌┬ ┬┌─┐┬─┐┬┌─┌─┐",
@@ -2622,5 +2624,65 @@ function bundleWords(files) {
   for (const rel of BUNDLE_FIXED) if (rel in files) out.push(BUNDLE_WORDS[rel]);
   const themes = Object.keys(files).filter((r) => r.startsWith("themes/")).sort();
   for (const r of themes) out.push("Theme " + r.slice(7, -5));
+  return out;
+}
+// WHAT AN IMPORT MAY WRITE (2026-10-24). hyprland `require`s every
+// hypr/*.lua, so a bundle's text written as it came ran whatever Lua it
+// held at the next reload: a settings file someone shared was a program.
+// Each is read through its own parser and written fresh by its own
+// renderer, so only the values those know come through — the same file
+// Oracle itself would write for them. monitors.lua's lines written by hand
+// do not. oracle.json and themes are JSON, read as data, and pass as they
+// are. `binds` is binds.lua's list (Oracle.bindList); with none, every
+// shortcut the bundle names is kept.
+function sanitizeBundleFile(rel, text, binds) {
+  const t = String(text || "");
+  switch (rel) {
+    case "hypr/keys.lua": {
+      const v = parseDefaultsLua(t);
+      const b = (binds && binds.length) ? binds
+        : Object.keys(v).map((id) => ({ id: id, chord: null }));
+      return renderKeysLua(v, b);
+    }
+    case "hypr/wake.lua": return renderWakeLua(parseWakeLua(t));
+    case "hypr/effects.lua": return renderEffectsLua(parseEffectsLua(t));
+    case "hypr/defaults.lua": return renderDefaultsLua(parseDefaultsLua(t));
+    case "hypr/input.lua": {
+      const v = parseInputLua(t);
+      for (const k in v) if (typeof v[k] === "number" && !isFinite(v[k])) delete v[k];
+      return renderInputLua(v);
+    }
+    case "hypr/windows.lua": return renderWindowsLua(parseWindowsLua(t));
+    case "hypr/startup.lua": return renderStartupLua(parseStartupLua(t));
+    case "hypr/monitors.lua": {
+      // the catch-all rule ("") is the renderer's own first line
+      const rules = parseMonitorRules(t).filter((r) => r.output !== "").map((r) => {
+        const f = {};
+        for (const k in r.fields) if (typeof r.fields[k] !== "number" || isFinite(r.fields[k])) f[k] = r.fields[k];
+        return { output: r.output, fields: f };
+      });
+      return renderMonitorRules([], rules, []);
+    }
+  }
+  return t;
+}
+// The commands an import would have run for you, for the sheet to show
+// before it is taken: every startup app, and the default apps that are a
+// command rather than a desktop id. [{ what, command, off }]
+function bundleCommands(files) {
+  const out = [];
+  const f = files || {};
+  if (typeof f["hypr/startup.lua"] === "string")
+    for (const a of parseStartupLua(f["hypr/startup.lua"]))
+      out.push({ what: "At login" + (a.name ? " · " + a.name : ""), command: a.command, off: !a.on });
+  if (typeof f["hypr/defaults.lua"] === "string") {
+    const d = parseDefaultsLua(f["hypr/defaults.lua"]);
+    const named = { terminal: "Terminal", editor: "Editor", sysmon: "System monitor" };
+    for (const k in named) {
+      const c = String(d[k] || "").trim();
+      if (c !== "" && !(k === "sysmon" && (c === "zeus" || /\.desktop$/.test(c))))
+        out.push({ what: named[k], command: c, off: false });
+    }
+  }
   return out;
 }

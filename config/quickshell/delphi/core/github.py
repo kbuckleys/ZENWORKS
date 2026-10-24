@@ -26,7 +26,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 import rest
 import tokenstore
-from files import SKIP_DIRS, SKIP_FILES, SKIP_ENDS, expand   # noqa: F401  (github.expand, the tests')
+from files import expand   # noqa: F401  (github.expand, the tests')
 from rest import ForgeError
 
 API = "https://api.github.com"

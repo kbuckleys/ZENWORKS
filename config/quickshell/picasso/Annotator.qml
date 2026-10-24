@@ -33,7 +33,6 @@ import Quickshell
 import "../morpheus"
 import "../morpheus/undo"
 import "capture.js" as Cap
-import "viewer.js" as V
 
 Item {
   id: ann

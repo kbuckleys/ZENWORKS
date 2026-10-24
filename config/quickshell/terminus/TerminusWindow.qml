@@ -32,8 +32,6 @@ import Quickshell.Hyprland
 import QtQuick.Effects
 import Qt.labs.folderlistmodel
 import "../morpheus"
-import "../picasso"
-import "../oracle"
 import "terminus.js" as Terminus
 import "../morpheus/thumbs.js" as Thumbs
 import "tags.js" as Tags

@@ -8,7 +8,6 @@
 // out of TerminusWindow with Sheet, which it goes with.
 
 import QtQuick
-import "."
 
 Item {
   id: shield

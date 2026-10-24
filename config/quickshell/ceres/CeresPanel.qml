@@ -19,7 +19,6 @@
 //   result    what happened, or why it did not
 
 import QtQuick
-import Quickshell
 import Quickshell.Widgets
 import Quickshell.Hyprland
 import "../morpheus"

@@ -21,7 +21,6 @@
 // pactl ships with pipewire-pulse, which is already running here.
 
 import QtQuick
-import Quickshell
 import Quickshell.Io
 import Quickshell.Services.Pipewire
 import "sound.js" as Sound

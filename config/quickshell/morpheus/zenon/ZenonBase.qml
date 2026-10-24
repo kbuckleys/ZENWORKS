@@ -526,14 +526,6 @@ QtObject {
   // the window's 80%, tint full toward rgb 10,18,40) — see-through, and
   // still the darker of the two.
   function tabAway(a) { return light ? a * 0.7 : a * 0.75; }
-  // What the ACTIVE tab lays over a strip already painted with the inactive
-  // glass, so the two compose to the window's own alpha `a`:
-  // 1 − (1 − away)(1 − over) = a. The strip keeps a ground of its own that
-  // way, and a tab cell rebuilt or still fading in never leaves a hole.
-  function tabOver(a) {
-    const away = tabAway(a);
-    return away >= 1 ? 0 : Math.max(0, 1 - (1 - a) / (1 - away));
-  }
   // The navy lift is Zenon's (user's pick, 2026-10-09). Under Follow
   // Background it lifts by about as much in the PICTURE's tint — ground
   // towards surface, which carry its hue — so a black and white background

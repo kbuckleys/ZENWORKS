@@ -8,14 +8,11 @@
 // term.<id>Ref (the window's aliases).
 
 import QtQuick
-import Quickshell
 import Quickshell.Widgets
-import Quickshell.Hyprland
 import QtQuick.Effects
 import "../morpheus"
 import "terminus.js" as Terminus
 import "../morpheus/icons.js" as Icons
-import "../morpheus/thumbs.js" as Thumbs
 
 Column {
   id: chrome

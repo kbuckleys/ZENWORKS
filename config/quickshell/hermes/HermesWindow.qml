@@ -26,6 +26,7 @@
 import QtQuick
 import Quickshell
 import "../morpheus"
+import "../morpheus/controls" as Ctl
 import "../terminus"
 import "../ceres" as Cer
 import "hermes.js" as H
@@ -301,30 +302,12 @@ FloatingWindow {
     ScrollEdge { view: pageFlick; below: true; follow: true; bar: foot }
 
     // ── what was just done, said once ────────────────────────────────────
-    Rectangle {
+    Ctl.Said {
       anchors.horizontalCenter: pageFlick.horizontalCenter
       anchors.bottom: foot.top
       anchors.bottomMargin: 18
-      width: Math.min(saidText.implicitWidth + 32, 560)
-      height: 34
-      radius: Zenon.windowRadius
-      color: Zenon.hud(0.85)
-      border.width: 1
-      border.color: Hermes.saidBad ? Zenon.alpha(Zenon.red, 0.6) : Zenon.border
-      opacity: Hermes.said !== "" ? 1 : 0
-      visible: opacity > 0
-      Behavior on opacity { NumberAnimation { duration: Zenon.normal; easing.type: Easing.OutCubic } }
-      Text {
-        id: saidText
-        anchors.centerIn: parent
-        width: Math.min(implicitWidth, parent.width - 32)
-        elide: Text.ElideRight
-        text: Hermes.said
-        color: Hermes.saidBad ? Zenon.red : Zenon.ink
-        font.family: Zenon.face
-        font.weight: Zenon.weight
-        font.pixelSize: Zenon.px(15)
-      }
+      text: Hermes.said
+      bad: Hermes.saidBad
     }
 
     // ── the foot ─────────────────────────────────────────────────────────

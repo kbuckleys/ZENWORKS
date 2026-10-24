@@ -269,10 +269,16 @@ def delete(paths):
     done, failed = [], []
     home = os.path.realpath(HOME)
     for p in paths:
-        # the link itself, never what it points at; and only inside the home
-        parent = os.path.realpath(os.path.dirname(os.path.abspath(p)))
-        full = os.path.join(parent, os.path.basename(p))
-        if not (parent == home or parent.startswith(home + os.sep)) or full == home:
+        # the link itself, never what it points at; and only inside the home.
+        # Named by the normalized path: "dir/" has no basename of its own,
+        # and joined back onto its parent that was the home with a slash on
+        # the end, which the guard below did not see as the home
+        ap = os.path.abspath(p)
+        name = os.path.basename(ap)
+        parent = os.path.realpath(os.path.dirname(ap))
+        full = os.path.join(parent, name)
+        if name in ("", ".", "..") or not (parent == home or parent.startswith(home + os.sep)) \
+                or os.path.realpath(full) == home:
             failed.append({"path": p, "why": "only files inside the home are deleted"})
             continue
         try:

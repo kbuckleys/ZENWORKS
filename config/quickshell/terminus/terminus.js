@@ -3184,6 +3184,73 @@ function exportCommand(paths, dest, ext, edge, quality, tag) {
     + "exit $s\n", [dest || "", ext, String(edge), String(quality), tag ? "-" + tag : ""].concat(paths));
 }
 
+// AS ART (user, 2026-10-24: "pixel and ascii filters — as an export
+// option"): one picture remade as `art_one SRC OUT KIND BLOCKS BY GRAY`.
+//   pixel  BLOCKS blocks on its longest side (96), 32 colors, no
+//          dithering, then blown up BY times (16) with no smoothing
+//   ascii  160 characters across (half as many rows, a character being
+//          about twice as tall as it is wide), the brightness spread over
+//          ` .:-=+*o#%@` and set in the monospace font fontconfig names
+//          (Oracle's Monospace), each character in its picture's color on
+//          black, or in its grays with GRAY=1
+//   text   the same characters as plain text
+// Its own names inside (a*): the loops round it own d, n, p, s and b.
+const ART_ONE = "art_one() {\n"
+  + "  if [ \"$3\" = pixel ]; then\n"
+  + "    magick -- \"$1[0]\" -auto-orient -resize \"$4x$4\" +dither -colors 32 -sample \"$(($5 * 100))%\" \"$2\"\n"
+  + "    return\n"
+  + "  fi\n"
+  + "  at=$(mktemp -d) || return 1\n"
+  + "  af=$(fc-match -f '%{file}' monospace 2>/dev/null)\n"
+  + "  ar=1\n"
+  + "  magick -- \"$1[0]\" -auto-orient -background black -alpha remove -alpha off"
+  + " -resize 160x -resize '100%x50%!' \"$at/c.png\""
+  + " && magick \"$at/c.png\" -colorspace gray -auto-level -depth 8 -compress none pgm:-"
+  + " | awk -v r=' .:-=+*o#%@' 'NR == 1 { next } { for (i = 1; i <= NF; i++) v[n++] = $i }"
+  + " END { w = v[0]; h = v[1]; m = v[2] + 1; k = 3; for (y = 0; y < h; y++) { l = \"\";"
+  + " for (x = 0; x < w; x++) l = l substr(r, int(v[k++] * length(r) / m) + 1, 1); print l } }'"
+  + " > \"$at/a.txt\" && {\n"
+  + "    if [ \"$3\" = text ]; then cp -- \"$at/a.txt\" \"$2\"\n"
+  + "    else\n"
+  + "      { [ \"$6\" != 1 ] || magick \"$at/c.png\" -colorspace gray \"$at/c.png\"; }"
+  + " && magick -background black -fill white -font \"${af:-Courier}\" -pointsize 14 \"label:@$at/a.txt\" \"$at/m.png\""
+  + " && awh=$(magick identify -format '%wx%h' \"$at/m.png\")"
+  + " && magick \"$at/c.png\" -sample \"$awh!\" \"$at/m.png\" -compose Multiply -composite \"$2\"\n"
+  + "    fi\n"
+  + "  } && ar=0\n"
+  + "  rm -rf -- \"$at\"\n"
+  + "  return $ar\n"
+  + "}\n";
+
+// The kinds' names on a copy: "photo-pixel.png", "photo-ascii.txt"
+function artSuffix(kind) {
+  return kind === "pixel" ? "-pixel.png" : kind === "text" ? "-ascii.txt" : "-ascii.png";
+}
+
+// art_one with its settings, for a script given the source as $1 and where
+// it goes as $2 (picasso's viewer makes a preview this way, to compare)
+function artScript(kind, opts) {
+  const o = opts || {};
+  const kinds = { pixel: 1, ascii: 1, text: 1 };
+  return ART_ONE + "art_one \"$1\" \"$2\" " + (kind in kinds ? kind : "pixel") + " "
+    + (Math.round(o.blocks) || 96) + " " + (Math.round(o.by) || 16) + " " + (o.gray ? 1 : 0) + "\n";
+}
+
+// each picture as art, beside it or into `dest`, through terminus_free like
+// the web export
+function artExportCommand(paths, dest, kind, opts) {
+  const o = opts || {};
+  return withArgs(FREE_NAME + ART_ONE + "D=$1; k=$2; bk=$3; x=$4; g=$5; sx=$6; shift 6; s=0\n"
+    + "for p; do\n"
+    + "  d=${D:-$(dirname -- \"$p\")}\n"
+    + STEM_OF
+    + "  n=$(terminus_free \"$d\" \"$stem$sx\" \"$p\")\n"
+    + "  art_one \"$p\" \"$d/$n\" \"$k\" \"$bk\" \"$x\" \"$g\" || s=1\n"
+    + "done\n"
+    + "exit $s\n", [dest || "", kind, String(o.blocks || 96), String(o.by || 16), o.gray ? "1" : "0",
+                   artSuffix(kind)].concat(paths));
+}
+
 // ONE picture into `dir` as `name`, through terminus_free like the rest —
 // for a source that is not where the result belongs (picasso's viewer
 // renders an edit to a temporary png first). The name the file actually got
@@ -3974,10 +4041,13 @@ function archiveTree(text) {
 // Both halves, together. `files` holds what was deleted and `info` the records
 // saying where each came from; removing one without the other leaves a trash
 // that every other implementation then reports inconsistently.
+// Every entry, by find rather than by glob: `.[!.]*` skipped names that
+// start with two dots ("..foo"), which then sat in a trash reported empty
+// (icarus' emptyTrash found it so and does the same).
 function emptyTrashCommand() {
-  const r = Strings.shellQuote(trashRoot());
-  return "rm -rf -- " + r + "/files/* " + r + "/files/.[!.]* "
-    + r + "/info/* " + r + "/info/.[!.]* 2>/dev/null; true";
+  const files = Strings.shellQuote(trashRoot() + "/files");
+  const info = Strings.shellQuote(trashRoot() + "/info");
+  return "find " + files + " " + info + " -mindepth 1 -maxdepth 1 -exec rm -rf -- {} + 2>/dev/null; true";
 }
 
 // How much the trash is holding — the files, not the records, which are a few

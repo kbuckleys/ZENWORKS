@@ -21,6 +21,7 @@ import Quickshell.Hyprland
 import Quickshell.Io
 import "../morpheus"
 import "../ceres"
+import "../morpheus/hypr.js" as Hypr
 import "../morpheus/lagnotes.js" as LagNotes
 
 Scope {
@@ -220,7 +221,7 @@ Scope {
   }
 
   function raise() {
-    Hyprland.dispatch('hl.dsp.focus({ window = "title:^(oracle)$" })');
+    Hyprland.dispatch(Hypr.focusTitle("oracle"));
   }
 
   // The window oracle is in has the keyboard: the one case where a toggle

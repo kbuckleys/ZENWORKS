@@ -8,7 +8,6 @@ NewsView 1.0 NewsView.qml
 SetupView 1.0 SetupView.qml
 ConfigView 1.0 ConfigView.qml
 ParuChoice 1.0 ParuChoice.qml
-Check 1.0 Check.qml
 StoreView 1.0 StoreView.qml
 StoreCard 1.0 StoreCard.qml
 StoreIcon 1.0 StoreIcon.qml

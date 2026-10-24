@@ -38,7 +38,6 @@
 
 import QtQuick
 import Quickshell
-import Quickshell.Widgets
 import Quickshell.Io
 import Quickshell.Hyprland
 import "."
@@ -2765,16 +2764,6 @@ FloatingWindow {
       }
     }
   }
-
-  // How many settings, everywhere, are off their defaults. Bound here rather
-  // than in the badge so the count is computed once per revision instead of
-  // once per repaint of a Text.
-  readonly property int totalChanged: {
-    Oracle.revision;
-    return Oracle.changedIn("");
-  }
-
-
 
   // ── the dropdown ──────────────────────────────────────────────────────
   // icarus' card, shared by every enum row. It is a separate layer surface,

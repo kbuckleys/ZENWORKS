@@ -4814,7 +4814,7 @@ FloatingWindow {
           font.weight: Zenon.weight
           font.pixelSize: Zenon.px(15)
         }
-        Check {
+        Controls.Check {
           visible: win.fpRemove && win.fpDataSize !== ""
           lit: win.fpDeleteData
           label: "Also delete what it kept \u2014 ~/.var/app/" + (fpGetSheet.a ? fpGetSheet.a.pkg : "") + ", " + win.fpDataSize
@@ -4941,7 +4941,7 @@ FloatingWindow {
             font.pixelSize: Zenon.px(14)
           }
         }
-        Check {
+        Controls.Check {
           visible: win.fpDataSize !== ""
           lit: win.fpDeleteData
           label: "Also delete what the apps kept \u2014 ~/.var/app, " + win.fpDataSize

@@ -16,7 +16,6 @@
 // the caret back at the start.
 
 import QtQuick
-import Quickshell
 import Quickshell.Widgets
 import "../morpheus"
 import "notes.js" as N

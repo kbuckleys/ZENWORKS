@@ -904,6 +904,12 @@ module.exports = {
     t.ok("only its own cache is swept", pc.indexOf("find '/c/pdf' -mindepth 1") >= 0);
     t.ok("one page renders only that page",
       T.pdfPageCommand("/x.pdf", "/c/k", 4, 1600).indexOf("-f 4 -l 4") >= 0);
+
+    // ── emptying the trash: every entry, "..foo" too (a glob skipped it) ──
+    const et = T.emptyTrashCommand();
+    t.ok("the trash is emptied entry by entry", et.indexOf("-mindepth 1 -maxdepth 1 -exec rm -rf -- {} +") >= 0);
+    t.ok("both halves of it", et.indexOf("/Trash/files'") >= 0 && et.indexOf("/Trash/info'") >= 0);
+    t.ok("by no glob", et.indexOf("*") < 0);
     t.eq("the tag comes back",
       T.parseFolderFacts("u:g\n1\n2\n3\nend 17\n").tag, "17");
     t.eq("an unreadable owner is empty, not a shift",
@@ -1124,5 +1130,16 @@ module.exports = {
     const ex = T.exportCommand(["/a/b.png"], "", "webp", 1600, 82, "web");
     t.eq("export: its settings travel as arguments", ex.args, ["", "webp", "1600", "82", "-web", "/a/b.png"]);
     t.eq("export: never blown up", ex.script.indexOf('${px}x${px}>') > 0, true);
+
+    const art = T.artExportCommand(["/a/b c.png"], "", "pixel");
+    t.eq("art export: the kind and the paths travel as arguments", art.args, ["", "pixel", "96", "16", "0", "-pixel.png", "/a/b c.png"]);
+    t.eq("art export: the block size and grays travel too",
+      T.artExportCommand(["/a.png"], "", "ascii", { blocks: 24, by: 64, gray: true }).args.slice(2, 5), ["24", "64", "1"]);
+    t.eq("art export: through the free-name helper", art.script.indexOf("terminus_free") >= 0, true);
+    t.eq("art export: each kind names its own copy",
+      ["pixel", "ascii", "text"].map(T.artSuffix), ["-pixel.png", "-ascii.png", "-ascii.txt"]);
+    t.eq("art preview: its settings in the script, the paths as $1 and $2",
+      T.artScript("ascii", { gray: true }).trim().split("\n").pop(), 'art_one "$1" "$2" ascii 96 16 1');
+    t.eq("art preview: an unknown kind is pixel art", T.artScript("rm -rf", {}).indexOf("rm -rf\n") < 0, true);
   }
 };

@@ -1064,8 +1064,7 @@ Item {
   // NO SCRIM OF ITS OWN: one per window stopped at the window's edge, and
   // the editor's inset beside the first column came out a darker sliver
   // under the first tab (user's capture, 2026-10-09). The plato window lays
-  // one across each whole bar while any edge is on — see edgesAbove/Below.
-  readonly property bool edgeAboveOn: topEdge.on
+  // one across the status bar while any edge is on — see edgesBelow.
   readonly property bool edgeBelowOn: footEdge.on
   ScrollEdge {
     id: topEdge

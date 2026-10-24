@@ -8,9 +8,7 @@
 // one passes it (`term: root`).
 
 import QtQuick
-import Quickshell
 import "../morpheus"
-import "tags.js" as Tags
 
 Item {
   // the terminus window — passed in by whoever makes one. NOT `root`:

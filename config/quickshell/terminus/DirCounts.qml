@@ -14,7 +14,6 @@
 // and the listing that carries it is already being kept fresh.
 
 import QtQuick
-import Quickshell
 import Quickshell.Io
 
 Item {

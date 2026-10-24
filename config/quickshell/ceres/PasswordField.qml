@@ -15,9 +15,7 @@
 // events to `key()`, which is the one place typing is understood.
 
 import QtQuick
-import Quickshell
 import "../morpheus"
-import "."
 
 Item {
   id: field

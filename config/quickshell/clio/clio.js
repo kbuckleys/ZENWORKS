@@ -52,6 +52,9 @@ var MIN_W = 180;
 var MIN_H = 44;
 var MAX_W = 900;
 var MAX_H = 900;
+// the widest a note grows to fit its text (ClioBoard slot.fit); a new note's
+// width, which has room for its whole head
+var FIT_W = 350;
 
 function clamp(v, lo, hi) {
   v = Number(v);
@@ -103,7 +106,11 @@ function sane(n, id) {
     face: String(n.face || ""),
     z: Math.round(Number(n.z) || 0),
     // pinned above windows: drawn on the board in the top layer (ClioBoard)
-    above: !!n.above
+    above: !!n.above,
+    // RESIZED BY HAND: the corner grip set this note's height, so it keeps
+    // it rather than fitting its text on leaving edit mode (ClioBoard
+    // slot.fit). Cleared by "Fit to text".
+    sized: !!n.sized
   };
 }
 

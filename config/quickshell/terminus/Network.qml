@@ -56,9 +56,6 @@ Item {
   }
   function keep(place) { net.persist(N.savePlace(net.places, place)); }
   function forget(uri) { net.persist(N.dropPlace(net.places, uri)); }
-  function placeOf(uri) {
-    return net.places.find((p) => N.sameUri(p.uri, uri)) || null;
-  }
 
   // ── WHAT IS MOUNTED ──
   // Asked when a window shows, after every connect or disconnect, and

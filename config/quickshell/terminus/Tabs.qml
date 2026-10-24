@@ -8,9 +8,7 @@
 // one-line forwarder for each function here, so callers are unchanged.
 
 import QtQuick
-import Quickshell
 import "../morpheus"
-import "terminus.js" as Terminus
 
 Item {
   id: tabs

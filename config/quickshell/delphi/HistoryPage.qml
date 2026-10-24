@@ -23,7 +23,6 @@
 //   here · menu: everything else (a patch of it, too)
 
 import QtQuick
-import Quickshell
 import "../morpheus"
 import "../terminus"
 import "delphi.js" as D

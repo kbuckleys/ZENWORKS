@@ -430,16 +430,9 @@ Item {
     readonly property real contentX: 0
     readonly property real contentY: 0
   }
-  // any edge under a bar is on: the plato window lays the bar's one scrim
-  // (the edges lay none — see WindowView's edgeAboveOn)
-  readonly property bool edgesAbove: {
-    if (mapTopEdge.on) return true;
-    for (let i = 0; i < windows.count; ++i) {
-      const it = windows.itemAt(i);
-      if (it && it.edgeAboveOn) return true;
-    }
-    return false;
-  }
+  // any edge under the status bar is on: the plato window lays the bar's
+  // one scrim (the edges lay none — see WindowView's edgeBelowOn). The tab
+  // strip's veil is always laid (user, 2026-10-13), so nothing asks above.
   readonly property bool edgesBelow: {
     if (mapFootEdge.on) return true;
     for (let i = 0; i < windows.count; ++i) {

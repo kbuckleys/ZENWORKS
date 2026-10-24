@@ -21,7 +21,6 @@
 // one passes it (`term: root`).
 
 import QtQuick
-import Quickshell
 import "../morpheus"
 
 ListView {

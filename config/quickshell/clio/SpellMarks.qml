@@ -92,11 +92,17 @@ Item {
       id: sq
       required property var modelData
       readonly property var f: sm.field
-      readonly property rect ra: { void [sq.f.width, sq.f.length, sq.f.font.pixelSize]; return sq.f.positionToRectangle(sq.modelData.a); }
-      readonly property rect rb: { void [sq.f.width, sq.f.length, sq.f.font.pixelSize]; return sq.f.positionToRectangle(sq.modelData.b); }
+      // the text got shorter than the word since it was asked (a delete, a
+      // note swapped in): hidden until the respell a moment later, and never
+      // measured past the end, which Qt warns about once per position
+      readonly property bool stale: sq.modelData.b > sq.f.length
+      visible: !sq.stale
+      function rectAt(pos) { return sq.f.positionToRectangle(Math.min(pos, sq.f.length)); }
+      readonly property rect ra: { void [sq.f.width, sq.f.length, sq.f.font.pixelSize]; return sq.rectAt(sq.modelData.a); }
+      readonly property rect rb: { void [sq.f.width, sq.f.length, sq.f.font.pixelSize]; return sq.rectAt(sq.modelData.b); }
       // a word that ends its line has its end on the next one: measured to
       // its last letter then
-      readonly property rect rl: { void [sq.f.width, sq.f.length]; return sq.f.positionToRectangle(Math.max(sq.modelData.a, sq.modelData.b - 1)); }
+      readonly property rect rl: { void [sq.f.width, sq.f.length]; return sq.rectAt(Math.max(sq.modelData.a, sq.modelData.b - 1)); }
       readonly property real wordW: Math.max(4, sq.rb.y === sq.ra.y ? sq.rb.x - sq.ra.x : sq.rl.x + sq.f.font.pixelSize * 0.5 - sq.ra.x)
       readonly property int padX: Math.max(2, Math.round(sq.f.font.pixelSize * 0.16))
       x: Math.round(sq.ra.x - sq.padX)

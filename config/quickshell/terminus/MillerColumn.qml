@@ -27,7 +27,6 @@
 // one passes it (`term: root`).
 
 import QtQuick
-import Quickshell
 import "../morpheus"
 import "terminus.js" as Terminus
 

@@ -42,6 +42,7 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Hyprland
 import "../morpheus"
+import "../morpheus/controls" as Ctl
 import "../terminus"
 import "alexandria.js" as A
 
@@ -1894,28 +1895,13 @@ FloatingWindow {
       }
 
       // what was just done, said once
-      Rectangle {
+      Ctl.Said {
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.bottom: parent.bottom
         anchors.bottomMargin: 18
-        width: saidText.implicitWidth + 32
-        height: 34
-        radius: Zenon.windowRadius
-        color: Zenon.hud(0.85)
-        border.width: 1
-        border.color: Zenon.border
-        opacity: win.said !== "" ? 1 : 0
-        visible: opacity > 0
-        Behavior on opacity { NumberAnimation { duration: Zenon.normal; easing.type: Easing.OutCubic } }
-        Text {
-          id: saidText
-          anchors.centerIn: parent
-          text: win.said
-          color: Zenon.ink
-          font.family: Zenon.face
-          font.weight: Zenon.weight
-          font.pixelSize: Zenon.px(14)
-        }
+        maxWidth: Infinity
+        text: win.said
+        pixelSize: Zenon.px(14)
       }
     }
 

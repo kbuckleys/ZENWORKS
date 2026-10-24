@@ -329,7 +329,6 @@ Singleton {
       root.reprobe();
     }
   }
-  readonly property bool vpnBusy: vpnProc.running
   // A WireGuard .conf or an OpenVPN .ovpn, into NetworkManager
   function importVpn(path) {
     if (!path || importProc.running) return;

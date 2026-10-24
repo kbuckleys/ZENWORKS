@@ -21,7 +21,6 @@
 // (its own fit query), so the two never disagree.
 
 import QtQuick
-import Quickshell
 import Quickshell.Io
 import Quickshell.Hyprland
 

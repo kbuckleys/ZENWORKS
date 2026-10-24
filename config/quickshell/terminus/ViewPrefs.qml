@@ -8,8 +8,6 @@
 // one-line forwarder for each function here, so callers are unchanged.
 
 import QtQuick
-import Quickshell
-import "terminus.js" as Terminus
 import "../morpheus/lru.js" as Lru
 
 Item {

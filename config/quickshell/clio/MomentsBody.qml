@@ -14,7 +14,6 @@
 // background — never the 12MB original decoded for a 104px tile (user, 2026-10-17).
 
 import QtQuick
-import Quickshell
 import Quickshell.Io
 import Quickshell.Widgets
 import "../morpheus"

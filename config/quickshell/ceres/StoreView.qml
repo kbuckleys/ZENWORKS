@@ -31,8 +31,8 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import Quickshell.Widgets
-import QtQuick.Effects
 import "../morpheus"
+import "../morpheus/controls" as Controls
 import "../terminus" as Term
 import "../oracle"
 import "."
@@ -1239,7 +1239,7 @@ Item {
                 width: permCol.width
                 height: 26
                 // installed: a switch for each — off is an override
-                Check {
+                Controls.Check {
                   id: permCheck
                   visible: page.permsLive
                   x: 30
@@ -1495,7 +1495,8 @@ Item {
           }
           Grid {
             id: facts
-            readonly property var rows: {
+            // not `rows`: that is Grid's own row count, shadowed
+            readonly property var factRows: {
               const a = page.a, i = store.info || {};
               if (!a) return [];
               const out = [];
@@ -1518,7 +1519,7 @@ Item {
             columnSpacing: 26
             rowSpacing: 14
             Repeater {
-              model: facts.rows
+              model: facts.factRows
               delegate: Column {
                 required property var modelData
                 width: (page.colW - facts.columnSpacing * (facts.columns - 1)) / facts.columns

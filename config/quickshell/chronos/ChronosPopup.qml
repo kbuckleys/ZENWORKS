@@ -18,7 +18,6 @@
 // selection to match. One selected date, two views of it.
 
 import QtQuick
-import Quickshell
 import Quickshell.Io
 import Quickshell.Hyprland
 import Quickshell.Widgets

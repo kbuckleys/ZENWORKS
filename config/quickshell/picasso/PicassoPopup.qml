@@ -258,7 +258,13 @@ LayerPopup {
   // dead halfway down with the picker gone.
   // and while the screen picker is choosing the card's accent: its overlay
   // takes the focus, and the card must still be there when it hands back
+  // (or the maker's color)
   readonly property bool capturing: gridScroll.dragging || Picasso.pickInto === "card:accent"
+                                    || Picasso.pickInto === "popup:maker"
+  Connections {
+    target: Picasso
+    function onColorPicked(into, hex) { if (into === "popup:maker") popup.pickHex = hex; }
+  }
 
   // A clear that arrived mid-gesture was SWALLOWED, and a swallowed grab is
   // still a lost one: it has to be taken again when the gesture ends, or
@@ -1002,6 +1008,13 @@ LayerPopup {
                 anchors.margins: 18
                 spacing: 8
 
+                // any color on screen into the maker: the suite's picker,
+                // as oracle's Accent color has it (user, 2026-10-24)
+                DialogButton {
+                  glyph: true
+                  label: "\u{F020A}"
+                  onClicked: Picasso.pickFor("popup:maker")
+                }
                 // keep it as a swatch of its own
                 DialogButton {
                   label: Picasso.colors.indexOf(popup.pickHex) >= 0 ? "Saved" : "Save"

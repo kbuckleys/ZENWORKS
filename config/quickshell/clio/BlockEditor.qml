@@ -21,7 +21,6 @@
 // mouse themselves; that is what lets a drag cross from one to the next.
 
 import QtQuick
-import Quickshell
 import "../morpheus"
 import "../morpheus/undo"
 import "notes.js" as N

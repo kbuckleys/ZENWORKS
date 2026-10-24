@@ -13,7 +13,6 @@
 // qmldir, and a type added to one is not seen until the shell restarts.
 
 import QtQuick
-import "oracle.js" as Ora
 import "../morpheus"
 import "../morpheus/controls" as Controls
 import "../ceres"

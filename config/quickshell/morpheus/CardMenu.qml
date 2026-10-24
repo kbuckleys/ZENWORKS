@@ -29,7 +29,9 @@
 // than from the font; `mark` is a tick on the right, for the rows that report
 // a current choice rather than perform an action; `danger` reddens a row that
 // is armed and waiting to be confirmed; `asks` means the row opens a question
-// rather than acting, so it does not flash.
+// rather than acting, so it does not flash. A row with `children` (rows of
+// its own) is a branch: pointed at, they open in CardPopup's card beside it
+// (MenuCore's BRANCHES), and a row picked there comes out as subChosen.
 //
 // IT DOES NOT GRAB FOCUS ITSELF. A menu is almost never alone — a submenu is
 // open beside it, and the layer that opened them both is underneath — and a
@@ -102,7 +104,7 @@ PanelWindow {
       if (!r || r.isSeparator) continue;
       let w = rowMetrics.advanceWidth(String(r.text || "")) + 12 + 10;
       if (r.icon || r.image) w += 16 + Zenon.menuIconGap;
-      if (r.hasChildren || r.mark !== undefined) w += 16 + 8;
+      if (r.hasChildren || r.children || r.mark !== undefined) w += 16 + 8;
       most = Math.max(most, w);
     }
     return Math.ceil(most + Zenon.menuCardPad * 2 + 2 + Zenon.menuFitSlack);
@@ -150,6 +152,7 @@ PanelWindow {
   property real shade: 0
   onOpenChanged: {
     root.shade = root.open ? 1 : 0;
+    if (!root.open) root.closeBranch();
     // on its current answer, once the card has its height (CardBody.reveal)
     if (root.open) Qt.callLater(body.reveal);
   }
@@ -258,9 +261,14 @@ PanelWindow {
     // (a whole menu taller than the screen still scrolls, or its last rows
     // could not be reached)
     still: root.whole && (!root.screen || root.contentH <= root.screen.height - Zenon.menuShadowPad * 2)
-    activeIndex: root.activeIndex
-    onChosen: (i) => root.chosen(i)
-    onHovered: (i) => root.hovered(i)
+    // the branch whose card is open stays lit while the pointer is in it
+    activeIndex: root.branch >= 0 ? root.branch : root.activeIndex
+    onChosen: (i) => {
+      const r = root.model[i];
+      if (r && r.children) { root.openBranch(i); return; }
+      root.chosen(i);
+    }
+    onHovered: (i) => { root.openBranch(i); root.hovered(i); }
     onUnhovered: (i) => root.unhovered(i)
     onSecondary: (i) => root.secondary(i)
   }
@@ -269,4 +277,41 @@ PanelWindow {
   signal unhovered(int index)
   signal secondary(int index)
   property int activeIndex: -1
+
+  // ── BRANCHES ──────────────────────────────────────────────────────────
+  // CardPopup's card hung off this surface at the row (a layer surface takes
+  // an xdg-popup as a window does), flipping to the left where the screen
+  // runs out. `child` is that card, for an owner's focus grab to list.
+  signal subChosen(int branch, int index)
+  property int branch: -1
+  property var child: null
+  function openBranch(i) {
+    const r = root.model[i];
+    if (!r || !r.children || r.enabled === false) { root.closeBranch(); return; }
+    if (root.branch === i && root.child) return;
+    root.closeBranch();
+    const c = Qt.createComponent("CardPopup.qml");
+    if (c.status !== Component.Ready) return;
+    // as a card a CardPopup hangs off: its inset, its width, the row's depth
+    const hinge = { pad: Zenon.menuShadowPad, cardW: root.cardW };
+    const k = c.createObject(root, { window: root, parentCard: hinge, hingeY: root.rowY(i) - 1,
+                                     fit: true, cardWidth: root.cardWidth, model: r.children });
+    if (!k) return;
+    root.branch = i;
+    root.child = k;
+    root.child.chosen.connect((j) => root.subChosen(i, j));
+    root.child.open = true;
+  }
+  function closeBranch() {
+    const k = root.child;
+    root.child = null;
+    root.branch = -1;
+    if (k) { k.open = false; k.destroy(); }
+  }
+  onModelChanged: {
+    if (!root.child) return;
+    const r = root.model[root.branch];
+    if (r && r.children) root.child.model = r.children;
+    else root.closeBranch();
+  }
 }

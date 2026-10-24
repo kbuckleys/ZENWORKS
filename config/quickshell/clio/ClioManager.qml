@@ -999,7 +999,6 @@ Scope {
   // sheet and on chronos' days. Ticked from there: what the window has typed
   // and not yet kept is kept first, then the note gets the item ticked —
   // only if it is still that item — and the window shows it afresh.
-  function tasksNow() { return N.tasks(mgr.notes, Date.now()); }
   function tickTask(t) {
     if (!t) return false;
     if (mgr.win) mgr.win.commit();

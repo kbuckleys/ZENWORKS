@@ -207,7 +207,8 @@ Item {
         }
       }
 
-      // the two buttons share the swatch's width
+      // the two buttons share the swatch's width: the picker its glyph
+      // alone (user, 2026-10-24), Reset the rest
       Row {
         id: tools
         width: parent.width
@@ -215,14 +216,15 @@ Item {
         // any color on screen: the suite's own picker (picasso), whose
         // click comes back here rather than to the clipboard
         DialogButton {
-          width: (tools.width - tools.spacing) / 2
-          label: "\u{F020A}  Picker"
+          id: pickBtn
+          glyph: true
+          label: "\u{F020A}"
           onClicked: Pic.Picasso.pickFor("oracle:" + cf.key)
         }
         // back to the theme's accent; dimmed while the color already is it
         // (user, 2026-10-21) — a custom hex that happens to match counts too
         DialogButton {
-          width: (tools.width - tools.spacing) / 2
+          width: tools.width - tools.spacing - pickBtn.width
           label: "\u{F0450}  Reset"
           ready: !cf.isTheme
           onClicked: if (!cf.isTheme) cf.useTheme()

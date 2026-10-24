@@ -8,7 +8,6 @@
 // one-line forwarder for each function here, so callers are unchanged.
 
 import QtQuick
-import Quickshell
 import Quickshell.Io
 import Quickshell.Hyprland
 import "../morpheus"

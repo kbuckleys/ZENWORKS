@@ -83,11 +83,10 @@ Rectangle {
   clip: true
   // TRANSPARENT: an inactive tab is the window's own body showing through
   // (black at the panel opacity, as every other surface), and the active
-  // tab paints the strip's gray itself — `hereBg`
+  // tab paints the strip's gray itself (Zenon.tabHere), untouched by a
+  // sheet, as terminus' (user, 2026-10-11): only the bars go with one,
+  // never the tabs
   color: "transparent"
-  // untouched by a sheet, as terminus' (user, 2026-10-11): only the bars go
-  // with one, never the tabs
-  readonly property color hereBg: Zenon.tabHere
   // the active tab's cell, for the glass under the strip (morpheus/TabGlass)
   property Item hereCell: null
 
@@ -103,8 +102,8 @@ Rectangle {
   property real dragX: 0
   function endDrag() { tabStrip.dragFrom = -1; tabStrip.dragTo = -1; }
   // THE INACTIVE GLASS, under every tab: the window lays no ground under
-  // the strip, so a cell paints only what it adds (Zenon.tabOver) and one
-  // rebuilt or mid-fade never leaves a hole (as terminus, 2026-10-09)
+  // the strip, so a cell paints only what it adds and one rebuilt or
+  // mid-fade never leaves a hole (as terminus, 2026-10-09)
   //
   // UNDER THE FROST, when the window lays it: painted here it sat over the
   // edges' blur (which the window puts under the whole bar) and hid it —

@@ -21,7 +21,6 @@
 // term.<id>Ref (the window's aliases).
 
 import QtQuick
-import Quickshell
 import "../morpheus"
 import "terminus.js" as Terminus
 

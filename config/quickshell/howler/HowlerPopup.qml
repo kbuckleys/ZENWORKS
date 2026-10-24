@@ -13,7 +13,6 @@
 // one growing out of the pill rather than appearing over it.
 
 import QtQuick
-import Quickshell
 import Quickshell.Widgets
 import Quickshell.Io
 import Quickshell.Hyprland

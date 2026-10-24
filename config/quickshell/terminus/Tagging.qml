@@ -11,7 +11,6 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import "../morpheus"
-import "terminus.js" as Terminus
 import "tags.js" as Tags
 
 Item {

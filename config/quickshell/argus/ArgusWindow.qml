@@ -788,30 +788,12 @@ FloatingWindow {
     }
 
     // ── what was just done, said once ────────────────────────────────────
-    Rectangle {
+    Ctl.Said {
       anchors.horizontalCenter: screen.horizontalCenter
       anchors.bottom: transport.top
       anchors.bottomMargin: 18
-      width: Math.min(saidText.implicitWidth + 32, 560)
-      height: 34
-      radius: Zenon.windowRadius
-      color: Zenon.hud(0.85)
-      border.width: 1
-      border.color: aw.saidBad ? Zenon.alpha(Zenon.red, 0.6) : Zenon.border
-      opacity: aw.said !== "" ? 1 : 0
-      visible: opacity > 0
-      Behavior on opacity { NumberAnimation { duration: Zenon.normal; easing.type: Easing.OutCubic } }
-      Text {
-        id: saidText
-        anchors.centerIn: parent
-        width: Math.min(implicitWidth, parent.width - 32)
-        elide: Text.ElideRight
-        text: aw.said
-        color: aw.saidBad ? Zenon.red : Zenon.ink
-        font.family: Zenon.face
-        font.weight: Zenon.weight
-        font.pixelSize: Zenon.px(15)
-      }
+      text: aw.said
+      bad: aw.saidBad
     }
 
     HintBar {

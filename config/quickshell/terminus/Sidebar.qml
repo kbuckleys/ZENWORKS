@@ -8,8 +8,6 @@
 // term.<id>Ref (the window's aliases).
 
 import QtQuick
-import Quickshell
-import Quickshell.Hyprland
 import QtQuick.Effects
 import "../morpheus"
 import "terminus.js" as Terminus

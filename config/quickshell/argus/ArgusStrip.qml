@@ -25,7 +25,6 @@ Item {
   property real position: 0
   // which handle is held: "in", "out", or ""
   readonly property string holding: inGrab.pressed ? "in" : outGrab.pressed ? "out" : ""
-  readonly property bool scrubbing: body.pressed
 
   signal seek(real ms)
   signal inMoved(real ms)

@@ -88,6 +88,9 @@ Variants {
     // Which note has the keyboard, "" for none. Board-local: the notes are
     // shared between screens, the keyboard is not.
     property string editing: ""
+    // Which note a press is holding (slot.busy), "" for none: its region
+    // covers the screen until the press ends (see the Instantiator below).
+    property string held: ""
 
     // ── THE REGION, ONE RECTANGLE PER NOTE ─────────────────────────────
     // Built rather than declared — see the note above. Positioned exactly as
@@ -119,10 +122,16 @@ Variants {
         readonly property bool headed: live && board.editing === key
         readonly property real reach: board.headH + board.headGap
         readonly property bool below: !!n && n.y - board.originY < reach
-        x: n ? Math.round(n.x - board.originX) : 0
-        y: n ? Math.round(n.y - board.originY - (headed && !below ? reach : 0)) : 0
-        width: live ? n.w : 0
-        height: live ? n.h + (headed ? reach : 0) : 0
+        // THE WHOLE SCREEN while it is held. The region is sent to the
+        // compositor after the note has moved, so it trails the pointer by
+        // a frame; a quick drag by the 30px head left it, and the press was
+        // taken away mid-drag. Only while the button is down, so nothing is
+        // swallowed once it is let go.
+        readonly property bool held: live && board.held === key
+        x: held ? 0 : n ? Math.round(n.x - board.originX) : 0
+        y: held ? 0 : n ? Math.round(n.y - board.originY - (headed && !below ? reach : 0)) : 0
+        width: held ? board.width : live ? n.w : 0
+        height: held ? board.height : live ? n.h + (headed ? reach : 0) : 0
       }
     }
 
@@ -165,7 +174,9 @@ Variants {
       // with no surface never covers it — so a click on a menu row counted
       // as a click outside, the grab cleared, and the note lost the
       // keyboard under whatever the row had just done.
-      windows: noteMenu.visible ? [ board, noteMenu ] : [ board ]
+      // (and its Color card, a popup of its own)
+      windows: !noteMenu.visible ? [ board ]
+        : noteMenu.child ? [ board, noteMenu, noteMenu.child ] : [ board, noteMenu ]
       active: board.editing !== "" || board.menuSlot !== null
       onCleared: {
         board.closeMenu();
@@ -204,10 +215,19 @@ Variants {
       // every row in sight, no scrolling (user, 2026-10-17)
       whole: true
       cardWidth: 240
-      model: board.menuItems.map((it) => it.isSeparator ? { isSeparator: true }
-        : { text: it.text, icon: it.icon, hint: it.hint || "", enabled: it.enabled !== false })
+      function row(it) {
+        return it.isSeparator ? { isSeparator: true }
+          : { text: it.text, icon: it.icon, hint: it.hint || "", enabled: it.enabled !== false,
+              iconInk: it.iconInk, children: it.children ? it.children.map(noteMenu.row) : undefined };
+      }
+      model: board.menuItems.map(noteMenu.row)
       onChosen: (i) => {
         const it = board.menuItems[i];
+        board.closeMenu();
+        if (it && it.run && it.enabled !== false) it.run();
+      }
+      onSubChosen: (b, i) => {
+        const it = board.menuItems[b] && board.menuItems[b].children ? board.menuItems[b].children[i] : null;
         board.closeMenu();
         if (it && it.run && it.enabled !== false) it.run();
       }
@@ -447,6 +467,10 @@ Variants {
 
           visible: slot.note !== null && board.mine(slot.note)
           property bool busy: false
+          onBusyChanged: {
+            if (slot.busy) board.held = slot.noteId;
+            else if (board.held === slot.noteId) board.held = "";
+          }
 
           // ── CHOOSING A TYPEFACE ──────────────────────────────────────
           // The list stands where the text was until a face is picked or
@@ -480,8 +504,109 @@ Variants {
           // takes no keyboard — so the board lost it, and the list closed
           // the moment it opened.
           function settle() {
-            if (!slot.body.activeFocus && !slot.pickFocus && board.editing === slot.noteId)
+            if (!slot.body.activeFocus && !slot.pickFocus && board.editing === slot.noteId) {
               board.editing = "";
+              slot.fit(false);
+            }
+          }
+          // ── FITTING ITS TEXT ─────────────────────────────────────────
+          // On leaving edit mode the note takes its text's size: as narrow
+          // as its longest line, up to Scribe.FIT_W (where a long note
+          // wraps), and as tall as the lines at that width. A note sized by
+          // hand at its corner keeps its size (`sized`) until "Fit to text"
+          // or its hover button asks again. Empty notes keep theirs, or a
+          // fresh one left blank would shrink to a sliver. Never past its
+          // screen's right or bottom gutter.
+          //
+          // MEASURED ON `gauge`, never on the body: the body is the width
+          // the note has now, and the height wanted is the one at the width
+          // it is about to have.
+          property bool fitting: false
+          function fit(force) {
+            const n = slot.note;
+            if (!n || (n.sized && !force) || slot.body.length === 0) return;
+            if (force && n.sized) Clio.set(slot.noteId, "sized", false);
+            // the card's room around the text, MEASURED: the inset, and the
+            // border the clip's content sits inside — assumed to be the
+            // inset alone, every fit came out 2px short and the fade hid
+            // the last line
+            const padW = slot.width - slot.body.width;
+            const padH = slot.height - field.scroll.height;
+            gauge.text = slot.body.text;
+            let w = Math.ceil(gauge.implicitWidth + padW + 4);
+            if (board.screen)
+              w = Math.min(w, board.originX + board.screen.width - board.snapGutter - n.x);
+            w = Scribe.clamp(Math.min(w, Scribe.FIT_W), Scribe.MIN_W, Scribe.MAX_W);
+            gauge.width = w - padW;
+            w = slot.unwidowed(w, padW);
+            gauge.width = w - padW;
+            let h = Math.ceil(gauge.implicitHeight + padH);
+            if (board.screen)
+              h = Math.min(h, board.originY + board.screen.height - board.snapGutter - n.y);
+            h = Scribe.clamp(h, Scribe.MIN_H, Scribe.MAX_H);
+            gauge.text = "";
+            if (Math.round(w) === n.w && Math.round(h) === n.h) return;
+            slot.fitting = true;
+            Clio.place(slot.noteId, n.x, n.y, w, h);
+          }
+          // NO WORD LEFT ALONE. A wrapped paragraph ending on a line of one
+          // word reads as a mistake, so the fit narrows the note a few
+          // pixels at a time until every paragraph ends on two or more —
+          // at the same number of lines if it can, one more if it must,
+          // and as it was if neither comes within reach.
+          function widows() {
+            const lines = gauge.lineCount;
+            if (lines < 2) return 0;
+            const lh = gauge.implicitHeight / lines;
+            const starts = [];
+            for (let i = 0; i < lines; i++) starts.push(gauge.positionAt(1, lh * i + lh / 2));
+            starts.push(gauge.length);
+            const brk = (t) => /[\n\u2029\u2028]$/.test(t);
+            let out = 0;
+            for (let i = 1; i < lines; i++) {
+              const t = gauge.getText(starts[i], starts[i + 1]);
+              const ends = i === lines - 1 || brk(t);
+              const wrapped = !brk(gauge.getText(starts[i - 1], starts[i]));
+              const words = t.trim().split(/\s+/).filter((x) => x !== "").length;
+              if (ends && wrapped && words === 1) out++;
+            }
+            return out;
+          }
+          function unwidowed(w, padW) {
+            if (slot.widows() === 0) return w;
+            const base = gauge.lineCount;
+            let more = -1;
+            for (let c = w - 6; c >= Math.max(Scribe.MIN_W, w - 140); c -= 6) {
+              gauge.width = c - padW;
+              if (slot.widows() !== 0) continue;
+              if (gauge.lineCount <= base) return c;
+              if (more < 0 && gauge.lineCount === base + 1) more = c;
+            }
+            return more > 0 ? more : w;
+          }
+          TextEdit {
+            id: gauge
+            visible: false
+            textFormat: TextEdit.RichText
+            wrapMode: TextEdit.Wrap
+            font.family: field.face
+            font.weight: field.weight
+            font.pixelSize: field.size
+          }
+          // Only the fit glides: a drag, or another screen's copy following
+          // one, moves at once. Let go when the glide ENDS, never on a
+          // timer: a Behavior switched off mid-glide leaves the card where
+          // it got to, short of the note, and the fade covered the last line.
+          function fitEnded() {
+            if (!fitW.running && !fitH.running) slot.fitting = false;
+          }
+          Behavior on width {
+            enabled: slot.fitting
+            NumberAnimation { id: fitW; duration: Zenon.normal; easing.type: Zenon.ease; onStopped: slot.fitEnded() }
+          }
+          Behavior on height {
+            enabled: slot.fitting
+            NumberAnimation { id: fitH; duration: Zenon.normal; easing.type: Zenon.ease; onStopped: slot.fitEnded() }
           }
           // Put down: the end of every gesture, released or taken away.
           function drop() {
@@ -532,6 +657,13 @@ Variants {
                 enabled: Scribe.stepSize(size, -1) !== size,
                 run: () => Clio.set(slot.noteId, "size", Scribe.stepSize(size, -1)) },
               { text: "Typeface", icon: "\uE659", run: () => slot.openFaces() },
+              // the head's swatches, in words: changed with the menu still on the note
+              { text: "Color", icon: "\u{F0765}", iconInk: slot.hue,
+                children: Scribe.HUES.map((h) => ({ text: h[0].toUpperCase() + h.slice(1),
+                  icon: slot.note && slot.note.hue === h ? "\uF111" : "\uF10C", iconInk: Clio.ink(h),
+                  run: () => Clio.set(slot.noteId, "hue", h) })) },
+              { text: "Fit to text", icon: "\u{F0EF5}", enabled: !!(slot.note && slot.note.sized),
+                run: () => slot.fit(true) },
               { isSeparator: true },
               { text: "New note", icon: "\uF067", run: () => Clio.addHere() },
               // the notebook, on this sticky in its Stickies shelf
@@ -575,7 +707,10 @@ Variants {
           // counted on the board while drawn at all (see board.drawn)
           readonly property bool onScreen: slot.popK > 0.001 && board.mine(slot.note)
           onOnScreenChanged: board.drawn += slot.onScreen ? 1 : -1
-          Component.onDestruction: if (slot.onScreen) board.drawn -= 1
+          Component.onDestruction: {
+            if (slot.onScreen) board.drawn -= 1;
+            if (board.held === slot.noteId) board.held = "";
+          }
           property real liftK: slot.lifted ? 1.015 : 1
           Behavior on liftK {
             NumberAnimation { duration: Zenon.normal; easing.type: Zenon.travelEase }
@@ -912,8 +1047,10 @@ Variants {
               // from under it on every frame, and the note grew in fits.
               // Reading the pointer off a thing the pointer is moving is a
               // feedback loop; the wall holds still.
+              property bool pulled: false
               onPressed: (m) => {
                 const p = mapToItem(wall, m.x, m.y);
+                pulled = false;
                 grabW = slot.note.w;
                 grabH = slot.note.h;
                 grabX = p.x;
@@ -924,6 +1061,7 @@ Variants {
               onPositionChanged: (m) => {
                 if (!pressed) return;
                 const p = mapToItem(wall, m.x, m.y);
+                pulled = true;
                 const s = board.snap(slot.noteId, slot.note.x, slot.note.y,
                   Scribe.clamp(grabW + (p.x - grabX),
                                Scribe.MIN_W, Scribe.MAX_W),
@@ -934,7 +1072,11 @@ Variants {
                   Scribe.clamp(s.w, Scribe.MIN_W, Scribe.MAX_W),
                   Scribe.clamp(s.h, Scribe.MIN_H, Scribe.MAX_H));
               }
-              onReleased: slot.drop()
+              // sized by hand from here on: no more fitting (slot.fit)
+              onReleased: {
+                slot.drop();
+                if (pulled && slot.note && !slot.note.sized) Clio.set(slot.noteId, "sized", true);
+              }
               onCanceled: slot.drop()
 
               Text {
@@ -944,6 +1086,35 @@ Variants {
                 font.family: Zenon.face
                 font.weight: Zenon.weight
                 font.pixelSize: Zenon.px(22)
+                Behavior on color { ColorAnimation { duration: Zenon.fast } }
+              }
+            }
+
+            // ── FIT AGAIN ────────────────────────────────────────────
+            // Beside the grip, and only on a note sized by hand, under the
+            // pointer, out of edit mode: the way back to fitting its text.
+            MouseArea {
+              id: refit
+              anchors.right: parent.right
+              anchors.bottom: parent.bottom
+              anchors.rightMargin: 26
+              width: 26
+              height: 26
+              readonly property bool shown: !!(slot.note && slot.note.sized)
+                && !slot.active && noteHov.hovered && slot.body.length > 0
+              enabled: refit.shown
+              opacity: refit.shown ? 1 : 0
+              Behavior on opacity { NumberAnimation { duration: Zenon.fast } }
+              hoverEnabled: true
+              onClicked: slot.fit(true)
+
+              Text {
+                anchors.centerIn: parent
+                text: "\u{F0EF5}"
+                color: Zenon.wash(refit.pressed ? 0.3 : refit.containsMouse ? 0.7 : 0.45)
+                font.family: Zenon.face
+                font.weight: Zenon.weight
+                font.pixelSize: Zenon.px(18)
                 Behavior on color { ColorAnimation { duration: Zenon.fast } }
               }
             }

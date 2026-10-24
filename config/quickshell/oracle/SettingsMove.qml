@@ -89,6 +89,11 @@ Item {
         }
       }
       if (!Object.keys(b.files).length) { move.tell("There are no settings in it to bring here"); return; }
+      // the hypr files written fresh from their values: hyprland runs them,
+      // and a bundle's own text could hold any Lua (Ora.sanitizeBundleFile)
+      for (const rel of Object.keys(b.files)) b.files[rel] = Ora.sanitizeBundleFile(rel, b.files[rel], Oracle.bindList);
+      // and what it would run, shown on the sheet before it is taken
+      b.commands = Ora.bundleCommands(b.files);
       move.withScreens = false;
       move.pick = 0;
       move.pending = b;
@@ -162,6 +167,78 @@ Item {
       pick: move.pick
       onPicked: (i) => move.pick = i
       onChose: (i) => { if (i === 0) move.importNow(); else move.pending = null; }
+      // ── WHAT IT WOULD RUN ──
+      // startup apps run at login and default apps from the keys: a bundle
+      // from someone else is only as safe as these, so they are read first
+      Column {
+        id: cmdBox
+        readonly property var cmds: move.pending && move.pending.commands ? move.pending.commands : []
+        width: parent.width
+        spacing: 6
+        visible: cmdBox.cmds.length > 0
+        Text {
+          width: parent.width
+          wrapMode: Text.Wrap
+          text: cmdBox.cmds.length === 1 ? "It runs this command" : "It runs these commands"
+          color: Zenon.accentMuted
+          font.family: Zenon.face
+          font.weight: Zenon.weight
+          font.pixelSize: Zenon.px(13)
+        }
+        Rectangle {
+          width: parent.width
+          height: cmdCol.implicitHeight + 12
+          radius: Zenon.windowRadius
+          color: Zenon.wash(0.04)
+          border.width: 1
+          border.color: Zenon.border
+          Column {
+            id: cmdCol
+            x: 12
+            y: 6
+            width: parent.width - 24
+            Repeater {
+              model: cmdBox.cmds.slice(0, 8)
+              delegate: Column {
+                required property var modelData
+                width: cmdCol.width
+                topPadding: 3
+                bottomPadding: 3
+                opacity: modelData.off ? Zenon.disabledDim : 1
+                Text {
+                  width: parent.width
+                  elide: Text.ElideRight
+                  text: modelData.what + (modelData.off ? " · off" : "")
+                  color: Zenon.accentMuted
+                  font.family: Zenon.face
+                  font.weight: Zenon.weight
+                  font.pixelSize: Zenon.px(12)
+                }
+                Text {
+                  width: parent.width
+                  elide: Text.ElideMiddle
+                  text: modelData.command
+                  color: Zenon.white
+                  font.family: Zenon.faceMono
+                  font.weight: Zenon.weight
+                  font.pixelSize: Zenon.px(13)
+                }
+              }
+            }
+            Text {
+              visible: cmdBox.cmds.length > 8
+              width: cmdCol.width
+              height: 22
+              verticalAlignment: Text.AlignVCenter
+              text: "And " + (cmdBox.cmds.length - 8) + " more"
+              color: Zenon.accentMuted
+              font.family: Zenon.face
+              font.weight: Zenon.weight
+              font.pixelSize: Zenon.px(13)
+            }
+          }
+        }
+      }
       Item {
         width: parent.width
         height: visible ? 36 : 0
