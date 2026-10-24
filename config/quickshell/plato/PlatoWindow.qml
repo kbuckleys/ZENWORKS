@@ -13,12 +13,10 @@
 import QtQuick
 import Quickshell
 import Quickshell.Hyprland
-import Quickshell.Io
 import "../morpheus"
 import "../terminus"
 import "core"
 import "editor"
-import "../morpheus/room.js" as Room
 import "editor/actions.js" as Actions
 import "../morpheus/icons.js" as Icons
 import "../morpheus/hypr.js" as Hypr
@@ -276,7 +274,6 @@ FloatingWindow {
   // `root`, asked for when they open.)
   readonly property string treeRoot: Quickshell.env("HOME")
   readonly property bool treeShown: win.mgr && !win.capture ? win.mgr.treeShown : false
-  onTreeShownChanged: win.makeRoom(win.treeShown)
   function toggleTree() {
     if (!win.mgr) return;
     // hidden: show it and go there; shown but elsewhere: go there;
@@ -297,7 +294,7 @@ FloatingWindow {
   // is uncovered rather than squeezed. A tree shown or hidden in the window
   // you are using (a floating one) grows or shrinks the WINDOW by the tree's
   // width, so the editor keeps its size rather than being pushed inward
-  // (see makeRoom).
+  // (see SideRoom, below).
   readonly property real treeTarget: !win.mgr ? 300
     : win.mgr.liveTreeWidth > 0 ? win.mgr.liveTreeWidth : win.mgr.treeWidth
   Item {
@@ -308,14 +305,13 @@ FloatingWindow {
     clip: true
     visible: width > 0.5
     // while Hyprland resizes the window for it, the tree is whatever the
-    // window has gained (see keepW); otherwise it slides on its own
-    width: win.keepW >= 0 ? Math.max(0, Math.min(win.treeTarget, win.width - win.keepW))
+    // window has gained (SideRoom); otherwise it slides on its own
+    width: room.keepW >= 0 ? Math.max(0, Math.min(win.treeTarget, win.width - room.keepW))
       : win.treeShown && !win.zen ? win.treeTarget : 0
     Behavior on width {
       // a drag of the edge follows the pointer, not an easing; nor does a
-      // tree that is following the window's own resize (`following`, its
-      // own flag — see releaseFollow for why it is not keepW)
-      enabled: (!win.mgr || win.mgr.liveTreeWidth < 0) && !win.following
+      // tree that is following the window's own resize (room.following)
+      enabled: (!win.mgr || win.mgr.liveTreeWidth < 0) && !room.following
       NumberAnimation { id: treeSlide; duration: Zenon.normal * 2; easing.type: Zenon.travelEase }
     }
 
@@ -377,117 +373,26 @@ FloatingWindow {
     }
   }
 
-  // ── THE WINDOW MAKES ROOM FOR ITS TREE, AS TERMINUS' DOES FOR ITS SPLIT
-  // The same logic, through the same functions (morpheus/room.js,
-  // see the notes on `fitSplit` in TerminusWindow):
-  // showing the tree in a floating window widens it by the tree, as far as
+  // ── THE WINDOW MAKES ROOM FOR ITS TREE (terminus/SideRoom) ────────────
+  // Showing the tree in a floating window widens it by the tree, as far as
   // the monitor allows, and hiding it gives exactly that back, from the left
-  // edge so the editor holds still — pushed inward only if the monitor's
-  // edge is in the way, never recentered. Tiled, fullscreen or maximized,
-  // the layout owns the size and nothing happens. Hyprland does the resize, because a mapped
-  // Quickshell window ignores a new implicitWidth.
-  //
-  // `treeGrew` is what was added, so a hide gives back only that. Each
-  // request says what it was for (`fitFor`) and resizes at most once
-  // (`fitPending`): a quick show-hide must not land the show's answer after
-  // the hide and ratchet the window wider, the bug terminus' split had.
+  // edge so the editor holds still. Tiled, fullscreen or maximized, the
+  // layout owns the size and the tree just slides. While Hyprland resizes,
+  // the editor keeps its width (room.keepW) and the tree is what the window
+  // has gained, one animation rather than two (the text used to shake).
   //
   // Only the window the toggle happened in: the tree is shown or hidden in
   // every plato window at once (oracle's setting), and the others keep their
   // size and make room inside.
-  property int treeGrew: 0
-  property int treeWant: 0
-  property bool fitFor: false
-  property bool fitPending: false
-  // ONE ANIMATION, NOT TWO. The tree used to slide on its own clock while
-  // Hyprland animated the window's resize and move on another; every
-  // frame the editor sat somewhere different inside a window that was
-  // somewhere different on screen, and the text shook left and right. Now,
-  // while the window is resized for the tree, the editor keeps its width
-  // (keepW: the window's width less the tree, at the toggle) and the tree is
-  // exactly what the window has gained or not yet given back. -1: not
-  // following; released once the window lands, or after a ceiling.
-  property real keepW: -1
-  property bool following: false
-  property int fitTarget: 0
-  // IN THIS ORDER. Releasing used to be keepW = -1 alone, which in one
-  // stroke switched the slide back on AND moved the tree's target — and
-  // which of the two Qt applied first was not ours to choose. Target
-  // first, and the tree jumped: in a tiled or maximized window (where
-  // no resize ever comes, and every toggle ends here) it vanished on a
-  // hide and the editor leapt sideways, then crept back. The slide is
-  // switched on first, then the target moves.
-  function releaseFollow() {
-    win.following = false;
-    win.keepW = -1;
-    followCeiling.stop();
-  }
-
-  // whether the layout owns the size (tiled, maximized, fullscreen): known
-  // before a toggle, so the tree in such a window slides at once — see
-  // terminus/LayoutProbe.qml
-  LayoutProbe { id: layout; title: win.title }
-  Timer { id: followCeiling; interval: 1500; onTriggered: win.releaseFollow() }
-  // LANDED: THE OTHER ORDER. The window's width arrives here before the
-  // tree's binding has seen it, so the tree still holds its width from
-  // before the resize (0 opening, the full width closing); switching the
-  // slide on first eased it from that all over again, and the editor took
-  // the whole window for a moment. With the slide still off, the tree goes
-  // straight to the width the window just gained (terminus' sidebar too).
-  onWidthChanged: if (win.keepW >= 0 && win.fitTarget > 0 && Math.abs(win.width - win.fitTarget) < 1) {
-    win.keepW = -1;
-    win.following = false;
-    followCeiling.stop();
-  }
-  function makeRoom(shown) {
-    if (!editor.Window.active) return;
-    // the layout owns the size: no resize will come, the tree just slides
-    if (layout.laidOut) { win.treeGrew = 0; return; }
-    if (shown) {
-      if (win.treeGrew > 0) return;
-      win.treeWant = win.width + Math.round(win.treeTarget);
-    } else if (win.treeGrew > 0) win.treeWant = win.width - win.treeGrew;
-    // a tree that was already out when the window floated (it opened tiled,
-    // or with the tree on) never grew it, but hiding it must still give its
-    // width back, as terminus' does (user, 2026-10-20)
-    else if (sidebarBox.width > 0.5) win.treeWant = win.width - Math.round(sidebarBox.width);
-    else return;
-    win.following = true;
-    win.keepW = win.width - sidebarBox.width;
-    win.fitTarget = 0;
-    followCeiling.restart();
-    win.fitFor = shown;
-    win.fitPending = true;
-    fitProc.running = false;
-    fitProc.running = true;
-  }
-  Process {
-    id: fitProc
-    command: ["sh", "-c", "hyprctl -j activewindow; echo '@@mons'; hyprctl -j monitors"]
-    stdout: StdioCollector {
-      id: fitOut
-      onStreamFinished: {
-        if (!win.fitPending) return;
-        // asked for a state we have since toggled out of
-        if (win.fitFor !== win.treeShown) { win.fitPending = false; return; }
-        const parts = fitOut.text.split("@@mons");
-        let w = null, mons = null;
-        try { w = JSON.parse(parts[0]); mons = JSON.parse(parts[1]); } catch (e) { win.releaseFollow(); return; }
-        // the window the toggle happened in is the focused one; anything
-        // else answering here is not ours to resize
-        if (!w || w.class !== "org.quickshell" || w.title !== win.title) { win.releaseFollow(); return; }
-        win.fitPending = false;
-        layout.note(w);
-        const room = Room.make(w, mons, win.treeWant, 16, 480, "left");
-        // no resize coming (tiled, or no room): the tree slides as before
-        if (!room) win.releaseFollow();
-        else {
-          win.fitTarget = w.size[0] + room.dw;
-          Room.dispatches(w.address, room).forEach((d) => Hyprland.dispatch(d));
-        }
-        win.treeGrew = win.fitFor && room ? room.dw : 0;
-      }
-    }
+  SideRoom {
+    id: room
+    window: win
+    anchor: editor
+    shown: win.treeShown
+    want: win.treeTarget
+    box: sidebarBox
+    edge: "left"
+    minW: 480
   }
 
   // the tree's edge: terminus/SeamGrip — a hairline, cyan under the pointer,

@@ -53,7 +53,7 @@ QS="$CONFIG/quickshell"
 # quickshell keeps a shell's state, data and cache under by-shell/<md5 of its
 # shell.qml path>: this config's, and no other config's or test copy's
 SHELL_ID="$(printf '%s' "$QS/shell.qml" | md5sum | cut -d' ' -f1)"
-# a config reached through a link (stow) may be known by its real path
+# a config reached through a link may be known by its real path
 if [[ ! -d "$STATE_HOME/quickshell/by-shell/$SHELL_ID" && -e "$QS/shell.qml" ]]; then
   real_id="$(printf '%s' "$(readlink -f -- "$QS/shell.qml")" | md5sum | cut -d' ' -f1)"
   [[ -d "$STATE_HOME/quickshell/by-shell/$real_id" ]] && SHELL_ID="$real_id"
@@ -151,10 +151,10 @@ collect_files() {
   done
   for d in "${CONFIGS[@]}"; do
     [[ -e "$CONFIG/$d" ]] || continue
-    # a link (stow, a dotfiles repo) is yours to undo: removing what it
+    # a link (a dotfiles repository of yours) is yours to undo: removing what it
     # points into would reach into that repo
     if [[ -L "$CONFIG/$d" ]]; then
-      LEFT+=("$(short "$CONFIG/$d")  a link to $(short "$(readlink -f -- "$CONFIG/$d")"); remove it where you made it (stow -D)")
+      LEFT+=("$(short "$CONFIG/$d")  a link to $(short "$(readlink -f -- "$CONFIG/$d")"); remove it where you made it")
       continue
     fi
     # only a directory holding some file ZENWORKS ships is ZENWORKS's: the
@@ -178,7 +178,7 @@ collect_files() {
   for f in "${DOTFILES[@]}"; do
     [[ -e "$HOME/$f" ]] || continue
     if [[ -L "$HOME/$f" ]]; then
-      LEFT+=("$(short "$HOME/$f")  a link to $(short "$(readlink -f -- "$HOME/$f")"); remove it where you made it (stow -D)")
+      LEFT+=("$(short "$HOME/$f")  a link to $(short "$(readlink -f -- "$HOME/$f")"); remove it where you made it")
       continue
     fi
     if cmp -s "$HOME/$f" "$REPO/home/$f"; then REMOVE+=("$HOME/$f")
@@ -367,15 +367,20 @@ collect_system() {
 PKGS=()
 PKG_NOTE=""
 
-# Everything ZENWORKS can put on a machine: the installer's list, what the
-# shell installed for itself through Ceres (noted in added.txt since
-# 2026-10-22), the package names its code asks for (for installs from before
-# that), and paru when install built it. Offered only when it was not there
-# before install ran.
+# what an older install put on a machine that this one no longer lists
+# (stow: Delphi's Stow page, scrapped 2026-10-24)
+RETIRED=(stow)
+
+# Everything ZENWORKS can put on a machine: the installer's list, the ones it
+# no longer lists (RETIRED), what the shell installed for itself through Ceres
+# (noted in added.txt since 2026-10-22), the package names its code asks for
+# (for installs from before that), and paru when install built it. Offered
+# only when it was not there before install ran.
 collect_packages() {
   local wanted p
   wanted="$(sed -n '/^PACKAGES=(/,/^)/p' "$REPO/install" | sed 's/#.*//' | tr -s ' \t' '\n' \
             | grep -v -e '^PACKAGES=($' -e '^)$' -e '^$' || true)"
+  wanted+=$'\n'"$(printf '%s\n' "${RETIRED[@]}")"
   [[ -f "$STATE/added.txt" ]] && wanted+=$'\n'"$(cat "$STATE/added.txt")"
   if [[ -d "$QS" ]]; then
     # pkgs: ["a", "b"], pkg: "a", Ceres.install(["a"]) / ("a"), fwStep(…, ["a"]

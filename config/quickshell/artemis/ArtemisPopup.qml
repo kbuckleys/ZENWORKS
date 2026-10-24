@@ -1128,7 +1128,7 @@ LayerPopup {
           event.accepted = true
           if (popup.rows.length > 0) {
             const path = popup.rows[popup.sel].path
-            Quickshell.execDetached(["sh", "-c", "printf '%s' " + Strings.shellQuote(path) + " | wl-copy 2>/dev/null"])
+            Strings.copy(path)
             // the suite's flash, with nothing on its tail — the copy is done
             popup.flashThen(popup.sel, null)
           }

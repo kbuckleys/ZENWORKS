@@ -46,6 +46,7 @@ Elastic 1.0 Elastic.qml
 ElasticScroll 1.0 ElasticScroll.qml
 ScrollEdge 1.0 ScrollEdge.qml
 TabGlass 1.0 TabGlass.qml
+SideGlass 1.0 SideGlass.qml
 Frost 1.0 Frost.qml
 Working 1.0 Working.qml
 DialogButton 1.0 DialogButton.qml
@@ -84,3 +85,7 @@ singleton Share 1.0 Share.qml
 ClearChip 1.0 ClearChip.qml
 AddChip 1.0 AddChip.qml
 ChevronChip 1.0 ChevronChip.qml
+SysMeter 1.0 SysMeter.qml
+GlassRim 1.0 GlassRim.qml
+PanelGround 1.0 PanelGround.qml
+OpenWatchdog 1.0 OpenWatchdog.qml

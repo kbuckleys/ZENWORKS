@@ -134,7 +134,6 @@ class PassWriter:
         name = (folder + "/" if folder else "") + title
         password = f.get("password") if f.get("password") is not None else (old or {}).get("password", "")
         pairs = list((old or {}).get("pairs", []))
-        used = {k.lower() for k, _ in pairs}
         if f.get("username") is not None:
             pairs = [(k, v) for k, v in pairs if k.lower() not in USER_KEYS]
             if f["username"]:
@@ -159,7 +158,9 @@ class PassWriter:
         otp = f.get("totp") if f.get("totp") is not None else (old or {}).get("otp", "")
         notes = draft["notes"] if "notes" in draft else (old or {}).get("notes", "")
         text = compose(password, pairs, otp, notes)
-        if id and name != id and os.path.exists(os.path.join(self.store(), name + ".gpg")):
+        # a NEW entry under a name already taken, as much as a rename onto
+        # one: write_entry's os.replace would put this over that password
+        if name != id and os.path.exists(os.path.join(self.store(), name + ".gpg")):
             raise VaultError("Something by that name is already there")
         self.write_entry(name, text, cancel)
         if id and name != id:

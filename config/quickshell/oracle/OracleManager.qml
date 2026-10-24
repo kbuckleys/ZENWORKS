@@ -160,8 +160,7 @@ Scope {
   }
 
   function open(section) {
-    mgr.asked = [section || ""];
-    watchdog.restart();
+    watchdog.arm([section || ""]);
     if (!mgr.comp || mgr.comp.status !== Component.Ready) {
       mgr.pending = [section || ""];
       mgr.compile();
@@ -187,38 +186,9 @@ Scope {
     if (was) mgr.raise();
   }
 
-  // ── ASKED FOR, NEVER SEEN ────────────────────────────────────────────
-  // The user (2026-10-11): ceres and oracle "sometimes do not load", with
-  // nothing in the log to say why. An open that has not put the window on
-  // screen 1.5 s later says what it found — the compile, the window, its
-  // screen, the monitor in focus — and builds a fresh window once, so the
-  // press still lands. The log line is the lead for the real cause.
-  property var asked: null
-  property bool rebuilt: false
-  onShownChanged: if (mgr.shown) { mgr.asked = null; mgr.rebuilt = false; }
-  Timer {
-    id: watchdog
-    interval: 1500
-    onTriggered: {
-      if (mgr.asked === null || mgr.shown) { mgr.asked = null; return; }
-      const w = mgr.alive() ? mgr.win : null;
-      const m = Hyprland.focusedMonitor;
-      console.warn("oracle: asked to open, not on screen after 1.5 s —"
-        + " comp " + (mgr.comp ? mgr.comp.status : "none")
-        + " · window " + (w ? "alive" : mgr.win ? "dead" : "none")
-        + (w ? " · visible " + w.visible + " · backing " + w.backingWindowVisible
-             + " · screen " + (w.screen ? w.screen.name : "none") : "")
-        + " · focused monitor " + (m ? m.name : "none")
-        + " · pending " + JSON.stringify(mgr.pending)
-        + (mgr.rebuilt ? " · already rebuilt once, leaving it" : " · rebuilding"));
-      if (mgr.rebuilt) { mgr.asked = null; return; }
-      mgr.rebuilt = true;
-      const again = mgr.asked;
-      if (w) { try { w.destroy(); } catch (e) {} }
-      mgr.win = null;
-      mgr.open(again[0]);
-    }
-  }
+  // asked for, never seen: an open not on screen 1.5 s later says what it
+  // found and builds a fresh window once (morpheus/OpenWatchdog)
+  OpenWatchdog { id: watchdog; owner: mgr; tag: "oracle" }
 
   function raise() {
     Hyprland.dispatch(Hypr.focusTitle("oracle"));

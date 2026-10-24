@@ -80,9 +80,7 @@ Item {
   }
 
   // TERMINUS' AND PLATO'S TWO LAYERS: an inactive tab's glass, the sheet's veil
-  Rectangle { anchors.fill: parent; color: Zenon.alpha(Zenon.tabAwayInk, Zenon.tabAway(Zenon.layerBg.a)) }
-  Rectangle { anchors.fill: parent; color: Zenon.ground; opacity: 0.6 }
-  Rectangle { anchors.right: parent.right; width: 1; height: parent.height; color: Zenon.border }
+  SideGlass { edge: "right" }
 
   // the name over it all
   Item {

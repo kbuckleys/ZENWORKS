@@ -136,11 +136,6 @@ module.exports = {
     D.setServers([]);
     t.eq("server: removed, and the three as they were", [D.FORGE_ORDER, !!D.FORGES["gitlab@git.example.org"]],
       [["github", "gitlab", "codeberg"], false]);
-    t.eq("stow: a package linked, from ~", D.stowCommand("/home/x/dot", "/home/x", "kitty", "stow", "/home/x"),
-      "stow -d ~/dot -t ~ kitty");
-    t.eq("stow: adopt, and a name that needs quoting", D.stowCommand("/home/x/my dots", "/home/x", "a b", "adopt", "/home/x"),
-      "stow --adopt -d ~/'my dots' -t ~ 'a b'");
-    t.eq("stow: undone", D.stowCommand("/srv/d", "/etc", "x", "unstow", "/home/x"), "stow -D -d /srv/d -t /etc x");
     const M = (xs) => D.autoMessage(xs.map(([p, k]) => ({ path: p, kind: k })));
     t.eq("auto: one", M([["dir/README.md", "added"]]), "Add README.md");
     t.eq("auto: two added", M([["README.md", "added"], ["LICENSE", "added"]]), "Add README.md and LICENSE");

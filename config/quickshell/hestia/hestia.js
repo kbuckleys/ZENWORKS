@@ -290,6 +290,39 @@ function diskHealthFacts(d) {
   if (d.unsafe >= 0) rows.push(["Unsafe shutdowns", String(d.unsafe), ""]);
   return rows;
 }
+// THE DRIVE'S OWN SELF-TEST (health.py selftest; stylus starts it): how
+// the last one went, or how far the one running is — words that stand
+// beside a "Self-test" label, so they do not say it again. udisks passes
+// on the controller's word — ATA's and NVMe's differ — and these are the
+// same few answers in ours. { running, left, words, level: good|warn|bad|"" }
+var SELFTEST_WORDS = {
+  success: ["The last one passed", "good"],
+  aborted: ["The last one was stopped", ""],
+  interrupted: ["The last one was interrupted", "warn"],
+  ctrl_reset: ["The last one was cut short by a reset", "warn"],
+  ns_removed: ["The last one was cut short", "warn"],
+  aborted_format: ["The last one was cut short by a format", "warn"],
+  aborted_unknown: ["The last one was cut short", "warn"],
+  aborted_sanitize: ["The last one was cut short by a sanitize", "warn"],
+  fatal: ["The last one failed", "bad"],
+  fatal_error: ["The last one failed", "bad"],
+  unknown_seg_fail: ["The last one failed", "bad"],
+  known_seg_fail: ["The last one failed", "bad"],
+  error_unknown: ["The last one failed", "bad"],
+  error_electrical: ["The last one failed: electrical", "bad"],
+  error_servo: ["The last one failed: the heads", "bad"],
+  error_read: ["The last one failed: reading", "bad"],
+  error_handling: ["The last one failed: handling", "bad"]
+};
+function selftestOf(d) {
+  var st = d ? String(d.selftest || "") : "";
+  var left = d && d.selftestLeft >= 0 ? d.selftestLeft : -1;
+  if (st === "inprogress" || (left > 0 && left < 100 && st === ""))
+    return { running: true, left: left, words: "Running" + (left >= 0 ? " \u00b7 " + (100 - left) + "% done" : ""), level: "" };
+  var w = SELFTEST_WORDS[st];
+  if (!w) return { running: false, left: -1, words: st ? cap(st.replace(/_/g, " ")) : "Not run yet", level: "" };
+  return { running: false, left: -1, words: w[0], level: w[1] };
+}
 // the drive a device (a partition or the disk itself) is on
 function driveOf(drives, dev) {
   return (drives || []).find(function (d) { return (d.devs || []).indexOf(dev) >= 0; }) || null;

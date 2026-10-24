@@ -5,7 +5,6 @@
 
 import QtQuick
 import Quickshell
-import Quickshell.Widgets
 import Quickshell.Io
 import Quickshell.Hyprland
 import "../morpheus"
@@ -17,7 +16,7 @@ LayerPopup {
   id: popup
 
   readonly property color bgColor: Zenon.layerBg
-  readonly property color headColor: Zenon.blue
+  readonly property color headColor: Zenon.cyan
   readonly property color dimColor: Zenon.muted
 
   property string query: ""
@@ -97,14 +96,14 @@ LayerPopup {
       && popup.histIdx < 0 ? Metis.complete(filterInput.text, popup.qalcNames.concat(Object.keys(popup.vars))) : ""
 
   readonly property var parseInk: ({
-    muted: String(Zenon.muted), arrow: String(Zenon.blue), target: String(Zenon.white),
+    muted: String(Zenon.muted), arrow: String(Zenon.cyan), target: String(Zenon.white),
     warn: String(Zenon.yellow)
   })
 
   // the colors the field's text is tinted in — see Metis.highlight, which
   // also says what counts as a number, a word and an operator
   readonly property var inkSet: ({
-    num: String(Zenon.blue), word: String(Zenon.white), joiner: String(Zenon.muted),
+    num: String(Zenon.cyan), word: String(Zenon.white), joiner: String(Zenon.muted),
     op: String(Zenon.keyInk), bad: String(Zenon.red)
   })
 
@@ -1133,29 +1132,9 @@ LayerPopup {
     width: Math.round(popup.liveWidth)
     height: popup.calcHeight()
 
-    // ClippingRectangle, not Rectangle + clip: true. Qt's own clip is
-    // RECTANGULAR — it clips to the bounding box and knows nothing about the
-    // radius — so every square child painted to the panel's edge (the bottom
-    // strip most visibly) filled in the rounded corners behind it. This one
-    // clips to the rounded shape itself.
-
-    ClippingRectangle {
+    PanelGround {
       id: bgRoot
-      anchors.fill: parent
-      // Grown by its own border: a ClippingRectangle insets its children by
-      // border.width on every side, so the content box came out 2px smaller
-      // than the panel and any layout measured against the panel's size fell
-      // one row or one column short. This hands the content its full box back.
-      anchors.margins: -bgRoot.border.width
       color: popup.bgColor
-      radius: Zenon.pillRadius
-      topLeftRadius: Zenon.pillRadius
-      topRightRadius: Zenon.pillRadius
-      bottomLeftRadius: Zenon.pillRadius
-      bottomRightRadius: Zenon.pillRadius
-      border.color: Zenon.border
-      border.width: 1
-      focus: true
 
       Keys.onEscapePressed: (event) => {
         event.accepted = true;
@@ -1353,7 +1332,7 @@ LayerPopup {
                 y: parent.height / 2 + 12
                 height: 2
                 radius: height / 2
-                color: popup.shownWhich ? Zenon.blue : Zenon.red
+                color: popup.shownWhich ? Zenon.cyan : Zenon.red
               }
 
               // the rest of the word being typed, faint after the cursor
@@ -1455,7 +1434,7 @@ LayerPopup {
             // How qalc read it, not the text echoed back — "5 kilometers →
             // miles" says the in was understood; the typed line would not.
             // Only when it says something: "5 km" read back as "5 kilometers"
-            // is noise (Metis.parseWorth). The arrow in blue, where it went
+            // is noise (Metis.parseWorth). The arrow in the accent, where it went
             // in white, a stale-rates warning in yellow.
             Text {
               anchors.horizontalCenter: parent.horizontalCenter
@@ -1508,7 +1487,7 @@ LayerPopup {
                 width: badWordText.implicitWidth + 16
                 height: badWordText.implicitHeight + 6
                 radius: Zenon.windowRadius
-                readonly property color ink: popup.shownWhich ? Zenon.blue : Zenon.red
+                readonly property color ink: popup.shownWhich ? Zenon.cyan : Zenon.red
                 color: Zenon.alpha(ink, 0.10)
                 border.width: 1
                 border.color: Zenon.alpha(ink, 0.32)
@@ -1858,7 +1837,7 @@ LayerPopup {
             anchors.verticalCenter: parent.verticalCenter
             visible: !!bubLine.modelData.glyph
             text: bubLine.modelData.glyph || ""
-            color: Zenon.blue
+            color: Zenon.cyan
             font.family: Zenon.face
             font.weight: 500
             font.pixelSize: Zenon.px(bubLine.modelData.big ? 15 : 12)

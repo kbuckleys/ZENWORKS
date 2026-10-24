@@ -26,6 +26,9 @@ Item {
   property real from: 0
   property real to: 1
   property string readout: ""
+  // room for the readout: a percent fits the 38 it always had, a size
+  // ("28.6 GiB", stylus' partition sheet) does not
+  property real readoutW: 38
   // dimmed when the value is the ordinary one, so it reads as "normal"
   // rather than as something you have changed
   property real neutral: -1
@@ -92,7 +95,7 @@ Item {
     anchors.right: parent.right
     anchors.rightMargin: 14
     anchors.verticalCenter: parent.verticalCenter
-    width: 38
+    width: sl.readoutW
     horizontalAlignment: Text.AlignRight
     text: sl.readout
     color: (sl.neutral >= 0 && Math.abs(sl.value - sl.neutral) < 0.001)

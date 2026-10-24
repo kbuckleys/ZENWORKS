@@ -692,7 +692,7 @@ FloatingWindow {
     const locked = !!n.sealed;
     const items = [];
     if (n.kind === "note") items.push({ text: n.pinned ? "Unpin" : "Pin", icon: "\u{F0403}", mark: "ctrl p", run: () => win.togglePin(n) });
-    if (n.kind === "entry") items.push({ text: n.bookmark ? "Remove bookmark" : "Bookmark", icon: n.bookmark ? "" : "", run: () => win.mgr.setField(n.id, "bookmark", !n.bookmark, false) });
+    if (n.kind === "entry") items.push({ text: n.bookmark ? "Remove bookmark" : "Bookmark", icon: n.bookmark ? "\uF47A" : "\uF461", iconInk: Zenon.cyan, run: () => win.mgr.setField(n.id, "bookmark", !n.bookmark, false) });
     items.push({ text: "Rename…", icon: "\u{F0455}", run: () => win.renameNote(n) });
     items.push({ text: locked ? "Remove lock" : "Lock", icon: locked ? "" : "", run: () => locked ? win.removeLock(n) : win.lockNote(n) });
     if (n.kind === "note") {

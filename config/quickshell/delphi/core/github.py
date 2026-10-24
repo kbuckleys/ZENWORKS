@@ -33,12 +33,6 @@ API = "https://api.github.com"
 HOST = "github.com"
 
 
-
-
-def _keyring(action, fields):
-    return rest.keyring(action, fields)
-
-
 def _gh(*args, input=None, timeout=20):
     try:
         return subprocess.run(["gh"] + list(args), input=input, text=True,
@@ -121,22 +115,7 @@ def login(emit, cancel):
                          stderr=subprocess.STDOUT, text=True,
                          env=dict(os.environ, BROWSER="true", GH_PROMPT_DISABLED=""),
                          start_new_session=True)
-    cancel.attach(p)
-    sent = {}
-    try:
-        for line in p.stdout:
-            m, u = CODE.search(line), URL.search(line)
-            if m:
-                sent["code"] = m.group(1)
-            if u:
-                sent["url"] = u.group(0)
-            if "code" in sent and "url" in sent and not sent.get("done"):
-                sent["done"] = True
-                emit({"device": {"code": sent["code"], "url": sent["url"]}})
-        p.wait()
-    finally:
-        cancel.detach(p)
-    cancel.check()
+    rest.device_flow(p, cancel, emit, CODE, URL)
     if p.returncode != 0:
         raise ForgeError("sign-in did not finish")
     tokenstore.set_prefer(HOST, "")   # gh's own sign-in is the one in use

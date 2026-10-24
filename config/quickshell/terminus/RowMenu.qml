@@ -29,6 +29,7 @@ import Quickshell.Widgets
 import "../morpheus"
 import "../picasso"
 import "terminus.js" as Terminus
+import "../stylus/stylus.js" as Stylus
 import "../morpheus/icons.js" as Icons
 import "menuglyphs.js" as MenuGlyphs
 import "tags.js" as Tags
@@ -819,6 +820,10 @@ PopupWindow {
       if (!t.isDir && Terminus.isVideo(t.name))
         out.push({ label: "Quick edit",
                    act: () => Quickshell.execDetached(["qs", "ipc", "call", "Argus", "edit", t.path]) });
+      // stylus' write sheet with this image chosen
+      if (!t.isDir && Stylus.isImageName(t.name))
+        out.push({ label: "Write to a drive\u2026",
+                   act: () => Quickshell.execDetached(["qs", "ipc", "call", "Stylus", "write", t.path]) });
       if (!t.isDir && Terminus.isVideo(t.name))
         out.push({ label: "Extract audio" + many, key: "e",
                    act: () => term.extractAudio() });
@@ -1192,7 +1197,7 @@ PopupWindow {
               visible: menu.cardGlyphs && !modelData.sep && !modelData.swatch
               text: MenuGlyphs.of(modelData)
               horizontalAlignment: Text.AlignHCenter
-              color: Zenon.white
+              color: MenuGlyphs.accented(modelData) ? Zenon.cyan : Zenon.white
               font.family: Zenon.face
               font.weight: Zenon.weight
               font.pixelSize: Zenon.px(15)
@@ -1552,7 +1557,7 @@ PopupWindow {
                 visible: menu.subGlyphs && !modelData.sep
                 text: MenuGlyphs.of(modelData)
                 horizontalAlignment: Text.AlignHCenter
-                color: Zenon.white
+                color: MenuGlyphs.accented(modelData) ? Zenon.cyan : Zenon.white
                 font.family: Zenon.face
                 font.weight: Zenon.weight
                 font.pixelSize: Zenon.px(15)

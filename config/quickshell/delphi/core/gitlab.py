@@ -176,23 +176,7 @@ def login(emit, cancel):
     p = subprocess.Popen(a, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
                          stderr=subprocess.STDOUT, text=True, start_new_session=True,
                          env=dict(os.environ, BROWSER="true", NO_PROMPT="1"))
-    cancel.attach(p)
-    sent, said = {}, []
-    try:
-        for line in p.stdout:
-            said.append(line.strip())
-            m, u = CODE.search(line), URL.search(line)
-            if m:
-                sent["code"] = m.group(1)
-            if u:
-                sent["url"] = u.group(0)
-            if "code" in sent and "url" in sent and not sent.get("done"):
-                sent["done"] = True
-                emit({"device": {"code": sent["code"], "url": sent["url"]}})
-        p.wait()
-    finally:
-        cancel.detach(p)
-    cancel.check()
+    said = rest.device_flow(p, cancel, emit, CODE, URL)
     if p.returncode != 0:
         # glab's own last words, not a bare "did not finish"
         why = [l for l in said if l and l not in ("ERROR",)][-2:]

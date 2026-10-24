@@ -10,7 +10,10 @@
 #                  smart, failing, warnings: [], tempK, hours, usedPct,
 #                  spareLeft, spareThresh, written, read, mediaErrors,
 #                  unsafe, powerCycles, badSectors, attrsFailing,
-#                  wcTempK, selftest }]
+#                  wcTempK, selftest, selftestLeft }]
+#   selftest ID short|extended|abort
+#               { ok, why } — a drive's own self-test started or stopped
+#               (udisks; polkit asks once, as for opening a drive)
 #   firmware    { installed, devices: [{ id, name, version, update, summary,
 #                 reboot }] }
 #
@@ -88,7 +91,7 @@ def disks():
              "dev": whole, "devs": sorted(devs), "kind": "", "smart": False, "failing": False,
              "warnings": [], "tempK": 0, "hours": -1, "usedPct": -1, "spareLeft": -1, "spareThresh": -1,
              "written": -1, "read": -1, "mediaErrors": -1, "unsafe": -1, "powerCycles": -1,
-             "badSectors": -1, "attrsFailing": -1, "wcTempK": 0, "selftest": ""}
+             "badSectors": -1, "attrsFailing": -1, "wcTempK": 0, "selftest": "", "selftestLeft": -1}
         nv = ifaces.get(UD + ".NVMe.Controller")
         ata = ifaces.get(UD + ".Drive.Ata")
         if nv:
@@ -98,6 +101,7 @@ def disks():
             r["tempK"] = val(nv.get("SmartTemperature")) or 0
             r["hours"] = val(nv.get("SmartPowerOnHours"))
             r["selftest"] = val(nv.get("SmartSelftestStatus")) or ""
+            r["selftestLeft"] = val(nv.get("SmartSelftestPercentRemaining"))
             a = busctl_json("call", UD, path, UD + ".NVMe.Controller", "SmartGetAttributes", "a{sv}", "0")
             if a:
                 at = (a.get("data") or [{}])[0]
@@ -121,6 +125,7 @@ def disks():
             r["badSectors"] = val(ata.get("SmartNumBadSectors"))
             r["attrsFailing"] = val(ata.get("SmartNumAttributesFailing"))
             r["selftest"] = val(ata.get("SmartSelftestStatus")) or ""
+            r["selftestLeft"] = val(ata.get("SmartSelftestPercentRemaining"))
         out.append(r)
     return out
 
@@ -144,6 +149,35 @@ def firmware():
     return {"installed": True, "devices": [x for x in devs if x["id"]]}
 
 
+def selftest(drive, what):
+    # the drive's own test, on the controller it has: NVMe or ATA
+    iface = None
+    objs = busctl_json("call", UD, "/org/freedesktop/UDisks2", "org.freedesktop.DBus.ObjectManager", "GetManagedObjects")
+    ifaces = ((objs or {}).get("data") or [{}])[0].get(drive, {})
+    for i in (UD + ".NVMe.Controller", UD + ".Drive.Ata"):
+        if i in ifaces:
+            iface = i
+    if not iface:
+        return {"ok": False, "why": "This drive has no self-test"}
+    if what == "abort":
+        argv = [iface, "SmartSelftestAbort", "a{sv}", "0"]
+    elif what in ("short", "extended"):
+        argv = [iface, "SmartSelftestStart", "sa{sv}", what, "0"]
+    else:
+        return {"ok": False, "why": "short, extended or abort"}
+    try:
+        r = subprocess.run(["busctl", "--system", "--allow-interactive-authorization=yes", "call", UD, drive] + argv,
+                           capture_output=True, text=True, timeout=120)
+    except (OSError, subprocess.SubprocessError):
+        return {"ok": False, "why": "udisks did not answer"}
+    if r.returncode == 0:
+        return {"ok": True, "why": ""}
+    err = (r.stderr.strip().splitlines() or [""])[-1]
+    if "not authorized" in err.lower() or "dismissed" in err.lower():
+        return {"ok": False, "why": "Permission was not given"}
+    return {"ok": False, "why": err.split(": ", 1)[-1] or "The drive refused"}
+
+
 def main():
     a = sys.argv[1:]
     cmd = a[0] if a else "disks"
@@ -151,8 +185,10 @@ def main():
         print(json.dumps(disks()))
     elif cmd == "firmware":
         print(json.dumps(firmware()))
+    elif cmd == "selftest" and len(a) > 2:
+        print(json.dumps(selftest(a[1], a[2])))
     else:
-        print(json.dumps({"error": "usage: health.py disks|firmware"}))
+        print(json.dumps({"error": "usage: health.py disks|firmware|selftest ID short|extended|abort"}))
 
 
 if __name__ == "__main__":

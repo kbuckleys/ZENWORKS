@@ -1363,7 +1363,7 @@ function mountsGone(before, now) {
 const FS_TOOLS = [
   "ntfsfix", "mkntfs", "e2fsck", "mkfs.ext4", "fsck.fat", "mkfs.fat",
   "fsck.exfat", "mkfs.exfat", "btrfs", "mkfs.btrfs", "xfs_repair", "mkfs.xfs",
-  "fsck.f2fs", "mkfs.f2fs", "sfdisk", "wipefs"
+  "fsck.f2fs", "mkfs.f2fs", "sfdisk", "wipefs", "cryptsetup"
 ];
 
 function fsToolsCommand() {
@@ -1402,7 +1402,8 @@ function repairCan(fstype, have) {
 function fsPackage(fstype) {
   return ({ ntfs: "ntfs-3g", vfat: "dosfstools", exfat: "exfatprogs",
             ext2: "e2fsprogs", ext3: "e2fsprogs", ext4: "e2fsprogs",
-            btrfs: "btrfs-progs", xfs: "xfsprogs", f2fs: "f2fs-tools" })[String(fstype || "")] || "";
+            btrfs: "btrfs-progs", xfs: "xfsprogs", f2fs: "f2fs-tools",
+            luks: "cryptsetup" })[String(fstype || "")] || "";
 }
 
 // How a tool's exit status reads. fsck's convention (e2fsck, fsck.fat,
@@ -1450,22 +1451,23 @@ function repairCommand(dev, fstype, mode, mounted) {
 
 // ── FORMAT ───────────────────────────────────────────────────────────────
 // What each filesystem is made with, its label limit, and the block (cluster)
-// sizes worth offering. 0 is "let the tool decide", which is the right answer
-// nearly always — every mkfs picks from the size of the disk, and it is the
-// default here. Bytes throughout; the builder converts to each tool's unit.
+// sizes worth offering. 0 is "Auto": autoBlock's answer for the size being
+// formatted, passed to mkfs as a number so what the card says is what is
+// made (2026-10-24 — it used to leave the choice to each tool, unnamed).
+// Bytes throughout; the builder converts to each tool's unit.
 const FORMATS = [
   { fs: "exfat", name: "exFAT", tool: "mkfs.exfat", labelMax: 15,
     note: "any OS, files over 4 GiB — best for sticks and cards",
     blocks: [0, 4096, 32768, 131072, 1048576] },
   { fs: "ntfs",  name: "NTFS",  tool: "mkntfs",     labelMax: 32,
     note: "Windows' own; Linux reads and writes it through ntfs-3g",
-    blocks: [0, 512, 1024, 2048, 4096, 8192, 16384, 32768, 65536] },
+    blocks: [0, 4096, 8192, 16384, 32768, 65536] },
   { fs: "ext4",  name: "ext4",  tool: "mkfs.ext4",  labelMax: 16,
     note: "Linux only — permissions, journaling, the fastest here",
     blocks: [0, 1024, 2048, 4096] },
   { fs: "vfat",  name: "FAT32", tool: "mkfs.fat",   labelMax: 11,
     note: "anything that plugs in reads it; no file over 4 GiB",
-    blocks: [0, 512, 1024, 2048, 4096, 8192, 16384, 32768] },
+    blocks: [0, 4096, 8192, 16384, 32768] },
   { fs: "btrfs", name: "Btrfs", tool: "mkfs.btrfs", labelMax: 255,
     note: "Linux only — snapshots, checksums, compression", blocks: [0] },
   { fs: "xfs",   name: "XFS",   tool: "mkfs.xfs",   labelMax: 12,
@@ -1482,6 +1484,24 @@ function formatsAvailable(have) {
 function formatOf(fs) {
   for (const f of FORMATS) if (f.fs === fs) return f;
   return null;
+}
+
+// AUTO, NAMED: the block (cluster) size a filesystem of `bytes` is best
+// made with — Microsoft's tables for exFAT and FAT32 (what every device that
+// reads them expects), 4 KiB elsewhere, and 1 KiB for a small ext4 (mke2fs'
+// own "small" type). 0 when there is no choice to make (Btrfs, F2FS) or the
+// size is not known.
+function autoBlock(fs, bytes) {
+  const b = Number(bytes) || 0;
+  const MiB = 1048576, GiB = 1073741824;
+  switch (String(fs || "")) {
+  case "exfat": return !b ? 0 : b < 256 * MiB ? 4096 : b <= 32 * GiB ? 32768 : 131072;
+  case "vfat": return !b ? 0 : b < 260 * MiB ? 512 : b < 8 * GiB ? 4096 : b < 16 * GiB ? 8192 : b < 32 * GiB ? 16384 : 32768;
+  case "ntfs": return 4096;
+  case "ext4": return b > 0 && b < 512 * MiB ? 1024 : 4096;
+  case "xfs": return 4096;
+  }
+  return 0;
 }
 
 // "4 KiB", "512 B", "1 MiB" — for the block size choices.
@@ -1571,33 +1591,68 @@ function firstPartition(dev) {
 // and every partition of it in `o.mounts` is unmounted before anything is
 // touched. Root work runs in ONE pkexec, so polkit asks once. The new
 // filesystem is mounted afterwards when `o.mountAfter`. "@@rc N" ends it.
+//
+// `o.block` 0 is Auto: autoBlock for `o.bytes`, when that is known.
+//
+// `o.zero` writes zeros over every byte first (the partition, or the whole
+// device), dd's progress turned into lines for the log.
+//
+// `o.encrypt` makes a LUKS2 container and the filesystem inside it. THE
+// PASSPHRASE NEVER TOUCHES A COMMAND LINE: the caller writes it, and a
+// newline, to the script's stdin; the root shell reads it into a variable
+// and pipes it to cryptsetup with printf (a builtin — no argv, nothing in
+// ps). The container is left open to be mounted when `o.mountAfter`, closed
+// otherwise; udisks names it luks-<uuid> as it does its own.
 function formatCommand(o) {
   const f = formatOf(o.fs);
   if (!f) return "";
   const whole = !!o.table;
-  const target = whole ? firstPartition(o.device) : o.target;
-  const args = mkfsArgs(Object.assign({}, o, { whole: !whole && o.target === o.device }));
+  const part = whole ? firstPartition(o.device) : o.target;
+  const block = Number(o.block) || autoBlock(o.fs, o.bytes);
+  const args = mkfsArgs(Object.assign({}, o, { block: f.blocks.length > 1 ? block : 0,
+                                               whole: !whole && !o.encrypt && o.target === o.device }));
   const qa = args.map(Strings.shellQuote).join(" ");
-  const qt = Strings.shellQuote(target);
-  let root = "set -e\n";
+  const qp = Strings.shellQuote(part);
+  const qd = Strings.shellQuote(whole ? o.device : o.target);
+  let root = "";
+  if (o.encrypt) root += "IFS= read -r PASS || :\n[ -n \"$PASS\" ] || { echo 'No passphrase was given'; exit 2; }\n";
+  root += "set -e\n";
+  if (o.zero)
+    root += "echo 'Writing zeros over every byte of " + String(whole ? o.device : o.target).replace(/'/g, "") + " \u2014 this takes a while'\n"
+      + "dd if=/dev/zero of=" + qd + " bs=4M oflag=direct status=progress 2>&1 | tr '\\r' '\\n' | grep -v 'No space left' || :\n";
   if (whole) {
-    const qd = Strings.shellQuote(o.device);
     root += "wipefs -a " + qd + " >/dev/null\n"
       + "printf 'label: %s\\n,,%s\\n' " + Strings.shellQuote(o.table === "gpt" ? "gpt" : "dos")
-      + " " + Strings.shellQuote(partType(o.fs, o.table)) + " | sfdisk -q --wipe always " + qd + "\n"
+      + " " + Strings.shellQuote(partType(o.encrypt ? "luks" : o.fs, o.table)) + " | sfdisk -q --wipe always " + qd + "\n"
       + "udevadm settle 2>/dev/null || sleep 1\n"
-      + "i=0; while [ ! -b " + qt + " ] && [ $i -lt 20 ]; do sleep 0.25; i=$((i+1)); done\n";
+      + "i=0; while [ ! -b " + qp + " ] && [ $i -lt 20 ]; do sleep 0.25; i=$((i+1)); done\n";
   } else {
-    root += "wipefs -a " + qt + " >/dev/null\n";
+    root += "wipefs -a " + qp + " >/dev/null\n";
   }
-  root += f.tool + " " + qa + " " + qt + "\n";
+  let made = qp;
+  if (o.encrypt) {
+    const lab = cleanLabel("btrfs", o.label);
+    root += "printf %s \"$PASS\" | cryptsetup luksFormat --batch-mode --type luks2"
+      + (lab ? " --label " + Strings.shellQuote(lab) : "") + " --key-file=- " + qp + "\n"
+      + "NAME=luks-$(cryptsetup luksUUID " + qp + ")\n"
+      + "printf %s \"$PASS\" | cryptsetup open --key-file=- " + qp + " \"$NAME\"\n"
+      + "unset PASS\n";
+    made = "\"/dev/mapper/$NAME\"";
+  }
+  root += f.tool + " " + qa + " " + made + "\n";
+  if (o.encrypt && !o.mountAfter) root += "cryptsetup close \"$NAME\"\n";
   const unm = (o.mounts || []).map((p) => "( " + unmountScript(Strings.shellQuote(p))
                                              + " ) || { echo '@@rc 90'; exit 90; }\n").join("");
+  // what is mounted after: the partition, or the container's open inside
+  const mountTarget = o.encrypt ? "\"$(lsblk -nrpo NAME " + qp + " | sed -n 2p)\"" : qp;
   return unm
-    + "echo " + Strings.shellQuote("$ " + f.tool + " " + args.join(" ") + " " + target) + "\n"
+    + "echo " + Strings.shellQuote("$ " + (o.encrypt ? "cryptsetup luksFormat " + part + " && " : "")
+                                   + f.tool + " " + args.join(" ") + " " + (o.encrypt ? "/dev/mapper/luks-\u2026" : part)) + "\n"
     + "pkexec sh -c " + Strings.shellQuote(root) + " 2>&1; rc=$?\n"
-    + (o.mountAfter ? "[ $rc -eq 0 ] && { udevadm settle 2>/dev/null; sleep 0.5; ( "
-       + mountCommand(target, o.fs) + " ) 2>&1 | tail -n 1; }\n" : "")
+    + (!o.mountAfter ? ""
+       : o.encrypt ? "[ $rc -eq 0 ] && { udevadm settle 2>/dev/null; sleep 0.5; m=" + mountTarget + "; "
+         + "udisksctl mount -b \"$m\" 2>&1 | tail -n 1; }\n"
+       : "[ $rc -eq 0 ] && { udevadm settle 2>/dev/null; sleep 0.5; ( " + mountCommand(part, o.fs) + " ) 2>&1 | tail -n 1; }\n")
     + "echo \"@@rc $rc\"; exit $rc";
 }
 

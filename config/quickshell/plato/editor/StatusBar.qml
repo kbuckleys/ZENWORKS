@@ -225,15 +225,18 @@ Item {
   // terminus' sidebar switch, the same glyph in the same inks: cyan while the
   // tree is out, white under the pointer, muted otherwise. First on the left,
   // since what it switches is to the left of everything else.
+  // IN THE TREE'S OWN BAR WHILE IT IS OUT (user, 2026-10-24, as terminus'):
+  // here only to bring it back, so it folds away and the mode takes its place.
   Item {
     id: treeToggle
-    visible: !bar.cmd
+    readonly property bool shown: !bar.cmd && !bar.treeShown
+    visible: treeToggle.shown
     anchors.left: parent.left
-    anchors.leftMargin: 14
+    anchors.leftMargin: treeToggle.shown ? 14 : 0
     anchors.top: parent.top
     anchors.bottom: parent.bottom
     // as wide as its glyph: the bar's 14 on the left is the 14 on the right
-    width: toggleGlyph.implicitWidth
+    width: treeToggle.shown ? toggleGlyph.implicitWidth : 0
     Text {
       id: toggleGlyph
       anchors.centerIn: parent
@@ -264,7 +267,8 @@ Item {
     anchors.verticalCenter: parent.verticalCenter
     width: Math.ceil(modeWidth.advanceWidth)
     font.family: Zenon.face
-    font.pixelSize: bar.font.pixelSize - 2
+    // the bar's own size and a step over (user, 2026-10-24: it was 2 under)
+    font.pixelSize: bar.font.pixelSize + 1
     font.weight: Font.DemiBold
     font.letterSpacing: 1.2
     color: bar.tinted ? bar.modeInk : Zenon.accentMuted

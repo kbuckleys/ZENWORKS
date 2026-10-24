@@ -412,8 +412,11 @@ Column {
       // The trail is rebuilt whenever the path changes, so this fires then
       // and not while you are reading it: scrolling back and standing
       // still does not yank you forward again.
-      onContentWidthChanged: Qt.callLater(crumbFlick.pinEnd)
-      onWidthChanged: Qt.callLater(crumbFlick.pinEnd)
+      // An owned Timer, not Qt.callLater(pinEnd): a bar torn down with a pin
+      // still queued answered "partAt is not a function" (live log, 10-24).
+      onContentWidthChanged: pinLater.restart()
+      onWidthChanged: pinLater.restart()
+      Timer { id: pinLater; interval: 0; onTriggered: crumbFlick.pinEnd() }
 
 
     Row {

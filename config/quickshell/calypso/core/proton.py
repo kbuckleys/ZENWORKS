@@ -317,8 +317,14 @@ class Proton(Provider):
             code, out, err = self.pc(argv, cancel, stdin=json.dumps(t), timeout=120)
             if code != 0:
                 raise VaultError(first_line(err) or "pass-cli could not make the item")
+            # an id is "share/item": the share is the vault's (the only one,
+            # with none named), so the window can pick the new item
             m = re.search(r'"?(?:item_?id|id)"?\s*[:=]\s*"?([A-Za-z0-9_=-]{8,})', out)
-            return {"id": None}
+            if not m:
+                return {"id": None}
+            vs = self.vaults(cancel)
+            sid = next((s for s, n in vs if n == vault), None) if vault else (vs[0][0] if len(vs) == 1 else None)
+            return {"id": sid + "/" + m.group(1) if sid else None}
         sid, iid = self.split(id)
         # Only --field: pass-cli takes no other way in, so a changed secret
         # is in pass-cli's argv for the moment it runs.

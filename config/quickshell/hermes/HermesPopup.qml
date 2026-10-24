@@ -26,7 +26,6 @@
 
 import QtQuick
 import Quickshell.Io
-import Quickshell.Widgets
 import Quickshell.Hyprland
 import "../morpheus"
 import "../morpheus/gridnav.js" as Nav
@@ -315,15 +314,8 @@ LayerPopup {
     width: Math.round(popup.liveWidth)
     height: popup.calcHeight()
 
-    ClippingRectangle {
+    PanelGround {
       id: bgRoot
-      anchors.fill: parent
-      anchors.margins: -bgRoot.border.width
-      color: Zenon.layerBg
-      radius: Zenon.pillRadius
-      border.color: Zenon.border
-      border.width: 1
-      focus: true
 
       // ── main ──────────────────────────────────────────────────────────
       Item {

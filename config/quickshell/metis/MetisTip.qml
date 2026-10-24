@@ -52,7 +52,7 @@ Rectangle {
     Text {
       anchors.verticalCenter: parent.verticalCenter
       text: tip.joiner
-      color: Zenon.blue
+      color: Zenon.cyan
       font.family: Zenon.face
       font.weight: Font.Bold
       font.pixelSize: Zenon.px(12)

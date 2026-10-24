@@ -89,10 +89,10 @@ const exact = {
   "Tags": "\u{F12F7}",                       // tag_multiple_outline
   "Manage tags": "\u{F12F7}",
   "Reindex tags": "\u{F1634}",               // database_refresh_outline
-  "Bookmark": "\u{F00C4}",                   // bookmark_plus_outline
-  "Bookmark this directory": "\u{F00C4}",
-  "Add to bookmarks": "\u{F00C4}",
-  "Remove bookmark": "\u{F137A}",            // bookmark_remove_outline
+  "Bookmark": "\uF461",                       // oct-bookmark (user, 2026-10-24)
+  "Bookmark this directory": "\uF461",
+  "Add to bookmarks": "\uF461",
+  "Remove bookmark": "\uF47A",           // oct-bookmark_fill: it is one
   "Archive": "\u{F120E}",                    // archive_outline
   "Extract here": "\u{F1259}",               // archive_arrow_down
   "Extract audio": "\u{F0387}",              // music_note
@@ -124,8 +124,8 @@ const prefixes = [
   ["Undo", "\u{F054C}"],                     // undo
   ["Rename", "\u{EC61}"],                    // "Rename (9)"
   ["Background on", "\u{F02E9}"],
-  ["Bookmark", "\u{F00C4}"],
-  ["Remove bookmark", "\u{F137A}"],
+  ["Bookmark", "\uF461"],
+  ["Remove bookmark", "\uF47A"],
   ["Open ", "\u{F0770}"],
   ["Close ", "\u{F0156}"]
 ];
@@ -137,4 +137,11 @@ function of(item) {
   if (l in exact) return exact[l];
   for (const p of prefixes) if (l.startsWith(p[0])) return p[1];
   return "";
+}
+
+// the bookmark wears the theme's accent wherever it is drawn (user,
+// 2026-10-24); the menus ask this for the color of a row's glyph
+function accented(item) {
+  const g = of(item);
+  return g === "\uF461" || g === "\uF47A";
 }

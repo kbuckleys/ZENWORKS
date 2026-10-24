@@ -29,7 +29,7 @@ Item {
       id: fill
       height: parent.height
       radius: parent.radius
-      color: Zenon.blue
+      color: Zenon.cyan
       width: parent.width * (root.progress ? root.progress.frac : 0)
       Behavior on width { NumberAnimation { duration: Zenon.slow * 2; easing.type: Zenon.ease } }
     }
@@ -40,7 +40,7 @@ Item {
       width: 7
       height: 7
       radius: 3.5
-      color: Zenon.blue
+      color: Zenon.cyan
     }
   }
 

@@ -287,7 +287,7 @@ LayerPopup {
             : popup.face === "result" ? (Ceres.txState === "done" ? words[1] : words[2])
             : Ceres.total === 0 ? "Up to date"
             : "Updates  " + Ceres.total
-          color: popup.face === "result" && Ceres.txState === "failed" ? Zenon.red : Zenon.blue
+          color: popup.face === "result" && Ceres.txState === "failed" ? Zenon.red : Zenon.cyan
           font.family: Zenon.face
           font.weight: Font.Bold
           font.pixelSize: Zenon.px(16)

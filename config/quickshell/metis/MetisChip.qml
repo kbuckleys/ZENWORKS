@@ -32,12 +32,12 @@ Rectangle {
   height: 26
   radius: Zenon.windowRadius
   // selected: blue, outlined — a gray fill alone was too quiet to find
-  color: chip.sel ? Qt.rgba(Zenon.blue.r, Zenon.blue.g, Zenon.blue.b, 0.14)
+  color: chip.sel ? Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b, 0.14)
     : hover.pressed ? Qt.rgba(Zenon.border.r, Zenon.border.g, Zenon.border.b, 0.45)
     : Zenon.alpha(Zenon.border, 0)
   Behavior on color { ColorAnimation { duration: Zenon.fast } }
   border.width: 1
-  border.color: chip.sel ? Qt.rgba(Zenon.blue.r, Zenon.blue.g, Zenon.blue.b, 0.65) : Zenon.border
+  border.color: chip.sel ? Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b, 0.65) : Zenon.border
   Behavior on border.color { ColorAnimation { duration: Zenon.fast } }
 
   opacity: 0
@@ -61,7 +61,7 @@ Rectangle {
       anchors.verticalCenter: parent.verticalCenter
       visible: chip.pinned
       text: "\uF08D"
-      color: Zenon.blue
+      color: Zenon.cyan
       font.family: Zenon.face
       font.weight: Zenon.weight
       font.pixelSize: Zenon.px(12)
@@ -71,7 +71,7 @@ Rectangle {
       anchors.verticalCenter: parent.verticalCenter
       visible: chip.glyph !== ""
       text: chip.glyph
-      color: chip.sel ? Zenon.blue : Zenon.muted
+      color: chip.sel ? Zenon.cyan : Zenon.muted
       Behavior on color { ColorAnimation { duration: Zenon.fast } }
       font.family: Zenon.face
       font.weight: 500
@@ -94,7 +94,7 @@ Rectangle {
     Text {
       anchors.verticalCenter: parent.verticalCenter
       text: chip.label
-      color: chip.sel ? Zenon.blue : Zenon.keyInk
+      color: chip.sel ? Zenon.cyan : Zenon.keyInk
       Behavior on color { ColorAnimation { duration: Zenon.fast } }
       font.family: Zenon.face
       font.weight: Font.Bold

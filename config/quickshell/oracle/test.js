@@ -116,9 +116,14 @@ function makeContext() {
 function load(rel) {
   const file = path.join(ROOT, rel);
   const ctx = makeContext();
+  const raw = fs.readFileSync(file, "utf8");
+  // another .js imported by path (stylus.js reaches terminus.js for its
+  // size words) is loaded the same way, under the name the file gave it
+  for (const m of raw.matchAll(/^\.import\s+"([^"]+\.js)"\s+as\s+(\w+)/gm))
+    ctx[m[2]] = load(path.relative(ROOT, path.join(path.dirname(file), m[1])));
   // .pragma and .import lines are QML's, not JavaScript: blanked, so line
   // numbers in a failure still point at the file
-  const src = fs.readFileSync(file, "utf8").replace(/^\.(pragma|import)\b.*$/gm, "");
+  const src = raw.replace(/^\.(pragma|import)\b.*$/gm, "");
 
   const names = new Set();
   for (const m of src.matchAll(/^(?:const|let)\s+([A-Za-z_$][\w$]*)/gm))

@@ -1,0 +1,13 @@
+StylusManager 1.0 StylusManager.qml
+StylusSource 1.0 StylusSource.qml
+StylusDrive 1.0 StylusDrive.qml
+StylusMap 1.0 StylusMap.qml
+StylusWrite 1.0 StylusWrite.qml
+StylusRename 1.0 StylusRename.qml
+StylusUnlock 1.0 StylusUnlock.qml
+StylusPartition 1.0 StylusPartition.qml
+ForgeJob 1.0 ForgeJob.qml
+StylusBackup 1.0 StylusBackup.qml
+StylusDownload 1.0 StylusDownload.qml
+StylusBench 1.0 StylusBench.qml
+StylusImage 1.0 StylusImage.qml

@@ -182,8 +182,8 @@ Rectangle {
         Text {
           visible: !!card.note && !!card.note.bookmark
           anchors.verticalCenter: parent.verticalCenter
-          text: ""
-          color: Zenon.sand
+          text: "\uF47A"
+          color: Zenon.cyan
           font.family: Zenon.glyphFace
           font.pixelSize: Zenon.px(13)
         }

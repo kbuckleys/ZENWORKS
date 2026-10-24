@@ -39,14 +39,12 @@
 import QtQuick
 import Quickshell
 import Quickshell.Hyprland
-import Quickshell.Io
 import "../morpheus"
 import "../morpheus/undo"
 import "../morpheus/hypr.js" as Hypr
 import "../morpheus/controls" as Ctl
 import "../terminus"
 import "minerva.js" as M
-import "../morpheus/room.js" as Room
 
 FloatingWindow {
   id: mw
@@ -76,8 +74,8 @@ FloatingWindow {
   implicitWidth: mw.settings.winSize ? mw.settings.winSize[0] : 1280
   implicitHeight: mw.settings.winSize ? mw.settings.winSize[1] : 880
   function keepSize() {
-    if (!mw.mgr || sideLayout.laidOut || mw.focusMode) return;
-    mw.mgr.setSetting("winSize", [Math.round(mw.width - Math.max(0, mw.sideGrew)), Math.round(mw.height)]);
+    if (!mw.mgr || room.laidOut || mw.focusMode) return;
+    mw.mgr.setSetting("winSize", [Math.round(mw.width - Math.max(0, room.grew)), Math.round(mw.height)]);
   }
 
   // lower (user, 2026-10-21): the tools sit in it now, not under it
@@ -403,84 +401,26 @@ FloatingWindow {
 
   function setSidebar(on) { if (mw.mgr) mw.mgr.setSetting("sidebar", on); }
 
-  // ── THE WINDOW MAKES ROOM FOR ITS SIDEBAR, AS TERMINUS' AND PLATO'S DO ──
-  // The same logic through the same functions (morpheus/room.js;
-  // see plato's makeRoom for the whole story): a
-  // floating window widens by the sidebar, to the right since that is where
-  // it stands, so the page holds still; closing gives exactly that back.
-  // Tiled, fullscreen or maximized, the layout owns the size and the
+  // ── THE WINDOW MAKES ROOM FOR ITS SIDEBAR (terminus/SideRoom) ─────────
+  // A floating window widens by the sidebar, to the right since that is
+  // where it stands, so the page holds still; closing gives exactly that
+  // back. Tiled, fullscreen or maximized, the layout owns the size and the
   // sidebar just slides. While Hyprland resizes, the page keeps its width
-  // (sideKeepW) and the sidebar is what the window has gained.
+  // (room.keepW) and the sidebar is what the window has gained.
   //
   // Focus mode is not a toggle of the sidebar: it hides it inside a
   // fullscreen window, and nothing is resized for it (`roomOpen`).
   readonly property bool roomOpen: mw.mode === "reading" && mw.settings.sidebar
-  onRoomOpenChanged: mw.sideRoom(mw.roomOpen)
-  property int sideGrew: 0
-  property int sideWant: 0
-  property bool sideFor: false
-  property bool sidePending: false
-  property real sideKeepW: -1
-  property bool sideFollowing: false
-  property int sideTarget: 0
-  function releaseSideFollow() {
-    mw.sideFollowing = false;
-    mw.sideKeepW = -1;
-    sideCeiling.stop();
-  }
-  LayoutProbe { id: sideLayout; title: mw.title }
-  Timer { id: sideCeiling; interval: 1500; onTriggered: mw.releaseSideFollow() }
-  // landed: the slide stays off until the sidebar has taken the width the
-  // window just gained (plato's onWidthChanged, the other order)
-  onWidthChanged: if (mw.sideKeepW >= 0 && mw.sideTarget > 0 && Math.abs(mw.width - mw.sideTarget) < 1) {
-    mw.sideKeepW = -1;
-    mw.sideFollowing = false;
-    sideCeiling.stop();
-  }
-  function sideRoom(shown) {
-    if (!keys.Window.active || mw.focusMode) return;
-    if (sideLayout.laidOut) { mw.sideGrew = 0; return; }
-    if (shown) {
-      if (mw.sideGrew > 0) return;
-      mw.sideWant = mw.width + mw.sideW;
-    } else if (mw.sideGrew > 0) mw.sideWant = mw.width - mw.sideGrew;
-    // already out when the window floated: closing still gives it back
-    else if (sideBox.width > 0.5) mw.sideWant = mw.width - Math.round(sideBox.width);
-    else return;
-    mw.sideFollowing = true;
-    mw.sideKeepW = mw.width - sideBox.width;
-    mw.sideTarget = 0;
-    sideCeiling.restart();
-    mw.sideFor = shown;
-    mw.sidePending = true;
-    sideFitProc.running = false;
-    sideFitProc.running = true;
-  }
-  Process {
-    id: sideFitProc
-    command: ["sh", "-c", "hyprctl -j activewindow; echo '@@mons'; hyprctl -j monitors"]
-    stdout: StdioCollector {
-      id: sideFitOut
-      onStreamFinished: {
-        if (!mw.sidePending) return;
-        // asked for a state we have since toggled out of
-        if (mw.sideFor !== mw.roomOpen) { mw.sidePending = false; return; }
-        const parts = sideFitOut.text.split("@@mons");
-        let w = null, mons = null;
-        try { w = JSON.parse(parts[0]); mons = JSON.parse(parts[1]); } catch (e) { mw.releaseSideFollow(); return; }
-        // the focused window is the one toggled; anything else is not ours
-        if (!w || w.class !== "org.quickshell" || w.title !== mw.title) { mw.releaseSideFollow(); return; }
-        mw.sidePending = false;
-        sideLayout.note(w);
-        const room = Room.make(w, mons, mw.sideWant, 16, 820, "right");
-        if (!room) mw.releaseSideFollow();
-        else {
-          mw.sideTarget = w.size[0] + room.dw;
-          Room.dispatches(w.address, room).forEach((d) => Hyprland.dispatch(d));
-        }
-        mw.sideGrew = mw.sideFor && room ? room.dw : 0;
-      }
-    }
+  SideRoom {
+    id: room
+    window: mw
+    anchor: keys
+    shown: mw.roomOpen
+    want: mw.sideW
+    box: sideBox
+    edge: "right"
+    minW: 820
+    active: !mw.focusMode
   }
   function openFile() {
     if (!mw.mgr || !mw.mgr.fileManager) return;
@@ -504,7 +444,7 @@ FloatingWindow {
   }
   readonly property var glyphs: ({
     copy: "\u{F018F}", marker: "\u{F0652}", note: "\u{F11D7}", lookup: "\u{F0E84}", translate: "\u{F05CA}",
-    bookmark: "\u{F00C0}", voice: "\u{F050A}", focus: "\u{F0293}", info: "\u{F064E}", terminus: "\u{F0DCF}",
+    bookmark: "\uF461", bookmarked: "\uF47A", voice: "\u{F050A}", focus: "\u{F0293}", info: "\u{F064E}", terminus: "\u{F0DCF}",
     clio: "\u{F0EBF}", export: "\u{F102E}", remove: "\u{F09E7}", shelf: "\u{F125F}", check: "\u{F012C}",
     go: "\u{F05DA}", watch: "\u{F178A}", more: "\u{F01D8}", stats: "\u{F0128}", aa: "\u{F027F}", plus: "\u{F05DB}"
   })
@@ -523,7 +463,7 @@ FloatingWindow {
       items.push({ text: "Translate", icon: mw.glyphs.translate, mark: "ctrl t", run: () => mw.lookUp("translate") });
       items.push({ isSeparator: true });
     }
-    items.push({ text: mw.hereMark ? "Remove the bookmark" : "Bookmark this page", icon: mw.glyphs.bookmark, mark: "ctrl d", run: () => mw.toggleBookmark() });
+    items.push({ text: mw.hereMark ? "Remove the bookmark" : "Bookmark this page", icon: mw.hereMark ? mw.glyphs.bookmarked : mw.glyphs.bookmark, iconInk: Zenon.cyan, mark: "ctrl d", run: () => mw.toggleBookmark() });
     items.push({ text: "A note on this page…", icon: mw.glyphs.note, mark: "ctrl n", run: () => mw.askNote(null) });
     if (mw.kind !== "comic") items.push({ text: voice.on ? "Stop reading aloud" : "Read aloud from here", icon: mw.glyphs.voice, mark: "ctrl r", run: () => voice.toggle() });
     mw.menuAt(item, x, y, items);
@@ -994,13 +934,13 @@ FloatingWindow {
       anchors.right: parent.right
       anchors.bottom: parent.bottom
       // while Hyprland resizes the window for it, the sidebar is whatever
-      // the window has gained (see sideKeepW); otherwise it slides on its own
-      width: mw.sideKeepW >= 0 ? Math.max(0, Math.min(mw.sideW, mw.width - mw.sideKeepW))
+      // the window has gained (SideRoom); otherwise it slides on its own
+      width: room.keepW >= 0 ? Math.max(0, Math.min(mw.sideW, mw.width - room.keepW))
         : mw.sideOpen ? mw.sideW : 0
       visible: width > 0
       // terminus' sidebar's slide
       Behavior on width {
-        enabled: !mw.sideFollowing
+        enabled: !room.following
         NumberAnimation { duration: Math.round(Zenon.normal * 1.4); easing.type: Zenon.travelEase }
       }
       clip: true
@@ -1010,9 +950,7 @@ FloatingWindow {
       // and what of the page runs on under it, frosted beneath both
       Frost { anchors.fill: parent; z: -1; source: readBox; active: mw.mode === "reading" && !!mw.page && !mw.focusMode
         visible: active; scrim: 0; track: [sideBox.x, sideBox.width] }
-      Rectangle { anchors.fill: parent; color: Zenon.alpha(Zenon.tabAwayInk, Zenon.tabAway(Zenon.layerBg.a)) }
-      Rectangle { anchors.fill: parent; color: Zenon.ground; opacity: 0.6 }
-      Rectangle { anchors.left: parent.left; width: 1; height: parent.height; color: Zenon.border; z: 5 }
+      SideGlass { edge: "left" }
       Item {
         id: sideTools
         z: 4
@@ -1273,7 +1211,7 @@ FloatingWindow {
         implicitHeight: 30
         visible: mw.mode === "reading" && !!mw.page
         glyph: true
-        label: mw.hereMark ? "\u{F00C0}" : "\u{F00C3}"
+        label: mw.hereMark ? "\uF47A" : "\uF461"
         ink: mw.hereMark ? Zenon.cyan : Zenon.muted
         onClicked: mw.toggleBookmark()
         HoverHandler { onHoveredChanged: hovered ? tip.show(markBtn, mw.hereMark ? "Remove the bookmark" : "Bookmark this page", "ctrl d") : tip.hide(markBtn) }

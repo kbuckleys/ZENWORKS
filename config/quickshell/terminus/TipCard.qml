@@ -26,21 +26,8 @@ Rectangle {
   border.color: Zenon.border
   border.width: 1
   radius: Zenon.windowRadius
-  // the glass rim, as Tooltip's card has it — see Zenon.rim
-  Rectangle {
-    z: 100
-    x: parent.radius
-    y: 1
-    width: Math.max(0, parent.width - 2 * parent.radius)
-    height: 1
-    gradient: Gradient {
-      orientation: Gradient.Horizontal
-      GradientStop { position: 0.0; color: Zenon.alpha(Zenon.rim, 0) }
-      GradientStop { position: 0.25; color: Zenon.rim }
-      GradientStop { position: 0.75; color: Zenon.rim }
-      GradientStop { position: 1.0; color: Zenon.alpha(Zenon.rim, 0) }
-    }
-  }
+  // the glass rim, as Tooltip's card has it
+  GlassRim {}
 
   Text {
     id: label

@@ -690,7 +690,7 @@ Singleton {
   }
 
   // ── A TOOL ANOTHER APP NEEDS, INSTALLED WHEN IT IS ASKED FOR ───────────
-  // Delphi's forge tools (gh, glab, stow, openssh) and calypso's vault CLIs
+  // Delphi's forge tools (gh, glab, openssh) and calypso's vault CLIs
   // (rbw, op, keepassxc…): installed when the thing that needs one is
   // chosen, not up front. Through here, so the app never runs pacman or asks
   // for a password itself — Ceres' own password card, its own log.

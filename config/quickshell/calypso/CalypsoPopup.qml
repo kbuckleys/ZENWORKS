@@ -19,7 +19,6 @@
 // daemon types and copies them itself.
 
 import QtQuick
-import Quickshell.Widgets
 import Quickshell.Hyprland
 import "../morpheus"
 import "../terminus"
@@ -369,15 +368,9 @@ LayerPopup {
     // a rounded clip (Qt's own clip is the bounding box): the strips painted
     // to the panel's edge would fill the corners in
 
-    ClippingRectangle {
+    PanelGround {
       id: bgRoot
-      anchors.fill: parent
-      anchors.margins: -bgRoot.border.width
       color: popup.bgColor
-      radius: Zenon.pillRadius
-      border.color: Zenon.border
-      border.width: 1
-      focus: true
 
       // ── list ──────────────────────────────────────────────────────────
       Item {

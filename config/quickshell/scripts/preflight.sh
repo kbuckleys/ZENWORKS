@@ -63,6 +63,10 @@ printf '%s\n' "$out" | grep -vE '^  ok ' || true
 # exact UID, never a shared file, never for good; khal and gio stood in for
 out=$(python3 "$root/oracle/tests/chronos-core.py" 2>&1) || fail=1
 printf '%s\n' "$out" | grep -vE '^  ok ' || true
+# and stylus' disk writer (oracle/tests/stylus-core.py): ISOs made by
+# bsdtar, every compression, regular files standing in for drives
+out=$(python3 "$root/oracle/tests/stylus-core.py" 2>&1) || fail=1
+printf '%s\n' "$out" | grep -vE '^  ok ' || true
 
 echo "── compiling every .qml"
 tmp=$(mktemp -d)

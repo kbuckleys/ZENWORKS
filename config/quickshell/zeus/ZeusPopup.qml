@@ -1503,28 +1503,9 @@ LayerPopup {
       onPressedChanged: if (pressed) popup.holding = true
     }
 
-    // ClippingRectangle, not Rectangle + clip: true. Qt's own clip is
-    // RECTANGULAR — it clips to the bounding box and knows nothing about the
-    // radius — so every square child painted to the panel's edge (the bottom
-    // strip most visibly) filled in the rounded corners behind it. This one
-    // clips to the rounded shape itself.
-    ClippingRectangle {
+    PanelGround {
       id: bgRoot
-      anchors.fill: parent
-      // Grown by its own border: a ClippingRectangle insets its children by
-      // border.width on every side, so the content box came out 2px smaller
-      // than the panel and any layout measured against the panel's size fell
-      // one row or one column short. This hands the content its full box back.
-      anchors.margins: -bgRoot.border.width
       color: popup.bgColor
-      radius: Zenon.pillRadius
-      topLeftRadius: Zenon.pillRadius
-      topRightRadius: Zenon.pillRadius
-      bottomLeftRadius: Zenon.pillRadius
-      bottomRightRadius: Zenon.pillRadius
-      border.color: Zenon.border
-      border.width: 1
-      focus: true
       // Same cascade as every other layer, with the kill list's one extra piece of
       // state folded in where alt c used to hold it: unwind what you have
       // built up, innermost first, and only close once there is nothing left.

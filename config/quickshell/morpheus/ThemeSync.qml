@@ -11,9 +11,10 @@
 // THE THEME. kitty, hyprland, GTK and Qt paint with their
 // own config, so when the theme changes they are each written a file
 // (themesync.js) and told to read it: kitty reloads its config on SIGUSR1,
-// hyprland on `hyprctl reload`. GTK reads gtk-4.0/colors.css and
-// gtk-3.0/colors.css (each gtk.css @imports its own) as an app starts, and
-// scripts/gtkscheme.sh sets dark or light, which libadwaita hears live.
+// hyprland on `hyprctl reload`. GTK 4 reads gtk-4.0/colors.css (its
+// gtk.css @imports it) as an app starts, and scripts/gtkscheme.sh sets dark
+// or light, which libadwaita hears live. GTK 3's gtk-3.0/colors.css rides
+// in a theme gtkscheme.sh swaps, so running GTK 3 and Electron apps repaint.
 // Qt apps read qt6ct/qt6ct.conf and its color scheme, also as they start.
 // hyprtoolkit apps (hyprshutdown) read hypr/hyprtoolkit.conf, and watch it.
 //
@@ -53,12 +54,15 @@ Item {
   readonly property string gtk3Text: Sync.renderGtk3(sync.colors, Zenon.light)
   // dark or light for every GTK app, Zenon included (gtkscheme.sh)
   readonly property string scheme: Sync.colorScheme(Zenon.light)
-  onSchemeChanged: schemeSettle.restart()
-  Timer {
-    id: schemeSettle
-    interval: 400
-    onTriggered: Quickshell.execDetached(
-      [Quickshell.shellDir + "/scripts/gtkscheme.sh", sync.scheme])
+  // the mode flips at once: color-scheme now, and GTK 3's colors.css
+  // without the settle — its slot swaps once the write lands (gtk3File)
+  onSchemeChanged: {
+    sync.gtkScheme("now");
+    if (!sync.put(gtk3File, sync.gtk3Text)) sync.gtkScheme("reload");
+  }
+  function gtkScheme(how) {
+    Quickshell.execDetached([Quickshell.shellDir + "/scripts/gtkscheme.sh", sync.scheme]
+      .concat(how ? [how] : []));
   }
   // hyprland's borders follow the theme Zenon included (user, 2026-10-19):
   // kitty keeps its own zenon.conf for Zenon, but base.lua's literals were
@@ -123,7 +127,8 @@ Item {
   onFontTextChanged: settle.restart()
   onQtTextChanged: settle.restart()
   onToolkitTextChanged: settle.restart()
-  Component.onCompleted: { settle.restart(); fontSettle.restart(); schemeSettle.restart(); }
+  // a start only checks the slot worn (gtkscheme.sh)
+  Component.onCompleted: { settle.restart(); fontSettle.restart(); sync.gtkScheme(""); }
 
   // a theme file being saved is several writes; the apps hear about the last
   Timer {
@@ -134,8 +139,10 @@ Item {
       if (sync.put(hyprFile, sync.hyprText)) tell.hypr = true;
       if (sync.put(fontFile, sync.fontText, true)) tell.hypr = true;
       if (sync.corner()) tell.hypr = true;
-      // nothing to tell: a GTK app reads its gtk.css as it starts
+      // nothing to tell GTK 4: an app reads its gtk.css as it starts
       sync.put(gtk4File, sync.gtk4Text);
+      // GTK 3 rereads colors.css when gtkscheme.sh names a fresh theme slot,
+      // once the write has landed (gtk3File's onSaved)
       sync.put(gtk3File, sync.gtk3Text);
       // nor for Qt: qt6ct reads its files as an app starts
       sync.put(qtFile, sync.qtText, true);
@@ -250,6 +257,8 @@ Item {
     blockLoading: true
     printErrors: false
     onLoadFailed: exists = false
+    // on disk now: wear the other slot so running apps reread it
+    onSaved: sync.gtkScheme("reload")
   }
 
   FileView {

@@ -616,24 +616,6 @@ function plainOf(text) {
     .trim();
 }
 
-// ── DOTFILES ────────────────────────────────────────────────────────────
-// The stow command for one package, to copy and run by hand (delphi never
-// runs it). how: "stow" links it, "adopt" first takes the files in the way
-// into the package (replacing its copies) and then links, "unstow" removes
-// its links. Paths under home written from ~, quoted only where the shell
-// needs it.
-function shellWord(s) {
-  var t = String(s);
-  if (/^[A-Za-z0-9_@%+=:,.\/~-]+$/.test(t)) return t;
-  var q = "'" + t.replace(/'/g, "'\\''") + "'";
-  return t.indexOf("~/") === 0 ? "~/" + "'" + t.slice(2).replace(/'/g, "'\\''") + "'" : q;
-}
-function stowCommand(root, target, name, how, home) {
-  var flag = how === "adopt" ? " --adopt" : how === "unstow" ? " -D" : "";
-  return "stow" + flag + " -d " + shellWord(tilde(root, home)) + " -t " + shellWord(tilde(target, home) || "~")
-    + " " + shellWord(name);
-}
-
 // ── A CONFLICT'S TWO SIDES, BY WHAT THEY ARE ────────────────────────────
 // git's "ours" and "theirs" are positions, not people: in a rebase "ours" is
 // the branch being rebased ONTO and "theirs" is your own commit. Named here

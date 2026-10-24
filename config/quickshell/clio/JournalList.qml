@@ -270,8 +270,10 @@ Item {
       Segments {
         anchors.left: parent.left
         anchors.verticalCenter: parent.verticalCenter
-        options: [["", "All"], ["bookmarked", ""], ["photos", ""], ["mood", "\u{F01F5}"], ["reflection", "\u{F0336}"]]
+        options: [["", "All"], ["bookmarked", "\uF47A"], ["photos", ""], ["mood", "\u{F01F5}"], ["reflection", "\u{F0336}"]]
         current: jl.mgr ? jl.mgr.journalFilter : ""
+        // the bookmark in the theme's accent, wherever it is drawn
+        inks: ({ bookmarked: Zenon.cyan })
         textSize: Zenon.px(12)
         onChose: (v) => { jl.mgr.set("journalFilter", v); jl.win.wantTop = true; }
         onPointed: (v, item, inside) => inside

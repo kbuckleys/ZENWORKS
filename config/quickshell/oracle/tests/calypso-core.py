@@ -341,6 +341,12 @@ def pass_store_for_real():
     r = p.save(None, {"kind": "login", "title": "new.example", "folder": "web", "fields": {"username": "ada", "password": "n3w", "totp": None},
                       "urls": ["https://new.example"], "notes": "hi", "custom": [{"label": "pin", "value": "7", "hidden": True}]}, c)
     eq(r["id"], "web/new.example")
+    # a second NEW one under that name is refused, never written over it
+    try:
+        p.save(None, {"kind": "login", "title": "new.example", "folder": "web", "fields": {"password": "other"}}, c)
+        eq("written", "refused", "a new entry over a taken name")
+    except Exception as e:
+        eq("already there" in str(e), True, "a new entry over a taken name")
     d = p.detail("web/new.example", c)
     flat = {f["label"]: f for sec in d["sections"] for f in sec["fields"]}
     eq((flat["username"]["value"], flat["password"]["value"], flat["pin"]["value"], d["notes"]), ("ada", "n3w", "7", "hi"))

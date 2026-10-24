@@ -513,11 +513,6 @@ QtObject {
     return menuScaleFrom + (1 - menuScaleFrom) * shade;
   }
   readonly property color headBg:    pick("headBg")
-  // THE ACTIVE TAB'S FILL (plato's and terminus' strips). headBg in a dark
-  // theme; in a light one headBg is a pale tint at 40% over pale glass and
-  // the active tab vanished into its neighbors (user, tab-visibility.png,
-  // 2026-10-08) — there it is the ink, washed thin, which reads as a tab.
-  readonly property color tabHere: light ? Qt.rgba(ink.r, ink.g, ink.b, 0.11) : headBg
   // AN INACTIVE TAB'S GLASS, given the window's alpha (plato's and terminus'
   // strips, which lay no window ground under their tabs): thinner than the
   // window's, so the desktop shows through. In a dark theme thin black glass

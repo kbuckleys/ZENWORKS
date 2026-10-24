@@ -1039,7 +1039,7 @@ Item {
       Quickshell.execDetached(["sh", "-c", Terminus.shellCommand(t.path, root.termCmd())]);
     else if (act === "open") root.openFile(t.path);
     else if (act === "copypath")
-      Quickshell.execDetached(["sh", "-c", "printf %s \"$1\" | wl-copy", "icarus", t.path]);
+      Strings.copy(t.path);
     else if (act === "copy")
       Quickshell.execDetached(Terminus.shArgv(Terminus.clipboardCopyCommand([t.path], false)));
     root.closeAll();

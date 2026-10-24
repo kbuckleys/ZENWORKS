@@ -56,7 +56,7 @@ Item {
 
   readonly property var tabs: (side.kind === "pdf" ? [{ id: "pages", glyph: "\u{F1518}", tip: "Pages" }] : []).concat([
     { id: "contents", glyph: "\u{F0836}", tip: "Contents" },
-    { id: "marks", glyph: "\u{F00C0}", tip: "Bookmarks" },
+    { id: "marks", glyph: "\uF47A", tip: "Bookmarks" },
     { id: "highlights", glyph: "\u{F0652}", tip: "Highlights" },
     { id: "find", glyph: "\u{F0349}", tip: "Find" }
   ])

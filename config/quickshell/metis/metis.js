@@ -2937,7 +2937,7 @@ function parseWorth(prep, parse, input) {
 }
 
 // "5 kilometers → miles  · rates 3 days old": the source muted, the arrow
-// in blue, where it went in white, a warning after "·" in yellow
+// in the accent, where it went in white, a warning after "·" in yellow
 function parseHtml(parse, ink) {
   const t = String(parse || "");
   const dot = t.indexOf("  · ");

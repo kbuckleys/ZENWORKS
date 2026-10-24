@@ -539,7 +539,7 @@ FloatingWindow {
 
   // ── COPYING, AND SAYING SO ─────────────────────────────────────────────
   function copy(text, what) {
-    Quickshell.execDetached(["sh", "-c", "printf '%s' \"$1\" | wl-copy", "sh", String(text)]);
+    Strings.copy(text);
     win.say("Copied " + (what || text));
   }
   function copyGlyph(asCode) {
@@ -702,9 +702,7 @@ FloatingWindow {
       // TERMINUS' AND PLATO'S TWO LAYERS (user, 2026-10-14: "all must
       // match"): an inactive tab's thinner glass, then the sheet's veil
       // over it. The veil alone left this a pale band beside them.
-      Rectangle { anchors.fill: parent; color: Zenon.alpha(Zenon.tabAwayInk, Zenon.tabAway(Zenon.layerBg.a)) }
-      Rectangle { anchors.fill: parent; color: Zenon.ground; opacity: 0.6 }
-      Rectangle { anchors.right: parent.right; width: 1; height: parent.height; color: Zenon.border }
+      SideGlass { edge: "right" }
 
       // the search
       Rectangle {
@@ -788,6 +786,7 @@ FloatingWindow {
             required property var modelData
             width: shelfCol.width
             glyph: shelfRow.modelData.glyph
+            glyphInk: shelfRow.modelData.id === "fav" ? Zenon.cyan : "transparent"
             label: shelfRow.modelData.label
             here: win.shelf === shelfRow.modelData.id
             fill: win.hiFill
@@ -911,8 +910,8 @@ FloatingWindow {
             spacing: 6
             Text {
               visible: !!(win.mgr && win.mgr.favs[famRow.modelData.name])
-              text: "\uF02E"
-              color: Zenon.sand
+              text: "\uF47A"
+              color: Zenon.cyan
               font.family: Zenon.glyphFace
               font.pixelSize: Zenon.px(12)
             }
@@ -1057,8 +1056,8 @@ FloatingWindow {
           border.color: Zenon.border
           Text {
             anchors.centerIn: parent
-            text: win.fav ? "\uF02E" : "\uF097"
-            color: win.fav ? Zenon.sand : Zenon.accentMuted
+            text: win.fav ? "\uF47A" : "\uF461"
+            color: win.fav ? Zenon.cyan : Zenon.accentMuted
             font.family: Zenon.glyphFace
             font.pixelSize: Zenon.px(15)
           }

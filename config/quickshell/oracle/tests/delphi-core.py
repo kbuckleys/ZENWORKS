@@ -840,57 +840,6 @@ def log_one_file():
 
 
 @test
-def stow_packages_plan_and_copy():
-    # a dotfiles repository and a home of its own (a fixture: stow is never
-    # run on the user's files) — stow's dry run read, never a real stow but
-    # the one made here to have something linked
-    import stow as ST
-    if not ST.have_stow():
-        return
-    d = fresh({"kitty/.config/kitty/kitty.conf": "a\n", "zsh/.zshrc": "z\n",
-               "hypr/.config/hypr/h.lua": "h\n", "README.md": "r\n", "empty/.keep": ""})
-    os.remove(os.path.join(d, "empty", ".keep"))
-    home = os.path.join(TMP, f"home{n[0]}")
-    write(home, ".zshrc", "mine\n")
-    write(home, ".config/hypr/other.lua", "o\n")
-    subprocess.run(["stow", "-d", d, "-t", home, "hypr"], check=True, capture_output=True)
-    r = R.Repo(d)
-    out = r.stow_packages(target=home)
-    by = {p["name"]: p for p in out["packages"]}
-    eq(sorted(by), ["empty", "hypr", "kitty", "zsh"], "directories only; README is no package")
-    eq(by["kitty"]["state"], "tolink")
-    eq(by["kitty"]["links"], [".config/kitty"], "a directory folded into one link")
-    eq(by["zsh"]["state"], "conflicts")
-    eq(by["zsh"]["conflicts"], [".zshrc"])
-    eq(by["hypr"]["state"], "linked")
-    eq(by["empty"]["state"], "empty")
-    eq(by["kitty"]["dotted"], True)
-    pl = {f["path"]: f["state"] for f in r.stow_plan("zsh", target=home)["files"]}
-    eq(pl, {".zshrc": "inTheWay"})
-    pl = {f["path"]: f["state"] for f in r.stow_plan("hypr", target=home)["files"]}
-    eq(pl, {".config/hypr/h.lua": "linked"})
-    # copied in: the source left exactly as it was
-    write(home, ".config/foot/foot.ini", "f\n")
-    write(home, ".config/foot/.git/HEAD", "x\n")
-    res = r.stow_copy_in(os.path.join(home, ".config/foot"), "foot", target=home)
-    eq(res["copied"], 1, ".git left behind")
-    eq(read(d, "foot/.config/foot/foot.ini"), "f\n")
-    eq(read(home, ".config/foot/foot.ini"), "f\n")
-    eq(os.path.islink(os.path.join(home, ".config/foot")), False, "the source not linked")
-    eq(r.stow_copy_in(os.path.join(home, ".config/foot"), "foot", target=home)["copied"], 0,
-       "the same files again: nothing to do")
-    write(home, ".config/foot/foot.ini", "changed\n")
-    for bad in [(os.path.join(home, ".config/foot"), "foot"), ("/etc/hostname", "x"),
-                (os.path.join(home, ".zshrc"), "../up")]:
-        try:
-            r.stow_copy_in(bad[0], bad[1], target=home)
-            raise AssertionError(f"copied {bad}")
-        except ST.StowError:
-            pass
-    eq(read(d, "foot/.config/foot/foot.ini"), "f\n", "a different copy is not overwritten")
-
-
-@test
 def forge_servers_of_your_own():
     # "gitlab@host" / "forgejo@host": a copy of the module per host, the
     # built-in forges untouched, and two servers never sharing a host

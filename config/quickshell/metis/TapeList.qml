@@ -101,7 +101,7 @@ Item {
         x: 16
         anchors.verticalCenter: parent.verticalCenter
         text: row.marked ? "" : row.modelData.pin ? "" : "·"
-        color: row.marked ? Zenon.green : row.modelData.pin ? Zenon.blue : Zenon.muted
+        color: row.marked ? Zenon.green : row.modelData.pin ? Zenon.cyan : Zenon.muted
         font.family: Zenon.face
         font.weight: Zenon.weight
         font.pixelSize: Zenon.px(12)
@@ -123,7 +123,7 @@ Item {
         anchors.rightMargin: 16
         anchors.verticalCenter: parent.verticalCenter
         text: Metis.group(row.modelData.result)
-        color: row.marked ? Zenon.green : row.sel ? Zenon.blue : Zenon.keyInk
+        color: row.marked ? Zenon.green : row.sel ? Zenon.cyan : Zenon.keyInk
         font.family: Zenon.face
         font.weight: Font.Bold
         font.pixelSize: Zenon.px(14)

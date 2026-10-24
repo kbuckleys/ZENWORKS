@@ -20,6 +20,7 @@
 import QtQuick
 import Quickshell
 import "."
+import "../morpheus"
 import Quickshell.Hyprland
 import Quickshell.Io
 import "../morpheus/lagnotes.js" as LagNotes
@@ -149,8 +150,7 @@ Scope {
   }
 
   function open(view) {
-    mgr.asked = [view || ""];
-    watchdog.restart();
+    watchdog.arm([view || ""]);
     mgr.settle();
     if (!mgr.comp || mgr.comp.status !== Component.Ready) {
       mgr.pending = view || "";
@@ -182,38 +182,9 @@ Scope {
   // To it, wherever it is. In the Lua dispatcher's own words — this config
   // runs hyprland on Lua, and the old "focuswindow title:…" string is
   // refused there, which is why this never did anything before.
-  // ── ASKED FOR, NEVER SEEN ────────────────────────────────────────────
-  // The user (2026-10-11): ceres and oracle "sometimes do not load", with
-  // nothing in the log to say why. An open that has not put the window on
-  // screen 1.5 s later says what it found — the compile, the window, its
-  // screen, the monitor in focus — and builds a fresh window once, so the
-  // press still lands. The log line is the lead for the real cause.
-  property var asked: null
-  property bool rebuilt: false
-  onShownChanged: if (mgr.shown) { mgr.asked = null; mgr.rebuilt = false; }
-  Timer {
-    id: watchdog
-    interval: 1500
-    onTriggered: {
-      if (mgr.asked === null || mgr.shown) { mgr.asked = null; return; }
-      const w = mgr.alive() ? mgr.win : null;
-      const m = Hyprland.focusedMonitor;
-      console.warn("ceres: asked to open, not on screen after 1.5 s —"
-        + " comp " + (mgr.comp ? mgr.comp.status : "none")
-        + " · window " + (w ? "alive" : mgr.win ? "dead" : "none")
-        + (w ? " · visible " + w.visible + " · backing " + w.backingWindowVisible
-             + " · screen " + (w.screen ? w.screen.name : "none") : "")
-        + " · focused monitor " + (m ? m.name : "none")
-        + " · pending " + JSON.stringify(mgr.pending)
-        + (mgr.rebuilt ? " · already rebuilt once, leaving it" : " · rebuilding"));
-      if (mgr.rebuilt) { mgr.asked = null; return; }
-      mgr.rebuilt = true;
-      const again = mgr.asked;
-      if (w) { try { w.destroy(); } catch (e) {} }
-      mgr.win = null;
-      mgr.open(again[0]);
-    }
-  }
+  // asked for, never seen: an open not on screen 1.5 s later says what it
+  // found and builds a fresh window once (morpheus/OpenWatchdog)
+  OpenWatchdog { id: watchdog; owner: mgr; tag: "ceres" }
 
   function raise() {
     Hyprland.dispatch(Hypr.focusTitle("ceres"));

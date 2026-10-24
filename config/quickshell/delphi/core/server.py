@@ -46,7 +46,6 @@ import signing
 from graph import Lanes
 from gitrun import GitError
 from rest import ForgeError
-from stow import StowError
 from lines import send
 import lines
 import tether
@@ -369,7 +368,7 @@ def route(op):
     return (FORGES[name], rest) if name in FORGES else None
 
 # Requests named here change the repository; they queue behind each other.
-WRITES = {"stowCopyIn", "resolveBlocks", "ignore", "untrack", "stage", "stageAll", "unstage", "unstageAll", "discard", "clean",
+WRITES = {"resolveBlocks", "ignore", "untrack", "stage", "stageAll", "unstage", "unstageAll", "discard", "clean",
           "stageLines", "unstageLines", "discardLines", "commit", "undoCommit",
           "branchCreate", "branchTrack", "switch", "branchDelete",
           "branchRename", "setUpstream", "tagCreate", "tagDelete",
@@ -421,8 +420,6 @@ class Server(lines.Service):
             return {"kind": "git", "error": e.err or str(e), "code": e.code}
         if isinstance(e, ForgeError):
             return {"kind": "forge", "error": str(e), "status": e.status}
-        if isinstance(e, StowError):
-            return {"kind": "stow", "error": str(e)}
         return None
 
     def dispatch(self, op, req, args, cancel, emit):

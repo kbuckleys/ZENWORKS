@@ -1099,6 +1099,28 @@ module.exports = {
         fc.indexOf("udisksctl unmount") < fc.indexOf("sfdisk") && fc.indexOf("sfdisk") < fc.lastIndexOf("mkfs.exfat"));
       t.has("in one pkexec", fc, "pkexec sh -c");
       t.has("onto the first partition", fc, "'/dev/sdb1'");
+      // auto, named, and passed (2026-10-24)
+      const G = 1073741824;
+      t.eq("exFAT auto by size", [T.autoBlock("exfat", 0.2 * G), T.autoBlock("exfat", 16 * G), T.autoBlock("exfat", 64 * G)],
+        [4096, 32768, 131072]);
+      t.eq("FAT32 auto by size", [T.autoBlock("vfat", 4 * G), T.autoBlock("vfat", 12 * G), T.autoBlock("vfat", 20 * G), T.autoBlock("vfat", 40 * G)],
+        [4096, 8192, 16384, 32768]);
+      t.eq("small ext4 takes 1 KiB", [T.autoBlock("ext4", 0.3 * G), T.autoBlock("ext4", 8 * G)], [1024, 4096]);
+      t.eq("no choice, no size", [T.autoBlock("btrfs", 8 * G), T.autoBlock("exfat", 0)], [0, 0]);
+      const auto = T.formatCommand({ fs: "exfat", target: "/dev/sdb1", device: "/dev/sdb", bytes: 16 * G });
+      t.has("auto is passed as a number", auto, "$ mkfs.exfat -c 32K /dev/sdb1");
+      t.ok("btrfs is never given one", T.formatCommand({ fs: "btrfs", target: "/dev/sdb1", device: "/dev/sdb", bytes: 16 * G }).indexOf("'-b'") < 0);
+      const enc = T.formatCommand({ fs: "ext4", label: "vault", target: "/dev/sdb1", device: "/dev/sdb", encrypt: true, mountAfter: true });
+      t.ok("encrypted: the container, then the filesystem inside it",
+        enc.indexOf("cryptsetup luksFormat") < enc.indexOf("mkfs.ext4") && enc.indexOf("/dev/mapper/$NAME") > 0);
+      t.has("the passphrase comes from stdin", enc, "read -r PASS");
+      t.eq("and only ever piped by printf", enc.split("\n").filter((l) => l.indexOf("$PASS") >= 0
+        && l.indexOf("printf %s \"$PASS\" | cryptsetup") < 0 && l.indexOf("[ -n \"$PASS\" ]") < 0), []);
+      t.has("mounted from inside the container", enc, "lsblk -nrpo NAME");
+      t.has("closed when not mounted", T.formatCommand({ fs: "ext4", target: "/dev/sdb1", device: "/dev/sdb", encrypt: true }), "cryptsetup close");
+      const zero = T.formatCommand({ fs: "exfat", device: "/dev/sdb", table: "gpt", zero: true });
+      t.ok("zeros first, over the whole drive", zero.indexOf("of='\\''/dev/sdb'\\''") > 0 && zero.indexOf("dd if=/dev/zero") < zero.indexOf("wipefs"));
+      t.has("an encrypted drive is a Linux partition", T.formatCommand({ fs: "exfat", device: "/dev/sdb", table: "gpt", encrypt: true }), "0FC63DAF");
       t.eq("a typed mode in octal", T.parseModeText("750"), 488);
       t.eq("with a leading zero", T.parseModeText("0644"), 420);
       t.eq("or as ls spells it", T.parseModeText("rwxr-x---"), 488);

@@ -21,7 +21,6 @@ import re
 import tempfile
 
 import diff as D
-import stow as ST
 import status as S
 from gitrun import Git, GitError, progress_of
 
@@ -251,16 +250,6 @@ class Repo:
             if len(f) == 3 and f[0]:
                 res.append({"subject": f[0], "sha": f[1], "author": f[2]})
         return res
-
-    # ── dotfiles: its stow packages (core/stow.py; never stowed here) ────
-    def stow_packages(self, target=None, cancel=None):
-        return ST.packages(self.root, target, cancel)
-
-    def stow_plan(self, name, target=None, cancel=None):
-        return ST.plan(self.root, name, target, cancel)
-
-    def stow_copy_in(self, src, package, target=None, cancel=None):
-        return ST.copy_in(self.root, src, package, target, cancel)
 
     # ── status ──────────────────────────────────────────────────────────
     def status(self, cancel=None, ignored=False):

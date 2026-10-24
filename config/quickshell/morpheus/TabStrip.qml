@@ -83,8 +83,8 @@ Rectangle {
   clip: true
   // TRANSPARENT: an inactive tab is the window's own body showing through
   // (black at the panel opacity, as every other surface), and the active
-  // tab paints the strip's gray itself (Zenon.tabHere), untouched by a
-  // sheet, as terminus' (user, 2026-10-11): only the bars go with one,
+  // tab wears the window's ground through the strip's glass (morpheus/
+  // TabGlass), untouched by a sheet, as terminus' (user, 2026-10-11): only the bars go with one,
   // never the tabs
   color: "transparent"
   // the active tab's cell, for the glass under the strip (morpheus/TabGlass)

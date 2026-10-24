@@ -1986,7 +1986,7 @@ FloatingWindow {
   }
   function copyPath() {
     if (win.path === "") return;
-    Quickshell.execDetached(["sh", "-c", "printf '%s' \"$1\" | wl-copy", "sh", win.path]);
+    Strings.copy(win.path);
     win.say("Path copied");
   }
   // In the image editor oracle's Default apps names, by its desktop id —
@@ -2472,7 +2472,7 @@ FloatingWindow {
     const sep = { isSeparator: true };
     const own = [Picasso.picturesDir, Picasso.shotDir, Picasso.dir].filter((d, i, a) => d !== "" && a.indexOf(d) === i);
     let out = own.map((d) => row(d, "\uf03e"));
-    if (marks.length > 0) out = out.concat([sep, { text: "Bookmarks", enabled: false }]).concat(marks.map((d) => row(d, "\uf02e")));
+    if (marks.length > 0) out = out.concat([sep, { text: "Bookmarks", enabled: false }]).concat(marks.map((d) => Object.assign(row(d, "\uF47A"), { iconInk: Zenon.cyan })));
     const rec = (win.mgr ? win.mgr.recent : []).filter((d) => own.indexOf(d) < 0 && marks.indexOf(d) < 0);
     if (rec.length > 0) out = out.concat([sep, { text: "Lately", enabled: false }]).concat(rec.map((d) => row(d, "\uf1da")));
     return out;
@@ -2958,7 +2958,7 @@ FloatingWindow {
     && win.fallback === "" && !win.cropping && !win.peekOriginal
   function copyColour() {
     if (!win.pixel) return;
-    Quickshell.execDetached(["sh", "-c", "printf '%s' \"$1\" | wl-copy", "sh", win.pixel.hex]);
+    Strings.copy(win.pixel.hex);
     win.say(win.pixel.hex + " copied");
   }
 
@@ -6030,7 +6030,7 @@ FloatingWindow {
                 anchors.fill: parent
                 hoverEnabled: true
                 onClicked: {
-                  Quickshell.execDetached(["sh", "-c", "printf '%s' \"$1\" | wl-copy", "sh", sw.modelData.hex]);
+                  Strings.copy(sw.modelData.hex);
                   win.say(sw.modelData.hex + " copied");
                 }
               }
@@ -6456,7 +6456,7 @@ FloatingWindow {
     case "copyP": win.run(["sh", "-c", "wl-copy < \"$1\"", "sh", p]); win.say("Copied to the clipboard"); break;
     case "copyPath": win.copyPath(); break;
     case "copyPathP":
-      Quickshell.execDetached(["sh", "-c", "printf '%s' \"$1\" | wl-copy", "sh", p]);
+      Strings.copy(p);
       win.say("Path copied");
       break;
     case "copyFiles": win.copyFiles(ps); break;

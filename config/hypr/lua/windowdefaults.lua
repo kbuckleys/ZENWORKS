@@ -25,6 +25,7 @@ return {
 	{ shipped = "argus", name = "Argus", class = "org.quickshell", title = "argus", float = true, persistent_size = true },
 	-- keeps its own size, less its sidebar (MinervaWindow keepSize)
 	{ shipped = "minerva", name = "Minerva", class = "org.quickshell", title = "minerva", float = true },
+	{ shipped = "stylus", name = "Stylus", class = "org.quickshell", title = "stylus", float = true, persistent_size = true },
 	{ shipped = "hestia", name = "Hestia", class = "org.quickshell", title = "hestia", float = true, persistent_size = true },
 	{ shipped = "kairos", name = "Kairos", class = "org.quickshell", title = "kairos", float = true, persistent_size = true },
 	{ shipped = "hygieia", name = "Tidy", class = "org.quickshell", title = "hygieia", float = true, persistent_size = true },

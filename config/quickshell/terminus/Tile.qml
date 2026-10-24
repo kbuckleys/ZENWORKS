@@ -494,7 +494,7 @@ Item {
             // NON-BREAKING spaces: this is markup now, and StyledText
             // collapses a run of ordinary ones to a single space, so the gap
             // asked for was never the gap drawn.
-            ? "<font color=\"" + Zenon.hex(Zenon.sand) + "\">\uF02E</font>&#160;&#160;" : "")
+            ? "<font color=\"" + Zenon.hex(Zenon.cyan) + "\">\uF47A</font>&#160;&#160;" : "")
           // Tags last, nearest the name, one colored mark each — the
           // list's tag column, said inline for the same reason as above.
           + tile.tagList.map((t) => "<font color=\"" + Zenon.hex(term.tagInk(t))

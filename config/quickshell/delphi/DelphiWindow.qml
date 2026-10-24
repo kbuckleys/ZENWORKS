@@ -13,9 +13,6 @@
 //   Worktrees    the other checkouts of this repository
 //   Releases     the forge repository's releases, and a new one with its
 //                notes written for you (ReleasesPage)
-//   Dotfiles     its GNU Stow packages: what stow would link, and what is
-//                in the way; a config copied in; the command to run (never
-//                run here — DotfilesPage, core/stow.py)
 //   Pull requests, Issues   the forge repository's — GitHub, GitLab,
 //                Codeberg (ForgePage): read, say
 //                something, open one, check a pull request out, merge
@@ -24,7 +21,8 @@
 //   Repositories the ones opened before, the ones found on disk, clone, init
 //
 // The head says where you are and carries Fetch, Pull and Push (with how
-// far ahead and behind); a network job's progress shows there. Everything
+// far ahead and behind) on the pages about commits (syncPages); a network
+// job's progress shows there on every page. Everything
 // git or ssh asks — a password, a passphrase, a new host's key — comes up
 // as a card from the head, as does every confirmation and every failure.
 //
@@ -779,7 +777,7 @@ FloatingWindow {
   function say(t, bad) { win.said = t; win.saidBad = !!bad; sayTimer.restart(); }
   Timer { id: sayTimer; interval: 2400; onTriggered: win.said = "" }
   function copy(text, what) {
-    Quickshell.execDetached(["sh", "-c", "printf '%s' \"$1\" | wl-copy", "sh", String(text)]);
+    Strings.copy(text);
     win.say("Copied " + (what || text));
   }
   function fail(title, detail, err) {
@@ -879,7 +877,6 @@ FloatingWindow {
     { id: "branches", label: "Branches", glyph: "", group: "repo" },
     { id: "stashes", label: "Stashes", glyph: "", group: "repo" },
     { id: "worktrees", label: "Worktrees", glyph: "", group: "repo" },
-    { id: "dotfiles", label: "Dotfiles", glyph: "\uF487", group: "repo" },
     { id: "pulls", label: win.hub && D.FORGES[win.hub.forge] ? D.FORGES[win.hub.forge].pulls : "Pull requests", glyph: "\uF407", group: "forge" },
     { id: "issues", label: "Issues", glyph: "\uF41B", group: "forge" },
     { id: "releases", label: "Releases", glyph: "\uF412", group: "forge" },
@@ -892,6 +889,9 @@ FloatingWindow {
       : "Everywhere";
   }
   readonly property string page: win.mgr ? win.mgr.page : "changes"
+  // the pages Fetch, Pull and Push stand on (user, 2026-10-24: not on
+  // unrelated ones); their keys work from every page
+  readonly property bool syncPage: win.root !== "" && ["changes", "history", "branches"].indexOf(win.page) >= 0
   function setPage(p) {
     if (win.mgr) win.mgr.set("page", p);
     Qt.callLater(win.refocus);
@@ -1024,9 +1024,7 @@ FloatingWindow {
       // TERMINUS' AND PLATO'S TWO LAYERS (user, 2026-10-14: "all must
       // match"): an inactive tab's thinner glass, then the sheet's veil
       // over it. The veil alone left this a pale band beside them.
-      Rectangle { anchors.fill: parent; color: Zenon.alpha(Zenon.tabAwayInk, Zenon.tabAway(Zenon.layerBg.a)) }
-      Rectangle { anchors.fill: parent; color: Zenon.ground; opacity: 0.6 }
-      Rectangle { anchors.right: parent.right; width: 1; height: parent.height; color: Zenon.border }
+      SideGlass { edge: "right" }
 
       // the repository, and the branch it is on
       Rectangle {
@@ -1678,20 +1676,20 @@ FloatingWindow {
           window: win
           target: netPill.visible ? netPill : pushBtn
           // not while the page holds the push in its own place (Changes, clean)
-          shown: !!win.pushing && win.visible && !(win.pageItem && win.pageItem.holdsPush)
+          shown: !!win.pushing && win.visible && !(win.pageItem && win.pageItem.holdsPush) && (netPill.visible || win.syncPage)
           cardWidth: 460
           PushSummary { p: win.pushing; lineWidth: 460 - 28 }
         }
         DialogButton {
           id: fetchBtn
-          visible: !win.netBusy && win.root !== ""
+          visible: !win.netBusy && win.syncPage
           label: "Fetch"
           onClicked: win.fetch()
           MouseArea { anchors.fill: parent; acceptedButtons: Qt.RightButton; onClicked: win.fetchMenu(fetchBtn) }
         }
         DialogButton {
           id: pullBtn
-          visible: !win.netBusy && win.root !== ""
+          visible: !win.netBusy && win.syncPage
           label: win.branch && win.branch.behind > 0 ? "Pull  ↓" + win.branch.behind : "Pull"
           ink: win.branch && win.branch.behind > 0 ? Zenon.cyan : Zenon.accentMuted
           ready: !!win.branch && !!win.branch.upstream
@@ -1700,7 +1698,7 @@ FloatingWindow {
         }
         // Push: where it goes is the chip beside the page's title (pushChip)
         Row {
-          visible: !win.netBusy && win.root !== ""
+          visible: !win.netBusy && win.syncPage
           spacing: 2
           DialogButton {
             id: pushBtn
@@ -1730,7 +1728,7 @@ FloatingWindow {
       anchors.bottom: foot.top
       source: win.root === "" && ["github", "repos"].indexOf(win.page) < 0 ? "ReposPage.qml"
         : ({ changes: "ChangesPage.qml", history: "HistoryPage.qml", branches: "BranchesPage.qml",
-             stashes: "StashesPage.qml", worktrees: "WorktreesPage.qml", dotfiles: "DotfilesPage.qml", releases: "ReleasesPage.qml", github: "GitHubPage.qml",
+             stashes: "StashesPage.qml", worktrees: "WorktreesPage.qml", releases: "ReleasesPage.qml", github: "GitHubPage.qml",
              pulls: "ForgePage.qml", issues: "ForgePage.qml",
              repos: "ReposPage.qml" })[win.page] || "ChangesPage.qml"
       onLoaded: { item.win = win; Qt.callLater(win.refocus); }

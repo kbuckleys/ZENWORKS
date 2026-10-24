@@ -120,6 +120,8 @@ const SHELL_ACTIONS = [
   { name: "Services", glyph: "\u{F08D6}", keys: "hestia systemd systemctl daemons units", ipc: "Hestia open system" },
   { name: "System journal", glyph: "\u{F09EE}", keys: "hestia logs journalctl errors", ipc: "Hestia journal ''" },
   { name: "What's wrong", glyph: "\u{F05D6}", keys: "hestia failed services errors broken overview health", ipc: "Hestia open overview" },
+  // stylus
+  { name: "Write an image to a drive", glyph: "\u{F0D13}", keys: "stylus iso usb flash burn etcher rufus sd card bootable dd", ipc: "Stylus open ''" },
   // kairos
   { name: "This week's screen time", glyph: "\u{F0128}", keys: "kairos screen time usage week apps hours", ipc: "Kairos open week" },
   { name: "Keyboard shortcuts", glyph: "\u{F030C}", keys: "keys keybinds binds cheat sheet hotkeys shortcuts", sh: "sleep 0.3 && qs ipc call Keys open" },

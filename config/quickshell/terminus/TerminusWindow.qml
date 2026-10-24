@@ -152,8 +152,6 @@ FloatingWindow {
   // The size you left it at is hyprland's: persistent_size on the
   // "terminus" and "terminus-picker" rules (hypr/lua/rules.lua). The two
   // above are only the size a window is born at the very first time.
-  onWidthChanged: root.noteSideWidth()
-
   // `shown` and `visible` are kept in step BOTH WAYS, and neither is a binding.
   //
   // Two bugs live here, and the second one hid behind the first.
@@ -1031,19 +1029,27 @@ FloatingWindow {
   readonly property real sidebarMin: 130
   readonly property real sidebarMax: 420
 
-  // ── THE SIDEBAR MAKES ROOM FOR ITSELF ─────────────────────────────────
-  // Plato's tree, copied: the sidebar is shown or hidden AT ONCE and slides
-  // (see `side`), and at the same moment a floating window asks Hyprland for
-  // the room — wider by the sidebar on the way out, narrower by exactly what
-  // was added on the way back, from the left edge so the listing holds still
-  // (pushed inward only if the monitor's edge is in the way). Tiled or fullscreen, the
-  // layout owns the size and nothing happens. Each request says what it was
-  // for (`sideFor`) and resizes at most once (`sidePending`), so a quick
-  // open-close cannot land the open's answer after the close.
-  property int sideGrew: 0
-  property int sideWant: 0
-  property bool sideFor: false
-  property bool sidePending: false
+  // ── THE SIDEBAR MAKES ROOM FOR ITSELF (terminus/SideRoom) ──────────────
+  // The sidebar is shown or hidden AT ONCE and slides (see `side`), and at
+  // the same moment a floating window asks Hyprland for the room — wider by
+  // the sidebar on the way out, narrower by exactly what was added on the
+  // way back, from the left edge so the listing holds still (pushed inward
+  // only if the monitor's edge is in the way). Tiled or fullscreen, the
+  // layout owns the size and nothing happens. What was added (`sideGrew`)
+  // is kept with the view preferences, so a window reopened wide still
+  // knows what is its to give back.
+  SideRoom {
+    id: room
+    window: root
+    anchor: side
+    shown: root.sidebar
+    want: root.sidebarWidth
+    box: side
+    edge: "left"
+    minW: 560
+  }
+  property alias sideGrew: room.grew
+  onSideGrewChanged: root.saveSide()
 
   function toggleSidebar() { return sideMarks.toggleSidebar(); }
 
@@ -1056,24 +1062,11 @@ FloatingWindow {
   // behaves exactly like the window, and keeps its own copy of the three
   // (pickerSidebar, pickerSidebarWidth, pickerSideGrew) through the merged
   // write in savePickerView, the way it keeps its own view and size.
-  // ONE ANIMATION, NOT TWO (plato's tree had it first). The sidebar slid on
-  // its own clock while Hyprland animated the resize and move on
-  // another, and the listing shook left and right between them. While the
-  // window is resized for the sidebar, the rest keeps its width (sideKeepW:
-  // the window less the sidebar, at the toggle) and the sidebar is exactly
-  // what the window has gained or not yet given back. -1: not following;
-  // released once the window lands, or after a ceiling.
-  property real sideKeepW: -1
-  property bool sideFollowing: false
-  property int sideTarget: 0
-  function releaseSideFollow() { return sideMarks.releaseSideFollow(); }
-  // tiled, maximized or fullscreen: the layout owns the size, no resize
-  // will come, and the sidebar just slides (terminus/LayoutProbe.qml)
-  LayoutProbe { id: sideLayout; title: root.title }
-  Timer { id: sideCeiling; interval: 1500; onTriggered: root.releaseSideFollow() }
-  function noteSideWidth() { return sideMarks.noteSideWidth(); }
-
-  function sideRoom(shown) { return sideMarks.sideRoom(shown); }
+  // ONE ANIMATION, NOT TWO: while the window is resized for the sidebar,
+  // the rest keeps its width and the sidebar is exactly what the window has
+  // gained or not yet given back (SideRoom's keepW; -1: not following)
+  readonly property real sideKeepW: room.keepW
+  readonly property bool sideFollowing: room.following
 
 
   property var disks: []
@@ -3784,7 +3777,7 @@ FloatingWindow {
     if (bulk.open) return "\uEC61";
     // The mark itself, the one the listing and the sidebar put beside a
     // bookmarked row — so the sheet is labeled with the thing it holds.
-    if (marks.open) return "\uF02E";
+    if (marks.open) return "\uF47A";
     // nf-fa-tag, the same mark the sidebar will list them under
     if (tagPick.open) return "\uF02B";
     if (collEdit.open)
@@ -3811,6 +3804,8 @@ FloatingWindow {
   readonly property color sheetGlyphInk:
     confirm.open ? (confirm.choices.length > 0 ? confirm.choices[0].ink : Zenon.sand)
     : bulk.open ? root.crumbInk
+    // the bookmark, in the accent as everywhere it is drawn
+    : marks.open ? Zenon.cyan
     // A FILE'S GLYPH WEARS THE GLYPH'S INK, its name the name's — as its row
     // does (user, 2026-10-17: the info and open-with headers wore one ink
     // for both, and a repository lost its magenta)
@@ -4318,8 +4313,6 @@ FloatingWindow {
   readonly property alias holdStopRef: holdStop
   readonly property alias warmRepRef: warmRep
   readonly property alias diskToolRef: diskTool
-  readonly property alias sideCeilingRef: sideCeiling
-  readonly property alias sideLayoutRef: sideLayout
   readonly property alias splitPaneRef: splitPane
   readonly property alias thumbFlushRef: thumbFlush
   readonly property alias listProcRef: listing.listProc

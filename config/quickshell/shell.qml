@@ -39,6 +39,7 @@ import "hermes"
 import "argus"
 import "minerva"
 import "hestia"
+import "stylus"
 import "kairos"
 import "hygieia"
 
@@ -182,6 +183,9 @@ ShellRoot {
   // services, timers and the journal — hestia; asks systemd only while
   // its window is open (its pages frost up under its head: ScrollEdge)
   HestiaManager { id: hestia }
+  // an image onto a drive — stylus; only the ipc and a running write live
+  // here, the window (and its drive watcher) only while it is open
+  StylusManager { id: stylus; fileManager: terminus }
   // tidy: what takes room that could be given back (window built on first use)
   HygieiaManager { id: hygieia }
   // screen time — kairos; counts the focused app, never while locked
@@ -1319,7 +1323,9 @@ ShellRoot {
           Gap { visible: root.meterGap(1) }
           GpuModule {
             implicitHeight: Zenon.slot
-            visible: Oracle.showGpu
+            // the module's own `visible` (no GPU, no meter) is replaced by
+            // this one, so it is said again — as meterRun says it
+            visible: Oracle.showGpu && Sysmon.gpuPresent
             onActivated: zeus.toggleAt("graphs")
           }
           Gap { visible: root.meterGap(2) }

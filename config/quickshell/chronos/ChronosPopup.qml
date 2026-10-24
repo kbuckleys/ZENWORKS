@@ -3,8 +3,9 @@
 // └─┘└─┘┘└┘└┴┘└─┘┴└─┘┴└─┘
 // https://github.com/kbuckleys/
 //
-// CHRONOS — what the clock opens into. The pomodoro band across the top, the
-// calendar under its left half, the forecast under its right.
+// CHRONOS — what the clock opens into. The calendar on the left, the forecast
+// on the right, the chosen day's agenda under both, and the pomodoro band
+// across the foot.
 //
 // POINTER-ONLY, deliberately. It spawns from a pill you clicked, so it is
 // answering a mouse, and every affordance in here is a hit target: months step
@@ -50,11 +51,10 @@ LayerPopup {
   readonly property string glyphRename:  ""
   readonly property string glyphReset:   ""
   readonly property string glyphRemove:  ""
-  readonly property string glyphToday:   ""
   readonly property string glyphTimer:   ""
-  readonly property string glyphOk:      ""
-  readonly property string glyphCelsius: ""
-  readonly property string glyphFahren:  ""
+  readonly property string glyphAdd:     "\u{F0415}"
+  readonly property string glyphPlay:    "\u{F040A}"
+  readonly property string glyphPause:   "\u{F03E4}"
 
   // ── the date the whole panel is pointed at ───────────────────────────
   // A month cursor rather than a Date for the view: paging by month on a Date
@@ -178,10 +178,12 @@ LayerPopup {
     return out;
   }
 
-  // The empty invitation is one LINE — a glyph and a sentence beside it — so it
-  // has no business being as tall as a cell carrying a countdown, a label, a
-  // stepper and a progress rule.
-  readonly property int emptyH: 44
+  // Two lines (2026-10-24): a cell's name over its countdown. On one line the
+  // name was what gave way, and three across it gave way entirely — the
+  // hover tools held their room even while hidden. The empty invitation is
+  // two lines as well (what to do, and the gestures), so the band keeps its
+  // shape when the first timer appears.
+  readonly property int emptyH: 58
 
   readonly property int bandInner: {
     if (popup.bandEmpty) return popup.emptyH;
@@ -273,12 +275,22 @@ LayerPopup {
     : Weather.fmt(popup.selForecast.hi)
   readonly property string wxLow: popup.showingNow
     ? "" : Weather.fmt(popup.selForecast.lo)
-  readonly property string wxFeels: popup.showingNow
-    ? (popup.wxNow ? Weather.fmt(popup.wxNow.feels) + Weather.unit : "--")
-    : Weather.fmt(popup.selForecast.lo) + Weather.unit
-  readonly property string wxHumid: popup.showingNow
-    ? (popup.wxNow ? popup.wxNow.humidity + "%" : "--")
-    : ((popup.selForecast.pop ?? 0) + "%")
+  readonly property string wxFeels:
+    popup.wxNow ? Weather.fmt(popup.wxNow.feels) + Weather.unit : "--"
+  readonly property string wxHumid:
+    popup.wxNow ? popup.wxNow.humidity + "%" : "--"
+  // A forecast day's own small print. Its low already sits beside the high,
+  // so the row under it carries what the day adds: the chance of rain and how
+  // long it is light (it used to repeat the low and print the rain twice).
+  readonly property string wxPop:
+    popup.selForecast ? (popup.selForecast.pop ?? 0) + "%" : "--"
+  readonly property string wxDaylight: {
+    const r = popup.wxRow ? new Date(popup.wxRow.sunrise) : null;
+    const s = popup.wxRow ? new Date(popup.wxRow.sunset) : null;
+    if (!r || !s || isNaN(r.getTime()) || isNaN(s.getTime())) return "--";
+    const m = Math.max(0, Math.round((s - r) / 60000));
+    return Math.floor(m / 60) + "h " + String(m % 60).padStart(2, "0") + "m";
+  }
   readonly property string wxWind: popup.wxNow
     ? Math.round(popup.wxNow.wind) + " km/h " + Wx.windDir(popup.wxNow.windDeg)
     : "--"
@@ -286,6 +298,15 @@ LayerPopup {
     popup.wxRow ? Wx.hhmm(popup.wxRow.sunrise) : "--:--"
   readonly property string wxSunset:
     popup.wxRow ? Wx.hhmm(popup.wxRow.sunset) : "--:--"
+
+  // an end of the twelve-hour curve: its hour and what it reads then — the
+  // curve is scaled to its own extremes, so without the degrees a flat
+  // evening and a 10° drop drew the same line
+  function hourEnd(i) {
+    const h = Weather.nextHours[i];
+    if (!h) return "";
+    return Wx.hhmm(h.time) + "  " + Weather.fmt(h.temp) + "°";
+  }
 
   function roleColor(code) {
     const r = Wx.role(code);
@@ -452,19 +473,9 @@ LayerPopup {
     width: Zenon.layerWidth(popup.panelWidth)
     height: popup.calcHeight()
 
-    ClippingRectangle {
+    PanelGround {
       id: bgRoot
-      anchors.fill: parent
-      // Grown by its own border: a ClippingRectangle insets its children by
-      // border.width on every side, so the content box came out 2px smaller
-      // than the panel and any layout measured against the panel's size fell
-      // one row or one column short. This hands the content its full box back.
-      anchors.margins: -bgRoot.border.width
-      color: Zenon.layerBg
       radius: popup.clipRadius
-      border.color: Zenon.border
-      border.width: 1
-      focus: true
 
       // Escape closes, because a layer that took the focus grab has to give it
       // back somehow. It is the only key this panel answers.
@@ -608,9 +619,8 @@ LayerPopup {
                       height: popup.cellH - 4
                       radius: Zenon.windowRadius
                       color: dayCell.isToday ? Zenon.cyan
-                        : (dayCell.isSel
-                            ? Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b, 0.16)
-                            : (dayMa.pressed ? Zenon.border : Zenon.alpha(Zenon.border, 0)))
+                        : (dayCell.isSel ? Zenon.menuHi
+                            : (dayMa.pressed ? Zenon.pressTile(false) : Zenon.alpha(Zenon.border, 0)))
                       border.color: (dayCell.isSel && !dayCell.isToday) ? Zenon.cyan : "transparent"
                       border.width: 1
                       Behavior on color { ColorAnimation { duration: Zenon.fast } }
@@ -684,16 +694,16 @@ LayerPopup {
                   font.pixelSize: Zenon.px(13)
                 }
 
-                PillButton {
+                // spelled out: a calendar glyph alone did not say where it went
+                DialogButton {
                   anchors.right: parent.right
                   anchors.rightMargin: 12
                   anchors.verticalCenter: parent.verticalCenter
-                  glyph: popup.glyphToday
                   label: "Today"
-                  accent: Zenon.cyan
-                  dimmed: popup.selIsToday && popup.viewMonth === popup.today.getMonth()
-                    && popup.viewYear === popup.today.getFullYear()
-                  onActivated: popup.goToday()
+                  ink: Zenon.cyan
+                  ready: !(popup.selIsToday && popup.viewMonth === popup.today.getMonth()
+                    && popup.viewYear === popup.today.getFullYear())
+                  onClicked: popup.goToday()
                 }
               }
             }
@@ -744,14 +754,13 @@ LayerPopup {
                 font.weight: Font.Bold
                 font.pixelSize: Zenon.px(15)
               }
-              PillButton {
+              DialogButton {
                 anchors.horizontalCenter: parent.horizontalCenter
-                glyph: Wx.icon("refresh")
                 visible: !Weather.disabled
                 label: Weather.located ? "Try again" : "Find me"
-                accent: Zenon.cyan
-                dimmed: Weather.loading
-                onActivated: if (!Weather.loading) Weather.refresh()
+                ink: Zenon.cyan
+                ready: !Weather.loading
+                onClicked: Weather.refresh()
               }
             }
 
@@ -797,25 +806,29 @@ LayerPopup {
                   }
                 }
 
+                // The units as the suite's switch, both on show: a glyph that
+                // named the OTHER unit, and only spelled it out under the
+                // pointer, read as a label for the one in use.
                 Row {
                   anchors.right: parent.right
                   anchors.rightMargin: 12
                   anchors.verticalCenter: parent.verticalCenter
-                  height: 24
                   spacing: 6
 
-                  PillButton {
-                    glyph: Weather.fahrenheit ? popup.glyphCelsius : popup.glyphFahren
-                    label: Weather.fahrenheit ? "To °C" : "To °F"
-                    accent: Zenon.sand
-                    onActivated: Weather.toggleUnits()
+                  Segments {
+                    anchors.verticalCenter: parent.verticalCenter
+                    textSize: Zenon.px(12)
+                    options: [["c", "°C"], ["f", "°F"]]
+                    current: Weather.fahrenheit ? "f" : "c"
+                    onChose: (v) => { if ((v === "f") !== Weather.fahrenheit) Weather.toggleUnits(); }
                   }
-                  PillButton {
-                    glyph: Wx.icon("refresh")
-                    label: Weather.loading ? "Fetching…" : "Refresh"
-                    accent: Weather.error !== "" ? Zenon.red : Zenon.cyan
-                    dimmed: Weather.loading
-                    onActivated: if (!Weather.loading) Weather.refresh()
+                  DialogButton {
+                    anchors.verticalCenter: parent.verticalCenter
+                    glyph: true
+                    label: Wx.icon("refresh")
+                    ink: Weather.error !== "" ? Zenon.red : Zenon.accentMuted
+                    ready: !Weather.loading
+                    onClicked: Weather.refresh()
                   }
                 }
               }
@@ -943,13 +956,15 @@ LayerPopup {
 
                 Reading {
                   glyph: Wx.icon("thermo")
+                  visible: popup.showingNow
                   text: popup.wxFeels
-                  hint: popup.showingNow ? "feels like" : "low"
+                  hint: "feels like"
                 }
                 Reading {
                   glyph: Wx.icon("humidity")
+                  visible: popup.showingNow
                   text: popup.wxHumid
-                  hint: popup.showingNow ? "humidity" : "rain"
+                  hint: "humidity"
                 }
                 Reading {
                   glyph: Wx.icon("wind")
@@ -960,8 +975,14 @@ LayerPopup {
                 Reading {
                   glyph: Wx.icon("umbrella")
                   visible: !popup.showingNow
-                  text: popup.wxHumid
+                  text: popup.wxPop
                   hint: "chance of rain"
+                }
+                Reading {
+                  glyph: Wx.icon("sunrise")
+                  visible: !popup.showingNow
+                  text: popup.wxDaylight
+                  hint: "daylight"
                 }
               }
 
@@ -973,9 +994,9 @@ LayerPopup {
 
                 Sparkline {
                   anchors.left: parent.left
-                  anchors.leftMargin: 46
+                  anchors.leftMargin: 80
                   anchors.right: parent.right
-                  anchors.rightMargin: 46
+                  anchors.rightMargin: 80
                   anchors.top: parent.top
                   height: 28
                   values: Weather.hourlyCurve
@@ -991,8 +1012,7 @@ LayerPopup {
                   anchors.left: parent.left
                   anchors.leftMargin: 12
                   anchors.top: parent.top
-                  text: Weather.nextHours.length > 0
-                    ? Wx.hhmm(Weather.nextHours[0].time) : ""
+                  text: popup.hourEnd(0)
                   color: Zenon.muted
                   font.family: popup.face
                   font.weight: Zenon.weight
@@ -1002,8 +1022,7 @@ LayerPopup {
                   anchors.right: parent.right
                   anchors.rightMargin: 12
                   anchors.top: parent.top
-                  text: Weather.nextHours.length > 0
-                    ? Wx.hhmm(Weather.nextHours[Weather.nextHours.length - 1].time) : ""
+                  text: popup.hourEnd(Weather.nextHours.length - 1)
                   color: Zenon.muted
                   font.family: popup.face
                   font.weight: Zenon.weight
@@ -1055,9 +1074,8 @@ LayerPopup {
                     anchors.fill: parent
                     anchors.margins: 2
                     radius: Zenon.windowRadius
-                    color: dayStrip.isSel
-                      ? Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b, 0.16)
-                      : (stripMa.pressed ? Zenon.border : Zenon.alpha(Zenon.border, 0))
+                    color: dayStrip.isSel ? Zenon.menuHi
+                      : (stripMa.pressed ? Zenon.pressTile(false) : Zenon.alpha(Zenon.border, 0))
                     border.color: dayStrip.isSel ? Zenon.cyan : "transparent"
                     border.width: 1
                     Behavior on color { ColorAnimation { duration: Zenon.fast } }
@@ -1070,7 +1088,7 @@ LayerPopup {
 
                     Text {
                       anchors.horizontalCenter: parent.horizontalCenter
-                      text: dayStrip.isToday ? "Now"
+                      text: dayStrip.isToday ? "Today"
                         : Chr.dayShort(Chr.weekIndex(dayStrip.when))
                       color: dayStrip.isToday ? Zenon.cyan : Zenon.muted
                       font.family: popup.face
@@ -1085,9 +1103,11 @@ LayerPopup {
                       font.weight: Zenon.weight
                       font.pixelSize: Zenon.px(20)
                     }
+                    // degrees marked: bare, a column of 31 / 29 / 28 under
+                    // weekday names read as the dates
                     Text {
                       anchors.horizontalCenter: parent.horizontalCenter
-                      text: Weather.fmt(dayStrip.modelData.hi)
+                      text: Weather.fmt(dayStrip.modelData.hi) + "°"
                       color: Zenon.white
                       font.family: popup.face
                       font.weight: Font.Bold
@@ -1095,7 +1115,7 @@ LayerPopup {
                     }
                     Text {
                       anchors.horizontalCenter: parent.horizontalCenter
-                      text: Weather.fmt(dayStrip.modelData.lo)
+                      text: Weather.fmt(dayStrip.modelData.lo) + "°"
                       color: Zenon.muted
                       font.family: popup.face
                       font.weight: Zenon.weight
@@ -1149,11 +1169,11 @@ LayerPopup {
               font.weight: Zenon.weight
               font.pixelSize: Zenon.px(13)
             }
-            PillButton {
+            DialogButton {
               anchors.verticalCenter: parent.verticalCenter
-              glyph: "\u{F0415}"
               label: Chronos.calStatus.khal ? "Make a calendar" : "Set up calendars"
-              onActivated: if (!Chronos.setupCalendar((ok) => popup.agendaSay(ok ? "Your calendar is ready" : "Not set up", !ok)))
+              ink: Zenon.cyan
+              onClicked: if (!Chronos.setupCalendar((ok) => popup.agendaSay(ok ? "Your calendar is ready" : "Not set up", !ok)))
                 popup.agendaSay("Ceres is busy \u2014 try again in a moment", true)
             }
           }
@@ -1188,12 +1208,12 @@ LayerPopup {
               radius: Zenon.windowRadius
               color: Zenon.wash(0.05)
               border.width: 1
-              border.color: addField.activeFocus ? Zenon.cyan : Zenon.border
+              border.color: Zenon.border
               TextInput {
                 id: addField
                 anchors.fill: parent
                 anchors.leftMargin: 10
-                anchors.rightMargin: 10
+                anchors.rightMargin: 28
                 verticalAlignment: TextInput.AlignVCenter
                 clip: true
                 color: Zenon.white
@@ -1223,6 +1243,15 @@ LayerPopup {
                   else bgRoot.forceActiveFocus();
                 }
               }
+              ClearChip {
+                size: Zenon.px(15)
+                shown: addField.text !== ""
+                anchors.right: parent.right
+                anchors.rightMargin: 8
+                anchors.verticalCenter: parent.verticalCenter
+                onClicked: addField.text = ""
+              }
+              HeldRing { anchors.fill: parent; radius: parent.radius; z: 10; on: addField.activeFocus }
             }
 
             ListView {
@@ -1268,25 +1297,25 @@ LayerPopup {
                 }
                 // removing a repeating event would take every one of them:
                 // that is khal's own editor's job, not a stray click's
-                Text {
+                ClearChip {
                   id: evRemove
+                  size: Zenon.px(15)
                   anchors.right: parent.right
-                  anchors.rightMargin: 4
+                  anchors.rightMargin: 8
                   anchors.verticalCenter: parent.verticalCenter
-                  visible: !!evRow.e && !evRow.e.repeats && !evRow.e.task
-                  text: "\u{F0156}"
-                  color: rmMa.pressed ? Zenon.red : Zenon.muted
-                  font.family: popup.face
-                  font.pixelSize: Zenon.px(13)
-                  MouseArea {
-                    id: rmMa
-                    anchors.fill: parent
-                    anchors.margins: -8
-                    onClicked: Chronos.removeEvent(evRow.e.uid, (ok, w) => popup.agendaSay(ok ? "Removed \u201C" + evRow.e.title + "\u201D" : w, !ok))
-                  }
+                  shown: !!evRow.e && !evRow.e.repeats && !evRow.e.task
+                  onClicked: Chronos.removeEvent(evRow.e.uid, (ok, w) => popup.agendaSay(ok ? "Removed \u201C" + evRow.e.title + "\u201D" : w, !ok))
                 }
-                // a task: its note, opened at it
+                // a task: its note, opened at it — and pressed like a row,
+                // since nothing else says this line goes anywhere
+                Rectangle {
+                  anchors.fill: parent
+                  z: -1
+                  radius: Zenon.windowRadius
+                  color: taskMa.pressed ? Zenon.pressTile(false) : Zenon.alpha(Zenon.border, 0)
+                }
                 MouseArea {
+                  id: taskMa
                   anchors.fill: parent
                   visible: !!evRow.e && !!evRow.e.task
                   onClicked: if (Clio.app) Clio.app.openTask(evRow.e.task.id, evRow.e.task.h)
@@ -1319,6 +1348,10 @@ LayerPopup {
             width: popup.bandWidth
             height: popup.bandInner
             spacing: popup.cellGap
+            // out of the way while a name is typed over them: the layer is
+            // glass, so no ground laid on top hides them completely
+            opacity: popup.naming ? 0 : 1
+            Behavior on opacity { NumberAnimation { duration: Zenon.fast; easing.type: Zenon.ease } }
 
             // the cells, in balanced rows
             Column {
@@ -1332,7 +1365,7 @@ LayerPopup {
                 width: parent.width
                 height: popup.emptyH
                 radius: Zenon.radiusCard
-                color: emptyMa.pressed ? Zenon.border : "transparent"
+                color: emptyMa.pressed ? Zenon.pressTile(false) : "transparent"
                 border.color: Zenon.border
                 border.width: 1
                 Behavior on color { ColorAnimation { duration: Zenon.fast } }
@@ -1351,9 +1384,19 @@ LayerPopup {
                     font.weight: Zenon.weight
                     font.pixelSize: Zenon.px(20)
                   }
-                  EmptyState {
+                  Column {
                     anchors.verticalCenter: parent.verticalCenter
-                    text: "No timers — click to start one"
+                    spacing: 2
+                    EmptyState { text: "No timers — click to start one" }
+                    // the gestures, said once where they cannot be found by
+                    // looking: nothing on a cell shows that it scrolls
+                    Text {
+                      text: "Click a timer to start or pause it \u00B7 scroll it to change its length"
+                      color: Zenon.muted
+                      font.family: popup.face
+                      font.weight: Zenon.weight
+                      font.pixelSize: Zenon.px(11)
+                    }
                   }
                 }
 
@@ -1399,7 +1442,8 @@ LayerPopup {
           Rectangle {
             id: nameStrip
             anchors.fill: parent
-            color: Zenon.panelBgDeep
+            // the band's own head strip; the cells fade out beneath it
+            color: Zenon.headBg
             visible: opacity > 0.01
             opacity: popup.naming ? 1 : 0
             Behavior on opacity { NumberAnimation { duration: Zenon.fast; easing.type: Zenon.ease } }
@@ -1427,7 +1471,7 @@ LayerPopup {
 
               Rectangle {
                 anchors.verticalCenter: parent.verticalCenter
-                width: parent.width - 220
+                width: parent.width - 264
                 height: 34
                 radius: Zenon.windowRadius
                 color: Zenon.selBg
@@ -1442,8 +1486,9 @@ LayerPopup {
                   anchors.leftMargin: 12
                   anchors.rightMargin: 12
                   verticalAlignment: TextInput.AlignVCenter
-                  color: Zenon.pink
-                  selectionColor: Qt.rgba(Zenon.red.r, Zenon.red.g, Zenon.red.b, 0.30)
+                  color: Zenon.white
+                  selectionColor: Zenon.cyan
+                  selectedTextColor: Zenon.onAccent
                   selectByMouse: true
                   font.family: popup.face
                   font.weight: Font.Bold
@@ -1482,19 +1527,19 @@ LayerPopup {
 
               // Naming is the one place a key is unavoidable; finishing it
               // still is not, so both ways out are buttons too.
-              PillButton {
+              // Cancel left of the verb, the verb the default answer — the
+              // confirmation sheets' order
+              DialogButton {
                 anchors.verticalCenter: parent.verticalCenter
-                glyph: popup.glyphOk
-                accent: Zenon.green
-                label: popup.nameTarget < 0 ? "Create" : "Rename"
-                onActivated: popup.commitName()
-              }
-              PillButton {
-                anchors.verticalCenter: parent.verticalCenter
-                glyph: popup.glyphRemove
-                accent: Zenon.red
                 label: "Cancel"
-                onActivated: popup.cancelName()
+                onClicked: popup.cancelName()
+              }
+              DialogButton {
+                anchors.verticalCenter: parent.verticalCenter
+                label: popup.nameTarget < 0 ? "Create" : "Rename"
+                ink: Zenon.green
+                primary: true
+                onClicked: popup.commitName()
               }
             }
           }
@@ -1509,7 +1554,12 @@ LayerPopup {
   // live down here rather than beside the things that use them.
 
   // One pomodoro. Click it to start or stop, scroll it to change its length,
-  // and the three buttons on hover rename, reset and remove it.
+  // and the buttons on hover add one, rename, reset and remove it.
+  //
+  // Two lines: the play state and name on top with the tools at its right
+  // end, the countdown under it with the length stepper at its right end.
+  // The tools only ever compete with the name, which elides — the countdown
+  // and the stepper always have their room.
   //
   // A ClippingRectangle rather than a Rectangle with clip: true — Qt's own clip
   // is RECTANGULAR and knows nothing about the radius, so the drain wash and
@@ -1529,9 +1579,10 @@ LayerPopup {
     readonly property real frac: Math.max(0, Math.min(1, cell.remain / cell.total))
     readonly property color accent: cell.running ? Zenon.green
       : (cell.armed ? Zenon.sand : Zenon.cyan)
+    readonly property bool showTools: cellHover.hovered || toolsHover.hovered
 
     radius: Zenon.radiusCard
-    color: cellMa.pressed ? Zenon.selBg : Zenon.panelBg
+    color: cellMa.pressed ? Zenon.pressTile(cell.running) : Zenon.panelBg
     border.color: cell.running
       ? Qt.rgba(cell.accent.r, cell.accent.g, cell.accent.b, 0.55) : Zenon.surface
     border.width: 1
@@ -1564,139 +1615,69 @@ LayerPopup {
       Behavior on width { NumberAnimation { duration: 900; easing.type: Easing.Linear } }
     }
 
-    // Everything on ONE line, chained right to left: the buttons hold the right
-    // edge, the stepper sits inside them, the countdown inside that, and the
-    // label takes whatever is left and elides. Nothing can overlap anything
-    // else however narrow the cell gets — at three across the label simply
-    // runs out of room, which is the right thing to lose first.
-    //
-    // The tools are always LAID OUT, only their opacity moves. Anchoring to an
-    // item that toggles `visible` would make the stepper jump sideways every
-    // time the pointer entered the cell. `enabled` follows the hover instead,
-    // so a faded button cannot be clicked.
+    // ── top line: state, name, tools ──────────────────────────────────
+    // A hover reveal on purpose (user, 2026-10-24: kept over always shown).
+    // The tools are always LAID OUT, only their opacity moves, so nothing
+    // shifts as the pointer enters; `enabled` follows the hover, so a faded
+    // button cannot be clicked.
     Row {
       id: cellTools
       anchors.right: parent.right
       anchors.rightMargin: 8
-      anchors.verticalCenter: parent.verticalCenter
-      anchors.verticalCenterOffset: -1
+      anchors.verticalCenter: cellName.verticalCenter
       spacing: 4
-      opacity: (cellHover.hovered || toolsHover.hovered) ? 1 : 0
-      enabled: cellHover.hovered || toolsHover.hovered
+      opacity: cell.showTools ? 1 : 0
+      enabled: cell.showTools
       Behavior on opacity { NumberAnimation { duration: Zenon.fast; easing.type: Zenon.ease } }
 
       HoverHandler { id: toolsHover }
 
-      // Adding a timer lives here rather than in a strip of its own: it is one
-      // more thing you do from a cell, and it sits FIRST so the destructive one
-      // stays at the far end, away from it.
+      // Adding sits FIRST so the destructive one stays at the far end. A
+      // TinyButton like its neighbours rather than an AddChip: the row is one
+      // set of controls and reads as one (user, 2026-10-24: "keep them
+      // uniform")
       TinyButton {
-        glyph: "＋"
-        accent: Zenon.green
-        dimmed: Chronos.timers.length >= Chronos.maxTimers
+        glyph: popup.glyphAdd
+        visible: Chronos.timers.length < Chronos.maxTimers
         onActivated: popup.startNaming(-1)
       }
       TinyButton {
         glyph: popup.glyphRename
-        accent: Zenon.cyan
         onActivated: popup.startNaming(cell.slot)
       }
       TinyButton {
         glyph: popup.glyphReset
-        accent: Zenon.sand
         dimmed: !cell.running && !cell.armed
         onActivated: Chronos.reset(cell.slot)
       }
       TinyButton {
         glyph: popup.glyphRemove
-        accent: Zenon.red
         onActivated: Chronos.remove(cell.slot)
       }
     }
 
-    // The countdown and its stepper travel together as one BODY, centered in the
-    // cell — with a single timer the cell is the whole band, and a reading pinned
-    // to its right edge looked like an afterthought.
-    //
-    // Centered only while there is room. Below that the tools would reach across
-    // and sit on the stepper, so the body falls back to hanging off their left
-    // edge. The test is on WIDTH, not on hover, so nothing moves under the
-    // pointer — a narrow cell is simply laid out the other way round.
-    readonly property bool roomToCentre:
-      (cell.width - cellBody.width) / 2 > cellTools.width + 14
-
-    Row {
-      id: cellBody
-      anchors.verticalCenter: parent.verticalCenter
-      anchors.verticalCenterOffset: -1
-      anchors.horizontalCenter: cell.roomToCentre ? parent.horizontalCenter : undefined
-      anchors.right: cell.roomToCentre ? undefined : cellTools.left
-      anchors.rightMargin: 8
-      spacing: 8
-
-      // the countdown, over its own unlit face
-      Item {
-        anchors.verticalCenter: parent.verticalCenter
-        width: liveTime.implicitWidth
-        height: liveTime.implicitHeight
-
-        Text {
-          anchors.centerIn: parent
-          text: Helpers.ghostText(Chr.clock(cell.remain))
-          color: Zenon.trough(cell.accent)
-          font.family: Zenon.clockFamily
-          font.weight: Font.Bold
-          font.pixelSize: Zenon.px(20)
-        }
-        Text {
-          id: liveTime
-          anchors.centerIn: parent
-          text: Chr.clock(cell.remain)
-          color: cell.accent
-          Behavior on color { ColorAnimation { duration: Zenon.normal } }
-          font.family: Zenon.clockFamily
-          font.weight: Font.Bold
-          font.pixelSize: Zenon.px(20)
-        }
-      }
-
-      // The length, as a stepper. It is also what the scroll wheel over the cell
-      // is driving, so the number the wheel moves is always on screen.
-      Row {
-        anchors.verticalCenter: parent.verticalCenter
-        spacing: 2
-
-        TinyButton {
-          glyph: "‹"
-          accent: Zenon.keyInk
-          onActivated: Chronos.bump(cell.slot, -1)
-        }
-        Text {
-          anchors.verticalCenter: parent.verticalCenter
-          width: 30
-          horizontalAlignment: Text.AlignHCenter
-          text: (cell.t !== null ? cell.t.minutes : 0) + "m"
-          color: cellMa.pressed ? Zenon.keyInk : Zenon.muted
-          Behavior on color { ColorAnimation { duration: Zenon.fast } }
-          font.family: popup.face
-          font.weight: Font.Bold
-          font.pixelSize: Zenon.px(13)
-        }
-        TinyButton {
-          glyph: "›"
-          accent: Zenon.keyInk
-          onActivated: Chronos.bump(cell.slot, 1)
-        }
-      }
+    // what a click on the cell will do, drawn as what it is doing: paused or
+    // idle shows play, counting shows pause
+    Text {
+      id: cellState
+      anchors.left: parent.left
+      anchors.leftMargin: 10
+      anchors.verticalCenter: cellName.verticalCenter
+      text: cell.running ? popup.glyphPause : popup.glyphPlay
+      color: cell.accent
+      Behavior on color { ColorAnimation { duration: Zenon.normal } }
+      font.family: popup.face
+      font.weight: Zenon.weight
+      font.pixelSize: Zenon.px(13)
     }
 
     Text {
-      anchors.left: parent.left
-      anchors.leftMargin: 10
-      anchors.right: cellBody.left
-      anchors.rightMargin: 8
-      anchors.verticalCenter: parent.verticalCenter
-      anchors.verticalCenterOffset: -1
+      id: cellName
+      anchors.left: cellState.right
+      anchors.leftMargin: 6
+      anchors.right: cellTools.left
+      anchors.rightMargin: 6
+      y: 7
       elide: Text.ElideRight
       text: cell.t !== null ? cell.t.label : ""
       color: cell.running ? cell.accent : Zenon.white
@@ -1706,6 +1687,64 @@ LayerPopup {
       font.pixelSize: Zenon.px(13)
     }
 
+    // ── bottom line: countdown, stepper ───────────────────────────────
+    // the countdown, over its own unlit face
+    Item {
+      id: cellClock
+      anchors.left: parent.left
+      anchors.leftMargin: 10
+      anchors.bottom: parent.bottom
+      anchors.bottomMargin: 7
+      width: liveTime.implicitWidth
+      height: liveTime.implicitHeight
+
+      Text {
+        anchors.centerIn: parent
+        text: Helpers.ghostText(Chr.clock(cell.remain))
+        color: Zenon.trough(cell.accent)
+        font.family: Zenon.clockFamily
+        font.weight: Font.Bold
+        font.pixelSize: Zenon.px(20)
+      }
+      Text {
+        id: liveTime
+        anchors.centerIn: parent
+        text: Chr.clock(cell.remain)
+        color: cell.accent
+        Behavior on color { ColorAnimation { duration: Zenon.normal } }
+        font.family: Zenon.clockFamily
+        font.weight: Font.Bold
+        font.pixelSize: Zenon.px(20)
+      }
+    }
+
+    // The length, as a stepper. It is also what the scroll wheel over the cell
+    // is driving, so the number the wheel moves is always on screen.
+    Row {
+      anchors.right: parent.right
+      anchors.rightMargin: 8
+      anchors.verticalCenter: cellClock.verticalCenter
+      spacing: 2
+
+      TinyButton {
+        glyph: "‹"
+        onActivated: Chronos.bump(cell.slot, -1)
+      }
+      Text {
+        anchors.verticalCenter: parent.verticalCenter
+        width: 34
+        horizontalAlignment: Text.AlignHCenter
+        text: (cell.t !== null ? cell.t.minutes : 0) + "m"
+        color: Zenon.keyInk
+        font.family: popup.face
+        font.weight: Font.Bold
+        font.pixelSize: Zenon.px(13)
+      }
+      TinyButton {
+        glyph: "›"
+        onActivated: Chronos.bump(cell.slot, 1)
+      }
+    }
 
     // the same countdown as a rule along the bottom edge, for the glance that
     // does not stop to read digits
@@ -1732,31 +1771,31 @@ LayerPopup {
 
   // A small square button. `dimmed` is for one that is currently pointless.
   //
-  // No outline: four boxed buttons in a 44px row read as a strip of chrome, the
-  // hover fill already says which one the pointer is on, and the border was
-  // costing the cell horizontal room it does not have.
+  // No outline: four boxed buttons in a row read as a strip of chrome. Lit
+  // while PRESSED, not under the pointer — the suite's buttons answer no
+  // hover (2026-10-11). One ink for all of them, rename and remove alike
+  // (user, 2026-10-24): the press is the suite's button press, not a color
+  // per verb.
   component TinyButton: Rectangle {
     id: tiny
     property string glyph: ""
-    property color accent: Zenon.cyan
     property bool dimmed: false
     signal activated()
 
-    readonly property bool lit: tinyMa.containsMouse && !tiny.dimmed
+    readonly property bool lit: tinyMa.pressed && !tiny.dimmed
 
     width: 20
     height: 20
     radius: Zenon.windowRadius
-    color: tiny.lit
-      ? Qt.rgba(tiny.accent.r, tiny.accent.g, tiny.accent.b, 0.20) : Zenon.alpha(tiny.accent, 0)
-    opacity: tiny.dimmed ? 0.4 : 1
+    color: tiny.lit ? Zenon.pressFill : Zenon.alpha(Zenon.pressFill, 0)
+    opacity: tiny.dimmed ? Zenon.disabledDim : 1
     Behavior on color { ColorAnimation { duration: Zenon.fast } }
     Behavior on opacity { NumberAnimation { duration: Zenon.fast } }
 
     Text {
       anchors.centerIn: parent
       text: tiny.glyph
-      color: tiny.lit ? tiny.accent : Zenon.muted
+      color: Zenon.keyInk
       Behavior on color { ColorAnimation { duration: Zenon.fast } }
       font.family: popup.face
       font.weight: Zenon.weight
@@ -1766,77 +1805,7 @@ LayerPopup {
     MouseArea {
       id: tinyMa
       anchors.fill: parent
-      hoverEnabled: true
       onClicked: if (!tiny.dimmed) tiny.activated()
-    }
-  }
-
-  // A glyph that grows its label out on hover rather than carrying it all the
-  // time, so a row of them stays a row of buttons.
-  component PillButton: Rectangle {
-    id: pill
-    property string glyph: ""
-    property string label: ""
-    property color accent: Zenon.cyan
-    property bool dimmed: false
-    signal activated()
-
-    readonly property bool lit: pillMa.containsMouse && !pill.dimmed
-
-    implicitWidth: pillRow.implicitWidth + 18
-    implicitHeight: 24
-    width: pill.implicitWidth
-    height: pill.implicitHeight
-    radius: Zenon.windowRadius
-    color: pill.lit
-      ? Qt.rgba(pill.accent.r, pill.accent.g, pill.accent.b, 0.18) : "transparent"
-    border.color: pill.lit ? pill.accent : Zenon.border
-    border.width: 1
-    opacity: pill.dimmed ? 0.45 : 1
-    Behavior on color { ColorAnimation { duration: Zenon.fast } }
-    Behavior on border.color { ColorAnimation { duration: Zenon.fast } }
-    Behavior on opacity { NumberAnimation { duration: Zenon.fast } }
-
-    Row {
-      id: pillRow
-      anchors.centerIn: parent
-      height: 18
-      spacing: (pill.lit && pill.label !== "") ? 6 : 0
-
-      Text {
-        anchors.verticalCenter: parent.verticalCenter
-        text: pill.glyph
-        color: pill.lit ? pill.accent : Zenon.muted
-        Behavior on color { ColorAnimation { duration: Zenon.fast } }
-        font.family: popup.face
-        font.weight: Font.Bold
-        font.pixelSize: Zenon.px(13)
-      }
-
-      Item {
-        anchors.verticalCenter: parent.verticalCenter
-        width: (pill.lit && pill.label !== "") ? pillLabel.implicitWidth : 0
-        height: pillLabel.implicitHeight
-        clip: true
-        Behavior on width { NumberAnimation { duration: Zenon.fast; easing.type: Zenon.ease } }
-
-        Text {
-          id: pillLabel
-          anchors.verticalCenter: parent.verticalCenter
-          text: pill.label
-          color: pill.accent
-          font.family: popup.face
-          font.weight: Font.Bold
-          font.pixelSize: Zenon.px(12)
-        }
-      }
-    }
-
-    MouseArea {
-      id: pillMa
-      anchors.fill: parent
-      hoverEnabled: true
-      onClicked: if (!pill.dimmed) pill.activated()
     }
   }
 

@@ -114,6 +114,78 @@ Item {
       font.pixelSize: Zenon.px(14)
     }
 
+    Row {
+      spacing: 8
+      DialogButton {
+        label: wr.picking ? "Cancel" : "Add rule"
+        ink: wr.picking ? wr.fgColor : wr.highlight
+        primary: !wr.picking
+        onClicked: wr.pick()
+      }
+    }
+
+    // ── THE PICKER: what is open now, by app ────────────────────────────
+    Item {
+      visible: wr.picking
+      width: body.width
+      height: pickList.implicitHeight + 12
+      Controls.ListFrame { anchors.fill: parent }
+      Column {
+        id: pickList
+        x: 6
+        y: 6
+        width: parent.width - 12
+        Text {
+          visible: wr.apps.length === 0
+          leftPadding: 10
+          height: 28
+          verticalAlignment: Text.AlignVCenter
+          text: clientsProc.running ? "Looking…" : "No windows are open."
+          color: wr.dimColor
+          font.family: wr.face
+          font.weight: Zenon.weight
+          font.pixelSize: Zenon.px(14)
+        }
+        Repeater {
+          model: wr.apps
+          delegate: Rectangle {
+            id: app
+            required property var modelData
+            width: pickList.width
+            height: 28
+            radius: Zenon.windowRadius
+            color: appTap.pressed ? Zenon.pressFill : appHover.hovered ? Zenon.wash(0.06) : "transparent"
+            Text {
+              id: appName
+              anchors.left: parent.left
+              anchors.leftMargin: 10
+              anchors.verticalCenter: parent.verticalCenter
+              text: app.modelData.name
+              color: wr.fgColor
+              font.family: wr.face
+              font.pixelSize: Zenon.px(16)
+            }
+            Text {
+              anchors.left: appName.right
+              anchors.leftMargin: 16
+              anchors.right: parent.right
+              anchors.rightMargin: 10
+              anchors.verticalCenter: parent.verticalCenter
+              horizontalAlignment: Text.AlignRight
+              elide: Text.ElideRight
+              text: app.modelData.cls + (app.modelData.title ? " · " + app.modelData.title : "")
+              color: wr.dimColor
+              font.family: wr.face
+              font.weight: Zenon.weight
+              font.pixelSize: Zenon.px(14)
+            }
+            HoverHandler { id: appHover }
+            TapHandler { id: appTap; onTapped: wr.add(app.modelData.cls, app.modelData.name) }
+          }
+        }
+      }
+    }
+
     // ── THE RULES ─────────────────────────────────────────────────────
     Item {
       visible: wr.rows.length > 0
@@ -372,78 +444,6 @@ Item {
             }
           }
         }
-      }
-    }
-
-    // ── THE PICKER: what is open now, by app ────────────────────────────
-    Item {
-      visible: wr.picking
-      width: body.width
-      height: pickList.implicitHeight + 12
-      Controls.ListFrame { anchors.fill: parent }
-      Column {
-        id: pickList
-        x: 6
-        y: 6
-        width: parent.width - 12
-        Text {
-          visible: wr.apps.length === 0
-          leftPadding: 10
-          height: 28
-          verticalAlignment: Text.AlignVCenter
-          text: clientsProc.running ? "Looking…" : "No windows are open."
-          color: wr.dimColor
-          font.family: wr.face
-          font.weight: Zenon.weight
-          font.pixelSize: Zenon.px(14)
-        }
-        Repeater {
-          model: wr.apps
-          delegate: Rectangle {
-            id: app
-            required property var modelData
-            width: pickList.width
-            height: 28
-            radius: Zenon.windowRadius
-            color: appTap.pressed ? Zenon.pressFill : appHover.hovered ? Zenon.wash(0.06) : "transparent"
-            Text {
-              id: appName
-              anchors.left: parent.left
-              anchors.leftMargin: 10
-              anchors.verticalCenter: parent.verticalCenter
-              text: app.modelData.name
-              color: wr.fgColor
-              font.family: wr.face
-              font.pixelSize: Zenon.px(16)
-            }
-            Text {
-              anchors.left: appName.right
-              anchors.leftMargin: 16
-              anchors.right: parent.right
-              anchors.rightMargin: 10
-              anchors.verticalCenter: parent.verticalCenter
-              horizontalAlignment: Text.AlignRight
-              elide: Text.ElideRight
-              text: app.modelData.cls + (app.modelData.title ? " · " + app.modelData.title : "")
-              color: wr.dimColor
-              font.family: wr.face
-              font.weight: Zenon.weight
-              font.pixelSize: Zenon.px(14)
-            }
-            HoverHandler { id: appHover }
-            TapHandler { id: appTap; onTapped: wr.add(app.modelData.cls, app.modelData.name) }
-          }
-        }
-      }
-    }
-
-    Row {
-      spacing: 8
-      DialogButton {
-        label: wr.picking ? "Cancel" : "Add rule"
-        ink: wr.picking ? wr.fgColor : wr.highlight
-        primary: !wr.picking
-        onClicked: wr.pick()
       }
     }
   }

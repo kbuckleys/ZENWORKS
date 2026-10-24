@@ -102,9 +102,6 @@ Scope {
   }
   // the forge the Accounts page shows: github | gitlab | codeberg
   property string forge: "github"
-  // where each dotfiles repository's packages go, by its root — chosen on
-  // the Dotfiles page when it is not the .stowrc's or home
-  property var stowTargets: ({})
   // ── CI: WHAT THE FORGES' CHECKS SAY OF A COMMIT ────────────────────
   // One answer per forge, repository and commit, shared by History, the
   // pull requests and the push chip: { state, runs, at }. A finished one
@@ -175,12 +172,6 @@ Scope {
     mgr.servers = mgr.servers.filter((s) => D.serverId(s.kind, s.host) !== id);
     mgr.keep_();
   }
-  function setStowTarget(root, dir) {
-    const o = Object.assign({}, mgr.stowTargets);
-    if (dir) o[root] = dir; else delete o[root];
-    mgr.stowTargets = o;
-    mgr.keep_();
-  }
   FileView {
     id: stateFile
     path: Quickshell.statePath("delphi.json")
@@ -193,13 +184,13 @@ Scope {
       if (Array.isArray(st.recents)) mgr.recents = st.recents.filter((r) => r && typeof r.root === "string");
       if (st.splits && typeof st.splits === "object") mgr.splits = st.splits;
       if (Array.isArray(st.hidden)) mgr.hidden = st.hidden.filter((h) => typeof h === "string");
-      if (typeof st.page === "string") mgr.page = st.page;
+      // the Stow page is gone (2026-10-24): one saved there opens Changes
+      if (typeof st.page === "string") mgr.page = st.page === "dotfiles" ? "changes" : st.page;
       if (Array.isArray(st.scanRoots) && st.scanRoots.length > 0) mgr.scanRoots = st.scanRoots;
       if (["ff-only", "rebase", "merge"].indexOf(st.pullMode) >= 0) mgr.pullMode = st.pullMode;
       if (typeof st.autoFetch === "boolean") mgr.autoFetch = st.autoFetch;
       if (Array.isArray(st.servers)) mgr.servers = st.servers.filter((s) => s && D.SERVER_KINDS[s.kind] && D.hostOf(s.host));
       if (D.FORGES[st.forge]) mgr.forge = st.forge;
-      if (st.stowTargets && typeof st.stowTargets === "object") mgr.stowTargets = st.stowTargets;
       if (st.pushTo && typeof st.pushTo === "object") mgr.pushTo = st.pushTo;
       if (st.syncs && typeof st.syncs === "object") mgr.syncs = st.syncs;
     } catch (e) {}
@@ -209,7 +200,7 @@ Scope {
     id: keepTimer
     interval: 400
     onTriggered: stateFile.setText(JSON.stringify({
-      recents: mgr.recents, hidden: mgr.hidden, splits: mgr.splits, page: mgr.page, scanRoots: mgr.scanRoots, pullMode: mgr.pullMode, autoFetch: mgr.autoFetch, forge: mgr.forge, stowTargets: mgr.stowTargets, servers: mgr.servers, pushTo: mgr.pushTo, syncs: mgr.syncs }, null, 1))
+      recents: mgr.recents, hidden: mgr.hidden, splits: mgr.splits, page: mgr.page, scanRoots: mgr.scanRoots, pullMode: mgr.pullMode, autoFetch: mgr.autoFetch, forge: mgr.forge, servers: mgr.servers, pushTo: mgr.pushTo, syncs: mgr.syncs }, null, 1))
   }
   function set(key, value) {
     if (mgr[key] === value) return;

@@ -20,6 +20,14 @@
 // A FILE of its own rather than an inline component, because both callers are
 // themselves inline components of TerminusWindow — and because the size column
 // and the sidebar are as far apart as two parts of that document get.
+//
+// ── IN STRETCHES (2026-10-24) ─────────────────────────────────────────
+// `segments` turns the one fill into Disk Utility's colored bar: what kind
+// of thing takes each stretch of a volume (UsageScan), or where each
+// partition lies on a drive (stylus' map). Each is { frac, ink }, with a
+// `start` when it does not follow the one before (a partition after a
+// gap) and `dim` to step it back (another partition picked). The written
+// figure stays; the stretches are solid, so put it under the bar instead.
 
 import QtQuick
 import "../morpheus"
@@ -48,6 +56,7 @@ Item {
   // already zoomed, and says `scaled: false`
   property bool scaled: true
   property int fontWeight: Font.Medium
+  property var segments: []
   readonly property real span: Math.max(0, Math.min(1, bar.frac))
   // Does the fill's edge land on the written figure? A couple of pixels
   // either side counts, so the mark never grazes the first or last glyph.
@@ -65,9 +74,45 @@ Item {
     color: Qt.rgba(Zenon.white.r, Zenon.white.g, Zenon.white.b, 0.07)
   }
 
+  // the stretches, one after another unless one says where it starts, and
+  // a share too small to draw is not drawn (as the fill's). SQUARE AND
+  // FLUSH (user, 2026-10-24): no track between neighbours, and only the
+  // bar's own two ends round, where a stretch meets the end of the track —
+  // a rounded block whose inner corners run past a clip. Both edges are
+  // rounded from where they fall on the bar, not the width on its own, so
+  // one stretch ends on the very pixel the next begins.
+  Repeater {
+    model: bar.bars ? bar.segments : []
+    Item {
+      id: seg
+      required property var modelData
+      required property int index
+      readonly property real at: modelData.start !== undefined ? modelData.start
+        : bar.segments.slice(0, index).reduce((a, s) => a + s.frac, 0)
+      readonly property bool first: seg.x <= 0
+      readonly property bool last: seg.x + seg.width >= bar.width - 1
+      readonly property real r: Math.min(bar.barRadius, seg.width / 2)
+      x: Math.round(at * bar.width)
+      width: Math.max(0, Math.round((at + modelData.frac) * bar.width) - Math.round(at * bar.width))
+      height: bar.height
+      visible: width >= 1
+      clip: true
+      opacity: modelData.dim ? 0.35 : 0.85
+      Behavior on opacity { NumberAnimation { duration: Zenon.fast } }
+      Behavior on width { NumberAnimation { duration: Zenon.normal; easing.type: Zenon.ease } }
+      Rectangle {
+        x: seg.first ? 0 : -seg.r
+        width: seg.width + (seg.first ? 0 : seg.r) + (seg.last ? 0 : seg.r)
+        height: parent.height
+        radius: seg.first || seg.last ? seg.r : 0
+        color: seg.modelData.ink
+      }
+    }
+  }
+
   Rectangle {
     id: fill
-    visible: bar.bars
+    visible: bar.bars && bar.segments.length === 0
     anchors.top: parent.top
     anchors.bottom: parent.bottom
     anchors.left: bar.fromRight ? undefined : parent.left

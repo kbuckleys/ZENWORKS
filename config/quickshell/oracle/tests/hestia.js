@@ -101,5 +101,13 @@ module.exports = {
     t.eq("an unknown device has none", H.driveOf([nv], "/dev/sdz"), null);
     t.eq("firmware without fwupd", H.parseFirmware('{"installed":false,"devices":[]}').installed, false);
     t.eq("a broken firmware answer", H.parseFirmware("x").known, false);
+
+    // self-test
+    t.eq("passed", H.selftestOf({ selftest: "success", selftestLeft: -1 }), { running: false, left: -1, words: "The last one passed", level: "good" });
+    t.eq("running", H.selftestOf({ selftest: "inprogress", selftestLeft: 70 }).words, "Running \u00b7 30% done");
+    t.eq("nvme running, no status yet", H.selftestOf({ selftest: "", selftestLeft: 90 }).running, true);
+    t.eq("failed reading", H.selftestOf({ selftest: "error_read" }).level, "bad");
+    t.eq("never run", H.selftestOf({ selftest: "" }).words, "Not run yet");
+    t.eq("an unknown word passed on", H.selftestOf({ selftest: "weird_thing" }).words, "Weird thing");
   }
 };

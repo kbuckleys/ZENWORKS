@@ -109,7 +109,9 @@ Item {
   // the pointer on an option, or off it — for the holder's tooltip
   signal pointed(string value, Item at, bool inside)
 
-  readonly property int index: segs.options.findIndex((o) => o[0] === segs.current)
+  // `|| []`: a holder being torn down (terminus' crumb bar, on a reload)
+  // hands over undefined for a moment, and these three said so in the log
+  readonly property int index: (segs.options || []).findIndex((o) => o[0] === segs.current)
   function partAt(v) {
     const i = segs.options.findIndex((o) => o[0] === v);
     return i >= 0 && i < rep.count ? rep.itemAt(i) : null;
@@ -135,7 +137,7 @@ Item {
   // everyone / just me" read as nothing chosen): the chosen half filled
   // deeper and ringed in the accent. Off, the suite's quiet switch.
   property bool strong: false
-  readonly property bool noted: segs.options.some(o => o.length > 2 && o[2])
+  readonly property bool noted: (segs.options || []).some(o => o.length > 2 && o[2])
   property real noteSize: Math.round(segs.textSize * 0.86)
   readonly property real noteRoom: segs.noted ? Math.round(segs.noteSize * 1.5) : 0
   implicitHeight: Math.round(segs.textSize * 2.1) + segs.artRoom + segs.noteRoom
@@ -182,7 +184,7 @@ Item {
     font.pixelSize: Math.round(segs.textSize * 1.05)
   }
   readonly property var partWs: {
-    const n = segs.options.length;
+    const n = (segs.options || []).length;
     if (!segs.even || n === 0) return [];
     const need = segs.options.map((o) => {
       const g = segs.glyphOf ? String(segs.glyphOf(String(o[0])) || "") : "";
@@ -196,7 +198,9 @@ Item {
   }
   function partX(i) { let x = 0; for (let k = 0; k < i; ++k) x += segs.partWs[k] || 0; return x; }
   property bool settled: false
-  function settle() { if (!segs.settled && segs.visible && segs.width > 0) Qt.callLater(() => { segs.settled = true; }); }
+  // an owned Timer, not Qt.callLater: it dies with the switch
+  function settle() { if (!segs.settled && segs.visible && segs.width > 0) settleLater.restart(); }
+  Timer { id: settleLater; interval: 0; onTriggered: segs.settled = true }
   onVisibleChanged: segs.settle()
   onWidthChanged: segs.settle()
   Component.onCompleted: segs.settle()

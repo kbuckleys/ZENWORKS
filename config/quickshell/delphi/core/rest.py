@@ -24,6 +24,30 @@ class ForgeError(Exception):
         self.status = status
 
 
+def device_flow(p, cancel, emit, code, url):
+    """A forge CLI's device sign-in, read as it prints (gh, glab): the
+    one-time code and the page it is typed into go to the window once both
+    have been seen. Returns every line said, for an error that needs one."""
+    sent, said = {}, []
+    cancel.attach(p)
+    try:
+        for line in p.stdout:
+            said.append(line.strip())
+            m, u = code.search(line), url.search(line)
+            if m:
+                sent["code"] = m.group(1)
+            if u:
+                sent["url"] = u.group(0)
+            if "code" in sent and "url" in sent and not sent.get("done"):
+                sent["done"] = True
+                emit({"device": {"code": sent["code"], "url": sent["url"]}})
+        p.wait()
+    finally:
+        cancel.detach(p)
+    cancel.check()
+    return said
+
+
 def keyring(action, fields):
     # Only the keyring helper, whatever else the user has configured: this is
     # delphi's own store, asked directly. Prompts are switched off, so a miss

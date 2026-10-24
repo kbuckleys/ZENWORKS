@@ -8,11 +8,10 @@
 // one-line forwarder for each function here, so callers are unchanged.
 
 import QtQuick
+import Quickshell
 import Quickshell.Io
-import Quickshell.Hyprland
 import "../morpheus"
 import "terminus.js" as Terminus
-import "../morpheus/room.js" as Room
 
 Item {
   id: sideMarks
@@ -21,78 +20,8 @@ Item {
   function toggleSidebar() { term.setSidebar(!term.sidebar); }
   function setSidebar(on) {
     if (on === term.sidebar) return;
+    // terminus/SideRoom makes the room, from the change
     term.sidebar = on;
-    term.sideRoom(on);
-  }
-  // IN THIS ORDER: the slide switched back on, THEN the target moved.
-  // sideKeepW = -1 alone did both at once, in whichever order Qt chose, and
-  // with the target first the sidebar jumped instead of sliding — every
-  // toggle in a tiled or maximized window, where no resize ever comes.
-  function releaseSideFollow() {
-    term.sideFollowing = false;
-    term.sideKeepW = -1;
-    term.sideCeilingRef.stop();
-  }
-  // LANDED: THE OTHER ORDER. The window's width arrives here before the
-  // sidebar's binding has seen it, so `side` still holds its width from
-  // before the resize (0 opening, the full width closing). Switching the
-  // slide back on first eased it from that stale width all over again —
-  // the listing took the whole window for a moment, reflowed to a column
-  // more, and reflowed back as the sidebar slid in. With the slide still
-  // off, the sidebar goes straight to the width the window just gained.
-  function noteSideWidth() {
-    if (term.sideKeepW >= 0 && term.sideTarget > 0
-        && Math.abs(term.width - term.sideTarget) < 1) {
-      term.sideKeepW = -1;
-      term.sideFollowing = false;
-      term.sideCeilingRef.stop();
-    }
-  }
-  function sideRoom(shown) {
-    if (!term.visible) return;
-    if (term.sideLayoutRef.laidOut) { term.sideGrew = 0; return; }
-    if (shown) {
-      if (term.sideGrew > 0) return;
-      term.sideWant = term.width + Math.round(term.sidebarWidth);
-    } else if (term.sideGrew > 0) term.sideWant = term.width - term.sideGrew;
-    else return;
-    term.sideFollowing = true;
-    term.sideKeepW = term.width - term.sideRef.width;
-    term.sideTarget = 0;
-    term.sideCeilingRef.restart();
-    term.sideFor = shown;
-    term.sidePending = true;
-    sideFitProc.running = false;
-    sideFitProc.running = true;
-  }
-  Process {
-    id: sideFitProc
-    command: ["sh", "-c", "hyprctl -j activewindow; echo '@@mons'; hyprctl -j monitors"]
-    stdout: StdioCollector {
-      id: sideFitOut
-      onStreamFinished: {
-        if (!term.sidePending) return;
-        // asked for a state we have since toggled out of
-        if (term.sideFor !== term.sidebar) { term.sidePending = false; return; }
-        const parts = sideFitOut.text.split("@@mons");
-        let w = null, mons = null;
-        try { w = JSON.parse(parts[0]); mons = JSON.parse(parts[1]); } catch (e) { term.releaseSideFollow(); return; }
-        // the window the toggle happened in is the focused one; anything
-        // else answering here is not ours to resize
-        if (!w || w.class !== "org.quickshell" || w.title !== term.title) { term.releaseSideFollow(); return; }
-        term.sidePending = false;
-        term.sideLayoutRef.note(w);
-        const room = Room.make(w, mons, term.sideWant, 16, 560, "left");
-        // no resize coming (tiled, or no room): the sidebar slides as before
-        if (!room) term.releaseSideFollow();
-        else {
-          term.sideTarget = w.size[0] + room.dw;
-          Room.dispatches(w.address, room).forEach((d) => Hyprland.dispatch(d));
-        }
-        term.sideGrew = term.sideFor && room ? room.dw : 0;
-        term.saveSide();
-      }
-    }
   }
   // Three rows claimed to be where you are at once: the bookmark for the
   // directory, and EVERY disk whose mount is a prefix of it — with / and
@@ -332,6 +261,10 @@ Item {
     // cannot be unmounted while the system runs on them.
     if (!Terminus.isSystemMount(d.mount)) {
       out.push({ sep: true });
+      // stylus, on the drive this is on (an image written over all of it)
+      if (Terminus.ejectable(d))
+        out.push({ label: "Write an image to it\u2026",
+                   act: () => Quickshell.execDetached(["qs", "ipc", "call", "Stylus", "drive", d.device !== "" ? d.device : d.path]) });
       out.push({ label: "Check and repair\u2026", act: () => term.diskToolRef.ask(d, "repair") });
       out.push({ label: "Format\u2026", act: () => term.diskToolRef.ask(d, "format") });
     }

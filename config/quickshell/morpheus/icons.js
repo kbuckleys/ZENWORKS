@@ -655,7 +655,9 @@ const APPS = {
   // U+F0996, md-progress_clock: screen time (its desktop id is kairos)
   "kairos": "\uDB82\uDD96",
   // U+F00E2, md-broom: Tidy, giving room back (its desktop id is hygieia)
-  "hygieia": "\uDB80\uDCE2"
+  "hygieia": "\uDB80\uDCE2",
+  // U+F0D13, md-fountain_pen_tip: the image writer (its desktop id is stylus)
+  "stylus": "\uDB83\uDD13"
 };
 
 // The glyph for a launcher entry, or "" when nothing claims it. `names` is

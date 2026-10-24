@@ -8,7 +8,6 @@
 // one-line forwarder for each function here, so callers are unchanged.
 
 import QtQuick
-import Quickshell
 import Quickshell.Io
 import "../morpheus"
 import "terminus.js" as Terminus
@@ -387,8 +386,7 @@ Item {
   // preview cache — a full refresh for putting text on the clipboard, which
   // also cleared the "copied" note the moment it appeared.
   function copyText(text, note) {
-    Quickshell.execDetached(["sh", "-c", "printf '%s' \"$1\" | wl-copy >/dev/null 2>&1",
-      "terminus-copy", String(text)]);
+    Strings.copy(text);
     term.status = note;
   }
   function openShell() {

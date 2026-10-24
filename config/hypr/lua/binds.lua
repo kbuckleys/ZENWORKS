@@ -102,6 +102,7 @@ bind("ceresCheck",     "",                   "Ceres, check for updates",       h
 bind("pomodoro",       "",                   "Chronos, start a pomodoro",      hl.dsp.exec_cmd("qs ipc call Chronos pomodoro 0"))
 bind("timersStop",     "",                   "Chronos, stop the timers",       hl.dsp.exec_cmd("qs ipc call Chronos halt"))
 bind("minerva",        "",                   "Minerva, the library",           hl.dsp.exec_cmd("qs ipc call Minerva library"))
+bind("stylus",         "",                   "Stylus, write an image",         hl.dsp.exec_cmd("qs ipc call Stylus open ''"))
 bind("hestia",         "",                   "Hestia, services and logs",      hl.dsp.exec_cmd("qs ipc call Hestia open ''"))
 bind("hestiaJournal",  "",                   "Hestia, the journal",            hl.dsp.exec_cmd("qs ipc call Hestia journal ''"))
 bind("kairos",         "",                   "Screen Time",                    hl.dsp.exec_cmd("qs ipc call Kairos open ''"))

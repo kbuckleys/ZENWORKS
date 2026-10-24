@@ -623,7 +623,8 @@ FocusScope {
       font.family: Zenon.faceMono
       font.weight: Zenon.weight
       font.pixelSize: tree.toolbarGlyphSize
-      color: tg.on ? Zenon.cyan : tgPress.pressed ? Zenon.white : Zenon.muted
+      // pressed before lit, so a lit glyph still answers the press
+      color: tgPress.pressed ? Zenon.white : tg.on ? Zenon.cyan : Zenon.muted
       text: tg.glyph
     }
     HoverHandler {
@@ -686,6 +687,12 @@ FocusScope {
       ToolGlyph { glyph: "󰘓"; tip: "Hidden files"; key: "."; on: tree.showHidden
                   onHit: tree.showHidden = !tree.showHidden }
       ToolGlyph { glyph: "󰑐"; tip: "Refresh"; onHit: tree.refresh() }
+      // THE SIDEBAR'S SWITCH, IN THE SIDEBAR WHILE IT IS OPEN — last, at its
+      // right edge, lit: the tree is out (user, 2026-10-24, as terminus'
+      // sideToggleIn). The host's own switch stands down meanwhile.
+      // cod-layout_sidebar_left_off, an escape for the reason StatusBar gives
+      ToolGlyph { visible: tree.hideable; glyph: ""; tip: "Hide the file tree"
+                  key: tree.hideKey; on: true; onHit: tree.hideRequested() }
     }
   }
 

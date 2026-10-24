@@ -11,7 +11,6 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import Quickshell.Hyprland
-import Quickshell.Widgets
 import "../morpheus"
 import "../morpheus/gridnav.js" as Nav
 import "../terminus" as Term
@@ -519,25 +518,9 @@ LayerPopup {
     // an invisible item cannot hold it.
     opacity: popup.cardOnly ? 0 : popup.contentFade
 
-    // ClippingRectangle, not Rectangle + clip: true. Qt's own clip is
-    // RECTANGULAR — it clips to the bounding box and knows nothing about the
-    // radius — so every square child painted to the panel's edge (the bottom
-    // strip most visibly) filled in the rounded corners behind it. This one
-    // clips to the rounded shape itself.
-
-    ClippingRectangle {
+    PanelGround {
       id: bgRoot
-      anchors.fill: parent
-      // Grown by its own border: a ClippingRectangle insets its children by
-      // border.width on every side, so the content box came out 2px smaller
-      // than the panel and any layout measured against the panel's size fell
-      // one row or one column short. This hands the content its full box back.
-      anchors.margins: -bgRoot.border.width
       color: popup.bgColor
-      radius: Zenon.pillRadius
-      border.color: Zenon.border
-      border.width: 1
-      focus: true
 
       Keys.onEscapePressed: (event) => {
         event.accepted = true;

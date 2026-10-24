@@ -573,9 +573,7 @@ FloatingWindow {
       anchors.right: parent.right
       anchors.bottom: foot.top
       width: aw.sideW
-      Rectangle { anchors.fill: parent; color: Zenon.alpha(Zenon.tabAwayInk, Zenon.tabAway(Zenon.layerBg.a)) }
-      Rectangle { anchors.fill: parent; color: Zenon.ground; opacity: 0.6 }
-      Rectangle { anchors.left: parent.left; width: 1; height: parent.height; color: Zenon.border }
+      SideGlass { edge: "left" }
 
       Column {
         x: 20

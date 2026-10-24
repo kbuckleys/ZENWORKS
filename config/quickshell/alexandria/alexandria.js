@@ -129,7 +129,7 @@ function styleLabel(fam, s) {
 // ── THE SHELVES ───────────────────────────────────────────────────────────
 const SHELVES = [
   { id: "all",  label: "All",          glyph: "" },
-  { id: "fav",  label: "Bookmarks",    glyph: "\uF02E" },
+  { id: "fav",  label: "Bookmarks",    glyph: "\uF47A" },
   { id: "mono", label: "Monospaced",   glyph: "" },
   { id: "nerd", label: "Nerd Fonts",   glyph: "\u{F0AEC}" },
   { id: "user", label: "Imported",     glyph: "" },

@@ -761,8 +761,8 @@ Item {
         anchors.leftMargin: Math.round(4 * host.zoom)
         anchors.verticalCenter: parent.verticalCenter
         visible: !!entryRow.entry && host.isBookmarked(entryRow.entry.path)
-        text: "\uF02E"
-        color: Zenon.sand
+        text: "\uF47A"
+        color: Zenon.cyan
         opacity: entryRow.dim ? 0.65 : 1
         font.family: Zenon.glyphFace   // JetBrainsMono's, whatever the shell face (Zenon.glyphFace)
         font.weight: Zenon.weight

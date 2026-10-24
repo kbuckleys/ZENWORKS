@@ -145,7 +145,12 @@ Rectangle {
     fromTop: term.tabStripRef.height + term.crumbBarRef.height
     // As wide as the footer needs: the hint and up to four buttons
     // share one row, and at a fixed 560 the buttons ran over the hint.
-    cardW: Math.max(560, diskInfoHint.implicitWidth + diskInfoBtns.implicitWidth + 20 + 14 + 24)
+    // And as the key of kinds under the gauge needs, on one line (user,
+    // 2026-10-24: "Other" wrapped alone); the Sheet caps it at the window.
+    // Rounded UP: the Sheet rounds the card to whole pixels, and a key that
+    // measured 622.3 handed 622 wrapped its last name all the same.
+    cardW: Math.max(560, diskInfoHint.implicitWidth + diskInfoBtns.implicitWidth + 20 + 14 + 24,
+                    diskInfoKey.visible ? Math.ceil(diskInfoKey.lineWidth) + 1 + 2 * 20 : 0)
     readonly property int factH: 28
     cardH: diskInfoHead.height + diskInfo.facts.length * diskInfoSheet.factH
       + 16 + diskInfoFoot.height
@@ -156,6 +161,12 @@ Rectangle {
     // so the card and the row it was opened from read as one instrument.
     // The exact used and total figures sit under it.
     //
+    // AND WHAT FILLS IT (2026-10-24): once UsageScan has sorted the volume
+    // by kind — from the cache stylus shares, or a walk at idle priority —
+    // the one fill becomes Disk Utility's colored stretches, with their key
+    // under the figures. The figure moves out of the bar then (solid
+    // colors under it), into the line beneath.
+    //
     // NO NAME HERE: the bar above names the disk, the way every other
     // sheet is named on the bar (see sheetTitle), so a second title on the
     // card was saying it twice. Unmounted, there is nothing to measure
@@ -165,8 +176,15 @@ Rectangle {
       anchors.top: parent.top
       anchors.left: parent.left
       anchors.right: parent.right
-      height: diskInfo.used >= 0 ? 78 : 0
+      height: diskInfo.used >= 0 ? 78 + (diskInfoKey.visible ? diskInfoKey.height + 10 : 0) : 0
       visible: height > 0
+
+      UsageScan {
+        id: diskInfoUse
+        visible: false
+        mount: diskInfo.cur ? diskInfo.cur.mount : ""
+        active: diskInfo.open && diskInfo.used >= 0
+      }
 
       readonly property color ink: diskInfo.used > 0.95 ? Zenon.red
         : (diskInfo.used > 0.85 ? Zenon.yellow : Zenon.cyan)
@@ -183,7 +201,8 @@ Rectangle {
         height: 22
         frac: Math.max(0, diskInfo.used)
         accent: diskInfoHead.ink
-        label: diskInfo.cur ? diskInfo.cur.avail + " free" : ""
+        segments: diskInfoUse.cats ? diskInfoUse.segments : []
+        label: diskInfo.cur && !diskInfoUse.cats ? diskInfo.cur.avail + " free" : ""
         ink: diskInfo.used > 0.85 ? diskInfoHead.ink : Zenon.white
         fontSize: 14
       }
@@ -195,6 +214,7 @@ Rectangle {
         anchors.topMargin: 8
         text: diskInfo.cur
           ? diskInfo.cur.fsUsed + " of " + diskInfo.cur.fsSize + " used"
+            + (diskInfoUse.cats ? "  \u00b7  " + diskInfo.cur.avail + " free" : "")
           : ""
         color: Zenon.accentMuted
         font.family: Zenon.face
@@ -206,11 +226,22 @@ Rectangle {
         anchors.right: diskInfoGauge.right
         anchors.top: diskInfoGauge.bottom
         anchors.topMargin: 8
-        text: Math.round(diskInfo.used * 100) + "%"
+        text: diskInfoUse.scanning ? diskInfoUse.words : Math.round(diskInfo.used * 100) + "%"
         color: Zenon.accentMuted
         font.family: Zenon.face
         font.weight: Zenon.weight
         font.pixelSize: Zenon.px(13)
+      }
+
+      // the kinds, one line each where they fit; Free is the bar's track
+      UsageLegend {
+        id: diskInfoKey
+        visible: !!diskInfoUse.cats
+        anchors.left: diskInfoGauge.left
+        anchors.right: diskInfoGauge.right
+        y: 78 - 8
+        compact: true
+        items: diskInfoUse.legend.filter((l) => l.name !== "Free")
       }
 
       Rectangle {

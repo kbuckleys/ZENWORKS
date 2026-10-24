@@ -177,7 +177,7 @@ LayerPopup {
           anchors.verticalCenter: parent.verticalCenter
           text: popup.rows.length === 0 ? "Notifications"
               : "Notifications  " + popup.rows.length
-          color: Zenon.blue
+          color: Zenon.cyan
           font.family: Zenon.face
           font.weight: Font.Bold
           font.pixelSize: Zenon.px(16)

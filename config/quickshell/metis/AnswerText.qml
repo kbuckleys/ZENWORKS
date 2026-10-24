@@ -8,7 +8,7 @@ import "../morpheus"
 import "metis.js" as Metis
 
 // AN ANSWER, WEIGHTED BY WHAT IT IS FOR. The number is what you came for,
-// so it is the large thing in the blue; the unit beside it is smaller and
+// so it is the large thing in the accent; the unit beside it is smaller and
 // quieter, and a time zone's date after the " · " quieter still. The split
 // is Metis.answerChars.
 //
@@ -24,7 +24,7 @@ Item {
   id: root
 
   property string value: ""
-  property color ink: Zenon.blue
+  property color ink: Zenon.cyan
   property color unitInk: Zenon.keyInk
   property int big: 26
   readonly property int small: Math.round(root.big * 0.65)

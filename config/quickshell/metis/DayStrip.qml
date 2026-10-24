@@ -18,7 +18,7 @@ Item {
 
   implicitHeight: 46
 
-  readonly property color night: Qt.rgba(Zenon.blue.r, Zenon.blue.g, Zenon.blue.b, 0.10)
+  readonly property color night: Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b, 0.10)
   readonly property color dawn: Qt.rgba(Zenon.yellow.r, Zenon.yellow.g, Zenon.yellow.b, 0.45)
   readonly property color day: Qt.rgba(Zenon.sand.r, Zenon.sand.g, Zenon.sand.b, 0.55)
 
@@ -72,7 +72,7 @@ Item {
         width: 11
         height: 11
         radius: 5.5
-        color: mark.index === 0 ? Zenon.keyInk : Zenon.blue
+        color: mark.index === 0 ? Zenon.keyInk : Zenon.cyan
         border.width: 2
         border.color: Zenon.layerBg
       }
@@ -84,7 +84,7 @@ Item {
         text: mark.modelData.label + "  "
           + String(Math.floor(mark.modelData.min / 60)).padStart(2, "0") + ":"
           + String(mark.modelData.min % 60).padStart(2, "0")
-        color: mark.index === 0 ? Zenon.keyInk : Zenon.blue
+        color: mark.index === 0 ? Zenon.keyInk : Zenon.cyan
         font.family: Zenon.face
         font.weight: Font.Bold
         font.pixelSize: Zenon.px(11)

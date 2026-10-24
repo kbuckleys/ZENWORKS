@@ -589,6 +589,7 @@ Variants {
             visible: false
             textFormat: TextEdit.RichText
             wrapMode: TextEdit.Wrap
+            cursorDelegate: Caret { field: gauge }
             font.family: field.face
             font.weight: field.weight
             font.pixelSize: field.size
@@ -1138,6 +1139,24 @@ Variants {
               }
             }
 
+            // ── CLOSE, UNDER THE POINTER (user, 2026-10-24) ──────────
+            // The suite's round × in the top-right corner while the note is
+            // hovered. Not while it is being written in: the head is up then,
+            // with its own ×.
+            ClearChip {
+              id: hoverClose
+              readonly property bool on: noteHov.hovered && !slot.active && !slot.picking
+              anchors.top: parent.top
+              anchors.right: parent.right
+              anchors.margins: 6
+              size: Zenon.px(15)
+              enabled: hoverClose.on
+              opacity: hoverClose.on ? 1 : 0
+              visible: opacity > 0.01
+              Behavior on opacity { NumberAnimation { duration: Zenon.fast; easing.type: Zenon.ease } }
+              onClicked: Clio.discard(slot.noteId)
+            }
+
             // ── BOLD, ITALIC, UNDERLINE ──────────────────────────────
             // An EDIT, not a property. TextEdit's font is document-wide, so
             // there is no per-selection bold to set — the selection is
@@ -1480,30 +1499,21 @@ Variants {
               }
             }
 
-            Text {
+            // the same round \u00D7 the note wears under the pointer (user,
+            // 2026-10-24), so the two closes are one control
+            ClearChip {
               id: close
               anchors.right: parent.right
               anchors.rightMargin: 8
               anchors.verticalCenter: parent.verticalCenter
-              text: "\uF00D"
-              // Red for the press, not the hover: passing over it on the way
-              // to a swatch is not a threat to the note.
-              color: closeMa.pressed ? Zenon.red : Zenon.white
+              size: Zenon.px(15)
+              enabled: head.armed
               opacity: head.armed ? 1 : 0
               visible: opacity > 0.01
-              font.family: Zenon.face
-              font.weight: Zenon.weight
-              font.pixelSize: Zenon.px(15)
               Behavior on opacity {
                 NumberAnimation { duration: Zenon.fast; easing.type: Zenon.ease }
               }
-
-              MouseArea {
-                id: closeMa
-                anchors.fill: parent
-                anchors.margins: -4
-                onClicked: Clio.discard(slot.noteId)
-              }
+              onClicked: Clio.discard(slot.noteId)
             }
           }
         }
