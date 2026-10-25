@@ -3,9 +3,9 @@
 // └─┘└─┘┘└┘└┴┘└─┘┴└─┴ ┴└─┘
 // https://github.com/kbuckleys/
 //
-// EVERY FORMAT AT ONCE, IN A ROW — the paragraph styles named in their own
-// weights, the lists and the quote, how the lines sit, the marks, indents,
-// the words' own typeface and clearing. Lifted out of NotePane's format bar
+// EVERY FORMAT AT ONCE, IN A ROW — the paragraph styles in one switch, the
+// lists and the quote, how the lines sit, the marks, indents, the words' own
+// typeface and clearing. Lifted out of NotePane's format bar
 // (user, 2026-10-25: one bar, no copies) so Delphi's release notes wear the
 // same one. Fills its holder, centered, and shrinks to fit a narrow one.
 //
@@ -19,6 +19,7 @@
 
 import QtQuick
 import "../morpheus"
+import "../terminus"
 import "notes.js" as N
 
 Item {
@@ -72,24 +73,25 @@ Item {
       x: Math.round((room.width - width) / 2)
       height: parent.height
       spacing: 0
-      // the paragraph styles, each named in its own weight
-      Repeater {
-        model: fb.styles
-        delegate: ClioTool {
-          required property string modelData
-          anchors.verticalCenter: parent.verticalCenter
-          pane: fb.host
-          onHoveredChanged: fb.hover()
-          size: 26
-          word: fb._styleInfo[modelData][0]
-          wordPx: Zenon.px(12)
-          pad: 10
-          wordWeight: fb._styleInfo[modelData][2]
-          litInk: Zenon.cyan
-          lit: !!fb.ed && fb.ed.kindHere === modelData
-          tip: N.KINDS[modelData].label
-          keys: fb._styleInfo[modelData][1]
-          onPressed: fb.ed.setKind(modelData)
+      // the paragraph styles, one switch (user, 2026-10-25: Segments): the
+      // one the caret is in lit, none while it is in a list or the quote.
+      // Chosen on the release, as a switch is; the caret stays put (a
+      // TapHandler takes no keyboard)
+      Segments {
+        id: styleSeg
+        anchors.verticalCenter: parent.verticalCenter
+        visible: fb.styles.length > 0
+        textSize: Zenon.px(12)
+        weight: Font.DemiBold
+        pad: 20
+        options: fb.styles.map((k) => [k, fb._styleInfo[k][0]])
+        current: fb.ed ? fb.ed.kindHere : ""
+        readonly property var _tips: fb.host && fb.host.win ? fb.host.win.tipsItem || null : null
+        onChose: (v) => { if (fb.ed) fb.ed.setKind(v); }
+        onPointed: (v, item, inside) => {
+          fb.hover();
+          if (!styleSeg._tips) return;
+          if (inside) styleSeg._tips.show(item, N.KINDS[v].label, fb._styleInfo[v][1]); else styleSeg._tips.hide(item);
         }
       }
       Rule { visible: fb.lists.length > 0 }

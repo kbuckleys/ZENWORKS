@@ -183,6 +183,16 @@ module.exports = {
     t.eq("attention: clean", D.attentionOf({ changed: 0, ahead: 0, behind: 0, conflicts: 0, state: null, branch: "main", upstream: "origin/main", oid: "a", remotes: [{}] }, null), []);
     t.eq("attention: words", D.attentionOf({ changed: 2, ahead: 1, behind: 3, conflicts: 0, state: { op: "rebase" }, branch: "main", upstream: null, oid: "a", remotes: [{}] },
       { state: "failure" }).map((a) => a.word), ["rebase under way", "2 changed", "↑1 to push", "↓3 to pull", "not published", "checks failing"]);
+    // underlined headings (GitHub's other way to write one) and the places
+    // kept for the hairlines under big headings and dividers
+    const R = D.RULE_MARK;
+    t.eq("md underline: - a heading, ruled", D.mdLinesOf("Intro\n\nAdded\n-\n- a thing"), "Intro\n\n## Added\n" + R + "\n\n- a thing");
+    t.eq("md underline: = a title, lines joined", D.mdLinesOf("Big\nname\n===\ntext"), "# Big name\n" + R + "\n\ntext");
+    t.eq("md # heading ruled, ### not", D.mdLinesOf("## A\n\n### B"), "## A\n" + R + "\n\n\n### B");
+    t.eq("md divider under a heading: its one line", D.mdLinesOf("## A\n\n---\n\nb"), "## A\n" + R + "\n\n\nb");
+    t.eq("md blank rows are room by blocks too", D.mdLinesOf("- a\n\n### B\n\n\nc"), "- a\n\n\u00a0\n\n### B\n\n\u00a0\n\n\u00a0\n\nc");
+    t.eq("md divider under words ends them", D.mdLinesOf("a\n***"), "a\n\n" + R + "\n");
+    t.eq("plain: underlines gone", D.plainOf("Added\n-\n- x"), "Added\n- x");
     t.eq("md details", D.mdOf("<details><summary>Log</summary>\n\nline</details>"), "Log\n\nline");
   },
 };

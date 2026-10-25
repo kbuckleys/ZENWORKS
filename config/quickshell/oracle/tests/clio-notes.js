@@ -95,6 +95,11 @@ module.exports = {
     t.eq("markdown", N.markdownOf(note, "att"),
       "# Shop\n\n- [x] milk\n- [ ] eggs\n1. a\n  1. b\n2. c\n\n![p.png](att/n1/p.png)\n\n**x** & y\n");
     t.eq("plain text", N.textOf(note.slice(0, 3)), "Shop\n☑ milk\n☐ eggs");
+    // GitHub's underlined headings: = a title, - (one is enough, --- too) a
+    // heading, the paragraph over it whole; a divider still where no words are
+    const ul = N.blocksOfMarkdown("Added\n-\n- a\n\nBig\nname\n===\n\n---\n\nx\n---");
+    t.eq("markdown underlines", ul.map((b) => b.k + ":" + b.h), ["heading:Added", "dash:a", "title:Big name", "rule:", "heading:x"]);
+    t.eq("underlines are not lost", N.markdownLoses("Added\n-"), "");
     const html = N.htmlOf(note, "");
     t.eq("html lists open and close", (html.match(/<ol>/g) || []).length, 2);
     t.eq("html: blocks back", N.blocksOf(html).map((b) => b.k), ["title", "check", "check", "number", "number", "number", "image", "body"]);

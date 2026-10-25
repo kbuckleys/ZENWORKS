@@ -1395,6 +1395,12 @@ function blocksOfMarkdown(text) {
       out.push(block("mono", code.join("\n"))); endPara(); continue;
     }
     if (/^\s*$/.test(line)) { endPara(); continue; }
+    // an underlined heading, as GitHub reads it: a paragraph with a line of
+    // = under it is a title, a line of - (one is enough) a heading — before
+    // the divider, since --- under words is the heading's underline too
+    if (para && para.k === "body" && (m = line.match(/^ {0,3}(=+|-+)\s*$/))) {
+      para.k = m[1].charAt(0) === "=" ? "title" : "heading"; endPara(); continue;
+    }
     if (/^\s*([-*_])(\s*\1){2,}\s*$/.test(line)) { out.push(block("rule", "")); endPara(); continue; }
     if ((m = line.match(/^(#{1,6})\s+(.*?)\s*#*\s*$/))) {
       out.push(block(m[1].length === 1 ? "title" : m[1].length === 2 ? "heading" : "subheading", mdRun(m[2]))); endPara(); continue;
@@ -1443,7 +1449,6 @@ function markdownLoses(text) {
   if (/<\/?[a-zA-Z][^>]*>|<!--/.test(s)) out.push("HTML");
   if (/^#{4,6}\s/m.test(s)) out.push("small headings");
   if (/^\s*>\s*>/m.test(s)) out.push("quotes in quotes");
-  if (/^\s{0,3}(=+|-+)\s*$/m.test(s.replace(/^\s*([-*_])(\s*\1){2,}\s*$/mg, ""))) out.push("underlined headings");
   if (/\[\^[^\]]+\]/.test(s)) out.push("footnotes");
   return out.join(", ");
 }

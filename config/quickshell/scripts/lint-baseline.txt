@@ -29,6 +29,7 @@
 1	clio/ClioCapture.qml	uncreatable-type	Type PanelWindow is not creatable.
 1	clio/ClioManager.qml	confusing-pluses	Confusing pluses.
 1	clio/DateBody.qml	missing-property	Member "chosen" not found on type "QQuickItem"
+2	clio/FormatBar.qml	missing-property	Member "win" not found on type "QQuickItem"
 1	clio/MomentsBody.qml	id-shadows-member	Id for object Flickable shadows property "flick". Rename one or the other.
 1	clio/MomentsBody.qml	id-shadows-member	Note: Id defined here
 1	clio/SettingsBody.qml	missing-property	Member "toLowerCase" not found on type "QJSPrimitiveValue"
@@ -45,8 +46,6 @@
 1	delphi/MessageWell.qml	id-shadows-member	Id for object Flickable shadows property "flick". Rename one or the other.
 1	delphi/MessageWell.qml	id-shadows-member	Id for object TextEdit shadows property "edit". Rename one or the other.
 2	delphi/MessageWell.qml	id-shadows-member	Note: Id defined here
-1	delphi/ReleaseEditor.qml	id-shadows-member	Id for object Column shadows property "top". Rename one or the other.
-1	delphi/ReleaseEditor.qml	id-shadows-member	Note: Id defined here
 3	howler/Howler.qml	missing-property	Member "ink" not found on type "Howler"
 1	howler/Howler.qml	missing-property	Member "slideBy" not found on type "Howler"
 2	howler/Howler.qml	missing-property	Member "values" not found on type "UntypedObjectModel"

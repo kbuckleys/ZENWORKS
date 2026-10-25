@@ -628,29 +628,74 @@ function mdOf(text) {
 // more than a line. A text line before another becomes a hard break; a run
 // of blank lines between text, that many no-break-space lines (a line of
 // nbsp is text, not blank); next to a heading, list, quote, table or rule,
-// the first blank still ends the block and the rest are nbsp paragraphs.
+// a blank ends the block and each one is an nbsp paragraph too.
 // Code fences pass untouched.
+var RULE_MARK = "\u2060";
 function mdLinesOf(text) {
   var src = String(text || "").replace(/\r\n/g, "\n").replace(/<!--[\s\S]*?-->/g, "");
   var lines = mdOf(src.replace(/\n/g, "\u0001")).split("\u0001");
   var block = /^\s{0,3}(#{1,6}(\s|$)|[-*+]\s|\d+[.)]\s|>|\||(-{3,}|\*{3,}|_{3,})\s*$)/;
   var fence = /^\s{0,3}(```|~~~)/;
-  var out = [], prev = "", blanks = 0, inFence = false;
+  var out = [], prev = "", blanks = 0, inFence = false, paraAt = 0;
+  // A LINE UNDER A BIG HEADING, as GitHub draws one under every # and ##
+  // (user, 2026-10-25: "still no separators"), and a divider's line. Qt's
+  // own divider is a heavy rule in the text's ink that no Markdown can
+  // restyle ("ugly — make it like the divider at the top"), so the place is
+  // kept instead: a paragraph of one invisible word joiner (RULE_MARK),
+  // and the preview draws the window's hairline over each one it finds.
+  // A heading with a divider written right under it takes that one.
+  var rule = /^\s{0,3}(-{3,}|\*{3,}|_{3,})\s*$/;
+  var marked = false, ruleNext = false;
+  var mark = function () { out.push(RULE_MARK, ""); marked = true; };
+  var ruleUnder = function (at) {
+    for (var j = at + 1; j < lines.length && /^\s*$/.test(lines[j]); j++) {}
+    if (j < lines.length && rule.test(lines[j])) { ruleNext = true; return; }
+    mark();
+  };
   for (var i = 0; i < lines.length; i++) {
     var l = lines[i];
     if (inFence) { out.push(l); if (fence.test(l)) { inFence = false; prev = "block"; } continue; }
     if (/^\s*$/.test(l)) { if (out.length) blanks++; continue; }
+    // a line of = or - right under words underlines them into a heading
+    // (GitHub's other way to write one, user 2026-10-25): the paragraph
+    // over it written back as a # heading, so the preview shows it as the
+    // forge does, whatever Qt's reader makes of an underline
+    if (prev === "text" && blanks === 0 && /^ {0,3}(=+|-+)\s*$/.test(l)) {
+      var words = out.splice(paraAt).map(function (w) { return w.replace(/ +$/, "").trim(); }).join(" ");
+      // the blank lines over it spaced as before a heading, not as text
+      var gap = 0;
+      while (out.length && out[out.length - 1] === "\u00a0  ") { out.pop(); gap++; }
+      if (gap > 0) {
+        out[out.length - 1] = out[out.length - 1].replace(/ {2}$/, "");
+        out.push("");
+        for (var g = 1; g < gap; g++) out.push("\u00a0", "");
+      }
+      out.push((l.trim().charAt(0) === "=" ? "# " : "## ") + words);
+      ruleUnder(i);
+      prev = "block";
+      continue;
+    }
+    // the divider written under a heading is the heading's own line: no
+    // room between them
+    if (ruleNext) { ruleNext = false; mark(); prev = "block"; blanks = 0; continue; }
     var kind = fence.test(l) || block.test(l) ? "block" : "text";
     if (out.length) {
       if (prev === "text" && kind === "text") {
         out[out.length - 1] += "  ";
         for (var b = 0; b < blanks; b++) out.push("\u00a0  ");
       } else if (blanks > 0) {
+        // every blank row a row of room, as the forge spaces its blocks
+        // (Qt's reader puts none between them: user, 2026-10-25) — but the
+        // first after a hairline's place, which brings its own
         out.push("");
-        for (var c = 1; c < blanks; c++) out.push("\u00a0", "");
+        for (var c = marked ? 1 : 0; c < blanks; c++) out.push("\u00a0", "");
       }
     }
+    if (kind === "text" && (prev !== "text" || blanks > 0)) paraAt = out.length;
+    marked = false;
+    if (rule.test(l)) { if (out.length && out[out.length - 1] !== "") out.push(""); mark(); prev = "block"; blanks = 0; continue; }
     out.push(l);
+    if (/^ {0,3}#{1,2}(\s|$)/.test(l)) ruleUnder(i);
     if (fence.test(l)) inFence = true;
     prev = kind;
     blanks = 0;
@@ -665,6 +710,7 @@ function plainOf(text) {
   return mdOf(text)
     .replace(/^```.*$/gm, "")
     .replace(/^\s{0,3}#{1,6}\s+/gm, "")
+    .replace(/^ {0,3}(=+|-+)\s*$/gm, "")
     .replace(/^\s{0,3}>\s?/gm, "")
     .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
     .replace(/<[^>]+>/g, "")

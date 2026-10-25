@@ -344,6 +344,7 @@ Item {
       }
       Rectangle { width: parent.width; height: 1; color: Zenon.border }
       TextEdit {
+        id: notesText
         palette.link: Zenon.link   // the theme's, not the system's blue
         width: parent.width
         readOnly: true
@@ -357,6 +358,25 @@ Item {
         font.weight: Zenon.weight
         font.pixelSize: editor.notesPx
         onLinkActivated: (link) => Quickshell.execDetached(["xdg-open", link])
+        // THE LINES UNDER BIG HEADINGS AND THE DIVIDERS, the hairline under
+        // the release's name (D.mdLinesOf keeps their places with
+        // D.RULE_MARK): read again once the text is laid out at its width
+        property var rules: []
+        function measure() {
+          const t = notesText.getText(0, notesText.length);
+          const ys = [];
+          for (let i = t.indexOf(D.RULE_MARK); i >= 0; i = t.indexOf(D.RULE_MARK, i + 1)) {
+            const r = notesText.positionToRectangle(i);
+            ys.push(Math.round(r.y + r.height * 0.3));
+          }
+          notesText.rules = ys;
+        }
+        onContentHeightChanged: Qt.callLater(notesText.measure)
+        onTextChanged: Qt.callLater(notesText.measure)
+        Repeater {
+          model: notesText.rules
+          delegate: Rectangle { required property real modelData; y: modelData; width: notesText.width; height: 1; color: Zenon.border }
+        }
       }
       // the files attached
       Text {

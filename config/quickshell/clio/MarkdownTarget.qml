@@ -27,7 +27,9 @@ QtObject {
     const f = md.field;
     if (!f) return "";
     void f.text; void f.cursorPosition;
-    return md.inMono ? "mono" : md.kindOf(md.lineAt(f.text, f.cursorPosition).text);
+    if (md.inMono) return "mono";
+    const u = md.underlined(f.text, f.cursorPosition);
+    return u ? u.kind : md.kindOf(md.lineAt(f.text, f.cursorPosition).text);
   }
   readonly property bool inMono: {
     const f = md.field;
@@ -76,6 +78,19 @@ QtObject {
     if (/^\s*[-*+]\s/.test(line)) return "bullet";
     return "body";
   }
+  // AN UNDERLINED HEADING — words with a line of = (a title) or - (a
+  // heading) right under them, GitHub's other way to write one (user,
+  // 2026-10-25). The one at a position, on its words or on its underline:
+  // { kind, a, b } over both lines, or null.
+  function isUnder(line) { return /^ {0,3}(=+|-+)\s*$/.test(line); }
+  function isWords(line) { return line.trim() !== "" && !md.isUnder(line) && md.kindOf(line) === "body" && !/^\s*([-*_])(\s*\1){2,}\s*$/.test(line); }
+  function underlined(t, pos) {
+    let l = md.lineAt(t, pos);
+    let u = l.b < t.length ? md.lineAt(t, l.b + 1) : null;
+    if (md.isUnder(l.text) && l.a > 0) { u = l; l = md.lineAt(t, l.a - 1); }
+    if (!u || !md.isUnder(u.text) || !md.isWords(l.text) || md.fenced(t, l.a)) return null;
+    return { kind: u.text.trim().charAt(0) === "=" ? "title" : "heading", a: l.a, b: u.b };
+  }
   // the line without what made it its kind (its indent kept)
   function bare(line) {
     return line.replace(/^#{1,6}\s+/, "").replace(/^>\s?/, "")
@@ -114,7 +129,20 @@ QtObject {
     const f = md.field;
     if (!f || f.readOnly) return;
     const sp = md.span();
+    // an underlined heading at either end taken in whole (Mono fences both
+    // its lines), and read as its # form: what the bar writes back is a #
+    // heading or plain words
+    const t = f.text;
+    const first = md.underlined(t, sp.a), last = md.underlined(t, sp.b);
+    if (first && first.a < sp.a) sp.a = first.a;
+    if (last && last.b > sp.b) sp.b = last.b;
+    sp.lines = t.slice(sp.a, sp.b).split("\n");
     if (k === "mono") { md.fence(sp); return; }
+    for (let i = sp.lines.length - 1; i > 0; --i)
+      if (md.isUnder(sp.lines[i]) && md.isWords(sp.lines[i - 1])) {
+        sp.lines[i - 1] = (sp.lines[i].trim().charAt(0) === "=" ? "# " : "## ") + sp.lines[i - 1].trim();
+        sp.lines.splice(i, 1);
+      }
     // all of them that kind already: back to lines (a toggle, as Clio's)
     const all = sp.lines.every((l) => md.kindOf(l) === k);
     const to = all && k !== "body" ? "body" : k;
