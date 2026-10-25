@@ -14,7 +14,6 @@
 
 import QtQuick
 import Quickshell
-import Quickshell.Io
 import "../morpheus"
 import "../terminus"
 import "notes.js" as N
@@ -612,22 +611,8 @@ Item {
                { text: "The time", icon: "", run: () => pane.typeHere(N.clock(Date.now())) });
     pane.win.menuRef.open(x, y, items);
   }
-  // the clipboard as words only (BlockEditor.pastePlain)
-  function pastePlain() {
-    plainProc.running = false;
-    plainProc.running = true;
-  }
-  Process {
-    id: plainProc
-    command: ["sh", "-c", "wl-paste -n -t text 2>/dev/null"]
-    stdout: StdioCollector {
-      waitForEnd: true
-      onStreamFinished: {
-        if (text === "") { pane.win.say("No words on the clipboard", true); return; }
-        ed.pastePlain(text);
-      }
-    }
-  }
+  // the clipboard as words only (BlockEditor.pastePlainNow)
+  function pastePlain() { ed.pastePlainNow(() => pane.win.say("No words on the clipboard", true)); }
   function typeHere(t) {
     const it = ed.current();
     if (!it || !it.isText) { ed.focusEnd(false); Qt.callLater(() => pane.typeHere(t)); return; }
@@ -681,20 +666,13 @@ Item {
   function editMenu(x, y, info) {
     if (!pane.note) return;
     const ro = ed.readOnly;
-    const it = ed.current();
-    const hasSel = ed.cross !== null || !!it && it.isText && it.te.selectionStart !== it.te.selectionEnd;
     // the spelling's own items first, as every Mac menu has them
     const sp = info.spell;
     const spellItems = !sp ? [] : sp.sugs.slice(0, 6).map((w) => ({ text: w, icon: "\uF00C", enabled: !ro,
                                                                      run: () => ed.respellWord(info.key, sp, w) }))
       .concat(sp.sugs.length === 0 ? [{ text: "No guesses", icon: "", enabled: false, run: () => {} }] : [])
       .concat(pane.mgr.spellTail(sp.w));
-    const items = spellItems.concat([
-      { text: "Cut", icon: "\u{F0190}", mark: "ctrl x", enabled: hasSel && !ro, run: () => { if (ed.cross) { ed.copyCross(); ed.deleteCross(); } else it.te.cut(); } },
-      { text: "Copy", icon: "\u{F018F}", mark: "ctrl c", enabled: hasSel, run: () => { if (ed.cross) ed.copyCross(); else it.te.copy(); } },
-      { text: "Paste", icon: "\u{F0192}", mark: "ctrl v", enabled: !ro, run: () => ed.pasteAsked() },
-      { text: "Paste as plain text", icon: "\u{F0192}", mark: "ctrl shift v", enabled: !ro, run: () => pane.pastePlain() },
-      { text: "Select all", icon: "\u{F0486}", mark: "ctrl a", run: () => ed.selectAll() }]);
+    const items = spellItems.concat(ed.editItems(() => pane.pastePlain()));
     const c = info.control;
     if (info.link) items.push({ isSeparator: true },
       { text: N.noteLink(info.link) ? "Open the note" : "Open the link", icon: "", run: () => ed.linkClicked(info.link) },

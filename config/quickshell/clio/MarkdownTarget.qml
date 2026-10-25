@@ -186,6 +186,36 @@ QtObject {
     const sp = md.span();
     md.put(sp.a, sp.b, sp.lines.map((l) => d > 0 ? (l.trim() === "" ? l : "  " + l) : l.replace(/^ {1,2}/, "")).join("\n"));
   }
+  // words at the caret, over what is chosen (a menu's Insert)
+  function insert(text) {
+    const f = md.field;
+    if (!f || f.readOnly) return;
+    if (f.selectionStart !== f.selectionEnd) f.remove(f.selectionStart, f.selectionEnd);
+    const at = f.cursorPosition;
+    f.insert(at, text);
+    f.cursorPosition = at + text.length;
+    f.forceActiveFocus();
+  }
+  // a link: round the words chosen, or `label` (the address itself) at the
+  // caret — [words](address)
+  function link(url, label) {
+    const f = md.field;
+    if (!f || f.readOnly) return;
+    const href = /^[a-z][a-z0-9+.-]*:/i.test(url) ? url : "https://" + url;
+    const words = f.selectionStart !== f.selectionEnd ? f.selectedText : (label || url);
+    md.insert("[" + words.replace(/[\[\]]/g, "\\$&") + "](" + href + ")");
+  }
+  // a divider on a line of its own
+  function rule() {
+    const f = md.field;
+    if (!f || f.readOnly) return;
+    const l = md.lineAt(f.text, f.cursorPosition);
+    const at = l.b;
+    const lead = l.text.trim() === "" ? "" : "\n\n";
+    f.insert(at, lead + "---\n");
+    f.cursorPosition = at + lead.length + 4;
+    f.forceActiveFocus();
+  }
   // the marks off the words chosen (the caret's line, with none chosen)
   function plainText() {
     const f = md.field;

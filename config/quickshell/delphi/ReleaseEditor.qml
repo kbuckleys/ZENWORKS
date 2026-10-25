@@ -29,6 +29,7 @@ import "../morpheus/controls" as Controls
 import "../terminus"
 import "../clio"
 import "../clio/notes.js" as N
+import "delphi.js" as D
 
 Item {
   id: ed
@@ -44,6 +45,9 @@ Item {
     return false;
   }
   readonly property var spellMgr: Clio.app
+  // the notes' words, a size up from the fields' (user, 2026-10-25: a bit
+  // small to write in); the release preview (ReleasesPage) reads it too
+  readonly property int notesPx: Zenon.px(17)
 
   function claim() {
     if (ed.e && ed.e.mode === "new") tagField.claim();
@@ -84,12 +88,99 @@ Item {
     if (v === "rich") ed.loadRich();
     Qt.callLater(ed.claim);
   }
-  // a wrong word's guesses, in the page's menu: `fix(word)` puts one in
-  function spellMenu(x, y, hit, fix) {
-    if (!ed.spellMgr) return;
-    fromPop.open(x, y, hit.sugs.slice(0, 6).map((w) => ({ text: w, icon: "\uF00C", run: () => fix(w) }))
-      .concat(hit.sugs.length === 0 ? [{ text: "No guesses", icon: "", enabled: false, run: () => {} }] : [])
-      .concat(ed.spellMgr.spellTail(hit.w)));
+  // ── THE NOTES' RIGHT-CLICK MENU ── everything the notes take, in one
+  // place (user, 2026-10-25: "a full and useful context menu — zenworks is
+  // all about convenience"): a wrong word's guesses (`fix(word)` puts one
+  // in), undo, the clipboard, formats and paragraph styles, a link, what to
+  // put in, how they are written, and the spelling's switch
+  function editMenu(x, y, hit, fix) {
+    const inRich = ed.form === "rich";
+    const t = toolHost.target;
+    const sm = ed.spellMgr;
+    const spell = !hit || !sm ? []
+      : hit.sugs.slice(0, 6).map((w) => ({ text: w, icon: "\uF00C", run: () => fix(w) }))
+        .concat(hit.sugs.length === 0 ? [{ text: "No guesses", icon: "", enabled: false, run: () => {} }] : [])
+        .concat(sm.spellTail(hit.w));
+    const undo = [
+      { text: "Undo", icon: "\u{F054C}", mark: "ctrl z", enabled: inRich ? rich.canUndo : notes.edit.canUndo,
+        run: () => { if (inRich) rich.undo(); else notes.edit.undo(); } },
+      { text: "Redo", icon: "\u{F044E}", mark: "ctrl shift z", enabled: inRich ? rich.canRedo : notes.edit.canRedo,
+        run: () => { if (inRich) rich.redo(); else notes.edit.redo(); } },
+      { isSeparator: true }];
+    const edits = inRich ? rich.editItems(() => rich.pastePlainNow(() => ed.page.win.say("No words on the clipboard", true)))
+                       : notes.editItems();
+    const kind = (k, label) => ({ text: label || N.KINDS[k].label, icon: N.KINDS[k].glyph, run: () => t.setKind(k) });
+    const shape = [
+      { isSeparator: true },
+      { text: "Format", icon: "\uF032", enabled: !t.inMono, children: [
+        { text: "Bold", icon: "\uF032", mark: "ctrl b", run: () => t.mark("b") },
+        { text: "Italic", icon: "\uF033", mark: "ctrl i", run: () => t.mark("i") },
+        { text: "Strikethrough", icon: "\uF0CC", mark: "ctrl shift x", run: () => t.mark("s") },
+        { isSeparator: true },
+        { text: "Clear formatting", icon: "\u{F0265}", run: () => t.plainText() }] },
+      { text: "Paragraph", icon: N.KINDS.heading.glyph, children: [
+        kind("heading"), kind("subheading"), kind("body"), { isSeparator: true },
+        kind("bullet"), kind("number"), kind("check"), { isSeparator: true },
+        kind("quote"), kind("mono", "Code")] },
+      { text: "Link…", icon: "\uF0C1", run: () => ed.askLink() },
+      { text: "Put in", icon: "\u{F1298}", children: ed.insertItems() },
+      { isSeparator: true },
+      { text: inRich ? "Write in Markdown" : "Write in rich text", icon: inRich ? "\u{F0354}" : "\u{F09A8}",
+        enabled: inRich || ed.loses === "", run: () => ed.writeAs(inRich ? "markdown" : "rich") },
+      { text: sm && sm.spellOn ? "Stop checking spelling" : "Check spelling", icon: "\u{F04C6}", enabled: !!sm,
+        run: () => sm.setSpellOn(!sm.spellOn) }];
+    fromPop.open(x, y, spell.concat(undo, edits, shape));
+  }
+  // what the menu's Put in offers: a divider, today's date, and the line
+  // every forge's release ends on — every change since the last tag
+  function insertItems() {
+    const inRich = ed.form === "rich";
+    const hub = ed.page ? ed.page.hub : null;
+    const site = ed.page ? ed.page.site : null;
+    const tag = ed.e ? ed.e.tag.trim() : "";
+    const url = hub && ed.e ? D.compareUrl(hub.web, !!site && (site.id === "gitlab" || site.kind === "gitlab"), ed.e.prev, tag) : "";
+    const today = Qt.formatDate(new Date(), "MMMM d, yyyy");
+    return [
+      { text: "Divider", icon: N.KINDS.rule.glyph, run: () => { if (inRich) rich.insertRule(); else mdTarget.rule(); } },
+      { text: "Today's date", icon: "\uF073", run: () => ed.putWords(today) },
+      { text: url ? "Full changelog link" : "Full changelog link — needs an earlier tag", icon: "\u{F08AA}", enabled: url !== "",
+        run: () => ed.putChangelog(url) }];
+  }
+  // words at the caret, in either way of writing
+  function putWords(w) {
+    if (ed.form !== "rich") { mdTarget.insert(w); return; }
+    const it = rich.current();
+    if (!it || !it.isText) return;
+    const te = it.te;
+    if (te.selectionStart !== te.selectionEnd) te.remove(te.selectionStart, te.selectionEnd);
+    te.insert(te.cursorPosition, N.escape(w));
+  }
+  // "**Full changelog**: <compare url>", a paragraph of its own at the end
+  function putChangelog(url) {
+    if (ed.form === "rich") {
+      rich.insertBlocks([N.block("body", "<b>Full changelog</b>: <a href=\"" + N.escape(url) + "\">" + N.escape(url) + "</a>")], true);
+      return;
+    }
+    const f = notes.edit;
+    const tail = f.text.replace(/\s+$/, "");
+    f.cursorPosition = f.length;
+    mdTarget.insert((tail === "" ? "" : f.text.endsWith("\n\n") ? "" : f.text.endsWith("\n") ? "\n" : "\n\n")
+                    + "**Full changelog**: " + url + "\n");
+  }
+  // the address asked for, round the words chosen or as its own words
+  function askLink() {
+    const inRich = ed.form === "rich";
+    const sel = inRich ? rich.selectedText() : notes.edit.selectedText;
+    const href = inRich ? rich.linkHere() : "";
+    ed.page.win.ask({ title: href ? "Edit link" : "Add a link", glyph: "\uF0C1", ink: Zenon.cyan,
+      fields: [{ key: "url", label: "Address", value: href || (/^\S+\.\S+$/.test(sel) ? sel : ""), hint: "https://…" }]
+        .concat(sel === "" ? [{ key: "label", label: "Words", value: "", optional: true }] : []),
+      verb: href ? "Save" : "Add",
+      then: (v) => {
+        const u = (v.url || "").trim();
+        if (!u) return;
+        Qt.callLater(() => { if (inRich) rich.link(u, v.label || ""); else mdTarget.link(u, v.label || ""); });
+      } });
   }
   // a different release opened: its own values in the fields, written in
   // rich text unless it has what only Markdown keeps
@@ -310,7 +401,7 @@ Item {
     anchors.rightMargin: 24
     anchors.topMargin: 10
     anchors.bottomMargin: 18
-    textSize: Zenon.px(15)
+    textSize: ed.notesPx
     ghost: "What is in it — markdown: ## headings, - lists, **bold**, `code`, [links](https://…)"
     note: ed.e ? (ed.e.body.length > 0 ? ed.e.body.split("\n").length + " lines" : "") : ""
     spellMgr: ed.spellMgr
@@ -320,7 +411,7 @@ Item {
     onSubmitted: ed.page.save()
     onEscaped: ed.page.cancelEdit()
     onBackTabbed: titleField.claim()
-    onSpellAsked: (x, y, hit) => { const p = notes.mapToItem(ed, x, y); ed.spellMenu(p.x, p.y, hit, (w) => notes.respell(hit, w)); }
+    onMenuAsked: (x, y, hit) => { const p = notes.mapToItem(ed, x, y); ed.editMenu(p.x, p.y, hit, (w) => notes.respell(hit, w)); }
   }
   // rich text: Clio's editor, in the well's frame
   Rectangle {
@@ -337,20 +428,22 @@ Item {
       anchors.margins: 1
       clip: true
       mgr: ed.spellMgr
-      textSize: Zenon.px(15)
+      textSize: ed.notesPx
       sidePad: 14
       topPad: 10
       bottomPad: 40
       maxColumn: 100000
       submits: true
+      // its own paste: words, as the blocks take them (no pictures here)
+      ownsPaste: true
       onEdited: richSync.restart()
       onSubmitted: { ed.settle(); ed.page.save(); }
       onEscaped: { ed.settle(); ed.page.cancelEdit(); }
       onLinkClicked: (href) => Quickshell.execDetached(["xdg-open", href])
       onMenuAsked: (x, y, info) => {
-        if (!info || !info.spell) return;
         const p = rich.mapToItem(ed, x, y);
-        ed.spellMenu(p.x, p.y, info.spell, (w) => rich.respellWord(info.key, info.spell, w));
+        const sp = info ? info.spell : null;
+        ed.editMenu(p.x, p.y, sp, (w) => rich.respellWord(info.key, sp, w));
       }
     }
     Text {
@@ -361,7 +454,7 @@ Item {
       color: Zenon.accentMuted
       font.family: Zenon.face
       font.weight: Zenon.weight
-      font.pixelSize: Zenon.px(15)
+      font.pixelSize: ed.notesPx
     }
     HeldRing { anchors.fill: parent; radius: parent.radius; z: 10; on: ed.richFocused }
   }

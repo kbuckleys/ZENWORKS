@@ -355,7 +355,7 @@ Item {
         selectionColor: Zenon.alpha(Zenon.cyan, 0.4)
         font.family: Zenon.face
         font.weight: Zenon.weight
-        font.pixelSize: Zenon.px(15)
+        font.pixelSize: editor.notesPx
         onLinkActivated: (link) => Quickshell.execDetached(["xdg-open", link])
       }
       // the files attached

@@ -21,6 +21,7 @@
 // mouse themselves; that is what lets a drag cross from one to the next.
 
 import QtQuick
+import Quickshell.Io
 import "../morpheus"
 import "../morpheus/undo"
 import "notes.js" as N
@@ -68,6 +69,10 @@ Item {
   signal pasteAsked()
   // ctrl+shift+v: the clipboard's words without their formatting
   signal pastePlainAsked()
+  // the editor pastes for itself (words, as the blocks take them), where
+  // the holder has nothing more to do with a paste — Delphi's release notes;
+  // Clio's notes take a picture off the clipboard first (NotePane)
+  property bool ownsPaste: false
   // the caret left the bottom of the last block downwards, or Esc
   signal escaped()
   // ctrl return, where the holder takes it (`submits`): Delphi's release
@@ -372,8 +377,8 @@ Item {
       if (hasSel && te.selectionStart === 0 && te.selectionEnd === len || len === 0) { ed.selectAll(); return true; }
       return false;
     }
-    if (ctrl && e.key === Qt.Key_V && !shift) { ed.pasteAsked(); return true; }
-    if (ctrl && e.key === Qt.Key_V && shift) { ed.pastePlainAsked(); return true; }
+    if (ctrl && e.key === Qt.Key_V && !shift) { ed.paste(); return true; }
+    if (ctrl && e.key === Qt.Key_V && shift) { if (ed.ownsPaste) ed.pastePlainNow(null); else ed.pastePlainAsked(); return true; }
     if (ctrl && !shift && e.key === Qt.Key_B) { ed.mark("b"); return true; }
     if (ctrl && !shift && e.key === Qt.Key_I) { ed.mark("i"); return true; }
     if (ctrl && !shift && e.key === Qt.Key_U) { ed.mark("u"); return true; }
@@ -885,6 +890,40 @@ Item {
     if (now && now.isText) now.te.paste();
   }
 
+  // ── THE CLIPBOARD ── a paste, the holder's or the editor's own
+  // (ownsPaste); the clipboard read as words for a plain paste; and the
+  // edit menu's rows every holder shows (NotePane's menu, Delphi's)
+  function paste() { if (ed.ownsPaste) ed.pasteText(); else ed.pasteAsked(); }
+  // `empty()`: said when there are no words on the clipboard
+  property var _plainEmpty: null
+  function pastePlainNow(empty) {
+    ed._plainEmpty = empty;
+    plainProc.running = false;
+    plainProc.running = true;
+  }
+  Process {
+    id: plainProc
+    command: ["sh", "-c", "wl-paste -n -t text 2>/dev/null"]
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: {
+        if (text === "") { if (ed._plainEmpty) ed._plainEmpty(); return; }
+        ed.pastePlain(text);
+      }
+    }
+  }
+  function editItems(plain) {
+    const ro = ed.readOnly;
+    const it = ed.current();
+    const hasSel = ed.cross !== null || !!it && it.isText && it.te.selectionStart !== it.te.selectionEnd;
+    return [
+      { text: "Cut", icon: "\u{F0190}", mark: "ctrl x", enabled: hasSel && !ro, run: () => { if (ed.cross) { ed.copyCross(); ed.deleteCross(); } else it.te.cut(); } },
+      { text: "Copy", icon: "\u{F018F}", mark: "ctrl c", enabled: hasSel, run: () => { if (ed.cross) ed.copyCross(); else it.te.copy(); } },
+      { text: "Paste", icon: "\u{F0192}", mark: "ctrl v", enabled: !ro, run: () => ed.paste() },
+      { text: "Paste as plain text", icon: "\u{F0192}", mark: "ctrl shift v", enabled: !ro, run: plain },
+      { text: "Select all", icon: "\u{F0486}", mark: "ctrl a", run: () => ed.selectAll() }];
+  }
+
   // PASTE AS PLAIN TEXT (user, 2026-10-15): the words alone, at the caret,
   // over whatever is selected — escaped, a line break a soft break, as a
   // rich paste flattened by "Plain text" (see the rewrite above) would be
@@ -1299,6 +1338,9 @@ Item {
     Qt.callLater(() => { view.contentY = Math.max(0, Math.min(y, view.contentHeight - view.height)); ed.place(st.at, st.pos); });
     ed.edited();
   }
+  // for a holder's menu (Delphi's release notes: Undo, Redo)
+  readonly property bool canUndo: history.canUndo
+  readonly property bool canRedo: history.canRedo
   function undo() {
     ed.flushTyping();
     if (!history.canUndo) return;
@@ -1595,7 +1637,15 @@ Item {
         overlay.moved = false;
         overlay.grab = null;
         const h = overlay.hit(m.x, m.y);
-        if (!h) return;
+        // the page under the last line: the menu all the same, for the
+        // caret where it is (user, 2026-10-25: right clicks there did nothing)
+        if (!h) {
+          if (m.button === Qt.RightButton) {
+            const p = overlay.mapToItem(ed, m.x, m.y);
+            ed.menuAsked(p.x, p.y, { key: "", kind: "", control: null, spell: null, link: "", cell: null });
+          }
+          return;
+        }
         const shift = m.modifiers & Qt.ShiftModifier;
         if (m.button === Qt.RightButton) {
           const c = h.it.control(h.x, h.y);

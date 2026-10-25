@@ -17,9 +17,10 @@
 // page keys), when given.
 //
 // Spelling, given `spellMgr` (Clio.app — the suite's one dictionary and its
-// one switch): clio's faint red chips on the words it calls wrong, and a
-// right click on one says `spellAsked(x, y, hit)` for the holder's menu;
-// respell(hit, word) puts a guess in its place.
+// one switch): clio's faint red chips on the words it calls wrong. With it,
+// a right click says `menuAsked(x, y, hit)` for the holder's menu — `hit`
+// the wrong word under the pointer, or null; respell(hit, word) puts a
+// guess in its place, editItems() are the clipboard's rows.
 
 import QtQuick
 import "../morpheus"
@@ -41,7 +42,15 @@ Rectangle {
   property int footRoom: 0
   property var spellMgr: null
   property bool spelling: true
-  signal spellAsked(real x, real y, var hit)
+  signal menuAsked(real x, real y, var hit)
+  function editItems() {
+    const sel = edit.selectionStart !== edit.selectionEnd;
+    return [
+      { text: "Cut", icon: "\u{F0190}", mark: "ctrl x", enabled: sel && !edit.readOnly, run: () => edit.cut() },
+      { text: "Copy", icon: "\u{F018F}", mark: "ctrl c", enabled: sel, run: () => edit.copy() },
+      { text: "Paste", icon: "\u{F0192}", mark: "ctrl v", enabled: edit.canPaste && !edit.readOnly, run: () => edit.paste() },
+      { text: "Select all", icon: "\u{F0486}", mark: "ctrl a", run: () => edit.selectAll() }];
+  }
   function respell(hit, word) {
     if (edit.getText(hit.a, hit.b).replace(/\u2019/g, "'") !== hit.w) return;
     edit.remove(hit.a, hit.b);
@@ -110,15 +119,16 @@ Rectangle {
       }
     }
   }
-  // a right click on a word called wrong: its guesses, from the holder
+  // a right click: the holder's menu, with the wrong word under it if any
   MouseArea {
     anchors.fill: flick
-    enabled: !!mw.spellMgr && mw.spelling
+    enabled: !!mw.spellMgr
     acceptedButtons: Qt.RightButton
     onClicked: (m) => {
       const p = mapToItem(edit, m.x, m.y);
-      const hit = spell.at(edit.positionAt(p.x, p.y));
-      if (hit) mw.spellAsked(m.x + flick.x, m.y + flick.y, hit);
+      const hit = mw.spelling ? spell.at(edit.positionAt(p.x, p.y)) : null;
+      edit.forceActiveFocus();
+      mw.menuAsked(m.x + flick.x, m.y + flick.y, hit);
     }
   }
   // the suite's scroll feel and bar, for text longer than the well

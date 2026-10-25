@@ -488,6 +488,14 @@ var FORGES = {
 };
 var FORGE_ORDER = ["github", "gitlab", "codeberg"];
 
+// Every change between two tags, on the forge's own page: GitLab puts its
+// pages under /-/, GitHub and Forgejo do not (release notes' "Full
+// changelog" line, 2026-10-25). "" without both tags.
+function compareUrl(web, gitlab, from, to) {
+  if (!web || !from || !to) return "";
+  return web + (gitlab ? "/-/compare/" : "/compare/") + encodeURIComponent(from) + "..." + encodeURIComponent(to);
+}
+
 // ── SERVERS OF YOUR OWN ──────────────────────────────────────────────────
 // A self-hosted GitLab, or a Forgejo or Gitea: { kind: "gitlab"|"forgejo",
 // host, name? }, kept by the manager and laid into FORGES (after the three)
