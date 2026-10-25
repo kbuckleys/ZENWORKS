@@ -91,7 +91,7 @@ Item {
       // plugin configs (the shell itself may be read-only in /usr) — and
       // keeps its data, state and plugins apart from any other nvim's,
       // under ~/.local/{share,state}/zenworks/plato.
-      const log = Quickshell.env("HOME") + "/.local/state/quickshell/plato/nvim.log";
+      const log = Quickshell.env("HOME") + "/.local/state/zenworks/plato/nvim.log";
       //
       // AND IT TAKES NOTHING OF THE SHELL'S WITH IT. A detached child inherits
       // every file the shell has open, and a stuck engine was found holding

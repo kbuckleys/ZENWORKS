@@ -90,7 +90,7 @@ QtObject {
   // the window that opens on an empty buffer: recent files, pins, projects
   property bool startCard: true
   // `qs ipc call Plato capture`: the note it opens (strftime's % codes work)
-  property string captureFile: "~/.local/share/quickshell/plato/scratch.md"
+  property string captureFile: "~/.local/share/zenworks/plato/scratch.md"
 
   // ── git ────────────────────────────────────────────────────────────
   property bool gitGutter: true

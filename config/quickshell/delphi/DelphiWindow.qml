@@ -1780,6 +1780,7 @@ FloatingWindow {
           label: modelData.label
           ink: modelData.ink || Zenon.accentMuted
           primary: !!modelData.primary
+          glyph: !!modelData.glyph
           ready: modelData.ready !== false
           onClicked: modelData.run()
         }

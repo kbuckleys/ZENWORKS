@@ -361,7 +361,7 @@ Scope {
       Hyprland.dispatch(Hypr.focusTitle("plato-capture"));
       return;
     }
-    const p = mgr._expand(mgr.strftime(settings.captureFile || "~/.local/share/quickshell/plato/scratch.md", new Date()));
+    const p = mgr._expand(mgr.strftime(settings.captureFile || "~/.local/share/zenworks/plato/scratch.md", new Date()));
     mgr.spawn(p, "", false, null, true);
   }
 

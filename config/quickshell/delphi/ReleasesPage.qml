@@ -57,6 +57,10 @@ Item {
     { label: pg.edit.mode === "new" ? (pg.edit.draft ? "Save the draft" : "Publish") : (pg.edit.wasDraft && !pg.edit.draft ? "Publish" : "Save"),
       ink: Zenon.cyan, primary: true, ready: pg.edit.tag.trim() !== "", run: () => pg.save() },
   ] : [
+    // the list asked again (r): a release made or changed on the web, or in
+    // another of Delphi's windows, without waiting (user, 2026-10-25) —
+    // the refresh glyph, no words, as Hestia's
+    { label: "\u{F0450}", glyph: true, visible: !!pg.hub, ready: !pg.loading, run: () => pg.reload() },
     { label: "Delete", ink: Zenon.red, visible: !!pg.rel, run: () => pg.remove() },
     { label: "Edit", visible: !!pg.rel, run: () => pg.editRel(pg.rel) },
     { label: "On the web", visible: !!pg.rel, run: () => pg.web() },
