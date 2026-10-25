@@ -126,21 +126,18 @@ Scope {
   }
 
   // ── ITS .desktop ENTRY ─────────────────────────────────────────────
-  Process {
-    running: true
-    command: ["sh", "-c", Desktop.installCommand("hestia", {
-      Type: "Application",
-      Name: "Hestia",
-      GenericName: "Services and Logs",
-      Comment: "Services, timers and the system journal, in ZENWORKS",
-      Icon: "utilities-system-monitor",
-      Categories: ["System", "Monitor"],
-      Keywords: ["systemd", "service", "services", "daemon", "journal", "log", "logs", "timer", "boot", "systemctl", "journalctl"],
-      Exec: Desktop.execLine(Quickshell.shellDir + "/hestia/bin/hestia", ""),
-      Terminal: "false",
-      StartupNotify: "false",
-    })]
-  }
+  readonly property var launcher: Desktop.launcher("hestia", {
+    Type: "Application",
+    Name: "Hestia",
+    GenericName: "Services and Logs",
+    Comment: "Services, timers and the system journal, in ZENWORKS",
+    Icon: "utilities-system-monitor",
+    Categories: ["System", "Monitor"],
+    Keywords: ["systemd", "service", "services", "daemon", "journal", "log", "logs", "timer", "boot", "systemctl", "journalctl"],
+    Exec: Desktop.execLine(Quickshell.shellDir + "/hestia/bin/hestia", ""),
+    Terminal: "false",
+    StartupNotify: "false",
+  })
 
   // ── THE WINDOW ─────────────────────────────────────────────────────
   // Floating by its title (hypr/lua/rules.lua: "hestia").

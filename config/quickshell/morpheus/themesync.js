@@ -165,34 +165,35 @@ function renderHyprFont(face, weight, size) {
   return out.join("\n");
 }
 
+// ── kitty's own config ─────────────────────────────────────────────────
+// ~/.config/zenworks/kitty/kitty.conf, where KITTY_CONFIG_DIRECTORY points
+// (hypr/hyprland.lua): the shipped kitty.conf and zenon.conf, by their
+// paths beside the shell, around the two files the shell writes beside
+// this one — and custom.conf last, which is yours and never written.
+function renderKittyConf(shipped) {
+  const out = HEAD.map((l) => "# " + l);
+  out.push("", "# KITTY", "# Written by the shell (morpheus/ThemeSync.qml). Edits here are",
+           "# overwritten: your own lines go in custom.conf, read last.", "",
+           "globinclude font.conf",
+           "include " + shipped + "/kitty.conf",
+           "include " + shipped + "/zenon.conf",
+           "globinclude theme.conf",
+           "globinclude custom.conf", "");
+  return out.join("\n");
+}
+
 // ── hyprland's window corner ───────────────────────────────────────────
-// Oracle's Corner rounding, written into base.lua itself: the one line
-// `rounding = N` that sits directly in `decoration = { … }`. Every other
-// line is left as the user wrote it, and a `rounding` deeper in (blur's,
-// the group bar's) is not this one. The text back unchanged when there is
-// no such line to change.
-function setHyprRounding(text, n) {
-  const src = String(text || "");
-  const start = src.search(/\bdecoration\s*=\s*\{/);
-  if (start < 0) return src;
-  let i = src.indexOf("{", start) + 1;
-  let depth = 1;
-  const re = /^([ \t]*)rounding(\s*=\s*)-?[0-9.]+/;
-  while (i < src.length && depth > 0) {
-    const c = src[i];
-    if (c === "{") depth++;
-    else if (c === "}") depth--;
-    else if (c === "-" && src[i + 1] === "-") { i = src.indexOf("\n", i); if (i < 0) break; continue; }
-    else if (c === "\n" && depth === 1) {
-      const m = re.exec(src.slice(i + 1));
-      if (m) {
-        const v = Math.max(0, Math.round(Number(n) || 0));
-        return src.slice(0, i + 1) + m[1] + "rounding" + m[2] + v + src.slice(i + 1 + m[0].length);
-      }
-    }
-    i++;
-  }
-  return src;
+// lua/corner.lua, read by base.lua like font.lua: Oracle's Corner rounding
+// for hyprland's windows. A file of its own since 2026-10-25 — it used to be
+// base.lua's own `rounding = N` line rewritten in place, but base.lua ships
+// with the shell and may be read-only in /usr/share/zenworks.
+function renderCornerLua(n) {
+  const v = Math.max(0, Math.round(Number(n) || 0));
+  const out = HEAD.map((l) => "-- " + l);
+  out.push("", "-- CORNER", "-- Written by the shell (morpheus/ThemeSync.qml) from oracle's Corner",
+           "-- rounding; base.lua reads it. Edits here are overwritten.", "",
+           "return { rounding = " + v + " }", "");
+  return out.join("\n");
 }
 
 // ── hyprtoolkit ────────────────────────────────────────────────────────

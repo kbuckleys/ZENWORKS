@@ -38,7 +38,7 @@ module.exports = {
       T.previewCommand("/x/a.js", "/q/r.lua").startsWith("if [ ! -f '/x/a.js' ]; then :; elif "), true);
     const platoPc = T.previewCommand("/x/a.js", "/q/plato/nvim/render.lua");
     t.eq("with one: plato's renderer, through plato's own nvim",
-      /NVIM_APPNAME=quickshell\/plato\/nvim exec nvim --headless -i NONE -n --clean/.test(platoPc), true);
+      /NVIM_APPNAME=zenworks\/plato exec nvim --headless -i NONE -n --clean/.test(platoPc), true);
     t.eq("and bat when it is missing or the file is huge",
       platoPc.indexOf("else " + T.batCommand("/x/a.js") + "; fi") > 0, true);
 

@@ -8,7 +8,7 @@
 // A view of core/Plugins.qml, which does the work for every window (and
 // feeds the status line's indicator). Three pages, Tab between them:
 //
-//   INSTALLED   every plugin in plato/nvim/plugins.json
+//   INSTALLED   every plugin in ~/.config/zenworks/plato/plugins.json
 //     a           add one: owner/repo, or a git URL — cloned, and loaded
 //                 into this window at once
 //     Space       switch it off (kept on disk, not loaded) or on again
@@ -32,7 +32,7 @@
 //
 //   Esc         close (or leave the name being typed)
 //
-// An update or install rewrites plato/nvim/nvim-pack-lock.json, so the same
+// An update or install rewrites ~/.config/zenworks/plato/nvim-pack-lock.json, so the same
 // versions are what the next machine gets too.
 //
 // A terminus sheet (PlatoSheet), hanging from the tab strip like every

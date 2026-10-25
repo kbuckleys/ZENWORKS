@@ -106,21 +106,18 @@ Scope {
   function reveal(path) { Quickshell.execDetached(["qs", "ipc", "call", "Terminus", "reveal", path]); }
 
   // ── ITS .desktop ENTRY ─────────────────────────────────────────────
-  Process {
-    running: true
-    command: ["sh", "-c", Desktop.installCommand("hygieia", {
-      Type: "Application",
-      Name: "Tidy",
-      GenericName: "Disk Cleanup",
-      Comment: "Give back room: old packages, caches, the journal, big downloads, duplicate files",
-      Icon: "user-trash",
-      Categories: ["System", "Utility"],
-      Keywords: ["hygieia", "clean", "cleanup", "tidy", "space", "disk", "cache", "duplicates", "duplicate", "orphans", "paccache", "journal", "free"],
-      Exec: Desktop.execLine(Quickshell.shellDir + "/hygieia/bin/hygieia", ""),
-      Terminal: "false",
-      StartupNotify: "false",
-    })]
-  }
+  readonly property var launcher: Desktop.launcher("hygieia", {
+    Type: "Application",
+    Name: "Tidy",
+    GenericName: "Disk Cleanup",
+    Comment: "Give back room: old packages, caches, the journal, big downloads, duplicate files",
+    Icon: "user-trash",
+    Categories: ["System", "Utility"],
+    Keywords: ["hygieia", "clean", "cleanup", "tidy", "space", "disk", "cache", "duplicates", "duplicate", "orphans", "paccache", "journal", "free"],
+    Exec: Desktop.execLine(Quickshell.shellDir + "/hygieia/bin/hygieia", ""),
+    Terminal: "false",
+    StartupNotify: "false",
+  })
 
   // ── THE WINDOW ─────────────────────────────────────────────────────
   // Floating by its title (hypr/lua/rules.lua: "hygieia").

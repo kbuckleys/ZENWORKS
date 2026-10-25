@@ -727,21 +727,9 @@ Singleton {
     if (!root.installing) return;
     if (root.txState !== "done" && root.txState !== "failed") return;
     const done = root._installDone;
-    if (root.txState === "done") root.noteAdded(root.installing.pkgs || []);
     root.installing = null;
     root._installDone = null;
     if (done) done(root.txState === "done");
-  }
-
-  // What the suite installed for itself, a name a line, for the package's
-  // ./uninstall to offer back (the App Store's installs are the user's own
-  // and are not noted). Names as asked for: uninstall resolves a provided
-  // one (words, bitwarden-cli) to what pacman installed.
-  function noteAdded(pkgs) {
-    if (!pkgs.length) return;
-    Quickshell.execDetached(["sh", "-c",
-      "d=\"$1\"; shift; mkdir -p \"$d\" && printf '%s\\n' \"$@\" >> \"$d/added.txt\"",
-      "sh", Paths.stateDir() + "/zenworks"].concat(pkgs));
   }
 
   // ── THE PASSWORD, REMEMBERED THE WAY SUDO REMEMBERS IT ─────────────────

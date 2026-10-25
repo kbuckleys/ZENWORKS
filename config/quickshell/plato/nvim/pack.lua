@@ -5,7 +5,7 @@
 --
 -- Plato's plugin updates, run in an nvim of their own.
 --
---   NVIM_APPNAME=quickshell/plato/nvim nvim --headless -i NONE --clean \
+--   NVIM_APPNAME=zenworks/plato nvim --headless -i NONE --clean \
 --     -c "luafile pack.lua"
 --     PLATO_PACK=check                  print what vim.pack would update
 --     PLATO_PACK=apply PLATO_PACK_NAMES=a,b   update those (all, if empty)
@@ -18,7 +18,7 @@
 -- fetches, and nvim waits with it; asked in the engine behind a window, the
 -- editor would stop answering keys for as long as GitHub took. A throwaway
 -- nvim with the same NVIM_APPNAME sees the same plugins and the same lockfile
--- (plato/nvim/nvim-pack-lock.json, which an update rewrites) and costs the
+-- (~/.config/zenworks/plato/nvim-pack-lock.json, which an update rewrites) and costs the
 -- editor nothing.
 --
 -- CHECKING IS vim.pack's OWN. It fetches, works out each plugin's revisions

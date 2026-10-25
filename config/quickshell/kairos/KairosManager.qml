@@ -25,21 +25,18 @@ Scope {
   Binding { target: Kairos; property: "locked"; value: !!mgr.lockscreen && mgr.lockscreen.locked }
 
   // ── ITS .desktop ENTRY ─────────────────────────────────────────────
-  Process {
-    running: true
-    command: ["sh", "-c", Desktop.installCommand("kairos", {
-      Type: "Application",
-      Name: "Screen Time",
-      GenericName: "Screen Time",
-      Comment: "How long each app had you, in ZENWORKS",
-      Icon: "preferences-system-time",
-      Categories: ["Utility"],
-      Keywords: ["kairos", "screen", "time", "usage", "apps", "focus", "hours", "today", "week"],
-      Exec: Desktop.execLine(Quickshell.shellDir + "/kairos/bin/kairos", ""),
-      Terminal: "false",
-      StartupNotify: "false",
-    })]
-  }
+  readonly property var launcher: Desktop.launcher("kairos", {
+    Type: "Application",
+    Name: "Screen Time",
+    GenericName: "Screen Time",
+    Comment: "How long each app had you, in ZENWORKS",
+    Icon: "preferences-system-time",
+    Categories: ["Utility"],
+    Keywords: ["kairos", "screen", "time", "usage", "apps", "focus", "hours", "today", "week"],
+    Exec: Desktop.execLine(Quickshell.shellDir + "/kairos/bin/kairos", ""),
+    Terminal: "false",
+    StartupNotify: "false",
+  })
 
   // ── THE WINDOW ─────────────────────────────────────────────────────
   // Floating by its title (hypr/lua/rules.lua: "kairos").

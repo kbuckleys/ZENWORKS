@@ -21,7 +21,6 @@
 // picasso/qmldir is not seen by a live reload.
 
 import QtQuick
-import Quickshell
 import Quickshell.Io
 import "../morpheus"
 import "../oracle"
@@ -183,10 +182,10 @@ Item {
     const slug = label.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40) || "theme";
     const out = { name: label.slice(0, 60), mode: t.mode, custom: true, colors: t.colors };
     keepProc.command = ["sh", "-c",
-      "d=\"$1\"; s=\"$2\"; f=\"$d/custom-$s.json\"; n=2; "
+      "d=\"$1\"; s=\"$2\"; mkdir -p \"$d\"; f=\"$d/custom-$s.json\"; n=2; "
       + "while [ -e \"$f\" ]; do f=\"$d/custom-$s-$n.json\"; n=$((n + 1)); done; "
       + "printf '%s\\n' \"$3\" > \"$f\"",
-      "sh", Quickshell.shellDir + "/themes", slug, JSON.stringify(out, null, 2)];
+      "sh", Oracle.themesDir, slug, JSON.stringify(out, null, 2)];
     keepProc.running = true;
   }
   Process {

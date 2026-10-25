@@ -40,6 +40,16 @@ Singleton {
     blockLoading: true
     printErrors: false
     onLoaded: root.text = String(file.text() || "")
+    // none yet — a first start (the old installer ran this): made once, the
+    // directories with it, then read. Without xdg-user-dirs, the fallbacks
+    // below stand.
+    onLoadFailed: if (!make.tried) { make.tried = true; make.running = true; }
+  }
+  Process {
+    id: make
+    property bool tried: false
+    command: ["sh", "-c", "command -v xdg-user-dirs-update >/dev/null && xdg-user-dirs-update"]
+    onExited: (code) => { if (code === 0) file.reload(); }
   }
   // Read once here as well, synchronously: picasso decides which directory
   // to scan as it starts, and must not scan the fallback first.

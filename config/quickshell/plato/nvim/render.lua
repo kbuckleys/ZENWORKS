@@ -6,7 +6,7 @@
 -- A file, colored as plato colors it, printed as ANSI for anything that
 -- reads ANSI: terminus' quick look, in place of bat.
 --
---   NVIM_APPNAME=quickshell/plato/nvim nvim --headless -i NONE -n --clean \
+--   NVIM_APPNAME=zenworks/plato nvim --headless -i NONE -n --clean \
 --     -c "luafile render.lua" -- FILE
 --   PLATO_RENDER_LINES   how many lines (90, as terminus asked bat for)
 --   PLATO_RENDER_FROM    the first of them (1): plato's grep previews the

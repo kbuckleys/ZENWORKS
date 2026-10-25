@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Delphi
+GenericName=Git Client
+Comment=Stage, commit, branch, sync and browse history with git, in ZENWORKS
+Icon=git
+Categories=Development;RevisionControl;
+Keywords=git;commit;branch;diff;merge;rebase;github;gitlab;codeberg;repository;version control;
+Exec=/usr/share/zenworks/quickshell/delphi/bin/delphi %f
+Terminal=false
+StartupNotify=false
+MimeType=inode/directory;

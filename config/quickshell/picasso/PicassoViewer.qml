@@ -40,35 +40,30 @@ Scope {
   property var fileManager: null
 
   // ── ITS .desktop ENTRY ─────────────────────────────────────────────
-  // Not shipped as a file: written into ~/.local/share/applications on
-  // startup when it is missing, with this machine's path to bin/picasso-view (see
-  // Desktop.installCommand). That is what file managers, artemis and
-  // `gio mime` find it by. One already there is left alone.
-  Process {
-    running: true
-    command: ["sh", "-c", Desktop.installCommand("picasso-view", {
-      Type: "Application",
-      Name: "Picasso",
-      GenericName: "Image Viewer",
-      Comment: "View, edit and annotate pictures, in ZENWORKS",
-      Icon: "image-viewer",
-      Categories: ["Graphics", "Viewer", "Photography"],
-      Keywords: ["image", "viewer", "picture", "photo", "gallery", "annotate"],
-      Exec: Desktop.execLine(Quickshell.shellDir + "/picasso/bin/picasso-view", "%F"),
-      Terminal: "false",
-      StartupNotify: "false",
-      MimeType: [
-        "image/png", "image/jpeg", "image/jpg", "image/gif", "image/webp",
-        "image/bmp", "image/tiff", "image/tif", "image/svg+xml", "image/avif",
-        "image/heif", "image/heic", "image/jxl", "image/x-exr",
-        "image/x-portable-pixmap", "image/x-tga", "image/x-qoi",
-        "image/x-portable-anymap", "image/x-dicom", "image/x-canon-cr2",
-        "image/x-nikon-nef", "image/x-adobe-dng", "image/x-sony-arw",
-        "image/x-fuji-raf", "image/vnd.adobe.photoshop", "image/x-xcf",
-        "image/x-icon", "image/x-ico", "image/qoi"
-      ],
-    })]
-  }
+  // Shipped as a file (scripts/launchers.js makes it from this).
+  // That is what file managers, artemis and `gio mime` find it by.
+  readonly property var launcher: Desktop.launcher("picasso-view", {
+    Type: "Application",
+    Name: "Picasso",
+    GenericName: "Image Viewer",
+    Comment: "View, edit and annotate pictures, in ZENWORKS",
+    Icon: "image-viewer",
+    Categories: ["Graphics", "Viewer", "Photography"],
+    Keywords: ["image", "viewer", "picture", "photo", "gallery", "annotate"],
+    Exec: Desktop.execLine(Quickshell.shellDir + "/picasso/bin/picasso-view", "%F"),
+    Terminal: "false",
+    StartupNotify: "false",
+    MimeType: [
+      "image/png", "image/jpeg", "image/jpg", "image/gif", "image/webp",
+      "image/bmp", "image/tiff", "image/tif", "image/svg+xml", "image/avif",
+      "image/heif", "image/heic", "image/jxl", "image/x-exr",
+      "image/x-portable-pixmap", "image/x-tga", "image/x-qoi",
+      "image/x-portable-anymap", "image/x-dicom", "image/x-canon-cr2",
+      "image/x-nikon-nef", "image/x-adobe-dng", "image/x-sony-arw",
+      "image/x-fuji-raf", "image/vnd.adobe.photoshop", "image/x-xcf",
+      "image/x-icon", "image/x-ico", "image/qoi"
+    ],
+  })
 
   // ── THE ORDER, AND THE SLIDESHOW'S PACE ────────────────────────────
   // One for every window and every mode — the gallery, the picture and its

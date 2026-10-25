@@ -41,33 +41,28 @@ Scope {
   property var gitClient: null
 
   // ── ITS .desktop ENTRY ─────────────────────────────────────────────
-  // Not shipped as a file: written into ~/.local/share/applications on
-  // startup when it is missing, with this machine's path to bin/plato (see
-  // Desktop.installCommand). That is what file managers, artemis and
-  // `gio mime` find it by. One already there is left alone.
-  Process {
-    running: true
-    command: ["sh", "-c", Desktop.installCommand("plato", {
-      Type: "Application",
-      Name: "Plato",
-      GenericName: "Text Editor",
-      Comment: "Edit text, in ZENWORKS",
-      Icon: "accessories-text-editor",
-      Categories: ["Development", "TextEditor"],
-      Keywords: ["editor", "text", "code", "nvim"],
-      Exec: Desktop.execLine(Quickshell.shellDir + "/plato/bin/plato", "%F"),
-      Terminal: "false",
-      StartupNotify: "false",
-      MimeType: [
-        "text/plain", "text/x-qml", "text/x-lua", "text/markdown", "text/x-sh",
-        "text/x-python", "text/x-csrc", "text/x-c++src", "text/x-java",
-        "text/csv", "text/css", "text/x-log", "application/json",
-        "application/ld+json", "application/x-toml", "application/x-yaml",
-        "application/x-shellscript", "application/javascript",
-        "application/xml", "application/x-perl", "inode/x-empty"
-      ],
-    })]
-  }
+  // Shipped as a file (scripts/launchers.js makes it from this).
+  // That is what file managers, artemis and `gio mime` find it by.
+  readonly property var launcher: Desktop.launcher("plato", {
+    Type: "Application",
+    Name: "Plato",
+    GenericName: "Text Editor",
+    Comment: "Edit text, in ZENWORKS",
+    Icon: "accessories-text-editor",
+    Categories: ["Development", "TextEditor"],
+    Keywords: ["editor", "text", "code", "nvim"],
+    Exec: Desktop.execLine(Quickshell.shellDir + "/plato/bin/plato", "%F"),
+    Terminal: "false",
+    StartupNotify: "false",
+    MimeType: [
+      "text/plain", "text/x-qml", "text/x-lua", "text/markdown", "text/x-sh",
+      "text/x-python", "text/x-csrc", "text/x-c++src", "text/x-java",
+      "text/csv", "text/css", "text/x-log", "application/json",
+      "application/ld+json", "application/x-toml", "application/x-yaml",
+      "application/x-shellscript", "application/javascript",
+      "application/xml", "application/x-perl", "inode/x-empty"
+    ],
+  })
 
   property var wins: []
 

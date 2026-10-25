@@ -25,51 +25,22 @@ import "../morpheus/hypr.js" as Hypr
 import "../morpheus/lagnotes.js" as LagNotes
 
 Scope {
-  // ── UPDATE ZENWORKS (oracle's About → Update) ──────────────────────
-  // scripts/update.sh as a job in the shell's drawer, beside terminus'
-  // copies: its progress, a stop that kills it, the receipt when it lands.
-  // Under setsid, as every job, so a stop takes its git and rsync with it.
-  //
-  // WHAT IT FOUND MISSING, CERES INSTALLS (user, 2026-10-13): the script
-  // leaves a one-shot note
-  // ($XDG_RUNTIME_DIR/zenworks-update.json — the packages the published
-  // installer lists that are not here, the pkgbuilds ZENWORKS builds itself
-  // that are not installed), read and removed here once the job lands, and
-  // handed to ceres as one transaction: its own password card, its own log.
-  property int updateJob: -1
+  // ── CHECK FOR UPDATES (oracle's About) ──────────────────────────────
+  // ZENWORKS is a package (2026-10-25): it updates through pacman and the
+  // AUR like everything else, so the row opens Ceres' Updates, where a new
+  // version is listed beside the rest. scripts/update.sh, which laid a
+  // fetched copy over ~/.config, is gone with the install script.
   Connections {
     target: Oracle
-    function onUpdateAsked() {
-      mgr.updateJob = Jobs.start("update", ["ZENWORKS"], "",
-                                 ["setsid", "-w", Quickshell.shellDir + "/scripts/update.sh"]);
-    }
+    function onUpdateAsked() { Ceres.openWindow("updates"); }
   }
+
+  // ── THE TERMINAL SETUP (oracle/ZshSetup.qml) ───────────────────────
+  // asked once at the first start; Default apps › Terminal setup after
+  ZshSetup { id: zshSetup }
   Connections {
-    target: Jobs
-    function onEnded(id, op, code, cancelled, dest) {
-      if (id !== mgr.updateJob) return;
-      mgr.updateJob = -1;
-      if (code === 0) updateNote.running = true;
-    }
-  }
-  Process {
-    id: updateNote
-    readonly property string path: (Quickshell.env("XDG_RUNTIME_DIR") || "/tmp") + "/zenworks-update.json"
-    command: ["sh", "-c", "[ -f \"$1\" ] && cat -- \"$1\"; rm -f -- \"$1\"", "sh", updateNote.path]
-    stdout: StdioCollector {
-      onStreamFinished: {
-        let need = null;
-        try { need = JSON.parse(text || "null"); } catch (e) { return; }
-        if (!need) return;
-        const steps = [];
-        if ((need.missing || []).length) steps.push(["-S", "--needed"].concat(need.missing));
-        for (const dir of (need.build || [])) steps.push(["-B", String(dir)]);
-        if (!steps.length) return;
-        const what = (need.missing || []).concat((need.build || []).map(d => String(d).split("/").pop()));
-        if (!Ceres.request(steps, "Install what ZENWORKS needs — " + what.join(", "), what.length))
-          console.warn("oracle: ceres is busy; the update's packages were not installed: " + what.join(" "));
-      }
-    }
+    target: Oracle
+    function onZshAsked() { zshSetup.apply(); }
   }
   id: mgr
 

@@ -8,9 +8,10 @@
 -- behavior (kept from the terminal nvim config where it was about editing) or engine
 -- setup that makes nvim's view of the screen match the one plato draws.
 --
--- ISOLATED BY NVIM_APPNAME=quickshell/plato/nvim, set by the process that
--- starts us (core/NvimClient.qml): data, state and cache live under
--- ~/.local/{share,state}/quickshell/plato/nvim and ~/.cache/quickshell/plato/nvim,
+-- ISOLATED BY NVIM_APPNAME=zenworks/plato, set by the process that starts
+-- us (core/NvimClient.qml): your plugin list and configs live in
+-- ~/.config/zenworks/plato (see plugins.lua), data, state and cache under
+-- ~/.local/{share,state}/zenworks/plato and ~/.cache/zenworks/plato,
 -- so undo history and shada never mix with any other nvim's. Not by
 -- overriding XDG_*_HOME — that would leak into every child nvim starts
 -- (an LSP server, a :! command) and send them looking in the wrong places.

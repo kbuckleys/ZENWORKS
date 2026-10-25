@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Alexandria
+GenericName=Font Book
+Comment=Browse, compare and install fonts and their glyphs, in ZENWORKS
+Icon=font-x-generic
+Categories=Utility;Viewer;
+Keywords=font;typeface;glyph;character;unicode;nerd;install;
+Exec=/usr/share/zenworks/quickshell/alexandria/bin/alexandria %F
+Terminal=false
+StartupNotify=false
+MimeType=font/ttf;font/otf;font/collection;font/sfnt;font/woff;font/woff2;application/x-font-ttf;application/x-font-otf;application/x-font-type1;

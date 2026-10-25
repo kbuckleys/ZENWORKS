@@ -6,7 +6,7 @@
 // THE THEME AND THE FONTS, CARRIED OUT OF THE SHELL. Oracle is the one
 // place a font is set: hyprland gets lua/font.lua (below), and kitty, GTK,
 // gsettings and fontconfig's generic families scripts/fontsync.sh. Oracle's
-// Corner rounding reaches hyprland's windows through base.lua's own line.
+// Corner rounding reaches hyprland's windows through lua/corner.lua.
 //
 // THE THEME. kitty, hyprland, GTK and Qt paint with their
 // own config, so when the theme changes they are each written a file
@@ -30,13 +30,16 @@
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import "../oracle"
 import "themesync.js" as Sync
 
 Item {
   id: sync
 
-  readonly property string configDir:
-    Quickshell.env("XDG_CONFIG_HOME") || (Quickshell.env("HOME") + "/.config")
+  readonly property string configDir: Oracle.configHome
+  // hyprland's generated files go with your own (Oracle's hyprLuaDir): the
+  // config beside the shell is shipped and may be read-only
+  readonly property string hyprLuaDir: Oracle.hyprLuaDir
 
   // the palette as plain hex, or null when Zenon is worn
   readonly property var colors: {
@@ -50,6 +53,9 @@ Item {
     return out;
   }
   readonly property string kittyText: Sync.renderKitty(sync.colors, Zenon.light)
+  // kitty's config is yours, beside its theme (see renderKittyConf)
+  readonly property string kittyDir: Oracle.zenworksDir + "/kitty"
+  readonly property string kittyConfText: Sync.renderKittyConf(Oracle.shippedDir + "/kitty")
   readonly property string gtk4Text: Sync.renderGtk4(sync.colors, Zenon.light)
   readonly property string gtk3Text: Sync.renderGtk3(sync.colors, Zenon.light)
   // dark or light for every GTK app, Zenon included (gtkscheme.sh)
@@ -114,10 +120,10 @@ Item {
       [Quickshell.shellDir + "/scripts/fontsync.sh"].concat(sync.fontArgs))
   }
 
-  // Oracle's Corner rounding for hyprland's windows: base.lua's own
-  // `rounding = N` line, rewritten in place (themesync.js) — there is no file
-  // of its own for one number base.lua already holds
+  // Oracle's Corner rounding for hyprland's windows: lua/corner.lua
+  // (themesync.js), which base.lua reads
   readonly property int windowCorner: Zenon.windowRadius
+  readonly property string cornerText: Sync.renderCornerLua(sync.windowCorner)
   onWindowCornerChanged: settle.restart()
 
   onKittyTextChanged: settle.restart()
@@ -135,10 +141,11 @@ Item {
     id: settle
     interval: 400
     onTriggered: {
+      if (sync.put(kittyConfFile, sync.kittyConfText, true)) tell.kitty = true;
       if (sync.put(kittyFile, sync.kittyText)) tell.kitty = true;
       if (sync.put(hyprFile, sync.hyprText)) tell.hypr = true;
       if (sync.put(fontFile, sync.fontText, true)) tell.hypr = true;
-      if (sync.corner()) tell.hypr = true;
+      if (sync.put(cornerFile, sync.cornerText, true)) tell.hypr = true;
       // nothing to tell GTK 4: an app reads its gtk.css as it starts
       sync.put(gtk4File, sync.gtk4Text);
       // GTK 3 rereads colors.css when gtkscheme.sh names a fresh theme slot,
@@ -184,28 +191,23 @@ Item {
     return true;
   }
 
-  // base.lua with its window corner set to Oracle's; true when it was written.
-  // Never created: no base.lua is a hyprland this shell does not configure.
-  function corner() {
-    if (!baseFile.exists) return false;
-    const have = baseFile.last !== "" ? baseFile.last : String(baseFile.text());
-    const want = Sync.setHyprRounding(have, sync.windowCorner);
-    if (have === want) return false;
-    baseFile.setText(want);
-    baseFile.last = want;
-    return true;
+  FileView {
+    id: cornerFile
+    property bool exists: true
+    property string last: ""
+    path: sync.hyprLuaDir + "/corner.lua"
+    blockLoading: true
+    printErrors: false
+    onLoadFailed: exists = false
   }
 
   FileView {
-    id: baseFile
+    id: kittyConfFile
     property bool exists: true
     property string last: ""
-    path: sync.configDir + "/hypr/lua/base.lua"
+    path: sync.kittyDir + "/kitty.conf"
     blockLoading: true
     printErrors: false
-    // a hand edit to base.lua is read fresh before the next write
-    watchChanges: true
-    onFileChanged: { last = ""; reload(); }
     onLoadFailed: exists = false
   }
 
@@ -213,7 +215,7 @@ Item {
     id: kittyFile
     property bool exists: true
     property string last: ""
-    path: sync.configDir + "/kitty/theme.conf"
+    path: sync.kittyDir + "/theme.conf"
     blockLoading: true
     printErrors: false
     onLoadFailed: exists = false
@@ -223,7 +225,7 @@ Item {
     id: hyprFile
     property bool exists: true
     property string last: ""
-    path: sync.configDir + "/hypr/lua/theme.lua"
+    path: sync.hyprLuaDir + "/theme.lua"
     blockLoading: true
     printErrors: false
     onLoadFailed: exists = false
@@ -233,7 +235,7 @@ Item {
     id: fontFile
     property bool exists: true
     property string last: ""
-    path: sync.configDir + "/hypr/lua/font.lua"
+    path: sync.hyprLuaDir + "/font.lua"
     blockLoading: true
     printErrors: false
     onLoadFailed: exists = false

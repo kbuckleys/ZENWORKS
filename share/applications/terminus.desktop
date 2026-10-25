@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Terminus
+GenericName=File Manager
+Comment=Browse and manage files, in ZENWORKS
+Icon=system-file-manager
+Categories=System;FileTools;FileManager;Utility;Core;
+Keywords=files;folder;directory;file manager;explorer;
+Exec=/usr/share/zenworks/quickshell/terminus/bin/terminus %f
+Terminal=false
+StartupNotify=false
+MimeType=inode/directory;application/zip;application/x-tar;application/x-compressed-tar;application/x-xz-compressed-tar;application/x-zstd-compressed-tar;application/x-bzip2-compressed-tar;application/x-7z-compressed;application/vnd.rar;application/x-rar;application/gzip;application/zstd;

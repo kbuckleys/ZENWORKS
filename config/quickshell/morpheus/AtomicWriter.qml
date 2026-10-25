@@ -42,9 +42,11 @@ Scope {
     const job = root.queue.shift();
     root.current = job;
     // the failure branch EXITS 1: `|| rm -f` alone ended on rm's own 0, and
-    // a write into a missing directory or onto a full disk said ok (10-23)
+    // a write into a missing directory or onto a full disk said ok (10-23).
+    // The directory is made first, as FileView's setText does: a fresh
+    // ~/.config/zenworks has none of its folders yet (2026-10-25)
     proc.command = ["sh", "-c",
-      "cat > \"$1.tmp.$$\" && mv -f \"$1.tmp.$$\" \"$1\" || { rm -f \"$1.tmp.$$\"; exit 1; }",
+      "mkdir -p \"$(dirname \"$1\")\" && cat > \"$1.tmp.$$\" && mv -f \"$1.tmp.$$\" \"$1\" || { rm -f \"$1.tmp.$$\"; exit 1; }",
       root.tag, job.path];
     proc.stdinEnabled = true;
     proc.running = true;

@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Tidy
+GenericName=Disk Cleanup
+Comment=Give back room: old packages, caches, the journal, big downloads, duplicate files
+Icon=user-trash
+Categories=System;Utility;
+Keywords=hygieia;clean;cleanup;tidy;space;disk;cache;duplicates;duplicate;orphans;paccache;journal;free;
+Exec=/usr/share/zenworks/quickshell/hygieia/bin/hygieia
+Terminal=false
+StartupNotify=false

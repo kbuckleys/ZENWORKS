@@ -19,10 +19,26 @@ import "zenon"
 ZenonBase {
   cfg: Oracle
 
-  readonly property FileView themeFile: FileView {
+  // YOURS FIRST: a theme in ~/.config/zenworks/themes (saved from Follow
+  // Background, or put there by hand) is worn over the shipped one of the
+  // same name beside the shell. Both are read side by side — switching one
+  // FileView over from a missing file dropped the second read (2026-10-25).
+  readonly property string themeStem: Zenon.themeName === "zenon" || Zenon.themeName === "follow" ? "" : Zenon.themeName
+  property var themeOwn: null
+  property var themeShipped: null
+  function wearTheme() { Zenon.fileTheme = Zenon.themeOwn || Zenon.themeShipped || ({}); }
+  function parseTheme(text, where) {
+    try {
+      const t = JSON.parse(text);
+      return t && typeof t === "object" ? t : null;
+    } catch (e) {
+      console.warn("zenon: theme " + Zenon.themeName + " (" + where + ") is not valid JSON, wearing Zenon");
+      return null;
+    }
+  }
+  readonly property FileView ownFile: FileView {
     // no file for Zenon, nor for Follow Background, which is made, not read
-    path: Zenon.themeName === "zenon" || Zenon.themeName === "follow" ? ""
-      : Quickshell.shellDir + "/themes/" + Zenon.themeName + ".json"
+    path: Zenon.themeStem === "" ? "" : Oracle.themesDir + "/" + Zenon.themeStem + ".json"
     // editing the theme you are wearing repaints the shell as you save
     watchChanges: true
     // read before the first frame: a few hundred bytes, and loaded in the
@@ -30,16 +46,18 @@ ZenonBase {
     blockLoading: true
     printErrors: false
     onFileChanged: reload()
-    onPathChanged: if (path === "") Zenon.fileTheme = ({})
-    onLoaded: {
-      try {
-        const t = JSON.parse(text());
-        Zenon.fileTheme = t && typeof t === "object" ? t : ({});
-      } catch (e) {
-        console.warn("zenon: theme " + Zenon.themeName + " is not valid JSON, wearing Zenon");
-        Zenon.fileTheme = ({});
-      }
-    }
-    onLoadFailed: Zenon.fileTheme = ({})
+    onPathChanged: { Zenon.themeOwn = null; if (path === "") Zenon.wearTheme(); }
+    onLoaded: { Zenon.themeOwn = Zenon.parseTheme(text(), "yours"); Zenon.wearTheme(); }
+    onLoadFailed: { Zenon.themeOwn = null; Zenon.wearTheme(); }
+  }
+  readonly property FileView shippedFile: FileView {
+    path: Zenon.themeStem === "" ? "" : Quickshell.shellDir + "/themes/" + Zenon.themeStem + ".json"
+    watchChanges: true
+    blockLoading: true
+    printErrors: false
+    onFileChanged: reload()
+    onPathChanged: { Zenon.themeShipped = null; if (path === "") Zenon.wearTheme(); }
+    onLoaded: { Zenon.themeShipped = Zenon.parseTheme(text(), "shipped"); Zenon.wearTheme(); }
+    onLoadFailed: { Zenon.themeShipped = null; Zenon.wearTheme(); }
   }
 }

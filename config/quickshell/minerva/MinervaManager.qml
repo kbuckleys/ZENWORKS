@@ -266,21 +266,23 @@ Scope {
   readonly property var mimes: ["application/pdf", "application/epub+zip", "application/x-pdf",
                                 "application/vnd.comicbook+zip", "application/vnd.comicbook-rar",
                                 "application/x-cbz", "application/x-cbr"]
+  readonly property var launcher: Desktop.launcher("minerva", {
+    Type: "Application",
+    Name: "Minerva",
+    GenericName: "Reader",
+    Comment: "Read PDFs, EPUBs and comics, with bookmarks and highlights, in ZENWORKS",
+    Icon: "accessories-ebook-reader",
+    Categories: ["Office", "Viewer", "Literature"],
+    Keywords: ["pdf", "epub", "ebook", "book", "reader", "document", "read", "comic", "cbz", "cbr"],
+    Exec: Desktop.execLine(Quickshell.shellDir + "/minerva/bin/minerva", "%F"),
+    Terminal: "false",
+    StartupNotify: "false",
+    MimeType: mgr.mimes,
+  })
+  // what opens these types, only where nothing was chosen for them
   Process {
     running: true
-    command: ["sh", "-c", Desktop.installCommand("minerva", {
-      Type: "Application",
-      Name: "Minerva",
-      GenericName: "Reader",
-      Comment: "Read PDFs, EPUBs and comics, with bookmarks and highlights, in ZENWORKS",
-      Icon: "accessories-ebook-reader",
-      Categories: ["Office", "Viewer", "Literature"],
-      Keywords: ["pdf", "epub", "ebook", "book", "reader", "document", "read", "comic", "cbz", "cbr"],
-      Exec: Desktop.execLine(Quickshell.shellDir + "/minerva/bin/minerva", "%F"),
-      Terminal: "false",
-      StartupNotify: "false",
-      MimeType: mgr.mimes,
-    }) + "\nfor m in \"$@\"; do\n"
+    command: ["sh", "-c", "for m in \"$@\"; do\n"
       + "  [ -n \"$(xdg-mime query default \"$m\" 2>/dev/null)\" ] || gio mime \"$m\" minerva.desktop >/dev/null 2>&1\n"
       + "done\nexit 0\n", "sh"].concat(mgr.mimes)
   }

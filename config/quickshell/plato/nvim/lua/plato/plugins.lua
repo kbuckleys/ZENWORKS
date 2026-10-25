@@ -7,10 +7,10 @@
 --
 -- TWO KINDS. The CORE is not features but data plato reads: nvim-lspconfig's
 -- server definitions and nvim-treesitter's highlight queries. Everything
--- else is YOURS, listed in plato/nvim/plugins.json and managed from plato's
+-- else is YOURS, listed in ~/.config/zenworks/plato/plugins.json and managed from plato's
 -- plugin panel (Space U): installed, switched off and on, configured and
 -- removed there. A plugin's configuration is a Lua file of its own,
--- plato/nvim/lua/plato/config/<name>.lua, run after the plugin loads; the
+-- ~/.config/zenworks/plato/lua/plato/config/<name>.lua, run after the plugin loads; the
 -- panel's "configure" opens it in plato.
 --
 --   plugins.json   { "plugins": [ { "src": "https://github.com/…", "enabled": true } ] }
@@ -23,17 +23,40 @@
 -- place: plato draws its own.
 --
 -- FETCHED ON FIRST START, NEVER BUNDLED. nvim's built-in vim.pack clones them
--- into plato's data directory (~/.local/share/quickshell/plato/nvim/site) at
--- the versions pinned in nvim-pack-lock.json beside init.lua — which travels
--- with this repository, as plugins.json does. Nothing here reads the
--- terminal nvim's config or packages.
+-- into plato's data directory (~/.local/share/zenworks/plato/site) at the
+-- versions pinned in nvim-pack-lock.json. Nothing here reads the terminal
+-- nvim's config or packages.
+--
+-- YOURS, NOT THE SHELL'S: plugins.json, the lockfile and the config/ files
+-- live in nvim's config directory, ~/.config/zenworks/plato (NVIM_APPNAME=
+-- zenworks/plato), because the shell itself may be read-only in /usr. The
+-- set beside this file is the shipped one, copied there the first time.
 
 local M = {}
 
 local here = vim.fs.dirname(debug.getinfo(1, "S").source:sub(2))   -- lua/plato
 M.root = vim.fs.dirname(vim.fs.dirname(here))                       -- plato/nvim
-M.manifestPath = M.root .. "/plugins.json"
-M.configDir = here .. "/config"
+M.dir = vim.fn.stdpath("config")                                    -- ~/.config/zenworks/plato
+M.manifestPath = M.dir .. "/plugins.json"
+M.configDir = M.dir .. "/lua/plato/config"
+
+-- THE SHIPPED SET, THE FIRST TIME: its plugins.json, lockfile and config
+-- files copied into yours — never over a file of yours, and plugins.json
+-- last, so a copy cut short is finished next time (core/Plugins.qml does
+-- the same when the panel finds no plugins.json before an engine started)
+function M.seed()
+  if vim.uv.fs_stat(M.manifestPath) then return end
+  vim.fn.mkdir(M.configDir, "p")
+  local function cp(a, b)
+    if vim.uv.fs_stat(a) and not vim.uv.fs_stat(b) then vim.uv.fs_copyfile(a, b) end
+  end
+  cp(M.root .. "/nvim-pack-lock.json", M.dir .. "/nvim-pack-lock.json")
+  for name, kind in vim.fs.dir(here .. "/config") do
+    if kind == "file" then cp(here .. "/config/" .. name, M.configDir .. "/" .. name) end
+  end
+  cp(M.root .. "/plugins.json", M.manifestPath)
+end
+M.seed()
 
 local GH = "https://github.com/"
 M.core = {

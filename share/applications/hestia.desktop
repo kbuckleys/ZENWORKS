@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Hestia
+GenericName=Services and Logs
+Comment=Services, timers and the system journal, in ZENWORKS
+Icon=utilities-system-monitor
+Categories=System;Monitor;
+Keywords=systemd;service;services;daemon;journal;log;logs;timer;boot;systemctl;journalctl;
+Exec=/usr/share/zenworks/quickshell/hestia/bin/hestia
+Terminal=false
+StartupNotify=false

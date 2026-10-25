@@ -89,33 +89,18 @@ QtObject {
       + "exit 1\n";
   }
 
-  // Write OUR OWN entry — plato's, picasso's — into the user's applications
-  // directory, unless one is already there.
+  // OUR OWN ENTRIES — plato's, picasso's, every suite app's — are described
+  // where the app is (a `launcher` property in its manager, made by the
+  // function below) and shipped as files: scripts/launchers.js reads these
+  // calls and writes share/applications/<id>.desktop for the package, which
+  // installs them in /usr/share/applications. Nothing is written into your
+  // applications directory any more (2026-10-25): an entry made at startup
+  // named the shell's path on the day it was made — a working copy's, or a
+  // folder since gone — and outlived the shell when it was removed.
   //
-  // The entries are not shipped as files: a .desktop names its program by an
-  // absolute path, and this config can live in any $HOME. So each app's
-  // manager hands its fields here at startup and the file is written fresh,
-  // real (never a link into the config) and with the path of the machine it
-  // is on. One that EXISTS is left alone, whatever is in it — that is the
-  // user's to edit, and a cold start of the shell must never undo it. A
-  // symlink in its place (how these used to be installed) is replaced.
-  //
-  // `fields` is an object, written in order as Key=value under
-  // [Desktop Entry]; arrays are joined with ";" and given the trailing one the
-  // spec wants for lists. Written to a temporary name and moved into place,
-  // so a launcher scanning the directory never reads half an entry.
-  function installCommand(id, fields) {
-    const lines = ["[Desktop Entry]"];
-    for (const k in fields) {
-      const v = fields[k];
-      lines.push(k + "=" + (Array.isArray(v) ? v.join(";") + ";" : String(v)));
-    }
-    const f = Strings.shellQuote(fileName(id));
-    return "d=\"${XDG_DATA_HOME:-$HOME/.local/share}/applications\"\n"
-      + "[ -e \"$d\"/" + f + " ] && [ ! -L \"$d\"/" + f + " ] && exit 0\n"
-      + "mkdir -p \"$d\" || exit 1\n"
-      + "printf '%s\\n' " + Strings.shellQuote(lines.join("\n")) + " > \"$d\"/" + f + ".part"
-      + " && mv -f \"$d\"/" + f + ".part \"$d\"/" + f + "\n";
+  // Here it only hands the description back, so a manager can read its own.
+  function launcher(id, fields) {
+    return { id: id, fields: fields };
   }
 
   // An Exec value for a program by its absolute path: quoted per the

@@ -35,8 +35,7 @@ hl.env("XDG_DATA_DIRS", dataDirs)
 -- as $EDITOR. As $EDITOR it is `plato --wait`: plato is a window, and git
 -- reads the file back the moment its editor returns. Once only — a reload
 -- runs this again with the PATH it set the first time.
-local xdg = os.getenv("XDG_CONFIG_HOME")
-local platoBin = ((xdg and xdg ~= "") and xdg or (os.getenv("HOME") .. "/.config")) .. "/quickshell/plato/bin"
+local platoBin = ZENWORKS.shell .. "/plato/bin"
 local path = os.getenv("PATH") or "/usr/local/bin:/usr/bin"
 if not (":" .. path .. ":"):find(":" .. platoBin .. ":", 1, true) then
 	hl.env("PATH", platoBin .. ":" .. path)
@@ -96,6 +95,16 @@ hl.env("XCURSOR_SIZE", "24")
 -- renderQt6ct); apps it launches inherit it from it.
 hl.env("QT_QPA_PLATFORMTHEME", "qt6ct")
 
+-- KITTY reads its config from ~/.config/zenworks/kitty, which the shell
+-- writes (morpheus/themesync.js renderKittyConf): the shipped kitty.conf
+-- beside this config, the shell's font and theme, then your custom.conf.
+hl.env("KITTY_CONFIG_DIRECTORY", ZENWORKS.kitty)
+
+-- THE DESKTOP'S NAME, as `zenworks` exports it — set again here in case
+-- Hyprland put its own over it as it started: xdg-desktop-portal picks
+-- zenworks-portals.conf by it, and autostart.lua's import hands it on.
+hl.env("XDG_CURRENT_DESKTOP", "ZENWORKS:Hyprland")
+
 -- SSH AGENT: one for the session, so a key's passphrase is asked once per
 -- login (delphi's SSH keys page writes AddKeysToAgent into ~/.ssh/config).
 -- autostart.lua starts it at this socket. Left alone when something else
@@ -104,6 +113,11 @@ local runtime = os.getenv("XDG_RUNTIME_DIR")
 if runtime and (os.getenv("SSH_AUTH_SOCK") or "") == "" then
 	hl.env("SSH_AUTH_SOCK", runtime .. "/ssh-agent.socket")
 end
+
+-- CORNER: oracle's Corner rounding for windows, written to corner.lua by
+-- quickshell's ThemeSync (and `hyprctl reload` after); 5 with no file yet.
+local okCorner, cornerFile = pcall(require, "lua.corner")
+local corner = okCorner and type(cornerFile) == "table" and tonumber(cornerFile.rounding) or 5
 
 hl.config({
 	render = {
@@ -159,8 +173,8 @@ hl.config({
 	},
 	decoration = {
 		dim_special = 0.8,
-        -- oracle's Corner rounding writes this number (morpheus/ThemeSync.qml)
-        rounding = 5,
+        -- oracle's Corner rounding (lua/corner.lua, above)
+        rounding = corner,
 		blur = {
             passes = 2,
             special = true,

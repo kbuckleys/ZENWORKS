@@ -190,23 +190,20 @@ Scope {
   // ── ITS .desktop ENTRY ─────────────────────────────────────────────
   // Offered for disk images in "Open with", never made the default: an ISO
   // is opened (terminus mounts it) far more often than it is written.
-  Process {
-    running: true
-    command: ["sh", "-c", Desktop.installCommand("stylus", {
-      Type: "Application",
-      Name: "Stylus",
-      GenericName: "Disk Image Writer",
-      Comment: "Write an ISO or a disk image to a USB drive or SD card, in ZENWORKS",
-      Icon: "drive-removable-media",
-      Categories: ["System", "Utility"],
-      Keywords: ["iso", "usb", "image", "flash", "burn", "write", "sd", "card", "bootable", "etcher", "rufus", "dd"],
-      Exec: Desktop.execLine(Quickshell.shellDir + "/stylus/bin/stylus", "%f"),
-      Terminal: "false",
-      StartupNotify: "false",
-      MimeType: ["application/x-iso9660-image", "application/x-cd-image", "application/x-raw-disk-image",
-                 "application/x-raw-disk-image-xz-compressed"],
-    })]
-  }
+  readonly property var launcher: Desktop.launcher("stylus", {
+    Type: "Application",
+    Name: "Stylus",
+    GenericName: "Disk Image Writer",
+    Comment: "Write an ISO or a disk image to a USB drive or SD card, in ZENWORKS",
+    Icon: "drive-removable-media",
+    Categories: ["System", "Utility"],
+    Keywords: ["iso", "usb", "image", "flash", "burn", "write", "sd", "card", "bootable", "etcher", "rufus", "dd"],
+    Exec: Desktop.execLine(Quickshell.shellDir + "/stylus/bin/stylus", "%f"),
+    Terminal: "false",
+    StartupNotify: "false",
+    MimeType: ["application/x-iso9660-image", "application/x-cd-image", "application/x-raw-disk-image",
+               "application/x-raw-disk-image-xz-compressed"],
+  })
 
   // ── THE WINDOW ─────────────────────────────────────────────────────
   // Floating by its title (hypr/lua/windowdefaults.lua: "stylus").

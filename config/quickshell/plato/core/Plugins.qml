@@ -4,7 +4,7 @@
 // https://github.com/kbuckleys/
 //
 // Plato's plugins, known once for every plato window: which are installed
-// (plato/nvim/plugins.json), and what vim.pack would update.
+// (~/.config/zenworks/plato/plugins.json), and what vim.pack would update.
 //
 // The one place plugins are installed, removed, switched on and off, and
 // updated. The status line's indicator and the plugin panel are both views
@@ -30,6 +30,7 @@
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import "../../oracle"
 import "../editor/pack.js" as Pack
 
 Scope {
@@ -67,8 +68,12 @@ Scope {
   function _local(rel) {
     return decodeURIComponent(String(Qt.resolvedUrl(rel)).replace(/^file:\/\//, ""));
   }
-  readonly property string manifestPath: plugins._local("../nvim/plugins.json")
-  readonly property string configDir: plugins._local("../nvim/lua/plato/config")
+  // YOURS: nvim's config directory under NVIM_APPNAME=zenworks/plato (see
+  // nvim/lua/plato/plugins.lua); the shipped set beside the engine is
+  // copied there the first time (seeder, below)
+  readonly property string userDir: Oracle.zenworksDir + "/plato"
+  readonly property string manifestPath: plugins.userDir + "/plugins.json"
+  readonly property string configDir: plugins.userDir + "/lua/plato/config"
 
   // ── what is installed ──────────────────────────────────────────────
   // plugins.json, read whenever it changes on disk (by this, or by hand):
@@ -86,8 +91,26 @@ Scope {
     id: manifestFile
     path: plugins.manifestPath
     watchChanges: true
+    // none at the first start: seeded, not an error (onLoadFailed)
+    printErrors: false
     onFileChanged: manifestFile.reload()
     onLoaded: plugins._readManifest()
+    // none yet: the shipped set copied in, once, then read
+    onLoadFailed: if (!seeder.tried) { seeder.tried = true; seeder.running = true; }
+  }
+  // THE SHIPPED SET, THE FIRST TIME — what plugins.lua's M.seed() does,
+  // for the panel opened before any engine started: never over a file of
+  // yours, plugins.json last
+  Process {
+    id: seeder
+    property bool tried: false
+    command: ["sh", "-c",
+      "u=\"$1\"; s=\"$2\"; mkdir -p \"$u/lua/plato/config\" || exit 1; "
+      + "cp -n \"$s/nvim-pack-lock.json\" \"$u/\" 2>/dev/null; "
+      + "cp -n \"$s\"/lua/plato/config/*.lua \"$u/lua/plato/config/\" 2>/dev/null; "
+      + "cp -n \"$s/plugins.json\" \"$u/\"",
+      "sh", plugins.userDir, plugins._local("../nvim")]
+    onExited: manifestFile.reload()
   }
   function _readManifest() {
     let list = [];
@@ -196,7 +219,7 @@ Scope {
     worker.mode = mode;
     worker.names = names || [];
     worker.command = ["sh", "-c", "exec \"$@\" </dev/null", "sh",
-      "env", "NVIM_APPNAME=quickshell/plato/nvim", "PLATO_PACK=" + mode,
+      "env", "NVIM_APPNAME=zenworks/plato", "PLATO_PACK=" + mode,
       "PLATO_PACK_NAMES=" + (names || []).join(","), "PLATO_PACK_RUN=" + worker.stamp,
       "GIT_TERMINAL_PROMPT=0", "GIT_ASKPASS=true", "SSH_ASKPASS=true",
       "GIT_SSH_COMMAND=ssh -o BatchMode=yes -o ConnectTimeout=20",
@@ -357,7 +380,7 @@ Scope {
   function _runParsers(mode, names, ft) {
     parserWorker.mode = mode;
     parserWorker.ft = ft;
-    parserWorker.command = ["env", "NVIM_APPNAME=quickshell/plato/nvim", "PLATO_PARSERS=" + mode,
+    parserWorker.command = ["env", "NVIM_APPNAME=zenworks/plato", "PLATO_PARSERS=" + mode,
       "PLATO_PARSERS_NAMES=" + names.join(","), "PLATO_PARSERS_FT=" + ft,
       "nvim", "--headless", "-i", "NONE", "--clean", "-c", "luafile " + plugins.parserScript];
     parserWorker.running = true;

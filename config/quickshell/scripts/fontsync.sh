@@ -23,7 +23,7 @@ put() {
 	mkdir -p "${1%/*}" && printf '%s' "$2" > "$1.tmp" && mv -f "$1.tmp" "$1"
 }
 
-# ── kitty: kitty.conf includes font.conf; SIGUSR1 rereads it ──
+# ── kitty: ~/.config/zenworks/kitty/kitty.conf includes font.conf; SIGUSR1 rereads it ──
 # The style is fontconfig's own name for that weight of the family — "Semibold"
 # in one, "SemiBold" in the next — so kitty matches it exactly.
 case "$monow" in
@@ -38,7 +38,7 @@ italic_font      auto
 bold_italic_font auto
 font_size        $monopt
 "
-put "$cfg/kitty/font.conf" "$kconf" && pkill -USR1 -x kitty
+put "$cfg/zenworks/kitty/font.conf" "$kconf" && pkill -USR1 -x kitty
 
 # ── GTK 3 and 4: settings.ini's gtk-font-name ──
 # gtkscheme.sh rewrites the same files, and both run as the shell starts

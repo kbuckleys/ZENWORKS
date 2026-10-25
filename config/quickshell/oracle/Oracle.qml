@@ -203,6 +203,16 @@ Singleton {
   signal nameFollowRequested()
   signal saveFollowRequested(string name)
 
+  // ── WHERE YOUR OWN FILES LIVE ──────────────────────────────────────
+  // The shell itself may sit read-only in /usr/share/zenworks (the AUR
+  // package), or be a working copy; what you make or change goes under
+  // ~/.config/zenworks either way — saved themes (themes/), the Hyprland
+  // files these settings write (hypr/), Plato's editor, kitty's colors.
+  // Shipped files stay beside the shell and are only read.
+  readonly property string configHome: Quickshell.env("XDG_CONFIG_HOME") || (Quickshell.env("HOME") + "/.config")
+  readonly property string zenworksDir: root.configHome + "/zenworks"
+  readonly property string themesDir: root.zenworksDir + "/themes"
+
   // Delete on a CUSTOM theme's row in the Theme list (OracleWindow): to the
   // trash, not gone — a slip is one restore away. Whatever was wearing it
   // (the theme, Follow Daytime's day or night) goes back to its default.
@@ -213,7 +223,7 @@ Singleton {
     if (root.themeDay === stem) root.set("themeDay", root.defaults.themeDay || "zenon-light");
     if (root.themeNight === stem) root.set("themeNight", root.defaults.themeNight || "zenon");
     themeDel.command = ["sh", "-c", "gio trash -- \"$1\" 2>/dev/null || rm -f -- \"$1\"",
-                        "sh", Quickshell.shellDir + "/themes/" + stem + ".json"];
+                        "sh", root.themesDir + "/" + stem + ".json"];
     themeDel.running = true;
   }
   Process { id: themeDel; onExited: root.scanThemes() }
@@ -300,11 +310,14 @@ Singleton {
 
   Process {
     id: themeProc
-    // one line per file: its stem, a tab, the file flattened to one line
+    // one line per file: its stem, a tab, the file flattened to one line —
+    // the shipped ones, then yours (one of yours by a shipped one's name is
+    // the one worn, see Zenon's ownFile, so the shipped one is left out)
     command: ["sh", "-c",
-      "for f in \"$1\"/*.json; do [ -f \"$f\" ] || continue; "
-      + "printf '%s\\t' \"$(basename \"$f\" .json)\"; tr '\\n' ' ' < \"$f\"; echo; done",
-      "sh", Quickshell.shellDir + "/themes"]
+      "for f in \"$1\"/*.json \"$2\"/*.json; do [ -f \"$f\" ] || continue; s=\"$(basename \"$f\" .json)\"; "
+      + "[ \"${f%/*}\" = \"$1\" ] && [ -f \"$2/$s.json\" ] && continue; "
+      + "printf '%s\\t' \"$s\"; tr '\\n' ' ' < \"$f\"; echo; done",
+      "sh", Quickshell.shellDir + "/themes", root.themesDir]
     stdout: StdioCollector {
       id: themeOut
       waitForEnd: true
@@ -752,7 +765,7 @@ Singleton {
       hyprDefault: "mouse", alias: "wake screens dpms mouse key press",
       options: [ { value: "key",   label: "Key press" },
                  { value: "mouse", label: "Mouse or key press" } ],
-      help: "What turns the screens back on, after idle or Lock and suspend screen. Kept in hypr/lua/wake.lua." },
+      help: "What turns the screens back on, after idle or Lock and suspend screen. Kept in ~/.config/zenworks/hypr/lua/wake.lua." },
     // ── input ──
     // The fixed rows; the devices' own are built in inputSpecs, where the
     // layouts and the screens this machine has are on hand.
@@ -926,7 +939,7 @@ Singleton {
     // hyprland's own, kept in hypr/lua/effects.lua — see Ora's EFFECTS
     { key: "hyprShadows", section: "look", label: "Window shadows", type: "bool",
       hyprFile: "effects", hyprDefault: true, alias: "hyprland window shadow drop shadow decoration",
-      help: "The soft shadow hyprland draws under every window. Kept in hypr/lua/effects.lua." },
+      help: "The soft shadow hyprland draws under every window. Kept in ~/.config/zenworks/hypr/lua/effects.lua." },
     { key: "scrollFrost", section: "look", alias: "scroll edge frost blur ghost rows under bar toolbar fade",
       label: "Frost under bars", type: "bool",
       help: "Rows scrolled past a list's edge carry on under the bar above it (or below it), blurred and fading out. Off, a list simply stops at its edge." },
@@ -943,7 +956,7 @@ Singleton {
       help: "Multiplies every duration in the shell. Zero means no animation at all." },
     { key: "hyprAnimations", section: "motion", label: "Window animations", type: "bool",
       hyprFile: "effects", hyprDefault: true, alias: "hyprland window workspace animation slide fade popin motion",
-      help: "Hyprland's windows popping in and out, workspaces sliding, and the shell's layers fading as they open and close. Off, all of it is instant. Kept in hypr/lua/effects.lua." },
+      help: "Hyprland's windows popping in and out, workspaces sliding, and the shell's layers fading as they open and close. Off, all of it is instant. Kept in ~/.config/zenworks/hypr/lua/effects.lua." },
     { key: "arrivalEnabled", section: "motion", label: "Play the arrival", type: "bool",
       help: "The pill's slide and the background's zoom, once, when the session starts." },
     { key: "arrivalDuration", section: "motion", label: "Arrival length", type: "int",
@@ -1273,6 +1286,11 @@ Singleton {
     { key: "actionAppsScan", section: "defaults", label: "Applications", type: "action",
       verb: "Detect",
       help: "Looks again for what is installed and what opens what. Runs by itself when you open this section." },
+    // the zsh setup ZENWORKS ships, also offered once at the first start
+    // (OracleManager's ZshSetup, which answers zshAsked)
+    { key: "actionZsh", section: "defaults", alias: "zsh shell terminal prompt p10k powerlevel10k zshrc login shell",
+      label: "Terminal setup", type: "action", verb: "Use ZENWORKS' zsh",
+      help: "zsh with a fast prompt, suggestions and fuzzy completion. What is missing is installed, your own ~/.zshrc and ~/.p10k.zsh are kept as *.before-zenworks, and zsh becomes your login shell (it asks for your password)." },
     { key: "infoDefaultsPath", section: "defaults", label: "Written to", type: "info",
       elideLeft: true,
       help: "A plain lua file the binds read, read back on every change — editing it by hand works too." },
@@ -1290,11 +1308,11 @@ Singleton {
     { key: "infoWindowRules", section: "windows", label: "Window rules", type: "info",
       fold: "rules",
       alias: "window rule rules float floating size workspace opacity transparent pin blur maximize fullscreen idle inhibit app class",
-      help: "How an app's windows open: floating and at what size, centered, on which workspace, how opaque, pinned, without blur, kept awake. Click to unfold. Kept in hypr/lua/windows.lua." },
+      help: "How an app's windows open: floating and at what size, centered, on which workspace, how opaque, pinned, without blur, kept awake. Click to unfold. Kept in ~/.config/zenworks/hypr/lua/windows.lua." },
     { key: "infoStartup", section: "windows", label: "Startup apps", type: "info",
       fold: "startup",
       alias: "startup autostart login boot launch start exec apps programs",
-      help: "What starts when you log in, besides the shell's own. Click to unfold. Kept in hypr/lua/startup.lua; a change counts from the next login." },
+      help: "What starts when you log in, besides the shell's own. Click to unfold. Kept in ~/.config/zenworks/hypr/lua/startup.lua; a change counts from the next login." },
 
     // ── the checkup ──
     // Readouts like the About rows, filled by oracle/doctor.sh — see
@@ -1367,9 +1385,9 @@ Singleton {
     { key: "actionResetAll", section: "about", label: "Reset everything", type: "action",
       verb: "Reset all",
       help: "Every setting in every section back to its default." },
-    { key: "actionUpdate", section: "about", label: "Update ZENWORKS", type: "action",
-      verb: "Update",
-      help: "Fetch the published ZENWORKS and lay it over this one — your default apps, monitors, input and theme files are kept. Runs in the jobs drawer; nothing is left behind. Refused where ZENWORKS is maintained (scripts/update.sh)." },
+    { key: "actionUpdate", section: "about", alias: "update upgrade new version zenworks package aur",
+      label: "Check for updates", type: "action", verb: "Open Ceres",
+      help: "ZENWORKS is a package now, so it updates with everything else: Ceres' Updates lists a new version beside the rest. Your settings live in ~/.config/zenworks and are never touched by an update." },
     { key: "actionRestart", section: "about", label: "Restart the shell", type: "action",
       verb: "Restart",
       help: "For the few settings that only take effect on a fresh start." }
@@ -1776,6 +1794,7 @@ Singleton {
   signal updateAsked()
   signal exportAsked()
   signal importAsked()
+  signal zshAsked()
   // An action still out from its last press: its button dims and ignores
   // another (the panel's ActionControl reads this).
   function actionBusy(key) {
@@ -1790,10 +1809,12 @@ Singleton {
     if (key === "actionSaveFollow") { root.nameFollowRequested(); return; }
     if (key === "actionResetSection") { root.resetSection(context); return; }
     if (key === "actionResetAll") { root.resetAll(); return; }
-    // the shell's side starts it, as a job in the drawer (OracleManager)
+    // the shell's side opens Ceres' Updates (OracleManager: Oracle cannot
+    // reach Ceres itself)
     if (key === "actionUpdate") { root.updateAsked(); return; }
     if (key === "actionExport") { root.exportAsked(); return; }
     if (key === "actionImport") { root.importAsked(); return; }
+    if (key === "actionZsh") { root.zshAsked(); return; }
     if (key === "actionRestart") {
       // Through scripts/restart.sh, in a shell that has already been
       // detached, so the replacement is never a child of the instance it
@@ -1819,9 +1840,7 @@ Singleton {
   // key ("display:DP-1:mode") -> value, rebuilt from the file and the monitors
   property var displayValues: ({})
 
-  readonly property string monitorsPath:
-    (Quickshell.env("XDG_CONFIG_HOME") || (Quickshell.env("HOME") + "/.config"))
-      + "/hypr/lua/monitors.lua"
+  readonly property string monitorsPath: root.hyprLuaDir + "/monitors.lua"
 
   // Each monitor's own ink, so its rows read as one group and the groups as
   // different monitors — and so its box in the Arrangement is the same color
@@ -2105,8 +2124,14 @@ Singleton {
   // hyprland's binds. binds.lua is the list — ids, labels, groups and the
   // default chords — and keys.lua, written here, the chords moved off them.
   // See Ora's SHORTCUTS for both files' shape.
-  readonly property string hyprLuaDir:
-    (Quickshell.env("XDG_CONFIG_HOME") || (Quickshell.env("HOME") + "/.config")) + "/hypr/lua"
+  // the Hyprland files these settings write — yours, read by hyprland.lua
+  // before the shipped ones of the same name (see hypr/hyprland.lua)
+  readonly property string hyprLuaDir: root.zenworksDir + "/hypr/lua"
+  // what ships beside the shell (/usr/share/zenworks, or a working copy's
+  // config/): only read. Its Hyprland config gives binds.lua and
+  // windowdefaults.lua; its kitty config is included by yours.
+  readonly property string shippedDir: Quickshell.shellDir.replace(/\/[^\/]+\/?$/, "")
+  readonly property string hyprShippedDir: root.shippedDir + "/hypr"
   readonly property string keysPath: root.hyprLuaDir + "/keys.lua"
   // hypr/lua/wake.lua: "key" or "mouse" — see Ora's WAKE
   // "mouse" by default (user, 2026-10-21)
@@ -2294,7 +2319,7 @@ Singleton {
 
   FileView {
     id: bindsFile
-    path: root.hyprLuaDir + "/binds.lua"
+    path: root.hyprShippedDir + "/lua/binds.lua"
     blockLoading: true
     printErrors: false
     watchChanges: true
@@ -2360,7 +2385,7 @@ Singleton {
   }
   FileView {
     id: shippedFile
-    path: root.hyprLuaDir + "/windowdefaults.lua"
+    path: root.hyprShippedDir + "/lua/windowdefaults.lua"
     blockLoading: true
     printErrors: false
     watchChanges: true
@@ -2419,9 +2444,7 @@ Singleton {
   // what is plugged in, by group (Ora.inputDevices) — the headers say it
   property var inputDevices: ({})
 
-  readonly property string inputPath:
-    (Quickshell.env("XDG_CONFIG_HOME") || (Quickshell.env("HOME") + "/.config"))
-      + "/hypr/lua/input.lua"
+  readonly property string inputPath: root.hyprLuaDir + "/input.lua"
 
   // A header row for each group, as each monitor has one, then the group's
   // fields as Ora describes them; a field's options that are facts about this
@@ -2593,9 +2616,7 @@ Singleton {
     return p !== "" && Ora.appById(root.appScan.apps, p) ? p : "";
   }
 
-  readonly property string defaultsPath:
-    (Quickshell.env("XDG_CONFIG_HOME") || (Quickshell.env("HOME") + "/.config"))
-      + "/hypr/lua/defaults.lua"
+  readonly property string defaultsPath: root.hyprLuaDir + "/defaults.lua"
 
   function defaultsSpecs() {
     const out = [];

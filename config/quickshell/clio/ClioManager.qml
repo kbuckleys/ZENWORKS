@@ -39,23 +39,19 @@ Scope {
   property var fontBook: null
 
   // ── ITS .desktop ENTRY ─────────────────────────────────────────────────
-  // Not shipped: written on startup when missing, with this machine's path
-  // (Desktop.installCommand), as every suite app's is.
-  Process {
-    running: true
-    command: ["sh", "-c", Desktop.installCommand("clio", {
-      Type: "Application",
-      Name: "Clio",
-      GenericName: "Notes",
-      Comment: "Notes, checklists, a journal and the stickies on your desktop, in ZENWORKS",
-      Icon: "accessories-text-editor",
-      Categories: ["Office", "Utility"],
-      Keywords: ["notes", "note", "journal", "diary", "sticky", "checklist", "todo", "memo", "write"],
-      Exec: Desktop.execLine(Quickshell.shellDir + "/clio/bin/clio"),
-      Terminal: "false",
-      StartupNotify: "false",
-    })]
-  }
+  // Shipped as a file (scripts/launchers.js makes it from this).
+  readonly property var launcher: Desktop.launcher("clio", {
+    Type: "Application",
+    Name: "Clio",
+    GenericName: "Notes",
+    Comment: "Notes, checklists, a journal and the stickies on your desktop, in ZENWORKS",
+    Icon: "accessories-text-editor",
+    Categories: ["Office", "Utility"],
+    Keywords: ["notes", "note", "journal", "diary", "sticky", "checklist", "todo", "memo", "write"],
+    Exec: Desktop.execLine(Quickshell.shellDir + "/clio/bin/clio"),
+    Terminal: "false",
+    StartupNotify: "false",
+  })
 
   Component.onCompleted: Clio.app = mgr
 

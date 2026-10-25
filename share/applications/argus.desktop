@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Argus
+GenericName=Video Trimmer
+Comment=Cut a recording and keep it as MP4, GIF or WebM, in ZENWORKS
+Icon=video-x-generic
+Categories=AudioVideo;Video;AudioVideoEditing;
+Keywords=video;trim;cut;gif;webm;mp4;recording;screen;clip;export;
+Exec=/usr/share/zenworks/quickshell/argus/bin/argus %f
+Terminal=false
+StartupNotify=false
+MimeType=video/mp4;video/webm;video/x-matroska;video/quicktime;video/x-msvideo;image/gif;

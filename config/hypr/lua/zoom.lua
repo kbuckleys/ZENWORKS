@@ -32,18 +32,8 @@ local DAMAGE_FULL    = 2  -- Hyprland's fine-grained default
 -- write 1.0. Hold the full-damage frames until it lands.
 local SETTLE_MS = 300
 
-local function config_dir()
-	local src = debug.getinfo(1, "S").source
-	if src:sub(1, 1) == "@" then
-		local dir = src:sub(2):match("^(.*)/lua/[^/]+$")
-		if dir then return dir end
-	end
-	local xdg = os.getenv("XDG_CONFIG_HOME")
-	if xdg and xdg ~= "" then return xdg .. "/hypr" end
-	return (os.getenv("HOME") or "") .. "/.config/hypr"
-end
-
-local SHADER = config_dir() .. "/shaders/zoom.frag"
+-- the shipped shader, beside this config (see hyprland.lua's ZENWORKS)
+local SHADER = ZENWORKS.hypr .. "/shaders/zoom.frag"
 
 -- THE COLOR FILTER (hermes' Control Hub › Display, 2026-10-22). Hyprland has
 -- one screen shader and this file owns it, so a filter is a copy of zoom.frag
@@ -53,7 +43,7 @@ local SHADER = config_dir() .. "/shaders/zoom.frag"
 -- hermes hands a new one over through `hyprctl eval` (zen_filter, below).
 -- Guarded: a missing or broken file, or a shader gone missing, is no filter.
 local function readFilter()
-	local ok, f = pcall(dofile, config_dir() .. "/lua/filter.lua")
+	local ok, f = pcall(dofile, ZENWORKS.user .. "/lua/filter.lua")
 	if not (ok and type(f) == "table" and type(f.shader) == "string" and f.shader ~= "") then return "" end
 	local fh = io.open(f.shader, "r")
 	if not fh then return "" end

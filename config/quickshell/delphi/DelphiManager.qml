@@ -50,27 +50,23 @@ Scope {
   readonly property int protocol: 1
 
   // ── ITS .desktop ENTRY ─────────────────────────────────────────────
-  // Not shipped as a file: written into ~/.local/share/applications on
-  // startup when missing, with this machine's path to bin/delphi (see
-  // Desktop.installCommand), as plato's, picasso's and alexandria's are.
+  // Shipped as a file (scripts/launchers.js makes it from this),
+  // as every suite app's is.
   // inode/directory is offered (Open with → Delphi on a repository in
   // terminus), never made the default.
-  Process {
-    running: true
-    command: ["sh", "-c", Desktop.installCommand("delphi", {
-      Type: "Application",
-      Name: "Delphi",
-      GenericName: "Git Client",
-      Comment: "Stage, commit, branch, sync and browse history with git, in ZENWORKS",
-      Icon: "git",
-      Categories: ["Development", "RevisionControl"],
-      Keywords: ["git", "commit", "branch", "diff", "merge", "rebase", "github", "gitlab", "codeberg", "repository", "version control"],
-      Exec: Desktop.execLine(Quickshell.shellDir + "/delphi/bin/delphi", "%f"),
-      Terminal: "false",
-      StartupNotify: "false",
-      MimeType: ["inode/directory"],
-    })]
-  }
+  readonly property var launcher: Desktop.launcher("delphi", {
+    Type: "Application",
+    Name: "Delphi",
+    GenericName: "Git Client",
+    Comment: "Stage, commit, branch, sync and browse history with git, in ZENWORKS",
+    Icon: "git",
+    Categories: ["Development", "RevisionControl"],
+    Keywords: ["git", "commit", "branch", "diff", "merge", "rebase", "github", "gitlab", "codeberg", "repository", "version control"],
+    Exec: Desktop.execLine(Quickshell.shellDir + "/delphi/bin/delphi", "%f"),
+    Terminal: "false",
+    StartupNotify: "false",
+    MimeType: ["inode/directory"],
+  })
 
   // ── WHAT IS KEPT ───────────────────────────────────────────────────
   // repositories opened, newest first; the page the window was on; the

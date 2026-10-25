@@ -56,25 +56,21 @@ Scope {
   readonly property int protocol: 1
 
   // ── ITS .desktop ENTRY ─────────────────────────────────────────────
-  // Not shipped as a file: written into ~/.local/share/applications on
-  // startup when missing, with this machine's path to bin/calypso (see
-  // Desktop.installCommand), as plato's, alexandria's and delphi's are.
-  Process {
-    running: true
-    command: ["sh", "-c", Desktop.installCommand("calypso", {
-      Type: "Application",
-      Name: "Calypso",
-      GenericName: "Password Manager",
-      Comment: "Your Bitwarden, 1Password, Proton Pass, KeePassXC and pass vaults, in ZENWORKS",
-      Icon: "dialog-password",
-      Categories: ["Utility", "Security"],
-      Keywords: ["password", "passwords", "vault", "login", "totp", "2fa", "otp", "bitwarden",
-                 "vaultwarden", "1password", "proton", "keepass", "keepassxc", "pass", "gopass"],
-      Exec: Desktop.execLine(Quickshell.shellDir + "/calypso/bin/calypso"),
-      Terminal: "false",
-      StartupNotify: "false",
-    })]
-  }
+  // Shipped as a file (scripts/launchers.js makes it from this),
+  // as every suite app's is.
+  readonly property var launcher: Desktop.launcher("calypso", {
+    Type: "Application",
+    Name: "Calypso",
+    GenericName: "Password Manager",
+    Comment: "Your Bitwarden, 1Password, Proton Pass, KeePassXC and pass vaults, in ZENWORKS",
+    Icon: "dialog-password",
+    Categories: ["Utility", "Security"],
+    Keywords: ["password", "passwords", "vault", "login", "totp", "2fa", "otp", "bitwarden",
+               "vaultwarden", "1password", "proton", "keepass", "keepassxc", "pass", "gopass"],
+    Exec: Desktop.execLine(Quickshell.shellDir + "/calypso/bin/calypso"),
+    Terminal: "false",
+    StartupNotify: "false",
+  })
 
   // ── WHAT IS KEPT ───────────────────────────────────────────────────
   property var accounts: []

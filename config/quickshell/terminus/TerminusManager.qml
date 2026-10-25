@@ -26,34 +26,29 @@ Scope {
   id: mgr
 
   // ── ITS .desktop ENTRY ─────────────────────────────────────────────
-  // picasso's arrangement (see PicassoViewer): written into
-  // ~/.local/share/applications on startup when missing, with this
-  // machine's path to bin/terminus. It is what makes terminus a file
-  // manager the rest of the desktop can name — oracle's Default apps hands
-  // it inode/directory, so another application's "show in directory" lands
-  // here. One already there is left alone.
-  Process {
-    running: true
-    command: ["sh", "-c", Desktop.installCommand("terminus", {
-      Type: "Application",
-      Name: "Terminus",
-      GenericName: "File Manager",
-      Comment: "Browse and manage files, in ZENWORKS",
-      Icon: "system-file-manager",
-      Categories: ["System", "FileTools", "FileManager", "Utility", "Core"],
-      Keywords: ["files", "folder", "directory", "file manager", "explorer"],
-      Exec: Desktop.execLine(Quickshell.shellDir + "/terminus/bin/terminus", "%f"),
-      Terminal: "false",
-      StartupNotify: "false",
-      // and archives, which it opens as directories (openArchive) — so
-      // oracle's Default apps can offer it for them
-      MimeType: ["inode/directory", "application/zip", "application/x-tar",
-                 "application/x-compressed-tar", "application/x-xz-compressed-tar",
-                 "application/x-zstd-compressed-tar", "application/x-bzip2-compressed-tar",
-                 "application/x-7z-compressed", "application/vnd.rar", "application/x-rar",
-                 "application/gzip", "application/zstd"]
-    })]
-  }
+  // Shipped as a file (scripts/launchers.js makes it from this).
+  // It is what makes terminus a file manager the rest of the desktop can
+  // name — oracle's Default apps hands it inode/directory, so another
+  // application's "show in directory" lands here.
+  readonly property var launcher: Desktop.launcher("terminus", {
+    Type: "Application",
+    Name: "Terminus",
+    GenericName: "File Manager",
+    Comment: "Browse and manage files, in ZENWORKS",
+    Icon: "system-file-manager",
+    Categories: ["System", "FileTools", "FileManager", "Utility", "Core"],
+    Keywords: ["files", "folder", "directory", "file manager", "explorer"],
+    Exec: Desktop.execLine(Quickshell.shellDir + "/terminus/bin/terminus", "%f"),
+    Terminal: "false",
+    StartupNotify: "false",
+    // and archives, which it opens as directories (openArchive) — so
+    // oracle's Default apps can offer it for them
+    MimeType: ["inode/directory", "application/zip", "application/x-tar",
+               "application/x-compressed-tar", "application/x-xz-compressed-tar",
+               "application/x-zstd-compressed-tar", "application/x-bzip2-compressed-tar",
+               "application/x-7z-compressed", "application/vnd.rar", "application/x-rar",
+               "application/gzip", "application/zstd"]
+  })
 
   // Windows are CREATED, not modeled.
   //

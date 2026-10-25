@@ -37,6 +37,7 @@ import Quickshell.Hyprland
 import Quickshell.Networking
 import Quickshell.Bluetooth
 import "../morpheus"
+import "../oracle"
 import "../morpheus/hypr.js" as Hypr
 import "../morpheus/lagnotes.js" as LagNotes
 import "../ceres"
@@ -518,7 +519,10 @@ Singleton {
   property bool filterFocus: false
   property bool focusQuiet: false
   readonly property string filterWorn: H.filterWorn(root.filter, root.filterFocus, root.focusQuiet)
-  readonly property string hyprDir: (Quickshell.env("XDG_CONFIG_HOME") || (Quickshell.env("HOME") + "/.config")) + "/hypr"
+  // the filter's shader and filter.lua are yours (~/.config/zenworks/hypr);
+  // zoom.frag, the shape every filter is made from, ships with the config
+  readonly property string hyprDir: Oracle.zenworksDir + "/hypr"
+  readonly property string hyprShippedDir: Oracle.hyprShippedDir
   function setFilter(id) { root.filter = id; root.save(); }
   function setFilterFocus(on) { root.filterFocus = on; root.save(); }
   property string _filterApplied: "?"
@@ -531,7 +535,7 @@ Singleton {
   }
   FileView {
     id: zoomFrag
-    path: root.hyprDir + "/shaders/zoom.frag"
+    path: root.hyprShippedDir + "/shaders/zoom.frag"
     blockLoading: true
     printErrors: false
   }
@@ -626,26 +630,22 @@ Singleton {
   }
 
   // ── ITS .desktop ENTRY ─────────────────────────────────────────────────
-  // So cynosure and artemis find it. Written when missing, with this
-  // machine's path (Desktop.installCommand).
-  Process {
-    running: root.fake === ""
-    command: ["sh", "-c", Desktop.installCommand("hermes", {
-      Type: "Application",
-      // what the launcher calls it (user, 2026-10-20); "hermes" stays a
-      // keyword, so either name finds it
-      Name: "Control Hub",
-      GenericName: "Network and Display",
-      Comment: "Wi-Fi, Bluetooth, VPN, brightness, night light, printers and scanners, in ZENWORKS",
-      Icon: "preferences-system-network",
-      Categories: ["Settings", "Network", "HardwareSettings"],
-      Keywords: ["hermes", "control", "hub", "wifi", "wi-fi", "wireless", "network", "ethernet", "bluetooth", "vpn", "wireguard",
-                 "brightness", "night light", "display", "monitor", "printer", "printing", "scanner", "scan", "cups"],
-      Exec: Desktop.execLine(Quickshell.shellDir + "/hermes/bin/hermes", ""),
-      Terminal: "false",
-      StartupNotify: "false",
-    })]
-  }
+  // So cynosure and artemis find it. Shipped as a file (scripts/launchers.js makes it from this).
+  readonly property var launcher: Desktop.launcher("hermes", {
+    Type: "Application",
+    // what the launcher calls it (user, 2026-10-20); "hermes" stays a
+    // keyword, so either name finds it
+    Name: "Control Hub",
+    GenericName: "Network and Display",
+    Comment: "Wi-Fi, Bluetooth, VPN, brightness, night light, printers and scanners, in ZENWORKS",
+    Icon: "preferences-system-network",
+    Categories: ["Settings", "Network", "HardwareSettings"],
+    Keywords: ["hermes", "control", "hub", "wifi", "wi-fi", "wireless", "network", "ethernet", "bluetooth", "vpn", "wireguard",
+               "brightness", "night light", "display", "monitor", "printer", "printing", "scanner", "scan", "cups"],
+    Exec: Desktop.execLine(Quickshell.shellDir + "/hermes/bin/hermes", ""),
+    Terminal: "false",
+    StartupNotify: "false",
+  })
 
   Component.onCompleted: {
     const s = H.parseSettings(settingsFile.text());

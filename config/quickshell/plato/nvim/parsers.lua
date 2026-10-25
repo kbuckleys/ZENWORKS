@@ -5,7 +5,7 @@
 --
 -- Plato's treesitter parsers, built in an nvim of their own (as pack.lua is).
 --
---   NVIM_APPNAME=quickshell/plato/nvim nvim --headless -i NONE --clean \
+--   NVIM_APPNAME=zenworks/plato nvim --headless -i NONE --clean \
 --     -c "luafile parsers.lua"
 --     PLATO_PARSERS=list [PLATO_PARSERS_FT=qml]   every language there is a
 --                                    parser for, as one line of JSON
@@ -19,7 +19,7 @@
 -- wanted for the handful that must be generated from their grammar, and
 -- those say so rather than fail halfway.
 --
--- Built into ~/.local/share/quickshell/plato/nvim/site/parser/<lang>.so,
+-- Built into ~/.local/share/zenworks/plato/site/parser/<lang>.so,
 -- which nvim finds on its own; the revision built goes beside it in
 -- parser-info/, so the list can say which are behind their pin. Replaced by
 -- a rename, never written in place: an engine that has the old one loaded

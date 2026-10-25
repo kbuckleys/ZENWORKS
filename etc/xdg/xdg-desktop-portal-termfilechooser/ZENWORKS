@@ -1,0 +1,8 @@
+# ZENWORKS' file chooser: terminus' picker, through the wrapper shipped with
+# the shell. Read in ZENWORKS sessions only (named after XDG_CURRENT_DESKTOP);
+# a config of your own in ~/.config/xdg-desktop-portal-termfilechooser/ wins.
+[filechooser]
+cmd=/usr/share/zenworks/xdg-desktop-portal-termfilechooser/terminus-wrapper.sh
+default_dir=$HOME
+open_mode=suggested
+save_mode=suggested

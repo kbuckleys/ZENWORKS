@@ -1051,7 +1051,7 @@ function previewCommand(path, platoRender, from, theme) {
     + "elif [ -f " + r + " ] && [ \"$(stat -c %s -- " + p + " 2>/dev/null || echo 0)\" -lt 4000000 ]; then "
     + (at > 1 ? "PLATO_RENDER_FROM=" + at + " " : "")
     + (theme ? "PLATO_THEME=" + Strings.shellQuote(JSON.stringify(theme)) + " " : "")
-    + "NVIM_APPNAME=quickshell/plato/nvim exec nvim --headless -i NONE -n --clean"
+    + "NVIM_APPNAME=zenworks/plato exec nvim --headless -i NONE -n --clean"
     + " -c \"luafile $(printf %s " + r + ")\" -- " + p + " 2>/dev/null; "
     + "else " + batCommand(path, from) + "; fi";
 }

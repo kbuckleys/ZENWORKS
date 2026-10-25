@@ -5,6 +5,14 @@
 //
 // The shell's root: the bar (a pill that morphs into whichever layer is open
 // on its monitor), and every layer, daemon and window under it.
+//
+// ONE NAME WHEREVER IT RUNS: quickshell keeps a shell's state (every
+// settings file, Quickshell.statePath) under by-shell/<its id>, and the id
+// is otherwise a hash of this file's path — moved to /usr/share/zenworks, or
+// run from a working copy, the settings would look lost. Named, the
+// installed shell and a dev copy share ~/.local/state/quickshell/by-shell/
+// zenworks.
+//@ pragma ShellId zenworks
 
 import QtQuick
 import QtQuick.Layouts

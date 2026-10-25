@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Picasso
+GenericName=Image Viewer
+Comment=View, edit and annotate pictures, in ZENWORKS
+Icon=image-viewer
+Categories=Graphics;Viewer;Photography;
+Keywords=image;viewer;picture;photo;gallery;annotate;
+Exec=/usr/share/zenworks/quickshell/picasso/bin/picasso-view %F
+Terminal=false
+StartupNotify=false
+MimeType=image/png;image/jpeg;image/jpg;image/gif;image/webp;image/bmp;image/tiff;image/tif;image/svg+xml;image/avif;image/heif;image/heic;image/jxl;image/x-exr;image/x-portable-pixmap;image/x-tga;image/x-qoi;image/x-portable-anymap;image/x-dicom;image/x-canon-cr2;image/x-nikon-nef;image/x-adobe-dng;image/x-sony-arw;image/x-fuji-raf;image/vnd.adobe.photoshop;image/x-xcf;image/x-icon;image/x-ico;image/qoi;

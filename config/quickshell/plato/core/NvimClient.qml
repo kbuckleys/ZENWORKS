@@ -86,10 +86,11 @@ Item {
       // setsid: its own session, so nothing aimed at the shell's process
       // group reaches it either. stderr goes to a log beside plato's state.
       //
-      // NVIM_APPNAME=quickshell/plato/nvim makes nvim's config directory this
-      // repository's plato/nvim — so vim.pack's lockfile is written there and
-      // travels with it — and keeps its data, state and plugins apart from
-      // any other nvim's, under ~/.local/{share,state}/quickshell/plato/nvim.
+      // NVIM_APPNAME=zenworks/plato makes nvim's config directory
+      // ~/.config/zenworks/plato — your plugin list, its lockfile, your
+      // plugin configs (the shell itself may be read-only in /usr) — and
+      // keeps its data, state and plugins apart from any other nvim's,
+      // under ~/.local/{share,state}/zenworks/plato.
       const log = Quickshell.env("HOME") + "/.local/state/quickshell/plato/nvim.log";
       //
       // AND IT TAKES NOTHING OF THE SHELL'S WITH IT. A detached child inherits
@@ -99,7 +100,7 @@ Item {
       Quickshell.execDetached(["bash", "-c",
         "for f in /proc/$$/fd/*; do n=${f##*/}; [ \"$n\" -gt 2 ] 2>/dev/null && eval \"exec $n>&-\"; done; "
         + "mkdir -p \"$(dirname \"$1\")\" \"$(dirname \"$3\")\"; "
-        + "NVIM_APPNAME=quickshell/plato/nvim PLATO_SOCK=\"$1\" exec setsid nvim --headless -u \"$2\" "
+        + "NVIM_APPNAME=zenworks/plato PLATO_SOCK=\"$1\" exec setsid nvim --headless -u \"$2\" "
         + "</dev/null >/dev/null 2>>\"$3\"",
         "sh", client.socketPath, client.initPath, log]);
     }

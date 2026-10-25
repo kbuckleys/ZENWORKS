@@ -50,22 +50,19 @@ Scope {
   // ── ITS .desktop ENTRY ─────────────────────────────────────────────
   // Offered for video in "Open with" (terminus' menu), never made the
   // default: a player is what a video opens in, an editor is chosen.
-  Process {
-    running: true
-    command: ["sh", "-c", Desktop.installCommand("argus", {
-      Type: "Application",
-      Name: "Argus",
-      GenericName: "Video Trimmer",
-      Comment: "Cut a recording and keep it as MP4, GIF or WebM, in ZENWORKS",
-      Icon: "video-x-generic",
-      Categories: ["AudioVideo", "Video", "AudioVideoEditing"],
-      Keywords: ["video", "trim", "cut", "gif", "webm", "mp4", "recording", "screen", "clip", "export"],
-      Exec: Desktop.execLine(Quickshell.shellDir + "/argus/bin/argus", "%f"),
-      Terminal: "false",
-      StartupNotify: "false",
-      MimeType: ["video/mp4", "video/webm", "video/x-matroska", "video/quicktime", "video/x-msvideo", "image/gif"],
-    })]
-  }
+  readonly property var launcher: Desktop.launcher("argus", {
+    Type: "Application",
+    Name: "Argus",
+    GenericName: "Video Trimmer",
+    Comment: "Cut a recording and keep it as MP4, GIF or WebM, in ZENWORKS",
+    Icon: "video-x-generic",
+    Categories: ["AudioVideo", "Video", "AudioVideoEditing"],
+    Keywords: ["video", "trim", "cut", "gif", "webm", "mp4", "recording", "screen", "clip", "export"],
+    Exec: Desktop.execLine(Quickshell.shellDir + "/argus/bin/argus", "%f"),
+    Terminal: "false",
+    StartupNotify: "false",
+    MimeType: ["video/mp4", "video/webm", "video/x-matroska", "video/quicktime", "video/x-msvideo", "image/gif"],
+  })
 
   // ── THE WINDOW ─────────────────────────────────────────────────────
   // One, reused: a second video opened replaces the first. Floating by its

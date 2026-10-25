@@ -41,28 +41,29 @@ Scope {
   property var fileManager: null
 
   // ── ITS .desktop ENTRY, AND THE DEFAULT FOR FONTS ──────────────────
-  // Written into ~/.local/share/applications when missing, with this
-  // machine's path (Desktop.installCommand), as plato's and picasso's are.
-  // And made what opens a font — but only for a type nobody has chosen an
+  // Shipped as a file (scripts/launchers.js makes it from this),
+  // as every suite app's is. And made what opens a font — but only for a type nobody has chosen an
   // application for: a choice made in oracle's Default apps stays made.
   readonly property var mimes: ["font/ttf", "font/otf", "font/collection", "font/sfnt",
                                 "font/woff", "font/woff2", "application/x-font-ttf",
                                 "application/x-font-otf", "application/x-font-type1"]
+  readonly property var launcher: Desktop.launcher("alexandria", {
+    Type: "Application",
+    Name: "Alexandria",
+    GenericName: "Font Book",
+    Comment: "Browse, compare and install fonts and their glyphs, in ZENWORKS",
+    Icon: "font-x-generic",
+    Categories: ["Utility", "Viewer"],
+    Keywords: ["font", "typeface", "glyph", "character", "unicode", "nerd", "install"],
+    Exec: Desktop.execLine(Quickshell.shellDir + "/alexandria/bin/alexandria", "%F"),
+    Terminal: "false",
+    StartupNotify: "false",
+    MimeType: mgr.mimes,
+  })
+  // what opens these types, only where nothing was chosen for them
   Process {
     running: true
-    command: ["sh", "-c", Desktop.installCommand("alexandria", {
-      Type: "Application",
-      Name: "Alexandria",
-      GenericName: "Font Book",
-      Comment: "Browse, compare and install fonts and their glyphs, in ZENWORKS",
-      Icon: "font-x-generic",
-      Categories: ["Utility", "Viewer"],
-      Keywords: ["font", "typeface", "glyph", "character", "unicode", "nerd", "install"],
-      Exec: Desktop.execLine(Quickshell.shellDir + "/alexandria/bin/alexandria", "%F"),
-      Terminal: "false",
-      StartupNotify: "false",
-      MimeType: mgr.mimes,
-    }) + "\nfor m in \"$@\"; do\n"
+    command: ["sh", "-c", "for m in \"$@\"; do\n"
       + "  [ -n \"$(xdg-mime query default \"$m\" 2>/dev/null)\" ] || gio mime \"$m\" alexandria.desktop >/dev/null 2>&1\n"
       + "done\nexit 0\n", "sh"].concat(mgr.mimes)
   }

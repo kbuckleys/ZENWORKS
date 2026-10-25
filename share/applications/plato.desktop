@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Plato
+GenericName=Text Editor
+Comment=Edit text, in ZENWORKS
+Icon=accessories-text-editor
+Categories=Development;TextEditor;
+Keywords=editor;text;code;nvim;
+Exec=/usr/share/zenworks/quickshell/plato/bin/plato %F
+Terminal=false
+StartupNotify=false
+MimeType=text/plain;text/x-qml;text/x-lua;text/markdown;text/x-sh;text/x-python;text/x-csrc;text/x-c++src;text/x-java;text/csv;text/css;text/x-log;application/json;application/ld+json;application/x-toml;application/x-yaml;application/x-shellscript;application/javascript;application/xml;application/x-perl;inode/x-empty;

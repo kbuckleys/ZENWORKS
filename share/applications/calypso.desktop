@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Calypso
+GenericName=Password Manager
+Comment=Your Bitwarden, 1Password, Proton Pass, KeePassXC and pass vaults, in ZENWORKS
+Icon=dialog-password
+Categories=Utility;Security;
+Keywords=password;passwords;vault;login;totp;2fa;otp;bitwarden;vaultwarden;1password;proton;keepass;keepassxc;pass;gopass;
+Exec=/usr/share/zenworks/quickshell/calypso/bin/calypso
+Terminal=false
+StartupNotify=false
