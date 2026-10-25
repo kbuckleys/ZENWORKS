@@ -629,13 +629,16 @@ Singleton {
 
   // ── first run ────────────────────────────────────────────────────────
   // No picasso.json at all means nothing was ever chosen: a fresh install.
-  // The Zenworks background (picasso/zenworks.png, the logo's Z tiled) is
-  // copied into a Zenworks directory of the backgrounds directory, where it
-  // is a picture like any other to keep or delete, and set everywhere. Set only once the copy has
-  // landed, or the daemon would load a file that is not there yet; setAll
-  // writes picasso.json, so this never runs twice. One already there (a
-  // reinstall) is not copied over.
-  readonly property string firstBackground: root.dir + "/Zenworks/zenworks.png"
+  // Zenworks' backgrounds are copied into a Zenworks directory of the
+  // backgrounds directory, where each is a picture like any other to keep
+  // or delete: grandeur (picasso/grandeur.jpg, a lit curve on the dark),
+  // set everywhere, and the logo's Z tiled (picasso/zenworks.png), the
+  // first default, kept beside it (user, 2026-10-26). Set only once the
+  // copies have landed, or the daemon would load a file that is not there
+  // yet; setAll writes picasso.json, so this never runs twice. One already
+  // there (a reinstall) is not copied over.
+  readonly property var shippedBackgrounds: ["grandeur.jpg", "zenworks.png"]
+  readonly property string firstBackground: root.dir + "/Zenworks/grandeur.jpg"
   Process {
     id: firstRunProc
     onExited: (code) => {
@@ -659,9 +662,11 @@ Singleton {
     root.slideshow = st.slideshow;
     root.scan();
     if (fresh) {
+      // sh -c '…' FROM TO NAME…: each one, unless it is there already
       firstRunProc.command = ["sh", "-c",
-        'mkdir -p -- "${1%/*}" && { [ -e "$1" ] || cp -- "$0" "$1"; }',
-        Quickshell.shellDir + "/picasso/zenworks.png", root.firstBackground];
+        'from=$1; to=$2; shift 2; mkdir -p -- "$to" || exit 1;'
+        + ' for n; do [ -e "$to/$n" ] || cp -- "$from/$n" "$to/$n" || exit 1; done',
+        "_", Quickshell.shellDir + "/picasso", root.dir + "/Zenworks"].concat(root.shippedBackgrounds);
       firstRunProc.running = true;
     }
   }

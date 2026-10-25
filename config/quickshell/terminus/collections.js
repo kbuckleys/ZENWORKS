@@ -280,11 +280,6 @@ function escapeRe(s) {
 
 // ── stage two: rg, over what fd found ───────────────────────────────────
 
-function contentRule(rules) {
-  var all = contentRules(rules);
-  return all.length > 0 ? all[0] : null;
-}
-
 // All of them, because rules are ANDed: each is one more rg over what the
 // last one kept. Only the first used to be asked, and the rest were ignored.
 function contentRules(rules) {

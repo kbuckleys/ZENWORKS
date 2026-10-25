@@ -154,8 +154,6 @@ module.exports = {
     t.eq("unsigned", S.sigWords({ state: "none" }).words, "");
     t.eq("copy phase", S.progressLine({ phase: "copy", frac: 0.5, rate: 0, phaseMs: 0 }), "Copying the installer 50%");
     t.eq("all clear", S.blocker(hybrid, [usb], false), "");
-    t.eq("label one", S.writeLabel([usb]), "Write to SanDisk Ultra");
-    t.eq("label many", S.writeLabel([usb, bare]), "Write to 2 drives");
 
     t.eq("erase notice", [S.eraseNotice(1), S.eraseNotice(2)], ["This action will erase the drive", "This action will erase 2 drives"]);
     t.eq("bad sums warned", S.writeWarning(hybrid, true), "The checksum does not match — the download may be damaged");

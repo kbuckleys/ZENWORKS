@@ -1775,7 +1775,7 @@ FloatingWindow {
     if (want.length === 0) return;
     win.run(Tags.writeSidecarsArgv(want.map((e) => ({
       path: e.path, names: e.names,
-      rating: Tags.sidecarRating(e.names.indexOf(V.FAVOURITE) >= 0, (win.sideInfo[e.path] || {}).rating || 0)
+      rating: Tags.sidecarRating(e.names.indexOf(V.FAVORITE) >= 0, (win.sideInfo[e.path] || {}).rating || 0)
     })), win.sidecars), (code) => { if (code !== 0) win.say("The tags are saved, but an .xmp beside them could not be written"); });
   }
 
@@ -1794,11 +1794,11 @@ FloatingWindow {
       if (said) win.say(said);
     });
   }
-  function starred(p) { return V.hasAllTags(win.tags[p], [V.FAVOURITE]) && !!p; }
+  function starred(p) { return V.hasAllTags(win.tags[p], [V.FAVORITE]) && !!p; }
   function toggleStar(p) {
     const ps = win.targets(p);
     if (ps.length === 0) return;
-    const t = Tags.toggleAcross(win.tags, ps, V.FAVOURITE);
+    const t = Tags.toggleAcross(win.tags, ps, V.FAVORITE);
     win.writeTags(t.pairs, (t.added ? "\u2605 " : "unstarred ") + win.some(ps));
   }
   function editTags(p) {
@@ -4735,7 +4735,7 @@ FloatingWindow {
             visible: cell.tagged.length > 0 && pic.visible
             Text {
               anchors.verticalCenter: parent.verticalCenter
-              visible: cell.tagged.indexOf(V.FAVOURITE) >= 0
+              visible: cell.tagged.indexOf(V.FAVORITE) >= 0
               text: "\uf005"
               color: Zenon.sand
               style: Text.Outline
@@ -5927,7 +5927,7 @@ FloatingWindow {
             ];
             if (win.isVid && win.vid) out.push({ k: "Length", v: V.clock(win.vid.duration) });
             const tg = win.tags[win.path] || [];
-            if (tg.length > 0) out.push({ k: "Tags", v: tg.map((t) => t === V.FAVOURITE ? "\u2605" : t).join(", ") });
+            if (tg.length > 0) out.push({ k: "Tags", v: tg.map((t) => t === V.FAVORITE ? "\u2605" : t).join(", ") });
             const more = win.exif.slice();
             // where it was taken: a link to the map — and a word that a copy
             // sent on would say so too
@@ -6381,7 +6381,7 @@ FloatingWindow {
       ];
 
     case "gallery": {
-      const starOnly = V.splitFilter(win.filterText).tags.indexOf(V.FAVOURITE) >= 0;
+      const starOnly = V.splitFilter(win.filterText).tags.indexOf(V.FAVORITE) >= 0;
       return (win.dupes ? [
         { text: "Mark all but the best of each", icon: "\uf00c", act: "markDupes" },
         { text: "Stop showing alike pictures", icon: "\uf00d", act: "dupes", hint: "esc" },
@@ -6530,8 +6530,8 @@ FloatingWindow {
     case "pasteLook": win.pasteLook(); break;
     case "filter": win.openFilter(); break;
     case "starredOnly": {
-      const on = V.splitFilter(win.filterText).tags.indexOf(V.FAVOURITE) >= 0;
-      win.setFilter(on ? win.filterText.split(/\s+/).filter((w) => V.splitFilter(w).tags.indexOf(V.FAVOURITE) < 0).join(" ")
+      const on = V.splitFilter(win.filterText).tags.indexOf(V.FAVORITE) >= 0;
+      win.setFilter(on ? win.filterText.split(/\s+/).filter((w) => V.splitFilter(w).tags.indexOf(V.FAVORITE) < 0).join(" ")
                        : (win.filterText + " \u2605").trim());
       break;
     }
@@ -6627,7 +6627,7 @@ FloatingWindow {
     function inkFor(r) { return Terminus.inkOf(r); }
     readonly property var tagMarks: win.tags
     function tagInk(name) {
-      const k = name === V.FAVOURITE ? "yellow" : Tags.presetInk(name);
+      const k = name === V.FAVORITE ? "yellow" : Tags.presetInk(name);
       return (k !== "" && Zenon[k]) ? Zenon[k] : Zenon.cyan;
     }
     // the gallery's own thumbnails: a picture shows itself, a video its frame

@@ -200,7 +200,12 @@ function writeManyCommand(pairs) {
 // five reads as the favorite, and a picture starred here is rated five.
 // Kept alongside the attribute, never instead of it: the attribute is what
 // terminus' tag pages index.
-var FAVOURITE = "favourite";
+var FAVORITE = "favorite";
+// the star's name up to 0.0.8, in British spelling: a file tagged so before
+// still reads as starred, and is written back as "favorite" the next time
+// its tags are
+var FAVORITE_WAS = "favourite";
+function renamed(t) { return t === FAVORITE_WAS ? FAVORITE : t; }
 
 // The sidecar of `path`: one of `present` (a { sidecar path: true } of
 // those that exist) when there is one, else the name a new one gets.
@@ -238,7 +243,7 @@ function parseSidecars(json, pictures) {
     var subj = e.Subject === undefined ? [] : (Array.isArray(e.Subject) ? e.Subject : [e.Subject]);
     var names = subj.map(function (t) { return String(t); });
     var rating = Number(e.Rating) || 0;
-    if (rating >= 5) names.push(FAVOURITE);
+    if (rating >= 5) names.push(FAVORITE);
     out[pic] = { names: normalise(names), rating: rating };
   }
   return out;
@@ -260,7 +265,7 @@ function writeSidecarsArgv(pairs, present) {
   var args = [];
   for (var i = 0; i < (pairs || []).length; ++i) {
     var e = pairs[i];
-    var words = (e.names || []).filter(function (t) { return t !== FAVOURITE; });
+    var words = (e.names || []).filter(function (t) { return t !== FAVORITE; });
     args.push(sidecarFor(e.path, present), e.rating === undefined ? "-" : String(e.rating), String(words.length));
     for (var j = 0; j < words.length; ++j) args.push(String(words[j]).replace(/[\r\n]/g, " "));
   }
@@ -286,7 +291,7 @@ function writeSidecarsArgv(pairs, present) {
 // comma leaves are dropped rather than becoming a tag with no name.
 function splitTags(s) {
   return String(s || "").split(",")
-    .map(function (t) { return t.trim(); })
+    .map(function (t) { return renamed(t.trim()); })
     .filter(function (t) { return t !== ""; });
 }
 
@@ -301,7 +306,7 @@ function normalise(names) {
   var out = [];
   var list = names || [];
   for (var i = 0; i < list.length; ++i) {
-    var t = String(list[i]).replace(/,/g, " ").trim();
+    var t = renamed(String(list[i]).replace(/,/g, " ").trim());
     if (t === "" || seen[t]) continue;
     seen[t] = true;
     out.push(t);

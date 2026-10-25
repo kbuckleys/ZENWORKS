@@ -404,6 +404,9 @@ module.exports = {
     t.eq("with every reason", deps.missing[1].why.length, 2);
     t.ok("paru and cargo flagged", deps.paru && deps.cargo);
     t.eq("nothing missing", C.readDeps("").missing.length, 0);
+    t.eq("the Store's own needs are marked as the Store's",
+      C.readDeps("/usr/share/swcatalog/xml\ncheckupdates\n").missing.map((m) => m.pkg + ":" + m.store),
+      ["pacman-contrib:false", "archlinux-appstream-data:true"]);
     t.has("deps command asks for each", C.depsCommand(), "command -v 'inotifywait'");
     const st = C.setupSteps(deps, "paru-git", "/home/test/.cache/ceres/build");
     t.eq("repo packages first, with the build tools and rust",

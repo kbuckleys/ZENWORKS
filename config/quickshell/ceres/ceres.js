@@ -1302,6 +1302,8 @@ function isUpgrade(steps) {
 //
 // A `file` in place of a `bin` is data rather than a program, there or not:
 // the Store's app catalog is a directory archlinux-appstream-data fills.
+// `store`: only the Store wants it — said in the Store's own tab when it is
+// missing, not as Setup in Updates (user, 2026-10-25).
 const DEPS = [
   { bin: "paru",              pkg: "paru",              aur: true, why: "installs and updates packages, the AUR included" },
   { bin: "checkupdates",      pkg: "pacman-contrib",    why: "checks for updates without root" },
@@ -1316,9 +1318,9 @@ const DEPS = [
   { bin: "xdg-open",          pkg: "xdg-utils",         why: "opening links" },
   { bin: "xdg-terminal-exec", pkg: "xdg-terminal-exec", why: "anything that needs a terminal" },
   { bin: "notify-send",       pkg: "libnotify",         why: "update toasts" },
-  { file: "/usr/share/swcatalog/xml", pkg: "archlinux-appstream-data",
+  { file: "/usr/share/swcatalog/xml", pkg: "archlinux-appstream-data", store: true,
     why: "the Store: icons, descriptions and screenshots of Arch's apps" },
-  { file: "/usr/lib/qt6/plugins/imageformats/kimg_jxl.so", pkg: "kimageformats",
+  { file: "/usr/lib/qt6/plugins/imageformats/kimg_jxl.so", pkg: "kimageformats", store: true,
     why: "the Store's app icons, which Arch ships as JPEG XL" }
 ];
 function depKey(d) { return d.bin || d.file; }
@@ -1338,7 +1340,7 @@ function depsCommand() {
     + "; p=$(command -v paru) && pacman -Qqo \"$p\" 2>/dev/null | sed 's/^/=/'; true";
 }
 
-// → { missing: [{ pkg, aur, why: [..] }], paru: bool, cargo: bool, paruPkg,
+// → { missing: [{ pkg, aur, store, why: [..] }], paru: bool, cargo: bool, paruPkg,
 //     flatpak } — flatpak is whether it is HERE, unlike paru and cargo;
 // one row per PACKAGE, however many of its programs are missing; paruPkg is
 // the package paru came from, "" when there is none or pacman does not own it.
@@ -1353,7 +1355,9 @@ function readDeps(text) {
   const byPkg = {}, order = [];
   for (const d of DEPS) {
     if (!gone[depKey(d)]) continue;
-    if (!byPkg[d.pkg]) { byPkg[d.pkg] = { pkg: d.pkg, aur: !!d.aur, why: [] }; order.push(d.pkg); }
+    if (!byPkg[d.pkg]) { byPkg[d.pkg] = { pkg: d.pkg, aur: !!d.aur, store: !!d.store, why: [] }; order.push(d.pkg); }
+    // a package anything else wants too is not the Store's alone
+    if (!d.store) byPkg[d.pkg].store = false;
     byPkg[d.pkg].why.push(d.why);
   }
   return { missing: order.map(p => byPkg[p]), paru: !!gone["paru"], cargo: !!gone["cargo"],

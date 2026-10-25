@@ -184,12 +184,7 @@ module.exports = {
 
     // ── stage two ─────────────────────────────────────────────────────────
     const content = [{ kind: "content", op: "text", value: "hello" }];
-    t.eq("a content rule is found", T.contentRule(content).value, "hello");
-    t.eq("an empty one is not a rule",
-      T.contentRule([{ kind: "content", op: "text", value: "  " }]), null);
-    t.eq("and neither is no rule at all", T.contentRule([]), null);
-
-    const rg = T.rgStage(content[0]);
+    const rg =T.rgStage(content[0]);
     t.ok("text is a fixed string, not a pattern",
       rg.indexOf("--fixed-strings") >= 0);
     t.ok("matches is not", T.rgStage({ op: "matches", value: "a.b" })

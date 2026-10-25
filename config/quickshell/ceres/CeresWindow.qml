@@ -4108,7 +4108,7 @@ FloatingWindow {
     case "news": return [["return", "continue"], ["esc", "back"]];
     case "setup": return (Ceres.deps.paru ? [["\u2190 \u2192", "paru or paru-git"]] : [])
       .concat(Ceres.flatpakAsk ? [["space", "Flatpak apps"]] : [])
-      .concat([["return", Ceres.deps.missing.length || setupView.flatpak ? "install" : "done"],
+      .concat([["return", Ceres.setupMissing.length || setupView.flatpak ? "install" : "done"],
                ].concat(Ceres.deps.paru ? [] : [["esc", "not now"]]));
     case "tx":
       if (Ceres.txBusy) return [["shift esc", "cancel"]];
@@ -4181,7 +4181,7 @@ FloatingWindow {
     DialogButton {
       visible: win.face === "setup"
       // only the Flatpak question left, answered no: nothing to install
-      label: Ceres.deps.missing.length || setupView.flatpak ? "Install" : "Done"
+      label: Ceres.setupMissing.length || setupView.flatpak ? "Install" : "Done"
       ink: Zenon.cyan
       primary: true
       onClicked: Ceres.setup(setupView.choice, setupView.flatpak)

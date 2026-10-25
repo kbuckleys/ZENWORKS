@@ -57,6 +57,12 @@ const DEFAULTS = {
 module.exports = {
   module: "oracle/oracle.js",
   cases: (T, t) => {
+    t.eq("version: installed", T.versionText("pkg 0.0.7-2\n"), "0.0.7-2");
+    t.eq("version: working copy on the tag", T.versionText("git 0.0.7-0-g528ee7b"), "0.0.7 (working copy)");
+    t.eq("version: working copy past it", T.versionText("git 0.0.7-3-g1a2b3c4-dirty"), "0.0.7 + 3 commits, changed (working copy)");
+    t.eq("version: one commit, clean", T.versionText("git 0.0.7-1-gabc"), "0.0.7 + 1 commit (working copy)");
+    t.eq("version: on the tag with edits", T.versionText("git 0.0.7-0-gabc-dirty"), "0.0.7 + changes (working copy)");
+    t.eq("version: nothing to say", [T.versionText(""), T.versionText("git abc")], ["", ""]);
     // ── coerce: what a value must BE before it is stored ────────────────
     // The file is hand-editable, so every one of these is a real thing that
     // can arrive at this function.

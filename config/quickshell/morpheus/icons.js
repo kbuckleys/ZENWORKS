@@ -123,7 +123,7 @@ const DIRS = {
   "db": "", "desktop": "", "dev": "",
   "development": "", "discord": "", "dist": "",
   "django": "", "doc": "", "docs": "",
-  "documents": "", "downloads": "󰃘", "dropbox": "",
+  "documents": "\uEAAC", "downloads": "󰃘", "dropbox": "",
   "electron": "󱀤", "elixir": "", "etc": "",
   "extensions": "", "fast": "", "fish": "",
   "flatpak": "", "flask": "", "fonts": "", "foot": "󰽒",

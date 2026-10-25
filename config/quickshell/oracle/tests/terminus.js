@@ -241,35 +241,6 @@ module.exports = {
     t.eq("mixed bits read ?", T.modeStringMixed(0o644, 0o022), "rw-r?-r?-");
     t.eq("mixed octal digits read ?", T.octalMixed(0o644, 0o002), "64?");
 
-    // ── THE RESTORED BRANCHES, SIEVED ─────────────────────────────────────
-    // A list of open branches off disk is a list of guesses. It is capped,
-    // so ghosts evict the living, and a ghost under the restored directory
-    // is handed to inotifywait, which exits on it and takes the watch down.
-    const sieve = T.livingDirsCommand([["/a b", "/c"], ["/d"]]);
-    t.has("each path is quoted", sieve, "'/a b'");
-    t.has("it asks about the paths themselves", sieve, "-maxdepth 0 -type d");
-    t.has("NUL separated, because a path may hold anything else",
-      sieve, "-print0");
-    // find exits nonzero for having been ASKED about a path that is gone,
-    // which is the ordinary case here and not a failure.
-    t.has("a missing path is not an error", sieve, "|| true");
-    t.eq("the two lists are kept apart",
-      sieve.split("printf '\\036'").length, 2);
-    // find with no paths is an error rather than an empty answer.
-    t.has("an empty list asks nothing", T.livingDirsCommand([[], ["/d"]]), "true;");
-    t.ok("and does not invoke find for it",
-      T.livingDirsCommand([[], []]).indexOf("find") < 0);
-
-    t.eq("the survivors come back per list",
-      T.parseLivingDirs("/a\u0000/b\u0000\u001e/c\u0000", 2),
-      [["/a", "/b"], ["/c"]]);
-    t.eq("an empty half is an empty list",
-      T.parseLivingDirs("\u001e/c\u0000", 2), [[], ["/c"]]);
-    t.eq("nothing at all is two empty lists",
-      T.parseLivingDirs("", 2), [[], []]);
-    t.eq("and a missing half does not become undefined",
-      T.parseLivingDirs("/a\u0000", 2), [["/a"], []]);
-
     // ── WHAT QT CANNOT OPEN ───────────────────────────────────────────────
     // Every one of these is an image by every other measure — the glyph, the
     // color, the sort — and none of them can be handed to an Image element.
@@ -361,21 +332,6 @@ module.exports = {
     t.eq("du's two columns are read", sizes["/d/a"], 4096);
     t.eq("both rows are read", sizes["/d/b"], 8192);
     t.eq("junk is ignored", Object.keys(T.parseDirSizes("nonsense\n")).length, 0);
-
-    // ── completion ────────────────────────────────────────────────────────
-    const HOME = "/home/test";
-    t.eq("a tilde expands", T.expandPath("~/x", HOME, "/cwd"), HOME + "/x");
-    t.eq("a bare tilde is home", T.expandPath("~", HOME, "/cwd"), HOME);
-    t.eq("an absolute path is left alone", T.expandPath("/a/b", HOME, "/cwd"), "/a/b");
-    t.eq("a relative path hangs off the cwd",
-      T.expandPath("b", HOME, "/a"), "/a/b");
-    t.eq("doubled slashes collapse", T.expandPath("/a//b", HOME, "/"), "/a/b");
-    t.eq("a trailing slash is dropped", T.expandPath("/a/b/", HOME, "/"), "/a/b");
-    t.eq("the root keeps its one slash", T.expandPath("/", HOME, "/"), "/");
-    t.eq("the common prefix of one is itself", T.commonPrefix(["abc"]), "abc");
-    t.eq("the common prefix of several", T.commonPrefix(["abcd", "abce"]), "abc");
-    t.eq("no common prefix", T.commonPrefix(["ab", "cd"]), "");
-    t.eq("nothing to complete", T.commonPrefix([]), "");
 
     // ── WHAT `p` PASTES: whatever was copied last, anywhere ──────────────
     t.ok("the same files in another order are the same", T.samePaths(["/a", "/b"], ["/b", "/a"]));
@@ -852,15 +808,15 @@ module.exports = {
     // Find and replace, which is what the editor was really being borrowed
     // for. PLAIN TEXT: a filename is full of characters a regex would eat.
     t.eq("every occurrence goes",
-      T.bulkReplace(["a-b-c"], "-", "_")[0], "a_b_c");
+      T.bulkReplaceIn(["a-b-c"], "-", "_", false, false)[0], "a_b_c");
     t.eq("a dot is a dot and not any character",
-      T.bulkReplace(["axb.jpeg"], ".jpeg", ".jpg")[0], "axb.jpg");
+      T.bulkReplaceIn(["axb.jpeg"], ".jpeg", ".jpg", false, false)[0], "axb.jpg");
     t.eq("brackets are not a character class",
-      T.bulkReplace(["shot (1).png"], " (1)", "")[0], "shot.png");
+      T.bulkReplaceIn(["shot (1).png"], " (1)", "", false, false)[0], "shot.png");
     t.eq("an empty needle changes nothing",
-      T.bulkReplace(["a.txt"], "", "x")[0], "a.txt");
+      T.bulkReplaceIn(["a.txt"], "", "x", false, false)[0], "a.txt");
     t.eq("and replacing with nothing deletes it",
-      T.bulkReplace(["IMG_0001.jpg"], "IMG_", "")[0], "0001.jpg");
+      T.bulkReplaceIn(["IMG_0001.jpg"], "IMG_", "", false, false)[0], "0001.jpg");
 
     // ── a directory's facts, for quick look ─────────────────────────────────
     // The shape the command prints: stat's owner, du's total, two wc counts,
@@ -1080,7 +1036,6 @@ module.exports = {
         { tool: "ntfsfix", check: true, repair: true });
       t.eq("and not without it", T.repairCan("vfat", have), null);
       t.eq("btrfs is checked, never repaired", T.repairCan("btrfs", { btrfs: true }).repair, false);
-      t.eq("formats follow the installed mkfs", T.formatsAvailable(have).map((f) => f.fs), ["ntfs", "ext4"]);
       t.eq("FAT labels are short capitals", T.cleanLabel("vfat", "my stick: photos"), "MY STICK PH");
       t.eq("ext4 args", T.mkfsArgs({ fs: "ext4", label: "data", block: 4096, reserved: 0 }),
         ["-F", "-L", "data", "-b", "4096", "-m", "0"]);

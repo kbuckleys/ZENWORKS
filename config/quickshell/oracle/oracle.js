@@ -1350,6 +1350,25 @@ function terminalEntry(cmd, apps) {
   return "";
 }
 
+// ZENWORKS' VERSION, as About says it (user, 2026-10-25): the reader
+// (Oracle's versionProc) prints "pkg <pacman's version>" for the installed
+// one, or "git <git describe --tags --long --dirty>" for a working copy.
+//   pkg 0.0.7-2                  → "0.0.7-2"
+//   git 0.0.7-0-g528ee7b         → "0.0.7 (working copy)"
+//   git 0.0.7-3-g1a2b3c4-dirty   → "0.0.7 + 3 commits, changed (working copy)"
+// "" when nothing could be said.
+function versionText(out) {
+  var s = String(out || "").trim();
+  var m = /^pkg\s+(\S+)$/.exec(s);
+  if (m) return m[1];
+  m = /^git\s+(.+?)-(\d+)-g[0-9a-f]+(-dirty)?$/.exec(s);
+  if (!m) return "";
+  var n = Number(m[2]), more = [];
+  if (n > 0) more.push(n + (n === 1 ? " commit" : " commits"));
+  var tail = (more.length ? " + " + more.join("") : "") + (m[3] ? (more.length ? ", changed" : " + changes") : "");
+  return m[1] + tail + " (working copy)";
+}
+
 // What a machine with no defaults.lua starts with: kitty, which Zenworks
 // installs, and failing that the first terminal there is.
 function terminalFallback(apps) {
@@ -1521,7 +1540,6 @@ const INPUT_GROUPS = [
     help: "Keyboards made by programs: on-screen keyboards, input methods, wtype." },
 ];
 
-const MS_FIELD = { type: "int", unit: "ms" };
 const XY = "two numbers, x then y, such as 1920 1080";
 
 const INPUT_FIELDS = [
@@ -1740,10 +1758,6 @@ const INPUT_FIELDS = [
     label: "Release keys on close", alias: "virtual keyboard release pressed keys close",
     help: "A program's keyboard going away lets go of whatever it was holding down." },
 ];
-
-// the prefixes that are tables of their own under input, longest first so
-// tablettool_ is not read as tablet_
-const INPUT_PREFIXES = ["virtualkeyboard", "touchdevice", "tablettool", "touchpad", "tablet"];
 
 function inputGroups() { return INPUT_GROUPS; }
 function inputFields() { return INPUT_FIELDS; }

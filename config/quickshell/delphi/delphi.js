@@ -58,18 +58,6 @@ function sections(st) {
 
 function byPath(a, b) { return a.path < b.path ? -1 : a.path > b.path ? 1 : 0; }
 
-// One flat list for the ListView: a head row per section, then its files.
-// The flat index is what the cursor moves over; heads are skipped by it.
-function flatten(secs) {
-  var out = [];
-  for (var i = 0; i < secs.length; i++) {
-    var s = secs[i];
-    out.push({ head: true, id: s.id, title: s.title, count: s.rows.length });
-    for (var j = 0; j < s.rows.length; j++) out.push(s.rows[j]);
-  }
-  return out;
-}
-
 // Where the cursor should be after the list changed under it: the same file
 // in the same section if it is still there; else — it was just staged, or
 // discarded — the row now at the same place in that section, because that

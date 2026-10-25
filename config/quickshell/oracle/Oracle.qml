@@ -1838,6 +1838,21 @@ Singleton {
   // the first start's cheat sheet (ZshSetup, which keeps welcome.json),
   // and whether the sheet is up (KeysSheet says) — the terminal question
   // waits for it to close
+  // ── ZENWORKS' VERSION, for About (user, 2026-10-25) ───────────────────
+  // The installed package's (pacman), or a working copy's git description
+  // when this shell runs from one — Ora.versionText says it. Read once, at
+  // start: a version changes only with a new start.
+  property string zenworksVersion: ""
+  Process {
+    id: versionProc
+    running: true
+    command: ["sh", "-c",
+      "case $1 in /usr/share/zenworks/*) printf 'pkg %s\\n' \"$(pacman -Q zenworks 2>/dev/null | cut -d' ' -f2)\" ;;"
+      + " *) printf 'git %s\\n' \"$(git -C \"$1\" describe --tags --long --dirty 2>/dev/null)\" ;; esac",
+      "_", Quickshell.shellDir]
+    stdout: StdioCollector { onStreamFinished: root.zenworksVersion = Ora.versionText(this.text) }
+  }
+
   signal keysSheetAsked()
   property bool keysSheetOpen: false
   // then its second card, Make it yours (WelcomeLook), the same way

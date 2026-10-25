@@ -4,7 +4,11 @@
 // https://github.com/kbuckleys/
 
 .pragma library
+.import qs.morpheus as Morpheus
 // ONE COPY FOR THE WHOLE SHELL (see morpheus/icons.js).
+// The shell's singletons come in through the import above (the same
+// instances); the node tests hand in stubs of their own.
+var Strings = typeof Morpheus !== "undefined" ? Morpheus.Strings : globalThis.Strings;
 //
 // MINERVA'S PURE HALF: the library (what you have opened, where you were in
 // it, your bookmarks and highlights), how far through a book you are, the
@@ -340,12 +344,9 @@ function openedWords(ms, now) {
 }
 
 // ── SEARCH ───────────────────────────────────────────────────────────────
-function escapeHtml(s) {
-  return String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-}
 // a hit's snippet with its words lit
 function litSnippet(snippet, words, ink) {
-  var s = escapeHtml(snippet), q = escapeHtml(String(words || "").trim());
+  var s = Strings.escapeHtml(snippet), q = Strings.escapeHtml(String(words || "").trim());
   if (!q) return s;
   var low = s.toLowerCase(), ql = q.toLowerCase(), out = "", i = 0, at;
   while ((at = low.indexOf(ql, i)) >= 0) {

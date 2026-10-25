@@ -21,7 +21,6 @@ const KINDS = {
   nfs:  { words: "NFS", pkgs: ["gvfs", "gvfs-nfs"] },
   afp:  { words: "Apple share", pkgs: ["gvfs", "gvfs-afp"] }
 };
-function schemes() { return Object.keys(KINDS); }
 
 // What was typed, as an address gvfs takes, or "" for nothing usable:
 //   smb://nas/share, sftp://me@host/path   as they are

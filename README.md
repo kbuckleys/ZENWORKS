@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="zenworks.png" alt="ZENWORKS" width="800">
+  <img src="zenworks.png" alt="Zenworks" width="800">
 </p>
 
 <h3><p align="center">
@@ -8,12 +8,12 @@ A zen Arch-based ecosystem in Quickshell
 
 ---
 
-ZENWORKS is a desktop environment for Arch Linux, built on
+Zenworks is a desktop environment for Arch Linux, built on
 [Quickshell](https://quickshell.org) and [Hyprland](https://hyprland.org).
 
 ## Install
 
-ZENWORKS is on the AUR. With an AUR helper:
+Zenworks is on the AUR. With an AUR helper:
 
 ```sh
 paru -S zenworks
@@ -29,14 +29,14 @@ On NVIDIA, also install your driver (`nvidia-open` or `nvidia`, with
 
 ## Start
 
-Log out and pick **ZENWORKS** on your login screen, or run `zen` from a
+Log out and pick **Zenworks** on your login screen, or run `zen` from a
 text console. (`zenworks`, its older name, still works.)
 
 A login screen set up to run one fixed command (greetd with
 `--cmd start-hyprland`, for instance) needs that command changed to `zen`.
 
 The very first start opens the shortcuts cheat sheet; **Super + /** brings
-it back any time, and typing filters it. A moment later ZENWORKS asks
+it back any time, and typing filters it. A moment later Zenworks asks
 whether you want its terminal setup: zsh with a fast prompt, suggestions
 and fuzzy completion. Your own setup is kept as a backup. Oracle › Default
 apps › Terminal setup offers it again later.
@@ -70,7 +70,7 @@ next start is a first start again.
 
 ## Update
 
-ZENWORKS updates like any other package: Ceres' Updates lists a new version
+Zenworks updates like any other package: Ceres' Updates lists a new version
 beside the rest (Oracle › About › Check for updates opens it), or run
 `paru -Syu`.
 
@@ -83,14 +83,14 @@ sudo pacman -Rns zenworks
 Your settings stay in `~/.config/zenworks`; delete that directory too for a
 clean slate.
 
-## Working on ZENWORKS
+## Working on Zenworks
 
-To run a working copy instead of the installed ZENWORKS, put the path of
+To run a working copy instead of the installed Zenworks, put the path of
 its `config` directory in `~/.config/zenworks/dev`, one line:
 
 ```sh
 mkdir -p ~/.config/zenworks
-echo ~/Projects/ZENWORKS/config > ~/.config/zenworks/dev
+echo ~/Projects/Zenworks/config > ~/.config/zenworks/dev
 zen --where
 ```
 
@@ -99,7 +99,7 @@ file to go back to the installed one.
 
 ## Credits
 
-ZENWORKS stands on [Quickshell](https://quickshell.org) and
+Zenworks stands on [Quickshell](https://quickshell.org) and
 [Hyprland](https://hyprland.org), and on Qt, PipeWire and the many tools it
 brings along.
 

@@ -1439,19 +1439,6 @@ function blocksOfMarkdown(text) {
   out.forEach(function (b) { delete b._br; if (b.k !== "mono" && b.k !== "table" && b.k !== "rule") b.h = inline(b.h); });
   return out;
 }
-// What blocksOfMarkdown would lose of a Markdown text, said in words ("" when
-// it keeps it all): an editor of blocks over it (Delphi's release notes in
-// rich text) would write it back without them.
-function markdownLoses(text) {
-  var s = String(text || "");
-  var out = [];
-  if (/!\[[^\]]*\]\([^)]*\)/.test(s)) out.push("pictures");
-  if (/<\/?[a-zA-Z][^>]*>|<!--/.test(s)) out.push("HTML");
-  if (/^#{4,6}\s/m.test(s)) out.push("small headings");
-  if (/^\s*>\s*>/m.test(s)) out.push("quotes in quotes");
-  if (/\[\^[^\]]+\]/.test(s)) out.push("footnotes");
-  return out.join(", ");
-}
 function fillTemplate(blocks, ms) {
   var d = new Date(ms);
   var words = { date: dateLong(ms), weekday: DAYS[d.getDay()], time: clock(ms), day: String(d.getDate()),
@@ -1656,14 +1643,6 @@ function tasks(notes, now) {
       || (a.due && b.due ? a.due - b.due : 0) || (b.modified - a.modified) || (a.at - b.at);
   });
   return out;
-}
-// the open tasks due on a day ("2026-10-22", as chronos keys its days)
-function tasksOn(notes, iso, now) {
-  return tasks(notes, now).filter(function (t) {
-    if (!t.due) return false;
-    var d = new Date(t.due);
-    return d.getFullYear() + "-" + two(d.getMonth() + 1) + "-" + two(d.getDate()) === iso;
-  });
 }
 // the note's blocks with item `at` ticked — only if it is still that item
 // (the note may have changed since the list was drawn): else null

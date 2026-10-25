@@ -125,7 +125,9 @@ PanelWindow {
       const app = sw.appOf(Hyprland.activeToplevel);
       const here = Hyprland.toplevels.values.filter((t) => t.wayland && (!oneApp || sw.appOf(t) === app));
       if (here.length === 0) return;
-      sw.mru = sw.mru.filter((a) => here.some((t) => t.address === a));
+      // closed windows out of the order — pruned against every window, not
+      // `here`: one app's card would otherwise forget the others' order
+      sw.mru = sw.mru.filter((a) => Hyprland.toplevels.values.some((t) => t.address === a));
       sw.windows = S.ordered(here.map((t) => ({ address: t.address, win: t })), sw.mru);
       sw.at = S.firstStop(dir, sw.windows.length);
       sw.lastPoint = null;

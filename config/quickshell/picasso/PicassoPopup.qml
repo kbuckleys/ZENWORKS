@@ -292,6 +292,12 @@ LayerPopup {
   Connections {
     target: Picasso
     function onColorPicked(into, hex) { if (into === "popup:maker") popup.pickHex = hex; }
+    // another backgrounds directory, or this level gone from it (moved,
+    // deleted, rescanned): back to the top, never an empty level
+    function onDirChanged() { popup.sub = ""; popup.sel = 0; }
+    function onFilesChanged() {
+      if (popup.sub !== "" && popup.filtered.length === 0) { popup.sub = ""; popup.sel = 0; }
+    }
   }
 
   // A clear that arrived mid-gesture was SWALLOWED, and a swallowed grab is

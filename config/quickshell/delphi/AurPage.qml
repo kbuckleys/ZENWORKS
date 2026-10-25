@@ -78,7 +78,8 @@ Item {
     pg.win.act("aurBuild", {}, { label: "The build", network: true,
       then: (res) => {
         pg.built = res;
-        pg.win.say(res.notes.length === 0 ? "Built, and namcap has nothing to say" : "Built — namcap has " + res.notes.length + " to read");
+        pg.win.say(!res.namcap ? "Built — namcap is not installed, so nothing was checked"
+          : res.notes.length === 0 ? "Built, and namcap has nothing to say" : "Built — namcap has " + res.notes.length + " to read");
       } });
   }
 

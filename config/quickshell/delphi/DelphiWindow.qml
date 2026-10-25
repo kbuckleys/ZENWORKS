@@ -1133,7 +1133,7 @@ FloatingWindow {
         anchors.topMargin: 4
         anchors.left: parent.left
         anchors.right: parent.right
-        anchors.bottom: whoLine.visible ? whoLine.top : parent.bottom
+        anchors.bottom: needBox.visible ? needBox.top : whoLine.visible ? whoLine.top : parent.bottom
         anchors.bottomMargin: 8
         contentWidth: width
         contentHeight: sideBody.height
@@ -1248,7 +1248,11 @@ FloatingWindow {
         }
       }
 
-      // what is missing, and its Install — see `needs`
+
+        }
+      }
+      // what is missing, and its Install — see `needs`; pinned above who
+      // commits, outside the pages' scroll (it anchors to whoLine)
       Rectangle {
         id: needBox
         anchors.left: parent.left
@@ -1297,9 +1301,6 @@ FloatingWindow {
               }
             }
           }
-        }
-      }
-
         }
       }
       ElasticScroll { anchors.fill: sideFlick; view: sideFlick }

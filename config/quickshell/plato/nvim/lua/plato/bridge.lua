@@ -759,10 +759,11 @@ local function attachUi()
       send({ event = "msg", kind = a[1], text = chunksText(a[2]),
              replace = a[3] == true, append = a[5] == true,
              msgId = (type(id) == "number" or type(id) == "string") and id or vim.NIL })
-    elseif event == "msg_clear" then
-      send({ event = "msg_clear" })
     end
-    -- nothing else is handled, and nothing here may touch the API
+    -- not msg_clear: nvim sends it whenever its message area clears — the
+    -- next key, the next redraw — and the cards keep their own time
+    -- (editor/Toasts.qml), so a "written" is not gone before it is read.
+    -- Nothing else is handled, and nothing here may touch the API
   end)
 end
 

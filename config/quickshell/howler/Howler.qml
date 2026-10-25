@@ -503,7 +503,9 @@ Singleton {
     if (root.fullscreenOn || root.heldInFullscreen === 0) return;
     const n = root.heldInFullscreen;
     root.heldInFullscreen = 0;
-    Quickshell.execDetached(["notify-send", "--app-name=" + root.selfSummaryApp, "--icon=preferences-system-notifications",
+    // words alone (user, 2026-10-26): the icon it asked for is not in every
+    // icon theme, and a missing one drew as a black and magenta checkerboard
+    Quickshell.execDetached(["notify-send", "--app-name=" + root.selfSummaryApp,
       n === 1 ? "1 notification came in" : n + " notifications came in",
       "While you were full screen. They are in the bell."]);
   }

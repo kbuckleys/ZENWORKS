@@ -7,9 +7,9 @@
 // work, glowing as it starts, breathing while it runs, bursting green when
 // the last lands (red on a fault), with a count once there are two. Lifted
 // out of terminus' path bar (Chrome.qml, 2026-10-13). The holder opens its drawer on
-// `hovered` and puts it away on `emptied`.
+// `hovered`, and keeps it to while there are jobs (Jobs.model.count).
 //
-//     JobsGlyph { onHoveredChanged: … ; onEmptied: … }
+//     JobsGlyph { onHoveredChanged: … }
 //
 // A browser's downloads button, and for the same reason: work that takes
 // time is not the thing you are doing, it is a thing that is happening, and
@@ -28,8 +28,6 @@ Item {
   property int size: Zenon.px(15)
   // the pointer is on it (the holder opens its drawer from that)
   readonly property bool hovered: jobsHov.hovered
-  // the last job gone: the holder puts its drawer away
-  signal emptied()
   readonly property bool live: jobsToggle.jobs.model.count > 0
   // ONE COLOR, READ BY EVERYTHING. The glyph, the count, the glow and
   // the burst all wear it, so "something went wrong" is a single fact
@@ -221,7 +219,6 @@ Item {
       if (jobsToggle.jobs.model.count > 0) return;
       jobsGlowBurst.stop();
       jobsGlowOut.restart();
-      jobsToggle.emptied();
     }
   }
 }

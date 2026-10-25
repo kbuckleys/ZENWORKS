@@ -405,13 +405,6 @@ function blocker(p, drives, busy) {
   return "";
 }
 
-// the button's words: "Write to SanDisk Ultra", "Write to 2 drives"
-function writeLabel(drives) {
-  var n = (drives || []).length;
-  if (n === 0) return "Write";
-  return n === 1 ? "Write to " + driveTitle(drives[0]) : "Write to " + n + " drives";
-}
-
 // the write sheet's question, in a red-ringed box at its foot (user,
 // 2026-10-24: one plain sentence, not a list of what goes)
 function eraseNotice(n) {

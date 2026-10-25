@@ -1564,6 +1564,70 @@ Item {
         }
       }
     }
+
+    // ── WHAT THE STORE NEEDS FIRST (user, 2026-10-25) ────────────────
+    // Said here, in the Store's own tab, with its Install button — not as
+    // Setup in Updates: the packages only the Store wants (Ceres.storeNeeds,
+    // Cer.DEPS `store`), over the content until they are in. Installed,
+    // Ceres looks again and the catalog is read.
+    Rectangle {
+      anchors.fill: parent
+      visible: Ceres.storeNeeds.length > 0
+      color: Zenon.layerBg
+      MouseArea { anchors.fill: parent }
+      Column {
+        anchors.centerIn: parent
+        width: Math.min(parent.width - 80, Zenon.px(15) * 34)
+        spacing: 14
+        Text {
+          anchors.horizontalCenter: parent.horizontalCenter
+          text: "\u{F0D68}"
+          color: Zenon.cyan
+          font.family: Zenon.face
+          font.pixelSize: Zenon.px(40)
+        }
+        Text {
+          width: parent.width
+          horizontalAlignment: Text.AlignHCenter
+          wrapMode: Text.Wrap
+          text: "The Store needs " + Cer.nameList(Ceres.storeNeeds.map((m) => m.pkg), 3) + " first"
+          color: Zenon.ink
+          font.family: Zenon.face
+          font.weight: Font.Bold
+          font.pixelSize: Zenon.px(17)
+        }
+        Repeater {
+          model: Ceres.storeNeeds
+          delegate: Text {
+            required property var modelData
+            width: parent.width
+            horizontalAlignment: Text.AlignHCenter
+            wrapMode: Text.Wrap
+            text: modelData.pkg + " — " + modelData.why.join("; ")
+            color: Zenon.accentMuted
+            font.family: Zenon.face
+            font.weight: Zenon.weight
+            font.pixelSize: Zenon.px(14)
+          }
+        }
+        DialogButton {
+          anchors.horizontalCenter: parent.horizontalCenter
+          label: Ceres.installing ? "Installing…" : "Install"
+          ink: Zenon.cyan
+          primary: true
+          ready: !Ceres.installing && !Ceres.txBusy
+          onClicked: {
+            const pkgs = Ceres.storeNeeds.map((m) => m.pkg);
+            Ceres.install(pkgs, "for the Store", (ok) => {
+              Ceres.checkDeps();
+              if (!ok) return;
+              store.failed = false;
+              store.load();
+            });
+          }
+        }
+      }
+    }
   }
 
   // ── a screenshot, large ────────────────────────────────────────────────

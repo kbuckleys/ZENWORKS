@@ -41,6 +41,9 @@ module.exports = {
       T.splitTags("red,,work,"), ["red", "work"]);
     t.eq("nothing is no tags", T.splitTags(""), []);
     t.eq("and neither is undefined", T.splitTags(undefined), []);
+    // the star's old British name reads as the new one, and is written so
+    t.eq("an old favourite reads as favorite", T.splitTags("favourite,red"), ["favorite", "red"]);
+    t.eq("and both spellings are one tag", T.normalise(["favourite", "favorite"]), ["favorite"]);
 
     // normalize is what makes two files carrying the same set carry the same
     // STRING, which is what lets a plain comparison answer "are these alike".
@@ -229,12 +232,12 @@ module.exports = {
     t.eq("sidecars read, a five is the star", T.parseSidecars(JSON.stringify([
       { SourceFile: "/p/a.jpg.xmp", Subject: "red", Rating: 5 }, { SourceFile: "/p/b.xmp", Subject: ["x", "y"] },
       { SourceFile: "/p/c.jpg.xmp", Subject: "lost" }]), ["/p/a.jpg", "/p/b.png"]),
-      { "/p/a.jpg": { names: ["favourite", "red"], rating: 5 }, "/p/b.png": { names: ["x", "y"], rating: 0 } });
+      { "/p/a.jpg": { names: ["favorite", "red"], rating: 5 }, "/p/b.png": { names: ["x", "y"], rating: 0 } });
     t.eq("starring rates five", T.sidecarRating(true, 2), "5");
     t.eq("unstarring clears a five", T.sidecarRating(false, 5), "");
     t.eq("any other rating is left", T.sidecarRating(false, 3), "-");
     t.eq("the favorite goes as the rating, not a word",
-      T.writeSidecarsArgv([{ path: "/p/a.jpg", names: ["favourite", "red"], rating: "5" }], {}).slice(4),
+      T.writeSidecarsArgv([{ path: "/p/a.jpg", names: ["favorite", "red"], rating: "5" }], {}).slice(4),
       ["/p/a.jpg.xmp", "5", "1", "red"]);
   }
 };

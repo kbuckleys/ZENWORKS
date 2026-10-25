@@ -47,13 +47,15 @@ module.exports = {
     t.eq("conflicts come first when there are any",
       D.sections(Object.assign({}, ST, { conflicts: [{ path: "c", how: "both modified" }] }))[0].id, "conflict");
 
-    const rows = D.flatten(secs);
+    // the flat list ChangesPage's rows are: a head per section, then its files
+    const flat = (ss) => ss.flatMap((s) => [{ head: true, id: s.id, title: s.title, count: s.rows.length }].concat(s.rows));
+    const rows = flat(secs);
     t.eq("heads in the flat list", rows.filter((r) => r.head).map((r) => r.title + r.count),
       ["Changes3", "Staged2"]);
     t.eq("reseat: same file, same area", D.reseat(rows, { path: "z.txt", sec: "unstaged" }, 0), 3);
     // b.txt was staged whole and left the Changes section: the cursor stays
     // in the section it was working through
-    const after = D.flatten(D.sections(Object.assign({}, ST,
+    const after = flat(D.sections(Object.assign({}, ST,
       { unstaged: [{ path: "z.txt", kind: "deleted" }] })));
     t.eq("reseat: gone, stays in its area", after[D.reseat(after, { path: "b.txt", sec: "unstaged" }, 1)].path, "dir/n.md");
     t.eq("reseat: empty", D.reseat([], null, 0), -1);

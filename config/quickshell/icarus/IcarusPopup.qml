@@ -935,7 +935,7 @@ Item {
         label: p.label, path: p.path,
         // Home wears the root menu's Home glyph; the rest, the shared map's
         glyph: p.path === home ? ""
-          : Icons.glyphFor({ name: Icarus.basename(p.path), isDir: true })
+          : Icons.glyphFor({ name: Terminus.basename(p.path), isDir: true })
       }));
   }
 

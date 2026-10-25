@@ -394,7 +394,7 @@ function viewAt(z, fx, fy, w, h, sw, sh) {
 // ── the gallery's filter ──────────────────────────────────────────────────
 // What was typed, split: words starting # are tags the picture must carry
 // ("#★" is the favorite), and the rest is matched against the name.
-const FAVOURITE = "favourite";
+const FAVORITE = "favorite";
 
 // `is:` words narrow by kind instead: is:video, is:picture (or is:image),
 // is:marked, is:directory — the last keeps only the directories.
@@ -411,8 +411,8 @@ function splitFilter(q) {
     if (m && FILTER_KINDS[m[1].toLowerCase()]) { kinds.push(FILTER_KINDS[m[1].toLowerCase()]); continue; }
     if (w.charAt(0) === "#" && w.length > 1) {
       const t = w.slice(1);
-      tags.push(t === "★" || t === "fav" ? FAVOURITE : t);
-    } else if (w === "★") tags.push(FAVOURITE);
+      tags.push(t === "★" || t === "fav" ? FAVORITE : t);
+    } else if (w === "★") tags.push(FAVORITE);
     else words.push(w);
   }
   return { tags: tags, text: words.join(" "), kinds: kinds };

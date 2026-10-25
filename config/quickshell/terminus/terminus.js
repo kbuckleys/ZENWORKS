@@ -1476,11 +1476,6 @@ const FORMATS = [
     note: "Linux only — made for flash", blocks: [0] }
 ];
 
-// The formats whose mkfs is installed, in the order above.
-function formatsAvailable(have) {
-  return FORMATS.filter((f) => !!(have || {})[f.tool]);
-}
-
 function formatOf(fs) {
   for (const f of FORMATS) if (f.fs === fs) return f;
   return null;
@@ -2806,52 +2801,6 @@ function urlFallbackName(url) {
   return n === "" ? "download" : n;
 }
 
-// ── THE OPEN BRANCHES THAT ARE STILL THERE ──────────────────────────────
-// openDirs is deliberately never pruned — walking out of a directory and back
-// in should find it as you left it — and that is right for a session. It is
-// wrong for a list restored from DISK, where every entry is a guess about a
-// directory that may have been deleted months ago. Measured on this machine
-// before it was: 59 of 70 remembered branches pointed at nothing.
-//
-// Two costs, and the second is the sharp one. The list is capped, so ghosts
-// occupy slots and evict branches that do exist, and the feature quietly
-// stops working. And openBranches hands every branch UNDER the current
-// directory to inotifywait, filtered by prefix rather than by existence —
-// inotifywait exits at once on a path that is not there, taking the watch on
-// the directory down with it and leaving a listing that silently stops
-// refreshing. In a session forgetVanished clears those out; a restored list
-// has never been through it.
-//
-// find with -maxdepth 0, which is the one-shot way to ask "which of these
-// exist" — the missing ones go to stderr and the survivors come back in one
-// pass, NUL separated because a path may hold anything but NUL.
-function livingDirsCommand(lists) {
-  const parts = [];
-  for (var i = 0; i < lists.length; ++i) {
-    var l = lists[i] || [];
-    // find with no paths is an error, not an empty answer.
-    if (l.length > 0)
-      parts.push("find "
-        + l.map(function (p) { return Strings.shellQuote(p); }).join(" ")
-        // `|| true`, because find exits nonzero for having been ASKED about a
-        // path that is gone — which is the ordinary case here and not a
-        // failure. The survivors are already on stdout by then.
-        + " -maxdepth 0 -type d -print0 2>/dev/null || true");
-    else parts.push("true");
-  }
-  return parts.join("; printf '\\036'; ");
-}
-
-function parseLivingDirs(text, n) {
-  var out = [];
-  var chunks = String(text || "").split(RECORD);
-  for (var i = 0; i < n; ++i) {
-    var c = chunks[i] === undefined ? "" : chunks[i];
-    out.push(c.split("\u0000").filter(function (p) { return p !== ""; }));
-  }
-  return out;
-}
-
 function conflictCommand(names, destDir) {
   const d = Strings.shellQuote(destDir);
   // ── AND WHETHER IT IS A DIRECTORY ───────────────────────────────────
@@ -3391,7 +3340,10 @@ function mapPart(names, stemOnly, fn) {
   });
 }
 
-// Literal by default and a REGEX when asked. An invalid pattern returns the
+// Literal by default and a REGEX when asked. Literal because these strings
+// are filenames, full of dots and brackets and parentheses — quietly treating
+// "(1)" as a capture group would make the tool a trap. An empty needle
+// changes nothing rather than inserting between every character. An invalid pattern returns the
 // names untouched rather than throwing: the field is being typed into, so it
 // is invalid most of the time it is read.
 function bulkReplaceIn(names, find, repl, useRegex, stemOnly) {
@@ -3545,20 +3497,6 @@ function bulkPairs(oldNames, newNames) {
     if (to !== oldNames[i]) pairs.push([oldNames[i], to]);
   }
   return pairs;
-}
-
-// Find-and-replace across the whole set at once, which is the thing the editor
-// was really being borrowed for.
-//
-// PLAIN TEXT, not a regular expression. These strings are filenames, and
-// filenames are full of dots and brackets and parentheses — quietly treating
-// "(1)" as a capture group would make the tool a trap. An empty needle changes
-// nothing rather than inserting between every character.
-function bulkReplace(names, find, repl) {
-  const f = String(find === undefined ? "" : find);
-  if (f === "") return names.slice();
-  const r = String(repl === undefined ? "" : repl);
-  return names.map((n) => String(n).split(f).join(r));
 }
 
 // Renamed through a temporary name when the new name is one that another file
@@ -4180,51 +4118,6 @@ function parseTextInfo(text) {
 // What `g` then space opens: somewhere to type a destination rather than
 // clicking down to it. Everything here is about turning half-typed text into
 // something the rest of terminus can navigate to.
-
-// `~` and `~/...` mean home, and nothing else does — `~foo` is another user's
-// home on some systems and terminus has no business guessing at that. A relative
-// path is taken against the directory you are standing in, which is what a
-// shell would do and therefore what the fingers expect.
-function expandPath(text, home, cwd) {
-  let t = String(text || "").trim();
-  if (t === "") return "";
-  if (t === "~") return home;
-  if (t.indexOf("~/") === 0) t = home + t.slice(1);
-  if (t.charAt(0) !== "/") t = joinPath(cwd, t);
-  // collapse any // and trailing / so two spellings of one path compare equal
-  t = t.replace(/\/+/g, "/");
-  if (t.length > 1) t = t.replace(/\/+$/, "");
-  return t;
-}
-
-// How far the candidates agree, IN THE FILESYSTEM'S OWN CASE.
-//
-// Matching ignores case, so completing has to hand back the real spelling
-// rather than the one you typed: type "doc" at a directory holding Documents
-// and appending the tail would leave "documents", which is not a path. The
-// caller replaces the whole fragment with this instead of appending to it.
-//
-// Empty when the best candidate does not start with what you typed — a fuzzy
-// hit like "dwn" for Downloads has no prefix to agree on, and spelling one out
-// would suggest something that does not exist. Tab takes the whole candidate
-// in that case; see the path bar.
-// How far every candidate agrees, so Tab can fill in the part that is not yet
-// a choice — the shell behavior: two directories sharing six letters means
-// Tab types those six and stops rather than picking one for you.
-function commonPrefix(names) {
-  if (!names || names.length === 0) return "";
-  if (names.length === 1) return names[0];
-  let pre = names[0];
-  for (let i = 1; i < names.length; ++i) {
-    const n = names[i];
-    let k = 0;
-    while (k < pre.length && k < n.length
-           && pre.charAt(k).toLowerCase() === n.charAt(k).toLowerCase()) k++;
-    pre = pre.slice(0, k);
-    if (pre === "") break;
-  }
-  return pre;
-}
 
 // ── how full a disk is ──────────────────────────────────────────────────
 // lsblk prints sizes as it likes to read them — "907.1M", "32.3G", "1.8T" —

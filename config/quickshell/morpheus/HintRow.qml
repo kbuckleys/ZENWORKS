@@ -90,7 +90,9 @@ Row {
   KeyCap {
     id: more
     anchors.verticalCenter: parent.verticalCenter
-    visible: hints.shown < hints.rows.length
+    // and only where there is room for it: with none at all, the buttons
+    // beside the row have the strip
+    visible: hints.shown < hints.rows.length && (hints.maxWidth < 0 || hints.maxWidth >= implicitWidth)
     fontSize: 13
     label: "?"
     border.color: morePress.pressed || hints.cardOpen ? Zenon.accentKey : Zenon.border

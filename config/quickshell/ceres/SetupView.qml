@@ -35,7 +35,7 @@ Item {
   FontMetrics { id: mfName; font.family: Zenon.face; font.weight: Font.Bold; font.pixelSize: Zenon.px(17) }
   readonly property real nameW: {
     let w = 190;
-    for (const m of Ceres.deps.missing)
+    for (const m of Ceres.setupMissing)
       w = Math.max(w, Math.ceil(mfName.advanceWidth(m.pkg + (m.aur ? "  AUR" : ""))) + 4);
     return w;
   }
@@ -48,7 +48,7 @@ Item {
     spacing: 14
 
     Text {
-      text: Ceres.deps.missing.length ? "Ceres needs a few things first" : "One question for the Store"
+      text: Ceres.setupMissing.length ? "Ceres needs a few things first" : "One question for the Store"
       color: Zenon.white
       font.family: Zenon.face
       font.weight: Font.Bold
@@ -59,7 +59,7 @@ Item {
       width: parent.width
       spacing: 6
       Repeater {
-        model: Ceres.deps.missing
+        model: Ceres.setupMissing
         delegate: Row {
           required property var modelData
           spacing: 12

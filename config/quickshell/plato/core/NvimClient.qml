@@ -48,7 +48,6 @@ Item {
   signal cmdline(var ev)
   signal cmdlinePos(int pos)
   signal message(var ev)
-  signal messagesCleared()
   // a yank or a delete, as screen cells, for the editor to light up (see
   // editing.lua's flashes)
   signal flash(var ev)
@@ -184,7 +183,6 @@ Item {
       case "cmdline": client.cmdline(ev); break;
       case "cmdline_pos": client.cmdlinePos(ev.pos); break;
       case "msg": client.message(ev); break;
-      case "msg_clear": client.messagesCleared(); break;
       case "flash": client.flash(ev); break;
       case "saveAs": client.saveAsWanted(ev.quit === true); break;
       case "minimap": client.minimap(ev); break;

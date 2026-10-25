@@ -32,19 +32,11 @@ import urllib.request
 
 RPC = "https://aur.archlinux.org/rpc/v5/info"
 WEB = "https://aur.archlinux.org/packages/"
-_REMOTE = re.compile(r"^(?:ssh://)?aur@aur\.archlinux\.org[:/](.+?)(?:\.git)?/?$|"
-                     r"^https://aur\.archlinux\.org/(.+?)(?:\.git)?/?$")
 _VERSION = re.compile(r"^[A-Za-z0-9._+]+$")
 
 
 class AurError(Exception):
     pass
-
-
-def package_of(url):
-    """The package a remote URL names, or "" when it is not the AUR's."""
-    m = _REMOTE.match(str(url or "").strip())
-    return (m.group(1) or m.group(2)) if m else ""
 
 
 def _var(text, name):

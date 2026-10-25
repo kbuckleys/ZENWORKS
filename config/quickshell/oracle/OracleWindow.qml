@@ -1857,10 +1857,18 @@ FloatingWindow {
               anchors.left: parent.left
               anchors.right: parent.right
               visible: popup.section === "about" && !popup.searching
-              height: visible ? 132 : 0
+              // as tall as the taller half and a little air (user,
+              // 2026-10-25: a fixed 132 left too much above and below)
+              height: visible ? Math.max(markCol.height, wordsCol.height) + 28 : 0
 
+              // MARK LEFT, WORDS RIGHT (user, 2026-10-25: centered and
+              // stacked, the header read cramped): the mark at the left,
+              // the version, credits and byline right-aligned at the right
               Column {
-                anchors.centerIn: parent
+                id: markCol
+                anchors.left: parent.left
+                anchors.leftMargin: 28
+                anchors.verticalCenter: parent.verticalCenter
                 spacing: 0
 
                 Repeater {
@@ -1886,17 +1894,33 @@ FloatingWindow {
                     lineHeight: 1.0
                   }
                 }
+              }
 
-                // The byline belongs TO the mark, not under it — the gap
-                // was reading as a separator between two unrelated things.
-                Item { width: 1; height: 6 }
+              Column {
+                id: wordsCol
+                anchors.right: parent.right
+                anchors.rightMargin: 28
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: 2
+
+                // which Zenworks this is (Oracle.zenworksVersion): the
+                // package's version, or a working copy's
+                Text {
+                  anchors.right: parent.right
+                  visible: text !== ""
+                  text: Oracle.zenworksVersion
+                  color: popup.headColor
+                  font.family: popup.face
+                  font.weight: Font.Bold
+                  font.pixelSize: Zenon.px(14)
+                }
 
                 // CREDITS (2026-10-25): what Zenworks stands on, said where
                 // its own name is — the session's launcher is called after
                 // Zenworks, and the work underneath is not ours. Above the
                 // byline (user, 2026-10-25: the two lines swapped).
                 Text {
-                  anchors.horizontalCenter: parent.horizontalCenter
+                  anchors.right: parent.right
                   textFormat: Text.StyledText
                   text: "built on <a href=\"https://quickshell.org\">Quickshell</a> and "
                     + "<a href=\"https://hyprland.org\">Hyprland</a>, with Qt"
@@ -1913,7 +1937,7 @@ FloatingWindow {
                 }
 
                 Text {
-                  anchors.horizontalCenter: parent.horizontalCenter
+                  anchors.right: parent.right
                   // StyledText, not RichText: it is one anchor in one line
                   // and StyledText parses <a href> perfectly well, without
                   // pulling in a whole rich-text document to lay out.

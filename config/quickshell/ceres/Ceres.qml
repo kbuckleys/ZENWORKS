@@ -161,7 +161,12 @@ Singleton {
   function setPreferSource(v) { root.preferSource = v === "flatpak" ? "flatpak" : "native"; root.saveStorePrefs(); }
   function setFlatpakPref(v) { root.flatpakPref = v; root.saveStorePrefs(); }
   function setFlatpakScope(v) { root.flatpakScope = v === "user" ? "user" : "system"; root.saveStorePrefs(); }
-  readonly property bool setupNeeded: root.deps.missing.length > 0 || root.flatpakAsk
+  // what is missing, split (user, 2026-10-25): what Ceres itself needs is
+  // Setup, said in Updates; what only the Store needs (Cer.DEPS `store`)
+  // the Store says in its own tab, with its Install button (StoreView)
+  readonly property var setupMissing: root.deps.missing.filter(m => !m.store)
+  readonly property var storeNeeds: root.deps.missing.filter(m => m.store)
+  readonly property bool setupNeeded: root.setupMissing.length > 0 || root.flatpakAsk
   readonly property string buildDir: Paths.cacheDir() + "/ceres/build"
   signal setupRequested()
   property bool _checkAfterSetup: false
@@ -183,15 +188,17 @@ Singleton {
   function setup(paru, flatpak) {
     const wantFlatpak = root.flatpakAsk && !!flatpak;
     if (root.flatpakAsk) root.setFlatpakPref(wantFlatpak ? "yes" : "no");
-    const steps = Cer.setupSteps(root.deps, root.deps.paru ? (paru || "paru") : "", root.buildDir,
+    // setup's own: the Store's needs are installed from the Store
+    const deps = Object.assign({}, root.deps, { missing: root.setupMissing });
+    const steps = Cer.setupSteps(deps, root.deps.paru ? (paru || "paru") : "", root.buildDir,
                                  Quickshell.shellDir + "/scripts/ceres.sh", wantFlatpak);
     if (steps.length === 0) return;
-    const n = root.deps.missing.filter(m => !m.aur).length + (wantFlatpak && !root.deps.flatpak ? 1 : 0);
+    const n = root.setupMissing.filter(m => !m.aur).length + (wantFlatpak && !root.deps.flatpak ? 1 : 0);
     // and once it is all in, a fresh look for updates — armed only for a
     // setup that was actually started, or the next unrelated job ran the
     // check in its place
     root._checkAfterSetup = root.request(steps,
-      "install " + root.deps.missing.map(m => m.pkg).concat(wantFlatpak ? ["flatpak"] : []).join(", "),
+      "install " + root.setupMissing.map(m => m.pkg).concat(wantFlatpak ? ["flatpak"] : []).join(", "),
       n + (root.deps.paru ? 1 : 0));
   }
 
@@ -349,10 +356,10 @@ Singleton {
     // which answers it no — Settings can still add Flatpak later
     if (root.setupNeeded)
       out.push({ level: "bad",
-        text: root.deps.missing.length ? "Setup needed: " + Cer.nameList(root.deps.missing.map(m => m.pkg), 2)
+        text: root.setupMissing.length ? "Setup needed: " + Cer.nameList(root.setupMissing.map(m => m.pkg), 2)
           : "Setup: Flatpak apps in the Store?",
         act: "Set up", run: "openSetup",
-        alt: root.deps.missing.length ? "" : "Discard", altRun: "discardFlatpak" });
+        alt: root.setupMissing.length ? "" : "Discard", altRun: "discardFlatpak" });
     if (root.restartNeeded) out.push({ level: "warn", text: "Reboot needed: kernel upgraded" });
     if (root.staleApps.length)
       out.push({ level: "warn", text: "Restart " + Cer.nameList(root.staleApps.map(g => g.name), 2) });

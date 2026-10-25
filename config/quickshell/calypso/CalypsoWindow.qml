@@ -1665,7 +1665,7 @@ FloatingWindow {
     : win.welcoming ? [["return", "add"], ["esc", "close"]]
     : win.lockAcct ? [["return", lockPane.missing ? "install" : lockPane.signedOut ? "sign in" : "unlock"]].concat(win.noneOpen && win.lockedAccts.length > 1 ? [["tab", "account"]] : []).concat([["esc", "close"]])
     : [["↑↓", "item"], ["return", "copy password"], ["ctrl shift c", "username"], ["ctrl alt c", "code"],
-       ["ctrl r", "reveal"], ["ctrl o", "website"], ["ctrl d", "favourite"], ["ctrl l", "lock"], ["esc", win.query !== "" ? "clear" : "close"]]
+       ["ctrl r", "reveal"], ["ctrl o", "website"], ["ctrl d", "favorite"], ["ctrl l", "lock"], ["esc", win.query !== "" ? "clear" : "close"]]
 
   // ── adding an account: the platforms, on a sheet ───────────────────────
   InputShield { visible: win.adding && !win.welcoming; onClicked: { win.adding = false; win.refocus(); } }

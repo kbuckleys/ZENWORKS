@@ -97,8 +97,8 @@ module.exports = {
     t.eq("clamped at the edges", V.viewAt(2, 0, 0, 1000, 800, 1000, 600), { z: 2, x: 0, y: 0 });
 
     t.eq("filter: tags and words", V.splitFilter("  #red beach  #★ sun "),
-      { tags: ["red", "favourite"], text: "beach sun", kinds: [] });
-    t.eq("a bare star is the favorite", V.splitFilter("★").tags, ["favourite"]);
+      { tags: ["red", "favorite"], text: "beach sun", kinds: [] });
+    t.eq("a bare star is the favorite", V.splitFilter("★").tags, ["favorite"]);
     t.eq("all tags carried", V.hasAllTags(["a", "b"], ["b"]), true);
     t.eq("one missing", V.hasAllTags(["a"], ["a", "b"]), false);
     t.eq("no tags wanted", V.hasAllTags(undefined, []), true);

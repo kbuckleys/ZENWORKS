@@ -88,9 +88,12 @@ Item {
     anchors.verticalCenter: parent.verticalCenter
     x: lead.width > 0 ? lead.x + lead.width + 16
       : (bar.flanked ? 16 : Math.round((bar.width - width) / 2))
-    maxWidth: bar.width - 32
+    // never below 0: -1 is HintRow's "unset, show them all", so buttons
+    // wider than what was left used to bring every hint back under them
+    // (Delphi's Repositories, user 2026-10-25)
+    maxWidth: Math.max(0, bar.width - 32
       - (lead.width > 0 ? lead.width + 16 : 0)
-      - (trail.width > 0 ? trail.width + 12 + 24 : 0)
+      - (trail.width > 0 ? trail.width + 12 + 24 : 0))
     opacity: bar.note !== "" ? 0 : 1
     Behavior on opacity { NumberAnimation { duration: Zenon.fast } }
   }

@@ -4,8 +4,12 @@
 // https://github.com/kbuckleys/
 
 .pragma library
+.import qs.morpheus as Morpheus
 // ONE COPY FOR THE WHOLE SHELL. Without the pragma every component instance
 // that imports this file evaluated all of it again (see morpheus/icons.js).
+// The shell's singletons come in through the import above (the same
+// instances); the node tests hand in stubs of their own.
+var Strings = typeof Morpheus !== "undefined" ? Morpheus.Strings : globalThis.Strings;
 //
 // HERMES' PURE HALF: what the probe said, put in order; the glyphs and the
 // words for a link, a network, a device; ddcutil's output read; and the
@@ -130,13 +134,6 @@ function stackWords(stack) {
   return { nm: "NetworkManager", networkd: "systemd-networkd", iwd: "iwd" }[stack] || "nothing Hermes knows";
 }
 
-// Every stack running a link, in words: a mixed machine (wired on
-// networkd, Wi-Fi on NetworkManager) names both
-function stacksWords(p) {
-  var ss = p && p.stacks && p.stacks.length ? p.stacks : (p && p.stack ? [p.stack] : []);
-  if (ss.length === 0) return stackWords("");
-  return ss.map(stackWords).join(" and ");
-}
 // The same, short enough for the window's sidebar
 function stacksShort(p) {
   var ss = p && p.stacks && p.stacks.length ? p.stacks : (p && p.stack ? [p.stack] : []);
@@ -449,21 +446,18 @@ function barWords(p, live) {
     lines.push("<b>Wired</b> · " + w.name + (w.speed ? " · " + speedWords(w.speed) : ""));
     if (w.ipv4.length) lines.push(w.ipv4[0].split("/")[0]);
   } else if (l.wifiNet) {
-    lines.push("<b>" + escapeHtml(l.wifiNet.name) + "</b> · " + Math.round(strength01(l.wifiNet.strength) * 100) + "%");
+    lines.push("<b>" + Strings.escapeHtml(l.wifiNet.name) + "</b> · " + Math.round(strength01(l.wifiNet.strength) * 100) + "%");
   } else if (p && p.wifiHw) {
     lines.push(l.wifiOn === false ? "<b>Wi-Fi off</b>" : "<b>Not connected</b>");
   } else {
     lines.push("<b>Not connected</b>");
   }
   if (l.btConnected > 0) lines.push("Bluetooth · " + l.btConnected + (l.btConnected === 1 ? " device" : " devices"));
-  if (l.vpnActive) lines.push("VPN · " + escapeHtml(l.vpnActive));
+  if (l.vpnActive) lines.push("VPN · " + Strings.escapeHtml(l.vpnActive));
   if (l.night) lines.push("Night light · " + kelvinWords(l.kelvin));
   return lines.join("\n");
 }
 
-function escapeHtml(s) {
-  return String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-}
 
 // ── PERSISTED SETTINGS ───────────────────────────────────────────────────
 function defaults() {

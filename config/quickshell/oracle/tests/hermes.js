@@ -40,11 +40,9 @@ module.exports = {
     // ── a mixed machine ──
     const mixed = H.parseProbe(JSON.stringify({ stack: "networkd", stacks: ["networkd", "nm"],
       links: [{ name: "enp7s0", kind: "wired", managedBy: "networkd" }, { name: "wlan1", kind: "wifi", managedBy: "nm" }] }));
-    t.eq("both stacks named", H.stacksWords(mixed), "systemd-networkd and NetworkManager");
     t.eq("the wired link's own", H.linkStack(mixed, mixed.links[0]), "systemd-networkd");
     t.eq("the wi-fi link's own", H.linkStack(mixed, mixed.links[1]), "NetworkManager");
     t.eq("short, for the sidebar", H.stacksShort(mixed), "networkd + NetworkManager");
-    t.eq("an older probe without stacks", H.stacksWords(H.parseProbe('{"stack":"nm"}')), "NetworkManager");
 
     // ── a bluetooth adapter that never reached BlueZ ──
     const stuck = H.parseProbe(JSON.stringify({ bt: { hw: true, installed: true, running: true, controllers: 0 } }));

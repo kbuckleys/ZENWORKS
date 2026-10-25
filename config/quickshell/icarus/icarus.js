@@ -5,6 +5,7 @@
 
 .pragma library
 .import qs.morpheus as Morpheus
+.import "../terminus/terminus.js" as Terminus
 // ONE COPY FOR THE WHOLE SHELL. Without the pragma every component instance
 // that imports this file evaluated all of it again (see morpheus/icons.js).
 // The shell's singletons come in through the imports above (the same
@@ -181,19 +182,12 @@ function places(home, userDirs, bookmarks, cwd) {
     if (path === "" || seen[path]) return;
     seen[path] = true;
     if (path === here || dirname(path) === here) return;
-    out.push({ path: path, label: label || basename(path) });
+    out.push({ path: path, label: label || Terminus.basename(path) });
   };
   add(home, "Home");
   for (const d of userDirs || []) add(d);
   for (const b of bookmarks || []) add(b);
   return out;
-}
-
-function basename(p) {
-  const s = String(p).replace(/\/+$/, "");
-  if (s === "") return "/";
-  const cut = s.lastIndexOf("/");
-  return cut >= 0 ? s.slice(cut + 1) : s;
 }
 
 // Which of a list of paths are directories that exist, asked in one process. A
