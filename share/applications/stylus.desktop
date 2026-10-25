@@ -2,7 +2,7 @@
 Type=Application
 Name=Stylus
 GenericName=Disk Image Writer
-Comment=Write an ISO or a disk image to a USB drive or SD card, in ZENWORKS
+Comment=Write an ISO or a disk image to a USB drive or SD card, in Zenworks
 Icon=drive-removable-media
 Categories=System;Utility;
 Keywords=iso;usb;image;flash;burn;write;sd;card;bootable;etcher;rufus;dd;

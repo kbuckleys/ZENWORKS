@@ -51,7 +51,7 @@ Scope {
     Type: "Application",
     Name: "Alexandria",
     GenericName: "Font Book",
-    Comment: "Browse, compare and install fonts and their glyphs, in ZENWORKS",
+    Comment: "Browse, compare and install fonts and their glyphs, in Zenworks",
     Icon: "font-x-generic",
     Categories: ["Utility", "Viewer"],
     Keywords: ["font", "typeface", "glyph", "character", "unicode", "nerd", "install"],

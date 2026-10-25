@@ -1350,7 +1350,7 @@ function terminalEntry(cmd, apps) {
   return "";
 }
 
-// What a machine with no defaults.lua starts with: kitty, which ZENWORKS
+// What a machine with no defaults.lua starts with: kitty, which Zenworks
 // installs, and failing that the first terminal there is.
 function terminalFallback(apps) {
   const t = terminalCandidates(apps);
@@ -2577,7 +2577,7 @@ function readBundle(text) {
   let j = null;
   try { j = JSON.parse(text); } catch (e) {}
   if (!j || j.zenworks !== "settings" || !j.files || typeof j.files !== "object")
-    return { ok: false, why: "Not a ZENWORKS settings file", made: "", files: {}, skipped: 0 };
+    return { ok: false, why: "Not a Zenworks settings file", made: "", files: {}, skipped: 0 };
   const files = {};
   let skipped = 0;
   for (const rel in j.files) {

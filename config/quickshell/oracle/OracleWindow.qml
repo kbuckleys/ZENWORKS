@@ -1891,9 +1891,9 @@ FloatingWindow {
                 // was reading as a separator between two unrelated things.
                 Item { width: 1; height: 6 }
 
-                // CREDITS (2026-10-25): what ZENWORKS stands on, said where
+                // CREDITS (2026-10-25): what Zenworks stands on, said where
                 // its own name is — the session's launcher is called after
-                // ZENWORKS, and the work underneath is not ours. Above the
+                // Zenworks, and the work underneath is not ours. Above the
                 // byline (user, 2026-10-25: the two lines swapped).
                 Text {
                   anchors.horizontalCenter: parent.horizontalCenter

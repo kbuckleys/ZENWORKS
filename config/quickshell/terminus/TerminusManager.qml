@@ -34,7 +34,7 @@ Scope {
     Type: "Application",
     Name: "Terminus",
     GenericName: "File Manager",
-    Comment: "Browse and manage files, in ZENWORKS",
+    Comment: "Browse and manage files, in Zenworks",
     Icon: "system-file-manager",
     Categories: ["System", "FileTools", "FileManager", "Utility", "Core"],
     Keywords: ["files", "folder", "directory", "file manager", "explorer"],

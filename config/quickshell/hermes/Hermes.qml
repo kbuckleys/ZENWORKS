@@ -637,7 +637,7 @@ Singleton {
     // keyword, so either name finds it
     Name: "Control Hub",
     GenericName: "Network and Display",
-    Comment: "Wi-Fi, Bluetooth, VPN, brightness, night light, printers and scanners, in ZENWORKS",
+    Comment: "Wi-Fi, Bluetooth, VPN, brightness, night light, printers and scanners, in Zenworks",
     Icon: "preferences-system-network",
     Categories: ["Settings", "Network", "HardwareSettings"],
     Keywords: ["hermes", "control", "hub", "wifi", "wi-fi", "wireless", "network", "ethernet", "bluetooth", "vpn", "wireguard",

@@ -58,7 +58,7 @@ Scope {
     Type: "Application",
     Name: "Delphi",
     GenericName: "Git Client",
-    Comment: "Stage, commit, branch, sync and browse history with git, in ZENWORKS",
+    Comment: "Stage, commit, branch, sync and browse history with git, in Zenworks",
     Icon: "git",
     Categories: ["Development", "RevisionControl"],
     Keywords: ["git", "commit", "branch", "diff", "merge", "rebase", "github", "gitlab", "codeberg", "repository", "version control"],

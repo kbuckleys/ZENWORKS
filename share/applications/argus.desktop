@@ -2,7 +2,7 @@
 Type=Application
 Name=Argus
 GenericName=Video Trimmer
-Comment=Cut a recording and keep it as MP4, GIF or WebM, in ZENWORKS
+Comment=Cut a recording and keep it as MP4, GIF or WebM, in Zenworks
 Icon=video-x-generic
 Categories=AudioVideo;Video;AudioVideoEditing;
 Keywords=video;trim;cut;gif;webm;mp4;recording;screen;clip;export;

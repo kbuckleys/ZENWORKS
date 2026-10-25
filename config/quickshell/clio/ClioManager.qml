@@ -44,7 +44,7 @@ Scope {
     Type: "Application",
     Name: "Clio",
     GenericName: "Notes",
-    Comment: "Notes, checklists, a journal and the stickies on your desktop, in ZENWORKS",
+    Comment: "Notes, checklists, a journal and the stickies on your desktop, in Zenworks",
     Icon: "accessories-text-editor",
     Categories: ["Office", "Utility"],
     Keywords: ["notes", "note", "journal", "diary", "sticky", "checklist", "todo", "memo", "write"],

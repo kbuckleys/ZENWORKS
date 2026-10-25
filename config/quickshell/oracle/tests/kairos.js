@@ -53,7 +53,7 @@ module.exports = {
     t.eq("summary", K.summaryLine(K.since(ticks, 0), (k) => k.toUpperCase()), "B 1m, A 1m");
 
     t.eq("pretty keys", [K.prettyKey("org.gnome.Nautilus"), K.prettyKey("brave-browser"), K.prettyKey("zenworks")],
-      ["Nautilus", "Brave browser", "ZENWORKS"]);
+      ["Nautilus", "Brave browser", "Zenworks"]);
     t.eq("broken file", K.parseMonth("{nope").days, {});
 
     // ── limits and breaks ──

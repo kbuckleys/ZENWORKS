@@ -168,7 +168,7 @@ PanelWindow {
 
       Text {
         anchors { left: parent.left; leftMargin: 24; verticalCenter: parent.verticalCenter }
-        text: sheet.welcome ? "Welcome to ZENWORKS" : "Shortcuts"
+        text: sheet.welcome ? "Welcome to Zenworks" : "Shortcuts"
         color: Zenon.white
         font.family: Zenon.face
         font.weight: Zenon.titleWeight

@@ -506,10 +506,27 @@ Item {
     anchors.bottom: parent.bottom
     width: 210
 
-    Column {
+    // the sections scroll when the window is too low for them all (user,
+    // 2026-10-25: very low screens)
+    Flickable {
+      id: sideFlick
       anchors.fill: parent
-      anchors.margins: 10
-      anchors.topMargin: 12
+      clip: true
+      contentHeight: sideCol.implicitHeight + 22
+      boundsBehavior: Flickable.StopAtBounds
+      ElasticScroll { view: sideFlick }
+      ScrollRail {
+        target: sideFlick
+        parent: sideFlick
+        anchors.right: parent.right
+        anchors.top: parent.top
+        anchors.bottom: parent.bottom
+      }
+    Column {
+      id: sideCol
+      x: 10
+      y: 12
+      width: sideFlick.width - 20
       spacing: 2
 
       Repeater {
@@ -542,6 +559,7 @@ Item {
           }
         }
       }
+    }
     }
   }
   Rectangle {

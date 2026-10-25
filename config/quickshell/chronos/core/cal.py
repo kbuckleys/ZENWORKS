@@ -38,7 +38,7 @@ LOCAL_CAL = os.path.join(DATA_HOME, "khal", "calendars", "personal")
 
 # the one khal config chronos writes: ISO dates and 24-hour times, because
 # those are what it hands khal and reads back
-CONFIG = """# written by chronos (ZENWORKS) — yours to edit; chronos only ever writes
+CONFIG = """# written by chronos (Zenworks) — yours to edit; chronos only ever writes
 # this file when there is none
 [calendars]
 [[personal]]

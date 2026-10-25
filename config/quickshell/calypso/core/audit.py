@@ -75,7 +75,7 @@ def pwned(passwords, cancel=None):
         if cancel:
             cancel.check()
         req = urllib.request.Request("https://api.pwnedpasswords.com/range/" + prefix,
-                                     headers={"User-Agent": "calypso (ZENWORKS)", "Add-Padding": "true"})
+                                     headers={"User-Agent": "calypso (Zenworks)", "Add-Padding": "true"})
         with urllib.request.urlopen(req, timeout=20) as r:
             body = r.read().decode()
         counts = {}

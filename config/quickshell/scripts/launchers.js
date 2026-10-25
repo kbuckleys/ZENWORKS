@@ -7,7 +7,7 @@
 // THE SUITE'S LAUNCHERS, SHIPPED — every app's .desktop entry, made from the
 // one place it is described: the `Desktop.launcher("id", { … })` in its
 // manager. The package installs them in /usr/share/applications (pacman
-// owns them, so they go when ZENWORKS goes), each naming its program under
+// owns them, so they go when Zenworks goes), each naming its program under
 // /usr/share/zenworks. A working copy needs no entries of its own: every
 // program here only says `qs ipc call …`, which QS_CONFIG_PATH (bin/zen)
 // sends to whichever shell is running.

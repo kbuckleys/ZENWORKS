@@ -439,7 +439,7 @@ def sums(path, expect=""):
 # is — never a version written in here, which would be stale by the next
 # release. One that cannot be reached is left out of the list, not guessed.
 
-UA = {"User-Agent": "stylus (ZENWORKS)"}
+UA = {"User-Agent": "stylus (Zenworks)"}
 
 
 def fetch(url, timeout=20):

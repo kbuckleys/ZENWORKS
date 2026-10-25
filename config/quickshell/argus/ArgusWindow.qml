@@ -577,10 +577,20 @@ FloatingWindow {
       width: aw.sideW
       SideGlass { edge: "left" }
 
+      // the settings scroll when the window is too low for them all
+      // (user, 2026-10-25: very low screens)
+      Flickable {
+        id: sideFlick
+        anchors.fill: parent
+        contentWidth: width
+        contentHeight: sideCol.implicitHeight + 40
+        boundsBehavior: Flickable.StopAtBounds
+        clip: true
       Column {
+        id: sideCol
         x: 20
         y: 20
-        width: parent.width - 40
+        width: sideFlick.width - 40
         spacing: 14
 
         SectionLabel { text: "Keep it as" }
@@ -759,6 +769,9 @@ FloatingWindow {
           text: "beside the original; Save as… puts it anywhere"
         }
       }
+      }
+      ElasticScroll { anchors.fill: sideFlick; view: sideFlick }
+      Scrollbar { flick: sideFlick; anchors.right: parent.right; anchors.top: sideFlick.top; anchors.bottom: sideFlick.bottom }
 
       // a save under way
       Column {

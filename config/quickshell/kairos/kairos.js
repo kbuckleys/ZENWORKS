@@ -21,7 +21,7 @@ const QS_CLASS = "org.quickshell";
 const OWN = ["alexandria", "argus", "calypso", "ceres", "clio", "delphi", "hermes", "hestia",
   "hygieia", "kairos", "minerva", "oracle", "picasso", "plato", "terminus"];
 const OWN_NAMES = { hermes: "Control Hub", hestia: "System Journal", hygieia: "Tidy", kairos: "Screen Time",
-  oracle: "Settings", zenworks: "ZENWORKS" };
+  oracle: "Settings", zenworks: "Zenworks" };
 
 function pad2(n) { return (n < 10 ? "0" : "") + n; }
 function dayKey(d) { return d.getFullYear() + "-" + pad2(d.getMonth() + 1) + "-" + pad2(d.getDate()); }

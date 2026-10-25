@@ -3,21 +3,25 @@
 // └─┘└─┘┘└┘└┴┘└─┘┴└─┴ ┴└─┘
 // https://github.com/kbuckleys/
 //
-// ZENWORKS' TERMINAL SETUP, OFFERED — the zsh prompt, suggestions and fuzzy
+// Zenworks' TERMINAL SETUP, OFFERED — the zsh prompt, suggestions and fuzzy
 // completion shipped in zsh/ beside the shell (scripts/zsh-setup.sh does
 // the files). The package never puts it in place: it is asked.
 //
 //   ONCE, AT THE FIRST START: a notification with two buttons, a few
 //   seconds after the desktop has settled. Closed unanswered, it is asked
 //   once more at the next start, then only here in Oracle (Default apps ›
-//   Terminal setup). One whose ~/.zshrc is the shipped one already is
-//   never asked: that is a yes.
+//   Terminal setup). One whose ~/.zshrc is the shipped one already and
+//   whose login shell is zsh is never asked: that is a yes. The shipped
+//   files with bash still the login shell are asked as usual (user,
+//   2026-10-25: the setup must make zsh the default shell — that case used
+//   to count as a yes and never got there).
 //
 //   USE IT: the tools it needs that are missing installed through Ceres
 //   (its own password card), yours kept as *.before-zenworks, the shipped
 //   ones copied in, then zsh made your login shell if it is not — the
-//   polkit agent asks for that password. Then a note: a new terminal's
-//   first start fetches the prompt's plugins once.
+//   polkit agent asks for that password — and this session told so, so
+//   what starts next is zsh without logging out. Then a note: a new
+//   terminal's first start fetches the prompt's plugins once.
 //
 // The answer is kept in welcome.json (Quickshell.statePath).
 //
@@ -112,12 +116,14 @@ Scope {
     id: check
     property string then: ""
     property bool same: false
+    property bool loginZsh: false
     property var missing: []
     command: ["sh", zsh.script, "check"]
     stdout: StdioCollector {
       onStreamFinished: {
         const lines = String(text).split("\n");
         check.same = lines[0] === "same";
+        check.loginZsh = lines.indexOf("login: yes") >= 0;
         const m = lines.find((l) => l.startsWith("missing:")) || "missing:";
         check.missing = m.slice(8).trim().split(/\s+/).filter((p) => p !== "");
       }
@@ -125,7 +131,7 @@ Scope {
     onExited: (code) => {
       if (code !== 0) return;
       if (check.then === "offer") {
-        if (check.same) zsh.keep("yes");
+        if (check.same && check.loginZsh) zsh.keep("yes");
         else ask.running = true;
       } else if (check.then === "apply") zsh.install();
     }
@@ -136,9 +142,9 @@ Scope {
   // it was closed without an answer
   Process {
     id: ask
-    command: ["notify-send", "--app-name=ZENWORKS", "--icon=utilities-terminal",
+    command: ["notify-send", "--app-name=Zenworks", "--icon=utilities-terminal",
               "--action=use=Use it", "--action=no=No thanks",
-              "Use ZENWORKS' terminal setup?",
+              "Use Zenworks' terminal setup?",
               "zsh with a fast prompt, suggestions and fuzzy completion. Your current setup is kept as a backup."]
     stdout: StdioCollector {
       onStreamFinished: {
@@ -160,7 +166,7 @@ Scope {
   }
   function install() {
     if (check.missing.length === 0) { files.running = true; return; }
-    const asked = Ceres.install(check.missing, "for ZENWORKS' terminal setup", (ok, how) => {
+    const asked = Ceres.install(check.missing, "for Zenworks' terminal setup", (ok, how) => {
       if (ok) files.running = true;
       else zsh.finish(how === "cancelled" ? "" : "The terminal setup needs " + check.missing.join(", ") + ", which did not install");
     });
@@ -187,6 +193,6 @@ Scope {
   }
   function finish(said) {
     zsh.busy = false;
-    if (said !== "") Quickshell.execDetached(["notify-send", "--app-name=ZENWORKS", "--icon=utilities-terminal", "Terminal setup", said]);
+    if (said !== "") Quickshell.execDetached(["notify-send", "--app-name=Zenworks", "--icon=utilities-terminal", "Terminal setup", said]);
   }
 }

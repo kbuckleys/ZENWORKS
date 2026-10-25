@@ -270,7 +270,7 @@ Scope {
     Type: "Application",
     Name: "Minerva",
     GenericName: "Reader",
-    Comment: "Read PDFs, EPUBs and comics, with bookmarks and highlights, in ZENWORKS",
+    Comment: "Read PDFs, EPUBs and comics, with bookmarks and highlights, in Zenworks",
     Icon: "accessories-ebook-reader",
     Categories: ["Office", "Viewer", "Literature"],
     Keywords: ["pdf", "epub", "ebook", "book", "reader", "document", "read", "comic", "cbz", "cbr"],

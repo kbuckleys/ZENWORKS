@@ -11,7 +11,7 @@
 //
 //   Theme       Zenon dark, Zenon light, or Follow Background
 //   Accent      the theme's own, or one of its other hues
-//   Background  the ZENWORKS one stays unless a picture is chosen in
+//   Background  the Zenworks one stays unless a picture is chosen in
 //               Picasso (the card closes and Picasso's setter opens)
 //
 // Done, Return or Esc closes it.
@@ -155,7 +155,7 @@ PanelWindow {
         Text {
           width: body.width
           wrapMode: Text.Wrap
-          text: "The ZENWORKS one, until you choose another."
+          text: "The Zenworks one, until you choose another."
           color: Zenon.soft
           font.family: Zenon.face
           font.weight: Zenon.weight

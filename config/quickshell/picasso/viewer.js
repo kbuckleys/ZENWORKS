@@ -928,7 +928,7 @@ function tileFile(dir, z, x, y) { return dir + "/" + z + "/" + x + "/" + y + ".p
 function tileCommand() {
   return 'f=$1; u=$2\n'
     + '[ -s "$f" ] && { printf "%s" "$f"; exit 0; }\n'
-    + 'mkdir -p "$(dirname "$f")" && curl -fsSL --max-time 20 -A "picasso-view/1.0 (ZENWORKS image viewer)" -o "$f.part" "$u"'
+    + 'mkdir -p "$(dirname "$f")" && curl -fsSL --max-time 20 -A "picasso-view/1.0 (Zenworks image viewer)" -o "$f.part" "$u"'
     + ' && mv -f "$f.part" "$f" && printf "%s" "$f"\n';
 }
 

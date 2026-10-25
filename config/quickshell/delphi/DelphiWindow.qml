@@ -1123,11 +1123,29 @@ FloatingWindow {
         }
       }
 
-      Column {
-        id: pageCol
+      // ── THE PAGES SCROLL (user, 2026-10-25: a very low screen ran out
+      // of room for them): the pages and git's state, between the
+      // repository at the top and who commits at the bottom, which stay ──
+      Flickable {
+        id: sideFlick
         anchors.top: repoChip.bottom
         // the first heading brings its own air (SideHead's airIn)
         anchors.topMargin: 4
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: whoLine.visible ? whoLine.top : parent.bottom
+        anchors.bottomMargin: 8
+        contentWidth: width
+        contentHeight: sideBody.height
+        boundsBehavior: Flickable.StopAtBounds
+        clip: true
+        Item {
+          id: sideBody
+          width: sideFlick.width
+          height: childrenRect.height + 12
+      Column {
+        id: pageCol
+        anchors.top: parent.top
         // edge to edge: the cursor spans the sidebar (user, 2026-10-11)
         anchors.left: parent.left
         anchors.right: parent.right
@@ -1281,6 +1299,12 @@ FloatingWindow {
           }
         }
       }
+
+        }
+      }
+      ElasticScroll { anchors.fill: sideFlick; view: sideFlick }
+      // on the sidebar's own edge (scrollbars hug the edge)
+      Scrollbar { flick: sideFlick; anchors.right: parent.right; anchors.top: sideFlick.top; anchors.bottom: sideFlick.bottom }
 
       // who commits: the first thing to set, said until it is
       Text {

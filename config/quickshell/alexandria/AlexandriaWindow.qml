@@ -768,15 +768,23 @@ FloatingWindow {
         HeldRing { anchors.fill: parent; radius: parent.radius; z: 10; on: famField.activeFocus }
       }
 
-      // the shelves
-      Column {
-        id: shelfCol
+      // the shelves — scrolled in a box of at most two fifths of the
+      // sidebar when the window is too low for them all, so the families
+      // under them keep room (user, 2026-10-25: very low screens)
+      Flickable {
+        id: shelfFlick
         anchors.top: famSearch.bottom
         anchors.topMargin: 10
         anchors.left: parent.left
         anchors.right: parent.right
-        anchors.leftMargin: 8
-        anchors.rightMargin: 8
+        height: Math.min(shelfCol.implicitHeight, Math.round(side.height * 0.4))
+        contentHeight: shelfCol.implicitHeight
+        boundsBehavior: Flickable.StopAtBounds
+        clip: true
+      Column {
+        id: shelfCol
+        x: 8
+        width: shelfFlick.width - 16
         spacing: 1
         Repeater {
           model: win.shelves
@@ -796,10 +804,13 @@ FloatingWindow {
           }
         }
       }
+      }
+      ElasticScroll { anchors.fill: shelfFlick; view: shelfFlick }
+      Scrollbar { flick: shelfFlick; anchors.right: parent.right; anchors.top: shelfFlick.top; anchors.bottom: shelfFlick.bottom }
 
       Rectangle {
         id: shelfRule
-        anchors.top: shelfCol.bottom
+        anchors.top: shelfFlick.bottom
         anchors.topMargin: 10
         anchors.left: parent.left
         anchors.right: parent.right

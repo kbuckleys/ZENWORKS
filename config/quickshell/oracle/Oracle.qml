@@ -1296,10 +1296,10 @@ Singleton {
     { key: "actionAppsScan", section: "defaults", label: "Applications", type: "action",
       verb: "Detect",
       help: "Looks again for what is installed and what opens what. Runs by itself when you open this section." },
-    // the zsh setup ZENWORKS ships, also offered once at the first start
+    // the zsh setup Zenworks ships, also offered once at the first start
     // (OracleManager's ZshSetup, which answers zshAsked)
     { key: "actionZsh", section: "defaults", alias: "zsh shell terminal prompt p10k powerlevel10k zshrc login shell",
-      label: "Terminal setup", type: "action", verb: "Use ZENWORKS' zsh",
+      label: "Terminal setup", type: "action", verb: "Use Zenworks' zsh",
       help: "zsh with a fast prompt, suggestions and fuzzy completion. What is missing is installed, your own ~/.zshrc and ~/.p10k.zsh are kept as *.before-zenworks, and zsh becomes your login shell (it asks for your password)." },
     { key: "infoDefaultsPath", section: "defaults", label: "Written to", type: "info",
       elideLeft: true,
@@ -1427,7 +1427,7 @@ Singleton {
       help: "Every setting in every section back to its default." },
     { key: "actionUpdate", section: "about", alias: "update upgrade new version zenworks package aur",
       label: "Check for updates", type: "action", verb: "Open Ceres",
-      help: "ZENWORKS is a package now, so it updates with everything else: Ceres' Updates lists a new version beside the rest. Your settings live in ~/.config/zenworks and are never touched by an update." },
+      help: "Zenworks is a package now, so it updates with everything else: Ceres' Updates lists a new version beside the rest. Your settings live in ~/.config/zenworks and are never touched by an update." },
     { key: "actionRestart", section: "about", label: "Restart the shell", type: "action",
       verb: "Restart",
       help: "For the few settings that only take effect on a fresh start." }

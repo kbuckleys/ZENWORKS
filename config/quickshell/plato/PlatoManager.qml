@@ -47,7 +47,7 @@ Scope {
     Type: "Application",
     Name: "Plato",
     GenericName: "Text Editor",
-    Comment: "Edit text, in ZENWORKS",
+    Comment: "Edit text, in Zenworks",
     Icon: "accessories-text-editor",
     Categories: ["Development", "TextEditor"],
     Keywords: ["editor", "text", "code", "nvim"],

@@ -158,8 +158,9 @@ def srcinfo(root):
 
 
 # namcap on a package of QML and shell: what it cannot see into it calls
-# unneeded, and every link inside the package it lists; neither is news
-_NOISE = re.compile(r"may not be needed|implicitly satisfied|symlink .* points to")
+# unneeded, the suite's own python modules uninstalled, and every link
+# inside the package it lists; none of it is news
+_NOISE = re.compile(r"may not be needed|implicitly satisfied|symlink .* points to|Referenced python module")
 
 
 def build(root, cancel):

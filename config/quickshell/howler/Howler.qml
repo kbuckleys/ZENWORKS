@@ -496,7 +496,8 @@ Singleton {
   }
   // FULL SCREEN (2026-10-25): the focused workspace has a full-screen
   // window. What it held back is counted, and said in one toast on leaving.
-  readonly property bool fullscreenOn: !!Hyprland.focusedWorkspace && Hyprland.focusedWorkspace.hasFullscreen
+  // (=== true: the workspace can be there a moment before its flags are)
+  readonly property bool fullscreenOn: !!Hyprland.focusedWorkspace && Hyprland.focusedWorkspace.hasFullscreen === true
   property int heldInFullscreen: 0
   onFullscreenOnChanged: {
     if (root.fullscreenOn || root.heldInFullscreen === 0) return;

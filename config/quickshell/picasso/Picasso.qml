@@ -629,7 +629,7 @@ Singleton {
 
   // ── first run ────────────────────────────────────────────────────────
   // No picasso.json at all means nothing was ever chosen: a fresh install.
-  // The ZENWORKS background (picasso/zenworks.png, the logo's Z tiled) is
+  // The Zenworks background (picasso/zenworks.png, the logo's Z tiled) is
   // copied into a Zenworks directory of the backgrounds directory, where it
   // is a picture like any other to keep or delete, and set everywhere. Set only once the copy has
   // landed, or the daemon would load a file that is not there yet; setAll

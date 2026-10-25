@@ -130,7 +130,7 @@ Scope {
     Type: "Application",
     Name: "Hestia",
     GenericName: "Services and Logs",
-    Comment: "Services, timers and the system journal, in ZENWORKS",
+    Comment: "Services, timers and the system journal, in Zenworks",
     Icon: "utilities-system-monitor",
     Categories: ["System", "Monitor"],
     Keywords: ["systemd", "service", "services", "daemon", "journal", "log", "logs", "timer", "boot", "systemctl", "journalctl"],

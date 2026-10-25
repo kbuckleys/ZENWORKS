@@ -645,6 +645,62 @@ function mdOf(text) {
 // a blank ends the block and each one is an nbsp paragraph too.
 // Code fences pass untouched.
 var RULE_MARK = "\u2060";
+
+// CODE AS CHIPS (user, 2026-10-25: "code blocks and words highlighted with
+// code should have a chip", as GitHub draws them). Qt's Markdown gives code
+// its monospace face and nothing behind it, so — as with RULE_MARK — the
+// places are kept: invisible marks just inside each `span` and round each
+// fenced block's lines, which the preview (NotesView) finds once laid out
+// and draws a chip behind. Run on what mdLinesOf gives.
+var CODE_IN = "\u2061", CODE_OUT = "\u2062", BLOCK_IN = "\u2063", BLOCK_OUT = "\u2064";
+// TAGS QT WOULD SWALLOW. Words like <Untitled> in the notes are no HTML,
+// but Qt's reader takes them for a tag that never closes and drops all that
+// follows — a column of empty bullets (user, 2026-10-25, spoot's 0.6.1).
+// The forge drops a tag it does not know; the preview shows it as written:
+// < and > escaped, unless it is one of these, and never inside code.
+var HTML_TAGS = ["a", "abbr", "b", "blockquote", "br", "code", "dd", "del", "details", "div", "dl", "dt", "em",
+  "h1", "h2", "h3", "h4", "h5", "h6", "hr", "i", "img", "ins", "kbd", "li", "ol", "p", "picture", "pre", "q",
+  "s", "samp", "source", "span", "strike", "strong", "sub", "summary", "sup", "table", "tbody", "td", "tfoot",
+  "th", "thead", "tr", "tt", "u", "ul", "var", "video"];
+function escapeStrayTags(line) {
+  return line.replace(/<(\/?)([A-Za-z][\w-]*)([^<>]*)>/g, function (all, slash, name, rest) {
+    return HTML_TAGS.indexOf(name.toLowerCase()) >= 0 ? all : "&lt;" + slash + name + rest + "&gt;";
+  });
+}
+function mdCodeMarks(text) {
+  var lines = String(text || "").split("\n");
+  var fence = /^\s{0,3}(```|~~~)/;
+  var open = -1;
+  for (var i = 0; i < lines.length; i++) {
+    if (fence.test(lines[i])) {
+      if (open < 0) { open = i; continue; }
+      // the lines between, if any: marked at the first's start, the last's end
+      if (i - open > 1) {
+        lines[open + 1] = BLOCK_IN + lines[open + 1];
+        lines[i - 1] = lines[i - 1] + BLOCK_OUT;
+      }
+      open = -1;
+      continue;
+    }
+    if (open >= 0) continue;
+    // stray tags escaped outside the code spans (the odd parts of a split
+    // on whole spans), then the spans marked
+    lines[i] = lines[i].split(/(`+(?!`)[\s\S]*?[^`]`+)/).map(function (part, k) {
+      return k % 2 === 0 ? escapeStrayTags(part) : part;
+    }).join("");
+    // a run of backticks, what it holds, the same run closing it
+    lines[i] = lines[i].replace(/(`+)(?!`)([\s\S]*?[^`])\1(?!`)/g, function (all, ticks, inside) {
+      // one space each side is the Markdown way to hold a backtick: the
+      // marks go inside those, so the chip is round the words
+      var m = /^( ?)([\s\S]*?)( ?)$/.exec(inside);
+      var pad = m[1] === " " && m[3] === " " && m[2] !== "";
+      return pad ? ticks + " " + CODE_IN + m[2] + CODE_OUT + " " + ticks
+                 : ticks + CODE_IN + inside + CODE_OUT + ticks;
+    });
+  }
+  return lines.join("\n");
+}
+
 function mdLinesOf(text) {
   var src = String(text || "").replace(/\r\n/g, "\n").replace(/<!--[\s\S]*?-->/g, "");
   var lines = mdOf(src.replace(/\n/g, "\u0001")).split("\u0001");

@@ -46,7 +46,7 @@ Scope {
     Type: "Application",
     Name: "Picasso",
     GenericName: "Image Viewer",
-    Comment: "View, edit and annotate pictures, in ZENWORKS",
+    Comment: "View, edit and annotate pictures, in Zenworks",
     Icon: "image-viewer",
     Categories: ["Graphics", "Viewer", "Photography"],
     Keywords: ["image", "viewer", "picture", "photo", "gallery", "annotate"],

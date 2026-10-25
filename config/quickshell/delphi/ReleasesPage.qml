@@ -159,8 +159,6 @@ Item {
       (ok, r) => { if (!pg) return; if (ok && r && r.body) put(r.body, r.by); else fromCommits(); });
   }
   function save() {
-    // rich text's last words into the notes first (ReleaseEditor.settle)
-    editor.settle();
     const e = pg.edit;
     if (!e || e.tag.trim() === "") return;
     const tag = e.tag.trim(), name = (e.name || "").trim() || tag;
@@ -347,40 +345,13 @@ Item {
         font.pixelSize: Zenon.px(14)
       }
       Rectangle { width: parent.width; height: 1; color: Zenon.border }
-      TextEdit {
+      // the notes, as the forge shows them — code chips, heading lines
+      // and all (NotesView, the editor's Preview too)
+      NotesView {
         id: notesText
-        palette.link: Zenon.link   // the theme's, not the system's blue
         width: parent.width
-        readOnly: true
-        selectByMouse: true
-        wrapMode: TextEdit.Wrap
-        textFormat: pg.rel && pg.rel.body.trim() !== "" ? TextEdit.MarkdownText : TextEdit.PlainText
-        text: !pg.rel ? "" : pg.rel.body.trim() === "" ? "No notes" : D.mdLinesOf(pg.rel.body)
-        color: pg.rel && pg.rel.body.trim() !== "" ? Zenon.ink : Zenon.accentMuted
-        selectionColor: Zenon.alpha(Zenon.cyan, 0.4)
-        font.family: Zenon.face
-        font.weight: Zenon.weight
-        font.pixelSize: editor.notesPx
-        onLinkActivated: (link) => Quickshell.execDetached(["xdg-open", link])
-        // THE LINES UNDER BIG HEADINGS AND THE DIVIDERS, the hairline under
-        // the release's name (D.mdLinesOf keeps their places with
-        // D.RULE_MARK): read again once the text is laid out at its width
-        property var rules: []
-        function measure() {
-          const t = notesText.getText(0, notesText.length);
-          const ys = [];
-          for (let i = t.indexOf(D.RULE_MARK); i >= 0; i = t.indexOf(D.RULE_MARK, i + 1)) {
-            const r = notesText.positionToRectangle(i);
-            ys.push(Math.round(r.y + r.height * 0.3));
-          }
-          notesText.rules = ys;
-        }
-        onContentHeightChanged: Qt.callLater(notesText.measure)
-        onTextChanged: Qt.callLater(notesText.measure)
-        Repeater {
-          model: notesText.rules
-          delegate: Rectangle { required property real modelData; y: modelData; width: notesText.width; height: 1; color: Zenon.border }
-        }
+        body: pg.rel ? pg.rel.body : ""
+        textSize: editor.notesPx
       }
       // the files attached
       Text {

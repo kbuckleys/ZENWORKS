@@ -26,7 +26,7 @@ import "../morpheus/lagnotes.js" as LagNotes
 
 Scope {
   // ── CHECK FOR UPDATES (oracle's About) ──────────────────────────────
-  // ZENWORKS is a package (2026-10-25): it updates through pacman and the
+  // Zenworks is a package (2026-10-25): it updates through pacman and the
   // AUR like everything else, so the row opens Ceres' Updates, where a new
   // version is listed beside the rest. scripts/update.sh, which laid a
   // fetched copy over ~/.config, is gone with the install script.

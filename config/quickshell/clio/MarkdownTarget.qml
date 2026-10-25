@@ -45,7 +45,8 @@ QtObject {
     const a = f.selectionStart - l.a, b = Math.min(f.selectionEnd, l.b) - l.a;
     return { b: md.within(l.text, /\*\*([^*]+?)\*\*|__([^_]+?)__/g, a, b),
              i: md.within(md.unbold(l.text), /\*([^*\s][^*]*?)\*|(^|[^\w])_([^_\s][^_]*?)_(?!\w)/g, a, b),
-             s: md.within(l.text, /~~([^~]+?)~~/g, a, b) };
+             s: md.within(l.text, /~~([^~]+?)~~/g, a, b),
+             c: md.within(l.text, /`([^`]+?)`/g, a, b) };
   }
 
   // ── READING THE TEXT ──
@@ -178,7 +179,7 @@ QtObject {
   function mark(tag) {
     const f = md.field;
     if (!f || f.readOnly || md.inMono) return;
-    const sign = tag === "b" ? "**" : tag === "i" ? "*" : tag === "s" ? "~~" : "";
+    const sign = tag === "b" ? "**" : tag === "i" ? "*" : tag === "s" ? "~~" : tag === "c" ? "`" : "";
     if (sign === "") return;
     let a = f.selectionStart, b = f.selectionEnd;
     const t = f.text;
@@ -206,6 +207,14 @@ QtObject {
     f.insert(a, sign);
     if (a === b) f.cursorPosition = a + n; else f.select(a + n, b + n);
     f.forceActiveFocus();
+  }
+  // CODE, as GitHub's button writes it: words in a line in `backticks`,
+  // lines chosen across a break in a ``` fence (Delphi's Markdown bar)
+  function code() {
+    const f = md.field;
+    if (!f || f.readOnly) return;
+    if (md.inMono || f.selectedText.indexOf("\u2029") >= 0 || f.selectedText.indexOf("\n") >= 0) md.setKind("mono");
+    else md.mark("c");
   }
   // a list item deeper or shallower: two spaces, as Clio writes them
   function indent(d) {

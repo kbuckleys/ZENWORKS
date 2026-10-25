@@ -62,7 +62,7 @@ Scope {
     Type: "Application",
     Name: "Calypso",
     GenericName: "Password Manager",
-    Comment: "Your Bitwarden, 1Password, Proton Pass, KeePassXC and pass vaults, in ZENWORKS",
+    Comment: "Your Bitwarden, 1Password, Proton Pass, KeePassXC and pass vaults, in Zenworks",
     Icon: "dialog-password",
     Categories: ["Utility", "Security"],
     Keywords: ["password", "passwords", "vault", "login", "totp", "2fa", "otp", "bitwarden",

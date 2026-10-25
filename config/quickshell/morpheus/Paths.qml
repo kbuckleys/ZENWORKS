@@ -47,7 +47,7 @@ QtObject {
     return Quickshell.env("XDG_DATA_HOME") || Paths.home() + "/.local/share";
   }
 
-  // Where state that should outlive a cache lives: ZENWORKS' own notes for
+  // Where state that should outlive a cache lives: Zenworks' own notes for
   // ./uninstall (zenworks/) are here.
   function stateDir() {
     return Quickshell.env("XDG_STATE_HOME") || Paths.home() + "/.local/state";

@@ -195,6 +195,18 @@ module.exports = {
     t.eq("md # heading ruled, ### not", D.mdLinesOf("## A\n\n### B"), "## A\n" + R + "\n\n\n### B");
     t.eq("md divider under a heading: its one line", D.mdLinesOf("## A\n\n---\n\nb"), "## A\n" + R + "\n\n\nb");
     t.eq("md blank rows are room by blocks too", D.mdLinesOf("- a\n\n### B\n\n\nc"), "- a\n\n\u00a0\n\n### B\n\n\u00a0\n\n\u00a0\n\nc");
+    t.eq("code marks: a span", D.mdCodeMarks("run `zen` now"), "run `" + D.CODE_IN + "zen" + D.CODE_OUT + "` now");
+    t.eq("code marks: two spans, a double run", D.mdCodeMarks("`a` and ``b`c``"),
+      "`" + D.CODE_IN + "a" + D.CODE_OUT + "` and ``" + D.CODE_IN + "b`c" + D.CODE_OUT + "``");
+    t.eq("code marks: padded span keeps its spaces", D.mdCodeMarks("`` `x` ``"), "`` " + D.CODE_IN + "`x`" + D.CODE_OUT + " ``");
+    t.eq("code marks: a fenced block, nothing inside it touched",
+      D.mdCodeMarks("```sh\nzen `x`\nzen --where\n```\nafter `y`"),
+      "```sh\n" + D.BLOCK_IN + "zen `x`\nzen --where" + D.BLOCK_OUT + "\n```\nafter `" + D.CODE_IN + "y" + D.CODE_OUT + "`");
+    t.eq("code marks: an empty block, a lone tick", D.mdCodeMarks("```\n```\nit's a ` tick"), "```\n```\nit's a ` tick");
+    t.eq("stray tags escaped, real ones kept", D.mdCodeMarks("(like <Untitled>) a <b>bold</b> <br> </Foo>"),
+      "(like &lt;Untitled&gt;) a <b>bold</b> <br> &lt;/Foo&gt;");
+    t.eq("stray tags inside code untouched", D.mdCodeMarks("`<Untitled>` and <Untitled>"),
+      "`" + D.CODE_IN + "<Untitled>" + D.CODE_OUT + "` and &lt;Untitled&gt;");
     t.eq("md divider under words ends them", D.mdLinesOf("a\n***"), "a\n\n" + R + "\n");
     t.eq("plain: underlines gone", D.plainOf("Added\n-\n- x"), "Added\n- x");
     t.eq("md details", D.mdOf("<details><summary>Log</summary>\n\nline</details>"), "Log\n\nline");

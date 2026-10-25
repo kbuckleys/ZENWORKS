@@ -2,7 +2,7 @@
 Type=Application
 Name=Screen Time
 GenericName=Screen Time
-Comment=How long each app had you, in ZENWORKS
+Comment=How long each app had you, in Zenworks
 Icon=preferences-system-time
 Categories=Utility;
 Keywords=kairos;screen;time;usage;apps;focus;hours;today;week;

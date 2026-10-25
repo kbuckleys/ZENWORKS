@@ -18,7 +18,6 @@ return {
 	{ shipped = "delphi", name = "Delphi", class = "org.quickshell", title = "delphi", float = true, persistent_size = true },
 	{ shipped = "oracle", name = "Oracle", class = "org.quickshell", title = "oracle", float = true, persistent_size = true },
 	{ shipped = "calypso", name = "Calypso", class = "org.quickshell", title = "calypso", float = true, persistent_size = true },
-	{ shipped = "terminus", name = "Terminus", class = "org.quickshell", title = "terminus", float = true, persistent_size = true },
 	{ shipped = "alexandria", name = "Alexandria", class = "org.quickshell", title = "alexandria", float = true, persistent_size = true },
 	{ shipped = "clio", name = "Clio", class = "org.quickshell", title = "clio", float = true, persistent_size = true },
 	{ shipped = "hermes", name = "Control Hub", class = "org.quickshell", title = "hermes", float = true, persistent_size = true },
