@@ -29,22 +29,44 @@ On NVIDIA, also install your driver (`nvidia-open` or `nvidia`, with
 
 ## Start
 
-Log out and pick **ZENWORKS** on your login screen, or run `zenworks` from a
-text console.
+Log out and pick **ZENWORKS** on your login screen, or run `zen` from a
+text console. (`zenworks`, its older name, still works.)
 
 A login screen set up to run one fixed command (greetd with
-`--cmd start-hyprland`, for instance) needs that command changed to
-`zenworks`.
+`--cmd start-hyprland`, for instance) needs that command changed to `zen`.
 
-On the first start, ZENWORKS asks whether you want its terminal setup: zsh
-with a fast prompt, suggestions and fuzzy completion. Your own setup is kept
-as a backup. Oracle › Default apps › Terminal setup offers it again later.
+The very first start opens the shortcuts cheat sheet; **Super + /** brings
+it back any time, and typing filters it. A moment later ZENWORKS asks
+whether you want its terminal setup: zsh with a fast prompt, suggestions
+and fuzzy completion. Your own setup is kept as a backup. Oracle › Default
+apps › Terminal setup offers it again later.
+
+## Getting around
+
+| Keys | What they do |
+| --- | --- |
+| Super + Space | Cynosure, the launcher |
+| Super + / | Every shortcut on one sheet |
+| Super + Tab | The window switcher: hold Super, tap Tab to step, let go to switch (Shift goes back) |
+| Super + Ctrl + Tab | The same, for the windows of the app in front |
+| Super + 1 … 5 | Go to a workspace; a strip of your workspaces shows as you switch |
+| Super + Return | The terminal |
+| Super + E | Terminus, the file manager |
+| Super + Q | Close the window |
+| Super + Escape | Lock the screen |
+
+Every shortcut can be changed in Oracle › Shortcuts. The workspace strip
+can be turned off in Oracle › Windows.
 
 ## Your settings
 
 Everything you change lives in `~/.config/zenworks`: your themes, monitors,
 shortcuts, input, Plato's plugins, and your own kitty lines
 (`~/.config/zenworks/kitty/custom.conf`). An update never touches it.
+
+To start over, log out and run `zen --reset` from a text console: your
+settings are moved to `~/zenworks-reset-<date>`, never deleted, and the
+next start is a first start again.
 
 ## Update
 
@@ -69,7 +91,7 @@ its `config` directory in `~/.config/zenworks/dev`, one line:
 ```sh
 mkdir -p ~/.config/zenworks
 echo ~/Projects/ZENWORKS/config > ~/.config/zenworks/dev
-zenworks --where
+zen --where
 ```
 
 Log in again and that copy runs, with Quickshell's live reload. Remove the

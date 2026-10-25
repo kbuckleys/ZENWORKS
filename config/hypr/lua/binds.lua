@@ -208,24 +208,55 @@ bind("focusDown",     "SUPER + DOWN",         "Focus down",                     
 bind("focusLeft",     "SUPER + LEFT",         "Focus left",                          hl.dsp.focus({ direction = "l" }))
 bind("focusUp",       "SUPER + UP",           "Focus up",                            hl.dsp.focus({ direction = "u" }))
 
-bind("cycle",         "SUPER + TAB",          "Next window",                         function()
-    hl.dispatch(hl.dsp.window.cycle_next())
-    hl.dispatch(hl.dsp.window.bring_to_top())
-end)
+-- THE WINDOW SWITCHER (quickshell's morpheus/WindowSwitcher): every press
+-- steps it, numbered, and a watch says when the modifiers are up again —
+-- then the shell switches to the window lit. Any of Super, Alt and Ctrl
+-- held keeps it open (Shift is the way back, not a hold), so a chord moved
+-- in oracle works the same; one with none of them switches at once.
+--
+-- While it is open hyprland is in the "switcher" submap, which holds the
+-- switcher's own keys and nothing else: Super held with a click is
+-- otherwise Super+click (move the window), and the click never reached
+-- the card. Super+Esc there puts it away unswitched. Letting go of the
+-- modifiers leaves the submap, whatever the card did.
+local HOLD_KEYS = { "Super_L", "Super_R", "Alt_L", "Alt_R", "Control_L", "Control_R" }
+local switchSeq, switchWatch = 0, nil
+local function switcher(way)
+	return function()
+		switchSeq = switchSeq + 1
+		hl.dispatch(hl.dsp.exec_cmd("qs ipc call Switcher step " .. way .. " " .. switchSeq))
+		if switchWatch then return end
+		hl.dispatch(hl.dsp.submap("switcher"))
+		switchWatch = hl.timer(function()
+			for _, k in ipairs(HOLD_KEYS) do
+				if hl.is_key_down(k) then return end
+			end
+			switchWatch:set_enabled(false)
+			switchWatch = nil
+			hl.dispatch(hl.dsp.submap("reset"))
+			hl.dispatch(hl.dsp.exec_cmd("qs ipc call Switcher commit " .. switchSeq))
+		end, { timeout = 40, type = "repeat" })
+	end
+end
 
-bind("cycleBack",     "SUPER + SHIFT + TAB",  "Previous window",                     function()
-    local ws = hl.get_active_workspace()
-    if not ws then return end
+bind("cycle",         "SUPER + TAB",          "Window switcher, next",               switcher("next"))
+bind("cycleBack",     "SUPER + SHIFT + TAB",  "Window switcher, back",               switcher("back"))
+bind("cycleApp",      "SUPER + CONTROL + TAB",          "Window switcher, this app's windows",        switcher("app"))
+bind("cycleAppBack",  "SUPER + CONTROL + SHIFT + TAB",  "Window switcher, this app's windows, back",  switcher("appBack"))
 
-    hl.dispatch(hl.dsp.window.alter_zorder({ mode = "bottom" }))
-
-    local top
-    for _, win in ipairs(hl.get_windows({ workspace = ws, mapped = true })) do
-        if not win.hidden then top = win end
-    end
-    if top then
-        hl.dispatch(hl.dsp.focus({ window = top }))
-    end
+-- the switcher's submap: the same four binds, at the chords they have now
+local function chordOf(id, default)
+	return type(keys[id]) == "string" and keys[id] or default
+end
+hl.define_submap("switcher", function()
+	for _, b in ipairs({
+		{ "cycle", "SUPER + TAB", "next" }, { "cycleBack", "SUPER + SHIFT + TAB", "back" },
+		{ "cycleApp", "SUPER + CONTROL + TAB", "app" }, { "cycleAppBack", "SUPER + CONTROL + SHIFT + TAB", "appBack" },
+	}) do
+		local chord = chordOf(b[1], b[2])
+		if chord ~= "" then hl.bind(chord, switcher(b[3])) end
+	end
+	hl.bind("SUPER + ESCAPE", hl.dsp.exec_cmd("qs ipc call Switcher cancel"))
 end)
 
 -- off until given a chord in oracle's Shortcuts

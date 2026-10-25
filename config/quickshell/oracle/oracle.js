@@ -2052,13 +2052,49 @@ function renderWakeLua(by) {
 // Motion's "Window animations" (user, 2026-10-22). base.lua reads it, so it
 // holds from login. Both on unless the file says false: no file, or a broken
 // one, leaves hyprland as base.lua sets it.
+// Every field, its default, in the order the file lists them: shadows
+// and animations (Look, Motion), and the windows' own (Windows, 2026-10-25:
+// gaps 8 outside and 2 between, the user's defaults). `fx` on a setting's
+// spec names its field here. A field missing from the file, or not the
+// kind it should be, is its default.
+var EFFECTS = [
+  { fx: "shadows",          def: true },
+  { fx: "animations",       def: true },
+  { fx: "gaps_out",         def: 8, min: 0, max: 40 },
+  { fx: "gaps_in",          def: 2, min: 0, max: 20 },
+  { fx: "special_gaps",     def: 30, min: 0, max: 120 },
+  { fx: "border_size",      def: 1, min: 0, max: 5 },
+  { fx: "layout",           def: "dwindle", options: ["dwindle", "master", "scrolling"] },
+  { fx: "resize_on_border", def: false },
+  { fx: "dim_inactive",     def: 0, min: 0, max: 0.5 },
+  { fx: "inactive_opacity", def: 1, min: 0.5, max: 1 },
+];
+function effectsDefaults() {
+  const out = {};
+  for (const e of EFFECTS) out[e.fx] = e.def;
+  return out;
+}
 function parseEffectsLua(text) {
   const src = stripLuaComments(String(text || ""));
-  const off = (k) => new RegExp("\\b" + k + "\\s*=\\s*false\\b").test(src);
-  return { shadows: !off("shadows"), animations: !off("animations") };
+  const out = {};
+  for (const e of EFFECTS) {
+    const at = "\\b" + e.fx + "\\s*=\\s*";
+    let m;
+    if (typeof e.def === "boolean")
+      out[e.fx] = (m = new RegExp(at + "(true|false)\\b").exec(src)) ? m[1] === "true" : e.def;
+    else if (typeof e.def === "number")
+      out[e.fx] = (m = new RegExp(at + "(-?\\d+(?:\\.\\d+)?)").exec(src))
+        ? Math.min(e.max, Math.max(e.min, Number(m[1]))) : e.def;
+    else
+      out[e.fx] = (m = new RegExp(at + "\"([a-z]+)\"").exec(src)) && e.options.indexOf(m[1]) >= 0 ? m[1] : e.def;
+  }
+  return out;
 }
 function renderEffectsLua(fx) {
-  const on = (v) => v === false ? "false" : "true";
+  const f = Object.assign(effectsDefaults(), fx || {});
+  const pad = Math.max.apply(null, EFFECTS.map((e) => e.fx.length));
+  const val = (v) => typeof v === "boolean" ? (v ? "true" : "false")
+    : typeof v === "number" ? String(v) : JSON.stringify(String(v));
   return [
     "-- ┌─┐┌─┐┌┐┌┬ ┬┌─┐┬─┐┬┌─┌─┐",
     "-- ┌─┘├┤ │││││││ │├┬┘├┴┐└─┐",
@@ -2066,15 +2102,13 @@ function renderEffectsLua(fx) {
     "-- https://github.com/kbuckleys/",
     "",
     "-- EFFECTS",
-    "-- Written by oracle (Look's Window shadows, Motion's Window animations),",
-    "-- and read back by it. false turns that one off; base.lua reads it.",
+    "-- Written by oracle (Look's Window shadows, Motion's Window animations,",
+    "-- the window rows under Windows), and read back by it; base.lua lays",
+    "-- it over its own. Gaps and border in pixels; dim_inactive 0 is off.",
     "",
     "return {",
-    "\tshadows    = " + on(fx && fx.shadows) + ",",
-    "\tanimations = " + on(fx && fx.animations) + ",",
-    "}",
-    "",
-  ].join("\n");
+  ].concat(EFFECTS.map((e) => "\t" + (e.fx + " ".repeat(pad)).slice(0, pad) + " = " + val(f[e.fx]) + ","))
+   .concat(["}", ""]).join("\n");
 }
 
 // ── RECORDS ──

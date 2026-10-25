@@ -252,6 +252,10 @@ Singleton {
   function cycleSort() {
     root.sortIndex = (root.sortIndex + 1) % root.sortModes.length;
   }
+  // quick access shows one directory at a time; this shows every picture
+  // under the backgrounds directory together, as it used to (user,
+  // 2026-10-25: a checkbox, off by default)
+  property bool everything: false
 
   // ── what each monitor is actually showing ────────────────────────────
   // monitor name -> path (or color) once it is decoded and on screen, as

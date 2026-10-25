@@ -14,6 +14,9 @@
 // press opens it; `Keys release` on the key coming up closes it, but only
 // once it was held past HOLD_MS — a quick tap leaves it open to read and
 // type into, closed by Esc, a click, or the same keys again.
+//
+// The very first start opens it too (Oracle.keysSheetAsked, from ZshSetup),
+// as a welcome: its title says so, and the corner which keys bring it back.
 
 import QtQuick
 import Quickshell
@@ -42,6 +45,8 @@ PanelWindow {
   readonly property int holdMs: 400
   property real heldAt: 0
   property string query: ""
+  // opened by the first start rather than the keys, until it closes
+  property bool welcome: false
 
   function open() {
     sheet.query = "";
@@ -50,7 +55,15 @@ PanelWindow {
   function close() {
     sheet.shown = false;
     sheet.heldAt = 0;
+    sheet.welcome = false;
   }
+
+  Binding { target: Oracle; property: "keysSheetOpen"; value: sheet.shown }
+  Connections {
+    target: Oracle
+    function onKeysSheetAsked() { sheet.open(); sheet.welcome = true; }
+  }
+  readonly property string ownChord: Ora.chordCaps(Oracle.keyValues["bind:keysSheet"] || "").join(" + ")
 
   IpcHandler {
     target: "Keys"
@@ -155,7 +168,7 @@ PanelWindow {
 
       Text {
         anchors { left: parent.left; leftMargin: 24; verticalCenter: parent.verticalCenter }
-        text: "Shortcuts"
+        text: sheet.welcome ? "Welcome to ZENWORKS" : "Shortcuts"
         color: Zenon.white
         font.family: Zenon.face
         font.weight: Zenon.titleWeight
@@ -165,7 +178,9 @@ PanelWindow {
       // the filter: whatever is typed lands here, there is nothing to click
       Text {
         anchors { right: parent.right; rightMargin: 24; verticalCenter: parent.verticalCenter }
-        text: sheet.query !== "" ? sheet.query : sheet.count + " shortcuts"
+        text: sheet.query !== "" ? sheet.query
+          : sheet.welcome && sheet.ownChord !== "" ? sheet.ownChord + " brings these shortcuts back"
+          : sheet.count + " shortcuts"
         color: sheet.query !== "" ? Zenon.cyan : Zenon.muted
         font.family: Zenon.face
         font.weight: Zenon.weight

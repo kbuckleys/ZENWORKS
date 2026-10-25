@@ -1,6 +1,6 @@
 [Desktop Entry]
 Name=ZENWORKS
 Comment=A desktop built on Quickshell and Hyprland
-Exec=zenworks
+Exec=zen
 Type=Application
 DesktopNames=ZENWORKS;Hyprland

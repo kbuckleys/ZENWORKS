@@ -29,6 +29,38 @@ function rel(path, dir) {
 // A row is { path, thumb, mtime, size }: the background, the cached thumbnail
 // the picker actually draws (thumb is "" when one could not be generated),
 // and the two facts the ordering needs.
+// THE GRID BY DIRECTORY (user, 2026-10-25: directories, not every picture
+// at once): what one directory under the backgrounds directory holds — its
+// directories first, by name, each { dir: true, name, sub, path, count,
+// cover, thumb } with its first picture (in the order given) for a cover,
+// then its own pictures. `sub` is relative to `dir`, "" the top.
+function level(files, dir, sub) {
+  const base = String(dir || "") + (sub ? "/" + sub : "");
+  const dirs = {}, names = [], own = [];
+  for (const f of files || []) {
+    const p = String(f.path || "");
+    if (p.indexOf(base + "/") !== 0) continue;
+    const rest = p.slice(base.length + 1);
+    const slash = rest.indexOf("/");
+    if (slash < 0) { own.push(f); continue; }
+    const name = rest.slice(0, slash);
+    if (!dirs[name]) {
+      dirs[name] = { dir: true, name: name, sub: (sub ? sub + "/" : "") + name, path: base + "/" + name,
+                     count: 0, cover: p, thumb: f.thumb || "" };
+      names.push(name);
+    }
+    dirs[name].count++;
+  }
+  names.sort((a, b) => a.localeCompare(b));
+  return names.map((n) => dirs[n]).concat(own);
+}
+// the directory above a `sub`, "" at the top
+function up(sub) {
+  const s = String(sub || "");
+  const i = s.lastIndexOf("/");
+  return i < 0 ? "" : s.slice(0, i);
+}
+
 function filter(files, query, dir) {
   const q = String(query || "").trim().toLowerCase();
   if (q === "") return files;

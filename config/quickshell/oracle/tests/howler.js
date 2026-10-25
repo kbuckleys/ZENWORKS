@@ -102,5 +102,8 @@ module.exports = {
     t.eq("a timer, but the switch is off", H.focus({ timers: false, timerRunning: true }).quiet, false);
     t.eq("quiet hours say until when", H.focus({ hours: true, fromH: 22, toH: 7, minutesOfDay: 23 * 60 }).why, "Quiet hours, until 07:00");
     t.eq("nothing", H.focus({}), { quiet: false, why: "" });
+    t.eq("full screen", H.focus({ fullscreen: true, fullscreenOn: true }), { quiet: true, why: "Quiet while full screen", fullscreen: true });
+    t.eq("full screen, but the switch is off", H.focus({ fullscreen: false, fullscreenOn: true }).quiet, false);
+    t.eq("a timer before full screen", H.focus({ timers: true, timerRunning: true, fullscreen: true, fullscreenOn: true }).why, "Quiet while a timer runs");
   }
 };

@@ -22,8 +22,12 @@ hl.layer_rule({ match = { namespace = "morpheus-bar-clear" }, blur = false })
 -- animation to fight its own fade, and no blur to pop in at half alpha
 hl.layer_rule({ match = { namespace = "cerberus-veil" }, animation = "none", blur = false })
 
--- SPECIAL WORKSPACE
-hl.workspace_rule({ workspace = "special:special", gaps_out = 30 })
+-- SPECIAL WORKSPACE: its windows stand this far in from the screen's
+-- edges — oracle's Windows › Special workspace gaps, kept in effects.lua
+-- (special_gaps); 30 without one. Guarded like defaults.lua.
+local okFx, fx = pcall(require, "lua.effects")
+local specialGaps = okFx and type(fx) == "table" and type(fx.special_gaps) == "number" and fx.special_gaps or 30
+hl.workspace_rule({ workspace = "special:special", gaps_out = specialGaps })
 
 -- SHIPPED + YOURS: windowdefaults.lua (the suite's own) and windows.lua,
 -- which oracle's Windows section writes (Window rules). A rule of yours

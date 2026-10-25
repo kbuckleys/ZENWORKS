@@ -53,6 +53,8 @@ function toggleSpecial(name) { return "hl.dsp.workspace.toggle_special(" + lua(n
 
 // ── the active window, or the one a selector names ──────────────────────
 function fullscreen() { return "hl.dsp.window.fullscreen()"; }
+// closed as its own close button would (not killed): the app may ask first
+function closeWindow(selector) { return "hl.dsp.window.close({ window = " + lua(selector) + " })"; }
 
 function moveOrResize_(verb, dx, dy, selector) {
   return "hl.dsp.window." + verb + "({ x = " + Number(dx || 0) + ", y = " + Number(dy || 0)

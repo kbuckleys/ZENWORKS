@@ -32,6 +32,12 @@ Row {
   property string label: ""
   property bool enabled2: true
   property color ink: Zenon.cyan
+  // the label's and the empty box's inks, and the label's size — for a
+  // Check standing among controls that speak in another (picasso's foot,
+  // in the accent beside its chips: user, 2026-10-25)
+  property color offInk: Zenon.accentKey
+  property color onInk: Zenon.white
+  property real textSize: Zenon.px(15)
   property bool kbOn: false
   // pressed from outside: a holder that takes the tap itself (a whole
   // settings row, a wider hit area) and turns this one's off says so here
@@ -52,7 +58,7 @@ Row {
     Behavior on color { ColorAnimation { duration: Zenon.fast } }
     // a touch heavier than a hairline (user, 2026-10-21)
     border.width: 1.5
-    border.color: ck.lit ? ck.ink : Zenon.accentKey
+    border.color: ck.lit ? ck.ink : ck.offInk
     Text {
       anchors.centerIn: parent
       visible: ck.lit
@@ -78,11 +84,11 @@ Row {
     visible: ck.label !== ""
     anchors.verticalCenter: parent.verticalCenter
     text: ck.label
-    color: ck.lit ? Zenon.white : Zenon.accentKey
+    color: ck.lit ? ck.onInk : ck.offInk
     opacity: ck.down ? Zenon.pressDim : 1
     font.family: Zenon.face
     font.weight: Zenon.weight
-    font.pixelSize: Zenon.px(15)
+    font.pixelSize: ck.textSize
   }
   TapHandler { id: ckTap; enabled: ck.enabled2; onTapped: ck.toggled() }
 }

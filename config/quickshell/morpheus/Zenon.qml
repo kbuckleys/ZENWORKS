@@ -19,6 +19,12 @@ import "zenon"
 ZenonBase {
   cfg: Oracle
 
+  // The window switcher's card is up (morpheus/WindowSwitcher says): the
+  // windows' hover tips and bubbles put themselves away, or its live
+  // pictures show them as a grey slab — hyprland frosts a window's popups
+  // in a capture too, with nothing behind them to frost.
+  property bool tipsAway: false
+
   // YOURS FIRST: a theme in ~/.config/zenworks/themes (saved from Follow
   // Background, or put there by hand) is worn over the shipped one of the
   // same name beside the shell. Both are read side by side — switching one

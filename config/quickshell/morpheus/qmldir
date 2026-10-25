@@ -89,3 +89,5 @@ SysMeter 1.0 SysMeter.qml
 GlassRim 1.0 GlassRim.qml
 PanelGround 1.0 PanelGround.qml
 OpenWatchdog 1.0 OpenWatchdog.qml
+WindowSwitcher 1.0 WindowSwitcher.qml
+WorkspaceStrip 1.0 WorkspaceStrip.qml

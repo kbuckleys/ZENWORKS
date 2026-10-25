@@ -14,6 +14,7 @@ import Quickshell.Hyprland
 import "../morpheus"
 import "../morpheus/gridnav.js" as Nav
 import "../terminus" as Term
+import "../morpheus/controls" as Controls
 import "picasso.js" as Art
 
 LayerPopup {
@@ -69,11 +70,36 @@ LayerPopup {
   // where the card grows out of — the clicked cell, in surface coordinates
   property point focusFrom: Qt.point(0, 0)
 
+  // BY DIRECTORY (user, 2026-10-25): the grid is one directory at a time —
+  // its directories first (a cover and a count; a click or Return goes in,
+  // Backspace or Esc comes back out), then its own pictures. Typing searches
+  // every picture under the backgrounds directory at once, flat, as before.
+  // `sub` is where you are, relative to Picasso.dir; "" is the top.
+  property string sub: ""
   // Filter first, then order: the sort only has to touch what survived, and
   // the two are separate questions the user changes independently.
-  readonly property var filtered: Art.sortRows(
-    Art.filter(Picasso.files, popup.query, Picasso.dir),
-    Picasso.sortMode, Picasso.dir)
+  readonly property var filtered: popup.query !== "" || Picasso.everything
+    ? Art.sortRows(Art.filter(Picasso.files, popup.query, Picasso.dir), Picasso.sortMode, Picasso.dir)
+    : Art.level(Art.sortRows(Picasso.files, Picasso.sortMode, Picasso.dir), Picasso.dir, popup.sub)
+  // the pictures alone, what the card steps through
+  readonly property var pictures: popup.filtered.filter((r) => !r.dir)
+  readonly property int dirCount: popup.filtered.length - popup.pictures.length
+
+  function enterDir(row) {
+    popup.sub = row.sub;
+    popup.sel = 0;
+    popup.followSelection();
+  }
+  // back out of a directory, the one just left selected
+  function upDir() {
+    if (popup.sub === "") return false;
+    const was = popup.sub;
+    popup.sub = Art.up(popup.sub);
+    const i = popup.filtered.findIndex((r) => r.dir && r.sub === was);
+    popup.sel = Math.max(0, i);
+    popup.followSelection();
+    return true;
+  }
 
   // The presets, then the ones made here. Shaped like a file row — a path
   // and nothing else — so the card can browse them the way it browses files.
@@ -93,7 +119,7 @@ LayerPopup {
 
   // what the card browses: whichever list its subject came from
   readonly property var focusList:
-    Art.isColor(popup.focusPath) ? popup.colorItems : popup.filtered
+    Art.isColor(popup.focusPath) ? popup.colorItems : popup.pictures
 
   // Every connected output, by name. Built from the live list, so plugging a
   // monitor in puts it on the map with no edit.
@@ -148,8 +174,11 @@ LayerPopup {
   // hanging off the edge as soon as that was not what it used to be. (It
   // used to have the scrollbar's strip taken off it as well, before the bar
   // was floated over the pictures.)
+  // and FEWER than the columns share the row between them (user,
+  // 2026-10-25): three pictures in a directory took three quarters of it
+  // and left the fourth empty
   readonly property int cellW:
-    Math.max(80, Math.floor(grid.width / popup.cols))
+    Math.max(80, Math.floor(grid.width / Math.max(1, Math.min(popup.cols, popup.filtered.length))))
   readonly property int cellH: 150
 
   function gridHeight() {
@@ -323,6 +352,7 @@ LayerPopup {
     popup.collapsing = false;
     popup.regrab = false;
     popup.query = "";
+    popup.sub = "";
     popup.sel = 0;
     popup.focusOpen = false;
     popup.focusPath = "";
@@ -436,6 +466,7 @@ LayerPopup {
     const list = colors ? popup.colorItems : popup.filtered;
     if (list.length === 0) return;
     const i = Math.min(colors ? popup.colorSel : popup.sel, list.length - 1);
+    if (!colors && list[i].dir) { popup.enterDir(list[i]); return; }
     popup.openFocus(list, i, popup.cellCentre(i));
   }
 
@@ -453,7 +484,8 @@ LayerPopup {
   // out of if you browsed.
   function closeFocus() {
     if (popup.cardOnly) { popup.focusOpen = false; popup.closePopup(); return; }
-    if (popup.focusIndex >= 0) popup.focusFrom = popup.cellCentre(popup.focusIndex);
+    if (popup.focusIndex >= 0)
+      popup.focusFrom = popup.cellCentre(popup.focusIndex + (Art.isColor(popup.focusPath) ? 0 : popup.dirCount));
     popup.focusOpen = false;
     popup.syncFocus();
   }
@@ -473,7 +505,8 @@ LayerPopup {
       popup.colorSel = to;
       Qt.callLater(() => colorGrid.positionViewAtIndex(to, GridView.Contain));
     } else {
-      popup.sel = to;
+      // the grid has the directories ahead of the pictures
+      popup.sel = to + popup.dirCount;
       popup.followSelection();
     }
   }
@@ -529,7 +562,7 @@ LayerPopup {
         // the panel
         if (popup.focusOpen) { if (!focusCard.cancel()) popup.closeFocus(); }
         else if (popup.query !== "") popup.query = "";
-        else popup.closePopup();
+        else if (!popup.upDir()) popup.closePopup();
       }
 
       Keys.onPressed: (event) => {
@@ -603,7 +636,7 @@ LayerPopup {
             chars.pop();
             popup.query = chars.join("");
             popup.clampSel();
-          }
+          } else popup.upDir();
         } else if (event.text && event.text.length > 0 &&
                    !(event.modifiers & Qt.ControlModifier) &&
                    !(event.modifiers & Qt.AltModifier) &&
@@ -743,8 +776,31 @@ LayerPopup {
                 anchors.horizontalCenter: parent.horizontalCenter
                 width: popup.cellW - 28
                 height: popup.cellH - 52
-                path: cell.modelData.path
+                // a directory wears its cover, its first picture
+                path: cell.modelData.dir ? cell.modelData.cover : cell.modelData.path
                 thumb: cell.modelData.thumb ?? ""
+              }
+
+              // a directory: its mark and how many pictures are in it, on
+              // a chip in the cover's corner
+              Rectangle {
+                visible: cell.modelData.dir === true
+                anchors.left: thumbBox.left
+                anchors.bottom: thumbBox.bottom
+                anchors.margins: 6
+                width: dirChip.implicitWidth + 14
+                height: dirChip.implicitHeight + 6
+                radius: Zenon.radiusControl
+                color: Zenon.hud(0.75)
+                Text {
+                  id: dirChip
+                  anchors.centerIn: parent
+                  text: "\uF07B  " + (cell.modelData.count || 0)
+                  color: Zenon.ink
+                  font.family: Zenon.face
+                  font.weight: Zenon.weight
+                  font.pixelSize: Zenon.px(12)
+                }
               }
 
               // a corner tick on whatever is currently on a monitor, so the
@@ -773,7 +829,7 @@ LayerPopup {
                 anchors.bottomMargin: 12
                 anchors.horizontalCenter: parent.horizontalCenter
                 width: popup.cellW - 28
-                text: Art.label(cell.modelData.path)
+                text: cell.modelData.dir ? cell.modelData.name : Art.label(cell.modelData.path)
                 color: cell.selected ? popup.highlight : popup.dimColor
                 font.family: Zenon.face
                 font.weight: cell.selected ? Font.Bold : Font.Normal
@@ -800,6 +856,7 @@ LayerPopup {
                 // it reads as the picture coming forward rather than a
                 // dialog arriving from nowhere.
                 onClicked: {
+                  if (cell.modelData.dir) { popup.enterDir(cell.modelData); return; }
                   const p = thumbBox.mapToItem(null, thumbBox.width / 2,
                                                thumbBox.height / 2);
                   popup.openFocus(popup.filtered, cell.index, p);
@@ -1123,6 +1180,25 @@ LayerPopup {
             // Neither ring is shown while you are typing or while the scan
             // is running: the line is carrying one message at a time, and
             // that message is what you typed or what it is doing.
+            // every picture at once instead of a directory at a time
+            Controls.Check {
+              visible: popup.restingStatus && popup.view === "backgrounds"
+              anchors.verticalCenter: parent.verticalCenter
+              label: "Everything"
+              lit: Picasso.everything
+              // the accent, as the chips beside it speak
+              ink: popup.headColor
+              offInk: Zenon.alpha(popup.headColor, 0.7)
+              onInk: popup.headColor
+              textSize: Zenon.px(14)
+              onToggled: {
+                Picasso.everything = !Picasso.everything;
+                popup.sub = "";
+                popup.sel = 0;
+                popup.followSelection();
+              }
+            }
+
             Ring {
               visible: popup.restingStatus && popup.view === "backgrounds"
               anchors.verticalCenter: parent.verticalCenter
@@ -1187,8 +1263,11 @@ LayerPopup {
                   text: popup.view === "colors"
                     ? popup.colorItems.length + " Colors"
                     : popup.query !== "" ? popup.query
-                    : popup.filtered.length + (popup.filtered.length === 1
-                        ? " Background" : " Backgrounds")
+                    : (popup.sub !== "" ? popup.sub + "  \u00B7  " : "")
+                      + [popup.pictures.length > 0 || popup.dirCount === 0
+                           ? popup.pictures.length + (popup.pictures.length === 1 ? " Background" : " Backgrounds") : "",
+                         popup.dirCount > 0 ? popup.dirCount + (popup.dirCount === 1 ? " Directory" : " Directories") : ""]
+                        .filter((w) => w !== "").join(", ")
                   // MUTED WHEN IT IS A COUNT, bright when it is your query.
                   // The count is a fact about the grid you are already
                   // looking at; the query is the only thing on this line you

@@ -100,7 +100,7 @@ hl.env("QT_QPA_PLATFORMTHEME", "qt6ct")
 -- beside this config, the shell's font and theme, then your custom.conf.
 hl.env("KITTY_CONFIG_DIRECTORY", ZENWORKS.kitty)
 
--- THE DESKTOP'S NAME, as `zenworks` exports it — set again here in case
+-- THE DESKTOP'S NAME, as `zen` exports it — set again here in case
 -- Hyprland put its own over it as it started: xdg-desktop-portal picks
 -- zenworks-portals.conf by it, and autostart.lua's import hands it on.
 hl.env("XDG_CURRENT_DESKTOP", "ZENWORKS:Hyprland")
@@ -137,7 +137,7 @@ hl.config({
 		initial_workspace_tracking = 0,
 		close_special_on_empty = true,
 		disable_hyprland_logo = true,
-		-- XDG_CURRENT_DESKTOP is ZENWORKS:Hyprland on purpose (bin/zenworks,
+		-- XDG_CURRENT_DESKTOP is ZENWORKS:Hyprland on purpose (bin/zen,
 		-- and above): without this Hyprland greets every login with "set
 		-- externally … might cause issues" (user, 2026-10-25)
 		disable_xdg_env_checks = true,
@@ -160,8 +160,10 @@ hl.config({
 			inactive_border = "#45505C4D",
 			active_border = "#45505CCC",
 		},
-		gaps_out = 0,
-		gaps_in = 0,
+		-- 8 outside, 2 between (2026-10-25); oracle's Windows section moves
+		-- them, through effects.lua (below)
+		gaps_out = 8,
+		gaps_in = 2,
 		snap = {
 			enabled = true,
             border_overlap = true,
@@ -241,15 +243,34 @@ end
 
 -- EFFECTS
 -- effects.lua, which oracle writes (Look's "Window shadows", Motion's
--- "Window animations"): `false` turns hyprland's shadows or its animations
--- off. Only false does; no file, or a broken one, keeps both. Guarded like
--- defaults.lua.
+-- "Window animations", and the window rows under Windows): `false` turns
+-- hyprland's shadows or its animations off; the gaps, border, layout,
+-- edge resizing, dim and unfocused opacity are laid over the ones above.
+-- A field the file lacks, or has as the wrong kind, keeps what is above.
+-- Each is its own call, so one hyprland refuses costs only that one.
+-- Guarded like defaults.lua.
 local okFx, fx = pcall(require, "lua.effects")
 if okFx and type(fx) == "table" then
 	pcall(hl.config, {
 		decoration = { shadow = { enabled = fx.shadows ~= false } },
 		animations = { enabled = fx.animations ~= false },
 	})
+	local function num(v) return type(v) == "number" and v or nil end
+	if num(fx.gaps_out) then pcall(hl.config, { general = { gaps_out = fx.gaps_out } }) end
+	if num(fx.gaps_in) then pcall(hl.config, { general = { gaps_in = fx.gaps_in } }) end
+	if num(fx.border_size) then pcall(hl.config, { general = { border_size = fx.border_size } }) end
+	if fx.layout == "dwindle" or fx.layout == "master" or fx.layout == "scrolling" then
+		pcall(hl.config, { general = { layout = fx.layout } })
+	end
+	if type(fx.resize_on_border) == "boolean" then
+		pcall(hl.config, { general = { resize_on_border = fx.resize_on_border } })
+	end
+	if num(fx.dim_inactive) then
+		pcall(hl.config, { decoration = { dim_inactive = fx.dim_inactive > 0, dim_strength = fx.dim_inactive } })
+	end
+	if num(fx.inactive_opacity) then
+		pcall(hl.config, { decoration = { inactive_opacity = fx.inactive_opacity } })
+	end
 end
 
 -- THEME: the shell's theme, written to theme.lua by quickshell's ThemeSync

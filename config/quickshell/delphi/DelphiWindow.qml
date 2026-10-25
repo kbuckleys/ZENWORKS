@@ -123,6 +123,8 @@ FloatingWindow {
   // for a fork, else origin's (D.hubOf) — { remote, full, web } or null
   // (servers of your own count: a remote on one is that server's)
   readonly property var hub: { win.mgr ? win.mgr.servers : null; return D.hubOf(win.remotes); }
+  // a package's recipe on the AUR (a remote there): its own page
+  readonly property var aur: D.aurOf(win.remotes)
 
   function openRepo(path) {
     if (!win.mgr) return;
@@ -879,8 +881,10 @@ FloatingWindow {
   // In three groups, each under its heading (user, 2026-10-11: the list
   // wanted a more logical arrangement): this repository's own work, its
   // forge's (named for the forge it is on), and what is not about one
-  // repository. Ctrl 1–9 follow this order.
-  readonly property var pages: [
+  // repository. Ctrl 1–9 follow this order. The AUR's page is there only
+  // for a repository with a remote on it.
+  readonly property var pages: win.allPages.filter((p) => p.id !== "aur" || !!win.aur)
+  readonly property var allPages: [
     { id: "changes", label: "Changes", glyph: "", group: "repo" },
     { id: "history", label: "History", glyph: "", group: "repo" },
     { id: "branches", label: "Branches", glyph: "", group: "repo" },
@@ -890,12 +894,14 @@ FloatingWindow {
     { id: "pulls", label: win.hub && D.FORGES[win.hub.forge] ? D.FORGES[win.hub.forge].pulls : "Pull requests", glyph: "\uF407", group: "forge" },
     { id: "issues", label: "Issues", glyph: "\uF41B", group: "forge" },
     { id: "releases", label: "Releases", glyph: "\uF412", group: "forge" },
+    { id: "aur", label: "Package", glyph: "\uF487", group: "aur" },
     { id: "repos", label: "Repositories", glyph: "", group: "all" },
     { id: "github", label: "Accounts", glyph: "\uF0C2", group: "all" },
     { id: "keys", label: "SSH keys", glyph: "\uF43D", group: "all" },
   ]
   function groupWord(g) {
     return g === "repo" ? "Repository"
+      : g === "aur" ? "AUR"
       : g === "forge" ? (win.hub && D.FORGES[win.hub.forge] ? D.FORGES[win.hub.forge].name : "Forge")
       : "Everywhere";
   }
@@ -1745,7 +1751,7 @@ FloatingWindow {
       anchors.bottom: foot.top
       source: win.root === "" && ["github", "repos", "keys"].indexOf(win.page) < 0 ? "ReposPage.qml"
         : ({ changes: "ChangesPage.qml", history: "HistoryPage.qml", branches: "BranchesPage.qml",
-             stashes: "StashesPage.qml", worktrees: "WorktreesPage.qml", remotes: "RemotesPage.qml", keys: "KeysPage.qml", releases: "ReleasesPage.qml", github: "GitHubPage.qml",
+             stashes: "StashesPage.qml", worktrees: "WorktreesPage.qml", remotes: "RemotesPage.qml", keys: "KeysPage.qml", releases: "ReleasesPage.qml", aur: "AurPage.qml", github: "GitHubPage.qml",
              pulls: "ForgePage.qml", issues: "ForgePage.qml",
              repos: "ReposPage.qml" })[win.page] || "ChangesPage.qml"
       onLoaded: { item.win = win; Qt.callLater(win.refocus); }

@@ -12,6 +12,19 @@
 module.exports = {
   module: "picasso/picasso.js",
   cases: (A, t) => {
+    {
+      const D = "/b";
+      const f = [{ path: "/b/top.png", thumb: "t0" }, { path: "/b/Space/a.png", thumb: "ta" },
+                 { path: "/b/Space/deep/c.png", thumb: "tc" }, { path: "/b/Space/b.png", thumb: "tb" },
+                 { path: "/b/Art/x.jpg", thumb: "tx" }, { path: "/elsewhere/y.png" }];
+      const top = A.level(f, D, "");
+      t.eq("level: dirs first by name, then own", top.map((r) => r.dir ? "[" + r.name + "]" : r.path), ["[Art]", "[Space]", "/b/top.png"]);
+      t.eq("level: a dir counts everything under it, first is its cover",
+        [top[1].count, top[1].cover, top[1].thumb, top[1].sub, top[1].path], [3, "/b/Space/a.png", "ta", "Space", "/b/Space"]);
+      const space = A.level(f, D, "Space");
+      t.eq("level: inside", space.map((r) => r.dir ? "[" + r.sub + "]" : r.path), ["[Space/deep]", "/b/Space/a.png", "/b/Space/b.png"]);
+      t.eq("up", [A.up("Space/deep"), A.up("Space"), A.up("")], ["Space", "", ""]);
+    }
     t.eq("a color is not a path", A.isColor("color:#112233"), true);
     t.eq("a path is not a color", A.isColor("/home/a/color:x.png"), false);
     t.eq("short hex widens", A.normHex("ABC"), "#aabbcc");

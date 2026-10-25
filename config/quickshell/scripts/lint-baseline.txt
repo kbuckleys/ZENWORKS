@@ -126,14 +126,20 @@
 1	morpheus/Strings.qml	missing-property	Member "done" not found on type Strings::pasteProc with type Process
 3	morpheus/Sysmon.qml	missing-property	Member "reload" not found on type "QObject"
 3	morpheus/Sysmon.qml	missing-property	Member "text" not found on type "QObject"
+1	morpheus/WindowSwitcher.qml	missing-property	Member "width" not found on type "QuickshellScreenInfo"
+1	morpheus/WindowSwitcher.qml	uncreatable-type	Type PanelWindow is not creatable.
 1	morpheus/WindowTip.qml	missing-property	Could not find property "adjustment".
 1	morpheus/WindowTip.qml	missing-property	Could not find property "edges".
 1	morpheus/WindowTip.qml	missing-property	Could not find property "gravity".
 1	morpheus/WindowTip.qml	missing-property	Could not find property "window".
 1	morpheus/WindowTip.qml	unresolved-type	Type rect is used but it is not resolved
+1	morpheus/WorkspaceStrip.qml	missing-property	Could not find property "bottom".
+1	morpheus/WorkspaceStrip.qml	missing-property	Member "height" not found on type "QuickshellScreenInfo"
+1	morpheus/WorkspaceStrip.qml	uncreatable-type	Type PanelWindow is not creatable.
 1	morpheus/Workspaces.qml	block-scope-var-declaration	var declaration in block scope is hoisted to function scope
 1	morpheus/Workspaces.qml	missing-property	Member "values" not found on type "UntypedObjectModel"
 1	oracle/KeysSheet.qml	uncreatable-type	Type PanelWindow is not creatable.
+1	oracle/WelcomeLook.qml	uncreatable-type	Type PanelWindow is not creatable.
 1	picasso/FocusCard.qml	missing-property	Member "ink" not found on type "QQuickItem"
 1	picasso/FocusCard.qml	missing-property	Member "value" not found on type "QQuickItem"
 1	picasso/MapView.qml	missing-property	Member "running" not found on type call to method createObject, returning QObject

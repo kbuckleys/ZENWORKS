@@ -1891,6 +1891,27 @@ FloatingWindow {
                 // was reading as a separator between two unrelated things.
                 Item { width: 1; height: 6 }
 
+                // CREDITS (2026-10-25): what ZENWORKS stands on, said where
+                // its own name is — the session's launcher is called after
+                // ZENWORKS, and the work underneath is not ours. Above the
+                // byline (user, 2026-10-25: the two lines swapped).
+                Text {
+                  anchors.horizontalCenter: parent.horizontalCenter
+                  textFormat: Text.StyledText
+                  text: "built on <a href=\"https://quickshell.org\">Quickshell</a> and "
+                    + "<a href=\"https://hyprland.org\">Hyprland</a>, with Qt"
+                  color: popup.dimColor
+                  linkColor: Zenon.link
+                  font.family: popup.face
+                  font.weight: Zenon.weight
+                  font.pixelSize: Zenon.px(13)
+                  onLinkActivated: (url) => Quickshell.execDetached(["xdg-open", url])
+                  HoverHandler {
+                    cursorShape: parent.hoveredLink !== ""
+                      ? Qt.PointingHandCursor : Qt.ArrowCursor
+                  }
+                }
+
                 Text {
                   anchors.horizontalCenter: parent.horizontalCenter
                   // StyledText, not RichText: it is one anchor in one line

@@ -23,6 +23,7 @@ pragma Singleton
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import Quickshell.Hyprland
 import Quickshell.Services.Mpris
 import Quickshell.Services.Notifications
 import Qt.labs.folderlistmodel
@@ -406,6 +407,7 @@ Singleton {
       // The stack draws a hushed toast as nothing for that one turn. A
       // critical one is the exception, as it is everywhere else.
       if (root.quiet && notif.urgency !== NotificationUrgency.Critical) {
+        if (root.focusState.fullscreen) root.heldInFullscreen = root.heldInFullscreen + 1;
         const h = Object.assign({}, root.hushed);
         h[notif.id] = true;
         root.hushed = h;
@@ -435,6 +437,7 @@ Singleton {
       // It still TOASTS. The arrival is worth saying once; it is the keeping
       // that was wrong.
       if (row.appName === root.selfUpdateApp) return;
+      if (row.appName === root.selfSummaryApp) return;
 
       const h = root.history.slice();
       h.unshift(row);
@@ -491,9 +494,24 @@ Singleton {
     triggeredOnStart: true
     onTriggered: { const d = new Date(); root.minuteOfDay = d.getHours() * 60 + d.getMinutes(); }
   }
+  // FULL SCREEN (2026-10-25): the focused workspace has a full-screen
+  // window. What it held back is counted, and said in one toast on leaving.
+  readonly property bool fullscreenOn: !!Hyprland.focusedWorkspace && Hyprland.focusedWorkspace.hasFullscreen
+  property int heldInFullscreen: 0
+  onFullscreenOnChanged: {
+    if (root.fullscreenOn || root.heldInFullscreen === 0) return;
+    const n = root.heldInFullscreen;
+    root.heldInFullscreen = 0;
+    Quickshell.execDetached(["notify-send", "--app-name=" + root.selfSummaryApp, "--icon=preferences-system-notifications",
+      n === 1 ? "1 notification came in" : n + " notifications came in",
+      "While you were full screen. They are in the bell."]);
+  }
+  // the summary is the bell talking about itself: shown, not kept
+  readonly property string selfSummaryApp: "Howler"
   readonly property var focusState: Wolf.focus({
     dnd: Oracle.notifSilent,
     timers: Oracle.notifFocusTimers, timerRunning: Chronos.anyRunning,
+    fullscreen: Oracle.notifQuietFullscreen, fullscreenOn: root.fullscreenOn,
     hours: Oracle.notifQuietHours, fromH: Oracle.notifQuietFrom, toH: Oracle.notifQuietTo,
     minutesOfDay: root.minuteOfDay
   })

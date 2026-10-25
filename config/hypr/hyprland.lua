@@ -5,7 +5,7 @@
 
 -- WHERE EVERYTHING IS. This config ships beside the shell — /usr/share/
 -- zenworks/{hypr,quickshell} from the package, or a working copy's, started
--- by `zenworks` (Hyprland --config this file) — and is only read. What you
+-- by `zen` (Hyprland --config this file) — and is only read. What you
 -- change lives in ~/.config/zenworks/hypr: oracle's settings (monitors.lua,
 -- keys.lua, input.lua …) and the files the shell generates (theme.lua,
 -- font.lua, corner.lua, filter.lua, the filter shaders). A file there is

@@ -24,6 +24,7 @@ module.exports = {
     t.eq("a workspace, as the bar wrote it", H.focusWorkspace("3"),
       'hl.dsp.focus({ workspace = "3" })');
     t.eq("fullscreen", H.fullscreen(), "hl.dsp.window.fullscreen()");
+    t.eq("close by address", H.closeWindow(H.byAddress("1f")), 'hl.dsp.window.close({ window = "address:0x1f" })');
     t.eq("a relative resize of a named window, as terminus wrote it",
       H.resizeBy(10, 0, "address:0xab"),
       'hl.dsp.window.resize({ x = 10, y = 0, relative = true, window = "address:0xab" })');

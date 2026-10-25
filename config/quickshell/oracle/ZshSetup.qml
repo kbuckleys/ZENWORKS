@@ -20,6 +20,12 @@
 //   first start fetches the prompt's plugins once.
 //
 // The answer is kept in welcome.json (Quickshell.statePath).
+//
+// THE CHEAT SHEET, ONCE: no welcome.json at all is the very first start,
+// so the shortcuts sheet opens over the new desktop (Oracle.keysSheetAsked,
+// KeysSheet listens) and welcome.json notes it at once. Closed, it hands on
+// to Make it yours (Oracle.welcomeLookAsked, WelcomeLook: theme, accent,
+// background). The terminal question waits until both are closed.
 
 import QtQuick
 import Quickshell
@@ -33,6 +39,8 @@ Scope {
   // "" not asked yet · "asked" shown once, not answered · "yes" · "no" ·
   // "quiet" shown twice, not answered: Oracle's row is the way now
   property string answer: ""
+  // "" not shown yet · "shown"
+  property string keys: ""
   property bool busy: false
 
   FileView {
@@ -41,20 +49,62 @@ Scope {
     blockLoading: true
     printErrors: false
   }
+  function save() {
+    stateFile.setText(JSON.stringify({ zsh: zsh.answer, keys: zsh.keys }, null, 1) + "\n");
+  }
   function keep(a) {
     zsh.answer = a;
-    stateFile.setText(JSON.stringify({ zsh: a }, null, 1) + "\n");
+    zsh.save();
   }
   Component.onCompleted: {
-    try { zsh.answer = String(JSON.parse(stateFile.text() || "{}").zsh || ""); } catch (e) {}
+    const text = stateFile.text() || "";
+    try {
+      const j = JSON.parse(text || "{}");
+      zsh.answer = String(j.zsh || "");
+      zsh.keys = String(j.keys || "");
+    } catch (e) {}
+    // older welcome.json files have no keys: those desktops are not new
+    if (text.trim() === "") {
+      zsh.keys = "shown";
+      zsh.save();
+      welcome.start();
+    }
     if (zsh.answer === "" || zsh.answer === "asked") settle.start();
   }
 
+  // the bar up first, so the sheet arrives on a desktop
+  property bool lookNext: false
+  Timer {
+    id: welcome
+    interval: 2000
+    onTriggered: { zsh.lookNext = true; Oracle.keysSheetAsked(); }
+  }
+  // the first start's two cards again, on asking: `qs ipc call Welcome
+  // show` (the cheat sheet, then Make it yours), or `look` for the second
+  IpcHandler {
+    target: "Welcome"
+    function show(): void { zsh.lookNext = true; Oracle.keysSheetAsked(); }
+    function look(): void { Oracle.welcomeLookAsked(); }
+  }
+  Connections {
+    target: Oracle
+    function onKeysSheetOpenChanged() {
+      if (Oracle.keysSheetOpen || !zsh.lookNext) return;
+      zsh.lookNext = false;
+      Oracle.welcomeLookAsked();
+    }
+  }
+
   // a few seconds in: the bar is up and a notification lands on a desktop
+  // — never under the cheat sheet, which is read first
   Timer {
     id: settle
     interval: 8000
-    onTriggered: { check.then = "offer"; check.running = true; }
+    onTriggered: {
+      if (welcome.running || zsh.lookNext || Oracle.keysSheetOpen || Oracle.welcomeLookOpen) { settle.restart(); return; }
+      check.then = "offer";
+      check.running = true;
+    }
   }
 
   // what is here: the shipped setup already, and what it needs that is not

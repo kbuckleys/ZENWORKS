@@ -234,9 +234,11 @@ Item {
                 // cyan; a CHEVRON is punctuation belonging to the label beside
                 // it and takes the label's own white. Muted was lumping the
                 // chevron in with "nothing here", which is what made it look
-                // like a disabled row.
+                // like a disabled row. A branch that IS off (icarus' Recent
+                // with nothing learned yet) dims it with its label (user,
+                // 2026-10-25).
                 color: (row.modelData.mark || false) ? Zenon.cyan
-                  : (row.branch ? Zenon.white
+                  : (row.branch ? (row.on ? Zenon.white : Zenon.accentMuted)
                     : Zenon.accentMuted)
                 font.family: Zenon.face
                 font.weight: Zenon.weight

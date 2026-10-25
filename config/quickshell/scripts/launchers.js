@@ -9,7 +9,7 @@
 // manager. The package installs them in /usr/share/applications (pacman
 // owns them, so they go when ZENWORKS goes), each naming its program under
 // /usr/share/zenworks. A working copy needs no entries of its own: every
-// program here only says `qs ipc call …`, which QS_CONFIG_PATH (bin/zenworks)
+// program here only says `qs ipc call …`, which QS_CONFIG_PATH (bin/zen)
 // sends to whichever shell is running.
 //
 //   node scripts/launchers.js --write DIR   (re)write DIR/<id>.desktop

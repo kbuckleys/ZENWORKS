@@ -69,7 +69,8 @@ PopupWindow {
   // the card never touches what it names
   readonly property int gap: 6
 
-  visible: tip.window !== null && tip.target !== null && tip.shade > 0.01
+  // away while the window switcher is up (Zenon.tipsAway says why)
+  visible: tip.window !== null && tip.target !== null && tip.shade > 0.01 && !Zenon.tipsAway
   color: "transparent"
   implicitWidth: card.width
   implicitHeight: card.height + tip.gap * 2

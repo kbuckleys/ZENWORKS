@@ -46,7 +46,8 @@ module.exports = {
     t.eq("with no list, every one named", O.parseDefaultsLua(O.sanitizeBundleFile("hypr/keys.lua", "return { a = \"SUPER + A\" }")),
       { a: "SUPER + A" });
     t.eq("wake and effects", [O.parseWakeLua(O.sanitizeBundleFile("hypr/wake.lua", "return { wake = \"key\" }")),
-      O.parseEffectsLua(O.sanitizeBundleFile("hypr/effects.lua", "return { shadows = false }"))],
+      O.parseEffectsLua(O.sanitizeBundleFile("hypr/effects.lua", "return { shadows = false }"))].map((x) =>
+        typeof x === "string" ? x : { shadows: x.shadows, animations: x.animations }),
       ["key", { shadows: false, animations: true }]);
     t.eq("default apps, hand-written ones too", O.parseDefaultsLua(O.sanitizeBundleFile("hypr/defaults.lua",
       "return { terminal = \"foot\", mine = \"x.desktop\" }")).mine, "x.desktop");

@@ -1,0 +1,105 @@
+#!/bin/sh
+# ┌─┐┌─┐┌┐┌┬ ┬┌─┐┬─┐┬┌─┌─┐
+# ┌─┘├┤ │││││││ │├┬┘├┴┐└─┐
+# └─┘└─┘┘└┘└┴┘└─┘┴└─┴ ┴└─┘
+# https://github.com/kbuckleys/
+#
+# ZENWORKS' SESSION — what a login screen runs (zenworks.desktop), or you
+# from a text console: Hyprland, through its own watchdog (start-hyprland),
+# with ZENWORKS' config instead of ~/.config/hypr, and the shell that config
+# starts. Built on Quickshell and Hyprland.
+#
+#   zen            start the session
+#   zen --where    say which ZENWORKS it would start, and why
+#   zen --reset    start over: your settings moved aside (asks first;
+#                  --reset --yes does not), from outside a session
+#
+# `zenworks` is the same program (the package links it), the name it had
+# up to 0.0.5: a login screen or a habit set up with it keeps working.
+#
+# WHICH ONE: the installed one (/usr/share/zenworks), unless
+# ~/.config/zenworks/dev names a working copy — a directory holding
+# quickshell/shell.qml and hypr/hyprland.lua, as the source repository's
+# config/ does. A dev file naming anything else is said and passed over:
+# the installed one starts, never half of each.
+#
+# QS_CONFIG_PATH is how every `qs ipc call` in the session finds this
+# shell (quickshell's own default is ~/.config/quickshell). Exported here,
+# Hyprland and everything it starts inherit it; autostart.lua hands it on
+# to systemd's environment too, for the portals.
+
+set -u
+installed=/usr/share/zenworks
+devfile="${XDG_CONFIG_HOME:-$HOME/.config}/zenworks/dev"
+root=$installed
+why="installed"
+
+if [ -f "$devfile" ]; then
+	# the first line that is not empty, trimmed; ~ is home
+	dev=$(sed -n '/[^[:space:]]/{s/^[[:space:]]*//;s/[[:space:]]*$//;p;q;}' "$devfile")
+	case $dev in "~" | "~/"*) dev="$HOME${dev#\~}" ;; esac
+	dev=${dev%/}
+	if [ -f "$dev/quickshell/shell.qml" ] && [ -f "$dev/hypr/hyprland.lua" ]; then
+		root=$dev
+		why="the working copy $devfile names"
+	else
+		echo "zen: $devfile names '$dev', which holds no quickshell/shell.qml and hypr/hyprland.lua — the installed one starts" >&2
+	fi
+fi
+
+# RESET: ~/.config/zenworks and the shell's own state (Oracle's settings,
+# what each app remembers, the first start's answers) moved — never
+# deleted — to ~/zenworks-reset-<when>. Your files (notes, pictures, the
+# apps' data under ~/.local/share) stay where they are. A dev file is put
+# back, so a working copy keeps running. From outside a session only: a
+# running shell would write it all straight back.
+reset() {
+	conf="${XDG_CONFIG_HOME:-$HOME/.config}/zenworks"
+	state="${XDG_STATE_HOME:-$HOME/.local/state}/quickshell/by-shell/zenworks"
+	if [ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ] || [ -n "${WAYLAND_DISPLAY:-}" ]; then
+		echo "zen: log out first — a running ZENWORKS would write its settings straight back. Run zen --reset from a text console." >&2
+		exit 1
+	fi
+	if [ ! -e "$conf" ] && [ ! -e "$state" ]; then
+		echo "zen: nothing to reset — ZENWORKS has no settings yet"
+		exit 0
+	fi
+	kept="$HOME/zenworks-reset-$(date +%Y-%m-%d-%H%M%S)"
+	if [ "${1:-}" != "--yes" ]; then
+		printf 'Move your ZENWORKS settings to %s and start over? [y/N] ' "$kept"
+		read -r answer || answer=""
+		case $answer in y | Y | yes) ;; *) echo "Nothing changed."; exit 0 ;; esac
+	fi
+	mkdir -p "$kept" || exit 1
+	[ -e "$conf" ] && { mv "$conf" "$kept/config" || exit 1; }
+	[ -e "$state" ] && { mv "$state" "$kept/state" || exit 1; }
+	if [ -f "$kept/config/dev" ]; then
+		mkdir -p "$conf" && cp "$kept/config/dev" "$conf/dev"
+	fi
+	echo "Done. Your old settings are in $kept — move a file back to keep it. The next start is a first start."
+	exit 0
+}
+
+case ${1:-} in
+--where) echo "$root ($why)"; exit 0 ;;
+--reset) reset "${2:-}" ;;
+"") ;;
+*) echo "usage: zen [--where | --reset [--yes]]" >&2; exit 2 ;;
+esac
+
+# started from a terminal inside a session, it would nest a second one
+if [ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ] || [ -n "${WAYLAND_DISPLAY:-}" ]; then
+	echo "zen: a graphical session is running already — start ZENWORKS from a login screen or a text console" >&2
+	exit 1
+fi
+if [ ! -f "$root/hypr/hyprland.lua" ] || [ ! -f "$root/quickshell/shell.qml" ]; then
+	echo "zen: no ZENWORKS at $root" >&2
+	exit 1
+fi
+
+export QS_CONFIG_PATH="$root/quickshell"
+# what portals and apps go by: ZENWORKS first (xdg-desktop-portal reads
+# zenworks-portals.conf), Hyprland after it for apps that look for that
+export XDG_CURRENT_DESKTOP=ZENWORKS:Hyprland
+export XDG_SESSION_DESKTOP=ZENWORKS
+exec start-hyprland -- --config "$root/hypr/hyprland.lua"

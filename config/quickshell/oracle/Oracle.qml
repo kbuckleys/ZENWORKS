@@ -99,6 +99,10 @@ Singleton {
   // reserved for it — windows run under it, whatever Reserve space says.
   property bool barAutohide: false
 
+  // The workspace strip (morpheus/WorkspaceStrip): a moment of the screen's
+  // workspaces, low on it, every time the workspace changes.
+  property bool workspaceStrip: true
+
   // What the pill actually shows. Each of these is the module's own `active`
   // ANDed with the switch, so turning one off is the same motion the module
   // already makes when it has nothing to say — it eases to zero width and the
@@ -432,6 +436,9 @@ Singleton {
   // counts, and in quiet hours (whole hours, crossing midnight as 22 → 7).
   // Critical notifications come through, as through Do not disturb.
   property bool notifFocusTimers: false
+  // and while the window in front is full screen (2026-10-25): a game, a
+  // film; on leaving it, one toast says how many came in
+  property bool notifQuietFullscreen: true
   property bool notifQuietHours: false
   property int notifQuietFrom: 22
   property int notifQuietTo: 7
@@ -698,7 +705,7 @@ Singleton {
     { id: "keys",   label: "Shortcuts",     icon: "\uDB81\uDE33",
       blurb: "hyprland's key binds \u2014 what each chord does, and which chord it is" },
     { id: "windows", label: "Windows",      icon: "\uF2D2",
-      blurb: "hyprland's window rules \u2014 how each app's windows open \u2014 and what starts at login" },
+      blurb: "hyprland's window rules \u2014 how each app's windows open \u2014 what starts at login, and the workspace strip" },
     { id: "bar",    label: "Bar",           icon: "",
       blurb: "morpheus — the pill and what it carries" },
     { id: "motion", label: "Motion",        icon: "",
@@ -938,7 +945,7 @@ Singleton {
       help: "The shadow every menu and sheet casts: icarus', the tray's, terminus' right-click menu, the dropdowns in here, and the sheets that drop over a window. Off, they sit flat on what is behind them." },
     // hyprland's own, kept in hypr/lua/effects.lua — see Ora's EFFECTS
     { key: "hyprShadows", section: "look", label: "Window shadows", type: "bool",
-      hyprFile: "effects", hyprDefault: true, alias: "hyprland window shadow drop shadow decoration",
+      hyprFile: "effects", fx: "shadows", hyprDefault: true, alias: "hyprland window shadow drop shadow decoration",
       help: "The soft shadow hyprland draws under every window. Kept in ~/.config/zenworks/hypr/lua/effects.lua." },
     { key: "scrollFrost", section: "look", alias: "scroll edge frost blur ghost rows under bar toolbar fade",
       label: "Frost under bars", type: "bool",
@@ -955,7 +962,7 @@ Singleton {
       min: 0, max: 2.5, step: 0.05, unit: "x",
       help: "Multiplies every duration in the shell. Zero means no animation at all." },
     { key: "hyprAnimations", section: "motion", label: "Window animations", type: "bool",
-      hyprFile: "effects", hyprDefault: true, alias: "hyprland window workspace animation slide fade popin motion",
+      hyprFile: "effects", fx: "animations", hyprDefault: true, alias: "hyprland window workspace animation slide fade popin motion",
       help: "Hyprland's windows popping in and out, workspaces sliding, and the shell's layers fading as they open and close. Off, all of it is instant. Kept in ~/.config/zenworks/hypr/lua/effects.lua." },
     { key: "arrivalEnabled", section: "motion", label: "Play the arrival", type: "bool",
       help: "The pill's slide and the background's zoom, once, when the session starts." },
@@ -1004,6 +1011,9 @@ Singleton {
     { key: "notifFocusTimers", section: "notify", alias: "focus pomodoro timer quiet dnd do not disturb chronos",
       label: "Quiet while a timer runs", type: "bool",
       help: "Do not disturb, on by itself while a Chronos timer counts down, and off again when none does. A timer finishing still shows. Also in the bell's right-click menu." },
+    { key: "notifQuietFullscreen", section: "notify", alias: "focus full screen fullscreen game video film movie quiet dnd do not disturb",
+      label: "Quiet while full screen", type: "bool",
+      help: "Hold toasts back while the window in front fills the screen — a game, a film. They wait in the bell; leaving full screen, one toast says how many came in. A critical one still shows." },
     { key: "notifQuietHours", section: "notify", alias: "focus night sleep quiet hours schedule dnd do not disturb",
       label: "Quiet hours", type: "bool",
       help: "Do not disturb every day between the two hours below; past midnight works (22 to 7). Critical notifications still show." },
@@ -1305,6 +1315,36 @@ Singleton {
     // Two rows that fold open into their lists: WindowRules.qml and
     // StartupApps.qml (fold "rules", "startup"). The lists live in hypr
     // files Oracle writes and reads back — see Ora's WINDOW RULES, STARTUP.
+    { key: "workspaceStrip", section: "windows", alias: "workspace strip switcher osd overview numbers switch",
+      label: "Workspace strip", type: "bool",
+      help: "Every time the workspace changes, its number and the apps on each workspace show low on the screen for a moment." },
+    // hyprland's windows, kept in hypr/lua/effects.lua beside the shadows
+    // and animations — see Ora's EFFECTS (2026-10-25)
+    { key: "hyprGapsOut", section: "windows", label: "Outer gaps", type: "int", min: 0, max: 40, step: 1, unit: "px",
+      hyprFile: "effects", fx: "gaps_out", hyprDefault: 8, alias: "gaps margin space edge screen tiling padding",
+      help: "Room between tiled windows and the screen's edges. Kept in ~/.config/zenworks/hypr/lua/effects.lua." },
+    { key: "hyprGapsIn", section: "windows", label: "Inner gaps", type: "int", min: 0, max: 20, step: 1, unit: "px",
+      hyprFile: "effects", fx: "gaps_in", hyprDefault: 2, alias: "gaps space between windows tiling padding",
+      help: "Room between one tiled window and the next. Hyprland counts it on each side, so two windows stand twice this apart." },
+    { key: "hyprSpecialGaps", section: "windows", label: "Special workspace gaps", type: "int", min: 0, max: 120, step: 2, unit: "px",
+      hyprFile: "effects", fx: "special_gaps", hyprDefault: 30, alias: "special workspace scratchpad gaps margin edge",
+      help: "How far the special workspace's windows stand in from the screen's edges (Super+` shows it)." },
+    { key: "hyprBorder", section: "windows", label: "Border width", type: "int", min: 0, max: 5, step: 1, unit: "px",
+      hyprFile: "effects", fx: "border_size", hyprDefault: 1, alias: "border outline frame thickness",
+      help: "The line round every window, in the theme's colors. 0 draws none." },
+    { key: "hyprLayout", section: "windows", label: "Tiling layout", type: "enum", segments: true,
+      hyprFile: "effects", fx: "layout", hyprDefault: "dwindle", alias: "layout tiling dwindle master scrolling columns",
+      options: [ { value: "dwindle", label: "Dwindle" }, { value: "master", label: "Master" }, { value: "scrolling", label: "Scrolling" } ],
+      help: "How new windows share a workspace. Dwindle splits the space each time; Master keeps one big window and stacks the rest; Scrolling sets them side by side in a strip you scroll through. A workspace switched with the layout bind keeps its own." },
+    { key: "hyprResizeBorder", section: "windows", label: "Resize from edges", type: "bool",
+      hyprFile: "effects", fx: "resize_on_border", hyprDefault: false, alias: "resize drag edge border corner mouse",
+      help: "Drag a window's edge or corner to resize it, as on other desktops. Super and the right button works either way." },
+    { key: "hyprDimInactive", section: "windows", label: "Dim unfocused windows", type: "real", min: 0, max: 0.5, step: 0.05,
+      hyprFile: "effects", fx: "dim_inactive", hyprDefault: 0, alias: "dim inactive unfocused darken focus",
+      help: "Darken every window but the one you are in, by this much. 0 leaves them as they are." },
+    { key: "hyprInactiveOpacity", section: "windows", label: "Unfocused opacity", type: "real", min: 0.5, max: 1, step: 0.05,
+      hyprFile: "effects", fx: "inactive_opacity", hyprDefault: 1, alias: "opacity transparent see through inactive unfocused",
+      help: "How see-through the windows you are not in are. 1 is solid." },
     { key: "infoWindowRules", section: "windows", label: "Window rules", type: "info",
       fold: "rules",
       alias: "window rule rules float floating size workspace opacity transparent pin blur maximize fullscreen idle inhibit app class",
@@ -1795,6 +1835,14 @@ Singleton {
   signal exportAsked()
   signal importAsked()
   signal zshAsked()
+  // the first start's cheat sheet (ZshSetup, which keeps welcome.json),
+  // and whether the sheet is up (KeysSheet says) — the terminal question
+  // waits for it to close
+  signal keysSheetAsked()
+  property bool keysSheetOpen: false
+  // then its second card, Make it yours (WelcomeLook), the same way
+  signal welcomeLookAsked()
+  property bool welcomeLookOpen: false
   // An action still out from its last press: its button dims and ignores
   // another (the panel's ActionControl reads this).
   function actionBusy(key) {
@@ -2144,15 +2192,31 @@ Singleton {
     wakeFile.setText(Ora.renderWakeLua(by));
     reloadHypr.restart();
   }
-  // hypr/lua/effects.lua: hyprland's shadows and animations — see Ora's EFFECTS
+  // hypr/lua/effects.lua: hyprland's shadows and animations, and the
+  // windows' gaps, border, layout, edges, dim and opacity — see Ora's
+  // EFFECTS. Each setting's spec names its field (`fx`).
   property bool hyprShadows: true
   property bool hyprAnimations: true
+  property int hyprGapsOut: 8
+  property int hyprGapsIn: 2
+  property int hyprSpecialGaps: 30
+  property int hyprBorder: 1
+  property string hyprLayout: "dwindle"
+  property bool hyprResizeBorder: false
+  property real hyprDimInactive: 0
+  property real hyprInactiveOpacity: 1
+  readonly property var effectSpecs: root.specs.filter((s) => s.hyprFile === "effects")
+  function effectValues() {
+    const out = {};
+    for (const s of root.effectSpecs) out[s.fx] = root[s.key];
+    return out;
+  }
   function setEffect(key, v) {
-    const on = !!v;
-    if (on === root[key]) return;
-    root[key] = on;
+    const val = Ora.coerce(root.spec(key), v);
+    if (Ora.same(root[key], val)) return;
+    root[key] = val;
     root.revision++;
-    effectsFile.setText(Ora.renderEffectsLua({ shadows: root.hyprShadows, animations: root.hyprAnimations }));
+    effectsFile.setText(Ora.renderEffectsLua(root.effectValues()));
     reloadHypr.restart();
   }
   // hypr/lua/windows.lua: your window rules, in order — see Ora's WINDOW RULES
@@ -2357,13 +2421,17 @@ Singleton {
     // FileView's own write never fires loaded: setEffect sets the pair itself
     onLoaded: {
       const fx = Ora.parseEffectsLua(effectsFile.text());
-      if (fx.shadows === root.hyprShadows && fx.animations === root.hyprAnimations) return;
-      root.hyprShadows = fx.shadows;
-      root.hyprAnimations = fx.animations;
+      let changed = false;
+      for (const s of root.effectSpecs) {
+        if (Ora.same(root[s.key], fx[s.fx])) continue;
+        root[s.key] = fx[s.fx];
+        changed = true;
+      }
+      if (!changed) return;
       root.revision++;
       reloadHypr.restart();
     }
-    onLoadFailed: { root.hyprShadows = true; root.hyprAnimations = true; }
+    onLoadFailed: { for (const s of root.effectSpecs) root[s.key] = s.hyprDefault; }
   }
 
   // FileView's own write never fires loaded: the setters set the list themselves

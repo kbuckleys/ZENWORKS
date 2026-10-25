@@ -37,6 +37,7 @@ import subprocess
 import tempfile
 import threading
 
+import aur
 import forgejo
 import github
 import gitlab
@@ -421,6 +422,8 @@ class Server(lines.Service):
             return {"kind": "git", "error": e.err or str(e), "code": e.code}
         if isinstance(e, ForgeError):
             return {"kind": "forge", "error": str(e), "status": e.status}
+        if isinstance(e, aur.AurError):
+            return {"kind": "aur", "error": str(e)}
         return None
 
     def dispatch(self, op, req, args, cancel, emit):
@@ -549,6 +552,20 @@ class Server(lines.Service):
             return self.forge(fr[0], fr[1], kw, cancel, emit)
         # ── one repository ──
         r, lock = self.repo(path)
+        # ── its AUR package (core/aur.py); the steps that write the
+        # recipe queue behind the repository's other writes ──
+        if op == "aurInfo":
+            return aur.info(r.root, kw.get("pkg", ""))
+        if op in ("aurVersion", "aurSums", "aurSrcinfo", "aurBuild"):
+            with lock:
+                cancel.check()
+                if op == "aurVersion":
+                    return aur.set_version(r.root, kw["version"])
+                if op == "aurSums":
+                    return aur.sums(r.root, cancel)
+                if op == "aurSrcinfo":
+                    return aur.srcinfo(r.root)
+                return aur.build(r.root, cancel)
         if op == "logOpen":
             with self.lock:
                 self.n += 1

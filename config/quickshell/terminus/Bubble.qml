@@ -112,7 +112,9 @@ PopupWindow {
   property real shade: bub.open ? 1 : 0
   Behavior on shade { NumberAnimation { duration: Zenon.menuFade; easing.type: Easing.OutCubic } }
 
+  // away while the window switcher is up (Zenon.tipsAway says why)
   visible: bub.window !== null && bub.target !== null && (bub.shade > 0.01 || face.grow > 0.01)
+    && !Zenon.tipsAway
   color: "transparent"
   // only the card (and its tail) takes the pointer, never the shadow's room
   mask: Region { x: face.card.x; y: bub.up ? face.card.y : face.card.y - bub.tail

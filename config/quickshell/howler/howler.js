@@ -127,6 +127,7 @@ function focus(s) {
   s = s || {};
   if (s.dnd) return { quiet: true, why: "Do not disturb" };
   if (s.timers && s.timerRunning) return { quiet: true, why: "Quiet while a timer runs" };
+  if (s.fullscreen && s.fullscreenOn) return { quiet: true, why: "Quiet while full screen", fullscreen: true };
   if (s.hours && inQuietHours(s.fromH, s.toH, s.minutesOfDay))
     return { quiet: true, why: "Quiet hours, until " + hourWords(s.toH) };
   return { quiet: false, why: "" };

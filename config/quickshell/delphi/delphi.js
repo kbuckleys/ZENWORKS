@@ -557,6 +557,20 @@ function hubOf(remotes, own) {
   return null;
 }
 
+// THE AUR: a remote at aur.archlinux.org is a package's recipe, not a
+// forge (core/aur.py) — { remote, pkg, web } for the first such remote,
+// or null. Its page is AurPage.
+function aurOf(remotes) {
+  var rs = remotes || [];
+  for (var i = 0; i < rs.length; i++) {
+    var u = String(rs[i].fetch || rs[i].push || "").trim();
+    var m = u.match(/^(?:ssh:\/\/)?aur@aur\.archlinux\.org[:\/](.+?)(?:\.git)?\/?$/)
+         || u.match(/^https:\/\/aur\.archlinux\.org\/(.+?)(?:\.git)?\/?$/);
+    if (m) return { remote: rs[i].name, pkg: m[1], web: "https://aur.archlinux.org/packages/" + m[1] };
+  }
+  return null;
+}
+
 // Every remote on a forge, the hub (hubOf) first, each forge repository
 // once — for what one of them may have turned off (Releases, 2026-10-21:
 // spoot's origin on Codeberg has releases off; its releases are on GitHub)

@@ -153,6 +153,12 @@ ShellRoot {
   CalypsoPopup { id: calypso; mgr: calypsoMgr; statusbar: bar; screen: root.focusedScreen; morphMode: root.morphedFor("calypso") && root.morphOnPill; morphFade: root.layerFade }
   // every shortcut on one sheet, held or tapped on binds.lua's keysSheet
   KeysSheet { screen: root.focusedScreen }
+  // the very first start's Make it yours, after the sheet (ZshSetup)
+  WelcomeLook { screen: root.focusedScreen }
+  // Super+Tab held: every window, a picture each (binds.lua's cycle)
+  WindowSwitcher { screen: root.focusedScreen }
+  // a moment of this screen's workspaces on every switch (Oracle › Windows)
+  WorkspaceStrip { screen: root.focusedScreen }
   MetisPopup { id: metis; statusbar: bar; screen: root.focusedScreen; morphMode: root.morphedFor("metis") && root.morphOnPill; morphFade: root.layerFade }
   HowlerPopup { id: howler; statusbar: bar; screen: root.focusedScreen; morphMode: root.morphedFor("howler") && root.morphOnPill; morphFade: root.layerFade }
   // what is waiting to be installed, out of the update count the way howler
