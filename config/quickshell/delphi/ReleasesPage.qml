@@ -155,6 +155,8 @@ Item {
       (ok, r) => { if (!pg) return; if (ok && r && r.body) put(r.body, r.by); else fromCommits(); });
   }
   function save() {
+    // rich text's last words into the notes first (ReleaseEditor.settle)
+    editor.settle();
     const e = pg.edit;
     if (!e || e.tag.trim() === "") return;
     const tag = e.tag.trim(), name = (e.name || "").trim() || tag;

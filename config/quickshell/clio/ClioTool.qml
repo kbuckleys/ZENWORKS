@@ -27,8 +27,11 @@ Item {
   // `menu`: it opens the window's menu, and stays pressed while that is up
   // (the window's menuHeld names it; user, 2026-10-17)
   property bool menu: false
-  readonly property bool held: tool.menu && !!tool.pane && !!tool.pane.win && tool.pane.win.menuRef.isOpen
-    && tool.pane.win.menuHeld === "tool:" + tool.glyph
+  readonly property bool held: tool.menu && !!tool.pane && !!tool.pane.win && !!tool.pane.win.menuRef
+    && tool.pane.win.menuRef.isOpen && tool.pane.win.menuHeld === "tool:" + tool.glyph
+  // a window without Clio's tips (Delphi's, which wears the format bar too):
+  // none shown, rather than an error per hover
+  readonly property var _tips: tool.pane && tool.pane.win ? tool.pane.win.tipsItem || null : null
   signal pressed(real x, real y)
 
   // the format bar's are narrower, to fit every format across the note
@@ -55,13 +58,17 @@ Item {
     id: press
     anchors.fill: parent
     onClicked: {
-      const p = tool.mapToItem(tool.pane.win.stageItem, 0, tool.height + 4);
+      const w = tool.pane ? tool.pane.win : null;
+      const p = tool.mapToItem(w && w.stageItem ? w.stageItem : null, 0, tool.height + 4);
       tool.pressed(p.x, p.y);
-      if (tool.menu && tool.pane.win.menuRef.isOpen) tool.pane.win.menuHeld = "tool:" + tool.glyph;
+      if (tool.menu && w && w.menuRef && w.menuRef.isOpen) w.menuHeld = "tool:" + tool.glyph;
     }
   }
   HoverHandler {
     id: hov
-    onHoveredChanged: hovered && tool.tip !== "" ? tool.pane.win.tipsItem.show(tool, tool.tip, tool.keys) : tool.pane.win.tipsItem.hide(tool)
+    onHoveredChanged: {
+      if (!tool._tips) return;
+      if (hovered && tool.tip !== "") tool._tips.show(tool, tool.tip, tool.keys); else tool._tips.hide(tool);
+    }
   }
 }

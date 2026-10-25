@@ -549,6 +549,38 @@ Variants {
             slot.fitting = true;
             Clio.place(slot.noteId, n.x, n.y, w, h);
           }
+          // ── GROWING AS IT IS WRITTEN ── (user, 2026-10-25) a line more
+          // than the note shows makes it that much taller, at once, while it
+          // is being typed in — at the width it has, so the words do not
+          // move under the caret (the fit on leaving settles the width).
+          // Never shorter while typing, never past its screen's bottom
+          // gutter or Scribe.MAX_H; a note sized by hand keeps its size.
+          //
+          // A ZOOM (ctrl + / -, the head's minus and plus) follows its text
+          // both ways at once, shorter as well (user, 2026-10-25: zoomed
+          // in, the note stayed the height of the smaller text; zoomed out,
+          // it kept the room of the bigger one) — `shrink`.
+          function grow(shrink) {
+            const n = slot.note;
+            if (!n || n.sized || board.editing !== slot.noteId) return;
+            const padH = slot.height - field.scroll.height;
+            let h = Math.ceil(slot.body.implicitHeight + padH);
+            if (board.screen)
+              h = Math.min(h, board.originY + board.screen.height - board.snapGutter - n.y);
+            h = Scribe.clamp(h, Scribe.MIN_H, Scribe.MAX_H);
+            if (shrink ? h === n.h : h <= n.h) return;
+            Clio.place(slot.noteId, n.x, n.y, n.w, h);
+          }
+          Connections {
+            target: slot.body
+            function onImplicitHeightChanged() { slot.grow(slot._zoomed); }
+          }
+          // the text's size changed: the next measure may shrink the note
+          // (the body re-lays out a moment after the size lands)
+          readonly property int textSize: slot.note ? slot.note.size : 0
+          property bool _zoomed: false
+          onTextSizeChanged: { slot._zoomed = true; zoomDone.restart(); Qt.callLater(() => slot.grow(true)); }
+          Timer { id: zoomDone; interval: 200; onTriggered: slot._zoomed = false }
           // NO WORD LEFT ALONE. A wrapped paragraph ending on a line of one
           // word reads as a mistake, so the fit narrows the note a few
           // pixels at a time until every paragraph ends on two or more —

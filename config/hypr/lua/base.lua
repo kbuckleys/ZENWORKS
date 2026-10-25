@@ -137,6 +137,10 @@ hl.config({
 		initial_workspace_tracking = 0,
 		close_special_on_empty = true,
 		disable_hyprland_logo = true,
+		-- XDG_CURRENT_DESKTOP is ZENWORKS:Hyprland on purpose (bin/zenworks,
+		-- and above): without this Hyprland greets every login with "set
+		-- externally … might cause issues" (user, 2026-10-25)
+		disable_xdg_env_checks = true,
 		background_color = 0x000000,
 		middle_click_paste = false,
 		-- screens turned off (idle, or binds.lua's screensOff) come back on

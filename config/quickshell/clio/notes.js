@@ -1376,7 +1376,10 @@ function mdRun(s) {
     .replace(/(^|[^*\w])\*([^*\s][^*]*?)\*(?!\*)/g, "$1<i>$2</i>")
     .replace(/(^|[^_\w])_([^_\s][^_]*?)_(?!\w)/g, "$1<i>$2</i>")
     .replace(/~~([^~]+)~~/g, "<s>$1</s>");
-  return t.replace(/\u0000(\d+)\u0000/g, function (m, i) { return codes[+i]; });
+  // the code kept in its backticks: a run has no code mark, and the text
+  // written back (mdInline) is then what was read (Delphi's release notes,
+  // 2026-10-25 — they were dropped, and the notes lost them on a save)
+  return t.replace(/\u0000(\d+)\u0000/g, function (m, i) { return "`" + codes[+i] + "`"; });
 }
 function blocksOfMarkdown(text) {
   var lines = String(text || "").replace(/\r\n?/g, "\n").split("\n");
@@ -1414,7 +1417,7 @@ function blocksOfMarkdown(text) {
       continue;
     }
     if ((m = line.match(/^(\s*)(?:[-*+]|\d+[.)])\s+\[([ xX])\]\s+(.*)$/))) {
-      out.push(block("check", mdRun(m[3]), { c: false, l: Math.floor(m[1].replace(/\t/g, "  ").length / 2) })); endPara(); continue;
+      out.push(block("check", mdRun(m[3]), { c: m[2] !== " ", l: Math.floor(m[1].replace(/\t/g, "  ").length / 2) })); endPara(); continue;
     }
     if ((m = line.match(/^(\s*)([-*+]|\d+[.)])\s+(.*)$/))) {
       var l = Math.floor(m[1].replace(/\t/g, "  ").length / 2);
@@ -1429,6 +1432,20 @@ function blocksOfMarkdown(text) {
   }
   out.forEach(function (b) { delete b._br; if (b.k !== "mono" && b.k !== "table" && b.k !== "rule") b.h = inline(b.h); });
   return out;
+}
+// What blocksOfMarkdown would lose of a Markdown text, said in words ("" when
+// it keeps it all): an editor of blocks over it (Delphi's release notes in
+// rich text) would write it back without them.
+function markdownLoses(text) {
+  var s = String(text || "");
+  var out = [];
+  if (/!\[[^\]]*\]\([^)]*\)/.test(s)) out.push("pictures");
+  if (/<\/?[a-zA-Z][^>]*>|<!--/.test(s)) out.push("HTML");
+  if (/^#{4,6}\s/m.test(s)) out.push("small headings");
+  if (/^\s*>\s*>/m.test(s)) out.push("quotes in quotes");
+  if (/^\s{0,3}(=+|-+)\s*$/m.test(s.replace(/^\s*([-*_])(\s*\1){2,}\s*$/mg, ""))) out.push("underlined headings");
+  if (/\[\^[^\]]+\]/.test(s)) out.push("footnotes");
+  return out.join(", ");
 }
 function fillTemplate(blocks, ms) {
   var d = new Date(ms);

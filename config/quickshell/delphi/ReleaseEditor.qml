@@ -7,9 +7,17 @@
 // or one there is (user, 2026-10-11: a sheet was too tight for its notes).
 // Across the top its tag, the branch it is made from (a new one only) and
 // its title; draft and pre-release where the forge has them; then the notes,
-// the rest of the page — written, or previewed as the forge will show them,
-// and "Write them for me" for GitHub's own or the commits since the last
-// tag. Saving and canceling are the page's buttons; ctrl return saves.
+// the rest of the page, and "Write them for me" for GitHub's own or the
+// commits since the last tag. Saving and canceling are the page's buttons;
+// ctrl return saves.
+//
+// The notes are written in RICH TEXT or as MARKDOWN (user, 2026-10-25),
+// under Clio's format bar (clio/FormatBar) either way: rich text is Clio's
+// own editor, its blocks read from the Markdown and written back to it as
+// they change (notes.js blocksOfMarkdown / markdownOf); Markdown is the plain
+// well, the bar writing the syntax (clio/MarkdownTarget). Notes rich text
+// cannot hold (pictures, HTML — notes.js markdownLoses) stay in Markdown.
+// Spelling is checked in both, by Clio's dictionary and its one switch.
 //
 // The fields write into page.edit as they are typed; reset() puts
 // page.edit back into them (opening one, notes written for you).
@@ -19,27 +27,76 @@ import Quickshell
 import "../morpheus"
 import "../morpheus/controls" as Controls
 import "../terminus"
-import "delphi.js" as D
+import "../clio"
+import "../clio/notes.js" as N
 
 Item {
   id: ed
   property var page: null
   readonly property var e: ed.page ? ed.page.edit : null
-  readonly property bool typing: tagField.focused || titleField.focused || notes.focused
-  property string showing: "write"   // write | preview
+  readonly property bool typing: tagField.focused || titleField.focused || notes.focused || ed.richFocused
+  // how the notes are written: "rich" (Clio's editor) or "markdown"
+  property string form: "rich"
+  // what rich text would drop of the notes, in words ("" — nothing)
+  readonly property string loses: ed.e ? N.markdownLoses(ed.e.body) : ""
+  readonly property bool richFocused: {
+    for (let p = ed.Window.activeFocusItem; p; p = p.parent) if (p === rich) return true;
+    return false;
+  }
+  readonly property var spellMgr: Clio.app
 
-  function claim() { if (ed.e && ed.e.mode === "new") tagField.claim(); else notes.claim(); }
+  function claim() {
+    if (ed.e && ed.e.mode === "new") tagField.claim();
+    else if (ed.form === "rich") rich.focusEnd(false);
+    else notes.claim();
+  }
   function reset() {
     if (!ed.e) return;
     tagField.text = ed.e.tag;
     titleField.text = ed.e.name;
     notes.text = ed.e.body;
+    if (ed.form === "rich" && ed.loses !== "") ed.form = "markdown";
+    if (ed.form === "rich") ed.loadRich();
   }
-  // a different release opened: its own values in the fields
+  // the notes into Clio's editor, from their Markdown
+  function loadRich() {
+    const bs = ed.e && ed.e.body.trim() !== "" ? N.blocksOfMarkdown(ed.e.body) : [];
+    rich.load(bs.length ? bs : [N.block("body", "")]);
+  }
+  // what the editor holds, back into the notes as Markdown — a beat after
+  // typing, and at once before a save or a switch
+  function settle() {
+    richSync.stop();
+    if (!ed.e || ed.form !== "rich") return;
+    const md = N.markdownOf(rich.stored(), "");
+    const body = md.trim() === "" ? "" : md;
+    if (body !== ed.e.body) ed.page.setEdit("body", body);
+  }
+  Timer { id: richSync; interval: 250; onTriggered: ed.settle() }
+  function writeAs(v) {
+    if (v === ed.form) return;
+    if (v === "rich" && ed.loses !== "") {
+      ed.page.win.say("These notes have " + ed.loses + ", which only Markdown keeps", true);
+      return;
+    }
+    if (v === "markdown") { ed.settle(); notes.text = ed.e ? ed.e.body : ""; }
+    ed.form = v;
+    if (v === "rich") ed.loadRich();
+    Qt.callLater(ed.claim);
+  }
+  // a wrong word's guesses, in the page's menu: `fix(word)` puts one in
+  function spellMenu(x, y, hit, fix) {
+    if (!ed.spellMgr) return;
+    fromPop.open(x, y, hit.sugs.slice(0, 6).map((w) => ({ text: w, icon: "\uF00C", run: () => fix(w) }))
+      .concat(hit.sugs.length === 0 ? [{ text: "No guesses", icon: "", enabled: false, run: () => {} }] : [])
+      .concat(ed.spellMgr.spellTail(hit.w)));
+  }
+  // a different release opened: its own values in the fields, written in
+  // rich text unless it has what only Markdown keeps
   property string _for: ""
   onEChanged: {
     const k = ed.e ? ed.e.mode + ":" + (ed.e.id || "") : "";
-    if (k !== ed._for) { ed._for = k; ed.showing = "write"; ed.reset(); if (ed.e) Qt.callLater(ed.claim); }
+    if (k !== ed._for) { ed._for = k; ed.form = "rich"; ed.reset(); if (ed.e) Qt.callLater(ed.claim); }
   }
 
   Column {
@@ -155,9 +212,9 @@ Item {
         id: notesSeg
         anchors.horizontalCenter: parent.horizontalCenter
         textSize: Zenon.px(13)
-        options: [["write", "Write"], ["preview", "Preview"]]
-        current: ed.showing
-        onChose: (v) => ed.showing = v
+        options: [["rich", "Rich text"], ["markdown", "Markdown"]]
+        current: ed.form
+        onChose: (v) => ed.writeAs(v)
       }
       Row {
         anchors.right: parent.right
@@ -179,12 +236,72 @@ Item {
         }
       }
     }
+
+    // ── the toolbar: Clio's format bar, and the spelling's switch ──
+    Rectangle {
+      width: parent.width
+      height: 40
+      radius: Zenon.windowRadius
+      color: Zenon.wash(0.03)
+      border.width: 1
+      border.color: Zenon.border
+      Item {
+        anchors.fill: parent
+        anchors.rightMargin: spellTool.width + 14
+        FormatBar {
+          host: toolHost
+          // (through toolHost: `ed` in here is the bar's own)
+          ed: toolHost.target
+          // what Markdown has: no alignment, underline, faces or dashes
+          lists: ["bullet", "number", "check", "quote"]
+          marks: ["b", "i", "s"]
+          aligns: false
+        }
+      }
+      Rectangle { anchors.right: spellTool.left; anchors.rightMargin: 6; anchors.verticalCenter: parent.verticalCenter; width: 1; height: 18; color: Zenon.border }
+      // spelling, on or off — Clio's switch, so one answer everywhere (on
+      // by default)
+      ClioTool {
+        id: spellTool
+        anchors.right: parent.right
+        anchors.rightMargin: 6
+        anchors.verticalCenter: parent.verticalCenter
+        pane: toolHost
+        glyph: "\u{F04C6}"
+        tip: ed.spellMgr && ed.spellMgr.spellOn ? "Spelling is checked — click to stop" : "Check spelling"
+        lit: !!ed.spellMgr && ed.spellMgr.spellOn
+        litInk: Zenon.cyan
+        enabled: !!ed.spellMgr
+        onPressed: ed.spellMgr.setSpellOn(!ed.spellMgr.spellOn)
+      }
+    }
+    // why these notes stay in Markdown
+    Text {
+      width: parent.width
+      visible: ed.form === "markdown" && ed.loses !== ""
+      wrapMode: Text.Wrap
+      text: "These notes have " + ed.loses + ", which rich text would drop — written in Markdown."
+      color: Zenon.yellow
+      font.family: Zenon.face
+      font.weight: Zenon.weight
+      font.pixelSize: Zenon.px(13)
+    }
   }
+
+  // the ClioTools' pane (their tips, in this window), and what the format
+  // bar acts on: Clio's editor, or the Markdown in the well
+  Item {
+    id: toolHost
+    readonly property var win: ({ tipsItem: tips })
+    readonly property var target: ed.form === "rich" ? rich : mdTarget
+  }
+  WindowTip { id: tips; window: ed.page ? ed.page.win : null }
+  MarkdownTarget { id: mdTarget; field: notes.edit }
 
   // ── the notes: the rest of the page ──
   MessageWell {
     id: notes
-    visible: ed.showing === "write"
+    visible: ed.form === "markdown"
     anchors.left: parent.left
     anchors.right: parent.right
     anchors.top: top.bottom
@@ -196,46 +313,57 @@ Item {
     textSize: Zenon.px(15)
     ghost: "What is in it — markdown: ## headings, - lists, **bold**, `code`, [links](https://…)"
     note: ed.e ? (ed.e.body.length > 0 ? ed.e.body.split("\n").length + " lines" : "") : ""
-    onTextChanged: if (ed.e && text !== ed.e.body) ed.page.setEdit("body", text)
+    spellMgr: ed.spellMgr
+    spelling: ed.form === "markdown"
+    onTextChanged: if (ed.e && ed.form === "markdown" && text !== ed.e.body) ed.page.setEdit("body", text)
     passKeys: (k) => ed.page.win.key(k)
     onSubmitted: ed.page.save()
     onEscaped: ed.page.cancelEdit()
     onBackTabbed: titleField.claim()
+    onSpellAsked: (x, y, hit) => { const p = notes.mapToItem(ed, x, y); ed.spellMenu(p.x, p.y, hit, (w) => notes.respell(hit, w)); }
   }
+  // rich text: Clio's editor, in the well's frame
   Rectangle {
-    visible: ed.showing === "preview"
+    id: richWell
+    visible: ed.form === "rich"
     anchors.fill: notes
     radius: Zenon.windowRadius
-    color: Zenon.wash(0.03)
+    color: Zenon.wash(0.05)
     border.width: 1
     border.color: Zenon.border
-    Flickable {
-      id: prev
+    BlockEditor {
+      id: rich
       anchors.fill: parent
-      anchors.margins: 14
+      anchors.margins: 1
       clip: true
-      contentWidth: width
-      contentHeight: prevText.implicitHeight
-      boundsBehavior: Flickable.StopAtBounds
-      TextEdit {
-        palette.link: Zenon.link   // the theme's, not the system's blue
-        id: prevText
-        width: prev.width
-        readOnly: true
-        selectByMouse: true
-        wrapMode: TextEdit.Wrap
-        textFormat: ed.e && ed.e.body.trim() !== "" ? TextEdit.MarkdownText : TextEdit.PlainText
-        text: !ed.e || ed.e.body.trim() === "" ? "Nothing written yet" : D.mdLinesOf(ed.e.body)
-        color: ed.e && ed.e.body.trim() !== "" ? Zenon.ink : Zenon.accentMuted
-        selectionColor: Zenon.alpha(Zenon.cyan, 0.4)
-        font.family: Zenon.face
-        font.weight: Zenon.weight
-        font.pixelSize: Zenon.px(15)
-        onLinkActivated: (link) => Quickshell.execDetached(["xdg-open", link])
+      mgr: ed.spellMgr
+      textSize: Zenon.px(15)
+      sidePad: 14
+      topPad: 10
+      bottomPad: 40
+      maxColumn: 100000
+      submits: true
+      onEdited: richSync.restart()
+      onSubmitted: { ed.settle(); ed.page.save(); }
+      onEscaped: { ed.settle(); ed.page.cancelEdit(); }
+      onLinkClicked: (href) => Quickshell.execDetached(["xdg-open", href])
+      onMenuAsked: (x, y, info) => {
+        if (!info || !info.spell) return;
+        const p = rich.mapToItem(ed, x, y);
+        ed.spellMenu(p.x, p.y, info.spell, (w) => rich.respellWord(info.key, info.spell, w));
       }
     }
-    ElasticScroll { anchors.fill: prev; view: prev }
-    Scrollbar { flick: prev; anchors.right: parent.right; anchors.top: prev.top; anchors.bottom: prev.bottom }
+    Text {
+      x: 14
+      y: 12
+      visible: !!ed.e && ed.e.body === "" && !ed.richFocused
+      text: "What is in it — headings, lists, bold, links: as the forge will show them"
+      color: Zenon.accentMuted
+      font.family: Zenon.face
+      font.weight: Zenon.weight
+      font.pixelSize: Zenon.px(15)
+    }
+    HeldRing { anchors.fill: parent; radius: parent.radius; z: 10; on: ed.richFocused }
   }
 
   PopMenu {

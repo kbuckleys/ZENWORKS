@@ -15,10 +15,16 @@
 //
 // Keys it does not use with ctrl held go to `passKeys(e)` (the window's
 // page keys), when given.
+//
+// Spelling, given `spellMgr` (Clio.app — the suite's one dictionary and its
+// one switch): clio's faint red chips on the words it calls wrong, and a
+// right click on one says `spellAsked(x, y, hit)` for the holder's menu;
+// respell(hit, word) puts a guess in its place.
 
 import QtQuick
 import "../morpheus"
 import "../terminus"
+import "../clio"
 
 Rectangle {
   id: mw
@@ -33,6 +39,15 @@ Rectangle {
   // room kept free under the text for what the holder sets in the well's
   // corner (ForgePage's Send, inside the field rather than beside it)
   property int footRoom: 0
+  property var spellMgr: null
+  property bool spelling: true
+  signal spellAsked(real x, real y, var hit)
+  function respell(hit, word) {
+    if (edit.getText(hit.a, hit.b).replace(/\u2019/g, "'") !== hit.w) return;
+    edit.remove(hit.a, hit.b);
+    edit.insert(hit.a, word);
+    edit.cursorPosition = hit.a + word.length;
+  }
   signal submitted()
   signal escaped()
   signal tabbed()
@@ -84,6 +99,7 @@ Rectangle {
         if (e.key === Qt.Key_Backtab) { e.accepted = true; mw.backTabbed(); return; }
         if (ctrl && mw.passKeys && mw.passKeys(e)) e.accepted = true;
       }
+      SpellMarks { id: spell; field: edit; mgr: mw.spellMgr; active: !!mw.spellMgr && mw.spelling; visible: active }
       Text {
         visible: edit.text === ""
         width: parent.width
@@ -92,6 +108,17 @@ Rectangle {
         color: Zenon.accentMuted
         font: edit.font
       }
+    }
+  }
+  // a right click on a word called wrong: its guesses, from the holder
+  MouseArea {
+    anchors.fill: flick
+    enabled: !!mw.spellMgr && mw.spelling
+    acceptedButtons: Qt.RightButton
+    onClicked: (m) => {
+      const p = mapToItem(edit, m.x, m.y);
+      const hit = spell.at(edit.positionAt(p.x, p.y));
+      if (hit) mw.spellAsked(m.x + flick.x, m.y + flick.y, hit);
     }
   }
   // the suite's scroll feel and bar, for text longer than the well

@@ -344,10 +344,15 @@ Singleton {
         ? "Checked " + Cer.age(root.now - root.lastOk) + " — " + why
         : "Not checked yet — " + why });
     }
+    // with its answers in the note (user, 2026-10-25: the Set up button sat
+    // apart in the foot); the Flatpak question alone can also be discarded,
+    // which answers it no — Settings can still add Flatpak later
     if (root.setupNeeded)
       out.push({ level: "bad",
         text: root.deps.missing.length ? "Setup needed: " + Cer.nameList(root.deps.missing.map(m => m.pkg), 2)
-          : "Setup: Flatpak apps in the Store?" });
+          : "Setup: Flatpak apps in the Store?",
+        act: "Set up", run: "openSetup",
+        alt: root.deps.missing.length ? "" : "Discard", altRun: "discardFlatpak" });
     if (root.restartNeeded) out.push({ level: "warn", text: "Reboot needed: kernel upgraded" });
     if (root.staleApps.length)
       out.push({ level: "warn", text: "Restart " + Cer.nameList(root.staleApps.map(g => g.name), 2) });
@@ -545,6 +550,11 @@ Singleton {
   // no view named — a keybind, the launcher — is the Store, Ceres' first tab
   // (user, 2026-10-14); the bar, its panel and the update toast name Updates
   function openWindow(view) { root.checkDeps(); root.windowRequested(view || "store"); }
+  // the setup note's answers (noteItems): its sheet, in the window (from the
+  // panel too), or the Flatpak question answered no
+  // (asked a beat later: a window opened by this is not listening yet)
+  function openSetup() { root.openWindow("updates"); Qt.callLater(root.setupRequested); }
+  function discardFlatpak() { root.setFlatpakPref("no"); }
   // Packages, searched for `q` — another app's way to "these, from Ceres"
   // (clio's spelling languages: hunspell). The window takes it as it shows.
   property string askedQuery: ""

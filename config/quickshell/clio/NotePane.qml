@@ -232,7 +232,7 @@ Item {
   // a click put it away: the hover does not bring it back until the
   // pointer has left Aa (and the bar) once
   property bool formatHush: false
-  // the pointer on the bar (see fmtRoom: why there is no Flickable)
+  // the pointer on the bar (see FormatBar: why there is no Flickable)
   // (the handler itself, not formatBar.hovered: its own hoveredChanged
   // ran before that binding caught up, read "still on the bar", and the
   // bar never went — user, 2026-10-14)
@@ -250,43 +250,19 @@ Item {
     }
   }
   Timer { id: formatLeave; interval: 380; onTriggered: if (!aaTool.hovered && !pane.barHovered()) pane.formatShown = false }
-  // the kind of block the caret is in, lit on the bar
-  readonly property string alignHere: ed.alignHere()
-  // the marks on the words in hand (the caret's, or the selection's), lit
-  // on the bar; a heading's own weight is not "bold" (TextEdit's
-  // cursorSelection, Qt 6.7)
-  readonly property var marksHere: {
-    void ed.cursorKey; void ed.rev;
-    const it = ed.current();
-    if (!it || !it.isText || !it.te || !it.te.cursorSelection) return ({});
-    void it.te.cursorPosition; void it.te.selectionStart; void it.te.selectionEnd; void it.te.length;
-    const f = it.te.cursorSelection.font;
-    return { b: f.weight >= Font.Bold && it.te.font.weight < Font.DemiBold, i: f.italic, u: f.underline, s: f.strikeout };
-  }
-  // the face the words in hand wear, when it is one chosen for them ("" for
-  // the note's own)
-  readonly property string faceHere: {
-    void ed.cursorKey; void ed.rev;
-    const it = ed.current();
-    if (!it || !it.isText || !it.te || !it.te.cursorSelection) return "";
-    void it.te.cursorPosition; void it.te.selectionStart; void it.te.selectionEnd; void it.te.length;
-    const f = it.te.cursorSelection.font.family;
-    return f && f !== it.te.font.family ? f : "";
-  }
+  // what is in hand, lit on the bar and in the menus: the editor's own
+  // (clio/FormatBar reads it there)
+  readonly property string alignHere: ed.alignNow
+  readonly property var marksHere: ed.marksHere
+  readonly property string faceHere: ed.faceHere
+  readonly property string kindHere: ed.kindHere
+  readonly property bool inMono: ed.inMono
   // Alexandria opened for the words in hand (user, 2026-10-17: "change the
   // font of one word while retaining a different font for the rest")
   function chooseRunFace() {
     if (!pane.mgr.fontBook || pane.inMono) return;
     pane.mgr.fontBook.pick({ title: "Font for these words", family: pane.faceHere || pane.mgr.faceFor(pane.isEntry), weight: 400 },
                            (family) => { ed.runFace(family === pane.mgr.faceFor(pane.isEntry) ? "" : family); pane.focusEditor(false); });
-  }
-  readonly property string kindHere: { void ed.cursorKey; void ed.rev; const it = ed.current(); return it ? it.kind : ""; }
-  // the caret (or every line chosen) in a Monostyled block: plain text,
-  // so marks, alignment and clearing do nothing there — dimmed on the bar
-  readonly property bool inMono: {
-    void ed.cursorKey; void ed.rev; void ed.cross;
-    const ts = ed.targets();
-    return ts.length > 0 && ts.every((x) => ed.blocks[x] && ed.blocks[x].k === "mono");
   }
   Rectangle {
     id: formatBar
@@ -305,124 +281,13 @@ Item {
     Behavior on height { NumberAnimation { duration: Zenon.fast; easing.type: Zenon.ease } }
     Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Zenon.border }
     HoverHandler { id: barHover; onHoveredChanged: pane.formatHover() }
-    // (no Flickable: it filtered the pointer, and the hover over the
-    // buttons went stale — the bar jumped, then would not go. A pane too
-    // narrow for every format gets the row a little smaller instead.)
-    Item {
-      id: fmtRoom
-      anchors.fill: parent
-      anchors.leftMargin: 4
-      anchors.rightMargin: 4
-      Row {
-        id: fmtRow
-        // centered, under the toolbar it opens from
-        readonly property real fit: Math.min(1, fmtRoom.width / Math.max(1, width))
-        scale: fit
-        transformOrigin: Item.Center
-        x: Math.round((fmtRoom.width - width) / 2)
-        height: parent.height
-        spacing: 0
-        // the paragraph styles, each named in its own weight
-        Repeater {
-          model: [["title", "Title", "ctrl shift t", Font.Bold], ["heading", "Heading", "ctrl shift h", Font.Bold],
-                  ["subheading", "Subheading", "ctrl shift j", Font.DemiBold], ["body", "Body", "ctrl shift b", Font.Normal],
-                  ["mono", "Mono", "ctrl shift m", Font.Normal]]
-          delegate: ClioTool {
-            required property var modelData
-            anchors.verticalCenter: parent.verticalCenter
-            pane: formatBar.host
-            onHoveredChanged: formatBar.host.formatHover()
-            size: 26
-            word: modelData[1]
-            wordPx: Zenon.px(12)
-            pad: 10
-            wordWeight: modelData[3]
-            litInk: Zenon.cyan
-            lit: pane.kindHere === modelData[0]
-            tip: N.KINDS[modelData[0]].label
-            keys: modelData[2]
-            onPressed: ed.setKind(modelData[0])
-          }
-        }
-        Item { width: 21; height: parent.height; Rectangle { anchors.centerIn: parent; width: 1; height: 18; color: Zenon.border } }
-        // lists and the quote
-        Repeater {
-          model: [["bullet", "ctrl shift 7"], ["dash", "ctrl shift 8"], ["number", "ctrl shift 9"], ["check", "ctrl shift l"], ["quote", ""]]
-          delegate: ClioTool {
-            required property var modelData
-            anchors.verticalCenter: parent.verticalCenter
-            pane: formatBar.host
-            onHoveredChanged: formatBar.host.formatHover()
-            size: 26
-            glyph: N.KINDS[modelData[0]].glyph
-            litInk: Zenon.cyan
-            lit: pane.kindHere === modelData[0]
-            tip: N.KINDS[modelData[0]].label
-            keys: modelData[1]
-            onPressed: ed.setKind(modelData[0])
-          }
-        }
-        Item { width: 21; height: parent.height; Rectangle { anchors.centerIn: parent; width: 1; height: 18; color: Zenon.border } }
-        // how the lines sit
-        Repeater {
-          model: [["", "\uF036", "Along the left"], ["center", "\uF037", "Centered"], ["right", "\uF038", "Along the right"], ["justify", "\uF039", "Justified"]]
-          delegate: ClioTool {
-            required property var modelData
-            anchors.verticalCenter: parent.verticalCenter
-            pane: formatBar.host
-            onHoveredChanged: formatBar.host.formatHover()
-            size: 26
-            glyph: modelData[1]
-            litInk: Zenon.cyan
-            enabled: !pane.inMono
-            lit: enabled && (pane.kindHere !== "" || ed.mediaSel !== "") && pane.alignHere === modelData[0]
-            tip: modelData[2]
-            onPressed: ed.setAlign(modelData[0])
-          }
-        }
-        Item { width: 21; height: parent.height; Rectangle { anchors.centerIn: parent; width: 1; height: 18; color: Zenon.border } }
-        // the marks on the words chosen
-        Repeater {
-          model: [["b", "", "Bold", "ctrl b"], ["i", "", "Italic", "ctrl i"], ["u", "", "Underline", "ctrl u"], ["s", "", "Strikethrough", "ctrl shift x"]]
-          delegate: ClioTool {
-            required property var modelData
-            anchors.verticalCenter: parent.verticalCenter
-            pane: formatBar.host
-            onHoveredChanged: formatBar.host.formatHover()
-            size: 26
-            glyph: modelData[1]
-            litInk: Zenon.cyan
-            enabled: !pane.inMono
-            lit: enabled && !!pane.marksHere[modelData[0]]
-            tip: modelData[2]
-            keys: modelData[3]
-            onPressed: ed.mark(modelData[0])
-          }
-        }
-        Item { width: 21; height: parent.height; Rectangle { anchors.centerIn: parent; width: 1; height: 18; color: Zenon.border } }
-        ClioTool { anchors.verticalCenter: parent.verticalCenter; pane: formatBar.host; onHoveredChanged: formatBar.host.formatHover(); size: 26; glyph: ""; tip: "Outdent"; keys: "shift tab"; onPressed: ed.indent(-1) }
-        ClioTool { anchors.verticalCenter: parent.verticalCenter; pane: formatBar.host; onHoveredChanged: formatBar.host.formatHover(); size: 26; glyph: ""; tip: "Indent"; keys: "tab"; onPressed: ed.indent(1) }
-        Item { width: 21; height: parent.height; Rectangle { anchors.centerIn: parent; width: 1; height: 18; color: Zenon.border } }
-        // the words' own typeface: its name on the bar when one is chosen
-        ClioTool {
-          anchors.verticalCenter: parent.verticalCenter
-          visible: !!pane.mgr.fontBook && !pane.isSticky
-          pane: formatBar.host
-          onHoveredChanged: formatBar.host.formatHover()
-          size: 26
-          pad: 14
-          word: pane.faceHere !== "" ? pane.faceHere : "Font"
-          wordPx: Zenon.px(13)
-          wordWeight: Font.DemiBold
-          lit: pane.faceHere !== ""
-          litInk: Zenon.cyan
-          tip: pane.faceHere !== "" ? "Font for these words — right click for the note's own" : "Font for these words"
-          enabled: !pane.inMono
-          onPressed: pane.chooseRunFace()
-          MouseArea { anchors.fill: parent; acceptedButtons: Qt.RightButton; onClicked: ed.runFace("") }
-        }
-        ClioTool { anchors.verticalCenter: parent.verticalCenter; pane: formatBar.host; onHoveredChanged: formatBar.host.formatHover(); size: 26; glyph: "\u{F0265}"; tip: "Clear formatting"; enabled: !pane.inMono; onPressed: ed.plainText() }
-      }
+    FormatBar {
+      host: formatBar.host
+      ed: pane.editor
+      faces: !!pane.mgr.fontBook && !pane.isSticky
+      onHover: pane.formatHover()
+      onFaceAsked: pane.chooseRunFace()
+      onFaceCleared: ed.runFace("")
     }
   }
 

@@ -19,7 +19,15 @@ hl.on("hyprland.start", function()
     -- import, found no WAYLAND_DISPLAY, failed five times in a second and
     -- systemd gave up on it for the session (start-limit-hit, 2026-10-20 —
     -- found by Hestia's overview). reset-failed clears an old give-up.
+    --
+    -- Portals left running by an earlier session (logging out does not
+    -- always stop the user manager) keep that session's environment and
+    -- config: switching from another desktop at the TTY left the file
+    -- chooser running a trashed wrapper (2026-10-25). try-restart only
+    -- touches ones already up; the rest start on demand with this env.
     hl.exec_cmd("sh -c 'dbus-update-activation-environment --systemd --all; "
+        .. "systemctl --user try-restart xdg-desktop-portal-termfilechooser "
+        .. "xdg-desktop-portal-hyprland xdg-desktop-portal-gtk xdg-desktop-portal; "
         .. "systemctl --user reset-failed hyprpolkitagent 2>/dev/null; "
         .. "systemctl --user start hyprpolkitagent'")
     -- the session's ssh-agent, where base.lua points SSH_AUTH_SOCK: only when

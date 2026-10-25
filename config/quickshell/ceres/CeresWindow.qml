@@ -4187,12 +4187,6 @@ FloatingWindow {
       onClicked: Ceres.setup(setupView.choice, setupView.flatpak)
     }
     DialogButton {
-      visible: win.face === "browse" && Ceres.setupNeeded
-      label: "Set up"
-      ink: Zenon.yellow
-      onClicked: win.showSetup = true
-    }
-    DialogButton {
       visible: win.face === "news"
       label: "Back"
       ink: Zenon.accentMuted

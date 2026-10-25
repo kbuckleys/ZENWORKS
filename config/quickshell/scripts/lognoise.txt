@@ -24,3 +24,13 @@ quickshell\.io\.socket.*PeerClosedError
 qt\.pdf\.links: skipping link with invalid page number
 # …and an outline entry with no position in it (the file's again)
 qt\.pdf\.bookmarks: bookmark with invalid location
+# a tray application that answers only some of the StatusNotifierItem
+# properties: Electron apps (Claude Desktop, 2026-10-25) give a pixmap and no
+# IconName, and quickshell's poll of the missing one fails twice a refresh.
+# The icon still shows, from the pixmap.
+quickshell\.dbus\.properties: Error updating property .*StatusNotifierItem.*:IconName
+quickshell\.dbus\.properties: QDBusError\("org\.freedesktop\.DBus\.Error\.Failed", "error occurred in Get"\)
+# Qt registering the shell with the desktop portal once more than the portal
+# takes: the connection already has its app ID (the first registration),
+# so nothing is lost. Seen at every start, 2026-10-25.
+qt\.qpa\.services: Failed to register with host portal.*already associated with an application ID

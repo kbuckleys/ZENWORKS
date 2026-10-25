@@ -36,3 +36,5 @@ SpellMarks 1.0 SpellMarks.qml
 HighlightsBody 1.0 HighlightsBody.qml
 NoteField 1.0 NoteField.qml
 TasksBody 1.0 TasksBody.qml
+FormatBar 1.0 FormatBar.qml
+MarkdownTarget 1.0 MarkdownTarget.qml

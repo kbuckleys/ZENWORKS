@@ -1253,6 +1253,21 @@ function onThumbsDone() {
             }
           }
 
+          // spelling, on or off: Clio's switch, so one answer everywhere (on
+          // by default — user, 2026-10-25)
+          ClioTool {
+            anchors.left: parent.left
+            anchors.leftMargin: 12
+            anchors.verticalCenter: editButtons.verticalCenter
+            word: "\u{F04C6}  Spelling"
+            wordPx: Zenon.px(13)
+            wordWeight: Font.DemiBold
+            pad: 16
+            lit: !!Clio.app && Clio.app.spellOn
+            litInk: Zenon.cyan
+            enabled: !!Clio.app && popup.editing
+            onPressed: Clio.app.setSpellOn(!Clio.app.spellOn)
+          }
           Row {
             id: editButtons
             anchors.right: parent.right

@@ -33,8 +33,11 @@ CardMenu {
   property var items: null
   signal picked(int index)
   // A row of the shell's own with `children` (rows of the same shape) opens
-  // them as a submenu, as a DBus branch does; a choice in there comes back
-  // to the ROOT menu as `subPicked(row, index)` and closes the whole chain.
+  // them as a submenu — CardMenu's own branch card, the one every menu here
+  // has; a choice in there comes back as `subPicked(row, index)` and closes
+  // the menu. (A second TrayMenu was opened for it as well, one row higher:
+  // two cards, the hidden one's last row peeking out under the other —
+  // user's screenshot, 2026-10-25. Only DBus branches open a TrayMenu.)
   signal subPicked(int row, int index)
   // The tray icon this hangs off — only the ROOT menu has one. A submenu
   // hangs off a row of its parent card instead, which it can measure directly
@@ -162,8 +165,7 @@ CardMenu {
 
   // The row whose submenu is open stays lit while you are inside it.
   activeIndex: {
-    if (!root.childMenu) return -1;
-    if (root.items !== null) return root.childMenu.parentRow;
+    if (!root.childMenu || root.items !== null) return -1;
     const kids = opener.children ? opener.children.values : [];
     for (let i = 0; i < kids.length; ++i)
       if (kids[i] === root.childMenu.menuHandle) return i;
@@ -171,19 +173,16 @@ CardMenu {
   }
 
   // A branch opens on hover and on click; everything else acts and closes.
+  // (the shell's own branches are CardMenu's: openBranch, on hover)
   onHovered: i => {
+    if (root.items !== null) return;
     const e = root.entryAt(i);
-    if (e?.hasChildren || e?.children) root.openChild(i);
-    // off a branch row, its submenu goes
-    else if (root.items !== null && root.childMenu) {
-      root.childMenu.closeMenu(); root.childMenu.destroy(); root.childMenu = null;
-    }
+    if (e?.hasChildren) root.openChild(i);
   }
   onChosen: i => {
     if (root.items !== null) {
-      if (root.items[i]?.children) { root.openChild(i); return; }
-      if (root.isSubMenu) root.parentMenu.childChose(root.parentRow, i);
-      else { root.picked(i); root.closeMenu(); }
+      root.picked(i);
+      root.closeMenu();
       return;
     }
     const e = root.entryAt(i);
@@ -198,6 +197,8 @@ CardMenu {
   // A grab per card would fight every other grab on screen.
   readonly property var grabWindows: {
     const out = [root];
+    // CardMenu's branch card, for the shell's own submenus
+    if (root.child) out.push(root.child);
     let m = root.childMenu;
     while (m) { out.push(m); m = m.childMenu; }
     return out;
@@ -234,25 +235,17 @@ CardMenu {
   // function of the same name would shadow it.
   function show() { root.open = true; }
 
-  // a submenu row of the shell's own was chosen: up to the root, then shut
-  function childChose(row, i) {
-    if (root.isSubMenu) { root.parentMenu.childChose(root.parentRow, row); return; }
-    root.subPicked(row, i);
-    root.closeMenu();
-  }
+  // a row in a branch card of the shell's own was chosen
+  onSubChosen: (row, i) => { root.subPicked(row, i); root.closeMenu(); }
 
   function openChild(i) {
     const e = root.entryAt(i);
     if (!e) return;
-    const own = root.items !== null;
-    if (root.childMenu && (own ? root.childMenu.parentRow === i
-                               : root.childMenu.menuHandle === e)) return;
+    if (root.childMenu && root.childMenu.menuHandle === e) return;
     if (root.childMenu) { root.childMenu.closeMenu(); root.childMenu.destroy(); }
     const comp = Qt.createComponent("TrayMenu.qml");
     if (comp.status !== Component.Ready) return;
-    root.childMenu = comp.createObject(root, own
-      ? { items: e.children, parentMenu: root, parentRow: i }
-      : { menuHandle: e, parentMenu: root, parentRow: i });
+    root.childMenu = comp.createObject(root, { menuHandle: e, parentMenu: root, parentRow: i });
     if (root.childMenu) root.childMenu.show();
   }
 

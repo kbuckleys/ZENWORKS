@@ -70,6 +70,10 @@ Item {
   signal pastePlainAsked()
   // the caret left the bottom of the last block downwards, or Esc
   signal escaped()
+  // ctrl return, where the holder takes it (`submits`): Delphi's release
+  // notes save on it, as its other wells do
+  property bool submits: false
+  signal submitted()
   // files dropped on the note from outside (terminus, say), and where:
   // `at` is the gap they land in, as dropAt
   signal filesDropped(var paths, int at)
@@ -353,6 +357,7 @@ Item {
       return false;
     }
 
+    if (ed.submits && ctrl && (e.key === Qt.Key_Return || e.key === Qt.Key_Enter)) { ed.flushTyping(); ed.submitted(); return true; }
     // a selection over several blocks takes every key first
     if (ed.cross && ed.crossKey(e)) return true;
     // then the tags offered, if any
@@ -608,6 +613,39 @@ Item {
     if (i < 0) return "";
     const b = ed.blocks[ed.sideKind(ed.blocks[i]) ? ed.rowStart(i) : i];
     return b && b.align ? b.align : "";
+  }
+  // ── WHAT IS IN HAND, FOR A FORMAT BAR ── (clio/FormatBar lights its
+  // buttons by these; NotePane had them, and Delphi's release notes wear
+  // the same bar since 2026-10-25)
+  readonly property string alignNow: ed.alignHere()
+  // the kind of block the caret is in
+  readonly property string kindHere: { void ed.cursorKey; void ed.rev; const it = ed.current(); return it ? it.kind : ""; }
+  // the marks on the words in hand (the caret's, or the selection's); a
+  // heading's own weight is not "bold" (TextEdit's cursorSelection, Qt 6.7)
+  readonly property var marksHere: {
+    void ed.cursorKey; void ed.rev;
+    const it = ed.current();
+    if (!it || !it.isText || !it.te || !it.te.cursorSelection) return ({});
+    void it.te.cursorPosition; void it.te.selectionStart; void it.te.selectionEnd; void it.te.length;
+    const f = it.te.cursorSelection.font;
+    return { b: f.weight >= Font.Bold && it.te.font.weight < Font.DemiBold, i: f.italic, u: f.underline, s: f.strikeout };
+  }
+  // the face the words in hand wear, when it is one chosen for them ("" for
+  // the note's own)
+  readonly property string faceHere: {
+    void ed.cursorKey; void ed.rev;
+    const it = ed.current();
+    if (!it || !it.isText || !it.te || !it.te.cursorSelection) return "";
+    void it.te.cursorPosition; void it.te.selectionStart; void it.te.selectionEnd; void it.te.length;
+    const f = it.te.cursorSelection.font.family;
+    return f && f !== it.te.font.family ? f : "";
+  }
+  // the caret (or every line chosen) in a Monostyled block: plain text, so
+  // marks, alignment and clearing do nothing there
+  readonly property bool inMono: {
+    void ed.cursorKey; void ed.rev; void ed.cross;
+    const ts = ed.targets();
+    return ts.length > 0 && ts.every((x) => ed.blocks[x] && ed.blocks[x].k === "mono");
   }
   // the first block of the row block i stands in (itself, alone)
   function rowStart(i) { if (i < 0) return i; while (i > 0 && ed.joins(i)) i--; return i; }

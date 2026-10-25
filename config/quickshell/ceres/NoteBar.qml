@@ -60,8 +60,9 @@ Rectangle {
         id: noteRow
         required property var modelData
         width: noteCol.width
-        height: noteAct.visible ? bar.rowH + 6 : bar.rowH
+        height: noteAct.visible || noteAlt.visible ? bar.rowH + 6 : bar.rowH
         spacing: 10
+        readonly property real acts: (noteAct.visible ? noteAct.width + 10 : 0) + (noteAlt.visible ? noteAlt.width + 10 : 0)
         Text {
           width: 18
           anchors.verticalCenter: parent.verticalCenter
@@ -73,7 +74,7 @@ Rectangle {
           font.pixelSize: bar.glyphSize
         }
         Text {
-          width: parent.width - 28 - (noteAct.visible ? noteAct.width + 10 : 0)
+          width: parent.width - 28 - noteRow.acts
           anchors.verticalCenter: parent.verticalCenter
           elide: Text.ElideRight
           text: noteRow.modelData.text
@@ -90,6 +91,16 @@ Rectangle {
           ink: bar.inkOf(noteRow.modelData.level)
           ready: !Ceres.txBusy
           onClicked: if (noteRow.modelData.run && Ceres[noteRow.modelData.run]) Ceres[noteRow.modelData.run]()
+        }
+        // a second answer, quieter: `alt` its word, `altRun` what it runs
+        // (the Flatpak question's Discard)
+        DialogButton {
+          id: noteAlt
+          visible: !!noteRow.modelData.alt
+          anchors.verticalCenter: parent.verticalCenter
+          label: noteRow.modelData.alt || ""
+          ink: Zenon.accentMuted
+          onClicked: if (noteRow.modelData.altRun && Ceres[noteRow.modelData.altRun]) Ceres[noteRow.modelData.altRun]()
         }
       }
     }

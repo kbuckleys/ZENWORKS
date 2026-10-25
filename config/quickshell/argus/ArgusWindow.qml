@@ -18,7 +18,7 @@
 //   space  play, pause (inside the cut)    i  o   in, out at the playhead
 //   ← →    a second ( shift: a tenth )     [  ]   to the in, to the out
 //   1 2 3  MP4 · GIF · WebM                m      mute
-//   ctrl s save    ctrl shift s  save as…  esc    stops a save, or closes
+//   ctrl s save    ctrl shift s  save as…  esc    stops a save, or a crop
 
 import QtQuick
 import Quickshell
@@ -305,7 +305,9 @@ FloatingWindow {
     Keys.onPressed: (e) => {
       const ctrl = e.modifiers & Qt.ControlModifier, shift = e.modifiers & Qt.ShiftModifier;
       e.accepted = true;
-      if (e.key === Qt.Key_Escape) { if (aw.saving) aw.stopSave(); else if (aw.cropping) aw.cropping = false; else aw.visible = false; return; }
+      // never the window (user, 2026-10-25: a stray esc lost the cut being
+      // made) — it is closed as any window is
+      if (e.key === Qt.Key_Escape) { if (aw.saving) aw.stopSave(); else if (aw.cropping) aw.cropping = false; return; }
       if (e.key === Qt.Key_C && !ctrl) { aw.toggleCrop(); return; }
       if (aw.cropping && (e.key === Qt.Key_Return || e.key === Qt.Key_Enter)) { aw.cropping = false; return; }
       if (ctrl && e.key === Qt.Key_O) { aw.openAsk(); return; }
@@ -802,7 +804,7 @@ FloatingWindow {
       rows: aw.saving ? [["esc", "stop saving"]]
         : aw.cropping ? [["drag", "the box"], ["shift", "square"], ["return", "done"], ["esc", "done"]]
         : [["space", "play"], ["i o", "in, out"], ["c", "crop"], ["← →", "seek"], ["[ ]", "to in, out"], ["1 2 3", "format"],
-           ["ctrl s", "save"], ["ctrl shift s", "save as"], ["esc", "close"]]
+           ["ctrl s", "save"], ["ctrl shift s", "save as"]]
     }
   }
 
