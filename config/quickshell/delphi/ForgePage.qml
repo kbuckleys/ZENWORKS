@@ -555,7 +555,7 @@ Item {
         font.family: Zenon.face
         font.weight: Zenon.weight
         font.pixelSize: Zenon.px(15)
-        onLinkActivated: (link) => Quickshell.execDetached(["xdg-open", link])
+        onLinkActivated: (link) => Strings.openLink(link)
         HoverHandler { cursorShape: parent.hoveredLink !== "" ? Qt.PointingHandCursor : Qt.ArrowCursor }
       }
     }

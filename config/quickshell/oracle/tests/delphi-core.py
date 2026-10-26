@@ -1608,6 +1608,10 @@ def aur_tag_checked_and_recipe_committed():
     eq("zen-0.10.0.tar.gz" in sh(d, "status", "--porcelain"), True, "the tarball stays out")
     again = A.commit(r, "again", gitrun.Cancel())
     eq((again["committed"], again["sha"]), (False, sh(d, "rev-parse", "HEAD").strip()), "nothing new: no empty commit")
+    # a cloned .SRCINFO naming files outside its own: never staged
+    write(d, ".SRCINFO", "pkgbase = zen\n\tsource = ../outside\n\tsource = /etc/hostname\n"
+                         "\tsource = .git/config\n\tinstall = zen.install\n")
+    eq(A._local_files(d), ["zen.install"], "only the checkout's own files")
 
 
 @test

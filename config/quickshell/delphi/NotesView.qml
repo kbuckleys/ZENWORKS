@@ -15,7 +15,6 @@
 //   (CODE_IN/OUT, BLOCK_IN/OUT; user, 2026-10-25), as GitHub draws them
 
 import QtQuick
-import Quickshell
 import "../morpheus"
 import "delphi.js" as D
 
@@ -38,7 +37,7 @@ TextEdit {
   font.family: Zenon.face
   font.weight: Zenon.weight
   font.pixelSize: view.textSize
-  onLinkActivated: (link) => Quickshell.execDetached(["xdg-open", link])
+  onLinkActivated: (link) => Strings.openLink(link)
 
   // where the marks landed: rules [y], chips [{ x, y, w, h }], blocks the same
   property var rules: []

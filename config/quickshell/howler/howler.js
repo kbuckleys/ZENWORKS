@@ -74,7 +74,25 @@ function capturePictures(row) {
 // Images come in through the notification's own image field, which the
 // sender cannot point anywhere this shell does not already look.
 function safeMarkup(s) {
-  return String(s ?? "").replace(/<\s*img\b[^>]*>/gi, "");
+  // an <img> the body never closes, too: StyledText may still load it
+  return String(s ?? "").replace(/<\s*img\b[^>]*(>|$)/gi, "");
+}
+
+// A track toast's line under the title: the artist alone (user, 2026-10-26).
+// Spotify sends "Artist — Album". The player's own artist (MPRIS) wins when
+// it has one; else the album is cut off the end when it is known, else at
+// the last spaced dash.
+function artistLine(line, artist, album) {
+  const a = String(artist ?? "").trim();
+  if (a !== "") return a;
+  const l = String(line ?? "").trim();
+  const al = String(album ?? "").trim();
+  if (al !== "") {
+    const m = l.match(new RegExp("^(.*?)\\s+[\u2014\u2013-]\\s+" + al.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "$"));
+    if (m) return m[1];
+  }
+  const cut = l.match(/^(.*)\s+\u2014\s+.*$/);
+  return cut ? cut[1] : l;
 }
 
 function serialize(rows) {

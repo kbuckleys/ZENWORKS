@@ -15,6 +15,7 @@ module.exports = {
     const g = C.monthGrid(2026, 9);
     t.eq("six weeks", g.length, 42);
     t.eq("iso", C.isoDay(2026, 9, 21), "2026-10-21");
+    t.eq("the clock's tooltip names the day", C.oneLine(new Date(2026, 9, 26)), "Monday, October 26, 2026");
 
     // events by day
     const ev = [

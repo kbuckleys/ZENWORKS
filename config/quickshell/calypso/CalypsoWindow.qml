@@ -344,8 +344,9 @@ FloatingWindow {
   // a revealed secret goes back to dots after a minute on its own
   Timer { id: revealTimer; interval: 60000; onTriggered: win.revealed = ({}) }
   function openUrl(u) {
-    const url = /^[a-z][a-z0-9+.-]*:/i.test(u) ? u : "https://" + u;
-    Quickshell.execDetached(["xdg-open", url]);
+    // an item's address is the vault's, and a vault can be imported or
+    // shared: the web only (Strings.openLink)
+    Strings.openLink(/^[a-z][a-z0-9+.-]*:/i.test(u) ? u : "https://" + u);
   }
   function website() {
     const it = win.item;

@@ -12,6 +12,10 @@
 // source from paru's GitHub — so pacman tracks the result like any package,
 // and paru can update itself from then on.
 //
+// Another AUR helper here (yay, …) is replaced by paru, and that is not
+// optional (user, 2026-10-26): Ceres runs the AUR through paru alone, and
+// every other job waits until setup has done it (Ceres.request).
+//
 // And once, whether the Store should carry Flathub's apps too (user,
 // 2026-10-14): asked here so Ceres fetches Flatpak with everything else, as
 // it fetches paru — see Ceres.flatpakAsk. Opt-in: unticked until ticked.
@@ -20,6 +24,7 @@ import QtQuick
 import "../morpheus"
 import "../morpheus/controls" as Controls
 import "."
+import "ceres.js" as Cer
 
 Item {
   id: view
@@ -48,7 +53,8 @@ Item {
     spacing: 14
 
     Text {
-      text: Ceres.setupMissing.length ? "Ceres needs a few things first" : "One question for the Store"
+      text: Ceres.otherHelpers.length ? "Ceres uses paru, not " + Cer.helperNames(Ceres.otherHelpers).join(" or ")
+        : Ceres.setupMissing.length ? "Ceres needs a few things first" : "One question for the Store"
       color: Zenon.white
       font.family: Zenon.face
       font.weight: Font.Bold
@@ -83,6 +89,38 @@ Item {
             font.pixelSize: Zenon.px(16)
           }
         }
+      }
+    }
+
+    // ── the other helper, replaced ──────────────────────────────────────
+    Column {
+      visible: Ceres.otherHelpers.length > 0
+      width: parent.width
+      spacing: 6
+      topPadding: 8
+
+      Text {
+        width: parent.width
+        wrapMode: Text.Wrap
+        textFormat: Text.StyledText
+        text: Ceres.otherHelpers.map((p) => Strings.escapeHtml(p)
+                + "  <font color='" + Zenon.red + "'>removed</font>").join("<br/>")
+        color: Zenon.white
+        font.family: Zenon.face
+        font.weight: Font.Bold
+        font.pixelSize: Zenon.px(17)
+      }
+      Text {
+        width: parent.width
+        wrapMode: Text.Wrap
+        text: "Ceres runs the AUR through paru alone: a second helper keeps its own cache and its own "
+          + "idea of what is out of date. Setup removes " + Cer.helperNames(Ceres.otherHelpers).join(" and ")
+          + (Ceres.deps.paru ? ", then builds paru from the channel below." : "; paru is already here.")
+          + " This can't be skipped: Ceres waits until it is done."
+        color: Zenon.accentMuted
+        font.family: Zenon.face
+        font.weight: Zenon.weight
+        font.pixelSize: Zenon.px(15)
       }
     }
 

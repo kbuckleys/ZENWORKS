@@ -511,7 +511,7 @@ Item {
           TapHandler {
             onTapped: {
               if (parent.page >= 0) pg.show(parent.page, Math.max(0, parent.location.y) * pg.zoom, -1);
-              else Qt.openUrlExternally(parent.url);
+              else Strings.openLink(parent.url.toString());
             }
           }
         }

@@ -1960,7 +1960,7 @@ FloatingWindow {
                   font.family: popup.face
                   font.weight: Zenon.weight
                   font.pixelSize: Zenon.px(13)
-                  onLinkActivated: (url) => Quickshell.execDetached(["xdg-open", url])
+                  onLinkActivated: (url) => Strings.openLink(url)
                   HoverHandler {
                     cursorShape: parent.hoveredLink !== ""
                       ? Qt.PointingHandCursor : Qt.ArrowCursor
@@ -1981,13 +1981,11 @@ FloatingWindow {
                   font.weight: Zenon.weight
                   font.pixelSize: Zenon.px(14)
 
-                  // The link opens in whatever the desktop uses for a URL.
-                  // execDetached rather than Qt.openUrlExternally: this is a
-                  // layer-shell surface with no QDesktopServices behind it,
-                  // and xdg-open is what every other outward link in this
-                  // shell already goes through.
-                  onLinkActivated: (url) => Quickshell.execDetached(
-                    ["xdg-open", url])
+                  // The link opens in whatever the desktop uses for a URL:
+                  // xdg-open through Strings.openLink, not
+                  // Qt.openUrlExternally: this is a layer-shell surface with
+                  // no QDesktopServices behind it.
+                  onLinkActivated: (url) => Strings.openLink(url)
 
                   // A link that does not say it is one is a decoration. The
                   // cursor is the only affordance a single word has here, and

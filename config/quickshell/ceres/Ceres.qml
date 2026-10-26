@@ -126,7 +126,7 @@ Singleton {
   // Checked at startup and after every transaction. Anything missing is
   // named with its package and its purpose, and whatever needs paru is sent
   // to setup rather than left to fail — see setupSteps.
-  property var deps: ({ missing: [], paru: false, cargo: false, paruPkg: "", flatpak: true })
+  property var deps: ({ missing: [], paru: false, cargo: false, paruPkg: "", flatpak: true, others: [] })
   // ── FLATPAK, IF YOU WANT IT (user, 2026-10-14) ──────────────────────────
   // Not a dependency: a question setup asks once — Arch and the AUR, or
   // Flathub's apps in the Store too. The answer is kept ("yes" / "no");
@@ -166,7 +166,10 @@ Singleton {
   // the Store says in its own tab, with its Install button (StoreView)
   readonly property var setupMissing: root.deps.missing.filter(m => !m.store)
   readonly property var storeNeeds: root.deps.missing.filter(m => m.store)
-  readonly property bool setupNeeded: root.setupMissing.length > 0 || root.flatpakAsk
+  // another AUR helper (yay, …): replaced by paru before anything else runs
+  // (user, 2026-10-26; Cer.OTHER_HELPERS) — see request
+  readonly property var otherHelpers: root.deps.others || []
+  readonly property bool setupNeeded: root.setupMissing.length > 0 || root.flatpakAsk || root.otherHelpers.length > 0
   readonly property string buildDir: Paths.cacheDir() + "/ceres/build"
   signal setupRequested()
   property bool _checkAfterSetup: false
@@ -186,6 +189,7 @@ Singleton {
   // kept the moment Install is pressed, so a "no" alone (nothing else to
   // install) is the whole of setup, and setup is done.
   function setup(paru, flatpak) {
+    if (root.txBusy) return;
     const wantFlatpak = root.flatpakAsk && !!flatpak;
     if (root.flatpakAsk) root.setFlatpakPref(wantFlatpak ? "yes" : "no");
     // setup's own: the Store's needs are installed from the Store
@@ -193,14 +197,20 @@ Singleton {
     const steps = Cer.setupSteps(deps, root.deps.paru ? (paru || "paru") : "", root.buildDir,
                                  Quickshell.shellDir + "/scripts/ceres.sh", wantFlatpak);
     if (steps.length === 0) return;
-    const n = root.setupMissing.filter(m => !m.aur).length + (wantFlatpak && !root.deps.flatpak ? 1 : 0);
+    const n = root.setupMissing.filter(m => !m.aur).length + (wantFlatpak && !root.deps.flatpak ? 1 : 0)
+      + root.otherHelpers.length;
     // and once it is all in, a fresh look for updates — armed only for a
     // setup that was actually started, or the next unrelated job ran the
     // check in its place
+    const what = root.setupMissing.map(m => m.pkg).concat(wantFlatpak ? ["flatpak"] : []);
+    root._setupGoing = true;
     root._checkAfterSetup = root.request(steps,
-      "install " + root.setupMissing.map(m => m.pkg).concat(wantFlatpak ? ["flatpak"] : []).join(", "),
+      (root.otherHelpers.length ? "replace " + Cer.helperNames(root.otherHelpers).join(", ") + " with paru"
+         + (what.length ? ", install " : "") : "install ") + what.join(", "),
       n + (root.deps.paru ? 1 : 0));
+    root._setupGoing = false;
   }
+  property bool _setupGoing: false
 
   // ── FLATPAK, LATER OR NOT AT ALL (Settings › Channels) ─────────────────
   // The apps Flatpak has here, for the sheet that asks before removing it —
@@ -356,10 +366,11 @@ Singleton {
     // which answers it no — Settings can still add Flatpak later
     if (root.setupNeeded)
       out.push({ level: "bad",
-        text: root.setupMissing.length ? "Setup needed: " + Cer.nameList(root.setupMissing.map(m => m.pkg), 2)
+        text: root.otherHelpers.length ? "Setup needed: replace " + Cer.nameList(Cer.helperNames(root.otherHelpers), 2) + " with paru"
+          : root.setupMissing.length ? "Setup needed: " + Cer.nameList(root.setupMissing.map(m => m.pkg), 2)
           : "Setup: Flatpak apps in the Store?",
         act: "Set up", run: "openSetup",
-        alt: root.setupMissing.length ? "" : "Discard", altRun: "discardFlatpak" });
+        alt: root.setupMissing.length || root.otherHelpers.length ? "" : "Discard", altRun: "discardFlatpak" });
     if (root.restartNeeded) out.push({ level: "warn", text: "Reboot needed: kernel upgraded" });
     if (root.staleApps.length)
       out.push({ level: "warn", text: "Restart " + Cer.nameList(root.staleApps.map(g => g.name), 2) });
@@ -687,6 +698,12 @@ Singleton {
     if (root.txBusy) return false;
     // Anything paru is asked to do, with no paru to ask: setup comes first.
     if (root.deps.paru && steps.some(a => a[0] !== "@sudo" && a[0] !== "@user")) {
+      root.setupRequested();
+      return false;
+    }
+    // Another AUR helper here: nothing at all until setup has swapped it
+    // for paru (user, 2026-10-26: mandatory) — setup's own job aside
+    if (root.otherHelpers.length > 0 && !root._setupGoing) {
       root.setupRequested();
       return false;
     }

@@ -1071,7 +1071,7 @@ Item {
                   id: linkMa
                   anchors.fill: parent
                   cursorShape: Qt.PointingHandCursor
-                  onClicked: Qt.openUrlExternally(link.modelData.url)
+                  onClicked: Strings.openLink(link.modelData.url)
                 }
               }
             }

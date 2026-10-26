@@ -76,7 +76,6 @@ zstyle ':completion:*' menu no
 setopt glob_dots
 
 # Aliases
-alias hypr='start-hyprland'
 alias icat='kitten icat'
 
 # Shell integrations

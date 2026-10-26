@@ -37,22 +37,19 @@ Item {
   property bool active: false
   // "volume" or "bright": what the card is showing
   property string kind: "volume"
-  // Where it comes in from, handed down by the stack so the OSD and a toast
-  // travel the same way for the same corner.
-  property real slideX: 0
-  property real slideY: 0
 
   implicitWidth: card.implicitWidth
-  // COLLAPSED ON A CURVE, not on the frame `active` goes false. Cutting the
-  // height to zero destroyed the card before its fade and its slide had a
-  // frame to run in — the open animated and the close did not exist. The
-  // height now travels with them, and the item stays alive until all three
-  // have finished.
-  implicitHeight: osd.active ? card.implicitHeight : 0
-  Behavior on implicitHeight {
-    NumberAnimation { duration: Howler.closeMs; easing.type: Zenon.ease }
-  }
-  visible: osd.implicitHeight > 0.5
+  // ONLY THE POP MOVES (user, 2026-10-26: "remove the slide animations
+  // from OSD. only pop"). Its room in the stack is there at once and stays
+  // until the pop back has finished, then goes at once: a height eased open
+  // and shut carried the card along the stack, which read as a slide.
+  // Cutting the height on the frame `active` went false is what once killed
+  // the close, so the room is held while `leave` runs.
+  readonly property bool held: osd.active || leave.running
+  implicitHeight: osd.held ? card.implicitHeight : 0
+  // the bounce's time both ways
+  readonly property int popMs: Howler.openMs * 2
+  visible: osd.held
 
   // ── THE FIRST VALUE IS THE STATE OF THE MACHINE, NOT NEWS ──────────────
   // Suppressing it by counting signals did not work, and could not: `ready`,
@@ -120,6 +117,13 @@ Item {
     osd.seenLevel = Volume.level;
     osd.seenMuted = Volume.muted;
     osd.kind = "volume";
+    osd.show();
+  }
+  // up, with the pop; already up, it only holds longer — a step while it
+  // is open moves the reading, not the card (user, 2026-10-26: animations
+  // for opening and closing only)
+  function show() {
+    if (!osd.active) arrive.restart();
     osd.active = true;
     hold.restart();
   }
@@ -130,8 +134,7 @@ Item {
     target: Hermes
     function onBrightnessBumped() {
       osd.kind = "bright";
-      osd.active = true;
-      hold.restart();
+      osd.show();
     }
   }
   readonly property bool bright: osd.kind === "bright"
@@ -158,24 +161,43 @@ Item {
     width: card.implicitWidth
     height: card.implicitHeight
 
-    opacity: osd.active ? 1 : 0
-    Behavior on opacity {
-      NumberAnimation { duration: Howler.closeMs; easing.type: Zenon.ease }
-    }
+    // set by the pop itself (arrive, leave): in quickly, out late in the
+    // bounce back so the swell is seen. A Behavior whose duration followed
+    // `active` read the old one, and faded out before the swell began.
+    opacity: 0
 
-    // THE SAME ARRIVAL A TOAST MAKES — it shares their stack, so it shares
-    // their motion rather than being the one thing in the corner that simply
-    // appears.
-    transform: Translate {
-      id: osdSlide
-      x: osd.active ? 0 : osd.slideX
-      y: osd.active ? 0 : osd.slideY
-      Behavior on x {
-        NumberAnimation { duration: Howler.openMs; easing.type: Zenon.travelEase }
+    // ITS OWN MOTION, NOT A TOAST'S (user, 2026-10-26: "the OSDs need
+    // different animations than notification toasts. go for bounce"). A
+    // toast slides in from its corner; the OSD pops where it stands, over
+    // its size and back (OutBack, the suite's ease for things arriving),
+    // and goes the way it came, bounced back (user, 2026-10-26): a swell
+    // past its size, then down to where it popped from. Nothing between.
+    scale: 1
+    ParallelAnimation {
+      id: arrive
+      NumberAnimation {
+        target: body; property: "scale"
+        from: 0.72; to: 1
+        // twice a toast's arrival: at its 140 the overshoot was over before
+        // it read as one
+        duration: osd.popMs
+        easing.type: Easing.OutBack; easing.overshoot: 2.2
       }
-      Behavior on y {
-        NumberAnimation { duration: Howler.openMs; easing.type: Zenon.travelEase }
+      NumberAnimation { target: body; property: "opacity"; to: 1; duration: Howler.closeMs; easing.type: Zenon.ease }
+    }
+    ParallelAnimation {
+      id: leave
+      NumberAnimation {
+        target: body; property: "scale"
+        to: 0.72
+        duration: osd.popMs
+        easing.type: Easing.InBack; easing.overshoot: 2.2
       }
+      NumberAnimation { target: body; property: "opacity"; to: 0; duration: osd.popMs; easing.type: Easing.InQuart }
+    }
+    Connections {
+      target: osd
+      function onActiveChanged() { if (!osd.active) { arrive.stop(); leave.restart(); } else leave.stop(); }
     }
 
     // It shares the toasts' stack and their skin, so it casts what they

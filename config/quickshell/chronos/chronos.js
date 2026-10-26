@@ -27,9 +27,10 @@ function dayShort(i) { return DAYS_SHORT[((i % 7) + 7) % 7]; }
 // Monday-first index of a Date, so it lines up with the grid's columns
 function weekIndex(d) { return (d.getDay() + 6) % 7; }
 
-// The one-line form the bar's clock hangs off: month, day, year.
+// The one-line form the bar's clock hangs off: the weekday (user,
+// 2026-10-26: "in clock's tooltip, show the day"), month, day, year.
 function oneLine(d) {
-  return monthName(d.getMonth()) + " " + d.getDate() + " " + d.getFullYear();
+  return DAYS[weekIndex(d)] + ", " + monthName(d.getMonth()) + " " + d.getDate() + ", " + d.getFullYear();
 }
 
 // "Saturday 29 August" — the footer under the grid. No year: the header above

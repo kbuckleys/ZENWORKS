@@ -14,6 +14,7 @@
 
 import QtQuick
 import "../morpheus"
+import "../morpheus/helpers.js" as Helpers
 
 Item {
   // the terminus window — passed in by whoever makes one. NOT `root`:
@@ -29,6 +30,14 @@ Item {
   // room for the readout: a percent fits the 38 it always had, a size
   // ("28.6 GiB", stylus' partition sheet) does not
   property real readoutW: 38
+  // the readout as a reading — the bar's segment digits over their unlit
+  // "8"s, the unit beside in the text face — where the number is the point
+  // (Control Hub's brightness, 2026-10-26); off, the plain small text
+  property bool segments: false
+  // the unlit digits behind it: as wide as the longest reading ("888" for a
+  // percent, so 9 and 100 sit on one ground); "" mirrors the reading itself
+  property string ghost: ""
+  readonly property var readParts: Helpers.splitRate(sl.readout)
   // dimmed when the value is the ordinary one, so it reads as "normal"
   // rather than as something you have changed
   property real neutral: -1
@@ -98,11 +107,48 @@ Item {
     width: sl.readoutW
     horizontalAlignment: Text.AlignRight
     text: sl.readout
-    color: (sl.neutral >= 0 && Math.abs(sl.value - sl.neutral) < 0.001)
-      ? Zenon.accentMuted : Zenon.cyan
+    visible: !sl.segments
+    color: sl.readInk
     font.family: Zenon.face
     font.weight: Zenon.weight
     font.pixelSize: Zenon.px(13)
+  }
+  readonly property color readInk: (sl.neutral >= 0 && Math.abs(sl.value - sl.neutral) < 0.001)
+    ? Zenon.accentMuted : Zenon.cyan
+  Row {
+    anchors.right: slRead.right
+    anchors.verticalCenter: parent.verticalCenter
+    visible: sl.segments
+    spacing: 3
+    Item {
+      anchors.verticalCenter: parent.verticalCenter
+      width: Math.max(segGhost.implicitWidth, segNum.implicitWidth)
+      height: segNum.implicitHeight
+      Text {
+        id: segGhost
+        anchors.right: parent.right
+        text: sl.ghost !== "" ? sl.ghost : Helpers.ghostText(sl.readParts.num)
+        color: Zenon.trough(sl.readInk)
+        font: segNum.font
+      }
+      Text {
+        id: segNum
+        anchors.right: parent.right
+        text: sl.readParts.num
+        color: sl.readInk
+        font.family: Zenon.clockFamily
+        font.weight: Font.Bold
+        font.pixelSize: Zenon.px(16)
+      }
+    }
+    Text {
+      anchors.verticalCenter: parent.verticalCenter
+      text: sl.readParts.unit
+      color: Zenon.accentMuted
+      font.family: Zenon.face
+      font.weight: Zenon.weight
+      font.pixelSize: Zenon.px(12)
+    }
   }
 
   Rectangle {

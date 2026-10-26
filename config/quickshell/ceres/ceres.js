@@ -1325,6 +1325,15 @@ const DEPS = [
 ];
 function depKey(d) { return d.bin || d.file; }
 
+// ONE AUR HELPER: PARU (user, 2026-10-26: "yay is old anyway"). Ceres runs
+// the AUR through paru alone; another helper beside it keeps its own cache,
+// its own idea of what is out of date and its own -Syu. Found, setup is not
+// done until it is gone and paru is in — no discard, and every other job
+// waits (Ceres.request). Each with its -bin / -git builds and the -debug
+// package makepkg leaves beside them.
+const OTHER_HELPERS = ["yay", "pikaur", "trizen", "aura", "pakku", "pacaur", "aurman", "rua"];
+const OTHER_HELPERS_RE = "(" + OTHER_HELPERS.join("|") + ")(-bin|-git)?(-debug)?";
+
 // Prints each missing program's name, one per line — and "cargo" when that
 // is missing too, since building paru needs it (rust provides it; someone on
 // rustup already has it, and must not be handed rust on top).
@@ -1332,24 +1341,29 @@ function depKey(d) { return d.bin || d.file; }
 // paru-git, paru-bin — for Settings, which offers to swap it for the other.
 // And "flatpak" when there is no flatpak: not a dependency — the Store asks
 // whether you want it (see setupSteps' `flatpak`).
+// And, as "~<package>", every other AUR helper installed (OTHER_HELPERS).
 function depsCommand() {
   return DEPS.map(d => (d.file ? "[ -e " + q(d.file) + " ]" : "command -v " + q(d.bin) + " >/dev/null 2>&1")
     + " || echo " + q(depKey(d))).join("; ")
     + "; command -v cargo >/dev/null 2>&1 || echo cargo"
     + "; command -v flatpak >/dev/null 2>&1 || echo flatpak"
-    + "; p=$(command -v paru) && pacman -Qqo \"$p\" 2>/dev/null | sed 's/^/=/'; true";
+    + "; p=$(command -v paru) && pacman -Qqo \"$p\" 2>/dev/null | sed 's/^/=/'"
+    + "; pacman -Qq 2>/dev/null | grep -xE " + q(OTHER_HELPERS_RE) + " | sed 's/^/~/'; true";
 }
 
+
 // → { missing: [{ pkg, aur, store, why: [..] }], paru: bool, cargo: bool, paruPkg,
-//     flatpak } — flatpak is whether it is HERE, unlike paru and cargo;
+//     flatpak, others } — flatpak is whether it is HERE, unlike paru and cargo;
+// others the other AUR helpers' packages installed (OTHER_HELPERS);
 // one row per PACKAGE, however many of its programs are missing; paruPkg is
 // the package paru came from, "" when there is none or pacman does not own it.
 function readDeps(text) {
-  const gone = {};
+  const gone = {}, others = [];
   let paruPkg = "";
   for (const l of String(text ?? "").split("\n")) {
     const t = l.trim();
     if (t.startsWith("=")) paruPkg = t.slice(1);
+    else if (t.startsWith("~")) { if (others.indexOf(t.slice(1)) < 0) others.push(t.slice(1)); }
     else if (t) gone[t] = true;
   }
   const byPkg = {}, order = [];
@@ -1361,7 +1375,17 @@ function readDeps(text) {
     byPkg[d.pkg].why.push(d.why);
   }
   return { missing: order.map(p => byPkg[p]), paru: !!gone["paru"], cargo: !!gone["cargo"],
-           paruPkg: gone["paru"] ? "" : paruPkg, flatpak: !gone["flatpak"] };
+           paruPkg: gone["paru"] ? "" : paruPkg, flatpak: !gone["flatpak"], others: others };
+}
+
+// The helpers' own names, for what setup says: "yay", not "yay-bin-debug"
+function helperNames(others) {
+  const out = [];
+  for (const p of others || []) {
+    const n = String(p).replace(/(-bin|-git)?(-debug)?$/, "");
+    if (out.indexOf(n) < 0) out.push(n);
+  }
+  return out;
 }
 
 // Flathub, as a remote for the whole system — see setupSteps
@@ -1551,7 +1575,8 @@ function parseFlatpaks(text) {
   return out;
 }
 
-// The steps that install what is missing. `paru` is "paru", "paru-git" or ""
+// The steps that install what is missing, and take out any other AUR helper
+// (deps.others). `paru` is "paru", "paru-git" or ""
 // (paru present). Repo packages first, in one pacman call — with base-devel
 // and git whenever paru is to be built, and rust only when there is no cargo.
 // Then paru: its AUR recipe cloned and built AS YOU (makepkg refuses root,
@@ -1578,9 +1603,15 @@ function setupSteps(deps, paru, buildDir, script, flatpak) {
     for (const p of ["base-devel", "git"]) if (repo.indexOf(p) < 0) repo.push(p);
     if (deps.cargo) repo.push("rust");
   }
-  if (repo.length === 0 && !paru && !flatpak) return steps;
+  const others = deps.others || [];
+  if (repo.length === 0 && !paru && !flatpak && others.length === 0) return steps;
   if (repo.length || paru) steps.push(["@sudo", "pacman", "-Syu", "--needed", "--noconfirm"].concat(repo));
   if (flatpak) steps.push(FLATHUB_STEP);
+  // the other helper out, then paru in (user, 2026-10-26: "remove yay then
+  // install" paru). -Rs takes what it alone pulled in; a package that needs
+  // the helper stops the removal, and the job, with pacman's own words. A
+  // paru build that then fails leaves setup to do again, paru still missing.
+  if (others.length) steps.push(["@sudo", "pacman", "-Rs", "--noconfirm"].concat(others));
   if (paru) steps.push(paruBuildStep(paru, buildDir));
   if (script) steps.push(["@user", q(script) + " aur"]);
   return steps;

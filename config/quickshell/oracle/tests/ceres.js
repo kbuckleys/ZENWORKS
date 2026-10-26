@@ -421,6 +421,17 @@ module.exports = {
     t.eq("the paru package is read", C.readDeps("fzf\n=paru-bin\n").paruPkg, "paru-bin");
     t.eq("and is no missing program", C.readDeps("=paru-git\n").missing.length, 0);
     t.eq("no paru, no package", C.readDeps("paru\n").paruPkg, "");
+    // another AUR helper: out before paru goes in, and setup is not done till then
+    const yay = C.readDeps("paru\n~yay-bin\n~yay-bin-debug\n~yay-bin\n");
+    t.eq("other helpers read, once each", yay.others, ["yay-bin", "yay-bin-debug"]);
+    t.eq("and named by the helper", C.helperNames(yay.others), ["yay"]);
+    t.eq("none is an empty list", C.readDeps("").others, []);
+    t.has("the command looks for them by package", C.depsCommand(), "(yay|pikaur|");
+    const swap = C.setupSteps(yay, "paru", "/b");
+    t.eq("removed after the repo step", swap[1], ["@sudo", "pacman", "-Rs", "--noconfirm", "yay-bin", "yay-bin-debug"]);
+    t.has("then paru built from the chosen channel", swap[2][1], "https://aur.archlinux.org/paru.git");
+    const only = C.setupSteps(C.readDeps("~pikaur\n"), "", "/b");
+    t.eq("paru already here: the removal alone", only, [["@sudo", "pacman", "-Rs", "--noconfirm", "pikaur"]]);
     // the Store's catalog is a directory, not a program
     t.has("a data dependency is tested as a path", C.depsCommand(), "[ -e '/usr/share/swcatalog/xml' ]");
     t.eq("and named by its package", C.readDeps("/usr/share/swcatalog/xml\n").missing.map(m => m.pkg),

@@ -145,8 +145,6 @@ PanelWindow {
        : toasts.side === "right" ? column.width - width
        : Math.round((column.width - width) / 2)
       atTop: toasts.atTop
-      slideX: toasts.slideX
-      slideY: toasts.slideY
       visible: toasts.atTop && osd.implicitHeight > 0
       height: toasts.atTop ? implicitHeight : 0
     }
@@ -356,8 +354,14 @@ PanelWindow {
         // keeps it.
         readonly property string bodyText: {
           const b = Wolf.safeMarkup(toast.modelData ? toast.modelData.body : "");
-          if (toast.musical)
-            return toast.bodyLines.length > 0 ? toast.bodyLines[0] : "";
+          if (toast.musical) {
+            // the artist alone, not "Artist — Album": the player's own,
+            // when it is this toast's track (Wolf.artistLine)
+            const m = toast.mpris && String(toast.mpris.trackTitle || "") === String(toast.modelData.summary || "")
+              ? toast.mpris : null;
+            return Wolf.artistLine(toast.bodyLines.length > 0 ? toast.bodyLines[0] : "",
+              m ? Strings.escapeHtml(m.trackArtist || "") : "", m ? Strings.escapeHtml(m.trackAlbum || "") : "");
+          }
           return Howler.markup ? b.replace(/\r?\n/g, "<br/>") : b;
         }
 
@@ -1045,8 +1049,6 @@ PanelWindow {
        : toasts.side === "right" ? column.width - width
        : Math.round((column.width - width) / 2)
       atTop: toasts.atTop
-      slideX: toasts.slideX
-      slideY: toasts.slideY
       visible: !toasts.atTop && osdLow.implicitHeight > 0
       height: !toasts.atTop ? implicitHeight : 0
     }

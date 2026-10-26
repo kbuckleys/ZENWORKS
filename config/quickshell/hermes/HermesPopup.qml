@@ -8,8 +8,9 @@
 //
 //   main    four tiles (the network — Wi-Fi, or the wired link where there
 //           is no Wi-Fi —, Bluetooth, VPN, night light), each on or off at
-//           return; a brightness slider per screen that can be dimmed, and
-//           the night light's warmth while it is on
+//           return, lit in the one accent (HermesTile); under "Display" a
+//           brightness slider per screen that can be dimmed, and the night
+//           light's warmth while it is on, read in segment digits
 //   wifi    the networks, joined at return; a passphrase asked for here
 //   bt      the devices, connected at return; s searches for more
 //   vpn     the connections NetworkManager has, up or down at return
@@ -51,6 +52,7 @@ LayerPopup {
   readonly property int visibleRows: 7
   readonly property int emptyH: 72
   readonly property int sliderH: 36
+  readonly property int labelH: 24
 
   focusable: true
 
@@ -298,7 +300,7 @@ LayerPopup {
   function calcHeight() {
     if (popup.mode === "main")
       return popup.pad + 2 * popup.tileH + 8 + popup.pad
-        + (popup.sliderCount > 0 ? popup.sliderCount * popup.sliderH + popup.pad : 0) + Zenon.hintBarH;
+        + (popup.sliderCount > 0 ? popup.labelH + popup.sliderCount * popup.sliderH + popup.pad : 0) + Zenon.hintBarH;
     if (popup.mode === "psk") return popup.headH + 132 + Zenon.hintBarH;
     const n = popup.rows.length;
     return popup.headH + (n === 0 ? popup.emptyH : Math.min(n, popup.visibleRows) * popup.cellH) + Zenon.hintBarH;
@@ -353,6 +355,7 @@ LayerPopup {
                 width: (tileGrid.width - tileGrid.spacing) / 2
                 height: popup.tileH
                 tile: popup.tiles[index] || null
+                picked: index === popup.tileSel
                 onPressed: { popup.tileSel = index; popup.pressTileAt(index); }
                 onListed: { popup.tileSel = index; popup.openList(popup.tiles[index].list); }
               }
@@ -372,6 +375,15 @@ LayerPopup {
           // screens array, and a Repeater handed one rebuilt its sliders —
           // the one being dragged included, which dropped the drag (user,
           // 2026-10-20). Only a screen coming or going rebuilds them now.
+          // what the sliders are, as the suite's sections are headed: the
+          // window's own name for them (brightness and warmth alike)
+          SectionLabel {
+            visible: popup.sliderCount > 0
+            x: 14
+            height: popup.labelH
+            verticalAlignment: Text.AlignVCenter
+            text: "Display"
+          }
           Repeater {
             model: Hermes.screens.length
             delegate: PrefSlider {
@@ -386,6 +398,9 @@ LayerPopup {
               to: 100
               wheelStep: 5
               readout: modelData.pct + "%"
+              segments: true
+              ghost: "888"
+              readoutW: 62
               onMoved: (v) => Hermes.setBrightness(modelData, v)
             }
           }
@@ -400,6 +415,9 @@ LayerPopup {
             to: H.KELVIN_MAX
             wheelStep: 100
             readout: (Hermes.kelvin / 1000).toFixed(1) + "k"
+            segments: true
+            ghost: "8.8"
+            readoutW: 62
             onMoved: (v) => Hermes.setKelvin(v)
           }
         }

@@ -188,7 +188,8 @@ def tags(root, version, cancel):
     v-prefixed — or "" when it is not there yet. Many a package's url= is
     a home page, not a repository: then checked is False and why says so,
     and the release goes on without the check."""
-    url = _var(open(os.path.join(root, "PKGBUILD")).read(), "url")
+    with open(os.path.join(root, "PKGBUILD")) as f:
+        url = _var(f.read(), "url")
     out = {"url": url, "tags": [], "tag": "", "checked": False, "why": ""}
     if not re.match(r"^(https?|git|ssh|file)://", url):
         out["why"] = "The PKGBUILD has no url= to check" if not url else url + " is not a repository"
@@ -259,6 +260,11 @@ def _local_files(root):
     out = []
     for key, val in re.findall(r"^\s*(source(?:_\w+)?|install|changelog)\s*=\s*(.+?)\s*$", text, re.M):
         if "::" in val or "://" in val:
+            continue
+        # a cloned recipe's .SRCINFO is not trusted to name only its own
+        # files: nothing outside the checkout, nothing in .git
+        parts = val.replace("\\", "/").split("/")
+        if val.startswith("/") or ".." in parts or ".git" in parts:
             continue
         if os.path.isfile(os.path.join(root, val)) and val not in out:
             out.append(val)

@@ -78,6 +78,17 @@ QtObject {
       .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   }
 
+  // A LINK FROM SOMEONE ELSE'S TEXT (a PDF, an issue, release notes, store
+  // data): opened only when it is the web or mail. xdg-open hands file:,
+  // a .desktop or any scheme handler whatever it names (audit 2026-10-26).
+  // false when refused.
+  function openLink(u) {
+    const s = String(u ?? "").trim();
+    if (!/^(https?|mailto):/i.test(s)) return false;
+    Quickshell.execDetached(["xdg-open", s]);
+    return true;
+  }
+
   // THE CLIPBOARD, as text. copy hands it to wl-copy as an argument, never
   // spliced into the shell line. paste asks Quickshell first; on Wayland that
   // read can come back empty while another client owns the clipboard (a token

@@ -5964,7 +5964,7 @@ FloatingWindow {
                 hoverEnabled: true
                 // a hand only for the web (user, 2026-10-19): the map is here
                 cursorShape: modelData.url && !modelData.mapAt ? Qt.PointingHandCursor : Qt.ArrowCursor
-                onClicked: modelData.mapAt ? win.openMap(win.gps) : Qt.openUrlExternally(modelData.url)
+                onClicked: modelData.mapAt ? win.openMap(win.gps) : Strings.openLink(modelData.url)
               }
             }
           }

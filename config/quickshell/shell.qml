@@ -1088,9 +1088,12 @@ ShellRoot {
         opacity: root.pillRowFade
           * ((workspacesMod.visible && workspacesMod.specialWorkspace !== null) ? 1 : 0)
         Behavior on opacity { NumberAnimation { duration: Zenon.slow; easing.type: Zenon.ease } }
+        // shown: the theme's accent, solid, its numbers in onAccent
+        // (Workspaces) — red is the urgent flash's alone (user, 2026-10-26)
         color: workspacesMod.specialFocused
-          ? Qt.rgba(Zenon.red.r, Zenon.red.g, Zenon.red.b, 0.22)
+          ? Zenon.cyan
           : Qt.rgba(Zenon.cyan.r, Zenon.cyan.g, Zenon.cyan.b, 0.18)
+        Behavior on color { ColorAnimation { duration: Zenon.normal; easing.type: Zenon.ease } }
         anchors.top: parent.top
         anchors.bottom: parent.bottom
         anchors.topMargin: bg.border.width

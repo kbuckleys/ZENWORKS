@@ -3,9 +3,15 @@
 // └─┘└─┘┘└┘└┴┘└─┘┴└─┴ ┴└─┘
 // https://github.com/kbuckleys/
 //
-// One of the quick panel's four tiles: the thing's glyph in its own colour
-// while it is on, its name, what it is doing, and — where it has a list
-// (networks, devices, connections) — a chevron that opens it.
+// One of the quick panel's four tiles: the thing's glyph, its name, what it
+// is doing, and — where it has a list (networks, devices, connections) — a
+// chevron that opens it.
+//
+// ONE ACCENT (user, 2026-10-26: "more zenworks"): a tile that is on is
+// filled with the theme's accent and everything on it is onAccent, as the
+// bar's special workspace and Chronos' today are; off, it is the panel's own
+// faint wash. The four colours it had (cyan, blue, green, yellow) were a
+// control centre's, not the suite's.
 //
 //   tile: { id, glyph, title, sub, on, ready, list }
 //
@@ -19,21 +25,28 @@ Item {
   id: t
 
   property var tile: null
+  // under the panel's keyboard cursor: the band (CursorBand) slides behind
+  // the tiles, which hides it under a filled one, so a lit tile shows it by
+  // going a step lighter
+  property bool picked: false
   signal pressed()
   signal listed()
 
   readonly property bool on: !!t.tile && t.tile.on
   readonly property bool ready: !!t.tile && t.tile.ready
-  // each thing in its own colour, as the bar's meters are told apart
-  readonly property color ink: !t.tile ? Zenon.cyan
-    : ({ net: Zenon.cyan, bt: Zenon.blue, vpn: Zenon.green, night: Zenon.yellow })[t.tile.id] || Zenon.cyan
+  // what is drawn on the tile: onAccent on the fill, the panel's inks off it
+  readonly property color ink: t.on ? Zenon.onAccent : t.ready ? Zenon.ink : Zenon.accentMuted
+  readonly property color subInk: t.on ? Zenon.alpha(Zenon.onAccent, 0.72) : Zenon.accentMuted
 
   Rectangle {
     anchors.fill: parent
     radius: Zenon.radiusCard
-    color: tilePress.pressed ? Zenon.pressTile(t.on) : t.on ? Zenon.alpha(t.ink, 0.14) : Zenon.wash(0.04)
-    border.width: 1
-    border.color: t.on ? Zenon.alpha(t.ink, 0.45) : Zenon.border
+    color: t.on ? (tilePress.pressed ? Zenon.mix(Zenon.cyan, Zenon.onAccent, 0.18)
+                   : t.picked ? Zenon.mix(Zenon.cyan, Zenon.white, 0.16) : Zenon.cyan)
+      : tilePress.pressed ? Zenon.pressTile(false) : Zenon.wash(0.04)
+    border.width: t.on ? 0 : 1
+    border.color: Zenon.border
+    Behavior on color { ColorAnimation { duration: Zenon.normal; easing.type: Zenon.ease } }
   }
 
   // the glyph bare, in the tile's colour while on (user, 2026-10-20: no
@@ -45,7 +58,7 @@ Item {
     anchors.verticalCenter: parent.verticalCenter
     horizontalAlignment: Text.AlignHCenter
     text: t.tile ? t.tile.glyph : ""
-    color: t.on ? t.ink : t.ready ? Zenon.ink : Zenon.accentMuted
+    color: t.ink
     font.family: Zenon.glyphFace
     font.pixelSize: Zenon.px(22)
   }
@@ -61,7 +74,7 @@ Item {
       width: parent.width
       elide: Text.ElideRight
       text: t.tile ? t.tile.title : ""
-      color: t.ready ? Zenon.ink : Zenon.accentMuted
+      color: t.ink
       font.family: Zenon.face
       font.weight: Zenon.titleWeight
       font.pixelSize: Zenon.px(15)
@@ -70,7 +83,7 @@ Item {
       width: parent.width
       elide: Text.ElideRight
       text: t.tile ? t.tile.sub : ""
-      color: t.on ? t.ink : Zenon.accentMuted
+      color: t.subInk
       font.family: Zenon.face
       font.weight: Zenon.weight
       font.pixelSize: Zenon.px(13)
@@ -100,12 +113,13 @@ Item {
       anchors.verticalCenter: parent.verticalCenter
       width: 1
       height: parent.height - 24
-      color: Zenon.border
+      color: t.on ? Zenon.alpha(Zenon.onAccent, 0.22) : Zenon.border
     }
     Text {
       anchors.centerIn: parent
       text: ""
-      color: listPress.pressed ? Zenon.ink : Zenon.accentMuted
+      color: t.on ? (listPress.pressed ? Zenon.onAccent : t.subInk)
+        : listPress.pressed ? Zenon.ink : Zenon.accentMuted
       font.family: Zenon.glyphFace
       font.pixelSize: Zenon.px(12)
     }

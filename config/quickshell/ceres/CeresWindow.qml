@@ -326,7 +326,9 @@ FloatingWindow {
     if (Ceres.newsGate) return "news";
     // No paru, nothing works: setup is the whole window. Anything less
     // missing waits behind the "Set up" button until asked for.
-    if (Ceres.setupNeeded && (Ceres.deps.paru || win.showSetup)) return "setup";
+    // another AUR helper holds the window on setup too, as no paru does: it
+    // is not optional (Ceres.otherHelpers)
+    if (Ceres.setupNeeded && (Ceres.deps.paru || Ceres.otherHelpers.length > 0 || win.showSetup)) return "setup";
     return win.overlay !== "" ? win.overlay : "browse";
   }
 
@@ -4108,7 +4110,7 @@ FloatingWindow {
     case "news": return [["return", "continue"], ["esc", "back"]];
     case "setup": return (Ceres.deps.paru ? [["\u2190 \u2192", "paru or paru-git"]] : [])
       .concat(Ceres.flatpakAsk ? [["space", "Flatpak apps"]] : [])
-      .concat([["return", Ceres.setupMissing.length || setupView.flatpak ? "install" : "done"],
+      .concat([["return", Ceres.otherHelpers.length ? "replace" : Ceres.setupMissing.length || setupView.flatpak ? "install" : "done"],
                ].concat(Ceres.deps.paru ? [] : [["esc", "not now"]]));
     case "tx":
       if (Ceres.txBusy) return [["shift esc", "cancel"]];
@@ -4181,7 +4183,7 @@ FloatingWindow {
     DialogButton {
       visible: win.face === "setup"
       // only the Flatpak question left, answered no: nothing to install
-      label: Ceres.setupMissing.length || setupView.flatpak ? "Install" : "Done"
+      label: Ceres.otherHelpers.length ? "Replace with paru" : Ceres.setupMissing.length || setupView.flatpak ? "Install" : "Done"
       ink: Zenon.cyan
       primary: true
       onClicked: Ceres.setup(setupView.choice, setupView.flatpak)

@@ -67,6 +67,12 @@ module.exports = {
     t.eq("an <img> in a body is dropped",
       H.safeMarkup('hi <img src="https://track.example/p.gif"> there'), "hi  there");
     t.eq("whatever its case or spacing", H.safeMarkup("<IMG\nsrc=x/>a"), "a");
+    t.eq("one never closed", H.safeMarkup('a <img src="https://track.example/p.gif"'), "a ");
+    // a track toast's line: the artist alone
+    t.eq("the player's artist wins", H.artistLine("Daft Punk \u2014 Discovery", "Daft Punk", "Discovery"), "Daft Punk");
+    t.eq("else the known album is cut", H.artistLine("Simon - Garfunkel \u2014 Bookends", "", "Bookends"), "Simon - Garfunkel");
+    t.eq("else at the last spaced em dash", H.artistLine("Air \u2014 Moon Safari", "", ""), "Air");
+    t.eq("a line with no album stays", H.artistLine("Björk", "", ""), "Björk");
     t.eq("the formatting the markup is for stays", H.safeMarkup("<b>bold</b>"), "<b>bold</b>");
 
     // ── a capture is drawn as its own file ────────────────────────────────

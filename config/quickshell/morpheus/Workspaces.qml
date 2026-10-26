@@ -166,16 +166,50 @@ Item {
   Item {
     id: wsLayer
     anchors.centerIn: parent
-    implicitWidth: wsRow.implicitWidth
+    // autofit: from the numbers' width to the glyph's as it comes in
+    implicitWidth: wsRow.implicitWidth * (1 - wsLayer.glyphShow)
+      + (specialGlyph.implicitWidth + 1 + Zenon.padModule * 2) * wsLayer.glyphShow
     implicitHeight: Zenon.slot
     opacity: 1 - root.cross
     visible: opacity > 0.01
 
+    // THE SPECIAL WORKSPACE SHOWN (user, 2026-10-26): the numbers give way
+    // to its glyph, in onAccent on the accent fill (shell.qml), the module
+    // fitting it (implicitWidth above). A click anywhere then puts it away:
+    // the numbers' own areas stand aside for the bare-ends one (toggleSpecial).
+    readonly property bool specialShown: root.specialWorkspace !== null && root.specialFocused
+    property real glyphShow: wsLayer.specialShown ? 1 : 0
+    Behavior on glyphShow { NumberAnimation { duration: Zenon.normal; easing.type: Zenon.ease } }
+    Text {
+      id: specialGlyph
+      anchors.centerIn: parent
+      anchors.horizontalCenterOffset: -0.5
+      text: "\uEAAE"
+      color: Zenon.onAccent
+      font.family: Zenon.glyphFace
+      font.pixelSize: Zenon.clockSize
+      opacity: wsLayer.glyphShow
+      visible: opacity > 0.01
+      // bolder as the active number is (wsThick): the glyph font has one
+      // weight, so a copy one pixel right widens its strokes
+      Text {
+        x: 1
+        text: specialGlyph.text
+        color: specialGlyph.color
+        font: specialGlyph.font
+      }
+    }
+
     Row {
       id: wsRow
       anchors.verticalCenter: parent.verticalCenter
+      // centered: as the layer narrows to the glyph, the numbers fade in place
+      anchors.horizontalCenter: parent.horizontalCenter
       leftPadding: Zenon.padModule
       rightPadding: Zenon.padModule
+      // opacity only: hidden, a Row lays out none of its children and
+      // the module would shrink to its padding
+      opacity: 1 - wsLayer.glyphShow
 
       Repeater {
         model: Hyprland.workspaces
@@ -230,7 +264,9 @@ Item {
               numeric: true
               // the unlit segments match the lit ones' thickness
               font.weight: wsLabel.font.weight
-              color: Zenon.trough(Zenon.cyan)
+              // on the special workspace's accent fill: a trace of its ink
+              color: root.specialWorkspace !== null && root.specialFocused
+                ? Zenon.alpha(Zenon.onAccent, 0.12) : Zenon.trough(Zenon.cyan)
             }
 
             BarText {
@@ -245,12 +281,10 @@ Item {
               color: {
                 if (btn.isUrgent) return root.urgentInk
                 if (root.specialWorkspace !== null && root.specialFocused)
-                  // a meter's faint notch is too faint for a number — on
-                  // paper or on the dark wash (user, 2026-10-24): inactive
-                  // takes the same halfway step toward the lit ink as the
-                  // cyan numbers do below
-                  return btn.isActive ? Zenon.pink
-                    : Zenon.light ? Zenon.alpha(Zenon.pink, 0.75) : Zenon.mix(Zenon.dimInk, Zenon.pink, 0.5)
+                  // inverted on the special workspace's accent fill
+                  // (shell.qml specialTakeover; user, 2026-10-26): red was
+                  // the fill, and red is the urgent flash's alone
+                  return btn.isActive ? Zenon.onAccent : Zenon.alpha(Zenon.onAccent, 0.6)
                 // Inactive in a dark theme: halfway from dim to the lit
                 // cyan. Plain dim sat barely above the unlit "8" behind it
                 // (wsGhost, trough cyan) and the numbers all but vanished
@@ -301,7 +335,7 @@ Item {
 
           MouseArea {
             anchors.fill: parent
-            enabled: !root.showTray
+            enabled: !root.showTray && !wsLayer.specialShown
             onClicked: root.clickNumber(modelData, btn.isActive)
           }
         }
@@ -372,8 +406,9 @@ Item {
             anchors.fill: parent
             visible: trayIcon.status === Image.Ready
             property var source: trayIcon
-            // the clock's ink (ClockModule: Zenon.cyan), as the bell's when caught up
-            property color ink: Zenon.cyan
+            // the clock's ink (ClockModule: Zenon.cyan), as the bell's when caught up;
+            // onAccent over the special workspace's accent fill (shell.qml)
+            property color ink: root.specialWorkspace !== null && root.specialFocused ? Zenon.onAccent : Zenon.cyan
             property real floorAlpha: 0.25
             fragmentShader: Qt.resolvedUrl("shaders/inktint.frag.qsb")
           }
