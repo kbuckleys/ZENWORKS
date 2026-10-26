@@ -48,6 +48,10 @@ function focusTitle(title) { return focusWindow(byTitle(title)); }
 function focusWorkspace(name) { return "hl.dsp.focus({ workspace = " + lua(name) + " })"; }
 // to the front of its workspace, over the floating windows focus alone
 // leaves on top of it (the window switcher, 2026-10-26)
+// a tag on or off a window, for a rule that matches it (rules.lua's zen-peek)
+function tagWindow(selector, tag, on) {
+  return "hl.dsp.window.tag({ tag = " + lua((on ? "+" : "-") + tag) + ", window = " + lua(selector) + " })";
+}
 function raiseWindow(selector) { return "hl.dsp.window.alter_zorder({ mode = \"top\", window = " + lua(selector) + " })"; }
 
 // ── workspaces ────────────────────────────────────────────────────────────

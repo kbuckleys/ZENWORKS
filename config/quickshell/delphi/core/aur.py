@@ -143,6 +143,15 @@ def _run(argv, root, cancel, tail=40):
 def sums(root, cancel):
     if not shutil.which("updpkgsums"):
         raise AurError("updpkgsums is missing (pacman-contrib)")
+    # always fetched fresh: makepkg reuses a tarball already here, and a
+    # forge can serve different bytes for the same tag (a renamed repository
+    # renames the directory inside it — zenworks 0.0.7-1 failed its checksum
+    # for everyone; release.sh does the same)
+    ver = recipe(root).get("pkgver") or ""
+    if _VERSION.match(ver):
+        for name in os.listdir(root):
+            if name.endswith("-" + ver + ".tar.gz") and os.path.isfile(os.path.join(root, name)):
+                os.remove(os.path.join(root, name))
     code, said = _run(["updpkgsums"], root, cancel)
     if code != 0:
         raise AurError("The checksums were not updated:\n" + "\n".join(said[-8:]))

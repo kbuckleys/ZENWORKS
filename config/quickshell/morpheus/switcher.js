@@ -53,3 +53,16 @@ function stepFrom(at, dir, count) {
   if (count <= 0) return 0;
   return ((at + (dir < 0 ? -1 : 1)) % count + count) % count;
 }
+
+// THE PEEK (user, 2026-10-26): every window but the picked one fades while
+// the card is up. Which windows gain the tag and which lose it, from those
+// `tagged` now: `pick` an address, or "" for none (all of them off).
+// { add, drop, tagged }
+function peekPlan(addresses, pick, tagged) {
+  const want = pick ? addresses.filter((a) => a !== pick) : [];
+  return {
+    add: want.filter((a) => tagged.indexOf(a) < 0),
+    drop: tagged.filter((a) => want.indexOf(a) < 0),
+    tagged: want,
+  };
+}

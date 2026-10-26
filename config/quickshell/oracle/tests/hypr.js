@@ -19,6 +19,10 @@ module.exports = {
     t.eq("regex characters in a title are", H.byTitle("a.b (c)"), "title:^(a\\.b \\(c\\))$");
     t.eq("focus by a selector", H.focusWindow("address:0x1f"),
       'hl.dsp.focus({ window = "address:0x1f" })');
+    t.eq("a tag on", H.tagWindow("address:0x1f", "zen-peek", true),
+      'hl.dsp.window.tag({ tag = "+zen-peek", window = "address:0x1f" })');
+    t.eq("a tag off", H.tagWindow("address:0x1f", "zen-peek", false),
+      'hl.dsp.window.tag({ tag = "-zen-peek", window = "address:0x1f" })');
     t.eq("raised to the top", H.raiseWindow("address:0x1f"),
       'hl.dsp.window.alter_zorder({ mode = "top", window = "address:0x1f" })');
     t.eq("an address gains its 0x once", H.byAddress("1f"), "address:0x1f");

@@ -85,3 +85,11 @@ for _, r in ipairs(shipped) do
 	if type(r) == "table" and not replaced[r.shipped] then pcall(apply, r) end
 end
 for _, r in ipairs(yours) do pcall(apply, r) end
+
+-- THE WINDOW SWITCHER'S PEEK (quickshell's morpheus/WindowSwitcher): while
+-- Super+Tab is held, every window but the one picked carries the tag
+-- zen-peek and fades, so the picked one shows through. A tag and not
+-- setprop: hyprland re-runs the rules when a tag comes or goes, so taking
+-- it off gives each window back exactly what its own rules said, where a
+-- set opacity cannot be unset. Last, so it wins over an opacity rule above.
+hl.window_rule({ match = { tag = "zen-peek" }, opacity = "0.5" })

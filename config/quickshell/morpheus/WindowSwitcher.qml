@@ -70,8 +70,37 @@ PanelWindow {
   property real showFactor: 0
   visible: sw.shown || sw.showFactor > 0.01
   onShownChanged: {
-    if (sw.shown) { fallOut.stop(); sw.showFactor = 0; riseIn.restart(); }
-    else { riseIn.stop(); fallOut.restart(); }
+    if (sw.shown) { fallOut.stop(); sw.showFactor = 0; riseIn.restart(); peekLater.restart(); }
+    else { riseIn.stop(); fallOut.restart(); peekLater.stop(); }
+  }
+
+  // ── THE PEEK ── (user, 2026-10-26) every window but the picked one fades
+  // while the card is up, so the picked one shows through: rules.lua fades
+  // what carries the tag zen-peek, and a tag taken off gives a window back
+  // exactly what its own rules said. Only the windows that change are
+  // dispatched (S.peekPlan); a beat after the card is up, so a quick tap of
+  // Super+Tab flashes nothing.
+  property var peeked: []
+  property bool peeking: false
+  function peek(pick) {
+    const p = S.peekPlan(sw.windows.map((w) => w.address), pick, sw.peeked);
+    for (const a of p.add) Hyprland.dispatch(Hypr.tagWindow(Hypr.byAddress(a), "zen-peek", true));
+    for (const a of p.drop) Hyprland.dispatch(Hypr.tagWindow(Hypr.byAddress(a), "zen-peek", false));
+    sw.peeked = p.tagged;
+  }
+  Timer {
+    id: peekLater
+    interval: 150
+    onTriggered: {
+      const w = sw.windows[sw.at];
+      if (!sw.shown || !w) return;
+      sw.peeking = true;
+      sw.peek(w.address);
+    }
+  }
+  onAtChanged: {
+    const w = sw.windows[sw.at];
+    if (sw.peeking && w) sw.peek(w.address);
   }
   SequentialAnimation {
     id: riseIn
@@ -102,6 +131,9 @@ PanelWindow {
         address: t.address,
         history: t.lastIpcObject && t.lastIpcObject.focusHistoryID !== undefined ? t.lastIpcObject.focusHistoryID : -1 })));
       sw.mru = sw.mru.concat(seeded.filter((a) => sw.mru.indexOf(a) < 0));
+      // a peek a reload or crash left behind (finish never ran) is lifted
+      for (const t of Hyprland.toplevels.values)
+        Hyprland.dispatch(Hypr.tagWindow(Hypr.byAddress(t.address), "zen-peek", false));
     }
   }
 
@@ -177,6 +209,8 @@ PanelWindow {
     if (go && sw.open && w)
       Quickshell.execDetached(Off.wanted([Hypr.focusWindow(Hypr.byAddress(w.address)),
                                           Hypr.raiseWindow(Hypr.byAddress(w.address))]));
+    sw.peeking = false;
+    sw.peek("");
     sw.open = false;
     sw.shown = false;
     sw.pendingCommit = 0;
