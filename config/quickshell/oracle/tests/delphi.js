@@ -170,6 +170,9 @@ module.exports = {
       { remote: "aur", pkg: "zenworks", web: "https://aur.archlinux.org/packages/zenworks" });
     t.eq("aur: https, among others", D.aurOf([rem("origin", "git@github.com:me/x.git"), rem("aur", "https://aur.archlinux.org/foo-bin.git")]).pkg, "foo-bin");
     t.eq("aur: none", D.aurOf([rem("origin", "git@github.com:me/x.git")]), null);
+    t.eq("andList: one", D.andList(["GitHub"]), "GitHub");
+    t.eq("andList: three", D.andList(["GitHub", "GitLab", "Codeberg"]), "GitHub, GitLab and Codeberg");
+    t.eq("andList: none", D.andList([]), "");
     t.eq("hub: upstream first", D.hubOf([rem("origin", "git@github.com:me/x.git"), rem("upstream", "https://github.com/them/x")]).full, "them/x");
     t.eq("hub: origin", D.hubOf([rem("origin", "git@github.com:me/x.git")]), { remote: "origin", host: "github.com", full: "me/x", web: "https://github.com/me/x", forge: "github" });
     t.eq("hub: upstream on codeberg", D.hubOf([rem("upstream", "https://codeberg.org/a/b"), rem("origin", "https://github.com/me/x")]).forge, "codeberg");

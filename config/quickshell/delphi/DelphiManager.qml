@@ -72,6 +72,9 @@ Scope {
   // repositories opened, newest first; the page the window was on; the
   // directories looked through for repositories; how pull integrates
   property var recents: []
+  // a release just published, to be followed on its AUR package's page:
+  // { root, version } — that page runs the release of it, once (AurPage)
+  property var aurWant: null
   // repositories forgotten: left off the list, and out of what a scan finds,
   // until opened again — their files are not touched
   property var hidden: []

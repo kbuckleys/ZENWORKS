@@ -187,6 +187,60 @@ def remote_key(url):
     return (m.group(1).lower(), m.group(2).lower()) if m else None
 
 
+def _headings(lines):
+    """(index, level, text, lines it takes) of each Markdown heading:
+    "## x" ones and underlined ones (=== level 1, --- level 2)."""
+    out, fence = [], False
+    for i, l in enumerate(lines):
+        if re.match(r"^\s*(```|~~~)", l):
+            fence = not fence
+            continue
+        if fence:
+            continue
+        m = re.match(r"^(#{1,6})\s+(.*?)\s*#*\s*$", l)
+        if m:
+            out.append((i, len(m.group(1)), m.group(2), 1))
+        elif (i + 1 < len(lines) and l.strip() and not re.match(r"^\s*([-*+]|\d+[.)])\s", l)
+              and re.match(r"^(=+|-+)\s*$", lines[i + 1])):
+            out.append((i, 1 if lines[i + 1].startswith("=") else 2, l.strip(), 2))
+    return out
+
+
+_ITEM = re.compile(r"^\s*([-*+]|\d+[.)])\s")
+
+
+def changelog_section(lines, tag):
+    """The section of a changelog's lines whose heading names `tag` (or
+    the version in it, "v" or not), up to the next heading as big; its
+    wrapped lines joined. "" when none does."""
+    ver = re.sub(r"^[vV](?=\d)", "", str(tag or "").strip())
+    if not ver:
+        return ""
+    want = re.compile(r"(?<![\w.])[vV]?" + re.escape(ver) + r"(?![\w.]|-\w)")
+    hs = _headings(lines)
+    at = next((k for k, h in enumerate(hs) if want.search(h[2])), -1)
+    if at < 0:
+        return ""
+    i, level, _, size = hs[at]
+    end = next((h[0] for h in hs[at + 1:] if h[1] <= level), len(lines))
+    body, fence = [], False
+    for l in lines[i + size:end]:
+        if re.match(r"^\s*(```|~~~)", l):
+            fence = not fence
+            body.append(l)
+            continue
+        prev = body[-1] if body else ""
+        joins = (not fence and l.strip() and prev.strip() and not _ITEM.match(l)
+                 and not re.match(r"^\s*(#|>|\||```|~~~)", l) and not re.match(r"^(=+|-+)\s*$", l)
+                 and not re.match(r"^\s*(#|\||```|~~~)", prev) and not re.match(r"^(=+|-+)\s*$", prev)
+                 and not prev.endswith("  "))
+        if joins:
+            body[-1] = prev.rstrip() + " " + l.strip()
+        else:
+            body.append(l.rstrip())
+    return "\n".join(body).strip("\n")
+
+
 class Repo:
     def __init__(self, path, sock=None):
         info = discover(path)
@@ -250,6 +304,26 @@ class Repo:
             if len(f) == 3 and f[0]:
                 res.append({"subject": f[0], "sha": f[1], "author": f[2]})
         return res
+
+    CHANGELOGS = ("CHANGELOG.md", "CHANGELOG", "CHANGELOG.txt", "Changelog.md", "changelog.md",
+                  "CHANGES.md", "CHANGES", "NEWS.md", "NEWS", "HISTORY.md")
+
+    def changelog_notes(self, tag, cancel=None):
+        """A release's notes from the work tree's changelog: the section
+        whose heading names the version ("## [1.2.0] - 2024-05-01",
+        "# v1.2.0", "1.2.0 (May 2024)" over a "---" line), as written —
+        its own headings kept — with wrapped lines joined, since the forges
+        keep a release's line breaks. { file, body }; body "" when no
+        changelog names it."""
+        name = next((n for n in self.CHANGELOGS if os.path.isfile(os.path.join(self.root, n))), "")
+        if not name:
+            return {"file": "", "body": ""}
+        try:
+            with open(os.path.join(self.root, name), encoding="utf-8", errors="replace") as f:
+                lines = f.read().splitlines()
+        except OSError:
+            return {"file": "", "body": ""}
+        return {"file": name, "body": changelog_section(lines, tag)}
 
     # ── status ──────────────────────────────────────────────────────────
     def status(self, cancel=None, ignored=False):

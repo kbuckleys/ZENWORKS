@@ -455,6 +455,7 @@ FloatingWindow {
   function remoteWord(r) {
     const o = D.remoteOf(r.push || r.fetch || "");
     const f = o ? D.forgeOfHost(o.host) : null;
+    if (!f && o && o.host === "aur.archlinux.org") return { glyph: "\uF303", where: "AUR" };
     return { glyph: f ? f.glyph : "\uF0C2", where: f ? f.name : o ? o.host : (r.push || r.fetch || "") };
   }
   // ── THE CHECKS ON WHAT WAS PUSHED ──────────────────────────────────────
@@ -894,7 +895,7 @@ FloatingWindow {
     { id: "pulls", label: win.hub && D.FORGES[win.hub.forge] ? D.FORGES[win.hub.forge].pulls : "Pull requests", glyph: "\uF407", group: "forge" },
     { id: "issues", label: "Issues", glyph: "\uF41B", group: "forge" },
     { id: "releases", label: "Releases", glyph: "\uF412", group: "forge" },
-    { id: "aur", label: "Package", glyph: "\uF487", group: "aur" },
+    { id: "aur", label: "Package", glyph: "\uF303", group: "aur" },
     { id: "repos", label: "Repositories", glyph: "", group: "all" },
     { id: "github", label: "Accounts", glyph: "\uF0C2", group: "all" },
     { id: "keys", label: "SSH keys", glyph: "\uF43D", group: "all" },

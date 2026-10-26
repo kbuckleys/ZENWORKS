@@ -1572,6 +1572,74 @@ def forges_ssh_keys():
     eq(sent[4][2], {"title": "aur", "key": "ssh-ed25519 AAAA", "usage_type": "auth"}, "GitLab: a key for signing in")
 
 
+@test
+def aur_tag_checked_and_recipe_committed():
+    import aur as A
+    src = fresh({"a": "1\n"})
+    for t in ("0.9.1", "0.10.0", "v0.2"):
+        sh(src, "tag", t)
+    pkgbuild = f'pkgname=zen\npkgver=0.10.0\npkgrel=1\nurl="file://{src}"\ninstall=zen.install\n'
+    d = fresh({"PKGBUILD": pkgbuild})
+    got = A.tags(d, "0.10.0", gitrun.Cancel())
+    eq(got["tags"], ["0.10.0", "0.9.1", "v0.2"], "newest version first")
+    eq(got["tag"], "0.10.0")
+    eq(A.tags(d, "0.2", gitrun.Cancel())["tag"], "v0.2", "a v-prefixed tag is the version")
+    eq(A.tags(d, "0.11.0", gitrun.Cancel())["tag"], "", "not tagged yet")
+    eq(got["checked"], True)
+    home = fresh({"PKGBUILD": 'pkgname=h\npkgver=1\npkgrel=1\nurl="https://example.org/h"\n'.replace("https://example.org/h", "file:///nowhere/at/all")})
+    soft = A.tags(home, "1", gitrun.Cancel())
+    eq((soft["checked"], soft["tag"]), (False, ""), "a url= that is no repository is not a failure")
+    plain = fresh({"PKGBUILD": "pkgname=h\npkgver=1\npkgrel=1\n"})
+    eq(A.tags(plain, "1", gitrun.Cancel())["why"], "The PKGBUILD has no url= to check")
+    r = R.Repo(d)
+    write(d, "PKGBUILD", pkgbuild.replace("pkgrel=1", "pkgrel=2"))
+    try:
+        A.commit(r, "zen 0.10.0-2", gitrun.Cancel())
+        raise AssertionError("committed with no .SRCINFO")
+    except A.AurError as e:
+        eq("write it first" in str(e), True, str(e))
+    write(d, "zen.install", "post_install() { :; }\n")
+    write(d, "zen-0.10.0.tar.gz", "makepkg leftover\n")
+    time.sleep(0.01)
+    write(d, ".SRCINFO", "pkgbase = zen\n\tpkgver = 0.10.0\n\tpkgrel = 2\n\tinstall = zen.install\n"
+                         "\tsource = zen-0.10.0.tar.gz::https://example.org/0.10.0.tar.gz\n")
+    eq(A.commit(r, "zen 0.10.0-2", gitrun.Cancel())["committed"], True)
+    eq(sorted(sh(d, "show", "--name-only", "--format=", "HEAD").split()), [".SRCINFO", "PKGBUILD", "zen.install"])
+    eq("zen-0.10.0.tar.gz" in sh(d, "status", "--porcelain"), True, "the tarball stays out")
+    again = A.commit(r, "again", gitrun.Cancel())
+    eq((again["committed"], again["sha"]), (False, sh(d, "rev-parse", "HEAD").strip()), "nothing new: no empty commit")
+
+
+@test
+def changelog_sections_in_every_shape():
+    keep = ["# Changelog", "", "## [Unreleased]", "", "## [1.2.0] - 2024-05-01", "### Added",
+            "- A thing that was", "  wrapped over two lines", "- Another", "", "```", "code stays", "as it is", "```",
+            "", "## [1.1.0] - 2024-01-01", "- old"]
+    eq(R.changelog_section(keep, "v1.2.0"),
+       "### Added\n- A thing that was wrapped over two lines\n- Another\n\n```\ncode stays\nas it is\n```")
+    eq(R.changelog_section(keep, "1.1.0"), "- old")
+    eq(R.changelog_section(keep, "1.2"), "", "1.2 is not 1.2.0")
+    setext = ["v2.0.0 (May 2024)", "-----------------", "", "Fixed things.", "", "v1.9.0", "------", "x"]
+    eq(R.changelog_section(setext, "2.0.0"), "Fixed things.")
+    eq(R.changelog_section(["# v3.0.0-rc1", "rc", "# v3.0.0", "final"], "3.0.0"), "final", "an rc is not the release")
+    d = fresh({"CHANGES.md": "## 0.5.0\n\n* one\n"})
+    eq(R.Repo(d).changelog_notes("0.5.0"), {"file": "CHANGES.md", "body": "* one"})
+    eq(R.Repo(fresh({"a": "1\n"})).changelog_notes("0.5.0"), {"file": "", "body": ""})
+
+
+@test
+def aur_packages_found_for_a_source():
+    import aur as A
+    pkg = fresh({"PKGBUILD": 'pkgname=zen\nurl="https://zen.example.org"\n'
+                             'source=("zen-$pkgver.tar.gz::https://github.com/Someone/Zen/archive/$pkgver.tar.gz")\n'})
+    sh(pkg, "remote", "add", "aur", "ssh://aur@aur.archlinux.org/zen.git")
+    other = fresh({"PKGBUILD": 'pkgname=other\nurl="https://github.com/someone/zenith"\n'})
+    sh(other, "remote", "add", "aur", "ssh://aur@aur.archlinux.org/other.git")
+    nopush = fresh({"PKGBUILD": 'pkgname=local\nurl="https://github.com/someone/zen"\n'})
+    eq(A.packages_for([pkg, other, nopush, "/nowhere"], ["git@github.com:someone/zen.git"]),
+       [{"root": pkg, "pkg": "zen"}], "matched by a source=, not by a longer name, never without an AUR remote")
+
+
 def main():
     want = sys.argv[1] if len(sys.argv) > 1 else ""
     ok = bad = skipped = 0

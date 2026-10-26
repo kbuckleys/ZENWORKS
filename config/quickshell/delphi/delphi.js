@@ -545,6 +545,13 @@ function hubOf(remotes, own) {
   return null;
 }
 
+// "GitHub", "GitHub and GitLab", "GitHub, GitLab and Codeberg"
+function andList(words) {
+  var w = (words || []).filter(function (x) { return x !== ""; });
+  if (w.length <= 1) return w.join("");
+  return w.slice(0, -1).join(", ") + " and " + w[w.length - 1];
+}
+
 // THE AUR: a remote at aur.archlinux.org is a package's recipe, not a
 // forge (core/aur.py) — { remote, pkg, web } for the first such remote,
 // or null. Its page is AurPage.

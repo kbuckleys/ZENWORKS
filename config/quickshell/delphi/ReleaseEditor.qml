@@ -6,9 +6,10 @@
 // A RELEASE BEING WRITTEN — the Releases page, given over to one release, new
 // or one there is (user, 2026-10-11: a sheet was too tight for its notes).
 // Across the top its tag, the branch it is made from (a new one only) and
-// its title; draft and pre-release where the forge has them; then the notes,
-// the rest of the page, and "Write them for me" for GitHub's own or the
-// commits since the last tag. Saving and canceling are the page's buttons;
+// its title; draft and pre-release where the forge has them; the other
+// forges the repository is on, ticked to have the same release; then the
+// notes, the rest of the page, and "Write them for me": the changelog's
+// section for the tag, else GitHub's own, else the commits since the last tag. Saving and canceling are the page's buttons;
 // ctrl return saves.
 //
 // The notes are MARKDOWN, written as Markdown under a bar made for it
@@ -215,7 +216,9 @@ Item {
       wrapMode: Text.Wrap
       text: !ed.e ? ""
         : ed.e.mode === "new" ? (ed.e.prev !== "" ? "The last tag is " + ed.e.prev + ". " : "No tags yet. ")
-          + ed.page.site.name + " makes the tag on " + (ed.e.target || "the branch") + " as it has it"
+          + (ed.page.alsoOf(ed.e).length > 0 && !ed.e.draft
+             ? "The tag is made here on " + (ed.e.target || "HEAD") + " and pushed to every forge ticked, so each has it on the same commit"
+             : ed.page.site.name + " makes the tag on " + (ed.e.target || "the branch") + " as it has it")
           + (ed.e.unpushed > 0 ? " — " + ed.e.unpushed + (ed.e.unpushed === 1 ? " commit" : " commits") + " here are not pushed yet, and would not be in it." : ".")
         : ed.e.wasDraft ? "A draft: only you see it until it is published." : ""
       color: ed.e && ed.e.unpushed > 0 ? Zenon.yellow : Zenon.accentMuted
@@ -240,6 +243,36 @@ Item {
         label: "A pre-release"
         lit: !!ed.e && ed.e.prerelease
         onToggled: ed.page.setEdit("prerelease", !ed.e.prerelease)
+      }
+    }
+
+    // the other forges: the same release on each one ticked
+    Row {
+      visible: !!ed.page && ed.page.others.length > 0
+      spacing: 28
+      Text {
+        height: 26
+        verticalAlignment: Text.AlignVCenter
+        text: ed.e && ed.e.mode === "edit" ? "Save it on" : "Also on"
+        color: Zenon.accentMuted
+        font.family: Zenon.face
+        font.weight: Zenon.weight
+        font.pixelSize: Zenon.px(13)
+      }
+      Repeater {
+        model: ed.page ? ed.page.others : []
+        delegate: Controls.Check {
+          required property var modelData
+          readonly property bool many: ed.page.others.filter((h) => h.forge === modelData.forge).length > 1
+          // a draft is public on a forge without drafts: not offered there
+          readonly property bool barred: !!ed.e && ed.e.draft && ed.page.draftless(modelData)
+          height: 26
+          enabled2: !barred
+          opacity: barred ? Zenon.disabledDim : 1
+          label: ed.page.siteOf(modelData).name + (many ? " " + modelData.full : "") + (barred ? " — it has no drafts" : "")
+          lit: !barred && !!ed.e && (ed.e.also || []).indexOf(ed.page.hubKeyOf(modelData)) >= 0
+          onToggled: ed.page.setAlso(modelData, !lit)
+        }
       }
     }
 
@@ -269,7 +302,8 @@ Item {
         Text {
           anchors.verticalCenter: parent.verticalCenter
           visible: !!ed.e && ed.e.by !== ""
-          text: ed.e && ed.e.by === "github" ? "Written by GitHub, from what was merged" : ed.e && ed.e.by === "commits" ? "Written from the commits since " + (ed.e.prev || "the start") : ""
+          text: ed.e && ed.e.by === "changelog" ? "From " + ed.e.file
+            : ed.e && ed.e.by === "github" ? "Written by GitHub, from what was merged" : ed.e && ed.e.by === "commits" ? "Written from the commits since " + (ed.e.prev || "the start") : ""
           color: Zenon.accentMuted
           font.family: Zenon.face
           font.weight: Zenon.weight

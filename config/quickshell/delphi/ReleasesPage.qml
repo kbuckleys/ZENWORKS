@@ -43,7 +43,28 @@ Item {
   readonly property var site: D.FORGES[pg.hub ? pg.hub.forge : "github"] || D.FORGES.github
   function op(name) { return (D.FORGES[pg.hub ? pg.hub.forge : "github"] || D.FORGES.github).id + name; }
   // GitLab (gitlab.com or a server of your own) has no drafts or pre-releases
-  readonly property bool drafts: !!pg.hub && !/^gitlab/.test(pg.hub.forge)
+  readonly property bool drafts: !!pg.hub && !pg.draftless(pg.hub)
+  function draftless(h) { return /^gitlab/.test(h.forge); }
+
+  // ── THE SAME RELEASE ON THE OTHER FORGES (user, 2026-10-26) ────────────
+  // The repository's other forge remotes, each a tick in the editor (edit
+  // .also, by hubKeyOf): ticked to begin with only when the repository is
+  // kept in sync across them (Push's "Keep them all in sync") — another
+  // remote may be a project you only follow. A draft goes to none that has
+  // no drafts: there it would be public.
+  readonly property var others: pg.hubs.filter((h) => pg.hubKeyOf(h) !== pg.hubKey)
+  function hubKeyOf(h) { return h.forge + " " + h.full; }
+  function opOf(h, name) { return (D.FORGES[h.forge] || D.FORGES.github).id + name; }
+  function siteOf(h) { return D.FORGES[h.forge] || D.FORGES.github; }
+  function alsoOf(e) {
+    return !e || !e.also ? [] : pg.others.filter((h) => e.also.indexOf(pg.hubKeyOf(h)) >= 0 && !(e.draft && pg.draftless(h)));
+  }
+  function setAlso(h, on) {
+    if (!pg.edit) return;
+    const k = pg.hubKeyOf(h), a = (pg.edit.also || []).filter((x) => x !== k);
+    pg.setEdit("also", on ? a.concat([k]) : a);
+  }
+  readonly property var alsoAtFirst: pg.win && pg.win.syncing ? pg.others.map(pg.hubKeyOf) : []
 
   readonly property string title: pg.edit ? (pg.edit.mode === "new" ? "New release" : "Editing " + pg.edit.tag) : "Releases"
   readonly property string subtitle: pg.edit ? pg.hubFull
@@ -120,15 +141,16 @@ Item {
     pg.win.mgr.call("lastTag", pg.win.root, {}, (ok, last) => { if (!pg) return;
       const prev = ok ? last : "";
       pg.edit = { mode: "new", id: null, tag: D.nextVersion(prev), target: here, name: "", body: "",
-                  draft: false, prerelease: false, wasDraft: false, prev: prev, by: "",
-                  unpushed: b && b.ahead > 0 ? b.ahead : 0 };
+                  draft: false, prerelease: false, wasDraft: false, prev: prev, by: "", file: "",
+                  unpushed: b && b.ahead > 0 ? b.ahead : 0, also: pg.alsoAtFirst, was: "" };
       pg.writeNotes();
     });
   }
   function editRel(r) {
     if (!r) return;
     pg.edit = { mode: "edit", id: r.id, tag: r.tag, target: r.target, name: r.name, body: r.body,
-                draft: r.draft, prerelease: r.prerelease, wasDraft: r.draft, prev: "", by: "", unpushed: 0 };
+                draft: r.draft, prerelease: r.prerelease, wasDraft: r.draft, prev: "", by: "", file: "", unpushed: 0,
+                also: pg.alsoAtFirst, was: r.tag };
   }
   function setEdit(k, v) {
     if (!pg.edit) return;
@@ -137,16 +159,18 @@ Item {
     pg.edit = e;
   }
   function cancelEdit() { pg.edit = null; Qt.callLater(pg.takeFocus); }
-  // The notes written for you: GitHub's own, else the commits since the
-  // last tag. Into the notes as they are — asked for again, they replace.
+  // The notes written for you: the repository's changelog where it has a
+  // section for the tag (CHANGELOG.md and its kin, core changelog_notes),
+  // else GitHub's own, else the commits since the last tag. Into the notes
+  // as they are — asked for again, they replace.
   property bool writing: false
   function writeNotes() {
     const e = pg.edit;
     if (!e || e.tag.trim() === "") return;
     const tag = e.tag.trim(), target = e.target, prev = e.prev;
-    const put = (body, by) => { if (!pg || !pg.edit || pg.edit.tag.trim() !== tag) return;
+    const put = (body, by, file) => { if (!pg || !pg.edit || pg.edit.tag.trim() !== tag) return;
       pg.writing = false;
-      const n = Object.assign({}, pg.edit, { body: body, by: by });
+      const n = Object.assign({}, pg.edit, { body: body, by: by, file: file || "" });
       pg.edit = n;
       editor.reset();
     };
@@ -154,9 +178,11 @@ Item {
       if (!pg) return;
       put(ok ? D.notesFrom(cs, prev) : "", ok && cs.length > 0 ? "commits" : "");
     });
-    pg.writing = true;
-    pg.win.mgr.call(pg.op("ReleaseNotes"), null, { full: pg.hubFull, tag: tag, target: target, previous: prev || null },
+    const fromForge = () => pg.win.mgr.call(pg.op("ReleaseNotes"), null, { full: pg.hubFull, tag: tag, target: target, previous: prev || null },
       (ok, r) => { if (!pg) return; if (ok && r && r.body) put(r.body, r.by); else fromCommits(); });
+    pg.writing = true;
+    pg.win.mgr.call("changelogNotes", pg.win.root, { tag: tag }, (ok, r) => { if (!pg) return;
+      if (ok && r.body !== "") put(r.body, "changelog", r.file); else fromForge(); });
   }
   function save() {
     const e = pg.edit;
@@ -164,10 +190,11 @@ Item {
     const tag = e.tag.trim(), name = (e.name || "").trim() || tag;
     const args = { full: pg.hubFull, tag: tag, name: name, body: e.body, draft: !!e.draft, prerelease: !!e.prerelease };
     if (e.mode === "new") args.target = e.target; else args.id = e.id;
-    pg.win.act(pg.op(e.mode === "new" ? "CreateRelease" : "UpdateRelease"), args, {
+    const also = pg.alsoOf(e);
+    const here = () => pg.win.act(pg.op(e.mode === "new" ? "CreateRelease" : "UpdateRelease"), args, {
       repo: null, network: true, refresh: false,
-      label: (e.mode === "new" ? (e.draft ? "Saving " : "Publishing ") : "Saving ") + tag,
-      said: e.mode === "new" ? (e.draft ? "Saved the draft of " + tag : "Released " + tag) : "Saved " + tag,
+      label: (e.mode === "new" ? (e.draft ? "Saving " : "Publishing ") : "Saving ") + tag + (also.length > 0 ? " on " + pg.site.name : ""),
+      said: also.length > 0 ? "" : e.mode === "new" ? (e.draft ? "Saved the draft of " + tag : "Released " + tag) : "Saved " + tag,
       then: (r) => {
         if (!pg) return;
         // in the list now, as the forge answered it
@@ -178,7 +205,86 @@ Item {
         relaxed.restart();
         if (e.mode === "new") pg.win.act("fetch", {}, { refresh: true });
         Qt.callLater(pg.takeFocus);
+        const after = () => { if (pg && e.mode === "new" && !e.draft && !e.prerelease) pg.offerAur(tag); };
+        if (also.length > 0) pg.spread(e, args, also, after); else after();
       } });
+    // a new release on more than one forge: the tag made here and pushed
+    // to each first, so every forge has it on the same commit — left to
+    // each forge, each would tag its own copy of the branch. A draft makes
+    // no tag until published, so it is left to the forges.
+    if (e.mode === "new" && !e.draft && also.length > 0) pg.tagEverywhere(tag, e.target, [pg.hub].concat(also), here);
+    else here();
+  }
+  function tagEverywhere(tag, target, hubs, then) {
+    const push = (i) => {
+      if (!pg) return;
+      if (i >= hubs.length) { then(); return; }
+      pg.win.act("push", { remote: hubs[i].remote, branch: "refs/tags/" + tag },
+        { label: "Pushing " + tag + " to " + pg.siteOf(hubs[i]).name, network: true, refresh: false, then: () => push(i + 1) });
+    };
+    if ((pg.win.refs.tags || []).some((t) => t.name === tag)) push(0);
+    else pg.win.act("tagCreate", { name: tag, rev: target || "HEAD", message: tag },
+                    { label: "Tagging " + tag, refresh: false, then: () => push(0) });
+  }
+  // the release on each other forge in turn, one that fails not stopping
+  // the rest; said at the end, all of them at once. An edit finds the
+  // release there by its tag (as it was), and makes it where it is missing.
+  function spread(e, args, hubs, after) {
+    const done = [pg.site.name], bad = [];
+    const finish = () => {
+      if (!pg) return;
+      const verb = e.mode === "new" ? (e.draft ? "Saved the draft of " : "Released ") : "Saved ";
+      if (bad.length === 0) pg.win.say(verb + args.tag + " on " + D.andList(done));
+      else pg.win.card_({ question: args.tag + " is not on " + D.andList(bad.map((b) => b.name)), glyph: "\uF412", ink: Zenon.yellow,
+        detail: (done.length > 0 ? "It is on " + D.andList(done) + ". " : "") + "Try those again from their own Releases page, or on the web.",
+        items: bad.map((b) => b.name + ": " + D.errorText(b.err).split("\n")[0]),
+        choices: [{ label: "OK", ink: Zenon.cyan }] });
+      after();
+    };
+    const next = (i) => {
+      if (!pg) return;
+      if (i >= hubs.length) { finish(); return; }
+      const h = hubs[i], site = pg.siteOf(h);
+      const one = Object.assign({}, args, { full: h.full });
+      const failed = (err) => { bad.push({ name: site.name, err: err ? String(err.error || "") : "" }); next(i + 1); };
+      const make = () => {
+        const c = Object.assign({}, one, { target: e.mode === "new" ? e.target : one.tag });
+        delete c.id;
+        pg.win.act(pg.opOf(h, "CreateRelease"), c, { repo: null, network: true, refresh: false,
+          label: "Publishing " + one.tag + " on " + site.name, failed: failed, then: () => { done.push(site.name); next(i + 1); } });
+      };
+      if (e.mode === "new") { make(); return; }
+      pg.win.mgr.call(pg.opOf(h, "Releases"), null, { full: h.full }, (ok, list, err) => {
+        if (!pg) return;
+        if (!ok) { failed(err); return; }
+        const there = list.find((r) => r.tag === (e.was || one.tag));
+        if (!there) { make(); return; }
+        pg.win.act(pg.opOf(h, "UpdateRelease"), Object.assign({}, one, { id: there.id }), { repo: null, network: true, refresh: false,
+          label: "Saving " + one.tag + " on " + site.name, failed: failed, then: () => { done.push(site.name); next(i + 1); } });
+      });
+    };
+    next(0);
+  }
+
+  // ── AND ITS AUR PACKAGE ────────────────────────────────────────────────
+  // A release published: Delphi's repositories looked through for an AUR
+  // package made from this one (core aur.packages_for — its url= or a
+  // source= is one of these remotes). There is one: offered, the release
+  // of it run on its AUR page with this version (mgr.aurWant). Publishing
+  // it there stays a step of its own.
+  function offerAur(tag) {
+    const roots = pg.win.mgr.recents.map((r) => r.root).filter((r) => r !== pg.win.root);
+    const urls = pg.win.remotes.map((r) => r.fetch || r.push);
+    if (roots.length === 0 || urls.length === 0) return;
+    const v = tag.replace(/^[vV](?=\d)/, "");
+    pg.win.mgr.call("aurFor", null, { roots: roots, urls: urls }, (ok, found) => {
+      if (!pg || !ok || found.length === 0) return;
+      pg.win.card_({ question: "Release " + D.andList(found.map((p) => p.pkg)) + " " + v + " on the AUR too?", glyph: "\uF303", ink: Zenon.cyan,
+        detail: "Its recipe opens on its AUR page, where the release runs: the tag checked, the version set, checksums, .SRCINFO and a build. Publishing it is a step of its own, after.",
+        choices: found.slice(0, 3).map((p) => ({ label: found.length > 1 ? "Release " + p.pkg : "Release it", ink: Zenon.cyan,
+                   run: () => { pg.win.mgr.aurWant = { root: p.root, version: v }; pg.win.openRepo(p.root); pg.win.setPage("aur"); } }))
+          .concat([{ label: "Not now", ink: Zenon.accentMuted }]) });
+    });
   }
   // the forge's list asked again a moment later, when it has caught up
   Timer { id: relaxed; interval: 4000; onTriggered: pg.reload() }

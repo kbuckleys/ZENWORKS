@@ -547,6 +547,8 @@ class Server(lines.Service):
                 if kw.get(k):
                     g.run(["config"] + where + [f"user.{k}", kw[k]])
             return {}
+        if op == "aurFor":
+            return aur.packages_for(kw.get("roots") or [], kw.get("urls") or [])
         fr = route(op)
         if fr:
             return self.forge(fr[0], fr[1], kw, cancel, emit)
@@ -556,7 +558,9 @@ class Server(lines.Service):
         # recipe queue behind the repository's other writes ──
         if op == "aurInfo":
             return aur.info(r.root, kw.get("pkg", ""))
-        if op in ("aurVersion", "aurSums", "aurSrcinfo", "aurBuild"):
+        if op == "aurTag":
+            return aur.tags(r.root, kw.get("version", ""), cancel)
+        if op in ("aurVersion", "aurSums", "aurSrcinfo", "aurBuild", "aurCommit"):
             with lock:
                 cancel.check()
                 if op == "aurVersion":
@@ -565,6 +569,8 @@ class Server(lines.Service):
                     return aur.sums(r.root, cancel)
                 if op == "aurSrcinfo":
                     return aur.srcinfo(r.root)
+                if op == "aurCommit":
+                    return aur.commit(r, kw.get("message", ""), cancel)
                 return aur.build(r.root, cancel)
         if op == "logOpen":
             with self.lock:
