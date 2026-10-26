@@ -65,13 +65,30 @@ PanelWindow {
 
   Binding { target: Zenon; property: "tipsAway"; value: sw.shown }
 
-  // the workspace strip's quick rise and fade (user, 2026-10-25), started
-  // a frame after the surface is asked for — see WorkspaceStrip
-  property real showFactor: 0
-  visible: sw.shown || sw.showFactor > 0.01
+  // INSTANT IN, A QUICK FADE OUT (user, 2026-10-26: "remove the fade in.
+  // so the switcher is instant at spawn"). Hyprland's layer fade is off for
+  // it (rules.lua), since a layer rule cannot keep only one way of it; the
+  // fade out is this one. `drawn` is let go by hand once the fade is done,
+  // never by a binding, so the layer cannot blink off and on.
+  property bool drawn: false
+  property real cardOpacity: 1
+  visible: sw.drawn
   onShownChanged: {
-    if (sw.shown) { fallOut.stop(); sw.showFactor = 0; riseIn.restart(); peekLater.restart(); }
-    else { riseIn.stop(); fallOut.restart(); peekLater.stop(); }
+    if (sw.shown) {
+      fadeOut.stop();
+      sw.cardOpacity = 1;
+      sw.drawn = true;
+      peekLater.restart();
+    } else {
+      peekLater.stop();
+      fadeOut.restart();
+    }
+  }
+  NumberAnimation {
+    id: fadeOut
+    target: sw; property: "cardOpacity"; to: 0
+    duration: Zenon.fast; easing.type: Zenon.ease
+    onFinished: if (!sw.shown) sw.drawn = false
   }
 
   // ── THE PEEK ── (user, 2026-10-26) every window but the picked one fades
@@ -102,13 +119,6 @@ PanelWindow {
     const w = sw.windows[sw.at];
     if (sw.peeking && w) sw.peek(w.address);
   }
-  SequentialAnimation {
-    id: riseIn
-    PauseAnimation { duration: 16 }
-    NumberAnimation { target: sw; property: "showFactor"; to: 1; duration: Zenon.fast; easing.type: Easing.OutCubic }
-  }
-  NumberAnimation { id: fallOut; target: sw; property: "showFactor"; to: 0; duration: Zenon.fast; easing.type: Easing.InCubic }
-
   implicitWidth: card.width + Zenon.menuShadowPad * 2
   implicitHeight: card.height + Zenon.menuShadowPad * 2
 
@@ -170,6 +180,10 @@ PanelWindow {
       sw.at = S.firstStop(dir, sw.windows.length);
       sw.lastPoint = null;
       sw.open = true;
+      // the tiles are built now (the Repeater's model follows `open`); laid
+      // out now too, not at the frame's end, so the layer is asked for at
+      // the card's real size the first time
+      grid.forceLayout();
       sw.shown = sw.windows.length > 1;
     } else {
       sw.at = S.stepFrom(sw.at, dir, sw.windows.length);
@@ -188,6 +202,9 @@ PanelWindow {
     sw.windows = left;
     if (left.length === 0) { sw.finish(false); return; }
     if (sw.at > i || sw.at >= left.length) sw.at = Math.max(0, sw.at - 1);
+    // the lit one closed: `at` may not change, yet it names the next window
+    // now, which the peek still had faded
+    if (sw.peeking) sw.peek(left[sw.at].address);
     idle.restart();
   }
   property var lastPoint: null
@@ -225,9 +242,7 @@ PanelWindow {
   readonly property int perRow: Math.max(1, Math.min(sw.windows.length,
     Math.floor(((sw.screen ? sw.screen.width : 1920) * 0.9 - 32) / (sw.tileW + 8))))
 
-  // the card's rise too: MenuShadow follows the card's geometry, not its
-  // transform, and would sit in place while the card came up into it
-  MenuShadow { panel: card; cornerRadius: card.radius; opacity: sw.showFactor; transform: Translate { y: (1 - sw.showFactor) * 14 } }
+  MenuShadow { panel: card; cornerRadius: card.radius; opacity: sw.cardOpacity }
 
   Rectangle {
     id: card
@@ -239,8 +254,7 @@ PanelWindow {
     color: Zenon.layerBg
     border.width: 1
     border.color: Zenon.border
-    opacity: sw.showFactor
-    transform: Translate { y: (1 - sw.showFactor) * 14 }
+    opacity: sw.cardOpacity
 
     Grid {
       id: grid
@@ -250,8 +264,12 @@ PanelWindow {
       spacing: 8
 
       Repeater {
-        // kept while it fades out; gone (and nothing captured) once it has
-        model: sw.visible ? sw.windows : []
+        // built the moment a press opens it, BEFORE the layer maps: gated
+        // on `visible`, the surface mapped at the empty card's size and
+        // then resized as the tiles came, a configure round trip late — the
+        // "tiny bit of delay on spawn" (user, 2026-10-26). Kept while it
+        // fades out; gone (and nothing captured) once it has.
+        model: sw.open || sw.drawn ? sw.windows : []
         delegate: Item {
           id: tile
           required property var modelData

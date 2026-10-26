@@ -20,6 +20,13 @@ hl.on("hyprland.start", function()
     -- systemd gave up on it for the session (start-limit-hit, 2026-10-20 —
     -- found by Hestia's overview). reset-failed clears an old give-up.
     --
+    -- And only through systemd when this is the user's DISPLAY session.
+    -- polkit takes a user service's caller to be in that one, so beside an
+    -- older login on another TTY the agent asked for this session, was
+    -- refused ("the session the caller is in differs"), crashed on the way
+    -- out five times and left the desktop with no agent at all (2026-10-26).
+    -- Elsewhere it runs from here, inside this session, the unit stopped.
+    --
     -- Portals left running by an earlier session (logging out does not
     -- always stop the user manager) keep that session's environment and
     -- config: switching from another desktop at the TTY left the file
@@ -29,7 +36,10 @@ hl.on("hyprland.start", function()
         .. "systemctl --user try-restart xdg-desktop-portal-termfilechooser "
         .. "xdg-desktop-portal-hyprland xdg-desktop-portal-gtk xdg-desktop-portal; "
         .. "systemctl --user reset-failed hyprpolkitagent 2>/dev/null; "
-        .. "systemctl --user start hyprpolkitagent'")
+        .. "d=$(loginctl show-user \"$(id -un)\" -p Display --value 2>/dev/null); "
+        .. "if [ -z \"$d\" ] || [ \"$d\" = \"$XDG_SESSION_ID\" ]; then systemctl --user start hyprpolkitagent; "
+        .. "else systemctl --user stop hyprpolkitagent 2>/dev/null; "
+        .. "exec /usr/lib/hyprpolkitagent/hyprpolkitagent; fi'")
     -- the session's ssh-agent, where base.lua points SSH_AUTH_SOCK: only when
     -- it points there (another agent is someone else's), openssh is
     -- installed, and nothing listens there yet

@@ -37,33 +37,50 @@ PanelWindow {
   color: "transparent"
   mask: Region {}
 
-  // A QUICK RISE AND FADE (user, 2026-10-25): up 14px into place as it
-  // fades in, back down as it goes. Run by hand rather than a Behavior, a
-  // frame after the surface is asked for: the layer maps as `shown` flips,
-  // and a fade started that same frame had already run its first part
-  // before there was anything on screen to see it.
+  // THE OSD'S POP (user, 2026-10-26: the workspace and window switchers
+  // "should also have the same OSD animations" — howler/HowlerOsd): in over
+  // its size and back with OutBack, out with InBack, a swell then down to
+  // where it came from. No rise any more. Started a frame after the surface
+  // is asked for: the layer maps as `drawn` flips, and a pop started that
+  // same frame had run its first part before there was anything to see.
+  // `drawn` is let go only once the pop back has finished, and never by a
+  // binding: a layer's `visible` must not blink false between two states.
   property bool shown: false
-  property real showFactor: 0
-  visible: strip.shown || strip.showFactor > 0.01
+  property bool drawn: false
+  visible: strip.drawn
+  readonly property int popMs: Zenon.normal * 2
   SequentialAnimation {
-    id: riseIn
+    id: arrive
     PauseAnimation { duration: 16 }
-    NumberAnimation { target: strip; property: "showFactor"; to: 1; duration: Zenon.fast; easing.type: Easing.OutCubic }
+    ParallelAnimation {
+      NumberAnimation { target: body; property: "scale"; from: 0.72; to: 1; duration: strip.popMs; easing.type: Easing.OutBack; easing.overshoot: 2.2 }
+      NumberAnimation { target: body; property: "opacity"; to: 1; duration: Zenon.fast; easing.type: Zenon.ease }
+    }
   }
-  NumberAnimation {
-    id: fallOut
-    target: strip; property: "showFactor"; to: 0; duration: Zenon.fast; easing.type: Easing.InCubic
-    onFinished: strip.shown = false
+  ParallelAnimation {
+    id: leave
+    NumberAnimation { target: body; property: "scale"; to: 0.72; duration: strip.popMs; easing.type: Easing.InBack; easing.overshoot: 2.2 }
+    NumberAnimation { target: body; property: "opacity"; to: 0; duration: strip.popMs; easing.type: Easing.InQuart }
+    onFinished: { strip.shown = false; strip.drawn = false; }
   }
+  // up, with the pop; already up, it only holds longer
+  // (caught going, it pops again from where the pop begins, as the OSD does)
   function show() {
-    fallOut.stop();
-    if (!strip.shown) { strip.shown = true; strip.showFactor = 0; riseIn.restart(); }
-    else if (!riseIn.running) strip.showFactor = 1;
+    const going = leave.running;
+    leave.stop();
+    if (!strip.shown || going) {
+      if (!going) body.opacity = 0;
+      strip.shown = true;
+      strip.drawn = true;
+      arrive.restart();
+    }
     hold.restart();
   }
+  // room for the swell past its size
+  readonly property real popRoom: Math.ceil(Math.max(card.width, card.height) * 0.04)
 
-  implicitWidth: card.width + Zenon.menuShadowPad * 2
-  implicitHeight: card.height + Zenon.menuShadowPad * 2
+  implicitWidth: card.width + (Zenon.menuShadowPad + strip.popRoom) * 2
+  implicitHeight: card.height + (Zenon.menuShadowPad + strip.popRoom) * 2
 
   Connections {
     target: Hyprland
@@ -74,7 +91,7 @@ PanelWindow {
       strip.show();
     }
   }
-  Timer { id: hold; interval: 900; onTriggered: { riseIn.stop(); fallOut.restart(); } }
+  Timer { id: hold; interval: 900; onTriggered: { arrive.stop(); leave.restart(); } }
 
   // this screen's workspaces, in number order: [{ ws, apps: [glyph] }]
   readonly property var tiles: {
@@ -92,62 +109,68 @@ PanelWindow {
   readonly property int maxApps: 4
   readonly property real tileW: Zenon.px(15) * 5
 
-  // the card's rise too: MenuShadow follows the card's geometry, not its
-  // transform, and would sit in place while the card came up into it
-  MenuShadow { panel: card; cornerRadius: card.radius; opacity: strip.showFactor; transform: Translate { y: (1 - strip.showFactor) * 14 } }
+  // the pop is on one item that holds both, so the shadow is carried with
+  // the card rather than sitting in place under it (MenuShadow follows
+  // geometry, not transforms)
+  Item {
+    id: body
+    anchors.fill: parent
+    opacity: 0
+    scale: 0.72
 
-  Rectangle {
-    id: card
-    x: Zenon.menuShadowPad
-    y: Zenon.menuShadowPad
-    width: row.implicitWidth + 20
-    height: row.implicitHeight + 20
-    color: Zenon.floor(Zenon.glass(Oracle.notifBgOpacity))
-    border.color: Zenon.border
-    border.width: 1
-    radius: Zenon.windowRadius * 2
-    opacity: strip.showFactor
-    transform: Translate { y: (1 - strip.showFactor) * 14 }
+    MenuShadow { panel: card; cornerRadius: card.radius }
 
-    Row {
-      id: row
-      x: 10
-      y: 10
-      spacing: 6
+    Rectangle {
+      id: card
+      x: Zenon.menuShadowPad + strip.popRoom
+      y: Zenon.menuShadowPad + strip.popRoom
+      width: row.implicitWidth + 20
+      height: row.implicitHeight + 20
+      color: Zenon.floor(Zenon.glass(Oracle.notifBgOpacity))
+      border.color: Zenon.border
+      border.width: 1
+      radius: Zenon.windowRadius * 2
 
-      Repeater {
-        model: strip.tiles
-        delegate: Rectangle {
-          id: tile
-          required property var modelData
-          readonly property bool lit: tile.modelData.ws === Hyprland.focusedWorkspace
-          width: strip.tileW
-          height: num.implicitHeight + apps.implicitHeight + 22
-          radius: Zenon.radiusCard
-          color: tile.lit ? Zenon.menuHi : "transparent"
+      Row {
+        id: row
+        x: 10
+        y: 10
+        spacing: 6
 
-          BarText {
-            id: num
-            anchors.horizontalCenter: parent.horizontalCenter
-            y: 8
-            src: String(tile.modelData.ws.id)
-            numeric: true
-            color: tile.lit ? Zenon.cyan : Zenon.light ? Zenon.dimInk : Zenon.mix(Zenon.dimInk, Zenon.cyan, 0.5)
-          }
-          // the apps on it, a glyph each; an empty one says so with a dot
-          Text {
-            id: apps
-            anchors.horizontalCenter: parent.horizontalCenter
-            anchors.top: num.bottom
-            anchors.topMargin: 6
-            readonly property var all: tile.modelData.apps
-            text: apps.all.length === 0 ? "·"
-              : apps.all.slice(0, strip.maxApps).join(" ")
-                + (apps.all.length > strip.maxApps ? " +" + (apps.all.length - strip.maxApps) : "")
-            color: tile.lit ? Zenon.white : Zenon.muted
-            font.family: Zenon.face
-            font.weight: Zenon.weight
-            font.pixelSize: Zenon.px(14)
+        Repeater {
+          model: strip.tiles
+          delegate: Rectangle {
+            id: tile
+            required property var modelData
+            readonly property bool lit: tile.modelData.ws === Hyprland.focusedWorkspace
+            width: strip.tileW
+            height: num.implicitHeight + apps.implicitHeight + 22
+            radius: Zenon.radiusCard
+            color: tile.lit ? Zenon.menuHi : "transparent"
+
+            BarText {
+              id: num
+              anchors.horizontalCenter: parent.horizontalCenter
+              y: 8
+              src: String(tile.modelData.ws.id)
+              numeric: true
+              color: tile.lit ? Zenon.cyan : Zenon.light ? Zenon.dimInk : Zenon.mix(Zenon.dimInk, Zenon.cyan, 0.5)
+            }
+            // the apps on it, a glyph each; an empty one says so with a dot
+            Text {
+              id: apps
+              anchors.horizontalCenter: parent.horizontalCenter
+              anchors.top: num.bottom
+              anchors.topMargin: 6
+              readonly property var all: tile.modelData.apps
+              text: apps.all.length === 0 ? "·"
+                : apps.all.slice(0, strip.maxApps).join(" ")
+                  + (apps.all.length > strip.maxApps ? " +" + (apps.all.length - strip.maxApps) : "")
+              color: tile.lit ? Zenon.white : Zenon.muted
+              font.family: Zenon.face
+              font.weight: Zenon.weight
+              font.pixelSize: Zenon.px(14)
+            }
           }
         }
       }

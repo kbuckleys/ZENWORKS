@@ -21,6 +21,11 @@ hl.layer_rule({ match = { namespace = "morpheus-bar-clear" }, blur = false })
 -- cerberus' black veil, faded in before the lock and out after it: no map
 -- animation to fight its own fade, and no blur to pop in at half alpha
 hl.layer_rule({ match = { namespace = "cerberus-veil" }, animation = "none", blur = false })
+-- the window switcher: there the instant it is asked for (user, 2026-10-26:
+-- "the switcher is instant at spawn"), its quick fade out its own
+-- (morpheus/WindowSwitcher); and the workspace strip, whose OSD pop is its
+-- whole motion, with no layer fade laid over it
+hl.layer_rule({ match = { namespace = "zenworks-(switcher|workspaces)" }, animation = "none" })
 
 -- SPECIAL WORKSPACE: its windows stand this far in from the screen's
 -- edges — oracle's Windows › Special workspace gaps, kept in effects.lua
