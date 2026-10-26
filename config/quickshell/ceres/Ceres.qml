@@ -71,6 +71,8 @@ Singleton {
   property var oldCode: []
   readonly property var staleApps: root.oldCode.filter(g => !g.service)
   readonly property var staleServices: root.oldCode.filter(g => g.service)
+  // Only this session's processes and your user services count — not a
+  // desktop still running on another TTY (Cer.staleCommand).
   // Asked while a look is out, it looks again once that one ends: the look
   // already out may have started before what it should see.
   function checkStale() {

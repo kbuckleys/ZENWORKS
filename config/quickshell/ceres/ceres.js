@@ -1684,11 +1684,25 @@ function matchesAll(name, query) {
 // "(deleted)" in /proc/<pid>/maps. Only your own processes can be read
 // without root, which covers every app and session service you run.
 //
+// THIS SESSION, NOT EVERY ONE OF YOURS (user, 2026-10-26: "I keep seeing
+// this message even after a re-login"). Logging in again on another TTY left
+// the first desktop running on its own, and its Hyprland, Xwayland and the
+// rest held the old LLVM — named as if this desktop had to restart them,
+// which no restart here would clear. Left out: processes of your OTHER login
+// sessions (logind's, class user*, another TTY or an ssh login). Everything
+// else still counts — this session, user services and the user manager (its
+// own "manager" session), scopes it started. Asked from no session logind
+// knows of, nothing is left out.
+//
 // One line per affected process: pid, name, the systemd unit it runs in if it
 // is a user service (its cgroup's last component, when that is a .service),
 // and up to three replaced files, comma-joined.
 function staleCommand() {
-  return "for p in /proc/[0-9]*; do [ -O \"$p\" ] || continue; "
+  return "s=$(cat /proc/self/sessionid 2>/dev/null); "
+    + "o=$(loginctl list-sessions --no-legend 2>/dev/null | awk -v s=\"$s\" -v u=\"$(id -u)\" "
+    + "'$2 == u && $6 ~ /^user/ { if ($1 == s) me = 1; else o = o \" \" $1 } END { if (me) print o }'); "
+    + "for p in /proc/[0-9]*; do [ -O \"$p\" ] || continue; "
+    + "if [ -n \"$o\" ]; then read -r q 2>/dev/null < \"$p/sessionid\" || q=; case \"$o \" in *\" $q \"*) continue;; esac; fi; "
     + "m=$(grep -oE '/usr/(lib|bin)[^ ]* \\(deleted\\)$' \"$p/maps\" 2>/dev/null | sed 's/ (deleted)//' | sort -u | head -3 | tr '\\n' ','); "
     + "e=$(readlink \"$p/exe\" 2>/dev/null); case \"$e\" in *' (deleted)') m=\"$m${e% (deleted)},\";; esac; "
     + "[ -n \"$m\" ] || continue; "

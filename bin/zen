@@ -97,6 +97,58 @@ if [ ! -f "$root/hypr/hyprland.lua" ] || [ ! -f "$root/quickshell/shell.qml" ]; 
 	exit 1
 fi
 
+# ONE HYPRLAND, ZENWORKS' (user, 2026-10-26). A Hyprland left running on
+# another console — a stock one started by hand, an older login never logged
+# out of — went on beside this one all day: polkit took it for the display
+# session and refused this one's agent, and Ceres asked to restart programs
+# that were not even in this desktop.
+#
+# Asked on a text console's own login (XDG_SESSION_TYPE tty, a terminal to
+# answer on). From a login screen it is closed unasked: nobody would see a
+# question there, and some (ly) run the session on a terminal all the same.
+# Each goes with its whole login (loginctl terminate-session), so nothing of
+# it is left holding old code; one in THIS login — left over on this very
+# console — is ended alone, its start-hyprland watchdog first so it is not
+# started again, since terminating the session would take this shell too.
+# Still there 5 s on, it is killed: you already said to close it.
+uid=$(id -u)
+others=$(pgrep -u "$uid" -x Hyprland)
+if [ -n "$others" ]; then
+	count=0
+	for p in $others; do
+		count=$((count + 1))
+		t=$(ps -o tty= -p "$p" | tr -d ' ')
+		case $t in "" | "?") t="" ;; *) t=" on $t" ;; esac
+		printf 'zen: another Hyprland is running%s, since %s\n' "$t" "$(ps -o lstart= -p "$p")"
+	done
+	if [ -t 0 ] && [ "${XDG_SESSION_TYPE:-tty}" = tty ]; then
+		if [ "$count" -gt 1 ]; then printf 'Close them and start Zenworks? [y/N] '
+		else printf 'Close it and start Zenworks? [y/N] '; fi
+		read -r answer || answer=""
+		case $answer in y | Y | yes) ;; *) echo "Nothing started."; exit 1 ;; esac
+	fi
+	me=$(cat /proc/self/sessionid 2>/dev/null)
+	for p in $others; do
+		s=$(cat "/proc/$p/sessionid" 2>/dev/null)
+		if [ -n "$s" ] && [ "$s" != "$me" ] && loginctl terminate-session "$s" 2>/dev/null; then
+			continue
+		fi
+		w=$(ps -o ppid= -p "$p" | tr -d ' ')
+		[ -n "$w" ] && [ "$(cat "/proc/$w/comm" 2>/dev/null)" = start-hyprland ] && kill -TERM "$w" 2>/dev/null
+		kill -TERM "$p" 2>/dev/null
+	done
+	n=0
+	while [ $n -lt 50 ] && pgrep -u "$uid" -x Hyprland >/dev/null; do
+		sleep 0.1
+		n=$((n + 1))
+	done
+	if pgrep -u "$uid" -x Hyprland >/dev/null; then
+		pkill -KILL -u "$uid" -x Hyprland
+		sleep 0.5
+		pgrep -u "$uid" -x Hyprland >/dev/null && echo "zen: the other Hyprland would not close" >&2
+	fi
+fi
+
 export QS_CONFIG_PATH="$root/quickshell"
 # what portals and apps go by: ZENWORKS first (xdg-desktop-portal reads
 # zenworks-portals.conf), Hyprland after it for apps that look for that

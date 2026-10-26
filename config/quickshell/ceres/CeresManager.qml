@@ -179,7 +179,8 @@ Scope {
     if (was) mgr.raise();
   }
 
-  // To it, wherever it is. In the Lua dispatcher's own words — this config
+  // To it, wherever it is (a ghost never mapped is OpenWatchdog's). In the
+  // Lua dispatcher's own words — this config
   // runs hyprland on Lua, and the old "focuswindow title:…" string is
   // refused there, which is why this never did anything before.
   // asked for, never seen: an open not on screen 1.5 s later says what it
