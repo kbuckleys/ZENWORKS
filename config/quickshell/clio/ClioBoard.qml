@@ -676,7 +676,7 @@ Variants {
             return slot.spellItems().concat([
               { text: "Cut", icon: "\u{F0190}", hint: "ctrl x", enabled: sel, run: () => slot.body.cut() },
               { text: "Copy", icon: "\u{F018F}", hint: "ctrl c", enabled: sel, run: () => slot.body.copy() },
-              { text: "Paste", icon: "\u{F0192}", hint: "ctrl v", enabled: slot.body.canPaste, run: () => slot.body.paste() },
+              { text: "Paste", icon: "\u{F0192}", hint: "ctrl v", enabled: slot.body.canPaste, run: () => field.pastePlain() },
               { text: "Select all", icon: "\u{F0486}", hint: "ctrl a", run: () => slot.body.selectAll() },
               { isSeparator: true },
               { text: "Bold", icon: "\uF032", run: () => card.mark("b") },

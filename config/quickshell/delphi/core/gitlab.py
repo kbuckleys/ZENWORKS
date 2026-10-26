@@ -522,6 +522,21 @@ def delete_release(full, id, tag=""):
     return {}
 
 
+# a picture or video for the notes: a project upload, GitLab's own way (a
+# release's files are links to elsewhere)
+def media_upload(full, rel, path):
+    tok, _ = token()
+    if not tok:
+        raise ForgeError("not signed in to GitLab", 401)
+    data = rest.read_media(path)
+    form, ctype = rest.multipart("file", rest.media_name(path, data), data, rest.media_type(path))
+    r = rest.request("POST", f"{API}/projects/{_pid(full)}/uploads",
+                     {"User-Agent": "delphi", "Accept": "application/json", "Authorization": "Bearer " + tok},
+                     payload=form, ctype=ctype, who=NAME) or {}
+    where = r.get("full_path") or f"/{full}{r.get('url') or ''}"
+    return f"https://{HOST}{where}"
+
+
 # ── SSH keys for signing in (core/sshkeys.py makes them) ──────────────
 def ssh_keys():
     return [{"id": k["id"], "title": k.get("title") or "", "key": " ".join((k.get("key") or "").split()[:2]),

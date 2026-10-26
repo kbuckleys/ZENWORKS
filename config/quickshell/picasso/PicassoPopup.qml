@@ -1195,7 +1195,7 @@ LayerPopup {
               // the accent, as the chips beside it speak
               ink: popup.headColor
               offInk: Zenon.alpha(popup.headColor, 0.7)
-              onInk: popup.headColor
+              litInk: popup.headColor
               textSize: Zenon.px(14)
               onToggled: {
                 Picasso.everything = !Picasso.everything;

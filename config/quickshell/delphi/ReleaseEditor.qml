@@ -139,6 +139,22 @@ Item {
         Qt.callLater(() => mdTarget.link(u, v.label || ""));
       } });
   }
+  // PICTURES AND VIDEOS (user, 2026-10-27): files of this computer, each
+  // on a line of its own as a file:// address the Preview shows as it is;
+  // saving the release sends them to the forge (core rest.attach_media)
+  function addMedia() {
+    const win = ed.page ? ed.page.win : null;
+    if (!win || !win.mgr || !win.mgr.fileManager) return;
+    win.mgr.fileManager.choose(false, win.home + "/Pictures", (paths) => {
+      const ok = (paths || []).filter((p) => D.mediaKindOf(p) !== "");
+      if ((paths || []).length > ok.length)
+        win.say("Only pictures and videos go into the notes — the rest were left out", true);
+      if (ok.length === 0) return;
+      const text = ok.map((p) => D.mediaMarkdown(p)).join("\n\n");
+      Qt.callLater(() => mdTarget.insert("\n" + text + "\n"));
+    }, "", true, false);
+  }
+
   // a different release opened: its own values in the fields, on Write
   property string _for: ""
   onEChanged: {
@@ -336,6 +352,8 @@ Item {
         enabled: ed.tab === "write"
         opacity: enabled ? 1 : Zenon.disabledDim
         onLinkAsked: ed.askLink()
+        media: true
+        onMediaAsked: ed.addMedia()
       }
       Rectangle { anchors.right: spellTool.left; anchors.rightMargin: 6; anchors.verticalCenter: parent.verticalCenter; width: 1; height: 18; color: Zenon.border }
       // spelling, on or off — Clio's switch, so one answer everywhere (on
@@ -388,6 +406,60 @@ Item {
     onBackTabbed: titleField.claim()
     onMenuAsked: (x, y, hit) => { const p = notes.mapToItem(ed, x, y); ed.editMenu(p.x, p.y, hit, (w) => notes.respell(hit, w)); }
   }
+  // ── DROPPED IN: pictures and videos from anywhere (MediaDrop), on their
+  // own lines where they land — at the end while on Preview — and words as
+  // words. Over the Preview's frame too, so it is the same place either way.
+  function placeAt(at) {
+    const f = notes.edit;
+    if (ed.tab !== "write") { f.cursorPosition = f.length; return; }
+    const p = mediaDrop.mapToItem(f, at.x, at.y);
+    f.cursorPosition = f.positionAt(p.x, p.y);
+  }
+  function dropMedia(paths, at) {
+    ed.placeAt(at);
+    const f = notes.edit, c = f.cursorPosition;
+    // a line of its own: a break before unless at a line's start
+    const before = c > 0 && f.getText(c - 1, c) !== "\n" ? "\n" : "";
+    mdTarget.insert(before + paths.map((p) => D.mediaMarkdown(p)).join("\n\n") + "\n");
+  }
+  MediaDrop {
+    id: mediaDrop
+    anchors.fill: notes
+    z: 5
+    enabled: !!ed.e
+    onMedia: (paths, at) => ed.dropMedia(paths, at)
+    onWords: (text, at) => { ed.placeAt(at); mdTarget.insert(text); }
+    onFailed: (why) => { if (ed.page) ed.page.win.say(why, true); }
+  }
+  // where it will go: the well ringed in the accent while a drag is over it,
+  // the dots while a picture is on its way in
+  Rectangle {
+    anchors.fill: notes
+    z: 6
+    visible: mediaDrop.over || mediaDrop.busy
+    radius: Zenon.windowRadius
+    color: mediaDrop.over ? Zenon.alpha(Zenon.cyan, 0.06) : "transparent"
+    border.width: mediaDrop.over ? 2 : 0
+    border.color: Zenon.cyan
+    Row {
+      anchors.horizontalCenter: parent.horizontalCenter
+      anchors.bottom: parent.bottom
+      anchors.bottomMargin: 14
+      spacing: 8
+      Working { running: mediaDrop.busy; anchors.verticalCenter: parent.verticalCenter; ink: Zenon.cyan }
+      Text {
+        anchors.verticalCenter: parent.verticalCenter
+        // the dots alone say a fetch is out (morpheus/Working)
+        visible: mediaDrop.over
+        text: "Drop pictures or videos"
+        color: Zenon.cyan
+        font.family: Zenon.face
+        font.weight: Zenon.weight
+        font.pixelSize: Zenon.px(14)
+      }
+    }
+  }
+
   // Preview: the notes as the release page will show them, in the well's frame
   Rectangle {
     id: previewWell

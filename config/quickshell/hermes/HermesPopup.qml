@@ -46,7 +46,18 @@ LayerPopup {
   property bool joining: false
 
   readonly property int pad: 12
-  readonly property int tileH: 64
+  // one line each (HermesTile)
+  readonly property int tileH: 44
+  // A TILE'S ROUND CORNERS: the ones on the grid's outside, two across
+  // ([topLeft, topRight, bottomLeft, bottomRight]). Where tiles meet the
+  // corners are square (user, 2026-10-27); a last tile alone on its row is
+  // round on its open side.
+  function cornerRound(i) {
+    const n = popup.tiles.length;
+    const left = i % 2 === 0, right = i % 2 === 1 || i === n - 1;
+    const top = i < 2, bottom = i + 2 >= n;
+    return [top && left, top && right, bottom && left, bottom && right];
+  }
   readonly property int headH: 46
   readonly property int cellH: 42
   readonly property int visibleRows: 7
@@ -336,7 +347,16 @@ LayerPopup {
           width: parent.width - 2 * popup.pad
           height: 2 * popup.tileH + 8
 
-          CursorBand { repeater: tileRep; index: popup.tileSel; radius: Zenon.radiusCard }
+          // the band takes the corners of the tile it is under
+          CursorBand {
+            readonly property var r: popup.cornerRound(popup.tileSel)
+            repeater: tileRep
+            index: popup.tileSel
+            topLeftRadius: r[0] ? Zenon.radiusCard : 0
+            topRightRadius: r[1] ? Zenon.radiusCard : 0
+            bottomLeftRadius: r[2] ? Zenon.radiusCard : 0
+            bottomRightRadius: r[3] ? Zenon.radiusCard : 0
+          }
 
           Grid {
             id: tileGrid
@@ -356,6 +376,7 @@ LayerPopup {
                 height: popup.tileH
                 tile: popup.tiles[index] || null
                 picked: index === popup.tileSel
+                round: popup.cornerRound(index)
                 onPressed: { popup.tileSel = index; popup.pressTileAt(index); }
                 onListed: { popup.tileSel = index; popup.openList(popup.tiles[index].list); }
               }

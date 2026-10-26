@@ -16,6 +16,7 @@
 import base64
 import os
 import re
+import urllib.parse
 
 import rest
 import tokenstore
@@ -423,6 +424,21 @@ def update_release(full, id, tag, name, body="", draft=False, prerelease=False):
 def delete_release(full, id, tag=""):
     call("DELETE", f"/repos/{full}/releases/{id}")
     return {}
+
+
+# a picture or video for the notes, attached to the release (github.py's)
+def media_upload(full, rel, path):
+    tok, _ = token()
+    if not tok:
+        raise ForgeError(f"not signed in to {HOST}", 401)
+    data = rest.read_media(path)
+    name = rest.media_name(path, data)
+    form, ctype = rest.multipart("attachment", name, data, rest.media_type(path))
+    rest.request("POST", f"{API}/repos/{full}/releases/{rel['id']}/assets?name=" + urllib.parse.quote(name, safe=""),
+                 {"User-Agent": "delphi", "Accept": "application/json", "Authorization": "token " + tok},
+                 payload=form, ctype=ctype, who=NAME)
+    return (f"https://{HOST}/{full}/releases/download/"
+            f"{urllib.parse.quote(rel['tag'], safe='')}/{urllib.parse.quote(name, safe='')}")
 
 
 # ── SSH keys for signing in (core/sshkeys.py makes them) ──────────────

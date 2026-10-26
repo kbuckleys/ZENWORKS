@@ -184,6 +184,26 @@ module.exports = {
     t.eq("mark merged", D.forgeMark({ pull: true, state: "merged" }).word, "Merged");
     t.eq("mark draft", D.forgeMark({ pull: true, state: "open", draft: true }).ink, "muted");
     t.eq("mark issue closed", D.forgeMark({ pull: false, state: "closed" }).word, "Closed");
+    // pictures and videos on lines of their own (2026-10-27)
+    const parts = D.notesParts("Intro\n\n![shot](https://x/a.png)\nmid\nhttps://github.com/user-attachments/assets/1a2b-3c\n<img alt=\"z\" src='https://x/b.jpg'>\n<video src=\"https://x/c.webm\"></video>\n```\n![no](https://x/d.png)\n```\nend ![inline](https://x/e.png)");
+    t.eq("parts: kinds in order", parts.map((p) => p.kind).join(","), "text,image,text,video,image,video,text");
+    t.eq("parts: picture address and alt", parts[1].url + " " + parts[1].alt, "https://x/a.png shot");
+    t.eq("parts: img tag alt", parts[4].alt, "z");
+    t.eq("parts: a fence keeps its picture as words", parts[6].text.indexOf("![no]") >= 0, true);
+    t.eq("parts: an inline picture stays words", parts[6].text.indexOf("![inline]") >= 0, true);
+    t.eq("parts: a video in picture syntax", D.notesParts("![v](file:///tmp/a%20b.mp4)")[0].kind, "video");
+    t.eq("parts: a bare link is words", D.notesParts("https://example.com/page")[0].kind, "text");
+    t.eq("media markdown: picture", D.mediaMarkdown("/home/u/My shot.png"), "![My shot](file:///home/u/My%20shot.png)");
+    t.eq("media markdown: video", D.mediaMarkdown("/tmp/clip.mp4"), "file:///tmp/clip.mp4");
+    // a drop, sorted (2026-10-27)
+    const dz = D.dropSorted(["file:///home/u/a%20b.png", "file:///home/u/notes.txt", "https://x/p.jpg?s=2", "https://x/page"], "https://x/page", false);
+    t.eq("drop: a picture file", dz.files.join(","), "/home/u/a b.png");
+    t.eq("drop: a web picture by its name", dz.web.join(","), "https://x/p.jpg?s=2");
+    t.eq("drop: with pictures, no words", dz.words, "");
+    t.eq("drop: an image drag fetches a plain address", D.dropSorted(["https://cdn/x/123"], "", true).web.join(), "https://cdn/x/123");
+    t.eq("drop: a link alone is words", D.dropSorted(["https://x/page"], "", false).words, "https://x/page");
+    t.eq("drop: text is words", D.dropSorted([], "hello", false).words, "hello");
+    t.eq("base64", D.base64Of(new Uint8Array([77, 97, 110, 77, 97]).buffer), "TWFuTWE=");
     t.eq("md comments", D.mdOf("a\r\n<!-- template -->\n\n\n\nb"), "a\n\nb");
     t.eq("md picture", D.mdOf("see ![shot](https://x/y.png \"t\")"), "see [shot](https://x/y.png)");
     t.eq("md img tag", D.mdOf('<img width="5" src="https://x/z.png">'), "[picture](https://x/z.png)");

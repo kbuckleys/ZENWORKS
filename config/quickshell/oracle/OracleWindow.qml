@@ -50,10 +50,11 @@ FloatingWindow {
   id: popup
 
   title: "oracle"
-  implicitWidth: 1000
+  // the settings' old width beside the sidebar
+  implicitWidth: 1000 + popup.sideW
   implicitHeight: popup.calcHeight()
-  minimumSize: Qt.size(640, 420)
-  color: popup.bgColor
+  minimumSize: Qt.size(640 + popup.sideW, 420)
+  color: Zenon.alpha(popup.bgColor, 0)
   visible: false
 
   // the manager that built it — see OracleManager
@@ -88,7 +89,7 @@ FloatingWindow {
   // A SECOND color is kept for the one job it is good at: marking a setting
   // that is no longer at its default. That is a STATE rather than an action,
   // it wants to be told apart from the cyan at a glance, and it appears in
-  // exactly three places — the toolbar's per-section count, the "n changed"
+  // exactly three places — the sidebar's per-section count, the "n changed"
   // badge in the head, and the dot at the start of a changed row.
   //
   // Yellow rather than the light red it was. Against this ground the pink
@@ -116,7 +117,7 @@ FloatingWindow {
   // `section` is where you are standing; `query` suspends it. A search is the
   // case where you do not know which section a setting is filed under — that
   // is why you are typing — so a non-empty query searches all of them and the
-  // toolbar goes quiet rather than lying about which one you are in.
+  // sidebar goes quiet rather than lying about which one you are in.
   property string section: "bar"
   // the key of the row folded open (About this computer), or ""
   property string unfolded: ""
@@ -359,7 +360,7 @@ FloatingWindow {
   readonly property var matches: Ora.filterSchema(Oracle.schema, popup.section, popup.query)
 
   // While searching, the sections the results are filed under — so the
-  // toolbar can say where the matches live instead of dimming all of it.
+  // sidebar can say where the matches live instead of dimming all of it.
   readonly property var hitSections: {
     const out = ({});
     if (!popup.searching) return out;
@@ -393,9 +394,9 @@ FloatingWindow {
   // the hint strip along the bottom, as tall as every other layer's
   readonly property int hintH: Zenon.hintBarH   // morpheus/HintBar's strip
   readonly property int bodyH: 460
-  // the section toolbar across the top of the body
-  readonly property int tabsH: 72
-  readonly property int tabsTop: 0
+  // the sidebar down the left. No section name over the settings: the
+  // sidebar says it already (user, 2026-10-27)
+  readonly property int sideW: 240
   readonly property int rowH: 64
   // a row inside a group's frame
   readonly property int frameRowH: 44
@@ -421,12 +422,9 @@ FloatingWindow {
   // The widest control decides nothing about the others — see controlSlot,
   // which measures the one it actually loaded.
   readonly property int controlW: 260
-  // how much of a row a label and its description may run across, whatever
-  // room the control leaves: the rest is the controls' column
-  readonly property real textFrac: 0.62
 
   function calcHeight() {
-    return popup.tabsTop + popup.tabsH + 1 + popup.bodyH + popup.hintH;
+    return popup.bodyH + popup.hintH;
   }
 
   // ── CLOSED BY THE COMPOSITOR ──────────────────────────────────────────
@@ -1529,73 +1527,252 @@ FloatingWindow {
       id: bgRoot
       anchors.fill: parent
       clip: true
-      color: popup.bgColor
+      // the window's ground beside the sidebar only: the sidebar's own
+      // glass lies straight on the compositor's blur (user, 2026-10-27:
+      // "sidebar needs a frost"), as delphi's does
+      color: "transparent"
+      Rectangle { z: -1; x: side.width; width: parent.width - x; height: parent.height; color: popup.bgColor }
       // square and borderless: it is a window now, and hyprland draws a
       // window's corners, border and shadow itself
       radius: 0
       border.width: 0
       focus: true
 
+      // ── THE SIDEBAR ────────────────────────────────────────────────
+      // The sections down the left, under the search field (user,
+      // 2026-10-27: "it has grown way past what its current UI can
+      // encompass … vertical this time, with a sidebar, just like macOS'
+      // System Settings"). It replaced the toolbar of icon-over-name tiles
+      // across the top, which had to scroll sideways once there were more
+      // sections than fit. The suite's sidebar: SideGlass, SideHead over
+      // each group, ShelfRow per section — delphi's, edge to edge. No
+      // pressed state: a ShelfRow has none, the fill says where you are.
+      Item {
+        id: side
+        anchors.left: parent.left
+        anchors.top: parent.top
+        anchors.bottom: parent.bottom
+        width: popup.sideW
+        z: 3
+
+        SideGlass { edge: "right" }
+
+        // sections scrolled up carry on under the search field, frosted
+        // (user, 2026-10-27: a short window scrolls the sidebar) — the
+        // settings' own ScrollEdge, for the sidebar
+        ScrollEdge {
+          view: sideFlick
+          width: side.width
+          height: sideFlick.y
+        }
+
+        // ── THE SEARCH FIELD, AT THE TOP ────────────────────────────
+        // Seen now (it used to be an unseen field in the hint strip):
+        // what you type still goes to it wherever the pointer is — a
+        // click anywhere hands it the keyboard back (panel, above).
+        // Ceres' search field's look.
+        Rectangle {
+          id: searchBox
+          anchors.left: parent.left
+          anchors.right: parent.right
+          anchors.top: parent.top
+          anchors.margins: 12
+          height: 32
+          radius: Zenon.windowRadius
+          color: Zenon.wash(filterInput.activeFocus ? 0.08 : 0.04)
+          border.width: 1
+          border.color: Zenon.border
+          Text {
+            id: searchGlyph
+            anchors.left: parent.left
+            anchors.leftMargin: 10
+            anchors.verticalCenter: parent.verticalCenter
+            text: ""
+            color: popup.searching ? popup.headColor : popup.dimColor
+            font.family: popup.face
+            font.weight: Zenon.weight
+            font.pixelSize: Zenon.px(13)
+          }
+          Item {
+            anchors.left: searchGlyph.right
+            anchors.leftMargin: 9
+            anchors.right: searchClear.visible ? searchClear.left : parent.right
+            anchors.rightMargin: 8
+            anchors.top: parent.top
+            anchors.bottom: parent.bottom
+            clip: true
+            TextInput {
+              id: filterInput
+              anchors.left: parent.left
+              anchors.right: parent.right
+              anchors.verticalCenter: parent.verticalCenter
+              cursorDelegate: Caret { field: filterInput }
+              activeFocusOnTab: false
+              color: popup.fgColor
+              selectionColor: popup.highlight
+              selectedTextColor: Zenon.onAccent
+              font.family: popup.face
+              font.weight: Zenon.weight
+              font.pixelSize: Zenon.px(15)
+              // so escape reaches the one handler that decides what it means
+              Keys.forwardTo: bgRoot
+
+              onTextChanged: {
+                popup.query = filterInput.text;
+                Qt.callLater(() => list.positionViewAtBeginning());
+              }
+
+              function clear() {
+                filterInput.text = "";
+                popup.query = "";
+              }
+            }
+            Text {
+              visible: filterInput.text === ""
+              anchors.left: parent.left
+              anchors.leftMargin: 3
+              anchors.verticalCenter: parent.verticalCenter
+              text: "Search"
+              color: popup.dimColor
+              font.family: popup.face
+              font.weight: Zenon.weight
+              font.pixelSize: Zenon.px(15)
+            }
+          }
+          ClearChip {
+            id: searchClear
+            anchors.right: parent.right
+            anchors.rightMargin: 8
+            anchors.verticalCenter: parent.verticalCenter
+            shown: popup.searching
+            onClicked: filterInput.clear()
+          }
+        }
+
+        // ── THE SECTIONS ────────────────────────────────────────────
+        // Mid-search the sections with matches stay lit and the rest dim,
+        // and one clicked narrows the results to it (goToSection) — the
+        // toolbar's ways, kept.
+        Flickable {
+          id: sideFlick
+          anchors.top: searchBox.bottom
+          anchors.topMargin: 4
+          anchors.left: parent.left
+          anchors.right: parent.right
+          anchors.bottom: parent.bottom
+          contentWidth: width
+          contentHeight: sideCol.height + 12
+          boundsBehavior: Flickable.StopAtBounds
+          clip: true
+          ElasticScroll { view: sideFlick }
+
+          Column {
+            id: sideCol
+            width: sideFlick.width
+            Repeater {
+              model: Oracle.sections
+              delegate: Column {
+                id: sec
+                required property var modelData
+                required property int index
+                width: sideCol.width
+                readonly property bool hit: popup.hitSections[sec.modelData.id] === true
+                readonly property bool here: popup.searching
+                  ? popup.searchScope === sec.modelData.id
+                  : popup.section === sec.modelData.id
+                // Depends on revision for the same reason every row does:
+                // changedIn is a call, not a binding.
+                readonly property int nChanged: {
+                  Oracle.revision;
+                  return Oracle.changedIn(sec.modelData.id);
+                }
+                // the one you are in is brought into view (a short screen,
+                // or ctrl+tab past the bottom)
+                onHereChanged: if (here) {
+                  const f = sideFlick, r = secRow;
+                  Qt.callLater(() => {
+                    if (!f || !r) return;
+                    const y = r.mapToItem(sideCol, 0, 0).y;
+                    if (y < f.contentY) f.contentY = Math.max(0, y - 30);
+                    else if (y + r.height > f.contentY + f.height)
+                      f.contentY = Math.min(f.contentHeight - f.height, y + r.height - f.height + 12);
+                  });
+                }
+                SideHead {
+                  visible: sec.index === 0 || Oracle.sections[sec.index - 1].group !== sec.modelData.group
+                  first: sec.index === 0
+                  ruled: false
+                  label: Oracle.sectionGroups[sec.modelData.group] || ""
+                }
+                ShelfRow {
+                  id: secRow
+                  width: sideCol.width
+                  radius: 0
+                  indent: 18
+                  glyph: sec.modelData.icon
+                  label: sec.modelData.label
+                  // how much of the section you have moved, in the
+                  // changed ink, as the tile's shoulder count was
+                  count: sec.nChanged > 0 ? String(sec.nChanged) : ""
+                  countInk: popup.changedColor
+                  glyphInk: sec.here || (popup.searching && sec.hit) ? popup.headColor : "transparent"
+                  here: sec.here
+                  fill: Zenon.menuHi
+                  opacity: !popup.searching || sec.hit ? 1 : 0.35
+                  Behavior on opacity { NumberAnimation { duration: Zenon.fast; easing.type: Zenon.ease } }
+                  onClicked: popup.goToSection(sec.modelData.id)
+                }
+              }
+            }
+          }
+        }
+        Scrollbar {
+          z: 1
+          flick: sideFlick
+          anchors.right: parent.right
+          anchors.top: sideFlick.top
+          anchors.bottom: parent.bottom
+          anchors.topMargin: 2
+          anchors.bottomMargin: 2
+        }
+      }
+
       // ── the hint strip ─────────────────────────────────────────────
-      // Along the bottom, as every other component in this suite has it:
-      // morpheus/HintBar (ceres' height, ground and rule), the keys centered,
-      // what you typed before them. Nothing at the right end — the changed
-      // count went (user, 2026-10-20): each tab's count says it already. It
-      // also holds the search field, which is never seen — what you type
-      // goes to it wherever the pointer is.
+      // Along the bottom beside the sidebar, as delphi's foot starts beside
+      // its own: morpheus/HintBar (ceres' height, ground and rule), the keys
+      // centered, how many matched before them. Nothing at the right end —
+      // the changed count went (user, 2026-10-20): each section's count
+      // says it already.
       HintBar {
         id: hintBar
-        anchors.left: parent.left
+        anchors.left: side.right
         anchors.right: parent.right
         anchors.bottom: parent.bottom
         z: 2
         rows: popup.searching
           ? [["ctrl tab", "narrow"], ["esc", "clear"]]
-          : [["type", "filter"], ["ctrl tab", "section"]]
+          : [["type", "search"], ["ctrl tab", "section"]]
         leading: Text {
           anchors.verticalCenter: parent.verticalCenter
           width: Math.min(implicitWidth, hintBar.width / 3)
           elide: Text.ElideRight
-          textFormat: Text.StyledText
-          // what you typed, which is otherwise shown nowhere; no section
-          // description — the settings say what they are
           text: {
             if (!popup.searching) return "";
             const n = popup.rows.length;
-            const q = String(popup.query).replace(/&/g, "&amp;").replace(/</g, "&lt;");
-            return "<font color='" + popup.highlight + "'>" + q + "</font>  "
-              + n + (n === 1 ? " match" : " matches");
+            return n + (n === 1 ? " match" : " matches");
           }
           color: popup.dimColor
           font.family: popup.face
           font.weight: Zenon.weight
           font.pixelSize: Zenon.px(13)
         }
-        overlay: TextInput {
-        id: filterInput
-
-        cursorDelegate: Caret { field: filterInput }
-        width: 1
-        height: 1
-        opacity: 0
-        activeFocusOnTab: false
-        // so escape reaches the one handler that decides what it means
-        Keys.forwardTo: bgRoot
-
-        onTextChanged: {
-          popup.query = filterInput.text;
-          Qt.callLater(() => list.positionViewAtBeginning());
-        }
-
-        function clear() {
-          filterInput.text = "";
-          popup.query = "";
-        }
-      }
       }
 
       Column {
-        anchors.fill: parent
+        anchors.left: side.right
+        anchors.right: parent.right
+        anchors.top: parent.top
+        anchors.bottom: parent.bottom
 
         // ── the body ─────────────────────────────────────────────────
         Item {
@@ -1604,14 +1781,14 @@ FloatingWindow {
           // grows the list rather than leaving it floating in a margin
           height: parent.height - popup.hintH
 
-          // settings scrolled off the top carry on under the tabs, frosted —
+          // settings scrolled off the top carry on under whatever stands
+          // over the list (the About mark, the display confirm), frosted —
           // see morpheus/ScrollEdge. First, so everything above the list
           // draws over it.
           ScrollEdge {
             view: list
             x: list.x
             width: list.width
-            // the list sits in the item under the tab rule
             height: list.parent.y + list.y
           }
 
@@ -1626,255 +1803,11 @@ FloatingWindow {
             height: popup.hintH
           }
 
-          // ── the sections, as a toolbar ──────────────────────────────
-          // Across the top, icon over name, the way the old System
-          // Preferences laid out its panes — so the settings below get the
-          // panel's whole width instead of what a sidebar left them. More
-          // sections than fit simply scroll: drag it, or turn the wheel over
-          // it, and the one you are in is always brought into view.
-          Item {
-            id: toolbar
-            anchors.left: parent.left
-            anchors.right: parent.right
-            anchors.top: parent.top
-            // the window's top edge is right above it now the head bar is
-            // gone, so it is given the room below it again above it
-            anchors.topMargin: popup.tabsTop
-            height: popup.tabsH
-            Flickable {
-              id: tabFlick
-              // edge to edge: the first and last tiles meet the window's
-              // sides, the way the highlight meets its top and bottom
-              anchors.fill: parent
-              contentWidth: tabRow.width
-              contentHeight: height
-              flickableDirection: Flickable.HorizontalFlick
-              boundsBehavior: Flickable.StopAtBounds
-              clip: true
-              // centered when it all fits, scrolled when it does not
-              leftMargin: Math.max(0, (width - tabRow.width) / 2)
-
-              // every move of the strip — the wheel, a revealed tab, a
-              // chevron — glides on the shell's one scroll (morpheus Elastic)
-              function reveal(item) {
-                if (!item || tabRow.width <= width) return;
-                const pad = 24;
-                const x0 = item.x - pad, x1 = item.x + item.width + pad;
-                if (x0 < contentX) tabWheel.elastic.scroll(tabFlick, Math.max(0, x0) - contentX);
-                else if (x1 > contentX + width)
-                  tabWheel.elastic.scroll(tabFlick, Math.min(tabRow.width - width, x1 - width) - contentX);
-              }
-              // the wheel, either way, or a touchpad: along the strip
-              ElasticScroll { id: tabWheel; view: tabFlick; horizontal: true; step: tabFlick.width * 0.35 }
-
-              Row {
-                id: tabRow
-                height: parent.height
-                spacing: 0
-
-                Repeater {
-                  id: tabRepeater
-                  model: Oracle.sections
-
-                  delegate: Item {
-                    id: tab
-                    required property var modelData
-                    required property int index
-                    // Sized by the name at its SELECTED weight, whichever
-                    // weight it wears now: measuring the live label made the
-                    // tile grow when it went DemiBold, and every tab after it
-                    // slid over a few pixels on each switch.
-                    width: Math.max(78, Math.ceil(boldName.advanceWidth) + 22)
-                    height: tabRow.height
-
-                    TextMetrics {
-                      id: boldName
-                      text: tab.modelData.label
-                      font.family: popup.face
-                      font.weight: Font.DemiBold
-                      font.pixelSize: Zenon.px(13)
-                    }
-                    // While searching, a section with a match stays lit and
-                    // the rest dim — dimmed rather than removed, because they
-                    // are still where settings live, and a toolbar that
-                    // vanished would make a search feel like a different screen.
-                    readonly property bool hit: popup.hitSections[tab.modelData.id] === true
-                    opacity: !popup.searching || tab.hit ? 1 : 0.35
-                    Behavior on opacity { NumberAnimation { duration: Zenon.fast; easing.type: Zenon.ease } }
-
-                    readonly property bool here: popup.searching
-                      ? popup.searchScope === tab.modelData.id
-                      : popup.section === tab.modelData.id
-                    // Depends on revision for the same reason every row does:
-                    // changedIn is a call, not a binding.
-                    readonly property int nChanged: {
-                      Oracle.revision;
-                      return Oracle.changedIn(tab.modelData.id);
-                    }
-
-                    // held now: by the later call a reload may have torn the
-                    // window down, and the id no longer resolves (null if so)
-                    onHereChanged: if (here) { const f = tabFlick; Qt.callLater(() => { if (f) f.reveal(tab); }); }
-
-                    // Only where you ARE. Nothing lights up under the pointer:
-                    // the section you are standing in is a fact about the
-                    // panel, and where the mouse happens to be is not.
-                    // The whole tile, top to bottom and square, the way the old
-                    // System Preferences marked the pane you were in: a column
-                    // of the toolbar, not a chip floating inside it.
-                    Rectangle {
-                      anchors.fill: parent
-                      // the pane you are in, in the menu band (swapped with the press,
-                      // user 2026-10-19)
-                      color: tab.here ? Zenon.menuHi : Zenon.alpha(Zenon.menuHi, 0)
-                      Behavior on color { ColorAnimation { duration: Zenon.fast; easing.type: Zenon.ease } }
-                    }
-                    // PRESSED, IT DARKENS (user, 2026-10-19), the suite's press:
-                    // the lit tab under the shadow ink, an unlit one the press fill
-                    Rectangle {
-                      anchors.fill: parent
-                      visible: tabPress.pressed
-                      // PRESSED: the slate the pane you are in used to wear (Zenon.border),
-                      // swapped with it (user, 2026-10-19)
-                      color: Zenon.border
-                    }
-
-                    // The icon over the name, as one group centered in the tile.
-                    Column {
-                      id: tabGroup
-                      anchors.centerIn: parent
-                      spacing: 4
-
-                      // The icon, with room above it for the count on its
-                      // shoulder, so the count is inside the group and not
-                      // hanging out of the top of it.
-                      Item {
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        // A box the size of the DRAWING, not of the glyph's
-                        // line: a Nerd Font's line box is far taller than its
-                        // icons, and measuring the group by it made the
-                        // highlight fill the tile and sit the pair off-center.
-                        width: tabIcon.implicitWidth
-                        height: 24
-
-                        Text {
-                          id: tabIcon
-                          anchors.centerIn: parent
-                          text: tab.modelData.icon
-                          color: tab.here || (popup.searching && tab.hit)
-                            ? popup.headColor : popup.dimColor
-                          font.family: popup.face
-                          font.weight: Zenon.weight
-                          font.pixelSize: Zenon.px(21)
-                          Behavior on color { ColorAnimation { duration: Zenon.fast; easing.type: Zenon.ease } }
-                        }
-
-                        // A count, not a dot: "3" says how much of this
-                        // section you have moved, and a dot would only have
-                        // said "something". Worn on the icon's shoulder.
-                        Text {
-                          anchors.left: parent.right
-                          anchors.leftMargin: 2
-                          anchors.top: parent.top
-                          visible: tab.nChanged > 0
-                          text: String(tab.nChanged)
-                          color: popup.changedColor
-                          font.family: popup.face
-                          font.weight: Font.DemiBold
-                          font.pixelSize: Zenon.px(11)
-                        }
-                      }
-
-                      Text {
-                        id: tabLabel
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        text: tab.modelData.label
-                        color: tab.here || (popup.searching && tab.hit)
-                          ? popup.fgColor : popup.dimColor
-                        font.family: popup.face
-                        font.weight: tab.here ? Font.DemiBold : Font.Medium
-                        font.pixelSize: Zenon.px(13)
-                        Behavior on color { ColorAnimation { duration: Zenon.fast; easing.type: Zenon.ease } }
-                      }
-                    }
-
-                    MouseArea {
-                      id: tabPress
-                      anchors.fill: parent
-                      onClicked: popup.goToSection(tab.modelData.id)
-                    }
-                  }
-                }
-              }
-            }
-
-
-            // Fades and chevrons at whichever ends have more beyond them, so
-            // a section that is off the edge is visibly somewhere rather than
-            // missing — and the chevron is a way to it, a page at a time.
-            readonly property bool moreLeft: tabFlick.contentX > 1
-            readonly property bool moreRight:
-              tabFlick.contentX < tabRow.width - tabFlick.width - 1
-
-            function page(dir) { tabWheel.elastic.scroll(tabFlick, dir * tabFlick.width * 0.7); }
-
-            component EdgeChevron: Item {
-              id: edge
-              property int dir: 1
-              property bool shown: false
-              anchors.top: parent.top
-              anchors.bottom: parent.bottom
-              width: 44
-              opacity: shown ? 1 : 0
-              visible: opacity > 0.01
-              Behavior on opacity { NumberAnimation { duration: Zenon.fast; easing.type: Zenon.ease } }
-
-              Rectangle {
-                anchors.fill: parent
-                gradient: Gradient {
-                  orientation: Gradient.Horizontal
-                  GradientStop { position: 0; color: edge.dir < 0 ? popup.bgColor : "transparent" }
-                  GradientStop { position: 0.55; color: popup.bgColor }
-                  GradientStop { position: 1; color: edge.dir < 0 ? "transparent" : popup.bgColor }
-                }
-              }
-
-              Text {
-                anchors.centerIn: parent
-                // chevron left / right, as escapes like every other glyph here
-                text: edge.dir < 0 ? "\uF053" : "\uF054"
-                color: edgeMa.pressed ? popup.headColor : popup.fgColor
-                font.family: popup.face
-                font.weight: Zenon.weight
-                font.pixelSize: Zenon.px(14)
-              }
-
-              MouseArea {
-                id: edgeMa
-                anchors.fill: parent
-                enabled: edge.shown
-                onClicked: toolbar.page(edge.dir)
-              }
-            }
-
-            EdgeChevron { anchors.left: parent.left; dir: -1; shown: toolbar.moreLeft }
-            EdgeChevron { anchors.right: parent.right; dir: 1; shown: toolbar.moreRight }
-          }
-
-          Rectangle {
-            id: tabRule
-            anchors.left: parent.left
-            anchors.right: parent.right
-            anchors.top: toolbar.bottom
-            height: 1
-            color: Zenon.border
-          }
-
           // the settings themselves
           Item {
             anchors.left: parent.left
             anchors.right: parent.right
-            anchors.top: tabRule.bottom
+            anchors.top: parent.top
             anchors.bottom: parent.bottom
 
             // ── the mark ──────────────────────────────────────────
@@ -2334,18 +2267,20 @@ FloatingWindow {
                   // into its frame
                   anchors.leftMargin: settingRow.inGroup ? 42
                     : settingRow.monitorRow && !settingRow.monitorHead ? 36 : 24
-                  // A READING MEASURE, not the row (user, 2026-10-20): the
-                  // text stops at popup.textFrac of the row, so it grows with
-                  // the window, and a switch's row wraps at the same edge as
-                  // a slider's — or sooner, where a wide control starts.
-                  width: Math.min(controlSlot.x - 18,
-                    Math.round(parent.width * popup.textFrac)) - anchors.leftMargin
+                  // THE NAME LEVEL WITH THE CONTROL, THE DESCRIPTION UNDER
+                  // BOTH (user, 2026-10-27: Font's description ran down a
+                  // narrow column beside its menus — "make this the standard
+                  // layout"): the name stops where the control starts, the
+                  // description runs the row's whole width to the control's
+                  // right edge. It replaced a reading measure (62% of the row) that
+                  // stopped the text beside every control.
+                  width: controlSlot.x + controlSlot.width - anchors.leftMargin
                   anchors.verticalCenter: rowHead.verticalCenter
                   spacing: 2
 
                   Row {
                     spacing: 8
-                    width: parent.width
+                    width: controlSlot.x - 18 - labels.anchors.leftMargin
 
                     // A changed setting says so in its own name. A dot in the
                     // gutter was a second thing to find; the label is already
@@ -2363,7 +2298,7 @@ FloatingWindow {
                         : settingRow.monitorHead ? settingRow.accent : popup.titleColor
                       font.family: popup.face
                       font.weight: settingRow.monitorHead ? Font.DemiBold : Font.Medium
-                      font.pixelSize: Zenon.px(17)
+                      font.pixelSize: Zenon.px(19)   // 17 until 2026-10-27 (user: +2)
 
                       MouseArea {
                         id: resetMa
@@ -2490,6 +2425,9 @@ FloatingWindow {
 
                   Text {
                     width: parent.width
+                    // clear of the control's foot, which hangs past the name,
+                    // and air under the line (user, 2026-10-27)
+                    topPadding: 12
                     visible: (settingRow.spec.help || "") !== ""
                     textFormat: popup.searching ? Text.StyledText : Text.PlainText
                     text: popup.searching

@@ -46,13 +46,17 @@
 1	delphi/MessageWell.qml	id-shadows-member	Id for object Flickable shadows property "flick". Rename one or the other.
 1	delphi/MessageWell.qml	id-shadows-member	Id for object TextEdit shadows property "edit". Rename one or the other.
 2	delphi/MessageWell.qml	id-shadows-member	Note: Id defined here
+1	delphi/NotesMedia.qml	missing-property	Member "going" not found on type "QObject"
+1	delphi/NotesMedia.qml	missing-property	Member "toggle" not found on type "QObject"
+1	delphi/NotesMedia.qml	missing-property	Member "vh" not found on type "QObject"
+1	delphi/NotesMedia.qml	missing-property	Member "vw" not found on type "QObject"
 3	howler/Howler.qml	missing-property	Member "ink" not found on type "Howler"
 1	howler/Howler.qml	missing-property	Member "slideBy" not found on type "Howler"
 2	howler/Howler.qml	missing-property	Member "values" not found on type "UntypedObjectModel"
 1	howler/HowlerOsd.qml	missing-property	Member "bg" not found on type "Howler"
 1	howler/HowlerOsd.qml	missing-property	Member "borderSize" not found on type "Howler"
-2	howler/HowlerOsd.qml	missing-property	Member "closeMs" not found on type "Howler"
-2	howler/HowlerOsd.qml	missing-property	Member "openMs" not found on type "Howler"
+1	howler/HowlerOsd.qml	missing-property	Member "closeMs" not found on type "Howler"
+1	howler/HowlerOsd.qml	missing-property	Member "openMs" not found on type "Howler"
 1	howler/HowlerOsd.qml	missing-property	Member "radius" not found on type "Howler"
 2	howler/HowlerPopup.qml	missing-property	Member "clearHistory" not found on type "Howler"
 3	howler/HowlerPopup.qml	missing-property	Member "dismissAll" not found on type "Howler"

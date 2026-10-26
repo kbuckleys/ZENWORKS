@@ -315,41 +315,69 @@ PanelWindow {
               font.family: Zenon.face
               font.pixelSize: Zenon.px(36)
             }
+            // WHICH WORKSPACE, when it is not this one: a badge in the
+            // picture's lower right corner (user, 2026-10-27), not a word on
+            // the title's line; the special one as the bar marks it, its
+            // glyph, bolder
+            Rectangle {
+              id: wsBadge
+              readonly property bool special: /^special:/.test(tile.wsName)
+              readonly property string mark: tile.win && tile.win.workspace && Hyprland.focusedWorkspace
+                && tile.win.workspace !== Hyprland.focusedWorkspace
+                ? (wsBadge.special ? "\uEAAE" : tile.wsName) : ""
+              visible: wsBadge.mark !== ""
+              x: (shot.hasContent ? shot.x + shot.width : frame.width) - width - 8
+              y: (shot.hasContent ? shot.y + shot.height : frame.height) - height - 8
+              width: Math.max(height, wsMark.implicitWidth + 16)
+              height: Zenon.px(30)
+              radius: Zenon.radiusControl
+              color: Zenon.shade(0.6)
+              Text {
+                id: wsMark
+                anchors.centerIn: parent
+                text: wsBadge.mark
+                color: Zenon.white
+                font.family: wsBadge.special ? Zenon.glyphFace : Zenon.face
+                font.weight: Font.DemiBold
+                font.pixelSize: Zenon.px(wsBadge.special ? 19 : 17)
+                // bolder, as the bar's (Workspaces' specialGlyph): the glyph
+                // font has one weight, so a copy one pixel right widens it
+                Text {
+                  x: 1
+                  visible: wsBadge.special
+                  text: wsMark.text
+                  color: wsMark.color
+                  font: wsMark.font
+                }
+              }
+            }
           }
 
+          // the app's glyph and the title, centered under the picture
+          // (user, 2026-10-27), the title cut short when it runs too long
           Row {
             id: nameRow
-            x: 10
+            anchors.horizontalCenter: parent.horizontalCenter
             anchors.top: frame.bottom
             anchors.topMargin: 8
-            width: parent.width - 20
             spacing: 6
             Text {
               id: glyph
+              anchors.verticalCenter: parent.verticalCenter
               text: Icons.appGlyph([tile.appId, tile.win ? tile.win.title : ""]) || "\u{F05C4}"
               color: tile.lit ? Zenon.cyan : Zenon.accentMuted
               font.family: Zenon.face
               font.pixelSize: Zenon.px(15)
             }
             Text {
-              width: nameRow.width - glyph.implicitWidth - ws.implicitWidth - nameRow.spacing * 2
+              anchors.verticalCenter: parent.verticalCenter
+              width: Math.min(implicitWidth, tile.width - 20 - glyph.implicitWidth - nameRow.spacing)
               text: tile.win ? tile.win.title : ""
               elide: Text.ElideRight
               color: tile.lit ? Zenon.white : Zenon.soft
               font.family: Zenon.face
               font.weight: Zenon.weight
               font.pixelSize: Zenon.px(14)
-            }
-            // which workspace, when it is not this one
-            Text {
-              id: ws
-              text: tile.win && tile.win.workspace && Hyprland.focusedWorkspace
-                && tile.win.workspace !== Hyprland.focusedWorkspace
-                ? tile.wsName.replace(/^special:/, "") : ""
-              color: Zenon.muted
-              font.family: Zenon.face
-              font.weight: Zenon.weight
-              font.pixelSize: Zenon.px(13)
             }
           }
 

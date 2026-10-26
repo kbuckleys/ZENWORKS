@@ -36,7 +36,7 @@ Row {
   // Check standing among controls that speak in another (picasso's foot,
   // in the accent beside its chips: user, 2026-10-25)
   property color offInk: Zenon.accentKey
-  property color onInk: Zenon.white
+  property color litInk: Zenon.white
   property real textSize: Zenon.px(15)
   property bool kbOn: false
   // pressed from outside: a holder that takes the tap itself (a whole
@@ -84,7 +84,7 @@ Row {
     visible: ck.label !== ""
     anchors.verticalCenter: parent.verticalCenter
     text: ck.label
-    color: ck.lit ? ck.onInk : ck.offInk
+    color: ck.lit ? ck.litInk : ck.offInk
     opacity: ck.down ? Zenon.pressDim : 1
     font.family: Zenon.face
     font.weight: Zenon.weight

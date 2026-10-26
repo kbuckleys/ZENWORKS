@@ -9,12 +9,15 @@
 # GitLab and Codeberg came (2026-10-11); each forge passes its own address,
 # headers and name.
 
+import hashlib
 import json
+import mimetypes
 import os
 import re
 import subprocess
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 
 
@@ -90,15 +93,17 @@ def _hidden(text, headers):
     return t
 
 
-def request(method, url, headers, body=None, raw=False, again=False, waited=None, who="the forge"):
+def request(method, url, headers, body=None, raw=False, again=False, waited=None, who="the forge",
+            payload=None, ctype=None):
     """One request. `again`: a write that may be sent twice —
     one whose second sending makes nothing new (a blob or a tree is named by
     its content: the same one twice is the same one). `waited(seconds)` is
-    told when GitHub asks for a pause and it is kept."""
-    data = json.dumps(body).encode() if body is not None else None
+    told when GitHub asks for a pause and it is kept. `payload`: bytes sent
+    as they are, of type `ctype` (a file), instead of `body` as JSON."""
+    data = payload if payload is not None else (json.dumps(body).encode() if body is not None else None)
     req = urllib.request.Request(url, data=data, method=method, headers=dict(headers))
     if data is not None:
-        req.add_header("Content-Type", "application/json")
+        req.add_header("Content-Type", ctype or "application/json")
     # A READ IS TRIED AGAIN when the network failed it — a connection that
     # hung (seen right after signing in, 2026-10-10: "timed out", and the
     # same call took 0.7 s a minute later) or one refused — and so is a write
@@ -199,3 +204,60 @@ def ci_many(fn, full, shas, limit=40):
     with ThreadPoolExecutor(max_workers=6) as ex:
         list(ex.map(one, list(shas)[:limit]))
     return out
+
+
+# ── PICTURES AND VIDEOS IN A RELEASE'S NOTES (2026-10-27) ─────────────────
+# The editor puts a file of this computer into the notes as a file://
+# address (delphi.js mediaMarkdown). Once the release is made or saved, each
+# goes to the forge — a file attached to the release on GitHub and Forgejo,
+# a project upload on GitLab (each forge's media_upload) — and the forge's
+# address takes its place in the notes, which are saved again.
+_LOCAL = re.compile(r"file://[^\s)\"'<>]+")
+
+
+def local_media(body):
+    out = []
+    for m in _LOCAL.finditer(body or ""):
+        if m.group(0) not in out:
+            out.append(m.group(0))
+    return out
+
+
+def media_name(path, data):
+    """The file's name, kept to what every forge takes, with a piece of its
+    content's hash: the same picture twice is one file, two of the same
+    name are two."""
+    stem, ext = os.path.splitext(os.path.basename(path))
+    stem = re.sub(r"[^\w.-]+", "-", stem).strip("-.") or "file"
+    return f"{stem}-{hashlib.sha1(data).hexdigest()[:8]}{ext.lower()}"
+
+
+def media_type(path):
+    return mimetypes.guess_type(path)[0] or "application/octet-stream"
+
+
+def multipart(field, name, data, ctype):
+    """(bytes, content type) of a form with one file in it."""
+    b = "delphi" + os.urandom(8).hex()
+    head = (f'--{b}\r\nContent-Disposition: form-data; name="{field}"; filename="{name}"\r\n'
+            f"Content-Type: {ctype}\r\n\r\n").encode()
+    return head + data + f"\r\n--{b}--\r\n".encode(), f"multipart/form-data; boundary={b}"
+
+
+def read_media(path):
+    if not os.path.isfile(path):
+        raise ForgeError(f"{os.path.basename(path)} is not there any more — choose it again, or take it out of the notes")
+    with open(path, "rb") as fh:
+        return fh.read()
+
+
+def attach_media(f, full, rel, body, draft=False, prerelease=False):
+    """`rel` just made or saved by forge module `f` with `body`: its local
+    files sent, and the notes saved with the forge's addresses."""
+    found = local_media(body)
+    if not found or not hasattr(f, "media_upload"):
+        return rel
+    new = body
+    for u in found:
+        new = new.replace(u, f.media_upload(full, rel, urllib.parse.unquote(u[len("file://"):])))
+    return f.update_release(full, rel["id"], rel["tag"], rel["name"], new, draft, prerelease)

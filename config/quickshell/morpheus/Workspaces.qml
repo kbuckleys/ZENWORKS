@@ -212,7 +212,10 @@ Item {
       opacity: 1 - wsLayer.glyphShow
 
       Repeater {
-        model: Hyprland.workspaces
+        // BY NUMBER (user, 2026-10-27: "the order is inverted"): Hyprland's
+        // list is in the order the workspaces were made, so a 2 opened before
+        // a 1 came first. Sorted as the workspace strip sorts them.
+        model: Hyprland.workspaces.values.slice().sort((a, b) => a.id - b.id)
 
         delegate: Collapsible {
           id: btn

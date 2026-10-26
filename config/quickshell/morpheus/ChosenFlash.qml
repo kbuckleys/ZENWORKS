@@ -40,6 +40,11 @@ Item {
   property bool painted: true
   // a grid cell's cursor is rounded (ideo, picasso): the flash takes its shape
   property alias radius: ink.radius
+  // and a cell rounded only on some corners (Control Hub's tiles)
+  property alias topLeftRadius: ink.topLeftRadius
+  property alias topRightRadius: ink.topRightRadius
+  property alias bottomLeftRadius: ink.bottomLeftRadius
+  property alias bottomRightRadius: ink.bottomRightRadius
 
   function fire(act) {
     flash.pending = act;

@@ -78,6 +78,16 @@ module.exports = {
     t.eq("an import is written fresh", O.sanitizeBundleFile("hypr/inputmethod.lua", "os.execute('x') return { on = true }"),
       O.renderImLua(true));
 
+    // "Add a language" (2026-10-27): the ones not added, by name, after Choose…
+    const all = O.imAddable([]);
+    t.eq("the dropdown starts with Choose", all[0].value, "");
+    t.eq("every language offered once", all.length - 1, O.IM_ENGINES.length);
+    t.eq("an added one is not offered", O.imAddable(["pinyin"]).some((o) => o.value === "pinyin"), false);
+    t.eq("offered by name", all.slice(1).map((o) => o.label).join("|"),
+      all.slice(1).map((o) => o.label).sort((a, b) => a.localeCompare(b)).join("|"));
+    t.eq("no fcitx5 name twice", new Set(O.IM_ENGINES.map((e) => e.im)).size, O.IM_ENGINES.length);
+    t.eq("every engine from an fcitx5 package",
+      O.IM_ENGINES.filter((e) => !/^fcitx5-/.test(e.pkg)).map((e) => e.im).join(","), "");
     t.eq("layout alone", O.imLayout("us", ""), "us");
     t.eq("first of several, with its variant", O.imLayout("de,us", "nodeadkeys,"), "de-nodeadkeys");
     t.eq("no layout is us", O.imLayout("", ""), "us");

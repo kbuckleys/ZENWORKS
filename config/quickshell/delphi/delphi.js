@@ -636,6 +636,112 @@ function mdOf(text) {
     .trim();
 }
 
+// ── PICTURES AND VIDEOS IN THE NOTES (user, 2026-10-27: "releases don't
+// support inserting and displaying images/videos like github does") ──
+// A picture or a video standing on a line of its own is drawn as itself
+// (NotesView), the words around it as before. What counts, as the forges
+// write it:
+//   ![alt](url)              a picture — a video when the address is one
+//   <img src="url">          a picture
+//   <video src="url">        a video
+//   a bare address           a video: GitHub's own (user-attachments/
+//                            assets/…), or one ending .mp4, .webm, .mov…
+// A picture in the middle of a sentence stays a link (mdOf). While the notes
+// are written, a file of this computer is a file:// address; saving the
+// release sends it to the forge and puts the forge's address in its place
+// (core rest.attach_media).
+var VIDEO_EXT = /\.(mp4|m4v|webm|mov|mkv|ogv)([?#]|$)/i;
+var IMAGE_EXT = /\.(png|jpe?g|gif|webp|avif|bmp|svg)([?#]|$)/i;
+function mediaKindOf(url) {
+  var u = String(url || "");
+  if (VIDEO_EXT.test(u)) return "video";
+  if (IMAGE_EXT.test(u)) return "image";
+  return "";
+}
+function srcOf(tag) {
+  var m = /\bsrc\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i.exec(tag);
+  return m ? (m[1] || m[2] || m[3] || "") : "";
+}
+function altOf(tag) {
+  var m = /\balt\s*=\s*(?:"([^"]*)"|'([^']*)')/i.exec(tag);
+  return m ? (m[1] || m[2] || "") : "";
+}
+// one line, alone: { kind, url, alt } or null
+function mediaLine(line) {
+  var l = String(line || "").trim();
+  var m = /^!\[([^\]]*)\]\(\s*<?([^)\s>]+)>?(?:\s+"[^"]*")?\s*\)$/.exec(l);
+  if (m) return { kind: VIDEO_EXT.test(m[2]) ? "video" : "image", url: m[2], alt: m[1] };
+  if (/^<img\b[^>]*>$/i.test(l) && srcOf(l)) return { kind: "image", url: srcOf(l), alt: altOf(l) };
+  m = /^(<video\b[^>]*>)(?:\s*<\/video>)?$/i.exec(l);
+  if (m && srcOf(m[1])) return { kind: "video", url: srcOf(m[1]), alt: "" };
+  if (/^(https?|file):\/\/\S+$/i.test(l)
+      && (/^https:\/\/github\.com\/user-attachments\/assets\/[\w-]+$/i.test(l) || VIDEO_EXT.test(l)))
+    return { kind: "video", url: l, alt: "" };
+  return null;
+}
+// the notes as parts: { kind: "text", text } and { kind, url, alt }, in
+// order; code fences are words, whatever they hold
+function notesParts(text) {
+  var lines = String(text || "").replace(/\r\n/g, "\n").split("\n");
+  var out = [], run = [], fence = false;
+  function flush() {
+    var t = run.join("\n");
+    if (t.trim() !== "") out.push({ kind: "text", text: t.replace(/^\n+|\n+$/g, "") });
+    run = [];
+  }
+  for (var i = 0; i < lines.length; i++) {
+    if (/^\s{0,3}(```|~~~)/.test(lines[i])) fence = !fence;
+    var m = fence ? null : mediaLine(lines[i]);
+    if (!m) { run.push(lines[i]); continue; }
+    flush();
+    out.push(m);
+  }
+  flush();
+  return out;
+}
+// A DROP, SORTED (user, 2026-10-27: "drag and drop … from external
+// sources, just like other apps"): { files, web, words } from what the drag
+// carried — files of this computer that are pictures or videos, web
+// addresses to fetch (a browser's dragged picture), and words for the rest.
+// A web address with no picture extension is fetched only when the drag
+// also says it holds an image (`imagey`): a dragged link stays a link.
+function dropSorted(urls, text, imagey) {
+  var out = { files: [], web: [], words: "" };
+  var rest = [];
+  (urls || []).forEach(function (u) {
+    u = String(u);
+    if (/^file:\/\//i.test(u)) {
+      var p = decodeURIComponent(u.replace(/^file:\/\/[^\/]*/, ""));
+      if (mediaKindOf(p) !== "") out.files.push(p); else rest.push(u);
+    } else if (/^https?:\/\//i.test(u) && (mediaKindOf(u) !== "" || imagey) && out.web.indexOf(u) < 0) {
+      out.web.push(u);
+    } else rest.push(u);
+  });
+  // a browser drags the picture's page link as text too: not words then
+  if (out.files.length === 0 && out.web.length === 0)
+    out.words = String(text || "").trim() !== "" ? String(text) : rest.join("\n");
+  return out;
+}
+// bytes as base64, for a picture dragged as data (no file, no address)
+function base64Of(buf) {
+  var b = new Uint8Array(buf), A = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+  var out = [];
+  for (var i = 0; i < b.length; i += 3) {
+    var n = (b[i] << 16) | ((b[i + 1] || 0) << 8) | (b[i + 2] || 0);
+    out.push(A[(n >> 18) & 63] + A[(n >> 12) & 63]
+      + (i + 1 < b.length ? A[(n >> 6) & 63] : "=") + (i + 2 < b.length ? A[n & 63] : "="));
+  }
+  return out.join("");
+}
+
+// what goes into the notes for a file chosen to show: a picture as
+// Markdown, a video as its bare address (GitHub's own way), on its own line
+function mediaMarkdown(path) {
+  var url = "file://" + encodeURI(String(path));
+  var name = baseName(path).replace(/\.[^.]*$/, "").replace(/[\[\]]/g, "");
+  return VIDEO_EXT.test(path) ? url : "![" + name + "](" + url + ")";
+}
+
 // A release's markdown for MarkdownText with every line kept as written
 // (user, 2026-10-12: the preview did not honor blank lines). GitHub keeps
 // a release's single newlines; Qt joined them, and spaced a paragraph no

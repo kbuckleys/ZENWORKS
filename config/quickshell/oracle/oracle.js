@@ -2071,16 +2071,71 @@ function renderWakeLua(by) {
 // Never GTK_IM_MODULE or QT_IM_MODULE: on Wayland both push apps off the
 // text-input protocol (oracle/tests/inputmethod.js keeps them out).
 var IM_BASE = ["fcitx5", "fcitx5-qt", "fcitx5-gtk", "fcitx5-configtool"];
-// `im` is fcitx5's name for it, `pkg` what brings it
+// `im` is fcitx5's name for it, `pkg` what brings it. A row each is too
+// many (user, 2026-10-27: "a lot more non-latin languages out there"):
+// Input lists the ones you added, and "Add a language" offers the rest.
+// m17n's are "m17n_<language>_<method>", from m17n-db's .mim files.
 var IM_ENGINES = [
-  { im: "pinyin",  label: "Chinese · Pinyin",    pkg: "fcitx5-chinese-addons" },
-  { im: "rime",    label: "Chinese · Rime",      pkg: "fcitx5-rime" },
-  { im: "chewing", label: "Chinese · Zhuyin",    pkg: "fcitx5-chewing" },
-  { im: "mozc",    label: "Japanese",                 pkg: "fcitx5-mozc" },
-  { im: "hangul",  label: "Korean",                   pkg: "fcitx5-hangul" },
-  { im: "unikey",  label: "Vietnamese",               pkg: "fcitx5-unikey" },
-  { im: "libthai", label: "Thai",                     pkg: "fcitx5-libthai" },
+  { im: "pinyin",                  label: "Chinese · Pinyin",            pkg: "fcitx5-chinese-addons" },
+  { im: "shuangpin",               label: "Chinese · Shuangpin",         pkg: "fcitx5-chinese-addons" },
+  { im: "wbx",                     label: "Chinese · Wubi",              pkg: "fcitx5-chinese-addons" },
+  { im: "cangjie",                 label: "Chinese · Cangjie",           pkg: "fcitx5-chinese-addons" },
+  { im: "rime",                    label: "Chinese · Rime",              pkg: "fcitx5-rime" },
+  { im: "chewing",                 label: "Chinese · Zhuyin",            pkg: "fcitx5-chewing" },
+  { im: "jyutping-table",          label: "Cantonese · Jyutping",        pkg: "fcitx5-table-extra" },
+  { im: "mozc",                    label: "Japanese · Mozc",             pkg: "fcitx5-mozc" },
+  { im: "anthy",                   label: "Japanese · Anthy",            pkg: "fcitx5-anthy" },
+  { im: "skk",                     label: "Japanese · SKK",              pkg: "fcitx5-skk" },
+  { im: "hangul",                  label: "Korean",                      pkg: "fcitx5-hangul" },
+  { im: "unikey",                  label: "Vietnamese · Unikey",         pkg: "fcitx5-unikey" },
+  { im: "bamboo",                  label: "Vietnamese · Bamboo",         pkg: "fcitx5-bamboo" },
+  { im: "libthai",                 label: "Thai",                        pkg: "fcitx5-libthai" },
+  { im: "sayura",                  label: "Sinhala",                     pkg: "fcitx5-sayura" },
+  { im: "m17n_am_sera",            label: "Amharic",                     pkg: "fcitx5-m17n" },
+  { im: "m17n_ar_translit",        label: "Arabic · Transliteration",    pkg: "fcitx5-m17n" },
+  { im: "m17n_hy_kbd",             label: "Armenian",                    pkg: "fcitx5-m17n" },
+  { im: "m17n_as_inscript2",       label: "Assamese",                    pkg: "fcitx5-m17n" },
+  { im: "m17n_bn_inscript2",       label: "Bengali · InScript",          pkg: "fcitx5-m17n" },
+  { im: "m17n_bn_probhat",         label: "Bengali · Probhat",           pkg: "fcitx5-m17n" },
+  { im: "m17n_my_kbd",             label: "Burmese",                     pkg: "fcitx5-m17n" },
+  { im: "m17n_dv_phonetic",        label: "Dhivehi",                     pkg: "fcitx5-m17n" },
+  { im: "m17n_ka_kbd",             label: "Georgian",                    pkg: "fcitx5-m17n" },
+  { im: "m17n_gu_inscript2",       label: "Gujarati",                    pkg: "fcitx5-m17n" },
+  { im: "m17n_hi_inscript2",       label: "Hindi · InScript",            pkg: "fcitx5-m17n" },
+  { im: "m17n_hi_phonetic",        label: "Hindi · Phonetic",            pkg: "fcitx5-m17n" },
+  { im: "m17n_iu_phonetic",        label: "Inuktitut",                   pkg: "fcitx5-m17n" },
+  { im: "m17n_kn_inscript2",       label: "Kannada",                     pkg: "fcitx5-m17n" },
+  { im: "m17n_kk_kbd",             label: "Kazakh",                      pkg: "fcitx5-m17n" },
+  { im: "m17n_km_yannis",          label: "Khmer",                       pkg: "fcitx5-m17n" },
+  { im: "m17n_lo_kbd",             label: "Lao",                         pkg: "fcitx5-m17n" },
+  { im: "m17n_ml_inscript2",       label: "Malayalam · InScript",        pkg: "fcitx5-m17n" },
+  { im: "m17n_ml_mozhi",           label: "Malayalam · Mozhi",           pkg: "fcitx5-m17n" },
+  { im: "m17n_mr_inscript2",       label: "Marathi",                     pkg: "fcitx5-m17n" },
+  { im: "m17n_ne_rom",             label: "Nepali",                      pkg: "fcitx5-m17n" },
+  { im: "m17n_or_inscript2",       label: "Odia",                        pkg: "fcitx5-m17n" },
+  { im: "m17n_ps_phonetic",        label: "Pashto",                      pkg: "fcitx5-m17n" },
+  { im: "m17n_fa_isiri",           label: "Persian",                     pkg: "fcitx5-m17n" },
+  { im: "m17n_pa_inscript2-guru",  label: "Punjabi",                     pkg: "fcitx5-m17n" },
+  { im: "m17n_sa_inscript2",       label: "Sanskrit",                    pkg: "fcitx5-m17n" },
+  { im: "m17n_syrc_phonetic",      label: "Syriac",                      pkg: "fcitx5-m17n" },
+  { im: "m17n_ta_tamil99",         label: "Tamil · Tamil99",             pkg: "fcitx5-m17n" },
+  { im: "m17n_ta_phonetic",        label: "Tamil · Phonetic",            pkg: "fcitx5-m17n" },
+  { im: "m17n_te_inscript2",       label: "Telugu",                      pkg: "fcitx5-m17n" },
+  { im: "m17n_bo_ewts",            label: "Tibetan",                     pkg: "fcitx5-m17n" },
+  { im: "m17n_ug_kbd",             label: "Uyghur",                      pkg: "fcitx5-m17n" },
+  { im: "m17n_ur_phonetic",        label: "Urdu",                        pkg: "fcitx5-m17n" },
+  { im: "m17n_ii_phonetic",        label: "Yi",                          pkg: "fcitx5-m17n" },
 ];
+
+// what "Add a language" offers: every language not added yet, by name
+function imAddable(added) {
+  const have = added || [];
+  return [{ value: "", label: "Choose\u2026" }].concat(IM_ENGINES
+    .filter((e) => have.indexOf(e.im) < 0)
+    .slice().sort((a, b) => a.label.localeCompare(b.label))
+    .map((e) => ({ value: e.im, label: e.label })));
+}
+
 // fcitx5's key names. Not Super+Space: that is Cynosure's, and a bind the
 // compositor holds never reaches fcitx5.
 var IM_KEYS = [

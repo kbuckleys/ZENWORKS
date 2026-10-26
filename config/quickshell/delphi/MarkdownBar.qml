@@ -30,6 +30,10 @@ Row {
   property var host: null
   // a link wants its address asked for; the holder asks
   signal linkAsked()
+  // a picture or a video from this computer; the holder picks it
+  // (absent where no holder answers: `media` false)
+  signal mediaAsked()
+  property bool media: false
   // a little air between the buttons (user, 2026-10-25)
   spacing: 6
 
@@ -50,7 +54,7 @@ Row {
     ["", "Task list", "", bar.kindNow === "check", () => bar.target.setKind("check")],
     "|",
     [N.KINDS.rule.glyph, "Divider", "", false, () => bar.target.rule()],
-  ]
+  ].concat(bar.media ? [["\u{F02E9}", "Picture or video", "", false, () => bar.mediaAsked()]] : [])
 
   function key(e) {
     if (!bar.target || !(e.modifiers & Qt.ControlModifier)) return false;

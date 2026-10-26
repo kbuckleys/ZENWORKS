@@ -167,9 +167,9 @@ Variants {
     // So whoever applied a background can wait for it to be on screen (the
     // card's Apply turns into working dots until it is) rather than for the
     // assignment, which is instant and says nothing about a decode.
-    readonly property string onScreen: surface.solid !== "" ? surface.want
+    readonly property string showingNow: surface.solid !== "" ? surface.want
       : surface.front.showing ? surface.front.path : ""
-    onOnScreenChanged: Picasso.noteShown(surface.screenName, surface.onScreen)
+    onShowingNowChanged: Picasso.noteShown(surface.screenName, surface.showingNow)
     function failed(img) {
       if (img.status === Image.Error && img.path !== "" && img.path === surface.want)
         Picasso.noteFailed(surface.screenName, img.path);

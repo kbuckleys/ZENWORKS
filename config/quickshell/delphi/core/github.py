@@ -21,6 +21,7 @@
 import base64
 import os
 import re
+import urllib.parse
 import subprocess
 from concurrent.futures import ThreadPoolExecutor
 
@@ -636,6 +637,28 @@ def update_release(full, id, tag, name, body="", draft=False, prerelease=False):
 def delete_release(full, id, tag=""):
     call("DELETE", f"/repos/{full}/releases/{id}")
     return {}
+
+
+# a picture or video for the notes, attached to the release; its address is
+# the tag's download, which works once the release is published
+def media_upload(full, rel, path):
+    tok, _ = token()
+    if not tok:
+        raise ForgeError("not signed in to GitHub", 401)
+    data = rest.read_media(path)
+    name = rest.media_name(path, data)
+    url = (f"https://uploads.github.com/repos/{full}/releases/{rel['id']}/assets?name="
+           + urllib.parse.quote(name, safe=""))
+    try:
+        rest.request("POST", url, {"Authorization": "Bearer " + tok, "Accept": "application/vnd.github+json",
+                                   "X-GitHub-Api-Version": "2022-11-28", "User-Agent": "delphi"},
+                     payload=data, ctype=rest.media_type(path), who="GitHub")
+    except ForgeError as e:
+        # 422: one of that name is attached already — the same content
+        if e.status != 422:
+            raise
+    return (f"https://github.com/{full}/releases/download/"
+            f"{urllib.parse.quote(rel['tag'], safe='')}/{urllib.parse.quote(name, safe='')}")
 
 
 # ── SSH keys for signing in (core/sshkeys.py makes them) ──────────────

@@ -85,8 +85,38 @@ Item {
       // the spelling, as a note's in the window (SpellMarks)
       SpellMarks { id: bodySpell; field: body; mgr: nf.mgr; visible: nf.spelling }
 
-      Keys.onPressed: (e) => nf.keyPressed(e)
+      // a paste is the words alone (user, 2026-10-27: "disable paste with
+      // formatting, just plain text"): a rich page took a web page's fonts,
+      // colors and sizes along with them
+      Keys.onPressed: (e) => {
+        const ctrl = (e.modifiers & Qt.ControlModifier) !== 0;
+        const shift = (e.modifiers & Qt.ShiftModifier) !== 0;
+        if (nf.rich && !body.readOnly
+            && ((ctrl && e.key === Qt.Key_V) || (shift && e.key === Qt.Key_Insert))) {
+          e.accepted = true;
+          nf.pastePlain();
+          return;
+        }
+        nf.keyPressed(e);
+      }
     }
+  }
+
+  // The clipboard as words: a plain TextEdit's own paste drops the
+  // formatting, and what it took goes in at the caret, escaped so the rich
+  // page reads it as text, not as tags.
+  TextEdit { id: plainCatch; visible: false; cursorVisible: false; textFormat: TextEdit.PlainText }
+  function pastePlain() {
+    if (!nf.rich) { body.paste(); return; }
+    plainCatch.text = "";
+    plainCatch.paste();
+    const t = plainCatch.text;
+    plainCatch.text = "";
+    if (t === "") return;
+    if (body.selectionEnd > body.selectionStart) body.remove(body.selectionStart, body.selectionEnd);
+    const html = t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+      .replace(/\r\n?/g, "\n").replace(/\n/g, "<br>");
+    body.insert(body.cursorPosition, html);
   }
 
   // ── WHERE THE TEXT RUNS ON ──────────────────────────────────────────

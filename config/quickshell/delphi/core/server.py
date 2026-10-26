@@ -38,6 +38,7 @@ import tempfile
 import threading
 
 import aur
+import rest
 import forgejo
 import github
 import gitlab
@@ -688,9 +689,12 @@ class Server(lines.Service):
             return f.add_ssh_key(kw["key"], kw.get("title", "delphi"))
         if op == "DeleteSshKey":
             return f.delete_ssh_key(kw["id"])
+        # pictures and videos in the notes go to the forge as the release is
+        # saved (rest.attach_media)
         if op == "UpdateRelease":
-            return f.update_release(kw["full"], kw["id"], kw["tag"], kw.get("name", ""), kw.get("body", ""),
-                                    kw.get("draft", False), kw.get("prerelease", False))
+            r = f.update_release(kw["full"], kw["id"], kw["tag"], kw.get("name", ""), kw.get("body", ""),
+                                 kw.get("draft", False), kw.get("prerelease", False))
+            return rest.attach_media(f, kw["full"], r, kw.get("body", ""), kw.get("draft", False), kw.get("prerelease", False))
         if op == "DeleteRelease":
             return f.delete_release(kw["full"], kw["id"], kw.get("tag", ""))
         if op == "Archive":
@@ -700,8 +704,9 @@ class Server(lines.Service):
         if op == "ReleaseNotes":
             return f.release_notes(kw["full"], kw["tag"], kw["target"], kw.get("previous"))
         if op == "CreateRelease":
-            return f.create_release(kw["full"], kw["tag"], kw["target"], kw.get("name", ""),
-                                    kw.get("body", ""), kw.get("draft", False), kw.get("prerelease", False))
+            r = f.create_release(kw["full"], kw["tag"], kw["target"], kw.get("name", ""),
+                                 kw.get("body", ""), kw.get("draft", False), kw.get("prerelease", False))
+            return rest.attach_media(f, kw["full"], r, kw.get("body", ""), kw.get("draft", False), kw.get("prerelease", False))
         raise ForgeError(f"unknown request: {f.__name__}{op}")
 
     def close(self):

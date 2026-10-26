@@ -690,45 +690,51 @@ Singleton {
   // ── how the panel describes itself ────────────────────────────────────
   // The order here is the order the sidebar reads, and it is deliberate: the
   // things you look at all day first, the things you set once at the end.
+  // `group`: the sidebar's heading over it (sectionGroups), in order
   readonly property var sections: [
     // FIRST, because it is the one that reaches everything else. Three of
     // these used to sit under Bar — the corner radius, the maximum width and
     // the screen clearance — which was where the code that reads them lives
     // rather than where they apply: every layer in the shell takes all three
     // through Zenon, not just the pill.
-    { id: "look",   label: "Global",        icon: "\uF0AC",
+    { id: "look",   group: "desktop", label: "Global",        icon: "\uF0AC",
       blurb: "what every component shares \u2014 the type, the corners, the surfaces" },
-    { id: "display", label: "Display",      icon: "\uF108",
+    { id: "display", group: "desktop", label: "Display",      icon: "\uF108",
       blurb: "hyprland's monitors \u2014 resolution, refresh, scale, rotation" },
-    { id: "input",  label: "Input",         icon: "\uF11C",
+    { id: "input",  group: "desktop", label: "Input",         icon: "\uF11C",
       blurb: "hyprland's keyboard, mouse, touchpad and tablet \u2014 layout, speed, focus" },
-    { id: "keys",   label: "Shortcuts",     icon: "\uDB81\uDE33",
+    { id: "keys",   group: "desktop", label: "Shortcuts",     icon: "\uDB81\uDE33",
       blurb: "hyprland's key binds \u2014 what each chord does, and which chord it is" },
-    { id: "windows", label: "Windows",      icon: "\uF2D2",
+    { id: "windows", group: "desktop", label: "Windows",      icon: "\uF2D2",
       blurb: "hyprland's window rules \u2014 how each app's windows open \u2014 what starts at login, and the workspace strip" },
-    { id: "bar",    label: "Bar",           icon: "",
+    { id: "bar",    group: "shell", label: "Bar",           icon: "",
       blurb: "morpheus — the pill and what it carries" },
-    { id: "motion", label: "Motion",        icon: "",
+    { id: "motion", group: "shell", label: "Motion",        icon: "",
       blurb: "how long everything in this shell takes" },
-    { id: "notify", label: "Notifications", icon: "",
+    { id: "notify", group: "shell", label: "Notifications", icon: "",
       blurb: "howler — toasts, and what the bell remembers" },
-    { id: "paper",  label: "Background",    icon: "",
+    { id: "paper",  group: "shell", label: "Background",    icon: "",
       blurb: "picasso and argus — the background, screenshots, recordings and the color picker" },
-    { id: "idle",   label: "Idle & lock",   icon: "",
+    { id: "idle",   group: "shell", label: "Idle & lock",   icon: "",
       blurb: "socordia and cerberus — being away from the machine" },
-    { id: "time",   label: "Time & weather", icon: "",
+    { id: "time",   group: "shell", label: "Time & weather", icon: "",
       blurb: "chronos — the clock, the calendar, the forecast" },
-    { id: "system", label: "System",        icon: "",
+    { id: "system", group: "shell", label: "System",        icon: "",
       blurb: "zeus and the update count — what is measured, how often" },
-    { id: "menu",   label: "Desktop menu",  icon: "",
+    { id: "menu",   group: "shell", label: "Desktop menu",  icon: "",
       blurb: "icarus — what right-clicking the desktop offers" },
-    { id: "defaults", label: "Default apps", icon: "\uF009",
+    { id: "defaults", group: "computer", label: "Default apps", icon: "\uF009",
       blurb: "what opens what \u2014 the terminal, the browser, every kind of file" },
-    { id: "health", label: "Health",        icon: "\uF0F1",
+    { id: "health", group: "computer", label: "Health",        icon: "\uF0F1",
       blurb: "a checkup of this shell \u2014 what an audit looks for" },
-    { id: "about",  label: "About",         icon: "",
+    { id: "about",  group: "computer", label: "About",         icon: "",
       blurb: "zenworks — this shell, and the whole of these settings" }
   ]
+
+  // the sidebar's headings (user, 2026-10-27: a sidebar, as macOS' System
+  // Settings has): what the desktop does, what the shell shows, and the
+  // computer around them
+  readonly property var sectionGroups: ({ desktop: "Desktop", shell: "Shell", computer: "This computer" })
 
   // ── THE MARK ──────────────────────────────────────────────────────────
   // The banner at the head of every file in this shell, which spells
@@ -1581,6 +1587,9 @@ Singleton {
 
   // a monitor came or went; the pickers have to say so
   onScreenOptionsChanged: if (root.defaultsTaken) root.buildSchema();
+  // the languages added, or one on its way: their rows come and go
+  onImListChanged: if (root.defaultsTaken) root.buildSchema();
+  onImPendingChanged: if (root.defaultsTaken) root.buildSchema();
 
   // "auto" resolved against where the bar actually is. Oracle cannot import
   // Zenon — Zenon imports Oracle — so the caller passes in what it knows.
@@ -2238,6 +2247,7 @@ Singleton {
   function imValue(key) {
     if (key === "im:on") return root.imOn;
     if (key === "im:key") return root.imKey;
+    if (key === "im:add") return "";
     return root.imList.indexOf(key.slice(3)) >= 0;
   }
   function imEngine(im) {
@@ -2278,6 +2288,7 @@ Singleton {
       return;
     }
     if (s.key === "im:on") { if (v) root.imTurnOn(null); else root.imTurnOff(); return; }
+    if (s.key === "im:add") { const e = root.imEngine(v); if (e) root.imTurnOn(e); return; }
     if (v) { root.imTurnOn(s.engine); return; }
     root.imList = Ora.imItems(root.imList, root.imLayoutNow(), s.engine.im, false);
     root.revision++;
@@ -2350,10 +2361,21 @@ Singleton {
         alias: "fcitx fcitx5 ime",
         help: "Starts fcitx5 now and at every login. Installs it the first time (it asks for your password). Kept in ~/.config/zenworks/hypr/lua/inputmethod.lua." },
     ];
-    for (const e of Ora.IM_ENGINES)
-      out.push({ key: "im:" + e.im, section: "input", type: "bool", im: true, engine: e, fallback: false,
+    // the languages you added, in fcitx5's order (one being installed shows
+    // its ring here), then the dropdown that adds another
+    const added = root.imList.slice();
+    if (root.imPending !== "" && added.indexOf(root.imPending) < 0) added.push(root.imPending);
+    for (const im of added) {
+      const e = root.imEngine(im);
+      if (!e) continue;
+      out.push({ key: "im:" + e.im, section: "input", type: "bool", im: true, engine: e, fallback: true,
         label: e.label, alias: "input method language " + e.im,
-        help: "Installs " + e.pkg + " the first time. Switch between it and your keyboard with the switch key. Kept in ~/.config/fcitx5/profile." });
+        help: "Untick to take it off the list. Switch between it and your keyboard with the switch key. Kept in ~/.config/fcitx5/profile." });
+    }
+    out.push({ key: "im:add", section: "input", type: "enum", im: true, fallback: "",
+      label: "Add a language", options: Ora.imAddable(added), chipW: 220,
+      alias: "input method language chinese japanese korean vietnamese thai hindi tamil bengali arabic persian amharic khmer tibetan " + Ora.IM_ENGINES.map((e) => e.label.toLowerCase()).join(" "),
+      help: "Installs what the language needs the first time (it asks for your password), then adds it to the switch key's list." });
     out.push({ key: "im:key", section: "input", type: "enum", im: true, fallback: Ora.IM_KEY_DEFAULT,
       label: "Switch key", options: Ora.IM_KEYS, alias: "input method trigger toggle",
       help: "Switches between your keyboard and the languages above while typing." });
@@ -2627,7 +2649,8 @@ Singleton {
   }
   Process {
     id: imPkgProc
-    command: ["pacman", "-Qq"].concat(Ora.IM_BASE, Ora.IM_ENGINES.map((e) => e.pkg))
+    command: ["pacman", "-Qq"].concat(Ora.IM_BASE, Ora.IM_ENGINES.map((e) => e.pkg)
+      .filter((p, i, all) => all.indexOf(p) === i))
     stdout: StdioCollector {
       id: imPkgOut
       onStreamFinished: root.imPackages = imPkgOut.text.split("\n").filter((l) => l !== "")

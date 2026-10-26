@@ -32,6 +32,15 @@ Item {
   signal pressed()
   signal listed()
 
+  // WHICH CORNERS ARE ROUND: only the grid's outer ones; where two tiles
+  // meet, the corners are square (user, 2026-10-27). The popup says which
+  // (HermesPopup.cornerRound): [topLeft, topRight, bottomLeft, bottomRight]
+  property var round: [true, true, true, true]
+  readonly property real rTL: t.round[0] ? Zenon.radiusCard : 0
+  readonly property real rTR: t.round[1] ? Zenon.radiusCard : 0
+  readonly property real rBL: t.round[2] ? Zenon.radiusCard : 0
+  readonly property real rBR: t.round[3] ? Zenon.radiusCard : 0
+
   readonly property bool on: !!t.tile && t.tile.on
   readonly property bool ready: !!t.tile && t.tile.ready
   // what is drawn on the tile: onAccent on the fill, the panel's inks off it
@@ -40,7 +49,10 @@ Item {
 
   Rectangle {
     anchors.fill: parent
-    radius: Zenon.radiusCard
+    topLeftRadius: t.rTL
+    topRightRadius: t.rTR
+    bottomLeftRadius: t.rBL
+    bottomRightRadius: t.rBR
     color: t.on ? (tilePress.pressed ? Zenon.mix(Zenon.cyan, Zenon.onAccent, 0.18)
                    : t.picked ? Zenon.mix(Zenon.cyan, Zenon.white, 0.16) : Zenon.cyan)
       : tilePress.pressed ? Zenon.pressTile(false) : Zenon.wash(0.04)
@@ -60,18 +72,22 @@ Item {
     text: t.tile ? t.tile.glyph : ""
     color: t.ink
     font.family: Zenon.glyphFace
-    font.pixelSize: Zenon.px(22)
+    font.pixelSize: Zenon.px(18)
   }
 
-  Column {
+  // ONE LINE (user, 2026-10-27: "these can be one liners"): the name, and
+  // what it is at after it, quieter — "Wired  1 Gb/s"
+  Row {
     anchors.left: disc.right
-    anchors.leftMargin: 11
+    anchors.leftMargin: 10
     anchors.right: chevron.visible ? chevron.left : parent.right
     anchors.rightMargin: 8
     anchors.verticalCenter: parent.verticalCenter
-    spacing: 1
+    spacing: 8
     Text {
-      width: parent.width
+      id: tileTitle
+      anchors.baseline: tileSub.baseline
+      width: Math.min(implicitWidth, parent.width)
       elide: Text.ElideRight
       text: t.tile ? t.tile.title : ""
       color: t.ink
@@ -80,7 +96,9 @@ Item {
       font.pixelSize: Zenon.px(15)
     }
     Text {
-      width: parent.width
+      id: tileSub
+      anchors.verticalCenter: parent.verticalCenter
+      width: Math.max(0, parent.width - tileTitle.width - parent.spacing)
       elide: Text.ElideRight
       text: t.tile ? t.tile.sub : ""
       color: t.subInk
@@ -98,7 +116,7 @@ Item {
   // the grids' flash (morpheus/ChosenFlash), in the tile's own corners:
   // the popup fires it, then the switch is thrown
   readonly property alias flash: tileFlash
-  ChosenFlash { id: tileFlash; radius: Zenon.radiusCard }
+  ChosenFlash { id: tileFlash; topLeftRadius: t.rTL; topRightRadius: t.rTR; bottomLeftRadius: t.rBL; bottomRightRadius: t.rBR }
 
   // the list, past the tile's own switch: on top of it, so it wins
   Item {

@@ -1573,6 +1573,58 @@ def forges_ssh_keys():
 
 
 @test
+def release_notes_pictures_go_to_the_forge():
+    # a file:// picture in the notes: sent as the release is made, its
+    # address put in its place, the notes saved again (2026-10-27)
+    import json as J
+    import github, gitlab, forgejo, rest, tempfile, os
+    d = tempfile.mkdtemp()
+    pic = os.path.join(d, "my shot.png")
+    with open(pic, "wb") as fh:
+        fh.write(b"\x89PNG fake")
+    sent = []
+
+    class Answer:
+        def __init__(self, v): self.v, self.headers = v, {}
+        def read(self): return J.dumps(self.v).encode()
+        def __enter__(self): return self
+        def __exit__(self, *a): pass
+
+    def fake(req, timeout):
+        body = req.data or b""
+        sent.append((req.get_method(), req.full_url, req.get_header("Content-type") or "", body))
+        if "/uploads" in req.full_url and "uploads.github" not in req.full_url:
+            return Answer({"url": "/uploads/ab/x.png", "full_path": "/-/project/1/uploads/ab/x.png"})
+        if req.get_method() in ("PATCH", "PUT") or "/releases" in req.full_url and "assets" not in req.full_url:
+            j = J.loads(body) if body.startswith(b"{") else {}
+            return Answer({"id": 5, "tag_name": "v1", "name": "v1", "body": j.get("body", ""),
+                           "description": j.get("description", "")})
+        return Answer({"id": 1})
+
+    keep = (github.rest.urllib.request.urlopen, github.token, gitlab.token, forgejo.token)
+    github.rest.urllib.request.urlopen = fake
+    github.token = gitlab.token = forgejo.token = lambda: ("t", "keyring")
+    url = "file://" + pic.replace(" ", "%20")
+    try:
+        got = {}
+        for f in (github, forgejo, gitlab):
+            sent.clear()
+            rel = f.create_release("o/r", "v1", "main", "v1", "Look:\n![shot](" + url + ")")
+            got[f.NAME if hasattr(f, "NAME") else "GitHub"] = rest.attach_media(f, "o/r", rel, "Look:\n![shot](" + url + ")")["body"]
+            up = [x for x in sent if "assets" in x[1] or x[1].endswith("/uploads")]
+            eq(len(up), 1, f"{f.__name__}: one upload")
+            eq(b"\x89PNG fake" in up[0][3], True, f"{f.__name__}: the file's bytes sent")
+    finally:
+        (github.rest.urllib.request.urlopen, github.token, gitlab.token, forgejo.token) = keep
+    name = rest.media_name(pic, b"\x89PNG fake")
+    eq(name.startswith("my-shot-") and name.endswith(".png"), True, "a forge-safe name")
+    eq(got["GitHub"], "Look:\n![shot](https://github.com/o/r/releases/download/v1/" + name + ")")
+    eq(got["Codeberg"], "Look:\n![shot](https://codeberg.org/o/r/releases/download/v1/" + name + ")")
+    eq(got["GitLab"], "Look:\n![shot](https://gitlab.com/-/project/1/uploads/ab/x.png)")
+    eq(rest.attach_media(github, "o/r", {"body": "x"}, "no pictures"), {"body": "x"}, "nothing to send, nothing done")
+
+
+@test
 def aur_tag_checked_and_recipe_committed():
     import aur as A
     src = fresh({"a": "1\n"})
