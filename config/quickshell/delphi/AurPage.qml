@@ -98,7 +98,10 @@ Item {
     return e ? e.sha : "";
   }
   readonly property bool pushed: !!pg.head && !!pg.head.oid && pg.remoteSha === pg.head.oid
-  readonly property bool lagging: !!pg.r && pg.pushed && pg.shown !== pg.here
+  // only a recipe with nothing changed since that commit: one whose new
+  // version is not committed yet has its old commit on the AUR, and
+  // nothing there to catch up with (user, 2026-10-26)
+  readonly property bool lagging: !!pg.r && pg.pushed && !pg.dirty && pg.shown !== pg.here
   // the recipe has something the AUR has not: changed here, or committed
   // and not pushed — what Publish is for
   readonly property bool dirty: !!pg.win && !!pg.win.st && (pg.win.st.staged.length + pg.win.st.unstaged.length) > 0
@@ -110,7 +113,7 @@ Item {
     onTriggered: { pg.lagTries++; pg.reload(true); }
   }
   property int lagTries: 0
-  onLaggingChanged: if (pg.lagging) pg.lagTries = 0; else if (pg.lagTries > 0) pg.win.say("The AUR shows " + pg.here + " now")
+  onLaggingChanged: if (pg.lagging) pg.lagTries = 0; else if (pg.lagTries > 0 && pg.shown === pg.here) pg.win.say("The AUR shows " + pg.here + " now")
 
   function setVersion() {
     pg.win.ask({ title: "The version", glyph: "",
