@@ -19,6 +19,8 @@ module.exports = {
     t.eq("regex characters in a title are", H.byTitle("a.b (c)"), "title:^(a\\.b \\(c\\))$");
     t.eq("focus by a selector", H.focusWindow("address:0x1f"),
       'hl.dsp.focus({ window = "address:0x1f" })');
+    t.eq("raised to the top", H.raiseWindow("address:0x1f"),
+      'hl.dsp.window.alter_zorder({ mode = "top", window = "address:0x1f" })');
     t.eq("an address gains its 0x once", H.byAddress("1f"), "address:0x1f");
     t.eq("and keeps the one it has", H.byAddress("0x1f"), "address:0x1f");
     t.eq("a workspace, as the bar wrote it", H.focusWorkspace("3"),

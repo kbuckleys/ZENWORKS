@@ -46,7 +46,7 @@ Item {
   }
   // what is here now, as a bundle's files
   function current() {
-    const rels = ["oracle.json", "hypr/keys.lua", "hypr/wake.lua", "hypr/effects.lua", "hypr/defaults.lua", "hypr/input.lua", "hypr/windows.lua", "hypr/startup.lua", "hypr/monitors.lua"]
+    const rels = ["oracle.json", "hypr/keys.lua", "hypr/wake.lua", "hypr/effects.lua", "hypr/defaults.lua", "hypr/input.lua", "hypr/inputmethod.lua", "hypr/windows.lua", "hypr/startup.lua", "hypr/monitors.lua"]
       .concat(Oracle.themeOptions.filter((o) => o.custom).map((o) => "themes/" + o.value + ".json"));
     const files = {};
     for (const rel of rels) {

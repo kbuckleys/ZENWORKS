@@ -10,12 +10,16 @@
 // so nothing can come between them.
 //
 //     Quickshell.execDetached(OffSpecial.wanted('hl.dsp.workspace.toggle_special("special")'))
+//
+// A list of dispatchers runs them in order in the same eval (the switcher's
+// focus, then raise).
 
 .pragma library
 
 function wanted(dispatcher) {
+  const all = Array.isArray(dispatcher) ? dispatcher : [dispatcher];
   return ["hyprctl", "-q", "eval",
     "local z = rawget(_G, 'zenOffSpecial')\n"
     + "if z and z.want then z.want() end\n"
-    + "hl.dispatch(" + dispatcher + ")\n"];
+    + all.map((d) => "hl.dispatch(" + d + ")\n").join("")];
 }

@@ -616,21 +616,52 @@ FloatingWindow {
     property bool value: false
     width: 24
     height: 24
+    // installing what the row turns on (Input methods' languages): the
+    // tick gives way to a turning ring until Ceres is done
+    readonly property bool busy: !!sw.spec && Oracle.imBusyKey === sw.spec.key
 
     Controls.Check {
       id: box
       anchors.right: parent.right
       anchors.verticalCenter: parent.verticalCenter
+      visible: !sw.busy
       enabled: false
       held: swTap.pressed
       lit: sw.value
       ink: popup.highlight
     }
 
+    Canvas {
+      id: busyRing
+      anchors.centerIn: box
+      width: 18
+      height: 18
+      visible: sw.busy
+      property color ink: popup.highlight
+      onInkChanged: requestPaint()
+      onVisibleChanged: if (visible) requestPaint()
+      onPaint: {
+        const c = getContext("2d");
+        c.reset();
+        c.lineWidth = 2;
+        c.lineCap = "round";
+        c.strokeStyle = Qt.rgba(busyRing.ink.r, busyRing.ink.g, busyRing.ink.b, 0.25);
+        c.beginPath(); c.arc(9, 9, 7, 0, Math.PI * 2); c.stroke();
+        c.strokeStyle = busyRing.ink;
+        c.beginPath(); c.arc(9, 9, 7, -Math.PI / 2, 0); c.stroke();
+      }
+      RotationAnimation on rotation {
+        running: sw.busy
+        loops: Animation.Infinite
+        from: 0; to: 360; duration: Zenon.spin
+      }
+    }
+
     MouseArea {
       id: swTap
       anchors.fill: box
       anchors.margins: -10
+      enabled: !sw.busy
       onClicked: Oracle.set(sw.spec.key, !sw.value)
     }
   }

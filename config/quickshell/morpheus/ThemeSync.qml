@@ -103,6 +103,23 @@ Item {
     face: Zenon.face, mono: Zenon.faceCode,
     px: { text: Zenon.px(16), small: Zenon.px(13), h3: Zenon.px(17), h2: Zenon.px(20), h1: Zenon.px(25) },
     large: Zenon.dialogRadius, small: Zenon.radiusControl })
+  // fcitx5's candidate list (themesync.js), only while oracle's Input
+  // methods is on: written through sh, as its directory may not be there
+  // yet, then a running fcitx5 told to read it again
+  readonly property string fcitxText: Oracle.imOn ? Sync.renderFcitxTheme({
+    name: Zenon.theme.name || Zenon.themeName, card: Zenon.hex(Zenon.card),
+    border: Zenon.hex(Zenon.border), ink: Zenon.hex(Zenon.ink), cyan: Zenon.hex(Zenon.cyan) }) : ""
+  readonly property string fcitxPath: (Quickshell.env("XDG_DATA_HOME") || (Quickshell.env("HOME") + "/.local/share"))
+    + "/fcitx5/themes/default/theme.conf"
+  property string fcitxLast: ""
+  onFcitxTextChanged: settle.restart()
+  function putFcitx() {
+    if (sync.fcitxText === "" || sync.fcitxText === sync.fcitxLast) return;
+    sync.fcitxLast = sync.fcitxText;
+    Quickshell.execDetached(["sh", "-c",
+      "mkdir -p \"${2%/*}\" && printf %s \"$1\" > \"$2.tmp\" && mv -f \"$2.tmp\" \"$2\" && fcitx5-remote --check -r; exit 0",
+      "fcitxtheme", sync.fcitxText, sync.fcitxPath]);
+  }
   // oracle's Font for hyprland's own text — always written, unlike the
   // theme: base.lua's literals are only a first-boot font (themesync.js)
   readonly property string fontText: Sync.renderHyprFont(Zenon.face, Zenon.weight, Zenon.px(14))
@@ -156,6 +173,7 @@ Item {
       sync.put(qt6ctFile, sync.qt6ctText, true);
       // nor for hyprtoolkit: its apps watch the file themselves
       sync.put(toolkitFile, sync.toolkitText, true);
+      sync.putFcitx();
       if (tell.kitty || tell.hypr) tell.restart();
     }
   }

@@ -728,7 +728,9 @@ Singleton {
   function install(pkg, why, done, after) {
     if (root.txBusy || root.installing) return false;
     // one package, or several at once (calypso's QR scan: zbar grim slurp)
-    const pkgs = (Array.isArray(pkg) ? pkg : [pkg]).filter((p) => !!p);
+    // a list that came through a signal is Qt's, not a JS array (oracle's
+    // input methods, 2026-10-26: pacman got "a,b,c" as one name)
+    const pkgs = (typeof pkg === "string" ? [pkg] : Array.from(pkg || [])).filter((p) => !!p).map(String);
     const extra = Array.isArray(after) ? after : [];
     if (pkgs.length === 0 && extra.length === 0) return false;
     root.installing = { pkg: pkgs.join(" "), pkgs: pkgs };

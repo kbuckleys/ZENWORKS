@@ -2060,6 +2060,178 @@ function renderWakeLua(by) {
   ].join("\n");
 }
 
+// ── INPUT METHODS ──
+// fcitx5, for the languages a keyboard layout cannot type: Input's "Input
+// methods" (user, 2026-10-26). hypr/lua/inputmethod.lua `on = true` is
+// read by base.lua (the environment apps need) and autostart.lua (fcitx5
+// at login); off unless the file says true. Which languages and the switch
+// key are fcitx5's own files, ~/.config/fcitx5/profile and config, so its
+// configtool and these rows read the same thing.
+//
+// Never GTK_IM_MODULE or QT_IM_MODULE: on Wayland both push apps off the
+// text-input protocol (oracle/tests/inputmethod.js keeps them out).
+var IM_BASE = ["fcitx5", "fcitx5-qt", "fcitx5-gtk", "fcitx5-configtool"];
+// `im` is fcitx5's name for it, `pkg` what brings it
+var IM_ENGINES = [
+  { im: "pinyin",  label: "Chinese · Pinyin",    pkg: "fcitx5-chinese-addons" },
+  { im: "rime",    label: "Chinese · Rime",      pkg: "fcitx5-rime" },
+  { im: "chewing", label: "Chinese · Zhuyin",    pkg: "fcitx5-chewing" },
+  { im: "mozc",    label: "Japanese",                 pkg: "fcitx5-mozc" },
+  { im: "hangul",  label: "Korean",                   pkg: "fcitx5-hangul" },
+  { im: "unikey",  label: "Vietnamese",               pkg: "fcitx5-unikey" },
+  { im: "libthai", label: "Thai",                     pkg: "fcitx5-libthai" },
+];
+// fcitx5's key names. Not Super+Space: that is Cynosure's, and a bind the
+// compositor holds never reaches fcitx5.
+var IM_KEYS = [
+  { value: "Control+space",       label: "Ctrl+Space" },
+  { value: "Control+Shift+space", label: "Ctrl+Shift+Space" },
+  { value: "Super+Shift+space",   label: "Super+Shift+Space" },
+];
+var IM_KEY_DEFAULT = "Control+space";
+
+function parseImLua(text) {
+  return /\bon\s*=\s*true\b/.test(stripLuaComments(String(text || "")));
+}
+function renderImLua(on) {
+  return [
+    "-- ┌─┐┌─┐┌┐┌┬ ┬┌─┐┬─┐┬┌─┌─┐",
+    "-- ┌─┘├┤ │││││││ │├┬┘├┴┐└─┐",
+    "-- └─┘└─┘┘└┘└┴┘└─┘┴└─┴ ┴└─┘",
+    "-- https://github.com/kbuckleys/",
+    "",
+    "-- INPUT METHODS",
+    "-- Written by oracle's Input section (Input methods), and read back by it.",
+    "-- true: fcitx5 starts at login and apps are told to use it. Which",
+    "-- languages it offers is fcitx5's own ~/.config/fcitx5/profile.",
+    "",
+    "return {",
+    "\ton = " + (on ? "true" : "false") + ",",
+    "}",
+    "",
+  ].join("\n");
+}
+
+// fcitx5's files are ini: [Section] then key=value. Read as sections in
+// file order, each { name, lines } with the lines kept as written, so a
+// file written back keeps what these rows do not know about.
+function parseIni(text) {
+  const out = [{ name: "", lines: [] }];
+  for (const raw of String(text || "").split("\n")) {
+    const m = /^\s*\[(.*)\]\s*$/.exec(raw);
+    if (m) out.push({ name: m[1], lines: [] });
+    else out[out.length - 1].lines.push(raw);
+  }
+  return out;
+}
+function iniValue(lines, key) {
+  for (const l of lines) {
+    const m = /^\s*([^#=][^=]*?)\s*=(.*)$/.exec(l);
+    if (m && m[1] === key) return m[2].trim();
+  }
+  return null;
+}
+function renderIni(sections) {
+  const parts = [];
+  for (const s of sections) {
+    // blank lines at a section's end are its spacing; one is put back
+    const body = s.lines.slice();
+    while (body.length && body[body.length - 1].trim() === "") body.pop();
+    if (s.name === "") { if (body.length) parts.push(body.join("\n")); continue; }
+    parts.push("[" + s.name + "]" + (body.length ? "\n" + body.join("\n") : ""));
+  }
+  return parts.join("\n\n") + "\n";
+}
+
+// The keyboard fcitx5 types plain letters with, from input.lua's first
+// layout and variant: "us", "de-nodeadkeys"
+function imLayout(kbLayout, kbVariant) {
+  const l = String(kbLayout || "").split(",")[0].trim() || "us";
+  const v = String(kbVariant || "").split(",")[0].trim();
+  return v ? l + "-" + v : l;
+}
+
+// profile's first group: { layout, items } — items are fcitx5's input
+// method names in order, "keyboard-us" first
+function parseImProfile(text) {
+  const secs = parseIni(text);
+  const out = { layout: "", items: [] };
+  const g = secs.find((s) => s.name === "Groups/0");
+  if (g) out.layout = iniValue(g.lines, "Default Layout") || "";
+  const items = secs
+    .map((s) => ({ m: /^Groups\/0\/Items\/(\d+)$/.exec(s.name), s: s }))
+    .filter((x) => x.m)
+    .sort((a, b) => Number(a.m[1]) - Number(b.m[1]));
+  for (const x of items) {
+    const n = iniValue(x.s.lines, "Name");
+    if (n) out.items.push(n);
+  }
+  return out;
+}
+
+// The items with `im` turned on or off. The keyboard comes first, always
+// — it is what fcitx5 types with when no language is switched on — and is
+// the layout's; any other the configtool added stays where it is.
+function imItems(items, layout, im, on) {
+  const kb = "keyboard-" + layout;
+  const rest = (items || []).filter((n) => !/^keyboard-/.test(n) && n !== im);
+  if (on && im) rest.push(im);
+  return [kb].concat(rest);
+}
+
+function renderImProfile(layout, items) {
+  const its = items && items.length ? items : ["keyboard-" + layout];
+  const lines = [
+    "[Groups/0]",
+    "Name=Default",
+    "Default Layout=" + layout,
+    "DefaultIM=" + its[its.length - 1],
+    "",
+  ];
+  its.forEach((n, i) => lines.push("[Groups/0/Items/" + i + "]", "Name=" + n, "Layout=", ""));
+  lines.push("[GroupOrder]", "0=Default", "");
+  return lines.join("\n");
+}
+
+// The switch key: config's [Hotkey/TriggerKeys] first entry
+function parseImKey(text) {
+  const s = parseIni(text).find((x) => x.name === "Hotkey/TriggerKeys");
+  const v = s ? iniValue(s.lines, "0") : null;
+  return v || IM_KEY_DEFAULT;
+}
+// config with the switch key set and everything else as it was
+function setImKey(text, key) {
+  const secs = parseIni(text);
+  let s = secs.find((x) => x.name === "Hotkey/TriggerKeys");
+  if (!s) { s = { name: "Hotkey/TriggerKeys", lines: [] }; secs.push(s); }
+  s.lines = ["0=" + key];
+  return renderIni(secs);
+}
+
+// One key set in an ini, the rest as it was; section "" is the top, before
+// any [Section] (where classicui.conf keeps everything)
+function setIniKey(text, section, key, value) {
+  const secs = parseIni(text);
+  let s = secs.find((x) => x.name === section);
+  if (!s) { s = { name: section, lines: [] }; secs.push(s); }
+  const at = s.lines.findIndex((l) => { const m = /^\s*([^#=][^=]*?)\s*=/.exec(l); return m && m[1] === key; });
+  if (at >= 0) s.lines[at] = key + "=" + value;
+  else {
+    let end = s.lines.length;
+    while (end > 0 && s.lines[end - 1].trim() === "") --end;
+    s.lines.splice(end, 0, key + "=" + value);
+  }
+  return renderIni(secs);
+}
+
+// fcitx5's tray icon as its own drawn text ("en", "拼") rather than a theme
+// icon by name: it asks for input-keyboard-symbolic and the like, which the
+// shell has no icon theme for (2026-10-26), and the tray's ink tint reads
+// the text's white as ink and its dark rim as faint
+function imClassicUi(text) {
+  return setIniKey(text, "", "PreferTextIcon", "True");
+}
+
 // ── EFFECTS ──
 // hyprland's window shadows and animations: hypr/lua/effects.lua,
 // `shadows = false` / `animations = false`, Look's "Window shadows" and
@@ -2599,10 +2771,12 @@ function chordTaken(chord, id, binds, values, live) {
 // only: no notes, no screen time, no passwords. A bundle names its files
 // by these relative paths, and nothing outside them is ever written back.
 const BUNDLE_FIXED = ["oracle.json", "hypr/keys.lua", "hypr/wake.lua", "hypr/effects.lua", "hypr/defaults.lua",
-                      "hypr/input.lua", "hypr/windows.lua", "hypr/startup.lua", "hypr/monitors.lua"];
+                      "hypr/input.lua", "hypr/inputmethod.lua", "hypr/windows.lua", "hypr/startup.lua",
+                      "hypr/monitors.lua"];
 const BUNDLE_WORDS = { "oracle.json": "Settings", "hypr/keys.lua": "Shortcuts", "hypr/wake.lua": "Wake by",
                        "hypr/effects.lua": "Window shadows and animations",
                        "hypr/defaults.lua": "Default apps", "hypr/input.lua": "Keyboard and mouse",
+                       "hypr/inputmethod.lua": "Input methods",
                        "hypr/windows.lua": "Window rules", "hypr/startup.lua": "Startup apps",
                        "hypr/monitors.lua": "Screen arrangement" };
 function bundlePathOk(rel) {
@@ -2663,6 +2837,7 @@ function sanitizeBundleFile(rel, text, binds) {
       return renderKeysLua(v, b);
     }
     case "hypr/wake.lua": return renderWakeLua(parseWakeLua(t));
+    case "hypr/inputmethod.lua": return renderImLua(parseImLua(t));
     case "hypr/effects.lua": return renderEffectsLua(parseEffectsLua(t));
     case "hypr/defaults.lua": return renderDefaultsLua(parseDefaultsLua(t));
     case "hypr/input.lua": {

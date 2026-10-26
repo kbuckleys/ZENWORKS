@@ -35,6 +35,16 @@ Scope {
     function onUpdateAsked() { Ceres.openWindow("updates"); }
   }
 
+  // ── INPUT METHODS (oracle's Input) ─────────────────────────────────
+  // fcitx5 and a language's engine, installed the first time a row is
+  // turned on; Oracle carries on (or puts the row back) once Ceres ends
+  Connections {
+    target: Oracle
+    function onImInstallAsked(pkgs, why) {
+      if (!Ceres.install(pkgs, why, (ok) => Oracle.imInstalled(ok))) Oracle.imInstalled(false);
+    }
+  }
+
   // ── THE TERMINAL SETUP (oracle/ZshSetup.qml) ───────────────────────
   // asked once at the first start; Default apps › Terminal setup after
   ZshSetup { id: zshSetup }

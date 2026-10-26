@@ -38,6 +38,8 @@ hl.on("hyprland.start", function()
         .. "&& exec ssh-agent -D -a \"$SSH_AUTH_SOCK\"'")
     hl.exec_cmd("wl-paste --type text --watch cliphist store")
     hl.exec_cmd("wl-paste --type image --watch cliphist store")
+    -- fcitx5, when base.lua found Input methods on and it installed
+    if ZENWORKS.inputMethod then hl.exec_cmd("fcitx5 -d --replace") end
 
     -- YOURS: startup.lua, which oracle's Windows section writes (Startup
     -- apps). The ones that are on, each `delay` seconds after this. Guarded

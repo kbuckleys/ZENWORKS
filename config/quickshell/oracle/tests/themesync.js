@@ -133,6 +133,12 @@ module.exports = {
     t.match("corner: the number, in a table", S.renderCornerLua(12), /^return \{ rounding = 12 \}$/m);
     t.match("corner: 0 is square", S.renderCornerLua(0), /rounding = 0 \}/);
     t.match("corner: no number is 0, a fraction rounded", S.renderCornerLua("x") + S.renderCornerLua(4.6), /rounding = 0 \}[\s\S]*rounding = 5 \}/);
+    const fx = S.renderFcitxTheme({ name: "Latte", card: "#e6e9ef", border: "#ccd0da", ink: "#4c4f69", cyan: "#179299" });
+    t.match("fcitx: the panel is the card", fx, /^\[InputPanel\/Background\]\nColor=#e6e9ef\nBorderColor=#ccd0da$/m);
+    t.match("fcitx: the cursor is the card tinted 16% cyan", fx, /^\[InputPanel\/Highlight\]\nColor=#c5dbe1$/m);
+    t.match("fcitx: candidates in the ink", fx, /^NormalColor=#4c4f69$/m);
+    t.ok("fcitx: every line a comment, a [section], key=value or blank", fx.split("\n")
+      .every((l) => l === "" || /^# /.test(l) || /^\[[A-Za-z\/]+\]$/.test(l) || /^[A-Za-z]+=\S/.test(l)));
     const fk = { face: "SF Pro Text", mono: "SF Mono", large: 10, small: 4,
                  px: { text: 16, small: 13, h3: 17, h2: 20, h1: 25 } };
     const hk = S.renderHyprtoolkit(LATTE, true, fk);

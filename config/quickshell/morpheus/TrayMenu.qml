@@ -73,7 +73,7 @@ CardMenu {
       const e = kids[i];
       out.push({
         text: e.text || "",
-        image: e.icon || "",
+        image: root.iconOrNone(e.icon),
         hasChildren: e.hasChildren || false,
         isSeparator: e.isSeparator || false,
         enabled: e.enabled !== false,
@@ -81,6 +81,15 @@ CardMenu {
       });
     }
     return out;
+  }
+
+  // An entry's icon named from a theme the shell does not have (fcitx5's
+  // view-refresh, application-exit: 2026-10-26) is no icon, rather than an
+  // empty slot and a warning. One with ?path= is looked up in the app's own
+  // icon directory, which iconPath does not search, so it is left alone.
+  function iconOrNone(u) {
+    const m = /^image:\/\/icon\/([^?]+)$/.exec(u || "");
+    return m && Quickshell.iconPath(m[1], true) === "" ? "" : (u || "");
   }
 
   // The entry behind a row, for the handlers below.

@@ -100,6 +100,21 @@ hl.env("QT_QPA_PLATFORMTHEME", "qt6ct")
 -- beside this config, the shell's font and theme, then your custom.conf.
 hl.env("KITTY_CONFIG_DIRECTORY", ZENWORKS.kitty)
 
+-- INPUT METHODS: fcitx5, when oracle's Input methods is on (inputmethod.lua)
+-- and fcitx5 is installed; autostart.lua starts it. Qt apps try the Wayland
+-- text-input protocol first and fcitx5's own module after; apps under
+-- XWayland find it through XMODIFIERS. GTK and kitty need nothing.
+-- NEVER GTK_IM_MODULE or QT_IM_MODULE: on Wayland they push apps off
+-- text-input (oracle/tests/inputmethod.js). Guarded like defaults.lua.
+local okIm, im = pcall(require, "lua.inputmethod")
+local fcitx = io.open("/usr/bin/fcitx5", "r")
+if fcitx then fcitx:close() end
+ZENWORKS.inputMethod = okIm and type(im) == "table" and im.on == true and fcitx ~= nil
+if ZENWORKS.inputMethod then
+	hl.env("QT_IM_MODULES", "wayland;fcitx")
+	hl.env("XMODIFIERS", "@im=fcitx")
+end
+
 -- THE DESKTOP'S NAME, as `zen` exports it — set again here in case
 -- Hyprland put its own over it as it started: xdg-desktop-portal picks
 -- zenworks-portals.conf by it, and autostart.lua's import hands it on.

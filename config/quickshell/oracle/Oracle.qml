@@ -1559,6 +1559,12 @@ Singleton {
       }
       out.push(is[i]);
     }
+    // Input methods' rows, under the devices'. Their defaults are fixed.
+    const ims = root.imSpecs();
+    for (let i = 0; i < ims.length; ++i) {
+      if (Ora.stored(ims[i])) d[ims[i].key] = ims[i].fallback;
+      out.push(ims[i]);
+    }
     // The binds' rows. Their defaults are binds.lua's own chords.
     const ks = root.keysSpecs();
     for (let i = 0; i < ks.length; ++i) {
@@ -1616,6 +1622,7 @@ Singleton {
       return g.length + (g.length === 1 ? " bind" : " binds") + (moved ? " \u00b7 " + moved + " changed" : "");
     }
     if (key.indexOf("inputHead:") === 0) return Ora.inputDeviceText(root.inputDevices, key.slice(10));
+    if (key === "imHead") return root.imWaiting ? "installing…" : root.imOn ? "on" : "off";
     if (key.indexOf("display:") === 0) {
       const m = root.displayByName(key.split(":")[1]);
       if (!m) return "";
@@ -1737,6 +1744,7 @@ Singleton {
     if (String(key).indexOf("display:") === 0) return root.displayValues[key];
     if (String(key).indexOf("default:") === 0) return root.appDefaults[key];
     if (String(key).indexOf("input:") === 0) return root.inputValues[key];
+    if (String(key).indexOf("im:") === 0) return root.imValue(key);
     if (String(key).indexOf("bind:") === 0) return root.keyValues[key];
     return root[key];
   }
@@ -1747,6 +1755,7 @@ Singleton {
     if (s.display) { root.setDisplay(s, value); return; }
     if (s.appDefault) { root.setAppDefault(s, value); return; }
     if (s.input) { root.setInput(s, value); return; }
+    if (s.im) { root.setIm(s, value); return; }
     if (s.bindKey) { root.setBind(s, value); return; }
     if (s.hyprFile === "effects") { root.setEffect(key, value); return; }
     if (s.hyprFile) { root.setWakeBy(value); return; }
@@ -1868,6 +1877,7 @@ Singleton {
     if (key === "actionDisplayScan") { root.scanDisplays(); return; }
     if (key === "actionAppsScan") { root.scanApps(); return; }
     if (key === "actionInputScan") { root.scanInputDevices(); return; }
+    if (key === "actionImSettings") { root.imSettings(); return; }
     if (key === "actionReload") { root.reloadFromDisk(); return; }
     if (key === "actionSaveFollow") { root.nameFollowRequested(); return; }
     if (key === "actionResetSection") { root.resetSection(context); return; }
@@ -2207,6 +2217,151 @@ Singleton {
     wakeFile.setText(Ora.renderWakeLua(by));
     reloadHypr.restart();
   }
+
+  // ── INPUT METHODS ── fcitx5, see Ora's INPUT METHODS. On/off is
+  // hypr/lua/inputmethod.lua; the languages and the switch key are fcitx5's
+  // own profile and config, read back so its configtool and these rows agree.
+  property bool imOn: false
+  property var imList: []                     // the profile's items, in order
+  property string imKey: Ora.IM_KEY_DEFAULT
+  property var imPackages: []                 // which of fcitx5's are installed
+  property bool imWaiting: false              // Ceres is installing for a row
+  property string imPending: ""               // that row's engine, "" for fcitx5 alone
+  // the row whose tick is a turning ring while Ceres installs for it
+  readonly property string imBusyKey: root.imWaiting ? (root.imPending !== "" ? "im:" + root.imPending : "im:on") : ""
+  readonly property string imDir: root.configHome + "/fcitx5"
+  signal imInstallAsked(var pkgs, string why)
+
+  function imLayoutNow() {
+    return Ora.imLayout(root.inputValues["input:kb_layout"], root.inputValues["input:kb_variant"]);
+  }
+  function imValue(key) {
+    if (key === "im:on") return root.imOn;
+    if (key === "im:key") return root.imKey;
+    return root.imList.indexOf(key.slice(3)) >= 0;
+  }
+  function imEngine(im) {
+    return Ora.IM_ENGINES.find((e) => e.im === im) || null;
+  }
+  function imRefresh() {
+    imClassicFile.reload();
+    imProfileFile.reload();
+    imConfigFile.reload();
+    if (!imPkgProc.running) imPkgProc.running = true;
+  }
+  // Written through sh, as fcitx5 has no directory until something writes
+  // one, and in a .tmp first so fcitx5 never reads half a file. `then`:
+  // "reload" tells a running fcitx5 to read it again, "start" (re)starts it.
+  // A START STOPS THE OLD ONE BEFORE WRITING: fcitx5 saves its profile as it
+  // exits, and one without the new engine loaded saved over ours, leaving
+  // only the keyboard (2026-10-26) — so it is gone first, then the file.
+  // A start also writes classicui.conf's text tray icon (Ora.imClassicUi).
+  function imWrite(path, text, then) {
+    const start = then === "start";
+    Quickshell.execDetached(["sh", "-c",
+      "put() { mkdir -p \"${2%/*}\" && printf %s \"$1\" > \"$2.tmp\" && mv -f \"$2.tmp\" \"$2\"; }; "
+      + "if [ \"$2\" = start ] && fcitx5-remote --check; then fcitx5-remote -e; i=0; "
+      + "while pgrep -u \"$(id -u)\" -x fcitx5 >/dev/null && [ $i -lt 50 ]; do sleep 0.1; i=$((i+1)); done; fi; "
+      + "put \"$1\" \"$3\" || exit 1; [ -n \"$5\" ] && put \"$4\" \"$5\"; "
+      + "case $2 in reload) fcitx5-remote --check -r ;; start) fcitx5 -d --replace ;; esac; exit 0",
+      "imwrite", text, then || "", path,
+      start ? Ora.imClassicUi(imClassicFile.text()) : "", start ? root.imDir + "/conf/classicui.conf" : ""]);
+  }
+
+  function setIm(s, value) {
+    const v = Ora.coerce(s, value);
+    if (Ora.same(root.imValue(s.key), v)) return;
+    if (s.key === "im:key") {
+      root.imKey = v;
+      root.revision++;
+      root.imWrite(root.imDir + "/config", Ora.setImKey(imConfigFile.text(), v), "reload");
+      return;
+    }
+    if (s.key === "im:on") { if (v) root.imTurnOn(null); else root.imTurnOff(); return; }
+    if (v) { root.imTurnOn(s.engine); return; }
+    root.imList = Ora.imItems(root.imList, root.imLayoutNow(), s.engine.im, false);
+    root.revision++;
+    root.imWrite(root.imDir + "/profile", Ora.renderImProfile(root.imLayoutNow(), root.imList), "reload");
+  }
+  // fcitx5 and an engine are installed the first time a row asks for them,
+  // through Ceres (OracleManager answers imInstallAsked with imInstalled)
+  function imTurnOn(engine) {
+    if (root.imWaiting) { root.revision++; return; }
+    const need = Ora.IM_BASE.concat(engine ? [engine.pkg] : [])
+      .filter((p) => root.imPackages.indexOf(p) < 0);
+    if (need.length > 0) {
+      root.imWaiting = true;
+      root.imPending = engine ? engine.im : "";
+      root.revision++;
+      root.imInstallAsked(need, engine ? "to type " + engine.label : "for input methods");
+      return;
+    }
+    root.imApply(engine);
+  }
+  function imInstalled(ok) {
+    const engine = root.imEngine(root.imPending);
+    root.imWaiting = false;
+    root.imPending = "";
+    root.revision++;
+    if (!imPkgProc.running) imPkgProc.running = true;
+    if (ok) root.imApply(engine, true);
+  }
+  // `fresh`: something was just installed. fcitx5 loads its engines only as
+  // it starts, and a reload does not look again (2026-10-26: Pinyin
+  // installed under a running fcitx5 left Ctrl+Space nothing to switch to)
+  function imApply(engine, fresh) {
+    const layout = root.imLayoutNow();
+    root.imList = Ora.imItems(root.imList, layout, engine ? engine.im : "", !!engine);
+    const starting = !root.imOn;
+    root.imOn = true;
+    root.revision++;
+    root.imWrite(root.imDir + "/profile", Ora.renderImProfile(layout, root.imList),
+      starting || fresh ? "start" : "reload");
+    if (starting) {
+      imFile.setText(Ora.renderImLua(true));
+      reloadHypr.restart();
+    }
+  }
+  // the environment base.lua set stays until you log out; with fcitx5 gone,
+  // apps fall back to typing as they always did
+  function imTurnOff() {
+    root.imOn = false;
+    root.revision++;
+    imFile.setText(Ora.renderImLua(false));
+    Quickshell.execDetached(["sh", "-c", "fcitx5-remote --check -e; exit 0"]);
+    reloadHypr.restart();
+  }
+  function imSettings() {
+    if (root.imPackages.indexOf("fcitx5-configtool") < 0) {
+      Quickshell.execDetached(["notify-send", "-a", "oracle", "Input methods",
+        "Turn on Input methods first: that installs fcitx5 and its settings."]);
+      return;
+    }
+    Quickshell.execDetached(["fcitx5-configtool"]);
+  }
+
+  // the rows, after the devices'
+  function imSpecs() {
+    const out = [
+      { key: "imHead", section: "input", type: "info", label: "Input methods",
+        alias: "input methods fcitx fcitx5 ime ibus chinese japanese korean vietnamese thai pinyin",
+        help: "For languages a keyboard layout cannot type. fcitx5 turns what you type into the language's characters, with a list to choose from. Apps already open need a restart to use it." },
+      { key: "im:on", section: "input", type: "bool", im: true, fallback: false, label: "Use input methods",
+        alias: "fcitx fcitx5 ime",
+        help: "Starts fcitx5 now and at every login. Installs it the first time (it asks for your password). Kept in ~/.config/zenworks/hypr/lua/inputmethod.lua." },
+    ];
+    for (const e of Ora.IM_ENGINES)
+      out.push({ key: "im:" + e.im, section: "input", type: "bool", im: true, engine: e, fallback: false,
+        label: e.label, alias: "input method language " + e.im,
+        help: "Installs " + e.pkg + " the first time. Switch between it and your keyboard with the switch key. Kept in ~/.config/fcitx5/profile." });
+    out.push({ key: "im:key", section: "input", type: "enum", im: true, fallback: Ora.IM_KEY_DEFAULT,
+      label: "Switch key", options: Ora.IM_KEYS, alias: "input method trigger toggle",
+      help: "Switches between your keyboard and the languages above while typing." });
+    out.push({ key: "actionImSettings", section: "input", type: "action", verb: "Open",
+      label: "More settings", alias: "fcitx5 configtool input method",
+      help: "fcitx5's own settings: more languages, the candidate list, punctuation." });
+    return out;
+  }
   // hypr/lua/effects.lua: hyprland's shadows and animations, and the
   // windows' gaps, border, layout, edges, dim and opacity — see Ora's
   // EFFECTS. Each setting's spec names its field (`fx`).
@@ -2427,6 +2582,59 @@ Singleton {
   }
 
   FileView {
+    id: imFile
+    path: root.hyprLuaDir + "/inputmethod.lua"
+    blockLoading: true
+    printErrors: false
+    watchChanges: true
+    onFileChanged: reload()
+    // FileView's own write never fires loaded: imApply/imTurnOff set imOn
+    onLoaded: {
+      const on = Ora.parseImLua(imFile.text());
+      if (on !== root.imOn) { root.imOn = on; root.revision++; }
+    }
+    onLoadFailed: root.imOn = false
+  }
+  FileView {
+    id: imProfileFile
+    path: root.imDir + "/profile"
+    blockLoading: true
+    printErrors: false
+    watchChanges: true
+    onFileChanged: reload()
+    onLoaded: { root.imList = Ora.parseImProfile(imProfileFile.text()).items; root.revision++; }
+    onLoadFailed: root.imList = []
+  }
+  FileView {
+    id: imConfigFile
+    path: root.imDir + "/config"
+    blockLoading: true
+    printErrors: false
+    watchChanges: true
+    onFileChanged: reload()
+    onLoaded: { root.imKey = Ora.parseImKey(imConfigFile.text()); root.revision++; }
+    onLoadFailed: root.imKey = Ora.IM_KEY_DEFAULT
+  }
+  // read only to keep what the configtool put beside PreferTextIcon;
+  // watched, so a start never writes back an older copy of it
+  FileView {
+    id: imClassicFile
+    path: root.imDir + "/conf/classicui.conf"
+    blockLoading: true
+    printErrors: false
+    watchChanges: true
+    onFileChanged: reload()
+  }
+  Process {
+    id: imPkgProc
+    command: ["pacman", "-Qq"].concat(Ora.IM_BASE, Ora.IM_ENGINES.map((e) => e.pkg))
+    stdout: StdioCollector {
+      id: imPkgOut
+      onStreamFinished: root.imPackages = imPkgOut.text.split("\n").filter((l) => l !== "")
+    }
+  }
+
+  FileView {
     id: effectsFile
     path: root.hyprLuaDir + "/effects.lua"
     blockLoading: true
@@ -2640,6 +2848,7 @@ Singleton {
   }
 
   function scanInputDevices() {
+    root.imRefresh();
     if (inputDevProc.running) return;
     inputDevProc.running = true;
   }

@@ -172,8 +172,11 @@ PanelWindow {
   function finish(go) {
     idle.stop();
     const w = sw.windows[sw.at];
-    if (go && sw.open && w && !(Hyprland.activeToplevel && Hyprland.activeToplevel.address === w.address))
-      Quickshell.execDetached(Off.wanted(Hypr.focusWindow(Hypr.byAddress(w.address))));
+    // focused AND raised: focus alone left a window under the floating ones
+    // over it (user, 2026-10-26). Raised even when it already has the focus.
+    if (go && sw.open && w)
+      Quickshell.execDetached(Off.wanted([Hypr.focusWindow(Hypr.byAddress(w.address)),
+                                          Hypr.raiseWindow(Hypr.byAddress(w.address))]));
     sw.open = false;
     sw.shown = false;
     sw.pendingCommit = 0;

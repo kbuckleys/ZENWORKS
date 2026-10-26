@@ -462,3 +462,37 @@ function renderQt6ct(schemePath) {
            "style=Fusion", "");
   return out.join("\n");
 }
+
+// ── fcitx5's candidate list ─────────────────────────────────────────────
+// Written as the user's theme named "default", which shadows fcitx5's own
+// of that name: no classicui.conf to edit, and a theme picked in its
+// configtool still wins. Only while oracle's Input methods is on
+// (ThemeSync). The card, its border and the menu cursor's tint, as the
+// shell's own menus have them; the text is fontconfig's Sans, which is
+// oracle's Font (renderFontconfig).
+function renderFcitxTheme(c) {
+  const k = (s) => "#" + rgb(c[s]);
+  const hi = "#" + mix(c.card, c.cyan, 0.16);
+  const margin = (n) => ["Left=" + n, "Right=" + n, "Top=" + n, "Bottom=" + n];
+  const sec = (name, lines) => ["[" + name + "]"].concat(lines, [""]);
+  return HEAD.map((l) => "# " + l).concat(
+    ["", "# Written by the shell (morpheus/ThemeSync.qml) whenever its theme",
+     "# changes, while Input methods is on. Edits here are overwritten.",
+     "# " + (c.name || "theme"), ""],
+    sec("Metadata", ["Name=Zenworks", "Version=1", "Author=Zenworks",
+                     "Description=The shell's theme", "ScaleWithDPI=True"]),
+    sec("InputPanel", ["NormalColor=" + k("ink"), "HighlightCandidateColor=" + k("ink"),
+                       "HighlightColor=" + k("ink"), "HighlightBackgroundColor=" + hi,
+                       "Spacing=4", "EnableBlur=False", "FullWidthHighlight=True"]),
+    sec("InputPanel/TextMargin", margin(6)),
+    sec("InputPanel/Background", ["Color=" + k("card"), "BorderColor=" + k("border"), "BorderWidth=1"]),
+    sec("InputPanel/Background/Margin", margin(2)),
+    sec("InputPanel/Highlight", ["Color=" + hi]),
+    sec("InputPanel/Highlight/Margin", margin(6)),
+    sec("Menu", ["NormalColor=" + k("ink"), "HighlightCandidateColor=" + k("ink"), "Spacing=3"]),
+    sec("Menu/Background", ["Color=" + k("card"), "BorderColor=" + k("border"), "BorderWidth=1"]),
+    sec("Menu/Highlight", ["Color=" + hi]),
+    sec("Menu/Separator", ["Color=" + k("border")]),
+    sec("Menu/ContentMargin", margin(2)),
+    sec("Menu/TextMargin", margin(6))).join("\n");
+}
