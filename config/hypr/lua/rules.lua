@@ -92,4 +92,4 @@ for _, r in ipairs(yours) do pcall(apply, r) end
 -- setprop: hyprland re-runs the rules when a tag comes or goes, so taking
 -- it off gives each window back exactly what its own rules said, where a
 -- set opacity cannot be unset. Last, so it wins over an opacity rule above.
-hl.window_rule({ match = { tag = "zen-peek" }, opacity = "0.5" })
+hl.window_rule({ match = { tag = "zen-peek" }, opacity = "0.75" })
