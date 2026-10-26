@@ -47,12 +47,6 @@ QtObject {
     return Quickshell.env("XDG_DATA_HOME") || Paths.home() + "/.local/share";
   }
 
-  // Where state that should outlive a cache lives: Zenworks' own notes for
-  // ./uninstall (zenworks/) are here.
-  function stateDir() {
-    return Quickshell.env("XDG_STATE_HOME") || Paths.home() + "/.local/state";
-  }
-
   // Where other programs' configuration lives, for the times this shell reads
   // someone else's file rather than its own — hermes takes its icon map
   // straight out of the yazi flavor instead of keeping a second copy of it.

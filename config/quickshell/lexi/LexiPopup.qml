@@ -995,25 +995,20 @@ LayerPopup {
     popup.liveSentSeq = seq;
     const rq = Lexicon.translateRequest(split.text, code, split.source);
 
-    let req = new XMLHttpRequest();
-    req.open("POST", rq.url);
-    req.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
-    req.onreadystatechange = () => {
-      if (req.readyState !== XMLHttpRequest.DONE) return;
+    Lexicon.postForm(rq, (status, body) => {
       if (seq !== popup.liveSeq) return;
       popup.liveDoneSeq = seq;
-      if (req.status !== 200) {
+      if (status !== 200) {
         popup.live = { error: true };
         return;
       }
-      const parsed = Lexicon.parseTranslateResponse(req.responseText);
+      const parsed = Lexicon.parseTranslateResponse(body);
       if (parsed) {
         popup.transCache = Lexicon.cachePut(popup.transCache, key, parsed);
         popup.saveTransCache();
       }
       popup.live = parsed || { error: true };
-    };
-    req.send(rq.body);
+    });
   }
 
   function targetLangCode() {
@@ -1106,14 +1101,10 @@ LayerPopup {
     const seq = ++popup.liveSeq;
     const rq = Lexicon.translateRequest(text, code, source);
 
-    let req = new XMLHttpRequest();
-    req.open("POST", rq.url);
-    req.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
-    req.onreadystatechange = () => {
-      if (req.readyState !== XMLHttpRequest.DONE) return;
+    Lexicon.postForm(rq, (status, body) => {
       if (seq !== popup.liveSeq) return;
-      const parsed = req.status === 200
-        ? Lexicon.parseTranslateResponse(req.responseText) : null;
+      const parsed = status === 200
+        ? Lexicon.parseTranslateResponse(body) : null;
       if (!parsed) {
         // the stale rule again: a translation you have seen before is a
         // better answer to "no connection" than the words "no connection"
@@ -1129,8 +1120,7 @@ LayerPopup {
         popup.transHist, code, source, text, parsed.translation);
       writer.write(Lexicon.transHistoryPath(),
         Lexicon.serializeTransHistory(popup.transHist));
-    };
-    req.send(rq.body);
+    });
   }
 
   function retranslateHistory(entry) {

@@ -2206,11 +2206,39 @@ const RULE_ORDER = ["name", "class", "title", "on", "float", "size", "center", "
 // tail, or the rule would only ever match the one window it was picked
 // from; rules.lua lets any such tail match again.
 function stableClass(cls) { return String(cls || "").replace(/_\d+_\d+$/, ""); }
-function blankWindowRule(cls, name) {
-  return { name: String(name || cls || ""), class: stableClass(cls), title: "", on: true,
+function blankWindowRule(cls, name, title) {
+  return { name: String(name || cls || ""), class: stableClass(cls), title: String(title || ""), on: true,
            float: false, size: "", center: false, workspace: "", silent: false, opacity: 100,
            pin: false, no_blur: false, idle_inhibit: "", open: "", no_initial_focus: false,
            persistent_size: false, shipped: "" };
+}
+// The suite's own windows all share quickshell's class and differ only by
+// title ("terminus", "plato", "picasso-view" — each Window's title:), so the
+// picker lists them a window each and a rule picked from one carries its
+// title; rules.lua matches that title whole, so "terminus" is not
+// "terminus-picker". Any other app is one row, title left out: its titles
+// change (a browser's tab, a file's name), its class does not.
+const SHELL_CLASS = "org.quickshell";
+// hyprctl clients -j → [{ cls, title, name }] by name; `shipped` names the
+// suite's windows (its rule for that title), nameOf(cls) the rest
+function windowPickRows(clients, shipped, nameOf) {
+  const seen = {}, out = [];
+  for (const c of (clients || [])) {
+    const cls = stableClass(c.class || c.initialClass || "");
+    if (!cls) continue;
+    const shell = cls === SHELL_CLASS;
+    const title = String((shell ? c.initialTitle || c.title : c.title) || "");
+    const key = shell ? cls + "\n" + title : cls;
+    if (seen[key]) continue;
+    seen[key] = true;
+    let name = nameOf ? nameOf(cls) : cls;
+    if (shell && title) {
+      const own = (shipped || []).find((d) => d.class === SHELL_CLASS && d.title === title);
+      name = own && own.name ? own.name : title.charAt(0).toUpperCase() + title.slice(1);
+    }
+    out.push({ cls: cls, title: title, pin: shell ? title : "", name: name });
+  }
+  return out.sort((a, b) => a.name.localeCompare(b.name));
 }
 // a rule as read, with every field there and in range
 function normWindowRule(r) {

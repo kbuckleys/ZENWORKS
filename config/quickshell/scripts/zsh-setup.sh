@@ -26,6 +26,13 @@ here=$(dirname "$(readlink -f "$0")")
 shipped=$(readlink -f "$here/../../zsh")
 set -- "${1:-}"
 
+# whether $1 is user $2's login shell: by where it leads, so a shell set as
+# /bin/zsh (Arch's /bin is /usr/bin) counts as the /usr/bin/zsh found here
+is_login() {
+	cur=$(getent passwd "$2" | cut -d: -f7)
+	[ -n "$cur" ] && [ "$(readlink -f "$cur")" = "$(readlink -f "$1")" ]
+}
+
 case $1 in
 check)
 	if cmp -s "$shipped/zshrc" "$HOME/.zshrc" && cmp -s "$shipped/p10k.zsh" "$HOME/.p10k.zsh"; then
@@ -41,7 +48,7 @@ check)
 	done
 	echo "missing:$missing"
 	z=$(command -v zsh 2>/dev/null)
-	if [ -n "$z" ] && [ "$(getent passwd "$(id -un)" | cut -d: -f7)" = "$z" ]; then echo "login: yes"; else echo "login: no"; fi
+	if [ -n "$z" ] && is_login "$z" "$(id -un)"; then echo "login: yes"; else echo "login: no"; fi
 	;;
 apply)
 	[ -f "$shipped/zshrc" ] && [ -f "$shipped/p10k.zsh" ] || { echo "no shipped zsh setup at $shipped" >&2; exit 1; }
@@ -61,7 +68,7 @@ apply)
 login)
 	z=$(command -v zsh) || { echo "zsh is not installed" >&2; exit 1; }
 	me=$(id -un)
-	if [ "$(getent passwd "$me" | cut -d: -f7)" != "$z" ]; then
+	if ! is_login "$z" "$me"; then
 		grep -qx "$z" /etc/shells || { echo "$z is not in /etc/shells" >&2; exit 1; }
 		pkexec chsh -s "$z" "$me" || exit $?
 	fi

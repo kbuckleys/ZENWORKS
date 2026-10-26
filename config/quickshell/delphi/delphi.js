@@ -617,8 +617,13 @@ function forgeMark(r) {
 function mdOf(text) {
   return String(text || "").replace(/\r\n/g, "\n")
     .replace(/<!--[\s\S]*?-->/g, "")
-    .replace(/<img\b[^>]*\bsrc="([^"]*)"[^>]*>/gi, "[picture]($1)")
+    // src quoted either way or not at all; an <img> left over (no src) goes
+    .replace(/<img\b[^>]*?\bsrc\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))[^>]*>/gi,
+      function (m, a, b, c) { return "[picture](" + (a || b || c) + ")"; })
+    .replace(/<img\b[^>]*>/gi, "")
     .replace(/!\[([^\]]*)\]\(([^)\s]+)[^)]*\)/g, function (m, alt, url) { return "[" + (alt || "picture") + "](" + url + ")"; })
+    // a reference picture (![alt][ref], ![alt]) a link to it too
+    .replace(/!\[([^\]]*)\](?=\[|[^(]|$)/g, function (m, alt) { return "[" + (alt || "picture") + "]"; })
     .replace(/<\/?(details|summary|p|div|span|br|sub|sup|kbd|picture|source)\b[^>]*>/gi, "")
     .replace(/\n{3,}/g, "\n\n")
     .trim();

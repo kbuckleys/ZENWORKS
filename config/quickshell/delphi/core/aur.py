@@ -46,7 +46,11 @@ def _var(text, name):
 
 def recipe(root):
     """What the checkout's PKGBUILD says, and whether .SRCINFO says the
-    same (makepkg reads the PKGBUILD for it, as the AUR will)."""
+    same. Read as text, never run: makepkg --printsrcinfo sources the
+    PKGBUILD, and this page opens on any clone of an AUR package — one you
+    are reading before you trust it, too. So .SRCINFO is behind when its
+    name, version or release differ, or the PKGBUILD changed after it
+    (updpkgsums, a hand edit); "Write it" is still makepkg's own."""
     path = os.path.join(root, "PKGBUILD")
     try:
         text = open(path).read()
@@ -54,16 +58,21 @@ def recipe(root):
         raise AurError("This repository has no PKGBUILD")
     out = {"pkgname": _var(text, "pkgname"), "pkgver": _var(text, "pkgver"),
            "pkgrel": _var(text, "pkgrel"), "srcinfo": "missing"}
+    info = os.path.join(root, ".SRCINFO")
     try:
-        have = open(os.path.join(root, ".SRCINFO")).read()
+        have = open(info).read()
     except OSError:
         return out
+    # a split package's pkgname is a list; its .SRCINFO is under pkgbase
+    base = _var(text, "pkgbase") or out["pkgname"]
+    said = dict(re.findall(r"^\s*(pkgbase|pkgver|pkgrel)\s*=\s*(.*?)\s*$", have, re.M))
+    same = (said.get("pkgver") == out["pkgver"] and said.get("pkgrel") == out["pkgrel"]
+            and (not base or base.startswith("(") or said.get("pkgbase") == base))
     try:
-        want = subprocess.run(["makepkg", "--printsrcinfo"], cwd=root, capture_output=True,
-                              text=True, timeout=30).stdout
-        out["srcinfo"] = "ok" if want.strip() == have.strip() else "stale"
-    except (OSError, subprocess.SubprocessError):
-        out["srcinfo"] = "unknown"
+        newer = os.path.getmtime(path) > os.path.getmtime(info) + 1
+    except OSError:
+        newer = False
+    out["srcinfo"] = "ok" if same and not newer else "stale"
     return out
 
 

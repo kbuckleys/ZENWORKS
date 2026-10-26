@@ -236,15 +236,10 @@ Scope {
   }
   function translate(text, code, done) {
     const rq = Lexicon.translateRequest(text, code, "");
-    const req = new XMLHttpRequest();
-    req.open("POST", rq.url);
-    req.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
-    req.onreadystatechange = () => {
-      if (req.readyState !== XMLHttpRequest.DONE) return;
-      const parsed = req.status === 200 ? Lexicon.parseTranslateResponse(req.responseText) : null;
-      done(parsed, parsed ? "" : req.status === 0 ? "No connection" : "The translation did not come back");
-    };
-    req.send(rq.body);
+    Lexicon.postForm(rq, (status, body) => {
+      const parsed = status === 200 ? Lexicon.parseTranslateResponse(body) : null;
+      done(parsed, parsed ? "" : status === 0 ? "No connection" : "The translation did not come back");
+    });
   }
   // the languages to translate into, the ones used most in Lexi first
   function languages() {

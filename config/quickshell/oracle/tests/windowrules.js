@@ -15,6 +15,15 @@ module.exports = {
       { float: true, size: "1200 800", center: true, workspace: "3", silent: true, opacity: 90 });
     const back = O.parseWindowsLua(O.renderWindowsLua([r]));
     t.eq("rule round trip", back, [r]);
+    const picked = O.windowPickRows([
+      { class: "org.quickshell", title: "terminus", initialTitle: "terminus" },
+      { class: "org.quickshell", title: "plato", initialTitle: "plato" },
+      { class: "org.quickshell", title: "terminus", initialTitle: "terminus" },
+      { class: "firefox", title: "One tab" }, { class: "firefox", title: "Another" }],
+      [{ class: "org.quickshell", title: "terminus", name: "Terminus" }], (c) => c);
+    t.eq("suite windows a row each, others one per app", picked.map((p) => [p.name, p.pin]),
+      [["firefox", ""], ["Plato", "plato"], ["Terminus", "terminus"]]);
+    t.eq("a picked suite window keeps its title", O.blankWindowRule("org.quickshell", "Plato", "plato").title, "plato");
     t.eq("quotes survive", O.parseWindowsLua(O.renderWindowsLua([O.blankWindowRule("a\"b", "x\\y")]))[0].class, "a\"b");
     t.eq("a comment is not a rule", O.parseWindowsLua("-- { class = \"x\" }\nreturn {\n}"), []);
     t.eq("no class, no rule", O.parseWindowsLua("return { { name = \"x\" } }"), []);

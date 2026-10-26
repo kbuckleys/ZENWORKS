@@ -40,6 +40,7 @@
 // you see is always what you pick.
 
 import QtQuick
+import QtQuick.Effects
 import QtQuick.Shapes
 import Quickshell
 import Quickshell.Io
@@ -188,17 +189,27 @@ Scope {
       property var grab: null
 
       // the pointer's starting place, if it is on this screen and no move
-      // has said otherwise yet
+      // has said otherwise yet. Tried again as the surface gets its size:
+      // hyprctl often answers before the layer is configured, when the
+      // window is still 0 × 0, and the loupe then waited for the first move
+      // somewhere else instead of opening under the pointer. Judged by the
+      // screen's own size, so a 0-wide window cannot turn it away.
+      function placeStart() {
+        if (pane.mx >= 0 || picker.startAt.x < 0) return;
+        const gx = picker.startAt.x - pane.modelData.x, gy = picker.startAt.y - pane.modelData.y;
+        if (gx < 0 || gy < 0 || gx >= pane.modelData.width || gy >= pane.modelData.height) return;
+        if (pane.width <= 0 || pane.height <= 0) return;
+        pane.px = gx; pane.py = gy;
+        pane.aim(gx, gy);
+        keys.forceActiveFocus();
+      }
       Connections {
         target: picker
-        function onStartAtChanged() {
-          const gx = picker.startAt.x - pane.modelData.x, gy = picker.startAt.y - pane.modelData.y;
-          if (pane.mx >= 0 || gx < 0 || gy < 0 || gx >= pane.width || gy >= pane.height) return;
-          pane.px = gx; pane.py = gy;
-          pane.aim(gx, gy);
-          keys.forceActiveFocus();
-        }
+        function onStartAtChanged() { pane.placeStart(); }
       }
+      onWidthChanged: pane.placeStart()
+      onHeightChanged: pane.placeStart()
+      Component.onCompleted: pane.placeStart()
 
       function sample() {
         if (pane.mx < 0 || !reader.ready) { pane.rgb = null; return; }
@@ -459,296 +470,385 @@ Scope {
         }
       }
 
-      ClippingRectangle {
-        id: loupe
-        z: 2
-        opacity: pane.mx >= 0 && reader.ready ? 1 : 0
-        x: Math.round(pane.mx - width / 2)
-        y: Math.round(pane.my - height / 2)
-        width: pane.loupeSize
-        height: pane.loupeSize
-        radius: width / 2
-        color: "black"
-
-        ShaderEffectSource {
-          anchors.fill: parent
-          sourceItem: scv
-          // not hidden: the frozen frame is the picture you pick from
-          hideSource: false
-          // LIVE, though the frame behind it never changes: a source that
-          // is not live renders once and then ignores its own sourceRect, so
-          // the loupe stayed on the first spot while the reading moved on.
-          live: true
-          smooth: false
-          sourceRect: Qt.rect(Math.floor(pane.mx) - Math.floor(pane.span / 2),
-                              Math.floor(pane.my) - Math.floor(pane.span / 2),
-                              pane.span, pane.span)
-        }
-
-        // ── the pixel grid ──────────────────────────────────────────
-        // A hairline on every pixel edge, so what is magnified reads as
-        // pixels you can count rather than as a blur of blocks — dark, and
-        // faint, so it separates the cells without tinting them.
-        Repeater {
-          model: pane.span - 1
-          delegate: Rectangle {
-            required property int index
-            x: (index + 1) * pane.zoom
-            width: 1
-            height: loupe.height
-            color: Qt.rgba(0, 0, 0, 0.28)
-          }
-        }
-        Repeater {
-          model: pane.span - 1
-          delegate: Rectangle {
-            required property int index
-            y: (index + 1) * pane.zoom
-            height: 1
-            width: loupe.width
-            color: Qt.rgba(0, 0, 0, 0.28)
-          }
-        }
-
-        // the pixel that will be taken
-        Rectangle {
-          anchors.centerIn: parent
-          width: Math.round(pane.zoom) + 2
-          height: width
-          color: "transparent"
-          border.width: 2
-          border.color: pane.rgb ? Cap.inkOn(pane.rgb.r, pane.rgb.g, pane.rgb.b) : "white"
-        }
+      // ── THE INSTRUMENT ARRIVES where the pointer is (user, 2026-10-26):
+      // lens, plate and rim together, up from a little smaller, fading in —
+      // an arrival, so OutBack. Leaving a screen hides it at once (the other
+      // screen's takes over); coming back plays the arrival again.
+      readonly property bool here: pane.mx >= 0 && reader.ready
+      property real appear: 0
+      onHereChanged: {
+        if (pane.here) { pane.appear = 0; arrive.restart(); }
+        else { arrive.stop(); pane.appear = 0; }
       }
+      NumberAnimation { id: arrive; target: pane; property: "appear"; to: 1; duration: Zenon.slow; easing.type: Easing.OutBack; easing.overshoot: 1.2 }
+      Item {
+        id: instrument
+        z: 2
+        anchors.fill: parent
+        opacity: Math.min(1, pane.appear * 1.6)
+        transform: Scale {
+          origin.x: pane.mx
+          origin.y: pane.my
+          xScale: 0.82 + 0.18 * pane.appear
+          yScale: 0.82 + 0.18 * pane.appear
+        }
 
-      // ── the reading ─────────────────────────────────────────────────
-      // ONE INSTRUMENT: a panel exactly as tall as the loupe, starting at the
-      // loupe's center and running out to one side, with the circle laid over
-      // its near half — the lens, and the plate it is mounted on. Out to the
-      // right, or mirrored to the left near the right edge of the screen.
-      // Square where it meets the circle, which touches its top and bottom
-      // edges there; rounded at the far end.
-      readonly property bool flipped:
-        loupe.x + loupe.width + readout.implicitWidth + 44 > pane.width - 8
-      Rectangle {
-        id: card
-        z: 1
-        opacity: loupe.opacity
-        // matched to the RIM, which stands 2px outside the lens all round —
-        // matched to the lens, the panel stopped short of the circle you see
-        y: loupe.y - 3
-        height: loupe.height + 6
-        width: loupe.width / 2 + readout.implicitWidth + 44
-        x: pane.flipped ? loupe.x + loupe.width / 2 - card.width : loupe.x + loupe.width / 2
-        color: Zenon.menuBgSolid
-        // no edge of its own: the rim below runs round lens and plate as one
-        readonly property int rad: Zenon.rad(10)
-        topLeftRadius: pane.flipped ? card.rad : 0
-        bottomLeftRadius: pane.flipped ? card.rad : 0
-        topRightRadius: pane.flipped ? 0 : card.rad
-        bottomRightRadius: pane.flipped ? 0 : card.rad
-
-        Column {
-          id: readout
-          anchors.verticalCenter: parent.verticalCenter
-          x: pane.flipped ? 22 : loupe.width / 2 + 22
-          spacing: 10
-
-          // THE COLOR, as a chip you could lay against something — big
-          // enough to read as the color rather than as a dot beside a
-          // number — and what it is: the value you copy, and where it is.
-          // THE RULER'S READING, in place of the color
-          Column {
-            visible: picker.ruler
-            spacing: 3
-            Text {
-              text: pane.measured === "" ? "—" : pane.measured + " px"
-              color: Zenon.white
-              font.family: Zenon.faceMono
-              font.weight: Font.Bold
-              font.pixelSize: Zenon.px(22)
+        // LIFTED OFF THE FROZEN SCREEN, as a menu is, with a menu's shadow
+        // — cast by the instrument's ONE outline (the rim's path, filled).
+        // Two shadows, the lens' and the plate's, both fell where they
+        // meet, and that strip read twice as dark (user, 2026-10-26). Kept
+        // to the instrument's box, so the blur is redone at its size, not
+        // the screen's, as it follows the pointer.
+        Item {
+          id: silhouette
+          x: Math.min(loupe.x, card.x) - 3
+          y: card.y
+          width: loupe.width / 2 + card.width + 6
+          height: card.height
+          layer.enabled: true
+          layer.effect: MultiEffect {
+            shadowEnabled: true
+            shadowColor: Zenon.menuShadowInk
+            // tighter than a menu's (user, 2026-10-26): it sits on whatever
+            // is being picked from, so it keeps close to the edge
+            blurMax: Math.round(Zenon.menuShadowBlur * 0.5)
+            shadowBlur: 1
+            shadowVerticalOffset: Math.round(Zenon.menuShadowDrop * 0.5)
+          }
+          Shape {
+            x: -silhouette.x
+            y: -silhouette.y
+            width: instrument.width
+            height: instrument.height
+            preferredRendererType: Shape.CurveRenderer
+            ShapePath {
+              strokeWidth: -1
+              fillColor: Zenon.menuBgSolid
+              PathSvg { path: instrument.rimPath }
             }
-            Text {
-              text: pane.hasBox ? "the box" : "edge to edge"
-              color: Zenon.accentMuted
-              font.family: Zenon.face
-              font.weight: Zenon.weight
-              font.pixelSize: Zenon.px(12)
+          }
+        }
+
+        ClippingRectangle {
+          id: loupe
+          z: 2
+          opacity: pane.mx >= 0 && reader.ready ? 1 : 0
+          x: Math.round(pane.mx - width / 2)
+          y: Math.round(pane.my - height / 2)
+          width: pane.loupeSize
+          height: pane.loupeSize
+          radius: width / 2
+          color: "black"
+
+          ShaderEffectSource {
+            anchors.fill: parent
+            sourceItem: scv
+            // not hidden: the frozen frame is the picture you pick from
+            hideSource: false
+            // LIVE, though the frame behind it never changes: a source that
+            // is not live renders once and then ignores its own sourceRect, so
+            // the loupe stayed on the first spot while the reading moved on.
+            live: true
+            smooth: false
+            sourceRect: Qt.rect(Math.floor(pane.mx) - Math.floor(pane.span / 2),
+                                Math.floor(pane.my) - Math.floor(pane.span / 2),
+                                pane.span, pane.span)
+          }
+
+          // ── the pixel grid ──────────────────────────────────────────
+          // A hairline on every pixel edge, so what is magnified reads as
+          // pixels you can count rather than as a blur of blocks — dark, and
+          // faint, so it separates the cells without tinting them.
+          Repeater {
+            model: pane.span - 1
+            delegate: Rectangle {
+              required property int index
+              x: (index + 1) * pane.zoom
+              width: 1
+              height: loupe.height
+              color: Qt.rgba(0, 0, 0, 0.28)
+            }
+          }
+          Repeater {
+            model: pane.span - 1
+            delegate: Rectangle {
+              required property int index
+              y: (index + 1) * pane.zoom
+              height: 1
+              width: loupe.width
+              color: Qt.rgba(0, 0, 0, 0.28)
             }
           }
 
-          Row {
-            visible: !picker.ruler
-            spacing: 12
-            Rectangle {
-              width: 42; height: 42; radius: Zenon.radiusCard
-              anchors.verticalCenter: parent.verticalCenter
-              color: pane.rgb ? Qt.rgba(pane.rgb.r / 255, pane.rgb.g / 255, pane.rgb.b / 255, 1) : "transparent"
-              border.width: 1
-              border.color: Zenon.wash(0.14)
+          // THE GLASS: the rim's cells sink into a soft dark, so it reads as
+          // a lens and the middle stands forward. Kept light — only the
+          // middle pixel is read.
+          Shape {
+            anchors.fill: parent
+            preferredRendererType: Shape.CurveRenderer
+            ShapePath {
+              strokeWidth: -1
+              fillGradient: RadialGradient {
+                centerX: loupe.width / 2; centerY: loupe.height / 2; centerRadius: loupe.width / 2
+                focalX: loupe.width / 2; focalY: loupe.height / 2
+                GradientStop { position: 0.6; color: Zenon.shade(0) }
+                GradientStop { position: 1.0; color: Zenon.shade(0.3) }
+              }
+              PathRectangle { width: loupe.width; height: loupe.height }
             }
+          }
+
+          // the pixel that will be taken: a ring in the ink that reads on
+          // it, edged by a hairline of the other, so it holds on any color
+          // and on a pixel that differs from its neighbors
+          Rectangle {
+            id: target
+            readonly property color ink: pane.rgb ? Cap.inkOn(pane.rgb.r, pane.rgb.g, pane.rgb.b) : "white"
+            anchors.centerIn: parent
+            width: Math.round(pane.zoom) + 4
+            height: width
+            radius: Zenon.rad(2)
+            color: "transparent"
+            border.width: 2
+            border.color: target.ink
+            Rectangle {
+              anchors.fill: parent
+              anchors.margins: -1
+              radius: Zenon.rad(3)
+              color: "transparent"
+              border.width: 1
+              border.color: Qt.rgba(1 - target.ink.r, 1 - target.ink.g, 1 - target.ink.b, 0.55)
+            }
+          }
+        }
+
+        // ── the reading ─────────────────────────────────────────────────
+        // ONE INSTRUMENT: a panel exactly as tall as the loupe, starting at the
+        // loupe's center and running out to one side, with the circle laid over
+        // its near half — the lens, and the plate it is mounted on. Out to the
+        // right, or mirrored to the left near the right edge of the screen.
+        // Square where it meets the circle, which touches its top and bottom
+        // edges there; rounded at the far end.
+        readonly property bool flipped:
+          loupe.x + loupe.width + readout.implicitWidth + 44 > pane.width - 8
+        Rectangle {
+          id: card
+          z: 1
+          // matched to the RIM, which stands 2px outside the lens all round —
+          // matched to the lens, the panel stopped short of the circle you see
+          y: loupe.y - 3
+          height: loupe.height + 6
+          width: loupe.width / 2 + readout.implicitWidth + 44
+          x: instrument.flipped ? loupe.x + loupe.width / 2 - card.width : loupe.x + loupe.width / 2
+          color: Zenon.menuBgSolid
+          // no edge of its own: the rim below runs round lens and plate as one
+          readonly property int rad: Zenon.rad(10)
+          topLeftRadius: instrument.flipped ? card.rad : 0
+          bottomLeftRadius: instrument.flipped ? card.rad : 0
+          topRightRadius: instrument.flipped ? 0 : card.rad
+          bottomRightRadius: instrument.flipped ? 0 : card.rad
+
+          Column {
+            id: readout
+            anchors.verticalCenter: parent.verticalCenter
+            x: instrument.flipped ? 22 : loupe.width / 2 + 22
+            spacing: 10
+
+            // THE COLOR, as a chip you could lay against something — big
+            // enough to read as the color rather than as a dot beside a
+            // number — and what it is: the value you copy, and where it is.
+            // THE RULER'S READING, in place of the color
             Column {
-              anchors.verticalCenter: parent.verticalCenter
+              visible: picker.ruler
               spacing: 3
               Text {
-                text: pane.rgb ? Cap.format(pane.rgb.r, pane.rgb.g, pane.rgb.b, picker.scheme) : ""
+                text: pane.measured === "" ? "—" : pane.measured + " px"
                 color: Zenon.white
                 font.family: Zenon.faceMono
                 font.weight: Font.Bold
-                font.pixelSize: Zenon.px(17)
+                font.pixelSize: Zenon.px(22)
               }
               Text {
-                text: pane.mx < 0 ? "" : Math.floor(pane.mx) + ", " + Math.floor(pane.my)
+                text: pane.hasBox ? "the box" : "edge to edge"
                 color: Zenon.accentMuted
-                font.family: Zenon.faceMono
+                font.family: Zenon.face
                 font.weight: Zenon.weight
                 font.pixelSize: Zenon.px(12)
               }
             }
-          }
 
-          // the formats the wheel walks through, this one lit — picasso's
-          // own answer buttons, as the focus card and the viewer wear them
-          Row {
-            visible: !picker.ruler
-            spacing: 4
-            Repeater {
-              model: Cap.SCHEMES
-              delegate: Seg {
-                required property string modelData
-                label: Cap.SCHEME_LABELS[modelData]
-                chosen: modelData === picker.scheme
-                height: 24
-                width: Math.max(38, schemeMetrics.advanceWidth + 16)
-                TextMetrics {
-                  id: schemeMetrics
-                  font.family: Zenon.face
-                  font.pixelSize: Zenon.px(13)
-                  font.weight: 600
-                  text: Cap.SCHEME_LABELS[modelData]
-                }
-              }
-            }
-          }
-
-          // the palette: the last colors copied here, each under its key
-          Row {
-            visible: !picker.ruler && !picker.forCaller && picker.palette.length > 0
-            spacing: 4
-            Repeater {
-              model: picker.palette
-              delegate: Rectangle {
-                required property string modelData
-                required property int index
-                width: 22; height: 22
-                radius: Zenon.rad(4)
-                color: modelData
+            Row {
+              visible: !picker.ruler
+              spacing: 12
+              Rectangle {
+                width: 46; height: 46; radius: Zenon.radiusCard
+                anchors.verticalCenter: parent.verticalCenter
+                color: pane.rgb ? Qt.rgba(pane.rgb.r / 255, pane.rgb.g / 255, pane.rgb.b / 255, 1) : "transparent"
                 border.width: 1
                 border.color: Zenon.wash(0.14)
+              }
+              Column {
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: 3
                 Text {
-                  anchors.centerIn: parent
-                  text: String((parent.index + 1) % 10)
-                  color: { const n = parseInt(parent.modelData.slice(1), 16); return Cap.inkOn((n >> 16) & 255, (n >> 8) & 255, n & 255); }
+                  text: pane.rgb ? Cap.format(pane.rgb.r, pane.rgb.g, pane.rgb.b, picker.scheme) : ""
+                  color: Zenon.white
                   font.family: Zenon.faceMono
                   font.weight: Font.Bold
-                  font.pixelSize: Zenon.px(11)
-                }
-              }
-            }
-          }
-
-          Rectangle {
-            width: parent.width
-            height: 1
-            color: Zenon.border
-          }
-
-          // the gestures, as keys — the cap every hint in the shell is
-          // written on — two to a row so the card stays the lens' height
-          Grid {
-            // three pairs a row, so the card stays the lens' height
-            columns: 6
-            columnSpacing: 8
-            rowSpacing: 6
-            verticalItemAlignment: Grid.AlignVCenter
-            Repeater {
-              model: picker.ruler
-                ? ["drag", "a box", "click", "copy", "shift click", "copy, keep going",
-                   "ctrl", "slow", "arrows", "one pixel", "m", "colors", "esc", "close"]
-                : ["click", "copy", "shift click", "copy, keep going",
-                   "ctrl", "slow", "arrows", "one pixel",
-                   "wheel", "format", "1 … 0", "palette",
-                   "m", "ruler", "esc", "close"]
-              delegate: Item {
-                id: hintCell
-                required property string modelData
-                required property int index
-                readonly property bool isKey: index % 2 === 0
-                implicitWidth: hintCell.isKey ? hintCap.implicitWidth : hintText.implicitWidth + (index % 6 !== 5 ? 10 : 0)
-                implicitHeight: 19
-                KeyCap {
-                  id: hintCap
-                  visible: hintCell.isKey
-                  anchors.verticalCenter: parent.verticalCenter
-                  label: hintCell.isKey ? hintCell.modelData : ""
+                  font.pixelSize: Zenon.px(19)
                 }
                 Text {
-                  id: hintText
-                  visible: !hintCell.isKey
-                  anchors.verticalCenter: parent.verticalCenter
-                  text: hintCell.modelData
+                  text: pane.mx < 0 ? "" : Math.floor(pane.mx) + ", " + Math.floor(pane.my)
                   color: Zenon.accentMuted
-                  font.family: Zenon.face
+                  font.family: Zenon.faceMono
                   font.weight: Zenon.weight
                   font.pixelSize: Zenon.px(12)
                 }
               }
             }
+
+            // the formats the wheel walks through, this one lit — picasso's
+            // own answer buttons, as the focus card and the viewer wear them
+            Row {
+              visible: !picker.ruler
+              spacing: 4
+              Repeater {
+                model: Cap.SCHEMES
+                delegate: Seg {
+                  required property string modelData
+                  label: Cap.SCHEME_LABELS[modelData]
+                  chosen: modelData === picker.scheme
+                  height: 24
+                  width: Math.max(38, schemeMetrics.advanceWidth + 16)
+                  TextMetrics {
+                    id: schemeMetrics
+                    font.family: Zenon.face
+                    font.pixelSize: Zenon.px(13)
+                    font.weight: 600
+                    text: Cap.SCHEME_LABELS[modelData]
+                  }
+                }
+              }
+            }
+
+            // the palette: the last colors copied here, each under its key
+            Row {
+              visible: !picker.ruler && !picker.forCaller && picker.palette.length > 0
+              spacing: 4
+              Repeater {
+                model: picker.palette
+                delegate: Rectangle {
+                  required property string modelData
+                  required property int index
+                  width: 22; height: 22
+                  radius: Zenon.rad(4)
+                  color: modelData
+                  border.width: 1
+                  border.color: Zenon.wash(0.14)
+                  Text {
+                    anchors.centerIn: parent
+                    text: String((parent.index + 1) % 10)
+                    color: { const n = parseInt(parent.modelData.slice(1), 16); return Cap.inkOn((n >> 16) & 255, (n >> 8) & 255, n & 255); }
+                    font.family: Zenon.faceMono
+                    font.weight: Font.Bold
+                    font.pixelSize: Zenon.px(11)
+                  }
+                }
+              }
+            }
+
+            Rectangle {
+              width: parent.width
+              height: 1
+              color: Zenon.border
+            }
+
+            // the gestures, as keys — the cap every hint in the shell is
+            // written on — two to a row so the card stays the lens' height
+            Grid {
+              // three pairs a row, so the card stays the lens' height
+              columns: 6
+              columnSpacing: 8
+              rowSpacing: 6
+              verticalItemAlignment: Grid.AlignVCenter
+              Repeater {
+                model: picker.ruler
+                  ? ["drag", "a box", "click", "copy", "shift click", "copy, keep going",
+                     "ctrl", "slow", "arrows", "one pixel", "m", "colors", "esc", "close"]
+                  : ["click", "copy", "shift click", "copy, keep going",
+                     "ctrl", "slow", "arrows", "one pixel",
+                     "wheel", "format", "1 … 0", "palette",
+                     "m", "ruler", "esc", "close"]
+                delegate: Item {
+                  id: hintCell
+                  required property string modelData
+                  required property int index
+                  readonly property bool isKey: index % 2 === 0
+                  implicitWidth: hintCell.isKey ? hintCap.implicitWidth : hintText.implicitWidth + (index % 6 !== 5 ? 10 : 0)
+                  implicitHeight: 19
+                  KeyCap {
+                    id: hintCap
+                    visible: hintCell.isKey
+                    anchors.verticalCenter: parent.verticalCenter
+                    label: hintCell.isKey ? hintCell.modelData : ""
+                  }
+                  Text {
+                    id: hintText
+                    visible: !hintCell.isKey
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: hintCell.modelData
+                    color: Zenon.accentMuted
+                    font.family: Zenon.face
+                    font.weight: Zenon.weight
+                    font.pixelSize: Zenon.px(12)
+                  }
+                }
+              }
+            }
           }
         }
-      }
 
-      // ── the rim ───────────────────────────────────────────────────
-      // ONE OUTLINE round lens and plate together: half the circle on the
-      // open side, running straight into the plate's top and bottom edges
-      // where they meet it, and round the plate's far end. They were two
-      // rims, and where the ring curved away from the plate's band each
-      // stopped short of the other.
-      // The band is the color itself, and a band of the color on a field
-      // of that color vanished — so it is drawn over a dark stroke two
-      // pixels wider, a hairline either side. Its middle runs half a pixel
-      // outside the lens, so it reaches 3 out: the plate's edge.
-      readonly property string rimPath: {
-        const r = loupe.width / 2, R = r + 0.5;
-        const cx = loupe.x + r, cy = loupe.y + r;
-        const s = pane.flipped ? -1 : 1, sw = pane.flipped ? 0 : 1;
-        const fx = (pane.flipped ? card.x : card.x + card.width) - s * 2.5;
-        const cr = Math.max(0, card.rad - 2.5);
-        const top = cy - R, bot = cy + R;
-        return "M " + cx + " " + top
-          + " L " + (fx - s * cr) + " " + top
-          + " A " + cr + " " + cr + " 0 0 " + sw + " " + fx + " " + (top + cr)
-          + " L " + fx + " " + (bot - cr)
-          + " A " + cr + " " + cr + " 0 0 " + sw + " " + (fx - s * cr) + " " + bot
-          + " L " + cx + " " + bot
-          + " A " + R + " " + R + " 0 0 " + sw + " " + cx + " " + top + " Z";
-      }
-      Shape {
-        z: 3
-        anchors.fill: parent
-        opacity: loupe.opacity
-        preferredRendererType: Shape.CurveRenderer
-        ShapePath {
-          fillColor: "transparent"
-          strokeColor: Qt.rgba(0, 0, 0, 0.55)
-          strokeWidth: 5
-          PathSvg { path: pane.rimPath }
+        // ── the rim ───────────────────────────────────────────────────
+        // ONE OUTLINE round lens and plate together: half the circle on the
+        // open side, running straight into the plate's top and bottom edges
+        // where they meet it, and round the plate's far end. They were two
+        // rims, and where the ring curved away from the plate's band each
+        // stopped short of the other.
+        // The band is the color itself, and a band of the color on a field
+        // of that color vanished — so it is drawn over a dark stroke two
+        // pixels wider, a hairline either side. Its middle runs half a pixel
+        // outside the lens, so it reaches 3 out: the plate's edge.
+        readonly property string rimPath: {
+          const r = loupe.width / 2, R = r + 0.5;
+          const cx = loupe.x + r, cy = loupe.y + r;
+          const s = instrument.flipped ? -1 : 1, sw = instrument.flipped ? 0 : 1;
+          const fx = (instrument.flipped ? card.x : card.x + card.width) - s * 2.5;
+          const cr = Math.max(0, card.rad - 2.5);
+          const top = cy - R, bot = cy + R;
+          return "M " + cx + " " + top
+            + " L " + (fx - s * cr) + " " + top
+            + " A " + cr + " " + cr + " 0 0 " + sw + " " + fx + " " + (top + cr)
+            + " L " + fx + " " + (bot - cr)
+            + " A " + cr + " " + cr + " 0 0 " + sw + " " + (fx - s * cr) + " " + bot
+            + " L " + cx + " " + bot
+            + " A " + R + " " + R + " 0 0 " + sw + " " + cx + " " + top + " Z";
         }
-        ShapePath {
-          fillColor: "transparent"
-          strokeColor: pane.ink
-          strokeWidth: 3
-          PathSvg { path: pane.rimPath }
+        Shape {
+          z: 3
+          anchors.fill: parent
+          preferredRendererType: Shape.CurveRenderer
+          ShapePath {
+            fillColor: "transparent"
+            strokeColor: Qt.rgba(0, 0, 0, 0.55)
+            strokeWidth: 5
+            PathSvg { path: instrument.rimPath }
+          }
+          ShapePath {
+            fillColor: "transparent"
+            strokeColor: pane.ink
+            strokeWidth: 3
+            PathSvg { path: instrument.rimPath }
+          }
         }
       }
     }

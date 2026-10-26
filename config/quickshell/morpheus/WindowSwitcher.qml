@@ -117,7 +117,13 @@ PanelWindow {
     function cancel(): void { sw.finish(false); }
   }
 
-  function appOf(t) { return t && t.wayland ? String(t.wayland.appId || "") : ""; }
+  // which app a window is; the suite's own windows share quickshell's app
+  // id and are told apart by title (each Window's title:, as oracle's
+  // window rules do), so Super+Ctrl+Tab in Terminus is Terminus' windows
+  function appOf(t) {
+    const id = t && t.wayland ? String(t.wayland.appId || "") : "";
+    return id === "org.quickshell" ? id + "\n" + String(t.title || "") : id;
+  }
   function step(dir, seq, oneApp) {
     if (seq < sw.lastSeq) sw.pendingCommit = 0;
     sw.lastSeq = seq;

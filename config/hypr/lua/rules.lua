@@ -34,7 +34,8 @@ hl.workspace_rule({ workspace = "special:special", gaps_out = specialGaps })
 -- with a `shipped` name stands in for that shipped rule; the rest of yours
 -- come after the shipped ones, so where both say something about a window,
 -- yours wins. hyprland matches the WHOLE class as a regex, so the class is
--- escaped and matched as written; a title matches anywhere in the title.
+-- escaped and matched as written; a title matches anywhere in the title
+-- (a suite window's, the whole title).
 -- Guarded like defaults.lua: a broken file, or a broken rule, costs only
 -- itself.
 local function esc(s) return (tostring(s):gsub("[%.%^%$%*%+%?%(%)%[%]%{%}%|\\]", "\\%0")) end
@@ -45,7 +46,13 @@ local function apply(r)
 	-- one it had when the rule was picked
 	local cls = r.class:gsub("_%d+_%d+$", "")
 	local spec = { match = { class = esc(cls) .. "(_\\d+_\\d+)?" } }
-	if type(r.title) == "string" and r.title ~= "" then spec.match.title = ".*" .. esc(r.title) .. ".*" end
+	-- the suite's own windows share quickshell's class and are told apart
+	-- by title alone, so theirs is matched whole: "terminus" is not
+	-- "terminus-picker", "plato" not "plato-capture"
+	if type(r.title) == "string" and r.title ~= "" then
+		if cls == "org.quickshell" then spec.match.title = "^" .. esc(r.title) .. "$"
+		else spec.match.title = ".*" .. esc(r.title) .. ".*" end
+	end
 	if r.float then
 		spec.float = true
 		if type(r.size) == "string" and r.size:match("^%d+ %d+$") then spec.size = r.size end

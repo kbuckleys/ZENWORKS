@@ -51,6 +51,18 @@ MARK = "# added by Delphi"
 USERS = {"github.com": "git", "gitlab.com": "git", "codeberg.org": "git", "aur.archlinux.org": "aur"}
 
 
+# A host or login name as ssh and ~/.ssh/config take one. Hosts can come
+# from a cloned repository's remote (delphi.js sshTarget), so one starting
+# with "-" would reach ssh as an option ("-oProxyCommand=…") and one with a
+# space or newline would write lines of its own into the config.
+NAME = re.compile(r"^[A-Za-z0-9_.][A-Za-z0-9_.@:%+-]*$")
+
+
+def _checked(host, user):
+    if not NAME.match(host or "") or (user and not NAME.match(user)):
+        raise GitError(["ssh"], 1, f"{user + '@' if user else ''}{host} is not a host ssh can be pointed at")
+
+
 def _tilde(p):
     return "~" + p[len(HOME):] if p == HOME or p.startswith(HOME + "/") else p
 
@@ -418,6 +430,7 @@ def use(host, key, user=None, replace=False, agent=True):
     """~/.ssh/config sends `key` to `host` (see plan_host); `agent`: its
     passphrase kept by the agent once given."""
     user = USERS.get(host.lower(), "") if user is None else user
+    _checked(host, user)
     p = plan_host(_read_config(), host, user, key, agent=agent, replace=replace)
     if p["state"] in ("added", "updated"):
         _write_config(p["lines"])
@@ -472,8 +485,9 @@ def test(host, user=None, sock=None, cancel=None):
     if not shutil.which("ssh"):
         raise GitError(["ssh"], 127, "ssh is not installed (openssh)")
     user = USERS.get(host.lower(), "git") if user is None else user
+    _checked(host, user)
     e = gitrun.env(sock=sock)
-    p = subprocess.Popen(["ssh", "-T", "-o", "ConnectTimeout=10", f"{user}@{host}"],
+    p = subprocess.Popen(["ssh", "-T", "-o", "ConnectTimeout=10", "--", f"{user}@{host}"],
                          stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
                          text=True, env=e, start_new_session=True)
     if cancel:
@@ -492,8 +506,9 @@ def test(host, user=None, sock=None, cancel=None):
 def remove(key):
     """The pair to the trash (gio), and its lines out of ~/.ssh/config."""
     priv = _full(key)
-    if os.path.dirname(priv) != SSH:
-        raise GitError(["rm"], 1, "only keys in ~/.ssh are removed here")
+    # a pair: ~/.ssh/config or known_hosts sit in the same directory
+    if os.path.dirname(priv) != SSH or priv.endswith(".pub") or not os.path.exists(priv + ".pub"):
+        raise GitError(["rm"], 1, "only key pairs in ~/.ssh are removed here")
     gone = []
     for p in (priv, priv + ".pub"):
         if os.path.exists(p):

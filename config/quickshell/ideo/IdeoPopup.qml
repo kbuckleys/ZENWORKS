@@ -110,21 +110,18 @@ LayerPopup {
   function fetchNerds() {
     popup.nerdLoading = true;
     popup.nerdFailed = false;
-    const xhr = new XMLHttpRequest();
-    xhr.open("GET", "https://www.nerdfonts.com/assets/css/webfont.css");
-    xhr.onreadystatechange = () => {
-      if (xhr.readyState !== XMLHttpRequest.DONE) return;
+    // curl, not XMLHttpRequest (morpheus/Net.qml says why)
+    Net.request("GET", "https://www.nerdfonts.com/assets/css/webfont.css", {}, (status, body) => {
       popup.nerdLoading = false;
-      if (xhr.status !== 200 || !xhr.responseText) {
+      if (status !== 200 || !body) {
         popup.nerdFailed = true;
         return;
       }
-      popup.nerdCache = Ideo.parseNerdCss(xhr.responseText);
+      popup.nerdCache = Ideo.parseNerdCss(body);
       if (popup.appMode !== "nerd") return;
       popup.entries = popup.nerdCache;
       popup.applyFilter();
-    };
-    xhr.send();
+    });
   }
 
   // ---------------------------------------------------------- actions --

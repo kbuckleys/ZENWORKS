@@ -1448,6 +1448,49 @@ def ssh_test_reading():
 
 
 @test
+def aur_recipe_read_not_run():
+    import aur
+    with tempfile.TemporaryDirectory() as d:
+        mark = os.path.join(d, "ran")
+        # a PKGBUILD's top level is code: reading the page never runs it
+        with open(os.path.join(d, "PKGBUILD"), "w") as f:
+            f.write("pkgname=foo\npkgver=1.2\npkgrel=3\ntouch " + mark + "\n")
+        eq(aur.recipe(d)["srcinfo"], "missing")
+        with open(os.path.join(d, ".SRCINFO"), "w") as f:
+            f.write("pkgbase = foo\n\tpkgver = 1.2\n\tpkgrel = 3\n\npkgname = foo\n")
+        eq(aur.recipe(d)["srcinfo"], "ok")
+        with open(os.path.join(d, ".SRCINFO"), "w") as f:
+            f.write("pkgbase = foo\n\tpkgver = 1.2\n\tpkgrel = 2\n")
+        eq(aur.recipe(d)["srcinfo"], "stale")
+        os.utime(os.path.join(d, ".SRCINFO"), (0, 0))   # the PKGBUILD changed after it
+        with open(os.path.join(d, ".SRCINFO"), "w") as f:
+            f.write("pkgbase = foo\n\tpkgver = 1.2\n\tpkgrel = 3\n")
+        os.utime(os.path.join(d, ".SRCINFO"), (0, 0))
+        eq(aur.recipe(d)["srcinfo"], "stale")
+        eq(os.path.exists(mark), False)
+
+
+@test
+def ssh_hosts_checked():
+    import sshkeys as K
+    # a remote's host is never an ssh option, nor config lines of its own
+    for host, user in (("-oProxyCommand=touch /tmp/x", "git"), ("github.com", "-oProxyCommand=x"),
+                       ("a.com\nHost *", ""), ("a b", "git"), ("", "git")):
+        try:
+            K.test(host, user)
+            raise AssertionError("tested " + repr(host))
+        except gitrun.GitError:
+            pass
+        try:
+            K.use(host, "~/.ssh/x", user)
+            raise AssertionError("used " + repr(host))
+        except gitrun.GitError:
+            pass
+    K._checked("aur.archlinux.org", "aur")
+    K._checked("192.168.1.4", "")
+
+
+@test
 def ssh_keys_made_used_removed():
     import sshkeys as K
     if not shutil.which("ssh-keygen"):

@@ -12,6 +12,7 @@
 // instances); the node tests hand in stubs of their own.
 var Paths = typeof Morpheus !== "undefined" ? Morpheus.Paths : globalThis.Paths;
 var Strings = typeof Morpheus !== "undefined" ? Morpheus.Strings : globalThis.Strings;
+var Net = typeof Morpheus !== "undefined" ? Morpheus.Net : globalThis.Net;
 
 function dictHistoryPath() {
   return Paths.cacheDir() + "/dict-history";
@@ -474,24 +475,21 @@ function decodeHtml(s) {
 
 // ------------------------------------------------------------------ HTTP --
 
+// through curl (morpheus/Net), never XMLHttpRequest: Qt's HTTP/2 crashed
+// the shell once (see Net.qml)
 function httpGet(url) {
   return new Promise((resolve, reject) => {
-    let settled = false;
-    let req = new XMLHttpRequest();
-    req.open("GET", url);
-    try { req.setRequestHeader("User-Agent", UA); } catch (e) {}
-    req.onreadystatechange = () => {
-      if (req.readyState !== XMLHttpRequest.DONE || settled) return;
-      settled = true;
-      if (req.status >= 200 && req.status < 300) resolve(req.responseText);
-      else reject(req.status === 0 ? "network" : "http");
-    };
-    try {
-      req.send();
-    } catch (e) {
-      if (!settled) { settled = true; reject("network"); }
-    }
+    Net.request("GET", url, { headers: { "User-Agent": UA } }, (status, body) => {
+      if (status >= 200 && status < 300) resolve(body);
+      else reject(status === 0 ? "network" : "http");
+    });
   });
+}
+
+// a translation request (translateRequest's { url, body }) → done(status, text)
+function postForm(rq, done) {
+  Net.request("POST", rq.url, { body: rq.body,
+    headers: { "Content-Type": "application/x-www-form-urlencoded" } }, done);
 }
 
 function httpGetJson(url) {

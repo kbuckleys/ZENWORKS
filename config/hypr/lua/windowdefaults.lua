@@ -10,7 +10,8 @@
 -- good — a rule in windows.lua with the same `shipped` stands in for it, which
 -- is how changing (or turning off) one of these in oracle is kept. Edit this
 -- file to change what ships, not what you have: oracle never writes it.
--- A title matches anywhere in the window's title.
+-- A title matches anywhere in the window's title; a suite window's
+-- (org.quickshell) matches the whole title.
 
 return {
 	{ shipped = "kitty", name = "kitty", class = "kitty", float = true, persistent_size = true },

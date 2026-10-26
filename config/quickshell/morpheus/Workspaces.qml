@@ -136,19 +136,30 @@ Item {
     onHoveredChanged: root.hovered = hovered
   }
 
-  // special toggle — disabled while tray is shown so tray clicks aren't hijacked
+  // THE SPECIAL WORKSPACE, BY CLICK (2026-10-26). This used to lie OVER the
+  // numbers whenever a special workspace existed, so a click on "3" toggled
+  // the special one instead of going to 3. Now the numbers come first: a
+  // number goes to its workspace (and puts a shown special one away, or 3
+  // would stay covered); the number you are on already, a click that did
+  // nothing, shows or hides it; and this, under the numbers, takes the
+  // module's bare ends. Off while the tray is shown so its clicks are its own.
+  function toggleSpecial() {
+    var sp = root.specialWorkspace !== null
+        ? root.specialWorkspace.name.replace(/^special:/, "")
+        : root.specialName;
+    // asked for: OffSpecial leaves a show it was told about alone
+    Quickshell.execDetached(Off.wanted(Hypr.toggleSpecial(sp)));
+  }
+  function clickNumber(ws, isActive) {
+    if (root.specialWorkspace !== null && (root.specialFocused || isActive)) root.toggleSpecial();
+    if (!isActive) Hyprland.dispatch(Hypr.focusWorkspace(ws.name));
+  }
   MouseArea {
     anchors.fill: parent
     visible: root.specialWorkspace !== null && !root.showTray
     enabled: visible
-    z: 2
-    onClicked: {
-      var sp = root.specialWorkspace !== null
-          ? root.specialWorkspace.name.replace(/^special:/, "")
-          : root.specialName;
-      // asked for: OffSpecial leaves a show it was told about alone
-      Quickshell.execDetached(Off.wanted(Hypr.toggleSpecial(sp)));
-    }
+    z: -1
+    onClicked: root.toggleSpecial()
   }
 
   // ── workspaces layer ──────────────────────────────────────────────────
@@ -291,9 +302,7 @@ Item {
           MouseArea {
             anchors.fill: parent
             enabled: !root.showTray
-            onClicked: {
-              Hyprland.dispatch(Hypr.focusWorkspace(modelData.name));
-            }
+            onClicked: root.clickNumber(modelData, btn.isActive)
           }
         }
       }

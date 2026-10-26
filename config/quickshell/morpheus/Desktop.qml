@@ -96,7 +96,7 @@ QtObject {
   // installs them in /usr/share/applications. Nothing is written into your
   // applications directory any more (2026-10-25): an entry made at startup
   // named the shell's path on the day it was made — a working copy's, or a
-  // folder since gone — and outlived the shell when it was removed.
+  // directory since gone — and outlived the shell when it was removed.
   //
   // Here it only hands the description back, so a manager can read its own.
   function launcher(id, fields) {

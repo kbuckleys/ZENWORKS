@@ -32,6 +32,7 @@ import math
 import os
 import re
 import subprocess
+import sys
 import time
 
 
@@ -208,7 +209,7 @@ def system(osr):
     bdate = dmi("bios_date")
     m = re.match(r"(\d\d)/(\d\d)/(\d{4})", bdate)
     if m:
-        bdate = time.strftime("%B %-d, %Y", time.strptime(bdate, "%m/%d/%Y"))
+        bdate = time.strftime("%B %-d, %Y", time.strptime(m.group(0), "%m/%d/%Y"))
     if bios:
         rows.append({"k": "Firmware", "v": bios + (" · " + bdate if bdate else "")})
 
@@ -603,23 +604,33 @@ def power():
     return rows
 
 
+def safe(fn, empty, *args):
+    # firmware and drivers write odd things: a section that trips on one
+    # costs only itself, not the whole About page
+    try:
+        return fn(*args)
+    except Exception as e:  # noqa: BLE001
+        print("machine.py: %s: %s" % (fn.__name__, e), file=sys.stderr)
+        return empty
+
+
 def main():
-    osr = os_release()
-    mons = hwmons()
-    model, sys_rows = system(osr)
-    cpu, cpu_rows = processor(mons)
-    gpu, gpu_rows = graphics(mons)
-    memtot, mem_rows = memory()
+    osr = safe(os_release, {})
+    mons = safe(hwmons, {})
+    model, sys_rows = safe(system, ("", []), osr)
+    cpu, cpu_rows = safe(processor, ("", []), mons)
+    gpu, gpu_rows = safe(graphics, ("", []), mons)
+    memtot, mem_rows = safe(memory, (0, []))
     sections = [
         {"name": "System", "rows": sys_rows},
-        {"name": "Desktop", "rows": desktop()},
+        {"name": "Desktop", "rows": safe(desktop, [])},
         {"name": "Processor", "rows": cpu_rows},
         {"name": "Graphics", "rows": gpu_rows},
         {"name": "Memory", "rows": mem_rows},
-        {"name": "Storage", "rows": storage(mons)},
-        {"name": "Displays", "rows": displays()},
-        {"name": "Network", "rows": network()},
-        {"name": "Power", "rows": power()},
+        {"name": "Storage", "rows": safe(storage, [], mons)},
+        {"name": "Displays", "rows": safe(displays, [])},
+        {"name": "Network", "rows": safe(network, [])},
+        {"name": "Power", "rows": safe(power, [])},
     ]
     name = osr.get("PRETTY_NAME") or osr.get("NAME") or "Linux"
     print(json.dumps({

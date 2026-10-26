@@ -45,7 +45,7 @@ Item {
   property int open: -1
   // the open-window picker is up
   property bool picking: false
-  // hyprctl clients, one per app: [{ cls, title, name }]
+  // hyprctl clients, one per app (a suite window each): [{ cls, title, pin, name }]
   property var apps: []
 
   function patch(i, change) {
@@ -59,8 +59,8 @@ Item {
     }
     Oracle.setWindowRules(Ora.windowRulesRemoved(wr.shipped, wr.rules, i));
   }
-  function add(cls, name) {
-    const next = wr.rules.concat([Ora.blankWindowRule(cls, name)]);
+  function add(cls, name, title) {
+    const next = wr.rules.concat([Ora.blankWindowRule(cls, name, title)]);
     Oracle.setWindowRules(next);
     wr.picking = false;
     // the last of yours, which come before the shipped ones
@@ -79,15 +79,7 @@ Item {
       onStreamFinished: {
         let list = [];
         try { list = JSON.parse(this.text); } catch (e) {}
-        const seen = {}, out = [];
-        for (const c of list) {
-          const cls = Ora.stableClass(c.class || c.initialClass || "");
-          if (!cls || seen[cls]) continue;
-          seen[cls] = true;
-          out.push({ cls: cls, title: String(c.title || ""), name: wr.appName(cls) });
-        }
-        out.sort((a, b) => a.name.localeCompare(b.name));
-        wr.apps = out;
+        wr.apps = Ora.windowPickRows(list, wr.shipped, wr.appName);
       }
     }
   }
@@ -180,7 +172,7 @@ Item {
               font.pixelSize: Zenon.px(14)
             }
             HoverHandler { id: appHover }
-            TapHandler { id: appTap; onTapped: wr.add(app.modelData.cls, app.modelData.name) }
+            TapHandler { id: appTap; onTapped: wr.add(app.modelData.cls, app.modelData.name, app.modelData.pin) }
           }
         }
       }
