@@ -44,7 +44,7 @@ return {
 	emulate_discrete_scroll                  = 1,
 
 	-- focus
-	follow_mouse                             = 1,
+	follow_mouse                             = 0,
 	follow_mouse_threshold                   = 0,
 	follow_mouse_shrink                      = 0,
 	mouse_refocus                            = true,

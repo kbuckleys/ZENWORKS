@@ -48,7 +48,10 @@ Item {
   // a grid with, which are landscape and fill the box's width — at the
   // Backgrounds zoom, 50px against 90. Three by two is the shape most
   // photographs are, so a row of covers and pictures reads as one row.
-  readonly property real aspect: 1.5
+  // A holder whose pictures are cut to another shape sets its own — picasso's
+  // quick access crops every picture to a wide box, and a 3:2 cover in that
+  // row came out a block narrower than the pictures beside it.
+  property real aspect: 1.5
   readonly property real coverW: Math.min(cover.width, cover.height * cover.aspect)
   readonly property real coverH: cover.coverW / cover.aspect
   // The badge and its inset scale off the short side.
@@ -138,7 +141,8 @@ Item {
   // ── THE DRAWING ───────────────────────────────────────────────────
   // Cell i of n, as a rectangle in a unit square: one whole, two halves,
   // one large and two small, or a two-by-two.
-  function cell(i, n) {
+  // (not `cell`: the holders' delegates are `cell`, and the id shadowed it)
+  function pieceRect(i, n) {
     if (n <= 1) return { x: 0, y: 0, w: 1, h: 1 };
     if (n === 2) return { x: i * 0.5, y: 0, w: 0.5, h: 1 };
     if (n === 3) return i === 0 ? { x: 0, y: 0, w: 0.5, h: 1 }
@@ -164,7 +168,7 @@ Item {
         required property int index
         // A hairline of the frame's own color between the pieces, so a
         // mosaic reads as four pictures rather than one confused one.
-        readonly property var r: cover.cell(piece.index, cover.pics.length)
+        readonly property var r: cover.pieceRect(piece.index, cover.pics.length)
         readonly property real gap: cover.pics.length > 1 ? 1 : 0
         x: Math.round(piece.r.x * frame.width) + (piece.r.x > 0 ? piece.gap : 0)
         y: Math.round(piece.r.y * frame.height) + (piece.r.y > 0 ? piece.gap : 0)

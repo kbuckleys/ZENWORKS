@@ -257,6 +257,43 @@ module.exports = {
       Object.keys(T.parse(SCHEMA, '{"notifMaxVisible":')).length, 0);
     t.eq("and so is a file holding something that is not an object",
       Object.keys(T.parse(SCHEMA, '[1,2,3]')).length, 0);
+    // ── a long page in parts ─────────────────────────────────────────────
+    // every setting of a laid-out page is listed once, under one heading —
+    // read off Oracle.qml's own specs, so a setting added later cannot slip
+    // to the end of its page unheaded
+    {
+      const qml = require("fs").readFileSync(require("path").join(__dirname, "..", "Oracle.qml"), "utf8");
+      const bySection = {};
+      const re = /\{ key: "(\w+)", section: "(\w+)"([^\n]*\n(?:(?!\s*\{ key:)[^\n]*\n){0,8})/g;
+      let m;
+      while ((m = re.exec(qml)) !== null) {
+        if (/within: "/.test(m[3])) continue;
+        (bySection[m[2]] = bySection[m[2]] || []).push(m[1]);
+      }
+      for (const page of ["notify", "bar", "menu", "idle", "windows", "time", "motion", "surfaces"]) {
+        const listed = [].concat(...T.pageLayout(page).map((p) => p[1]));
+        t.eq(page + ": each setting listed once", listed.length, new Set(listed).size);
+        t.eq(page + ": every setting of the page is under a heading",
+          (bySection[page] || []).filter((k) => listed.indexOf(k) < 0).join(", "), "");
+        // an input setting shown here too (its alsoIn) is made from
+        // oracle.js, not Oracle.qml: named "input:<field>"
+        t.eq(page + ": nothing listed that the page lacks",
+          listed.filter((k) => (bySection[page] || []).indexOf(k) < 0 && !/^input:/.test(k)).join(", "), "");
+      }
+      const rows = T.filterSchema([{ key: "b", section: "time" }, { key: "clock24h", section: "time" },
+                                   { key: "weatherEnabled", section: "time" }], "time", "");
+      t.eq("laid out in the page's order", rows.map((r) => r.key).join(","), "clock24h,weatherEnabled,b");
+      t.eq("the first of a part carries its heading", rows[0].head + "/" + rows[1].head, "Clock/Weather");
+      t.eq("a search lists no headings",
+        T.filterSchema([{ key: "clock24h", section: "time", label: "24-hour clock" }], "time", "clock")[0].head, undefined);
+    }
+
+    // ...but it is told apart from a file that was fine, so it is kept
+    // aside rather than written over with the defaults (Oracle.keepBroken)
+    t.eq("a stray comma does not parse", T.parses('{"notifMaxVisible": 3,}'), false);
+    t.eq("an array does not parse", T.parses("[1,2,3]"), false);
+    t.eq("an object parses", T.parses('{"notifMaxVisible":3}'), true);
+    t.eq("an empty file parses: nothing set yet", T.parses("  \n"), true);
     t.eq("an empty file is simply no settings",
       Object.keys(T.parse(SCHEMA, "")).length, 0);
 
@@ -387,6 +424,13 @@ module.exports = {
     t.has("repeats are counted, not listed", B.pollers.text, "hyprctl \u00d75");
     t.eq("errors are bad", B.log.level, "bad");
     t.eq("no output at all did not run", T.readCheckup("", 1).tests.text, "did not run");
+    // and each that wants it, its fix (OracleWindow.healthFix)
+    t.eq("a clean run offers nothing to fix", Object.keys(G).filter((k) => G[k].fix).length, 0);
+    t.eq("changed scripts: restart", B.stale.fix.act, "restart");
+    t.eq("grown memory: restart", B.memory.fix.act, "restart");
+    t.eq("errors: the log", B.log.fix.act, "log");
+    t.eq("a probe: shown", B.probes.fix.act + " " + B.probes.fix.files[0], "open cerberus/Cerberus Lock.qml");
+    t.eq("no clean preflight: run one", T.readCheckup("stack\tquickshell 0.3.2-1\n", 1).stack.fix.act, "preflight");
     const st = "quickshell 0.3.2-1, qt6-base 6.12.0-3, hyprland 0.56.2-4, jemalloc 1:5.4.0-1";
     const S = (now, then) => T.readCheckup("stack\t" + now + "\nstamp\t" + then + "\n", 1).stack;
     t.eq("the same stack is ok", S(st, st).level, "ok");
@@ -642,7 +686,8 @@ module.exports.defaultApps = (t, T) => {
   t.eq("the defaults", [T.inputDefault("kb_layout"), T.inputDefault("repeat_rate"),
     T.inputDefault("repeat_delay"), T.inputDefault("touchpad_tap_to_click"), T.inputDefault("follow_mouse"),
     T.inputDefault("accel_profile"), T.inputDefault("sensitivity"), T.inputDefault("focus_on_close")],
-    ["us", 35, 200, true, 1, "flat", -0.6, 2]);
+    // follow_mouse 0: click to focus (user, 2026-10-27)
+    ["us", 35, 200, true, 0, "flat", -0.6, 2]);
   const mine = { accel_profile: "adaptive", sensitivity: 0.25, focus_on_close: 1, by_hand: "kept" };
   const inBack = T.parseInputLua(T.renderInputLua(mine));
   t.eq("a value survives the file", [inBack.accel_profile, inBack.sensitivity, inBack.focus_on_close],

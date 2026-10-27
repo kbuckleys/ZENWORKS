@@ -14,7 +14,6 @@
 // items since your last upgrade marked new.
 
 import QtQuick
-import Quickshell
 import "../morpheus"
 import "."
 
@@ -155,7 +154,7 @@ Item {
       }
       TapHandler {
         id: open
-        onTapped: Quickshell.execDetached(["xdg-open", card.modelData.link])
+        onTapped: Strings.openLink(card.modelData.link)
       }
     }
   }

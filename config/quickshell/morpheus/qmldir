@@ -85,6 +85,7 @@ singleton Share 1.0 Share.qml
 ClearChip 1.0 ClearChip.qml
 AddChip 1.0 AddChip.qml
 ChevronChip 1.0 ChevronChip.qml
+Swatch 1.0 Swatch.qml
 SysMeter 1.0 SysMeter.qml
 GlassRim 1.0 GlassRim.qml
 PanelGround 1.0 PanelGround.qml

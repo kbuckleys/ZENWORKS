@@ -102,7 +102,7 @@ Scope {
       return;
     }
     if (!mgr.win) mgr.build();
-    if (mgr.pending !== null) { const p = mgr.pending; mgr.pending = null; mgr.open(p[0]); }
+    if (mgr.pending !== null) { const p = mgr.pending; mgr.pending = null; mgr.open(p[0], p[1]); }
   }
 
   // ── ITS SIZE, REMEMBERED ─────────────────────────────────────────────
@@ -140,10 +140,12 @@ Scope {
     LagNotes.mark("oracle window", t0);
   }
 
-  function open(section) {
+  // `key`: a setting to land on — its page opened, the row scrolled to and
+  // lit for a moment (openAt)
+  function open(section, key) {
     watchdog.arm([section || ""]);
     if (!mgr.comp || mgr.comp.status !== Component.Ready) {
-      mgr.pending = [section || ""];
+      mgr.pending = [section || "", key || ""];
       mgr.compile();
       return;
     }
@@ -162,6 +164,7 @@ Scope {
     if (scr && !mgr.win.visible && mgr.win.screen !== scr) mgr.win.screen = scr;
     const was = mgr.win.visible;
     mgr.win.openPopup(section || "");
+    if (key) mgr.win.reveal(key);
     // already open is not the same as in front of you — it may be on
     // another workspace entirely
     if (was) mgr.raise();
@@ -187,6 +190,15 @@ Scope {
     else mgr.open("");
   }
 
+  // STRAIGHT TO ONE SETTING (user, 2026-10-27): by its key, from anywhere —
+  // the bar's menu, a notice, a Health finding. A key Oracle does not know
+  // opens the panel where it was left.
+  function openAt(key) {
+    const s = Oracle.spec(String(key || ""));
+    if (!s) { mgr.open(""); return; }
+    mgr.open(s.section, s.key);
+  }
+
   function close() {
     if (mgr.alive()) mgr.win.closePopup();
   }
@@ -200,6 +212,8 @@ Scope {
     // open standing in a named section, for a keybind or a menu that goes
     // straight to the monitors or the lock rather than wherever it was left
     function at(section: string) { mgr.open(section); }
+    // open on one setting, by its key: `qs ipc call Oracle show barAutohide`
+    function show(key: string) { mgr.openAt(key); }
     // open on the FIRST section, wherever it was left — icarus' Settings
     // is a front door, not a return to where you were. Named by position
     // rather than by id, so reordering the sections cannot strand it.

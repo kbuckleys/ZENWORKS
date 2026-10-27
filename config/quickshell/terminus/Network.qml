@@ -105,9 +105,10 @@ Item {
       p.destroy();
     });
     p.command = ["python3", "-I", net.helper].concat(args);
+    // the password written once python is really there (AtomicWriter's
+    // lesson: a write in the same breath as `running` can be lost)
+    p.started.connect(() => { p.write((password || "") + "\n"); p.stdinEnabled = false; });
     p.running = true;
-    p.write((password || "") + "\n");
-    p.stdinEnabled = false;
   }
 
   // place: { uri, name, user, domain }; opts: { password, remember, accept }

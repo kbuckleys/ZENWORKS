@@ -102,7 +102,10 @@ Scope {
       if (Array.isArray(st.recent)) mgr.recent = st.recent.slice(0, 40);
       if (typeof st.clearAfter === "number" && st.clearAfter >= 0) mgr.clearAfter = st.clearAfter;
       mgr.migrated = !!st.migrated;
-    } catch (e) {}
+    } catch (e) {
+      // the accounts are in it: kept aside before the next save
+      if (String(stateFile.text() || "").trim() !== "") Strings.keepAside(stateFile.path, "calypso");
+    }
     // The account rbw already had, before calypso kept accounts of its own
     // (it drove rbw alone until 2026-10-11): brought over once, so the
     // vault Quick Access opened yesterday is still there today.

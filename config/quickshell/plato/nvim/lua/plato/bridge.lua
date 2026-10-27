@@ -594,6 +594,83 @@ end
 
 function methods.ping() return "pong" end
 
+-- A COLOR UNDER THE CURSOR, for the window's color sheet (ColorSheet.qml):
+-- a #rgb, #rrggbb or #rrggbbaa the cursor is on, with where it stands (on
+-- none, only where the cursor is: no `hex`, and the window opens nothing).
+-- Bytes, 0-based, end exclusive, as nvim_buf_set_text takes them.
+function methods.colorAt()
+  local buf = api.nvim_get_current_buf()
+  local row, col = unpack(api.nvim_win_get_cursor(0))
+  local line = api.nvim_get_current_line()
+  local from = 1
+  while true do
+    local a, b = line:find("#%x+", from)
+    if not a then break end
+    local n = b - a
+    if (n == 3 or n == 6 or n == 8) and col >= a - 1 and col <= b - 1 then
+      local hex = line:sub(a + 1, b)
+      if n == 3 then hex = hex:gsub("(%x)", "%1%1") end
+      return { buf = buf, line = row, s = a - 1, e = b, hex = hex:sub(1, 6),
+               alpha = n == 8 and line:sub(b - 1, b) or "" }
+    end
+    from = b + 1
+  end
+  return { buf = buf, line = row, col = col }
+end
+function methods.setColor(p)
+  local buf = p.buf or 0
+  if not api.nvim_buf_is_valid(buf) then return false end
+  if p.s == nil or p.e == nil then return false end
+  local r = (p.line or 1) - 1
+  pcall(api.nvim_buf_set_text, buf, r, p.s, r, p.e, { tostring(p.hex or "") })
+  view.schedule(true)
+  return true
+end
+
+-- THE SELECTION, for a note (the window hands it to clio): the lines a
+-- visual selection covers, or the cursor's line, with the file and the line
+-- numbers they came from. Visual mode is left, as fork leaves it.
+function methods.selection()
+  local mode = api.nvim_get_mode().mode
+  local visual = mode == "v" or mode == "V" or mode == "\22"
+  local lines, l1, l2
+  if visual then
+    local a, b = vim.fn.getpos("v"), vim.fn.getpos(".")
+    lines = vim.fn.getregion(a, b, { type = mode })
+    l1, l2 = math.min(a[2], b[2]), math.max(a[2], b[2])
+    api.nvim_feedkeys(vim.keycode("<Esc>"), "nx", false)
+  else
+    l1 = api.nvim_win_get_cursor(0)[1]
+    l2, lines = l1, { api.nvim_get_current_line() }
+  end
+  return { lines = lines, file = api.nvim_buf_get_name(0), l1 = l1, l2 = l2, ft = vim.bo.filetype }
+end
+
+-- LINES UNDER THE CURSOR'S, for the window's pictures into Markdown (a
+-- drop or a paste): `lines` put in below the current line, the cursor on
+-- the last of them.
+function methods.insertBelow(p)
+  local row = api.nvim_win_get_cursor(0)[1]
+  local lines = p.lines or {}
+  if #lines == 0 then return false end
+  api.nvim_buf_set_lines(0, row, row, false, lines)
+  pcall(api.nvim_win_set_cursor, 0, { row + #lines, 0 })
+  view.schedule(true)
+  return true
+end
+
+-- THE WHOLE BUFFER, for the window's Markdown preview (PlatoWindow): its
+-- text with the buffer and its changedtick, or { same = true } when the
+-- caller already has this buffer at this tick — asked again and again while
+-- the preview is up, it costs a compare until something is typed.
+function methods.text(p)
+  local buf = api.nvim_get_current_buf()
+  local tick = api.nvim_buf_get_changedtick(buf)
+  if p and p.buf == buf and p.tick == tick then return { same = true } end
+  return { buf = buf, tick = tick, file = api.nvim_buf_get_name(buf), ft = vim.bo[buf].filetype,
+           text = table.concat(api.nvim_buf_get_lines(buf, 0, -1, false), "\n") }
+end
+
 -- ── KEYS DO NOT WAIT FOR THE MAIN LOOP ─────────────────────────────────
 -- A key typed mid-command — the second g of gg, the j of 10j, the second d
 -- of dd — arrives while nvim is sitting in its key reader waiting for exactly

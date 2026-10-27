@@ -187,13 +187,7 @@ Scope {
     printErrors: false
     onLoaded: mgr.nerd = A.parseNerdNames(nerdFile.text())
     // not fetched yet: fetched, once (a week-old copy is fetched again)
-    onLoadFailed: nerdFetch.running = true
-  }
-  Process {
-    id: nerdFetch
-    command: ["sh", "-c", "mkdir -p \"$(dirname \"$1\")\" && curl -fsSL --max-time 30 -o \"$1.part\" \"$2\" && mv -f \"$1.part\" \"$1\"",
-              "sh", mgr.nerdPath, A.NERD_NAMES_URL]
-    onExited: (code) => { if (code === 0) nerdFile.reload(); }
+    onLoadFailed: Net.fetch(A.NERD_NAMES_URL, mgr.nerdPath, { timeout: 30 }, (ok) => { if (ok) nerdFile.reload(); })
   }
   Process {
     running: true

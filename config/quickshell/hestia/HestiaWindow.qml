@@ -61,10 +61,7 @@ FloatingWindow {
   function refocus() { Qt.callLater(() => keys.forceActiveFocus()); }
 
   // ── WHAT WAS JUST DONE, SAID ONCE ─────────────────────────────────────
-  property string said: ""
-  property bool saidBad: false
-  function say(t, bad) { hw.said = t; hw.saidBad = !!bad; sayTimer.restart(); }
-  Timer { id: sayTimer; interval: 3200; onTriggered: hw.said = "" }
+  function say(t, bad) { saidBox.say(t, bad); }
   Connections {
     target: hw.mgr
     function onActed(ok, words) { hw.say(words, !ok); }
@@ -194,8 +191,8 @@ FloatingWindow {
       anchors.bottomMargin: 18
       z: 5
       maxWidth: 620
-      text: hw.said
-      bad: hw.saidBad
+      id: saidBox
+      lasts: 3200
     }
 
     HintBar {

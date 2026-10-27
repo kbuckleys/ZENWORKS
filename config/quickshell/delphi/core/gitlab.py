@@ -455,7 +455,11 @@ def _rel(r):
             "when": r.get("released_at") or r.get("created_at"),
             "url": ((r.get("_links") or {}).get("self")) or "",
             "target": (r.get("commit") or {}).get("id") or "",
-            "assets": [{"name": a.get("name"), "size": 0, "downloads": -1, "url": a.get("url")} for a in links]}
+            "assets": [{"name": a.get("name"), "size": 0, "downloads": -1, "url": a.get("url")} for a in links],
+            # the tag's own archives (github.py's _sources): zip, tar.gz,
+            # tar.bz2, tar
+            "sources": [rest.source_row(s.get("format") or "", s.get("url"))
+                        for s in (r.get("assets") or {}).get("sources") or [] if s.get("url")]}
 
 
 def releases(full):

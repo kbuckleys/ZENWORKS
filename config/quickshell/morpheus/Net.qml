@@ -12,6 +12,7 @@
 // live translation asks as you type. A crash in curl is curl's alone.
 //
 //   Net.request(method, url, { headers, body, timeout }, (status, text) => …)
+//   Net.fetch(url, file, { timeout, maxBytes }, (ok) => …)
 //
 // `status` is the HTTP status, or 0 when nothing came back (no network, a
 // timeout, curl missing) — what XMLHttpRequest said in the same case, so a
@@ -41,6 +42,38 @@ Singleton {
     // started as it is made: everything it needs is set before it runs
     call.createObject(root, { command: argv, done: done, input: hasBody ? String(o.body) : "",
                               stdinEnabled: hasBody, running: true });
+  }
+
+  // A FILE FROM THE WEB, KEPT: `url` into `file` once — already there, it
+  // is not asked for again. The covers (NowPlaying.art), the pictures in
+  // Delphi's release notes, Alexandria's glyph names: one way, not three
+  // (audit, 2026-10-27). Only http(s), and curl kept to it on redirects
+  // too, with `--` before the address — these come from other people's
+  // words (release notes, a player's metadata), and curl would as readily
+  // take a gopher:// or a -K. Written as file.part and moved, so a fetch
+  // cut short never passes for the file. done(ok).
+  function fetch(url, file, opts, done) {
+    const o = opts || {};
+    const u = String(url || "");
+    if (!/^https?:\/\/\S+$/i.test(u) || String(file || "") === "") { if (done) Qt.callLater(() => done(false)); return; }
+    getter.createObject(root, { done: done, running: true, command: ["sh", "-c",
+      'f=$1; [ -s "$f" ] && exit 0; mkdir -p "${f%/*}" || exit 1; '
+      + 'curl -fsSL --proto =http,https --proto-redir =http,https --max-time "$3" --max-filesize "$4" -o "$f.part" -- "$2" '
+      + '&& [ -s "$f.part" ] && mv -f "$f.part" "$f" || { rm -f "$f.part"; exit 1; }',
+      "sh", String(file), u, String(o.timeout || 30), String(o.maxBytes || 100000000)] });
+  }
+  Component {
+    id: getter
+    Process {
+      id: g
+      property var done: null
+      onExited: (code) => {
+        const fn = g.done;
+        g.done = null;
+        g.destroy();
+        if (fn) fn(code === 0);
+      }
+    }
   }
 
   // the text curl printed, split from the status -w put on its last line

@@ -203,7 +203,10 @@ Scope {
       if (st.pushTo && typeof st.pushTo === "object") mgr.pushTo = st.pushTo;
       if (st.syncs && typeof st.syncs === "object") mgr.syncs = st.syncs;
       if (st.sshFor && typeof st.sshFor === "object") mgr.sshFor = st.sshFor;
-    } catch (e) {}
+    } catch (e) {
+      // the repositories and servers are in it: kept aside before the next save
+      if (String(stateFile.text() || "").trim() !== "") Strings.keepAside(stateFile.path, "delphi");
+    }
   }
   function keep_() { keepTimer.restart(); }
   Timer {

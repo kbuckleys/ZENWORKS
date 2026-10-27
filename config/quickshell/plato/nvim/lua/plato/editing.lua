@@ -68,6 +68,7 @@ function M.options(p)
   if p.indentGuides ~= nil then vim.g.plato_guides = p.indentGuides end
   if p.rainbowBrackets ~= nil then vim.g.plato_rainbow = p.rainbowBrackets end
   if p.suggestParsers ~= nil then vim.g.plato_suggest_parsers = p.suggestParsers end
+  if p.suggestTools ~= nil then vim.g.plato_suggest_tools = p.suggestTools end
   if type(p.markdown) == "table" then vim.g.plato_md = p.markdown end
   if p.largeFileMB ~= nil then vim.g.plato_large_mb = p.largeFileMB end
   -- TYPEWRITER (zen only, PlatoWindow decides): the cursor's line held in

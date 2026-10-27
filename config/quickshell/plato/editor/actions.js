@@ -31,6 +31,12 @@
 //   ctx.lspMenu()           restart, stop, format, check the language servers
 //   ctx.plugins(page)       the plugin manager, on a page: "parsers"
 //   ctx.toggleSetting(key)  flip one of plato's on/off settings
+//   ctx.git()               delphi (history, blame, show) or null
+//   ctx.toggleMdPreview()   the Markdown preview beside the text
+//   ctx.pickColor()         the #hex under the cursor in a color picker
+//   ctx.pastePicture()      a picture on the clipboard, beside the file, linked
+//   ctx.toNote()            the selection (or the line) to a new Clio note
+//   ctx.line()              the cursor's line
 //
 // An action with no `keys` is in the palette only; `hint` is the key that
 // does it elsewhere (| for the tree), shown beside it there.
@@ -43,6 +49,13 @@
 .pragma library
 
 // groups on the leader menu, by their key
+// delphi for a file on disk when the shell has it, the command otherwise
+function gitOr(c, viaDelphi, cmd) {
+  const g = c.git ? c.git() : null, f = c.file();
+  if (g && f !== "") viaDelphi(g, f);
+  else c.client.cmd(cmd);
+}
+
 const groups = {
   "l": "LSP",
   "g": "Git",
@@ -101,6 +114,10 @@ const list = [
   { title: "Indent guides", run: (c) => c.toggleSetting("indentGuides") },
   { keys: "v", title: "Markdown: rendered / as written",
     run: (c) => c.client.cmd("lua require('plato.markdown').toggle()") },
+  { keys: "M", title: "Markdown preview beside the text", run: (c) => c.toggleMdPreview() },
+  { keys: "c", title: "Pick a color…", run: (c) => c.pickColor() },
+  { keys: "P", title: "Paste a picture into Markdown", run: (c) => c.pastePicture() },
+  { keys: "C", title: "Send to a Clio note", run: (c) => c.toNote() },
   { keys: "x", title: "Tick / untick checkbox",
     run: (c) => c.client.cmd("lua require('plato.markdown').toggleTask()") },
   { keys: "k", title: "Spell check on / off", hint: "z= suggests",
@@ -124,9 +141,14 @@ const list = [
 
   // ── git, through fugitive ─────────────────────────────────────────────
   // each one a toggle: up again, it closes (confine.lua)
-  { keys: "gs", title: "Git status", run: (c) => c.client.cmd("lua require('plato.confine').toggle('status', 'Git')") },
-  { keys: "gb", title: "Git blame", run: (c) => c.client.cmd("lua require('plato.confine').toggle('blame', 'Git blame')") },
-  { keys: "gl", title: "Git log", run: (c) => c.client.cmd("lua require('plato.confine').toggle('log', 'Git log --oneline')") },
+  // in delphi, the suite's git client, when the shell has it (user,
+  // 2026-10-27: git through delphi); fugitive's own windows otherwise
+  { keys: "gs", title: "Git status", run: (c) => gitOr(c, (g, f) => g.show(f, "changes"),
+      "lua require('plato.confine').toggle('status', 'Git')") },
+  { keys: "gb", title: "Git blame", run: (c) => gitOr(c, (g, f) => g.blame(f, c.line()),
+      "lua require('plato.confine').toggle('blame', 'Git blame')") },
+  { keys: "gl", title: "Git log", run: (c) => gitOr(c, (g, f) => g.history(f),
+      "lua require('plato.confine').toggle('log', 'Git log --oneline')") },
 
   // ── several cursors (multicursor.nvim; see its config file) ──────────
   { keys: "mn", title: "Add cursor at next match", run: (c) => c.client.cmd("lua require('multicursor-nvim').matchAddCursor(1)") },

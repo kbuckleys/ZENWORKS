@@ -5,17 +5,23 @@
 //
 // WHAT WAS JUST DONE, SAID ONCE: the small hud pill a window shows over its
 // foot ("Saved", "Copied", a failure in red) and fades out again. Nine
-// windows wore this as their own Rectangle; where it stands and how long
-// the words stay are still each window's (its said/saidBad and say()).
+// windows wore this as their own Rectangle; where it stands, and how long
+// the words stay (`lasts`), are still each window's.
 //
 //   import "../morpheus/controls" as Ctl
 //   Ctl.Said {
+//     id: saidBox
 //     anchors.horizontalCenter: body.horizontalCenter
 //     anchors.bottom: foot.top
 //     anchors.bottomMargin: 18
-//     text: win.said
-//     bad: win.saidBad
+//     lasts: 2600
 //   }
+//   function say(t, bad) { saidBox.say(t, bad); }
+//
+// IT KEEPS ITS OWN WORDS (audit, 2026-10-27): say() puts them up and they
+// go after `lasts` ms. Eleven windows each kept a said string, a bad flag
+// and a Timer to clear them, alike but for how long; that is here now, and
+// a window's say() hands over.
 //
 // A directory with no qmldir, imported by path (see Check.qml).
 
@@ -31,6 +37,15 @@ Rectangle {
   property real maxWidth: 560
   property real ground: 0.85
   property int pixelSize: Zenon.px(15)
+  // how long words stay up after say(), in ms
+  property int lasts: 2600
+
+  function say(t, isBad) {
+    said.text = String(t ?? "");
+    said.bad = !!isBad;
+    clearAfter.restart();
+  }
+  Timer { id: clearAfter; interval: said.lasts; onTriggered: said.text = "" }
 
   width: Math.min(saidText.implicitWidth + 32, said.maxWidth)
   height: 34

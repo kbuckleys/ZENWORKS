@@ -85,6 +85,9 @@ QtObject {
   property bool reopenTabs: false
   // a file in a language with no parser offers to build one (suggest.lua)
   property bool suggestParsers: true
+  // a file whose language server, formatter or checker is missing offers
+  // to install it through Ceres (suggest.lua)
+  property bool suggestTools: true
   // a file bigger than this opens with the extras off (large.lua)
   property int largeFileMB: 5
   // the window that opens on an empty buffer: recent files, pins, projects
@@ -219,6 +222,9 @@ QtObject {
 
     { key: "suggestParsers", section: "editing", label: "Offer missing syntax parsers", type: "bool",
       help: "A file in a language plato has no treesitter parser for asks once whether to build one. \"Never\" is remembered per language; the plugins sheet's Parsers page builds any of them by hand." },
+
+    { key: "suggestTools", section: "editing", label: "Offer missing language tools", type: "bool",
+      help: "A file whose language server, formatter or checker is not installed asks once per language whether to install it, through Ceres. \"Never\" is remembered per package." },
 
     { key: "gitGutter", section: "git", label: "Changes in the gutter", type: "bool",
       help: "A bar down the gutter's edge where lines were added (green) or changed (yellow) since the last commit, and a red wedge where some were deleted. Also on the scrollbar." },

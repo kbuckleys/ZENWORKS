@@ -2798,7 +2798,8 @@ function urlFallbackName(url) {
   let n = cut < 0 ? u : u.slice(cut + 1);
   try { n = decodeURIComponent(n); } catch (e) { /* leave it as it came */ }
   n = n.replace(/[\/\0]/g, "");
-  return n === "" ? "download" : n;
+  // "." and ".." name no file of their own
+  return n === "" || n === "." || n === ".." ? "download" : n;
 }
 
 function conflictCommand(names, destDir) {

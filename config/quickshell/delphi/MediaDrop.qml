@@ -33,7 +33,9 @@ DropArea {
   readonly property bool over: drop.containsDrag
   property int out: 0
   readonly property bool busy: drop.out > 0
-  readonly property string dir: Paths.cacheDir() + "/delphi/dropped"
+  // where fetched and written pictures go: the cache, for the release
+  // editor; plato's Markdown drop sets the file's own directory
+  property string dir: Paths.cacheDir() + "/delphi/dropped"
 
   readonly property var imageTypes: ["image/png", "image/jpeg", "image/gif", "image/webp", "image/avif", "image/bmp"]
 
@@ -75,7 +77,7 @@ DropArea {
       property string said: ""
       command: ["sh", "-c",
         'd=$1; mkdir -p "$d" || exit 1; f="$d/$(printf %s "$2" | md5sum | cut -c1-16)"; '
-        + 't=$(curl -fsSL --max-time 120 --max-filesize 300000000 -o "$f.part" -w "%{content_type}" "$2") || { rm -f "$f.part"; exit 1; }; '
+        + 't=$(curl -fsSL --proto =http,https --proto-redir =http,https --max-time 120 --max-filesize 300000000 -o "$f.part" -w "%{content_type}" -- "$2") || { rm -f "$f.part"; exit 1; }; '
         + 'case $t in image/png*) e=png;; image/jpeg*) e=jpg;; image/gif*) e=gif;; image/webp*) e=webp;; image/avif*) e=avif;; '
         + 'image/svg*) e=svg;; video/mp4*) e=mp4;; video/webm*) e=webm;; video/quicktime*) e=mov;; '
         + '*) n=${2%%[?#]*}; e=${n##*.}; case $e in */*|"") rm -f "$f.part"; exit 2;; esac;; esac; '

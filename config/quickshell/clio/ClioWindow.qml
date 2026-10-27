@@ -645,10 +645,7 @@ FloatingWindow {
   }
 
   // ── SAID ONCE ──────────────────────────────────────────────────────────
-  property string said: ""
-  property bool saidBad: false
-  function say(t, bad) { win.said = t; win.saidBad = !!bad; sayTimer.restart(); }
-  Timer { id: sayTimer; interval: 2600; onTriggered: win.said = "" }
+  function say(t, bad) { saidBox.say(t, bad); }
   Connections { target: win.mgr; function onFailure(text) { win.say(text, true); } }
   // the sync guard: the note changed on another machine as well — the one
   // from there is shown, what was written here kept beside it
@@ -937,8 +934,8 @@ FloatingWindow {
       anchors.horizontalCenter: pane.horizontalCenter
       anchors.bottom: foot.top
       anchors.bottomMargin: 18 + pane.findH
-      text: win.said
-      bad: win.saidBad
+      id: saidBox
+      lasts: 2600
     }
 
     // ── and up out of the foot ──

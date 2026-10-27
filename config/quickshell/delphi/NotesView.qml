@@ -20,6 +20,9 @@ Column {
   property string body: ""
   property string empty: "No notes"
   property int textSize: Zenon.px(17)
+  // where a relative picture's address starts (a Markdown file's own
+  // directory, in plato's preview); "" for none — a release's notes
+  property string base: ""
 
   readonly property var parts: D.notesParts(view.body)
   spacing: 10
@@ -44,7 +47,7 @@ Column {
       }
       Component {
         id: mediaComp
-        NotesMedia { width: part.width; kind: part.modelData.kind; url: part.modelData.url; alt: part.modelData.alt }
+        NotesMedia { width: part.width; kind: part.modelData.kind; url: part.modelData.url; alt: part.modelData.alt; base: view.base }
       }
     }
   }

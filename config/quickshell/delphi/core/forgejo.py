@@ -368,7 +368,12 @@ def _rel(r):
             "url": r.get("html_url"), "target": r.get("target_commitish") or "",
             "assets": [{"name": a.get("name"), "size": a.get("size", 0),
                         "downloads": a.get("download_count", 0),
-                        "url": a.get("browser_download_url")} for a in r.get("assets") or []]}
+                        "url": a.get("browser_download_url")} for a in r.get("assets") or []],
+            # the tag's own archives (github.py's _sources); these are
+            # the web's links already
+            "sources": [] if r.get("draft") else
+                       [rest.source_row(kind, r[key]) for kind, key in (("zip", "zipball_url"), ("tar.gz", "tarball_url"))
+                        if r.get(key)]}
 
 
 def releases(full):

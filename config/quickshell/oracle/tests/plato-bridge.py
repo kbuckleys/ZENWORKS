@@ -1070,6 +1070,45 @@ try:
     check("log: dates, T, keys, numbers, strings", [g for g in got if g[0] not in (20, 25)] == want, got)
     b14.send("quit"); b14.proc.wait(timeout=5)
 
+    # ── 2026-10-27: the preview's text, a color, pictures, a note ──
+    b15 = Bridge(tmp, "today")
+    b15.send("resize", rows=10, cols=80)
+    todayf = os.path.join(tmp, "today.css")
+    with open(todayf, "w") as fh:
+        fh.write("a { color: #12abEF; }\nb { color: #abc; }\nc { color: #11223380; }\nplain line\n")
+    b15.send("open", path=todayf); b15.settle(0.4)
+    def ask15(method, **params):
+        b15.s.sendall((json.dumps({"id": 915, "method": method, "params": params}) + "\n").encode())
+        while True:
+            ev = json.loads(b15.f.readline())
+            if ev.get("id") == 915: return ev.get("result")
+    t1 = ask15("text")
+    check("text: the whole buffer, with its tick", t1 and t1["text"].startswith("a { color: #12abEF; }") and t1["tick"] > 0, t1)
+    t2 = ask15("text", buf=t1["buf"], tick=t1["tick"])
+    check("text: the same tick is answered as unchanged", t2 == {"same": True}, t2)
+    b15.keys("0f#")
+    c1 = ask15("colorAt")
+    check("colorAt: the #rrggbb under the cursor, and where", c1 and c1["hex"] == "12abEF" and c1["s"] == 11 and c1["e"] == 18, c1)
+    ask15("setColor", **dict(c1, hex="#000000")); b15.settle()
+    check("setColor: written over the one it opened on", b15.text()[0] == "a { color: #000000; }", b15.text())
+    b15.keys("j0f#")
+    c2 = ask15("colorAt")
+    check("colorAt: a #rgb reads as #rrggbb", c2 and c2["hex"] == "aabbcc", c2)
+    b15.keys("j0f#")
+    c3 = ask15("colorAt")
+    check("colorAt: an #rrggbbaa keeps its alpha apart", c3 and c3["hex"] == "112233" and c3["alpha"] == "80", c3)
+    b15.keys("j0")
+    c4 = ask15("colorAt")
+    check("colorAt: on no color, where one would go in", c4 and "hex" not in c4 and c4["line"] == 4, c4)
+    ask15("insertBelow", lines=["![shot](shot.png)"]); b15.settle()
+    check("insertBelow: a line under the cursor's", b15.text()[4] == "![shot](shot.png)", b15.text())
+    b15.keys("gg"); b15.keys("V"); b15.keys("j")
+    sel = ask15("selection"); b15.settle()
+    check("selection: the lines a visual selection covers, and where",
+          sel and sel["lines"] == ["a { color: #000000; }", "b { color: #abc; }"] and sel["l1"] == 1 and sel["l2"] == 2
+          and sel["file"].endswith("today.css"), sel)
+    check("selection: visual mode is left", b15.last["mode"] == "n", b15.last["mode"])
+
     # an engine that cannot listen (a socket it may not make) goes at once,
     # rather than idling forever where no window can reach it
     longsock = "/proc/plato-test/no.sock"
@@ -1092,7 +1131,7 @@ try:
     check("two untitled buffers rescued side by side", after - before == 2, (before, after))
 
 finally:
-    for p in ("b", "b2", "b3", "b4", "b5", "b6", "b7", "b8", "b9", "b10", "b11", "b12", "b13", "b14"):
+    for p in ("b", "b2", "b3", "b4", "b5", "b6", "b7", "b8", "b9", "b10", "b11", "b12", "b13", "b14", "b15"):
         br = globals().get(p)
         if br and br.proc.poll() is None: br.proc.kill()
     shutil.rmtree(tmp, ignore_errors=True)

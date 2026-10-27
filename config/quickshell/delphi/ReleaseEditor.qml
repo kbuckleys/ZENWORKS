@@ -151,6 +151,7 @@ Item {
         win.say("Only pictures and videos go into the notes — the rest were left out", true);
       if (ok.length === 0) return;
       const text = ok.map((p) => D.mediaMarkdown(p)).join("\n\n");
+      ed.noteMedia(ok);
       Qt.callLater(() => mdTarget.insert("\n" + text + "\n"));
     }, "", true, false);
   }
@@ -415,7 +416,16 @@ Item {
     const p = mediaDrop.mapToItem(f, at.x, at.y);
     f.cursorPosition = f.positionAt(p.x, p.y);
   }
+  // THE FILES THAT MAY BE SENT: only those picked or dropped here (audit,
+  // 2026-10-27). The notes can come from a cloned repo's changelog, the
+  // forge or a release already up, and a file:// line in any of those
+  // would otherwise upload that file of this computer on save.
+  function noteMedia(paths) {
+    const e = ed.page ? ed.page.edit : null;
+    if (e) e.media = (e.media || []).concat(paths);
+  }
   function dropMedia(paths, at) {
+    ed.noteMedia(paths);
     ed.placeAt(at);
     const f = notes.edit, c = f.cursorPosition;
     // a line of its own: a break before unless at a line's start

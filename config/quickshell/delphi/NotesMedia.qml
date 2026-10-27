@@ -13,7 +13,6 @@
 
 import QtQuick
 import QtMultimedia
-import Quickshell.Io
 import "../morpheus"
 
 Item {
@@ -21,11 +20,21 @@ Item {
   property string kind: "image"   // or "video"
   property string url: ""
   property string alt: ""
+  // a relative address is a file beside the Markdown that names it (plato's
+  // preview hands its directory in, NotesView.base); `addr` is what is shown
+  property string base: ""
+  readonly property string addr: med.base === "" || med.url === "" || /^[a-z][a-z0-9+.-]*:/i.test(med.url)
+    ? med.url
+    : Strings.fileUrl(med.url.charAt(0) === "/" ? med.url : med.base + "/" + med.decoded(med.url))
+  function decoded(u) { try { return decodeURI(u); } catch (e) { return u; } }
 
-  readonly property bool local: /^file:\/\//i.test(med.url)
+  readonly property bool local: /^file:\/\//i.test(med.addr)
+  // fetched only from the web: notes are anyone's words, and curl would
+  // take a gopher:// or a -K as readily (audit, 2026-10-27)
+  readonly property bool web: /^https?:\/\/[^\s]+$/i.test(med.addr)
   // the file shown: the local one, or the cached copy once it is in
-  property string file: med.local ? med.url : ""
-  property bool failed: false
+  property string file: med.local ? med.addr : ""
+  property bool failed: !med.local && !med.web
   readonly property bool loading: !med.local && med.file === "" && !med.failed
   readonly property int maxH: 520
 
@@ -43,24 +52,16 @@ Item {
   // named by the address; its extension kept, so the player knows the
   // kind (GitHub's own videos have none: an .mp4)
   readonly property string ext: {
-    const m = /\.(\w{2,4})(?:[?#]|$)/.exec(med.url.replace(/^\w+:\/\/[^\/]*/, ""));
+    const m = /\.(\w{2,4})(?:[?#]|$)/.exec(med.addr.replace(/^\w+:\/\/[^\/]*/, ""));
     return m ? "." + m[1].toLowerCase() : med.kind === "video" ? ".mp4" : "";
   }
   readonly property string cacheFile: med.local ? ""
-    : Paths.cacheDir() + "/delphi/media/" + Qt.md5(med.url) + med.ext
-  Process {
-    id: fetch
-    running: !med.local && med.url !== ""
-    command: ["sh", "-c",
-      'f=$1; [ -s "$f" ] && exit 0; mkdir -p "${f%/*}" || exit 1; '
-      + 'curl -fsSL --max-time 300 --max-filesize "$3" -o "$f.part" "$2" '
-      + '&& [ -s "$f.part" ] && mv -f "$f.part" "$f" || { rm -f "$f.part"; exit 1; }',
-      "sh", med.cacheFile, med.url, med.kind === "video" ? "300000000" : "40000000"]
-    onExited: (code) => {
-      if (code === 0) med.file = Strings.fileUrl(med.cacheFile);
-      else med.failed = true;
-    }
-  }
+    : Paths.cacheDir() + "/delphi/media/" + Qt.md5(med.addr) + med.ext
+  // the one fetch the suite has (morpheus/Net.fetch): http(s) only, kept
+  Component.onCompleted: if (med.web)
+    Net.fetch(med.addr, med.cacheFile, { timeout: 300, maxBytes: med.kind === "video" ? 300000000 : 40000000 },
+      (ok) => { if (!med) return; if (ok) med.file = Strings.fileUrl(med.cacheFile); else med.failed = true; })
+
 
   // loading, or not to be had
   Row {
@@ -73,7 +74,7 @@ Item {
       anchors.verticalCenter: parent.verticalCenter
       textFormat: Text.StyledText
       text: (med.kind === "video" ? "A video" : "A picture") + " that could not be fetched — "
-        + "<a href=\"" + med.url.replace(/"/g, "%22") + "\">open it</a>"
+        + "<a href=\"" + med.addr.replace(/"/g, "%22") + "\">open it</a>"
       color: Zenon.accentMuted
       linkColor: Zenon.link
       font.family: Zenon.face
@@ -95,8 +96,8 @@ Item {
     asynchronous: true
     smooth: true
     mipmap: true
+    // no hairline round it (user, 2026-10-27): the picture as it is
     onStatusChanged: if (status === Image.Error) med.failed = true
-    Rectangle { anchors.fill: parent; color: "transparent"; border.width: 1; border.color: Zenon.border; radius: Zenon.radiusControl }
   }
 
   // ── A VIDEO: a still until played ──

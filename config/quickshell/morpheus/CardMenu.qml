@@ -23,13 +23,15 @@
 // Putting it away is the caller's: it sets `open` false — on a choice, on a
 // focus grab clearing, on escape. The card never closes itself.
 //
-// A row is { text, icon, image, hasChildren, isSeparator, enabled, mark,
-// danger, asks }. Everything but `text` is optional. `icon` is a font glyph
-// and `image` a URL, for the menus whose icons come from applications rather
-// than from the font; `mark` is a tick on the right, for the rows that report
-// a current choice rather than perform an action; `danger` reddens a row that
-// is armed and waiting to be confirmed; `asks` means the row opens a question
-// rather than acting, so it does not flash. A row with `children` (rows of
+// A row is { text, icon, image, swatch, weight, hasChildren, isSeparator,
+// enabled, mark, danger, asks }. Everything but `text` is optional. `icon`
+// is a font glyph and `image` a URL, for the menus whose icons come from
+// applications rather than from the font; `swatch` is a theme's three
+// colors (see Swatch), `weight` the row's own font weight; `mark` is a tick
+// on the right, for the rows that report a current choice rather than
+// perform an action; `danger` reddens a row that is armed and waiting to be
+// confirmed; `asks` means the row opens a question rather than acting, so
+// it does not flash. A row with `children` (rows of
 // its own) is a branch: pointed at, they open in CardPopup's card beside it
 // (MenuCore's BRANCHES), and a row picked there comes out as subChosen.
 //
@@ -103,7 +105,8 @@ PanelWindow {
       const r = rows[i];
       if (!r || r.isSeparator) continue;
       let w = rowMetrics.advanceWidth(String(r.text || "")) + 12 + 10;
-      if (r.icon || r.image) w += 16 + Zenon.menuIconGap;
+      if (r.swatch) w += 22 + Zenon.menuIconGap;
+      else if (r.icon || r.image) w += 16 + Zenon.menuIconGap;
       if (r.hasChildren || r.children || r.mark !== undefined) w += 16 + 8;
       most = Math.max(most, w);
     }

@@ -795,10 +795,7 @@ FloatingWindow {
   readonly property bool welcoming: !!win.mgr && win.mgr.accounts.length === 0
 
   // ── SAID ONCE ──────────────────────────────────────────────────────────
-  property string said: ""
-  property bool saidBad: false
-  function say(t, bad) { win.said = t; win.saidBad = !!bad; sayTimer.restart(); }
-  Timer { id: sayTimer; interval: 2600; onTriggered: win.said = "" }
+  function say(t, bad) { saidBox.say(t, bad); }
 
   // ── KEYS ───────────────────────────────────────────────────────────────
   function refocus() {
@@ -1644,8 +1641,8 @@ FloatingWindow {
       anchors.horizontalCenter: detailPane.visible ? detailPane.horizontalCenter : head.horizontalCenter
       anchors.bottom: foot.top
       anchors.bottomMargin: 18
-      text: win.said
-      bad: win.saidBad
+      id: saidBox
+      lasts: 2600
     }
 
     // ── the foot ─────────────────────────────────────────────────────────

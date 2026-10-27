@@ -38,7 +38,10 @@ Scope {
   }
 
   function drain() {
-    if (root.queue.length === 0 || proc.running) return;
+    // busy from the moment a job is taken, not from when the process says
+    // it runs: while the shell starts, `running` set true reads false for a
+    // while, and a second write took the first one's place (audit, 10-27)
+    if (root.queue.length === 0 || root.current !== null || proc.running) return;
     const job = root.queue.shift();
     root.current = job;
     // the failure branch EXITS 1: `|| rm -f` alone ended on rm's own 0, and
@@ -50,12 +53,19 @@ Scope {
       root.tag, job.path];
     proc.stdinEnabled = true;
     proc.running = true;
-    proc.write(job.content);
-    proc.stdinEnabled = false;
   }
 
   Process {
     id: proc
+    // the content written once cat is really there (audit, 2026-10-27):
+    // a write made in the same breath as `running` was lost while the shell
+    // was still starting — cat then waited on stdin for good, and so did
+    // every write queued behind it
+    onStarted: {
+      const job = root.current;
+      proc.write(job ? job.content : "");
+      proc.stdinEnabled = false;
+    }
     onExited: (code) => {
       const job = root.current;
       root.current = null;

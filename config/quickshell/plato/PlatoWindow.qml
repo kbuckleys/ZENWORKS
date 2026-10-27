@@ -13,6 +13,7 @@
 import QtQuick
 import Quickshell
 import Quickshell.Hyprland
+import Quickshell.Io
 import "../morpheus"
 import "../terminus"
 import "core"
@@ -20,6 +21,8 @@ import "editor"
 import "editor/actions.js" as Actions
 import "../morpheus/icons.js" as Icons
 import "../morpheus/hypr.js" as Hypr
+import "../ceres"
+import "../delphi/delphi.js" as D
 
 FloatingWindow {
   id: win
@@ -132,6 +135,7 @@ FloatingWindow {
       typewriter: win.zen && s.typewriter, indentGuides: s.indentGuides,
       largeFileMB: s.largeFileMB, rainbowBrackets: s.rainbowBrackets,
       suggestParsers: s.suggestParsers,
+      suggestTools: s.suggestTools,
       markdown: {
         render: s.mdRender, rawLine: s.mdRawLine, headings: s.mdHeadings, inline: s.mdInline,
         lists: s.mdLists, code: s.mdCode, tables: s.mdTables, quotes: s.mdQuotes, rules: s.mdRules,
@@ -146,6 +150,31 @@ FloatingWindow {
   // view.lua's `para`). Per window, and not kept: it is a mood, not a
   // setting. Esc does not leave it; Space z does.
   property bool zen: false
+
+  // ── MARKDOWN, AS IT READS (user, 2026-10-27) ──────────────────────────
+  // Beside a Markdown file, the page as delphi's notes reader draws it —
+  // pictures and videos included, which the text's own rendering
+  // (markdown.lua) cannot show. Space M; only for Markdown, never in zen.
+  // The text is asked for while it is up (bridge `text`), and comes back
+  // only when the buffer changed.
+  property bool mdPreview: false
+  readonly property bool previewShown: win.mdPreview && st.filetype === "markdown" && !win.zen
+  property string mdText: ""
+  property string mdBase: ""
+  property var mdAt: ({ buf: -1, tick: -1 })
+  Timer {
+    interval: 350
+    repeat: true
+    triggeredOnStart: true
+    running: win.previewShown && win.visible
+    onTriggered: nvim.request("text", { buf: win.mdAt.buf, tick: win.mdAt.tick }, (r) => {
+      if (!r || r.same) return;
+      win.mdAt = { buf: r.buf, tick: r.tick };
+      win.mdText = String(r.text || "");
+      const f = String(r.file || "");
+      win.mdBase = f.lastIndexOf("/") > 0 ? f.slice(0, f.lastIndexOf("/")) : "";
+    })
+  }
   onZenChanged: { win.pushOptions(); zenSlide.restart(); }
 
   // ── SAVED WHEN YOU LOOK AWAY ───────────────────────────────────────
@@ -247,6 +276,15 @@ FloatingWindow {
     onReferences: (items) => picker.openRefs(items)
     onSaveAsWanted: (quit) => win.saveAs(quit)
     onBuildParsers: (langs) => win.buildParsers(langs)
+    // a language's missing tools, asked for in a card (suggest.lua)
+    onInstallWanted: (pkgs, why) => {
+      // installed: the servers turned on again (plugins.lsp) and the file
+      // read again, so the new ones attach, format and check it
+      const asked = Ceres.install(pkgs, why, (ok) => {
+        if (ok) nvim.cmd("lua require('plato.plugins').lsp() | silent! edit");
+      });
+      if (!asked) toasts.take({ kind: "wmsg", text: "Ceres is busy — ask again when it is done" });
+    }
     // `:q` in the editor quits nvim, and a window with no nvim is no editor
     onExited: win.finish(false)
   }
@@ -515,6 +553,10 @@ FloatingWindow {
     // the file being edited, as a path ("" for a buffer with no file)
     file: () => st.file.replace(/^~/, Quickshell.env("HOME")),
     exec: (argv) => Quickshell.execDetached(argv),
+    // delphi, when the shell has it (PlatoManager.gitClient): history(file),
+    // blame(file, line), show(path, page); null and fugitive does the work
+    git: () => win.mgr ? win.mgr.gitClient : null,
+    line: () => st.line,
     toggleTree: () => win.toggleTree(),
     // another plato window, empty, beside this one (as SUPER+E is for terminus)
     newWindow: () => { if (win.mgr) win.mgr.spawn(""); },
@@ -531,6 +573,10 @@ FloatingWindow {
     peek: () => nvim.cmd("lua require('plato.peek').definition()"),
     restoreTabs: () => nvim.request("restore", {}),
     toggleZen: () => { win.zen = !win.zen; },
+    toggleMdPreview: () => { win.mdPreview = !win.mdPreview; },
+    pickColor: () => win.pickColor(),
+    pastePicture: () => win.pastePicture(),
+    toNote: () => win.toNote(),
     // the status line's indent part: how this file is indented and ended
     formatMenu: () => {
       const st0 = st.status, ind = st0.indent || {};
@@ -579,6 +625,73 @@ FloatingWindow {
   // the first line is also the gap beside it, so the current line's bar
   // sits off the window's edges by the same amount all round
   readonly property int editorInset: 6
+  // the Markdown preview's pane (mdPreview): delphi's NotesView, by URL,
+  // in the suite's scroll helpers. IT OPENS AS THE TREE DOES (user,
+  // 2026-10-27: "the same animation like the sidebar, same mechanic"):
+  // terminus' SideRoom on the right edge — a floating window widens by it
+  // and the text holds still, tiled it slides in — and what it shows keeps
+  // its full width, uncovered rather than squeezed, fading with the slide.
+  readonly property real mdWidth: 560
+  SideRoom {
+    id: mdRoom
+    window: win
+    anchor: editor
+    shown: win.previewShown
+    want: win.mdWidth
+    box: previewBox
+    edge: "right"
+    minW: 480
+  }
+  Item {
+    id: previewBox
+    anchors.right: parent.right
+    anchors.top: tabs.bottom
+    anchors.bottom: status.top
+    width: mdRoom.keepW >= 0 ? Math.max(0, Math.min(win.mdWidth, win.width - mdRoom.keepW))
+      : win.previewShown ? win.mdWidth : 0
+    Behavior on width {
+      enabled: !mdRoom.following
+      NumberAnimation { duration: Zenon.normal * 2; easing.type: Zenon.travelEase }
+    }
+    visible: width > 0.5
+    clip: true
+    opacity: Math.pow(Math.min(1, previewBox.width / Math.max(1, win.mdWidth)), 1.5)
+    Rectangle { width: 1; height: parent.height; color: Zenon.border; z: 2 }
+    Flickable {
+      id: mdFlick
+      anchors.left: parent.left
+      anchors.top: parent.top
+      anchors.bottom: parent.bottom
+      width: win.mdWidth
+      contentWidth: width
+      contentHeight: mdLoader.height + 48
+      boundsBehavior: Flickable.StopAtBounds
+      ElasticScroll { view: mdFlick }
+      Loader {
+        id: mdLoader
+        x: 24
+        y: 24
+        width: win.mdWidth - 48
+        active: previewBox.visible
+        source: Qt.resolvedUrl("../delphi/NotesView.qml")
+        onLoaded: {
+          item.width = Qt.binding(() => mdLoader.width);
+          item.body = Qt.binding(() => win.mdText);
+          item.base = Qt.binding(() => win.mdBase);
+          item.empty = "Nothing written yet";
+          item.textSize = Qt.binding(() => Zenon.px(16));
+        }
+      }
+    }
+    Scrollbar {
+      z: 1
+      flick: mdFlick
+      anchors.right: mdFlick.right
+      anchors.top: parent.top
+      anchors.bottom: parent.bottom
+    }
+  }
+
   EditorView {
     id: editor
     hostWindow: win
@@ -599,7 +712,7 @@ FloatingWindow {
     onNewWindowRequested: win.ctx.newWindow()
     onContextRequested: (x, y) => contextMenu.open(x, y)
     anchors.left: sidebarBox.right
-    anchors.right: parent.right
+    anchors.right: previewBox.left
     anchors.top: tabs.bottom
     anchors.bottom: status.top
     anchors.topMargin: win.editorInset
@@ -884,7 +997,8 @@ FloatingWindow {
     anchors.top: parent.top
     anchors.bottom: status.top
     z: 30
-    keys: ["text/uri-list"]
+    // a Markdown file also takes a picture as data (a screenshot tool's)
+    keys: st.filetype === "markdown" ? ["text/uri-list"].concat(win.imageTypes) : ["text/uri-list"]
     property bool over: false
     property real atX: 0
     readonly property bool onStrip: drop.over && tabs.visible && drop.atY < tabs.height
@@ -897,6 +1011,27 @@ FloatingWindow {
     onDropped: (d) => {
       const slot = drop.onStrip ? drop.slot : -1;
       drop.over = false;
+      // PICTURES INTO MARKDOWN (user, 2026-10-27): on the text of a Markdown
+      // file, a picture or video becomes a link under the cursor's line —
+      // one of this computer where it is, a web one fetched and picture data
+      // written out beside the file (delphi's MediaDrop, D.dropSorted).
+      // Anything else still opens as a tab.
+      if (st.filetype === "markdown" && slot < 0 && win.mdDir() !== "") {
+        const kind = win.imageTypes.find((t) => (d.formats || []).indexOf(t) >= 0) || "";
+        const got = D.dropSorted(d.hasUrls ? d.urls : [], "", kind !== "");
+        if (got.files.length || got.web.length || kind !== "") {
+          d.acceptProposedAction();
+          if (got.files.length) win.linkMedia(got.files);
+          for (const u of got.web) mediaHelp.item.fetch(u, Qt.point(0, 0));
+          if (!got.files.length && !got.web.length && kind !== "") {
+            const buf = d.getDataAsArrayBuffer(kind);
+            if (buf && buf.byteLength > 0)
+              mediaHelp.item.write(D.base64Of(buf), kind.split("/")[1].replace("jpeg", "jpg"), Qt.point(0, 0));
+          }
+          editor.forceActiveFocus();
+          return;
+        }
+      }
       const paths = (d.urls || []).map((u) => String(u))
         .filter((u) => u.startsWith("file://"))
         .map((u) => decodeURIComponent(u.replace(/^file:\/\/[^/]*/, "")));
@@ -1083,6 +1218,96 @@ FloatingWindow {
   }
   function showSettings() { settingsSheet.open(); }
   // a row of the tree, its properties — terminus' card, see PropsSheet
+  // ── PICTURES INTO MARKDOWN ─────────────────────────────────────────────
+  readonly property var imageTypes: ["image/png", "image/jpeg", "image/gif", "image/webp", "image/avif", "image/bmp"]
+  // the Markdown file's own directory, "" for a buffer with no file
+  function mdDir() {
+    const f = st.file.replace(/^~/, Quickshell.env("HOME"));
+    return f.lastIndexOf("/") > 0 ? f.slice(0, f.lastIndexOf("/")) : "";
+  }
+  // a link per file, its path from the Markdown file's directory when it is
+  // under it, as it is otherwise
+  function linkMedia(paths) {
+    const dir = win.mdDir();
+    const lines = (paths || []).map((p) => {
+      const rel = dir !== "" && p.indexOf(dir + "/") === 0 ? p.slice(dir.length + 1) : p;
+      const url = encodeURI(rel);
+      const name = D.baseName(p).replace(/\.[^.]*$/, "").replace(/[\[\]]/g, "");
+      return D.mediaKindOf(p) === "video" ? url : "![" + name + "](" + url + ")";
+    });
+    if (lines.length) nvim.request("insertBelow", { lines: lines });
+  }
+  // delphi's MediaDrop, by URL, as a helper only: its fetch and write, into
+  // the Markdown file's directory; it takes no drops of its own
+  Loader {
+    id: mediaHelp
+    active: st.filetype === "markdown"
+    source: Qt.resolvedUrl("../delphi/MediaDrop.qml")
+    onLoaded: {
+      item.enabled = false;
+      item.dir = Qt.binding(() => win.mdDir());
+      item.media.connect((paths) => win.linkMedia(paths));
+      item.failed.connect((why) => toasts.take({ kind: "wmsg", text: why }));
+    }
+  }
+  // a picture on the clipboard, written beside the Markdown file and linked
+  function pastePicture() {
+    const dir = win.mdDir();
+    if (st.filetype !== "markdown" || dir === "") {
+      toasts.take({ kind: "wmsg", text: "Pictures go into a saved Markdown file" });
+      return;
+    }
+    pasteProc.command = ["sh", "-c",
+      't=$(wl-paste --list-types 2>/dev/null | grep -m1 "^image/") || exit 2; e=${t#image/}; [ "$e" = jpeg ] && e=jpg; '
+      + 'f="$1/pasted-$(date +%Y%m%d-%H%M%S).$e"; wl-paste --no-newline --type "$t" > "$f" && [ -s "$f" ] && printf %s "$f"',
+      "sh", dir];
+    pasteProc.running = true;
+  }
+  Process {
+    id: pasteProc
+    stdout: StdioCollector { id: pasteOut }
+    onExited: (code) => {
+      if (code === 0 && pasteOut.text !== "") win.linkMedia([pasteOut.text]);
+      else toasts.take({ kind: "wmsg", text: code === 2 ? "No picture on the clipboard" : "The picture could not be kept" });
+    }
+  }
+
+  // ── THE SELECTION, TO A NOTE (user, 2026-10-27) ───────────────────────
+  // A new Clio note (PlatoManager.notes): the file's name as its title, the
+  // lines — Monostyled, but for prose (Markdown, plain text) — and where they
+  // came from, file:line, under them.
+  function toNote() {
+    const clio = win.mgr ? win.mgr.notes : null;
+    if (!clio) { toasts.take({ kind: "wmsg", text: "Clio is not in this shell" }); return; }
+    nvim.request("selection", {}, (r) => {
+      if (!r) return;
+      const lines = st._list(r.lines).map(String);
+      const f = String(r.file || "").replace(Quickshell.env("HOME"), "~");
+      const name = f === "" ? "Untitled" : f.slice(f.lastIndexOf("/") + 1);
+      const where = f === "" ? "" : f + ":" + r.l1 + (r.l2 > r.l1 ? "–" + r.l2 : "");
+      const prose = ["markdown", "text", ""].indexOf(String(r.ft || "")) >= 0;
+      clio.noteFromText(name, lines, where, !prose);
+    });
+  }
+
+  // a #hex under the cursor, chosen again — or one put in (ColorSheet)
+  ColorSheet {
+    id: colorSheet
+    backdrop: editor
+    client: nvim
+    dimLeft: win.treeEdge
+    fromTop: tabs.height
+    onClosed: editor.forceActiveFocus()
+  }
+  // only ON a color: one written in where the cursor stood split a word
+  // (user, 2026-10-27: "promp#00f5fft")
+  function pickColor() {
+    nvim.request("colorAt", {}, (r) => {
+      if (r && r.hex) colorSheet.openFor(r);
+      else toasts.take({ kind: "wmsg", text: "Put the cursor on a #hex color first" });
+    });
+  }
+
   PropsSheet {
     backdrop: editor   // frosted over it — see morpheus/Sheet
     id: propsSheet

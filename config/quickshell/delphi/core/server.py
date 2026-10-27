@@ -694,7 +694,8 @@ class Server(lines.Service):
         if op == "UpdateRelease":
             r = f.update_release(kw["full"], kw["id"], kw["tag"], kw.get("name", ""), kw.get("body", ""),
                                  kw.get("draft", False), kw.get("prerelease", False))
-            return rest.attach_media(f, kw["full"], r, kw.get("body", ""), kw.get("draft", False), kw.get("prerelease", False))
+            return rest.attach_media(f, kw["full"], r, kw.get("body", ""), kw.get("draft", False), kw.get("prerelease", False),
+                                     kw.get("media") or [])
         if op == "DeleteRelease":
             return f.delete_release(kw["full"], kw["id"], kw.get("tag", ""))
         if op == "Archive":
@@ -706,7 +707,8 @@ class Server(lines.Service):
         if op == "CreateRelease":
             r = f.create_release(kw["full"], kw["tag"], kw["target"], kw.get("name", ""),
                                  kw.get("body", ""), kw.get("draft", False), kw.get("prerelease", False))
-            return rest.attach_media(f, kw["full"], r, kw.get("body", ""), kw.get("draft", False), kw.get("prerelease", False))
+            return rest.attach_media(f, kw["full"], r, kw.get("body", ""), kw.get("draft", False), kw.get("prerelease", False),
+                                     kw.get("media") or [])
         raise ForgeError(f"unknown request: {f.__name__}{op}")
 
     def close(self):

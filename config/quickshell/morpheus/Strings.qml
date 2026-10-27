@@ -31,6 +31,7 @@ import Quickshell.Io
 import "."
 
 QtObject {
+  id: root
   // POSIX single-quoting: wrap in quotes and replace each embedded quote with
   // '\'' — close, escape, reopen. Safe for every byte a filename can hold,
   // which is why every layer that shells out reaches for it.
@@ -89,14 +90,48 @@ QtObject {
     return true;
   }
 
+  // A FILE THAT COULD NOT BE READ, KEPT (audit, 2026-10-27). A state file
+  // that does not parse came back as nothing — no settings, no accounts, no
+  // collections — and the next save wrote that nothing over it. Called where
+  // a parse fails on text that was there: a copy beside it as
+  // <name>.broken-<when>, and a notice from `app`.
+  function keepAside(path, app) {
+    const p = String(path || "");
+    if (p === "") return;
+    const name = p.replace(/^.*\//, "");
+    Quickshell.execDetached(["sh", "-c", 'cp -f -- "$1" "$1.broken-$(date +%Y%m%d-%H%M%S)"', "sh", p]);
+    Quickshell.execDetached(["notify-send", "-a", String(app || "zenworks"), name + " could not be read",
+      "A copy is kept beside it as " + name + ".broken-… — " + String(app || "it") + " goes on without what it held."]);
+  }
+
   // THE CLIPBOARD, as text. copy hands it to wl-copy as an argument, never
   // spliced into the shell line. paste asks Quickshell first; on Wayland that
   // read can come back empty while another client owns the clipboard (a token
   // copied in the browser, 2026-10-11) — then wl-paste is asked, and `done`
   // gets its answer later. One read at a time: a second paste while wl-paste
   // is out replaces the first one's `done`.
+  //
+  // Long text goes on stdin instead (audit, 2026-10-27): one argument holds
+  // 128 KiB at the most, and past it the copy failed without a word — a
+  // whole transaction log selected in Ceres, a diff in Delphi.
   function copy(t) {
-    Quickshell.execDetached(["sh", "-c", "printf '%s' \"$1\" | wl-copy >/dev/null 2>&1", "_", String(t ?? "")]);
+    const s = String(t ?? "");
+    if (s.length < 32768) {
+      Quickshell.execDetached(["sh", "-c", "printf '%s' \"$1\" | wl-copy >/dev/null 2>&1", "_", s]);
+      return;
+    }
+    root.copier.createObject(root, { input: s, running: true });
+  }
+  readonly property Component copier: Component {
+    Process {
+      id: cp
+      property string input: ""
+      command: ["sh", "-c", "wl-copy >/dev/null 2>&1"]
+      stdinEnabled: true
+      // written once it is really there (AtomicWriter's lesson)
+      onStarted: { cp.write(cp.input); cp.stdinEnabled = false; }
+      onExited: cp.destroy()
+    }
   }
   function paste(done) {
     const t = String(Quickshell.clipboardText || "");

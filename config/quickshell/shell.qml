@@ -116,7 +116,7 @@ ShellRoot {
   // startup and nothing of it stays once its last window closes: until the
   // first `qs ipc call Plato open`, this is an ipc handler and nothing else.
   // Handed terminus for its open/save dialogs and artemis as its file finder.
-  PlatoManager { id: plato; fileManager: terminus; finder: artemis; gitClient: delphi }
+  PlatoManager { id: plato; fileManager: terminus; finder: artemis; gitClient: delphi; notes: clioApp }
   // The font book — and oracle's font picker. Built on first use, like plato.
   AlexandriaManager { id: alexandria; fileManager: terminus }
   // The git client — and git for the rest of the shell (terminus' Open in

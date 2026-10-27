@@ -466,7 +466,7 @@ Item {
   }
 
   // ── A PATH, SHOWN ──────────────────────────────────────────────────
-  // The pointer resting on a path ("~/todo", logo.png, "../lib/x.lua")
+  // The pointer resting on a path ("~/notes.md", logo.png, "../lib/x.lua")
   // brings up its file in a card beside it (PathCard.qml): the text
   // highlighted, a picture as itself, a directory's entries. A word that
   // names no file brings up nothing. A relative path is the current file's
@@ -549,7 +549,7 @@ Item {
     }
     // where it is: "~" is home; a relative path is looked for beside the
     // file, then from its project's top (git's), then from home — the first
-    // that exists, as a note in ~/todo names a file under a project.
+    // that exists, as a note in ~/notes.md names a file under a project.
     function look() {
       const f = peek.found;
       if (!f) return;

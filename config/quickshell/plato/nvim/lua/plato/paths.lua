@@ -4,9 +4,10 @@
 -- https://github.com/kbuckleys/
 --
 -- PATHS, COMPLETED AS THEY ARE TYPED. A source for 'autocomplete' (the "F"
--- in 'complete', see plugins.lua): "~/to" offers ~/todo and ~/tools/, "./"
--- the files beside this one, "/etc/" what is in /etc. Directories end in a
--- slash, so taking one and typing on lists what is inside it.
+-- in 'complete', see plugins.lua): "~/Do" offers ~/Documents/ and
+-- ~/Downloads/, "./" the files beside this one, "/etc/" what is in /etc.
+-- Directories end in a slash, so taking one and typing on lists what is
+-- inside it.
 --
 -- WHAT IT OFFERS IS A FILE, AND PLATO SHOWS IT. Each offer's absolute path
 -- is kept (M.offered, by the name shown in the menu); the bridge hands it to

@@ -114,7 +114,6 @@ Scope {
   readonly property bool scanning: scanJob_.running
   function scan(drive) { return !!drive && scanJob_.start(["scan", drive.dev], { drive: drive }); }
   function stopScan() { scanJob_.stop(); }
-  function clearScan() { scanJob_.clear(); }
   ForgeJob {
     id: scanJob_
     core: mgr.core

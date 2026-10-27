@@ -65,12 +65,13 @@ Item {
   }
   readonly property real keyWidth: Math.min(pc.keyNeed, pc.colWidth / 3)
 
-  // TWO COLUMNS ONCE THERE IS ROOM (user, 2026-10-25): side by side when
-  // each half still fits a key, the gap and a full usage bar's worth of
-  // reading; one column otherwise
+  // UP TO THREE COLUMNS (user, 2026-10-25: two; 2026-10-27: up to three):
+  // as many side by side as each still fits a key, the gap and 280 of
+  // reading (a usage bar shrinks to its column); one column otherwise
   readonly property real colGap: 64
-  readonly property bool twoUp: (facts.width - pc.colGap) / 2 >= pc.keyNeed + 24 + Zenon.px(400)
-  readonly property real colWidth: pc.twoUp ? Math.floor((facts.width - pc.colGap) / 2) : facts.width
+  function fits(n) { return (facts.width - (n - 1) * pc.colGap) / n >= pc.keyNeed + 24 + Zenon.px(280); }
+  readonly property int nUp: pc.fits(3) ? 3 : pc.fits(2) ? 2 : 1
+  readonly property real colWidth: Math.floor((facts.width - (pc.nUp - 1) * pc.colGap) / pc.nUp)
   // the sections stay in their order, down the left and on down the right,
   // cut where the two halves come out nearest the same height (a section's
   // label and the gap over it count as two lines, a note as half of one)
@@ -96,18 +97,34 @@ Item {
         r.note ? noteFm.advanceWidth(r.note) : 0);
     return Math.ceil(Math.min(pc.colWidth, pc.keyWidth + 24 + w + 4));
   }
+  // where the centered columns start: the head, the inks and the buttons
+  // line up with it
+  readonly property real colsX: Math.max(0, (facts.width - colsRow.width) / 2)
+
+  // the sections in their order, cut into nUp runs whose tallest is as short
+  // as it can be (every cut tried: there are a dozen sections at the most)
   readonly property var columns: {
     const secs = pc.sections;
-    if (!pc.twoUp || secs.length < 2) return [secs];
+    const n = Math.min(pc.nUp, secs.length);
+    if (n < 2) return [secs];
     const weight = secs.map((s) => 2 + s.rows.reduce((a, r) => a + 1 + (r.note ? 0.6 : 0), 0));
-    const total = weight.reduce((a, b) => a + b, 0);
-    let best = 1, bestH = Infinity, left = 0;
-    for (let k = 1; k < secs.length; ++k) {
-      left += weight[k - 1];
-      const h = Math.max(left, total - left);
-      if (h < bestH) { bestH = h; best = k; }
-    }
-    return [secs.slice(0, best), secs.slice(best)];
+    const sum = (a, b) => weight.slice(a, b).reduce((x, y) => x + y, 0);
+    let best = null, bestH = Infinity;
+    const cut = (from, left, cuts) => {
+      if (left === 1) {
+        const all = cuts.concat([secs.length]);
+        let h = 0, a = 0;
+        for (const b of all) { h = Math.max(h, sum(a, b)); a = b; }
+        if (h < bestH) { bestH = h; best = all; }
+        return;
+      }
+      for (let k = from + 1; k <= secs.length - left + 1; ++k) cut(k, left - 1, cuts.concat([k]));
+    };
+    cut(0, n, []);
+    const out = [];
+    let a = 0;
+    for (const b of best) { out.push(secs.slice(a, b)); a = b; }
+    return out;
   }
 
   Column {
@@ -121,67 +138,124 @@ Item {
     // the logo beside the distro's name and the machine's model: a head the
     // facts hang under, rather than a tall column beside them that the
     // window's frosted header cut through once the fold scrolled
-    Row {
-      visible: pc.shown
-      spacing: 18
-      topPadding: 8
-      bottomPadding: 20
-      Item {
-        id: logo
-        readonly property bool arch: !!pc.c && pc.c.glyph === "\uF303"
-        width: logo.arch ? logo.height : logoGlyph.contentWidth
-        height: Zenon.px(64)
-        Text {
-          id: logoGlyph
-          visible: !logo.arch
-          anchors.verticalCenter: parent.verticalCenter
-          text: pc.c ? pc.c.glyph : ""
-          color: pc.highlight
-          font.family: Zenon.glyphFace
-          font.pixelSize: Zenon.px(58)
-        }
-        // ARCH IS DRAWN, NOT TYPED. Nerd Fonts' Arch logo (U+F303) carries
-        // a small ™ beside its right foot, close enough that no crop takes
-        // it off cleanly at every size (a sliver of the T stayed). This is
-        // the one outline from /usr/share/pixmaps/archlinux-logo.svg,
-        // without its ™ paths, in the panel's accent.
-        Shape {
-          visible: logo.arch
-          anchors.fill: parent
-          preferredRendererType: Shape.CurveRenderer
-          ShapePath {
-            fillColor: pc.highlight
-            strokeColor: "transparent"
-            fillRule: ShapePath.OddEvenFill
-            // the outline spans 12..245 of the file's 256 box: fit that span
-            scale: Qt.size(logo.height / 233, logo.height / 233)
-            PathSvg {
-              path: "m116.98 0c-10.316 25.309-16.543 41.855-28.031 66.41 7.043 7.4609 15.691 16.156 29.734 25.977-15.098-6.207-25.395-12.445-33.094-18.918-14.703 30.68-37.742 74.391-84.492 158.39 36.746-21.219 65.23-34.293 91.773-39.289-1.1406-4.8945-1.7852-10.195-1.7422-15.734l0.042969-1.1719c0.58203-23.551 12.828-41.645 27.336-40.418 14.508 1.2266 25.781 21.316 25.199 44.867-0.10938 4.4219-0.60938 8.6914-1.4805 12.641 26.258 5.1328 54.438 18.18 90.684 39.105-7.1484-13.156-13.527-25.016-19.621-36.316-9.5938-7.4336-19.605-17.117-40.023-27.594 14.035 3.6406 24.082 7.8516 31.914 12.555-61.941-115.32-66.957-130.66-88.199-180.5z"
+    // THE HEAD, ONE LINE (user, 2026-10-27): the logo at the first column's
+    // edge; the inks and the buttons at the right, ending where the last
+    // column ends. Reread stays when there is nothing to show yet.
+    Item {
+      width: body.width
+      height: Math.max(pc.shown ? headRow.height : 0, headSide.height + (pc.shown ? 0 : 12))
+      Column {
+        id: headSide
+        x: Math.max(0, pc.colsX + colsRow.width - width)
+        y: pc.shown ? (headRow.height - headRow.bottomPadding + headRow.topPadding - height) / 2 : 0
+        spacing: 10
+        Row {
+          visible: pc.shown
+          anchors.right: parent.right
+          spacing: 0
+          Repeater {
+            model: ["red", "yellow", "green", "cyan", "blue", "magenta", "pink", "sand"]
+            delegate: Rectangle {
+              required property string modelData
+              required property int index
+              width: 26
+              height: 14
+              color: Zenon[modelData]
+              topLeftRadius: index === 0 ? Zenon.rad(3) : 0
+              bottomLeftRadius: index === 0 ? Zenon.rad(3) : 0
+              topRightRadius: index === 7 ? Zenon.rad(3) : 0
+              bottomRightRadius: index === 7 ? Zenon.rad(3) : 0
             }
           }
         }
-      }
-      Column {
-        anchors.verticalCenter: parent.verticalCenter
-        spacing: 2
-        Text {
-          text: pc.c ? pc.c.title : ""
-          color: pc.highlight
-          font.family: pc.face
-          font.weight: Font.DemiBold
-          font.pixelSize: Zenon.px(19)
+        // centered under the inks (user, 2026-10-27)
+        Row {
+          anchors.horizontalCenter: parent.horizontalCenter
+          spacing: 8
+          DialogButton {
+            visible: pc.shown
+            label: pc.copied ? "Copied" : "Copy"
+            ink: pc.highlight
+            primary: true
+            onClicked: {
+              Strings.copy(Ora.computerText(pc.c));
+              pc.copied = true;
+              copiedTimer.restart();
+            }
+          }
+          DialogButton {
+            label: pc.reading ? "Reading…" : "Reread"
+            ink: pc.fgColor
+            ready: !pc.reading
+            onClicked: Oracle.readComputer(true)
+          }
         }
-        Text {
-          visible: !!(pc.c && pc.c.model)
-          width: facts.width - logo.width - 18
-          elide: Text.ElideRight
-          text: pc.c ? pc.c.model : ""
-          color: pc.dimColor
-          font.family: pc.face
-          font.weight: Zenon.weight
-          font.pixelSize: Zenon.px(14)
+      }
+      Row {
+        id: headRow
+        visible: pc.shown
+        x: pc.colsX
+        spacing: 18
+        topPadding: 8
+        bottomPadding: 20
+        Item {
+          id: logo
+          readonly property bool arch: !!pc.c && pc.c.glyph === "\uF303"
+          width: logo.arch ? logo.height : logoGlyph.contentWidth
+          height: Zenon.px(64)
+          Text {
+            id: logoGlyph
+            visible: !logo.arch
+            anchors.verticalCenter: parent.verticalCenter
+            text: pc.c ? pc.c.glyph : ""
+            color: pc.highlight
+            font.family: Zenon.glyphFace
+            font.pixelSize: Zenon.px(58)
+          }
+          // ARCH IS DRAWN, NOT TYPED. Nerd Fonts' Arch logo (U+F303) carries
+          // a small ™ beside its right foot, close enough that no crop takes
+          // it off cleanly at every size (a sliver of the T stayed). This is
+          // the one outline from /usr/share/pixmaps/archlinux-logo.svg,
+          // without its ™ paths, in the panel's accent.
+          Shape {
+            visible: logo.arch
+            anchors.fill: parent
+            preferredRendererType: Shape.CurveRenderer
+            ShapePath {
+              fillColor: pc.highlight
+              strokeColor: "transparent"
+              fillRule: ShapePath.OddEvenFill
+              // the outline spans 12..245 of the file's 256 box: fit that span
+              scale: Qt.size(logo.height / 233, logo.height / 233)
+              PathSvg {
+                path: "m116.98 0c-10.316 25.309-16.543 41.855-28.031 66.41 7.043 7.4609 15.691 16.156 29.734 25.977-15.098-6.207-25.395-12.445-33.094-18.918-14.703 30.68-37.742 74.391-84.492 158.39 36.746-21.219 65.23-34.293 91.773-39.289-1.1406-4.8945-1.7852-10.195-1.7422-15.734l0.042969-1.1719c0.58203-23.551 12.828-41.645 27.336-40.418 14.508 1.2266 25.781 21.316 25.199 44.867-0.10938 4.4219-0.60938 8.6914-1.4805 12.641 26.258 5.1328 54.438 18.18 90.684 39.105-7.1484-13.156-13.527-25.016-19.621-36.316-9.5938-7.4336-19.605-17.117-40.023-27.594 14.035 3.6406 24.082 7.8516 31.914 12.555-61.941-115.32-66.957-130.66-88.199-180.5z"
+              }
+            }
+          }
+        }
+        Column {
+          anchors.verticalCenter: parent.verticalCenter
+          spacing: 2
+          Text {
+            text: pc.c ? pc.c.title : ""
+            color: pc.highlight
+            font.family: pc.face
+            font.weight: Font.DemiBold
+            font.pixelSize: Zenon.px(19)
+          }
+          Text {
+            visible: !!(pc.c && pc.c.model)
+            width: Math.min(implicitWidth, Math.max(0, colsRow.width - logo.width - 18 - headSide.width - 24))
+            elide: Text.ElideRight
+            text: pc.c ? pc.c.model : ""
+            color: pc.dimColor
+            font.family: pc.face
+            font.weight: Zenon.weight
+            font.pixelSize: Zenon.px(14)
+          }
         }
       }
+
     }
 
     Column {
@@ -196,7 +270,10 @@ Item {
         color: Zenon.border
       }
 
+      // the columns, each as wide as what it shows, centered together
       Row {
+        id: colsRow
+        x: pc.colsX
         spacing: pc.colGap
         Repeater {
           model: pc.columns
@@ -204,10 +281,9 @@ Item {
             id: col
             required property var modelData
             required property int index
-            // the last column takes what is left, so long readings elide
-            // against the panel's edge rather than a column's
-            width: col.index === pc.columns.length - 1
-              ? facts.width - col.x : pc.fitWidth(col.modelData)
+            // as wide as its widest reading, a column's share at the most
+            // (a long reading elides against it), so the lot can be centered
+            width: pc.fitWidth(col.modelData)
             Repeater {
               model: col.modelData
               delegate: Column {
@@ -290,27 +366,6 @@ Item {
         }
       }
 
-      // the inks, as fastfetch ends with its color blocks
-      Row {
-        visible: pc.shown
-        topPadding: 16
-        spacing: 0
-        Repeater {
-          model: ["red", "yellow", "green", "cyan", "blue", "magenta", "pink", "sand"]
-          delegate: Rectangle {
-            required property string modelData
-            required property int index
-            width: 26
-            height: 14
-            color: Zenon[modelData]
-            topLeftRadius: index === 0 ? Zenon.rad(3) : 0
-            bottomLeftRadius: index === 0 ? Zenon.rad(3) : 0
-            topRightRadius: index === 7 ? Zenon.rad(3) : 0
-            bottomRightRadius: index === 7 ? Zenon.rad(3) : 0
-          }
-        }
-      }
-
       // nothing to show: still reading (the dots), or why not
       Working {
         running: !pc.shown && pc.reading
@@ -328,27 +383,6 @@ Item {
         font.pixelSize: Zenon.px(14)
       }
 
-      Row {
-        topPadding: 10
-        spacing: 8
-        DialogButton {
-          visible: pc.shown
-          label: pc.copied ? "Copied" : "Copy"
-          ink: pc.highlight
-          primary: true
-          onClicked: {
-            Strings.copy(Ora.computerText(pc.c));
-            pc.copied = true;
-            copiedTimer.restart();
-          }
-        }
-        DialogButton {
-          label: pc.reading ? "Reading…" : "Reread"
-          ink: pc.fgColor
-          ready: !pc.reading
-          onClicked: Oracle.readComputer(true)
-        }
-      }
     }
   }
 }

@@ -191,6 +191,12 @@ def ci_sum(runs):
     return "success" if "success" in st else "neutral"
 
 
+# One of the files a forge makes of a release's tag itself ("Source code
+# (zip)"), in the shape of an uploaded one: no size, no download count.
+def source_row(kind, url):
+    return {"name": f"Source code ({kind})", "size": 0, "downloads": -1, "url": url, "source": True}
+
+
 def ci_many(fn, full, shas, limit=40):
     """fn(full, sha) for each of the first `limit` commits, a few at once:
     {sha: answer}; one that fails says nothing rather than failing the rest."""
@@ -251,13 +257,27 @@ def read_media(path):
         return fh.read()
 
 
-def attach_media(f, full, rel, body, draft=False, prerelease=False):
-    """`rel` just made or saved by forge module `f` with `body`: its local
-    files sent, and the notes saved with the forge's addresses."""
-    found = local_media(body)
+def sendable(url, chosen):
+    """The path behind a notes' file:// address when it may be uploaded: one
+    the editor was given (picked or dropped — `chosen`), a picture or a
+    video. None for anything else: notes from a cloned repo's changelog or
+    from the forge could name any file of this computer."""
+    path = urllib.parse.unquote(url[len("file://"):])
+    if path not in set(chosen or []):
+        return None
+    kind = media_type(path)
+    return path if kind.startswith("image/") or kind.startswith("video/") else None
+
+
+def attach_media(f, full, rel, body, draft=False, prerelease=False, chosen=()):
+    """`rel` just made or saved by forge module `f` with `body`: the local
+    files the editor was given (`chosen`) sent, and the notes saved with the
+    forge's addresses. Any other file:// line is left as written."""
+    found = [(u, sendable(u, chosen)) for u in local_media(body)]
+    found = [(u, p) for u, p in found if p]
     if not found or not hasattr(f, "media_upload"):
         return rel
     new = body
-    for u in found:
-        new = new.replace(u, f.media_upload(full, rel, urllib.parse.unquote(u[len("file://"):])))
+    for u, p in found:
+        new = new.replace(u, f.media_upload(full, rel, p))
     return f.update_release(full, rel["id"], rel["tag"], rel["name"], new, draft, prerelease)

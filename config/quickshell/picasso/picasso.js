@@ -46,12 +46,17 @@ function level(files, dir, sub) {
     const name = rest.slice(0, slash);
     if (!dirs[name]) {
       dirs[name] = { dir: true, name: name, sub: (sub ? sub + "/" : "") + name, path: base + "/" + name,
-                     count: 0, cover: p, thumb: f.thumb || "" };
+                     count: 0, cover: p, thumb: f.thumb || "", stamp: 0 };
       names.push(name);
     }
     dirs[name].count++;
+    // what a cover is remembered under (terminus/FolderCover): the newest
+    // picture in it plus how many there are, so one added or taken away is
+    // a new key — the scan has no directory mtimes to give it
+    dirs[name].stamp = Math.max(dirs[name].stamp, f.mtime || 0);
   }
   names.sort((a, b) => a.localeCompare(b));
+  for (const n of names) dirs[n].stamp += dirs[n].count;
   return names.map((n) => dirs[n]).concat(own);
 }
 // the directory above a `sub`, "" at the top
@@ -352,13 +357,14 @@ function serializeState(st) {
     looks: st.looks || {},
     span: st.span || null,
     colors: st.colors || [],
-    slideshow: st.slideshow || null
+    slideshow: st.slideshow || null,
+    place: st.place || null
   });
 }
 
 function parseState(text) {
   const j = parse(text);
-  const empty = { looks: {}, span: null, colors: [], slideshow: null };
+  const empty = { looks: {}, span: null, colors: [], slideshow: null, place: null };
   if (j.v === 2 || j.v === 3) {
     const span = isMap(j.span) && typeof j.span.path === "string"
       && Array.isArray(j.span.screens) ? j.span : null;
@@ -369,7 +375,9 @@ function parseState(text) {
       looks: isMap(j.looks) ? j.looks : {},
       span: span,
       colors: Array.isArray(j.colors) ? j.colors.map(normHex).filter((c) => c !== "") : [],
-      slideshow: ss
+      slideshow: ss,
+      place: isMap(j.place) && typeof j.place.dir === "string" && typeof j.place.sub === "string"
+        ? { dir: j.place.dir, sub: j.place.sub } : null
     };
   }
   // version 1: the object IS the assignment, and nothing had a fit of its own

@@ -564,7 +564,21 @@ def _rel(r):
             "url": r.get("html_url"), "target": r.get("target_commitish") or "",
             "assets": [{"name": a.get("name"), "size": a.get("size", 0),
                         "downloads": a.get("download_count", 0),
-                        "url": a.get("browser_download_url")} for a in r.get("assets") or []]}
+                        "url": a.get("browser_download_url")} for a in r.get("assets") or []],
+            "sources": _sources(r)}
+
+
+# The files GitHub makes of the tag itself — its "Source code (zip)" and
+# "(tar.gz)", listed apart from the uploaded ones and in no API's assets.
+# The web's archive links, not the API's zipball_url: that one wants a
+# token on a private repository, the browser's session opens these. None
+# for a draft, whose tag may not be there yet.
+def _sources(r):
+    page, tag = r.get("html_url") or "", r.get("tag_name") or ""
+    if r.get("draft") or not tag or "/releases/" not in page:
+        return []
+    base = page.split("/releases/")[0] + "/archive/refs/tags/" + urllib.parse.quote(tag, safe="")
+    return [rest.source_row(kind, base + "." + kind) for kind in ("zip", "tar.gz")]
 
 
 def releases(full):

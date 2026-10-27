@@ -39,6 +39,8 @@ Scope {
   property var finder: null
   // delphi's manager, handed in by shell.qml: the status bar's branch opens it
   property var gitClient: null
+  // clio, for a selection sent to a new note (ContextMenu, Space C)
+  property var notes: null
 
   // ── ITS .desktop ENTRY ─────────────────────────────────────────────
   // Shipped as a file (scripts/launchers.js makes it from this).

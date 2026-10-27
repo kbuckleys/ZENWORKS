@@ -69,12 +69,9 @@ FloatingWindow {
   function size(n) { return Terminus.formatSize(n); }
 
   // ── WHAT WAS JUST DONE, SAID ONCE ─────────────────────────────────────
-  property string said: ""
-  property bool saidBad: false
-  Timer { id: sayTimer; interval: 3600; onTriggered: tw.said = "" }
   Connections {
     target: tw.mgr
-    function onSaid(words, bad) { tw.said = words; tw.saidBad = bad; sayTimer.restart(); }
+    function onSaid(words, bad) { saidBox.say(words, bad); }
   }
   readonly property bool busy: !!tw.mgr && tw.mgr.busy !== ""
 
@@ -454,8 +451,8 @@ FloatingWindow {
       anchors.bottomMargin: 18
       z: 5
       maxWidth: 620
-      text: tw.said
-      bad: tw.saidBad
+      id: saidBox
+      lasts: 3600
     }
 
     HintBar {

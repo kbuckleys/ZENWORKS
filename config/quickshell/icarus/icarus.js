@@ -41,12 +41,9 @@ const RECORD = "\u001e";
 // empty directory, one you may not read, one that is not there — and all three
 // drew as the same blank card. The shell knows which it is before find runs.
 //
-// The trailing slash makes find follow the directory itself when it is a link;
-// see terminus' listPath.
-function listPath(dir) {
-  const d = String(dir);
-  return d === "" || d.charAt(d.length - 1) === "/" ? d : d + "/";
-}
+// The trailing slash makes find follow the directory itself when it is a link:
+// terminus' listPath, the one copy.
+const listPath = Terminus.listPath;
 
 function listCommand(dir) {
   return "d=" + Strings.shellQuote(listPath(dir)) + "; "

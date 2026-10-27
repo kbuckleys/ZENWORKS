@@ -3086,12 +3086,27 @@ FloatingWindow {
 
     // the picture under it, frosted: under the bar's ground, which tints it
     // (see `canvas`)
+    // In a comparison it is two: the first half's over `canvas`, the
+    // second's over `twin`.
     Frost {
-      anchors.fill: parent
+      anchors.top: parent.top
+      anchors.bottom: parent.bottom
+      anchors.left: parent.left
+      width: win.compare ? canvas.width : parent.width
       z: -1
       source: stage
       active: win.picShows && win.picTop < bar.height
       // handing the bar to stripFrost while a sheet is up
+      opacity: 1 - win.sheetInk
+    }
+    Frost {
+      anchors.top: parent.top
+      anchors.bottom: parent.bottom
+      anchors.right: parent.right
+      width: win.compare ? parent.width - canvas.width : 0
+      z: -1
+      source: twin
+      active: win.compare && twin.underTop
       opacity: 1 - win.sheetInk
     }
     // the bar's glass while a sheet is up — see sheetUp: the card's own
@@ -4207,12 +4222,19 @@ FloatingWindow {
   // in the middle and drawn as wide — read off `pic` as it is DRAWN, so it
   // glides along with every zoom. Wheel and drag here move the first, and
   // this follows; it has no edit, no crop and no keys of its own.
+  // Like the first half's `canvas`, it runs on under the bar, the strip and
+  // the edit panel, so their frost has this half to blur too (user,
+  // 2026-10-27: the panel went flat in a comparison); the room it fits in
+  // and is laid out by is the part between them (roomW/roomY/roomH).
   Item {
     id: twin
-    anchors.top: bar.bottom
-    anchors.right: panel.left
-    anchors.bottom: strip.top
-    width: win.compare && win.mode === "view" ? Math.floor((win.width - panel.width) / 2) : 0
+    anchors.top: parent.top
+    anchors.right: parent.right
+    anchors.bottom: parent.bottom
+    readonly property real roomW: win.compare && win.mode === "view" ? Math.floor((win.width - panel.width) / 2) : 0
+    readonly property real roomY: win.full ? 0 : bar.height
+    readonly property real roomH: twin.height - (win.full ? 0 : bar.height + strip.height)
+    width: twin.roomW > 0 ? twin.roomW + panel.width : 0
     visible: width > 0
     clip: true
     readonly property var crow: win.showsMade ? { path: win.made.tmp, name: win.made.name }
@@ -4220,20 +4242,35 @@ FloatingWindow {
     readonly property real bw: twinImg.status === Image.Ready ? twinImg.implicitWidth : 0
     readonly property real bh: twinImg.status === Image.Ready ? twinImg.implicitHeight : 0
     readonly property var view: {
-      if (!(twin.bw > 0) || !(win.tw > 0) || !(pic.width > 0) || twin.width <= 0) return { z: 1, x: 0, y: 0 };
+      if (!(twin.bw > 0) || !(win.tw > 0) || !(pic.width > 0) || twin.roomW <= 0) return { z: 1, x: 0, y: 0 };
       if (win.fitted) {
         const m = win.margin;
-        const v = V.fitView(twin.bw, twin.bh, twin.width - 2 * m, twin.height - 2 * m, 1);
+        const v = V.fitView(twin.bw, twin.bh, twin.roomW - 2 * m, twin.roomH - 2 * m, 1);
         return { z: v.z, x: v.x + m, y: v.y + m };
       }
       const z = pic.width / win.tw;
       const c = V.centreOf({ z: z, x: pic.x, y: pic.y }, win.tw, win.th, stage.width, stage.height);
-      return V.viewAt(z * win.tw / twin.bw, c.fx, c.fy, twin.bw, twin.bh, twin.width, twin.height);
+      return V.viewAt(z * win.tw / twin.bw, c.fx, c.fy, twin.bw, twin.bh, twin.roomW, twin.roomH);
+    }
+    // where its picture reaches under the chrome, as win.picTop & co. do
+    // for the first half's — each frost over this half is on only then
+    readonly property bool shows: twin.visible && twinImg.status === Image.Ready
+    readonly property bool underTop: twin.shows && twin.roomY + twin.view.y < bar.height
+    readonly property bool underBottom: twin.shows && twin.roomY + twin.view.y + twinImg.height > strip.y
+    readonly property bool underRight: twin.shows && twin.view.x + twinImg.width > twin.roomW
+    // a point on this half as the same place on the first picture, in the
+    // stage's coordinates — zoomTo's — so a wheel here zooms towards the
+    // pointer, not towards wherever that spot falls on the left
+    function stagePoint(x, y) {
+      const w = twin.bw * twin.view.z, h = twin.bh * twin.view.z;
+      if (!(w > 0) || !(h > 0)) return Qt.point(x, y);
+      return Qt.point(win.vx + (x - twin.view.x) / w * win.tw * win.vz,
+                      win.vy + (y - twin.view.y) / h * win.th * win.vz);
     }
     Image {
       id: twinImg
       x: twin.view.x
-      y: twin.view.y
+      y: twin.roomY + twin.view.y
       width: twin.bw * twin.view.z
       height: twin.bh * twin.view.z
       source: twin.crow ? win.urlOf(twin.crow.path) : ""
@@ -4263,6 +4300,12 @@ FloatingWindow {
         smooth: twin.view.z < 3
       }
     }
+    // the room: what is laid out in it, and what it answers
+    Item {
+      x: 0
+      y: twin.roomY
+      width: twin.roomW
+      height: twin.roomH
     MouseArea {
       anchors.fill: parent
       acceptedButtons: Qt.LeftButton | Qt.MiddleButton
@@ -4271,12 +4314,15 @@ FloatingWindow {
       property real ly: 0
       onWheel: (w) => {
         const d = w.angleDelta.y !== 0 ? w.angleDelta.y : w.angleDelta.x;
-        if (d !== 0) win.zoomTo(win.vz * Math.pow(1.0015, d), w.x, w.y, 90);
+        if (d === 0) return;
+        const p = twin.stagePoint(w.x, w.y);
+        win.zoomTo(win.vz * Math.pow(1.0015, d), p.x, p.y, 90);
       }
       onPressed: (m) => { keys.forceActiveFocus(); lx = m.x; ly = m.y; }
       onPositionChanged: (m) => { win.panBy(m.x - lx, m.y - ly); lx = m.x; ly = m.y; }
       onDoubleClicked: (m) => {
-        if (win.fitted) win.zoomTo(Math.max(1, win.fitZ() * 2), m.x, m.y, Zenon.normal);
+        const p = twin.stagePoint(m.x, m.y);
+        if (win.fitted) win.zoomTo(Math.max(1, win.fitZ() * 2), p.x, p.y, Zenon.normal);
         else { win.fitted = true; win.refit(true); }
       }
     }
@@ -4328,6 +4374,7 @@ FloatingWindow {
         DialogButton { label: "Let it go"; onClicked: win.dropMade() }
         DialogButton { label: win.made && win.made.saved ? "Save again\u2026" : "Save\u2026"; ink: Zenon.cyan; primary: !(win.made && win.made.saved); onClicked: win.saveMade() }
       }
+    }
     }
   }
 
@@ -5226,12 +5273,25 @@ FloatingWindow {
     color: Zenon.headBg
     Rectangle { anchors.top: parent.top; width: parent.width; height: 1; color: Zenon.border }
 
-    // the picture under it, frosted (see `canvas`)
+    // the picture under it, frosted (see `canvas`); two in a comparison,
+    // as the bar's
     Frost {
-      anchors.fill: parent
+      anchors.top: parent.top
+      anchors.bottom: parent.bottom
+      anchors.left: parent.left
+      width: win.compare ? canvas.width : parent.width
       z: -1
       source: stage
       active: win.picShows && win.picBottom > strip.y
+    }
+    Frost {
+      anchors.top: parent.top
+      anchors.bottom: parent.bottom
+      anchors.right: parent.right
+      width: win.compare ? parent.width - canvas.width : 0
+      z: -1
+      source: twin
+      active: win.compare && twin.underBottom
     }
 
     ListView {
@@ -5483,12 +5543,13 @@ FloatingWindow {
     Rectangle { anchors.left: parent.left; width: 1; height: parent.height; color: Zenon.border; z: 2 }
 
     // the picture under it, frosted (see `canvas`): the panel lies over the
-    // picture rather than beside it once it is zoomed past the room
+    // picture rather than beside it once it is zoomed past the room — in a
+    // comparison, the second half's, which runs on under it (see `twin`)
     Frost {
       anchors.fill: parent
       z: -1
-      source: stage
-      active: win.picShows && !win.compare && win.picRight > panel.x
+      source: win.compare ? twin : stage
+      active: win.compare ? twin.underRight : win.picShows && win.picRight > panel.x
     }
 
     // Its insides at their full width all the while, held to the panel's
@@ -5877,7 +5938,7 @@ FloatingWindow {
     id: infoSpot
     anchors.top: bar.bottom
     anchors.topMargin: 12
-    anchors.right: win.compare ? twin.right : panel.left
+    anchors.right: panel.left
     anchors.rightMargin: 12
     width: 380
     height: 1

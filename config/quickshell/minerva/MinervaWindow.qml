@@ -394,10 +394,7 @@ FloatingWindow {
   }
 
   // ── WHAT WAS JUST DONE, SAID ONCE ─────────────────────────────────────
-  property string said: ""
-  property bool saidBad: false
-  function say(t, bad) { mw.said = t; mw.saidBad = !!bad; sayTimer.restart(); }
-  Timer { id: sayTimer; interval: 2800; onTriggered: mw.said = "" }
+  function say(t, bad) { saidBox.say(t, bad); }
 
   function setSidebar(on) { if (mw.mgr) mw.mgr.setSetting("sidebar", on); }
 
@@ -1409,8 +1406,8 @@ FloatingWindow {
       anchors.topMargin: 14
       z: 7
       maxWidth: 620
-      text: mw.said
-      bad: mw.saidBad
+      id: saidBox
+      lasts: 2800
       ground: 0.9
     }
 

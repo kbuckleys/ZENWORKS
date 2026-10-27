@@ -21,6 +21,7 @@
 import QtQuick
 import Quickshell
 import "../morpheus"
+import "../morpheus/controls" as Controls
 import "../terminus"
 import "delphi.js" as D
 import "../terminus/terminus.js" as Terminus
@@ -97,6 +98,9 @@ Item {
   property string listError: ""
   property int sel: 0
   readonly property var rel: pg.sel >= 0 && pg.sel < pg.rels.length ? pg.rels[pg.sel] : null
+  // every file of a release: the ones uploaded, then the forge's own
+  // archives of the tag ("Source code (zip)"), as the forge's page has them
+  function filesOf(r) { return r ? r.assets.concat(r.sources || []) : []; }
   function reload() {
     if (!pg || !pg.win || !pg.hub) return;
     const asked = pg.hubKey, keep = pg.rel ? pg.rel.tag : "";
@@ -188,7 +192,9 @@ Item {
     const e = pg.edit;
     if (!e || e.tag.trim() === "") return;
     const tag = e.tag.trim(), name = (e.name || "").trim() || tag;
-    const args = { full: pg.hubFull, tag: tag, name: name, body: e.body, draft: !!e.draft, prerelease: !!e.prerelease };
+    const args = { full: pg.hubFull, tag: tag, name: name, body: e.body, draft: !!e.draft, prerelease: !!e.prerelease,
+                   // what may be uploaded from the notes (ReleaseEditor.noteMedia)
+                   media: e.media || [] };
     if (e.mode === "new") args.target = e.target; else args.id = e.id;
     const also = pg.alsoOf(e);
     const here = () => pg.win.act(pg.op(e.mode === "new" ? "CreateRelease" : "UpdateRelease"), args, {
@@ -373,7 +379,7 @@ Item {
             elide: Text.ElideRight
             text: [rrow.r.draft ? "Draft" : rrow.r.prerelease ? "Pre-release" : rrow.index === 0 ? "Latest" : "",
                    rrow.r.author, rrow.r.when ? D.ago(D.secondsOf(rrow.r.when), Date.now()) : "",
-                   rrow.r.assets.length > 0 ? rrow.r.assets.length + (rrow.r.assets.length === 1 ? " file" : " files") : ""]
+                   pg.filesOf(rrow.r).length > 0 ? pg.filesOf(rrow.r).length + (pg.filesOf(rrow.r).length === 1 ? " file" : " files") : ""]
               .filter((x) => x !== "").join("  ·  ")
             color: Zenon.accentMuted
             font.family: Zenon.face
@@ -461,44 +467,61 @@ Item {
       }
       // the files attached
       Text {
-        visible: !!pg.rel && pg.rel.assets.length > 0
+        visible: pg.filesOf(pg.rel).length > 0
         text: "Files"
         color: Zenon.accentKey
         font.family: Zenon.face
         font.weight: Font.Bold
         font.pixelSize: Zenon.px(14)
       }
-      Repeater {
-        model: pg.rel ? pg.rel.assets : []
-        delegate: Item {
-          id: arow
-          required property var modelData
-          width: relCol.width
-          height: Zenon.px(15) * 2
-          Text {
-            id: an
-            anchors.verticalCenter: parent.verticalCenter
-            width: parent.width - asz.width - 12
-            elide: Text.ElideMiddle
-            text: arow.modelData.name
-            color: Zenon.blue
-            font.family: Zenon.face
-            font.weight: Zenon.weight
-            font.pixelSize: Zenon.px(15)
-            MouseArea { anchors.fill: parent; onClicked: Quickshell.execDetached(["xdg-open", arow.modelData.url]) }
-          }
-          Text {
-            id: asz
-            anchors.right: parent.right
-            anchors.verticalCenter: parent.verticalCenter
-            text: [arow.modelData.size > 0 ? Terminus.formatSize(arow.modelData.size) : "",
-                   arow.modelData.downloads >= 0 ? arow.modelData.downloads + (arow.modelData.downloads === 1 ? " download" : " downloads") : ""]
-              .filter((x) => x !== "").join("  ·  ")
-            color: Zenon.accentMuted
-            font.family: Zenon.face
-            font.weight: Zenon.weight
-            font.features: { "tnum": 1 }
-            font.pixelSize: Zenon.px(13)
+      // in the box a list stands in (morpheus' ListFrame), as Oracle's
+      Item {
+        visible: pg.filesOf(pg.rel).length > 0
+        width: relCol.width
+        height: fileList.height + 12
+        Controls.ListFrame { anchors.fill: parent }
+        Column {
+          id: fileList
+          x: 6
+          y: 6
+          width: parent.width - 12
+          Repeater {
+            model: pg.filesOf(pg.rel)
+            delegate: Item {
+              id: arow
+              required property var modelData
+              width: fileList.width
+              height: Zenon.px(15) * 2
+              Text {
+                id: an
+                x: 10
+                anchors.verticalCenter: parent.verticalCenter
+                width: parent.width - asz.width - 32
+                elide: Text.ElideMiddle
+                text: arow.modelData.name
+                color: Zenon.blue
+                font.family: Zenon.face
+                font.weight: Zenon.weight
+                font.pixelSize: Zenon.px(15)
+                // a GitLab release's links are whatever its author typed:
+                // web addresses only (Strings.openLink)
+                MouseArea { anchors.fill: parent; onClicked: Strings.openLink(arow.modelData.url) }
+              }
+              Text {
+                id: asz
+                anchors.right: parent.right
+                anchors.rightMargin: 10
+                anchors.verticalCenter: parent.verticalCenter
+                text: [arow.modelData.size > 0 ? Terminus.formatSize(arow.modelData.size) : "",
+                       arow.modelData.downloads >= 0 ? arow.modelData.downloads + (arow.modelData.downloads === 1 ? " download" : " downloads") : ""]
+                  .filter((x) => x !== "").join("  ·  ")
+                color: Zenon.accentMuted
+                font.family: Zenon.face
+                font.weight: Zenon.weight
+                font.features: { "tnum": 1 }
+                font.pixelSize: Zenon.px(13)
+              }
+            }
           }
         }
       }

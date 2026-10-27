@@ -65,6 +65,8 @@ Item {
   signal spellSuggest(var ev)
   // the engine offered a parser and was told to build it (suggest.lua)
   signal buildParsers(var langs)
+  // packages a language wants (suggest.lua): Ceres installs them
+  signal installWanted(var pkgs, string why)
   // nvim went away and is not coming back — `:q`, a crash, the grace ran out
   signal exited()
 
@@ -191,6 +193,7 @@ Item {
       case "unask": client.unask(ev.ask); break;
       case "spell": client.spellSuggest(ev); break;
       case "buildParsers": client.buildParsers(Array.from(ev.langs || [])); break;
+      case "install": client.installWanted(Array.from(ev.pkgs || []), String(ev.why || "")); break;
       case "error": console.warn("plato: nvim:", ev.message); break;
     }
   }

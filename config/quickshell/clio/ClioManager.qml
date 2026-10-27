@@ -281,6 +281,30 @@ Scope {
     mgr.write(n);
     return n.id;
   }
+  // Asked of a notebook that may not be read yet: `go` once it is — read
+  // first, or after the read in flight (the quote, the files and the text
+  // below each wanted this; one place now, audit 2026-10-27)
+  function whenLoaded(go) {
+    if (mgr.loaded) go();
+    else if (!mgr.loading) mgr.load(go);
+    else quoteRetry.later(go);
+  }
+
+  // ── TEXT FROM ELSEWHERE (user, 2026-10-27: plato's selection) ─────────
+  // A new note: `title`, then the lines — each a Monostyled line when
+  // `mono` (code), a Body line otherwise — and `where` it came from beneath,
+  // opened on. done(id).
+  function noteFromText(title, lines, where, mono, done) {
+    mgr.whenLoaded(() => {
+      const blocks = [N.block("title", N.escape(title || "Untitled"))]
+        .concat((lines || []).map((l) => N.block(mono ? "mono" : "body", N.escape(String(l)))))
+        .concat(where ? [N.block("subheading", N.escape(where))] : []);
+      const id = mgr.newNote("", blocks);
+      mgr.openAt(id, "");
+      if (done) done(id);
+    });
+  }
+
   // ── A QUOTE FROM ELSEWHERE ─────────────────────────────────────────────
   // Minerva's highlights (2026-10-20): one note per book, "Highlights ·
   // <book>", made the first time and appended to after — each quote a
@@ -304,9 +328,7 @@ Scope {
       }
       if (done) done(id);
     };
-    if (mgr.loaded) go();
-    else if (!mgr.loading) mgr.load(go);
-    else quoteRetry.later(go);
+    mgr.whenLoaded(go);
   }
   Timer {
     id: quoteRetry
@@ -342,9 +364,7 @@ Scope {
         if (--left === 0) finish();
       }));
     };
-    if (mgr.loaded) go();
-    else if (!mgr.loading) mgr.load(go);
-    else quoteRetry.later(go);
+    mgr.whenLoaded(go);
   }
   function newEntry(journal, date, prompt, blocks) {
     const n = N.blankEntry(journal || (mgr.journals[0] || {}).id || "journal", date, prompt);

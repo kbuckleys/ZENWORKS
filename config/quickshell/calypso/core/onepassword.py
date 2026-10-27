@@ -49,6 +49,15 @@ CATEGORY = {"login": "LOGIN", "password": "PASSWORD", "note": "SECURE_NOTE",
 # the tokens, by account id — this daemon's memory only
 _tokens = {}
 _lock = threading.Lock()
+# HOW EACH ACCOUNT'S SESSION IS HANDED TO op (audit, 2026-10-27): "env" —
+# in op's environment, where only this user can read it — or "argv", the
+# old --session flag, which any user on the machine can read off the
+# process list while op runs. Settled at each unlock by trying the
+# environment first (_settle); anything not yet proven goes by argv, so a
+# version of op that reads the environment differently still unlocks.
+_via = {}
+# the account's user ID, from `op account list`, for OP_SESSION_<id>
+_uuids = {}
 
 
 class OnePassword(Provider):
@@ -72,14 +81,49 @@ class OnePassword(Provider):
         with _lock:
             return _tokens.get(self.cfg.get("id"))
 
+    def session_env(self, t):
+        """The token under every name op is known to read: OP_SESSION (the
+        documented one), and OP_SESSION_<shorthand> / OP_SESSION_<user ID>
+        (what op signin has printed, by version) where the name is a valid
+        variable name — a shorthand like my.1password.com is not."""
+        env = {"OP_SESSION": t}
+        with _lock:
+            uuid = _uuids.get(self.cfg.get("id"))
+        for n in (str(self.cfg.get("shorthand") or ""), str(uuid or "")):
+            if re.fullmatch(r"[A-Za-z0-9_]+", n):
+                env["OP_SESSION_" + n] = t
+        return env
+
     def op(self, args, cancel, token=True, **kw):
         argv = ["op"] + args
         if self.account:
             argv += ["--account", self.account]
         t = self.token() if token else None
         if t:
-            argv += ["--session", t]
+            with _lock:
+                via = _via.get(self.cfg.get("id"), "argv")
+            if via == "env":
+                kw["env"] = dict(kw.get("env") or {}, **self.session_env(t))
+            else:
+                argv += ["--session", t]
         return run(argv, cancel, **kw)
+
+    def _settle(self, cancel):
+        """A fresh token: does op take it from the environment? Asked once,
+        with `whoami` and no --session; the answer is how every call of this
+        account passes it until the next unlock."""
+        aid = self.cfg.get("id")
+        for a in self.known(cancel):
+            if self.account in (a.get("shorthand"), a.get("url"), a.get("account_uuid"), a.get("user_uuid")):
+                with _lock:
+                    _uuids[aid] = a.get("user_uuid") or ""
+                break
+        with _lock:
+            _via[aid] = "env"
+        code, _, _ = self.op(["whoami", "--format", "json"], cancel, timeout=20)
+        if code != 0:
+            with _lock:
+                _via[aid] = "argv"
 
     def known(self, cancel):
         code, out, _ = run(["op", "account", "list", "--format", "json"], cancel, timeout=20)
@@ -130,6 +174,8 @@ class OnePassword(Provider):
             with _lock:
                 _tokens[self.cfg.get("id")] = t
         self.cfg.update({"address": address, "email": email, "shorthand": short or address})
+        if t:
+            self._settle(cancel)
         return dict(self.status(cancel), shorthand=short or address, address=address)
 
     def why(self, err):
@@ -150,6 +196,7 @@ class OnePassword(Provider):
             raise VaultError(self.why(err), "auth")
         with _lock:
             _tokens[self.cfg.get("id")] = t.splitlines()[-1].strip()
+        self._settle(cancel)
         return {}
 
     def lock(self, cancel):
@@ -157,6 +204,7 @@ class OnePassword(Provider):
             self.op(["signout"], cancel, timeout=20)
         with _lock:
             _tokens.pop(self.cfg.get("id"), None)
+            _via.pop(self.cfg.get("id"), None)
         return {}
 
     def forget(self, cancel):

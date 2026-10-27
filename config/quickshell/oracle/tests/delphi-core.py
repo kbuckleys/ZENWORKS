@@ -1610,7 +1610,8 @@ def release_notes_pictures_go_to_the_forge():
         for f in (github, forgejo, gitlab):
             sent.clear()
             rel = f.create_release("o/r", "v1", "main", "v1", "Look:\n![shot](" + url + ")")
-            got[f.NAME if hasattr(f, "NAME") else "GitHub"] = rest.attach_media(f, "o/r", rel, "Look:\n![shot](" + url + ")")["body"]
+            got[f.NAME if hasattr(f, "NAME") else "GitHub"] = rest.attach_media(f, "o/r", rel, "Look:\n![shot](" + url + ")",
+                                                                              chosen=[pic])["body"]
             up = [x for x in sent if "assets" in x[1] or x[1].endswith("/uploads")]
             eq(len(up), 1, f"{f.__name__}: one upload")
             eq(b"\x89PNG fake" in up[0][3], True, f"{f.__name__}: the file's bytes sent")
@@ -1622,6 +1623,16 @@ def release_notes_pictures_go_to_the_forge():
     eq(got["Codeberg"], "Look:\n![shot](https://codeberg.org/o/r/releases/download/v1/" + name + ")")
     eq(got["GitLab"], "Look:\n![shot](https://gitlab.com/-/project/1/uploads/ab/x.png)")
     eq(rest.attach_media(github, "o/r", {"body": "x"}, "no pictures"), {"body": "x"}, "nothing to send, nothing done")
+    # a file:// line the editor was not given (a cloned repo's changelog,
+    # notes from the forge) is never sent, nor a chosen file that is not a
+    # picture or a video
+    secret = os.path.join(os.path.dirname(pic), "id_ed25519")
+    with open(secret, "w") as fh:
+        fh.write("PRIVATE")
+    eq(rest.attach_media(github, "o/r", {"body": "x"}, "![k](file://" + secret + ")"), {"body": "x"}, "an unchosen file stays")
+    eq(rest.attach_media(github, "o/r", {"body": "x"}, "![k](file://" + secret + ")", chosen=[secret]), {"body": "x"},
+       "a chosen file that is no picture stays")
+    eq(rest.attach_media(github, "o/r", {"body": "x"}, "![shot](" + url + ")"), {"body": "x"}, "a picture not chosen stays")
 
 
 @test

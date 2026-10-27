@@ -153,10 +153,7 @@ FloatingWindow {
   property real progress: 0
   property string savingTo: ""
   property string savedTo: ""
-  property string said: ""
-  property bool saidBad: false
-  function say(t, bad) { aw.said = t; aw.saidBad = !!bad; sayTimer.restart(); }
-  Timer { id: sayTimer; interval: 3200; onTriggered: aw.said = "" }
+  function say(t, bad) { saidBox.say(t, bad); }
 
   // ── THE CROP (user, 2026-10-21: "so many memes on the fly") ─────────
   // picasso's crop box over the picture; `crop` in the video's pixels, null
@@ -805,8 +802,8 @@ FloatingWindow {
       anchors.horizontalCenter: screen.horizontalCenter
       anchors.bottom: transport.top
       anchors.bottomMargin: 18
-      text: aw.said
-      bad: aw.saidBad
+      id: saidBox
+      lasts: 3200
     }
 
     HintBar {

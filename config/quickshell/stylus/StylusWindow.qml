@@ -550,10 +550,7 @@ FloatingWindow {
   function refocus() { Qt.callLater(() => keys.forceActiveFocus()); }
 
   // ── WHAT WAS JUST DONE, SAID ONCE ─────────────────────────────────────
-  property string said: ""
-  property bool saidBad: false
-  function say(t, bad) { sw.said = t; sw.saidBad = !!bad; sayTimer.restart(); }
-  Timer { id: sayTimer; interval: 3200; onTriggered: sw.said = "" }
+  function say(t, bad) { saidBox.say(t, bad); }
 
   // ── MENUS ──────────────────────────────────────────────────────────────
   function moreMenu() {
@@ -1108,8 +1105,8 @@ FloatingWindow {
       anchors.bottomMargin: 18
       z: 5
       maxWidth: 560
-      text: sw.said
-      bad: sw.saidBad
+      id: saidBox
+      lasts: 3200
     }
 
     HintBar {

@@ -53,6 +53,10 @@ Singleton {
   // passes exactly this to -a. Named here rather than matched inline so the
   // two ends of the arrangement can be found from either side.
   readonly property string selfUpdateApp: "ceres"
+  // Oracle's sample toast, sent while the Notifications page is changed
+  // (OracleWindow.sampleToast): shown even under Do not disturb — you are
+  // looking for it — one at a time, and never kept in the bell
+  readonly property string sampleApp: "oracle-sample"
 
   // ── mako's config, as settings ──────────────────────────────────────────
   readonly property int maxVisible:   Oracle.notifMaxVisible
@@ -406,7 +410,13 @@ Singleton {
       // and closing it inside this handler would hand the model a dead one.
       // The stack draws a hushed toast as nothing for that one turn. A
       // critical one is the exception, as it is everywhere else.
-      if (root.quiet && notif.urgency !== NotificationUrgency.Critical) {
+      // the sample before it replaces any still up: one at a time
+      const sample = notif.appName === root.sampleApp;
+      if (sample) {
+        const up = root.live ? root.live.values : [];
+        for (const n of up) if (n && n !== notif && n.appName === root.sampleApp) Qt.callLater(() => n.expire());
+      }
+      if (root.quiet && !sample && notif.urgency !== NotificationUrgency.Critical) {
         if (root.focusState.fullscreen) root.heldInFullscreen = root.heldInFullscreen + 1;
         const h = Object.assign({}, root.hushed);
         h[notif.id] = true;
@@ -438,6 +448,7 @@ Singleton {
       // that was wrong.
       if (row.appName === root.selfUpdateApp) return;
       if (row.appName === root.selfSummaryApp) return;
+      if (sample) return;
 
       const h = root.history.slice();
       h.unshift(row);

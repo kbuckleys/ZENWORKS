@@ -660,7 +660,9 @@ PanelWindow {
             const n = toast.modelData, f = toast.pending;
             toast.pending = null;
             if (f && f()) return;
-            if (n) n.expire();
+            // gone already: closed while it left (a newer sample toast
+            // replaces the last, Howler.sampleApp)
+            if (n && typeof n.expire === "function") n.expire();
           }
         }
 

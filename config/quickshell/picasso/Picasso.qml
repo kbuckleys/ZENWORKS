@@ -462,6 +462,22 @@ Singleton {
     saveTimer.restart();
   }
 
+  // ── WHERE QUICK ACCESS WAS LEFT (user, 2026-10-27) ──────────────────
+  // { dir, sub }: the directory it was showing, relative to `dir` — the
+  // backgrounds directory it belongs to, so pointing Oracle somewhere else
+  // starts at that one's top. Kept across a restart; the popup checks the
+  // place still holds pictures before going back to it.
+  property var place: null
+  function setPlace(sub) {
+    const p = { dir: root.dir, sub: String(sub || "") };
+    if (root.place && root.place.dir === p.dir && root.place.sub === p.sub) return;
+    root.place = p;
+    saveTimer.restart();
+  }
+  function placeSub() {
+    return root.place && root.place.dir === root.dir ? root.place.sub : "";
+  }
+
   // ── THE SLIDESHOW ────────────────────────────────────────────────────
   // { minutes, shuffle, query, screens, span } or null. `query` is the
   // filter it draws from, "" for everything; `screens` the monitors it
@@ -615,7 +631,8 @@ Singleton {
     interval: 250
     onTriggered: stateFile.setText(Art.serializeState({
       assignment: root.assignment, fits: root.fits, looks: root.looks,
-      span: root.span, colors: root.colors, slideshow: root.slideshow
+      span: root.span, colors: root.colors, slideshow: root.slideshow,
+      place: root.place
     }))
   }
 
@@ -660,6 +677,7 @@ Singleton {
     root.span = st.span;
     root.colors = st.colors;
     root.slideshow = st.slideshow;
+    root.place = st.place;
     root.scan();
     if (fresh) {
       // sh -c '…' FROM TO NAME…: each one, unless it is there already

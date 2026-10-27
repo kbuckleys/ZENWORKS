@@ -784,10 +784,7 @@ FloatingWindow {
   Timer { id: pushLinger; interval: 2600; onTriggered: win.pushing = null }
 
   // ── WHAT IT SAYS ───────────────────────────────────────────────────────
-  property string said: ""
-  property bool saidBad: false
-  function say(t, bad) { win.said = t; win.saidBad = !!bad; sayTimer.restart(); }
-  Timer { id: sayTimer; interval: 2400; onTriggered: win.said = "" }
+  function say(t, bad) { saidBox.say(t, bad); }
   function copy(text, what) {
     Strings.copy(text);
     win.say("Copied " + (what || text));
@@ -1790,8 +1787,8 @@ FloatingWindow {
       anchors.bottom: foot.top
       anchors.bottomMargin: 18
       maxWidth: pageLoader.width - 40
-      text: win.said
-      bad: win.saidBad
+      id: saidBox
+      lasts: 2400
     }
 
     // ── the foot ─────────────────────────────────────────────────────────

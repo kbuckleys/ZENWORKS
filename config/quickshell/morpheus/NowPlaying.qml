@@ -16,7 +16,6 @@ pragma Singleton
 
 import QtQuick
 import Quickshell
-import Quickshell.Io
 import Quickshell.Services.Mpris
 
 Singleton {
@@ -169,31 +168,21 @@ Singleton {
     root._artNext();
   }
 
+  property bool _artBusy: false
   function _artNext() {
-    if (artFetch.running || root._artQueue.length === 0) return;
+    if (root._artBusy || root._artQueue.length === 0) return;
     const u = root._artQueue[0];
-    artFetch.url = u;
-    artFetch.file = root.artDir + "/" + Qt.md5(u);
-    artFetch.running = true;
-  }
-
-  Process {
-    id: artFetch
-    property string url: ""
-    property string file: ""
-    // already there from an earlier session: no fetch at all
-    command: ["sh", "-c",
-      'f=$1; [ -s "$f" ] && exit 0; mkdir -p "${f%/*}" || exit 1; '
-      + 'curl -fsSL --max-time 15 --max-filesize 20000000 -o "$f.part" "$2" '
-      + '&& [ -s "$f.part" ] && mv -f "$f.part" "$f" || { rm -f "$f.part"; exit 1; }',
-      "sh", artFetch.file, artFetch.url]
-    onExited: code => {
+    const file = root.artDir + "/" + Qt.md5(u);
+    root._artBusy = true;
+    // already there from an earlier session: no fetch at all (Net.fetch)
+    Net.fetch(u, file, { timeout: 15, maxBytes: 20000000 }, (ok) => {
       const m = Object.assign({}, root._art);
-      m[artFetch.url] = code === 0 ? "file://" + artFetch.file : "";
+      m[u] = ok ? "file://" + file : "";
       root._art = m;
-      root._artQueue = root._artQueue.filter(x => x !== artFetch.url);
+      root._artQueue = root._artQueue.filter(x => x !== u);
+      root._artBusy = false;
       Qt.callLater(root._artNext);
-    }
+    });
   }
 
   // A safety net for a player that changes without saying so; it was the

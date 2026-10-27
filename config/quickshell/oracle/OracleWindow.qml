@@ -124,6 +124,47 @@ FloatingWindow {
   // the groups of rows opened under their heads (Shortcuts' Shell, Audio…):
   // group -> true. All shut to begin with, as About this computer is.
   property var openGroups: ({})
+  // ── A SAMPLE TOAST (user, 2026-10-27: live previews) ──────────────────
+  // While the Notifications page is open, a change to how a toast is placed,
+  // looks or arrives sends one — Howler's own toast, so what you see is the
+  // real thing, not a likeness (Howler.sampleApp: never kept, one at a time,
+  // shown under Do not disturb too). Half a second after the last change,
+  // so a slider dragged sends one.
+  readonly property string toastLook: {
+    Oracle.revision;
+    const page = Ora.pageLayout("notify") || [];
+    const keys = [].concat(...page.filter((p) => ["Place and size", "Look", "Arrival"].indexOf(p[0]) >= 0).map((p) => p[1]));
+    return keys.map((k) => String(Oracle.get(k))).join("|");
+  }
+  onToastLookChanged: if (popup.shown && popup.section === "notify" && !popup.searching) sampleTimer.restart()
+  Timer { id: sampleTimer; interval: 550; onTriggered: popup.sampleToast() }
+  function sampleToast() {
+    Quickshell.execDetached(["notify-send", "-a", "oracle-sample", "-t", "5000",
+      "A sample toast", "How every notification looks now — change a setting and another comes."]);
+  }
+
+  // ── A HEALTH FINDING, DEALT WITH ──────────────────────────────────────
+  // Restart through Oracle's own Restart the shell; preflight and the log in
+  // a terminal (they are long, and worth reading as they go); a leftover
+  // probe opened where it is.
+  function healthFix(fix) {
+    if (!fix) return;
+    const dir = Quickshell.shellDir;
+    const term = (title, script, args) => Quickshell.execDetached(["xdg-terminal-exec", "--title=" + title, "--", "sh", "-c",
+      script + '; printf "\\nPress RETURN to close."; read _', "sh"].concat(args || []));
+    if (fix.act === "restart") Oracle.run("actionRestart", "");
+    else if (fix.act === "preflight") term("Preflight", 'cd "$1" && bash scripts/preflight.sh', [dir]);
+    else if (fix.act === "log") term("Shell log", 'qs log -p "$1/shell.qml" -f', [dir]);
+    else if (fix.act === "open" && (fix.files || []).length) Quickshell.execDetached(["xdg-open", dir + "/" + String(fix.files[0]).replace(/^\.\//, "")]);
+  }
+
+  // ── A WORD SAID FOR A MOMENT (an undo): morpheus' Said ──
+  function say(t) { saidBox.say(t); }
+  function stepHistory(back) {
+    const what = back ? Oracle.undo() : Oracle.redo();
+    popup.say(what === "" ? (back ? "Nothing to undo" : "Nothing to redo")
+                          : (back ? "Undid " : "Redid ") + what);
+  }
   function toggleGroup(g) {
     const next = ({});
     for (const k in popup.openGroups) next[k] = popup.openGroups[k];
@@ -176,6 +217,25 @@ FloatingWindow {
                 : (t.indexOf("-right") >= 0 ? 2 : 1) };
   }
 
+  // A theme's swatch, [ground, ink, accent] (CardBody draws it): the file's
+  // own (Ora.themeSwatch) with Zenon's for what it leaves out, Zenon's
+  // itself, the background's while Follow Background has made one. Follow
+  // Daytime is two themes, and keeps only its glyph. null for any other row.
+  function swatchOf(sp, opt) {
+    if (!sp || !opt || (sp.optionsFrom !== "themes" && sp.optionsFrom !== "themesNoSun")) return null;
+    const z = Zenon.zenon;
+    const fill = (sw) => [sw[0] || z.ground, sw[1] || z.ink, sw[2] || z.cyan];
+    if (opt.value === "zenon") return [z.ground, z.ink, z.cyan];
+    if (opt.value === "follow") {
+      const sw = Ora.themeSwatch(Zenon.followTheme && Zenon.followTheme.colors);
+      return sw ? fill(sw) : null;
+    }
+    return opt.swatch ? fill(opt.swatch) : null;
+  }
+
+  // the font weight rows (Font's, Monospace's): drawn in what they say
+  function isWeight(sp) { return !!sp && (sp.key === "fontWeight" || sp.key === "monoWeight"); }
+
   // A spec that names a PLACE gets the grid; everything else gets the list.
   readonly property bool enumIsGrid:
     popup.enumShownSpec !== null && popup.enumShownSpec.pictogram === "corner"
@@ -222,6 +282,9 @@ FloatingWindow {
     for (let i = 0; i < opts.length; ++i) {
       out.push({ text: opts[i].label,
                  mark: opts[i].value === now,
+                 swatch: popup.swatchOf(sp, opts[i]),
+                 // a font weight's options, each in its own weight
+                 weight: popup.isWeight(sp) ? parseInt(opts[i].value, 10) || 0 : 0,
                  cell: sp.pictogram === "corner"
                    ? popup.cornerCell(opts[i].value) : null });
     }
@@ -357,7 +420,38 @@ FloatingWindow {
   }
 
   // With a query, every match in the panel; without one, the section's rows.
-  readonly property var matches: Ora.filterSchema(Oracle.schema, popup.section, popup.query)
+  readonly property var matches: popup.section === "changed" && !popup.searching
+    ? popup.changedRows
+    : Ora.filterSchema(Oracle.schema, popup.section, popup.query)
+
+  // ── EVERYTHING CHANGED, ONE PAGE (user, 2026-10-27) ─────────────────────
+  // Every setting not at its default, from every page, under its page's
+  // name — the row's own reset (its name) puts each back. A setting drawn
+  // inside another row (Font's weight) shows as that row. The monitors keep
+  // their own page: theirs are not defaults but a desk.
+  readonly property var changedRows: {
+    Oracle.revision;
+    const order = ({});
+    Oracle.sections.forEach((sec, i) => { order[sec.id] = i; });
+    const seen = ({}), out = [];
+    for (const s of Oracle.schema) {
+      if (!Ora.stored(s) || s.display || Oracle.isDefault(s.key)) continue;
+      const row = s.within ? Oracle.spec(s.within) : s;
+      if (!row || seen[row.key]) continue;
+      seen[row.key] = true;
+      out.push(row);
+    }
+    out.sort((a, b) => (order[a.section] ?? 99) - (order[b.section] ?? 99));
+    let last = "";
+    return out.map((r) => {
+      // a shortcut stands in a folding group on its own page; here there is
+      // no group head to open it, so it is a row of its own
+      const own = r.inGroup ? Object.assign({}, r, { inGroup: "" }) : r;
+      if (r.section === last) return own;
+      last = r.section;
+      return Object.assign({}, own, { head: popup.sectionLabel(r.section) });
+    });
+  }
 
   // While searching, the sections the results are filed under — so the
   // sidebar can say where the matches live instead of dimming all of it.
@@ -392,18 +486,26 @@ FloatingWindow {
   }
 
   // the hint strip along the bottom, as tall as every other layer's
-  readonly property int hintH: Zenon.hintBarH   // morpheus/HintBar's strip
   readonly property int bodyH: 460
   // the sidebar down the left. No section name over the settings: the
   // sidebar says it already (user, 2026-10-27)
   readonly property int sideW: 240
   readonly property int rowH: 64
+  // ONE PADDING ON EVERY PAGE (user, 2026-10-27: "padding is wrong in every
+  // page. it's not uniform"): the labels this far from the left, the
+  // controls this far from the right, the first row this far from the top —
+  // and `rowPad` above and below every row, so the gap between two rows is
+  // the same with a description or without one
+  readonly property int pad: 24
+  readonly property int rowPad: 11
   // a row inside a group's frame
   readonly property int frameRowH: 44
   // a group's head (Shortcuts' Shell, Audio…), between the two
   readonly property int groupHeadH: 48
   // the Arrangement's picture of the desk
   readonly property int arrangeH: 240
+  // Surfaces' sample (SurfaceSample)
+  readonly property int sampleH: 150
   // ── CONTROLS HANG OFF THE RIGHT EDGE ──────────────────────────────────
   // Every control ENDS at the same x, hard against the scrollbar, and each
   // one takes only the width it actually needs. Two things follow from that,
@@ -424,7 +526,7 @@ FloatingWindow {
   readonly property int controlW: 260
 
   function calcHeight() {
-    return popup.bodyH + popup.hintH;
+    return popup.bodyH;
   }
 
   // ── CLOSED BY THE COMPOSITOR ──────────────────────────────────────────
@@ -463,6 +565,24 @@ FloatingWindow {
   }
 
   // ── open and close ────────────────────────────────────────────────────
+
+  // ── LANDING ON ONE SETTING (OracleManager.openAt) ──────────────────────
+  // Its row scrolled into the middle and lit for a moment, once the page's
+  // rows are laid out. A setting drawn inside another row (Font's weight)
+  // lights the row that holds it.
+  property string litKey: ""
+  Timer { id: litTimer; interval: 1600; onTriggered: popup.litKey = "" }
+  function reveal(key) {
+    const s = Oracle.spec(key);
+    const want = s && s.within ? s.within : key;
+    Qt.callLater(() => {
+      const i = popup.rows.findIndex((r) => r.key === want);
+      if (i < 0) return;
+      list.positionViewAtIndex(i, ListView.Center);
+      popup.litKey = want;
+      litTimer.restart();
+    });
+  }
 
   function openPopup(section) {
     const cold = !popup.visible;
@@ -508,6 +628,11 @@ FloatingWindow {
   // The search field holds the keyboard so that typing works without clicking
   // into it first. That is not a keyboard interface — it is the one thing a
   // pointer cannot do for you, and everything else in here is a click.
+  // A PAGE FROM ITS BEGINNING, top margin and all (user, 2026-10-27: a
+  // category opened "a bit down"). positionViewAtBeginning puts the first
+  // row at the list's very top, under the margin that holds it `pad` down.
+  function toTop() { list.contentY = list.originY - list.topMargin; }
+
   function syncFocus() {
     Qt.callLater(() => {
       if (!popup.shown) return;
@@ -537,7 +662,7 @@ FloatingWindow {
         if (popup.hitSections[sec.id] === true) ids.push(sec.id);
       const i = ids.indexOf(popup.searchScope);
       popup.searchScope = ids[((i < 0 ? 0 : i) + dir + ids.length) % ids.length];
-      Qt.callLater(() => list.positionViewAtBeginning());
+      Qt.callLater(popup.toTop);
       return;
     }
     for (const sec of Oracle.sections) ids.push(sec.id);
@@ -551,17 +676,18 @@ FloatingWindow {
     if (popup.searching) {
       popup.searchScope = popup.searchScope === id ? "" : id;
       if (id === "display") Oracle.scanDisplays();
-      if (id === "look") { Oracle.scanThemes(); Oracle.scanFonts(); }
+      if (id === "look") Oracle.scanThemes();
+      if (id === "fonts") Oracle.scanFonts();
       if (id === "defaults") Oracle.scanApps();
       if (id === "input") Oracle.scanInputDevices();
       popup.closeEnumMenu();
-      Qt.callLater(() => list.positionViewAtBeginning());
+      Qt.callLater(popup.toTop);
       popup.syncFocus();
       return;
     }
     // Neither About nor Health holds a setting, so neither is a section
     // "Reset one section" could mean.
-    if (popup.section !== "about" && popup.section !== "health")
+    if (popup.section !== "about" && popup.section !== "health" && popup.section !== "changed")
       popup.lastRealSection = popup.section;
     popup.section = id;
     // The checkup runs on arrival — a Health page showing "not run yet" is
@@ -574,7 +700,8 @@ FloatingWindow {
     if (id === "display") Oracle.scanDisplays();
     // and the themes, so a file dropped into themes/ is offered at once —
     // and the fonts, so one installed since the shell started is too
-    if (id === "look") { Oracle.scanThemes(); Oracle.scanFonts(); }
+    if (id === "look") Oracle.scanThemes();
+    if (id === "fonts") Oracle.scanFonts();
     // and what is installed: an application added since the last look is
     // one you may well have come here to choose
     if (id === "defaults") Oracle.scanApps();
@@ -582,7 +709,7 @@ FloatingWindow {
     if (id === "input") Oracle.scanInputDevices();
     popup.editingKey = "";
     popup.closeEnumMenu();
-    Qt.callLater(() => list.positionViewAtBeginning());
+    Qt.callLater(popup.toTop);
     popup.syncFocus();
   }
 
@@ -612,8 +739,24 @@ FloatingWindow {
     id: sw
     property var spec: null
     property bool value: false
-    width: 24
+    // a spec's `sample`: what the setting does, shown beside the tick as it
+    // stands ("clock": the time as the clock writes it)
+    readonly property string sample: !sw.spec || !sw.spec.sample ? ""
+      : sw.spec.sample === "clock" ? (sw.value ? "13:00" : "1:00 PM") : ""
+    width: 24 + (sw.sample !== "" ? sampleText.implicitWidth + 12 : 0)
     height: 24
+    Text {
+      id: sampleText
+      visible: sw.sample !== ""
+      anchors.left: parent.left
+      anchors.verticalCenter: parent.verticalCenter
+      text: sw.sample
+      color: popup.dimColor
+      font.family: popup.face
+      font.weight: Font.Medium
+      font.features: { "tnum": 1 }
+      font.pixelSize: Zenon.px(15)
+    }
     // installing what the row turns on (Input methods' languages): the
     // tick gives way to a turning ring until Ceres is done
     readonly property bool busy: !!sw.spec && Oracle.imBusyKey === sw.spec.key
@@ -832,9 +975,21 @@ FloatingWindow {
         }
       }
 
+      // the worn theme's swatch, as its row in the card has it
+      Swatch {
+        id: chipSwatch
+        colors: en.spec
+          ? popup.swatchOf(en.spec, (en.spec.options || []).find((o) => o.value === String(en.value)))
+          : null
+        visible: !en.hasPicto && chipSwatch.colors !== null
+        anchors.left: parent.left
+        anchors.leftMargin: 10
+        anchors.verticalCenter: parent.verticalCenter
+      }
+
       Text {
-        anchors.left: en.hasPicto ? picto.right : parent.left
-        anchors.leftMargin: en.hasPicto ? 8 : 10
+        anchors.left: en.hasPicto ? picto.right : chipSwatch.visible ? chipSwatch.right : parent.left
+        anchors.leftMargin: en.hasPicto || chipSwatch.visible ? 8 : 10
         anchors.right: caret.left
         anchors.rightMargin: 6
         anchors.verticalCenter: parent.verticalCenter
@@ -843,7 +998,7 @@ FloatingWindow {
         text: en.spec ? Ora.display(en.spec, en.value) : ""
         color: popup.fgColor
         font.family: popup.face
-        font.weight: Font.Medium
+        font.weight: popup.isWeight(en.spec) ? (parseInt(en.value, 10) || Font.Medium) : Font.Medium
         font.pixelSize: Zenon.px(en.hasPicto ? 14 : 15)
       }
 
@@ -875,6 +1030,216 @@ FloatingWindow {
         onWheel: (w) => {
           Oracle.nudge(en.spec.key, w.angleDelta.y > 0 ? 1 : -1);
           w.accepted = true;
+        }
+      }
+    }
+  }
+
+  // ── A SETTING'S PICTURE ───────────────────────────────────────────────
+  // Over each word of a switch whose choices are shapes (user, 2026-10-27:
+  // "pictograms for better visual clarity"): a screen 26 by 16 and what the
+  // choice does on it. A spec names its kind with `art` — "fit" (picasso's
+  // own FitGlyph, the background card's), "bar" (the pill on its edge),
+  // "corner" (a dot in it), "layout" (how tiled windows share it), "align"
+  // (lines held to a side) and "accel" (the pointer's curve).
+  component SettingArt: Item {
+    id: art
+    property string kind: ""
+    property string value: ""
+    property color ink: popup.dimColor
+    implicitWidth: 26
+    implicitHeight: 16
+    readonly property color fill: Qt.rgba(art.ink.r, art.ink.g, art.ink.b, 0.55)
+
+    // by URL, as picasso's viewer loads its map: no import of picasso here
+    Loader {
+      anchors.fill: parent
+      active: art.kind === "fit"
+      source: Qt.resolvedUrl("../picasso/FitGlyph.qml")
+      onLoaded: {
+        item.mode = Qt.binding(() => art.value);
+        item.ink = Qt.binding(() => art.ink);
+      }
+    }
+
+    Item {
+      anchors.fill: parent
+      visible: art.kind !== "fit"
+      // what is on the screen, cut to it (a scrolling strip runs past)
+      Item {
+        anchors.fill: parent
+        anchors.margins: 2
+        clip: true
+        // bar: the pill on its edge
+        Rectangle {
+          visible: art.kind === "bar"
+          anchors.horizontalCenter: parent.horizontalCenter
+          y: art.value === "top" ? 0 : parent.height - height
+          width: 12; height: 3; radius: 1.5
+          color: art.ink
+        }
+        // corner: a dot in it
+        Rectangle {
+          visible: art.kind === "corner"
+          width: 5; height: 5; radius: 2.5
+          x: /Left$/.test(art.value) ? 0 : parent.width - width
+          y: /^top/.test(art.value) ? 0 : parent.height - height
+          color: art.ink
+        }
+        // layout: the windows, a pixel apart
+        Repeater {
+          model: art.kind !== "layout" ? []
+            : art.value === "master" ? [[0, 0, 12, 12], [13, 0, 9, 3.67], [13, 4.17, 9, 3.67], [13, 8.33, 9, 3.67]]
+            : art.value === "scrolling" ? [[-5, 0, 8, 12], [4, 0, 14, 12], [19, 0, 8, 12]]
+            : [[0, 0, 10.5, 12], [11.5, 0, 10.5, 5.5], [11.5, 6.5, 4.75, 5.5], [17.25, 6.5, 4.75, 5.5]]
+          Rectangle {
+            required property var modelData
+            x: modelData[0]; y: modelData[1]; width: modelData[2]; height: modelData[3]
+            radius: 1
+            color: art.fill
+          }
+        }
+        // align: three lines of text, held to their side
+        Repeater {
+          model: art.kind !== "align" ? [] : [[18, 1.5], [12, 5], [15, 8.5]]
+          Rectangle {
+            required property var modelData
+            width: modelData[0]; height: 2; y: modelData[1]
+            radius: 1
+            x: art.value === "center" ? (parent.width - width) / 2
+              : art.value === "right" ? parent.width - width : 0
+            color: art.ink
+          }
+        }
+        // accel: how far the pointer goes for how fast the hand — a straight
+        // line for Flat, a curve that bends up for Adaptive, steps for Custom,
+        // a dashed line for the device's own
+        Canvas {
+          id: accel
+          anchors.fill: parent
+          visible: art.kind === "accel"
+          readonly property var key: [art.value, art.ink.toString()]
+          onKeyChanged: requestPaint()
+          onPaint: {
+            const c = getContext("2d");
+            c.reset();
+            if (art.kind !== "accel") return;
+            const w = width, h = height;
+            c.strokeStyle = art.ink;
+            c.lineWidth = 1.5;
+            c.lineCap = "round";
+            c.beginPath();
+            if (art.value === "adaptive") {
+              c.moveTo(1, h - 1);
+              c.quadraticCurveTo(w * 0.7, h - 1, w - 1, 1);
+            } else if (art.value === "custom") {
+              c.moveTo(1, h - 1);
+              c.lineTo(w * 0.35, h - 1); c.lineTo(w * 0.35, h * 0.6);
+              c.lineTo(w * 0.7, h * 0.6); c.lineTo(w * 0.7, 1); c.lineTo(w - 1, 1);
+            } else {
+              if (art.value === "") c.setLineDash([2, 2]);
+              c.moveTo(1, h - 1);
+              c.lineTo(w - 1, 1);
+            }
+            c.stroke();
+          }
+        }
+      }
+      Rectangle {
+        anchors.fill: parent
+        radius: Zenon.rad(2)
+        color: "transparent"
+        border.width: 1
+        border.color: art.ink
+      }
+    }
+  }
+
+  // ── SURFACES, DRAWN (user, 2026-10-27: live previews) ──────────────────
+  // A panel and a menu card as the shell makes them now — their opacity,
+  // corners and the menu's shadow — over stripes, so how much shows through
+  // can be seen. Read off Zenon, so it follows every change as it is made.
+  component SurfaceSample: Item {
+    id: ss
+    clip: true
+    Controls.ListFrame { anchors.fill: parent }
+    // the ground: stripes of the accents, inside the frame
+    Item {
+      anchors.fill: parent
+      anchors.margins: 1
+      clip: true
+      // wider and taller than the frame, so the tilt leaves no corner bare
+      Row {
+        rotation: -20
+        x: -ss.width * 0.35
+        y: -ss.height * 2
+        Repeater {
+          model: 18
+          Rectangle {
+            required property int index
+            width: Math.ceil(ss.width / 10)
+            height: ss.height * 5
+            color: [Zenon.cyan, Zenon.pink, Zenon.sand, Zenon.blue][index % 4]
+            opacity: 0.55
+          }
+        }
+      }
+    }
+    // a panel, as layers wear it
+    Rectangle {
+      id: samplePanel
+      x: 18
+      y: 18
+      width: ss.width * 0.46
+      height: ss.height - 36
+      radius: Zenon.radiusCard
+      color: Zenon.layerBg
+      border.width: 1
+      border.color: Zenon.border
+      Column {
+        x: 14; y: 12
+        spacing: 7
+        Text { text: "A panel"; color: Zenon.ink; font.family: Zenon.face; font.weight: Zenon.titleWeight; font.pixelSize: Zenon.px(14) }
+        Repeater {
+          model: [0.8, 0.6, 0.7]
+          Rectangle { required property real modelData; width: samplePanel.width * modelData - 28; height: 6; radius: 3; color: Zenon.alpha(Zenon.ink, 0.25) }
+        }
+      }
+    }
+    // and a menu, with its shadow
+    MenuShadow { panel: sampleMenu; cornerRadius: sampleMenu.radius }
+    Rectangle {
+      id: sampleMenu
+      x: ss.width * 0.46 + 40
+      y: 26
+      width: Math.min(ss.width * 0.4, Zenon.menuWidth)
+      height: ss.height - 52
+      radius: Zenon.menuRadius
+      color: Zenon.menuBg
+      border.width: 1
+      border.color: Zenon.border
+      Column {
+        anchors.fill: parent
+        anchors.margins: Zenon.menuCardPad
+        Repeater {
+          model: ["Open", "Copy", "Move to trash"]
+          Rectangle {
+            required property string modelData
+            required property int index
+            width: parent.width
+            height: (sampleMenu.height - 2 * Zenon.menuCardPad) / 3
+            radius: Zenon.menuRadius - Zenon.menuCardPad
+            color: index === 0 ? Zenon.menuHi : "transparent"
+            Text {
+              anchors.verticalCenter: parent.verticalCenter
+              x: 10
+              text: parent.modelData
+              color: Zenon.ink
+              font.family: Zenon.face
+              font.weight: Zenon.weight
+              font.pixelSize: Zenon.px(14)
+            }
+          }
         }
       }
     }
@@ -1138,8 +1503,25 @@ FloatingWindow {
     id: nfo
     property var spec: null
     property string value: ""
-    width: popup.controlW + 60
+    // a Health reading's fix, when it has one (Ora.readCheckup's `fix`)
+    readonly property var fix: {
+      Oracle.revision;
+      if (!nfo.spec || !nfo.spec.health || Oracle.checking) return null;
+      const r = Oracle.checkup[nfo.spec.health];
+      return r && r.fix ? r.fix : null;
+    }
+    width: popup.controlW + 60 + (fixBtn.visible ? fixBtn.width + 12 : 0)
     height: 28
+
+    DialogButton {
+      id: fixBtn
+      visible: nfo.fix !== null
+      anchors.left: parent.left
+      anchors.verticalCenter: parent.verticalCenter
+      label: nfo.fix ? nfo.fix.label : ""
+      ink: popup.highlight
+      onClicked: popup.healthFix(nfo.fix)
+    }
 
     // out and not back yet: dots, not "checking…" — see morpheus/Working
     readonly property bool busy: !!nfo.spec && (nfo.spec.health ? Oracle.checking
@@ -1154,6 +1536,7 @@ FloatingWindow {
     // row's labels), not out here by the readout
     Text {
       anchors.fill: parent
+      anchors.leftMargin: fixBtn.visible ? fixBtn.width + 12 : 0
       visible: !nfo.busy
       verticalAlignment: Text.AlignVCenter
       // LEFT, like every control beside it. It was right-aligned against the
@@ -1402,7 +1785,7 @@ FloatingWindow {
   }
 
   // ── THE HOVER TIP ─────────────────────────────────────────────────────
-  // One, for the whole window, drawn inside it under the pointer: see resetMa.
+  // One, for the whole window: the restore glyph, a pictogram, the font book, a long pick.
   // The suite's WindowTip (morpheus): its own popup surface, hung under what
   // it names, so it is frosted like every other tooltip (Zenon.tipBg). It was
   // a rectangle drawn in this window, which nothing can frost.
@@ -1582,6 +1965,9 @@ FloatingWindow {
           color: Zenon.wash(filterInput.activeFocus ? 0.08 : 0.04)
           border.width: 1
           border.color: Zenon.border
+          // the suite's focus ring while it has the keys (user, 2026-10-27),
+          // as Clio's search wears it
+          HeldRing { anchors.fill: parent; radius: parent.radius; z: 10; on: filterInput.activeFocus }
           Text {
             id: searchGlyph
             anchors.left: parent.left
@@ -1619,7 +2005,7 @@ FloatingWindow {
 
               onTextChanged: {
                 popup.query = filterInput.text;
-                Qt.callLater(() => list.positionViewAtBeginning());
+                Qt.callLater(popup.toTop);
               }
 
               function clear() {
@@ -1669,6 +2055,29 @@ FloatingWindow {
           Column {
             id: sideCol
             width: sideFlick.width
+            // air between the search field and the first entry (user,
+            // 2026-10-27), inside the list so entries still scroll under it
+            topPadding: 10
+            // every changed setting on one page (changedRows), above the
+            // sections, while there is any
+            ShelfRow {
+              id: changedRow
+              readonly property int n: { Oracle.revision; return Oracle.changedIn(""); }
+              readonly property bool onIt: !popup.searching && popup.section === "changed"
+              visible: changedRow.n > 0 || changedRow.onIt
+              width: sideCol.width
+              radius: 0
+              indent: 18
+              glyph: "\uF040"
+              label: "Changed"
+              count: changedRow.n > 0 ? String(changedRow.n) : ""
+              countInk: popup.changedColor
+              glyphInk: changedRow.onIt ? popup.headColor : "transparent"
+              here: changedRow.onIt
+              fill: Zenon.menuHi
+              opacity: popup.searching ? 0.35 : 1
+              onClicked: popup.goToSection("changed")
+            }
             Repeater {
               model: Oracle.sections
               delegate: Column {
@@ -1737,35 +2146,18 @@ FloatingWindow {
         }
       }
 
-      // ── the hint strip ─────────────────────────────────────────────
-      // Along the bottom beside the sidebar, as delphi's foot starts beside
-      // its own: morpheus/HintBar (ceres' height, ground and rule), the keys
-      // centered, how many matched before them. Nothing at the right end —
-      // the changed count went (user, 2026-10-20): each section's count
-      // says it already.
-      HintBar {
-        id: hintBar
-        anchors.left: side.right
-        anchors.right: parent.right
+      // NO HINT STRIP (user, 2026-10-27: removed). What it said in passing —
+      // an undo — is said once over the foot instead (morpheus' Said).
+      Controls.Said {
+        z: 3
+        // centered over the settings, right of the sidebar
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.horizontalCenterOffset: side.width / 2
         anchors.bottom: parent.bottom
-        z: 2
-        rows: popup.searching
-          ? [["ctrl tab", "narrow"], ["esc", "clear"]]
-          : [["type", "search"], ["ctrl tab", "section"]]
-        leading: Text {
-          anchors.verticalCenter: parent.verticalCenter
-          width: Math.min(implicitWidth, hintBar.width / 3)
-          elide: Text.ElideRight
-          text: {
-            if (!popup.searching) return "";
-            const n = popup.rows.length;
-            return n + (n === 1 ? " match" : " matches");
-          }
-          color: popup.dimColor
-          font.family: popup.face
-          font.weight: Zenon.weight
-          font.pixelSize: Zenon.px(13)
-        }
+        anchors.bottomMargin: 18
+        maxWidth: parent.width - side.width - 40
+        id: saidBox
+        lasts: 2400
       }
 
       Column {
@@ -1776,10 +2168,11 @@ FloatingWindow {
 
         // ── the body ─────────────────────────────────────────────────
         Item {
+          id: body
           width: parent.width
-          // the whole window above the hint strip, so resizing the window
-          // grows the list rather than leaving it floating in a margin
-          height: parent.height - popup.hintH
+          // the whole window, so resizing it grows the list rather than
+          // leaving it floating in a margin
+          height: parent.height
 
           // settings scrolled off the top carry on under whatever stands
           // over the list (the About mark, the display confirm), frosted —
@@ -1792,16 +2185,6 @@ FloatingWindow {
             height: list.parent.y + list.y
           }
 
-          // and the settings still below rise out of the hint bar, which
-          // sits just past this item's bottom (z 2, so it draws over this)
-          ScrollEdge {
-            view: list
-            below: true
-            x: list.x
-            y: list.parent.y + list.y + list.height
-            width: list.width
-            height: popup.hintH
-          }
 
           // the settings themselves
           Item {
@@ -2026,7 +2409,8 @@ FloatingWindow {
               anchors.centerIn: parent
               visible: popup.rows.length === 0
               text: popup.searching ? "Nothing matches “" + popup.query + "”"
-                                    : "Nothing to set here"
+                : popup.section === "changed" ? "Everything is at its default"
+                : "Nothing to set here"
             }
 
             // The bar takes its width out of the list rather than floating
@@ -2057,6 +2441,10 @@ FloatingWindow {
               anchors.top: confirmBar.bottom
               anchors.bottom: parent.bottom
               anchors.right: parent.right
+              // the first row's name `pad` from the top, as the labels are
+              // from the left (its own rowPad is the rest)
+              topMargin: popup.pad - popup.rowPad
+              bottomMargin: popup.pad - popup.rowPad
               clip: true
               model: popup.rows
               visible: popup.rows.length > 0
@@ -2094,9 +2482,14 @@ FloatingWindow {
                 // what you see (user, 2026-10-20: its right side was wider
                 // by the bar). Only the controls keep clear of the bar.
                 width: list.width
-                readonly property real gutter: scroller.scrollable ? list.width - (scroller.x - list.x) : 0
+                // an autohidden bar comes and goes over the rows, so it
+                // keeps no room of its own (user, 2026-10-27); one always
+                // shown keeps its thickness clear
+                readonly property real gutter: scroller.scrollable && !Zenon.scrollAutohide ? scroller.thickness : 0
+                // a setting's own row, not a frame's, a group's head or the desk
+                readonly property bool plain: !settingRow.arrange && !settingRow.inGroup && !settingRow.groupHead
                 height: settingRow.tucked ? 0
-                  : settingRow.arrange ? popup.arrangeH
+                  : settingRow.arrange ? (settingRow.sampleRow ? popup.sampleH + settingRow.headH : popup.arrangeH)
                   : rowHead.y + rowHead.height + settingRow.frameBelow
                     + (settingRow.open ? foldBody.height : 0)
                 Behavior on height { NumberAnimation { duration: Zenon.menuFade; easing.type: Easing.OutCubic } }
@@ -2104,7 +2497,10 @@ FloatingWindow {
                 visible: height > 0
 
                 readonly property var spec: settingRow.modelData
-                readonly property bool arrange: settingRow.spec.type === "arrange"
+                // a row that is a picture, wide and with no control: the
+                // desk's Arrangement, or Surfaces' sample
+                readonly property bool sampleRow: settingRow.spec.type === "sample"
+                readonly property bool arrange: settingRow.spec.type === "arrange" || settingRow.sampleRow
 
                 // ── A ROW THAT FOLDS OPEN ────────────────────────────────
                 // `fold` (About this computer): the row is its usual self
@@ -2143,6 +2539,31 @@ FloatingWindow {
                 readonly property int frameAbove: settingRow.groupFirst ? 10 : 0
                 // the frame's inset, then the gap before the next head
                 readonly property int frameBelow: settingRow.groupLast ? 14 : 0
+                // ── A PART OF A LONG PAGE ────────────────────────────────
+                // Ora's PAGES: the first row of each part has a heading over
+                // it (morpheus' SectionLabel). Not mid-search, where rows
+                // come from anywhere.
+                readonly property string head: popup.searching ? "" : (settingRow.spec.head || "")
+                // the first one `pad` from the top, as the labels are from the left
+                readonly property int headH: settingRow.head === "" ? 0 : settingRow.index === 0 ? 30 : 44
+                // lit for a moment when landed on (popup.reveal)
+                Rectangle {
+                  x: popup.pad - 12
+                  y: rowHead.y
+                  width: parent.width - 2 * (popup.pad - 12) - settingRow.gutter
+                  height: rowHead.height
+                  radius: Zenon.radiusCard
+                  color: Zenon.menuHi
+                  opacity: popup.litKey === settingRow.spec.key ? 0.9 : 0
+                  Behavior on opacity { NumberAnimation { duration: popup.litKey === settingRow.spec.key ? Zenon.fast : 900; easing.type: Zenon.ease } }
+                  z: -1
+                }
+                SectionLabel {
+                  visible: settingRow.head !== ""
+                  x: popup.pad
+                  y: settingRow.headH - height - 4
+                  text: settingRow.head
+                }
                 Controls.ListFrame {
                   visible: settingRow.inGroup
                   z: -1
@@ -2154,7 +2575,7 @@ FloatingWindow {
                 // as tall as the label and its wrapped description, 64 at least
                 Item {
                   id: rowHead
-                  y: settingRow.frameAbove
+                  y: settingRow.frameAbove + settingRow.headH
                   width: parent.width
                   // tighter inside a frame (user, 2026-10-20): the frame
                   // already sets them apart, as About this computer's lines are
@@ -2164,7 +2585,10 @@ FloatingWindow {
                     // help under it: at a full row's 64 the heads stood
                     // apart like sections of their own (user, 2026-10-24)
                     : settingRow.groupHead ? Math.max(popup.groupHeadH, Math.ceil(labels.implicitHeight) + 16)
-                    : Math.max(popup.rowH, Math.ceil(labels.implicitHeight) + 22)
+                    // the name (level with the control) and its description,
+                    // rowPad above and below: no 64 at least any more, which
+                    // left a row with no description taller than its words
+                    : Math.ceil(labels.anchors.topMargin + labels.implicitHeight) + popup.rowPad
                 }
                 // what this row adds while open, for the list's cacheBuffer
                 Binding {
@@ -2184,10 +2608,13 @@ FloatingWindow {
                 }
                 Loader {
                   id: foldBody
-                  y: rowHead.height
+                  // under the row's head wherever it stands — a part's heading
+                  // over it moves it down (it sat at the old place, and loaded
+                  // while shut, its button showing through: user, 10-27)
+                  y: rowHead.y + rowHead.height
                   width: parent.width
                   height: item ? item.implicitHeight : 0
-                  active: settingRow.fold && (settingRow.open || settingRow.height > rowHead.height)
+                  active: settingRow.fold && (settingRow.open || settingRow.height > rowHead.y + rowHead.height + settingRow.frameBelow)
                   source: ({ computer: "ComputerPanel.qml", tools: "ToolsPanel.qml",
                              color: "ColorFold.qml", rules: "WindowRules.qml",
                              startup: "StartupApps.qml" })[settingRow.spec.fold] || ""
@@ -2227,10 +2654,18 @@ FloatingWindow {
                   opacity: settingRow.monitorHead ? 1 : 0.55
                 }
 
+                SurfaceSample {
+                  visible: settingRow.sampleRow
+                  x: popup.pad
+                  // rowPad above and below, as every row has
+                  y: settingRow.headH + popup.rowPad
+                  width: parent.width - 2 * popup.pad - settingRow.gutter
+                  height: popup.sampleH - 2 * popup.rowPad
+                }
                 ArrangeView {
                   anchors.fill: parent
                   anchors.rightMargin: settingRow.gutter
-                  visible: settingRow.arrange
+                  visible: settingRow.arrange && !settingRow.sampleRow
                   face: popup.face
                   fgColor: popup.fgColor
                   dimColor: popup.dimColor
@@ -2275,18 +2710,23 @@ FloatingWindow {
                   // right edge. It replaced a reading measure (62% of the row) that
                   // stopped the text beside every control.
                   width: controlSlot.x + controlSlot.width - anchors.leftMargin
-                  anchors.verticalCenter: rowHead.verticalCenter
+                  // a plain row from its top, rowPad down — more by half of
+                  // what a control taller than the name stands out by, so the
+                  // control starts rowPad down too
+                  anchors.verticalCenter: settingRow.plain ? undefined : rowHead.verticalCenter
+                  anchors.top: settingRow.plain ? rowHead.top : undefined
+                  anchors.topMargin: settingRow.plain
+                    ? popup.rowPad + Math.max(0, (controlSlot.height - rowLabel.height) / 2) : 0
                   spacing: 2
 
                   Row {
                     spacing: 8
                     width: controlSlot.x - 18 - labels.anchors.leftMargin
 
-                    // A changed setting says so in its own name. A dot in the
-                    // gutter was a second thing to find; the label is already
-                    // where the eye lands, and it is the widest target in the
-                    // row, so it is also what you click to put the setting
-                    // back. Nothing moves when it changes color.
+                    // A changed setting says so with its restore glyph alone
+                    // (user, 2026-10-27: "only their reset button in yellow,
+                    // not the whole title"). The name keeps the title's ink,
+                    // and is no longer a way back — the glyph is.
                     Text {
                       id: rowLabel
                       // mid-search, where it matched is marked — see Ora.markMatch
@@ -2294,45 +2734,10 @@ FloatingWindow {
                       text: popup.searching
                         ? Ora.markMatch(settingRow.spec.label, popup.query, popup.highlight)
                         : settingRow.spec.label
-                      color: settingRow.moved ? popup.changedColor
-                        : settingRow.monitorHead ? settingRow.accent : popup.titleColor
+                      color: settingRow.monitorHead ? settingRow.accent : popup.titleColor
                       font.family: popup.face
                       font.weight: settingRow.monitorHead ? Font.DemiBold : Font.Medium
                       font.pixelSize: Zenon.px(19)   // 17 until 2026-10-27 (user: +2)
-
-                      MouseArea {
-                        id: resetMa
-                        anchors.fill: parent
-                        anchors.margins: -4
-                        // not on a row that folds: there the name opens it
-                        // (user, 2026-10-20 — a click to open the Accent
-                        // color reset it), and the restore glyph resets
-                        enabled: settingRow.moved && !settingRow.fold && !settingRow.groupHead
-                        hoverEnabled: enabled
-                        onClicked: {
-                          popup.hideTip();
-                          Oracle.reset(settingRow.spec.key);
-                          for (const k of Ora.alsoKeys(Oracle.spec(settingRow.spec.key) || settingRow.spec)) Oracle.reset(k);
-                        }
-                        // The one thing hover still does, and it is not an
-                        // effect — it is the only place the old value is
-                        // written down, and without it the color says a
-                        // setting moved but not from what, and gives no hint
-                        // that the name is a way back. A WindowTip (see
-                        // showTip): a bar tooltip is a layer surface, and
-                        // cannot know where a window is.
-                        onContainsMouseChanged: {
-                          if (!resetMa.containsMouse) { popup.hideTip(); return; }
-                          popup.showTip("was " +
-                            Ora.display(settingRow.spec, Oracle.defaults[settingRow.spec.key]) +
-                            " \u00b7 click to put it back", resetMa);
-                        }
-                        onPositionChanged: (m) => {
-                          if (resetMa.containsMouse)
-                            popup.moveTip(resetMa.mapToItem(panel, m.x, m.y));
-                        }
-                      }
-
                     }
 
                     // a row that folds open says so, and which way it is,
@@ -2350,8 +2755,8 @@ FloatingWindow {
                     }
 
                     // RESTORE DEFAULT, said with a glyph beside the name
-                    // (U+E612, the user's pick): the colored name is a way
-                    // back too, but nothing on it says so. Only while moved.
+                    // (U+E612, the user's pick), in the changed ink: the one
+                    // mark of a moved setting, and its way back. Only while moved.
                     // clear of a fold's chevron, so the two read as two
                     Item {
                       visible: settingRow.moved && (settingRow.fold || settingRow.groupHead)
@@ -2426,8 +2831,11 @@ FloatingWindow {
                   Text {
                     width: parent.width
                     // clear of the control's foot, which hangs past the name,
-                    // and air under the line (user, 2026-10-27)
-                    topPadding: 12
+                    // and air under the line (user, 2026-10-27) — but a
+                    // monitor's maker, under its name in the band, is a
+                    // subtitle, held close (user, 2026-10-27: the band's
+                    // padding stood out)
+                    topPadding: settingRow.monitorHead ? 3 : 12
                     visible: (settingRow.spec.help || "") !== ""
                     textFormat: popup.searching ? Text.StyledText : Text.PlainText
                     text: popup.searching
@@ -2469,7 +2877,7 @@ FloatingWindow {
                   anchors.right: parent.right
                   // inside a frame, as far in from its right side as the
                   // labels are from its left; elsewhere clear of the bar
-                  anchors.rightMargin: settingRow.inGroup ? 42 : 20 + settingRow.gutter
+                  anchors.rightMargin: settingRow.inGroup ? 42 : popup.pad + settingRow.gutter
                   // LEVEL WITH THE NAME, not the row (user, 2026-10-20): a
                   // wrapped description made the row tall, and a control
                   // centered in it sat down beside the help, away from the
@@ -2480,7 +2888,8 @@ FloatingWindow {
                   // there is. This is what hands a bool row's 200 spare
                   // pixels to its description.
                   width: ctl.item ? ctl.item.width : popup.controlW
-                  height: 30
+                  // a switch with pictures over its words is taller
+                  height: ctl.item ? Math.max(30, ctl.item.height) : 30
 
                   Loader {
                     id: ctl
@@ -2517,6 +2926,18 @@ FloatingWindow {
                     Segments {
                       textSize: Zenon.px(13)
                       pad: 20
+                      // a picture for each choice, for a spec with `art` — the
+                      // picture alone, its name a tooltip (user, 2026-10-27)
+                      art: !settingRow.spec.art ? null : segArt
+                      words: !settingRow.spec.art
+                      tip: tips
+                      readonly property Component segArt: Component {
+                        SettingArt {
+                          kind: settingRow.spec.art || ""
+                          value: parent ? String(parent.value) : ""
+                          ink: parent ? parent.ink : popup.dimColor
+                        }
+                      }
                       options: (settingRow.spec.options || []).map((o) => [o.value, o.label])
                       current: String(settingRow.live)
                       onChose: (v) => Oracle.set(settingRow.spec.key, v)
@@ -2682,6 +3103,15 @@ FloatingWindow {
         // Delete over a theme you saved, in the open Theme list
         if (event.key === Qt.Key_Delete && popup.deleteHoveredTheme()) { event.accepted = true; return; }
         if (!(event.modifiers & Qt.ControlModifier)) return;
+        // undo and redo of settings (Oracle.undo): ctrl+z, ctrl+shift+z or ctrl+y
+        if ((event.key === Qt.Key_Z || event.key === Qt.Key_Y)
+            // words typed in the search undo as words
+            && !(filterInput.activeFocus && filterInput.text !== "")) {
+          event.accepted = true;
+          const back = event.key === Qt.Key_Z && !(event.modifiers & Qt.ShiftModifier);
+          popup.stepHistory(back);
+          return;
+        }
         if (event.key === Qt.Key_Tab || event.key === Qt.Key_PageDown) {
           event.accepted = true;
           popup.stepSection((event.modifiers & Qt.ShiftModifier) ? -1 : 1);

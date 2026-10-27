@@ -75,8 +75,10 @@ module.exports = {
     t.eq("v2 has no span", v2.span, null);
     const st = { assignment: { "*": "color:#000000" }, fits: {}, looks: { "HDMI-A-1": { rotate: 90 } },
                  span: { path: "/p", screens: ["A", "B"] }, colors: ["#123456"],
-                 slideshow: { minutes: 15, shuffle: true, query: "", screens: [], span: false } };
+                 slideshow: { minutes: 15, shuffle: true, query: "", screens: [], span: false },
+                 place: { dir: "/b", sub: "a/c" } };
     t.eq("v3 round trip", A.parseState(A.serializeState(st)), st);
+    t.eq("bad saved place dropped", A.parseState('{"v":3,"place":{"dir":"/b"}}').place, null);
     t.eq("bad saved colors dropped", A.parseState('{"v":3,"colors":["#12","#abcdef"]}').colors, ["#abcdef"]);
   }
 };

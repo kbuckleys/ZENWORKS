@@ -22,7 +22,7 @@
 // oracle page change (qmlprofiler, 2026-10-09). It needs nothing of QML's.
 
 function stored(spec) {
-  return spec.type !== "action" && spec.type !== "info" && spec.type !== "arrange";
+  return spec.type !== "action" && spec.type !== "info" && spec.type !== "arrange" && spec.type !== "sample";
 }
 
 // ── numbers ───────────────────────────────────────────────────────────────
@@ -131,6 +131,15 @@ const FOLLOW = { value: "follow", label: "Follow Background  \u{F0E09}" };
 // dark (Zenon.daylight, chronos/SunClock)
 const SUN = { value: "sun", label: "Follow Daytime  \u{F522}" };
 
+// A theme's swatch: [ground, ink, accent] from its colors, "" where a slot
+// is missing or not a color; null when it has none of the three.
+function themeSwatch(colors) {
+  const ok = (v) => typeof v === "string" && /^#([0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(v) ? v : "";
+  if (!colors || typeof colors !== "object") return null;
+  const sw = [ok(colors.ground), ok(colors.ink), ok(colors.cyan)];
+  return sw.some((v) => v !== "") ? sw : null;
+}
+
 function themeOptions(text) {
   const out = [{ value: "zenon", label: "Zenon" }, FOLLOW, SUN];
   for (const line of String(text || "").split("\n")) {
@@ -140,6 +149,7 @@ function themeOptions(text) {
     if (stem === "zenon" || stem === "follow" || stem === "sun") continue;
     let label = stem;
     let custom = false;
+    let swatch = null;
     try {
       const t = JSON.parse(line.slice(tab + 1));
       if (t && typeof t.name === "string" && t.name.trim() !== "") label = t.name.trim();
@@ -150,12 +160,18 @@ function themeOptions(text) {
       if (custom) label += "  \uF2C0";
       // a light theme is marked with a glyph (U+F19E2, Buck's pick), not spelled out
       if (t && t.mode === "light") label += "  \u{F19E2}";
+      // its ground, ink and accent, for the swatch the menu draws beside
+      // it (user, 2026-10-27: dark from light at a glance); a color the
+      // file leaves out is Zenon's, filled in where it is drawn
+      swatch = themeSwatch(t && t.colors);
     } catch (e) {
       label = stem + " \u00b7 broken";
     }
     // `custom`: saved here (Follow Background's Save), and so the only kind
     // Delete may remove from the list — never a shipped theme
-    out.push(custom ? { value: stem, label: label, custom: true } : { value: stem, label: label });
+    const o = custom ? { value: stem, label: label, custom: true } : { value: stem, label: label };
+    if (swatch) o.swatch = swatch;
+    out.push(o);
   }
   // Zenon's light side straight under Zenon, ahead of the two Follows
   const rank = (o) => o.value === "zenon" ? 0 : o.value === "zenon-light" ? 0.5
@@ -424,6 +440,95 @@ function alsoShown(spec, get) {
   return String(get(w[0])) === String(w[1]);
 }
 
+// ── A LONG PAGE, IN PARTS (user, 2026-10-27: "oracle feels chaotic, we
+// should organize relevant items together") ─────────────────────────────
+// For each page laid out here, its headings in order and the settings under
+// each. filterSchema puts the rows in this order with `head` on the first of
+// each part, which the panel draws as a small heading above it. Only on the
+// page itself: a search lists matches as they come, with no headings. A
+// setting a page has that is not listed here keeps its place at the end
+// (oracle/tests/oracle.js checks there is none).
+const PAGES = {
+  notify: [
+    ["Timing", ["notifTimeout", "notifTimeoutLow", "notifCriticalSticky"]],
+    ["Place and size", ["notifPosition", "notifMaxVisible", "notifWidth", "notifMaxWidth", "notifMinHeight",
+                        "notifMaxHeight", "notifCaptureWidth", "notifLift", "notifSpacing", "notifPadding"]],
+    ["Look", ["notifIcons", "notifIconSize", "notifFontSize", "notifTextAlign", "notifMarkup", "notifBgOpacity",
+              "notifTitleInk", "notifBodyInk", "notifAccent", "notifGlow", "notifGlowReach"]],
+    ["Arrival", ["notifAnimStyle", "notifSlide", "notifAnimSpeed"]],
+    ["Quiet", ["notifSilent", "notifFocusTimers", "notifQuietFullscreen", "notifQuietHours", "notifQuietFrom", "notifQuietTo"]],
+    ["History", ["notifHistoryCap", "notifTrackMusic", "notifBellAlways"]]
+  ],
+  bar: [
+    ["Place", ["barPosition", "barMonitor", "barReserveSpace", "barAutohide", "barWindowGap"]],
+    ["Size", ["barSlot", "barTextSize", "barGap", "barPadBar", "barPadModule"]],
+    ["Look", ["barOpacity", "barBlur", "barTooltips"]],
+    ["Modules", ["showWorkspaces", "showClock", "showNotifications", "showUpdates", "showNetwork", "showCpu",
+                 "showGpu", "showMemory", "showVolume", "showNowPlaying", "showStatus", "showHermes", "showTray"]]
+  ],
+  menu: [
+    ["Size", ["menuWidth", "menuRowHeight"]],
+    ["Entries", ["menuShowFiles", "menuShowPackages", "menuShowApps", "menuShowTrash", "menuShowBackground",
+                 "menuShowDisplay", "menuShowNote"]],
+    ["Home", ["menuShowHome", "menuShowHidden", "menuHomePlaces", "menuHomeRemember"]],
+    ["Recent places", ["menuShowRecent", "menuRecentCount"]]
+  ],
+  idle: [
+    ["Away", ["idleEnabled", "idleLockSecs", "idleKeyboardSecs", "idleLightDevices", "idleInhibitPlayback"]],
+    ["Lock screen", ["lockHideCursor", "lockShade", "lockFrost", "lockFailLimit", "lockWidgetMonitor",
+                     "lockClockSize", "lockDateSize", "lockFieldWidth"]]
+  ],
+  windows: [
+    ["Gaps and borders", ["hyprGapsOut", "hyprGapsIn", "hyprSpecialGaps", "hyprBorder"]],
+    ["Tiling", ["hyprLayout", "hyprResizeBorder", "workspaceStrip"]],
+    // Keyboard & mouse's Keyboard focus here too (its alsoIn), with what
+    // the windows it leaves look like
+    ["Focus", ["input:follow_mouse", "hyprDimInactive", "hyprInactiveOpacity"]],
+    ["Rules and startup", ["infoWindowRules", "infoStartup"]]
+  ],
+  time: [
+    ["Clock", ["clock24h", "clockSeconds"]],
+    ["Weather", ["weatherEnabled", "weatherFahrenheit", "weatherRefreshMins", "weatherStaleMins"]],
+    ["Calendar", ["calRemindLead", "calSyncMins"]]
+  ],
+  motion: [
+    ["Animations", ["motionScale", "hyprAnimations", "cursorSlide"]],
+    ["Scrolling", ["elasticScroll", "scrollbarAutohide"]],
+    ["Arrival", ["arrivalEnabled", "arrivalDuration", "arrivalDeadline"]]
+  ],
+  surfaces: [
+    // the sample of them all first, under no heading (OracleWindow's SurfaceSample)
+    ["", ["surfacesSample"]],
+    ["Shape", ["cornerRadius", "barMaxWidth", "barScreenPad"]],
+    ["Opacity", ["panelOpacity", "menuOpacity", "scrollFrost"]],
+    ["Shadows", ["shadowStrength", "menuShadows", "hyprShadows"]]
+  ]
+};
+
+// a page's parts, or null for a page with none (the tests read it)
+function pageLayout(section) { return PAGES[section] || null; }
+
+// rows of one page in its PAGES order, the first of each part carrying
+// `head` (a copy: the schema's own entries are left alone)
+function laidOut(rows, page) {
+  const at = {}, heads = {};
+  let n = 0;
+  for (const [head, keys] of page) {
+    keys.forEach((k, i) => { at[k] = n++; if (i === 0) heads[k] = head; });
+  }
+  const placed = rows.map((r, i) => ({ r: r, o: r.key in at ? at[r.key] : n + i }));
+  placed.sort((a, b) => a.o - b.o);
+  const out = [];
+  const seen = {};
+  for (const p of placed) {
+    const h = heads[p.r.key];
+    // a head only once, on the first of its part that is here
+    out.push(h && !seen[h] ? Object.assign({}, p.r, { head: h }) : p.r);
+    if (h) seen[h] = true;
+  }
+  return out;
+}
+
 function filterSchema(schema, section, query) {
   const out = [];
   const q = String(query || "").trim();
@@ -450,7 +555,7 @@ function filterSchema(schema, section, query) {
     const at = out.findIndex((r) => r.key === g.alsoAfter);
     if (at < 0) out.push(g); else out.splice(at + 1, 0, g);
   }
-  return out;
+  return q === "" && PAGES[section] ? laidOut(out, PAGES[section]) : out;
 }
 
 // ── the file ──────────────────────────────────────────────────────────────
@@ -478,6 +583,17 @@ function same(a, b) {
 // A half-written or hand-edited file must never take the shell down with it,
 // and an unknown key is simply skipped rather than kept: it is either a
 // setting that has been removed or a typo, and neither is worth carrying.
+// Whether the settings file can be read at all: empty is fine (nothing set
+// yet), a JSON object is; anything else — a hand edit's stray comma — is
+// not, and must not be taken for "everything at its default" (audit,
+// 2026-10-27: Reload then reset every setting, and the next save wrote the
+// defaults over the file).
+function parses(text) {
+  const t = String(text || "").trim();
+  if (t === "") return true;
+  try { const j = JSON.parse(t); return !!j && typeof j === "object" && !Array.isArray(j); } catch (e) { return false; }
+}
+
 function parse(schema, text) {
   let j = null;
   try { j = JSON.parse(String(text || "").trim() || "{}"); } catch (e) { return {}; }
@@ -642,14 +758,19 @@ function readCheckup(text, baselineKb) {
     : /FAILED|not installed/.test(f.tests) ? { text: f.tests, level: "bad" }
     : { text: f.tests, level: "ok" };
 
+  // ── AND WHAT TO DO ABOUT IT (user, 2026-10-27: "Health that offers
+  // fixes") — `fix` on a reading that wants one: the button's word and what
+  // it does (OracleWindow.healthFix). Missing tools have theirs in the fold.
+  const RESTART = { label: "Restart", act: "restart" };
   const probes = list("probes");
   rows.probes = probes.length
-    ? { text: probes.length + " left in " + probes.join(", "), level: "warn" }
+    ? { text: probes.length + " left in " + probes.join(", "), level: "warn",
+        fix: { label: "Show", act: "open", files: probes } }
     : { text: "none", level: "ok" };
 
   const stale = list("stale");
   rows.stale = stale.length
-    ? { text: stale.map((p) => p.replace(/.*\//, "")).join(", ") + " \u2014 restart to be sure", level: "warn" }
+    ? { text: stale.map((p) => p.replace(/.*\//, "")).join(", ") + " \u2014 restart to be sure", level: "warn", fix: RESTART }
     : { text: "all current", level: "ok" };
 
   const kb = parseInt(f.rss, 10);
@@ -663,6 +784,8 @@ function readCheckup(text, baselineKb) {
       // growth that was chased down once already.
       level: pct > 70 ? "bad" : pct > 30 ? "warn" : "ok",
     };
+    // grown: a fresh start gives it back
+    if (rows.memory.level !== "ok") rows.memory.fix = RESTART;
   }
 
   const held = list("held"), spawned = list("spawned");
@@ -682,14 +805,16 @@ function readCheckup(text, baselineKb) {
   const now = parts("stack"), then = parts("stamp");
   const short = (p) => p.replace(/^(\S+) (?:\d+:)?([^-\s]+).*$/, "$1 $2");
   if (!now.length) rows.stack = { text: "unreadable", level: "warn" };
-  else if (!then.length) rows.stack = { text: "no clean preflight on record \u2014 run scripts/preflight.sh", level: "warn" };
+  else if (!then.length) rows.stack = { text: "no clean preflight on record \u2014 run scripts/preflight.sh", level: "warn",
+                                        fix: { label: "Run preflight", act: "preflight" } };
   else {
     const was = {};
     for (const p of then) was[p.split(" ")[0]] = p;
     const moved = now.filter((p) => was[p.split(" ")[0]] !== p)
       .map((p) => { const o = was[p.split(" ")[0]]; return (o ? short(o) : p.split(" ")[0] + " (new)") + " \u2192 " + short(p).split(" ")[1]; });
     rows.stack = moved.length
-      ? { text: "updated since the last clean preflight: " + moved.join(", ") + " \u2014 run scripts/preflight.sh", level: "warn" }
+      ? { text: "updated since the last clean preflight: " + moved.join(", ") + " \u2014 run scripts/preflight.sh", level: "warn",
+          fix: { label: "Run preflight", act: "preflight" } }
       : { text: now.filter((p) => /^(quickshell|qt6-base|hyprland) /.test(p)).map(short).join(" \u00b7 ") + " \u00b7 preflight passed on these", level: "ok" };
   }
 
@@ -718,6 +843,7 @@ function readCheckup(text, baselineKb) {
     level: errors > 0 ? "bad" : "ok",
     detail: f.lasterror || "",
   };
+  if (errors > 0) rows.log.fix = { label: "Open the log", act: "log" };
   return rows;
 }
 
@@ -1576,7 +1702,7 @@ const INPUT_FIELDS = [
     help: "With several layouts, a shortcut on a letter follows where that letter is in the layout you are typing in, not where it is on the first one." },
 
   // mouse
-  { key: "accel_profile", group: "mouse", def: "flat", type: "enum",
+  { key: "accel_profile", group: "mouse", def: "flat", type: "enum", segments: true, art: "accel",
     options: [{ value: "", label: "Device default" }, { value: "adaptive", label: "Adaptive" },
               { value: "flat", label: "Flat" }, { value: "custom", label: "Custom" }],
     label: "Acceleration", alias: "mouse pointer acceleration accel profile flat adaptive",
@@ -1622,10 +1748,12 @@ const INPUT_FIELDS = [
     help: "Turns a smooth, high-resolution wheel's motion into the steps older programs expect." },
 
   // focus
-  { key: "follow_mouse", group: "focus", def: 1, type: "enum",
+  // Click to focus by default (user, 2026-10-27: "disable focus on
+  // hover"), and shown under Windows as well (alsoIn: one setting, two pages)
+  { key: "follow_mouse", group: "focus", def: 0, type: "enum", alsoIn: "windows",
     options: [{ value: 0, label: "Click to focus" }, { value: 1, label: "Follows the pointer" },
               { value: 2, label: "Pointer only" }, { value: 3, label: "Separate" }],
-    label: "Focus", alias: "focus follows mouse pointer click hover",
+    label: "Keyboard focus", alias: "focus follows mouse pointer click hover",
     help: "Follows the pointer: the window under it gets the keyboard. Pointer only: hovering sends the pointer there but the keyboard stays until you click. Separate: the keyboard never follows the pointer at all." },
   { key: "follow_mouse_threshold", group: "focus", def: 0, type: "real", min: 0, max: 200, step: 1, unit: "px",
     label: "Pointer travel before focus", alias: "focus follow mouse threshold distance",

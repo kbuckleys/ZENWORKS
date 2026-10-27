@@ -268,6 +268,51 @@ def onepassword_through_op():
     onepassword._tokens.clear()
 
 
+@test
+def onepassword_session_off_argv():
+    # the session token kept off the process list: in op's environment when
+    # op reads it from there (proven at unlock by whoami), --session only
+    # when it does not — both kinds of op played here
+    keep = onepassword.run
+    for reads_env in (True, False):
+        calls = []
+
+        def fake(argv, cancel=None, stdin=None, env=None, timeout=60, check=False):
+            env = env or {}
+            calls.append((list(argv), dict(env)))
+            if argv[1:2] == ["signin"]:
+                return (0, "TOK123\n", "")
+            if argv[1:3] == ["account", "list"]:
+                return (0, json.dumps([{"shorthand": "me", "url": "my.1password.com", "user_uuid": "UUIDABC"}]), "")
+            has = ("--session" in argv and argv[argv.index("--session") + 1] == "TOK123") or \
+                  (reads_env and env.get("OP_SESSION") == "TOK123")
+            return (0, "[]", "") if has else (1, "", "[ERROR] not signed in")
+        onepassword.run = fake
+        try:
+            o = onepassword.OnePassword({"id": "ops", "kind": "onepassword", "shorthand": "me"})
+            o.unlock("master", lines.Cancel())
+            calls.clear()
+            code, _, _ = o.op(["item", "list", "--format", "json"], lines.Cancel())
+            argv, env = calls[-1]
+            eq(code, 0, f"reads_env={reads_env}: the call is signed in")
+            if reads_env:
+                eq("TOK123" in " ".join(argv), False, "no token on argv")
+                eq((env.get("OP_SESSION"), env.get("OP_SESSION_me"), env.get("OP_SESSION_UUIDABC")),
+                   ("TOK123", "TOK123", "TOK123"), "every name op is known to read")
+            else:
+                eq(argv[-2:], ["--session", "TOK123"], "an op that does not read it: the flag, as before")
+            o.lock(lines.Cancel())
+            eq(onepassword._via.get("ops"), None, "settled again at the next unlock")
+        finally:
+            onepassword.run = keep
+            onepassword._tokens.clear()
+            onepassword._via.clear()
+            onepassword._uuids.clear()
+    # a shorthand that is no variable name gets no OP_SESSION_<it>
+    o = onepassword.OnePassword({"id": "opd", "kind": "onepassword", "shorthand": "my.1password.com"})
+    eq(sorted(o.session_env("T")), ["OP_SESSION"])
+
+
 # ── pass, for real ────────────────────────────────────────────────────────
 PASSPHRASE = "correct horse"
 

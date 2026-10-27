@@ -7,7 +7,7 @@
 // sheet (ZshSetup sequences them; Oracle.welcomeLookAsked opens it): dark
 // or light, an accent, a background. Each is Oracle's own setting, set the
 // moment it is picked, so the desktop behind it changes as you choose.
-// Oracle's Global and Background sections hold them all afterwards.
+// Oracle's Appearance sections hold them all afterwards.
 //
 //   Theme       Zenon dark, Zenon light, or Follow Background
 //   Accent      the theme's own, or one of its other hues

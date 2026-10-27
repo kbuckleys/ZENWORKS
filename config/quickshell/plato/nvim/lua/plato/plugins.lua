@@ -34,6 +34,14 @@
 
 local M = {}
 
+-- the language servers plato turns on when their program is here (and
+-- suggest.lua offers to install when it is not)
+M.lspCandidates = {
+  "qmlls", "rust_analyzer", "lua_ls", "clangd", "gopls", "basedpyright",
+  "ruff", "ts_ls", "bashls", "jsonls", "yamlls", "taplo", "marksman",
+  "html", "cssls",
+}
+
 local here = vim.fs.dirname(debug.getinfo(1, "S").source:sub(2))   -- lua/plato
 M.root = vim.fs.dirname(vim.fs.dirname(here))                       -- plato/nvim
 M.dir = vim.fn.stdpath("config")                                    -- ~/.config/zenworks/plato
@@ -326,12 +334,7 @@ function M.lsp()
     })
   end
 
-  local candidates = {
-    "qmlls", "rust_analyzer", "lua_ls", "clangd", "gopls", "basedpyright",
-    "ruff", "ts_ls", "bashls", "jsonls", "yamlls", "taplo", "marksman",
-    "html", "cssls",
-  }
-  for _, name in ipairs(candidates) do
+  for _, name in ipairs(M.lspCandidates) do
     local ok, cfg = pcall(function() return vim.lsp.config[name] end)
     local cmd = ok and cfg and cfg.cmd
     local exe = type(cmd) == "table" and cmd[1] or nil

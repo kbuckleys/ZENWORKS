@@ -43,6 +43,7 @@ import Quickshell.Io
 import Quickshell.Hyprland
 import "oracle.js" as Ora
 import "../morpheus/hypr.js" as Hypr
+import "../morpheus/undo"
 
 Singleton {
   id: root
@@ -692,49 +693,62 @@ Singleton {
   // things you look at all day first, the things you set once at the end.
   // `group`: the sidebar's heading over it (sectionGroups), in order
   readonly property var sections: [
-    // FIRST, because it is the one that reaches everything else. Three of
-    // these used to sit under Bar — the corner radius, the maximum width and
-    // the screen clearance — which was where the code that reads them lives
-    // rather than where they apply: every layer in the shell takes all three
-    // through Zenon, not just the pill.
-    { id: "look",   group: "desktop", label: "Global",        icon: "\uF0AC",
-      blurb: "what every component shares \u2014 the type, the corners, the surfaces" },
-    { id: "display", group: "desktop", label: "Display",      icon: "\uF108",
+    // ── APPEARANCE: what everything wears ──
+    // Theme & color, Fonts and Surfaces were one page, "Global" (user,
+    // 2026-10-27: "oracle feels chaotic"); Follow Background's rows came
+    // over from Background. The id stays "look", so a remembered section
+    // still opens here.
+    { id: "look", group: "looks", label: "Theme & color", icon: "\uF1FC",
+      blurb: "the palette \u2014 the theme, Follow Daytime and Follow Background, the accent" },
+    { id: "fonts", group: "looks", label: "Fonts", icon: "\uF031",
+      blurb: "the type every component reads \u2014 the font, the monospace, their sizes" },
+    { id: "surfaces", group: "looks", label: "Surfaces", icon: "\uF24D",
+      blurb: "what every layer is made of \u2014 the corners, the width, opacity, shadows and frost" },
+    { id: "motion", group: "looks", label: "Motion", icon: "",
+      blurb: "how long everything takes, and how scrolling feels" },
+    { id: "paper", group: "looks", label: "Background", icon: "",
+      blurb: "picasso \u2014 the background, where it comes from and how it fits" },
+    // ── DESKTOP: the windows and what sits around them ──
+    { id: "display", group: "desktop", label: "Display", icon: "\uF108",
       blurb: "hyprland's monitors \u2014 resolution, refresh, scale, rotation" },
-    { id: "input",  group: "desktop", label: "Input",         icon: "\uF11C",
-      blurb: "hyprland's keyboard, mouse, touchpad and tablet \u2014 layout, speed, focus" },
-    { id: "keys",   group: "desktop", label: "Shortcuts",     icon: "\uDB81\uDE33",
-      blurb: "hyprland's key binds \u2014 what each chord does, and which chord it is" },
-    { id: "windows", group: "desktop", label: "Windows",      icon: "\uF2D2",
+    { id: "windows", group: "desktop", label: "Windows", icon: "\uF2D2",
       blurb: "hyprland's window rules \u2014 how each app's windows open \u2014 what starts at login, and the workspace strip" },
-    { id: "bar",    group: "shell", label: "Bar",           icon: "",
+    { id: "bar", group: "desktop", label: "Bar", icon: "",
       blurb: "morpheus — the pill and what it carries" },
-    { id: "motion", group: "shell", label: "Motion",        icon: "",
-      blurb: "how long everything in this shell takes" },
-    { id: "notify", group: "shell", label: "Notifications", icon: "",
-      blurb: "howler — toasts, and what the bell remembers" },
-    { id: "paper",  group: "shell", label: "Background",    icon: "",
-      blurb: "picasso and argus — the background, screenshots, recordings and the color picker" },
-    { id: "idle",   group: "shell", label: "Idle & lock",   icon: "",
-      blurb: "socordia and cerberus — being away from the machine" },
-    { id: "time",   group: "shell", label: "Time & weather", icon: "",
-      blurb: "chronos — the clock, the calendar, the forecast" },
-    { id: "system", group: "shell", label: "System",        icon: "",
-      blurb: "zeus and the update count — what is measured, how often" },
-    { id: "menu",   group: "shell", label: "Desktop menu",  icon: "",
+    { id: "menu", group: "desktop", label: "Desktop menu", icon: "",
       blurb: "icarus — what right-clicking the desktop offers" },
+    // ── INPUT ──
+    { id: "input", group: "input", label: "Keyboard & mouse", icon: "\uF11C",
+      blurb: "hyprland's keyboard, mouse, touchpad and tablet \u2014 layout, speed, focus" },
+    { id: "keys", group: "input", label: "Shortcuts", icon: "\uDB81\uDE33",
+      blurb: "hyprland's key binds \u2014 what each chord does, and which chord it is" },
+    // ── ALERTS & TIME: what calls for you, and when ──
+    { id: "notify", group: "alerts", label: "Notifications", icon: "",
+      blurb: "howler — toasts, and what the bell remembers" },
+    { id: "time", group: "alerts", label: "Time & weather", icon: "",
+      blurb: "chronos — the clock, the calendar, the forecast" },
+    { id: "screentime", group: "alerts", label: "Screen time", icon: "\uF253",
+      blurb: "kairos \u2014 what is counted, and the reminders to take a break" },
+    { id: "idle", group: "alerts", label: "Idle & lock", icon: "",
+      blurb: "socordia and cerberus — being away from the machine" },
+    // ── CAPTURE ──
+    { id: "capture", group: "capture", label: "Screenshots & recordings", icon: "\uF030",
+      blurb: "argus and the color picker \u2014 the countdown, the sound, the camera, the picker's format" },
+    // ── THIS COMPUTER: set once, looked at seldom ──
+    { id: "system", group: "computer", label: "System", icon: "",
+      blurb: "zeus and the update count — what is measured, how often" },
     { id: "defaults", group: "computer", label: "Default apps", icon: "\uF009",
       blurb: "what opens what \u2014 the terminal, the browser, every kind of file" },
-    { id: "health", group: "computer", label: "Health",        icon: "\uF0F1",
+    { id: "health", group: "computer", label: "Health", icon: "\uF0F1",
       blurb: "a checkup of this shell \u2014 what an audit looks for" },
-    { id: "about",  group: "computer", label: "About",         icon: "",
+    { id: "about", group: "computer", label: "About", icon: "",
       blurb: "zenworks — this shell, and the whole of these settings" }
   ]
 
   // the sidebar's headings (user, 2026-10-27: a sidebar, as macOS' System
-  // Settings has): what the desktop does, what the shell shows, and the
-  // computer around them
-  readonly property var sectionGroups: ({ desktop: "Desktop", shell: "Shell", computer: "This computer" })
+  // Settings has; then related items together under more of them)
+  readonly property var sectionGroups: ({ looks: "Appearance", desktop: "Desktop", input: "Input",
+                                          alerts: "Alerts & time", capture: "Capture", computer: "This computer" })
 
   // ── THE MARK ──────────────────────────────────────────────────────────
   // The banner at the head of every file in this shell, which spells
@@ -789,7 +803,7 @@ Singleton {
       elideLeft: true,
       help: "A plain lua file hyprland reads when it starts, read back on every change \u2014 editing it by hand works too." },
     // ── bar ──
-    { key: "barPosition", section: "bar", label: "Position", type: "enum",
+    { key: "barPosition", section: "bar", label: "Position", type: "enum", segments: true, art: "bar",
       options: [ { value: "bottom", label: "Bottom" },
                  { value: "top",    label: "Top" } ],
       help: "Which edge the pill lives on. Every layer that opens out of it follows, and so do the toasts and the tooltips." },
@@ -886,7 +900,7 @@ Singleton {
       label: "Keep this Follow Background", type: "action", verb: "Save",
       help: "Saves the palette Follow Background is wearing now as a theme of its own, named after the picture, so it outlives the background. It appears in Theme straight away." },
     // drawn as the Font row's second dropdown (`within`), not a row of its own
-    { key: "fontWeight", section: "look", within: "fontFamily", alias: "font weight bold semibold light regular medium thickness",
+    { key: "fontWeight", section: "fonts", within: "fontFamily", alias: "font weight bold semibold light regular medium thickness",
       label: "Font weight", type: "enum",
       options: [ { value: "300", label: "Light" },
                  { value: "400", label: "Regular" },
@@ -895,18 +909,18 @@ Singleton {
                  { value: "700", label: "Bold" } ],
       help: "How heavy the shell's text is where it does not ask for a weight of its own; bold labels stay bold. Picking a font file sets this to that file's cut." },
     // drawn as the Font row's size stepper (`within`), not a row of its own
-    { key: "fontSize", section: "look", within: "fontFamily", label: "Font size", type: "int",
+    { key: "fontSize", section: "fonts", within: "fontFamily", label: "Font size", type: "int",
       min: 12, max: 24, step: 1, unit: "px",
       help: "How large the shell's text is, everywhere but the bar (its own Text size) and the places with a size of their own." },
     // ONE ROW (the user asked): the family, then its weight and its size
     // (`also` — the specs drawn beside this one, in order). The book button
     // before the family opens Alexandria to choose from (`book`).
-    { key: "fontFamily", section: "look", label: "Font", type: "enum",
+    { key: "fontFamily", section: "fonts", label: "Font", type: "enum",
       optionsFrom: "fontFamilies", also: ["fontWeight", "fontSize"], book: true, chipW: 230, open: true,
       alias: "font family typeface nerd weight bold semibold light regular medium thickness size alexandria book",
       help: "The shell's typeface and how heavy its text is — and hyprland's, GTK's, and what every other application asks for as sans-serif. Any installed family will do: the icons always come from JetBrainsMono Nerd Font (from the next shell start, the first time), and a Nerd Font gets the right cut of it per use. Bold labels stay bold whatever the weight." },
     // THE MONOSPACED FACE, one row like Font's: family, weight, size
-    { key: "monoWeight", section: "look", within: "monoFamily", alias: "monospace mono font weight bold semibold light regular medium",
+    { key: "monoWeight", section: "fonts", within: "monoFamily", alias: "monospace mono font weight bold semibold light regular medium",
       label: "Monospace weight", type: "enum",
       options: [ { value: "300", label: "Light" },
                  { value: "400", label: "Regular" },
@@ -914,55 +928,60 @@ Singleton {
                  { value: "600", label: "SemiBold" },
                  { value: "700", label: "Bold" } ],
       help: "How heavy fixed-width text is. Bold in a terminal stays a step heavier." },
-    { key: "monoSize", section: "look", within: "monoFamily", label: "Monospace size", type: "int",
+    { key: "monoSize", section: "fonts", within: "monoFamily", label: "Monospace size", type: "int",
       min: 10, max: 32, step: 1, unit: "px",
       help: "kitty's text and the system's monospace size. Plato keeps a size of its own." },
-    { key: "monoFamily", section: "look", label: "Monospace font", type: "enum",
+    { key: "monoFamily", section: "fonts", label: "Monospace font", type: "enum",
       optionsFrom: "monoFamilies", also: ["monoWeight", "monoSize"], book: true, chipW: 230, open: true,
       alias: "monospace mono fixed width code terminal kitty plato editor typeface family weight size",
       help: "The face for text laid out on a grid: kitty, plato, code and file previews, logs, and what every other application asks for as monospace. Only fixed-width families are listed." },
-    { key: "lexiTextStep", section: "look", alias: "lexi dictionary translate translation font text size zoom",
+    { key: "lexiTextStep", section: "fonts", alias: "lexi dictionary translate translation font text size zoom",
       label: "Lexicon text", type: "int", min: -8, max: 12, step: 1, unit: "px",
       help: "Lexi's text, larger or smaller than where it starts. Ctrl + and Ctrl − in lexi do the same, and Ctrl 0 puts it back." },
-    { key: "cornerRadius", section: "look", label: "Corner rounding", type: "int",
+    // what these make, drawn: a panel and a menu over a striped ground
+    // (OracleWindow's SurfaceSample) — a menu's opacity and shadow are
+    // otherwise seen only with a menu open
+    { key: "surfacesSample", section: "surfaces", type: "sample", label: "Sample",
+      alias: "preview sample surfaces panel menu card" },
+    { key: "cornerRadius", section: "surfaces", label: "Corner rounding", type: "int",
       min: 0, max: 16, step: 1, unit: "px",
       alias: "corner radius rounding round rounded square button scrollbar thumb menu pill bar panel dialog card toast notification osd window hyprland",
       help: "Every rounded corner: hyprland's windows, and in the shell every button, row, card, dialog, menu, scroll thumb, the pill and its panels, toasts and the OSD. This is a window's corner; the rest keep their proportion to it, so a dialog stays rounder than a button. 0 is square everywhere; pills and circles stay round." },
-    { key: "barMaxWidth", section: "look", label: "Maximum panel width", type: "int",
+    { key: "barMaxWidth", section: "surfaces", label: "Maximum panel width", type: "int",
       min: 400, max: 2400, step: 20, unit: "px",
       help: "How wide any panel may grow. Always rounded down to an even number, so centering it lands on a whole pixel." },
-    { key: "barScreenPad", section: "look", label: "Gap to screen edge", type: "int",
+    { key: "barScreenPad", section: "surfaces", label: "Gap to screen edge", type: "int",
       min: 0, max: 48, step: 1, unit: "px",
       help: "How far the pill floats off whichever edge it lives on. Every layer that opens out of it follows, or they would not line up with it." },
-    { key: "panelOpacity", section: "look", alias: "transparency translucency see-through panel layer background", label: "Panel opacity", type: "real",
+    { key: "panelOpacity", section: "surfaces", alias: "transparency translucency see-through panel layer background", label: "Panel opacity", type: "real",
       min: 0.1, max: 1, step: 0.05,
       help: "The ground every layer that opens out of the pill is painted on. Alpha over black, so lower is more transparent." },
-    { key: "menuOpacity", section: "look", alias: "transparency translucency see-through menu background", label: "Menu opacity", type: "real",
+    { key: "menuOpacity", section: "surfaces", alias: "transparency translucency see-through menu background", label: "Menu opacity", type: "real",
       // From where the frost starts. Below blurFloor (0.52) Zenon holds the
       // ground at the floor anyway, so the old 0.30 left a third of the
       // slider doing nothing at all.
       min: 0.55, max: 1, step: 0.05,
       help: "The ground under the rows of every menu — icarus', the tray's, picasso's, terminus' right-click menu, the dropdowns in here — and under terminus' quick look. Alpha over black, so lower is more transparent, and hyprland frosts what is behind it. Never lower than the point where that frost would stop." },
-    { key: "shadowStrength", section: "look", label: "Panel shadow", type: "real",
+    { key: "shadowStrength", section: "surfaces", label: "Panel shadow", type: "real",
       min: 0, max: 1, step: 0.05,
       help: "How far a layer lifts off the desktop. A layer sits near an edge, so too much of this reads as a black halo." },
-    { key: "menuShadows", section: "look", label: "Menu and sheet shadows", type: "bool",
+    { key: "menuShadows", section: "surfaces", label: "Menu and sheet shadows", type: "bool",
       alias: "menu sheet dialog dropdown context right-click shadow drop shadow",
       help: "The shadow every menu and sheet casts: icarus', the tray's, terminus' right-click menu, the dropdowns in here, and the sheets that drop over a window. Off, they sit flat on what is behind them." },
     // hyprland's own, kept in hypr/lua/effects.lua — see Ora's EFFECTS
-    { key: "hyprShadows", section: "look", label: "Window shadows", type: "bool",
+    { key: "hyprShadows", section: "surfaces", label: "Window shadows", type: "bool",
       hyprFile: "effects", fx: "shadows", hyprDefault: true, alias: "hyprland window shadow drop shadow decoration",
       help: "The soft shadow hyprland draws under every window. Kept in ~/.config/zenworks/hypr/lua/effects.lua." },
-    { key: "scrollFrost", section: "look", alias: "scroll edge frost blur ghost rows under bar toolbar fade",
+    { key: "scrollFrost", section: "surfaces", alias: "scroll edge frost blur ghost rows under bar toolbar fade",
       label: "Frost under bars", type: "bool",
       help: "Rows scrolled past a list's edge carry on under the bar above it (or below it), blurred and fading out. Off, a list simply stops at its edge." },
-    { key: "elasticScroll", section: "look", alias: "elastic rubber band bounce overscroll scroll edge stretch",
+    { key: "elasticScroll", section: "motion", alias: "elastic rubber band bounce overscroll scroll edge stretch",
       label: "Elastic scrolling", type: "bool",
       help: "Scrolling past the end of a list stretches it a little and springs back, as macOS does, and a fling bounces off the end. Off, every list stops dead at its edge." },
     { key: "cursorSlide", section: "motion", alias: "sliding cursor glide selection highlight row move jump",
       label: "Sliding cursor", type: "bool",
       help: "The highlight on a list's chosen row glides to the next one as you move, in every app and panel. Off, it jumps straight there." },
-    { key: "scrollbarAutohide", section: "look", alias: "scrollbar scroll bar hide overlay thumb", label: "Autohide scrollbars", type: "bool",
+    { key: "scrollbarAutohide", section: "motion", alias: "scrollbar scroll bar hide overlay thumb", label: "Autohide scrollbars", type: "bool",
       help: "Every scrollbar in the shell fades away once the list stops moving, and comes back when you scroll or put the pointer on it. Off, the thumb is always there." },
     { key: "motionScale", section: "motion", label: "Animation speed", type: "real",
       min: 0, max: 2.5, step: 0.05, unit: "x",
@@ -1034,7 +1053,7 @@ Singleton {
       help: "How many notifications the bell remembers across restarts." },
     { key: "notifFontSize", section: "notify", label: "Text size", type: "int",
       min: 10, max: 28, step: 1, unit: "px" },
-    { key: "notifTextAlign", section: "notify", label: "Text alignment", type: "enum",
+    { key: "notifTextAlign", section: "notify", label: "Text alignment", type: "enum", segments: true, art: "align",
       options: [ { value: "left",   label: "Left" },
                  { value: "center", label: "Center" },
                  { value: "right",  label: "Right" } ] },
@@ -1093,14 +1112,14 @@ Singleton {
     { key: "backgroundDir", section: "paper", label: "Location", type: "text",
       pick: "directory", placeholder: "your pictures directory, then /Backgrounds",
       help: "Where picasso looks for backgrounds, chosen in terminus. Rescanned when this changes. Empty asks XDG for your pictures directory." },
-    { key: "backgroundFit", section: "paper", label: "Fit", type: "enum",
+    { key: "backgroundFit", section: "paper", label: "Fit", type: "enum", segments: true, art: "fit",
       options: [ { value: "crop",    label: "Crop" },
                  { value: "fit",     label: "Fit" },
                  { value: "stretch", label: "Stretch" },
                  { value: "pad",     label: "Center" },
                  { value: "tile",    label: "Tile" } ],
       help: "How an image that is not the monitor's shape is made to fit it. The default — a monitor given its own fit in the picker keeps that one." },
-    { key: "pickerScheme", section: "paper", alias: "colour color picker hyprpicker hex rgb hsl oklch",
+    { key: "pickerScheme", section: "capture", alias: "colour color picker hyprpicker hex rgb hsl oklch",
       label: "Picker format", type: "enum",
       options: [ { value: "hex",   label: "HEX" },
                  { value: "rgb",   label: "RGB" },
@@ -1124,35 +1143,35 @@ Singleton {
                  { value: "light", label: "Light" },
                  { value: "sun",   label: "Daytime" } ],
       help: "Only while the theme is Follow Background. Auto reads how bright the background is; Daytime is light from sunrise to sunset and dark after." },
-    { key: "followVivid", section: "paper", alias: "follow background wallpaper colour color saturation vivid",
+    { key: "followVivid", section: "look", alias: "follow background wallpaper colour color saturation vivid",
       label: "Follow Background color", type: "real", min: 0, max: 1, step: 0.05,
       help: "Only while the theme is Follow Background. How much of the background's color the panels and text take: low is nearly neutral, high is tinted through." },
-    { key: "followMonitor", section: "paper", alias: "follow background wallpaper monitor screen display",
+    { key: "followMonitor", section: "look", alias: "follow background wallpaper monitor screen display",
       label: "Follow Background monitor", type: "enum", optionsFrom: "screens", open: true, chipW: 208,
       help: "Whose background the theme is made from. Automatic is the main monitor (Display). The background tint follows the same one." },
-    { key: "followSlideshow", section: "paper", alias: "follow background wallpaper slideshow",
+    { key: "followSlideshow", section: "look", alias: "follow background wallpaper slideshow",
       label: "Follow the slideshow", type: "bool",
       help: "A slideshow on that monitor changes the theme with every picture. Off, the theme stays with the picture the slideshow started on." },
     { key: "wallpaperTint", section: "paper", alias: "tint wallpaper accent colour color glass background",
       label: "Background tint", type: "real", min: 0, max: 0.3, step: 0.02,
       help: "Lays the glass in a little of the background's own color, so the pill and its panels read as lit by what is behind them. Zero is the theme's plain ground." },
     // ── recording (argus) ──
-    { key: "recCountdown", section: "paper", alias: "record recording screen video countdown delay argus wf-recorder",
+    { key: "recCountdown", section: "capture", alias: "record recording screen video countdown delay argus wf-recorder",
       label: "Recording countdown", type: "int", min: 0, max: 10, step: 1, unit: "s",
       help: "Seconds counted down in the middle of the screen before a recording starts, so it does not open on the shortcut being pressed. 0 starts at once." },
-    { key: "recAudio", section: "paper", alias: "record recording sound audio microphone mic voice argus",
+    { key: "recAudio", section: "capture", alias: "record recording sound audio microphone mic voice argus",
       label: "Recording sound", type: "enum", segments: true,
       options: [ { value: "none", label: "None" }, { value: "system", label: "System" },
                  { value: "mic", label: "Microphone" }, { value: "both", label: "Both" } ],
       help: "What is heard in a recording: what the machine plays, your microphone (the default input), both mixed, or silence." },
-    { key: "recBigPointer", section: "paper", alias: "record recording cursor pointer highlight bigger argus",
+    { key: "recBigPointer", section: "capture", alias: "record recording cursor pointer highlight bigger argus",
       label: "Bigger pointer while recording", type: "bool",
       help: "The pointer at twice its size while a recording runs, so it is easy to follow in the video; back to normal when it stops." },
-    { key: "recCamera", section: "paper", alias: "record recording webcam camera face bubble argus",
+    { key: "recCamera", section: "capture", alias: "record recording webcam camera face bubble argus",
       label: "Camera while recording", type: "bool",
       help: "Your webcam in a round bubble in a corner of the screen while a recording runs, so it is in the video. Needs a camera." },
-    { key: "recCameraCorner", section: "paper", alias: "record recording webcam camera corner argus",
-      label: "Camera corner", type: "enum", segments: true,
+    { key: "recCameraCorner", section: "capture", alias: "record recording webcam camera corner argus",
+      label: "Camera corner", type: "enum", segments: true, art: "corner",
       options: [ { value: "topLeft", label: "Top left" }, { value: "topRight", label: "Top right" },
                  { value: "bottomLeft", label: "Bottom left" }, { value: "bottomRight", label: "Bottom right" } ],
       help: "Where the camera bubble sits." },
@@ -1201,7 +1220,7 @@ Singleton {
       help: "As a fraction of the monitor's width. It never goes below 240px whatever this says." },
 
     // ── time & weather ──
-    { key: "clock24h", section: "time", label: "24-hour clock", type: "bool" },
+    { key: "clock24h", section: "time", label: "24-hour clock", type: "bool", sample: "clock" },
     { key: "clockSeconds", section: "time", label: "Show seconds", type: "bool",
       help: "The clock then repaints once a second rather than once a minute." },
     { key: "weatherFahrenheit", section: "time", label: "Fahrenheit", type: "bool",
@@ -1220,16 +1239,16 @@ Singleton {
     { key: "calSyncMins", section: "time", alias: "calendar sync vdirsyncer caldav online google nextcloud",
       label: "Calendar sync", type: "int", min: 5, max: 240, step: 5, unit: "min",
       help: "How often an online calendar set up through vdirsyncer is synced. Nothing happens without one." },
-    { key: "screenTime", section: "time", alias: "screen time kairos usage apps focus tracking privacy",
+    { key: "screenTime", section: "screentime", alias: "screen time kairos usage apps focus tracking privacy",
       label: "Screen time", type: "bool",
       help: "Count how long each app is in front of you, kept on this machine only. Shown in Screen Time; a finished Chronos timer says what its time went to." },
-    { key: "screenTimeIdleMins", section: "time", alias: "screen time idle away kairos",
+    { key: "screenTimeIdleMins", section: "screentime", alias: "screen time idle away kairos",
       label: "Stop counting after idle", type: "int", min: 1, max: 30, step: 1, unit: "min",
       help: "No key or mouse for this long and screen time stops counting. A playing video holds it off." },
-    { key: "screenBreaks", section: "time", alias: "break rest eyes 20 20 20 look away reminder kairos screen time",
+    { key: "screenBreaks", section: "screentime", alias: "break rest eyes 20 20 20 look away reminder kairos screen time",
       label: "Remind me to take breaks", type: "bool",
       help: "After a stretch at the screen, a notification says to look at something far away for 20 seconds. Stepping away past the idle time above counts as a break. Quiet while Focus is on." },
-    { key: "screenBreakMins", section: "time", alias: "break rest eyes interval kairos",
+    { key: "screenBreakMins", section: "screentime", alias: "break rest eyes interval kairos",
       label: "Break every", type: "int", min: 10, max: 120, step: 5, unit: "min",
       help: "How long at the screen before the break reminder. Per-app daily limits are set in Screen Time." },
 
@@ -1338,7 +1357,7 @@ Singleton {
     { key: "hyprBorder", section: "windows", label: "Border width", type: "int", min: 0, max: 5, step: 1, unit: "px",
       hyprFile: "effects", fx: "border_size", hyprDefault: 1, alias: "border outline frame thickness",
       help: "The line round every window, in the theme's colors. 0 draws none." },
-    { key: "hyprLayout", section: "windows", label: "Tiling layout", type: "enum", segments: true,
+    { key: "hyprLayout", section: "windows", label: "Tiling layout", type: "enum", segments: true, art: "layout",
       hyprFile: "effects", fx: "layout", hyprDefault: "dwindle", alias: "layout tiling dwindle master scrolling columns",
       options: [ { value: "dwindle", label: "Dwindle" }, { value: "master", label: "Master" }, { value: "scrolling", label: "Scrolling" } ],
       help: "How new windows share a workspace. Dwindle splits the space each time; Master keeps one big window and stacks the rest; Scrolling sets them side by side in a strip you scroll through. A workspace switched with the layout bind keeps its own." },
@@ -1758,9 +1777,66 @@ Singleton {
     return root[key];
   }
 
+  // ── UNDO AND REDO (user, 2026-10-27) ──────────────────────────────────
+  // Every change to a setting, from the panel or from anywhere else that
+  // sets one (the bell's Do not disturb, Lexi's text size), is a step:
+  // { key: the value it left }. A burst on one key — a slider dragged, the
+  // wheel over a chip — joins into one step, and a reset of a page or of
+  // everything is one step for all it touched. The monitors are not in it:
+  // they have their own keep-or-revert question. morpheus/undo's UndoStack.
+  UndoStack { id: history }
+  readonly property bool canUndo: history.canUndo
+  readonly property bool canRedo: history.canRedo
+  property var _step: null           // the step being gathered, while open
+  property int _stepDepth: 0
+  property bool _replaying: false
+  property string _lastKey: ""
+  property double _lastAt: 0
+  function _beginStep() { if (root._stepDepth++ === 0) root._step = ({}); }
+  function _endStep() {
+    if (--root._stepDepth > 0) return;
+    const step = root._step;
+    root._step = null;
+    const keys = Object.keys(step || {});
+    if (keys.length === 0) return;
+    const now = Date.now();
+    const joins = keys.length === 1 && keys[0] === root._lastKey && now - root._lastAt < 1200;
+    root._lastKey = keys.length === 1 ? keys[0] : "";
+    root._lastAt = now;
+    history.record(step, joins);
+  }
+  function _note(key, old) {
+    if (root._replaying || !root._step || key in root._step) return;
+    root._step[key] = old;
+  }
+  // back (dir -1) or forward (1) a step: the label of the first setting it
+  // touched, "" when there was none
+  function stepHistory(dir) {
+    const list = dir < 0 ? history.past : history.future;
+    if (list.length === 0) return "";
+    const top = list[list.length - 1];
+    const now = ({});
+    for (const k in top) now[k] = root.get(k);
+    const s = dir < 0 ? history.undo(now) : history.redo(now);
+    if (s === undefined) return "";
+    root._replaying = true;
+    try { for (const k in s) root.set(k, s[k]); } finally { root._replaying = false; }
+    root._lastKey = "";
+    const first = root.spec(Object.keys(s)[0]);
+    const n = Object.keys(s).length;
+    return (first ? first.label : Object.keys(s)[0]) + (n > 1 ? " and " + (n - 1) + " more" : "");
+  }
+  function undo() { return root.stepHistory(-1); }
+  function redo() { return root.stepHistory(1); }
+
   function set(key, value) {
     const s = root.spec(key);
     if (!s || !Ora.stored(s)) return;
+    root._beginStep();
+    try { root._set(s, key, value); } finally { root._endStep(); }
+  }
+  function _set(s, key, value) {
+    if (!s.display && !Ora.same(root.get(key), Ora.coerce(s, value))) root._note(key, root.get(key));
     if (s.display) { root.setDisplay(s, value); return; }
     if (s.appDefault) { root.setAppDefault(s, value); return; }
     if (s.input) { root.setInput(s, value); return; }
@@ -1796,6 +1872,10 @@ Singleton {
   }
 
   function resetSection(section) {
+    root._beginStep();
+    try { root._resetSection(section); } finally { root._endStep(); }
+  }
+  function _resetSection(section) {
     for (let i = 0; i < root.schema.length; ++i) {
       const s = root.schema[i];
       // the monitors too: each goes through setDisplay, so the lot is one
@@ -1810,6 +1890,10 @@ Singleton {
   // the file back — neither should reach into hyprland and change a screen or
   // a keyboard layout, or into mimeapps.list. Those sections reset on their own.
   function resetAll() {
+    root._beginStep();
+    try { root._resetAll(); } finally { root._endStep(); }
+  }
+  function _resetAll() {
     for (let i = 0; i < root.schema.length; ++i) {
       const s = root.schema[i];
       if (Ora.stored(s) && !s.display && !s.appDefault && !s.input && !s.bindKey && !s.hyprFile) root.reset(s.key);
@@ -3181,12 +3265,16 @@ Singleton {
     onLoaded: {
       if (!root._reloadWanted) return;
       root._reloadWanted = false;
+      // a file that cannot be read changes nothing: kept aside, and said
+      if (!Ora.parses(stateFile.text())) { root.keepBroken(true); return; }
       // A hand-edited file can have LOST a key as well as gained one, and
       // load() only applies what it finds — a setting deleted by hand would
       // otherwise keep whatever it currently held, which is not what the file
       // now says. Cleared first, so "reload" means the file and nothing else.
       root.resetAll();
       root.load();
+      // the file is what holds now: nothing before it to go back to
+      history.clear();
     }
   }
 
@@ -3221,7 +3309,13 @@ Singleton {
   // restore on its own — see actionReload, which clears first — because at
   // startup there is nothing to clear and a reset pass would write the file
   // back out for no reason.
+  // oracle.json that is not JSON: a copy kept beside it before anything
+  // writes over it, and a notice (Strings.keepAside). On a reload nothing
+  // else happens; at startup the shell goes on at its defaults.
+  function keepBroken(reloading) { Strings.keepAside(root.statePath, "oracle"); }
+
   function load() {
+    if (!Ora.parses(stateFile.text())) root.keepBroken(false);
     const j = Ora.parse(root.schema, stateFile.text());
     // ── THE OLD KEYBOARD NAME, CARRIED OVER ──────────────────────────
     // idleKeyboardName was one device, typed in. It is now one entry of

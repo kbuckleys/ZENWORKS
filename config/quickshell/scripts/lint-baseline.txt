@@ -126,7 +126,6 @@
 1	morpheus/Elastic.qml	missing-property	Member "grow" not found on type "QObject"
 1	morpheus/Elastic.qml	missing-property	Member "hold" not found on type "QObject"
 1	morpheus/LayerPopup.qml	uncreatable-type	Type PanelWindow is not creatable.
-1	morpheus/NowPlaying.qml	missing-property	Member "values" not found on type "UntypedObjectModel"
 1	morpheus/Strings.qml	missing-property	Member "done" not found on type Strings::pasteProc with type Process
 3	morpheus/Sysmon.qml	missing-property	Member "reload" not found on type "QObject"
 3	morpheus/Sysmon.qml	missing-property	Member "text" not found on type "QObject"

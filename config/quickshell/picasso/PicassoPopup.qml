@@ -15,6 +15,9 @@ import "../morpheus"
 import "../morpheus/gridnav.js" as Nav
 import "../terminus" as Term
 import "../morpheus/controls" as Controls
+import "../morpheus/undo"
+import "../morpheus/icons.js" as Icons
+import "../terminus/terminus.js" as Terminus
 import "picasso.js" as Art
 
 LayerPopup {
@@ -85,20 +88,82 @@ LayerPopup {
   readonly property var pictures: popup.filtered.filter((r) => !r.dir)
   readonly property int dirCount: popup.filtered.length - popup.pictures.length
 
-  function enterDir(row) {
-    popup.sub = row.sub;
-    popup.sel = 0;
-    popup.followSelection();
-  }
+  function enterDir(row) { popup.goSub(row.sub); }
   // back out of a directory, the one just left selected
   function upDir() {
     if (popup.sub === "") return false;
+    popup.goSub(Art.up(popup.sub));
+    return true;
+  }
+  // anywhere along the trail (the crumbs): back out lands on the directory
+  // it came out of, down lands at the top
+  function goSub(to, keep) {
+    if (to === popup.sub) return;
     const was = popup.sub;
-    popup.sub = Art.up(popup.sub);
-    const i = popup.filtered.findIndex((r) => r.dir && r.sub === was);
+    if (!keep) trail.record(was);
+    popup.stagger();
+    popup.sub = to;
+    // the step below `to` on the way back to where you were
+    const pre = to === "" ? "" : to + "/";
+    const left = was.indexOf(pre) === 0 ? pre + was.slice(pre.length).split("/")[0] : "";
+    const i = left === "" ? -1 : popup.filtered.findIndex((r) => r.dir && r.sub === left);
     popup.sel = Math.max(0, i);
     popup.followSelection();
-    return true;
+  }
+
+  // ── BACK AND FORWARD ────────────────────────────────────────────────
+  // The places walked through, as terminus' window keeps them: a step
+  // anywhere new forgets the way forward. The strip's chip, mouse 4/5 and
+  // alt+←/→ take them. morpheus' UndoStack holds them (audit, 2026-10-27:
+  // a pair of lists of its own was that stack again): a place left is
+  // recorded, back is an undo, forward a redo.
+  UndoStack { id: trail }
+  function back() {
+    const to = trail.undo(popup.sub);
+    if (to !== undefined) popup.goSub(to, true);
+  }
+  function forward() {
+    const to = trail.redo(popup.sub);
+    if (to !== undefined) popup.goSub(to, true);
+  }
+  function forgetHistory() { trail.clear(); }
+
+  // A DIRECTORY ARRIVED IN: its tiles come up one after another, top to
+  // bottom — terminus' TileRise, as its grid and picasso's gallery do it.
+  property bool staggering: false
+  Timer { id: staggerOff; interval: 500; onTriggered: popup.staggering = false }
+  function stagger() {
+    popup.staggering = true;
+    staggerOff.restart();
+  }
+
+  // ── THE CRUMBS ──────────────────────────────────────────────────────
+  // Where you are, from the backgrounds directory down, as terminus' crumb
+  // bar draws it (terminus/Segments) — and past it, faint, the way back down
+  // to the deepest place you came up out of, as terminus keeps it.
+  property string deep: ""
+  // kept while you are somewhere along it, cut to here once you leave it;
+  // and remembered, for the next open (Picasso.place) — only while open:
+  // the resets a hidden panel takes (the backgrounds directory settling at
+  // startup) are not somewhere you went
+  onSubChanged: {
+    if (popup.shown) Picasso.setPlace(popup.sub);
+    const pre = popup.sub === "" ? "" : popup.sub + "/";
+    if (popup.deep !== popup.sub && popup.deep.indexOf(pre) !== 0) popup.deep = popup.sub;
+  }
+  function absOf(s) { return Picasso.dir + (s === "" ? "" : "/" + s); }
+  readonly property var crumbList: {
+    const out = [{ label: Terminus.basename(Picasso.dir) || Picasso.dir, path: popup.absOf(""), sub: "" }];
+    const flat = popup.query !== "" || Picasso.everything;
+    const trail = flat ? "" : popup.deep;
+    let at = "";
+    for (const part of trail.split("/")) {
+      if (part === "") continue;
+      at = at === "" ? part : at + "/" + part;
+      out.push({ label: part, path: popup.absOf(at), sub: at,
+                 ghost: !(popup.sub === at || popup.sub.indexOf(at + "/") === 0) });
+    }
+    return out;
   }
 
   // The presets, then the ones made here. Shaped like a file row — a path
@@ -294,9 +359,11 @@ LayerPopup {
     function onColorPicked(into, hex) { if (into === "popup:maker") popup.pickHex = hex; }
     // another backgrounds directory, or this level gone from it (moved,
     // deleted, rescanned): back to the top, never an empty level
-    function onDirChanged() { popup.sub = ""; popup.sel = 0; }
+    function onDirChanged() { popup.sub = ""; popup.deep = ""; popup.sel = 0; popup.forgetHistory(); }
     function onFilesChanged() {
-      if (popup.sub !== "" && popup.filtered.length === 0) { popup.sub = ""; popup.sel = 0; }
+      if (popup.sub !== "" && popup.filtered.length === 0) {
+        popup.sub = ""; popup.deep = ""; popup.sel = 0; popup.forgetHistory();
+      }
     }
   }
 
@@ -358,7 +425,9 @@ LayerPopup {
     popup.collapsing = false;
     popup.regrab = false;
     popup.query = "";
-    popup.sub = "";
+    // back where it was left (Picasso.place), not at the top — unless that
+    // directory has no pictures any more (onFilesChanged takes it up)
+    popup.sub = Picasso.placeSub();
     popup.sel = 0;
     popup.focusOpen = false;
     popup.focusPath = "";
@@ -623,6 +692,10 @@ LayerPopup {
         } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
           event.accepted = true;
           popup.openFocusAtSelection();
+        } else if (event.key === Qt.Key_Left && (event.modifiers & Qt.AltModifier)) {
+          event.accepted = true; popup.back();
+        } else if (event.key === Qt.Key_Right && (event.modifiers & Qt.AltModifier)) {
+          event.accepted = true; popup.forward();
         } else if (event.key === Qt.Key_Left) {
           event.accepted = true; popup.moveSel(-1);
         } else if (event.key === Qt.Key_Right) {
@@ -741,6 +814,11 @@ LayerPopup {
             // position cut a row in half. A grid of tiles has an obvious
             // unit and this is it.
             ElasticScroll { view: grid; step: popup.cellH }
+            // mouse 4/5: back and forward, as in terminus
+            TapHandler {
+              acceptedButtons: Qt.BackButton | Qt.ForwardButton
+              onTapped: (pt, button) => button === Qt.BackButton ? popup.back() : popup.forward()
+            }
             anchors.left: parent.left
             anchors.top: parent.top
             anchors.bottom: parent.bottom
@@ -768,6 +846,10 @@ LayerPopup {
 
               readonly property bool selected: cell.index === popup.sel
 
+              // a directory arrived in comes up a tile after a tile
+              Term.TileRise { id: rise }
+              Component.onCompleted: if (popup.staggering) { rise.hide(); rise.start(grid, cell.index); }
+
               Rectangle {
                 anchors.fill: parent
                 anchors.margins: 6
@@ -782,16 +864,34 @@ LayerPopup {
                 anchors.horizontalCenter: parent.horizontalCenter
                 width: popup.cellW - 28
                 height: popup.cellH - 52
-                // a directory wears its cover, its first picture
+                // a directory is drawn as its pictures (dirCover); until
+                // those are in, or with none of its own, its first picture
+                // further down
+                visible: !dirCover.shown
                 path: cell.modelData.dir ? cell.modelData.cover : cell.modelData.path
                 thumb: cell.modelData.thumb ?? ""
               }
+              // terminus' directory cover, as its grid and picasso's gallery
+              // draw one — see terminus/FolderCover.qml — cut to the
+              // pictures' own box, so the row stays one row
+              Term.FolderCover {
+                id: dirCover
+                anchors.fill: thumbBox
+                aspect: thumbBox.width / Math.max(1, thumbBox.height)
+                live: cell.modelData.dir === true
+                path: cell.modelData.dir ? cell.modelData.path : ""
+                stamp: cell.modelData.stamp || 0
+                glyph: "\uF07B"
+              }
 
-              // a directory: its mark and how many pictures are in it, on
-              // a chip in the cover's corner
+              // a directory: how many pictures are in it, on a chip in the
+              // cover's corner — with its mark too while the cover is a
+              // single picture (FolderCover wears the mark on its own badge,
+              // bottom-left, so the count steps over to the right)
               Rectangle {
                 visible: cell.modelData.dir === true
-                anchors.left: thumbBox.left
+                anchors.left: dirCover.shown ? undefined : thumbBox.left
+                anchors.right: dirCover.shown ? thumbBox.right : undefined
                 anchors.bottom: thumbBox.bottom
                 anchors.margins: 6
                 width: dirChip.implicitWidth + 14
@@ -801,7 +901,7 @@ LayerPopup {
                 Text {
                   id: dirChip
                   anchors.centerIn: parent
-                  text: "\uF07B  " + (cell.modelData.count || 0)
+                  text: (dirCover.shown ? "" : "\uF07B  ") + (cell.modelData.count || 0)
                   color: Zenon.ink
                   font.family: Zenon.face
                   font.weight: Zenon.weight
@@ -855,18 +955,25 @@ LayerPopup {
                 // choice now: a click puts it somewhere and it stays there,
                 // which is also what makes the keyboard's arrows and the
                 // pointer agree about what is selected.
-                // Either button lifts it into the card. The right one used
-                // to open the menu the card replaces, and a hand that has
-                // learned to right-click a background should still get
-                // somewhere. The card grows out of the thumbnail itself, so
-                // it reads as the picture coming forward rather than a
-                // dialog arriving from nowhere.
-                onClicked: {
+                // A DOUBLE CLICK OPENS (user, 2026-10-27), as in terminus and
+                // the gallery: one click only selects. A directory goes in; a
+                // picture lifts into the card, which grows out of the
+                // thumbnail itself, so it reads as the picture coming forward
+                // rather than a dialog arriving from nowhere. The right
+                // button still opens at once — it used to open the menu the
+                // card replaces, and a hand that has learned to right-click a
+                // background should still get somewhere.
+                function open() {
                   if (cell.modelData.dir) { popup.enterDir(cell.modelData); return; }
                   const p = thumbBox.mapToItem(null, thumbBox.width / 2,
                                                thumbBox.height / 2);
                   popup.openFocus(popup.filtered, cell.index, p);
                 }
+                onClicked: (mouse) => {
+                  if (mouse.button === Qt.RightButton) cellMa.open();
+                  else popup.sel = cell.index;
+                }
+                onDoubleClicked: (mouse) => { if (mouse.button === Qt.LeftButton) cellMa.open(); }
               }
             }
           }
@@ -1115,25 +1222,72 @@ LayerPopup {
             color: Zenon.border
           }
 
-          // PICTURES OR COLORS, at the strip's left edge: terminus'
-          // Segments, as picasso's card switches its tabs (user,
-          // 2026-10-12) — tab flips between them too.
-          Term.Segments {
+          // ── BACK AND FORWARD, then the crumbs, at the strip's left ────
+          // terminus' own pill for them (BarChip, as its Chrome sets it):
+          // unlit when there is nowhere to go.
+          Term.BarChip {
+            id: navChip
             anchors.left: parent.left
             anchors.leftMargin: 8
             anchors.verticalCenter: parent.verticalCenter
             z: 2
-            textSize: Zenon.px(13)
-            options: [["backgrounds", "Pictures"], ["colors", "Colors"]]
-            current: popup.view
-            onChose: (v) => popup.setView(v)
+            visible: popup.view === "backgrounds"
+            height: crumbSegs.height
+            partW: 28
+            parts: [{ glyph: "\uF053", ok: trail.canUndo, size: Zenon.px(13), heavy: true },
+                    { glyph: "\uF054", ok: trail.canRedo, size: Zenon.px(13), heavy: true }]
+            onClicked: (i) => i === 0 ? popup.back() : popup.forward()
           }
 
-          // THE STRIP'S RIGHT EDGE: what is running, then the two rings that
-          // decide how the grid is ordered and how it is fitted — controls
-          // at one end, the view switch at the other, and the count and its
-          // hint in the middle where the eye lands.
+          // terminus' crumb bar (terminus/Segments, as its Chrome sets it):
+          // a step goes there, the one you are in lit. Longer than the room
+          // it has, the trail keeps its end in sight — that is where you are.
+          // The pictures only: the colors have no directories.
+          Item {
+            id: crumbBox
+            anchors.left: navChip.right
+            anchors.leftMargin: 6
+            anchors.verticalCenter: parent.verticalCenter
+            z: 2
+            visible: popup.view === "backgrounds"
+            width: visible ? Math.max(0, Math.min(crumbSegs.implicitWidth,
+              stripRight.x - crumbBox.x - 16 - stripMid.implicitWidth - 16)) : 0
+            height: crumbSegs.height
+            clip: true
+
+            Term.Segments {
+              id: crumbSegs
+              x: Math.min(0, crumbBox.width - width)
+              textSize: Zenon.px(13)
+              weight: Zenon.titleWeight
+              glyphWeight: Zenon.titleWeight
+              pad: 22
+              ink: Zenon.accentMuted
+              options: popup.crumbList.map((c) => [c.path, c.label])
+              glyphOf: (v) => {
+                const c = popup.crumbList.find((k) => k.path === v);
+                return Terminus.dirGlyph(v, Icons, c ? c.label : "");
+              }
+              current: popup.query !== "" || Picasso.everything ? popup.absOf("") : popup.absOf(popup.sub)
+              faint: popup.crumbList.filter((c) => c.ghost === true).map((c) => c.path)
+              onChose: (v) => {
+                const c = popup.crumbList.find((k) => k.path === v);
+                if (!c) return;
+                // a step out of a search or Everything is a step back into
+                // the directories
+                if (popup.query !== "") popup.query = "";
+                if (Picasso.everything) Picasso.everything = false;
+                popup.goSub(c.sub);
+              }
+            }
+          }
+
+          // THE STRIP'S RIGHT EDGE: what is running, the two rings that
+          // decide how the grid is ordered and how it is fitted, and last
+          // the view switch — the crumbs at the other end, and the filter's
+          // hint between them.
           Row {
+            id: stripRight
             anchors.right: parent.right
             anchors.rightMargin: 10
             anchors.verticalCenter: parent.verticalCenter
@@ -1233,16 +1387,31 @@ LayerPopup {
                 + (Quickshell.screens.length > 1 ? "  " + popup.screenName : "")
               act: () => Picasso.cycleFitFor(popup.screenName)
             }
+
+            // PICTURES OR COLORS: terminus' Segments, as picasso's card
+            // switches its tabs (user, 2026-10-12) — tab flips between them
+            // too. At the right end since the crumbs took the left
+            // (user, 2026-10-27).
+            Term.Segments {
+              anchors.verticalCenter: parent.verticalCenter
+              textSize: Zenon.px(13)
+              options: [["backgrounds", "Pictures"], ["colors", "Colors"]]
+              current: popup.view
+              onChose: (v) => popup.setView(v)
+            }
           }
 
           Item {
             anchors.fill: parent
 
-            // The count, and beside it the hint for the one thing it also
-            // is: the filter you type into. Centered on the line, as the
-            // rings beside it are (it hung from a 6px top pad, 2026-10-17).
+            // What you typed, after the crumbs. NO COUNT and no hint (user,
+            // 2026-10-27): how many pictures and directories was a fact about
+            // the grid you are already looking at.
             Row {
-              anchors.centerIn: parent
+              id: stripMid
+              anchors.left: parent.left
+              anchors.leftMargin: crumbBox.visible ? crumbBox.x + crumbBox.width + 16 : 12
+              anchors.verticalCenter: parent.verticalCenter
               spacing: 0
 
               Item {
@@ -1266,20 +1435,8 @@ LayerPopup {
                   // Doubles as the input, since there is no field — the same
                   // shape howler uses. What you type lands here.
                   visible: !Picasso.scanning
-                  text: popup.view === "colors"
-                    ? popup.colorItems.length + " Colors"
-                    : popup.query !== "" ? popup.query
-                    : (popup.sub !== "" ? popup.sub + "  \u00B7  " : "")
-                      + [popup.pictures.length > 0 || popup.dirCount === 0
-                           ? popup.pictures.length + (popup.pictures.length === 1 ? " Background" : " Backgrounds") : "",
-                         popup.dirCount > 0 ? popup.dirCount + (popup.dirCount === 1 ? " Directory" : " Directories") : ""]
-                        .filter((w) => w !== "").join(", ")
-                  // MUTED WHEN IT IS A COUNT, bright when it is your query.
-                  // The count is a fact about the grid you are already
-                  // looking at; the query is the only thing on this line you
-                  // put there, and the two were the same color.
-                  color: popup.query === "" ? popup.dimColor
-                    : (clearMa.pressed ? popup.highlight : popup.headColor)
+                  text: popup.view === "colors" ? "" : popup.query
+                  color: clearMa.pressed ? popup.highlight : popup.headColor
                   font.bold: true
                   font.family: Zenon.face
                   font.weight: 600
@@ -1302,20 +1459,6 @@ LayerPopup {
                 }
               }
 
-              // The one thing on the old strip that was not an explanation of
-              // a visible control: filtering has nothing on screen to point
-              // at, because it IS the line above. So it keeps its hint, and
-              // only while there is nothing typed.
-              Text {
-                anchors.verticalCenter: parent.verticalCenter
-                visible: popup.restingStatus
-                text: popup.view === "colors" ? "   tab for pictures" : "   type to filter"
-                color: Qt.rgba(popup.dimColor.r, popup.dimColor.g,
-                               popup.dimColor.b, 0.7)
-                font.family: Zenon.face
-                font.weight: Zenon.weight
-                font.pixelSize: Zenon.px(13)
-              }
             }
 
           }

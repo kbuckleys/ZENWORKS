@@ -152,11 +152,21 @@ Item {
               Item {
                 id: icon
                 anchors.verticalCenter: parent.verticalCenter
-                width: 16
                 height: 16
-                visible: icon.glyph !== "" || icon.src !== ""
+                visible: icon.glyph !== "" || icon.src !== "" || icon.swatch !== null
                 readonly property string glyph: row.modelData.icon || ""
                 readonly property string src: row.modelData.image || ""
+                // or a theme's swatch, [ground, ink, accent] (see Swatch)
+                readonly property var swatch: row.modelData.swatch || null
+                width: icon.swatch !== null ? sw.width : 16
+
+                Swatch {
+                  id: sw
+                  visible: icon.swatch !== null
+                  anchors.verticalCenter: parent.verticalCenter
+                  colors: icon.swatch
+                  opacity: row.on ? 1 : 0.45
+                }
 
                 Text {
                   anchors.fill: parent
@@ -194,7 +204,9 @@ Item {
                 elide: Text.ElideRight
                 color: row.ink
                 font.family: Zenon.face
-                font.weight: Zenon.weight
+                // a row may be set in a weight of its own (`weight`): a font
+                // weight's menu shows each in itself
+                font.weight: row.modelData.weight || Zenon.weight
                 font.pixelSize: Zenon.px(16)
               }
 

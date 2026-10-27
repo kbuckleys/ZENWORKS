@@ -39,6 +39,9 @@
 // For a switch whose choices are shapes (picasso's Fit): `art` is a
 // Component made once per part, above its word, `artH` tall. It reads
 // `parent.value` (the part's value) and `parent.ink` (its word's color).
+// With `words: false` the picture stands alone and the word is a tooltip
+// (`tip`, the window's WindowTip) — how every pictogram in the suite reads
+// since 2026-10-27: picasso's Fit, Oracle's.
 //
 // terminus' PrefSeg is the settings panel's own (enrolled with its window
 // for the keyboard); this is the one for anywhere else.
@@ -129,6 +132,14 @@ Item {
   property Component art: null
   property real artH: 16
   readonly property real artRoom: segs.art ? segs.artH + 8 : 0
+  // PICTURES ALONE (`words: false`, user 2026-10-27: Oracle's pictograms
+  // with their names as tooltips): each part its `art`, centered, `artW`
+  // wide; the word is said by `tip` (the holder window's morpheus
+  // WindowTip) while the pointer is on it — one place for every switch of
+  // pictures in the suite, not each holder's own
+  property bool words: true
+  property real artW: 26
+  property var tip: null
   // A NOTE UNDER A LABEL: an option given a third field, [value, label,
   // note], says a line more under its label, muted — so a choice that needs
   // explaining (Ceres' paru: release or commit, user 2026-10-14) explains
@@ -140,7 +151,8 @@ Item {
   readonly property bool noted: (segs.options || []).some(o => o.length > 2 && o[2])
   property real noteSize: Math.round(segs.textSize * 0.86)
   readonly property real noteRoom: segs.noted ? Math.round(segs.noteSize * 1.5) : 0
-  implicitHeight: Math.round(segs.textSize * 2.1) + segs.artRoom + segs.noteRoom
+  implicitHeight: segs.words ? Math.round(segs.textSize * 2.1) + segs.artRoom + segs.noteRoom
+                             : segs.artH + 16
   width: implicitWidth
   height: implicitHeight
 
@@ -188,7 +200,8 @@ Item {
     if (!segs.even || n === 0) return [];
     const need = segs.options.map((o) => {
       const g = segs.glyphOf ? String(segs.glyphOf(String(o[0])) || "") : "";
-      const word = String(o[1] || "");
+      const word = segs.words ? String(o[1] || "") : "";
+      if (!segs.words) return segs.artW + segs.pad;
       return wordFm.advanceWidth(word) + (g !== "" ? glyphFm.advanceWidth(g) + (word !== "" ? 7 : 0) : 0) + segs.pad;
     });
     const total = need.reduce((a, b) => a + b, 0);
@@ -236,6 +249,7 @@ Item {
         readonly property bool on: segs.current === one.modelData[0]
         readonly property bool ok: segs.allowed === null || segs.allowed.indexOf(one.modelData[0]) >= 0
         width: segs.even ? (segs.partWs[one.index] || 0)
+          : !segs.words ? segs.artW + segs.pad
           : label.implicitWidth + mark.room + segs.pad
         height: row.height
         // between two options, a hairline
@@ -295,8 +309,9 @@ Item {
           readonly property color ink: label.color
           opacity: label.opacity
           anchors.horizontalCenter: parent.horizontalCenter
-          anchors.bottom: label.top
+          anchors.bottom: segs.words ? label.top : undefined
           anchors.bottomMargin: 6
+          anchors.verticalCenter: segs.words ? undefined : parent.verticalCenter
         }
         Text {
           id: label
@@ -304,6 +319,9 @@ Item {
           anchors.verticalCenterOffset: segs.artRoom / 2 - segs.noteRoom / 2
           anchors.horizontalCenterOffset: mark.room / 2
           text: one.modelData[1]
+          // still there without words, unseen: its color and fade are the
+          // art's (the Loader reads them)
+          visible: segs.words
           color: segs.inks[one.modelData[0]] !== undefined ? segs.inks[one.modelData[0]]
             : one.on || segs.hot === one.modelData[0] ? Zenon.cyan : segs.ink
           opacity: !one.ok ? 0.35
@@ -348,7 +366,14 @@ Item {
           font.weight: Zenon.weight
           font.pixelSize: segs.noteSize
         }
-        HoverHandler { onHoveredChanged: segs.pointed(one.modelData[0], one, hovered) }
+        HoverHandler {
+          onHoveredChanged: {
+            segs.pointed(one.modelData[0], one, hovered);
+            if (segs.words || !segs.tip) return;
+            if (hovered) segs.tip.show(one, String(one.modelData[1]));
+            else segs.tip.hide(one);
+          }
+        }
         TapHandler {
           id: press
           acceptedButtons: segs.buttons

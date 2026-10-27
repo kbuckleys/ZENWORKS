@@ -59,7 +59,7 @@ Item {
     } catch (e) {
       // A corrupt file is not a reason to lose the session. The index
       // rebuilds from disk anyway, and defs is the only real casualty.
-      return { defs: [], index: ({}), views: ({}), gone: ({}) };
+      return { defs: [], index: ({}), views: ({}), gone: ({}), broken: true };
     }
   }
   function loadTags() {
@@ -82,6 +82,8 @@ Item {
     tagFile.reload();
     tagFile.waitForJob();
     const st = term.tagState();
+    // about to be written over: the unreadable file kept aside first
+    if (st.broken) { Strings.keepAside(tagFile.path, "terminus"); delete st.broken; }
     mutate(st);
     // In memory first, so the listing repaints on this frame; the write
     // comes back round through onTextChanged and re-derives the same thing.

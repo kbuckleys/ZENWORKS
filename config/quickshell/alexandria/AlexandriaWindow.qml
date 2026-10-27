@@ -547,9 +547,7 @@ FloatingWindow {
     if (asCode) win.copy(A.uplus(win.gcp));
     else win.copy(A.charOf(win.gcp), A.charOf(win.gcp) + "  " + A.uplus(win.gcp));
   }
-  property string said: ""
-  function say(t) { win.said = t; sayTimer.restart(); }
-  Timer { id: sayTimer; interval: 1800; onTriggered: win.said = "" }
+  function say(t) { saidBox.say(t); }
 
   Component.onCompleted: {
     if (win.mgr && win.mgr.page === "glyphs") win.mgr.needNames();
@@ -1910,7 +1908,8 @@ FloatingWindow {
         anchors.bottom: parent.bottom
         anchors.bottomMargin: 18
         maxWidth: Infinity
-        text: win.said
+        id: saidBox
+        lasts: 1800
         pixelSize: Zenon.px(14)
       }
     }

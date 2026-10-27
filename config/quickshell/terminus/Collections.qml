@@ -56,7 +56,11 @@ Item {
     try {
       const o = JSON.parse(String(collFile.text() || "") || "[]");
       list = Array.isArray(o) ? o : [];
-    } catch (e) { list = []; }
+    } catch (e) {
+      // about to be written over: the unreadable file kept aside first
+      Strings.keepAside(collFile.path, "terminus");
+      list = [];
+    }
     mutate(list);
     term.collections = list;
     collFile.setText(JSON.stringify(list));
