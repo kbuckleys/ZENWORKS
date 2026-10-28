@@ -164,6 +164,7 @@ Rectangle {
         font.pixelSize: Zenon.px(14)
       }
       Text {
+        textFormat: Text.PlainText
         id: totalText
         anchors.right: parent.right
         anchors.rightMargin: 18

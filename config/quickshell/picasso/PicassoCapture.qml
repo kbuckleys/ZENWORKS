@@ -648,6 +648,7 @@ Scope {
                 anchors.verticalCenter: parent.verticalCenter
               }
               Text {
+                textFormat: Text.PlainText
                 text: chip.modelData.label
                 color: Zenon.white
                 font.family: Zenon.face

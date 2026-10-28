@@ -96,6 +96,7 @@ Column {
           font.pixelSize: Zenon.px(13)
         }
         Text {
+          textFormat: Text.PlainText
           width: ps.lineWidth - 80
           elide: Text.ElideRight
           text: cr.modelData.subject

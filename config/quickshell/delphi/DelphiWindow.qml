@@ -892,8 +892,12 @@ FloatingWindow {
     { id: "pulls", label: win.hub && D.FORGES[win.hub.forge] ? D.FORGES[win.hub.forge].pulls : "Pull requests", glyph: "\uF407", group: "forge" },
     { id: "issues", label: "Issues", glyph: "\uF41B", group: "forge" },
     { id: "releases", label: "Releases", glyph: "\uF412", group: "forge" },
+    // your AUR account (the one your AUR key signs in as): always here,
+    // first under the AUR's heading, a recipe's Package after it
+    { id: "aurhub", label: "Account", glyph: "\uF2BD", group: "aur" },
     { id: "aur", label: "Package", glyph: "\uF303", group: "aur" },
     { id: "repos", label: "Repositories", glyph: "", group: "all" },
+    { id: "inbox", label: "Inbox", glyph: "\u{F0687}", group: "all" },
     { id: "github", label: "Accounts", glyph: "\uF0C2", group: "all" },
     { id: "keys", label: "SSH keys", glyph: "\uF43D", group: "all" },
   ]
@@ -1174,7 +1178,7 @@ FloatingWindow {
             countInk: pageRow.modelData.id === "changes" && win.st && win.st.conflicts.length > 0 ? Zenon.red : Zenon.accentMuted
             here: win.page === pageRow.modelData.id
             fill: win.hiFill
-            opacity: win.root === "" && ["github", "repos", "keys"].indexOf(pageRow.modelData.id) < 0 ? 0.4 : 1
+            opacity: win.root === "" && ["github", "repos", "keys", "aurhub", "inbox"].indexOf(pageRow.modelData.id) < 0 ? 0.4 : 1
             onClicked: win.setPage(pageRow.modelData.id)
           }
           }
@@ -1205,7 +1209,8 @@ FloatingWindow {
             wrapMode: Text.Wrap
             text: !win.state ? "" : (win.state.op === "rebase" ? "Rebasing" + (win.state.steps ? "  " + win.state.step + " / " + win.state.steps : "")
               : win.state.op === "merge" ? "Merging" : win.state.op === "cherry-pick" ? "Cherry-picking"
-              : win.state.op === "revert" ? "Reverting" : win.state.op === "am" ? "Applying patches" : "Bisecting")
+              : win.state.op === "revert" ? "Reverting" : win.state.op === "am" ? "Applying patches"
+              : win.bisectNow && win.bisectNow.culprit ? "Found it" : "Bisecting")
             color: Zenon.yellow
             font.family: Zenon.face
             font.weight: Font.Bold
@@ -1220,6 +1225,40 @@ FloatingWindow {
             font.family: Zenon.face
             font.weight: Zenon.weight
             font.pixelSize: Zenon.px(14)
+          }
+          // bisecting: what is being tried, and the answers to it
+          Text {
+            width: parent.width
+            wrapMode: Text.Wrap
+            visible: !!win.state && win.state.op === "bisect" && !!win.bisectNow
+            text: !win.bisectNow ? ""
+              : win.bisectNow.culprit ? "It came in with " + D.short(win.bisectNow.culprit.sha) + "  " + win.bisectNow.culprit.subject
+              : win.bisectNow.why ? win.bisectNow.why
+              : win.bisectNow.testing ? "Try " + D.short(win.bisectNow.testing.sha) + "  " + win.bisectNow.testing.subject
+                + (win.bisectNow.left !== null && win.bisectNow.left !== undefined ? "  ·  about " + win.bisectNow.left + (win.bisectNow.left === 1 ? " step" : " steps") + " left after it" : "")
+                + " — does it have the bug?" : ""
+            color: win.bisectNow && win.bisectNow.culprit ? Zenon.ink : Zenon.accentSoft
+            font.family: Zenon.face
+            font.weight: Zenon.weight
+            font.pixelSize: Zenon.px(14)
+          }
+          Flow {
+            width: parent.width
+            spacing: 6
+            visible: !!win.state && win.state.op === "bisect"
+            DialogButton { visible: !(win.bisectNow && win.bisectNow.culprit); label: "Good"; ink: Zenon.green; onClicked: win.bisect("good") }
+            DialogButton { visible: !(win.bisectNow && win.bisectNow.culprit); label: "Bad"; ink: Zenon.red; onClicked: win.bisect("bad") }
+            DialogButton { visible: !(win.bisectNow && win.bisectNow.culprit); label: "Skip"; onClicked: win.bisect("skip") }
+            DialogButton {
+              visible: !!(win.bisectNow && win.bisectNow.culprit)
+              label: "Copy its id"
+              onClicked: win.copy(win.bisectNow.culprit.sha, D.short(win.bisectNow.culprit.sha))
+            }
+            DialogButton {
+              label: win.bisectNow && win.bisectNow.culprit ? "Finish" : "Stop"
+              ink: win.bisectNow && win.bisectNow.culprit ? Zenon.cyan : Zenon.accentMuted
+              onClicked: win.bisect("reset")
+            }
           }
           Flow {
             width: parent.width
@@ -1385,6 +1424,7 @@ FloatingWindow {
         anchors.top: parent.top
         anchors.bottom: parent.bottom
         Text {
+          textFormat: Text.PlainText
           id: headTitle
           anchors.left: parent.left
           anchors.verticalCenter: parent.verticalCenter
@@ -1522,13 +1562,13 @@ FloatingWindow {
                   width: parent.width
                   elide: Text.ElideRight
                   textFormat: Text.StyledText
-                  text: "<b>" + (rc.h ? rc.h.name : rc.modelData) + "</b>  <font color='" + Zenon.hex(Zenon.accentMuted) + "'>" + D.ciWords(rc.c) + "</font>"
+                  text: "<b>" + D.esc(rc.h ? rc.h.name : rc.modelData) + "</b>  <font color='" + Zenon.hex(Zenon.accentMuted) + "'>" + D.ciWords(rc.c) + "</font>"
                   color: Zenon.ink
                   font.family: Zenon.face
                   font.weight: Zenon.weight
                   font.pixelSize: Zenon.px(14)
                 }
-                CiRuns { width: parent.width; c: rc.c; most: 6 }
+                CiRuns { width: parent.width; c: rc.c; most: 6; win: win }
               }
             }
           }
@@ -1542,6 +1582,13 @@ FloatingWindow {
         anchors.rightMargin: 16
         anchors.verticalCenter: parent.verticalCenter
         spacing: 8
+        // a page's own controls, at the bar's right end (`headTools`, a
+        // Component the page declares: the AUR account's search and lists)
+        Loader {
+          anchors.verticalCenter: parent.verticalCenter
+          active: !!win.pageItem && !!win.pageItem.headTools
+          sourceComponent: win.pageItem ? win.pageItem.headTools || null : null
+        }
         // always: an upload or a clone runs with no repository open, and
         // its progress belongs here even then — only the three need one
         // ── an upload: a ring that fills as the files go, its count, and on
@@ -1688,6 +1735,7 @@ FloatingWindow {
             spacing: 10
             Working { anchors.verticalCenter: parent.verticalCenter; running: !!win.netJob; ink: Zenon.cyan; dot: 5; gap: 4 }
             Text {
+              textFormat: Text.PlainText
               anchors.verticalCenter: parent.verticalCenter
               text: !win.netJob ? "" : win.netJob.label
                 + (win.netJob.progress >= 0 ? "  ·  " + win.netJob.phase.toLowerCase() + " " + win.netJob.progress + "%" : "…")
@@ -1772,9 +1820,9 @@ FloatingWindow {
       anchors.right: parent.right
       anchors.top: head.bottom
       anchors.bottom: foot.top
-      source: win.root === "" && ["github", "repos", "keys"].indexOf(win.page) < 0 ? "ReposPage.qml"
+      source: win.root === "" && ["github", "repos", "keys", "aurhub", "inbox"].indexOf(win.page) < 0 ? "ReposPage.qml"
         : ({ changes: "ChangesPage.qml", history: "HistoryPage.qml", branches: "BranchesPage.qml",
-             stashes: "StashesPage.qml", worktrees: "WorktreesPage.qml", remotes: "RemotesPage.qml", keys: "KeysPage.qml", releases: "ReleasesPage.qml", aur: "AurPage.qml", github: "GitHubPage.qml",
+             stashes: "StashesPage.qml", worktrees: "WorktreesPage.qml", remotes: "RemotesPage.qml", keys: "KeysPage.qml", aurhub: "AurHubPage.qml", inbox: "InboxPage.qml", releases: "ReleasesPage.qml", aur: "AurPage.qml", github: "GitHubPage.qml",
              pulls: "ForgePage.qml", issues: "ForgePage.qml",
              repos: "ReposPage.qml" })[win.page] || "ChangesPage.qml"
       onLoaded: { item.win = win; Qt.callLater(win.refocus); }
@@ -1817,12 +1865,55 @@ FloatingWindow {
     }
   }
 
+  // ── BISECT (2026-10-28) ────────────────────────────────────────────────
+  // Halving the commits between one without a bug and one with it: each
+  // step checks one out to try, you say good, bad or skip, and the
+  // banner says how many are left — then which commit it was.
+  // bisectNow: core's answer ({ testing, left, culprit, why }), asked
+  // again when the window finds a bisect it did not start
+  property var bisectNow: null
+  function bisect(action, args) {
+    win.act("bisect", Object.assign({ action: action }, args || {}), {
+      label: action === "start" ? "Starting" : action === "reset" ? "Finishing" : "Checking out the next",
+      then: (res) => {
+        win.bisectNow = action === "reset" ? null : res;
+        if (action === "reset") win.say("Back where you were");
+        else if (res.culprit) win.say("Found it: " + D.short(res.culprit.sha) + " " + res.culprit.subject);
+      } });
+  }
+  onStateChanged: {
+    if (win.state && win.state.op === "bisect" && !win.bisectNow)
+      win.mgr.call("bisectRead", win.root, {}, (ok, res) => { if (ok && win) win.bisectNow = res; });
+    if (!win.state || win.state.op !== "bisect") win.bisectNow = null;
+  }
+
+  // ── A CI JOB'S LOG, READ HERE (2026-10-28) ────────────────────────────
+  // The hub's forge's (GitHub Actions, GitLab CI): its last lines, the
+  // errors marked, as a card; a failed one re-run from it.
+  function jobLog(run) {
+    const h = win.hub;
+    if (!h || !run || !run.job) return;
+    const op = (D.FORGES[h.forge] || D.FORGES.github).id;
+    win.act(op + "JobLog", { full: h.full, job: run.job }, { repo: null, label: "Reading the log", network: true, refresh: false,
+      then: (res) => {
+        const failed = run.state === "failure";
+        win.card_({ question: run.name, glyph: "", ink: failed ? Zenon.red : Zenon.ink,
+          detail: (failed ? "Failed" : run.state === "pending" ? "Running" : "Done") + "  ·  its last " + res.lines.length + " lines",
+          log: res.lines,
+          choices: (failed ? [{ label: "Re-run", ink: Zenon.cyan, run: () => win.act(op + "Rerun", { full: h.full, job: run.job },
+                                  { repo: null, label: "Asking for a re-run", network: true, refresh: false,
+                                    said: "Re-running " + run.name, then: () => win.watchCi() }) }] : [])
+            .concat(run.url ? [{ label: "On the web", keep: true, run: () => Strings.openLink(run.url) }] : [])
+            .concat([{ label: "Close" }]) });
+      } });
+  }
+
   // ── the card ───────────────────────────────────────────────────────────
   CardSheet {
     id: cards
     fromTop: head.height
     leftInset: side.width
-    cardW: 540
+    cardW: win.card && win.card.log ? Math.min(980, win.width - side.width - 80) : 540
     lead: win.gitAsk ? win.askForm(win.gitAsk) : null
     onLeadChose: (i) => win.mgr.answer(win.gitAsk.ask, i === 0 ? "yes" : "no")
     onLeadSettled: (ok, values) => win.mgr.answer(win.gitAsk.ask, ok ? values.answer : null)
@@ -1830,6 +1921,40 @@ FloatingWindow {
     // a terminus picker for a FormBody directory field, from where it points
     chooseDir: win.mgr && win.mgr.fileManager ? (start, reply) => win.mgr.fileManager.choose(true, start || win.home,
       (paths) => reply(paths && paths.length > 0 ? paths[0] : "")) : null
+    // a job's log (jobLog): its lines, newest at the foot, in the code
+    // face; an error line in red
+    Rectangle {
+      readonly property bool wanted: !!win.card && !!win.card.log
+      visible: wanted
+      width: cards.cardW - 36
+      height: wanted ? Math.min(460, win.height * 0.55) : 0
+      radius: Zenon.windowRadius
+      color: Zenon.wash(0.04)
+      border.width: 1
+      border.color: Zenon.border
+      clip: true
+      ListView {
+        id: logList
+        anchors.fill: parent
+        anchors.margins: 8
+        model: parent.wanted ? win.card.log : []
+        boundsBehavior: Flickable.StopAtBounds
+        onCountChanged: Qt.callLater(() => logList.positionViewAtEnd())
+        delegate: Text {
+          required property string modelData
+          width: logList.width
+          wrapMode: Text.WrapAnywhere
+          text: modelData === "" ? " " : modelData
+          color: /(^##\[error\]|\berror\b|ERROR|FAILED|failed with exit code)/.test(modelData) ? Zenon.red
+            : /^##\[(group|endgroup)\]/.test(modelData) ? Zenon.accentMuted : Zenon.ink
+          font.family: Zenon.faceCode
+          font.pixelSize: Zenon.px(12)
+          textFormat: Text.PlainText
+        }
+      }
+      ElasticScroll { anchors.fill: logList; view: logList }
+      Scrollbar { flick: logList; anchors.right: parent.right; anchors.top: parent.top; anchors.bottom: parent.bottom }
+    }
     // a card about files on their way somewhere (the upload's breakdown):
     // where each lands, as the tree terminus and plato show — morpheus'
     // FileTree, of the given paths — with its size, new or replacing

@@ -65,8 +65,16 @@ Item {
   // to light, so the whole workspace area blinks instead — shell.qml paints
   // it at bg level, over the special wash (specialUrgentWash), off this
   // value. Same two flashes and rest as a numbered workspace's urgentWash.
+  // SHOWN TOO (user, 2026-10-28: "unfocused flash needs to extend to special
+  // workspace as well"): the glyph covers the numbers then, so a numbered
+  // workspace asking blinked behind it unseen — the active one under the
+  // special as well, since it is not where you are. The area blinks for
+  // those, and for a window of the special itself that is not the focused
+  // one (Hyprland marks only unfocused windows; focusing it clears it).
+  readonly property bool numberUrgent: Hyprland.workspaces.values.some(w =>
+    w.urgent === true && !String(w.name).startsWith("special:"))
   readonly property bool specialUrgent: root.specialWorkspace !== null
-    && root.specialWorkspace.urgent === true && !root.specialFocused
+    && (root.specialWorkspace.urgent === true || (root.specialFocused && root.numberUrgent))
   property real specialFlash: 0
   SequentialAnimation on specialFlash {
     running: root.specialUrgent
@@ -198,6 +206,16 @@ Item {
         color: specialGlyph.color
         font: specialGlyph.font
       }
+      // black on the lit urgent wash, as a flashing number goes (its own
+      // copy, not a color change, for the same reason as the number's)
+      Text {
+        text: specialGlyph.text
+        font: specialGlyph.font
+        color: Zenon.black
+        opacity: root.specialUrgent ? root.specialFlash : 0
+        visible: opacity > 0.01
+        Text { x: 1; text: parent.text; font: parent.font; color: parent.color }
+      }
     }
 
     Row {
@@ -308,6 +326,7 @@ Item {
             // the active number's second pass; urgent is never active, so it
             // never needs the black copy's treatment
             Text {
+              textFormat: Text.PlainText
               id: wsThick
               anchors.fill: wsLabel
               anchors.leftMargin: 1
@@ -324,6 +343,7 @@ Item {
             // change on it: BarText eases every color over Zenon.normal, which
             // is longer than a flash, so the number never got to black.
             Text {
+              textFormat: Text.PlainText
               anchors.fill: wsLabel
               text: wsLabel.text
               font: wsLabel.font

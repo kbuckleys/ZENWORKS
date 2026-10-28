@@ -124,6 +124,7 @@ Bubble {
               width: parent.width - 12
               spacing: 4
               Text {
+                textFormat: Text.PlainText
                 anchors.horizontalCenter: parent.horizontalCenter
                 text: Icons.glyphFor({ name: tile.modelData.name }) || "\u{F0214}"
                 color: Zenon.cyan
@@ -131,6 +132,7 @@ Bubble {
                 font.pixelSize: Zenon.px(26)
               }
               Text {
+                textFormat: Text.PlainText
                 width: parent.width
                 horizontalAlignment: Text.AlignHCenter
                 elide: Text.ElideMiddle

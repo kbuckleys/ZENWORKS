@@ -128,6 +128,7 @@ Item {
             height: 28
             Dot { id: ownDot; x: 10; anchors.verticalCenter: parent.verticalCenter; up: sa.running(own.modelData.look) }
             Text {
+              textFormat: Text.PlainText
               anchors.left: ownDot.right
               anchors.leftMargin: 12
               anchors.verticalCenter: parent.verticalCenter
@@ -175,6 +176,7 @@ Item {
                 onToggled: sa.patch(appRow.index, { on: !appRow.a.on })
               }
               Text {
+                textFormat: Text.PlainText
                 id: appName
                 anchors.left: onBox.right
                 anchors.leftMargin: 10
@@ -333,6 +335,7 @@ Item {
               radius: Zenon.windowRadius
               color: instTap.pressed ? Zenon.pressFill : instHover.hovered ? Zenon.wash(0.06) : "transparent"
               Text {
+                textFormat: Text.PlainText
                 id: instName
                 anchors.left: parent.left
                 anchors.leftMargin: 10
@@ -408,6 +411,7 @@ Item {
     property string label: ""
     spacing: 12
     Text {
+      textFormat: Text.PlainText
       Layout.preferredWidth: 120
       Layout.preferredHeight: 28
       verticalAlignment: Text.AlignVCenter

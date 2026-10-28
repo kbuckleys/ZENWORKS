@@ -1,0 +1,10 @@
+#!/bin/sh
+# ┌─┐┌─┐┌┐┌┬ ┬┌─┐┬─┐┬┌─┌─┐
+# ┌─┘├┤ │││││││ │├┬┘├┴┐└─┐
+# └─┘└─┘┘└┘└┴┘└─┘┴└─┴ ┴└─┘
+# https://github.com/kbuckleys/
+#
+# chronos [YYYY-MM-DD]    chronos' calendar window, from a terminal, a
+#                         keybind, or chronos.desktop; on that day if given
+[ $# -eq 0 ] && exec qs ipc call Calendar open "" >/dev/null
+exec qs ipc call Calendar day "$1" >/dev/null

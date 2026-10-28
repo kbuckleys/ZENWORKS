@@ -223,6 +223,7 @@ PlatoSheet {
           text: row.modelData.icon || ""
         }
         Text {
+          textFormat: Text.PlainText
           font.family: Zenon.face
           font.pixelSize: Zenon.px(14)
           font.weight: Font.DemiBold
@@ -246,6 +247,7 @@ PlatoSheet {
         anchors.verticalCenter: parent.verticalCenter
         spacing: 6
         Text {
+          textFormat: Text.PlainText
           id: rowName
           anchors.verticalCenter: parent.verticalCenter
           width: Math.min(implicitWidth, row.width - 22 - 250 - (row.changed ? 30 : 0))

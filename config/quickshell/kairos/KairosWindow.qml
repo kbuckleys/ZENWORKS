@@ -240,6 +240,7 @@ FloatingWindow {
                 Behavior on height { NumberAnimation { duration: Zenon.slow; easing.type: Zenon.ease } }
               }
               Text {
+                textFormat: Text.PlainText
                 anchors.horizontalCenter: parent.horizontalCenter
                 anchors.bottom: parent.bottom
                 text: bar.modelData.label

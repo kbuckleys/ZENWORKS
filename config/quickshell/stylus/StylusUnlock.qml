@@ -51,6 +51,7 @@ FocusScope {
         font.pixelSize: Zenon.px(18)
       }
       Text {
+        textFormat: Text.PlainText
         anchors.verticalCenter: parent.verticalCenter
         text: "Unlock " + S.partName(body.win ? body.win.vol : null)
         color: Zenon.ink
@@ -69,6 +70,7 @@ FocusScope {
     }
 
     Text {
+      textFormat: Text.PlainText
       width: parent.width
       wrapMode: Text.Wrap
       text: body.win && body.win.unlockWhy !== "" ? body.win.unlockWhy : "What is inside is mounted once it opens"

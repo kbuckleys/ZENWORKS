@@ -296,6 +296,7 @@ Item {
         }
         // which screen, when there is more than one to tell apart
         Text {
+          textFormat: Text.PlainText
           anchors.verticalCenter: parent.verticalCenter
           visible: osd.bright && Hermes.osdBright.label !== ""
           text: Hermes.osdBright.label

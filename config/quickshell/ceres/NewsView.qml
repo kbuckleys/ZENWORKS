@@ -107,6 +107,7 @@ Item {
           font.pixelSize: Zenon.px(15) + view.grow
         }
         Text {
+          textFormat: Text.PlainText
           width: parent.width
           wrapMode: Text.Wrap
           maximumLineCount: 4

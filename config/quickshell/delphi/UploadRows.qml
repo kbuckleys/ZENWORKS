@@ -59,6 +59,7 @@ Item {
         font.pixelSize: Zenon.px(14)
       }
       Text {
+        textFormat: Text.PlainText
         id: nameText
         anchors.left: glyph.right
         anchors.leftMargin: 6
@@ -73,6 +74,7 @@ Item {
       }
       // where it lands, when that is not simply its own name at the top
       Text {
+        textFormat: Text.PlainText
         anchors.left: nameText.right
         anchors.leftMargin: 8
         anchors.right: size.left

@@ -4,7 +4,8 @@
 // https://github.com/kbuckleys/
 //
 // A COMMIT'S CHECKS, EACH — its dot and its name, and a click opens its
-// log on the forge. Under a few, all of them; past `most`, the failed and
+// log: in Delphi (`win`'s jobLog) for a job the forge gives logs of
+// (GitHub Actions, GitLab CI; 2026-10-28), on the forge for the rest. Under a few, all of them; past `most`, the failed and
 // running first and a count of the rest. History's commit and the push
 // chip's bubble.
 
@@ -16,6 +17,8 @@ Column {
   id: cr
   property var c: null
   property int most: 8
+  // the window, for a job's log read in Delphi
+  property var win: null
   property real textSize: Zenon.px(13)
   spacing: 4
   readonly property var runs: {
@@ -32,6 +35,7 @@ Column {
       spacing: 8
       CiDot { anchors.verticalCenter: parent.verticalCenter; c: ({ state: one.modelData.state === "neutral" ? "neutral" : one.modelData.state }); size: cr.textSize * 0.65 }
       Text {
+        textFormat: Text.PlainText
         width: cr.width - 20
         elide: Text.ElideRight
         text: one.modelData.name + (one.modelData.state === "failure" ? "  — failed" : one.modelData.state === "pending" ? "  — running" : "")
@@ -41,9 +45,10 @@ Column {
         font.pixelSize: cr.textSize
         MouseArea {
           anchors.fill: parent
-          enabled: !!one.modelData.url
+          enabled: !!one.modelData.url || (!!one.modelData.job && !!cr.win)
           cursorShape: Qt.PointingHandCursor
-          onClicked: Quickshell.execDetached(["xdg-open", one.modelData.url])
+          onClicked: if (one.modelData.job && cr.win) cr.win.jobLog(one.modelData);
+                     else Quickshell.execDetached(["xdg-open", one.modelData.url])
         }
       }
     }

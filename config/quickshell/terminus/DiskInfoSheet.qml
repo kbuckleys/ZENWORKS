@@ -222,6 +222,7 @@ Rectangle {
         font.pixelSize: Zenon.px(13)
       }
       Text {
+        textFormat: Text.PlainText
         visible: diskInfo.used >= 0
         anchors.right: diskInfoGauge.right
         anchors.top: diskInfoGauge.bottom

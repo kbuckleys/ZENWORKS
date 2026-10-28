@@ -58,6 +58,7 @@ Rectangle {
     font.pixelSize: Zenon.px(14)
   }
   Text {
+    textFormat: Text.PlainText
     anchors.left: shelfGlyph.right
     anchors.leftMargin: 8
     anchors.right: shelfCount.left

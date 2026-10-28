@@ -219,6 +219,7 @@ Item {
         font.pixelSize: Zenon.px(14)
       }
       Text {
+        textFormat: Text.PlainText
         anchors.left: sha.right
         anchors.leftMargin: 14
         anchors.right: word.left

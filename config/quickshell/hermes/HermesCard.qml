@@ -52,6 +52,7 @@ Rectangle {
       font.pixelSize: Zenon.px(18)
     }
     Text {
+      textFormat: Text.PlainText
       id: headTitle
       anchors.left: headGlyph.right
       anchors.leftMargin: 12

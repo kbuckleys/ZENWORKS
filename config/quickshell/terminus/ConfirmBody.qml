@@ -183,6 +183,7 @@ Item {
             font.pixelSize: Zenon.px(14)
           }
           Text {
+            textFormat: Text.PlainText
             x: itemGlyph.width
             width: parent.width - x
             height: parent.height

@@ -609,9 +609,12 @@ def checks(full, sha):
     cr = call("GET", f"/repos/{full}/commits/{sha}/check-runs?per_page=100", tok=tok)
     for r in cr.get("check_runs") or []:
         st = r.get("conclusion") if r.get("status") == "completed" else r.get("status")
+        # an Actions check run is its job: its log and its re-run are here
+        actions = (r.get("app") or {}).get("slug") == "github-actions"
         runs.append({"name": r.get("name") or "", "state": rest.ci_word(st),
                      "url": r.get("html_url") or r.get("details_url") or "",
-                     "started": r.get("started_at"), "finished": r.get("completed_at")})
+                     "started": r.get("started_at"), "finished": r.get("completed_at"),
+                     "job": r.get("id") if actions else None})
     cs = call("GET", f"/repos/{full}/commits/{sha}/status", tok=tok)
     for s in cs.get("statuses") or []:
         runs.append({"name": s.get("context") or "", "state": rest.ci_word(s.get("state")),
@@ -622,6 +625,92 @@ def checks(full, sha):
 
 def checks_many(full, shas):
     return rest.ci_many(checks, full, shas)
+
+
+def job_log(full, job):
+    """an Actions job's log, readable: { lines }"""
+    tok, _ = token()
+    t = rest.text(f"{API}/repos/{full}/actions/jobs/{int(job)}/logs",
+                  {"Authorization": "Bearer " + tok, "Accept": "application/vnd.github+json",
+                   "X-GitHub-Api-Version": "2022-11-28", "User-Agent": "delphi"}, who="GitHub")
+    return {"lines": rest.log_lines(t)}
+
+
+def rerun(full, job):
+    """the job run again (and what depends on it)"""
+    call("POST", f"/repos/{full}/actions/jobs/{int(job)}/rerun", {})
+    return {}
+
+
+# ── THE INBOX: what GitHub has for you (2026-10-28) ────────────────────
+def _web_of(subject, full):
+    """a notification's subject → its page (the API names its API address)"""
+    u = (subject or {}).get("url") or ""
+    m = re.search(r"/repos/([^/]+/[^/]+)/(pulls|issues|commits|releases)/([^/]+)$", u)
+    if not m:
+        return f"https://github.com/{full}", 0
+    kind = {"pulls": "pull", "issues": "issues", "commits": "commit", "releases": "releases"}[m.group(2)]
+    n = int(m.group(3)) if m.group(3).isdigit() else 0
+    if kind == "releases":
+        return f"https://github.com/{m.group(1)}/releases", 0
+    return f"https://github.com/{m.group(1)}/{kind}/{m.group(3)}", n
+
+
+def inbox():
+    out = []
+    for t in call("GET", "/notifications?all=false&per_page=50") or []:
+        full = (t.get("repository") or {}).get("full_name") or ""
+        sub = t.get("subject") or {}
+        web, n = _web_of(sub, full)
+        out.append({"id": str(t.get("id")), "title": sub.get("title") or "", "repo": full, "number": n,
+                    "kind": {"PullRequest": "pull", "Issue": "issue", "Release": "release", "Commit": "commit",
+                             "Discussion": "discussion", "CheckSuite": "ci"}.get(sub.get("type"), "other"),
+                    "reason": (t.get("reason") or "").replace("_", " "), "when": t.get("updated_at") or "", "web": web})
+    return out
+
+
+def inbox_done(nid):
+    call("PATCH", f"/notifications/threads/{int(nid)}", {})
+    return {}
+
+
+# ── REVIEWS ───────────────────────────────────────────────────────────────
+def review(full, number, verdict, body=""):
+    """approve, changes (requested) or comment — a pull request's review"""
+    event = {"approve": "APPROVE", "changes": "REQUEST_CHANGES", "comment": "COMMENT"}[verdict]
+    call("POST", f"/repos/{full}/pulls/{int(number)}/reviews", {"event": event, "body": body or ""})
+    return {}
+
+
+# ── THE REPOSITORY ON GITHUB: ITS SETTINGS, A FORK ───────────────────────
+def repo_info(full):
+    r = call("GET", f"/repos/{full}")
+    return {"full": r["full_name"], "name": r["name"], "description": r.get("description") or "",
+            "homepage": r.get("homepage") or "", "private": bool(r.get("private")),
+            "default": r.get("default_branch") or "", "topics": r.get("topics") or [],
+            "archived": bool(r.get("archived")), "fork": bool(r.get("fork")),
+            "parent": (r.get("parent") or {}).get("full_name") or "",
+            "web": r.get("html_url") or "", "https": r.get("clone_url") or "", "ssh": r.get("ssh_url") or ""}
+
+
+def repo_edit(full, changes):
+    """what changed of name, description, homepage, private, default, topics"""
+    body = {}
+    for k, api in (("name", "name"), ("description", "description"), ("homepage", "homepage"),
+                   ("private", "private"), ("default", "default_branch")):
+        if k in changes:
+            body[api] = changes[k]
+    if body:
+        r = call("PATCH", f"/repos/{full}", body)
+        full = r.get("full_name") or full
+    if "topics" in changes:
+        call("PUT", f"/repos/{full}/topics", {"names": [t.lower() for t in changes["topics"]]})
+    return repo_info(full)
+
+
+def fork(full, org=None):
+    r = call("POST", f"/repos/{full}/forks", {"organization": org} if org else {})
+    return {"full": r["full_name"], "https": r.get("clone_url") or "", "ssh": r.get("ssh_url") or ""}
 
 
 # ── A KEY THAT SIGNS ──────────────────────────────────────────────────────

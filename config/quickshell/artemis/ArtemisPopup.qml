@@ -683,6 +683,7 @@ LayerPopup {
             Behavior on opacity { NumberAnimation { duration: Zenon.fast } }
 
             Text {
+              textFormat: Text.PlainText
               id: promptText
               width: 30
               height: parent.height

@@ -50,13 +50,14 @@ Item {
     : pg.loading ? pg.hubFull + "  ·  asking " + pg.site.name + "…"
     : pg.hubFull + "  ·  " + pg.rows.length + " " + pg.showing
   readonly property var hints: pg.area === "reply" ? [["ctrl return", "send"], ["esc", "back"]]
-    : (pg.pulls ? [["c", "check out"], ["m", "merge"]] : [])
+    : (pg.pulls ? [["c", "check out"], ["v", "review"], ["m", "merge"]] : [])
       .concat([["r", "reply"], ["x", pg.open ? "close" : "reopen"], ["w", "web"], ["n", "new"], ["s", pg.showing === "open" ? "closed" : "open"]])
   readonly property bool open: !!pg.item && pg.item.state === "open"
   readonly property var buttons: !pg.hub ? [{ label: "Publish it", ink: Zenon.cyan, primary: true, run: () => pg.win.setPage("github") }]
     : pg.signInNeeded ? [{ label: "Sign in to " + pg.site.name, ink: Zenon.cyan, primary: true, run: () => pg.win.signInTo(pg.site.id) }]
     : [
       { label: pg.open ? "Close" : "Reopen", ink: pg.open ? Zenon.red : Zenon.accentMuted, visible: !!pg.item, run: () => pg.setOpen(!pg.open) },
+      { label: "Review…", visible: pg.pulls && pg.open && !!pg.item, run: () => pg.review() },
       { label: "Merge", ink: Zenon.magenta, visible: pg.pulls && pg.open && !!pg.item && !pg.item.draft, run: () => pg.merge() },
       { label: "Check out", visible: pg.pulls && !!pg.item && pg.item.state !== "merged", run: () => pg.checkout() },
       { label: pg.pulls ? "New " + pg.site.pull : "New issue", ink: Zenon.cyan, primary: true, run: () => pg.pulls ? pg.newPull() : pg.newIssue() },
@@ -236,6 +237,28 @@ Item {
                 { label: "Cancel" }] });
   }
 
+  // A REVIEW (2026-10-28): approve, ask for changes, or say something —
+  // as the forge has it (GitLab's are an approval, or a note)
+  function review() {
+    const t = pg.item;
+    if (!t || !t.pull || t.state !== "open") return;
+    pg.win.ask({ title: "Review #" + t.number, glyph: "\uF407",
+      detail: t.title + (pg.hub.forge === "gitlab" ? "  ·  GitLab has approvals: a request for changes is a note that says so" : ""),
+      fields: [{ key: "verdict", label: "Your verdict", options: [["approve", "Approve"], ["changes", "Request changes"], ["comment", "Comment only"]] },
+               { key: "body", label: "What you say", lines: true, optional: true, hint: "Looks good — one thing in the parser…" }],
+      verb: "Send", hold: true, busyText: "Sending…",
+      then: (v, finish) => {
+        if (v.verdict !== "approve" && v.body.trim() === "") { finish("Say what should change, or what you think"); return; }
+        pg.win.mgr.call(pg.op("Review"), null, { full: pg.hubFull, number: t.number, verdict: v.verdict, body: v.body.trim() }, (ok, res, err) => {
+          if (!pg) return;
+          if (!ok) { finish(err && err.error ? err.error : "It was not sent"); return; }
+          finish(true);
+          pg.win.say(v.verdict === "approve" ? "Approved #" + t.number : v.verdict === "changes" ? "Asked for changes on #" + t.number : "Reviewed #" + t.number);
+          pg.reload();
+        });
+      } });
+  }
+
   function newIssue() {
     if (!pg.hub) return;
     pg.win.ask({ title: "A new issue on " + pg.hubFull, glyph: "",
@@ -310,6 +333,7 @@ Item {
     if (k === Qt.Key_X) { pg.setOpen(!pg.open); return true; }
     if (pg.pulls && k === Qt.Key_C) { pg.checkout(); return true; }
     if (pg.pulls && k === Qt.Key_M) { pg.merge(); return true; }
+    if (pg.pulls && k === Qt.Key_V) { pg.review(); return true; }
     return false;
   }
 
@@ -402,6 +426,7 @@ Item {
           anchors.verticalCenter: parent.verticalCenter
           spacing: 3
           Text {
+            textFormat: Text.PlainText
             width: parent.width
             elide: Text.ElideRight
             text: frow.r.title
@@ -411,6 +436,7 @@ Item {
             font.pixelSize: Zenon.px(15)
           }
           Text {
+            textFormat: Text.PlainText
             width: parent.width
             elide: Text.ElideRight
             text: "#" + frow.r.number + "  ·  " + frow.r.author + "  ·  " + D.ago(D.secondsOf(frow.r.updated), Date.now())
@@ -495,6 +521,7 @@ Item {
         border.width: 1
         border.color: Zenon.alpha(Qt.color(modelData.color), 0.6)
         Text {
+          textFormat: Text.PlainText
           id: lab
           anchors.centerIn: parent
           text: modelData.name
@@ -532,7 +559,7 @@ Item {
         width: parent.width
         elide: Text.ElideRight
         textFormat: Text.StyledText
-        text: "<b>" + post.author + "</b>"
+        text: "<b>" + D.esc(post.author) + "</b>"
           + (post.kind === "approved" ? "  <font color='" + Zenon.green + "'>approved</font>"
             : post.kind === "changes" ? "  <font color='" + Zenon.yellow + "'>asked for changes</font>"
             : post.kind === "review" ? "  reviewed" : "")
@@ -629,6 +656,7 @@ Item {
             }
           }
           Text {
+            textFormat: Text.PlainText
             height: 26
             verticalAlignment: Text.AlignVCenter
             text: !pg.item ? "" : pg.item.author + " opened it " + D.ago(D.secondsOf(pg.item.created), Date.now())
@@ -670,6 +698,7 @@ Item {
         }
         // GitLab keeps a discussion for those signed in, even when public
         Text {
+          textFormat: Text.PlainText
           visible: pg.whole && !!pg.item.signInToRead
           width: parent.width
           wrapMode: Text.Wrap
@@ -746,6 +775,7 @@ Item {
     cardWidth: 440
     readonly property var mark: D.forgeMark(pg.peek)
     Text {
+      textFormat: Text.PlainText
       width: 412
       wrapMode: Text.Wrap
       maximumLineCount: 3
@@ -770,6 +800,7 @@ Item {
     }
     Labels { width: 412; labels: pg.peek ? pg.peek.labels : [] }
     Text {
+      textFormat: Text.PlainText
       width: 412
       wrapMode: Text.Wrap
       maximumLineCount: 6
@@ -781,6 +812,7 @@ Item {
       font.pixelSize: Zenon.px(14)
     }
     Text {
+      textFormat: Text.PlainText
       visible: !!pg.peek && pg.peek.comments > 0
       text: pg.peek ? pg.peek.comments + (pg.peek.comments === 1 ? " comment" : " comments") + "  ·  updated " + D.ago(D.secondsOf(pg.peek.updated), Date.now()) : ""
       color: Zenon.accentMuted

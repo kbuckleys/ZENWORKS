@@ -27,6 +27,13 @@ the checkout, and the steps a release of it takes, one request each:
   aurCommit   the recipe committed (PKGBUILD, .SRCINFO, its local files
               and what is tracked), refused while .SRCINFO is behind;
               committed: false when there was nothing new
+  aurSsh      one of the AUR's own commands, over SSH as a push goes
+              (2026-10-28): the packages you keep (list-repos), adopt,
+              disown, flag and unflag out of date, vote, unvote,
+              set-keywords, set-comaintainers
+  aurSearch   the AUR searched, by name and description (its RPC)
+
+A new package from a repository is core/aurnew.py's.
 
 The push is delphi's own, as for any repository: it publishes at once.
 """
@@ -313,3 +320,154 @@ def build(root, cancel):
             _, out = _run(["namcap", what], root, cancel, tail=400)
             notes += [l for l in out if l.strip() and not _NOISE.search(l)]
     return {"package": os.path.basename(pkg), "notes": notes, "namcap": bool(shutil.which("namcap"))}
+
+
+# ── THE AUR'S OWN COMMANDS, OVER SSH (2026-10-28) ───────────────────────
+# aurweb's git-serve answers these on the account the key signs in as; the
+# key's passphrase and a first host key come up as cards (delphi-askpass),
+# as a push's do. Each takes the package base first, but list-repos.
+SSH_COMMANDS = {"list-repos": 0, "adopt": 1, "disown": 1, "flag": 2, "unflag": 1, "vote": 1,
+                "unvote": 1, "set-keywords": -1, "set-comaintainers": -1}
+_WORD = re.compile(r"^[A-Za-z0-9@._+-]+$")
+
+
+def ssh(cmd, args, sock=None, cancel=None):
+    """{ lines } — what the AUR said, line by line. Refused here before it
+    goes: a command not on the list, a package or user name that is not
+    one (they reach a remote shell as words)."""
+    import gitrun
+    if cmd not in SSH_COMMANDS:
+        raise AurError("The AUR has no command " + str(cmd))
+    args = [str(a) for a in (args or [])]
+    need = SSH_COMMANDS[cmd]
+    if need >= 0 and len(args) != need:
+        raise AurError(cmd + " takes " + str(need) + " word" + ("s" if need != 1 else ""))
+    if need < 0 and not args:
+        raise AurError(cmd + " needs the package")
+    # flag's comment is one argument of free text; everything else a word
+    words = args[:1] if cmd == "flag" else args
+    if any(not _WORD.match(w) for w in words):
+        raise AurError("Names are letters, digits and @ . _ + -")
+    if cmd == "flag":
+        comment = re.sub(r"\s+", " ", args[1]).strip()
+        if len(comment) < 3:
+            raise AurError("Say why it is out of date")
+        # one remote word: quoted for the shell git-serve splits it with
+        args = [args[0], "'" + comment.replace("'", "'\\''") + "'"]
+    if not shutil.which("ssh"):
+        raise AurError("ssh is not installed (openssh)")
+    p = subprocess.Popen(["ssh", "-o", "ConnectTimeout=15", "--", "aur@aur.archlinux.org", cmd] + args,
+                         stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
+                         text=True, env=gitrun.env(sock=sock), start_new_session=True)
+    if cancel:
+        cancel.attach(p)
+    try:
+        out, _ = p.communicate(timeout=90)
+    except subprocess.TimeoutExpired:
+        p.kill()
+        out, _ = p.communicate()
+    finally:
+        if cancel:
+            cancel.detach(p)
+    if cancel:
+        cancel.check()
+    lines = [l for l in (out or "").splitlines() if l.strip()]
+    if p.returncode != 0:
+        said = "\n".join(lines[-4:]) or "it did not answer"
+        if "Permission denied" in said:
+            said = "The AUR did not take your SSH key: add its public half to your AUR account"
+        raise AurError(said)
+    return {"lines": lines}
+
+
+# ── WHAT IS NEWER UPSTREAM (2026-10-28) ─────────────────────────────────
+# A maintainer's chore, done for every package at once: the AUR's version
+# of each, against the newest version tag on its source (its url=, when
+# that is a repository) — nvchecker's job for the common case.
+def _vercmp(a, b):
+    """pacman's own comparison (vercmp), else by _vkey"""
+    try:
+        r = subprocess.run(["vercmp", a, b], capture_output=True, text=True, timeout=5)
+        if r.returncode == 0 and r.stdout.strip().lstrip("-").isdigit():
+            return int(r.stdout.strip())
+    except (OSError, subprocess.SubprocessError):
+        pass
+    ka, kb = _vkey(a), _vkey(b)
+    return (ka > kb) - (ka < kb)
+
+
+def _newest_tag(url, timeout=25):
+    if not re.match(r"^(https?|git)://", url or ""):
+        return ""
+    try:
+        p = subprocess.run(["git", "ls-remote", "--tags", "--refs", url], capture_output=True, text=True,
+                           timeout=timeout, stdin=subprocess.DEVNULL,
+                           env=dict(os.environ, GIT_TERMINAL_PROMPT="0", GIT_ASKPASS="", SSH_ASKPASS=""))
+    except (OSError, subprocess.SubprocessError):
+        return ""
+    if p.returncode != 0:
+        return ""
+    names = [l.split("refs/tags/", 1)[1] for l in p.stdout.splitlines() if "\trefs/tags/" in l]
+    # versions only: a tag of digits and dots (v-prefixed or not), no
+    # pre-release words
+    names = [n for n in names if re.fullmatch(r"[vV]?\d+(\.\d+)*", n)]
+    names.sort(key=_vkey, reverse=True)
+    return names[0] if names else ""
+
+
+def outdated(names, cancel=None):
+    """[{ name, version, upstream, newer, url, maintainer, outOfDate, votes }]
+    — upstream "" when the source is no repository or has no version tags"""
+    names = [n for n in (names or []) if _NAME.match(str(n))][:150]
+    if not names:
+        return []
+    q = urllib.parse.urlencode([("arg[]", n) for n in names])
+    try:
+        with urllib.request.urlopen(RPC + "?" + q, timeout=20) as r:
+            res = (json.load(r) or {}).get("results") or []
+    except (OSError, ValueError) as e:
+        raise AurError(f"The AUR did not answer: {e}")
+    from concurrent.futures import ThreadPoolExecutor
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        tags = list(pool.map(lambda p: _newest_tag(p.get("URL") or ""), res))
+    if cancel:
+        cancel.check()
+    out = []
+    for p, tag in zip(res, tags):
+        ver = p.get("Version", "")
+        pkgver = ver.rsplit("-", 1)[0].split(":")[-1]
+        up = tag[1:] if tag[:1] in "vV" else tag
+        vcs = bool(re.search(r"-(git|hg|svn|bzr)$", p.get("Name", "")))
+        out.append({"name": p.get("Name", ""), "base": p.get("PackageBase", ""), "version": ver, "upstream": up,
+                    "newer": bool(up) and not vcs and _vercmp(up, pkgver) > 0, "url": p.get("URL") or "",
+                    "maintainer": p.get("Maintainer") or "", "outOfDate": p.get("OutOfDate"),
+                    "votes": p.get("NumVotes", 0)})
+    return out
+
+
+_NAME = re.compile(r"^[a-z0-9@._+-]+$")
+SEARCH = "https://aur.archlinux.org/rpc/v5/search/"
+
+
+def search(text, by="name-desc"):
+    """the AUR's packages matching `text`: [{ name, version, description,
+    votes, popularity, maintainer, outOfDate, url }], most voted first"""
+    t = str(text or "").strip()
+    if len(t) < 2:
+        return []
+    if by not in ("name", "name-desc", "maintainer", "depends", "provides"):
+        by = "name-desc"
+    try:
+        with urllib.request.urlopen(SEARCH + urllib.parse.quote(t) + "?by=" + by, timeout=15) as r:
+            data = json.load(r)
+    except (OSError, ValueError) as e:
+        raise AurError(f"The AUR did not answer: {e}")
+    if data.get("type") == "error":
+        raise AurError(data.get("error") or "The AUR refused the search")
+    out = [{"name": p.get("Name", ""), "base": p.get("PackageBase", ""), "version": p.get("Version", ""),
+            "description": p.get("Description") or "", "votes": p.get("NumVotes", 0),
+            "popularity": p.get("Popularity", 0), "maintainer": p.get("Maintainer") or "",
+            "outOfDate": p.get("OutOfDate"), "url": p.get("URL") or "", "web": WEB + p.get("Name", "")}
+           for p in data.get("results") or []]
+    out.sort(key=lambda p: (-p["votes"], p["name"]))
+    return out[:200]

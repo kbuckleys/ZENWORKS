@@ -176,6 +176,7 @@ Rectangle {
   }
 
   Text {
+    textFormat: Text.PlainText
     id: btnText
     anchors.centerIn: parent
     text: btn.label

@@ -49,6 +49,7 @@ Item {
     anchors.verticalCenter: parent.verticalCenter
     spacing: 3
     Text {
+      textFormat: Text.PlainText
       text: row.field ? row.field.label : ""
       color: row.justCopied ? Zenon.cyan : Zenon.accentMuted
       font.family: Zenon.face

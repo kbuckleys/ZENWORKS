@@ -28,6 +28,7 @@ Column {
 
   // ── THE BOOK ───────────────────────────────────────────────────────────
   Text {
+    textFormat: Text.PlainText
     width: parent.width
     visible: !!info.book
     wrapMode: Text.WordWrap
@@ -40,6 +41,7 @@ Column {
     font.weight: Font.DemiBold
   }
   Text {
+    textFormat: Text.PlainText
     visible: !!info.book && info.book.author !== ""
     text: info.book ? info.book.author : ""
     color: Zenon.accentMuted

@@ -956,6 +956,7 @@ Item {
     shown: !!hunkTip.info && !!view.hostWindow
     cardWidth: Math.max(320, Math.min(720, view.width * 0.6))
     Text {
+      textFormat: Text.PlainText
       width: parent ? parent.width : 0
       readonly property var i: hunkTip.info
       text: !i ? "" : (i.kind === "add" ? i.new.length + (i.new.length === 1 ? " line added" : " lines added")

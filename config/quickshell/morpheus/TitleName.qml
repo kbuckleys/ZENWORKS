@@ -70,6 +70,7 @@ Item {
   onEditableChanged: if (!tn.editable) tn.cancel()
 
   Text {
+    textFormat: Text.PlainText
     id: shown
     visible: !tn.editing
     width: Math.min(implicitWidth, tn.maxWidth)

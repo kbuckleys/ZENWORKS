@@ -388,6 +388,7 @@ Item {
         anchors.verticalCenter: parent.verticalCenter
         spacing: 3
         Text {
+          textFormat: Text.PlainText
           width: parent.width
           elide: Text.ElideRight
           text: krow.k.name

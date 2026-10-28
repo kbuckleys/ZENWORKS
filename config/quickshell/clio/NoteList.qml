@@ -279,6 +279,7 @@ Item {
           Behavior on opacity { NumberAnimation { duration: Zenon.ms(180); easing.type: Easing.OutCubic } }
         }
         Text {
+          textFormat: Text.PlainText
           visible: tile.n.d.images.length === 0 || !!tile.n.sealed
           x: 12
           y: 10

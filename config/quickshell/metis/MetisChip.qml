@@ -92,6 +92,7 @@ Rectangle {
     }
 
     Text {
+      textFormat: Text.PlainText
       anchors.verticalCenter: parent.verticalCenter
       text: chip.label
       color: chip.sel ? Zenon.cyan : Zenon.keyInk

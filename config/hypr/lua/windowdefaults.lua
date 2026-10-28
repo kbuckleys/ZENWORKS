@@ -29,6 +29,7 @@ return {
 	{ shipped = "hestia", name = "Hestia", class = "org.quickshell", title = "hestia", float = true, persistent_size = true },
 	{ shipped = "kairos", name = "Kairos", class = "org.quickshell", title = "kairos", float = true, persistent_size = true },
 	{ shipped = "hygieia", name = "Tidy", class = "org.quickshell", title = "hygieia", float = true, persistent_size = true },
+	{ shipped = "chronos", name = "Calendar", class = "org.quickshell", title = "chronos", float = true, persistent_size = true },
 	{ shipped = "picasso-view", name = "Picasso", class = "org.quickshell", title = "picasso-view", float = true, persistent_size = true },
 	{ shipped = "plato-capture", name = "Plato capture", class = "org.quickshell", title = "plato-capture", float = true, persistent_size = true },
 	{ shipped = "terminus-picker", name = "Terminus picker", class = "org.quickshell", title = "terminus-picker", float = true, persistent_size = true },

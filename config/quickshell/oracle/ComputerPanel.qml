@@ -149,23 +149,24 @@ Item {
         x: Math.max(0, pc.colsX + colsRow.width - width)
         y: pc.shown ? (headRow.height - headRow.bottomPadding + headRow.topPadding - height) / 2 : 0
         spacing: 10
-        Row {
+        // the theme's inks, each flowing into the next (user, 2026-10-28:
+        // "colors merging in gradients"): one bar, a stop per ink
+        Rectangle {
           visible: pc.shown
           anchors.right: parent.right
-          spacing: 0
-          Repeater {
-            model: ["red", "yellow", "green", "cyan", "blue", "magenta", "pink", "sand"]
-            delegate: Rectangle {
-              required property string modelData
-              required property int index
-              width: 26
-              height: 14
-              color: Zenon[modelData]
-              topLeftRadius: index === 0 ? Zenon.rad(3) : 0
-              bottomLeftRadius: index === 0 ? Zenon.rad(3) : 0
-              topRightRadius: index === 7 ? Zenon.rad(3) : 0
-              bottomRightRadius: index === 7 ? Zenon.rad(3) : 0
-            }
+          width: 26 * 8
+          height: 14
+          radius: Zenon.rad(3)
+          gradient: Gradient {
+            orientation: Gradient.Horizontal
+            GradientStop { position: 0 / 7; color: Zenon.red }
+            GradientStop { position: 1 / 7; color: Zenon.sand }
+            GradientStop { position: 2 / 7; color: Zenon.yellow }
+            GradientStop { position: 3 / 7; color: Zenon.green }
+            GradientStop { position: 4 / 7; color: Zenon.cyan }
+            GradientStop { position: 5 / 7; color: Zenon.blue }
+            GradientStop { position: 6 / 7; color: Zenon.magenta }
+            GradientStop { position: 7 / 7; color: Zenon.pink }
           }
         }
         // centered under the inks (user, 2026-10-27)
@@ -237,6 +238,7 @@ Item {
           anchors.verticalCenter: parent.verticalCenter
           spacing: 2
           Text {
+            textFormat: Text.PlainText
             text: pc.c ? pc.c.title : ""
             color: pc.highlight
             font.family: pc.face

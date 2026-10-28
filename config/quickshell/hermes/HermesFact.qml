@@ -22,6 +22,7 @@ Item {
   visible: f.value !== ""
 
   Text {
+    textFormat: Text.PlainText
     x: 18
     width: f.labelW
     y: 5

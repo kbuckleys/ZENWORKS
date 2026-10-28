@@ -47,6 +47,7 @@ Flow {
         border.color: Zenon.border
       }
       Text {
+        textFormat: Text.PlainText
         visible: key.compact
         text: modelData.name + "  " + modelData.line
         color: modelData.hot ? Zenon.cyan : Zenon.accentMuted
@@ -58,6 +59,7 @@ Flow {
         visible: !key.compact
         spacing: 1
         Text {
+          textFormat: Text.PlainText
           text: modelData.name
           color: modelData.hot ? Zenon.cyan : Zenon.ink
           font.family: Zenon.face
@@ -65,6 +67,7 @@ Flow {
           font.pixelSize: Zenon.px(13)
         }
         Text {
+          textFormat: Text.PlainText
           text: modelData.line
           color: Zenon.accentMuted
           font.family: Zenon.face

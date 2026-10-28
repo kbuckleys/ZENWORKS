@@ -110,6 +110,7 @@ Item {
           anchors.centerIn: parent
           spacing: 2
           Text {
+            textFormat: Text.PlainText
             anchors.horizontalCenter: parent.horizontalCenter
             text: box.modelData.name
             color: box.ink

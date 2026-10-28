@@ -713,6 +713,7 @@ Item {
         }
         // the subject's length, as it is typed: 50 is the habit, 72 the wall
         Text {
+          textFormat: Text.PlainText
           anchors.right: undoBtn.visible ? undoBtn.left : commitBtn.left
           anchors.rightMargin: 10
           anchors.verticalCenter: commitBtn.verticalCenter
@@ -830,6 +831,7 @@ Item {
       font.pixelSize: Zenon.px(17)
     }
     Text {
+      textFormat: Text.PlainText
       visible: !!parent.tip
       width: parent.width
       horizontalAlignment: Text.AlignHCenter
@@ -912,6 +914,7 @@ Item {
       font.pixelSize: Zenon.px(40)
     }
     Text {
+      textFormat: Text.PlainText
       width: parent.width
       horizontalAlignment: Text.AlignHCenter
       wrapMode: Text.Wrap

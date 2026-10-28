@@ -353,6 +353,54 @@ Singleton {
     }
   }
 
+  // ── A CALENDAR REMINDER'S COLOR (2026-10-28) ───────────────────────
+  // Chronos sends the event's hue (Clio's stickies' seven) in
+  // x-howler-event; the toast and its history row both draw it, in the
+  // theme's own ink. "" for a hue it does not know: no reminder look.
+  function eventInk(hue) {
+    switch (String(hue || "")) {
+      case "sand": return Zenon.sand;
+      case "yellow": return Zenon.yellow;
+      case "green": return Zenon.green;
+      case "cyan": return Zenon.cyan;
+      case "blue": return Zenon.blue;
+      case "magenta": return Zenon.magenta;
+      case "pink": return Zenon.pink;
+    }
+    return Zenon.cyan;
+  }
+  // "2026-10-28" → a Date (today when it does not read)
+  function eventDayOf(iso) {
+    const m = /^(\d{4})-(\d\d)-(\d\d)/.exec(String(iso || ""));
+    return m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : new Date();
+  }
+
+  // A NOTIFICATION'S OWN ICON, as an image source: a file by its path or
+  // its file:// address (Claude sends file:///usr/lib/…/icon.png), a
+  // themed name only when the theme has it — asked straight of
+  // image://icon, a missing name came back as Qt's magenta and black
+  // checkerboard (Oracle's "utilities-terminal", 2026-10-28). "" for none.
+  // what stands in for an icon that is named and cannot be had — a theme
+  // without it, a file that will not load: oct-question (user, 2026-10-28:
+  // "instead of getting rid of the checkerboard, replace it")
+  readonly property string missingGlyph: "\uF420"
+  function iconSource(icon) {
+    const s = String(icon || "");
+    if (s === "") return "";
+    if (s.indexOf("file://") === 0) return s;
+    if (s.indexOf("/") === 0) return "file://" + s;
+    return Quickshell.iconPath(s, true);
+  }
+  // A NOTIFICATION'S IMAGE, the same way: notify-send -i sends its icon as
+  // the image-path hint too, which Quickshell hands over as image://icon/
+  // <name or path> — Qt's checkerboard when there is no such thing. Through
+  // iconSource instead, so a missing one is no image (and the question mark)
+  function imageSource(image) {
+    const s = String(image || "");
+    if (s.indexOf("image://icon/") !== 0) return s;
+    return root.iconSource(decodeURIComponent(s.slice("image://icon/".length)));
+  }
+
   function rowOf(notif) {
     // A track with no picture of its own keeps its player's cover, as the
     // toast draws it. A web address survives a restart (Wolf.localImage),
@@ -362,7 +410,10 @@ Singleton {
       time: Date.now(),
       appName: String(notif.appName || ""),
       appIcon: String(notif.appIcon || ""),
-      image: String(notif.image || "") || root.artFor(notif),
+      image: root.imageSource(notif.image) || root.artFor(notif),
+      // the image as sent, so a missing one still earns the question mark
+      // (notify-send -i names its icon only as the image)
+      rawImage: String(notif.image || ""),
       summary: String(notif.summary || ""),
       body: String(notif.body || ""),
       urgency: notif.urgency,
@@ -376,7 +427,11 @@ Singleton {
       capture: String((notif.hints || {})["x-howler-capture"] || ""),
       captureFile: String((notif.hints || {})["x-howler-file"] || ""),
       capturePicture: String((notif.hints || {})["x-howler-picture"] || ""),
-      captureKept: root.keepFrame(String((notif.hints || {})["x-howler-picture"] || ""))
+      captureKept: root.keepFrame(String((notif.hints || {})["x-howler-picture"] || "")),
+      // a calendar reminder's hue and day, so its history row keeps the
+      // toast's look (the hints themselves are not kept)
+      eventHue: String((notif.hints || {})["x-howler-event"] || ""),
+      eventDay: String((notif.hints || {})["x-howler-day"] || "")
     };
   }
 

@@ -93,6 +93,7 @@ Rectangle {
   // the whole thing for editing.
   readonly property bool overflows: fldIn.contentWidth > fldIn.width
   Text {
+    textFormat: Text.PlainText
     anchors.fill: fldIn
     verticalAlignment: Text.AlignVCenter
     visible: fld.overflows && !fldIn.activeFocus

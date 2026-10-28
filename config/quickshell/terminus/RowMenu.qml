@@ -1204,6 +1204,7 @@ PopupWindow {
             }
 
             Text {
+              textFormat: Text.PlainText
               id: menuLabel
               anchors.left: parent.left
               anchors.leftMargin: 12 + menu.cardGlyphW
@@ -1564,6 +1565,7 @@ PopupWindow {
               }
 
               Text {
+                textFormat: Text.PlainText
                 id: subLabel
                 anchors.left: parent.left
                 anchors.leftMargin: 12 + menu.subGlyphW

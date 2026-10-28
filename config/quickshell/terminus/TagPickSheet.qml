@@ -410,6 +410,7 @@ Rectangle {
           && tagPick.renaming === tagRow.modelData.name
 
         Text {
+          textFormat: Text.PlainText
           id: tagName
           anchors.left: tagDot.right
           anchors.leftMargin: 14

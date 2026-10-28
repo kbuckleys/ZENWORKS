@@ -1215,6 +1215,46 @@ class Repo:
                     "message": (err or out).strip()[-2000:]}
         raise GitError(args, code, (err or out).strip()[-2000:])
 
+    # ── bisect (2026-10-28) ──────────────────────────────────────────────
+    def bisect(self, action, good=None, bad=None, cancel=None):
+        """Finding the commit that brought a bug in, by halves. start (good
+        a commit without it, bad one with it — HEAD when not given), then
+        good / bad / skip for each commit git checks out, reset to stop.
+        → { testing: {sha, subject} | None, left, culprit: {sha, subject}
+        | None, done }"""
+        if action == "start":
+            if not good:
+                raise GitError(["bisect"], 1, "say a commit without the bug")
+            self.git.run(["bisect", "start"], cancel=cancel)
+            self.git.run(["bisect", "bad", bad or "HEAD"], cancel=cancel)
+            out = self.git.run(["bisect", "good", good], cancel=cancel)
+        elif action in ("good", "bad", "skip"):
+            out = self.git.run(["bisect", action], cancel=cancel)
+        elif action == "reset":
+            self.git.run(["bisect", "reset"], cancel=cancel)
+            return {"testing": None, "left": 0, "culprit": None, "done": True}
+        else:
+            raise GitError(["bisect"], 1, "start, good, bad, skip or reset")
+        return self.bisect_read(out)
+
+    def bisect_read(self, out=""):
+        """what a bisect step said: the culprit, once found; else the commit
+        being tested and roughly how many steps are left"""
+        # git 2.4x says the term quoted ("the first 'bad' commit"), older bare
+        m = re.search(r"^([0-9a-f]{7,40}) is the first '?bad'? commit", out or "", re.M)
+        if m:
+            sha = self.git.run(["rev-parse", m.group(1)]).strip()
+            subj = self.git.run(["log", "-1", "--format=%s", sha]).strip()
+            return {"testing": None, "left": 0, "culprit": {"sha": sha, "subject": subj}, "done": False}
+        if re.search(r"only skipped commits left", out or ""):
+            return {"testing": None, "left": 0, "culprit": None, "done": False,
+                    "why": "Only skipped commits are left: the culprit is one of them"}
+        left = re.search(r"roughly (\d+) step", out or "")
+        sha = self.git.run(["rev-parse", "HEAD"]).strip()
+        subj = self.git.run(["log", "-1", "--format=%s", sha]).strip()
+        return {"testing": {"sha": sha, "subject": subj}, "left": int(left.group(1)) if left else None,
+                "culprit": None, "done": False}
+
     def reset(self, rev, mode="mixed", cancel=None):
         self.git.run(["reset", f"--{mode}", rev], cancel=cancel)
 

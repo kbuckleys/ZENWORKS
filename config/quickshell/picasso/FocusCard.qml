@@ -902,6 +902,7 @@ Item {
           spacing: 1
 
           Text {
+            textFormat: Text.PlainText
             width: parent.width
             text: card.isColor ? card.picker.colorName(card.colorHex) : Art.label(card.path)
             color: card.fgColor
@@ -1114,6 +1115,7 @@ Item {
                   radius: Zenon.rad(3)
                   color: Zenon.hud(0.7)
                   Text {
+                    textFormat: Text.PlainText
                     id: tag
                     anchors.centerIn: parent
                     width: Math.min(tag.implicitWidth, parent.width - 10)

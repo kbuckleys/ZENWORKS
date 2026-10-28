@@ -989,6 +989,7 @@ property var statusbar: null
             }
 
             Text {
+              textFormat: Text.PlainText
               id: msgText
               anchors.verticalCenter: parent.verticalCenter
               // capped so a long command still elides inside the area's 420
@@ -1060,6 +1061,7 @@ property var statusbar: null
               }
 
               Text {
+                textFormat: Text.PlainText
                 anchors.verticalCenter: parent.verticalCenter
                 text: pickerBtn.face.label
                 color: Zenon.white

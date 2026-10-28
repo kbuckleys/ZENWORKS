@@ -296,6 +296,7 @@ Item {
             anchors.verticalCenter: parent.verticalCenter
             spacing: 2
             Text {
+              textFormat: Text.PlainText
               text: grow.modelData.title
               color: Zenon.white
               font.family: Zenon.face
@@ -344,6 +345,7 @@ Item {
       anchors.verticalCenter: gTitle.verticalCenter
       spacing: 8
       Text {
+        textFormat: Text.PlainText
         anchors.verticalCenter: parent.verticalCenter
         text: view.changes + (view.changes === 1 ? " line changed" : " lines changed")
         color: Zenon.yellow
@@ -364,6 +366,7 @@ Item {
       }
     }
     Text {
+      textFormat: Text.PlainText
       id: gTitle
       text: view.group.title
       color: Zenon.white
@@ -576,6 +579,7 @@ Item {
     border.width: 1
     border.color: chip.lit ? (chip.dim ? Zenon.border : Zenon.cyan) : Zenon.border
     Text {
+      textFormat: Text.PlainText
       id: chipText
       anchors.centerIn: parent
       text: chip.label
@@ -847,6 +851,7 @@ Item {
         width: parent.width - sigCols.width - 32
         spacing: 2
         Text {
+          textFormat: Text.PlainText
           width: parent.width
           wrapMode: Text.Wrap
           text: orow.spec.label
@@ -1114,6 +1119,7 @@ Item {
     default property alias content: slot.data
     spacing: 10
     Text {
+      textFormat: Text.PlainText
       width: view.narrow ? lab.width : 130
       height: view.narrow ? 22 : 32
       verticalAlignment: Text.AlignVCenter
@@ -1185,6 +1191,7 @@ Item {
               passive: true
             }
             Text {
+              textFormat: Text.PlainText
               id: repoName
               anchors.verticalCenter: parent.verticalCenter
               width: Math.min(implicitWidth, titleRow.width - 22)

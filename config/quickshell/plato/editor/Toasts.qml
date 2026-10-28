@@ -288,6 +288,7 @@ Item {
                 anchors.centerIn: parent
                 spacing: 8
                 Text {
+                  textFormat: Text.PlainText
                   anchors.verticalCenter: parent.verticalCenter
                   font.family: Zenon.face
                   font.weight: Zenon.weight

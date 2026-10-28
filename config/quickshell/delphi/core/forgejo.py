@@ -407,6 +407,75 @@ def checks_many(full, shas):
     return rest.ci_many(checks, full, shas)
 
 
+# Forgejo's API gives no job logs (its web pages do): said, not faked
+def job_log(full, job):
+    raise ForgeError(NAME + " gives no job logs through its API — read it on the web", 501)
+
+
+def rerun(full, job):
+    raise ForgeError(NAME + " re-runs jobs from its web page only", 501)
+
+
+# ── THE INBOX: what Forgejo has for you (2026-10-28) ───────────────────
+def inbox():
+    out = []
+    for t in call("GET", "/notifications?status-types=unread&limit=50") or []:
+        sub = t.get("subject") or {}
+        full = (t.get("repository") or {}).get("full_name") or ""
+        web = sub.get("html_url") or (t.get("repository") or {}).get("html_url") or ""
+        m = re.search(r"/(pulls|issues)/(\d+)$", web)
+        out.append({"id": str(t.get("id")), "title": sub.get("title") or "", "repo": full,
+                    "number": int(m.group(2)) if m else 0,
+                    "kind": {"Pull": "pull", "Issue": "issue", "Commit": "commit", "Repository": "other"}.get(sub.get("type"), "other"),
+                    "reason": (sub.get("state") or "").lower(), "when": t.get("updated_at") or "", "web": web})
+    return out
+
+
+def inbox_done(nid):
+    call("PATCH", f"/notifications/threads/{int(nid)}?to-status=read", {})
+    return {}
+
+
+# ── REVIEWS ───────────────────────────────────────────────────────────────
+def review(full, number, verdict, body=""):
+    event = {"approve": "APPROVED", "changes": "REQUEST_CHANGES", "comment": "COMMENT"}[verdict]
+    call("POST", f"/repos/{full}/pulls/{int(number)}/reviews", {"event": event, "body": body or ""})
+    return {}
+
+
+# ── THE REPOSITORY ON FORGEJO: ITS SETTINGS, A FORK ──────────────────────
+def repo_info(full):
+    r = call("GET", f"/repos/{full}")
+    try:
+        topics = (call("GET", f"/repos/{full}/topics") or {}).get("topics") or []
+    except ForgeError:
+        topics = []
+    return {"full": r["full_name"], "name": r["name"], "description": r.get("description") or "",
+            "homepage": r.get("website") or "", "private": bool(r.get("private")),
+            "default": r.get("default_branch") or "", "topics": topics, "archived": bool(r.get("archived")),
+            "fork": bool(r.get("fork")), "parent": (r.get("parent") or {}).get("full_name") or "",
+            "web": r.get("html_url") or "", "https": r.get("clone_url") or "", "ssh": r.get("ssh_url") or ""}
+
+
+def repo_edit(full, changes):
+    body = {}
+    for k, api in (("name", "name"), ("description", "description"), ("homepage", "website"),
+                   ("private", "private"), ("default", "default_branch")):
+        if k in changes:
+            body[api] = changes[k]
+    if body:
+        r = call("PATCH", f"/repos/{full}", body)
+        full = r.get("full_name") or full
+    if "topics" in changes:
+        call("PUT", f"/repos/{full}/topics", {"topics": [t.lower() for t in changes["topics"]]})
+    return repo_info(full)
+
+
+def fork(full, org=None):
+    r = call("POST", f"/repos/{full}/forks", {"organization": org} if org else {})
+    return {"full": r["full_name"], "https": r.get("clone_url") or "", "ssh": r.get("ssh_url") or ""}
+
+
 # ── A KEY THAT SIGNS ──────────────────────────────────────────────────────
 # Forgejo checks an SSH signature against the keys on the account (and asks
 # for the key to be verified once, on the web — said back if so).

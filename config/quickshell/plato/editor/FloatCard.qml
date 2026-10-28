@@ -54,6 +54,7 @@ Item {
   }
 
   Text {
+    textFormat: Text.PlainText
     visible: card.title !== ""
     x: 12
     y: 0

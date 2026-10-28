@@ -572,6 +572,7 @@ LayerPopup {
               anchors.verticalCenter: parent.verticalCenter
               spacing: 1
               Text {
+                textFormat: Text.PlainText
                 width: parent.width
                 text: popup.activeEntry ? popup.activeEntry.title : ""
                 color: Zenon.ink
@@ -632,6 +633,7 @@ LayerPopup {
                         font.pixelSize: Zenon.px(13)
                       }
                       Text {
+                        textFormat: Text.PlainText
                         anchors.verticalCenter: parent.verticalCenter
                         text: group.modelData.title
                         color: Zenon.cyan
@@ -681,6 +683,7 @@ LayerPopup {
                         anchors.verticalCenter: parent.verticalCenter
                       }
                       Text {
+                        textFormat: Text.PlainText
                         anchors.left: actIcon.right
                         anchors.leftMargin: 10
                         anchors.right: ring.visible ? ring.left : parent.right
@@ -746,6 +749,7 @@ LayerPopup {
                   ink: popup.lockAcct ? C.platform(popup.lockAcct.kind).ink : "cyan"
                 }
                 Text {
+                  textFormat: Text.PlainText
                   anchors.verticalCenter: parent.verticalCenter
                   text: popup.lockAcct ? popup.lockAcct.name : ""
                   color: Zenon.ink

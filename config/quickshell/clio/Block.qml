@@ -438,6 +438,7 @@ Item {
         anchors.verticalCenter: parent.verticalCenter
         spacing: 12
         Text {
+          textFormat: Text.PlainText
           anchors.verticalCenter: parent.verticalCenter
           text: blk.b ? (Icons.glyphFor({ name: blk.b.name || "" }) || "") : ""
           color: Zenon.cyan
@@ -447,6 +448,7 @@ Item {
         Column {
           anchors.verticalCenter: parent.verticalCenter
           Text {
+            textFormat: Text.PlainText
             text: blk.b ? blk.b.name || "file" : ""
             color: Zenon.ink
             elide: Text.ElideMiddle

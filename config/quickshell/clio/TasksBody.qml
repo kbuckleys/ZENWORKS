@@ -158,6 +158,7 @@ Item {
               font.pixelSize: Zenon.px(15)
             }
             Text {
+              textFormat: Text.PlainText
               id: where
               anchors.left: what.left
               anchors.right: what.right

@@ -1996,6 +1996,7 @@ LayerPopup {
       height: 26
 
       Text {
+        textFormat: Text.PlainText
         anchors.fill: parent
         verticalAlignment: Text.AlignVCenter
         horizontalAlignment: soundHead.rightAlign ? Text.AlignRight : Text.AlignLeft
@@ -2231,6 +2232,7 @@ LayerPopup {
                       font.pixelSize: Zenon.px(13)
                     }
                     Text {
+                      textFormat: Text.PlainText
                       text: parent.fact ? parent.fact.label : ""
                       color: popup.dimColor
                       font.family: Zenon.face
@@ -3617,6 +3619,7 @@ LayerPopup {
                   }
 
                   Text {
+                    textFormat: Text.PlainText
                     anchors.centerIn: parent
                     text: modelData.label
                     color: popup.confirmKill === modelData.action
@@ -3906,6 +3909,7 @@ LayerPopup {
             font.pixelSize: Zenon.px(14)
           }
           Text {
+            textFormat: Text.PlainText
             anchors.right: parent.right
             text: parent.fact ? parent.fact.label : ""
             color: popup.dimColor

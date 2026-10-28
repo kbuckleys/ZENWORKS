@@ -523,6 +523,7 @@ FocusScope {
         BulkField { id: passB; width: 200; masked: true; ghost: "Again"; onAccepted: tool.go() }
       }
       Text {
+        textFormat: Text.PlainText
         visible: tool.encrypt || tool.zero
         x: 118
         width: body.width - 118

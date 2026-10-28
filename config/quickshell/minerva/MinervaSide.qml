@@ -268,6 +268,7 @@ Item {
         anchors.verticalCenter: parent.verticalCenter
         spacing: 3
         Text {
+          textFormat: Text.PlainText
           width: parent.width
           elide: Text.ElideRight
           visible: side.tab === "contents"
@@ -304,6 +305,7 @@ Item {
         }
         // what you wrote on it
         Text {
+          textFormat: Text.PlainText
           width: parent.width
           visible: side.tab === "highlights" && !!row.r && row.r.comment !== ""
           wrapMode: Text.WordWrap

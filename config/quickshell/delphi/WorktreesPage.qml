@@ -132,6 +132,7 @@ Item {
           font.pixelSize: Zenon.px(16)
         }
         Text {
+          textFormat: Text.PlainText
           width: parent.width
           elide: Text.ElideMiddle
           text: D.tilde(trow.t.path, pg.win.home) + (trow.t.prunable ? "   ·   directory gone — prune it" : "")

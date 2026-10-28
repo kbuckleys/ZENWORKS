@@ -959,6 +959,7 @@ FloatingWindow {
               font.pixelSize: Zenon.px(13)
             }
             Text {
+              textFormat: Text.PlainText
               anchors.right: parent.right
               anchors.baseline: freeText.baseline
               text: use.words + (use.scanning || use.words === "" ? "" : "  \u00b7  sort again")

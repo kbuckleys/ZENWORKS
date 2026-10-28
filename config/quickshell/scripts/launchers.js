@@ -14,6 +14,15 @@
 //
 //   node scripts/launchers.js --write DIR   (re)write DIR/<id>.desktop
 //   node scripts/launchers.js --check DIR   say what differs; status 1 if any
+//   node scripts/launchers.js --dev DIR     a WORKING COPY's entries (user,
+//                                           2026-10-28: the calendar had none):
+//                                           Exec in this copy, each marked
+//                                           X-Zenworks-Dev; written over the
+//                                           package's in ~/.local/share/applications
+//                                           by bin/zen when it starts a working copy
+//   node scripts/launchers.js --undev DIR   those marked entries gone again (zen,
+//                                           starting the installed copy). Nothing
+//                                           unmarked in DIR is ever touched.
 //
 // oracle/tests/launchers.js runs the check against the working copy's
 // share/applications, so a field changed in a manager and not here fails.
@@ -72,7 +81,7 @@ function listsIn(text) {
 }
 
 // every launcher the managers describe: [{ id, file, fields }]
-function launchers(root) {
+function launchers(root, shellDir) {
   const found = [];
   const walk = (d) => {
     for (const e of fs.readdirSync(d, { withFileTypes: true })) {
@@ -87,7 +96,7 @@ function launchers(root) {
         for (const args of calls) {
           const ctx = {
             Desktop: { execLine, launcher: (id, fields) => ({ id, fields }) },
-            Quickshell: { shellDir: PREFIX },
+            Quickshell: { shellDir: shellDir || PREFIX },
             mgr: lists, root: lists, viewer: lists,
           };
           const r = vm.runInNewContext("Desktop.launcher(" + args + ")", ctx);
@@ -111,10 +120,36 @@ function render(fields) {
   return lines.join("\n") + "\n";
 }
 
+const DEV_MARK = "X-Zenworks-Dev=true";
+function marked(f) {
+  try { return fs.readFileSync(f, "utf8").split("\n").includes(DEV_MARK); } catch (e) { return false; }
+}
+// a working copy's entries over the package's; only marked files are ever
+// replaced or removed, so an entry of your own by the same name is kept
+function dev(dir, undo) {
+  const want = new Set();
+  let n = 0;
+  if (!undo) {
+    fs.mkdirSync(dir, { recursive: true });
+    for (const l of launchers(ROOT, ROOT)) {
+      const f = path.join(dir, l.id + ".desktop");
+      want.add(l.id + ".desktop");
+      if (fs.existsSync(f) && !marked(f)) continue;
+      fs.writeFileSync(f, render(l.fields) + DEV_MARK + "\n");
+      n++;
+    }
+  }
+  if (fs.existsSync(dir))
+    for (const f of fs.readdirSync(dir))
+      if (f.endsWith(".desktop") && !want.has(f) && marked(path.join(dir, f))) fs.unlinkSync(path.join(dir, f));
+  console.log(undo ? "removed the working copy's launchers from " + dir : "wrote " + n + " working-copy launchers to " + dir);
+}
+
 function main() {
   const [mode, dir] = process.argv.slice(2);
+  if (["--dev", "--undev"].includes(mode) && dir) { dev(dir, mode === "--undev"); return; }
   if (!["--write", "--check"].includes(mode) || !dir) {
-    console.error("usage: launchers.js --write DIR | --check DIR");
+    console.error("usage: launchers.js --write DIR | --check DIR | --dev DIR | --undev DIR");
     process.exit(2);
   }
   const all = launchers(ROOT);

@@ -243,6 +243,7 @@ Item {
           font.letterSpacing: Zenon.labelSpacing
         }
         Text {
+          textFormat: Text.PlainText
           width: parent.width
           elide: Text.ElideRight
           maximumLineCount: 2

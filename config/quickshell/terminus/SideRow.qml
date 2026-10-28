@@ -401,6 +401,7 @@ Item {
   // part you were looking for. Separated, the name gives up its own width
   // and the figure always survives.
   Text {
+    textFormat: Text.PlainText
     id: sideLabel
     anchors.left: sideGlyph.right
     anchors.leftMargin: 8
@@ -427,6 +428,7 @@ Item {
   }
 
   Text {
+    textFormat: Text.PlainText
     id: sideDetail
     anchors.right: mountBtn.visible ? mountBtn.left : parent.right
     anchors.rightMargin: mountBtn.visible ? 8 : 12

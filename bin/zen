@@ -149,6 +149,21 @@ if [ -n "$others" ]; then
 	fi
 fi
 
+# A WORKING COPY'S LAUNCHERS (2026-10-28): the package's entries in
+# /usr/share/applications name its own copy, and lag a working copy's apps
+# (the calendar had none). Started from one, its entries are written over
+# them in your own applications directory, each marked; started from the
+# installed copy, the marked ones go again. Your own entries are never
+# touched. Needs node, which a working copy's tests need anyway.
+apps="${XDG_DATA_HOME:-$HOME/.local/share}/applications"
+if command -v node >/dev/null 2>&1; then
+	if [ "$root" != "$installed" ]; then
+		node "$root/quickshell/scripts/launchers.js" --dev "$apps" >/dev/null 2>&1
+	else
+		node "$root/quickshell/scripts/launchers.js" --undev "$apps" >/dev/null 2>&1
+	fi
+fi
+
 export QS_CONFIG_PATH="$root/quickshell"
 # what portals and apps go by: ZENWORKS first (xdg-desktop-portal reads
 # zenworks-portals.conf), Hyprland after it for apps that look for that

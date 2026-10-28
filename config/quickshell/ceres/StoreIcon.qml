@@ -49,6 +49,7 @@ Item {
     border.width: 1
     border.color: Zenon.alpha(Zenon.cyan, 0.4)
     Text {
+      textFormat: Text.PlainText
       anchors.centerIn: parent
       text: ic.app ? ic.app.name.charAt(0).toUpperCase() : ""
       color: Zenon.cyan

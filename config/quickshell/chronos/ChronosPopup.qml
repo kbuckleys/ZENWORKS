@@ -34,6 +34,9 @@ LayerPopup {
   id: popup
 
   readonly property string face: Zenon.face
+  // the calendar window's manager (shell.qml's Loader): a day
+  // double-clicked opens it there
+  property var calendar: null
 
   // While the pill is still growing into this layer, the panel is scaled down
   // to the pill's live size — and a radius scales with it. Halfway through, an
@@ -672,6 +675,8 @@ LayerPopup {
                       hoverEnabled: true
                       onClicked: popup.pick(dayCell.modelData.y,
                         dayCell.modelData.m, dayCell.modelData.d)
+                      // the calendar window, on that day (2026-10-28)
+                      onDoubleClicked: if (popup.calendar) popup.calendar.day(Chr.isoDay(dayCell.modelData.y, dayCell.modelData.m, dayCell.modelData.d))
                     }
                   }
                 }
@@ -915,6 +920,7 @@ LayerPopup {
                   }
 
                   Text {
+                    textFormat: Text.PlainText
                     text: Wx.label(popup.wxCode)
                     color: Zenon.keyInk
                     font.family: popup.face
@@ -1162,19 +1168,28 @@ LayerPopup {
             }
             Text {
               anchors.verticalCenter: parent.verticalCenter
-              text: Chronos.calStatus.khal ? "Your calendars are kept by khal \u2014 it needs one to show"
-                : "Calendars and reminders come from khal, installed through Ceres"
+              text: "Where should your calendar live?"
               color: Zenon.muted
               font.family: popup.face
               font.weight: Zenon.weight
               font.pixelSize: Zenon.px(13)
             }
+            // asked first, installed after (user, 2026-10-28): here
+            // installs khal; online opens the window's accounts sheet,
+            // which installs what the account needs once it is given
             DialogButton {
               anchors.verticalCenter: parent.verticalCenter
-              label: Chronos.calStatus.khal ? "Make a calendar" : "Set up calendars"
+              label: "On this computer"
               ink: Zenon.cyan
               onClicked: if (!Chronos.setupCalendar((ok) => popup.agendaSay(ok ? "Your calendar is ready" : "Not set up", !ok)))
                 popup.agendaSay("Ceres is busy \u2014 try again in a moment", true)
+            }
+            DialogButton {
+              anchors.verticalCenter: parent.verticalCenter
+              visible: !!popup.calendar
+              label: "Online account\u2026"
+              ink: Zenon.cyan
+              onClicked: popup.calendar.accounts()
             }
           }
 
@@ -1198,8 +1213,21 @@ LayerPopup {
               font.weight: Font.Bold
               font.pixelSize: Zenon.px(13)
             }
+            // the Calendar window, on the day chosen here
+            DialogButton {
+              id: openCal
+              visible: Chronos.calReady && !!popup.calendar
+              glyph: true
+              label: "\u{EAB0}"
+              implicitHeight: 28
+              anchors.right: addBox.left
+              anchors.rightMargin: 8
+              anchors.verticalCenter: agendaHead.verticalCenter
+              onClicked: popup.calendar.day(popup.selIso)
+            }
             // the line a new event is typed into
             Rectangle {
+              id: addBox
               visible: Chronos.calReady
               anchors.right: parent.right
               anchors.verticalCenter: agendaHead.verticalCenter
@@ -1227,7 +1255,7 @@ LayerPopup {
                   anchors.fill: parent
                   verticalAlignment: Text.AlignVCenter
                   visible: addField.text === ""
-                  text: "Add \u2014 14:00 Dentist @ Clinic, or a title for all day"
+                  text: "Add \u2014 Lunch with Sam fri 1pm @ Luigi's"
                   color: Zenon.muted
                   font: addField.font
                   elide: Text.ElideRight
@@ -1269,13 +1297,26 @@ LayerPopup {
                 readonly property var e: popup.dayEvents[index] || null
                 width: eventList.width
                 height: popup.agendaRowH
+                // its color, the Calendar's (2026-10-28): a task a hollow box
+                Rectangle {
+                  id: evDot
+                  x: 6
+                  anchors.verticalCenter: parent.verticalCenter
+                  width: 8
+                  height: 8
+                  radius: evRow.e && evRow.e.task ? 1.5 : 4
+                  readonly property color ink: evRow.e && !evRow.e.task ? Clio.ink(Chronos.hueOf(evRow.e)) : Zenon.accentMuted
+                  color: evRow.e && evRow.e.task ? "transparent" : evDot.ink
+                  border.width: evRow.e && evRow.e.task ? 1.2 : 0
+                  border.color: evDot.ink
+                }
                 Text {
                   id: evTime
-                  x: 4
-                  width: 120
+                  x: 22
+                  width: 110
                   anchors.verticalCenter: parent.verticalCenter
                   text: Chr.eventTime(evRow.e)
-                  color: Zenon.cyan
+                  color: evDot.ink
                   font.family: popup.face
                   font.weight: Font.Bold
                   font.pixelSize: Zenon.px(13)
@@ -1287,7 +1328,7 @@ LayerPopup {
                   anchors.verticalCenter: parent.verticalCenter
                   elide: Text.ElideRight
                   textFormat: Text.StyledText
-                  text: !evRow.e ? "" : (evRow.e.task ? "\u{F0131}  " : "") + Strings.escapeHtml(evRow.e.title)
+                  text: !evRow.e ? "" : Strings.escapeHtml(evRow.e.title)
                     + (evRow.e.location ? '  <font color="' + Zenon.hex(Zenon.muted) + '">' + Strings.escapeHtml(evRow.e.location) + "</font>" : "")
                     + (evRow.e.repeats ? '  <font color="' + Zenon.hex(Zenon.muted) + '">\u{F0456}</font>' : "")
                   color: Zenon.white
@@ -1301,7 +1342,8 @@ LayerPopup {
                   id: evRemove
                   size: Zenon.px(15)
                   anchors.right: parent.right
-                  anchors.rightMargin: 8
+                  // clear of the scrollbar's strip, when there is one
+                  anchors.rightMargin: 18
                   anchors.verticalCenter: parent.verticalCenter
                   shown: !!evRow.e && !evRow.e.repeats && !evRow.e.task
                   onClicked: Chronos.removeEvent(evRow.e.uid, (ok, w) => popup.agendaSay(ok ? "Removed \u201C" + evRow.e.title + "\u201D" : w, !ok))
@@ -1314,15 +1356,24 @@ LayerPopup {
                   radius: Zenon.windowRadius
                   color: taskMa.pressed ? Zenon.pressTile(false) : Zenon.alpha(Zenon.border, 0)
                 }
+                // a task opens its note at it; an event, in the Calendar
                 MouseArea {
                   id: taskMa
                   anchors.fill: parent
-                  visible: !!evRow.e && !!evRow.e.task
-                  onClicked: if (Clio.app) Clio.app.openTask(evRow.e.task.id, evRow.e.task.h)
+                  anchors.rightMargin: evRemove.shown ? evRemove.width + 12 : 0
+                  visible: !!evRow.e && (!!evRow.e.task || !!popup.calendar)
+                  onClicked: {
+                    if (evRow.e.task) { if (Clio.app) Clio.app.openTask(evRow.e.task.id, evRow.e.task.h); return; }
+                    popup.calendar.event(evRow.e);
+                  }
                 }
               }
             }
-            Scrollbar { flick: eventList; visible: eventList.visible; anchors.right: eventList.right; anchors.top: eventList.top; anchors.bottom: eventList.bottom }
+            // only with more than fits: along the right edge it lay over
+            // each row's ×, and took its clicks (user, 2026-10-28: "the
+            // remove event in quick access doesn't do anything")
+            Scrollbar { flick: eventList; visible: eventList.visible && eventList.contentHeight > eventList.height + 1
+                        anchors.right: eventList.right; anchors.top: eventList.top; anchors.bottom: eventList.bottom }
           }
         }
         Rectangle {
@@ -1672,6 +1723,7 @@ LayerPopup {
     }
 
     Text {
+      textFormat: Text.PlainText
       id: cellName
       anchors.left: cellState.right
       anchors.leftMargin: 6
@@ -1838,6 +1890,7 @@ LayerPopup {
       spacing: 0
 
       Text {
+        textFormat: Text.PlainText
         text: reading.text
         color: Zenon.white
         font.family: popup.face

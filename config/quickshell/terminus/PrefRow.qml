@@ -55,6 +55,7 @@ Item {
   }
 
   Text {
+    textFormat: Text.PlainText
     anchors.left: parent.left
     anchors.leftMargin: 14
     anchors.right: prefHint.visible ? prefHint.left : prefSwitch.left

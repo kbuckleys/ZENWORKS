@@ -79,6 +79,8 @@ ShellRoot {
   Loader { source: "morpheus/OffSpecial.qml" }
   // is the sun up? for Follow Daytime — see chronos/SunClock
   Loader { source: "chronos/SunClock.qml" }
+  // chronos' calendar window (ipc Calendar); the window is built on first use
+  Loader { id: calendarWin; source: "chronos/CalendarManager.qml" }
   // the background, on its own background layer per monitor
   PicassoDaemon { }
   // screenshots, the color picker, and the image viewer — which annotation
@@ -180,7 +182,7 @@ ShellRoot {
     }
   }
   PicassoPopup { id: picasso; statusbar: bar; screen: root.focusedScreen; morphMode: root.morphedFor("picasso") && root.morphOnPill; morphFade: root.layerFade }
-  ChronosPopup { id: chronos; statusbar: bar; screen: root.focusedScreen; morphMode: root.morphedFor("chronos") && root.morphOnPill; morphFade: root.layerFade }
+  ChronosPopup { id: chronos; calendar: calendarWin.item; statusbar: bar; screen: root.focusedScreen; morphMode: root.morphedFor("chronos") && root.morphOnPill; morphFade: root.layerFade }
   // network, bluetooth, vpn and the display's light — the quick panel the
   // bar's connection icon opens; the window is built on first use (Hermes)
   HermesPopup { id: hermes; statusbar: bar; screen: root.focusedScreen; morphMode: root.morphedFor("hermes") && root.morphOnPill; morphFade: root.layerFade }
@@ -681,7 +683,9 @@ ShellRoot {
     if (h.length === 0) return "No notifications";
     const lines = h.slice(0, 6).map((n) => {
       const app = (n.appName && n.appName !== "") ? n.appName : "unknown";
-      return "<b>" + app + "</b>  " + (n.summary ?? "");
+      // escaped: the tooltip reads markup, and a notification's words are
+      // any app's (an <img src=http…> in one was a fetch from the bar)
+      return "<b>" + Strings.escapeHtml(app) + "</b>  " + Strings.escapeHtml(n.summary ?? "");
     });
     let tip = lines.join("\n");
     if (h.length > 6) tip += "\n… and " + (h.length - 6) + " more";
@@ -1111,8 +1115,10 @@ ShellRoot {
         id: specialUrgentWash
         visible: workspacesMod.visible && workspacesMod.specialUrgent && opacity > 0.01
         opacity: root.pillRowFade * workspacesMod.specialFlash
+        // shown, over the solid accent: the whole ink, as a number's wash
+        // is — at 0.45 it only muddied the fill
         color: Qt.rgba(workspacesMod.urgentInk.r, workspacesMod.urgentInk.g,
-                       workspacesMod.urgentInk.b, 0.45)
+                       workspacesMod.urgentInk.b, workspacesMod.specialFocused ? 1 : 0.45)
         anchors.top: parent.top
         anchors.bottom: parent.bottom
         anchors.topMargin: bg.border.width

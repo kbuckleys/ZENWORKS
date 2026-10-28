@@ -38,6 +38,7 @@ Item {
     shown: np.ready && !!np.entry
     cardWidth: 400
     Text {
+      textFormat: Text.PlainText
       width: 372
       wrapMode: Text.WrapAnywhere
       text: np.entry ? np.entry.name : ""

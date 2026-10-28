@@ -1647,6 +1647,7 @@ Item {
                   }
 
                   Text {
+                    textFormat: Text.PlainText
                     id: appLabel
                     anchors.left: appGlyph.right
                     anchors.leftMargin: Zenon.menuIconGap

@@ -198,6 +198,7 @@ Rectangle {
         }
 
         Text {
+          textFormat: Text.PlainText
           id: diskName
           anchors.left: diskGlyph.right
           anchors.leftMargin: 12

@@ -437,6 +437,7 @@ Item {
       width: body.width - 48
       spacing: 10
       Text {
+        textFormat: Text.PlainText
         width: parent.width
         wrapMode: Text.Wrap
         text: pg.rel ? pg.rel.name : ""
@@ -493,6 +494,7 @@ Item {
               width: fileList.width
               height: Zenon.px(15) * 2
               Text {
+                textFormat: Text.PlainText
                 id: an
                 x: 10
                 anchors.verticalCenter: parent.verticalCenter

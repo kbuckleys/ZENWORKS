@@ -27,6 +27,7 @@ Row {
   anchors.verticalCenterOffset: 4
   spacing: 10
   Text {
+    textFormat: Text.PlainText
     text: head.title.toUpperCase()
     color: head.ink
     font.family: Zenon.face

@@ -86,6 +86,7 @@ Item {
     ? Math.max(0, Math.min(1, (sl.value - sl.from) / sl.span)) : 0
 
   Text {
+    textFormat: Text.PlainText
     anchors.left: parent.left
     anchors.leftMargin: 14
     anchors.right: slTrack.left

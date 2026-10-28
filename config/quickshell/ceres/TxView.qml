@@ -371,6 +371,7 @@ Item {
         spacing: 16
 
         Text {
+          textFormat: Text.PlainText
           anchors.verticalCenter: parent.verticalCenter
           visible: text !== ""
           text: !track.total ? ""
@@ -382,6 +383,7 @@ Item {
           font.pixelSize: Zenon.px(13) + view.grow
         }
         Text {
+          textFormat: Text.PlainText
           anchors.verticalCenter: parent.verticalCenter
           text: track.total ? Math.floor(track.frac * 100) + "%"
             : Ceres.txEvents.length + " / " + Math.max(Ceres.txExpected, Ceres.txEvents.length)
@@ -457,6 +459,7 @@ Item {
           required property var modelData
           spacing: 8
           Text {
+            textFormat: Text.PlainText
             anchors.verticalCenter: parent.verticalCenter
             text: provRow.modelData.name + " from"
             color: Zenon.accentKey

@@ -285,6 +285,7 @@ Rectangle {
         }
 
         Text {
+          textFormat: Text.PlainText
           anchors.left: markGlyph.right
           anchors.leftMargin: 8
           anchors.right: markPath.left

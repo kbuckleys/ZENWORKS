@@ -157,6 +157,7 @@ FocusScope {
     spacing: 14
 
     Text {
+      textFormat: Text.PlainText
       text: "Partition " + S.driveTitle(body.drive)
       color: Zenon.ink
       font.family: Zenon.face
@@ -281,6 +282,7 @@ FocusScope {
     }
 
     Text {
+      textFormat: Text.PlainText
       width: parent.width
       wrapMode: Text.Wrap
       visible: text !== ""

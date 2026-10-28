@@ -489,6 +489,7 @@ PanelWindow {
               }
 
               Text {
+                textFormat: Text.PlainText
                 id: crumbLabel
                 height: Zenon.menuRowHeight
                 width: crumb.last ? Math.min(implicitWidth, crumbRow.availW) : implicitWidth
@@ -670,6 +671,7 @@ PanelWindow {
                   }
 
                   Text {
+                    textFormat: Text.PlainText
                     anchors.left: glyph.right
                     anchors.leftMargin: 8
                     anchors.right: detail.left

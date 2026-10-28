@@ -54,6 +54,7 @@ Item {
     font.pixelSize: Zenon.px(17)
   }
   Text {
+    textFormat: Text.PlainText
     id: name
     anchors.left: icon.right
     anchors.leftMargin: 10

@@ -113,6 +113,7 @@ Item {
               onChose: (v) => { ed.st.acct = v; ed.st.folder = ""; folderBox.text = ""; ed.rebuild(); }
             }
             Text {
+              textFormat: Text.PlainText
               anchors.verticalCenter: parent.verticalCenter
               visible: !!ed.st && (ed.st.id !== "" || ed.win.writable(ed.st.kind).length <= 1)
               text: (C.platform(ed.acct.kind).glyph || "") + "  " + (ed.acct.name || "")

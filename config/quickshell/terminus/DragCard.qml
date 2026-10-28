@@ -106,6 +106,7 @@ Item {
   }
 
   Text {
+    textFormat: Text.PlainText
     id: labelText
     anchors.left: parent.left
     anchors.leftMargin: (card.pictured ? 5 : card.pad) + card.lead + (card.lead > 0 ? 8 : 0)

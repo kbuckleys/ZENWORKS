@@ -1292,6 +1292,7 @@ Column {
           }
 
           Text {
+            textFormat: Text.PlainText
             anchors.verticalCenter: parent.verticalCenter
             visible: !!term.sendToRef.current && !term.sendToRef.sending
             width: Math.min(implicitWidth, 260)
@@ -2173,6 +2174,7 @@ Column {
               }
 
               Text {
+                textFormat: Text.PlainText
                 anchors.left: treeGlyph.right
                 anchors.leftMargin: 4
                 anchors.right: parent.right
@@ -3183,6 +3185,7 @@ Column {
       // The file's own mark, from the name as typed, so "notes.md"
       // wears the glyph it will have in the listing once it exists.
       Text {
+        textFormat: Text.PlainText
         id: saveGlyph
         anchors.left: parent.left
         anchors.leftMargin: 11
@@ -3360,6 +3363,7 @@ Column {
               anchors.verticalCenter: parent.verticalCenter
               spacing: 6
               Text {
+                textFormat: Text.PlainText
                 anchors.verticalCenter: parent.verticalCenter
                 text: Icons.glyphFor({ name: pick.name, isDir: !!term.portal && (term.portal.directory || term.portalDirSet[String(pick.modelData)] === true) })
                 color: Zenon.cyan
@@ -3368,6 +3372,7 @@ Column {
                 font.pixelSize: Zenon.px(13)
               }
               Text {
+                textFormat: Text.PlainText
                 anchors.verticalCenter: parent.verticalCenter
                 width: Math.max(20, Math.min(implicitWidth, pick.most - 40))
                 elide: Text.ElideMiddle

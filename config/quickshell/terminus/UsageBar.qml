@@ -182,6 +182,7 @@ Item {
 
   // Declared last so it draws over the band.
   Text {
+    textFormat: Text.PlainText
     id: figure
     anchors.fill: parent
     horizontalAlignment: Text.AlignRight

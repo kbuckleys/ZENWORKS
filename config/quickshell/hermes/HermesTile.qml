@@ -85,6 +85,7 @@ Item {
     anchors.verticalCenter: parent.verticalCenter
     spacing: 8
     Text {
+      textFormat: Text.PlainText
       id: tileTitle
       anchors.baseline: tileSub.baseline
       width: Math.min(implicitWidth, parent.width)

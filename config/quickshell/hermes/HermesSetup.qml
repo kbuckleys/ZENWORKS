@@ -35,6 +35,7 @@ Column {
     font.pixelSize: Zenon.px(40)
   }
   Text {
+    textFormat: Text.PlainText
     anchors.horizontalCenter: parent.horizontalCenter
     text: s.title
     color: Zenon.ink

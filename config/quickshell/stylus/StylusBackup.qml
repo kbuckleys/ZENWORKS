@@ -71,6 +71,7 @@ FocusScope {
       width: parent.width
       spacing: 3
       Text {
+        textFormat: Text.PlainText
         width: parent.width
         elide: Text.ElideRight
         text: "Back up " + (body.part ? S.partName(body.part) : S.driveTitle(body.drive))
@@ -80,6 +81,7 @@ FocusScope {
         font.pixelSize: Zenon.px(17)
       }
       Text {
+        textFormat: Text.PlainText
         width: parent.width
         wrapMode: Text.Wrap
         text: "Every byte of it, " + Terminus.formatSize(body.part ? body.part.size : body.drive ? body.drive.size : 0)
@@ -108,6 +110,7 @@ FocusScope {
       border.width: 1
       border.color: Zenon.border
       Text {
+        textFormat: Text.PlainText
         anchors.left: parent.left
         anchors.leftMargin: 16
         anchors.right: pick.left
@@ -149,6 +152,7 @@ FocusScope {
       width: parent.width
       spacing: 8
       Text {
+        textFormat: Text.PlainText
         width: parent.width
         elide: Text.ElideMiddle
         text: body.job ? body.job.out : ""
@@ -171,6 +175,7 @@ FocusScope {
         }
       }
       Text {
+        textFormat: Text.PlainText
         width: parent.width
         wrapMode: Text.Wrap
         text: S.backupWords(body.job)

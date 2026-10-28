@@ -53,6 +53,7 @@ FocusScope {
     spacing: 14
 
     Text {
+      textFormat: Text.PlainText
       text: "Rename " + S.partName(body.vol)
       color: Zenon.ink
       font.family: Zenon.face
@@ -74,6 +75,7 @@ FocusScope {
       }
       BulkField { id: labelField; width: 260; ghost: "None"; onAccepted: body.named ? nameField.claim() : body.go() }
       Text {
+        textFormat: Text.PlainText
         anchors.verticalCenter: parent.verticalCenter
         // terminus' rule for the filesystem: FAT's capitals, each limit
         text: !body.labelled ? "" : body.label !== labelField.text.trim() && labelField.text.trim() !== ""
@@ -109,6 +111,7 @@ FocusScope {
     }
 
     Text {
+      textFormat: Text.PlainText
       width: parent.width
       wrapMode: Text.Wrap
       text: "Set in place — nothing on it is touched." + (body.named ? " The label is what file managers show; the partition name is the table's." : "")

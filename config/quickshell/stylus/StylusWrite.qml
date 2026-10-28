@@ -66,6 +66,7 @@ Item {
       width: parent.width
       spacing: 3
       Text {
+        textFormat: Text.PlainText
         width: parent.width
         elide: Text.ElideRight
         text: body.face === "done" ? (body.job.result.ok ? "Done" : S.headWords(body.job, []))
@@ -79,6 +80,7 @@ Item {
         font.pixelSize: Zenon.px(17)
       }
       Text {
+        textFormat: Text.PlainText
         width: parent.width
         wrapMode: Text.Wrap
         text: body.face === "writing" ? "You can hide this — the write goes on, and the sidebar keeps count"
@@ -148,6 +150,7 @@ Item {
     }
 
     Text {
+      textFormat: Text.PlainText
       width: parent.width
       wrapMode: Text.Wrap
       visible: body.face === "choosing" && body.warning !== ""
@@ -169,6 +172,7 @@ Item {
       border.width: 1
       border.color: Zenon.alpha(Zenon.red, 0.55)
       Text {
+        textFormat: Text.PlainText
         id: notice
         anchors.centerIn: parent
         width: parent.width - 32

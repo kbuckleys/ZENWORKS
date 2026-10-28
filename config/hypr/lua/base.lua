@@ -83,7 +83,11 @@ end
 
 -- CURSOR
 hl.env("HYPRCURSOR_THEME", "XCursor-Pro-Hyprcursor-Dark")
-hl.env("XCURSOR_THEME", "XCursor-Pro-Hyprcursor-Dark")
+-- X apps (Spotify, Steam, anything under XWayland) cannot read hyprcursor:
+-- theirs is the same design in X's own format (xcursor-pro-cursor-theme;
+-- user, 2026-10-28: "my cursors are different in apps like spotify and
+-- steam"). scripts/gtkscheme.sh tells GTK and ~/.icons/default the same.
+hl.env("XCURSOR_THEME", "XCursor-Pro-Dark")
 hl.env("HYPRCURSOR_SIZE", "24")
 hl.env("XCURSOR_SIZE", "24")
 

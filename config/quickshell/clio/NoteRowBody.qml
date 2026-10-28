@@ -80,6 +80,7 @@ Item {
       width: parent.width
       spacing: 8
       Text {
+        textFormat: Text.PlainText
         width: parent.width - (checks.visible ? checks.width + 8 : 0)
         elide: Text.ElideRight
         text: !rb.note ? "" : rb.note.sealed ? "Locked" : rb.d.preview !== "" ? rb.d.preview : "No additional text"

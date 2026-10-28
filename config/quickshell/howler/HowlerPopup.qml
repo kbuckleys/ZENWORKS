@@ -325,6 +325,7 @@ LayerPopup {
         border.width: 1
 
         Text {
+          textFormat: Text.PlainText
           id: chipText
           anchors.centerIn: parent
           text: chip.label
@@ -417,6 +418,23 @@ LayerPopup {
           width: list.width
           height: popup.rowH
 
+          // A CALENDAR REMINDER KEEPS ITS TOAST'S LOOK (user, 2026-10-28):
+          // washed in the event's hue, a band of it down the edge, and its
+          // date tile where the icon would be
+          readonly property bool event: !!row.modelData.eventHue
+          readonly property color eventInk: Howler.eventInk(row.modelData.eventHue)
+          readonly property var eventDay: Howler.eventDayOf(row.modelData.eventDay)
+          ClippingRectangle {
+            anchors.fill: parent
+            anchors.leftMargin: 8
+            anchors.rightMargin: 8
+            anchors.topMargin: 2
+            anchors.bottomMargin: 2
+            visible: row.event
+            radius: Howler.radius
+            color: Zenon.alpha(row.eventInk, Zenon.light ? 0.12 : 0.16)
+            Rectangle { width: 4; height: parent.height; color: row.eventInk }
+          }
           Rectangle {
             anchors.fill: parent
             anchors.leftMargin: 8
@@ -426,6 +444,40 @@ LayerPopup {
           }
           HoverHandler { id: rowHov }
 
+          Rectangle {
+            id: rowTile
+            visible: row.event
+            anchors.left: parent.left
+            anchors.leftMargin: 20
+            anchors.verticalCenter: parent.verticalCenter
+            width: 44
+            height: 44
+            radius: Zenon.rad(2)
+            color: Zenon.alpha(row.eventInk, 0.22)
+            border.width: 1
+            border.color: Zenon.alpha(row.eventInk, 0.6)
+            Column {
+              anchors.centerIn: parent
+              spacing: -2
+              Text {
+                anchors.horizontalCenter: parent.horizontalCenter
+                text: Qt.locale().dayName(row.eventDay.getDay(), Locale.ShortFormat).toUpperCase()
+                color: row.eventInk
+                font.family: Zenon.face
+                font.weight: Font.Bold
+                font.pixelSize: Zenon.px(10)
+              }
+              Text {
+                anchors.horizontalCenter: parent.horizontalCenter
+                text: row.eventDay.getDate()
+                color: Zenon.ink
+                font.family: Zenon.face
+                font.weight: Font.Bold
+                font.pixelSize: Zenon.px(20)
+              }
+            }
+          }
+
           // The row's own icon, at the size oracle asks for — the image the
           // application sent if it survived being written down, and its
           // themed icon if it did not. See howler.js for which is which.
@@ -434,9 +486,9 @@ LayerPopup {
             anchors.left: parent.left
             anchors.leftMargin: 20
             anchors.verticalCenter: parent.verticalCenter
-            width: Howler.iconsEnabled ? 40 : 0
+            width: Howler.iconsEnabled && !row.event ? 40 : 0
             height: 40
-            visible: Howler.iconsEnabled
+            visible: Howler.iconsEnabled && !row.event
             radius: Howler.iconRadius
             color: "transparent"
 
@@ -459,19 +511,33 @@ LayerPopup {
               source: {
                 const r = row.modelData;
                 if (shotImg.tried < shotImg.pictures.length) return shotImg.pictures[shotImg.tried];
-                if (r.image && r.image !== "") return r.image;
-                if (r.appIcon && r.appIcon !== "")
-                  return r.appIcon.indexOf("/") === 0
-                    ? "file://" + r.appIcon : "image://icon/" + r.appIcon;
+                // (rows kept from before carry image://icon/ addresses)
+                const im = Howler.imageSource(r.image);
+                if (im !== "") return im;
+                // a file, a file:// address, or a themed name the theme has
+                const ic = Howler.iconSource(r.appIcon);
+                if (ic !== "") return ic;
                 return "";
               }
+            }
+            // named and not to be had: the question mark (Howler.missingGlyph)
+            Text {
+              anchors.centerIn: parent
+              visible: (!!row.modelData.appIcon || !!row.modelData.rawImage)
+                && Wolf.capturePictures(row.modelData).length === 0
+                && (shotImg.source.toString() === "" || shotImg.status === Image.Error)
+              text: Howler.missingGlyph
+              color: Zenon.accentMuted
+              font.family: Zenon.glyphFace
+              font.pixelSize: Zenon.px(24)
             }
           }
 
           Text {
+            textFormat: Text.PlainText
             id: appLine
-            anchors.left: shot.right
-            anchors.leftMargin: Howler.iconsEnabled ? 14 : 20
+            anchors.left: row.event ? rowTile.right : shot.right
+            anchors.leftMargin: row.event ? 16 : Howler.iconsEnabled ? 14 : 20
             anchors.right: stamp.left
             anchors.rightMargin: 10
             anchors.top: parent.top
@@ -479,7 +545,7 @@ LayerPopup {
             elide: Text.ElideRight
             text: row.modelData.summary !== "" ? row.modelData.summary
                 : row.modelData.appName
-            color: row.modelData.urgency === 2 ? Zenon.red : Zenon.white
+            color: row.modelData.urgency === 2 && !row.event ? Zenon.red : Zenon.white
             font.family: Zenon.face
             font.weight: Font.Bold
             font.pixelSize: Zenon.px(14)
@@ -494,7 +560,7 @@ LayerPopup {
             visible: text !== ""
             text: Wolf.safeMarkup(row.modelData.body)
             textFormat: Howler.markup ? Text.StyledText : Text.PlainText
-            color: Zenon.muted
+            color: row.event ? row.eventInk : Zenon.muted
             font.family: Zenon.face
             font.weight: Font.Bold
             font.pixelSize: Zenon.px(13)
@@ -516,6 +582,7 @@ LayerPopup {
           }
 
           Text {
+            textFormat: Text.PlainText
             anchors.right: stamp.right
             anchors.top: stamp.bottom
             anchors.topMargin: 2

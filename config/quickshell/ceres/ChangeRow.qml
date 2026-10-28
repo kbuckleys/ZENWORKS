@@ -42,6 +42,7 @@ Item {
   // last.
   readonly property real nameShare: 0.45
   Text {
+    textFormat: Text.PlainText
     id: chName
     anchors.left: chGlyph.right
     anchors.right: vers.left

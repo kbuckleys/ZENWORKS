@@ -252,6 +252,7 @@ Rectangle {
         FlashOver { flash: cmdFlash; index: cmdRow.index }
 
         Text {
+          textFormat: Text.PlainText
           anchors.left: parent.left
           anchors.leftMargin: 16
           anchors.right: cmdKey.left

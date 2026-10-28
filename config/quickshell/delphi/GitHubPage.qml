@@ -826,6 +826,7 @@ Item {
             font.pixelSize: Zenon.px(14)
           }
           Text {
+            textFormat: Text.PlainText
             anchors.verticalCenter: parent.verticalCenter
             text: chip.inside ? chip.x_.account.login : pg.wasOf(chip.fid) !== "" ? pg.wasOf(chip.fid) : chip.s.name
             color: Zenon.ink
@@ -834,6 +835,7 @@ Item {
             font.pixelSize: Zenon.px(14)
           }
           Text {
+            textFormat: Text.PlainText
             anchors.verticalCenter: parent.verticalCenter
             // what it is, and how it stands: the forge, a second account, a
             // tool gone, a listing that failed, its repositories coming
@@ -988,6 +990,7 @@ Item {
           font.pixelSize: Zenon.px(16)
         }
         Text {
+          textFormat: Text.PlainText
           visible: text !== ""
           width: parent.width
           elide: Text.ElideRight

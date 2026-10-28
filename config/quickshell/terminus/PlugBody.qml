@@ -58,6 +58,7 @@ Item {
     height: body.headH
 
     Text {
+      textFormat: Text.PlainText
       id: heading
       anchors.left: parent.left
       anchors.leftMargin: 18
@@ -70,6 +71,7 @@ Item {
       font.pixelSize: Zenon.px(17)
     }
     Text {
+      textFormat: Text.PlainText
       anchors.right: parent.right
       anchors.rightMargin: 18
       anchors.left: heading.right
@@ -142,6 +144,7 @@ Item {
         anchors.verticalCenter: parent.verticalCenter
         spacing: 2
         Text {
+          textFormat: Text.PlainText
           width: parent.width
           elide: Text.ElideRight
           text: row.modelData.name !== "" ? row.modelData.name
@@ -214,6 +217,7 @@ Item {
     readonly property bool onlyMounted: !!foot.only && foot.only.mount !== ""
 
     Text {
+      textFormat: Text.PlainText
       anchors.left: parent.left
       anchors.leftMargin: 18
       anchors.right: buttons.left

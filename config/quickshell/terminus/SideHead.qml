@@ -106,6 +106,7 @@ Item {
   }
 
   Text {
+    textFormat: Text.PlainText
     id: sideHeadText
     // 12, the panel's own left edge — where the GLYPH column starts, not
     // where the names do. A heading that is a title belongs at the edge

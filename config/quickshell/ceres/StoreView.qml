@@ -677,6 +677,7 @@ Item {
               spacing: 6
               leftPadding: 4
               Text {
+                textFormat: Text.PlainText
                 anchors.verticalCenter: parent.verticalCenter
                 text: shelf.modelData.title
                 color: Zenon.white
@@ -912,6 +913,7 @@ Item {
               anchors.verticalCenter: parent.verticalCenter
               spacing: 5
               Text {
+                textFormat: Text.PlainText
                 width: parent.width
                 wrapMode: Text.Wrap
                 maximumLineCount: 2
@@ -933,6 +935,7 @@ Item {
                 font.pixelSize: Zenon.px(17)
               }
               Text {
+                textFormat: Text.PlainText
                 width: parent.width
                 wrapMode: Text.Wrap
                 maximumLineCount: 2
@@ -1059,6 +1062,7 @@ Item {
                     font.pixelSize: Zenon.px(14)
                   }
                   Text {
+                    textFormat: Text.PlainText
                     anchors.verticalCenter: parent.verticalCenter
                     text: link.modelData.label
                     color: Zenon.white

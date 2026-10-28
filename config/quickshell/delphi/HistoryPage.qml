@@ -425,6 +425,7 @@ Item {
     readonly property string body: pg.peekMsg ? String(pg.peekMsg.body || "") : ""
     readonly property string rest: peekBubble.body.indexOf("\n") >= 0 ? peekBubble.body.slice(peekBubble.body.indexOf("\n") + 1).trim() : ""
     Text {
+      textFormat: Text.PlainText
       width: 452
       wrapMode: Text.Wrap
       maximumLineCount: 3
@@ -448,6 +449,7 @@ Item {
       font.pixelSize: Zenon.px(14)
     }
     Text {
+      textFormat: Text.PlainText
       width: 452
       elide: Text.ElideRight
       text: !pg.peekC ? "" : pg.peekC.author + "  ·  " + D.stamp(pg.peekC.when) + "  ·  " + D.short(pg.peekC.sha)
@@ -588,12 +590,25 @@ Item {
       { text: "Check out", icon: "", enabled: !here, run: () => pg.checkout(c) },
       { text: "Cherry-pick onto " + pg.win.branchName, icon: "", mark: "p", enabled: !here, run: () => pg.cherryPick(c) },
       { text: "Revert", icon: "", run: () => pg.revert(c) },
+      { text: "Find when a bug came in, from here…", icon: "\uF188", enabled: !here, run: () => pg.bisectFrom(c) },
       { isSeparator: true },
       { text: "Rework the commits after it", icon: "", mark: "i", enabled: !here, run: () => pg.rework(c) },
       { text: "Move " + pg.win.branchName + " here", icon: "", enabled: !here, danger: true, run: () => pg.resetTo(c) },
       { isSeparator: true },
       { text: "Save as a patch…", icon: "\uF0C7", run: () => pg.savePatch(c.sha) },
     ];
+  }
+
+  // BISECT from a commit that did not have the bug to HEAD, which does:
+  // the window's banner takes it from there (DelphiWindow.bisect)
+  function bisectFrom(c) {
+    if (pg.win.st && (pg.win.st.staged.length + pg.win.st.unstaged.length) > 0) {
+      pg.win.say("Commit or stash your changes first: bisect checks out other commits", true);
+      return;
+    }
+    pg.win.confirm({ question: "Find when a bug came in?", glyph: "\uF188", ink: Zenon.cyan,
+      detail: D.short(c.sha) + " " + c.subject + " did not have it; " + pg.win.branchName + " does. Commits between are checked out one at a time, halving what is left: try each, and say whether it has the bug.",
+      verb: "Start", then: () => { pg.win.bisect("start", { good: c.sha }); pg.win.setPage("changes"); } });
   }
 
   // ── KEYS ───────────────────────────────────────────────────────────────
@@ -859,6 +874,7 @@ Item {
               border.width: modelData.here ? 1 : 0
               border.color: Zenon[modelData.ink]
               Text {
+                textFormat: Text.PlainText
                 id: chipText
                 anchors.centerIn: parent
                 text: modelData.glyph + " " + modelData.label
@@ -871,6 +887,7 @@ Item {
           }
         }
         Text {
+          textFormat: Text.PlainText
           anchors.left: chipRow.right
           anchors.leftMargin: chipRow.width > 0 ? 8 : 0
           anchors.right: who.left
@@ -884,6 +901,7 @@ Item {
           font.pixelSize: Zenon.px(15)
         }
         Text {
+          textFormat: Text.PlainText
           id: who
           anchors.right: ciCell.left
           anchors.rightMargin: 12
@@ -991,6 +1009,7 @@ Item {
           note: arow.r.head ? D.tilde(arow.r.root, pg.win.home) : ""
         }
         Text {
+          textFormat: Text.PlainText
           visible: !arow.r.head
           x: 30
           width: parent.width - 30 - whoText.width - 34
@@ -1003,6 +1022,7 @@ Item {
           font.pixelSize: Zenon.px(15)
         }
         Text {
+          textFormat: Text.PlainText
           id: whoText
           visible: !arow.r.head
           anchors.right: parent.right
@@ -1047,6 +1067,7 @@ Item {
       spacing: 6
       visible: !!pg.commit
       Text {
+        textFormat: Text.PlainText
         width: parent.width
         wrapMode: Text.Wrap
         maximumLineCount: 3
@@ -1109,6 +1130,7 @@ Item {
       }
       // signed, and whether git could check it (D.signatureOf)
       Text {
+        textFormat: Text.PlainText
         readonly property var sig: pg.message ? D.signatureOf(pg.message.signature, pg.message.signer) : null
         visible: !!sig
         width: parent.width
@@ -1136,6 +1158,7 @@ Item {
         }
       }
       CiRuns {
+        win: pg.win
         width: parent.width
         c: pg.commit ? pg.ciOf(pg.commit.sha) : null
         visible: !!c && c.runs && c.runs.length > 0 && c.state !== "success"
@@ -1198,6 +1221,7 @@ Item {
           font.pixelSize: Zenon.px(14)
         }
         Text {
+          textFormat: Text.PlainText
           anchors.left: fg.right
           anchors.leftMargin: 6
           anchors.right: counts.left

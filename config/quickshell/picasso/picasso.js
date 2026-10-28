@@ -34,7 +34,7 @@ function rel(path, dir) {
 // directories first, by name, each { dir: true, name, sub, path, count,
 // cover, thumb } with its first picture (in the order given) for a cover,
 // then its own pictures. `sub` is relative to `dir`, "" the top.
-function level(files, dir, sub) {
+function level(files, dir, sub, mode) {
   const base = String(dir || "") + (sub ? "/" + sub : "");
   const dirs = {}, names = [], own = [];
   for (const f of files || []) {
@@ -46,17 +46,24 @@ function level(files, dir, sub) {
     const name = rest.slice(0, slash);
     if (!dirs[name]) {
       dirs[name] = { dir: true, name: name, sub: (sub ? sub + "/" : "") + name, path: base + "/" + name,
-                     count: 0, cover: p, thumb: f.thumb || "", stamp: 0 };
+                     count: 0, cover: p, thumb: f.thumb || "", stamp: 0, newest: 0, size: 0 };
       names.push(name);
     }
     dirs[name].count++;
     // what a cover is remembered under (terminus/FolderCover): the newest
     // picture in it plus how many there are, so one added or taken away is
     // a new key — the scan has no directory mtimes to give it
-    dirs[name].stamp = Math.max(dirs[name].stamp, f.mtime || 0);
+    dirs[name].newest = Math.max(dirs[name].newest, f.mtime || 0);
+    dirs[name].size += f.size || 0;
   }
-  names.sort((a, b) => a.localeCompare(b));
-  for (const n of names) dirs[n].stamp += dirs[n].count;
+  // in the sort's order too (user, 2026-10-28: the directories stayed by
+  // name whatever the sort said): recent by the newest picture in each,
+  // size by all of them together; still ahead of the pictures. Ties by name.
+  const byName = (a, b) => a.localeCompare(b);
+  if (mode === "size") names.sort((a, b) => dirs[b].size - dirs[a].size || byName(a, b));
+  else if (mode === "recent") names.sort((a, b) => dirs[b].newest - dirs[a].newest || byName(a, b));
+  else names.sort(byName);
+  for (const n of names) dirs[n].stamp = dirs[n].newest + dirs[n].count;
   return names.map((n) => dirs[n]).concat(own);
 }
 // the directory above a `sub`, "" at the top

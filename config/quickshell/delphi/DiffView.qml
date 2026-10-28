@@ -205,6 +205,7 @@ Item {
         font.pixelSize: Zenon.px(13)
       }
       Text {
+        textFormat: Text.PlainText
         id: mark
         visible: row.r.kind === "line"
         x: newNum.x + list.numW + 10
@@ -245,6 +246,7 @@ Item {
         font.pixelSize: Zenon.px(12)
       }
       Text {
+        textFormat: Text.PlainText
         visible: row.r.kind === "hunk"
         x: 14
         width: parent.width - 28
@@ -258,6 +260,7 @@ Item {
         font.pixelSize: Zenon.px(13)
       }
       Text {
+        textFormat: Text.PlainText
         visible: row.r.kind === "file"
         x: 14
         width: parent.width - 28

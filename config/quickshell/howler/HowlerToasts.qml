@@ -201,7 +201,13 @@ PanelWindow {
           && !!Howler.hushed[toast.modelData.id]
         visible: !toast.hushed
 
-        readonly property bool hasIcon: Howler.iconsEnabled && toast.source !== ""
+        // named but not to be had (no such themed icon, a file that will not
+        // load): the box stays, with Howler's question mark in it
+        // (notify-send -i names it as the image alone, appIcon left empty)
+        readonly property bool iconMissing: !!toast.modelData
+          && (!!toast.modelData.appIcon || !!toast.modelData.image)
+          && (toast.source === "" || iconImg.status === Image.Error)
+        readonly property bool hasIcon: Howler.iconsEnabled && (toast.source !== "" || toast.iconMissing)
 
         // ── A CAPTURE IS ITS PICTURE ─────────────────────────────────
         // A screenshot or a recording says so in two hints — the kind and
@@ -216,6 +222,17 @@ PanelWindow {
           return k === "shot" || k === "video" ? k : "";
         }
         readonly property string captureFile: String(toast.hints["x-howler-file"] || "")
+        // ── A CALENDAR EVENT'S REMINDER (user, 2026-10-28: "visually special,
+        // and sport the color of the event") ───────────────────────────
+        // Chronos says the event's hue (Clio's stickies' seven) and its day
+        // in two hints. The card is washed in that hue, a band of it down
+        // its edge, its border and glow in it, and a date tile — the day of
+        // the month under its weekday, Apple's — where an icon would be.
+        readonly property string eventHue: String(toast.hints["x-howler-event"] || "")
+        readonly property bool event: toast.eventHue !== "" && !toast.capture
+        readonly property color eventInk: Howler.eventInk(toast.eventHue)
+        // "2026-10-28": the tile's weekday and day
+        readonly property var eventDay: Howler.eventDayOf(toast.hints["x-howler-day"])
         // THE PICTURE BY ITS PATH, never through `source`. That one hands
         // anything not starting with "/" to the icon theme, and notify-send
         // can deliver its -i path as a file:// url — which the icon provider
@@ -246,16 +263,20 @@ PanelWindow {
         readonly property string source: {
           const r = toast.modelData;
           if (!r) return "";
-          if (r.image && r.image !== "") return NowPlaying.art(r.image);
+          // (a raw notification: notify-send's icon also comes as an
+          // image://icon/ image — checked, so a missing one is not Qt's
+          // checkerboard)
+          const im = Howler.imageSource(r.image);
+          if (im !== "") return NowPlaying.art(im);
           // A TRACK WITH NO PICTURE OF ITS OWN wears its player's cover.
           // Spotify's client sends none at all — the bar's panel had the
           // art all along because it reads MPRIS, and now so does this.
           // (http covers as NowPlaying's cached file: Qt's HTTP/2 crashed)
           if (toast.artUrl !== "") return NowPlaying.art(toast.artUrl);
-          if (r.appIcon && r.appIcon !== "")
-            return String(r.appIcon).indexOf("/") === 0
-              ? "file://" + r.appIcon : "image://icon/" + r.appIcon;
-          return "";
+          // a file, a file:// address, or a themed name the theme has
+          // (Howler.iconSource: a missing name is no icon, not Qt's
+          // checkerboard)
+          return Howler.iconSource(r.appIcon);
         }
 
         // FROM A MUSIC PLAYER, asked of the players actually running rather
@@ -422,8 +443,11 @@ PanelWindow {
         // is this. Maximum width still has the last word. Measured off a
         // free-standing copy of the text rather than off the drawn one,
         // whose width is this very binding.
+        // a reminder's date tile, and the room after it (dayTile below)
+        readonly property int tileRoom: toast.event ? Howler.padding + 6 + Math.round(Howler.fontSize * 3.9) + Howler.hPadding + 4 : 0
         readonly property int lane: Howler.hPadding + Howler.borderSize * 2
-          + (toast.hasIcon
+          + (toast.event ? toast.tileRoom
+             : toast.hasIcon
              ? Howler.iconPadding + Howler.iconSize + Howler.hPadding
              : Howler.hPadding)
         // THE DELEGATE IS THE LANE, and the card is centered in it. Setting
@@ -453,7 +477,9 @@ PanelWindow {
         readonly property int cardW: {
           const need = Math.ceil(Math.max(bodyMetrics.implicitWidth,
                                           titleMetrics.implicitWidth)) + 2;
-          return Math.min(Howler.maxWidth,
+          // a reminder is wider by its tile: its words keep the room any
+          // toast's have (user, 2026-10-28: "give the text more width")
+          return Math.min(Howler.maxWidth + toast.tileRoom,
             toast.lane + Math.max(Howler.width, need));
         }
         // MEASURED FROM THE CONTENT, never from `inner`. inner fills this
@@ -472,6 +498,7 @@ PanelWindow {
         // The summary measured the same way, and it has to be: a short body
         // under a long title was fitted to the body and elided the title.
         Text {
+          textFormat: Text.PlainText
           id: titleMetrics
           visible: false
           text: toast.titleless || !toast.modelData ? "" : (toast.modelData.summary || "")
@@ -682,12 +709,13 @@ PanelWindow {
         MenuShadow {
           panel: card
           cornerRadius: Howler.radius
-          ink: Howler.accent
+          ink: toast.event ? toast.eventInk : Howler.accent
           reach: Howler.glowReach
           softness: Howler.glowReach
           grow: Howler.borderSize * 2
           drop: 0
-          visible: toast.critical && Howler.glowOn && Howler.glowReach > 0
+          // a calendar reminder wears its color, not a glow (user, 2026-10-28)
+          visible: toast.critical && !toast.event && Howler.glowOn && Howler.glowReach > 0
         }
 
         ClippingRectangle {
@@ -697,10 +725,23 @@ PanelWindow {
           height: parent.height
           radius: Howler.radius
           color: Howler.bg
-          border.color: toast.critical ? Howler.accent : Zenon.border
+          border.color: toast.event ? toast.eventInk : toast.critical ? Howler.accent : Zenon.border
           border.width: Howler.borderSize
 
           HoverHandler { id: toastHov }
+
+          // the event's wash, and its band down the edge
+          Rectangle {
+            anchors.fill: parent
+            visible: toast.event
+            color: Zenon.alpha(toast.eventInk, Zenon.light ? 0.12 : 0.16)
+          }
+          Rectangle {
+            visible: toast.event
+            width: 5
+            height: parent.height
+            color: toast.eventInk
+          }
 
           // ── THE CAPTURE ──────────────────────────────────────────────
           // Inside the border, so the card's edge is still drawn round it.
@@ -805,9 +846,44 @@ PanelWindow {
             // difference on whichever side has no icon against it.
             readonly property int textInset: Howler.hPadding - Howler.padding
 
+            // the event's date tile
+            Rectangle {
+              id: dayTile
+              visible: toast.event
+              anchors.left: parent.left
+              anchors.leftMargin: 6
+              anchors.verticalCenter: parent.verticalCenter
+              width: toast.event ? Math.round(Howler.fontSize * 3.9) : 0
+              height: width
+              radius: Zenon.rad(2)
+              color: Zenon.alpha(toast.eventInk, 0.22)
+              border.width: 1
+              border.color: Zenon.alpha(toast.eventInk, 0.6)
+              Column {
+                anchors.centerIn: parent
+                spacing: -2
+                Text {
+                  anchors.horizontalCenter: parent.horizontalCenter
+                  text: Qt.locale().dayName(toast.eventDay.getDay(), Locale.ShortFormat).toUpperCase()
+                  color: toast.eventInk
+                  font.family: Zenon.face
+                  font.weight: Font.Bold
+                  font.pixelSize: Math.round(Howler.fontSize * 0.72)
+                }
+                Text {
+                  anchors.horizontalCenter: parent.horizontalCenter
+                  text: toast.eventDay.getDate()
+                  color: Howler.titleInk
+                  font.family: Zenon.face
+                  font.weight: Font.Bold
+                  font.pixelSize: Math.round(Howler.fontSize * 1.75)
+                }
+              }
+            }
+
             ClippingRectangle {
               id: iconBox
-              anchors.left: parent.left
+              anchors.left: toast.event ? dayTile.right : parent.left
               // Back OUT of inner's gutter by the difference, so the image sits
               // at its own inset from the card rather than at the text's.
               // ONLY WHEN THERE IS AN IMAGE. With none, the box is still an
@@ -815,12 +891,13 @@ PanelWindow {
               // pixels left took six pixels off the text's left gutter and
               // left them on its right — which a centered line shows as being
               // three pixels off center, on every toast without an icon.
-              anchors.leftMargin: toast.hasIcon
-                ? Howler.iconPadding - Howler.padding : 0
+              // after a reminder's date tile, the room a picture would have
+              anchors.leftMargin: toast.event ? Howler.hPadding + 4
+                : toast.hasIcon ? Howler.iconPadding - Howler.padding : 0
               anchors.verticalCenter: parent.verticalCenter
-              width: toast.hasIcon ? Howler.iconSize : 0
+              width: toast.hasIcon && !toast.event ? Howler.iconSize : 0
               height: width
-              visible: toast.hasIcon
+              visible: toast.hasIcon && !toast.event
               radius: Howler.iconRadius
               color: "transparent"
 
@@ -833,6 +910,14 @@ PanelWindow {
                 sourceSize.height: Howler.iconSize
                 source: toast.source
                 onStatusChanged: if (status !== Image.Loading) toast.release()
+              }
+              Text {
+                anchors.centerIn: parent
+                visible: toast.iconMissing
+                text: Howler.missingGlyph
+                color: Zenon.accentMuted
+                font.family: Zenon.glyphFace
+                font.pixelSize: Math.round(Howler.iconSize * 0.6)
               }
             }
 
@@ -852,12 +937,13 @@ PanelWindow {
               spacing: 2
 
               Text {
+                textFormat: Text.PlainText
                 width: parent.width
                 horizontalAlignment: Howler.textAlign
                 elide: Text.ElideRight
                 visible: !toast.titleless
                 text: toast.modelData ? (toast.modelData.summary || "") : ""
-                color: toast.critical ? Howler.accent : Howler.titleInk
+                color: toast.event ? Howler.titleInk : toast.critical ? Howler.accent : Howler.titleInk
                 font.family: Zenon.face
                 font.weight: Font.Bold
                 font.pixelSize: Howler.fontSize
@@ -891,7 +977,7 @@ PanelWindow {
                 opacity: transport.visible && toast.marks === "" ? 0 : 1
                 text: toast.bodyText
                 textFormat: Howler.markup ? Text.StyledText : Text.PlainText
-                color: toast.titleless ? Howler.titleInk : Howler.bodyInk
+                color: toast.event ? toast.eventInk : toast.titleless ? Howler.titleInk : Howler.bodyInk
                 font.family: Zenon.face
                 font.weight: Font.Bold
                 font.pixelSize: toast.titleless

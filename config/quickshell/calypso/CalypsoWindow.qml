@@ -931,6 +931,7 @@ FloatingWindow {
           anchors.verticalCenter: parent.verticalCenter
           spacing: 2
           Text {
+            textFormat: Text.PlainText
             width: parent.width
             elide: Text.ElideRight
             text: acctChip.acct ? acctChip.acct.name : "Calypso"
@@ -940,6 +941,7 @@ FloatingWindow {
             font.pixelSize: Zenon.px(16)
           }
           Text {
+            textFormat: Text.PlainText
             width: parent.width
             elide: Text.ElideRight
             text: !win.mgr ? "" : acctChip.acct ? C.platform(acctChip.acct.kind).name
@@ -1072,6 +1074,7 @@ FloatingWindow {
                   Column {
                     anchors.verticalCenter: parent.verticalCenter
                     Text {
+                      textFormat: Text.PlainText
                       text: acctRow.modelData.name
                       color: Zenon.ink
                       font.family: Zenon.face
@@ -1079,6 +1082,7 @@ FloatingWindow {
                       font.pixelSize: Zenon.px(14)
                     }
                     Text {
+                      textFormat: Text.PlainText
                       text: C.platform(acctRow.modelData.kind).name + (acctRow.st.user ? "  ·  " + acctRow.st.user : "")
                       color: Zenon.accentMuted
                       font.family: Zenon.face
@@ -1252,6 +1256,7 @@ FloatingWindow {
                 font.pixelSize: Zenon.px(15)
               }
               Text {
+                textFormat: Text.PlainText
                 width: parent.width
                 elide: Text.ElideRight
                 visible: text !== ""
@@ -1386,6 +1391,7 @@ FloatingWindow {
             if (win.key(e)) e.accepted = true;
           }
           Text {
+            textFormat: Text.PlainText
             visible: searchField.text === ""
             anchors.verticalCenter: parent.verticalCenter
             text: !win.mgr ? "" : "Search " + (win.scope.acct ? (win.mgr.accountOf(win.scope.acct) || {}).name || "" : "everything")
@@ -1566,6 +1572,7 @@ FloatingWindow {
         font.pixelSize: Zenon.px(19)
       }
       Text {
+        textFormat: Text.PlainText
         anchors.left: headTitle.right
         anchors.leftMargin: 12
         anchors.baseline: headTitle.baseline

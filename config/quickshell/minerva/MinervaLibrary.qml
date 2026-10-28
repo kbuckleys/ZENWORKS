@@ -250,6 +250,7 @@ Item {
           }
           // no cover of its own: its kind, as the grid's plain board has it
           Text {
+            textFormat: Text.PlainText
             anchors.centerIn: parent
             visible: !!lib.hero && !lib.hero.cover
             text: !lib.hero ? "" : ({ pdf: "\u{F0226}", epub: "\u{F05DA}", comic: "\u{F02F9}", text: "\u{F09ED}" })[lib.hero.kind] || "\u{F05DA}"
@@ -267,6 +268,7 @@ Item {
           spacing: 6
           SectionLabel { text: "Continue reading" }
           Text {
+            textFormat: Text.PlainText
             width: parent.width
             elide: Text.ElideRight
             text: lib.hero ? lib.hero.title : ""
@@ -276,6 +278,7 @@ Item {
             font.weight: Font.DemiBold
           }
           Text {
+            textFormat: Text.PlainText
             width: parent.width
             elide: Text.ElideRight
             visible: text !== ""
@@ -394,6 +397,7 @@ Item {
           spacing: 8
           visible: coverBox.src === ""
           Text {
+            textFormat: Text.PlainText
             anchors.horizontalCenter: parent.horizontalCenter
             text: !cell.book ? "" : ({ pdf: "\u{F0226}", epub: "\u{F05DA}", comic: "\u{F02F9}", text: "\u{F09ED}" })[cell.book.kind] || "\u{F05DA}"
             color: Zenon.accentMuted
@@ -401,6 +405,7 @@ Item {
             font.pixelSize: Zenon.px(30)
           }
           Text {
+            textFormat: Text.PlainText
             width: parent.width
             horizontalAlignment: Text.AlignHCenter
             wrapMode: Text.WordWrap
@@ -448,6 +453,7 @@ Item {
         width: coverBox.width
         spacing: 2
         Text {
+          textFormat: Text.PlainText
           width: parent.width
           elide: Text.ElideRight
           text: cell.book ? cell.book.title : ""
@@ -457,6 +463,7 @@ Item {
           font.pixelSize: Zenon.px(14)
         }
         Text {
+          textFormat: Text.PlainText
           width: parent.width
           elide: Text.ElideRight
           text: !cell.book ? "" : [cell.book.author, M.KINDS[cell.book.kind]].filter((x) => x).join("  ·  ")

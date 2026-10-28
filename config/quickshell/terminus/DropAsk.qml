@@ -295,6 +295,7 @@ PanelWindow {
             // centered, after menu.openCustom's custom lists — but this is
             // a menu, and the shared ones set its type, size and edge.
             Text {
+              textFormat: Text.PlainText
               visible: !modelData.sep
               anchors.verticalCenter: parent.verticalCenter
               anchors.left: parent.left

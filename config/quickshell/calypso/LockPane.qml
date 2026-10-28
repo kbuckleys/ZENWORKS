@@ -91,6 +91,7 @@ Item {
       width: parent.width
       spacing: 4
       Text {
+        textFormat: Text.PlainText
         width: parent.width
         horizontalAlignment: Text.AlignHCenter
         elide: Text.ElideRight
@@ -101,6 +102,7 @@ Item {
         font.pixelSize: Zenon.px(22)
       }
       Text {
+        textFormat: Text.PlainText
         width: parent.width
         horizontalAlignment: Text.AlignHCenter
         elide: Text.ElideMiddle

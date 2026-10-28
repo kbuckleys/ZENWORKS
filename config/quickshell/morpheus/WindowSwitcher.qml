@@ -308,6 +308,7 @@ PanelWindow {
             // nothing to show yet (or ever, for a window that will not be
             // captured): its glyph, large
             Text {
+              textFormat: Text.PlainText
               anchors.centerIn: parent
               visible: !shot.hasContent
               text: Icons.appGlyph([tile.appId, tile.win ? tile.win.title : ""]) || "\u{F05C4}"
@@ -362,6 +363,7 @@ PanelWindow {
             anchors.topMargin: 8
             spacing: 6
             Text {
+              textFormat: Text.PlainText
               id: glyph
               anchors.verticalCenter: parent.verticalCenter
               text: Icons.appGlyph([tile.appId, tile.win ? tile.win.title : ""]) || "\u{F05C4}"
@@ -370,6 +372,7 @@ PanelWindow {
               font.pixelSize: Zenon.px(15)
             }
             Text {
+              textFormat: Text.PlainText
               anchors.verticalCenter: parent.verticalCenter
               width: Math.min(implicitWidth, tile.width - 20 - glyph.implicitWidth - nameRow.spacing)
               text: tile.win ? tile.win.title : ""

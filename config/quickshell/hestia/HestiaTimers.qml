@@ -72,6 +72,7 @@ Item {
           font.pixelSize: Zenon.px(14)
         }
         Text {
+          textFormat: Text.PlainText
           width: parent.width
           elide: Text.ElideRight
           text: trow.r ? trow.r.desc || trow.r.activates : ""

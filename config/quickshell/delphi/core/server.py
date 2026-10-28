@@ -38,6 +38,7 @@ import tempfile
 import threading
 
 import aur
+import aurnew
 import rest
 import forgejo
 import github
@@ -339,6 +340,7 @@ FORGES = {"github": github, "gitlab": gitlab, "codeberg": forgejo}
 KINDS = {"gitlab": gitlab, "forgejo": forgejo}
 _HOSTED = {}
 _HOSTED_LOCK = threading.Lock()
+_FULL = re.compile(r"^(?!.*(^|/)\.\.?(/|$))[A-Za-z0-9_.-]+(/[A-Za-z0-9_.-]+)+$")
 _ROUTE = re.compile(r"(github|gitlab|codeberg|forgejo)(?:@([a-z0-9][a-z0-9.\-]*(?::\d+)?))?(?=[A-Z])")
 
 
@@ -379,7 +381,7 @@ WRITES = {"resolveBlocks", "ignore", "untrack", "stage", "stageAll", "unstage", 
           "stashPush", "stashApply", "stashDrop", "stashBranch",
           "worktreeAdd", "worktreeRemove", "worktreePrune", "merge",
           "cherryPick", "revert", "rebase", "rebaseInteractive", "sequence",
-          "reset", "take", "markResolved", "pullCheckout", "connect", "bringBack", "applyPatch", "sync", "mirrorAdd"}
+          "reset", "bisect", "take", "markResolved", "pullCheckout", "connect", "bringBack", "applyPatch", "sync", "mirrorAdd"}
 
 # Request op → Repo method, where the names differ.
 ALIAS = {"files": "files_in", "refs": "refs", "lastMessage": "last_message"}
@@ -550,6 +552,24 @@ class Server(lines.Service):
             return {}
         if op == "aurFor":
             return aur.packages_for(kw.get("roots") or [], kw.get("urls") or [])
+        # ── the AUR beyond one recipe (2026-10-28): a new package from a
+        # source checkout (core/aurnew.py), its commands over SSH, a search ──
+        if op == "aurScan":
+            return aurnew.scan(kw["path"])
+        if op == "aurResolve":
+            return aurnew.resolve(kw.get("names") or [])
+        if op == "aurAvailable":
+            return aurnew.available(kw.get("name", ""))
+        if op == "aurDraft":
+            return {"text": aurnew.write(kw.get("spec") or {})}
+        if op == "aurCreate":
+            return aurnew.create(kw.get("spec") or {}, kw.get("dest", ""))
+        if op == "aurSsh":
+            return aur.ssh(kw.get("cmd", ""), kw.get("args") or [], self.asker.path, cancel)
+        if op == "aurOutdated":
+            return aur.outdated(kw.get("names") or [], cancel)
+        if op == "aurSearch":
+            return aur.search(kw.get("text", ""), kw.get("by", "name-desc"))
         fr = route(op)
         if fr:
             return self.forge(fr[0], fr[1], kw, cancel, emit)
@@ -646,6 +666,12 @@ class Server(lines.Service):
             finally:
                 if cli:
                     gitrun.CREDS.set(f.HOST, f.token()[1] == cli)
+        # A REPOSITORY'S NAME GOES INTO THE API'S PATH (/repos/{full}/…) with
+        # your token: read from a cloned repository's remote, so `a/../../user`
+        # would aim a write (a settings edit, a fork, a re-run) elsewhere.
+        # owner/name (GitLab: groups/…/name), plain segments only.
+        if "full" in kw and not _FULL.match(str(kw["full"])):
+            raise ForgeError("not a repository's name: " + str(kw["full"])[:80], 422)
         if op == "Accounts":
             return f.accounts()
         if op == "Repos":
@@ -681,6 +707,26 @@ class Server(lines.Service):
             return f.checks(kw["full"], kw["sha"])
         if op == "ChecksMany":
             return f.checks_many(kw["full"], kw["shas"])
+        # a job's log and its re-run; a review; the repository's settings;
+        # a fork (2026-10-28)
+        if op == "JobLog":
+            return f.job_log(kw["full"], kw["job"])
+        if op == "Rerun":
+            return f.rerun(kw["full"], kw["job"])
+        if op == "Review":
+            if kw.get("verdict") not in ("approve", "changes", "comment"):
+                raise ForgeError("approve, changes or comment", 422)
+            return f.review(kw["full"], kw["number"], kw["verdict"], kw.get("body", ""))
+        if op == "Inbox":
+            return f.inbox()
+        if op == "InboxDone":
+            return f.inbox_done(kw["id"])
+        if op == "RepoInfo":
+            return f.repo_info(kw["full"])
+        if op == "RepoEdit":
+            return f.repo_edit(kw["full"], kw.get("changes") or {})
+        if op == "Fork":
+            return f.fork(kw["full"], kw.get("org"))
         if op == "AddSigningKey":
             return f.add_signing_key(kw["key"], kw.get("title", "delphi"))
         if op == "SshKeys":

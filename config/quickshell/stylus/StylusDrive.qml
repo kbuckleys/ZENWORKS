@@ -82,6 +82,7 @@ Rectangle {
     // what is on it; while writing, how far; after, how it went; and when
     // the image cannot go here, why
     Text {
+      textFormat: Text.PlainText
       width: parent.width
       elide: Text.ElideRight
       text: card.result ? card.result.words : card.running ? S.progressLine(card.job)

@@ -57,6 +57,7 @@ Rectangle {
   visible: opacity > 0
   Behavior on opacity { NumberAnimation { duration: Zenon.normal; easing.type: Easing.OutCubic } }
   Text {
+    textFormat: Text.PlainText
     id: saidText
     anchors.centerIn: parent
     width: Math.min(implicitWidth, parent.width - 32)

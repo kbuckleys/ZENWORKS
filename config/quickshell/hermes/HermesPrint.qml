@@ -485,6 +485,7 @@ Column {
             font.pixelSize: Zenon.px(16)
           }
           Text {
+            textFormat: Text.PlainText
             anchors.left: devGlyph.right
             anchors.leftMargin: 10
             anchors.right: devAdd.left
@@ -570,6 +571,7 @@ Column {
             font.pixelSize: Zenon.px(16)
           }
           Text {
+            textFormat: Text.PlainText
             anchors.left: scGlyph.right
             anchors.leftMargin: 10
             anchors.right: parent.right

@@ -160,6 +160,52 @@ def request(method, url, headers, body=None, raw=False, again=False, waited=None
 
 
 # ── CI: WHAT A FORGE'S CHECKS SAY OF A COMMIT ─────────────────────────────
+def text(url, headers, who="the forge", tail=400000):
+    """A text answer (a CI job's log), the last `tail` characters. A
+    redirect to another host (GitHub's logs live in blob storage, behind a
+    signed address) is followed WITHOUT the forge's sign-in: the token is
+    the forge's, never handed to whoever the forge points at."""
+    host = urllib.parse.urlparse(url).netloc
+
+    class Keep(urllib.request.HTTPRedirectHandler):
+        def redirect_request(self, req, fp, code, msg, hdrs, newurl):
+            new = super().redirect_request(req, fp, code, msg, hdrs, newurl)
+            to = urllib.parse.urlparse(newurl)
+            # another host, or the same one in the clear: no sign-in
+            if new is not None and (to.netloc != host or to.scheme != "https"):
+                for k in list(new.headers):
+                    if k.lower() in ("authorization", "private-token"):
+                        del new.headers[k]
+                new.unredirected_hdrs.pop("Authorization", None)
+            return new
+
+    opener = urllib.request.build_opener(Keep)
+    req = urllib.request.Request(url, headers=dict(headers))
+    try:
+        with opener.open(req, timeout=30) as r:
+            data = r.read()
+    except urllib.error.HTTPError as e:
+        raise ForgeError(f"{who} answered {e.code}" + (": the log has expired, or the job never started" if e.code in (404, 410) else ""), e.code)
+    except (urllib.error.URLError, TimeoutError, OSError) as e:
+        raise ForgeError(f"cannot reach {who}: {getattr(e, 'reason', None) or e}")
+    t = data.decode("utf-8", errors="replace")
+    return t[-tail:] if len(t) > tail else t
+
+
+def log_lines(t, most=4000):
+    """a log made readable: colour codes and timestamps off, the last lines"""
+    t = re.sub(r"\x1b\[[0-9;?]*[A-Za-z]", "", t.lstrip("\ufeff"))
+    out = []
+    for line in t.replace("\r\n", "\n").split("\n"):
+        line = line.split("\r")[-1]
+        # GitHub's: 2026-10-28T03:14:15.1234567Z at each line's start
+        line = re.sub(r"^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(\.\d+)?Z ", "", line)
+        # GitLab's section markers
+        line = re.sub(r"section_(start|end):\d+:[\w.-]+(\[[^\]]*\])?", "", line)
+        out.append(line)
+    return out[-most:]
+
+
 # GitHub's check runs and statuses, GitLab's job statuses, Forgejo's commit
 # statuses — each forge's words for how a check went, said one way here:
 # pending, success, failure, or neutral (skipped, canceled by a newer run's

@@ -10,6 +10,10 @@
 //   n add · r rename · return/e edit the addresses · s switch HTTPS ↔ SSH
 //   (SSH tested first: no key that gets in, and the SSH keys page offers to
 //   make one) · f fetch it · w its page on the web · d remove
+//   o its settings on the forge (2026-10-28): name, description, home
+//     page, visibility, default branch, topics — a rename on the forge
+//     renames it here too · k fork it to your account (origin becomes
+//     your fork, the original upstream)
 
 import QtQuick
 import Quickshell
@@ -25,11 +29,12 @@ Item {
   readonly property string title: "Remotes"
   readonly property string subtitle: pg.rows.length === 0 ? "Not connected anywhere"
     : pg.rows.length + (pg.rows.length === 1 ? " remote" : " remotes")
-  readonly property var hints: [["n", "add"], ["r", "rename"], ["e", "edit"], ["s", "ssh / https"], ["f", "fetch"], ["w", "web"], ["d", "remove"]]
+  readonly property var hints: [["n", "add"], ["r", "rename"], ["e", "edit"], ["s", "ssh / https"], ["o", "forge settings"], ["k", "fork"], ["f", "fetch"], ["w", "web"], ["d", "remove"]]
   readonly property var buttons: [
     { label: "Remove", ink: Zenon.red, visible: !!pg.row, run: () => pg.remove(pg.row) },
     { label: pg.row && D.protocolOf(pg.row.fetch) === "SSH" ? "Use HTTPS" : "Use SSH",
       visible: !!pg.row && D.otherUrl(pg.row.fetch) !== "", run: () => pg.switchWay(pg.row) },
+    { label: "On the forge…", visible: !!pg.forgeRow, run: () => pg.settings(pg.row) },
     { label: "Add remote", ink: Zenon.cyan, primary: true, run: () => pg.add() },
   ]
   function takeFocus() { if (pg.win) pg.win.focusKeys(); }
@@ -71,6 +76,101 @@ Item {
     if (r.host === "aur.archlinux.org") return "https://aur.archlinux.org/packages/" + r.full.replace(/\.git$/, "");
     return r.web.replace(/\.git$/, "");
   }
+  // the selected remote's forge, when Delphi speaks to it: { id, name, full }
+  readonly property var forgeRow: {
+    if (!pg.row) return null;
+    const o = D.remoteOf(pg.row.fetch || pg.row.push);
+    const f = o ? D.forgeOfHost(o.host) : null;
+    return f ? { id: f.id, name: f.name, full: o.full, host: o.host } : null;
+  }
+
+  // ── ITS SETTINGS ON THE FORGE ──────────────────────────────────────────
+  function settings(r) {
+    const f = pg.forgeRow;
+    if (!r || !f) { pg.win.say("Delphi speaks to GitHub, GitLab and Codeberg (and servers of your own)", true); return; }
+    pg.win.act(f.id + "RepoInfo", { full: f.full }, { repo: null, label: "Asking " + f.name, network: true, refresh: false,
+      then: (i) => pg.settingsForm(r, f, i) });
+  }
+  function settingsForm(r, f, i) {
+    pg.win.mgr.call(f.id + "Branches", null, { full: i.full }, (ok, br) => {
+      if (!pg) return;
+      const branches = ok && br.branches.length ? br.branches : [i.default];
+      pg.win.ask({ title: i.full + " on " + f.name, glyph: "",
+        detail: (i.fork ? "A fork of " + i.parent + ".  " : "") + (i.archived ? "Archived: read-only on " + f.name + "." : "")
+          + " A new name renames it on " + f.name + ", and this remote's addresses with it.",
+        fields: [{ key: "name", label: "Name", value: i.name },
+                 { key: "description", label: "Description", value: i.description, optional: true },
+                 { key: "homepage", label: "Home page", value: i.homepage, optional: true },
+                 { key: "visibility", label: "Who sees it", options: i.private ? [["private", "Only you and who you let in"], ["public", "Everyone"]]
+                                                                      : [["public", "Everyone"], ["private", "Only you and who you let in"]] },
+                 { key: "default", label: "Default branch", options: [i.default].concat(branches.filter((b) => b !== i.default)).map((b) => [b, b]) },
+                 { key: "topics", label: "Topics", value: i.topics.join(" "), optional: true, hint: "space-separated" }],
+        verb: "Save", hold: true, busyText: "Saving…",
+        then: (v, finish) => {
+          const ch = {};
+          if (v.name.trim() !== i.name) ch.name = v.name.trim();
+          if (v.description.trim() !== i.description) ch.description = v.description.trim();
+          if (f.id.indexOf("gitlab") !== 0 && v.homepage.trim() !== i.homepage) ch.homepage = v.homepage.trim();
+          if ((v.visibility === "private") !== i.private) ch.private = v.visibility === "private";
+          if (v.default !== i.default) ch.default = v.default;
+          const topics = v.topics.split(/[\s,]+/).filter((t) => t !== "");
+          if (topics.join(" ") !== i.topics.join(" ")) ch.topics = topics;
+          if (Object.keys(ch).length === 0) { finish(true); pg.win.say("Nothing changed"); return; }
+          // A PRIVATE ONE MADE PUBLIC is the change that cannot be taken
+          // back — whoever looks in the meantime has seen it: asked again
+          if (ch.private === false) {
+            finish(true);
+            pg.win.confirm({ question: "Make " + i.full + " public?", glyph: "", ink: Zenon.yellow,
+              detail: "Everyone on " + f.name + " can see it, its history and its issues as soon as it is saved — making it private again later does not unsee it.",
+              verb: "Make it public",
+              then: () => pg.saveSettings(r, f, i, ch, (why) => { if (why !== true) pg.win.say(why, true); }) });
+            return;
+          }
+          pg.saveSettings(r, f, i, ch, finish);
+        } });
+    });
+  }
+  // the settings changed (ch) saved on the forge; done(true) or done(why)
+  function saveSettings(r, f, i, ch, done) {
+    pg.win.mgr.call(f.id + "RepoEdit", null, { full: i.full, changes: ch }, (ok2, after, err) => {
+      if (!pg) return;
+      if (!ok2) { done(err && err.error ? err.error : "It was not saved"); return; }
+      done(true);
+      // renamed there: this remote follows (the forge redirects for a
+      // while, then stops)
+      if (ch.name && after.full !== i.full) {
+        const swap = (u) => u ? u.replace(i.full, after.full) : u;
+        const own = r.push && r.push !== r.fetch;
+        pg.win.act("remoteSetUrl", { name: r.name, url: swap(r.fetch), push: own ? swap(r.push) : null },
+          { label: "Following the rename", then: () => pg.changed("Renamed to " + after.full + " — this remote follows", r.name) });
+      } else pg.win.say("Saved on " + f.name);
+    });
+  }
+
+  // ── A FORK ─────────────────────────────────────────────────────────────
+  // Made on your account; then origin points at it and the original is
+  // upstream, so pushes go to your fork and pull requests to theirs.
+  function fork(r) {
+    const f = pg.forgeRow;
+    if (!r || !f) return;
+    pg.win.confirm({ question: "Fork " + f.full + "?", glyph: "", ink: Zenon.cyan,
+      detail: "A copy on your " + f.name + " account. Then " + (r.name === "origin" ? "origin is your fork, and this one is upstream" : "your fork is added as origin")
+        + ": you push to yours, and open pull requests to theirs.",
+      verb: "Fork",
+      then: () => pg.win.act(f.id + "Fork", { full: f.full }, { repo: null, label: "Forking", network: true, refresh: false,
+        then: (made) => {
+          const url = pg.win.mgr.sshFor[f.id] && made.ssh ? made.ssh : made.https;
+          const addOrigin = () => pg.win.act("remoteAdd", { name: "origin", url: url }, { label: "Adding your fork",
+            then: () => pg.changed("Forked — origin is " + made.full, "origin") });
+          const taken = (n) => pg.rows.some((x) => x.name === n);
+          if (r.name === "origin" && !taken("upstream"))
+            pg.win.act("remoteRename", { old: "origin", "new": "upstream" }, { label: "Renaming", then: addOrigin });
+          else if (!taken("origin")) addOrigin();
+          else pg.win.act("remoteAdd", { name: "fork", url: url }, { label: "Adding your fork",
+            then: () => pg.changed("Forked — your fork is the remote “fork”", "fork") });
+        } }) });
+  }
+
   readonly property var nameOk: /^[A-Za-z0-9][A-Za-z0-9._\/-]*$/
 
   function add() {
@@ -197,6 +297,8 @@ Item {
     if (k === Qt.Key_R) { pg.rename(pg.row); return true; }
     if (k === Qt.Key_S) { pg.switchWay(pg.row); return true; }
     if (k === Qt.Key_F) { pg.fetchOne(pg.row); return true; }
+    if (k === Qt.Key_O) { pg.settings(pg.row); return true; }
+    if (k === Qt.Key_K) { pg.fork(pg.row); return true; }
     if (k === Qt.Key_W) { pg.web(pg.row); return true; }
     if (k === Qt.Key_D || k === Qt.Key_Delete) { pg.remove(pg.row); return true; }
     if (k === Qt.Key_Menu) { menu.open(list.width / 2, (pg.sel + 1) * list.rowH - list.contentY, pg.menuFor(pg.row), pg.sel); return true; }
@@ -243,6 +345,7 @@ Item {
         Row {
           spacing: 10
           Text {
+            textFormat: Text.PlainText
             text: rrow.r.name
             color: rrow.index === pg.sel ? Zenon.ink : Zenon.accentSoft
             font.family: Zenon.face
@@ -250,6 +353,7 @@ Item {
             font.pixelSize: Zenon.px(15)
           }
           Text {
+            textFormat: Text.PlainText
             anchors.baseline: parent.children[0].baseline
             visible: text !== ""
             text: (rrow.r.name === pg.upstream ? "followed by " + (pg.win.branch ? pg.win.branch.head : "this branch") : "")

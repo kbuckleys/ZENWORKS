@@ -99,6 +99,7 @@ FocusScope {
       border.width: 1
       border.color: Zenon.border
       Text {
+        textFormat: Text.PlainText
         anchors.left: parent.left
         anchors.leftMargin: 16
         anchors.right: pick.left
@@ -143,6 +144,7 @@ FocusScope {
         }
       }
       Text {
+        textFormat: Text.PlainText
         anchors.verticalCenter: parent.verticalCenter
         text: Terminus.formatSize(body.size)
         color: Zenon.accentMuted
@@ -160,6 +162,7 @@ FocusScope {
     BulkField { id: label; visible: body.fs !== ""; width: 260; ghost: "Label"; onAccepted: body.go() }
 
     Text {
+      textFormat: Text.PlainText
       visible: body.why !== ""
       width: parent.width
       wrapMode: Text.Wrap

@@ -91,6 +91,7 @@ Column {
       }
     }
     Text {
+      textFormat: Text.PlainText
       anchors.bottom: parent.bottom
       anchors.horizontalCenter: parent.horizontalCenter
       text: mb.chosen ? mb.mood.label : "Choose a place on the scale"

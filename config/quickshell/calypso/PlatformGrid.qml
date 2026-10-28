@@ -123,6 +123,7 @@ Item {
             anchors.topMargin: 10
             spacing: 2
             Text {
+              textFormat: Text.PlainText
               width: parent.width
               elide: Text.ElideRight
               text: cell.p.name

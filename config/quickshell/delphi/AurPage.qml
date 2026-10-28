@@ -28,6 +28,9 @@
 // the page says so and asks again every 30 s until they catch up.
 //
 //   o           the package's page on the AUR
+//   m           keeping it (2026-10-28), the AUR's own commands over SSH:
+//               flag or unflag it out of date, vote, its keywords, its
+//               co-maintainers, adopt it (orphaned) or disown it
 
 import QtQuick
 import "../morpheus"
@@ -44,8 +47,9 @@ Item {
   readonly property string subtitle: !pg.info ? "Reading the recipe…"
     : !pg.info.aur ? (pg.info.error !== "" ? pg.info.error : "Not on the AUR yet: the first push publishes it")
     : "On the AUR at " + pg.info.aur.version
-  readonly property var hints: [["r", "release"], ["p", "publish"], ["v", "version"], ["c", "checksums"], ["s", ".SRCINFO"], ["b", "build"], ["o", "AUR page"]]
+  readonly property var hints: [["r", "release"], ["p", "publish"], ["m", "maintain"], ["v", "version"], ["c", "checksums"], ["s", ".SRCINFO"], ["b", "build"], ["o", "AUR page"]]
   readonly property var buttons: [
+    { label: "Maintain…", visible: !!pg.info && !!pg.info.aur && !pg.running, run: () => pg.maintain() },
     { label: "Build and check", visible: !!pg.info && !pg.running, run: () => pg.build() },
     { label: "Publish…", ink: Zenon.cyan, primary: pg.ready, visible: !!pg.info && !pg.running && pg.ready, run: () => pg.publish() },
     { label: "Release…", ink: Zenon.cyan, primary: !pg.ready, visible: !!pg.info && !pg.running, run: () => pg.release() },
@@ -150,8 +154,35 @@ Item {
     pg.run = { version: pg.run.version, steps: pg.run.steps.map((x) => x.id === id
       ? { id: x.id, label: x.label, state: state, note: note !== undefined ? note : x.note } : x) };
   }
+  // A VCS package (-git, -hg…): no version to set — makepkg's pkgver()
+  // writes it during the build — so its release is the build, then
+  // .SRCINFO written from what the build left in the PKGBUILD
+  readonly property bool vcs: !!pg.r && /-(git|hg|svn|bzr|fossil)$/.test(pg.r.pkgname)
+  function releaseVcs() {
+    pg.built = null;
+    pg.run = { version: "", steps: [
+      { id: "build", label: "Build", state: "wait", note: "" },
+      { id: "srcinfo", label: ".SRCINFO", state: "wait", note: "" },
+    ] };
+    pg.mark("build", "run");
+    pg.win.act("aurBuild", {}, { label: "Building", network: true,
+      failed: (err) => pg.mark("build", "bad", D.errorText(String(err && err.error || "")).split("\n").slice(-6).join("\n")),
+      stopped: () => pg.mark("build", "bad", "Stopped"),
+      then: (b) => {
+        if (!pg || !pg.run) return;
+        pg.built = b;
+        pg.mark("build", "ok", !b.namcap ? "Built — namcap is not installed"
+          : b.notes.length === 0 ? "Built, and namcap has nothing to say" : "Built — namcap has " + b.notes.length + " to read");
+        pg.mark("srcinfo", "run");
+        pg.win.act("aurSrcinfo", {}, { label: "Writing .SRCINFO",
+          failed: () => pg.mark("srcinfo", "bad", "makepkg could not read the PKGBUILD"),
+          then: () => { pg.mark("srcinfo", "ok", "Written, at the version the build found"); pg.reload();
+                        pg.win.say("Ready to publish — p, or Publish"); } });
+      } });
+  }
   function release() {
     if (pg.running) return;
+    if (pg.vcs) { pg.releaseVcs(); return; }
     const ask = (tags) => {
       const newest = tags.length > 0 ? tags[0].replace(/^[vV]/, "") : "";
       pg.win.ask({ title: "Release a version", glyph: "\uF303",
@@ -270,10 +301,58 @@ Item {
         } }) });
   }
 
+  // ── KEEPING IT: THE AUR'S OWN COMMANDS (core/aur.py ssh) ───────────────
+  function aurSsh(cmd, args, label, said) {
+    pg.win.act("aurSsh", { cmd: cmd, args: args }, { repo: null, label: label, network: true, refresh: false,
+      said: said, then: () => pg.reload(true) });
+  }
+  function maintain() {
+    const p = pg.info ? pg.info.aur : null;
+    const base = pg.a ? pg.a.pkg : "";
+    if (!p) { pg.win.say("It is not on the AUR yet — publish it first", true); return; }
+    const flagged = !!p.outOfDate;
+    const orphan = !p.maintainer;
+    pg.win.card_({ question: "Keeping " + base, glyph: "\uF303", ink: Zenon.ink,
+      detail: "The AUR's own commands, over SSH with your AUR key. "
+        + (orphan ? "It is orphaned: adopting it makes it yours." : "Kept by " + p.maintainer + ".")
+        + (flagged ? " Flagged out of date since " + pg.when(p.outOfDate) + "." : ""),
+      choices: [
+        flagged ? { label: "Unflag", ink: Zenon.cyan, run: () => pg.aurSsh("unflag", [base], "Unflagging", "Unflagged") }
+                : { label: "Flag out of date…", ink: Zenon.yellow, run: () => pg.flag(base) },
+        { label: "Vote", run: () => pg.aurSsh("vote", [base], "Voting", "Voted for " + base) },
+        { label: "Keywords…", run: () => pg.words(base, "set-keywords", "Its keywords", "Words it is found by on the AUR's search, space-separated. Empty clears them.", "editor text vim") },
+        { label: "Co-maintainers…", run: () => pg.words(base, "set-comaintainers", "Its co-maintainers", "AUR user names, space-separated: they can push to it too. Empty clears them.", "someone another") },
+        orphan ? { label: "Adopt", ink: Zenon.cyan, run: () => pg.aurSsh("adopt", [base], "Adopting", "Adopted — it is yours") }
+               : { label: "Disown…", ink: Zenon.red, run: () => pg.disown(base) },
+        { label: "Cancel" }] });
+  }
+  function flag(base) {
+    pg.win.ask({ title: "Flag " + base + " out of date", glyph: "\uF303", ink: Zenon.yellow,
+      detail: "Its maintainer is mailed what you write. Say which version is out, and where.",
+      fields: [{ key: "why", label: "Why", hint: "2.0 is out: https://…" }], verb: "Flag",
+      then: (v) => pg.aurSsh("flag", [base, v.why.trim()], "Flagging", "Flagged out of date") });
+  }
+  function words(base, cmd, title, detail, hint) {
+    pg.win.ask({ title: title, glyph: "\uF303", detail: detail,
+      fields: [{ key: "words", label: cmd === "set-keywords" ? "Keywords" : "User names", hint: hint, optional: true }],
+      verb: "Set",
+      then: (v) => {
+        const ws = v.words.split(/[\s,]+/).filter((w) => w !== "");
+        // the command takes the package and the new list, an empty one too
+        pg.aurSsh(cmd, [base].concat(ws), "Setting " + title.toLowerCase(), ws.length ? "Set" : "Cleared");
+      } });
+  }
+  function disown(base) {
+    pg.win.confirm({ question: "Disown " + base + "?", glyph: "\uF303", ink: Zenon.red,
+      detail: "You stop keeping it. A co-maintainer, if it has one, keeps it next; otherwise it is orphaned and anyone can adopt it.",
+      verb: "Disown", then: () => pg.aurSsh("disown", [base], "Disowning", "Disowned " + base) });
+  }
+
   function key(e) {
     if (e.modifiers & Qt.ControlModifier) return false;
     const k = e.key;
     if (!pg.info) return false;
+    if (k === Qt.Key_M) { pg.maintain(); return true; }
     if (k === Qt.Key_R) { pg.release(); return true; }
     if (k === Qt.Key_P) { pg.publish(); return true; }
     if (pg.running && (k === Qt.Key_V || k === Qt.Key_C || k === Qt.Key_S || k === Qt.Key_B)) {
@@ -284,7 +363,7 @@ Item {
     if (k === Qt.Key_C) { pg.sums(); return true; }
     if (k === Qt.Key_S) { pg.srcinfo(); return true; }
     if (k === Qt.Key_B) { pg.build(); return true; }
-    if (k === Qt.Key_O && pg.a) { Qt.openUrlExternally(pg.a.web); return true; }
+    if (k === Qt.Key_O && pg.a) { Strings.openLink(pg.a.web); return true; }
     return false;
   }
 
@@ -352,7 +431,7 @@ Item {
         font.family: Zenon.face
         font.weight: Zenon.weight
         font.pixelSize: Zenon.px(14)
-        MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: Qt.openUrlExternally(pg.a.web) }
+        MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: Strings.openLink(pg.a.web) }
       }
 
       Item { width: 1; height: 14 }
@@ -368,7 +447,7 @@ Item {
       }
 
       Item { width: 1; height: 14; visible: !!pg.run }
-      SectionLabel { visible: !!pg.run; text: pg.run ? "Release " + pg.run.version : "" }
+      SectionLabel { visible: !!pg.run; text: pg.run ? (pg.run.version !== "" ? "Release " + pg.run.version : "Release, from the latest commit") : "" }
       Repeater {
         model: pg.run ? pg.run.steps : []
         delegate: Row {

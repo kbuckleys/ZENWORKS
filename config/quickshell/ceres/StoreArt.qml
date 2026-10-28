@@ -76,6 +76,7 @@ Item {
       font.letterSpacing: Zenon.labelSpacing
     }
     Text {
+      textFormat: Text.PlainText
       width: parent.width
       elide: Text.ElideRight
       text: art.app ? art.app.name : ""
@@ -85,6 +86,7 @@ Item {
       font.pixelSize: Zenon.px(16)
     }
     Text {
+      textFormat: Text.PlainText
       width: parent.width
       elide: Text.ElideRight
       text: art.app ? art.app.summary : ""

@@ -242,6 +242,7 @@ Item {
     source: fp._pic !== "" ? "file://" + fp._pic : ""
   }
   Text {
+    textFormat: Text.PlainText
     visible: fp.message !== ""
     anchors.centerIn: parent
     font.family: Zenon.face

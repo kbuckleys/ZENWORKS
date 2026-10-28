@@ -922,16 +922,20 @@ FloatingWindow {
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: 12
                 Text {
+                  textFormat: Text.PlainText
                   width: 22
                   horizontalAlignment: Text.AlignHCenter
                   anchors.verticalCenter: parent.verticalCenter
                   font.family: Zenon.faceMono
                   font.weight: Zenon.weight
                   font.pixelSize: Zenon.px(17)
-                  color: entry.project ? Zenon.blue : Zenon.white
+                  // a directory in the theme's accent (user, 2026-10-28), as
+                  // directories are everywhere else in the suite
+                  color: entry.project ? Zenon.cyan : Zenon.white
                   text: entry.project ? "\u{F024B}" : Icons.glyphFor({ name: entry.name, isDir: false })
                 }
                 Text {
+                  textFormat: Text.PlainText
                   anchors.verticalCenter: parent.verticalCenter
                   font.family: Zenon.face
                   font.pixelSize: Zenon.px(15)

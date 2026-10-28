@@ -112,6 +112,7 @@ Item {
           anchors.verticalCenter: parent.verticalCenter
           spacing: 4
           Text {
+            textFormat: Text.PlainText
             width: parent.width
             elide: Text.ElideRight
             text: pane.it ? pane.it.title : ""
@@ -198,7 +199,7 @@ Item {
             }
             Text {
               anchors.verticalCenter: parent.verticalCenter
-              text: "<b>" + parent.parent.pr.label + "</b>  \u00b7  " + parent.parent.pr.say
+              text: "<b>" + C.esc(parent.parent.pr.label) + "</b>  \u00b7  " + C.esc(parent.parent.pr.say)
               textFormat: Text.StyledText
               color: Zenon.ink
               font.family: Zenon.face
@@ -361,7 +362,7 @@ Item {
                   anchors.rightMargin: 8
                   anchors.verticalCenter: parent.verticalCenter
                   elide: Text.ElideMiddle
-                  text: modelData.name + (modelData.size ? "  <font color='" + Zenon.accentMuted + "'>" + modelData.size + "</font>" : "")
+                  text: C.esc(modelData.name) + (modelData.size ? "  <font color='" + Zenon.accentMuted + "'>" + modelData.size + "</font>" : "")
                   textFormat: Text.StyledText
                   color: Zenon.ink
                   font.family: Zenon.face

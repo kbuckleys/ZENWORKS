@@ -136,6 +136,7 @@ ClippingRectangle {
         font.letterSpacing: Zenon.labelSpacing
       }
       Text {
+        textFormat: Text.PlainText
         width: parent.width
         elide: Text.ElideRight
         text: hero.app ? hero.app.name : ""
@@ -145,6 +146,7 @@ ClippingRectangle {
         font.pixelSize: Zenon.px(32)
       }
       Text {
+        textFormat: Text.PlainText
         width: parent.width
         elide: Text.ElideRight
         text: hero.app ? hero.app.summary : ""

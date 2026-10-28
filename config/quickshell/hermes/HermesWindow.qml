@@ -351,6 +351,7 @@ FloatingWindow {
           font.pixelSize: Zenon.px(18)
         }
         Text {
+          textFormat: Text.PlainText
           anchors.verticalCenter: parent.verticalCenter
           text: hw.pskNet ? "Join " + hw.pskNet.name : ""
           color: Zenon.ink

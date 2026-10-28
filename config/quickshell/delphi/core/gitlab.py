@@ -491,15 +491,97 @@ def checks(full, sha):
         if key in seen:
             continue
         seen.add(key)
+        # a pipeline job's status is the job: its address ends /-/jobs/<id>
+        m = re.search(r"/-/jobs/(\d+)", s.get("target_url") or "")
         runs.append({"name": (s.get("stage") + ": " if s.get("stage") else "") + (s.get("name") or ""),
                      "state": "neutral" if s.get("allow_failure") and s.get("status") == "failed" else rest.ci_word(s.get("status")),
                      "url": s.get("target_url") or "", "started": s.get("started_at"),
-                     "finished": s.get("finished_at")})
+                     "finished": s.get("finished_at"), "job": int(m.group(1)) if m else None})
     return {"sha": sha, "state": rest.ci_sum(runs), "runs": list(reversed(runs))}
 
 
 def checks_many(full, shas):
     return rest.ci_many(checks, full, shas)
+
+
+def job_log(full, job):
+    tok, _ = token()
+    h = {"User-Agent": "delphi"}
+    if tok:
+        h["PRIVATE-TOKEN"] = tok
+    t = rest.text(f"{API}/projects/{_pid(full)}/jobs/{int(job)}/trace", h, who=NAME)
+    return {"lines": rest.log_lines(t)}
+
+
+def rerun(full, job):
+    call("POST", f"/projects/{_pid(full)}/jobs/{int(job)}/retry")
+    return {}
+
+
+# ── THE INBOX: GitLab's to-dos (2026-10-28) ────────────────────────────
+def inbox():
+    out = []
+    for t in call("GET", "/todos?state=pending&per_page=50") or []:
+        tgt = t.get("target") or {}
+        kind = {"MergeRequest": "pull", "Issue": "issue", "Commit": "commit", "Epic": "issue"}.get(t.get("target_type"), "other")
+        out.append({"id": str(t.get("id")), "title": tgt.get("title") or t.get("body") or "",
+                    "repo": (t.get("project") or {}).get("path_with_namespace") or "", "number": tgt.get("iid") or 0,
+                    "kind": kind, "reason": (t.get("action_name") or "").replace("_", " "),
+                    "when": t.get("updated_at") or t.get("created_at") or "", "web": t.get("target_url") or ""})
+    return out
+
+
+def inbox_done(nid):
+    call("POST", f"/todos/{int(nid)}/mark_as_done", {})
+    return {}
+
+
+# ── REVIEWS ───────────────────────────────────────────────────────────────
+# GitLab has approvals, not verdicts: approve is one; "changes" and a
+# comment are a note on the merge request (changes says so first)
+def review(full, number, verdict, body=""):
+    if verdict == "approve":
+        call("POST", f"/projects/{_pid(full)}/merge_requests/{int(number)}/approve", {})
+        if body:
+            call("POST", f"/projects/{_pid(full)}/merge_requests/{int(number)}/notes", {"body": body})
+        return {}
+    text = ("**Changes requested.**\n\n" if verdict == "changes" else "") + (body or "")
+    if not text.strip():
+        raise ForgeError("Say what should change", 422)
+    call("POST", f"/projects/{_pid(full)}/merge_requests/{int(number)}/notes", {"body": text})
+    return {}
+
+
+# ── THE PROJECT ON GITLAB: ITS SETTINGS, A FORK ──────────────────────────
+def repo_info(full):
+    p = call("GET", f"/projects/{_pid(full)}")
+    return {"full": p["path_with_namespace"], "name": p.get("path") or p.get("name"), "description": p.get("description") or "",
+            "homepage": "", "private": p.get("visibility") != "public", "default": p.get("default_branch") or "",
+            "topics": p.get("topics") or p.get("tag_list") or [], "archived": bool(p.get("archived")),
+            "fork": bool(p.get("forked_from_project")), "parent": (p.get("forked_from_project") or {}).get("path_with_namespace") or "",
+            "web": p.get("web_url") or "", "https": p.get("http_url_to_repo") or "", "ssh": p.get("ssh_url_to_repo") or ""}
+
+
+def repo_edit(full, changes):
+    body = {}
+    if "name" in changes:
+        body["name"] = changes["name"]
+        body["path"] = changes["name"]
+    if "description" in changes:
+        body["description"] = changes["description"]
+    if "private" in changes:
+        body["visibility"] = "private" if changes["private"] else "public"
+    if "default" in changes:
+        body["default_branch"] = changes["default"]
+    if "topics" in changes:
+        body["topics"] = list(changes["topics"])
+    p = call("PUT", f"/projects/{_pid(full)}", body) if body else None
+    return repo_info((p or {}).get("path_with_namespace") or full)
+
+
+def fork(full, org=None):
+    p = call("POST", f"/projects/{_pid(full)}/fork", {"namespace_path": org} if org else {})
+    return {"full": p["path_with_namespace"], "https": p.get("http_url_to_repo") or "", "ssh": p.get("ssh_url_to_repo") or ""}
 
 
 # ── A KEY THAT SIGNS ──────────────────────────────────────────────────────

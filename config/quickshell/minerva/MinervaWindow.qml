@@ -743,6 +743,7 @@ FloatingWindow {
         HoverHandler { enabled: mw.mode === "reading"; onHoveredChanged: hovered ? tip.show(owl, "Library", "ctrl l") : tip.hide(owl) }
       }
       Text {
+        textFormat: Text.PlainText
         id: headTitle
         anchors.left: owl.right
         anchors.leftMargin: 14
@@ -1496,6 +1497,7 @@ FloatingWindow {
         font.pixelSize: Zenon.px(19)
       }
       Text {
+        textFormat: Text.PlainText
         width: parent.width
         visible: !!mw.noteFor && mw.noteFor.list === "highlights"
         maximumLineCount: 3

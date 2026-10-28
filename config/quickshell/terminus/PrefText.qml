@@ -46,6 +46,7 @@ Item {
   // it has the keyboard, which is already a mark and a better one.
 
   Text {
+    textFormat: Text.PlainText
     id: ptextLabel
     anchors.left: parent.left
     anchors.leftMargin: 14

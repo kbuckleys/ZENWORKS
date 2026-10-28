@@ -1843,6 +1843,7 @@ LayerPopup {
             font.pixelSize: Zenon.px(bubLine.modelData.big ? 15 : 12)
           }
           Text {
+            textFormat: Text.PlainText
             width: Math.min(implicitWidth, 312 - (bubGlyph.visible ? bubGlyph.implicitWidth + 7 : 0))
             wrapMode: Text.Wrap
             text: bubLine.modelData.text

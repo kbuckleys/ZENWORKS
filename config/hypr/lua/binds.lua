@@ -86,6 +86,7 @@ bind("ceresUpdates",   "SUPER + SHIFT + P",  "Ceres, updates",                 h
 -- off until given a chord in oracle's Shortcuts
 bind("oracle",         "",                   "Oracle, the settings",           hl.dsp.exec_cmd("qs ipc call Oracle toggle"))
 bind("chronos",        "",                   "Chronos, the calendar",          hl.dsp.exec_cmd("qs ipc call Chronos toggle"))
+bind("calendarWin",    "",                   "Calendar, the window",           hl.dsp.exec_cmd("qs ipc call Calendar open ''"))
 bind("icarus",         "",                   "Icarus, the desktop menu",       hl.dsp.exec_cmd("qs ipc call Icarus toggle"))
 bind("lexiTranslate",  "",                   "Lexi, translate",                hl.dsp.exec_cmd("qs ipc call Lexi translate"))
 bind("zeusProcs",      "",                   "Zeus, the processes",            hl.dsp.exec_cmd("qs ipc call Zeus view list"))

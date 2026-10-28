@@ -76,6 +76,7 @@ Item {
     spacing: 5
 
     Text {
+      textFormat: Text.PlainText
       visible: !row.labelEditable
       text: row.label
       color: Zenon.accentMuted

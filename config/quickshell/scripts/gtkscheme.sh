@@ -57,6 +57,13 @@ if [ "$2" = now ]; then
 fi
 
 data="${XDG_DATA_HOME:-$HOME/.local/share}"
+# the cursor in X's own format, when it is installed (xcursor-pro-cursor-
+# theme): the same design Hyprland wears as a hyprcursor, at its size
+xsize=24
+xcursor=""
+for d in "$data/icons" "$HOME/.icons" /usr/share/icons; do
+	if [ -d "$d/XCursor-Pro-Dark/cursors" ]; then xcursor=XCursor-Pro-Dark; break; fi
+done
 base=
 for d in "$data/themes" "$HOME/.themes" /usr/share/themes; do
 	[ -f "$d/adw-gtk3/gtk-3.0/gtk.css" ] && { base=adw-gtk3; [ $dark = 1 ] && base=adw-gtk3-dark; base="$d/$base/gtk-3.0/gtk.css"; break; }
@@ -132,5 +139,26 @@ for f in "$cfg/gtk-3.0/settings.ini" "$cfg/gtk-4.0/settings.ini"; do
 		ini gtk-application-prefer-dark-theme $dark "$f"
 	fi
 	[ -z "$theme" ] || ini gtk-theme-name "$theme" "$f"
+	# THE CURSOR, X's way (2026-10-28): GTK and the apps that ask it
+	# (Spotify, Steam) drew Adwaita at size 6 beside Hyprland's XCursor-Pro.
+	# Only once the X-format theme is there — naming one that is not makes
+	# matters worse than leaving GTK's own.
+	if [ -n "$xcursor" ]; then
+		ini gtk-cursor-theme-name "$xcursor" "$f"
+		ini gtk-cursor-theme-size "$xsize" "$f"
+	fi
 done
+if [ -n "$xcursor" ]; then
+	if command -v gsettings >/dev/null 2>&1; then
+		[ "$(gsettings get $s cursor-theme 2>/dev/null)" = "'$xcursor'" ] || gsettings set $s cursor-theme "$xcursor"
+		[ "$(gsettings get $s cursor-size 2>/dev/null)" = "$xsize" ] || gsettings set $s cursor-size "$xsize"
+	fi
+	# the default X cursor, for any X app that asks no one: ours, or one
+	# you set yourself (a file without our mark is left alone)
+	d="$HOME/.icons/default/index.theme"
+	if [ ! -f "$d" ] || grep -q "scripts/gtkscheme.sh" "$d"; then
+		mkdir -p "$HOME/.icons/default"
+		printf '[Icon Theme]\nName=Default\nComment=The cursor Zenworks wears (scripts/gtkscheme.sh)\nInherits=%s\n' "$xcursor" > "$d.tmp" && mv -f "$d.tmp" "$d"
+	fi
+fi
 exit 0

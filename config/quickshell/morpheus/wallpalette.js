@@ -210,7 +210,10 @@ function palette(colors, opts) {
       neutral ? lv.acc : Math.max(light ? 0.5 : 0.62, Math.min(light ? 0.8 : 0.86, seed.L)),
       neutral ? 0 : Math.min(0.22, seedC * (0.85 + 0.6 * v))),
     pink: accent(hueToward(10, seedH, neutral), need.acc, lv.pink, accC * (light ? 0.75 : 0.55)),
-    sand: light ? accent(88, need.acc, 0.8, 0.16) : accent(100, need.acc, 0.88, 0.09),
+    // SAND IS A WARM TAN (user, 2026-10-28: "incredibly ugly in every
+    // theme"): hue 80, not 100 — 100 is a yellow-green, a lime khaki on
+    // dark grounds and mustard on light ones; low chroma, as sand is
+    sand: light ? accent(80, need.acc, 0.61, 0.072) : accent(80, need.acc, 0.84, 0.052),
   };
   for (const k in hues) c[k] = accent(hueToward(hues[k], seedH, neutral), need.acc);
   c.red = accent(redFrom(seedH, neutral), need.acc, lv.acc, accC * 1.15);

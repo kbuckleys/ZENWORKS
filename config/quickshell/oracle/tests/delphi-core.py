@@ -1707,6 +1707,137 @@ def aur_packages_found_for_a_source():
        [{"root": pkg, "pkg": "zen"}], "matched by a source=, not by a longer name, never without an AUR remote")
 
 
+@test
+def aur_new_package_scanned_never_run():
+    import aurnew as N
+    mark = os.path.join(TMP, "scan-ran")
+    with tempfile.TemporaryDirectory() as d:
+        files = {
+            "Cargo.toml": '[package]\nname = "zap"\nversion = "1.4.0"\ndescription = "Zaps things."\nlicense = "MIT OR Apache-2.0"\nrepository = "https://github.com/me/zap"\n',
+            "setup.py": "import os; open(%r, 'w')\n" % mark,
+            "configure.ac": "AC_INIT([x], [1])\nPKG_CHECK_MODULES([X], [glib-2.0 >= 2.0])\n",
+            "LICENSE": "Permission is hereby granted, free of charge, to any person",
+        }
+        for n, t in files.items():
+            with open(os.path.join(d, n), "w") as f:
+                f.write(t)
+        sc = N.scan(d)
+        eq([sc["name"], sc["version"], sc["description"], sc["license"], sc["url"]],
+           ["zap", "1.4.0", "Zaps things", "MIT OR Apache-2.0", "https://github.com/me/zap"])
+        eq(sc["systems"][:2], ["cargo", "python"])
+        eq("cargo" in sc["makedepends"] and "gcc-libs" in sc["depends"], True)
+        eq(os.path.exists(mark), False, "setup.py read, never run")
+    with tempfile.TemporaryDirectory() as d:
+        with open(os.path.join(d, "pyproject.toml"), "w") as f:
+            f.write('[project]\nname = "Tidy_Up"\nversion = "0.3"\ndependencies = ["PyYAML>=6", "requests[socks]; python_version>\'3.8\'"]\n'
+                    '[project.optional-dependencies]\ncolor = ["rich"]\n[build-system]\nbuild-backend = "hatchling.build"\n')
+        with open(os.path.join(d, "COPYING"), "w") as f:
+            f.write("GNU GENERAL PUBLIC LICENSE\n Version 3, 29 June 2007")
+        sc = N.scan(d)
+        eq([sc["name"], sc["arch"], sc["license"]], ["tidy-up", "any", "GPL-3.0-or-later"])
+        eq(sc["depends"], ["python", "python-pyyaml", "python-requests"])
+        eq("python-hatchling" in sc["makedepends"], True)
+        eq(sc["optdepends"], ["python-rich: for color"])
+        eq(sc["kinds"], ["git"], "no tags: a -git package")
+    with tempfile.TemporaryDirectory() as d:
+        with open(os.path.join(d, "README.md"), "w") as f:
+            f.write("# zed\n\n![badge](x)\n\nA small editor. It edits.\n")
+        with open(os.path.join(d, "go.mod"), "w") as f:
+            f.write("module codeberg.org/me/zed\n\ngo 1.22\n")
+        sc = N.scan(d)
+        eq([sc["name"], sc["url"], sc["description"], sc["systems"]], ["zed", "https://codeberg.org/me/zed", "A small editor", ["go"]])
+
+
+@test
+def aur_new_package_written():
+    import aurnew as N
+    spec = {"name": "zap", "kind": "release", "version": "1.4.0", "description": "it's quick", "source": "https://github.com/me/zap",
+            "license": "MIT", "depends": ["gcc-libs"], "makedepends": ["cargo"], "system": "cargo", "tag": "v$pkgver"}
+    t = N.write(spec)
+    eq("source=(\"$pkgname-$pkgver.tar.gz::https://github.com/me/zap/archive/refs/tags/v$pkgver.tar.gz\")" in t, True)
+    eq('_src="zap-$pkgver"' in t, True, "GitHub drops the v")
+    eq("pkgdesc='it'\\''s quick'" in t, True)
+    g = N.write(dict(spec, kind="git", source="https://gitlab.com/me/zap"))
+    eq([("pkgname=zap-git" in g), ("provides=('zap')" in g), ("'git'" in g), ("git+https://gitlab.com/me/zap" in g)], [True] * 4)
+    # a manifest's address or a tag is shell in a double-quoted source=
+    # (audit 2026-10-28): refused, never written
+    for bad in (dict(spec, name="Zap!"), dict(spec, source="file:///etc"), dict(spec, version="1 2"),
+                dict(spec, source="https://github.com/me/$(touch x)"), dict(spec, source="https://x/`id`"),
+                dict(spec, kind="git", source='https://x/a"b'), dict(spec, tag="$(id)"), dict(spec, tag="v1 2")):
+        try:
+            N.write(bad)
+            raise AssertionError("written: " + repr(bad))
+        except N.NewError:
+            pass
+    if shutil.which("makepkg") and shutil.which("bash"):
+        for system in ("cargo", "python", "npm", "go", "meson", "cmake", "autotools", "make", "copy"):
+            with tempfile.TemporaryDirectory() as d:
+                with open(os.path.join(d, "PKGBUILD"), "w") as f:
+                    f.write(N.write(dict(spec, system=system)))
+                r = subprocess.run(["bash", "-n", "PKGBUILD"], cwd=d, capture_output=True, text=True)
+                eq(r.returncode, 0, system + ": " + r.stderr)
+                r = subprocess.run(["makepkg", "--printsrcinfo"], cwd=d, capture_output=True, text=True)
+                eq("pkgver = 1.4.0" in r.stdout, True, system)
+    with tempfile.TemporaryDirectory() as d:
+        out = N.create(spec, os.path.join(d, "zap"))
+        eq(sh(out["root"], "remote", "get-url", "aur").strip(), "ssh://aur@aur.archlinux.org/zap.git")
+        try:
+            N.create(spec, out["root"])
+            raise AssertionError("made over a full directory")
+        except N.NewError:
+            pass
+
+
+@test
+def forge_repository_names_checked():
+    """a cloned repository's remote names the API path with your token in
+    it: `a/../../user` is no repository (audit 2026-10-28)"""
+    import server as S
+    eq([bool(S._FULL.match(f)) for f in ("me/zap", "grp/sub/zap", "me/zap.js")], [True] * 3)
+    eq([bool(S._FULL.match(f)) for f in ("a/../../user", "../x", "a/b/..", "a/.", "zap", "a/b?x=1", "a/b#c")], [False] * 7)
+
+
+@test
+def aur_ssh_commands_refused_before_they_go():
+    import aur as A
+    for cmd, args in (("rm", ["x"]), ("adopt", []), ("adopt", ["a;b"]), ("vote", ["-oProxyCommand=x"]),
+                      ("flag", ["zap", "x"]), ("set-keywords", []), ("adopt", ["a", "b"])):
+        try:
+            A.ssh(cmd, args)
+            raise AssertionError("sent " + cmd + " " + repr(args))
+        except A.AurError:
+            pass
+    eq(A.search("x"), [], "one letter is no search")
+
+
+@test
+def bisect_finds_the_commit():
+    root = fresh({"a.txt": "fine\n"})
+    for i in range(1, 9):
+        with open(os.path.join(root, "a.txt"), "w") as f:
+            f.write(("broken" if i >= 5 else "fine") + " " + str(i) + "\n")
+        sh(root, "commit", "-qam", "step " + str(i))
+    r = R.Repo(root)
+    first = sh(root, "rev-list", "--max-parents=0", "HEAD").strip()
+    st = r.bisect("start", good=first)
+    eq(st["testing"] is not None and st["left"] is not None, True)
+    for _ in range(10):
+        if st["culprit"]:
+            break
+        bad = open(os.path.join(root, "a.txt")).read().startswith("broken")
+        st = r.bisect("bad" if bad else "good")
+    eq(st["culprit"]["subject"], "step 5")
+    eq(r.bisect("reset")["done"], True)
+    eq(os.path.exists(os.path.join(root, ".git", "BISECT_LOG")), False)
+
+
+@test
+def aur_upstream_versions_compared():
+    import aur as A
+    eq([A._vercmp("1.10.0", "1.9.2"), A._vercmp("2.0", "2.0"), A._vercmp("0.9", "1.0")], [1, 0, -1])
+    eq(A.outdated(["Not a name!", ""]), [], "names that are not package names never reach the AUR")
+
+
 def main():
     want = sys.argv[1] if len(sys.argv) > 1 else ""
     ok = bad = skipped = 0

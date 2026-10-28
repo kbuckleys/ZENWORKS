@@ -78,6 +78,7 @@ Item {
       }
 
       Text {
+        textFormat: Text.PlainText
         id: tag
         x: Math.max(0, Math.min(strip.width - implicitWidth, mark.cx - implicitWidth / 2))
         y: mark.above ? bar.y - implicitHeight - 6 : bar.y + bar.height + 6

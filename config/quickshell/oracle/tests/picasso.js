@@ -24,6 +24,13 @@ module.exports = {
       const space = A.level(f, D, "Space");
       t.eq("level: inside", space.map((r) => r.dir ? "[" + r.sub + "]" : r.path), ["[Space/deep]", "/b/Space/a.png", "/b/Space/b.png"]);
       t.eq("up", [A.up("Space/deep"), A.up("Space"), A.up("")], ["Space", "", ""]);
+      // the directories follow the sort as the pictures do
+      const g = [{ path: "/b/Old/a.png", mtime: 1, size: 900 }, { path: "/b/New/a.png", mtime: 9, size: 10 },
+                 { path: "/b/New/b.png", mtime: 2, size: 10 }, { path: "/b/Mid/a.png", mtime: 5, size: 50 }];
+      const dirsBy = (m) => A.level(g, D, "", m).map((r) => r.name);
+      t.eq("level: dirs by recent", dirsBy("recent"), ["New", "Mid", "Old"]);
+      t.eq("level: dirs by size", dirsBy("size"), ["Old", "Mid", "New"]);
+      t.eq("level: dirs by name", dirsBy("name"), ["Mid", "New", "Old"]);
     }
     t.eq("a color is not a path", A.isColor("color:#112233"), true);
     t.eq("a path is not a color", A.isColor("/home/a/color:x.png"), false);

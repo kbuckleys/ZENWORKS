@@ -148,6 +148,7 @@ Item {
             radius: Zenon.windowRadius
             color: appTap.pressed ? Zenon.pressFill : appHover.hovered ? Zenon.wash(0.06) : "transparent"
             Text {
+              textFormat: Text.PlainText
               id: appName
               anchors.left: parent.left
               anchors.leftMargin: 10
@@ -158,6 +159,7 @@ Item {
               font.pixelSize: Zenon.px(16)
             }
             Text {
+              textFormat: Text.PlainText
               anchors.left: appName.right
               anchors.leftMargin: 16
               anchors.right: parent.right
@@ -446,6 +448,7 @@ Item {
     property string label: ""
     spacing: 12
     Text {
+      textFormat: Text.PlainText
       Layout.preferredWidth: 120
       Layout.preferredHeight: 28
       verticalAlignment: Text.AlignVCenter

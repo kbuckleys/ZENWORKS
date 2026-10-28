@@ -58,6 +58,7 @@ FocusScope {
       width: parent.width
       spacing: 3
       Text {
+        textFormat: Text.PlainText
         text: body.face === "choosing" ? "Download a Linux" : body.job.entry.name + " " + body.job.entry.version
         color: Zenon.ink
         font.family: Zenon.face
@@ -92,6 +93,7 @@ FocusScope {
             width: rows.width
             height: 34
             Text {
+              textFormat: Text.PlainText
               x: 10
               anchors.verticalCenter: parent.verticalCenter
               text: modelData.name
@@ -117,6 +119,7 @@ FocusScope {
       }
       CursorBand { repeater: rep; index: body.sel; shown: body.list.length > 0 }
       Text {
+        textFormat: Text.PlainText
         anchors.verticalCenter: parent.verticalCenter
         visible: body.list.length === 0
         text: body.loading ? "Finding the current releases…" : "None of them could be reached — is the network up?"
@@ -146,6 +149,7 @@ FocusScope {
         }
       }
       Text {
+        textFormat: Text.PlainText
         width: parent.width
         wrapMode: Text.Wrap
         text: !body.job ? "" : !body.job.result ? S.progressLine(body.job)

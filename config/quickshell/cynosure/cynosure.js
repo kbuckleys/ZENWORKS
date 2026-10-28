@@ -81,6 +81,8 @@ const SHELL_ACTIONS = [
   { name: "Nerd glyphs", glyph: "\uF031", keys: "ideo icons font symbols", ipc: "Ideo nerd" },
   { name: "Sound & system", glyph: "\uF028", keys: "zeus volume audio mixer cpu memory monitor", ipc: "Zeus toggle" },
   { name: "Calendar & weather", glyph: "\uF073", keys: "chronos clock date forecast", ipc: "Chronos toggle" },
+  { name: "Calendar", glyph: "\u{EAB0}", keys: "chronos calendar window month week events schedule agenda", ipc: "Calendar open ''" },
+  { name: "New event", glyph: "\u{F00F3}", keys: "chronos calendar event appointment meeting add", ipc: "Calendar add ''" },
   // `choose: "timer"`: with more than one idle timer the popup asks which
   // one in its picker (see timerChoices) instead of running `ipc` blind.
   { name: "Start timer", glyph: "\uF017", keys: "chronos pomodoro focus countdown", ipc: "Chronos start", choose: "timer" },

@@ -35,6 +35,7 @@ Rectangle {
   visible: cap.label !== ""
 
   Text {
+    textFormat: Text.PlainText
     id: capText
     anchors.centerIn: parent
     text: cap.label

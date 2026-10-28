@@ -91,6 +91,7 @@ Rectangle {
       }
     }
     Text {
+      textFormat: Text.PlainText
       visible: text !== ""
       width: parent.width
       elide: Text.ElideRight
@@ -101,6 +102,7 @@ Rectangle {
       font.pixelSize: Zenon.px(16)
     }
     Text {
+      textFormat: Text.PlainText
       visible: text !== ""
       width: parent.width
       wrapMode: Text.Wrap
@@ -170,6 +172,7 @@ Rectangle {
           radius: Zenon.radiusControl
           color: card.mood ? Zenon.alpha(Zenon[card.mood.ink] || Zenon.accentMuted, 0.16) : "transparent"
           Text {
+            textFormat: Text.PlainText
             id: moodWord
             anchors.centerIn: parent
             text: card.mood ? card.mood.label : ""

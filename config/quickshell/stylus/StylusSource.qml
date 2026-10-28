@@ -64,6 +64,7 @@ Rectangle {
     anchors.verticalCenter: parent.verticalCenter
     spacing: 3
     Text {
+      textFormat: Text.PlainText
       width: parent.width
       elide: Text.ElideMiddle
       text: src.path === "" ? "Choose an image" : src.path.replace(/.*\//, "")
@@ -73,6 +74,7 @@ Rectangle {
       font.pixelSize: Zenon.px(15)
     }
     Text {
+      textFormat: Text.PlainText
       width: parent.width
       elide: Text.ElideRight
       text: src.path === "" ? "An ISO or a disk image — or drop one here"
@@ -84,6 +86,7 @@ Rectangle {
     }
     // the sums: matched, not, being worked out, or none to check against
     Text {
+      textFormat: Text.PlainText
       width: parent.width
       elide: Text.ElideRight
       visible: src.sums.words !== ""
@@ -99,6 +102,7 @@ Rectangle {
       visible: src.sig.words !== ""
       spacing: 10
       Text {
+        textFormat: Text.PlainText
         text: src.sig.words
         color: src.sig.level === "good" ? Zenon.green : src.sig.level === "bad" ? Zenon.red
           : src.sig.level === "warn" ? Zenon.yellow : Zenon.muted

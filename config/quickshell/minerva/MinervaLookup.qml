@@ -97,6 +97,7 @@ Rectangle {
 
     // the word, and how it sounds
     Text {
+      textFormat: Text.PlainText
       width: parent.width
       visible: card.mode === "define"
       elide: Text.ElideRight
@@ -163,6 +164,7 @@ Rectangle {
 
     // the translation, and the language it is in
     Text {
+      textFormat: Text.PlainText
       width: parent.width
       visible: card.mode === "translate"
       maximumLineCount: 4

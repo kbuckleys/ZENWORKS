@@ -142,6 +142,7 @@ Item {
         visible: gen.wordsMissing || gen.err !== ""
         spacing: 8
         Text {
+          textFormat: Text.PlainText
           anchors.horizontalCenter: parent.horizontalCenter
           text: gen.wordsMissing ? "Words need a word list — the words package" : gen.err
           color: gen.wordsMissing ? Zenon.accentMuted : Zenon.red

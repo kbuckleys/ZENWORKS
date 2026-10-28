@@ -24,6 +24,7 @@ Item {
   height: 30
 
   Text {
+    textFormat: Text.PlainText
     id: slLabel
     anchors.left: parent.left
     anchors.verticalCenter: parent.verticalCenter

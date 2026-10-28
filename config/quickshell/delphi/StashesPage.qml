@@ -136,6 +136,7 @@ Item {
         anchors.verticalCenter: parent.verticalCenter
         spacing: 3
         Text {
+          textFormat: Text.PlainText
           width: parent.width
           elide: Text.ElideRight
           text: srow.modelData.message.replace(/^(WIP )?[Oo]n [^:]+: /, "")

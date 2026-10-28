@@ -329,6 +329,7 @@ Item {
           HoverHandler { id: handlerHov }
 
           Text {
+            textFormat: Text.PlainText
             id: handlerGlyph
             anchors.left: parent.left
             anchors.leftMargin: 14
@@ -343,6 +344,7 @@ Item {
           }
 
           Text {
+            textFormat: Text.PlainText
             anchors.left: handlerGlyph.right
             anchors.leftMargin: picker.glyphGap
             anchors.right: handlerDef.visible ? handlerDef.left
@@ -473,6 +475,7 @@ Item {
         }
 
         Text {
+          textFormat: Text.PlainText
           id: appName
           anchors.left: appGlyph.right
           anchors.leftMargin: picker.glyphGap

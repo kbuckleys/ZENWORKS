@@ -2386,6 +2386,7 @@ FloatingWindow {
                     border.color: cb.modelData.keep ? popup.highlight : Zenon.border
 
                     Text {
+                      textFormat: Text.PlainText
                       id: cbText
                       anchors.centerIn: parent
                       text: cb.modelData.text
@@ -2736,8 +2737,9 @@ FloatingWindow {
                         : settingRow.spec.label
                       color: settingRow.monitorHead ? settingRow.accent : popup.titleColor
                       font.family: popup.face
-                      font.weight: settingRow.monitorHead ? Font.DemiBold : Font.Medium
-                      font.pixelSize: Zenon.px(19)   // 17 until 2026-10-27 (user: +2)
+                      // bolder (user, 2026-10-28): DemiBold, a monitor's head Bold
+                      font.weight: settingRow.monitorHead ? Font.Bold : Font.DemiBold
+                      font.pixelSize: Zenon.px(17)   // 19 on 2026-10-27; back to 17 (user, 2026-10-28)
                     }
 
                     // a row that folds open says so, and which way it is,
@@ -2835,7 +2837,8 @@ FloatingWindow {
                     // monitor's maker, under its name in the band, is a
                     // subtitle, held close (user, 2026-10-27: the band's
                     // padding stood out)
-                    topPadding: settingRow.monitorHead ? 3 : 12
+                    // held close under its name (user, 2026-10-28: 12 was too far)
+                    topPadding: settingRow.monitorHead ? 3 : 4
                     visible: (settingRow.spec.help || "") !== ""
                     textFormat: popup.searching ? Text.StyledText : Text.PlainText
                     text: popup.searching
@@ -2858,6 +2861,7 @@ FloatingWindow {
                   // A CHORD REFUSED AS A DUPE, said here rather than in a
                   // toast (user, 2026-10-20): whose it is, under the name
                   Text {
+                    textFormat: Text.PlainText
                     width: parent.width
                     readonly property var refusal: Oracle.bindRefusal
                     visible: !!refusal && refusal.key === settingRow.spec.key

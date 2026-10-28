@@ -293,6 +293,7 @@ Item {
             border.width: 1
             border.color: on ? Zenon.alpha(Zenon.cyan, 0.5) : Zenon.border
             Text {
+              textFormat: Text.PlainText
               id: tagText
               anchors.centerIn: parent
               text: "#" + modelData.name

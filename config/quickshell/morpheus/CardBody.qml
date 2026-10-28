@@ -194,6 +194,7 @@ Item {
               }
 
               Text {
+                textFormat: Text.PlainText
                 anchors.left: icon.visible ? icon.right : parent.left
                 anchors.leftMargin: icon.visible ? Zenon.menuIconGap : 0
                 anchors.right: keyHint.left

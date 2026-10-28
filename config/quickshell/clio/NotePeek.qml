@@ -60,6 +60,7 @@ Bubble {
     font.pixelSize: Zenon.px(12)
   }
   Text {
+    textFormat: Text.PlainText
     visible: text !== ""
     width: 312
     wrapMode: Text.Wrap

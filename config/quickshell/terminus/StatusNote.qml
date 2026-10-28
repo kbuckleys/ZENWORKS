@@ -60,6 +60,7 @@ Item {
     }
 
     Text {
+      textFormat: Text.PlainText
       id: words
       x: 12
       y: 10

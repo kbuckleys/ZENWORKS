@@ -210,6 +210,7 @@ Item {
     Behavior on border.color { ColorAnimation { duration: Zenon.fast } }
 
     Text {
+      textFormat: Text.PlainText
       anchors.left: parent.left
       anchors.leftMargin: 9
       anchors.verticalCenter: parent.verticalCenter

@@ -197,6 +197,7 @@ Item {
             font.pixelSize: Zenon.px(14)
           }
           Text {
+            textFormat: Text.PlainText
             width: parent.width
             elide: Text.ElideRight
             text: urow.u ? (urow.u.desc || H.bootWords(urow.u.file)) : ""

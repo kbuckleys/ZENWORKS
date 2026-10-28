@@ -130,6 +130,7 @@ Item {
                 font.features: { "tnum": 1 }
               }
               Text {
+                textFormat: Text.PlainText
                 text: card.modelData.label
                 color: Zenon.ink
                 font.family: Zenon.face

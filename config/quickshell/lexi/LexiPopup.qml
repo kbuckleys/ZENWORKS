@@ -2096,6 +2096,7 @@ LayerPopup {
                     height: popup.dictSuggest.length > 0 ? 30 : 0
 
                     Text {
+                      textFormat: Text.PlainText
                       anchors.centerIn: parent
                       text: modelData.text
                       color: popup.fgColor

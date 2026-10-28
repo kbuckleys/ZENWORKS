@@ -74,6 +74,7 @@ Rectangle {
           font.pixelSize: bar.glyphSize
         }
         Text {
+          textFormat: Text.PlainText
           width: parent.width - 28 - noteRow.acts
           anchors.verticalCenter: parent.verticalCenter
           elide: Text.ElideRight

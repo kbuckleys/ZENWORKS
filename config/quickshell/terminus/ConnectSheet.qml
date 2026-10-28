@@ -186,6 +186,7 @@ Rectangle {
             onAccepted: conn.commit()
           }
           Text {
+            textFormat: Text.PlainText
             id: kind
             anchors.right: addr.right
             anchors.rightMargin: 10

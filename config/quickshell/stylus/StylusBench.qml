@@ -47,6 +47,7 @@ FocusScope {
       width: parent.width
       spacing: 3
       Text {
+        textFormat: Text.PlainText
         width: parent.width
         elide: Text.ElideRight
         text: "Benchmark " + S.driveTitle(body.drive)
@@ -118,6 +119,7 @@ FocusScope {
       width: parent.width
       spacing: 4
       Text {
+        textFormat: Text.PlainText
         width: parent.width
         wrapMode: Text.Wrap
         text: body.face === "running" ? S.progressLine(body.job)
@@ -129,6 +131,7 @@ FocusScope {
         font.pixelSize: Zenon.px(14)
       }
       Text {
+        textFormat: Text.PlainText
         visible: !!body.result
         text: body.result ? S.accessWords(body.result.accessMs) : ""
         color: Zenon.accentMuted

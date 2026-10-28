@@ -74,6 +74,7 @@ Item {
     anchors.verticalCenter: parent.verticalCenter
     spacing: 2
     Text {
+      textFormat: Text.PlainText
       width: parent.width
       wrapMode: Text.Wrap
       maximumLineCount: 2
@@ -86,6 +87,7 @@ Item {
       lineHeight: 0.95
     }
     Text {
+      textFormat: Text.PlainText
       width: parent.width
       elide: Text.ElideRight
       text: card.app ? card.app.summary : ""

@@ -149,6 +149,7 @@ CursorAnchor {
           spacing: 3
 
           Text {
+            textFormat: Text.PlainText
             id: titleText
             width: Math.min(implicitWidth, 380)
             text: NowPlaying.title
@@ -161,6 +162,7 @@ CursorAnchor {
           }
 
           Text {
+            textFormat: Text.PlainText
             id: artistText
             width: Math.min(implicitWidth, 380)
             text: NowPlaying.artist
@@ -173,6 +175,7 @@ CursorAnchor {
           }
 
           Text {
+            textFormat: Text.PlainText
             id: albumText
             width: Math.min(implicitWidth, 380)
             text: NowPlaying.album

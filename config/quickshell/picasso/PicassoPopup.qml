@@ -81,9 +81,16 @@ LayerPopup {
   property string sub: ""
   // Filter first, then order: the sort only has to touch what survived, and
   // the two are separate questions the user changes independently.
-  readonly property var filtered: popup.query !== "" || Picasso.everything
+  // A SEARCH LOOKS WHERE YOU ARE (user, 2026-10-28: the crumbs shrank to
+  // the first step while searching): this directory and everything under
+  // it, Finder's "this folder" — from the top, that is every background
+  readonly property var searchPool: popup.sub === "" ? Picasso.files
+    : Picasso.files.filter((f) => String(f.path).indexOf(popup.absOf(popup.sub) + "/") === 0)
+  readonly property var filtered: Picasso.everything
     ? Art.sortRows(Art.filter(Picasso.files, popup.query, Picasso.dir), Picasso.sortMode, Picasso.dir)
-    : Art.level(Art.sortRows(Picasso.files, Picasso.sortMode, Picasso.dir), Picasso.dir, popup.sub)
+    : popup.query !== ""
+    ? Art.sortRows(Art.filter(popup.searchPool, popup.query, Picasso.dir), Picasso.sortMode, Picasso.dir)
+    : Art.level(Art.sortRows(Picasso.files, Picasso.sortMode, Picasso.dir), Picasso.dir, popup.sub, Picasso.sortMode)
   // the pictures alone, what the card steps through
   readonly property var pictures: popup.filtered.filter((r) => !r.dir)
   readonly property int dirCount: popup.filtered.length - popup.pictures.length
@@ -154,7 +161,7 @@ LayerPopup {
   function absOf(s) { return Picasso.dir + (s === "" ? "" : "/" + s); }
   readonly property var crumbList: {
     const out = [{ label: Terminus.basename(Picasso.dir) || Picasso.dir, path: popup.absOf(""), sub: "" }];
-    const flat = popup.query !== "" || Picasso.everything;
+    const flat = Picasso.everything;
     const trail = flat ? "" : popup.deep;
     let at = "";
     for (const part of trail.split("/")) {
@@ -269,8 +276,12 @@ LayerPopup {
   // The keys all still work. They are simply no longer the interface.
   function stripHeight() { return 34; }
 
+  // THE SEARCH LINE, while there is something typed (user, 2026-10-28:
+  // "just like artemis"): the filter in a line of its own over the
+  // pictures, not in the bottom bar; the panel grows by it
+  readonly property int inputH: popup.view === "backgrounds" && popup.query.length > 0 ? 36 : 0
   function calcHeight() {
-    return popup.gridHeight() + popup.stripHeight();
+    return popup.inputH + popup.gridHeight() + popup.stripHeight();
   }
 
   // Nothing typed, nothing scanning — the line is free to report state rather
@@ -320,6 +331,7 @@ LayerPopup {
       }
 
       Text {
+        textFormat: Text.PlainText
         id: ringWord
         anchors.centerIn: parent
         text: ring.label
@@ -745,6 +757,57 @@ LayerPopup {
       Column {
         anchors.fill: parent
 
+        // ------------------------------------------- the search line --
+        // Artemis' (ArtemisPopup inputBar): the lens and what you typed,
+        // unfolding with the panel; a click on the × empties it
+        Item {
+          id: inputBar
+          width: parent.width
+          height: popup.inputH
+          visible: height > 0.5
+          clip: true
+          Behavior on height { NumberAnimation { duration: Zenon.slow; easing.type: Zenon.ease } }
+          Row {
+            anchors.left: parent.left
+            anchors.leftMargin: 10
+            anchors.right: queryClear.left
+            anchors.rightMargin: 8
+            height: parent.height
+            opacity: inputBar.height / 36
+            Behavior on opacity { NumberAnimation { duration: Zenon.fast } }
+            Text {
+              width: 30
+              height: parent.height
+              text: "\uf002"
+              color: popup.highlight
+              font.family: Zenon.face
+              font.weight: Font.Bold
+              font.pixelSize: Zenon.px(18)
+              verticalAlignment: Text.AlignVCenter
+            }
+            Text {
+              width: parent.width - 30
+              height: parent.height
+              elide: Text.ElideLeft
+              text: popup.query
+              color: Zenon.ink
+              font.family: Zenon.face
+              font.weight: 600
+              font.pixelSize: Zenon.px(18)
+              verticalAlignment: Text.AlignVCenter
+            }
+          }
+          ClearChip {
+            id: queryClear
+            anchors.right: parent.right
+            anchors.rightMargin: 14
+            anchors.verticalCenter: parent.verticalCenter
+            size: Zenon.px(15)
+            opacity: inputBar.height / 36
+            onClicked: popup.query = ""
+          }
+        }
+
         // ------------------------------------------------- the grid --
         Item {
           width: parent.width
@@ -931,6 +994,7 @@ LayerPopup {
               }
 
               Text {
+                textFormat: Text.PlainText
                 anchors.bottom: parent.bottom
                 anchors.bottomMargin: 12
                 anchors.horizontalCenter: parent.horizontalCenter
@@ -1083,6 +1147,7 @@ LayerPopup {
                 }
 
                 Text {
+                  textFormat: Text.PlainText
                   anchors.bottom: parent.bottom
                   anchors.bottomMargin: 10
                   anchors.horizontalCenter: parent.horizontalCenter
@@ -1268,14 +1333,14 @@ LayerPopup {
                 const c = popup.crumbList.find((k) => k.path === v);
                 return Terminus.dirGlyph(v, Icons, c ? c.label : "");
               }
-              current: popup.query !== "" || Picasso.everything ? popup.absOf("") : popup.absOf(popup.sub)
+              // where you are, searching or not (a search looks there, under it)
+              current: Picasso.everything ? popup.absOf("") : popup.absOf(popup.sub)
               faint: popup.crumbList.filter((c) => c.ghost === true).map((c) => c.path)
               onChose: (v) => {
                 const c = popup.crumbList.find((k) => k.path === v);
                 if (!c) return;
-                // a step out of a search or Everything is a step back into
-                // the directories
-                if (popup.query !== "") popup.query = "";
+                // a step out of Everything is a step back into the
+                // directories; a search keeps going, looking there instead
                 if (Picasso.everything) Picasso.everything = false;
                 popup.goSub(c.sub);
               }
@@ -1432,10 +1497,10 @@ LayerPopup {
 
                 Text {
                   id: countText
-                  // Doubles as the input, since there is no field — the same
-                  // shape howler uses. What you type lands here.
+                  // what you type is the search line's now (inputBar), not
+                  // this one's (user, 2026-10-28)
                   visible: !Picasso.scanning
-                  text: popup.view === "colors" ? "" : popup.query
+                  text: ""
                   color: clearMa.pressed ? popup.highlight : popup.headColor
                   font.bold: true
                   font.family: Zenon.face
@@ -1453,7 +1518,7 @@ LayerPopup {
                   id: clearMa
                   anchors.fill: parent
                   anchors.margins: -4
-                  enabled: popup.query !== ""
+                  enabled: false
                   hoverEnabled: true
                   onClicked: popup.query = ""
                 }

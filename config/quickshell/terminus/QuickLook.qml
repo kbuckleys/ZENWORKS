@@ -1272,6 +1272,7 @@ PanelWindow {
           }
 
           Text {
+            textFormat: Text.PlainText
             anchors.left: lookTreeGlyph.right
             anchors.leftMargin: 4
             anchors.right: parent.right
@@ -1503,6 +1504,7 @@ PanelWindow {
                 font.pixelSize: Math.round(16 * root.zoom)
               }
               Text {
+                textFormat: Text.PlainText
                 anchors.left: dirCellGlyphA.right
                 anchors.leftMargin: 6
                 anchors.right: parent.right
@@ -1537,6 +1539,7 @@ PanelWindow {
                 font.pixelSize: Math.round(16 * root.zoom)
               }
               Text {
+                textFormat: Text.PlainText
                 anchors.left: dirCellGlyphB.right
                 anchors.leftMargin: 6
                 anchors.right: parent.right
@@ -1758,6 +1761,7 @@ PanelWindow {
         }
 
         Text {
+          textFormat: Text.PlainText
           id: lookName
           anchors.left: lookGlyph.right
           anchors.leftMargin: 8

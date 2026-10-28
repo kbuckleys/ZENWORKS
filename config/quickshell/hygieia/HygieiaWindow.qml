@@ -521,6 +521,7 @@ FloatingWindow {
       onToggled: ln.flipped()
     }
     Text {
+      textFormat: Text.PlainText
       id: lnName
       x: ln.tick ? lnBox.x + lnBox.width + 10 : 18 + ln.indent
       anchors.verticalCenter: parent.verticalCenter

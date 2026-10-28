@@ -126,6 +126,7 @@ Item {
           border.color: Zenon.border
           Rectangle { x: 0; y: 8; width: 4; height: parent.height - 16; radius: 2; color: Zenon[card.modelData.marker] || Zenon.sand }
           Text {
+            textFormat: Text.PlainText
             id: words
             x: 18
             y: 10
@@ -140,6 +141,7 @@ Item {
             font.pixelSize: Zenon.px(15)
           }
           Text {
+            textFormat: Text.PlainText
             id: where
             x: 18
             anchors.top: words.bottom

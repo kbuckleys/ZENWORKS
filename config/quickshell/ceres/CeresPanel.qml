@@ -274,6 +274,7 @@ LayerPopup {
         height: popup.headH
 
         Text {
+          textFormat: Text.PlainText
           anchors.left: parent.left
           anchors.leftMargin: 16
           anchors.verticalCenter: parent.verticalCenter
@@ -420,6 +421,7 @@ LayerPopup {
             height: popup.rowH
 
             Text {
+              textFormat: Text.PlainText
               visible: modelData.head
               anchors.left: parent.left
               anchors.verticalCenter: parent.verticalCenter

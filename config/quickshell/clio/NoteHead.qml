@@ -90,6 +90,7 @@ Column {
       border.width: 1
       border.color: mood ? Zenon.alpha(Zenon[mood.ink] || Zenon.accentMuted, 0.5) : Zenon.border
       Text {
+        textFormat: Text.PlainText
         id: moodText
         anchors.centerIn: parent
         text: parent.mood ? "\u{F01F5}  " + parent.mood.label + (nh.n.mood.words.length ? " · " + nh.n.mood.words.slice(0, 3).join(", ") : "")

@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Calendar
+GenericName=Calendar
+Comment=Your calendars and events, in Zenworks
+Icon=x-office-calendar
+Categories=Office;Calendar;
+Keywords=calendar;events;schedule;agenda;appointment;meeting;caldav;khal;chronos;
+Exec=/usr/share/zenworks/quickshell/chronos/bin/chronos
+Terminal=false
+StartupNotify=false

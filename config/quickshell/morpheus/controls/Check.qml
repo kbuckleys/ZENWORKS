@@ -81,6 +81,7 @@ Row {
     }
   }
   Text {
+    textFormat: Text.PlainText
     visible: ck.label !== ""
     anchors.verticalCenter: parent.verticalCenter
     text: ck.label

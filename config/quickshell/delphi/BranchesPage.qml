@@ -271,6 +271,7 @@ Item {
           font.pixelSize: Zenon.px(15)
         }
         Text {
+          textFormat: Text.PlainText
           id: bname
           anchors.left: bg_.right
           anchors.leftMargin: 6
@@ -299,6 +300,7 @@ Item {
           font.pixelSize: Zenon.px(13)
         }
         Text {
+          textFormat: Text.PlainText
           anchors.left: track.right
           anchors.leftMargin: 14
           anchors.right: bwhen.left

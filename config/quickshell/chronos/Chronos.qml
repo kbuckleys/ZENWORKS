@@ -200,10 +200,16 @@ Singleton {
 
   Component { id: calProcComp; Process {} }
   Component { id: calCollComp; StdioCollector { waitForEnd: true } }
-  function calAsk(args, fn) {
+  // `input`, one line written to its stdin and stdin shut (a password:
+  // never an argument)
+  function calAsk(args, fn, input) {
     const p = calProcComp.createObject(root);
     const out = calCollComp.createObject(p);
     p.stdout = out;
+    if (input !== undefined) {
+      p.stdinEnabled = true;
+      p.started.connect(() => { p.write(input + "\n"); p.stdinEnabled = false; });
+    }
     out.streamFinished.connect(() => {
       let j = null;
       try { j = JSON.parse(out.text); } catch (e) {}
@@ -241,15 +247,29 @@ Singleton {
   readonly property var byDay: Chr.eventsByDay(root.events)
 
   // the panel's line → a new event on that day; done(ok, words)
+  // In plain words (Chr.parseNatural, 2026-10-28): "Lunch tomorrow 1pm @
+  // Luigi's" lands on its own day, said when that is not the day in view
   function addQuick(text, iso, done) {
-    const q = Chr.parseQuick(text, iso);
+    const q = Chr.parseNatural(text, iso);
     if (q.error) { if (done) done(false, q.error); return; }
     root.calBusy = true;
-    root.calAsk(["new"].concat(Chr.newArgs(q, "")), (j) => {
+    const spec = { title: q.title, allDay: q.allDay, start: q.start, end: q.end, location: q.location, calendar: "",
+                   alert: q.allDay ? null : 15 };
+    root.calAsk(["save", JSON.stringify(spec)], (j) => {
       root.calBusy = false;
-      if (done) done(!j.error, j.error ? j.error : "Added “" + q.title + "”");
+      const d = Chr.dateOf(q.iso);
+      const elsewhere = q.iso !== iso && d ? " on " + Chr.longDay(d) : "";
+      if (done) done(!j.error, j.error ? j.error : "Added “" + q.title + "”" + elsewhere);
       root.reloadEvents();
     });
+  }
+  // an event's hue: its own, else its calendar's (Clio's seven; the
+  // window's and the panel's dots, Howler's reminder toast)
+  function hueOf(e) {
+    if (e && e.color && Chr.isColor(e.color)) return e.color;
+    const i = root.calendars.findIndex((c) => e && c.name === e.calendar);
+    const h = Chr.calColor(i >= 0 ? root.calendars[i].color : "", Math.max(0, i));
+    return Chr.isColor(h) ? h : "cyan";
   }
   function removeEvent(uid, done) {
     if (!uid) return;
@@ -258,6 +278,62 @@ Singleton {
       root.reloadEvents();
     });
   }
+  // ── THE CALENDAR WINDOW'S (2026-10-28) ──────────────────────────────
+  // the calendars, colored and named, and the online accounts chronos set up
+  property var calendars: []        // [{ name, title, path, color }]
+  property var accounts: []         // [{ name, url, user }]
+  function loadCalendars() {
+    root.calAsk(["calendars"], (j) => { if (Array.isArray(j)) root.calendars = j; });
+    root.calAsk(["accounts"], (j) => { if (Array.isArray(j)) root.accounts = j; });
+  }
+  onCalReadyChanged: if (root.calReady) root.loadCalendars()
+  // events between two ISO days, for whoever asks; fn({ events } | { error })
+  function listRange(from, to, fn) { root.calAsk(["list", from, to], fn); }
+  function getEvent(uid, fn) { root.calAsk(["get", uid], fn); }
+  // a new event or one changed (cal.py save); fn({ ok, uid } | { error })
+  function saveEvent(e, fn) {
+    root.calBusy = true;
+    root.calAsk(["save", JSON.stringify(e)], (j) => { root.calBusy = false; root.reloadEvents(); if (fn) fn(j); });
+  }
+  // A CalDAV account: what it needs and is missing (vdirsyncer syncs it,
+  // khal reads what is synced) through Ceres in one go, asked only once
+  // the account is given; then cal.py does the rest (it can take a
+  // minute: the first sync). fn(j)
+  function addAccount(name, url, user, password, fn) {
+    const go = () => root.calAsk(["account", name, url, user], (j) => {
+      root.loadCalendars();
+      root.calCheck(() => root.reloadEvents());
+      if (fn) fn(j);
+    }, password);
+    const need = (root.calStatus.khal ? [] : ["khal"]).concat(root.calStatus.vdirsyncer ? [] : ["vdirsyncer"]);
+    if (need.length === 0) { go(); return true; }
+    return Ceres.install(need, "for online calendars in Chronos", (ok) => {
+      if (ok) root.calCheck(go);
+      else if (fn) fn({ error: need.join(" and ") + " were not installed" });
+    });
+  }
+  function removeAccount(name, fn) {
+    root.calAsk(["unaccount", name], (j) => { root.loadCalendars(); root.calCheck(() => root.reloadEvents()); if (fn) fn(j); });
+  }
+  // ── MOVING, COPYING, FINDING; CALENDARS OF YOUR OWN (2026-10-28) ─────
+  // each re-reads what is shown after, and hands cal.py's answer on
+  function calDo(args, fn) {
+    root.calBusy = true;
+    root.calAsk(args, (j) => { root.calBusy = false; root.reloadEvents(); if (fn) fn(j); });
+  }
+  // ds, de: minutes (days for an all-day event)
+  function shiftEvent(uid, ds, de, fn) { root.calDo(["shift", uid, String(Math.round(ds)), String(Math.round(de))], fn); }
+  function copyEvent(uid, days, fn) { root.calDo(["copy", uid, String(Math.round(days || 0))], fn); }
+  function searchEvents(text, fn) { root.calAsk(["search", text], fn); }
+  function newCalendar(title, color, fn) { root.calAsk(["newcal", title, color || ""], (j) => { root.loadCalendars(); root.reloadEvents(); if (fn) fn(j); }); }
+  function setCalendar(name, title, color, fn) { root.calAsk(["setcal", name, title, color || ""], (j) => { root.loadCalendars(); if (fn) fn(j); }); }
+  function deleteCalendar(name, fn) { root.calAsk(["delcal", name], (j) => { root.loadCalendars(); root.reloadEvents(); if (fn) fn(j); }); }
+
+  function syncNow(fn) {
+    root.calBusy = true;
+    root.calAsk(["sync"], (j) => { root.calBusy = false; root.reloadEvents(); if (fn) fn(j); });
+  }
+
   // khal through Ceres, then a config with one local calendar; done(ok)
   function setupCalendar(done) {
     const finish = () => root.calAsk(["setup"], () => root.calCheck(() => { root.reloadEvents(); if (done) done(root.calReady); }));
@@ -303,9 +379,14 @@ Singleton {
   }
   function remind(e) {
     const p = remindProcComp.createObject(root, { ev: e });
+    // its hue and its day, for Howler's calendar toast (HowlerToasts:
+    // eventHue): the event's own color, else its calendar's
+    const hue = root.hueOf(e);
     p.command = ["notify-send", "-u", "critical", "-a", "chronos", "-i", "x-office-calendar",
+                 "-h", "string:x-howler-event:" + (Chr.isColor(hue) ? hue : "cyan"),
+                 "-h", "string:x-howler-day:" + e.date,
                  "-A", "snooze=Snooze 10 min", "-A", "done=Done",
-                 "\u{F00F0}  " + e.title, Chr.remindWords(e, Date.now())];
+                 e.title, Chr.remindWords(e, Date.now())];
     p.running = true;
   }
   Component {

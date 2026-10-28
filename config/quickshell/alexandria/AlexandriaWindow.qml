@@ -878,6 +878,7 @@ FloatingWindow {
           // highlight, which stays on the row (user, 2026-10-09). Both lines
           // sit on fixed baselines whatever the face's metrics.
           Text {
+            textFormat: Text.PlainText
             id: famName
             anchors.left: parent.left
             anchors.leftMargin: 16
@@ -1012,6 +1013,7 @@ FloatingWindow {
         anchors.verticalCenter: parent.verticalCenter
         spacing: 2
         Text {
+          textFormat: Text.PlainText
           width: parent.width
           elide: Text.ElideRight
           text: win.fam ? win.fam.name : ""
@@ -1652,6 +1654,7 @@ FloatingWindow {
                 radius: Zenon.windowRadius
                 color: spellMa.pressed ? Zenon.wash(0.08) : Zenon.wash(0.03)
                 Text {
+                  textFormat: Text.PlainText
                   anchors.left: parent.left
                   anchors.leftMargin: 10
                   anchors.verticalCenter: parent.verticalCenter
@@ -1662,6 +1665,7 @@ FloatingWindow {
                   font.pixelSize: Zenon.px(12)
                 }
                 Text {
+                  textFormat: Text.PlainText
                   anchors.right: copyMark.left
                   anchors.rightMargin: 8
                   anchors.verticalCenter: parent.verticalCenter
@@ -1723,6 +1727,7 @@ FloatingWindow {
               radius: Zenon.windowRadius
               color: grow.here ? win.hiFill : growMa.pressed ? Zenon.wash(0.06) : Zenon.alpha(Zenon.cyan, 0)
               Text {
+                textFormat: Text.PlainText
                 anchors.left: parent.left
                 anchors.leftMargin: 10
                 anchors.right: growN.left

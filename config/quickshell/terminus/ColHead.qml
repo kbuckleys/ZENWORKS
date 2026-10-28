@@ -30,6 +30,7 @@ Item {
   height: 22
 
   Text {
+    textFormat: Text.PlainText
     anchors.fill: parent
     verticalAlignment: Text.AlignVCenter
     horizontalAlignment: head.rightAlign ? Text.AlignRight : Text.AlignLeft

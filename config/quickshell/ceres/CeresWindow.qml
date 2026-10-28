@@ -842,6 +842,7 @@ FloatingWindow {
       font.pixelSize: Zenon.px(16)
     }
     Text {
+      textFormat: Text.PlainText
       width: 412
       visible: text !== ""
       wrapMode: Text.Wrap
@@ -2671,6 +2672,7 @@ FloatingWindow {
               color: Zenon.border
             }
             Text {
+              textFormat: Text.PlainText
               visible: hrow.modelData.kind === "day"
               x: 15
               y: (hrow.modelData.first ? 0 : 14) + 7
@@ -2796,6 +2798,7 @@ FloatingWindow {
             spacing: 8
 
             Text {
+              textFormat: Text.PlainText
               text: win.hevent ? win.hevent.name : ""
               color: Zenon.white
               font.family: Zenon.face
@@ -2993,6 +2996,7 @@ FloatingWindow {
                   anchors.verticalCenter: parent.verticalCenter
                   spacing: 2
                   Text {
+                    textFormat: Text.PlainText
                     text: mrow.modelData.title
                     color: Zenon.white
                     font.family: Zenon.face
@@ -3038,6 +3042,7 @@ FloatingWindow {
           readonly property var m: win.maint
 
           Text {
+            textFormat: Text.PlainText
             id: mdTitle
             text: win.maintItems[win.msel].title
             color: Zenon.white
@@ -3484,6 +3489,7 @@ FloatingWindow {
               height: 22
               readonly property bool on: win.sortKey === ch.key
               Text {
+                textFormat: Text.PlainText
                 anchors.fill: parent
                 verticalAlignment: Text.AlignVCenter
                 horizontalAlignment: ch.rightAlign ? Text.AlignRight : Text.AlignLeft
@@ -3701,6 +3707,7 @@ FloatingWindow {
                 border.color: urow.marked ? Zenon.cyan : Zenon.border
               }
               Text {
+                textFormat: Text.PlainText
                 visible: urow.modelData.head
                 anchors.left: parent.left
                 anchors.leftMargin: 10
@@ -3807,6 +3814,7 @@ FloatingWindow {
             visible: !!win.info && win.info.fields.length > 0
 
             Text {
+              textFormat: Text.PlainText
               width: parent.width
               wrapMode: Text.Wrap
               text: win.info ? (win.info.map["Name"] || "") : ""
@@ -3816,6 +3824,7 @@ FloatingWindow {
               font.pixelSize: Zenon.px(24)
             }
             Text {
+              textFormat: Text.PlainText
               width: parent.width
               wrapMode: Text.Wrap
               text: win.info ? (win.info.map["Description"] || "") : ""
@@ -3878,6 +3887,7 @@ FloatingWindow {
               Row {
                 spacing: 8
                 Text {
+                  textFormat: Text.PlainText
                   anchors.verticalCenter: parent.verticalCenter
                   text: ih.label
                   color: ih.foldable && ihPress.pressed ? Zenon.white : Zenon.accentKey
@@ -4527,6 +4537,7 @@ FloatingWindow {
             required property var modelData
             spacing: 10
             Text {
+              textFormat: Text.PlainText
               anchors.verticalCenter: parent.verticalCenter
               text: provLine.modelData.name + " from"
               color: Zenon.accentKey
@@ -4739,6 +4750,7 @@ FloatingWindow {
             anchors.verticalCenter: parent.verticalCenter
             spacing: 3
             Text {
+              textFormat: Text.PlainText
               text: !fpGetSheet.a ? "" : (win.fpRemove ? "Remove " : "Install ") + fpGetSheet.a.name + (win.fpRemove ? "?" : "")
               color: Zenon.white
               font.family: Zenon.face
@@ -4909,6 +4921,7 @@ FloatingWindow {
                 font.pixelSize: Zenon.px(14)
               }
               Text {
+                textFormat: Text.PlainText
                 anchors.verticalCenter: parent.verticalCenter
                 width: parent.width - 150
                 elide: Text.ElideRight
@@ -5078,6 +5091,7 @@ FloatingWindow {
             anchors.verticalCenter: parent.verticalCenter
             spacing: 4
             Text {
+              textFormat: Text.PlainText
               text: stat.label
               color: Zenon.accentMuted
               font.family: Zenon.face
@@ -5171,6 +5185,7 @@ FloatingWindow {
           border.color: Zenon.border
 
           Text {
+            textFormat: Text.PlainText
             id: cardTitle
             anchors.left: parent.left
             anchors.top: parent.top
@@ -5216,6 +5231,7 @@ FloatingWindow {
               // pacman's line under it, quieter, for when the plain words
               // above are not the whole story
               Text {
+                textFormat: Text.PlainText
                 width: parent.width
                 visible: card.detail !== "" && card.detail !== card.error
                 wrapMode: Text.Wrap
@@ -5316,6 +5332,7 @@ FloatingWindow {
               height: 28
 
               Text {
+                textFormat: Text.PlainText
                 visible: !!ent.modelData.head
                 anchors.left: parent.left
                 anchors.leftMargin: 4
@@ -5342,6 +5359,7 @@ FloatingWindow {
                 font.pixelSize: Zenon.px(15)
               }
               Text {
+                textFormat: Text.PlainText
                 id: entName
                 visible: !ent.modelData.head
                 anchors.left: entGlyph.right

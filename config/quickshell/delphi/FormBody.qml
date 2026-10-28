@@ -219,6 +219,7 @@ Item {
         width: body.width - 36
         spacing: 6
         Text {
+          textFormat: Text.PlainText
           visible: !!fcol.modelData.label
           readonly property bool wanted: fb.missing.indexOf(fcol.modelData.key) >= 0
           text: (fcol.modelData.label || "") + (wanted ? "  —  needed" + (fcol.modelData.why ? ": " + fcol.modelData.why : "") : "")

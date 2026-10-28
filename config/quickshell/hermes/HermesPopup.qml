@@ -479,6 +479,7 @@ LayerPopup {
             MouseArea { id: backPress; anchors.fill: parent; anchors.margins: -10; onClicked: popup.back() }
           }
           Text {
+            textFormat: Text.PlainText
             anchors.left: backGlyph.right
             anchors.leftMargin: 14
             anchors.verticalCenter: parent.verticalCenter

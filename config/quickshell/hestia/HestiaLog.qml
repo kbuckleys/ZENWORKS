@@ -80,6 +80,7 @@ Item {
       width: list.width
       height: Math.max(28, msgText.contentHeight + 8)
       Text {
+        textFormat: Text.PlainText
         id: timeText
         x: 16
         y: 4
@@ -93,6 +94,7 @@ Item {
         font.features: { "tnum": 1 }
       }
       Text {
+        textFormat: Text.PlainText
         id: identText
         x: timeText.x + timeText.width + 10
         y: 4
@@ -105,6 +107,7 @@ Item {
         font.pixelSize: Zenon.px(14)
       }
       Text {
+        textFormat: Text.PlainText
         id: msgText
         x: identText.x + identText.width + 10
         y: 4

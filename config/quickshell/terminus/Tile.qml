@@ -528,6 +528,7 @@ Item {
   // Smaller and muted under the name, the list's own columns said once:
   // what the pane is sorted by, or the size / the count by default.
   Text {
+    textFormat: Text.PlainText
     id: tileDetail
     anchors.top: tileName.bottom
     anchors.topMargin: 1

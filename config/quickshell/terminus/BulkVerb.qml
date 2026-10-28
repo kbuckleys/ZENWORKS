@@ -38,6 +38,7 @@ Rectangle {
   Behavior on border.color { ColorAnimation { duration: Zenon.fast } }
 
   Text {
+    textFormat: Text.PlainText
     id: verbText
     anchors.centerIn: parent
     text: verb.label

@@ -904,6 +904,7 @@ FocusScope {
       onActiveFocusChanged: if (!activeFocus && nameField.Window.active && tree.editing !== "") tree.editing = ""
     }
     Text {
+      textFormat: Text.PlainText
       visible: nameField.text === "" && tree.editing === "new"
       anchors.verticalCenter: parent.verticalCenter
       x: 8

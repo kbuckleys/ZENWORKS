@@ -24,6 +24,7 @@ Item {
     width: parent.width - 48
     spacing: 18
     Text {
+      textFormat: Text.PlainText
       text: big.label
       color: Zenon.accentMuted
       font.family: Zenon.face

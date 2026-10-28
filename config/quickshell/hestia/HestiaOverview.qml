@@ -131,6 +131,7 @@ Item {
                 font.pixelSize: Zenon.px(14)
               }
               Text {
+                textFormat: Text.PlainText
                 width: parent.width
                 elide: Text.ElideRight
                 text: u.desc || ""
@@ -323,6 +324,7 @@ Item {
               anchors.verticalCenter: parent.verticalCenter
               width: parent.width - fwBtn.width - 50
               Text {
+                textFormat: Text.PlainText
                 width: parent.width
                 elide: Text.ElideRight
                 text: fwRow.d.name + "  ·  " + fwRow.d.version + " \u2192 " + fwRow.d.update
@@ -332,6 +334,7 @@ Item {
                 font.pixelSize: Zenon.px(14)
               }
               Text {
+                textFormat: Text.PlainText
                 width: parent.width
                 elide: Text.ElideRight
                 text: (fwRow.d.reboot ? "Restart needed afterwards  ·  " : "") + fwRow.d.summary

@@ -1413,6 +1413,7 @@ Scope {
                 }
 
                 Text {
+                  textFormat: Text.PlainText
                   id: titleText
                   width: Math.min(implicitWidth, parent.width - playIcon.implicitWidth - parent.spacing)
                   text: NowPlaying.title
@@ -1427,6 +1428,7 @@ Scope {
               }
 
               Text {
+                textFormat: Text.PlainText
                 width: parent.width
                 visible: NowPlaying.artist !== ""
                 text: NowPlaying.artist
@@ -1440,6 +1442,7 @@ Scope {
                 horizontalAlignment: Text.AlignLeft
               }
               Text {
+                textFormat: Text.PlainText
                 width: parent.width
                 visible: NowPlaying.album !== ""
                 text: NowPlaying.album

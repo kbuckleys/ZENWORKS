@@ -85,6 +85,7 @@ Item {
     }
 
     Text {
+      textFormat: Text.PlainText
       anchors.centerIn: parent
       text: jobsGlyph.text
       color: jobsToggle.tone

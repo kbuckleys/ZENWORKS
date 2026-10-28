@@ -347,6 +347,7 @@ FloatingWindow {
         font.pixelSize: Zenon.px(20)
       }
       Text {
+        textFormat: Text.PlainText
         id: headTitle
         anchors.left: headGlyph.right
         anchors.leftMargin: 12
@@ -605,6 +606,7 @@ FloatingWindow {
               border.width: 1
               border.color: on ? Zenon.alpha(Zenon.yellow, 0.6) : Zenon.border
               Text {
+                textFormat: Text.PlainText
                 anchors.centerIn: parent
                 text: modelData.label
                 color: parent.on ? Zenon.yellow : Zenon.ink
@@ -729,6 +731,7 @@ FloatingWindow {
               border.width: 1
               border.color: on ? Zenon.alpha(Zenon.yellow, 0.6) : Zenon.border
               Text {
+                textFormat: Text.PlainText
                 anchors.centerIn: parent
                 text: modelData.label
                 color: parent.on ? Zenon.yellow : Zenon.ink
@@ -752,6 +755,7 @@ FloatingWindow {
         Item { width: 1; height: 6 }
         SectionLabel { text: "Saves as" }
         Text {
+          textFormat: Text.PlainText
           width: parent.width
           wrapMode: Text.WrapAnywhere
           text: aw.path === "" ? "—" : A.outPath(aw.path, aw.opts.format).replace(/.*\//, "")

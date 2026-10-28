@@ -54,7 +54,7 @@ QtObject {
     magenta:   "#c8a4e0",
     cyan:      "#9bbfbf",
     pink:      "#eebebe",
-    sand:      "#e0d8a4",
+    sand:      "#dfc6a6",   // a warm tan (2026-10-28; was a lime khaki)
     dim:       "#506060",
     sparkFill: "#339bbfbf",
     border:    "#4d45505c",

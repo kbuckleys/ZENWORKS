@@ -230,6 +230,7 @@ PanelWindow {
                     height: sheet.rowH
 
                     Text {
+                      textFormat: Text.PlainText
                       anchors { left: parent.left; right: caps.left; rightMargin: 12; verticalCenter: parent.verticalCenter }
                       text: row.modelData.label
                       color: Zenon.white

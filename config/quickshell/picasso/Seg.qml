@@ -40,6 +40,7 @@ Rectangle {
 
   Item { id: segInner; anchors.fill: parent }
   Text {
+    textFormat: Text.PlainText
     anchors.centerIn: parent
     visible: seg.label !== ""
     text: seg.label

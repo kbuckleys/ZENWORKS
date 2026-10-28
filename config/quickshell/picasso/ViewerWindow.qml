@@ -3928,6 +3928,7 @@ FloatingWindow {
             radius: Zenon.radiusControl
             color: Zenon.hud(0.8)
             Text {
+              textFormat: Text.PlainText
               id: monName
               anchors.centerIn: parent
               text: modelData.name + (modelData.short ? "  \u00b7  smaller than the screen" : "")
@@ -4192,6 +4193,7 @@ FloatingWindow {
       radius: Zenon.windowRadius
       color: Zenon.hud(0.8)
       Text {
+        textFormat: Text.PlainText
         id: aName
         anchors.fill: parent
         anchors.leftMargin: 8
@@ -4692,6 +4694,7 @@ FloatingWindow {
             }
           }
           Text {
+            textFormat: Text.PlainText
             visible: cell.directory
             readonly property real side: parent.height
             readonly property int inset: Math.max(3, Math.round(side * 0.06))
@@ -4888,6 +4891,7 @@ FloatingWindow {
             anchors.centerIn: parent
             spacing: 8
             Text {
+              textFormat: Text.PlainText
               text: cell.chip ? cell.chip.text : ""
               color: cell.chip && cell.chip.kind === "dupe" ? Zenon.sand : Zenon.white
               font.family: Zenon.face
@@ -4996,6 +5000,7 @@ FloatingWindow {
           anchors.centerIn: parent
           spacing: 8
           Text {
+            textFormat: Text.PlainText
             text: pinned.chip ? pinned.chip.text : ""
             color: pinned.chip && pinned.chip.kind === "dupe" ? Zenon.sand : Zenon.white
             font.family: Zenon.face

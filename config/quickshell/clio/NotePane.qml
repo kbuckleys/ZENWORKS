@@ -341,6 +341,7 @@ Item {
         HeldRing { anchors.fill: parent; radius: parent.radius; z: 10; on: findField.activeFocus }
       }
       Text {
+        textFormat: Text.PlainText
         anchors.verticalCenter: parent.verticalCenter
         text: findField.text === "" ? "" : ed.findHits.length === 0 ? "None" : (ed.findAt + 1) + " of " + ed.findHits.length
         color: ed.findHits.length === 0 && findField.text !== "" ? Zenon.red : Zenon.accentMuted
